@@ -1,0 +1,96 @@
+# =============================================================================
+# DX-Lab — Git Ignore
+# Tuân thủ tiêu chí đánh giá PoF (Tiêu chí #4, #5)
+# =============================================================================
+
+# --- Môi trường & Bí mật (Secrets) -------------------------------------------
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+
+# --- Dữ liệu runtime & CSDL (không commit — do container sinh ra) ------------
+data/
+volumes/
+storage/
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.rdb
+
+# --- Bản dựng & Gói nén phát hành (Build & Archives) -------------------------
+dist/
+build/
+out/
+bin/
+*.tar.gz
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.sha256
+
+# --- Phụ thuộc (KHÔNG bundle mã nguồn dự án khác — tiêu chí PoF #5) ----------
+node_modules/
+vendor/
+third_party/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Tài liệu nhị phân & Thể lệ cuộc thi ------------------------------------
+public/*.pdf
+*.pdf
+
+# --- Docker overrides cục bộ -------------------------------------------------
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# --- Nhật ký & Tệp tạm -------------------------------------------------------
+*.log
+logs/
+tmp/
+temp/
+.cache/
+*.pid
+*.seed
+*.pid.lock
+
+# --- IDE & Hệ điều hành (OS) -------------------------------------------------
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+

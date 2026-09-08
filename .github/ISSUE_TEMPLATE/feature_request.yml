@@ -1,0 +1,63 @@
+# Copyright 2026 DX-Lab Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Đề xuất tính năng
+description: Đề xuất một tính năng hoặc cải tiến cho DX-Lab
+title: "[Đề xuất]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: space
+    attributes:
+      label: Không gian liên quan
+      options:
+        - "[H] Nhân sự"
+        - "[P] Quy trình"
+        - "[D] Dữ liệu"
+        - "[I] Trí tuệ nhân tạo"
+        - "Hạ tầng / trải nghiệm cài đặt"
+        - "Tài liệu"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Vấn đề vận hành cần giải quyết
+      description: Mô tả tình huống thực tế của người dùng, chưa cần nói tới giải pháp.
+      placeholder: |
+        Kế toán phải tự tổng hợp số liệu từ 3 nguồn mỗi cuối tháng, mất 2 ngày...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Giải pháp đề xuất
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Đối chiếu ràng buộc kiến trúc
+      description: Đề xuất phải tôn trọng các nguyên tắc trong CONTRIBUTING.md
+      options:
+        - label: Không yêu cầu fork và chỉnh sửa mã nguồn phần mềm thượng nguồn
+        - label: Không bundle mã nguồn dự án khác vào kho DX-Lab
+        - label: Không phụ thuộc thành phần nguồn đóng hoặc dịch vụ trả phí bắt buộc
+        - label: Tôn trọng lộ trình tuyến tính (không làm [I] khi [D] chưa sẵn sàng)
+        - label: Chạy được trong giới hạn tài nguyên của một SME (8 GB RAM)

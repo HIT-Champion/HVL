@@ -1,0 +1,95 @@
+# Copyright 2026 DX-Lab Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Kiểm tra tự động các điều kiện chấm điểm PoF trên mọi thay đổi.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  license:
+    name: Giấy phép (PoF #2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Có bản sao toàn văn giấy phép
+        run: |
+          test -f LICENSE || { echo "::error::Thiếu tệp LICENSE (toàn văn giấy phép)"; exit 1; }
+          grep -q "Apache License" LICENSE || { echo "::error::LICENSE không phải Apache-2.0"; exit 1; }
+          test -f NOTICE || { echo "::error::Thiếu NOTICE (thông báo mục đích giấy phép)"; exit 1; }
+
+      - name: Header giấy phép trong từng tệp mã
+        run: ./scripts/license-header.sh check
+
+      - name: Không bundle mã nguồn dự án khác
+        run: |
+          for d in vendor third_party node_modules; do
+            if git ls-files --error-unmatch "$d" >/dev/null 2>&1; then
+              echo "::error::Phát hiện thư mục bundle '$d' được commit — vi phạm tiêu chí PoF #5"
+              exit 1
+            fi
+          done
+          echo "Không có mã nguồn dự án khác bị bundle vào kho."
+
+  build:
+    name: Dựng từ mã nguồn (PoF #4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cấu hình được trước khi dựng, không sửa tệp mã
+        run: cp .env.example .env
+
+      - name: Cú pháp Docker Compose hợp lệ
+        run: docker compose config -q
+
+      - name: Mọi profile H/P/D/I đều phân giải được
+        run: |
+          for p in h p d i all; do
+            docker compose --profile "$p" config -q \
+              || { echo "::error::Profile '$p' không hợp lệ"; exit 1; }
+            echo "profile $p: hợp lệ"
+          done
+
+      - name: Script khả thi và đúng cú pháp
+        run: |
+          for f in scripts/*.sh; do
+            bash -n "$f" || { echo "::error::Lỗi cú pháp: $f"; exit 1; }
+            test -x "$f" || { echo "::error::Thiếu quyền thực thi: $f"; exit 1; }
+          done
+
+  docs:
+    name: Tài liệu (PoF #6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Có đủ tài liệu bắt buộc
+        run: |
+          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md; do
+            test -f "$f" || { echo "::error::Thiếu $f"; exit 1; }
+          done
+          echo "Đủ tài liệu bắt buộc."
+
+      - name: CHANGELOG có mục cho thay đổi chưa phát hành
+        run: |
+          grep -q "## \[Chưa phát hành\]" CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md thiếu mục [Chưa phát hành]"; exit 1; }
