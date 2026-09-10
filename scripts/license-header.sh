@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2026 DX-Lab Team
+# Copyright 2026 Mộc Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,8 +32,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-COPYRIGHT_HOLDER="${DXLAB_COPYRIGHT_HOLDER:-DX-Lab Team}"
-COPYRIGHT_YEAR="${DXLAB_COPYRIGHT_YEAR:-2026}"
+COPYRIGHT_HOLDER="${MOC_COPYRIGHT_HOLDER:-Mộc Team}"
+COPYRIGHT_YEAR="${MOC_COPYRIGHT_YEAR:-2026}"
 
 # Dấu hiệu nhận biết header đã tồn tại
 MARKER="SPDX-License-Identifier: Apache-2.0"
@@ -59,43 +59,94 @@ ${MARKER}
 EOF
 }
 
-# Ký tự mở đầu dòng chú thích theo phần mở rộng tệp
-comment_prefix_for() {
+# Kiểu chú thích theo loại tệp:
+#   "line <tiền tố>"  — chú thích từng dòng: #, //, --
+#   "html"            — khối <!-- ... -->  (Vue, HTML, XML, BPMN)
+#   "css"             — khối /* ... */     (CSS, SCSS, Less)
+#   ""                — loại tệp chưa hỗ trợ
+comment_style_for() {
   case "$1" in
-    *.sh|*.bash|*.py|*.yml|*.yaml|*.toml|*.cfg|*.conf|Makefile|Dockerfile|*.mk) echo "#" ;;
-    *.js|*.ts|*.jsx|*.tsx|*.go|*.java|*.c|*.h|*.cpp|*.rs|*.kt)                  echo "//" ;;
-    *.sql)                                                                       echo "--" ;;
+    *.sh|*.bash|*.py|*.yml|*.yaml|*.toml|*.cfg|*.conf|*.ini|*.graphql|*.gql|Makefile|*/Makefile|Dockerfile|*/Dockerfile|*.Dockerfile|*.mk)
+      echo "line #" ;;
+    *.js|*.mjs|*.cjs|*.ts|*.mts|*.cts|*.jsx|*.tsx|*.go|*.java|*.c|*.h|*.cpp|*.rs|*.kt)
+      echo "line //" ;;
+    *.sql|*.lua)
+      echo "line --" ;;
+    *.vue|*.html|*.htm|*.xml|*.bpmn|*.dmn)
+      echo "html" ;;
+    *.css|*.scss|*.less)
+      echo "css" ;;
     *) echo "" ;;
   esac
 }
 
-# Liệt kê tệp mã nguồn do dự án viết (Git theo dõi, bỏ qua tài liệu và dữ liệu)
+# Tệp không phải mã nguồn: tài liệu, dữ liệu, hình ảnh, phông chữ, cấu hình công cụ.
+# Mẫu bắt đầu bằng * để khớp cả tệp nằm trong thư mục con (vd. services/x/.dockerignore).
+# Định dạng JSON không có cú pháp chú thích nên không thể mang header.
+is_non_source() {
+  case "$1" in
+    *.md|*.txt|LICENSE|NOTICE|*.json|*.lock|*.csv|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.svg|\
+    *.woff|*.woff2|*.ttf|*.otf|*.gitkeep|*.gitignore|*.gitattributes|*.dockerignore|*.editorconfig|\
+    *.env.example|*.nvmrc|*.python-version)
+      return 0 ;;
+  esac
+  return 1
+}
+
+# Liệt kê tệp mã nguồn do dự án viết (Git theo dõi, bỏ qua tài liệu và dữ liệu).
+# Tệp có loại chưa hỗ trợ được ghi vào $UNSUPPORTED để cảnh báo thay vì bỏ qua im lặng.
+UNSUPPORTED="$(mktemp)"
+trap 'rm -f "$UNSUPPORTED"' EXIT
+
 source_files() {
   git ls-files -z 2>/dev/null | tr '\0' '\n' | while read -r f; do
     [ -f "$f" ] || continue
-    case "$f" in
-      *.md|*.txt|LICENSE|NOTICE|*.json|*.lock|*.png|*.jpg|*.pdf|*.svg|.gitignore|.editorconfig|.env.example)
-        continue ;;
-    esac
-    [ -n "$(comment_prefix_for "$f")" ] && echo "$f"
+    is_non_source "$f" && continue
+    if [ -n "$(comment_style_for "$f")" ]; then
+      echo "$f"
+    else
+      echo "$f" >> "$UNSUPPORTED"
+    fi
   done
 }
 
 has_header() { head -n 25 "$1" | grep -qF "$MARKER"; }
 
+# In header đã bọc chú thích theo kiểu của tệp
+render_header() {
+  local style="$1" kind prefix
+  read -r kind prefix <<< "$style"
+  case "$kind" in
+    line)
+      header_body | while IFS= read -r line; do
+        if [ -z "$line" ]; then printf '%s\n' "$prefix"; else printf '%s %s\n' "$prefix" "$line"; fi
+      done ;;
+    html)
+      printf '%s\n' "<!--"
+      header_body | while IFS= read -r line; do
+        if [ -z "$line" ]; then printf '\n'; else printf '  %s\n' "$line"; fi
+      done
+      printf '%s\n' "-->" ;;
+    css)
+      printf '%s\n' "/*"
+      header_body | while IFS= read -r line; do
+        if [ -z "$line" ]; then printf '%s\n' " *"; else printf ' * %s\n' "$line"; fi
+      done
+      printf '%s\n' " */" ;;
+  esac
+}
+
 insert_header() {
-  local file="$1" prefix="$2" tmp first_line=""
+  local file="$1" style="$2" tmp first_line=""
   tmp="$(mktemp)"
 
-  # Giữ nguyên dòng shebang hoặc chỉ thị đầu tệp nếu có
-  if head -n 1 "$file" | grep -qE '^(#!|<\?|// *@|# *-\*-)'; then
+  # Giữ nguyên dòng phải đứng đầu tệp: shebang, khai báo XML, DOCTYPE, chỉ thị biên dịch
+  if head -n 1 "$file" | grep -qiE '^(#!|<\?|<!doctype|// *@|# *-\*-)'; then
     first_line="$(head -n 1 "$file")"
     printf '%s\n' "$first_line" > "$tmp"
   fi
 
-  header_body | while IFS= read -r line; do
-    if [ -z "$line" ]; then printf '%s\n' "$prefix"; else printf '%s %s\n' "$prefix" "$line"; fi
-  done >> "$tmp"
+  render_header "$style" >> "$tmp"
   printf '\n' >> "$tmp"
 
   if [ -n "$first_line" ]; then tail -n +2 "$file" >> "$tmp"; else cat "$file" >> "$tmp"; fi
@@ -111,14 +162,27 @@ while IFS= read -r file; do
   [ -n "$file" ] || continue
   if has_header "$file"; then continue; fi
   missing=$((missing + 1))
-  prefix="$(comment_prefix_for "$file")"
   if [ "$mode" = "fix" ]; then
-    insert_header "$file" "$prefix"
+    insert_header "$file" "$(comment_style_for "$file")"
     echo "  đã chèn header: $file"
   else
     echo "  THIẾU header giấy phép: $file"
   fi
 done < <(source_files)
+
+# Cảnh báo tệp có loại chưa hỗ trợ: cần thêm kiểu chú thích vào comment_style_for,
+# hoặc khai báo là không phải mã nguồn trong is_non_source
+if [ -s "$UNSUPPORTED" ]; then
+  echo ""
+  echo "CẢNH BÁO — loại tệp chưa được script hỗ trợ, không kiểm tra được header:"
+  while IFS= read -r f; do
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+      echo "::warning file=$f::Loại tệp chưa được scripts/license-header.sh hỗ trợ"
+    else
+      echo "  ? $f"
+    fi
+  done < "$UNSUPPORTED"
+fi
 
 if [ "$mode" = "fix" ]; then
   echo "Hoàn tất: đã xử lý $missing tệp."
