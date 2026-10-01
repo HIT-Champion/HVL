@@ -1,6 +1,6 @@
 # Lịch sử thay đổi
 
-Mọi thay đổi đáng chú ý của DX-Lab được ghi lại trong tệp này.
+Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này.
 
 Định dạng theo [Keep a Changelog 1.1.0](https://keepachangelog.com/vi/1.1.0/),
 đánh phiên bản theo [Semantic Versioning 2.0.0](https://semver.org/lang/vi/).
@@ -16,6 +16,52 @@ Mọi thay đổi đáng chú ý của DX-Lab được ghi lại trong tệp nà
 - Mẫu báo lỗi / đề xuất tính năng và mẫu pull request.
 - Tài liệu: README, CONTRIBUTING, CODE_OF_CONDUCT, ROADMAP, DEPENDENCIES,
   tóm tắt đề bài OLP 2026, bảng tự chấm PoF.
+- Tài liệu nghiên cứu trước khi có đề thi, lưu ở `docs/nghien-cuu/`: chiến lược dự thi, hướng
+  triển khai, và bản kiểm chứng chủ đề 2026 (giáo trình DX-OS, giấy phép công cụ ứng viên, kho mã
+  các đội mùa trước).
+- Đặc tả nghiệp vụ DX-Safety (`docs/nghien-cuu/dac-ta-dx-safety.md`): sổ sự cố an toàn xưởng, bàn
+  phê duyệt ngoại lệ, đồng hồ H% đo từ dữ liệu vận hành, kịch bản demo.
+- Dự báo đề thi tháng 11/2026 (`docs/nghien-cuu/du-bao-de-thi-2026.md`): mô hình ba mùa, lĩnh vực
+  và chuẩn có thể bị ép, kiến trúc gói lĩnh vực để phòng; bổ sung bảng ba mùa vào chiến lược dự thi.
+- Kế hoạch 4 tuần cho vòng cấp trường (`docs/nghien-cuu/ke-hoach-vong-truong.md`): phạm vi tối
+  thiểu, lịch tuần, phân vai, cổng kiểm tra và danh sách cắt.
+- Dự báo đề thi, đợt bằng chứng 2: tác giả chủ đề và FDS, hộp cát Alpha Corporation kèm CSV mẫu,
+  đối chứng bài giới thiệu 2025; đổi gói lĩnh vực vòng trường sang DX-Ticket theo hộp cát.
+- Phân tích đề thi chính thức OLP PMNM 2026 (`docs/olp-2026-de-thi.md`), kế hoạch phát triển theo
+  phase (`docs/ke-hoach-phat-trien.md`) và quy trình Git của dự án (`docs/git_flow.md`).
+- `DEPENDENCIES.md`: danh mục đầy đủ phần mềm thượng nguồn kèm phiên bản ghim, giấy phép, cách nạp,
+  và các thành phần đã loại vì không mang giấy phép OSI.
+- Đặc tả sản phẩm (`docs/dac-ta-san-pham.md`): Văn phòng điện tử quản lý văn bản đến / đi theo Nghị định
+  30/2020/NĐ-CP và cổng xác thực văn bản bằng mã QR; so sánh phương án, đối chiếu kho mã công khai của
+  các đội khác, căn cứ pháp lý, kịch bản demo.
+- Bản nháp mô hình dữ liệu (`docs/mo-hinh-du-lieu.md`): schema `core` dùng chung và `office` của ứng dụng,
+  quyền theo vai trò, Hasura Actions, task BPMN, định dạng sự kiện.
+
+### Đã sửa đổi
+- Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,
+  làm rõ giới hạn kiểm tra PoF và phạm vi phát triển mã nguồn riêng.
+- README: phát biểu bài toán sản phẩm giải quyết (bài toán nền tảng và bài toán nghiệp vụ).
+- Đổi bài toán nghiệp vụ từ luồng phê duyệt đề xuất sang quản lý văn bản đến / đi: README, kế hoạch
+  phát triển (Phase 2–4, phân công, rủi ro), phân tích đề §6.2.
+- CONTRIBUTING và mẫu pull request: quy ước nhánh, commit và phạm vi theo `docs/git_flow.md`.
+- README, NOTICE, đặc tả sản phẩm §0: phát biểu sản phẩm theo thứ tự lõi trước, ứng dụng sau; nêu lớp
+  tin cậy dùng chung của lõi (danh tính, quét mã độc, sổ kiểm toán chuỗi băm, API xác thực).
+- Sổ kiểm toán chuỗi băm và cổng xác thực văn bản chuyển từ Should (Phase 3) lên Must (Phase 2): mã
+  F3.5 → F2.12, F3.6 → F2.13 trong kế hoạch, đặc tả và mô hình dữ liệu.
+- Kế hoạch §4: thay bảng RAM bằng danh mục tài nguyên cần có — con người, hạ tầng, tài khoản, dữ liệu,
+  kiến thức, chi phí, việc phải có trước `v0.1.0`.
+- Đổi tên sản phẩm từ DX-Lab sang **Mộc** (theo chữ "đóng mộc" — đóng dấu), vì "DX-Lab" là tên Trạm
+  thực hành số trong chủ đề cuộc thi và trùng ứng dụng của một đội khác. Tên kỹ thuật đổi theo:
+  Compose project, mạng và CSDL mặc định `moc`; biến môi trường `DXLAB_*` thành `MOC_*` (ai đã tạo
+  `.env` thì sửa theo); gói phát hành `moc-<phiên bản>.tar.gz`. README và mẫu issue trỏ về repo
+  `HIT-Champion/HVL`.
+- Kế hoạch: dời `v0.1.0` từ 21/10 sang 25/10 vì Phase 1 chưa bắt đầu; Phase 2 thành 26/10–08/11,
+  Phase 3 thành 09–20/11, Phase 4 (cũng là đệm) thành 21–25/11; giữ nguyên ngày đóng băng và ngày nộp.
+
+### Đã sửa lỗi
+- `scripts/license-header.sh` bỏ qua im lặng các tệp `.vue`, `.html`, `.xml`, `.bpmn`, `.css`,
+  `.scss`, `.mjs`, `.graphql`, `.lua` — các tệp này giờ được kiểm tra và tự chèn header; loại tệp
+  chưa hỗ trợ được in ra dưới dạng cảnh báo.
 
 <!--
 Mẫu cho bản phát hành kế tiếp:

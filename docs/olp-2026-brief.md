@@ -1,8 +1,18 @@
 # OLP PMNM 2026 — Bản tóm tắt nền
 
-> Nguồn: `public/Quick-guide-to-DXOS.pdf` (giới thiệu mô hình DX-OS & chủ đề thi) và
-> `public/Thể lệ cuộc thi phần mềm nguồn mở - OLP 2026.pdf` (thể lệ chính thức).
-> Tổng hợp ngày 31/08/2026.
+> Tổng hợp ngày 31/08/2026. Rà soát ngày 09/09/2026 theo hai bài đăng của VFOSSA
+> (ngày 09/06/2026):
+>
+> - [Giới thiệu mô hình DX-OS và chủ đề cuộc thi](https://vfossa.vn/tin-tuc/gioi-thieu-mo-hinh-dx-os-va-chu-de-cuoc-thi-phan-mem-nguon-mo-olp-2026-761.html)
+> - [Thể lệ OLP Phần mềm nguồn mở năm 2026](https://vfossa.vn/tin-tuc/the-le-olp-phan-mem-nguon-mo-nam-2026-760.html)
+>
+> Việc rà soát dựa trên bản HTML lưu cục bộ của hai bài trên, đặt trong thư mục `publics/`.
+> Thư mục này **không kèm trong repo** (đã đưa vào `.gitignore`) để tránh phân phối lại
+> tài liệu của BTC; hãy dùng hai liên kết gốc ở trên khi cần đối chiếu.
+>
+> Mục 1–2 tóm tắt bài giới thiệu; mục 3–4 tóm tắt thể lệ; mục 5–6 là nhận định và
+> đề xuất của đội. Chưa đối chiếu toàn văn giáo trình DX-OS hoặc các cập nhật trực tuyến
+> sau bản lưu. Khi có đề thi và thông báo mới, cần cập nhật lại phạm vi sản phẩm.
 
 ---
 
@@ -11,9 +21,12 @@
 - **Chủ đề 2026**: Xây dựng **Hệ điều hành Doanh nghiệp số (DX-OS)** — cụ thể là một
   **Trạm thực hành số (DX-Lab)** theo kiến trúc **Open-Core**, mô phỏng đủ 4 không gian **H-P-D-I**.
 - **Thang điểm 100** = **50đ PoF** (chấm kho mã nguồn, 7–9/12/2026) + **50đ sản phẩm** (chấm chung kết 10/12/2026).
-- **50đ PoF gần như không liên quan tới tính năng phần mềm** — đó là kỷ luật hạ tầng dự án nguồn mở
-  (license, release, build from source, bundling, tài liệu). Chuẩn bị được **ngay từ bây giờ**, trước khi có đề.
-- **Đề thi công bố tháng 11/2026**, tức chỉ ~1 tháng để code. Cửa sổ 9–11/2026 là để dựng sẵn khung + hạ tầng repo.
+- **50đ PoF đánh giá nền tảng và khả năng sử dụng của dự án nguồn mở**: giấy phép, quản lý mã nguồn,
+  bản phát hành, cài đặt từ mã nguồn, phụ thuộc và tài liệu. Có thể chuẩn bị trước nhiều hạng mục,
+  nhưng phải nghiệm thu trên sản phẩm thực tế; bộ khung và CI chưa bảo đảm đạt đủ điểm.
+- **Theo lịch đã công bố, đề thi ra tháng 11/2026**, khoảng một tháng trước chung kết.
+  Đội đề xuất tận dụng thời gian trước đó để khảo sát công cụ, thử tích hợp và chuẩn bị hạ tầng;
+  phạm vi nghiệp vụ cuối cùng cần bám đề thi cụ thể.
 
 ---
 
@@ -23,8 +36,8 @@
 
 Chuyển đổi số (CĐS) hiện đang mắc bẫy **"ảo tưởng công nghệ"**: tổ chức đổ tiền mua hàng loạt phần mềm đắt đỏ nhưng nhân sự vẫn làm việc theo thói quen cũ — nhắn tin rải rác, báo cáo thủ công. Hệ quả là dữ liệu sinh ra bị giam trong các **ốc đảo thông tin** rời rạc và thất bại trong việc giải quyết bài toán chiến lược. Áp lực này đè lên cả tầng quản lý vĩ mô của Chính phủ lẫn hơn **900.000 SME** trên cả nước.
 
-Luận điểm gốc của giáo trình *"Xây dựng Hệ điều hành Doanh nghiệp số: Từ Tư duy đến Hành động
-(DX-OS in Action)"*:
+Bài giới thiệu trình bày luận điểm của giáo trình *"Xây dựng Hệ điều hành Doanh nghiệp số:
+Từ Tư duy đến Hành động (DX-OS in Action)"*:
 
 > **CĐS về bản chất là quá trình chuyển giao quyền kiểm soát từ thao tác thủ công của con người
 > sang các thuật toán tự động.**
@@ -53,6 +66,9 @@ tỷ lệ thao tác tay của nhân sự (hằng số **[H]**) sụt từ **100%
 vai trò sang: thiết kế luồng thuật toán · kiểm soát chất lượng hệ thống · giám sát rào chắn đạo đức ·
 phê duyệt ngoại lệ.
 
+Mức 10–20% là mô tả trong bài giới thiệu mô hình; thể lệ đã lưu chưa quy định đây là ngưỡng
+nghiệm thu hay chỉ tiêu chấm điểm bắt buộc. Nếu dùng làm mục tiêu demo, đội cần định nghĩa cách đo.
+
 ---
 
 ## 2. Chủ đề cuộc thi: Xây dựng DX-Lab
@@ -69,8 +85,8 @@ triệt để các bài toán vận hành của doanh nghiệp.
 BTC yêu cầu **chủ động kết hợp** các nền tảng đã khai thác ở các kỳ OLP trước thành một cỗ máy vận
 hành hoàn chỉnh:
 
-| Chủ đề cũ      | Công nghệ                                 | Ánh xạ vào DX-Lab                                                                                 |
-| ------------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Chủ đề cũ      | Công nghệ                                 | Ánh xạ vào DX-Lab                                                                           |
+| ------------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | **OLP 2024** | Nền tảng**Low-code/No-code (LCDP)** | Xây biểu mẫu nhập liệu, thiết lập CSDL quan hệ, tạo rào chắn kỹ thuật tại**[P]** |
 | **OLP 2025** | **Dữ liệu mở liên kết (LOD)**    | Chuẩn hóa cấu trúc siêu dữ liệu, hình thành Nguồn sự thật duy nhất cho**[D]**     |
 | **OLP 2023** | **LLM + RAG**                         | Xây tác tử thông minh, tự động hóa quy trình ra quyết định tại**[I]**             |
@@ -130,8 +146,8 @@ Toàn văn giáo trình: [https://opendigitransform.gitbook.io/dx-os](https://op
 | **10/12/2026**     | Trình diễn sản phẩm & chấm chung kết                           |
 | 11/12/2026               | Công bố trao giải                                                 |
 
-> **Tình trạng tại 31/08/2026**: còn ~2 tháng trước khi có đề, ~3,5 tháng tới hạn cuối.
-> Đây là cửa sổ vàng để dựng sẵn khung DX-Lab và hoàn thiện hạ tầng repo ăn trọn 50đ PoF.
+> **Kế hoạch của đội tại 09/09/2026:** chuẩn bị nền tảng nguồn mở và thử nghiệm tích hợp trước
+> tháng 11; đối chiếu đề thi khi công bố và nghiệm thu sản phẩm trước đợt chấm repo ngày 7–9/12.
 
 ### 3.2. Điều kiện cần (loại từ vòng gửi xe)
 
@@ -145,23 +161,23 @@ Toàn văn giáo trình: [https://opendigitransform.gitbook.io/dx-os](https://op
 
 ### Phần I — Tiêu chí dựa trên PoF: **50đ** (chấm **trước** buổi chung kết)
 
-| # | Tiêu chí                                                        | Tối đa     | Các mức trừ điểm                                                                                                                                                                                                                                                                                                                       | Ghi chú BTC                                                               |
-| - | ----------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1 | Sử dụng hệ thống quản lý mã nguồn trên Internet          | **5**  | không có web viewer**−3**không được truy cập mở **−3**có repo nhưng thực tế không dùng **−5**                                                                                                                                                                                                            | Có thể truy cập kho mã nguồn từ Internet                             |
-| 2 | Cấp phép PMNM theo giấy phép OSI-approved                     | **10** | license không ghi trong**từng tệp mã** **−5**mã nguồn tự thân chứa **xung đột giấy phép** **−5**không có thông báo về mục đích giấy phép **−5**không có **bản sao toàn văn** giấy phép **−5**                                                                   | Sản phẩm có giấy phép mở**và giải quyết đúng đầu bài** |
-| 3 | Có ít nhất một**release** làm sản phẩm dự thi       | **5**  | không có phát hành**−5**không phát hành theo phiên bản **−3**dùng **định dạng không mở** (.zip, .rar, .arj…) **−3**                                                                                                                                                                              | Release đầu tiên phải tạo**trước thời điểm nộp bài**     |
-| 4 | Cài đặt, dịch từ mã nguồn (**Building From Source**) | **10** | không có hướng dẫn build**−5**cấu hình bằng cách **sửa tay file header** **−5**không configure được trước khi dịch **−5**dịch bằng **công cụ nguồn đóng/tự tạo** **−5**chương trình không chạy được nếu **nằm ngoài thư mục mã nguồn** **−5** | Sản phẩm phải cho phép cài đặt, biên dịch được từ mã nguồn  |
-| 5 | Sử dụng thư viện và gói đính kèm (**bundling**)    | **10** | không cố gắng dùng thư viện**sẵn có trong hệ thống** **−5**phát hành **kèm gói của dự án khác** mà nó phụ thuộc **−5****mã nguồn gói đính kèm đã bị chỉnh sửa** **−5**                                                                                              | Có thông tin làm rõ các thư viện, gói đính kèm được dùng    |
-| 6 | Tài liệu và giao tiếp                                         | **10** | không có**bug tracker** **−5**không có **changelog** **−5**không có **README**/hướng dẫn **−5**                                                                                                                                                                                             | Tài liệu rõ ràng, thực hiện được                                  |
+| # | Tiêu chí                                                        | Tối đa     | Các mức trừ điểm                                                                                                                                                                                                                                                                                                                | Ghi chú BTC                                                               |
+| - | ----------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| 1 | Sử dụng hệ thống quản lý mã nguồn trên Internet          | **5**  | không có web viewer **−3** · không được truy cập mở **−3** · có repo nhưng thực tế không dùng **−5**                                                                                                                                                                                                            | Có thể truy cập kho mã nguồn từ Internet                             |
+| 2 | Cấp phép PMNM theo giấy phép OSI-approved                     | **10** | license không ghi trong **từng tệp mã** **−5** · mã nguồn tự thân chứa **xung đột giấy phép** **−5** · không có thông báo về mục đích giấy phép **−5** · không có **bản sao toàn văn** giấy phép **−5**                                                            | Sản phẩm có giấy phép mở **và giải quyết đúng đầu bài** |
+| 3 | Có ít nhất một **release** làm sản phẩm dự thi       | **5**  | không có phát hành **−5** · không phát hành theo phiên bản **−3** · dùng **định dạng không mở** (.zip, .rar, .arj…) **−3**                                                                                                                                                                              | Release đầu tiên phải tạo **trước thời điểm nộp bài**     |
+| 4 | Cài đặt, dịch từ mã nguồn (**Building From Source**) | **10** | không có hướng dẫn build **−5** · cấu hình bằng cách **sửa tay file header** **−5** · không configure được trước khi dịch **−5** · dịch bằng **công cụ nguồn đóng/tự tạo** **−5** · chương trình không chạy được nếu **nằm ngoài thư mục mã nguồn** **−5** | Sản phẩm phải cho phép cài đặt, biên dịch được từ mã nguồn  |
+| 5 | Sử dụng thư viện và gói đính kèm (**bundling**)    | **10** | không cố gắng dùng thư viện **sẵn có trong hệ thống** **−5** · phát hành **kèm gói của dự án khác** mà nó phụ thuộc **−5** · **mã nguồn gói đính kèm đã bị chỉnh sửa** **−5**                                                                                             | Có thông tin làm rõ các thư viện, gói đính kèm được dùng    |
+| 6 | Tài liệu và giao tiếp                                         | **10** | không có **bug tracker** **−5** · không có **changelog** **−5** · không có **README**/hướng dẫn **−5**                                                                                                                                                                                      | Tài liệu rõ ràng, thực hiện được                                  |
 
 ### Phần II — Tiêu chí dựa trên sản phẩm: **50đ** (chấm **trong** buổi chung kết)
 
 | #  | Tiêu chí                                                                       | Tối đa | Căn cứ chấm                                                |
 | -- | -------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------- |
 | 7  | **Tính nguyên gốc** của giải pháp kỹ thuật                         | 10       | Kết quả trình bày về sự sáng tạo của đội thi       |
-| 8  | **Mức độ hoàn thiện** của sản phẩm                                 | 10       | Kết quả**chạy trình diễn** sản phẩm              |
-| 9  | Mức độ**sử dụng thân thiện**                                        | 10       | Các tiện ích của sản phẩm đối với người dùng      |
-| 10 | Mức độ**phát triển bền vững**                                       | 10       | Tài liệu kỹ thuật, công cụ hỗ trợ công bố kèm theo |
+| 8  | **Mức độ hoàn thiện** của sản phẩm                                 | 10       | Kết quả **chạy trình diễn** sản phẩm              |
+| 9  | Mức độ **sử dụng thân thiện**                                        | 10       | Các tiện ích của sản phẩm đối với người dùng      |
+| 10 | Mức độ **phát triển bền vững**                                       | 10       | Tài liệu kỹ thuật, công cụ hỗ trợ công bố kèm theo |
 | 11 | **Phong cách trình diễn** & khả năng thu hút cộng đồng nguồn mở | 10       | Showcase trình diễn sản phẩm tại cuộc thi               |
 
 **Nguồn gốc bộ tiêu chí PoF:**
@@ -174,39 +190,60 @@ Toàn văn giáo trình: [https://opendigitransform.gitbook.io/dx-os](https://op
 
 ---
 
-## 5. Nhận định chiến lược (rút ra từ việc ghép hai tài liệu)
+## 5. Nhận định và đề xuất của đội
 
-1. **Một nửa số điểm không nằm ở code.**
-   50đ PoF là checklist kỷ luật hạ tầng dự án nguồn mở: license header trong **từng file**, LICENSE toàn
-   văn, CHANGELOG, README, bug tracker (Issues), release có tag semver bằng **định dạng mở**
-   (`.tar.gz`, không `.zip`). Hoàn toàn có thể tự động hóa bằng CI **trước khi biết đề**.
-2. **Bẫy "bundling" mâu thuẫn trực tiếp với bản chất DX-Lab.**
-   Sản phẩm là ghép nhiều nền tảng open-core, nhưng tiêu chí 5 trừ điểm nếu *phát hành kèm gói của dự
-   án khác mà nó phụ thuộc* hoặc *sửa mã nguồn gói đính kèm*.
-   ⇒ Kiến trúc phải là **orchestration**: `docker compose` kéo image upstream **nguyên bản**; mọi tùy
-   biến nằm ở lớp config / plugin / adapter của riêng đội. **Tuyệt đối không fork-và-sửa** vào cây mã
-   upstream. Cần một trang tài liệu liệt kê rõ mọi dependency + giấy phép của chúng (tránh cả bẫy
-   "xung đột giấy phép" ở tiêu chí 2).
-3. **Docker được BTC khuyến khích rõ ràng** để đóng gói DX-Lab — nhưng vẫn phải giữ đường
-   **build from source** có hướng dẫn đầy đủ và configure được (tiêu chí 4), và chương trình phải chạy
-   được **ngoài thư mục mã nguồn**.
-4. **"Tính nguyên gốc" nằm ở lớp keo, không ở lớp component.**
-   Ai cũng dùng các nền tảng open-source sẵn có, nên điểm sáng tạo đến từ: cách ánh xạ nghiệp vụ vào
-   H-P-D-I, event bus nối [P] → [D], và tác tử [I] tiêu thụ đúng dữ liệu do chính [P] sinh ra.
-5. **Kịch bản demo phải chứng minh tính tuyến tính.**
-   Một nghiệp vụ chạy end-to-end xuyên **[H] → [P] → [D] → [I]** sẽ ăn điểm hơn hẳn 4 module rời rạc —
-   đúng tinh thần "không nhảy cóc lên AI" của giáo trình. Nên chọn một quy trình SME cụ thể, đủ nhỏ để
-   chạy trọn vẹn.
-6. **20đ cho bền vững + thu hút cộng đồng** đòi tài liệu kỹ thuật, roadmap, CONTRIBUTING và một
-   showcase thuyết phục. Phải chuẩn bị song song với code, không để dồn đến tháng 12.
+Các đề xuất dưới đây nhằm triển khai chủ đề và giảm rủi ro khi dự thi. Chúng không bổ sung
+quy định của BTC và không bảo đảm mức điểm cụ thể.
+
+1. **Chuẩn bị sớm nền tảng đáp ứng PoF, nghiệm thu trên sản phẩm hoàn chỉnh.**
+   Đội có thể dựng trước LICENSE, thông báo giấy phép trong từng tệp mã, CHANGELOG, README,
+   bug tracker và quy trình phát hành. CI hỗ trợ kiểm tra tự động một phần; vẫn cần kiểm chứng
+   cài đặt/build thực tế, truy cập repo công khai, lịch sử sử dụng repo, bản phát hành thật và
+   tính tương thích giấy phép. Tiêu chí #2 còn ghi sản phẩm phải giải quyết đúng đầu bài.
+   Đội chọn tag **SemVer** và gói **`.tar.gz`** để quản lý phát hành; thể lệ yêu cầu phát hành
+   theo phiên bản và định dạng mở, không chỉ định SemVer. Ví dụ `.zip` trong bảng điểm được
+   giữ theo cách phân loại của thể lệ, không phải kết luận kỹ thuật chung về định dạng ZIP.
+2. **Ưu tiên điều phối upstream nguyên bản để giảm rủi ro bundling.**
+   Tiêu chí #5 nêu mức trừ cho phát hành kèm gói phụ thuộc và chỉnh sửa mã nguồn gói đính kèm.
+   Đội chọn Docker Compose kéo image upstream nguyên bản, đặt tùy biến trong cấu hình,
+   plugin hoặc adapter riêng, đồng thời ghi dependency và giấy phép trong `DEPENDENCIES.md`.
+   Đây là chính sách kiến trúc của đội; hai tài liệu nguồn chưa đủ để kết luận Compose là
+   phương án bắt buộc hoặc mọi hình thức fork đều bị cấm. Danh mục dependency cũng cần đi kèm
+   kiểm tra cách sử dụng và nghĩa vụ giấy phép của từng thành phần.
+3. **Dùng Docker kèm quy trình cài đặt từ mã nguồn có thể kiểm chứng.**
+   Bài giới thiệu khuyến khích container hóa bằng Docker. Đội vẫn phải đáp ứng tiêu chí #4:
+   hướng dẫn đầy đủ, cấu hình trước khi build, dùng công cụ nguồn mở và chạy được ngoài thư mục
+   mã nguồn. Chỉ có Compose kéo image dựng sẵn chưa chứng minh đầy đủ khả năng build từ mã nguồn;
+   cần mô tả rõ cách dựng phần đội phát triển và cách lấy/dựng các thành phần phụ thuộc.
+4. **Đầu tư vào tích hợp và phần nghiệp vụ tạo giá trị.**
+   Đội đề xuất tập trung vào ánh xạ nghiệp vụ H-P-D-I, chuẩn hóa dữ liệu, kết nối sự kiện và
+   tác tử thực hiện hành động có kiểm soát. Tiêu chí tính nguyên gốc không giới hạn sáng tạo
+   ở lớp tích hợp: đội có thể tự viết module nghiệp vụ, giao diện, cơ chế kiểm soát dữ liệu
+   hoặc tác tử khi cần. Hai tài liệu đã đọc không quy định lượng code tối thiểu; phần tự viết
+   cần phục vụ bài toán và phối hợp được với nền tảng nguồn mở đã chọn.
+5. **Chọn một nghiệp vụ xuyên bốn trục làm kịch bản demo.**
+   Đội đề xuất một quy trình SME đủ nhỏ để chạy trọn vòng đời **[H] → [P] → [D] → [I]**, cho thấy
+   dữ liệu đầu vào được kiểm soát, quy trình phát sinh dữ liệu thống nhất và AI sử dụng dữ liệu
+   đó để hành động. Cách này giúp thể hiện rõ tinh thần của mô hình; điểm thực tế vẫn phụ thuộc
+   yêu cầu đề thi, mức độ hoàn thiện và đánh giá của giám khảo.
+6. **Chuẩn bị tài liệu và khả năng trình diễn song song với triển khai.**
+   Hai tiêu chí bền vững và trình diễn/thu hút cộng đồng có tổng tối đa 20đ. Đội đề xuất dùng
+   tài liệu kỹ thuật, ROADMAP, CONTRIBUTING, hướng dẫn vận hành và showcase làm bằng chứng.
+   Thể lệ không quy định bắt buộc đầy đủ các tên tệp này hoặc mặc định có chúng là đạt đủ điểm.
 
 ---
 
-## 6. Việc cần làm tiếp
+## 6. Việc cần làm tiếp (kế hoạch của đội)
 
-- [ ] Dựng skeleton repo ăn trọn 50đ PoF (LICENSE toàn văn + SPDX header CI, CHANGELOG,
-  README, Issues bật sẵn, release workflow xuất `.tar.gz` có tag semver).
+- [ ] Rà soát bộ khung repo đã có: LICENSE, header giấy phép, CHANGELOG, README, CI và workflow
+  phát hành; bổ sung bằng chứng theo `docs/pof-checklist.md`, không tự chấm đủ điểm từ bộ khung.
+- [ ] Kiểm chứng repo công khai và bug tracker được sử dụng thực tế; tạo bản phát hành có phiên bản
+  trước thời điểm nộp bài.
 - [ ] Chốt stack open-source cụ thể cho từng trục H / P / D / I, kèm bảng giấy phép để kiểm tra
   tương thích.
-- [ ] Chọn 1 kịch bản nghiệp vụ SME chạy xuyên 4 trục làm xương sống cho demo.
-- [ ] Đăng ký đội (≤3 SV + 1 giảng viên) và theo dõi mốc công bố đề tháng 11/2026.
+- [ ] Chọn 1 kịch bản nghiệp vụ SME chạy xuyên 4 trục để thử nghiệm; xác định phần dùng sẵn,
+  phần cấu hình và phần cần tự code.
+- [ ] Nghiệm thu cài đặt/build trên môi trường sạch, cấu hình trước khi dựng và khả năng chạy ngoài
+  thư mục mã nguồn; cập nhật hướng dẫn theo kết quả thực tế.
+- [ ] Đăng ký đội (≤3 SV + 1 giảng viên), theo dõi đề thi tháng 11/2026 và các thông báo mới của BTC;
+  điều chỉnh phạm vi sản phẩm và checklist theo yêu cầu chính thức.
