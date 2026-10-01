@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Signet — Văn phòng điện tử (Tầng 2)",
+  "description": "Signet \u2014 V\u0103n ph\u00f2ng \u0111i\u1ec7n t\u1eed (T\u1ea7ng 2)",
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt generate",
-    "typecheck": "nuxt typecheck",
-    "test": "node --test tests/*.test.ts",
-    "postinstall": "nuxt prepare"
+    "test": "node --test tests/*.test.js",
+    "postinstall": "nuxt prepare",
+    "check": "node scripts/check.mjs",
+    "preview": "nuxt preview"
   },
   "dependencies": {
     "echarts": "6.1.0",

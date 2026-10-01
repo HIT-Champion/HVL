@@ -1,3 +1,9 @@
 .nuxt/
 .output/
 node_modules/
+dist/
+.cache/
+.taste-skill/
+.env
+.env.*
+!.env.example
