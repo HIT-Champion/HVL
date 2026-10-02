@@ -14,24 +14,16 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { createI18n } from 'vue-i18n'
-import en from '~/locales/en.json'
-import vi from '~/locales/vi.json'
-
-// Khóa i18n từ ngày đầu (F2.9). Ngôn ngữ chọn được lưu trên trình duyệt.
-export default defineNuxtPlugin((nuxtApp) => {
-  let saved: string | null = null
-  try {
-    saved = localStorage.getItem('moc.locale')
-  } catch {
-    // trình duyệt chặn bộ nhớ cục bộ: dùng tiếng Việt
+// Mọi trang cần đăng nhập, trừ trang nhận kết quả đăng nhập từ Keycloak và cổng xác thực văn bản (công khai).
+export default defineNuxtRouteMiddleware(async to => {
+  if (import.meta.dev && to.name === 'fe-preview') return;
+  if (to.path.replace(/\/$/, '') === '/dang-nhap') return;
+  if (to.path === '/xac-thuc' || to.path.startsWith('/xac-thuc/')) return;
+  const auth = useAuth();
+  if (auth.user.value && !auth.user.value.expired) return;
+  const restored = await auth.restore();
+  if (!restored) {
+    await auth.login(to.fullPath);
+    return abortNavigation();
   }
-  const i18n = createI18n({
-    legacy: false,
-    globalInjection: true,
-    locale: saved === 'en' ? 'en' : 'vi',
-    fallbackLocale: 'vi',
-    messages: { vi, en },
-  })
-  nuxtApp.vueApp.use(i18n)
-})
+});
