@@ -16,21 +16,21 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
+<script setup>
 // Keycloak chuyển về đây sau khi đăng nhập (redirect_uri); đổi mã lấy token rồi về trang đang mở dở.
-definePageMeta({ layout: false })
-
-const auth = useAuth()
-const router = useRouter()
-const failed = ref(false)
-
+definePageMeta({
+  layout: false
+});
+const auth = useAuth();
+const router = useRouter();
+const failed = ref(false);
 onMounted(async () => {
   try {
-    await router.replace(await auth.finishLogin())
+    await router.replace(await auth.finishLogin());
   } catch {
-    failed.value = true
+    failed.value = true;
   }
-})
+});
 </script>
 
 <template>
