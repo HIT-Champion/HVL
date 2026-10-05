@@ -1,5 +1,5 @@
 # =============================================================================
-# DX-Lab — Git Ignore
+# Mộc — Git Ignore
 # Tuân thủ tiêu chí đánh giá PoF (Tiêu chí #4, #5)
 # =============================================================================
 
@@ -16,15 +16,18 @@
 *.p12
 
 # --- Dữ liệu runtime & CSDL (không commit — do container sinh ra) ------------
-data/
-volumes/
-storage/
+# Neo ở gốc repo: thư mục mã nguồn trùng tên (vd. seed/data/) vẫn được theo dõi.
+/data/
+/volumes/
+/storage/
+/backups/
 *.db
 *.sqlite
 *.sqlite3
-*.sql
 *.dump
 *.rdb
+# Không bỏ qua *.sql: migration trong db/migrations/ là mã nguồn. Bản sao lưu
+# nằm trong /backups/ hoặc ở dạng nén (*.gz, đã bỏ qua ở dưới).
 
 # --- Bản dựng & Gói nén phát hành (Build & Archives) -------------------------
 dist/
@@ -94,3 +97,10 @@ Desktop.ini
 *.swp
 *.swo
 
+
+# Bản lưu cục bộ của tài liệu BTC (không phân phối lại)
+publics/
+
+# Tài liệu nội bộ của đội — không đưa lên repo công khai (ví dụ TEAM.local.md)
+*.local.md
+/COMMIT.md

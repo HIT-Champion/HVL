@@ -1,24 +1,38 @@
+<!--
+Tiêu đề PR phải theo Conventional Commits, ví dụ:
+  feat(workflow): thêm bước giám đốc duyệt khi số tiền vượt ngưỡng
+Khi gộp bằng "Squash and merge", tiêu đề này trở thành commit trên main.
+Xem docs/git_flow.md.
+-->
+
 ## Nội dung thay đổi
 
-<!-- Mô tả ngắn gọn thay đổi này làm gì và vì sao cần thiết. -->
+<!-- Mô tả ngắn gọn thay đổi này làm gì và VÌ SAO cần thiết. -->
 
-## Không gian liên quan
+Closes #
 
-- [ ] [H] Nhân sự
-- [ ] [P] Quy trình
-- [ ] [D] Dữ liệu
-- [ ] [I] Trí tuệ nhân tạo
-- [ ] Hạ tầng / tài liệu
+## Mảng và thành phần
+
+- [ ] Backend
+- [ ] AI
+- [ ] Frontend
+- [ ] Hạ tầng / CI / tài liệu chung
+
+<!-- Thành phần chính (phạm vi commit): gateway · auth · db · workflow · files · realtime · office · ai · data · ops · cli · ci · deps · docs · release -->
 
 ## Danh mục kiểm tra
 
-- [ ] `make license-check` chạy sạch — mọi tệp mã mới đều có header Apache-2.0
+- [ ] Tiêu đề PR theo Conventional Commits; mô tả có `Closes #<số-issue>`
+- [ ] *(Thành viên đội)* Đã gắn nhãn mảng và milestone của phase hiện tại
+- [ ] `make license-check` chạy sạch, không có CẢNH BÁO loại tệp chưa hỗ trợ
 - [ ] `make check` chạy sạch — cấu hình Compose hợp lệ
+- [ ] Đã thêm hoặc cập nhật test cho phần thay đổi (nếu có thể kiểm thử)
+- [ ] Tài liệu của tính năng được cập nhật **trong chính PR này**
 - [ ] Tham số cấu hình mới (nếu có) đã được khai báo trong `.env.example` kèm chú thích
-- [ ] `CHANGELOG.md` mục `[Chưa phát hành]` đã được cập nhật
-- [ ] Phần mềm thượng nguồn mới (nếu có) đã được ghi vào `DEPENDENCIES.md` kèm giấy phép
+- [ ] `CHANGELOG.md` mục `[Chưa phát hành]` đã được cập nhật (với thay đổi người dùng thấy được)
+- [ ] Phần mềm thượng nguồn mới (nếu có) đã được ghi vào `DEPENDENCIES.md` kèm giấy phép OSI
 - [ ] Không fork-sửa và không bundle mã nguồn của dự án thượng nguồn nào
-- [ ] Thay đổi không phá vỡ nguyên tắc tuyến tính [H] → [P] → [D] → [I]
+- [ ] Không có bí mật, `.env`, dữ liệu thật, trọng số mô hình trong thay đổi
 
 ## Cách kiểm chứng
 
