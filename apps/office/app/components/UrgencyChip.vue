@@ -16,13 +16,19 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-const props = defineProps<{ urgency: string; quiet?: boolean }>()
-const tone: Record<string, string> = {
+<script setup>
+const props = defineProps({
+  urgency: {
+    type: String,
+    required: true
+  },
+  quiet: Boolean
+});
+const tone = {
   khan: 'bg-amber-100 text-amber-900 ring-1 ring-amber-300',
   thuong_khan: 'bg-orange-100 text-orange-900 ring-1 ring-orange-300',
-  hoa_toc: 'bg-red-100 text-red-800 ring-1 ring-red-300',
-}
+  hoa_toc: 'bg-red-100 text-red-800 ring-1 ring-red-300'
+};
 </script>
 
 <template>

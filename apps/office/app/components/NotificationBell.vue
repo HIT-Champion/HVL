@@ -16,44 +16,52 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import type { AppNotification } from '~/composables/useNotifications'
-
+<script setup>
+import { useI18n } from 'vue-i18n';
 // Chuông thông báo trên thanh trên: số chưa đọc, 20 tin mới nhất, chấm xanh khi đang nhận tin trực tiếp
-const { t } = useI18n()
-const { items, unread, markRead, markAllRead } = useNotifications()
-const { state } = useRealtime()
-const notice = useNotice()
-const open = ref(false)
-const root = ref<HTMLElement | null>(null)
-
-function outside(e: MouseEvent) {
-  if (open.value && root.value && !root.value.contains(e.target as Node)) open.value = false
+const {
+  t
+} = useI18n();
+const {
+  items,
+  unread,
+  markRead,
+  markAllRead
+} = useNotifications();
+const {
+  state
+} = useRealtime();
+const notice = useNotice();
+const open = ref(false);
+const polling = import.meta.dev;
+const root = ref(null);
+function outside(e) {
+  if (open.value && root.value && !root.value.contains(e.target)) open.value = false;
 }
-onMounted(() => document.addEventListener('click', outside))
-onBeforeUnmount(() => document.removeEventListener('click', outside))
-
-const URGENT = new Set(['task.overdue', 'task.escalated', 'document.overdue', 'ot.alarm'])
-const rows = computed(() => items.value.map((n) => ({ n, ...describeNotification(t, n), urgent: URGENT.has(n.kind) })))
-
-async function go(n: AppNotification) {
-  open.value = false
-  markRead(n).catch(() => { /* lần sau tải lại vẫn thấy chưa đọc */ })
-  if (n.document_id) await navigateTo(`/van-ban/${n.document_id}`)
+onMounted(() => document.addEventListener('click', outside));
+onBeforeUnmount(() => document.removeEventListener('click', outside));
+const URGENT = new Set(['task.overdue', 'task.escalated', 'document.overdue', 'ot.alarm']);
+const rows = computed(() => items.value.map(n => ({
+  n,
+  ...describeNotification(t, n),
+  urgent: URGENT.has(n.kind)
+})));
+async function go(n) {
+  open.value = false;
+  markRead(n).catch(() => {/* lần sau tải lại vẫn thấy chưa đọc */});
+  if (n.document_id) await navigateTo(`/van-ban/${n.document_id}`);
 }
-
 async function readAll() {
   try {
-    await markAllRead()
+    await markAllRead();
   } catch (e) {
-    notice.error(errorText(t, e))
+    notice.error(errorText(t, e));
   }
 }
 </script>
 
 <template>
-  <div ref="root" class="relative">
+  <div ref="root" class="relative" @keydown.esc.stop="open = false">
     <button
       class="btn-ghost relative" :aria-label="t('notify.title')" :aria-expanded="open" data-testid="notification-bell"
       @click="open = !open"
@@ -82,7 +90,7 @@ async function readAll() {
         </button>
       </div>
       <p class="border-b border-stone-100 px-4 py-2 text-xs" :class="state === 'online' ? 'text-emerald-700' : 'text-stone-500'">
-        {{ state === 'online' ? t('notify.live') : t('notify.offline') }}
+        {{ polling ? t('notify.polling') : state === 'online' ? t('notify.live') : t('notify.offline') }}
       </p>
       <ul v-if="rows.length" class="max-h-[60vh] divide-y divide-stone-100 overflow-y-auto">
         <li v-for="row in rows" :key="row.n.id">

@@ -16,10 +16,11 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { NuxtLink } from '#components'
-
-const { notices } = useNotice()
+<script setup>
+import { NuxtLink } from '#components';
+const {
+  notices
+} = useNotice();
 </script>
 
 <template>
