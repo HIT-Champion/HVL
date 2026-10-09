@@ -16,26 +16,30 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+<script setup>
+import { useI18n } from 'vue-i18n';
 
 // Khung của trang công khai (cổng xác thực văn bản): không cần đăng nhập, không gọi API nào cần token.
-const { t, locale } = useI18n()
-
+const {
+  t,
+  locale
+} = useI18n();
 function toggleLocale() {
-  locale.value = locale.value === 'vi' ? 'en' : 'vi'
-  try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
-  document.documentElement.lang = locale.value
+  locale.value = locale.value === 'vi' ? 'en' : 'vi';
+  try {
+    localStorage.setItem('moc.locale', locale.value);
+  } catch {/* bỏ qua */}
+  document.documentElement.lang = locale.value;
 }
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col">
-    <header class="border-b border-stone-200 bg-white">
+  <div class="moc-public flex min-h-screen flex-col">
+    <header class="border-b border-stone-200">
       <div class="mx-auto flex h-16 w-full max-w-3xl items-center gap-3 px-4">
         <img src="/favicon.svg" alt="" class="h-8 w-8">
         <div class="flex-1">
-          <div class="text-lg leading-none font-semibold text-brand-800">{{ t('app.name') }}</div>
+          <div class="moc-public-wordmark text-brand-800">{{ t('app.name') }}</div>
           <div class="text-xs text-stone-500">{{ t('verify.title') }}</div>
         </div>
         <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>
@@ -44,6 +48,6 @@ function toggleLocale() {
     <main class="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
       <slot />
     </main>
-    <footer class="py-6 text-center text-xs text-stone-500">{{ t('verify.footer') }}</footer>
+    <footer class="px-6 py-6 text-center text-xs text-stone-500">{{ t('verify.footer') }}</footer>
   </div>
 </template>

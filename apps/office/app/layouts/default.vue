@@ -16,136 +16,167 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
-const { t, locale } = useI18n()
-const auth = useAuth()
-const claims = auth.claims
-const route = useRoute()
-const open = ref(false)
-
-const { gql } = useApi()
-const tenantName = ref('')
+<script setup>
+import { useI18n } from 'vue-i18n';
+const {
+  t,
+  locale
+} = useI18n();
+const auth = useAuth();
+const claims = auth.claims;
+const route = useRoute();
+const open = ref(false);
+const collapsed = ref(false);
+const calendarDay = ref(today());
+const dateLabel = computed(() => new Intl.DateTimeFormat(locale.value === 'vi' ? 'vi-VN' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(calendarDay.value + 'T12:00:00')));
+let calendarClock;
+function toggleSidebar() {
+  collapsed.value = !collapsed.value;
+  try { localStorage.setItem('signet.sidebar.collapsed', String(collapsed.value)); } catch { /* preference only */ }
+}
+const mobile = ref(false);
+const menuButton = ref(null);
+let media;
+const updateViewport = () => { mobile.value = media.matches; if (!mobile.value) open.value = false; };
+onMounted(() => { try { collapsed.value = localStorage.getItem('signet.sidebar.collapsed') === 'true'; } catch { /* preference only */ } calendarClock = setInterval(() => { calendarDay.value = today(); }, 60000); media = window.matchMedia('(max-width: 900px)'); updateViewport(); media.addEventListener('change', updateViewport); });
+onBeforeUnmount(() => { media?.removeEventListener('change', updateViewport); clearInterval(calendarClock); document.body.style.overflow = ''; });
+watch(open, async value => { document.body.style.overflow = value && mobile.value ? 'hidden' : ''; await nextTick(); if (value) document.querySelector('#app-navigation a')?.focus(); else if (mobile.value) menuButton.value?.focus(); });
+const router = useRouter();
+function keyboard(event) {
+  if (event.key === 'Escape') open.value = false;
+  if (event.key === 'Tab' && open.value && mobile.value) {
+    const items = [...document.querySelectorAll('#app-navigation a, #app-navigation button')].filter(item => item.getClientRects().length && getComputedStyle(item).visibility !== 'hidden');
+    const first = items[0], last = items.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    router.push('/tim-kiem');
+  }
+}
+onMounted(() => window.addEventListener('keydown', keyboard));
+onBeforeUnmount(() => window.removeEventListener('keydown', keyboard));
+const {
+  gql
+} = useApi();
+const tenantName = ref('');
 onMounted(async () => {
   try {
-    const data = await gql<{ core_tenants: { name: string }[] }>('{ core_tenants { name } }')
-    tenantName.value = data.core_tenants[0]?.name ?? ''
+    const data = await gql('{ core_tenants { name } }');
+    tenantName.value = data.core_tenants[0]?.name ?? '';
   } catch {
     // tên đơn vị chỉ để hiển thị
   }
-})
-
+});
 const nav = computed(() => {
-  const role = claims.value?.role
-  const items = [] as { to: string; label: string; icon: string }[]
-  if (role && role !== 'tenant_admin') items.push({ to: '/', label: t('nav.inbox'), icon: 'M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z' })
-  if (role && role !== 'tenant_admin') items.push({ to: '/van-ban-den', label: t('nav.incoming'), icon: 'M4 4h10l6 6v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm10 0v6h6' })
-  if (role === 'clerk') items.push({ to: '/van-ban-den/tiep-nhan', label: t('nav.receive'), icon: 'M12 5v14m-7-7h14' })
-  if (role && role !== 'tenant_admin') items.push({ to: '/van-ban-di', label: t('nav.outgoing'), icon: 'M4 12l16-8-6 16-2-7-8-1z' })
-  if (role === 'staff') items.push({ to: '/van-ban-di/soan', label: t('nav.compose'), icon: 'M4 20h4l10.5-10.5a2.1 2.1 0 00-3-3L5 17v3zM13.5 7.5l3 3' })
-  if (role === 'clerk' || role === 'director') items.push({ to: '/so-dang-ky', label: t('nav.register'), icon: 'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zm0 16a2 2 0 012-2h13v2H6a2 2 0 01-2 0zM8 7h7M8 11h7' })
-  items.push({ to: '/tim-kiem', label: t('nav.search'), icon: 'M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z' })
-  // Hỏi đáp trên kho văn bản (F4.2): vai trò nghiệp vụ; quản trị đơn vị không đọc văn bản nên không hỏi được
-  if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/hoi-dap', label: t('nav.ask'), icon: 'M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z' })
-  if (role === 'director') items.push({ to: '/dieu-hanh', label: t('nav.board'), icon: 'M3 3v18h18M8 17v-4m4 4V8m4 9v-6' })
-  if (role === 'director' || role === 'tenant_admin') items.push({ to: '/so-kiem-toan', label: t('nav.audit'), icon: 'M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4' })
-  return items
-})
-
-function active(to: string) {
-  return route.path === to
+  const role = claims.value?.role;
+  const items = [];
+  if (role && role !== 'tenant_admin') items.push({
+    to: '/',
+    label: t('nav.inbox'),
+    icon: 'M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z'
+  });
+  if (role && role !== 'tenant_admin') items.push({
+    to: '/van-ban-den',
+    label: t('nav.incoming'),
+    icon: 'M4 4h10l6 6v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm10 0v6h6'
+  });
+  if (role === 'clerk') items.push({
+    to: '/van-ban-den/tiep-nhan',
+    label: t('nav.receive'),
+    icon: 'M12 5v14m-7-7h14'
+  });
+  if (role && role !== 'tenant_admin') items.push({
+    to: '/van-ban-di',
+    label: t('nav.outgoing'),
+    icon: 'M4 12l16-8-6 16-2-7-8-1z'
+  });
+  if (role === 'clerk' || role === 'director') items.push({
+    to: '/so-dang-ky',
+    label: t('nav.register'),
+    icon: 'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zm0 16a2 2 0 012-2h13v2H6a2 2 0 01-2 0zM8 7h7M8 11h7'
+  });
+  if (['clerk', 'staff', 'manager', 'director'].includes(role)) items.push({ to: '/hoi-dap', label: t('nav.ask'), icon: 'M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z' });
+  if (role === 'director') items.push({
+    to: '/dieu-hanh',
+    label: t('nav.board'),
+    icon: 'M3 3v18h18M8 17v-4m4 4V8m4 9v-6'
+  });
+  if (role === 'director' || role === 'tenant_admin') items.push({
+    to: '/so-kiem-toan',
+    label: t('nav.audit'),
+    icon: 'M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4'
+  });
+  if (role && role !== 'tenant_admin') items.push({ to: '/ho-so', label: t('cases.title'), icon: 'M3 7h7l2 2h9v11H3V7zm0 0V4h7l2 3' });
+  return items;
+});
+function active(to) {
+  if (to === '/') return route.path === '/';
+  return route.path === to || (route.path.startsWith(to + '/') && !nav.value.some(item => item.to !== to && route.path === item.to));
 }
-
 function toggleLocale() {
-  locale.value = locale.value === 'vi' ? 'en' : 'vi'
-  try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
-  document.documentElement.lang = locale.value
+  locale.value = locale.value === 'vi' ? 'en' : 'vi';
+  try {
+    localStorage.setItem('moc.locale', locale.value);
+  } catch {/* bỏ qua */}
+  document.documentElement.lang = locale.value;
 }
-
-watch(() => route.fullPath, () => { open.value = false })
+watch(() => route.fullPath, () => {
+  open.value = false;
+});
 
 // Thông báo (F2.5): một kết nối realtime cho cả phiên làm việc; mỗi lần (nối lại) kết nối thì tải lại danh sách,
 // vì tin đẩy lúc mất kết nối không được gửi lại
-const realtime = useRealtime()
-const notifications = useNotifications()
-const notice = useNotice()
-const reload = () => notifications.load().catch(() => { /* chuông chỉ để hiển thị */ })
-realtime.onConnected(reload)
-realtime.onMessage((msg) => {
-  notifications.receive(msg)
-  const text = describeNotification(t, msg)
-  notice.info(text.title, { detail: text.note || text.detail, to: msg.document_id ? `/van-ban/${msg.document_id}` : undefined })
-})
+const realtime = useRealtime();
+const notifications = useNotifications();
+const notice = useNotice();
+let notificationPoll;
+const reload = () => notifications.load().catch(() => {/* chuông chỉ để hiển thị */});
+realtime.onConnected(reload);
+realtime.onMessage(msg => {
+  notifications.receive(msg);
+  const text = describeNotification(t, msg);
+  notice.info(text.title, {
+    detail: text.note || text.detail,
+    to: msg.document_id ? `/van-ban/${msg.document_id}` : undefined
+  });
+});
 onMounted(() => {
-  reload()
-  realtime.start()
-  window.addEventListener('online', realtime.online)
-})
+  reload();
+  // HMR dev server is a different origin; production receives the secured WebSocket.
+  if (import.meta.dev) notificationPoll = setInterval(reload, 15000);
+  else realtime.start();
+  window.addEventListener('online', realtime.online);
+});
 onBeforeUnmount(() => {
-  window.removeEventListener('online', realtime.online)
-  realtime.stop()
-})
-
+  window.removeEventListener('online', realtime.online);
+  realtime.stop();
+  clearInterval(notificationPoll);
+});
 async function logout() {
-  realtime.stop()
-  await auth.logout()
+  realtime.stop();
+  await auth.logout();
 }
 </script>
 
 <template>
-  <div class="min-h-screen md:flex">
-    <!-- thanh bên -->
-    <aside
-      class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-stone-200 bg-white transition md:static md:translate-x-0"
-      :class="{ 'translate-x-0': open }"
-    >
-      <div class="flex h-16 items-center gap-3 border-b border-stone-200 px-5">
-        <img src="/favicon.svg" alt="" class="h-8 w-8">
-        <div>
-          <div class="text-lg leading-none font-semibold text-brand-800">{{ t('app.name') }}</div>
-          <div class="text-xs text-stone-500">{{ t('app.tagline') }}</div>
-        </div>
-      </div>
-      <nav class="space-y-1 p-3">
-        <NuxtLink
-          v-for="item in nav" :key="item.to" :to="item.to"
-          class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium"
-          :class="active(item.to) ? 'bg-brand-50 text-brand-800' : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'"
-        >
-          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-          </svg>
-          {{ item.label }}
-        </NuxtLink>
-      </nav>
-      <div class="absolute inset-x-0 bottom-0 border-t border-stone-200 p-4 text-xs text-stone-500">
-        {{ tenantName }}
+  <div class="sg-shell" :class="{ 'is-collapsed': collapsed, 'is-mobile-open': open }">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 btn-primary">{{ t('fe.skip') }}</a>
+    <aside id="app-navigation" class="sg-sidebar" :inert="mobile && !open ? true : undefined" :aria-label="t('fe.navigation')">
+      <div class="sg-brand-row"><NuxtLink to="/" class="sg-wordmark" :aria-label="t('app.name')"><span class="sg-brand-full">Signet</span><span class="sg-brand-short" aria-hidden="true">S</span></NuxtLink><button class="btn-ghost sg-close-menu" :aria-label="t('shell.closeNav')" @click="open = false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
+      <nav class="sg-nav" :aria-label="t('fe.navigation')"><NuxtLink v-for="item in nav" :key="item.to" :to="item.to" class="sg-nav-link" :class="{ 'is-active': active(item.to) }" :aria-label="item.label" :title="collapsed ? item.label : undefined" :aria-current="active(item.to) ? 'page' : undefined"><svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" /></svg><span class="sg-nav-label">{{ item.label }}</span></NuxtLink></nav>
+      <div class="sg-sidebar-bottom">
+        <NuxtLink to="/tim-kiem" class="sg-nav-link sg-search-link" :aria-label="t('nav.search')" :title="collapsed ? t('nav.search') : undefined"><svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" /></svg><span class="sg-nav-label">{{ t('nav.search') }}</span></NuxtLink>
+        <button class="sg-sidebar-toggle sg-nav-link" :aria-label="t(collapsed ? 'shell.expand' : 'shell.collapse')" :title="t(collapsed ? 'shell.expand' : 'shell.collapse')" aria-controls="app-navigation" :aria-expanded="!collapsed" @click="toggleSidebar"><svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 4h16v16H4zM9 4v16m6-11-3 3 3 3" /></svg><span class="sg-nav-label">{{ t('shell.collapse') }}</span></button>
+        <div class="sg-account"><span class="sg-avatar" aria-hidden="true">{{ initialOf(claims?.givenName || '', claims?.name || '') }}</span><div class="sg-account-name sg-nav-label"><strong>{{ claims?.name }}</strong><small>{{ claims?.role ? t('role.' + claims.role) : t('error.noRole') }}</small></div><button class="btn-ghost sg-logout" :aria-label="t('nav.logout')" :title="t('nav.logout')" @click="logout"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 4H4v16h5m6-4l4-4-4-4m-7 4h11" /></svg></button></div>
       </div>
     </aside>
-    <div v-if="open" class="fixed inset-0 z-30 bg-black/30 md:hidden" @click="open = false" />
-
-    <div class="flex min-w-0 flex-1 flex-col">
-      <!-- thanh trên -->
-      <header class="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-stone-200 bg-white/90 px-4 backdrop-blur md:px-8">
-        <button class="btn-ghost md:hidden" :aria-label="t('nav.inbox')" @click="open = !open">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
-        </button>
-        <div class="flex-1" />
-        <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>
-        <NotificationBell v-if="claims?.role && claims.role !== 'tenant_admin'" />
-        <div v-if="claims" class="hidden text-right sm:block">
-          <div class="text-sm font-medium text-stone-900">{{ claims.name }}</div>
-          <div class="text-xs text-stone-500">{{ claims.role ? t(`role.${claims.role}`) : t('error.noRole') }}</div>
-        </div>
-        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800" aria-hidden="true" data-testid="avatar-initial">
-          {{ initialOf(claims?.givenName ?? '', claims?.name ?? '') }}
-        </div>
-        <button class="btn-secondary" @click="logout">{{ t('nav.logout') }}</button>
-      </header>
-      <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8 md:py-8">
-        <slot />
-      </main>
+    <button v-if="open" class="sg-scrim" :aria-label="t('shell.closeNav')" tabindex="-1" @click="open = false" />
+    <div class="sg-workspace" :inert="mobile && open ? true : undefined">
+      <header class="sg-topbar"><div class="sg-topbar-context"><button ref="menuButton" class="btn-secondary sg-mobile-menu" :aria-label="t('fe.menu')" aria-controls="app-navigation" :aria-expanded="open" @click="open = !open"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button><span>{{ tenantName || t('fe.organization') }}</span></div><div class="sg-topbar-tools"><time :datetime="calendarDay">{{ dateLabel }}</time><NotificationBell /><button class="btn-ghost sg-language" :aria-label="t('nav.language')" @click="toggleLocale">{{ locale === 'vi' ? 'EN' : 'VI' }}</button></div></header>
+      <main id="main-content" class="moc-sheet"><slot /></main>
+      <footer class="moc-shell-footer"><span>Signet <span aria-hidden="true">/</span> {{ t('app.tagline') }}</span><NuxtLink to="/xac-thuc" class="moc-footer-verify">{{ t('fe.verify') }}</NuxtLink><span>{{ t('fe.localData') }}</span></footer>
     </div>
   </div>
 </template>
