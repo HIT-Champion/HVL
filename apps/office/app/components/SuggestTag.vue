@@ -16,38 +16,42 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import type { ReadField } from '~/composables/useApi'
-import { tagState } from '~/utils/suggest'
-
-// Nhãn cạnh tên ô của form tiếp nhận (F4.1): ô do tác tử đọc văn bản điền sẵn. Chữ trên nhãn tự nói đủ (không chỉ
-// dựa vào màu): "Gợi ý" (độ tin cậy cao), "Gợi ý (chưa chắc)", "Gợi ý của mô hình", "Đã sửa" khi văn thư sửa khác
-// gợi ý. Ô nhập trỏ tới nhãn bằng aria-describedby để trình đọc màn hình đọc kèm độ tin cậy.
-const props = defineProps<{
-  suggestion?: ReadField
-  value: string
-  display?: string   // giá trị gợi ý để hiện khi đã sửa (vd tên loại văn bản thay cho mã)
-}>()
-
-const { t } = useI18n()
-
+<script setup>
+import { useI18n } from 'vue-i18n';
+import { tagState } from '~/utils/suggest';
+const props = defineProps({
+    suggestion: {
+        type: null,
+        required: false
+    },
+    value: {
+        type: String,
+        required: true
+    },
+    display: {
+        type: String,
+        required: false
+    }
+});
+const { t } = useI18n();
 const tone = {
-  high: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-300',
-  medium: 'bg-amber-50 text-amber-900 ring-1 ring-amber-300',
-  model: 'bg-sky-50 text-sky-900 ring-1 ring-sky-300',
-  edited: 'bg-stone-100 text-stone-700 ring-1 ring-stone-300',
-} as const
-
-const state = computed(() => tagState(props.suggestion, props.value))
-const hint = computed(() => {
-  const s = props.suggestion
-  if (!s || !state.value) return ''
-  if (state.value === 'edited') return t('receive.suggest.editedHint', { value: props.display ?? s.value })
-  return t('receive.suggest.hint', {
-    source: t(`receive.suggest.source.${s.source}`), confidence: t(`receive.suggest.confidence.${s.confidence}`),
-  })
-})
+    high: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-300',
+    medium: 'bg-amber-50 text-amber-900 ring-1 ring-amber-300',
+    model: 'bg-sky-50 text-sky-900 ring-1 ring-sky-300',
+    edited: 'bg-stone-100 text-stone-700 ring-1 ring-stone-300'
+};
+const state = computed(()=>tagState(props.suggestion, props.value));
+const hint = computed(()=>{
+    const s = props.suggestion;
+    if (!s || !state.value) return '';
+    if (state.value === 'edited') return t('receive.suggest.editedHint', {
+        value: props.display ?? s.value
+    });
+    return t('receive.suggest.hint', {
+        source: t(`receive.suggest.source.${s.source}`),
+        confidence: t(`receive.suggest.confidence.${s.confidence}`)
+    });
+});
 </script>
 
 <template>
