@@ -78,7 +78,7 @@ git push origin main --tags
 
 ```bash
 cd /tmp && rm -rf pof-test && mkdir pof-test && cd pof-test
-git clone <URL-repo> && cd dx-lab
+git clone <URL-repo> && cd HVL
 cp .env.example .env
 make check && make build && make up
 # Hệ thống phải chạy được mà không cần sửa bất kỳ tệp mã nào.
@@ -95,7 +95,7 @@ make check && make build && make up
 | ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` | −5 |
 | ☐ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin | −5 |
 
-> ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của DX-Lab. Nguyên tắc
+> ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Mộc. Nguyên tắc
 > an toàn: `docker-compose.yml` kéo image thượng nguồn **nguyên bản có ghim thẻ phiên bản**; mọi
 > tùy biến nằm ở `.env`, tệp cấu hình riêng, hoặc adapter do đội tự viết.
 

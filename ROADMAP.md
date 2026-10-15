@@ -1,7 +1,7 @@
-# Lộ trình phát triển DX-Lab
+# Lộ trình phát triển Mộc
 
 Lộ trình bám theo nguyên lý **tiến hóa tuyến tính** của mô hình DX-OS: mỗi giai đoạn chỉ khởi
-động khi giai đoạn trước đã ổn định. Đây cũng là lộ trình mà một tổ chức áp dụng DX-Lab nên đi
+động khi giai đoạn trước đã ổn định. Đây cũng là lộ trình mà một tổ chức áp dụng Mộc nên đi
 theo, không chỉ là lịch phát triển nội bộ.
 
 ## Giai đoạn 0 — Nền dự án nguồn mở ✅
@@ -60,7 +60,7 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
 
 ## Giai đoạn 5 — Đóng gói cho cộng đồng
 
-Mục tiêu: một SME không có đội IT tự cài được DX-Lab trong dưới một giờ.
+Mục tiêu: một SME không có đội IT tự cài được Mộc trong dưới một giờ.
 
 - [ ] Trình cài đặt một lệnh kèm kiểm tra tiền điều kiện
 - [ ] Bộ dữ liệu mẫu theo ngành để dùng thử ngay

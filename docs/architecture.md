@@ -1,4 +1,4 @@
-# Kiến trúc DX-Lab
+# Kiến trúc Mộc
 
 > Tài liệu này ghi lại kiến trúc hệ thống, bản đồ công cụ nguồn mở, và các quyết định kỹ thuật
 > kèm lý do. Trạng thái hiện tại: **đang khảo sát công cụ** (giai đoạn 1 của `ROADMAP.md`).
@@ -7,7 +7,7 @@
 
 ### 1.1. Open-Core: điều phối, không viết lại
 
-DX-Lab **không** viết lại các phần mềm đã có bản nguồn mở trưởng thành. Nó là **lớp điều phối**
+Mộc **không** viết lại các phần mềm đã có bản nguồn mở trưởng thành. Nó là **lớp điều phối**
 (orchestration layer) gắn kết chúng thành một hệ thống vận hành thống nhất. Giá trị của dự án
 nằm ở *lớp keo* — cách các thành phần được nối, chuẩn hóa và đồng bộ — không nằm ở bản thân
 các thành phần.
@@ -122,7 +122,7 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
-- **Bối cảnh:** DX-Lab lắp ghép nhiều phần mềm thượng nguồn có giấy phép khác nhau. Tiêu chí chấm
+- **Bối cảnh:** Mộc lắp ghép nhiều phần mềm thượng nguồn có giấy phép khác nhau. Tiêu chí chấm
   điểm PoF #2 trừ 5 điểm nếu *"mã nguồn tự thân chứa sự không tương thích của các giấy phép"*.
 - **Phương án:** MIT (đơn giản nhất) · Apache-2.0 (permissive, có điều khoản sáng chế) ·
   GPL-3.0 / AGPL-3.0 (copyleft mạnh).

@@ -1,4 +1,4 @@
-# Copyright 2026 DX-Lab Team
+# Copyright 2026 Mộc Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,9 +42,9 @@ jobs:
         run: |
           V="${{ steps.ver.outputs.version }}"
           mkdir -p dist
-          git archive --format=tar.gz --prefix="dx-lab-$V/" \
-                      -o "dist/dx-lab-$V.tar.gz" "$GITHUB_REF_NAME"
-          ( cd dist && sha256sum "dx-lab-$V.tar.gz" > "dx-lab-$V.tar.gz.sha256" )
+          git archive --format=tar.gz --prefix="moc-$V/" \
+                      -o "dist/moc-$V.tar.gz" "$GITHUB_REF_NAME"
+          ( cd dist && sha256sum "moc-$V.tar.gz" > "moc-$V.tar.gz.sha256" )
 
       - name: Trích ghi chú phát hành từ CHANGELOG
         run: |
