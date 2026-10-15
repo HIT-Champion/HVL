@@ -1,5 +1,5 @@
-DX-Lab — Trạm thực hành Hệ điều hành Doanh nghiệp số (DX-OS)
-Copyright 2026 DX-Lab Team
+Mộc — Lõi DX-OS Open-Core nguồn mở và ứng dụng Văn phòng điện tử
+Copyright 2026 Mộc Team
 
 Sản phẩm này được phát hành dưới giấy phép Apache License, Version 2.0
 (một giấy phép được OSI phê duyệt — https://opensource.org/license/apache-2-0).
@@ -7,7 +7,7 @@ Sản phẩm này được phát hành dưới giấy phép Apache License, Vers
 MỤC ĐÍCH CỦA GIẤY PHÉP
 ----------------------
 Nhóm tác giả chọn Apache-2.0 nhằm bảo đảm bốn quyền tự do cốt lõi của phần mềm
-nguồn mở cho mọi tổ chức tiếp nhận DX-Lab — đặc biệt là các doanh nghiệp nhỏ và
+nguồn mở cho mọi tổ chức tiếp nhận Mộc — đặc biệt là các doanh nghiệp nhỏ và
 vừa (SME) và cơ quan nhà nước không có ngân sách bản quyền phần mềm:
 
   1. Tự do sử dụng cho mọi mục đích, kể cả thương mại, không phải trả phí.
@@ -15,7 +15,7 @@ vừa (SME) và cơ quan nhà nước không có ngân sách bản quyền phầ
   3. Tự do phân phối lại bản gốc hoặc bản đã sửa đổi.
   4. Tự do đóng góp ngược lại cho cộng đồng.
 
-Apache-2.0 được chọn thay vì các giấy phép copyleft mạnh vì DX-Lab là một hệ
+Apache-2.0 được chọn thay vì các giấy phép copyleft mạnh vì Mộc là một hệ
 thống LẮP GHÉP (kiến trúc Open-Core) từ nhiều phần mềm nguồn mở thượng nguồn có
 giấy phép khác nhau. Giấy phép permissive giúp bảo đảm không phát sinh xung đột
 giấy phép giữa các thành phần (xem DEPENDENCIES.md).
@@ -25,6 +25,6 @@ Mỗi tệp mã nguồn đều mang thông báo giấy phép ở phần đầu t
 
 THÀNH PHẦN THỨ BA
 -----------------
-DX-Lab điều phối (orchestrate) các phần mềm nguồn mở thượng nguồn ở dạng NGUYÊN
+Mộc điều phối (orchestrate) các phần mềm nguồn mở thượng nguồn ở dạng NGUYÊN
 BẢN, không sao chép và không chỉnh sửa mã nguồn của chúng vào kho này. Danh sách
 đầy đủ kèm giấy phép tương ứng: xem DEPENDENCIES.md.

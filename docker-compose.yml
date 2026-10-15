@@ -1,4 +1,4 @@
-# Copyright 2026 DX-Lab Team
+# Copyright 2026 Mộc Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# DX-Lab — điều phối 4 không gian H-P-D-I.
+# Mộc — điều phối 4 không gian H-P-D-I.
 #
 # NGUYÊN TẮC: tệp này chỉ ĐIỀU PHỐI các phần mềm nguồn mở thượng nguồn ở dạng
-# NGUYÊN BẢN qua image chính thức có ghim thẻ phiên bản. Kho mã nguồn DX-Lab
+# NGUYÊN BẢN qua image chính thức có ghim thẻ phiên bản. Kho mã nguồn Mộc
 # không chứa bản sao và không chỉnh sửa mã nguồn của chúng (tiêu chí PoF #5).
 #
 # Mỗi không gian là một profile riêng, cho phép triển khai theo đúng lộ trình
@@ -29,13 +29,13 @@
 #   docker compose --profile all up -d             # đủ 4 trục
 # ---------------------------------------------------------------------------
 
-name: dxlab
+name: moc
 
 x-common: &common
   restart: unless-stopped
-  networks: [dxlab]
+  networks: [moc]
   environment:
-    TZ: ${DXLAB_TIMEZONE:-Asia/Ho_Chi_Minh}
+    TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
 
 services:
 
@@ -48,14 +48,14 @@ services:
     image: postgres:16-alpine
     profiles: [h, p, d, i, all]
     environment:
-      TZ: ${DXLAB_TIMEZONE:-Asia/Ho_Chi_Minh}
-      POSTGRES_DB: ${POSTGRES_DB:-dxlab}
-      POSTGRES_USER: ${POSTGRES_USER:-dxlab}
+      TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
+      POSTGRES_DB: ${POSTGRES_DB:-moc}
+      POSTGRES_USER: ${POSTGRES_USER:-moc}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Bat buoc dat POSTGRES_PASSWORD trong .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dxlab} -d ${POSTGRES_DB:-dxlab}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-moc} -d ${POSTGRES_DB:-moc}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,7 +88,7 @@ services:
   # i-agent:      # Tác tử tự hành (Agentic AI)
 
 networks:
-  dxlab:
+  moc:
     driver: bridge
 
 volumes:

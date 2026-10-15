@@ -1,4 +1,4 @@
-# Copyright 2026 DX-Lab Team
+# Copyright 2026 Mộc Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# DX-Lab — điều phối dựng, chạy và phát hành.
+# Mộc — điều phối dựng, chạy và phát hành.
 # Toàn bộ công cụ sử dụng đều là phần mềm nguồn mở (tiêu chí PoF #4).
 # Chạy `make help` để xem danh sách lệnh.
 # ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ build: $(ENV_FILE) ## Dựng toàn bộ image từ mã nguồn
 
 up: $(ENV_FILE) ## Khởi động đủ 4 trục H-P-D-I
 	@$(COMPOSE) --profile all up -d
-	@echo "DX-Lab đang chạy. Xem nhật ký: make logs"
+	@echo "Mộc đang chạy. Xem nhật ký: make logs"
 
 up-h: $(ENV_FILE) ## Khởi động riêng trục [H] — Nhân sự
 	@$(COMPOSE) --profile h up -d

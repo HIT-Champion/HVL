@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2026 DX-Lab Team
+# Copyright 2026 Mộc Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# Tạo gói phát hành DX-Lab ở định dạng MỞ (.tar.gz).
+# Tạo gói phát hành Mộc ở định dạng MỞ (.tar.gz).
 #
 # Tiêu chí chấm điểm PoF #3 trừ 3 điểm nếu "sử dụng các định dạng không phải là
 # mở cho bản phát hành (vd., zip, .rar, .arj)" và trừ 3 điểm nếu "dự án không
@@ -57,19 +57,19 @@ DIST="dist"
 mkdir -p "$DIST"
 
 echo "==> Gắn thẻ phiên bản $TAG"
-git tag -a "$TAG" -m "DX-Lab $VERSION"
+git tag -a "$TAG" -m "Mộc $VERSION"
 
-echo "==> Sinh gói nguồn $DIST/dx-lab-$VERSION.tar.gz"
+echo "==> Sinh gói nguồn $DIST/moc-$VERSION.tar.gz"
 git archive --format=tar.gz \
-            --prefix="dx-lab-$VERSION/" \
-            -o "$DIST/dx-lab-$VERSION.tar.gz" \
+            --prefix="moc-$VERSION/" \
+            -o "$DIST/moc-$VERSION.tar.gz" \
             "$TAG"
 
 echo "==> Sinh tổng kiểm tra SHA-256"
-( cd "$DIST" && sha256sum "dx-lab-$VERSION.tar.gz" > "dx-lab-$VERSION.tar.gz.sha256" )
+( cd "$DIST" && sha256sum "moc-$VERSION.tar.gz" > "moc-$VERSION.tar.gz.sha256" )
 
 echo ""
 echo "Đã tạo bản phát hành $TAG:"
-ls -lh "$DIST/dx-lab-$VERSION.tar.gz"*
+ls -lh "$DIST/moc-$VERSION.tar.gz"*
 echo ""
 echo "Bước tiếp theo:  git push origin main --tags"

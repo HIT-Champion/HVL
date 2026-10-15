@@ -1,4 +1,4 @@
-# Copyright 2026 DX-Lab Team
+# Copyright 2026 Mộc Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: Đề xuất tính năng
-description: Đề xuất một tính năng hoặc cải tiến cho DX-Lab
+description: Đề xuất một tính năng hoặc cải tiến cho Mộc
 title: "[Đề xuất]: "
 labels: ["enhancement"]
 body:
@@ -57,7 +57,7 @@ body:
       description: Đề xuất phải tôn trọng các nguyên tắc trong CONTRIBUTING.md
       options:
         - label: Không yêu cầu fork và chỉnh sửa mã nguồn phần mềm thượng nguồn
-        - label: Không bundle mã nguồn dự án khác vào kho DX-Lab
+        - label: Không bundle mã nguồn dự án khác vào kho Mộc
         - label: Không phụ thuộc thành phần nguồn đóng hoặc dịch vụ trả phí bắt buộc
         - label: Tôn trọng lộ trình tuyến tính (không làm [I] khi [D] chưa sẵn sàng)
         - label: Chạy được trong giới hạn tài nguyên của một SME (8 GB RAM)
