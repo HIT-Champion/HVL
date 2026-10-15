@@ -16,139 +16,140 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import {
-  MAX_POLLS, POLL_MS, applyValues, confidenceTone, evidenceIds, matchState, pollState, readEvidence, reasonKey,
-  shownEvidence,
-} from '~/utils/assignSuggest'
-import type { AssignSuggestionRow, SuggestApply, SuggestReadable } from '~/utils/assignSuggest'
-
-// Gợi ý giao việc (F4.3) ở đầu form chỉ đạo: tác tử moc-assigner chạy song song từ lúc vào sổ, gợi ý đơn vị chủ trì
-// và hạn theo các văn bản tương tự đã giao. Mọi truy vấn bằng token người xem: căn cứ chỉ hiện văn bản người xem đọc
-// được (đã loại văn bản hạn chế). "Dùng gợi ý" chỉ điền form, không gửi — lãnh đạo vẫn tự bấm "Giao xử lý".
-// Không dùng <label> / aria-label trong khối: tên ô của form ("Phòng chủ trì", "Hạn giải quyết"…) và tên phòng chỉ
-// được là nhãn của chính ô đó (kịch bản e2e tìm ô theo nhãn, chế độ strict).
-const props = defineProps<{
-  documentId: string
-  departments: { id: string; name: string }[]
-  chosen: string | null
-  documentDue: string | null
-}>()
-const emit = defineEmits<{ apply: [SuggestApply] }>()
-
-const { t } = useI18n()
-const { gql } = useApi()
-
-const row = ref<AssignSuggestionRow | null>(null)
-const waiting = ref(false)
-const readable = ref(new Map<string, SuggestReadable>())
-let timer: ReturnType<typeof setTimeout> | null = null
-let polls = 0
-let alive = true
-
+<script setup>
+import { useI18n } from 'vue-i18n';
+import { MAX_POLLS, POLL_MS, applyValues, confidenceTone, evidenceIds, matchState, pollState, readEvidence, reasonKey, shownEvidence } from '~/utils/assignSuggest';
+const props = defineProps({
+    documentId: {
+        type: String,
+        required: true
+    },
+    departments: {
+        type: Array,
+        required: true
+    },
+    chosen: {
+        type: [
+            String,
+            null
+        ],
+        required: true
+    },
+    documentDue: {
+        type: [
+            String,
+            null
+        ],
+        required: true
+    }
+});
+const emit = defineEmits([
+    "apply"
+]);
+const { t } = useI18n();
+const { gql } = useApi();
+const row = ref(null);
+const waiting = ref(false);
+const readable = ref(new Map());
+let timer = null;
+let polls = 0;
+let alive = true;
 const GOI_Y = `query GoiYGiaoViec($id: uuid!) {
   office_assignment_suggestions_by_pk(document_id: $id) {
     status reason department_id confidence share due_days due_on evidence created_at }
-  office_documents_by_pk(id: $id) { registered_at } }`
+  office_documents_by_pk(id: $id) { registered_at } }`;
 const CAN_CU = `query CanCuGoiY($ids: [uuid!]!) {
-  office_documents(where: {id: {_in: $ids}, restricted: {_eq: false}}) { id symbol summary } }`
-
+  office_documents(where: {id: {_in: $ids}, restricted: {_eq: false}}) { id symbol summary } }`;
 function stop() {
-  if (timer) clearTimeout(timer)
-  timer = null
+    if (timer) clearTimeout(timer);
+    timer = null;
 }
-
 async function load() {
-  timer = null
-  const want = props.documentId
-  try {
-    const data = await gql<{
-      office_assignment_suggestions_by_pk: AssignSuggestionRow | null
-      office_documents_by_pk: { registered_at: string | null } | null
-    }>(GOI_Y, { id: want })
-    if (!alive || want !== props.documentId) return
-    const found = data.office_assignment_suggestions_by_pk
-    polls += 1
-    if (found) {
-      row.value = found
-      waiting.value = false
-      if (found.status === 'suggested') void loadEvidence(want, evidenceIds(found.evidence))
-      return
+    timer = null;
+    const want = props.documentId;
+    try {
+        const data = await gql(GOI_Y, {
+            id: want
+        });
+        if (!alive || want !== props.documentId) return;
+        const found = data.office_assignment_suggestions_by_pk;
+        polls += 1;
+        if (found) {
+            row.value = found;
+            waiting.value = false;
+            if (found.status === 'suggested') void loadEvidence(want, evidenceIds(found.evidence));
+            return;
+        }
+        waiting.value = pollState(found, data.office_documents_by_pk?.registered_at, Date.now()) === 'wait' && polls < MAX_POLLS;
+        if (waiting.value) timer = setTimeout(load, POLL_MS);
+    } catch  {
+        if (alive && want === props.documentId) waiting.value = false;
     }
-    // chưa có dòng: tác tử còn đang tìm (vào sổ chưa quá 60 giây) thì hỏi lại sau 3 giây, quá thì thôi không hiện
-    waiting.value = pollState(found, data.office_documents_by_pk?.registered_at, Date.now()) === 'wait' && polls < MAX_POLLS
-    if (waiting.value) timer = setTimeout(load, POLL_MS)
-  } catch {
-    // gợi ý chỉ là phần thêm: lỗi mạng, lỗi quyền thì không hiện gì, lãnh đạo giao việc như thường lệ
-    if (alive && want === props.documentId) waiting.value = false
-  }
 }
-
-// Căn cứ: hỏi lại bằng token người xem — văn bản không đọc được (hay vừa bị đặt hạn chế) không có trong kết quả
-async function loadEvidence(want: string, ids: string[]) {
-  if (!ids.length) return
-  try {
-    const data = await gql<{ office_documents: { id: string; symbol: string | null; summary: string | null }[] }>(
-      CAN_CU, { ids })
-    if (!alive || want !== props.documentId) return
-    readable.value = new Map(data.office_documents.map((d) => [d.id, { symbol: d.symbol, summary: d.summary }]))
-  } catch {
-    // không đọc được căn cứ: vẫn hiện gợi ý, chỉ không có liên kết
-  }
+async function loadEvidence(want, ids) {
+    if (!ids.length) return;
+    try {
+        const data = await gql(CAN_CU, {
+            ids
+        });
+        if (!alive || want !== props.documentId) return;
+        readable.value = new Map(data.office_documents.map((d)=>[
+                d.id,
+                {
+                    symbol: d.symbol,
+                    summary: d.summary
+                }
+            ]));
+    } catch  {}
 }
-
 function reset() {
-  stop()
-  row.value = null
-  waiting.value = false
-  readable.value = new Map()
-  polls = 0
+    stop();
+    row.value = null;
+    waiting.value = false;
+    readable.value = new Map();
+    polls = 0;
 }
-
-onMounted(load)
-watch(() => props.documentId, () => {
-  reset()
-  void load()
-})
-onBeforeUnmount(() => {
-  alive = false
-  stop()
-})
-
-const deptName = (id: string | null) => (id ? props.departments.find((d) => d.id === id)?.name ?? '' : '')
-const unitName = computed(() => deptName(row.value?.department_id ?? null))
-
-// Trạng thái hiện: đang tìm, có gợi ý, không gợi ý / lỗi (một dòng mờ), hoặc không hiện gì. Gợi ý một phòng không
-// có trong danh mục (phòng vừa bị xóa) thì không hiện — không có gì để điền vào form.
-const state = computed<'off' | 'waiting' | 'suggested' | 'none'>(() => {
-  const r = row.value
-  if (!r) return waiting.value ? 'waiting' : 'off'
-  if (r.status === 'suggested') return unitName.value && r.confidence ? 'suggested' : 'off'
-  return 'none'
-})
-
-const evidenceCount = computed(() => readEvidence(row.value?.evidence).length)
-const links = computed(() => shownEvidence(row.value?.evidence, readable.value))
-const match = computed(() => matchState(row.value, props.chosen))
-const reasonText = computed(() => {
-  const key = reasonKey(row.value?.reason)
-  return key ? t('assign.suggest.nothing', { reason: t(key) }) : t('assign.suggest.nothingPlain')
-})
-
-// "Hạn đề xuất": văn bản đã ghi hạn thì theo hạn đó (tác tử không gợi ý hạn); không thì hạn tác tử tính từ số ngày
-// các văn bản tương tự đã được giao
-const dueText = computed(() => {
-  const r = row.value
-  if (props.documentDue) return t('assign.suggest.dueFromDocument', { date: fmtDate(props.documentDue) })
-  if (!r?.due_on) return ''
-  const n = r.due_days ?? 0
-  return n > 0 ? t('assign.suggest.dueDays', { date: fmtDate(r.due_on), n }, n) : fmtDate(r.due_on)
-})
-
+onMounted(load);
+watch(()=>props.documentId, ()=>{
+    reset();
+    void load();
+});
+onBeforeUnmount(()=>{
+    alive = false;
+    stop();
+});
+const deptName = (id)=>id ? props.departments.find((d)=>d.id === id)?.name ?? '' : '';
+const unitName = computed(()=>deptName(row.value?.department_id ?? null));
+const state = computed(()=>{
+    const r = row.value;
+    if (!r) return waiting.value ? 'waiting' : 'off';
+    if (r.status === 'suggested') return unitName.value && r.confidence ? 'suggested' : 'off';
+    return 'none';
+});
+const evidenceCount = computed(()=>readEvidence(row.value?.evidence).length);
+const links = computed(()=>shownEvidence(row.value?.evidence, readable.value));
+const match = computed(()=>matchState(row.value, props.chosen));
+const reasonText = computed(()=>{
+    const key = reasonKey(row.value?.reason);
+    return key ? t('assign.suggest.nothing', {
+        reason: t(key)
+    }) : t('assign.suggest.nothingPlain');
+});
+const dueText = computed(()=>{
+    const r = row.value;
+    if (props.documentDue) return t('assign.suggest.dueFromDocument', {
+        date: fmtDate(props.documentDue)
+    });
+    if (!r?.due_on) return '';
+    const n = r.due_days ?? 0;
+    return n > 0 ? t('assign.suggest.dueDays', {
+        date: fmtDate(r.due_on),
+        n
+    }, n) : fmtDate(r.due_on);
+});
 function apply() {
-  const values = applyValues(row.value, props.documentDue, today())
-  if (values) emit('apply', values)
+    const values = applyValues(row.value, props.documentDue, today());
+    if (values) emit('apply', values);
 }
 </script>
 
