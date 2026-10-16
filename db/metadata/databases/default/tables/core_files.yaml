@@ -1,0 +1,57 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Tệp đã qua ClamAV. Chỉ svc-files thêm dòng (vai trò service), sau khi tệp đã nằm trong SeaweedFS.
+# Người dùng thấy tệp mình vừa tải lên, và tệp gắn với văn bản mình được đọc.
+# object_key và wrapped_dek không lộ ra cho người dùng: tải tệp luôn đi qua svc-files.
+table:
+  name: files
+  schema: core
+array_relationships:
+  - name: document_files
+    using:
+      manual_configuration:
+        remote_table: {name: document_files, schema: office}
+        column_mapping: {id: file_id}
+insert_permissions:
+  - role: service
+    permission:
+      columns: [id, object_key, filename, mime_type, size_bytes, sha256, scanned_at, encrypted, wrapped_dek]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+        created_by: X-Hasura-User-Id
+      check: {}
+select_permissions:
+  - role: clerk
+    permission: &user_select
+      columns: [id, filename, mime_type, size_bytes, sha256, scanned_at, encrypted, storage_tier, created_by, created_at]
+      filter:
+        _and:
+          - tenant_id: {_eq: X-Hasura-Tenant-Id}
+          - _or:
+              - created_by: {_eq: X-Hasura-User-Id}
+              - document_files: {document: {visible: {_eq: true}}}
+  - role: staff
+    permission: *user_select
+  - role: manager
+    permission: *user_select
+  - role: director
+    permission: *user_select
+  - role: service
+    permission:
+      columns: [id, tenant_id, object_key, filename, mime_type, size_bytes, sha256, scanned_at, encrypted, wrapped_dek,
+                storage_tier, created_by, created_at]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
