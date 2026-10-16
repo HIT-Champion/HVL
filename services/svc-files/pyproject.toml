@@ -1,0 +1,45 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Khai báo phụ thuộc trực tiếp. Phiên bản khóa cụ thể (kèm băm) nằm trong
+# requirements.txt và requirements-dev.txt, sinh lại bằng lệnh ở README.md.
+
+[project]
+name = "svc-files"
+version = "0.1.0"
+description = "Mộc — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.143.3,<0.144",
+  "uvicorn>=0.54,<0.55",
+  "python-multipart>=0.0.32",
+  "boto3>=1.43,<2",
+  "pyjwt[crypto]>=2.15,<3",
+  "httpx2>=2.13,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.1,<10",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+markers = [
+  "integration: cần ClamAV và SeaweedFS đang chạy; bật bằng MOC_IT=1",
+]
