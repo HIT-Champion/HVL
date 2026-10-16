@@ -16,25 +16,13 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+<script setup>
+import { useI18n } from 'vue-i18n';
 
 // Dashboard điều hành (F3.11), cho lãnh đạo đơn vị: văn bản đến theo trạng thái, quá hạn theo phòng, thời gian
 // xử lý, văn bản khẩn, văn bản đi theo tháng. Số liệu lấy từ bốn khung nhìn chỉ có số đếm (migration
 // 1792281601200) qua Hasura bằng token của người xem: Hasura lọc theo thuê ước trong token, vai trò khác bị từ
 // chối. Văn bản hạn chế không vào phép chia nào, chỉ có con số tổng (lý do ở migration).
-
-interface Count {
-  direction: string
-  restricted: boolean
-  status: string | null
-  urgency: string | null
-  overdue: boolean | null
-  documents: number
-}
-interface Department { department_id: string | null; code: string | null; name: string | null; in_progress: number; overdue: number }
-interface Processing { month: string; documents: number; total_hours: number; with_due: number; on_time: number }
-interface Outgoing { month: string; documents: number }
 
 const QUERY = `{
   office_v_document_counts { direction restricted status urgency overdue documents }
@@ -43,154 +31,244 @@ const QUERY = `{
   }
   office_v_processing_time(order_by: {month: asc}) { month documents total_hours with_due on_time }
   office_v_outgoing_by_month(order_by: {month: asc}) { month documents }
-}`
-const IN_STATUSES = ['received', 'registered', 'in_progress', 'done', 'archived', 'cancelled'] as const
-const OPEN = new Set(['received', 'registered', 'in_progress'])
-const MONTHS = 12
-const BRAND = '#0f766e'
-const LATE = '#dc2626'
+}`;
+const IN_STATUSES = ['received', 'registered', 'in_progress', 'done', 'archived', 'cancelled'];
+const OPEN = new Set(['received', 'registered', 'in_progress']);
+const MONTHS = 12;
+const BRAND = '#555b3f';
+const LATE = '#a02727';
 // giống grid.containLabel của ECharts 5: nhãn trục nằm trong khung
-const GRID = { left: 8, right: 16, top: 16, bottom: 8, outerBoundsMode: 'same', outerBoundsContain: 'axisLabel' }
-
-const { t, locale } = useI18n()
-const { gql } = useApi()
-const claims = useAuth().claims
-
-const counts = ref<Count[]>([])
-const departments = ref<Department[]>([])
-const processing = ref<Processing[]>([])
-const outgoing = ref<Outgoing[]>([])
-const loaded = ref(false)
-const loading = ref(false)
-const failure = ref('')
-const allowed = computed(() => claims.value?.role === 'director')
+const GRID = {
+  left: 8,
+  right: 16,
+  top: 16,
+  bottom: 8,
+  outerBoundsMode: 'same',
+  outerBoundsContain: 'axisLabel'
+};
+const {
+  t,
+  locale
+} = useI18n();
+const {
+  gql
+} = useApi();
+const claims = useAuth().claims;
+const counts = ref([]);
+const departments = ref([]);
+const processing = ref([]);
+const outgoing = ref([]);
+const loaded = ref(false);
+const loading = ref(false);
+const failure = ref('');
+const allowed = computed(() => claims.value?.role === 'director');
 
 // Làm mới giữ số cũ trên trang tới khi có số mới, không vẽ lại từ đầu
 async function load() {
-  loading.value = true
-  failure.value = ''
+  loading.value = true;
+  failure.value = '';
   try {
-    const data = await gql<{
-      office_v_document_counts: Count[]
-      office_v_overdue_by_department: Department[]
-      office_v_processing_time: Processing[]
-      office_v_outgoing_by_month: Outgoing[]
-    }>(QUERY)
-    counts.value = data.office_v_document_counts
-    departments.value = data.office_v_overdue_by_department
-    processing.value = data.office_v_processing_time
-    outgoing.value = data.office_v_outgoing_by_month
-    loaded.value = true
+    const data = await gql(QUERY);
+    counts.value = data.office_v_document_counts;
+    departments.value = data.office_v_overdue_by_department;
+    processing.value = data.office_v_processing_time;
+    outgoing.value = data.office_v_outgoing_by_month;
+    loaded.value = true;
   } catch (e) {
-    failure.value = errorText(t, e)
+    failure.value = errorText(t, e);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 onMounted(() => {
-  if (allowed.value) load()
-})
-
-function sum<T>(rows: T[], pick: (row: T) => number) {
-  return rows.reduce((n, r) => n + pick(r), 0)
+  if (allowed.value) load();
+});
+function sum(rows, pick) {
+  return rows.reduce((n, r) => n + pick(r), 0);
 }
-const number = computed(() => new Intl.NumberFormat(locale.value === 'vi' ? 'vi-VN' : 'en-GB', { maximumFractionDigits: 1 }))
+const number = computed(() => new Intl.NumberFormat(locale.value === 'vi' ? 'vi-VN' : 'en-GB', {
+  maximumFractionDigits: 1
+}));
 // Dưới một ngày thì tính giờ: văn bản xử lý trong ngày không hiện thành "0 ngày"
-function duration(hours: number) {
-  if (hours < 1) return t('board.underHour')
-  return hours < 24 ? t('board.hoursValue', { n: number.value.format(hours) })
-    : t('board.daysValue', { n: number.value.format(hours / 24) })
+function duration(hours) {
+  if (hours < 1) return t('board.underHour');
+  return hours < 24 ? t('board.hoursValue', {
+    n: number.value.format(hours)
+  }) : t('board.daysValue', {
+    n: number.value.format(hours / 24)
+  });
 }
 
 // 12 tháng gần nhất theo giờ Việt Nam, tháng không có số liệu vẫn có cột
 const months = computed(() => {
-  const [y, m] = today().split('-').map(Number) as [number, number]
-  return Array.from({ length: MONTHS }, (_, i) => {
-    const d = new Date(y, m - 1 - (MONTHS - 1 - i), 1)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-  })
-})
-function monthLabel(iso: string) {
-  const [y, m] = iso.split('-')
-  return `${Number(m)}/${y}`
+  const [y, m] = today().split('-').map(Number);
+  return Array.from({
+    length: MONTHS
+  }, (_, i) => {
+    const d = new Date(y, m - 1 - (MONTHS - 1 - i), 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+});
+function monthLabel(iso) {
+  const [y, m] = iso.split('-');
+  return `${Number(m)}/${y}`;
 }
-
-const incoming = computed(() => counts.value.filter((r) => r.direction === 'in' && !r.restricted))
-const restricted = computed(() => sum(counts.value.filter((r) => r.restricted), (r) => r.documents))
-const processingByMonth = computed(() => months.value.map((month) => processing.value.find((r) => r.month === month)
-  ?? { month, documents: 0, total_hours: 0, with_due: 0, on_time: 0 }))
-const kpis = computed(() => {
-  const open = incoming.value.filter((r) => OPEN.has(r.status ?? ''))
-  const recent = processingByMonth.value
-  const done = sum(recent, (r) => r.documents)
-  const withDue = sum(recent, (r) => r.with_due)
-  return {
-    open: sum(open, (r) => r.documents),
-    overdue: sum(incoming.value.filter((r) => r.overdue), (r) => r.documents),
-    urgent: sum(open.filter((r) => r.urgency !== 'normal'), (r) => r.documents),
-    done,
-    hours: done ? sum(recent, (r) => r.total_hours) / done : null,
-    onTimePct: withDue ? Math.round((sum(recent, (r) => r.on_time) / withDue) * 100) : null,
-  }
-})
-
-const byStatus = computed(() => IN_STATUSES.map((s) => ({
-  status: s,
-  documents: sum(incoming.value.filter((r) => r.status === s), (r) => r.documents),
-})))
-const outgoingByMonth = computed(() => months.value.map((month) => ({
+const incoming = computed(() => counts.value.filter(r => r.direction === 'in' && !r.restricted));
+const restricted = computed(() => sum(counts.value.filter(r => r.restricted), r => r.documents));
+const processingByMonth = computed(() => months.value.map(month => processing.value.find(r => r.month === month) ?? {
   month,
-  documents: outgoing.value.find((r) => r.month === month)?.documents ?? 0,
-})))
-function departmentName(r: Department) {
-  return r.name ?? t('board.noDepartment')
+  documents: 0,
+  total_hours: 0,
+  with_due: 0,
+  on_time: 0
+}));
+const kpis = computed(() => {
+  const open = incoming.value.filter(r => OPEN.has(r.status ?? ''));
+  const recent = processingByMonth.value;
+  const done = sum(recent, r => r.documents);
+  const withDue = sum(recent, r => r.with_due);
+  return {
+    open: sum(open, r => r.documents),
+    overdue: sum(incoming.value.filter(r => r.overdue), r => r.documents),
+    urgent: sum(open.filter(r => r.urgency !== 'normal'), r => r.documents),
+    done,
+    hours: done ? sum(recent, r => r.total_hours) / done : null,
+    onTimePct: withDue ? Math.round(sum(recent, r => r.on_time) / withDue * 100) : null
+  };
+});
+const byStatus = computed(() => IN_STATUSES.map(s => ({
+  status: s,
+  documents: sum(incoming.value.filter(r => r.status === s), r => r.documents)
+})));
+const outgoingByMonth = computed(() => months.value.map(month => ({
+  month,
+  documents: outgoing.value.find(r => r.month === month)?.documents ?? 0
+})));
+function departmentName(r) {
+  return r.name ?? t('board.noDepartment');
 }
 // Biểu đồ theo phòng cao theo số phòng, để không phòng nào mất nhãn
-const departmentHeight = computed(() => Math.max(256, departments.value.length * 36 + 72))
+const departmentHeight = computed(() => Math.max(256, departments.value.length * 36 + 72));
 // Thời gian xử lý vẽ theo giờ nếu mọi tháng đều xong trong ngày, không thì theo ngày
-const inHours = computed(() => processingByMonth.value.every((r) => !r.documents || r.total_hours / r.documents < 24))
-
-const tooltip = { trigger: 'axis', axisPointer: { type: 'shadow' } }
+const inHours = computed(() => processingByMonth.value.every(r => !r.documents || r.total_hours / r.documents < 24));
+const tooltip = {
+  trigger: 'axis',
+  axisPointer: {
+    type: 'shadow'
+  }
+};
 const statusChart = computed(() => ({
   tooltip,
-  grid: GRID,
-  xAxis: { type: 'category', data: byStatus.value.map((r) => t(`status.${r.status}`)), axisLabel: { interval: 0, width: 72, overflow: 'break' } },
-  yAxis: { type: 'value', minInterval: 1 },
-  series: [{ type: 'bar', name: t('board.count'), data: byStatus.value.map((r) => r.documents), itemStyle: { color: BRAND }, label: { show: true, position: 'top' } }],
-}))
+  grid: { ...GRID, right: 32 },
+  xAxis: {
+    type: 'value',
+    minInterval: 1
+  },
+  yAxis: {
+    type: 'category',
+    inverse: true,
+    data: byStatus.value.map(r => t(`status.${r.status}`)),
+    axisLabel: {
+      interval: 0,
+      width: 105,
+      fontSize: 13,
+      overflow: 'break'
+    }
+  },
+  series: [{
+    type: 'bar',
+    name: t('board.count'),
+    data: byStatus.value.map(r => r.documents),
+    itemStyle: {
+      color: BRAND
+    },
+    label: {
+      show: true,
+      position: 'right'
+    }
+  }]
+}));
 const departmentChart = computed(() => {
-  const rows = [...departments.value].reverse() // nhiều quá hạn nhất ở trên cùng
+  const rows = [...departments.value].reverse(); // nhiều quá hạn nhất ở trên cùng
   return {
     tooltip,
-    legend: { bottom: 0 },
-    grid: { ...GRID, bottom: 32 },
-    xAxis: { type: 'value', minInterval: 1 },
-    yAxis: { type: 'category', data: rows.map(departmentName) },
-    series: [
-      { type: 'bar', stack: 'all', name: t('board.inTime'), data: rows.map((r) => r.in_progress - r.overdue), itemStyle: { color: BRAND } },
-      { type: 'bar', stack: 'all', name: t('board.late'), data: rows.map((r) => r.overdue), itemStyle: { color: LATE } },
-    ],
-  }
-})
+    legend: {
+      bottom: 0
+    },
+    grid: {
+      ...GRID,
+      bottom: 32
+    },
+    xAxis: {
+      type: 'value',
+      minInterval: 1
+    },
+    yAxis: {
+      type: 'category',
+      data: rows.map(departmentName)
+    },
+    series: [{
+      type: 'bar',
+      stack: 'all',
+      name: t('board.inTime'),
+      data: rows.map(r => r.in_progress - r.overdue),
+      itemStyle: {
+        color: BRAND
+      }
+    }, {
+      type: 'bar',
+      stack: 'all',
+      name: t('board.late'),
+      data: rows.map(r => r.overdue),
+      itemStyle: {
+        color: LATE
+      }
+    }]
+  };
+});
 const processingChart = computed(() => ({
   tooltip,
   grid: GRID,
-  xAxis: { type: 'category', data: months.value.map(monthLabel) },
-  yAxis: { type: 'value' },
+  xAxis: {
+    type: 'category',
+    data: months.value.map(monthLabel),
+    axisLabel: { showMaxLabel: true, hideOverlap: true }
+  },
+  yAxis: {
+    type: 'value'
+  },
   series: [{
     type: 'bar',
     name: inHours.value ? t('board.avgHours') : t('board.avgDays'),
-    data: processingByMonth.value.map((r) => (r.documents ? Math.round((r.total_hours / r.documents / (inHours.value ? 1 : 24)) * 100) / 100 : 0)),
-    itemStyle: { color: BRAND },
-  }],
-}))
+    // Không làm tròn về 0 các lượt xử lý nhanh trong demo; tháng thiếu dữ liệu để trống.
+    data: processingByMonth.value.map(r => r.documents ? r.total_hours / r.documents / (inHours.value ? 1 : 24) : null),
+    barMinHeight: 2,
+    itemStyle: {
+      color: BRAND
+    }
+  }]
+}));
 const outgoingChart = computed(() => ({
   tooltip,
   grid: GRID,
-  xAxis: { type: 'category', data: months.value.map(monthLabel) },
-  yAxis: { type: 'value', minInterval: 1 },
-  series: [{ type: 'bar', name: t('board.issued'), data: outgoingByMonth.value.map((r) => r.documents), itemStyle: { color: BRAND } }],
-}))
+  xAxis: {
+    type: 'category',
+    data: months.value.map(monthLabel),
+    axisLabel: { showMaxLabel: true, hideOverlap: true }
+  },
+  yAxis: {
+    type: 'value',
+    minInterval: 1
+  },
+  series: [{
+    type: 'bar',
+    name: t('board.issued'),
+    data: outgoingByMonth.value.map(r => r.documents),
+    itemStyle: {
+      color: BRAND
+    }
+  }]
+}));
 </script>
 
 <template>
@@ -202,7 +280,7 @@ const outgoingChart = computed(() => ({
     <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
     <p v-if="allowed && !loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <div v-if="allowed && loaded" class="space-y-4">
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="board-kpis">
+      <div class="moc-board-kpis" data-testid="board-kpis">
         <div class="card p-4">
           <div class="text-sm text-stone-500">{{ t('board.open') }}</div>
           <div class="mt-1 text-3xl font-semibold text-stone-900" data-testid="kpi-open">{{ kpis.open }}</div>

@@ -16,100 +16,107 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
+<script setup>
+import { useI18n } from 'vue-i18n';
 
 // Sổ kiểm toán của đơn vị (F2.12), cho lãnh đạo và quản trị đơn vị: ai, lúc nào, làm gì, cột nào đổi, hash của
 // từng dòng và dòng đó đã được neo ra ngoài CSDL chưa. Hasura chỉ trả `overview`: cột chứa nội dung (trích yếu,
 // nội dung, tên tệp, ý kiến…) chỉ có tên, không có giá trị, để sổ không lộ văn bản hạn chế. Kiểm toàn bộ chuỗi
 // là việc của lệnh `make audit` trên máy chủ, vì chuỗi chung cho mọi đơn vị.
 
-interface Row {
-  id: number
-  occurred_at: string
-  actor_id: string
-  actor_kind: string
-  action: string
-  entity: string
-  entity_id: string
-  hash: string
-  // trigger ghi {cột: [cũ, mới]}; sự kiện dịch vụ tự ghi (vd file.rejected) thì {trường: giá trị}
-  overview: Record<string, unknown>
-}
-
-const PAGE = 50
+const PAGE = 50;
 const groups = {
   all: null,
-  documents: ['office.documents', 'office.case_files', 'office.case_file_documents', 'office.dispatches'],
+  documents: ['office.documents', 'office.case_files', 'office.case_file_documents'],
   assignments: ['office.assignments'],
   files: ['office.document_files', 'core.files'],
   people: ['core.users', 'office.document_acl'],
-  catalog: ['office.departments', 'office.registers', 'office.document_types', 'core.tenants'],
-} as const
-type Group = keyof typeof groups
-
-const { t } = useI18n()
-const { gql } = useApi()
-const route = useRoute()
-const router = useRouter()
-
-const group = computed<Group>(() => (String(route.query.loai ?? '') in groups ? (route.query.loai as Group) : 'all'))
-const doc = computed(() => (typeof route.query.van_ban === 'string' ? route.query.van_ban : ''))
-const rows = ref<Row[]>([])
-const more = ref(false)
-const anchor = ref<{ audit_id: number; anchored_at: string } | null>(null)
-const names = ref(new Map<string, string>())
-const departments = ref(new Map<string, string>())
-const units = ref(new Map<string, string>())   // đơn vị khác (liên thông): tên thay cho id
-const loading = ref(true)
-const failure = ref('')
-// quản trị đơn vị xem sổ nhưng không đọc văn bản nghiệp vụ: không có đường mở văn bản
-const claims = useAuth().claims
-const canOpen = computed(() => claims.value?.role !== 'tenant_admin')
-let latest = 0 // đổi bộ lọc khi lần tải trước chưa xong: bỏ kết quả cũ
+  catalog: ['office.departments', 'office.registers', 'office.document_types', 'core.tenants']
+};
+const {
+  t
+} = useI18n();
+const {
+  gql
+} = useApi();
+const route = useRoute();
+const router = useRouter();
+const group = computed(() => String(route.query.loai ?? '') in groups ? route.query.loai : 'all');
+const doc = computed(() => typeof route.query.van_ban === 'string' ? route.query.van_ban : '');
+const rows = ref([]);
+const more = ref(false);
+const anchor = ref(null);
+const names = ref(new Map());
+const departments = ref(new Map());
+const loading = ref(true);
+const failure = ref('');
+let latest = 0; // đổi bộ lọc khi lần tải trước chưa xong: bỏ kết quả cũ
 
 // Giao việc của văn bản đang lọc (dòng sổ của giao việc mang id giao việc, không mang id văn bản). Quản trị đơn vị
 // không đọc được giao việc: chỉ lọc theo chính văn bản.
-async function assignmentsOf(id: string): Promise<string[]> {
+async function assignmentsOf(id) {
   try {
-    const data = await gql<{ office_assignments: { id: string }[] }>(
-      'query ($d: uuid!) { office_assignments(where: {document_id: {_eq: $d}}) { id } }', { d: id })
-    return data.office_assignments.map((a) => a.id)
+    const data = await gql('query ($d: uuid!) { office_assignments(where: {document_id: {_eq: $d}}) { id } }', {
+      d: id
+    });
+    return data.office_assignments.map(a => a.id);
   } catch {
-    return []
+    return [];
   }
 }
-
-async function where(before?: number) {
-  const parts: Record<string, unknown>[] = []
-  const entities = groups[group.value]
-  if (entities) parts.push({ entity: { _in: entities } })
+async function where(before) {
+  const parts = [];
+  const entities = groups[group.value];
+  if (entities) parts.push({
+    entity: {
+      _in: entities
+    }
+  });
   // văn bản: chính dòng văn bản, tệp và quyền xem gắn với nó (entity_id "<văn bản>/<…>"), các lần giao việc
   if (doc.value) {
-    parts.push({ _or: [
-      { entity_id: { _eq: doc.value } },
-      { entity_id: { _like: `${doc.value}/%` } },
+    parts.push({
+      _or: [{
+        entity_id: {
+          _eq: doc.value
+        }
+      }, {
+        entity_id: {
+          _like: `${doc.value}/%`
+        }
+      },
       // văn bản trong hồ sơ (F3.8): entity_id "<hồ sơ>/<văn bản>"
-      { entity: { _eq: 'office.case_file_documents' }, entity_id: { _like: `%/${doc.value}` } },
-      { entity: { _eq: 'office.assignments' }, entity_id: { _in: await assignmentsOf(doc.value) } },
-    ] })
+      {
+        entity: {
+          _eq: 'office.case_file_documents'
+        },
+        entity_id: {
+          _like: `%/${doc.value}`
+        }
+      }, {
+        entity: {
+          _eq: 'office.assignments'
+        },
+        entity_id: {
+          _in: await assignmentsOf(doc.value)
+        }
+      }]
+    });
   }
-  if (before) parts.push({ id: { _lt: before } })
-  return { _and: parts }
+  if (before) parts.push({
+    id: {
+      _lt: before
+    }
+  });
+  return {
+    _and: parts
+  };
 }
-
 async function load(append = false) {
-  const mine = ++latest
-  if (!append) loading.value = true
-  failure.value = ''
+  const mine = ++latest;
+  if (!append) loading.value = true;
+  failure.value = '';
   try {
-    const data = await gql<{
-      core_audit_log: Row[]
-      core_audit_anchors: { audit_id: number; anchored_at: string }[]
-      core_users: { id: string; full_name: string }[]
-      office_departments: { id: string; name: string }[]
-      office_dispatch_units: { id: string; name: string }[]
-    }>(`
+    const data = await gql(`
       query ($where: core_audit_log_bool_exp!, $limit: Int!) {
         core_audit_log(where: $where, order_by: {id: desc}, limit: $limit) {
           id occurred_at actor_id actor_kind action entity entity_id hash overview
@@ -117,38 +124,40 @@ async function load(append = false) {
         core_audit_anchors(order_by: {audit_id: desc}, limit: 1) { audit_id anchored_at }
         core_users { id full_name }
         office_departments { id name }
-        office_dispatch_units { id name }
-      }`, { where: await where(append ? rows.value.at(-1)?.id : undefined), limit: PAGE + 1 })
-    if (mine !== latest) return
-    const page = data.core_audit_log.slice(0, PAGE)
-    more.value = data.core_audit_log.length > PAGE
-    rows.value = append ? [...rows.value, ...page] : page
-    anchor.value = data.core_audit_anchors[0] ?? null
-    names.value = new Map(data.core_users.map((u) => [u.id, u.full_name]))
-    departments.value = new Map(data.office_departments.map((d) => [d.id, d.name]))
-    units.value = new Map(data.office_dispatch_units.map((u) => [u.id, u.name]))
+      }`, {
+      where: await where(append ? rows.value.at(-1)?.id : undefined),
+      limit: PAGE + 1
+    });
+    if (mine !== latest) return;
+    const page = data.core_audit_log.slice(0, PAGE);
+    more.value = data.core_audit_log.length > PAGE;
+    rows.value = append ? [...rows.value, ...page] : page;
+    anchor.value = data.core_audit_anchors[0] ?? null;
+    names.value = new Map(data.core_users.map(u => [u.id, u.full_name]));
+    departments.value = new Map(data.office_departments.map(d => [d.id, d.name]));
   } catch (e) {
-    if (mine === latest) failure.value = errorText(t, e)
+    if (mine === latest) failure.value = errorText(t, e);
   } finally {
-    if (mine === latest) loading.value = false
+    if (mine === latest) loading.value = false;
   }
 }
-
-watch([group, doc], () => load())
-onMounted(() => load())
-
-const { label, action, who, changes } = useAuditFormat(names, departments, units)
+watch([group, doc], () => load());
+onMounted(() => load());
+const {
+  label,
+  who,
+  changes
+} = useAuditFormat(names, departments);
 
 // Văn bản mà dòng sổ thuộc về, để mở trang văn bản
-function documentOf(row: Row): string | null {
-  if (row.entity === 'office.documents') return row.entity_id
-  if (row.entity === 'office.document_files' || row.entity === 'office.document_acl') return row.entity_id.split('/')[0] ?? null
-  const ref = row.overview.document_id
-  return Array.isArray(ref) ? String(ref[1] ?? ref[0] ?? '') || null : null
+function documentOf(row) {
+  if (row.entity === 'office.documents') return row.entity_id;
+  if (row.entity === 'office.document_files' || row.entity === 'office.document_acl') return row.entity_id.split('/')[0] ?? null;
+  const ref = row.overview.document_id;
+  return Array.isArray(ref) ? String(ref[1] ?? ref[0] ?? '') || null : null;
 }
-
-function anchored(row: Row) {
-  return anchor.value !== null && row.id <= anchor.value.audit_id
+function anchored(row) {
+  return anchor.value !== null && row.id <= anchor.value.audit_id;
 }
 </script>
 
@@ -185,9 +194,11 @@ function anchored(row: Row) {
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
     <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('audit.empty') }}</p>
-    <div v-else class="card overflow-x-auto">
+    <div v-else>
+      <p class="moc-scroll-hint">{{ t('fe.scrollTable') }}</p>
+      <div class="moc-table-scroll moc-audit-table card overflow-x-auto" tabindex="0" role="region" :aria-label="t('audit.title')">
       <table class="w-full text-sm" data-testid="audit-table">
-        <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500 uppercase">
+        <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium text-stone-500">
           <tr>
             <th class="px-4 py-3">{{ t('audit.when') }}</th>
             <th class="px-4 py-3">{{ t('audit.who') }}</th>
@@ -201,8 +212,8 @@ function anchored(row: Row) {
             <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDateTime(row.occurred_at) }}</td>
             <td class="px-4 py-3">{{ who(row) }}</td>
             <td class="px-4 py-3">
-              <div class="font-medium whitespace-nowrap">{{ action(row) }} · {{ label('audit.entity', row.entity) }}</div>
-              <NuxtLink v-if="canOpen && documentOf(row)" :to="`/van-ban/${documentOf(row)}`" class="text-xs text-brand-700 hover:underline">{{ t('audit.openDocument') }}</NuxtLink>
+              <div class="font-medium whitespace-nowrap">{{ label('audit.action', row.action) }} · {{ label('audit.entity', row.entity) }}</div>
+              <NuxtLink v-if="documentOf(row)" :to="`/van-ban/${documentOf(row)}`" class="text-xs text-brand-700 hover:underline">{{ t('audit.openDocument') }}</NuxtLink>
             </td>
             <td class="max-w-md px-4 py-3">
               <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>
@@ -221,6 +232,7 @@ function anchored(row: Row) {
       </table>
       <div v-if="more" class="border-t border-stone-100 p-3 text-center">
         <button class="btn-secondary" @click="load(true)">{{ t('audit.more') }}</button>
+      </div>
       </div>
     </div>
   </div>

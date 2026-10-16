@@ -16,78 +16,84 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import type { RegisterBook } from '~/composables/useApi'
-
+<script setup>
+import { useI18n } from 'vue-i18n';
 // Sổ đăng ký văn bản đến / đi theo năm (F2.8), cho văn thư và lãnh đạo đơn vị. NĐ 30/2020, Điều 16, 22: văn bản
 // đăng ký trên hệ thống phải in ra giấy đủ các trường theo mẫu sổ (Phụ lục IV), ký nhận và đóng sổ. Màn này cho
 // xem đúng các cột, các ô sẽ in (svc-files dựng cả hai từ một chỗ), kiểm sổ có liền số không, rồi in ra PDF.
 // Văn bản hạn chế người xem không được đọc vẫn có dòng (sổ phải liền số) nhưng chỉ có số, ngày, số ký hiệu.
 
-const books = { den: 'in', di: 'out' } as const
-type Book = keyof typeof books
-const FIRST_YEAR = 2020
-
-const { t } = useI18n()
-const { register, printRegister } = useApi()
-const notice = useNotice()
-const route = useRoute()
-const router = useRouter()
-
-const thisYear = Number(today().slice(0, 4))
-const years = Array.from({ length: thisYear - FIRST_YEAR + 1 }, (_, i) => thisYear - i)
-const book = computed<Book>(() => (String(route.query.so ?? '') in books ? (route.query.so as Book) : 'den'))
+const books = {
+  den: 'in',
+  di: 'out'
+};
+const FIRST_YEAR = 2020;
+const {
+  t
+} = useI18n();
+const {
+  register,
+  printRegister
+} = useApi();
+const notice = useNotice();
+const route = useRoute();
+const router = useRouter();
+const thisYear = Number(today().slice(0, 4));
+const years = Array.from({
+  length: thisYear - FIRST_YEAR + 1
+}, (_, i) => thisYear - i);
+const book = computed(() => String(route.query.so ?? '') in books ? route.query.so : 'den');
 const year = computed(() => {
-  const y = Number(route.query.nam)
-  return Number.isInteger(y) && y >= FIRST_YEAR && y <= thisYear ? y : thisYear
-})
-
-const data = ref<RegisterBook | null>(null)
-const loading = ref(true)
-const failure = ref('')
-const printing = ref(false)
-let latest = 0 // đổi sổ, đổi năm khi lần tải trước chưa xong: bỏ kết quả cũ
+  const y = Number(route.query.nam);
+  return Number.isInteger(y) && y >= FIRST_YEAR && y <= thisYear ? y : thisYear;
+});
+const data = ref(null);
+const loading = ref(true);
+const failure = ref('');
+const printing = ref(false);
+let latest = 0; // đổi sổ, đổi năm khi lần tải trước chưa xong: bỏ kết quả cũ
 
 async function load() {
-  const mine = ++latest
-  loading.value = true
-  failure.value = ''
+  const mine = ++latest;
+  loading.value = true;
+  failure.value = '';
   try {
-    const result = await register(books[book.value], year.value)
-    if (mine === latest) data.value = result
+    const result = await register(books[book.value], year.value);
+    if (mine === latest) data.value = result;
   } catch (e) {
-    if (mine === latest) failure.value = errorText(t, e)
+    if (mine === latest) failure.value = errorText(t, e);
   } finally {
-    if (mine === latest) loading.value = false
+    if (mine === latest) loading.value = false;
   }
 }
-
-watch([book, year], load)
-onMounted(load)
+watch([book, year], load);
+onMounted(load);
 
 // Cột luôn trống trên hệ thống (Ký nhận, Số lượng bản) chỉ để ghi tay trên bản in: màn hình bỏ đi cho gọn
 const shown = computed(() => {
-  const d = data.value
-  if (!d) return []
-  const idx = d.columns.map((_, i) => i)
-  return d.entries.length ? idx.filter((i) => d.entries.some((e) => e.cells[i])) : idx
-})
-const isDate = (cell: string | undefined) => /^\d\d\/\d\d\/\d{4}$/.test(cell ?? '')
-const masked = computed(() => data.value?.entries.filter((e) => e.hidden).length ?? 0)
-
-function pick(query: Record<string, string>) {
-  router.replace({ query: { ...route.query, ...query } })
+  const d = data.value;
+  if (!d) return [];
+  const idx = d.columns.map((_, i) => i);
+  return d.entries.length ? idx.filter(i => d.entries.some(e => e.cells[i])) : idx;
+});
+const isDate = cell => /^\d\d\/\d\d\/\d{4}$/.test(cell ?? '');
+const masked = computed(() => data.value?.entries.filter(e => e.hidden).length ?? 0);
+function pick(query) {
+  router.replace({
+    query: {
+      ...route.query,
+      ...query
+    }
+  });
 }
-
 async function print() {
-  printing.value = true
+  printing.value = true;
   try {
-    await printRegister(books[book.value], year.value)
+    await printRegister(books[book.value], year.value);
   } catch (e) {
-    notice.error(errorText(t, e))
+    notice.error(errorText(t, e));
   } finally {
-    printing.value = false
+    printing.value = false;
   }
 }
 </script>
@@ -96,7 +102,7 @@ async function print() {
   <div>
     <PageHeader :title="t('register.title')" :subtitle="t('register.subtitle')">
       <label class="sr-only" for="register-year">{{ t('register.year') }}</label>
-      <select id="register-year" class="input w-28" :value="year" @change="pick({ nam: ($event.target as HTMLSelectElement).value })">
+      <select id="register-year" class="input w-28" :value="year" @change="pick({ nam: $event.target.value })">
         <option v-for="y in years" :key="y" :value="y">{{ t('register.yearOption', { year: y }) }}</option>
       </select>
       <button class="btn-primary" :disabled="printing || loading || !!failure" data-testid="register-print" @click="print">
@@ -132,11 +138,12 @@ async function print() {
         </div>
       </div>
 
-      <div v-if="data.entries.length" class="card overflow-x-auto">
+      <p v-if="data.entries.length" class="moc-scroll-hint">{{ t('fe.scrollTable') }}</p>
+      <div v-if="data.entries.length" class="moc-table-scroll moc-register-table card overflow-x-auto" tabindex="0" role="region" :aria-label="t('register.title')">
         <table class="w-full text-sm" data-testid="register-table">
           <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500">
             <tr>
-              <th v-for="i in shown" :key="i" class="px-3 py-3">{{ data.columns[i] }}</th>
+              <th v-for="i in shown" :key="i" class="px-3 py-3" :class="{ 'text-right': data.direction === 'in' && i === 1 }">{{ data.columns[i] }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-100">
@@ -147,7 +154,7 @@ async function print() {
             >
               <td
                 v-for="i in shown" :key="i" class="px-3 py-2"
-                :class="{ 'font-semibold tabular-nums': data.direction === 'in' && i === 1, 'whitespace-nowrap': isDate(entry.cells[i]) }"
+                :class="{ 'font-semibold tabular-nums text-right': data.direction === 'in' && i === 1, 'whitespace-nowrap': isDate(entry.cells[i]) }"
               >
                 {{ entry.cells[i] }}
               </td>
