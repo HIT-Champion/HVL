@@ -1,0 +1,36 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Sổ kiểm toán. Thay đổi dòng của bảng nghiệp vụ do trigger core.audit() tự ghi; dịch vụ chỉ ghi thêm
+# sự kiện không gắn với dòng nào, vd svc-files ghi 'file.rejected' khi ClamAV chặn tệp.
+# id, occurred_at, prev_hash, hash do trigger trong CSDL đặt — người ghi không chọn được.
+# Màn xem sổ cho lãnh đạo đơn vị thêm ở F2.12.
+table:
+  name: audit_log
+  schema: core
+insert_permissions:
+  - role: service
+    permission:
+      columns: [actor_id, actor_kind, request_id, action, entity, entity_id, diff]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+      check: {}
+select_permissions:
+  - role: service
+    permission:
+      columns: [id, tenant_id, occurred_at, actor_id, actor_kind, request_id, action, entity, entity_id, diff,
+                prev_hash, hash]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}

@@ -14,8 +14,9 @@
   — ứng dụng nào cũng dùng. `office` là dữ liệu riêng của ứng dụng Văn phòng điện tử. Ứng dụng khác cắm vào
   lõi thì có schema riêng của nó, không sửa `core`.
 - **Mọi bảng nghiệp vụ có `tenant_id`**; quyền Hasura luôn lọc theo `X-Hasura-Tenant-Id`.
-- **Người dùng không nằm trong CSDL.** Keycloak là nguồn sự thật về người dùng; bảng chỉ lưu `sub`
-  (kiểu `text`). Phòng ban của người dùng đi trong JWT (`department_id`).
+- **Keycloak là nguồn sự thật về người dùng.** Bảng nghiệp vụ chỉ lưu `sub` (kiểu `text`); phòng ban của
+  người dùng đi trong JWT (`department_id`). `core.users` là **bản sao chỉ đọc** do `svc-workflow` đồng bộ
+  từ Keycloak mỗi 15 giây, chỉ để chọn người được giao việc và hiện tên — không ai sửa qua GraphQL.
 - **Không xóa.** Văn bản bị hủy thì đổi trạng thái `cancelled`. Không vai trò nào có quyền `delete`
   trên bảng nghiệp vụ. Ngoại lệ duy nhất là job nộp lưu (§2.4), và chỉ xóa sau khi đã ghi gói lưu trữ
   có băm sang kho lạnh.
@@ -53,6 +54,17 @@ create table core.files (                   -- tệp đã qua kiểm dịch; t�
   created_by    text not null,               -- sub Keycloak hoặc tên tài khoản dịch vụ
   created_at    timestamptz not null default now(),
   check (encrypted = (wrapped_dek is not null))
+);
+
+create table core.users (                   -- danh bạ, đồng bộ từ Keycloak (migration 1792281600400)
+  id             text primary key,             -- sub của Keycloak
+  tenant_id      uuid not null references core.tenants,
+  department_id  uuid,                          -- không đặt khóa ngoại: core không phụ thuộc office
+  username       text not null,
+  full_name      text not null,                 -- "firstName lastName" của Keycloak: họ đệm + tên
+  email          text,
+  role           text not null check (role in ('clerk', 'staff', 'manager', 'director', 'tenant_admin')),
+  enabled        boolean not null default true  -- bị xóa hoặc khóa trong Keycloak: false, không xóa dòng
 );
 
 create table core.audit_log (               -- sổ kiểm toán chuỗi băm (F2.12)
@@ -351,7 +363,12 @@ JWT do Keycloak cấp, mapper đưa vào claim `https://hasura.io/jwt/claims`:
 | `x-hasura-user-id` | `sub` |
 | `x-hasura-tenant-id` | thuộc tính người dùng `tenant_id` |
 | `x-hasura-department-id` | thuộc tính người dùng `department_id` |
-| `x-hasura-allowed-roles`, `x-hasura-default-role` | vai trò realm |
+| `x-hasura-allowed-roles`, `x-hasura-default-role` | thuộc tính người dùng `moc_role` (một vai trò mỗi người) |
+
+Ba thuộc tính `tenant_id`, `department_id`, `moc_role` khai trong user profile của realm
+(`auth/realm/moc-realm.json`): chỉ quản trị viên xem và sửa được, người dùng không tự đổi đơn vị hay vai trò
+của mình. Dùng một thuộc tính cho cả hai claim vai trò để không bao giờ lệch nhau; giá trị bị giới hạn trong 5
+vai trò nghiệp vụ, nên không gán được vai trò `admin` của Hasura.
 
 Quyền đọc `office.documents` (các bảng con lọc theo văn bản cha):
 
@@ -397,20 +414,28 @@ người ngoài liệt kê được mọi văn bản đã phát hành.
 
 | Action | Ai gọi | Làm gì |
 |---|---|---|
-| `registerIncoming(documentId)` | `clerk` | Kiểm thông tin đủ, cấp số đến, `received → registered`, khởi chạy `van-ban-den` với `businessKey = documentId` |
+| `registerIncoming(documentId)` | `clerk` | Gọi hàm `office.register_incoming` (một giao dịch: khóa văn bản, lấy số kế tiếp của sổ năm nay, `received → registered`, ghi sự kiện), rồi khởi chạy `van-ban-den` với `businessKey = documentId`. Flowable lỗi thì vẫn giữ số đã cấp; job đối soát (5 phút) khởi chạy sau |
+| `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` | Kiểm dự thảo đủ trường, `draft/returned → in_review`, khởi chạy hoặc tiếp tục `van-ban-di` |
 | `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
-cấp số hai lần.
+cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác
+đã nhận thì 409) → ghi PostgreSQL trong một giao dịch, sự kiện mang `task_id` → hoàn thành việc trong Flowable.
+Gọi lại khi đã có sự kiện mang `task_id` thì bỏ qua bước ghi; CSDL từ chối thì trả việc về nhóm.
+
+Hasura gửi kèm tiêu đề `X-Moc-Action-Secret`; `svc-workflow` từ chối yêu cầu không mang đúng giá trị.
+
+Nhóm ứng viên trong Flowable (Flowable không biết người dùng Keycloak; `svc-workflow` ánh xạ từ token):
+`t:<tenant>:director`, `t:<tenant>:d:<department>:manager`, `t:<tenant>:clerk`; việc đích danh giao theo `sub`.
 
 ### 4.2. Task trong BPMN
 
 | Quy trình | Task (`formKey`) | Ai làm | `outcome` | `data` |
 |---|---|---|---|---|
-| `van-ban-den` | `vbden.chiDao` | `director` | `direct` · `file` (chỉ lưu) | `instruction`, `lead` (phòng hoặc người), `supports[]`, `infos[]`, `due_on` |
+| `van-ban-den` | `vbden.chiDao` | `director` | `direct` · `file` (chỉ lưu) | `direct`: `instruction`, đúng một trong `lead_department_id` / `lead_user_id`, `supports[]` (phòng), `due_on`; `file`: `note` |
 | | `vbden.phanCong` | `manager` của phòng chủ trì | `assign` · `self` | `user_id`, `note` |
-| | `vbden.xuLy` | Người được giao | `done` | `result_note`, `reply_document_id` (tùy chọn) |
+| | `vbden.xuLy` | Người được giao | `done` | `result_note` (`reply_document_id` khi có văn bản đi — Phase 2) |
 | `van-ban-di` | `vbdi.duyetPhong` | `manager` của phòng soạn | `approve` · `return` | `note` |
 | | `vbdi.duyetDonVi` | `director` (người ký) | `approve` · `return` | `note` |
 | | `vbdi.phatHanh` | `clerk` | `issue` | `is_public` |
@@ -474,6 +499,7 @@ Một khuôn chung cho thông báo realtime (Centrifugo), callback và `office.d
 | `office.document.directed` | Lãnh đạo ghi ý kiến chỉ đạo |
 | `office.document.assigned` | Có việc giao cho một người hoặc phòng |
 | `office.document.processed` | Người được giao báo xong |
+| `office.document.filed` | Lãnh đạo cho lưu, không xử lý |
 | `office.document.submitted` / `approved` / `returned` | Văn bản đi được trình / duyệt / trả lại |
 | `office.document.issued` | Văn bản đi được phát hành |
 | `office.task.due_soon` / `office.task.overdue` / `office.task.escalated` | Timer của Flowable |

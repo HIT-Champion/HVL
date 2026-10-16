@@ -1,0 +1,49 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Danh bạ người dùng, đồng bộ từ Keycloak (svc-workflow, vai trò service). Người trong thuê ước đọc được
+# để chọn người được giao việc và hiện tên trên dòng thời gian; không ai sửa qua GraphQL.
+table:
+  name: users
+  schema: core
+insert_permissions:
+  - role: service
+    permission:
+      columns: [id, department_id, username, full_name, email, role, enabled]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+      check: {}
+select_permissions:
+  - role: clerk
+    permission: &tenant_select
+      columns: [id, department_id, username, full_name, email, role, enabled]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+  - role: staff
+    permission: *tenant_select
+  - role: manager
+    permission: *tenant_select
+  - role: director
+    permission: *tenant_select
+  - role: tenant_admin
+    permission: *tenant_select
+  - role: service
+    permission: *tenant_select
+update_permissions:
+  - role: service
+    permission:
+      columns: [department_id, username, full_name, email, role, enabled]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+      check: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
