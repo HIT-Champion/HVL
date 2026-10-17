@@ -1,0 +1,203 @@
+{
+  "app": {
+    "name": "Mộc",
+    "tagline": "Văn phòng điện tử",
+    "loading": "Đang tải…",
+    "retry": "Thử lại",
+    "back": "Quay lại",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "none": "—",
+    "required": "bắt buộc",
+    "optional": "không bắt buộc",
+    "refresh": "Làm mới"
+  },
+  "nav": {
+    "inbox": "Hộp việc",
+    "incoming": "Văn bản đến",
+    "receive": "Tiếp nhận văn bản",
+    "search": "Tìm kiếm",
+    "logout": "Đăng xuất",
+    "language": "English"
+  },
+  "role": {
+    "clerk": "Văn thư",
+    "staff": "Chuyên viên",
+    "manager": "Lãnh đạo phòng",
+    "director": "Lãnh đạo đơn vị",
+    "tenant_admin": "Quản trị đơn vị"
+  },
+  "status": {
+    "received": "Chờ vào sổ",
+    "registered": "Chờ chỉ đạo",
+    "in_progress": "Đang xử lý",
+    "done": "Đã xử lý",
+    "archived": "Đã lưu trữ",
+    "cancelled": "Đã hủy",
+    "draft": "Dự thảo",
+    "in_review": "Đang trình",
+    "returned": "Bị trả lại",
+    "approved": "Đã duyệt",
+    "issued": "Đã phát hành"
+  },
+  "urgency": {
+    "normal": "Thường",
+    "khan": "Khẩn",
+    "thuong_khan": "Thượng khẩn",
+    "hoa_toc": "Hỏa tốc"
+  },
+  "task": {
+    "vbden": {
+      "chiDao": "Cho ý kiến chỉ đạo",
+      "phanCong": "Phân công xử lý",
+      "xuLy": "Xử lý văn bản"
+    }
+  },
+  "event": {
+    "received": "Tiếp nhận văn bản",
+    "office": {
+      "document": {
+        "registered": "Vào sổ, số đến {n}",
+        "directed": "Chỉ đạo",
+        "assigned": "Phân công cho {name}",
+        "processed": "Báo cáo kết quả",
+        "filed": "Lưu, không xử lý"
+      }
+    }
+  },
+  "inbox": {
+    "title": "Hộp việc",
+    "subtitle": "Việc đang chờ bạn — văn bản khẩn xếp trước",
+    "empty": "Không còn việc nào chờ bạn.",
+    "received": "Nhận lúc",
+    "due": "Hạn",
+    "open": "Mở"
+  },
+  "incoming": {
+    "title": "Văn bản đến",
+    "receive": "Tiếp nhận văn bản",
+    "empty": "Chưa có văn bản nào.",
+    "tab": {
+      "received": "Chờ vào sổ",
+      "active": "Đang xử lý",
+      "done": "Đã xong",
+      "all": "Tất cả"
+    },
+    "number": "Số đến",
+    "symbol": "Số, ký hiệu",
+    "issuer": "Cơ quan ban hành",
+    "summary": "Trích yếu",
+    "status": "Trạng thái",
+    "due": "Hạn xử lý"
+  },
+  "receive": {
+    "title": "Tiếp nhận văn bản đến",
+    "subtitle": "Tải bản điện tử lên, nhập thông tin trên văn bản rồi vào sổ.",
+    "file": "Tệp văn bản",
+    "drop": "Kéo thả tệp PDF hoặc ảnh vào đây, hoặc bấm để chọn",
+    "scanning": "Đang tải lên và quét virus…",
+    "clean": "Đã quét — sạch",
+    "infected": "Tệp nhiễm mã độc ({sig}) — đã bị chặn, không lưu",
+    "type": "Loại văn bản",
+    "symbol": "Số, ký hiệu",
+    "symbolHint": "Ví dụ: 123/UBND-VP",
+    "issuer": "Cơ quan ban hành",
+    "issuedOn": "Ngày ban hành",
+    "summary": "Trích yếu nội dung",
+    "summaryHint": "10–500 ký tự",
+    "urgency": "Độ khẩn",
+    "dueOn": "Hạn giải quyết",
+    "restricted": "Hạn chế người xem",
+    "restrictedHint": "Chỉ người tiếp nhận và người được cấp quyền xem được",
+    "save": "Lưu văn bản",
+    "saveAndRegister": "Lưu và vào sổ",
+    "duplicate": "Văn bản này có thể đã được tiếp nhận: {symbol} của {issuer}, ngày {date}.",
+    "saved": "Đã lưu văn bản.",
+    "registered": "Đã vào sổ — số đến {n}."
+  },
+  "doc": {
+    "info": "Thông tin văn bản",
+    "files": "Tệp đính kèm",
+    "noFiles": "Chưa có tệp.",
+    "download": "Tải về",
+    "type": "Loại",
+    "symbol": "Số, ký hiệu",
+    "issuer": "Cơ quan ban hành",
+    "issuedOn": "Ngày ban hành",
+    "registered": "Vào sổ",
+    "number": "Số đến",
+    "due": "Hạn giải quyết",
+    "urgency": "Độ khẩn",
+    "assignments": "Giao xử lý",
+    "lead": "Chủ trì",
+    "support": "Phối hợp",
+    "info_role": "Để biết",
+    "timeline": "Dòng thời gian",
+    "register": "Vào sổ",
+    "registerConfirm": "Vào sổ văn bản này? Số đến được cấp tự động, liên tiếp theo năm.",
+    "notFound": "Không tìm thấy văn bản, hoặc bạn không có quyền xem.",
+    "restricted": "Hạn chế",
+    "assignmentDone": "Đã xong",
+    "assignmentOpen": "Đang xử lý"
+  },
+  "form": {
+    "chiDao": {
+      "title": "Ý kiến chỉ đạo",
+      "instruction": "Ý kiến chỉ đạo",
+      "leadKind": "Giao chủ trì cho",
+      "leadDepartment": "Một phòng",
+      "leadUser": "Một người",
+      "department": "Phòng chủ trì",
+      "user": "Người chủ trì",
+      "supports": "Phòng phối hợp",
+      "due": "Hạn giải quyết",
+      "direct": "Giao xử lý",
+      "file": "Lưu, không xử lý",
+      "fileNote": "Lý do lưu (không bắt buộc)"
+    },
+    "phanCong": {
+      "title": "Phân công trong phòng",
+      "user": "Giao cho",
+      "note": "Lời dặn",
+      "assign": "Giao việc",
+      "self": "Tôi tự xử lý"
+    },
+    "xuLy": {
+      "title": "Báo cáo kết quả",
+      "result": "Kết quả xử lý",
+      "done": "Báo cáo xong"
+    },
+    "pick": "— Chọn —",
+    "done": "Đã chuyển bước tiếp theo."
+  },
+  "search": {
+    "title": "Tìm kiếm văn bản",
+    "placeholder": "Số ký hiệu, trích yếu, cơ quan ban hành — gõ không dấu cũng được",
+    "button": "Tìm",
+    "empty": "Không có văn bản nào khớp.",
+    "more": "Xem thêm",
+    "any": "Tất cả",
+    "direction": {
+      "in": "Văn bản đến",
+      "out": "Văn bản đi"
+    }
+  },
+  "error": {
+    "generic": "Có lỗi xảy ra: {msg}",
+    "network": "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
+    "session": "Phiên đăng nhập đã hết, đang chuyển tới trang đăng nhập…",
+    "documents_in_dedup": "Văn bản này đã được tiếp nhận trước đó (trùng cơ quan ban hành, số ký hiệu và ngày ban hành).",
+    "documents_due_after_registered": "Hạn giải quyết không được trước ngày vào sổ.",
+    "documents_summary": "Trích yếu phải dài 10–500 ký tự.",
+    "infected": "Tệp nhiễm mã độc, đã bị chặn.",
+    "too_large": "Tệp vượt quá dung lượng cho phép.",
+    "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị."
+  },
+  "validation": {
+    "required": "Không được để trống",
+    "summaryLength": "Cần 10–500 ký tự",
+    "dateFuture": "Không được sau hôm nay",
+    "dueBefore": "Hạn phải từ hôm nay trở đi"
+  }
+}

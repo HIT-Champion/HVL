@@ -1,0 +1,203 @@
+<!--
+  Copyright 2026 Mộc Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong processes/van-ban-den.bpmn20.xml).
+// Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
+
+export interface PanelUser { id: string; full_name: string; role: string; department_id: string | null }
+export interface PanelDepartment { id: string; code: string; name: string }
+
+const props = defineProps<{
+  taskId: string
+  formKey: string
+  documentDue: string | null
+  users: PanelUser[]
+  departments: PanelDepartment[]
+  myDepartment: string | null
+  myId: string
+}>()
+const emit = defineEmits<{ done: [] }>()
+
+const { t } = useI18n()
+const { gql } = useApi()
+const notice = useNotice()
+const busy = ref(false)
+const tried = ref(false)
+
+// vbden.chiDao
+const direct = reactive({
+  instruction: '',
+  leadKind: 'department' as 'department' | 'user',
+  lead_department_id: '',
+  lead_user_id: '',
+  supports: [] as string[],
+  due_on: props.documentDue ?? addDays(today(), 7),
+})
+const fileNote = ref('')
+// vbden.phanCong
+const assign = reactive({ user_id: '', note: '' })
+// vbden.xuLy
+const result = ref('')
+
+const handlers = computed(() => props.users.filter((u) => u.role === 'staff' || u.role === 'manager'))
+const myPeople = computed(() => props.users.filter((u) => u.department_id === props.myDepartment && u.id !== props.myId && (u.role === 'staff' || u.role === 'manager')))
+const deptName = (id: string | null) => props.departments.find((d) => d.id === id)?.name ?? ''
+
+const directErrors = computed(() => {
+  const e: Record<string, string> = {}
+  if (!direct.instruction.trim()) e.instruction = t('validation.required')
+  if (direct.leadKind === 'department' && !direct.lead_department_id) e.lead = t('validation.required')
+  if (direct.leadKind === 'user' && !direct.lead_user_id) e.lead = t('validation.required')
+  if (direct.due_on && direct.due_on < today()) e.due_on = t('validation.dueBefore')
+  return e
+})
+
+async function complete(outcome: string, data: Record<string, unknown>) {
+  busy.value = true
+  try {
+    await gql(
+      'mutation ($t: String!, $o: String!, $d: jsonb) { completeTask(taskId: $t, outcome: $o, data: $d) { task_id } }',
+      { t: props.taskId, o: outcome, d: data },
+    )
+    notice.ok(t('form.done'))
+    emit('done')
+  } catch (e) {
+    notice.error(errorText(t, e))
+  } finally {
+    busy.value = false
+  }
+}
+
+function submitDirect() {
+  tried.value = true
+  if (Object.keys(directErrors.value).length) return
+  complete('direct', {
+    instruction: direct.instruction.trim(),
+    ...(direct.leadKind === 'department' ? { lead_department_id: direct.lead_department_id } : { lead_user_id: direct.lead_user_id }),
+    supports: direct.supports.filter((d) => d !== direct.lead_department_id),
+    due_on: direct.due_on || null,
+  })
+}
+
+function submitAssign() {
+  tried.value = true
+  if (!assign.user_id) return
+  complete('assign', { user_id: assign.user_id, note: assign.note.trim() || null })
+}
+
+function submitDone() {
+  tried.value = true
+  if (!result.value.trim()) return
+  complete('done', { result_note: result.value.trim() })
+}
+</script>
+
+<template>
+  <section class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
+    <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
+      <h2 class="text-sm font-semibold text-brand-900">{{ t(`task.${formKey}`) }}</h2>
+    </div>
+
+    <!-- Lãnh đạo đơn vị chỉ đạo -->
+    <form v-if="formKey === 'vbden.chiDao'" class="space-y-4 p-5" novalidate @submit.prevent="submitDirect">
+      <div>
+        <label class="label" for="instruction">{{ t('form.chiDao.instruction') }}</label>
+        <textarea id="instruction" v-model="direct.instruction" rows="3" class="input" maxlength="2000"
+                  :aria-invalid="tried && !!directErrors.instruction" />
+        <p v-if="tried && directErrors.instruction" class="field-error">{{ directErrors.instruction }}</p>
+      </div>
+      <fieldset>
+        <legend class="label">{{ t('form.chiDao.leadKind') }}</legend>
+        <div class="flex gap-4 text-sm">
+          <label class="flex items-center gap-2"><input v-model="direct.leadKind" type="radio" value="department" class="accent-brand-700"> {{ t('form.chiDao.leadDepartment') }}</label>
+          <label class="flex items-center gap-2"><input v-model="direct.leadKind" type="radio" value="user" class="accent-brand-700"> {{ t('form.chiDao.leadUser') }}</label>
+        </div>
+      </fieldset>
+      <div v-if="direct.leadKind === 'department'">
+        <label class="label" for="lead_dept">{{ t('form.chiDao.department') }}</label>
+        <select id="lead_dept" v-model="direct.lead_department_id" class="input" :aria-invalid="tried && !!directErrors.lead">
+          <option value="">{{ t('form.pick') }}</option>
+          <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+      </div>
+      <div v-else>
+        <label class="label" for="lead_user">{{ t('form.chiDao.user') }}</label>
+        <select id="lead_user" v-model="direct.lead_user_id" class="input" :aria-invalid="tried && !!directErrors.lead">
+          <option value="">{{ t('form.pick') }}</option>
+          <option v-for="u in handlers" :key="u.id" :value="u.id">{{ u.full_name }} — {{ deptName(u.department_id) }}</option>
+        </select>
+      </div>
+      <p v-if="tried && directErrors.lead" class="field-error">{{ directErrors.lead }}</p>
+      <fieldset>
+        <legend class="label">{{ t('form.chiDao.supports') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></legend>
+        <div class="grid gap-1.5 sm:grid-cols-2">
+          <label v-for="d in departments.filter((x) => x.id !== direct.lead_department_id)" :key="d.id" class="flex items-center gap-2 text-sm">
+            <input v-model="direct.supports" type="checkbox" :value="d.id" class="h-4 w-4 accent-brand-700"> {{ d.name }}
+          </label>
+        </div>
+      </fieldset>
+      <div class="max-w-xs">
+        <label class="label" for="due">{{ t('form.chiDao.due') }}</label>
+        <input id="due" v-model="direct.due_on" type="date" class="input" :min="today()" :aria-invalid="tried && !!directErrors.due_on">
+        <p v-if="tried && directErrors.due_on" class="field-error">{{ directErrors.due_on }}</p>
+      </div>
+      <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
+        <div class="flex items-end gap-2">
+          <input v-model="fileNote" class="input w-56" :placeholder="t('form.chiDao.fileNote')">
+          <button type="button" class="btn-secondary" :disabled="busy" @click="complete('file', { note: fileNote.trim() || null })">{{ t('form.chiDao.file') }}</button>
+        </div>
+        <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.chiDao.direct') }}</button>
+      </div>
+    </form>
+
+    <!-- Lãnh đạo phòng phân công -->
+    <form v-else-if="formKey === 'vbden.phanCong'" class="space-y-4 p-5" novalidate @submit.prevent="submitAssign">
+      <div>
+        <label class="label" for="assignee">{{ t('form.phanCong.user') }}</label>
+        <select id="assignee" v-model="assign.user_id" class="input" :aria-invalid="tried && !assign.user_id">
+          <option value="">{{ t('form.pick') }}</option>
+          <option v-for="u in myPeople" :key="u.id" :value="u.id">{{ u.full_name }}</option>
+        </select>
+        <p v-if="tried && !assign.user_id" class="field-error">{{ t('validation.required') }}</p>
+      </div>
+      <div>
+        <label class="label" for="note">{{ t('form.phanCong.note') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></label>
+        <textarea id="note" v-model="assign.note" rows="2" class="input" maxlength="2000" />
+      </div>
+      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+        <button type="button" class="btn-secondary" :disabled="busy" @click="complete('self', { note: assign.note.trim() || null })">{{ t('form.phanCong.self') }}</button>
+        <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.phanCong.assign') }}</button>
+      </div>
+    </form>
+
+    <!-- Chuyên viên báo kết quả -->
+    <form v-else-if="formKey === 'vbden.xuLy'" class="space-y-4 p-5" novalidate @submit.prevent="submitDone">
+      <div>
+        <label class="label" for="result">{{ t('form.xuLy.result') }}</label>
+        <textarea id="result" v-model="result" rows="4" class="input" maxlength="4000" :aria-invalid="tried && !result.trim()" />
+        <p v-if="tried && !result.trim()" class="field-error">{{ t('validation.required') }}</p>
+      </div>
+      <div class="flex justify-end border-t border-stone-100 pt-4">
+        <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.xuLy.done') }}</button>
+      </div>
+    </form>
+  </section>
+</template>

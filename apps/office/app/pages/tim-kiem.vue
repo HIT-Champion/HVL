@@ -1,0 +1,89 @@
+<!--
+  Copyright 2026 Mộc Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import type { SearchHit } from '~/composables/useApi'
+
+// Tìm kiếm (F1.7, F2.7): Meilisearch xếp hạng, Hasura lọc theo quyền — chỉ hiện văn bản người dùng được đọc.
+const { t } = useI18n()
+const { search } = useApi()
+const route = useRoute()
+const router = useRouter()
+
+const q = ref(String(route.query.q ?? ''))
+const direction = ref(String(route.query.direction ?? ''))
+const hits = ref<SearchHit[]>([])
+const next = ref<number | null>(null)
+const loading = ref(false)
+const searched = ref(false)
+const failure = ref('')
+
+async function run(more = false) {
+  if (!q.value.trim()) return
+  loading.value = true
+  failure.value = ''
+  try {
+    const res = await search({ q: q.value.trim(), direction: direction.value || undefined, limit: 20, offset: more ? next.value ?? 0 : 0 })
+    hits.value = more ? [...hits.value, ...res.hits] : res.hits
+    next.value = res.next_offset
+    searched.value = true
+    if (!more) router.replace({ query: { q: q.value.trim(), ...(direction.value ? { direction: direction.value } : {}) } })
+  } catch (e) {
+    failure.value = errorText(t, e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => { if (q.value) run() })
+</script>
+
+<template>
+  <div>
+    <PageHeader :title="t('search.title')" />
+    <form class="card mb-6 flex flex-col gap-3 p-4 sm:flex-row" @submit.prevent="run()">
+      <input v-model="q" type="search" class="input flex-1" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
+      <select v-model="direction" class="input sm:w-44">
+        <option value="">{{ t('search.any') }}</option>
+        <option value="in">{{ t('search.direction.in') }}</option>
+        <option value="out">{{ t('search.direction.out') }}</option>
+      </select>
+      <button class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
+    </form>
+
+    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
+    <p v-else-if="searched && !hits.length" class="card p-12 text-center text-stone-500">{{ t('search.empty') }}</p>
+    <ul v-else class="space-y-3">
+      <li v-for="h in hits" :key="h.id">
+        <NuxtLink :to="`/van-ban/${h.id}`" class="card block p-4 transition hover:border-brand-600 hover:shadow-md">
+          <div class="mb-1 flex flex-wrap items-center gap-2">
+            <StatusChip :status="h.status" />
+            <UrgencyChip :urgency="h.urgency" quiet />
+            <span class="text-xs text-stone-500">{{ t(`search.direction.${h.direction}`) }}<span v-if="h.register_number"> · {{ t('incoming.number') }} {{ h.register_number }}</span></span>
+          </div>
+          <div class="font-medium text-stone-900">{{ h.summary }}</div>
+          <div class="mt-0.5 text-sm text-stone-500">{{ h.symbol }} · {{ h.issuer_name }} · {{ fmtDate(h.issued_on) }}</div>
+        </NuxtLink>
+      </li>
+    </ul>
+    <div v-if="next !== null" class="mt-4 text-center">
+      <button class="btn-secondary" :disabled="loading" @click="run(true)">{{ t('search.more') }}</button>
+    </div>
+  </div>
+</template>

@@ -1,0 +1,50 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Phục vụ giao diện tĩnh sau APISIX. ${MOC_REALM} do image nginx thay từ biến môi trường lúc khởi động.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    server_tokens off;
+
+    # nginx chỉ kế thừa add_header khi khối con không có add_header nào, nên mỗi location tự include
+    # security-headers.conf. $csp_scripts: băm của các đoạn script nội tuyến, tính lúc dựng image (scripts/csp-hashes.mjs)
+    include /etc/nginx/csp.conf;
+
+    # Cấu hình đọc lúc chạy: đổi realm không phải dựng lại giao diện (PoF #4)
+    location = /config.json {
+        default_type application/json;
+        include /etc/nginx/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        return 200 '{"realm":"${MOC_REALM}","clientId":"app-office"}';
+    }
+
+    # Tệp đã băm tên: lưu đệm lâu
+    location /_nuxt/ {
+        include /etc/nginx/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # Ứng dụng một trang: mọi đường dẫn khác trả về index.html
+    location / {
+        include /etc/nginx/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        # $uri/index.html thay cho $uri/: không để nginx chuyển hướng thêm dấu / (làm mất trang nhận đăng nhập)
+        try_files $uri $uri/index.html /index.html;
+    }
+}
