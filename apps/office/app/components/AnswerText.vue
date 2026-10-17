@@ -16,30 +16,37 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import type { AskSource } from '~/composables/useApi'
-import { citeLabel, segments, sourceAnchor } from '~/utils/answer'
-
-// Một câu trả lời của trợ lý hỏi đáp (F4.2): chữ thuần dựng thành nút chữ — không bao giờ v-html, vì chữ đến từ văn
-// bản người khác tải lên và từ mô hình ngôn ngữ. Mỗi dấu [n] là liên kết tới mục nguồn n bên dưới, tên đọc được
-// "Nguồn 1: 88/CTSV, trang 1"; bấm (chuột, Enter) thì cuộn tới và đưa tiêu điểm vào mục đó.
-const props = defineProps<{
-  text: string
-  sources: AskSource[]
-  ask: string   // ask_id của lượt hỏi: id các mục nguồn mang nó (utils/answer.ts sourceAnchor)
-}>()
-
-const { t } = useI18n()
-const parts = computed(() => segments(props.text, props.sources))
-
-function jump(e: MouseEvent, n: number) {
-  const el = document.getElementById(sourceAnchor(props.ask, n))
-  if (!el) return   // không thấy mục nguồn: để trình duyệt tự theo href
-  e.preventDefault()
-  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' })
-  el.focus({ preventScroll: true })
+<script setup>
+import { useI18n } from 'vue-i18n';
+import { citeLabel, segments, sourceAnchor } from '~/utils/answer';
+const props = defineProps({
+    text: {
+        type: String,
+        required: true
+    },
+    sources: {
+        type: Array,
+        required: true
+    },
+    ask: {
+        type: String,
+        required: true
+    }
+});
+const { t } = useI18n();
+const parts = computed(()=>segments(props.text, props.sources));
+function jump(e, n) {
+    const el = document.getElementById(sourceAnchor(props.ask, n));
+    if (!el) return;
+    e.preventDefault();
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({
+        behavior: reduce ? 'auto' : 'smooth',
+        block: 'nearest'
+    });
+    el.focus({
+        preventScroll: true
+    });
 }
 </script>
 

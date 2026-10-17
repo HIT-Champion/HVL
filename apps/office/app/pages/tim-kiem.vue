@@ -16,50 +16,75 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import type { SearchHit } from '~/composables/useApi'
-
-// Tìm kiếm (F1.7, F2.7): Meilisearch xếp hạng, Hasura lọc theo quyền — chỉ hiện văn bản người dùng được đọc.
-const { t } = useI18n()
-const { search } = useApi()
-const route = useRoute()
-const router = useRouter()
-
-const q = ref(String(route.query.q ?? ''))
-const direction = ref(String(route.query.direction ?? ''))
-// "Hỏi trợ lý" (F4.2): mang câu đang tìm sang trang Hỏi đáp, điền sẵn, không tự gửi
-const claims = useAuth().claims
-const canAsk = computed(() => ['clerk', 'staff', 'manager', 'director'].includes(claims.value?.role ?? ''))
-const askLink = computed(() => (q.value.trim() ? { path: '/hoi-dap', query: { q: q.value.trim() } } : { path: '/hoi-dap' }))
-const hits = ref<SearchHit[]>([])
-const next = ref<string | null>(null)
-// "Xem thêm" lấy tiếp đúng câu tìm đang hiện kết quả, dù ô tìm đã gõ khác: trang sau gắn với câu tìm (svc-files)
-let shown: { q: string; direction?: string } = { q: '' }
-const loading = ref(false)
-const searched = ref(false)
-const failure = ref('')
-
+<script setup>
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
+const { search } = useApi();
+const route = useRoute();
+const router = useRouter();
+const q = ref(String(route.query.q ?? ''));
+const direction = ref(String(route.query.direction ?? ''));
+const claims = useAuth().claims;
+const canAsk = computed(()=>[
+        'clerk',
+        'staff',
+        'manager',
+        'director'
+    ].includes(claims.value?.role ?? ''));
+const askLink = computed(()=>q.value.trim() ? {
+        path: '/hoi-dap',
+        query: {
+            q: q.value.trim()
+        }
+    } : {
+        path: '/hoi-dap'
+    });
+const hits = ref([]);
+const next = ref(null);
+let shown = {
+    q: ''
+};
+const loading = ref(false);
+const searched = ref(false);
+const failure = ref('');
 async function run(more = false) {
-  if (!more && !q.value.trim()) return
-  const params = more ? shown : { q: q.value.trim(), direction: direction.value || undefined }
-  loading.value = true
-  failure.value = ''
-  try {
-    const res = await search({ ...params, limit: 20, cursor: more ? next.value ?? undefined : undefined })
-    hits.value = more ? [...hits.value, ...res.hits] : res.hits
-    next.value = res.next_cursor
-    shown = params
-    searched.value = true
-    if (!more) router.replace({ query: { q: q.value.trim(), ...(direction.value ? { direction: direction.value } : {}) } })
-  } catch (e) {
-    failure.value = errorText(t, e)
-  } finally {
-    loading.value = false
-  }
+    if (!more && !q.value.trim()) return;
+    const params = more ? shown : {
+        q: q.value.trim(),
+        direction: direction.value || undefined
+    };
+    loading.value = true;
+    failure.value = '';
+    try {
+        const res = await search({
+            ...params,
+            limit: 20,
+            cursor: more ? next.value ?? undefined : undefined
+        });
+        hits.value = more ? [
+            ...hits.value,
+            ...res.hits
+        ] : res.hits;
+        next.value = res.next_cursor;
+        shown = params;
+        searched.value = true;
+        if (!more) router.replace({
+            query: {
+                q: q.value.trim(),
+                ...direction.value ? {
+                    direction: direction.value
+                } : {}
+            }
+        });
+    } catch (e) {
+        failure.value = errorText(t, e);
+    } finally{
+        loading.value = false;
+    }
 }
-
-onMounted(() => { if (q.value) run() })
+onMounted(()=>{
+    if (q.value) run();
+});
 </script>
 
 <template>

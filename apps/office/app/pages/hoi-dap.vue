@@ -16,241 +16,238 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { ApiError } from '~/composables/useApi'
-import type { AskBody, AskResult, AskSource } from '~/composables/useApi'
-import { MAX_QUESTION, blocks, citeLabel, cleanQuestion, hasMask, needsGenerate, sourceAnchor, tidy } from '~/utils/answer'
-
-// Hỏi đáp trên kho văn bản (F4.2). Trợ lý moc-assistant (svc-files) chỉ tìm trong các văn bản người hỏi được xem,
-// văn bản hạn chế không bao giờ vào chỉ mục. Hai pha cho mỗi câu hỏi: extract trả ngay câu trích nguyên văn kèm
-// nguồn "số ký hiệu · tr. n" (< 1 giây, không cần mô hình); nếu mô hình sẵn sàng (ai_available) thì tự gọi generate
-// với cùng ask_id — mô hình viết câu trả lời có trích dẫn [n] trong 15–40 giây, bấm Dừng hoặc Esc thì thôi, câu trích
-// vẫn còn đó. Mỗi câu hỏi độc lập; danh sách chỉ giữ trong bộ nhớ trang (tối đa 10), không lưu ở đâu cả.
-
-interface Turn {
-  key: number
-  question: string
-  direction: '' | 'in' | 'out'
-  year: number | null
-  phase: 'searching' | 'error' | 'shown'
-  result: AskResult | null
-  error: string
-  // pha viết câu trả lời: chờ lượt (một lượt viết một lúc), đang viết, đã dừng, lỗi, xong
-  gen: 'idle' | 'waiting' | 'running' | 'stopped' | 'failed' | 'done'
-  genError: string
-  started: number
-  showExtract: boolean     // đã có câu trả lời của mô hình: người dùng mở thêm khối câu trích nguyên văn
-  opened: number[]         // nguồn đang mở đủ đoạn trích
+<script setup>
+import { useI18n } from 'vue-i18n';
+import { ApiError } from '~/composables/useApi';
+import { MAX_QUESTION, blocks, citeLabel, cleanQuestion, hasMask, needsGenerate, sourceAnchor, tidy } from '~/utils/answer';
+const MAX_TURNS = 10;
+const ROLES = [
+    'clerk',
+    'staff',
+    'manager',
+    'director'
+];
+const LONG_EXCERPT = 240;
+const { t, te } = useI18n();
+const { ask } = useApi();
+const route = useRoute();
+const claims = useAuth().claims;
+const allowed = computed(()=>ROLES.includes(claims.value?.role ?? ''));
+const text = ref(typeof route.query.q === 'string' ? route.query.q.slice(0, MAX_QUESTION) : '');
+watch(()=>route.query.q, (q)=>{
+    if (typeof q === 'string') text.value = q.slice(0, MAX_QUESTION);
+});
+const direction = ref('');
+const year = ref(null);
+const thisYear = Number(today().slice(0, 4));
+const years = Array.from({
+    length: 10
+}, (_, i)=>thisYear - i);
+const turns = ref([]);
+const controllers = new Map();
+let nextKey = 1;
+let genChain = Promise.resolve();
+const announce = ref('');
+const now = ref(Date.now());
+const searching = computed(()=>turns.value.some((x)=>x.phase === 'searching'));
+const ready = computed(()=>allowed.value && !searching.value && cleanQuestion(text.value).length > 0);
+const find = (key)=>turns.value.find((x)=>x.key === key);
+function say(message) {
+    announce.value = '';
+    nextTick(()=>{
+        announce.value = message;
+    });
 }
-
-const MAX_TURNS = 10
-const ROLES = ['clerk', 'staff', 'manager', 'director']
-const LONG_EXCERPT = 240
-
-const { t, te } = useI18n()
-const { ask } = useApi()
-const route = useRoute()
-const claims = useAuth().claims
-
-const allowed = computed(() => ROLES.includes(claims.value?.role ?? ''))
-// Từ trang Tìm kiếm ("Hỏi trợ lý"): điền sẵn câu tìm, không tự gửi
-const text = ref(typeof route.query.q === 'string' ? route.query.q.slice(0, MAX_QUESTION) : '')
-watch(() => route.query.q, (q) => { if (typeof q === 'string') text.value = q.slice(0, MAX_QUESTION) })
-const direction = ref<'' | 'in' | 'out'>('')
-const year = ref<number | null>(null)
-const thisYear = Number(today().slice(0, 4))
-const years = Array.from({ length: 10 }, (_, i) => thisYear - i)
-
-const turns = ref<Turn[]>([])
-const controllers = new Map<number, AbortController>()   // nút Dừng của lượt viết, theo khóa lượt hỏi
-let nextKey = 1
-let genChain: Promise<void> = Promise.resolve()          // lượt viết nối đuôi nhau: svc-files chỉ viết một lượt một lúc
-const announce = ref('')                                   // vùng aria-live: đang tìm, tìm thấy, đã trả lời, lỗi
-const now = ref(Date.now())
-
-const searching = computed(() => turns.value.some((x) => x.phase === 'searching'))
-const ready = computed(() => allowed.value && !searching.value && cleanQuestion(text.value).length > 0)
-const find = (key: number) => turns.value.find((x) => x.key === key)
-
-// Báo cho trình đọc màn hình (aria-live): xóa rồi mới đặt, để câu trùng lần trước vẫn được đọc; không đổi tiêu điểm
-function say(message: string) {
-  announce.value = ''
-  nextTick(() => { announce.value = message })
-}
-
-// Đồng hồ giây của lượt đang viết
-const writing = computed(() => turns.value.some((x) => x.gen === 'running'))
-let ticker: ReturnType<typeof setInterval> | undefined
-watch(writing, (on) => {
-  clearInterval(ticker)
-  if (!on) return
-  now.value = Date.now()
-  ticker = setInterval(() => { now.value = Date.now() }, 1000)
-})
-const elapsed = (turn: Turn) => Math.max(0, Math.floor((now.value - turn.started) / 1000))
-
-// Mã lỗi của svc-files → câu cho người hỏi (mã riêng của chức năng hỏi đáp, không dùng utils/errors.ts); mạng, hết
-// phiên, giới hạn tốc độ của cổng thì như mọi trang
-function askError(e: unknown): string {
-  if (e instanceof ApiError && e.code && te(`assist.error.${e.code}`)) return t(`assist.error.${e.code}`)
-  if (e instanceof ApiError && !['network', 'session', 'rate_limited'].includes(e.code ?? '')) {
-    return t('assist.error.generic', { msg: e.message })
-  }
-  return errorText(t, e)
-}
-
-function warningTexts(res: AskResult): string[] {
-  return res.warnings.filter((code) => te(`assist.warning.${code}`)).map((code) => t(`assist.warning.${code}`))
-}
-
-function body(turn: Turn, mode: 'extract' | 'generate'): AskBody {
-  return {
-    question: turn.question,
-    mode,
-    ...(turn.direction ? { direction: turn.direction } : {}),
-    ...(turn.year ? { year: turn.year } : {}),
-    ...(mode === 'generate' && turn.result ? { ask_id: turn.result.ask_id } : {}),
-  }
-}
-
-function onKey(e: KeyboardEvent) {
-  // Enter gửi, Shift+Enter xuống dòng; đang gõ dở bằng bộ gõ tiếng Việt (composition) thì Enter là của bộ gõ
-  if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return
-  e.preventDefault()
-  submit()
-}
-
-function submit() {
-  const question = cleanQuestion(text.value)
-  if (!question || !ready.value) return
-  const turn: Turn = {
-    key: nextKey++, question, direction: direction.value, year: year.value, phase: 'searching', result: null,
-    error: '', gen: 'idle', genError: '', started: 0, showExtract: false, opened: [],
-  }
-  // mới nhất trên cùng; quá 10 thì bỏ câu cũ nhất (đang viết thì dừng)
-  const all = [turn, ...turns.value]
-  for (const old of all.slice(MAX_TURNS)) controllers.get(old.key)?.abort()
-  turns.value = all.slice(0, MAX_TURNS)
-  text.value = ''
-  search(turn.key)
-}
-
-async function search(key: number) {
-  const turn = find(key)
-  if (!turn) return
-  turn.phase = 'searching'
-  turn.error = ''
-  say(t('assist.searching'))
-  let res: AskResult
-  try {
-    res = tidy(await ask(body(turn, 'extract')))
-  } catch (e) {
-    const cur = find(key)
-    if (!cur) return
-    cur.phase = 'error'
-    cur.error = askError(e)
-    say(cur.error)
-    return
-  }
-  const cur = find(key)
-  if (!cur) return
-  cur.result = res
-  cur.phase = 'shown'
-  if (res.status === 'no_evidence') {
-    say(t('assist.noEvidence'))
-    return
-  }
-  const found = t('assist.live.found', { n: res.sources.length })
-  if (!needsGenerate(res)) {
-    say(found)
-    return
-  }
-  say(`${found} ${t('assist.live.generating')}`)
-  queueGenerate(key)
-}
-
-function queueGenerate(key: number) {
-  const turn = find(key)
-  if (!turn?.result) return
-  turn.gen = 'waiting'
-  turn.genError = ''
-  const ctrl = new AbortController()
-  controllers.set(key, ctrl)
-  genChain = genChain.then(() => generate(key, ctrl)).catch(() => { /* generate tự bắt lỗi */ })
-}
-
-async function generate(key: number, ctrl: AbortController) {
-  try {
-    const turn = find(key)
-    if (!turn || ctrl.signal.aborted || turn.gen !== 'waiting') return   // đã dừng, hoặc đã bị bỏ khỏi danh sách
-    turn.gen = 'running'
-    turn.started = Date.now()
-    let res: AskResult
-    try {
-      res = tidy(await ask(body(turn, 'generate'), ctrl.signal))
-    } catch (e) {
-      const cur = find(key)
-      if (!cur) return
-      if (e instanceof ApiError && e.code === 'aborted') {
-        cur.gen = 'stopped'
-        say(t('assist.stopped'))
-      } else {
-        cur.gen = 'failed'
-        cur.genError = askError(e)
-        say(t('assist.generateFailed', { reason: cur.genError }))
-      }
-      return
+const writing = computed(()=>turns.value.some((x)=>x.gen === 'running'));
+let ticker;
+watch(writing, (on)=>{
+    clearInterval(ticker);
+    if (!on) return;
+    now.value = Date.now();
+    ticker = setInterval(()=>{
+        now.value = Date.now();
+    }, 1000);
+});
+const elapsed = (turn)=>Math.max(0, Math.floor((now.value - turn.started) / 1000));
+function askError(e) {
+    if (e instanceof ApiError && e.code && te(`assist.error.${e.code}`)) return t(`assist.error.${e.code}`);
+    if (e instanceof ApiError && ![
+        'network',
+        'session',
+        'rate_limited'
+    ].includes(e.code ?? '')) {
+        return t('assist.error.generic', {
+            msg: e.message
+        });
     }
-    const cur = find(key)
-    if (!cur) return
-    // lượt generate tìm lại từ đầu: [n] của câu trả lời trỏ vào nguồn của chính lượt này
-    cur.result = res
-    cur.gen = 'done'
-    // câu trả lời có nhãn che (F4.4: mô hình chỉ thấy [SĐT-1]…) thì mở sẵn câu trích nguyên văn — số thật ở đó
-    cur.showExtract = hasMask(blocks(res).model?.text)
-    cur.opened = []
-    if (blocks(res).model) say(t('assist.live.answered'))
-    else if (res.status === 'no_evidence') say(t('assist.noEvidence'))
-    else say(warningTexts(res)[0] ?? t('assist.live.extractOnly'))
-  } finally {
-    if (controllers.get(key) === ctrl) controllers.delete(key)
-  }
+    return errorText(t, e);
 }
-
-function stop(key: number) {
-  const turn = find(key)
-  if (turn?.gen === 'waiting') {
-    turn.gen = 'stopped'
-    say(t('assist.stopped'))
-  }
-  controllers.get(key)?.abort()
+function warningTexts(res) {
+    return res.warnings.filter((code)=>te(`assist.warning.${code}`)).map((code)=>t(`assist.warning.${code}`));
 }
-
-// Esc: dừng mọi lượt đang viết hoặc đang chờ lượt viết
-function onEscape(e: KeyboardEvent) {
-  if (e.key !== 'Escape') return
-  for (const turn of turns.value) if (turn.gen === 'waiting' || turn.gen === 'running') stop(turn.key)
+function body(turn, mode) {
+    return {
+        question: turn.question,
+        mode,
+        ...turn.direction ? {
+            direction: turn.direction
+        } : {},
+        ...turn.year ? {
+            year: turn.year
+        } : {},
+        ...mode === 'generate' && turn.result ? {
+            ask_id: turn.result.ask_id
+        } : {}
+    };
 }
-
-function toggleExcerpt(turn: Turn, n: number) {
-  turn.opened = turn.opened.includes(n) ? turn.opened.filter((x) => x !== n) : [...turn.opened, n]
+function onKey(e) {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    submit();
 }
-
-function metaLine(s: AskSource): string {
-  return [s.type_name || s.type_code, s.issuer_name, s.issued_on ? fmtDate(s.issued_on) : '',
-    te(`assist.direction.${s.direction}`) ? t(`assist.direction.${s.direction}`) : ''].filter(Boolean).join(' · ')
+function submit() {
+    const question = cleanQuestion(text.value);
+    if (!question || !ready.value) return;
+    const turn = {
+        key: nextKey++,
+        question,
+        direction: direction.value,
+        year: year.value,
+        phase: 'searching',
+        result: null,
+        error: '',
+        gen: 'idle',
+        genError: '',
+        started: 0,
+        showExtract: false,
+        opened: []
+    };
+    const all = [
+        turn,
+        ...turns.value
+    ];
+    for (const old of all.slice(MAX_TURNS))controllers.get(old.key)?.abort();
+    turns.value = all.slice(0, MAX_TURNS);
+    text.value = '';
+    search(turn.key);
 }
-
-const took = (res: AskResult) => t('assist.took', { s: fmtNumber(Math.round(Number(res.duration_ms) / 100) / 10) })
-const stateOf = (turn: Turn) => (turn.phase === 'shown' ? turn.result?.status ?? 'error' : turn.phase)
-
-onMounted(() => window.addEventListener('keydown', onEscape))
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onEscape)
-  clearInterval(ticker)
-  for (const ctrl of controllers.values()) ctrl.abort()
-})
+async function search(key) {
+    const turn = find(key);
+    if (!turn) return;
+    turn.phase = 'searching';
+    turn.error = '';
+    say(t('assist.searching'));
+    let res;
+    try {
+        res = tidy(await ask(body(turn, 'extract')));
+    } catch (e) {
+        const cur = find(key);
+        if (!cur) return;
+        cur.phase = 'error';
+        cur.error = askError(e);
+        say(cur.error);
+        return;
+    }
+    const cur = find(key);
+    if (!cur) return;
+    cur.result = res;
+    cur.phase = 'shown';
+    if (res.status === 'no_evidence') {
+        say(t('assist.noEvidence'));
+        return;
+    }
+    const found = t('assist.live.found', {
+        n: res.sources.length
+    });
+    if (!needsGenerate(res)) {
+        say(found);
+        return;
+    }
+    say(`${found} ${t('assist.live.generating')}`);
+    queueGenerate(key);
+}
+function queueGenerate(key) {
+    const turn = find(key);
+    if (!turn?.result) return;
+    turn.gen = 'waiting';
+    turn.genError = '';
+    const ctrl = new AbortController();
+    controllers.set(key, ctrl);
+    genChain = genChain.then(()=>generate(key, ctrl)).catch(()=>{});
+}
+async function generate(key, ctrl) {
+    try {
+        const turn = find(key);
+        if (!turn || ctrl.signal.aborted || turn.gen !== 'waiting') return;
+        turn.gen = 'running';
+        turn.started = Date.now();
+        let res;
+        try {
+            res = tidy(await ask(body(turn, 'generate'), ctrl.signal));
+        } catch (e) {
+            const cur = find(key);
+            if (!cur) return;
+            if (e instanceof ApiError && e.code === 'aborted') {
+                cur.gen = 'stopped';
+                say(t('assist.stopped'));
+            } else {
+                cur.gen = 'failed';
+                cur.genError = askError(e);
+                say(t('assist.generateFailed', {
+                    reason: cur.genError
+                }));
+            }
+            return;
+        }
+        const cur = find(key);
+        if (!cur) return;
+        cur.result = res;
+        cur.gen = 'done';
+        cur.showExtract = hasMask(blocks(res).model?.text);
+        cur.opened = [];
+        if (blocks(res).model) say(t('assist.live.answered'));
+        else if (res.status === 'no_evidence') say(t('assist.noEvidence'));
+        else say(warningTexts(res)[0] ?? t('assist.live.extractOnly'));
+    } finally{
+        if (controllers.get(key) === ctrl) controllers.delete(key);
+    }
+}
+function stop(key) {
+    const turn = find(key);
+    if (turn?.gen === 'waiting') {
+        turn.gen = 'stopped';
+        say(t('assist.stopped'));
+    }
+    controllers.get(key)?.abort();
+}
+function onEscape(e) {
+    if (e.key !== 'Escape') return;
+    for (const turn of turns.value)if (turn.gen === 'waiting' || turn.gen === 'running') stop(turn.key);
+}
+function toggleExcerpt(turn, n) {
+    turn.opened = turn.opened.includes(n) ? turn.opened.filter((x)=>x !== n) : [
+        ...turn.opened,
+        n
+    ];
+}
+function metaLine(s) {
+    return [
+        s.type_name || s.type_code,
+        s.issuer_name,
+        s.issued_on ? fmtDate(s.issued_on) : '',
+        te(`assist.direction.${s.direction}`) ? t(`assist.direction.${s.direction}`) : ''
+    ].filter(Boolean).join(' · ');
+}
+const took = (res)=>t('assist.took', {
+        s: fmtNumber(Math.round(Number(res.duration_ms) / 100) / 10)
+    });
+const stateOf = (turn)=>turn.phase === 'shown' ? turn.result?.status ?? 'error' : turn.phase;
+onMounted(()=>window.addEventListener('keydown', onEscape));
+onBeforeUnmount(()=>{
+    window.removeEventListener('keydown', onEscape);
+    clearInterval(ticker);
+    for (const ctrl of controllers.values())ctrl.abort();
+});
 </script>
 
 <template>
@@ -345,9 +342,9 @@ onBeforeUnmount(() => {
                     {{ t('assist.modelNote') }}
                   </span>
                 </div>
-                <AnswerText :text="blocks(turn.result).model!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
+                <AnswerText :text="blocks(turn.result).model.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
                 <!-- F4.4: chữ gửi mô hình đã che, mô hình viết nhãn [SĐT-1] thay cho số -->
-                <p v-if="hasMask(blocks(turn.result).model!.text)" class="mt-2 text-xs text-sky-900" data-testid="ask-masked">
+                <p v-if="hasMask(blocks(turn.result).model.text)" class="mt-2 text-xs text-sky-900" data-testid="ask-masked">
                   {{ t('assist.maskedNote') }}
                 </p>
                 <button
@@ -366,7 +363,7 @@ onBeforeUnmount(() => {
                 :id="`trich-${turn.key}`" class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-4" data-testid="ask-extract"
               >
                 <h3 class="mb-2 text-sm font-semibold text-stone-800">{{ t('assist.extractTitle') }}</h3>
-                <AnswerText :text="blocks(turn.result).extract!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
+                <AnswerText :text="blocks(turn.result).extract.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
               </section>
 
               <!-- đang viết câu trả lời -->
