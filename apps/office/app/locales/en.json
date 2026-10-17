@@ -1,0 +1,203 @@
+{
+  "app": {
+    "name": "Mộc",
+    "tagline": "e-Office",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "none": "—",
+    "required": "required",
+    "optional": "optional",
+    "refresh": "Refresh"
+  },
+  "nav": {
+    "inbox": "My tasks",
+    "incoming": "Incoming documents",
+    "receive": "Receive document",
+    "search": "Search",
+    "logout": "Sign out",
+    "language": "Tiếng Việt"
+  },
+  "role": {
+    "clerk": "Clerk",
+    "staff": "Officer",
+    "manager": "Head of department",
+    "director": "Director",
+    "tenant_admin": "Unit administrator"
+  },
+  "status": {
+    "received": "Awaiting registration",
+    "registered": "Awaiting direction",
+    "in_progress": "In progress",
+    "done": "Done",
+    "archived": "Archived",
+    "cancelled": "Cancelled",
+    "draft": "Draft",
+    "in_review": "In review",
+    "returned": "Returned",
+    "approved": "Approved",
+    "issued": "Issued"
+  },
+  "urgency": {
+    "normal": "Normal",
+    "khan": "Urgent",
+    "thuong_khan": "Very urgent",
+    "hoa_toc": "Express"
+  },
+  "task": {
+    "vbden": {
+      "chiDao": "Give direction",
+      "phanCong": "Assign within department",
+      "xuLy": "Handle document"
+    }
+  },
+  "event": {
+    "received": "Received",
+    "office": {
+      "document": {
+        "registered": "Registered, no. {n}",
+        "directed": "Directed",
+        "assigned": "Assigned to {name}",
+        "processed": "Reported result",
+        "filed": "Filed without action"
+      }
+    }
+  },
+  "inbox": {
+    "title": "My tasks",
+    "subtitle": "Tasks waiting for you — urgent first",
+    "empty": "Nothing is waiting for you.",
+    "received": "Received",
+    "due": "Due",
+    "open": "Open"
+  },
+  "incoming": {
+    "title": "Incoming documents",
+    "receive": "Receive document",
+    "empty": "No documents yet.",
+    "tab": {
+      "received": "To register",
+      "active": "In progress",
+      "done": "Done",
+      "all": "All"
+    },
+    "number": "No.",
+    "symbol": "Reference",
+    "issuer": "Issuer",
+    "summary": "Summary",
+    "status": "Status",
+    "due": "Due"
+  },
+  "receive": {
+    "title": "Receive an incoming document",
+    "subtitle": "Upload the electronic copy, enter the document details, then register.",
+    "file": "Document file",
+    "drop": "Drop a PDF or image here, or click to choose",
+    "scanning": "Uploading and scanning for malware…",
+    "clean": "Scanned — clean",
+    "infected": "Malware detected ({sig}) — blocked, not stored",
+    "type": "Document type",
+    "symbol": "Reference number",
+    "symbolHint": "e.g. 123/UBND-VP",
+    "issuer": "Issuing body",
+    "issuedOn": "Issue date",
+    "summary": "Summary",
+    "summaryHint": "10–500 characters",
+    "urgency": "Urgency",
+    "dueOn": "Deadline",
+    "restricted": "Restricted",
+    "restrictedHint": "Only the receiver and granted people can see it",
+    "save": "Save",
+    "saveAndRegister": "Save and register",
+    "duplicate": "This document may already be received: {symbol} from {issuer}, dated {date}.",
+    "saved": "Document saved.",
+    "registered": "Registered — number {n}."
+  },
+  "doc": {
+    "info": "Document details",
+    "files": "Files",
+    "noFiles": "No files.",
+    "download": "Download",
+    "type": "Type",
+    "symbol": "Reference",
+    "issuer": "Issuer",
+    "issuedOn": "Issue date",
+    "registered": "Registered",
+    "number": "No.",
+    "due": "Deadline",
+    "urgency": "Urgency",
+    "assignments": "Assignments",
+    "lead": "Lead",
+    "support": "Support",
+    "info_role": "For information",
+    "timeline": "Timeline",
+    "register": "Register",
+    "registerConfirm": "Register this document? The number is assigned automatically, consecutively per year.",
+    "notFound": "Document not found, or you are not allowed to see it.",
+    "restricted": "Restricted",
+    "assignmentDone": "Done",
+    "assignmentOpen": "In progress"
+  },
+  "form": {
+    "chiDao": {
+      "title": "Direction",
+      "instruction": "Direction",
+      "leadKind": "Lead",
+      "leadDepartment": "A department",
+      "leadUser": "A person",
+      "department": "Lead department",
+      "user": "Lead person",
+      "supports": "Supporting departments",
+      "due": "Deadline",
+      "direct": "Assign",
+      "file": "File without action",
+      "fileNote": "Reason (optional)"
+    },
+    "phanCong": {
+      "title": "Assign within department",
+      "user": "Assign to",
+      "note": "Note",
+      "assign": "Assign",
+      "self": "I will handle it"
+    },
+    "xuLy": {
+      "title": "Report result",
+      "result": "Result",
+      "done": "Report done"
+    },
+    "pick": "— Choose —",
+    "done": "Moved to the next step."
+  },
+  "search": {
+    "title": "Search documents",
+    "placeholder": "Reference, summary, issuer — diacritics optional",
+    "button": "Search",
+    "empty": "No matching documents.",
+    "more": "Load more",
+    "any": "All",
+    "direction": {
+      "in": "Incoming",
+      "out": "Outgoing"
+    }
+  },
+  "error": {
+    "generic": "Something went wrong: {msg}",
+    "network": "Cannot reach the server. Check your connection and retry.",
+    "session": "Your session has expired, redirecting to sign in…",
+    "documents_in_dedup": "This document was already received (same issuer, reference and date).",
+    "documents_due_after_registered": "The deadline cannot be before the registration date.",
+    "documents_summary": "The summary must be 10–500 characters.",
+    "infected": "The file contains malware and was blocked.",
+    "too_large": "The file is too large.",
+    "noRole": "Your account has no role or unit yet. Contact your unit administrator."
+  },
+  "validation": {
+    "required": "Required",
+    "summaryLength": "10–500 characters",
+    "dateFuture": "Cannot be in the future",
+    "dueBefore": "Must be today or later"
+  }
+}

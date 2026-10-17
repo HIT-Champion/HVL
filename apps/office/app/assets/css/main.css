@@ -1,0 +1,66 @@
+/*
+ * Copyright 2026 Mộc Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import "tailwindcss";
+
+/* Màu của Mộc: xanh lá đậm (gỗ, cây) làm màu chính, hổ phách cho văn bản khẩn */
+@theme {
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+  /* phông hệ thống có đủ dấu tiếng Việt, không tải phông từ bên ngoài */
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+}
+
+@layer base {
+  html { @apply bg-stone-50 text-stone-900 antialiased; }
+}
+
+/* Thành phần dùng chung (Tailwind v4: khai báo bằng @utility để @apply được) */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-brand-700 text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700;
+}
+@utility btn-secondary {
+  @apply btn border border-stone-300 bg-white text-stone-800 hover:bg-stone-100;
+}
+@utility btn-ghost {
+  @apply btn text-stone-600 hover:bg-stone-100;
+}
+@utility card {
+  @apply rounded-xl border border-stone-200 bg-white shadow-sm;
+}
+@utility label {
+  @apply mb-1 block text-sm font-medium text-stone-700;
+}
+@utility input {
+  @apply block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm shadow-xs placeholder:text-stone-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 focus:outline-none aria-invalid:border-red-500;
+}
+@utility field-error {
+  @apply mt-1 text-xs text-red-600;
+}
+@utility chip {
+  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+}
