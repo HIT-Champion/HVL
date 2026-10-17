@@ -1,0 +1,185 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+"""Gọi Flowable REST (chỉ trong mạng nội bộ, tài khoản rest-admin).
+
+Flowable là chủ trạng thái quy trình: đang ở bước nào, ai phải làm. Dữ liệu nghiệp vụ nằm ở PostgreSQL
+(docs/ke-hoach-phat-trien.md §2.1). Flowable không biết người dùng Keycloak; việc được giao cho nhóm
+ứng viên dạng ``t:<tenant>:director`` hoặc ``t:<tenant>:d:<phòng>:manager``, hoặc đích danh theo ``sub``.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import pathlib
+from dataclasses import dataclass, field
+from typing import Any
+
+import httpx2
+
+
+class FlowableError(Exception):
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+@dataclass(frozen=True)
+class Task:
+    id: str
+    name: str
+    form_key: str
+    assignee: str | None
+    process_instance_id: str
+    created_at: str
+    variables: dict[str, Any] = field(default_factory=dict)
+
+
+def _variables(values: dict[str, Any]) -> list[dict[str, Any]]:
+    out = []
+    for name, value in values.items():
+        if isinstance(value, bool):
+            kind = "boolean"
+        elif isinstance(value, int):
+            kind = "long"
+        else:
+            kind, value = "string", ("" if value is None else str(value))
+        out.append({"name": name, "type": kind, "value": value})
+    return out
+
+
+def _task(row: dict[str, Any]) -> Task:
+    return Task(
+        id=row["id"],
+        name=row.get("name") or "",
+        form_key=row.get("formKey") or "",
+        assignee=row.get("assignee"),
+        process_instance_id=row["processInstanceId"],
+        created_at=row["createTime"],
+        variables={v["name"]: v.get("value") for v in row.get("variables") or []},
+    )
+
+
+class FlowableClient:
+    def __init__(
+        self,
+        base_url: str,
+        user: str,
+        password: str,
+        *,
+        timeout_s: float = 15.0,
+        transport: httpx2.AsyncBaseTransport | None = None,
+    ) -> None:
+        self._http = httpx2.AsyncClient(base_url=base_url, auth=(user, password), timeout=timeout_s, transport=transport)
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        try:
+            r = await self._http.request(method, path, **kwargs)
+        except httpx2.HTTPError as exc:
+            raise FlowableError(f"Không gọi được Flowable: {exc}") from exc
+        if r.status_code >= 400:
+            raise FlowableError(f"Flowable trả {r.status_code}: {r.text[:300]}", r.status_code)
+        return r.json() if r.content else None
+
+    async def ping(self) -> bool:
+        try:
+            await self._request("GET", "/management/engine")
+        except FlowableError:
+            return False
+        return True
+
+    # --- định nghĩa quy trình ---------------------------------------------------------------------
+
+    async def deploy_dir(self, directory: str) -> list[str]:
+        """Deploy mọi *.bpmn20.xml chưa có; tên deployment gắn băm nội dung nên tệp không đổi thì bỏ qua."""
+        deployed = []
+        for path in sorted(pathlib.Path(directory).glob("*.bpmn20.xml")):
+            content = path.read_bytes()
+            name = f"{path.name.removesuffix('.bpmn20.xml')}@{hashlib.sha256(content).hexdigest()[:12]}"
+            existing = await self._request("GET", "/repository/deployments", params={"name": name})
+            if existing["data"]:
+                continue
+            await self._request(
+                "POST", "/repository/deployments", params={"deploymentName": name},
+                files={"file": (path.name, content, "text/xml")},
+            )
+            deployed.append(name)
+        return deployed
+
+    # --- phiên quy trình ----------------------------------------------------------------------------
+
+    async def find_process(self, key: str, business_key: str) -> str | None:
+        data = await self._request(
+            "GET", "/runtime/process-instances", params={"processDefinitionKey": key, "businessKey": business_key},
+        )
+        if data["data"]:
+            return data["data"][0]["id"]
+        # đã chạy xong cũng tính là có (không khởi chạy lại)
+        hist = await self._request(
+            "GET", "/history/historic-process-instances",
+            params={"processDefinitionKey": key, "businessKey": business_key},
+        )
+        return hist["data"][0]["id"] if hist["data"] else None
+
+    async def start_process(self, key: str, business_key: str, variables: dict[str, Any]) -> str:
+        data = await self._request(
+            "POST", "/runtime/process-instances",
+            json={"processDefinitionKey": key, "businessKey": business_key, "variables": _variables(variables)},
+        )
+        return data["id"]
+
+    # --- việc ---------------------------------------------------------------------------------------
+
+    async def tasks_for(self, user_id: str, groups: list[str]) -> list[Task]:
+        """Việc giao đích danh cho user_id, cộng việc chưa ai nhận của các nhóm ứng viên."""
+        found: dict[str, Task] = {}
+        queries = [{"assignee": user_id}]
+        if groups:
+            queries.append({"candidateGroupIn": groups, "unassigned": True})
+        for q in queries:
+            data = await self._request(
+                "POST", "/query/tasks", json={**q, "includeProcessVariables": True, "size": 500},
+            )
+            for row in data["data"]:
+                found[row["id"]] = _task(row)
+        return list(found.values())
+
+    async def task(self, task_id: str) -> Task | None:
+        try:
+            row = await self._request("GET", f"/runtime/tasks/{task_id}")
+        except FlowableError as exc:
+            if exc.status == 404:
+                return None
+            raise
+        variables = await self._request("GET", f"/runtime/process-instances/{row['processInstanceId']}/variables")
+        row["variables"] = variables
+        return _task(row)
+
+    async def candidate_groups(self, task_id: str) -> list[str]:
+        links = await self._request("GET", f"/runtime/tasks/{task_id}/identitylinks")
+        return [link["group"] for link in links if link.get("group") and link.get("type") == "candidate"]
+
+    async def claim(self, task_id: str, user_id: str | None) -> None:
+        """Nhận việc cho user_id; None trả việc về nhóm. Người khác đã nhận thì Flowable trả 409."""
+        await self._request("POST", f"/runtime/tasks/{task_id}", json={"action": "claim", "assignee": user_id})
+
+    async def complete(self, task_id: str, variables: dict[str, Any]) -> None:
+        await self._request(
+            "POST", f"/runtime/tasks/{task_id}", json={"action": "complete", "variables": _variables(variables)},
+        )
