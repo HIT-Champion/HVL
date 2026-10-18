@@ -581,3 +581,11 @@ tên miền theo năm. Không nâng cấp server trừ khi số đo RAM thật b
   `core.audit_log` đằng nào cũng tạo ở F1.3. Phase 2 còn job neo hash, lệnh `dxos audit verify` và màn xem sổ.
 - `office.document_files`, `office.document_acl` thêm cột `tenant_id`; khóa ngoại giữa các bảng nghiệp vụ đi
   kèm `tenant_id`, để CSDL tự chặn việc trỏ sang dữ liệu của thuê ước khác.
+
+**18/10/2026 (tối)** — Frontend và Backend chưa bắt đầu (chưa có realm Keycloak, khung Nuxt, Compose); người làm
+AI làm thay toàn bộ lát cắt đầu tiên theo chiều dọc thay vì làm xong lõi rồi mới làm giao diện. Đã chạy được
+bằng `make up && make seed`: #13 (Compose, Makefile), #14 (APISIX), #15 (svc-workflow + Actions), #16 (seed,
+smoke), #21 (realm), #22 (giao diện), #23 (BPMN văn bản đến), cùng #18–#20. Vai trò lấy từ thuộc tính
+`moc_role` (một giá trị cho cả hai claim vai trò của Hasura) thay vì vai trò realm. Danh bạ `core.users` đồng
+bộ từ Keycloak. Kế tiếp: lát văn bản đi + PDF có mã QR + cổng xác thực (F2.4, F2.13). Rủi ro mới: lịch sử
+commit chỉ một tác giả (PoF #1) — cần hai bạn nhận việc Phase 2.

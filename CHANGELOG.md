@@ -9,7 +9,7 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 
 ### Đã thêm
 - Khung dự án nguồn mở: giấy phép Apache-2.0 (toàn văn + thông báo mục đích + header từng tệp).
-- Quy trình dựng từ mã nguồn qua `Makefile` và Docker Compose theo 4 profile H/P/D/I.
+- Quy trình dựng từ mã nguồn qua `Makefile` và Docker Compose (profile `core` cho Tầng 1, `app` cho Tầng 2).
 - Cấu hình tách khỏi mã nguồn qua `.env.example`.
 - CI kiểm tra header giấy phép và tính hợp lệ của Compose.
 - Quy trình phát hành sinh gói `.tar.gz` theo thẻ phiên bản.
@@ -36,6 +36,19 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   các đội khác, căn cứ pháp lý, kịch bản demo.
 - Bản nháp mô hình dữ liệu (`docs/mo-hinh-du-lieu.md`): schema `core` dùng chung và `office` của ứng dụng,
   quyền theo vai trò, Hasura Actions, task BPMN, định dạng sự kiện.
+- Lõi Tầng 1 chạy bằng `make up`: Keycloak (realm `moc`, vai trò/đơn vị/phòng vào token cho Hasura),
+  APISIX là cổng duy nhất (kiểm JWT ở biên, chặn đường quản trị, gỡ khóa quản trị Hasura từ ngoài vào),
+  PostgreSQL + Hasura, Flowable, SeaweedFS (có kiểm khóa S3), ClamAV, Meilisearch (#13, #14, #21).
+- Schema `core` + `office`, quyền 6 vai trò, sổ kiểm toán chuỗi băm; danh bạ `core.users` và hàm vào sổ
+  `office.register_incoming` cấp số đến liên tiếp trong một giao dịch (#18).
+- `svc-files`: tải lên qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch gõ không dấu (#19, #20).
+- `svc-workflow`: Hasura Actions `registerIncoming`, `myTasks`, `completeTask`; quy trình BPMN
+  `van-ban-den` (chỉ đạo → phân công → xử lý); đồng bộ danh bạ Keycloak; job đối soát (#15, #23).
+- Giao diện Văn phòng điện tử (`apps/office`, Nuxt 4): đăng nhập SSO, hộp việc, văn bản đến, tiếp nhận có
+  kiểm form và chặn trùng, chi tiết văn bản với dòng thời gian, xử lý việc, tìm kiếm; tiếng Việt / Anh;
+  CSP chặt (#22).
+- `make env`, `make seed` (2 đơn vị, 10 tài khoản, văn bản ở mọi bước), `make smoke` (13 kiểm tra qua
+  cổng), `make e2e` (Playwright trên trình duyệt thật) (#16).
 
 ### Đã sửa đổi
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,
