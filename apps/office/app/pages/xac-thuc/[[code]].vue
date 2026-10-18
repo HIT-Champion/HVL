@@ -16,122 +16,89 @@
   SPDX-License-Identifier: Apache-2.0
 -->
 
-<script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
-// Cổng xác thực văn bản (F2.13), công khai. Tra bằng mã in cạnh mã QR (quét QR là mở thẳng trang này), hoặc
-// thả tệp PDF: trình duyệt tự tính SHA-256 (Web Crypto) và chỉ gửi mã băm đi tra — tệp không rời khỏi máy.
-// Có mã rồi thì thả tệp để so: khớp từng byte với bản đã phát hành mới báo "khớp".
-// Bản phát hành từ F4.5 có chữ ký số PAdES bằng PKI nội bộ trong két (chỉ minh họa, không có giá trị pháp lý): trang
-// hiện chuẩn, người ký, CA, số sê-ri, giờ ký tự khai — lấy từ CSDL, svc-files đã tự kiểm chữ ký lúc ký; kiểm đầy đủ
-// phần mật mã thì dùng pyHanko trong svc-files. Văn bản cũ hoặc hạn chế không có chữ ký số (signature: null).
-
-definePageMeta({ layout: 'public' })
-
-interface VerifiedSignature {
-  level: string
-  signer: string
-  ca: string
-  serial: string
-  signed_at: string
-  illustrative: boolean
+<script setup>
+import { useI18n } from 'vue-i18n';
+definePageMeta({
+    layout: 'public'
+});
+const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
+const code = ref(String(route.params.code ?? ''));
+const result = ref(null);
+const found = ref(null);
+const match = ref(null);
+const fileName = ref('');
+const checking = ref(false);
+const failure = ref('');
+const dragging = ref(false);
+const readableCode = computed(()=>found.value ? `${found.value.verify_code.slice(0, 5)}-${found.value.verify_code.slice(5)}` : '');
+async function call(url) {
+    const res = await fetch(url, {
+        cache: 'no-store'
+    });
+    if (res.status === 429) throw new Error(t('verify.rateLimited'));
+    if (!res.ok) throw new Error(t('error.generic', {
+        msg: `HTTP ${res.status}`
+    }));
+    return res.json();
 }
-
-interface Verified {
-  symbol: string
-  issued_on: string
-  type_name: string
-  issuer_name: string
-  parent_name: string | null
-  summary: string | null
-  sha256: string
-  verify_code: string
-  status: string
-  signature: VerifiedSignature | null
-}
-
-const { t } = useI18n()
-const route = useRoute()
-const router = useRouter()
-
-const code = ref(String(route.params.code ?? ''))
-const result = ref<'valid' | 'not_found' | null>(null)
-const found = ref<Verified | null>(null)
-const match = ref<boolean | null>(null)
-const fileName = ref('')
-const checking = ref(false)
-const failure = ref('')
-const dragging = ref(false)
-
-const readableCode = computed(() => (found.value ? `${found.value.verify_code.slice(0, 5)}-${found.value.verify_code.slice(5)}` : ''))
-
-async function call(url: string): Promise<{ result: 'valid' | 'not_found'; document: Verified | null }> {
-  const res = await fetch(url, { cache: 'no-store' })
-  if (res.status === 429) throw new Error(t('verify.rateLimited'))
-  if (!res.ok) throw new Error(t('error.generic', { msg: `HTTP ${res.status}` }))
-  return res.json()
-}
-
-async function run(job: () => Promise<void>) {
-  checking.value = true
-  failure.value = ''
-  try {
-    await job()
-  } catch (e) {
-    failure.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    checking.value = false
-  }
-}
-
-function lookup(value: string) {
-  return run(async () => {
-    const body = await call(`/api/verify/${encodeURIComponent(value)}`)
-    result.value = body.result
-    found.value = body.document
-    match.value = null
-    fileName.value = ''
-  })
-}
-
-function submitCode() {
-  const value = code.value.trim()
-  if (!value) return
-  router.replace(`/xac-thuc/${encodeURIComponent(value)}`)
-  lookup(value)
-}
-
-async function digest(file: File): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function onFile(file: File | undefined) {
-  if (!file) return
-  if (!window.crypto?.subtle) {
-    failure.value = t('verify.noCrypto')
-    return
-  }
-  run(async () => {
-    const hash = await digest(file)
-    fileName.value = file.name
-    if (found.value) {
-      match.value = hash === found.value.sha256
-      return
+async function run(job) {
+    checking.value = true;
+    failure.value = '';
+    try {
+        await job();
+    } catch (e) {
+        failure.value = e instanceof Error ? e.message : String(e);
+    } finally{
+        checking.value = false;
     }
-    const body = await call(`/api/verify?sha256=${hash}`)
-    result.value = body.result
-    found.value = body.document
-    match.value = body.result === 'valid' ? true : null
-  })
 }
-
-function onDrop(e: DragEvent) {
-  dragging.value = false
-  onFile(e.dataTransfer?.files?.[0])
+function lookup(value) {
+    return run(async ()=>{
+        const body = await call(`/api/verify/${encodeURIComponent(value)}`);
+        result.value = body.result;
+        found.value = body.document;
+        match.value = null;
+        fileName.value = '';
+    });
 }
-
-onMounted(() => { if (code.value) lookup(code.value) })
+function submitCode() {
+    const value = code.value.trim();
+    if (!value) return;
+    router.replace(`/xac-thuc/${encodeURIComponent(value)}`);
+    lookup(value);
+}
+async function digest(file) {
+    const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return Array.from(new Uint8Array(hash), (b)=>b.toString(16).padStart(2, '0')).join('');
+}
+function onFile(file) {
+    if (!file) return;
+    if (!window.crypto?.subtle) {
+        failure.value = t('verify.noCrypto');
+        return;
+    }
+    run(async ()=>{
+        const hash = await digest(file);
+        fileName.value = file.name;
+        if (found.value) {
+            match.value = hash === found.value.sha256;
+            return;
+        }
+        const body = await call(`/api/verify?sha256=${hash}`);
+        result.value = body.result;
+        found.value = body.document;
+        match.value = body.result === 'valid' ? true : null;
+    });
+}
+function onDrop(e) {
+    dragging.value = false;
+    onFile(e.dataTransfer?.files?.[0]);
+}
+onMounted(()=>{
+    if (code.value) lookup(code.value);
+});
 </script>
 
 <template>
@@ -209,7 +176,7 @@ onMounted(() => { if (code.value) lookup(code.value) })
       @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
     >
       <input id="verify-file" type="file" accept="application/pdf,.pdf" class="sr-only"
-             @change="onFile(($event.target as HTMLInputElement).files?.[0])">
+             @change="onFile(($event.target ).files?.[0])">
       <svg class="h-8 w-8 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
       <span class="font-medium text-stone-800">{{ found ? t('verify.compare') : t('verify.file') }}</span>
       <span class="text-xs text-stone-500">{{ t('verify.fileHint') }}</span>
