@@ -10,6 +10,7 @@
 > Sản phẩm dự thi **Olympic Tin học Sinh viên Việt Nam 2026 — nội dung Phần mềm Nguồn mở (OLP PMNM 2026)**.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![CI](https://github.com/HIT-Champion/HVL/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HIT-Champion/HVL/actions/workflows/ci.yml)
 
 ---
 
@@ -158,6 +159,10 @@ Trang quản trị Keycloak chỉ mở trên máy chủ: <http://127.0.0.1:8180/
 | `make smoke` | Đi trọn luồng văn bản đến qua cổng APISIX; chặn EICAR, chặn đường quản trị, cách ly đơn vị | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Cùng luồng trên trình duyệt thật (Playwright, chạy trong container) | Như trên |
 | `db/tests/` | 62 test schema, quyền, sổ kiểm toán trên PostgreSQL + Hasura thật | xem `db/README.md` |
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
+thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, đồng thời
+quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
 
 ## Tài liệu
 
