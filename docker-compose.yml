@@ -15,18 +15,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# Mộc — điều phối 4 không gian H-P-D-I.
+# Mộc — điều phối hai tầng của DX-OS Open-Core (docs/architecture.md).
 #
-# NGUYÊN TẮC: tệp này chỉ ĐIỀU PHỐI các phần mềm nguồn mở thượng nguồn ở dạng
-# NGUYÊN BẢN qua image chính thức có ghim thẻ phiên bản. Kho mã nguồn Mộc
-# không chứa bản sao và không chỉnh sửa mã nguồn của chúng (tiêu chí PoF #5).
+# NGUYÊN TẮC: tệp này chỉ ĐIỀU PHỐI phần mềm nguồn mở thượng nguồn ở dạng
+# NGUYÊN BẢN qua image chính thức có ghim phiên bản; mã của đội (svc-*, app-*)
+# dựng từ thư mục trong repo. Không chép, không sửa mã của dự án khác (PoF #5).
 #
-# Mỗi không gian là một profile riêng, cho phép triển khai theo đúng lộ trình
-# tuyến tính [H] -> [P] -> [D] -> [I]:
+#   profile core — Tầng 1, lõi headless: chỉ APISIX mở cổng ra ngoài
+#   profile app  — Tầng 2, ứng dụng Văn phòng điện tử
 #
-#   docker compose --profile h up -d               # chỉ trục [H]
-#   docker compose --profile h --profile p up -d   # [H] + [P]
-#   docker compose --profile all up -d             # đủ 4 trục
+#   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
 
 name: moc
@@ -34,58 +32,258 @@ name: moc
 x-common: &common
   restart: unless-stopped
   networks: [moc]
-  environment:
-    TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+
+# Địa chỉ realm: iss trong token là URL công khai; khóa công khai lấy qua mạng nội bộ
+x-oidc: &oidc
+  MOC_OIDC_ISSUER: ${MOC_PUBLIC_URL:?}/realms/${MOC_REALM:-moc}
+  MOC_OIDC_JWKS_URL: http://keycloak:8080/realms/${MOC_REALM:-moc}/protocol/openid-connect/certs
 
 services:
 
-  # =========================================================================
-  # [D] KHÔNG GIAN DỮ LIỆU — nền tảng lưu trữ dùng chung
-  # Khai báo sớm vì các trục [H] và [P] đều phụ thuộc vào CSDL này.
-  # =========================================================================
+  # ===========================================================================
+  # Tầng 1 — lõi headless
+  # ===========================================================================
+
   postgres:
     <<: *common
     image: postgres:16-alpine
-    profiles: [h, p, d, i, all]
+    profiles: [core]
     environment:
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
       POSTGRES_DB: ${POSTGRES_DB:-moc}
       POSTGRES_USER: ${POSTGRES_USER:-moc}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Bat buoc dat POSTGRES_PASSWORD trong .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD trong .env}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      FLOWABLE_DB_PASSWORD: ${FLOWABLE_DB_PASSWORD:?}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-moc} -d ${POSTGRES_DB:-moc}"]
+      # hỏi qua TCP: lúc khởi tạo, image chạy một máy chủ tạm chỉ nghe socket Unix
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-moc} -d ${POSTGRES_DB:-moc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # F1.1 — SSO. Realm nạp từ auth/realm/ ở lần đầu (bỏ qua nếu realm đã có).
+  keycloak:
+    <<: *common
+    image: quay.io/keycloak/keycloak:26.7.5
+    profiles: [core]
+    command: ["start", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      # URL công khai qua APISIX; dịch vụ nội bộ gọi thẳng http://keycloak:8080
+      KC_HOSTNAME: ${MOC_PUBLIC_URL:?}
+      KC_HOSTNAME_ADMIN: http://127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50
+      # giá trị thay vào auth/realm/moc-realm.json khi nạp
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_CLI_CLIENT_ENABLED: ${MOC_CLI_CLIENT_ENABLED:-false}
+      MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
+    volumes:
+      - ./auth/realm:/opt/keycloak/data/import:ro
+    ports:
+      # trang quản trị: chỉ trên máy chủ, không qua APISIX
+      - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgres: {condition: service_healthy}
 
-  # =========================================================================
-  # [H] KHÔNG GIAN NHÂN SỰ — môi trường làm việc số khép kín
-  # Các dịch vụ dưới đây được chốt sau giai đoạn khảo sát công cụ.
-  # Xem docs/architecture.md, mục "Bản đồ công cụ".
-  # =========================================================================
-  # h-sso:        # Quản trị định danh tập trung (SSO)
-  # h-storage:    # Lưu trữ đám mây nội bộ, cấu trúc P.A.R.A
-  # h-wiki:       # Hệ quản trị tri thức
-  # h-chat:       # Truyền thông nội bộ tức thời
+  # F1.2 — cổng duy nhất mở ra ngoài
+  apisix:
+    <<: *common
+    image: apache/apisix:3.18.0-debian
+    profiles: [core]
+    environment:
+      MOC_REALM: ${MOC_REALM:-moc}
+      MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
+    volumes:
+      - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    ports:
+      - ${MOC_HTTP_PORT:-8080}:9080
+    depends_on:
+      keycloak: {condition: service_healthy}
 
-  # =========================================================================
-  # [P] KHÔNG GIAN QUY TRÌNH — tự động hóa luồng việc hướng sự kiện
-  # =========================================================================
-  # p-lowcode:    # Nền tảng low-code dựng biểu mẫu và giao diện
-  # p-workflow:   # Tự động hóa luồng việc / iPaaS
+  # F1.3 — GraphQL tự sinh, quyền theo vai trò và thuê ước; migrations + metadata tự áp từ db/
+  hasura:
+    <<: *common
+    image: hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3
+    profiles: [core]
+    volumes:
+      - ./db/migrations:/hasura-migrations:ro
+      - ./db/metadata:/hasura-metadata:ro
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://${POSTGRES_USER:-moc}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-moc}
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://${POSTGRES_USER:-moc}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-moc}
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
+      HASURA_GRAPHQL_JWT_SECRET: '{"jwk_url":"http://keycloak:8080/realms/${MOC_REALM:-moc}/protocol/openid-connect/certs","issuer":"${MOC_PUBLIC_URL}/realms/${MOC_REALM:-moc}","claims_namespace":"https://hasura.io/jwt/claims"}'
+      HASURA_GRAPHQL_ENABLED_APIS: graphql,metadata
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "false"
+      HASURA_GRAPHQL_DEV_MODE: "false"
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+      HASURA_GRAPHQL_INFER_FUNCTION_PERMISSIONS: "false"
+      # KHÔNG đặt HASURA_GRAPHQL_UNAUTHORIZED_ROLE: không có vai trò ẩn danh
+      MOC_WORKFLOW_URL: http://svc-workflow:8000
+      MOC_ACTION_SECRET: ${MOC_ACTION_SECRET:?}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
 
-  # =========================================================================
-  # [D] KHÔNG GIAN DỮ LIỆU — trực quan hóa và nguồn sự thật duy nhất
-  # =========================================================================
-  # d-bi:         # Nền tảng BI, dashboard thời gian thực
+  # F1.4 — động cơ quy trình BPMN; chỉ svc-workflow gọi, không qua APISIX
+  flowable:
+    <<: *common
+    image: flowable/flowable-rest:8.0.0
+    profiles: [core]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowable
+      SPRING_DATASOURCE_USERNAME: flowable
+      SPRING_DATASOURCE_PASSWORD: ${FLOWABLE_DB_PASSWORD:?}
+      SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "2"
+      SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "10"
+      FLOWABLE_REST_APP_ADMIN_USER_ID: rest-admin
+      FLOWABLE_REST_APP_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
+      FLOWABLE_REST_APP_CREATE_DEMO_DEFINITIONS: "false"
+      FLOWABLE_REST_APP_SWAGGER_DOCS_ENABLED: "false"
+      # biến quy trình chỉ nhận kiểu đơn giản: không giải tuần tự hóa đối tượng Java gửi qua REST
+      REST_VARIABLES_ALLOW_SERIALIZABLE: "false"
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      JAVA_OPTS: -Xmx512M
+      TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
+    mem_limit: 1g
+    healthcheck:
+      # actuator của Flowable đòi đăng nhập
+      test: ["CMD-SHELL", "wget -q -O /dev/null \"http://rest-admin:$${FLOWABLE_REST_APP_ADMIN_PASSWORD}@127.0.0.1:8080/flowable-rest/actuator/health\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgres: {condition: service_healthy}
 
-  # =========================================================================
-  # [I] KHÔNG GIAN TRÍ TUỆ NHÂN TẠO — chỉ bật khi [D] đã có nguồn sự thật
-  # =========================================================================
-  # i-vectordb:   # Cơ sở dữ liệu véc-tơ
-  # i-agent:      # Tác tử tự hành (Agentic AI)
+  # F1.5 — kho đối tượng. Chỉ svc-files gọi; không có URL ký sẵn nào phát ra ngoài.
+  seaweedfs:
+    <<: *common
+    image: chrislusf/seaweedfs:4.48
+    profiles: [core]
+    # Không có tệp danh tính thì cổng S3 không kiểm khóa: sinh tệp từ .env trước khi chạy
+    # (khóa chỉ gồm chữ và số)
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        umask 077
+        printf '{"identities":[{"name":"svc-files","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' \
+          "$$SEAWEEDFS_S3_ACCESS_KEY" "$$SEAWEEDFS_S3_SECRET_KEY" > /tmp/s3.json
+        chown seaweed:seaweed /tmp/s3.json
+        exec /entrypoint.sh "$$@"
+      - --
+    command: >-
+      server -s3 -dir=/data -ip.bind=0.0.0.0 -volume.max=0 -master.volumeSizeLimitMB=1024
+      -s3.config=/tmp/s3.json
+    environment:
+      SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?}
+      SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?}
+    volumes:
+      - seaweedfs_data:/data
+
+  # F1.6 — trạm kiểm dịch. Giữ volume chữ ký để không tải lại mỗi lần khởi động.
+  clamav:
+    <<: *common
+    image: clamav/clamav:1.5.4
+    profiles: [core]
+    environment:
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
+      CLAMD_CONF_StreamMaxLength: 64M
+    volumes:
+      - clamav_data:/var/lib/clamav
+
+  # F1.7 — tìm kiếm toàn văn; chỉ svc-files gọi
+  meilisearch:
+    <<: *common
+    image: getmeili/meilisearch:v1.54.3
+    profiles: [core]
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+
+  svc-files:
+    <<: *common
+    build: ./services/svc-files
+    image: moc/svc-files:${MOC_VERSION:-dev}
+    profiles: [core]
+    environment:
+      <<: *oidc
+      SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?}
+      SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?}
+      MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
+      HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
+      MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:?}
+    depends_on:
+      hasura: {condition: service_healthy}
+      seaweedfs: {condition: service_started}
+      clamav: {condition: service_started}
+      meilisearch: {condition: service_started}
+
+  svc-workflow:
+    <<: *common
+    build: ./services/svc-workflow
+    image: moc/svc-workflow:${MOC_VERSION:-dev}
+    profiles: [core]
+    environment:
+      HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
+      MOC_ACTION_SECRET: ${MOC_ACTION_SECRET:?}
+      FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
+      MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
+      MOC_KEYCLOAK_URL: http://keycloak:8080
+      MOC_REALM: ${MOC_REALM:-moc}
+      MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
+      TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
+    volumes:
+      - ./processes:/app/processes:ro
+    depends_on:
+      hasura: {condition: service_healthy}
+      flowable: {condition: service_healthy}
+
+  # ===========================================================================
+  # Tầng 2 — ứng dụng
+  # ===========================================================================
+
+  # Văn phòng điện tử: trang tĩnh (Nuxt, chế độ SPA), gọi lõi qua APISIX cùng tên miền
+  app-office:
+    <<: *common
+    build: ./apps/office
+    image: moc/app-office:${MOC_VERSION:-dev}
+    profiles: [app]
+    environment:
+      MOC_REALM: ${MOC_REALM:-moc}
 
 networks:
   moc:
@@ -93,3 +291,6 @@ networks:
 
 volumes:
   postgres_data:
+  seaweedfs_data:
+  clamav_data:
+  meili_data:

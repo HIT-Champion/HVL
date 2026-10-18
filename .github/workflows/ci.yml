@@ -61,12 +61,13 @@ jobs:
       - name: Cú pháp Docker Compose hợp lệ
         run: docker compose config -q
 
-      - name: Mọi profile H/P/D/I đều phân giải được
+      - name: Mọi profile đều phân giải được và có dịch vụ
         run: |
-          for p in h p d i all; do
-            docker compose --profile "$p" config -q \
+          for p in core app; do
+            services=$(docker compose --profile "$p" config --services) \
               || { echo "::error::Profile '$p' không hợp lệ"; exit 1; }
-            echo "profile $p: hợp lệ"
+            test -n "$services" || { echo "::error::Profile '$p' không có dịch vụ nào"; exit 1; }
+            echo "profile $p: $(echo $services | wc -w) dịch vụ"
           done
 
       - name: Script khả thi và đúng cú pháp
