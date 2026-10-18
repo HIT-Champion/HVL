@@ -23,10 +23,10 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-COMPOSE := docker compose
+COMPOSE := docker compose --profile core --profile app
 ENV_FILE := .env
 
-.PHONY: help check build up up-h up-p up-d down restart logs ps seed \
+.PHONY: help env check build up down reset restart logs ps seed smoke e2e test \
         license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -34,46 +34,60 @@ help: ## Hiển thị danh sách lệnh
 	| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 $(ENV_FILE):
-	@echo "Chưa có $(ENV_FILE). Tạo từ mẫu: cp .env.example .env" >&2
+	@echo "Chưa có $(ENV_FILE). Tạo bằng: make env  (hoặc cp .env.example .env rồi sửa)" >&2
 	@exit 1
+
+env: ## Sinh .env từ .env.example, thay mọi change_me bằng chuỗi ngẫu nhiên
+	@test ! -f $(ENV_FILE) || { echo "Đã có $(ENV_FILE) — xóa đi nếu muốn sinh lại." >&2; exit 1; }
+	@./scripts/gen-env.sh .env.example > $(ENV_FILE)
+	@chmod 600 $(ENV_FILE)
+	@echo "Đã tạo $(ENV_FILE). Mật khẩu của các tài khoản mẫu là giá trị MOC_DEMO_PASSWORD trong tệp này."
 
 check: ## Kiểm tra tiền điều kiện của môi trường
 	@command -v docker >/dev/null || { echo "Thiếu Docker Engine >= 24.0"; exit 1; }
-	@$(COMPOSE) version >/dev/null || { echo "Thiếu plugin docker compose v2"; exit 1; }
-	@test -f $(ENV_FILE) || { echo "Thiếu $(ENV_FILE) — chạy: cp .env.example .env"; exit 1; }
+	@docker compose version >/dev/null || { echo "Thiếu plugin docker compose v2"; exit 1; }
+	@test -f $(ENV_FILE) || { echo "Thiếu $(ENV_FILE) — chạy: make env"; exit 1; }
 	@$(COMPOSE) config -q && echo "Cú pháp Docker Compose hợp lệ."
 	@echo "Môi trường sẵn sàng."
 
-build: $(ENV_FILE) ## Dựng toàn bộ image từ mã nguồn
-	@$(COMPOSE) --profile all build
+build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
+	@$(COMPOSE) build
 
-up: $(ENV_FILE) ## Khởi động đủ 4 trục H-P-D-I
-	@$(COMPOSE) --profile all up -d
-	@echo "Mộc đang chạy. Xem nhật ký: make logs"
+up: $(ENV_FILE) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+	@$(COMPOSE) up -d --build --wait --wait-timeout 600
+	@echo "Mộc đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
-up-h: $(ENV_FILE) ## Khởi động riêng trục [H] — Nhân sự
-	@$(COMPOSE) --profile h up -d
+down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
+	@$(COMPOSE) down
 
-up-p: $(ENV_FILE) ## Khởi động trục [H] + [P] — thêm Quy trình
-	@$(COMPOSE) --profile h --profile p up -d
-
-up-d: $(ENV_FILE) ## Khởi động trục [H] + [P] + [D] — thêm Dữ liệu
-	@$(COMPOSE) --profile h --profile p --profile d up -d
-
-down: ## Dừng toàn bộ dịch vụ
-	@$(COMPOSE) --profile all down
+reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
+	@read -p "Xóa toàn bộ dữ liệu của Mộc trên máy này? [y/N] " a && [ "$$a" = y ]
+	@$(COMPOSE) down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
 logs: ## Theo dõi nhật ký của mọi dịch vụ
-	@$(COMPOSE) --profile all logs -f --tail=100
+	@$(COMPOSE) logs -f --tail=100
 
 ps: ## Liệt kê trạng thái các dịch vụ
-	@$(COMPOSE) --profile all ps
+	@$(COMPOSE) ps
 
-seed: $(ENV_FILE) ## Nạp dữ liệu mẫu để chạy thử
-	@test -d seed || { echo "Chưa có thư mục seed/ — sẽ bổ sung ở giai đoạn 1."; exit 0; }
-	@bash seed/load.sh
+seed: $(ENV_FILE) ## Nạp dữ liệu mẫu: 2 đơn vị, phòng ban, tài khoản, văn bản
+	@python3 scripts/seed.py
+
+smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
+	@python3 scripts/smoke.py
+
+PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble
+
+e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): luồng văn bản đến qua giao diện
+	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \
+	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e $(PLAYWRIGHT_IMAGE) \
+	  sh -c 'npm ci --no-audit --no-fund --ignore-scripts >/dev/null && npx playwright test'
+
+test: ## Chạy test đơn vị của các dịch vụ (không cần Docker)
+	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
+	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 
 license-check: ## Kiểm tra header giấy phép trong từng tệp mã (tiêu chí PoF #2)
 	@./scripts/license-header.sh check
