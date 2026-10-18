@@ -1,0 +1,118 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+"""make seed — nạp dữ liệu mẫu (F2.10). Chạy lại nhiều lần được.
+
+1. Đơn vị và phòng ban: seed/tenants.sql (id cố định).
+2. Tài khoản: seed/users.csv → Keycloak Admin REST qua cổng quản trị nội bộ (127.0.0.1).
+3. Văn bản: chạy kịch bản nghiệp vụ qua API như người dùng thật (seed_documents.py) — không chèn thẳng
+   vào CSDL, để quy trình trong Flowable khớp với dữ liệu.
+"""
+
+from __future__ import annotations
+
+import sys
+import time
+
+from moc_env import ENV, KEYCLOAK_ADMIN_URL, PUBLIC_URL, REALM, ROOT, HTTPError, Session, call_json, compose, wait_for
+
+
+def seed_tenants() -> None:
+    sql = (ROOT / "seed" / "tenants.sql").read_bytes()
+    compose("exec", "-T", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1",
+            "-U", ENV.get("POSTGRES_USER", "moc"), "-d", ENV.get("POSTGRES_DB", "moc"), stdin=sql)
+    print("  đơn vị, phòng ban: xong")
+
+
+def admin_token() -> str:
+    data, _ = call_json(
+        "POST", f"{KEYCLOAK_ADMIN_URL}/realms/master/protocol/openid-connect/token",
+        form={"grant_type": "password", "client_id": "admin-cli",
+              "username": ENV.get("KEYCLOAK_ADMIN_USER", "admin"), "password": ENV["KEYCLOAK_ADMIN_PASSWORD"]},
+    )
+    return data["access_token"]
+
+
+def seed_users() -> None:
+    token = admin_token()
+    auth = {"Authorization": f"Bearer {token}"}
+    base = f"{KEYCLOAK_ADMIN_URL}/admin/realms/{REALM}"
+    domain = {"c300d5bb-028f-44cc-ba10-7b5277a4225d": "cntt", "318da474-60d6-4a90-aa7f-928b31b8fc59": "kt"}
+    count = 0
+    for line in (ROOT / "seed" / "users.csv").read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        username, first, last, role, tenant, department = line.split(",")
+        attrs = {"tenant_id": [tenant], "moc_role": [role]}
+        if department != "-":
+            attrs["department_id"] = [department]
+        user = {
+            "username": username,
+            "enabled": True,
+            "emailVerified": True,
+            "firstName": first,
+            "lastName": last,
+            "email": f"{username}@{domain.get(tenant, 'demo')}.moc.example",
+            "attributes": attrs,
+        }
+        found, _ = call_json("GET", f"{base}/users?exact=true&username={username}", headers=auth)
+        if found:
+            user_id = found[0]["id"]
+            call_json("PUT", f"{base}/users/{user_id}", user, headers=auth)
+        else:
+            _, headers = call_json("POST", f"{base}/users", user, headers=auth)
+            user_id = headers["Location"].rsplit("/", 1)[-1]
+        call_json("PUT", f"{base}/users/{user_id}/reset-password",
+                  {"type": "password", "value": ENV["MOC_DEMO_PASSWORD"], "temporary": False}, headers=auth)
+        count += 1
+    print(f"  tài khoản Keycloak: {count}")
+
+
+def wait_directory(timeout_s: int = 90) -> None:
+    """svc-workflow chép danh bạ Keycloak sang core.users theo chu kỳ; đợi tài khoản mẫu có mặt."""
+    wanted = sum(1 for line in (ROOT / "seed" / "users.csv").read_text(encoding="utf-8").splitlines()
+                 if line.strip() and not line.startswith("#") and ",c300d5bb-" in line)
+    clerk = Session("vanthu")
+    deadline = time.time() + timeout_s
+    while len(clerk.gql("{ core_users(where: {enabled: {_eq: true}}) { id } }")["core_users"]) < wanted:
+        if time.time() > deadline:
+            sys.exit("svc-workflow chưa đồng bộ danh bạ từ Keycloak — xem: docker compose logs svc-workflow")
+        time.sleep(2)
+    print("  danh bạ (core.users): đã đồng bộ")
+
+
+def main() -> None:
+    if len(ENV.get("MOC_DEMO_PASSWORD", "")) < 10:
+        sys.exit("MOC_DEMO_PASSWORD trong .env phải có ít nhất 10 ký tự (chính sách mật khẩu của realm)")
+    print("Đợi Keycloak và cổng APISIX…")
+    wait_for(f"{KEYCLOAK_ADMIN_URL}/realms/{REALM}", "Keycloak")
+    wait_for(f"{PUBLIC_URL}/realms/{REALM}", "APISIX")
+    print("Nạp dữ liệu mẫu:")
+    seed_tenants()
+    try:
+        seed_users()
+    except HTTPError as exc:
+        sys.exit(f"Keycloak từ chối: {exc}")
+    if "--no-documents" not in sys.argv:
+        wait_directory()
+        import seed_documents
+        seed_documents.run()
+    print(f"Xong. Mở {PUBLIC_URL} — đăng nhập vanthu, truongkhoa, totruongdt, chuyenviendt, giamkhao… "
+          "(mật khẩu: MOC_DEMO_PASSWORD trong .env)")
+
+
+if __name__ == "__main__":
+    main()

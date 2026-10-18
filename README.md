@@ -76,19 +76,34 @@ Bài toán này đi đúng lộ trình tiến hóa `[H] → [P] → [D] → [I]`
 mới chuẩn hóa được quy trình, quy trình chuẩn mới sinh ra số liệu sạch, có số liệu sạch thì AI mới
 gợi ý đúng. Mục tiêu của mô hình là giảm tỷ lệ thao tác thủ công từ **100% xuống 10–20%**.
 
-## Kiến trúc 4 không gian
+## Đang chạy được
 
-| Trục | Không gian | Vai trò | Trạng thái |
-|------|-----------|---------|-----------|
-| **[H]** | Nhân sự | Môi trường làm việc số khép kín: định danh tập trung (SSO), lưu trữ chuẩn P.A.R.A, cổng thông tin nội bộ | 🚧 đang khảo sát |
-| **[P]** | Quy trình | Tự động hóa luồng việc hướng sự kiện, ràng buộc Poka-yoke chống nhập sai | 🚧 đang khảo sát |
-| **[D]** | Dữ liệu | Hợp nhất thành Nguồn sự thật duy nhất, dashboard thời gian thực | 🚧 đang khảo sát |
-| **[I]** | Trí tuệ nhân tạo | Tác tử tự hành (Agentic AI) đọc [D], bắt sự kiện từ [P], tự thực thi | 🚧 đang khảo sát |
+Lát cắt đầu tiên chạy trọn từ giao diện xuống lõi: **văn bản đến** — văn thư tải công văn lên (quét
+ClamAV) → nhập thông tin, chặn trùng → vào sổ, hệ thống cấp số đến liên tiếp → lãnh đạo khoa chỉ đạo,
+giao phòng chủ trì và phối hợp, đặt hạn → lãnh đạo phòng phân công → chuyên viên báo kết quả. Mỗi bước có
+trong hộp việc của đúng người, hiện trên dòng thời gian văn bản và vào sổ kiểm toán chuỗi băm; tìm lại
+được bằng chữ không dấu.
 
-Nguyên tắc bất di bất dịch: **tiến hóa tuyến tính**. Không triển khai [I] khi [D] chưa có nguồn sự
-thật duy nhất và [P] chưa có ràng buộc kỹ thuật — nếu không sẽ rơi vào *Garbage In, Garbage Out*.
+```
+ Trình duyệt ──► APISIX :8080 ─┬─ /            → app-office (Nuxt, trang tĩnh)          Tầng 2
+                (kiểm JWT,     ├─ /realms/moc/* → Keycloak (đăng nhập SSO)
+                 X-Request-Id) ├─ /v1/graphql   → Hasura ─┬─ PostgreSQL (core, office)  Tầng 1
+                               │                          └─ Actions → svc-workflow → Flowable (BPMN)
+                               └─ /api/files, /api/search → svc-files ─ ClamAV · SeaweedFS · Meilisearch
+```
 
-Chi tiết kiến trúc và bản đồ công cụ: [`docs/architecture.md`](docs/architecture.md).
+| Thành phần | Vai trò | Thư mục |
+|---|---|---|
+| Keycloak 26 | SSO; vai trò, đơn vị, phòng đưa vào token cho Hasura | `auth/realm/` |
+| Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị | `gateway/` |
+| Hasura 2 + PostgreSQL 16 | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng, sổ kiểm toán chuỗi băm | `db/` |
+| Flowable 8 | Quy trình BPMN xử lý văn bản đến | `processes/` |
+| `svc-workflow` | Hasura Actions: vào sổ, hộp việc, hoàn thành việc; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
+| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch | `services/svc-files/` |
+| `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
+
+Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): văn bản đi, dựng PDF có mã QR
+và cổng xác thực (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
 
 ## Yêu cầu hệ thống
 
@@ -96,9 +111,9 @@ Chi tiết kiến trúc và bản đồ công cụ: [`docs/architecture.md`](doc
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Git | 2.30 | |
-| RAM | 8 GB | mục tiêu: chạy được trên máy văn phòng phổ thông |
-| Đĩa trống | 20 GB | |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke` (thư viện chuẩn, không cài thêm gì) |
+| RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
+| Đĩa trống | 10 GB | image khoảng 5 GB |
 
 Toàn bộ công cụ dùng để dựng Mộc đều là phần mềm nguồn mở. Không cần bất kỳ công cụ
 nguồn đóng hay tự chế nào.
@@ -111,37 +126,38 @@ git clone https://github.com/HIT-Champion/HVL.git
 cd HVL
 
 # 2. Cấu hình (KHÔNG sửa mã nguồn để cấu hình — mọi tham số nằm trong .env)
-cp .env.example .env
-$EDITOR .env          # đổi mật khẩu và cổng nếu cần
-
-# 3. Kiểm tra môi trường
+make env              # sinh .env từ .env.example, mật khẩu ngẫu nhiên; hoặc: cp .env.example .env rồi sửa
 make check
 
-# 4. Dựng và khởi động toàn bộ Mộc
-make build
+# 3. Dựng image của đội và khởi động toàn bộ (lần đầu vài phút: tải image, ClamAV nạp chữ ký)
 make up
 
-# 5. Nạp dữ liệu mẫu để chạy thử
+# 4. Nạp dữ liệu mẫu: 2 đơn vị, phòng ban, 10 tài khoản, ~17 văn bản ở mọi bước của quy trình
 make seed
 ```
 
-Mở `http://localhost` để vào cổng thông tin. Dừng hệ thống: `make down`.
+Mở <http://localhost:8080> và đăng nhập bằng một tài khoản mẫu; mật khẩu chung là giá trị
+`MOC_DEMO_PASSWORD` trong `.env`.
 
-Mộc **chạy được ngoài thư mục mã nguồn**: mọi đường dẫn đều tương đối theo biến môi trường,
-không phụ thuộc vị trí thư mục cài đặt.
+| Tài khoản | Vai trò | Thấy gì |
+|---|---|---|
+| `vanthu` | Văn thư Khoa CNTT | Tiếp nhận, vào sổ; mọi văn bản đến của khoa |
+| `truongkhoa` | Lãnh đạo khoa | Hộp việc chỉ đạo; mọi văn bản của khoa |
+| `totruongdt` | Tổ trưởng Đào tạo | Văn bản giao cho tổ; phân công |
+| `chuyenviendt`, `giamkhao` | Chuyên viên Tổ Đào tạo | Văn bản được giao cho mình |
+| `vanthukt`, `truongkhoakt` | Khoa Kinh tế | Chỉ văn bản của Khoa Kinh tế |
 
-Xem toàn bộ lệnh: `make help`.
+Dừng: `make down` (giữ dữ liệu) · xóa sạch dữ liệu: `make reset` · xem mọi lệnh: `make help`.
+Trang quản trị Keycloak chỉ mở trên máy chủ: <http://127.0.0.1:8180/admin> (tài khoản `KEYCLOAK_ADMIN_*`).
 
-## Khởi động từng trục riêng lẻ
+## Kiểm thử
 
-Mỗi không gian là một Docker Compose profile độc lập, cho phép triển khai theo đúng lộ trình tuyến tính:
-
-```bash
-make up-h      # chỉ [H] — nền tảng nhân sự
-make up-p      # [H] + [P]
-make up-d      # [H] + [P] + [D]
-make up        # đủ 4 trục
-```
+| Lệnh | Kiểm gì | Cần |
+|---|---|---|
+| `make test` | Test đơn vị của `svc-files`, `svc-workflow` | Python + [uv](https://github.com/astral-sh/uv) |
+| `make smoke` | Đi trọn luồng văn bản đến qua cổng APISIX; chặn EICAR, chặn đường quản trị, cách ly đơn vị | Hệ thống đang chạy + `make seed` |
+| `make e2e` | Cùng luồng trên trình duyệt thật (Playwright, chạy trong container) | Như trên |
+| `db/tests/` | 62 test schema, quyền, sổ kiểm toán trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 ## Tài liệu
 
@@ -153,6 +169,7 @@ make up        # đủ 4 trục
 | [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md) | Kế hoạch phát triển theo phase, phân công, rủi ro |
 | [`docs/git_flow.md`](docs/git_flow.md) | Quy trình Git: nhánh, commit, pull request, phát hành |
 | [`docs/architecture.md`](docs/architecture.md) | Kiến trúc H-P-D-I, bản đồ công cụ, quyết định kỹ thuật |
+| [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
 | [`docs/pof-checklist.md`](docs/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
 | [`docs/nghien-cuu/`](docs/nghien-cuu/) | Nghiên cứu trước khi có đề thi (lưu trữ) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Danh mục phần mềm thượng nguồn + giấy phép |

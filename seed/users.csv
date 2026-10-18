@@ -1,0 +1,12 @@
+# Tài khoản mẫu (CSV): username, họ và đệm, tên, vai trò, đơn vị (tenant_id), phòng (department_id; - nếu không có)
+# Mật khẩu chung: MOC_DEMO_PASSWORD trong .env. KHÔNG dùng trên hệ thống thật.
+vanthu,Trần Thị,Thu,clerk,c300d5bb-028f-44cc-ba10-7b5277a4225d,ecd87efb-e9a1-4113-a46a-f599a9d15574
+truongkhoa,Phạm Minh,Đức,director,c300d5bb-028f-44cc-ba10-7b5277a4225d,ecd87efb-e9a1-4113-a46a-f599a9d15574
+totruongdt,Lê Thị,Hoa,manager,c300d5bb-028f-44cc-ba10-7b5277a4225d,5cc372aa-304d-4574-896c-4f3e781a2ce7
+chuyenviendt,Hoàng Văn,Nam,staff,c300d5bb-028f-44cc-ba10-7b5277a4225d,5cc372aa-304d-4574-896c-4f3e781a2ce7
+giamkhao,Tài khoản,Giám khảo,staff,c300d5bb-028f-44cc-ba10-7b5277a4225d,5cc372aa-304d-4574-896c-4f3e781a2ce7
+truongbmktpm,Đỗ Quang,Huy,manager,c300d5bb-028f-44cc-ba10-7b5277a4225d,7ee31261-b14c-4c42-8e1b-9a7e99935412
+giangvienktpm,Vũ Thị,Mai,staff,c300d5bb-028f-44cc-ba10-7b5277a4225d,7ee31261-b14c-4c42-8e1b-9a7e99935412
+quantri,Ngô Văn,Tín,tenant_admin,c300d5bb-028f-44cc-ba10-7b5277a4225d,-
+vanthukt,Bùi Thị,Lan,clerk,318da474-60d6-4a90-aa7f-928b31b8fc59,0647d361-8734-427d-be0e-deb9530dce81
+truongkhoakt,Đặng Văn,Hùng,director,318da474-60d6-4a90-aa7f-928b31b8fc59,0647d361-8734-427d-be0e-deb9530dce81
