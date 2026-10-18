@@ -257,7 +257,10 @@ gh pr create --fill                              # 5. mở PR (hoặc mở trên
 
 ### 5.4. Merge
 
-- Điều kiện: **CI xanh** (3 job: Giấy phép, Dựng từ mã nguồn, Tài liệu) + **1 duyệt**.
+- Điều kiện: **CI xanh** (7 job: Giấy phép, Dựng từ mã nguồn, Tài liệu, Test đơn vị dịch vụ, Schema và
+  quyền trên CSDL thật, Chạy thử toàn hệ thống, Quét bí mật và lỗ hổng phụ thuộc) + **1 duyệt**.
+  Job chạy thử toàn hệ thống mất khoảng 10–15 phút; lỗi thì tải `stack-logs` ở trang lượt chạy để xem
+  nhật ký từng dịch vụ và vết Playwright.
 - Cách merge: **Squash and merge** — mọi commit nhỏ của nhánh gộp thành một commit sạch trên `main`.
 - Người mở PR tự merge sau khi được duyệt, rồi **xóa nhánh**.
 
@@ -331,7 +334,7 @@ git push origin deploy
 
 - **Bảo vệ nhánh `main`**:
   - bắt buộc qua PR, 1 duyệt;
-  - bắt buộc 3 job CI xanh;
+  - bắt buộc 7 job CI xanh (mục 5.4);
   - cấm force push và cấm xóa nhánh.
 - **Bảo vệ nhánh `deploy`**: cấm force push; chỉ Backend được push.
 - **Merge**:

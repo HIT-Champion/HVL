@@ -49,6 +49,9 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   CSP chặt (#22).
 - `make env`, `make seed` (2 đơn vị, 10 tài khoản, văn bản ở mọi bước), `make smoke` (13 kiểm tra qua
   cổng), `make e2e` (Playwright trên trình duyệt thật) (#16).
+- CI chạy kiểm thử thật trên mọi PR: test đơn vị dịch vụ, 62 test schema và quyền trên PostgreSQL + Hasura,
+  dựng toàn hệ thống rồi `make seed` → `make smoke` → `make e2e`; quét bí mật trong lịch sử commit
+  (gitleaks) và lỗ hổng phụ thuộc (OSV-Scanner); kiểm workflow bằng actionlint.
 
 ### Đã sửa đổi
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,
@@ -75,6 +78,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - `scripts/license-header.sh` bỏ qua im lặng các tệp `.vue`, `.html`, `.xml`, `.bpmn`, `.css`,
   `.scss`, `.mjs`, `.graphql`, `.lua` — các tệp này giờ được kiểm tra và tự chèn header; loại tệp
   chưa hỗ trợ được in ra dưới dạng cảnh báo.
+
+### Bảo mật
+- Action GitHub trong CI và quy trình phát hành ghim theo SHA commit, image công cụ CI ghim theo digest;
+  workflow CI chỉ có quyền đọc kho.
 
 <!--
 Mẫu cho bản phát hành kế tiếp:

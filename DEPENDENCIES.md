@@ -36,11 +36,16 @@ sử dụng"*).
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
 | Git | ≥ 2.30 | GPL-2.0 | Quản lý mã nguồn, sinh gói phát hành | Gói hệ thống |
+| uv | 0.12.19 | Apache-2.0 / MIT | Cài thư viện test theo băm và chạy `make test`, test `db/tests/` | Tệp chạy độc lập |
+| actionlint | 1.7.12 | MIT | CI: kiểm cú pháp và lỗi thường gặp trong `.github/workflows/` | `rhysd/actionlint:1.7.12` |
+| gitleaks | 8.30.1 | MIT | CI: quét bí mật lộ trong toàn bộ lịch sử commit | `ghcr.io/gitleaks/gitleaks:v8.30.1` |
+| OSV-Scanner | 2.6.0 | Apache-2.0 | CI: đối chiếu tệp khóa phụ thuộc với cơ sở dữ liệu lỗ hổng OSV | `ghcr.io/google/osv-scanner:v2.6.0` |
 
 > **Ghi chú tương thích:** Make và Git là *công cụ dựng*, được gọi như tiến trình độc lập và không
 > liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Mộc. Cả hai đều là phần
 > mềm nguồn mở — Mộc không dùng bất kỳ công cụ nguồn đóng hay tự chế nào để dựng
-> (tiêu chí PoF #4).
+> (tiêu chí PoF #4). CI trên GitHub Actions chỉ gọi lại đúng các lệnh `make` ở trên, nên dựng và kiểm
+> thử trên máy riêng không cần GitHub.
 
 ## Tầng 1 — Lõi nền tảng
 
