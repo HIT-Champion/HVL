@@ -29,9 +29,9 @@ export function fmtDateTime(value: string | null | undefined): string {
   }).format(new Date(value))
 }
 
+// Hôm nay theo giờ Việt Nam (YYYY-MM-DD), như svc-workflow và CSDL — không theo múi giờ của máy người dùng
 export function today(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
 }
 
 export function addDays(iso: string, days: number): string {

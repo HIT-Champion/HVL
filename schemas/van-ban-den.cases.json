@@ -1,0 +1,219 @@
+{
+  "$comment": "Ca thử dùng chung cho cả ba lớp kiểm của schemas/van-ban-den.json: form (apps/office/tests/forms.test.ts), Action receiveIncoming (services/svc-workflow/tests/test_intake.py), CSDL (db/tests/test_intake.py). Mỗi ca = base, đổi các trường trong set, bỏ các trường trong unset. Giá trị 'today', 'today+N', 'today-N' là ngày theo giờ Việt Nam lúc chạy test; {\"$repeat\": s, \"times\": n} là chuỗi s lặp n lần; {\"$nfd\": s} là s viết dạng tổ hợp (Unicode NFD), như chép từ một số tệp PDF. error: trường → mã lỗi mà form và Action phải trả. db: đoạn chữ phải có trong lỗi của PostgreSQL khi ghi thẳng vào bảng; ca không có db là ca CSDL không kiểm được (kiểu dữ liệu JSON, trường lạ, hạn tính theo hôm nay).",
+  "base": {
+    "type_code": "CV",
+    "symbol": "15/UBND-VX",
+    "issuer_name": "Ủy ban nhân dân tỉnh Hưng Yên",
+    "issued_on": "today-3",
+    "summary": "Về việc triển khai chuyển đổi số trong các cơ sở giáo dục năm 2026",
+    "urgency": "khan",
+    "due_on": "today+7",
+    "restricted": false,
+    "file_ids": ["0b7c6f1e-3a52-4f0e-9a51-2d4f3c6e8a10"]
+  },
+  "valid": [
+    {"name": "đủ các trường"},
+    {"name": "chỉ các trường bắt buộc", "unset": ["urgency", "due_on", "restricted", "file_ids"]},
+    {"name": "ban hành hôm nay, hạn là hôm nay", "set": {"issued_on": "today", "due_on": "today"}},
+    {"name": "không có hạn giải quyết", "set": {"due_on": null}},
+    {"name": "ký hiệu có chữ Đ và dấu gạch", "set": {"symbol": "123/QĐ-ĐHCN-ĐT"}},
+    {"name": "trích yếu đúng 10 ký tự", "set": {"summary": "Về việc ab"}},
+    {
+      "name": "trích yếu đúng 500 ký tự có dấu",
+      "set": {"summary": {"$repeat": "ệ", "times": 500}}
+    },
+    {"name": "trích yếu có ký tự ngoài BMP vẫn đếm theo ký tự", "set": {"summary": "Về việc 📄📄"}},
+    {"name": "trích yếu nhiều dòng", "set": {"summary": "Về việc tuyển sinh năm 2026\nvà kế hoạch năm 2027"}},
+    {
+      "name": "hai tệp",
+      "set": {"file_ids": ["0b7c6f1e-3a52-4f0e-9a51-2d4f3c6e8a10", "5d1e2c3b-7a8f-4e6d-b1c2-9f0a8e7d6c5b"]}
+    },
+    {"name": "văn bản hạn chế, hỏa tốc", "set": {"restricted": true, "urgency": "hoa_toc"}},
+    {
+      "name": "trích yếu xuống dòng kiểu Windows",
+      "set": {"summary": "Về việc tuyển sinh năm 2026\r\nvà kế hoạch năm 2027"}
+    },
+    {"name": "ký hiệu có dấu & và chữ Đ", "set": {"symbol": "57/KT&ĐBCL"}}
+  ],
+  "invalid": [
+    {"name": "thiếu số, ký hiệu", "unset": ["symbol"], "error": {"symbol": "required"}, "db": "documents_in_identity"},
+    {
+      "name": "thiếu cơ quan ban hành",
+      "unset": ["issuer_name"],
+      "error": {"issuer_name": "required"},
+      "db": "documents_in_identity"
+    },
+    {
+      "name": "thiếu ngày ban hành",
+      "unset": ["issued_on", "due_on"],
+      "error": {"issued_on": "required"},
+      "db": "documents_in_identity"
+    },
+    {"name": "thiếu trích yếu", "unset": ["summary"], "error": {"summary": "required"}, "db": "column \"summary\""},
+    {
+      "name": "thiếu loại văn bản",
+      "unset": ["type_code"],
+      "error": {"type_code": "required"},
+      "db": "column \"type_code\""
+    },
+    {
+      "name": "loại văn bản quá dài",
+      "set": {"type_code": "CONGVANKHAN1"},
+      "error": {"type_code": "maxLength"},
+      "db": "documents_type_code_fkey"
+    },
+    {"name": "số, ký hiệu để trống", "set": {"symbol": ""}, "error": {"symbol": "minLength"}, "db": "documents_in_symbol"},
+    {
+      "name": "số, ký hiệu toàn khoảng trắng",
+      "set": {"symbol": "   "},
+      "error": {"symbol": "not"},
+      "db": "documents_in_symbol"
+    },
+    {
+      "name": "số, ký hiệu có khoảng trắng ở cuối",
+      "set": {"symbol": "15/UBND-VX "},
+      "error": {"symbol": "not"},
+      "db": "documents_in_symbol"
+    },
+    {
+      "name": "số, ký hiệu có xuống dòng",
+      "set": {"symbol": "15/UBND\nVX"},
+      "error": {"symbol": "not"},
+      "db": "documents_in_symbol"
+    },
+    {
+      "name": "số, ký hiệu quá 50 ký tự",
+      "set": {"symbol": {"$repeat": "9", "times": 51}},
+      "error": {"symbol": "maxLength"},
+      "db": "documents_in_symbol"
+    },
+    {
+      "name": "cơ quan ban hành mở đầu bằng khoảng trắng không ngắt",
+      "set": {"issuer_name": "\u00a0UBND tỉnh Hưng Yên"},
+      "error": {"issuer_name": "not"},
+      "db": "documents_in_issuer"
+    },
+    {
+      "name": "cơ quan ban hành quá 200 ký tự",
+      "set": {"issuer_name": {"$repeat": "Ủ", "times": 201}},
+      "error": {"issuer_name": "maxLength"},
+      "db": "documents_in_issuer"
+    },
+    {
+      "name": "trích yếu 9 ký tự",
+      "set": {"summary": "Về việc a"},
+      "error": {"summary": "minLength"},
+      "db": "documents_summary_check"
+    },
+    {
+      "name": "trích yếu 501 ký tự",
+      "set": {"summary": {"$repeat": "ệ", "times": 501}},
+      "error": {"summary": "maxLength"},
+      "db": "documents_summary_check"
+    },
+    {
+      "name": "trích yếu xuống dòng ở cuối",
+      "set": {"summary": "Về việc triển khai chuyển đổi số\n"},
+      "error": {"summary": "not"},
+      "db": "documents_in_summary"
+    },
+    {
+      "name": "độ khẩn không có trong danh mục",
+      "set": {"urgency": "rat_khan"},
+      "error": {"urgency": "enum"},
+      "db": "documents_urgency_check"
+    },
+    {"name": "ngày 30 tháng 2", "set": {"issued_on": "2026-02-30"}, "error": {"issued_on": "format"}, "db": "out of range"},
+    {"name": "ngày theo kiểu dd/mm/yyyy", "set": {"issued_on": "19/10/2026"}, "error": {"issued_on": "format"}},
+    {
+      "name": "ngày ban hành sau hôm nay",
+      "set": {"issued_on": "today+1", "due_on": null},
+      "error": {"issued_on": "x-moc-date"},
+      "db": "documents_in_dates"
+    },
+    {"name": "hạn giải quyết đã qua", "set": {"due_on": "today-1"}, "error": {"due_on": "x-moc-date"}},
+    {
+      "name": "hạn giải quyết trước ngày ban hành",
+      "set": {"due_on": "today-5"},
+      "error": {"due_on": "x-moc-date"},
+      "db": "documents_in_dates"
+    },
+    {"name": "văn bản hạn chế ghi bằng chuỗi", "set": {"restricted": "true"}, "error": {"restricted": "type"}},
+    {"name": "trích yếu là số", "set": {"summary": 1234567890}, "error": {"summary": "type"}},
+    {"name": "tự đặt trạng thái", "set": {"status": "registered"}, "error": {"status": "additionalProperties"}},
+    {
+      "name": "tự đặt đơn vị",
+      "set": {"tenant_id": "00000000-0000-0000-0000-000000000000"},
+      "error": {"tenant_id": "additionalProperties"}
+    },
+    {
+      "name": "một tệp gửi hai lần",
+      "set": {"file_ids": ["0b7c6f1e-3a52-4f0e-9a51-2d4f3c6e8a10", "0b7c6f1e-3a52-4f0e-9a51-2d4f3c6e8a10"]},
+      "error": {"file_ids": "uniqueItems"}
+    },
+    {
+      "name": "mã tệp không phải UUID",
+      "set": {"file_ids": ["0b7c6f1e-3a52-4f0e-9a51-2d4f3c6e8a10", "cong-van.pdf"]},
+      "error": {"file_ids": "format"}
+    },
+    {
+      "name": "số, ký hiệu có ký tự rộng 0 ở cuối",
+      "set": {"symbol": "15/UBND-VX\u200b"},
+      "error": {"symbol": "not"},
+      "db": "documents_in_symbol"
+    },
+    {
+      "name": "trích yếu toàn ký tự vô hình",
+      "set": {"summary": {"$repeat": "\u200b", "times": 10}},
+      "error": {"summary": "not"},
+      "db": "documents_in_summary"
+    },
+    {
+      "name": "trích yếu có gạch nối mềm",
+      "set": {"summary": "Về việc chuyển\u00addổi số trong các trường"},
+      "error": {"summary": "not"},
+      "db": "documents_in_summary"
+    },
+    {
+      "name": "trích yếu có ký tự tab",
+      "set": {"summary": "Về việc chuyển đổi số\ttrong các trường"},
+      "error": {"summary": "not"},
+      "db": "documents_in_summary"
+    },
+    {
+      "name": "trích yếu có ký tự NUL",
+      "set": {"summary": "Về việc chuyển đổi số\u0000 trong các trường"},
+      "error": {"summary": "not"}
+    },
+    {
+      "name": "trích yếu dạng tổ hợp (NFD)",
+      "set": {"summary": {"$nfd": "Về việc triển khai chuyển đổi số trong các cơ sở giáo dục"}},
+      "error": {"summary": "x-moc-nfc"},
+      "db": "documents_in_summary"
+    },
+    {
+      "name": "cơ quan ban hành dạng tổ hợp (NFD)",
+      "set": {"issuer_name": {"$nfd": "Ủy ban nhân dân tỉnh Hưng Yên"}},
+      "error": {"issuer_name": "x-moc-nfc"},
+      "db": "documents_in_issuer"
+    },
+    {
+      "name": "năm ban hành gõ nhầm",
+      "set": {"issued_on": "0202-10-19"},
+      "error": {"issued_on": "pattern"},
+      "db": "documents_in_dates"
+    },
+    {"name": "năm của hạn giải quyết gõ nhầm", "set": {"due_on": "3026-10-19"}, "error": {"due_on": "pattern"}},
+    {
+      "name": "trường lạ trùng tên thuộc tính có sẵn của JavaScript",
+      "set": {"constructor": 1, "toString": "x"},
+      "error": {"constructor": "additionalProperties", "toString": "additionalProperties"}
+    },
+    {
+      "name": "nhiều lỗi một lúc",
+      "set": {"symbol": "", "summary": "Ngắn"},
+      "unset": ["issuer_name"],
+      "error": {"symbol": "minLength", "issuer_name": "required", "summary": "minLength"}
+    }
+  ]
+}

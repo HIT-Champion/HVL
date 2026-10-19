@@ -56,6 +56,11 @@ input Int_comparison_exp {
   _nin: [Int!]
 }
 
+type ReceiveIncomingOutput {
+  document: office_documents
+  document_id: uuid!
+}
+
 type RegisterIncomingOutput {
   document: office_documents
   document_id: uuid!
@@ -639,41 +644,7 @@ input jsonb_comparison_exp {
 "mutation root"
 type mutation_root {
   completeTask(data: jsonb, outcome: String!, taskId: String!): CompleteTaskOutput
-  "delete data from the table: \"office.document_files\""
-  delete_office_document_files(
-    "filter the rows which have to be deleted"
-    where: office_document_files_bool_exp!
-  ): office_document_files_mutation_response
-  "delete single row from the table: \"office.document_files\""
-  delete_office_document_files_by_pk(document_id: uuid!, file_id: uuid!): office_document_files
-  "insert data into the table: \"office.document_files\""
-  insert_office_document_files(
-    "the rows to be inserted"
-    objects: [office_document_files_insert_input!]!
-    "upsert condition"
-    on_conflict: office_document_files_on_conflict
-  ): office_document_files_mutation_response
-  "insert a single row into the table: \"office.document_files\""
-  insert_office_document_files_one(
-    "the row to be inserted"
-    object: office_document_files_insert_input!
-    "upsert condition"
-    on_conflict: office_document_files_on_conflict
-  ): office_document_files
-  "insert data into the table: \"office.documents\""
-  insert_office_documents(
-    "the rows to be inserted"
-    objects: [office_documents_insert_input!]!
-    "upsert condition"
-    on_conflict: office_documents_on_conflict
-  ): office_documents_mutation_response
-  "insert a single row into the table: \"office.documents\""
-  insert_office_documents_one(
-    "the row to be inserted"
-    object: office_documents_insert_input!
-    "upsert condition"
-    on_conflict: office_documents_on_conflict
-  ): office_documents
+  receiveIncoming(data: jsonb!): ReceiveIncomingOutput
   registerIncoming(documentId: uuid!): RegisterIncomingOutput
   "update data of the table: \"core.notifications\""
   update_core_notifications(
@@ -693,24 +664,6 @@ type mutation_root {
     "updates to execute, in order"
     updates: [core_notifications_updates!]!
   ): [core_notifications_mutation_response]
-  "update data of the table: \"office.documents\""
-  update_office_documents(
-    "sets the columns of the filtered rows to the given values"
-    _set: office_documents_set_input
-    "filter the rows which have to be updated"
-    where: office_documents_bool_exp!
-  ): office_documents_mutation_response
-  "update single row of the table: \"office.documents\""
-  update_office_documents_by_pk(
-    "sets the columns of the filtered rows to the given values"
-    _set: office_documents_set_input
-    pk_columns: office_documents_pk_columns_input!
-  ): office_documents
-  "update multiples rows of table: \"office.documents\""
-  update_office_documents_many(
-    "updates to execute, in order"
-    updates: [office_documents_updates!]!
-  ): [office_documents_mutation_response]
 }
 
 "columns and relationships of \"office.assignments\""
@@ -1131,13 +1084,6 @@ input office_document_files_aggregate_order_by {
   variance: office_document_files_variance_order_by
 }
 
-"input type for inserting array relation for remote table \"office.document_files\""
-input office_document_files_arr_rel_insert_input {
-  data: [office_document_files_insert_input!]!
-  "upsert condition"
-  on_conflict: office_document_files_on_conflict
-}
-
 "order by avg() on columns of table \"office.document_files\""
 input office_document_files_avg_order_by {
   version: order_by
@@ -1158,22 +1104,6 @@ input office_document_files_bool_exp {
   version: Int_comparison_exp
 }
 
-"unique or primary key constraints on table \"office.document_files\""
-enum office_document_files_constraint {
-  "unique or primary key constraint on columns \"document_id\""
-  document_files_one_issued
-  "unique or primary key constraint on columns \"document_id\", \"file_id\""
-  document_files_pkey
-}
-
-"input type for inserting data into table \"office.document_files\""
-input office_document_files_insert_input {
-  document: office_documents_obj_rel_insert_input
-  document_id: uuid
-  file_id: uuid
-  role: String
-}
-
 "order by max() on columns of table \"office.document_files\""
 input office_document_files_max_order_by {
   added_at: order_by
@@ -1192,21 +1122,6 @@ input office_document_files_min_order_by {
   file_id: order_by
   role: order_by
   version: order_by
-}
-
-"response of any mutation on the table \"office.document_files\""
-type office_document_files_mutation_response {
-  "number of rows affected by the mutation"
-  affected_rows: Int!
-  "data from the rows affected by the mutation"
-  returning: [office_document_files!]!
-}
-
-"on_conflict condition type for table \"office.document_files\""
-input office_document_files_on_conflict {
-  constraint: office_document_files_constraint!
-  update_columns: [office_document_files_update_column!]! = []
-  where: office_document_files_bool_exp
 }
 
 "Ordering options when selecting data from \"office.document_files\"."
@@ -1273,12 +1188,6 @@ input office_document_files_stream_cursor_value_input {
 "order by sum() on columns of table \"office.document_files\""
 input office_document_files_sum_order_by {
   version: order_by
-}
-
-"placeholder for update columns of table \"office.document_files\" (current role has no relevant permissions)"
-enum office_document_files_update_column {
-  "placeholder (do not use)"
-  _PLACEHOLDER
 }
 
 "order by var_pop() on columns of table \"office.document_files\""
@@ -1501,39 +1410,6 @@ input office_documents_bool_exp {
   verify_code: String_comparison_exp
 }
 
-"unique or primary key constraints on table \"office.documents\""
-enum office_documents_constraint {
-  "unique or primary key constraint on columns \"content_sha256\""
-  documents_content_sha256_key
-  "unique or primary key constraint on columns \"symbol\", \"issued_on\", \"tenant_id\""
-  documents_in_dedup
-  "unique or primary key constraint on columns \"id\""
-  documents_pkey
-  "unique or primary key constraint on columns \"process_id\""
-  documents_process_id_key
-  "unique or primary key constraint on columns \"register_id\", \"register_number\""
-  documents_register_id_register_number_key
-  "unique or primary key constraint on columns \"id\", \"tenant_id\""
-  documents_tenant_id_id_key
-  "unique or primary key constraint on columns \"verify_code\""
-  documents_verify_code_key
-}
-
-"input type for inserting data into table \"office.documents\""
-input office_documents_insert_input {
-  due_on: date
-  files: office_document_files_arr_rel_insert_input
-  issued_on: date
-  issuer_name: String
-  reply_to: office_documents_obj_rel_insert_input
-  restricted: Boolean
-  source: office_documents_obj_rel_insert_input
-  summary: String
-  symbol: String
-  type_code: String
-  urgency: String
-}
-
 "aggregate max on columns"
 type office_documents_max_fields {
   body: String
@@ -1592,28 +1468,6 @@ type office_documents_min_fields {
   verify_code: String
 }
 
-"response of any mutation on the table \"office.documents\""
-type office_documents_mutation_response {
-  "number of rows affected by the mutation"
-  affected_rows: Int!
-  "data from the rows affected by the mutation"
-  returning: [office_documents!]!
-}
-
-"input type for inserting object relation for remote table \"office.documents\""
-input office_documents_obj_rel_insert_input {
-  data: office_documents_insert_input!
-  "upsert condition"
-  on_conflict: office_documents_on_conflict
-}
-
-"on_conflict condition type for table \"office.documents\""
-input office_documents_on_conflict {
-  constraint: office_documents_constraint!
-  update_columns: [office_documents_update_column!]! = []
-  where: office_documents_bool_exp
-}
-
 "Ordering options when selecting data from \"office.documents\"."
 input office_documents_order_by {
   assignments_aggregate: office_assignments_aggregate_order_by
@@ -1654,11 +1508,6 @@ input office_documents_order_by {
   updated_at: order_by
   urgency: order_by
   verify_code: order_by
-}
-
-"primary key columns input for table: office.documents"
-input office_documents_pk_columns_input {
-  id: uuid!
 }
 
 "select columns of table \"office.documents\""
@@ -1721,18 +1570,6 @@ enum office_documents_select_column {
   verify_code
 }
 
-"input type for updating data in table \"office.documents\""
-input office_documents_set_input {
-  due_on: date
-  issued_on: date
-  issuer_name: String
-  restricted: Boolean
-  summary: String
-  symbol: String
-  type_code: String
-  urgency: String
-}
-
 "aggregate stddev on columns"
 type office_documents_stddev_fields {
   register_number: Float
@@ -1791,33 +1628,6 @@ input office_documents_stream_cursor_value_input {
 "aggregate sum on columns"
 type office_documents_sum_fields {
   register_number: Int
-}
-
-"update columns of table \"office.documents\""
-enum office_documents_update_column {
-  "column name"
-  due_on
-  "column name"
-  issued_on
-  "column name"
-  issuer_name
-  "column name"
-  restricted
-  "column name"
-  summary
-  "column name"
-  symbol
-  "column name"
-  type_code
-  "column name"
-  urgency
-}
-
-input office_documents_updates {
-  "sets the columns of the filtered rows to the given values"
-  _set: office_documents_set_input
-  "filter the rows which have to be updated"
-  where: office_documents_bool_exp!
 }
 
 "aggregate var_pop on columns"

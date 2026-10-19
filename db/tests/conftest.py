@@ -216,6 +216,17 @@ mutation ($o: office_documents_insert_input!) {
 }"""
 
 
+def received(clerk: User, doc: dict) -> dict:
+    """Văn bản đến như Action receiveIncoming ghi (F2.2): vai trò service thay mặt văn thư, người tạo là văn thư.
+
+    Văn thư không còn quyền ghi thẳng bảng văn bản; stack test này không có svc-workflow nên ghi như svc-workflow
+    ghi. Phần kiểm của svc-workflow có test riêng (services/svc-workflow/tests/test_intake.py).
+    """
+    svc = Service(clerk.sub, "service", clerk.tenant)
+    row = {**doc, "direction": "in", "status": "received", "created_by": clerk.sub}
+    return svc.gql(INSERT_DOC, {"o": row})["insert_office_documents_one"]
+
+
 def incoming(tag: str, n: int, **overrides) -> dict:
     doc = {
         "type_code": "CV",

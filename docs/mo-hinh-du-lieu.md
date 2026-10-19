@@ -21,7 +21,8 @@
   trên bảng nghiệp vụ. Ngoại lệ duy nhất là job nộp lưu (§2.4), và chỉ xóa sau khi đã ghi gói lưu trữ
   có băm sang kho lạnh.
 - **Chỉ `svc-workflow` ghi cột `status`** (vai trò Hasura `service`). Người dùng đổi trạng thái qua Actions.
-- **Ràng buộc nằm trong CSDL** (`CHECK`, `UNIQUE`) — lớp thứ ba của Poka-yoke, sau form và Action handler.
+- **Ràng buộc nằm trong CSDL** (`CHECK`, `UNIQUE`) — lớp thứ ba của Poka-yoke, sau form và Action handler. Cả
+  ba lớp theo một JSON Schema dùng chung ở `schemas/` ([`schemas/README.md`](../schemas/README.md)).
 - Thời gian: `timestamptz`; ngày theo nghĩa hành chính (ngày ban hành, hạn giải quyết): `date`.
 
 ---
@@ -262,6 +263,16 @@ create table office.documents (
          or (symbol is not null and register_number is not null and issued_on is not null
              and content_sha256 is not null and verify_code is not null and signer_id is not null)),
   check (due_on is null or registered_at is null or due_on >= registered_at::date),
+  -- poka-yoke lớp 3 (F2.2), cùng quy tắc với schemas/van-ban-den.json: số ký hiệu 1–50 ký tự, cơ quan ban hành
+  -- 1–200 ký tự, một dòng; không khoảng trắng ở đầu hoặc cuối, không ký tự ẩn, dạng Unicode NFC; ngày ban hành
+  -- từ 1900, không sau ngày tiếp nhận; hạn không trước ngày ban hành (migration 1792281600800)
+  constraint documents_in_symbol  check (direction <> 'in' or (char_length(symbol) between 1 and 50
+                                                            and symbol is nfc normalized and symbol !~ '…')),
+  constraint documents_in_issuer  check (direction <> 'in' or (char_length(issuer_name) between 1 and 200 and …)),
+  constraint documents_in_summary check (direction <> 'in' or (summary is nfc normalized and summary !~ '…')),
+  constraint documents_in_dates   check (direction <> 'in' or (issued_on between '1900-01-01'
+                                                                             and (created_at at time zone 'Asia/Ho_Chi_Minh')::date
+                                                           and (due_on is null or due_on >= issued_on))),
   unique (register_id, register_number)
 );
 
@@ -441,9 +452,8 @@ Ghi trực tiếp (không qua Action):
 
 | Vai trò | Được làm | Cột đặt sẵn |
 |---|---|---|
-| `clerk` | Thêm văn bản đến ở trạng thái `received`; sửa thông tin khi còn `received` | `tenant_id`, `created_by`, `direction = 'in'`, `status = 'received'` |
 | `staff` | Thêm dự thảo văn bản đi; sửa khi còn `draft` hoặc `returned` | `tenant_id`, `created_by`, `direction = 'out'`, `status = 'draft'` |
-| `clerk`, `staff` | Gắn tệp do chính mình tải lên vào văn bản mình còn được sửa (như hai dòng trên); gỡ khi văn bản còn ở bước đó | `tenant_id`, `added_by` |
+| `staff` | Gắn tệp do chính mình tải lên vào dự thảo của mình (như dòng trên); gỡ khi dự thảo còn ở bước đó | `tenant_id`, `added_by` |
 | `staff`, `manager` | Tạo, đóng hồ sơ công việc của phòng mình; đưa văn bản vào hồ sơ *(Phase 3)* | `tenant_id`, `department_id` |
 | `tenant_admin` | Phòng ban | `tenant_id` |
 
@@ -466,6 +476,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 
 | Action | Ai gọi | Làm gì |
 |---|---|---|
+| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm |
 | `registerIncoming(documentId)` | `clerk` | Gọi hàm `office.register_incoming` (một giao dịch: khóa văn bản, lấy số kế tiếp của sổ năm nay, `received → registered`, ghi sự kiện), rồi khởi chạy `van-ban-den` với `businessKey = documentId`. Flowable lỗi thì vẫn giữ số đã cấp; job đối soát (5 phút) khởi chạy sau |
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |

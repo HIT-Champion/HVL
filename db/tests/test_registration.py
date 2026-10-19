@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from conftest import INSERT_DOC, GraphQLError, Service, incoming, sql
+from conftest import INSERT_DOC, GraphQLError, Service, incoming, received, sql
 
 REGISTER = """
 mutation ($id: uuid!) {
@@ -32,7 +32,7 @@ mutation ($id: uuid!) {
 
 
 def receive(world, n: int) -> str:
-    return world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, n)})["insert_office_documents_one"]["id"]
+    return received(world.clerk_a, incoming(world.tag, n))["id"]
 
 
 def register(service: Service, doc_id: str) -> dict:

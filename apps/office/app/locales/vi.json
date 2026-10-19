@@ -257,13 +257,27 @@
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
-    "documents_body_length": "Nội dung dài quá 20.000 ký tự."
+    "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
+    "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu."
   },
   "validation": {
     "required": "Không được để trống",
     "summaryLength": "Cần 10–500 ký tự",
     "dateFuture": "Không được sau hôm nay",
-    "dueBefore": "Hạn phải từ hôm nay trở đi"
+    "dueBefore": "Hạn phải từ hôm nay trở đi",
+    "between": "Cần {min}–{max} ký tự",
+    "max": "Tối đa {max} ký tự",
+    "format": "Không đúng định dạng",
+    "not": "Có khoảng trắng thừa ở đầu hoặc cuối, xuống dòng hoặc ký tự ẩn",
+    "nfc": "Chữ tiếng Việt chưa ở dạng dựng sẵn (Unicode NFC)",
+    "year": "Năm phải từ 1900 đến 2099",
+    "enum": "Không có trong danh mục",
+    "type": "Sai kiểu dữ liệu",
+    "additionalProperties": "Trường không có trong mẫu",
+    "uniqueItems": "Một tệp được đính kèm hai lần",
+    "maxItems": "Quá số tệp cho phép",
+    "duplicate": "Đã có văn bản đến trùng cơ quan ban hành, số ký hiệu và ngày ban hành",
+    "unknown": "Không tìm thấy, hoặc không do bạn tải lên"
   },
   "outgoing": {
     "title": "Văn bản đi",

@@ -30,6 +30,10 @@ COPY requirements.txt ./
 RUN pip install --require-hashes -r requirements.txt
 
 COPY src/ ./src/
+# JSON Schema dùng chung với giao diện (schemas/ ở gốc repo; compose đưa vào bằng additional_contexts, dựng tay thì
+# docker build --build-context schemas=schemas services/svc-workflow): dựng cùng image để form (biên dịch vào
+# app-office lúc dựng) và svc-workflow luôn kiểm theo cùng một bản
+COPY --from=schemas . ./schemas/
 
 RUN useradd --system --uid 10001 --no-create-home svc
 USER 10001

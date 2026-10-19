@@ -619,4 +619,19 @@ Phase 2:
   - Bản neo "tệp trong repo" thành `audit anchor --to <tệp>`: đơn vị tự chép tệp ra kho git riêng. Chưa có
     server nên chưa chạy tự động.
   - Màn xem sổ không hiện giá trị của cột chứa nội dung, vì lãnh đạo không được đọc văn bản hạn chế.
-- Phase 2 còn lại: sổ đăng ký in được (F2.8), poka-yoke JSON Schema dùng chung (F2.2).
+- **F2.2 xong.** Một JSON Schema dùng chung, `schemas/van-ban-den.json`, cho ba lớp: form kiểm bằng Ajv, Action
+  mới `receiveIncoming` của `svc-workflow` kiểm lại bằng `jsonschema`, PostgreSQL chặn lần cuối bằng 4 ràng buộc
+  `CHECK` mới. Ba lớp chạy chung một bộ ca thử (`schemas/van-ban-den.cases.json`), mỗi lớp một bộ test; `make
+  smoke`, `make e2e` kiểm lại trên hệ thống thật. Khác bản thiết kế:
+  - Ajv biên dịch schema thành mã JavaScript lúc dựng (standalone), không chạy trên trình duyệt: CSP của ứng dụng
+    không cho `unsafe-eval`. Ajv chỉ là phụ thuộc lúc dựng.
+  - Văn thư không còn quyền ghi thẳng bảng văn bản; trước đây giao diện ghi thẳng bằng GraphQL nên lớp Action
+    chưa có. Sửa văn bản đến chưa vào sổ tạm không còn (giao diện chưa từng dùng).
+  - "Hôm nay" (ngày ban hành không sau hôm nay, hạn không trước hôm nay) và "chữ ở dạng Unicode dựng sẵn" không
+    viết được trong JSON Schema: thêm hai từ khóa chú thích `x-moc-date`, `x-moc-nfc`, form và `svc-workflow` tự
+    kiểm; CSDL kiểm NFC bằng `is nfc normalized`, còn ngày thì kiểm điều yếu hơn mà không phụ thuộc lúc ghi.
+  - Thêm điều bản kế hoạch chưa nói: chặn ký tự ẩn và chữ dạng tổ hợp chép từ PDF, vì chúng làm cùng một văn bản
+    lọt qua chặn trùng.
+  - Dữ liệu của các việc trong quy trình (`completeTask`) vẫn kiểm bằng Pydantic ở `svc-workflow`, form soạn văn
+    bản đi vẫn ghi thẳng; chuyển sang JSON Schema dùng chung khi làm lại các form đó.
+- Phase 2 còn lại: sổ đăng ký in được (F2.8).

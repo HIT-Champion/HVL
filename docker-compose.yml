@@ -271,7 +271,8 @@ services:
 
   svc-workflow:
     <<: *common
-    build: ./services/svc-workflow
+    # schemas/ (JSON Schema dùng chung với giao diện) dựng vào image như ở app-office: hai lớp kiểm luôn cùng một bản
+    build: {context: ./services/svc-workflow, additional_contexts: {schemas: ./schemas}}
     image: moc/svc-workflow:${MOC_VERSION:-dev}
     profiles: [core]
     environment:
@@ -322,7 +323,8 @@ services:
   # Văn phòng điện tử: trang tĩnh (Nuxt, chế độ SPA), gọi lõi qua APISIX cùng tên miền
   app-office:
     <<: *common
-    build: ./apps/office
+    # schemas/ ở gốc repo nằm ngoài thư mục dựng: đưa vào bằng ngữ cảnh phụ (viết một dòng để make install thay được)
+    build: {context: ./apps/office, additional_contexts: {schemas: ./schemas}}
     image: moc/app-office:${MOC_VERSION:-dev}
     profiles: [app]
     environment:

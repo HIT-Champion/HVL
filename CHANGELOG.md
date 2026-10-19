@@ -92,8 +92,25 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   được khóa ghi của bucket. Tắt gửi thống kê ẩn danh của SeaweedFS ra ngoài (#33).
 - `make smoke` thêm 3 kiểm tra (tổng 31): neo rồi kiểm cả sổ, mốc neo không xóa được, lãnh đạo thấy hash văn bản
   vừa phát hành trong sổ; `make e2e` thêm kịch bản lãnh đạo xem sổ kiểm toán.
+- Poka-yoke ba lớp cho tiếp nhận văn bản đến (F2.2) theo một JSON Schema dùng chung, `schemas/van-ban-den.json`:
+  form kiểm bằng Ajv biên dịch sẵn lúc build (không cần `unsafe-eval` trong CSP); Action mới `receiveIncoming`
+  của `svc-workflow` kiểm lại bằng `jsonschema` rồi tra loại văn bản, tệp, văn bản trùng; PostgreSQL chặn lần cuối
+  bằng ràng buộc mới `documents_in_symbol`, `documents_in_issuer`, `documents_in_summary`, `documents_in_dates`.
+  Ngoài độ dài, khoảng trắng, ngày: chặn ký tự ẩn và chữ dạng Unicode tổ hợp (chép từ PDF hay dính, làm cùng một
+  văn bản lọt qua chặn trùng); form tự dọn những thứ này trước khi gửi.
+  Hai lớp đầu trả lỗi từng trường cùng một bộ mã; ba lớp chạy chung bộ ca thử `schemas/van-ban-den.cases.json`
+  (#34).
+- `make test` chạy thêm test kiểm form (`apps/office`, Node 24); `make smoke` thêm 4 kiểm tra (tổng 35): văn thư
+  không ghi thẳng được bảng văn bản, svc-workflow trả lỗi từng trường, chặn tiếp nhận trùng, CSDL chặn khi ghi
+  thẳng bằng quyền quản trị; `make e2e`: form sai bị chặn trên trình duyệt, không gửi gì đi (#34).
 
 ### Đã sửa đổi
+- Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
+  đính kèm (`insert_office_document_files_one`, `delete_office_document_files`): văn bản đến kèm tệp vào qua Action
+  `receiveIncoming(data: jsonb!)`, nên không đi vòng được lớp kiểm của svc-workflow. Sửa văn bản đến chưa vào sổ
+  không còn qua GraphQL (giao diện chưa từng dùng). Migration dọn văn bản đến đã có (khoảng trắng thừa, ký tự ẩn,
+  dạng Unicode tổ hợp) trước khi thêm ràng buộc; dòng nào còn sai thì cảnh báo kèm mã văn bản. Sổ kiểm toán ghi lần tiếp nhận là
+  `svc-workflow` làm thay văn thư, kèm đúng người bấm. Ngày "hôm nay" của giao diện tính theo giờ Việt Nam (#34).
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,
   làm rõ giới hạn kiểm tra PoF và phạm vi phát triển mã nguồn riêng.
 - README: phát biểu bài toán sản phẩm giải quyết (bài toán nền tảng và bài toán nghiệp vụ).

@@ -140,6 +140,20 @@ def gql(tok: str, query: str, variables: dict) -> dict:
     return body["data"]
 
 
+def receive(tenant: str, clerk: str, doc: dict, files: tuple[str, ...] = ()) -> str:
+    """Văn bản đến kèm tệp như Action receiveIncoming ghi: vai trò service thay mặt văn thư. Stack test này
+    (db/tests/stack.sh) không có svc-workflow, mà văn thư không còn quyền ghi thẳng bảng văn bản, tệp (F2.2)."""
+    links = [{"file_id": f, "role": "main" if i == 0 else "attachment", "added_by": clerk} for i, f in enumerate(files)]
+    body = _post("/v1/graphql", {
+        "query": "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }",
+        "variables": {"o": {**doc, "direction": "in", "status": "received", "created_by": clerk,
+                            "files": {"data": links}}},
+    }, {"X-Hasura-Admin-Secret": ADMIN_SECRET, "X-Hasura-Role": "service", "X-Hasura-Tenant-Id": tenant,
+        "X-Hasura-User-Id": clerk})
+    assert "errors" not in body, body
+    return body["data"]["insert_office_documents_one"]["id"]
+
+
 def test_ready_with_hasura(app_client):
     r = app_client.get("/readyz")
     assert r.status_code == 200, r.text
@@ -174,11 +188,9 @@ def test_director_sees_file_once_attached_to_a_document(app_client, tenants, tok
     file_id = upload(app_client, clerk, "Giấy mời họp.pdf", PDF).json()["id"]
     assert app_client.get(f"/api/files/{file_id}", headers=bearer(director)).status_code == 404
 
-    doc = gql(clerk, """mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }""",
-              {"o": {"type_code": "GM", "symbol": f"{uuid.uuid4().hex[:4]}/GM-SGD", "issuer_name": "Sở GD&ĐT",
-                     "issued_on": "2026-10-16", "summary": "Mời dự họp triển khai nhiệm vụ năm học"}})
-    gql(clerk, """mutation ($o: office_document_files_insert_input!) { insert_office_document_files_one(object: $o) { file_id } }""",
-        {"o": {"document_id": doc["insert_office_documents_one"]["id"], "file_id": file_id, "role": "main"}})
+    receive(tenants[0], "van-thu-a", {"type_code": "GM", "symbol": f"{uuid.uuid4().hex[:4]}/GM-SGD",
+                                      "issuer_name": "Sở GD&ĐT", "issued_on": "2026-10-16",
+                                      "summary": "Mời dự họp triển khai nhiệm vụ năm học"}, files=(file_id,))
 
     got = app_client.get(f"/api/files/{file_id}", headers=bearer(director))
     assert got.status_code == 200 and got.content == PDF
@@ -238,14 +250,14 @@ def test_search_respects_tenant_and_role(app_client, tenants, token):
     clerk_b = token("van-thu-b", "clerk", b)
 
     insert = """mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }"""
-    incoming = gql(clerk_a, insert, {"o": {
+    incoming = receive(a, "van-thu-a", {
         "type_code": "CV", "symbol": f"45/UBND-{tag}", "issuer_name": "Ủy ban nhân dân tỉnh Hưng Yên",
-        "issued_on": "2026-10-15", "summary": "Về việc tuyển sinh đại học chính quy năm 2026"}})["insert_office_documents_one"]["id"]
+        "issued_on": "2026-10-15", "summary": "Về việc tuyển sinh đại học chính quy năm 2026"})
     draft = gql(staff_1, insert, {"o": {
         "type_code": "KH", "summary": "Dự thảo kế hoạch tuyển sinh sau đại học"}})["insert_office_documents_one"]["id"]
-    other = gql(clerk_b, insert, {"o": {
+    other = receive(b, "van-thu-b", {
         "type_code": "CV", "symbol": f"46/UBND-{tag}", "issuer_name": "Ủy ban nhân dân tỉnh Hưng Yên",
-        "issued_on": "2026-10-15", "summary": "Về việc tuyển sinh đại học chính quy năm 2026"}})["insert_office_documents_one"]["id"]
+        "issued_on": "2026-10-15", "summary": "Về việc tuyển sinh đại học chính quy năm 2026"})
     sync_index(app_client)
 
     assert set(found(app_client, director_a, "tuyen sinh")) == {incoming, draft}   # gõ không dấu

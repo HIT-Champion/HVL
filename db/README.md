@@ -19,10 +19,11 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 |---|---|
 | `core.tenants`, `core.files`, `core.audit_log` (+ `audit_head`, `audit_anchors`) | **Xong** |
 | `office.departments`, `document_types` (28 loại theo NĐ 30), `registers`, `documents`, `document_files`, `document_acl`, `assignments`, `document_events` | **Xong** |
-| Quyền Hasura cho 6 vai trò, cách ly thuê ước | **Xong** — 52 test |
-| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung) | **Xong** — 20 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
+| Quyền Hasura cho 6 vai trò, cách ly thuê ước | **Xong** — 38 test |
+| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung) | **Xong** — 21 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch) | **Xong** — 10 test |
-| `metadata/actions.graphql`, `actions.yaml`: `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
+| `metadata/actions.graphql`, `actions.yaml`: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
+| Poka-yoke lớp 3 cho văn bản đến (F2.2): `documents_in_symbol`, `documents_in_issuer`, `documents_in_summary`, `documents_in_dates` — cùng quy tắc với `schemas/van-ban-den.json` (độ dài, khoảng trắng, ký tự ẩn, dạng NFC, năm 1900+); migration dọn trước dữ liệu cũ sửa được mà không đổi nghĩa | **Xong** — 43 test chạy chung bộ ca thử với form và svc-workflow, chèn thẳng bằng quyền quản trị |
 | Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
 | `core.notifications` (thông báo từng người, F2.5): mỗi người chỉ đọc và đánh dấu đã đọc thông báo của mình, chống gửi trùng theo khóa | **Xong** — 6 test |
 | `office.case_files` (hồ sơ, nộp lưu) và các view báo cáo | Phase 2–3 |
@@ -31,7 +32,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 
 | Vai trò | Đọc | Ghi trực tiếp (không qua Action) |
 |---|---|---|
-| `clerk` — văn thư | Mọi văn bản của thuê ước | Thêm văn bản đến (`received`), sửa khi còn `received`; gắn và gỡ tệp mình tải lên |
+| `clerk` — văn thư | Mọi văn bản của thuê ước | — (văn bản đến kèm tệp chỉ thêm qua Action `receiveIncoming`: svc-workflow kiểm theo `schemas/van-ban-den.json`) |
 | `staff` — chuyên viên | Văn bản mình tạo, được giao cho mình, văn bản đi của phòng mình | Thêm dự thảo văn bản đi; sửa khi còn `draft`/`returned` và là của mình; gắn và gỡ tệp |
 | `manager` — lãnh đạo phòng | Văn bản phòng mình soạn hoặc được giao cho phòng mình | — |
 | `director` — lãnh đạo đơn vị | Mọi văn bản của thuê ước | — |
@@ -103,9 +104,15 @@ ghi vào sổ kiểm toán) và `X-Hasura-Request-Id` (lấy từ `X-Request-Id`
 2. Bảng mới: thêm tệp `metadata/databases/default/tables/<schema>_<bảng>.yaml` và một dòng trong
    `tables.yaml`. Bảng nghiệp vụ có `tenant_id` thì mọi quyền đều lọc `tenant_id = X-Hasura-Tenant-Id`, và
    gắn `core.audit()`.
-3. Đặt tên cho ràng buộc `check` (vd `documents_in_identity`): Hasura trả tên này trong lỗi, giao diện dịch
-   thành câu tiếng Việt.
-4. Sửa `docs/mo-hinh-du-lieu.md` trong cùng PR, thêm test vào `tests/`.
+3. Đặt tên cho ràng buộc `check` (vd `documents_in_identity`): Hasura trả tên này trong lỗi, svc-workflow và
+   giao diện dịch thành câu tiếng Việt. Ràng buộc cho dữ liệu người dùng nhập theo form phải khớp schema ở
+   `schemas/` (xem `schemas/README.md`), kèm ca thử trong `schemas/*.cases.json`.
+4. Thêm ràng buộc lên bảng đã có dữ liệu: dọn trước những gì sửa được mà không đổi nghĩa, rồi
+   `add constraint … not valid` và `validate constraint` trong khối bắt `check_violation`, như migration
+   `1792281600800_intake_rules`. Dữ liệu cũ còn sai thì migration vẫn chạy, cảnh báo trong nhật ký Hasura kèm mã
+   văn bản. Ràng buộc vẫn chặn mọi lần ghi — **kể cả sửa chính dòng sai đó** (vào sổ, đổi trạng thái…), nên phải
+   sửa nội dung dòng đó bằng quyền quản trị rồi chạy `alter table … validate constraint <tên>`.
+5. Sửa `docs/mo-hinh-du-lieu.md` trong cùng PR, thêm test vào `tests/`.
 
 ## Test
 

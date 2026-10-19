@@ -47,6 +47,8 @@ class Settings:
     flowable_password: str
     files_url: str
     processes_dir: str
+    # JSON Schema dùng chung với giao diện (schemas/ ở gốc repo) — lớp kiểm thứ hai của poka-yoke (F2.2)
+    schemas_dir: str
     sla_duration: str
     keycloak_url: str
     realm: str
@@ -76,6 +78,7 @@ class Settings:
                 flowable_password=env["FLOWABLE_ADMIN_PASSWORD"],
                 files_url=env.get("MOC_FILES_URL", "http://svc-files:8000").rstrip("/"),
                 processes_dir=env.get("MOC_PROCESSES_DIR", "/app/processes"),
+                schemas_dir=env.get("MOC_SCHEMAS_DIR", "/app/schemas"),
                 sla_duration=env.get("MOC_SLA_DURATION", "PT24H"),
                 keycloak_url=env.get("MOC_KEYCLOAK_URL", "http://keycloak:8080").rstrip("/"),
                 realm=env.get("MOC_REALM", "moc"),

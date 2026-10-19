@@ -30,18 +30,20 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from . import __version__
-from .config import Settings
+from .config import ConfigError, Settings
 from .directory import Directory
 from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
 from .hasura import Actor, HasuraClient
 from .notify import Notifier
+from .schemas import FormSchema, SchemaFileError
 from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
 
@@ -64,7 +66,11 @@ def _error_doc(description: str) -> dict[str, Any]:
         "required": ["message", "extensions"],
         "properties": {
             "message": {"type": "string", "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"},
-            "extensions": {"type": "object", "required": ["code"], "properties": {"code": {"type": "string"}}},
+            "extensions": {"type": "object", "required": ["code"], "properties": {
+                "code": {"type": "string"},
+                "fields": {"type": "object", "additionalProperties": {"type": "string"},
+                           "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"},
+            }},
         },
     }}}}
 
@@ -94,20 +100,24 @@ ACTION_DOC: dict[str, Any] = {
     },
     "responses": {
         "200": {"description": "Kết quả của Action, đúng kiểu trả về khai trong db/metadata/actions.graphql"},
-        "400": _error_doc("Sai định dạng Action; kết quả hoặc dữ liệu của việc không hợp lệ"),
+        "400": _error_doc("Sai định dạng Action; dữ liệu văn bản đến, kết quả hoặc dữ liệu của việc không hợp lệ"),
         "401": _error_doc("Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi"),
         "403": _error_doc("Vai trò không được dùng Action này, hoặc việc không giao cho người gọi"),
         "404": _error_doc("Không có văn bản hoặc việc"),
-        "409": _error_doc("Văn bản sai trạng thái, việc vừa có người khác nhận, hoặc CSDL từ chối"),
+        "409": _error_doc("Văn bản đến trùng văn bản đã tiếp nhận, văn bản sai trạng thái, việc vừa có người khác "
+                          "nhận, hoặc CSDL từ chối"),
         "500": _error_doc("Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký"),
         "503": _error_doc("Chưa gọi được Flowable hoặc CSDL, thử lại sau"),
     },
 }
 
 
-def _error(status: int, code: str, message: str) -> JSONResponse:
-    # Định dạng lỗi Hasura chuyển nguyên cho client: errors[0].message và extensions.code
-    return JSONResponse({"message": message, "extensions": {"code": code}}, status_code=status)
+def _error(status: int, code: str, message: str, fields: dict[str, str] | None = None) -> JSONResponse:
+    # Định dạng lỗi Hasura chuyển nguyên cho client: errors[0].message và extensions (code, fields)
+    extensions: dict[str, Any] = {"code": code}
+    if fields:
+        extensions["fields"] = fields
+    return JSONResponse({"message": message, "extensions": extensions}, status_code=status)
 
 
 async def _deploy_processes(flowable: FlowableClient, directory: str) -> None:
@@ -154,7 +164,11 @@ def create_app(
     files = files or FilesClient(settings.files_url, ServiceToken(
         settings.keycloak_url, settings.realm, settings.directory_client_id, settings.directory_client_secret))
     notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key)
-    workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration)
+    try:
+        intake = FormSchema.load(Path(settings.schemas_dir) / "van-ban-den.json")
+    except SchemaFileError as exc:
+        raise ConfigError(f"MOC_SCHEMAS_DIR: {exc}") from exc
+    workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration, intake=intake)
     deadlines = Deadlines(hasura, flowable, notifier, sla_duration=settings.sla_duration)
 
     @asynccontextmanager
@@ -203,7 +217,8 @@ def create_app(
         ok = all(checks.values())
         return JSONResponse({"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503)
 
-    @app.post("/actions/{name}", summary="Chạy một Hasura Action: registerIncoming, submitOutgoing, myTasks, completeTask",
+    @app.post("/actions/{name}",
+              summary="Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",
               openapi_extra=ACTION_DOC)
     async def action(name: str, request: Request) -> JSONResponse:
         given = request.headers.get("x-moc-action-secret", "")
@@ -221,8 +236,10 @@ def create_app(
 
         started = asyncio.get_running_loop().time()
         try:
-            if name == "registerIncoming" and actor.role == "clerk":
-                result: Any = await workflow.register_incoming(actor, str(payload.get("documentId", "")))
+            if name == "receiveIncoming" and actor.role == "clerk":
+                result: Any = await workflow.receive_incoming(actor, payload.get("data"))
+            elif name == "registerIncoming" and actor.role == "clerk":
+                result = await workflow.register_incoming(actor, str(payload.get("documentId", "")))
             elif name == "submitOutgoing" and actor.role == "staff":
                 result = await workflow.submit_outgoing(
                     actor, str(payload.get("documentId", "")), str(payload.get("signerId", "")),
@@ -237,8 +254,8 @@ def create_app(
                 return _error(403, "forbidden", "Vai trò không được dùng thao tác này")
         except WorkflowError as exc:
             log.info(json.dumps({"event": "office.action.rejected", "action": name, "code": exc.code,
-                                 "user_id": actor.user_id, "request_id": actor.request_id}))
-            return _error(exc.status, exc.code, exc.message)
+                                 "fields": exc.fields, "user_id": actor.user_id, "request_id": actor.request_id}))
+            return _error(exc.status, exc.code, exc.message, exc.fields)
         except Exception:  # noqa: BLE001 — không để lộ chi tiết nội bộ cho client
             log.exception(json.dumps({"event": "office.action.failed", "action": name, "request_id": actor.request_id}))
             return _error(500, "internal", "Lỗi không mong đợi; đã ghi nhật ký với mã " + (actor.request_id or "?"))

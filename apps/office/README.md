@@ -10,12 +10,16 @@ chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi 
 | `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem`, `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
 | `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo) |
 | `app/components/TaskPanel.vue` | Khung xử lý theo `formKey` của BPMN |
+| `scripts/forms.mjs`, `app/utils/forms.ts` | Biên dịch `schemas/*.json` (gốc repo) thành mã kiểm form lúc dựng; quy lỗi về `{trường: mã}` như svc-workflow |
+| `tests/` | Test kiểm form trên bộ ca thử dùng chung `schemas/*.cases.json` (`npm test`, Node 24) |
 | `app/components/NotificationBell.vue` | Chuông: số chưa đọc, 20 tin mới nhất, đánh dấu đã đọc |
 | `app/locales/` | Tiếng Việt, tiếng Anh |
 | `nginx/` | Cấu hình phục vụ: CSP chặt, `/config.json` đọc realm từ biến môi trường |
 
 - **Quyền** do Hasura và các dịch vụ kiểm; giao diện chỉ đọc vai trò từ token để vẽ menu.
-- **Poka-yoke lớp 1**: form kiểm đúng các ràng buộc của CSDL và báo văn bản trùng trước khi lưu.
+- **Poka-yoke lớp 1**: form tiếp nhận văn bản đến kiểm theo `schemas/van-ban-den.json` — cùng tệp svc-workflow
+  kiểm lại và CSDL chặn bằng ràng buộc (`schemas/README.md`) — và báo văn bản trùng trước khi lưu. Ajv biên dịch
+  schema thành mã JavaScript lúc dựng (module ảo `virtual:moc-forms`), nên trình duyệt không cần `unsafe-eval`.
 - **CSP**: chỉ chạy mã của chính trang; các đoạn script nội tuyến Nuxt sinh ra được cho phép theo băm SHA-256
   tính lúc dựng (`scripts/csp-hashes.mjs`), không mở `unsafe-inline`.
 
@@ -25,5 +29,9 @@ Cần Docker (dựng trong `node:24.20.0-slim`, npm 11 — npm 9/10 lỗi khi c�
 
 ```bash
 docker compose --profile app up -d --build app-office    # dựng lại sau khi sửa, ~40 giây
+npm ci --ignore-scripts && npm test                      # kiểm form theo schemas/ (Node 24, không cần trình duyệt)
 make e2e                                                 # kiểm thử trên trình duyệt thật
 ```
+
+Image dựng từ `apps/office` cộng ngữ cảnh phụ `schemas` (compose tự đưa vào): dựng tay thì
+`docker build --build-context schemas=schemas -t moc/app-office apps/office` ở gốc repo.

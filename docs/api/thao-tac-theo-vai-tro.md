@@ -9,7 +9,7 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 25 | 14 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `clerk` (văn thư) | `vanthu` | 25 | 6 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
 | `staff` (chuyên viên) | `chuyenviendt` | 23 | 14 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 23 | 4 | [`graphql/manager.graphql`](graphql/manager.graphql) |
 | `director` (lãnh đạo đơn vị) | `truongkhoa` | 30 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
@@ -55,14 +55,15 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | Trường | `clerk` | `staff` | `manager` | `director` | `tenant_admin` |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `completeTask` | ✓ | ✓ | ✓ | ✓ |  |
-| `delete_office_document_files` | ✓ | ✓ |  |  |  |
-| `delete_office_document_files_by_pk` | ✓ | ✓ |  |  |  |
+| `delete_office_document_files` |  | ✓ |  |  |  |
+| `delete_office_document_files_by_pk` |  | ✓ |  |  |  |
 | `insert_office_departments` |  |  |  |  | ✓ |
 | `insert_office_departments_one` |  |  |  |  | ✓ |
-| `insert_office_document_files` | ✓ | ✓ |  |  |  |
-| `insert_office_document_files_one` | ✓ | ✓ |  |  |  |
-| `insert_office_documents` | ✓ | ✓ |  |  |  |
-| `insert_office_documents_one` | ✓ | ✓ |  |  |  |
+| `insert_office_document_files` |  | ✓ |  |  |  |
+| `insert_office_document_files_one` |  | ✓ |  |  |  |
+| `insert_office_documents` |  | ✓ |  |  |  |
+| `insert_office_documents_one` |  | ✓ |  |  |  |
+| `receiveIncoming` | ✓ |  |  |  |  |
 | `registerIncoming` | ✓ |  |  |  |  |
 | `submitOutgoing` |  | ✓ |  |  |  |
 | `update_core_notifications` | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -74,8 +75,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `update_office_departments` |  |  |  |  | ✓ |
 | `update_office_departments_by_pk` |  |  |  |  | ✓ |
 | `update_office_departments_many` |  |  |  |  | ✓ |
-| `update_office_documents` | ✓ | ✓ |  |  |  |
-| `update_office_documents_by_pk` | ✓ | ✓ |  |  |  |
-| `update_office_documents_many` | ✓ | ✓ |  |  |  |
+| `update_office_documents` |  | ✓ |  |  |  |
+| `update_office_documents_by_pk` |  | ✓ |  |  |  |
+| `update_office_documents_many` |  | ✓ |  |  |  |
 
 `subscription` có trong schema của Hasura nhưng chưa gọi được qua cổng (chưa mở WebSocket), nên không liệt kê.

@@ -123,16 +123,28 @@ Luồng văn bản đến của văn thư, giống `make smoke`:
 # 1. tải công văn lên (§3), lấy id tệp
 FILE=$(curl -s "$MOC/api/files" -H "Authorization: Bearer $TOKEN" -F file=@cong-van.pdf | jq -r .id)
 
-# 2. nhập văn bản đến kèm tệp: trạng thái received
-gql '{"query": "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id status } }",
-      "variables": {"o": {"type_code": "CV", "symbol": "123/ĐHCN-ĐT", "issuer_name": "Trường Đại học Công nghiệp",
+# 2. tiếp nhận văn bản đến kèm tệp: trạng thái received; data đúng schemas/van-ban-den.json
+gql '{"query": "mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id document { status } } }",
+      "variables": {"d": {"type_code": "CV", "symbol": "123/ĐHCN-ĐT", "issuer_name": "Trường Đại học Công nghiệp",
         "issued_on": "2026-10-19", "urgency": "khan", "summary": "Về việc rà soát chương trình đào tạo",
-        "files": {"data": [{"file_id": "'"$FILE"'", "role": "main"}]}}}}'
+        "file_ids": ["'"$FILE"'"]}}}'
 
 # 3. vào sổ: cấp số đến, lãnh đạo đơn vị nhận việc "vbden.chiDao" trong hộp việc
 gql '{"query": "mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
-      "variables": {"id": "<id ở bước 2>"}}'
+      "variables": {"id": "<document_id ở bước 2>"}}'
 ```
+
+`receiveIncoming` kiểm lại `data` theo [`schemas/van-ban-den.json`](../../schemas/van-ban-den.json), đúng tệp mà form
+của giao diện kiểm: trường lạ, thiếu trường, sai độ dài, ngày ban hành sau hôm nay… đều bị từ chối, kèm trường sai
+và mã lỗi để ứng dụng hiện ngay dưới ô nhập ([`schemas/README.md`](../../schemas/README.md)):
+
+```json
+{"errors": [{"message": "Dữ liệu văn bản đến chưa hợp lệ: summary, symbol",
+             "extensions": {"code": "invalid", "fields": {"symbol": "not", "summary": "minLength"}}}]}
+```
+
+Văn bản đã tiếp nhận (cùng cơ quan ban hành, số ký hiệu, ngày ban hành) trả `duplicate`. Văn thư không ghi thẳng
+được bảng văn bản (`insert_office_documents_one`), nên ứng dụng nào cũng phải qua lớp kiểm này.
 
 Văn bản đi của chuyên viên: soạn dự thảo (`insert_office_documents_one` với `body`, `recipients`) → tải bản xem
 trước (§3) → `submitOutgoing` → lãnh đạo phòng `completeTask` việc `vbdi.duyetPhong` → người ký `vbdi.duyetDonVi`
@@ -176,8 +188,8 @@ curl -s "$MOC/api/verify?sha256=$(sha256sum cong-van-nhan-duoc.pdf | cut -d' ' -
 Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi đúng hai đường trên; ứng dụng khác
 cũng dùng được để tự kiểm văn bản nhận được.
 
-Tệp được gắn vào văn bản bằng GraphQL (`files` khi tạo văn bản, hoặc `insert_office_document_files_one`), không
-qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
+Tệp được gắn vào văn bản bằng GraphQL (`file_ids` của `receiveIncoming`, `files` khi chuyên viên tạo dự thảo, hoặc
+`insert_office_document_files_one`), không qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
 
 ## 4. Thông báo: `core_notifications` và `/realtime`
 

@@ -23,7 +23,7 @@ văn bản đã có (cùng số ký hiệu) thì bỏ qua.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 
 from moc_env import Session
 
@@ -123,6 +123,11 @@ OUT_CNTT = [
 ]
 
 
+def today():
+    """Hôm nay theo giờ Việt Nam, như svc-workflow so ngày ban hành và hạn — không theo múi giờ của máy chạy seed."""
+    return datetime.now(timezone(timedelta(hours=7))).date()
+
+
 def _exists(clerk: Session, symbol: str) -> bool:
     data = clerk.gql("query ($s: String!) { office_documents(where: {symbol: {_eq: $s}}, limit: 1) { id } }", {"s": symbol})
     return bool(data["office_documents"])
@@ -131,14 +136,14 @@ def _exists(clerk: Session, symbol: str) -> bool:
 def _receive(clerk: Session, s: Sample) -> str:
     file = clerk.upload(f"{s.symbol.replace('/', '-')}.pdf", PDF)
     doc = clerk.gql(
-        "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }",
-        {"o": {
+        "mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }",
+        {"d": {
             "type_code": s.type_code, "symbol": s.symbol, "issuer_name": s.issuer, "summary": s.summary,
-            "issued_on": (date.today() - timedelta(days=s.days_ago)).isoformat(), "urgency": s.urgency,
-            "files": {"data": [{"file_id": file["id"], "role": "main"}]},
+            "issued_on": (today() - timedelta(days=s.days_ago)).isoformat(), "urgency": s.urgency,
+            "file_ids": [file["id"]],
         }},
     )
-    return doc["insert_office_documents_one"]["id"]
+    return doc["receiveIncoming"]["document_id"]
 
 
 def _run(clerk_name: str, director_name: str, samples: list[Sample]) -> int:
@@ -168,7 +173,7 @@ def _run(clerk_name: str, director_name: str, samples: list[Sample]) -> int:
         director.complete(task, "direct", {
             "instruction": f"Giao {'Tổ Đào tạo' if s.lead == 'ĐT' else 'Bộ môn ' + s.lead} chủ trì thực hiện, báo cáo đúng hạn.",
             "lead_department_id": DEPT[s.lead], "supports": [DEPT[d] for d in s.supports],
-            "due_on": (date.today() + timedelta(days=s.due_in)).isoformat(),
+            "due_on": (today() + timedelta(days=s.due_in)).isoformat(),
         })
         if s.stop == "directed":
             continue

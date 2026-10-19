@@ -21,14 +21,14 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import DOC, OUT, TENANT
+from conftest import DOC, OUT, SCHEMAS, TENANT
 from svc_workflow.app import create_app
 from svc_workflow.config import ConfigError, Settings
 
 ENV = {
     "HASURA_ADMIN_SECRET": "h", "MOC_ACTION_SECRET": "bi-mat-action", "FLOWABLE_ADMIN_PASSWORD": "f",
     "MOC_DIRECTORY_CLIENT_SECRET": "d", "MOC_DIRECTORY_SYNC_INTERVAL_S": "0", "MOC_RECONCILE_INTERVAL_S": "0",
-    "MOC_PROCESSES_DIR": "/khong-co",
+    "MOC_PROCESSES_DIR": "/khong-co", "MOC_SCHEMAS_DIR": str(SCHEMAS),
 }
 
 

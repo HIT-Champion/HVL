@@ -17,9 +17,10 @@
 # Văn bản đến / đi. Quy tắc ai đọc được văn bản nào nằm ở một chỗ: hàm office.document_visible
 # (migration 1792281600200), gắn vào đây thành trường `visible`; các bảng con lọc theo document.visible.
 #
-# Người dùng chỉ ghi trực tiếp khi văn bản còn ở bước đầu (văn thư: received; chuyên viên: draft,
-# returned). status, số, ký hiệu văn bản đi, băm, mã tra cứu, process_id chỉ đổi qua Hasura Actions
-# do svc-workflow xử lý (vai trò service) — docs/mo-hinh-du-lieu.md §3, §4.
+# Văn bản đến chỉ vào qua Action receiveIncoming (svc-workflow kiểm lại theo schemas/van-ban-den.json —
+# poka-yoke lớp 2, F2.2), nên văn thư không có quyền ghi thẳng bảng này. Chuyên viên ghi trực tiếp dự thảo
+# văn bản đi khi còn ở bước đầu (draft, returned). status, số, ký hiệu văn bản đi, băm, mã tra cứu, process_id
+# chỉ đổi qua Hasura Actions do svc-workflow xử lý (vai trò service) — docs/mo-hinh-du-lieu.md §3, §4.
 table:
   name: documents
   schema: office
@@ -83,15 +84,6 @@ computed_fields:
       session_argument: hasura_session
     comment: Người gọi có được đọc văn bản này không — quy tắc ở docs/mo-hinh-du-lieu.md §3
 insert_permissions:
-  - role: clerk
-    permission:
-      columns: [type_code, symbol, issuer_name, issued_on, summary, urgency, restricted, due_on]
-      set:
-        tenant_id: X-Hasura-Tenant-Id
-        created_by: X-Hasura-User-Id
-        direction: in
-        status: received
-      check: {}
   - role: staff
     permission:
       columns: [type_code, summary, body, urgency, restricted, recipients, reply_to_id]
@@ -137,14 +129,6 @@ select_permissions:
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       allow_aggregations: true
 update_permissions:
-  - role: clerk
-    permission:
-      columns: [type_code, symbol, issuer_name, issued_on, summary, urgency, restricted, due_on]
-      filter:
-        tenant_id: {_eq: X-Hasura-Tenant-Id}
-        direction: {_eq: in}
-        status: {_eq: received}
-      check: {}
   - role: staff
     permission:
       columns: [type_code, summary, body, urgency, restricted, recipients, reply_to_id]

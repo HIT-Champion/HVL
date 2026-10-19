@@ -90,9 +90,10 @@ e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn 
 	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e $(PLAYWRIGHT_IMAGE) \
 	  sh -c 'npm ci --no-audit --no-fund --ignore-scripts >/dev/null && npx playwright test'
 
-test: ## Chạy test đơn vị của các dịch vụ (không cần Docker)
+test: ## Chạy test đơn vị của các dịch vụ và phần kiểm form (không cần Docker; cần uv, Node 24, npm ci trong apps/office)
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
+	@cd apps/office && npm test
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify

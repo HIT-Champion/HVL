@@ -17,8 +17,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import { PASSWORD, PDF, TOTP_SECRET, shot, signIn } from './helpers'
 
-// Kịch bản demo (docs/dac-ta-san-pham.md §7, màn 1–2) trên giao diện thật: văn thư tiếp nhận và vào sổ →
-// lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu.
+// Kịch bản demo (docs/dac-ta-san-pham.md §7, màn 1–2) trên giao diện thật: form sai bị chặn, văn thư tiếp nhận và
+// vào sổ → lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu.
 
 const tag = Math.random().toString(36).slice(2, 7).toUpperCase()
 const summary = `Về việc rà soát chương trình đào tạo ngành Kỹ thuật phần mềm năm 2027 (thử ${tag})`
@@ -42,6 +42,19 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
   await clerk.locator('input[type=file]').setInputFiles({ name: `cong-van-${tag}.pdf`, mimeType: 'application/pdf', buffer: PDF })
   await expect(clerk.getByText('Đã quét — sạch')).toBeVisible()
+
+  // Poka-yoke lớp 1 (F2.2): form sai bị chặn ngay trên trình duyệt theo schemas/van-ban-den.json, chưa gửi gì đi
+  const sent: string[] = []
+  clerk.on('request', (r) => { if (r.postData()?.includes('receiveIncoming')) sent.push(r.url()) })
+  await clerk.getByRole('button', { name: 'Lưu và vào sổ' }).click()
+  await expect(clerk.getByText('Không được để trống')).toHaveCount(4)
+  await clerk.getByLabel('Trích yếu nội dung').fill('Ngắn quá')
+  await clerk.getByLabel('Ngày ban hành').fill(new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10))
+  await expect(clerk.getByText('Cần 10–500 ký tự')).toBeVisible()
+  await expect(clerk.getByText('Không được sau hôm nay')).toBeVisible()
+  await shot(clerk, '0-form-sai-bi-chan')
+  expect(sent).toEqual([])
+
   await clerk.getByLabel('Số, ký hiệu').fill(`45/ĐHCN-ĐT${tag}`)
   await clerk.getByLabel('Ngày ban hành').fill(new Date().toISOString().slice(0, 10))
   await clerk.getByLabel('Cơ quan ban hành').fill('Trường Đại học Công nghiệp')

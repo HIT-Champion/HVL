@@ -18,10 +18,15 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { schemas, vanBanDen } from 'virtual:moc-forms'
+import { ApiError } from '~/composables/useApi'
 import type { UploadedFile } from '~/composables/useApi'
+import { formErrors } from '~/utils/forms'
+import type { FieldErrors } from '~/utils/forms'
 
-// Tiếp nhận văn bản đến (F2.2). Poka-yoke lớp 1: kiểm ngay trên form theo đúng các ràng buộc của CSDL
-// (db/migrations: documents_in_identity, độ dài trích yếu, chặn trùng) — CSDL vẫn kiểm lại lần cuối.
+// Tiếp nhận văn bản đến (F2.2). Poka-yoke lớp 1: kiểm ngay trên form theo schemas/van-ban-den.json — cùng tệp mà
+// svc-workflow kiểm lại khi nhận Action receiveIncoming (lớp 2); CSDL chặn lần cuối bằng ràng buộc CHECK (lớp 3).
+// Độ dài tối đa, danh mục độ khẩn cũng đọc từ schema, không viết lại ở đây.
 
 interface PendingFile {
   key: number
@@ -32,6 +37,18 @@ interface PendingFile {
   message?: string
   uploaded?: UploadedFile
 }
+
+const SCHEMA = schemas.vanBanDen
+const FIELDS = SCHEMA.properties ?? {}
+const URGENCIES = FIELDS.urgency?.enum as string[]
+const maxLength = (field: string) => FIELDS[field]?.maxLength as number | undefined
+
+// Chữ chép từ PDF hay dính ký tự ẩn (rộng 0, gạch nối mềm, điều khiển) và dạng Unicode tổ hợp: mắt không thấy nhưng
+// làm hỏng chặn trùng. Form tự dọn trước khi kiểm và gửi; svc-workflow, CSDL không tự sửa mà từ chối.
+const oneLine = (s: string) => s.normalize('NFC').replace(/[\t\n\v\f\r\p{Zl}\p{Zp}]+/gu, ' ')
+  .replace(/[\p{Cc}\p{Cf}]/gu, '').trim()
+const multiLine = (s: string) => s.normalize('NFC').replace(/\r\n?|[\p{Zl}\p{Zp}]/gu, '\n')
+  .replace(/[\t\v\f]+/g, ' ').replace(/[^\n\P{Cc}]|\p{Cf}/gu, '').trim()
 
 const { t } = useI18n()
 const { gql, upload } = useApi()
@@ -45,6 +62,7 @@ const dragging = ref(false)
 const saving = ref(false)
 const tried = ref(false)
 const duplicate = ref<{ symbol: string; issuer_name: string; issued_on: string } | null>(null)
+const serverErrors = ref<FieldErrors>({})   // lỗi svc-workflow trả về (lớp 2), xóa khi người dùng sửa form
 let nextKey = 1
 
 const form = reactive({
@@ -66,20 +84,48 @@ onMounted(async () => {
   types.value = data.office_document_types
 })
 
-const errors = computed(() => {
-  const e: Record<string, string> = {}
-  if (!form.symbol.trim()) e.symbol = t('validation.required')
-  if (!form.issuer_name.trim()) e.issuer_name = t('validation.required')
-  if (!form.issued_on) e.issued_on = t('validation.required')
-  else if (form.issued_on > today()) e.issued_on = t('validation.dateFuture')
-  const len = form.summary.trim().length
-  if (len < 10 || len > 500) e.summary = t('validation.summaryLength')
-  if (form.due_on && form.due_on < today()) e.due_on = t('validation.dueBefore')
-  return e
-})
-
 const uploading = computed(() => files.value.some((f) => f.state === 'uploading'))
 const cleanFiles = computed(() => files.value.filter((f) => f.state === 'clean'))
+
+// Dữ liệu gửi đi, đúng hình schema mô tả: chuỗi đã dọn, ô bắt buộc để trống thì thiếu trường
+const payload = computed(() => ({
+  type_code: form.type_code,
+  symbol: oneLine(form.symbol) || undefined,
+  issuer_name: oneLine(form.issuer_name) || undefined,
+  issued_on: form.issued_on || undefined,
+  summary: multiLine(form.summary) || undefined,
+  urgency: form.urgency,
+  due_on: form.due_on || null,
+  restricted: form.restricted,
+  file_ids: cleanFiles.value.map((f) => f.uploaded!.id),
+}))
+
+// Lỗi form tự thấy thì chặn bấm lưu; lỗi svc-workflow trả về chỉ để hiện (sửa bất cứ gì là xóa, gửi lại được):
+// form cũ trong trình duyệt có thể lệch schema mới, chặn theo lỗi đó thì nút lưu không còn tác dụng
+const clientErrors = computed<FieldErrors>(() => {
+  const e = formErrors(vanBanDen, SCHEMA, payload.value, today())
+  if (duplicate.value && !e.symbol) e.symbol = 'duplicate'
+  return e
+})
+const errors = computed<FieldErrors>(() => ({ ...serverErrors.value, ...clientErrors.value }))
+watch(payload, () => { serverErrors.value = {} }, { deep: true })
+
+// Mã lỗi (chung với svc-workflow) → câu cho người nhập; số giới hạn lấy từ schema
+function message(field: string, code: string): string {
+  const rule = FIELDS[field] ?? {}
+  if (code === 'minLength' || code === 'maxLength') {
+    return Number(rule.minLength) > 1
+      ? t('validation.between', { min: rule.minLength, max: rule.maxLength })
+      : t('validation.max', { max: rule.maxLength })
+  }
+  if (code === 'x-moc-date') return t(rule['x-moc-date'] === 'not-after-today' ? 'validation.dateFuture' : 'validation.dueBefore')
+  if (code === 'x-moc-nfc') return t('validation.nfc')
+  if (code === 'pattern' && rule.format === 'date') return t('validation.year')
+  return t(`validation.${code}`)
+}
+
+const show = (field: string) => (tried.value && errors.value[field] ? message(field, errors.value[field]!) : undefined)
+const summaryLength = computed(() => [...multiLine(form.summary)].length)   // theo ký tự, như schema đếm
 
 function addFiles(list: FileList | null) {
   for (const file of Array.from(list ?? [])) {
@@ -108,39 +154,38 @@ function removeFile(key: number) {
   files.value = files.value.filter((f) => f.key !== key)
 }
 
-// Chặn trùng: cùng cơ quan ban hành, số ký hiệu, ngày ban hành (NĐ 30) — báo sớm trước khi bấm lưu
+// Chặn trùng: cùng cơ quan ban hành, số ký hiệu, ngày ban hành (NĐ 30) — báo ngay khi rời ô, chưa cho lưu. Chỉ tra
+// được văn bản người này thấy; svc-workflow tra lại trên mọi văn bản của đơn vị, CSDL có chỉ mục chặn trùng.
 async function checkDuplicate() {
   duplicate.value = null
-  if (!form.symbol.trim() || !form.issuer_name.trim() || !form.issued_on) return
+  const { symbol, issuer_name: issuer, issued_on: day } = payload.value
+  if (!symbol || !issuer || !day) return
   const data = await gql<{ office_documents: { symbol: string; issuer_name: string; issued_on: string }[] }>(`
     query ($s: String!, $i: String!, $d: date!) {
       office_documents(where: {direction: {_eq: "in"}, status: {_neq: "cancelled"}, symbol: {_eq: $s},
                                issuer_name: {_ilike: $i}, issued_on: {_eq: $d}}, limit: 1) { symbol issuer_name issued_on }
-    }`, { s: form.symbol.trim(), i: form.issuer_name.trim(), d: form.issued_on })
+    }`, { s: symbol, i: issuer.replace(/[\\%_]/g, '\\$&'), d: day })
   duplicate.value = data.office_documents[0] ?? null
 }
 
 async function save(register: boolean) {
   tried.value = true
-  if (Object.keys(errors.value).length || uploading.value) return
+  if (Object.keys(clientErrors.value).length || uploading.value) return
   saving.value = true
+  let id: string
   try {
-    const object = {
-      type_code: form.type_code,
-      symbol: form.symbol.trim(),
-      issuer_name: form.issuer_name.trim(),
-      issued_on: form.issued_on,
-      summary: form.summary.trim(),
-      urgency: form.urgency,
-      due_on: form.due_on || null,
-      restricted: form.restricted,
-      files: { data: cleanFiles.value.map((f, i) => ({ file_id: f.uploaded!.id, role: i === 0 ? 'main' : 'attachment' })) },
-    }
-    const data = await gql<{ insert_office_documents_one: { id: string } }>(
-      'mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }',
-      { o: object },
+    const data = await gql<{ receiveIncoming: { document_id: string } }>(
+      'mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }', { d: payload.value },
     )
-    const id = data.insert_office_documents_one.id
+    id = data.receiveIncoming.document_id
+  } catch (e) {
+    if (e instanceof ApiError && e.fields) serverErrors.value = e.fields
+    notice.error(errorText(t, e))
+    saving.value = false
+    return
+  }
+  // Đã tiếp nhận: vào sổ lỗi thì vẫn sang trang văn bản (vào sổ lại ở đó), không ở lại form — lưu lần nữa sẽ trùng
+  try {
     if (register) {
       const reg = await gql<{ registerIncoming: { register_number: number } }>(
         'mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }', { id },
@@ -149,15 +194,13 @@ async function save(register: boolean) {
     } else {
       notice.ok(t('receive.saved'))
     }
-    await router.push(`/van-ban/${id}`)
   } catch (e) {
     notice.error(errorText(t, e))
   } finally {
     saving.value = false
   }
+  await router.push(`/van-ban/${id}`)
 }
-
-const show = (field: string) => (tried.value ? errors.value[field] : undefined)
 </script>
 
 <template>
@@ -196,6 +239,7 @@ const show = (field: string) => (tried.value ? errors.value[field] : undefined)
             <div v-else class="mt-1 text-xs font-medium text-red-600">{{ f.message }}</div>
           </li>
         </ul>
+        <p v-if="show('file_ids')" class="field-error">{{ show('file_ids') }}</p>
       </section>
 
       <!-- thông tin văn bản -->
@@ -203,14 +247,15 @@ const show = (field: string) => (tried.value ? errors.value[field] : undefined)
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label class="label" for="type">{{ t('receive.type') }}</label>
-            <select id="type" v-model="form.type_code" class="input">
+            <select id="type" v-model="form.type_code" class="input" :aria-invalid="!!show('type_code')">
               <option v-for="ty in types" :key="ty.code" :value="ty.code">{{ ty.name }}</option>
             </select>
+            <p v-if="show('type_code')" class="field-error">{{ show('type_code') }}</p>
           </div>
           <div>
             <label class="label" for="urgency">{{ t('receive.urgency') }}</label>
             <select id="urgency" v-model="form.urgency" class="input">
-              <option v-for="u in ['normal', 'khan', 'thuong_khan', 'hoa_toc']" :key="u" :value="u">{{ t(`urgency.${u}`) }}</option>
+              <option v-for="u in URGENCIES" :key="u" :value="u">{{ t(`urgency.${u}`) }}</option>
             </select>
           </div>
           <div>
@@ -231,10 +276,10 @@ const show = (field: string) => (tried.value ? errors.value[field] : undefined)
         </div>
         <div>
           <label class="label" for="summary">{{ t('receive.summary') }} <span class="font-normal text-stone-400">({{ t('receive.summaryHint') }})</span></label>
-          <textarea id="summary" v-model="form.summary" rows="3" class="input" maxlength="500" :aria-invalid="!!show('summary')" />
+          <textarea id="summary" v-model="form.summary" rows="3" class="input" :aria-invalid="!!show('summary')" />
           <div class="mt-1 flex justify-between text-xs">
             <span class="field-error !mt-0">{{ show('summary') }}</span>
-            <span class="text-stone-400 tabular-nums">{{ form.summary.trim().length }}/500</span>
+            <span class="text-stone-400 tabular-nums">{{ summaryLength }}/{{ maxLength('summary') }}</span>
           </div>
         </div>
         <div class="grid gap-4 sm:grid-cols-2">

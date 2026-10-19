@@ -8,7 +8,7 @@
   "paths": {
     "/actions/{name}": {
       "post": {
-        "summary": "Chạy một Hasura Action: registerIncoming, submitOutgoing, myTasks, completeTask",
+        "summary": "Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",
         "operationId": "action_actions__name__post",
         "parameters": [
           {
@@ -50,7 +50,7 @@
             }
           },
           "400": {
-            "description": "Sai định dạng Action; kết quả hoặc dữ liệu của việc không hợp lệ",
+            "description": "Sai định dạng Action; dữ liệu văn bản đến, kết quả hoặc dữ liệu của việc không hợp lệ",
             "content": {
               "application/json": {
                 "schema": {
@@ -72,6 +72,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }
@@ -103,6 +110,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }
@@ -134,6 +148,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }
@@ -165,6 +186,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }
@@ -174,7 +202,7 @@
             }
           },
           "409": {
-            "description": "Văn bản sai trạng thái, việc vừa có người khác nhận, hoặc CSDL từ chối",
+            "description": "Văn bản đến trùng văn bản đã tiếp nhận, văn bản sai trạng thái, việc vừa có người khác nhận, hoặc CSDL từ chối",
             "content": {
               "application/json": {
                 "schema": {
@@ -196,6 +224,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }
@@ -227,6 +262,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }
@@ -258,6 +300,13 @@
                       "properties": {
                         "code": {
                           "type": "string"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"
                         }
                       }
                     }

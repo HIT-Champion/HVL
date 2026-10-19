@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from conftest import ADMIN_SECRET, INSERT_DOC, GraphQLError, Service, gql_raw, outgoing, sql
+from conftest import ADMIN_SECRET, INSERT_DOC, GraphQLError, Service, gql_raw, outgoing, received, sql
 
 NUMBER = """
 mutation ($id: uuid!, $code: String!) {
@@ -116,10 +116,9 @@ def test_staff_writes_body_only_while_draft(world):
 
 
 def test_incoming_documents_have_no_body(world):
-    body = world.clerk_a.raw(INSERT_DOC, {"o": {"type_code": "CV", "symbol": "1/X", "issuer_name": "UBND",
-                                                "issued_on": "2026-10-15", "summary": "Văn bản đến có nội dung",
-                                                "body": "không được"}})
-    assert "errors" in body and "body" in body["errors"][0]["message"]
+    with pytest.raises(GraphQLError, match="documents_body_only_out"):
+        received(world.clerk_a, {"type_code": "CV", "symbol": "1/X", "issuer_name": "UBND", "issued_on": "2026-10-15",
+                                 "summary": "Văn bản đến có nội dung", "body": "không được"})
     with pytest.raises(Exception, match="documents_body_only_out"):
         sql(f"insert into office.documents (tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, "
             f"summary, body, created_by) values ('{world.tenant_a}', 'in', 'received', 'CV', '1/Y', 'UBND', "
@@ -169,11 +168,10 @@ def test_only_approved_outgoing_documents_get_a_number(world):
     doc = draft(world, 9305)
     with pytest.raises(GraphQLError, match="chưa được cấp số"):
         number(world, doc)
-    incoming = world.clerk_a.gql(INSERT_DOC, {"o": {"type_code": "CV", "symbol": f"9/UBND{world.tag}",
-                                                    "issuer_name": "UBND", "issued_on": "2026-10-15",
-                                                    "summary": "Văn bản đến không cấp số đi"}})
+    incoming = received(world.clerk_a, {"type_code": "CV", "symbol": f"9/UBND{world.tag}", "issuer_name": "UBND",
+                                        "issued_on": "2026-10-15", "summary": "Văn bản đến không cấp số đi"})
     with pytest.raises(GraphQLError, match="chỉ văn bản đi"):
-        number(world, incoming["insert_office_documents_one"]["id"])
+        number(world, incoming["id"])
 
 
 def test_other_tenant_cannot_number(world):

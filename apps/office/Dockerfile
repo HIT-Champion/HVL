@@ -14,22 +14,25 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Dựng: docker build -t moc/app-office apps/office
-# Bước 1: dựng trang tĩnh bằng Nuxt (thư viện cài từ npm theo package-lock.json, không chép vào repo — PoF #5)
+# Dựng: docker build --build-context schemas=schemas -t moc/app-office apps/office (ở gốc repo; compose tự làm)
+# Bước 1: dựng trang tĩnh bằng Nuxt (thư viện cài từ npm theo package-lock.json, không chép vào repo — PoF #5).
+# JSON Schema dùng chung với svc-workflow (schemas/ ở gốc repo) chép vào đúng vị trí tương đối như trong repo:
+# scripts/forms.mjs biên dịch nó thành mã kiểm form lúc build.
 FROM node:24.20.0-slim AS build
-WORKDIR /app
+WORKDIR /src/apps/office
 ENV NUXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund --ignore-scripts
 COPY . .
+COPY --from=schemas . /src/schemas/
 RUN npx nuxt prepare && npx nuxt generate && node scripts/csp-hashes.mjs .output/public > .output/csp.conf
 
 # Bước 2: chỉ giữ tệp tĩnh, phục vụ bằng nginx không chạy quyền root
 FROM nginxinc/nginx-unprivileged:1.30.6-alpine
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY nginx/security-headers.conf /etc/nginx/security-headers.conf
-COPY --from=build /app/.output/public /usr/share/nginx/html
-COPY --from=build /app/.output/csp.conf /etc/nginx/csp.conf
+COPY --from=build /src/apps/office/.output/public /usr/share/nginx/html
+COPY --from=build /src/apps/office/.output/csp.conf /etc/nginx/csp.conf
 ENV MOC_REALM=moc
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD wget -q -O /dev/null http://127.0.0.1:8080/config.json || exit 1

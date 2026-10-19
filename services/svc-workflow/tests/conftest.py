@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -28,6 +29,7 @@ from svc_workflow.files import FilesError
 from svc_workflow.flowable import ExternalJob, FlowableError, Task
 from svc_workflow.hasura import Actor, HasuraError
 from svc_workflow.notify import Notifier
+from svc_workflow.schemas import FormSchema
 from svc_workflow.workflow import Workflow
 
 TENANT = uuid.UUID("c300d5bb-028f-44cc-ba10-7b5277a4225d")
@@ -36,6 +38,8 @@ DEPT_DT = uuid.UUID("5cc372aa-304d-4574-896c-4f3e781a2ce7")
 DEPT_KTPM = uuid.UUID("7ee31261-b14c-4c42-8e1b-9a7e99935412")
 DOC = "11111111-1111-4111-8111-111111111111"
 OUT = "22222222-2222-4222-8222-222222222222"
+NEW = "33333333-3333-4333-8333-333333333333"
+SCHEMAS = Path(__file__).resolve().parents[3] / "schemas"   # schemas/ ở gốc repo, dùng chung với giao diện
 
 
 def actor(role: str, user: str = "u-1", tenant: uuid.UUID = TENANT, dept: uuid.UUID | None = None) -> Actor:
@@ -157,6 +161,11 @@ class FakeHasura:
     fail_writes: str | None = None
     fail_notify: bool = False
     register_error: str | None = None
+    # tiếp nhận văn bản đến: loại văn bản có trong danh mục, tệp → người tải lên, văn bản đến đã có
+    document_types: set[str] = field(default_factory=lambda: {"CV", "TB", "QĐ"})
+    uploads: dict[str, str] = field(default_factory=dict)
+    received: list[dict[str, Any]] = field(default_factory=list)
+    lookups: list[dict[str, Any]] = field(default_factory=list)
 
     async def as_service(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         variables = variables or {}
@@ -178,6 +187,16 @@ class FakeHasura:
                                                 "verify_code": code}]}
         if op == "Document":
             return {"office_documents_by_pk": self.document if actor.tenant_id == TENANT else None}
+        if op == "IntakeLookup":
+            self.lookups.append(variables)
+            same = [d for d in self.received if (d["symbol"], d["issuer_name"].lower(), d["issued_on"])
+                    == (variables["symbol"], variables["issuer"].lower(), variables["issued"])]
+            return {
+                "office_document_types_by_pk": {"code": variables["type"]}
+                if variables["type"] in self.document_types else None,
+                "core_files": [{"id": f} for f in variables["files"] if self.uploads.get(f) == variables["user"]],
+                "office_documents": [{"id": d["id"]} for d in same[:1]],
+            }
         if op == "OpenAssignments":
             return {"office_assignments": [a for a in self.assignments if a["status"] == "open"]}
         if op == "User":
@@ -220,6 +239,9 @@ class FakeHasura:
         self.writes.append((op, variables, actor))
         if "task_id" in (variables.get("event") or {}).get("data", {}):
             self.events_with_task.add(variables["event"]["data"]["task_id"])
+        if op == "TiepNhan":
+            self.received.append({**variables["doc"], "id": NEW})
+            return {"insert_office_documents_one": {"id": NEW}}
         return {}
 
     async def aclose(self) -> None: ...
@@ -289,4 +311,5 @@ def notifier(hasura: FakeHasura) -> Notifier:
 
 @pytest.fixture
 def workflow(hasura: FakeHasura, flowable: FakeFlowable, files: FakeFiles, notifier: Notifier) -> Workflow:
-    return Workflow(hasura, flowable, files, notifier=notifier)  # type: ignore[arg-type]
+    return Workflow(hasura, flowable, files, notifier=notifier,  # type: ignore[arg-type]
+                    intake=FormSchema.load(SCHEMAS / "van-ban-den.json"))

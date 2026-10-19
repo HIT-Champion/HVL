@@ -257,13 +257,27 @@
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
-    "documents_body_length": "The body is longer than 20,000 characters."
+    "documents_body_length": "The body is longer than 20,000 characters.",
+    "invalid": "Some fields are not valid, see the highlighted fields."
   },
   "validation": {
     "required": "Required",
     "summaryLength": "10–500 characters",
     "dateFuture": "Cannot be in the future",
-    "dueBefore": "Must be today or later"
+    "dueBefore": "Must be today or later",
+    "between": "{min}–{max} characters",
+    "max": "At most {max} characters",
+    "format": "Invalid format",
+    "not": "Extra spaces at the start or end, line breaks or hidden characters",
+    "nfc": "Text is not in composed Unicode form (NFC)",
+    "year": "The year must be between 1900 and 2099",
+    "enum": "Not in the list",
+    "type": "Wrong data type",
+    "additionalProperties": "Field not in the form",
+    "uniqueItems": "The same file is attached twice",
+    "maxItems": "Too many files",
+    "duplicate": "An incoming document with the same issuer, number and date already exists",
+    "unknown": "Not found, or not uploaded by you"
   },
   "outgoing": {
     "title": "Outgoing documents",

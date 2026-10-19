@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Nghiệp vụ của các Action: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, đối soát.
+"""Nghiệp vụ của các Action: tiếp nhận, vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, đối soát.
 
 Thứ tự ghi khi hoàn thành một việc: kiểm quyền và dữ liệu → nhận việc (claim) trong Flowable → ghi
 PostgreSQL trong một giao dịch, kèm sự kiện mang ``task_id`` → hoàn thành việc trong Flowable. Gọi lại sau
@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable
@@ -57,6 +58,7 @@ from .hasura import (
     HasuraError,
 )
 from .notify import Notifier, People
+from .schemas import FormSchema
 
 PROCESS_IN = "van-ban-den"
 PROCESS_OUT = "van-ban-di"
@@ -70,17 +72,25 @@ log = logging.getLogger("svc_workflow")
 class WorkflowError(Exception):
     """Lỗi trả về cho người dùng qua Hasura: mã máy đọc + câu tiếng Việt."""
 
-    def __init__(self, code: str, message: str, status: int = 400) -> None:
+    def __init__(self, code: str, message: str, status: int = 400, fields: dict[str, str] | None = None) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status = status
+        self.fields = fields  # trường → mã lỗi, cùng mã với form (schemas/README.md)
 
 
 # Tên ràng buộc trong CSDL → câu cho người dùng (db/README.md: "Đặt tên cho ràng buộc check")
 CONSTRAINT_MESSAGES = {
     "documents_due_after_registered": "Hạn giải quyết không được trước ngày vào sổ",
     "documents_in_identity": "Văn bản đến phải có số ký hiệu, cơ quan ban hành và ngày ban hành",
+    "documents_in_dedup": "Văn bản này đã được tiếp nhận: trùng cơ quan ban hành, số ký hiệu và ngày ban hành",
+    "documents_in_symbol": "Số, ký hiệu tối đa 50 ký tự, một dòng, không có khoảng trắng ở đầu hoặc cuối",
+    "documents_in_issuer": "Cơ quan ban hành tối đa 200 ký tự, một dòng, không có khoảng trắng ở đầu hoặc cuối",
+    "documents_in_summary": "Trích yếu không được có khoảng trắng ở đầu hoặc cuối",
+    "documents_in_dates": "Ngày ban hành không được sau ngày tiếp nhận; hạn giải quyết không được trước ngày ban hành",
+    "documents_summary_check": "Trích yếu cần 10–500 ký tự",
+    "documents_type_code_fkey": "Không có loại văn bản này",
     "assignments_one_lead": "Văn bản đã có nơi chủ trì",
     "documents_body_length": "Nội dung văn bản dài quá 20.000 ký tự",
     "documents_out_issued_complete": "Văn bản chưa đủ số, ký hiệu, ngày ban hành, người ký để phát hành",
@@ -177,6 +187,27 @@ mutation PhatHanh($doc: uuid!, $sha: bytea!, $public: Boolean!, $file: office_do
   insert_office_document_events_one(object: $event) { id }
 }"""
 
+# Tiếp nhận: những điều schema không biết mà CSDL biết — loại văn bản có thật, tệp do chính người này tải lên
+# (đã qua ClamAV mới có dòng trong core.files), chưa có văn bản trùng (kể cả văn bản hạn chế văn thư không thấy)
+INTAKE_LOOKUP = """
+query IntakeLookup($type: String!, $files: [uuid!]!, $user: String!, $symbol: String!, $issuer: String!,
+                   $issued: date!) {
+  office_document_types_by_pk(code: $type) { code }
+  core_files(where: {id: {_in: $files}, created_by: {_eq: $user}}) { id }
+  office_documents(where: {direction: {_eq: "in"}, status: {_neq: "cancelled"}, symbol: {_eq: $symbol},
+                           issuer_name: {_ilike: $issuer}, issued_on: {_eq: $issued}}, limit: 1) { id }
+}"""
+
+# Cột văn thư được đặt khi tiếp nhận: đúng các thuộc tính của schemas/van-ban-den.json trừ file_ids. Thêm thuộc
+# tính vào schema thì phải thêm ở đây (test_intake kiểm), không thì một thuộc tính mới như register_number,
+# is_public thành cột văn thư tự đặt được.
+INTAKE_COLUMNS = ("type_code", "symbol", "issuer_name", "issued_on", "summary", "urgency", "due_on", "restricted")
+
+RECEIVE = """
+mutation TiepNhan($doc: office_documents_insert_input!) {
+  insert_office_documents_one(object: $doc) { id }
+}"""
+
 DEPARTMENT_MANAGERS = """
 query Managers($dept: uuid!) {
   office_departments_by_pk(id: $dept) { id }
@@ -186,12 +217,59 @@ query Managers($dept: uuid!) {
 
 class Workflow:
     def __init__(self, hasura: HasuraClient, flowable: FlowableClient, files: FilesClient | None = None, *,
-                 notifier: Notifier | None = None, sla_duration: str = "PT24H") -> None:
+                 notifier: Notifier | None = None, sla_duration: str = "PT24H",
+                 intake: FormSchema | None = None) -> None:
         self.hasura = hasura
         self.flowable = flowable
         self.files = files
         self.notifier = notifier
         self.sla_duration = sla_duration
+        self.intake = intake
+
+    # --- tiếp nhận ------------------------------------------------------------------------------------
+
+    async def receive_incoming(self, actor: Actor, data: Any) -> dict[str, Any]:
+        """Văn thư tiếp nhận văn bản đến — lớp thứ hai của poka-yoke (F2.2).
+
+        Kiểm lại toàn bộ theo schemas/van-ban-den.json như form đã kiểm, rồi những điều chỉ CSDL biết. Văn thư
+        không còn quyền ghi thẳng bảng văn bản, nên dữ liệu nào vào được CSDL cũng đã qua đây.
+        """
+        if self.intake is None:
+            raise WorkflowError("unavailable", "Chưa nạp schema tiếp nhận văn bản đến", 503)
+        errors = self.intake.errors(data)
+        if errors:
+            raise WorkflowError("invalid", "Dữ liệu văn bản đến chưa hợp lệ: " + ", ".join(sorted(errors)), 400,
+                                fields=errors)
+        file_ids: list[str] = data.get("file_ids", [])
+        try:
+            found = await self.hasura.as_service(actor, INTAKE_LOOKUP, {
+                "type": data["type_code"], "files": file_ids, "user": actor.user_id, "symbol": data["symbol"],
+                "issuer": re.sub(r"([\\%_])", r"\\\1", data["issuer_name"]), "issued": data["issued_on"],
+            })
+        except HasuraError as exc:
+            raise _db_error(exc) from exc
+        if found["office_document_types_by_pk"] is None:
+            raise WorkflowError("invalid", "Không có loại văn bản này", 400, fields={"type_code": "unknown"})
+        if len(found["core_files"]) != len(file_ids):
+            raise WorkflowError("invalid", "Tệp không tồn tại hoặc không do bạn tải lên", 400,
+                                fields={"file_ids": "unknown"})
+        if found["office_documents"]:
+            raise WorkflowError("duplicate", CONSTRAINT_MESSAGES["documents_in_dedup"], 409,
+                                fields={"symbol": "duplicate"})
+
+        doc = {k: data[k] for k in INTAKE_COLUMNS if k in data}
+        doc.update(direction="in", status="received", created_by=actor.user_id, files={"data": [
+            {"file_id": f, "role": "main" if i == 0 else "attachment", "added_by": actor.user_id}
+            for i, f in enumerate(file_ids)
+        ]})
+        try:
+            created = await self.hasura.as_service(actor, RECEIVE, {"doc": doc})
+        except HasuraError as exc:
+            if "documents_in_dedup" in str(exc):     # hai văn thư lưu cùng lúc: chỉ mục của CSDL chặn người sau
+                raise WorkflowError("duplicate", CONSTRAINT_MESSAGES["documents_in_dedup"], 409,
+                                    fields={"symbol": "duplicate"}) from exc
+            raise _db_error(exc) from exc
+        return {"document_id": created["insert_office_documents_one"]["id"]}
 
     # --- vào sổ ---------------------------------------------------------------------------------------
 

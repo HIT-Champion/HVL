@@ -25,7 +25,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from conftest import INSERT_DOC, SQLError, User, incoming, sql, visible_ids
+from conftest import INSERT_DOC, SQLError, User, incoming, outgoing, received, sql, visible_ids
 
 # Phần kiểm từ bên ngoài CSDL của lệnh `moc audit verify` (scripts/audit_chain.py, chỉ dùng thư viện chuẩn)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts"))
@@ -47,17 +47,25 @@ def test_chain_is_intact():
 
 
 def test_user_change_is_recorded_with_actor_from_token(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 101)})["insert_office_documents_one"]
+    doc = world.staff_a1.gql(INSERT_DOC, {"o": outgoing(101)})["insert_office_documents_one"]
     entry = last_audit("office.documents", doc["id"])
-    assert entry["actor_id"] == world.clerk_a.sub
+    assert entry["actor_id"] == world.staff_a1.sub
     assert entry["actor_kind"] == "user"
     assert entry["action"] == "insert"
     assert entry["tenant_id"] == world.tenant_a
+    assert entry["diff"]["status"] == [None, "draft"]
+
+
+def test_action_write_is_recorded_as_the_service_acting_for_the_clerk(world):
+    """svc-workflow ghi văn bản đến thay văn thư: sổ ghi đúng người bấm, kèm dấu "qua dịch vụ"."""
+    doc = received(world.clerk_a, incoming(world.tag, 115))
+    entry = last_audit("office.documents", doc["id"])
+    assert (entry["actor_id"], entry["actor_kind"]) == (world.clerk_a.sub, "service")
     assert entry["diff"]["status"] == [None, "received"]
 
 
 def test_service_change_is_recorded_as_service(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 102)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 102))
     world.service_a.gql(
         """mutation ($id: uuid!) { update_office_documents_by_pk(pk_columns: {id: $id}, _set: {status: "cancelled"}) { id } }""",
         {"id": doc["id"]},
@@ -98,7 +106,7 @@ def test_audit_log_is_append_only():
 
 def test_tampering_is_detected_even_by_superuser(world):
     """Superuser tắt trigger rồi sửa một dòng: core.audit_verify() chỉ đúng dòng đó."""
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 103)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 103))
     target, original = sql(f"""select id, diff::text from core.audit_log
                                where entity_id = '{doc["id"]}' order by id desc limit 1""")[0]
     forged = json.loads(original)
@@ -115,7 +123,7 @@ def test_tampering_is_detected_even_by_superuser(world):
 
 
 def test_deleting_the_tail_is_detected(world):
-    world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 104)})
+    received(world.clerk_a, incoming(world.tag, 104))
     cols = "id, tenant_id, occurred_at, actor_id, actor_kind, request_id, action, entity, entity_id, diff, prev_hash, hash"
     last = sql("select max(id) from core.audit_log")[0][0]
     toggle = "alter table core.audit_log {on} trigger audit_no_change; alter table core.audit_log {on} trigger audit_chain"
@@ -169,7 +177,7 @@ def problems(report) -> list[tuple[str, int | None]]:
 
 
 def test_outside_check_agrees_with_the_database(world):
-    world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 105)})
+    received(world.clerk_a, incoming(world.tag, 105))
     report = outside(anchor_now())
     assert report.ok, report.problems
     assert report.rows == report.last_id == int(sql("select last_id from core.audit_head")[0][0])
@@ -177,7 +185,7 @@ def test_outside_check_agrees_with_the_database(world):
 
 
 def test_outside_check_points_at_the_edited_row(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 106)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 106))
     target, original = sql(f"""select id, diff::text from core.audit_log
                                where entity_id = '{doc["id"]}' order by id desc limit 1""")[0]
     forged = json.loads(original)
@@ -199,11 +207,11 @@ def test_rewritten_chain_fools_the_database_but_not_the_anchor(world):
     """Superuser sửa một dòng rồi tính lại hash cả chuỗi phía sau: core.audit_verify() vẫn báo nguyên vẹn, mốc neo
     thì lệch, và khoảng dòng bị viết lại nằm giữa mốc còn khớp và mốc bị lệch."""
     before = anchor_now()
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 107)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 107))
     target = int(sql(f"select max(id) from core.audit_log where entity_id = '{doc['id']}'")[0][0])
-    world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 108)})
+    received(world.clerk_a, incoming(world.tag, 108))
     after = anchor_now()
-    world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 109)})      # thêm dòng sau mốc
+    received(world.clerk_a, incoming(world.tag, 109))      # thêm dòng sau mốc
     rewrite = f"""
       alter table core.audit_log disable trigger audit_no_change;
       create table public._audit_backup as select id, diff, prev_hash, hash from core.audit_log where id >= {target};
@@ -245,7 +253,7 @@ def test_rewritten_chain_fools_the_database_but_not_the_anchor(world):
 
 def test_cut_tail_with_moved_head_is_caught_by_the_anchor(world):
     """Xóa các dòng cuối rồi lùi cả đầu chuỗi: trong CSDL không còn dấu vết, mốc neo thì trỏ vào dòng đã mất."""
-    world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 110)})
+    received(world.clerk_a, incoming(world.tag, 110))
     tip = anchor_now()
     cols = "id, tenant_id, occurred_at, actor_id, actor_kind, request_id, action, entity, entity_id, diff, prev_hash, hash"
     toggle = "alter table core.audit_log {on} trigger audit_no_change; alter table core.audit_log {on} trigger audit_chain"
@@ -268,7 +276,7 @@ def test_cut_tail_with_moved_head_is_caught_by_the_anchor(world):
 
 def test_document_hash_swapped_without_trigger_is_caught(world):
     """Đổi content_sha256 (để một tệp giả "khớp" ở cổng xác thực) khi tắt trigger: hash không còn khớp sổ."""
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 111)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 111))
     real, fake = os.urandom(32).hex(), os.urandom(32).hex()
     sql(f"update office.documents set content_sha256 = '\\x{real}' where id = '{doc['id']}'")   # ghi sổ bình thường
     assert outside().ok
@@ -308,7 +316,7 @@ def test_anchor_written_after_the_read_waits_for_the_next_check(world):
 
 def test_service_event_shaped_like_a_document_change_is_not_a_hash(world):
     """Dịch vụ tự ghi sự kiện (diff không phải [cũ, mới]) vào đúng văn bản: không bị đọc nhầm thành hash văn bản."""
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 114)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 114))
     real = os.urandom(32).hex()
     sql(f"update office.documents set content_sha256 = '\\x{real}' where id = '{doc['id']}'")
     world.service_a.gql(
@@ -329,7 +337,7 @@ AUDIT_VIEW = """query ($e: String!) {
 
 
 def test_director_sees_who_changed_what_but_not_the_content(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 112, restricted=True)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 112, restricted=True))
     assert doc["id"] not in visible_ids(world.director_a)          # văn bản hạn chế: lãnh đạo không đọc được
     sql(f"update office.documents set content_sha256 = '\\x{os.urandom(32).hex()}' where id = '{doc['id']}'")
     for viewer in (world.director_a, world.admin_a):
@@ -343,7 +351,7 @@ def test_director_sees_who_changed_what_but_not_the_content(world):
 
 
 def test_audit_view_has_no_raw_diff_and_stays_in_the_tenant(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 113)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 113))
     assert "errors" in world.director_a.raw("{ core_audit_log(limit: 1) { diff } }")
     assert "errors" in world.director_a.raw("{ core_audit_head { last_id } }")
     for outsider in (world.clerk_a, world.manager_a1, world.staff_a1):

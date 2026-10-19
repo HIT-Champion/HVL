@@ -16,7 +16,8 @@
 
 """make smoke — đi trọn luồng văn bản đến qua cổng APISIX, như người dùng thật (cần make seed trước).
 
-văn thư tải công văn lên (qua ClamAV) → nhập văn bản → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
+văn thư tải công văn lên (qua ClamAV) → nhập văn bản (Action receiveIncoming; dữ liệu sai bị chặn ở svc-workflow
+và ở CSDL, theo cùng schemas/van-ban-den.json với form) → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
 Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Rồi luồng văn bản đi: chuyên
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
 mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Thông báo: tổ trưởng nhận tin việc mới
@@ -45,7 +46,7 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request
 
@@ -256,18 +257,50 @@ def main() -> None:
     print("Luồng văn bản đến")
     file = clerk.upload(f"cong-van-{tag}.pdf", PDF)
     ok(f"văn thư tải công văn lên, quét sạch ({file['sha256'][:12]}…)")
-    doc = clerk.gql(
-        """mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id status } }""",
-        {"o": {
-            "type_code": "CV", "symbol": f"123/ĐHCN-ĐT{tag}", "issuer_name": "Trường Đại học Công nghiệp",
-            "issued_on": date.today().isoformat(), "urgency": "khan",
-            "summary": f"Về việc rà soát chương trình đào tạo năm học 2026–2027 (kiểm tra {tag})",
-            "files": {"data": [{"file_id": file["id"], "role": "main"}]},
-        }},
-    )["insert_office_documents_one"]
-    doc_id = doc["id"]
-    doc["status"] == "received" or fail("văn bản mới không ở trạng thái received")
-    ok("văn thư nhập văn bản đến kèm tệp")
+    incoming = {
+        "type_code": "CV", "symbol": f"123/ĐHCN-ĐT{tag}", "issuer_name": "Trường Đại học Công nghiệp",
+        "issued_on": datetime.now(timezone(timedelta(hours=7))).date().isoformat(), "urgency": "khan",   # giờ Việt Nam
+        "summary": f"Về việc rà soát chương trình đào tạo năm học 2026–2027 (kiểm tra {tag})", "file_ids": [file["id"]],
+    }
+    receive = "mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id document { status files { role } } } }"
+    doc = clerk.gql(receive, {"d": incoming})["receiveIncoming"]
+    doc_id = doc["document_id"]
+    doc["document"] == {"status": "received", "files": [{"role": "main"}]} or fail(f"văn bản mới chưa đúng: {doc}")
+    ok("văn thư nhập văn bản đến kèm tệp (Action receiveIncoming)")
+
+    print("Poka-yoke: dữ liệu văn bản đến sai bị chặn ở svc-workflow và CSDL, không chỉ ở form")
+    direct, _ = call_json("POST", f"{PUBLIC_URL}/v1/graphql", headers=clerk.auth, body={
+        "query": "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }",
+        "variables": {"o": {k: v for k, v in incoming.items() if k != "file_ids"}}})
+    "insert_office_documents_one" in json.dumps(direct.get("errors")) \
+        or fail(f"văn thư vẫn ghi thẳng được bảng văn bản: {direct}")
+    ok("văn thư không ghi thẳng được bảng văn bản: văn bản đến chỉ vào qua Action")
+
+    def rejected(data: dict) -> dict:
+        body, _ = call_json("POST", f"{PUBLIC_URL}/v1/graphql", headers=clerk.auth,
+                            body={"query": receive, "variables": {"d": data}})
+        return ((body.get("errors") or [{}])[0].get("extensions") or {}) if body else {}
+
+    bad = rejected({**incoming, "symbol": " 124/ĐHCN-ĐT", "summary": "Ngắn", "status": "registered"})
+    (bad.get("code"), bad.get("fields")) == ("invalid", {"symbol": "not", "summary": "minLength",
+                                                         "status": "additionalProperties"}) \
+        or fail(f"svc-workflow chưa trả lỗi từng trường: {bad}")
+    ok("svc-workflow kiểm lại theo schemas/van-ban-den.json, trả lỗi từng trường về form")
+    dup = rejected({**incoming, "issuer_name": incoming["issuer_name"].upper(), "file_ids": []})
+    dup.get("code") == "duplicate" or fail(f"tiếp nhận trùng không bị chặn: {dup}")
+    ok("tiếp nhận lần hai cùng cơ quan ban hành, số ký hiệu, ngày ban hành bị chặn")
+    tampered = (f"begin;\ninsert into office.documents (tenant_id, direction, status, type_code, symbol, issuer_name, "
+                f"issued_on, summary, created_by) select tenant_id, 'in', 'received', type_code, symbol || ' sửa', "
+                f"issuer_name || E'\\n', issued_on, summary, created_by from office.documents where id = '{doc_id}';\n"
+                f"rollback;\n")
+    try:
+        compose("exec", "-T", "postgres", "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U",
+                ENV.get("POSTGRES_USER", "moc"), "-d", ENV.get("POSTGRES_DB", "moc"), "-f", "-",
+                stdin=tampered.encode())
+        fail("CSDL nhận văn bản đến có cơ quan ban hành xuống dòng khi ghi thẳng")
+    except subprocess.CalledProcessError as exc:
+        b"documents_in_issuer" in exc.stderr or fail(f"CSDL từ chối nhưng không vì ràng buộc: {exc.stderr!r}")
+    ok("ghi thẳng vào CSDL bằng quyền quản trị cũng bị ràng buộc CHECK chặn")
 
     reg = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number document { status process_id } } }",
                     {"id": doc_id})["registerIncoming"]

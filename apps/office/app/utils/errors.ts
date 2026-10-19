@@ -26,6 +26,8 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'network') return t('error.network')
     if (e.code === 'session') return t('error.session')
     if (e.code === 'infected') return t('error.infected')
+    if (e.code === 'invalid') return t('error.invalid')            // svc-workflow trả lỗi từng trường (fields)
+    if (e.code === 'duplicate') return t('error.documents_in_dedup')
     if (e.status === 413) return t('error.too_large')
     if (e.status === 429) return t('error.rate_limited')
     for (const name of CONSTRAINTS) if (e.message.includes(name)) return t(`error.${name}`)

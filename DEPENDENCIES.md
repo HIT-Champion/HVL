@@ -80,7 +80,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak | npm | 1 |
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
-| Ajv | 8.20 | MIT | Kiểm tra form theo JSON Schema dùng chung | npm | 2 |
+| Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
 | PDF.js (`pdfjs-dist`) | 6.4 | Apache-2.0 | Xem PDF ngay trên trang | npm | 2 |
 | Apache ECharts | 6.1 | Apache-2.0 | Biểu đồ dashboard điều hành | npm | 3 |
 
@@ -114,7 +114,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
-| jsonschema | 4.26 | MIT | Kiểm tra dữ liệu đề xuất theo JSON Schema dùng chung | pip | 2 |
+| jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
 | DuckDB | 1.5 | MIT | Đọc hồ sơ lưu trữ lạnh (Parquet) | pip | 3 |
 | openlineage-python | 1.53 | Apache-2.0 | Phát sự kiện truy vết dữ liệu | pip | 3 |
 

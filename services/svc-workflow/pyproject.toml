@@ -27,6 +27,7 @@ dependencies = [
   "fastapi>=0.143.3,<0.144",
   "uvicorn>=0.54,<0.55",
   "httpx2>=2.13,<3",
+  "jsonschema>=4.26,<5",
 ]
 
 [project.optional-dependencies]

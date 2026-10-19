@@ -18,7 +18,9 @@
 // svc-files cho tệp và tìm kiếm. Mọi yêu cầu mang access token của người dùng.
 
 export class ApiError extends Error {
-  constructor(message: string, public code: string | null = null, public status = 0) {
+  // fields: trường sai → mã lỗi do svc-workflow trả (cùng mã với app/utils/forms.ts)
+  constructor(message: string, public code: string | null = null, public status = 0,
+              public fields: Record<string, string> | null = null) {
     super(message)
   }
 }
@@ -75,7 +77,7 @@ export function useApi() {
     const body = await res.json()
     if (body.errors?.length) {
       const e = body.errors[0]
-      throw new ApiError(e.message, e.extensions?.code ?? null, res.status)
+      throw new ApiError(e.message, e.extensions?.code ?? null, res.status, e.extensions?.fields ?? null)
     }
     return body.data as T
   }
