@@ -73,6 +73,29 @@ query VisibleDocuments($ids: [uuid!]!) {
   }
 }"""
 
+# Văn bản đi để dựng PDF: dùng chung cho bản phát hành (vai trò service) và bản xem trước (token người dùng —
+# Hasura áp quyền đọc, người không được đọc văn bản nhận null)
+LETTER = """
+query Letter($id: uuid!, $tenant: uuid!) {
+  office_documents_by_pk(id: $id) {
+    id direction status type_code summary body recipients symbol issued_on verify_code
+    document_type { name in_symbol }
+    department { code }
+    signer { full_name }
+    events(where: {kind: {_eq: "office.document.approved"}}, order_by: {created_at: desc}, limit: 1) { created_at }
+  }
+  core_tenants_by_pk(id: $tenant) { code name parent_name place_name head_title }
+}"""
+
+# Cổng xác thực: đúng một văn bản đã phát hành, theo mã tra cứu hoặc theo băm (vai trò verifier, chỉ đọc
+# khung nhìn office.issued_documents)
+VERIFY = """
+query Verify($where: office_issued_documents_bool_exp!) {
+  office_issued_documents(where: $where, limit: 1) {
+    verify_code content_sha256 symbol issued_on type_name issuer_name parent_name summary status
+  }
+}"""
+
 # Hasura từ chối chính token/phiên của người gọi
 AUTH_CODES = {"invalid-jwt", "invalid-headers", "access-denied", "jwt-missing-role-claims"}
 
@@ -260,3 +283,41 @@ class HasuraClient:
         data = await self._call(FILE_LOCATION, {"id": str(file_id)}, self._as_service(tenant_id, actor_id, request_id))
         row = data.get("core_files_by_pk")
         return row["object_key"] if row else None
+
+    async def letter(self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str,
+                     document_id: uuid.UUID) -> dict[str, Any] | None:
+        """Dữ liệu dựng bản phát hành, đọc bằng vai trò service của đúng thuê ước trong yêu cầu."""
+        data = await self._call(LETTER, {"id": str(document_id), "tenant": str(tenant_id)},
+                                self._as_service(tenant_id, actor_id, request_id))
+        return _letter(data)
+
+    async def visible_letter(self, token: str, tenant_id: uuid.UUID, document_id: uuid.UUID) -> dict[str, Any] | None:
+        """Dữ liệu dựng bản xem trước nếu người giữ token được đọc văn bản, ngược lại None."""
+        try:
+            data = await self._call(LETTER, {"id": str(document_id), "tenant": str(tenant_id)},
+                                    {"Authorization": f"Bearer {token}"})
+        except HasuraAuthError:
+            raise
+        except HasuraError as exc:
+            if exc.code == "validation-failed":  # vai trò không đọc văn bản (vd tenant_admin)
+                return None
+            raise
+        return _letter(data)
+
+    async def verify(self, *, code: str | None = None, sha256_hex: str | None = None) -> dict[str, Any] | None:
+        """Văn bản đã phát hành có mã tra cứu hoặc băm này (vai trò verifier), không có thì None."""
+        where = {"verify_code": {"_eq": code}} if code else {"content_sha256": {"_eq": _bytea(sha256_hex or "")}}
+        data = await self._call(VERIFY, {"where": where},
+                                {"X-Hasura-Admin-Secret": self._secret, "X-Hasura-Role": "verifier"})
+        rows = data["office_issued_documents"]
+        if not rows:
+            return None
+        return {**rows[0], "content_sha256": _hex(rows[0]["content_sha256"])}
+
+
+def _letter(data: dict[str, Any]) -> dict[str, Any] | None:
+    doc, tenant = data.get("office_documents_by_pk"), data.get("core_tenants_by_pk")
+    if doc is None or tenant is None or doc["direction"] != "out":
+        return None
+    return {**doc, "tenant": tenant}
+

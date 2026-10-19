@@ -120,6 +120,7 @@ services:
       MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
       MOC_RATE_LOGIN_PER_MIN: ${MOC_RATE_LOGIN_PER_MIN:-60}
       MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
+      MOC_RATE_VERIFY_PER_MIN: ${MOC_RATE_VERIFY_PER_MIN:-30}
     volumes:
       - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
@@ -250,6 +251,8 @@ services:
       MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
       HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
       MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:?}
+      # in vào mã QR của văn bản đi phát hành: <MOC_PUBLIC_URL>/xac-thuc/<mã>
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
     depends_on:
       hasura: {condition: service_healthy}
       seaweedfs: {condition: service_started}

@@ -104,6 +104,11 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | python-multipart | 0.0.32 | Apache-2.0 | Đọc tệp tải lên (`svc-files`) | pip | 1 |
 | boto3 | 1.43 | Apache-2.0 | Gọi SeaweedFS qua giao thức S3 (`svc-files`) | pip | 1 |
 | PyJWT (+ cryptography) | 2.15 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files` | pip | 1 |
+| WeasyPrint (+ pydyf, tinycss2, cssselect2, tinyhtml5, webencodings) | 70.0 | BSD-3-Clause (tinyhtml5: MIT) | Dựng PDF văn bản đi đúng thể thức NĐ 30 từ khuôn HTML (`svc-files`) | pip | 2 |
+| fontTools (+ Brotli, zopfli) | 4.66 | MIT (zopfli: Apache-2.0) | Nhúng và nén phông vào PDF (WeasyPrint kéo theo) | pip | 2 |
+| Pillow | 12.3 | MIT-CMU | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo) | pip | 2 |
+| Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Mộc dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
+| segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `dxos` | pip | 3 |
 | jsonschema | 4.26 | MIT | Kiểm tra dữ liệu đề xuất theo JSON Schema dùng chung | pip | 2 |
@@ -111,7 +116,9 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | openlineage-python | 1.53 | Apache-2.0 | Phát sự kiện truy vết dữ liệu | pip | 3 |
 
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
-`python:3.13.16-slim` (PSF-2.0).
+`python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
+chạy, không sửa), HarfBuzz (MIT) và phông Liberation 2.1 (SIL OFL 1.1) — cùng số đo với Times New Roman mà
+NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 
 ## Vận hành và bốn nguyên lý thiết kế
 
@@ -172,6 +179,8 @@ trọng số không được OSI phê duyệt.
 Giấy phép được chấp nhận trong Mộc (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
 
 - ✅ Apache-2.0, MIT, BSD-2/3-Clause, PostgreSQL License, ISC, MPL-2.0
+- ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
+  trong ba giấy phép), Pango (nạp động), phông Liberation.
 - ⚠️ GPL-2.0/3.0, AGPL-3.0 — chấp nhận được khi chạy như **dịch vụ độc lập** giao tiếp qua mạng,
   không liên kết mã. Hiện gồm: ClamAV (GPL-2.0), Grafana và Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic

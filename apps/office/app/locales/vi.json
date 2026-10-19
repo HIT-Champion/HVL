@@ -19,7 +19,9 @@
     "receive": "Tiếp nhận văn bản",
     "search": "Tìm kiếm",
     "logout": "Đăng xuất",
-    "language": "English"
+    "language": "English",
+    "outgoing": "Văn bản đi",
+    "compose": "Soạn văn bản đi"
   },
   "role": {
     "clerk": "Văn thư",
@@ -52,6 +54,12 @@
       "chiDao": "Cho ý kiến chỉ đạo",
       "phanCong": "Phân công xử lý",
       "xuLy": "Xử lý văn bản"
+    },
+    "vbdi": {
+      "duyetPhong": "Duyệt dự thảo cấp phòng",
+      "duyetDonVi": "Duyệt và ký văn bản",
+      "chinhSua": "Sửa dự thảo theo ý kiến",
+      "phatHanh": "Cấp số và phát hành"
     }
   },
   "event": {
@@ -62,9 +70,17 @@
         "directed": "Chỉ đạo",
         "assigned": "Phân công cho {name}",
         "processed": "Báo cáo kết quả",
-        "filed": "Lưu, không xử lý"
+        "filed": "Lưu, không xử lý",
+        "submitted": "Trình duyệt",
+        "resubmitted": "Trình lại sau khi sửa",
+        "reviewed": "Lãnh đạo phòng đồng ý",
+        "returned": "Trả lại để sửa",
+        "approved": "Ký duyệt",
+        "numbered": "Cấp số {symbol}",
+        "issued": "Phát hành"
       }
-    }
+    },
+    "drafted": "Tạo dự thảo"
   },
   "inbox": {
     "title": "Hộp việc",
@@ -139,7 +155,31 @@
     "notFound": "Không tìm thấy văn bản, hoặc bạn không có quyền xem.",
     "restricted": "Hạn chế",
     "assignmentDone": "Đã xong",
-    "assignmentOpen": "Đang xử lý"
+    "assignmentOpen": "Đang xử lý",
+    "draft": "Dự thảo",
+    "body": "Nội dung",
+    "recipients": "Nơi nhận",
+    "department": "Phòng soạn thảo",
+    "signer": "Người ký",
+    "replyTo": "Trả lời văn bản",
+    "createdBy": "Người soạn",
+    "preview": "Tải bản xem trước (PDF)",
+    "edit": "Sửa dự thảo",
+    "submit": "Trình ký",
+    "resubmit": "Trình lại",
+    "submitTitle": "Trình dự thảo",
+    "submitHint": "Lãnh đạo phòng duyệt trước, rồi người ký duyệt. Bị trả lại thì dự thảo về bạn để sửa.",
+    "returnedHint": "Dự thảo bị trả lại: {note}",
+    "signerPick": "Lãnh đạo đơn vị ký",
+    "submitted": "Đã trình. Dự thảo đang chờ lãnh đạo phòng duyệt.",
+    "verifyCode": "Mã xác thực",
+    "verifyOpen": "Mở trang xác thực",
+    "fileRole": {
+      "main": "Văn bản",
+      "attachment": "Kèm theo",
+      "draft": "Dự thảo",
+      "issued": "Bản phát hành"
+    }
   },
   "form": {
     "chiDao": {
@@ -169,7 +209,22 @@
       "done": "Báo cáo xong"
     },
     "pick": "— Chọn —",
-    "done": "Đã chuyển bước tiếp theo."
+    "done": "Đã chuyển bước tiếp theo.",
+    "duyet": {
+      "note": "Ý kiến",
+      "approve": "Đồng ý, trình ký",
+      "sign": "Ký duyệt",
+      "return": "Trả lại",
+      "returnNote": "Ghi rõ lý do trả lại, cần sửa gì",
+      "preview": "Xem bản PDF trước khi duyệt"
+    },
+    "phatHanh": {
+      "public": "Công khai trích yếu trên cổng xác thực",
+      "publicHint": "Người tra mã thấy cả trích yếu; không chọn thì chỉ thấy số, ngày, cơ quan ban hành.",
+      "issue": "Cấp số và phát hành",
+      "confirm": "Cấp số đi và phát hành văn bản này? Số được cấp liên tiếp theo năm và không thu hồi được.",
+      "issued": "Đã phát hành."
+    }
   },
   "search": {
     "title": "Tìm kiếm văn bản",
@@ -193,12 +248,76 @@
     "infected": "Tệp nhiễm mã độc, đã bị chặn.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
-    "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị."
+    "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
+    "documents_body_length": "Nội dung dài quá 20.000 ký tự."
   },
   "validation": {
     "required": "Không được để trống",
     "summaryLength": "Cần 10–500 ký tự",
     "dateFuture": "Không được sau hôm nay",
     "dueBefore": "Hạn phải từ hôm nay trở đi"
+  },
+  "outgoing": {
+    "title": "Văn bản đi",
+    "compose": "Soạn văn bản đi",
+    "empty": "Chưa có văn bản đi nào.",
+    "tab": {
+      "drafts": "Dự thảo",
+      "review": "Đang trình",
+      "issued": "Đã phát hành",
+      "all": "Tất cả"
+    },
+    "symbol": "Số, ký hiệu",
+    "summary": "Trích yếu",
+    "department": "Phòng soạn",
+    "status": "Trạng thái",
+    "issuedOn": "Ngày ban hành",
+    "unnumbered": "Chưa cấp số"
+  },
+  "compose": {
+    "title": "Soạn văn bản đi",
+    "editTitle": "Sửa dự thảo",
+    "subtitle": "Nội dung được dựng thành PDF đúng thể thức NĐ 30/2020; số, ký hiệu và ngày ban hành do văn thư cấp khi phát hành.",
+    "type": "Loại văn bản",
+    "summary": "Trích yếu nội dung",
+    "summaryHint": "10–500 ký tự. Công văn ghi theo dạng \"Về việc …\"",
+    "body": "Nội dung",
+    "bodyHint": "Mỗi dòng là một đoạn, tự thụt đầu dòng khi in",
+    "recipients": "Nơi nhận",
+    "recipientsHint": "Mỗi dòng một nơi nhận; công văn in thành \"Kính gửi\"",
+    "urgency": "Độ khẩn",
+    "replyTo": "Trả lời văn bản đến",
+    "replyNone": "— Không —",
+    "attachments": "Tài liệu kèm theo",
+    "attachmentsHint": "Phụ lục, bảng biểu đính kèm (không bắt buộc); tệp được quét virus trước khi lưu",
+    "save": "Lưu dự thảo",
+    "saved": "Đã lưu dự thảo.",
+    "notEditable": "Dự thảo này không sửa được nữa: đã trình, hoặc không phải bạn soạn."
+  },
+  "verify": {
+    "title": "Xác thực văn bản",
+    "subtitle": "Kiểm tra một văn bản do đơn vị dùng Mộc phát hành có thật và còn nguyên vẹn hay không.",
+    "code": "Mã xác thực",
+    "codeHint": "10 ký tự in cạnh mã QR, ví dụ ABCDE-23456",
+    "lookup": "Tra cứu",
+    "file": "Hoặc thả tệp PDF bạn nhận được vào đây",
+    "fileHint": "Tệp không rời khỏi máy bạn: trình duyệt tự tính SHA-256 rồi chỉ gửi mã băm đi tra.",
+    "checking": "Đang tra cứu…",
+    "valid": "Văn bản có thật, do đơn vị dưới đây phát hành",
+    "notFound": "Không tìm thấy văn bản nào khớp",
+    "notFoundHint": "Kiểm tra lại mã. Nếu tra bằng tệp: tệp đã bị sửa, hoặc không phải văn bản phát hành trên Mộc.",
+    "match": "Tệp khớp từng byte với bản đã phát hành",
+    "mismatch": "Tệp KHÔNG khớp với văn bản có mã này: có thể đã bị sửa",
+    "compare": "Thả tệp PDF bạn nhận được để so với bản gốc",
+    "symbol": "Số, ký hiệu",
+    "issuedOn": "Ngày ban hành",
+    "issuer": "Cơ quan ban hành",
+    "type": "Loại văn bản",
+    "summary": "Trích yếu",
+    "summaryHidden": "Không công khai",
+    "sha256": "SHA-256 của bản phát hành",
+    "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
+    "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
+    "footer": "Mộc — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
   }
 }

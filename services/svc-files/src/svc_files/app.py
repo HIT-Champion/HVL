@@ -21,6 +21,11 @@ Hasura. ClamAV không trả lời thì từ chối (503), không bao giờ lưu 
 sổ kiểm toán. Tải xuống: hỏi Hasura bằng chính token người dùng xem họ có được xem tệp không, rồi mới
 đọc từ SeaweedFS. Tìm kiếm (F1.7): Meilisearch xếp hạng, Hasura lọc theo quyền — chi tiết ở search.py.
 
+Văn bản đi (F2.4): svc-workflow gọi /internal/issue bằng token tài khoản dịch vụ khi văn thư phát hành —
+dựng PDF có số, mã QR từ dữ liệu trong CSDL, quét, lưu như mọi tệp. Người được đọc dự thảo xem trước bản PDF
+ở /api/documents/{id}/preview. Cổng xác thực (F2.13): /api/verify trả thông tin công khai của đúng một văn
+bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập.
+
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
 
@@ -28,6 +33,7 @@ Chạy: ``uvicorn svc_files.app:create_app --factory``
 # dependency khai báo bên trong create_app().
 import asyncio
 import hashlib
+import io
 import json
 import logging
 import re
@@ -40,10 +46,10 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from . import __version__
@@ -51,6 +57,7 @@ from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .hasura import HasuraAuthError, HasuraClient, HasuraError
+from .render import letter_from, render_pdf
 from .search import Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .storage import ObjectStore, StorageError, object_key
 
@@ -102,6 +109,40 @@ class SearchHit(BaseModel):
     register_number: int | None
     registered_at: datetime | None
     due_on: date | None
+
+
+class IssueIn(BaseModel):
+    tenant_id: uuid.UUID
+    document_id: uuid.UUID
+    actor_id: str = Field(min_length=1, max_length=64)
+
+
+class IssueOut(BaseModel):
+    file_id: uuid.UUID
+    sha256: str
+    size_bytes: int
+
+
+class VerifiedDocument(BaseModel):
+    symbol: str
+    issued_on: date
+    type_name: str
+    issuer_name: str
+    parent_name: str | None
+    # chỉ có khi văn bản được đánh dấu công khai lúc phát hành
+    summary: str | None
+    sha256: str
+    verify_code: str
+    status: Literal["issued", "archived"]
+
+
+class VerifyOut(BaseModel):
+    result: Literal["valid", "not_found"]
+    document: VerifiedDocument | None = None
+
+
+VERIFY_CODE_RE = re.compile(r"[^A-Z2-7]")
+NO_STORE = {"Cache-Control": "no-store"}
 
 
 class SearchOut(BaseModel):
@@ -505,5 +546,156 @@ def create_app(
         log_event("core.search", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
                   q_length=len(q), hits=len(hits))
         return SearchOut(hits=[SearchHit.model_validate(h) for h in hits], next_offset=next_offset)
+
+    # --- văn bản đi -----------------------------------------------------------------------------------
+
+    def service_caller(
+        creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    ) -> str:
+        if creds is None:
+            raise HTTPException(401, {"code": "missing_token", "message": "Thiếu token"}, {"WWW-Authenticate": "Bearer"})
+        try:
+            return verifier.verify_service(creds.credentials, settings.service_clients)
+        except AuthError as exc:
+            headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
+            raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}, headers) from exc
+
+    async def _scan_bytes(data: bytes) -> bool:
+        async def chunks() -> AsyncIterator[bytes]:
+            for i in range(0, len(data), CHUNK_SIZE):
+                yield data[i:i + CHUNK_SIZE]
+        return (await scanner.scan(chunks())).clean
+
+    # API nội bộ: APISIX không có route tới đây; chỉ client trong MOC_SERVICE_CLIENTS (svc-workflow) gọi được.
+    @app.post("/internal/issue", status_code=201, response_model=IssueOut, include_in_schema=False)
+    async def issue_document(
+        body: IssueIn,
+        request: Request,
+        caller: Annotated[str, Depends(service_caller)],
+    ) -> IssueOut:
+        rid = request.state.request_id
+        try:
+            row = await hasura.letter(tenant_id=body.tenant_id, actor_id=body.actor_id, request_id=rid,
+                                      document_id=body.document_id)
+        except HasuraError as exc:
+            log_event("office.document.render_failed", request, document_id=body.document_id, error=str(exc))
+            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
+        if row is None:
+            raise _error(404, "not_found", "Không có văn bản đi này trong đơn vị")
+        if row["status"] != "approved" or not row["symbol"] or not row["verify_code"]:
+            raise _error(409, "not_numbered", "Văn bản chưa được duyệt và cấp số")
+
+        pdf = await asyncio.to_thread(render_pdf, letter_from(row, verify_base=f"{settings.public_url}/xac-thuc"))
+        digest = hashlib.sha256(pdf).hexdigest()
+        # Tệp do hệ thống dựng vẫn qua trạm kiểm dịch như mọi tệp: core.files chỉ có tệp đã quét
+        try:
+            clean = await _scan_bytes(pdf)
+        except ScanError as exc:
+            raise _error(503, "scanner_unavailable", "Trạm quét mã độc chưa sẵn sàng") from exc
+        scanned_at = datetime.now(UTC)
+        if not clean:
+            log_event("office.document.render_rejected", request, document_id=body.document_id)
+            raise _error(500, "render_rejected", "Bản PDF dựng ra bị trạm quét chặn")
+
+        file_id = uuid.uuid4()
+        key = object_key(body.tenant_id, file_id, scanned_at)
+        try:
+            await asyncio.to_thread(store.put, key, io.BytesIO(pdf), size=len(pdf), content_type="application/pdf",
+                                    sha256_hex=digest)
+        except StorageError as exc:
+            raise _error(503, "storage_unavailable", "Kho lưu tệp chưa sẵn sàng") from exc
+        try:
+            await hasura.insert_file(
+                tenant_id=body.tenant_id, actor_id=body.actor_id, request_id=rid, file_id=file_id, object_key=key,
+                filename=row["symbol"].replace("/", "-") + ".pdf", mime_type="application/pdf",
+                size_bytes=len(pdf), sha256_hex=digest, scanned_at=scanned_at,
+            )
+        except HasuraError as exc:
+            await discard(request, key)
+            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng, chưa lưu bản phát hành") from exc
+        log_event("office.document.rendered", request, tenant_id=body.tenant_id, actor_id=body.actor_id,
+                  document_id=body.document_id, file_id=file_id, size_bytes=len(pdf), caller=caller)
+        return IssueOut(file_id=file_id, sha256=digest, size_bytes=len(pdf))
+
+    @app.get(
+        "/api/documents/{document_id}/preview",
+        response_class=Response,
+        summary="Xem trước văn bản đi dưới dạng PDF đúng thể thức, chưa có số và mã xác thực",
+        responses={
+            200: {"content": {"application/pdf": {}}, "description": "Bản PDF in chữ DỰ THẢO"},
+            401: {"description": "Thiếu hoặc sai token"},
+            404: {"description": "Không có văn bản đi, hoặc người gọi không được đọc — hai trường hợp trả như nhau"},
+            409: {"description": "Văn bản đã phát hành: tải bản phát hành thay vì xem trước"},
+            503: {"description": "CSDL không sẵn sàng"},
+        },
+    )
+    async def preview_document(
+        document_id: uuid.UUID,
+        request: Request,
+        principal: Annotated[Principal, Depends(current_principal)],
+    ) -> Response:
+        try:
+            row = await hasura.visible_letter(principal.token, principal.tenant_id, document_id)
+        except HasuraAuthError as exc:
+            raise HTTPException(
+                401, {"code": "invalid_token", "message": "Token không hợp lệ hoặc đã hết hạn"},
+                {"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except HasuraError as exc:
+            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
+        if row is None:
+            raise _error(404, "not_found", "Không có văn bản này, hoặc bạn không có quyền xem")
+        if row["status"] in ("issued", "archived"):
+            raise _error(409, "issued", "Văn bản đã phát hành, hãy tải bản phát hành")
+        pdf = await asyncio.to_thread(render_pdf, letter_from(row, draft=True))
+        log_event("office.document.previewed", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
+                  document_id=document_id)
+        return Response(pdf, media_type="application/pdf", headers={
+            **DOWNLOAD_HEADERS, **NO_STORE,
+            "Content-Disposition": content_disposition(f"du-thao-{document_id}.pdf"),
+        })
+
+    # --- cổng xác thực (không cần đăng nhập; APISIX giới hạn tốc độ theo IP) ------------------------------
+
+    async def _verify(request: Request, method: str, **lookup: str) -> JSONResponse:
+        try:
+            row = await hasura.verify(**lookup)
+        except HasuraError as exc:
+            log_event("core.verify.failed", request, error=str(exc))
+            raise _error(503, "database_unavailable", "Chưa tra cứu được, thử lại sau") from exc
+        log_event("core.verify", request, method=method, result="valid" if row else "not_found")
+        if row is None:
+            out = VerifyOut(result="not_found")
+        else:
+            out = VerifyOut(result="valid", document=VerifiedDocument(
+                symbol=row["symbol"], issued_on=row["issued_on"], type_name=row["type_name"],
+                issuer_name=row["issuer_name"], parent_name=row["parent_name"], summary=row["summary"],
+                sha256=row["content_sha256"], verify_code=row["verify_code"], status=row["status"],
+            ))
+        return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
+
+    verify_responses = {
+        200: {"model": VerifyOut, "description": "valid: văn bản đã phát hành; not_found: không có văn bản nào khớp"},
+        429: {"description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"},
+        503: {"description": "CSDL không sẵn sàng"},
+    }
+
+    @app.get("/api/verify/{code}", response_model=VerifyOut, responses=verify_responses,
+             summary="Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)")
+    async def verify_by_code(code: Annotated[str, Path(max_length=40)], request: Request) -> JSONResponse:
+        # nhận cả dạng có dấu gạch, khoảng trắng, chữ thường: ABCDE-23456, abcde 23456
+        normalized = VERIFY_CODE_RE.sub("", code.upper())
+        if len(normalized) != 10:
+            log_event("core.verify", request, method="code", result="malformed")
+            return JSONResponse(VerifyOut(result="not_found").model_dump(mode="json"), headers=NO_STORE)
+        return await _verify(request, "code", code=normalized)
+
+    @app.get("/api/verify", response_model=VerifyOut, responses=verify_responses,
+             summary="Tra văn bản đã phát hành theo SHA-256 của tệp PDF (trình duyệt tự tính, không tải tệp lên)")
+    async def verify_by_hash(
+        request: Request,
+        sha256: Annotated[str, Query(pattern=r"^[0-9a-fA-F]{64}$", description="SHA-256 của tệp, 64 ký tự hex")],
+    ) -> JSONResponse:
+        return await _verify(request, "sha256", sha256_hex=sha256.lower())
 
     return app

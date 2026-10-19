@@ -25,6 +25,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Dựng PDF văn bản đi bằng WeasyPrint: Pango dàn chữ, HarfBuzz nhúng phông vào PDF. Phông Liberation Serif
+# (SIL OFL 1.1) có cùng số đo với Times New Roman mà NĐ 30/2020 quy định, đủ dấu tiếng Việt.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+
 # Thư viện cài từ PyPI theo tệp khóa có băm; không chép thư viện vào repo (PoF #5).
 COPY requirements.txt ./
 RUN pip install --require-hashes -r requirements.txt

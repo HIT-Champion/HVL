@@ -19,7 +19,9 @@
     "receive": "Receive document",
     "search": "Search",
     "logout": "Sign out",
-    "language": "Tiếng Việt"
+    "language": "Tiếng Việt",
+    "outgoing": "Outgoing",
+    "compose": "Draft a document"
   },
   "role": {
     "clerk": "Clerk",
@@ -52,6 +54,12 @@
       "chiDao": "Give direction",
       "phanCong": "Assign within department",
       "xuLy": "Handle document"
+    },
+    "vbdi": {
+      "duyetPhong": "Review draft (department)",
+      "duyetDonVi": "Approve and sign",
+      "chinhSua": "Revise draft",
+      "phatHanh": "Number and issue"
     }
   },
   "event": {
@@ -62,9 +70,17 @@
         "directed": "Directed",
         "assigned": "Assigned to {name}",
         "processed": "Reported result",
-        "filed": "Filed without action"
+        "filed": "Filed without action",
+        "submitted": "Submitted for review",
+        "resubmitted": "Resubmitted after revision",
+        "reviewed": "Approved by department head",
+        "returned": "Returned for revision",
+        "approved": "Approved and signed",
+        "numbered": "Numbered {symbol}",
+        "issued": "Issued"
       }
-    }
+    },
+    "drafted": "Draft created"
   },
   "inbox": {
     "title": "My tasks",
@@ -139,7 +155,31 @@
     "notFound": "Document not found, or you are not allowed to see it.",
     "restricted": "Restricted",
     "assignmentDone": "Done",
-    "assignmentOpen": "In progress"
+    "assignmentOpen": "In progress",
+    "draft": "Draft",
+    "body": "Body",
+    "recipients": "Recipients",
+    "department": "Drafting unit",
+    "signer": "Signer",
+    "replyTo": "In reply to",
+    "createdBy": "Drafted by",
+    "preview": "Download preview (PDF)",
+    "edit": "Edit draft",
+    "submit": "Submit for signing",
+    "resubmit": "Resubmit",
+    "submitTitle": "Submit draft",
+    "submitHint": "The department head reviews first, then the signer. If returned, the draft comes back to you.",
+    "returnedHint": "Draft returned: {note}",
+    "signerPick": "Signing director",
+    "submitted": "Submitted. Waiting for the department head.",
+    "verifyCode": "Verification code",
+    "verifyOpen": "Open verification page",
+    "fileRole": {
+      "main": "Document",
+      "attachment": "Attachment",
+      "draft": "Draft",
+      "issued": "Issued copy"
+    }
   },
   "form": {
     "chiDao": {
@@ -169,7 +209,22 @@
       "done": "Report done"
     },
     "pick": "— Choose —",
-    "done": "Moved to the next step."
+    "done": "Moved to the next step.",
+    "duyet": {
+      "note": "Comment",
+      "approve": "Approve, send to signer",
+      "sign": "Approve and sign",
+      "return": "Return",
+      "returnNote": "Say why it is returned and what to change",
+      "preview": "Read the PDF before approving"
+    },
+    "phatHanh": {
+      "public": "Show the subject on the public verification page",
+      "publicHint": "If unchecked, only the number, date and issuer are shown.",
+      "issue": "Number and issue",
+      "confirm": "Assign the next outgoing number and issue this document? Numbers are sequential per year and cannot be taken back.",
+      "issued": "Issued."
+    }
   },
   "search": {
     "title": "Search documents",
@@ -193,12 +248,76 @@
     "infected": "The file contains malware and was blocked.",
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
-    "noRole": "Your account has no role or unit yet. Contact your unit administrator."
+    "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
+    "documents_body_length": "The body is longer than 20,000 characters."
   },
   "validation": {
     "required": "Required",
     "summaryLength": "10–500 characters",
     "dateFuture": "Cannot be in the future",
     "dueBefore": "Must be today or later"
+  },
+  "outgoing": {
+    "title": "Outgoing documents",
+    "compose": "Draft a document",
+    "empty": "No outgoing documents yet.",
+    "tab": {
+      "drafts": "Drafts",
+      "review": "In review",
+      "issued": "Issued",
+      "all": "All"
+    },
+    "symbol": "Number",
+    "summary": "Subject",
+    "department": "Drafting unit",
+    "status": "Status",
+    "issuedOn": "Issued on",
+    "unnumbered": "Not numbered"
+  },
+  "compose": {
+    "title": "Draft an outgoing document",
+    "editTitle": "Edit draft",
+    "subtitle": "The text is typeset as a PDF following Decree 30/2020; the clerk assigns the number and date when issuing.",
+    "type": "Document type",
+    "summary": "Subject",
+    "summaryHint": "10–500 characters",
+    "body": "Body",
+    "bodyHint": "Each line is a paragraph",
+    "recipients": "Recipients",
+    "recipientsHint": "One recipient per line",
+    "urgency": "Urgency",
+    "replyTo": "In reply to",
+    "replyNone": "— None —",
+    "attachments": "Attachments",
+    "attachmentsHint": "Annexes or tables (optional); files are virus-scanned before they are stored",
+    "save": "Save draft",
+    "saved": "Draft saved.",
+    "notEditable": "This draft can no longer be edited: it was submitted, or you are not its author."
+  },
+  "verify": {
+    "title": "Verify a document",
+    "subtitle": "Check that a document issued through Mộc is genuine and unaltered.",
+    "code": "Verification code",
+    "codeHint": "10 characters printed next to the QR code, e.g. ABCDE-23456",
+    "lookup": "Look up",
+    "file": "Or drop the PDF you received here",
+    "fileHint": "The file never leaves your computer: your browser computes its SHA-256 and only the hash is sent.",
+    "checking": "Checking…",
+    "valid": "Genuine document, issued by the organisation below",
+    "notFound": "No matching document",
+    "notFoundHint": "Check the code. When checking a file: it was altered, or it was not issued through Mộc.",
+    "match": "The file matches the issued copy byte for byte",
+    "mismatch": "The file does NOT match the document with this code: it may have been altered",
+    "compare": "Drop the PDF you received to compare it with the original",
+    "symbol": "Number",
+    "issuedOn": "Issued on",
+    "issuer": "Issuer",
+    "type": "Type",
+    "summary": "Subject",
+    "summaryHidden": "Not public",
+    "sha256": "SHA-256 of the issued copy",
+    "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
+    "rateLimited": "Too many lookups. Wait a minute and try again.",
+    "footer": "Mộc — open-source e-office. No login required on this page."
   }
 }

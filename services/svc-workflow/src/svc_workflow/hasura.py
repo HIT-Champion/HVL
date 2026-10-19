@@ -152,6 +152,20 @@ query User($id: String!) {
   core_users_by_pk(id: $id) { id department_id role enabled }
 }"""
 
+# Văn bản đi: đủ trường để kiểm trước khi trình, duyệt, phát hành
+OUTGOING = """
+query Outgoing($id: uuid!) {
+  office_documents_by_pk(id: $id) {
+    id direction status created_by department_id signer_id process_id urgency summary body recipients
+    register_number symbol verify_code
+  }
+}"""
+
+NUMBER_OUTGOING = """
+mutation NumberOutgoing($id: uuid!, $code: String!) {
+  office_number_outgoing(args: {document_id: $id, verify_code: $code}) { id register_number symbol verify_code }
+}"""
+
 TASK_DONE = """
 query TaskDone($doc: uuid!, $task: jsonb!) {
   office_document_events(where: {document_id: {_eq: $doc}, data: {_contains: $task}}, limit: 1) { id }

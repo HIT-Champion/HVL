@@ -21,7 +21,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import DOC, TENANT
+from conftest import DOC, OUT, TENANT
 from svc_workflow.app import create_app
 from svc_workflow.config import ConfigError, Settings
 
@@ -63,6 +63,13 @@ def test_register_incoming_is_for_clerks_only(client):
     r = call(client, "registerIncoming", "clerk", {"documentId": DOC})
     assert r.status_code == 200 and r.json()["register_number"] == 7
 
+
+def test_submit_outgoing_is_for_staff_only(client):
+    r = call(client, "submitOutgoing", "clerk", {"documentId": OUT, "signerId": "u-director"})
+    assert r.status_code == 403 and r.json()["extensions"]["code"] == "forbidden"
+    # chuyên viên được gọi; người trong phiên không phải người soạn nên bị từ chối ở bước nghiệp vụ
+    r = call(client, "submitOutgoing", "staff", {"documentId": OUT, "signerId": "u-director"})
+    assert r.status_code == 403 and r.json()["extensions"]["code"] == "not_your_document"
 
 def test_errors_use_hasura_action_format(client):
     r = call(client, "completeTask", "staff", {"taskId": "khong-co", "outcome": "done", "data": {}})

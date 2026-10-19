@@ -38,6 +38,7 @@ from fastapi.responses import JSONResponse
 from . import __version__
 from .config import Settings
 from .directory import Directory
+from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
 from .hasura import Actor, HasuraClient
 from .workflow import Workflow, WorkflowError
@@ -138,6 +139,7 @@ def create_app(
     hasura: HasuraClient | None = None,
     flowable: FlowableClient | None = None,
     directory: Directory | None = None,
+    files: FilesClient | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env()
@@ -146,7 +148,9 @@ def create_app(
     flowable = flowable or FlowableClient(settings.flowable_url, settings.flowable_user, settings.flowable_password)
     directory = directory or Directory(settings.keycloak_url, settings.realm, settings.directory_client_id,
                                        settings.directory_client_secret, hasura)
-    workflow = Workflow(hasura, flowable, sla_duration=settings.sla_duration)
+    files = files or FilesClient(settings.files_url, ServiceToken(
+        settings.keycloak_url, settings.realm, settings.directory_client_id, settings.directory_client_secret))
+    workflow = Workflow(hasura, flowable, files, sla_duration=settings.sla_duration)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -163,6 +167,7 @@ def create_app(
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             await directory.aclose()
+            await files.aclose()
             await flowable.aclose()
             await hasura.aclose()
 
@@ -186,7 +191,7 @@ def create_app(
         ok = all(checks.values())
         return JSONResponse({"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503)
 
-    @app.post("/actions/{name}", summary="Chạy một Hasura Action: registerIncoming, myTasks, completeTask",
+    @app.post("/actions/{name}", summary="Chạy một Hasura Action: registerIncoming, submitOutgoing, myTasks, completeTask",
               openapi_extra=ACTION_DOC)
     async def action(name: str, request: Request) -> JSONResponse:
         given = request.headers.get("x-moc-action-secret", "")
@@ -206,6 +211,10 @@ def create_app(
         try:
             if name == "registerIncoming" and actor.role == "clerk":
                 result: Any = await workflow.register_incoming(actor, str(payload.get("documentId", "")))
+            elif name == "submitOutgoing" and actor.role == "staff":
+                result = await workflow.submit_outgoing(
+                    actor, str(payload.get("documentId", "")), str(payload.get("signerId", "")),
+                )
             elif name == "myTasks":
                 result = await workflow.my_tasks(actor)
             elif name == "completeTask":

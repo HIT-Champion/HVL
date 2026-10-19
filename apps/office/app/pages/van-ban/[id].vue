@@ -20,8 +20,9 @@
 import { useI18n } from 'vue-i18n'
 import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
 
-// Chi tiết văn bản: thông tin, tệp, giao xử lý, dòng thời gian (F2.6) và khung xử lý việc đang chờ người
-// dùng. Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
+// Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6) và khung xử lý việc đang
+// chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
+// Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
 
 interface Doc {
   id: string
@@ -40,6 +41,12 @@ interface Doc {
   due_on: string | null
   created_by: string
   created_at: string
+  body: string | null
+  recipients: string[]
+  signer_id: string | null
+  verify_code: string | null
+  department: { name: string } | null
+  reply_to: { id: string; symbol: string | null; summary: string } | null
   files: { role: string; file: { id: string; filename: string; mime_type: string; size_bytes: number } | null }[]
   assignments: {
     id: string; parent_id: string | null; role: string; department: { name: string } | null; user_id: string | null
@@ -50,7 +57,7 @@ interface Doc {
 }
 
 const { t } = useI18n()
-const { gql, download } = useApi()
+const { gql, download, preview } = useApi()
 const notice = useNotice()
 const claims = useAuth().claims
 const route = useRoute()
@@ -62,6 +69,8 @@ const task = ref<{ id: string; form_key: string } | null>(null)
 const loading = ref(true)
 const missing = ref(false)
 const registering = ref(false)
+const submitting = ref(false)
+const signer = ref('')
 
 const id = computed(() => String(route.params.id))
 const nameOf = (uid: string | null) => users.value.find((u) => u.id === uid)?.full_name ?? (uid ? uid.slice(0, 8) : '')
@@ -73,7 +82,8 @@ async function load() {
       query ($id: uuid!) {
         office_documents_by_pk(id: $id) {
           id direction status type_code document_type { name } symbol issuer_name issued_on summary urgency restricted
-          register_number registered_at due_on created_by created_at
+          register_number registered_at due_on created_by created_at body recipients signer_id verify_code
+          department { name } reply_to { id symbol summary }
           files(order_by: {added_at: asc}) { role file { id filename mime_type size_bytes } }
           assignments(order_by: {assigned_at: asc}) {
             id parent_id role department { name } user_id instruction due_on status result_note assigned_by assigned_at completed_at
@@ -88,7 +98,9 @@ async function load() {
     missing.value = !doc.value
     users.value = data.core_users
     departments.value = data.office_departments
-    task.value = data.myTasks.find((x) => x.document_id === id.value) ?? null
+    // bước "sửa dự thảo" làm bằng nút Trình lại ở dưới, không hiện khung xử lý riêng
+    task.value = data.myTasks.find((x) => x.document_id === id.value && x.form_key !== 'vbdi.chinhSua') ?? null
+    signer.value = doc.value?.signer_id ?? directors.value[0]?.id ?? ''
   } catch (e) {
     notice.error(errorText(t, e))
   } finally {
@@ -112,16 +124,47 @@ async function register() {
   }
 }
 
-// Dòng thời gian: bước tiếp nhận lấy từ chính văn bản, các bước sau từ office.document_events
+const outgoing = computed(() => doc.value?.direction === 'out')
+const directors = computed(() => users.value.filter((u) => u.role === 'director'))
+// Người soạn sửa, trình được khi dự thảo còn ở bước đầu hoặc bị trả lại
+const canEdit = computed(() => outgoing.value && claims.value?.role === 'staff' && doc.value?.created_by === claims.value?.userId
+  && ['draft', 'returned'].includes(doc.value?.status ?? ''))
+const lastReturn = computed(() => [...(doc.value?.events ?? [])].reverse().find((e) => e.kind === 'office.document.returned')?.note ?? '')
+const issuedFile = computed(() => doc.value?.files.find((f) => f.role === 'issued')?.file ?? null)
+const verifyCode = computed(() => (doc.value?.verify_code ? `${doc.value.verify_code.slice(0, 5)}-${doc.value.verify_code.slice(5)}` : ''))
+
+async function submit() {
+  if (!signer.value) return
+  submitting.value = true
+  try {
+    await gql('mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }',
+      { d: id.value, s: signer.value })
+    notice.ok(t('doc.submitted'))
+    await load()
+  } catch (e) {
+    notice.error(errorText(t, e))
+  } finally {
+    submitting.value = false
+  }
+}
+
+function showPreview() {
+  preview(id.value).catch((e) => notice.error(errorText(t, e)))
+}
+
+// Dòng thời gian: bước đầu (tiếp nhận / tạo dự thảo) lấy từ chính văn bản, các bước sau từ office.document_events
 const timeline = computed(() => {
   if (!doc.value) return []
-  const items = [{ key: 'received', title: t('event.received'), who: nameOf(doc.value.created_by), at: doc.value.created_at, note: null as string | null }]
+  const first = outgoing.value ? t('event.drafted') : t('event.received')
+  const items = [{ key: 'first', title: first, who: nameOf(doc.value.created_by), at: doc.value.created_at, note: null as string | null }]
   for (const e of doc.value.events) {
     const title = e.kind === 'office.document.registered'
       ? t('event.office.document.registered', { n: e.data.register_number })
       : e.kind === 'office.document.assigned'
         ? t('event.office.document.assigned', { name: nameOf(e.data.user_id) })
-        : t(`event.${e.kind}`)
+        : e.kind === 'office.document.numbered'
+          ? t('event.office.document.numbered', { symbol: e.data.symbol })
+          : t(`event.${e.kind}`)
     let note = e.note
     if (e.kind === 'office.document.directed') {
       const lead = e.data.lead_department_id
@@ -149,7 +192,7 @@ onMounted(load)
 
 <template>
   <div>
-    <NuxtLink to="/van-ban-den" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
+    <NuxtLink :to="outgoing ? '/van-ban-di' : '/van-ban-den'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
 
     <p v-if="loading && !doc" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="missing" class="card p-8 text-center text-stone-500">{{ t('doc.notFound') }}</p>
@@ -165,23 +208,88 @@ onMounted(load)
             <span class="text-sm text-stone-500">{{ doc.document_type?.name }}</span>
           </div>
           <h1 class="text-xl font-semibold text-stone-900">{{ doc.summary }}</h1>
-          <p class="mt-1 text-sm text-stone-500">{{ doc.symbol }} · {{ doc.issuer_name }} · {{ fmtDate(doc.issued_on) }}</p>
+          <p v-if="outgoing" class="mt-1 text-sm text-stone-500">
+            {{ doc.symbol ?? t('doc.draft') }} · {{ doc.department?.name }}<span v-if="doc.issued_on"> · {{ fmtDate(doc.issued_on) }}</span>
+          </p>
+          <p v-else class="mt-1 text-sm text-stone-500">{{ doc.symbol }} · {{ doc.issuer_name }} · {{ fmtDate(doc.issued_on) }}</p>
         </div>
-        <button v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering" @click="register">
-          {{ t('doc.register') }}
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <button v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering" @click="register">
+            {{ t('doc.register') }}
+          </button>
+          <NuxtLink v-if="canEdit" :to="`/van-ban-di/soan?id=${doc.id}`" class="btn-secondary">{{ t('doc.edit') }}</NuxtLink>
+          <button v-if="outgoing && !issuedFile" class="btn-secondary" @click="showPreview">{{ t('doc.preview') }}</button>
+          <button v-if="issuedFile" class="btn-primary" @click="download(issuedFile.id, issuedFile.filename).catch((e) => notice.error(errorText(t, e)))">
+            {{ t('doc.download') }} {{ t('doc.fileRole.issued').toLowerCase() }}
+          </button>
+        </div>
       </div>
 
       <div class="grid gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-2">
           <TaskPanel
             v-if="task" :key="task.id" :task-id="task.id" :form-key="task.form_key" :document-due="doc.due_on"
-            :users="users" :departments="departments" :my-department="claims?.departmentId ?? null" :my-id="claims?.userId ?? ''"
-            @done="load"
+            :document-id="doc.id" :users="users" :departments="departments" :my-department="claims?.departmentId ?? null"
+            :my-id="claims?.userId ?? ''" @done="load"
           />
 
+          <!-- trình dự thảo: lần đầu, hoặc trình lại sau khi bị trả lại -->
+          <section v-if="canEdit" class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
+            <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
+              <h2 class="text-sm font-semibold text-brand-900">{{ t('doc.submitTitle') }}</h2>
+            </div>
+            <form class="space-y-4 p-5" @submit.prevent="submit">
+              <p v-if="doc.status === 'returned' && lastReturn" class="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                {{ t('doc.returnedHint', { note: lastReturn }) }}
+              </p>
+              <p class="text-sm text-stone-600">{{ t('doc.submitHint') }}</p>
+              <div class="max-w-sm">
+                <label class="label" for="signer">{{ t('doc.signerPick') }}</label>
+                <select id="signer" v-model="signer" class="input">
+                  <option v-for="u in directors" :key="u.id" :value="u.id">{{ u.full_name }}</option>
+                </select>
+              </div>
+              <div class="flex justify-end border-t border-stone-100 pt-4">
+                <button type="submit" class="btn-primary" :disabled="submitting || !signer">
+                  {{ doc.status === 'returned' ? t('doc.resubmit') : t('doc.submit') }}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- mã xác thực của văn bản đã phát hành -->
+          <section v-if="outgoing && doc.verify_code && issuedFile" class="card flex flex-wrap items-center justify-between gap-3 p-5">
+            <div>
+              <div class="text-sm text-stone-500">{{ t('doc.verifyCode') }}</div>
+              <div class="font-mono text-lg font-semibold tracking-wider text-stone-900" data-testid="verify-code">{{ verifyCode }}</div>
+            </div>
+            <a :href="`/xac-thuc/${doc.verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} ↗</a>
+          </section>
+
+          <!-- nội dung văn bản đi -->
+          <section v-if="outgoing" class="card p-5">
+            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.body') }}</h2>
+            <div class="space-y-2 font-serif text-[15px] leading-relaxed whitespace-pre-line text-stone-800">{{ doc.body }}</div>
+          </section>
+
           <!-- thông tin -->
-          <section class="card p-5">
+          <section v-if="outgoing" class="card p-5">
+            <h2 class="mb-4 text-sm font-semibold text-stone-800">{{ t('doc.info') }}</h2>
+            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              <div><dt class="text-stone-500">{{ t('doc.symbol') }}</dt><dd class="font-medium">{{ doc.symbol ?? '—' }}</dd></div>
+              <div><dt class="text-stone-500">{{ t('doc.issuedOn') }}</dt><dd class="font-medium">{{ fmtDate(doc.issued_on) }}</dd></div>
+              <div><dt class="text-stone-500">{{ t('doc.department') }}</dt><dd class="font-medium">{{ doc.department?.name ?? '—' }}</dd></div>
+              <div><dt class="text-stone-500">{{ t('doc.createdBy') }}</dt><dd class="font-medium">{{ nameOf(doc.created_by) }}</dd></div>
+              <div><dt class="text-stone-500">{{ t('doc.signer') }}</dt><dd class="font-medium">{{ doc.signer_id ? nameOf(doc.signer_id) : '—' }}</dd></div>
+              <div><dt class="text-stone-500">{{ t('doc.urgency') }}</dt><dd class="font-medium">{{ t(`urgency.${doc.urgency}`) }}</dd></div>
+              <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('doc.recipients') }}</dt><dd class="font-medium">{{ doc.recipients.join('; ') || '—' }}</dd></div>
+              <div v-if="doc.reply_to" class="sm:col-span-2">
+                <dt class="text-stone-500">{{ t('doc.replyTo') }}</dt>
+                <dd><NuxtLink :to="`/van-ban/${doc.reply_to.id}`" class="font-medium text-brand-800 hover:underline">{{ doc.reply_to.symbol }} — {{ doc.reply_to.summary }}</NuxtLink></dd>
+              </div>
+            </dl>
+          </section>
+          <section v-else class="card p-5">
             <h2 class="mb-4 text-sm font-semibold text-stone-800">{{ t('doc.info') }}</h2>
             <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div><dt class="text-stone-500">{{ t('doc.symbol') }}</dt><dd class="font-medium">{{ doc.symbol ?? '—' }}</dd></div>
@@ -202,6 +310,7 @@ onMounted(load)
               <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id" class="flex items-center gap-3 py-2 text-sm">
                 <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5" /></svg>
                 <span class="min-w-0 flex-1 truncate">{{ f.file!.filename }}</span>
+                <span class="chip bg-stone-100 text-stone-600">{{ t(`doc.fileRole.${f.role}`) }}</span>
                 <span class="text-xs text-stone-500">{{ fmtSize(f.file!.size_bytes) }}</span>
                 <button class="btn-ghost text-brand-800" @click="download(f.file!.id, f.file!.filename).catch((e) => notice.error(errorText(t, e)))">{{ t('doc.download') }}</button>
               </li>

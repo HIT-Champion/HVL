@@ -293,6 +293,153 @@
           }
         }
       }
+    },
+    "/api/documents/{document_id}/preview": {
+      "get": {
+        "summary": "Xem trước văn bản đi dưới dạng PDF đúng thể thức, chưa có số và mã xác thực",
+        "operationId": "preview_document_api_documents__document_id__preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bản PDF in chữ DỰ THẢO",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Không có văn bản đi, hoặc người gọi không được đọc — hai trường hợp trả như nhau"
+          },
+          "409": {
+            "description": "Văn bản đã phát hành: tải bản phát hành thay vì xem trước"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify/{code}": {
+      "get": {
+        "summary": "Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)",
+        "operationId": "verify_by_code_api_verify__code__get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "valid: văn bản đã phát hành; not_found: không có văn bản nào khớp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify": {
+      "get": {
+        "summary": "Tra văn bản đã phát hành theo SHA-256 của tệp PDF (trình duyệt tự tính, không tải tệp lên)",
+        "operationId": "verify_by_hash_api_verify_get",
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{64}$",
+              "description": "SHA-256 của tệp, 64 ký tự hex",
+              "title": "Sha256"
+            },
+            "description": "SHA-256 của tệp, 64 ký tự hex"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "valid: văn bản đã phát hành; not_found: không có văn bản nào khớp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -554,6 +701,105 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerifiedDocument": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "issued_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Issued On"
+          },
+          "type_name": {
+            "type": "string",
+            "title": "Type Name"
+          },
+          "issuer_name": {
+            "type": "string",
+            "title": "Issuer Name"
+          },
+          "parent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Name"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "verify_code": {
+            "type": "string",
+            "title": "Verify Code"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "issued",
+              "archived"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "issued_on",
+          "type_name",
+          "issuer_name",
+          "parent_name",
+          "summary",
+          "sha256",
+          "verify_code",
+          "status"
+        ],
+        "title": "VerifiedDocument"
+      },
+      "VerifyOut": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "not_found"
+            ],
+            "title": "Result"
+          },
+          "document": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifiedDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "result"
+        ],
+        "title": "VerifyOut"
       }
     },
     "securitySchemes": {

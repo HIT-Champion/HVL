@@ -106,6 +106,12 @@ input String_comparison_exp {
   _similar: String
 }
 
+type SubmitOutgoingOutput {
+  document: office_documents
+  document_id: uuid!
+  status: String!
+}
+
 type WorkTask {
   created_at: timestamptz!
   document: office_documents
@@ -256,9 +262,12 @@ input core_files_stream_cursor_value_input {
 "columns and relationships of \"core.tenants\""
 type core_tenants {
   code: String!
+  head_title: String
   id: uuid!
   name: String!
   org_ident: String
+  parent_name: String
+  place_name: String
 }
 
 "Boolean expression to filter rows from the table \"core.tenants\". All fields are combined with a logical 'AND'."
@@ -267,17 +276,23 @@ input core_tenants_bool_exp {
   _not: core_tenants_bool_exp
   _or: [core_tenants_bool_exp!]
   code: String_comparison_exp
+  head_title: String_comparison_exp
   id: uuid_comparison_exp
   name: String_comparison_exp
   org_ident: String_comparison_exp
+  parent_name: String_comparison_exp
+  place_name: String_comparison_exp
 }
 
 "Ordering options when selecting data from \"core.tenants\"."
 input core_tenants_order_by {
   code: order_by
+  head_title: order_by
   id: order_by
   name: order_by
   org_ident: order_by
+  parent_name: order_by
+  place_name: order_by
 }
 
 "select columns of table \"core.tenants\""
@@ -285,11 +300,17 @@ enum core_tenants_select_column {
   "column name"
   code
   "column name"
+  head_title
+  "column name"
   id
   "column name"
   name
   "column name"
   org_ident
+  "column name"
+  parent_name
+  "column name"
+  place_name
 }
 
 "Streaming cursor of the table \"core_tenants\""
@@ -303,9 +324,12 @@ input core_tenants_stream_cursor_input {
 "Initial value of the column from where the streaming should start"
 input core_tenants_stream_cursor_value_input {
   code: String
+  head_title: String
   id: uuid
   name: String
   org_ident: String
+  parent_name: String
+  place_name: String
 }
 
 "columns and relationships of \"core.users\""
@@ -476,6 +500,7 @@ type mutation_root {
     "upsert condition"
     on_conflict: office_documents_on_conflict
   ): office_documents
+  submitOutgoing(documentId: uuid!, signerId: String!): SubmitOutgoingOutput
   "update data of the table: \"office.documents\""
   update_office_documents(
     "sets the columns of the filtered rows to the given values"
@@ -1143,9 +1168,12 @@ type office_documents {
     "filter the rows returned"
     where: office_assignments_bool_exp
   ): [office_assignments!]!
+  body: String
   content_sha256: bytea
   created_at: timestamptz!
   created_by: String!
+  "An object relationship"
+  creator: core_users
   "An object relationship"
   department: office_departments
   department_id: uuid
@@ -1192,6 +1220,8 @@ type office_documents {
   reply_to: office_documents
   reply_to_id: uuid
   restricted: Boolean!
+  "An object relationship"
+  signer: core_users
   signer_id: String
   "An object relationship"
   source: office_documents
@@ -1238,9 +1268,11 @@ input office_documents_bool_exp {
   _not: office_documents_bool_exp
   _or: [office_documents_bool_exp!]
   assignments: office_assignments_bool_exp
+  body: String_comparison_exp
   content_sha256: bytea_comparison_exp
   created_at: timestamptz_comparison_exp
   created_by: String_comparison_exp
+  creator: core_users_bool_exp
   department: office_departments_bool_exp
   department_id: uuid_comparison_exp
   direction: String_comparison_exp
@@ -1260,6 +1292,7 @@ input office_documents_bool_exp {
   reply_to: office_documents_bool_exp
   reply_to_id: uuid_comparison_exp
   restricted: Boolean_comparison_exp
+  signer: core_users_bool_exp
   signer_id: String_comparison_exp
   source: office_documents_bool_exp
   source_id: uuid_comparison_exp
@@ -1293,6 +1326,7 @@ enum office_documents_constraint {
 
 "input type for inserting data into table \"office.documents\""
 input office_documents_insert_input {
+  body: String
   files: office_document_files_arr_rel_insert_input
   recipients: [String!]
   reply_to: office_documents_obj_rel_insert_input
@@ -1306,6 +1340,7 @@ input office_documents_insert_input {
 
 "aggregate max on columns"
 type office_documents_max_fields {
+  body: String
   created_at: timestamptz
   created_by: String
   department_id: uuid
@@ -1334,6 +1369,7 @@ type office_documents_max_fields {
 
 "aggregate min on columns"
 type office_documents_min_fields {
+  body: String
   created_at: timestamptz
   created_by: String
   department_id: uuid
@@ -1385,9 +1421,11 @@ input office_documents_on_conflict {
 "Ordering options when selecting data from \"office.documents\"."
 input office_documents_order_by {
   assignments_aggregate: office_assignments_aggregate_order_by
+  body: order_by
   content_sha256: order_by
   created_at: order_by
   created_by: order_by
+  creator: core_users_order_by
   department: office_departments_order_by
   department_id: order_by
   direction: order_by
@@ -1407,6 +1445,7 @@ input office_documents_order_by {
   reply_to: office_documents_order_by
   reply_to_id: order_by
   restricted: order_by
+  signer: core_users_order_by
   signer_id: order_by
   source: office_documents_order_by
   source_id: order_by
@@ -1427,6 +1466,8 @@ input office_documents_pk_columns_input {
 
 "select columns of table \"office.documents\""
 enum office_documents_select_column {
+  "column name"
+  body
   "column name"
   content_sha256
   "column name"
@@ -1485,6 +1526,7 @@ enum office_documents_select_column {
 
 "input type for updating data in table \"office.documents\""
 input office_documents_set_input {
+  body: String
   recipients: [String!]
   reply_to_id: uuid
   restricted: Boolean
@@ -1518,6 +1560,7 @@ input office_documents_stream_cursor_input {
 
 "Initial value of the column from where the streaming should start"
 input office_documents_stream_cursor_value_input {
+  body: String
   content_sha256: bytea
   created_at: timestamptz
   created_by: String
@@ -1554,6 +1597,8 @@ type office_documents_sum_fields {
 
 "update columns of table \"office.documents\""
 enum office_documents_update_column {
+  "column name"
+  body
   "column name"
   recipients
   "column name"

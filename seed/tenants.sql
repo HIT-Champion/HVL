@@ -19,10 +19,12 @@
 begin;
 set local moc.actor = 'seed';
 
-insert into core.tenants (id, code, name) values
-  ('c300d5bb-028f-44cc-ba10-7b5277a4225d', 'CNTT', 'Khoa Công nghệ thông tin'),
-  ('318da474-60d6-4a90-aa7f-928b31b8fc59', 'KT',   'Khoa Kinh tế')
-on conflict (id) do update set code = excluded.code, name = excluded.name;
+-- parent_name, place_name, head_title in trên văn bản đi (thể thức NĐ 30/2020)
+insert into core.tenants (id, code, name, parent_name, place_name, head_title) values
+  ('c300d5bb-028f-44cc-ba10-7b5277a4225d', 'CNTT', 'Khoa Công nghệ thông tin', 'Trường Đại học Công nghiệp', 'Hà Nội', 'Trưởng khoa'),
+  ('318da474-60d6-4a90-aa7f-928b31b8fc59', 'KT',   'Khoa Kinh tế',             'Trường Đại học Công nghiệp', 'Hà Nội', 'Trưởng khoa')
+on conflict (id) do update set code = excluded.code, name = excluded.name, parent_name = excluded.parent_name,
+  place_name = excluded.place_name, head_title = excluded.head_title;
 
 insert into office.departments (id, tenant_id, code, name) values
   ('ecd87efb-e9a1-4113-a46a-f599a9d15574', 'c300d5bb-028f-44cc-ba10-7b5277a4225d', 'VP',   'Văn phòng khoa'),

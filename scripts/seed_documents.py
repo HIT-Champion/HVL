@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Văn bản mẫu ở đủ các bước của quy trình, tạo bằng chính các thao tác người dùng gọi qua APISIX.
+"""Văn bản đến và văn bản đi mẫu ở đủ các bước của quy trình, tạo bằng chính các thao tác người dùng gọi qua APISIX.
 
 Nội dung là văn bản giả lập của một khoa trong trường đại học, không phải văn bản thật. Chạy lại được:
 văn bản đã có (cùng số ký hiệu) thì bỏ qua.
@@ -73,6 +73,53 @@ CNTT = [
 KT = [
     Sample("129/ĐT-ĐH", "Phòng Đào tạo", "TB", "Thông báo lịch đăng ký học phần học kỳ II năm học 2026–2027 (Khoa Kinh tế)", 1, stop="received"),
     Sample("89/CTSV", "Phòng Công tác sinh viên", "CV", "Về việc xét cấp học bổng khuyến khích học tập (Khoa Kinh tế)", 4, stop="registered"),
+]
+
+
+@dataclass
+class Draft:
+    """Văn bản đi mẫu: chuyên viên soạn rồi đi qua quy trình van-ban-di tới bước `stop`."""
+
+    type_code: str
+    summary: str
+    body: str
+    recipients: tuple[str, ...]
+    # bước dừng lại: draft | in_review | returned | approved | issued
+    stop: str = "issued"
+    drafter: str = "chuyenviendt"
+    is_public: bool = False
+    reply_to: str | None = None   # số ký hiệu của văn bản đến được trả lời
+
+
+OUT_CNTT = [
+    Draft("TB", "Thông báo lịch họp giao ban tháng 11 năm 2026",
+          "Khoa Công nghệ thông tin thông báo lịch họp giao ban tháng 11 năm 2026 như sau:\n"
+          "1. Thời gian: 14 giờ 00, thứ Hai ngày 02/11/2026.\n"
+          "2. Địa điểm: Phòng họp tầng 3, nhà A1.\n"
+          "3. Thành phần: Trưởng các bộ môn, Tổ trưởng Tổ Đào tạo, giáo vụ khoa.\n"
+          "Đề nghị các đơn vị chuẩn bị báo cáo kết quả công tác tháng 10 và gửi về Văn phòng khoa trước ngày 30/10/2026.",
+          ("Các bộ môn", "Tổ Đào tạo"), is_public=True),
+    Draft("CV", "Về việc cử giảng viên tham dự hội thảo chuyển đổi số trong giáo dục đại học",
+          "Phúc đáp Công văn số 47/KHCN của Phòng Khoa học và Hợp tác quốc tế, Khoa Công nghệ thông tin cử giảng viên "
+          "Vũ Thị Mai, Bộ môn Kỹ thuật phần mềm, tham dự hội thảo và trình bày tham luận về ứng dụng nguồn mở trong "
+          "quản lý văn bản.\nKhoa trân trọng đề nghị Phòng tổng hợp, báo cáo Ban Giám hiệu.",
+          ("Phòng Khoa học và Hợp tác quốc tế",), drafter="giangvienktpm", reply_to="47/KHCN"),
+    Draft("KH", "Kế hoạch tổ chức seminar khoa học tháng 12 năm 2026",
+          "Nhằm đẩy mạnh hoạt động nghiên cứu khoa học của giảng viên và sinh viên, Khoa xây dựng kế hoạch tổ chức "
+          "seminar khoa học tháng 12 năm 2026.\nMỗi bộ môn đăng ký ít nhất hai báo cáo, gửi về Tổ Đào tạo trước ngày 20/11/2026.",
+          ("Các bộ môn",), stop="approved"),
+    Draft("CV", "Về việc báo cáo kết quả rà soát đề cương chi tiết học phần",
+          "Thực hiện Công văn số 140/ĐT-ĐH của Phòng Đào tạo, Khoa đã rà soát đề cương chi tiết 42 học phần theo chuẩn "
+          "đầu ra mới.\nKết quả rà soát chi tiết gửi kèm theo công văn này.",
+          ("Phòng Đào tạo",), stop="in_review"),
+    Draft("BC", "Báo cáo khối lượng giảng dạy học kỳ I năm học 2026–2027",
+          "Khoa Công nghệ thông tin báo cáo khối lượng giảng dạy học kỳ I năm học 2026–2027 của giảng viên cơ hữu và "
+          "thỉnh giảng như bảng tổng hợp kèm theo.",
+          ("Phòng Đào tạo",), stop="returned"),
+    Draft("TB", "Thông báo tuyển sinh viên tham gia nhóm nghiên cứu phần mềm nguồn mở",
+          "Bộ môn Kỹ thuật phần mềm thông báo tuyển sinh viên năm thứ ba, năm thứ tư tham gia nhóm nghiên cứu phần mềm "
+          "nguồn mở năm học 2026–2027.",
+          ("Sinh viên các khóa",), stop="draft", drafter="giangvienktpm"),
 ]
 
 
@@ -138,6 +185,58 @@ def _run(clerk_name: str, director_name: str, samples: list[Sample]) -> int:
     return created
 
 
+def _user_id(session: Session, username: str) -> str:
+    return session.gql("query ($u: String!) { core_users(where: {username: {_eq: $u}}) { id } }",
+                       {"u": username})["core_users"][0]["id"]
+
+
+def _run_outgoing(clerk_name: str, director_name: str, drafts: list[Draft]) -> int:
+    clerk, director = Session(clerk_name), Session(director_name)
+    people: dict[str, Session] = {}
+
+    def person(name: str) -> Session:
+        if name not in people:
+            people[name] = Session(name)
+        return people[name]
+
+    signer = _user_id(clerk, director_name)
+    created = 0
+    for d in drafts:
+        drafter = person(d.drafter)
+        found = drafter.gql("query ($s: String!) { office_documents(where: {direction: {_eq: \"out\"}, "
+                            "summary: {_eq: $s}}, limit: 1) { id } }", {"s": d.summary})["office_documents"]
+        if found:
+            continue
+        draft: dict = {"type_code": d.type_code, "summary": d.summary, "body": d.body, "recipients": list(d.recipients)}
+        if d.reply_to:
+            reply = clerk.gql("query ($s: String!) { office_documents(where: {symbol: {_eq: $s}}, limit: 1) { id } }",
+                              {"s": d.reply_to})["office_documents"]
+            if reply:
+                draft["reply_to_id"] = reply[0]["id"]
+        doc_id = drafter.gql("mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) "
+                             "{ id } }", {"o": draft})["insert_office_documents_one"]["id"]
+        created += 1
+        if d.stop == "draft":
+            continue
+        drafter.gql("mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }",
+                    {"d": doc_id, "s": signer})
+        if d.stop == "in_review":
+            continue
+        manager = person("totruongdt" if d.drafter == "chuyenviendt" else "truongbmktpm")
+        task = manager.wait_task(doc_id, "vbdi.duyetPhong")
+        if d.stop == "returned":
+            manager.complete(task, "return", {"note": "Bổ sung số liệu giảng viên thỉnh giảng, ghi rõ số tiết quy đổi."})
+            continue
+        manager.complete(task, "approve", {"note": "Đồng ý, trình lãnh đạo khoa ký."})
+        director.complete(director.wait_task(doc_id, "vbdi.duyetDonVi"), "approve", {})
+        if d.stop == "approved":
+            continue
+        clerk.complete(clerk.wait_task(doc_id, "vbdi.phatHanh"), "issue", {"is_public": d.is_public})
+    return created
+
+
 def run() -> None:
     created = _run("vanthu", "truongkhoa", CNTT) + _run("vanthukt", "truongkhoakt", KT)
-    print(f"  văn bản mẫu: {created} văn bản mới (văn bản đã có thì bỏ qua)")
+    print(f"  văn bản đến mẫu: {created} văn bản mới (văn bản đã có thì bỏ qua)")
+    created = _run_outgoing("vanthu", "truongkhoa", OUT_CNTT)
+    print(f"  văn bản đi mẫu: {created} văn bản mới, đủ các bước soạn → duyệt → phát hành")

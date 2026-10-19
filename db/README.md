@@ -22,7 +22,8 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Quyền Hasura cho 6 vai trò, cách ly thuê ước | **Xong** — 52 test |
 | Sổ kiểm toán chuỗi băm: trigger trên mọi bảng nghiệp vụ, `core.audit_verify()` | **Xong** (F2.12 làm sớm); job neo hash ra ngoài CSDL ở Phase 2 |
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch) | **Xong** — 10 test |
-| `metadata/actions.graphql`, `actions.yaml`: `registerIncoming`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
+| `metadata/actions.graphql`, `actions.yaml`: `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
+| Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
 | `office.case_files` (hồ sơ, nộp lưu) và các view báo cáo | Phase 2–3 |
 
 ## Vai trò
@@ -35,6 +36,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `director` — lãnh đạo đơn vị | Mọi văn bản của thuê ước | — |
 | `tenant_admin` — quản trị đơn vị | Không đọc văn bản; đọc phòng ban, sổ, danh mục | Thêm, sửa phòng ban |
 | `service` — `svc-workflow`, `svc-files` | Mọi dòng của thuê ước trong yêu cầu | Trạng thái, số, giao việc, tệp, dòng thời gian, sổ kiểm toán |
+| `verifier` — `svc-files` (cổng xác thực) | Chỉ khung nhìn `office.issued_documents`, tối đa một dòng mỗi lần | — |
 
 Văn bản hạn chế (`restricted`) chỉ người tạo và người có tên trong `office.document_acl` đọc được, kể cả
 `clerk` và `director`. Quy tắc đọc viết một lần trong hàm SQL `office.document_visible`, Hasura gắn thành

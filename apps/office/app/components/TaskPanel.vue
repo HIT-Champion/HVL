@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong processes/van-ban-den.bpmn20.xml).
+// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong processes/*.bpmn20.xml).
 // Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
 
 export interface PanelUser { id: string; full_name: string; role: string; department_id: string | null }
@@ -28,6 +28,7 @@ export interface PanelDepartment { id: string; code: string; name: string }
 const props = defineProps<{
   taskId: string
   formKey: string
+  documentId: string
   documentDue: string | null
   users: PanelUser[]
   departments: PanelDepartment[]
@@ -37,7 +38,7 @@ const props = defineProps<{
 const emit = defineEmits<{ done: [] }>()
 
 const { t } = useI18n()
-const { gql } = useApi()
+const { gql, preview } = useApi()
 const notice = useNotice()
 const busy = ref(false)
 const tried = ref(false)
@@ -56,6 +57,11 @@ const fileNote = ref('')
 const assign = reactive({ user_id: '', note: '' })
 // vbden.xuLy
 const result = ref('')
+// vbdi.duyetPhong, vbdi.duyetDonVi: ý kiến; trả lại thì bắt buộc
+const reviewNote = ref('')
+const returning = ref(false)
+// vbdi.phatHanh: mặc định không công khai trích yếu — phần lớn văn bản đi chỉ lưu hành nội bộ
+const isPublic = ref(false)
 
 const handlers = computed(() => props.users.filter((u) => u.role === 'staff' || u.role === 'manager'))
 const myPeople = computed(() => props.users.filter((u) => u.department_id === props.myDepartment && u.id !== props.myId && (u.role === 'staff' || u.role === 'manager')))
@@ -101,6 +107,21 @@ function submitAssign() {
   tried.value = true
   if (!assign.user_id) return
   complete('assign', { user_id: assign.user_id, note: assign.note.trim() || null })
+}
+
+function approve() {
+  complete('approve', { note: reviewNote.value.trim() || null })
+}
+
+function sendBack() {
+  returning.value = true
+  if (!reviewNote.value.trim()) return
+  complete('return', { note: reviewNote.value.trim() })
+}
+
+function issue() {
+  if (!confirm(t('form.phatHanh.confirm'))) return
+  complete('issue', { is_public: isPublic.value })
 }
 
 function submitDone() {
@@ -197,6 +218,39 @@ function submitDone() {
       </div>
       <div class="flex justify-end border-t border-stone-100 pt-4">
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.xuLy.done') }}</button>
+      </div>
+    </form>
+
+    <!-- Lãnh đạo phòng, người ký duyệt dự thảo văn bản đi -->
+    <form v-else-if="formKey === 'vbdi.duyetPhong' || formKey === 'vbdi.duyetDonVi'" class="space-y-4 p-5" novalidate @submit.prevent="approve">
+      <button type="button" class="btn-secondary" @click="preview(documentId).catch((e) => notice.error(errorText(t, e)))">
+        {{ t('form.duyet.preview') }}
+      </button>
+      <div>
+        <label class="label" for="review-note">{{ t('form.duyet.note') }}</label>
+        <textarea id="review-note" v-model="reviewNote" rows="3" class="input" maxlength="2000"
+                  :placeholder="t('form.duyet.returnNote')" :aria-invalid="returning && !reviewNote.trim()" />
+        <p v-if="returning && !reviewNote.trim()" class="field-error">{{ t('form.duyet.returnNote') }}</p>
+      </div>
+      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+        <button type="button" class="btn-secondary" :disabled="busy" @click="sendBack">{{ t('form.duyet.return') }}</button>
+        <button type="submit" class="btn-primary" :disabled="busy">
+          {{ formKey === 'vbdi.duyetDonVi' ? t('form.duyet.sign') : t('form.duyet.approve') }}
+        </button>
+      </div>
+    </form>
+
+    <!-- Văn thư cấp số, phát hành -->
+    <form v-else-if="formKey === 'vbdi.phatHanh'" class="space-y-4 p-5" @submit.prevent="issue">
+      <label class="flex items-start gap-2 text-sm">
+        <input v-model="isPublic" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700">
+        <span>{{ t('form.phatHanh.public') }}<span class="block text-xs text-stone-500">{{ t('form.phatHanh.publicHint') }}</span></span>
+      </label>
+      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+        <button type="button" class="btn-secondary" @click="preview(documentId).catch((e) => notice.error(errorText(t, e)))">
+          {{ t('form.duyet.preview') }}
+        </button>
+        <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.phatHanh.issue') }}</button>
       </div>
     </form>
   </section>

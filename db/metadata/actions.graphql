@@ -23,6 +23,11 @@ type Mutation {
 }
 
 type Mutation {
+  "Người soạn trình dự thảo văn bản đi (lần đầu hoặc sau khi sửa), chọn lãnh đạo đơn vị ký"
+  submitOutgoing(documentId: uuid!, signerId: String!): SubmitOutgoingOutput
+}
+
+type Mutation {
   "Hoàn thành một việc trong hộp việc; data kiểm theo formKey của việc"
   completeTask(taskId: String!, outcome: String!, data: jsonb): CompleteTaskOutput
 }
@@ -35,6 +40,11 @@ type Query {
 type RegisterIncomingOutput {
   document_id: uuid!
   register_number: Int!
+}
+
+type SubmitOutgoingOutput {
+  document_id: uuid!
+  status: String!
 }
 
 type CompleteTaskOutput {

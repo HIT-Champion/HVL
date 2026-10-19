@@ -17,3 +17,4 @@
 # Hàm SQL Hasura đưa ra thành trường GraphQL. Quyền gọi khai báo tường minh
 # (HASURA_GRAPHQL_INFER_FUNCTION_PERMISSIONS=false): có quyền đọc bảng trả về chưa đủ để gọi hàm.
 - "!include office_register_incoming.yaml"
+- "!include office_number_outgoing.yaml"

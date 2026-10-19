@@ -20,7 +20,7 @@
 [project]
 name = "svc-files"
 version = "0.1.0"
-description = "Mộc — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS"
+description = "Mộc — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS; dựng PDF văn bản đi; cổng xác thực"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -30,6 +30,8 @@ dependencies = [
   "boto3>=1.43,<2",
   "pyjwt[crypto]>=2.15,<3",
   "httpx2>=2.13,<3",
+  "weasyprint>=70,<71",
+  "segno>=1.6,<2",
 ]
 
 [project.optional-dependencies]

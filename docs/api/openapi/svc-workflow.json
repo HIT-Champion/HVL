@@ -8,7 +8,7 @@
   "paths": {
     "/actions/{name}": {
       "post": {
-        "summary": "Chạy một Hasura Action: registerIncoming, myTasks, completeTask",
+        "summary": "Chạy một Hasura Action: registerIncoming, submitOutgoing, myTasks, completeTask",
         "operationId": "action_actions__name__post",
         "parameters": [
           {

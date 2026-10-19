@@ -26,3 +26,4 @@
 - "!include office_document_acl.yaml"
 - "!include office_assignments.yaml"
 - "!include office_document_events.yaml"
+- "!include office_issued_documents.yaml"

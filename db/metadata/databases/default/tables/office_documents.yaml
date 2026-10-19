@@ -49,6 +49,17 @@ object_relationships:
       manual_configuration:
         remote_table: {name: documents, schema: office}
         column_mapping: {source_id: id}
+  # người ký văn bản đi, người tạo: danh bạ core.users (không có khóa ngoại — core không phụ thuộc office)
+  - name: signer
+    using:
+      manual_configuration:
+        remote_table: {name: users, schema: core}
+        column_mapping: {signer_id: id}
+  - name: creator
+    using:
+      manual_configuration:
+        remote_table: {name: users, schema: core}
+        column_mapping: {created_by: id}
 array_relationships:
   - name: files
     using:
@@ -83,7 +94,7 @@ insert_permissions:
       check: {}
   - role: staff
     permission:
-      columns: [type_code, summary, urgency, restricted, recipients, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, reply_to_id]
       set:
         tenant_id: X-Hasura-Tenant-Id
         created_by: X-Hasura-User-Id
@@ -93,19 +104,19 @@ insert_permissions:
       check: {}
   - role: service
     permission:
-      columns: [id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency, restricted,
-                is_public, register_id, register_number, registered_at, due_on, department_id, signer_id,
-                recipients, reply_to_id, source_id, process_id, created_by]
+      columns: [id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body, urgency,
+                restricted, is_public, register_id, register_number, registered_at, due_on, department_id,
+                signer_id, recipients, reply_to_id, source_id, process_id, created_by]
       set:
         tenant_id: X-Hasura-Tenant-Id
       check: {}
 select_permissions:
   - role: clerk
     permission: &user_select
-      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency,
-                restricted, is_public, register_id, register_number, registered_at, due_on, department_id,
-                signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id, process_id,
-                created_by, created_at, updated_at]
+      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
+                urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
+                department_id, signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id,
+                process_id, created_by, created_at, updated_at]
       filter:
         _and:
           - tenant_id: {_eq: X-Hasura-Tenant-Id}
@@ -119,10 +130,10 @@ select_permissions:
     permission: *user_select
   - role: service
     permission:
-      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency,
-                restricted, is_public, register_id, register_number, registered_at, due_on, department_id,
-                signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id, process_id,
-                created_by, created_at, updated_at]
+      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
+                urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
+                department_id, signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id,
+                process_id, created_by, created_at, updated_at]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       allow_aggregations: true
 update_permissions:
@@ -136,7 +147,7 @@ update_permissions:
       check: {}
   - role: staff
     permission:
-      columns: [type_code, summary, urgency, restricted, recipients, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, reply_to_id]
       filter:
         tenant_id: {_eq: X-Hasura-Tenant-Id}
         direction: {_eq: out}
@@ -145,8 +156,8 @@ update_permissions:
       check: {}
   - role: service
     permission:
-      columns: [status, type_code, symbol, issuer_name, issued_on, summary, urgency, restricted, is_public,
-                register_id, register_number, registered_at, due_on, department_id, signer_id, recipients,
-                reply_to_id, content_sha256, verify_code, source_id, process_id]
+      columns: [status, type_code, symbol, issuer_name, issued_on, summary, body, urgency, restricted,
+                is_public, register_id, register_number, registered_at, due_on, department_id, signer_id,
+                recipients, reply_to_id, content_sha256, verify_code, source_id, process_id]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       check: {tenant_id: {_eq: X-Hasura-Tenant-Id}}

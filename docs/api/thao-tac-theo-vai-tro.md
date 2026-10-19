@@ -10,10 +10,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
 | `clerk` (văn thư) | `vanthu` | 22 | 11 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
-| `staff` (chuyên viên) | `chuyenviendt` | 20 | 10 | [`graphql/staff.graphql`](graphql/staff.graphql) |
+| `staff` (chuyên viên) | `chuyenviendt` | 20 | 11 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 20 | 1 | [`graphql/manager.graphql`](graphql/manager.graphql) |
 | `director` (lãnh đạo đơn vị) | `truongkhoa` | 22 | 1 | [`graphql/director.graphql`](graphql/director.graphql) |
-| `tenant_admin` (quản trị đơn vị) | `quantri` | 10 | 5 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
+| `tenant_admin` (quản trị đơn vị) | `quantri` | 10 | 8 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
 
@@ -56,6 +56,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `insert_office_documents` | ✓ | ✓ |  |  |  |
 | `insert_office_documents_one` | ✓ | ✓ |  |  |  |
 | `registerIncoming` | ✓ |  |  |  |  |
+| `submitOutgoing` |  | ✓ |  |  |  |
+| `update_core_tenants` |  |  |  |  | ✓ |
+| `update_core_tenants_by_pk` |  |  |  |  | ✓ |
+| `update_core_tenants_many` |  |  |  |  | ✓ |
 | `update_office_departments` |  |  |  |  | ✓ |
 | `update_office_departments_by_pk` |  |  |  |  | ✓ |
 | `update_office_departments_many` |  |  |  |  | ✓ |

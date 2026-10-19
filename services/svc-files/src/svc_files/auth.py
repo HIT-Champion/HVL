@@ -71,22 +71,7 @@ class TokenVerifier:
         self._keys = keys or jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=300, timeout=5)
 
     def verify(self, token: str) -> Principal:
-        try:
-            key = self._keys.get_signing_key_from_jwt(token).key
-            claims = jwt.decode(
-                token,
-                key,
-                algorithms=ALGORITHMS,
-                issuer=self.issuer,
-                audience=self.audience,
-                leeway=self.leeway_s,
-                options={"require": ["exp", "iat", "iss", "sub"], "verify_aud": self.audience is not None},
-            )
-        except jwt.PyJWKClientConnectionError as exc:
-            raise AuthError(503, "jwks_unavailable", "Không lấy được khóa công khai của Keycloak") from exc
-        except jwt.PyJWTError as exc:
-            raise AuthError(401, "invalid_token", "Token không hợp lệ hoặc đã hết hạn") from exc
-
+        claims = self._decode(token)
         ns = claims.get(HASURA_CLAIMS)
         if not isinstance(ns, dict):
             ns = {}
@@ -104,3 +89,32 @@ class TokenVerifier:
             department_id=ns.get("x-hasura-department-id"),
             token=token,
         )
+
+    def verify_service(self, token: str, clients: frozenset[str]) -> str:
+        """Token tài khoản dịch vụ (client credentials của Keycloak): trả client_id nếu được phép gọi API nội bộ.
+
+        Người dùng không lấy được token mang client_id của dịch vụ khi không có bí mật của client đó.
+        """
+        claims = self._decode(token)
+        client = claims.get("azp") or claims.get("client_id")
+        if client not in clients:
+            raise AuthError(403, "not_a_service", "Chỉ dịch vụ nội bộ được gọi")
+        return str(client)
+
+    def _decode(self, token: str) -> dict[str, Any]:
+        try:
+            key = self._keys.get_signing_key_from_jwt(token).key
+            claims = jwt.decode(
+                token,
+                key,
+                algorithms=ALGORITHMS,
+                issuer=self.issuer,
+                audience=self.audience,
+                leeway=self.leeway_s,
+                options={"require": ["exp", "iat", "iss", "sub"], "verify_aud": self.audience is not None},
+            )
+        except jwt.PyJWKClientConnectionError as exc:
+            raise AuthError(503, "jwks_unavailable", "Không lấy được khóa công khai của Keycloak") from exc
+        except jwt.PyJWTError as exc:
+            raise AuthError(401, "invalid_token", "Token không hợp lệ hoặc đã hết hạn") from exc
+        return claims

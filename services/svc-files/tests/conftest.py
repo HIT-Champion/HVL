@@ -208,6 +208,58 @@ class FakeHasura:
                 out[doc_id] = {k: v for k, v in row.items() if k not in {"readers", "tenant_id", "updated_at"}}
         return out
 
+    # --- văn bản đi -------------------------------------------------------------------------------------
+
+    letters: dict[str, dict] = field(default_factory=dict)
+
+    def add_letter(self, tenant: uuid.UUID, *, readers: set[str] | None = None, **cols) -> str:
+        doc_id = str(uuid.uuid4())
+        self.letters[doc_id] = {
+            "id": doc_id, "direction": "out", "status": "approved", "type_code": "TB",
+            "summary": "Về việc họp giao ban tháng 11", "body": "Khoa thông báo lịch họp.\nĐề nghị tham dự đầy đủ.",
+            "recipients": ["Các bộ môn"], "symbol": "05/TB-CNTT", "issued_on": "2026-10-19",
+            "verify_code": "ABCDE23456", "document_type": {"name": "Thông báo", "in_symbol": True},
+            "department": {"code": "ĐT"}, "signer": {"full_name": "Phạm Minh Đức"},
+            "events": [{"created_at": "2026-10-19T03:00:00+00:00"}],
+            "tenant": {"code": "CNTT", "name": "Khoa Công nghệ thông tin", "parent_name": "Trường Đại học Thử",
+                       "place_name": "Hà Nội", "head_title": "Trưởng khoa"},
+            "_tenant_id": str(tenant), "_readers": readers, **cols,
+        }
+        return doc_id
+
+    @staticmethod
+    def _public(row: dict) -> dict:
+        return {k: v for k, v in row.items() if not k.startswith("_")}
+
+    async def letter(self, *, tenant_id, actor_id, request_id, document_id) -> dict | None:
+        self._check()
+        row = self.letters.get(str(document_id))
+        return self._public(row) if row and row["_tenant_id"] == str(tenant_id) else None
+
+    async def visible_letter(self, token: str, tenant_id, document_id) -> dict | None:
+        self._check()
+        if self.reject_tokens:
+            raise HasuraAuthError("JWTExpired", "invalid-jwt")
+        ns = jwt.decode(token, options={"verify_signature": False})[HASURA_CLAIMS]
+        row = self.letters.get(str(document_id))
+        if row is None or row["_tenant_id"] != ns["x-hasura-tenant-id"]:
+            return None
+        if row["_readers"] is not None and ns["x-hasura-user-id"] not in row["_readers"]:
+            return None
+        return self._public(row)
+
+    async def verify(self, *, code: str | None = None, sha256_hex: str | None = None) -> dict | None:
+        self._check()
+        for row in self.letters.values():
+            if row["status"] not in ("issued", "archived"):
+                continue
+            if (code and row["verify_code"] == code) or (sha256_hex and row.get("content_sha256") == sha256_hex):
+                return {"verify_code": row["verify_code"], "content_sha256": row["content_sha256"],
+                        "symbol": row["symbol"], "issued_on": row["issued_on"], "type_name": row["document_type"]["name"],
+                        "issuer_name": row["tenant"]["name"], "parent_name": row["tenant"]["parent_name"],
+                        "summary": row["summary"] if row.get("is_public") else None, "status": row["status"]}
+        return None
+
     async def changed_documents(self, since, limit: int, offset: int) -> list[dict]:
         self._check()
         rows = sorted((r for r in self.documents.values() if datetime.fromisoformat(r["updated_at"]) >= since),

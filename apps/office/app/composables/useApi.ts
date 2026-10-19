@@ -114,6 +114,21 @@ export function useApi() {
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
+  /** Bản PDF xem trước của dự thảo văn bản đi (svc-files dựng đúng thể thức, in chữ DỰ THẢO), tải về máy. */
+  async function preview(documentId: string): Promise<void> {
+    const res = await authFetch(`/api/documents/${documentId}/preview`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new ApiError(body.detail?.message ?? `HTTP ${res.status}`, body.detail?.code ?? null, res.status)
+    }
+    const url = URL.createObjectURL(await res.blob())
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `du-thao-${documentId.slice(0, 8)}.pdf`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+
   async function search(params: Record<string, string | number | undefined>): Promise<{ hits: SearchHit[]; next_offset: number | null }> {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
@@ -123,5 +138,5 @@ export function useApi() {
     return body
   }
 
-  return { gql, upload, download, search }
+  return { gql, upload, download, preview, search }
 }

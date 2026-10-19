@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Nghiệp vụ của các Action: vào sổ, hộp việc, hoàn thành việc, đối soát.
+"""Nghiệp vụ của các Action: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, đối soát.
 
 Thứ tự ghi khi hoàn thành một việc: kiểm quyền và dữ liệu → nhận việc (claim) trong Flowable → ghi
 PostgreSQL trong một giao dịch, kèm sự kiện mang ``task_id`` → hoàn thành việc trong Flowable. Gọi lại sau
@@ -26,18 +26,23 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
 from pydantic import ValidationError
 
+from .files import FilesClient, FilesError
 from .flowable import FlowableClient, FlowableError, Task
-from .forms import FORMS, ChiDao, Note, PhanCong, XuLy
+from .forms import FORMS, ChiDao, Note, PhanCong, PhatHanh, XuLy
 from .hasura import (
     DOCUMENT,
+    NUMBER_OUTGOING,
     OPEN_ASSIGNMENTS,
+    OUTGOING,
     REGISTER_INCOMING,
     SET_PROCESS,
     TASK_DONE,
@@ -49,6 +54,8 @@ from .hasura import (
 )
 
 PROCESS_IN = "van-ban-den"
+PROCESS_OUT = "van-ban-di"
+BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 URGENCY_RANK = {"hoa_toc": 3, "thuong_khan": 2, "khan": 1, "normal": 0}
 SYSTEM_ACTOR = "svc-workflow"
 
@@ -70,7 +77,14 @@ CONSTRAINT_MESSAGES = {
     "documents_due_after_registered": "Hạn giải quyết không được trước ngày vào sổ",
     "documents_in_identity": "Văn bản đến phải có số ký hiệu, cơ quan ban hành và ngày ban hành",
     "assignments_one_lead": "Văn bản đã có nơi chủ trì",
+    "documents_body_length": "Nội dung văn bản dài quá 20.000 ký tự",
+    "documents_out_issued_complete": "Văn bản chưa đủ số, ký hiệu, ngày ban hành, người ký để phát hành",
 }
+
+
+def new_verify_code() -> str:
+    """Mã tra cứu in cạnh mã QR: 10 ký tự base32 ngẫu nhiên (50 bit) — không đoán, không liệt kê được."""
+    return "".join(secrets.choice(BASE32) for _ in range(10))
 
 
 def _db_error(exc: HasuraError) -> WorkflowError:
@@ -85,11 +99,16 @@ def _db_error(exc: HasuraError) -> WorkflowError:
 
 @dataclass(frozen=True)
 class Plan:
-    """Việc cần ghi khi hoàn thành một task: một mutation (một giao dịch) và biến cho Flowable."""
+    """Việc cần ghi khi hoàn thành một task: một mutation (một giao dịch) và biến cho Flowable.
+
+    prepare: việc chạy sau khi đã nhận task, ngay trước mutation, trả thêm biến cho mutation — dùng khi phát
+    hành (cấp số, dựng PDF), để không dựng PDF cho một task người khác đã nhận.
+    """
 
     mutation: str
     variables: dict[str, Any]
     flow: dict[str, Any]
+    prepare: Callable[[], Awaitable[dict[str, Any]]] | None = None
 
 
 DIRECT = """
@@ -123,6 +142,32 @@ mutation XuLy($ids: [uuid!]!, $note: String!, $now: timestamptz!, $doc: uuid!,
   insert_office_document_events_one(object: $event) { id }
 }"""
 
+SUBMIT = """
+mutation Trinh($doc: uuid!, $set: office_documents_set_input!, $event: office_document_events_insert_input!) {
+  update_office_documents_by_pk(pk_columns: {id: $doc}, _set: $set) { id }
+  insert_office_document_events_one(object: $event) { id }
+}"""
+
+SET_STATUS = """
+mutation DoiTrangThai($doc: uuid!, $status: String!, $event: office_document_events_insert_input!) {
+  update_office_documents_by_pk(pk_columns: {id: $doc}, _set: {status: $status}) { id }
+  insert_office_document_events_one(object: $event) { id }
+}"""
+
+EVENT_ONLY = """
+mutation GhiSuKien($event: office_document_events_insert_input!) {
+  insert_office_document_events_one(object: $event) { id }
+}"""
+
+ISSUE = """
+mutation PhatHanh($doc: uuid!, $sha: bytea!, $public: Boolean!, $file: office_document_files_insert_input!,
+                  $event: office_document_events_insert_input!) {
+  update_office_documents_by_pk(pk_columns: {id: $doc},
+                                _set: {status: "issued", content_sha256: $sha, is_public: $public}) { id }
+  insert_office_document_files_one(object: $file) { file_id }
+  insert_office_document_events_one(object: $event) { id }
+}"""
+
 DEPARTMENT_MANAGERS = """
 query Managers($dept: uuid!) {
   office_departments_by_pk(id: $dept) { id }
@@ -131,9 +176,11 @@ query Managers($dept: uuid!) {
 
 
 class Workflow:
-    def __init__(self, hasura: HasuraClient, flowable: FlowableClient, *, sla_duration: str = "PT24H") -> None:
+    def __init__(self, hasura: HasuraClient, flowable: FlowableClient, files: FilesClient | None = None, *,
+                 sla_duration: str = "PT24H") -> None:
         self.hasura = hasura
         self.flowable = flowable
+        self.files = files
         self.sla_duration = sla_duration
 
     # --- vào sổ ---------------------------------------------------------------------------------------
@@ -184,6 +231,88 @@ class Workflow:
             await self._attach_process(actor, row)
         return len(rows)
 
+    # --- trình văn bản đi -----------------------------------------------------------------------------
+
+    async def submit_outgoing(self, actor: Actor, document_id: str, signer_id: str) -> dict[str, Any]:
+        """Người soạn trình dự thảo cho lãnh đạo phòng duyệt: lần đầu, hoặc sau khi sửa theo ý kiến trả lại."""
+        try:
+            return await self._submit_outgoing(actor, document_id, signer_id)
+        except HasuraError as exc:
+            raise _db_error(exc) from exc
+        except FlowableError as exc:
+            raise WorkflowError("workflow_unavailable", "Chưa gọi được động cơ quy trình, thử lại sau", 503) from exc
+
+    async def _submit_outgoing(self, actor: Actor, document_id: str, signer_id: str) -> dict[str, Any]:
+        doc = await self._outgoing(actor, document_id)
+        if doc["created_by"] != actor.user_id:
+            raise WorkflowError("not_your_document", "Chỉ người soạn mới trình được dự thảo này", 403)
+        if doc["status"] == "in_review" and doc["signer_id"] == signer_id:
+            # gọi lại sau lỗi mạng: dữ liệu đã ghi, chỉ hoàn thành nốt bước sửa trong Flowable nếu còn
+            await self._finish_revision(actor, doc, signer_id)
+            return {"document_id": doc["id"], "status": "in_review"}
+        if doc["status"] not in ("draft", "returned"):
+            raise WorkflowError("wrong_status", "Văn bản đã trình, không trình lại được", 409)
+        if not (doc["body"] or "").strip():
+            raise WorkflowError("invalid_data", "Dự thảo chưa có nội dung", 400)
+        if not doc["recipients"]:
+            raise WorkflowError("invalid_data", "Dự thảo chưa ghi nơi nhận", 400)
+        signer = await self._user(actor, signer_id)
+        if signer is None or signer["role"] != "director":
+            raise WorkflowError("invalid_data", "Người ký phải là lãnh đạo đơn vị", 400)
+        found = await self.hasura.as_service(actor, DEPARTMENT_MANAGERS, {"dept": doc["department_id"]})
+        if not found["core_users"]:
+            raise WorkflowError("no_manager", "Phòng của bạn chưa có lãnh đạo phòng để duyệt", 409)
+
+        first = doc["status"] == "draft"
+        changes: dict[str, Any] = {"status": "in_review", "signer_id": signer_id}
+        if first:
+            changes["process_id"] = doc["process_id"] or await self._start_outgoing(actor, doc, signer_id)
+        event = {
+            "document_id": doc["id"],
+            "kind": "office.document.submitted" if first else "office.document.resubmitted",
+            "actor_id": actor.user_id,
+            "actor_kind": "user",
+            "data": {"signer_id": signer_id},
+        }
+        await self.hasura.as_service(actor, SUBMIT, {"doc": doc["id"], "set": changes, "event": event})
+        if not first:
+            await self._finish_revision(actor, doc, signer_id)
+        return {"document_id": doc["id"], "status": "in_review"}
+
+    async def _start_outgoing(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> str:
+        pid = await self.flowable.find_process(PROCESS_OUT, doc["id"])
+        if pid is None:
+            pid = await self.flowable.start_process(PROCESS_OUT, doc["id"], {
+                "tenantId": str(actor.tenant_id),
+                "documentId": doc["id"],
+                "departmentId": doc["department_id"],
+                "drafterId": doc["created_by"],
+                "signerId": signer_id,
+                "urgency": doc.get("urgency") or "normal",
+                "dueOn": "",
+                "slaDuration": self.sla_duration,
+                "outcome": "",
+            })
+        return pid
+
+    async def _finish_revision(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> None:
+        """Hoàn thành bước "sửa dự thảo" của người soạn: quy trình quay về duyệt cấp phòng, người ký có thể đổi."""
+        if not doc["process_id"]:
+            return
+        for task in await self.flowable.tasks_for(actor.user_id, []):
+            if task.process_instance_id == doc["process_id"] and task.form_key == "vbdi.chinhSua":
+                await self.flowable.complete(task.id, {"signerId": signer_id})
+
+    async def _outgoing(self, actor: Actor, doc_id: str) -> dict[str, Any]:
+        try:
+            uuid.UUID(doc_id)
+        except ValueError:
+            raise WorkflowError("document_not_found", "Không tìm thấy văn bản", 404) from None
+        doc = (await self.hasura.as_service(actor, OUTGOING, {"id": doc_id}))["office_documents_by_pk"]
+        if doc is None or doc["direction"] != "out":
+            raise WorkflowError("document_not_found", "Không tìm thấy văn bản đi", 404)
+        return doc
+
     # --- hộp việc -------------------------------------------------------------------------------------
 
     async def my_tasks(self, actor: Actor) -> list[dict[str, Any]]:
@@ -219,6 +348,8 @@ class Workflow:
             raise WorkflowError("task_not_found", "Việc không còn — có thể đã có người xử lý", 404)
         await self._check_owner(actor, task)
 
+        if task.form_key == "vbdi.chinhSua":
+            raise WorkflowError("use_submit", "Sửa dự thảo xong thì trình lại để lãnh đạo duyệt", 400)
         outcomes = FORMS.get(task.form_key)
         if outcomes is None:
             raise WorkflowError("unknown_form", f"Không xử lý được việc loại {task.form_key}", 400)
@@ -246,12 +377,16 @@ class Workflow:
                 raise WorkflowError("workflow_unavailable", "Chưa gọi được động cơ quy trình", 503) from exc
             claimed = True
         try:
-            done = await self.hasura.as_service(actor, TASK_DONE, {"doc": doc_id, "task": {"task_id": task_id}})
-            if not done["office_document_events"]:
-                await self.hasura.as_service(actor, plan.mutation, plan.variables)
-        except HasuraError as exc:
+            if not await self._task_done(actor, doc_id, task_id):
+                variables = plan.variables
+                if plan.prepare is not None:
+                    variables = {**variables, **await plan.prepare()}
+                await self.hasura.as_service(actor, plan.mutation, variables)
+        except (HasuraError, WorkflowError) as exc:
             if claimed:
                 await self._unclaim(task_id)
+            if isinstance(exc, WorkflowError):
+                raise
             raise _db_error(exc) from exc
         try:
             await self.flowable.complete(task_id, plan.flow)
@@ -259,6 +394,11 @@ class Workflow:
             # Dữ liệu đã ghi; người dùng bấm lại sẽ chỉ hoàn thành nốt trong Flowable
             raise WorkflowError("workflow_unavailable", "Đã lưu, nhưng chưa chuyển được bước tiếp — bấm lại", 503) from exc
         return {"task_id": task_id, "document_id": doc_id}
+
+    async def _task_done(self, actor: Actor, doc_id: str, task_id: str) -> bool:
+        """Đã có sự kiện mang task_id: dữ liệu của việc này đã ghi ở một lần gọi trước."""
+        done = await self.hasura.as_service(actor, TASK_DONE, {"doc": doc_id, "task": {"task_id": task_id}})
+        return bool(done["office_document_events"])
 
     async def _check_owner(self, actor: Actor, task: Task) -> None:
         if task.assignee:
@@ -314,6 +454,10 @@ class Workflow:
             return await self._plan_assign(actor, task, doc_id, outcome, form)
         if isinstance(form, XuLy):
             return await self._plan_processed(actor, task, doc_id, form)
+        if task.form_key in ("vbdi.duyetPhong", "vbdi.duyetDonVi"):
+            return await self._plan_review(actor, task, doc_id, outcome, form)
+        if isinstance(form, PhatHanh):
+            return await self._plan_issue(actor, task, doc_id, form)
         raise WorkflowError("unknown_form", f"Không xử lý được việc loại {task.form_key}", 400)
 
     async def _plan_direct(self, actor: Actor, task: Task, doc_id: str, form: ChiDao) -> Plan:
@@ -391,3 +535,51 @@ class Workflow:
              "event": event},
             {"outcome": "done"},
         )
+
+    # --- văn bản đi -------------------------------------------------------------------------------------
+
+    async def _plan_review(self, actor: Actor, task: Task, doc_id: str, outcome: str, form: Any) -> Plan:
+        """Lãnh đạo phòng (vbdi.duyetPhong) hoặc người ký (vbdi.duyetDonVi) đồng ý hay trả lại dự thảo."""
+        doc = await self._outgoing(actor, doc_id)
+        if doc["status"] != "in_review" and not await self._task_done(actor, doc_id, task.id):
+            raise WorkflowError("wrong_status", "Văn bản không ở bước chờ duyệt", 409)
+        level = "department" if task.form_key == "vbdi.duyetPhong" else "unit"
+        if outcome == "return":
+            event = self._event(actor, doc_id, "office.document.returned", task.id, form.note, level=level)
+            return Plan(SET_STATUS, {"doc": doc_id, "status": "returned", "event": event}, {"outcome": "return"})
+        if level == "department":
+            event = self._event(actor, doc_id, "office.document.reviewed", task.id, form.note, level=level)
+            return Plan(EVENT_ONLY, {"event": event}, {"outcome": "approve"})
+        event = self._event(actor, doc_id, "office.document.approved", task.id, form.note)
+        return Plan(SET_STATUS, {"doc": doc_id, "status": "approved", "event": event}, {"outcome": "approve"})
+
+    async def _plan_issue(self, actor: Actor, task: Task, doc_id: str, form: PhatHanh) -> Plan:
+        """Văn thư phát hành: cấp số đi → svc-files dựng PDF có số, mã QR, rồi lưu → ghi băm, chuyển issued.
+
+        Gọi lại sau lỗi: cấp số trả về số đã cấp; PDF được dựng lại (tệp cũ chưa gắn vào văn bản thì bỏ).
+        """
+        doc = await self._outgoing(actor, doc_id)
+        if doc["status"] != "approved" and not await self._task_done(actor, doc_id, task.id):
+            raise WorkflowError("wrong_status", "Văn bản chưa được lãnh đạo đơn vị ký duyệt", 409)
+        files = self.files
+        if files is None:
+            raise WorkflowError("files_unavailable", "Chưa nối được dịch vụ tệp để dựng bản phát hành", 503)
+
+        async def prepare() -> dict[str, Any]:
+            numbered = (await self.hasura.as_service(
+                actor, NUMBER_OUTGOING, {"id": doc_id, "code": new_verify_code()}))["office_number_outgoing"][0]
+            try:
+                pdf = await files.issue(actor, doc_id)
+            except FilesError as exc:
+                log.warning(json.dumps({"event": "office.document.render_failed", "document_id": doc_id,
+                                        "error": str(exc)}, ensure_ascii=False))
+                raise WorkflowError("files_unavailable", "Chưa dựng được bản phát hành, thử lại sau", 503) from exc
+            event = self._event(actor, doc_id, "office.document.issued", task.id, None, symbol=numbered["symbol"],
+                                verify_code=numbered["verify_code"], sha256=pdf["sha256"], is_public=form.is_public)
+            return {
+                "sha": "\\x" + pdf["sha256"],
+                "file": {"document_id": doc_id, "file_id": pdf["file_id"], "role": "issued", "added_by": actor.user_id},
+                "event": event,
+            }
+
+        return Plan(ISSUE, {"doc": doc_id, "public": form.is_public}, {"outcome": "issue"}, prepare)

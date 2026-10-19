@@ -36,6 +36,10 @@ create table core.tenants (                 -- cơ quan, đơn vị dùng hệ t
   code        text not null unique,          -- viết tắt dùng trong ký hiệu văn bản, vd 'KCNTT'
   name        text not null,
   org_ident   text unique,                   -- mã định danh 13 ký tự theo QCVN 102 (tùy chọn)
+  -- in trên văn bản đi theo thể thức NĐ 30/2020; quản trị đơn vị sửa được
+  parent_name text,                          -- cơ quan chủ quản: 'Trường Đại học …'
+  place_name  text,                          -- địa danh trước ngày tháng: 'Hà Nội'
+  head_title  text,                          -- chức vụ người đứng đầu ở phần ký: 'Trưởng khoa'
   created_at  timestamptz not null default now()
 );
 
@@ -187,6 +191,7 @@ create table office.documents (
   department_id    uuid references office.departments,  -- đơn vị soạn thảo
   signer_id        text,                     -- người ký (sub)
   recipients       text[] not null default '{}',        -- nơi nhận, như in trên văn bản
+  body             text check (char_length(body) <= 20000),  -- nội dung văn bản đi; mỗi dòng một đoạn
   reply_to_id      uuid references office.documents,    -- trả lời văn bản đến nào
   content_sha256   bytea unique check (content_sha256 is null or octet_length(content_sha256) = 32),
   verify_code      text unique check (verify_code is null or verify_code ~ '^[A-Z2-7]{10}$'),
@@ -418,7 +423,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 |---|---|---|
 | `registerIncoming(documentId)` | `clerk` | Gọi hàm `office.register_incoming` (một giao dịch: khóa văn bản, lấy số kế tiếp của sổ năm nay, `received → registered`, ghi sự kiện), rồi khởi chạy `van-ban-den` với `businessKey = documentId`. Flowable lỗi thì vẫn giữ số đã cấp; job đối soát (5 phút) khởi chạy sau |
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
-| `submitOutgoing(documentId, signerId)` | `staff` | Kiểm dự thảo đủ trường, `draft/returned → in_review`, khởi chạy hoặc tiếp tục `van-ban-di` |
+| `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
 | `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
@@ -438,13 +443,25 @@ Nhóm ứng viên trong Flowable (Flowable không biết người dùng Keycloak
 | `van-ban-den` | `vbden.chiDao` | `director` | `direct` · `file` (chỉ lưu) | `direct`: `instruction`, đúng một trong `lead_department_id` / `lead_user_id`, `supports[]` (phòng), `due_on`; `file`: `note` |
 | | `vbden.phanCong` | `manager` của phòng chủ trì | `assign` · `self` | `user_id`, `note` |
 | | `vbden.xuLy` | Người được giao | `done` | `result_note` (`reply_document_id` khi có văn bản đi — Phase 2) |
-| `van-ban-di` | `vbdi.duyetPhong` | `manager` của phòng soạn | `approve` · `return` | `note` |
-| | `vbdi.duyetDonVi` | `director` (người ký) | `approve` · `return` | `note` |
+| `van-ban-di` | `vbdi.duyetPhong` | `manager` của phòng soạn | `approve` · `return` | `note` (bắt buộc khi `return`) |
+| | `vbdi.duyetDonVi` | `director` được chọn làm người ký | `approve` · `return` | `note` (bắt buộc khi `return`) |
+| | `vbdi.chinhSua` | Người soạn, khi bị trả lại | — (hoàn thành bằng `submitOutgoing`) | — |
 | | `vbdi.phatHanh` | `clerk` | `issue` | `is_public` |
 
-`vbdi.phatHanh` với `outcome = issue`: `svc-workflow` cấp số đi → gọi `svc-files` dựng PDF từ mẫu, chèn số,
-ký hiệu, ngày, mã QR → tính SHA-256 → sinh `verify_code` → `status = issued` → giao bản cho nơi nhận nội bộ
-(F3.12).
+`vbdi.duyetDonVi` với `approve`: `in_review → approved`. Trả lại ở bước nào cũng `→ returned`.
+
+`vbdi.phatHanh` với `outcome = issue` (đã làm):
+
+1. `svc-workflow` sinh `verify_code` (10 ký tự base32, 50 bit ngẫu nhiên) rồi gọi hàm `office.number_outgoing`:
+   một giao dịch khóa văn bản, lấy số kế tiếp của sổ đi năm nay, ghi số, ký hiệu, ngày ban hành, mã tra cứu.
+   Ký hiệu theo NĐ 30, Phụ lục I: văn bản có tên loại `05/TB-CNTT`, công văn `05/CNTT-ĐT`. Gọi lại thì trả về
+   số đã cấp.
+2. `svc-workflow` gọi `POST /internal/issue` của `svc-files` bằng token tài khoản dịch vụ (client credentials của
+   client `svc-workflow`). `svc-files` đọc văn bản từ CSDL, dựng PDF đúng thể thức (WeasyPrint): số, ngày, mã QR
+   dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. PDF vẫn qua ClamAV rồi mới lưu vào `core.files` như mọi tệp.
+3. Một mutation: `status = issued`, `content_sha256` = SHA-256 của tệp, gắn tệp với vai trò `issued`, ghi sự kiện.
+
+Giao bản cho nơi nhận nội bộ (F3.12) làm ở Phase 3.
 
 Timer: mỗi user task có timer `DXOS_SLA_DURATION` (thật `PT24H` — NĐ 30 yêu cầu trình trong ngày; demo
 `PT1M`) → nhắc → leo thang lên lãnh đạo đơn vị. Văn bản đến có `due_on` → timer theo hạn giải quyết.
@@ -457,8 +474,10 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `POST /api/files` | Người đăng nhập | Quét ClamAV → ghi SeaweedFS → thêm dòng `core.files`; nhiễm thì trả 422 và ghi `file.rejected` |
 | `GET /api/files/{id}` | Người có quyền với văn bản chứa tệp | Kiểm quyền qua Hasura; tệp mã hóa thì giải mã trong bộ nhớ, thêm watermark |
 | `GET /api/search?q=` | Người đăng nhập | Meilisearch, lọc thuê ước và quyền phía server |
-| `GET /api/verify/{code}` | Ẩn danh | `{result, symbol, issued_on, issuer, summary?, sha256}`; `summary` chỉ có khi `is_public` |
+| `GET /api/documents/{id}/preview` | Người đọc được văn bản đi | PDF đúng thể thức của dự thảo, chưa có số, in chữ "DỰ THẢO" |
+| `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status}}`; `summary` chỉ có khi `is_public` |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
+| `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
 
 `GET /api/files/{id}` (đã làm ở #19): svc-files hỏi Hasura `core_files_by_pk` **bằng token của người gọi** —
 Hasura trả dòng khi người gọi là người tải lên hoặc đọc được văn bản có gắn tệp — rồi mới lấy `object_key`
@@ -471,7 +490,11 @@ họ được đọc theo đúng thứ tự xếp hạng. Không trả tổng s�
 `office.documents.updated_at`.
 
 `verify_code`: 10 ký tự base32 ngẫu nhiên (50 bit) — không đoán, không liệt kê được. APISIX giới hạn tốc độ
-`/api/verify/*` theo IP.
+`/api/verify/*` theo IP (`MOC_RATE_VERIFY_PER_MIN`).
+
+`/api/verify` (đã làm): `svc-files` tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`. Vai
+trò này chỉ đọc được khung nhìn đó, tối đa một dòng mỗi lần, và không có trong token của người dùng. Khung nhìn
+chỉ có văn bản đi đã phát hành; trích yếu bị ẩn khi văn bản không công khai.
 
 ---
 
@@ -502,8 +525,11 @@ Một khuôn chung cho thông báo realtime (Centrifugo), callback và `office.d
 | `office.document.assigned` | Có việc giao cho một người hoặc phòng |
 | `office.document.processed` | Người được giao báo xong |
 | `office.document.filed` | Lãnh đạo cho lưu, không xử lý |
-| `office.document.submitted` / `approved` / `returned` | Văn bản đi được trình / duyệt / trả lại |
-| `office.document.issued` | Văn bản đi được phát hành |
+| `office.document.submitted` / `resubmitted` | Văn bản đi được trình / trình lại sau khi sửa |
+| `office.document.reviewed` | Lãnh đạo phòng đồng ý, chuyển người ký |
+| `office.document.approved` / `returned` | Người ký duyệt / trả lại (ở bước nào) |
+| `office.document.numbered` | Văn bản đi được cấp số, ký hiệu |
+| `office.document.issued` | Văn bản đi được phát hành, kèm băm và mã tra cứu |
 | `office.task.due_soon` / `office.task.overdue` / `office.task.escalated` | Timer của Flowable |
 | `office.case_file.archived` | Hồ sơ nộp lưu xong |
 | `core.file.rejected` | ClamAV chặn tệp |

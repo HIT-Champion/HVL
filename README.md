@@ -85,12 +85,20 @@ giao phòng chủ trì và phối hợp, đặt hạn → lãnh đạo phòng ph
 trong hộp việc của đúng người, hiện trên dòng thời gian văn bản và vào sổ kiểm toán chuỗi băm; tìm lại
 được bằng chữ không dấu.
 
+Lát cắt thứ hai là **văn bản đi và cổng xác thực**. Chuyên viên soạn công văn trả lời và xem trước bản PDF đúng
+thể thức NĐ 30. Sau đó dự thảo được trình lãnh đạo phòng duyệt; bị trả lại thì sửa rồi trình lại. Lãnh đạo khoa
+ký duyệt, rồi văn thư cấp số đi. Hệ thống dựng PDF có số, ký hiệu, ngày, **mã QR và SHA-256**. Người ngoài quét
+mã QR, không cần đăng nhập, thấy văn bản có thật. Thả tệp nhận được vào trang xác thực: tệp nguyên vẹn thì
+"khớp", sửa một byte thì "không khớp".
+
 ```
- Trình duyệt ──► APISIX :8080 ─┬─ /            → app-office (Nuxt, trang tĩnh)          Tầng 2
-                (kiểm JWT,     ├─ /realms/moc/* → Keycloak (đăng nhập SSO)
-                 X-Request-Id) ├─ /v1/graphql   → Hasura ─┬─ PostgreSQL (core, office)  Tầng 1
-                               │                          └─ Actions → svc-workflow → Flowable (BPMN)
-                               └─ /api/files, /api/search → svc-files ─ ClamAV · SeaweedFS · Meilisearch
+ Trình duyệt ──► APISIX :8080 ─┬─ /             → app-office (Nuxt, trang tĩnh; /xac-thuc công khai)  Tầng 2
+                (kiểm JWT,     ├─ /realms/moc/*  → Keycloak (đăng nhập SSO, TOTP)
+                 X-Request-Id) ├─ /v1/graphql    → Hasura ─┬─ PostgreSQL (core, office)               Tầng 1
+                               │                           └─ Actions → svc-workflow → Flowable (BPMN)
+                               ├─ /api/files, /api/search, /api/documents/* → svc-files
+                               └─ /api/verify (không token, giới hạn theo IP) → svc-files
+                                  svc-files: ClamAV · SeaweedFS · Meilisearch · dựng PDF (WeasyPrint)
 ```
 
 | Thành phần | Vai trò | Thư mục |
@@ -98,13 +106,14 @@ trong hộp việc của đúng người, hiện trên dòng thời gian văn b�
 | Keycloak 26 | SSO; vai trò, đơn vị, phòng đưa vào token cho Hasura | `auth/realm/` |
 | Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị, giới hạn tốc độ đăng nhập (theo IP) và API (theo phiên) | `gateway/` |
 | Hasura 2 + PostgreSQL 16 | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng, sổ kiểm toán chuỗi băm | `db/` |
-| Flowable 8 | Quy trình BPMN xử lý văn bản đến | `processes/` |
-| `svc-workflow` | Hasura Actions: vào sổ, hộp việc, hoàn thành việc; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
-| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch | `services/svc-files/` |
+| Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `processes/` |
+| `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
+| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 
-Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): văn bản đi, dựng PDF có mã QR
-và cổng xác thực (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
+Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): thông báo realtime, nhắc hạn,
+sổ đăng ký in được, neo hash sổ kiểm toán (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
+Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống
 
@@ -145,11 +154,14 @@ Authenticator). Tài khoản thật thuộc các vai trò này tự cài TOTP b�
 
 | Tài khoản | Vai trò | Thấy gì |
 |---|---|---|
-| `vanthu` | Văn thư Khoa CNTT | Tiếp nhận, vào sổ; mọi văn bản đến của khoa |
-| `truongkhoa` | Lãnh đạo khoa | Hộp việc chỉ đạo; mọi văn bản của khoa |
-| `totruongdt` | Tổ trưởng Đào tạo | Văn bản giao cho tổ; phân công |
-| `chuyenviendt`, `giamkhao` | Chuyên viên Tổ Đào tạo | Văn bản được giao cho mình |
+| `vanthu` | Văn thư Khoa CNTT | Tiếp nhận, vào sổ; cấp số, phát hành văn bản đi; mọi văn bản của khoa |
+| `truongkhoa` | Lãnh đạo khoa | Hộp việc chỉ đạo, ký duyệt văn bản đi; mọi văn bản của khoa |
+| `totruongdt` | Tổ trưởng Đào tạo | Văn bản giao cho tổ; phân công; duyệt dự thảo của tổ |
+| `chuyenviendt`, `giamkhao` | Chuyên viên Tổ Đào tạo | Văn bản được giao cho mình; soạn, trình văn bản đi |
 | `vanthukt`, `truongkhoakt` | Khoa Kinh tế | Chỉ văn bản của Khoa Kinh tế |
+
+Cổng xác thực văn bản không cần đăng nhập: <http://localhost:8080/xac-thuc>. Mã của các văn bản mẫu đã phát hành
+có trên trang chi tiết văn bản (mục Văn bản đi, tab Đã phát hành).
 
 Dừng: `make down` (giữ dữ liệu) · xóa sạch dữ liệu: `make reset` · xem mọi lệnh: `make help`.
 Trang quản trị Keycloak chỉ mở trên máy chủ: <http://127.0.0.1:8180/admin> (tài khoản `KEYCLOAK_ADMIN_*`).
@@ -179,9 +191,9 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow` | Python + [uv](https://github.com/astral-sh/uv) |
-| `make smoke` | Đi trọn luồng văn bản đến qua cổng APISIX; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ | Hệ thống đang chạy + `make seed` |
-| `make e2e` | Cùng luồng trên trình duyệt thật (Playwright, chạy trong container) | Như trên |
-| `db/tests/` | 62 test schema, quyền, sổ kiểm toán trên PostgreSQL + Hasura thật | xem `db/README.md` |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ | Hệ thống đang chạy + `make seed` |
+| `make e2e` | Hai luồng trên trình duyệt thật (Playwright, chạy trong container), kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không | Như trên |
+| `db/tests/` | 80 test schema, quyền, sổ kiểm toán, cấp số đến và đi trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
 thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, rồi

@@ -24,6 +24,11 @@ const tone: Record<string, string> = {
   in_progress: 'bg-indigo-100 text-indigo-800',
   done: 'bg-emerald-100 text-emerald-800',
   cancelled: 'bg-stone-200 text-stone-600',
+  draft: 'bg-stone-100 text-stone-700',
+  in_review: 'bg-sky-100 text-sky-800',
+  returned: 'bg-rose-100 text-rose-800',
+  approved: 'bg-indigo-100 text-indigo-800',
+  issued: 'bg-emerald-100 text-emerald-800',
 }
 </script>
 

@@ -589,3 +589,18 @@ smoke), #21 (realm), #22 (giao diện), #23 (BPMN văn bản đến), cùng #18�
 `moc_role` (một giá trị cho cả hai claim vai trò của Hasura) thay vì vai trò realm. Danh bạ `core.users` đồng
 bộ từ Keycloak. Kế tiếp: lát văn bản đi + PDF có mã QR + cổng xác thực (F2.4, F2.13). Rủi ro mới: lịch sử
 commit chỉ một tác giả (PoF #1) — cần hai bạn nhận việc Phase 2.
+
+**19/10/2026** — Phase 1 xong phần mã (còn F1.9 chờ server): CI 7 job chạy thật, `make install` (F1.8), giới hạn
+tốc độ (F1.2), TOTP bắt buộc với văn thư và lãnh đạo (F1.1), tài liệu API xuất tự động (F1.10). Làm sớm lõi của
+Phase 2:
+
+- **F2.4 và F2.13 đã chạy** từ giao diện xuống lõi, có smoke và e2e. Lát văn bản đi gồm soạn, xem trước, trình,
+  trả lại hoặc ký duyệt; văn thư cấp số đi; PDF có mã QR và SHA-256. Cổng xác thực công khai tra theo mã hoặc thả
+  tệp.
+- **PDF dựng từ khuôn HTML** (WeasyPrint, phông Liberation Serif cùng số đo Times New Roman), chưa nhận tệp dự
+  thảo `.docx` tải lên. Lý do: số, ngày, mã QR phải in đúng chỗ theo thể thức, còn tệp người dùng tải lên thì không
+  biết chỗ trống nằm đâu.
+- **Không phải chữ ký số.** Văn bản ghi "Đã duyệt trên hệ thống Mộc". Tính toàn vẹn dựa vào SHA-256 trong CSDL,
+  sổ kiểm toán chuỗi băm và cổng xác thực. Chữ ký số PKI (PAdES) để sau, nếu còn thời gian.
+- Phase 2 còn lại: Centrifugo (F2.5), timer nhắc hạn, sổ đăng ký in được (F2.8), neo hash và lệnh
+  `dxos audit verify` (F2.12), poka-yoke JSON Schema dùng chung (F2.2).

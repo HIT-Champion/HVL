@@ -9,8 +9,9 @@ Chủ: issue #15.
 | Action | Vai trò | Làm gì |
 |---|---|---|
 | `registerIncoming(documentId)` | `clerk` | Vào sổ (hàm `office.register_incoming`, một giao dịch) → khởi chạy `van-ban-den` |
+| `submitOutgoing(documentId, signerId)` | `staff` | Người soạn trình dự thảo → khởi chạy `van-ban-di`, hoặc trình lại sau khi bị trả lại |
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
-| `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable |
+| `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
@@ -33,6 +34,7 @@ Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp 
 | `MOC_PROCESSES_DIR` | `/app/processes` | Compose gắn `processes/` vào đây |
 | `MOC_SLA_DURATION` | `PT24H` | Thời hạn mỗi bước (ISO 8601) |
 | `MOC_DIRECTORY_SYNC_INTERVAL_S`, `MOC_RECONCILE_INTERVAL_S` | `15`, `300` | `0` tắt vòng nền |
+| `MOC_FILES_URL` | `http://svc-files:8000` | Dựng bản phát hành văn bản đi; gọi bằng token tài khoản dịch vụ của client `svc-workflow` |
 
 ## Phát triển
 

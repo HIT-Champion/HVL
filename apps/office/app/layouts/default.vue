@@ -42,6 +42,8 @@ const nav = computed(() => {
   if (role && role !== 'tenant_admin') items.push({ to: '/', label: t('nav.inbox'), icon: 'M3 7l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z' })
   if (role && role !== 'tenant_admin') items.push({ to: '/van-ban-den', label: t('nav.incoming'), icon: 'M4 4h10l6 6v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1zm10 0v6h6' })
   if (role === 'clerk') items.push({ to: '/van-ban-den/tiep-nhan', label: t('nav.receive'), icon: 'M12 5v14m-7-7h14' })
+  if (role && role !== 'tenant_admin') items.push({ to: '/van-ban-di', label: t('nav.outgoing'), icon: 'M4 12l16-8-6 16-2-7-8-1z' })
+  if (role === 'staff') items.push({ to: '/van-ban-di/soan', label: t('nav.compose'), icon: 'M4 20h4l10.5-10.5a2.1 2.1 0 00-3-3L5 17v3zM13.5 7.5l3 3' })
   items.push({ to: '/tim-kiem', label: t('nav.search'), icon: 'M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z' })
   return items
 })

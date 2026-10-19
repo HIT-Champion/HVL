@@ -86,9 +86,12 @@ input String_comparison_exp {
 "columns and relationships of \"core.tenants\""
 type core_tenants {
   code: String!
+  head_title: String
   id: uuid!
   name: String!
   org_ident: String
+  parent_name: String
+  place_name: String
 }
 
 "Boolean expression to filter rows from the table \"core.tenants\". All fields are combined with a logical 'AND'."
@@ -97,17 +100,36 @@ input core_tenants_bool_exp {
   _not: core_tenants_bool_exp
   _or: [core_tenants_bool_exp!]
   code: String_comparison_exp
+  head_title: String_comparison_exp
   id: uuid_comparison_exp
   name: String_comparison_exp
   org_ident: String_comparison_exp
+  parent_name: String_comparison_exp
+  place_name: String_comparison_exp
+}
+
+"response of any mutation on the table \"core.tenants\""
+type core_tenants_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [core_tenants!]!
 }
 
 "Ordering options when selecting data from \"core.tenants\"."
 input core_tenants_order_by {
   code: order_by
+  head_title: order_by
   id: order_by
   name: order_by
   org_ident: order_by
+  parent_name: order_by
+  place_name: order_by
+}
+
+"primary key columns input for table: core.tenants"
+input core_tenants_pk_columns_input {
+  id: uuid!
 }
 
 "select columns of table \"core.tenants\""
@@ -115,11 +137,24 @@ enum core_tenants_select_column {
   "column name"
   code
   "column name"
+  head_title
+  "column name"
   id
   "column name"
   name
   "column name"
   org_ident
+  "column name"
+  parent_name
+  "column name"
+  place_name
+}
+
+"input type for updating data in table \"core.tenants\""
+input core_tenants_set_input {
+  head_title: String
+  parent_name: String
+  place_name: String
 }
 
 "Streaming cursor of the table \"core_tenants\""
@@ -133,9 +168,19 @@ input core_tenants_stream_cursor_input {
 "Initial value of the column from where the streaming should start"
 input core_tenants_stream_cursor_value_input {
   code: String
+  head_title: String
   id: uuid
   name: String
   org_ident: String
+  parent_name: String
+  place_name: String
+}
+
+input core_tenants_updates {
+  "sets the columns of the filtered rows to the given values"
+  _set: core_tenants_set_input
+  "filter the rows which have to be updated"
+  where: core_tenants_bool_exp!
 }
 
 "columns and relationships of \"core.users\""
@@ -235,6 +280,24 @@ type mutation_root {
     "upsert condition"
     on_conflict: office_departments_on_conflict
   ): office_departments
+  "update data of the table: \"core.tenants\""
+  update_core_tenants(
+    "sets the columns of the filtered rows to the given values"
+    _set: core_tenants_set_input
+    "filter the rows which have to be updated"
+    where: core_tenants_bool_exp!
+  ): core_tenants_mutation_response
+  "update single row of the table: \"core.tenants\""
+  update_core_tenants_by_pk(
+    "sets the columns of the filtered rows to the given values"
+    _set: core_tenants_set_input
+    pk_columns: core_tenants_pk_columns_input!
+  ): core_tenants
+  "update multiples rows of table: \"core.tenants\""
+  update_core_tenants_many(
+    "updates to execute, in order"
+    updates: [core_tenants_updates!]!
+  ): [core_tenants_mutation_response]
   "update data of the table: \"office.departments\""
   update_office_departments(
     "sets the columns of the filtered rows to the given values"

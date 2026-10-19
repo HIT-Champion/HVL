@@ -57,6 +57,8 @@ class Settings:
     meili_api_key: str
     search_index: str
     search_sync_interval_s: float
+    public_url: str                 # in vào mã QR của văn bản phát hành: <public_url>/xac-thuc/<mã>
+    service_clients: frozenset[str]  # client Keycloak được gọi API nội bộ (/internal/*)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -85,6 +87,11 @@ class Settings:
                 search_index=env.get("MOC_SEARCH_INDEX", "documents"),
                 # 0: tắt vòng đồng bộ nền (test gọi sync_once trực tiếp)
                 search_sync_interval_s=float(env.get("MOC_SEARCH_SYNC_INTERVAL_S", "5")),
+                # mặc định: phần trước /realms/ của issuer, tức URL công khai của cổng
+                public_url=(env.get("MOC_PUBLIC_URL") or env["MOC_OIDC_ISSUER"].split("/realms/")[0]).rstrip("/"),
+                service_clients=frozenset(
+                    c.strip() for c in env.get("MOC_SERVICE_CLIENTS", "svc-workflow").split(",") if c.strip()
+                ),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc

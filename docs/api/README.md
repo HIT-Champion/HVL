@@ -5,9 +5,10 @@ Mọi ứng dụng gọi lõi qua **một cổng duy nhất**: APISIX ở `MOC_P
 Có hai loại API:
 
 - **GraphQL** (Hasura) cho dữ liệu có cấu trúc và thao tác nghiệp vụ.
-- **REST** (`svc-files`) cho tệp và tìm kiếm.
+- **REST** (`svc-files`) cho tệp, tìm kiếm, bản xem trước văn bản đi và cổng xác thực.
 
-Dù gọi theo cách nào, người gọi cũng phải có token Keycloak, và đơn vị lẫn vai trò luôn lấy từ token.
+Dù gọi theo cách nào, người gọi cũng phải có token Keycloak, và đơn vị lẫn vai trò luôn lấy từ token. Ngoại lệ
+duy nhất là cổng xác thực văn bản đã phát hành (`/api/verify`), ai cũng gọi được.
 
 ## Tệp trong thư mục này
 
@@ -41,7 +42,8 @@ cũng nạp được.
 |---|---|---|
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
-| `POST /api/files`, `GET /api/files/{id}`, `GET /api/search` | `svc-files` | Bắt buộc |
+| `POST /api/files`, `GET /api/files/{id}`, `GET /api/search`, `GET /api/documents/{id}/preview` | `svc-files` | Bắt buộc |
+| `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
 
 Cổng trả `404` cho các đường còn lại:
@@ -109,6 +111,7 @@ Action đều gọi lại được sau lỗi mạng mà không cấp số hai l�
 | Action | Ai gọi | Làm gì |
 |---|---|---|
 | `registerIncoming(documentId)` | `clerk` | Vào sổ văn bản đến: cấp số đến liên tiếp, khởi chạy quy trình `van-ban-den` |
+| `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Trình dự thảo văn bản đi cho lãnh đạo phòng duyệt, chọn lãnh đạo đơn vị ký; trình lại sau khi bị trả lại |
 | `myTasks` | `clerk`, `staff`, `manager`, `director` | Hộp việc: việc giao đích danh và việc của nhóm vai trò, khẩn xếp trước |
 | `completeTask(taskId, outcome, data)` | Người được giao việc | Hoàn thành việc; `data` kiểm theo loại việc |
 
@@ -130,6 +133,16 @@ gql '{"query": "mutation ($id: uuid!) { registerIncoming(documentId: $id) { regi
       "variables": {"id": "<id ở bước 2>"}}'
 ```
 
+Văn bản đi của chuyên viên: soạn dự thảo (`insert_office_documents_one` với `body`, `recipients`) → tải bản xem
+trước (§3) → `submitOutgoing` → lãnh đạo phòng `completeTask` việc `vbdi.duyetPhong` → người ký `vbdi.duyetDonVi`
+→ văn thư `vbdi.phatHanh` với `outcome: "issue"`. Bước cuối cấp số đi, dựng PDF có mã QR và gắn vào văn bản với
+vai trò `issued`; `verify_code` và `content_sha256` của văn bản là mã tra cứu và băm của tệp đó.
+
+```bash
+gql '{"query": "mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }",
+      "variables": {"d": "<id dự thảo>", "s": "<id lãnh đạo đơn vị trong core_users>"}}'
+```
+
 **Lỗi.** Hasura trả HTTP 200 kèm `errors`. Lỗi của Action có `extensions.code` do `svc-workflow` đặt, ví dụ
 `task_taken`, `not_your_task`, `wrong_status`; `message` là câu tiếng Việt hiển thị được cho người dùng:
 
@@ -146,11 +159,21 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `POST /api/files` (multipart, trường `file`) | Quét ClamAV, sạch mới lưu → `201 {id, filename, mime_type, size_bytes, sha256, scanned_at}`. Tệp nhiễm → `422`, không lưu, ghi sổ kiểm toán |
 | `GET /api/files/{id}` | Tải về nếu người gọi được xem; không có tệp và không được xem đều trả `404` |
 | `GET /api/search?q=…` | Tìm theo số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được; chỉ trả văn bản người gọi được đọc |
+| `GET /api/documents/{id}/preview` | PDF đúng thể thức NĐ 30 của dự thảo văn bản đi, chưa có số, in chữ "DỰ THẢO"; văn bản đã phát hành thì tải bản phát hành |
+| `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
+| `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
 
 ```bash
 curl -s -OJ "$MOC/api/files/$FILE" -H "Authorization: Bearer $TOKEN"
 curl -s -G "$MOC/api/search" -H "Authorization: Bearer $TOKEN" --data-urlencode 'q=tuyen sinh' --data-urlencode limit=10
+
+# cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
+curl -s "$MOC/api/verify/ABCDE-23456"
+curl -s "$MOC/api/verify?sha256=$(sha256sum cong-van-nhan-duoc.pdf | cut -d' ' -f1)"
 ```
+
+Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi đúng hai đường trên; ứng dụng khác
+cũng dùng được để tự kiểm văn bản nhận được.
 
 Tệp được gắn vào văn bản bằng GraphQL (`files` khi tạo văn bản, hoặc `insert_office_document_files_one`), không
 qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
@@ -162,6 +185,7 @@ qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "messag
 - **Giới hạn tốc độ**, vượt thì trả `429`:
   - Đăng nhập và cấp token: theo địa chỉ IP, `MOC_RATE_LOGIN_PER_MIN` (mặc định 60/phút).
   - GraphQL và tệp: theo token, `MOC_RATE_API_PER_MIN` (mặc định 300/phút).
+  - Cổng xác thực: theo địa chỉ IP, `MOC_RATE_VERIFY_PER_MIN` (mặc định 30/phút).
   - Phản hồi có `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (giây).
 - **Thuê ước**: không gửi `tenant_id`; Hasura và `svc-files` lấy từ token. Người của đơn vị này không đọc được
   dữ liệu của đơn vị khác (`make smoke` kiểm).
@@ -172,4 +196,5 @@ qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "messag
 |---|---|---|
 | Hasura → `svc-workflow` `POST /actions/{name}` | Tiêu đề `X-Moc-Action-Secret` và biến phiên lấy từ JWT | [`openapi/svc-workflow.json`](openapi/svc-workflow.json) |
 | `svc-files`, `svc-workflow` → Hasura | Khóa quản trị + `X-Hasura-Role: service` + đơn vị, người dùng, request id lấy từ token | [`db/README.md`](../../db/README.md#dịch-vụ-gọi-hasura) |
+| `svc-workflow` → `svc-files` `POST /internal/issue` | Token tài khoản dịch vụ `svc-workflow` (client credentials của Keycloak) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → Flowable REST, Keycloak | Tài khoản dịch vụ | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |

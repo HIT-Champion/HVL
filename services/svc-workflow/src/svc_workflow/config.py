@@ -43,6 +43,7 @@ class Settings:
     flowable_url: str
     flowable_user: str
     flowable_password: str
+    files_url: str
     processes_dir: str
     sla_duration: str
     keycloak_url: str
@@ -67,6 +68,7 @@ class Settings:
                 flowable_url=env.get("FLOWABLE_URL", "http://flowable:8080/flowable-rest/service").rstrip("/"),
                 flowable_user=env.get("FLOWABLE_ADMIN_USER", "rest-admin"),
                 flowable_password=env["FLOWABLE_ADMIN_PASSWORD"],
+                files_url=env.get("MOC_FILES_URL", "http://svc-files:8000").rstrip("/"),
                 processes_dir=env.get("MOC_PROCESSES_DIR", "/app/processes"),
                 sla_duration=env.get("MOC_SLA_DURATION", "PT24H"),
                 keycloak_url=env.get("MOC_KEYCLOAK_URL", "http://keycloak:8080").rstrip("/"),

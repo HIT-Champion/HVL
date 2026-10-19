@@ -14,49 +14,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { createHmac } from 'node:crypto'
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+import { PASSWORD, PDF, TOTP_SECRET, shot, signIn } from './helpers'
 
 // Kịch bản demo (docs/dac-ta-san-pham.md §7, màn 1–2) trên giao diện thật: văn thư tiếp nhận và vào sổ →
 // lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu.
 
-const PASSWORD = process.env.MOC_DEMO_PASSWORD ?? ''
-const TOTP_SECRET = process.env.MOC_DEMO_TOTP_SECRET ?? ''
-const SHOTS = process.env.MOC_E2E_SCREENSHOTS ?? 'test-results/screens'
 const tag = Math.random().toString(36).slice(2, 7).toUpperCase()
 const summary = `Về việc rà soát chương trình đào tạo ngành Kỹ thuật phần mềm năm 2027 (thử ${tag})`
-
-// Tệp PDF tối thiểu hợp lệ để tải lên (ClamAV quét như tệp thật)
-const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n')
-
-// Mã TOTP (RFC 6238: HMAC-SHA1, 6 số, 30 giây) từ khóa chung mà make seed cài cho văn thư, lãnh đạo.
-// Keycloak dùng chính chuỗi khóa làm khóa HMAC.
-function totp(secret: string): string {
-  const counter = Buffer.alloc(8)
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)))
-  const mac = createHmac('sha1', secret).update(counter).digest()
-  const offset = mac[mac.length - 1] & 0x0f
-  return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0')
-}
-
-async function signIn(browser: Browser, username: string, { otp = false } = {}): Promise<Page> {
-  const page = await (await browser.newContext()).newPage()
-  await page.goto('/')
-  await page.locator('#username').fill(username)
-  await page.locator('#password').fill(PASSWORD)
-  await page.locator('#kc-login').click()
-  if (otp) {
-    // Xác thực hai bước bắt buộc với văn thư, lãnh đạo (luồng moc-browser của realm)
-    await page.locator('#otp').fill(totp(TOTP_SECRET))
-    await page.locator('#kc-login').click()
-  }
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-  return page
-}
-
-async function shot(page: Page, name: string) {
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
-}
 
 async function openTask(page: Page, screenshot?: string) {
   await page.goto('/')

@@ -4,10 +4,12 @@ Cửa duy nhất để tệp vào và ra khỏi kho đối tượng của Mộc.
 sạch mới ghi vào SeaweedFS và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp
 chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
-Hasura quyết ai được đọc văn bản nào.
+Hasura quyết ai được đọc văn bản nào. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
+trả lời người ngoài một văn bản có thật, còn nguyên vẹn không.
 
-Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch) và F1.7 (tìm kiếm) trong
-[`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI · issue #19, #20.
+Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 (tìm kiếm), F2.4 (dựng PDF văn bản đi)
+và F2.13 (cổng xác thực) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+issue #19, #20.
 
 ## Trạng thái
 
@@ -19,8 +21,9 @@ Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiể
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
 | Tìm trong nội dung PDF có lớp chữ (trường `content` đã chừa sẵn) | Phase 2 (F2.7) |
 | Giải mã văn bản hạn chế, watermark khi tải | Phase 3 (F3.7) |
-| `/api/search` (Meilisearch) | #20 |
-| `/api/verify/*`, dựng PDF văn bản đi | Phase 2 (F2.13, F2.4) |
+| `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
+| `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
+| `GET /api/verify/{mã}`, `GET /api/verify?sha256=`: không cần đăng nhập | **Xong** (F2.13) |
 
 ## API
 
@@ -37,6 +40,10 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` |
 | `GET /api/search?q=` | `200` `{hits: [...], next_offset}` · `400` câu tìm trống · `422` tham số sai · `401` · `503` |
+| `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
+| `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456` |
+| `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
+| `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `GET /healthz` | Tiến trình còn sống |
 | `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"` |
 
@@ -67,6 +74,20 @@ do APISIX gắn); mã này cũng đi vào cột `request_id` của sổ kiểm t
 Hasura (khóa quản trị, chỉ đọc) và ghi đè vào Meilisearch theo id. Mỗi lượt đọc lùi lại 60 giây để không sót
 giao dịch ghi xong muộn; văn bản chưa đổi không bị đẩy lại. Khởi động lại thì đồng bộ lại toàn bộ.
 
+### Văn bản đi và cổng xác thực
+
+- **Dựng PDF** (`render.py`): khuôn HTML theo thể thức NĐ 30, Phụ lục I — cơ quan chủ quản, tên đơn vị, số ký
+  hiệu, quốc hiệu, tiêu ngữ, địa danh và ngày (ngày dưới 10, tháng 1–2 có số 0), tên loại và trích yếu (công văn:
+  "V/v …" dưới số, "Kính gửi"), nội dung, nơi nhận kèm "Lưu: VT, <phòng>.", chức vụ và tên người ký, giờ ký duyệt
+  trên Mộc. Bản phát hành có mã QR dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. Mọi chữ người dùng nhập được thoát
+  HTML. Phông Liberation Serif (cùng số đo Times New Roman) cài trong image.
+- **Không phải chữ ký số.** "Đã duyệt trên hệ thống Mộc" chỉ ghi lại việc người ký bấm duyệt trong Mộc. Tính toàn
+  vẹn đến từ SHA-256 của tệp, lưu trong CSDL và trong sổ kiểm toán chuỗi băm, kiểm được ở cổng xác thực.
+- **Dữ liệu dựng lấy từ CSDL**, không từ người gọi: `/internal/issue` chỉ nhận id văn bản, thuê ước, người thực
+  hiện. Bản phát hành vẫn qua ClamAV và vào `core.files` như mọi tệp.
+- **Cổng xác thực** tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`, mỗi lần đúng một văn
+  bản. Nhật ký chỉ ghi cách tra (mã hay băm) và kết quả.
+
 ### Gọi Hasura
 
 | Việc | Gọi bằng |
@@ -75,6 +96,9 @@ giao dịch ghi xong muộn; văn bản chưa đổi không bị đẩy lại. K
 | Lọc kết quả tìm kiếm theo quyền | Token của người dùng |
 | Thêm dòng `core.files`, ghi `file.rejected`, đọc `object_key` | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng, request id lấy từ token đã kiểm |
 | Đọc văn bản mới sửa để đồng bộ chỉ mục | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, không nhận tham số từ người dùng |
+| Đọc văn bản để dựng bản xem trước | Token của người dùng |
+| Đọc văn bản để dựng bản phát hành | Khóa quản trị + `X-Hasura-Role: service` + thuê ước trong yêu cầu của svc-workflow |
+| Tra cứu ở cổng xác thực | Khóa quản trị + `X-Hasura-Role: verifier` |
 
 ## Cấu hình
 
@@ -97,6 +121,8 @@ giao dịch ghi xong muộn; văn bản chưa đổi không bị đẩy lại. K
 | `MEILISEARCH_API_KEY` | **bắt buộc** | Hiện dùng master key của Meilisearch (chỉ trong mạng nội bộ) |
 | `MOC_SEARCH_INDEX` | `documents` | Tự tạo và áp cấu hình khi khởi động |
 | `MOC_SEARCH_SYNC_INTERVAL_S` | `5` | `0` tắt vòng đồng bộ nền |
+| `MOC_PUBLIC_URL` | phần trước `/realms/` của `MOC_OIDC_ISSUER` | In vào mã QR của bản phát hành |
+| `MOC_SERVICE_CLIENTS` | `svc-workflow` | Client Keycloak được gọi `/internal/*`, cách nhau dấu phẩy |
 
 ## Phát triển
 

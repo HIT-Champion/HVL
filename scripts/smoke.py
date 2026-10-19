@@ -17,13 +17,16 @@
 """make smoke — đi trọn luồng văn bản đến qua cổng APISIX, như người dùng thật (cần make seed trước).
 
 văn thư tải công văn lên (qua ClamAV) → nhập văn bản → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
-Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Kèm các kiểm tra chặn: tệp
-EICAR, không token, đường quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập
-mã TOTP; giới hạn tốc độ.
+Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Rồi luồng văn bản đi: chuyên
+viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
+mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Kèm các kiểm tra chặn: tệp EICAR, không
+token, đường quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới
+hạn tốc độ.
 """
 
 from __future__ import annotations
 
+import hashlib
 import html
 import http.cookiejar
 import re
@@ -182,6 +185,52 @@ def main() -> None:
     except HTTPError as exc:
         exc.status == 404 or fail(f"tải tệp của đơn vị khác trả {exc.status}")
     ok("đơn vị khác không tải được tệp (404)")
+
+    print("Văn bản đi")
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    out_id = staff.gql(
+        "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id status } }",
+        {"o": {
+            "type_code": "CV", "reply_to_id": doc_id, "recipients": ["Phòng Đào tạo"],
+            "summary": f"Về việc báo cáo kết quả rà soát chương trình đào tạo (kiểm tra {tag})",
+            "body": "Phúc đáp công văn của Phòng Đào tạo, Khoa báo cáo kết quả rà soát chương trình đào tạo.\n"
+                    "Đề nghị Phòng tổng hợp, báo cáo Ban Giám hiệu.",
+        }},
+    )["insert_office_documents_one"]["id"]
+    _, _, preview = request("GET", f"{PUBLIC_URL}/api/documents/{out_id}/preview", headers=staff.auth)
+    preview.startswith(b"%PDF-") or fail("xem trước dự thảo không ra tệp PDF")
+    ok("chuyên viên soạn công văn trả lời, xem trước bản PDF (DỰ THẢO)")
+
+    staff.gql("mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }",
+              {"d": out_id, "s": signer})
+    manager.complete(manager.wait_task(out_id, "vbdi.duyetPhong"), "approve", {"note": "Đồng ý, trình ký."})
+    director.complete(director.wait_task(out_id, "vbdi.duyetDonVi"), "approve", {})
+    ok("trình → tổ trưởng duyệt → lãnh đạo khoa ký duyệt")
+
+    clerk.complete(clerk.wait_task(out_id, "vbdi.phatHanh"), "issue", {"is_public": True})
+    issued = clerk.gql("""query ($id: uuid!) { office_documents_by_pk(id: $id) { status symbol verify_code
+        content_sha256 files(where: {role: {_eq: "issued"}}) { file_id } } }""", {"id": out_id})["office_documents_by_pk"]
+    issued["status"] == "issued" and re.fullmatch(r"\d{2,}/CNTT-ĐT", issued["symbol"] or "") and issued["files"] \
+        or fail(f"phát hành chưa đúng: {issued}")
+    _, _, released = request("GET", f"{PUBLIC_URL}/api/files/{issued['files'][0]['file_id']}", headers=clerk.auth)
+    sha = hashlib.sha256(released).hexdigest()
+    released.startswith(b"%PDF-") and issued["content_sha256"] == "\\x" + sha \
+        or fail("tệp phát hành không phải PDF hoặc băm không khớp CSDL")
+    ok(f"văn thư phát hành: số {issued['symbol']}, tệp PDF có mã QR, SHA-256 khớp CSDL")
+
+    print("Cổng xác thực (không đăng nhập)")
+    found, headers = call_json("GET", f"{PUBLIC_URL}/api/verify/{issued['verify_code']}")
+    found["result"] == "valid" and found["document"]["symbol"] == issued["symbol"] \
+        or fail(f"tra mã tra cứu không ra văn bản: {found}")
+    header(headers, "X-RateLimit-Limit") == ENV.get("MOC_RATE_VERIFY_PER_MIN", "30") \
+        or fail("cổng xác thực không có giới hạn tra cứu như cấu hình")
+    ok("tra mã in cạnh mã QR → đúng văn bản; giới hạn tra cứu theo địa chỉ IP")
+    tampered = bytearray(released)
+    tampered[len(tampered) // 2] ^= 1
+    same = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={sha}")[0]["result"]
+    changed = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(tampered).hexdigest()}")[0]["result"]
+    (same, changed) == ("valid", "not_found") or fail(f"tra theo băm sai: nguyên vẹn {same}, đã sửa {changed}")
+    ok("tệp nguyên vẹn → khớp; sửa một byte → không khớp")
 
     # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
     print("Giới hạn tốc độ")

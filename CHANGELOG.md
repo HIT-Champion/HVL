@@ -52,7 +52,7 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - Giới hạn tốc độ ở cổng APISIX (F1.2), vượt thì trả 429: đường nhận mật khẩu và cấp token theo địa chỉ IP
   (`MOC_RATE_LOGIN_PER_MIN`, mặc định 60/phút), GraphQL và tệp theo phiên đăng nhập (`MOC_RATE_API_PER_MIN`,
   mặc định 300/phút). Giao diện báo "thao tác quá nhanh" thay cho lỗi chung; `make smoke` thêm 3 kiểm tra.
-- CI chạy kiểm thử thật trên mọi PR: test đơn vị dịch vụ, 62 test schema và quyền trên PostgreSQL + Hasura,
+- CI chạy kiểm thử thật trên mọi PR: test đơn vị dịch vụ, test schema và quyền trên PostgreSQL + Hasura,
   dựng toàn hệ thống rồi `make seed` → `make smoke` → `make e2e`; quét bí mật trong lịch sử commit
   (gitleaks) và lỗ hổng phụ thuộc (OSV-Scanner); kiểm workflow bằng actionlint.
 - `make install PREFIX=/opt/moc` và `make uninstall`: cài ra ngoài thư mục mã nguồn — image của đội gắn thẻ
@@ -61,6 +61,16 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - Tài liệu API (`docs/api/`, F1.10): hướng dẫn lấy token và gọi GraphQL, REST qua cổng; schema GraphQL mà
   từng vai trò thấy, bảng vai trò × truy vấn/thao tác ghi, OpenAPI của `svc-files` và `svc-workflow` — xuất
   từ hệ thống đang chạy bằng `make api-docs`, CI báo lỗi khi tài liệu lệch mã (#24).
+- Văn bản đi (F2.4): chuyên viên soạn dự thảo (nội dung, nơi nhận, trả lời văn bản đến, tài liệu kèm theo),
+  xem trước PDF đúng thể thức NĐ 30/2020; quy trình BPMN `van-ban-di` — lãnh đạo phòng duyệt, lãnh đạo đơn vị
+  ký, trả lại ở bước nào cũng về người soạn sửa rồi trình lại (Action `submitOutgoing`); văn thư cấp số đi liên
+  tiếp theo năm, ký hiệu theo NĐ 30 (`05/TB-CNTT`, `05/CNTT-ĐT`) trong một giao dịch; `svc-files` dựng bản phát
+  hành bằng WeasyPrint có mã QR, quét ClamAV rồi lưu, SHA-256 ghi vào CSDL và sổ kiểm toán (#29).
+- Cổng xác thực văn bản (F2.13): `/api/verify` không cần đăng nhập, mỗi lần đúng một văn bản theo mã tra cứu
+  hoặc SHA-256, APISIX giới hạn theo IP (`MOC_RATE_VERIFY_PER_MIN`); trang `/xac-thuc` mở thẳng từ mã QR, thả
+  tệp PDF thì trình duyệt tự tính SHA-256 — tệp không tải lên — và báo khớp hay đã bị sửa (#30).
+- `make seed` thêm 6 văn bản đi ở đủ các bước; `make smoke` thêm 5 kiểm tra (tổng 23); `make e2e` thêm kịch
+  bản văn bản đi: soạn, trả lại, trình lại, ký, phát hành, người ngoài kiểm tệp ở cổng xác thực.
 
 ### Đã sửa đổi
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,

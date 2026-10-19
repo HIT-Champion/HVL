@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright 2026 Mộc Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+
+<!--
+  Quy trình duyệt và phát hành văn bản đi (F2.4, NĐ 30/2020 Điều 13–15). Chuyên viên trình (Action
+  submitOutgoing) thì svc-workflow khởi chạy quy trình với businessKey = id văn bản. Dữ liệu nghiệp vụ nằm ở
+  PostgreSQL; quy trình chỉ giữ bước đang đến và ai phải làm (docs/ke-hoach-phat-trien.md §2.1).
+
+  Bị trả lại ở bước nào cũng về người soạn (vbdi.chinhSua); người soạn sửa rồi trình lại bằng submitOutgoing,
+  quy trình quay về bước duyệt cấp phòng — một văn bản chỉ có một phiên quy trình.
+
+  Nhóm ứng viên: t:<tenantId>:d:<departmentId>:manager, t:<tenantId>:clerk — svc-workflow ánh xạ từ vai trò và
+  phòng trong token. Biến:
+    departmentId  phòng soạn thảo
+    drafterId     người soạn (sub)
+    signerId      lãnh đạo đơn vị ký (sub), người soạn chọn khi trình
+    outcome       approve | return (duyệt) · issue (phát hành)
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="https://moc.example/bpmn">
+
+  <process id="van-ban-di" name="Duyệt và phát hành văn bản đi" isExecutable="true">
+
+    <startEvent id="trinh" name="Chuyên viên trình"/>
+    <sequenceFlow id="f1" sourceRef="trinh" targetRef="duyetPhong"/>
+
+    <userTask id="duyetPhong" name="Duyệt dự thảo cấp phòng" flowable:formKey="vbdi.duyetPhong"
+              flowable:candidateGroups="t:${tenantId}:d:${departmentId}:manager"/>
+    <sequenceFlow id="f2" sourceRef="duyetPhong" targetRef="sauDuyetPhong"/>
+
+    <exclusiveGateway id="sauDuyetPhong" name="Lãnh đạo phòng đồng ý?"/>
+    <sequenceFlow id="f3" name="Đồng ý, trình ký" sourceRef="sauDuyetPhong" targetRef="duyetDonVi">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${outcome == 'approve'}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="f4" name="Trả lại" sourceRef="sauDuyetPhong" targetRef="chinhSua">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${outcome == 'return'}]]></conditionExpression>
+    </sequenceFlow>
+
+    <userTask id="duyetDonVi" name="Duyệt và ký văn bản" flowable:formKey="vbdi.duyetDonVi"
+              flowable:assignee="${signerId}"/>
+    <sequenceFlow id="f5" sourceRef="duyetDonVi" targetRef="sauDuyetDonVi"/>
+
+    <exclusiveGateway id="sauDuyetDonVi" name="Lãnh đạo đơn vị ký?"/>
+    <sequenceFlow id="f6" name="Ký, chuyển phát hành" sourceRef="sauDuyetDonVi" targetRef="phatHanh">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${outcome == 'approve'}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="f7" name="Trả lại" sourceRef="sauDuyetDonVi" targetRef="chinhSua">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${outcome == 'return'}]]></conditionExpression>
+    </sequenceFlow>
+
+    <userTask id="chinhSua" name="Sửa dự thảo theo ý kiến" flowable:formKey="vbdi.chinhSua"
+              flowable:assignee="${drafterId}"/>
+    <sequenceFlow id="f8" sourceRef="chinhSua" targetRef="duyetPhong"/>
+
+    <userTask id="phatHanh" name="Cấp số và phát hành" flowable:formKey="vbdi.phatHanh"
+              flowable:candidateGroups="t:${tenantId}:clerk"/>
+    <sequenceFlow id="f9" sourceRef="phatHanh" targetRef="daPhatHanh"/>
+
+    <endEvent id="daPhatHanh" name="Đã phát hành"/>
+  </process>
+</definitions>

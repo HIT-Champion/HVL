@@ -29,6 +29,8 @@
 #     loạt; Keycloak còn tự khóa từng tài khoản sau 10 lần sai (bruteForceProtected trong realm)
 #   - GraphQL và tệp: theo phiên đăng nhập (MOC_RATE_API_PER_MIN) — không theo IP, để cả văn phòng dùng
 #     chung một IP không bị chặn lây vì một người; mở phiên mới lại phải qua giới hạn đăng nhập
+#   - cổng xác thực văn bản, không cần đăng nhập: theo địa chỉ IP (MOC_RATE_VERIFY_PER_MIN) — không dò được
+#     mã tra cứu hàng loạt
 
 upstreams:
   - id: keycloak
@@ -112,10 +114,26 @@ routes:
           remove: [X-Hasura-Admin-Secret]
 
   - id: svc-files
-    uris: ["/api/files", "/api/files/*", "/api/search"]
+    uris: ["/api/files", "/api/files/*", "/api/search", "/api/documents/*"]
     methods: [GET, POST]
     upstream_id: svc-files
     plugin_config_id: can-token
+
+  # Cổng xác thực văn bản đã phát hành (F2.13): ai cũng gọi được, không cần token — chỉ đọc, mỗi lần đúng một
+  # văn bản theo mã tra cứu hoặc băm, không liệt kê được
+  - id: xac-thuc
+    uris: ["/api/verify", "/api/verify/*"]
+    methods: [GET]
+    upstream_id: svc-files
+    plugins:
+      limit-count:
+        count: ${{MOC_RATE_VERIFY_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Tra cứu quá nhiều trong một phút, thử lại sau ít giây."
 
   # Giao diện quản trị và API nội bộ của các thành phần lõi: không bao giờ qua cổng
   - id: chan

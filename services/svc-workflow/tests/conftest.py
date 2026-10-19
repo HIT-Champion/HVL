@@ -24,6 +24,7 @@ from typing import Any
 
 import pytest
 
+from svc_workflow.files import FilesError
 from svc_workflow.flowable import FlowableError, Task
 from svc_workflow.hasura import Actor, HasuraError
 from svc_workflow.workflow import Workflow
@@ -33,6 +34,7 @@ OTHER = uuid.UUID("318da474-60d6-4a90-aa7f-928b31b8fc59")
 DEPT_DT = uuid.UUID("5cc372aa-304d-4574-896c-4f3e781a2ce7")
 DEPT_KTPM = uuid.UUID("7ee31261-b14c-4c42-8e1b-9a7e99935412")
 DOC = "11111111-1111-4111-8111-111111111111"
+OUT = "22222222-2222-4222-8222-222222222222"
 
 
 def actor(role: str, user: str = "u-1", tenant: uuid.UUID = TENANT, dept: uuid.UUID | None = None) -> Actor:
@@ -52,8 +54,8 @@ class FakeFlowable:
 
     def add_task(self, task_id: str, form_key: str, *, assignee: str | None = None, groups: list[str] | None = None,
                  tenant: uuid.UUID = TENANT, urgency: str = "normal", created: str = "2026-10-18T09:00:00Z",
-                 doc: str = DOC) -> None:
-        self.tasks[task_id] = Task(task_id, form_key, form_key, assignee, f"p-{task_id}", created,
+                 doc: str = DOC, process: str | None = None) -> None:
+        self.tasks[task_id] = Task(task_id, form_key, form_key, assignee, process or f"p-{task_id}", created,
                                    {"tenantId": str(tenant), "documentId": doc, "urgency": urgency})
         self.groups[task_id] = groups or []
 
@@ -110,6 +112,13 @@ class FakeHasura:
         "id": DOC, "direction": "in", "status": "registered", "urgency": "khan", "due_on": None,
         "registered_at": "2026-10-18T08:00:00Z", "process_id": None,
     })
+    outgoing: dict[str, Any] = field(default_factory=lambda: {
+        "id": OUT, "direction": "out", "status": "draft", "created_by": "u-staff-dt", "department_id": str(DEPT_DT),
+        "signer_id": None, "process_id": None, "urgency": "normal", "summary": "Thông báo lịch họp giao ban",
+        "body": "Khoa thông báo lịch họp.", "recipients": ["Các bộ môn"], "register_number": None, "symbol": None,
+        "verify_code": None,
+    })
+    numbered: list[dict[str, Any]] = field(default_factory=list)
     writes: list[tuple[str, dict[str, Any], Actor]] = field(default_factory=list)
     fail_writes: str | None = None
     register_error: str | None = None
@@ -124,6 +133,14 @@ class FakeHasura:
                 raise HasuraError("không có văn bản x", "data-exception")
             self.document.update(status="registered", register_number=7)
             return {"office_register_incoming": [{**self.document, "register_number": 7}]}
+        if op == "Outgoing":
+            return {"office_documents_by_pk": self.outgoing if actor.tenant_id == TENANT else None}
+        if op == "NumberOutgoing":
+            self.numbered.append(variables)
+            code = self.outgoing["verify_code"] or variables["code"]
+            self.outgoing.update(register_number=5, symbol="05/TB-CNTT", verify_code=code)
+            return {"office_number_outgoing": [{"id": OUT, "register_number": 5, "symbol": "05/TB-CNTT",
+                                                "verify_code": code}]}
         if op == "Document":
             return {"office_documents_by_pk": self.document if actor.tenant_id == TENANT else None}
         if op == "OpenAssignments":
@@ -144,7 +161,7 @@ class FakeHasura:
         if self.fail_writes:
             raise HasuraError(self.fail_writes, "constraint-violation")
         self.writes.append((op, variables, actor))
-        if "event" in variables:
+        if "task_id" in (variables.get("event") or {}).get("data", {}):
             self.events_with_task.add(variables["event"]["data"]["task_id"])
         return {}
 
@@ -155,6 +172,27 @@ class FakeHasura:
 
     async def as_system(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         return {"office_documents": []}
+
+
+@dataclass
+class FakeFiles:
+    """svc-files giả: dựng PDF phát hành."""
+
+    calls: list[tuple[str, str]] = field(default_factory=list)
+    down: bool = False
+
+    async def issue(self, actor: Actor, document_id: str) -> dict[str, Any]:
+        if self.down:
+            raise FilesError("svc-files trả 503", 503)
+        self.calls.append((actor.user_id, document_id))
+        return {"file_id": f"f-{len(self.calls)}", "sha256": "ab" * 32, "size_bytes": 4321}
+
+    async def aclose(self) -> None: ...
+
+
+@pytest.fixture
+def files() -> FakeFiles:
+    return FakeFiles()
 
 
 @pytest.fixture
@@ -170,10 +208,11 @@ def hasura() -> FakeHasura:
         "u-staff-dt": {"id": "u-staff-dt", "department_id": str(DEPT_DT), "role": "staff", "enabled": True},
         "u-staff-ktpm": {"id": "u-staff-ktpm", "department_id": str(DEPT_KTPM), "role": "staff", "enabled": True},
         "u-clerk": {"id": "u-clerk", "department_id": None, "role": "clerk", "enabled": True},
+        "u-director": {"id": "u-director", "department_id": None, "role": "director", "enabled": True},
     }
     return h
 
 
 @pytest.fixture
-def workflow(hasura: FakeHasura, flowable: FakeFlowable) -> Workflow:
-    return Workflow(hasura, flowable)  # type: ignore[arg-type]
+def workflow(hasura: FakeHasura, flowable: FakeFlowable, files: FakeFiles) -> Workflow:
+    return Workflow(hasura, flowable, files)  # type: ignore[arg-type]
