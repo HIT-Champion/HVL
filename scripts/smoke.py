@@ -27,7 +27,7 @@ import sys
 import uuid
 from datetime import date, timedelta
 
-from moc_env import PUBLIC_URL, HTTPError, Session, call_json, request
+from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, request
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -48,6 +48,10 @@ def ok(message: str) -> None:
 def fail(message: str) -> None:
     print(f"  ✗ {message}")
     sys.exit(1)
+
+
+def header(headers: dict[str, str], name: str) -> str | None:
+    return next((v for k, v in headers.items() if k.lower() == name.lower()), None)
 
 
 def main() -> None:
@@ -139,6 +143,37 @@ def main() -> None:
     except HTTPError as exc:
         exc.status == 404 or fail(f"tải tệp của đơn vị khác trả {exc.status}")
     ok("đơn vị khác không tải được tệp (404)")
+
+    # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
+    print("Giới hạn tốc độ")
+    _, headers = call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={
+        "grant_type": "password", "client_id": "moc-cli", "username": "vanthu",
+        "password": ENV["MOC_DEMO_PASSWORD"], "scope": "openid"})
+    login_limit = header(headers, "X-RateLimit-Limit")
+    login_limit and login_limit == ENV.get("MOC_RATE_LOGIN_PER_MIN", login_limit) \
+        or fail(f"đường đăng nhập không có giới hạn tốc độ như cấu hình ({login_limit})")
+    ok(f"đăng nhập giới hạn {login_limit} lần mỗi phút theo địa chỉ IP")
+
+    burst = Session("chuyenviendt")  # phiên mới: bộ đếm riêng, không ảnh hưởng các phiên ở trên
+
+    def ping(session: Session) -> dict[str, str]:
+        return call_json("POST", f"{PUBLIC_URL}/v1/graphql", {"query": "{ __typename }"}, headers=session.auth)[1]
+
+    for _ in range(2):  # cửa sổ đếm sang phút mới giữa chừng thì thử lại một lần
+        remaining = int(header(ping(burst), "X-RateLimit-Remaining") or -1)
+        remaining >= 0 or fail("GraphQL không có giới hạn tốc độ")
+        for _ in range(remaining):
+            ping(burst)
+        try:
+            ping(burst)
+        except HTTPError as exc:
+            exc.status == 429 or fail(f"vượt giới hạn mà GraphQL trả {exc.status}")
+            break
+    else:
+        fail("vượt giới hạn mà GraphQL vẫn trả lời")
+    ok("một phiên gọi GraphQL vượt giới hạn mỗi phút → 429")
+    ping(clerk)
+    ok("phiên khác vẫn gọi được, không bị chặn lây")
 
     print(f"Đạt {passed} kiểm tra.")
 

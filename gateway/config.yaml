@@ -35,9 +35,13 @@ nginx_config:
   envs:
     - MOC_REALM
     - MOC_FILES_MAX_MB
+    - MOC_RATE_LOGIN_PER_MIN
+    - MOC_RATE_API_PER_MIN
   http:
     # svc-files tự giới hạn theo MOC_FILES_MAX_MB; ở biên chỉ chặn yêu cầu quá lớn rõ ràng
     client_max_body_size: 64m
+    # Giới hạn đăng nhập đếm theo IP nguồn. Đặt APISIX sau một proxy TLS thì mọi yêu cầu mang IP của proxy:
+    # khai real_ip_from (IP của proxy) và real_ip_header ở đây, nếu không cả hệ thống dùng chung một bộ đếm.
 
 # Chỉ bật plugin đang dùng
 plugins:

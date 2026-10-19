@@ -192,6 +192,7 @@
     "documents_summary": "The summary must be 10–500 characters.",
     "infected": "The file contains malware and was blocked.",
     "too_large": "The file is too large.",
+    "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator."
   },
   "validation": {

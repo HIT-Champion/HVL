@@ -118,6 +118,8 @@ services:
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
       MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
+      MOC_RATE_LOGIN_PER_MIN: ${MOC_RATE_LOGIN_PER_MIN:-60}
+      MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
     volumes:
       - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro

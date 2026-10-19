@@ -192,6 +192,7 @@
     "documents_summary": "Trích yếu phải dài 10–500 ký tự.",
     "infected": "Tệp nhiễm mã độc, đã bị chặn.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
+    "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị."
   },
   "validation": {

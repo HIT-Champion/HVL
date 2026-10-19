@@ -23,6 +23,12 @@
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Kiểm token ở biên bằng JWKS của Keycloak (zero-trust: Hasura và svc-files vẫn kiểm lại).
+#
+# Giới hạn tốc độ (số yêu cầu mỗi phút đặt trong .env), vượt thì trả 429:
+#   - đường nhận mật khẩu và cấp token: theo địa chỉ IP (MOC_RATE_LOGIN_PER_MIN) — chặn dò mật khẩu hàng
+#     loạt; Keycloak còn tự khóa từng tài khoản sau 10 lần sai (bruteForceProtected trong realm)
+#   - GraphQL và tệp: theo phiên đăng nhập (MOC_RATE_API_PER_MIN) — không theo IP, để cả văn phòng dùng
+#     chung một IP không bị chặn lây vì một người; mở phiên mới lại phải qua giới hạn đăng nhập
 
 upstreams:
   - id: keycloak
@@ -57,6 +63,15 @@ plugin_configs:
         set_access_token_header: false
         set_id_token_header: false
         set_userinfo_header: false
+      # Đếm theo token sau khi openid-connect đã kiểm (token giả bị trả 401 trước, không tạo bộ đếm)
+      limit-count:
+        count: ${{MOC_RATE_API_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: http_authorization
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều yêu cầu trong một phút, thử lại sau ít giây."
 
 global_rules:
   - id: 1
@@ -70,6 +85,20 @@ routes:
   - id: keycloak
     uris: ["/realms/${{MOC_REALM}}", "/realms/${{MOC_REALM}}/*", "/resources/*"]
     upstream_id: keycloak
+
+  # Đường cụ thể hơn route keycloak nên được chọn trước: biểu mẫu đăng nhập, quên mật khẩu, cấp và làm mới token
+  - id: dang-nhap
+    uris: ["/realms/${{MOC_REALM}}/protocol/openid-connect/token", "/realms/${{MOC_REALM}}/login-actions/*"]
+    upstream_id: keycloak
+    plugins:
+      limit-count:
+        count: ${{MOC_RATE_LOGIN_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều lần đăng nhập từ địa chỉ này, thử lại sau một phút."
 
   - id: graphql
     uri: /v1/graphql

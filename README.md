@@ -96,7 +96,7 @@ trong hộp việc của đúng người, hiện trên dòng thời gian văn b�
 | Thành phần | Vai trò | Thư mục |
 |---|---|---|
 | Keycloak 26 | SSO; vai trò, đơn vị, phòng đưa vào token cho Hasura | `auth/realm/` |
-| Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị | `gateway/` |
+| Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị, giới hạn tốc độ đăng nhập (theo IP) và API (theo phiên) | `gateway/` |
 | Hasura 2 + PostgreSQL 16 | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng, sổ kiểm toán chuỗi băm | `db/` |
 | Flowable 8 | Quy trình BPMN xử lý văn bản đến | `processes/` |
 | `svc-workflow` | Hasura Actions: vào sổ, hộp việc, hoàn thành việc; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
@@ -176,7 +176,7 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow` | Python + [uv](https://github.com/astral-sh/uv) |
-| `make smoke` | Đi trọn luồng văn bản đến qua cổng APISIX; chặn EICAR, chặn đường quản trị, cách ly đơn vị | Hệ thống đang chạy + `make seed` |
+| `make smoke` | Đi trọn luồng văn bản đến qua cổng APISIX; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Cùng luồng trên trình duyệt thật (Playwright, chạy trong container) | Như trên |
 | `db/tests/` | 62 test schema, quyền, sổ kiểm toán trên PostgreSQL + Hasura thật | xem `db/README.md` |
 

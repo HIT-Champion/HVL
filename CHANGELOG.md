@@ -49,6 +49,9 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   CSP chặt (#22).
 - `make env`, `make seed` (2 đơn vị, 10 tài khoản, văn bản ở mọi bước), `make smoke` (13 kiểm tra qua
   cổng), `make e2e` (Playwright trên trình duyệt thật) (#16).
+- Giới hạn tốc độ ở cổng APISIX (F1.2), vượt thì trả 429: đường nhận mật khẩu và cấp token theo địa chỉ IP
+  (`MOC_RATE_LOGIN_PER_MIN`, mặc định 60/phút), GraphQL và tệp theo phiên đăng nhập (`MOC_RATE_API_PER_MIN`,
+  mặc định 300/phút). Giao diện báo "thao tác quá nhanh" thay cho lỗi chung; `make smoke` thêm 3 kiểm tra.
 - CI chạy kiểm thử thật trên mọi PR: test đơn vị dịch vụ, 62 test schema và quyền trên PostgreSQL + Hasura,
   dựng toàn hệ thống rồi `make seed` → `make smoke` → `make e2e`; quét bí mật trong lịch sử commit
   (gitleaks) và lỗ hổng phụ thuộc (OSV-Scanner); kiểm workflow bằng actionlint.

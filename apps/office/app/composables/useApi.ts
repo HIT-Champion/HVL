@@ -61,6 +61,8 @@ export function useApi() {
       await auth.login(window.location.pathname + window.location.search)
       throw new ApiError('session', 'session', 401)
     }
+    // APISIX giới hạn tốc độ theo phiên (gateway/apisix.yaml)
+    if (res.status === 429) throw new ApiError('rate_limited', 'rate_limited', 429)
     return res
   }
 
