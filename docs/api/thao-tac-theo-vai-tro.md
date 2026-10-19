@@ -12,13 +12,18 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `clerk` (văn thư) | `vanthu` | 25 | 14 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
 | `staff` (chuyên viên) | `chuyenviendt` | 23 | 14 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 23 | 4 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 25 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
-| `tenant_admin` (quản trị đơn vị) | `quantri` | 13 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 30 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `tenant_admin` (quản trị đơn vị) | `quantri` | 18 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
 
 | Trường | `clerk` | `staff` | `manager` | `director` | `tenant_admin` |
 |---|:-:|:-:|:-:|:-:|:-:|
+| `core_audit_anchors` |  |  |  | ✓ | ✓ |
+| `core_audit_anchors_aggregate` |  |  |  | ✓ | ✓ |
+| `core_audit_log` |  |  |  | ✓ | ✓ |
+| `core_audit_log_aggregate` |  |  |  | ✓ | ✓ |
+| `core_audit_log_by_pk` |  |  |  | ✓ | ✓ |
 | `core_files` | ✓ | ✓ | ✓ | ✓ |  |
 | `core_files_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `core_notifications` | ✓ | ✓ | ✓ | ✓ | ✓ |

@@ -98,6 +98,312 @@ input bigint_comparison_exp {
   _nin: [bigint!]
 }
 
+scalar bytea
+
+"Boolean expression to compare columns of type \"bytea\". All fields are combined with logical 'AND'."
+input bytea_comparison_exp {
+  _eq: bytea
+  _gt: bytea
+  _gte: bytea
+  _in: [bytea!]
+  _is_null: Boolean
+  _lt: bytea
+  _lte: bytea
+  _neq: bytea
+  _nin: [bytea!]
+}
+
+"columns and relationships of \"core.audit_anchors\""
+type core_audit_anchors {
+  anchored_at: timestamptz!
+  audit_id: bigint!
+}
+
+"aggregated selection of \"core.audit_anchors\""
+type core_audit_anchors_aggregate {
+  aggregate: core_audit_anchors_aggregate_fields
+  nodes: [core_audit_anchors!]!
+}
+
+"aggregate fields of \"core.audit_anchors\""
+type core_audit_anchors_aggregate_fields {
+  avg: core_audit_anchors_avg_fields
+  count(columns: [core_audit_anchors_select_column!], distinct: Boolean): Int!
+  max: core_audit_anchors_max_fields
+  min: core_audit_anchors_min_fields
+  stddev: core_audit_anchors_stddev_fields
+  stddev_pop: core_audit_anchors_stddev_pop_fields
+  stddev_samp: core_audit_anchors_stddev_samp_fields
+  sum: core_audit_anchors_sum_fields
+  var_pop: core_audit_anchors_var_pop_fields
+  var_samp: core_audit_anchors_var_samp_fields
+  variance: core_audit_anchors_variance_fields
+}
+
+"aggregate avg on columns"
+type core_audit_anchors_avg_fields {
+  audit_id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.audit_anchors\". All fields are combined with a logical 'AND'."
+input core_audit_anchors_bool_exp {
+  _and: [core_audit_anchors_bool_exp!]
+  _not: core_audit_anchors_bool_exp
+  _or: [core_audit_anchors_bool_exp!]
+  anchored_at: timestamptz_comparison_exp
+  audit_id: bigint_comparison_exp
+}
+
+"aggregate max on columns"
+type core_audit_anchors_max_fields {
+  anchored_at: timestamptz
+  audit_id: bigint
+}
+
+"aggregate min on columns"
+type core_audit_anchors_min_fields {
+  anchored_at: timestamptz
+  audit_id: bigint
+}
+
+"Ordering options when selecting data from \"core.audit_anchors\"."
+input core_audit_anchors_order_by {
+  anchored_at: order_by
+  audit_id: order_by
+}
+
+"select columns of table \"core.audit_anchors\""
+enum core_audit_anchors_select_column {
+  "column name"
+  anchored_at
+  "column name"
+  audit_id
+}
+
+"aggregate stddev on columns"
+type core_audit_anchors_stddev_fields {
+  audit_id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_audit_anchors_stddev_pop_fields {
+  audit_id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_audit_anchors_stddev_samp_fields {
+  audit_id: Float
+}
+
+"Streaming cursor of the table \"core_audit_anchors\""
+input core_audit_anchors_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_audit_anchors_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_audit_anchors_stream_cursor_value_input {
+  anchored_at: timestamptz
+  audit_id: bigint
+}
+
+"aggregate sum on columns"
+type core_audit_anchors_sum_fields {
+  audit_id: bigint
+}
+
+"aggregate var_pop on columns"
+type core_audit_anchors_var_pop_fields {
+  audit_id: Float
+}
+
+"aggregate var_samp on columns"
+type core_audit_anchors_var_samp_fields {
+  audit_id: Float
+}
+
+"aggregate variance on columns"
+type core_audit_anchors_variance_fields {
+  audit_id: Float
+}
+
+"columns and relationships of \"core.audit_log\""
+type core_audit_log {
+  action: String!
+  actor_id: String!
+  actor_kind: String!
+  entity: String!
+  entity_id: String!
+  hash: bytea!
+  id: bigint!
+  occurred_at: timestamptz!
+  "Cột đã đổi → [cũ, mới]; cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) chỉ có tên, giá trị null"
+  overview(
+    "JSON select path"
+    path: String
+  ): jsonb
+  prev_hash: bytea!
+}
+
+"aggregated selection of \"core.audit_log\""
+type core_audit_log_aggregate {
+  aggregate: core_audit_log_aggregate_fields
+  nodes: [core_audit_log!]!
+}
+
+"aggregate fields of \"core.audit_log\""
+type core_audit_log_aggregate_fields {
+  avg: core_audit_log_avg_fields
+  count(columns: [core_audit_log_select_column!], distinct: Boolean): Int!
+  max: core_audit_log_max_fields
+  min: core_audit_log_min_fields
+  stddev: core_audit_log_stddev_fields
+  stddev_pop: core_audit_log_stddev_pop_fields
+  stddev_samp: core_audit_log_stddev_samp_fields
+  sum: core_audit_log_sum_fields
+  var_pop: core_audit_log_var_pop_fields
+  var_samp: core_audit_log_var_samp_fields
+  variance: core_audit_log_variance_fields
+}
+
+"aggregate avg on columns"
+type core_audit_log_avg_fields {
+  id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.audit_log\". All fields are combined with a logical 'AND'."
+input core_audit_log_bool_exp {
+  _and: [core_audit_log_bool_exp!]
+  _not: core_audit_log_bool_exp
+  _or: [core_audit_log_bool_exp!]
+  action: String_comparison_exp
+  actor_id: String_comparison_exp
+  actor_kind: String_comparison_exp
+  entity: String_comparison_exp
+  entity_id: String_comparison_exp
+  hash: bytea_comparison_exp
+  id: bigint_comparison_exp
+  occurred_at: timestamptz_comparison_exp
+  overview: jsonb_comparison_exp
+  prev_hash: bytea_comparison_exp
+}
+
+"aggregate max on columns"
+type core_audit_log_max_fields {
+  action: String
+  actor_id: String
+  actor_kind: String
+  entity: String
+  entity_id: String
+  id: bigint
+  occurred_at: timestamptz
+}
+
+"aggregate min on columns"
+type core_audit_log_min_fields {
+  action: String
+  actor_id: String
+  actor_kind: String
+  entity: String
+  entity_id: String
+  id: bigint
+  occurred_at: timestamptz
+}
+
+"Ordering options when selecting data from \"core.audit_log\"."
+input core_audit_log_order_by {
+  action: order_by
+  actor_id: order_by
+  actor_kind: order_by
+  entity: order_by
+  entity_id: order_by
+  hash: order_by
+  id: order_by
+  occurred_at: order_by
+  overview: order_by
+  prev_hash: order_by
+}
+
+"select columns of table \"core.audit_log\""
+enum core_audit_log_select_column {
+  "column name"
+  action
+  "column name"
+  actor_id
+  "column name"
+  actor_kind
+  "column name"
+  entity
+  "column name"
+  entity_id
+  "column name"
+  hash
+  "column name"
+  id
+  "column name"
+  occurred_at
+  "column name"
+  prev_hash
+}
+
+"aggregate stddev on columns"
+type core_audit_log_stddev_fields {
+  id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_audit_log_stddev_pop_fields {
+  id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_audit_log_stddev_samp_fields {
+  id: Float
+}
+
+"Streaming cursor of the table \"core_audit_log\""
+input core_audit_log_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_audit_log_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_audit_log_stream_cursor_value_input {
+  action: String
+  actor_id: String
+  actor_kind: String
+  entity: String
+  entity_id: String
+  hash: bytea
+  id: bigint
+  occurred_at: timestamptz
+  prev_hash: bytea
+}
+
+"aggregate sum on columns"
+type core_audit_log_sum_fields {
+  id: bigint
+}
+
+"aggregate var_pop on columns"
+type core_audit_log_var_pop_fields {
+  id: Float
+}
+
+"aggregate var_samp on columns"
+type core_audit_log_var_samp_fields {
+  id: Float
+}
+
+"aggregate variance on columns"
+type core_audit_log_variance_fields {
+  id: Float
+}
+
 "columns and relationships of \"core.notifications\""
 type core_notifications {
   created_at: timestamptz!
@@ -786,6 +1092,60 @@ enum order_by {
 }
 
 type query_root {
+  "fetch data from the table: \"core.audit_anchors\""
+  core_audit_anchors(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): [core_audit_anchors!]!
+  "fetch aggregated fields from the table: \"core.audit_anchors\""
+  core_audit_anchors_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): core_audit_anchors_aggregate!
+  "fetch data from the table: \"core.audit_log\""
+  core_audit_log(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): [core_audit_log!]!
+  "fetch aggregated fields from the table: \"core.audit_log\""
+  core_audit_log_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): core_audit_log_aggregate!
+  "fetch data from the table: \"core.audit_log\" using primary key columns"
+  core_audit_log_by_pk(id: bigint!): core_audit_log
   "fetch data from the table: \"core.notifications\""
   core_notifications(
     "distinct select on columns"
@@ -892,6 +1252,78 @@ type query_root {
 }
 
 type subscription_root {
+  "fetch data from the table: \"core.audit_anchors\""
+  core_audit_anchors(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): [core_audit_anchors!]!
+  "fetch aggregated fields from the table: \"core.audit_anchors\""
+  core_audit_anchors_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): core_audit_anchors_aggregate!
+  "fetch data from the table in a streaming manner: \"core.audit_anchors\""
+  core_audit_anchors_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_audit_anchors_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): [core_audit_anchors!]!
+  "fetch data from the table: \"core.audit_log\""
+  core_audit_log(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): [core_audit_log!]!
+  "fetch aggregated fields from the table: \"core.audit_log\""
+  core_audit_log_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): core_audit_log_aggregate!
+  "fetch data from the table: \"core.audit_log\" using primary key columns"
+  core_audit_log_by_pk(id: bigint!): core_audit_log
+  "fetch data from the table in a streaming manner: \"core.audit_log\""
+  core_audit_log_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_audit_log_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): [core_audit_log!]!
   "fetch data from the table: \"core.notifications\""
   core_notifications(
     "distinct select on columns"

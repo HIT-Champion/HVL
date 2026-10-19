@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit \
         install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -85,7 +85,7 @@ smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 
 PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble
 
-e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, thông báo realtime
+e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, thông báo, sổ kiểm toán
 	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \
 	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e $(PLAYWRIGHT_IMAGE) \
 	  sh -c 'npm ci --no-audit --no-fund --ignore-scripts >/dev/null && npx playwright test'
@@ -93,6 +93,9 @@ e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn 
 test: ## Chạy test đơn vị của các dịch vụ (không cần Docker)
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
+
+audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
+	@python3 scripts/moc.py audit verify
 
 api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
 	@python3 scripts/api_docs.py

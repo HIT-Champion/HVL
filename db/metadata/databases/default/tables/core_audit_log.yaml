@@ -17,10 +17,18 @@
 # Sổ kiểm toán. Thay đổi dòng của bảng nghiệp vụ do trigger core.audit() tự ghi; dịch vụ chỉ ghi thêm
 # sự kiện không gắn với dòng nào, vd svc-files ghi 'file.rejected' khi ClamAV chặn tệp.
 # id, occurred_at, prev_hash, hash do trigger trong CSDL đặt — người ghi không chọn được.
-# Màn xem sổ cho lãnh đạo đơn vị thêm ở F2.12.
+#
+# Lãnh đạo và quản trị đơn vị xem sổ của đơn vị mình (màn "Sổ kiểm toán", F2.12): ai, lúc nào, làm gì, cột nào
+# đổi, hash của dòng. Không đọc được cột diff: chỉ trường `overview`, giữ giá trị của các cột không chứa nội
+# dung (hàm core.audit_overview, migration 1792281600700), để sổ không lộ văn bản hạn chế.
 table:
   name: audit_log
   schema: core
+computed_fields:
+  - name: overview
+    definition:
+      function: {name: audit_overview, schema: core}
+    comment: Cột đã đổi → [cũ, mới]; cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) chỉ có tên, giá trị null
 insert_permissions:
   - role: service
     permission:
@@ -29,6 +37,14 @@ insert_permissions:
         tenant_id: X-Hasura-Tenant-Id
       check: {}
 select_permissions:
+  - role: director
+    permission: &oversight
+      columns: [id, occurred_at, actor_id, actor_kind, action, entity, entity_id, prev_hash, hash]
+      computed_fields: [overview]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+      allow_aggregations: true
+  - role: tenant_admin
+    permission: *oversight
   - role: service
     permission:
       columns: [id, tenant_id, occurred_at, actor_id, actor_kind, request_id, action, entity, entity_id, diff,

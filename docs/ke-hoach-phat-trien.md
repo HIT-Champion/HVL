@@ -608,5 +608,15 @@ Phase 2:
   cho callback `POST /internal/flowable/events`. Lý do: Flowable không phải giữ địa chỉ và khóa của dịch vụ nào,
   `svc-workflow` dừng thì việc nhắc chờ đó chứ không mất. Giao diện nhận tin bằng WebSocket có sẵn của trình
   duyệt, không dùng `centrifuge-js` (kéo theo `protobufjs` có script chạy lúc cài).
-- Phase 2 còn lại: sổ đăng ký in được (F2.8), neo hash và lệnh `dxos audit verify` (F2.12), poka-yoke JSON Schema
-  dùng chung (F2.2).
+- **F2.12 xong.** `svc-files` định kỳ neo đầu chuỗi sổ kiểm toán ra bucket lạnh `moc-cold` bật S3 Object Lock
+  (COMPLIANCE): đã thử trên SeaweedFS 4.48, xóa phiên bản, rút ngắn hạn giữ, xóa bucket đều bị từ chối, kể cả với
+  khóa quản trị của kho. `make audit` tính lại cả chuỗi bên ngoài CSDL. Có test cho sửa một dòng, sửa rồi tính
+  lại cả chuỗi (`core.audit_verify()` trong CSDL bị qua mặt, mốc neo thì không), cắt đuôi, đổi hash văn bản phát
+  hành. Màn "Sổ kiểm toán" cho lãnh đạo, quản trị đơn vị. Khác bản thiết kế:
+  - Lệnh là `python3 scripts/moc.py audit verify` (`make audit`) thay cho `dxos audit verify`: tên kỹ thuật đã
+    đổi sang `moc` cùng tên sản phẩm. Viết bằng thư viện chuẩn thay Typer, để chạy ngay trong thư mục cài mà
+    không cài thêm gói.
+  - Bản neo "tệp trong repo" thành `audit anchor --to <tệp>`: đơn vị tự chép tệp ra kho git riêng. Chưa có
+    server nên chưa chạy tự động.
+  - Màn xem sổ không hiện giá trị của cột chứa nội dung, vì lãnh đạo không được đọc văn bản hạn chế.
+- Phase 2 còn lại: sổ đăng ký in được (F2.8), poka-yoke JSON Schema dùng chung (F2.2).

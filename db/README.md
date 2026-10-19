@@ -20,7 +20,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `core.tenants`, `core.files`, `core.audit_log` (+ `audit_head`, `audit_anchors`) | **Xong** |
 | `office.departments`, `document_types` (28 loại theo NĐ 30), `registers`, `documents`, `document_files`, `document_acl`, `assignments`, `document_events` | **Xong** |
 | Quyền Hasura cho 6 vai trò, cách ly thuê ước | **Xong** — 52 test |
-| Sổ kiểm toán chuỗi băm: trigger trên mọi bảng nghiệp vụ, `core.audit_verify()` | **Xong** (F2.12 làm sớm); job neo hash ra ngoài CSDL ở Phase 2 |
+| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung) | **Xong** — 20 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch) | **Xong** — 10 test |
 | `metadata/actions.graphql`, `actions.yaml`: `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
 | Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
@@ -76,10 +76,25 @@ ghi vào sổ kiểm toán) và `X-Hasura-Request-Id` (lấy từ `X-Request-Id`
   khóa dòng này khiến các giao dịch ghi sổ xếp hàng, nên thứ tự `id` trùng thứ tự chuỗi (đã thử 20 yêu
   cầu ghi song song).
 - `core.audit_log` chỉ được ghi thêm: sửa, xóa, `truncate` đều bị trigger chặn.
-- Kiểm tra: `select * from core.audit_verify();` — không trả dòng nào là chuỗi nguyên vẹn; ngược lại chỉ ra
-  `audit_id` và loại lỗi (`hash`, `prev_hash`, `gap`, `head`). Superuser tắt trigger để sửa lén vẫn bị phát
-  hiện (có test); sửa rồi tính lại cả chuỗi thì chỉ bắt được khi đối chiếu với hash đã neo ra ngoài
-  (job neo — Phase 2).
+- Kiểm nhanh trong CSDL: `select * from core.audit_verify();` — không trả dòng nào là chuỗi nguyên vẹn; ngược
+  lại chỉ ra `audit_id` và loại lỗi (`hash`, `prev_hash`, `gap`, `head`). Superuser tắt trigger để sửa một dòng
+  vẫn bị phát hiện.
+- **Neo ra ngoài CSDL.** Superuser sửa một dòng rồi tính lại hash cả chuỗi phía sau thì `core.audit_verify()`
+  báo nguyên vẹn (có test cho chính trường hợp này). Vì vậy `svc-files` định kỳ chép đầu chuỗi ra bucket lạnh
+  `moc-cold` bật S3 Object Lock, chế độ COMPLIANCE: trong hạn giữ không ai xóa, ghi đè hay rút ngắn hạn được,
+  kể cả khóa quản trị của kho (`services/svc-files/README.md`). `core.audit_anchors` là bản tra cứu các lần neo.
+- **Kiểm đầy đủ: `make audit`** (`python3 scripts/moc.py audit verify`, chạy được cả trong thư mục cài). Lệnh
+  tự tính lại chuỗi bên ngoài CSDL (không tin `core.audit_verify()`, vì superuser sửa được cả hàm), so hash của
+  dòng tại mỗi mốc neo trong bucket, và so `content_sha256` của văn bản với giá trị lần cuối ghi vào sổ. Viết
+  lại chuỗi thì lệnh chỉ ra khoảng dòng bị sửa, nằm giữa mốc cuối còn khớp và mốc đầu bị lệch. Mọi câu đọc nằm
+  trong một giao dịch `REPEATABLE READ`, nên dòng mới ghi trong lúc kiểm không gây báo nhầm. Thoát `0` khi nguyên
+  vẹn, `1` khi có dòng bị sửa, `2` khi chưa đủ bằng chứng: chưa có mốc nào, mốc mới nhất quá cũ, bucket không
+  khóa ghi, hay bảng `core.audit_anchors` ghi một mốc mà bucket không có.
+  `python3 scripts/moc.py audit anchor --to <tệp>` neo ngay và ghi thêm mốc vào một tệp, để chép ra ngoài máy
+  chủ; kiểm cả tệp đó: `audit verify --anchors <tệp>`.
+- **Màn xem sổ** cho `director`, `tenant_admin`: đọc dòng sổ của đơn vị mình, không đọc được cột `diff`, chỉ đọc
+  trường `overview` (hàm `core.audit_overview`): cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) có
+  tên nhưng giá trị null, để sổ không lộ văn bản hạn chế mà lãnh đạo không được đọc.
 
 ## Thêm hoặc đổi schema
 

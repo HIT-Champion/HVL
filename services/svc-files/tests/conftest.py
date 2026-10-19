@@ -328,6 +328,7 @@ def settings() -> Settings:
             "HASURA_ADMIN_SECRET": "test",
             "MEILISEARCH_API_KEY": "test",
             "MOC_SEARCH_SYNC_INTERVAL_S": "0",
+            "MOC_AUDIT_ANCHOR_INTERVAL_S": "0",
             "MOC_FILES_MAX_MB": "1",
         }
     )

@@ -98,12 +98,13 @@ create table core.audit_log (               -- sổ kiểm toán chuỗi băm (F
   hash         bytea not null unique
 );
 
-create table core.audit_anchors (           -- hash đầu chuỗi đã neo ra ngoài CSDL
+create table core.audit_anchors (           -- bản tra cứu các lần neo đầu chuỗi ra ngoài CSDL
   id           bigint generated always as identity primary key,
   audit_id     bigint not null references core.audit_log,
   hash         bytea not null,
-  location     text not null,                -- 's3://cold/anchors/…' hoặc 'git:anchors/…'
-  anchored_at  timestamptz not null default now()
+  location     text not null,                -- 's3://moc-cold/anchors/<audit_id>-<hash>.json'
+  anchored_at  timestamptz not null default now(),
+  unique (audit_id, location)                -- migration 1792281600700
 );
 ```
 
@@ -121,6 +122,34 @@ create table core.audit_anchors (           -- hash đầu chuỗi đã neo ra n
   dịch vụ ghi thẳng vào CSDL thì `set local moc.actor = '…'` trước khi ghi.
 - `core.audit_log` chỉ được ghi thêm (trigger chặn sửa, xóa, `truncate`). `core.audit_verify()` tính lại
   chuỗi, trả về dòng sai và loại lỗi (`hash`, `prev_hash`, `gap`, `head`).
+
+**Neo ra ngoài CSDL và kiểm từ bên ngoài** (F2.12, migration 1792281600700):
+
+- Superuser tắt được trigger, sửa một dòng rồi tính lại hash của mọi dòng phía sau, kể cả `core.audit_head`:
+  chuỗi lại liền mạch và `core.audit_verify()` báo nguyên vẹn. Chặn bằng **mốc neo**: `svc-files` định kỳ
+  (`MOC_AUDIT_ANCHOR_INTERVAL_S`, mặc định 600 giây, chỉ khi có dòng mới) chép `(last_id, last_hash)` thành đối
+  tượng `anchors/<last_id 12 chữ số>-<hash>.json` trên bucket lạnh `moc-cold`. Bucket tạo với S3 Object Lock;
+  mỗi đối tượng giữ ở chế độ COMPLIANCE `MOC_AUDIT_ANCHOR_RETENTION_DAYS` ngày (mặc định 3650): không ai xóa,
+  ghi đè hay rút ngắn hạn được, kể cả tài khoản quản trị của kho. Ghi lại cùng khóa chỉ tạo thêm phiên bản, bản
+  đầu vẫn còn và lúc kiểm mang cờ. Hash nằm ngay trong tên đối tượng, nên lệnh kiểm chỉ cần liệt kê bucket.
+- Khóa ghi chỉ có hiệu lực khi đi qua cổng S3: gọi thẳng filer của SeaweedFS thì xóa được cả mốc đang khóa (đã
+  thử). Vì vậy SeaweedFS chạy với `-filer.disableHttp` và nằm riêng mạng `storage` với `svc-files`; PostgreSQL
+  (superuser chạy được lệnh hệ điều hành qua `COPY … TO PROGRAM`) không tới được kho.
+- Vòng neo nhớ mốc vừa ghi trong bộ nhớ, không hỏi `core.audit_anchors`: thêm dòng giả vào bảng đó không làm
+  vòng neo dừng.
+- `core.audit_anchors` là bản tra cứu trong CSDL (màn xem sổ dùng để báo dòng nào đã neo); khi kiểm không tin
+  bảng này.
+- **`make audit`** (`scripts/moc.py audit verify`) tính lại cả chuỗi bên ngoài CSDL: PostgreSQL chỉ dựng chuỗi
+  JSON của từng dòng bằng `pg_catalog.jsonb_build_array` (cùng biểu thức với `core.audit_hash`), còn băm và nối
+  chuỗi tính bằng Python. Ba lớp: chuỗi liền mạch; hash của dòng tại mỗi mốc bằng hash đã neo (viết lại chuỗi
+  từ dòng k thì mọi mốc từ k lệch, dòng bị sửa nằm giữa mốc cuối còn khớp và mốc đầu bị lệch); `content_sha256`
+  của mọi văn bản bằng giá trị lần cuối ghi vào sổ (đổi hash để một tệp giả "khớp" ở cổng xác thực mà tắt
+  trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ.
+- **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
+  toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
+  nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản). Lãnh đạo không đọc được văn bản hạn chế thì sổ
+  cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
+  chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
 
 Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` ghi sự kiện `file.rejected` vào
 `core.audit_log` (màn demo kiểm dịch F3.1).

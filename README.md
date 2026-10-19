@@ -118,8 +118,8 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 
-Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): sổ đăng ký in được, neo hash
-sổ kiểm toán (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
+Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): sổ đăng ký in được, kiểm form ba
+lớp bằng một JSON Schema dùng chung (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
 Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống
@@ -128,7 +128,7 @@ Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo h�
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -198,9 +198,10 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow` | Python + [uv](https://github.com/astral-sh/uv) |
-| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
-| `make e2e` | Hai luồng trên trình duyệt thật (Playwright, chạy trong container), kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang | Như trên |
-| `db/tests/` | 80 test schema, quyền, sổ kiểm toán, cấp số đến và đi trên PostgreSQL + Hasura thật | xem `db/README.md` |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
+| `make e2e` | Hai luồng trên trình duyệt thật (Playwright, chạy trong container), kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang; lãnh đạo xem sổ kiểm toán | Như trên |
+| `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
+| `db/tests/` | 97 test schema, quyền, sổ kiểm toán (kể cả các kiểu sửa lén), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
 thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, rồi

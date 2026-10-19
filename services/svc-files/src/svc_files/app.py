@@ -53,13 +53,14 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from . import __version__
+from .anchors import Anchorer, AnchorStore
 from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .hasura import HasuraAuthError, HasuraClient, HasuraError
 from .render import letter_from, render_pdf
 from .search import Indexer, MeiliClient, SearchError, SearchQuery, search_documents
-from .storage import ObjectStore, StorageError, object_key
+from .storage import ObjectStore, StorageError, object_key, s3_client
 
 CHUNK_SIZE = 64 * 1024
 # Phần đầu và biên của multipart cộng thêm vào kích thước tệp
@@ -241,6 +242,7 @@ def create_app(
     verifier: TokenVerifier | None = None,
     hasura: HasuraClient | None = None,
     meili: MeiliClient | None = None,
+    anchor_store: AnchorStore | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env()
@@ -252,6 +254,15 @@ def create_app(
     hasura = hasura or HasuraClient(settings.hasura_url, settings.hasura_admin_secret, timeout_s=settings.hasura_timeout_s)
     meili = meili or MeiliClient(settings.meili_url, settings.meili_api_key, settings.search_index)
     indexer = Indexer(hasura, meili, interval_s=settings.search_sync_interval_s or 5.0)
+    anchorer = Anchorer(
+        hasura,
+        anchor_store or AnchorStore(
+            s3_client(settings.s3_endpoint, settings.s3_access_key, settings.s3_secret_key, settings.s3_region),
+            settings.cold_bucket,
+            settings.anchor_retention_days,
+        ),
+        interval_s=settings.anchor_interval_s,
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -261,9 +272,11 @@ def create_app(
             # Không dừng dịch vụ: /readyz báo chưa sẵn sàng cho tới khi kho đối tượng lên.
             log.warning(json.dumps({"event": "storage.bucket_unready", "error": str(exc)}, ensure_ascii=False))
         sync = asyncio.create_task(indexer.run()) if settings.search_sync_interval_s > 0 else None
+        anchor = asyncio.create_task(anchorer.run()) if settings.anchor_interval_s > 0 else None
         yield
-        if sync is not None:
-            sync.cancel()
+        for task in (sync, anchor):
+            if task is not None:
+                task.cancel()
         await meili.aclose()
         await hasura.aclose()
 
@@ -275,6 +288,7 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.indexer = indexer
+    app.state.anchorer = anchorer
     app.state.meili = meili
     bearer = HTTPBearer(auto_error=False)
 

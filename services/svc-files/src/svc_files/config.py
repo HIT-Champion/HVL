@@ -59,6 +59,9 @@ class Settings:
     search_sync_interval_s: float
     public_url: str                 # in vào mã QR của văn bản phát hành: <public_url>/xac-thuc/<mã>
     service_clients: frozenset[str]  # client Keycloak được gọi API nội bộ (/internal/*)
+    cold_bucket: str                # bucket lạnh bật khóa ghi (S3 Object Lock): mốc neo sổ kiểm toán
+    anchor_interval_s: float        # chu kỳ neo đầu chuỗi sổ kiểm toán; 0: tắt vòng nền
+    anchor_retention_days: int      # hạn giữ mỗi mốc neo, trong hạn không ai xóa được
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -92,6 +95,18 @@ class Settings:
                 service_clients=frozenset(
                     c.strip() for c in env.get("MOC_SERVICE_CLIENTS", "svc-workflow").split(",") if c.strip()
                 ),
+                cold_bucket=env.get("MOC_COLD_BUCKET", "moc-cold"),
+                anchor_interval_s=float(env.get("MOC_AUDIT_ANCHOR_INTERVAL_S", "600")),
+                anchor_retention_days=int(env.get("MOC_AUDIT_ANCHOR_RETENTION_DAYS", "3650")),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
+
+    def __post_init__(self) -> None:
+        if self.anchor_interval_s < 0:
+            raise ConfigError("MOC_AUDIT_ANCHOR_INTERVAL_S phải ≥ 0 (0: tắt vòng neo)")
+        if self.anchor_retention_days < 1:
+            raise ConfigError("MOC_AUDIT_ANCHOR_RETENTION_DAYS phải ≥ 1")
+        if self.cold_bucket == self.bucket:
+            # bucket lạnh khóa ghi, còn bucket tệp thường phải xóa được
+            raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")

@@ -113,7 +113,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Mộc dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
-| Typer | 0.27 | MIT | Khung viết lệnh `dxos` | pip | 3 |
+| Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema | 4.26 | MIT | Kiểm tra dữ liệu đề xuất theo JSON Schema dùng chung | pip | 2 |
 | DuckDB | 1.5 | MIT | Đọc hồ sơ lưu trữ lạnh (Parquet) | pip | 3 |
 | openlineage-python | 1.53 | Apache-2.0 | Phát sự kiện truy vết dữ liệu | pip | 3 |

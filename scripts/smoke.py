@@ -21,7 +21,8 @@ Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chu
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
 mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Thông báo: tổ trưởng nhận tin việc mới
 qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
-kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị,
+kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả
+chuỗi ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị,
 đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới hạn tốc độ.
 """
 
@@ -33,10 +34,12 @@ import html
 import http.cookiejar
 import json
 import os
+import pathlib
 import re
 import socket
 import ssl
 import struct
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -44,7 +47,7 @@ import urllib.request
 import uuid
 from datetime import date, timedelta
 
-from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, request
+from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -385,6 +388,45 @@ def main() -> None:
         and "document.issued" in [n["kind"] for n in issued_note] \
         or fail(f"thông báo đã lưu chưa đúng: {mine} / {theirs} / {issued_note}")
     ok("thông báo lưu lại cho người nhận (người khác không đọc được); người soạn có tin văn bản đã phát hành")
+
+    print("Sổ kiểm toán (neo hash ra ngoài CSDL)")
+    moc = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "audit"]
+    anchored = subprocess.run([*moc, "anchor"], capture_output=True, text=True)
+    anchored.returncode == 0 or fail(f"moc audit anchor lỗi: {anchored.stderr.strip() or anchored.stdout.strip()}")
+    checked = subprocess.run([*moc, "verify", "--json"], capture_output=True, text=True)
+    try:
+        report = json.loads(checked.stdout)
+    except json.JSONDecodeError:
+        fail(f"moc audit verify không chạy được: {checked.stderr.strip() or checked.stdout.strip()}")
+    checked.returncode == 0 and report["ok"] or fail(f"sổ kiểm toán chưa ổn: {report['problems'] or report['notes']}")
+    bucket = next((v for k, v in report["anchors"].items() if k.startswith("bucket")), None)
+    bucket and bucket["checked"] >= 1 and bucket["matched"] == bucket["checked"] and report["documents"] >= 1 \
+        or fail(f"thiếu mốc neo hoặc văn bản có hash: {report}")
+    ok(f"moc audit verify: tính lại {report['rows']} dòng sổ ngoài CSDL, khớp {bucket['matched']} mốc neo trong"
+       f" bucket lạnh và hash của {report['documents']} văn bản")
+    try_delete = (
+        "from svc_files.config import Settings\n"
+        "from svc_files.storage import s3_client\n"
+        "s = Settings.from_env()\n"
+        "c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)\n"
+        "v = c.list_object_versions(Bucket=s.cold_bucket, Prefix='anchors/')['Versions'][0]\n"
+        "try:\n"
+        "    c.delete_object(Bucket=s.cold_bucket, Key=v['Key'], VersionId=v['VersionId'])\n"
+        "    print('deleted')\n"
+        "except Exception as exc:\n"
+        "    print('refused', type(exc).__name__)\n"
+    )
+    refused = compose("exec", "-T", "svc-files", "python", "-c", try_delete).decode().strip()
+    refused.startswith("refused") or fail(f"xóa được mốc neo trong bucket lạnh: {refused}")
+    ok("mốc neo không xóa được, kể cả bằng khóa quản trị kho (S3 Object Lock)")
+    rows = director.gql("""query ($e: String!) { core_audit_log(where: {entity: {_eq: "office.documents"},
+        entity_id: {_eq: $e}}) { id overview } }""", {"e": out_id})["core_audit_log"]
+    issued_rows = [r["overview"] for r in rows if (r["overview"].get("status") or [None, None])[1] == "issued"]
+    hashed = [r["overview"] for r in rows if "content_sha256" in r["overview"]]
+    issued_rows and hashed and all(o["content_sha256"] is None for o in hashed) \
+        and all(o.get("summary") is None for o in (r["overview"] for r in rows)) \
+        or fail(f"sổ lãnh đạo xem chưa đúng (cần thấy lần phát hành, không thấy hash, trích yếu): {rows}")
+    ok("lãnh đạo khoa xem sổ của đơn vị: thấy lần phát hành, không thấy hash hay trích yếu")
 
     # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
     print("Giới hạn tốc độ")

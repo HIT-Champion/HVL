@@ -361,6 +361,12 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
             </li>
           </ol>
+          <NuxtLink
+            v-if="claims?.role === 'director'" :to="{ path: '/so-kiem-toan', query: { van_ban: doc.id } }"
+            class="mt-5 inline-block text-xs font-medium text-brand-700 hover:underline"
+          >
+            {{ t('audit.openAudit') }}
+          </NuxtLink>
         </aside>
       </div>
     </div>

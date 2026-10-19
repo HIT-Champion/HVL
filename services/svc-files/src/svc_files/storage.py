@@ -25,7 +25,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from datetime import datetime
-from typing import BinaryIO
+from typing import Any, BinaryIO
 
 import boto3
 from botocore.config import Config
@@ -41,27 +41,31 @@ def object_key(tenant_id: uuid.UUID, file_id: uuid.UUID, at: datetime) -> str:
     return f"tenant/{tenant_id}/{at:%Y}/{at:%m}/{file_id}"
 
 
+def s3_client(endpoint: str, access_key: str, secret_key: str, region: str) -> Any:
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name=region,
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+            # Chỉ tính checksum khi API bắt buộc: kho S3 tương thích không phải lúc
+            # nào cũng hiểu kiểu checksum mặc định của boto3 bản mới.
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+            connect_timeout=5,
+            read_timeout=60,
+            retries={"max_attempts": 3, "mode": "standard"},
+        ),
+    )
+
+
 class ObjectStore:
     def __init__(self, endpoint: str, access_key: str, secret_key: str, region: str, bucket: str) -> None:
         self.bucket = bucket
-        self._s3 = boto3.client(
-            "s3",
-            endpoint_url=endpoint,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region,
-            config=Config(
-                signature_version="s3v4",
-                s3={"addressing_style": "path"},
-                # Chỉ tính checksum khi API bắt buộc: kho S3 tương thích không phải lúc
-                # nào cũng hiểu kiểu checksum mặc định của boto3 bản mới.
-                request_checksum_calculation="when_required",
-                response_checksum_validation="when_required",
-                connect_timeout=5,
-                read_timeout=60,
-                retries={"max_attempts": 3, "mode": "standard"},
-            ),
-        )
+        self._s3 = s3_client(endpoint, access_key, secret_key, region)
 
     def ensure_bucket(self) -> None:
         try:

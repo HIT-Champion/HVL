@@ -7,7 +7,7 @@ chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi 
 
 | Thư mục | Nội dung |
 |---|---|
-| `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem`, `xac-thuc/[[code]]` (công khai, không đăng nhập) |
+| `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem`, `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
 | `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo) |
 | `app/components/TaskPanel.vue` | Khung xử lý theo `formKey` của BPMN |
 | `app/components/NotificationBell.vue` | Chuông: số chưa đọc, 20 tin mới nhất, đánh dấu đã đọc |

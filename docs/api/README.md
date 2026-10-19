@@ -217,7 +217,27 @@ kết nối giới hạn theo địa chỉ IP (`MOC_RATE_REALTIME_PER_MIN`). Tin
 thì đọc lại `core_notifications`. Giao diện Mộc làm đúng như vậy trong
 [`apps/office/app/composables/useRealtime.ts`](../../apps/office/app/composables/useRealtime.ts).
 
-## 5. Quy ước chung
+## 5. Sổ kiểm toán: `core_audit_log` (lãnh đạo, quản trị đơn vị)
+
+Mọi thay đổi dữ liệu nghiệp vụ vào sổ kiểm toán chuỗi băm. Vai trò `director`, `tenant_admin` đọc được dòng sổ
+của đơn vị mình, nhưng không đọc cột `diff`. Thay vào đó là trường `overview`: tên mọi cột đã đổi, kèm giá trị
+`[cũ, mới]` chỉ ở các cột không chứa nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản). Cột chứa nội
+dung và hash có giá trị `null`, để sổ không lộ văn bản hạn chế (có hash là tra được văn bản ở cổng xác thực).
+
+```graphql
+{
+  core_audit_log(where: {entity_id: {_eq: "<id văn bản>"}}, order_by: {id: desc}, limit: 50) {
+    id occurred_at actor_id actor_kind action entity entity_id hash overview
+  }
+  core_audit_anchors(order_by: {audit_id: desc}, limit: 1) { audit_id anchored_at }   # đã neo tới dòng nào
+}
+```
+
+Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"], "issued_on": [null, "2026-10-19"],
+"content_sha256": null, "symbol": null, …}`. Kiểm cả chuỗi không làm qua API, vì chuỗi chung cho mọi đơn vị: quản trị máy chủ chạy
+`make audit` ([`db/README.md`](../../db/README.md#sổ-kiểm-toán-chuỗi-băm)).
+
+## 6. Quy ước chung
 
 - **`X-Request-Id`**: cổng gắn vào mọi phản hồi. Mã này cũng có trong nhật ký của dịch vụ và cột `request_id`
   của sổ kiểm toán; gửi kèm khi báo lỗi.
@@ -230,7 +250,7 @@ thì đọc lại `core_notifications`. Giao diện Mộc làm đúng như vậy
 - **Thuê ước**: không gửi `tenant_id`; Hasura và `svc-files` lấy từ token. Người của đơn vị này không đọc được
   dữ liệu của đơn vị khác (`make smoke` kiểm).
 
-## 6. API nội bộ, không qua cổng
+## 7. API nội bộ, không qua cổng
 
 | Bên gọi → bên nhận | Cách gọi | Tài liệu |
 |---|---|---|
@@ -240,3 +260,5 @@ thì đọc lại `core_notifications`. Giao diện Mộc làm đúng như vậy
 | `svc-workflow` → Flowable REST, Keycloak | Tài khoản dịch vụ | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
 | `svc-workflow` → Flowable `external-job-api` | Tự lấy việc nhắc hạn (topic `moc-sla`) do timer trong BPMN tạo | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
 | `svc-workflow` → Centrifugo `POST /api/batch` (cổng nội bộ 9000) | Tiêu đề `X-API-Key` (`CENTRIFUGO_API_KEY`) | [`realtime/config.yaml`](../../realtime/config.yaml) |
+| `svc-files` → SeaweedFS, bucket lạnh `moc-cold` | S3, bucket bật Object Lock; ghi mốc neo sổ kiểm toán kèm hạn giữ COMPLIANCE | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
+| `scripts/moc.py` trên máy chủ → PostgreSQL, `svc-files` | `docker compose exec` (không mở thêm cổng) | [`db/README.md`](../../db/README.md#sổ-kiểm-toán-chuỗi-băm) |

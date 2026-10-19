@@ -81,6 +81,17 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - `make smoke` thêm 5 kiểm tra (tổng 28): token giả bị đóng kết nối, tin việc mới tới qua WebSocket, thông báo
   lưu đúng người, nhắc hạn và báo lãnh đạo khi `MOC_SLA_DURATION` ngắn (CI đặt `PT20S`); `make e2e` thêm kịch
   bản hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang.
+- Sổ kiểm toán chuỗi băm (F2.12): `svc-files` định kỳ neo hash đầu chuỗi ra bucket lạnh `moc-cold` bật S3 Object
+  Lock, chế độ COMPLIANCE — trong hạn giữ không ai xóa, ghi đè hay rút ngắn hạn được, kể cả quản trị kho.
+  `make audit` (`scripts/moc.py audit verify`) tính lại cả chuỗi bên ngoài CSDL, so với các mốc đã neo và với hash
+  của văn bản: sửa một dòng thì chỉ ra dòng đó, sửa rồi tính lại cả chuỗi thì chỉ ra khoảng dòng bị viết lại, đổi
+  hash văn bản phát hành thì chỉ ra văn bản đó; `audit anchor --to <tệp>` giữ thêm một bản mốc ngoài máy chủ. Màn
+  "Sổ kiểm toán" cho lãnh đạo, quản trị đơn vị: ai, lúc nào, làm gì, cột nào đổi, dòng đã neo chưa — không lộ nội
+  dung văn bản hạn chế (#33).
+- SeaweedFS nằm riêng mạng `storage`, chỉ `svc-files` tới được, và tắt HTTP của filer: gọi thẳng filer thì bỏ qua
+  được khóa ghi của bucket. Tắt gửi thống kê ẩn danh của SeaweedFS ra ngoài (#33).
+- `make smoke` thêm 3 kiểm tra (tổng 31): neo rồi kiểm cả sổ, mốc neo không xóa được, lãnh đạo thấy hash văn bản
+  vừa phát hành trong sổ; `make e2e` thêm kịch bản lãnh đạo xem sổ kiểm toán.
 
 ### Đã sửa đổi
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,

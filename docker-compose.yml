@@ -192,10 +192,13 @@ services:
       postgres: {condition: service_healthy}
 
   # F1.5 — kho đối tượng. Chỉ svc-files gọi; không có URL ký sẵn nào phát ra ngoài.
+  # Nằm riêng mạng storage với svc-files: filer (8888) và volume server của SeaweedFS không kiểm khóa và đi vòng
+  # được qua khóa ghi (S3 Object Lock) của bucket lạnh — container khác, kể cả PostgreSQL, không được tới đó (F2.12).
   seaweedfs:
     <<: *common
     image: chrislusf/seaweedfs:4.48
     profiles: [core]
+    networks: [storage]
     # Không có tệp danh tính thì cổng S3 không kiểm khóa: sinh tệp từ .env trước khi chạy
     # (khóa chỉ gồm chữ và số)
     entrypoint:
@@ -208,9 +211,11 @@ services:
         chown seaweed:seaweed /tmp/s3.json
         exec /entrypoint.sh "$$@"
       - --
+    # -filer.disableHttp: chỉ đi qua cổng S3 (có kiểm khóa, có Object Lock); -master.telemetry=false: không gửi
+    # thống kê ra ngoài
     command: >-
       server -s3 -dir=/data -ip.bind=0.0.0.0 -volume.max=0 -master.volumeSizeLimitMB=1024
-      -s3.config=/tmp/s3.json
+      -s3.config=/tmp/s3.json -filer.disableHttp -master.telemetry=false
     environment:
       SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?}
       SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?}
@@ -245,6 +250,7 @@ services:
     build: ./services/svc-files
     image: moc/svc-files:${MOC_VERSION:-dev}
     profiles: [core]
+    networks: [moc, storage]
     environment:
       <<: *oidc
       SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?}
@@ -254,6 +260,9 @@ services:
       MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:?}
       # in vào mã QR của văn bản đi phát hành: <MOC_PUBLIC_URL>/xac-thuc/<mã>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      # F2.12 — neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi
+      MOC_AUDIT_ANCHOR_INTERVAL_S: ${MOC_AUDIT_ANCHOR_INTERVAL_S:-600}
+      MOC_AUDIT_ANCHOR_RETENTION_DAYS: ${MOC_AUDIT_ANCHOR_RETENTION_DAYS:-3650}
     depends_on:
       hasura: {condition: service_healthy}
       seaweedfs: {condition: service_started}
@@ -322,6 +331,10 @@ services:
 networks:
   moc:
     driver: bridge
+  # chỉ seaweedfs và svc-files; không ra Internet
+  storage:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres_data:

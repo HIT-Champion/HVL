@@ -96,6 +96,17 @@ query Verify($where: office_issued_documents_bool_exp!) {
   }
 }"""
 
+# Neo sổ kiểm toán (anchors.py): đầu chuỗi — khóa quản trị, không vai trò nào đọc được core.audit_head
+AUDIT_HEAD = """
+query AuditHead {
+  core_audit_head { last_id last_hash }
+}"""
+
+RECORD_ANCHOR = """
+mutation RecordAnchor($o: core_audit_anchors_insert_input!) {
+  insert_core_audit_anchors_one(object: $o, on_conflict: {constraint: audit_anchors_once, update_columns: []}) { id }
+}"""
+
 # Hasura từ chối chính token/phiên của người gọi
 AUTH_CODES = {"invalid-jwt", "invalid-headers", "access-denied", "jwt-missing-role-claims"}
 
@@ -313,6 +324,16 @@ class HasuraClient:
         if not rows:
             return None
         return {**rows[0], "content_sha256": _hex(rows[0]["content_sha256"])}
+
+    async def audit_head(self) -> tuple[int, str]:
+        """(id dòng cuối, hash dòng cuối) của sổ kiểm toán."""
+        data = await self._call(AUDIT_HEAD, {}, {"X-Hasura-Admin-Secret": self._secret})
+        head = data["core_audit_head"][0]
+        return int(head["last_id"]), _hex(head["last_hash"])
+
+    async def record_anchor(self, audit_id: int, hash_hex: str, location: str) -> None:
+        await self._call(RECORD_ANCHOR, {"o": {"audit_id": audit_id, "hash": _bytea(hash_hex), "location": location}},
+                         {"X-Hasura-Admin-Secret": self._secret})
 
 
 def _letter(data: dict[str, Any]) -> dict[str, Any] | None:
