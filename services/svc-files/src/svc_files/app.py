@@ -226,7 +226,13 @@ def create_app(
         await meili.aclose()
         await hasura.aclose()
 
-    app = FastAPI(title="Mộc — svc-files", version=__version__, lifespan=lifespan)
+    app = FastAPI(
+        title="Mộc — svc-files",
+        version=__version__,
+        description="Tải tệp lên qua trạm kiểm dịch ClamAV, tải xuống theo quyền, tìm văn bản. Gọi qua cổng APISIX "
+                    "với token Bearer do Keycloak cấp (docs/api/README.md).",
+        lifespan=lifespan,
+    )
     app.state.indexer = indexer
     app.state.meili = meili
     bearer = HTTPBearer(auto_error=False)

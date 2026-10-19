@@ -1,0 +1,566 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mộc — svc-files",
+    "description": "Tải tệp lên qua trạm kiểm dịch ClamAV, tải xuống theo quyền, tìm văn bản. Gọi qua cổng APISIX với token Bearer do Keycloak cấp (docs/api/README.md).",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/files": {
+      "post": {
+        "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
+        "operationId": "upload_file_api_files_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "413": {
+            "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
+          },
+          "422": {
+            "description": "Tệp chứa mã độc — đã chặn, không lưu, ghi vào sổ kiểm toán"
+          },
+          "503": {
+            "description": "ClamAV, kho đối tượng hoặc CSDL không sẵn sàng — không lưu"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files/{file_id}": {
+      "get": {
+        "summary": "Tải tệp xuống, nếu người gọi được xem tệp",
+        "operationId": "download_file_api_files__file_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nội dung tệp, luôn ở dạng tải về",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Không có tệp, hoặc người gọi không được xem — hai trường hợp trả như nhau"
+          },
+          "503": {
+            "description": "CSDL hoặc kho đối tượng không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "summary": "Tìm văn bản theo số ký hiệu, trích yếu, cơ quan ban hành",
+        "operationId": "search_api_search_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Gõ có dấu hay không dấu đều được",
+              "title": "Q"
+            },
+            "description": "Gõ có dấu hay không dấu đều được"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "in",
+                    "out"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "received",
+                    "registered",
+                    "in_progress",
+                    "done",
+                    "draft",
+                    "in_review",
+                    "returned",
+                    "approved",
+                    "issued",
+                    "archived",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[^\\s/\"\\\\-]{1,10}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type Code"
+            }
+          },
+          {
+            "name": "urgency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "normal",
+                    "khan",
+                    "thuong_khan",
+                    "hoa_toc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Urgency"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "503": {
+            "description": "Meilisearch hoặc CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FileOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "scanned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Scanned At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "mime_type",
+          "size_bytes",
+          "sha256",
+          "scanned_at"
+        ],
+        "title": "FileOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "SearchHit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "received",
+              "registered",
+              "in_progress",
+              "done",
+              "draft",
+              "in_review",
+              "returned",
+              "approved",
+              "issued",
+              "archived",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "type_code": {
+            "type": "string",
+            "title": "Type Code"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "khan",
+              "thuong_khan",
+              "hoa_toc"
+            ],
+            "title": "Urgency"
+          },
+          "register_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Register Number"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered At"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "status",
+          "type_code",
+          "symbol",
+          "issuer_name",
+          "issued_on",
+          "summary",
+          "urgency",
+          "register_number",
+          "registered_at",
+          "due_on"
+        ],
+        "title": "SearchHit"
+      },
+      "SearchOut": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "type": "array",
+            "title": "Hits"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hits",
+          "next_offset"
+        ],
+        "title": "SearchOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

@@ -81,6 +81,14 @@ def test_missing_session_is_bad_request(client):
     assert r.status_code == 400
 
 
+def test_openapi_documents_action_contract(client):
+    spec = client.get("/openapi.json").json()
+    op = spec["paths"]["/actions/{name}"]["post"]
+    assert "session_variables" in op["requestBody"]["content"]["application/json"]["schema"]["properties"]
+    assert "X-Moc-Action-Secret" in [p["name"] for p in op["parameters"]]
+    assert {"401", "403", "409"} <= set(op["responses"])
+    assert "/healthz" not in spec["paths"] and "/readyz" not in spec["paths"]
+
 def test_config_requires_secrets():
     with pytest.raises(ConfigError, match="MOC_ACTION_SECRET"):
         Settings.from_env({k: v for k, v in ENV.items() if k != "MOC_ACTION_SECRET"})

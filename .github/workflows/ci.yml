@@ -196,6 +196,10 @@ jobs:
       - name: Nạp dữ liệu mẫu (make seed)
         run: make seed
 
+      # Xuất lại schema GraphQL theo vai trò và OpenAPI từ hệ thống vừa dựng, so với docs/api/ trong commit
+      - name: Tài liệu API trong docs/api/ khớp mã (make api-docs)
+        run: python3 scripts/api_docs.py --check
+
       - name: Luồng chính qua cổng APISIX, EICAR bị chặn (make smoke)
         run: make smoke
 

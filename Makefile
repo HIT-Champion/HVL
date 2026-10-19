@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs \
         install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -93,6 +93,9 @@ e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): luồ
 test: ## Chạy test đơn vị của các dịch vụ (không cần Docker)
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
+
+api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
+	@python3 scripts/api_docs.py
 
 install: $(ENV_FILE) ## Cài ra ngoài thư mục mã nguồn, chạy từ đó — dùng: make install PREFIX=/opt/moc
 	@MOC_VERSION="$(MOC_VERSION)" ./scripts/install.sh install "$(PREFIX)"

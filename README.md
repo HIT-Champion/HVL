@@ -112,7 +112,7 @@ và cổng xác thực (Phase 2), bằng chứng 4 nguyên lý và dashboard (Ph
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make install` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -185,8 +185,9 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
 thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, rồi
-`make install` sang thư mục khác và chạy lại smoke từ bản cài; đồng thời quét bí mật trong lịch sử commit
-(gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
+`make install` sang thư mục khác và chạy lại smoke từ bản cài; kiểm tài liệu API trong `docs/api/` khớp hệ
+thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa
+phụ thuộc (OSV-Scanner).
 
 ## Tài liệu
 
@@ -199,6 +200,7 @@ thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → 
 | [`docs/git_flow.md`](docs/git_flow.md) | Quy trình Git: nhánh, commit, pull request, phát hành |
 | [`docs/architecture.md`](docs/architecture.md) | Kiến trúc H-P-D-I, bản đồ công cụ, quyết định kỹ thuật |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
+| [`docs/api/`](docs/api/README.md) | Tài liệu API: lấy token, gọi GraphQL và REST qua cổng; schema GraphQL theo vai trò và OpenAPI xuất tự động (`make api-docs`) |
 | [`docs/pof-checklist.md`](docs/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
 | [`docs/nghien-cuu/`](docs/nghien-cuu/) | Nghiên cứu trước khi có đề thi (lưu trữ) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Danh mục phần mềm thượng nguồn + giấy phép |

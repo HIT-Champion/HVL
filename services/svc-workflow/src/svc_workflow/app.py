@@ -55,6 +55,53 @@ def _setup_logging() -> None:
         log.propagate = False
 
 
+def _error_doc(description: str) -> dict[str, Any]:
+    return {"description": description, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["message", "extensions"],
+        "properties": {
+            "message": {"type": "string", "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"},
+            "extensions": {"type": "object", "required": ["code"], "properties": {"code": {"type": "string"}}},
+        },
+    }}}}
+
+
+# Thân yêu cầu đọc bằng tay để lỗi nào cũng trả đúng định dạng Action, nên khai cho tài liệu OpenAPI ở đây.
+ACTION_DOC: dict[str, Any] = {
+    "parameters": [{
+        "name": "X-Moc-Action-Secret", "in": "header", "required": True, "schema": {"type": "string"},
+        "description": "Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET)",
+    }],
+    "requestBody": {
+        "required": True,
+        "content": {"application/json": {"schema": {
+            "type": "object",
+            "required": ["action", "input", "session_variables"],
+            "properties": {
+                "action": {"type": "object", "required": ["name"],
+                           "properties": {"name": {"type": "string", "description": "Trùng {name} trên đường dẫn"}}},
+                "input": {"type": "object", "description": "Đối số của Action, khai trong db/metadata/actions.graphql"},
+                "session_variables": {
+                    "type": "object", "additionalProperties": {"type": "string"},
+                    "description": "Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, "
+                                   "x-hasura-tenant-id, x-hasura-department-id",
+                },
+            },
+        }}},
+    },
+    "responses": {
+        "200": {"description": "Kết quả của Action, đúng kiểu trả về khai trong db/metadata/actions.graphql"},
+        "400": _error_doc("Sai định dạng Action; kết quả hoặc dữ liệu của việc không hợp lệ"),
+        "401": _error_doc("Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi"),
+        "403": _error_doc("Vai trò không được dùng Action này, hoặc việc không giao cho người gọi"),
+        "404": _error_doc("Không có văn bản hoặc việc"),
+        "409": _error_doc("Văn bản sai trạng thái, việc vừa có người khác nhận, hoặc CSDL từ chối"),
+        "500": _error_doc("Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký"),
+        "503": _error_doc("Chưa gọi được Flowable hoặc CSDL, thử lại sau"),
+    },
+}
+
+
 def _error(status: int, code: str, message: str) -> JSONResponse:
     # Định dạng lỗi Hasura chuyển nguyên cho client: errors[0].message và extensions.code
     return JSONResponse({"message": message, "extensions": {"code": code}}, status_code=status)
@@ -119,21 +166,28 @@ def create_app(
             await flowable.aclose()
             await hasura.aclose()
 
-    app = FastAPI(title="Mộc svc-workflow", version=__version__, lifespan=lifespan)
+    app = FastAPI(
+        title="Mộc svc-workflow",
+        version=__version__,
+        description="Hasura Actions của Văn phòng điện tử. API nội bộ: chỉ Hasura gọi, không qua cổng APISIX; "
+                    "ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
+        lifespan=lifespan,
+    )
     app.state.workflow = workflow
     app.state.directory = directory
 
-    @app.get("/healthz")
+    @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/readyz")
+    @app.get("/readyz", include_in_schema=False)
     async def readyz() -> JSONResponse:
         checks = {"hasura": await hasura.ping(), "flowable": await flowable.ping()}
         ok = all(checks.values())
         return JSONResponse({"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503)
 
-    @app.post("/actions/{name}")
+    @app.post("/actions/{name}", summary="Chạy một Hasura Action: registerIncoming, myTasks, completeTask",
+              openapi_extra=ACTION_DOC)
     async def action(name: str, request: Request) -> JSONResponse:
         given = request.headers.get("x-moc-action-secret", "")
         if not hmac.compare_digest(given.encode(), settings.action_secret.encode()):

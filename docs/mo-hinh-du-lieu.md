@@ -410,6 +410,8 @@ người ngoài liệt kê được mọi văn bản đã phát hành.
 
 ## 4. Hasura Actions và API của dịch vụ
 
+Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống đang chạy: [`docs/api/`](api/README.md).
+
 ### 4.1. Actions (do `svc-workflow` xử lý)
 
 | Action | Ai gọi | Làm gì |

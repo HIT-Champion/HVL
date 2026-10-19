@@ -24,7 +24,8 @@ Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiể
 
 ## API
 
-Đi qua APISIX ở `/api/files/*`; tài liệu OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ).
+Đi qua APISIX ở `/api/files/*`, `/api/search`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
+xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-files.json) (`make api-docs`).
 
 | Đường dẫn | Kết quả |
 |---|---|
