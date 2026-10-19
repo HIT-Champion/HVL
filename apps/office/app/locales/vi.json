@@ -77,10 +77,17 @@
         "returned": "Trả lại để sửa",
         "approved": "Ký duyệt",
         "numbered": "Cấp số {symbol}",
-        "issued": "Phát hành"
+        "issued": "Phát hành",
+        "overdue": "Quá hạn giải quyết ({due})"
+      },
+      "task": {
+        "overdue": "Quá hạn bước «{task}», đã nhắc",
+        "escalated": "Quá hạn hai lần bước «{task}», đã báo lãnh đạo"
       }
     },
-    "drafted": "Tạo dự thảo"
+    "drafted": "Tạo dự thảo",
+    "system": "Hệ thống",
+    "notified": "Đã báo: {names}"
   },
   "inbox": {
     "title": "Hộp việc",
@@ -319,5 +326,20 @@
     "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
     "footer": "Mộc — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
+  },
+  "notify": {
+    "title": "Thông báo",
+    "empty": "Chưa có thông báo nào",
+    "markAll": "Đánh dấu đã đọc hết",
+    "live": "Đang nhận thông báo trực tiếp",
+    "offline": "Chưa nối được kênh thông báo trực tiếp — vẫn xem được thông báo đã có, đang thử nối lại",
+    "someone": "Người được giao",
+    "note": "Ý kiến: {note}",
+    "taskAssigned": "Việc mới: {task}",
+    "taskOverdue": "Quá hạn: {task}",
+    "taskEscalated": "{name} chưa làm xong «{task}» đúng hạn",
+    "documentIssued": "Đã phát hành văn bản {symbol}",
+    "documentProcessed": "{name} đã báo kết quả xử lý",
+    "documentOverdue": "Văn bản quá hạn giải quyết ({due})"
   }
 }

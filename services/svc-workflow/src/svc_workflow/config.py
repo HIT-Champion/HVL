@@ -22,6 +22,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from .sla import parse_duration
+
 REQUIRED = (
     "HASURA_ADMIN_SECRET",
     "MOC_ACTION_SECRET",
@@ -50,9 +52,13 @@ class Settings:
     realm: str
     directory_client_id: str
     directory_client_secret: str
+    # Centrifugo: API nội bộ để đẩy thông báo; để trống khóa thì chỉ lưu thông báo, không đẩy realtime
+    centrifugo_url: str
+    centrifugo_api_key: str
     # 0: tắt vòng nền (test gọi trực tiếp)
     directory_sync_interval_s: float
     reconcile_interval_s: float
+    sla_poll_interval_s: float
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -75,8 +81,18 @@ class Settings:
                 realm=env.get("MOC_REALM", "moc"),
                 directory_client_id=env.get("MOC_DIRECTORY_CLIENT_ID", "svc-workflow"),
                 directory_client_secret=env["MOC_DIRECTORY_CLIENT_SECRET"],
+                centrifugo_url=env.get("MOC_CENTRIFUGO_URL", "http://centrifugo:9000").rstrip("/"),
+                centrifugo_api_key=env.get("CENTRIFUGO_API_KEY", ""),
                 directory_sync_interval_s=float(env.get("MOC_DIRECTORY_SYNC_INTERVAL_S", "15")),
                 reconcile_interval_s=float(env.get("MOC_RECONCILE_INTERVAL_S", "300")),
+                sla_poll_interval_s=float(env.get("MOC_SLA_POLL_INTERVAL_S", "5")),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
+
+    def __post_init__(self) -> None:
+        # thời hạn sai thì dừng ngay lúc khởi động, không để timer trong Flowable hỏng khi văn bản đã vào sổ
+        try:
+            parse_duration(self.sla_duration)
+        except ValueError as exc:
+            raise ConfigError(f"MOC_SLA_DURATION: {exc}") from exc

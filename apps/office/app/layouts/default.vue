@@ -59,6 +59,33 @@ function toggleLocale() {
 }
 
 watch(() => route.fullPath, () => { open.value = false })
+
+// Thông báo (F2.5): một kết nối realtime cho cả phiên làm việc; mỗi lần (nối lại) kết nối thì tải lại danh sách,
+// vì tin đẩy lúc mất kết nối không được gửi lại
+const realtime = useRealtime()
+const notifications = useNotifications()
+const notice = useNotice()
+const reload = () => notifications.load().catch(() => { /* chuông chỉ để hiển thị */ })
+realtime.onConnected(reload)
+realtime.onMessage((msg) => {
+  notifications.receive(msg)
+  const text = describeNotification(t, msg)
+  notice.info(text.title, { detail: text.note || text.detail, to: msg.document_id ? `/van-ban/${msg.document_id}` : undefined })
+})
+onMounted(() => {
+  reload()
+  realtime.start()
+  window.addEventListener('online', realtime.online)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('online', realtime.online)
+  realtime.stop()
+})
+
+async function logout() {
+  realtime.stop()
+  await auth.logout()
+}
 </script>
 
 <template>
@@ -101,6 +128,7 @@ watch(() => route.fullPath, () => { open.value = false })
         </button>
         <div class="flex-1" />
         <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>
+        <NotificationBell v-if="claims?.role && claims.role !== 'tenant_admin'" />
         <div v-if="claims" class="hidden text-right sm:block">
           <div class="text-sm font-medium text-stone-900">{{ claims.name }}</div>
           <div class="text-xs text-stone-500">{{ claims.role ? t(`role.${claims.role}`) : t('error.noRole') }}</div>
@@ -108,7 +136,7 @@ watch(() => route.fullPath, () => { open.value = false })
         <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800" aria-hidden="true">
           {{ claims?.name?.split(' ').pop()?.[0] ?? '?' }}
         </div>
-        <button class="btn-secondary" @click="auth.logout()">{{ t('nav.logout') }}</button>
+        <button class="btn-secondary" @click="logout">{{ t('nav.logout') }}</button>
       </header>
       <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8 md:py-8">
         <slot />

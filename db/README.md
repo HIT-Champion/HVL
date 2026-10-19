@@ -24,6 +24,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch) | **Xong** — 10 test |
 | `metadata/actions.graphql`, `actions.yaml`: `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
 | Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
+| `core.notifications` (thông báo từng người, F2.5): mỗi người chỉ đọc và đánh dấu đã đọc thông báo của mình, chống gửi trùng theo khóa | **Xong** — 6 test |
 | `office.case_files` (hồ sơ, nộp lưu) và các view báo cáo | Phase 2–3 |
 
 ## Vai trò

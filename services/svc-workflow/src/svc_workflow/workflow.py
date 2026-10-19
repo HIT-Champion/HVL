@@ -20,6 +20,9 @@ Thứ tự ghi khi hoàn thành một việc: kiểm quyền và dữ liệu →
 PostgreSQL trong một giao dịch, kèm sự kiện mang ``task_id`` → hoàn thành việc trong Flowable. Gọi lại sau
 lỗi mạng: sự kiện có ``task_id`` đã có thì bỏ qua bước ghi, chỉ hoàn thành nốt trong Flowable — không giao
 việc hai lần (docs/mo-hinh-du-lieu.md §4.1, "idempotent theo taskId").
+
+Sau mỗi bước, người phải làm bước kế tiếp nhận thông báo (F2.5, notify.py). Thông báo gửi sau khi bước đã ghi
+xong và không bao giờ làm hỏng bước đó: lỗi chỉ ghi nhật ký.
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ from .files import FilesClient, FilesError
 from .flowable import FlowableClient, FlowableError, Task
 from .forms import FORMS, ChiDao, Note, PhanCong, PhatHanh, XuLy
 from .hasura import (
+    BRIEF,
     DOCUMENT,
     NUMBER_OUTGOING,
     OPEN_ASSIGNMENTS,
@@ -52,6 +56,7 @@ from .hasura import (
     HasuraClient,
     HasuraError,
 )
+from .notify import Notifier, People
 
 PROCESS_IN = "van-ban-den"
 PROCESS_OUT = "van-ban-di"
@@ -103,12 +108,16 @@ class Plan:
 
     prepare: việc chạy sau khi đã nhận task, ngay trước mutation, trả thêm biến cho mutation — dùng khi phát
     hành (cấp số, dựng PDF), để không dựng PDF cho một task người khác đã nhận.
+    note: ý kiến kèm theo, ghi vào thông báo việc kế tiếp (lý do trả lại dự thảo).
+    after: thông báo thêm sau khi Flowable đã chuyển bước (văn bản đã phát hành, đã xử lý xong).
     """
 
     mutation: str
     variables: dict[str, Any]
     flow: dict[str, Any]
     prepare: Callable[[], Awaitable[dict[str, Any]]] | None = None
+    note: str | None = None
+    after: Callable[[], Awaitable[None]] | None = None
 
 
 DIRECT = """
@@ -177,10 +186,11 @@ query Managers($dept: uuid!) {
 
 class Workflow:
     def __init__(self, hasura: HasuraClient, flowable: FlowableClient, files: FilesClient | None = None, *,
-                 sla_duration: str = "PT24H") -> None:
+                 notifier: Notifier | None = None, sla_duration: str = "PT24H") -> None:
         self.hasura = hasura
         self.flowable = flowable
         self.files = files
+        self.notifier = notifier
         self.sla_duration = sla_duration
 
     # --- vào sổ ---------------------------------------------------------------------------------------
@@ -201,11 +211,13 @@ class Workflow:
         doc = data["office_register_incoming"][0]
         if not doc["process_id"]:
             try:
-                await self._attach_process(actor, doc)
+                pid = await self._attach_process(actor, doc)
             except (FlowableError, HasuraError) as exc:
                 # Số đến đã cấp và đã ghi; job đối soát sẽ khởi chạy quy trình sau
                 log.warning(json.dumps({"event": "office.process.start_failed", "document_id": doc["id"],
                                         "error": str(exc)}, ensure_ascii=False))
+            else:
+                await self._announce(actor, pid, doc["id"])
         return {"document_id": doc["id"], "register_number": doc["register_number"]}
 
     async def _attach_process(self, actor: Actor, doc: dict[str, Any]) -> str:
@@ -228,7 +240,7 @@ class Workflow:
         rows = (await self.hasura.as_system(UNLINKED))["office_documents"]
         for row in rows:
             actor = Actor(SYSTEM_ACTOR, uuid.UUID(row["tenant_id"]), "service", None)
-            await self._attach_process(actor, row)
+            await self._announce(actor, await self._attach_process(actor, row), row["id"])
         return len(rows)
 
     # --- trình văn bản đi -----------------------------------------------------------------------------
@@ -249,6 +261,7 @@ class Workflow:
         if doc["status"] == "in_review" and doc["signer_id"] == signer_id:
             # gọi lại sau lỗi mạng: dữ liệu đã ghi, chỉ hoàn thành nốt bước sửa trong Flowable nếu còn
             await self._finish_revision(actor, doc, signer_id)
+            await self._announce(actor, doc["process_id"], doc["id"])
             return {"document_id": doc["id"], "status": "in_review"}
         if doc["status"] not in ("draft", "returned"):
             raise WorkflowError("wrong_status", "Văn bản đã trình, không trình lại được", 409)
@@ -277,6 +290,7 @@ class Workflow:
         await self.hasura.as_service(actor, SUBMIT, {"doc": doc["id"], "set": changes, "event": event})
         if not first:
             await self._finish_revision(actor, doc, signer_id)
+        await self._announce(actor, changes.get("process_id") or doc["process_id"], doc["id"])
         return {"document_id": doc["id"], "status": "in_review"}
 
     async def _start_outgoing(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> str:
@@ -312,6 +326,55 @@ class Workflow:
         if doc is None or doc["direction"] != "out":
             raise WorkflowError("document_not_found", "Không tìm thấy văn bản đi", 404)
         return doc
+
+    # --- thông báo ------------------------------------------------------------------------------------
+
+    async def _quietly(self, what: str, doc_id: str, job: Callable[[], Awaitable[None]]) -> None:
+        """Thông báo không bao giờ làm hỏng bước nghiệp vụ đã ghi xong: lỗi chỉ ghi nhật ký."""
+        try:
+            await job()
+        except Exception as exc:  # noqa: BLE001 — bước đã ghi và đã chuyển trong Flowable, không được báo lỗi
+            log.warning(json.dumps({"event": "core.notification.failed", "step": what, "document_id": doc_id,
+                                    "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
+
+    async def brief(self, actor: Actor, doc_id: str) -> dict[str, Any] | None:
+        """Trích yếu, số ký hiệu, độ khẩn ghi kèm thông báo."""
+        doc = (await self.hasura.as_service(actor, BRIEF, {"id": doc_id}))["office_documents_by_pk"]
+        if doc is None:
+            return None
+        return {k: doc[k] for k in ("summary", "symbol", "urgency", "direction") if doc.get(k)}
+
+    async def _announce(self, actor: Actor, process_id: str | None, doc_id: str, *, note: str | None = None) -> None:
+        """Báo cho người phải làm từng việc đang mở của quy trình — trừ chính người vừa làm bước trước."""
+        notifier = self.notifier
+        if notifier is None or not process_id:
+            return
+
+        async def job() -> None:
+            tasks = await self.flowable.process_tasks(process_id)
+            if not tasks:
+                return
+            brief = await self.brief(actor, doc_id) or {}
+            people = await notifier.people(actor)
+            for task in tasks:
+                users = await notifier.task_people(self.flowable, actor, task, people) - {actor.user_id}
+                data = {"form_key": task.form_key, "task_id": task.id, **brief, **({"note": note} if note else {})}
+                await notifier.send(actor, users, "task.assigned", f"task:{task.id}:assigned", doc_id, data)
+
+        await self._quietly("announce", doc_id, job)
+
+    async def _tell(self, actor: Actor, users: set[str], kind: str, doc_id: str, **data: Any) -> None:
+        """Một thông báo về văn bản (không gắn việc) cho những người cụ thể, mỗi người một lần."""
+        notifier = self.notifier
+        if notifier is None:
+            return
+        brief = await self.brief(actor, doc_id) or {}
+        people: People = await notifier.people(actor)
+        by = people.get(actor.user_id)
+        payload = {**brief, **({"by_name": by.full_name} if by else {}),
+                   **{k: v for k, v in data.items() if v not in (None, "")}}
+        await notifier.send(actor, (users & people.keys()) - {actor.user_id}, kind, f"doc:{doc_id}:{kind}", doc_id,
+                            payload)
 
     # --- hộp việc -------------------------------------------------------------------------------------
 
@@ -393,6 +456,9 @@ class Workflow:
         except FlowableError as exc:
             # Dữ liệu đã ghi; người dùng bấm lại sẽ chỉ hoàn thành nốt trong Flowable
             raise WorkflowError("workflow_unavailable", "Đã lưu, nhưng chưa chuyển được bước tiếp — bấm lại", 503) from exc
+        await self._announce(actor, task.process_instance_id, doc_id, note=plan.note)
+        if plan.after is not None:
+            await self._quietly("after", doc_id, plan.after)
         return {"task_id": task_id, "document_id": doc_id}
 
     async def _task_done(self, actor: Actor, doc_id: str, task_id: str) -> bool:
@@ -529,11 +595,19 @@ class Workflow:
             raise WorkflowError("no_assignment", "Bạn không có việc mở với văn bản này", 409)
         ids = [mine["id"]] + ([mine["parent_id"]] if mine["parent_id"] else [])
         event = self._event(actor, doc_id, "office.document.processed", task.id, form.result_note)
+        # người đã giao việc: lãnh đạo phòng phân công, lãnh đạo đơn vị chỉ đạo
+        assigners = {a.get("assigned_by") for a in open_rows if a["id"] in ids}
+
+        async def after() -> None:
+            await self._tell(actor, {u for u in assigners if u}, "document.processed", doc_id,
+                             note=form.result_note[:300])
+
         return Plan(
             PROCESSED,
             {"ids": ids, "note": form.result_note, "now": datetime.now(UTC).isoformat(), "doc": doc_id,
              "event": event},
             {"outcome": "done"},
+            after=after,
         )
 
     # --- văn bản đi -------------------------------------------------------------------------------------
@@ -546,7 +620,8 @@ class Workflow:
         level = "department" if task.form_key == "vbdi.duyetPhong" else "unit"
         if outcome == "return":
             event = self._event(actor, doc_id, "office.document.returned", task.id, form.note, level=level)
-            return Plan(SET_STATUS, {"doc": doc_id, "status": "returned", "event": event}, {"outcome": "return"})
+            return Plan(SET_STATUS, {"doc": doc_id, "status": "returned", "event": event}, {"outcome": "return"},
+                        note=form.note)
         if level == "department":
             event = self._event(actor, doc_id, "office.document.reviewed", task.id, form.note, level=level)
             return Plan(EVENT_ONLY, {"event": event}, {"outcome": "approve"})
@@ -582,4 +657,7 @@ class Workflow:
                 "event": event,
             }
 
-        return Plan(ISSUE, {"doc": doc_id, "public": form.is_public}, {"outcome": "issue"}, prepare)
+        async def after() -> None:
+            await self._tell(actor, {doc["created_by"], doc["signer_id"]} - {None}, "document.issued", doc_id)
+
+        return Plan(ISSUE, {"doc": doc_id, "public": form.is_public}, {"outcome": "issue"}, prepare, after=after)

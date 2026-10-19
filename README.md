@@ -91,14 +91,20 @@ ký duyệt, rồi văn thư cấp số đi. Hệ thống dựng PDF có số, k
 mã QR, không cần đăng nhập, thấy văn bản có thật. Thả tệp nhận được vào trang xác thực: tệp nguyên vẹn thì
 "khớp", sửa một byte thì "không khớp".
 
+Ở mọi bước, người phải làm tiếp **nhận thông báo ngay** (Centrifugo, WebSocket): tin hiện ở góc màn hình, chuông
+giữ lại tin, hộp việc tự cập nhật không phải tải lại trang. Để một bước quá thời hạn (`MOC_SLA_DURATION`, thật
+`PT24H`, demo `PT1M`) thì timer trong quy trình BPMN nhắc người phải làm; quá hai thời hạn thì báo lãnh đạo của
+họ, và dòng thời gian văn bản ghi lại cả hai lần.
+
 ```
  Trình duyệt ──► APISIX :8080 ─┬─ /             → app-office (Nuxt, trang tĩnh; /xac-thuc công khai)  Tầng 2
                 (kiểm JWT,     ├─ /realms/moc/*  → Keycloak (đăng nhập SSO, TOTP)
                  X-Request-Id) ├─ /v1/graphql    → Hasura ─┬─ PostgreSQL (core, office)               Tầng 1
                                │                           └─ Actions → svc-workflow → Flowable (BPMN)
                                ├─ /api/files, /api/search, /api/documents/* → svc-files
-                               └─ /api/verify (không token, giới hạn theo IP) → svc-files
-                                  svc-files: ClamAV · SeaweedFS · Meilisearch · dựng PDF (WeasyPrint)
+                               ├─ /api/verify (không token, giới hạn theo IP) → svc-files
+                               │  svc-files: ClamAV · SeaweedFS · Meilisearch · dựng PDF (WeasyPrint)
+                               └─ /realtime (WebSocket) → Centrifugo ◄── svc-workflow đẩy thông báo
 ```
 
 | Thành phần | Vai trò | Thư mục |
@@ -107,12 +113,13 @@ mã QR, không cần đăng nhập, thấy văn bản có thật. Thả tệp nh
 | Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị, giới hạn tốc độ đăng nhập (theo IP) và API (theo phiên) | `gateway/` |
 | Hasura 2 + PostgreSQL 16 | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng, sổ kiểm toán chuỗi băm | `db/` |
 | Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `processes/` |
-| `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
+| `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; thông báo sau mỗi bước, nhắc hạn theo timer BPMN; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
+| Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người; tự kiểm token Keycloak | `realtime/` |
 | `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 
-Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): thông báo realtime, nhắc hạn,
-sổ đăng ký in được, neo hash sổ kiểm toán (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
+Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): sổ đăng ký in được, neo hash
+sổ kiểm toán (Phase 2), bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
 Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống
@@ -191,8 +198,8 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow` | Python + [uv](https://github.com/astral-sh/uv) |
-| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ | Hệ thống đang chạy + `make seed` |
-| `make e2e` | Hai luồng trên trình duyệt thật (Playwright, chạy trong container), kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không | Như trên |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
+| `make e2e` | Hai luồng trên trình duyệt thật (Playwright, chạy trong container), kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang | Như trên |
 | `db/tests/` | 80 test schema, quyền, sổ kiểm toán, cấp số đến và đi trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ

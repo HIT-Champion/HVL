@@ -71,6 +71,16 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   tệp PDF thì trình duyệt tự tính SHA-256 — tệp không tải lên — và báo khớp hay đã bị sửa (#30).
 - `make seed` thêm 6 văn bản đi ở đủ các bước; `make smoke` thêm 5 kiểm tra (tổng 23); `make e2e` thêm kịch
   bản văn bản đi: soạn, trả lại, trình lại, ký, phát hành, người ngoài kiểm tệp ở cổng xác thực.
+- Thông báo realtime (F2.5): sau mỗi bước, người phải làm việc kế tiếp nhận thông báo — việc mới (kèm ý kiến khi
+  bị trả lại), văn bản đã phát hành, đã báo kết quả xử lý. Thông báo lưu ở `core.notifications` (mỗi người chỉ
+  đọc của mình), Centrifugo đẩy qua WebSocket `/realtime` tới kênh riêng của từng người, tự kiểm token Keycloak.
+  Giao diện có chuông thông báo, tin hiện ở góc màn hình, hộp việc và trang văn bản tự tải lại (#31).
+- Nhắc hạn (F2.3): mỗi bước trong hai quy trình BPMN có timer `R2/${slaDuration}` (`MOC_SLA_DURATION`, thật
+  `PT24H`, demo `PT1M`); quá một thời hạn thì nhắc người phải làm, quá hai thì báo lãnh đạo của họ, ghi vào dòng
+  thời gian. Văn bản đến qua hạn giải quyết thì báo người xử lý và lãnh đạo (#32).
+- `make smoke` thêm 5 kiểm tra (tổng 28): token giả bị đóng kết nối, tin việc mới tới qua WebSocket, thông báo
+  lưu đúng người, nhắc hạn và báo lãnh đạo khi `MOC_SLA_DURATION` ngắn (CI đặt `PT20S`); `make e2e` thêm kịch
+  bản hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang.
 
 ### Đã sửa đổi
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,

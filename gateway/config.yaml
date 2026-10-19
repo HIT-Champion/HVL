@@ -38,6 +38,7 @@ nginx_config:
     - MOC_RATE_LOGIN_PER_MIN
     - MOC_RATE_API_PER_MIN
     - MOC_RATE_VERIFY_PER_MIN
+    - MOC_RATE_REALTIME_PER_MIN
   http:
     # svc-files tự giới hạn theo MOC_FILES_MAX_MB; ở biên chỉ chặn yêu cầu quá lớn rõ ràng
     client_max_body_size: 64m

@@ -27,6 +27,7 @@
     outcome           direct | file (chỉ đạo) · assign | self (phân công) · done (xử lý)
     leadDepartmentId  phòng chủ trì, '' nếu lãnh đạo giao thẳng cho một người
     handlerId         người xử lý (sub), '' khi chưa biết
+    slaDuration       thời hạn mỗi bước (ISO 8601) lấy từ MOC_SLA_DURATION lúc khởi chạy
 -->
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:flowable="http://flowable.org/bpmn"
@@ -40,6 +41,10 @@
 
     <userTask id="chiDao" name="Cho ý kiến chỉ đạo" flowable:formKey="vbden.chiDao"
               flowable:candidateGroups="t:${tenantId}:director"/>
+    <boundaryEvent id="hanChiDao" name="Quá hạn" attachedToRef="chiDao" cancelActivity="false">
+      <timerEventDefinition><timeCycle>R2/${slaDuration}</timeCycle></timerEventDefinition>
+    </boundaryEvent>
+    <sequenceFlow id="h1" sourceRef="hanChiDao" targetRef="nhacHan"/>
     <sequenceFlow id="f2" sourceRef="chiDao" targetRef="sauChiDao"/>
 
     <exclusiveGateway id="sauChiDao" name="Chỉ đạo thế nào?"/>
@@ -55,12 +60,28 @@
 
     <userTask id="phanCong" name="Phân công xử lý" flowable:formKey="vbden.phanCong"
               flowable:candidateGroups="t:${tenantId}:d:${leadDepartmentId}:manager"/>
+    <boundaryEvent id="hanPhanCong" name="Quá hạn" attachedToRef="phanCong" cancelActivity="false">
+      <timerEventDefinition><timeCycle>R2/${slaDuration}</timeCycle></timerEventDefinition>
+    </boundaryEvent>
+    <sequenceFlow id="h2" sourceRef="hanPhanCong" targetRef="nhacHan"/>
     <sequenceFlow id="f6" sourceRef="phanCong" targetRef="xuLy"/>
 
     <userTask id="xuLy" name="Xử lý văn bản" flowable:formKey="vbden.xuLy" flowable:assignee="${handlerId}"/>
+    <boundaryEvent id="hanXuLy" name="Quá hạn" attachedToRef="xuLy" cancelActivity="false">
+      <timerEventDefinition><timeCycle>R2/${slaDuration}</timeCycle></timerEventDefinition>
+    </boundaryEvent>
+    <sequenceFlow id="h3" sourceRef="hanXuLy" targetRef="nhacHan"/>
     <sequenceFlow id="f7" sourceRef="xuLy" targetRef="daXuLy"/>
 
     <endEvent id="daXuLy" name="Đã xử lý xong"/>
     <endEvent id="daLuu" name="Đã lưu"/>
+
+    <!-- Nhắc hạn: mỗi việc có timer không ngắt việc, bắn sau một và hai thời hạn (slaDuration, MOC_SLA_DURATION).
+         svc-workflow nhận việc này (external worker, topic moc-sla): lần đầu nhắc người phải làm, lần hai báo
+         thêm lãnh đạo của họ (services/svc-workflow/src/svc_workflow/sla.py). Việc vẫn ở nguyên chỗ cũ. -->
+    <serviceTask id="nhacHan" name="Nhắc hạn, báo lãnh đạo" flowable:type="external-worker" flowable:topic="moc-sla"
+                 flowable:exclusive="false"/>
+    <sequenceFlow id="h9" sourceRef="nhacHan" targetRef="daNhac"/>
+    <endEvent id="daNhac" name="Đã nhắc"/>
   </process>
 </definitions>

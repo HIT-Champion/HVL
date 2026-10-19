@@ -602,5 +602,11 @@ Phase 2:
   biết chỗ trống nằm đâu.
 - **Không phải chữ ký số.** Văn bản ghi "Đã duyệt trên hệ thống Mộc". Tính toàn vẹn dựa vào SHA-256 trong CSDL,
   sổ kiểm toán chuỗi băm và cổng xác thực. Chữ ký số PKI (PAdES) để sau, nếu còn thời gian.
-- Phase 2 còn lại: Centrifugo (F2.5), timer nhắc hạn, sổ đăng ký in được (F2.8), neo hash và lệnh
-  `dxos audit verify` (F2.12), poka-yoke JSON Schema dùng chung (F2.2).
+- **F2.5 và timer nhắc hạn đã chạy.** Sau mỗi bước, người phải làm tiếp nhận thông báo qua Centrifugo; thông báo
+  lưu ở `core.notifications`, nên mất kết nối không mất tin. Nhắc hạn đổi so với bản thiết kế: timer vẫn nằm trong
+  BPMN (`R2/${slaDuration}`), nhưng `svc-workflow` **tự lấy** việc nhắc về (external worker của Flowable) thay
+  cho callback `POST /internal/flowable/events`. Lý do: Flowable không phải giữ địa chỉ và khóa của dịch vụ nào,
+  `svc-workflow` dừng thì việc nhắc chờ đó chứ không mất. Giao diện nhận tin bằng WebSocket có sẵn của trình
+  duyệt, không dùng `centrifuge-js` (kéo theo `protobufjs` có script chạy lúc cài).
+- Phase 2 còn lại: sổ đăng ký in được (F2.8), neo hash và lệnh `dxos audit verify` (F2.12), poka-yoke JSON Schema
+  dùng chung (F2.2).

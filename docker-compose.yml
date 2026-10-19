@@ -121,6 +121,7 @@ services:
       MOC_RATE_LOGIN_PER_MIN: ${MOC_RATE_LOGIN_PER_MIN:-60}
       MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
       MOC_RATE_VERIFY_PER_MIN: ${MOC_RATE_VERIFY_PER_MIN:-30}
+      MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
     volumes:
       - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
@@ -270,6 +271,7 @@ services:
       FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
       MOC_KEYCLOAK_URL: http://keycloak:8080
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:?}
       MOC_REALM: ${MOC_REALM:-moc}
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -278,6 +280,31 @@ services:
     depends_on:
       hasura: {condition: service_healthy}
       flowable: {condition: service_healthy}
+    # Không phụ thuộc centrifugo: thiếu nó thì thông báo vẫn lưu, chỉ không đẩy tức thời
+
+  # F2.5 — đẩy thông báo tới trình duyệt qua WebSocket (/realtime ở APISIX); tự kiểm token Keycloak
+  centrifugo:
+    <<: *common
+    image: centrifugo/centrifugo:v6.9.7
+    profiles: [core]
+    command: ["centrifugo", "--config", "/centrifugo/config.yaml"]
+    environment:
+      CENTRIFUGO_HTTP_API_KEY: ${CENTRIFUGO_API_KEY:?}
+      # iss trong token là URL công khai; khóa công khai lấy qua mạng nội bộ
+      CENTRIFUGO_CLIENT_TOKEN_JWKS_PUBLIC_ENDPOINT: http://keycloak:8080/realms/${MOC_REALM:-moc}/protocol/openid-connect/certs
+      CENTRIFUGO_CLIENT_TOKEN_ISSUER: ${MOC_PUBLIC_URL:?}/realms/${MOC_REALM:-moc}
+      # chỉ trang của chính Mộc được mở WebSocket (chặn trang lạ dùng phiên của người dùng)
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${MOC_PUBLIC_URL:?}
+    volumes:
+      - ./realtime:/centrifugo:ro
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      keycloak: {condition: service_healthy}
 
   # ===========================================================================
   # Tầng 2 — ứng dụng

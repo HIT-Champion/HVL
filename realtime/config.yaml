@@ -1,0 +1,56 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Centrifugo — thông báo realtime (F2.5). Chỉ đẩy tin từ máy chủ xuống trình duyệt:
+#
+#   - Trình duyệt kết nối WebSocket qua APISIX (/realtime), gửi access token Keycloak trong lệnh connect đầu
+#     tiên; Centrifugo tự kiểm chữ ký bằng JWKS của realm và iss (WebSocket không gắn được header Authorization,
+#     nên APISIX không kiểm thay được).
+#   - Mỗi kết nối tự vào kênh riêng personal:#<sub> của người trong token. Client không tự đăng ký kênh nào khác,
+#     không gửi tin, không xem ai đang trực tuyến — mặc định của Centrifugo là cấm hết.
+#   - svc-workflow đẩy tin bằng HTTP API ở cổng nội bộ 9000 (khóa CENTRIFUGO_HTTP_API_KEY); cổng 8000 chỉ phục vụ
+#     WebSocket, APISIX chỉ chuyển /realtime tới đó.
+#
+# Giá trị theo từng bản cài (khóa API, JWKS, iss, origin) đặt bằng biến môi trường trong docker-compose.yml.
+
+client:
+  token:
+    user_id_claim: sub
+  allow_anonymous_connect_without_token: false
+  subscribe_to_user_personal_channel:
+    enabled: true
+    personal_channel_namespace: personal
+  # một người mở nhiều tab vẫn được, nhưng không mở vô hạn kết nối
+  user_connection_limit: 20
+
+channel:
+  namespaces:
+    # kênh riêng: chỉ máy chủ đẩy vào; không giữ lịch sử (thông báo đã lưu trong core.notifications)
+    - name: personal
+
+http_server:
+  port: 8000
+  internal_port: 9000
+
+health:
+  enabled: true
+
+# không gửi số liệu sử dụng ẩn danh về nhà phát triển (như Hasura, Meilisearch đã tắt)
+usage_stats:
+  disabled: true
+
+log:
+  level: info

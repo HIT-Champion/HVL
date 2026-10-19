@@ -25,8 +25,9 @@ from typing import Any
 import pytest
 
 from svc_workflow.files import FilesError
-from svc_workflow.flowable import FlowableError, Task
+from svc_workflow.flowable import ExternalJob, FlowableError, Task
 from svc_workflow.hasura import Actor, HasuraError
+from svc_workflow.notify import Notifier
 from svc_workflow.workflow import Workflow
 
 TENANT = uuid.UUID("c300d5bb-028f-44cc-ba10-7b5277a4225d")
@@ -49,6 +50,11 @@ class FakeFlowable:
     claims: list[tuple[str, str | None]] = field(default_factory=list)
     completed: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     started: list[dict[str, Any]] = field(default_factory=list)
+    # việc Flowable tạo tiếp sau khi một việc xong / khi quy trình bắt đầu (id việc mới, form, tham số add_task)
+    follow_ups: dict[str, list[tuple[str, str, dict[str, Any]]]] = field(default_factory=dict)
+    jobs: list[ExternalJob] = field(default_factory=list)
+    jobs_done: list[str] = field(default_factory=list)
+    jobs_failed: list[tuple[str, str]] = field(default_factory=list)
     down: bool = False
     claim_conflict: bool = False
 
@@ -58,6 +64,14 @@ class FakeFlowable:
         self.tasks[task_id] = Task(task_id, form_key, form_key, assignee, process or f"p-{task_id}", created,
                                    {"tenantId": str(tenant), "documentId": doc, "urgency": urgency})
         self.groups[task_id] = groups or []
+
+    def then(self, after: str, task_id: str, form_key: str, **kwargs: Any) -> None:
+        """Khi việc (hoặc văn bản vừa khởi chạy quy trình) `after` xong thì Flowable tạo việc task_id."""
+        self.follow_ups.setdefault(after, []).append((task_id, form_key, kwargs))
+
+    def _follow(self, after: str, process: str) -> None:
+        for task_id, form_key, kwargs in self.follow_ups.pop(after, []):
+            self.add_task(task_id, form_key, process=process, **kwargs)
 
     async def aclose(self) -> None: ...
 
@@ -81,7 +95,24 @@ class FakeFlowable:
         if self.down:
             raise FlowableError("down")
         self.completed.append((task_id, variables))
-        self.tasks.pop(task_id, None)
+        done = self.tasks.pop(task_id, None)
+        if done is not None:
+            self._follow(task_id, done.process_instance_id)
+
+    async def process_tasks(self, process_instance_id: str) -> list[Task]:
+        if self.down:
+            raise FlowableError("down")
+        return [t for t in self.tasks.values() if t.process_instance_id == process_instance_id]
+
+    async def acquire_jobs(self, topic: str, worker_id: str, **kwargs: Any) -> list[ExternalJob]:
+        jobs, self.jobs = self.jobs, []
+        return jobs
+
+    async def complete_job(self, job_id: str, worker_id: str) -> None:
+        self.jobs_done.append(job_id)
+
+    async def fail_job(self, job_id: str, worker_id: str, message: str, retry_after: str = "PT1M") -> None:
+        self.jobs_failed.append((job_id, message))
 
     async def tasks_for(self, user_id: str, groups: list[str]) -> list[Task]:
         if self.down:
@@ -97,6 +128,7 @@ class FakeFlowable:
             raise FlowableError("down")
         self.started.append(variables)
         self.processes[business_key] = f"proc-{business_key}"
+        self._follow(business_key, self.processes[business_key])
         return self.processes[business_key]
 
 
@@ -120,7 +152,10 @@ class FakeHasura:
     })
     numbered: list[dict[str, Any]] = field(default_factory=list)
     writes: list[tuple[str, dict[str, Any], Actor]] = field(default_factory=list)
+    notifications: list[dict[str, Any]] = field(default_factory=list)
+    overdue: list[dict[str, Any]] = field(default_factory=list)
     fail_writes: str | None = None
+    fail_notify: bool = False
     register_error: str | None = None
 
     async def as_service(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -157,6 +192,28 @@ class FakeHasura:
         if op == "TaskDone":
             found = variables["task"]["task_id"] in self.events_with_task
             return {"office_document_events": [{"id": 1}] if found else []}
+        if op == "SlaEvent":
+            found = [w for w in self.writes if w[0] == "GhiSuKien" and w[1]["event"]["kind"] == variables["kind"]
+                     and w[1]["event"]["data"].get("sla_task_id") == variables["task"]["sla_task_id"]]
+            return {"office_document_events": [{"id": 1}] if found else []}
+        if op == "People":
+            return {"core_users": [{"id": u, "role": r["role"], "department_id": r["department_id"],
+                                    "full_name": r.get("full_name", u)} for u, r in self.users.items() if r["enabled"]]}
+        if op == "Brief":
+            doc = {DOC: self.document, OUT: self.outgoing}.get(variables["id"])
+            return {"office_documents_by_pk": {"summary": "Công văn về chuyển đổi số", "symbol": None,
+                                               "created_by": None, "signer_id": None, **doc} if doc else None}
+        if op == "Notify":
+            if self.fail_notify:
+                raise HasuraError("Không gọi được Hasura")
+            created = []
+            for row in variables["rows"]:
+                if any(n["user_id"] == row["user_id"] and n["key"] == row["key"] for n in self.notifications):
+                    continue
+                self.notifications.append({**row, "tenant_id": actor.tenant_id})
+                created.append({"id": len(self.notifications), "created_at": "2026-10-19T09:00:00Z",
+                                **{k: row[k] for k in ("user_id", "kind", "document_id", "data")}})
+            return {"insert_core_notifications": {"returning": created}}
         # còn lại là mutation ghi
         if self.fail_writes:
             raise HasuraError(self.fail_writes, "constraint-violation")
@@ -171,7 +228,17 @@ class FakeHasura:
         return True
 
     async def as_system(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        if "OverdueDocuments" in query:
+            return {"office_documents": self.overdue}
         return {"office_documents": []}
+
+    def sent(self, kind: str | None = None) -> dict[str, set[str]]:
+        """Thông báo đã ghi: loại → người nhận (lọc một loại nếu có)."""
+        out: dict[str, set[str]] = {}
+        for n in self.notifications:
+            if kind is None or n["kind"] == kind:
+                out.setdefault(n["kind"], set()).add(n["user_id"])
+        return out
 
 
 @dataclass
@@ -204,8 +271,10 @@ def flowable() -> FakeFlowable:
 def hasura() -> FakeHasura:
     h = FakeHasura()
     h.users = {
-        "u-manager-dt": {"id": "u-manager-dt", "department_id": str(DEPT_DT), "role": "manager", "enabled": True},
-        "u-staff-dt": {"id": "u-staff-dt", "department_id": str(DEPT_DT), "role": "staff", "enabled": True},
+        "u-manager-dt": {"id": "u-manager-dt", "department_id": str(DEPT_DT), "role": "manager", "enabled": True,
+                         "full_name": "Phạm Thị Thu"},
+        "u-staff-dt": {"id": "u-staff-dt", "department_id": str(DEPT_DT), "role": "staff", "enabled": True,
+                       "full_name": "Nguyễn Văn An"},
         "u-staff-ktpm": {"id": "u-staff-ktpm", "department_id": str(DEPT_KTPM), "role": "staff", "enabled": True},
         "u-clerk": {"id": "u-clerk", "department_id": None, "role": "clerk", "enabled": True},
         "u-director": {"id": "u-director", "department_id": None, "role": "director", "enabled": True},
@@ -214,5 +283,10 @@ def hasura() -> FakeHasura:
 
 
 @pytest.fixture
-def workflow(hasura: FakeHasura, flowable: FakeFlowable, files: FakeFiles) -> Workflow:
-    return Workflow(hasura, flowable, files)  # type: ignore[arg-type]
+def notifier(hasura: FakeHasura) -> Notifier:
+    return Notifier(hasura)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def workflow(hasura: FakeHasura, flowable: FakeFlowable, files: FakeFiles, notifier: Notifier) -> Workflow:
+    return Workflow(hasura, flowable, files, notifier=notifier)  # type: ignore[arg-type]

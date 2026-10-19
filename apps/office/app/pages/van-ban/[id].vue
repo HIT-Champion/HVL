@@ -53,7 +53,7 @@ interface Doc {
     instruction: string | null; due_on: string | null; status: string; result_note: string | null
     assigned_by: string; assigned_at: string; completed_at: string | null
   }[]
-  events: { id: number; kind: string; actor_id: string; note: string | null; data: Record<string, any>; created_at: string }[]
+  events: { id: number; kind: string; actor_id: string; actor_kind: string; note: string | null; data: Record<string, any>; created_at: string }[]
 }
 
 const { t } = useI18n()
@@ -88,7 +88,7 @@ async function load() {
           assignments(order_by: {assigned_at: asc}) {
             id parent_id role department { name } user_id instruction due_on status result_note assigned_by assigned_at completed_at
           }
-          events(order_by: {id: asc}) { id kind actor_id note data created_at }
+          events(order_by: {id: asc}) { id kind actor_id actor_kind note data created_at }
         }
         core_users(order_by: {full_name: asc}) { id full_name role department_id }
         office_departments(order_by: {name: asc}) { id code name }
@@ -164,15 +164,23 @@ const timeline = computed(() => {
         ? t('event.office.document.assigned', { name: nameOf(e.data.user_id) })
         : e.kind === 'office.document.numbered'
           ? t('event.office.document.numbered', { symbol: e.data.symbol })
-          : t(`event.${e.kind}`)
+          : e.kind === 'office.task.overdue' || e.kind === 'office.task.escalated'
+            ? t(`event.${e.kind}`, { task: t(`task.${e.data.form_key}`) })
+            : e.kind === 'office.document.overdue'
+              ? t('event.office.document.overdue', { due: fmtDate(e.data.due_on) })
+              : t(`event.${e.kind}`)
     let note = e.note
+    // nhắc hạn do hệ thống gửi: ghi ai đã được báo
+    if (Array.isArray(e.data.notified) && e.data.notified.length) {
+      note = t('event.notified', { names: e.data.notified.map(nameOf).join(', ') })
+    }
     if (e.kind === 'office.document.directed') {
       const lead = e.data.lead_department_id
         ? departments.value.find((d) => d.id === e.data.lead_department_id)?.name
         : nameOf(e.data.lead_user_id)
       note = [e.note, lead ? `${t('doc.lead')}: ${lead}` : '', e.data.due_on ? `${t('doc.due')}: ${fmtDate(e.data.due_on)}` : ''].filter(Boolean).join(' · ')
     }
-    items.push({ key: String(e.id), title, who: nameOf(e.actor_id), at: e.created_at, note })
+    items.push({ key: String(e.id), title, who: e.actor_kind === 'service' ? t('event.system') : nameOf(e.actor_id), at: e.created_at, note })
   }
   return items.reverse()
 })
@@ -188,6 +196,10 @@ const assignments = computed(() => {
 
 watch(id, load)
 onMounted(load)
+
+// có người vừa làm một bước với văn bản này (F2.5): tải lại để thấy trạng thái, việc và dòng thời gian mới
+const { lastPush } = useNotifications()
+watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 </script>
 
 <template>

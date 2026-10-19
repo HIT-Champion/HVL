@@ -53,6 +53,10 @@ async function load() {
 }
 
 onMounted(load)
+
+// việc mới, nhắc hạn đẩy tới (F2.5): tải lại hộp việc, không phải bấm Làm mới
+const { lastPush } = useNotifications()
+watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
 </script>
 
 <template>
@@ -62,7 +66,7 @@ onMounted(load)
     </PageHeader>
 
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-else-if="loading && !tasks.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <div v-else-if="!tasks.length" class="card flex flex-col items-center gap-2 p-12 text-center text-stone-500">
       <svg class="h-10 w-10 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       {{ t('inbox.empty') }}

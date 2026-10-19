@@ -143,7 +143,7 @@ query Document($id: uuid!) {
 OPEN_ASSIGNMENTS = """
 query OpenAssignments($doc: uuid!) {
   office_assignments(where: {document_id: {_eq: $doc}, status: {_eq: "open"}}) {
-    id parent_id department_id user_id role due_on
+    id parent_id department_id user_id role due_on assigned_by
   }
 }"""
 
@@ -166,6 +166,12 @@ mutation NumberOutgoing($id: uuid!, $code: String!) {
   office_number_outgoing(args: {document_id: $id, verify_code: $code}) { id register_number symbol verify_code }
 }"""
 
+# Vài dòng về văn bản để ghi vào thông báo (trích yếu, số ký hiệu) — giữ nguyên như lúc gửi
+BRIEF = """
+query Brief($id: uuid!) {
+  office_documents_by_pk(id: $id) { id direction summary symbol urgency created_by signer_id }
+}"""
+
 TASK_DONE = """
 query TaskDone($doc: uuid!, $task: jsonb!) {
   office_document_events(where: {document_id: {_eq: $doc}, data: {_contains: $task}}, limit: 1) { id }
@@ -176,6 +182,17 @@ UNLINKED = """
 query Unlinked {
   office_documents(where: {direction: {_eq: "in"}, status: {_eq: "registered"}, process_id: {_is_null: true}},
                    limit: 100) { id tenant_id urgency due_on created_by }
+}"""
+
+# Văn bản đến quá hạn giải quyết mà chưa báo (xuyên thuê ước, vòng nền của svc-workflow)
+OVERDUE_DOCUMENTS = """
+query OverdueDocuments($today: date!) {
+  office_documents(where: {direction: {_eq: "in"}, status: {_eq: "in_progress"}, due_on: {_lt: $today},
+                           _not: {events: {kind: {_eq: "office.document.overdue"}}}},
+                   order_by: {due_on: asc}, limit: 100) {
+    id tenant_id summary symbol due_on
+    assignments(where: {status: {_eq: "open"}}) { user_id department_id assigned_by }
+  }
 }"""
 
 TENANT_USERS = """

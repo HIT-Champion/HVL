@@ -41,6 +41,8 @@ from .directory import Directory
 from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
 from .hasura import Actor, HasuraClient
+from .notify import Notifier
+from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
 
 log = logging.getLogger("svc_workflow")
@@ -140,6 +142,7 @@ def create_app(
     flowable: FlowableClient | None = None,
     directory: Directory | None = None,
     files: FilesClient | None = None,
+    notifier: Notifier | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env()
@@ -150,7 +153,9 @@ def create_app(
                                        settings.directory_client_secret, hasura)
     files = files or FilesClient(settings.files_url, ServiceToken(
         settings.keycloak_url, settings.realm, settings.directory_client_id, settings.directory_client_secret))
-    workflow = Workflow(hasura, flowable, files, sla_duration=settings.sla_duration)
+    notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key)
+    workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration)
+    deadlines = Deadlines(hasura, flowable, notifier, sla_duration=settings.sla_duration)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -160,6 +165,11 @@ def create_app(
         if settings.reconcile_interval_s > 0:
             tasks.append(asyncio.create_task(
                 _every(settings.reconcile_interval_s, "office.process.reconciled", workflow.reconcile)))
+            tasks.append(asyncio.create_task(
+                _every(settings.reconcile_interval_s, "office.document.overdue_notified", deadlines.overdue_documents)))
+        if settings.sla_poll_interval_s > 0:
+            tasks.append(asyncio.create_task(
+                _every(settings.sla_poll_interval_s, "office.sla.jobs_handled", deadlines.run_jobs)))
         try:
             yield
         finally:
@@ -167,6 +177,7 @@ def create_app(
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             await directory.aclose()
+            await notifier.aclose()
             await files.aclose()
             await flowable.aclose()
             await hasura.aclose()
@@ -179,6 +190,7 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.workflow = workflow
+    app.state.deadlines = deadlines
     app.state.directory = directory
 
     @app.get("/healthz", include_in_schema=False)

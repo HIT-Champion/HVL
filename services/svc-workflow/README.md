@@ -17,9 +17,18 @@ Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hi
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
 xuất bằng `make api-docs`.
 
+**Thông báo** (F2.5, `notify.py`): sau mỗi bước, người phải làm việc kế tiếp nhận thông báo — ghi
+`core.notifications` rồi đẩy qua HTTP API nội bộ của Centrifugo tới kênh riêng `personal:#<sub>`. Thông báo gửi
+sau khi bước đã ghi xong; lỗi ghi hay lỗi đẩy chỉ ghi nhật ký, không làm hỏng bước nghiệp vụ. Mỗi người nhận
+một lần cho mỗi khóa (gọi lại Action không gửi trùng).
+
+**Nhắc hạn** (`sla.py`): mỗi việc trong BPMN có timer `R2/${slaDuration}`; timer bắn thì Flowable tạo việc giao
+ra ngoài (external worker, topic `moc-sla`), dịch vụ lấy về mỗi `MOC_SLA_POLL_INTERVAL_S` giây: quá một thời
+hạn thì nhắc người phải làm, quá hai thì báo thêm lãnh đạo của họ.
+
 Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp không đổi); đồng bộ danh bạ Keycloak →
-`core.users` mỗi `MOC_DIRECTORY_SYNC_INTERVAL_S` giây; đối soát văn bản đã vào sổ mà chưa có quy trình mỗi
-`MOC_RECONCILE_INTERVAL_S` giây.
+`core.users` mỗi `MOC_DIRECTORY_SYNC_INTERVAL_S` giây; mỗi `MOC_RECONCILE_INTERVAL_S` giây đối soát văn bản đã
+vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn giải quyết; nhận việc nhắc hạn của Flowable.
 
 ## Cấu hình
 
@@ -32,8 +41,10 @@ Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp 
 | `HASURA_URL`, `FLOWABLE_URL`, `MOC_KEYCLOAK_URL` | `http://hasura:8080`, `http://flowable:8080/flowable-rest/service`, `http://keycloak:8080` | Mạng nội bộ |
 | `MOC_REALM` | `moc` | |
 | `MOC_PROCESSES_DIR` | `/app/processes` | Compose gắn `processes/` vào đây |
-| `MOC_SLA_DURATION` | `PT24H` | Thời hạn mỗi bước (ISO 8601) |
-| `MOC_DIRECTORY_SYNC_INTERVAL_S`, `MOC_RECONCILE_INTERVAL_S` | `15`, `300` | `0` tắt vòng nền |
+| `MOC_SLA_DURATION` | `PT24H` | Thời hạn mỗi bước (ISO 8601: ngày, giờ, phút, giây — `P1D`, `PT24H`, `PT1M`). Sai dạng thì dịch vụ dừng khi khởi động. Gắn vào quy trình lúc khởi chạy: đổi giá trị không đổi hạn của văn bản đang xử lý |
+| `CENTRIFUGO_API_KEY` | trống | Khóa HTTP API của Centrifugo; trống thì chỉ lưu thông báo, không đẩy realtime |
+| `MOC_CENTRIFUGO_URL` | `http://centrifugo:9000` | Cổng nội bộ của Centrifugo (API), không qua APISIX |
+| `MOC_DIRECTORY_SYNC_INTERVAL_S`, `MOC_RECONCILE_INTERVAL_S`, `MOC_SLA_POLL_INTERVAL_S` | `15`, `300`, `5` | `0` tắt vòng nền |
 | `MOC_FILES_URL` | `http://svc-files:8000` | Dựng bản phát hành văn bản đi; gọi bằng token tài khoản dịch vụ của client `svc-workflow` |
 
 ## Phát triển
@@ -41,7 +52,7 @@ Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp 
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 36 test đơn vị với Flowable, Hasura giả lập
+.venv/bin/python -m pytest          # 102 test đơn vị với Flowable, Hasura, Centrifugo giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

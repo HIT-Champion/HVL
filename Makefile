@@ -85,7 +85,7 @@ smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 
 PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble
 
-e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): luồng văn bản đến qua giao diện
+e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, thông báo realtime
 	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \
 	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e $(PLAYWRIGHT_IMAGE) \
 	  sh -c 'npm ci --no-audit --no-fund --ignore-scripts >/dev/null && npx playwright test'

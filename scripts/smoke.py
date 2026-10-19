@@ -19,18 +19,26 @@
 văn thư tải công văn lên (qua ClamAV) → nhập văn bản → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
 Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Rồi luồng văn bản đi: chuyên
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
-mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Kèm các kiểm tra chặn: tệp EICAR, không
-token, đường quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới
-hạn tốc độ.
+mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Thông báo: tổ trưởng nhận tin việc mới
+qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
+kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị,
+đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới hạn tốc độ.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import html
 import http.cookiejar
+import json
+import os
 import re
+import socket
+import ssl
+import struct
 import sys
+import time
 import urllib.parse
 import urllib.request
 import uuid
@@ -86,6 +94,120 @@ def browser_login(username: str) -> str:
     if not url.path.startswith("/realms/") and "code" in urllib.parse.parse_qs(url.query):
         return "code"
     return "otp" if 'name="otp"' in resp.read().decode() else "khác"
+
+
+class Realtime:
+    """Kết nối WebSocket tới /realtime như trình duyệt, nói giao thức JSON của Centrifugo — chỉ thư viện chuẩn."""
+
+    def __init__(self, token: str) -> None:
+        url = urllib.parse.urlsplit(PUBLIC_URL)
+        port = url.port or (443 if url.scheme == "https" else 80)
+        sock = socket.create_connection((url.hostname, port), timeout=15)
+        if url.scheme == "https":
+            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=url.hostname)
+        key = base64.b64encode(os.urandom(16)).decode()
+        sock.sendall((f"GET /realtime HTTP/1.1\r\nHost: {url.netloc}\r\nUpgrade: websocket\r\n"
+                      f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
+                      f"Origin: {PUBLIC_URL}\r\n\r\n").encode())
+        self.sock, self.buf, self.closed = sock, b"", None
+        head = self._until(b"\r\n\r\n").decode(errors="replace")
+        " 101 " in head.split("\r\n")[0] or fail(f"/realtime không nâng lên WebSocket: {head.splitlines()[0]}")
+        self.send({"id": 1, "connect": {"token": token, "name": "smoke"}})
+        self.reply = self.next(15)
+
+    def _until(self, marker: bytes) -> bytes:
+        while marker not in self.buf:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise ConnectionError("đóng kết nối")
+            self.buf += chunk
+        head, self.buf = self.buf.split(marker, 1)
+        return head
+
+    def _read(self, n: int) -> bytes:
+        while len(self.buf) < n:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise ConnectionError("đóng kết nối")
+            self.buf += chunk
+        data, self.buf = self.buf[:n], self.buf[n:]
+        return data
+
+    def _frame(self, opcode: int, payload: bytes) -> None:
+        mask = os.urandom(4)
+        n = len(payload)
+        size = bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack("!H", n)
+        self.sock.sendall(bytes([0x80 | opcode]) + size + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+
+    def send(self, command: dict) -> None:
+        self._frame(0x1, json.dumps(command).encode())
+
+    def next(self, timeout: float) -> dict | None:
+        """Lệnh kế tiếp từ máy chủ (trả lời ping ngay); None nếu máy chủ đóng kết nối hoặc hết giờ."""
+        deadline = time.time() + timeout
+        pending: list[dict] = getattr(self, "_pending", [])
+        while not pending:
+            self.sock.settimeout(max(deadline - time.time(), 0.01))
+            try:
+                first, second = self._read(2)
+            except (TimeoutError, socket.timeout):
+                return None
+            self.sock.settimeout(15)  # đã có đầu khung: đọc trọn khung, không cắt giữa chừng theo hạn chờ
+            n = second & 0x7F
+            if n == 126:
+                n = struct.unpack("!H", self._read(2))[0]
+            elif n == 127:
+                n = struct.unpack("!Q", self._read(8))[0]
+            payload, opcode = self._read(n), first & 0x0F
+            if opcode == 0x8:
+                self.closed = struct.unpack("!H", payload[:2])[0] if len(payload) >= 2 else 1005
+                return None
+            if opcode == 0x9:
+                self._frame(0xA, payload)
+            elif opcode == 0x1:
+                for line in payload.decode().splitlines():
+                    msg = json.loads(line) if line.strip() else None
+                    if msg == {}:
+                        self.send({})  # ping của Centrifugo → pong
+                    elif msg:
+                        pending.append(msg)
+        self._pending = pending
+        return pending.pop(0)
+
+    def wait_push(self, match, timeout: float) -> dict | None:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            msg = self.next(deadline - time.time())
+            if msg is None and self.closed is not None:
+                return None
+            data = ((msg or {}).get("push") or {}).get("pub", {}).get("data")
+            if data and match(data):
+                return data
+        return None
+
+    def close(self) -> None:
+        try:
+            self._frame(0x8, struct.pack("!H", 1000))
+        finally:
+            self.sock.close()
+
+
+def sla_seconds() -> float | None:
+    """MOC_SLA_DURATION đủ ngắn để chờ trong smoke (≤ 1 phút) → số giây; dài hơn thì None."""
+    m = re.fullmatch(r"PT(?:(\d+)M)?(?:(\d+)S)?", ENV.get("MOC_SLA_DURATION", "PT24H"))
+    seconds = (int(m.group(1) or 0) * 60 + int(m.group(2) or 0)) if m else 0
+    return seconds if 0 < seconds <= 60 else None
+
+
+def wait_notification(session: Session, doc_id: str, kind: str, timeout: float) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        found = session.gql("""query ($d: uuid!, $k: String!) {
+            core_notifications(where: {document_id: {_eq: $d}, kind: {_eq: $k}}) { id } }""", {"d": doc_id, "k": kind})
+        if found["core_notifications"]:
+            return True
+        time.sleep(2)
+    return False
 
 
 def main() -> None:
@@ -232,6 +354,38 @@ def main() -> None:
     (same, changed) == ("valid", "not_found") or fail(f"tra theo băm sai: nguyên vẹn {same}, đã sửa {changed}")
     ok("tệp nguyên vẹn → khớp; sửa một byte → không khớp")
 
+    print("Thông báo (Centrifugo, timer Flowable)")
+    fake = Realtime("khong.phai.token")
+    fake.reply is None and fake.closed == 3500 or fail(f"token giả vẫn kết nối được: {fake.reply} {fake.closed}")
+    fake.sock.close()
+    live = Realtime(manager.token)
+    channels = list(((live.reply or {}).get("connect") or {}).get("subs") or {})
+    len(channels) == 1 and channels[0].startswith("personal:#") or fail(f"kết nối realtime chưa vào kênh riêng: {live.reply}")
+    ok("token giả bị Centrifugo đóng (3500); token thật tự vào kênh riêng của người đó")
+
+    waiting = staff.gql(
+        "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }",
+        {"o": {"type_code": "TB", "recipients": ["Các bộ môn"], "body": "Khoa thông báo lịch họp giao ban tháng 11.",
+               "summary": f"Thông báo lịch họp giao ban tháng 11 (kiểm tra {tag})"}},
+    )["insert_office_documents_one"]["id"]
+    started = time.time()
+    staff.gql("mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }",
+              {"d": waiting, "s": signer})
+    pushed = live.wait_push(lambda d: d["kind"] == "task.assigned" and d["document_id"] == waiting, 15)
+    live.close()
+    pushed and pushed["data"]["form_key"] == "vbdi.duyetPhong" or fail("tổ trưởng không nhận tin việc mới qua WebSocket")
+    ok(f"chuyên viên trình → tổ trưởng nhận tin việc mới qua WebSocket sau {time.time() - started:.1f} giây")
+    mine = manager.gql("query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}}) { kind } }",
+                       {"d": waiting})["core_notifications"]
+    theirs = staff.gql("query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}}) { kind } }",
+                       {"d": waiting})["core_notifications"]
+    issued_note = staff.gql("query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}}) { kind } }",
+                            {"d": out_id})["core_notifications"]
+    [n["kind"] for n in mine] == ["task.assigned"] and theirs == [] \
+        and "document.issued" in [n["kind"] for n in issued_note] \
+        or fail(f"thông báo đã lưu chưa đúng: {mine} / {theirs} / {issued_note}")
+    ok("thông báo lưu lại cho người nhận (người khác không đọc được); người soạn có tin văn bản đã phát hành")
+
     # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
     print("Giới hạn tốc độ")
     _, headers = call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={
@@ -262,6 +416,23 @@ def main() -> None:
     ok("một phiên gọi GraphQL vượt giới hạn mỗi phút → 429")
     ping(clerk)
     ok("phiên khác vẫn gọi được, không bị chặn lây")
+
+    # Để cuối: thời gian các phần trên đã chạy cũng tính vào thời hạn đang chờ
+    print("Nhắc hạn (timer Flowable)")
+    sla = sla_seconds()
+    if sla is None:
+        print(f"  – bỏ qua: MOC_SLA_DURATION={ENV.get('MOC_SLA_DURATION', 'PT24H')}; đặt PT20S để kiểm (CI đặt sẵn)")
+    else:
+        fresh = Session("totruongdt")  # phiên trước đã dùng nhiều yêu cầu trong phút này
+        wait_notification(fresh, waiting, "task.overdue", started + sla + 45 - time.time()) \
+            or fail(f"quá {sla:.0f} giây mà tổ trưởng chưa được nhắc")
+        ok(f"để quá {sla:.0f} giây: tổ trưởng được nhắc việc duyệt dự thảo")
+        wait_notification(Session("truongkhoa"), waiting, "task.escalated", started + 2 * sla + 45 - time.time()) \
+            or fail(f"quá {2 * sla:.0f} giây mà lãnh đạo khoa chưa được báo")
+        events = [e["kind"] for e in fresh.gql("query ($d: uuid!) { office_documents_by_pk(id: $d) { events { kind } } }",
+                                               {"d": waiting})["office_documents_by_pk"]["events"]]
+        {"office.task.overdue", "office.task.escalated"} <= set(events) or fail(f"dòng thời gian thiếu nhắc hạn: {events}")
+        ok(f"quá {2 * sla:.0f} giây: báo lãnh đạo khoa; dòng thời gian ghi cả hai lần")
 
     print(f"Đạt {passed} kiểm tra.")
 

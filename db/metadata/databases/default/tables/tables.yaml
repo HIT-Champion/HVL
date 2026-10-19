@@ -18,6 +18,7 @@
 - "!include core_files.yaml"
 - "!include core_audit_log.yaml"
 - "!include core_users.yaml"
+- "!include core_notifications.yaml"
 - "!include office_departments.yaml"
 - "!include office_document_types.yaml"
 - "!include office_registers.yaml"

@@ -44,14 +44,15 @@ cũng nạp được.
 | `POST /v1/graphql` | Hasura | Bắt buộc |
 | `POST /api/files`, `GET /api/files/{id}`, `GET /api/search`, `GET /api/documents/{id}/preview` | `svc-files` | Bắt buộc |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
+| `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
 
 Cổng trả `404` cho các đường còn lại:
 
 - API quản trị và nội bộ: `/v1/metadata`, `/v2/query`, `/console`, `/admin`, `/flowable-rest/*`, `/healthz`,
   `/metrics`, …
-- WebSocket, nên chưa dùng được `subscription` của GraphQL. Danh sách đầy đủ ở
-  [`gateway/apisix.yaml`](../../gateway/apisix.yaml).
+- WebSocket tới Hasura, nên chưa dùng được `subscription` của GraphQL; thông báo đẩy đi qua `/realtime` (§4).
+  Danh sách đầy đủ ở [`gateway/apisix.yaml`](../../gateway/apisix.yaml).
 
 Token thiếu, sai chữ ký hoặc hết hạn bị cổng trả `401` trước khi tới Hasura hay `svc-files`. Hai dịch vụ này
 vẫn kiểm lại token (zero-trust).
@@ -178,7 +179,45 @@ cũng dùng được để tự kiểm văn bản nhận được.
 Tệp được gắn vào văn bản bằng GraphQL (`files` khi tạo văn bản, hoặc `insert_office_document_files_one`), không
 qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
 
-## 4. Quy ước chung
+## 4. Thông báo: `core_notifications` và `/realtime`
+
+Sau mỗi bước, người phải làm tiếp nhận một thông báo: việc mới (`task.assigned`), quá hạn (`task.overdue`), báo
+lãnh đạo khi quá hạn hai lần (`task.escalated`), văn bản đã phát hành (`document.issued`), đã báo kết quả xử lý
+(`document.processed`), văn bản đến qua hạn giải quyết (`document.overdue`). Ai nhận gì: [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §5.
+
+Thông báo lưu ở bảng `core_notifications`; mỗi người chỉ đọc được của mình và chỉ sửa được `read_at`:
+
+```graphql
+{
+  core_notifications(order_by: {id: desc}, limit: 20) { id kind document_id data created_at read_at }
+  core_notifications_aggregate(where: {read_at: {_is_null: true}}) { aggregate { count } }
+}
+mutation ($at: timestamptz!) {
+  update_core_notifications(where: {read_at: {_is_null: true}}, _set: {read_at: $at}) { affected_rows }
+}
+```
+
+`data` giữ những gì cần để hiện câu thông báo (`form_key`, `summary`, `symbol`, `note`, `assignee_name`…); câu
+chữ do ứng dụng dựng, theo ngôn ngữ của người dùng.
+
+Muốn nhận ngay khi có, mở WebSocket tới `/realtime` (Centrifugo, [giao thức JSON](https://centrifugal.dev/docs/transports/client_protocol))
+và gửi access token Keycloak trong lệnh đầu tiên. Centrifugo tự kiểm token và đưa kết nối vào kênh riêng
+`personal:#<sub>` của người đó; không đăng ký được kênh nào khác, không gửi tin được.
+
+```text
+→ {"id":1,"connect":{"token":"<access token>"}}
+← {"id":1,"connect":{"client":"…","expires":true,"ttl":299,"ping":25,"pong":true,"subs":{"personal:#<sub>":{}}}}
+← {"push":{"channel":"personal:#<sub>","pub":{"data":{"id":42,"kind":"task.assigned","document_id":"…","data":{…},"created_at":"…"}}}}
+← {}                                   ping mỗi 25 giây → trả lời {}
+→ {"id":2,"refresh":{"token":"<token mới>"}}   trước khi hết ttl
+```
+
+Token sai thì Centrifugo đóng kết nối với mã `3500`; trang khác tên miền (`Origin`) không mở được kết nối. Mở
+kết nối giới hạn theo địa chỉ IP (`MOC_RATE_REALTIME_PER_MIN`). Tin đẩy lúc mất kết nối không gửi lại: nối lại
+thì đọc lại `core_notifications`. Giao diện Mộc làm đúng như vậy trong
+[`apps/office/app/composables/useRealtime.ts`](../../apps/office/app/composables/useRealtime.ts).
+
+## 5. Quy ước chung
 
 - **`X-Request-Id`**: cổng gắn vào mọi phản hồi. Mã này cũng có trong nhật ký của dịch vụ và cột `request_id`
   của sổ kiểm toán; gửi kèm khi báo lỗi.
@@ -186,11 +225,12 @@ qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "messag
   - Đăng nhập và cấp token: theo địa chỉ IP, `MOC_RATE_LOGIN_PER_MIN` (mặc định 60/phút).
   - GraphQL và tệp: theo token, `MOC_RATE_API_PER_MIN` (mặc định 300/phút).
   - Cổng xác thực: theo địa chỉ IP, `MOC_RATE_VERIFY_PER_MIN` (mặc định 30/phút).
+  - Mở kết nối `/realtime`: theo địa chỉ IP, `MOC_RATE_REALTIME_PER_MIN` (mặc định 60/phút).
   - Phản hồi có `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (giây).
 - **Thuê ước**: không gửi `tenant_id`; Hasura và `svc-files` lấy từ token. Người của đơn vị này không đọc được
   dữ liệu của đơn vị khác (`make smoke` kiểm).
 
-## 5. API nội bộ, không qua cổng
+## 6. API nội bộ, không qua cổng
 
 | Bên gọi → bên nhận | Cách gọi | Tài liệu |
 |---|---|---|
@@ -198,3 +238,5 @@ qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "messag
 | `svc-files`, `svc-workflow` → Hasura | Khóa quản trị + `X-Hasura-Role: service` + đơn vị, người dùng, request id lấy từ token | [`db/README.md`](../../db/README.md#dịch-vụ-gọi-hasura) |
 | `svc-workflow` → `svc-files` `POST /internal/issue` | Token tài khoản dịch vụ `svc-workflow` (client credentials của Keycloak) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → Flowable REST, Keycloak | Tài khoản dịch vụ | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
+| `svc-workflow` → Flowable `external-job-api` | Tự lấy việc nhắc hạn (topic `moc-sla`) do timer trong BPMN tạo | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
+| `svc-workflow` → Centrifugo `POST /api/batch` (cổng nội bộ 9000) | Tiêu đề `X-API-Key` (`CENTRIFUGO_API_KEY`) | [`realtime/config.yaml`](../../realtime/config.yaml) |

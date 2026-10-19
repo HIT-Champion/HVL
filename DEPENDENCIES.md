@@ -90,7 +90,10 @@ giấy phép MIT, ISC, Apache-2.0, BSD, BlueOak-1.0.0, MPL-2.0 hoặc CC0 — đ
 
 **Ghi chú:** BTC gợi ý "Nuxt 3 / Vue 3". Mộc dùng **Nuxt 4** (vẫn chạy trên Vue 3) vì đây là dòng
 chính hiện tại; dòng Nuxt 3 chỉ còn nhận bản vá bảo trì. Dùng `vue-i18n` trực tiếp thay cho
-`@nuxtjs/i18n`: ứng dụng chạy hoàn toàn trên trình duyệt, không cần định tuyến theo ngôn ngữ.
+`@nuxtjs/i18n`: ứng dụng chạy hoàn toàn trên trình duyệt, không cần định tuyến theo ngôn ngữ. Nhận thông báo từ
+Centrifugo bằng WebSocket có sẵn của trình duyệt (`app/composables/useRealtime.ts`, theo giao thức JSON công khai
+của Centrifugo), không dùng thư viện `centrifuge`: nó kéo theo `protobufjs` (có script chạy lúc cài) và hơn chục
+gói khác, trong khi giao diện chỉ cần nhận tin.
 
 ## Dịch vụ tự viết (`services/`, `cli/`)
 

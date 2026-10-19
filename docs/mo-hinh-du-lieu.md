@@ -71,6 +71,18 @@ create table core.users (                   -- danh bạ, đồng bộ từ Keyc
   enabled        boolean not null default true  -- bị xóa hoặc khóa trong Keycloak: false, không xóa dòng
 );
 
+create table core.notifications (           -- thông báo từng người (F2.5, migration 1792281600600)
+  id           bigint generated always as identity primary key,
+  tenant_id    uuid not null references core.tenants,
+  user_id      text not null,                -- (tenant_id, user_id) → core.users
+  kind         text not null,                -- task.assigned | task.overdue | task.escalated | document.*
+  key          text not null,                -- chống gửi trùng: unique (tenant_id, user_id, key)
+  document_id  uuid,
+  data         jsonb not null default '{}',  -- form_key, trích yếu, số ký hiệu… lúc gửi; câu chữ dựng ở giao diện
+  created_at   timestamptz not null default now(),
+  read_at      timestamptz
+);
+
 create table core.audit_log (               -- sổ kiểm toán chuỗi băm (F2.12)
   id           bigint primary key,           -- trigger cấp, liên tiếp theo thứ tự chuỗi
   tenant_id    uuid,                         -- null: sự kiện của nền tảng
@@ -112,6 +124,10 @@ create table core.audit_anchors (           -- hash đầu chuỗi đã neo ra n
 
 Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` ghi sự kiện `file.rejected` vào
 `core.audit_log` (màn demo kiểm dịch F3.1).
+
+**Thông báo** (`core.notifications`): dịch vụ ghi bằng vai trò `service`; mỗi người chỉ đọc thông báo của mình
+và chỉ sửa được `read_at`. Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
+Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 ---
 
@@ -463,8 +479,18 @@ Nhóm ứng viên trong Flowable (Flowable không biết người dùng Keycloak
 
 Giao bản cho nơi nhận nội bộ (F3.12) làm ở Phase 3.
 
-Timer: mỗi user task có timer `DXOS_SLA_DURATION` (thật `PT24H` — NĐ 30 yêu cầu trình trong ngày; demo
-`PT1M`) → nhắc → leo thang lên lãnh đạo đơn vị. Văn bản đến có `due_on` → timer theo hạn giải quyết.
+Nhắc hạn (đã làm): mỗi user task có timer không ngắt việc, chu kỳ `R2/${slaDuration}` (`MOC_SLA_DURATION`: thật
+`PT24H` — NĐ 30 yêu cầu trình trong ngày; demo `PT1M`). Timer bắn thì Flowable tạo việc giao ra ngoài (external
+worker, topic `moc-sla`); `svc-workflow` **tự lấy** việc đó về (không có callback từ Flowable vào, nên Flowable
+không cần biết địa chỉ hay khóa của dịch vụ nào; `svc-workflow` dừng thì việc chờ đó, chạy lại thì làm tiếp):
+
+- quá một thời hạn → nhắc người phải làm (`task.overdue`)
+- quá hai thời hạn → báo thêm lãnh đạo của họ (`task.escalated`): chuyên viên → lãnh đạo phòng, còn lại → lãnh
+  đạo đơn vị; việc của lãnh đạo đơn vị thì chỉ nhắc
+
+Mỗi lần ghi một sự kiện `office.task.overdue` / `office.task.escalated` vào dòng thời gian, `data` có
+`sla_task_id`, `notified`. Văn bản đến có `due_on`: vòng nền của `svc-workflow` (5 phút) tìm văn bản đang xử lý
+đã qua hạn, báo người xử lý, người giao việc và lãnh đạo đơn vị một lần (`office.document.overdue`).
 Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 
 ### 4.3. API REST của `svc-files`
@@ -500,7 +526,8 @@ chỉ có văn bản đi đã phát hành; trích yếu bị ẩn khi văn bản
 
 ## 5. Định dạng sự kiện
 
-Một khuôn chung cho thông báo realtime (Centrifugo), callback và `office.document_events`:
+Khuôn chung cho sự kiện gửi ra ngoài hệ thống (webhook, liên thông — Phase 3). `office.document_events` lưu
+cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`:
 
 ```json
 {
@@ -530,14 +557,26 @@ Một khuôn chung cho thông báo realtime (Centrifugo), callback và `office.d
 | `office.document.approved` / `returned` | Người ký duyệt / trả lại (ở bước nào) |
 | `office.document.numbered` | Văn bản đi được cấp số, ký hiệu |
 | `office.document.issued` | Văn bản đi được phát hành, kèm băm và mã tra cứu |
-| `office.task.due_soon` / `office.task.overdue` / `office.task.escalated` | Timer của Flowable |
+| `office.task.overdue` / `office.task.escalated` | Timer của Flowable: quá một / hai thời hạn của bước (§4.2) |
+| `office.document.overdue` | Văn bản đến qua hạn giải quyết mà chưa xử lý xong |
 | `office.case_file.archived` | Hồ sơ nộp lưu xong |
 | `core.file.rejected` | ClamAV chặn tệp |
 | `ot.alarm` | Cảm biến vượt ngưỡng (F3.10) |
 
-Kênh Centrifugo: kênh giới hạn theo người dùng (`…#<sub>`) cho hộp việc của từng người; kênh
-`dashboard:<tenant_id>` cho dashboard. Callback từ Flowable gọi `POST /internal/flowable/events` của
-`svc-workflow` (chỉ trong mạng nội bộ, không qua APISIX).
+**Thông báo realtime** (đã làm): mỗi kết nối Centrifugo tự vào kênh riêng `personal:#<sub>` của người trong
+token (Centrifugo tự kiểm token Keycloak qua JWKS); trình duyệt không đăng ký được kênh nào khác. Sau mỗi bước,
+`svc-workflow` ghi `core.notifications` rồi đẩy dòng vừa ghi (`id`, `kind`, `document_id`, `data`, `created_at`)
+qua HTTP API nội bộ của Centrifugo:
+
+| `kind` | Gửi cho | Khi |
+|---|---|---|
+| `task.assigned` | Người phải làm việc mới (đích danh, hoặc mọi người trong nhóm ứng viên), trừ người vừa làm bước trước | Sau mỗi bước làm quy trình sinh việc mới; bị trả lại thì kèm ý kiến |
+| `task.overdue` / `task.escalated` | Người phải làm / lãnh đạo của họ | Timer quá một / hai thời hạn |
+| `document.issued` | Người soạn, người ký | Văn thư phát hành văn bản đi |
+| `document.processed` | Lãnh đạo đã chỉ đạo, lãnh đạo phòng đã phân công | Người xử lý báo xong |
+| `document.overdue` | Người xử lý, người giao việc, lãnh đạo đơn vị | Văn bản đến qua hạn giải quyết |
+
+Kênh `dashboard:<tenant_id>` cho dashboard làm ở Phase 3.
 
 ---
 

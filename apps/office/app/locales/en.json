@@ -77,10 +77,17 @@
         "returned": "Returned for revision",
         "approved": "Approved and signed",
         "numbered": "Numbered {symbol}",
-        "issued": "Issued"
+        "issued": "Issued",
+        "overdue": "Past due date ({due})"
+      },
+      "task": {
+        "overdue": "Step “{task}” overdue, reminder sent",
+        "escalated": "Step “{task}” overdue twice, leader informed"
       }
     },
-    "drafted": "Draft created"
+    "drafted": "Draft created",
+    "system": "System",
+    "notified": "Informed: {names}"
   },
   "inbox": {
     "title": "My tasks",
@@ -319,5 +326,20 @@
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
     "footer": "Mộc — open-source e-office. No login required on this page."
+  },
+  "notify": {
+    "title": "Notifications",
+    "empty": "No notifications yet",
+    "markAll": "Mark all as read",
+    "live": "Receiving live notifications",
+    "offline": "Live channel not connected — existing notifications are still shown, reconnecting",
+    "someone": "The assignee",
+    "note": "Comment: {note}",
+    "taskAssigned": "New task: {task}",
+    "taskOverdue": "Overdue: {task}",
+    "taskEscalated": "{name} has not finished “{task}” on time",
+    "documentIssued": "Document {symbol} issued",
+    "documentProcessed": "{name} reported the result",
+    "documentOverdue": "Document past its due date ({due})"
   }
 }
