@@ -17,6 +17,7 @@
 # Kiểm tra tự động trên mọi thay đổi: điều kiện chấm điểm PoF, test đơn vị, schema và quyền trên CSDL
 # thật, dựng toàn bộ hệ thống rồi chạy seed → smoke → e2e, quét bí mật và lỗ hổng phụ thuộc.
 # Action ngoài ghim theo SHA commit, image công cụ ghim theo digest — đổi phiên bản thì đổi cả hai.
+# Máy chạy ghim ubuntu-24.04 (ubuntu-latest chuyển sang Ubuntu 26 từ 19/10/2026); chỉ đổi sau khi đã chạy thử.
 name: CI
 
 on:
@@ -43,7 +44,7 @@ env:
 jobs:
   license:
     name: Giấy phép (PoF #2)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -69,7 +70,7 @@ jobs:
 
   build:
     name: Dựng từ mã nguồn (PoF #4)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,7 +102,7 @@ jobs:
 
   docs:
     name: Tài liệu (PoF #6)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,7 +121,7 @@ jobs:
 
   unit:
     name: Test đơn vị dịch vụ
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -132,13 +133,14 @@ jobs:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: "**/requirements*.txt"
+          cache-suffix: unit
 
       - name: svc-files và svc-workflow (make test)
         run: make test
 
   db:
     name: Schema và quyền trên CSDL thật
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,6 +151,7 @@ jobs:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: "**/requirements*.txt"
+          cache-suffix: db
 
       - name: Dựng PostgreSQL + Hasura, nạp migrations và metadata từ db/
         run: db/tests/stack.sh up
@@ -166,7 +169,7 @@ jobs:
   stack:
     name: Chạy thử toàn hệ thống (PoF #4)
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
       COMPOSE: docker compose --profile core --profile app
@@ -222,7 +225,7 @@ jobs:
 
   security:
     name: Quét bí mật và lỗ hổng phụ thuộc
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

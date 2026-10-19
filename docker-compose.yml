@@ -100,7 +100,9 @@ services:
       - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
     mem_limit: 1g
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      # Sẵn sàng khi chính realm trả được JWKS. /health/ready báo UP sớm hơn, lúc Keycloak còn khởi tạo và trả
+      # 503 "Bootstrap in progress": Hasura lấy JWKS đúng lúc đó sẽ dừng rồi khởi động lại, make up báo lỗi.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/${MOC_REALM:-moc}/protocol/openid-connect/certs HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '^HTTP/1.. 200' <&3"]
       interval: 10s
       timeout: 5s
       retries: 30
