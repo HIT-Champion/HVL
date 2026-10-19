@@ -25,9 +25,11 @@ SHELL := /bin/bash
 
 COMPOSE := docker compose --profile core --profile app
 ENV_FILE := .env
+# Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
+PREFIX ?= /opt/moc
 
 .PHONY: help env check build up down reset restart logs ps seed smoke e2e test \
-        license-check license-fix lint release clean
+        install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -88,6 +90,12 @@ e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): luồ
 test: ## Chạy test đơn vị của các dịch vụ (không cần Docker)
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
+
+install: $(ENV_FILE) ## Cài ra ngoài thư mục mã nguồn, chạy từ đó — dùng: make install PREFIX=/opt/moc
+	@MOC_VERSION="$(MOC_VERSION)" ./scripts/install.sh install "$(PREFIX)"
+
+uninstall: ## Gỡ bản cài, giữ .env và dữ liệu — dùng: make uninstall PREFIX=/opt/moc
+	@./scripts/install.sh uninstall "$(PREFIX)"
 
 license-check: ## Kiểm tra header giấy phép trong từng tệp mã (tiêu chí PoF #2)
 	@./scripts/license-header.sh check

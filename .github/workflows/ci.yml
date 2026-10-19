@@ -202,6 +202,15 @@ jobs:
       - name: Văn bản đến trên trình duyệt thật (make e2e)
         run: make e2e
 
+      # Dừng bản chạy trong thư mục mã nguồn, cài sang thư mục khác rồi chạy lại từ đó (dùng chung dữ liệu)
+      - name: Cài ra ngoài thư mục mã nguồn và chạy từ đó (make install)
+        run: |
+          make down
+          make install PREFIX="$RUNNER_TEMP/moc"
+          cd "$RUNNER_TEMP/moc"
+          docker compose up -d --wait --wait-timeout 600
+          python3 scripts/smoke.py
+
       - name: Trạng thái và nhật ký dịch vụ khi lỗi
         if: failure()
         run: |

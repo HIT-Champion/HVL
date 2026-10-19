@@ -52,6 +52,9 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - CI chạy kiểm thử thật trên mọi PR: test đơn vị dịch vụ, 62 test schema và quyền trên PostgreSQL + Hasura,
   dựng toàn hệ thống rồi `make seed` → `make smoke` → `make e2e`; quét bí mật trong lịch sử commit
   (gitleaks) và lỗ hổng phụ thuộc (OSV-Scanner); kiểm workflow bằng actionlint.
+- `make install PREFIX=/opt/moc` và `make uninstall`: cài ra ngoài thư mục mã nguồn — image của đội gắn thẻ
+  phiên bản, compose và cấu hình chép sang `PREFIX`, tự kiểm bản cài không trỏ về mã nguồn; cài lại là nâng
+  cấp, giữ `.env`. CI chạy smoke từ bản cài (F1.8, PoF #4).
 
 ### Đã sửa đổi
 - Rà soát bản tóm tắt OLP 2026: sửa nguồn tham khảo, phân biệt yêu cầu BTC với đề xuất của đội,

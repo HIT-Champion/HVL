@@ -112,7 +112,7 @@ và cổng xác thực (Phase 2), bằng chứng 4 nguyên lý và dashboard (Ph
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make install` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -151,6 +151,26 @@ Mở <http://localhost:8080> và đăng nhập bằng một tài khoản mẫu; 
 Dừng: `make down` (giữ dữ liệu) · xóa sạch dữ liệu: `make reset` · xem mọi lệnh: `make help`.
 Trang quản trị Keycloak chỉ mở trên máy chủ: <http://127.0.0.1:8180/admin> (tài khoản `KEYCLOAK_ADMIN_*`).
 
+### Cài ra ngoài thư mục mã nguồn
+
+`make install` dựng image của đội gắn thẻ phiên bản, chép `docker-compose.yml`, `.env` và các tệp cấu hình
+mà container dùng sang `PREFIX`, rồi kiểm tra bản cài không còn trỏ về thư mục mã nguồn. Sau đó xóa thư mục
+mã nguồn đi hệ thống vẫn chạy.
+
+```bash
+sudo install -d -o "$USER" /opt/moc     # thư mục cài thuộc người vận hành, không cần chạy make bằng root
+make install PREFIX=/opt/moc
+make down                               # nếu đang chạy trong thư mục mã nguồn: hai bản dùng chung dữ liệu
+cd /opt/moc && docker compose up -d --wait
+python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
+```
+
+- `PREFIX` mặc định là `/opt/moc`. Phiên bản lấy từ `git describe`; cài từ gói `.tar.gz` thì đặt tay:
+  `make install PREFIX=/opt/moc MOC_VERSION=0.1.0`.
+- Nâng cấp: dừng bản cài, `make install` lại với cùng `PREFIX`. Compose, cấu hình và image được thay; `.env`
+  của bản cài được giữ, chỉ đổi `MOC_VERSION`.
+- Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
+
 ## Kiểm thử
 
 | Lệnh | Kiểm gì | Cần |
@@ -161,8 +181,9 @@ Trang quản trị Keycloak chỉ mở trên máy chủ: <http://127.0.0.1:8180/
 | `db/tests/` | 62 test schema, quyền, sổ kiểm toán trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
-thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, đồng thời
-quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
+thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, rồi
+`make install` sang thư mục khác và chạy lại smoke từ bản cài; đồng thời quét bí mật trong lịch sử commit
+(gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
 
 ## Tài liệu
 
