@@ -88,6 +88,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 ### Bảo mật
 - Action GitHub trong CI và quy trình phát hành ghim theo SHA commit, image công cụ CI ghim theo digest;
   workflow CI chỉ có quyền đọc kho.
+- Xác thực hai bước TOTP (F1.1): đăng nhập trình duyệt bắt buộc mã với văn thư, lãnh đạo phòng, lãnh đạo đơn
+  vị, quản trị đơn vị (chưa cài thì Keycloak bắt cài ở lần đăng nhập đầu); vai trò khác chỉ hỏi mã nếu đã tự cài.
+  Client `moc-cli` của kịch bản dòng lệnh bỏ qua bước này và phải tắt trên server thật. `make seed` cài sẵn
+  TOTP cho tài khoản mẫu, `make totp` in mã; `make smoke` thêm 2 kiểm tra, e2e đăng nhập kèm mã.
 
 <!--
 Mẫu cho bản phát hành kế tiếp:

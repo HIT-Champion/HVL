@@ -138,7 +138,10 @@ make seed
 ```
 
 Mở <http://localhost:8080> và đăng nhập bằng một tài khoản mẫu; mật khẩu chung là giá trị
-`MOC_DEMO_PASSWORD` trong `.env`.
+`MOC_DEMO_PASSWORD` trong `.env`. Văn thư, lãnh đạo và quản trị đơn vị bắt buộc xác thực hai bước: sau mật
+khẩu nhập mã TOTP. `make seed` cài sẵn cho các tài khoản này một khóa chung (`MOC_DEMO_TOTP_SECRET`); `make totp`
+in mã hiện tại và khóa để thêm một lần vào ứng dụng xác thực trên điện thoại (FreeOTP, Aegis, Google
+Authenticator). Tài khoản thật thuộc các vai trò này tự cài TOTP bằng mã QR ở lần đăng nhập đầu.
 
 | Tài khoản | Vai trò | Thấy gì |
 |---|---|---|

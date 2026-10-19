@@ -24,6 +24,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import time
 
@@ -46,12 +47,28 @@ def admin_token() -> str:
     return data["access_token"]
 
 
+# Khớp authenticatorConfig "moc-vai-tro-bat-buoc-otp" trong auth/realm/moc-realm.json
+MFA_ROLES = {"clerk", "manager", "director", "tenant_admin"}
+
+
+def otp_credential(secret: str) -> dict:
+    """TOTP với khóa cho trước (MOC_DEMO_TOTP_SECRET), cùng thông số với otpPolicy* của realm."""
+    return {
+        "type": "otp",
+        "userLabel": "Mộc — tài khoản mẫu",
+        "secretData": json.dumps({"value": secret}),
+        "credentialData": json.dumps({"subType": "totp", "digits": 6, "counter": 0, "period": 30,
+                                      "algorithm": "HmacSHA1"}),
+    }
+
+
 def seed_users() -> None:
     token = admin_token()
     auth = {"Authorization": f"Bearer {token}"}
     base = f"{KEYCLOAK_ADMIN_URL}/admin/realms/{REALM}"
     domain = {"c300d5bb-028f-44cc-ba10-7b5277a4225d": "cntt", "318da474-60d6-4a90-aa7f-928b31b8fc59": "kt"}
-    count = 0
+    secret = ENV.get("MOC_DEMO_TOTP_SECRET", "")
+    count = with_otp = 0
     for line in (ROOT / "seed" / "users.csv").read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.startswith("#"):
             continue
@@ -68,17 +85,27 @@ def seed_users() -> None:
             "email": f"{username}@{domain.get(tenant, 'demo')}.moc.example",
             "attributes": attrs,
         }
+        needs_otp = role in MFA_ROLES and bool(secret)
         found, _ = call_json("GET", f"{base}/users?exact=true&username={username}", headers=auth)
         if found:
             user_id = found[0]["id"]
+            # Chạy lại seed: chỉ thêm TOTP khi chưa có, không sinh thiết bị trùng
+            creds, _ = call_json("GET", f"{base}/users/{user_id}/credentials", headers=auth)
+            if needs_otp and not any(c["type"] == "otp" for c in creds):
+                user["credentials"] = [otp_credential(secret)]
             call_json("PUT", f"{base}/users/{user_id}", user, headers=auth)
         else:
+            if needs_otp:
+                user["credentials"] = [otp_credential(secret)]
             _, headers = call_json("POST", f"{base}/users", user, headers=auth)
             user_id = headers["Location"].rsplit("/", 1)[-1]
         call_json("PUT", f"{base}/users/{user_id}/reset-password",
                   {"type": "password", "value": ENV["MOC_DEMO_PASSWORD"], "temporary": False}, headers=auth)
         count += 1
-    print(f"  tài khoản Keycloak: {count}")
+        with_otp += needs_otp
+    print(f"  tài khoản Keycloak: {count}, trong đó {with_otp} tài khoản đã cài sẵn TOTP")
+    if not secret:
+        print("  (chưa có MOC_DEMO_TOTP_SECRET trong .env: văn thư, lãnh đạo sẽ phải tự cài TOTP ở lần đăng nhập đầu)")
 
 
 def wait_directory(timeout_s: int = 90) -> None:
@@ -112,6 +139,8 @@ def main() -> None:
         seed_documents.run()
     print(f"Xong. Mở {PUBLIC_URL} — đăng nhập vanthu, truongkhoa, totruongdt, chuyenviendt, giamkhao… "
           "(mật khẩu: MOC_DEMO_PASSWORD trong .env)")
+    print("Văn thư, lãnh đạo, quản trị còn phải nhập mã TOTP: make totp in mã hiện tại và khóa để thêm vào "
+          "ứng dụng xác thực trên điện thoại.")
 
 
 if __name__ == "__main__":

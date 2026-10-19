@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed smoke e2e test \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test \
         install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -76,6 +76,9 @@ ps: ## Liệt kê trạng thái các dịch vụ
 
 seed: $(ENV_FILE) ## Nạp dữ liệu mẫu: 2 đơn vị, phòng ban, tài khoản, văn bản
 	@python3 scripts/seed.py
+
+totp: $(ENV_FILE) ## Mã TOTP của tài khoản mẫu văn thư, lãnh đạo; khóa để thêm vào ứng dụng xác thực
+	@python3 scripts/totp.py
 
 smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 	@python3 scripts/smoke.py

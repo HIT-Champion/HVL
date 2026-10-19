@@ -14,12 +14,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHmac } from 'node:crypto'
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
 // Kịch bản demo (docs/dac-ta-san-pham.md §7, màn 1–2) trên giao diện thật: văn thư tiếp nhận và vào sổ →
 // lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu.
 
 const PASSWORD = process.env.MOC_DEMO_PASSWORD ?? ''
+const TOTP_SECRET = process.env.MOC_DEMO_TOTP_SECRET ?? ''
 const SHOTS = process.env.MOC_E2E_SCREENSHOTS ?? 'test-results/screens'
 const tag = Math.random().toString(36).slice(2, 7).toUpperCase()
 const summary = `Về việc rà soát chương trình đào tạo ngành Kỹ thuật phần mềm năm 2027 (thử ${tag})`
@@ -27,12 +29,27 @@ const summary = `Về việc rà soát chương trình đào tạo ngành Kỹ t
 // Tệp PDF tối thiểu hợp lệ để tải lên (ClamAV quét như tệp thật)
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n')
 
-async function signIn(browser: Browser, username: string): Promise<Page> {
+// Mã TOTP (RFC 6238: HMAC-SHA1, 6 số, 30 giây) từ khóa chung mà make seed cài cho văn thư, lãnh đạo.
+// Keycloak dùng chính chuỗi khóa làm khóa HMAC.
+function totp(secret: string): string {
+  const counter = Buffer.alloc(8)
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)))
+  const mac = createHmac('sha1', secret).update(counter).digest()
+  const offset = mac[mac.length - 1] & 0x0f
+  return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0')
+}
+
+async function signIn(browser: Browser, username: string, { otp = false } = {}): Promise<Page> {
   const page = await (await browser.newContext()).newPage()
   await page.goto('/')
   await page.locator('#username').fill(username)
   await page.locator('#password').fill(PASSWORD)
   await page.locator('#kc-login').click()
+  if (otp) {
+    // Xác thực hai bước bắt buộc với văn thư, lãnh đạo (luồng moc-browser của realm)
+    await page.locator('#otp').fill(totp(TOTP_SECRET))
+    await page.locator('#kc-login').click()
+  }
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   return page
 }
@@ -53,10 +70,10 @@ async function openTask(page: Page, screenshot?: string) {
 test.describe.configure({ mode: 'serial' })
 
 test('luồng văn bản đến trên giao diện', async ({ browser }) => {
-  test.skip(!PASSWORD, 'đặt MOC_DEMO_PASSWORD (make e2e tự đọc từ .env)')
+  test.skip(!PASSWORD || !TOTP_SECRET, 'đặt MOC_DEMO_PASSWORD, MOC_DEMO_TOTP_SECRET (make e2e tự đọc từ .env)')
 
   // 1. Văn thư tiếp nhận, tải tệp (quét ClamAV), nhập thông tin, vào sổ
-  const clerk = await signIn(browser, 'vanthu')
+  const clerk = await signIn(browser, 'vanthu', { otp: true })
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
   await clerk.locator('input[type=file]').setInputFiles({ name: `cong-van-${tag}.pdf`, mimeType: 'application/pdf', buffer: PDF })
   await expect(clerk.getByText('Đã quét — sạch')).toBeVisible()
@@ -72,7 +89,7 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   await shot(clerk, '2-da-vao-so')
 
   // 2. Lãnh đạo khoa: việc khẩn trong hộp việc → chỉ đạo, giao Tổ Đào tạo chủ trì, Bộ môn KTPM phối hợp
-  const director = await signIn(browser, 'truongkhoa')
+  const director = await signIn(browser, 'truongkhoa', { otp: true })
   await openTask(director, '3-hop-viec-lanh-dao')
   await director.getByLabel('Ý kiến chỉ đạo').fill('Giao Tổ Đào tạo chủ trì rà soát, Bộ môn KTPM phối hợp. Báo cáo trước hạn.')
   await director.getByLabel('Phòng chủ trì').selectOption({ label: 'Tổ Đào tạo' })
@@ -83,7 +100,7 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   await expect(director.getByText('Đang xử lý').first()).toBeVisible()
 
   // 3. Tổ trưởng Đào tạo phân công chuyên viên
-  const manager = await signIn(browser, 'totruongdt')
+  const manager = await signIn(browser, 'totruongdt', { otp: true })
   await openTask(manager)
   await manager.getByLabel('Giao cho').selectOption({ label: 'Hoàng Văn Nam' })
   await manager.getByLabel('Lời dặn').fill('Em rà soát và dự thảo công văn trả lời.')

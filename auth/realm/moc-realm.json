@@ -21,6 +21,83 @@
     "en"
   ],
   "defaultLocale": "vi",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyCodeReusable": false,
+  "browserFlow": "moc-browser",
+  "authenticationFlows": [
+    {
+      "alias": "moc-browser",
+      "description": "Đăng nhập trên trình duyệt: mật khẩu, rồi mã TOTP — bắt buộc với văn thư, lãnh đạo, quản trị đơn vị; với vai trò khác chỉ hỏi khi người đó đã tự cài TOTP",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "auth-cookie", "requirement": "ALTERNATIVE", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"flowAlias": "moc-browser-forms", "requirement": "ALTERNATIVE", "priority": 20, "autheticatorFlow": true, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-browser-forms",
+      "description": "Mật khẩu, rồi TOTP theo vai trò",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "auth-username-password-form", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"flowAlias": "moc-otp-bat-buoc", "requirement": "CONDITIONAL", "priority": 20, "autheticatorFlow": true, "userSetupAllowed": false},
+        {"flowAlias": "moc-otp-tu-chon", "requirement": "CONDITIONAL", "priority": 30, "autheticatorFlow": true, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-otp-bat-buoc",
+      "description": "Văn thư, lãnh đạo phòng, lãnh đạo đơn vị, quản trị đơn vị: bắt buộc TOTP; chưa cài thì Keycloak bắt cài ngay ở lần đăng nhập này",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-bat-buoc-otp", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "auth-otp-form", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-otp-tu-chon",
+      "description": "Vai trò khác đã tự cài TOTP: hỏi mã",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-configured", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-khong-bat-buoc-otp", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "auth-otp-form", "requirement": "REQUIRED", "priority": 30, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "id": "caf1a197-9781-4731-b8a2-5a9ae6ebe31d",
+      "alias": "moc-cli-direct-grant",
+      "description": "Chỉ cho client moc-cli (make seed, make smoke, CI): mật khẩu, không hỏi TOTP. Trên server thật tắt moc-cli bằng MOC_CLI_CLIENT_ENABLED=false",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "direct-grant-validate-username", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "direct-grant-validate-password", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "moc-vai-tro-bat-buoc-otp",
+      "config": {"attribute_name": "moc_role", "attribute_expected_value": "^(clerk|manager|director|tenant_admin)$", "regex": "true", "not": "false", "include_group_attributes": "false"}
+    },
+    {
+      "alias": "moc-vai-tro-khong-bat-buoc-otp",
+      "config": {"attribute_name": "moc_role", "attribute_expected_value": "^(clerk|manager|director|tenant_admin)$", "regex": "true", "not": "true", "include_group_attributes": "false"}
+    }
+  ],
   "clients": [
     {
       "clientId": "app-office",
@@ -132,6 +209,9 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
+      "authenticationFlowBindingOverrides": {
+        "direct_grant": "caf1a197-9781-4731-b8a2-5a9ae6ebe31d"
+      },
       "protocolMappers": [
         {
           "name": "hasura-user-id",

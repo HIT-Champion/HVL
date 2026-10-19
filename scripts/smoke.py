@@ -18,12 +18,18 @@
 
 văn thư tải công văn lên (qua ClamAV) → nhập văn bản → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
 Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Kèm các kiểm tra chặn: tệp
-EICAR, không token, đường quản trị, đơn vị khác không thấy văn bản.
+EICAR, không token, đường quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập
+mã TOTP; giới hạn tốc độ.
 """
 
 from __future__ import annotations
 
+import html
+import http.cookiejar
+import re
 import sys
+import urllib.parse
+import urllib.request
 import uuid
 from datetime import date, timedelta
 
@@ -54,6 +60,31 @@ def header(headers: dict[str, str], name: str) -> str | None:
     return next((v for k, v in headers.items() if k.lower() == name.lower()), None)
 
 
+class BrowserCookies(http.cookiejar.DefaultCookiePolicy):
+    """Keycloak gắn Secure cho cookie phiên cả khi chạy http; trình duyệt coi http://localhost là ngữ cảnh an
+    toàn nên vẫn gửi — làm giống vậy, chỉ với localhost."""
+
+    def return_ok_secure(self, cookie, request) -> bool:
+        return request.host.split(":")[0] in ("localhost", "127.0.0.1") or super().return_ok_secure(cookie, request)
+
+
+def browser_login(username: str) -> str:
+    """Đăng nhập như trình duyệt (luồng code + PKCE của app-office) tới hết bước mật khẩu. Trả "otp" nếu
+    Keycloak hỏi tiếp mã TOTP, "code" nếu đã chuyển về giao diện kèm mã cấp quyền."""
+    jar = http.cookiejar.CookieJar(policy=BrowserCookies())
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    query = urllib.parse.urlencode({"client_id": "app-office", "redirect_uri": f"{PUBLIC_URL}/", "response_type": "code",
+                                    "scope": "openid", "code_challenge": "x" * 43, "code_challenge_method": "S256"})
+    page = opener.open(f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/auth?{query}", timeout=30).read().decode()
+    form = re.search(r'<form[^>]*\saction="([^"]+)"', page) or fail(f"không thấy biểu mẫu đăng nhập cho {username}")
+    resp = opener.open(html.unescape(form.group(1)), timeout=30, data=urllib.parse.urlencode(
+        {"username": username, "password": ENV["MOC_DEMO_PASSWORD"]}).encode())
+    url = urllib.parse.urlsplit(resp.geturl())  # trang của Keycloak có session_code=, không phải mã cấp quyền
+    if not url.path.startswith("/realms/") and "code" in urllib.parse.parse_qs(url.query):
+        return "code"
+    return "otp" if 'name="otp"' in resp.read().decode() else "khác"
+
+
 def main() -> None:
     print(f"Kiểm tra {PUBLIC_URL}")
     tag = uuid.uuid4().hex[:6].upper()
@@ -77,6 +108,14 @@ def main() -> None:
     manager, staff = Session("totruongdt"), Session("chuyenviendt")
     other_tenant = Session("vanthukt")
     ok("5 tài khoản đăng nhập được (Keycloak, qua cổng)")
+
+    print("Xác thực hai bước")
+    step = browser_login("vanthu")
+    step == "otp" or fail(f"văn thư đăng nhập trình duyệt không bị hỏi mã TOTP ({step})")
+    ok("văn thư đăng nhập trên trình duyệt: qua mật khẩu vẫn phải nhập mã TOTP")
+    step = browser_login("chuyenviendt")
+    step == "code" or fail(f"chuyên viên đăng nhập trình duyệt chưa vào được ({step})")
+    ok("chuyên viên (vai trò không bắt buộc TOTP): đúng mật khẩu là vào")
 
     print("Trạm kiểm dịch")
     try:
