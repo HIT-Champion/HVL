@@ -124,6 +124,12 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   bản mình không được đọc có chứa một từ (#36).
 - `make smoke` thêm 2 kiểm tra (tổng 40): tìm được công văn theo chữ chỉ có trong tệp PDF; tệp của văn bản hạn chế
   không bị đọc chữ, không tìm được theo nội dung. `make e2e`: chuyên viên tìm văn bản bằng chữ trong tệp PDF (#36).
+- Màn demo kiểm dịch (F3.1, nguyên lý (iv)): `make demo-kiem-dich` chạy dưới một phút. Tệp sạch qua; tệp EICAR bị
+  ClamAV chặn ở cửa ngõ, không được lưu (không có dòng trong `core.files`); lần chặn nằm trong sổ kiểm toán, được neo ra ngoài CSDL rồi kiểm lại cả
+  chuỗi. Kịch bản trình bày và câu hỏi hay gặp ở `docs/demo-script.md` (chỗ ghi đủ 4 màn nguyên lý). Sổ kiểm toán
+  hiện mẫu mã độc, cỡ tệp của tệp bị chặn (tên tệp vẫn ẩn). `make smoke` kiểm thêm dòng sổ của lần chặn (tổng
+  41); `make e2e` thêm kịch bản văn thư tải tệp nhiễm, lãnh đạo xem lần chặn trong sổ (#37). Trang tiếp nhận hiện
+  đúng mẫu mã độc của tệp bị chặn (trước đó chỉ hiện thông báo chung).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

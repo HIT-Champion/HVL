@@ -25,7 +25,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from conftest import INSERT_DOC, SQLError, User, incoming, outgoing, received, sql, visible_ids
+from conftest import INSERT_DOC, SQLError, User, incoming, insert_file, outgoing, received, sql, visible_ids
 
 # Phần kiểm từ bên ngoài CSDL của lệnh `moc audit verify` (scripts/audit_chain.py, chỉ dùng thư viện chuẩn)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts"))
@@ -362,6 +362,24 @@ def test_director_sees_register_prints(world):
     [row] = world.director_a.gql(AUDIT_VIEW, {"e": entity_id})["core_audit_log"]
     assert (row["action"], row["actor_id"]) == ("register.printed", world.clerk_a.sub)
     assert row["overview"] == {"direction": "in", "year": 2026, "entries": 12, "masked": 2}
+
+
+def test_director_sees_what_quarantine_blocked_but_not_the_filename(world):
+    # F3.1: mẫu mã độc và cỡ tệp bị ClamAV chặn hiện trong sổ; tên tệp do người dùng đặt, có thể nói lên nội dung
+    entity_id = f"sha-{world.tag}"
+    world.service_a.gql(
+        """mutation ($o: core_audit_log_insert_input!) { insert_core_audit_log_one(object: $o) { id } }""",
+        {"o": {"actor_id": world.clerk_a.sub, "actor_kind": "user", "action": "file.rejected",
+               "entity": "core.files", "entity_id": entity_id,
+               "diff": {"filename": "danh-sach-ky-luat.pdf", "size_bytes": 68, "sha256": entity_id,
+                        "signature": "Eicar-Test-Signature"}}},
+    )
+    [row] = world.director_a.gql(AUDIT_VIEW, {"e": entity_id})["core_audit_log"]
+    assert row["overview"] == {"filename": None, "size_bytes": 68, "sha256": None, "signature": "Eicar-Test-Signature"}
+    # cỡ của tệp đã lưu vẫn ẩn: tệp có thể thuộc văn bản hạn chế
+    stored = insert_file(world.service_a, world.clerk_a)
+    [insert] = world.director_a.gql(AUDIT_VIEW, {"e": stored})["core_audit_log"]
+    assert insert["overview"]["size_bytes"] is None
 
 
 def test_audit_view_has_no_raw_diff_and_stays_in_the_tenant(world):

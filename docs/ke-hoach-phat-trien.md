@@ -675,3 +675,16 @@ Phase 2:
   - Tìm kiếm bắt mọi từ phải khớp.
   - Trigger CSDL xóa chữ khi văn bản bật hạn chế.
 - Phase 2 còn lại: F2.11 (cộng đồng, không phải mã).
+
+**20/10/2026** — F3.1 (Phase 3, làm sớm):
+
+- **F3.1 xong.** `make demo-kiem-dich` là màn (iv) Kiểm dịch, chạy bằng một lệnh, dưới một phút:
+  - tệp sạch qua; tệp EICAR bị ClamAV chặn trên luồng, không được lưu (không có dòng trong `core.files`);
+  - lần chặn nằm trong sổ kiểm toán, được neo ra bucket lạnh khóa ghi rồi kiểm lại cả chuỗi.
+- Phần chặn và phần ghi sổ đã có từ F1.6 và F2.12. F3.1 thêm:
+  - màn demo một lệnh, chạy được cả trong thư mục cài;
+  - `docs/demo-script.md`, nơi ghi đủ 4 màn nguyên lý — điều kiện hoàn thành Phase 3;
+  - sổ kiểm toán hiện mẫu mã độc và cỡ của tệp bị chặn (chỉ ở dòng `file.rejected`; cỡ tệp đã lưu vẫn ẩn);
+    tên tệp vẫn ẩn vì do người dùng đặt;
+  - smoke và e2e kiểm cả dòng sổ của lần chặn.
+- Phase 3 còn lại: F3.2–F3.5, F3.7–F3.15.

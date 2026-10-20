@@ -117,7 +117,9 @@ export function useApi() {
         try { body = JSON.parse(xhr.responseText) } catch { /* không phải JSON */ }
         if (xhr.status === 201) return resolve(body as UploadedFile)
         const detail = body.detail ?? {}
-        reject(new ApiError(detail.message ?? detail.signature ?? `HTTP ${xhr.status}`, detail.code ?? null, xhr.status))
+        // tệp nhiễm: thông điệp là mẫu mã độc ClamAV báo, để trang tiếp nhận nói rõ tệp nhiễm gì
+        const message = detail.code === 'infected' ? detail.signature ?? detail.message : detail.message
+        reject(new ApiError(message ?? `HTTP ${xhr.status}`, detail.code ?? null, xhr.status))
       }
       const form = new FormData()
       form.append('file', file)

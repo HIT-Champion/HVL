@@ -48,12 +48,10 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pdf
+from moc_env import EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pdf
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
-# Chuỗi kiểm thử chuẩn EICAR (không phải mã độc thật), ghép từ hai nửa để chính tệp này không bị chặn
-EICAR = ("X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").encode()
 
 passed = 0
 
@@ -245,12 +243,23 @@ def main() -> None:
     ok("chuyên viên (vai trò không bắt buộc TOTP): đúng mật khẩu là vào")
 
     print("Trạm kiểm dịch")
+    before = director.gql("{ core_audit_log_aggregate { aggregate { max { id } } } }")
+    before = before["core_audit_log_aggregate"]["aggregate"]["max"]["id"] or 0
     try:
-        clerk.upload("eicar.pdf", EICAR)
+        clerk.upload(f"eicar-{tag}.pdf", EICAR)
         fail("tệp EICAR không bị chặn")
     except HTTPError as exc:
         exc.status == 422 or fail(f"tệp EICAR trả {exc.status}")
     ok("tệp EICAR bị ClamAV chặn (422), không lưu")
+    # F3.1: lần chặn vào sổ kiểm toán; lãnh đạo thấy mẫu mã độc, không thấy tên tệp
+    blocked = director.gql(
+        """query ($h: String!, $after: bigint!) { core_audit_log(where: {action: {_eq: "file.rejected"},
+             entity_id: {_eq: $h}, id: {_gt: $after}}) { overview } }""",
+        {"h": hashlib.sha256(EICAR).hexdigest(), "after": before})["core_audit_log"]
+    [row["overview"] for row in blocked] == [{"filename": None, "size_bytes": len(EICAR), "sha256": None,
+                                              "signature": "Eicar-Test-Signature"}] \
+        or fail(f"sổ kiểm toán không có đúng một dòng file.rejected của lần chặn này: {blocked}")
+    ok("lần chặn nằm trong sổ kiểm toán: lãnh đạo thấy mẫu mã độc, cỡ tệp; tên tệp ẩn")
 
     print("Luồng văn bản đến")
     # Văn bản hạn chế tiếp nhận TRƯỚC: svc-files đọc chữ PDF theo thứ tự tải lên, nên khi công văn dưới đã tìm được

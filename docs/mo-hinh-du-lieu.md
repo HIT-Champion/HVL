@@ -159,7 +159,7 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 - **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
-  1792281600900). Lãnh đạo không đọc được văn bản hạn chế thì sổ
+  1792281600900; mẫu mã độc, cỡ tệp của tệp bị ClamAV chặn — migration 1792281601100, tên tệp vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế thì sổ
   cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
   chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
 

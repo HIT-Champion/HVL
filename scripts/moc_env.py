@@ -30,6 +30,9 @@ import urllib.request
 import uuid
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+# Chuỗi kiểm thử chuẩn EICAR (không phải mã độc thật), ghép từ hai nửa để chính tệp này không bị phần mềm diệt
+# virus chặn — dùng cho kiểm tra chặn (smoke.py) và màn demo kiểm dịch (demo.py)
+EICAR = ("X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").encode()
 
 
 def load_env() -> dict[str, str]:

@@ -154,6 +154,7 @@ function show(col: string, value: unknown): string {
   if (col === 'department_id') return departments.value.get(String(value)) ?? String(value)
   if (col === 'registered_at') return fmtDateTime(String(value))
   if (col === 'due_on' || col === 'issued_on') return fmtDate(String(value))
+  if (col === 'size_bytes' && typeof value === 'number') return fmtSize(value)
   return String(value)
 }
 
