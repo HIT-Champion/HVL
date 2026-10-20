@@ -9,10 +9,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 25 | 6 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
-| `staff` (chuyên viên) | `chuyenviendt` | 23 | 14 | [`graphql/staff.graphql`](graphql/staff.graphql) |
-| `manager` (lãnh đạo phòng) | `totruongdt` | 23 | 4 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 34 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `clerk` (văn thư) | `vanthu` | 29 | 6 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `staff` (chuyên viên) | `chuyenviendt` | 27 | 23 | [`graphql/staff.graphql`](graphql/staff.graphql) |
+| `manager` (lãnh đạo phòng) | `totruongdt` | 27 | 13 | [`graphql/manager.graphql`](graphql/manager.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 38 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
 | `tenant_admin` (quản trị đơn vị) | `quantri` | 18 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
@@ -36,6 +36,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `myTasks` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_assignments` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_assignments_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_case_file_documents` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_case_file_documents_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_case_files` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_case_files_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_departments` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_departments_by_pk` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_document_events` | ✓ | ✓ | ✓ | ✓ |  |
@@ -59,8 +63,14 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | Trường | `clerk` | `staff` | `manager` | `director` | `tenant_admin` |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `completeTask` | ✓ | ✓ | ✓ | ✓ |  |
+| `delete_office_case_file_documents` |  | ✓ | ✓ |  |  |
+| `delete_office_case_file_documents_by_pk` |  | ✓ | ✓ |  |  |
 | `delete_office_document_files` |  | ✓ |  |  |  |
 | `delete_office_document_files_by_pk` |  | ✓ |  |  |  |
+| `insert_office_case_file_documents` |  | ✓ | ✓ |  |  |
+| `insert_office_case_file_documents_one` |  | ✓ | ✓ |  |  |
+| `insert_office_case_files` |  | ✓ | ✓ |  |  |
+| `insert_office_case_files_one` |  | ✓ | ✓ |  |  |
 | `insert_office_departments` |  |  |  |  | ✓ |
 | `insert_office_departments_one` |  |  |  |  | ✓ |
 | `insert_office_document_files` |  | ✓ |  |  |  |
@@ -76,6 +86,9 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `update_core_tenants` |  |  |  |  | ✓ |
 | `update_core_tenants_by_pk` |  |  |  |  | ✓ |
 | `update_core_tenants_many` |  |  |  |  | ✓ |
+| `update_office_case_files` |  | ✓ | ✓ |  |  |
+| `update_office_case_files_by_pk` |  | ✓ | ✓ |  |  |
+| `update_office_case_files_many` |  | ✓ | ✓ |  |  |
 | `update_office_departments` |  |  |  |  | ✓ |
 | `update_office_departments_by_pk` |  |  |  |  | ✓ |
 | `update_office_departments_many` |  |  |  |  | ✓ |

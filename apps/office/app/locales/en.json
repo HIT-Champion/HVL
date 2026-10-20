@@ -34,6 +34,8 @@
     "tenant_admin": "Unit administrator"
   },
   "status": {
+    "closed": "Closed",
+    "open": "Open",
     "received": "Awaiting registration",
     "registered": "Awaiting direction",
     "in_progress": "In progress",
@@ -402,6 +404,10 @@
       },
       "register": {
         "printed": "Printed register"
+      },
+      "case_file": {
+        "archived": "Case file archived",
+        "read": "Archived case file read"
       }
     },
     "entity": {
@@ -412,7 +418,9 @@
         "document_acl": "Document access",
         "departments": "Department",
         "registers": "Register",
-        "document_types": "Document type"
+        "document_types": "Document type",
+        "case_files": "Case file",
+        "case_file_documents": "Document in case file"
       },
       "core": {
         "files": "Uploaded file",
@@ -475,7 +483,15 @@
       "username": "username",
       "year": "year",
       "entries": "rows",
-      "masked": "masked rows"
+      "masked": "masked rows",
+      "closed_on": "Closed on",
+      "retention_years": "Retention (years)",
+      "archived_at": "Archived at",
+      "archive_sha256": "archive package hash",
+      "case_file_id": "Case file",
+      "documents": "Documents",
+      "files": "Files",
+      "title": "case file title"
     },
     "direction": {
       "in": "Incoming",

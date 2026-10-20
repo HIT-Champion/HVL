@@ -42,7 +42,7 @@ const PAGE = 50
 const HIDDEN = new Set(['id', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'object_key'])
 const groups = {
   all: null,
-  documents: ['office.documents'],
+  documents: ['office.documents', 'office.case_files', 'office.case_file_documents'],
   assignments: ['office.assignments'],
   files: ['office.document_files', 'core.files'],
   people: ['core.users', 'office.document_acl'],
@@ -87,6 +87,8 @@ async function where(before?: number) {
     parts.push({ _or: [
       { entity_id: { _eq: doc.value } },
       { entity_id: { _like: `${doc.value}/%` } },
+      // văn bản trong hồ sơ (F3.8): entity_id "<hồ sơ>/<văn bản>"
+      { entity: { _eq: 'office.case_file_documents' }, entity_id: { _like: `%/${doc.value}` } },
       { entity: { _eq: 'office.assignments' }, entity_id: { _in: await assignmentsOf(doc.value) } },
     ] })
   }
@@ -152,8 +154,10 @@ function show(col: string, value: unknown): string {
   if (col === 'direction' || col === 'role') return label(`audit.${col}`, String(value))
   if (col === 'user_id' || col === 'signer_id') return names.value.get(String(value)) ?? String(value)
   if (col === 'department_id') return departments.value.get(String(value)) ?? String(value)
-  if (col === 'registered_at') return fmtDateTime(String(value))
-  if (col === 'due_on' || col === 'issued_on') return fmtDate(String(value))
+  if (col === 'registered_at' || col === 'archived_at') return fmtDateTime(String(value))
+  if (col === 'due_on' || col === 'issued_on' || col === 'closed_on') return fmtDate(String(value))
+  // băm gói nộp lưu: sự kiện case_file.archived ghi dạng hex, không có tiền tố \x
+  if (col === 'archive_sha256') return `${String(value).replace(/^\\x/, '').slice(0, 10)}…`
   if (col === 'size_bytes' && typeof value === 'number') return fmtSize(value)
   return String(value)
 }
@@ -163,7 +167,7 @@ function changes(row: Row) {
   const shown: { col: string; text: string }[] = []
   const hidden: string[] = []
   for (const [col, value] of Object.entries(row.overview)) {
-    if (HIDDEN.has(col) || col === 'document_id' || col === 'file_id') continue
+    if (HIDDEN.has(col) || col === 'document_id' || col === 'file_id' || col === 'case_file_id') continue
     if (value === null) {
       hidden.push(label('audit.col', col))
       continue

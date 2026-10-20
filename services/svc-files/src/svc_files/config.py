@@ -63,6 +63,8 @@ class Settings:
     cold_bucket: str                # bucket lạnh bật khóa ghi (S3 Object Lock): mốc neo sổ kiểm toán
     anchor_interval_s: float        # chu kỳ neo đầu chuỗi sổ kiểm toán; 0: tắt vòng nền
     anchor_retention_days: int      # hạn giữ mỗi mốc neo, trong hạn không ai xóa được
+    archive_interval_s: float = 3600.0  # chu kỳ nộp lưu hồ sơ đã đóng (F3.8); 0: tắt vòng nền
+    archive_after_days: int = 365   # hồ sơ đóng từ chừng ấy ngày thì nộp lưu (NĐ 30: trong 01 năm)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -100,6 +102,8 @@ class Settings:
                 cold_bucket=env.get("MOC_COLD_BUCKET", "moc-cold"),
                 anchor_interval_s=float(env.get("MOC_AUDIT_ANCHOR_INTERVAL_S", "600")),
                 anchor_retention_days=int(env.get("MOC_AUDIT_ANCHOR_RETENTION_DAYS", "3650")),
+                archive_interval_s=float(env.get("MOC_ARCHIVE_INTERVAL_S", "3600")),
+                archive_after_days=int(env.get("MOC_ARCHIVE_AFTER_DAYS", "365")),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -111,6 +115,10 @@ class Settings:
             raise ConfigError("MOC_AUDIT_ANCHOR_INTERVAL_S phải ≥ 0 (0: tắt vòng neo)")
         if self.anchor_retention_days < 1:
             raise ConfigError("MOC_AUDIT_ANCHOR_RETENTION_DAYS phải ≥ 1")
+        if self.archive_interval_s < 0:
+            raise ConfigError("MOC_ARCHIVE_INTERVAL_S phải ≥ 0 (0: tắt vòng nộp lưu)")
+        if self.archive_after_days < 0:
+            raise ConfigError("MOC_ARCHIVE_AFTER_DAYS phải ≥ 0")
         if self.cold_bucket == self.bucket:
             # bucket lạnh khóa ghi, còn bucket tệp thường phải xóa được
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")

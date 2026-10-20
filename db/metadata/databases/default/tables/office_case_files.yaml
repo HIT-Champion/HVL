@@ -1,0 +1,72 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Hồ sơ công việc (F3.8). Chuyên viên, tổ trưởng lập hồ sơ của phòng mình và đóng khi công việc kết thúc (đặt
+# status = closed; ngày đóng do trigger đặt). Chuyển sang archived chỉ có job nộp lưu của svc-files (khóa quản trị): không vai trò
+# người dùng nào đặt được. Văn thư, lãnh đạo đơn vị xem mọi hồ sơ của đơn vị (phòng đọc: GET /api/case-files/{id}/archive).
+table:
+  name: case_files
+  schema: office
+object_relationships:
+  - name: department
+    using:
+      manual_configuration:
+        remote_table: {name: departments, schema: office}
+        column_mapping: {department_id: id}
+array_relationships:
+  - name: case_file_documents
+    using:
+      manual_configuration:
+        remote_table: {name: case_file_documents, schema: office}
+        column_mapping: {id: case_file_id}
+insert_permissions:
+  - role: staff
+    permission: &create
+      columns: [year, code, title, retention_years]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+        department_id: X-Hasura-Department-Id
+        created_by: X-Hasura-User-Id
+      check: {}
+  - role: manager
+    permission: *create
+select_permissions:
+  - role: staff
+    permission: &department_select
+      columns: &columns [id, tenant_id, department_id, year, code, title, retention_years, status, closed_on,
+                         archived_at, archive_key, archive_sha256, created_by, created_at]
+      filter:
+        tenant_id: {_eq: X-Hasura-Tenant-Id}
+        department_id: {_eq: X-Hasura-Department-Id}
+  - role: manager
+    permission: *department_select
+  - role: clerk
+    permission: &tenant_select
+      columns: *columns
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+  - role: director
+    permission: *tenant_select
+update_permissions:
+  - role: staff
+    permission: &close
+      columns: [title, retention_years, status]      # ngày đóng do trigger đặt khi đóng
+      filter:
+        tenant_id: {_eq: X-Hasura-Tenant-Id}
+        department_id: {_eq: X-Hasura-Department-Id}
+        status: {_eq: open}
+      check: {status: {_in: [open, closed]}}
+  - role: manager
+    permission: *close

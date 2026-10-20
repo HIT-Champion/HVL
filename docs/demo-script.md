@@ -14,12 +14,60 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 
 | Nguyên lý | Màn | Lệnh | Tình trạng |
 | --- | --- | --- | --- |
-| (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm và xác thực được | — | Chưa có (F3.8) |
+| (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm và xác thực được | `make demo-nong-lanh` | Có (F3.8) |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | — | Chưa có (F3.10) |
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | — | Chưa có (F3.9) |
 | (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
+
+## (i) Nóng → lạnh — `make demo-nong-lanh`
+
+**Điều muốn chứng minh:**
+
+- Dữ liệu có vòng đời: văn bản đang xử lý nằm ở CSDL nghiệp vụ (nóng). Hồ sơ đã đóng thì nộp lưu (NĐ 30/2020, Điều
+  28–31): chi tiết chuyển sang kho lạnh rẻ, không sửa được; CSDL nghiệp vụ chỉ giữ bản ghi rút gọn.
+- Chuyển đi mà không mất gì: gói có manifest băm từng phần, đọc lại so băm xong mới gỡ khỏi CSDL. Văn bản vẫn tìm
+  thấy, quét mã QR vẫn "khớp", phòng đọc vẫn đọc lại được gói.
+- Kho lạnh có khóa ghi: trong thời hạn bảo quản không ai xóa được gói, kể cả quản trị kho.
+
+**Lệnh in ra 5 bước:**
+
+1. Chuyên viên (hoặc tổ trưởng) lập hồ sơ `HS-…`, đưa vào tối đa ba văn bản đã xong mà mình đọc được, thuộc phòng
+   mình (ưu tiên văn bản đi đã phát hành, có mã QR), đóng hồ sơ — ngày đóng do CSDL đặt. In số dòng liên kết tệp,
+   dòng thời gian, giao việc của các văn bản đó trong CSDL.
+2. Gọi job nộp lưu của svc-files ngay (bình thường là vòng nền mỗi giờ, cho hồ sơ đóng quá `MOC_ARCHIVE_AFTER_DAYS`
+   ngày). In đường dẫn gói `s3://moc-cold/cold/<đơn vị>/case/<hồ sơ>/`, số văn bản, số tệp, số byte, thời gian, băm
+   của manifest (`manifest-<băm>.json`).
+3. CSDL nghiệp vụ: văn bản ở trạng thái `archived`; liên kết tệp, dòng thời gian về 0; giao việc giữ nguyên (căn
+   cứ quyền xem, sổ đăng ký); bản tệp trong bucket nóng đã xóa.
+4. Vẫn dùng được:
+   - quét mã tra cứu của văn bản đi ở cổng xác thực, không đăng nhập → "khớp", trạng thái `archived`;
+   - văn thư tìm theo số ký hiệu → ra văn bản đã nộp lưu;
+   - phòng đọc `GET /api/case-files/{id}/archive`: manifest khớp băm trong CSDL, DuckDB đọc `documents.parquet` ra
+     đúng các văn bản.
+5. Thử xóa manifest bằng khóa quản trị của kho → bị từ chối (S3 Object Lock, chế độ COMPLIANCE). Dòng
+   `case_file.archived` nằm trong sổ kiểm toán chuỗi băm.
+
+**Trên giao diện:**
+
+- *Bất kỳ ai*: mở trang xác thực, nhập mã tra cứu của văn bản vừa nộp lưu → vẫn "Văn bản khớp".
+- *Lãnh đạo khoa*: **Sổ kiểm toán** → tab **Văn bản**, dòng "Nộp lưu hồ sơ" kèm ký hiệu hồ sơ, băm gói, số văn bản,
+  số tệp; tên hồ sơ không hiện.
+- Chưa có màn lập hồ sơ: bước 1 đi qua GraphQL với đúng quyền của chuyên viên.
+
+**Nếu giám khảo hỏi:**
+
+- *"Lạnh là ở đâu?"* Bucket `moc-cold` của SeaweedFS, có khóa ghi, chung với mốc neo sổ kiểm toán. Triển khai thật
+  thì trỏ `MOC_COLD_BUCKET` sang ổ rẻ hơn hoặc kho S3 khác. Parquet là định dạng cột mở: công cụ nào cũng đọc được,
+  không cần Mộc.
+- *"Sao không dùng Kestra?"* Một job mỗi giờ không đáng thêm một máy chủ Java khoảng 1 GB RAM. Job là vòng nền trong
+  svc-files, như vòng neo sổ kiểm toán. DuckDB nhúng trong svc-files, không chạy máy chủ riêng.
+- *"Hỏng giữa chừng thì sao?"* Thứ tự là kiểm băm tệp nóng → ghi gói → đọc lại so băm → một giao dịch CSDL → xóa
+  bản nóng. Giao dịch kiểm CSDL còn đúng như gói (khóa dòng), lệch thì không đổi gì. Hỏng trước giao dịch thì CSDL
+  chưa đổi gì, lượt sau làm lại và không ghi lại phần đã có. Hỏng sau giao dịch thì chỉ thừa bản nóng, không mất gì.
+- *"Văn bản hạn chế?"* Không vào hồ sơ nộp lưu: tệp của nó sẽ mã hóa riêng (F3.7). Nộp lưu bản mã hóa cần thêm bước
+  giữ khóa.
 
 ## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
 

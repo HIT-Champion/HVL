@@ -297,6 +297,9 @@ services:
       # F2.12 — neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi
       MOC_AUDIT_ANCHOR_INTERVAL_S: ${MOC_AUDIT_ANCHOR_INTERVAL_S:-600}
       MOC_AUDIT_ANCHOR_RETENTION_DAYS: ${MOC_AUDIT_ANCHOR_RETENTION_DAYS:-3650}
+      # F3.8 — nộp lưu hồ sơ đã đóng sang bucket lạnh
+      MOC_ARCHIVE_INTERVAL_S: ${MOC_ARCHIVE_INTERVAL_S:-3600}
+      MOC_ARCHIVE_AFTER_DAYS: ${MOC_ARCHIVE_AFTER_DAYS:-365}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     depends_on:

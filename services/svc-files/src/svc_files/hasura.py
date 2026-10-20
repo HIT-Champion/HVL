@@ -49,6 +49,12 @@ query VisibleFile($id: uuid!) {
   core_files_by_pk(id: $id) { id filename mime_type size_bytes sha256 }
 }"""
 
+# Phòng đọc hồ sơ đã nộp lưu (F3.8): hỏi bằng token người dùng, Hasura quyết ai xem được hồ sơ nào
+VISIBLE_CASE_FILE = """
+query VisibleCaseFile($id: uuid!) {
+  office_case_files_by_pk(id: $id) { id code title year status closed_on archived_at archive_key archive_sha256 }
+}"""
+
 FILE_LOCATION = """
 query FileLocation($id: uuid!) {
   core_files_by_pk(id: $id) { object_key }
@@ -325,6 +331,24 @@ class HasuraClient:
                 return {}
             raise
         return {row["id"]: row for row in data["office_documents"]}
+
+    async def admin(self, query: str, variables: dict[str, Any], headers: dict[str, str] | None = None,
+                    ) -> dict[str, Any]:
+        """Khóa quản trị không kèm vai trò, cho việc nội bộ không nhận tham số từ người dùng (job nộp lưu F3.8)."""
+        return await self._call(query, variables, {"X-Hasura-Admin-Secret": self._secret, **(headers or {})})
+
+    async def visible_case_file(self, token: str, case_file_id: uuid.UUID) -> dict[str, Any] | None:
+        """Hồ sơ nếu người giữ token được xem, ngược lại None; vai trò không đọc hồ sơ cũng là None."""
+        try:
+            data = await self._call(VISIBLE_CASE_FILE, {"id": str(case_file_id)}, {"Authorization": f"Bearer {token}"})
+        except HasuraAuthError:
+            raise
+        except HasuraError as exc:
+            if exc.code == "validation-failed":
+                return None
+            raise
+        row = data.get("office_case_files_by_pk")
+        return {**row, "archive_sha256": _hex(row["archive_sha256"]) if row["archive_sha256"] else None} if row else None
 
     async def changed_documents(self, since: datetime, limit: int, after: str) -> list[dict[str, Any]]:
         """Văn bản sửa (hoặc có tệp vừa được đọc chữ) từ `since` của mọi thuê ước, để đồng bộ chỉ mục tìm kiếm.

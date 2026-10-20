@@ -34,6 +34,8 @@
     "tenant_admin": "Quản trị đơn vị"
   },
   "status": {
+    "closed": "Đã đóng",
+    "open": "Đang mở",
     "received": "Chờ vào sổ",
     "registered": "Chờ chỉ đạo",
     "in_progress": "Đang xử lý",
@@ -402,6 +404,10 @@
       },
       "register": {
         "printed": "In sổ đăng ký"
+      },
+      "case_file": {
+        "archived": "Nộp lưu hồ sơ",
+        "read": "Đọc hồ sơ lưu trữ"
       }
     },
     "entity": {
@@ -412,7 +418,9 @@
         "document_acl": "Quyền xem văn bản",
         "departments": "Phòng ban",
         "registers": "Sổ đăng ký",
-        "document_types": "Loại văn bản"
+        "document_types": "Loại văn bản",
+        "case_files": "Hồ sơ",
+        "case_file_documents": "Văn bản trong hồ sơ"
       },
       "core": {
         "files": "Tệp tải lên",
@@ -475,7 +483,15 @@
       "username": "tên đăng nhập",
       "year": "năm",
       "entries": "số dòng",
-      "masked": "dòng bị che"
+      "masked": "dòng bị che",
+      "closed_on": "Ngày đóng",
+      "retention_years": "Thời hạn bảo quản (năm)",
+      "archived_at": "Nộp lưu lúc",
+      "archive_sha256": "hash gói lưu trữ",
+      "case_file_id": "Hồ sơ",
+      "documents": "Số văn bản",
+      "files": "Số tệp",
+      "title": "tên hồ sơ"
     },
     "direction": {
       "in": "Đến",

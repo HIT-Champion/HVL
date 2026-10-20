@@ -27,10 +27,13 @@ issue #19, #20.
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=`: không cần đăng nhập | **Xong** (F2.13) |
 | Neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi (S3 Object Lock) | **Xong** (F2.12) |
 | `GET /api/registers/{in\|out}/{năm}` và `/pdf`: sổ đăng ký văn bản đến / đi theo mẫu NĐ 30, in A4 ngang | **Xong** (F2.8) |
+| Nộp lưu hồ sơ đã đóng sang bucket lạnh (Parquet + tệp + manifest có băm), `GET /api/case-files/{id}/archive` | **Xong** (F3.8) |
+| Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa — cùng đợt với F3.7 |
 
 ## API
 
-Đi qua APISIX ở `/api/files/*`, `/api/search`, `/api/documents/*`, `/api/registers/*`, `/api/verify`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
+Đi qua APISIX ở `/api/files/*`, `/api/search`, `/api/documents/*`, `/api/registers/*`, `/api/verify`,
+`/api/case-files/*`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
 xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-files.json) (`make api-docs`).
 
 | Đường dẫn | Kết quả |
@@ -48,6 +51,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
 | `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456` |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
+| `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `GET /healthz` | Tiến trình còn sống |
 | `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"` |
@@ -180,6 +184,48 @@ tra cứu, không thêm phiên bản.
 - Chạy tay trong container (lệnh `scripts/moc.py` trên máy chủ gọi qua `docker compose exec`):
   `python -m svc_files.anchors now` neo ngay; `python -m svc_files.anchors list` in các mốc dạng JSON.
 
+### Nộp lưu hồ sơ — nóng → lạnh (F3.8)
+
+`archive.py`, theo NĐ 30/2020 (lập hồ sơ, nộp lưu) và [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §2.4.
+Chuyên viên, trưởng phòng lập hồ sơ công việc của phòng (`office.case_files`), đưa vào văn bản đã xong mà mình đọc
+được và thuộc phòng mình (đến `done` giao cho mình hoặc cho phòng, đi `issued` của phòng; không nhận văn bản hạn chế),
+rồi đóng hồ sơ — ngày đóng do CSDL đặt. Không vai trò nào đặt được `archived`: chỉ svc-files làm, sau khi gói đã nằm
+trong bucket lạnh.
+
+Mỗi `MOC_ARCHIVE_INTERVAL_S` giây, svc-files nộp lưu các hồ sơ đóng từ `MOC_ARCHIVE_AFTER_DAYS` ngày trở lên:
+
+1. Đọc hồ sơ cùng văn bản, giao việc, dòng thời gian, tệp. Văn bản nào đã hạn chế hoặc không còn ở trạng thái xong/đã
+   ban hành thì dừng. Đọc từng tệp trong bucket nóng, băm phải khớp băm lúc tải lên — lệch một tệp là dừng trước khi
+   ghi gì sang bucket lạnh (đối tượng ở đó bị khóa nhiều năm).
+2. Ghi gói vào `MOC_COLD_BUCKET` dưới `cold/<tenant_id>/case/<id>/`, mọi tên theo băm nội dung: `files/<sha256>`,
+   `documents-<sha256>.parquet`, `assignments-<sha256>.parquet`, `events-<sha256>.parquet` (DuckDB, nén zstd, lược đồ
+   cột cố định), `manifest-<sha256>.json` liệt kê từng phần kèm SHA-256, số dòng. Mỗi đối tượng khóa COMPLIANCE tới
+   hết thời hạn bảo quản tính theo năm lịch **từ ngày đóng hồ sơ** (`retention_years`; vĩnh viễn thì 100 năm; đã
+   quá hạn thì giữ tới hết ngày mai). Manifest không ghi giờ chạy, nên lượt chạy lại ra đúng gói cũ: đối tượng đã có
+   đúng nội dung (lượt trước hỏng giữa chừng) thì không ghi lại; tên theo băm nên hai lượt cùng lúc không đè nhau.
+3. Đọc lại cả gói từ bucket lạnh, so băm. Lệch một đối tượng là dừng, CSDL chưa đổi gì.
+4. Hàm SQL `office.archive_case_file` (chỉ khóa quản trị gọi được), một giao dịch có khóa dòng: kiểm hồ sơ còn
+   `closed`, đúng các văn bản, dòng thời gian, liên kết tệp đã vào gói (không có dòng mới sinh trong lúc ghi gói) —
+   lệch thì không đổi gì, lượt sau làm lại; `archive_key` phải đúng thư mục gói của hồ sơ; rồi hồ sơ `archived` kèm `archive_key`, `archive_sha256` (băm manifest),
+   văn bản `archived`, xóa dòng thời gian, liên kết tệp, tệp `storage_tier = 'cold'`, sự kiện `case_file.archived`
+   vào sổ kiểm toán. Giao việc ở lại: là căn cứ quyền xem văn bản và cột "đơn vị nhận" của sổ đăng ký.
+5. Xóa bản nóng của tệp. Tệp còn gắn với văn bản ngoài hồ sơ thì giữ ở bucket nóng.
+
+Một hồ sơ lỗi không chặn hồ sơ khác: lượt nền ghi `case_file.archive_failed` vào nhật ký rồi làm hồ sơ kế tiếp; hồ
+sơ vừa lỗi được bỏ qua 24 giờ (tính trong tiến trình) để không chiếm chỗ của hồ sơ khác trong giới hạn mỗi lượt. Tệp đã
+sang lạnh không gắn lại được vào văn bản nào (trigger `document_files_hot_only`).
+
+Sau khi nộp lưu, dòng văn bản rút gọn ở lại: ai đọc được trước đó vẫn đọc được, tìm thấy theo số, ký hiệu, trích yếu;
+cổng xác thực vẫn trả `valid` theo mã tra cứu và băm (trạng thái `archived`). Lớp chữ của PDF đính kèm không còn trong
+chỉ mục tìm kiếm; tệp không tải được qua `/api/files/{id}` nữa, chỉ đọc từ gói; tệp đã nộp lưu không gắn lại được vào
+dự thảo. Phòng đọc chỉ trả những văn bản trong gói mà người gọi đọc được, kèm số văn bản bị ẩn (`hidden`).
+
+Chưa làm: dọn bản nóng khi giao dịch đã chạy mà svc-files không nhận được trả lời (hồ sơ đã `archived`, tệp đã
+`cold`, bản nóng còn thừa — không mất gì).
+
+Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` nộp lưu ngay một hồ sơ đã đóng (màn demo
+`make demo-nong-lanh`); `python -m svc_files.archive now --after-days 0` nộp lưu mọi hồ sơ đã đóng, in hồ sơ nào lỗi.
+
 ### Gọi Hasura
 
 | Việc | Gọi bằng |
@@ -194,6 +240,8 @@ tra cứu, không thêm phiên bản.
 | Đọc sổ đăng ký một năm | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng lấy từ token đã kiểm; rồi token của người dùng để biết dòng nào được đọc |
 | Tra cứu ở cổng xác thực | Khóa quản trị + `X-Hasura-Role: verifier` |
 | Đọc đầu chuỗi sổ kiểm toán, ghi mốc neo | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
+| Đọc hồ sơ, văn bản, tệp để nộp lưu; gọi hàm `office_archive_case_file` | Khóa quản trị, không kèm vai trò, `X-Hasura-User-Id: svc-files:archive` — việc nội bộ; id hồ sơ lấy từ CSDL hoặc lệnh chạy tay. Hàm không cấp quyền cho vai trò nào |
+| Phòng đọc: tìm hồ sơ, lọc văn bản người gọi đọc được | Token của người dùng; ghi `case_file.read` như ghi `register.printed` |
 
 ## Cấu hình
 
@@ -230,6 +278,8 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_COLD_BUCKET` | `moc-cold` | Bucket lạnh có khóa ghi, tự tạo; phải khác `MOC_FILES_BUCKET` |
 | `MOC_AUDIT_ANCHOR_INTERVAL_S` | `600` | Chu kỳ neo đầu chuỗi sổ kiểm toán; `0` tắt vòng neo |
 | `MOC_AUDIT_ANCHOR_RETENTION_DAYS` | `3650` | Hạn giữ mỗi mốc; trong hạn không ai xóa được |
+| `MOC_ARCHIVE_INTERVAL_S` | `3600` | Chu kỳ tìm hồ sơ đến hạn nộp lưu; `0` tắt vòng nộp lưu |
+| `MOC_ARCHIVE_AFTER_DAYS` | `365` | Hồ sơ đóng từ chừng ấy ngày trở lên thì nộp lưu |
 
 ## Phát triển
 

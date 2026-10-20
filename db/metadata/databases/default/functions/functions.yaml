@@ -18,3 +18,4 @@
 # (HASURA_GRAPHQL_INFER_FUNCTION_PERMISSIONS=false): có quyền đọc bảng trả về chưa đủ để gọi hàm.
 - "!include office_register_incoming.yaml"
 - "!include office_number_outgoing.yaml"
+- "!include office_archive_case_file.yaml"

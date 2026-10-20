@@ -41,5 +41,6 @@ test('sổ kiểm toán: lãnh đạo xem ai đổi gì, chuỗi đã neo tới 
   await expect(director.getByRole('heading', { level: 1 })).toBeVisible()
   await director.getByRole('link', { name: 'Xem trong sổ kiểm toán' }).click()
   await expect(director.getByText('Của một văn bản')).toBeVisible()
-  await expect(table.getByText('Thêm · Văn bản')).toHaveCount(1)
+  // đúng nhãn: văn bản đã vào hồ sơ (F3.8) còn có dòng "Thêm · Văn bản trong hồ sơ"
+  await expect(table.getByText('Thêm · Văn bản', { exact: true })).toHaveCount(1)
 })

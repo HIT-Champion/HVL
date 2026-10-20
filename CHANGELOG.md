@@ -169,6 +169,19 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   GitOps với repo git cục bộ; `make smoke` thêm 1 kiểm tra (tổng 46): một lượt reconciler không thấy gì phải sửa.
   Giới hạn: áp một commit là cài lại toàn bộ (Mộc dừng khoảng một phút), image cũ không tự xóa, `.env` không do git
   quản (#41).
+- Lập hồ sơ và nộp lưu — dữ liệu nóng sang lạnh (F3.8, màn (i)). Bảng `office.case_files`,
+  `office.case_file_documents`: chuyên viên, tổ trưởng lập hồ sơ của phòng mình, đưa vào văn bản đã xử lý xong mà mình
+  đọc được và thuộc phòng mình (văn bản hạn chế không vào), đóng hồ sơ; ngày đóng do CSDL đặt, hồ sơ rỗng không đóng
+  được, hồ sơ đã nộp lưu không sửa được nữa. svc-files nộp lưu hồ sơ đóng từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định
+  365): kiểm băm tệp nóng, ghi gói `cold/<đơn vị>/case/<hồ sơ>/` gồm ba bảng Parquet (DuckDB 1.5.6, lược đồ cố định),
+  tệp gốc và manifest có SHA-256 từng phần, mọi tên theo băm, khóa ghi COMPLIANCE theo thời hạn bảo quản; đọc lại cả
+  gói, so băm, rồi hàm SQL `office.archive_case_file` (một giao dịch, khóa dòng, CSDL lệch với gói thì không đổi gì)
+  gỡ dòng thời gian, liên kết tệp và ghi `case_file.archived` vào sổ kiểm toán. Giao việc và dòng văn bản rút gọn ở
+  lại: ai đọc được vẫn đọc được, vẫn tìm thấy, cổng xác thực vẫn trả "khớp". Phòng đọc
+  `GET /api/case-files/{id}/archive` đọc lại gói, kiểm băm với CSDL, chỉ trả văn bản người gọi đọc được, ghi
+  `case_file.read`. Sổ kiểm toán thấy ký hiệu hồ sơ, băm gói, không thấy tên hồ sơ. `make demo-nong-lanh` (màn (i),
+  cũng là bước CI); `make smoke` thêm 1 kiểm tra (tổng 47). Giới hạn: chưa có giao diện lập hồ sơ, phòng đọc chưa xem
+  được tệp (cùng đợt F3.7), lớp chữ PDF của văn bản đã nộp lưu không còn trong chỉ mục tìm kiếm (#42).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

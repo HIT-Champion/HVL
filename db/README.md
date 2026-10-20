@@ -20,7 +20,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `core.tenants`, `core.files`, `core.audit_log` (+ `audit_head`, `audit_anchors`) | **Xong** |
 | `office.departments`, `document_types` (28 loại theo NĐ 30), `registers`, `documents`, `document_files`, `document_acl`, `assignments`, `document_events` | **Xong** |
 | Quyền Hasura cho 6 vai trò, cách ly thuê ước | **Xong** — 38 test |
-| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung; thấy năm, số dòng của lần in sổ đăng ký; mẫu mã độc, cỡ của tệp bị kiểm dịch chặn) | **Xong** — 23 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
+| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung; thấy năm, số dòng của lần in sổ đăng ký; mẫu mã độc, cỡ của tệp bị kiểm dịch chặn; ký hiệu hồ sơ, băm gói nộp lưu) | **Xong** — 23 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch) | **Xong** — 10 test |
 | `metadata/actions.graphql`, `actions.yaml`: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
 | Poka-yoke lớp 3 cho văn bản đến (F2.2): `documents_in_symbol`, `documents_in_issuer`, `documents_in_summary`, `documents_in_dates` — cùng quy tắc với `schemas/van-ban-den.json` (độ dài, khoảng trắng, ký tự ẩn, dạng NFC, năm 1900+); migration dọn trước dữ liệu cũ sửa được mà không đổi nghĩa | **Xong** — 43 test chạy chung bộ ca thử với form và svc-workflow, chèn thẳng bằng quyền quản trị |
@@ -29,7 +29,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `core.notifications` (thông báo từng người, F2.5): mỗi người chỉ đọc và đánh dấu đã đọc thông báo của mình, chống gửi trùng theo khóa | **Xong** — 6 test |
 | Sao lưu, khôi phục (F3.4): `pg_dump -Fc` → `pg_restore` giữ nguyên mọi dòng và hash của sổ kiểm toán; dòng `system.restored` nối tiếp chuỗi | **Xong** — 2 test, dump và restore ngay trong container PostgreSQL thử |
 | View cho dashboard điều hành (F3.11): `office.v_document_counts`, `v_overdue_by_department`, `v_processing_time`, `v_outgoing_by_month` — chỉ có số đếm, lãnh đạo đơn vị đọc số của đơn vị mình; văn bản hạn chế không vào phép chia nào, chỉ có con số tổng | **Xong** — 6 test, trên một đơn vị riêng nên số đếm biết trước |
-| `office.case_files` (hồ sơ, nộp lưu) | Phase 3 |
+| Hồ sơ công việc, nộp lưu (F3.8): `office.case_files`, `office.case_file_documents`; trigger: chỉ văn bản đã xử lý xong, không hạn chế vào hồ sơ đang mở, ngày đóng do CSDL đặt, hồ sơ rỗng không đóng được, đóng rồi không mở lại, đã nộp lưu thì đóng băng; chuyên viên, tổ trưởng lập và đóng hồ sơ của phòng mình, chỉ đưa vào văn bản mình đọc được và thuộc phòng mình; hàm `office.archive_case_file` chỉ khóa quản trị gọi được, CSDL lệch với gói thì không đổi gì, lần hai bị từ chối; tệp đã nộp lưu không gắn lại vào dự thảo; sổ thấy ký hiệu hồ sơ, băm gói, không thấy tên hồ sơ | **Xong** — 7 test |
 
 ## Vai trò
 

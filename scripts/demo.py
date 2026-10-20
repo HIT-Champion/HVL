@@ -18,6 +18,10 @@
 """Màn demo bằng chứng các nguyên lý thiết kế (docs/demo-script.md): mỗi màn một lệnh, dưới một phút, chạy trên
 hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện chuẩn, chạy được trong thư mục cài (make install).
 
+    python3 scripts/demo.py nong-lanh
+        (i) Vòng đời dữ liệu nóng → lạnh: chuyên viên lập hồ sơ, đóng; svc-files nộp lưu thành gói Parquet + tệp +
+        manifest có băm trên bucket lạnh khóa ghi, gỡ chi tiết khỏi CSDL nghiệp vụ; văn bản vẫn tìm thấy, quét QR vẫn
+        khớp, phòng đọc đọc lại gói bằng DuckDB. (make demo-nong-lanh)
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
@@ -42,8 +46,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
-from moc_env import EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, compose, text_pdf
+from moc_env import EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, text_pdf
 
 
 class DemoFailed(Exception):
@@ -337,7 +342,153 @@ def tu_phuc_hoi() -> None:
     print("\nTrên máy chủ thật: ops/systemd/moc-reconcile.timer · nhật ký: journalctl -u moc-reconcile")
 
 
-DEMOS = {"kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi}
+CREATE_CASE_FILE = """
+mutation ($o: office_case_files_insert_input!) { insert_office_case_files_one(object: $o) { id code } }"""
+ADD_TO_CASE_FILE = """
+mutation ($o: office_case_file_documents_insert_input!) {
+  insert_office_case_file_documents_one(object: $o) { document_id }
+}"""
+CLOSE_CASE_FILE = """
+mutation ($id: uuid!) {
+  update_office_case_files(where: {id: {_eq: $id}}, _set: {status: "closed"}) { affected_rows }
+}"""
+
+# Văn bản người lập hồ sơ được đưa vào (cùng quy tắc với quyền Hasura): đã xong, không hạn chế, chưa thuộc hồ sơ nào;
+# văn bản đi của phòng mình, văn bản đến giao cho mình (tổ trưởng: giao cho phòng mình). Chọn người có nhiều văn bản
+# như thế nhất, để chạy demo nhiều lần sau một lần seed vẫn còn văn bản.
+FILEABLE = """
+select u.username, d.id from office.documents d join core.users u on u.tenant_id = d.tenant_id
+ where u.role in ('staff', 'manager') and u.enabled and not d.restricted
+   and not exists (select 1 from office.case_file_documents c where c.document_id = d.id)
+   and ((d.direction = 'out' and d.status = 'issued' and d.department_id = u.department_id)
+     or (d.direction = 'in' and d.status = 'done' and exists (select 1 from office.assignments a
+          where a.document_id = d.id and a.status <> 'cancelled'
+            and ((u.role = 'staff' and a.user_id = u.id)
+              or (u.role = 'manager' and a.department_id = u.department_id)))))
+ order by u.role = 'staff' desc, d.direction = 'out' desc, d.created_at"""
+
+
+def oltp_detail(ids: list[str]) -> dict[str, int]:
+    """Số dòng chi tiết của các văn bản trong CSDL nghiệp vụ (OLTP)."""
+    inlist = ", ".join(f"'{i}'" for i in ids)
+    row = psql(f"select (select count(*) from office.document_files where document_id in ({inlist})),"
+               f" (select count(*) from office.document_events where document_id in ({inlist})),"
+               f" (select count(*) from office.assignments where document_id in ({inlist}))")
+    files, events, assignments = (int(x) for x in row.split("|"))
+    return {"liên kết tệp": files, "dòng thời gian": events, "giao việc": assignments}
+
+
+def nong_lanh() -> None:
+    print("Màn (i) · Vòng đời dữ liệu: nóng → lạnh — hồ sơ đã đóng được nộp lưu thành gói Parquet + tệp + manifest có"
+          " băm trên bucket lạnh khóa ghi; CSDL nghiệp vụ chỉ giữ bản ghi rút gọn")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = Session("vanthu")
+
+    say(1, "Chuyên viên lập hồ sơ công việc, đưa văn bản đã xong vào, đóng hồ sơ (NĐ 30/2020, Điều 28–29)")
+    # văn bản đi đã phát hành (có mã QR) và văn bản đến đã xử lý xong mà người lập hồ sơ được đưa vào
+    by_user: dict[str, list[str]] = {}
+    for row in psql(FILEABLE).splitlines():
+        username, doc_id = row.split("|")
+        by_user.setdefault(username, []).append(doc_id)
+    if not by_user:
+        raise DemoFailed("không còn văn bản đã xong nào chưa nộp lưu — chạy make seed (hoặc make smoke) để có thêm")
+    username = max(by_user, key=lambda u: min(len(by_user[u]), 3))   # bằng nhau thì giữ thứ tự: chuyên viên trước
+    ids = by_user[username][:3]
+    staff = Session(username)
+    docs = {}
+    for row in psql("select id, direction, coalesce(symbol, ''), coalesce(verify_code, ''), summary from"
+                    f" office.documents where id in ({', '.join(repr(i) for i in ids)})").splitlines():
+        i, direction, symbol, code, summary = row.split("|", 4)
+        docs[i] = {"direction": direction, "symbol": symbol, "verify_code": code, "summary": summary}
+    cf = staff.gql(CREATE_CASE_FILE, {"o": {"year": datetime.now().year, "code": f"HS-{tag}",
+                                            "title": f"Hồ sơ thử nộp lưu {tag}", "retention_years": 10}})
+    cf = cf["insert_office_case_files_one"]
+    for i in ids:
+        staff.gql(ADD_TO_CASE_FILE, {"o": {"case_file_id": cf["id"], "document_id": i}})
+    staff.gql(CLOSE_CASE_FILE, {"id": cf["id"]})
+    for d in docs.values():
+        ok(f"{'đi' if d['direction'] == 'out' else 'đến'} {d['symbol']} — {d['summary'][:60]}")
+    before = oltp_detail(ids)
+    ok(f"{username} lập hồ sơ {cf['code']}, đóng (ngày đóng do CSDL đặt); trong CSDL nghiệp vụ: "
+       + ", ".join(f"{v} dòng {k}" for k, v in before.items()))
+
+    say(2, "Nộp lưu (job svc-files; vòng nền chạy mỗi giờ cho hồ sơ đóng quá MOC_ARCHIVE_AFTER_DAYS, ở đây gọi ngay)")
+    started = time.monotonic()
+    out = compose("exec", "-T", "svc-files", "python", "-m", "svc_files.archive", "now", "--case-file", cf["id"])
+    result = json.loads(out.decode().strip().splitlines()[-1])
+    if "error" in result:
+        raise DemoFailed(f"nộp lưu lỗi: {result['error']}")
+    done = result["archived"][0]
+    ok(f"gói s3://moc-cold/{done['archive_key']} — {done['documents']} văn bản, {done['files']} tệp,"
+       f" {done['bytes']:,} byte, {time.monotonic() - started:.1f} giây".replace(",", "."))
+    ok(f"manifest-{done['archive_sha256'][:16]}….json — băm của nó ghi vào case_files.archive_sha256 và sổ kiểm toán;"
+       " mọi đối tượng khóa ghi COMPLIANCE 10 năm")
+
+    say(3, "CSDL nghiệp vụ chỉ còn bản ghi rút gọn")
+    after = oltp_detail(ids)
+    if after["liên kết tệp"] or after["dòng thời gian"] or after["giao việc"] != before["giao việc"]:
+        raise DemoFailed(f"CSDL sau nộp lưu chưa đúng: {after}")
+    states = psql(f"select string_agg(distinct status, ',') from office.documents where id in"
+                  f" ({', '.join(repr(i) for i in ids)})")
+    if states != "archived":
+        raise DemoFailed(f"văn bản chưa ở trạng thái archived: {states}")
+    ok(f"văn bản: trạng thái archived (dòng rút gọn: số, ký hiệu, trích yếu, băm, mã tra cứu);"
+       f" liên kết tệp {before['liên kết tệp']} → 0, dòng thời gian {before['dòng thời gian']} → 0;"
+       f" giữ {before['giao việc']} dòng giao việc (căn cứ quyền xem, sổ đăng ký)")
+    ok("tệp: bản trong bucket nóng đã xóa, core.files chuyển storage_tier = cold")
+
+    say(4, "Vẫn tìm thấy, vẫn xác thực được, đọc lại được từ kho lạnh")
+    out_doc = next((d for d in docs.values() if d["verify_code"]), None)
+    if out_doc:
+        verified, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{out_doc['verify_code']}")
+        if verified.get("result") != "valid" or verified["document"]["status"] != "archived":
+            raise DemoFailed(f"cổng xác thực trả {verified}")
+        ok(f"quét QR {out_doc['verify_code']} → khớp: {out_doc['symbol']} (trạng thái archived, không đăng nhập)")
+    first = next(iter(docs.values()))
+    deadline = time.monotonic() + 30
+    while True:
+        found, _ = call_json("GET", f"{PUBLIC_URL}/api/search?q={quote(first['symbol'])}", headers=clerk.auth)
+        hits = found["hits"]
+        hit = next((h for h in hits if h.get("status") == "archived"), None)
+        if hit or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    if not hit:
+        raise DemoFailed(f"tìm '{first['symbol']}' không ra văn bản đã nộp lưu")
+    ok(f"văn thư tìm '{first['symbol']}' → ra văn bản, trạng thái archived")
+    room, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/{cf['id']}/archive", headers=clerk.auth)
+    if room["manifest_sha256"] != done["archive_sha256"] or len(room["documents"]) != len(ids):
+        raise DemoFailed(f"phòng đọc trả {room}")
+    ok(f"phòng đọc: manifest khớp băm trong CSDL; DuckDB đọc documents.parquet ra {len(room['documents'])} văn bản: "
+       + ", ".join(d["symbol"] or "?" for d in room["documents"]))
+
+    say(5, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
+    try_delete = (
+        "import os, sys\n"
+        "from svc_files.config import Settings\n"
+        "from svc_files.openbao import with_secrets\n"
+        "from svc_files.storage import s3_client\n"
+        "s = Settings.from_env(with_secrets(os.environ))\n"
+        "c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)\n"
+        "key = f'{sys.argv[1]}manifest-{sys.argv[2]}.json'\n"
+        "v = c.list_object_versions(Bucket=s.cold_bucket, Prefix=key)['Versions'][0]\n"
+        "try:\n"
+        "    c.delete_object(Bucket=s.cold_bucket, Key=v['Key'], VersionId=v['VersionId'])\n"
+        "    print('deleted')\n"
+        "except Exception as exc:\n"
+        "    print('refused', type(exc).__name__)\n"
+    )
+    refused = compose("exec", "-T", "svc-files", "python", "-c", try_delete, done["archive_key"],
+                      done["archive_sha256"]).decode().strip()
+    if not refused.startswith("refused"):
+        raise DemoFailed(f"xóa được manifest trong bucket lạnh: {refused}")
+    ok(f"xóa manifest bằng khóa quản trị kho → {refused.split()[-1]}")
+    event = psql("select id from core.audit_log where action = 'case_file.archived' and entity_id ="
+                 f" '{cf['id']}'")
+    ok(f"sổ kiểm toán dòng #{event}: case_file.archived kèm archive_sha256 — lần nộp lưu cũng nằm trong chuỗi băm")
+
+
+DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi}
 
 
 def main(argv: list[str] | None = None) -> int:

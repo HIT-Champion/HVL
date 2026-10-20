@@ -639,6 +639,13 @@ input jsonb_comparison_exp {
 "mutation root"
 type mutation_root {
   completeTask(data: jsonb, outcome: String!, taskId: String!): CompleteTaskOutput
+  "delete data from the table: \"office.case_file_documents\""
+  delete_office_case_file_documents(
+    "filter the rows which have to be deleted"
+    where: office_case_file_documents_bool_exp!
+  ): office_case_file_documents_mutation_response
+  "delete single row from the table: \"office.case_file_documents\""
+  delete_office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
   "delete data from the table: \"office.document_files\""
   delete_office_document_files(
     "filter the rows which have to be deleted"
@@ -646,6 +653,34 @@ type mutation_root {
   ): office_document_files_mutation_response
   "delete single row from the table: \"office.document_files\""
   delete_office_document_files_by_pk(document_id: uuid!, file_id: uuid!): office_document_files
+  "insert data into the table: \"office.case_file_documents\""
+  insert_office_case_file_documents(
+    "the rows to be inserted"
+    objects: [office_case_file_documents_insert_input!]!
+    "upsert condition"
+    on_conflict: office_case_file_documents_on_conflict
+  ): office_case_file_documents_mutation_response
+  "insert a single row into the table: \"office.case_file_documents\""
+  insert_office_case_file_documents_one(
+    "the row to be inserted"
+    object: office_case_file_documents_insert_input!
+    "upsert condition"
+    on_conflict: office_case_file_documents_on_conflict
+  ): office_case_file_documents
+  "insert data into the table: \"office.case_files\""
+  insert_office_case_files(
+    "the rows to be inserted"
+    objects: [office_case_files_insert_input!]!
+    "upsert condition"
+    on_conflict: office_case_files_on_conflict
+  ): office_case_files_mutation_response
+  "insert a single row into the table: \"office.case_files\""
+  insert_office_case_files_one(
+    "the row to be inserted"
+    object: office_case_files_insert_input!
+    "upsert condition"
+    on_conflict: office_case_files_on_conflict
+  ): office_case_files
   "insert data into the table: \"office.document_files\""
   insert_office_document_files(
     "the rows to be inserted"
@@ -693,6 +728,28 @@ type mutation_root {
     "updates to execute, in order"
     updates: [core_notifications_updates!]!
   ): [core_notifications_mutation_response]
+  "update data of the table: \"office.case_files\""
+  update_office_case_files(
+    "increments the numeric columns with given value of the filtered values"
+    _inc: office_case_files_inc_input
+    "sets the columns of the filtered rows to the given values"
+    _set: office_case_files_set_input
+    "filter the rows which have to be updated"
+    where: office_case_files_bool_exp!
+  ): office_case_files_mutation_response
+  "update single row of the table: \"office.case_files\""
+  update_office_case_files_by_pk(
+    "increments the numeric columns with given value of the filtered values"
+    _inc: office_case_files_inc_input
+    "sets the columns of the filtered rows to the given values"
+    _set: office_case_files_set_input
+    pk_columns: office_case_files_pk_columns_input!
+  ): office_case_files
+  "update multiples rows of table: \"office.case_files\""
+  update_office_case_files_many(
+    "updates to execute, in order"
+    updates: [office_case_files_updates!]!
+  ): [office_case_files_mutation_response]
   "update data of the table: \"office.documents\""
   update_office_documents(
     "sets the columns of the filtered rows to the given values"
@@ -888,6 +945,355 @@ input office_assignments_stream_cursor_value_input {
   role: String
   status: String
   user_id: String
+}
+
+"columns and relationships of \"office.case_file_documents\""
+type office_case_file_documents {
+  added_at: timestamptz!
+  added_by: String!
+  "An object relationship"
+  case_file: office_case_files
+  case_file_id: uuid!
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  tenant_id: uuid!
+}
+
+"order by aggregate values of table \"office.case_file_documents\""
+input office_case_file_documents_aggregate_order_by {
+  count: order_by
+  max: office_case_file_documents_max_order_by
+  min: office_case_file_documents_min_order_by
+}
+
+"input type for inserting array relation for remote table \"office.case_file_documents\""
+input office_case_file_documents_arr_rel_insert_input {
+  data: [office_case_file_documents_insert_input!]!
+  "upsert condition"
+  on_conflict: office_case_file_documents_on_conflict
+}
+
+"Boolean expression to filter rows from the table \"office.case_file_documents\". All fields are combined with a logical 'AND'."
+input office_case_file_documents_bool_exp {
+  _and: [office_case_file_documents_bool_exp!]
+  _not: office_case_file_documents_bool_exp
+  _or: [office_case_file_documents_bool_exp!]
+  added_at: timestamptz_comparison_exp
+  added_by: String_comparison_exp
+  case_file: office_case_files_bool_exp
+  case_file_id: uuid_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"unique or primary key constraints on table \"office.case_file_documents\""
+enum office_case_file_documents_constraint {
+  "unique or primary key constraint on columns \"document_id\""
+  case_file_documents_document_id_key
+  "unique or primary key constraint on columns \"document_id\", \"case_file_id\""
+  case_file_documents_pkey
+}
+
+"input type for inserting data into table \"office.case_file_documents\""
+input office_case_file_documents_insert_input {
+  case_file: office_case_files_obj_rel_insert_input
+  case_file_id: uuid
+  document: office_documents_obj_rel_insert_input
+  document_id: uuid
+}
+
+"order by max() on columns of table \"office.case_file_documents\""
+input office_case_file_documents_max_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file_id: order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"order by min() on columns of table \"office.case_file_documents\""
+input office_case_file_documents_min_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file_id: order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"response of any mutation on the table \"office.case_file_documents\""
+type office_case_file_documents_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [office_case_file_documents!]!
+}
+
+"on_conflict condition type for table \"office.case_file_documents\""
+input office_case_file_documents_on_conflict {
+  constraint: office_case_file_documents_constraint!
+  update_columns: [office_case_file_documents_update_column!]! = []
+  where: office_case_file_documents_bool_exp
+}
+
+"Ordering options when selecting data from \"office.case_file_documents\"."
+input office_case_file_documents_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file: office_case_files_order_by
+  case_file_id: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.case_file_documents\""
+enum office_case_file_documents_select_column {
+  "column name"
+  added_at
+  "column name"
+  added_by
+  "column name"
+  case_file_id
+  "column name"
+  document_id
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_case_file_documents\""
+input office_case_file_documents_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_case_file_documents_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_case_file_documents_stream_cursor_value_input {
+  added_at: timestamptz
+  added_by: String
+  case_file_id: uuid
+  document_id: uuid
+  tenant_id: uuid
+}
+
+"placeholder for update columns of table \"office.case_file_documents\" (current role has no relevant permissions)"
+enum office_case_file_documents_update_column {
+  "placeholder (do not use)"
+  _PLACEHOLDER
+}
+
+"columns and relationships of \"office.case_files\""
+type office_case_files {
+  archive_key: String
+  archive_sha256: bytea
+  archived_at: timestamptz
+  "An array relationship"
+  case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  closed_on: date
+  code: String!
+  created_at: timestamptz!
+  created_by: String!
+  "An object relationship"
+  department: office_departments
+  department_id: uuid!
+  id: uuid!
+  retention_years: Int
+  status: String!
+  tenant_id: uuid!
+  title: String!
+  year: Int!
+}
+
+"Boolean expression to filter rows from the table \"office.case_files\". All fields are combined with a logical 'AND'."
+input office_case_files_bool_exp {
+  _and: [office_case_files_bool_exp!]
+  _not: office_case_files_bool_exp
+  _or: [office_case_files_bool_exp!]
+  archive_key: String_comparison_exp
+  archive_sha256: bytea_comparison_exp
+  archived_at: timestamptz_comparison_exp
+  case_file_documents: office_case_file_documents_bool_exp
+  closed_on: date_comparison_exp
+  code: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  created_by: String_comparison_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  id: uuid_comparison_exp
+  retention_years: Int_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  title: String_comparison_exp
+  year: Int_comparison_exp
+}
+
+"unique or primary key constraints on table \"office.case_files\""
+enum office_case_files_constraint {
+  "unique or primary key constraint on columns \"id\""
+  case_files_pkey
+  "unique or primary key constraint on columns \"id\", \"tenant_id\""
+  case_files_tenant_id_id_key
+  "unique or primary key constraint on columns \"code\", \"year\", \"tenant_id\""
+  case_files_tenant_id_year_code_key
+}
+
+"input type for incrementing numeric columns in table \"office.case_files\""
+input office_case_files_inc_input {
+  retention_years: Int
+}
+
+"input type for inserting data into table \"office.case_files\""
+input office_case_files_insert_input {
+  case_file_documents: office_case_file_documents_arr_rel_insert_input
+  code: String
+  retention_years: Int
+  title: String
+  year: Int
+}
+
+"response of any mutation on the table \"office.case_files\""
+type office_case_files_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [office_case_files!]!
+}
+
+"input type for inserting object relation for remote table \"office.case_files\""
+input office_case_files_obj_rel_insert_input {
+  data: office_case_files_insert_input!
+  "upsert condition"
+  on_conflict: office_case_files_on_conflict
+}
+
+"on_conflict condition type for table \"office.case_files\""
+input office_case_files_on_conflict {
+  constraint: office_case_files_constraint!
+  update_columns: [office_case_files_update_column!]! = []
+  where: office_case_files_bool_exp
+}
+
+"Ordering options when selecting data from \"office.case_files\"."
+input office_case_files_order_by {
+  archive_key: order_by
+  archive_sha256: order_by
+  archived_at: order_by
+  case_file_documents_aggregate: office_case_file_documents_aggregate_order_by
+  closed_on: order_by
+  code: order_by
+  created_at: order_by
+  created_by: order_by
+  department: office_departments_order_by
+  department_id: order_by
+  id: order_by
+  retention_years: order_by
+  status: order_by
+  tenant_id: order_by
+  title: order_by
+  year: order_by
+}
+
+"primary key columns input for table: office.case_files"
+input office_case_files_pk_columns_input {
+  id: uuid!
+}
+
+"select columns of table \"office.case_files\""
+enum office_case_files_select_column {
+  "column name"
+  archive_key
+  "column name"
+  archive_sha256
+  "column name"
+  archived_at
+  "column name"
+  closed_on
+  "column name"
+  code
+  "column name"
+  created_at
+  "column name"
+  created_by
+  "column name"
+  department_id
+  "column name"
+  id
+  "column name"
+  retention_years
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  title
+  "column name"
+  year
+}
+
+"input type for updating data in table \"office.case_files\""
+input office_case_files_set_input {
+  retention_years: Int
+  status: String
+  title: String
+}
+
+"Streaming cursor of the table \"office_case_files\""
+input office_case_files_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_case_files_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_case_files_stream_cursor_value_input {
+  archive_key: String
+  archive_sha256: bytea
+  archived_at: timestamptz
+  closed_on: date
+  code: String
+  created_at: timestamptz
+  created_by: String
+  department_id: uuid
+  id: uuid
+  retention_years: Int
+  status: String
+  tenant_id: uuid
+  title: String
+  year: Int
+}
+
+"update columns of table \"office.case_files\""
+enum office_case_files_update_column {
+  "column name"
+  retention_years
+  "column name"
+  status
+  "column name"
+  title
+}
+
+input office_case_files_updates {
+  "increments the numeric columns with given value of the filtered values"
+  _inc: office_case_files_inc_input
+  "sets the columns of the filtered rows to the given values"
+  _set: office_case_files_set_input
+  "filter the rows which have to be updated"
+  where: office_case_files_bool_exp!
 }
 
 "columns and relationships of \"office.departments\""
@@ -1933,6 +2339,36 @@ type query_root {
   ): [office_assignments!]!
   "fetch data from the table: \"office.assignments\" using primary key columns"
   office_assignments_by_pk(id: uuid!): office_assignments
+  "fetch data from the table: \"office.case_file_documents\""
+  office_case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_file_documents\" using primary key columns"
+  office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
+  "fetch data from the table: \"office.case_files\""
+  office_case_files(
+    "distinct select on columns"
+    distinct_on: [office_case_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_files_order_by!]
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.case_files\" using primary key columns"
+  office_case_files_by_pk(id: uuid!): office_case_files
   "fetch data from the table: \"office.departments\""
   office_departments(
     "distinct select on columns"
@@ -2157,6 +2593,54 @@ type subscription_root {
     "filter the rows returned"
     where: office_assignments_bool_exp
   ): [office_assignments!]!
+  "fetch data from the table: \"office.case_file_documents\""
+  office_case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_file_documents\" using primary key columns"
+  office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
+  "fetch data from the table in a streaming manner: \"office.case_file_documents\""
+  office_case_file_documents_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_case_file_documents_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_files\""
+  office_case_files(
+    "distinct select on columns"
+    distinct_on: [office_case_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_files_order_by!]
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.case_files\" using primary key columns"
+  office_case_files_by_pk(id: uuid!): office_case_files
+  "fetch data from the table in a streaming manner: \"office.case_files\""
+  office_case_files_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_case_files_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
   "fetch data from the table: \"office.departments\""
   office_departments(
     "distinct select on columns"

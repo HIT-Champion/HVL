@@ -389,43 +389,81 @@ create table office.document_events (       -- dòng thời gian hiển thị ch
 
 ### 2.4. Hồ sơ và lưu trữ
 
+Đã làm ở F3.8 (migration `1792281601300_case_files`; tóm tắt, bản đủ có thêm kiểm độ dài, mẫu `archive_key`):
+
 ```sql
 create table office.case_files (            -- hồ sơ công việc
   id               uuid primary key default gen_random_uuid(),
   tenant_id        uuid not null references core.tenants,
-  department_id    uuid not null references office.departments,
+  department_id    uuid not null,            -- (tenant_id, department_id) → office.departments
   year             int  not null,
   code             text not null,            -- ký hiệu hồ sơ theo danh mục hồ sơ của đơn vị
   title            text not null,
-  retention_years  int  check (retention_years is null or retention_years > 0),  -- null = vĩnh viễn
+  retention_years  int  check (retention_years is null or retention_years between 1 and 100),  -- null = vĩnh viễn
   status           text not null default 'open' check (status in ('open', 'closed', 'archived')),
-  closed_on        date,
+  closed_on        date,                     -- trigger đặt khi đóng (ngày giờ Việt Nam)
   archived_at      timestamptz,
   archive_key      text,                     -- cold/<tenant_id>/case/<id>/
-  archive_sha256   bytea,                    -- băm của manifest.json trong gói lưu trữ
+  archive_sha256   bytea,                    -- băm của manifest-<băm>.json trong gói lưu trữ
+  created_by       text not null,
+  created_at       timestamptz not null default now(),
   unique (tenant_id, year, code),
   check ((status = 'open') = (closed_on is null)),
-  check (status <> 'archived' or (archive_key is not null and archive_sha256 is not null))
+  check ((status = 'archived') = (archive_key is not null and archive_sha256 is not null and archived_at is not null))
 );
 
 create table office.case_file_documents (
-  case_file_id  uuid not null references office.case_files,
-  document_id   uuid not null references office.documents,
-  primary key (case_file_id, document_id)
+  tenant_id     uuid not null,
+  case_file_id  uuid not null,             -- (tenant_id, case_file_id) → office.case_files
+  document_id   uuid not null,             -- (tenant_id, document_id) → office.documents
+  added_by      text not null,
+  added_at      timestamptz not null default now(),
+  primary key (case_file_id, document_id),
+  unique (document_id)                     -- mỗi văn bản thuộc một hồ sơ
 );
 ```
 
-**Nộp lưu — nóng sang lạnh (F3.8).** Job định kỳ chọn hồ sơ `closed` quá `DXOS_ARCHIVE_AFTER_DAYS`:
+Trigger giữ quy tắc ở CSDL, mọi đường ghi đều theo:
 
-1. Ghi gói vào `cold/<tenant_id>/case/<id>/`: `metadata.parquet` (văn bản, giao việc, dòng thời gian),
-   `files/<sha256>.pdf`, `manifest.json` liệt kê từng tệp kèm SHA-256.
-2. Ghi `archive_key`, `archive_sha256`, `status = 'archived'` vào `case_files`; đổi `storage_tier = 'cold'`
-   của các tệp.
-3. Xóa khỏi OLTP các dòng `assignments`, `document_events`, `document_files` của hồ sơ đó. **Giữ** dòng
-   `documents` rút gọn (trạng thái `archived`) để vẫn tìm thấy và cổng xác thực vẫn trả lời được.
-4. Sự kiện `case_file.archived` kèm `archive_sha256` vào `core.audit_log`.
+- Văn bản vào hồ sơ phải đã xử lý xong (đến `done`, đi `issued`), không phải văn bản hạn chế (tệp của nó mã hóa
+  riêng, F3.7), và hồ sơ còn `open` (khóa dòng hồ sơ, không lọt văn bản vào hồ sơ vừa đóng). Gỡ văn bản ra chỉ khi
+  hồ sơ còn mở.
+- Đóng hồ sơ: phải có ít nhất một văn bản; `closed_on` do trigger đặt (ngày theo giờ Việt Nam), không ai chọn được —
+  lùi ngày là ép nộp lưu ngay, đẩy ngày là không bao giờ nộp lưu. Đóng rồi không mở lại; đã `archived` thì không sửa
+  được nữa, kể cả bằng khóa quản trị.
+- Cả hai bảng có trigger `core.audit`. Sổ hiện ký hiệu hồ sơ, ngày đóng, thời hạn bảo quản, băm gói; tên hồ sơ do
+  người dùng đặt nên ẩn như trích yếu.
 
-Xem lại hồ sơ đã lưu: `svc-files` đọc Parquet bằng DuckDB, hiển thị trong phòng đọc ảo.
+Quyền Hasura: `staff`, `manager` lập hồ sơ cho phòng mình (`tenant_id`, `department_id`, `created_by` đặt sẵn từ
+token), đưa vào văn bản mình đọc được và thuộc phòng mình (văn bản đi của phòng, văn bản đến giao cho phòng hoặc cho
+mình), đóng hồ sơ (`status` chỉ được `open` hoặc `closed`); `clerk`, `director` xem hồ sơ cả đơn vị. Không vai trò
+người dùng nào đặt được `archived`, `archive_key`, `archive_sha256`, `closed_on`.
+
+**Nộp lưu — nóng sang lạnh (F3.8).** Vòng nền của `svc-files` (`MOC_ARCHIVE_INTERVAL_S`, mặc định mỗi giờ) chọn
+hồ sơ `closed` từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định 365); một hồ sơ lỗi không chặn hồ sơ khác (bỏ qua nó
+24 giờ):
+
+1. Kiểm băm mọi tệp trong bucket nóng, rồi ghi gói vào bucket lạnh có khóa ghi, dưới `cold/<tenant_id>/case/<id>/`,
+   mọi tên theo băm nội dung: `documents-<băm>.parquet`, `assignments-<băm>.parquet`, `events-<băm>.parquet` (DuckDB,
+   nén zstd, lược đồ cột cố định), `files/<sha256>` (nguyên byte), `manifest-<băm>.json` liệt kê từng phần kèm
+   SHA-256 và số dòng. Khóa COMPLIANCE tới hết thời hạn bảo quản tính từ ngày đóng (vĩnh viễn: 100 năm; đã quá hạn
+   thì tới hết ngày mai); manifest không ghi giờ chạy nên lượt chạy lại ra đúng gói cũ. Đọc lại cả gói, so băm, rồi
+   mới sang bước 2.
+2. Hàm `office.archive_case_file(p jsonb)` (Hasura đưa ra thành mutation, chỉ khóa quản trị gọi được), một giao dịch
+   có khóa dòng: kiểm hồ sơ còn `closed` và CSDL còn đúng như gói (đúng văn bản, dòng thời gian, liên kết tệp) — lệch
+   thì raise, không đổi gì; rồi `case_files` ghi `archive_key`, `archive_sha256`, `archived_at`, `status =
+   'archived'`; văn bản `archived`; xóa `document_events`, `document_files` của các văn bản đó; tệp đổi `storage_tier
+   = 'cold'`; sự kiện `case_file.archived` kèm băm vào `core.audit_log`. **Giữ** dòng `documents` rút gọn (vẫn tìm
+   thấy, cổng xác thực vẫn trả lời — `office.issued_documents` gồm cả `archived`) và `assignments` (căn cứ quyền xem,
+   cột "đơn vị nhận" của sổ đăng ký). Hai lượt cùng lúc: lượt sau đợi khóa, thấy hồ sơ đã `archived`, rollback.
+3. Xóa bản nóng của tệp (tệp còn gắn văn bản ngoài hồ sơ thì giữ). Trigger `document_files_hot_only` chặn gắn tệp
+   đã sang lạnh vào văn bản nào nữa.
+
+Xem lại hồ sơ đã lưu: `GET /api/case-files/{id}/archive` (§4.3) — svc-files tải manifest theo `archive_sha256`, so
+băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Phòng đọc xem tệp có watermark làm cùng F3.7.
+
+Thống kê điều hành (§2.5) tính thời gian xử lý từ dòng thời gian: văn bản đã nộp lưu không còn trong số đó (mặc định
+nộp lưu sau một năm, ngoài cửa sổ 12 tháng của dashboard).
 
 ### 2.5. Khung nhìn cho báo cáo
 
@@ -491,7 +529,7 @@ Ghi trực tiếp (không qua Action):
 |---|---|---|
 | `staff` | Thêm dự thảo văn bản đi; sửa khi còn `draft` hoặc `returned` | `tenant_id`, `created_by`, `direction = 'out'`, `status = 'draft'` |
 | `staff` | Gắn tệp do chính mình tải lên vào dự thảo của mình (như dòng trên); gỡ khi dự thảo còn ở bước đó | `tenant_id`, `added_by` |
-| `staff`, `manager` | Tạo, đóng hồ sơ công việc của phòng mình; đưa văn bản vào hồ sơ *(Phase 3)* | `tenant_id`, `department_id` |
+| `staff`, `manager` | Tạo, đóng hồ sơ công việc của phòng mình; đưa vào văn bản đã xong mình đọc được và thuộc phòng mình, gỡ ra khi hồ sơ còn mở (F3.8) | `tenant_id`, `department_id`, `created_by` / `added_by` |
 | `tenant_admin` | Phòng ban | `tenant_id` |
 
 Sổ do `svc-workflow` tạo khi cấp số đầu tiên của năm. Danh mục loại văn bản dùng chung cho mọi thuê ước,
@@ -582,6 +620,7 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `GET /api/registers/{in\|out}/{year}/pdf` | `clerk`, `director` | Như trên, ra PDF A4 ngang để ký nhận, đóng sổ; ghi `register.printed` vào sổ kiểm toán |
 | `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status}}`; `summary` chỉ có khi `is_public` |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
+| `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
 
 `GET /api/files/{id}` (đã làm ở #19): svc-files hỏi Hasura `core_files_by_pk` **bằng token của người gọi** —

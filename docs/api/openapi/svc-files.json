@@ -586,10 +586,287 @@
           }
         }
       }
+    },
+    "/api/case-files/{case_file_id}/archive": {
+      "get": {
+        "summary": "Phòng đọc: đọc lại gói lưu trữ của hồ sơ đã nộp lưu từ bucket lạnh, kiểm băm",
+        "operationId": "case_file_archive_api_case_files__case_file_id__archive_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có hồ sơ, hoặc người gọi không được xem"
+          },
+          "409": {
+            "description": "Hồ sơ chưa nộp lưu"
+          },
+          "502": {
+            "description": "Gói trong bucket lạnh không khớp băm ghi trong CSDL"
+          },
+          "503": {
+            "description": "Chưa đọc được CSDL hoặc bucket lạnh"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ArchiveOut": {
+        "properties": {
+          "case_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case File Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "closed_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed On"
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Archived At"
+          },
+          "archive_key": {
+            "type": "string",
+            "title": "Archive Key",
+            "description": "Tiền tố của gói trong bucket lạnh (khóa ghi S3 Object Lock)"
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "title": "Manifest Sha256",
+            "description": "Băm manifest.json đọc từ bucket lạnh — đã so khớp với CSDL"
+          },
+          "retain_until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Retain Until",
+            "description": "Hạn giữ khóa ghi của gói"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDocumentOut"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "Văn bản người gọi đọc được (cùng quy tắc như trước khi nộp lưu), đọc từ bảng Parquet trong gói (DuckDB)"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivedFileOut"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Tệp của các văn bản trên"
+          },
+          "hidden": {
+            "type": "integer",
+            "title": "Hidden",
+            "description": "Số văn bản trong gói người gọi không được đọc — chỉ biết có, không biết là gì"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_file_id",
+          "code",
+          "title",
+          "closed_on",
+          "archived_at",
+          "archive_key",
+          "manifest_sha256",
+          "retain_until",
+          "documents",
+          "files",
+          "hidden"
+        ],
+        "title": "ArchiveOut"
+      },
+      "ArchivedDocumentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction"
+          },
+          "type_code": {
+            "type": "string",
+            "title": "Type Code"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "register_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Register Number"
+          },
+          "verify_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify Code"
+          },
+          "content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "type_code",
+          "symbol",
+          "issuer_name",
+          "issued_on",
+          "summary",
+          "register_number",
+          "verify_code",
+          "content_sha256"
+        ],
+        "title": "ArchivedDocumentOut"
+      },
+      "ArchivedFileOut": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "mime_type",
+          "sha256",
+          "bytes"
+        ],
+        "title": "ArchivedFileOut"
+      },
       "FileOut": {
         "properties": {
           "id": {

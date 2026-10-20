@@ -843,6 +843,234 @@ input office_assignments_stream_cursor_value_input {
   user_id: String
 }
 
+"columns and relationships of \"office.case_file_documents\""
+type office_case_file_documents {
+  added_at: timestamptz!
+  added_by: String!
+  "An object relationship"
+  case_file: office_case_files
+  case_file_id: uuid!
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  tenant_id: uuid!
+}
+
+"order by aggregate values of table \"office.case_file_documents\""
+input office_case_file_documents_aggregate_order_by {
+  count: order_by
+  max: office_case_file_documents_max_order_by
+  min: office_case_file_documents_min_order_by
+}
+
+"Boolean expression to filter rows from the table \"office.case_file_documents\". All fields are combined with a logical 'AND'."
+input office_case_file_documents_bool_exp {
+  _and: [office_case_file_documents_bool_exp!]
+  _not: office_case_file_documents_bool_exp
+  _or: [office_case_file_documents_bool_exp!]
+  added_at: timestamptz_comparison_exp
+  added_by: String_comparison_exp
+  case_file: office_case_files_bool_exp
+  case_file_id: uuid_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"order by max() on columns of table \"office.case_file_documents\""
+input office_case_file_documents_max_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file_id: order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"order by min() on columns of table \"office.case_file_documents\""
+input office_case_file_documents_min_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file_id: order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"Ordering options when selecting data from \"office.case_file_documents\"."
+input office_case_file_documents_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file: office_case_files_order_by
+  case_file_id: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.case_file_documents\""
+enum office_case_file_documents_select_column {
+  "column name"
+  added_at
+  "column name"
+  added_by
+  "column name"
+  case_file_id
+  "column name"
+  document_id
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_case_file_documents\""
+input office_case_file_documents_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_case_file_documents_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_case_file_documents_stream_cursor_value_input {
+  added_at: timestamptz
+  added_by: String
+  case_file_id: uuid
+  document_id: uuid
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.case_files\""
+type office_case_files {
+  archive_key: String
+  archive_sha256: bytea
+  archived_at: timestamptz
+  "An array relationship"
+  case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  closed_on: date
+  code: String!
+  created_at: timestamptz!
+  created_by: String!
+  "An object relationship"
+  department: office_departments
+  department_id: uuid!
+  id: uuid!
+  retention_years: Int
+  status: String!
+  tenant_id: uuid!
+  title: String!
+  year: Int!
+}
+
+"Boolean expression to filter rows from the table \"office.case_files\". All fields are combined with a logical 'AND'."
+input office_case_files_bool_exp {
+  _and: [office_case_files_bool_exp!]
+  _not: office_case_files_bool_exp
+  _or: [office_case_files_bool_exp!]
+  archive_key: String_comparison_exp
+  archive_sha256: bytea_comparison_exp
+  archived_at: timestamptz_comparison_exp
+  case_file_documents: office_case_file_documents_bool_exp
+  closed_on: date_comparison_exp
+  code: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  created_by: String_comparison_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  id: uuid_comparison_exp
+  retention_years: Int_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  title: String_comparison_exp
+  year: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.case_files\"."
+input office_case_files_order_by {
+  archive_key: order_by
+  archive_sha256: order_by
+  archived_at: order_by
+  case_file_documents_aggregate: office_case_file_documents_aggregate_order_by
+  closed_on: order_by
+  code: order_by
+  created_at: order_by
+  created_by: order_by
+  department: office_departments_order_by
+  department_id: order_by
+  id: order_by
+  retention_years: order_by
+  status: order_by
+  tenant_id: order_by
+  title: order_by
+  year: order_by
+}
+
+"select columns of table \"office.case_files\""
+enum office_case_files_select_column {
+  "column name"
+  archive_key
+  "column name"
+  archive_sha256
+  "column name"
+  archived_at
+  "column name"
+  closed_on
+  "column name"
+  code
+  "column name"
+  created_at
+  "column name"
+  created_by
+  "column name"
+  department_id
+  "column name"
+  id
+  "column name"
+  retention_years
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  title
+  "column name"
+  year
+}
+
+"Streaming cursor of the table \"office_case_files\""
+input office_case_files_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_case_files_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_case_files_stream_cursor_value_input {
+  archive_key: String
+  archive_sha256: bytea
+  archived_at: timestamptz
+  closed_on: date
+  code: String
+  created_at: timestamptz
+  created_by: String
+  department_id: uuid
+  id: uuid
+  retention_years: Int
+  status: String
+  tenant_id: uuid
+  title: String
+  year: Int
+}
+
 "columns and relationships of \"office.departments\""
 type office_departments {
   code: String!
@@ -1806,6 +2034,36 @@ type query_root {
   ): [office_assignments!]!
   "fetch data from the table: \"office.assignments\" using primary key columns"
   office_assignments_by_pk(id: uuid!): office_assignments
+  "fetch data from the table: \"office.case_file_documents\""
+  office_case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_file_documents\" using primary key columns"
+  office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
+  "fetch data from the table: \"office.case_files\""
+  office_case_files(
+    "distinct select on columns"
+    distinct_on: [office_case_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_files_order_by!]
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.case_files\" using primary key columns"
+  office_case_files_by_pk(id: uuid!): office_case_files
   "fetch data from the table: \"office.departments\""
   office_departments(
     "distinct select on columns"
@@ -2045,6 +2303,54 @@ type subscription_root {
     "filter the rows returned"
     where: office_assignments_bool_exp
   ): [office_assignments!]!
+  "fetch data from the table: \"office.case_file_documents\""
+  office_case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_file_documents\" using primary key columns"
+  office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
+  "fetch data from the table in a streaming manner: \"office.case_file_documents\""
+  office_case_file_documents_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_case_file_documents_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_files\""
+  office_case_files(
+    "distinct select on columns"
+    distinct_on: [office_case_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_files_order_by!]
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.case_files\" using primary key columns"
+  office_case_files_by_pk(id: uuid!): office_case_files
+  "fetch data from the table in a streaming manner: \"office.case_files\""
+  office_case_files_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_case_files_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
   "fetch data from the table: \"office.departments\""
   office_departments(
     "distinct select on columns"

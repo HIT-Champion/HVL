@@ -776,3 +776,33 @@ Phase 2:
 - Nói rõ khi trình bày: `.env` (bí mật, cấu hình riêng máy chủ) không nằm trong git nên không do reconciler quản;
   image cũ không tự xóa; bảo trì tay thì phải dừng timer trước, không thì reconciler dựng lại trong vòng một phút.
 - Phase 3 còn lại: F3.5, F3.7–F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.8 (Phase 3):
+
+- **F3.8 xong.** Lập hồ sơ và nộp lưu — dữ liệu nóng sang lạnh (màn (i)):
+  - CSDL: `office.case_files`, `office.case_file_documents` (migration `1792281601300_case_files`); chuyên viên, tổ
+    trưởng lập hồ sơ của phòng mình, đưa vào văn bản đã xử lý xong mình đọc được và thuộc phòng mình, đóng hồ sơ (ngày
+    đóng do CSDL đặt); không vai trò nào đặt được `archived`;
+  - svc-files (`svc_files.archive`): vòng nền mỗi giờ nộp lưu hồ sơ đóng từ `MOC_ARCHIVE_AFTER_DAYS` ngày — gói
+    Parquet (DuckDB 1.5.6) + tệp gốc + manifest có băm, mọi tên theo băm, khóa ghi COMPLIANCE theo thời hạn bảo quản;
+    đọc lại cả gói, so băm, rồi hàm SQL `office.archive_case_file` (một giao dịch, khóa dòng, lệch với gói thì không
+    đổi gì) gỡ dòng thời gian, liên kết tệp, ghi `case_file.archived`;
+  - văn bản đã nộp lưu vẫn tìm thấy theo số, ký hiệu, trích yếu và cổng xác thực vẫn trả "khớp"; phòng đọc
+    `GET /api/case-files/{id}/archive` đọc lại gói, kiểm băm với CSDL, chỉ trả văn bản người gọi đọc được;
+  - `make demo-nong-lanh` (màn (i), bước CI), `make smoke` +1 (tổng 47), 7 test CSDL, 12 test đơn vị.
+- Chỗ khác kế hoạch:
+  - Không dùng Kestra: job nộp lưu là vòng nền trong `svc-files` (như vòng neo sổ kiểm toán), chạy tay được bằng
+    `python -m svc_files.archive now`. Một job mỗi giờ không đáng thêm một máy chủ Java khoảng 1 GB RAM; DuckDB nhúng
+    trong svc-files, không chạy máy chủ riêng.
+  - Gói gồm ba bảng Parquet riêng (văn bản, giao việc, dòng thời gian) thay vì một `metadata.parquet`; mọi tên theo
+    băm nội dung (manifest cũng vậy), tệp giữ nguyên định dạng gốc.
+  - Giao việc ở lại CSDL (gói cũng có một bản): xóa đi thì người được giao mất quyền xem văn bản và sổ đăng ký ghi sai
+    cột "đơn vị nhận". Chỉ dòng thời gian và liên kết tệp rời CSDL; phần nặng là tệp, rời bucket nóng.
+  - Văn bản hạn chế không vào hồ sơ: tệp của nó sẽ mã hóa riêng (F3.7), nộp lưu bản mã hóa cần thêm bước giữ khóa.
+  - Gói và mốc neo sổ kiểm toán chung một bucket lạnh có khóa ghi (`MOC_COLD_BUCKET`), khác tiền tố.
+  - Chưa có giao diện lập hồ sơ (làm qua GraphQL, demo, smoke), chưa có e2e mới; phòng đọc chỉ trả danh sách văn bản
+    và tệp trong gói, chưa xem được tệp có watermark (cùng đợt F3.7).
+- Nói rõ khi trình bày: sau khi nộp lưu, lớp chữ PDF của văn bản không còn trong chỉ mục tìm kiếm (vẫn tìm theo số,
+  ký hiệu, trích yếu); thống kê thời gian xử lý không tính văn bản đã nộp lưu (dòng thời gian đã rời CSDL); gói đã
+  ghi thì trong thời hạn bảo quản không ai xóa được, kể cả quản trị kho.
+- Phase 3 còn lại: F3.5, F3.7, F3.9, F3.10, F3.12–F3.15.

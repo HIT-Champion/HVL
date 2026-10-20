@@ -603,6 +603,34 @@ def main() -> None:
         or fail(f"sổ lãnh đạo xem chưa đúng (cần thấy lần phát hành, không thấy hash, trích yếu): {rows}")
     ok("lãnh đạo khoa xem sổ của đơn vị: thấy lần phát hành, không thấy hash hay trích yếu")
 
+    # F3.8: công văn vừa phát hành vào hồ sơ, đóng, nộp lưu ngay — vẫn xác thực được, phòng đọc đọc lại từ bucket lạnh
+    print("Nộp lưu (nóng → lạnh)")
+    case_file = staff.gql("""mutation ($o: office_case_files_insert_input!) {
+        insert_office_case_files_one(object: $o) { id } }""", {"o": {
+        "year": datetime.now().year, "code": f"HS-SMOKE-{tag}", "title": f"Hồ sơ kiểm tra nhanh {tag}",
+        "retention_years": 5}})["insert_office_case_files_one"]["id"]
+    staff.gql("""mutation ($o: office_case_file_documents_insert_input!) {
+        insert_office_case_file_documents_one(object: $o) { document_id } }""",
+              {"o": {"case_file_id": case_file, "document_id": out_id}})
+    staff.gql("""mutation ($id: uuid!) { update_office_case_files(where: {id: {_eq: $id}},
+        _set: {status: "closed"}) { affected_rows } }""", {"id": case_file})
+    archived = json.loads(compose("exec", "-T", "svc-files", "python", "-m", "svc_files.archive", "now",
+                                  "--case-file", case_file).decode().strip().splitlines()[-1])
+    "archived" in archived or fail(f"nộp lưu lỗi: {archived}")
+    doc = clerk.gql("""query ($id: uuid!) { office_documents_by_pk(id: $id) { status files { file_id }
+        assignments { id } events { id } } }""", {"id": out_id})["office_documents_by_pk"]
+    doc["status"] == "archived" and not doc["files"] and not doc["events"] \
+        or fail(f"văn bản đã nộp lưu vẫn còn dòng thời gian, liên kết tệp trong CSDL: {doc}")
+    found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{issued['verify_code']}")
+    found["result"] == "valid" and found["document"]["status"] == "archived" \
+        or fail(f"cổng xác thực không còn khớp văn bản đã nộp lưu: {found}")
+    room, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/{case_file}/archive", headers=clerk.auth)
+    room["manifest_sha256"] == archived["archived"][0]["archive_sha256"] \
+        and [d["id"] for d in room["documents"]] == [out_id] and room["files"] and room["hidden"] == 0 \
+        or fail(f"phòng đọc không đọc lại được gói lưu trữ: {room}")
+    ok(f"hồ sơ nộp lưu thành gói Parquet + {len(room['files'])} tệp + manifest trên bucket lạnh khóa ghi; CSDL chỉ"
+       " còn bản ghi rút gọn; quét QR vẫn khớp; phòng đọc kiểm băm, DuckDB đọc lại danh sách văn bản")
+
     # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
     print("Giới hạn tốc độ")
     _, headers = call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={

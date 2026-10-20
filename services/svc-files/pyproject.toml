@@ -32,6 +32,7 @@ dependencies = [
   "cryptography>=50,<51",
   "httpx2>=2.13,<3",
   "weasyprint>=70,<71",
+  "duckdb==1.5.6",
   "segno>=1.6,<2",
   "pypdf>=6.19,<7",
 ]

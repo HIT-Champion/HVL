@@ -45,7 +45,8 @@ insert_permissions:
               direction: {_eq: out}
               status: {_in: [draft, returned]}
               created_by: {_eq: X-Hasura-User-Id}
-          - file: {created_by: {_eq: X-Hasura-User-Id}}
+          # tệp đã nộp lưu (F3.8) chỉ còn trong bucket lạnh: không gắn lại vào dự thảo
+          - file: {created_by: {_eq: X-Hasura-User-Id}, storage_tier: {_eq: hot}}
           - role: {_in: [draft, attachment]}
   - role: service
     permission:

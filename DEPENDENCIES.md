@@ -116,7 +116,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
-| DuckDB | 1.5 | MIT | Đọc hồ sơ lưu trữ lạnh (Parquet) | pip | 3 |
+| DuckDB | 1.5.6 | MIT | Nộp lưu hồ sơ (F3.8, `svc-files`): ghi bảng văn bản, giao việc, dòng thời gian thành Parquet (nén zstd) và đọc lại cho phòng đọc. Một wheel nhúng, không kéo thêm gói Python, không chạy máy chủ riêng | pip | 3 |
 | openlineage-python | 1.53 | Apache-2.0 | Phát sự kiện truy vết dữ liệu | pip | 3 |
 
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
@@ -129,7 +129,7 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
 | OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa. Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
-| Kestra | v2.0.5 | Apache-2.0 | Chạy job ngầm: chuyển dữ liệu nóng → lạnh, kiểm tra sổ kiểm toán | `kestra/kestra:v2.0.5` | 3 |
+| Kestra | v2.0.5 | Apache-2.0 | Dự kiến chạy job ngầm. **Chưa đưa vào**: nộp lưu nóng → lạnh (F3.8) chạy thành vòng nền trong `svc-files` — một job mỗi giờ không đáng thêm một máy chủ Java ~1 GB RAM | `kestra/kestra:v2.0.5` | 3 |
 | Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage) | `marquezproject/marquez:0.51.1` | 3 |
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (IT/OT) | `scorpiobroker/all-in-one-runner:java-6.0.2` | 3 |
 | Prometheus | v3.15.0 | Apache-2.0 | Thu thập chỉ số giám sát | `prom/prometheus:v3.15.0` | 3 |
