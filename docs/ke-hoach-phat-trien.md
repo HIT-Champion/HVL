@@ -726,3 +726,28 @@ Phase 2:
   - Không sao lưu `.env` (chứa chính khóa kho): tài liệu dặn chép ra ngoài máy chủ. Chỉ mục Meilisearch và chữ ký
     ClamAV không sao lưu, vì dựng lại được.
 - Phase 3 còn lại: F3.2, F3.3, F3.5, F3.7–F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.2 (Phase 3):
+
+- **F3.2 xong.** Két bí mật OpenBao 2.7.1 (`openbao/`, dịch vụ `openbao`):
+  - `svc-files`, `svc-workflow` không còn nhận bí mật qua biến môi trường; lúc khởi động mỗi dịch vụ đăng nhập
+    AppRole riêng, chỉ đọc được phần bí mật của mình (kv-v2 `moc/`); két cấp secret_id mới mỗi lần khởi động;
+  - static seal: khởi động lại là tự mở khóa (cần cho màn tự phục hồi F3.3); két ghi sổ mọi lần truy cập ra stdout;
+  - khóa transit `moc-files` (AES-256-GCM) cho F3.7; policy của `svc-files` chỉ xin khóa dữ liệu mới và mở khóa đã
+    bọc, không lấy được khóa gốc;
+  - `make demo-ket-bi-mat` (màn (iv), bước CI), `make smoke` +2.
+- Chỗ khác kế hoạch:
+  - Két nằm trong profile `core` chứ không phải `ops`: `svc-files`, `svc-workflow` không khởi động được khi thiếu két.
+  - AppRole cấp bí mật dịch vụ (khóa S3, khóa quản trị Hasura, khóa Meilisearch, khóa Actions, mật khẩu Flowable,
+    khóa Centrifugo, client secret) chứ không phải mật khẩu CSDL: hai dịch vụ của đội không nối thẳng PostgreSQL.
+  - OpenBao 2.7 bỏ storage `file` (dùng raft một nút), chỉ cho khai thiết bị audit trong tệp cấu hình, và chặn
+    `generate-root` khi chưa đăng nhập. Vì vậy két được cấu hình bằng token root một lần lúc khởi tạo rồi thu hồi;
+    các lần khởi động sau dùng token khởi động: không đọc thẳng được bí mật, không sửa được policy, nhưng cấp được
+    secret_id cho hai vai trò có sẵn (nên volume của két phải được giữ như chính két).
+  - Két nằm riêng mạng `secrets` (internal) với hai dịch vụ dùng nó: container khác không gọi được két, kể cả lúc két
+    chưa khởi tạo.
+  - Khóa static seal 32 byte suy từ `MOC_OPENBAO_SEAL_KEY` bằng SHA-256, để `make env` sinh như mọi khóa khác.
+- Nói rõ khi trình bày: `.env` vẫn là nguồn bí mật và chứa khóa mở két; khóa phục hồi, token khởi động, secret_id
+  nằm trên đĩa; phần mềm thượng nguồn (Hasura, SeaweedFS, Meilisearch, Centrifugo) vẫn đọc bí mật từ biến môi
+  trường; két chưa có TLS và chưa nằm trong `make backup` (F3.7 phải thêm, vì mất khóa transit là mất tệp mã hóa).
+- Phase 3 còn lại: F3.3, F3.5, F3.7–F3.10, F3.12–F3.15.

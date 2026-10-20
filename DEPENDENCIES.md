@@ -128,7 +128,7 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| OpenBao | 2.7.1 | MPL-2.0 | Két quản lý bí mật và khóa (thay HashiCorp Vault) | `openbao/openbao:2.7.1` | 3 |
+| OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa. Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
 | Kestra | v2.0.5 | Apache-2.0 | Chạy job ngầm: chuyển dữ liệu nóng → lạnh, kiểm tra sổ kiểm toán | `kestra/kestra:v2.0.5` | 3 |
 | Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage) | `marquezproject/marquez:0.51.1` | 3 |
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (IT/OT) | `scorpiobroker/all-in-one-runner:java-6.0.2` | 3 |

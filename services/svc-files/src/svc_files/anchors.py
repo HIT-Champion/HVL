@@ -44,6 +44,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import sys
 from collections.abc import Callable
@@ -229,13 +230,14 @@ class Anchorer:
 def main(argv: list[str] | None = None) -> int:
     from .config import Settings
     from .hasura import HasuraClient, HasuraError
+    from .openbao import with_secrets
     from .storage import s3_client
 
     args = sys.argv[1:] if argv is None else argv
     if args not in (["now"], ["list"]):
         print("Dùng: python -m svc_files.anchors now|list", file=sys.stderr)
         return 2
-    settings = Settings.from_env()
+    settings = Settings.from_env(with_secrets(os.environ))
     store = AnchorStore(
         s3_client(settings.s3_endpoint, settings.s3_access_key, settings.s3_secret_key, settings.s3_region),
         settings.cold_bucket,

@@ -119,21 +119,22 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `processes/` |
 | `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; thông báo sau mỗi bước, nhắc hạn theo timer BPMN; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
 | Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người; tự kiểm token Keycloak | `realtime/` |
+| OpenBao 2 | Két bí mật: `svc-files`, `svc-workflow` lấy bí mật qua AppRole lúc khởi động; static seal tự mở khóa; khóa transit cho tệp mã hóa | `openbao/` |
 | `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, in sổ đăng ký; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 
 Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý
-(Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**) và sao lưu, khôi
-phục một lệnh (`make backup`, `make restore`).
+(Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**), sao lưu, khôi
+phục một lệnh (`make backup`, `make restore`) và két bí mật OpenBao.
 Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống
 
 | Thành phần | Phiên bản tối thiểu | Ghi chú |
 |---|---|---|
-| Docker Engine | 24.0 | kèm plugin `docker compose` v2 |
+| Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -224,20 +225,47 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
 - Chỉ mục tìm kiếm và chữ ký ClamAV không sao lưu: `svc-files` dựng lại chỉ mục từ CSDL khi khởi động, ClamAV tự
   tải chữ ký.
 
+### Két bí mật
+
+`svc-files` và `svc-workflow` không nhận khóa kho S3, khóa quản trị Hasura, mật khẩu Flowable… qua biến môi trường.
+Lúc khởi động, mỗi dịch vụ đăng nhập két [OpenBao](https://openbao.org) bằng AppRole của riêng mình và chỉ đọc được
+phần bí mật của mình; két ghi sổ mọi lần đăng nhập và đọc (`docker compose logs openbao`, giá trị đã băm HMAC). Két
+dùng *static seal*: khởi động lại là tự mở khóa, không cần người nhập khóa. Két cũng giữ khóa `moc-files` (transit)
+để mã hóa tệp văn bản hạn chế về sau. Thử: `make demo-ket-bi-mat` (`docs/demo-script.md`).
+
+Nói rõ giới hạn:
+
+- `.env` vẫn là nguồn của các bí mật: container `openbao` nhận chúng qua biến môi trường và nạp lại vào két mỗi lần
+  khởi động. Hasura, SeaweedFS, Meilisearch, Centrifugo (phần mềm thượng nguồn) vẫn đọc bí mật của chúng từ biến môi
+  trường.
+- Khóa mở két `MOC_OPENBAO_SEAL_KEY` nằm trong `.env`; khóa phục hồi, token khởi động và role_id/secret_id của dịch vụ
+  nằm trong volume trên đĩa. Ai có quyền Docker trên máy chủ vẫn đọc được két. Két chỉ nằm trong mạng nội bộ
+  `secrets` cùng hai dịch vụ (container khác không tới được), chưa có TLS.
+- Két (volume `openbao_data`) chưa nằm trong `make backup`. Mất volume thì két khởi tạo lại và nạp bí mật từ `.env`,
+  nhưng khóa transit mới sẽ khác.
+- **Đổi `MOC_OPENBAO_SEAL_KEY` sau khi két đã khởi tạo thì két không mở được nữa.** Bản cài có từ trước khi có két:
+  thêm vào `.env` của bản cài một dòng `MOC_OPENBAO_SEAL_KEY=` với chuỗi ngẫu nhiên dài (vd. `openssl rand -hex 32`).
+- Đổi cấu hình két (thêm khóa, policy) cần token quản trị. Lần đầu khởi tạo, `openbao/start.sh` cấu hình bằng token
+  root rồi thu hồi nó. Token khởi động không đọc thẳng được bí mật và không sửa được policy, nhưng cấp được secret_id
+  nên làm được mọi việc hai dịch vụ làm được: giữ volume `openbao_data` như chính két.
+- Đổi bí mật trong `.env` rồi `make up`: két được dựng lại và nạp bí mật mới, `svc-files`, `svc-workflow` khởi động
+  lại theo (`depends_on … restart: true`, cần Docker Compose 2.17 trở lên).
+
 ## Kiểm thử
 
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow`; kiểm form theo `schemas/` trên cùng bộ ca thử với svc-workflow và CSDL ([`schemas/README.md`](schemas/README.md)) | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
-| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Các luồng trên trình duyệt thật (Playwright, chạy trong container): form sai bị chặn trước khi gửi, kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang; lãnh đạo xem sổ kiểm toán; văn thư tải tệp EICAR bị chặn ngay, lãnh đạo thấy lần chặn trong sổ; lãnh đạo xem dashboard điều hành, văn thư không có mục này | Như trên |
 | `make demo-kiem-dich` | Màn demo (iv) kiểm dịch, dưới một phút: tệp sạch qua, tệp EICAR bị ClamAV chặn ở cửa ngõ, không lưu gì; lần chặn nằm trong sổ kiểm toán, neo ra ngoài CSDL rồi kiểm lại cả chuỗi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
+| `make demo-ket-bi-mat` | Màn demo (iv) két bí mật, dưới một phút: dịch vụ không có bí mật trong biến môi trường; khởi động lại két thì két tự mở khóa; khởi động lại svc-files thì nó lấy lại khóa kho từ két và nhận tệp; AppRole không đọc chéo; sổ của két không chứa giá trị bí mật (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
 | Diễn tập khôi phục | `make backup` hai lượt, xóa volume CSDL và tệp, `python3 scripts/moc.py backup restore --yes`, rồi `make smoke` và `make audit` phải qua (bước trong CI) | Hệ thống đang chạy + `make seed` |
 | `db/tests/` | 156 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
-thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`; diễn tập
+thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → `make demo-ket-bi-mat`; diễn tập
 sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install` sang thư mục khác và chạy lại smoke từ bản cài; kiểm tài liệu API trong `docs/api/` khớp hệ
 thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa
 phụ thuộc (OSV-Scanner).

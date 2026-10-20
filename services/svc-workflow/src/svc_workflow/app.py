@@ -28,6 +28,7 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -43,6 +44,7 @@ from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
 from .hasura import Actor, HasuraClient
 from .notify import Notifier
+from .openbao import with_secrets
 from .schemas import FormSchema, SchemaFileError
 from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
@@ -155,7 +157,7 @@ def create_app(
     notifier: Notifier | None = None,
 ) -> FastAPI:
     _setup_logging()
-    settings = settings or Settings.from_env()
+    settings = settings or Settings.from_env(with_secrets(os.environ))
     hasura = hasura or HasuraClient(settings.hasura_url, settings.hasura_admin_secret,
                                     timeout_s=settings.hasura_timeout_s)
     flowable = flowable or FlowableClient(settings.flowable_url, settings.flowable_user, settings.flowable_password)

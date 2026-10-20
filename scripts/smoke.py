@@ -68,6 +68,18 @@ def fail(message: str) -> None:
     sys.exit(1)
 
 
+def vault_status() -> dict:
+    """`bao status` trong container két; két đang khóa thì lệnh thoát 2 nhưng vẫn in trạng thái."""
+    try:
+        raw = compose("exec", "-T", "openbao", "bao", "status", "-format=json")
+    except subprocess.CalledProcessError as exc:
+        raw = exc.stdout or b"{}"
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return {"error": raw.decode(errors="replace")[:200]}
+
+
 def header(headers: dict[str, str], name: str) -> str | None:
     return next((v for k, v in headers.items() if k.lower() == name.lower()), None)
 
@@ -229,6 +241,35 @@ def main() -> None:
         except HTTPError as exc:
             exc.status == 404 or fail(f"{path} trả {exc.status}")
     ok("đường quản trị của Hasura, Keycloak, Flowable bị chặn ở cổng")
+
+    # F3.2: két tự mở khóa (static seal); svc-files, svc-workflow không nhận bí mật qua biến môi trường mà lấy từ két
+    # bằng AppRole của riêng mình
+    print("Két bí mật")
+    seal = vault_status()
+    seal.get("initialized") and seal.get("sealed") is False and seal.get("type") == "static" \
+        or fail(f"két chưa khởi tạo, đang khóa hoặc không dùng static seal: {seal}")
+    secrets = {"svc-files": ("SEAWEEDFS_S3_ACCESS_KEY", "SEAWEEDFS_S3_SECRET_KEY", "HASURA_ADMIN_SECRET",
+                             "MEILI_MASTER_KEY"),
+               "svc-workflow": ("HASURA_ADMIN_SECRET", "MOC_ACTION_SECRET", "FLOWABLE_ADMIN_PASSWORD",
+                                "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET")}
+    for service, names in secrets.items():
+        # so băm giá trị chứ không so tên: bí mật không được nằm trong env dưới bất kỳ tên nào
+        hashed = json.loads(compose("exec", "-T", service, "python", "-c",
+                                    "import hashlib, json, os\n"
+                                    "print(json.dumps({k: hashlib.sha256(v.encode()).hexdigest()"
+                                    " for k, v in os.environ.items()}))"))
+        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names}
+        leaked = sorted(f"{wanted[h]} (biến {k})" for k, h in hashed.items() if h in wanted)
+        not leaked or fail(f"{service} còn nhận bí mật qua biến môi trường: {', '.join(leaked)}")
+    ok("két đã mở khóa (static seal); svc-files, svc-workflow không có bí mật nào trong biến môi trường")
+    cross = compose("exec", "-T", "svc-workflow", "python", "-c",
+                    "import os\nfrom svc_workflow.config import ConfigError\n"
+                    "from svc_workflow.openbao import with_secrets\n"
+                    "try:\n    with_secrets({**os.environ, 'MOC_OPENBAO_SECRET_PATH': 'moc/data/svc-files'},\n"
+                    "                 attempts=1)\n"
+                    "    print('read')\nexcept ConfigError as exc:\n    print('refused', exc)\n").decode().strip()
+    cross.startswith("refused") and "403" in cross or fail(f"svc-workflow đọc được bí mật của svc-files: {cross}")
+    ok("mỗi dịch vụ chỉ đọc được bí mật của mình: AppRole svc-workflow đọc phần svc-files bị két từ chối (403)")
 
     clerk, director = Session("vanthu"), Session("truongkhoa")
     manager, staff = Session("totruongdt"), Session("chuyenviendt")
@@ -523,9 +564,11 @@ def main() -> None:
     ok(f"moc audit verify: tính lại {report['rows']} dòng sổ ngoài CSDL, khớp {bucket['matched']} mốc neo trong"
        f" bucket lạnh và hash của {report['documents']} văn bản")
     try_delete = (
+        "import os\n"
         "from svc_files.config import Settings\n"
+        "from svc_files.openbao import with_secrets\n"
         "from svc_files.storage import s3_client\n"
-        "s = Settings.from_env()\n"
+        "s = Settings.from_env(with_secrets(os.environ))\n"
         "c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)\n"
         "v = c.list_object_versions(Bucket=s.cold_bucket, Prefix='anchors/')['Versions'][0]\n"
         "try:\n"

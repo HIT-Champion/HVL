@@ -146,6 +146,16 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   trong `.env`: `MOC_BACKUP_PASSWORD` (mất là mất bản sao lưu), `MOC_BACKUP_DIR`. CI diễn tập mỗi pull request: sao
   lưu, xóa volume CSDL và tệp, khôi phục, rồi smoke và `make audit`. Test CSDL thêm 2: dump rồi restore giữ nguyên
   chuỗi băm, dòng `system.restored` nối chuỗi (#39).
+- Két bí mật OpenBao 2.7.1 (F3.2): dịch vụ `openbao` trong profile core. `svc-files`, `svc-workflow` không còn nhận
+  khóa S3, khóa quản trị Hasura, khóa Meilisearch, khóa Actions, mật khẩu Flowable, khóa Centrifugo, client secret qua
+  biến môi trường: lúc khởi động mỗi dịch vụ đăng nhập két bằng AppRole riêng (`role_id`/`secret_id` trong volume chỉ
+  nó gắn, két cấp secret_id mới mỗi lần khởi động) và chỉ đọc được phần của mình. Static seal: khởi động lại là tự
+  mở khóa. Khóa transit `moc-files` để dành cho mã hóa tệp văn bản hạn chế. Két ghi sổ mọi lần truy cập ra
+  `docker compose logs openbao`. Két nằm riêng mạng nội bộ `secrets` với hai dịch vụ. Lần đầu két cấu hình bằng
+  token root rồi thu hồi; về sau chỉ dùng token khởi động không sửa được policy. Biến mới trong `.env`: `MOC_OPENBAO_SEAL_KEY` (đổi sau khi khởi tạo thì két không mở được). `make
+  demo-ket-bi-mat` (màn (iv), cũng là bước CI); `make smoke` thêm 2 kiểm tra (tổng 45): két đã mở khóa, dịch vụ
+  không có bí mật nào trong biến môi trường, AppRole không đọc chéo. Giới hạn: `.env` vẫn là nguồn bí mật, phần mềm
+  thượng nguồn vẫn đọc từ biến môi trường, két chưa có TLS và chưa nằm trong `make backup` (#40).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

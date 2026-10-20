@@ -245,25 +245,63 @@ services:
     volumes:
       - meili_data:/meili_data
 
+  # F3.2 — két bí mật (openbao/start.sh): svc-files, svc-workflow lấy bí mật qua AppRole lúc khởi động thay vì nhận
+  # qua biến môi trường; khóa transit moc-files cho F3.7. Static seal: khởi động lại là tự mở khóa. Không mở cổng ra
+  # ngoài. Chạy bằng root chỉ để ghi tệp đăng nhập cho từng dịch vụ; máy chủ chạy bằng người dùng openbao.
+  openbao:
+    <<: *common
+    image: openbao/openbao:2.7.1
+    profiles: [core]
+    # chỉ mạng secrets: container khác (APISIX, Hasura…) không tới được két, kể cả lúc két chưa khởi tạo
+    networks: [secrets]
+    user: "0"
+    entrypoint: ["sh", "/moc/start.sh"]
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
+      MOC_OPENBAO_SEAL_KEY: ${MOC_OPENBAO_SEAL_KEY:?}
+      # nạp vào két mỗi lần khởi động; chỉ container này nhận các biến này
+      SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?}
+      SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?}
+      HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?}
+      MOC_ACTION_SECRET: ${MOC_ACTION_SECRET:?}
+      FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:?}
+      MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
+    volumes:
+      - ./openbao:/moc:ro
+      - openbao_data:/openbao/file
+      - openbao_svc_files:/run/moc/svc-files
+      - openbao_svc_workflow:/run/moc/svc-workflow
+    # sẵn sàng = đã mở khóa VÀ đã nạp bí mật, cấp AppRole xong
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/moc-ready && bao status >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+
   svc-files:
     <<: *common
     build: ./services/svc-files
     image: moc/svc-files:${MOC_VERSION:-dev}
     profiles: [core]
-    networks: [moc, storage]
+    networks: [moc, storage, secrets]
     environment:
       <<: *oidc
-      SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?}
-      SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?}
+      # F3.2 — khóa S3, khóa quản trị Hasura, khóa Meilisearch lấy từ két lúc khởi động (AppRole), không ở đây
+      MOC_OPENBAO_ADDR: http://openbao:8200
+      MOC_OPENBAO_SECRET_PATH: moc/data/svc-files
       MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
-      HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
-      MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY:?}
       # in vào mã QR của văn bản đi phát hành: <MOC_PUBLIC_URL>/xac-thuc/<mã>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
       # F2.12 — neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi
       MOC_AUDIT_ANCHOR_INTERVAL_S: ${MOC_AUDIT_ANCHOR_INTERVAL_S:-600}
       MOC_AUDIT_ANCHOR_RETENTION_DAYS: ${MOC_AUDIT_ANCHOR_RETENTION_DAYS:-3650}
+    volumes:
+      - openbao_svc_files:/run/openbao:ro
     depends_on:
+      # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
+      openbao: {condition: service_healthy, restart: true}
       hasura: {condition: service_healthy}
       seaweedfs: {condition: service_started}
       clamav: {condition: service_started}
@@ -275,19 +313,21 @@ services:
     build: {context: ./services/svc-workflow, additional_contexts: {schemas: ./schemas}}
     image: moc/svc-workflow:${MOC_VERSION:-dev}
     profiles: [core]
+    networks: [moc, secrets]
     environment:
-      HASURA_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:?}
-      MOC_ACTION_SECRET: ${MOC_ACTION_SECRET:?}
-      FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
+      # F3.2 — khóa Hasura, khóa Actions, mật khẩu Flowable, khóa Centrifugo, client secret lấy từ két (AppRole)
+      MOC_OPENBAO_ADDR: http://openbao:8200
+      MOC_OPENBAO_SECRET_PATH: moc/data/svc-workflow
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
       MOC_KEYCLOAK_URL: http://keycloak:8080
-      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:?}
       MOC_REALM: ${MOC_REALM:-moc}
-      MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
       - ./processes:/app/processes:ro
+      - openbao_svc_workflow:/run/openbao:ro
     depends_on:
+      # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
+      openbao: {condition: service_healthy, restart: true}
       hasura: {condition: service_healthy}
       flowable: {condition: service_healthy}
     # Không phụ thuộc centrifugo: thiếu nó thì thông báo vẫn lưu, chỉ không đẩy tức thời
@@ -351,9 +391,17 @@ networks:
   storage:
     driver: bridge
     internal: true
+  # chỉ openbao, svc-files, svc-workflow; không ra Internet
+  secrets:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres_data:
   seaweedfs_data:
   clamav_data:
   meili_data:
+  openbao_data:
+  # tệp đăng nhập AppRole (role_id, secret_id) của từng dịch vụ: két ghi, chỉ dịch vụ đó gắn (chỉ đọc)
+  openbao_svc_files:
+  openbao_svc_workflow:

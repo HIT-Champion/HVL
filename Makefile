@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -100,6 +100,9 @@ audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài 
 
 demo-kiem-dich: $(ENV_FILE) ## Màn demo (iv) kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán (docs/demo-script.md)
 	@python3 scripts/demo.py kiem-dich
+
+demo-ket-bi-mat: $(ENV_FILE) ## Màn demo (iv) két bí mật: dịch vụ lấy bí mật từ OpenBao, két tự mở khóa khi khởi động lại (docs/demo-script.md)
+	@python3 scripts/demo.py ket-bi-mat
 
 backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (MOC_BACKUP_DIR, mặc định ./backups)
 	@python3 scripts/moc.py backup create

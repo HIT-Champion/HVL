@@ -21,6 +21,9 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
+    python3 scripts/demo.py ket-bi-mat
+        (iv) Két bí mật: dịch vụ không nhận bí mật qua biến môi trường mà lấy từ két OpenBao bằng AppRole riêng;
+        khởi động lại két thì két tự mở khóa, dịch vụ khởi động lại vẫn lấy được bí mật. (make demo-ket-bi-mat)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -34,6 +37,7 @@ import subprocess
 import sys
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from moc_env import EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, compose, text_pdf
@@ -69,6 +73,18 @@ def error_detail(exc: HTTPError) -> dict[str, Any]:
     except (ValueError, AttributeError):
         return {}
     return detail if isinstance(detail, dict) else {"message": detail}
+
+
+def vault_status() -> dict[str, Any]:
+    """`bao status` trong container két; két đang khóa thì lệnh thoát 2 nhưng vẫn in trạng thái."""
+    try:
+        raw = compose("exec", "-T", "openbao", "bao", "status", "-format=json")
+    except subprocess.CalledProcessError as exc:
+        raw = exc.stdout or b"{}"
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return {"error": raw.decode(errors="replace")[:200]}
 
 
 def last_audit_id(director: Session) -> int:
@@ -146,7 +162,109 @@ def kiem_dich() -> None:
     print(f"\nXem trên giao diện (lãnh đạo khoa): {PUBLIC_URL}/so-kiem-toan?loai=files — dòng \"Chặn tệp nhiễm mã độc\"")
 
 
-DEMOS = {"kiem-dich": kiem_dich}
+# Bí mật svc-files, svc-workflow cần (tên trong .env) — cùng danh sách openbao/start.sh nạp vào két
+SECRETS = {"svc-files": ("SEAWEEDFS_S3_ACCESS_KEY", "SEAWEEDFS_S3_SECRET_KEY", "HASURA_ADMIN_SECRET",
+                         "MEILI_MASTER_KEY"),
+           "svc-workflow": ("HASURA_ADMIN_SECRET", "MOC_ACTION_SECRET", "FLOWABLE_ADMIN_PASSWORD",
+                            "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET")}
+
+
+def env_hashes(service: str) -> dict[str, str]:
+    """SHA-256 từng biến môi trường của dịch vụ: so với bí mật mà không đưa bí mật ra khỏi container."""
+    out = compose("exec", "-T", service, "python", "-c",
+                  "import hashlib, json, os\nprint(json.dumps({k: hashlib.sha256(v.encode()).hexdigest()"
+                  " for k, v in os.environ.items()}))")
+    return json.loads(out)
+
+
+def restart(service: str, *wait_also: str) -> float:
+    started = time.monotonic()
+    compose("restart", service)
+    compose("up", "-d", "--wait", "--wait-timeout", "120", service, *wait_also)
+    return time.monotonic() - started
+
+
+def ket_bi_mat() -> None:
+    print("Màn (iv) · Két bí mật — dịch vụ lấy bí mật từ két OpenBao bằng AppRole riêng, không qua biến môi trường")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = Session("vanthu")
+
+    say(1, "svc-files, svc-workflow không có bí mật nào trong biến môi trường")
+    for service, names in SECRETS.items():
+        hashed = env_hashes(service)
+        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names}
+        leaked = sorted(f"{wanted[h]} (biến {k})" for k, h in hashed.items() if h in wanted)
+        if leaked:
+            raise DemoFailed(f"{service} còn nhận bí mật qua biến môi trường: {', '.join(leaked)}")
+        found = sorted(k for k in hashed if k.startswith("MOC_OPENBAO_"))
+        ok(f"{service}: 0/{len(names)} bí mật trong env (so băm giá trị) — chỉ có địa chỉ két: {', '.join(found)}")
+
+    say(2, "Khởi động lại két: static seal tự mở khóa, không ai phải nhập khóa")
+    since = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # svc-files, svc-workflow phụ thuộc két (restart: true) nên khởi động lại theo: chờ cả hai sẵn sàng
+    took = restart("openbao", "svc-files", "svc-workflow")
+    seal = vault_status()
+    if seal.get("sealed") is not False or seal.get("type") != "static":
+        raise DemoFailed(f"két chưa mở khóa sau khi khởi động lại: {seal}")
+    ok(f"openbao khởi động lại, mở khóa và cấp lại AppRole; hai dịch vụ lấy lại bí mật — sẵn sàng sau {took:.0f} "
+       f"giây · seal {seal['type']}, sealed={seal['sealed']}")
+
+    say(3, "Khởi động lại svc-files: đăng nhập két bằng AppRole, lấy khóa kho S3, rồi nhận tệp như thường")
+    took = restart("svc-files")
+    stored = clerk.upload(f"sau-khoi-dong-{tag}.pdf", text_pdf("Kiem tra ket bi mat", f"Ma thu {tag}"))
+    ok(f"svc-files sẵn sàng sau {took:.0f} giây; tải tệp → 201, vào kho bằng khóa S3 lấy từ két "
+       f"(SHA-256 {stored['sha256'][:16]}…)")
+
+    say(4, "Mỗi dịch vụ chỉ đọc được bí mật của mình")
+    cross = compose("exec", "-T", "svc-workflow", "python", "-c",
+                    "import os\nfrom svc_workflow.config import ConfigError\n"
+                    "from svc_workflow.openbao import with_secrets\n"
+                    "try:\n    with_secrets({**os.environ, 'MOC_OPENBAO_SECRET_PATH': 'moc/data/svc-files'},\n"
+                    "                 attempts=1)\n"
+                    "    print('read')\nexcept ConfigError as exc:\n    print('refused', exc)\n").decode().strip()
+    if not cross.startswith("refused") or "403" not in cross:
+        raise DemoFailed(f"svc-workflow đọc được bí mật của svc-files: {cross}")
+    ok("AppRole svc-workflow đọc moc/data/svc-files → két từ chối (403)")
+
+    say(5, "Két ghi sổ mọi lần truy cập; giá trị bí mật trong sổ đã băm HMAC")
+    logs = compose("logs", "--no-log-prefix", "--since", since, "openbao").decode()
+    if any(ENV[n] in logs for names in SECRETS.values() for n in names):
+        raise DemoFailed("sổ truy cập của két chứa giá trị bí mật")
+    reads = []
+    for line in logs.splitlines():
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict) or entry.get("type") != "response":
+            continue
+        path = (entry.get("request") or {}).get("path")
+        role = ((entry.get("auth") or {}).get("metadata") or {}).get("role_name")
+        if path in ("auth/approle/login", "moc/data/svc-files", "moc/data/svc-workflow") and role:
+            what = "đăng nhập" if path.startswith("auth/") else f"đọc {path}"
+            if entry.get("error"):
+                # lỗi của két có dạng "1 error occurred:\n\t* permission denied\n": gom về một dòng
+                reason = " ".join(str(entry["error"]).replace("1 error occurred:", "").replace("*", " ").split())
+                what += f" → bị từ chối ({reason})"
+            try:   # sổ ghi giờ UTC, in theo giờ máy
+                at = datetime.strptime(entry["time"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                when = at.astimezone().strftime("%H:%M:%S")
+            except (KeyError, TypeError, ValueError):
+                when = "?"
+            reads.append(f"{when} {role} {what}")
+    if not any(r.endswith("svc-files đọc moc/data/svc-files") for r in reads):
+        raise DemoFailed(f"sổ của két không có lần svc-files đọc bí mật: {reads}")
+    if not any("svc-workflow đọc moc/data/svc-files → bị từ chối" in r for r in reads):
+        raise DemoFailed(f"sổ của két không ghi lần svc-workflow đọc chéo bị từ chối: {reads}")
+    for r in reads[-4:]:
+        print(f"   · {r}")
+    ok(f"{len(reads)} lần đăng nhập/đọc từ lúc khởi động lại két, kể cả lần đọc chéo bị từ chối; không giá trị bí "
+       f"mật nào xuất hiện rõ trong sổ")
+
+    print("\nXem sổ của két: docker compose logs openbao · trạng thái: docker compose exec openbao bao status")
+
+
+DEMOS = {"kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat}
 
 
 def main(argv: list[str] | None = None) -> int:

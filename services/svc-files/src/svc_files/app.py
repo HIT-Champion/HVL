@@ -38,6 +38,7 @@ import hashlib
 import io
 import json
 import logging
+import os
 import re
 import unicodedata
 import uuid
@@ -60,6 +61,7 @@ from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .hasura import HasuraAuthError, HasuraClient, HasuraError
+from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
@@ -272,7 +274,7 @@ def create_app(
     anchor_store: AnchorStore | None = None,
 ) -> FastAPI:
     _setup_logging()
-    settings = settings or Settings.from_env()
+    settings = settings or Settings.from_env(with_secrets(os.environ))
     scanner = scanner or ClamAVClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout_s)
     store = store or ObjectStore(
         settings.s3_endpoint, settings.s3_access_key, settings.s3_secret_key, settings.s3_region, settings.bucket

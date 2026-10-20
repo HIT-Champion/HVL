@@ -197,12 +197,20 @@ tra cứu, không thêm phiên bản.
 
 ## Cấu hình
 
+Bí mật (khóa S3, khóa quản trị Hasura, khóa Meilisearch) không truyền qua biến môi trường. Khi có `MOC_OPENBAO_ADDR`,
+lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc chúng (F3.2, `openbao/start.sh`); bí
+mật trong két đè lên biến cùng tên. Không đặt `MOC_OPENBAO_ADDR` thì đọc thẳng biến môi trường (test, chạy tay).
+Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
+
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
+| `MOC_OPENBAO_ADDR` | trống | Địa chỉ két, vd `http://openbao:8200`; trống thì không dùng két |
+| `MOC_OPENBAO_SECRET_PATH` | `moc/data/svc-files` | Đường kv-v2 chứa bí mật của dịch vụ |
+| `MOC_OPENBAO_ROLE_ID_FILE`, `MOC_OPENBAO_SECRET_ID_FILE` | `/run/openbao/role_id`, `/run/openbao/secret_id` | Két ghi vào volume chỉ dịch vụ này gắn; mỗi lần két khởi động cấp secret_id mới, hủy cái cũ |
 | `MOC_OIDC_ISSUER` | **bắt buộc** | URL công khai của realm, trùng claim `iss`, vd `https://moc.example/realms/moc` |
 | `MOC_OIDC_JWKS_URL` | **bắt buộc** | URL nội bộ, vd `http://keycloak:8080/realms/moc/protocol/openid-connect/certs` |
 | `MOC_OIDC_AUDIENCE` | trống | Đặt thì kiểm claim `aud` |
-| `SEAWEEDFS_S3_ACCESS_KEY`, `SEAWEEDFS_S3_SECRET_KEY` | **bắt buộc** | |
+| `SEAWEEDFS_S3_ACCESS_KEY`, `SEAWEEDFS_S3_SECRET_KEY` | **bắt buộc** | Lấy từ két |
 | `SEAWEEDFS_S3_ENDPOINT` | `http://seaweedfs:8333` | |
 | `SEAWEEDFS_S3_REGION` | `us-east-1` | |
 | `MOC_FILES_BUCKET` | `moc-files` | Tự tạo nếu chưa có |
@@ -210,10 +218,10 @@ tra cứu, không thêm phiên bản.
 | `CLAMAV_HOST`, `CLAMAV_PORT` | `clamav`, `3310` | |
 | `CLAMAV_TIMEOUT_S` | `60` | |
 | `HASURA_URL` | `http://hasura:8080` | Gọi trong mạng nội bộ, không qua APISIX |
-| `HASURA_ADMIN_SECRET` | **bắt buộc** | Trùng giá trị Hasura dùng |
+| `HASURA_ADMIN_SECRET` | **bắt buộc** | Trùng giá trị Hasura dùng; lấy từ két |
 | `HASURA_TIMEOUT_S` | `10` | |
 | `MEILISEARCH_URL` | `http://meilisearch:7700` | |
-| `MEILISEARCH_API_KEY` | **bắt buộc** | Hiện dùng master key của Meilisearch (chỉ trong mạng nội bộ) |
+| `MEILISEARCH_API_KEY` | **bắt buộc** | Hiện dùng master key của Meilisearch (chỉ trong mạng nội bộ); lấy từ két |
 | `MOC_SEARCH_INDEX` | `documents` | Tự tạo và áp cấu hình khi khởi động |
 | `MOC_SEARCH_SYNC_INTERVAL_S` | `5` | `0` tắt vòng đồng bộ nền |
 | `MOC_TEXT_INTERVAL_S` | `10` | Chu kỳ đọc chữ của PDF mới gắn vào văn bản; `0` tắt vòng đọc |

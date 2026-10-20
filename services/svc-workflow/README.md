@@ -33,8 +33,16 @@ vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn gi�
 
 ## Cấu hình
 
+Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi
+trường: khi có `MOC_OPENBAO_ADDR`, lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc
+chúng (F3.2, `openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Két chưa sẵn sàng thì
+thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
+
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
+| `MOC_OPENBAO_ADDR` | trống | Địa chỉ két, vd `http://openbao:8200`; trống thì không dùng két |
+| `MOC_OPENBAO_SECRET_PATH` | `moc/data/svc-workflow` | Đường kv-v2 chứa bí mật của dịch vụ |
+| `MOC_OPENBAO_ROLE_ID_FILE`, `MOC_OPENBAO_SECRET_ID_FILE` | `/run/openbao/role_id`, `/run/openbao/secret_id` | Két ghi vào volume chỉ dịch vụ này gắn |
 | `HASURA_ADMIN_SECRET` | **bắt buộc** | Gọi Hasura bằng vai trò `service` |
 | `MOC_ACTION_SECRET` | **bắt buộc** | Hasura gửi kèm mỗi Action; sai thì 401 |
 | `FLOWABLE_ADMIN_PASSWORD` | **bắt buộc** | Tài khoản `rest-admin` của Flowable |
