@@ -34,9 +34,9 @@ COMPOSE=(docker compose --profile core --profile app)
 # Danh sách tệp do bản cài quản lý — lần cài sau và lệnh gỡ chỉ xóa đúng những tệp này
 MANIFEST=.moc-install
 # Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py
-# (cả sao lưu), màn demo (demo.py)
+# (cả sao lưu), màn demo (demo.py), reconciler GitOps (reconcile.py)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
-         scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/demo.py seed)
+         scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/demo.py scripts/reconcile.py seed)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -74,20 +74,34 @@ for name, svc in json.load(sys.stdin)["services"].items():
 ' "$1"
 }
 
+# Mỗi lúc một lệnh vận hành trên một bản cài: reconciler (scripts/reconcile.py) và `moc backup` giữ cùng khóa này
+# (flock trên thư mục cài). Reconciler gọi install.sh khi đã giữ khóa thì đặt MOC_OPS_LOCKED=1.
+lock_dest() {
+  [ "${MOC_OPS_LOCKED:-}" != 1 ] || return 0
+  command -v flock >/dev/null || return 0
+  exec 9<"$1"
+  flock -n 9 || die "đang có lệnh khác trên $1 (reconciler, sao lưu hoặc khôi phục) — đợi xong; bảo trì tay thì dừng timer trước: systemctl stop moc-reconcile.timer"
+}
+
 # Container đang chạy mà compose khởi động từ thư mục này
 running_from() {
   docker ps -q --filter "label=com.docker.compose.project.working_dir=$1"
 }
 
-# Xóa các tệp lần cài trước đã chép (theo MANIFEST); không đụng .env
+# Xóa các tệp lần cài trước đã chép (theo MANIFEST); không đụng .env. keep: giữ chính tệp MANIFEST
 remove_managed() {
-  local dest=$1 rel
+  local dest=$1 keep=${2:-} rel
   [ -f "$dest/$MANIFEST" ] || return 0
   while IFS= read -r rel; do
     case "$rel" in "" | . | .env | /* | .. | ../* | */../* | */..) die "đường dẫn lạ trong $dest/$MANIFEST: '$rel'" ;; esac
     rm -rf -- "${dest:?}/$rel"
   done < "$dest/$MANIFEST"
-  rm -f -- "$dest/$MANIFEST"
+  [ -n "$keep" ] || rm -f -- "$dest/$MANIFEST"
+}
+
+# Ghi MANIFEST cả tệp một lần (tệp tạm rồi đổi tên)
+write_manifest() {
+  cat > "$1/$MANIFEST.tmp" && mv -f -- "$1/$MANIFEST.tmp" "$1/$MANIFEST"
 }
 
 # Đặt KHÓA=giá trị trong tệp .env: thay dòng đang có, không thì thêm vào cuối. Ghi đè nội dung tại chỗ
@@ -104,8 +118,10 @@ do_install() {
   local dest ver mounts check rel img
   dest="$(prefix "${1:-}")"
   [ -f "$SRC/.env" ] || die "chưa có $SRC/.env — chạy: make env"
+  [ -d "$dest" ] || mkdir -p "$dest"
+  lock_dest "$dest"
   # .env và kho sao lưu (backups/) được giữ lại khi gỡ: cài lại vào đó vẫn được
-  if [ -d "$dest" ] && [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vxE '\.env|backups' || true)" ]; then
+  if [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vxE '\.env|backups|\.moc-install\.tmp' || true)" ]; then
     die "$dest đã có tệp nhưng không phải bản cài Mộc — chọn thư mục trống hoặc chưa có"
   fi
   # Thay thư mục cấu hình dưới container đang chạy thì container còn giữ thư mục cũ đã xóa
@@ -121,14 +137,21 @@ do_install() {
   echo "==> Dựng image của đội, thẻ $ver"
   (cd "$SRC" && MOC_VERSION="$ver" "${COMPOSE[@]}" build)
 
-  echo "==> Chép compose và cấu hình vào $dest"
-  mkdir -p "$dest"
-  remove_managed "$dest"
   local files=()
   while IFS= read -r rel; do files+=("$rel"); done \
     < <({ awk '$1 == "BIND" { print $2 }' <<<"$mounts"; printf '%s\n' "${RUNTIME[@]}"; } | sort -u)
+  # Kiểm hết trước khi xóa gì ở bản cài
   for rel in "${files[@]}"; do
     [ "$rel" != . ] || die "không chép cả thư mục mã nguồn"
+    [ -e "$SRC/$rel" ] || die "thiếu $SRC/$rel (bind mount trong compose hoặc tệp chạy) — tệp có trong git chưa?"
+  done
+
+  echo "==> Chép compose và cấu hình vào $dest"
+  # Bị ngắt giữa chừng (mất điện, hết đĩa) thì MANIFEST vẫn liệt kê đủ tệp cũ lẫn mới: cài lại là dọn và chép lại
+  { [ ! -f "$dest/$MANIFEST" ] || cat "$dest/$MANIFEST"
+    printf '%s\n' docker-compose.yml VERSION scripts/__pycache__ "${files[@]}"; } | sort -u | write_manifest "$dest"
+  remove_managed "$dest" keep
+  for rel in "${files[@]}"; do
     mkdir -p "$dest/$(dirname "$rel")"
     rm -rf -- "${dest:?}/$rel"
     cp -R -- "$SRC/$rel" "$dest/$rel"
@@ -142,7 +165,7 @@ do_install() {
     "$(git -C "$SRC" -c safe.directory="$SRC" rev-parse --short HEAD 2>/dev/null || echo không-rõ)" \
     "$(date +%Y-%m-%dT%H:%M:%S%z)" > "$dest/VERSION"
   # __pycache__: do python3 scripts/seed.py tạo ra khi chạy từ bản cài
-  printf '%s\n' docker-compose.yml VERSION scripts/__pycache__ "${files[@]}" > "$dest/$MANIFEST"
+  printf '%s\n' docker-compose.yml VERSION scripts/__pycache__ "${files[@]}" | write_manifest "$dest"
 
   if [ -f "$dest/.env" ]; then
     echo "    .env: giữ bản đang có trong $dest"
@@ -173,6 +196,7 @@ do_install() {
   python3 scripts/moc.py audit verify   # kiểm sổ kiểm toán
   python3 scripts/demo.py kiem-dich     # màn demo kiểm dịch (docs/demo-script.md)
   python3 scripts/moc.py backup create  # sao lưu CSDL và tệp vào MOC_BACKUP_DIR (mặc định $dest/backups)
+  python3 scripts/reconcile.py         # một lượt GitOps + tự phục hồi (timer mẫu: ops/systemd/)
 Bản cài dùng chung tên project và dữ liệu "moc" với bản chạy trong thư mục mã nguồn: dừng bản đó trước (make down).
 EOF
 }
@@ -181,6 +205,7 @@ do_uninstall() {
   local dest
   dest="$(prefix "${1:-}")"
   [ -f "$dest/$MANIFEST" ] || die "$dest không phải bản cài Mộc (không có $MANIFEST)"
+  lock_dest "$dest"
   if [ -n "$(running_from "$dest")" ]; then
     die "Mộc đang chạy từ $dest — dừng trước: cd $dest && docker compose down"
   fi

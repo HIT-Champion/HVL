@@ -751,3 +751,28 @@ Phase 2:
   nằm trên đĩa; phần mềm thượng nguồn (Hasura, SeaweedFS, Meilisearch, Centrifugo) vẫn đọc bí mật từ biến môi
   trường; két chưa có TLS và chưa nằm trong `make backup` (F3.7 phải thêm, vì mất khóa transit là mất tệp mã hóa).
 - Phase 3 còn lại: F3.3, F3.5, F3.7–F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.3 (Phase 3):
+
+- **F3.3 xong.** Reconciler GitOps và tự phục hồi (`scripts/reconcile.py`, `make reconcile`, tệp mẫu systemd timer
+  60 giây trong `ops/systemd/`):
+  - tự phục hồi: dịch vụ khai trong compose mà mất container hoặc đã dừng thì `up -d`, unhealthy thì khởi động lại;
+  - GitOps (khi đặt `MOC_GITOPS_DIR`): kéo nhánh `deploy` về bản sao git riêng; commit mới, hoặc tệp đã cài bị sửa tay
+    (so băm từng tệp theo danh sách `.moc-install`), thì dựng image, cài lại đúng commit, chạy lại; commit áp lỗi thì
+    đợi commit kế tiếp chứ không thử lại mỗi phút;
+  - `make demo-tu-phuc-hoi` (màn (iv), bước CI), bước CI GitOps với repo git cục bộ, `make smoke` +1 (tổng 46).
+- Chỗ khác kế hoạch:
+  - Không dùng Flux hay Argo CD: hai công cụ này cần Kubernetes, Mộc chạy Docker Compose. Reconciler là script thư
+    viện chuẩn, chạy bằng systemd timer trên máy chủ chứ không trong container (không gắn socket Docker vào đâu).
+  - Áp một commit là cài lại toàn bộ (`down` → `install.sh install` → `up --wait`, Mộc dừng khoảng một phút):
+    `install.sh` không cho thay cấu hình dưới container đang chạy. Image dựng xong trước khi dừng Mộc.
+  - Reconciler, `scripts/backup.py` và `install.sh` dùng chung một khóa (flock trên thư mục chạy Mộc): không dựng lại
+    dịch vụ giữa lúc khôi phục, cài đặt. Khôi phục dừng giữa chừng để lại dấu `.moc-restoring`: reconciler không chạy
+    lại Mộc trên dữ liệu dở dang. Dịch vụ tạm dừng có chủ ý thì bỏ qua cả lượt; còn tạm dừng từ lần sao lưu bị giết
+    cứng thì chạy lại.
+  - Cài hỏng sau khi đã dừng Mộc thì reconciler cài lại commit cũ; `install.sh` kiểm đủ tệp trước khi xóa và ghi danh
+    sách tệp (cũ lẫn mới) trước khi chép, nên bị ngắt giữa chừng vẫn cài lại được.
+  - APISIX giữ địa chỉ DNS dịch vụ 5 giây thay vì theo TTL (mặc định tới 10 phút): container dựng lại có địa chỉ mới.
+- Nói rõ khi trình bày: `.env` (bí mật, cấu hình riêng máy chủ) không nằm trong git nên không do reconciler quản;
+  image cũ không tự xóa; bảo trì tay thì phải dừng timer trước, không thì reconciler dựng lại trong vòng một phút.
+- Phase 3 còn lại: F3.5, F3.7–F3.10, F3.12–F3.15.

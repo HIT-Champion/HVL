@@ -156,6 +156,19 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   demo-ket-bi-mat` (màn (iv), cũng là bước CI); `make smoke` thêm 2 kiểm tra (tổng 45): két đã mở khóa, dịch vụ
   không có bí mật nào trong biến môi trường, AppRole không đọc chéo. Giới hạn: `.env` vẫn là nguồn bí mật, phần mềm
   thượng nguồn vẫn đọc từ biến môi trường, két chưa có TLS và chưa nằm trong `make backup` (#40).
+- GitOps và tự phục hồi (F3.3): `scripts/reconcile.py` (`make reconcile`) đưa hệ thống đang chạy về đúng trạng thái
+  khai báo, mỗi lần gọi một lượt; tệp mẫu systemd timer 60 giây trong `ops/systemd/` (cài lên máy chủ, không gắn
+  socket Docker vào container nào). Dịch vụ khai trong compose mà mất container hoặc đã dừng thì dựng lại, unhealthy
+  thì khởi động lại. Đặt `MOC_GITOPS_DIR` (bản sao git riêng của reconciler) thì reconciler kéo nhánh
+  `MOC_GITOPS_BRANCH` (mặc định `deploy`): có commit mới, hoặc tệp đã cài bị sửa tay, thì dựng image của commit đó rồi
+  cài lại đúng commit vào thư mục cài; cài hỏng giữa chừng thì cài lại commit cũ; commit áp lỗi thì đợi commit kế
+  tiếp. Lượt reconciler bỏ qua khi đang sao lưu, khôi phục, `make install` (chung một khóa), khi lần khôi phục trước
+  dừng giữa chừng hoặc có dịch vụ đang tạm dừng có chủ ý. `install.sh` kiểm đủ tệp trước khi xóa gì ở bản cài và bị
+  ngắt giữa chừng thì cài lại được. APISIX chỉ giữ địa chỉ DNS của
+  dịch vụ 5 giây để thấy ngay container vừa dựng lại. `make demo-tu-phuc-hoi` (màn (iv), cũng là bước CI); bước CI
+  GitOps với repo git cục bộ; `make smoke` thêm 1 kiểm tra (tổng 46): một lượt reconciler không thấy gì phải sửa.
+  Giới hạn: áp một commit là cài lại toàn bộ (Mộc dừng khoảng một phút), image cũ không tự xóa, `.env` không do git
+  quản (#41).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

@@ -24,6 +24,9 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py ket-bi-mat
         (iv) Két bí mật: dịch vụ không nhận bí mật qua biến môi trường mà lấy từ két OpenBao bằng AppRole riêng;
         khởi động lại két thì két tự mở khóa, dịch vụ khởi động lại vẫn lấy được bí mật. (make demo-ket-bi-mat)
+    python3 scripts/demo.py tu-phuc-hoi
+        (iv) Tự phục hồi: xóa hẳn container svc-files, dừng centrifugo; một lượt reconciler (systemd timer chạy mỗi
+        60 giây) dựng lại đúng như compose khai báo, tải tệp lại được. (make demo-tu-phuc-hoi)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -264,7 +267,77 @@ def ket_bi_mat() -> None:
     print("\nXem sổ của két: docker compose logs openbao · trạng thái: docker compose exec openbao bao status")
 
 
-DEMOS = {"kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat}
+def service_state(service: str) -> str:
+    """Trạng thái container của dịch vụ: "không có", "running (healthy)", "exited"…"""
+    raw = compose("ps", "-a", "--format", "json", service).decode().strip()
+    rows = json.loads(raw) if raw.startswith("[") else [json.loads(line) for line in raw.splitlines() if line]
+    if not rows:
+        return "không có container"
+    row = rows[0]
+    return f"{row.get('State')}" + (f" ({row['Health']})" if row.get("Health") else "")
+
+
+def reconcile_pass() -> tuple[int, str]:
+    """Một lượt tự phục hồi (không kéo commit từ git); timer của máy chủ đang chạy một lượt thì đợi nó xong."""
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "reconcile.py"), "--heal-only", "--wait", "300"],
+                       cwd=ROOT, capture_output=True, text=True)
+    return r.returncode, (r.stdout + r.stderr).strip()
+
+
+def tu_phuc_hoi() -> None:
+    print("Màn (iv) · Tự phục hồi — reconciler đưa hệ thống đang chạy về đúng trạng thái khai trong compose (git)")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = Session("vanthu")
+
+    say(1, "Trước khi phá: một lượt reconciler thấy hệ thống đã khớp khai báo")
+    code, out = reconcile_pass()
+    if code != 0 or "không có gì phải làm" not in out:
+        raise DemoFailed(f"hệ thống chưa khớp khai báo trước khi bắt đầu:\n{out}")
+    for line in out.splitlines():
+        print(f"   {line}")
+
+    say(2, "Phá: xóa hẳn container svc-files (docker rm -f), dừng centrifugo (docker stop)")
+    files_id = compose("ps", "-q", "svc-files").decode().strip()
+    realtime_id = compose("ps", "-q", "centrifugo").decode().strip()
+    if not files_id or not realtime_id:
+        raise DemoFailed("svc-files hoặc centrifugo không chạy")
+    subprocess.run(["docker", "rm", "-f", files_id], check=True, capture_output=True)
+    subprocess.run(["docker", "stop", realtime_id], check=True, capture_output=True)
+    try:
+        clerk.upload(f"luc-hong-{tag}.pdf", text_pdf("Thu khi svc-files mat", f"Ma thu {tag}"))
+        raise DemoFailed("svc-files đã bị xóa mà vẫn nhận tệp")
+    except HTTPError as exc:
+        ok(f"svc-files: {service_state('svc-files')} · centrifugo: {service_state('centrifugo')} · tải tệp → "
+           f"{exc.status} (cổng không tới được dịch vụ)")
+
+    say(3, "Một lượt reconciler — systemd timer gọi mỗi 60 giây, ở đây gọi ngay cho khỏi chờ")
+    started = time.monotonic()
+    code, out = reconcile_pass()
+    for line in out.splitlines():
+        print(f"   {line}")
+    if code == 0 and "không có gì phải làm" in out and compose("ps", "-q", "svc-files").decode().strip():
+        # máy chủ đã bật timer (ops/systemd/) và lượt của timer chạy trước lượt này
+        print("   (timer reconciler của máy chủ đã dựng lại trước lượt gọi tay này)")
+    elif code != 0 or "dựng lại svc-files" not in out or "chạy lại centrifugo" not in out:
+        raise DemoFailed("reconciler không dựng lại đủ hai dịch vụ")
+
+    say(4, "Hệ thống trở lại: dịch vụ healthy, tải tệp được")
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        states = {s: service_state(s) for s in ("svc-files", "centrifugo")}
+        if all(v == "running (healthy)" for v in states.values()):
+            break
+        time.sleep(2)
+    else:
+        raise DemoFailed(f"sau 2 phút vẫn chưa healthy: {states}")
+    stored = clerk.upload(f"sau-phuc-hoi-{tag}.pdf", text_pdf("Thu sau khi tu phuc hoi", f"Ma thu {tag}"))
+    ok(f"svc-files, centrifugo healthy sau {time.monotonic() - started:.0f} giây kể từ lượt reconciler; tải tệp → "
+       f"201 (SHA-256 {stored['sha256'][:16]}…)")
+
+    print("\nTrên máy chủ thật: ops/systemd/moc-reconcile.timer · nhật ký: journalctl -u moc-reconcile")
+
+
+DEMOS = {"kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi}
 
 
 def main(argv: list[str] | None = None) -> int:

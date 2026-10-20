@@ -26,6 +26,9 @@ apisix:
   enable_ipv6: false
   enable_control: false
   enable_server_tokens: false
+  # F3.3: container bị xóa rồi dựng lại (tự phục hồi) có IP mới — chỉ tin bản ghi DNS của Docker 5 giây thay vì
+  # TTL 600 giây, để cổng tìm thấy dịch vụ mới ngay
+  dns_resolver_valid: 5
   ssl:
     enable: false
 

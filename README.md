@@ -125,7 +125,7 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 
 Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý
 (Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**), sao lưu, khôi
-phục một lệnh (`make backup`, `make restore`) và két bí mật OpenBao.
+phục một lệnh (`make backup`, `make restore`), két bí mật OpenBao, reconciler GitOps và tự phục hồi.
 Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống
@@ -134,7 +134,7 @@ Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo h�
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make demo-tu-phuc-hoi`, `make reconcile`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -251,24 +251,59 @@ Nói rõ giới hạn:
 - Đổi bí mật trong `.env` rồi `make up`: két được dựng lại và nạp bí mật mới, `svc-files`, `svc-workflow` khởi động
   lại theo (`depends_on … restart: true`, cần Docker Compose 2.17 trở lên).
 
+### GitOps và tự phục hồi
+
+`scripts/reconcile.py` đưa hệ thống đang chạy về đúng trạng thái khai trong git, mỗi lượt một lần gọi. Trên máy chủ,
+systemd timer gọi nó mỗi 60 giây (tệp mẫu [`ops/systemd/`](ops/systemd/), chạy trên máy chủ chứ không trong container:
+không gắn socket Docker vào container nào). Mỗi lượt:
+
+- **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
+  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Thử: `make demo-tu-phuc-hoi` (`docs/demo-script.md`).
+- **GitOps** (khi đặt `MOC_GITOPS_DIR` trong `.env` của bản cài): kéo nhánh `MOC_GITOPS_BRANCH` (mặc định `deploy`)
+  về một bản sao git riêng của reconciler (bản sao có thay đổi chưa commit thì reconciler từ chối, không xóa việc của
+  ai). Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm lúc cài), thì dựng image của commit đó, dừng Mộc, cài lại
+  đúng commit vào thư mục cài rồi chạy lại. Cài hỏng giữa chừng thì cài lại commit đang chạy trước đó. Commit áp lỗi
+  thì không thử lại mỗi phút mà đợi commit kế tiếp.
+
+```bash
+# trên máy chủ, đã make install PREFIX=/opt/moc; người vận hành moc thuộc nhóm docker
+git clone -b deploy https://github.com/HIT-Champion/HVL.git /opt/moc-src
+echo "MOC_GITOPS_DIR=/opt/moc-src" >> /opt/moc/.env
+python3 /opt/moc/scripts/reconcile.py          # thử một lượt
+sudo cp ops/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enable --now moc-reconcile.timer
+```
+
+- Áp một commit là cài lại toàn bộ: Mộc dừng khoảng một phút (`install.sh` không thay cấu hình dưới container đang
+  chạy). Image cũ theo commit không tự xóa.
+- `.env` (bí mật, cấu hình riêng của máy chủ) không nằm trong git và reconciler không đụng tới.
+- Lượt reconciler bỏ qua khi đang sao lưu, khôi phục, `make install` (cả ba dùng chung một khóa trên thư mục cài),
+  khi lần khôi phục trước dừng giữa chừng (không chạy lại Mộc trên dữ liệu dở dang: chạy lại `backup restore`) hoặc
+  có dịch vụ đang tạm dừng có chủ ý. Dịch vụ còn tạm dừng từ một lần sao lưu bị giết cứng thì reconciler chạy lại.
+- Bảo trì tay (`docker compose down`, sửa cấu hình thử) thì tắt timer trước: `sudo systemctl stop moc-reconcile.timer`,
+  không thì reconciler dựng lại trong vòng một phút.
+- `make smoke` và `make demo-tu-phuc-hoi` gọi `reconcile.py --heal-only`: chỉ tự phục hồi, không kéo commit mới.
+
 ## Kiểm thử
 
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow`; kiểm form theo `schemas/` trên cùng bộ ca thử với svc-workflow và CSDL ([`schemas/README.md`](schemas/README.md)) | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
-| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo; một lượt reconciler không thấy gì phải sửa. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Các luồng trên trình duyệt thật (Playwright, chạy trong container): form sai bị chặn trước khi gửi, kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang; lãnh đạo xem sổ kiểm toán; văn thư tải tệp EICAR bị chặn ngay, lãnh đạo thấy lần chặn trong sổ; lãnh đạo xem dashboard điều hành, văn thư không có mục này | Như trên |
 | `make demo-kiem-dich` | Màn demo (iv) kiểm dịch, dưới một phút: tệp sạch qua, tệp EICAR bị ClamAV chặn ở cửa ngõ, không lưu gì; lần chặn nằm trong sổ kiểm toán, neo ra ngoài CSDL rồi kiểm lại cả chuỗi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-ket-bi-mat` | Màn demo (iv) két bí mật, dưới một phút: dịch vụ không có bí mật trong biến môi trường; khởi động lại két thì két tự mở khóa; khởi động lại svc-files thì nó lấy lại khóa kho từ két và nhận tệp; AppRole không đọc chéo; sổ của két không chứa giá trị bí mật (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
+| `make demo-tu-phuc-hoi` | Màn demo (iv) tự phục hồi, dưới một phút: xóa hẳn container `svc-files`, dừng `centrifugo`; tải tệp hỏng; một lượt reconciler dựng lại cả hai, tải tệp lại được (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
 | Diễn tập khôi phục | `make backup` hai lượt, xóa volume CSDL và tệp, `python3 scripts/moc.py backup restore --yes`, rồi `make smoke` và `make audit` phải qua (bước trong CI) | Hệ thống đang chạy + `make seed` |
 | `db/tests/` | 156 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
-thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → `make demo-ket-bi-mat`; diễn tập
-sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install` sang thư mục khác và chạy lại smoke từ bản cài; kiểm tài liệu API trong `docs/api/` khớp hệ
-thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa
-phụ thuộc (OSV-Scanner).
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ thống
+từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → `make
+demo-ket-bi-mat` → `make demo-tu-phuc-hoi`; diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install`
+sang thư mục khác và chạy lại smoke từ bản cài; GitOps với repo git cục bộ: đẩy commit lên nhánh `deploy` thì
+reconciler áp vào bản cài, sửa tay `docker-compose.yml` đã cài thì reconciler đưa về; kiểm tài liệu API trong
+`docs/api/` khớp hệ thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các
+tệp khóa phụ thuộc (OSV-Scanner).
 
 ## Tài liệu
 

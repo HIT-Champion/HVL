@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat demo-tu-phuc-hoi reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -103,6 +103,12 @@ demo-kiem-dich: $(ENV_FILE) ## Màn demo (iv) kiểm dịch: tệp EICAR bị ch
 
 demo-ket-bi-mat: $(ENV_FILE) ## Màn demo (iv) két bí mật: dịch vụ lấy bí mật từ OpenBao, két tự mở khóa khi khởi động lại (docs/demo-script.md)
 	@python3 scripts/demo.py ket-bi-mat
+
+demo-tu-phuc-hoi: $(ENV_FILE) ## Màn demo (iv) tự phục hồi: xóa container, reconciler dựng lại theo khai báo (docs/demo-script.md)
+	@python3 scripts/demo.py tu-phuc-hoi
+
+reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
+	@python3 scripts/reconcile.py
 
 backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (MOC_BACKUP_DIR, mặc định ./backups)
 	@python3 scripts/moc.py backup create

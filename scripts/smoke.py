@@ -271,6 +271,20 @@ def main() -> None:
     cross.startswith("refused") and "403" in cross or fail(f"svc-workflow đọc được bí mật của svc-files: {cross}")
     ok("mỗi dịch vụ chỉ đọc được bí mật của mình: AppRole svc-workflow đọc phần svc-files bị két từ chối (403)")
 
+    # F3.3: một lượt reconciler trên hệ thống vừa dựng — mọi dịch vụ khai trong compose đều có container chạy, không
+    # có gì phải sửa (màn phá rồi tự dựng lại: make demo-tu-phuc-hoi)
+    print("Tự phục hồi")
+    # --heal-only: smoke không kéo commit mới về (không tự cài lại Mộc); timer đang chạy một lượt thì đợi nó xong
+    rec = subprocess.run([sys.executable, str(pathlib.Path(__file__).with_name("reconcile.py")), "--json",
+                          "--heal-only", "--wait", "300"], capture_output=True, text=True)
+    try:
+        report = json.loads(rec.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        fail(f"reconciler không trả kết quả: {rec.stdout}{rec.stderr}")
+    rec.returncode == 0 and not report["skipped"] and not report["actions"] and not report["problems"] \
+        or fail(f"reconciler thấy hệ thống lệch khai báo: {report}")
+    ok("reconciler: mọi dịch vụ khai trong compose đang chạy đúng, không có gì phải sửa")
+
     clerk, director = Session("vanthu"), Session("truongkhoa")
     manager, staff = Session("totruongdt"), Session("chuyenviendt")
     other_tenant = Session("vanthukt")

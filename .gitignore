@@ -21,6 +21,8 @@
 /volumes/
 /storage/
 /backups/
+# scripts/backup.py đặt trong lúc khôi phục (F3.3: reconciler không dựng lại Mộc trên dữ liệu dở dang)
+/.moc-restoring
 *.db
 *.sqlite
 *.sqlite3

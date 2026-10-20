@@ -63,6 +63,9 @@ FILES = "/data/seaweedfs"               # chỗ volume SeaweedFS gắn vào cont
 HOST = "moc"                            # tên máy ghi vào snapshot: cố định, để restic tìm ra lượt trước và chỉ đọc
 TAG = "moc"                             # tệp đã đổi (container mỗi lần một tên khác)
 MANIFEST = "manifest.json"
+# Đặt trước khi dừng Mộc để khôi phục, xóa khi Mộc đã chạy lại: còn tệp này thì reconciler (F3.3) không dựng lại Mộc
+# trên dữ liệu khôi phục dở dang
+RESTORING = ROOT / ".moc-restoring"
 # Những gì restic tạo trong kho — chỉ trả quyền sở hữu những mục này, không đụng tệp khác trong thư mục
 REPO_ENTRIES = "/repo/config /repo/keys /repo/data /repo/index /repo/snapshots /repo/locks"
 USER = ENV.get("POSTGRES_USER", "moc")
@@ -137,13 +140,26 @@ def _guard(repo: pathlib.Path) -> Iterator[None]:
 
     old = {s: signal.signal(s, stop) for s in (signal.SIGTERM, signal.SIGHUP)}
     fd = os.open(repo, os.O_RDONLY)
+    ops = os.open(ROOT, os.O_RDONLY)
     try:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise BackupError(f"một lệnh sao lưu hoặc khôi phục khác đang chạy trên kho {repo}") from None
+        # F3.3: khóa chung với reconciler (scripts/reconcile.py) trên thư mục chạy Mộc — reconciler không dựng lại
+        # dịch vụ giữa lúc khôi phục. Reconciler đang áp cấu hình mới thì đợi nó xong (tối đa 30 phút).
+        deadline = time.monotonic() + 1800
+        while True:
+            try:
+                fcntl.flock(ops, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise BackupError("reconciler (F3.3) giữ khóa quá 30 phút — xem nhật ký moc-reconcile") from None
+                time.sleep(2)
         yield
     finally:
+        os.close(ops)
         os.close(fd)
         for s, handler in old.items():
             signal.signal(s, handler)
@@ -414,6 +430,7 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         print("  ✓ Bản sao lưu đọc được trọn vẹn", flush=True)
         started = time.monotonic()
         try:
+            RESTORING.write_text(f"{manifest['run']}\n", encoding="utf-8")
             _call([*COMPOSE, "down"], "không dừng được Mộc")
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "300", "postgres"], "PostgreSQL không lên")
             print("  ✓ Đã dừng Mộc, chỉ chạy PostgreSQL", flush=True)
@@ -438,6 +455,7 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
             event = _psql(RESTORED_SQL, actor=actor, run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
             print(f"  ✓ Lần khôi phục ghi vào sổ kiểm toán: dòng #{event}", flush=True)
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"], "Mộc chưa chạy lại được — xem: make logs")
+            RESTORING.unlink(missing_ok=True)
         except BaseException:
             print(f"✗ Khôi phục dừng giữa chừng; Mộc có thể đang dừng. Sửa lỗi bên dưới rồi chạy lại: python3"
                   f" scripts/moc.py backup restore {manifest['run']}", file=sys.stderr)

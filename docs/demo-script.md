@@ -19,7 +19,7 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | — | Chưa có (F3.9) |
 | (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
-| (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | — | Chưa có (F3.3) |
+| (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
 ## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
 
@@ -94,3 +94,47 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
   — nên volume của két phải được giữ như chính két.
 - *"Két dùng làm gì nữa?"* Khóa transit `moc-files` để mã hóa tệp của văn bản hạn chế (F3.7): `svc-files` chỉ xin
   được khóa dữ liệu mới và mở khóa đã bọc, không bao giờ cầm khóa gốc.
+
+## (iv) Tự phục hồi — `make demo-tu-phuc-hoi`
+
+**Điều muốn chứng minh:**
+
+- Trạng thái mong muốn nằm trong git (`docker-compose.yml`, cấu hình cổng, policy két…); một reconciler đều đặn
+  so trạng thái đang chạy với khai báo và tự sửa phần lệch, không cần người.
+- Dịch vụ chết hay bị xóa hẳn thì được dựng lại; cấu hình bị sửa tay trên máy chủ thì bị đưa về đúng commit.
+
+**Lệnh in ra 4 bước (dưới một phút):**
+
+1. Một lượt `scripts/reconcile.py`: "đã khớp trạng thái khai báo, không có gì phải làm".
+2. Phá: `docker rm -f` container `svc-files` (mất hẳn, không phải chỉ dừng), `docker stop` container `centrifugo`.
+   Văn thư tải tệp → cổng trả lỗi vì không tới được dịch vụ.
+3. Một lượt reconciler (trên máy chủ là systemd timer mỗi 60 giây, ở đây gọi ngay): in "dựng lại svc-files (không
+   còn container)", "chạy lại centrifugo (đã dừng: …)".
+4. Hai dịch vụ về `running (healthy)` (svc-files lấy lại bí mật từ két F3.2), văn thư tải tệp → `201`.
+
+**Phần GitOps** (chạy trong CI, bước "GitOps"; trên máy chủ xem README mục "GitOps và tự phục hồi"):
+
+- Đẩy một commit lên nhánh `deploy` của repo → lượt reconciler kế tiếp in "áp commit … (nhánh deploy: cũ → mới)",
+  tệp `VERSION` của bản cài mang commit mới, smoke vẫn qua.
+- Sửa tay `docker-compose.yml` trong thư mục cài → lượt kế tiếp in "tệp đã cài bị sửa tay, đưa về commit …" và
+  tệp trở lại đúng như trong git.
+
+**Đối chiếu bốn nguyên tắc OpenGitOps 1.0:**
+
+| Nguyên tắc | Ở Mộc |
+| --- | --- |
+| Khai báo (declarative) | Toàn bộ hệ thống khai trong `docker-compose.yml` + cấu hình từng thành phần (realm Keycloak, metadata Hasura, cổng APISIX, cấu hình két); không bước dựng tay nào ngoài `.env` |
+| Có phiên bản, bất biến (versioned and immutable) | Trạng thái mong muốn là một commit git; image dựng theo commit (`MOC_VERSION` = `git describe`), tệp `VERSION` của bản cài ghi commit; lùi phiên bản = đẩy commit cũ lên `deploy` |
+| Tự kéo về (pulled automatically) | Reconciler trên máy chủ tự `git fetch`; không ai đẩy vào máy chủ, CI không cần quyền vào máy chủ |
+| Liên tục đối chiếu (continuously reconciled) | systemd timer mỗi 60 giây: so commit, so băm tệp đã cài, so container đang chạy với khai báo; lệch thì sửa |
+
+**Nếu giám khảo hỏi:**
+
+- *"Sao không dùng Argo CD hay Flux?"* Hai công cụ đó chạy trên Kubernetes; Mộc nhắm máy chủ đơn vị chạy Docker
+  Compose. Reconciler là một script thư viện chuẩn Python, đọc được trong vài phút.
+- *"Docker có `restart: unless-stopped` rồi mà?"* Chính sách đó chỉ chạy lại container còn tồn tại và không chạy lại
+  container bị `docker stop`. Container bị xóa hẳn, hay cấu hình lệch khỏi git, thì chỉ reconciler đưa về được.
+- *"Áp commit có làm gián đoạn không?"* Có, khoảng một phút: reconciler dựng image trước, rồi dừng Mộc, cài lại đúng
+  commit và chạy lại. Commit áp lỗi thì reconciler đợi commit kế tiếp chứ không thử lại liên tục.
+- *"`.env` thì sao?"* Không nằm trong git (chứa bí mật), reconciler không đụng tới; đổi `.env` vẫn là việc của
+  người vận hành.
