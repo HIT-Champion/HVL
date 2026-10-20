@@ -20,7 +20,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `core.tenants`, `core.files`, `core.audit_log` (+ `audit_head`, `audit_anchors`) | **Xong** |
 | `office.departments`, `document_types` (28 loại theo NĐ 30), `registers`, `documents`, `document_files`, `document_acl`, `assignments`, `document_events` | **Xong** |
 | Quyền Hasura cho 6 vai trò, cách ly thuê ước | **Xong** — 38 test |
-| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung) | **Xong** — 21 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
+| Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung; thấy năm, số dòng của lần in sổ đăng ký) | **Xong** — 22 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch) | **Xong** — 10 test |
 | `metadata/actions.graphql`, `actions.yaml`: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
 | Poka-yoke lớp 3 cho văn bản đến (F2.2): `documents_in_symbol`, `documents_in_issuer`, `documents_in_summary`, `documents_in_dates` — cùng quy tắc với `schemas/van-ban-den.json` (độ dài, khoảng trắng, ký tự ẩn, dạng NFC, năm 1900+); migration dọn trước dữ liệu cũ sửa được mà không đổi nghĩa | **Xong** — 43 test chạy chung bộ ca thử với form và svc-workflow, chèn thẳng bằng quyền quản trị |

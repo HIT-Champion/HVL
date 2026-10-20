@@ -20,7 +20,7 @@
 #
 # Lãnh đạo và quản trị đơn vị xem sổ của đơn vị mình (màn "Sổ kiểm toán", F2.12): ai, lúc nào, làm gì, cột nào
 # đổi, hash của dòng. Không đọc được cột diff: chỉ trường `overview`, giữ giá trị của các cột không chứa nội
-# dung (hàm core.audit_overview, migration 1792281600700), để sổ không lộ văn bản hạn chế.
+# dung (hàm core.audit_overview, migration 1792281600700, 1792281600900), để sổ không lộ văn bản hạn chế.
 table:
   name: audit_log
   schema: core

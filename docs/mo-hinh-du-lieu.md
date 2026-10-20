@@ -148,7 +148,8 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ.
 - **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
-  nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản). Lãnh đạo không đọc được văn bản hạn chế thì sổ
+  nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
+  1792281600900). Lãnh đạo không đọc được văn bản hạn chế thì sổ
   cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
   chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
 
@@ -409,9 +410,12 @@ Hasura theo dõi các view sau, cùng quy tắc lọc thuê ước như bảng g
 
 | View | Dùng cho |
 |---|---|
-| `office.v_register_in`, `office.v_register_out` | Sổ đăng ký văn bản đến / đi theo năm, xuất PDF (F2.8) |
 | `office.v_overdue_by_department` | Dashboard: việc quá hạn theo phòng (F3.11) |
 | `office.v_processing_time` | Dashboard: thời gian từ vào sổ đến hoàn thành |
+
+Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
+(chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
+được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
 
 ---
 
@@ -541,6 +545,8 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `GET /api/files/{id}` | Người có quyền với văn bản chứa tệp | Kiểm quyền qua Hasura; tệp mã hóa thì giải mã trong bộ nhớ, thêm watermark |
 | `GET /api/search?q=` | Người đăng nhập | Meilisearch, lọc thuê ước và quyền phía server |
 | `GET /api/documents/{id}/preview` | Người đọc được văn bản đi | PDF đúng thể thức của dự thảo, chưa có số, in chữ "DỰ THẢO" |
+| `GET /api/registers/{in\|out}/{year}` | `clerk`, `director` | Sổ đăng ký một năm, cột theo mẫu NĐ 30 Phụ lục IV; dòng văn bản hạn chế người gọi không đọc được chỉ có số, ngày, số ký hiệu |
+| `GET /api/registers/{in\|out}/{year}/pdf` | `clerk`, `director` | Như trên, ra PDF A4 ngang để ký nhận, đóng sổ; ghi `register.printed` vào sổ kiểm toán |
 | `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status}}`; `summary` chỉ có khi `is_public` |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |

@@ -22,6 +22,7 @@
     "language": "Tiếng Việt",
     "outgoing": "Outgoing",
     "compose": "Draft a document",
+    "register": "Registers",
     "audit": "Audit log"
   },
   "role": {
@@ -395,6 +396,9 @@
       "delete": "Deleted",
       "file": {
         "rejected": "Blocked infected file"
+      },
+      "register": {
+        "printed": "Printed register"
       }
     },
     "entity": {
@@ -466,7 +470,9 @@
       "code": "code",
       "org_ident": "organisation id",
       "username": "username",
-      "year": "year"
+      "year": "year",
+      "entries": "rows",
+      "masked": "masked rows"
     },
     "direction": {
       "in": "Incoming",
@@ -486,5 +492,22 @@
       "director": "Director",
       "tenant_admin": "Administrator"
     }
+  },
+  "register": {
+    "title": "Document registers",
+    "subtitle": "The columns of the statutory register template (Decree 30/2020/NĐ-CP, Appendix IV). Print on paper for signatures and the year-end closing.",
+    "year": "Year",
+    "yearOption": "Year {year}",
+    "book": {
+      "den": "Incoming register",
+      "di": "Outgoing register"
+    },
+    "print": "Print register (PDF)",
+    "printing": "Rendering…",
+    "none": "The {year} register has no documents yet.",
+    "continuous": "No gaps: numbers 01 to {last}.",
+    "gaps": "Rows missing for numbers: {numbers}. Tell your system administrator before printing.",
+    "how": "Click a row to open the document. The Signature and Copies columns stay blank for handwriting on the printout. Every print is recorded in the audit log.",
+    "masked": "{n} rows are restricted documents you cannot read: only number, dates and reference are shown."
   }
 }

@@ -42,7 +42,7 @@ cũng nạp được.
 |---|---|---|
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
-| `POST /api/files`, `GET /api/files/{id}`, `GET /api/search`, `GET /api/documents/{id}/preview` | `svc-files` | Bắt buộc |
+| `POST /api/files`, `GET /api/files/{id}`, `GET /api/search`, `GET /api/documents/{id}/preview`, `GET /api/registers/…` | `svc-files` | Bắt buộc |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
@@ -173,12 +173,15 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `GET /api/files/{id}` | Tải về nếu người gọi được xem; không có tệp và không được xem đều trả `404` |
 | `GET /api/search?q=…` | Tìm theo số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được; chỉ trả văn bản người gọi được đọc |
 | `GET /api/documents/{id}/preview` | PDF đúng thể thức NĐ 30 của dự thảo văn bản đi, chưa có số, in chữ "DỰ THẢO"; văn bản đã phát hành thì tải bản phát hành |
+| `GET /api/registers/{in\|out}/{năm}` | Văn thư, lãnh đạo đơn vị: sổ đăng ký văn bản đến / đi của một năm, đúng các cột của mẫu sổ NĐ 30 (Phụ lục IV); văn bản hạn chế người gọi không được đọc chỉ có số, ngày, số ký hiệu; `missing` là các số thiếu dòng |
+| `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, ra bản in A4 ngang để ký nhận, đóng sổ; mỗi lần in ghi `register.printed` vào sổ kiểm toán |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
 
 ```bash
 curl -s -OJ "$MOC/api/files/$FILE" -H "Authorization: Bearer $TOKEN"
 curl -s -G "$MOC/api/search" -H "Authorization: Bearer $TOKEN" --data-urlencode 'q=tuyen sinh' --data-urlencode limit=10
+curl -s -OJ "$MOC/api/registers/in/2026/pdf" -H "Authorization: Bearer $TOKEN"     # token văn thư hoặc lãnh đạo đơn vị
 
 # cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
 curl -s "$MOC/api/verify/ABCDE-23456"

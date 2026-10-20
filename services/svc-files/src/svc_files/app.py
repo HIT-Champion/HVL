@@ -24,7 +24,8 @@ sổ kiểm toán. Tải xuống: hỏi Hasura bằng chính token người dùn
 Văn bản đi (F2.4): svc-workflow gọi /internal/issue bằng token tài khoản dịch vụ khi văn thư phát hành —
 dựng PDF có số, mã QR từ dữ liệu trong CSDL, quét, lưu như mọi tệp. Người được đọc dự thảo xem trước bản PDF
 ở /api/documents/{id}/preview. Cổng xác thực (F2.13): /api/verify trả thông tin công khai của đúng một văn
-bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập.
+bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập. Sổ đăng ký văn bản đến / đi (F2.8):
+văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} và in ra PDF để ký nhận, đóng sổ — registers.py.
 
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
@@ -58,6 +59,7 @@ from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .hasura import HasuraAuthError, HasuraClient, HasuraError
+from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
 from .search import Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .storage import ObjectStore, StorageError, object_key, s3_client
@@ -144,6 +146,26 @@ class VerifyOut(BaseModel):
 
 VERIFY_CODE_RE = re.compile(r"[^A-Z2-7]")
 NO_STORE = {"Cache-Control": "no-store"}
+# Sổ đăng ký là việc của văn thư; lãnh đạo đơn vị xem để kiểm (NĐ 30/2020, Điều 16, 22)
+REGISTER_ROLES = {"clerk", "director"}
+
+
+class RegisterEntryOut(BaseModel):
+    number: int = Field(description="Số đến (sổ đến) hoặc số văn bản đi (sổ đi)")
+    document_id: uuid.UUID | None = Field(description="Mở văn bản trên giao diện; null khi dòng bị che")
+    hidden: bool = Field(description="Văn bản hạn chế người gọi không được đọc: chỉ có số, ngày, số ký hiệu")
+    cells: list[str] = Field(description="Giá trị từng cột, đúng thứ tự `columns`; ô Ký nhận để trống")
+
+
+class RegisterOut(BaseModel):
+    direction: Literal["in", "out"]
+    year: int
+    title: str
+    org_name: str
+    columns: list[str] = Field(description="Cột theo mẫu sổ đăng ký, NĐ 30/2020/NĐ-CP Phụ lục IV")
+    entries: list[RegisterEntryOut]
+    last_number: int = Field(description="Số cuối đã cấp trong năm")
+    missing: list[int] = Field(description="Số đã cấp mà không có dòng — sổ phải liền số, bình thường rỗng")
 
 
 class SearchOut(BaseModel):
@@ -667,6 +689,87 @@ def create_app(
         return Response(pdf, media_type="application/pdf", headers={
             **DOWNLOAD_HEADERS, **NO_STORE,
             "Content-Disposition": content_disposition(f"du-thao-{document_id}.pdf"),
+        })
+
+    # --- sổ đăng ký văn bản đến / đi (F2.8) ----------------------------------------------------------------
+
+    printing = asyncio.Semaphore(2)
+    register_responses: dict[int | str, dict[str, object]] = {
+        401: {"description": "Thiếu hoặc sai token"},
+        403: {"description": "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký"},
+        503: {"description": "CSDL không sẵn sàng"},
+    }
+
+    async def _read_register(direction: str, year: int, request: Request, principal: Principal) -> Register:
+        try:
+            data = await hasura.register(tenant_id=principal.tenant_id, actor_id=principal.user_id,
+                                         request_id=request.state.request_id, direction=direction, year=year)
+        except HasuraError as exc:      # vai trò service: lỗi phía máy chủ, không phải token người gọi
+            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
+        ids = [doc["id"] for doc in data["office_documents"]]
+        try:
+            # dòng nào người gọi đọc được: Hasura quyết theo token của họ, sổ chỉ che phần còn lại
+            visible = set(await hasura.visible_documents(principal.token, ids)) if ids else set()
+        except HasuraAuthError as exc:
+            raise HTTPException(
+                401, {"code": "invalid_token", "message": "Token không hợp lệ hoặc đã hết hạn"},
+                {"WWW-Authenticate": "Bearer"},
+            ) from exc
+        except HasuraError as exc:
+            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
+        return build_register(data, visible, direction=direction, year=year, printed_at=datetime.now(UTC))
+
+    async def _register(direction: str, year: int, request: Request, principal: Principal) -> Register:
+        if not REGISTER_ROLES & set(principal.roles):
+            raise _error(403, "forbidden", "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký")
+        reg = await _read_register(direction, year, request, principal)
+        # Số cuối đã cấp và các dòng là hai câu đọc riêng: văn thư khác vào sổ đúng lúc đó thì có thể thấy số mới mà
+        # chưa thấy dòng của nó. Đọc lại một lần; vẫn thiếu thì là thiếu thật, báo ra.
+        return await _read_register(direction, year, request, principal) if reg.missing else reg
+
+    Direction = Annotated[Literal["in", "out"], Path(description="in: sổ văn bản đến; out: sổ văn bản đi")]
+    Year = Annotated[int, Path(ge=2000, le=2100)]
+
+    @app.get("/api/registers/{direction}/{year}", response_model=RegisterOut, responses=register_responses,
+             summary="Sổ đăng ký văn bản đến / đi của một năm, đúng các cột sẽ in")
+    async def register_json(direction: Direction, year: Year, request: Request,
+                            principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
+        reg = await _register(direction, year, request, principal)
+        out = RegisterOut(
+            direction=direction, year=year, title=reg.title, org_name=reg.org_name, columns=list(reg.columns),
+            entries=[RegisterEntryOut(number=e.number, document_id=e.document_id, hidden=e.hidden, cells=list(e.cells))
+                     for e in reg.entries],
+            last_number=reg.last, missing=reg.missing,
+        )
+        return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
+
+    @app.get(
+        "/api/registers/{direction}/{year}/pdf",
+        response_class=Response,
+        responses={**register_responses, 200: {"content": {"application/pdf": {}},
+                                              "description": "Sổ A4 ngang: bìa, bảng theo mẫu, chỗ ký của văn thư"}},
+        summary="In sổ đăng ký văn bản đến / đi của một năm ra PDF để ký nhận, đóng sổ (NĐ 30/2020, Điều 16, 22)",
+    )
+    async def register_pdf(direction: Direction, year: Year, request: Request,
+                           principal: Annotated[Principal, Depends(current_principal)]) -> Response:
+        reg = await _register(direction, year, request, principal)
+        async with printing:    # WeasyPrint tốn CPU: không để nhiều lần in chiếm hết luồng của tải tệp lên, xuống
+            pdf = await asyncio.to_thread(render_register_pdf, reg)
+        # In sổ là việc đáng ghi lại: ai in, sổ nào, bao nhiêu dòng — vào sổ kiểm toán chuỗi băm
+        try:
+            await hasura.log_event(
+                tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=request.state.request_id,
+                action="register.printed", entity="office.registers", entity_id=f"{direction}/{year}",
+                details={"direction": direction, "year": year, "entries": len(reg.entries),
+                         "masked": sum(e.hidden for e in reg.entries)},
+            )
+        except HasuraError as exc:
+            raise _error(503, "database_unavailable", "Chưa ghi được sổ kiểm toán, thử lại sau") from exc
+        log_event("office.register.printed", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
+                  direction=direction, year=year, entries=len(reg.entries))
+        name = f"so-dang-ky-van-ban-{'den' if direction == 'in' else 'di'}-{year}.pdf"
+        return Response(pdf, media_type="application/pdf", headers={
+            **DOWNLOAD_HEADERS, **NO_STORE, "Content-Disposition": content_disposition(name),
         })
 
     # --- cổng xác thực (không cần đăng nhập; APISIX giới hạn tốc độ theo IP) ------------------------------

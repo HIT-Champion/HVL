@@ -390,6 +390,34 @@ def main() -> None:
     (same, changed) == ("valid", "not_found") or fail(f"tra theo băm sai: nguyên vẹn {same}, đã sửa {changed}")
     ok("tệp nguyên vẹn → khớp; sửa một byte → không khớp")
 
+    print("Sổ đăng ký văn bản (in theo NĐ 30, Điều 16, 22)")
+    years = clerk.gql("""query ($a: uuid!, $b: uuid!) { a: office_documents_by_pk(id: $a) { register { year } }
+        b: office_documents_by_pk(id: $b) { register { year } } }""", {"a": doc_id, "b": out_id})
+    year_in, year_out = years["a"]["register"]["year"], years["b"]["register"]["year"]
+    book_in = call_json("GET", f"{PUBLIC_URL}/api/registers/in/{year_in}", headers=clerk.auth)[0]
+    book_out = call_json("GET", f"{PUBLIC_URL}/api/registers/out/{year_out}", headers=director.auth)[0]
+    row_in = next((e for e in book_in["entries"] if e["document_id"] == doc_id), None)
+    row_out = next((e for e in book_out["entries"] if e["document_id"] == out_id), None)
+    row_in and row_in["number"] == reg["register_number"] and row_out and row_out["cells"][0] == issued["symbol"] \
+        and book_in["missing"] == [] and book_out["missing"] == [] \
+        or fail(f"sổ đăng ký thiếu văn bản hoặc không liền số: đến {row_in}, đi {row_out}")
+    ok(f"sổ đến {year_in} có số đến {reg['register_number']}, sổ đi có {issued['symbol']}; cả hai liền số")
+    _, _, printed = request("GET", f"{PUBLIC_URL}/api/registers/in/{year_in}/pdf", headers=clerk.auth)
+    prints = director.gql("""query ($e: String!) { core_audit_log(where: {action: {_eq: "register.printed"},
+        entity_id: {_eq: $e}}, order_by: {id: desc}, limit: 1) { actor_id overview } }""",
+                          {"e": f"in/{year_in}"})["core_audit_log"]
+    clerk_id = clerk.gql('{ core_users(where: {username: {_eq: "vanthu"}}) { id } }')["core_users"][0]["id"]
+    printed.startswith(b"%PDF-") and prints and prints[0]["actor_id"] == clerk_id \
+        and prints[0]["overview"].get("entries") == len(book_in["entries"]) \
+        or fail(f"in sổ chưa ra PDF hoặc chưa ghi sổ kiểm toán: {prints}")
+    ok("văn thư in sổ đến ra PDF; lần in vào sổ kiểm toán, lãnh đạo thấy ai in, bao nhiêu dòng")
+    try:
+        request("GET", f"{PUBLIC_URL}/api/registers/in/{year_in}", headers=staff.auth)
+        fail("chuyên viên xem được sổ đăng ký")
+    except HTTPError as exc:
+        exc.status == 403 or fail(f"chuyên viên xem sổ đăng ký trả {exc.status}")
+    ok("chuyên viên không xem được sổ đăng ký (403)")
+
     print("Thông báo (Centrifugo, timer Flowable)")
     fake = Realtime("khong.phai.token")
     fake.reply is None and fake.closed == 3500 or fail(f"token giả vẫn kết nối được: {fake.reply} {fake.closed}")

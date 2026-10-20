@@ -48,6 +48,25 @@ export interface SearchHit {
   due_on: string | null
 }
 
+// Sổ đăng ký văn bản đến / đi một năm (F2.8): đúng các cột, các ô sẽ in (svc-files, registers.py)
+export interface RegisterEntry {
+  number: number
+  document_id: string | null // null: văn bản hạn chế người xem không được đọc, chỉ có số, ngày, số ký hiệu
+  hidden: boolean
+  cells: string[]
+}
+
+export interface RegisterBook {
+  direction: 'in' | 'out'
+  year: number
+  title: string
+  org_name: string
+  columns: string[]
+  entries: RegisterEntry[]
+  last_number: number
+  missing: number[]
+}
+
 export function useApi() {
   const auth = useAuth()
 
@@ -116,9 +135,9 @@ export function useApi() {
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
-  /** Bản PDF xem trước của dự thảo văn bản đi (svc-files dựng đúng thể thức, in chữ DỰ THẢO), tải về máy. */
-  async function preview(documentId: string): Promise<void> {
-    const res = await authFetch(`/api/documents/${documentId}/preview`)
+  /** PDF do svc-files dựng, tải về máy với tên filename. */
+  async function savePdf(path: string, filename: string): Promise<void> {
+    const res = await authFetch(path)
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
       throw new ApiError(body.detail?.message ?? `HTTP ${res.status}`, body.detail?.code ?? null, res.status)
@@ -126,9 +145,28 @@ export function useApi() {
     const url = URL.createObjectURL(await res.blob())
     const a = document.createElement('a')
     a.href = url
-    a.download = `du-thao-${documentId.slice(0, 8)}.pdf`
+    a.download = filename
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+
+  /** Bản PDF xem trước của dự thảo văn bản đi (svc-files dựng đúng thể thức, in chữ DỰ THẢO), tải về máy. */
+  function preview(documentId: string): Promise<void> {
+    return savePdf(`/api/documents/${documentId}/preview`, `du-thao-${documentId.slice(0, 8)}.pdf`)
+  }
+
+  /** Sổ đăng ký một năm để xem trên màn hình. */
+  async function register(direction: 'in' | 'out', year: number): Promise<RegisterBook> {
+    const res = await authFetch(`/api/registers/${direction}/${year}`)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new ApiError(body.detail?.message ?? `HTTP ${res.status}`, body.detail?.code ?? null, res.status)
+    return body
+  }
+
+  /** In sổ đăng ký ra PDF (A4 ngang) để ký nhận, đóng sổ; mỗi lần in được ghi vào sổ kiểm toán. */
+  function printRegister(direction: 'in' | 'out', year: number): Promise<void> {
+    return savePdf(`/api/registers/${direction}/${year}/pdf`,
+      `so-dang-ky-van-ban-${direction === 'in' ? 'den' : 'di'}-${year}.pdf`)
   }
 
   async function search(params: Record<string, string | number | undefined>): Promise<{ hits: SearchHit[]; next_offset: number | null }> {
@@ -140,5 +178,5 @@ export function useApi() {
     return body
   }
 
-  return { gql, upload, download, preview, search }
+  return { gql, upload, download, preview, register, printRegister, search }
 }

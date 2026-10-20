@@ -5,10 +5,10 @@ sạch mới ghi vào SeaweedFS và thêm dòng `core.files`; ClamAV không tr�
 chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
 Hasura quyết ai được đọc văn bản nào. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
-trả lời người ngoài một văn bản có thật, còn nguyên vẹn không.
+trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
 
-Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 (tìm kiếm), F2.4 (dựng PDF văn bản đi)
-và F2.13 (cổng xác thực) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 (tìm kiếm), F2.4 (dựng PDF văn bản đi),
+F2.8 (sổ đăng ký in được) và F2.13 (cổng xác thực) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
 issue #19, #20.
 
 ## Trạng thái
@@ -25,10 +25,11 @@ issue #19, #20.
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=`: không cần đăng nhập | **Xong** (F2.13) |
 | Neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi (S3 Object Lock) | **Xong** (F2.12) |
+| `GET /api/registers/{in\|out}/{năm}` và `/pdf`: sổ đăng ký văn bản đến / đi theo mẫu NĐ 30, in A4 ngang | **Xong** (F2.8) |
 
 ## API
 
-Đi qua APISIX ở `/api/files/*`, `/api/search`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
+Đi qua APISIX ở `/api/files/*`, `/api/search`, `/api/documents/*`, `/api/registers/*`, `/api/verify`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
 xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-files.json) (`make api-docs`).
 
 | Đường dẫn | Kết quả |
@@ -42,6 +43,8 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` |
 | `GET /api/search?q=` | `200` `{hits: [...], next_offset}` · `400` câu tìm trống · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
+| `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
+| `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
 | `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456` |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
@@ -89,6 +92,30 @@ giao dịch ghi xong muộn; văn bản chưa đổi không bị đẩy lại. K
 - **Cổng xác thực** tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`, mỗi lần đúng một văn
   bản. Nhật ký chỉ ghi cách tra (mã hay băm) và kết quả.
 
+### Sổ đăng ký văn bản (F2.8)
+
+`registers.py`. NĐ 30/2020, Điều 16 (văn bản đi) và Điều 22 (văn bản đến): đăng ký bằng hệ thống thì in ra giấy đủ
+các trường theo mẫu sổ ở Phụ lục IV, ký nhận và đóng sổ.
+
+- **Cột theo mẫu sổ.** Sổ đến 9 cột: Ngày đến, Số đến, Tác giả, Số ký hiệu, Ngày tháng, Tên loại và trích yếu,
+  Đơn vị hoặc người nhận, Ký nhận, Ghi chú. Sổ đi 10 cột: Số ký hiệu, Ngày tháng, Tên loại và trích yếu, Người ký,
+  Nơi nhận, Đơn vị và người nhận bản lưu, Số lượng bản, Ngày chuyển, Ký nhận, Ghi chú. Ô Ký nhận, Số lượng bản để
+  trống, ghi tay trên bản in. Đơn vị nhận văn bản đến là nơi chủ trì lãnh đạo giao; chưa giao thì là lãnh đạo đơn
+  vị. Ghi chú có độ khẩn, hạn giải quyết, "Hạn chế", "Đã hủy", mã xác thực của văn bản đi.
+- **Liền số.** Sổ đọc mọi văn bản đã vào sổ của năm bằng vai trò `service`, kể cả văn bản hạn chế người in không
+  được đọc, rồi hỏi Hasura bằng token người in xem họ đọc được dòng nào. Dòng không đọc được chỉ có số, ngày, số
+  ký hiệu, ghi chú "Hạn chế"; trích yếu, tác giả, người ký, phòng soạn, nơi nhận, người nhận, độ khẩn bị che,
+  `document_id` là `null`. So với số cuối đã cấp (`office.registers.last_number`), số nào không có dòng thì nằm
+  trong `missing` và bìa sổ báo ra. Số cuối và các dòng là hai câu đọc riêng, nên thấy thiếu thì đọc lại một lần
+  trước khi báo (văn thư khác vừa vào sổ đúng lúc đó).
+- **Văn bản đi đã cấp số mà chưa phát hành** (dựng bản phát hành lỗi, còn `approved`): ô Ngày chuyển để trống,
+  không in mã xác thực, ghi chú "Đã cấp số, chưa phát hành".
+- **Một chỗ dựng ô.** Bản JSON cho giao diện và bản PDF cùng các ô đã định dạng (ngày `dd/mm/yyyy` theo giờ Việt
+  Nam), nên màn hình và giấy không lệch nhau. PDF A4 ngang: bìa (cơ quan chủ quản, đơn vị, năm, từ ngày đến ngày,
+  từ số đến số), bảng có hàng đánh số cột lặp lại ở mỗi trang, chỗ văn thư ký cuối sổ.
+- **Mỗi lần in** ghi `register.printed` (`entity_id` `in/2026`, kèm số dòng và số dòng bị che) vào sổ kiểm toán.
+  Mỗi lúc dựng tối đa hai bản in, để in sổ dài không chiếm hết luồng của tải tệp lên, xuống.
+
 ### Neo sổ kiểm toán (F2.12)
 
 `anchors.py`. Mỗi `MOC_AUDIT_ANCHOR_INTERVAL_S` giây, nếu sổ có dòng mới từ mốc trước, svc-files đọc đầu chuỗi
@@ -119,6 +146,7 @@ tra cứu, không thêm phiên bản.
 | Đọc văn bản mới sửa để đồng bộ chỉ mục | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, không nhận tham số từ người dùng |
 | Đọc văn bản để dựng bản xem trước | Token của người dùng |
 | Đọc văn bản để dựng bản phát hành | Khóa quản trị + `X-Hasura-Role: service` + thuê ước trong yêu cầu của svc-workflow |
+| Đọc sổ đăng ký một năm | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng lấy từ token đã kiểm; rồi token của người dùng để biết dòng nào được đọc |
 | Tra cứu ở cổng xác thực | Khóa quản trị + `X-Hasura-Role: verifier` |
 | Đọc đầu chuỗi sổ kiểm toán, ghi mốc neo | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
 

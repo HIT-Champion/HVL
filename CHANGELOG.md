@@ -103,6 +103,14 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - `make test` chạy thêm test kiểm form (`apps/office`, Node 24); `make smoke` thêm 4 kiểm tra (tổng 35): văn thư
   không ghi thẳng được bảng văn bản, svc-workflow trả lỗi từng trường, chặn tiếp nhận trùng, CSDL chặn khi ghi
   thẳng bằng quyền quản trị; `make e2e`: form sai bị chặn trên trình duyệt, không gửi gì đi (#34).
+- Sổ đăng ký văn bản đến / đi theo năm (F2.8), in được theo NĐ 30/2020, Điều 16, 22: `svc-files` dựng sổ đúng các
+  cột của mẫu sổ ở Phụ lục IV (sổ đến 9 cột, sổ đi 10 cột) — `GET /api/registers/{in|out}/{năm}` cho giao diện,
+  `…/pdf` ra bản in A4 ngang có bìa, bảng kẻ, chỗ văn thư ký để ký nhận và đóng sổ. Chỉ văn thư, lãnh đạo đơn vị
+  xem được. Sổ luôn liền số từ 01, kể cả văn bản hạn chế người in không được đọc: dòng đó chỉ có số, ngày, số ký
+  hiệu; bìa sổ báo nếu thiếu số. Mỗi lần in ghi vào sổ kiểm toán (`register.printed`: ai in, sổ nào, bao nhiêu
+  dòng, bao nhiêu dòng bị che). Trang `/so-dang-ky` xem sổ theo năm, mở văn bản từ dòng sổ, in PDF (#35).
+- `make smoke` thêm 3 kiểm tra (tổng 38): sổ đến, sổ đi có văn bản vừa vào sổ, phát hành và liền số; in sổ ra PDF,
+  lần in vào sổ kiểm toán; chuyên viên không xem được sổ. `make e2e` thêm kịch bản văn thư xem sổ, in PDF (#35).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

@@ -350,6 +350,20 @@ def test_director_sees_who_changed_what_but_not_the_content(world):
         assert "content_sha256" in hashed["overview"] and hashed["overview"]["content_sha256"] is None
 
 
+def test_director_sees_register_prints(world):
+    # svc-files ghi mỗi lần in sổ đăng ký (F2.8): năm, số dòng, số dòng bị che không phải nội dung, được thấy
+    entity_id = "in/2026"           # đơn vị thử mới cho mỗi lần chạy: không lẫn dòng của lần chạy trước
+    world.service_a.gql(
+        """mutation ($o: core_audit_log_insert_input!) { insert_core_audit_log_one(object: $o) { id } }""",
+        {"o": {"actor_id": world.clerk_a.sub, "actor_kind": "user", "action": "register.printed",
+               "entity": "office.registers", "entity_id": entity_id,
+               "diff": {"direction": "in", "year": 2026, "entries": 12, "masked": 2}}},
+    )
+    [row] = world.director_a.gql(AUDIT_VIEW, {"e": entity_id})["core_audit_log"]
+    assert (row["action"], row["actor_id"]) == ("register.printed", world.clerk_a.sub)
+    assert row["overview"] == {"direction": "in", "year": 2026, "entries": 12, "masked": 2}
+
+
 def test_audit_view_has_no_raw_diff_and_stays_in_the_tenant(world):
     doc = received(world.clerk_a, incoming(world.tag, 113))
     assert "errors" in world.director_a.raw("{ core_audit_log(limit: 1) { diff } }")

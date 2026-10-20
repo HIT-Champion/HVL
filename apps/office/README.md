@@ -1,14 +1,15 @@
 # app-office — Văn phòng điện tử
 
 Ứng dụng Tầng 2 trên lõi Mộc: hộp việc, văn bản đến (tiếp nhận, vào sổ, chỉ đạo, phân công, xử lý), văn bản đi
-(soạn, trình, duyệt, phát hành), cổng xác thực công khai, thông báo tức thời, dòng thời gian, tìm kiếm. Nuxt 4 ở
+(soạn, trình, duyệt, phát hành), sổ đăng ký in được, cổng xác thực công khai, thông báo tức thời, dòng thời gian,
+tìm kiếm. Nuxt 4 ở
 chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi dữ liệu lấy qua cổng cùng tên miền —
 `/v1/graphql` (Hasura), `/api/*` (svc-files), `/realms/moc` (Keycloak), `/realtime` (Centrifugo, WebSocket). Chủ: #22.
 
 | Thư mục | Nội dung |
 |---|---|
-| `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem`, `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
-| `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo) |
+| `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem`, `so-dang-ky` (văn thư, lãnh đạo đơn vị: sổ đến / đi theo năm, in PDF), `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
+| `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm, sổ đăng ký), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo) |
 | `app/components/TaskPanel.vue` | Khung xử lý theo `formKey` của BPMN |
 | `scripts/forms.mjs`, `app/utils/forms.ts` | Biên dịch `schemas/*.json` (gốc repo) thành mã kiểm form lúc dựng; quy lỗi về `{trường: mã}` như svc-workflow |
 | `tests/` | Test kiểm form trên bộ ca thử dùng chung `schemas/*.cases.json` (`npm test`, Node 24) |

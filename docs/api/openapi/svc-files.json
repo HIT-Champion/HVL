@@ -347,6 +347,142 @@
         }
       }
     },
+    "/api/registers/{direction}/{year}": {
+      "get": {
+        "summary": "Sổ đăng ký văn bản đến / đi của một năm, đúng các cột sẽ in",
+        "operationId": "register_json_api_registers__direction___year__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "direction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string",
+              "description": "in: sổ văn bản đến; out: sổ văn bản đi",
+              "title": "Direction"
+            },
+            "description": "in: sổ văn bản đến; out: sổ văn bản đi"
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/registers/{direction}/{year}/pdf": {
+      "get": {
+        "summary": "In sổ đăng ký văn bản đến / đi của một năm ra PDF để ký nhận, đóng sổ (NĐ 30/2020, Điều 16, 22)",
+        "operationId": "register_pdf_api_registers__direction___year__pdf_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "direction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string",
+              "description": "in: sổ văn bản đến; out: sổ văn bản đi",
+              "title": "Direction"
+            },
+            "description": "in: sổ văn bản đến; out: sổ văn bản đi"
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sổ A4 ngang: bìa, bảng theo mẫu, chỗ ký của văn thư",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/verify/{code}": {
       "get": {
         "summary": "Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)",
@@ -496,6 +632,113 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "RegisterEntryOut": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number",
+            "description": "Số đến (sổ đến) hoặc số văn bản đi (sổ đi)"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Mở văn bản trên giao diện; null khi dòng bị che"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "description": "Văn bản hạn chế người gọi không được đọc: chỉ có số, ngày, số ký hiệu"
+          },
+          "cells": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cells",
+            "description": "Giá trị từng cột, đúng thứ tự `columns`; ô Ký nhận để trống"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "document_id",
+          "hidden",
+          "cells"
+        ],
+        "title": "RegisterEntryOut"
+      },
+      "RegisterOut": {
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns",
+            "description": "Cột theo mẫu sổ đăng ký, NĐ 30/2020/NĐ-CP Phụ lục IV"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/RegisterEntryOut"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "last_number": {
+            "type": "integer",
+            "title": "Last Number",
+            "description": "Số cuối đã cấp trong năm"
+          },
+          "missing": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Số đã cấp mà không có dòng — sổ phải liền số, bình thường rỗng"
+          }
+        },
+        "type": "object",
+        "required": [
+          "direction",
+          "year",
+          "title",
+          "org_name",
+          "columns",
+          "entries",
+          "last_number",
+          "missing"
+        ],
+        "title": "RegisterOut"
       },
       "SearchHit": {
         "properties": {

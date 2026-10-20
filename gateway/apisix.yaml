@@ -19,7 +19,7 @@
 #
 #   /realms/<realm>/*, /resources/*  → Keycloak (đăng nhập)          — không cần token
 #   /v1/graphql                      → Hasura                       — cần token
-#   /api/files/*, /api/search, /api/documents/* → svc-files          — cần token
+#   /api/files/*, /api/search, /api/documents/*, /api/registers/* → svc-files   — cần token
 #   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
@@ -122,7 +122,7 @@ routes:
           remove: [X-Hasura-Admin-Secret]
 
   - id: svc-files
-    uris: ["/api/files", "/api/files/*", "/api/search", "/api/documents/*"]
+    uris: ["/api/files", "/api/files/*", "/api/search", "/api/documents/*", "/api/registers/*"]
     methods: [GET, POST]
     upstream_id: svc-files
     plugin_config_id: can-token

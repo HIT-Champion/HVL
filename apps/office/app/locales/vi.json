@@ -22,6 +22,7 @@
     "language": "English",
     "outgoing": "Văn bản đi",
     "compose": "Soạn văn bản đi",
+    "register": "Sổ đăng ký",
     "audit": "Sổ kiểm toán"
   },
   "role": {
@@ -395,6 +396,9 @@
       "delete": "Xóa",
       "file": {
         "rejected": "Chặn tệp nhiễm mã độc"
+      },
+      "register": {
+        "printed": "In sổ đăng ký"
       }
     },
     "entity": {
@@ -466,7 +470,9 @@
       "code": "mã",
       "org_ident": "mã định danh",
       "username": "tên đăng nhập",
-      "year": "năm"
+      "year": "năm",
+      "entries": "số dòng",
+      "masked": "dòng bị che"
     },
     "direction": {
       "in": "Đến",
@@ -486,5 +492,22 @@
       "director": "Lãnh đạo đơn vị",
       "tenant_admin": "Quản trị đơn vị"
     }
+  },
+  "register": {
+    "title": "Sổ đăng ký văn bản",
+    "subtitle": "Đúng các cột của mẫu sổ (Nghị định 30/2020/NĐ-CP, Phụ lục IV). In ra giấy để ký nhận và đóng sổ cuối năm.",
+    "year": "Năm",
+    "yearOption": "Năm {year}",
+    "book": {
+      "den": "Sổ văn bản đến",
+      "di": "Sổ văn bản đi"
+    },
+    "print": "In sổ (PDF)",
+    "printing": "Đang dựng bản in…",
+    "none": "Sổ năm {year} chưa có văn bản nào.",
+    "continuous": "Sổ liền số, từ số 01 đến số {last}.",
+    "gaps": "Sổ thiếu dòng của số: {numbers}. Báo quản trị hệ thống trước khi in.",
+    "how": "Bấm vào một dòng để mở văn bản. Cột Ký nhận, Số lượng bản để trống, ghi tay trên bản in. Mỗi lần in được ghi vào sổ kiểm toán.",
+    "masked": "{n} dòng là văn bản hạn chế bạn không được đọc: chỉ có số, ngày, số ký hiệu."
   }
 }

@@ -91,6 +91,10 @@ ký duyệt, rồi văn thư cấp số đi. Hệ thống dựng PDF có số, k
 mã QR, không cần đăng nhập, thấy văn bản có thật. Thả tệp nhận được vào trang xác thực: tệp nguyên vẹn thì
 "khớp", sửa một byte thì "không khớp".
 
+Văn thư và lãnh đạo khoa xem **sổ đăng ký văn bản đến, văn bản đi** theo năm, đúng các cột của mẫu sổ trong NĐ 30,
+rồi in ra PDF để ký nhận và đóng sổ — nghị định bắt in khi đăng ký bằng hệ thống. Sổ luôn liền số từ 01, kể cả văn
+bản hạn chế người in không được đọc (dòng đó chỉ có số, ngày, số ký hiệu); mỗi lần in vào sổ kiểm toán.
+
 Ở mọi bước, người phải làm tiếp **nhận thông báo ngay** (Centrifugo, WebSocket): tin hiện ở góc màn hình, chuông
 giữ lại tin, hộp việc tự cập nhật không phải tải lại trang. Để một bước quá thời hạn (`MOC_SLA_DURATION`, thật
 `PT24H`, demo `PT1M`) thì timer trong quy trình BPMN nhắc người phải làm; quá hai thời hạn thì báo lãnh đạo của
@@ -101,7 +105,7 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
                 (kiểm JWT,     ├─ /realms/moc/*  → Keycloak (đăng nhập SSO, TOTP)
                  X-Request-Id) ├─ /v1/graphql    → Hasura ─┬─ PostgreSQL (core, office)               Tầng 1
                                │                           └─ Actions → svc-workflow → Flowable (BPMN)
-                               ├─ /api/files, /api/search, /api/documents/* → svc-files
+                               ├─ /api/files, /api/search, /api/documents/*, /api/registers/* → svc-files
                                ├─ /api/verify (không token, giới hạn theo IP) → svc-files
                                │  svc-files: ClamAV · SeaweedFS · Meilisearch · dựng PDF (WeasyPrint)
                                └─ /realtime (WebSocket) → Centrifugo ◄── svc-workflow đẩy thông báo
@@ -115,11 +119,11 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `processes/` |
 | `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; thông báo sau mỗi bước, nhắc hạn theo timer BPMN; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
 | Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người; tự kiểm token Keycloak | `realtime/` |
-| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR; cổng xác thực công khai | `services/svc-files/` |
+| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, in sổ đăng ký; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 
-Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): sổ đăng ký in được (Phase 2),
-bằng chứng 4 nguyên lý và dashboard (Phase 3), AI (Phase 4).
+Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý và
+dashboard (Phase 3), AI (Phase 4).
 Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống

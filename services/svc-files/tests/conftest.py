@@ -69,9 +69,10 @@ def signing_key() -> rsa.RSAPrivateKey:
 
 @pytest.fixture
 def make_token(signing_key):
-    def _make(*, tenant: str | None = str(TENANT_A), sub: str = "u-van-thu", ttl: int = 300, **overrides) -> str:
+    def _make(*, tenant: str | None = str(TENANT_A), sub: str = "u-van-thu", ttl: int = 300, role: str = "clerk",
+              **overrides) -> str:
         now = int(time.time())
-        ns = {"x-hasura-user-id": sub, "x-hasura-allowed-roles": ["clerk"], "x-hasura-default-role": "clerk"}
+        ns = {"x-hasura-user-id": sub, "x-hasura-allowed-roles": [role], "x-hasura-default-role": role}
         if tenant is not None:
             ns["x-hasura-tenant-id"] = tenant
         claims = {"iss": ISSUER, "sub": sub, "iat": now, "exp": now + ttl, HASURA_CLAIMS: ns, **overrides}
@@ -259,6 +260,32 @@ class FakeHasura:
                         "issuer_name": row["tenant"]["name"], "parent_name": row["tenant"]["parent_name"],
                         "summary": row["summary"] if row.get("is_public") else None, "status": row["status"]}
         return None
+
+    # --- sổ đăng ký (F2.8) --------------------------------------------------------------------------------
+
+    def add_registered(self, tenant: uuid.UUID, direction: str, number: int, *, year: int = 2026,
+                       readers: set[str] | None = None, **cols) -> str:
+        """Văn bản đã vào sổ `direction` năm `year` với số `number`; readers như add_document."""
+        defaults = {"status": "registered" if direction == "in" else "issued", "restricted": readers is not None,
+                    "register_number": number, "document_type": {"name": "Công văn"}, "department": None,
+                    "signer": None, "recipients": None, "verify_code": None, "assignments": [], "events": [],
+                    "registered_at": f"{year}-10-0{min(number, 9)}T02:00:00+00:00"}
+        summary = cols.pop("summary", f"Văn bản số {number}")
+        return self.add_document(tenant, summary, readers=readers, direction=direction, _year=year,
+                                 **{**defaults, **cols})
+
+    async def register(self, *, tenant_id, actor_id, request_id, direction: str, year: int) -> dict:
+        self._check()
+        rows = sorted((r for r in self.documents.values() if r["tenant_id"] == str(tenant_id)
+                       and r["direction"] == direction and r.get("_year") == year), key=lambda r: r["register_number"])
+        hidden = {"readers", "tenant_id", "updated_at", "_year", "direction", "type_code"}
+        return {
+            "core_tenants_by_pk": {"code": "CNTT", "name": "Khoa Công nghệ thông tin",
+                                   "parent_name": "Trường Đại học Thử", "head_title": "Trưởng khoa"},
+            "office_registers": [{"last_number": max(r["register_number"] for r in rows)}] if rows else [],
+            "office_documents": [{k: v for k, v in r.items() if k not in hidden} for r in rows],
+            "core_users": [{"id": "u-chuyen-vien", "full_name": "Lê Thị Hoa"}],
+        }
 
     async def changed_documents(self, since, limit: int, offset: int) -> list[dict]:
         self._check()

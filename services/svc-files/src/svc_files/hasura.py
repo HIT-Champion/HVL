@@ -96,6 +96,28 @@ query Verify($where: office_issued_documents_bool_exp!) {
   }
 }"""
 
+# Sổ đăng ký văn bản đến / đi của một năm (F2.8): mọi dòng của sổ, kể cả văn bản hạn chế, để sổ in ra liền số
+# (vai trò service). Dòng nào người in không được đọc thì registers.py che nội dung — hỏi lại bằng token của họ.
+REGISTER = """
+query Register($tenant: uuid!, $direction: String!, $year: Int!) {
+  core_tenants_by_pk(id: $tenant) { code name parent_name head_title }
+  office_registers(where: {direction: {_eq: $direction}, year: {_eq: $year}}) { last_number }
+  office_documents(where: {register: {direction: {_eq: $direction}, year: {_eq: $year}}},
+                   order_by: {register_number: asc}) {
+    id status symbol issuer_name issued_on summary urgency restricted register_number registered_at due_on
+    recipients verify_code
+    document_type { name }
+    department { name }
+    signer { full_name }
+    assignments(where: {role: {_eq: "lead"}, parent_id: {_is_null: true}, status: {_neq: "cancelled"}},
+                order_by: {assigned_at: asc}, limit: 1) {
+      user_id department { name }
+    }
+    events(where: {kind: {_eq: "office.document.issued"}}, limit: 1) { created_at }
+  }
+  core_users { id full_name }
+}"""
+
 # Neo sổ kiểm toán (anchors.py): đầu chuỗi — khóa quản trị, không vai trò nào đọc được core.audit_head
 AUDIT_HEAD = """
 query AuditHead {
@@ -314,6 +336,12 @@ class HasuraClient:
                 return None
             raise
         return _letter(data)
+
+    async def register(self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, direction: str,
+                       year: int) -> dict[str, Any]:
+        """Mọi dòng của sổ đăng ký một năm, đọc bằng vai trò service của đúng thuê ước trong token người gọi."""
+        return await self._call(REGISTER, {"tenant": str(tenant_id), "direction": direction, "year": year},
+                                self._as_service(tenant_id, actor_id, request_id))
 
     async def verify(self, *, code: str | None = None, sha256_hex: str | None = None) -> dict[str, Any] | None:
         """Văn bản đã phát hành có mã tra cứu hoặc băm này (vai trò verifier), không có thì None."""
