@@ -688,3 +688,20 @@ Phase 2:
     tên tệp vẫn ẩn vì do người dùng đặt;
   - smoke và e2e kiểm cả dòng sổ của lần chặn.
 - Phase 3 còn lại: F3.2–F3.5, F3.7–F3.15.
+
+**20/10/2026** — F3.11 (Phase 3):
+
+- **F3.11 xong.** Trang **Điều hành** cho lãnh đạo đơn vị:
+  - thẻ tổng: văn bản đến chưa xong, quá hạn, khẩn chưa xong, thời gian xử lý trung bình và tỉ lệ đúng hạn;
+  - biểu đồ Apache ECharts 6.1.0 (chỉ nạp biểu đồ cột, vẽ SVG), mỗi biểu đồ kèm bảng số.
+- Số liệu lấy qua view của Hasura như kế hoạch, nên tự đúng SSO và quyền thuê ước, không thêm dịch vụ. Tính lúc
+  mở trang, có nút làm mới; không dùng kênh realtime.
+- Chỗ khác kế hoạch:
+  - Bốn view thay cho hai: thêm `v_document_counts` (theo trạng thái, độ khẩn, quá hạn) và `v_outgoing_by_month`.
+  - Văn bản hạn chế không vào phép chia nào, chỉ có con số tổng. Lý do (phát hiện khi rà soát): lãnh đạo đọc được
+    mọi văn bản khác, nên lấy số chia trừ đi là ra trạng thái, phòng, thời gian xử lý của văn bản hạn chế. Đổi lại,
+    số quá hạn trên dashboard không gồm văn bản hạn chế.
+  - Chỉ vai trò `director` đọc được. Quản trị đơn vị không đọc nội dung nghiệp vụ. Lãnh đạo phòng xem số của
+    phòng mình để sau, nếu đơn vị chạy thử cần.
+  - Lúc xong của văn bản đến lấy từ dòng thời gian (sự kiện báo xong hoặc cho lưu), không thêm cột mới.
+- Phase 3 còn lại: F3.2–F3.5, F3.7–F3.10, F3.12–F3.15.

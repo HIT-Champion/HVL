@@ -887,6 +887,21 @@ input date_comparison_exp {
   _nin: [date!]
 }
 
+scalar float8
+
+"Boolean expression to compare columns of type \"float8\". All fields are combined with logical 'AND'."
+input float8_comparison_exp {
+  _eq: float8
+  _gt: float8
+  _gte: float8
+  _in: [float8!]
+  _is_null: Boolean
+  _lt: float8
+  _lte: float8
+  _neq: float8
+  _nin: [float8!]
+}
+
 scalar jsonb
 
 input jsonb_cast_exp {
@@ -1978,6 +1993,262 @@ input office_registers_stream_cursor_value_input {
   year: Int
 }
 
+"columns and relationships of \"office.v_document_counts\""
+type office_v_document_counts {
+  direction: String
+  documents: Int
+  overdue: Boolean
+  restricted: Boolean
+  status: String
+  tenant_id: uuid
+  urgency: String
+}
+
+"Boolean expression to filter rows from the table \"office.v_document_counts\". All fields are combined with a logical 'AND'."
+input office_v_document_counts_bool_exp {
+  _and: [office_v_document_counts_bool_exp!]
+  _not: office_v_document_counts_bool_exp
+  _or: [office_v_document_counts_bool_exp!]
+  direction: String_comparison_exp
+  documents: Int_comparison_exp
+  overdue: Boolean_comparison_exp
+  restricted: Boolean_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  urgency: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_document_counts\"."
+input office_v_document_counts_order_by {
+  direction: order_by
+  documents: order_by
+  overdue: order_by
+  restricted: order_by
+  status: order_by
+  tenant_id: order_by
+  urgency: order_by
+}
+
+"select columns of table \"office.v_document_counts\""
+enum office_v_document_counts_select_column {
+  "column name"
+  direction
+  "column name"
+  documents
+  "column name"
+  overdue
+  "column name"
+  restricted
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  urgency
+}
+
+"Streaming cursor of the table \"office_v_document_counts\""
+input office_v_document_counts_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_document_counts_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_document_counts_stream_cursor_value_input {
+  direction: String
+  documents: Int
+  overdue: Boolean
+  restricted: Boolean
+  status: String
+  tenant_id: uuid
+  urgency: String
+}
+
+"columns and relationships of \"office.v_outgoing_by_month\""
+type office_v_outgoing_by_month {
+  documents: Int
+  month: date
+  tenant_id: uuid
+}
+
+"Boolean expression to filter rows from the table \"office.v_outgoing_by_month\". All fields are combined with a logical 'AND'."
+input office_v_outgoing_by_month_bool_exp {
+  _and: [office_v_outgoing_by_month_bool_exp!]
+  _not: office_v_outgoing_by_month_bool_exp
+  _or: [office_v_outgoing_by_month_bool_exp!]
+  documents: Int_comparison_exp
+  month: date_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_outgoing_by_month\"."
+input office_v_outgoing_by_month_order_by {
+  documents: order_by
+  month: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_outgoing_by_month\""
+enum office_v_outgoing_by_month_select_column {
+  "column name"
+  documents
+  "column name"
+  month
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_v_outgoing_by_month\""
+input office_v_outgoing_by_month_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_outgoing_by_month_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_outgoing_by_month_stream_cursor_value_input {
+  documents: Int
+  month: date
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.v_overdue_by_department\""
+type office_v_overdue_by_department {
+  code: String
+  department_id: uuid
+  in_progress: Int
+  name: String
+  overdue: Int
+  tenant_id: uuid
+}
+
+"Boolean expression to filter rows from the table \"office.v_overdue_by_department\". All fields are combined with a logical 'AND'."
+input office_v_overdue_by_department_bool_exp {
+  _and: [office_v_overdue_by_department_bool_exp!]
+  _not: office_v_overdue_by_department_bool_exp
+  _or: [office_v_overdue_by_department_bool_exp!]
+  code: String_comparison_exp
+  department_id: uuid_comparison_exp
+  in_progress: Int_comparison_exp
+  name: String_comparison_exp
+  overdue: Int_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_overdue_by_department\"."
+input office_v_overdue_by_department_order_by {
+  code: order_by
+  department_id: order_by
+  in_progress: order_by
+  name: order_by
+  overdue: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_overdue_by_department\""
+enum office_v_overdue_by_department_select_column {
+  "column name"
+  code
+  "column name"
+  department_id
+  "column name"
+  in_progress
+  "column name"
+  name
+  "column name"
+  overdue
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_v_overdue_by_department\""
+input office_v_overdue_by_department_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_overdue_by_department_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_overdue_by_department_stream_cursor_value_input {
+  code: String
+  department_id: uuid
+  in_progress: Int
+  name: String
+  overdue: Int
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.v_processing_time\""
+type office_v_processing_time {
+  documents: Int
+  month: date
+  on_time: Int
+  tenant_id: uuid
+  total_hours: float8
+  with_due: Int
+}
+
+"Boolean expression to filter rows from the table \"office.v_processing_time\". All fields are combined with a logical 'AND'."
+input office_v_processing_time_bool_exp {
+  _and: [office_v_processing_time_bool_exp!]
+  _not: office_v_processing_time_bool_exp
+  _or: [office_v_processing_time_bool_exp!]
+  documents: Int_comparison_exp
+  month: date_comparison_exp
+  on_time: Int_comparison_exp
+  tenant_id: uuid_comparison_exp
+  total_hours: float8_comparison_exp
+  with_due: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_processing_time\"."
+input office_v_processing_time_order_by {
+  documents: order_by
+  month: order_by
+  on_time: order_by
+  tenant_id: order_by
+  total_hours: order_by
+  with_due: order_by
+}
+
+"select columns of table \"office.v_processing_time\""
+enum office_v_processing_time_select_column {
+  "column name"
+  documents
+  "column name"
+  month
+  "column name"
+  on_time
+  "column name"
+  tenant_id
+  "column name"
+  total_hours
+  "column name"
+  with_due
+}
+
+"Streaming cursor of the table \"office_v_processing_time\""
+input office_v_processing_time_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_processing_time_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_processing_time_stream_cursor_value_input {
+  documents: Int
+  month: date
+  on_time: Int
+  tenant_id: uuid
+  total_hours: float8
+  with_due: Int
+}
+
 "column ordering options"
 enum order_by {
   "in ascending order, nulls last"
@@ -2241,6 +2512,58 @@ type query_root {
   ): [office_registers!]!
   "fetch data from the table: \"office.registers\" using primary key columns"
   office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table: \"office.v_document_counts\""
+  office_v_document_counts(
+    "distinct select on columns"
+    distinct_on: [office_v_document_counts_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_document_counts_order_by!]
+    "filter the rows returned"
+    where: office_v_document_counts_bool_exp
+  ): [office_v_document_counts!]!
+  "fetch data from the table: \"office.v_outgoing_by_month\""
+  office_v_outgoing_by_month(
+    "distinct select on columns"
+    distinct_on: [office_v_outgoing_by_month_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_outgoing_by_month_order_by!]
+    "filter the rows returned"
+    where: office_v_outgoing_by_month_bool_exp
+  ): [office_v_outgoing_by_month!]!
+  "fetch data from the table: \"office.v_overdue_by_department\""
+  office_v_overdue_by_department(
+    "distinct select on columns"
+    distinct_on: [office_v_overdue_by_department_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_overdue_by_department_order_by!]
+    "filter the rows returned"
+    where: office_v_overdue_by_department_bool_exp
+  ): [office_v_overdue_by_department!]!
+  "fetch data from the table: \"office.v_processing_time\""
+  office_v_processing_time(
+    "distinct select on columns"
+    distinct_on: [office_v_processing_time_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_processing_time_order_by!]
+    "filter the rows returned"
+    where: office_v_processing_time_bool_exp
+  ): [office_v_processing_time!]!
 }
 
 type subscription_root {
@@ -2606,6 +2929,94 @@ type subscription_root {
     "filter the rows returned"
     where: office_registers_bool_exp
   ): [office_registers!]!
+  "fetch data from the table: \"office.v_document_counts\""
+  office_v_document_counts(
+    "distinct select on columns"
+    distinct_on: [office_v_document_counts_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_document_counts_order_by!]
+    "filter the rows returned"
+    where: office_v_document_counts_bool_exp
+  ): [office_v_document_counts!]!
+  "fetch data from the table in a streaming manner: \"office.v_document_counts\""
+  office_v_document_counts_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_document_counts_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_document_counts_bool_exp
+  ): [office_v_document_counts!]!
+  "fetch data from the table: \"office.v_outgoing_by_month\""
+  office_v_outgoing_by_month(
+    "distinct select on columns"
+    distinct_on: [office_v_outgoing_by_month_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_outgoing_by_month_order_by!]
+    "filter the rows returned"
+    where: office_v_outgoing_by_month_bool_exp
+  ): [office_v_outgoing_by_month!]!
+  "fetch data from the table in a streaming manner: \"office.v_outgoing_by_month\""
+  office_v_outgoing_by_month_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_outgoing_by_month_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_outgoing_by_month_bool_exp
+  ): [office_v_outgoing_by_month!]!
+  "fetch data from the table: \"office.v_overdue_by_department\""
+  office_v_overdue_by_department(
+    "distinct select on columns"
+    distinct_on: [office_v_overdue_by_department_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_overdue_by_department_order_by!]
+    "filter the rows returned"
+    where: office_v_overdue_by_department_bool_exp
+  ): [office_v_overdue_by_department!]!
+  "fetch data from the table in a streaming manner: \"office.v_overdue_by_department\""
+  office_v_overdue_by_department_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_overdue_by_department_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_overdue_by_department_bool_exp
+  ): [office_v_overdue_by_department!]!
+  "fetch data from the table: \"office.v_processing_time\""
+  office_v_processing_time(
+    "distinct select on columns"
+    distinct_on: [office_v_processing_time_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_processing_time_order_by!]
+    "filter the rows returned"
+    where: office_v_processing_time_bool_exp
+  ): [office_v_processing_time!]!
+  "fetch data from the table in a streaming manner: \"office.v_processing_time\""
+  office_v_processing_time_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_processing_time_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_processing_time_bool_exp
+  ): [office_v_processing_time!]!
 }
 
 scalar timestamptz

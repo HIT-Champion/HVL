@@ -13,6 +13,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "echarts": "6.1.0",
     "nuxt": "4.5.2",
     "oidc-client-ts": "3.5.0",
     "vue-i18n": "11.4.13"

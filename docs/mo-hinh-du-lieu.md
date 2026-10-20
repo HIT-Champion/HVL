@@ -424,12 +424,22 @@ Xem lại hồ sơ đã lưu: `svc-files` đọc Parquet bằng DuckDB, hiển t
 
 ### 2.5. Khung nhìn cho báo cáo
 
-Hasura theo dõi các view sau, cùng quy tắc lọc thuê ước như bảng gốc:
+Dashboard điều hành (F3.11, migration `1792281601200_dashboard`) đọc bốn view chỉ có số đếm, đã gom theo thuê
+ước: không cột nào chứa trích yếu, số ký hiệu hay tên người. Hasura cho `director` đọc, lọc
+`tenant_id = X-Hasura-Tenant-Id`; vai trò khác không thấy. "Hôm nay", "tháng" tính theo giờ Việt Nam.
 
-| View | Dùng cho |
-|---|---|
-| `office.v_overdue_by_department` | Dashboard: việc quá hạn theo phòng (F3.11) |
-| `office.v_processing_time` | Dashboard: thời gian từ vào sổ đến hoàn thành |
+**Văn bản hạn chế không vào phép chia nào.** Lãnh đạo đọc được mọi văn bản khác của đơn vị, nên lấy số chia trừ đi
+số văn bản mình thấy là ra trạng thái, độ khẩn, phòng xử lý, thời gian xử lý của văn bản hạn chế — đúng thứ sổ đăng
+ký in che đi (F2.8). Chúng chỉ có một con số tổng mỗi chiều (`v_document_counts`, `restricted = true`), như sổ đăng
+ký vẫn cho biết có bao nhiêu văn bản. Nhờ vậy mọi số chia trên dashboard tính lại được từ văn bản người xem đọc
+được (smoke kiểm đúng điều này).
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.v_document_counts` | `direction`, `restricted`, `status`, `urgency`, `overdue`, `documents` | Văn bản đến theo trạng thái, văn bản khẩn chưa xong, số quá hạn (văn bản đến chưa xong — chờ vào sổ, chờ chỉ đạo, đang xử lý — mà đã qua `due_on`). Dòng `restricted = true`: số văn bản hạn chế, `status`, `urgency`, `overdue` để null |
+| `office.v_overdue_by_department` | `department_id`, `code`, `name`, `in_progress`, `overdue` | Văn bản đến đang xử lý theo phòng chủ trì: việc chủ trì gốc giao cho phòng, hoặc giao cho một người thì tính về phòng của người đó (`core.users`). Phòng chưa có việc vẫn có dòng, số 0. Không xác định được phòng thì vào dòng `department_id` null ("Chưa rõ phòng"), để tổng luôn bằng số văn bản đang xử lý |
+| `office.v_processing_time` | `month`, `documents`, `total_hours`, `with_due`, `on_time` | Thời gian từ vào sổ đến khi xong, theo tháng xong. Lúc xong là sự kiện `office.document.processed` (báo xong) hoặc `office.document.filed` (cho lưu) trên dòng thời gian, ghi cùng giao dịch với trạng thái `done`. Trả tổng số giờ để giao diện tự chia, gộp nhiều tháng không lệch; `on_time` đếm trong số `with_due` (văn bản có hạn) |
+| `office.v_outgoing_by_month` | `month`, `documents` | Văn bản đi đã phát hành theo tháng ban hành |
 
 Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
@@ -640,7 +650,7 @@ qua HTTP API nội bộ của Centrifugo:
 | `document.processed` | Lãnh đạo đã chỉ đạo, lãnh đạo phòng đã phân công | Người xử lý báo xong |
 | `document.overdue` | Người xử lý, người giao việc, lãnh đạo đơn vị | Văn bản đến qua hạn giải quyết |
 
-Kênh `dashboard:<tenant_id>` cho dashboard làm ở Phase 3.
+Dashboard điều hành (F3.11) không dùng kênh realtime: số liệu tính lúc mở trang, có nút làm mới (§2.5).
 
 ---
 

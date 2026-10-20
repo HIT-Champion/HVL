@@ -12,7 +12,7 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `clerk` (văn thư) | `vanthu` | 25 | 6 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
 | `staff` (chuyên viên) | `chuyenviendt` | 23 | 14 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 23 | 4 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 30 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 34 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
 | `tenant_admin` (quản trị đơn vị) | `quantri` | 18 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
@@ -49,6 +49,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_documents_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_registers` | ✓ |  |  | ✓ | ✓ |
 | `office_registers_by_pk` | ✓ |  |  | ✓ | ✓ |
+| `office_v_document_counts` |  |  |  | ✓ |  |
+| `office_v_outgoing_by_month` |  |  |  | ✓ |  |
+| `office_v_overdue_by_department` |  |  |  | ✓ |  |
+| `office_v_processing_time` |  |  |  | ✓ |  |
 
 ## Thao tác ghi (`mutation`)
 

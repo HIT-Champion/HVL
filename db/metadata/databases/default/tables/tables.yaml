@@ -31,3 +31,7 @@
 - "!include office_assignments.yaml"
 - "!include office_document_events.yaml"
 - "!include office_issued_documents.yaml"
+- "!include office_v_document_counts.yaml"
+- "!include office_v_overdue_by_department.yaml"
+- "!include office_v_processing_time.yaml"
+- "!include office_v_outgoing_by_month.yaml"

@@ -1,0 +1,27 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Dashboard điều hành (F3.11, migration 1792281601200): số văn bản theo chiều, trạng thái, độ khẩn, quá hạn.
+# Chỉ có số đếm, không cột nào chứa trích yếu, số ký hiệu hay tên người; văn bản hạn chế không vào phép chia nào
+# (migration giải thích). Lãnh đạo đơn vị đọc số của đơn vị mình.
+table:
+  name: v_document_counts
+  schema: office
+select_permissions:
+  - role: director
+    permission:
+      columns: [tenant_id, direction, restricted, status, urgency, overdue, documents]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}

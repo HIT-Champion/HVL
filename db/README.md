@@ -27,7 +27,8 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
 | `core.file_texts` (lớp chữ của PDF để tìm theo nội dung, F2.7): không vai trò người dùng nào đọc được, xóa tệp thì xóa theo, không gắn sổ kiểm toán; tệp của văn bản hạn chế không có chữ (trigger) | **Xong** — 10 test |
 | `core.notifications` (thông báo từng người, F2.5): mỗi người chỉ đọc và đánh dấu đã đọc thông báo của mình, chống gửi trùng theo khóa | **Xong** — 6 test |
-| `office.case_files` (hồ sơ, nộp lưu) và các view báo cáo | Phase 2–3 |
+| View cho dashboard điều hành (F3.11): `office.v_document_counts`, `v_overdue_by_department`, `v_processing_time`, `v_outgoing_by_month` — chỉ có số đếm, lãnh đạo đơn vị đọc số của đơn vị mình; văn bản hạn chế không vào phép chia nào, chỉ có con số tổng | **Xong** — 6 test, trên một đơn vị riêng nên số đếm biết trước |
+| `office.case_files` (hồ sơ, nộp lưu) | Phase 3 |
 
 ## Vai trò
 

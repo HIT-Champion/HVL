@@ -130,6 +130,14 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   hiện mẫu mã độc, cỡ tệp của tệp bị chặn (tên tệp vẫn ẩn). `make smoke` kiểm thêm dòng sổ của lần chặn (tổng
   41); `make e2e` thêm kịch bản văn thư tải tệp nhiễm, lãnh đạo xem lần chặn trong sổ (#37). Trang tiếp nhận hiện
   đúng mẫu mã độc của tệp bị chặn (trước đó chỉ hiện thông báo chung).
+- Dashboard điều hành (F3.11) cho lãnh đạo đơn vị, trang **Điều hành**: văn bản đến chưa xong, quá hạn, khẩn chưa
+  xong, thời gian xử lý trung bình (từ vào sổ đến khi xong, tỉ lệ đúng hạn); biểu đồ Apache ECharts văn bản đến
+  theo trạng thái, đang xử lý và quá hạn theo phòng chủ trì, thời gian xử lý và văn bản đi phát hành theo tháng,
+  kèm bảng số. Số liệu từ bốn view chỉ có số đếm (`office.v_document_counts`, `v_overdue_by_department`,
+  `v_processing_time`, `v_outgoing_by_month`) qua Hasura, theo đúng thuê ước trong token; vai trò khác không đọc
+  được. Văn bản hạn chế không vào phép chia nào, chỉ có con số tổng, để không ai trừ ra được trạng thái của chúng.
+  `make smoke` thêm 2 kiểm tra (tổng 43), kiểm số chia khớp đúng văn bản lãnh đạo đọc được; `make e2e` thêm kịch
+  bản lãnh đạo xem dashboard, văn thư không có mục này (#38).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

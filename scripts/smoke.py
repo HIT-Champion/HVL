@@ -22,7 +22,8 @@ Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chu
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
 mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Thông báo: tổ trưởng nhận tin việc mới
 qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
-kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả
+kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
+có con số tổng), văn thư không đọc được. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả
 chuỗi ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị,
 đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới hạn tốc độ.
 """
@@ -478,6 +479,33 @@ def main() -> None:
         and "document.issued" in [n["kind"] for n in issued_note] \
         or fail(f"thông báo đã lưu chưa đúng: {mine} / {theirs} / {issued_note}")
     ok("thông báo lưu lại cho người nhận (người khác không đọc được); người soạn có tin văn bản đã phát hành")
+
+    print("Dashboard điều hành")
+    board = director.gql("""{ office_v_document_counts { direction restricted documents }
+        office_v_overdue_by_department { in_progress }
+        office_v_processing_time { documents }
+        office_v_outgoing_by_month { month documents }
+        readable: office_documents_aggregate(where: {direction: {_eq: "in"}, restricted: {_eq: false}}) {
+          aggregate { count } }
+        working: office_documents_aggregate(where: {direction: {_eq: "in"}, status: {_eq: "in_progress"},
+          restricted: {_eq: false}}) { aggregate { count } } }""")
+    counted = sum(r["documents"] for r in board["office_v_document_counts"] if r["direction"] == "in" and not r["restricted"])
+    hidden = sum(r["documents"] for r in board["office_v_document_counts"] if r["direction"] == "in" and r["restricted"])
+    by_department = sum(r["in_progress"] for r in board["office_v_overdue_by_department"])
+    month = datetime.now(timezone(timedelta(hours=7))).date().replace(day=1).isoformat()
+    this_month = sum(r["documents"] for r in board["office_v_outgoing_by_month"] if r["month"] == month)
+    # Số chia khớp đúng văn bản lãnh đạo đọc được; văn bản hạn chế vừa tiếp nhận chỉ vào con số tổng
+    counted == board["readable"]["aggregate"]["count"] and hidden >= 1 \
+        and by_department == board["working"]["aggregate"]["count"] and this_month >= 1 \
+        and board["office_v_processing_time"] \
+        or fail(f"dashboard chưa đúng: {board}")
+    ok(f"lãnh đạo khoa xem dashboard: {counted} văn bản đến, tổng theo phòng khớp {by_department} văn bản đang xử "
+       f"lý, {this_month} văn bản đi phát hành tháng này; {hidden} văn bản hạn chế chỉ có con số tổng")
+    try:
+        clerk.gql("{ office_v_document_counts { documents } }")
+        fail("văn thư đọc được số liệu dashboard")
+    except RuntimeError:
+        ok("dashboard chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
 
     print("Sổ kiểm toán (neo hash ra ngoài CSDL)")
     moc = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "audit"]

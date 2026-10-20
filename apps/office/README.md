@@ -8,7 +8,7 @@ chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi 
 
 | Thư mục | Nội dung |
 |---|---|
-| `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem` (cả chữ trong tệp PDF, nhãn "Khớp trong nội dung"), `so-dang-ky` (văn thư, lãnh đạo đơn vị: sổ đến / đi theo năm, in PDF), `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
+| `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết), `tim-kiem` (cả chữ trong tệp PDF, nhãn "Khớp trong nội dung"), `so-dang-ky` (văn thư, lãnh đạo đơn vị: sổ đến / đi theo năm, in PDF), `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `dieu-hanh` (dashboard điều hành, lãnh đạo đơn vị; biểu đồ ECharts qua `app/components/EChart.vue`, kèm bảng số), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
 | `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm, sổ đăng ký), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo) |
 | `app/components/TaskPanel.vue` | Khung xử lý theo `formKey` của BPMN |
 | `scripts/forms.mjs`, `app/utils/forms.ts` | Biên dịch `schemas/*.json` (gốc repo) thành mã kiểm form lúc dựng; quy lỗi về `{trường: mã}` như svc-workflow |

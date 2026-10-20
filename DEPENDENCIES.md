@@ -82,7 +82,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
 | PDF.js (`pdfjs-dist`) | 6.4 | Apache-2.0 | Xem PDF ngay trên trang | npm | 2 |
-| Apache ECharts | 6.1 | Apache-2.0 | Biểu đồ dashboard điều hành | npm | 3 |
+| Apache ECharts | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
 
 Thư viện gián tiếp (khoảng 600 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
 giấy phép MIT, ISC, Apache-2.0, BSD, BlueOak-1.0.0, MPL-2.0 hoặc CC0 — đã quét `node_modules` ngày
