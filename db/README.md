@@ -30,6 +30,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Sao lưu, khôi phục (F3.4): `pg_dump -Fc` → `pg_restore` giữ nguyên mọi dòng và hash của sổ kiểm toán; dòng `system.restored` nối tiếp chuỗi | **Xong** — 2 test, dump và restore ngay trong container PostgreSQL thử |
 | View cho dashboard điều hành (F3.11): `office.v_document_counts`, `v_overdue_by_department`, `v_processing_time`, `v_outgoing_by_month` — chỉ có số đếm, lãnh đạo đơn vị đọc số của đơn vị mình; văn bản hạn chế không vào phép chia nào, chỉ có con số tổng | **Xong** — 6 test, trên một đơn vị riêng nên số đếm biết trước |
 | Hồ sơ công việc, nộp lưu (F3.8): `office.case_files`, `office.case_file_documents`; trigger: chỉ văn bản đã xử lý xong, không hạn chế vào hồ sơ đang mở, ngày đóng do CSDL đặt, hồ sơ rỗng không đóng được, đóng rồi không mở lại, đã nộp lưu thì đóng băng; chuyên viên, tổ trưởng lập và đóng hồ sơ của phòng mình, chỉ đưa vào văn bản mình đọc được và thuộc phòng mình; hàm `office.archive_case_file` chỉ khóa quản trị gọi được, CSDL lệch với gói thì không đổi gì, lần hai bị từ chối; tệp đã nộp lưu không gắn lại vào dự thảo; sổ thấy ký hiệu hồ sơ, băm gói, không thấy tên hồ sơ | **Xong** — 7 test |
+| Phả hệ dữ liệu (F3.9): `core.lineage_events` chỉ thêm (trigger chặn sửa, xóa kể cả ghi thẳng CSDL); lãnh đạo, văn thư đọc của đơn vị mình; vai trò khác không thấy, không ai ghi | **Xong** — 2 test |
 
 ## Vai trò
 

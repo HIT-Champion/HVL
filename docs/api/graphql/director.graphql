@@ -544,6 +544,185 @@ input core_files_stream_cursor_value_input {
   storage_tier: String
 }
 
+"columns and relationships of \"core.lineage_events\""
+type core_lineage_events {
+  event(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  event_time: timestamptz!
+  event_type: String!
+  id: bigint!
+  inputs: [String!]!
+  job: String!
+  outputs: [String!]!
+  parent_run_id: uuid
+  quality_ok: Boolean
+  run_id: uuid!
+}
+
+"aggregated selection of \"core.lineage_events\""
+type core_lineage_events_aggregate {
+  aggregate: core_lineage_events_aggregate_fields
+  nodes: [core_lineage_events!]!
+}
+
+"aggregate fields of \"core.lineage_events\""
+type core_lineage_events_aggregate_fields {
+  avg: core_lineage_events_avg_fields
+  count(columns: [core_lineage_events_select_column!], distinct: Boolean): Int!
+  max: core_lineage_events_max_fields
+  min: core_lineage_events_min_fields
+  stddev: core_lineage_events_stddev_fields
+  stddev_pop: core_lineage_events_stddev_pop_fields
+  stddev_samp: core_lineage_events_stddev_samp_fields
+  sum: core_lineage_events_sum_fields
+  var_pop: core_lineage_events_var_pop_fields
+  var_samp: core_lineage_events_var_samp_fields
+  variance: core_lineage_events_variance_fields
+}
+
+"aggregate avg on columns"
+type core_lineage_events_avg_fields {
+  id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.lineage_events\". All fields are combined with a logical 'AND'."
+input core_lineage_events_bool_exp {
+  _and: [core_lineage_events_bool_exp!]
+  _not: core_lineage_events_bool_exp
+  _or: [core_lineage_events_bool_exp!]
+  event: jsonb_comparison_exp
+  event_time: timestamptz_comparison_exp
+  event_type: String_comparison_exp
+  id: bigint_comparison_exp
+  inputs: String_array_comparison_exp
+  job: String_comparison_exp
+  outputs: String_array_comparison_exp
+  parent_run_id: uuid_comparison_exp
+  quality_ok: Boolean_comparison_exp
+  run_id: uuid_comparison_exp
+}
+
+"aggregate max on columns"
+type core_lineage_events_max_fields {
+  event_time: timestamptz
+  event_type: String
+  id: bigint
+  inputs: [String!]
+  job: String
+  outputs: [String!]
+  parent_run_id: uuid
+  run_id: uuid
+}
+
+"aggregate min on columns"
+type core_lineage_events_min_fields {
+  event_time: timestamptz
+  event_type: String
+  id: bigint
+  inputs: [String!]
+  job: String
+  outputs: [String!]
+  parent_run_id: uuid
+  run_id: uuid
+}
+
+"Ordering options when selecting data from \"core.lineage_events\"."
+input core_lineage_events_order_by {
+  event: order_by
+  event_time: order_by
+  event_type: order_by
+  id: order_by
+  inputs: order_by
+  job: order_by
+  outputs: order_by
+  parent_run_id: order_by
+  quality_ok: order_by
+  run_id: order_by
+}
+
+"select columns of table \"core.lineage_events\""
+enum core_lineage_events_select_column {
+  "column name"
+  event
+  "column name"
+  event_time
+  "column name"
+  event_type
+  "column name"
+  id
+  "column name"
+  inputs
+  "column name"
+  job
+  "column name"
+  outputs
+  "column name"
+  parent_run_id
+  "column name"
+  quality_ok
+  "column name"
+  run_id
+}
+
+"aggregate stddev on columns"
+type core_lineage_events_stddev_fields {
+  id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_lineage_events_stddev_pop_fields {
+  id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_lineage_events_stddev_samp_fields {
+  id: Float
+}
+
+"Streaming cursor of the table \"core_lineage_events\""
+input core_lineage_events_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_lineage_events_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_lineage_events_stream_cursor_value_input {
+  event: jsonb
+  event_time: timestamptz
+  event_type: String
+  id: bigint
+  inputs: [String!]
+  job: String
+  outputs: [String!]
+  parent_run_id: uuid
+  quality_ok: Boolean
+  run_id: uuid
+}
+
+"aggregate sum on columns"
+type core_lineage_events_sum_fields {
+  id: bigint
+}
+
+"aggregate var_pop on columns"
+type core_lineage_events_var_pop_fields {
+  id: Float
+}
+
+"aggregate var_samp on columns"
+type core_lineage_events_var_samp_fields {
+  id: Float
+}
+
+"aggregate variance on columns"
+type core_lineage_events_variance_fields {
+  id: Float
+}
+
 "columns and relationships of \"core.notifications\""
 type core_notifications {
   created_at: timestamptz!
@@ -2563,6 +2742,34 @@ type query_root {
   ): [core_files!]!
   "fetch data from the table: \"core.files\" using primary key columns"
   core_files_by_pk(id: uuid!): core_files
+  "fetch data from the table: \"core.lineage_events\""
+  core_lineage_events(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): [core_lineage_events!]!
+  "fetch aggregated fields from the table: \"core.lineage_events\""
+  core_lineage_events_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): core_lineage_events_aggregate!
+  "fetch data from the table: \"core.lineage_events\" using primary key columns"
+  core_lineage_events_by_pk(id: bigint!): core_lineage_events
   "fetch data from the table: \"core.notifications\""
   core_notifications(
     "distinct select on columns"
@@ -2921,6 +3128,43 @@ type subscription_root {
     "filter the rows returned"
     where: core_files_bool_exp
   ): [core_files!]!
+  "fetch data from the table: \"core.lineage_events\""
+  core_lineage_events(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): [core_lineage_events!]!
+  "fetch aggregated fields from the table: \"core.lineage_events\""
+  core_lineage_events_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): core_lineage_events_aggregate!
+  "fetch data from the table: \"core.lineage_events\" using primary key columns"
+  core_lineage_events_by_pk(id: bigint!): core_lineage_events
+  "fetch data from the table in a streaming manner: \"core.lineage_events\""
+  core_lineage_events_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_lineage_events_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): [core_lineage_events!]!
   "fetch data from the table: \"core.notifications\""
   core_notifications(
     "distinct select on columns"

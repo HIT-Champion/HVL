@@ -631,6 +631,20 @@ def main() -> None:
     ok(f"hồ sơ nộp lưu thành gói Parquet + {len(room['files'])} tệp + manifest trên bucket lạnh khóa ghi; CSDL chỉ"
        " còn bản ghi rút gọn; quét QR vẫn khớp; phòng đọc kiểm băm, DuckDB đọc lại danh sách văn bản")
 
+    # F3.9: lượt nộp lưu vừa rồi có phả hệ OpenLineage — run cha + 4 bước, bảng Parquet đã qua kiểm chất lượng
+    print("Phả hệ dữ liệu")
+    pkg = archived["archived"][0]
+    runs = director.gql("""query ($r: uuid!) { core_lineage_events(where: {run_id: {_eq: $r},
+        event_type: {_eq: "COMPLETE"}}) { run_id outputs } }""", {"r": pkg["run_id"]})["core_lineage_events"]
+    runs and runs[0]["outputs"][0].endswith(f"{pkg['archive_key']}manifest-{pkg['archive_sha256']}.json") \
+        or fail(f"không có phả hệ của lượt nộp lưu vừa rồi: {runs}")
+    steps = director.gql("""query ($r: uuid!) { core_lineage_events(where: {parent_run_id: {_eq: $r}},
+        order_by: {id: asc}) { job event_type quality_ok } }""", {"r": runs[0]["run_id"]})["core_lineage_events"]
+    [(e["job"].rsplit(".", 1)[1], e["event_type"]) for e in steps] == [
+        ("files", "COMPLETE"), ("tables", "COMPLETE"), ("manifest", "COMPLETE"), ("commit", "COMPLETE")] \
+        and steps[1]["quality_ok"] is True or fail(f"phả hệ thiếu bước hoặc bảng chưa qua kiểm chất lượng: {steps}")
+    ok("lượt nộp lưu là một run OpenLineage với 4 bước (tệp, bảng, manifest, CSDL); bảng Parquet đạt kiểm số dòng, null")
+
     # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
     print("Giới hạn tốc độ")
     _, headers = call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={

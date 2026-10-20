@@ -806,3 +806,24 @@ Phase 2:
   ký hiệu, trích yếu); thống kê thời gian xử lý không tính văn bản đã nộp lưu (dòng thời gian đã rời CSDL); gói đã
   ghi thì trong thời hạn bảo quản không ai xóa được, kể cả quản trị kho.
 - Phase 3 còn lại: F3.5, F3.7, F3.9, F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.9 (Phase 3):
+
+- **F3.9 xong.** Phả hệ dữ liệu và kiểm chất lượng (màn (iii)):
+  - svc-files (`svc_files.lineage`): mỗi lượt nộp lưu (F3.8) là một run OpenLineage 2-0-2 của job
+    `moc.case_file.archive` với 4 run con — `files`, `tables`, `manifest`, `commit` (facet `parent`); tên dataset
+    theo quy ước OpenLineage: `postgres://postgres:5432` + `moc.<schema>.<bảng>`, `s3://<bucket>` + key;
+  - kiểm chất lượng: bảng Parquet dựng xong được DuckDB đọc lại — số dòng bằng số dòng lấy từ CSDL, cột bắt buộc không
+    null (facet `dataQualityAssertions`, `outputStatistics`, `schema`); trượt thì bước FAIL, cảnh báo trong nhật ký,
+    job dừng trước khi ghi gì sang bucket lạnh (đổi thứ tự so với F3.8: dựng và kiểm bảng trước, chép tệp sau);
+  - CSDL: `core.lineage_events` (migration `1792281601400_lineage`), chỉ thêm (trigger chặn sửa, xóa), lãnh đạo và
+    văn thư đọc của đơn vị mình qua Hasura; cột `event` giữ nguyên sự kiện;
+  - `make demo-pha-he` (màn (iii), bước CI), `make smoke` +1 (tổng 48), 2 test CSDL, 6 test đơn vị.
+- Chỗ khác kế hoạch:
+  - Chưa dựng Marquez trong compose: thêm máy chủ Java và CSDL riêng (~1 GB RAM) cho một job mỗi giờ; bản phát hành
+    gần nhất đã từ 03/2025. Sự kiện lưu trong PostgreSQL — đúng phương án dự phòng đã ghi trong `DEPENDENCIES.md` —
+    và gửi được sang Marquez bằng `MOC_OPENLINEAGE_URL` (có test đơn vị, chưa thử với Marquez thật).
+  - Không dùng `openlineage-python`: sự kiện dựng bằng thư viện chuẩn, không thêm phụ thuộc.
+  - Phả hệ mới phủ job nộp lưu (job dữ liệu duy nhất hiện có); "báo cáo" của dashboard (F3.11) đọc thẳng view, chưa có
+    job nên chưa có run.
+- Phase 3 còn lại: F3.5, F3.7, F3.10, F3.12–F3.15.

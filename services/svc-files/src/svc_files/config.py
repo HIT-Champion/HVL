@@ -65,6 +65,7 @@ class Settings:
     anchor_retention_days: int      # hạn giữ mỗi mốc neo, trong hạn không ai xóa được
     archive_interval_s: float = 3600.0  # chu kỳ nộp lưu hồ sơ đã đóng (F3.8); 0: tắt vòng nền
     archive_after_days: int = 365   # hồ sơ đóng từ chừng ấy ngày thì nộp lưu (NĐ 30: trong 01 năm)
+    openlineage_url: str = ""       # gửi thêm sự kiện phả hệ tới máy chủ OpenLineage (vd Marquez); rỗng: chỉ ghi CSDL
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -104,6 +105,7 @@ class Settings:
                 anchor_retention_days=int(env.get("MOC_AUDIT_ANCHOR_RETENTION_DAYS", "3650")),
                 archive_interval_s=float(env.get("MOC_ARCHIVE_INTERVAL_S", "3600")),
                 archive_after_days=int(env.get("MOC_ARCHIVE_AFTER_DAYS", "365")),
+                openlineage_url=env.get("MOC_OPENLINEAGE_URL", "").strip(),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc

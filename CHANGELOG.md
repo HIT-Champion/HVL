@@ -182,6 +182,12 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   `case_file.read`. Sổ kiểm toán thấy ký hiệu hồ sơ, băm gói, không thấy tên hồ sơ. `make demo-nong-lanh` (màn (i),
   cũng là bước CI); `make smoke` thêm 1 kiểm tra (tổng 47). Giới hạn: chưa có giao diện lập hồ sơ, phòng đọc chưa xem
   được tệp (cùng đợt F3.7), lớp chữ PDF của văn bản đã nộp lưu không còn trong chỉ mục tìm kiếm (#42).
+- Phả hệ dữ liệu và kiểm chất lượng (F3.9, màn (iii)): mỗi lượt nộp lưu là một run OpenLineage 2-0-2 với 4 bước (tệp,
+  bảng, manifest, CSDL), tên dataset theo quy ước `postgres://…/moc.<schema>.<bảng>`, `s3://<bucket>/<key>`; sự kiện
+  lưu trong bảng chỉ thêm `core.lineage_events` (lãnh đạo, văn thư đọc của đơn vị mình), gửi thêm tới Marquez khi đặt
+  `MOC_OPENLINEAGE_URL`. Bảng Parquet được kiểm số dòng = CSDL và cột bắt buộc không null trước khi ghi gì sang kho
+  lạnh; trượt thì dừng, sự kiện FAIL nằm lại trong phả hệ. `make demo-pha-he` (cũng là bước CI); `make smoke` thêm 1
+  kiểm tra (tổng 48). Chưa dựng Marquez trong compose (#43).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

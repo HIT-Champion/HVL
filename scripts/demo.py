@@ -488,7 +488,103 @@ def nong_lanh() -> None:
     ok(f"sổ kiểm toán dòng #{event}: case_file.archived kèm archive_sha256 — lần nộp lưu cũng nằm trong chuỗi băm")
 
 
-DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi}
+LINEAGE_RUNS = """query { core_lineage_events(where: {job: {_eq: "moc.case_file.archive"}, event_type: {_eq: "COMPLETE"}},
+  order_by: {id: desc}, limit: 1) { run_id outputs } }"""
+LINEAGE_OF = """query ($run: uuid!) { core_lineage_events(order_by: {id: asc},
+  where: {_or: [{run_id: {_eq: $run}}, {parent_run_id: {_eq: $run}}]}) {
+  run_id parent_run_id job event_type inputs outputs quality_ok event } }"""
+QUALITY_FAILED = """query { core_lineage_events_aggregate(where: {quality_ok: {_eq: false}}) { aggregate { count } } }"""
+
+
+def short(name: str) -> str:
+    """Rút gọn tên dataset để in: bỏ namespace postgres, bỏ tiền tố cold/<tenant>/case/<id>/, băm còn 8 ký tự."""
+    name = name.removeprefix("postgres://postgres:5432/")
+    if "/case/" in name:
+        name = "…/" + name.split("/case/", 1)[1].split("/", 1)[1]
+    elif name.startswith("s3://") and "/tenant/" in name:
+        name = name.split("/tenant/", 1)[0] + "/tenant/…/" + name.rsplit("/", 1)[1][:8] + "…"
+    folder, _, base = name.rpartition("/")
+    if "-" in base:                                # documents-<sha256>.parquet, manifest-<sha256>.json
+        head, _, tail = base.rpartition("-")
+        base = f"{head}-{tail[:8]}…{tail[64:]}" if len(tail) > 64 else base
+    elif len(base) == 64:                          # files/<sha256>
+        base = f"{base[:8]}…"
+    return f"{folder}/{base}" if folder else base
+
+
+def pha_he() -> None:
+    print("Màn (iii) · Quản trị dữ liệu: phả hệ + kiểm chất lượng — mỗi bước nộp lưu là một run OpenLineage; gói lưu trữ"
+          " truy ngược được về bảng nghiệp vụ; bảng Parquet nào cũng được kiểm số dòng và null trước khi ghi")
+    director = Session("truongkhoa")
+
+    say(1, "Lượt nộp lưu gần nhất (chưa có thì chạy màn (i) trước)")
+    runs = director.gql(LINEAGE_RUNS)["core_lineage_events"]
+    if not runs:
+        nong_lanh()
+        runs = director.gql(LINEAGE_RUNS)["core_lineage_events"]
+    if not runs:
+        raise DemoFailed("nộp lưu xong mà không có sự kiện phả hệ nào trong core.lineage_events")
+    run = runs[0]["run_id"]
+    events = director.gql(LINEAGE_OF, {"run": run})["core_lineage_events"]
+    steps = [e for e in events if e["parent_run_id"] == run]
+    names = [e["job"].rsplit(".", 1)[1] for e in steps]
+    if names != ["files", "tables", "manifest", "commit"] or any(e["event_type"] != "COMPLETE" for e in steps):
+        raise DemoFailed(f"lượt nộp lưu {run} thiếu bước: {[(e['job'], e['event_type']) for e in steps]}")
+    ok(f"run {run[:8]}… của job moc.case_file.archive: START → 4 run con (files, tables, manifest, commit) → COMPLETE;"
+       " lãnh đạo đọc qua Hasura, chỉ đơn vị mình")
+    for e in steps:
+        ins = ", ".join(sorted({short(i) for i in e["inputs"]}))
+        outs = ", ".join(sorted({short(o) for o in e["outputs"]}))
+        print(f"       · {e['job'].rsplit('.', 1)[1]:<8} {ins}\n                  → {outs}")
+
+    say(2, "Truy ngược: gói lưu trữ ← bảng Parquet / tệp ← bảng nghiệp vụ, bucket nóng")
+    # bước commit ghi ngược vào chính các bảng nghiệp vụ: bỏ ra, phả hệ của gói dừng ở nguồn
+    produced = {o: e for e in steps if not e["job"].endswith(".commit") for o in e["outputs"]}
+    manifest = runs[0]["outputs"][0]
+    seen: set[str] = set()
+    expanded: set[str] = set()      # mỗi bước chỉ in đầu vào một lần
+
+    def trace(name: str, depth: int) -> None:
+        print(f"       {'   ' * depth}{'← ' if depth else ''}{short(name)}")
+        step = produced.get(name)
+        if name in seen or not step:
+            return
+        seen.add(name)
+        if step["run_id"] in expanded:
+            print(f"       {'   ' * (depth + 1)}← (cùng bước {step['job'].rsplit('.', 1)[1]}, như trên)")
+            return
+        expanded.add(step["run_id"])
+        for parent in sorted(set(step["inputs"])):
+            trace(parent, depth + 1)
+    trace(manifest, 0)
+    tables = next(e for e in steps if e["job"].endswith(".tables"))
+    if not any(i.endswith("moc.office.documents") for i in tables["inputs"]):
+        raise DemoFailed("phả hệ không dẫn bảng Parquet về office.documents")
+    ok("manifest dẫn về documents/assignments/events.parquet và từng tệp; Parquet dẫn về office.documents,"
+       " office.assignments, office.document_events")
+
+    say(3, "Kiểm chất lượng của từng bảng trước khi ghi sang bucket lạnh")
+    for out in tables["event"]["outputs"]:
+        checks = out["facets"]["dataQualityAssertions"]["assertions"]
+        rows = out["outputFacets"]["outputStatistics"]["rowCount"]
+        not_null = [a for a in checks if a["assertion"] == "not_null"]
+        same = next(a for a in checks if a["assertion"] == "row_count_equals_source")
+        if not all(a["success"] for a in checks):
+            raise DemoFailed(f"{short(out['name'])}: {checks}")
+        ok(f"{short(out['namespace'] + '/' + out['name'])}: {rows} dòng = số dòng trong CSDL"
+           f" ({'✓' if same['success'] else '✗'}); {len(not_null)} cột bắt buộc không null ✓")
+    failed = director.gql(QUALITY_FAILED)["core_lineage_events_aggregate"]["aggregate"]["count"]
+    ok(f"bảng trượt kiểm thì job dừng trước khi ghi gì sang lạnh, sự kiện FAIL nằm lại trong phả hệ — đơn vị này hiện"
+       f" có {failed} bước trượt")
+
+    say(4, "Sự kiện theo đặc tả OpenLineage — chuyển được sang Marquez (MOC_OPENLINEAGE_URL)")
+    first = events[0]["event"]
+    ok(f"{first['schemaURL']} · producer {first['producer'].rsplit('/', 2)[-1]} · namespace job"
+       f" '{first['job']['namespace']}'; tên dataset theo quy ước postgres://host:port/db.schema.bảng, s3://bucket/key")
+
+
+DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi,
+         "pha-he": pha_he}
 
 
 def main(argv: list[str] | None = None) -> int:

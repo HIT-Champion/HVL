@@ -300,6 +300,7 @@ services:
       # F3.8 — nộp lưu hồ sơ đã đóng sang bucket lạnh
       MOC_ARCHIVE_INTERVAL_S: ${MOC_ARCHIVE_INTERVAL_S:-3600}
       MOC_ARCHIVE_AFTER_DAYS: ${MOC_ARCHIVE_AFTER_DAYS:-365}
+      MOC_OPENLINEAGE_URL: ${MOC_OPENLINEAGE_URL:-}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     depends_on:

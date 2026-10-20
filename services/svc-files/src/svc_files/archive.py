@@ -36,6 +36,10 @@ Hồ sơ công việc đã đóng (``office.case_files``, status ``closed``) t�
    gọn ở lại: vẫn tìm thấy theo số, ký hiệu, trích yếu; cổng xác thực vẫn trả lời "khớp" theo mã tra cứu và băm.
 5. Xóa bản trong bucket nóng (lỗi ở bước này chỉ để thừa đối tượng, không mất gì).
 
+Phả hệ và chất lượng (F3.9, ``svc_files.lineage``): mỗi lượt là một run OpenLineage của job ``moc.case_file.archive``
+với bốn run con ``.tables``, ``.files``, ``.manifest``, ``.commit``. Bảng Parquet được dựng và kiểm (số dòng khớp CSDL,
+cột bắt buộc không null) trước khi ghi bất cứ gì sang bucket lạnh; trượt thì dừng, sự kiện FAIL nằm trong phả hệ.
+
 Một hồ sơ lỗi không chặn các hồ sơ khác: lượt nền ghi lỗi rồi làm hồ sơ kế tiếp, giờ sau thử lại.
 
 Phòng đọc: ``read_package`` tải manifest theo ``archive_sha256`` trong CSDL, kiểm băm, rồi DuckDB đọc
@@ -67,6 +71,7 @@ import duckdb
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .anchors import AnchorStore
+from .lineage import Lineage, null_counts_sql, pg, quality_facets, s3, schema_facet
 from .storage import ObjectMissing, StorageError
 
 log = logging.getLogger("svc_files")
@@ -137,6 +142,10 @@ mutation Archive($p: jsonb!) {
 
 class ArchiveError(Exception):
     """Không nộp lưu được hồ sơ — thông báo cho người vận hành."""
+
+
+class QualityError(ArchiveError):
+    """Bảng Parquet không đạt kiểm chất lượng (F3.9). Thông báo chỉ có ký hiệu hồ sơ và tên bảng."""
 
 
 def package_prefix(tenant_id: str, case_file_id: str) -> str:
@@ -246,13 +255,14 @@ class Archived:
     documents: int
     files: int
     bytes: int
+    run_id: str = ""        # run OpenLineage của lượt này (core.lineage_events)
 
 
 class Archiver:
     """Nộp lưu hồ sơ đã đóng. ``hasura`` là HasuraClient (khóa quản trị), ``hot`` là ObjectStore bucket nóng."""
 
     def __init__(self, hasura: Any, hot: Any, cold: ColdStore, *, after_days: int, interval_s: float = 3600.0,
-                 clock: Callable[[], datetime] = lambda: datetime.now(UTC)) -> None:
+                 clock: Callable[[], datetime] = lambda: datetime.now(UTC), lineage_url: str = "") -> None:
         self.hasura = hasura
         self.hot = hot
         self.cold = cold
@@ -260,6 +270,7 @@ class Archiver:
         self.interval_s = interval_s
         self.clock = clock
         self.failed_at: dict[str, datetime] = {}     # hồ sơ lỗi ở lượt nền → lúc lỗi
+        self.lineage = Lineage(lambda q, v: self._admin(q, v), lineage_url, clock=lambda: self.clock())
 
     async def _admin(self, query: str, variables: dict[str, Any], request_id: str = "") -> dict[str, Any]:
         headers = {"X-Hasura-User-Id": ACTOR}
@@ -304,7 +315,36 @@ class Archiver:
         today = datetime.combine(self.clock().date(), datetime.min.time(), UTC)
         retain_until = max(_add_years(closed, cf["retention_years"] or PERMANENT_YEARS), today + timedelta(days=2))
         prefix = package_prefix(cf["tenant_id"], cf["id"])
+        job = "moc.case_file.archive"
+        sources = [pg(t) for t in ("office.case_files", "office.case_file_documents", "office.documents",
+                                   "office.assignments", "office.document_events", "office.document_files",
+                                   "core.files")]
+        await self.lineage.emit(cf["tenant_id"], self.lineage.event("START", job, request_id, inputs=sources))
+        progress: dict[str, str | None] = {"step": None}     # bước đang làm, để báo FAIL đúng bước
+        try:
+            done = await self._archive(cf, docs, doc_ids, prefix, retain_until, request_id, progress)
+        except Exception as exc:
+            # Phả hệ không ghi nguyên văn lỗi: thông báo có thể có tên tệp, số ký hiệu — thứ sổ kiểm toán cũng không hiện
+            reason = str(exc) if isinstance(exc, QualityError) else f"{type(exc).__name__} — xem nhật ký svc-files"
+            if progress["step"]:
+                await self._step(cf["tenant_id"], progress["step"], request_id, [], [], reason)
+            await self.lineage.emit(cf["tenant_id"], self.lineage.event("FAIL", job, request_id, inputs=sources,
+                                                                        error=reason))
+            raise
+        await self.lineage.emit(cf["tenant_id"], self.lineage.event(
+            "COMPLETE", job, request_id, inputs=sources,
+            outputs=[s3(self.cold.bucket, manifest_key(prefix, done.archive_sha256))]))
+        return done
 
+    async def _step(self, tenant_id: str, name: str, parent: str, inputs: list[dict[str, Any]],
+                    outputs: list[dict[str, Any]], error: str | None = None) -> None:
+        """Một bước của lượt nộp lưu thành một run con OpenLineage (chỉ một sự kiện COMPLETE hoặc FAIL)."""
+        await self.lineage.emit(tenant_id, self.lineage.event(
+            "FAIL" if error else "COMPLETE", f"moc.case_file.archive.{name}", str(uuid.uuid4()),
+            parent=("moc.case_file.archive", parent), inputs=inputs, outputs=outputs, error=error))
+
+    async def _archive(self, cf: dict[str, Any], docs: list[dict[str, Any]], doc_ids: list[str], prefix: str,
+                       retain_until: datetime, request_id: str, progress: dict[str, str | None]) -> Archived:
         files: dict[str, dict[str, Any]] = {}
         for d in docs:
             for link in d["files"]:
@@ -318,7 +358,36 @@ class Archiver:
             SHARED_FILES, {"files": list(files), "docs": doc_ids}))["office_document_files"]}
         await asyncio.to_thread(self.cold.ensure)
 
+        # Bảng: văn bản (không kèm tệp, giao việc, dòng thời gian lồng nhau), giao việc, dòng thời gian. Dựng Parquet
+        # và kiểm chất lượng trước khi ghi gì sang bucket lạnh: bảng hỏng thì dừng, không để lại đối tượng bị khóa.
+        rows = {
+            "documents": [{**{k: v for k, v in d.items() if k not in ("files", "assignments", "events")},
+                           "content_sha256": _hex(d["content_sha256"]), "case_file_id": cf["id"]} for d in docs],
+            "assignments": [{**a, "document_id": d["id"]} for d in docs for a in d["assignments"]],
+            "events": [{**e, "document_id": d["id"]} for d in docs for e in d["events"]],
+        }
+        parquet: dict[str, bytes] = {}
+        outputs: list[dict[str, Any]] = []
+        failed: list[str] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in SCHEMAS:
+                if not rows[name]:
+                    continue
+                parquet[name] = data_bytes = await asyncio.to_thread(to_parquet, rows[name], pathlib.Path(tmp), name)
+                measured = (await asyncio.to_thread(read_parquet, data_bytes, null_counts_sql(name)))[0]
+                facets, out_facets, ok = quality_facets(name, len(rows[name]), measured, len(data_bytes))
+                outputs.append({**s3(self.cold.bucket, f"{prefix}{name}-{_sha256(data_bytes)}.parquet",
+                                     {"schema": schema_facet(SCHEMAS[name]), **facets}), "outputFacets": out_facets})
+                if not ok:
+                    failed.append(name)
+        table_sources = [pg(t) for t in ("office.documents", "office.assignments", "office.document_events")]
+        if failed:
+            error = f"hồ sơ {cf['code']}: bảng {', '.join(failed)} không đạt kiểm chất lượng — dừng nộp lưu"
+            await self._step(cf["tenant_id"], "tables", request_id, table_sources, outputs, error)
+            raise QualityError(error)
+
         # Bước 2: tệp, chép nguyên byte (đọc lại và kiểm băm lần nữa ngay trước khi ghi)
+        progress["step"] = "files"
         entries: list[dict[str, Any]] = []
         total = 0
         for f in files.values():
@@ -328,27 +397,25 @@ class Archiver:
             entries.append({"path": f"files/{f['sha256']}", "sha256": f["sha256"], "bytes": len(body),
                             "filename": f["filename"], "mime_type": f["mime_type"], "file_id": f["id"],
                             "documents": f["documents"]})
+        file_outputs = [s3(self.cold.bucket, f"{prefix}{e['path']}") for e in entries]
+        await self._step(cf["tenant_id"], "files", request_id,
+                         [s3(self.hot.bucket, f["object_key"]) for f in files.values()], file_outputs)
+        progress["step"] = "tables"
 
-        # Bảng: văn bản (không kèm tệp, giao việc, dòng thời gian lồng nhau), giao việc, dòng thời gian
-        rows = {
-            "documents": [{**{k: v for k, v in d.items() if k not in ("files", "assignments", "events")},
-                           "content_sha256": _hex(d["content_sha256"]), "case_file_id": cf["id"]} for d in docs],
-            "assignments": [{**a, "document_id": d["id"]} for d in docs for a in d["assignments"]],
-            "events": [{**e, "document_id": d["id"]} for d in docs for e in d["events"]],
-        }
         tables: dict[str, dict[str, Any]] = {}
-        with tempfile.TemporaryDirectory() as tmp:
-            for name in SCHEMAS:
-                if not rows[name]:
-                    tables[name] = {"path": None, "rows": 0}
-                    continue
-                data_bytes = await asyncio.to_thread(to_parquet, rows[name], pathlib.Path(tmp), name)
-                digest = _sha256(data_bytes)
-                path = f"{name}-{digest}.parquet"
-                await asyncio.to_thread(self.cold.put, f"{prefix}{path}", data_bytes,
-                                        "application/vnd.apache.parquet", retain_until)
-                total += len(data_bytes)
-                tables[name] = {"path": path, "rows": len(rows[name]), "sha256": digest, "bytes": len(data_bytes)}
+        for name in SCHEMAS:
+            if name not in parquet:
+                tables[name] = {"path": None, "rows": 0}
+                continue
+            data_bytes = parquet[name]
+            digest = _sha256(data_bytes)
+            path = f"{name}-{digest}.parquet"
+            await asyncio.to_thread(self.cold.put, f"{prefix}{path}", data_bytes,
+                                    "application/vnd.apache.parquet", retain_until)
+            total += len(data_bytes)
+            tables[name] = {"path": path, "rows": len(rows[name]), "sha256": digest, "bytes": len(data_bytes)}
+        await self._step(cf["tenant_id"], "tables", request_id, table_sources, outputs)
+        progress["step"] = "manifest"
 
         manifest = {
             "format": FORMAT,
@@ -370,6 +437,14 @@ class Archiver:
         for key, digest in expected.items():
             if _sha256(await asyncio.to_thread(self.cold.get, key)) != digest:
                 raise ArchiveError(f"đọc lại {key} từ bucket lạnh không khớp băm — chưa gỡ gì khỏi CSDL")
+        # Bảng Parquet là đầu vào của manifest: kết quả kiểm chất lượng đi theo dạng facet đầu vào (đặc tả OpenLineage
+        # định nghĩa dataQualityAssertions cho đầu vào); ở bước tables nó nằm trong facet của dataset vừa ghi
+        manifest_out = s3(self.cold.bucket, manifest_key(prefix, archive_sha))
+        table_inputs = [{"namespace": o["namespace"], "name": o["name"], "facets": {"schema": o["facets"]["schema"]},
+                         "inputFacets": {"dataQualityAssertions": o["facets"]["dataQualityAssertions"]}}
+                        for o in outputs]
+        await self._step(cf["tenant_id"], "manifest", request_id, table_inputs + file_outputs, [manifest_out])
+        progress["step"] = "commit"
 
         # Bước 4: CSDL — hàm SQL kiểm lại đúng những dòng đã vào gói rồi mới đổi, trong một giao dịch
         cold_files = [fid for fid in files if fid not in shared]
@@ -382,6 +457,10 @@ class Archiver:
         }}, request_id)
         if [row["status"] for row in result["office_archive_case_file"]] != ["archived"]:
             raise ArchiveError(f"hồ sơ {cf['code']}: CSDL không xác nhận đã nộp lưu")
+        await self._step(cf["tenant_id"], "commit", request_id, [manifest_out],
+                         [pg(t) for t in ("office.case_files", "office.documents", "office.document_events",
+                                          "office.document_files", "core.files", "core.audit_log")])
+        progress["step"] = None
 
         # Bước 5: bản nóng
         for fid in cold_files:
@@ -390,7 +469,7 @@ class Archiver:
             except StorageError as exc:  # thừa một đối tượng trong bucket nóng, không mất gì
                 log.warning(json.dumps({"event": "case_file.archive_hot_delete_failed", "error": str(exc)},
                                        ensure_ascii=False))
-        done = Archived(cf["id"], cf["code"], prefix, archive_sha, len(docs), len(entries), total)
+        done = Archived(cf["id"], cf["code"], prefix, archive_sha, len(docs), len(entries), total, request_id)
         log.info(json.dumps({"event": "case_file.archived", **asdict(done)}, ensure_ascii=False))
         return done
 
@@ -463,7 +542,8 @@ def main(argv: list[str] | None = None) -> int:
     async def once() -> tuple[list[Archived], list[dict[str, str]]]:
         hasura = HasuraClient(settings.hasura_url, settings.hasura_admin_secret, timeout_s=settings.hasura_timeout_s)
         try:
-            archiver = Archiver(hasura, hot, ColdStore(s3, settings.cold_bucket), after_days=settings.archive_after_days)
+            archiver = Archiver(hasura, hot, ColdStore(s3, settings.cold_bucket), after_days=settings.archive_after_days,
+                                lineage_url=settings.openlineage_url)
             if args.case_file:
                 return [await archiver.archive(args.case_file)], []
             return await archiver.run_once(args.after_days)

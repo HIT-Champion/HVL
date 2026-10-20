@@ -16,7 +16,7 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | --- | --- | --- | --- |
 | (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm và xác thực được | `make demo-nong-lanh` | Có (F3.8) |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | — | Chưa có (F3.10) |
-| (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | — | Chưa có (F3.9) |
+| (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | `make demo-pha-he` | Có (F3.9) |
 | (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
@@ -68,6 +68,35 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
   chưa đổi gì, lượt sau làm lại và không ghi lại phần đã có. Hỏng sau giao dịch thì chỉ thừa bản nóng, không mất gì.
 - *"Văn bản hạn chế?"* Không vào hồ sơ nộp lưu: tệp của nó sẽ mã hóa riêng (F3.7). Nộp lưu bản mã hóa cần thêm bước
   giữ khóa.
+
+## (iii) Phả hệ và kiểm chất lượng — `make demo-pha-he`
+
+**Điều muốn chứng minh:**
+
+- Biết dữ liệu từ đâu ra: mỗi bước của job nộp lưu (màn (i)) để lại một sự kiện theo chuẩn mở OpenLineage. Từ gói
+  lưu trữ truy ngược được về bảng nghiệp vụ và tệp gốc đã sinh ra nó.
+- Chất lượng kiểm tự động, trước khi ghi: bảng Parquet nào cũng được đọc lại, số dòng phải bằng số dòng trong CSDL,
+  cột bắt buộc không được rỗng. Trượt thì job dừng trước khi ghi gì sang kho lạnh, sự kiện FAIL nằm lại trong phả hệ.
+
+**Lệnh in ra 4 bước** (chưa có lượt nộp lưu nào thì chạy màn (i) trước):
+
+1. Lượt nộp lưu gần nhất: run của job `moc.case_file.archive`, START → 4 run con `files`, `tables`, `manifest`,
+   `commit` → COMPLETE. Mỗi bước in đầu vào → đầu ra. Lãnh đạo đọc qua Hasura, chỉ thấy đơn vị mình.
+2. Truy ngược: `manifest-<băm>.json` ← `documents/assignments/events-<băm>.parquet` + `files/<sha256>` ←
+   `moc.office.documents`, `moc.office.assignments`, `moc.office.document_events` + đối tượng trong bucket nóng.
+3. Kiểm chất lượng từng bảng: số dòng = CSDL, các cột bắt buộc không null (facet `dataQualityAssertions`,
+   `outputStatistics`); số bước trượt kiểm của đơn vị.
+4. Sự kiện đúng đặc tả OpenLineage 2-0-2 (`schemaURL`, `producer`, tên dataset theo quy ước): đặt
+   `MOC_OPENLINEAGE_URL` là gửi được sang Marquez.
+
+**Nếu giám khảo hỏi:**
+
+- *"Marquez đâu?"* Chưa dựng trong compose: thêm một máy chủ Java và CSDL riêng (khoảng 1 GB RAM) cho một job mỗi
+  giờ. Sự kiện lưu trong `core.lineage_events` (cột `event` là nguyên văn OpenLineage), cùng sao lưu với CSDL; bật
+  Marquez chỉ cần đặt `MOC_OPENLINEAGE_URL`.
+- *"Kiểm trượt thì sao?"* Thử trong test đơn vị: một văn bản thiếu trích yếu → bước `tables` FAIL, không đối tượng nào
+  được ghi sang bucket lạnh (ở đó bị khóa nhiều năm), CSDL không đổi, lượt sau thử lại.
+- *"Ai sửa được phả hệ?"* Không ai: bảng chỉ thêm, trigger chặn sửa và xóa kể cả khi ghi thẳng CSDL.
 
 ## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
 

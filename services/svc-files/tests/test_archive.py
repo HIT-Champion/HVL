@@ -32,6 +32,7 @@ import pytest
 from svc_files.archive import (ARCHIVE, CLOSED, SHARED_FILES, ArchiveError, Archiver, ColdStore, _add_years,
                                manifest_key, read_package)
 from svc_files.hasura import HasuraError
+from svc_files.lineage import INSERT as LINEAGE
 from svc_files.storage import ObjectMissing
 
 TENANT, CASE = "11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"
@@ -82,6 +83,8 @@ class FakeHasura:
         self.fail_commit = False
         self.due: list[str] = [CASE]
         self.skips: list[list[str]] = []
+        self.lineage: list[dict[str, Any]] = []
+        self.fail_lineage = False
 
     async def admin(self, query: str, variables: dict[str, Any], headers: dict[str, str] | None = None) -> dict:
         if query == ARCHIVE:
@@ -89,6 +92,11 @@ class FakeHasura:
                 raise HasuraError("dòng thời gian hoặc tệp của hồ sơ HS-01 đổi trong lúc nộp lưu")
             self.commits.append(variables["p"])
             return {"office_archive_case_file": [{"id": variables["p"]["id"], "status": "archived"}]}
+        if query == LINEAGE:
+            if self.fail_lineage:
+                raise HasuraError("Không gọi được Hasura")
+            self.lineage.append(json.loads(json.dumps(variables["o"])))
+            return {"insert_core_lineage_events_one": {"id": len(self.lineage)}}
         if query == SHARED_FILES:
             return {"office_document_files": [{"file_id": f} for f in self.shared]}
         if query == CLOSED:
@@ -100,6 +108,8 @@ class FakeHasura:
 
 
 class FakeHot:
+    bucket = "moc-files"
+
     def __init__(self) -> None:
         self.objects = {f"tenant/{TENANT}/{F1}": PDF_IN, f"tenant/{TENANT}/{F2}": PDF_OUT}
         self.deleted: list[str] = []
@@ -295,3 +305,105 @@ def test_lock_counts_from_closing_date_but_never_ends_in_the_past():
     asyncio.run(archiver.archive(CASE))
     # hết hạn bảo quản từ 2021 nhưng vẫn khóa tới sau hôm nay hai ngày: không ghi đối tượng có hạn khóa đã qua
     assert {until for _, until in s3.locks.values()} == {datetime(2026, 10, 22, tzinfo=UTC)}
+
+
+def test_lineage_one_run_per_step_linked_to_the_archive_run():
+    archiver, _, hasura, _ = make()
+    done = asyncio.run(archiver.archive(CASE))
+    ev = hasura.lineage
+    assert [(e["job"], e["event_type"]) for e in ev] == [
+        ("moc.case_file.archive", "START"), ("moc.case_file.archive.files", "COMPLETE"),
+        ("moc.case_file.archive.tables", "COMPLETE"), ("moc.case_file.archive.manifest", "COMPLETE"),
+        ("moc.case_file.archive.commit", "COMPLETE"), ("moc.case_file.archive", "COMPLETE")]
+    parent = ev[0]["run_id"]
+    assert {e["parent_run_id"] for e in ev[1:5]} == {parent} and ev[-1]["run_id"] == parent
+    assert {e["tenant_id"] for e in ev} == {TENANT}
+    prefix = f"s3://moc-cold/cold/{TENANT}/case/{CASE}/"
+    # phả hệ: manifest ← bảng Parquet + tệp ← bảng OLTP / bucket nóng
+    tables = ev[2]
+    assert tables["inputs"] == ["postgres://postgres:5432/moc.office.documents",
+                                "postgres://postgres:5432/moc.office.assignments",
+                                "postgres://postgres:5432/moc.office.document_events"]
+    assert [o.split("/")[-1].split("-")[0] for o in tables["outputs"]] == ["documents", "assignments", "events"]
+    assert ev[1]["inputs"] == [f"s3://moc-files/tenant/{TENANT}/{F1}", f"s3://moc-files/tenant/{TENANT}/{F2}"]
+    assert ev[3]["outputs"] == [f"{prefix}manifest-{done.archive_sha256}.json"]
+    assert set(ev[3]["inputs"]) == set(tables["outputs"]) | set(ev[1]["outputs"])
+    assert ev[4]["inputs"] == ev[3]["outputs"] and ev[-1]["outputs"] == ev[3]["outputs"]
+    # kiểm chất lượng: số dòng khớp CSDL, cột bắt buộc không null — nằm trong facet của từng bảng
+    assert tables["quality_ok"] is True and ev[1]["quality_ok"] is None and ev[3]["quality_ok"] is None
+    assert done.run_id == parent
+    # ở bước manifest, bảng Parquet là đầu vào: kết quả kiểm nằm trong inputFacets như đặc tả
+    first_in = ev[3]["event"]["inputs"][0]
+    assert first_in["inputFacets"]["dataQualityAssertions"]["assertions"][0]["success"] is True
+    docs = tables["event"]["outputs"][0]
+    assert docs["outputFacets"]["outputStatistics"]["rowCount"] == 2
+    checks = {(a["assertion"], a.get("column")) for a in docs["facets"]["dataQualityAssertions"]["assertions"]}
+    assert ("row_count_equals_source", None) in checks and ("not_null", "summary") in checks
+    assert [f["name"] for f in docs["facets"]["schema"]["fields"]][:2] == ["id", "case_file_id"]
+    # sự kiện đúng khuôn OpenLineage
+    run = ev[0]["event"]
+    assert run["schemaURL"].endswith("#/$defs/RunEvent") and run["job"]["namespace"] == "moc"
+    assert ev[1]["event"]["run"]["facets"]["parent"]["run"]["runId"] == parent
+
+
+def test_quality_failure_stops_before_anything_cold_and_is_in_lineage():
+    cf = case_file()
+    cf["case_file_documents"][0]["document"]["summary"] = None
+    archiver, s3, hasura, hot = make(cf)
+    with pytest.raises(ArchiveError, match="không đạt kiểm chất lượng"):
+        asyncio.run(archiver.archive(CASE))
+    assert s3.puts == 0 and hasura.commits == [] and hot.deleted == []
+    assert [(e["job"], e["event_type"], e["quality_ok"]) for e in hasura.lineage] == [
+        ("moc.case_file.archive", "START", None), ("moc.case_file.archive.tables", "FAIL", False),
+        ("moc.case_file.archive", "FAIL", None)]
+    failed = {(a["column"], a["success"]) for a in hasura.lineage[1]["event"]["outputs"][0]["facets"][
+        "dataQualityAssertions"]["assertions"] if a["assertion"] == "not_null"}
+    assert ("summary", False) in failed and ("id", True) in failed
+    assert "bảng documents" in hasura.lineage[-1]["event"]["run"]["facets"]["errorMessage"]["message"]
+
+
+def test_lineage_store_down_does_not_block_archiving():
+    archiver, _, hasura, _ = make()
+    hasura.fail_lineage = True
+    asyncio.run(archiver.archive(CASE))
+    assert len(hasura.commits) == 1 and hasura.lineage == []
+
+
+def test_lineage_also_sent_to_openlineage_server():
+    import httpx2
+    got: list[dict[str, Any]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        got.append(json.loads(request.content))
+        return httpx2.Response(201)
+
+    archiver, _, hasura, _ = make()
+    archiver.lineage.url = "http://marquez:5000/api/v1/lineage"
+    archiver.lineage.transport = httpx2.MockTransport(handler)
+    asyncio.run(archiver.archive(CASE))
+    assert [e["eventType"] for e in got] == [e["event_type"] for e in hasura.lineage]
+    assert got[0]["producer"].endswith("services/svc-files")
+
+
+def test_failed_step_is_named_and_lineage_never_carries_file_names():
+    archiver, _, hasura, _ = make()
+    hasura.fail_commit = True
+    with pytest.raises(HasuraError):
+        asyncio.run(archiver.archive(CASE))
+    assert [(e["job"].removeprefix("moc.case_file.archive"), e["event_type"]) for e in hasura.lineage] == [
+        ("", "START"), (".files", "COMPLETE"), (".tables", "COMPLETE"), (".manifest", "COMPLETE"),
+        (".commit", "FAIL"), ("", "FAIL")]
+    # tệp nóng lệch băm: thông báo lỗi có tên tệp — phả hệ (văn thư đọc được, có thể gửi ra Marquez) chỉ có lớp lỗi
+    archiver, _, hasura, hot = make()
+    hot.objects[f"tenant/{TENANT}/{F2}"] = b"%PDF bi sua"
+    with pytest.raises(ArchiveError, match="công văn.pdf"):
+        asyncio.run(archiver.archive(CASE))
+    assert "công văn" not in json.dumps(hasura.lineage, ensure_ascii=False)
+    assert hasura.lineage[-1]["event"]["run"]["facets"]["errorMessage"]["message"].startswith("ArchiveError")
+
+
+def test_bad_openlineage_url_does_not_block_archiving():
+    archiver, _, hasura, _ = make()
+    archiver.lineage.url = "http://[::1/x"
+    asyncio.run(archiver.archive(CASE))
+    assert len(hasura.commits) == 1 and len(hasura.lineage) == 6

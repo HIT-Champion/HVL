@@ -134,7 +134,7 @@ Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo h�
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make demo-tu-phuc-hoi`, `make demo-nong-lanh`, `make reconcile`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make demo-tu-phuc-hoi`, `make demo-nong-lanh`, `make demo-pha-he`, `make reconcile`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -294,13 +294,14 @@ sudo cp ops/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enabl
 | `make demo-ket-bi-mat` | Màn demo (iv) két bí mật, dưới một phút: dịch vụ không có bí mật trong biến môi trường; khởi động lại két thì két tự mở khóa; khởi động lại svc-files thì nó lấy lại khóa kho từ két và nhận tệp; AppRole không đọc chéo; sổ của két không chứa giá trị bí mật (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-tu-phuc-hoi` | Màn demo (iv) tự phục hồi, dưới một phút: xóa hẳn container `svc-files`, dừng `centrifugo`; tải tệp hỏng; một lượt reconciler dựng lại cả hai, tải tệp lại được (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-nong-lanh` | Màn demo (i) nóng → lạnh, dưới một phút: lập hồ sơ từ văn bản đã xong, đóng, nộp lưu ngay; gói Parquet + tệp + manifest có băm nằm trong bucket lạnh có khóa ghi, chi tiết rời khỏi CSDL; văn bản vẫn tìm thấy, quét mã vẫn "khớp"; phòng đọc đọc lại gói, kiểm băm; xóa gói bị từ chối (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
+| `make demo-pha-he` | Màn demo (iii) phả hệ + chất lượng: lượt nộp lưu gần nhất là một run OpenLineage với 4 bước; truy ngược gói lưu trữ về bảng nghiệp vụ và tệp gốc; bảng Parquet nào cũng đã kiểm số dòng = CSDL, cột bắt buộc không null trước khi ghi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
 | Diễn tập khôi phục | `make backup` hai lượt, xóa volume CSDL và tệp, `python3 scripts/moc.py backup restore --yes`, rồi `make smoke` và `make audit` phải qua (bước trong CI) | Hệ thống đang chạy + `make seed` |
-| `db/tests/` | 163 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
+| `db/tests/` | 165 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ thống
 từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → `make
-demo-ket-bi-mat` → `make demo-tu-phuc-hoi` → `make demo-nong-lanh`; diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install`
+demo-ket-bi-mat` → `make demo-tu-phuc-hoi` → `make demo-nong-lanh` → `make demo-pha-he`; diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install`
 sang thư mục khác và chạy lại smoke từ bản cài; GitOps với repo git cục bộ: đẩy commit lên nhánh `deploy` thì
 reconciler áp vào bản cài, sửa tay `docker-compose.yml` đã cài thì reconciler đưa về; kiểm tài liệu API trong
 `docs/api/` khớp hệ thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các

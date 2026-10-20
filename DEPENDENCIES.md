@@ -117,7 +117,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
 | DuckDB | 1.5.6 | MIT | Nộp lưu hồ sơ (F3.8, `svc-files`): ghi bảng văn bản, giao việc, dòng thời gian thành Parquet (nén zstd) và đọc lại cho phòng đọc. Một wheel nhúng, không kéo thêm gói Python, không chạy máy chủ riêng | pip | 3 |
-| openlineage-python | 1.53 | Apache-2.0 | Phát sự kiện truy vết dữ liệu | pip | 3 |
+| openlineage-python | 1.53 | Apache-2.0 | Dự kiến phát sự kiện truy vết dữ liệu. **Chưa đưa vào**: svc-files dựng sự kiện OpenLineage 2-0-2 bằng thư viện chuẩn (F3.9, `svc_files.lineage`) | pip | 3 |
 
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
@@ -130,7 +130,7 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 |---|---|---|---|---|---|
 | OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa. Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
 | Kestra | v2.0.5 | Apache-2.0 | Dự kiến chạy job ngầm. **Chưa đưa vào**: nộp lưu nóng → lạnh (F3.8) chạy thành vòng nền trong `svc-files` — một job mỗi giờ không đáng thêm một máy chủ Java ~1 GB RAM | `kestra/kestra:v2.0.5` | 3 |
-| Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage) | `marquezproject/marquez:0.51.1` | 3 |
+| Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage). **Chưa đưa vào compose**: sự kiện lưu trong `core.lineage_events` (F3.9); đặt `MOC_OPENLINEAGE_URL` thì svc-files gửi sang Marquez | `marquezproject/marquez:0.51.1` | 3 |
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (IT/OT) | `scorpiobroker/all-in-one-runner:java-6.0.2` | 3 |
 | Prometheus | v3.15.0 | Apache-2.0 | Thu thập chỉ số giám sát | `prom/prometheus:v3.15.0` | 3 |
 | Grafana (OSS) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát (dịch vụ độc lập, chỉ mạng nội bộ) | `grafana/grafana:13.2.3` | 3 |
@@ -143,7 +143,8 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 
 - Grafana: chỉ dùng `grafana/grafana` (AGPL-3.0). `grafana/grafana-enterprise` là bản độc quyền.
 - Marquez: bản phát hành gần nhất là 0.51.1 (03/2025), mã nguồn vẫn có commit năm 2026 nhưng nhịp chậm.
-  Theo dõi trong Phase 3; nếu gặp lỗi chặn thì chuyển sang chỉ lưu sự kiện OpenLineage vào PostgreSQL.
+  Theo dõi trong Phase 3; nếu gặp lỗi chặn thì chuyển sang chỉ lưu sự kiện OpenLineage vào PostgreSQL. F3.9 đã làm
+  theo hướng đó (`core.lineage_events`): tránh thêm máy chủ Java và CSDL riêng (~1 GB RAM) cho một job mỗi giờ.
 
 ## Trí tuệ nhân tạo
 

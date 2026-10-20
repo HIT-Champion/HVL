@@ -338,7 +338,7 @@ def create_app(
         settings.cold_bucket,
     )
     archiver = Archiver(hasura, store, cold, after_days=settings.archive_after_days,
-                        interval_s=settings.archive_interval_s)
+                        interval_s=settings.archive_interval_s, lineage_url=settings.openlineage_url)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:

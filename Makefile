@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh reconcile \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -109,6 +109,9 @@ demo-tu-phuc-hoi: $(ENV_FILE) ## Màn demo (iv) tự phục hồi: xóa containe
 
 demo-nong-lanh: $(ENV_FILE) ## Màn demo (i) nóng → lạnh: lập hồ sơ, nộp lưu thành gói Parquet + tệp + manifest có băm trên bucket lạnh (docs/demo-script.md)
 	@python3 scripts/demo.py nong-lanh
+
+demo-pha-he: $(ENV_FILE) ## Màn demo (iii) phả hệ + chất lượng: lượt nộp lưu truy ngược về bảng nghiệp vụ, bảng nào cũng được kiểm (docs/demo-script.md)
+	@python3 scripts/demo.py pha-he
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py

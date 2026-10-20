@@ -462,6 +462,31 @@ hồ sơ `closed` từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định 365); một
 Xem lại hồ sơ đã lưu: `GET /api/case-files/{id}/archive` (§4.3) — svc-files tải manifest theo `archive_sha256`, so
 băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Phòng đọc xem tệp có watermark làm cùng F3.7.
 
+**Phả hệ và kiểm chất lượng (F3.9).** Mỗi lượt nộp lưu là một run OpenLineage của job `moc.case_file.archive`, với
+4 run con `files`, `tables`, `manifest`, `commit` (facet `parent`). svc-files ghi từng sự kiện vào:
+
+```sql
+create table core.lineage_events (
+  id bigint generated always as identity primary key,
+  tenant_id uuid references core.tenants,     -- null: việc của nền tảng
+  run_id uuid not null, parent_run_id uuid,
+  job text not null, event_type text not null, event_time timestamptz not null,
+  inputs text[] not null default '{}', outputs text[] not null default '{}',   -- "<namespace>/<name>"
+  quality_ok boolean,                         -- null: bước không kiểm chất lượng
+  event jsonb not null,                       -- sự kiện OpenLineage 2-0-2 nguyên văn
+  recorded_at timestamptz not null default now()
+);
+```
+
+- Tên dataset: bảng `postgres://postgres:5432` + `moc.<schema>.<bảng>`; đối tượng `s3://<bucket>` + key.
+- Bảng Parquet được dựng và kiểm trước khi ghi sang lạnh: số dòng bằng số dòng lấy từ CSDL, cột bắt buộc không null
+  (`dataQualityAssertions`); trượt thì bước `tables` FAIL, job dừng, không ghi gì sang bucket lạnh.
+- Chỉ thêm: trigger chặn sửa, xóa. Không chứa tên hồ sơ, trích yếu, tên tệp (thông báo lỗi chỉ có tên lớp lỗi). Ghi
+  phả hệ lỗi không chặn việc nộp lưu.
+- `dataQualityAssertions` nằm ở dataset đầu ra của bước `tables` (mở rộng của Mộc) và ở `inputFacets` của bảng đầu
+  vào bước `manifest` (đúng đặc tả OpenLineage, Marquez hiển thị được).
+- Quyền: `director`, `clerk` đọc của đơn vị mình (§3); không vai trò nào ghi.
+
 Thống kê điều hành (§2.5) tính thời gian xử lý từ dòng thời gian: văn bản đã nộp lưu không còn trong số đó (mặc định
 nộp lưu sau một năm, ngoài cửa sổ 12 tháng của dashboard).
 
