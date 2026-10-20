@@ -15,10 +15,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test, type Page } from '@playwright/test'
-import { PASSWORD, PDF, TOTP_SECRET, shot, signIn } from './helpers'
+import { PASSWORD, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
 
 // Kịch bản demo (docs/dac-ta-san-pham.md §7, màn 1–2) trên giao diện thật: form sai bị chặn, văn thư tiếp nhận và
-// vào sổ → lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu.
+// vào sổ → lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu,
+// và bằng chữ chỉ có trong tệp PDF đính kèm.
 
 const tag = Math.random().toString(36).slice(2, 7).toUpperCase()
 const summary = `Về việc rà soát chương trình đào tạo ngành Kỹ thuật phần mềm năm 2027 (thử ${tag})`
@@ -40,7 +41,8 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   // 1. Văn thư tiếp nhận, tải tệp (quét ClamAV), nhập thông tin, vào sổ
   const clerk = await signIn(browser, 'vanthu', { otp: true })
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
-  await clerk.locator('input[type=file]').setInputFiles({ name: `cong-van-${tag}.pdf`, mimeType: 'application/pdf', buffer: PDF })
+  const pdf = textPdf('De nghi Khoa ra soat chuong trinh dao tao', `Phu luc kem theo: bang doi chieu chuan dau ra ${tag}`)
+  await clerk.locator('input[type=file]').setInputFiles({ name: `cong-van-${tag}.pdf`, mimeType: 'application/pdf', buffer: pdf })
   await expect(clerk.getByText('Đã quét — sạch')).toBeVisible()
 
   // Poka-yoke lớp 1 (F2.2): form sai bị chặn ngay trên trình duyệt theo schemas/van-ban-den.json, chưa gửi gì đi
@@ -100,4 +102,13 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
     await expect(staff.getByRole('link', { name: new RegExp(tag) })).toBeVisible({ timeout: 3_000 })
   }).toPass({ timeout: 30_000 })
   await shot(staff, '6-tim-kiem')
+
+  // 6. Tìm bằng chữ chỉ có trong tệp PDF (F2.7): svc-files đọc lớp chữ ở vòng nền rồi đồng bộ sang Meilisearch
+  await expect(async () => {
+    await staff.goto(`/tim-kiem?q=${encodeURIComponent(`bang doi chieu chuan dau ra ${tag}`)}`)
+    const hit = staff.getByRole('link', { name: new RegExp(tag) })
+    await expect(hit).toBeVisible({ timeout: 3_000 })
+    await expect(hit.getByText('Khớp trong nội dung')).toBeVisible()
+  }).toPass({ timeout: 60_000 })
+  await shot(staff, '6b-tim-theo-noi-dung')
 })

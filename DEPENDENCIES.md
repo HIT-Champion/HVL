@@ -106,12 +106,13 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | httpx2 (+ httpcore2, truststore) | 2.13 | BSD-3-Clause (truststore: MIT) | Gọi Hasura, Flowable, Keycloak, Meilisearch | pip | 1 |
 | python-multipart | 0.0.32 | Apache-2.0 | Đọc tệp tải lên (`svc-files`) | pip | 1 |
 | boto3 | 1.43 | Apache-2.0 | Gọi SeaweedFS qua giao thức S3 (`svc-files`) | pip | 1 |
-| PyJWT (+ cryptography) | 2.15 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files` | pip | 1 |
+| PyJWT (+ cryptography) | 2.15 · 50.0 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files`; mã hóa con trỏ trang tìm kiếm | pip | 1 |
 | WeasyPrint (+ pydyf, tinycss2, cssselect2, tinyhtml5, webencodings) | 70.0 | BSD-3-Clause (tinyhtml5: MIT) | Dựng PDF văn bản đi đúng thể thức NĐ 30 từ khuôn HTML (`svc-files`) | pip | 2 |
 | fontTools (+ Brotli, zopfli) | 4.66 | MIT (zopfli: Apache-2.0) | Nhúng và nén phông vào PDF (WeasyPrint kéo theo) | pip | 2 |
 | Pillow | 12.3 | MIT-CMU | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo) | pip | 2 |
 | Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Mộc dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
+| pypdf | 6.19 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); thuần Python, không kéo thêm gói | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |

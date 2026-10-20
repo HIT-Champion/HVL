@@ -29,19 +29,23 @@ const router = useRouter()
 const q = ref(String(route.query.q ?? ''))
 const direction = ref(String(route.query.direction ?? ''))
 const hits = ref<SearchHit[]>([])
-const next = ref<number | null>(null)
+const next = ref<string | null>(null)
+// "Xem thêm" lấy tiếp đúng câu tìm đang hiện kết quả, dù ô tìm đã gõ khác: trang sau gắn với câu tìm (svc-files)
+let shown: { q: string; direction?: string } = { q: '' }
 const loading = ref(false)
 const searched = ref(false)
 const failure = ref('')
 
 async function run(more = false) {
-  if (!q.value.trim()) return
+  if (!more && !q.value.trim()) return
+  const params = more ? shown : { q: q.value.trim(), direction: direction.value || undefined }
   loading.value = true
   failure.value = ''
   try {
-    const res = await search({ q: q.value.trim(), direction: direction.value || undefined, limit: 20, offset: more ? next.value ?? 0 : 0 })
+    const res = await search({ ...params, limit: 20, cursor: more ? next.value ?? undefined : undefined })
     hits.value = more ? [...hits.value, ...res.hits] : res.hits
-    next.value = res.next_offset
+    next.value = res.next_cursor
+    shown = params
     searched.value = true
     if (!more) router.replace({ query: { q: q.value.trim(), ...(direction.value ? { direction: direction.value } : {}) } })
   } catch (e) {
@@ -76,6 +80,7 @@ onMounted(() => { if (q.value) run() })
             <StatusChip :status="h.status" />
             <UrgencyChip :urgency="h.urgency" quiet />
             <span class="text-xs text-stone-500">{{ t(`search.direction.${h.direction}`) }}<span v-if="h.register_number"> · {{ t('incoming.number') }} {{ h.register_number }}</span></span>
+            <span v-if="h.matched_content" class="chip bg-amber-50 text-amber-800" :title="t('search.matchedContentHint')">{{ t('search.matchedContent') }}</span>
           </div>
           <div class="font-medium text-stone-900">{{ h.summary }}</div>
           <div class="mt-0.5 text-sm text-stone-500">{{ h.symbol }} · {{ h.issuer_name }} · {{ fmtDate(h.issued_on) }}</div>

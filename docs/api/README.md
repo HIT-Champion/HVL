@@ -171,7 +171,7 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 |---|---|
 | `POST /api/files` (multipart, trường `file`) | Quét ClamAV, sạch mới lưu → `201 {id, filename, mime_type, size_bytes, sha256, scanned_at}`. Tệp nhiễm → `422`, không lưu, ghi sổ kiểm toán |
 | `GET /api/files/{id}` | Tải về nếu người gọi được xem; không có tệp và không được xem đều trả `404` |
-| `GET /api/search?q=…` | Tìm theo số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được; chỉ trả văn bản người gọi được đọc |
+| `GET /api/search?q=…` | Tìm theo số ký hiệu, trích yếu, cơ quan ban hành, nội dung văn bản đi và chữ trong tệp PDF đính kèm (văn bản hạn chế chỉ tìm theo ba trường đầu); gõ không dấu được, mọi từ phải khớp; chỉ trả văn bản người gọi được đọc; `matched_content: true` khi chỉ khớp nội dung; trang sau: `cursor=<next_cursor>` |
 | `GET /api/documents/{id}/preview` | PDF đúng thể thức NĐ 30 của dự thảo văn bản đi, chưa có số, in chữ "DỰ THẢO"; văn bản đã phát hành thì tải bản phát hành |
 | `GET /api/registers/{in\|out}/{năm}` | Văn thư, lãnh đạo đơn vị: sổ đăng ký văn bản đến / đi của một năm, đúng các cột của mẫu sổ NĐ 30 (Phụ lục IV); văn bản hạn chế người gọi không được đọc chỉ có số, ngày, số ký hiệu; `missing` là các số thiếu dòng |
 | `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, ra bản in A4 ngang để ký nhận, đóng sổ; mỗi lần in ghi `register.printed` vào sổ kiểm toán |

@@ -111,6 +111,19 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   dòng, bao nhiêu dòng bị che). Trang `/so-dang-ky` xem sổ theo năm, mở văn bản từ dòng sổ, in PDF (#35).
 - `make smoke` thêm 3 kiểm tra (tổng 38): sổ đến, sổ đi có văn bản vừa vào sổ, phát hành và liền số; in sổ ra PDF,
   lần in vào sổ kiểm toán; chuyên viên không xem được sổ. `make e2e` thêm kịch bản văn thư xem sổ, in PDF (#35).
+- Tìm theo nội dung (F2.7): ngoài số ký hiệu, trích yếu, cơ quan ban hành, tìm được cả nội dung văn bản đi và chữ
+  trong tệp PDF đính kèm. `svc-files` đọc lớp chữ của PDF đã gắn vào văn bản ở vòng nền (pypdf, trong tiến trình con
+  giới hạn bộ nhớ, CPU và thời gian — PDF dựng có ý đồ không làm treo dịch vụ), lưu ở bảng mới `core.file_texts`
+  (không vai trò người dùng nào đọc được) để dựng lại chỉ mục không phải đọc lại tệp; tệp tải lên trước đó cũng được
+  đọc bù. Văn bản hạn chế không đưa nội dung vào chỉ mục. Kết quả chỉ khớp nội dung có nhãn "Khớp trong nội dung".
+  Bản scan không có lớp chữ được đánh dấu để dành OCR (F4.1). `make seed`: văn bản đến mẫu có tệp PDF tiếng Việt
+  thật thay cho tệp rỗng (#36).
+- Tìm kiếm: mọi từ trong câu tìm phải khớp (trước đây Meilisearch bớt dần từ khi ít kết quả, nên một công văn dài
+  chỉ chứa vài từ phổ biến cũng hiện ra). **Đổi API:** `GET /api/search` bỏ `offset` / `next_offset`, thay bằng
+  `cursor` / `next_cursor` — vị trí trang sau mã hóa, gắn với người tìm và câu tìm, để không đếm ngược ra số văn
+  bản mình không được đọc có chứa một từ (#36).
+- `make smoke` thêm 2 kiểm tra (tổng 40): tìm được công văn theo chữ chỉ có trong tệp PDF; tệp của văn bản hạn chế
+  không bị đọc chữ, không tìm được theo nội dung. `make e2e`: chuyên viên tìm văn bản bằng chữ trong tệp PDF (#36).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

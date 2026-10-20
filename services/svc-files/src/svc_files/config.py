@@ -57,6 +57,7 @@ class Settings:
     meili_api_key: str
     search_index: str
     search_sync_interval_s: float
+    text_interval_s: float          # chu kỳ đọc lớp chữ của PDF mới gắn vào văn bản (F2.7); 0: tắt vòng nền
     public_url: str                 # in vào mã QR của văn bản phát hành: <public_url>/xac-thuc/<mã>
     service_clients: frozenset[str]  # client Keycloak được gọi API nội bộ (/internal/*)
     cold_bucket: str                # bucket lạnh bật khóa ghi (S3 Object Lock): mốc neo sổ kiểm toán
@@ -90,6 +91,7 @@ class Settings:
                 search_index=env.get("MOC_SEARCH_INDEX", "documents"),
                 # 0: tắt vòng đồng bộ nền (test gọi sync_once trực tiếp)
                 search_sync_interval_s=float(env.get("MOC_SEARCH_SYNC_INTERVAL_S", "5")),
+                text_interval_s=float(env.get("MOC_TEXT_INTERVAL_S", "10")),
                 # mặc định: phần trước /realms/ của issuer, tức URL công khai của cổng
                 public_url=(env.get("MOC_PUBLIC_URL") or env["MOC_OIDC_ISSUER"].split("/realms/")[0]).rstrip("/"),
                 service_clients=frozenset(
@@ -103,6 +105,8 @@ class Settings:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
 
     def __post_init__(self) -> None:
+        if self.text_interval_s < 0:
+            raise ConfigError("MOC_TEXT_INTERVAL_S phải ≥ 0 (0: tắt vòng đọc chữ của PDF)")
         if self.anchor_interval_s < 0:
             raise ConfigError("MOC_AUDIT_ANCHOR_INTERVAL_S phải ≥ 0 (0: tắt vòng neo)")
         if self.anchor_retention_days < 1:

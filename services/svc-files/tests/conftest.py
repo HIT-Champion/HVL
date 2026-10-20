@@ -38,7 +38,7 @@ from svc_files.clamav import ScanError, ScanResult
 from svc_files.config import Settings
 from svc_files.hasura import HasuraAuthError, HasuraError, StoredFile
 from svc_files.search import SearchError
-from svc_files.storage import StorageError
+from svc_files.storage import ObjectMissing, StorageError
 
 ISSUER = "https://moc.example/realms/moc"
 TENANT_A = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000a")
@@ -110,6 +110,7 @@ class FakeStore:
     def __init__(self) -> None:
         self.objects: dict[str, dict] = {}
         self.deleted: list[str] = []
+        self.unreadable: set[str] = set()      # khóa đọc lỗi (kho đứt kết nối, hỏng đĩa) dù đối tượng vẫn còn
 
     def ensure_bucket(self) -> None:
         pass
@@ -125,8 +126,10 @@ class FakeStore:
         self.objects.pop(key, None)
 
     def read_stream(self, key: str, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
+        if key in self.unreadable:
+            raise StorageError(f"đứt kết nối khi đọc {key}")
         if key not in self.objects:
-            raise StorageError(f"không có {key}")
+            raise ObjectMissing(f"không có {key}")
         data = self.objects[key]["data"]
         return iter([data[i:i + chunk_size] for i in range(0, len(data), chunk_size)])
 
@@ -261,6 +264,23 @@ class FakeHasura:
                         "summary": row["summary"] if row.get("is_public") else None, "status": row["status"]}
         return None
 
+    # --- lớp chữ của PDF (F2.7) ---------------------------------------------------------------------------
+
+    pdfs: list[dict] = field(default_factory=list)      # tệp PDF đã gắn vào văn bản (thứ tự như PENDING_TEXTS)
+    texts: dict[str, dict] = field(default_factory=dict)
+    rejected: set[str] = field(default_factory=set)     # id tệp mà CSDL không nhận kết quả đọc (chỉ nhận "failed" trơn)
+    change_reads: list[str] = field(default_factory=list)   # `after` của từng lần đọc CHANGED_DOCUMENTS
+
+    async def pending_texts(self, limit: int) -> list[dict]:
+        self._check()
+        return [f for f in self.pdfs if f["id"] not in self.texts][:limit]
+
+    async def save_text(self, *, file_id: str, tenant_id: str, **row) -> None:
+        self._check()
+        if file_id in self.rejected and row["note"] != "not saved":
+            raise HasuraError("Hasura trả lỗi: integer out of range")
+        self.texts.setdefault(file_id, {"tenant_id": tenant_id, **row})      # on_conflict: giữ bản đầu
+
     # --- sổ đăng ký (F2.8) --------------------------------------------------------------------------------
 
     def add_registered(self, tenant: uuid.UUID, direction: str, number: int, *, year: int = 2026,
@@ -287,11 +307,38 @@ class FakeHasura:
             "core_users": [{"id": "u-chuyen-vien", "full_name": "Lê Thị Hoa"}],
         }
 
-    async def changed_documents(self, since, limit: int, offset: int) -> list[dict]:
+    async def changed_documents(self, since, limit: int, after: str) -> list[dict]:
         self._check()
-        rows = sorted((r for r in self.documents.values() if datetime.fromisoformat(r["updated_at"]) >= since),
-                      key=lambda r: (r["updated_at"], r["id"]))
-        return [{k: v for k, v in r.items() if k != "readers"} for r in rows[offset:offset + limit]]
+        self.change_reads.append(after)
+
+        def changed(r: dict) -> bool:      # như _or của CHANGED_DOCUMENTS: sửa văn bản, hoặc tệp vừa được đọc chữ
+            texts = [(f.get("file") or {}).get("text") for f in r.get("files") or []]
+            return any(datetime.fromisoformat(t) >= since
+                       for t in [r["updated_at"], *(x["extracted_at"] for x in texts if x)])
+
+        rows = sorted((r for r in self.documents.values() if changed(r) and r["id"] > after), key=lambda r: r["id"])
+        return [{k: v for k, v in r.items() if k != "readers"} for r in rows[:limit]]
+
+
+def text_pdf(*lines: str, pages: int = 1) -> bytes:
+    """PDF nhỏ có lớp chữ (Helvetica, chỉ ASCII), mỗi trang đủ các dòng `lines`; pages=0: không có trang nào."""
+    def esc(line: str) -> str:
+        return line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    stream = ("BT /F1 12 Tf 72 760 Td 14 TL " + " ".join(f"({esc(line)}) '" for line in lines) + " ET").encode()
+    kids = " ".join(f"{4 + i} 0 R" for i in range(pages))
+    objs = [b"<</Type/Catalog/Pages 2 0 R>>", f"<</Type/Pages/Kids[{kids}]/Count {pages}>>".encode(),
+            b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>"]
+    objs += [f"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 3 0 R>>>>"
+             f"/Contents {4 + pages} 0 R>>".encode()] * pages
+    objs.append(b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream")
+    out, offsets = b"%PDF-1.4\n", []
+    for i, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + obj + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    return out + b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
 
 
 def fold(text: str) -> str:
@@ -302,7 +349,8 @@ def fold(text: str) -> str:
 
 @dataclass
 class FakeMeili:
-    """Meilisearch giả: khớp khi mọi từ của câu tìm có trong số ký hiệu / trích yếu / cơ quan ban hành."""
+    """Meilisearch giả: khớp khi mọi từ của câu tìm có trong số ký hiệu / trích yếu / cơ quan ban hành / nội dung
+    (hoặc trong đúng các trường `attributes` khi được chỉ định)."""
 
     docs: dict[str, dict] = field(default_factory=dict)
     searches: list[dict] = field(default_factory=list)
@@ -329,17 +377,19 @@ class FakeMeili:
         self.tasks += 1
         return self.tasks
 
-    async def search(self, q: str, filters: list[str], limit: int, offset: int) -> list[str]:
+    async def search(self, q: str, filters: list[str], limit: int, offset: int,
+                     attributes: list[str] | None = None) -> list[str]:
         if self.down:
             raise SearchError("Meilisearch tắt")
-        self.searches.append({"q": q, "filters": filters, "limit": limit, "offset": offset})
-        conds = [re.fullmatch(r'(\w+) = "?(.*?)"?', f).groups() for f in filters]
+        self.searches.append({"q": q, "filters": filters, "limit": limit, "offset": offset, "attributes": attributes})
+        conds = [re.fullmatch(r'(\w+) = "?(.*?)"?', f).groups() for f in filters if " IN " not in f]
+        only = [set(re.findall(r'"([^"]*)"', f)) for f in filters if f.startswith("id IN ")]
+        fields = attributes or ("symbol", "summary", "issuer_name", "content")
         words = fold(q).split()
         hits = [
             d["id"] for d in self.docs.values()
-            if all(str(d.get(k)) == v for k, v in conds)
-            and all(w in fold(" ".join(str(d.get(f) or "") for f in ("symbol", "summary", "issuer_name")))
-                    for w in words)
+            if all(str(d.get(k)) == v for k, v in conds) and all(d["id"] in ids for ids in only)
+            and all(w in fold(" ".join(str(d.get(f) or "") for f in fields)) for w in words)
         ]
         return hits[offset:offset + limit]
 
@@ -356,6 +406,7 @@ def settings() -> Settings:
             "MEILISEARCH_API_KEY": "test",
             "MOC_SEARCH_SYNC_INTERVAL_S": "0",
             "MOC_AUDIT_ANCHOR_INTERVAL_S": "0",
+            "MOC_TEXT_INTERVAL_S": "0",
             "MOC_FILES_MAX_MB": "1",
         }
     )

@@ -36,6 +36,10 @@ class StorageError(Exception):
     """Kho đối tượng lỗi hoặc không kết nối được."""
 
 
+class ObjectMissing(StorageError):
+    """Kho trả lời được nhưng không có đối tượng này — đọc lại cũng không ra."""
+
+
 def object_key(tenant_id: uuid.UUID, file_id: uuid.UUID, at: datetime) -> str:
     """Khóa ``tenant/<tenant_id>/<yyyy>/<mm>/<file_id>`` (mo-hinh-du-lieu.md §1)."""
     return f"tenant/{tenant_id}/{at:%Y}/{at:%m}/{file_id}"
@@ -112,7 +116,11 @@ class ObjectStore:
         """Mở đối tượng và trả về các khúc dữ liệu; lỗi khi mở báo ngay, không đợi tới lúc đọc."""
         try:
             body = self._s3.get_object(Bucket=self.bucket, Key=key)["Body"]
-        except (BotoCoreError, ClientError) as exc:
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404", "NotFound"):
+                raise ObjectMissing(f"Không có {key} trong kho") from exc
+            raise StorageError(f"Không đọc được {key}: {exc}") from exc
+        except BotoCoreError as exc:
             raise StorageError(f"Không đọc được {key}: {exc}") from exc
 
         def chunks() -> Iterator[bytes]:

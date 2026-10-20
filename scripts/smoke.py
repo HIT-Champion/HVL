@@ -48,14 +48,12 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request
+from moc_env import ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pdf
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
 # Chuỗi kiểm thử chuẩn EICAR (không phải mã độc thật), ghép từ hai nửa để chính tệp này không bị chặn
 EICAR = ("X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").encode()
-PDF = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n" \
-      b"trailer<</Root 1 0 R>>\n%%EOF\n"
 
 passed = 0
 
@@ -255,7 +253,11 @@ def main() -> None:
     ok("tệp EICAR bị ClamAV chặn (422), không lưu")
 
     print("Luồng văn bản đến")
-    file = clerk.upload(f"cong-van-{tag}.pdf", PDF)
+    # Văn bản hạn chế tiếp nhận TRƯỚC: svc-files đọc chữ PDF theo thứ tự tải lên, nên khi công văn dưới đã tìm được
+    # theo nội dung mà tệp này vẫn chưa được đọc thì đúng là tệp của văn bản hạn chế bị bỏ qua (F2.7)
+    secret_pdf = clerk.upload(f"han-che-{tag}.pdf", text_pdf(f"Danh sach nang luong truoc han MATKIN{tag}"))
+    file = clerk.upload(f"cong-van-{tag}.pdf", text_pdf("De nghi Khoa ra soat chuong trinh dao tao nam hoc 2026-2027",
+                                                        f"Ma kiem tra noi dung NOIDUNG{tag}"))
     ok(f"văn thư tải công văn lên, quét sạch ({file['sha256'][:12]}…)")
     incoming = {
         "type_code": "CV", "symbol": f"123/ĐHCN-ĐT{tag}", "issuer_name": "Trường Đại học Công nghiệp",
@@ -263,6 +265,8 @@ def main() -> None:
         "summary": f"Về việc rà soát chương trình đào tạo năm học 2026–2027 (kiểm tra {tag})", "file_ids": [file["id"]],
     }
     receive = "mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id document { status files { role } } } }"
+    clerk.gql(receive, {"d": {**incoming, "symbol": f"124/ĐHCN-TC{tag}", "restricted": True, "urgency": "normal",
+                              "summary": f"Về việc nâng lương trước hạn (kiểm tra {tag})", "file_ids": [secret_pdf["id"]]}})
     doc = clerk.gql(receive, {"d": incoming})["receiveIncoming"]
     doc_id = doc["document_id"]
     doc["document"] == {"status": "received", "files": [{"role": "main"}]} or fail(f"văn bản mới chưa đúng: {doc}")
@@ -389,6 +393,22 @@ def main() -> None:
     changed = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(tampered).hexdigest()}")[0]["result"]
     (same, changed) == ("valid", "not_found") or fail(f"tra theo băm sai: nguyên vẹn {same}, đã sửa {changed}")
     ok("tệp nguyên vẹn → khớp; sửa một byte → không khớp")
+
+    print("Tìm theo nội dung tệp PDF")
+    # svc-files đọc lớp chữ ở vòng nền (MOC_TEXT_INTERVAL_S) rồi đồng bộ sang Meilisearch (MOC_SEARCH_SYNC_INTERVAL_S)
+    started, hits = time.time(), []
+    while not hits and time.time() - started < 120:
+        hits = call_json("GET", f"{PUBLIC_URL}/api/search?q=NOIDUNG{tag}", headers=director.auth)[0]["hits"]
+        hits or time.sleep(2)
+    [(h["id"], h["matched_content"]) for h in hits] == [(doc_id, True)] \
+        or fail(f"không tìm được công văn theo chữ trong tệp PDF: {hits}")
+    ok(f"đọc lớp chữ của PDF đính kèm, tìm theo nội dung ra đúng công văn (sau {time.time() - started:.0f} giây)")
+    hidden = call_json("GET", f"{PUBLIC_URL}/api/search?q=MATKIN{tag}", headers=clerk.auth)[0]["hits"]
+    read = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                   "-d", ENV.get("POSTGRES_DB", "moc"), "-c",
+                   f"select count(*) from core.file_texts where file_id = '{secret_pdf['id']}'").decode().strip()
+    hidden == [] and read == "0" or fail(f"tệp của văn bản hạn chế bị đọc chữ hoặc tìm được: {hidden}, {read}")
+    ok("văn bản hạn chế: tệp không bị đọc chữ, không tìm được theo nội dung (kể cả người tạo)")
 
     print("Sổ đăng ký văn bản (in theo NĐ 30, Điều 16, 22)")
     years = clerk.gql("""query ($a: uuid!, $b: uuid!) { a: office_documents_by_pk(id: $a) { register { year } }

@@ -33,6 +33,7 @@ Chạy: ``uvicorn svc_files.app:create_app --factory``
 # Không dùng "from __future__ import annotations": FastAPI cần đọc được kiểu của
 # dependency khai báo bên trong create_app().
 import asyncio
+import dataclasses
 import hashlib
 import io
 import json
@@ -61,8 +62,9 @@ from .config import Settings
 from .hasura import HasuraAuthError, HasuraClient, HasuraError
 from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
-from .search import Indexer, MeiliClient, SearchError, SearchQuery, search_documents
+from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .storage import ObjectStore, StorageError, object_key, s3_client
+from .texts import TextExtractor
 
 CHUNK_SIZE = 64 * 1024
 # Phần đầu và biên của multipart cộng thêm vào kích thước tệp
@@ -112,6 +114,9 @@ class SearchHit(BaseModel):
     register_number: int | None
     registered_at: datetime | None
     due_on: date | None
+    matched_content: bool = Field(
+        False, description="Khớp trong nội dung (văn bản đi, chữ của tệp PDF đính kèm), không khớp số ký hiệu, "
+                           "trích yếu, cơ quan ban hành")
 
 
 class IssueIn(BaseModel):
@@ -170,8 +175,8 @@ class RegisterOut(BaseModel):
 
 class SearchOut(BaseModel):
     hits: list[SearchHit]
-    # offset để lấy trang sau; None khi đã hết. Không có tổng số kết quả — xem search.py.
-    next_offset: int | None
+    # Không có tổng số kết quả, vị trí trang sau cũng mã hóa — xem search.Cursor.
+    next_cursor: str | None = Field(description="Gửi lại ở tham số `cursor` để lấy trang sau; null khi đã hết")
 
 
 class FileTooLarge(Exception):
@@ -275,7 +280,10 @@ def create_app(
     verifier = verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_jwks_url, settings.oidc_audience)
     hasura = hasura or HasuraClient(settings.hasura_url, settings.hasura_admin_secret, timeout_s=settings.hasura_timeout_s)
     meili = meili or MeiliClient(settings.meili_url, settings.meili_api_key, settings.search_index)
+    cursors = Cursor(settings.hasura_admin_secret)   # khóa dẫn xuất (HKDF) từ một bí mật sẵn có của svc-files
     indexer = Indexer(hasura, meili, interval_s=settings.search_sync_interval_s or 5.0)
+    extractor = TextExtractor(hasura, store, interval_s=settings.text_interval_s or 10.0,
+                              max_bytes=settings.max_upload_bytes)
     anchorer = Anchorer(
         hasura,
         anchor_store or AnchorStore(
@@ -295,8 +303,9 @@ def create_app(
             log.warning(json.dumps({"event": "storage.bucket_unready", "error": str(exc)}, ensure_ascii=False))
         sync = asyncio.create_task(indexer.run()) if settings.search_sync_interval_s > 0 else None
         anchor = asyncio.create_task(anchorer.run()) if settings.anchor_interval_s > 0 else None
+        texts = asyncio.create_task(extractor.run()) if settings.text_interval_s > 0 else None
         yield
-        for task in (sync, anchor):
+        for task in (sync, anchor, texts):
             if task is not None:
                 task.cancel()
         await meili.aclose()
@@ -310,6 +319,7 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.indexer = indexer
+    app.state.extractor = extractor
     app.state.anchorer = anchorer
     app.state.meili = meili
     bearer = HTTPBearer(auto_error=False)
@@ -540,8 +550,9 @@ def create_app(
     @app.get(
         "/api/search",
         response_model=SearchOut,
-        summary="Tìm văn bản theo số ký hiệu, trích yếu, cơ quan ban hành",
+        summary="Tìm văn bản theo số ký hiệu, trích yếu, cơ quan ban hành, nội dung",
         responses={
+            400: {"description": "Câu tìm trống, hoặc `cursor` sai, không phải của câu tìm này"},
             401: {"description": "Thiếu hoặc sai token"},
             503: {"description": "Meilisearch hoặc CSDL không sẵn sàng"},
         },
@@ -556,12 +567,18 @@ def create_app(
         urgency: Urgency | None = None,
         year: Annotated[int | None, Query(ge=2000, le=2100)] = None,
         limit: Annotated[int, Query(ge=1, le=50)] = 20,
-        offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+        cursor: Annotated[str | None, Query(max_length=100, description="`next_cursor` của trang trước")] = None,
     ) -> SearchOut:
         if not q.strip():
             raise _error(400, "empty_query", "Nhập từ cần tìm")
         query = SearchQuery(q=q.strip(), direction=direction, status=status, type_code=type_code,
                             urgency=urgency, year=year)
+        scope = json.dumps([principal.user_id, str(principal.tenant_id), *dataclasses.astuple(query)],
+                           ensure_ascii=False)
+        try:
+            offset = cursors.open(cursor, scope) if cursor else 0
+        except ValueError as exc:
+            raise _error(400, "invalid_cursor", "Trang sau không còn hợp lệ, hãy tìm lại") from exc
         try:
             hits, next_offset = await search_documents(
                 meili, hasura, token=principal.token, tenant_id=principal.tenant_id, query=query,
@@ -581,7 +598,8 @@ def create_app(
         # Không ghi nội dung câu tìm vào nhật ký: có thể chứa thông tin văn bản hạn chế.
         log_event("core.search", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
                   q_length=len(q), hits=len(hits))
-        return SearchOut(hits=[SearchHit.model_validate(h) for h in hits], next_offset=next_offset)
+        return SearchOut(hits=[SearchHit.model_validate(h) for h in hits],
+                         next_cursor=cursors.seal(next_offset, scope) if next_offset is not None else None)
 
     # --- văn bản đi -----------------------------------------------------------------------------------
 

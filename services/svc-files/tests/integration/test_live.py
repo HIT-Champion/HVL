@@ -35,7 +35,7 @@ import pytest
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi.testclient import TestClient
 
-from conftest import EICAR, ISSUER, StaticKeys
+from conftest import EICAR, ISSUER, StaticKeys, text_pdf
 from svc_files.app import create_app
 from svc_files.auth import HASURA_CLAIMS, TokenVerifier
 from svc_files.config import Settings
@@ -111,6 +111,7 @@ def live_settings() -> Settings:
         "MEILISEARCH_API_KEY": os.environ.get("MOC_IT_MEILISEARCH_KEY", "it-meili-master-key-0123456789"),
         "MOC_SEARCH_INDEX": f"documents-it-{uuid.uuid4().hex[:8]}",   # chỉ mục riêng cho mỗi lần chạy
         "MOC_SEARCH_SYNC_INTERVAL_S": "0",                            # test tự gọi sync_once
+        "MOC_TEXT_INTERVAL_S": "0",                                   # test tự gọi run_once
     })
 
 
@@ -267,3 +268,47 @@ def test_search_respects_tenant_and_role(app_client, tenants, token):
     assert found(app_client, admin_a, "tuyen sinh") == []
     assert found(app_client, clerk_a, f"45/UBND-{tag}") == [incoming]               # theo số ký hiệu
     assert found(app_client, director_a, "tuyen sinh", direction="out") == [draft]
+
+
+def test_search_finds_text_inside_pdfs(app_client, tenants, token):
+    """F2.7: đọc lớp chữ PDF đã gắn vào văn bản (truy vấn thật của svc-files trên Hasura thật), tìm theo nội dung."""
+    a, _ = tenants
+    tag = uuid.uuid4().hex[:8].upper()
+    clerk = token("van-thu-a", "clerk", a)
+    director = token("hieu-truong-a", "director", a)
+
+    def pdf_file(*lines: str) -> str:
+        r = upload(app_client, clerk, "cong-van.pdf", text_pdf(*lines))
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    main = pdf_file(f"De nghi bo sung chung chi NOIDUNG{tag}", "Han nop truoc ngay 30/11")
+    secret_file = pdf_file(f"Danh sach nang luong MATKIN{tag}")
+    loose = pdf_file(f"Tep chua gan LOOSE{tag}")
+    doc = receive(a, "van-thu-a", {
+        "type_code": "CV", "symbol": f"77/PDF-{tag}", "issuer_name": "Phòng Đào tạo", "issued_on": "2026-10-15",
+        "summary": "Về việc rà soát danh sách sinh viên"}, (main,))
+    receive(a, "van-thu-a", {
+        "type_code": "CV", "symbol": f"78/PDF-{tag}", "issuer_name": "Phòng Tổ chức", "issued_on": "2026-10-15",
+        "summary": "Về việc nâng lương trước hạn", "restricted": True}, (secret_file,))
+
+    extractor = app_client.app.state.extractor
+    while app_client.portal.call(extractor.run_once) == extractor.batch:
+        pass
+    texts = {r[0]: r[1:] for r in sql(f"""select file_id, status, content from core.file_texts
+                                           where file_id in ('{main}', '{secret_file}', '{loose}')""")}
+    assert texts[main][0] == "ok" and f"NOIDUNG{tag}" in texts[main][1]
+    assert secret_file not in texts and loose not in texts        # văn bản hạn chế, tệp chưa gắn: không đọc chữ
+
+    sync_index(app_client)
+    r = app_client.get("/api/search", headers=bearer(director), params={"q": f"noidung{tag}"})
+    assert [(h["id"], h["matched_content"]) for h in r.json()["hits"]] == [(doc, True)]
+    assert found(app_client, director, "ra soat danh sach sinh vien") == [doc]
+    # mọi từ phải khớp: Meilisearch thật mặc định sẽ bớt từ cuối và trả về văn bản chỉ khớp một phần
+    assert found(app_client, director, f"noidung{tag} khongcotrongvanban") == []
+
+    # không vai trò người dùng nào đọc được bảng chữ
+    for tok in (clerk, director, token("quan-tri-a", "tenant_admin", a)):
+        assert "errors" in _post("/v1/graphql", {"query": "{ core_file_texts { content } }"}, bearer(tok))
+        body = _post("/v1/graphql", {"query": "{ core_files { text { content } } }"}, bearer(tok))
+        assert "errors" in body

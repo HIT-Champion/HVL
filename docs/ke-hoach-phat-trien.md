@@ -650,3 +650,28 @@ Phase 2:
   - Ô Ký nhận, Số lượng bản để trống, ghi tay trên bản in: hệ thống không biết bản giấy gửi đi mấy bản.
 - Phase 2 còn lại: tìm trong nội dung PDF có lớp chữ (F2.7 hiện mới tìm theo số ký hiệu, trích yếu, cơ quan ban
   hành; trường `content` của chỉ mục đã chừa sẵn) và F2.11 (cộng đồng, không phải mã).
+
+**20/10/2026** — F2.7:
+
+- **F2.7 xong.** Tìm được theo nội dung văn bản đi và chữ trong tệp PDF đính kèm; kết quả chỉ khớp nội dung có
+  nhãn "Khớp trong nội dung". Khác bản thiết kế:
+  - Chữ của PDF lưu trong CSDL (`core.file_texts`), không chỉ trong Meilisearch: svc-files khởi động lại thì đồng
+    bộ lại toàn bộ chỉ mục, không phải đọc lại mọi tệp.
+  - Đọc ở vòng nền, không lúc tải lên: lúc tải lên tệp chưa gắn vào văn bản nào, chưa biết văn bản có hạn chế không;
+    vòng nền còn đọc bù tệp tải lên trước đó.
+  - **Văn bản hạn chế không tìm được theo nội dung**, kể cả với người được đọc nó. Lý do: bản chữ trần nằm ngoài
+    tệp sẽ vô hiệu việc lưu mã hóa tệp của văn bản hạn chế (F3.7); và chỉ mục chỉ còn siêu dữ liệu của văn bản hạn
+    chế như trước.
+  - PDF đọc trong tiến trình con giới hạn bộ nhớ, CPU, thời gian: tệp do người ngoài gửi, ClamAV không bắt được
+    PDF dựng để làm treo bộ đọc.
+  - Bản scan, ảnh chụp không có lớp chữ: đánh dấu `empty`, để dành OCR ở F4.1.
+- `make seed` dựng tệp PDF tiếng Việt thật cho văn bản đến mẫu (WeasyPrint trong container svc-files), để màn tìm
+  kiếm có nội dung thật mà tìm; ví dụ "giáo dục quốc phòng" ra công văn 131/ĐT-ĐH.
+- Sửa sau rà soát:
+  - Một PDF dựng có ý đồ (khai hàng tỉ trang) từng chặn được hàng đợi đọc chữ của mọi thuê ước. Nay tệp nào cũng đi
+    tới một dòng kết quả.
+  - Vị trí trang sau của tìm kiếm trước đây trả dạng số, đếm ngược ra được số văn bản mình không được đọc có chứa
+    một từ. Nay mã hóa (`cursor`).
+  - Tìm kiếm bắt mọi từ phải khớp.
+  - Trigger CSDL xóa chữ khi văn bản bật hạn chế.
+- Phase 2 còn lại: F2.11 (cộng đồng, không phải mã).

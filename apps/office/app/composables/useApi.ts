@@ -46,6 +46,8 @@ export interface SearchHit {
   register_number: number | null
   registered_at: string | null
   due_on: string | null
+  // khớp trong nội dung (văn bản đi, chữ của tệp PDF đính kèm — F2.7), không khớp số ký hiệu, trích yếu, cơ quan
+  matched_content: boolean
 }
 
 // Sổ đăng ký văn bản đến / đi một năm (F2.8): đúng các cột, các ô sẽ in (svc-files, registers.py)
@@ -169,7 +171,7 @@ export function useApi() {
       `so-dang-ky-van-ban-${direction === 'in' ? 'den' : 'di'}-${year}.pdf`)
   }
 
-  async function search(params: Record<string, string | number | undefined>): Promise<{ hits: SearchHit[]; next_offset: number | null }> {
+  async function search(params: Record<string, string | number | undefined>): Promise<{ hits: SearchHit[]; next_cursor: string | null }> {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
     const res = await authFetch(`/api/search?${qs}`)

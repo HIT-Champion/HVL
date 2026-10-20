@@ -25,6 +25,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `metadata/actions.graphql`, `actions.yaml`: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `myTasks`, `completeTask` → svc-workflow | **Xong** |
 | Poka-yoke lớp 3 cho văn bản đến (F2.2): `documents_in_symbol`, `documents_in_issuer`, `documents_in_summary`, `documents_in_dates` — cùng quy tắc với `schemas/van-ban-den.json` (độ dài, khoảng trắng, ký tự ẩn, dạng NFC, năm 1900+); migration dọn trước dữ liệu cũ sửa được mà không đổi nghĩa | **Xong** — 43 test chạy chung bộ ca thử với form và svc-workflow, chèn thẳng bằng quyền quản trị |
 | Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
+| `core.file_texts` (lớp chữ của PDF để tìm theo nội dung, F2.7): không vai trò người dùng nào đọc được, xóa tệp thì xóa theo, không gắn sổ kiểm toán | **Xong** — 7 test |
 | `core.notifications` (thông báo từng người, F2.5): mỗi người chỉ đọc và đánh dấu đã đọc thông báo của mình, chống gửi trùng theo khóa | **Xong** — 6 test |
 | `office.case_files` (hồ sơ, nộp lưu) và các view báo cáo | Phase 2–3 |
 

@@ -4,11 +4,11 @@ Cửa duy nhất để tệp vào và ra khỏi kho đối tượng của Mộc.
 sạch mới ghi vào SeaweedFS và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp
 chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
-Hasura quyết ai được đọc văn bản nào. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
+Hasura quyết ai được đọc văn bản nào; tìm được cả theo chữ trong tệp PDF đính kèm. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
 trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
 
-Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 (tìm kiếm), F2.4 (dựng PDF văn bản đi),
-F2.8 (sổ đăng ký in được) và F2.13 (cổng xác thực) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
+F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được) và F2.13 (cổng xác thực) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
 issue #19, #20.
 
 ## Trạng thái
@@ -19,7 +19,8 @@ issue #19, #20.
 | Tệp nhiễm: ghi `file.rejected` vào sổ kiểm toán `core.audit_log` | **Xong** |
 | `GET /api/files/{id}`: kiểm quyền qua Hasura → đọc SeaweedFS | **Xong** |
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
-| Tìm trong nội dung PDF có lớp chữ (trường `content` đã chừa sẵn) | Phase 2 (F2.7) |
+| Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
+| Đọc chữ bản scan, ảnh chụp (OCR) | Phase 4 (F4.1) |
 | Giải mã văn bản hạn chế, watermark khi tải | Phase 3 (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
@@ -41,7 +42,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `403` `unknown_tenant` — thuê ước trong token chưa có trong `core.tenants` |
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` |
-| `GET /api/search?q=` | `200` `{hits: [...], next_offset}` · `400` câu tìm trống · `422` tham số sai · `401` · `503` |
+| `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
 | `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
 | `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
@@ -67,16 +68,59 @@ do APISIX gắn); mã này cũng đi vào cột `request_id` của sổ kiểm t
 "QĐ-ĐHCN") và chịu được gõ sai một chữ.
 
 1. Meilisearch tìm trong chỉ mục với điều kiện `tenant_id` lấy từ token — luôn đứng đầu bộ lọc, không lấy từ
-   tham số. Chỉ mục chỉ trả về id (`displayedAttributes: ["id"]`).
+   tham số. Chỉ mục chỉ trả về id (`displayedAttributes: ["id"]`). Mọi từ trong câu tìm phải khớp
+   (`matchingStrategy: "all"`): mặc định của Meilisearch bớt dần từ khi ít kết quả, nên khi đã tìm cả nội dung tệp,
+   một công văn dài chỉ chứa vài từ phổ biến của câu tìm cũng hiện ra.
 2. svc-files hỏi Hasura **bằng token người dùng** các id đó: văn bản không được đọc bị bỏ, dữ liệu trả về là
    bản mới nhất trong CSDL. Người chỉ được đọc ít văn bản thì svc-files lấy thêm vài lượt để đủ `limit`.
-3. Không trả tổng số kết quả: con số của Meilisearch tính cả văn bản người dùng không được đọc. Trang sau
-   lấy bằng `offset=next_offset`; `next_offset: null` là hết.
+3. Không trả tổng số kết quả: con số của Meilisearch tính cả văn bản người dùng không được đọc. Vì cùng lý do,
+   vị trí trang sau cũng không trả dạng số (tìm với `limit=1` rồi lấy vị trí trừ 1 là ra số văn bản mình không được
+   đọc có chứa từ đó): `next_cursor` là vị trí đã mã hóa AES-GCM, gắn với người tìm, câu tìm và bộ lọc. Trang sau
+   lấy bằng `cursor=<next_cursor>`; `next_cursor: null` là hết; cursor của người khác, câu tìm khác, hoặc bị sửa
+   nhận `400 invalid_cursor`. Khóa dẫn xuất (HKDF) từ `HASURA_ADMIN_SECRET`: đổi khóa đó thì cursor cũ hết hiệu lực.
 4. Nhật ký chỉ ghi độ dài câu tìm, không ghi nội dung.
+5. Mỗi kết quả có `matched_content`: câu tìm khớp nội dung mà không khớp số ký hiệu, trích yếu, cơ quan ban hành.
+   Meilisearch không cho biết khớp ở trường nào khi chỉ hiện id, nên svc-files hỏi thêm một lượt, chỉ trong ba
+   trường đó và chỉ với các id vừa tìm được (`attributesToSearchOn`, mọi từ phải khớp).
 
-Đồng bộ chỉ mục: mỗi `MOC_SEARCH_SYNC_INTERVAL_S` giây, svc-files đọc các văn bản có `updated_at` mới qua
-Hasura (khóa quản trị, chỉ đọc) và ghi đè vào Meilisearch theo id. Mỗi lượt đọc lùi lại 60 giây để không sót
-giao dịch ghi xong muộn; văn bản chưa đổi không bị đẩy lại. Khởi động lại thì đồng bộ lại toàn bộ.
+Đồng bộ chỉ mục: mỗi `MOC_SEARCH_SYNC_INTERVAL_S` giây, svc-files đọc các văn bản có `updated_at` mới — hoặc có
+tệp vừa được đọc chữ — qua Hasura (khóa quản trị, chỉ đọc) và ghi đè vào Meilisearch theo id. Mỗi lượt đọc lùi
+lại 60 giây để không sót giao dịch ghi xong muộn; văn bản chưa đổi (đủ mọi mốc thời gian của văn bản và chữ các
+tệp) không bị đẩy lại, đẩy lỗi thì lượt sau đẩy lại. Lật trang theo id, không theo offset: văn bản đổi giữa lúc
+đang lật không làm trượt mất dòng ở mép trang. Khởi động lại thì đồng bộ lại toàn bộ (chữ của PDF đọc từ CSDL,
+không đọc lại tệp).
+
+### Nội dung tệp PDF (F2.7)
+
+`texts.py`, `pdftext.py`. Trường `content` của chỉ mục là nội dung văn bản đi cộng chữ của các tệp PDF gắn vào
+văn bản (bản chính, tài liệu kèm theo; không lấy bản phát hành vì nó chính là nội dung đã có), tối đa 100 000 ký
+tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số ký hiệu, trích yếu, cơ quan ban hành.
+
+- **Đọc ở vòng nền**, mỗi `MOC_TEXT_INTERVAL_S` giây, các PDF **đã gắn vào văn bản** (bản chính, tài liệu kèm
+  theo) mà chưa đọc; còn tồn (vd tệp tải lên trước khi có F2.7) thì đọc tiếp ngay. Kết quả ghi vào
+  `core.file_texts` (khóa quản trị; không vai trò người dùng nào đọc được bảng này), mỗi tệp một lần: `ok`, `empty`
+  (không có lớp chữ — bản scan, để dành OCR F4.1), `failed` kèm lý do (`encrypted`, `timeout`, `memory`,
+  `too large`, `missing` — kho không có đối tượng, `unreadable` — kho lỗi 5 lượt liền, `not saved` — CSDL không
+  nhận kết quả, `bad output`, lỗi của pypdf).
+- **Một tệp lỗi không chặn hàng đợi.** Hàng đợi chung mọi thuê ước, tệp cũ nhất trước: tệp nào cũng phải đi tới
+  một dòng kết quả, nếu không thì tệp đó đứng đầu mãi. Số trang tệp tự khai (`/Count`, pypdf trả nguyên với tệp mã
+  hóa) không được tin — lấy số trang thật sau khi duyệt cây trang; kết quả của tiến trình con được kiểm đúng ràng
+  buộc của bảng trước khi ghi; CSDL vẫn từ chối thì ghi `failed` trơn. Kho tạm lỗi thì tệp sau vẫn được đọc.
+- **Văn bản hạn chế không đưa nội dung vào chỉ mục**, tệp của nó cũng không được đọc chữ: kể cả người được đọc
+  văn bản cũng chỉ tìm được theo số ký hiệu, trích yếu, cơ quan ban hành. Bản chữ trần nằm ngoài tệp sẽ vô hiệu
+  việc lưu mã hóa tệp của văn bản hạn chế (F3.7). CSDL chặn thêm bằng trigger: không ghi chữ cho tệp của văn bản
+  hạn chế, và xóa chữ đã đọc khi văn bản bật hạn chế hoặc khi tệp được gắn vào văn bản hạn chế; lượt đồng bộ kế
+  tiếp đẩy lại văn bản với nội dung rỗng.
+- **Chưa xử lý** (ghi lại để làm sau): bỏ tệp đính kèm mà không sửa văn bản (gọi thẳng `delete_office_document_files`)
+  thì chữ của tệp còn trong chỉ mục tới lần sửa văn bản kế tiếp — giao diện luôn sửa văn bản trong cùng lệnh nên
+  dùng thường không gặp. Hàng đợi đọc chữ là một hàng chung: một người gắn nhiều PDF chậm làm chậm việc đọc chữ
+  của mọi thuê ước (mỗi tệp tối đa 60 giây).
+- **Không đọc PDF trong tiến trình của svc-files.** Tệp do người dùng tải lên, ClamAV chỉ biết nó không chứa mã
+  độc đã biết; một PDF dựng có ý đồ vẫn làm bộ đọc chạy mãi hoặc ăn hết bộ nhớ. Mỗi tệp đọc trong một tiến trình
+  con (`python -I pdftext.py`) giới hạn 1 GB bộ nhớ ảo, CPU và 60 giây; quá hạn thì bị giết, tệp ghi `failed`.
+  Đọc tối đa 200 trang đầu, giữ 50 000 ký tự, đưa về Unicode dựng sẵn (NFC), bỏ ký tự điều khiển và ký tự ẩn.
+- PDF khóa bằng mật khẩu chủ (cấm sửa, cấm chép) nhưng mở không cần mật khẩu vẫn đọc được; cần mật khẩu để mở
+  thì `failed`, `encrypted`. Tệp đã mã hóa ở kho (F3.7) không đọc.
 
 ### Văn bản đi và cổng xác thực
 
@@ -144,6 +188,7 @@ tra cứu, không thêm phiên bản.
 | Lọc kết quả tìm kiếm theo quyền | Token của người dùng |
 | Thêm dòng `core.files`, ghi `file.rejected`, đọc `object_key` | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng, request id lấy từ token đã kiểm |
 | Đọc văn bản mới sửa để đồng bộ chỉ mục | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, không nhận tham số từ người dùng |
+| Tìm PDF chờ đọc chữ, ghi `core.file_texts` | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
 | Đọc văn bản để dựng bản xem trước | Token của người dùng |
 | Đọc văn bản để dựng bản phát hành | Khóa quản trị + `X-Hasura-Role: service` + thuê ước trong yêu cầu của svc-workflow |
 | Đọc sổ đăng ký một năm | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng lấy từ token đã kiểm; rồi token của người dùng để biết dòng nào được đọc |
@@ -171,6 +216,7 @@ tra cứu, không thêm phiên bản.
 | `MEILISEARCH_API_KEY` | **bắt buộc** | Hiện dùng master key của Meilisearch (chỉ trong mạng nội bộ) |
 | `MOC_SEARCH_INDEX` | `documents` | Tự tạo và áp cấu hình khi khởi động |
 | `MOC_SEARCH_SYNC_INTERVAL_S` | `5` | `0` tắt vòng đồng bộ nền |
+| `MOC_TEXT_INTERVAL_S` | `10` | Chu kỳ đọc chữ của PDF mới gắn vào văn bản; `0` tắt vòng đọc |
 | `MOC_PUBLIC_URL` | phần trước `/realms/` của `MOC_OIDC_ISSUER` | In vào mã QR của bản phát hành |
 | `MOC_SERVICE_CLIENTS` | `svc-workflow` | Client Keycloak được gọi `/internal/*`, cách nhau dấu phẩy |
 | `MOC_COLD_BUCKET` | `moc-cold` | Bucket lạnh có khóa ghi, tự tạo; phải khác `MOC_FILES_BUCKET` |
@@ -191,7 +237,8 @@ uv venv && uv pip install -r requirements-dev.txt     # hoặc: python -m venv .
 
 Đi trọn luồng: tải lên → bản ghi `core.files` → tải xuống; lãnh đạo chỉ xem được sau khi tệp gắn vào văn bản;
 thuê ước khác nhận 404; EICAR bị chặn và nằm trong chuỗi băm của sổ kiểm toán; thuê ước lạ không để lại
-tệp mồ côi; tìm kiếm trả đúng văn bản từng vai trò được đọc. Hasura dựng bằng `db/tests/stack.sh` (schema và quyền lấy từ `db/` của cây mã nguồn) với khóa
+tệp mồ côi; tìm kiếm trả đúng văn bản từng vai trò được đọc; đọc chữ PDF đã gắn vào văn bản (bỏ tệp của văn bản
+hạn chế, tệp chưa gắn) rồi tìm được theo nội dung. Hasura dựng bằng `db/tests/stack.sh` (schema và quyền lấy từ `db/` của cây mã nguồn) với khóa
 công khai RS256, vì svc-files chỉ nhận token RS256 như của Keycloak.
 
 ```bash

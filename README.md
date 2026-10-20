@@ -69,7 +69,7 @@ Mộc, quản lý văn bản đến và đi theo Nghị định 30/2020/NĐ-CP v
 | Hồ sơ bị sửa lén sau khi lưu | Sổ kiểm toán chuỗi băm; lưu trữ hồ sơ sang kho lạnh có băm | Lõi + [D] |
 | Văn bản nhạy cảm bị lộ | Lưu mã hóa, chỉ giải mã trong bộ nhớ khi người có quyền xem | [P] |
 | Lãnh đạo không biết việc nghẽn ở đâu | Dashboard điều hành từ số liệu thật | [D] |
-| Tìm lại văn bản cũ mất thời gian | Tìm kiếm toàn văn; trợ lý hỏi đáp có trích dẫn số ký hiệu | [I] |
+| Tìm lại văn bản cũ mất thời gian | Tìm kiếm toàn văn, cả chữ trong tệp PDF đính kèm; trợ lý hỏi đáp có trích dẫn số ký hiệu | [I] |
 
 Chi tiết phạm vi, vai trò người dùng và kịch bản demo: [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md).
 
@@ -83,7 +83,7 @@ Lát cắt đầu tiên chạy trọn từ giao diện xuống lõi: **văn bả
 ClamAV) → nhập thông tin, chặn trùng → vào sổ, hệ thống cấp số đến liên tiếp → lãnh đạo khoa chỉ đạo,
 giao phòng chủ trì và phối hợp, đặt hạn → lãnh đạo phòng phân công → chuyên viên báo kết quả. Mỗi bước có
 trong hộp việc của đúng người, hiện trên dòng thời gian văn bản và vào sổ kiểm toán chuỗi băm; tìm lại
-được bằng chữ không dấu.
+được bằng chữ không dấu, kể cả chữ chỉ có trong tệp PDF đính kèm.
 
 Lát cắt thứ hai là **văn bản đi và cổng xác thực**. Chuyên viên soạn công văn trả lời và xem trước bản PDF đúng
 thể thức NĐ 30. Sau đó dự thảo được trình lãnh đạo phòng duyệt; bị trả lại thì sửa rồi trình lại. Lãnh đạo khoa

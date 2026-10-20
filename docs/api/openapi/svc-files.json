@@ -112,7 +112,7 @@
     },
     "/api/search": {
       "get": {
-        "summary": "Tìm văn bản theo số ký hiệu, trích yếu, cơ quan ban hành",
+        "summary": "Tìm văn bản theo số ký hiệu, trích yếu, cơ quan ban hành, nội dung",
         "operationId": "search_api_search_get",
         "security": [
           {
@@ -252,16 +252,23 @@
             }
           },
           {
-            "name": "offset",
+            "name": "cursor",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 10000,
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` của trang trước",
+              "title": "Cursor"
+            },
+            "description": "`next_cursor` của trang trước"
           }
         ],
         "responses": {
@@ -274,6 +281,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Câu tìm trống, hoặc `cursor` sai, không phải của câu tìm này"
           },
           "401": {
             "description": "Thiếu hoặc sai token"
@@ -858,6 +868,12 @@
               }
             ],
             "title": "Due On"
+          },
+          "matched_content": {
+            "type": "boolean",
+            "title": "Matched Content",
+            "description": "Khớp trong nội dung (văn bản đi, chữ của tệp PDF đính kèm), không khớp số ký hiệu, trích yếu, cơ quan ban hành",
+            "default": false
           }
         },
         "type": "object",
@@ -886,22 +902,23 @@
             "type": "array",
             "title": "Hits"
           },
-          "next_offset": {
+          "next_cursor": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Next Offset"
+            "title": "Next Cursor",
+            "description": "Gửi lại ở tham số `cursor` để lấy trang sau; null khi đã hết"
           }
         },
         "type": "object",
         "required": [
           "hits",
-          "next_offset"
+          "next_cursor"
         ],
         "title": "SearchOut"
       },

@@ -54,15 +54,44 @@ query FileLocation($id: uuid!) {
   core_files_by_pk(id: $id) { object_key }
 }"""
 
-# Đồng bộ chỉ mục tìm kiếm: đọc xuyên mọi thuê ước, theo thứ tự thời điểm sửa
+# Đồng bộ chỉ mục tìm kiếm: đọc xuyên mọi thuê ước, lật trang theo id. Văn bản cũng được đọc lại khi
+# một tệp của nó vừa được đọc chữ (F2.7) — việc đó không đổi updated_at của văn bản.
 CHANGED_DOCUMENTS = """
-query ChangedDocuments($since: timestamptz!, $limit: Int!, $offset: Int!) {
+query ChangedDocuments($since: timestamptz!, $limit: Int!, $after: uuid!) {
   office_documents(
-    where: {updated_at: {_gte: $since}}
-    order_by: [{updated_at: asc}, {id: asc}]
+    where: {_and: [{id: {_gt: $after}}, {_or: [
+      {updated_at: {_gte: $since}},
+      {files: {role: {_in: ["main", "attachment"]}, file: {text: {extracted_at: {_gte: $since}}}}}
+    ]}]}
+    order_by: {id: asc}
     limit: $limit
-    offset: $offset
-  ) { id tenant_id direction status type_code symbol issuer_name issued_on summary urgency updated_at }
+  ) {
+    id tenant_id direction status type_code symbol issuer_name issued_on summary urgency restricted body updated_at
+    files(where: {role: {_in: ["main", "attachment"]}}, order_by: {added_at: asc}) {
+      file { text { content extracted_at } }
+    }
+  }
+}"""
+
+# Lớp chữ của PDF (F2.7): tệp PDF chính hoặc đính kèm của một văn bản, chưa đọc chữ. Bỏ tệp đã mã hóa, tệp của
+# văn bản hạn chế (bản chữ trần sẽ vô hiệu việc mã hóa — F3.7; CSDL cũng chặn, xem migration file_texts), tệp chưa
+# gắn vào văn bản nào (chưa biết có hạn chế không), bản thảo và bản phát hành văn bản đi (chỉ mục không dùng).
+PENDING_TEXTS = """
+query PendingTexts($limit: Int!) {
+  core_files(
+    where: {_and: [
+      {mime_type: {_eq: "application/pdf"}}, {encrypted: {_eq: false}},
+      {document_files: {role: {_in: ["main", "attachment"]}}},
+      {_not: {text: {}}}, {_not: {document_files: {document: {restricted: {_eq: true}}}}}
+    ]}
+    order_by: [{created_at: asc}, {id: asc}]
+    limit: $limit
+  ) { id tenant_id object_key size_bytes }
+}"""
+
+SAVE_TEXT = """
+mutation SaveText($o: core_file_texts_insert_input!) {
+  insert_core_file_texts_one(object: $o, on_conflict: {constraint: file_texts_pkey, update_columns: []}) { file_id }
 }"""
 
 # Kết quả tìm kiếm: chỉ những văn bản người dùng được đọc, dữ liệu mới nhất từ CSDL
@@ -297,18 +326,32 @@ class HasuraClient:
             raise
         return {row["id"]: row for row in data["office_documents"]}
 
-    async def changed_documents(self, since: datetime, limit: int, offset: int) -> list[dict[str, Any]]:
-        """Văn bản sửa từ `since` của mọi thuê ước, để đồng bộ chỉ mục tìm kiếm.
+    async def changed_documents(self, since: datetime, limit: int, after: str) -> list[dict[str, Any]]:
+        """Văn bản sửa (hoặc có tệp vừa được đọc chữ) từ `since` của mọi thuê ước, để đồng bộ chỉ mục tìm kiếm.
+
+        Lật trang theo id (`after`: id cuối của trang trước), không theo offset: văn bản đổi giữa lúc đang lật thì
+        thứ tự theo id vẫn đứng yên, không trượt mất dòng nào ở mép trang.
 
         Gọi bằng khóa quản trị không kèm vai trò (vai trò admin của Hasura): việc nội bộ, chỉ đọc, không
         nhận tham số nào từ người dùng.
         """
         data = await self._call(
             CHANGED_DOCUMENTS,
-            {"since": since.isoformat(), "limit": limit, "offset": offset},
+            {"since": since.isoformat(), "limit": limit, "after": after},
             {"X-Hasura-Admin-Secret": self._secret},
         )
         return data["office_documents"]
+
+    async def pending_texts(self, limit: int) -> list[dict[str, Any]]:
+        """Tệp PDF chờ đọc chữ, của mọi thuê ước — khóa quản trị: việc nội bộ, không nhận tham số từ người dùng."""
+        data = await self._call(PENDING_TEXTS, {"limit": limit}, {"X-Hasura-Admin-Secret": self._secret})
+        return data["core_files"]
+
+    async def save_text(self, *, file_id: str, tenant_id: str, status: str, pages: int | None, content: str,
+                        note: str | None) -> None:
+        await self._call(SAVE_TEXT, {"o": {"file_id": file_id, "tenant_id": tenant_id, "status": status,
+                                           "pages": pages, "content": content, "note": note}},
+                         {"X-Hasura-Admin-Secret": self._secret})
 
     async def file_location(
         self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, file_id: uuid.UUID

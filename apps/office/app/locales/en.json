@@ -237,7 +237,7 @@
   },
   "search": {
     "title": "Search documents",
-    "placeholder": "Reference, summary, issuer — diacritics optional",
+    "placeholder": "Reference, summary, issuer, PDF text — diacritics optional",
     "button": "Search",
     "empty": "No matching documents.",
     "more": "Load more",
@@ -245,7 +245,9 @@
     "direction": {
       "in": "Incoming",
       "out": "Outgoing"
-    }
+    },
+    "matchedContent": "Matched in content",
+    "matchedContentHint": "The words appear in the document body or in the text of an attached PDF, not in its reference or summary"
   },
   "error": {
     "generic": "Something went wrong: {msg}",

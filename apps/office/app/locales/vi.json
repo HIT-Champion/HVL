@@ -237,7 +237,7 @@
   },
   "search": {
     "title": "Tìm kiếm văn bản",
-    "placeholder": "Số ký hiệu, trích yếu, cơ quan ban hành — gõ không dấu cũng được",
+    "placeholder": "Số ký hiệu, trích yếu, cơ quan ban hành, nội dung tệp PDF — gõ không dấu cũng được",
     "button": "Tìm",
     "empty": "Không có văn bản nào khớp.",
     "more": "Xem thêm",
@@ -245,7 +245,9 @@
     "direction": {
       "in": "Văn bản đến",
       "out": "Văn bản đi"
-    }
+    },
+    "matchedContent": "Khớp trong nội dung",
+    "matchedContentHint": "Từ cần tìm có trong nội dung văn bản hoặc trong chữ của tệp PDF đính kèm, không có trong số ký hiệu, trích yếu"
   },
   "error": {
     "generic": "Có lỗi xảy ra: {msg}",

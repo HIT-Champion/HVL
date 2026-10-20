@@ -20,6 +20,13 @@
 table:
   name: files
   schema: core
+# lớp chữ của PDF (F2.7): core.file_texts không mở cho vai trò người dùng nào, nên chỉ khóa quản trị thấy trường này
+object_relationships:
+  - name: text
+    using:
+      manual_configuration:
+        remote_table: {name: file_texts, schema: core}
+        column_mapping: {id: file_id}
 array_relationships:
   - name: document_files
     using:

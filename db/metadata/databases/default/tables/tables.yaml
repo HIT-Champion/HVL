@@ -16,6 +16,7 @@
 
 - "!include core_tenants.yaml"
 - "!include core_files.yaml"
+- "!include core_file_texts.yaml"
 - "!include core_audit_log.yaml"
 - "!include core_audit_head.yaml"
 - "!include core_audit_anchors.yaml"

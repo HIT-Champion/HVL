@@ -152,6 +152,25 @@ class Session:
         return json.loads(raw)
 
 
+def text_pdf(*lines: str) -> bytes:
+    """PDF một trang có lớp chữ (Helvetica, chỉ ASCII) — để kiểm tìm theo nội dung tệp (F2.7)."""
+    def esc(line: str) -> str:
+        return line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    stream = ("BT /F1 12 Tf 72 760 Td 14 TL " + " ".join(f"({esc(line)}) '" for line in lines) + " ET").encode()
+    objs = [b"<</Type/Catalog/Pages 2 0 R>>", b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>",
+            b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+            b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream"]
+    out, offsets = b"%PDF-1.4\n", []
+    for i, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + obj + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 6\n0000000000 65535 f \n" + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    return out + b"trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % xref
+
+
 def compose(*args: str, stdin: bytes | None = None) -> bytes:
     cmd = ["docker", "compose", "--profile", "core", "--profile", "app", *args]
     return subprocess.run(cmd, cwd=ROOT, input=stdin, check=True, capture_output=True).stdout

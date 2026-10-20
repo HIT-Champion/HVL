@@ -61,6 +61,16 @@ create table core.files (                   -- tệp đã qua kiểm dịch; t�
   check (encrypted = (wrapped_dek is not null))
 );
 
+create table core.file_texts (              -- lớp chữ của PDF để tìm theo nội dung (F2.7, migration 1792281601000)
+  file_id       uuid primary key,             -- (tenant_id, file_id) tham chiếu core.files, xóa tệp thì xóa theo
+  tenant_id     uuid not null,
+  status        text not null check (status in ('ok', 'empty', 'failed')),   -- empty: bản scan, chờ OCR (F4.1)
+  pages         int,
+  content       text not null default '' check (char_length(content) <= 50000),
+  note          text,                         -- lý do khi failed: encrypted, timeout, memory, too large…
+  extracted_at  timestamptz not null default now()
+);
+
 create table core.users (                   -- danh bạ, đồng bộ từ Keycloak (migration 1792281600400)
   id             text primary key,             -- sub của Keycloak
   tenant_id      uuid not null references core.tenants,
@@ -155,6 +165,14 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 
 Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` ghi sự kiện `file.rejected` vào
 `core.audit_log` (màn demo kiểm dịch F3.1).
+
+**Lớp chữ của PDF** (`core.file_texts`, F2.7): `svc-files` đọc ở vòng nền các PDF đã gắn vào văn bản, trong tiến
+trình con có giới hạn, rồi ghi bằng khóa quản trị; vòng đồng bộ tìm kiếm đưa vào trường `content` của
+Meilisearch. Không vai trò người dùng nào đọc được bảng này. Tệp của văn bản hạn chế không được đọc chữ và nội
+dung văn bản hạn chế không vào chỉ mục (bản chữ trần sẽ vô hiệu việc mã hóa tệp — F3.7). Trigger giữ điều này ở
+CSDL: chữ của tệp gắn vào văn bản hạn chế bị bỏ qua khi ghi, và bị xóa khi văn bản bật hạn chế hoặc khi tệp được
+gắn vào văn bản hạn chế. Bảng không gắn sổ kiểm
+toán: chữ là dữ liệu dẫn xuất, tính lại được từ tệp mà băm đã nằm trong `core.files` và trong sổ.
 
 **Thông báo** (`core.notifications`): dịch vụ ghi bằng vai trò `service`; mỗi người chỉ đọc thông báo của mình
 và chỉ sửa được `read_at`. Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
@@ -543,7 +561,7 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 |---|---|---|
 | `POST /api/files` | Người đăng nhập | Quét ClamAV → ghi SeaweedFS → thêm dòng `core.files`; nhiễm thì trả 422 và ghi `file.rejected` |
 | `GET /api/files/{id}` | Người có quyền với văn bản chứa tệp | Kiểm quyền qua Hasura; tệp mã hóa thì giải mã trong bộ nhớ, thêm watermark |
-| `GET /api/search?q=` | Người đăng nhập | Meilisearch, lọc thuê ước và quyền phía server |
+| `GET /api/search?q=` | Người đăng nhập | Meilisearch tìm trong số ký hiệu, trích yếu, cơ quan ban hành, nội dung văn bản đi và chữ của PDF đính kèm (trừ văn bản hạn chế); lọc thuê ước và quyền phía server; `matched_content` báo kết quả chỉ khớp nội dung |
 | `GET /api/documents/{id}/preview` | Người đọc được văn bản đi | PDF đúng thể thức của dự thảo, chưa có số, in chữ "DỰ THẢO" |
 | `GET /api/registers/{in\|out}/{year}` | `clerk`, `director` | Sổ đăng ký một năm, cột theo mẫu NĐ 30 Phụ lục IV; dòng văn bản hạn chế người gọi không đọc được chỉ có số, ngày, số ký hiệu |
 | `GET /api/registers/{in\|out}/{year}/pdf` | `clerk`, `director` | Như trên, ra PDF A4 ngang để ký nhận, đóng sổ; ghi `register.printed` vào sổ kiểm toán |
