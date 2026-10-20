@@ -25,6 +25,17 @@
         Neo đầu chuỗi ngay, không đợi vòng neo định kỳ của svc-files. --to: ghi thêm mốc vào một tệp, để chép
         ra ngoài máy chủ (kho git riêng của đơn vị, thư điện tử…) — bản này nằm ngoài tầm cả quản trị máy chủ.
 
+    python3 scripts/moc.py backup create [--keep N]
+        Sao lưu mọi CSDL và tệp vào kho restic (MOC_BACKUP_DIR), mã hóa bằng MOC_BACKUP_PASSWORD. --keep N: sau đó
+        chỉ giữ N lượt mới nhất. (make backup; chi tiết trong scripts/backup.py)
+
+    python3 scripts/moc.py backup list [--json] | check
+        Các lượt trong kho; kiểm cấu trúc kho.
+
+    python3 scripts/moc.py backup restore [LƯỢT] [--yes]
+        Dừng Mộc, thay mọi CSDL và tệp bằng một lượt (mặc định lượt mới nhất), ghi lần khôi phục vào sổ kiểm
+        toán, chạy lại. Hỏi lại trước khi thay, trừ khi có --yes. (make restore)
+
 Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`: không mở thêm
 cổng nào, không cần mật khẩu ngoài .env.
 """
@@ -41,6 +52,7 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
+import backup
 from audit_chain import ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Report, check, local_time, to_datetime
 from moc_env import ENV, ROOT
 
@@ -209,6 +221,11 @@ def verify(args: argparse.Namespace) -> int:
         gaps += coverage(report, bucket)
     if report.later:
         notes.append(f"{report.later} mốc neo ghi trong lúc đang kiểm, đối chiếu ở lần sau")
+    # Chỉ là lời khai trong CSDL, không miễn lỗi nào: người sửa được CSDL cũng thêm được một dòng như vậy
+    for r in report.restores:
+        notes.append(f"dòng #{r['id']}: khôi phục từ bản sao lưu lượt {r['run']} lúc {local_time(r['at'])}, chuỗi quay"
+                     f" về dòng #{r['audit_id']}. Mốc chép ra ngoài sau lúc sao lưu đó sẽ không khớp: đối chiếu với"
+                     " nhật ký vận hành, đúng có lần khôi phục này thì bỏ các mốc đó khỏi tệp mốc")
 
     if args.json:
         print(json.dumps({
@@ -258,6 +275,13 @@ def anchor(args: argparse.Namespace) -> int:
     return 0
 
 
+def positive(value: str) -> int:
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("phải từ 1 trở lên")
+    return n
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="moc", description="Lệnh vận hành Mộc trên máy chủ")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -270,6 +294,20 @@ def main(argv: list[str] | None = None) -> int:
     a = audit.add_parser("anchor", help="neo đầu chuỗi ngay")
     a.add_argument("--to", type=pathlib.Path, metavar="TỆP", help="ghi thêm mốc vào tệp này")
     a.set_defaults(run=anchor)
+
+    b = groups.add_parser("backup", help="sao lưu, khôi phục CSDL và tệp (F3.4)").add_subparsers(dest="cmd",
+                                                                                                 required=True)
+    c = b.add_parser("create", help="sao lưu một lượt")
+    c.add_argument("--keep", type=positive, metavar="N", help="sau đó chỉ giữ N lượt mới nhất")
+    c.set_defaults(run=backup.cmd_create)
+    ls = b.add_parser("list", help="các lượt trong kho")
+    ls.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    ls.set_defaults(run=backup.cmd_list)
+    b.add_parser("check", help="kiểm cấu trúc kho (restic check)").set_defaults(run=backup.cmd_check)
+    r = b.add_parser("restore", help="dừng Mộc, thay CSDL và tệp bằng một lượt sao lưu, chạy lại")
+    r.add_argument("run_id", nargs="?", metavar="LƯỢT", help="mã lượt trong backup list; mặc định: lượt mới nhất")
+    r.add_argument("--yes", action="store_true", help="không hỏi lại")
+    r.set_defaults(run=backup.cmd_restore)
     args = parser.parse_args(argv)
     return args.run(args)
 

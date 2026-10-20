@@ -27,6 +27,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Văn bản đi: cột `body`, thông tin in trên văn bản ở `core.tenants`, hàm `office.number_outgoing` (cấp số đi, ký hiệu theo NĐ 30 trong một giao dịch), khung nhìn `office.issued_documents` cho cổng xác thực | **Xong** — 18 test |
 | `core.file_texts` (lớp chữ của PDF để tìm theo nội dung, F2.7): không vai trò người dùng nào đọc được, xóa tệp thì xóa theo, không gắn sổ kiểm toán; tệp của văn bản hạn chế không có chữ (trigger) | **Xong** — 10 test |
 | `core.notifications` (thông báo từng người, F2.5): mỗi người chỉ đọc và đánh dấu đã đọc thông báo của mình, chống gửi trùng theo khóa | **Xong** — 6 test |
+| Sao lưu, khôi phục (F3.4): `pg_dump -Fc` → `pg_restore` giữ nguyên mọi dòng và hash của sổ kiểm toán; dòng `system.restored` nối tiếp chuỗi | **Xong** — 2 test, dump và restore ngay trong container PostgreSQL thử |
 | View cho dashboard điều hành (F3.11): `office.v_document_counts`, `v_overdue_by_department`, `v_processing_time`, `v_outgoing_by_month` — chỉ có số đếm, lãnh đạo đơn vị đọc số của đơn vị mình; văn bản hạn chế không vào phép chia nào, chỉ có con số tổng | **Xong** — 6 test, trên một đơn vị riêng nên số đếm biết trước |
 | `office.case_files` (hồ sơ, nộp lưu) | Phase 3 |
 
@@ -95,6 +96,11 @@ ghi vào sổ kiểm toán) và `X-Hasura-Request-Id` (lấy từ `X-Request-Id`
   khóa ghi, hay bảng `core.audit_anchors` ghi một mốc mà bucket không có.
   `python3 scripts/moc.py audit anchor --to <tệp>` neo ngay và ghi thêm mốc vào một tệp, để chép ra ngoài máy
   chủ; kiểm cả tệp đó: `audit verify --anchors <tệp>`.
+- **Sao lưu, khôi phục** (`make backup`, `make restore`, F3.4; `scripts/backup.py`). Lúc sao lưu, `svc-files` (chỗ
+  ghi mốc neo) tạm dừng từ trước khi dump CSDL tới khi chép xong bucket, nên mốc trong bucket và bảng
+  `core.audit_anchors` cùng một thời điểm: khôi phục xong `make audit` vẫn khớp. Lần khôi phục thêm một dòng
+  `system.restored` của nền tảng (`tenant_id` null, `entity_id` là mã lượt, `diff` có đầu chuỗi lúc sao lưu) ngay
+  sau đầu chuỗi vừa khôi phục: các dòng ghi sau lúc sao lưu không còn là vì khôi phục, và sổ ghi rõ điều đó.
 - **Màn xem sổ** cho `director`, `tenant_admin`: đọc dòng sổ của đơn vị mình, không đọc được cột `diff`, chỉ đọc
   trường `overview` (hàm `core.audit_overview`): cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) có
   tên nhưng giá trị null, để sổ không lộ văn bản hạn chế mà lãnh đạo không được đọc.

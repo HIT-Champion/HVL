@@ -705,3 +705,24 @@ Phase 2:
     phòng mình để sau, nếu đơn vị chạy thử cần.
   - Lúc xong của văn bản đến lấy từ dòng thời gian (sự kiện báo xong hoặc cho lưu), không thêm cột mới.
 - Phase 3 còn lại: F3.2–F3.5, F3.7–F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.4 (Phase 3):
+
+- **F3.4 xong.** `make backup`, `make restore` (`moc backup create --keep N | list | check | restore [LƯỢT]`):
+  - mỗi lượt gồm `pg_dump -Fc` của mọi CSDL trong máy chủ PostgreSQL và cả volume SeaweedFS, vào kho restic 0.19.1
+    mã hóa (container `restic`, profile `backup`, không mạng); lượt thiếu manifest không dùng để khôi phục;
+  - khôi phục: dừng Mộc, dựng PostgreSQL, `pg_restore --create` từng CSDL, so hash dòng sổ kiểm toán cuối lúc sao
+    lưu, khôi phục volume tệp, ghi lần khôi phục vào sổ, chạy lại;
+  - CI diễn tập mỗi pull request: xóa volume CSDL và tệp, khôi phục, rồi smoke và `make audit` phải qua.
+- Chỗ khác kế hoạch:
+  - restic chạy trong container có image ghim thay cho gói hệ thống: không cài gì lên máy chủ, mọi nơi cùng một
+    phiên bản.
+  - Sao lưu cả volume SeaweedFS chứ không chỉ tệp văn bản, vì bucket lạnh giữ mốc neo sổ kiểm toán cùng trạng thái
+    khóa ghi. `svc-files` và SeaweedFS tạm dừng suốt lúc dump CSDL và chép tệp. Lý do: mốc neo ghi vào bucket
+    trước, vào CSDL sau; chụp hai nơi ở hai thời điểm thì khôi phục xong `make audit` báo chuỗi bị cắt (mốc vượt
+    quá CSDL) hoặc báo bảng mốc có mốc mà bucket không có.
+  - Lần khôi phục thành một dòng sổ kiểm toán (`system.restored`), để các dòng mất đi sau lúc sao lưu có lý do
+    ghi ngay trong sổ.
+  - Không sao lưu `.env` (chứa chính khóa kho): tài liệu dặn chép ra ngoài máy chủ. Chỉ mục Meilisearch và chữ ký
+    ClamAV không sao lưu, vì dựng lại được.
+- Phase 3 còn lại: F3.2, F3.3, F3.5, F3.7–F3.10, F3.12–F3.15.

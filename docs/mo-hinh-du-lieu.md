@@ -166,6 +166,11 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` ghi sự kiện `file.rejected` vào
 `core.audit_log` (màn demo kiểm dịch F3.1).
 
+Khôi phục từ bản sao lưu (`moc backup restore`, F3.4) ghi sự kiện `system.restored` của nền tảng (`tenant_id` null,
+`entity` = `backup`, `entity_id` = mã lượt) ngay sau đầu chuỗi vừa khôi phục. Bản sao lưu gồm mọi CSDL (`pg_dump
+-Fc`) và cả volume SeaweedFS (tệp, bucket lạnh với mốc neo); chỉ mục Meilisearch dựng lại từ CSDL khi `svc-files`
+khởi động.
+
 **Lớp chữ của PDF** (`core.file_texts`, F2.7): `svc-files` đọc ở vòng nền các PDF đã gắn vào văn bản, trong tiến
 trình con có giới hạn, rồi ghi bằng khóa quản trị; vòng đồng bộ tìm kiếm đưa vào trường `content` của
 Meilisearch. Không vai trò người dùng nào đọc được bảng này. Tệp của văn bản hạn chế không được đọc chữ và nội

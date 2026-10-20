@@ -29,7 +29,7 @@ ENV_FILE := .env
 PREFIX ?= /opt/moc
 
 .PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich \
-        install uninstall license-check license-fix lint release clean
+        backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -100,6 +100,12 @@ audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài 
 
 demo-kiem-dich: $(ENV_FILE) ## Màn demo (iv) kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán (docs/demo-script.md)
 	@python3 scripts/demo.py kiem-dich
+
+backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (MOC_BACKUP_DIR, mặc định ./backups)
+	@python3 scripts/moc.py backup create
+
+restore: $(ENV_FILE) ## Khôi phục lượt sao lưu mới nhất (hỏi lại trước khi thay dữ liệu); các lượt: python3 scripts/moc.py backup list
+	@python3 scripts/moc.py backup restore
 
 api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
 	@python3 scripts/api_docs.py

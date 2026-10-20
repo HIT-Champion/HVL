@@ -33,10 +33,10 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 COMPOSE=(docker compose --profile core --profile app)
 # Danh sách tệp do bản cài quản lý — lần cài sau và lệnh gỡ chỉ xóa đúng những tệp này
 MANIFEST=.moc-install
-# Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py,
-# màn demo (demo.py)
+# Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py
+# (cả sao lưu), màn demo (demo.py)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
-         scripts/moc.py scripts/audit_chain.py scripts/demo.py seed)
+         scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/demo.py seed)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -104,7 +104,8 @@ do_install() {
   local dest ver mounts check rel img
   dest="$(prefix "${1:-}")"
   [ -f "$SRC/.env" ] || die "chưa có $SRC/.env — chạy: make env"
-  if [ -d "$dest" ] && [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vx .env || true)" ]; then
+  # .env và kho sao lưu (backups/) được giữ lại khi gỡ: cài lại vào đó vẫn được
+  if [ -d "$dest" ] && [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vxE '\.env|backups' || true)" ]; then
     die "$dest đã có tệp nhưng không phải bản cài Mộc — chọn thư mục trống hoặc chưa có"
   fi
   # Thay thư mục cấu hình dưới container đang chạy thì container còn giữ thư mục cũ đã xóa
@@ -171,6 +172,7 @@ do_install() {
   python3 scripts/smoke.py    # kiểm tra nhanh
   python3 scripts/moc.py audit verify   # kiểm sổ kiểm toán
   python3 scripts/demo.py kiem-dich     # màn demo kiểm dịch (docs/demo-script.md)
+  python3 scripts/moc.py backup create  # sao lưu CSDL và tệp vào MOC_BACKUP_DIR (mặc định $dest/backups)
 Bản cài dùng chung tên project và dữ liệu "moc" với bản chạy trong thư mục mã nguồn: dừng bản đó trước (make down).
 EOF
 }
@@ -184,7 +186,7 @@ do_uninstall() {
   fi
   remove_managed "$dest"
   find "$dest" -mindepth 1 -type d -empty -delete
-  echo "Đã gỡ Mộc khỏi $dest. Giữ lại $dest/.env (mật khẩu) và dữ liệu trong các volume Docker của project moc."
+  echo "Đã gỡ Mộc khỏi $dest. Giữ lại $dest/.env (mật khẩu), kho sao lưu (nếu có) và dữ liệu trong các volume Docker của project moc."
   echo "Xóa cả dữ liệu: docker volume rm \$(docker volume ls -q --filter label=com.docker.compose.project=moc)"
 }
 

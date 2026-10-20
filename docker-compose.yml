@@ -316,6 +316,20 @@ services:
     depends_on:
       keycloak: {condition: service_healthy}
 
+  # F3.4 — sao lưu: không chạy thường trực, chỉ `moc backup` gọi (docker compose run), không có mạng. Kho restic
+  # (MOC_BACKUP_DIR) gắn vào /repo lúc gọi, không khai ở đây: kho nên nằm trên ổ khác, ngoài thư mục cài.
+  restic:
+    image: restic/restic:0.19.1
+    profiles: [backup]
+    network_mode: none
+    # stdout là bản dump khi khôi phục: không để Docker chép vào nhật ký trên đĩa
+    logging: {driver: none}
+    environment:
+      RESTIC_REPOSITORY: /repo
+      RESTIC_PASSWORD: ${MOC_BACKUP_PASSWORD:-}
+    volumes:
+      - seaweedfs_data:/data/seaweedfs
+
   # ===========================================================================
   # Tầng 2 — ứng dụng
   # ===========================================================================

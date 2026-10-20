@@ -134,7 +134,7 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (IT/OT) | `scorpiobroker/all-in-one-runner:java-6.0.2` | 3 |
 | Prometheus | v3.15.0 | Apache-2.0 | Thu thập chỉ số giám sát | `prom/prometheus:v3.15.0` | 3 |
 | Grafana (OSS) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát (dịch vụ độc lập, chỉ mạng nội bộ) | `grafana/grafana:13.2.3` | 3 |
-| restic | 0.19.1 | BSD-2-Clause | Sao lưu và khôi phục | Gói hệ thống | 3 |
+| restic | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
 | Vector | 0.59.0 | MPL-2.0 | Thu gom log *(Could)* | `timberio/vector:0.59.0-debian` | 3 |
 | Parseable | 3.2 | AGPL-3.0 | Lưu và tra cứu log *(Could)* | `parseable/parseable` (ghim thẻ khi đưa vào) | 3 |
 | Coraza | 3.8 | Apache-2.0 | Tường lửa ứng dụng web tại gateway *(Could)* | Plugin proxy-wasm cho APISIX | 3 |

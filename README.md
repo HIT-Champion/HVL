@@ -123,7 +123,8 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 
 Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý
-(Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**).
+(Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**) và sao lưu, khôi
+phục một lệnh (`make backup`, `make restore`).
 Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
 
 ## Yêu cầu hệ thống
@@ -132,7 +133,7 @@ Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo h�
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -197,6 +198,32 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
   của bản cài được giữ, chỉ đổi `MOC_VERSION`.
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
 
+### Sao lưu và khôi phục
+
+`make backup` sao lưu mọi CSDL (dữ liệu nghiệp vụ, Keycloak, Flowable) và toàn bộ tệp (SeaweedFS, kể cả các mốc
+neo sổ kiểm toán) vào kho [restic](https://restic.net) mã hóa ở `MOC_BACKUP_DIR` (mặc định `./backups`); lần sau
+chỉ thêm phần đã đổi. Để mọi CSDL và tệp cùng một thời điểm, Mộc tạm dừng ghi trong lúc dump CSDL (vài giây), còn
+tải tệp lên, xuống thì đợi tới khi chép xong tệp. `make restore` kiểm bản sao lưu đọc được trọn vẹn, rồi mới dừng
+Mộc, thay CSDL và tệp bằng lượt mới nhất (hỏi lại trước), ghi lần khôi phục vào sổ kiểm toán rồi chạy lại; `make
+audit` sau đó vẫn khớp mốc neo trong bucket. Mốc đã chép ra tệp ngoài máy chủ (`audit anchor --to`) sau lúc sao lưu
+thì không còn khớp — đúng như vậy, vì các dòng đó đã mất; `make audit` chỉ ra lần khôi phục để đối chiếu.
+
+```bash
+python3 scripts/moc.py backup create --keep 14    # sao lưu, chỉ giữ 14 lượt mới nhất (đặt vào cron hằng đêm)
+python3 scripts/moc.py backup list                # các lượt trong kho
+python3 scripts/moc.py backup check               # kiểm cấu trúc kho
+python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lượt cụ thể
+```
+
+- **Khóa kho là `MOC_BACKUP_PASSWORD` trong `.env`: mất khóa là mất bản sao lưu.** Chép `.env` ra ngoài máy chủ.
+  Bản cài có từ trước khi có lệnh này: thêm vào `.env` của bản cài một dòng `MOC_BACKUP_PASSWORD=` với chuỗi ngẫu
+  nhiên dài (vd. `openssl rand -hex 24`).
+- Kho nên nằm trên ổ khác hoặc ổ mạng đã gắn vào máy chủ (`MOC_BACKUP_DIR=/mnt/nas/moc`, thư mục trống hoặc kho
+  có sẵn), và chép thêm một bản ra ngoài đơn vị: kho chỉ gồm tệp đã mã hóa, chép bằng `rsync` được. restic chạy bằng
+  root trong container (để đọc tệp của SeaweedFS): ổ NFS phải cho root ghi (`no_root_squash`).
+- Chỉ mục tìm kiếm và chữ ký ClamAV không sao lưu: `svc-files` dựng lại chỉ mục từ CSDL khi khởi động, ClamAV tự
+  tải chữ ký.
+
 ## Kiểm thử
 
 | Lệnh | Kiểm gì | Cần |
@@ -206,11 +233,12 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 | `make e2e` | Các luồng trên trình duyệt thật (Playwright, chạy trong container): form sai bị chặn trước khi gửi, kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang; lãnh đạo xem sổ kiểm toán; văn thư tải tệp EICAR bị chặn ngay, lãnh đạo thấy lần chặn trong sổ; lãnh đạo xem dashboard điều hành, văn thư không có mục này | Như trên |
 | `make demo-kiem-dich` | Màn demo (iv) kiểm dịch, dưới một phút: tệp sạch qua, tệp EICAR bị ClamAV chặn ở cửa ngõ, không lưu gì; lần chặn nằm trong sổ kiểm toán, neo ra ngoài CSDL rồi kiểm lại cả chuỗi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
-| `db/tests/` | 154 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
+| Diễn tập khôi phục | `make backup` hai lượt, xóa volume CSDL và tệp, `python3 scripts/moc.py backup restore --yes`, rồi `make smoke` và `make audit` phải qua (bước trong CI) | Hệ thống đang chạy + `make seed` |
+| `db/tests/` | 156 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ
-thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`, rồi
-`make install` sang thư mục khác và chạy lại smoke từ bản cài; kiểm tài liệu API trong `docs/api/` khớp hệ
+thống từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e`; diễn tập
+sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install` sang thư mục khác và chạy lại smoke từ bản cài; kiểm tài liệu API trong `docs/api/` khớp hệ
 thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa
 phụ thuộc (OSV-Scanner).
 

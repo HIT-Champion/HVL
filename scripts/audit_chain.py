@@ -64,6 +64,15 @@ select json_build_object('audit_id', audit_id, 'hash', encode(hash, 'hex'), 'loc
 from core.audit_anchors order by audit_id
 """
 
+# Lần khôi phục từ bản sao lưu (moc backup restore, F3.4) thành một dòng sổ của nền tảng (tenant_id null), nối tiếp
+# chuỗi vừa khôi phục: sổ cho thấy các dòng ghi sau lúc sao lưu không còn là vì khôi phục, không phải vì bị xóa lén.
+# Biến psql: actor, run, diff (JSON).
+RESTORED_SQL = """
+insert into core.audit_log (tenant_id, actor_id, actor_kind, action, entity, entity_id, diff)
+values (null, :'actor', 'system', 'system.restored', 'backup', :'run', :'diff'::jsonb)
+returning id;
+"""
+
 # Lúc đọc (đầu giao dịch): mốc neo sau lúc này chưa thể có dòng của nó trong lần đọc
 NOW_SQL = "select json_build_object('now', extract(epoch from now()))::text"
 
@@ -92,6 +101,7 @@ class Report:
     rewritten: tuple[int, int] | None = None        # khoảng dòng bị viết lại, suy từ mốc
     documents: int = 0
     later: int = 0                                  # mốc neo sau lúc đọc CSDL, bỏ qua lần này
+    restores: list[dict[str, Any]] = field(default_factory=list)   # dòng system.restored (moc backup restore)
 
     @property
     def ok(self) -> bool:
@@ -168,6 +178,8 @@ def check(rows: Iterable[dict[str, Any]], head: dict[str, Any], anchors: Iterabl
         if rid in wanted:
             seen[rid] = stored
         action, entity, entity_id, diff = payload[6], payload[7], payload[8], payload[9]
+        if action == "system.restored" and isinstance(diff, dict):
+            report.restores.append({"id": rid, "run": entity_id, "audit_id": diff.get("audit_id"), "at": payload[1]})
         # chỉ dòng do trigger core.audit() ghi: diff là {cột: [cũ, mới]}; sự kiện dịch vụ tự ghi thì bỏ qua
         change = diff.get("content_sha256") if isinstance(diff, dict) else None
         if (entity == "office.documents" and action in {"insert", "update", "delete"}

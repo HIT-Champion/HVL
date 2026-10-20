@@ -138,6 +138,14 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   được. Văn bản hạn chế không vào phép chia nào, chỉ có con số tổng, để không ai trừ ra được trạng thái của chúng.
   `make smoke` thêm 2 kiểm tra (tổng 43), kiểm số chia khớp đúng văn bản lãnh đạo đọc được; `make e2e` thêm kịch
   bản lãnh đạo xem dashboard, văn thư không có mục này (#38).
+- Sao lưu và khôi phục (F3.4): `make backup` sao lưu mọi CSDL (dữ liệu nghiệp vụ, Keycloak, Flowable) và toàn bộ
+  tệp SeaweedFS, kể cả mốc neo sổ kiểm toán, vào kho restic 0.19.1 mã hóa ở `MOC_BACKUP_DIR`; lần sau chỉ thêm phần
+  đổi. `make restore` dừng Mộc, thay CSDL và tệp bằng lượt mới nhất (hỏi lại trước), ghi lần khôi phục vào sổ kiểm
+  toán (`system.restored`) rồi chạy lại. `python3 scripts/moc.py backup create --keep N | list | check | restore
+  [LƯỢT]`. Lúc sao lưu, `svc-files` và SeaweedFS tạm dừng vài giây để mốc neo trong bucket khớp CSDL. Biến mới
+  trong `.env`: `MOC_BACKUP_PASSWORD` (mất là mất bản sao lưu), `MOC_BACKUP_DIR`. CI diễn tập mỗi pull request: sao
+  lưu, xóa volume CSDL và tệp, khôi phục, rồi smoke và `make audit`. Test CSDL thêm 2: dump rồi restore giữ nguyên
+  chuỗi băm, dòng `system.restored` nối chuỗi (#39).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
