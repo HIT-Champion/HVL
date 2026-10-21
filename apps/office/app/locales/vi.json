@@ -159,7 +159,93 @@
     "dropRestricted": "Kéo thả tệp PDF vào đây, hoặc bấm để chọn — tệp được mã hóa trước khi lưu",
     "cleanSealed": "Đã quét — sạch, đã mã hóa",
     "pdfOnly": "Văn bản hạn chế chỉ nhận tệp PDF",
-    "restrictedLocked": "Gỡ hết tệp đã tải để đổi chế độ hạn chế"
+    "restrictedLocked": "Gỡ hết tệp đã tải để đổi chế độ hạn chế",
+    "read": {
+      "button": "Đọc văn bản",
+      "reread": "Đọc lại",
+      "forFile": "{action}: {name}",
+      "reading": "Đang đọc văn bản… {s} giây",
+      "readingHint": "Bản scan có thể mất đến 30 giây.",
+      "started": "Đang đọc tệp {name}.",
+      "done": "Đã đọc bằng {method} — điền sẵn {n} ô.",
+      "doneNone": "Đã đọc bằng {method} — không điền thêm ô nào.",
+      "doneOther": "Đã đọc bằng {method} — form đang theo tệp {name} nên không tự điền; {n} gợi ý khác hiện dưới các ô.",
+      "doneOtherNone": "Đã đọc bằng {method} — không khác gì các ô đang có (form đang theo tệp {name}).",
+      "cached": "kết quả lần đọc trước",
+      "empty": "Không đọc được thông tin — nhập tay.",
+      "restricted": "Văn bản hạn chế không đọc tự động.",
+      "confirmNote": "Các ô có nhãn Gợi ý do tác tử đọc văn bản điền sẵn. Đối chiếu với bản gốc trước khi lưu — bấm lưu là văn thư xác nhận.",
+      "offer": "Gợi ý: {value}",
+      "use": "Dùng",
+      "useFor": "Dùng gợi ý: {value}",
+      "method": {
+        "text": "lớp chữ PDF",
+        "ocr": "nhận dạng chữ (OCR)"
+      },
+      "field": {
+        "type_code": "loại văn bản",
+        "symbol": "số ký hiệu",
+        "issued_on": "ngày ban hành",
+        "issuer_name": "cơ quan ban hành",
+        "summary": "trích yếu",
+        "urgency": "độ khẩn"
+      },
+      "warning": {
+        "future_date": "Ngày đọc được muộn hơn hôm nay — đối chiếu với bản gốc.",
+        "invalid_date": "Ngày ghi trên văn bản không có thật — nhập tay.",
+        "symbol_no_number": "Văn bản chưa điền số, chỉ có ký hiệu — kiểm tra bản gốc.",
+        "type_conflict": "Tiêu đề và ký hiệu chỉ hai loại văn bản khác nhau — đã lấy theo tiêu đề, kiểm tra lại.",
+        "low_text": "Đọc được rất ít chữ — bản scan có thể mờ hoặc nghiêng.",
+        "truncated": "Văn bản dài, chỉ đọc phần đầu.",
+        "model_unavailable": "Chưa bật mô hình ngôn ngữ — trích yếu theo quy tắc.",
+        "model_timeout": "Mô hình ngôn ngữ trả lời quá lâu — trích yếu theo quy tắc.",
+        "model_rejected": "Trích yếu của mô hình không đạt kiểm tra nên đã bỏ — trích yếu theo quy tắc.",
+        "model_skipped": "Lần này không hỏi mô hình ngôn ngữ — trích yếu theo quy tắc."
+      },
+      "error": {
+        "missing_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi bấm Đọc văn bản.",
+        "invalid_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi bấm Đọc văn bản.",
+        "forbidden": "Chỉ văn thư được dùng chức năng đọc văn bản.",
+        "not_found": "Không tìm thấy tệp để đọc (tệp đã bị gỡ, hoặc không do bạn tải lên) — tải lên lại.",
+        "restricted": "Văn bản hạn chế không đọc tự động — nhập tay.",
+        "too_large": "Tệp quá lớn để đọc tự động — nhập tay.",
+        "unsupported": "Chỉ đọc được tệp PDF, JPEG, PNG, TIFF — nhập tay.",
+        "unreadable": "Không đọc được tệp ({reason}) — nhập tay.",
+        "busy": "Đang đọc văn bản khác — đợi một lát rồi bấm Đọc văn bản.",
+        "reader_disabled": "Chức năng đọc văn bản chưa được bật — nhập tay.",
+        "ocr_unavailable": "Máy chủ chưa có bộ nhận dạng chữ (OCR) nên chưa đọc được bản scan — nhập tay.",
+        "storage_unavailable": "Kho tệp tạm thời không truy cập được — thử lại sau ít phút.",
+        "database_unavailable": "Chưa ghi được sổ kiểm toán nên chưa trả gợi ý — thử lại sau ít phút.",
+        "client_timeout": "Đọc quá 60 giây chưa xong — bấm Đọc văn bản để thử lại, hoặc nhập tay.",
+        "generic": "Không đọc được văn bản: {msg}"
+      },
+      "reason": {
+        "password": "PDF có mật khẩu",
+        "corrupt": "tệp hỏng",
+        "no_text": "không có chữ hay ảnh để đọc",
+        "timeout": "quá thời gian cho phép",
+        "memory": "vượt bộ nhớ cho phép",
+        "too_many_pixels": "ảnh quá lớn",
+        "unknown": "lỗi không rõ"
+      }
+    },
+    "suggest": {
+      "high": "Gợi ý",
+      "medium": "Gợi ý (chưa chắc)",
+      "model": "Gợi ý của mô hình",
+      "edited": "Đã sửa",
+      "hint": "Tác tử đọc văn bản điền sẵn ô này ({source}, {confidence}). Đối chiếu với bản gốc trước khi lưu.",
+      "editedHint": "Văn thư đã sửa. Tác tử đọc được: {value}",
+      "source": {
+        "rule": "đọc theo quy tắc",
+        "model": "do mô hình ngôn ngữ viết"
+      },
+      "confidence": {
+        "high": "độ tin cậy cao",
+        "medium": "độ tin cậy trung bình",
+        "low": "độ tin cậy thấp"
+      }
+    }
   },
   "doc": {
     "info": "Thông tin văn bản",
@@ -476,6 +562,9 @@
       "case_file": {
         "archived": "Nộp lưu hồ sơ",
         "read": "Đọc hồ sơ lưu trữ"
+      },
+      "intake": {
+        "suggested": "Đọc văn bản, gợi ý thông tin tiếp nhận"
       }
     },
     "entity": {
@@ -570,7 +659,14 @@
       "last_error": "lỗi gần nhất",
       "delivered_at": "Chuyển lúc",
       "next_attempt_at": "thử lại lúc",
-      "notified_at": "báo lúc"
+      "notified_at": "báo lúc",
+      "method": "Cách đọc",
+      "pages": "Số trang",
+      "found": "Trường đọc được",
+      "summary_source": "Nguồn trích yếu",
+      "model": "Mô hình",
+      "duration_ms": "Thời gian đọc",
+      "reason": "Lý do"
     },
     "direction": {
       "in": "Đến",
@@ -589,6 +685,21 @@
       "manager": "Lãnh đạo phòng",
       "director": "Lãnh đạo đơn vị",
       "tenant_admin": "Quản trị đơn vị"
+    },
+    "agent": "{name} (tác tử)",
+    "agents": {
+      "moc-doc-reader": "Trợ lý đọc văn bản"
+    },
+    "seconds": "{n} giây",
+    "readStatus": {
+      "ok": "Có gợi ý",
+      "empty": "Không ra thông tin",
+      "unreadable": "Không đọc được"
+    },
+    "summarySource": {
+      "rule": "Quy tắc",
+      "model": "Mô hình ngôn ngữ",
+      "none": "Không có"
     }
   },
   "register": {

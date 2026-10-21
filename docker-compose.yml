@@ -295,7 +295,8 @@ services:
     build: ./services/svc-files
     image: moc/svc-files:${MOC_VERSION:-dev}
     profiles: [core]
-    networks: [moc, storage, secrets]
+    # ai: tới Ollama (profile ai, F4.1) — chưa bật profile thì svc-files dò thấy không có, trích yếu theo quy tắc
+    networks: [moc, storage, secrets, ai]
     environment:
       <<: *oidc
       # F3.2 — khóa S3, khóa quản trị Hasura, khóa Meilisearch lấy từ két lúc khởi động (AppRole), không ở đây
@@ -311,6 +312,15 @@ services:
       MOC_ARCHIVE_INTERVAL_S: ${MOC_ARCHIVE_INTERVAL_S:-3600}
       MOC_ARCHIVE_AFTER_DAYS: ${MOC_ARCHIVE_AFTER_DAYS:-365}
       MOC_OPENLINEAGE_URL: ${MOC_OPENLINEAGE_URL:-}
+      # F4.1 — đọc văn bản đến: lớp chữ PDF hoặc OCR (Tesseract trong image), quy tắc gợi ý các trường của form tiếp
+      # nhận; mô hình ngôn ngữ (Ollama, profile ai) chỉ viết trích yếu. MOC_AI_URL đặt rỗng thì không dò mô hình
+      MOC_READ_ENABLED: ${MOC_READ_ENABLED:-true}
+      MOC_READ_CONCURRENCY: ${MOC_READ_CONCURRENCY:-1}
+      MOC_OCR_TIMEOUT_S: ${MOC_OCR_TIMEOUT_S:-40}
+      MOC_AI_URL: ${MOC_AI_URL-http://ollama:11434}
+      MOC_AI_MODEL: ${MOC_AI_MODEL:-qwen3:1.7b}
+      MOC_AI_TIMEOUT_S: ${MOC_AI_TIMEOUT_S:-20}
+      MOC_AI_SUMMARY: ${MOC_AI_SUMMARY:-fallback}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
@@ -497,6 +507,55 @@ services:
     volumes:
       - ./ot/sensor.py:/ot/sensor.py:ro
 
+  # F4.1 — mô hình ngôn ngữ cục bộ cho tác tử đọc văn bản đến, profile ai (tùy chọn: make up-ai). Ollama (MIT) chạy
+  # Qwen3 (Apache-2.0) trên CPU; chỉ viết trích yếu khi quy tắc không ra trích yếu tin cậy — số, ngày, cơ quan luôn
+  # theo quy tắc. Chỉ nằm mạng ai (internal): không ra Internet, không mở cổng, chỉ svc-files tới được; chỉ nhận thân
+  # văn bản không hạn chế. Không bật profile thì mọi thứ vẫn chạy, trích yếu theo quy tắc. Trọng số tải một lần bằng
+  # make ai-model (dịch vụ ollama-pull bên dưới, cần Internet), nằm ở volume ollama_models.
+  ollama:
+    <<: *common
+    # ghim cả digest (index đa kiến trúc amd64, arm64) vì thẻ của Ollama có thể bị đẩy lại
+    image: ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c
+    profiles: [ai]
+    networks: [ai]
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      # tắt tính năng đám mây của Ollama (suy luận từ xa, tìm kiếm web), thêm vào việc không có Internet
+      OLLAMA_NO_CLOUD: "1"
+    volumes:
+      - ollama_models:/root/.ollama
+    # mặc định 6 GB, 4 lõi: đủ cho qwen3:1.7b (≈ 1,4 GB) cùng ngữ cảnh 4096; MOC_AI_CPUS không được vượt số lõi của máy
+    mem_limit: ${MOC_AI_MEM_LIMIT:-6g}
+    cpus: ${MOC_AI_CPUS:-4}
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # Tải trọng số mô hình một lần (make ai-model): chạy một máy chủ Ollama tạm, kéo MOC_AI_MODEL từ thư viện Ollama vào
+  # volume ollama_models rồi in danh sách kèm mã băm để so với DEPENDENCIES.md. Mạng riêng ai-pull có Internet; không
+  # chung mạng với dịch vụ nào khác. Profile riêng: bật profile ai thường trực không kéo theo dịch vụ chạy một lần này
+  ollama-pull:
+    <<: *common
+    image: ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c
+    profiles: [ai-pull]
+    restart: "no"
+    networks: [ai-pull]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        ollama serve >/dev/null 2>&1 &
+        for i in $$(seq 1 30); do ollama list >/dev/null 2>&1 && break; sleep 1; done
+        ollama pull "$$MOC_AI_MODEL" && ollama list
+    environment:
+      MOC_AI_MODEL: ${MOC_AI_MODEL:-qwen3:1.7b}
+    volumes:
+      - ollama_models:/root/.ollama
+
   # F3.4 — sao lưu: không chạy thường trực, chỉ `moc backup` gọi (docker compose run), không có mạng. Kho restic
   # (MOC_BACKUP_DIR) gắn vào /repo lúc gọi, không khai ở đây: kho nên nằm trên ổ khác, ngoài thư mục cài.
   restic:
@@ -547,6 +606,13 @@ networks:
   iot-db:
     driver: bridge
     internal: true
+  # F4.1: svc-files ↔ Ollama (profile ai). Không ra Internet: mô hình không gửi được thân văn bản đi đâu
+  ai:
+    driver: bridge
+    internal: true
+  # chỉ ollama-pull (make ai-model): tải trọng số mô hình từ thư viện Ollama, có Internet
+  ai-pull:
+    driver: bridge
 
 volumes:
   postgres_data:
@@ -559,3 +625,5 @@ volumes:
   # tệp đăng nhập AppRole (role_id, secret_id) của từng dịch vụ: két ghi, chỉ dịch vụ đó gắn (chỉ đọc)
   openbao_svc_files:
   openbao_svc_workflow:
+  # trọng số mô hình ngôn ngữ (F4.1, profile ai); không sao lưu: tải lại được bằng make ai-model
+  ollama_models:

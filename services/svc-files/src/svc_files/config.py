@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -30,6 +31,10 @@ REQUIRED = (
     "HASURA_ADMIN_SECRET",
     "MEILISEARCH_API_KEY",
 )
+
+
+# tên dữ liệu ngôn ngữ của tesseract (đi vào argv, không qua shell): vie, eng, vie+eng
+OCR_LANG_RE = re.compile(r"[A-Za-z0-9_]{1,32}(?:\+[A-Za-z0-9_]{1,32}){0,3}")
 
 
 class ConfigError(RuntimeError):
@@ -71,6 +76,25 @@ class Settings:
     vault_role_id_file: str = "/run/openbao/role_id"
     vault_secret_id_file: str = "/run/openbao/secret_id"
     transit_key: str = "moc-files"
+    # F4.1 — tác tử đọc văn bản đến (docread/): lớp chữ của PDF hoặc OCR (Tesseract), quy tắc, mô hình tùy chọn
+    read_enabled: bool = True
+    read_max_bytes: int = 25 * 1024 * 1024
+    read_text_pages: int = 3            # số trang lớp chữ đọc
+    ocr_max_pages: int = 1              # số trang OCR: số, ngày, cơ quan, trích yếu đều ở trang 1
+    ocr_lang: str = "vie"
+    ocr_timeout_s: float = 40.0         # hạn tiến trình con OCR, quá thì giết cả nhóm (cả tesseract)
+    ocr_memory_mb: int = 1536           # RLIMIT_AS của tiến trình con OCR (tesseract kế thừa)
+    ocr_max_pixels: int = 40_000_000    # trần điểm ảnh: chặn ảnh bom giải nén
+    read_concurrency: int = 1           # số lượt đọc cùng lúc (OCR, mô hình tốn CPU)
+    read_queue_s: float = 15.0          # chờ lượt quá thì 503 busy
+    read_deadline_s: float = 50.0       # hạn tổng một yêu cầu, dưới 60 s mặc định của APISIX
+    ai_url: str = ""                    # Ollama trong mạng nội bộ; rỗng: không dùng mô hình
+    ai_model: str = "qwen3:1.7b"
+    ai_timeout_s: float = 20.0
+    ai_max_chars: int = 3000            # số ký tự thân văn bản gửi mô hình
+    ai_summary: str = "fallback"        # fallback: chỉ khi quy tắc không ra trích yếu tin cậy cao · always
+    agent_id: str = "moc-doc-reader"    # danh tính tác tử trong sổ kiểm toán (X-Hasura-User-Id của vai trò agent)
+    tesseract_bin: str = "tesseract"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -115,6 +139,25 @@ class Settings:
                 vault_role_id_file=env.get("MOC_OPENBAO_ROLE_ID_FILE", "/run/openbao/role_id"),
                 vault_secret_id_file=env.get("MOC_OPENBAO_SECRET_ID_FILE", "/run/openbao/secret_id"),
                 transit_key=env.get("MOC_FILES_TRANSIT_KEY", "moc-files"),
+                read_enabled=_flag("MOC_READ_ENABLED", env.get("MOC_READ_ENABLED", "true")),
+                read_max_bytes=int(env.get("MOC_READ_MAX_MB") or env.get("MOC_FILES_MAX_MB", "25")) * 1024 * 1024,
+                read_text_pages=int(env.get("MOC_READ_TEXT_PAGES", "3")),
+                ocr_max_pages=int(env.get("MOC_OCR_MAX_PAGES", "1")),
+                ocr_lang=env.get("MOC_OCR_LANG", "vie").strip(),
+                ocr_timeout_s=float(env.get("MOC_OCR_TIMEOUT_S", "40")),
+                ocr_memory_mb=int(env.get("MOC_OCR_MEMORY_MB", "1536")),
+                ocr_max_pixels=int(env.get("MOC_OCR_MAX_PIXELS", "40000000")),
+                read_concurrency=int(env.get("MOC_READ_CONCURRENCY", "1")),
+                read_queue_s=float(env.get("MOC_READ_QUEUE_S", "15")),
+                read_deadline_s=float(env.get("MOC_READ_DEADLINE_S", "50")),
+                # mặc định là dịch vụ ollama của profile `ai`; không bật profile thì dò thấy không có, bỏ qua mô hình
+                ai_url=env.get("MOC_AI_URL", "http://ollama:11434").strip().rstrip("/"),
+                ai_model=env.get("MOC_AI_MODEL", "qwen3:1.7b").strip(),
+                ai_timeout_s=float(env.get("MOC_AI_TIMEOUT_S", "20")),
+                ai_max_chars=int(env.get("MOC_AI_MAX_CHARS", "3000")),
+                ai_summary=env.get("MOC_AI_SUMMARY", "fallback").strip().lower(),
+                agent_id=env.get("MOC_AGENT_ID", "moc-doc-reader").strip(),
+                tesseract_bin=env.get("MOC_TESSERACT_BIN", "tesseract").strip(),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -133,3 +176,42 @@ class Settings:
         if self.cold_bucket == self.bucket:
             # bucket lạnh khóa ghi, còn bucket tệp thường phải xóa được
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")
+        self._check_reader()
+
+    def _check_reader(self) -> None:
+        """Biến của tác tử đọc văn bản đến (F4.1)."""
+        if self.read_max_bytes < 1:
+            raise ConfigError("MOC_READ_MAX_MB phải ≥ 1")
+        if not 1 <= self.read_text_pages <= 200 or not 1 <= self.ocr_max_pages <= 200:
+            raise ConfigError("MOC_READ_TEXT_PAGES, MOC_OCR_MAX_PAGES phải trong 1–200")
+        if not OCR_LANG_RE.fullmatch(self.ocr_lang):
+            raise ConfigError("MOC_OCR_LANG phải là tên dữ liệu ngôn ngữ của tesseract, vd vie hoặc vie+eng")
+        if self.ocr_timeout_s <= 0 or self.read_deadline_s <= 0 or self.ai_timeout_s <= 0:
+            raise ConfigError("MOC_OCR_TIMEOUT_S, MOC_READ_DEADLINE_S, MOC_AI_TIMEOUT_S phải > 0")
+        if self.read_queue_s < 0:
+            raise ConfigError("MOC_READ_QUEUE_S phải ≥ 0")
+        if self.ocr_memory_mb < 64 or self.ocr_max_pixels < 1:
+            raise ConfigError("MOC_OCR_MEMORY_MB phải ≥ 64, MOC_OCR_MAX_PIXELS phải ≥ 1")
+        if self.read_concurrency < 1:
+            raise ConfigError("MOC_READ_CONCURRENCY phải ≥ 1")
+        if self.ai_url and not self.ai_url.startswith(("http://", "https://")):
+            raise ConfigError("MOC_AI_URL phải là URL http(s)://…, hoặc rỗng để tắt mô hình")
+        if self.ai_url and not self.ai_model:
+            raise ConfigError("MOC_AI_MODEL không được rỗng khi có MOC_AI_URL")
+        if self.ai_max_chars < 100:
+            raise ConfigError("MOC_AI_MAX_CHARS phải ≥ 100")
+        if self.ai_summary not in ("fallback", "always"):
+            raise ConfigError("MOC_AI_SUMMARY chỉ nhận fallback hoặc always")
+        if not 1 <= len(self.agent_id) <= 64:
+            raise ConfigError("MOC_AGENT_ID phải dài 1–64 ký tự")
+        if not self.tesseract_bin:
+            raise ConfigError("MOC_TESSERACT_BIN không được rỗng")
+
+
+def _flag(name: str, value: str) -> bool:
+    v = value.strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    raise ConfigError(f"{name} chỉ nhận true hoặc false")

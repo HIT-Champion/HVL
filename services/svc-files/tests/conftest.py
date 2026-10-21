@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import os
 import re
 import time
@@ -30,6 +31,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import BinaryIO
 
+import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -120,6 +122,7 @@ class FakeStore:
         self.objects: dict[str, dict] = {}
         self.deleted: list[str] = []
         self.unreadable: set[str] = set()      # khóa đọc lỗi (kho đứt kết nối, hỏng đĩa) dù đối tượng vẫn còn
+        self.reads: list[str] = []             # khóa đã mở để đọc (đọc văn bản đến: tệp hạn chế không được mở)
 
     def ensure_bucket(self) -> None:
         pass
@@ -135,6 +138,7 @@ class FakeStore:
         self.objects.pop(key, None)
 
     def read_stream(self, key: str, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
+        self.reads.append(key)
         if key in self.unreadable:
             raise StorageError(f"đứt kết nối khi đọc {key}")
         if key not in self.objects:
@@ -194,12 +198,14 @@ class FakeHasura:
         if row["created_by"] != ns["x-hasura-user-id"] and file_id not in self.shared:
             return None
         return StoredFile(file_id, row["filename"], row["mime_type"], row["size_bytes"], row["sha256_hex"],
-                          encrypted=row.get("wrapped_dek") is not None)
+                          encrypted=row.get("wrapped_dek") is not None, created_by=row["created_by"])
 
     async def file_location(self, *, tenant_id, actor_id, request_id, file_id) -> Location | None:
         self._check()
         row = self.files.get(file_id)
-        return Location(row["object_key"], row.get("wrapped_dek")) if row and row["tenant_id"] == tenant_id else None
+        if not row or row["tenant_id"] != tenant_id:
+            return None
+        return Location(row["object_key"], row.get("wrapped_dek"), file_id in self.in_restricted)
 
     def add_document(self, tenant: uuid.UUID, summary: str, *, readers: set[str] | None = None, **cols) -> str:
         doc_id = str(uuid.uuid4())
@@ -367,6 +373,68 @@ class FakeHasura:
                 "size_bytes": row["size_bytes"], "sha256": row["sha256_hex"]} if row else None
 
 
+    # --- đọc văn bản đến (F4.1): vai trò agent ------------------------------------------------------------
+
+    suggestions: dict[str, dict] = field(default_factory=dict)   # office.intake_suggestions theo file_id
+    agent_calls: list[dict] = field(default_factory=list)       # mỗi lời gọi as_role: phiên và tên câu GraphQL
+    agent_events: list[dict] = field(default_factory=list)      # dòng sổ tác tử đã ghi, cột preset như Hasura đặt
+    fail_agent: bool = False          # mọi lời gọi vai trò agent lỗi (CSDL không ghi được sổ)
+    sealed: set[str] = field(default_factory=set)   # file_id mà trigger intake_suggestions_guard chặn (văn bản hạn chế)
+    # tệp (kể cả tệp rõ) đang gắn vào văn bản hạn chế: FileLocation trả restricted_links khác rỗng
+    in_restricted: set[uuid.UUID] = field(default_factory=set)
+    document_types: list[dict] = field(default_factory=lambda: [
+        {"code": c, "name": n, "in_symbol": True}
+        for c, n in (("CV", "Công văn"), ("QĐ", "Quyết định"), ("TB", "Thông báo"), ("KH", "Kế hoạch"))])
+    admin_queries: list[str] = field(default_factory=list)
+
+    AGENT_SUGGESTION_COLUMNS = {"file_id", "requested_by", "status", "method", "pages", "fields", "warnings",
+                                "summary_source", "model", "duration_ms"}
+    AGENT_AUDIT_COLUMNS = {"request_id", "action", "entity", "entity_id", "diff"}
+
+    async def as_role(self, role: str, tenant_id, user_id: str, request_id: str, query: str, variables: dict) -> dict:
+        """Như Hasura với quyền của vai trò agent (db/metadata, luồng A): cột được ghi, preset, check."""
+        self._check()
+        name = re.search(r"(?:query|mutation)\s+(\w+)", query).group(1)
+        self.agent_calls.append({"role": role, "tenant_id": str(tenant_id), "user_id": user_id,
+                                 "request_id": request_id, "op": name})
+        if self.fail_agent:
+            raise HasuraError("không ghi được")
+        if role != "agent":
+            raise HasuraError("vai trò không có quyền", "validation-failed")
+        if name == "GoiYDaCo":
+            row = self.suggestions.get(variables["id"])
+            return {"office_intake_suggestions_by_pk":
+                    {k: v for k, v in row.items() if k not in {"tenant_id", "agent_id", "requested_by"}}
+                    if row and row["tenant_id"] == str(tenant_id) else None}
+        event = variables["e"]
+        if set(event) - self.AGENT_AUDIT_COLUMNS:
+            raise HasuraError("cột không được phép", "validation-failed")
+        if event["action"] != "intake.suggested" or event["entity"] != "core.files":
+            raise HasuraError("check constraint of an insert permission has failed", "permission-error")
+        out: dict = {"insert_core_audit_log": {"affected_rows": 1}}
+        if name == "LuuGoiY":
+            o = variables["o"]
+            if set(o) - self.AGENT_SUGGESTION_COLUMNS:
+                raise HasuraError("cột không được phép", "validation-failed")
+            if o["file_id"] in self.sealed:
+                raise HasuraError("intake_suggestions_sealed: tệp của văn bản hạn chế", "constraint-violation")
+            read_at = f"2026-10-21T08:00:{len(self.agent_events) % 60:02d}+00:00"
+            self.suggestions[o["file_id"]] = {**o, "tenant_id": str(tenant_id), "agent_id": user_id,
+                                              "read_at": read_at}
+            out["insert_office_intake_suggestions_one"] = {"file_id": o["file_id"], "read_at": read_at}
+        elif name != "GhiSoTacTu":
+            raise HasuraError(f"câu lạ {name}")
+        self.agent_events.append({**event, "tenant_id": str(tenant_id), "actor_id": user_id, "actor_kind": "agent"})
+        return out
+
+    async def admin(self, query: str, variables: dict, headers: dict | None = None) -> dict:
+        self._check()
+        self.admin_queries.append(query)
+        if "LoaiVanBan" in query:
+            return {"office_document_types": self.document_types}
+        raise HasuraError("câu lạ")
+
+
 def text_pdf(*lines: str, pages: int = 1) -> bytes:
     """PDF nhỏ có lớp chữ (Helvetica, chỉ ASCII), mỗi trang đủ các dòng `lines`; pages=0: không có trang nào."""
     def esc(line: str) -> str:
@@ -386,6 +454,59 @@ def text_pdf(*lines: str, pages: int = 1) -> bytes:
     xref = len(out)
     out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
     return out + b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+
+
+# TSV của tesseract (``tsv``) cho một trang công văn ngắn: dòng level 1 là cỡ trang, level 5 là từng từ
+SAMPLE_TSV = "\n".join("\t".join(map(str, row)) for row in [
+    ("level", "page_num", "block_num", "par_num", "line_num", "word_num", "left", "top", "width", "height", "conf",
+     "text"),
+    (1, 1, 0, 0, 0, 0, 0, 0, 2000, 2829, -1, ""),
+    (2, 1, 1, 0, 0, 0, 150, 120, 700, 120, -1, ""),
+    (3, 1, 1, 1, 0, 0, 150, 120, 700, 120, -1, ""),
+    (4, 1, 1, 1, 1, 0, 150, 120, 700, 50, -1, ""),
+    (5, 1, 1, 1, 1, 1, 150, 120, 200, 50, 96.1, "UBND"),
+    (5, 1, 1, 1, 1, 2, 370, 120, 200, 50, 95.3, "TỈNH"),
+    (5, 1, 1, 1, 1, 3, 590, 120, 200, 50, 94.8, "MẪU"),
+    (4, 1, 1, 1, 2, 0, 150, 190, 700, 50, -1, ""),
+    (5, 1, 1, 1, 2, 1, 150, 190, 120, 50, 91.0, "Số:"),
+    (5, 1, 1, 1, 2, 2, 290, 190, 400, 50, 88.2, "105/TB-ĐHM"),
+    (2, 1, 2, 0, 0, 0, 700, 700, 600, 60, -1, ""),
+    (3, 1, 2, 1, 0, 0, 700, 700, 600, 60, -1, ""),
+    (4, 1, 2, 1, 1, 0, 700, 700, 600, 60, -1, ""),
+    (5, 1, 2, 1, 1, 1, 700, 700, 300, 60, 97.0, "THÔNG"),
+    (5, 1, 2, 1, 1, 2, 1020, 700, 280, 60, 96.4, "BÁO"),
+    (4, 1, 2, 1, 2, 0, 400, 780, 1200, 50, -1, ""),
+    (5, 1, 2, 1, 2, 1, 400, 780, 1200, 50, 90.0, "Lịch họp giao ban tháng 11 của nhà trường"),
+]) + "\n"
+
+
+def fake_tesseract(directory, *, tsv: str = SAMPLE_TSV, sleep_s: float = 0.0, exit_code: int = 0, stderr: str = "",
+                   kill: int | None = None):
+    """Tesseract giả (``MOC_TESSERACT_BIN``): ghi lại tham số, biến OMP_THREAD_LIMIT, ảnh nhận được, pid vào
+    ``directory``; ngủ ``sleep_s`` giây; in ``tsv`` (và ``stderr``); tự giết bằng tín hiệu ``kill`` (không đổ lõi),
+    không thì thoát với ``exit_code``."""
+    import sys
+
+    kill = None if kill is None else int(kill)      # signal.Signals → số, để in vào mã
+    path = directory / "tesseract"
+    path.write_text(f"""#!{sys.executable}
+import json, os, resource, sys, time
+d = {str(directory)!r}
+open(os.path.join(d, "pid"), "w").write(str(os.getpid()))
+json.dump({{"args": sys.argv[1:], "omp": os.environ.get("OMP_THREAD_LIMIT")}}, open(os.path.join(d, "call.json"), "w"))
+open(os.path.join(d, "stdin.png"), "wb").write(sys.stdin.buffer.read())
+time.sleep({sleep_s!r})
+sys.stdout.write({json.dumps(tsv)})
+sys.stderr.write({json.dumps(stderr)})
+sys.stdout.flush()
+sys.stderr.flush()
+if {kill!r} is not None:
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    os.kill(os.getpid(), {kill!r})
+sys.exit({exit_code})
+""", encoding="utf-8")
+    path.chmod(0o755)
+    return path
 
 
 def fold(text: str) -> str:
@@ -441,6 +562,37 @@ class FakeMeili:
         return hits[offset:offset + limit]
 
 
+OLLAMA_MODEL = "qwen3:1.7b"
+GOOD_SUMMARY = "Về việc tổ chức họp giao ban công tác tháng 11 năm 2026"
+
+
+class FakeOllama:
+    """Ollama giả: /api/tags liệt kê `models`; /api/chat trả `reply` (chuỗi nội dung, hoặc hàm nhận yêu cầu)."""
+
+    def __init__(self, *, models=(OLLAMA_MODEL,), reply=None, status: int = 200) -> None:
+        self.models = list(models)
+        self.reply = reply if reply is not None else json.dumps({"trich_yeu": GOOD_SUMMARY}, ensure_ascii=False)
+        self.status = status
+        self.requests: list[httpx2.Request] = []
+
+    def calls(self, path: str) -> list[dict]:
+        return [json.loads(r.content) if r.content else {} for r in self.requests if r.url.path == path]
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        if request.url.path == "/api/tags":
+            return httpx2.Response(200, json={"models": [{"name": m, "model": m} for m in self.models]})
+        if request.url.path == "/api/generate":
+            return httpx2.Response(200, json={"model": OLLAMA_MODEL, "done": True})
+        reply = self.reply
+        if callable(reply):
+            reply = await reply(request)
+            if isinstance(reply, httpx2.Response):
+                return reply
+        return httpx2.Response(self.status, json={"model": OLLAMA_MODEL, "done": True,
+                                                  "message": {"role": "assistant", "content": reply}})
+
+
 class FakeVault:
     """Két giả: khóa dữ liệu ngẫu nhiên, "bọc" bằng cách ghi nhớ trong từ điển; đếm số lần mở khóa."""
 
@@ -481,8 +633,29 @@ def settings() -> Settings:
             "MOC_AUDIT_ANCHOR_INTERVAL_S": "0",
             "MOC_TEXT_INTERVAL_S": "0",
             "MOC_FILES_MAX_MB": "1",
+            "MOC_AI_URL": "",       # không dò Ollama trong test (test đọc văn bản đến tự tiêm mô hình giả)
         }
     )
+
+
+@pytest.fixture
+def log_records():
+    """Các dòng nhật ký JSON của logger svc_files (đã giải mã), trong lúc chạy test."""
+    import logging
+
+    records: list[dict] = []
+
+    class Grab(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(json.loads(record.getMessage()))
+
+    logger, handler = logging.getLogger("svc_files"), Grab()
+    level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    yield records
+    logger.removeHandler(handler)
+    logger.setLevel(level)
 
 
 @pytest.fixture

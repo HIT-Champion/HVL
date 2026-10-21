@@ -54,8 +54,9 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
   }
 
   // Dịch vụ ghi thay người dùng (vai trò service) thì actor_id vẫn là người đó; tài khoản dịch vụ, việc tự chạy và
-  // ghi thẳng CSDL thì là "Hệ thống"
+  // ghi thẳng CSDL thì là "Hệ thống"; tác tử (F4.1, vd moc-doc-reader đọc văn bản đến) có tên riêng
   function who(row: AuditRow) {
+    if (row.actor_kind === 'agent') return t('audit.agent', { name: label('audit.agents', row.actor_id) })
     const name = names.value.get(row.actor_id)
     if (row.actor_kind === 'service') return name ? t('audit.service', { name }) : t('event.system')
     if (row.actor_kind === 'system') return t('event.system')
@@ -66,7 +67,8 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     if (value === null || value === undefined || value === '') return '—'
     if (typeof value === 'boolean') return value ? t('audit.yes') : t('audit.no')
     if (typeof value === 'string' && value.startsWith('\\x')) return `${value.slice(2, 12)}…`
-    if (col === 'status') return label('status', String(value))
+    // trạng thái văn bản; sự kiện đọc văn bản (intake.suggested) có trạng thái riêng: ok, empty, unreadable
+    if (col === 'status') return te(`status.${value}`) ? t(`status.${value}`) : label('audit.readStatus', String(value))
     if (col === 'urgency') return label('urgency', String(value))
     if (col === 'direction' || col === 'role') return label(`audit.${col}`, String(value))
     if (col === 'user_id' || col === 'signer_id') return names.value.get(String(value)) ?? String(value)
@@ -77,6 +79,17 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     // băm gói nộp lưu: sự kiện case_file.archived ghi dạng hex, không có tiền tố \x
     if (col === 'archive_sha256') return `${String(value).replace(/^\\x/, '').slice(0, 10)}…`
     if (col === 'size_bytes' && typeof value === 'number') return fmtSize(value)
+    // đọc văn bản đến (F4.1): trường đọc được ghi thành chuỗi "symbol,issued_on,…" (diff không chứa mảng)
+    if (col === 'found') {
+      return String(value).split(',').map((k) => k.trim()).filter(Boolean)
+        .map((k) => label('receive.read.field', k)).join(', ') || '—'
+    }
+    if (col === 'duration_ms' && Number.isFinite(Number(value))) {
+      return t('audit.seconds', { n: fmtNumber(Math.round(Number(value) / 100) / 10) })
+    }
+    if (col === 'method') return label('receive.read.method', String(value))
+    if (col === 'summary_source') return label('audit.summarySource', String(value))
+    if (col === 'reason') return label('receive.read.reason', String(value))
     return String(value)
   }
 
@@ -86,6 +99,9 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     const hidden: string[] = []
     for (const [col, value] of Object.entries(row.overview)) {
       if (HIDDEN.has(col)) continue
+      // sự kiện đọc văn bản chỉ ghi siêu dữ liệu: null là không có (không dùng mô hình, không lỗi), không phải trường
+      // nội dung bị ẩn
+      if (value === null && row.action === 'intake.suggested') continue
       if (value === null) {
         hidden.push(label('audit.col', col))
         continue

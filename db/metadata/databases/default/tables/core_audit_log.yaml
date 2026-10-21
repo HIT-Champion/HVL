@@ -23,6 +23,10 @@
 # dung (hàm core.audit_overview, migration 1792281600700, 1792281600900, 1792281601100, 1792281601300), để sổ
 # không lộ văn bản hạn chế. Dòng của văn bản hạn chế mà người xem không đọc được chỉ còn tên cột
 # (office.audit_overview_seen, migration 1792281601600, F3.7).
+#
+# Tác tử đọc văn bản đến (F4.1, vai trò `agent`) chỉ ghi được dòng `intake.suggested` về một tệp: người ghi
+# (actor_id = X-Hasura-User-Id, actor_kind = agent) và thuê ước đặt sẵn từ phiên, gửi lên bị từ chối. Màn xem sổ thấy
+# cách đọc, số trang, tên các trường tìm thấy… (migration 1792281601900), không thấy giá trị của trường nào.
 table:
   name: audit_log
   schema: core
@@ -39,6 +43,16 @@ insert_permissions:
       set:
         tenant_id: X-Hasura-Tenant-Id
       check: {}
+  - role: agent
+    permission:
+      columns: [request_id, action, entity, entity_id, diff]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+        actor_id: X-Hasura-User-Id
+        actor_kind: agent
+      check:
+        action: {_eq: intake.suggested}
+        entity: {_eq: core.files}
 select_permissions:
   - role: director
     permission: &oversight

@@ -1130,6 +1130,146 @@ input office_registers_stream_cursor_value_input {
   year: Int
 }
 
+"columns and relationships of \"office.v_intake_accuracy\""
+type office_v_intake_accuracy {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"aggregated selection of \"office.v_intake_accuracy\""
+type office_v_intake_accuracy_aggregate {
+  aggregate: office_v_intake_accuracy_aggregate_fields
+  nodes: [office_v_intake_accuracy!]!
+}
+
+"aggregate fields of \"office.v_intake_accuracy\""
+type office_v_intake_accuracy_aggregate_fields {
+  avg: office_v_intake_accuracy_avg_fields
+  count(columns: [office_v_intake_accuracy_select_column!], distinct: Boolean): Int!
+  max: office_v_intake_accuracy_max_fields
+  min: office_v_intake_accuracy_min_fields
+  stddev: office_v_intake_accuracy_stddev_fields
+  stddev_pop: office_v_intake_accuracy_stddev_pop_fields
+  stddev_samp: office_v_intake_accuracy_stddev_samp_fields
+  sum: office_v_intake_accuracy_sum_fields
+  var_pop: office_v_intake_accuracy_var_pop_fields
+  var_samp: office_v_intake_accuracy_var_samp_fields
+  variance: office_v_intake_accuracy_variance_fields
+}
+
+"aggregate avg on columns"
+type office_v_intake_accuracy_avg_fields {
+  kept: Float
+  suggested: Float
+}
+
+"Boolean expression to filter rows from the table \"office.v_intake_accuracy\". All fields are combined with a logical 'AND'."
+input office_v_intake_accuracy_bool_exp {
+  _and: [office_v_intake_accuracy_bool_exp!]
+  _not: office_v_intake_accuracy_bool_exp
+  _or: [office_v_intake_accuracy_bool_exp!]
+  confidence: String_comparison_exp
+  field: String_comparison_exp
+  kept: Int_comparison_exp
+  suggested: Int_comparison_exp
+}
+
+"aggregate max on columns"
+type office_v_intake_accuracy_max_fields {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"aggregate min on columns"
+type office_v_intake_accuracy_min_fields {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"Ordering options when selecting data from \"office.v_intake_accuracy\"."
+input office_v_intake_accuracy_order_by {
+  confidence: order_by
+  field: order_by
+  kept: order_by
+  suggested: order_by
+}
+
+"select columns of table \"office.v_intake_accuracy\""
+enum office_v_intake_accuracy_select_column {
+  "column name"
+  confidence
+  "column name"
+  field
+  "column name"
+  kept
+  "column name"
+  suggested
+}
+
+"aggregate stddev on columns"
+type office_v_intake_accuracy_stddev_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_v_intake_accuracy_stddev_pop_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_v_intake_accuracy_stddev_samp_fields {
+  kept: Float
+  suggested: Float
+}
+
+"Streaming cursor of the table \"office_v_intake_accuracy\""
+input office_v_intake_accuracy_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_intake_accuracy_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_intake_accuracy_stream_cursor_value_input {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"aggregate sum on columns"
+type office_v_intake_accuracy_sum_fields {
+  kept: Int
+  suggested: Int
+}
+
+"aggregate var_pop on columns"
+type office_v_intake_accuracy_var_pop_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate var_samp on columns"
+type office_v_intake_accuracy_var_samp_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate variance on columns"
+type office_v_intake_accuracy_variance_fields {
+  kept: Float
+  suggested: Float
+}
+
 "column ordering options"
 enum order_by {
   "in ascending order, nulls last"
@@ -1317,6 +1457,32 @@ type query_root {
   ): [office_registers!]!
   "fetch data from the table: \"office.registers\" using primary key columns"
   office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): [office_v_intake_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): office_v_intake_accuracy_aggregate!
 }
 
 type subscription_root {
@@ -1571,6 +1737,41 @@ type subscription_root {
     "filter the rows returned"
     where: office_registers_bool_exp
   ): [office_registers!]!
+  "fetch data from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): [office_v_intake_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): office_v_intake_accuracy_aggregate!
+  "fetch data from the table in a streaming manner: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_intake_accuracy_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): [office_v_intake_accuracy!]!
 }
 
 scalar timestamptz

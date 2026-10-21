@@ -1,0 +1,54 @@
+# Copyright 2026 Mộc Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Gợi ý đọc văn bản đến (F4.1, migration 1792281601900): tác tử moc-doc-reader trong svc-files ghi, đọc lại khi văn
+# thư bấm đọc lần nữa. Chỉ vai trò `agent` (khóa quản trị + X-Hasura-Role: agent) có quyền: thuê ước và danh tính tác
+# tử đặt sẵn từ phiên, gửi lên bị từ chối; khóa ngoại (tenant_id, file_id) chặn gợi ý cho tệp của đơn vị khác. Không vai
+# trò người dùng nào đọc, ghi bảng này — giao diện nhận gợi ý qua POST /api/files/{id}/read. Không ai xóa: xóa tệp thì
+# gợi ý xóa theo, văn bản bật hạn chế thì trigger xóa.
+table:
+  name: intake_suggestions
+  schema: office
+# vai trò agent không đọc được core.files: quan hệ chỉ dùng với khóa quản trị
+object_relationships:
+  - name: file
+    using:
+      manual_configuration:
+        remote_table: {name: files, schema: core}
+        column_mapping: {file_id: id}
+insert_permissions:
+  - role: agent
+    permission:
+      columns: [file_id, requested_by, status, method, pages, fields, warnings, summary_source, model, duration_ms]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+        agent_id: X-Hasura-User-Id
+      check: {}
+select_permissions:
+  - role: agent
+    permission:
+      columns: [file_id, tenant_id, requested_by, agent_id, status, method, pages, fields, warnings, summary_source,
+                model, duration_ms, read_at]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+# đọc lại (force): upsert theo khóa chính, ghi đè đúng các cột của lần đọc mới; read_at do trigger đặt
+update_permissions:
+  - role: agent
+    permission:
+      columns: [requested_by, status, method, pages, fields, warnings, summary_source, model, duration_ms]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+      check: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+      set:
+        agent_id: X-Hasura-User-Id

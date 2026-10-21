@@ -152,6 +152,16 @@ class Service(User):
 
 
 @dataclass(frozen=True)
+class Agent(Service):
+    """Tác tử đọc văn bản đến trong svc-files (F4.1): khóa quản trị + vai trò agent + thuê ước của văn thư bấm đọc;
+    sub là danh tính tác tử (MOC_AGENT_ID, mặc định moc-doc-reader)."""
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {**super().headers, "X-Hasura-Role": "agent"}
+
+
+@dataclass(frozen=True)
 class World:
     tenant_a: str
     tenant_b: str

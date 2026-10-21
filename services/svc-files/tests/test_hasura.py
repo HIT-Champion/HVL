@@ -104,6 +104,21 @@ def test_rejected_token_raises_auth_error():
         run(client(rec).visible_file("t", FILE))
 
 
+def test_file_location_runs_as_service_and_reports_restricted_documents():
+    rec = Recorder((200, {"data": {"core_files_by_pk": {
+        "object_key": f"tenant/{TENANT}/2026/10/{FILE}", "wrapped_dek": None,
+        "restricted_links": [{"document_id": str(uuid.uuid4())}]}}}))
+    loc = run(client(rec).file_location(tenant_id=TENANT, actor_id="u-van-thu", request_id="req-1", file_id=FILE))
+    headers, body = rec.last
+    assert headers["x-hasura-role"] == "service" and headers["x-hasura-tenant-id"] == str(TENANT)
+    # chỉ lấy liên kết tới văn bản đang hạn chế, một dòng là đủ
+    assert "document_files(where: {document: {restricted: {_eq: true}}}, limit: 1)" in body["query"]
+    assert loc.restricted is True and loc.wrapped_dek is None and loc.object_key.endswith(str(FILE))
+    rec.reply = (200, {"data": {"core_files_by_pk": {"object_key": "k", "wrapped_dek": None, "restricted_links": []}}})
+    loc = run(client(rec).file_location(tenant_id=TENANT, actor_id="u", request_id="r", file_id=FILE))
+    assert loc.restricted is False
+
+
 @pytest.mark.parametrize("reply", [
     httpx2.ConnectError("không nối được"),
     (500, {"error": "lỗi máy chủ"}),

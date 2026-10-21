@@ -67,6 +67,8 @@ htmlcov/
 # --- Tài liệu nhị phân & Thể lệ cuộc thi ------------------------------------
 public/*.pdf
 *.pdf
+# Văn bản đến mẫu (giả lập) để thử, đo tác tử đọc văn bản F4.1 — sinh bằng make van-ban-mau
+!/seed/van-ban-den/*.pdf
 
 # --- Docker overrides cục bộ -------------------------------------------------
 docker-compose.override.yml

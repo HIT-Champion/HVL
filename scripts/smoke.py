@@ -21,8 +21,10 @@ và ở CSDL, theo cùng schemas/van-ban-den.json với form) → vào sổ, có
 Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Rồi luồng văn bản đi: chuyên
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
 mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Liên thông: công văn gửi Khoa Kinh tế trong hệ
-thống thành văn bản đến của bên nhận, cùng bản phát hành. Thông báo: tổ trưởng nhận tin việc mới
-qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
+thống thành văn bản đến của bên nhận, cùng bản phát hành. Đọc văn bản đến (F4.1): tác tử moc-doc-reader đọc lớp chữ
+PDF văn thư vừa tải lên, gợi ý số ký hiệu, ngày ban hành, loại; tệp hạn chế không bị đọc, đơn vị khác không gọi được,
+mỗi lần đọc một dòng sổ kiểm toán (không OCR ở đây — make demo-doc-van-ban thử cả ảnh). Thông báo: tổ trưởng nhận tin
+việc mới qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
 kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
 có con số tổng), văn thư không đọc được. Văn bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người
 xem, chỉ người có tên trong danh sách được xem (người nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán:
@@ -549,6 +551,42 @@ def main() -> None:
                    f"select count(*) from core.file_texts where file_id = '{secret_pdf['id']}'").decode().strip()
     hidden == [] and read == "0" or fail(f"tệp của văn bản hạn chế bị đọc chữ hoặc tìm được: {hidden}, {read}")
     ok("văn bản hạn chế: tệp không bị đọc chữ, không tìm được theo nội dung (kể cả người tạo)")
+
+    # F4.1: tác tử moc-doc-reader đọc tệp văn thư vừa tải lên, trả gợi ý cho form tiếp nhận — không ghi vào văn bản
+    print("Đọc văn bản đến (F4.1)")
+
+    def read_status(session: Session, file_id: str) -> tuple[int, str | None]:
+        try:
+            request("POST", f"{PUBLIC_URL}/api/files/{file_id}/read", data=b"", headers=session.auth, timeout=90)
+        except HTTPError as exc:
+            try:
+                return exc.status, (json.loads(exc.body).get("detail") or {}).get("code")
+            except (ValueError, AttributeError):
+                return exc.status, None
+        return 200, None
+
+    notice = clerk.upload(f"thong-bao-{tag}.pdf", text_pdf(
+        "CONG HOA XA HOI CHU NGHIA VIET NAM", f"So: 99/TB-SMK{tag}", "Ha Noi, ngay 15 thang 10 nam 2026", "THONG BAO",
+        f"Lich hop giao ban thang 11 {tag}"))
+    _, _, raw = request("POST", f"{PUBLIC_URL}/api/files/{notice['id']}/read", data=b"", headers=clerk.auth,
+                        timeout=90)
+    suggested = json.loads(raw)
+    values = {k: v["value"] for k, v in (suggested.get("fields") or {}).items()}
+    (suggested.get("method"), values.get("symbol"), values.get("issued_on"), values.get("type_code")) \
+        == ("text", f"99/TB-SMK{tag}", "2026-10-15", "TB") or fail(f"tác tử đọc thông báo chưa đúng: {suggested}")
+    ok("tác tử đọc lớp chữ PDF vừa tải lên, gợi ý đúng số ký hiệu, ngày ban hành, loại (POST /api/files/{id}/read)")
+    sealed = clerk.upload(f"han-che-doc-{tag}.pdf", text_pdf(f"So: 98/TB-SMK{tag}"), restricted=True)
+    read_status(clerk, sealed["id"]) == (409, "restricted") \
+        or fail(f"tệp của văn bản hạn chế không bị chặn đọc: {read_status(clerk, sealed['id'])}")
+    read_status(other_tenant, notice["id"]) == (404, "not_found") \
+        or fail(f"văn thư đơn vị khác gọi đọc tệp: {read_status(other_tenant, notice['id'])}")
+    ok("tệp hạn chế không bị đọc (409 restricted); văn thư Khoa Kinh tế gọi đọc tệp của Khoa CNTT → 404")
+    rows = director.gql("""query ($f: String!) { core_audit_log(where: {action: {_eq: "intake.suggested"},
+        entity_id: {_eq: $f}}) { actor_id actor_kind overview } }""", {"f": notice["id"]})["core_audit_log"]
+    [(r["actor_id"], r["actor_kind"]) for r in rows] == [("moc-doc-reader", "agent")] \
+        and f"SMK{tag}" not in json.dumps(rows) \
+        or fail(f"sổ kiểm toán chưa có đúng một dòng intake.suggested của tác tử: {rows}")
+    ok("sổ kiểm toán: một dòng intake.suggested, người thực hiện moc-doc-reader (agent), không có chữ của văn bản")
 
     print("Văn bản hạn chế: tệp mã hóa, danh sách người được xem (F3.7)")
     secret_pdf.get("encrypted") is True or fail(f"tệp tải lên ở chế độ hạn chế không được mã hóa: {secret_pdf}")

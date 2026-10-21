@@ -130,7 +130,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   request_id, action, entity, entity_id, diff)::text)`. Thời điểm lấy theo epoch để không phụ thuộc múi giờ
   của phiên; `jsonb::text` cho cùng một chuỗi với cùng một giá trị, nên tính lại được khi kiểm tra.
 - Người thực hiện: đọc `current_setting('hasura.user', true)` (Hasura đặt biến này trong mỗi giao dịch);
-  dịch vụ ghi thẳng vào CSDL thì `set local moc.actor = '…'` trước khi ghi.
+  dịch vụ ghi thẳng vào CSDL thì `set local moc.actor = '…'` trước khi ghi. `actor_kind` theo vai trò Hasura của
+  phiên: `service` → `service`, `agent` → `agent` (tác tử đọc văn bản đến, F4.1, migration 1792281601900), `admin` →
+  `system`, vai trò người dùng → `user`.
 - `core.audit_log` chỉ được ghi thêm (trigger chặn sửa, xóa, `truncate`). `core.audit_verify()` tính lại
   chuỗi, trả về dòng sai và loại lỗi (`hash`, `prev_hash`, `gap`, `head`).
 
@@ -161,7 +163,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
   1792281600900; mẫu mã độc, cỡ tệp của tệp bị ClamAV chặn — migration 1792281601100, tên tệp vẫn ẩn; đơn vị nhận,
   văn bản đến, văn bản gửi, số lần thử, lúc giao của lần gửi liên thông — migration 1792281601800, băm và mã tra cứu
-  chụp từ văn bản gửi, lỗi giao vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế thì sổ
+  chụp từ văn bản gửi, lỗi giao vẫn ẩn; cách đọc, số trang, tên các trường tìm thấy, nguồn trích yếu, tên mô hình,
+  thời gian, lý do của lượt đọc văn bản đến `intake.suggested` — migration 1792281601900, các khóa này chỉ hiện ở
+  dòng sự kiện đó). Lãnh đạo không đọc được văn bản hạn chế thì sổ
   cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
@@ -194,6 +198,44 @@ dung văn bản hạn chế không vào chỉ mục (bản chữ trần sẽ vô
 CSDL: chữ của tệp gắn vào văn bản hạn chế bị bỏ qua khi ghi, và bị xóa khi văn bản bật hạn chế hoặc khi tệp được
 gắn vào văn bản hạn chế. Bảng không gắn sổ kiểm
 toán: chữ là dữ liệu dẫn xuất, tính lại được từ tệp mà băm đã nằm trong `core.files` và trong sổ.
+
+**Gợi ý đọc văn bản đến** (`office.intake_suggestions`, F4.1, migration 1792281601900). Văn thư tải công văn lên màn
+tiếp nhận, bấm đọc (`POST /api/files/{id}/read`, §4.3); tác tử `moc-doc-reader` trong `svc-files` đọc lớp chữ PDF,
+không có thì nhận dạng chữ (Tesseract), rồi gợi ý sáu trường của form tiếp nhận. Văn thư đối chiếu, sửa rồi mới lưu —
+văn bản vẫn chỉ vào qua Action `receiveIncoming`; gợi ý không bao giờ tự thành văn bản.
+
+```sql
+create table office.intake_suggestions (    -- một dòng mỗi tệp: bản gợi ý của lần đọc gần nhất
+  file_id         uuid primary key,          -- (tenant_id, file_id) tham chiếu core.files, xóa tệp thì xóa theo
+  tenant_id       uuid not null,             -- preset từ phiên
+  requested_by    text not null,             -- sub văn thư bấm đọc
+  agent_id        text not null,             -- preset X-Hasura-User-Id của phiên agent (moc-doc-reader)
+  status          text not null check (status in ('ok', 'empty')),
+  method          text not null check (method in ('text', 'ocr')),
+  pages           int  not null check (pages between 0 and 200),
+  fields          jsonb not null default '{}',   -- {trường: {value, confidence, source}}, khóa ⊂ type_code, symbol,
+                                                 -- issued_on, issuer_name, summary, urgency; tối đa 16 KB
+  warnings        jsonb not null default '[]',   -- mã cảnh báo: future_date, low_text, model_timeout…
+  summary_source  text not null default 'none' check (summary_source in ('rule', 'model', 'none')),
+  model           text,                          -- tên mô hình đã viết trích yếu, null nếu không dùng
+  duration_ms     int  not null check (duration_ms >= 0),
+  read_at         timestamptz not null default now()   -- trigger đặt lại mỗi lần ghi
+);
+```
+
+- Lần bấm đọc sau trả ngay bản đã lưu (không đọc lại tệp, không ghi sổ); văn thư chọn đọc lại thì ghi đè cả dòng
+  (upsert theo `file_id`).
+- Ràng buộc mang tên mặc định của PostgreSQL (`intake_suggestions_<cột>_check`): thông điệp lỗi nêu đúng cột sai.
+- **Văn bản hạn chế không bao giờ có gợi ý**: bản gợi ý (số ký hiệu, trích yếu) là chữ trần, lưu ra sẽ vô hiệu việc
+  mã hóa tệp (F3.7). `svc-files` từ chối tệp mã hóa trước khi đọc byte; trigger `intake_suggestions_guard` chặn thêm
+  ở CSDL — ghi gợi ý cho tệp mã hóa hoặc tệp đang gắn vào văn bản hạn chế bị từ chối (`intake_suggestions_sealed`,
+  `check_violation`) — và xóa gợi ý khi văn bản bật hạn chế hoặc khi tệp đã đọc được gắn vào văn bản hạn chế (dữ liệu
+  có từ trước F3.7), như `core.file_texts`.
+- Bảng không gắn trigger sổ kiểm toán (gợi ý là dữ liệu dẫn xuất có nội dung văn bản). Mỗi lần đọc thật, tác tử ghi
+  dòng sổ `intake.suggested` chỉ có siêu dữ liệu (§5) **trong cùng yêu cầu GraphQL** với gợi ý: Hasura chạy một
+  mutation nhiều trường trong một giao dịch, ghi sổ lỗi thì gợi ý cũng không được lưu.
+- Không vai trò người dùng nào đọc, ghi bảng này; giao diện nhận gợi ý qua API của `svc-files`. Lãnh đạo, quản trị
+  đơn vị xem số đo qua view `office.v_intake_accuracy` (§2.5).
 
 **Thông báo** (`core.notifications`): dịch vụ ghi bằng vai trò `service`; mỗi người chỉ đọc thông báo của mình
 và chỉ sửa được `read_at`. Thông báo về văn bản hạn chế (F3.7) không mang nội dung: trigger `notifications_restricted`
@@ -611,6 +653,15 @@ ký vẫn cho biết có bao nhiêu văn bản. Nhờ vậy mọi số chia trê
 | `office.v_processing_time` | `month`, `documents`, `total_hours`, `with_due`, `on_time` | Thời gian từ vào sổ đến khi xong, theo tháng xong. Lúc xong là sự kiện `office.document.processed` (báo xong) hoặc `office.document.filed` (cho lưu) trên dòng thời gian, ghi cùng giao dịch với trạng thái `done`. Trả tổng số giờ để giao diện tự chia, gộp nhiều tháng không lệch; `on_time` đếm trong số `with_due` (văn bản có hạn) |
 | `office.v_outgoing_by_month` | `month`, `documents` | Văn bản đi đã phát hành theo tháng ban hành |
 
+**Số đo đọc văn bản đến** (F4.1, migration 1792281601900): `office.v_intake_accuracy` đối chiếu gợi ý đã lưu với
+văn bản văn thư đã lưu từ tệp đó (tệp là bản chính của văn bản đến chưa hủy), cho biết văn thư giữ nguyên bao nhiêu
+gợi ý trên dữ liệu thật. Văn bản hạn chế không vào phép đếm. `director`, `tenant_admin` đọc, lọc thuê ước, có
+aggregate; vai trò khác không thấy.
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.v_intake_accuracy` | `field`, `confidence`, `suggested`, `kept` | Theo trường và độ tin cậy: số gợi ý, số gợi ý văn thư giữ nguyên. Số ký hiệu so không phân biệt hoa thường, bỏ khoảng trắng; cơ quan ban hành so không phân biệt hoa thường, gộp khoảng trắng; ngày so dạng `YYYY-MM-DD`; trường khác so đúng từng ký tự |
+
 Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
 được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
@@ -671,6 +722,19 @@ về chính đơn vị mình trả null (`from_unit` ở bên gửi, `to_unit` �
 người dùng và `service` đọc mọi đơn vị trừ đơn vị trong phiên (`id <> X-Hasura-Tenant-Id`). Không vai trò nào thêm,
 xóa dòng `dispatches`; `service` (phiên bên gửi hoặc bên nhận) chỉ sửa `attempts`, `last_error`, `next_attempt_at`,
 `notified_at`; trạng thái chỉ đổi trong hàm `office.deliver_dispatch` (mutation chỉ cho `service`).
+
+**Tác tử đọc văn bản đến** (F4.1, migration 1792281601900). Vai trò Hasura `agent` không có trong token người dùng:
+`svc-files` gọi bằng khóa quản trị kèm `X-Hasura-Role: agent`, `X-Hasura-Tenant-Id` (đơn vị của văn thư bấm đọc),
+`X-Hasura-User-Id` = danh tính tác tử (`MOC_AGENT_ID`, mặc định `moc-doc-reader`). Quyền:
+
+| Bảng | Được làm | Cột đặt sẵn |
+|---|---|---|
+| `office.intake_suggestions` | Thêm, đọc, sửa (upsert) gợi ý của đơn vị trong phiên; không xóa | `tenant_id`, `agent_id` |
+| `core.audit_log` | Chỉ thêm dòng `action = intake.suggested`, `entity = core.files` (cột `request_id`, `entity_id`, `diff`) | `tenant_id`, `actor_id`, `actor_kind = agent` |
+
+Ngoài hai bảng này `agent` không có quyền nào: không đọc, ghi văn bản, không đọc `core.files`, không đọc sổ. Tệp có
+được đọc hay không do `svc-files` hỏi Hasura bằng **token của văn thư** trước khi đọc byte; khóa ngoại kèm thuê ước
+chặn lưu gợi ý cho tệp của đơn vị khác.
 
 > **Không đặt tên vai trò là `admin`.** `admin` là vai trò có sẵn của Hasura, bỏ qua mọi quyền kể cả khi nằm
 > trong JWT. Chạy thử ở #18: token có `x-hasura-default-role: admin` đọc được dữ liệu của mọi thuê ước.
@@ -833,6 +897,7 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status}}`; `summary` chỉ có khi `is_public` |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
+| `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
 | `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |
 
@@ -895,10 +960,28 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 | `office.document.dispatch_duplicate` | Đơn vị nhận đã có văn bản đến trùng: nối vào văn bản đó, không thêm bản thứ hai (ở văn bản đi). `data` như trên |
 | `office.document.arrived` | Văn bản đến do liên thông tạo (ở văn bản đến bên nhận). `data`: `dispatch_id`, `from_tenant_id`, `from_name`, `verify_code` (mã tra cứu của bên gửi) |
 | `core.file.rejected` | ClamAV chặn tệp |
+| `core.intake.suggested` | Tác tử đọc xong một tệp văn bản đến, có gợi ý (F4.1). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
 
 Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
 đến; không bao giờ mang `task_id` — chỉ mục `document_events_task_once` là chỉ mục duy nhất cho cả bảng.
+
+**Lượt đọc văn bản đến** (F4.1): mỗi lần tác tử đọc thật một tệp (không tính lần trả bản đã lưu), `svc-files` ghi
+một dòng `core.audit_log` bằng vai trò `agent`: `action` `intake.suggested`, `entity` `core.files`, `entity_id` = id
+tệp, `actor_id` `moc-doc-reader`, `actor_kind` `agent`. `diff` chỉ có giá trị vô hướng, **không mang nội dung**: không
+số ký hiệu, trích yếu, tên tệp, chữ nhận dạng được.
+
+```json
+{
+  "user_id": "<sub văn thư bấm đọc>", "file_id": "2b0c…", "status": "ok", "method": "ocr", "pages": 1,
+  "found": "symbol,issued_on,issuer_name,type_code,summary", "summary_source": "rule", "model": null,
+  "duration_ms": 8123, "reason": null
+}
+```
+
+`status`: `ok` | `empty` | `unreadable`; `method`: `text` | `ocr`; `found`: tên các trường tìm thấy, cách nhau dấu
+phẩy; `summary_source`: `rule` | `model` | `none`; `model`: tên mô hình đã dùng hoặc null; `reason`: lý do khi
+`unreadable`. Lãnh đạo xem sổ thấy đủ các khóa này qua `overview` (§1).
 
 **Thông báo realtime** (đã làm): mỗi kết nối Centrifugo tự vào kênh riêng `personal:#<sub>` của người trong
 token (Centrifugo tự kiểm token Keycloak qua JWKS); trình duyệt không đăng ký được kênh nào khác. Sau mỗi bước,

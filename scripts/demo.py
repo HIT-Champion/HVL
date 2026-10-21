@@ -43,6 +43,15 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Liên thông văn bản trong hệ thống (F3.12, không thuộc 4 nguyên lý): Khoa CNTT phát hành công văn gửi Khoa
         Kinh tế; bên nhận tự có văn bản đến cùng tệp (cùng SHA-256), cùng mã xác thực; vào sổ, lãnh đạo có việc chỉ
         đạo; sổ kiểm toán của cả hai đơn vị ghi lại; văn bản hạn chế không gửi được. (make demo-lien-thong)
+    python3 scripts/demo.py doc-van-ban
+        Đọc văn bản đến (F4.1, dưới hai phút, không cần mô hình): văn thư tải công văn mẫu, tác tử moc-doc-reader đọc
+        lớp chữ (ảnh thì OCR) và gợi ý số ký hiệu, ngày, cơ quan, loại, độ khẩn, trích yếu kèm độ tin cậy; văn thư sửa
+        một ô rồi vào sổ; sổ kiểm toán ghi lần đọc (chỉ siêu dữ liệu); tệp hạn chế không bị đọc; bật profile ai thì
+        mô hình viết trích yếu cho văn bản không có dòng V/v. (make demo-doc-van-ban)
+    python3 scripts/demo.py do-doc-van-ban
+        Đo tác tử trên 14 văn bản mẫu seed/van-ban-den so với nhãn nhan.json: bảng đúng / sai / trống từng trường,
+        riêng PDF có lớp chữ và bản scan, thời gian trung bình; thoát 1 khi PDF có lớp chữ dưới ngưỡng.
+        (make do-doc-van-ban)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -52,6 +61,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
@@ -999,8 +1009,327 @@ def lien_thong() -> None:
           f" {doc['issuer_name']}\"; bên gửi (vanthu): {PUBLIC_URL}/van-ban/{sent}")
 
 
+# --- F4.1 · Đọc văn bản đến ------------------------------------------------------------------------------------------
+# Văn bản mẫu hư cấu đi kèm mã nguồn (sinh lại: make van-ban-mau), nhãn đúng của từng tệp trong nhan.json
+SAMPLES_DIR = ROOT / "seed" / "van-ban-den"
+READ_FIELDS = ("type_code", "symbol", "issued_on", "issuer_name", "urgency")
+FIELD_NAMES = {"type_code": "Loại", "symbol": "Số, ký hiệu", "issued_on": "Ngày ban hành",
+               "issuer_name": "Cơ quan ban hành", "urgency": "Độ khẩn", "summary": "Trích yếu"}
+SAMPLE_MIME = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+# Ngưỡng trên 10 PDF có lớp chữ — như services/svc-files/tests/test_docread_samples.py; thêm: không trường high nào sai
+TEXT_MIN = {"symbol": 9, "issued_on": 9, "type_code": 9, "issuer_name": 8, "summary": 8}
+# /readyz của svc-files (trong container, cổng không mở ra máy chủ): "ai": true khi Ollama có mô hình (profile ai)
+AI_READY = """import json, urllib.error, urllib.request
+try:
+    raw = urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()
+except urllib.error.HTTPError as exc:
+    raw = exc.read()
+print(json.dumps(json.loads(raw).get('ai')))
+"""
+RECEIVED_BEFORE = """query ($s: String!, $d: date!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s},
+  issued_on: {_eq: $d}}, order_by: {created_at: asc}) { id status issuer_name register_number } }"""
+READ_AUDIT = """query ($f: String!) { core_audit_log(where: {action: {_eq: "intake.suggested"}, entity_id: {_eq: $f}},
+  order_by: {id: asc}) { id occurred_at entity actor_id actor_kind overview } }"""
+
+
+def sample_labels() -> list[dict[str, Any]]:
+    path = SAMPLES_DIR / "nhan.json"
+    if not path.is_file():
+        raise DemoFailed(f"không có {path.relative_to(ROOT)} — văn bản mẫu đi kèm mã nguồn (sinh lại: make van-ban-mau)")
+    return json.loads(path.read_text(encoding="utf-8"))["samples"]
+
+
+def upload_sample(clerk: Session, name: str) -> dict[str, Any]:
+    path = SAMPLES_DIR / name
+    return clerk.upload(name, path.read_bytes(), SAMPLE_MIME.get(path.suffix.lower(), "application/octet-stream"))
+
+
+def read_file(clerk: Session, file_id: str, *, force: bool = False) -> dict[str, Any]:
+    """POST /api/files/{id}/read qua APISIX: tác tử moc-doc-reader đọc tệp, trả gợi ý — không ghi gì vào văn bản.
+    Hết lượt OCR (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần."""
+    url = f"{PUBLIC_URL}/api/files/{file_id}/read" + ("?force=true" if force else "")
+    attempts = 0
+    while True:
+        try:
+            _, _, raw = request("POST", url, data=b"", headers=clerk.auth, timeout=90)
+            return json.loads(raw)
+        except HTTPError as exc:
+            attempts += 1
+            if exc.status != 503 or error_detail(exc).get("code") != "busy" or attempts == 3:
+                raise
+            time.sleep(10)
+
+
+def expected(field: str, labels: dict[str, Any]) -> str | None:
+    """Nhãn của trường; "normal" (không có dấu độ khẩn) coi như không có gì để gợi ý."""
+    want = labels.get(field)
+    return None if field == "urgency" and want == "normal" else want
+
+
+def same_value(field: str, got: str, want: str | None) -> bool:
+    """So như tests/test_docread_samples.py: số ký hiệu bỏ khoảng trắng, không phân biệt hoa thường; cơ quan gộp
+    khoảng trắng; trích yếu trùng ≥ 60% từ của nhãn; còn lại bằng nhau."""
+    if want is None:
+        return False
+    if field == "symbol":
+        return "".join(got.split()).casefold() == "".join(want.split()).casefold()
+    if field == "issuer_name":
+        return " ".join(got.split()).casefold() == " ".join(want.split()).casefold()
+    if field == "summary":
+        words = set(re.findall(r"\w+", want.casefold()))
+        return len(words & set(re.findall(r"\w+", got.casefold()))) >= 0.6 * max(len(words), 1)
+    return got == want
+
+
+def misses(fields: dict[str, Any], labels: dict[str, Any]) -> list[str]:
+    """Các ô gợi ý khác nhãn hoặc bỏ trống trong khi nhãn có giá trị."""
+    out = []
+    for name in (*READ_FIELDS, "summary"):
+        got, want = fields.get(name), expected(name, labels)
+        if got is None:
+            if want is not None:
+                out.append(f"{name}: trống, nhãn {want!r}")
+        elif not same_value(name, str(got["value"]), want):
+            out.append(f"{name}: {got['value']!r} ≠ nhãn {want!r}")
+    return out
+
+
+def show_fields(result: dict[str, Any], labels: dict[str, Any]) -> tuple[int, list[str]]:
+    """In bảng gợi ý so với nhãn; trả (số trường đúng trên 6, các trường high sai)."""
+    fields = result.get("fields") or {}
+    right, wrong_high = 0, []
+    print(f"   {'trường':<17} {'tin cậy':<8} {'nguồn':<6} nhãn  gợi ý")
+    for name in (*READ_FIELDS, "summary"):
+        got, want = fields.get(name), expected(name, labels)
+        if got is None:
+            mark = "✓" if want is None else "·"
+            right += want is None
+            print(f"   {FIELD_NAMES[name]:<17} {'—':<8} {'—':<6} {mark:<5} (không gợi ý)")
+            continue
+        good = same_value(name, str(got["value"]), want)
+        right += good
+        if got["confidence"] == "high" and not good:
+            wrong_high.append(f"{name} = {got['value']!r}, nhãn {want!r}")
+        value = str(got["value"])
+        value = value if len(value) <= 70 else value[:69] + "…"
+        print(f"   {FIELD_NAMES[name]:<17} {got['confidence']:<8} {got['source']:<6} {'✓' if good else '✗':<5} {value}")
+    if result.get("warnings"):
+        print(f"   cảnh báo: {', '.join(result['warnings'])}")
+    return right, wrong_high
+
+
+def ai_ready() -> bool:
+    try:
+        return json.loads(compose("exec", "-T", "svc-files", "python", "-c", AI_READY)) is True
+    except (subprocess.CalledProcessError, ValueError):
+        return False
+
+
+def doc_van_ban() -> None:
+    print("Màn F4.1 · Đọc văn bản đến — tác tử moc-doc-reader đọc tệp văn thư vừa tải lên, gợi ý các ô tiếp nhận kèm độ"
+          " tin cậy; văn thư kiểm, sửa, quyết. Gợi ý không tự ghi vào văn bản; văn bản hạn chế không bị đọc")
+    tag = uuid.uuid4().hex[:6].upper()
+    labels = {s["file"]: s for s in sample_labels()}
+    clerk, director = Session("vanthu"), Session("truongkhoa")
+
+    say(1, "Văn thư tải công văn 01-cong-van.pdf (PDF có lớp chữ, hai dòng đầu, V/v hai dòng) và bấm Đọc văn bản")
+    letter = labels["01-cong-van.pdf"]
+    file = upload_sample(clerk, letter["file"])
+    first = read_file(clerk, file["id"])
+    if first.get("method") != "text" or first.get("cached") or first.get("status") != "ok":
+        raise DemoFailed(f"đọc PDF có lớp chữ chưa đúng: {first}")
+    right, wrong = show_fields(first, letter["fields"])
+    missing = [f for f in ("symbol", "issued_on", "type_code") if f not in first["fields"]]
+    if wrong or missing:
+        raise DemoFailed("gợi ý chưa đúng: " + "; ".join(wrong + [f"thiếu {f}" for f in missing]))
+    ok(f"đọc lớp chữ {first['pages']} trang trong {first['duration_ms']} ms: {right}/6 ô khớp nhãn, không ô high nào"
+       " sai; ô medium, low là ô văn thư cần kiểm kỹ")
+    again = read_file(clerk, file["id"])
+    if not again.get("cached") or again.get("fields") != first["fields"]:
+        raise DemoFailed(f"bấm lại không trả gợi ý đã lưu: cached={again.get('cached')}")
+    ok("bấm lại: trả ngay gợi ý đã lưu (cached), không đọc lại tệp, không ghi thêm dòng sổ kiểm toán")
+
+    say(2, "Tải ảnh chụp của chính công văn đó (11-cong-van-anh-300dpi.jpg): không có lớp chữ, tác tử OCR bằng Tesseract")
+    photo = labels["11-cong-van-anh-300dpi.jpg"]
+    image = upload_sample(clerk, photo["file"])
+    started = time.monotonic()
+    try:
+        scanned = read_file(clerk, image["id"])
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        hint = " — image svc-files chưa có tesseract-ocr-vie?" if detail.get("code") == "ocr_unavailable" else ""
+        raise DemoFailed(f"đọc ảnh trả {exc.status} {detail or exc.body[:200]}{hint}") from exc
+    took = time.monotonic() - started
+    if scanned.get("method") != "ocr" or scanned.get("status") != "ok":
+        raise DemoFailed(f"đọc ảnh chưa đúng: method {scanned.get('method')}, status {scanned.get('status')}")
+    right, wrong = show_fields(scanned, photo["fields"])
+    ok(f"OCR trang 1 trong {took:.1f} giây: {right}/6 ô khớp nhãn"
+       + (f" — {len(wrong)} ô high sai: {'; '.join(wrong)}" if wrong else "; chữ OCR nhầm thì độ tin cậy hạ xuống"))
+
+    say(3, "Văn thư kiểm gợi ý, sửa ô Cơ quan ban hành (medium) cho đủ tên trường, rồi lưu và vào sổ")
+    values = {k: v["value"] for k, v in first["fields"].items()}
+    data = {k: values.get(k) or letter["fields"][k] for k in ("type_code", "symbol", "issued_on", "summary")}
+    data.update(urgency=values.get("urgency", "normal"), file_ids=[file["id"]],
+                issuer_name=f"{values.get('issuer_name') or letter['fields']['issuer_name']}, Trường Đại học Mẫu")
+    before = clerk.gql(RECEIVED_BEFORE, {"s": data["symbol"], "d": data["issued_on"]})["office_documents"]
+    if before:
+        doc_id, number = before[0]["id"], before[0]["register_number"]
+        print(f"   – {data['symbol']} đã được tiếp nhận ở lần chạy trước — bỏ qua bước tiếp nhận (chặn trùng)")
+    else:
+        doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }",
+                           {"d": data})["receiveIncoming"]["document_id"]
+        number = None
+        ok(f"Cơ quan ban hành: “{values.get('issuer_name')}” → “{data['issuer_name']}”; các ô khác giữ gợi ý — "
+           "receiveIncoming kiểm lại theo schemas/van-ban-den.json như khi gõ tay")
+    if number is None:
+        number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                           {"id": doc_id})["registerIncoming"]["register_number"]
+        ok(f"{data['symbol']} vào sổ, số đến {number} — từ đây là luồng văn bản đến bình thường")
+    else:
+        ok(f"{data['symbol']} đã vào sổ ở lần chạy trước, số đến {number}")
+
+    say(4, "Lãnh đạo khoa đọc sổ kiểm toán: lần đọc do tác tử thực hiện, sổ chỉ có siêu dữ liệu")
+    rows = director.gql(READ_AUDIT, {"f": file["id"]})["core_audit_log"]
+    if len(rows) != 1:
+        raise DemoFailed(f"tệp {file['id']} có {len(rows)} dòng intake.suggested (cần đúng 1: lần bấm lại không ghi)")
+    row = rows[0]
+    overview = row["overview"] or {}
+    shown = json.dumps(overview, ensure_ascii=False)
+    leaked = [f for f in ("symbol", "issuer_name", "summary") if f in values and str(values[f]) in shown]
+    if (row["actor_id"], row["actor_kind"], row["entity"]) != ("moc-doc-reader", "agent", "core.files") or leaked:
+        raise DemoFailed(f"dòng #{row['id']} chưa đúng: {row['actor_id']}/{row['actor_kind']}, lộ {leaked}: {shown}")
+    ok(f"dòng #{row['id']} intake.suggested · {row['occurred_at'][:19].replace('T', ' ')} · người thực hiện"
+       f" moc-doc-reader ({row['actor_kind']}) · method {overview.get('method')}, tìm được {overview.get('found')},"
+       f" {overview.get('duration_ms')} ms")
+    ok("không có số ký hiệu, cơ quan, trích yếu hay chữ nào của văn bản trong sổ — chỉ biết ai nhờ đọc, đọc ra những ô nào")
+
+    say(5, "Tệp của văn bản hạn chế (mã hóa khi tải lên): tác tử không đọc")
+    sealed = clerk.upload(f"han-che-{tag}.pdf", text_pdf("CONG HOA XA HOI CHU NGHIA VIET NAM", f"So: 77/QD-MAU{tag}",
+                                                       "Danh sach nang luong truoc han nam 2026"), restricted=True)
+    try:
+        read_file(clerk, sealed["id"])
+        raise DemoFailed("tệp của văn bản hạn chế vẫn đọc được")
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        if exc.status != 409 or detail.get("code") != "restricted":
+            raise DemoFailed(f"tệp hạn chế trả {exc.status} {detail or exc.body[:200]}") from exc
+    kept = psql(f"select count(*) from office.intake_suggestions where file_id = '{sealed['id']}'")
+    if kept != "0":
+        raise DemoFailed(f"office.intake_suggestions có {kept} dòng cho tệp hạn chế")
+    ok(f"409 restricted: {detail.get('message')} — kiểm trước khi đọc byte, không tới OCR, không tới mô hình")
+    ok("office.intake_suggestions: 0 dòng cho tệp này; CSDL cũng chặn lưu gợi ý của tệp mã hóa (trigger)")
+
+    say(6, "Trích yếu bằng mô hình ngôn ngữ chạy tại chỗ (tùy chọn: profile ai, không ra Internet)")
+    if not ai_ready():
+        print("   – chưa bật mô hình — trích yếu theo quy tắc (make ai-model, xem docs)")
+    else:
+        invite = labels["06-giay-moi.pdf"]
+        drafted = read_file(clerk, upload_sample(clerk, invite["file"])["id"])
+        summary = drafted["fields"].get("summary") or {}
+        if drafted.get("summary_source") != "model" or summary.get("source") != "model":
+            raise DemoFailed(f"mô hình sẵn sàng mà trích yếu không do mô hình viết: cảnh báo {drafted.get('warnings')}")
+        ok(f"giấy mời không có dòng V/v: {drafted.get('model')} viết trích yếu “{summary['value']}” (medium — văn thư"
+           " kiểm); số, ngày, cơ quan vẫn do quy tắc")
+
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/van-ban-den/tiep-nhan — tải tệp, các ô có nhãn \"Gợi ý\"; văn bản"
+          f" vừa vào sổ: {PUBLIC_URL}/van-ban/{doc_id}; sổ kiểm toán (truongkhoa): {PUBLIC_URL}/so-kiem-toan?loai=files")
+
+
+def score_reads(results: list[tuple[str, dict[str, Any], dict[str, Any]]]) -> dict[str, Any]:
+    """Mỗi trường: đúng / sai (điền mà khác — tệ hơn bỏ trống) / trống, riêng ô high; trích yếu: có / trùng ≥ 60% từ."""
+    table = {f: {"đúng": 0, "sai": 0, "trống": 0, "high": 0, "high_sai": 0} for f in READ_FIELDS}
+    table["summary"] = {"có": 0, "khớp": 0, "high": 0, "high_sai": 0}
+    wrong: list[str] = []
+    for name, labels, fields in results:
+        for f in READ_FIELDS:
+            got, want = fields.get(f), expected(f, labels)
+            if got is None:
+                table[f]["đúng" if want is None else "trống"] += 1
+                continue
+            good = same_value(f, str(got["value"]), want)
+            table[f]["đúng" if good else "sai"] += 1
+            if got["confidence"] == "high":
+                table[f]["high"] += 1
+                if not good:
+                    table[f]["high_sai"] += 1
+                    wrong.append(f"{name}: {f} = {got['value']!r} (high), nhãn {want!r}")
+        got = fields.get("summary")
+        if got is not None:
+            good = same_value("summary", str(got["value"]), labels["summary"])
+            table["summary"]["có"] += 1
+            table["summary"]["khớp"] += good
+            if got["confidence"] == "high":
+                table["summary"]["high"] += 1
+                if not good:
+                    table["summary"]["high_sai"] += 1
+                    wrong.append(f"{name}: summary = {got['value']!r} (high), nhãn {labels['summary']!r}")
+    return {"n": len(results), "table": table, "wrong": wrong}
+
+
+def accuracy_table(title: str, measured: dict[str, Any]) -> str:
+    n, t = measured["n"], measured["table"]
+    rows = [f"### {title} — {n} tệp", "| trường | đúng | sai | trống | high (sai) |", "|---|---|---|---|---|"]
+    rows += [f"| {f} | {t[f]['đúng']}/{n} | {t[f]['sai']} | {t[f]['trống']} | {t[f]['high']} ({t[f]['high_sai']}) |"
+             for f in READ_FIELDS]
+    s = t["summary"]
+    rows.append(f"| summary | có {s['có']}/{n}, trùng ≥ 60% từ {s['khớp']}/{n} | | | {s['high']} ({s['high_sai']}) |")
+    return "\n".join(rows)
+
+
+def do_doc_van_ban() -> None:
+    print("Đo F4.1 · Tác tử đọc từng văn bản mẫu trong seed/van-ban-den qua APISIX như văn thư (force=true), so với nhãn"
+          " nhan.json")
+    clerk = Session("vanthu")
+    results: dict[str, list] = {"text": [], "scan": []}
+    took: dict[str, list[float]] = {"text": [], "scan": []}
+    server: dict[str, list[int]] = {"text": [], "scan": []}
+    models: set[str] = set()
+    print()
+    for sample in sample_labels():
+        name, kind = sample["file"], sample["kind"]
+        file = upload_sample(clerk, name)
+        started = time.monotonic()
+        try:
+            got = read_file(clerk, file["id"], force=True)
+        except HTTPError as exc:
+            detail = error_detail(exc)
+            got = {"method": "lỗi", "fields": {}, "warnings": [f"{exc.status} {detail.get('code')}"
+                                                              f" {detail.get('reason') or ''}".strip()]}
+        took[kind].append(time.monotonic() - started)
+        if isinstance(got.get("duration_ms"), int):
+            server[kind].append(got["duration_ms"])
+        if got.get("model"):
+            models.add(got["model"])
+        fields = got.get("fields") or {}
+        results[kind].append((name, sample["fields"], fields))
+        wrong = misses(fields, sample["fields"])
+        note = f" · cảnh báo {', '.join(got['warnings'])}" if got.get("warnings") else ""
+        print(f"   {name:<30} {got.get('method', '?'):<4} {took[kind][-1]:5.1f} s  {6 - len(wrong)}/6 ô khớp{note}")
+        for miss in wrong:
+            print(f"      ✗ {miss[:110]}")
+
+    for kind, title in (("text", "PDF có lớp chữ"), ("scan", "Ảnh, bản scan (OCR)")):
+        if results[kind]:
+            print("\n" + accuracy_table(title, score_reads(results[kind])))
+            inside = f" (svc-files tự đo {sum(server[kind]) / len(server[kind]):.0f} ms)" if server[kind] else ""
+            print(f"\nTrung bình {sum(took[kind]) / len(took[kind]):.1f} giây/tệp từ lúc gọi tới lúc có gợi ý{inside}")
+    print(f"Trích yếu bằng mô hình: {', '.join(sorted(models)) if models else 'không (chưa bật profile ai)'}")
+
+    measured = score_reads(results["text"])
+    t = measured["table"]
+    below = [f"{f} {t[f]['có'] if f == 'summary' else t[f]['đúng']}/{measured['n']} < {minimum}"
+             for f, minimum in TEXT_MIN.items() if (t[f]["có"] if f == "summary" else t[f]["đúng"]) < minimum]
+    if len(results["text"]) != 10:
+        below.append(f"có {len(results['text'])} PDF có lớp chữ, cần 10")
+    if below or measured["wrong"]:
+        raise DemoFailed("PDF có lớp chữ dưới ngưỡng: " + "; ".join(below + measured["wrong"]))
+    print("\n✓ PDF có lớp chữ đạt ngưỡng: số ký hiệu, ngày ban hành, loại ≥ 9/10; cơ quan ban hành, trích yếu ≥ 8/10;"
+          " không ô high nào sai")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
-         "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong}
+         "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
+         "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -23,6 +23,8 @@ Hai cách gọi:
 - **Vai trò service** (các hàm còn lại): khóa quản trị kèm thuê ước, người thực hiện, request id
   (db/README.md, mục "Dịch vụ gọi Hasura"). Chỉ dùng cho việc người dùng không được tự làm: thêm dòng
   ``core.files`` sau khi quét sạch, ghi sự kiện vào sổ kiểm toán, đọc ``object_key``.
+- **Vai trò khác đặt sẵn phiên** (``as_role``): như service nhưng chọn vai trò — tác tử đọc văn bản đến (F4.1) gọi
+  bằng vai trò ``agent``, Hasura ép danh tính, thuê ước qua preset (docread/store.py).
 """
 
 from __future__ import annotations
@@ -44,9 +46,10 @@ mutation LogEvent($o: core_audit_log_insert_input!) {
   insert_core_audit_log(objects: [$o]) { affected_rows }
 }"""
 
+# created_by: đọc văn bản đến (F4.1) chỉ nhận tệp chính văn thư vừa tải lên
 VISIBLE_FILE = """
 query VisibleFile($id: uuid!) {
-  core_files_by_pk(id: $id) { id filename mime_type size_bytes sha256 encrypted }
+  core_files_by_pk(id: $id) { id filename mime_type size_bytes sha256 encrypted created_by }
 }"""
 
 # Phòng đọc hồ sơ đã nộp lưu (F3.8): hỏi bằng token người dùng, Hasura quyết ai xem được hồ sơ nào
@@ -55,9 +58,14 @@ query VisibleCaseFile($id: uuid!) {
   office_case_files_by_pk(id: $id) { id code title year status closed_on archived_at archive_key archive_sha256 }
 }"""
 
+# Kèm: tệp có đang gắn vào văn bản hạn chế nào không. Tệp rõ của văn bản hạn chế có từ trước F3.7 (hoặc văn bản
+# được đánh dấu hạn chế sau khi gắn tệp) vẫn không mã hóa — người đọc tự động (F4.1) phải chặn theo văn bản.
 FILE_LOCATION = """
 query FileLocation($id: uuid!) {
-  core_files_by_pk(id: $id) { object_key wrapped_dek }
+  core_files_by_pk(id: $id) {
+    object_key wrapped_dek
+    restricted_links: document_files(where: {document: {restricted: {_eq: true}}}, limit: 1) { document_id }
+  }
 }"""
 
 # Đồng bộ chỉ mục tìm kiếm: đọc xuyên mọi thuê ước, lật trang theo id. Văn bản cũng được đọc lại khi
@@ -210,12 +218,14 @@ class StoredFile:
     size_bytes: int
     sha256: str  # hex — của bản rõ, cả khi tệp lưu mã hóa
     encrypted: bool = False  # tệp của văn bản hạn chế (F3.7): kho chỉ giữ bản mã
+    created_by: str | None = None  # người tải lên (sub)
 
 
 @dataclass(frozen=True)
 class Location:
     object_key: str
     wrapped_dek: str | None  # khóa dữ liệu đã bọc bởi két (F3.7); None: tệp không mã hóa
+    restricted: bool = False  # đang gắn vào văn bản hạn chế (kể cả khi tệp không mã hóa)
 
 
 def _bytea(hex_digest: str) -> str:
@@ -272,6 +282,17 @@ class HasuraClient:
             "X-Hasura-User-Id": actor_id,
             "X-Hasura-Request-Id": request_id,
         }
+
+    async def as_role(self, role: str, tenant_id: uuid.UUID, user_id: str, request_id: str, query: str,
+                      variables: dict[str, Any]) -> dict[str, Any]:
+        """Khóa quản trị kèm vai trò và phiên đặt sẵn: Hasura áp quyền, preset của vai trò như với người dùng."""
+        return await self._call(query, variables, {
+            "X-Hasura-Admin-Secret": self._secret,
+            "X-Hasura-Role": role,
+            "X-Hasura-Tenant-Id": str(tenant_id),
+            "X-Hasura-User-Id": user_id,
+            "X-Hasura-Request-Id": request_id,
+        })
 
     async def insert_file(
         self,
@@ -351,6 +372,7 @@ class HasuraClient:
             size_bytes=int(row["size_bytes"]),
             sha256=_hex(row["sha256"]),
             encrypted=bool(row.get("encrypted")),
+            created_by=row.get("created_by"),
         )
 
     async def visible_documents(self, token: str, ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -415,7 +437,9 @@ class HasuraClient:
     ) -> Location | None:
         data = await self._call(FILE_LOCATION, {"id": str(file_id)}, self._as_service(tenant_id, actor_id, request_id))
         row = data.get("core_files_by_pk")
-        return Location(row["object_key"], row.get("wrapped_dek")) if row else None
+        if not row:
+            return None
+        return Location(row["object_key"], row.get("wrapped_dek"), bool(row.get("restricted_links")))
 
     async def letter(self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str,
                      document_id: uuid.UUID) -> dict[str, Any] | None:

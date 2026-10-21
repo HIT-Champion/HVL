@@ -18,9 +18,10 @@
 // svc-files cho tệp và tìm kiếm. Mọi yêu cầu mang access token của người dùng.
 
 export class ApiError extends Error {
-  // fields: trường sai → mã lỗi do svc-workflow trả (cùng mã với app/utils/forms.ts)
+  // fields: trường sai → mã lỗi do svc-workflow trả (cùng mã với app/utils/forms.ts); reason: lý do chi tiết của
+  // một số mã (vd đọc văn bản unreadable → password, corrupt, timeout…)
   constructor(message: string, public code: string | null = null, public status = 0,
-              public fields: Record<string, string> | null = null) {
+              public fields: Record<string, string> | null = null, public reason: string | null = null) {
     super(message)
   }
 }
@@ -69,6 +70,38 @@ export interface RegisterBook {
   last_number: number
   missing: number[]
 }
+
+// Đọc văn bản đến (F4.1): tác tử moc-doc-reader trong svc-files đọc tệp vừa tải lên (lớp chữ PDF, không có thì
+// nhận dạng chữ) và gợi ý thông tin tiếp nhận. Chỉ là gợi ý: văn thư đối chiếu, sửa, rồi mới lưu (app/utils/suggest.ts).
+export type ReadFieldKey = 'type_code' | 'symbol' | 'issued_on' | 'issuer_name' | 'summary' | 'urgency'
+
+export interface ReadField {
+  value: string
+  confidence: 'high' | 'medium' | 'low'
+  source: 'rule' | 'model'   // model: mô hình ngôn ngữ viết (chỉ trích yếu)
+}
+
+export interface ReadResult {
+  file_id: string
+  status: 'ok' | 'empty'     // empty: đọc được mà không ra trường nào
+  method: 'text' | 'ocr'
+  pages: number
+  fields: Partial<Record<ReadFieldKey, ReadField>>   // chỉ trường tìm thấy; issued_on dạng YYYY-MM-DD
+  // future_date, invalid_date, symbol_no_number, type_conflict, low_text, truncated, model_unavailable,
+  // model_timeout, model_rejected, model_skipped
+  warnings: string[]
+  summary_source: 'rule' | 'model' | 'none'
+  model: string | null
+  duration_ms: number
+  cached: boolean            // gợi ý đã lưu từ lần đọc trước, không đọc lại
+  read_at: string
+}
+
+// Hạn chờ một lần đọc: svc-files tự dừng ở 50 s, APISIX ở 60 s
+const READ_TIMEOUT_MS = 60_000
+// Mã lỗi khi máy chủ không trả thân lỗi chuẩn (vd route chưa có, cổng trả lỗi)
+const READ_STATUS_CODES: Record<number, string> = { 403: 'forbidden', 404: 'not_found', 409: 'restricted',
+  413: 'too_large', 415: 'unsupported', 422: 'unreadable' }
 
 export function useApi() {
   const auth = useAuth()
@@ -184,5 +217,28 @@ export function useApi() {
     return body
   }
 
-  return { gql, upload, download, preview, register, printRegister, search }
+  /** Tác tử đọc tệp đã quét sạch (chỉ văn thư, chỉ tệp mình tải lên, không đọc tệp của văn bản hạn chế) và trả gợi ý
+   *  thông tin tiếp nhận. force: đọc lại dù đã có gợi ý lưu từ lần trước. Mỗi lần đọc thật được ghi vào sổ kiểm toán
+   *  (sự kiện intake.suggested, chỉ siêu dữ liệu). Lỗi: ApiError với mã của svc-files (restricted, unreadable +
+   *  reason, busy…), hoặc client_timeout khi quá 60 giây. */
+  async function readFile(fileId: string, force = false): Promise<ReadResult> {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), READ_TIMEOUT_MS)
+    try {
+      const res = await authFetch(`/api/files/${encodeURIComponent(fileId)}/read${force ? '?force=true' : ''}`,
+        { method: 'POST', signal: ctrl.signal })
+      if (res.ok) return await res.json() as ReadResult
+      const body = await res.json().catch(() => ({}))
+      const detail = typeof body.detail === 'object' && body.detail !== null ? body.detail : {}
+      throw new ApiError(detail.message ?? `HTTP ${res.status}`,
+        detail.code ?? READ_STATUS_CODES[res.status] ?? null, res.status, null, detail.reason ?? null)
+    } catch (e) {
+      if (ctrl.signal.aborted) throw new ApiError('client_timeout', 'client_timeout')
+      throw e
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  return { gql, upload, download, preview, register, printRegister, search, readFile }
 }

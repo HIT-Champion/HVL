@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "note": "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật.",
+  "samples": [
+    {
+      "file": "01-cong-van.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "CV",
+        "symbol": "131/ĐT-ĐHM",
+        "issued_on": "2026-10-15",
+        "issuer_name": "Phòng Đào tạo",
+        "urgency": "normal",
+        "summary": "Về việc rà soát danh sách sinh viên đủ điều kiện xét tốt nghiệp đợt tháng 12 năm 2026"
+      }
+    },
+    {
+      "file": "02-quyet-dinh.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "QĐ",
+        "symbol": "123/QĐ-UBND",
+        "issued_on": "2026-10-05",
+        "issuer_name": "Ủy ban nhân dân tỉnh Mẫu",
+        "urgency": "normal",
+        "summary": "Quyết định về việc ban hành Quy chế quản lý, sử dụng hệ thống văn phòng điện tử tỉnh Mẫu"
+      }
+    },
+    {
+      "file": "03-thong-bao.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "TB",
+        "symbol": "128/TB-ĐHM",
+        "issued_on": "2026-10-12",
+        "issuer_name": "Trường Đại học Mẫu",
+        "urgency": "normal",
+        "summary": "Thông báo lịch đăng ký học phần học kỳ II năm học 2026–2027"
+      }
+    },
+    {
+      "file": "04-ke-hoach.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "KH",
+        "symbol": "57/KH-SKHCN",
+        "issued_on": "2026-09-30",
+        "issuer_name": "Sở Khoa học và Công nghệ tỉnh Mẫu",
+        "urgency": "normal",
+        "summary": "Kế hoạch tổ chức Ngày hội khởi nghiệp đổi mới sáng tạo tỉnh Mẫu năm 2026"
+      }
+    },
+    {
+      "file": "05-thong-tu.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": null,
+        "symbol": "45/2026/TT-BTN",
+        "issued_on": "2026-09-25",
+        "issuer_name": "Bộ Tài nguyên Mẫu",
+        "urgency": "normal",
+        "summary": "Thông tư quy định kỹ thuật về số hóa tài liệu lưu trữ"
+      }
+    },
+    {
+      "file": "06-giay-moi.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "GM",
+        "symbol": "209/GM-CNM",
+        "issued_on": "2026-10-14",
+        "issuer_name": "Công ty Cổ phần Công nghệ Mẫu",
+        "urgency": "normal",
+        "summary": "Giấy mời dự Hội thảo ứng dụng phần mềm nguồn mở trong chuyển đổi số"
+      }
+    },
+    {
+      "file": "07-cong-van-khan.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "CV",
+        "symbol": "1205/SGDĐT-VP",
+        "issued_on": "2026-10-16",
+        "issuer_name": "Sở Giáo dục và Đào tạo tỉnh Mẫu",
+        "urgency": "khan",
+        "summary": "Về việc triển khai hệ thống quản lý văn bản điện tử trong các cơ sở giáo dục năm học 2026–2027"
+      }
+    },
+    {
+      "file": "08-to-trinh.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "TTr",
+        "symbol": "08/TTr-KCNTT",
+        "issued_on": "2026-10-08",
+        "issuer_name": "Khoa Công nghệ thông tin",
+        "urgency": "normal",
+        "summary": "Tờ trình về việc đề nghị phê duyệt danh mục học phần tự chọn năm học 2026–2027"
+      }
+    },
+    {
+      "file": "09-bao-cao.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "BC",
+        "symbol": "15/BC-VNC",
+        "issued_on": "2026-10-19",
+        "issuer_name": "Viện Nghiên cứu Mẫu",
+        "urgency": "normal",
+        "summary": "Báo cáo kết quả khảo sát nhu cầu đào tạo nguồn nhân lực công nghệ thông tin năm 2026"
+      }
+    },
+    {
+      "file": "10-cong-van-tphcm.pdf",
+      "kind": "text",
+      "fields": {
+        "type_code": "CV",
+        "symbol": "12/CV-PMM",
+        "issued_on": "2026-02-01",
+        "issuer_name": "Công ty TNHH Phần mềm Mẫu",
+        "urgency": "normal",
+        "summary": "Về việc đề nghị tiếp nhận sinh viên thực tập tốt nghiệp"
+      }
+    },
+    {
+      "file": "11-cong-van-anh-300dpi.jpg",
+      "kind": "scan",
+      "source": "01-cong-van.pdf",
+      "fields": {
+        "type_code": "CV",
+        "symbol": "131/ĐT-ĐHM",
+        "issued_on": "2026-10-15",
+        "issuer_name": "Phòng Đào tạo",
+        "urgency": "normal",
+        "summary": "Về việc rà soát danh sách sinh viên đủ điều kiện xét tốt nghiệp đợt tháng 12 năm 2026"
+      }
+    },
+    {
+      "file": "12-quyet-dinh-anh-mo.jpg",
+      "kind": "scan",
+      "source": "02-quyet-dinh.pdf",
+      "fields": {
+        "type_code": "QĐ",
+        "symbol": "123/QĐ-UBND",
+        "issued_on": "2026-10-05",
+        "issuer_name": "Ủy ban nhân dân tỉnh Mẫu",
+        "urgency": "normal",
+        "summary": "Quyết định về việc ban hành Quy chế quản lý, sử dụng hệ thống văn phòng điện tử tỉnh Mẫu"
+      }
+    },
+    {
+      "file": "13-thong-bao-ban-scan.pdf",
+      "kind": "scan",
+      "source": "03-thong-bao.pdf",
+      "fields": {
+        "type_code": "TB",
+        "symbol": "128/TB-ĐHM",
+        "issued_on": "2026-10-12",
+        "issuer_name": "Trường Đại học Mẫu",
+        "urgency": "normal",
+        "summary": "Thông báo lịch đăng ký học phần học kỳ II năm học 2026–2027"
+      }
+    },
+    {
+      "file": "14-giay-moi-xam.png",
+      "kind": "scan",
+      "source": "06-giay-moi.pdf",
+      "fields": {
+        "type_code": "GM",
+        "symbol": "209/GM-CNM",
+        "issued_on": "2026-10-14",
+        "issuer_name": "Công ty Cổ phần Công nghệ Mẫu",
+        "urgency": "normal",
+        "summary": "Giấy mời dự Hội thảo ứng dụng phần mềm nguồn mở trong chuyển đổi số"
+      }
+    }
+  ]
+}

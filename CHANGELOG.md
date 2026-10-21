@@ -253,6 +253,37 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   ghi của bucket lạnh đặt sai là vĩnh viễn; cách ly đã có ở CSDL, tiền tố tệp, quyền đọc) — lý do trong
   `docs/mo-hinh-du-lieu.md` §1. Bước CI thêm đơn vị thứ ba, chạy lại, đối chiếu; `make smoke` +1 (tổng 60); test
   đơn vị `scripts/tests/` chạy trong `make test`.
+- Đọc văn bản đến (F4.1): văn thư kéo thả công văn PDF hoặc ảnh chụp vào "Tiếp nhận văn bản", tệp quét sạch thì tác tử
+  `moc-doc-reader` tự đọc một lần và điền sẵn số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu —
+  mỗi ô có nhãn "Gợi ý" / "Gợi ý (chưa chắc)" / "Gợi ý của mô hình", sửa thì thành "Đã sửa"; **tác tử không tạo văn
+  bản**, văn thư đối chiếu bản gốc rồi lưu như cũ. `POST /api/files/{id}/read` (svc-files, module `docread`): chỉ văn
+  thư, chỉ tệp chính mình tải lên; PDF có lớp chữ đọc theo bố cục (pypdf `layout`), ảnh và bản scan nhận dạng chữ bằng
+  Tesseract (`tesseract-ocr` + `tesseract-ocr-vie` trong image); **quy tắc quyết mọi trường** (`rules.py`, thuần Python,
+  bố cục NĐ 30), chữ từ OCR không trường nào được mức "chắc chắn". Đọc trong tiến trình con có giới hạn bộ nhớ / CPU /
+  thời gian (quá giờ giết cả nhóm tiến trình), Pillow có trần điểm ảnh, một lượt đọc một lúc (`503 busy`), hạn tổng 50
+  giây. Không bao giờ ghi đè chữ văn thư đã gõ: chỉ điền ô trống, ô còn mặc định chưa chạm, ô tác tử điền mà chưa sửa;
+  độ tin cậy thấp chỉ hiện "Gợi ý: … [Dùng]". Số đo trên 14 văn bản mẫu (mức trần — mẫu sạch hơn công văn thật): PDF có
+  chữ 10/10 mọi trường, 0,6 giây; bản scan 3–4/4 từng trường, 1,2 giây (bảng ở README svc-files).
+- Tác tử có danh tính và có sổ: vai trò Hasura mới `agent` (svc-files gọi bằng khóa quản trị + `X-Hasura-Role: agent`,
+  preset ép danh tính `moc-doc-reader`, `actor_kind = agent`, thuê ước) chỉ thêm / sửa gợi ý và thêm dòng sổ
+  `intake.suggested` về tệp của đơn vị trong phiên, không có quyền nào trên văn bản. Migration
+  `1792281601900_intake_suggestions`: bảng `office.intake_suggestions` (gợi ý theo tệp, đọc lại thì ghi đè) và view
+  `office.v_intake_accuracy` (lãnh đạo, quản trị đơn vị: bao nhiêu gợi ý văn thư giữ nguyên khi lưu). Gợi ý và dòng sổ
+  đi trong một giao dịch — không ghi được sổ thì không trả gợi ý; dòng sổ chỉ có siêu dữ liệu (cách đọc, số trang, tên
+  các trường tìm thấy, thời gian), không số ký hiệu, trích yếu hay chữ nào của văn bản. Sổ kiểm toán hiện "Trợ lý đọc
+  văn bản (tác tử)".
+- Mô hình ngôn ngữ cục bộ, tùy chọn: profile Compose `ai` (Ollama 0.35.1 ghim digest, mạng nội bộ riêng chỉ svc-files
+  nối được, không mở cổng, tắt tính năng đám mây, giới hạn bộ nhớ / lõi `MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`) và `ai-pull`
+  (tải Qwen3-1.7B, Apache-2.0, vào volume `ollama_models`); `make ai-model`, `make up-ai`. Mô hình **chỉ viết trích
+  yếu**, chỉ khi quy tắc chưa ra trích yếu chắc chắn: thân văn bản trong thẻ riêng, ép JSON Schema, đầu ra kiểm chặt
+  (độ dài, một dòng, không liên kết, địa chỉ thư, dãy số dài) — sai thì giữ trích yếu theo quy tắc. Không bật `ai`
+  (mặc định, CI) thì mọi thứ vẫn chạy, trích yếu theo quy tắc. `/readyz` của svc-files báo thêm `ai`.
+- Văn bản đến mẫu hư cấu `seed/van-ban-den/` (10 PDF có lớp chữ, 4 ảnh / bản scan, nhãn đúng trong `nhan.json`, ~1 MB)
+  và `scripts/van_ban_mau.py` sinh lại (`make van-ban-mau`); TSV Tesseract của 4 bản scan cho test. `make
+  demo-doc-van-ban` (6 bước, cũng là bước CI) và `make do-doc-van-ban` (đo trên 14 mẫu qua APISIX, bảng đúng / sai /
+  trống từng trường, thoát 1 khi PDF có chữ dưới ngưỡng — bước CI); `make smoke` +3 (tổng 63); e2e `doc-van-ban.spec.ts`
+  (`make e2e` gắn văn bản mẫu vào container Playwright); CI kiểm cấu hình profile `ai`, `ai-pull`. Test: CSDL +35,
+  svc-files +243, giao diện +13.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -285,6 +316,8 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - `make seed` tạo Organization cho hai đơn vị mẫu (`cntt`, `kt`) và đưa tài khoản mẫu vào (cùng hàm với
   `moc tenant create`, chạy lại thì giữ nguyên); realm bật `organizationsEnabled` — bản đã dựng thì `make seed` tự bật,
   không cần `make reset`.
+- Tiếp nhận văn bản đến (F4.1): giao diện gọi tác tử đọc khi tệp quét sạch; `make down`, `make reset` dừng cả profile
+  `ai`, `ai-pull`; `.gitignore` theo dõi `seed/van-ban-den/*.pdf`; `scripts/license-header.sh` coi `*.tsv` là dữ liệu.
 
 ### Đã sửa lỗi
 - Bấm lại khi hoàn thành việc lâu (phát hành) hay hai lần gọi chen nhau không còn ghi hai lần (hai phân công, hai lần
@@ -320,6 +353,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   chưa hỗ trợ được in ra dưới dạng cảnh báo.
 
 ### Bảo mật
+- Văn bản hạn chế (F3.7) không bao giờ có gợi ý đọc tự động (F4.1): svc-files trả `409` trước khi đọc byte nào —
+  tệp mã hóa, hay tệp rõ còn gắn vào văn bản hạn chế (dữ liệu có từ trước F3.7) — nên không tới OCR, không tới mô
+  hình; trigger `intake_suggestions_guard` chặn thêm ở CSDL việc lưu gợi ý của các tệp đó, xóa gợi ý khi văn bản bật
+  hạn chế. Vai trò `agent` không đọc, ghi văn bản; dòng sổ và nhật ký của tác tử không mang nội dung văn bản.
 - Action GitHub trong CI và quy trình phát hành ghim theo SHA commit, image công cụ CI ghim theo digest;
   workflow CI chỉ có quyền đọc kho.
 - Xác thực hai bước TOTP (F1.1): đăng nhập trình duyệt bắt buộc mã với văn thư, lãnh đạo phòng, lãnh đạo đơn

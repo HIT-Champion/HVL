@@ -109,10 +109,10 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | PyJWT (+ cryptography) | 2.15 · 50.0 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files`; mã hóa con trỏ trang tìm kiếm | pip | 1 |
 | WeasyPrint (+ pydyf, tinycss2, cssselect2, tinyhtml5, webencodings) | 70.0 | BSD-3-Clause (tinyhtml5: MIT) | Dựng PDF văn bản đi đúng thể thức NĐ 30 từ khuôn HTML (`svc-files`) | pip | 2 |
 | fontTools (+ Brotli, zopfli) | 4.66 | MIT (zopfli: Apache-2.0) | Nhúng và nén phông vào PDF (WeasyPrint kéo theo) | pip | 2 |
-| Pillow | 12.3 | MIT-CMU | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo) | pip | 2 |
+| Pillow | 12.3 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
 | Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Mộc dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
-| pypdf | 6.19 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); thuần Python, không kéo thêm gói | pip | 2 |
+| pypdf | 6.19 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
@@ -122,7 +122,8 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
 chạy, không sửa), HarfBuzz (MIT) và phông Liberation 2.1 (SIL OFL 1.1) — cùng số đo với Times New Roman mà
-NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
+NĐ 30/2020 quy định, có đủ dấu tiếng Việt; từ F4.1 thêm Tesseract cùng dữ liệu tiếng Việt (mục Trí tuệ nhân tạo),
+gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 
 ## Vận hành và bốn nguyên lý thiết kế
 
@@ -151,19 +152,21 @@ NĐ 30/2020 quy định, có đủ dấu tiếng Việt.
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| Ollama | 0.40.2 | MIT | Chạy mô hình ngôn ngữ cục bộ | `ollama/ollama:0.40.2` | 4 |
-| Qwen3 (4B hoặc 8B, chốt sau spike) | — | Apache-2.0 | Trọng số mô hình ngôn ngữ | Tải qua Ollama | 4 |
+| Ollama | 0.35.1 | MIT | Chạy mô hình ngôn ngữ cục bộ (F4.1, profile `ai`, tùy chọn): chỉ viết trích yếu khi quy tắc không ra trích yếu tin cậy; mạng nội bộ riêng, không mở cổng, tắt tính năng đám mây (`OLLAMA_NO_CLOUD`). Bản ổn định mới nhất trước 06/10/2026, có `think` và `format` theo JSON Schema | `ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c` (image 02/10/2026) | 4 |
+| Qwen3-1.7B | `qwen3:1.7b` (Q4_K_M, khoảng 1,36 GB) | Apache-2.0 (đã kiểm model card và tệp LICENSE trên Hugging Face của đúng cỡ 1.7B; cỡ 4B cũng Apache-2.0) | Trọng số mô hình viết trích yếu (F4.1). Phát hành 04/2025. Máy đủ nhanh thì đổi `MOC_AI_MODEL=qwen3:4b` | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7` — so với `ollama list` | 4 |
 | bge-m3 | — | MIT | Mô hình nhúng văn bản cho tìm kiếm ngữ nghĩa | Tải qua Ollama | 4 |
 | Qdrant | v1.19.2 | Apache-2.0 | Cơ sở dữ liệu véc-tơ | `qdrant/qdrant:v1.19.2` | 4 |
 | LlamaIndex | 0.14 | MIT | Khung RAG và tác tử (khung AI duy nhất) | pip | 4 |
-| Tesseract **hoặc** PaddleOCR (chốt sau spike) | 5.5.3 / 3.7 | Apache-2.0 | Nhận dạng chữ trên chứng từ | Gói hệ thống / pip | 4 |
+| Tesseract OCR (+ dữ liệu `vie`) | 5.5.0 (gói Debian trixie `tesseract-ocr` 5.5.0-1+b1, `tesseract-ocr-vie` 1:4.1.0-2) | Apache-2.0 | Nhận dạng chữ trên công văn scan, ảnh chụp khi tiếp nhận (F4.1, `svc-files`). Dữ liệu `vie` là bản tessdata_fast 4.1.0 (mô hình LSTM nhanh). Phiên bản gói lấy từ kho Debian theo image gốc — kiểm lại bằng `dpkg-query -W 'tesseract-ocr*'` trong image `svc-files` sau khi dựng | Gói hệ thống (apt) | 4 |
 | Presidio | 2.2 | MIT | Che thông tin cá nhân *(Could)* | pip | 4 |
 | Gotenberg | 8.37.0 | MIT | Sinh PDF *(Could)* | `gotenberg/gotenberg:8.37.0` | 4 |
 | pyHanko | 0.37 | MIT | Ký số PDF *(Could)* | pip | 4 |
 
 **Ghi chú:** trọng số mô hình có giấy phép riêng, tách khỏi giấy phép của Ollama. Trước khi dùng phải
 đọc giấy phép trên model card **của đúng kích cỡ đã chọn**. Không dùng Llama hoặc Gemma vì giấy phép
-trọng số không được OSI phê duyệt.
+trọng số không được OSI phê duyệt. F4.1 đã kiểm Qwen3-1.7B và Qwen3-4B (Apache-2.0); lớp giấy phép trong bản
+kê `qwen3:1.7b` của thư viện Ollama cũng là văn bản Apache-2.0. Ollama ghim theo ngày image lên Docker Hub
+(02/10/2026): trang GitHub ghi ngày bản thử nghiệm đầu tiên nên sớm hơn ngày phát hành thật.
 
 ## Thành phần đã cân nhắc nhưng không dùng
 
@@ -179,6 +182,7 @@ trọng số không được OSI phê duyệt.
 | Directus | BSL-1.1 / MSCL — không phải OSI | Hasura + PostgreSQL |
 | Metabase | Bản mã nguồn mở không hỗ trợ đăng nhập OIDC (Keycloak); đọc thẳng CSDL, bỏ qua phân quyền thuê ước | Dashboard trong ứng dụng (ECharts) |
 | bpmn-js | MIT kèm điều khoản bắt buộc giữ watermark — không thuộc danh sách OSI | Hiển thị tiến trình do đội tự vẽ |
+| PaddleOCR, VietOCR | Kéo theo PaddlePaddle hoặc PyTorch (hàng trăm MB), image và CI chậm hẳn; Tesseract đủ cho công văn in | Tesseract + quy tắc bố cục NĐ 30 (F4.1) |
 
 ## Kiểm tra tương thích giấy phép
 

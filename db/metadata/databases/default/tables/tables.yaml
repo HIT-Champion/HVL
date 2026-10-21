@@ -41,3 +41,5 @@
 - "!include office_document_history.yaml"
 - "!include office_dispatch_units.yaml"
 - "!include office_dispatches.yaml"
+- "!include office_intake_suggestions.yaml"
+- "!include office_v_intake_accuracy.yaml"

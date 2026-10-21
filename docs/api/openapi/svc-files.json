@@ -6,6 +6,78 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/files/{file_id}/read": {
+      "post": {
+        "summary": "Đọc văn bản đến vừa tải lên (lớp chữ PDF hoặc OCR), gợi ý thông tin tiếp nhận",
+        "description": "Chỉ văn thư, chỉ tệp chính mình tải lên. Tác tử `moc-doc-reader` đọc tệp, quy tắc tìm số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu; có mô hình ngôn ngữ thì mô hình chỉ viết trích yếu. Mỗi lần đọc thật ghi một dòng `intake.suggested` vào sổ kiểm toán (chỉ siêu dữ liệu, không có nội dung văn bản) cùng giao dịch lưu gợi ý. Đã có gợi ý thì trả luôn (`cached`), trừ khi `force=true`. Không tạo văn bản: văn thư đối chiếu, sửa rồi mới lưu.",
+        "operationId": "read_file_api_files__file_id__read_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: đọc lại dù đã có gợi ý lưu (nút Đọc lại)",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "true: đọc lại dù đã có gợi ý lưu (nút Đọc lại)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token (`missing_token`, `invalid_token`)"
+          },
+          "403": {
+            "description": "`forbidden` — không phải văn thư"
+          },
+          "404": {
+            "description": "`not_found` — không có tệp, không xem được, không do người gọi tải lên, hoặc không còn trong kho"
+          },
+          "409": {
+            "description": "`restricted` — tệp của văn bản hạn chế: không đọc (kiểm trước khi đọc byte)"
+          },
+          "413": {
+            "description": "`too_large` — tệp lớn hơn `MOC_READ_MAX_MB`"
+          },
+          "415": {
+            "description": "`unsupported` — byte đầu không phải PDF, JPEG, PNG, TIFF (không tin mime khai)"
+          },
+          "422": {
+            "description": "`unreadable` kèm `reason`: password, corrupt, no_text, timeout, memory, too_many_pixels — đã ghi `intake.suggested` (status unreadable) vào sổ kiểm toán"
+          },
+          "503": {
+            "description": "`busy` (kèm `Retry-After: 10`) chờ lượt quá `MOC_READ_QUEUE_S` · `reader_disabled` · `ocr_unavailable` · `storage_unavailable` · `database_unavailable` — gồm cả khi chưa ghi được sổ kiểm toán: không ghi được sổ thì không trả gợi ý"
+          }
+        }
+      }
+    },
     "/api/files": {
       "post": {
         "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
@@ -945,6 +1017,149 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ReadField": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "issued_on: ngày ISO; urgency: normal | khan | thuong_khan | hoa_toc; type_code: mã trong danh mục loại văn bản"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "description": "high, medium: giao diện điền sẵn; low: chỉ hiện gợi ý, văn thư bấm Dùng"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "model"
+            ],
+            "title": "Source",
+            "description": "rule: quy tắc; model: mô hình ngôn ngữ (chỉ trích yếu)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "confidence",
+          "source"
+        ],
+        "title": "ReadField"
+      },
+      "ReadOut": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "description": "ok: tìm được ít nhất một trường; empty: đọc được mà không ra trường nào"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "text",
+              "ocr"
+            ],
+            "title": "Method",
+            "description": "text: lớp chữ của PDF; ocr: nhận dạng chữ bản scan, ảnh"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages",
+            "description": "Số trang của tệp"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReadField"
+            },
+            "propertyNames": {
+              "enum": [
+                "type_code",
+                "symbol",
+                "issued_on",
+                "issuer_name",
+                "summary",
+                "urgency"
+              ]
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "Chỉ có khóa đã tìm thấy"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Mã cố định: future_date, invalid_date, symbol_no_number, type_conflict, low_text, truncated, model_unavailable, model_timeout, model_rejected, model_skipped"
+          },
+          "summary_source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "model",
+              "none"
+            ],
+            "title": "Summary Source"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Mô hình ngôn ngữ đã gọi; null nếu không gọi"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached",
+            "description": "true: gợi ý đã lưu từ lần đọc trước (không đọc lại, không ghi sổ)"
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "status",
+          "method",
+          "pages",
+          "fields",
+          "warnings",
+          "summary_source",
+          "model",
+          "duration_ms",
+          "cached",
+          "read_at"
+        ],
+        "title": "ReadOut"
       },
       "RegisterEntryOut": {
         "properties": {

@@ -159,7 +159,93 @@
     "dropRestricted": "Drop PDF files here, or click to choose — files are encrypted before they are stored",
     "cleanSealed": "Scanned — clean, encrypted",
     "pdfOnly": "Restricted documents accept PDF files only",
-    "restrictedLocked": "Remove the uploaded files to change the restricted setting"
+    "restrictedLocked": "Remove the uploaded files to change the restricted setting",
+    "read": {
+      "button": "Read document",
+      "reread": "Read again",
+      "forFile": "{action}: {name}",
+      "reading": "Reading the document… {s} s",
+      "readingHint": "A scanned copy can take up to 30 seconds.",
+      "started": "Reading {name}.",
+      "done": "Read via {method} — {n} field prefilled. | Read via {method} — {n} fields prefilled.",
+      "doneNone": "Read via {method} — no more fields to prefill.",
+      "doneOther": "Read via {method} — the form follows {name}, so nothing was filled in; {n} different suggestion is shown under the fields. | Read via {method} — the form follows {name}, so nothing was filled in; {n} different suggestions are shown under the fields.",
+      "doneOtherNone": "Read via {method} — nothing differs from the fields already filled in (the form follows {name}).",
+      "cached": "result of an earlier read",
+      "empty": "No details found — please enter them manually.",
+      "restricted": "Restricted documents are not read automatically.",
+      "confirmNote": "Fields tagged Suggested were prefilled by the document reader agent. Check them against the original before saving — saving means the clerk confirms them.",
+      "offer": "Suggestion: {value}",
+      "use": "Use",
+      "useFor": "Use suggestion: {value}",
+      "method": {
+        "text": "the PDF text layer",
+        "ocr": "text recognition (OCR)"
+      },
+      "field": {
+        "type_code": "document type",
+        "symbol": "reference number",
+        "issued_on": "issue date",
+        "issuer_name": "issuing body",
+        "summary": "summary",
+        "urgency": "urgency"
+      },
+      "warning": {
+        "future_date": "The date read is later than today — check it against the original.",
+        "invalid_date": "The date on the document does not exist — please enter it manually.",
+        "symbol_no_number": "The document has a symbol but no number — check the original.",
+        "type_conflict": "The title and the reference number point to different document types — the title was used, please check.",
+        "low_text": "Very little text was found — the scan may be blurred or skewed.",
+        "truncated": "Long document: only the beginning was read.",
+        "model_unavailable": "No language model is enabled — summary taken by rules.",
+        "model_timeout": "The language model took too long — summary taken by rules.",
+        "model_rejected": "The model’s summary failed the checks and was discarded — summary taken by rules.",
+        "model_skipped": "The language model was not asked this time — summary taken by rules."
+      },
+      "error": {
+        "missing_token": "Your session has expired — sign in again, then click Read document.",
+        "invalid_token": "Your session has expired — sign in again, then click Read document.",
+        "forbidden": "Only clerks can use document reading.",
+        "not_found": "File not found for reading (removed, or not uploaded by you) — upload it again.",
+        "restricted": "Restricted documents are not read automatically — please enter the details manually.",
+        "too_large": "The file is too large to read automatically — please enter the details manually.",
+        "unsupported": "Only PDF, JPEG, PNG and TIFF files can be read — please enter the details manually.",
+        "unreadable": "The file could not be read ({reason}) — please enter the details manually.",
+        "busy": "Another document is being read — wait a moment, then click Read document.",
+        "reader_disabled": "Document reading is not enabled — please enter the details manually.",
+        "ocr_unavailable": "The server has no text recognition (OCR), so scans cannot be read — please enter the details manually.",
+        "storage_unavailable": "File storage is temporarily unavailable — try again in a few minutes.",
+        "database_unavailable": "The audit log could not be written, so no suggestions were returned — try again in a few minutes.",
+        "client_timeout": "Reading took more than 60 seconds — click Read document to try again, or enter the details manually.",
+        "generic": "The document could not be read: {msg}"
+      },
+      "reason": {
+        "password": "password-protected PDF",
+        "corrupt": "damaged file",
+        "no_text": "no text or image to read",
+        "timeout": "took too long",
+        "memory": "out of memory",
+        "too_many_pixels": "image too large",
+        "unknown": "unknown error"
+      }
+    },
+    "suggest": {
+      "high": "Suggested",
+      "medium": "Suggested (unsure)",
+      "model": "Suggested by model",
+      "edited": "Edited",
+      "hint": "Prefilled by the document reader agent ({source}, {confidence}). Check it against the original before saving.",
+      "editedHint": "Edited by the clerk. The agent read: {value}",
+      "source": {
+        "rule": "read by rules",
+        "model": "written by a language model"
+      },
+      "confidence": {
+        "high": "high confidence",
+        "medium": "medium confidence",
+        "low": "low confidence"
+      }
+    }
   },
   "doc": {
     "info": "Document details",
@@ -476,6 +562,9 @@
       "case_file": {
         "archived": "Case file archived",
         "read": "Archived case file read"
+      },
+      "intake": {
+        "suggested": "Read document, suggested intake details"
       }
     },
     "entity": {
@@ -570,7 +659,14 @@
       "last_error": "last error",
       "delivered_at": "Delivered at",
       "next_attempt_at": "next attempt at",
-      "notified_at": "notified at"
+      "notified_at": "notified at",
+      "method": "Read via",
+      "pages": "Pages",
+      "found": "Fields found",
+      "summary_source": "Summary source",
+      "model": "Model",
+      "duration_ms": "Reading time",
+      "reason": "Reason"
     },
     "direction": {
       "in": "Incoming",
@@ -589,6 +685,21 @@
       "manager": "Department head",
       "director": "Director",
       "tenant_admin": "Administrator"
+    },
+    "agent": "{name} (agent)",
+    "agents": {
+      "moc-doc-reader": "Document reader"
+    },
+    "seconds": "{n} s",
+    "readStatus": {
+      "ok": "Suggestions found",
+      "empty": "No details found",
+      "unreadable": "Unreadable"
+    },
+    "summarySource": {
+      "rule": "Rules",
+      "model": "Language model",
+      "none": "None"
     }
   },
   "register": {

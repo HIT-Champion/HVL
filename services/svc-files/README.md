@@ -7,9 +7,11 @@ quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. 
 Hasura quyết ai được đọc văn bản nào; tìm được cả theo chữ trong tệp PDF đính kèm. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
 trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
 Văn bản đi gửi đơn vị khác trong hệ thống thì bản phát hành được chép sang kho của đơn vị nhận ở đây (liên thông).
+Văn thư tải văn bản đến lên thì tác tử `moc-doc-reader` đọc tệp (lớp chữ PDF hoặc OCR) và gợi ý thông tin tiếp nhận.
 
 Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
-F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực) và F3.12 (liên thông) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực), F3.12 (liên thông) và F4.1 (đọc văn
+bản đến) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
 issue #19, #20.
 
 ## Trạng thái
@@ -21,7 +23,7 @@ issue #19, #20.
 | `GET /api/files/{id}`: kiểm quyền qua Hasura → đọc SeaweedFS | **Xong** |
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
 | Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
-| Đọc chữ bản scan, ảnh chụp (OCR) | Phase 4 (F4.1) |
+| `POST /api/files/{id}/read`: đọc văn bản đến (lớp chữ PDF hoặc OCR Tesseract), quy tắc gợi ý 6 trường, mô hình tùy chọn viết trích yếu, ghi sổ của tác tử | **Xong** (F4.1) |
 | Văn bản hạn chế: lưu mã hóa (khóa riêng từng tệp từ két), tải về giải mã trong bộ nhớ, đóng dấu người xem, ghi sổ | **Xong** (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
@@ -48,6 +50,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `422` `{code: "infected", signature}` — tệp nhiễm, **không lưu**, ghi vào sổ kiểm toán |
 | | `403` `unknown_tenant` — thuê ước trong token chưa có trong `core.tenants` |
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
+| `POST /api/files/{id}/read` | Chỉ `clerk`, chỉ tệp chính mình tải lên. `?force=true` đọc lại. `200` `{file_id, status, method, pages, fields, warnings, summary_source, model, duration_ms, cached, read_at}` · `401` · `403` `forbidden` · `404` `not_found` (cả tệp người khác) · `409` `restricted` tệp mã hóa hoặc tệp đang gắn vào văn bản hạn chế (trước gợi ý đã lưu, trước khi đọc byte) · `413` `too_large` · `415` `unsupported` · `422` `unreadable` + `reason` · `503` `busy` (+ `Retry-After: 10`), `reader_disabled`, `ocr_unavailable`, `storage_unavailable`, `database_unavailable` — mục Đọc văn bản đến |
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
@@ -59,7 +62,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `GET /healthz` | Tiến trình còn sống |
-| `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"` |
+| `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"`; `ai`: mô hình trích yếu (F4.1) đang sẵn sàng không — không ảnh hưởng `status` |
 
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
 Tệp tải về luôn ở dạng `attachment`, kèm `X-Content-Type-Options: nosniff` và
@@ -131,6 +134,93 @@ tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số k
   Đọc tối đa 200 trang đầu, giữ 50 000 ký tự, đưa về Unicode dựng sẵn (NFC), bỏ ký tự điều khiển và ký tự ẩn.
 - PDF khóa bằng mật khẩu chủ (cấm sửa, cấm chép) nhưng mở không cần mật khẩu vẫn đọc được; cần mật khẩu để mở
   thì `failed`, `encrypted`. Tệp đã mã hóa ở kho (F3.7) không đọc.
+
+### Đọc văn bản đến (F4.1)
+
+`docread/`. Văn thư kéo thả công văn PDF hoặc ảnh chụp vào "Tiếp nhận văn bản"; tệp quét sạch thì giao diện gọi
+`POST /api/files/{id}/read` và điền sẵn số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu — mỗi ô
+có nhãn "Gợi ý". **Tác tử không tạo văn bản**: văn thư đối chiếu với bản gốc, sửa, bấm lưu (`receiveIncoming` như cũ).
+
+- **Ai, tệp nào.** Chỉ văn thư, chỉ tệp chính họ tải lên (`created_by`) — tệp người khác trả `404` như không có. Chỉ
+  tệp có dòng `core.files`, tức đã qua ClamAV. **Văn bản hạn chế không bao giờ được đọc**: tệp mã hóa (F3.7), hay
+  tệp đang gắn vào văn bản hạn chế (kể cả tệp rõ có từ trước F3.7), trả `409` trước cả gợi ý đã lưu và trước khi đọc
+  byte nào (bản chữ trần hay bản gửi mô hình đều vô hiệu việc hạn chế); CSDL chặn thêm bằng trigger (không lưu gợi ý
+  của tệp gắn vào văn bản hạn chế, xóa gợi ý khi văn bản bật hạn chế).
+- **Đọc.** Nhận loại theo byte đầu (PDF `%PDF-`, JPEG, PNG, TIFF), không tin mime khai. PDF: lớp chữ giữ bố cục
+  (`pdflayout.py`, pypdf chế độ `layout`, `MOC_READ_TEXT_PAGES` trang đầu); trang 1 có từ 40 ký tự không trắng thì
+  dùng (`method: text`), không thì OCR ảnh nhúng lớn nhất của từng trang (không rasterize: image không có poppler,
+  pdfium — PDF máy scan là một ảnh mỗi trang); PDF ít chữ mà không có ảnh nhúng nào, hay máy chủ chưa OCR được (thiếu
+  tesseract, thiếu dữ liệu ngôn ngữ), thì dùng lớp chữ ít ỏi đó (`method: text`). Ảnh: OCR (`method: ocr`). OCR
+  (`ocr.py`): Pillow xoay theo EXIF, đổi xám, giãn tương phản, đưa cạnh dài về 2000–3500 px, gửi PNG cho
+  `tesseract stdin stdout -l vie --oem 1 --psm 3 tsv`.
+- **Tiến trình con có giới hạn**, như `pdftext.py`: `python -I`, `RLIMIT_AS` (lớp chữ 1 GB, OCR `MOC_OCR_MEMORY_MB`),
+  `RLIMIT_CPU`, quá giờ thì giết. Tiến trình OCR mở phiên riêng: quá giờ hoặc yêu cầu bị hủy thì giết **cả nhóm**
+  (`os.killpg`), tesseract không chạy mồ côi. Pillow có trần điểm ảnh (`MOC_OCR_MAX_PIXELS`), cả khi pypdf giải mã
+  ảnh nhúng trong PDF: kích thước khai được kiểm trước khi giải nén, kích thước thật kiểm lúc Pillow mở — vượt trần là
+  `too_many_pixels`. Tesseract chết vì tín hiệu là lỗi của tệp (`422`): `SIGKILL`, `SIGABRT` hay tự báo không cấp phát
+  được → `memory`, tín hiệu khác → `corrupt`; `503 ocr_unavailable` chỉ khi thiếu tesseract hoặc dữ liệu ngôn ngữ.
+  Tesseract chỉ nhận `PATH`, `OMP_THREAD_LIMIT=1` (và `TESSDATA_PREFIX` nếu đặt) — không thấy bí mật của svc-files.
+  Kết quả của tiến trình con được kiểm lại trước khi dùng.
+- **Quy tắc quyết mọi trường** (`rules.py`, `layout.py` — thuần Python, regex tuyến tính trên ≤ 20 000 ký tự, kiểm
+  thử được, giải thích được). Mô hình chỉ viết **trích yếu**, chỉ khi quy tắc không ra trích yếu tin cậy cao
+  (`MOC_AI_SUMMARY=fallback`) và còn ≥ 5 giây trong hạn tổng: số, ngày từ mô hình có thể bịa.
+- **Mô hình tùy chọn** (`summarize.py`): Ollama ở profile `ai` của compose, mạng nội bộ không ra Internet. svc-files dò
+  `GET /api/tags` lúc khởi động và mỗi 60 giây — bật / tắt profile không phải khởi động lại svc-files; vừa thấy mô
+  hình thì nạp trước. Gọi `/api/chat` không stream, tắt suy nghĩ, ép JSON Schema `{"trich_yeu"}`, nhiệt độ 0,1, hạt
+  giống cố định; thân văn bản trong thẻ `<van_ban>` (thẻ trùng tên trong văn bản bị bỏ), lời dặn bảo mô hình không làm
+  theo yêu cầu nằm trong văn bản. Đầu ra kiểm chặt: 10–300 ký tự, một dòng, không ký tự điều khiển / vô hình, không
+  `http`, `www.`, `@`, `<`, `>`, không dãy từ 6 chữ số liền nhau (số điện thoại, số tài khoản) — sai thì
+  `model_rejected`, trích yếu quy tắc giữ nguyên. Không có mô hình vẫn chạy đủ.
+- **Hạn và lượt.** Đồng bộ, hạn tổng `MOC_READ_DEADLINE_S` (50 giây, dưới 60 giây mặc định của APISIX). Một lượt đọc
+  một lúc (`MOC_READ_CONCURRENCY`): OCR, mô hình tranh CPU; chờ quá `MOC_READ_QUEUE_S` thì `503 busy` kèm
+  `Retry-After: 10` (không dùng `429`: giao diện coi `429` là giới hạn tốc độ của APISIX).
+- **Tác tử có danh tính, có sổ.** Lưu gợi ý (`office.intake_suggestions`) và ghi **một** dòng `intake.suggested` vào
+  sổ kiểm toán trong cùng một mutation, bằng vai trò Hasura `agent`: preset ép `actor_id = moc-doc-reader`,
+  `actor_kind = agent`, thuê ước — dữ liệu gửi lên không giả được; vai trò `agent` không có quyền nào trên văn bản.
+  `diff` chỉ có siêu dữ liệu (người yêu cầu, tệp, trạng thái, cách đọc, số trang, tên các trường tìm thấy, nguồn trích
+  yếu, mô hình, thời gian, lý do) — không số ký hiệu, trích yếu, tên tệp, chữ OCR. **Không ghi được sổ thì không trả
+  gợi ý** (`503`). Đọc hỏng (`422`) chỉ ghi dòng sổ. Lần bấm sau trả gợi ý đã lưu (`cached: true`, không ghi sổ);
+  "Đọc lại" (`force=true`) đọc lại và ghi sổ.
+- **Nhật ký không có chữ của văn bản**: `office.intake.read` {file_id, tenant_id, actor_id, method, pages, chars, found,
+  duration_ms, model, cached}, `office.intake.read_failed` {file_id, reason}. Lỗi của quy tắc chỉ ghi tên lỗi.
+
+| Kết quả | Ý nghĩa |
+|---|---|
+| `status` | `ok` ít nhất một trường · `empty` đọc được mà không ra trường nào |
+| `fields.<khóa>` | `{value, confidence: high\|medium\|low, source: rule\|model}`; khóa ⊂ `type_code, symbol, issued_on, issuer_name, summary, urgency`; `issued_on` ISO, `urgency` ∈ `normal, khan, thuong_khan, hoa_toc` |
+| `warnings` | `future_date`, `invalid_date`, `symbol_no_number`, `type_conflict`, `low_text`, `truncated`, `model_unavailable` (cần mà chưa có mô hình), `model_timeout`, `model_rejected`, `model_skipped` (không đủ thời gian) |
+| `422 reason` | `password` PDF phải nhập mật khẩu · `corrupt` (cả tesseract sập) · `no_text` không chữ không ảnh · `timeout` · `memory` (cả tesseract bị giết vì hết bộ nhớ) · `too_many_pixels` |
+
+**Số đo** (`make do-doc-van-ban` trên stack thật, 21/10/2026, 10 PDF có chữ + 4 bản scan trong `seed/van-ban-den/`;
+máy đo: AMD Ryzen 7 7735HS, 16 luồng, một lượt đọc một lúc, tesseract 5.5.0 + `vie` 4.1.0). Mẫu hư cấu in sạch hơn công
+văn thật — đây là **mức trần**; số thật đo bằng view `office.v_intake_accuracy` khi có đơn vị chạy thử.
+
+| Trường | PDF có chữ: đúng / sai / trống | Bản scan (OCR): đúng / sai / trống | `high` sai |
+|---|---|---|---|
+| Số, ký hiệu | 10 / 0 / 0 | 3 / 1 / 0 | 0 (*) |
+| Ngày ban hành | 10 / 0 / 0 | 4 / 0 / 0 | 0 |
+| Cơ quan ban hành | 10 / 0 / 0 | 3 / 1 / 0 | 0 |
+| Loại văn bản | 10 / 0 / 0 | 4 / 0 / 0 | 0 |
+| Độ khẩn | 10 / 0 / 0 | 4 / 0 / 0 | 0 |
+| Trích yếu (có gợi ý / trùng ≥ 60% từ) | 10 / 10 | 4 / 4 | — |
+
+(*) OCR đọc `131/ĐT-ĐHM` thành `131/ĐT1-ĐHM` (thừa một chữ số) mà quy tắc vẫn chấm `high` — vì vậy mọi trường
+đọc bằng OCR hạ xuống tối đa `medium`: vẫn điền sẵn, nhãn "Gợi ý (chưa chắc)", văn thư đối chiếu bản gốc. Ô sai còn lại
+là dấu (`Cõ phần` thay `Cổ phần`, `medium`).
+
+| Thời gian một lần đọc | Trung bình | Lớn nhất |
+|---|---|---|
+| PDF có chữ, không mô hình | 0,6 giây | 0,7 giây |
+| Ảnh / PDF scan (OCR 1 trang) | 1,2 giây | 1,5 giây |
+| PDF có chữ + trích yếu bằng `qwen3:1.7b` (CPU, mô hình đã nạp) | 4,1 giây | 4,1 giây |
+| Ảnh scan + trích yếu bằng `qwen3:1.7b` | 6,6 giây | 6,6 giây |
+
+Mô hình chỉ chạy khi quy tắc chưa ra trích yếu chắc chắn: trên 14 mẫu là 2 lần (giấy mời không có dòng V/v, ảnh xám),
+các tệp khác giữ thời gian như khi không bật mô hình. Từ bản này chữ OCR không trường nào `high` nên mọi ảnh, bản scan
+đều qua mô hình khi bật `ai` (thêm khoảng 3,5–6 giây).
+
+Chưa làm: OCR bản scan cho tìm kiếm toàn văn (F2.7 chỉ đọc lớp chữ); so sánh PaddleOCR / VietOCR; dữ liệu
+`tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ volume nếu cần chính xác hơn).
 
 ### Văn bản đi và cổng xác thực
 
@@ -309,6 +399,10 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 | Phòng đọc: tìm hồ sơ, lọc văn bản người gọi đọc được | Token của người dùng; ghi `case_file.read` như ghi `register.printed` |
 | Liên thông: đọc dòng outbox, văn bản nguồn, bản phát hành; bản sao đã có chưa | Khóa quản trị, không kèm vai trò — id dòng do svc-workflow gửi, mọi thứ khác đọc từ CSDL |
 | Liên thông: thêm dòng `core.files` của bản sao | Khóa quản trị + `X-Hasura-Role: service` + thuê ước **nhận** (đọc từ dòng outbox), người thực hiện `svc-workflow` |
+| Đọc văn bản đến: tệp có xem được, có do người gọi tải lên | Token của người dùng (`created_by` trong `core_files_by_pk`) |
+| Đọc văn bản đến: vị trí tệp trong kho, tệp có gắn vào văn bản hạn chế nào không (`document_files.document.restricted`) | Như tải xuống: khóa quản trị + `X-Hasura-Role: service` + thuê ước trong token |
+| Đọc văn bản đến: gợi ý đã lưu, lưu gợi ý + ghi `intake.suggested` (một mutation) | Khóa quản trị + `X-Hasura-Role: agent` + thuê ước trong token + `X-Hasura-User-Id: <MOC_AGENT_ID>` — preset của vai trò ép danh tính, thuê ước |
+| Đọc văn bản đến: danh mục loại văn bản (giữ 10 phút) | Khóa quản trị, không kèm vai trò — danh mục chung, chỉ đọc |
 
 ## Cấu hình
 
@@ -349,6 +443,24 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ARCHIVE_INTERVAL_S` | `3600` | Chu kỳ tìm hồ sơ đến hạn nộp lưu; `0` tắt vòng nộp lưu |
 | `MOC_ARCHIVE_AFTER_DAYS` | `365` | Hồ sơ đóng từ chừng ấy ngày trở lên thì nộp lưu |
 | `MOC_OPENLINEAGE_URL` | (rỗng) | Gửi thêm sự kiện phả hệ tới máy chủ OpenLineage, vd `http://marquez:5000/api/v1/lineage`; rỗng thì chỉ ghi `core.lineage_events` |
+| `MOC_READ_ENABLED` | `true` | Đọc văn bản đến (F4.1); `false`: `503 reader_disabled` |
+| `MOC_READ_MAX_MB` | = `MOC_FILES_MAX_MB` | Tệp lớn hơn thì không đọc (`413`) |
+| `MOC_READ_TEXT_PAGES` | `3` | Số trang đầu đọc lớp chữ |
+| `MOC_OCR_MAX_PAGES` | `1` | Số trang đầu OCR (số, ngày, cơ quan, trích yếu đều ở trang 1) |
+| `MOC_OCR_LANG` | `vie` | Dữ liệu ngôn ngữ của tesseract, vd `vie+eng` |
+| `MOC_OCR_TIMEOUT_S` | `40` | Hạn tiến trình con OCR, quá thì giết cả nhóm; `RLIMIT_CPU` = hạn + 5 |
+| `MOC_OCR_MEMORY_MB` | `1536` | `RLIMIT_AS` của tiến trình con OCR (tesseract kế thừa) |
+| `MOC_OCR_MAX_PIXELS` | `40000000` | Trần điểm ảnh, chặn ảnh bom giải nén (`422 too_many_pixels`) |
+| `MOC_READ_CONCURRENCY` | `1` | Số lượt đọc cùng lúc |
+| `MOC_READ_QUEUE_S` | `15` | Chờ lượt quá thì `503 busy` |
+| `MOC_READ_DEADLINE_S` | `50` | Hạn tổng một yêu cầu đọc (dưới 60 giây của APISIX) |
+| `MOC_AI_URL` | `http://ollama:11434` | Ollama của profile `ai`; rỗng: tắt mô hình |
+| `MOC_AI_MODEL` | `qwen3:1.7b` | Tên mô hình trong Ollama (thử `qwen3:4b` nếu máy đủ nhanh) |
+| `MOC_AI_TIMEOUT_S` | `20` | Hạn mô hình; quá thì trích yếu theo quy tắc (`model_timeout`) |
+| `MOC_AI_MAX_CHARS` | `3000` | Số ký tự thân văn bản gửi mô hình |
+| `MOC_AI_SUMMARY` | `fallback` | `fallback`: chỉ hỏi mô hình khi quy tắc không ra trích yếu tin cậy cao · `always`: luôn hỏi |
+| `MOC_AGENT_ID` | `moc-doc-reader` | Danh tính tác tử trong sổ kiểm toán |
+| `MOC_TESSERACT_BIN` | `tesseract` | Chương trình tesseract (test thay bằng bản giả) |
 
 ## Phát triển
 

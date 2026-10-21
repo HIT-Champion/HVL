@@ -85,7 +85,7 @@ comment_style_for() {
 # Định dạng JSON không có cú pháp chú thích nên không thể mang header.
 is_non_source() {
   case "$1" in
-    *.md|*.txt|LICENSE|NOTICE|*.json|*.lock|*.csv|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.svg|\
+    *.md|*.txt|LICENSE|NOTICE|*.json|*.lock|*.csv|*.tsv|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.svg|\
     *.woff|*.woff2|*.ttf|*.otf|*.gitkeep|*.gitignore|*.gitattributes|*.dockerignore|*.editorconfig|\
     *.env.example|*.nvmrc|*.python-version)
       return 0 ;;

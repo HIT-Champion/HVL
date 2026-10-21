@@ -28,7 +28,8 @@ bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đă
 văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} và in ra PDF để ký nhận, đóng sổ — registers.py.
 Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh — archive.py; phòng đọc
 /api/case-files/{id}/archive đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL. Liên thông trong hệ thống (F3.12):
-svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kho của đơn vị nhận — dispatch.py.
+svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kho của đơn vị nhận — dispatch.py. Đọc văn bản đến
+(F4.1): văn thư gọi /api/files/{id}/read, tác tử đọc tệp vừa tải lên và gợi ý thông tin tiếp nhận — docread/.
 
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
@@ -65,6 +66,9 @@ from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .dispatch import DispatchError, copy_issued_file
+from .docread import api as docread_api
+from .docread.reader import Reader
+from .docread.summarize import make_summarizer
 from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
 from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
@@ -321,6 +325,7 @@ def create_app(
     meili: MeiliClient | None = None,
     anchor_store: AnchorStore | None = None,
     vault: Vault | None = None,
+    reader: Reader | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -353,6 +358,8 @@ def create_app(
     if vault is None and settings.vault_addr:
         vault = Vault(settings.vault_addr, role_id_file=settings.vault_role_id_file,
                       secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
+    reader = reader or Reader(settings, hasura, store, summarizer=make_summarizer(
+        settings.ai_url, settings.ai_model, max_chars=settings.ai_max_chars))
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -365,10 +372,12 @@ def create_app(
         anchor = asyncio.create_task(anchorer.run()) if settings.anchor_interval_s > 0 else None
         texts = asyncio.create_task(extractor.run()) if settings.text_interval_s > 0 else None
         archive = asyncio.create_task(archiver.run()) if settings.archive_interval_s > 0 else None
+        ai = asyncio.create_task(reader.summarizer.run())     # dò Ollama mỗi 60 giây (F4.1); không có mô hình: về ngay
         yield
-        for task in (sync, anchor, texts, archive):
+        for task in (sync, anchor, texts, archive, ai):
             if task is not None:
                 task.cancel()
+        await reader.summarizer.aclose()
         await meili.aclose()
         await hasura.aclose()
         if vault is not None:
@@ -385,6 +394,7 @@ def create_app(
     app.state.extractor = extractor
     app.state.anchorer = anchorer
     app.state.meili = meili
+    app.state.reader = reader
     bearer = HTTPBearer(auto_error=False)
 
     @app.middleware("http")
@@ -412,6 +422,9 @@ def create_app(
             headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
             raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}, headers) from exc
 
+    # Đọc văn bản đến (F4.1): POST /api/files/{file_id}/read — docread/api.py
+    docread_api.install(app, reader, current_principal)
+
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
@@ -424,8 +437,10 @@ def create_app(
         ready = clamd_ok and store_ok and hasura_ok
         # Tìm kiếm hỏng không chặn tải lên / tải xuống: báo "degraded" nhưng vẫn sẵn sàng nhận yêu cầu.
         status = "not_ready" if not ready else "ready" if search_ok else "degraded"
+        # ai: mô hình trích yếu (F4.1, profile ai) — tùy chọn, không ảnh hưởng ready
         return JSONResponse(
-            {"status": status, "clamav": clamd_ok, "storage": store_ok, "hasura": hasura_ok, "search": search_ok},
+            {"status": status, "clamav": clamd_ok, "storage": store_ok, "hasura": hasura_ok, "search": search_ok,
+             "ai": reader.summarizer.available},
             status_code=200 if ready else 503,
         )
 

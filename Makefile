@@ -28,7 +28,8 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong reconcile \
+.PHONY: help env check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
+        demo-doc-van-ban do-doc-van-ban van-ban-mau reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -59,12 +60,18 @@ up: $(ENV_FILE) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	@echo "Mộc đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
+up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai) cho tác tử đọc văn bản viết trích yếu — cần make ai-model trước
+	@$(COMPOSE) --profile ai up -d --wait ollama
+
+ai-model: $(ENV_FILE) ## Tải mô hình MOC_AI_MODEL (mặc định qwen3:1.7b) vào volume ollama_models — chạy một lần, cần Internet
+	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
+
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) --profile iot --profile iot-sim down
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Mộc trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) --profile iot --profile iot-sim down -v
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
@@ -85,9 +92,10 @@ smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 
 PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble
 
-e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, thông báo, sổ kiểm toán, sổ đăng ký, kiểm dịch, văn bản hạn chế
+e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, thông báo, sổ kiểm toán, sổ đăng ký, kiểm dịch, văn bản hạn chế, đọc văn bản đến
 	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \
-	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e $(PLAYWRIGHT_IMAGE) \
+	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e \
+	  -v "$(CURDIR)/seed/van-ban-den:/mau:ro" -e MOC_SAMPLES_DIR=/mau $(PLAYWRIGHT_IMAGE) \
 	  sh -c 'npm ci --no-audit --no-fund --ignore-scripts >/dev/null && npx playwright test'
 
 test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và phần kiểm form (không cần Docker; cần uv, Node 24, npm ci trong apps/office)
@@ -122,6 +130,15 @@ demo-it-ot: $(ENV_FILE) ## Màn demo (ii) IT/OT: bật broker NGSI-LD, cảm bi�
 
 demo-lien-thong: $(ENV_FILE) ## Màn liên thông (F3.12): CNTT phát hành → Khoa Kinh tế tự nhận văn bản đến cùng băm, mã xác thực, vào sổ, chỉ đạo (docs/demo-script.md)
 	@python3 scripts/demo.py lien-thong
+
+demo-doc-van-ban: $(ENV_FILE) ## Màn đọc văn bản đến (F4.1): văn thư tải công văn, tác tử đọc (lớp chữ PDF / OCR) gợi ý số, ngày, cơ quan, loại, trích yếu; vào sổ; văn bản hạn chế không đọc (docs/demo-script.md)
+	@python3 scripts/demo.py doc-van-ban
+
+do-doc-van-ban: $(ENV_FILE) ## Đo tác tử đọc văn bản trên 14 mẫu seed/van-ban-den: bảng đúng/sai/trống từng trường, thời gian (thoát 1 khi PDF có chữ dưới ngưỡng)
+	@python3 scripts/demo.py do-doc-van-ban
+
+van-ban-mau: $(ENV_FILE) ## Sinh lại văn bản đến mẫu seed/van-ban-den (PDF, ảnh scan, nhãn) và TSV Tesseract cho test, trong container svc-files (cần make up)
+	@python3 scripts/van_ban_mau.py --mode container
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py
