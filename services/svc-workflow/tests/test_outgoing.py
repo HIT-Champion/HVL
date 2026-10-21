@@ -23,7 +23,7 @@ import asyncio
 
 import pytest
 
-from conftest import DEPT_DT, OUT, TENANT, actor
+from conftest import DEPT_DT, OTHER, OUT, TENANT, actor
 from svc_workflow.workflow import BASE32, WorkflowError, new_verify_code
 
 DRAFTER = actor("staff", "u-staff-dt", dept=DEPT_DT)
@@ -85,6 +85,40 @@ def test_draft_must_be_complete_before_submission(workflow, hasura, flowable, fi
 def test_signer_must_be_a_director_of_the_tenant(workflow, hasura, signer):
     with pytest.raises(WorkflowError, match="lãnh đạo đơn vị"):
         run(workflow.submit_outgoing(DRAFTER, OUT, signer))
+
+
+def test_units_in_the_system_are_checked_before_submission(workflow, hasura, flowable):
+    hasura.outgoing["recipient_tenant_ids"] = [str(OTHER)]
+    assert run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))["status"] == "in_review"
+    (_, variables, who), = [c for c in hasura.dispatch_calls if c[0] == "DispatchUnits"]
+    assert variables == {"ids": [str(OTHER)]} and who.user_id == "u-staff-dt"
+
+
+@pytest.mark.parametrize(("units", "restricted", "code", "message"), [
+    ([str(OTHER)], True, "restricted", "Văn bản hạn chế không gửi liên thông trong hệ thống"),
+    ([str(OTHER), str(TENANT)], False, "self", "chính đơn vị mình"),
+    ([str(OTHER), "0f0f0f0f-0000-4000-8000-000000000000"], False, "unknown", "không có trong hệ thống"),
+])
+def test_units_in_the_system_must_be_other_real_units(workflow, hasura, flowable, units, restricted, code, message):
+    hasura.outgoing.update(recipient_tenant_ids=units, restricted=restricted)
+    with pytest.raises(WorkflowError, match=message) as err:
+        run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert (err.value.code, err.value.status, err.value.fields) == ("invalid", 400, {"recipient_tenant_ids": code})
+    assert not hasura.writes and not flowable.started
+
+
+@pytest.mark.parametrize(("error", "message"), [
+    ('new row for relation "documents" violates check constraint "documents_restricted_local"',
+     "Văn bản hạn chế không gửi liên thông"),
+    ("documents_recipient_units: đơn vị nhận chỉ đổi được khi văn bản còn là dự thảo", "Đơn vị nhận trong hệ thống"),
+    ('new row for relation "documents" violates check constraint "documents_recipient_units_other"',
+     "Đơn vị nhận trong hệ thống"),
+])
+def test_database_refusals_of_units_read_in_vietnamese(workflow, hasura, error, message):
+    hasura.fail_writes = error
+    with pytest.raises(WorkflowError, match=message) as err:
+        run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert (err.value.code, err.value.status) == ("constraint", 409)
 
 
 def test_department_without_manager_cannot_review(workflow, hasura):

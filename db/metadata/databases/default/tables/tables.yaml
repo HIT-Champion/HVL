@@ -39,3 +39,5 @@
 - "!include office_case_file_documents.yaml"
 - "!include core_lineage_events.yaml"
 - "!include office_document_history.yaml"
+- "!include office_dispatch_units.yaml"
+- "!include office_dispatches.yaml"

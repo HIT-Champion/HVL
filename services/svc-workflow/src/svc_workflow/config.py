@@ -68,6 +68,9 @@ class Settings:
     ot_threshold: float = 35.0
     ot_notify_url: str = "http://svc-workflow:8000"
     ot_interval_s: float = 15.0
+    # F3.12 liên thông: chu kỳ vòng nền chuyển dòng chờ đến hạn và báo dòng đã chuyển mà chưa báo — ngắn hơn
+    # MOC_RECONCILE_INTERVAL_S để lần thử lại (30 giây, 1 phút, 2 phút…) đúng hẹn
+    dispatch_interval_s: float = 30.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -100,6 +103,7 @@ class Settings:
                 ot_threshold=float(env.get("MOC_OT_THRESHOLD", "35")),
                 ot_notify_url=env.get("MOC_OT_NOTIFY_URL", "http://svc-workflow:8000").rstrip("/"),
                 ot_interval_s=float(env.get("MOC_OT_SUBSCRIPTION_INTERVAL_S", "15")),
+                dispatch_interval_s=float(env.get("MOC_DISPATCH_INTERVAL_S", "30")),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc

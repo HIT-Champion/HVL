@@ -39,6 +39,10 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         (ii) Hội tụ IT/OT: bật context broker NGSI-LD (profile iot); cảm biến nhiệt độ phòng máy chủ giả lập gửi các
         lần đo, vượt ngưỡng thì svc-workflow dựng dự thảo "Báo cáo sự cố" từ mẫu cho chuyên viên phụ trách; chuyên viên
         trình, dự thảo vào luồng văn bản đi. (make demo-it-ot)
+    python3 scripts/demo.py lien-thong
+        Liên thông văn bản trong hệ thống (F3.12, không thuộc 4 nguyên lý): Khoa CNTT phát hành công văn gửi Khoa
+        Kinh tế; bên nhận tự có văn bản đến cùng tệp (cùng SHA-256), cùng mã xác thực; vào sổ, lãnh đạo có việc chỉ
+        đạo; sổ kiểm toán của cả hai đơn vị ghi lại; văn bản hạn chế không gửi được. (make demo-lien-thong)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -854,8 +858,149 @@ def it_ot() -> None:
        " sai bị từ chối (401) — token mỗi đơn vị suy từ khóa của svc-workflow, chỉ broker giữ")
 
 
+DISPATCH_UNITS = "{ office_dispatch_units(order_by: {name: asc}) { id code name } }"
+DRAFT = "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }"
+ISSUED = "query ($id: uuid!) { office_documents_by_pk(id: $id) { status symbol verify_code content_sha256 } }"
+ARRIVED = """query ($s: uuid!) { office_documents(where: {source_id: {_eq: $s}}) { id status symbol issuer_name
+  files { role file_id file { sha256 } } } }"""
+INCOMING_NOTE = """query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}, kind: {_eq: "document.incoming"}})
+  { data } }"""
+DISPATCH_OUT = "query ($d: uuid!) { office_dispatches(where: {document_id: {_eq: $d}}) { id status delivered_at } }"
+DISPATCH_IN = """query ($d: uuid!) { office_dispatches(where: {incoming_document_id: {_eq: $d}}) {
+  id status source_verify_code source_sha256 } }"""
+AUDIT_OF = """query ($ids: [String!]!) { core_audit_log(where: {entity_id: {_in: $ids}}, order_by: {id: asc}) {
+  id action entity actor_kind } }"""
+
+
+def hexed(bytea: str | None) -> str:
+    return (bytea or "").removeprefix("\\x")
+
+
+def lien_thong() -> None:
+    print("Màn F3.12 · Liên thông văn bản trong hệ thống — Khoa CNTT phát hành công văn gửi Khoa Kinh tế; bên nhận tự có"
+          " văn bản đến cùng tệp, cùng mã xác thực, rồi vào sổ, chỉ đạo như mọi văn bản đến")
+    tag = uuid.uuid4().hex[:6].upper()
+    staff, manager, director, clerk = (Session(u) for u in ("chuyenviendt", "totruongdt", "truongkhoa", "vanthu"))
+    kt_clerk, kt_director = Session("vanthukt"), Session("truongkhoakt")
+
+    say(1, "Chuyên viên CNTT soạn công văn, chọn Khoa Kinh tế trong danh sách đơn vị trong hệ thống")
+    units = staff.gql(DISPATCH_UNITS)["office_dispatch_units"]
+    own = staff.gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+    kt = next((u for u in units if u["code"] == "KT"), None)
+    if kt is None:
+        raise DemoFailed(f"danh sách đơn vị trong hệ thống không có Khoa Kinh tế (mã KT): {units} — chạy make seed")
+    if any(u["id"] == own for u in units):
+        raise DemoFailed("danh sách đơn vị nhận có cả đơn vị của người soạn")
+    sent = staff.gql(DRAFT, {"o": {
+        "type_code": "CV", "recipients": [kt["name"]], "recipient_tenant_ids": [kt["id"]],
+        "summary": f"Về việc phối hợp tổ chức hội thảo khoa học liên khoa (demo {tag})",
+        "body": "Khoa Công nghệ thông tin đề nghị Khoa Kinh tế cử cán bộ tham gia ban tổ chức hội thảo.\n"
+                "Danh sách gửi về Văn phòng khoa trước ngày 15 tháng sau.",
+    }})["insert_office_documents_one"]["id"]
+    ok(f"danh sách chọn được: {', '.join(u['name'] for u in units)} (không có đơn vị mình); dự thảo gửi {kt['name']}")
+
+    say(2, "Trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư CNTT phát hành")
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    staff.gql(SUBMIT, {"d": sent, "s": signer})
+    manager.complete(manager.wait_task(sent, "vbdi.duyetPhong"), "approve", {})
+    director.complete(director.wait_task(sent, "vbdi.duyetDonVi"), "approve", {})
+    clerk.complete(clerk.wait_task(sent, "vbdi.phatHanh"), "issue", {"is_public": False})
+    issued_at = time.monotonic()
+    src = clerk.gql(ISSUED, {"id": sent})["office_documents_by_pk"]
+    if src["status"] != "issued":
+        raise DemoFailed(f"công văn chưa phát hành: {src}")
+    sha, code = hexed(src["content_sha256"]), src["verify_code"]
+    ok(f"{src['symbol']} phát hành: mã xác thực {code[:5]}-{code[5:]}, SHA-256 {sha[:16]}…")
+
+    say(3, "Khoa Kinh tế tự nhận văn bản đến — không ai gửi thư điện tử, không ai tải tệp lên lại")
+    # svc-workflow chuyển ngay sau lần phát hành; trượt thì vòng đối soát nền làm lại
+    deadline = time.monotonic() + 90
+    while not (arrived := kt_clerk.gql(ARRIVED, {"s": sent})["office_documents"]):
+        if time.monotonic() > deadline:
+            raise DemoFailed("sau 90 giây Khoa Kinh tế chưa có văn bản đến từ công văn vừa phát hành")
+        time.sleep(1)
+    took = time.monotonic() - issued_at
+    doc = arrived[0]
+    main = [f for f in doc["files"] if f["role"] == "main"]
+    if len(arrived) != 1 or doc["status"] != "received" or len(main) != 1 or doc["symbol"] != src["symbol"]:
+        raise DemoFailed(f"văn bản đến chưa đúng: {arrived}")
+    _, _, body = request("GET", f"{PUBLIC_URL}/api/files/{main[0]['file_id']}", headers=kt_clerk.auth)
+    got = hashlib.sha256(body).hexdigest()
+    if got != sha or hexed((main[0]["file"] or {}).get("sha256")) != sha:
+        raise DemoFailed(f"tệp bên nhận không trùng bản phát hành: {got} ≠ {sha}")
+    ok(f"{took:.0f} giây sau phát hành: văn bản đến {doc['symbol']} của {doc['issuer_name']}, trạng thái received"
+       " (chờ vào sổ)")
+    ok(f"văn thư KT tải tệp chính về: SHA-256 {got[:16]}… trùng từng byte bản phát hành — bản sao nằm trong kho của Khoa"
+       " Kinh tế, đã qua ClamAV")
+    deadline = time.monotonic() + 15
+    while not (notes := kt_clerk.gql(INCOMING_NOTE, {"d": doc["id"]})["core_notifications"]):
+        if time.monotonic() > deadline:
+            raise DemoFailed("văn thư Khoa Kinh tế chưa nhận thông báo văn bản đến mới")
+        time.sleep(1)
+    out = clerk.gql(DISPATCH_OUT, {"d": sent})["office_dispatches"]
+    if [r["status"] for r in out] != ["delivered"] or not out[0]["delivered_at"]:
+        raise DemoFailed(f"bên gửi chưa thấy đã chuyển: {out}")
+    at = datetime.fromisoformat(out[0]["delivered_at"]).astimezone().strftime("%H:%M:%S")
+    ok(f"vanthukt nhận thông báo văn bản đến mới (từ {notes[0]['data'].get('from_name')}); bên gửi thấy trạng thái"
+       f" delivered lúc {at}, không thấy gì thêm của bên nhận")
+
+    say(4, "Bên nhận kiểm ở cổng xác thực bằng mã của bên gửi (không cần đăng nhập)")
+    link = kt_clerk.gql(DISPATCH_IN, {"d": doc["id"]})["office_dispatches"]
+    if len(link) != 1 or link[0]["source_verify_code"] != code or hexed(link[0]["source_sha256"]) != sha:
+        raise DemoFailed(f"văn bản đến không mang mã xác thực, băm của bên gửi: {link}")
+    by_code, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{code}")
+    by_hash, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={got}")
+    if by_code.get("result") != "valid" or by_code["document"]["sha256"] != got or by_hash.get("result") != "valid":
+        raise DemoFailed(f"cổng xác thực trả {by_code} / {by_hash}")
+    ok(f"mã {code[:5]}-{code[5:]} (giao diện hiện cạnh văn bản đến) → khớp: {by_code['document']['symbol']} do"
+       f" {by_code['document']['issuer_name']} phát hành; tra theo SHA-256 của tệp nhận được cũng khớp")
+
+    say(5, "Văn thư KT vào sổ — văn bản vào luồng văn bản đến bình thường của Khoa Kinh tế")
+    number = kt_clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                          {"id": doc["id"]})["registerIncoming"]["register_number"]
+    kt_director.wait_task(doc["id"], "vbden.chiDao")
+    ok(f"số đến {number} trong sổ đến của Khoa Kinh tế; truongkhoakt có việc cho ý kiến chỉ đạo (vbden.chiDao)")
+    if clerk.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { id } }",
+                 {"id": doc["id"]})["office_documents_by_pk"] is not None:
+        raise DemoFailed("Khoa CNTT đọc được văn bản đến của Khoa Kinh tế")
+    ok("Khoa CNTT không đọc được văn bản đến của Khoa Kinh tế — mỗi đơn vị chỉ thấy phần của mình")
+
+    say(6, "Sổ kiểm toán của cả hai đơn vị ghi lại — mỗi lãnh đạo đọc sổ của đơn vị mình")
+    ours = director.gql(AUDIT_OF, {"ids": [link[0]["id"]]})["core_audit_log"]
+    theirs = kt_director.gql(AUDIT_OF, {"ids": [doc["id"], main[0]["file_id"]]})["core_audit_log"]
+    peek = kt_director.gql(AUDIT_OF, {"ids": [link[0]["id"], sent]})["core_audit_log"]
+    if not {("office.dispatches", "insert"), ("office.dispatches", "update")} <= {(r["entity"], r["action"])
+                                                                                  for r in ours}:
+        raise DemoFailed(f"sổ Khoa CNTT thiếu dòng liên thông: {ours}")
+    copied = [r for r in theirs if (r["entity"], r["action"]) == ("core.files", "insert")]
+    if not copied or not any((r["entity"], r["action"]) == ("office.documents", "insert") for r in theirs):
+        raise DemoFailed(f"sổ Khoa Kinh tế thiếu văn bản đến hoặc bản sao tệp: {theirs}")
+    if peek:
+        raise DemoFailed(f"lãnh đạo Khoa Kinh tế đọc được sổ của Khoa CNTT: {peek}")
+    ok(f"sổ Khoa CNTT: {len(ours)} dòng office.dispatches (tạo trong giao dịch phát hành → delivered),"
+       f" từ dòng #{ours[0]['id']}")
+    ok(f"sổ Khoa Kinh tế: {len(theirs)} dòng — văn bản đến, vào sổ, bản sao tệp (người thực hiện:"
+       f" {copied[0]['actor_kind']}); lãnh đạo Khoa Kinh tế không đọc được dòng nào của Khoa CNTT")
+
+    say(7, "Văn bản hạn chế không gửi được trong hệ thống")
+    try:
+        staff.gql(DRAFT, {"o": {
+            "type_code": "CV", "recipients": [kt["name"]], "recipient_tenant_ids": [kt["id"]], "restricted": True,
+            "summary": f"Về việc danh sách nâng lương trước hạn (demo {tag})", "body": "Danh sách kèm theo.",
+        }})
+        raise DemoFailed("văn bản hạn chế vẫn chọn được đơn vị nhận trong hệ thống")
+    except RuntimeError as exc:
+        if "documents_restricted_local" not in str(exc):
+            raise DemoFailed(f"bị từ chối nhưng không vì ràng buộc documents_restricted_local: {exc}") from exc
+    ok("dự thảo hạn chế chọn Khoa Kinh tế → CSDL từ chối (documents_restricted_local); svc-workflow, svc-files cũng"
+       " chặn — tệp hạn chế mã hóa theo khóa của đơn vị gửi, không rời đơn vị")
+
+    print(f"\nXem trên giao diện (vanthukt): {PUBLIC_URL}/van-ban/{doc['id']} — chip \"Liên thông\", \"Nhận từ"
+          f" {doc['issuer_name']}\"; bên gửi (vanthu): {PUBLIC_URL}/van-ban/{sent}")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
-         "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot}
+         "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong}
 
 
 def main(argv: list[str] | None = None) -> int:

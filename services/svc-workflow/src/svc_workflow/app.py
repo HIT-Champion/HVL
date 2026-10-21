@@ -40,6 +40,7 @@ from fastapi.responses import JSONResponse, Response
 from . import __version__
 from .config import ConfigError, Settings
 from .directory import Directory
+from .dispatch import Dispatcher
 from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
 from .hasura import Actor, HasuraClient, HasuraError
@@ -172,7 +173,9 @@ def create_app(
         intake = FormSchema.load(Path(settings.schemas_dir) / "van-ban-den.json")
     except SchemaFileError as exc:
         raise ConfigError(f"MOC_SCHEMAS_DIR: {exc}") from exc
-    workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration, intake=intake)
+    dispatcher = Dispatcher(hasura, files, notifier)
+    workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration, intake=intake,
+                        dispatcher=dispatcher)
     deadlines = Deadlines(hasura, flowable, notifier, sla_duration=settings.sla_duration)
     ot = ot or (OtBridge(hasura, notifier, settings.ngsi_url, secret=settings.action_secret,
                          threshold=settings.ot_threshold, notify_url=settings.ot_notify_url)
@@ -188,6 +191,9 @@ def create_app(
                 _every(settings.reconcile_interval_s, "office.process.reconciled", workflow.reconcile)))
             tasks.append(asyncio.create_task(
                 _every(settings.reconcile_interval_s, "office.document.overdue_notified", deadlines.overdue_documents)))
+        if settings.dispatch_interval_s > 0:
+            tasks.append(asyncio.create_task(
+                _every(settings.dispatch_interval_s, "office.dispatch.reconciled", dispatcher.reconcile)))
         if settings.sla_poll_interval_s > 0:
             tasks.append(asyncio.create_task(
                 _every(settings.sla_poll_interval_s, "office.sla.jobs_handled", deadlines.run_jobs)))
@@ -215,6 +221,7 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.workflow = workflow
+    app.state.dispatcher = dispatcher
     app.state.deadlines = deadlines
     app.state.directory = directory
     app.state.ot = ot

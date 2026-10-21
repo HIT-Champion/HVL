@@ -22,6 +22,9 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
+Ngoài các màn nguyên lý còn một màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
+(`make demo-lien-thong`, F3.12) — xem [mục cuối](#ngoài-4-nguyên-lý-liên-thông-trong-hệ-thống--make-demo-lien-thong).
+
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
 **Điều muốn chứng minh:**
@@ -307,3 +310,61 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
   commit và chạy lại. Commit áp lỗi thì reconciler đợi commit kế tiếp chứ không thử lại liên tục.
 - *"`.env` thì sao?"* Không nằm trong git (chứa bí mật), reconciler không đụng tới; đổi `.env` vẫn là việc của
   người vận hành.
+
+## Ngoài 4 nguyên lý: liên thông trong hệ thống — `make demo-lien-thong`
+
+Màn này thuộc F3.12, **không** phải một trong các màn bằng chứng nguyên lý ở bảng trên: nó cho thấy một việc nghiệp
+vụ chạy trên cùng nền (tách đơn vị, kiểm dịch, sổ kiểm toán, cổng xác thực).
+
+**Điều muốn chứng minh:**
+
+- Hai đơn vị trên cùng một bản cài gửi văn bản cho nhau không qua thư điện tử, không ai tải lại tệp: văn thư bên gửi
+  phát hành → bên nhận có ngay văn bản đến (`received`, chờ vào sổ), tệp trùng từng byte (cùng SHA-256), kèm mã xác
+  thực của bên gửi.
+- Vẫn tách đơn vị: bản sao tệp nằm trong kho dưới tiền tố của bên nhận, qua ClamAV như mọi tệp tải lên; mỗi đơn vị
+  chỉ đọc văn bản và sổ kiểm toán của mình; bên gửi chỉ thấy "đã chuyển".
+- Đúng một lần: giao dịch phát hành ghi luôn một dòng outbox (`office.dispatches`) cho mỗi đơn vị nhận; svc-workflow
+  chuyển ngay, trượt thì vòng nền làm lại; chạy lại bao nhiêu lần cũng chỉ một văn bản đến, một bản sao tệp, một
+  thông báo.
+- Văn bản hạn chế (F3.7) không gửi được trong hệ thống.
+
+**Lệnh in ra 7 bước:**
+
+1. `chuyenviendt` (Khoa CNTT) đọc danh sách đơn vị trong hệ thống (không có đơn vị mình), soạn công văn gửi Khoa
+   Kinh tế.
+2. Trình → `totruongdt` duyệt → `truongkhoa` ký → `vanthu` phát hành. In số ký hiệu, mã xác thực, SHA-256.
+3. Đợi văn bản đến ở Khoa Kinh tế (thường vài giây, tối đa 90 giây): `received`, cùng số ký hiệu, nơi ban hành là
+   tên Khoa CNTT, đúng một tệp chính. `vanthukt` tải tệp về: SHA-256 trùng bản phát hành. `vanthukt` có thông báo
+   văn bản đến mới; bên gửi thấy dòng liên thông `delivered` và giờ chuyển.
+4. Văn bản đến mang mã xác thực và băm của bên gửi; cổng xác thực (không đăng nhập) tra theo mã → "khớp", tra theo
+   SHA-256 của tệp nhận được → "khớp".
+5. `vanthukt` vào sổ → số đến trong sổ của Khoa Kinh tế; `truongkhoakt` có việc cho ý kiến chỉ đạo. Khoa CNTT
+   không đọc được văn bản đến đó.
+6. Sổ kiểm toán: `truongkhoa` thấy các dòng `office.dispatches` (tạo lúc phát hành, chuyển xong); `truongkhoakt`
+   thấy văn bản đến, vào sổ, bản sao tệp (người thực hiện `service`) và không đọc được dòng nào của Khoa CNTT.
+7. Dự thảo hạn chế chọn Khoa Kinh tế → CSDL từ chối (`documents_restricted_local`).
+
+**Trên giao diện:**
+
+- *`vanthukt`*: chuông báo văn bản đến mới; danh sách Văn bản đến có chip "Liên thông"; mở văn bản: "Nhận từ Khoa
+  Công nghệ thông tin · mã xác thực XXXXX-XXXXX" (bấm sang trang xác thực), "SHA-256 khớp".
+- *`chuyenviendt`*: màn soạn văn bản đi có danh sách "Gửi trong hệ thống", tắt khi văn bản hạn chế. *`vanthu`*: văn
+  bản đã phát hành có thẻ "Liên thông", trạng thái từng đơn vị nhận.
+
+**Nếu giám khảo hỏi:**
+
+- *"Sao văn bản đến không có mã xác thực, băm của riêng nó?"* Hai cột đó duy nhất toàn hệ thống: một mã trỏ về đúng
+  một bản phát hành — bản của bên gửi. Văn bản đến giữ mã và băm của bên gửi ở dòng liên thông; giao diện hiện mã và
+  đối chiếu băm với tệp.
+- *"svc-workflow chết giữa chừng?"* Dòng outbox đã nằm trong CSDL cùng giao dịch phát hành; vòng nền gửi lại, giãn
+  dần từ 30 giây tới 1 giờ. Bản sao tệp có id định trước nên chép lại không ra bản thứ hai; mỗi văn bản nguồn chỉ
+  thành một văn bản đến ở mỗi đơn vị (ràng buộc duy nhất).
+- *"svc-workflow có chép được tệp tùy ý sang đơn vị khác?"* Không: svc-files chỉ nhận id dòng liên thông, tự đọc tệp
+  phát hành của đúng văn bản đó, so băm với core.files, với văn bản và với dòng outbox; văn bản chưa phát hành, hạn
+  chế hay tệp đã sang kho lạnh thì từ chối.
+- *"Văn bản hạn chế?"* Tệp mã hóa bằng khóa gắn với đơn vị và tệp (F3.7); gửi sang đơn vị khác là phải giải mã ra
+  khỏi đơn vị. Chặn ở CSDL, svc-workflow và svc-files.
+- *"Còn gì chưa làm?"* Danh sách đơn vị nhận cho mọi người dùng thấy tên mọi đơn vị trên bản cài (ổn với các khoa
+  một trường; cho thuê nhiều tổ chức cần cờ cho phép nhận); chưa có nút gửi lại dòng `failed`; bên gửi không thấy
+  bên nhận xử lý tới đâu (cố ý tách); bên nhận đã có văn bản đến trùng thì dòng thành `duplicate`, bản sao tệp đã
+  chép thành mồ côi. Gửi sang hệ thống khác (ngoài bản cài) chưa làm.

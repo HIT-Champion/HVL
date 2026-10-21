@@ -14,7 +14,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Gọi svc-files để dựng bản phát hành của văn bản đi (PDF có số, mã QR, SHA-256).
+"""Gọi svc-files để dựng bản phát hành của văn bản đi (PDF có số, mã QR, SHA-256), và để chép bản phát hành sang
+đơn vị nhận khi liên thông văn bản trong hệ thống (F3.12).
 
 svc-files không tin mạng nội bộ (zero-trust): mỗi yêu cầu mang token của tài khoản dịch vụ svc-workflow, lấy
 từ Keycloak bằng client credentials — cùng client dùng để đọc danh bạ, không thêm bí mật nào.
@@ -35,6 +36,30 @@ class FilesError(Exception):
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
+
+
+# svc-files từ chối chép (409): dòng liên thông không còn chờ, văn bản chưa phát hành, văn bản hạn chế hoặc tệp đã mã
+# hóa, tệp đã sang kho lạnh, băm của byte đọc ra không khớp
+DISPATCH_REFUSALS = frozenset({"not_pending", "not_issued", "restricted", "cold", "integrity"})
+# 422: trạm quét chặn bản phát hành lúc chép (mẫu mã độc mới, giới hạn quét đổi) — chép lại cũng bị chặn
+DISPATCH_BLOCKED = frozenset({"infected", "unscannable"})
+# thử lại cũng ra đúng lỗi đó: dòng liên thông thành failed thay vì chờ mãi (dòng chờ còn chặn nộp lưu văn bản gửi)
+DISPATCH_FINAL = (DISPATCH_REFUSALS - {"not_pending"}) | DISPATCH_BLOCKED
+
+
+class DispatchFileError(FilesError):
+    """svc-files chưa chép được tệp phát hành sang đơn vị nhận.
+
+    code: một mã trong DISPATCH_REFUSALS (409), DISPATCH_BLOCKED (422), ``unavailable`` (503, không gọi được) hoặc
+    ``http_<mã>``.
+    message: câu tiếng Việt ngắn, ghi vào ``last_error`` của dòng liên thông — người dùng thấy ở thẻ "Liên thông".
+    """
+
+    def __init__(self, code: str, message: str, status: int | None = None, detail: str = "") -> None:
+        super().__init__(message, status)
+        self.code = code
+        self.message = message
+        self.detail = detail  # nguyên văn để ghi nhật ký, không đưa ra giao diện
 
 
 class ServiceToken:
@@ -93,3 +118,39 @@ class FilesClient:
         if r.status_code != 201:
             raise FilesError(f"svc-files trả {r.status_code}: {r.text[:300]}", r.status_code)
         return r.json()
+
+    async def dispatch_file(self, dispatch_id: str, *, actor_id: str = "svc-workflow") -> dict[str, Any]:
+        """Liên thông (F3.12): chép tệp phát hành của văn bản nguồn sang thuê ước nhận → {file_id, sha256, size_bytes}.
+
+        svc-files tự đọc dòng liên thông và tệp phát hành bằng khóa quản trị: bên gọi chỉ nói dòng nào, không chỉ
+        định được tệp. Bản sao mang id định trước trong dòng (``dispatches.file_id``) nên gọi lại không chép hai lần —
+        201 lần đầu, 200 khi đã có.
+        """
+        headers = {"Authorization": f"Bearer {await self._token.get()}"}
+        try:
+            r = await self._http.post("/internal/dispatch-file", headers=headers, json={
+                "dispatch_id": str(uuid.UUID(dispatch_id)),
+                "actor_id": actor_id,
+            })
+        except httpx2.HTTPError as exc:
+            raise DispatchFileError("unavailable", "Chưa gọi được dịch vụ tệp, sẽ thử lại",
+                                    detail=f"Không gọi được svc-files: {exc}") from exc
+        if r.status_code in (200, 201):
+            return r.json()
+        try:
+            body = r.json()
+        except ValueError:
+            body = None
+        detail = body.get("detail") if isinstance(body, dict) else None
+        detail = detail if isinstance(detail, dict) else {}
+        text = f"svc-files trả {r.status_code}: {r.text[:300]}"
+        if r.status_code == 409 and detail.get("code") in DISPATCH_REFUSALS:
+            message = str(detail.get("message") or detail["code"])[:300]
+            raise DispatchFileError(str(detail["code"]), message, 409, text)
+        if r.status_code == 422 and detail.get("code") in DISPATCH_BLOCKED:
+            raise DispatchFileError(str(detail["code"]), "Trạm quét mã độc chặn bản phát hành khi chép sang đơn vị nhận",
+                                    422, text)
+        if r.status_code == 503:
+            raise DispatchFileError("unavailable", "Kho tệp hoặc trạm quét chưa sẵn sàng, sẽ thử lại", 503, text)
+        raise DispatchFileError(f"http_{r.status_code}", f"Dịch vụ tệp trả lỗi {r.status_code}, sẽ thử lại",
+                                r.status_code, text)

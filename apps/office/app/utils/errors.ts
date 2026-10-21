@@ -19,8 +19,9 @@ import { ApiError } from '~/composables/useApi'
 
 // Lỗi từ máy chủ → câu cho người dùng. Hasura trả tên ràng buộc trong CSDL (db/README.md: đặt tên cho
 // ràng buộc check) nên dịch được thành câu tiếng Việt cụ thể; svc-workflow đã trả câu tiếng Việt sẵn.
+// documents_recipient_units gồm cả documents_recipient_units_out, _other và lỗi của trigger cùng tiền tố (F3.12).
 const CONSTRAINTS = ['documents_in_dedup', 'documents_due_after_registered', 'documents_body_length',
-  'document_files_sealed', 'documents_restricted_sealed']
+  'document_files_sealed', 'documents_restricted_sealed', 'documents_restricted_local', 'documents_recipient_units']
 
 export function errorText(t: Composer['t'], e: unknown): string {
   if (e instanceof ApiError) {
@@ -28,6 +29,10 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'session') return t('error.session')
     if (e.code === 'infected') return t('error.infected')
     if (e.code === 'unscannable') return t('error.unscannable')    // có mật khẩu, nén quá sâu: ClamAV không quét hết
+    // submitOutgoing kiểm đơn vị nhận (restricted / self / unknown) ở trang văn bản, nơi không có ô nào để đánh dấu
+    if (e.code === 'invalid' && e.fields?.recipient_tenant_ids) {
+      return t(e.fields.recipient_tenant_ids === 'restricted' ? 'error.documents_restricted_local' : 'error.documents_recipient_units')
+    }
     if (e.code === 'invalid') return t('error.invalid')            // svc-workflow trả lỗi từng trường (fields)
     if (e.code === 'duplicate') return t('error.documents_in_dedup')
     if (e.status === 413) return t('error.too_large')

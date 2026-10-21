@@ -9,11 +9,11 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 35 | 8 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
-| `staff` (chuyên viên) | `chuyenviendt` | 28 | 23 | [`graphql/staff.graphql`](graphql/staff.graphql) |
-| `manager` (lãnh đạo phòng) | `totruongdt` | 28 | 13 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 44 | 6 | [`graphql/director.graphql`](graphql/director.graphql) |
-| `tenant_admin` (quản trị đơn vị) | `quantri` | 18 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
+| `clerk` (văn thư) | `vanthu` | 38 | 8 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `staff` (chuyên viên) | `chuyenviendt` | 31 | 23 | [`graphql/staff.graphql`](graphql/staff.graphql) |
+| `manager` (lãnh đạo phòng) | `totruongdt` | 31 | 13 | [`graphql/manager.graphql`](graphql/manager.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 47 | 6 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `tenant_admin` (quản trị đơn vị) | `quantri` | 19 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
 
@@ -45,6 +45,9 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_case_files_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_departments` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_departments_by_pk` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `office_dispatch_units` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `office_dispatches` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_dispatches_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_document_acl` | ✓ |  |  | ✓ |  |
 | `office_document_acl_by_pk` | ✓ |  |  | ✓ |  |
 | `office_document_events` | ✓ | ✓ | ✓ | ✓ |  |

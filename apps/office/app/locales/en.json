@@ -47,7 +47,11 @@
     "in_review": "In review",
     "returned": "Returned",
     "approved": "Approved",
-    "issued": "Issued"
+    "issued": "Issued",
+    "pending": "Sending",
+    "delivered": "Delivered",
+    "duplicate": "Already received",
+    "failed": "Failed"
   },
   "urgency": {
     "normal": "Normal",
@@ -84,7 +88,10 @@
         "approved": "Approved and signed",
         "numbered": "Numbered {symbol}",
         "issued": "Issued",
-        "overdue": "Past due date ({due})"
+        "overdue": "Past due date ({due})",
+        "dispatched": "Dispatched within the system to {name}",
+        "dispatch_duplicate": "{name} already had this document — no duplicate created",
+        "arrived": "Received from {name} within the system"
       },
       "task": {
         "overdue": "Step “{task}” overdue, reminder sent",
@@ -96,7 +103,8 @@
     "notified": "Informed: {names}",
     "ot": {
       "alarm": "Sensor {name} read {value} °C, above the {threshold} °C threshold — draft created by the system"
-    }
+    },
+    "sourceCode": "Sender’s verification code: {code}"
   },
   "inbox": {
     "title": "My tasks",
@@ -121,7 +129,8 @@
     "issuer": "Issuer",
     "summary": "Summary",
     "status": "Status",
-    "due": "Due"
+    "due": "Due",
+    "dispatched": "Inter-unit"
   },
   "receive": {
     "title": "Receive an incoming document",
@@ -213,7 +222,27 @@
     "viewerRemove": "Remove",
     "viewerBy": "granted by {by} at {at}",
     "viewerGranted": "{name} can now read this document",
-    "viewerRevoked": "{name} can no longer read this document"
+    "viewerRevoked": "{name} can no longer read this document",
+    "dispatch": {
+      "title": "Dispatch within the system",
+      "plannedHint": "Once issued, the document goes straight to the clerks of the units below, with the issued PDF.",
+      "sentHint": "The document goes straight to each unit’s clerk with the issued PDF; they register and handle it like any incoming document.",
+      "status": {
+        "pending": "Sending",
+        "delivered": "Delivered",
+        "duplicate": "Already received",
+        "failed": "Failed"
+      },
+      "deliveredAt": "Delivered at {at}",
+      "duplicateHint": "The receiving unit had already registered this document, so no duplicate was created.",
+      "retrying": "Attempt {n} failed: {error} — retrying automatically",
+      "from": "Received from {name}",
+      "sourceCode": "Sender’s verification code",
+      "hashMatch": "SHA-256 matches the issued copy",
+      "hashMismatch": "SHA-256 does NOT match the sender’s issued copy — report it to the administrator",
+      "fromHint": "An outgoing document of another unit on Mộc, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
+      "manualHint": "The clerk registered this document from paper or email; the sender's in-system dispatch arrived later and was only linked, so the attached file is the one the clerk uploaded. Open the verification page to compare it with the issued copy."
+    }
   },
   "form": {
     "chiDao": {
@@ -290,7 +319,9 @@
     "documents_body_length": "The body is longer than 20,000 characters.",
     "invalid": "Some fields are not valid, see the highlighted fields.",
     "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",
-    "documents_restricted_sealed": "This document already has files, so its restricted setting cannot change"
+    "documents_restricted_sealed": "This document already has files, so its restricted setting cannot change",
+    "documents_restricted_local": "Restricted documents cannot be sent to other units within the system.",
+    "documents_recipient_units": "Invalid receiving unit (unknown, or your own unit), or the document was already submitted so its receiving units can no longer change."
   },
   "validation": {
     "required": "Required",
@@ -350,7 +381,10 @@
     "save": "Save draft",
     "saved": "Draft saved.",
     "restored": "Restored your unsaved draft.",
-    "notEditable": "This draft can no longer be edited: it was submitted, or you are not its author."
+    "notEditable": "This draft can no longer be edited: it was submitted, or you are not its author.",
+    "units": "Send within the system",
+    "unitsHint": "Once issued, the document goes straight to the clerks of the selected units, with the issued PDF. Ticking a unit adds its name to the recipients.",
+    "unitsRestricted": "Restricted documents are not sent to other units: their files can only be opened in your own unit."
   },
   "verify": {
     "title": "Verify a document",
@@ -393,7 +427,8 @@
     "documentProcessed": "{name} reported the result",
     "documentOverdue": "Document past its due date ({due})",
     "otAlarm": "Temperature alert in {name}: {value} °C — incident report draft ready",
-    "restricted": "Restricted document"
+    "restricted": "Restricted document",
+    "documentIncoming": "Incoming document from {name} (within the system)"
   },
   "audit": {
     "title": "Audit log",
@@ -453,7 +488,8 @@
         "registers": "Register",
         "document_types": "Document type",
         "case_files": "Case file",
-        "case_file_documents": "Document in case file"
+        "case_file_documents": "Document in case file",
+        "dispatches": "Inter-unit dispatch"
       },
       "core": {
         "files": "Uploaded file",
@@ -524,7 +560,17 @@
       "case_file_id": "Case file",
       "documents": "Documents",
       "files": "Files",
-      "title": "case file title"
+      "title": "case file title",
+      "recipient_tenant_ids": "receiving units",
+      "to_tenant_id": "Receiving unit",
+      "incoming_document_id": "receiver’s incoming document",
+      "source_verify_code": "sender’s verification code",
+      "source_sha256": "issued copy hash",
+      "attempts": "Attempts",
+      "last_error": "last error",
+      "delivered_at": "Delivered at",
+      "next_attempt_at": "next attempt at",
+      "notified_at": "notified at"
     },
     "direction": {
       "in": "Incoming",

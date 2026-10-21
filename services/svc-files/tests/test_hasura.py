@@ -123,6 +123,24 @@ def test_log_event_sends_details_as_jsonb():
     assert headers["x-hasura-role"] == "service"
     assert body["variables"]["o"]["diff"] == {"signature": "Eicar"}
     assert body["variables"]["o"]["action"] == "file.rejected"
+    assert body["variables"]["o"]["actor_kind"] == "user"
+
+
+def test_dispatch_source_reads_with_admin_secret_and_returns_hex_hashes():
+    rec = Recorder((200, {"data": {"office_dispatches_by_pk": {
+        "id": "d-1", "tenant_id": str(TENANT), "to_tenant_id": "t-2", "status": "pending", "file_id": str(FILE),
+        "source_sha256": "\\x" + "ab" * 32,
+        "document": {"id": "doc-1", "status": "issued", "restricted": False, "content_sha256": "\\x" + "ab" * 32,
+                     "files": [{"file": {"id": "f-1", "object_key": "k", "filename": "a.pdf",
+                                         "mime_type": "application/pdf", "size_bytes": 10, "sha256": "\\x" + "ab" * 32,
+                                         "encrypted": False, "storage_tier": "hot"}}]},
+    }}}))
+    row = run(client(rec).dispatch_source(uuid.uuid4()))
+    headers, _ = rec.last
+    assert headers["x-hasura-admin-secret"] == "bi-mat" and "x-hasura-role" not in headers
+    assert row["source_sha256"] == row["document"]["content_sha256"] == row["document"]["issued"][0]["sha256"] \
+        == "ab" * 32
+    assert "files" not in row["document"]
 
 
 def test_ping():

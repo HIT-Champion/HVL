@@ -20,7 +20,8 @@ văn thư tải công văn lên (qua ClamAV) → nhập văn bản (Action recei
 và ở CSDL, theo cùng schemas/van-ban-den.json với form) → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
 Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Rồi luồng văn bản đi: chuyên
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
-mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Thông báo: tổ trưởng nhận tin việc mới
+mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Liên thông: công văn gửi Khoa Kinh tế trong hệ
+thống thành văn bản đến của bên nhận, cùng bản phát hành. Thông báo: tổ trưởng nhận tin việc mới
 qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
 kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
 có con số tổng), văn thư không đọc được. Văn bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người
@@ -56,6 +57,7 @@ from moc_env import (EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_jso
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
+TENANT_KT = "318da474-60d6-4a90-aa7f-928b31b8fc59"     # Khoa Kinh tế (seed/tenants.sql)
 
 passed = 0
 
@@ -427,6 +429,24 @@ def main() -> None:
     except HTTPError as exc:
         exc.status == 404 or fail(f"tải tệp của đơn vị khác trả {exc.status}")
     ok("đơn vị khác không tải được tệp (404)")
+    # F3.12: mỗi đơn vị mẫu đúng một Organization trong Keycloak mang tenant_id của nó; tài khoản của đơn vị là thành
+    # viên Organization đó và không thuộc Organization nào khác; danh bạ core.users khớp Keycloak (moc tenant check)
+    seeded = ("CNTT", "KT")
+    checked = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "tenant",
+                              "check", *seeded, "--json"], capture_output=True, text=True)
+    try:
+        orgs = json.loads(checked.stdout)
+    except json.JSONDecodeError:
+        fail(f"moc tenant check không chạy được: {checked.stderr.strip() or checked.stdout.strip()}")
+    checked.returncode == 0 and orgs["ok"] \
+        or fail(f"đơn vị và Keycloak Organizations lệch nhau (make seed đã chạy lại chưa?): "
+                f"{orgs.get('problems') or orgs.get('error')}")
+    units = {t["code"]: t for t in orgs["tenants"]}
+    all(units[c]["organization"] and units[c]["members"] == units[c]["accounts"] >= 1 for c in seeded) \
+        or fail(f"Organization của đơn vị mẫu chưa đủ thành viên: {orgs['tenants']}")
+    ok("mỗi đơn vị một Organization Keycloak mang đúng tenant_id ("
+       + ", ".join(f"{units[c]['organization']}: {units[c]['members']} thành viên" for c in seeded)
+       + "); không tài khoản nào lạc sang Organization của đơn vị khác")
 
     print("Văn bản đi")
     signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
@@ -473,6 +493,46 @@ def main() -> None:
     changed = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(tampered).hexdigest()}")[0]["result"]
     (same, changed) == ("valid", "not_found") or fail(f"tra theo băm sai: nguyên vẹn {same}, đã sửa {changed}")
     ok("tệp nguyên vẹn → khớp; sửa một byte → không khớp")
+
+    # F3.12: công văn gửi Khoa Kinh tế trong hệ thống — phát hành xong thì văn thư bên nhận tự có văn bản đến kèm đúng
+    # bản phát hành. svc-workflow chép ngay sau lần phát hành; trượt thì vòng đối soát nền làm lại
+    print("Liên thông trong hệ thống")
+    sent = staff.gql(
+        "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }",
+        {"o": {"type_code": "CV", "recipients": ["Khoa Kinh tế"], "recipient_tenant_ids": [TENANT_KT],
+               "summary": f"Về việc phối hợp tổ chức hội thảo khoa học liên khoa (kiểm tra {tag})",
+               "body": "Khoa Công nghệ thông tin đề nghị Khoa Kinh tế cử cán bộ tham gia ban tổ chức hội thảo."}},
+    )["insert_office_documents_one"]["id"]
+    staff.gql("mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }",
+              {"d": sent, "s": signer})
+    manager.complete(manager.wait_task(sent, "vbdi.duyetPhong"), "approve", {})
+    director.complete(director.wait_task(sent, "vbdi.duyetDonVi"), "approve", {})
+    clerk.complete(clerk.wait_task(sent, "vbdi.phatHanh"), "issue", {"is_public": False})
+    source = clerk.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { status symbol content_sha256 } }",
+                       {"id": sent})["office_documents_by_pk"]
+    source["status"] == "issued" or fail(f"công văn gửi Khoa Kinh tế chưa phát hành: {source}")
+    sender = clerk.gql("{ core_tenants { name } }")["core_tenants"][0]["name"]
+    arrived_q = """query ($s: uuid!) { office_documents(where: {source_id: {_eq: $s}}) { id direction status symbol
+        issuer_name files { role file_id file { sha256 } } } }"""
+    started, arrived = time.time(), []
+    while not arrived and time.time() - started < 90:
+        arrived = other_tenant.gql(arrived_q, {"s": sent})["office_documents"]
+        arrived or time.sleep(2)
+    len(arrived) == 1 or fail(f"sau {time.time() - started:.0f} giây văn thư Khoa Kinh tế chưa có đúng một văn bản đến"
+                              f" từ công văn vừa phát hành: {arrived}")
+    got = arrived[0]
+    (got["direction"], got["status"], got["symbol"], got["issuer_name"]) == ("in", "received", source["symbol"], sender) \
+        and [(f["role"], (f["file"] or {}).get("sha256")) for f in got["files"]] == [("main", source["content_sha256"])] \
+        or fail(f"văn bản đến liên thông chưa đúng (cần received, cùng số ký hiệu, tệp chính cùng băm): {got}")
+    seen = clerk.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { id } }", {"id": got["id"]})
+    seen["office_documents_by_pk"] is None or fail("Khoa CNTT đọc được văn bản đến của Khoa Kinh tế")
+    try:
+        request("GET", f"{PUBLIC_URL}/api/files/{got['files'][0]['file_id']}", headers=clerk.auth)
+        fail("Khoa CNTT tải được bản sao nằm trong kho của Khoa Kinh tế")
+    except HTTPError as exc:
+        exc.status == 404 or fail(f"tải bản sao của đơn vị khác trả {exc.status}")
+    ok(f"công văn {source['symbol']} gửi Khoa Kinh tế: {time.time() - started:.0f} giây sau phát hành văn thư bên nhận có"
+       " văn bản đến (chờ vào sổ), tệp chính cùng SHA-256 bản phát hành; Khoa CNTT không đọc được văn bản, tệp bên nhận")
 
     print("Tìm theo nội dung tệp PDF")
     # svc-files đọc lớp chữ ở vòng nền (MOC_TEXT_INTERVAL_S) rồi đồng bộ sang Meilisearch (MOC_SEARCH_SYNC_INTERVAL_S)

@@ -10,9 +10,9 @@ Chủ: issue #15.
 |---|---|---|
 | `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến: kiểm lại `data` theo `schemas/van-ban-den.json` (poka-yoke lớp 2, F2.2), tra loại văn bản, tệp, văn bản trùng, rồi ghi văn bản `received`. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`) |
 | `registerIncoming(documentId)` | `clerk` | Vào sổ (hàm `office.register_incoming`, một giao dịch) → khởi chạy `van-ban-den` |
-| `submitOutgoing(documentId, signerId)` | `staff` | Người soạn trình dự thảo → khởi chạy `van-ban-di`, hoặc trình lại sau khi bị trả lại |
+| `submitOutgoing(documentId, signerId)` | `staff` | Người soạn trình dự thảo → khởi chạy `van-ban-di`, hoặc trình lại sau khi bị trả lại. Có đơn vị nhận trong hệ thống (`recipient_tenant_ids`) thì kiểm: có thật, không phải đơn vị mình, văn bản không hạn chế (`400`, `fields.recipient_tenant_ids` = `unknown` / `self` / `restricted`) |
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
-| `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` |
+| `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` → liên thông tới đơn vị nhận trong hệ thống |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
@@ -50,6 +50,18 @@ của cảm biến, và báo người đó. Còn dự thảo chưa trình hoặc
 nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi thông báo (nhật ký Scorpio: "Mutiny had
 to drop … ResponseException").
 
+**Liên thông trong hệ thống** (F3.12, `dispatch.py`): văn bản đi có đơn vị nhận trong hệ thống thì lúc phát hành
+CSDL tạo một dòng `office.dispatches` `pending` cho mỗi đơn vị, cùng giao dịch (trigger — hộp thư đi). Sau khi
+chuyển bước, `completeTask` chuyển ngay các dòng của văn bản đó (giới hạn 15 giây, lỗi không làm hỏng bước phát
+hành): `svc-files` chép bản PDF phát hành sang đơn vị nhận (`POST /internal/dispatch-file`, id bản sao định trước)
+→ hàm `office.deliver_dispatch`, gọi trong phiên của bên nhận, dựng văn bản đến `received` gắn bản sao, ghi sự kiện
+ở cả hai bên → báo văn thư bên nhận (`document.incoming`; không có văn thư thì lãnh đạo đơn vị) → đặt
+`notified_at`. Lỗi thì ghi `last_error` (bên gửi thấy ở thẻ "Liên thông"), thử lại sau 30 s·2^lần, tối đa 1 giờ; mỗi
+`MOC_DISPATCH_INTERVAL_S` giây vòng nền chuyển dòng đã đến hạn và báo dòng đã chuyển mà chưa báo (dịch vụ dừng giữa
+chừng). Bên nhận đã tiếp nhận tay văn bản này thì dòng thành `duplicate`, nối vào văn bản đã có, không báo ai; CSDL
+từ chối dữ liệu thì `failed`, không thử lại (chưa có thao tác gửi lại). Mỗi dòng một lượt (`dispatch:<id>`), mỗi
+người nhận một thông báo (khóa `doc:<văn bản đến>:document.incoming`); sự kiện liên thông không mang `task_id`.
+
 **Văn bản hạn chế** (F3.7): sau mỗi bước, người phải làm việc đang mở được thêm vào danh sách xem
 (`office.document_acl`, đã có tên thì giữ nguyên); người không đọc được văn bản thì `completeTask` từ chối (`403`
 `restricted`), `registerIncoming` trả `404` như không có văn bản. Phát hành không được công khai trích yếu (`400`,
@@ -58,7 +70,8 @@ leo thang, báo quá hạn chỉ tới người có tên trong danh sách xem v�
 
 Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp không đổi); đồng bộ danh bạ Keycloak →
 `core.users` mỗi `MOC_DIRECTORY_SYNC_INTERVAL_S` giây; mỗi `MOC_RECONCILE_INTERVAL_S` giây đối soát văn bản đã
-vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn giải quyết; nhận việc nhắc hạn của Flowable.
+vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn giải quyết; nhận việc nhắc hạn của Flowable; mỗi
+`MOC_DISPATCH_INTERVAL_S` giây chuyển tiếp liên thông.
 
 ## Cấu hình
 
@@ -84,7 +97,8 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `CENTRIFUGO_API_KEY` | trống | Khóa HTTP API của Centrifugo; trống thì chỉ lưu thông báo, không đẩy realtime |
 | `MOC_CENTRIFUGO_URL` | `http://centrifugo:9000` | Cổng nội bộ của Centrifugo (API), không qua APISIX |
 | `MOC_DIRECTORY_SYNC_INTERVAL_S`, `MOC_RECONCILE_INTERVAL_S`, `MOC_SLA_POLL_INTERVAL_S` | `15`, `300`, `5` | `0` tắt vòng nền |
-| `MOC_FILES_URL` | `http://svc-files:8000` | Dựng bản phát hành văn bản đi; gọi bằng token tài khoản dịch vụ của client `svc-workflow` |
+| `MOC_DISPATCH_INTERVAL_S` | `30` | Chu kỳ vòng nền liên thông (F3.12); ngắn để lần thử lại đúng hẹn. `0` tắt |
+| `MOC_FILES_URL` | `http://svc-files:8000` | Dựng bản phát hành văn bản đi, chép bản phát hành khi liên thông; gọi bằng token tài khoản dịch vụ của client `svc-workflow` |
 | `MOC_NGSI_URL` | trống | Context broker NGSI-LD, vd `http://scorpio:9090`; trống thì tắt IT/OT (`/ot/notify` trả 404) |
 | `MOC_OT_THRESHOLD` | `35` | Ngưỡng nhiệt độ (°C) của subscription |
 | `MOC_OT_NOTIFY_URL` | `http://svc-workflow:8000` | Địa chỉ broker dùng để gọi lại dịch vụ |
@@ -95,7 +109,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 207 test đơn vị với Flowable, Hasura, Centrifugo giả lập
+.venv/bin/python -m pytest          # 303 test đơn vị với Flowable, Hasura, svc-files, Centrifugo giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

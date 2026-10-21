@@ -971,6 +971,61 @@ input office_departments_updates {
   where: office_departments_bool_exp!
 }
 
+"columns and relationships of \"office.dispatch_units\""
+type office_dispatch_units {
+  code: String
+  id: uuid
+  name: String
+  parent_name: String
+}
+
+"Boolean expression to filter rows from the table \"office.dispatch_units\". All fields are combined with a logical 'AND'."
+input office_dispatch_units_bool_exp {
+  _and: [office_dispatch_units_bool_exp!]
+  _not: office_dispatch_units_bool_exp
+  _or: [office_dispatch_units_bool_exp!]
+  code: String_comparison_exp
+  id: uuid_comparison_exp
+  name: String_comparison_exp
+  parent_name: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.dispatch_units\"."
+input office_dispatch_units_order_by {
+  code: order_by
+  id: order_by
+  name: order_by
+  parent_name: order_by
+}
+
+"select columns of table \"office.dispatch_units\""
+enum office_dispatch_units_select_column {
+  "column name"
+  code
+  "column name"
+  id
+  "column name"
+  name
+  "column name"
+  parent_name
+}
+
+"Streaming cursor of the table \"office_dispatch_units\""
+input office_dispatch_units_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_dispatch_units_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_dispatch_units_stream_cursor_value_input {
+  code: String
+  id: uuid
+  name: String
+  parent_name: String
+}
+
 "columns and relationships of \"office.document_types\""
 type office_document_types {
   code: String!
@@ -1219,6 +1274,19 @@ type query_root {
   ): [office_departments!]!
   "fetch data from the table: \"office.departments\" using primary key columns"
   office_departments_by_pk(id: uuid!): office_departments
+  "fetch data from the table: \"office.dispatch_units\""
+  office_dispatch_units(
+    "distinct select on columns"
+    distinct_on: [office_dispatch_units_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatch_units_order_by!]
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
   "fetch data from the table: \"office.document_types\""
   office_document_types(
     "distinct select on columns"
@@ -1433,6 +1501,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_departments_bool_exp
   ): [office_departments!]!
+  "fetch data from the table: \"office.dispatch_units\""
+  office_dispatch_units(
+    "distinct select on columns"
+    distinct_on: [office_dispatch_units_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatch_units_order_by!]
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table in a streaming manner: \"office.dispatch_units\""
+  office_dispatch_units_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_dispatch_units_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
   "fetch data from the table: \"office.document_types\""
   office_document_types(
     "distinct select on columns"

@@ -36,8 +36,18 @@
         Dừng Mộc, thay mọi CSDL và tệp bằng một lượt (mặc định lượt mới nhất), ghi lần khôi phục vào sổ kiểm
         toán, chạy lại. Hỏi lại trước khi thay, trừ khi có --yes. (make restore)
 
-Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`: không mở thêm
-cổng nào, không cần mật khẩu ngoài .env.
+    python3 scripts/moc.py tenant create --code MÃ --name TÊN --admin TÊN_ĐĂNG_NHẬP [--department "MÃ=Tên" ...]
+                                         [--dry-run] [--json] …
+        Thêm (hoặc cập nhật) một đơn vị: dòng core.tenants, phòng, Organization trong Keycloak, tài khoản quản trị
+        đơn vị với mật khẩu tạm (in một lần). Chạy lại được. Thoát 0: xong; 1: bị từ chối hoặc danh bạ chưa đồng bộ;
+        2: không gọi được CSDL, Keycloak. (chi tiết trong scripts/tenants.py)
+
+    python3 scripts/moc.py tenant list [--json] | check [MÃ ...] [--json]
+        Các đơn vị kèm số phòng, người dùng, văn bản, Organization; đối chiếu đơn vị, Organization, thành viên và
+        danh bạ core.users. check thoát 1 nếu lệch.
+
+Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`, gọi Keycloak qua cổng
+quản trị nội bộ (127.0.0.1): không mở thêm cổng nào, không cần mật khẩu ngoài .env.
 """
 
 from __future__ import annotations
@@ -53,6 +63,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import backup
+import tenants
 from audit_chain import ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Report, check, local_time, to_datetime
 from moc_env import ENV, ROOT
 
@@ -308,6 +319,45 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("run_id", nargs="?", metavar="LƯỢT", help="mã lượt trong backup list; mặc định: lượt mới nhất")
     r.add_argument("--yes", action="store_true", help="không hỏi lại")
     r.set_defaults(run=backup.cmd_restore)
+
+    t = groups.add_parser("tenant", help="đơn vị (thuê ước) và Keycloak Organizations (F3.12)").add_subparsers(
+        dest="cmd", required=True)
+    tc = t.add_parser("create", help="thêm hoặc cập nhật một đơn vị: CSDL, Organization, quản trị đơn vị (chạy lại được)")
+    tc.add_argument("--code", required=True, type=tenants.code_arg, metavar="MÃ",
+                    help="mã viết trong ký hiệu văn bản, vd KTCK (không dấu cách, '/', '-'; tối đa 20 ký tự)")
+    tc.add_argument("--name", required=True, type=tenants.text_arg, metavar="TÊN", help='tên đơn vị, vd "Khoa Cơ khí"')
+    tc.add_argument("--parent-name", type=tenants.text_arg, metavar="TÊN", help="cơ quan chủ quản in trên văn bản đi")
+    tc.add_argument("--place-name", type=tenants.text_arg, metavar="TÊN", help="địa danh trước ngày tháng, vd Hà Nội")
+    tc.add_argument("--head-title", type=tenants.text_arg, metavar="TÊN",
+                    help="chức vụ người đứng đầu ở phần ký, vd Trưởng khoa")
+    tc.add_argument("--org-ident", type=tenants.org_ident_arg, metavar="MÃ",
+                    help="mã định danh 13 ký tự theo QCVN 102 (tùy chọn)")
+    tc.add_argument("--department", type=tenants.department_arg, action="append", default=[], metavar="MÃ=TÊN",
+                    help='phòng, bộ môn; lặp lại cho nhiều phòng, vd --department "VP=Văn phòng khoa"')
+    tc.add_argument("--admin", required=True, type=tenants.username_arg, metavar="TÊN_ĐĂNG_NHẬP",
+                    help="tài khoản quản trị đơn vị (tenant_admin); đã có ở đơn vị này thì giữ nguyên")
+    tc.add_argument("--admin-name", type=tenants.person_arg, metavar="HỌ_TÊN",
+                    help='họ và tên, vd "Ngô Văn Tín" (mặc định: Quản trị <tên đơn vị>)')
+    tc.add_argument("--admin-email", type=tenants.email_arg, metavar="EMAIL",
+                    help="mặc định <tên đăng nhập>@<alias>.moc.example — thành viên Organization phải có email")
+    tc.add_argument("--alias", type=tenants.alias_arg,
+                    help="alias Organization (mặc định suy từ mã: ĐT → dt); Keycloak không cho đổi sau khi tạo")
+    tc.add_argument("--domain", type=tenants.domain_arg, action="append", default=[], metavar="TÊN_MIỀN",
+                    help="tên miền email của đơn vị gắn vào Organization (tùy chọn, lặp lại được)")
+    tc.add_argument("--reset-password", action="store_true",
+                    help="quản trị đơn vị đã có: đặt lại mật khẩu tạm (vd mất mật khẩu in lần trước)")
+    tc.add_argument("--wait", type=int, default=90, metavar="GIÂY",
+                    help="đợi svc-workflow chép quản trị đơn vị vào danh bạ tối đa bao lâu (mặc định 90; 0: không đợi)")
+    tc.add_argument("--dry-run", action="store_true", help="chỉ in kế hoạch, không thay đổi gì")
+    tc.add_argument("--json", action="store_true", help="in kết quả dạng JSON (có mật khẩu tạm nếu vừa đặt)")
+    tc.set_defaults(run=tenants.cmd_create)
+    tl = t.add_parser("list", help="các đơn vị: phòng, người dùng, văn bản, Organization")
+    tl.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    tl.set_defaults(run=tenants.cmd_list)
+    tk = t.add_parser("check", help="đối chiếu đơn vị, Organization, thành viên và danh bạ core.users")
+    tk.add_argument("codes", nargs="*", metavar="MÃ", help="chỉ kiểm các đơn vị này (mặc định: tất cả)")
+    tk.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    tk.set_defaults(run=tenants.cmd_check)
     args = parser.parse_args(argv)
     return args.run(args)
 

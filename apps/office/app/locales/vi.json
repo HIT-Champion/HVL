@@ -47,7 +47,11 @@
     "in_review": "Đang trình",
     "returned": "Bị trả lại",
     "approved": "Đã duyệt",
-    "issued": "Đã phát hành"
+    "issued": "Đã phát hành",
+    "pending": "Đang chuyển",
+    "delivered": "Đã chuyển",
+    "duplicate": "Bên nhận đã có",
+    "failed": "Không chuyển được"
   },
   "urgency": {
     "normal": "Thường",
@@ -84,7 +88,10 @@
         "approved": "Ký duyệt",
         "numbered": "Cấp số {symbol}",
         "issued": "Phát hành",
-        "overdue": "Quá hạn giải quyết ({due})"
+        "overdue": "Quá hạn giải quyết ({due})",
+        "dispatched": "Chuyển liên thông tới {name}",
+        "dispatch_duplicate": "{name} đã có văn bản này, không tạo bản trùng",
+        "arrived": "Nhận liên thông từ {name}"
       },
       "task": {
         "overdue": "Quá hạn bước «{task}», đã nhắc",
@@ -96,7 +103,8 @@
     "notified": "Đã báo: {names}",
     "ot": {
       "alarm": "Cảm biến {name} đo {value} °C, vượt ngưỡng {threshold} °C — hệ thống dựng dự thảo"
-    }
+    },
+    "sourceCode": "Mã xác thực của bên gửi: {code}"
   },
   "inbox": {
     "title": "Hộp việc",
@@ -121,7 +129,8 @@
     "issuer": "Cơ quan ban hành",
     "summary": "Trích yếu",
     "status": "Trạng thái",
-    "due": "Hạn xử lý"
+    "due": "Hạn xử lý",
+    "dispatched": "Liên thông"
   },
   "receive": {
     "title": "Tiếp nhận văn bản đến",
@@ -213,7 +222,27 @@
     "viewerRemove": "Gỡ",
     "viewerBy": "{by} cấp lúc {at}",
     "viewerGranted": "Đã cấp quyền xem cho {name}",
-    "viewerRevoked": "Đã gỡ quyền xem của {name}"
+    "viewerRevoked": "Đã gỡ quyền xem của {name}",
+    "dispatch": {
+      "title": "Liên thông trong hệ thống",
+      "plannedHint": "Phát hành xong, văn bản tự chuyển tới văn thư các đơn vị dưới đây, kèm bản PDF đã phát hành.",
+      "sentHint": "Văn bản tự chuyển tới văn thư từng đơn vị, kèm bản PDF đã phát hành; bên nhận vào sổ, xử lý như văn bản đến khác.",
+      "status": {
+        "pending": "Đang chuyển",
+        "delivered": "Đã chuyển",
+        "duplicate": "Bên nhận đã có",
+        "failed": "Không chuyển được"
+      },
+      "deliveredAt": "Đã chuyển lúc {at}",
+      "duplicateHint": "Đơn vị nhận đã tiếp nhận văn bản này trước đó, không tạo bản trùng.",
+      "retrying": "Lần thử thứ {n} chưa được: {error} — hệ thống tự thử lại",
+      "from": "Nhận từ {name}",
+      "sourceCode": "Mã xác thực của bên gửi",
+      "hashMatch": "SHA-256 khớp bản phát hành",
+      "hashMismatch": "SHA-256 KHÔNG khớp bản phát hành của bên gửi — báo quản trị hệ thống",
+      "fromHint": "Văn bản đi của đơn vị khác cùng dùng Mộc, tự chuyển sang khi bên gửi phát hành. Tệp là bản sao của bản phát hành; mở trang xác thực để đối chiếu.",
+      "manualHint": "Văn thư đã tiếp nhận văn bản này từ bản giấy hoặc thư điện tử; bên gửi phát hành qua liên thông sau đó nên chỉ nối vào, tệp đính kèm là bản văn thư tải lên. Mở trang xác thực để đối chiếu với bản phát hành."
+    }
   },
   "form": {
     "chiDao": {
@@ -290,7 +319,9 @@
     "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
     "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
     "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",
-    "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế"
+    "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
+    "documents_restricted_local": "Văn bản hạn chế không gửi liên thông trong hệ thống.",
+    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ (không có, hoặc là chính đơn vị mình), hoặc văn bản đã trình nên không đổi được đơn vị nhận."
   },
   "validation": {
     "required": "Không được để trống",
@@ -350,7 +381,10 @@
     "save": "Lưu dự thảo",
     "saved": "Đã lưu dự thảo.",
     "restored": "Đã khôi phục phần đang soạn dở, chưa lưu.",
-    "notEditable": "Dự thảo này không sửa được nữa: đã trình, hoặc không phải bạn soạn."
+    "notEditable": "Dự thảo này không sửa được nữa: đã trình, hoặc không phải bạn soạn.",
+    "units": "Gửi trong hệ thống",
+    "unitsHint": "Phát hành xong, văn bản tự chuyển tới văn thư các đơn vị được chọn, kèm bản PDF đã phát hành. Tích một đơn vị thì tên được thêm vào ô nơi nhận.",
+    "unitsRestricted": "Văn bản hạn chế không gửi liên thông trong hệ thống: tệp chỉ mở được ở đơn vị mình."
   },
   "verify": {
     "title": "Xác thực văn bản",
@@ -393,7 +427,8 @@
     "documentProcessed": "{name} đã báo kết quả xử lý",
     "documentOverdue": "Văn bản quá hạn giải quyết ({due})",
     "otAlarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố",
-    "restricted": "Văn bản hạn chế"
+    "restricted": "Văn bản hạn chế",
+    "documentIncoming": "Văn bản đến liên thông từ {name}"
   },
   "audit": {
     "title": "Sổ kiểm toán",
@@ -453,7 +488,8 @@
         "registers": "Sổ đăng ký",
         "document_types": "Loại văn bản",
         "case_files": "Hồ sơ",
-        "case_file_documents": "Văn bản trong hồ sơ"
+        "case_file_documents": "Văn bản trong hồ sơ",
+        "dispatches": "Liên thông văn bản"
       },
       "core": {
         "files": "Tệp tải lên",
@@ -524,7 +560,17 @@
       "case_file_id": "Hồ sơ",
       "documents": "Số văn bản",
       "files": "Số tệp",
-      "title": "tên hồ sơ"
+      "title": "tên hồ sơ",
+      "recipient_tenant_ids": "đơn vị nhận trong hệ thống",
+      "to_tenant_id": "Đơn vị nhận",
+      "incoming_document_id": "văn bản đến bên nhận",
+      "source_verify_code": "mã xác thực bên gửi",
+      "source_sha256": "hash bản phát hành",
+      "attempts": "Số lần thử",
+      "last_error": "lỗi gần nhất",
+      "delivered_at": "Chuyển lúc",
+      "next_attempt_at": "thử lại lúc",
+      "notified_at": "báo lúc"
     },
     "direction": {
       "in": "Đến",

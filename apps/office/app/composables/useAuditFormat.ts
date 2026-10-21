@@ -32,7 +32,9 @@ export interface AuditRow {
 const HIDDEN = new Set(['id', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'object_key', 'document_id',
   'file_id', 'case_file_id'])
 
-export function useAuditFormat(names: { value: Map<string, string> }, departments: { value: Map<string, string> }) {
+// units: tên đơn vị khác trong hệ thống (liên thông, F3.12) — không có thì hiện id
+export function useAuditFormat(names: { value: Map<string, string> }, departments: { value: Map<string, string> },
+  units?: { value: Map<string, string> }) {
   const { t, te } = useI18n()
 
   function label(map: string, key: string) {
@@ -69,7 +71,8 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     if (col === 'direction' || col === 'role') return label(`audit.${col}`, String(value))
     if (col === 'user_id' || col === 'signer_id') return names.value.get(String(value)) ?? String(value)
     if (col === 'department_id') return departments.value.get(String(value)) ?? String(value)
-    if (col === 'registered_at' || col === 'archived_at') return fmtDateTime(String(value))
+    if (col === 'to_tenant_id') return units?.value.get(String(value)) ?? String(value)
+    if (col === 'registered_at' || col === 'archived_at' || col === 'delivered_at') return fmtDateTime(String(value))
     if (col === 'due_on' || col === 'issued_on' || col === 'closed_on') return fmtDate(String(value))
     // băm gói nộp lưu: sự kiện case_file.archived ghi dạng hex, không có tiền tố \x
     if (col === 'archive_sha256') return `${String(value).replace(/^\\x/, '').slice(0, 10)}…`

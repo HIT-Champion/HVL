@@ -23,6 +23,18 @@ import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
 // Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
 // khung xử lý việc đang chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
 // Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
+// Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Mộc có thẻ trạng thái chuyển từng đơn vị;
+// văn bản đến nhận theo đường này có thẻ "Nhận từ …" với mã xác thực của bên gửi và đối chiếu SHA-256 tệp.
+
+interface Dispatch {
+  id: string
+  to_tenant_id: string
+  status: string            // pending | delivered | duplicate | failed
+  attempts: number
+  last_error: string | null
+  delivered_at: string | null
+  to_unit: { name: string } | null
+}
 
 interface Doc {
   id: string
@@ -45,16 +57,21 @@ interface Doc {
   recipients: string[]
   signer_id: string | null
   verify_code: string | null
+  source_id: string | null
+  recipient_tenant_ids: string[]
   department: { name: string } | null
   reply_to: { id: string; symbol: string | null; summary: string } | null
-  files: { role: string; file: { id: string; filename: string; mime_type: string; size_bytes: number; encrypted: boolean } | null }[]
+  files: { role: string; file: { id: string; filename: string; mime_type: string; size_bytes: number; encrypted: boolean; sha256: string } | null }[]
   assignments: {
     id: string; parent_id: string | null; role: string; department: { name: string } | null; user_id: string | null
     instruction: string | null; due_on: string | null; status: string; result_note: string | null
     assigned_by: string; assigned_at: string; completed_at: string | null
   }[]
-  events: { id: number; kind: string; actor_id: string; actor_kind: string; note: string | null; data: Record<string, any>; created_at: string }[]
+  events: DocEvent[]
+  dispatches: Dispatch[]
+  dispatch_in: { source_verify_code: string; source_sha256: string; from_unit: { name: string } | null } | null
 }
+interface DocEvent { id: number; kind: string; actor_id: string; actor_kind: string; note: string | null; data: Record<string, any>; created_at: string }
 
 const { t } = useI18n()
 const { gql, download, preview } = useApi()
@@ -65,6 +82,7 @@ const route = useRoute()
 const doc = ref<Doc | null>(null)
 const users = ref<PanelUser[]>([])
 const departments = ref<PanelDepartment[]>([])
+const units = ref<{ id: string; name: string }[]>([])   // đơn vị khác trong hệ thống (liên thông)
 const task = ref<{ id: string; form_key: string } | null>(null)
 const loading = ref(true)
 const missing = ref(false)
@@ -90,7 +108,8 @@ const side = ref<'timeline' | 'history'>('timeline')
 const history = ref<HistoryRow[] | null>(null)
 const userNames = computed(() => new Map(users.value.map((u) => [u.id, u.full_name])))
 const departmentNames = computed(() => new Map(departments.value.map((d) => [d.id, d.name])))
-const { label, action, who, changes } = useAuditFormat(userNames, departmentNames)
+const unitNames = computed(() => new Map(units.value.map((u) => [u.id, u.name])))
+const { label, action, who, changes } = useAuditFormat(userNames, departmentNames, unitNames)
 
 async function openHistory() {
   side.value = 'history'
@@ -108,31 +127,76 @@ async function openHistory() {
   }
 }
 const nameOf = (uid: string | null) => users.value.find((u) => u.id === uid)?.full_name ?? (uid ? uid.slice(0, 8) : '')
+const unitName = (tid: string) => unitNames.value.get(tid) ?? tid.slice(0, 8)
+
+const EVENT_FIELDS = 'id kind actor_id actor_kind note data created_at'
+const DISPATCH_FIELDS = 'id to_tenant_id status attempts last_error delivered_at to_unit { name }'
+
+// Liên thông (F3.12): phát hành xong, svc-workflow chuyển văn bản sang từng đơn vị nhận ngay sau đó (lỗi thì tự thử
+// lại). Bên nhận không báo ngược lại cho bên gửi, nên còn dòng "đang chuyển" thì hỏi lại trạng thái (và dòng thời
+// gian) 5 giây một lần, tối đa 2 phút; quá thế thì tải lại trang để xem
+let dispatchTimer: ReturnType<typeof setTimeout> | null = null
+let dispatchPolls = 0
+function followDispatches() {
+  if (dispatchTimer) clearTimeout(dispatchTimer)
+  dispatchTimer = null
+  if (!doc.value?.dispatches.some((d) => d.status === 'pending') || dispatchPolls >= 24) return
+  dispatchTimer = setTimeout(refreshDispatches, 5_000)
+}
+async function refreshDispatches() {
+  dispatchPolls += 1
+  const want = id.value
+  try {
+    const data = await gql<{ office_documents_by_pk: Pick<Doc, 'dispatches' | 'events'> | null }>(`
+      query ($id: uuid!) {
+        office_documents_by_pk(id: $id) {
+          dispatches(order_by: {created_at: asc}) { ${DISPATCH_FIELDS} }
+          events(order_by: {id: asc}) { ${EVENT_FIELDS} }
+        }
+      }`, { id: want })
+    const fresh = data.office_documents_by_pk
+    if (fresh && doc.value && want === id.value) Object.assign(doc.value, fresh)
+  } catch {
+    // mạng chập chờn: lần hỏi sau thử lại
+  }
+  followDispatches()
+}
+onBeforeUnmount(() => { if (dispatchTimer) clearTimeout(dispatchTimer) })
 
 async function load() {
   loading.value = true
   failure.value = ''
   try {
-    const data = await gql<{ office_documents_by_pk: Doc | null; core_users: PanelUser[]; office_departments: PanelDepartment[]; myTasks: { id: string; form_key: string; document_id: string }[] }>(`
+    const data = await gql<{
+      office_documents_by_pk: Doc | null; core_users: PanelUser[]; office_departments: PanelDepartment[]
+      office_dispatch_units: { id: string; name: string }[]; myTasks: { id: string; form_key: string; document_id: string }[]
+    }>(`
       query ($id: uuid!) {
         office_documents_by_pk(id: $id) {
           id direction status type_code document_type { name } symbol issuer_name issued_on summary urgency restricted
           register_number registered_at due_on created_by created_at body recipients signer_id verify_code
+          source_id recipient_tenant_ids
           department { name } reply_to { id symbol summary }
-          files(order_by: {added_at: asc}) { role file { id filename mime_type size_bytes encrypted } }
+          files(order_by: {added_at: asc}) { role file { id filename mime_type size_bytes encrypted sha256 } }
           assignments(order_by: {assigned_at: asc}) {
             id parent_id role department { name } user_id instruction due_on status result_note assigned_by assigned_at completed_at
           }
-          events(order_by: {id: asc}) { id kind actor_id actor_kind note data created_at }
+          events(order_by: {id: asc}) { ${EVENT_FIELDS} }
+          dispatches(order_by: {created_at: asc}) { ${DISPATCH_FIELDS} }
+          dispatch_in { source_verify_code source_sha256 from_unit { name } }
         }
         core_users(order_by: {full_name: asc}) { id full_name role department_id }
         office_departments(order_by: {name: asc}) { id code name }
+        office_dispatch_units(order_by: {name: asc}) { id name }
         myTasks { id form_key document_id }
       }`, { id: id.value })
     doc.value = data.office_documents_by_pk
     missing.value = !doc.value
     users.value = data.core_users
     departments.value = data.office_departments
+    units.value = data.office_dispatch_units
+    dispatchPolls = 0
+    followDispatches()
     // bước "sửa dự thảo" làm bằng nút Trình lại ở dưới, không hiện khung xử lý riêng
     task.value = data.myTasks.find((x) => x.document_id === id.value && x.form_key !== 'vbdi.chinhSua') ?? null
     signer.value = doc.value?.signer_id ?? directors.value[0]?.id ?? ''
@@ -211,7 +275,24 @@ const canEdit = computed(() => outgoing.value && claims.value?.role === 'staff' 
   && ['draft', 'returned'].includes(doc.value?.status ?? ''))
 const lastReturn = computed(() => [...(doc.value?.events ?? [])].reverse().find((e) => e.kind === 'office.document.returned')?.note ?? '')
 const issuedFile = computed(() => doc.value?.files.find((f) => f.role === 'issued')?.file ?? null)
-const verifyCode = computed(() => (doc.value?.verify_code ? `${doc.value.verify_code.slice(0, 5)}-${doc.value.verify_code.slice(5)}` : ''))
+const verifyCode = computed(() => fmtVerifyCode(doc.value?.verify_code))
+
+// Văn bản đi gửi trong hệ thống: chưa phát hành thì là danh sách sẽ gửi, phát hành rồi thì trạng thái từng đơn vị
+const dispatches = computed(() => doc.value?.dispatches ?? [])
+const DISPATCH_TONE: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-800',
+  delivered: 'bg-emerald-100 text-emerald-800',
+  duplicate: 'bg-sky-100 text-sky-800',
+  failed: 'bg-rose-100 text-rose-800',
+}
+// Văn bản đến nhận liên thông: tệp chính (bản sao của bản phát hành) phải cùng SHA-256 với bản bên gửi đã phát hành.
+// null: không còn tệp để so (vd đã nộp lưu), hoặc văn bản do văn thư tiếp nhận tay mà lần liên thông chỉ nối vào
+// (trùng — không có source_id): tệp là bản scan của văn thư, khác băm là đương nhiên
+const sourceMatch = computed(() => {
+  const main = doc.value?.files.find((f) => f.role === 'main')?.file
+  return doc.value?.dispatch_in && doc.value.source_id && main
+    ? sameSha256(main.sha256, doc.value.dispatch_in.source_sha256) : null
+})
 
 async function submit() {
   if (!signer.value) return
@@ -232,27 +313,38 @@ function showPreview() {
   preview(id.value).catch((e) => notice.error(errorText(t, e)))
 }
 
-// Dòng thời gian: bước đầu (tiếp nhận / tạo dự thảo) lấy từ chính văn bản, các bước sau từ office.document_events
+function eventTitle(e: DocEvent): string {
+  switch (e.kind) {
+    case 'office.document.registered': return t('event.office.document.registered', { n: e.data.register_number })
+    case 'office.document.assigned': return t('event.office.document.assigned', { name: nameOf(e.data.user_id) })
+    case 'office.document.numbered': return t('event.office.document.numbered', { symbol: e.data.symbol })
+    case 'office.task.overdue':
+    case 'office.task.escalated': return t(`event.${e.kind}`, { task: t(`task.${e.data.form_key}`) })
+    case 'office.document.overdue': return t('event.office.document.overdue', { due: fmtDate(e.data.due_on) })
+    case 'ot.alarm':
+      return t('event.ot.alarm', { name: e.data.name, value: fmtNumber(e.data.temperature), threshold: fmtNumber(e.data.threshold) })
+    // liên thông (F3.12): bên gửi ghi tên đơn vị nhận, bên nhận ghi tên đơn vị gửi
+    case 'office.document.dispatched':
+    case 'office.document.dispatch_duplicate': return t(`event.${e.kind}`, { name: e.data.to_name ?? '' })
+    case 'office.document.arrived': return t('event.office.document.arrived', { name: e.data.from_name ?? '' })
+    default: return t(`event.${e.kind}`)
+  }
+}
+
+// Dòng thời gian: bước đầu (tiếp nhận / tạo dự thảo) lấy từ chính văn bản, các bước sau từ office.document_events.
+// Văn bản đến nhận liên thông do dịch vụ tạo: bước đầu là sự kiện "nhận liên thông", không thêm bước "tiếp nhận"
 const timeline = computed(() => {
   if (!doc.value) return []
   const first = outgoing.value ? t('event.drafted') : t('event.received')
-  const items = [{ key: 'first', title: first, who: nameOf(doc.value.created_by), at: doc.value.created_at, note: null as string | null }]
+  const items: { key: string; title: string; who: string; at: string; note: string | null }[] = doc.value.source_id
+    ? []
+    : [{ key: 'first', title: first, who: nameOf(doc.value.created_by), at: doc.value.created_at, note: null }]
   for (const e of doc.value.events) {
-    const title = e.kind === 'office.document.registered'
-      ? t('event.office.document.registered', { n: e.data.register_number })
-      : e.kind === 'office.document.assigned'
-        ? t('event.office.document.assigned', { name: nameOf(e.data.user_id) })
-        : e.kind === 'office.document.numbered'
-          ? t('event.office.document.numbered', { symbol: e.data.symbol })
-          : e.kind === 'office.task.overdue' || e.kind === 'office.task.escalated'
-            ? t(`event.${e.kind}`, { task: t(`task.${e.data.form_key}`) })
-            : e.kind === 'office.document.overdue'
-              ? t('event.office.document.overdue', { due: fmtDate(e.data.due_on) })
-              : e.kind === 'ot.alarm'
-                ? t('event.ot.alarm', { name: e.data.name, value: fmtNumber(e.data.temperature),
-                                        threshold: fmtNumber(e.data.threshold) })
-                : t(`event.${e.kind}`)
+    const title = eventTitle(e)
     let note = e.note
+    if (e.kind === 'office.document.arrived' && e.data.verify_code) {
+      note = t('event.sourceCode', { code: fmtVerifyCode(e.data.verify_code) })
+    }
     // nhắc hạn do hệ thống gửi: ghi ai đã được báo
     if (Array.isArray(e.data.notified) && e.data.notified.length) {
       note = t('event.notified', { names: e.data.notified.map(nameOf).join(', ') })
@@ -307,6 +399,7 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
             <StatusChip :status="doc.status" />
             <UrgencyChip :urgency="doc.urgency" quiet />
             <span v-if="doc.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
+            <span v-if="doc.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">{{ t('incoming.dispatched') }}</span>
             <span class="text-sm text-stone-500">{{ doc.document_type?.name }}</span>
           </div>
           <h1 class="text-xl font-semibold text-stone-900">{{ doc.summary }}</h1>
@@ -366,6 +459,45 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               <div class="font-mono text-lg font-semibold tracking-wider text-stone-900" data-testid="verify-code">{{ verifyCode }}</div>
             </div>
             <a :href="`/xac-thuc/${doc.verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} ↗</a>
+          </section>
+
+          <!-- gửi trong hệ thống (F3.12): chưa phát hành thì là danh sách sẽ gửi, phát hành rồi thì trạng thái từng đơn vị -->
+          <section v-if="outgoing && (dispatches.length || doc.recipient_tenant_ids.length)" class="card p-5" data-testid="dispatch">
+            <h2 class="mb-1 text-sm font-semibold text-stone-800">{{ t('doc.dispatch.title') }}</h2>
+            <p class="mb-3 text-xs text-stone-500">{{ dispatches.length ? t('doc.dispatch.sentHint') : t('doc.dispatch.plannedHint') }}</p>
+            <ul v-if="dispatches.length" class="divide-y divide-stone-100">
+              <li v-for="d in dispatches" :key="d.id" class="flex items-start gap-3 py-2 text-sm">
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium">{{ d.to_unit?.name ?? unitName(d.to_tenant_id) }}</span>
+                  <span v-if="d.delivered_at" class="block text-xs text-stone-500">{{ t('doc.dispatch.deliveredAt', { at: fmtDateTime(d.delivered_at) }) }}</span>
+                  <span v-if="d.status === 'duplicate'" class="block text-xs text-stone-500">{{ t('doc.dispatch.duplicateHint') }}</span>
+                  <span v-if="d.last_error && d.status === 'pending'" class="block text-xs text-amber-800">{{ t('doc.dispatch.retrying', { n: d.attempts, error: d.last_error }) }}</span>
+                  <span v-else-if="d.last_error && d.status === 'failed'" class="block text-xs text-rose-700">{{ d.last_error }}</span>
+                </span>
+                <span class="chip" :class="DISPATCH_TONE[d.status] ?? 'bg-stone-100 text-stone-700'">{{ t(`doc.dispatch.status.${d.status}`) }}</span>
+              </li>
+            </ul>
+            <ul v-else class="flex flex-wrap gap-2">
+              <li v-for="u in doc.recipient_tenant_ids" :key="u" class="chip bg-stone-100 text-stone-700">{{ unitName(u) }}</li>
+            </ul>
+          </section>
+
+          <!-- nhận liên thông từ đơn vị khác trong hệ thống (F3.12) -->
+          <section v-if="!outgoing && doc.dispatch_in" class="card p-5" data-testid="dispatch-in">
+            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.dispatch.from', { name: doc.dispatch_in.from_unit?.name ?? doc.issuer_name ?? '' }) }}</h2>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="text-sm text-stone-500">{{ t('doc.dispatch.sourceCode') }}</div>
+                <div class="font-mono text-lg font-semibold tracking-wider text-stone-900" data-testid="source-code">{{ fmtVerifyCode(doc.dispatch_in.source_verify_code) }}</div>
+              </div>
+              <a :href="`/xac-thuc/${doc.dispatch_in.source_verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} ↗</a>
+            </div>
+            <p v-if="sourceMatch === true" class="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-800" data-testid="source-hash">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+              {{ t('doc.dispatch.hashMatch') }}
+            </p>
+            <p v-else-if="sourceMatch === false" class="mt-3 text-sm font-medium text-red-700" data-testid="source-hash">{{ t('doc.dispatch.hashMismatch') }}</p>
+            <p class="mt-2 text-xs text-stone-500">{{ t(doc.source_id ? 'doc.dispatch.fromHint' : 'doc.dispatch.manualHint') }}</p>
           </section>
 
           <!-- nội dung văn bản đi -->
@@ -493,7 +625,7 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               {{ t('doc.history') }}
             </button>
           </div>
-          <ol v-if="side === 'timeline'" class="relative space-y-5 border-l border-stone-200 pl-5">
+          <ol v-if="side === 'timeline'" class="relative space-y-5 border-l border-stone-200 pl-5" data-testid="timeline">
             <li v-for="(item, i) in timeline" :key="item.key" class="relative">
               <span class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white" :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'" />
               <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>

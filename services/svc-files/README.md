@@ -6,9 +6,10 @@ chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của n
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
 Hasura quyết ai được đọc văn bản nào; tìm được cả theo chữ trong tệp PDF đính kèm. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
 trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
+Văn bản đi gửi đơn vị khác trong hệ thống thì bản phát hành được chép sang kho của đơn vị nhận ở đây (liên thông).
 
 Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
-F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được) và F2.13 (cổng xác thực) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực) và F3.12 (liên thông) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
 issue #19, #20.
 
 ## Trạng thái
@@ -29,6 +30,7 @@ issue #19, #20.
 | `GET /api/registers/{in\|out}/{năm}` và `/pdf`: sổ đăng ký văn bản đến / đi theo mẫu NĐ 30, in A4 ngang | **Xong** (F2.8) |
 | Nộp lưu hồ sơ đã đóng sang bucket lạnh (Parquet + tệp + manifest có băm), `GET /api/case-files/{id}/archive` | **Xong** (F3.8) |
 | Phả hệ OpenLineage cho từng bước nộp lưu, kiểm chất lượng bảng Parquet trước khi ghi | **Xong** (F3.9) |
+| `/internal/dispatch-file`: chép bản phát hành sang kho của đơn vị nhận trong hệ thống (kiểm băm, quét, id định trước) | **Xong** (F3.12) |
 | Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa |
 
 ## API
@@ -55,6 +57,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
+| `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `GET /healthz` | Tiến trình còn sống |
 | `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"` |
 
@@ -142,6 +145,28 @@ tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số k
   hiện. Bản phát hành vẫn qua ClamAV và vào `core.files` như mọi tệp.
 - **Cổng xác thực** tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`, mỗi lần đúng một văn
   bản. Nhật ký chỉ ghi cách tra (mã hay băm) và kết quả.
+
+### Liên thông trong hệ thống (F3.12)
+
+`dispatch.py`. Văn bản đi chọn đơn vị nhận trong hệ thống thì lúc phát hành CSDL thêm một dòng `office.dispatches`
+(outbox) cho mỗi đơn vị. svc-workflow gọi `POST /internal/dispatch-file` với id dòng đó, rồi gọi hàm
+`office_deliver_dispatch` trong phiên của đơn vị nhận để tạo văn bản đến (`received`, `source_id` = văn bản gửi).
+
+- **Bên gọi chỉ đưa id dòng outbox.** svc-files tự đọc dòng đó, văn bản nguồn và bản phát hành (vai trò `issued`)
+  bằng khóa quản trị; không chỉ định được tệp nào khác.
+- **Từ chối (409)** khi dòng không còn `pending`; văn bản chưa phát hành; văn bản hạn chế hoặc tệp mã hóa (bản mã có
+  AAD = đơn vị gửi ‖ id tệp, khóa nằm trong két của đơn vị gửi — không chép được, CSDL cũng chặn chọn đơn vị nhận cho
+  văn bản hạn chế); tệp đã sang kho lạnh; SHA-256 của byte đọc từ kho khác `core.files.sha256`, khác
+  `content_sha256` của văn bản hoặc khác băm chụp vào dòng outbox lúc phát hành.
+- **Như mọi tệp vào kho**: quét ClamAV trước (chặn thì `422`, ghi `file.rejected` vào sổ của đơn vị nhận), ghi ở
+  `tenant/<đơn vị nhận>/<yyyy>/<mm>/<file_id>`, dòng `core.files` thuộc đơn vị nhận — trigger sổ kiểm toán ghi dòng đó
+  vào sổ của đơn vị nhận. Bản sao là tệp `main` của văn bản đến nên vòng đọc chữ và đồng bộ tìm kiếm tự nhận như tệp
+  tải lên thường (tải lên cũng không lập chỉ mục ngay).
+- **Đúng một bản sao**: id tệp định trước (`dispatches.file_id`). Gọi lại khi bản sao đã có → `200` cùng thân (kể cả
+  khi dòng outbox vừa chuyển `delivered`). Hai lần gọi chen nhau: trong một tiến trình thì xếp hàng; khác tiến trình
+  thì lần thêm dòng sau gặp trùng khóa chính, dùng dòng của lần trước, chỉ bỏ đối tượng của mình khi khóa khác
+  (cùng tháng thì cùng một khóa — đó là đối tượng của dòng thắng). Không thêm được dòng mà cũng không có dòng nào thì
+  bỏ đối tượng vừa ghi, `503`; không đọc được CSDL để biết thì giữ đối tượng (thà thừa còn hơn dòng trỏ vào chỗ trống).
 
 ### Sổ đăng ký văn bản (F2.8)
 
@@ -282,6 +307,8 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 | Đọc đầu chuỗi sổ kiểm toán, ghi mốc neo | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
 | Đọc hồ sơ, văn bản, tệp để nộp lưu; gọi hàm `office_archive_case_file` | Khóa quản trị, không kèm vai trò, `X-Hasura-User-Id: svc-files:archive` — việc nội bộ; id hồ sơ lấy từ CSDL hoặc lệnh chạy tay. Hàm không cấp quyền cho vai trò nào |
 | Phòng đọc: tìm hồ sơ, lọc văn bản người gọi đọc được | Token của người dùng; ghi `case_file.read` như ghi `register.printed` |
+| Liên thông: đọc dòng outbox, văn bản nguồn, bản phát hành; bản sao đã có chưa | Khóa quản trị, không kèm vai trò — id dòng do svc-workflow gửi, mọi thứ khác đọc từ CSDL |
+| Liên thông: thêm dòng `core.files` của bản sao | Khóa quản trị + `X-Hasura-Role: service` + thuê ước **nhận** (đọc từ dòng outbox), người thực hiện `svc-workflow` |
 
 ## Cấu hình
 

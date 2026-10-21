@@ -21,6 +21,8 @@
 # poka-yoke lớp 2, F2.2), nên văn thư không có quyền ghi thẳng bảng này. Chuyên viên ghi trực tiếp dự thảo
 # văn bản đi khi còn ở bước đầu (draft, returned). status, số, ký hiệu văn bản đi, băm, mã tra cứu, process_id
 # chỉ đổi qua Hasura Actions do svc-workflow xử lý (vai trò service) — docs/mo-hinh-du-lieu.md §3, §4.
+# Đơn vị nhận trong hệ thống (recipient_tenant_ids, F3.12) chuyên viên chọn lúc soạn; CSDL kiểm đơn vị có thật, không
+# phải đơn vị mình, không với văn bản hạn chế, và không đổi được sau khi trình (migration 1792281601800).
 table:
   name: documents
   schema: office
@@ -50,6 +52,12 @@ object_relationships:
       manual_configuration:
         remote_table: {name: documents, schema: office}
         column_mapping: {source_id: id}
+  # văn bản đến do liên thông trong hệ thống tạo ra (F3.12): lượt gửi đã sinh ra nó
+  - name: dispatch_in
+    using:
+      manual_configuration:
+        remote_table: {name: dispatches, schema: office}
+        column_mapping: {id: incoming_document_id}
   # người ký văn bản đi, người tạo: danh bạ core.users (không có khóa ngoại — core không phụ thuộc office)
   - name: signer
     using:
@@ -77,6 +85,12 @@ array_relationships:
       manual_configuration:
         remote_table: {name: document_events, schema: office}
         column_mapping: {id: document_id}
+  # văn bản đi gửi đơn vị khác trong hệ thống (F3.12): mỗi đơn vị nhận một dòng
+  - name: dispatches
+    using:
+      manual_configuration:
+        remote_table: {name: dispatches, schema: office}
+        column_mapping: {id: document_id}
 computed_fields:
   - name: visible
     definition:
@@ -86,7 +100,7 @@ computed_fields:
 insert_permissions:
   - role: staff
     permission:
-      columns: [type_code, summary, body, urgency, restricted, recipients, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id]
       set:
         tenant_id: X-Hasura-Tenant-Id
         created_by: X-Hasura-User-Id
@@ -107,8 +121,8 @@ select_permissions:
     permission: &user_select
       columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
                 urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
-                department_id, signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id,
-                process_id, created_by, created_at, updated_at]
+                department_id, signer_id, recipients, recipient_tenant_ids, reply_to_id, content_sha256,
+                verify_code, source_id, process_id, created_by, created_at, updated_at]
       filter:
         _and:
           - tenant_id: {_eq: X-Hasura-Tenant-Id}
@@ -124,14 +138,14 @@ select_permissions:
     permission:
       columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
                 urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
-                department_id, signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id,
-                process_id, created_by, created_at, updated_at]
+                department_id, signer_id, recipients, recipient_tenant_ids, reply_to_id, content_sha256,
+                verify_code, source_id, process_id, created_by, created_at, updated_at]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       allow_aggregations: true
 update_permissions:
   - role: staff
     permission:
-      columns: [type_code, summary, body, urgency, restricted, recipients, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id]
       filter:
         tenant_id: {_eq: X-Hasura-Tenant-Id}
         direction: {_eq: out}

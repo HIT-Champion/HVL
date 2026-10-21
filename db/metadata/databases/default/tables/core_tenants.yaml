@@ -14,7 +14,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Mỗi người chỉ thấy thuê ước của mình. Tạo thuê ước: `dxos tenant create` (Phase 3), không qua GraphQL.
+# Mỗi người chỉ thấy thuê ước của mình. Tạo thuê ước: `python3 scripts/moc.py tenant create` (F3.12, ghi thẳng vào
+# CSDL trên máy chủ, kèm Organization trong Keycloak), không qua GraphQL.
 # Quản trị đơn vị sửa được thông tin in trên văn bản đi: cơ quan chủ quản, địa danh, chức vụ người đứng đầu.
 table:
   name: tenants

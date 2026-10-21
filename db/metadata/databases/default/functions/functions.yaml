@@ -21,3 +21,5 @@
 - "!include office_archive_case_file.yaml"
 - "!include office_grant_document_access.yaml"
 - "!include office_revoke_document_access.yaml"
+- "!include office_deliver_dispatch.yaml"
+- "!include office_fail_dispatch.yaml"

@@ -122,6 +122,7 @@ query CaseFile($id: uuid!) {
         assignments { id parent_id department_id user_id role instruction due_on status result_note assigned_by
                       assigned_at completed_at }
         events { id kind actor_id actor_kind note data created_at }
+        dispatches(where: {status: {_eq: "pending"}}) { id }
       }
     }
   }
@@ -304,7 +305,12 @@ class Archiver:
         if not links:
             raise ArchiveError(f"hồ sơ {cf['code']} không có văn bản nào")
         docs = [link["document"] for link in links]
-        # cùng điều kiện hàm SQL sẽ kiểm — sai thì dừng trước khi ghi gì sang bucket lạnh (đối tượng ở đó bị khóa)
+        # cùng điều kiện hàm SQL sẽ kiểm — sai thì dừng trước khi ghi gì sang bucket lạnh (đối tượng ở đó bị khóa).
+        # Văn bản đi còn dòng liên thông chờ chuyển (F3.12): CSDL chặn nộp lưu (documents_dispatch_pending)
+        sending = [d["symbol"] or d["id"] for d in docs if d.pop("dispatches", None)]
+        if sending:
+            raise ArchiveError(f"hồ sơ {cf['code']}: văn bản {', '.join(sending)} còn đang gửi liên thông, chưa nộp "
+                               "lưu được")
         wrong = [d["symbol"] or d["id"] for d in docs if d.pop("restricted") or d["status"] not in ("done", "issued")]
         if wrong:
             raise ArchiveError(f"hồ sơ {cf['code']}: văn bản {', '.join(wrong)} không còn ở trạng thái nộp lưu được")

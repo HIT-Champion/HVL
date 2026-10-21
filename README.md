@@ -209,6 +209,33 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
   của bản cài được giữ, chỉ đổi `MOC_VERSION`.
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
 
+### Thêm đơn vị (thuê ước)
+
+Một bản cài phục vụ nhiều đơn vị (khoa, phòng, trường thành viên); mỗi người chỉ thấy dữ liệu của đơn vị mình. Thêm
+một đơn vị bằng một lệnh trên máy chủ, chạy lại được (đã có thì giữ nguyên, chỉ thêm phần còn thiếu):
+
+```bash
+python3 scripts/moc.py tenant create --code KTCK --name "Khoa Cơ khí" \
+    --parent-name "Trường Đại học Công nghiệp" --place-name "Hà Nội" --head-title "Trưởng khoa" \
+    --department "VP=Văn phòng khoa" --department "ĐT=Tổ Đào tạo" \
+    --admin quantrick --admin-name "Lê Văn Cường" --admin-email quantri@ck.example.edu.vn --dry-run
+# bỏ --dry-run để làm thật; rồi:
+python3 scripts/moc.py tenant list           # đơn vị, phòng, người dùng, văn bản, Organization
+python3 scripts/moc.py tenant check KTCK     # Organization, thành viên, danh bạ có khớp nhau không
+```
+
+- Lệnh ghi dòng `core.tenants` và các phòng (sổ kiểm toán ghi người chạy lệnh), tạo một **Organization** trong
+  Keycloak (alias suy từ mã: `KTCK` → `ktck`, `ĐT` → `dt`; thuộc tính `tenant_id` = id của đơn vị) và tài khoản quản
+  trị đơn vị (`tenant_admin`, không thuộc phòng nào) với mật khẩu tạm in ra **một lần**: lần đầu đăng nhập phải đổi
+  mật khẩu và cài TOTP. Mất mật khẩu đó thì chạy lại lệnh với `--reset-password`.
+- Lệnh đợi `svc-workflow` chép quản trị đơn vị vào danh bạ (tối đa 90 giây, `--wait`) rồi in những gì đã tạo, đã
+  giữ, những gì tự có (sổ đăng ký, subscription NGSI-LD, lọc tìm kiếm, tiền tố tệp) và những gì dùng chung có chủ ý.
+- Tài khoản khác của đơn vị (văn thư, lãnh đạo…) tạo trong trang quản trị Keycloak với `tenant_id`, `department_id`,
+  `moc_role`, rồi chạy lại `tenant create` để đưa vào Organization; `tenant check` chỉ ra tài khoản còn thiếu hoặc
+  lạc sang Organization của đơn vị khác (thoát 1). `make seed` tự làm việc này cho hai đơn vị mẫu.
+- Không có bucket hay khóa riêng cho từng đơn vị: cách ly nằm ở token, quyền Hasura, ràng buộc CSDL và mã hóa gắn
+  với đơn vị — lý do ở [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) §1.
+
 ### Sao lưu và khôi phục
 
 `make backup` sao lưu mọi CSDL (dữ liệu nghiệp vụ, Keycloak, Flowable), toàn bộ tệp (SeaweedFS, kể cả các mốc
@@ -347,8 +374,8 @@ docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT 
 
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
-| `make test` | Test đơn vị của `svc-files`, `svc-workflow`; kiểm form theo `schemas/` trên cùng bộ ca thử với svc-workflow và CSDL ([`schemas/README.md`](schemas/README.md)) | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
-| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo; một lượt reconciler không thấy gì phải sửa; lập hồ sơ, nộp lưu, văn bản đã lưu vẫn xác thực được, phòng đọc đọc lại gói; Prometheus thu được chỉ số của cổng, Grafana có bảng điều khiển. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
+| `make test` | Test đơn vị của `svc-files`, `svc-workflow` và lệnh `moc tenant` (`scripts/tests/`, Keycloak và CSDL giả); kiểm form theo `schemas/` trên cùng bộ ca thử với svc-workflow và CSDL ([`schemas/README.md`](schemas/README.md)) | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị (cả Organization trong Keycloak khớp đơn vị), giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo; một lượt reconciler không thấy gì phải sửa; lập hồ sơ, nộp lưu, văn bản đã lưu vẫn xác thực được, phòng đọc đọc lại gói; Prometheus thu được chỉ số của cổng, Grafana có bảng điều khiển. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Các luồng trên trình duyệt thật (Playwright, chạy trong container): form sai bị chặn trước khi gửi, kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang; lãnh đạo xem sổ kiểm toán; văn thư tải tệp EICAR bị chặn ngay, lãnh đạo thấy lần chặn trong sổ; lãnh đạo xem dashboard điều hành, văn thư không có mục này | Như trên |
 | `make demo-kiem-dich` | Màn demo (iv) kiểm dịch, dưới một phút: tệp sạch qua, tệp EICAR bị ClamAV chặn ở cửa ngõ, không lưu gì; lần chặn nằm trong sổ kiểm toán, neo ra ngoài CSDL rồi kiểm lại cả chuỗi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-ket-bi-mat` | Màn demo (iv) két bí mật, dưới một phút: dịch vụ không có bí mật trong biến môi trường; khởi động lại két thì két tự mở khóa; khởi động lại svc-files thì nó lấy lại khóa kho từ két và nhận tệp; AppRole không đọc chéo; sổ của két không chứa giá trị bí mật (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |

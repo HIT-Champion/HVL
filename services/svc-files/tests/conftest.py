@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import os
 import re
 import time
@@ -330,6 +332,39 @@ class FakeHasura:
 
         rows = sorted((r for r in self.documents.values() if changed(r) and r["id"] > after), key=lambda r: r["id"])
         return [{k: v for k, v in r.items() if k != "readers"} for r in rows[:limit]]
+
+    # --- liên thông trong hệ thống (F3.12) ------------------------------------------------------------------
+
+    dispatches: dict[str, dict] = field(default_factory=dict)
+
+    def add_dispatch(self, store: FakeStore, data: bytes, *, to_tenant: uuid.UUID, document: dict | None = None,
+                     file: dict | None = None, **cols) -> str:
+        """Văn bản đi của TENANT_A đã phát hành, bản phát hành `data` nằm trong kho; một dòng outbox gửi `to_tenant`.
+        Dạng dữ liệu như hasura.dispatch_source trả (băm hex, `document.issued`)."""
+        sha = hashlib.sha256(data).hexdigest()
+        source = uuid.uuid4()
+        key = f"tenant/{TENANT_A}/2026/10/{source}"
+        store.objects[key] = {"data": data, "size": len(data), "content_type": "application/pdf", "sha256": sha}
+        issued = {"id": str(source), "object_key": key, "filename": "05-TB-CNTT.pdf", "mime_type": "application/pdf",
+                  "size_bytes": len(data), "sha256": sha, "encrypted": False, "storage_tier": "hot", **(file or {})}
+        doc = {"id": str(uuid.uuid4()), "status": "issued", "restricted": False, "content_sha256": sha,
+               "issued": [issued], **(document or {})}
+        dispatch_id = str(uuid.uuid4())
+        self.dispatches[dispatch_id] = {
+            "id": dispatch_id, "tenant_id": str(TENANT_A), "to_tenant_id": str(to_tenant), "status": "pending",
+            "file_id": str(uuid.uuid4()), "source_sha256": sha, "document": doc, **cols,
+        }
+        return dispatch_id
+
+    async def dispatch_source(self, dispatch_id: uuid.UUID) -> dict | None:
+        self._check()
+        return copy.deepcopy(self.dispatches.get(str(dispatch_id)))
+
+    async def dispatched_file(self, file_id: uuid.UUID) -> dict | None:
+        self._check()
+        row = self.files.get(file_id)
+        return {"id": str(file_id), "tenant_id": str(row["tenant_id"]), "object_key": row["object_key"],
+                "size_bytes": row["size_bytes"], "sha256": row["sha256_hex"]} if row else None
 
 
 def text_pdf(*lines: str, pages: int = 1) -> bytes:

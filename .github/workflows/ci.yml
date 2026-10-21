@@ -253,6 +253,27 @@ jobs:
       - name: Hội tụ IT/OT (make demo-it-ot)
         run: make demo-it-ot
 
+      # F3.12: CNTT phát hành văn bản đi có Khoa Kinh tế trong đơn vị nhận → KT tự có văn bản đến cùng hash, cổng xác
+      # thực "khớp", vào sổ được; mỗi đơn vị chỉ thấy sổ kiểm toán của mình; văn bản hạn chế không gửi liên thông được
+      - name: Liên thông văn bản trong hệ thống (make demo-lien-thong)
+        run: make demo-lien-thong
+
+      # F3.12: thêm đơn vị thứ ba bằng một lệnh (CSDL, Organization, quản trị đơn vị); chạy lại không tạo gì mới, không
+      # đặt lại mật khẩu; đối chiếu khớp. Mật khẩu tạm không ra nhật ký CI
+      - name: Thêm đơn vị bằng một lệnh (moc tenant create, check)
+        run: |
+          create() {
+            python3 scripts/moc.py tenant create --code KTCK --name "Khoa Cơ khí" --department "VP=Văn phòng khoa" \
+              --department "ĐT=Tổ Đào tạo" --admin quantrick --admin-name "Lê Văn Cường" "$@" | sed '/Mật khẩu tạm/d'
+          }
+          create --dry-run
+          create
+          out=$(create)
+          echo "$out"
+          if grep -q 'tạo mới\|đặt lại' <<<"$out"; then echo "chạy lại mà vẫn tạo mới hoặc đặt lại mật khẩu"; exit 1; fi
+          python3 scripts/moc.py tenant list
+          python3 scripts/moc.py tenant check
+
       # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL,
       # tệp và két, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về cùng),
       # sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục

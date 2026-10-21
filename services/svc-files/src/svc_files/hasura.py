@@ -164,6 +164,28 @@ mutation RecordAnchor($o: core_audit_anchors_insert_input!) {
   insert_core_audit_anchors_one(object: $o, on_conflict: {constraint: audit_anchors_once, update_columns: []}) { id }
 }"""
 
+# Liên thông trong hệ thống (F3.12): dòng outbox, văn bản nguồn và bản phát hành của nó — khóa quản trị không kèm vai
+# trò (dòng outbox, văn bản thuộc đơn vị gửi; bản sao thuộc đơn vị nhận). svc-workflow chỉ gửi id dòng, mọi thứ khác
+# đọc từ CSDL: bên gọi không chỉ định được tệp nào.
+DISPATCH_SOURCE = """
+query DispatchSource($id: uuid!) {
+  office_dispatches_by_pk(id: $id) {
+    id tenant_id to_tenant_id status file_id source_sha256
+    document {
+      id status restricted content_sha256
+      files(where: {role: {_eq: "issued"}}) {
+        file { id object_key filename mime_type size_bytes sha256 encrypted storage_tier }
+      }
+    }
+  }
+}"""
+
+# Bản sao đã có chưa (id định trước = dispatches.file_id): gọi lại sau khi đã chép thì trả đúng dòng đó
+DISPATCHED_FILE = """
+query DispatchedFile($id: uuid!) {
+  core_files_by_pk(id: $id) { id tenant_id object_key size_bytes sha256 }
+}"""
+
 # Hasura từ chối chính token/phiên của người gọi
 AUTH_CODES = {"invalid-jwt", "invalid-headers", "access-denied", "jwt-missing-role-claims"}
 
@@ -292,13 +314,14 @@ class HasuraClient:
         entity: str,
         entity_id: str,
         details: dict[str, Any],
+        actor_kind: str = "user",
     ) -> None:
         """Ghi một sự kiện vào core.audit_log; id, thời điểm và hash do trigger trong CSDL đặt."""
         await self._call(
             LOG_EVENT,
             {"o": {
                 "actor_id": actor_id,
-                "actor_kind": "user",
+                "actor_kind": actor_kind,
                 "request_id": request_id,
                 "action": action,
                 "entity": entity,
@@ -429,6 +452,25 @@ class HasuraClient:
         if not rows:
             return None
         return {**rows[0], "content_sha256": _hex(rows[0]["content_sha256"])}
+
+    async def dispatch_source(self, dispatch_id: uuid.UUID) -> dict[str, Any] | None:
+        """Dòng office.dispatches kèm văn bản nguồn; ``document.issued``: bản phát hành (0 hoặc 1 tệp). Băm đổi sang
+        hex. Không có dòng thì None."""
+        data = await self._call(DISPATCH_SOURCE, {"id": str(dispatch_id)}, {"X-Hasura-Admin-Secret": self._secret})
+        row = data.get("office_dispatches_by_pk")
+        if row is None:
+            return None
+        doc = {k: v for k, v in row["document"].items() if k != "files"}
+        issued = [{**link["file"], "sha256": _hex(link["file"]["sha256"])} for link in row["document"]["files"]]
+        content = _hex(doc["content_sha256"]) if doc["content_sha256"] else None
+        return {**row, "source_sha256": _hex(row["source_sha256"]),
+                "document": {**doc, "content_sha256": content, "issued": issued}}
+
+    async def dispatched_file(self, file_id: uuid.UUID) -> dict[str, Any] | None:
+        """Dòng core.files có id này, của bất kỳ thuê ước nào (bản sao liên thông đã chép chưa); băm dạng hex."""
+        data = await self._call(DISPATCHED_FILE, {"id": str(file_id)}, {"X-Hasura-Admin-Secret": self._secret})
+        row = data.get("core_files_by_pk")
+        return {**row, "sha256": _hex(row["sha256"])} if row else None
 
     async def audit_head(self) -> tuple[int, str]:
         """(id dòng cuối, hash dòng cuối) của sổ kiểm toán."""

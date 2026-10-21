@@ -1622,6 +1622,265 @@ input office_departments_stream_cursor_value_input {
   name: String
 }
 
+"columns and relationships of \"office.dispatch_units\""
+type office_dispatch_units {
+  code: String
+  id: uuid
+  name: String
+  parent_name: String
+}
+
+"Boolean expression to filter rows from the table \"office.dispatch_units\". All fields are combined with a logical 'AND'."
+input office_dispatch_units_bool_exp {
+  _and: [office_dispatch_units_bool_exp!]
+  _not: office_dispatch_units_bool_exp
+  _or: [office_dispatch_units_bool_exp!]
+  code: String_comparison_exp
+  id: uuid_comparison_exp
+  name: String_comparison_exp
+  parent_name: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.dispatch_units\"."
+input office_dispatch_units_order_by {
+  code: order_by
+  id: order_by
+  name: order_by
+  parent_name: order_by
+}
+
+"select columns of table \"office.dispatch_units\""
+enum office_dispatch_units_select_column {
+  "column name"
+  code
+  "column name"
+  id
+  "column name"
+  name
+  "column name"
+  parent_name
+}
+
+"Streaming cursor of the table \"office_dispatch_units\""
+input office_dispatch_units_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_dispatch_units_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_dispatch_units_stream_cursor_value_input {
+  code: String
+  id: uuid
+  name: String
+  parent_name: String
+}
+
+"columns and relationships of \"office.dispatches\""
+type office_dispatches {
+  attempts: Int!
+  created_at: timestamptz!
+  delivered_at: timestamptz
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  "An object relationship"
+  from_unit: office_dispatch_units
+  id: uuid!
+  "An object relationship"
+  incoming: office_documents
+  incoming_document_id: uuid
+  last_error: String
+  source_sha256: bytea!
+  source_verify_code: String!
+  status: String!
+  tenant_id: uuid!
+  to_tenant_id: uuid!
+  "An object relationship"
+  to_unit: office_dispatch_units
+}
+
+"order by aggregate values of table \"office.dispatches\""
+input office_dispatches_aggregate_order_by {
+  avg: office_dispatches_avg_order_by
+  count: order_by
+  max: office_dispatches_max_order_by
+  min: office_dispatches_min_order_by
+  stddev: office_dispatches_stddev_order_by
+  stddev_pop: office_dispatches_stddev_pop_order_by
+  stddev_samp: office_dispatches_stddev_samp_order_by
+  sum: office_dispatches_sum_order_by
+  var_pop: office_dispatches_var_pop_order_by
+  var_samp: office_dispatches_var_samp_order_by
+  variance: office_dispatches_variance_order_by
+}
+
+"order by avg() on columns of table \"office.dispatches\""
+input office_dispatches_avg_order_by {
+  attempts: order_by
+}
+
+"Boolean expression to filter rows from the table \"office.dispatches\". All fields are combined with a logical 'AND'."
+input office_dispatches_bool_exp {
+  _and: [office_dispatches_bool_exp!]
+  _not: office_dispatches_bool_exp
+  _or: [office_dispatches_bool_exp!]
+  attempts: Int_comparison_exp
+  created_at: timestamptz_comparison_exp
+  delivered_at: timestamptz_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  from_unit: office_dispatch_units_bool_exp
+  id: uuid_comparison_exp
+  incoming: office_documents_bool_exp
+  incoming_document_id: uuid_comparison_exp
+  last_error: String_comparison_exp
+  source_sha256: bytea_comparison_exp
+  source_verify_code: String_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  to_tenant_id: uuid_comparison_exp
+  to_unit: office_dispatch_units_bool_exp
+}
+
+"order by max() on columns of table \"office.dispatches\""
+input office_dispatches_max_order_by {
+  attempts: order_by
+  created_at: order_by
+  delivered_at: order_by
+  document_id: order_by
+  id: order_by
+  incoming_document_id: order_by
+  last_error: order_by
+  source_verify_code: order_by
+  status: order_by
+  tenant_id: order_by
+  to_tenant_id: order_by
+}
+
+"order by min() on columns of table \"office.dispatches\""
+input office_dispatches_min_order_by {
+  attempts: order_by
+  created_at: order_by
+  delivered_at: order_by
+  document_id: order_by
+  id: order_by
+  incoming_document_id: order_by
+  last_error: order_by
+  source_verify_code: order_by
+  status: order_by
+  tenant_id: order_by
+  to_tenant_id: order_by
+}
+
+"Ordering options when selecting data from \"office.dispatches\"."
+input office_dispatches_order_by {
+  attempts: order_by
+  created_at: order_by
+  delivered_at: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  from_unit: office_dispatch_units_order_by
+  id: order_by
+  incoming: office_documents_order_by
+  incoming_document_id: order_by
+  last_error: order_by
+  source_sha256: order_by
+  source_verify_code: order_by
+  status: order_by
+  tenant_id: order_by
+  to_tenant_id: order_by
+  to_unit: office_dispatch_units_order_by
+}
+
+"select columns of table \"office.dispatches\""
+enum office_dispatches_select_column {
+  "column name"
+  attempts
+  "column name"
+  created_at
+  "column name"
+  delivered_at
+  "column name"
+  document_id
+  "column name"
+  id
+  "column name"
+  incoming_document_id
+  "column name"
+  last_error
+  "column name"
+  source_sha256
+  "column name"
+  source_verify_code
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  to_tenant_id
+}
+
+"order by stddev() on columns of table \"office.dispatches\""
+input office_dispatches_stddev_order_by {
+  attempts: order_by
+}
+
+"order by stddev_pop() on columns of table \"office.dispatches\""
+input office_dispatches_stddev_pop_order_by {
+  attempts: order_by
+}
+
+"order by stddev_samp() on columns of table \"office.dispatches\""
+input office_dispatches_stddev_samp_order_by {
+  attempts: order_by
+}
+
+"Streaming cursor of the table \"office_dispatches\""
+input office_dispatches_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_dispatches_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_dispatches_stream_cursor_value_input {
+  attempts: Int
+  created_at: timestamptz
+  delivered_at: timestamptz
+  document_id: uuid
+  id: uuid
+  incoming_document_id: uuid
+  last_error: String
+  source_sha256: bytea
+  source_verify_code: String
+  status: String
+  tenant_id: uuid
+  to_tenant_id: uuid
+}
+
+"order by sum() on columns of table \"office.dispatches\""
+input office_dispatches_sum_order_by {
+  attempts: order_by
+}
+
+"order by var_pop() on columns of table \"office.dispatches\""
+input office_dispatches_var_pop_order_by {
+  attempts: order_by
+}
+
+"order by var_samp() on columns of table \"office.dispatches\""
+input office_dispatches_var_samp_order_by {
+  attempts: order_by
+}
+
+"order by variance() on columns of table \"office.dispatches\""
+input office_dispatches_variance_order_by {
+  attempts: order_by
+}
+
 "columns and relationships of \"office.document_acl\""
 type office_document_acl {
   "An object relationship"
@@ -2159,6 +2418,21 @@ type office_documents {
   department_id: uuid
   direction: String!
   "An object relationship"
+  dispatch_in: office_dispatches
+  "An array relationship"
+  dispatches(
+    "distinct select on columns"
+    distinct_on: [office_dispatches_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatches_order_by!]
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "An object relationship"
   document_type: office_document_types
   due_on: date
   "An array relationship"
@@ -2192,6 +2466,7 @@ type office_documents {
   issued_on: date
   issuer_name: String
   process_id: String
+  recipient_tenant_ids: [uuid!]!
   recipients: [String!]!
   "An object relationship"
   register: office_registers
@@ -2258,6 +2533,8 @@ input office_documents_bool_exp {
   department: office_departments_bool_exp
   department_id: uuid_comparison_exp
   direction: String_comparison_exp
+  dispatch_in: office_dispatches_bool_exp
+  dispatches: office_dispatches_bool_exp
   document_type: office_document_types_bool_exp
   due_on: date_comparison_exp
   events: office_document_events_bool_exp
@@ -2267,6 +2544,7 @@ input office_documents_bool_exp {
   issued_on: date_comparison_exp
   issuer_name: String_comparison_exp
   process_id: String_comparison_exp
+  recipient_tenant_ids: uuid_array_comparison_exp
   recipients: String_array_comparison_exp
   register: office_registers_bool_exp
   register_id: uuid_comparison_exp
@@ -2301,6 +2579,7 @@ type office_documents_max_fields {
   issued_on: date
   issuer_name: String
   process_id: String
+  recipient_tenant_ids: [uuid!]
   recipients: [String!]
   register_id: uuid
   register_number: Int
@@ -2330,6 +2609,7 @@ type office_documents_min_fields {
   issued_on: date
   issuer_name: String
   process_id: String
+  recipient_tenant_ids: [uuid!]
   recipients: [String!]
   register_id: uuid
   register_number: Int
@@ -2358,6 +2638,8 @@ input office_documents_order_by {
   department: office_departments_order_by
   department_id: order_by
   direction: order_by
+  dispatch_in: office_dispatches_order_by
+  dispatches_aggregate: office_dispatches_aggregate_order_by
   document_type: office_document_types_order_by
   due_on: order_by
   events_aggregate: office_document_events_aggregate_order_by
@@ -2367,6 +2649,7 @@ input office_documents_order_by {
   issued_on: order_by
   issuer_name: order_by
   process_id: order_by
+  recipient_tenant_ids: order_by
   recipients: order_by
   register: office_registers_order_by
   register_id: order_by
@@ -2415,6 +2698,8 @@ enum office_documents_select_column {
   issuer_name
   "column name"
   process_id
+  "column name"
+  recipient_tenant_ids
   "column name"
   recipients
   "column name"
@@ -2486,6 +2771,7 @@ input office_documents_stream_cursor_value_input {
   issued_on: date
   issuer_name: String
   process_id: String
+  recipient_tenant_ids: [uuid!]
   recipients: [String!]
   register_id: uuid
   register_number: Int
@@ -3078,6 +3364,34 @@ type query_root {
   ): [office_departments!]!
   "fetch data from the table: \"office.departments\" using primary key columns"
   office_departments_by_pk(id: uuid!): office_departments
+  "fetch data from the table: \"office.dispatch_units\""
+  office_dispatch_units(
+    "distinct select on columns"
+    distinct_on: [office_dispatch_units_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatch_units_order_by!]
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table: \"office.dispatches\""
+  office_dispatches(
+    "distinct select on columns"
+    distinct_on: [office_dispatches_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatches_order_by!]
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "fetch data from the table: \"office.dispatches\" using primary key columns"
+  office_dispatches_by_pk(id: uuid!): office_dispatches
   "fetch data from the table: \"office.document_acl\""
   office_document_acl(
     "distinct select on columns"
@@ -3563,6 +3877,52 @@ type subscription_root {
     "filter the rows returned"
     where: office_departments_bool_exp
   ): [office_departments!]!
+  "fetch data from the table: \"office.dispatch_units\""
+  office_dispatch_units(
+    "distinct select on columns"
+    distinct_on: [office_dispatch_units_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatch_units_order_by!]
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table in a streaming manner: \"office.dispatch_units\""
+  office_dispatch_units_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_dispatch_units_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table: \"office.dispatches\""
+  office_dispatches(
+    "distinct select on columns"
+    distinct_on: [office_dispatches_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatches_order_by!]
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "fetch data from the table: \"office.dispatches\" using primary key columns"
+  office_dispatches_by_pk(id: uuid!): office_dispatches
+  "fetch data from the table in a streaming manner: \"office.dispatches\""
+  office_dispatches_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_dispatches_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
   "fetch data from the table: \"office.document_acl\""
   office_document_acl(
     "distinct select on columns"
@@ -3848,6 +4208,23 @@ input timestamptz_comparison_exp {
 }
 
 scalar uuid
+
+"Boolean expression to compare columns of type \"uuid\". All fields are combined with logical 'AND'."
+input uuid_array_comparison_exp {
+  "is the array contained in the given array value"
+  _contained_in: [uuid!]
+  "does the array contain the given value"
+  _contains: [uuid!]
+  _eq: [uuid!]
+  _gt: [uuid!]
+  _gte: [uuid!]
+  _in: [[uuid!]!]
+  _is_null: Boolean
+  _lt: [uuid!]
+  _lte: [uuid!]
+  _neq: [uuid!]
+  _nin: [[uuid!]!]
+}
 
 "Boolean expression to compare columns of type \"uuid\". All fields are combined with logical 'AND'."
 input uuid_comparison_exp {

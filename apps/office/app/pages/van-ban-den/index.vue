@@ -31,6 +31,7 @@ interface Row {
   due_on: string | null
   issued_on: string | null
   restricted: boolean
+  source_id: string | null   // nhận liên thông từ đơn vị khác trong hệ thống (F3.12)
 }
 
 const { t } = useI18n()
@@ -70,7 +71,7 @@ async function load(append = false) {
     const data = await gql<{ office_documents: Row[] }>(`
       query ($where: office_documents_bool_exp!, $offset: Int!, $limit: Int!) {
         office_documents(where: $where, order_by: [{registered_at: desc_nulls_first}, {created_at: desc}, {id: asc}], limit: $limit, offset: $offset) {
-          id symbol issuer_name summary status urgency register_number registered_at due_on issued_on restricted
+          id symbol issuer_name summary status urgency register_number registered_at due_on issued_on restricted source_id
         }
       }`, {
       where: { direction: { _eq: 'in' }, ...(statuses ? { status: { _in: statuses } } : {}) },
@@ -91,6 +92,10 @@ async function load(append = false) {
 
 watch(tab, () => load())
 onMounted(() => load())
+
+// văn bản liên thông từ đơn vị khác vừa tới (văn thư được báo): hiện ngay trong danh sách
+const { lastPush } = useNotifications()
+watch(lastPush, (n) => { if (n?.kind === 'document.incoming') load() })
 </script>
 
 <template>
@@ -140,6 +145,7 @@ onMounted(() => load())
                 {{ row.issuer_name }}
                 <UrgencyChip :urgency="row.urgency" quiet />
                 <span v-if="row.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
+                <span v-if="row.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">{{ t('incoming.dispatched') }}</span>
               </div>
             </td>
             <td class="px-4 py-3"><StatusChip :status="row.status" /></td>

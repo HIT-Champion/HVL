@@ -20,13 +20,16 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from svc_workflow.files import FilesError
+from svc_workflow.dispatch import Dispatcher
+from svc_workflow.files import DispatchFileError, FilesError
 from svc_workflow.flowable import ExternalJob, FlowableError, Task
 from svc_workflow.hasura import Actor, HasuraError
 from svc_workflow.notify import Notifier
@@ -40,6 +43,8 @@ DEPT_KTPM = uuid.UUID("7ee31261-b14c-4c42-8e1b-9a7e99935412")
 DOC = "11111111-1111-4111-8111-111111111111"
 OUT = "22222222-2222-4222-8222-222222222222"
 NEW = "33333333-3333-4333-8333-333333333333"
+RECEIVED_BY_HAND = "44444444-4444-4444-8444-444444444444"  # văn bản đến bên nhận đã tiếp nhận tay trước liên thông
+LONG_AGO = datetime(2000, 1, 1, tzinfo=UTC)  # next_attempt_at = now() lúc trigger tạo dòng: đến hạn ngay
 SCHEMAS = Path(__file__).resolve().parents[3] / "schemas"   # schemas/ ở gốc repo, dùng chung với giao diện
 
 
@@ -196,12 +201,127 @@ class FakeHasura:
     # chỉ mục task_once chặn lần ghi mà không có sự kiện nào của văn bản này mang task_id (một lần)
     task_once_elsewhere: bool = False
     slow: bool = False  # nhường lượt ở mỗi lần gọi: hai lần gọi chen nhau như trên mạng thật
+    # liên thông (F3.12): đơn vị trong hệ thống (id → tên); người dùng của thuê ước khác TENANT; dòng liên thông; văn
+    # bản đến dựng ở bên nhận; dòng đã có bản sao tệp (svc-files ghi core.files bên nhận trước khi CSDL gắn tệp)
+    units: dict[str, str] = field(default_factory=lambda: {str(TENANT): "Khoa Công nghệ thông tin",
+                                                           str(OTHER): "Khoa Kinh tế"})
+    tenant_users: dict[uuid.UUID, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    dispatches: dict[str, dict[str, Any]] = field(default_factory=dict)
+    arrived: dict[str, dict[str, Any]] = field(default_factory=dict)
+    copied: set[str] = field(default_factory=set)
+    dispatch_events: list[dict[str, Any]] = field(default_factory=list)
+    dispatch_calls: list[tuple[str, dict[str, Any], Actor | None]] = field(default_factory=list)
+    already_received: bool = False  # bên nhận đã có văn bản đến trùng → duplicate
+    deliver_rejects: str | None = None  # hàm CSDL bắt check_violation → failed + last_error
+    deliver_error: str | None = None  # hàm CSDL ném lỗi (văn bản nguồn chưa phát hành…) → Hasura trả lỗi
+    fail_dispatch_query: bool = False
+    fail_notified: int = 0  # số lần DispatchNotified tiếp theo lỗi (dịch vụ dừng ngay sau khi báo)
+    fail_fail: bool = False  # FailDispatch lỗi (Hasura không gọi được)
+
+    def add_dispatch(self, to: str, doc: str = OUT) -> dict[str, Any]:
+        """Như trigger documents_dispatch: một dòng pending mỗi (văn bản, đơn vị) — có rồi thì thôi."""
+        for row in self.dispatches.values():
+            if (row["document_id"], row["to_tenant_id"]) == (doc, to):
+                return row
+        row_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"dispatch:{doc}:{to}"))
+        self.dispatches[row_id] = {
+            "id": row_id, "tenant_id": str(TENANT), "document_id": doc, "to_tenant_id": to, "status": "pending",
+            "file_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"file:{row_id}")), "incoming_document_id": None,
+            "source_verify_code": self.outgoing.get("verify_code"), "attempts": 0, "last_error": None,
+            "next_attempt_at": LONG_AGO, "notified_at": None, "delivered_at": None,
+        }
+        return self.dispatches[row_id]
+
+    def deliver_row(self, row: dict[str, Any]) -> None:
+        """Như office.deliver_dispatch khi dòng còn pending: văn bản đến received, sự kiện hai bên, delivered."""
+        if self.already_received:
+            row.update(status="duplicate", incoming_document_id=RECEIVED_BY_HAND)
+            self.dispatch_events.append({"document_id": row["document_id"], "actor_kind": "service",
+                                         "kind": "office.document.dispatch_duplicate",
+                                         "data": {"dispatch_id": row["id"]}})
+            return
+        if self.deliver_rejects:
+            row.update(status="failed", last_error=self.deliver_rejects)
+            return
+        incoming = str(uuid.uuid5(uuid.NAMESPACE_URL, f"incoming:{row['id']}"))
+        self.arrived[incoming] = {
+            "id": incoming, "tenant_id": row["to_tenant_id"], "direction": "in", "status": "received",
+            "summary": self.outgoing["summary"], "symbol": self.outgoing.get("symbol"),
+            "urgency": self.outgoing.get("urgency"), "issuer_name": self.units[row["tenant_id"]],
+            "source_id": row["document_id"], "restricted": False, "file_id": row["file_id"],
+        }
+        row.update(status="delivered", incoming_document_id=incoming, delivered_at="2026-10-21T09:00:00Z")
+        self.dispatch_events += [
+            {"document_id": incoming, "kind": "office.document.arrived", "actor_kind": "service",
+             "data": {"dispatch_id": row["id"], "from_tenant_id": row["tenant_id"]}},
+            {"document_id": row["document_id"], "kind": "office.document.dispatched", "actor_kind": "service",
+             "data": {"dispatch_id": row["id"], "to_tenant_id": row["to_tenant_id"]}},
+        ]
+
+    async def _dispatch_op(self, op: str, actor: Actor | None, variables: dict[str, Any]) -> dict[str, Any] | None:
+        """Các lệnh của liên thông; None nếu không phải."""
+        if op not in {"PendingDispatches", "Dispatch", "DocumentDispatches", "Deliver", "DispatchRetry",
+                      "DispatchNotified", "DispatchUnits", "FailDispatch"}:
+            return None
+        if self.slow:
+            await asyncio.sleep(0)
+        self.dispatch_calls.append((op, variables, actor))
+        if op == "DispatchUnits":   # view chỉ có các đơn vị khác đơn vị của phiên
+            return {"office_dispatch_units": [{"id": i, "name": n} for i, n in self.units.items()
+                                              if i in variables["ids"] and i != str(actor.tenant_id)]}
+        if op == "PendingDispatches":
+            now = datetime.fromisoformat(variables["now"])
+            return {"office_dispatches": [{"id": r["id"]} for r in self.dispatches.values()
+                                          if (r["status"] == "pending" and r["next_attempt_at"] <= now)
+                                          or (r["status"] in ("delivered", "duplicate") and r["notified_at"] is None)]}
+        if op == "DocumentDispatches":
+            if self.fail_dispatch_query:
+                raise HasuraError("Không gọi được Hasura")
+            return {"office_dispatches": [{"id": r["id"]} for r in self.dispatches.values()
+                                          if r["document_id"] == variables["doc"] and r["status"] == "pending"]}
+        row = self.dispatches.get(variables["id"])
+        if op == "Dispatch":
+            return {"office_dispatches_by_pk": {**row, "from_unit": {"name": self.units[row["tenant_id"]]}}
+                    if row else None}
+        assert row is not None and actor is not None and actor.role == "service"
+        if op == "Deliver":
+            if self.deliver_error:
+                raise HasuraError(self.deliver_error, "unexpected")
+            if row["to_tenant_id"] != str(actor.tenant_id):   # hàm chỉ thấy dòng gửi tới thuê ước của phiên
+                raise HasuraError("không có dòng liên thông này", "unexpected")
+            if row["status"] == "pending":
+                if row["id"] not in self.copied:
+                    raise HasuraError('insert or update on table "document_files" violates foreign key constraint',
+                                      "constraint-violation")
+                self.deliver_row(row)
+            return {"office_deliver_dispatch": [{k: row[k] for k in ("id", "status", "incoming_document_id",
+                                                                     "last_error")}]}
+        assert str(actor.tenant_id) in (row["tenant_id"], row["to_tenant_id"])
+        if op == "FailDispatch":   # office.fail_dispatch: chỉ dòng còn chờ
+            if self.fail_fail:
+                raise HasuraError("Không gọi được Hasura")
+            if row["status"] != "pending":
+                return {"office_fail_dispatch": []}
+            row.update(status="failed", last_error=variables["reason"])
+            return {"office_fail_dispatch": [{k: row[k] for k in ("id", "status", "last_error")}]}
+        if op == "DispatchRetry":
+            row.update(attempts=row["attempts"] + 1, last_error=variables["error"],
+                       next_attempt_at=datetime.fromisoformat(variables["next"]))
+        if op == "DispatchNotified":
+            if self.fail_notified:
+                self.fail_notified -= 1
+                raise HasuraError("Không gọi được Hasura")
+            row["notified_at"] = variables["now"]
+        return {"update_office_dispatches_by_pk": {"id": row["id"]}}
 
     async def as_service(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         variables = variables or {}
         if self.slow:
             await asyncio.sleep(0)
         op = query.split("(")[0].split()[1] if query.strip().startswith(("query", "mutation")) else ""
+        found = await self._dispatch_op(op, actor, variables)
+        if found is not None:
+            return found
         if op == "Register":
             if self.register_error:
                 raise HasuraError(self.register_error, "unexpected")
@@ -260,10 +380,11 @@ class FakeHasura:
                      and w[1]["event"]["data"].get("sla_task_id") == variables["task"]["sla_task_id"]]
             return {"office_document_events": [{"id": 1}] if found else []}
         if op == "People":
+            pool = self.tenant_users.get(actor.tenant_id, self.users)
             return {"core_users": [{"id": u, "role": r["role"], "department_id": r["department_id"],
-                                    "full_name": r.get("full_name", u)} for u, r in self.users.items() if r["enabled"]]}
+                                    "full_name": r.get("full_name", u)} for u, r in pool.items() if r["enabled"]]}
         if op == "Brief":
-            doc = {DOC: self.document, OUT: self.outgoing}.get(variables["id"])
+            doc = {DOC: self.document, OUT: self.outgoing}.get(variables["id"]) or self.arrived.get(variables["id"])
             return {"office_documents_by_pk": {"summary": "Công văn về chuyển đổi số", "symbol": None,
                                                "created_by": None, "signer_id": None, **doc} if doc else None}
         if op == "Readers":  # danh sách xem của văn bản hạn chế: dùng chung tập viewers
@@ -316,6 +437,10 @@ class FakeHasura:
         if op == "TiepNhan":
             self.received.append({**variables["doc"], "id": NEW})
             return {"insert_office_documents_one": {"id": NEW}}
+        if op == "PhatHanh":    # như CSDL: issued, trigger documents_dispatch tạo dòng chờ cho mỗi đơn vị nhận
+            self.outgoing["status"] = "issued"
+            for to in self.outgoing.get("recipient_tenant_ids") or []:
+                self.add_dispatch(to)
         return {}
 
     async def as_user(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -329,6 +454,10 @@ class FakeHasura:
         return True
 
     async def as_system(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        op = query.split("(")[0].split()[1] if query.strip().startswith(("query", "mutation")) else ""
+        found = await self._dispatch_op(op, None, variables or {})
+        if found is not None:
+            return found
         if "OverdueDocuments" in query:
             return {"office_documents": self.overdue}
         return {"office_documents": []}
@@ -344,10 +473,34 @@ class FakeHasura:
 
 @dataclass
 class FakeFiles:
-    """svc-files giả: dựng PDF phát hành."""
+    """svc-files giả: dựng PDF phát hành, chép bản phát hành sang đơn vị nhận (liên thông)."""
 
     calls: list[tuple[str, str]] = field(default_factory=list)
     down: bool = False
+    copied: set[str] = field(default_factory=set)   # dùng chung với FakeHasura.copied (core.files bên nhận)
+    dispatched: list[str] = field(default_factory=list)  # lần chép thành công
+    dispatch_tries: int = 0
+    dispatch_down: bool = False
+    refuse: str | None = None  # mã 409 (422 nếu là mã của trạm quét) svc-files trả
+    explode: bool = False  # lỗi không lường trước
+    delay: float = 0.0
+    hook: Callable[[str], None] | None = None  # chạy ngay khi được gọi: lần gọi khác chen vào giữa
+
+    async def dispatch_file(self, dispatch_id: str) -> dict[str, Any]:
+        self.dispatch_tries += 1
+        await asyncio.sleep(self.delay)
+        if self.hook is not None:
+            self.hook(dispatch_id)
+        if self.explode:
+            raise RuntimeError("bất ngờ")
+        if self.dispatch_down:
+            raise DispatchFileError("unavailable", "Kho tệp hoặc trạm quét chưa sẵn sàng, sẽ thử lại", 503)
+        if self.refuse:
+            status = 422 if self.refuse in ("infected", "unscannable") else 409
+            raise DispatchFileError(self.refuse, f"svc-files từ chối: {self.refuse}", status)
+        self.copied.add(dispatch_id)     # chép lại thì trả dòng đã có (200), không thêm bản sao
+        self.dispatched.append(dispatch_id)
+        return {"file_id": f"copy-{dispatch_id}", "sha256": "ab" * 32, "size_bytes": 4321}
 
     async def issue(self, actor: Actor, document_id: str) -> dict[str, Any]:
         if self.down:
@@ -358,9 +511,27 @@ class FakeFiles:
     async def aclose(self) -> None: ...
 
 
+class Clock:
+    """Đồng hồ cho liên thông: lần thử lại hẹn theo giờ này, đối soát lấy dòng đến hạn theo giờ này."""
+
+    def __init__(self) -> None:
+        self.now = datetime(2026, 10, 21, 9, 0, tzinfo=UTC)
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def tick(self, **delta: float) -> None:
+        self.now += timedelta(**delta)
+
+
 @pytest.fixture
-def files() -> FakeFiles:
-    return FakeFiles()
+def files(hasura: FakeHasura) -> FakeFiles:
+    return FakeFiles(copied=hasura.copied)
+
+
+@pytest.fixture
+def clock() -> Clock:
+    return Clock()
 
 
 @pytest.fixture
@@ -389,6 +560,12 @@ def notifier(hasura: FakeHasura) -> Notifier:
 
 
 @pytest.fixture
-def workflow(hasura: FakeHasura, flowable: FakeFlowable, files: FakeFiles, notifier: Notifier) -> Workflow:
+def dispatcher(hasura: FakeHasura, files: FakeFiles, notifier: Notifier, clock: Clock) -> Dispatcher:
+    return Dispatcher(hasura, files, notifier, clock=clock)  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def workflow(hasura: FakeHasura, flowable: FakeFlowable, files: FakeFiles, notifier: Notifier,
+             dispatcher: Dispatcher) -> Workflow:
     return Workflow(hasura, flowable, files, notifier=notifier,  # type: ignore[arg-type]
-                    intake=FormSchema.load(SCHEMAS / "van-ban-den.json"))
+                    intake=FormSchema.load(SCHEMAS / "van-ban-den.json"), dispatcher=dispatcher)

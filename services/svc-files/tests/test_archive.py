@@ -298,6 +298,15 @@ def test_restricted_or_unfinished_document_stops_before_anything_cold():
         assert s3.puts == 0 and hasura.commits == [] and hot.deleted == []
 
 
+def test_document_still_being_dispatched_stops_before_anything_cold():
+    cf = case_file()
+    cf["case_file_documents"][1]["document"]["dispatches"] = [{"id": "66666666-6666-6666-6666-666666666666"}]
+    archiver, s3, hasura, hot = make(cf)
+    with pytest.raises(ArchiveError, match="còn đang gửi liên thông"):
+        asyncio.run(archiver.archive(CASE))
+    assert s3.puts == 0 and hasura.commits == [] and hot.deleted == []
+
+
 def test_lock_counts_from_closing_date_but_never_ends_in_the_past():
     cf = case_file(retention=1)
     cf["closed_on"] = "2020-01-01"

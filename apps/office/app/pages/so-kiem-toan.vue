@@ -40,7 +40,7 @@ interface Row {
 const PAGE = 50
 const groups = {
   all: null,
-  documents: ['office.documents', 'office.case_files', 'office.case_file_documents'],
+  documents: ['office.documents', 'office.case_files', 'office.case_file_documents', 'office.dispatches'],
   assignments: ['office.assignments'],
   files: ['office.document_files', 'core.files'],
   people: ['core.users', 'office.document_acl'],
@@ -60,6 +60,7 @@ const more = ref(false)
 const anchor = ref<{ audit_id: number; anchored_at: string } | null>(null)
 const names = ref(new Map<string, string>())
 const departments = ref(new Map<string, string>())
+const units = ref(new Map<string, string>())   // đơn vị khác (liên thông): tên thay cho id
 const loading = ref(true)
 const failure = ref('')
 // quản trị đơn vị xem sổ nhưng không đọc văn bản nghiệp vụ: không có đường mở văn bản
@@ -107,6 +108,7 @@ async function load(append = false) {
       core_audit_anchors: { audit_id: number; anchored_at: string }[]
       core_users: { id: string; full_name: string }[]
       office_departments: { id: string; name: string }[]
+      office_dispatch_units: { id: string; name: string }[]
     }>(`
       query ($where: core_audit_log_bool_exp!, $limit: Int!) {
         core_audit_log(where: $where, order_by: {id: desc}, limit: $limit) {
@@ -115,6 +117,7 @@ async function load(append = false) {
         core_audit_anchors(order_by: {audit_id: desc}, limit: 1) { audit_id anchored_at }
         core_users { id full_name }
         office_departments { id name }
+        office_dispatch_units { id name }
       }`, { where: await where(append ? rows.value.at(-1)?.id : undefined), limit: PAGE + 1 })
     if (mine !== latest) return
     const page = data.core_audit_log.slice(0, PAGE)
@@ -123,6 +126,7 @@ async function load(append = false) {
     anchor.value = data.core_audit_anchors[0] ?? null
     names.value = new Map(data.core_users.map((u) => [u.id, u.full_name]))
     departments.value = new Map(data.office_departments.map((d) => [d.id, d.name]))
+    units.value = new Map(data.office_dispatch_units.map((u) => [u.id, u.name]))
   } catch (e) {
     if (mine === latest) failure.value = errorText(t, e)
   } finally {
@@ -133,7 +137,7 @@ async function load(append = false) {
 watch([group, doc], () => load())
 onMounted(() => load())
 
-const { label, action, who, changes } = useAuditFormat(names, departments)
+const { label, action, who, changes } = useAuditFormat(names, departments, units)
 
 // Văn bản mà dòng sổ thuộc về, để mở trang văn bản
 function documentOf(row: Row): string | null {

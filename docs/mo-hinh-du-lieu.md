@@ -159,7 +159,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 - **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
-  1792281600900; mẫu mã độc, cỡ tệp của tệp bị ClamAV chặn — migration 1792281601100, tên tệp vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế thì sổ
+  1792281600900; mẫu mã độc, cỡ tệp của tệp bị ClamAV chặn — migration 1792281601100, tên tệp vẫn ẩn; đơn vị nhận,
+  văn bản đến, văn bản gửi, số lần thử, lúc giao của lần gửi liên thông — migration 1792281601800, băm và mã tra cứu
+  chụp từ văn bản gửi, lỗi giao vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế thì sổ
   cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
@@ -168,7 +170,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
 - **Lịch sử của một văn bản** (F3.5, tab "Lịch sử" trên trang văn bản): view `office.document_history` (migration
   1792281601500) gồm các dòng sổ về chính văn bản, tệp gắn với nó (`entity_id` "<văn bản>/<tệp>"), các lần giao
-  việc, lần đưa vào hồ sơ (bỏ id hồ sơ); cột `document_id`, `id`, `occurred_at`, `actor_id`, `actor_kind`, `action`,
+  việc, lần đưa vào hồ sơ (bỏ id hồ sơ), lần gửi liên thông của văn bản đi (`office.dispatches`, migration
+  1792281601800 — dòng sổ thuộc đơn vị gửi nên chỉ hiện ở văn bản đi; văn bản đến bên nhận có lịch sử riêng trong sổ
+  của đơn vị nhận); cột `document_id`, `id`, `occurred_at`, `actor_id`, `actor_kind`, `action`,
   `entity`, `overview` — không có `diff`, không có hash. Không gồm danh sách được xem văn bản hạn chế
   (`document_acl`): người có tên không được biết ai khác cũng có tên. `staff`, `manager`, `clerk`, `director` đọc khi
   đọc được văn bản (computed field `visible` qua quan hệ `document`), tối đa 500 dòng mỗi lần. Mỗi nhánh của view nối
@@ -196,6 +200,31 @@ và chỉ sửa được `read_at`. Thông báo về văn bản hạn chế (F3.
 gọt `summary`, `symbol`, `issuer_name`, `note` khỏi `data` và gắn `restricted: true` ở mọi lần ghi, kể cả dịch vụ ghi
 sai; văn bản chuyển sang hạn chế thì thông báo đã gửi về nó cũng bị gọt (`documents_restricted_notifications`). Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
+
+**Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
+create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — README, mục Thêm đơn vị). Ranh giới giữa
+các đơn vị nằm ở nhiều lớp, lớp sau không tin lớp trước:
+
+- *Danh tính*: đơn vị của một người là thuộc tính `tenant_id` của tài khoản Keycloak, đi vào JWT
+  (`x-hasura-tenant-id`); người dùng không tự khai được. Organization của Keycloak (alias suy từ mã, thuộc tính
+  `tenant_id`) gom tài khoản theo đơn vị để quản trị; `tenant check` kiểm mỗi tài khoản thuộc đúng một Organization,
+  khớp `tenant_id`.
+- *Quyền Hasura*: mọi bảng nghiệp vụ lọc theo `X-Hasura-Tenant-Id`; dịch vụ ghi bằng vai trò `service` kèm thuê ước
+  lấy từ token đã kiểm, không từ tham số.
+- *Ràng buộc CSDL*: khóa ngoại kèm thuê ước (`unique (tenant_id, id)`): giao việc, gắn tệp, phòng chủ trì không trỏ
+  được sang đơn vị khác; `files_object_key_tenant` buộc khóa đối tượng của tệp nằm dưới `tenant/<tenant_id>/`.
+- *Tìm kiếm*: chỉ mục Meilisearch chung, điều kiện `tenant_id` lấy từ token luôn đứng đầu bộ lọc.
+- *Mã hóa*: tệp văn bản hạn chế mã hóa AES-GCM với AAD = id đơn vị ‖ id tệp — bản mã chép sang dòng `core.files` của
+  đơn vị khác thì không giải mã được.
+- *IoT*: mỗi đơn vị một tenant NGSI-LD trong broker (`NGSILD-Tenant`), token thông báo riêng từng đơn vị.
+
+Không có bucket (hay khóa transit, CSDL) riêng cho từng đơn vị, có chủ ý: `svc-files` là dịch vụ duy nhất chạm kho tệp,
+giữ một khóa S3 đọc được mọi bucket, nên tách bucket không thêm ranh giới nào mà nhân số bucket phải tạo, khóa ghi
+(Object Lock ở bucket lạnh đặt theo bucket), sao lưu và giám sát theo số đơn vị. Ranh giới thật là thuê ước lấy từ token
+cộng ràng buộc trong CSDL và AAD của bản mã ở trên. Một bucket nóng (tiền tố `tenant/<id>/`), một bucket lạnh khóa
+ghi (gói nộp lưu dưới `cold/<id>/`, mốc neo sổ kiểm toán chung cả nền tảng vì chuỗi băm là một), một khóa transit
+`moc-files` (mỗi tệp một khóa dữ liệu riêng). Đơn vị cần tách vật lý (cơ quan khác, yêu cầu pháp lý) thì chạy một bản
+cài Mộc riêng.
 
 ---
 
@@ -275,13 +304,14 @@ create table office.documents (
   department_id    uuid references office.departments,  -- đơn vị soạn thảo
   signer_id        text,                     -- người ký (sub)
   recipients       text[] not null default '{}',        -- nơi nhận, như in trên văn bản
+  recipient_tenant_ids uuid[] not null default '{}',    -- đơn vị nhận trong hệ thống (F3.12, migration 1792281601800)
   body             text check (char_length(body) <= 20000),  -- nội dung văn bản đi; mỗi dòng một đoạn
   reply_to_id      uuid references office.documents,    -- trả lời văn bản đến nào
   content_sha256   bytea unique check (content_sha256 is null or octet_length(content_sha256) = 32),
   verify_code      text unique check (verify_code is null or verify_code ~ '^[A-Z2-7]{10}$'),
 
   -- liên kết
-  source_id        uuid references office.documents,    -- văn bản đi nội bộ sinh ra văn bản đến này (F3.12)
+  source_id        uuid references office.documents,    -- văn bản đi của đơn vị khác sinh ra văn bản đến này (F3.12)
   process_id       text unique,              -- processInstanceId của Flowable
   created_by       text not null,
   created_at       timestamptz not null default now(),
@@ -343,7 +373,8 @@ create table office.document_acl (          -- ai được xem văn bản hạn 
 **Khóa ngoại kèm thuê ước.** Bản trong `db/migrations/` viết mọi khóa ngoại giữa các bảng nghiệp vụ (phòng,
 sổ, văn bản trả lời, tệp, giao việc) kèm `tenant_id`, vd `foreign key (tenant_id, department_id) references
 office.departments (tenant_id, id)`. Nhờ vậy CSDL tự chặn việc trỏ sang dữ liệu của thuê ước khác, kể cả khi
-lớp quyền phía trên có lỗi. Riêng `source_id` (F3.12) được trỏ sang thuê ước khác. Văn bản đến chỉ vào được
+lớp quyền phía trên có lỗi. Riêng `source_id` (F3.12) được trỏ sang thuê ước khác; `office.dispatches` nối hai thuê
+ước bằng hai khóa ngoại, mỗi khóa kèm thuê ước của văn bản nó trỏ tới (bên dưới). Văn bản đến chỉ vào được
 sổ đến (khóa ngoại kèm `direction`). Các ràng buộc `check` đều có tên (vd `documents_in_identity`), để giao
 diện dịch lỗi thành câu tiếng Việt.
 
@@ -357,6 +388,63 @@ Văn bản đi:   draft ──submitOutgoing──► in_review ──duyệt đ
                  ▲                          │
                  └──── returned ◄──trả lại──┘
 ```
+
+Văn bản đến liên thông trong hệ thống bắt đầu ở `received` như văn bản văn thư tiếp nhận, do `office.deliver_dispatch`
+tạo (§4.2).
+
+**Liên thông trong hệ thống** (F3.12, migration `1792281601800_dispatches`). Văn bản đi chọn đơn vị nhận là đơn vị
+khác dùng Mộc; văn thư phát hành thì mỗi đơn vị nhận có một văn bản đến `received` (`source_id` trỏ về văn bản đi) kèm
+bản sao tệp phát hành — luồng và cách giữ đúng một lần ở §4.2.
+
+```sql
+alter table office.documents
+  add column recipient_tenant_ids uuid[] not null default '{}',   -- đơn vị nhận trong hệ thống
+  add constraint documents_recipient_units_out   check (direction = 'out' or recipient_tenant_ids = '{}'),
+  add constraint documents_recipient_units_other check (not (tenant_id = any (recipient_tenant_ids))),
+  add constraint documents_restricted_local      check (not (restricted and recipient_tenant_ids <> '{}'));
+-- mỗi văn bản gửi sinh nhiều nhất một văn bản đến ở mỗi đơn vị, kể cả khi bản đó đã hủy
+create unique index documents_source_once on office.documents (tenant_id, source_id) where source_id is not null;
+
+create view office.dispatch_units as select id, code, name, parent_name from core.tenants;
+
+create table office.dispatches (            -- hộp thư đi: một dòng cho mỗi (văn bản gửi, đơn vị nhận)
+  id                    uuid primary key default gen_random_uuid(),
+  tenant_id             uuid not null references core.tenants,   -- đơn vị gửi
+  document_id           uuid not null,                           -- (tenant_id, document_id) → văn bản đi
+  to_tenant_id          uuid not null references core.tenants,   -- đơn vị nhận
+  status                text not null default 'pending',         -- pending | delivered | duplicate | failed
+  file_id               uuid not null default gen_random_uuid(), -- id bản sao tệp ở đơn vị nhận, định trước
+  incoming_document_id  uuid unique,                             -- (to_tenant_id, incoming_document_id) → văn bản đến
+  source_verify_code    text not null,                           -- chụp lúc phát hành
+  source_sha256         bytea not null,
+  attempts              int not null default 0,                  -- số lần giao lỗi
+  last_error            text,
+  next_attempt_at       timestamptz not null default now(),
+  notified_at           timestamptz,                             -- đã báo văn thư bên nhận
+  delivered_at          timestamptz,
+  created_at            timestamptz not null default now(),
+  constraint dispatches_once unique (document_id, to_tenant_id),
+  constraint dispatches_not_self check (to_tenant_id <> tenant_id),
+  constraint dispatches_linked check ((status in ('delivered', 'duplicate')) = (incoming_document_id is not null))
+);
+```
+
+- `recipient_tenant_ids`: trigger `documents_recipient_units` bỏ trùng, xếp theo id, kiểm mọi id là đơn vị có trong
+  `core.tenants`, và khóa danh sách khi văn bản đã trình (khác `draft`, `returned`) — đơn vị nhận là một phần văn bản
+  người ký đã duyệt. Lỗi bắt đầu bằng `documents_recipient_units:`. Không gửi cho chính mình
+  (`documents_recipient_units_other`); văn bản đến không có đơn vị nhận (`documents_recipient_units_out`).
+- **Văn bản hạn chế chỉ ở trong đơn vị** (`documents_restricted_local`, F3.7): tệp của nó mã hóa gắn với đơn vị và
+  tệp (AAD), bản sao ở đơn vị khác không giải mã được; danh sách người được xem (`document_acl`) là người của đơn vị
+  gửi, sang đơn vị nhận không còn nghĩa, và đơn vị nhận không biết phải hạn chế với ai. Muốn liên thông thì văn bản
+  không đặt hạn chế (chọn trước khi tải tệp), hoặc gửi theo đường khác.
+- `office.dispatch_units`: người dùng chỉ đọc được dòng `core.tenants` của đơn vị mình (§3), nên danh sách để chọn đi
+  qua view chỉ có mã, tên, cơ quan chủ quản.
+- `source_verify_code`, `source_sha256` chụp lúc phát hành vì `verify_code`, `content_sha256` là `unique` trên
+  `office.documents`, văn bản đến không mang được; bên nhận so băm tệp chính với `source_sha256`, tra mã ở cổng xác
+  thực của bên gửi.
+- `core.audit` gắn vào `office.dispatches`; `tenant_id` của dòng là đơn vị gửi.
+- Trigger `documents_dispatch_pending`: văn bản còn dòng `pending` thì chưa chuyển sang `archived` được (nộp lưu gỡ
+  dòng thời gian, tệp của văn bản, §2.4) — raise `serialization_failure`, job nộp lưu thử lại ở lượt sau.
 
 ### 2.3. Giao việc và dòng thời gian
 
@@ -571,6 +659,19 @@ gắn vào văn bản chỉ theo quyền đọc văn bản — người tạo d�
 hành thay) bị gỡ khỏi danh sách cũng hết tải. Văn bản hạn chế không được công khai trích yếu ở cổng xác thực (ràng
 buộc `documents_restricted_private`: không `restricted` và `is_public` cùng lúc).
 
+**Liên thông trong hệ thống** (F3.12, migration 1792281601800). Một dòng `office.dispatches` có hai bên, mỗi bên đọc
+theo văn bản của mình: `clerk`, `staff`, `manager`, `director` của đơn vị gửi thấy dòng khi đọc được văn bản đi
+(`tenant_id = X-Hasura-Tenant-Id` và `document.visible`); của đơn vị nhận thấy khi văn bản đến đã có và họ đọc được nó
+(`to_tenant_id = X-Hasura-Tenant-Id` và `incoming.visible`) — dòng còn chờ giao thì bên nhận chưa thấy. Cột cho người
+dùng: id, hai đơn vị, hai văn bản, trạng thái, mã tra cứu và băm chụp lúc phát hành, số lần thử, lỗi, lúc tạo, lúc
+giao; `file_id`, `next_attempt_at`, `notified_at` chỉ `service` đọc. Quan hệ sang văn bản của bên kia (`document`,
+`incoming`, `source`) trả null, vì quyền đọc văn bản lọc theo thuê ước: bên gửi không thấy tiến độ xử lý của bên nhận,
+bên nhận không đọc văn bản gốc — chỉ có tên đơn vị kia qua `to_unit` (bên gửi) / `from_unit` (bên nhận). Quan hệ trỏ
+về chính đơn vị mình trả null (`from_unit` ở bên gửi, `to_unit` ở bên nhận). `office.dispatch_units` cho bốn vai trò
+người dùng và `service` đọc mọi đơn vị trừ đơn vị trong phiên (`id <> X-Hasura-Tenant-Id`). Không vai trò nào thêm,
+xóa dòng `dispatches`; `service` (phiên bên gửi hoặc bên nhận) chỉ sửa `attempts`, `last_error`, `next_attempt_at`,
+`notified_at`; trạng thái chỉ đổi trong hàm `office.deliver_dispatch` (mutation chỉ cho `service`).
+
 > **Không đặt tên vai trò là `admin`.** `admin` là vai trò có sẵn của Hasura, bỏ qua mọi quyền kể cả khi nằm
 > trong JWT. Chạy thử ở #18: token có `x-hasura-default-role: admin` đọc được dữ liệu của mọi thuê ước.
 > Quản trị đơn vị là `tenant_admin`; mapper của realm chỉ đưa 5 vai trò nghiệp vụ vào claim.
@@ -579,7 +680,7 @@ Ghi trực tiếp (không qua Action):
 
 | Vai trò | Được làm | Cột đặt sẵn |
 |---|---|---|
-| `staff` | Thêm dự thảo văn bản đi; sửa khi còn `draft` hoặc `returned` | `tenant_id`, `created_by`, `direction = 'out'`, `status = 'draft'` |
+| `staff` | Thêm dự thảo văn bản đi (kể cả đơn vị nhận trong hệ thống, `recipient_tenant_ids` — F3.12); sửa khi còn `draft` hoặc `returned` | `tenant_id`, `created_by`, `direction = 'out'`, `status = 'draft'` |
 | `staff` | Gắn tệp do chính mình tải lên vào dự thảo của mình (như dòng trên); gỡ khi dự thảo còn ở bước đó | `tenant_id`, `added_by` |
 | `staff`, `manager` | Tạo, đóng hồ sơ công việc của phòng mình; đưa vào văn bản đã xong mình đọc được và thuộc phòng mình, gỡ ra khi hồ sơ còn mở (F3.8) | `tenant_id`, `department_id`, `created_by` / `added_by` |
 | `tenant_admin` | Phòng ban | `tenant_id` |
@@ -657,7 +758,53 @@ Nhóm ứng viên trong Flowable (Flowable không biết người dùng Keycloak
    dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. PDF vẫn qua ClamAV rồi mới lưu vào `core.files` như mọi tệp.
 3. Một mutation: `status = issued`, `content_sha256` = SHA-256 của tệp, gắn tệp với vai trò `issued`, ghi sự kiện.
 
-Giao bản cho nơi nhận nội bộ (F3.12) làm ở Phase 3.
+**Liên thông trong hệ thống** (F3.12, migration 1792281601800; bảng ở §2.2). Văn bản đi có `recipient_tenant_ids`:
+
+1. Cùng giao dịch với bước 3, trigger `documents_dispatch` (sau khi `status` chuyển sang `issued`) thêm một dòng
+   `office.dispatches` `pending` cho mỗi đơn vị nhận (`on conflict on constraint dispatches_once do nothing`), chụp mã
+   tra cứu và băm. Phát hành lỗi thì không có dòng nào; phát hành xong thì dòng đã nằm trong CSDL (hộp thư đi), không
+   phụ thuộc dịch vụ còn chạy hay không. `submitOutgoing` kiểm lại đơn vị nhận trước khi trình.
+2. `svc-workflow` giao từng dòng ngay sau khi phát hành; vòng nền đối soát giao lại dòng `pending` đến hạn
+   (`next_attempt_at`) và báo dòng đã giao mà chưa báo (`notified_at` null). Các lần gọi cùng một dòng chạy lần lượt.
+   Giao một dòng:
+   1. `svc-files` `POST /internal/dispatch-file` (§4.3) chép tệp phát hành sang đơn vị nhận với id = `file_id`.
+   2. Hàm `office.deliver_dispatch(dispatch_id)` — Hasura đưa ra thành mutation `office_deliver_dispatch`, chỉ vai trò
+      `service`, gọi trong phiên của **đơn vị nhận** (thuê ước, người thực hiện lấy từ `hasura_session`):
+      - khóa dòng (`for update`); dòng không gửi tới đơn vị trong phiên thì báo như không có; đã khác `pending` thì trả
+        nguyên dòng;
+      - văn bản gửi không còn `issued` / `archived`, hoặc là văn bản hạn chế → `failed`;
+      - đơn vị nhận đã có văn bản đến trùng (cùng khóa của `documents_in_dedup`, chưa hủy — vd đã tiếp nhận tay từ bản
+        giấy) → `duplicate`, nối `incoming_document_id`, sự kiện `office.document.dispatch_duplicate` ở văn bản gửi;
+      - không thì trong một khối `begin … exception`: văn bản đến `received` (loại, số ký hiệu, ngày ban hành, độ khẩn
+        của văn bản gửi; `issuer_name` = tên đơn vị gửi; trích yếu làm sạch bằng `office.clean_text` — trích yếu văn
+        bản đi không theo các ràng buộc `documents_in_*` của F2.2; `source_id`; `created_by` = người thực hiện), tệp
+        `main` = `file_id`, sự kiện `office.document.arrived` (văn bản đến) và `office.document.dispatched` (văn bản
+        gửi), `delivered`, `delivered_at`. Vi phạm ràng buộc (`check_violation`, `unique_violation`) → khối quay lui,
+        `failed` kèm `last_error` — lỗi cố định, không giao lại. Chưa có tệp ở đơn vị nhận (khóa ngoại) → lỗi, dòng
+        vẫn `pending`.
+   3. Báo văn thư đơn vị nhận (không có văn thư thì lãnh đạo đơn vị): thông báo `document.incoming` (§5), rồi đặt
+      `notified_at`.
+3. Lỗi ở bước chép tệp hay giao (dịch vụ, kho, ClamAV không sẵn sàng; khóa ngoại) → `attempts + 1`, `last_error`,
+   `next_attempt_at = now + min(30 giây · 2^n, 1 giờ)`.
+
+**Đúng một lần.** Một dòng cho mỗi (văn bản, đơn vị) (`dispatches_once`). Nhiều nhất một văn bản đến cho mỗi dòng:
+khóa dòng và trạng thái trong hàm, chốt cuối là chỉ mục `documents_source_once` (văn bản đến đã hủy vẫn giữ chỗ). Tệp
+chép một lần: `file_id` định trước từ lúc tạo dòng, `svc-files` chép lại thì trùng khóa chính. Nhiều nhất một thông báo
+cho mỗi người: khóa `doc:<văn bản đến>:document.incoming` của `core.notifications`. Hai sổ kiểm toán cùng ghi trong
+giao dịch giao: `core.audit()` lấy `tenant_id` từ chính dòng ghi — dòng `dispatches` vào sổ bên gửi, văn bản đến và tệp
+vào sổ bên nhận; người thực hiện là tài khoản dịch vụ (`actor_kind` `service`).
+
+**Rủi ro đã biết** (ghi lại, chưa làm):
+- `office.dispatch_units` cho mọi người dùng thấy tên mọi đơn vị trên cùng hệ thống — ổn cho các khoa, phòng của một
+  trường; bản nhiều tổ chức (SaaS) cần cờ kiểu `dispatch_open` trên `core.tenants` để đơn vị chọn có hiện trong danh
+  sách hay không.
+- Hàm đánh dấu `duplicate` hoặc `failed` sau khi `svc-files` đã chép tệp: bản sao (dòng `core.files` và đối tượng
+  trong kho) mồ côi ở đơn vị nhận.
+- Chưa có nút gửi lại dòng `failed` (việc Could: Action `retryDispatch` đưa dòng về `pending`).
+- Bên gửi không thấy tiến độ xử lý của bên nhận — cố ý cách ly; chỉ biết đã giao và lúc nào.
+- Nhiều bản sao `svc-workflow` cùng giao một dòng: dựa vào khóa dòng của hàm và `file_id` định trước (`svc-files` thua
+  khóa chính thì chỉ xóa đối tượng của mình khi khác khóa của dòng đã có).
+- Dòng còn `pending` chặn nộp lưu văn bản gửi; job nộp lưu bỏ qua hồ sơ đó 24 giờ rồi thử lại.
 
 Nhắc hạn (đã làm): mỗi user task có timer không ngắt việc, chu kỳ `R2/${slaDuration}` (`MOC_SLA_DURATION`: thật
 `PT24H` — NĐ 30 yêu cầu trình trong ngày; demo `PT1M`). Timer bắn thì Flowable tạo việc giao ra ngoài (external
@@ -687,6 +834,7 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
+| `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |
 
 `GET /api/files/{id}` (đã làm ở #19): svc-files hỏi Hasura `core_files_by_pk` **bằng token của người gọi** —
 Hasura trả dòng khi người gọi là người tải lên hoặc đọc được văn bản có gắn tệp — rồi mới lấy `object_key`
@@ -743,8 +891,14 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 | `office.task.overdue` / `office.task.escalated` | Timer của Flowable: quá một / hai thời hạn của bước (§4.2) |
 | `office.document.overdue` | Văn bản đến qua hạn giải quyết mà chưa xử lý xong |
 | `office.case_file.archived` | Hồ sơ nộp lưu xong |
+| `office.document.dispatched` | Văn bản đi đã giao tới một đơn vị trong hệ thống (F3.12, ở văn bản đi). `data`: `dispatch_id`, `to_tenant_id`, `to_name` |
+| `office.document.dispatch_duplicate` | Đơn vị nhận đã có văn bản đến trùng: nối vào văn bản đó, không thêm bản thứ hai (ở văn bản đi). `data` như trên |
+| `office.document.arrived` | Văn bản đến do liên thông tạo (ở văn bản đến bên nhận). `data`: `dispatch_id`, `from_tenant_id`, `from_name`, `verify_code` (mã tra cứu của bên gửi) |
 | `core.file.rejected` | ClamAV chặn tệp |
 | `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
+
+Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
+đến; không bao giờ mang `task_id` — chỉ mục `document_events_task_once` là chỉ mục duy nhất cho cả bảng.
 
 **Thông báo realtime** (đã làm): mỗi kết nối Centrifugo tự vào kênh riêng `personal:#<sub>` của người trong
 token (Centrifugo tự kiểm token Keycloak qua JWKS); trình duyệt không đăng ký được kênh nào khác. Sau mỗi bước,
@@ -759,6 +913,7 @@ qua HTTP API nội bộ của Centrifugo:
 | `document.processed` | Lãnh đạo đã chỉ đạo, lãnh đạo phòng đã phân công | Người xử lý báo xong |
 | `document.overdue` | Người xử lý, người giao việc, lãnh đạo đơn vị | Văn bản đến qua hạn giải quyết |
 | `ot.alarm` | Chuyên viên phụ trách cảm biến | Cảm biến vượt ngưỡng, hệ thống vừa dựng dự thảo báo cáo sự cố (F3.10); `data`: tên phòng, nhiệt độ, ngưỡng, trích yếu |
+| `document.incoming` | Văn thư đơn vị nhận (không có văn thư thì lãnh đạo đơn vị) | Có văn bản đến liên thông mới (F3.12); `data`: tóm tắt văn bản đến như các thông báo khác, kèm `from_name`; khóa `doc:<văn bản đến>:document.incoming` |
 
 Dashboard điều hành (F3.11) không dùng kênh realtime: số liệu tính lúc mở trang, có nút làm mới (§2.5).
 
@@ -768,8 +923,8 @@ Dashboard điều hành (F3.11) không dùng kênh realtime: số liệu tính l
 
 1. Danh sách loại văn bản ban đầu và cách sinh ký hiệu (công văn: `số/viết tắt đơn vị-viết tắt phòng`;
    loại khác: `số/tên loại-viết tắt đơn vị`) — đối chiếu phụ lục NĐ 30.
-2. Văn bản đi gửi nhiều đơn vị trong hệ thống: một văn bản đến cho mỗi đơn vị nhận (`source_id` trỏ về
-   văn bản đi) — đã chọn; Backend xác nhận.
+2. ~~Văn bản đi gửi nhiều đơn vị trong hệ thống~~ — F3.12 làm đúng như đã chọn: một văn bản đến cho mỗi đơn vị
+   nhận (`source_id` trỏ về văn bản đi), qua hộp thư đi `office.dispatches` (§2.2, §4.2).
 3. `completeTask` dùng chung hay tách Action theo từng task — bản nháp chọn dùng chung, kiểm theo `formKey`.
 4. ~~Phạm vi Phase 1~~ — #18 làm toàn bộ §1 và §2.1–2.3, cùng trigger sổ kiểm toán. Còn `case_files`,
    `case_file_documents` và các view ở §2.5 (Phase 2–3).

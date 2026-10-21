@@ -220,6 +220,39 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   xem" trên trang văn bản. Sao lưu gồm cả két (volume `openbao_data`, dừng két trong lúc chụp); diễn tập ở CI xóa cả
   két rồi kiểm tệp mã hóa từ trước vẫn mở được. `make demo-han-che` (cũng là bước CI), `make smoke` thêm 8 kiểm tra
   (tổng 57), e2e `han-che.spec.ts`. Không dùng cho bí mật nhà nước (#47).
+- Liên thông văn bản trong hệ thống (F3.12): văn bản đi chọn thêm đơn vị nhận là đơn vị khác cùng dùng Mộc
+  (`recipient_tenant_ids`; màn soạn có danh sách "Gửi trong hệ thống" từ view `office.dispatch_units`, tích thì tên tự
+  vào ô nơi nhận). Phát hành → trigger ghi một dòng `pending` cho mỗi đơn vị nhận vào hộp thư đi `office.dispatches`
+  ngay trong giao dịch phát hành, chụp mã tra cứu và băm bản phát hành; `svc-workflow` chuyển ngay (giới hạn 15 giây,
+  lỗi không làm hỏng bước phát hành): `svc-files` chép bản PDF phát hành sang kho của đơn vị nhận qua API nội bộ `POST
+  /internal/dispatch-file` (chỉ token dịch vụ, APISIX không định tuyến; so SHA-256 với `core.files`, băm nội dung văn
+  bản và băm chụp lúc phát hành, quét ClamAV), rồi hàm `office.deliver_dispatch` chạy trong phiên của đơn vị nhận dựng
+  văn bản đến `received` (cơ quan ban hành là tên đơn vị gửi, `source_id` trỏ về văn bản gửi) kèm tệp, ghi
+  `office.document.arrived` bên nhận, `office.document.dispatched` bên gửi, sổ kiểm toán của cả hai đơn vị trong cùng
+  giao dịch. Văn thư bên nhận (không có thì lãnh đạo đơn vị) nhận thông báo `document.incoming` đúng một lần. Gọi lại,
+  chạy đua: chỉ mục `documents_source_once` chốt một văn bản đến cho mỗi văn bản gửi ở mỗi đơn vị; bên nhận đã tiếp nhận
+  tay cùng văn bản thì nối vào (`duplicate`), không báo. Lỗi thì ghi `last_error`, thử lại sau 30 s·2^lần (tối đa 1
+  giờ), vòng nền `MOC_DISPATCH_INTERVAL_S` (mặc định 30 giây); `svc-files` từ chối hẳn (tệp nguồn sai băm, đã sang kho
+  lạnh, văn bản không còn phát hành, trạm quét chặn) thì `office.fail_dispatch` đánh dấu `failed`, không thử lại, không
+  chặn nộp lưu; CSDL kiểm lại băm bản sao ở đơn vị nhận trước khi dựng văn bản đến. Văn bản hạn chế không liên thông
+  (`documents_restricted_local` ở CSDL, kiểm lại ở `submitOutgoing`, ô bị khóa trên giao diện) vì tệp mã hóa gắn với đơn
+  vị gửi; không gửi cho chính mình; văn bản còn dòng chờ chuyển thì chưa nộp lưu được. Mỗi bên chỉ thấy dòng liên thông
+  qua văn bản của mình, văn bản bên kia vẫn cách ly. Giao diện: thẻ "Liên thông trong hệ thống" trên văn bản đi (trạng
+  thái từng đơn vị, tự hỏi lại khi còn đang chuyển); văn bản đến có chip "Liên thông", thẻ "Nhận từ …" kèm mã xác thực
+  của bên gửi và dòng "SHA-256 khớp bản phát hành". `make demo-lien-thong` (7 bước, cũng là bước CI), `make smoke` +1,
+  e2e `lien-thong.spec.ts`, 19 test CSDL, svc-workflow +47, svc-files +26. Sổ kiểm toán hiện tên đơn vị nhận. Giới hạn:
+  chưa gửi lại được dòng `failed`; danh sách đơn vị hiện cho mọi người dùng.
+- Thêm đơn vị bằng một lệnh (F3.12): `python3 scripts/moc.py tenant create --code KTCK --name "Khoa Cơ khí"
+  --department "VP=Văn phòng khoa" --admin quantrick` ghi đơn vị và phòng trong một giao dịch (sổ kiểm toán ghi người
+  chạy lệnh), bật Organizations cho realm nếu chưa bật, tạo một Keycloak Organization cho đơn vị (thuộc tính
+  `tenant_id`) và tài khoản quản trị đơn vị (mật khẩu tạm in một lần, lần đầu đăng nhập phải đổi mật khẩu và cài TOTP),
+  đưa mọi tài khoản của đơn vị vào Organization, đợi danh bạ `core.users` có quản trị đơn vị. Kiểm mọi xung đột trước
+  khi ghi; chạy lại được (giữ nguyên cái đã có); `--dry-run`, `--json`, `--reset-password`. `moc tenant list` và
+  `moc tenant check [MÃ…]` (đơn vị ↔ Organization ↔ thành viên ↔ danh bạ; lệch thì thoát 1 kèm cách sửa). Token không
+  đổi: đơn vị vẫn lấy từ thuộc tính `tenant_id`, Organization chỉ là lớp thành viên. Không tách bucket theo đơn vị (khóa
+  ghi của bucket lạnh đặt sai là vĩnh viễn; cách ly đã có ở CSDL, tiền tố tệp, quyền đọc) — lý do trong
+  `docs/mo-hinh-du-lieu.md` §1. Bước CI thêm đơn vị thứ ba, chạy lại, đối chiếu; `make smoke` +1 (tổng 60); test
+  đơn vị `scripts/tests/` chạy trong `make test`.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -249,6 +282,9 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   Phase 3 thành 09–20/11, Phase 4 (cũng là đệm) thành 21–25/11; giữ nguyên ngày đóng băng và ngày nộp.
 - Hasura chờ `completeTask` tới 90 giây (trước là 30): phát hành gồm cấp số, dựng PDF, quét, lưu kho, máy chậm có thể
   quá 30 giây. Cổng APISIX chờ Hasura 100 giây (mặc định 60).
+- `make seed` tạo Organization cho hai đơn vị mẫu (`cntt`, `kt`) và đưa tài khoản mẫu vào (cùng hàm với
+  `moc tenant create`, chạy lại thì giữ nguyên); realm bật `organizationsEnabled` — bản đã dựng thì `make seed` tự bật,
+  không cần `make reset`.
 
 ### Đã sửa lỗi
 - Bấm lại khi hoàn thành việc lâu (phát hành) hay hai lần gọi chen nhau không còn ghi hai lần (hai phân công, hai lần

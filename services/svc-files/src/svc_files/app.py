@@ -27,7 +27,8 @@ dựng PDF có số, mã QR từ dữ liệu trong CSDL, quét, lưu như mọi 
 bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập. Sổ đăng ký văn bản đến / đi (F2.8):
 văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} và in ra PDF để ký nhận, đóng sổ — registers.py.
 Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh — archive.py; phòng đọc
-/api/case-files/{id}/archive đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL.
+/api/case-files/{id}/archive đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL. Liên thông trong hệ thống (F3.12):
+svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kho của đơn vị nhận — dispatch.py.
 
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
@@ -63,6 +64,7 @@ from .archive import ArchiveError, Archiver, ColdStore, read_package
 from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
+from .dispatch import DispatchError, copy_issued_file
 from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
 from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
@@ -132,7 +134,13 @@ class IssueIn(BaseModel):
     actor_id: str = Field(min_length=1, max_length=64)
 
 
+class DispatchFileIn(BaseModel):
+    dispatch_id: uuid.UUID
+    actor_id: str = Field(min_length=1, max_length=64)
+
+
 class IssueOut(BaseModel):
+    # cũng là kết quả của /internal/dispatch-file (bản sao liên thông, F3.12)
     file_id: uuid.UUID
     sha256: str
     size_bytes: int
@@ -830,6 +838,35 @@ def create_app(
                   document_id=body.document_id, file_id=file_id, size_bytes=len(pdf), encrypted=wrapped is not None,
                   caller=caller)
         return IssueOut(file_id=file_id, sha256=digest, size_bytes=len(pdf))
+
+    # Mỗi lúc một lượt chép liên thông: svc-workflow gọi lại khi lần trước quá hạn chờ thì lần sau đợi lần trước xong
+    # rồi thấy bản sao đã có (200), không chép song song trong cùng tiến trình
+    copying = asyncio.Lock()
+
+    # Liên thông trong hệ thống (F3.12) — dispatch.py. Như /internal/issue: APISIX không có route, chỉ dịch vụ nội bộ.
+    # 201 bản sao mới · 200 bản sao đã có · 404 không có dòng outbox · 409 {code: not_pending | not_issued | restricted |
+    # cold | integrity} · 422 trạm quét chặn · 503 kho, ClamAV, CSDL chưa sẵn sàng (svc-workflow thử lại sau)
+    @app.post("/internal/dispatch-file", status_code=201, response_model=IssueOut, include_in_schema=False)
+    async def dispatch_file(
+        body: DispatchFileIn,
+        request: Request,
+        caller: Annotated[str, Depends(service_caller)],
+    ) -> JSONResponse:
+        def note(event: str, **fields: object) -> None:
+            log_event(event, request, **fields)
+
+        try:
+            async with copying:
+                copied = await copy_issued_file(body.dispatch_id, actor_id=body.actor_id,
+                                                request_id=request.state.request_id, hasura=hasura, store=store,
+                                                scanner=scanner, log=note, drop=lambda key: discard(request, key))
+        except DispatchError as exc:
+            raise _error(exc.status, exc.code, exc.message) from exc
+        note("office.dispatch.file_copied" if copied.created else "office.dispatch.file_exists",
+             dispatch_id=body.dispatch_id, tenant_id=copied.tenant_id, actor_id=body.actor_id, file_id=copied.file_id,
+             size_bytes=copied.size_bytes, caller=caller)
+        out = IssueOut(file_id=copied.file_id, sha256=copied.sha256, size_bytes=copied.size_bytes)
+        return JSONResponse(out.model_dump(mode="json"), status_code=201 if copied.created else 200)
 
     @app.get(
         "/api/documents/{document_id}/preview",

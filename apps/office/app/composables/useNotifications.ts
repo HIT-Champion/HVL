@@ -52,6 +52,9 @@ export function describeNotification(t: Translate, n: Pick<RealtimeMessage, 'kin
       return { title: t('notify.documentOverdue', { due: fmtDate(d.due_on) }), detail: doc, note }
     case 'ot.alarm':
       return { title: t('notify.otAlarm', { name: d.name ?? '', value: fmtNumber(d.temperature) }), detail: doc, note }
+    // liên thông (F3.12): văn bản đi của đơn vị khác trong hệ thống vừa vào sổ chờ của đơn vị mình
+    case 'document.incoming':
+      return { title: t('notify.documentIncoming', { name: d.from_name ?? '' }), detail: doc, note }
     default:
       return { title: n.kind, detail: doc, note }
   }

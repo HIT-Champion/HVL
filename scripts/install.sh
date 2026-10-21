@@ -34,10 +34,11 @@ COMPOSE=(docker compose --profile core --profile app)
 # Danh sách tệp do bản cài quản lý — lần cài sau và lệnh gỡ chỉ xóa đúng những tệp này
 MANIFEST=.moc-install
 # Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py
-# (cả sao lưu), màn demo (demo.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot (compose chỉ
-# đọc ở đây profile core, app nên không thấy bind mount của nó)
+# (cả sao lưu, thêm đơn vị), màn demo (demo.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot
+# (compose chỉ đọc ở đây profile core, app nên không thấy bind mount của nó)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
-         scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/demo.py scripts/reconcile.py seed ot/sensor.py)
+         scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/tenants.py scripts/demo.py scripts/reconcile.py
+         seed ot/sensor.py)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 

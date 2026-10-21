@@ -24,7 +24,8 @@ chạy lần lượt; CSDL còn chặn lần ghi thứ hai bằng chỉ mục du
 một văn bản một lượt, và chỉ gắn quy trình khi văn bản chưa có — không khởi chạy hai quy trình cho một văn bản.
 
 Sau mỗi bước, người phải làm bước kế tiếp nhận thông báo (F2.5, notify.py). Thông báo gửi sau khi bước đã ghi
-xong và không bao giờ làm hỏng bước đó: lỗi chỉ ghi nhật ký.
+xong và không bao giờ làm hỏng bước đó: lỗi chỉ ghi nhật ký. Văn bản đi có đơn vị nhận trong hệ thống thì sau khi
+phát hành được chuyển sang các đơn vị đó (F3.12, dispatch.py) — cũng không bao giờ làm hỏng bước phát hành.
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
@@ -49,6 +50,7 @@ from .forms import FORMS, ChiDao, Note, PhanCong, PhatHanh, XuLy
 from .hasura import (
     BRIEF,
     CLAIM_PROCESS,
+    DISPATCH_UNITS,
     DOCUMENT,
     NUMBER_OUTGOING,
     OPEN_ASSIGNMENTS,
@@ -66,6 +68,9 @@ from .hasura import (
 )
 from .notify import Notifier, People, brief_of, load_people, task_people
 from .schemas import FormSchema
+
+if TYPE_CHECKING:
+    from .dispatch import Dispatcher
 
 PROCESS_IN = "van-ban-den"
 PROCESS_OUT = "van-ban-di"
@@ -105,6 +110,10 @@ CONSTRAINT_MESSAGES = {
     "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
     "documents_restricted_private": "Văn bản hạn chế không công khai trích yếu ở trang tra cứu",
     "document_events_task_once": "Việc này đã được ghi ở một lần gọi khác",
+    # liên thông trong hệ thống (F3.12, migration 1792281601800): ràng buộc check và trigger chuẩn hóa đơn vị nhận
+    "documents_restricted_local": "Văn bản hạn chế không gửi liên thông trong hệ thống",
+    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ: chỉ văn bản đi gửi liên thông, tới đơn vị "
+                                 "khác có trong hệ thống, và chỉ đổi được khi văn bản còn là dự thảo",
 }
 
 # Chỉ mục duy nhất theo task_id của sự kiện: một việc Flowable chỉ ghi dữ liệu một lần (migration 1792281601700)
@@ -113,6 +122,7 @@ TASK_ONCE = "document_events_task_once"
 RESTRICTED_NOT_SEALED = "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa)"
 SEALED_NOT_RESTRICTED = "Tệp đã mã hóa chỉ gắn được vào văn bản hạn chế"
 RESTRICTED_PUBLIC = CONSTRAINT_MESSAGES["documents_restricted_private"]
+RESTRICTED_LOCAL = CONSTRAINT_MESSAGES["documents_restricted_local"]
 
 
 
@@ -261,14 +271,16 @@ query Managers($dept: uuid!) {
 class Workflow:
     def __init__(self, hasura: HasuraClient, flowable: FlowableClient, files: FilesClient | None = None, *,
                  notifier: Notifier | None = None, sla_duration: str = "PT24H",
-                 intake: FormSchema | None = None) -> None:
+                 intake: FormSchema | None = None, dispatcher: Dispatcher | None = None) -> None:
         self.hasura = hasura
         self.flowable = flowable
         self.files = files
         self.notifier = notifier
         self.sla_duration = sla_duration
         self.intake = intake
-        self._turns = _Turns()
+        self.dispatcher = dispatcher
+        # một sổ lượt chung với liên thông: khóa "dispatch:<id>" nằm cạnh "doc:<id>", "task:<id>"
+        self._turns = dispatcher.turns if dispatcher is not None else _Turns()
 
     # --- tiếp nhận ------------------------------------------------------------------------------------
 
@@ -436,6 +448,8 @@ class Workflow:
             raise WorkflowError("invalid_data", "Dự thảo chưa có nội dung", 400)
         if not doc["recipients"]:
             raise WorkflowError("invalid_data", "Dự thảo chưa ghi nơi nhận", 400)
+        if doc.get("recipient_tenant_ids"):
+            await self._check_units(actor, doc, doc["recipient_tenant_ids"])
         signer = await self._user(actor, signer_id)
         if signer is None or signer["role"] != "director":
             raise WorkflowError("invalid_data", "Người ký phải là lãnh đạo đơn vị", 400)
@@ -461,6 +475,19 @@ class Workflow:
         await self._share(actor, process_id, doc["id"])
         await self._announce(actor, process_id, doc["id"])
         return {"document_id": doc["id"], "status": "in_review"}
+
+    async def _check_units(self, actor: Actor, doc: dict[str, Any], units: list[str]) -> None:
+        """Đơn vị nhận trong hệ thống (F3.12): có thật, không phải đơn vị mình; văn bản hạn chế không gửi liên thông
+        (tệp niêm phong gắn với thuê ước của mình). CSDL cũng chặn — ở đây để báo đúng trường trước khi trình."""
+        field = "recipient_tenant_ids"
+        if doc.get("restricted"):
+            raise WorkflowError("invalid", RESTRICTED_LOCAL, 400, fields={field: "restricted"})
+        wanted = {str(u).lower() for u in units}
+        if str(actor.tenant_id) in wanted:
+            raise WorkflowError("invalid", "Không gửi liên thông cho chính đơn vị mình", 400, fields={field: "self"})
+        found = (await self.hasura.as_service(actor, DISPATCH_UNITS, {"ids": sorted(wanted)}))["office_dispatch_units"]
+        if {str(u["id"]).lower() for u in found} != wanted:
+            raise WorkflowError("invalid", "Đơn vị nhận không có trong hệ thống", 400, fields={field: "unknown"})
 
     async def _start_outgoing(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> str:
         pid = await self.flowable.find_process(PROCESS_OUT, doc["id"])
@@ -886,6 +913,8 @@ class Workflow:
         """Văn thư phát hành: cấp số đi → svc-files dựng PDF có số, mã QR, rồi lưu → ghi băm, chuyển issued.
 
         Gọi lại sau lỗi: cấp số trả về số đã cấp; PDF được dựng lại (tệp cũ chưa gắn vào văn bản thì bỏ).
+        Có đơn vị nhận trong hệ thống: CSDL tạo dòng liên thông cùng giao dịch phát hành (trigger), sau khi chuyển
+        bước thì chuyển ngay sang các đơn vị đó; chưa xong thì vòng nền đối soát chuyển tiếp (dispatch.py).
         """
         doc = await self._outgoing(actor, doc_id)
         if doc["status"] != "approved" and not await self._task_done(actor, doc_id, task.id):
@@ -914,6 +943,9 @@ class Workflow:
             }
 
         async def after() -> None:
-            await self._tell(actor, {doc["created_by"], doc["signer_id"]} - {None}, "document.issued", doc_id)
+            await self._quietly("after", doc_id, lambda: self._tell(
+                actor, {doc["created_by"], doc["signer_id"]} - {None}, "document.issued", doc_id))
+            if doc.get("recipient_tenant_ids") and self.dispatcher is not None:
+                await self.dispatcher.dispatch_document(doc_id)   # tự giới hạn thời gian, không ném lỗi
 
         return Plan(ISSUE, {"doc": doc_id, "public": form.is_public}, {"outcome": "issue"}, prepare, after=after)

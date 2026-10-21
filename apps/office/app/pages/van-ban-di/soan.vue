@@ -23,8 +23,11 @@ import type { UploadedFile } from '~/composables/useApi'
 // Soạn hoặc sửa dự thảo văn bản đi (F2.4). Chuyên viên nhập trích yếu, nội dung, nơi nhận; svc-files dựng
 // PDF đúng thể thức NĐ 30 từ đây. Số, ký hiệu, ngày ban hành do văn thư cấp khi phát hành, không nhập tay.
 // Kiểm trên form theo ràng buộc của CSDL (độ dài trích yếu, nội dung); svc-workflow kiểm lại khi trình.
+// Gửi trong hệ thống (F3.12): tích đơn vị nhận cùng dùng Mộc — phát hành xong, văn bản tự vào sổ chờ của văn thư
+// đơn vị đó (recipient_tenant_ids). Văn bản hạn chế không gửi liên thông (tệp mã hóa theo đơn vị).
 
 interface Attachment { key: number; name: string; state: 'uploading' | 'clean' | 'error'; message?: string; uploaded?: UploadedFile; existing?: boolean }
+interface Unit { id: string; code: string; name: string; parent_name: string | null }
 
 const { t } = useI18n()
 const { gql, upload } = useApi()
@@ -36,6 +39,7 @@ const claims = useAuth().claims
 const editId = computed(() => (route.query.id ? String(route.query.id) : null))
 const types = ref<{ code: string; name: string }[]>([])
 const incoming = ref<{ id: string; symbol: string | null; summary: string }[]>([])
+const units = ref<Unit[]>([])   // đơn vị khác trong hệ thống (view office.dispatch_units không có đơn vị mình)
 const attachments = ref<Attachment[]>([])
 const removed = ref<string[]>([])
 const loading = ref(true)
@@ -45,7 +49,9 @@ const saving = ref(false)
 const tried = ref(false)
 let nextKey = 1
 
-const form = reactive({ type_code: 'CV', summary: '', body: '', recipients: '', urgency: 'normal', reply_to_id: '' })
+const form = reactive({
+  type_code: 'CV', summary: '', body: '', recipients: '', urgency: 'normal', reply_to_id: '', recipient_tenant_ids: [] as string[],
+})
 
 const recipientList = computed(() => form.recipients.split('\n').map((r) => r.trim()).filter(Boolean))
 const errors = computed(() => {
@@ -59,12 +65,19 @@ const errors = computed(() => {
 })
 const uploading = computed(() => attachments.value.some((a) => a.state === 'uploading'))
 
+// Tích một đơn vị thì thêm tên vào ô Nơi nhận (để in "Kính gửi"); bỏ tích chỉ gỡ dòng đúng bằng tên đó
+function toggleUnit(unit: Unit, on: boolean) {
+  const rest = form.recipient_tenant_ids.filter((x) => x !== unit.id)
+  form.recipient_tenant_ids = on ? [...rest, unit.id] : rest
+  form.recipients = toggleRecipient(form.recipients, unit.name, on)
+}
+
 // Hết phiên giữa chừng: quay lại sau khi đăng nhập vẫn còn bản đang soạn (tệp đã tải lên giữ theo id)
 interface Kept { form: typeof form; files: { name: string; uploaded: UploadedFile; existing?: boolean }[]; removed: string[] }
 const draft = useFormDraft<Kept>(
   () => (claims.value ? `${claims.value.userId}:van-ban-di:${editId.value ?? 'moi'}` : null),
   () => (restricted.value ? null : {
-    form: { ...form }, removed: [...removed.value],
+    form: { ...form, recipient_tenant_ids: [...form.recipient_tenant_ids] }, removed: [...removed.value],
     files: attachments.value.filter((a) => a.state === 'clean' && a.uploaded)
       .map((a) => ({ name: a.name, uploaded: a.uploaded!, existing: a.existing })),
   }),
@@ -81,12 +94,15 @@ onMounted(async () => {
     const data = await gql<{
       office_document_types: { code: string; name: string }[]
       office_documents: { id: string; symbol: string | null; summary: string }[]
+      office_dispatch_units: Unit[]
     }>(`{
       office_document_types(order_by: {name: asc}) { code name }
       office_documents(where: {direction: {_eq: "in"}}, order_by: {created_at: desc}, limit: 50) { id symbol summary }
+      office_dispatch_units(order_by: {name: asc}) { id code name parent_name }
     }`)
     types.value = data.office_document_types
     incoming.value = data.office_documents
+    units.value = data.office_dispatch_units
     if (route.query.reply) form.reply_to_id = String(route.query.reply)
     if (editId.value) await loadDraft(editId.value)
     if (restricted.value) draft.clear()
@@ -101,11 +117,11 @@ onMounted(async () => {
 async function loadDraft(id: string) {
   const data = await gql<{ office_documents_by_pk: {
     status: string; created_by: string; restricted: boolean; type_code: string; summary: string; body: string | null
-    recipients: string[]
+    recipients: string[]; recipient_tenant_ids: string[]
     urgency: string; reply_to_id: string | null; files: { role: string; file: { id: string; filename: string } | null }[]
   } | null }>(`
     query ($id: uuid!) { office_documents_by_pk(id: $id) {
-      status created_by restricted type_code summary body recipients urgency reply_to_id
+      status created_by restricted type_code summary body recipients recipient_tenant_ids urgency reply_to_id
       files(where: {role: {_eq: "attachment"}}) { role file { id filename } }
     } }`, { id })
   const doc = data.office_documents_by_pk
@@ -116,7 +132,7 @@ async function loadDraft(id: string) {
   restricted.value = doc.restricted
   Object.assign(form, {
     type_code: doc.type_code, summary: doc.summary, body: doc.body ?? '', recipients: doc.recipients.join('\n'),
-    urgency: doc.urgency, reply_to_id: doc.reply_to_id ?? '',
+    urgency: doc.urgency, reply_to_id: doc.reply_to_id ?? '', recipient_tenant_ids: [...doc.recipient_tenant_ids],
   })
   attachments.value = doc.files.filter((f) => f.file).map((f) => ({
     key: nextKey++, name: f.file!.filename, state: 'clean' as const, existing: true,
@@ -146,6 +162,8 @@ async function save() {
   const fields = {
     type_code: form.type_code, summary: form.summary.trim(), body: form.body.trim(), recipients: recipientList.value,
     urgency: form.urgency, reply_to_id: form.reply_to_id || null,
+    // bản dở cũ có thể còn đơn vị đã bỏ khỏi hệ thống: chỉ gửi đơn vị còn trong danh sách
+    recipient_tenant_ids: restricted.value ? [] : form.recipient_tenant_ids.filter((x) => units.value.some((u) => u.id === x)),
   }
   const fresh = attachments.value.filter((a) => a.state === 'clean' && !a.existing)
   try {
@@ -237,6 +255,24 @@ async function save() {
           </select>
         </div>
       </div>
+
+      <!-- gửi trong hệ thống (F3.12) -->
+      <fieldset v-if="units.length" data-testid="units">
+        <legend class="label">{{ t('compose.units') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></legend>
+        <div class="grid gap-1.5 sm:grid-cols-2" :class="{ 'opacity-60': restricted }">
+          <label v-for="u in units" :key="u.id" class="flex items-start gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm">
+            <input
+              type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700" :checked="form.recipient_tenant_ids.includes(u.id)" :disabled="restricted"
+              @change="toggleUnit(u, ($event.target as HTMLInputElement).checked)"
+            >
+            <span>
+              <span class="font-medium">{{ u.name }}</span>
+              <span v-if="u.parent_name" class="block text-xs text-stone-500">{{ u.parent_name }}</span>
+            </span>
+          </label>
+        </div>
+        <p class="mt-1 text-xs text-stone-500">{{ restricted ? t('compose.unitsRestricted') : t('compose.unitsHint') }}</p>
+      </fieldset>
 
       <div>
         <span class="label">{{ t('compose.attachments') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></span>

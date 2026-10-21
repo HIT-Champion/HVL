@@ -9,6 +9,7 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
+  "organizationsEnabled": true,
   "bruteForceProtected": true,
   "failureFactor": 10,
   "accessTokenLifespan": 300,

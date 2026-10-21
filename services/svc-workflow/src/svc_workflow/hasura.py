@@ -177,7 +177,7 @@ OUTGOING = """
 query Outgoing($id: uuid!) {
   office_documents_by_pk(id: $id) {
     id direction status created_by department_id signer_id process_id urgency summary body recipients
-    register_number symbol verify_code restricted
+    register_number symbol verify_code restricted recipient_tenant_ids
   }
 }"""
 
@@ -238,6 +238,60 @@ query OverdueDocuments($today: date!) {
 
 TENANT_USERS = """
 query TenantUsers { core_users { id department_id username full_name email role enabled } }"""
+
+# --- liên thông văn bản trong hệ thống (F3.12, dispatch.py) ----------------------------------------------
+
+# Đối soát (as_system, xuyên thuê ước): dòng chờ chuyển đã đến hạn thử, và dòng đã chuyển mà chưa báo bên nhận
+PENDING_DISPATCHES = """
+query PendingDispatches($now: timestamptz!) {
+  office_dispatches(where: {_or: [
+    {status: {_eq: "pending"}, next_attempt_at: {_lte: $now}},
+    {status: {_in: ["delivered", "duplicate"]}, notified_at: {_is_null: true}}
+  ]}, order_by: {created_at: asc}, limit: 50) { id }
+}"""
+
+# as_system: attempts để tính lần thử sau (lùi dần), from_unit để ghi tên đơn vị gửi vào thông báo
+DISPATCH = """
+query Dispatch($id: uuid!) {
+  office_dispatches_by_pk(id: $id) {
+    id tenant_id to_tenant_id document_id status incoming_document_id notified_at attempts from_unit { name }
+  }
+}"""
+
+# as_system: dòng chờ chuyển của một văn bản vừa phát hành
+DOCUMENT_DISPATCHES = """
+query DocumentDispatches($doc: uuid!) {
+  office_dispatches(where: {document_id: {_eq: $doc}, status: {_eq: "pending"}}) { id }
+}"""
+
+# Gọi trong phiên của bên nhận (hàm office.deliver_dispatch): văn bản đến, tệp, sự kiện của hai bên, một giao dịch
+DELIVER = """
+mutation Deliver($id: uuid!) {
+  office_deliver_dispatch(args: {dispatch_id: $id}) { id status incoming_document_id last_error }
+}"""
+
+DISPATCH_RETRY = """
+mutation DispatchRetry($id: uuid!, $error: String!, $next: timestamptz!) {
+  update_office_dispatches_by_pk(pk_columns: {id: $id}, _inc: {attempts: 1},
+                                 _set: {last_error: $error, next_attempt_at: $next}) { id }
+}"""
+
+# svc-files từ chối chép vĩnh viễn: dòng chờ thành failed (hàm office.fail_dispatch, phiên của bên gửi)
+FAIL_DISPATCH = """
+mutation FailDispatch($id: uuid!, $reason: String!) {
+  office_fail_dispatch(args: {dispatch_id: $id, reason: $reason}) { id status last_error }
+}"""
+
+DISPATCH_NOTIFIED = """
+mutation DispatchNotified($id: uuid!, $now: timestamptz!) {
+  update_office_dispatches_by_pk(pk_columns: {id: $id}, _set: {notified_at: $now}) { id }
+}"""
+
+# Hỏi bằng phiên service của người trình: view chỉ có các đơn vị khác, không có chính đơn vị mình
+DISPATCH_UNITS = """
+query DispatchUnits($ids: [uuid!]!) {
+  office_dispatch_units(where: {id: {_in: $ids}}) { id name }
+}"""
 
 UPSERT_USERS = """
 mutation UpsertUsers($rows: [core_users_insert_input!]!) {

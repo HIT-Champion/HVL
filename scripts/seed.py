@@ -18,7 +18,9 @@
 
 1. Đơn vị và phòng ban: seed/tenants.sql (id cố định).
 2. Tài khoản: seed/users.csv → Keycloak Admin REST qua cổng quản trị nội bộ (127.0.0.1).
-3. Văn bản: chạy kịch bản nghiệp vụ qua API như người dùng thật (seed_documents.py) — không chèn thẳng
+3. Mỗi đơn vị mẫu một Organization trong Keycloak, tài khoản mẫu là thành viên (F3.12) — cùng các hàm của
+   `moc tenant create` (tenants.py).
+4. Văn bản: chạy kịch bản nghiệp vụ qua API như người dùng thật (seed_documents.py) — không chèn thẳng
    vào CSDL, để quy trình trong Flowable khớp với dữ liệu.
 """
 
@@ -28,7 +30,9 @@ import json
 import sys
 import time
 
+import tenants
 from moc_env import ENV, KEYCLOAK_ADMIN_URL, PUBLIC_URL, REALM, ROOT, HTTPError, Session, call_json, compose, wait_for
+from tenants import admin_token
 
 
 def seed_tenants() -> None:
@@ -36,15 +40,6 @@ def seed_tenants() -> None:
     compose("exec", "-T", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1",
             "-U", ENV.get("POSTGRES_USER", "moc"), "-d", ENV.get("POSTGRES_DB", "moc"), stdin=sql)
     print("  đơn vị, phòng ban: xong")
-
-
-def admin_token() -> str:
-    data, _ = call_json(
-        "POST", f"{KEYCLOAK_ADMIN_URL}/realms/master/protocol/openid-connect/token",
-        form={"grant_type": "password", "client_id": "admin-cli",
-              "username": ENV.get("KEYCLOAK_ADMIN_USER", "admin"), "password": ENV["KEYCLOAK_ADMIN_PASSWORD"]},
-    )
-    return data["access_token"]
 
 
 # Khớp authenticatorConfig "moc-vai-tro-bat-buoc-otp" trong auth/realm/moc-realm.json
@@ -108,6 +103,18 @@ def seed_users() -> None:
         print("  (chưa có MOC_DEMO_TOTP_SECRET trong .env: văn thư, lãnh đạo sẽ phải tự cài TOTP ở lần đăng nhập đầu)")
 
 
+def seed_organizations() -> None:
+    """Organization của các đơn vị mẫu, tài khoản mẫu là thành viên: tạo nếu chưa có, chạy lại thì giữ nguyên."""
+    wanted = {line.split(",")[4] for line in (ROOT / "seed" / "users.csv").read_text(encoding="utf-8").splitlines()
+              if line.strip() and not line.startswith("#")}
+    rows = [t for t in tenants.database().query(tenants.TENANTS_SQL) if t["id"] in wanted]
+    enabled, done = tenants.organize(tenants.connect(), rows)
+    added = sum(len(d["added"]) for d in done)
+    print(f"  Keycloak Organizations: {', '.join(d['alias'] for d in done)} — {sum(d['members'] for d in done)} "
+          f"thành viên" + (f", vừa thêm {added}" if added else "")
+          + ("; vừa bật Organizations cho realm" if enabled else ""))
+
+
 def wait_directory(timeout_s: int = 90) -> None:
     """svc-workflow chép danh bạ Keycloak sang core.users theo chu kỳ; đợi tài khoản mẫu có mặt."""
     wanted = sum(1 for line in (ROOT / "seed" / "users.csv").read_text(encoding="utf-8").splitlines()
@@ -131,8 +138,11 @@ def main() -> None:
     seed_tenants()
     try:
         seed_users()
+        seed_organizations()
     except HTTPError as exc:
         sys.exit(f"Keycloak từ chối: {exc}")
+    except (tenants.TenantError, tenants.Unavailable) as exc:
+        sys.exit(str(exc))
     if "--no-documents" not in sys.argv:
         if not ENV.get("MOC_DEMO_TOTP_SECRET"):
             # văn bản mẫu dựng bằng tài khoản văn thư, lãnh đạo qua client moc-cli — client này hỏi mã TOTP như trình duyệt
