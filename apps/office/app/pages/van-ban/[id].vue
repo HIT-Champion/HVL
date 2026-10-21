@@ -47,7 +47,7 @@ interface Doc {
   verify_code: string | null
   department: { name: string } | null
   reply_to: { id: string; symbol: string | null; summary: string } | null
-  files: { role: string; file: { id: string; filename: string; mime_type: string; size_bytes: number } | null }[]
+  files: { role: string; file: { id: string; filename: string; mime_type: string; size_bytes: number; encrypted: boolean } | null }[]
   assignments: {
     id: string; parent_id: string | null; role: string; department: { name: string } | null; user_id: string | null
     instruction: string | null; due_on: string | null; status: string; result_note: string | null
@@ -117,7 +117,7 @@ async function load() {
           id direction status type_code document_type { name } symbol issuer_name issued_on summary urgency restricted
           register_number registered_at due_on created_by created_at body recipients signer_id verify_code
           department { name } reply_to { id symbol summary }
-          files(order_by: {added_at: asc}) { role file { id filename mime_type size_bytes } }
+          files(order_by: {added_at: asc}) { role file { id filename mime_type size_bytes encrypted } }
           assignments(order_by: {assigned_at: asc}) {
             id parent_id role department { name } user_id instruction due_on status result_note assigned_by assigned_at completed_at
           }
@@ -136,10 +136,51 @@ async function load() {
     signer.value = doc.value?.signer_id ?? directors.value[0]?.id ?? ''
     // tab Lịch sử đang mở: thao tác vừa xong (vào sổ, trình ký, xử lý) có dòng sổ mới
     if (side.value === 'history') void openHistory()
+    viewers.value = null
+    if (doc.value?.restricted && canManageViewers.value) void loadViewers()
   } catch (e) {
     notice.error(errorText(t, e))
   } finally {
     loading.value = false
+  }
+}
+
+// Văn bản hạn chế (F3.7): văn thư, lãnh đạo đơn vị đang đọc được văn bản thì xem và sửa danh sách người được xem
+// (hàm office.grant_document_access / revoke_document_access kiểm lại vai trò, thuê ước, quyền đọc)
+interface Viewer { user_id: string; granted_by: string; granted_at: string }
+const viewers = ref<Viewer[] | null>(null)
+const viewerPick = ref('')
+const viewerBusy = ref(false)
+const canManageViewers = computed(() => ['clerk', 'director'].includes(claims.value?.role ?? ''))
+const viewerChoices = computed(() => users.value.filter((u) => u.role !== 'tenant_admin' && u.id !== doc.value?.created_by
+  && !viewers.value?.some((v) => v.user_id === u.id)))
+
+async function loadViewers() {
+  const want = id.value
+  try {
+    const data = await gql<{ office_document_acl: Viewer[] }>(`
+      query ($id: uuid!) {
+        office_document_acl(where: {document_id: {_eq: $id}}, order_by: {granted_at: asc}) { user_id granted_by granted_at }
+      }`, { id: want })
+    if (want === id.value) viewers.value = data.office_document_acl
+  } catch (e) {
+    notice.error(errorText(t, e))
+  }
+}
+
+async function changeViewer(userId: string, grant: boolean) {
+  viewerBusy.value = true
+  try {
+    const fn = grant ? 'office_grant_document_access' : 'office_revoke_document_access'
+    await gql(`mutation ($d: uuid!, $u: String!) { ${fn}(args: {document_id: $d, user_id: $u}) { user_id } }`,
+      { d: id.value, u: userId })
+    notice.ok(t(grant ? 'doc.viewerGranted' : 'doc.viewerRevoked', { name: nameOf(userId) }))
+    viewerPick.value = ''
+    await loadViewers()
+  } catch (e) {
+    notice.error(errorText(t, e))
+  } finally {
+    viewerBusy.value = false
   }
 }
 
@@ -282,8 +323,8 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
         <div class="space-y-6 lg:col-span-2">
           <TaskPanel
             v-if="task" :key="task.id" :task-id="task.id" :form-key="task.form_key" :document-due="doc.due_on"
-            :document-id="doc.id" :users="users" :departments="departments" :my-department="claims?.departmentId ?? null"
-            :my-id="claims?.userId ?? ''" @done="load"
+            :document-id="doc.id" :restricted="doc.restricted" :users="users" :departments="departments"
+            :my-department="claims?.departmentId ?? null" :my-id="claims?.userId ?? ''" @done="load"
           />
 
           <!-- trình dự thảo: lần đầu, hoặc trình lại sau khi bị trả lại -->
@@ -363,11 +404,46 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id" class="flex items-center gap-3 py-2 text-sm">
                 <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5" /></svg>
                 <span class="min-w-0 flex-1 truncate">{{ f.file!.filename }}</span>
+                <span v-if="f.file!.encrypted" class="chip gap-1 bg-stone-800 text-white" :title="t('doc.sealedHint')" data-testid="file-sealed">
+                  <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" /></svg>
+                  {{ t('doc.sealed') }}
+                </span>
                 <span class="chip bg-stone-100 text-stone-600">{{ t(`doc.fileRole.${f.role}`) }}</span>
                 <span class="text-xs text-stone-500">{{ fmtSize(f.file!.size_bytes) }}</span>
                 <button class="btn-ghost text-brand-800" @click="download(f.file!.id, f.file!.filename).catch((e) => notice.error(errorText(t, e)))">{{ t('doc.download') }}</button>
               </li>
             </ul>
+          </section>
+
+          <!-- người được xem văn bản hạn chế (F3.7) -->
+          <section v-if="doc.restricted && canManageViewers && viewers" class="card p-5" data-testid="viewers">
+            <h2 class="mb-1 text-sm font-semibold text-stone-800">{{ t('doc.viewers') }}</h2>
+            <p class="mb-3 text-xs text-stone-500">{{ t('doc.viewersHint') }}</p>
+            <p v-if="!viewers.length" class="text-sm text-stone-500">{{ t('doc.viewersEmpty') }}</p>
+            <ul v-else class="mb-3 divide-y divide-stone-100">
+              <li v-for="v in viewers" :key="v.user_id" class="flex items-center gap-3 py-2 text-sm">
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium">{{ nameOf(v.user_id) }}</span>
+                  <span class="block text-xs text-stone-500">{{ t('doc.viewerBy', { by: nameOf(v.granted_by), at: fmtDateTime(v.granted_at) }) }}</span>
+                </span>
+                <button
+                  v-if="v.user_id !== claims?.userId" class="btn-ghost text-rose-700" :disabled="viewerBusy"
+                  @click="changeViewer(v.user_id, false)"
+                >
+                  {{ t('doc.viewerRemove') }}
+                </button>
+              </li>
+            </ul>
+            <form class="flex flex-wrap items-end gap-2" @submit.prevent="viewerPick && changeViewer(viewerPick, true)">
+              <div class="min-w-48 flex-1">
+                <label class="label" for="viewer">{{ t('doc.viewerPick') }}</label>
+                <select id="viewer" v-model="viewerPick" class="input">
+                  <option value="" disabled>—</option>
+                  <option v-for="u in viewerChoices" :key="u.id" :value="u.id">{{ u.full_name }}</option>
+                </select>
+              </div>
+              <button type="submit" class="btn-secondary" :disabled="viewerBusy || !viewerPick">{{ t('doc.viewerAdd') }}</button>
+            </form>
           </section>
 
           <!-- giao xử lý -->

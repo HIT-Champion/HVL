@@ -21,14 +21,16 @@
 # Lãnh đạo và quản trị đơn vị xem sổ của đơn vị mình (màn "Sổ kiểm toán", F2.12): ai, lúc nào, làm gì, cột nào
 # đổi, hash của dòng. Không đọc được cột diff: chỉ trường `overview`, giữ giá trị của các cột không chứa nội
 # dung (hàm core.audit_overview, migration 1792281600700, 1792281600900, 1792281601100, 1792281601300), để sổ
-# không lộ văn bản hạn chế.
+# không lộ văn bản hạn chế. Dòng của văn bản hạn chế mà người xem không đọc được chỉ còn tên cột
+# (office.audit_overview_seen, migration 1792281601600, F3.7).
 table:
   name: audit_log
   schema: core
 computed_fields:
   - name: overview
     definition:
-      function: {name: audit_overview, schema: core}
+      function: {name: audit_overview_seen, schema: office}
+      session_argument: hasura_session
     comment: Cột đã đổi → [cũ, mới]; cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) chỉ có tên, giá trị null
 insert_permissions:
   - role: service

@@ -45,11 +45,17 @@ select_permissions:
   - role: clerk
     permission: &user_select
       columns: [id, filename, mime_type, size_bytes, sha256, scanned_at, encrypted, storage_tier, created_by, created_at]
+      # Tệp mã hóa (văn bản hạn chế, F3.7) đã gắn vào văn bản thì chỉ theo quyền đọc văn bản: người tải lên, người
+      # phát hành bị gỡ khỏi danh sách được xem thì cũng không mở được nữa
       filter:
         _and:
           - tenant_id: {_eq: X-Hasura-Tenant-Id}
           - _or:
-              - created_by: {_eq: X-Hasura-User-Id}
+              - _and:
+                  - created_by: {_eq: X-Hasura-User-Id}
+                  - _or:
+                      - encrypted: {_eq: false}
+                      - _not: {document_files: {}}
               - document_files: {document: {visible: {_eq: true}}}
   - role: staff
     permission: *user_select

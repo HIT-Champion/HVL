@@ -21,10 +21,14 @@ Mỗi lần sao lưu là một "lượt": vài snapshot restic cùng thẻ `run-
 - `pg_dump -Fc` của từng CSDL trong máy chủ PostgreSQL (moc, keycloak, flowable…), đẩy thẳng từ container postgres
   sang restic qua ống, không ghi tệp tạm;
 - cả volume SeaweedFS: tệp văn bản, bucket lạnh cùng các mốc neo sổ kiểm toán và trạng thái khóa ghi của chúng;
+- cả volume két OpenBao (F3.7): khóa transit `moc-files` bọc khóa dữ liệu của từng tệp văn bản hạn chế, chỉ nằm ở
+  đây — mất két là mất mọi tệp mã hóa. Két khôi phục mở bằng khóa static seal trong .env đang dùng
+  (MOC_OPENBAO_SEAL_KEY): cất một bản .env ở chỗ riêng, KHÔNG để chung với kho sao lưu — thiếu nó thì không khôi
+  phục được, có cả hai thì mở được mọi tệp mã hóa;
 - manifest.json, ghi sau cùng. Lượt thiếu manifest là lượt hỏng giữa chừng, không dùng để khôi phục.
 
-Từ trước lúc dump CSDL tới lúc chép xong tệp, svc-files (chỗ duy nhất ghi vào SeaweedFS và neo sổ kiểm toán) và
-SeaweedFS tạm dừng (`docker compose pause`): mốc neo trong bucket với bảng mốc trong CSDL, tệp với dòng trỏ tới tệp
+Từ trước lúc dump CSDL tới lúc chép xong tệp, svc-files (chỗ duy nhất ghi vào SeaweedFS và neo sổ kiểm toán),
+SeaweedFS và két tạm dừng (`docker compose pause`): mốc neo trong bucket với bảng mốc trong CSDL, tệp với dòng trỏ tới tệp
 là cùng một lúc, nên khôi phục xong `moc audit verify` vẫn khớp. Các dịch vụ còn lại có ghi CSDL (Hasura,
 svc-workflow, Flowable, Keycloak) chỉ tạm dừng lúc dump, để các CSDL cùng một lúc. Volume tệp được chép mồi một
 lượt trước khi tạm dừng, nên lúc dừng chỉ phải đọc tệp đổi trong vài giây đó.
@@ -32,7 +36,8 @@ lượt trước khi tạm dừng, nên lúc dừng chỉ phải đọc tệp đ
 restic (BSD-2-Clause) chạy trong container `restic` (profile backup, không mạng): mã hóa, khử trùng lặp, các lần
 sau chỉ thêm phần đã đổi. Kho ở MOC_BACKUP_DIR, khóa là MOC_BACKUP_PASSWORD — mất khóa là mất bản sao lưu. Chỉ mục
 Meilisearch và chữ ký ClamAV không sao lưu: svc-files đồng bộ lại chỉ mục từ CSDL khi khởi động, ClamAV tự tải chữ
-ký.
+ký. Lịch sử cảm biến của màn demo IT/OT (Scorpio, profile iot) cũng không sao lưu. Lượt sao lưu cũ chưa có két thì
+khôi phục giữ nguyên két đang có.
 """
 
 from __future__ import annotations
@@ -57,9 +62,10 @@ from audit_chain import HEAD_SQL, RESTORED_SQL
 from moc_env import ENV, ROOT
 
 COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
-WRITERS = ("svc-files", "seaweedfs")                       # tạm dừng suốt lúc sao lưu
+WRITERS = ("svc-files", "seaweedfs", "openbao")            # tạm dừng suốt lúc sao lưu
 DB_WRITERS = ("hasura", "svc-workflow", "flowable", "keycloak")   # tạm dừng lúc dump CSDL
 FILES = "/data/seaweedfs"               # chỗ volume SeaweedFS gắn vào container restic
+VAULT = "/data/openbao"                 # chỗ volume két OpenBao gắn vào container restic (F3.7)
 HOST = "moc"                            # tên máy ghi vào snapshot: cố định, để restic tìm ra lượt trước và chỉ đọc
 TAG = "moc"                             # tệp đã đổi (container mỗi lần một tên khác)
 MANIFEST = "manifest.json"
@@ -308,9 +314,12 @@ def create(keep: int | None = None) -> dict[str, Any]:
                 _unpause(held)
                 part = _summary(_call(_backup_args(tags, FILES), "restic không chép được volume SeaweedFS"))
                 manifest["files"] = part
-                manifest["paused_s"] = round(time.monotonic() - started, 1)
                 print(f"  ✓ Tệp (volume SeaweedFS): {_size(part['bytes'])}"
                       f" (thêm vào kho {_size(prime['added'] + part['added'])})", flush=True)
+                manifest["vault"] = part = _summary(_call(_backup_args(tags, VAULT),
+                                                          "restic không chép được volume két OpenBao"))
+                manifest["paused_s"] = round(time.monotonic() - started, 1)
+                print(f"  ✓ Két (volume OpenBao): {_size(part['bytes'])}", flush=True)
             finally:
                 _unpause(held + paused)
             _call(_backup_args(tags, "--stdin", "--stdin-filename", MANIFEST), "restic không ghi được manifest",
@@ -388,6 +397,8 @@ def _check_readable(target: dict[str, Any], manifest: dict[str, Any]) -> None:
     (restic kiểm hash từng khối khi đọc). Hỏng thì dừng ở đây, chưa đụng tới dữ liệu đang có."""
     wanted = {f"{db}.dump": part["snapshot"] for db, part in manifest["databases"].items()}
     wanted[FILES.lstrip("/")] = manifest["files"]["snapshot"]
+    if "vault" in manifest:                 # lượt sao lưu trước F3.7 chưa có két
+        wanted[VAULT.lstrip("/")] = manifest["vault"]["snapshot"]
     missing = [name for name, sid in wanted.items() if target["parts"].get(name) != sid]
     if missing:
         raise BackupError(f"lượt {manifest['run']} không còn đủ phần trong kho ({', '.join(missing)}) — chọn lượt khác")
@@ -409,6 +420,7 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         head = manifest["audit"]
         print(f"Lượt {manifest['run']}, sao lưu lúc {_when(manifest['run'])} (Mộc {manifest['version']}):"
               f" CSDL {', '.join(manifest['databases'])}; tệp {_size(manifest['files']['bytes'])};"
+              f" {'két' if 'vault' in manifest else 'chưa có két (giữ két đang có)'};"
               f" sổ kiểm toán tới dòng #{head['id']}.")
         current = ENV.get("MOC_VERSION") or "dev"
         if manifest["version"] != current:
@@ -446,6 +458,10 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
             _call(restic("restore", f"{manifest['files']['snapshot']}:{FILES}", "--target", FILES, "--delete"),
                   "không khôi phục được tệp")
             print("  ✓ Tệp (volume SeaweedFS)", flush=True)
+            if "vault" in manifest:
+                _call(restic("restore", f"{manifest['vault']['snapshot']}:{VAULT}", "--target", VAULT, "--delete"),
+                      "không khôi phục được két")
+                print("  ✓ Két (volume OpenBao)", flush=True)
             try:
                 actor = f"os:{getpass.getuser()}"
             except (KeyError, OSError):

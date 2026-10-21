@@ -47,6 +47,8 @@ class Principal:
     tenant_id: uuid.UUID
     roles: tuple[str, ...]
     department_id: str | None = None
+    # Tên hiển thị (claim name, preferred_username của Keycloak): in lên bản xem văn bản hạn chế (F3.7)
+    display_name: str = ""
     # Token gốc, để hỏi Hasura thay mặt người dùng (quyền do Hasura quyết, không viết lại ở đây).
     token: str = field(default="", repr=False, compare=False)
 
@@ -82,11 +84,15 @@ class TokenVerifier:
             raise AuthError(403, "no_tenant", "Tài khoản chưa được gán đơn vị (tenant_id)") from exc
 
         roles = ns.get("x-hasura-allowed-roles") or []
+        name = " ".join(str(claims.get("name") or "").split())[:120]
+        login = " ".join(str(claims.get("preferred_username") or "").split())[:60]
+        display = f"{name} ({login})" if name and login and login != name else name or login
         return Principal(
             user_id=str(ns.get("x-hasura-user-id") or claims["sub"]),
             tenant_id=tenant_id,
             roles=tuple(str(r) for r in roles) if isinstance(roles, list) else (),
             department_id=ns.get("x-hasura-department-id"),
+            display_name=display,
             token=token,
         )
 

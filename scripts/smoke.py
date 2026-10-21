@@ -23,7 +23,8 @@ viên soạn công văn trả lời, xem trước → trình → tổ trưởng 
 mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Thông báo: tổ trưởng nhận tin việc mới
 qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
 kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
-có con số tổng), văn thư không đọc được. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả
+có con số tổng), văn thư không đọc được. Văn bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người
+xem, chỉ người có tên trong danh sách được xem (người nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả
 chuỗi ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị,
 đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới hạn tốc độ.
 """
@@ -321,7 +322,8 @@ def main() -> None:
     print("Luồng văn bản đến")
     # Văn bản hạn chế tiếp nhận TRƯỚC: svc-files đọc chữ PDF theo thứ tự tải lên, nên khi công văn dưới đã tìm được
     # theo nội dung mà tệp này vẫn chưa được đọc thì đúng là tệp của văn bản hạn chế bị bỏ qua (F2.7)
-    secret_pdf = clerk.upload(f"han-che-{tag}.pdf", text_pdf(f"Danh sach nang luong truoc han MATKIN{tag}"))
+    secret_pdf = clerk.upload(f"han-che-{tag}.pdf", text_pdf(f"Danh sach nang luong truoc han MATKIN{tag}"),
+                              restricted=True)
     file = clerk.upload(f"cong-van-{tag}.pdf", text_pdf("De nghi Khoa ra soat chuong trinh dao tao nam hoc 2026-2027",
                                                         f"Ma kiem tra noi dung NOIDUNG{tag}"))
     ok(f"văn thư tải công văn lên, quét sạch ({file['sha256'][:12]}…)")
@@ -331,8 +333,10 @@ def main() -> None:
         "summary": f"Về việc rà soát chương trình đào tạo năm học 2026–2027 (kiểm tra {tag})", "file_ids": [file["id"]],
     }
     receive = "mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id document { status files { role } } } }"
-    clerk.gql(receive, {"d": {**incoming, "symbol": f"124/ĐHCN-TC{tag}", "restricted": True, "urgency": "normal",
-                              "summary": f"Về việc nâng lương trước hạn (kiểm tra {tag})", "file_ids": [secret_pdf["id"]]}})
+    secret_id = clerk.gql(receive, {"d": {
+        **incoming, "symbol": f"124/ĐHCN-TC{tag}", "restricted": True, "urgency": "normal",
+        "summary": f"Về việc nâng lương trước hạn (kiểm tra {tag})", "file_ids": [secret_pdf["id"]],
+    }})["receiveIncoming"]["document_id"]
     doc = clerk.gql(receive, {"d": incoming})["receiveIncoming"]
     doc_id = doc["document_id"]
     doc["document"] == {"status": "received", "files": [{"role": "main"}]} or fail(f"văn bản mới chưa đúng: {doc}")
@@ -475,6 +479,85 @@ def main() -> None:
                    f"select count(*) from core.file_texts where file_id = '{secret_pdf['id']}'").decode().strip()
     hidden == [] and read == "0" or fail(f"tệp của văn bản hạn chế bị đọc chữ hoặc tìm được: {hidden}, {read}")
     ok("văn bản hạn chế: tệp không bị đọc chữ, không tìm được theo nội dung (kể cả người tạo)")
+
+    print("Văn bản hạn chế: tệp mã hóa, danh sách người được xem (F3.7)")
+    secret_pdf.get("encrypted") is True or fail(f"tệp tải lên ở chế độ hạn chế không được mã hóa: {secret_pdf}")
+    key = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                  "-d", ENV.get("POSTGRES_DB", "moc"), "-c",
+                  f"select object_key from core.files where id = '{secret_pdf['id']}'").decode().strip()
+    peek = (
+        "import os, sys\n"
+        "from svc_files.config import Settings\n"
+        "from svc_files.openbao import with_secrets\n"
+        "from svc_files.storage import s3_client\n"
+        "s = Settings.from_env(with_secrets(os.environ))\n"
+        "c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)\n"
+        "b = c.get_object(Bucket=s.bucket, Key=sys.argv[1])['Body'].read()\n"
+        "print(b[:4].decode('latin-1'), b'%PDF' in b, sys.argv[2].encode() in b)\n"
+    )
+    stored = compose("exec", "-T", "svc-files", "python", "-c", peek, key, f"MATKIN{tag}").decode().split()
+    stored == ["MOC1", "False", "False"] or fail(f"tệp của văn bản hạn chế nằm trong kho chưa mã hóa: {stored}")
+    ok("trong kho tệp chỉ có bản mã (MOC1, AES-256-GCM, khóa riêng từng tệp bọc bằng OpenBao): không đầu PDF, "
+       "không chữ")
+    _, got, opened = request("GET", f"{PUBLIC_URL}/api/files/{secret_pdf['id']}", headers=clerk.auth)
+    opened.startswith(b"%PDF") and hashlib.sha256(opened).hexdigest() != secret_pdf["sha256"] \
+        and "no-store" in (header(got, "Cache-Control") or "") and header(got, "ETag") is None \
+        or fail(f"văn thư mở tệp hạn chế chưa đúng: {header(got, 'Cache-Control')} {header(got, 'ETag')}")
+    ok("văn thư mở tệp: giải mã trong bộ nhớ, đóng dấu tên người xem (khác bản gốc), cấm lưu đệm")
+    # vào sổ → quy trình giao lãnh đạo khoa cho ý kiến chỉ đạo; svc-workflow thêm người nhận việc vào danh sách được xem
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": secret_id})
+    users = clerk.gql('{ core_users(where: {username: {_in: ["vanthu", "truongkhoa"]}}) { id username } }')["core_users"]
+    uid = {u["username"]: u["id"] for u in users}
+    viewers_q = "query ($d: uuid!) { office_document_acl(where: {document_id: {_eq: $d}}) { user_id granted_by } }"
+    viewers = clerk.gql(viewers_q, {"d": secret_id})["office_document_acl"]
+    (uid["truongkhoa"], uid["vanthu"]) in [(v["user_id"], v["granted_by"]) for v in viewers] \
+        or fail(f"lãnh đạo nhận việc chỉ đạo mà chưa có tên trong danh sách được xem: {viewers}")
+
+    def opens(who: Session) -> bool:
+        try:
+            request("GET", f"{PUBLIC_URL}/api/files/{secret_pdf['id']}", headers=who.auth)
+            return True
+        except HTTPError as exc:
+            exc.status == 404 or fail(f"tải tệp hạn chế trả {exc.status}")
+            return False
+
+    opens(director) or fail("lãnh đạo có tên trong danh sách mà không mở được tệp")
+    ok("lãnh đạo nhận việc chỉ đạo tự có tên trong danh sách được xem, mở được tệp")
+    started, notes = time.time(), []
+    while not notes and time.time() - started < 15:
+        notes = director.gql("query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}}) { data } }",
+                             {"d": secret_id})["core_notifications"]
+        notes or time.sleep(1)
+    notes and all(n["data"].get("restricted") is True and not {"summary", "symbol", "issuer_name"} & set(n["data"])
+                  for n in notes) or fail(f"thông báo về văn bản hạn chế mang nội dung: {notes}")
+    ok("thông báo về văn bản hạn chế không mang số ký hiệu, trích yếu, cơ quan ban hành")
+    grant = "mutation ($d: uuid!, $u: String!) { %s(args: {document_id: $d, user_id: $u}) { user_id } }"
+    clerk.gql(grant % "office_revoke_document_access", {"d": secret_id, "u": uid["truongkhoa"]})
+    revoked = opens(director)
+    clerk.gql(grant % "office_grant_document_access", {"d": secret_id, "u": uid["truongkhoa"]})
+    (opens(staff), revoked, opens(director)) == (False, False, True) \
+        or fail(f"quyền xem chưa đúng: chuyên viên {opens(staff)}, lãnh đạo sau khi bị gỡ {revoked}")
+    ok("chuyên viên không có tên → 404; văn thư gỡ tên lãnh đạo → 404, cấp lại → mở được")
+    opened_by = director.gql("""query ($e: String!) { core_audit_log(where: {action: {_eq: "file.decrypted"},
+        entity_id: {_eq: $e}}) { actor_id } }""", {"e": secret_pdf["id"]})["core_audit_log"]
+    sorted(r["actor_id"] for r in opened_by) == sorted([uid["vanthu"], uid["truongkhoa"], uid["truongkhoa"]]) \
+        or fail(f"sổ kiểm toán chưa đúng các lần mở tệp hạn chế: {opened_by}")
+    ok("mỗi lần mở là một dòng file.decrypted trong sổ kiểm toán (văn thư 1, lãnh đạo 2; lần bị chặn không ghi)")
+    plain = rejected({**incoming, "symbol": f"125/ĐHCN-TC{tag}", "restricted": True})
+    (plain.get("code"), plain.get("fields")) == ("invalid", {"file_ids": "not_sealed"}) \
+        or fail(f"văn bản hạn chế kèm tệp chưa mã hóa không bị chặn: {plain}")
+    try:
+        clerk.upload(f"han-che-{tag}.txt", b"Danh sach nang luong", mime="text/plain", restricted=True)
+        fail("tải tệp không phải PDF ở chế độ hạn chế không bị chặn")
+    except HTTPError as exc:
+        exc.status == 415 or fail(f"tải tệp không phải PDF ở chế độ hạn chế trả {exc.status}")
+    ok("văn bản hạn chế chỉ kèm tệp PDF tải lên ở chế độ hạn chế (tệp thường bị trả về form, tệp khác PDF 415)")
+    # Sau diễn tập sao lưu ở CI, tệp cũ nhất có từ trước lần khôi phục: mở được nghĩa là két khóa được khôi phục cùng
+    oldest = clerk.gql("""{ core_files(where: {encrypted: {_eq: true}, document_files: {}},
+        order_by: {created_at: asc}, limit: 1) { id created_at } }""")["core_files"][0]
+    _, _, old_pdf = request("GET", f"{PUBLIC_URL}/api/files/{oldest['id']}", headers=clerk.auth)
+    old_pdf.startswith(b"%PDF") or fail(f"tệp mã hóa cũ nhất không mở được: {oldest}")
+    ok(f"tệp mã hóa cũ nhất (tải lên {oldest['created_at'][:16].replace('T', ' ')}) vẫn mở được")
 
     print("Sổ đăng ký văn bản (in theo NĐ 30, Điều 16, 22)")
     years = clerk.gql("""query ($a: uuid!, $b: uuid!) { a: office_documents_by_pk(id: $a) { register { year } }

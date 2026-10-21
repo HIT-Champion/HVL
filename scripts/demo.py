@@ -25,6 +25,10 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
+    python3 scripts/demo.py han-che
+        (iv) Văn bản hạn chế: tệp mã hóa từng tệp bằng khóa từ két OpenBao trước khi vào kho; người nhận việc tự có
+        tên trong danh sách được xem, người khác 404; mở ra là bản giải mã trong bộ nhớ có dấu tên người xem, mỗi lần
+        mở một dòng sổ kiểm toán; thông báo không mang nội dung. (make demo-han-che)
     python3 scripts/demo.py ket-bi-mat
         (iv) Két bí mật: dịch vụ không nhận bí mật qua biến môi trường mà lấy từ két OpenBao bằng AppRole riêng;
         khởi động lại két thì két tự mở khóa, dịch vụ khởi động lại vẫn lấy được bí mật. (make demo-ket-bi-mat)
@@ -48,12 +52,12 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
-from moc_env import EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, text_pdf
+from moc_env import EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, request, text_pdf
 
 
 class DemoFailed(Exception):
@@ -173,6 +177,107 @@ def kiem_dich() -> None:
        f"dòng #{row['id']} đều bị phát hiện")
 
     print(f"\nXem trên giao diện (lãnh đạo khoa): {PUBLIC_URL}/so-kiem-toan?loai=files — dòng \"Chặn tệp nhiễm mã độc\"")
+
+
+# Đọc thẳng đối tượng trong kho tệp từ container svc-files (khóa kho lấy từ két như svc-files): 4 byte đầu, cỡ,
+# có đầu PDF hay chữ cần tìm không
+PEEK = """import os, sys
+from svc_files.config import Settings
+from svc_files.openbao import with_secrets
+from svc_files.storage import s3_client
+s = Settings.from_env(with_secrets(os.environ))
+c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)
+b = c.get_object(Bucket=s.bucket, Key=sys.argv[1])['Body'].read()
+print(b[:4].decode('latin-1'), len(b), b'%PDF' in b, sys.argv[2].encode() in b)
+"""
+
+# Chữ trên trang đầu của PDF đưa vào stdin (pypdf có sẵn trong svc-files)
+PAGE_TEXT = "import io, sys, pypdf; print(pypdf.PdfReader(io.BytesIO(sys.stdin.buffer.read())).pages[0].extract_text())"
+
+
+def han_che() -> None:
+    print("Màn (iv) · Văn bản hạn chế — tệp mã hóa trong kho, chỉ người có tên mới mở được, mỗi lần mở có dấu tên "
+          "và vào sổ")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk, director, manager = Session("vanthu"), Session("truongkhoa"), Session("totruongdt")
+
+    say(1, "Văn thư tải lên danh sách nâng lương trước hạn ở chế độ hạn chế")
+    marker = f"MATKIN{tag}"
+    pdf = clerk.upload(f"nang-luong-{tag}.pdf", text_pdf("Danh sach nang luong truoc han nam 2026", f"Ma thu {marker}"),
+                       restricted=True)
+    if not pdf.get("encrypted"):
+        raise DemoFailed(f"tệp tải lên ở chế độ hạn chế không được mã hóa: {pdf}")
+    key, wrapped = psql(f"select object_key, split_part(wrapped_dek, ':', 1) || ':' || split_part(wrapped_dek, ':', 2) "
+                        f"from core.files where id = '{pdf['id']}'").split("|")
+    head, size, has_pdf, has_marker = compose("exec", "-T", "svc-files", "python", "-c", PEEK, key,
+                                              marker).decode().split()
+    if (head, has_pdf, has_marker) != ("MOC1", "False", "False") or wrapped != "vault:v1":
+        raise DemoFailed(f"đối tượng trong kho chưa phải bản mã: {head} {has_pdf} {has_marker}, khóa {wrapped}")
+    ok(f"svc-files xin két OpenBao một khóa AES-256 riêng cho tệp, mã hóa (AES-GCM) rồi mới lưu: trong kho là {size} "
+       f"byte bắt đầu bằng MOC1, không có đầu %PDF, không có chữ {marker}")
+    ok(f"CSDL chỉ giữ khóa đã bọc bằng khóa của két ({wrapped}:…) — lấy được CSDL và kho tệp cũng không đọc được")
+
+    say(2, "Văn thư tiếp nhận văn bản hạn chế; quy trình giao lãnh đạo khoa cho ý kiến chỉ đạo")
+    symbol = f"88/ĐHCN-TCCB{tag}"
+    doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+        "type_code": "CV", "symbol": symbol, "issuer_name": "Trường Đại học Công nghiệp",
+        "issued_on": datetime.now(timezone(timedelta(hours=7))).date().isoformat(), "urgency": "normal",  # giờ VN
+        "restricted": True, "summary": f"Về việc nâng lương trước hạn năm 2026 (demo {tag})", "file_ids": [pdf["id"]],
+    }})["receiveIncoming"]["document_id"]
+    number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                       {"id": doc_id})["registerIncoming"]["register_number"]
+    names = {u["id"]: u["username"] for u in clerk.gql("{ core_users { id username } }")["core_users"]}
+    viewers = clerk.gql("query ($d: uuid!) { office_document_acl(where: {document_id: {_eq: $d}}) { user_id } }",
+                        {"d": doc_id})["office_document_acl"]
+    if "truongkhoa" not in [names.get(v["user_id"]) for v in viewers]:
+        raise DemoFailed(f"lãnh đạo nhận việc mà không có tên trong danh sách được xem: {viewers}")
+    ok(f"{symbol} vào sổ, số đến {number}; svc-workflow tự thêm người nhận việc vào danh sách được xem: "
+       f"{', '.join(sorted(names.get(v['user_id'], v['user_id']) for v in viewers))}")
+
+    say(3, "Tổ trưởng Tổ Đào tạo không có tên trong danh sách")
+    seen = manager.gql("query ($d: uuid!) { office_documents_by_pk(id: $d) { id } }", {"d": doc_id})
+    try:
+        request("GET", f"{PUBLIC_URL}/api/files/{pdf['id']}", headers=manager.auth)
+        raise DemoFailed("tổ trưởng không có tên vẫn tải được tệp")
+    except HTTPError as exc:
+        if exc.status != 404:
+            raise DemoFailed(f"tổ trưởng tải tệp trả {exc.status}") from exc
+    if seen["office_documents_by_pk"] is not None:
+        raise DemoFailed("tổ trưởng không có tên vẫn đọc được văn bản")
+    ok("không đọc được văn bản; mở thẳng đường dẫn tệp → 404, y như tệp không tồn tại")
+
+    say(4, "Lãnh đạo khoa mở tệp: giải mã trong bộ nhớ, đóng dấu tên người xem và giờ xem lên mọi trang")
+    _, headers, opened = request("GET", f"{PUBLIC_URL}/api/files/{pdf['id']}", headers=director.auth)
+    text = compose("exec", "-T", "svc-files", "python", "-c", PAGE_TEXT, stdin=opened).decode()
+    stamp = next((line.strip() for line in text.splitlines() if "VĂN BẢN HẠN CHẾ" in line), None)
+    cache = next((v for k, v in headers.items() if k.lower() == "cache-control"), "")
+    if not stamp or marker not in text or "no-store" not in cache:
+        raise DemoFailed(f"bản mở ra chưa có dấu người xem hoặc cho lưu đệm ({cache}):\n{text[:400]}")
+    ok(f"dấu trên trang: \"{stamp}\"")
+    sha = hashlib.sha256(opened).hexdigest()
+    ok(f"Cache-Control: {cache}; mỗi người, mỗi lần mở là một bản khác (SHA-256 {sha[:12]}… ≠ bản gốc "
+       f"{pdf['sha256'][:12]}…) — bản rõ không ghi xuống đĩa")
+
+    say(5, "Thông báo việc mới gửi lãnh đạo khoa không mang nội dung văn bản")
+    started, notes = time.time(), []
+    while not notes and time.time() - started < 15:
+        notes = director.gql("query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}}) { kind data } }",
+                             {"d": doc_id})["core_notifications"]
+        notes or time.sleep(1)
+    if not notes or any({"summary", "symbol", "issuer_name"} & set(n["data"]) for n in notes):
+        raise DemoFailed(f"thông báo về văn bản hạn chế mang nội dung: {notes}")
+    ok(f"{notes[0]['kind']}: {json.dumps(notes[0]['data'], ensure_ascii=False)} — CSDL gọt nội dung cho mọi đường ghi")
+
+    say(6, "Sổ kiểm toán: ai đã mở tệp, lúc nào")
+    rows = director.gql("""query ($e: String!) { core_audit_log(where: {action: {_eq: "file.decrypted"},
+        entity_id: {_eq: $e}}, order_by: {id: asc}) { id occurred_at actor_id } }""",
+                        {"e": pdf["id"]})["core_audit_log"]
+    if [names.get(r["actor_id"]) for r in rows] != ["truongkhoa"]:
+        raise DemoFailed(f"sổ kiểm toán chưa đúng lần mở: {rows}")
+    ok(f"dòng #{rows[0]['id']} file.decrypted · {rows[0]['occurred_at'][:19].replace('T', ' ')} · truongkhoa — "
+       f"lần tổ trưởng bị từ chối không giải mã gì nên không có dòng")
+
+    print(f"\nXem trên giao diện (văn thư): {PUBLIC_URL}/van-ban/{doc_id} — khóa ở tệp đính kèm, mục người được xem")
 
 
 # Bí mật svc-files, svc-workflow cần (tên trong .env) — cùng danh sách openbao/start.sh nạp vào két
@@ -749,8 +854,8 @@ def it_ot() -> None:
        " sai bị từ chối (401) — token mỗi đơn vị suy từ khóa của svc-workflow, chỉ broker giữ")
 
 
-DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi,
-         "pha-he": pha_he, "it-ot": it_ot}
+DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
+         "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot}
 
 
 def main(argv: list[str] | None = None) -> int:

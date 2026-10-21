@@ -10,25 +10,25 @@
       "post": {
         "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
         "operationId": "upload_file_api_files_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                },
-                "type": "object",
-                "required": [
-                  "file"
-                ]
-              }
-            }
-          },
-          "required": true
-        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restricted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Tệp của văn bản hạn chế (F3.7): chỉ nhận PDF; lưu mã hóa bằng khóa dữ liệu riêng do két cấp, chỉ gắn được vào văn bản hạn chế, xem có dấu tên người xem",
+              "default": false,
+              "title": "Restricted"
+            },
+            "description": "Tệp của văn bản hạn chế (F3.7): chỉ nhận PDF; lưu mã hóa bằng khóa dữ liệu riêng do két cấp, chỉ gắn được vào văn bản hạn chế, xem có dấu tên người xem"
+          }
+        ],
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -46,23 +46,41 @@
           "413": {
             "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
           },
+          "415": {
+            "description": "restricted=true mà tệp không phải PDF đọc được, không mật khẩu"
+          },
           "422": {
             "description": "Tệp chứa mã độc — đã chặn, không lưu, ghi vào sổ kiểm toán"
           },
           "503": {
-            "description": "ClamAV, kho đối tượng hoặc CSDL không sẵn sàng — không lưu"
+            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng — không lưu"
           }
         },
-        "security": [
-          {
-            "HTTPBearer": []
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
           }
-        ]
+        }
       }
     },
     "/api/files/{file_id}": {
       "get": {
         "summary": "Tải tệp xuống, nếu người gọi được xem tệp",
+        "description": "Tệp của văn bản hạn chế (F3.7) được giải mã trong bộ nhớ, đóng dấu tên người xem và giờ xem lên mọi trang; mỗi lần mở ghi một dòng `file.decrypted` vào sổ kiểm toán — không ghi được sổ thì không trả tệp.",
         "operationId": "download_file_api_files__file_id__get",
         "security": [
           {
@@ -94,8 +112,11 @@
           "404": {
             "description": "Không có tệp, hoặc người gọi không được xem — hai trường hợp trả như nhau"
           },
+          "500": {
+            "description": "Tệp mã hóa không mở được: bản mã hỏng hoặc không khớp tệp"
+          },
           "503": {
-            "description": "CSDL hoặc kho đối tượng không sẵn sàng"
+            "description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng"
           },
           "422": {
             "description": "Validation Error",
@@ -894,6 +915,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Scanned At"
+          },
+          "encrypted": {
+            "type": "boolean",
+            "title": "Encrypted",
+            "default": false
           }
         },
         "type": "object",

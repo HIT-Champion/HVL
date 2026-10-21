@@ -249,8 +249,8 @@ def visible_ids(user: User) -> set[str]:
     return {d["id"] for d in user.gql("{ office_documents { id } }")["office_documents"]}
 
 
-def insert_file(service: Service, owner: User, name: str = "cong-van.pdf") -> str:
-    """Giả lập svc-files: tệp đã qua ClamAV, người tải lên là owner."""
+def insert_file(service: Service, owner: User, name: str = "cong-van.pdf", *, encrypted: bool = False) -> str:
+    """Giả lập svc-files: tệp đã qua ClamAV, người tải lên là owner; encrypted = tải lên ở chế độ hạn chế (F3.7)."""
     file_id = str(uuid.uuid4())
     svc = Service(owner.sub, "service", service.tenant)
     svc.gql(
@@ -263,6 +263,7 @@ def insert_file(service: Service, owner: User, name: str = "cong-van.pdf") -> st
             "size_bytes": 1024,
             "sha256": "\\x" + hashlib.sha256(file_id.encode()).hexdigest(),
             "scanned_at": "2026-10-18T09:00:00+07:00",
+            **({"encrypted": True, "wrapped_dek": "vault:v1:thu"} if encrypted else {}),
         }},
     )
     return file_id

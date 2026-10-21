@@ -140,12 +140,16 @@
     "urgency": "Độ khẩn",
     "dueOn": "Hạn giải quyết",
     "restricted": "Hạn chế người xem",
-    "restrictedHint": "Chỉ người tiếp nhận và người được cấp quyền xem được",
+    "restrictedHint": "Chỉ người tiếp nhận và người được cấp quyền xem được. Chỉ nhận tệp PDF, lưu mã hóa; mỗi lần xem có dấu tên người xem",
     "save": "Lưu văn bản",
     "saveAndRegister": "Lưu và vào sổ",
     "duplicate": "Văn bản này có thể đã được tiếp nhận: {symbol} của {issuer}, ngày {date}.",
     "saved": "Đã lưu văn bản.",
-    "registered": "Đã vào sổ — số đến {n}."
+    "registered": "Đã vào sổ — số đến {n}.",
+    "dropRestricted": "Kéo thả tệp PDF vào đây, hoặc bấm để chọn — tệp được mã hóa trước khi lưu",
+    "cleanSealed": "Đã quét — sạch, đã mã hóa",
+    "pdfOnly": "Văn bản hạn chế chỉ nhận tệp PDF",
+    "restrictedLocked": "Gỡ hết tệp đã tải để đổi chế độ hạn chế"
   },
   "doc": {
     "info": "Thông tin văn bản",
@@ -197,7 +201,18 @@
       "attachment": "Kèm theo",
       "draft": "Dự thảo",
       "issued": "Bản phát hành"
-    }
+    },
+    "sealed": "Đã mã hóa",
+    "sealedHint": "Tệp lưu mã hóa. Bản tải về có dấu tên người xem, mỗi lần mở đều ghi vào sổ kiểm toán",
+    "viewers": "Người được xem",
+    "viewersHint": "Chỉ người tiếp nhận và người có tên dưới đây đọc được văn bản. Người phải làm bước tiếp theo được tự thêm; người được thêm vẫn cần quyền theo vai trò (phòng, việc được giao).",
+    "viewersEmpty": "Chưa cấp cho ai.",
+    "viewerPick": "Chọn người",
+    "viewerAdd": "Cấp quyền xem",
+    "viewerRemove": "Gỡ",
+    "viewerBy": "{by} cấp lúc {at}",
+    "viewerGranted": "Đã cấp quyền xem cho {name}",
+    "viewerRevoked": "Đã gỡ quyền xem của {name}"
   },
   "form": {
     "chiDao": {
@@ -239,6 +254,7 @@
     "phatHanh": {
       "public": "Công khai trích yếu trên cổng xác thực",
       "publicHint": "Người tra mã thấy cả trích yếu; không chọn thì chỉ thấy số, ngày, cơ quan ban hành.",
+      "restricted": "Văn bản hạn chế: trang tra cứu chỉ hiện số, ngày, cơ quan ban hành — không công khai trích yếu.",
       "issue": "Cấp số và phát hành",
       "confirm": "Cấp số đi và phát hành văn bản này? Số được cấp liên tiếp theo năm và không thu hồi được.",
       "issued": "Đã phát hành."
@@ -270,7 +286,9 @@
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
     "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
-    "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu."
+    "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
+    "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",
+    "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế"
   },
   "validation": {
     "required": "Không được để trống",
@@ -289,7 +307,10 @@
     "uniqueItems": "Một tệp được đính kèm hai lần",
     "maxItems": "Quá số tệp cho phép",
     "duplicate": "Đã có văn bản đến trùng cơ quan ban hành, số ký hiệu và ngày ban hành",
-    "unknown": "Không tìm thấy, hoặc không do bạn tải lên"
+    "unknown": "Không tìm thấy, hoặc không do bạn tải lên",
+    "not_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế — gỡ tệp và tải lại",
+    "sealed": "Tệp đã mã hóa chỉ dùng cho văn bản hạn chế — gỡ tệp và tải lại",
+    "restricted": "Văn bản hạn chế không công khai trích yếu"
   },
   "outgoing": {
     "title": "Văn bản đi",
@@ -368,7 +389,8 @@
     "documentIssued": "Đã phát hành văn bản {symbol}",
     "documentProcessed": "{name} đã báo kết quả xử lý",
     "documentOverdue": "Văn bản quá hạn giải quyết ({due})",
-    "otAlarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố"
+    "otAlarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố",
+    "restricted": "Văn bản hạn chế"
   },
   "audit": {
     "title": "Sổ kiểm toán",

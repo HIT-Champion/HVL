@@ -70,10 +70,23 @@ def _count(file_id: str) -> str:
 
 def test_texts_of_restricted_documents_are_never_stored(world):
     doc = received(world.clerk_a, incoming(world.tag, 301, restricted=True))
-    file_id = insert_file(world.service_a, world.clerk_a)
+    file_id = insert_file(world.service_a, world.clerk_a, encrypted=True)
     _attach(world, doc["id"], file_id)
     _text(world, file_id)                            # bỏ qua, không báo lỗi: svc-files không kẹt ở tệp này
     assert _count(file_id) == "0"
+
+
+def test_encrypted_files_never_get_texts_even_before_attaching(world):
+    file_id = insert_file(world.service_a, world.clerk_a, encrypted=True)
+    _text(world, file_id)
+    assert _count(file_id) == "0"
+
+
+# Văn bản hạn chế có từ trước F3.7 có thể mang tệp rõ. Nay trigger document_files_sealed và
+# documents_restricted_sealed (migration 1792281601600) chặn hai đường dưới; tắt chúng trong cùng giao dịch để
+# kiểm phần dọn lớp chữ của F2.7 vẫn đúng cho dữ liệu cũ.
+def _legacy(statement: str, trigger: str, table: str) -> None:
+    sql(f"alter table {table} disable trigger {trigger}; {statement}; alter table {table} enable trigger {trigger}")
 
 
 def test_restricting_a_document_drops_texts_already_read(world):
@@ -84,7 +97,11 @@ def test_restricting_a_document_drops_texts_already_read(world):
     assert _count(file_id) == "1"
     sql(f"update office.documents set summary = summary || ' (sửa)' where id = '{doc['id']}'")
     assert _count(file_id) == "1"                    # sửa trường khác: giữ nguyên
-    sql(f"update office.documents set restricted = true where id = '{doc['id']}'")
+    with pytest.raises(SQLError, match="documents_restricted_sealed"):   # tệp rõ không tự mã hóa lại được
+        sql(f"update office.documents set restricted = true where id = '{doc['id']}'")
+    assert _count(file_id) == "1"
+    _legacy(f"update office.documents set restricted = true where id = '{doc['id']}'",
+            "documents_restricted_sealed", "office.documents")
     assert _count(file_id) == "0"
 
 
@@ -94,5 +111,10 @@ def test_attaching_a_read_file_to_a_restricted_document_drops_its_text(world):
     file_id = insert_file(world.service_a, world.clerk_a)
     _attach(world, open_doc["id"], file_id)
     _text(world, file_id)
-    _attach(world, secret["id"], file_id, role="attachment")
+    with pytest.raises(SQLError, match="document_files_sealed"):
+        _attach(world, secret["id"], file_id, role="attachment")
+    assert _count(file_id) == "1"
+    _legacy(f"insert into office.document_files (tenant_id, document_id, file_id, role, added_by) values "
+            f"('{world.tenant_a}', '{secret['id']}', '{file_id}', 'attachment', '{world.clerk_a.sub}')",
+            "document_files_sealed", "office.document_files")
     assert _count(file_id) == "0"

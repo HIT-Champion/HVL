@@ -46,7 +46,7 @@ mutation LogEvent($o: core_audit_log_insert_input!) {
 
 VISIBLE_FILE = """
 query VisibleFile($id: uuid!) {
-  core_files_by_pk(id: $id) { id filename mime_type size_bytes sha256 }
+  core_files_by_pk(id: $id) { id filename mime_type size_bytes sha256 encrypted }
 }"""
 
 # Phòng đọc hồ sơ đã nộp lưu (F3.8): hỏi bằng token người dùng, Hasura quyết ai xem được hồ sơ nào
@@ -57,7 +57,7 @@ query VisibleCaseFile($id: uuid!) {
 
 FILE_LOCATION = """
 query FileLocation($id: uuid!) {
-  core_files_by_pk(id: $id) { object_key }
+  core_files_by_pk(id: $id) { object_key wrapped_dek }
 }"""
 
 # Đồng bộ chỉ mục tìm kiếm: đọc xuyên mọi thuê ước, lật trang theo id. Văn bản cũng được đọc lại khi
@@ -113,7 +113,7 @@ query VisibleDocuments($ids: [uuid!]!) {
 LETTER = """
 query Letter($id: uuid!, $tenant: uuid!) {
   office_documents_by_pk(id: $id) {
-    id direction status type_code summary body recipients symbol issued_on verify_code
+    id direction status type_code summary body recipients symbol issued_on verify_code restricted
     document_type { name in_symbol }
     department { code }
     signer { full_name }
@@ -186,7 +186,14 @@ class StoredFile:
     filename: str
     mime_type: str
     size_bytes: int
-    sha256: str  # hex
+    sha256: str  # hex — của bản rõ, cả khi tệp lưu mã hóa
+    encrypted: bool = False  # tệp của văn bản hạn chế (F3.7): kho chỉ giữ bản mã
+
+
+@dataclass(frozen=True)
+class Location:
+    object_key: str
+    wrapped_dek: str | None  # khóa dữ liệu đã bọc bởi két (F3.7); None: tệp không mã hóa
 
 
 def _bytea(hex_digest: str) -> str:
@@ -257,21 +264,23 @@ class HasuraClient:
         size_bytes: int,
         sha256_hex: str,
         scanned_at: datetime,
+        wrapped_dek: str | None = None,
     ) -> None:
-        """Thêm dòng core.files; tenant_id và created_by do Hasura đặt từ phiên, không gửi trong dữ liệu."""
-        await self._call(
-            INSERT_FILE,
-            {"o": {
-                "id": str(file_id),
-                "object_key": object_key,
-                "filename": filename,
-                "mime_type": mime_type,
-                "size_bytes": size_bytes,
-                "sha256": _bytea(sha256_hex),
-                "scanned_at": scanned_at.isoformat(),
-            }},
-            self._as_service(tenant_id, actor_id, request_id),
-        )
+        """Thêm dòng core.files; tenant_id và created_by do Hasura đặt từ phiên, không gửi trong dữ liệu.
+
+        wrapped_dek: tệp đã mã hóa (F3.7) — size_bytes, sha256_hex vẫn là của bản rõ."""
+        row: dict[str, Any] = {
+            "id": str(file_id),
+            "object_key": object_key,
+            "filename": filename,
+            "mime_type": mime_type,
+            "size_bytes": size_bytes,
+            "sha256": _bytea(sha256_hex),
+            "scanned_at": scanned_at.isoformat(),
+        }
+        if wrapped_dek is not None:
+            row.update(encrypted=True, wrapped_dek=wrapped_dek)
+        await self._call(INSERT_FILE, {"o": row}, self._as_service(tenant_id, actor_id, request_id))
 
     async def log_event(
         self,
@@ -318,6 +327,7 @@ class HasuraClient:
             mime_type=row["mime_type"],
             size_bytes=int(row["size_bytes"]),
             sha256=_hex(row["sha256"]),
+            encrypted=bool(row.get("encrypted")),
         )
 
     async def visible_documents(self, token: str, ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -379,10 +389,10 @@ class HasuraClient:
 
     async def file_location(
         self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, file_id: uuid.UUID
-    ) -> str | None:
+    ) -> Location | None:
         data = await self._call(FILE_LOCATION, {"id": str(file_id)}, self._as_service(tenant_id, actor_id, request_id))
         row = data.get("core_files_by_pk")
-        return row["object_key"] if row else None
+        return Location(row["object_key"], row.get("wrapped_dek")) if row else None
 
     async def letter(self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str,
                      document_id: uuid.UUID) -> dict[str, Any] | None:

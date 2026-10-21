@@ -31,6 +31,7 @@ export interface UploadedFile {
   mime_type: string
   size_bytes: number
   sha256: string
+  encrypted?: boolean
 }
 
 export interface SearchHit {
@@ -103,12 +104,13 @@ export function useApi() {
     return body.data as T
   }
 
-  /** Tải tệp lên svc-files (quét ClamAV trước khi lưu); onProgress nhận 0–100. */
-  async function upload(file: File, onProgress?: (pct: number) => void): Promise<UploadedFile> {
+  /** Tải tệp lên svc-files (quét ClamAV trước khi lưu); onProgress nhận 0–100. restricted: tệp của văn bản hạn chế
+   *  (F3.7) — chỉ PDF, svc-files mã hóa trước khi lưu. */
+  async function upload(file: File, onProgress?: (pct: number) => void, restricted = false): Promise<UploadedFile> {
     const token = await auth.accessToken()
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', '/api/files')
+      xhr.open('POST', restricted ? '/api/files?restricted=true' : '/api/files')
       xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)) }
       xhr.onerror = () => reject(new ApiError('network', 'network'))

@@ -823,6 +823,36 @@ input jsonb_comparison_exp {
 "mutation root"
 type mutation_root {
   completeTask(data: jsonb, outcome: String!, taskId: String!): CompleteTaskOutput
+  "execute VOLATILE function \"office.grant_document_access\" which returns \"office.document_acl\""
+  office_grant_document_access(
+    "input parameters for function \"office_grant_document_access\""
+    args: office_grant_document_access_args!
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "execute VOLATILE function \"office.revoke_document_access\" which returns \"office.document_acl\""
+  office_revoke_document_access(
+    "input parameters for function \"office_revoke_document_access\""
+    args: office_revoke_document_access_args!
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
   receiveIncoming(data: jsonb!): ReceiveIncomingOutput
   registerIncoming(documentId: uuid!): RegisterIncomingOutput
   "update data of the table: \"core.notifications\""
@@ -1297,6 +1327,69 @@ input office_departments_stream_cursor_value_input {
   code: String
   id: uuid
   name: String
+}
+
+"columns and relationships of \"office.document_acl\""
+type office_document_acl {
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  granted_at: timestamptz!
+  granted_by: String!
+  "An object relationship"
+  user: core_users
+  user_id: String!
+}
+
+"Boolean expression to filter rows from the table \"office.document_acl\". All fields are combined with a logical 'AND'."
+input office_document_acl_bool_exp {
+  _and: [office_document_acl_bool_exp!]
+  _not: office_document_acl_bool_exp
+  _or: [office_document_acl_bool_exp!]
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  granted_at: timestamptz_comparison_exp
+  granted_by: String_comparison_exp
+  user: core_users_bool_exp
+  user_id: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.document_acl\"."
+input office_document_acl_order_by {
+  document: office_documents_order_by
+  document_id: order_by
+  granted_at: order_by
+  granted_by: order_by
+  user: core_users_order_by
+  user_id: order_by
+}
+
+"select columns of table \"office.document_acl\""
+enum office_document_acl_select_column {
+  "column name"
+  document_id
+  "column name"
+  granted_at
+  "column name"
+  granted_by
+  "column name"
+  user_id
+}
+
+"Streaming cursor of the table \"office_document_acl\""
+input office_document_acl_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_acl_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_acl_stream_cursor_value_input {
+  document_id: uuid
+  granted_at: timestamptz
+  granted_by: String
+  user_id: String
 }
 
 "columns and relationships of \"office.document_events\""
@@ -2138,6 +2231,11 @@ type office_documents_variance_fields {
   register_number: Float
 }
 
+input office_grant_document_access_args {
+  document_id: uuid
+  user_id: String
+}
+
 "columns and relationships of \"office.registers\""
 type office_registers {
   direction: String!
@@ -2191,6 +2289,11 @@ input office_registers_stream_cursor_value_input {
   id: uuid
   last_number: Int
   year: Int
+}
+
+input office_revoke_document_access_args {
+  document_id: uuid
+  user_id: String
 }
 
 "column ordering options"
@@ -2372,6 +2475,21 @@ type query_root {
   ): [office_departments!]!
   "fetch data from the table: \"office.departments\" using primary key columns"
   office_departments_by_pk(id: uuid!): office_departments
+  "fetch data from the table: \"office.document_acl\""
+  office_document_acl(
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "fetch data from the table: \"office.document_acl\" using primary key columns"
+  office_document_acl_by_pk(document_id: uuid!, user_id: String!): office_document_acl
   "fetch data from the table: \"office.document_events\""
   office_document_events(
     "distinct select on columns"
@@ -2718,6 +2836,30 @@ type subscription_root {
     "filter the rows returned"
     where: office_departments_bool_exp
   ): [office_departments!]!
+  "fetch data from the table: \"office.document_acl\""
+  office_document_acl(
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "fetch data from the table: \"office.document_acl\" using primary key columns"
+  office_document_acl_by_pk(document_id: uuid!, user_id: String!): office_document_acl
+  "fetch data from the table in a streaming manner: \"office.document_acl\""
+  office_document_acl_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_acl_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
   "fetch data from the table: \"office.document_events\""
   office_document_events(
     "distinct select on columns"

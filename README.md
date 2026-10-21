@@ -95,6 +95,14 @@ Văn thư và lãnh đạo khoa xem **sổ đăng ký văn bản đến, văn b�
 rồi in ra PDF để ký nhận và đóng sổ — nghị định bắt in khi đăng ký bằng hệ thống. Sổ luôn liền số từ 01, kể cả văn
 bản hạn chế người in không được đọc (dòng đó chỉ có số, ngày, số ký hiệu); mỗi lần in vào sổ kiểm toán.
 
+**Văn bản hạn chế** (lương, kỷ luật, nhân sự…): văn thư đánh dấu khi tiếp nhận rồi tải tệp PDF lên. `svc-files` mã
+hóa từng tệp bằng một khóa riêng do két OpenBao cấp rồi mới lưu, nên kho tệp và bản sao lưu chỉ có bản mã của tệp;
+trích yếu, nội dung soạn trên hệ thống vẫn nằm trong CSDL như văn bản thường, chỉ được che bằng phân quyền. Chỉ người
+tiếp nhận và người có tên trong danh sách được xem đọc được: người phải làm bước tiếp theo được tự thêm, văn thư và
+lãnh đạo khoa cấp hoặc gỡ thêm. Mở tệp là nhận bản giải mã trong bộ nhớ, có tên người xem và giờ xem đóng trên mọi
+trang; mỗi lần mở vào sổ kiểm toán. Thông báo và sổ kiểm toán không mang nội dung của văn bản. Không dùng cho bí mật
+nhà nước. Thử: `make demo-han-che`.
+
 Ở mọi bước, người phải làm tiếp **nhận thông báo ngay** (Centrifugo, WebSocket): tin hiện ở góc màn hình, chuông
 giữ lại tin, hộp việc tự cập nhật không phải tải lại trang. Để một bước quá thời hạn (`MOC_SLA_DURATION`, thật
 `PT24H`, demo `PT1M`) thì timer trong quy trình BPMN nhắc người phải làm; quá hai thời hạn thì báo lãnh đạo của
@@ -203,8 +211,8 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 
 ### Sao lưu và khôi phục
 
-`make backup` sao lưu mọi CSDL (dữ liệu nghiệp vụ, Keycloak, Flowable) và toàn bộ tệp (SeaweedFS, kể cả các mốc
-neo sổ kiểm toán) vào kho [restic](https://restic.net) mã hóa ở `MOC_BACKUP_DIR` (mặc định `./backups`); lần sau
+`make backup` sao lưu mọi CSDL (dữ liệu nghiệp vụ, Keycloak, Flowable), toàn bộ tệp (SeaweedFS, kể cả các mốc
+neo sổ kiểm toán) và két OpenBao (giữ khóa mở tệp văn bản hạn chế) vào kho [restic](https://restic.net) mã hóa ở `MOC_BACKUP_DIR` (mặc định `./backups`); lần sau
 chỉ thêm phần đã đổi. Để mọi CSDL và tệp cùng một thời điểm, Mộc tạm dừng ghi trong lúc dump CSDL (vài giây), còn
 tải tệp lên, xuống thì đợi tới khi chép xong tệp. `make restore` kiểm bản sao lưu đọc được trọn vẹn, rồi mới dừng
 Mộc, thay CSDL và tệp bằng lượt mới nhất (hỏi lại trước), ghi lần khôi phục vào sổ kiểm toán rồi chạy lại; `make
@@ -219,6 +227,8 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
 ```
 
 - **Khóa kho là `MOC_BACKUP_PASSWORD` trong `.env`: mất khóa là mất bản sao lưu.** Chép `.env` ra ngoài máy chủ.
+  Két khôi phục được mở bằng `MOC_OPENBAO_SEAL_KEY`, cũng trong `.env`: thiếu nó thì tệp văn bản hạn chế không mở
+  được, dù dữ liệu đã về đủ. Cất bản chép `.env` ở chỗ khác với kho sao lưu: ai có cả hai là mở được mọi tệp mã hóa.
   Bản cài có từ trước khi có lệnh này: thêm vào `.env` của bản cài một dòng `MOC_BACKUP_PASSWORD=` với chuỗi ngẫu
   nhiên dài (vd. `openssl rand -hex 24`).
 - Kho nên nằm trên ổ khác hoặc ổ mạng đã gắn vào máy chủ (`MOC_BACKUP_DIR=/mnt/nas/moc`, thư mục trống hoặc kho
@@ -233,7 +243,8 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
 Lúc khởi động, mỗi dịch vụ đăng nhập két [OpenBao](https://openbao.org) bằng AppRole của riêng mình và chỉ đọc được
 phần bí mật của mình; két ghi sổ mọi lần đăng nhập và đọc (`docker compose logs openbao`, giá trị đã băm HMAC). Két
 dùng *static seal*: khởi động lại là tự mở khóa, không cần người nhập khóa. Két cũng giữ khóa `moc-files` (transit)
-để mã hóa tệp văn bản hạn chế về sau. Thử: `make demo-ket-bi-mat` (`docs/demo-script.md`).
+bọc khóa của từng tệp văn bản hạn chế: `svc-files` chỉ xin được khóa mới và nhờ két mở khóa đã bọc, không lấy được
+khóa gốc. Thử: `make demo-ket-bi-mat`, `make demo-han-che` (`docs/demo-script.md`).
 
 Nói rõ giới hạn:
 
@@ -243,8 +254,8 @@ Nói rõ giới hạn:
 - Khóa mở két `MOC_OPENBAO_SEAL_KEY` nằm trong `.env`; khóa phục hồi, token khởi động và role_id/secret_id của dịch vụ
   nằm trong volume trên đĩa. Ai có quyền Docker trên máy chủ vẫn đọc được két. Két chỉ nằm trong mạng nội bộ
   `secrets` cùng hai dịch vụ (container khác không tới được), chưa có TLS.
-- Két (volume `openbao_data`) chưa nằm trong `make backup`. Mất volume thì két khởi tạo lại và nạp bí mật từ `.env`,
-  nhưng khóa transit mới sẽ khác.
+- Két (volume `openbao_data`) nằm trong `make backup`. Mất volume mà không khôi phục thì két khởi tạo lại và nạp bí
+  mật từ `.env`, nhưng khóa transit mới khác: tệp văn bản hạn chế đã lưu không mở được nữa.
 - **Đổi `MOC_OPENBAO_SEAL_KEY` sau khi két đã khởi tạo thì két không mở được nữa.** Bản cài có từ trước khi có két:
   thêm vào `.env` của bản cài một dòng `MOC_OPENBAO_SEAL_KEY=` với chuỗi ngẫu nhiên dài (vd. `openssl rand -hex 32`).
 - Đổi cấu hình két (thêm khóa, policy) cần token quản trị. Lần đầu khởi tạo, `openbao/start.sh` cấu hình bằng token

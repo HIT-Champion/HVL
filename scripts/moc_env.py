@@ -144,13 +144,15 @@ class Session:
             {"t": task_id, "o": outcome, "d": data},
         )
 
-    def upload(self, filename: str, content: bytes, mime: str = "application/pdf") -> dict:
+    def upload(self, filename: str, content: bytes, mime: str = "application/pdf", *, restricted: bool = False) -> dict:
+        """restricted: tải lên cho văn bản hạn chế (F3.7) — svc-files mã hóa trước khi lưu, chỉ nhận PDF."""
         boundary = uuid.uuid4().hex
         body = (
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
             f"Content-Type: {mime}\r\n\r\n"
         ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
-        _, _, raw = request("POST", f"{PUBLIC_URL}/api/files", data=body,
+        url = f"{PUBLIC_URL}/api/files" + ("?restricted=true" if restricted else "")
+        _, _, raw = request("POST", url, data=body,
                             headers={**self.auth, "Content-Type": f"multipart/form-data; boundary={boundary}"})
         return json.loads(raw)
 

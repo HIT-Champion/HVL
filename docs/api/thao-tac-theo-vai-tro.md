@@ -9,10 +9,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 33 | 6 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `clerk` (văn thư) | `vanthu` | 35 | 8 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
 | `staff` (chuyên viên) | `chuyenviendt` | 28 | 23 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 28 | 13 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 42 | 4 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 44 | 6 | [`graphql/director.graphql`](graphql/director.graphql) |
 | `tenant_admin` (quản trị đơn vị) | `quantri` | 18 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
@@ -45,6 +45,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_case_files_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_departments` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_departments_by_pk` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `office_document_acl` | ✓ |  |  | ✓ |  |
+| `office_document_acl_by_pk` | ✓ |  |  | ✓ |  |
 | `office_document_events` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_document_events_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_document_files` | ✓ | ✓ | ✓ | ✓ |  |
@@ -81,6 +83,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `insert_office_document_files_one` |  | ✓ |  |  |  |
 | `insert_office_documents` |  | ✓ |  |  |  |
 | `insert_office_documents_one` |  | ✓ |  |  |  |
+| `office_grant_document_access` | ✓ |  |  | ✓ |  |
+| `office_revoke_document_access` | ✓ |  |  | ✓ |  |
 | `receiveIncoming` | ✓ |  |  |  |  |
 | `registerIncoming` | ✓ |  |  |  |  |
 | `submitOutgoing` |  | ✓ |  |  |  |

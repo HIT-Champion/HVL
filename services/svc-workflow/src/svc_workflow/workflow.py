@@ -50,14 +50,16 @@ from .hasura import (
     OUTGOING,
     REGISTER_INCOMING,
     SET_PROCESS,
+    SHARE,
     TASK_DONE,
     UNLINKED,
     USER,
+    VISIBLE,
     Actor,
     HasuraClient,
     HasuraError,
 )
-from .notify import Notifier, People
+from .notify import Notifier, People, brief_of, load_people, task_people
 from .schemas import FormSchema
 
 PROCESS_IN = "van-ban-den"
@@ -94,7 +96,15 @@ CONSTRAINT_MESSAGES = {
     "assignments_one_lead": "Văn bản đã có nơi chủ trì",
     "documents_body_length": "Nội dung văn bản dài quá 20.000 ký tự",
     "documents_out_issued_complete": "Văn bản chưa đủ số, ký hiệu, ngày ban hành, người ký để phát hành",
+    "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và ngược lại",
+    "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
+    "documents_restricted_private": "Văn bản hạn chế không công khai trích yếu ở trang tra cứu",
 }
+
+RESTRICTED_NOT_SEALED = "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa)"
+SEALED_NOT_RESTRICTED = "Tệp đã mã hóa chỉ gắn được vào văn bản hạn chế"
+RESTRICTED_PUBLIC = CONSTRAINT_MESSAGES["documents_restricted_private"]
+
 
 
 def new_verify_code() -> str:
@@ -193,7 +203,7 @@ INTAKE_LOOKUP = """
 query IntakeLookup($type: String!, $files: [uuid!]!, $user: String!, $symbol: String!, $issuer: String!,
                    $issued: date!) {
   office_document_types_by_pk(code: $type) { code }
-  core_files(where: {id: {_in: $files}, created_by: {_eq: $user}}) { id }
+  core_files(where: {id: {_in: $files}, created_by: {_eq: $user}}) { id encrypted }
   office_documents(where: {direction: {_eq: "in"}, status: {_neq: "cancelled"}, symbol: {_eq: $symbol},
                            issuer_name: {_ilike: $issuer}, issued_on: {_eq: $issued}}, limit: 1) { id }
 }"""
@@ -253,6 +263,11 @@ class Workflow:
         if len(found["core_files"]) != len(file_ids):
             raise WorkflowError("invalid", "Tệp không tồn tại hoặc không do bạn tải lên", 400,
                                 fields={"file_ids": "unknown"})
+        sealed = sum(1 for f in found["core_files"] if f.get("encrypted"))    # F3.7; CSDL cũng chặn (trigger)
+        if data.get("restricted") and sealed != len(file_ids):
+            raise WorkflowError("invalid", RESTRICTED_NOT_SEALED, 400, fields={"file_ids": "not_sealed"})
+        if not data.get("restricted") and sealed:
+            raise WorkflowError("invalid", SEALED_NOT_RESTRICTED, 400, fields={"file_ids": "sealed"})
         if found["office_documents"]:
             raise WorkflowError("duplicate", CONSTRAINT_MESSAGES["documents_in_dedup"], 409,
                                 fields={"symbol": "duplicate"})
@@ -279,6 +294,12 @@ class Workflow:
         except ValueError:
             raise WorkflowError("document_not_found", "Không tìm thấy văn bản", 404) from None
         try:
+            await self._check_visible(actor, document_id)
+        except WorkflowError as exc:
+            if exc.code == "restricted":  # văn thư khác không có tên: như không có văn bản, không lộ là có
+                raise WorkflowError("document_not_found", "Không tìm thấy văn bản", 404) from None
+            raise
+        try:
             data = await self.hasura.as_service(actor, REGISTER_INCOMING, {"id": document_id})
         except HasuraError as exc:
             if "không có văn bản" in str(exc):
@@ -295,6 +316,7 @@ class Workflow:
                 log.warning(json.dumps({"event": "office.process.start_failed", "document_id": doc["id"],
                                         "error": str(exc)}, ensure_ascii=False))
             else:
+                await self._share(actor, pid, doc["id"])
                 await self._announce(actor, pid, doc["id"])
         return {"document_id": doc["id"], "register_number": doc["register_number"]}
 
@@ -318,7 +340,9 @@ class Workflow:
         rows = (await self.hasura.as_system(UNLINKED))["office_documents"]
         for row in rows:
             actor = Actor(SYSTEM_ACTOR, uuid.UUID(row["tenant_id"]), "service", None)
-            await self._announce(actor, await self._attach_process(actor, row), row["id"])
+            pid = await self._attach_process(actor, row)
+            await self._share(actor, pid, row["id"])
+            await self._announce(actor, pid, row["id"])
         return len(rows)
 
     # --- trình văn bản đi -----------------------------------------------------------------------------
@@ -339,6 +363,7 @@ class Workflow:
         if doc["status"] == "in_review" and doc["signer_id"] == signer_id:
             # gọi lại sau lỗi mạng: dữ liệu đã ghi, chỉ hoàn thành nốt bước sửa trong Flowable nếu còn
             await self._finish_revision(actor, doc, signer_id)
+            await self._share(actor, doc["process_id"], doc["id"])
             await self._announce(actor, doc["process_id"], doc["id"])
             return {"document_id": doc["id"], "status": "in_review"}
         if doc["status"] not in ("draft", "returned"):
@@ -368,6 +393,7 @@ class Workflow:
         await self.hasura.as_service(actor, SUBMIT, {"doc": doc["id"], "set": changes, "event": event})
         if not first:
             await self._finish_revision(actor, doc, signer_id)
+        await self._share(actor, changes.get("process_id") or doc["process_id"], doc["id"])
         await self._announce(actor, changes.get("process_id") or doc["process_id"], doc["id"])
         return {"document_id": doc["id"], "status": "in_review"}
 
@@ -416,11 +442,31 @@ class Workflow:
                                     "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
 
     async def brief(self, actor: Actor, doc_id: str) -> dict[str, Any] | None:
-        """Trích yếu, số ký hiệu, độ khẩn ghi kèm thông báo."""
+        """Trích yếu, số ký hiệu, độ khẩn ghi kèm thông báo; văn bản hạn chế chỉ có nhãn."""
         doc = (await self.hasura.as_service(actor, BRIEF, {"id": doc_id}))["office_documents_by_pk"]
-        if doc is None:
-            return None
-        return {k: doc[k] for k in ("summary", "symbol", "urgency", "direction") if doc.get(k)}
+        return brief_of(doc) if doc is not None else None
+
+    async def _share(self, actor: Actor, process_id: str | None, doc_id: str) -> None:
+        """Văn bản hạn chế (F3.7): người phải làm việc đang mở được thêm vào danh sách xem, không thì họ nhận việc
+        mà không mở được văn bản. Bước nghiệp vụ đã ghi xong nên lỗi chỉ ghi nhật ký; văn thư, lãnh đạo đơn vị cấp
+        tay được ở màn văn bản. Người đã bị gỡ mà lại phải làm bước sau thì được thêm lại."""
+        if not process_id:
+            return
+        try:
+            doc = (await self.hasura.as_service(actor, BRIEF, {"id": doc_id}))["office_documents_by_pk"]
+            if not doc or not doc.get("restricted"):
+                return
+            tasks = await self.flowable.process_tasks(process_id)
+            people = await load_people(self.hasura, actor)
+            users: set[str] = set()
+            for task in tasks:
+                users |= await task_people(self.flowable, actor, task, people)
+            if users:
+                await self.hasura.as_service(actor, SHARE, {"rows": [
+                    {"document_id": doc_id, "user_id": u, "granted_by": actor.user_id} for u in sorted(users)]})
+        except (HasuraError, FlowableError) as exc:
+            log.warning(json.dumps({"event": "office.acl.share_failed", "document_id": doc_id,
+                                    "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
 
     async def _announce(self, actor: Actor, process_id: str | None, doc_id: str, *, note: str | None = None) -> None:
         """Báo cho người phải làm từng việc đang mở của quy trình — trừ chính người vừa làm bước trước."""
@@ -488,6 +534,7 @@ class Workflow:
         if task is None or task.variables.get("tenantId") != str(actor.tenant_id):
             raise WorkflowError("task_not_found", "Việc không còn — có thể đã có người xử lý", 404)
         await self._check_owner(actor, task)
+        await self._check_visible(actor, task.variables.get("documentId") or "")
 
         if task.form_key == "vbdi.chinhSua":
             raise WorkflowError("use_submit", "Sửa dự thảo xong thì trình lại để lãnh đạo duyệt", 400)
@@ -534,6 +581,7 @@ class Workflow:
         except FlowableError as exc:
             # Dữ liệu đã ghi; người dùng bấm lại sẽ chỉ hoàn thành nốt trong Flowable
             raise WorkflowError("workflow_unavailable", "Đã lưu, nhưng chưa chuyển được bước tiếp — bấm lại", 503) from exc
+        await self._share(actor, task.process_instance_id, doc_id)
         await self._announce(actor, task.process_instance_id, doc_id, note=plan.note)
         if plan.after is not None:
             await self._quietly("after", doc_id, plan.after)
@@ -552,6 +600,21 @@ class Workflow:
         groups = await self.flowable.candidate_groups(task.id)
         if not set(groups) & set(actor.groups):
             raise WorkflowError("not_your_task", "Việc này không giao cho bạn", 403)
+
+    async def _check_visible(self, actor: Actor, doc_id: str) -> None:
+        """Văn bản hạn chế: chỉ người đọc được nó (có tên trong danh sách xem, hoặc người tạo) làm tiếp việc của nó."""
+        if not doc_id:
+            return
+        try:
+            doc = (await self.hasura.as_service(actor, BRIEF, {"id": doc_id}))["office_documents_by_pk"]
+            if not doc or not doc.get("restricted"):
+                return
+            seen = (await self.hasura.as_user(actor, VISIBLE, {"id": doc_id}))["office_documents_by_pk"]
+        except HasuraError as exc:
+            raise _db_error(exc) from exc
+        if seen is None:
+            raise WorkflowError("restricted", "Văn bản hạn chế: bạn chưa có tên trong danh sách được xem — nhờ văn "
+                                              "thư hoặc lãnh đạo đơn vị cấp quyền", 403)
 
     async def _unclaim(self, task_id: str) -> None:
         try:
@@ -714,6 +777,8 @@ class Workflow:
         doc = await self._outgoing(actor, doc_id)
         if doc["status"] != "approved" and not await self._task_done(actor, doc_id, task.id):
             raise WorkflowError("wrong_status", "Văn bản chưa được lãnh đạo đơn vị ký duyệt", 409)
+        if form.is_public and doc.get("restricted"):
+            raise WorkflowError("invalid", RESTRICTED_PUBLIC, 400, fields={"is_public": "restricted"})
         files = self.files
         if files is None:
             raise WorkflowError("files_unavailable", "Chưa nối được dịch vụ tệp để dựng bản phát hành", 503)

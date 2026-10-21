@@ -31,22 +31,24 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Sao lưu, khôi phục (F3.4): `pg_dump -Fc` → `pg_restore` giữ nguyên mọi dòng và hash của sổ kiểm toán; dòng `system.restored` nối tiếp chuỗi | **Xong** — 2 test, dump và restore ngay trong container PostgreSQL thử |
 | View cho dashboard điều hành (F3.11): `office.v_document_counts`, `v_overdue_by_department`, `v_processing_time`, `v_outgoing_by_month` — chỉ có số đếm, lãnh đạo đơn vị đọc số của đơn vị mình; văn bản hạn chế không vào phép chia nào, chỉ có con số tổng | **Xong** — 6 test, trên một đơn vị riêng nên số đếm biết trước |
 | Hồ sơ công việc, nộp lưu (F3.8): `office.case_files`, `office.case_file_documents`; trigger: chỉ văn bản đã xử lý xong, không hạn chế vào hồ sơ đang mở, ngày đóng do CSDL đặt, hồ sơ rỗng không đóng được, đóng rồi không mở lại, đã nộp lưu thì đóng băng; chuyên viên, tổ trưởng lập và đóng hồ sơ của phòng mình, chỉ đưa vào văn bản mình đọc được và thuộc phòng mình; hàm `office.archive_case_file` chỉ khóa quản trị gọi được, CSDL lệch với gói thì không đổi gì, lần hai bị từ chối; tệp đã nộp lưu không gắn lại vào dự thảo; sổ thấy ký hiệu hồ sơ, băm gói, không thấy tên hồ sơ | **Xong** — 7 test |
+| Văn bản hạn chế (F3.7): tệp khớp chế độ (`files_encryption_key`; trigger `document_files_sealed` — văn bản hạn chế chỉ gắn tệp mã hóa và ngược lại, `documents_restricted_sealed` — có tệp thì không đổi chế độ; ràng buộc `documents_restricted_private` — văn bản hạn chế không công khai trích yếu); tệp mã hóa đã gắn vào văn bản chỉ theo quyền đọc văn bản, kể cả với người tạo dòng tệp; hàm `office.grant_document_access`, `revoke_document_access` cho văn thư, lãnh đạo đơn vị; thông báo về văn bản hạn chế bị gọt nội dung (trigger `notifications_restricted`, kể cả thông báo đã gửi khi văn bản chuyển sang hạn chế); `overview` của sổ che giá trị dòng về văn bản hạn chế người xem không đọc được (`office.audit_overview_seen`) | **Xong** — 15 test |
 | Phả hệ dữ liệu (F3.9): `core.lineage_events` chỉ thêm (trigger chặn sửa, xóa kể cả ghi thẳng CSDL); lãnh đạo, văn thư đọc của đơn vị mình; vai trò khác không thấy, không ai ghi | **Xong** — 2 test |
 
 ## Vai trò
 
 | Vai trò | Đọc | Ghi trực tiếp (không qua Action) |
 |---|---|---|
-| `clerk` — văn thư | Mọi văn bản của thuê ước | — (văn bản đến kèm tệp chỉ thêm qua Action `receiveIncoming`: svc-workflow kiểm theo `schemas/van-ban-den.json`) |
+| `clerk` — văn thư | Mọi văn bản của thuê ước | — (văn bản đến kèm tệp chỉ thêm qua Action `receiveIncoming`: svc-workflow kiểm theo `schemas/van-ban-den.json`); cấp, gỡ người được xem văn bản hạn chế qua hàm |
 | `staff` — chuyên viên | Văn bản mình tạo, được giao cho mình, văn bản đi của phòng mình | Thêm dự thảo văn bản đi; sửa khi còn `draft`/`returned` và là của mình; gắn và gỡ tệp |
 | `manager` — lãnh đạo phòng | Văn bản phòng mình soạn hoặc được giao cho phòng mình | — |
-| `director` — lãnh đạo đơn vị | Mọi văn bản của thuê ước | — |
+| `director` — lãnh đạo đơn vị | Mọi văn bản của thuê ước | Cấp, gỡ người được xem văn bản hạn chế qua hàm `office.grant_document_access`, `revoke_document_access` |
 | `tenant_admin` — quản trị đơn vị | Không đọc văn bản; đọc phòng ban, sổ, danh mục | Thêm, sửa phòng ban |
 | `service` — `svc-workflow`, `svc-files` | Mọi dòng của thuê ước trong yêu cầu | Trạng thái, số, giao việc, tệp, dòng thời gian, sổ kiểm toán |
 | `verifier` — `svc-files` (cổng xác thực) | Chỉ khung nhìn `office.issued_documents`, tối đa một dòng mỗi lần | — |
 
 Văn bản hạn chế (`restricted`) chỉ người tạo và người có tên trong `office.document_acl` đọc được, kể cả
-`clerk` và `director`. Quy tắc đọc viết một lần trong hàm SQL `office.document_visible`, Hasura gắn thành
+`clerk` và `director`; có tên vẫn phải có quyền theo vai trò ở bảng trên. `svc-workflow` (vai trò `service`) tự thêm
+người phải làm các việc đang mở của quy trình (F3.7). Quy tắc đọc viết một lần trong hàm SQL `office.document_visible`, Hasura gắn thành
 trường `visible` của `office_documents`; tệp, giao việc, dòng thời gian lọc theo `document.visible`.
 
 > ⚠️ **Không bao giờ để vai trò `admin` lọt vào token.** `admin` là vai trò có sẵn của Hasura và bỏ qua
@@ -104,8 +106,9 @@ ghi vào sổ kiểm toán) và `X-Hasura-Request-Id` (lấy từ `X-Request-Id`
   `system.restored` của nền tảng (`tenant_id` null, `entity_id` là mã lượt, `diff` có đầu chuỗi lúc sao lưu) ngay
   sau đầu chuỗi vừa khôi phục: các dòng ghi sau lúc sao lưu không còn là vì khôi phục, và sổ ghi rõ điều đó.
 - **Màn xem sổ** cho `director`, `tenant_admin`: đọc dòng sổ của đơn vị mình, không đọc được cột `diff`, chỉ đọc
-  trường `overview` (hàm `core.audit_overview`): cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) có
-  tên nhưng giá trị null, để sổ không lộ văn bản hạn chế mà lãnh đạo không được đọc.
+  trường `overview` (hàm `office.audit_overview_seen`, dựa trên `core.audit_overview`): cột chứa nội dung (trích
+  yếu, nội dung, tên tệp, ý kiến…) có tên nhưng giá trị null; dòng về văn bản hạn chế mà người xem không đọc được
+  thì mọi cột đều null, để sổ không lộ văn bản đó (F3.7).
 
 ## Thêm hoặc đổi schema
 

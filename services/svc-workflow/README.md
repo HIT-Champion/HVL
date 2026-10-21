@@ -40,6 +40,12 @@ của cảm biến, và báo người đó. Còn dự thảo chưa trình hoặc
 nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi thông báo (nhật ký Scorpio: "Mutiny had
 to drop … ResponseException").
 
+**Văn bản hạn chế** (F3.7): sau mỗi bước, người phải làm việc đang mở được thêm vào danh sách xem
+(`office.document_acl`, đã có tên thì giữ nguyên); người không đọc được văn bản thì `completeTask` từ chối (`403`
+`restricted`), `registerIncoming` trả `404` như không có văn bản. Phát hành không được công khai trích yếu (`400`,
+`fields.is_public = restricted`). Thông báo chỉ mang nhãn "văn bản hạn chế", không trích yếu, số ký hiệu; nhắc hạn,
+leo thang, báo quá hạn chỉ tới người có tên trong danh sách xem và người tạo văn bản.
+
 Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp không đổi); đồng bộ danh bạ Keycloak →
 `core.users` mỗi `MOC_DIRECTORY_SYNC_INTERVAL_S` giây; mỗi `MOC_RECONCILE_INTERVAL_S` giây đối soát văn bản đã
 vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn giải quyết; nhận việc nhắc hạn của Flowable.

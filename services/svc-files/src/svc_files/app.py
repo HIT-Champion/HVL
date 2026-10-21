@@ -48,7 +48,7 @@ from collections.abc import Iterator
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, BinaryIO, Literal
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
@@ -63,10 +63,11 @@ from .archive import ArchiveError, Archiver, ColdStore, read_package
 from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
-from .hasura import HasuraAuthError, HasuraClient, HasuraError
+from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
 from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
+from .sealed import SealError, Vault, VaultError, check_pdf, seal, unseal, watermark
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .storage import ObjectStore, StorageError, object_key, s3_client
 from .texts import TextExtractor
@@ -97,6 +98,7 @@ class FileOut(BaseModel):
     size_bytes: int
     sha256: str
     scanned_at: datetime
+    encrypted: bool = False     # tệp của văn bản hạn chế (F3.7): lưu mã hóa, xem có dấu tên người xem
 
 
 Status = Literal[
@@ -310,6 +312,7 @@ def create_app(
     hasura: HasuraClient | None = None,
     meili: MeiliClient | None = None,
     anchor_store: AnchorStore | None = None,
+    vault: Vault | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -339,6 +342,9 @@ def create_app(
     )
     archiver = Archiver(hasura, store, cold, after_days=settings.archive_after_days,
                         interval_s=settings.archive_interval_s, lineage_url=settings.openlineage_url)
+    if vault is None and settings.vault_addr:
+        vault = Vault(settings.vault_addr, role_id_file=settings.vault_role_id_file,
+                      secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -357,6 +363,8 @@ def create_app(
                 task.cancel()
         await meili.aclose()
         await hasura.aclose()
+        if vault is not None:
+            await vault.aclose()
 
     app = FastAPI(
         title="Mộc — svc-files",
@@ -413,6 +421,17 @@ def create_app(
             status_code=200 if ready else 503,
         )
 
+    async def seal_bytes(request: Request, plain: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) -> tuple[bytes, str]:
+        """Bản mã và khóa đã bọc (F3.7). Khóa rõ chỉ sống trong hàm này; két không sẵn sàng thì không lưu gì."""
+        if vault is None:
+            raise _error(503, "vault_unavailable", "Chưa cấu hình két khóa, chưa nhận được tệp của văn bản hạn chế")
+        try:
+            dek, wrapped = await vault.datakey()
+        except VaultError as exc:
+            log_event("core.file.vault_failed", request, file_id=file_id, error=str(exc))
+            raise _error(503, "vault_unavailable", "Két khóa chưa sẵn sàng, tệp chưa được lưu") from exc
+        return await asyncio.to_thread(seal, plain, dek, tenant_id, file_id), wrapped
+
     async def discard(request: Request, key: str) -> None:
         """Gỡ đối tượng vừa ghi khi không thêm được dòng CSDL — không để tệp mồ côi trong kho."""
         try:
@@ -431,18 +450,24 @@ def create_app(
         responses={
             401: {"description": "Thiếu hoặc sai token"},
             413: {"description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"},
+            415: {"description": "restricted=true mà tệp không phải PDF đọc được, không mật khẩu"},
             422: {"description": "Tệp chứa mã độc — đã chặn, không lưu, ghi vào sổ kiểm toán"},
-            503: {"description": "ClamAV, kho đối tượng hoặc CSDL không sẵn sàng — không lưu"},
+            503: {"description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng — không lưu"},
         },
     )
     async def upload_file(
         request: Request,
         principal: Annotated[Principal, Depends(current_principal)],
+        restricted: Annotated[bool, Query(description=(
+            "Tệp của văn bản hạn chế (F3.7): chỉ nhận PDF; lưu mã hóa bằng khóa dữ liệu riêng do két cấp, "
+            "chỉ gắn được vào văn bản hạn chế, xem có dấu tên người xem"))] = False,
     ) -> FileOut:
         limit = settings.max_upload_bytes
         length = request.headers.get("content-length")
         if length and length.isdigit() and int(length) > limit + MULTIPART_OVERHEAD:
             raise _error(413, "too_large", f"Tệp vượt giới hạn {limit // (1024 * 1024)} MB")
+        if restricted and vault is None:
+            raise _error(503, "vault_unavailable", "Chưa cấu hình két khóa, chưa nhận được tệp của văn bản hạn chế")
 
         form = await request.form(max_files=1, max_fields=1)
         try:
@@ -491,9 +516,27 @@ def create_app(
             file_id = uuid.uuid4()
             key = object_key(principal.tenant_id, file_id, scanned_at)
             await upload.seek(0)
+            wrapped: str | None = None
+            body: BinaryIO = upload.file
+            stored_size, stored_sha, stored_mime = digest.size, digest.hexdigest(), mime
+            if restricted:
+                # Văn bản hạn chế (F3.7): bản rõ đọc vào bộ nhớ (Starlette đệm phần lớn tệp ở /tmp — tmpfs trong
+                # compose), kiểm đóng dấu được, mã hóa; kho chỉ nhận bản mã
+                if mime != "application/pdf":
+                    raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF (để đóng dấu người xem)")
+                plain = await upload.read()
+                try:
+                    await asyncio.to_thread(check_pdf, plain)
+                except SealError as exc:
+                    raise _error(415, "restricted_pdf_only",
+                                 f"Văn bản hạn chế chỉ nhận tệp PDF đọc được, không đặt mật khẩu: {exc}") from exc
+                blob, wrapped = await seal_bytes(request, plain, principal.tenant_id, file_id)
+                del plain
+                body, stored_size = io.BytesIO(blob), len(blob)
+                stored_sha, stored_mime = hashlib.sha256(blob).hexdigest(), "application/octet-stream"
             try:
                 await asyncio.to_thread(
-                    store.put, key, upload.file, size=digest.size, content_type=mime, sha256_hex=digest.hexdigest()
+                    store.put, key, body, size=stored_size, content_type=stored_mime, sha256_hex=stored_sha
                 )
             except StorageError as exc:
                 log_event("core.file.store_failed", request, object_key=key, error=str(exc))
@@ -513,6 +556,7 @@ def create_app(
                 size_bytes=digest.size,
                 sha256_hex=digest.hexdigest(),
                 scanned_at=scanned_at,
+                wrapped_dek=wrapped,
             )
         except HasuraError as exc:
             log_event("core.file.record_failed", request, object_key=key, code=exc.code, error=str(exc))
@@ -530,6 +574,7 @@ def create_app(
             file_id=file_id,
             object_key=key,
             size_bytes=digest.size,
+            encrypted=wrapped is not None,
         )
         return FileOut(
             id=file_id,
@@ -538,17 +583,22 @@ def create_app(
             size_bytes=digest.size,
             sha256=digest.hexdigest(),
             scanned_at=scanned_at,
+            encrypted=wrapped is not None,
         )
 
     @app.get(
         "/api/files/{file_id}",
         response_class=StreamingResponse,
         summary="Tải tệp xuống, nếu người gọi được xem tệp",
+        description="Tệp của văn bản hạn chế (F3.7) được giải mã trong bộ nhớ, đóng dấu tên người xem và giờ xem lên "
+                    "mọi trang; mỗi lần mở ghi một dòng `file.decrypted` vào sổ kiểm toán — không ghi được sổ thì "
+                    "không trả tệp.",
         responses={
             200: {"content": {"application/octet-stream": {}}, "description": "Nội dung tệp, luôn ở dạng tải về"},
             401: {"description": "Thiếu hoặc sai token"},
             404: {"description": "Không có tệp, hoặc người gọi không được xem — hai trường hợp trả như nhau"},
-            503: {"description": "CSDL hoặc kho đối tượng không sẵn sàng"},
+            500: {"description": "Tệp mã hóa không mở được: bản mã hỏng hoặc không khớp tệp"},
+            503: {"description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng"},
         },
     )
     async def download_file(
@@ -559,9 +609,9 @@ def create_app(
         rid = request.state.request_id
         try:
             meta = await hasura.visible_file(principal.token, file_id)
-            key = None
+            loc = None
             if meta is not None:
-                key = await hasura.file_location(
+                loc = await hasura.file_location(
                     tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=rid, file_id=file_id
                 )
         except HasuraAuthError as exc:
@@ -572,8 +622,11 @@ def create_app(
         except HasuraError as exc:
             log_event("core.file.lookup_failed", request, file_id=file_id, code=exc.code, error=str(exc))
             raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
-        if meta is None or key is None:
+        if meta is None or loc is None:
             raise _error(404, "not_found", "Không có tệp này, hoặc bạn không có quyền xem")
+        if meta.encrypted or loc.wrapped_dek is not None:
+            return await open_sealed(request, principal, meta, loc)
+        key = loc.object_key
 
         try:
             chunks: Iterator[bytes] = await asyncio.to_thread(store.read_stream, key, CHUNK_SIZE)
@@ -593,6 +646,55 @@ def create_app(
                 "ETag": f'"{meta.sha256}"',
             },
         )
+
+    sealing = asyncio.Semaphore(2)      # giải mã + đóng dấu tốn CPU và bộ nhớ: tối đa hai bản cùng lúc
+
+    async def open_sealed(request: Request, principal: Principal, meta: StoredFile, loc: Location) -> Response:
+        """Tệp của văn bản hạn chế (F3.7): giải mã trong bộ nhớ, kiểm băm, đóng dấu người xem, ghi sổ rồi mới trả."""
+        rid = request.state.request_id
+        if vault is None or loc.wrapped_dek is None:
+            raise _error(503, "vault_unavailable", "Chưa cấu hình két khóa, chưa mở được tệp của văn bản hạn chế")
+        wrapped = loc.wrapped_dek
+        who = principal.display_name or principal.user_id
+        # Bản mã cũng nằm trong RAM: đọc kho, mở khóa đều trong giới hạn số lượt cùng lúc, không chỉ bước giải mã
+        async with sealing:
+            try:
+                blob = b"".join(await asyncio.to_thread(lambda: list(store.read_stream(loc.object_key, CHUNK_SIZE))))
+            except StorageError as exc:
+                log_event("core.file.read_failed", request, file_id=meta.id, object_key=loc.object_key, error=str(exc))
+                raise _error(503, "storage_unavailable", "Kho lưu tệp chưa sẵn sàng") from exc
+            try:
+                dek = await vault.unwrap(wrapped)
+            except VaultError as exc:
+                log_event("core.file.vault_failed", request, file_id=meta.id, error=str(exc))
+                raise _error(503, "vault_unavailable", "Két khóa chưa sẵn sàng, chưa mở được tệp") from exc
+            at = datetime.now(UTC)
+
+            def unseal_and_stamp() -> bytes:
+                plain = unseal(blob, dek, principal.tenant_id, meta.id)
+                if hashlib.sha256(plain).hexdigest() != meta.sha256:
+                    raise SealError("băm bản rõ không khớp CSDL")
+                return watermark(plain, who, at)
+
+            try:
+                out = await asyncio.to_thread(unseal_and_stamp)
+            except SealError as exc:
+                log_event("core.file.unseal_failed", request, tenant_id=principal.tenant_id, file_id=meta.id,
+                          error=str(exc))
+                raise _error(500, "sealed_corrupt", "Tệp mã hóa không mở được (hỏng hoặc không khớp tệp)") from exc
+        # Mỗi lần mở đều vào sổ kiểm toán; không ghi được sổ thì không trả bản rõ
+        try:
+            await hasura.log_event(tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=rid,
+                                   action="file.decrypted", entity="core.files", entity_id=str(meta.id),
+                                   details={"watermark": who, "at": at.isoformat(timespec="seconds")})
+        except HasuraError as exc:
+            log_event("core.file.audit_failed", request, file_id=meta.id, error=str(exc))
+            raise _error(503, "database_unavailable", "Chưa ghi được sổ kiểm toán nên chưa mở tệp") from exc
+        log_event("core.file.decrypted", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
+                  file_id=meta.id, size_bytes=len(out))
+        return Response(out, media_type="application/pdf", headers={
+            **DOWNLOAD_HEADERS, **NO_STORE, "Content-Disposition": content_disposition(meta.filename),
+        })
 
     @app.get(
         "/api/search",
@@ -700,22 +802,27 @@ def create_app(
 
         file_id = uuid.uuid4()
         key = object_key(body.tenant_id, file_id, scanned_at)
+        stored, wrapped, stored_mime = pdf, None, "application/pdf"
+        if row.get("restricted"):       # văn bản hạn chế (F3.7): bản phát hành cũng lưu mã hóa như tệp tải lên
+            stored, wrapped = await seal_bytes(request, pdf, body.tenant_id, file_id)
+            stored_mime = "application/octet-stream"
         try:
-            await asyncio.to_thread(store.put, key, io.BytesIO(pdf), size=len(pdf), content_type="application/pdf",
-                                    sha256_hex=digest)
+            await asyncio.to_thread(store.put, key, io.BytesIO(stored), size=len(stored), content_type=stored_mime,
+                                    sha256_hex=hashlib.sha256(stored).hexdigest())
         except StorageError as exc:
             raise _error(503, "storage_unavailable", "Kho lưu tệp chưa sẵn sàng") from exc
         try:
             await hasura.insert_file(
                 tenant_id=body.tenant_id, actor_id=body.actor_id, request_id=rid, file_id=file_id, object_key=key,
                 filename=row["symbol"].replace("/", "-") + ".pdf", mime_type="application/pdf",
-                size_bytes=len(pdf), sha256_hex=digest, scanned_at=scanned_at,
+                size_bytes=len(pdf), sha256_hex=digest, scanned_at=scanned_at, wrapped_dek=wrapped,
             )
         except HasuraError as exc:
             await discard(request, key)
             raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng, chưa lưu bản phát hành") from exc
         log_event("office.document.rendered", request, tenant_id=body.tenant_id, actor_id=body.actor_id,
-                  document_id=body.document_id, file_id=file_id, size_bytes=len(pdf), caller=caller)
+                  document_id=body.document_id, file_id=file_id, size_bytes=len(pdf), encrypted=wrapped is not None,
+                  caller=caller)
         return IssueOut(file_id=file_id, sha256=digest, size_bytes=len(pdf))
 
     @app.get(

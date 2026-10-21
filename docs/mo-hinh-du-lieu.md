@@ -160,7 +160,11 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
   1792281600900; mẫu mã độc, cỡ tệp của tệp bị ClamAV chặn — migration 1792281601100, tên tệp vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế thì sổ
-  cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
+  cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
+  `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
+  `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
+  vào, giao việc, lần vào hồ sơ, danh sách được xem) chỉ còn tên trường, mọi giá trị là null — trạng thái, độ khẩn,
+  hạn, người ký cũng không lộ. Ai có tên trong danh sách được xem vẫn thấy qua `entity_id` của dòng `document_acl`. Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
   chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
 - **Lịch sử của một văn bản** (F3.5, tab "Lịch sử" trên trang văn bản): view `office.document_history` (migration
   1792281601500) gồm các dòng sổ về chính văn bản, tệp gắn với nó (`entity_id` "<văn bản>/<tệp>"), các lần giao
@@ -188,7 +192,9 @@ gắn vào văn bản hạn chế. Bảng không gắn sổ kiểm
 toán: chữ là dữ liệu dẫn xuất, tính lại được từ tệp mà băm đã nằm trong `core.files` và trong sổ.
 
 **Thông báo** (`core.notifications`): dịch vụ ghi bằng vai trò `service`; mỗi người chỉ đọc thông báo của mình
-và chỉ sửa được `read_at`. Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
+và chỉ sửa được `read_at`. Thông báo về văn bản hạn chế (F3.7) không mang nội dung: trigger `notifications_restricted`
+gọt `summary`, `symbol`, `issuer_name`, `note` khỏi `data` và gắn `restricted: true` ở mọi lần ghi, kể cả dịch vụ ghi
+sai; văn bản chuyển sang hạn chế thì thông báo đã gửi về nó cũng bị gọt (`documents_restricted_notifications`). Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 ---
@@ -552,6 +558,19 @@ Quyền đọc `office.documents` (các bảng con lọc theo văn bản cha):
 thì người xem phải là người tạo hoặc có trong `office.document_acl`. Quy tắc viết một lần trong hàm SQL
 `office.document_visible`; Hasura gắn thành trường `visible`, các bảng con lọc theo `document.visible`.
 
+**Danh sách người được xem** (F3.7, migration 1792281601600). Có tên vẫn phải có quyền theo vai trò ở bảng trên
+(tổ trưởng phòng khác chưa được giao việc thì vẫn không thấy). Văn thư và lãnh đạo đơn vị cấp, gỡ qua hai hàm
+`office.grant_document_access(document_id, user_id)`, `office.revoke_document_access(document_id, user_id)` (Hasura
+đưa ra thành mutation, truyền phiên của người gọi vào `hasura_session`): hàm kiểm vai trò, người gọi đọc được văn bản, văn bản đang hạn chế,
+người được cấp cùng đơn vị và còn hoạt động, không tự gỡ mình; cấp lại người đã có thì giữ người cấp lần đầu. Mỗi lần
+cấp, gỡ là một dòng sổ kiểm toán (`office.document_acl`, `entity_id` "<văn bản>/<người>"). `svc-workflow` (vai trò
+`service`) tự thêm người phải làm các việc đang mở của quy trình sau mỗi bước, để không ai nhận việc mà không mở được
+văn bản. Tệp phải khớp chế độ: văn bản hạn chế chỉ gắn tệp mã hóa, văn bản thường chỉ gắn tệp thường (trigger
+`document_files_sealed`); đã có tệp thì không bật, tắt hạn chế được nữa (`documents_restricted_sealed`). Tệp mã hóa đã
+gắn vào văn bản chỉ theo quyền đọc văn bản — người tạo dòng tệp (vd lãnh đạo bấm phát hành, svc-files dựng bản phát
+hành thay) bị gỡ khỏi danh sách cũng hết tải. Văn bản hạn chế không được công khai trích yếu ở cổng xác thực (ràng
+buộc `documents_restricted_private`: không `restricted` và `is_public` cùng lúc).
+
 > **Không đặt tên vai trò là `admin`.** `admin` là vai trò có sẵn của Hasura, bỏ qua mọi quyền kể cả khi nằm
 > trong JWT. Chạy thử ở #18: token có `x-hasura-default-role: admin` đọc được dữ liệu của mọi thuê ước.
 > Quản trị đơn vị là `tenant_admin`; mapper của realm chỉ đưa 5 vai trò nghiệp vụ vào claim.
@@ -564,6 +583,7 @@ Ghi trực tiếp (không qua Action):
 | `staff` | Gắn tệp do chính mình tải lên vào dự thảo của mình (như dòng trên); gỡ khi dự thảo còn ở bước đó | `tenant_id`, `added_by` |
 | `staff`, `manager` | Tạo, đóng hồ sơ công việc của phòng mình; đưa vào văn bản đã xong mình đọc được và thuộc phòng mình, gỡ ra khi hồ sơ còn mở (F3.8) | `tenant_id`, `department_id`, `created_by` / `added_by` |
 | `tenant_admin` | Phòng ban | `tenant_id` |
+| `clerk`, `director` | Cấp, gỡ người được xem văn bản hạn chế, qua hàm `office.grant_document_access`, `office.revoke_document_access` (F3.7) | `tenant_id`, `granted_by` |
 
 Sổ do `svc-workflow` tạo khi cấp số đầu tiên của năm. Danh mục loại văn bản dùng chung cho mọi thuê ước,
 chỉ đổi bằng migration.
@@ -584,11 +604,11 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 
 | Action | Ai gọi | Làm gì |
 |---|---|---|
-| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm |
+| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn bản hạn chế phải kèm toàn tệp đã mã hóa, văn bản thường không được kèm tệp mã hóa (`file_ids`: `not_sealed`, `sealed`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm |
 | `registerIncoming(documentId)` | `clerk` | Gọi hàm `office.register_incoming` (một giao dịch: khóa văn bản, lấy số kế tiếp của sổ năm nay, `received → registered`, ghi sự kiện), rồi khởi chạy `van-ban-den` với `businessKey = documentId`. Flowable lỗi thì vẫn giữ số đã cấp; job đối soát (5 phút) khởi chạy sau |
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
-| `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
+| `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, văn bản hạn chế thì người gọi phải đọc được nó (403 `restricted`), kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
 cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác
@@ -645,8 +665,8 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 
 | Đường dẫn (qua APISIX) | Ai gọi | Làm gì |
 |---|---|---|
-| `POST /api/files` | Người đăng nhập | Quét ClamAV → ghi SeaweedFS → thêm dòng `core.files`; nhiễm thì trả 422 và ghi `file.rejected` |
-| `GET /api/files/{id}` | Người có quyền với văn bản chứa tệp | Kiểm quyền qua Hasura; tệp mã hóa thì giải mã trong bộ nhớ, thêm watermark |
+| `POST /api/files` | Người đăng nhập | Quét ClamAV → ghi SeaweedFS → thêm dòng `core.files`; nhiễm thì trả 422 và ghi `file.rejected`. `?restricted=true`: chỉ PDF, mã hóa bằng khóa riêng do két cấp rồi mới ghi, `wrapped_dek` vào CSDL (F3.7) |
+| `GET /api/files/{id}` | Người có quyền với văn bản chứa tệp | Kiểm quyền qua Hasura; tệp mã hóa thì giải mã trong bộ nhớ, kiểm băm, đóng dấu tên người xem lên mọi trang, ghi `file.decrypted` vào sổ kiểm toán rồi mới trả |
 | `GET /api/search?q=` | Người đăng nhập | Meilisearch tìm trong số ký hiệu, trích yếu, cơ quan ban hành, nội dung văn bản đi và chữ của PDF đính kèm (trừ văn bản hạn chế); lọc thuê ước và quyền phía server; `matched_content` báo kết quả chỉ khớp nội dung |
 | `GET /api/documents/{id}/preview` | Người đọc được văn bản đi | PDF đúng thể thức của dự thảo, chưa có số, in chữ "DỰ THẢO" |
 | `GET /api/registers/{in\|out}/{year}` | `clerk`, `director` | Sổ đăng ký một năm, cột theo mẫu NĐ 30 Phụ lục IV; dòng văn bản hạn chế người gọi không đọc được chỉ có số, ngày, số ký hiệu |
@@ -671,7 +691,7 @@ họ được đọc theo đúng thứ tự xếp hạng. Không trả tổng s�
 
 `/api/verify` (đã làm): `svc-files` tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`. Vai
 trò này chỉ đọc được khung nhìn đó, tối đa một dòng mỗi lần, và không có trong token của người dùng. Khung nhìn
-chỉ có văn bản đi đã phát hành; trích yếu bị ẩn khi văn bản không công khai.
+chỉ có văn bản đi đã phát hành; trích yếu bị ẩn khi văn bản không công khai hoặc là văn bản hạn chế.
 
 ---
 

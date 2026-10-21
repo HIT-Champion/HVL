@@ -166,6 +166,10 @@ class FakeHasura:
     uploads: dict[str, str] = field(default_factory=dict)
     received: list[dict[str, Any]] = field(default_factory=list)
     lookups: list[dict[str, Any]] = field(default_factory=list)
+    # văn bản hạn chế (F3.7): tệp tải lên ở chế độ hạn chế; người đọc được văn bản (as_user); lỗi khi cấp quyền xem
+    sealed: set[str] = field(default_factory=set)
+    viewers: set[str] = field(default_factory=set)
+    fail_share: bool = False
 
     async def as_service(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         variables = variables or {}
@@ -194,7 +198,8 @@ class FakeHasura:
             return {
                 "office_document_types_by_pk": {"code": variables["type"]}
                 if variables["type"] in self.document_types else None,
-                "core_files": [{"id": f} for f in variables["files"] if self.uploads.get(f) == variables["user"]],
+                "core_files": [{"id": f, "encrypted": f in self.sealed} for f in variables["files"]
+                               if self.uploads.get(f) == variables["user"]],
                 "office_documents": [{"id": d["id"]} for d in same[:1]],
             }
         if op == "OpenAssignments":
@@ -222,6 +227,11 @@ class FakeHasura:
             doc = {DOC: self.document, OUT: self.outgoing}.get(variables["id"])
             return {"office_documents_by_pk": {"summary": "Công văn về chuyển đổi số", "symbol": None,
                                                "created_by": None, "signer_id": None, **doc} if doc else None}
+        if op == "Readers":  # danh sách xem của văn bản hạn chế: dùng chung tập viewers
+            doc = {DOC: self.document, OUT: self.outgoing}.get(variables["id"])
+            return {"office_documents_by_pk": {"restricted": doc.get("restricted", False),
+                                               "created_by": doc.get("created_by")} if doc else None,
+                    "office_document_acl": [{"user_id": u} for u in sorted(self.viewers)]}
         if op == "Notify":
             if self.fail_notify:
                 raise HasuraError("Không gọi được Hasura")
@@ -234,6 +244,8 @@ class FakeHasura:
                                 **{k: row[k] for k in ("user_id", "kind", "document_id", "data")}})
             return {"insert_core_notifications": {"returning": created}}
         # còn lại là mutation ghi
+        if op == "ChoXem" and self.fail_share:
+            raise HasuraError("Không gọi được Hasura")
         if self.fail_writes:
             raise HasuraError(self.fail_writes, "constraint-violation")
         self.writes.append((op, variables, actor))
@@ -243,6 +255,11 @@ class FakeHasura:
             self.received.append({**variables["doc"], "id": NEW})
             return {"insert_office_documents_one": {"id": NEW}}
         return {}
+
+    async def as_user(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        assert "query Visible" in query
+        seen = actor.tenant_id == TENANT and actor.user_id in self.viewers
+        return {"office_documents_by_pk": {"id": (variables or {})["id"]} if seen else None}
 
     async def aclose(self) -> None: ...
 

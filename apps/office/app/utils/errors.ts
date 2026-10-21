@@ -19,7 +19,8 @@ import { ApiError } from '~/composables/useApi'
 
 // Lỗi từ máy chủ → câu cho người dùng. Hasura trả tên ràng buộc trong CSDL (db/README.md: đặt tên cho
 // ràng buộc check) nên dịch được thành câu tiếng Việt cụ thể; svc-workflow đã trả câu tiếng Việt sẵn.
-const CONSTRAINTS = ['documents_in_dedup', 'documents_due_after_registered', 'documents_body_length']
+const CONSTRAINTS = ['documents_in_dedup', 'documents_due_after_registered', 'documents_body_length',
+  'document_files_sealed', 'documents_restricted_sealed']
 
 export function errorText(t: Composer['t'], e: unknown): string {
   if (e instanceof ApiError) {

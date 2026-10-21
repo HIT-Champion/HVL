@@ -66,6 +66,11 @@ class Settings:
     archive_interval_s: float = 3600.0  # chu kỳ nộp lưu hồ sơ đã đóng (F3.8); 0: tắt vòng nền
     archive_after_days: int = 365   # hồ sơ đóng từ chừng ấy ngày thì nộp lưu (NĐ 30: trong 01 năm)
     openlineage_url: str = ""       # gửi thêm sự kiện phả hệ tới máy chủ OpenLineage (vd Marquez); rỗng: chỉ ghi CSDL
+    # F3.7 — két giữ khóa transit bọc khóa dữ liệu của tệp văn bản hạn chế; rỗng: không nhận, không mở tệp mã hóa
+    vault_addr: str = ""
+    vault_role_id_file: str = "/run/openbao/role_id"
+    vault_secret_id_file: str = "/run/openbao/secret_id"
+    transit_key: str = "moc-files"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -106,6 +111,10 @@ class Settings:
                 archive_interval_s=float(env.get("MOC_ARCHIVE_INTERVAL_S", "3600")),
                 archive_after_days=int(env.get("MOC_ARCHIVE_AFTER_DAYS", "365")),
                 openlineage_url=env.get("MOC_OPENLINEAGE_URL", "").strip(),
+                vault_addr=(env.get("MOC_OPENBAO_ADDR") or "").rstrip("/"),
+                vault_role_id_file=env.get("MOC_OPENBAO_ROLE_ID_FILE", "/run/openbao/role_id"),
+                vault_secret_id_file=env.get("MOC_OPENBAO_SECRET_ID_FILE", "/run/openbao/secret_id"),
+                transit_key=env.get("MOC_FILES_TRANSIT_KEY", "moc-files"),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc

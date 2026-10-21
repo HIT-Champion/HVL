@@ -230,6 +230,11 @@ services:
     environment:
       CLAMD_CONF_ConcurrentDatabaseReload: "no"
       CLAMD_CONF_StreamMaxLength: 64M
+      CLAMD_CONF_TemporaryDirectory: /tmp
+    # F3.7 — clamd ghi luồng nhận qua INSTREAM (và phần giải nén của PDF) ra thư mục tạm trước khi quét: để trong RAM,
+    # bản rõ của văn bản hạn chế không xuống đĩa ở cả container quét
+    tmpfs:
+      - /tmp:size=512m,mode=1777
     volumes:
       - clamav_data:/var/lib/clamav
 
@@ -303,6 +308,10 @@ services:
       MOC_OPENLINEAGE_URL: ${MOC_OPENLINEAGE_URL:-}
     volumes:
       - openbao_svc_files:/run/openbao:ro
+    # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
+    # không xuống đĩa. Đủ cho vài lượt tải song song cỡ MOC_FILES_MAX_MB.
+    tmpfs:
+      - /tmp:size=512m,mode=1777
     depends_on:
       # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
       openbao: {condition: service_healthy, restart: true}
@@ -496,6 +505,7 @@ services:
       RESTIC_PASSWORD: ${MOC_BACKUP_PASSWORD:-}
     volumes:
       - seaweedfs_data:/data/seaweedfs
+      - openbao_data:/data/openbao            # F3.7: khóa transit bọc khóa của tệp văn bản hạn chế
 
   # ===========================================================================
   # Tầng 2 — ứng dụng

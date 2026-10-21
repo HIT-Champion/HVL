@@ -34,7 +34,8 @@ export function describeNotification(t: Translate, n: Pick<RealtimeMessage, 'kin
   const d = n.data as Record<string, string | undefined>
   const task = d.form_key ? t(`task.${d.form_key}`) : ''
   const someone = t('notify.someone')
-  const doc = [d.symbol, d.summary].filter(Boolean).join(' — ')
+  // văn bản hạn chế (F3.7): máy chủ không gửi trích yếu, số ký hiệu — chỉ nhãn
+  const doc = d.restricted ? t('notify.restricted') : [d.symbol, d.summary].filter(Boolean).join(' — ')
   const note = d.note ? t('notify.note', { note: d.note }) : ''
   switch (n.kind) {
     case 'task.assigned':
@@ -44,7 +45,7 @@ export function describeNotification(t: Translate, n: Pick<RealtimeMessage, 'kin
     case 'task.escalated':
       return { title: t('notify.taskEscalated', { task, name: d.assignee_name || someone }), detail: doc, note }
     case 'document.issued':
-      return { title: t('notify.documentIssued', { symbol: d.symbol ?? '' }), detail: d.summary ?? '', note }
+      return { title: t('notify.documentIssued', { symbol: d.symbol ?? '' }), detail: d.restricted ? doc : d.summary ?? '', note }
     case 'document.processed':
       return { title: t('notify.documentProcessed', { name: d.by_name || someone }), detail: doc, note }
     case 'document.overdue':

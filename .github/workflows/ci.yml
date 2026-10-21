@@ -223,6 +223,11 @@ jobs:
       - name: Văn bản đến, văn bản đi, thông báo realtime trên trình duyệt thật (make e2e)
         run: make e2e
 
+      # F3.7: tệp văn bản hạn chế mã hóa trong kho bằng khóa từ két; người nhận việc tự có tên trong danh sách được
+      # xem, người khác 404; bản mở ra có dấu tên người xem, vào sổ kiểm toán; thông báo không mang nội dung
+      - name: Văn bản hạn chế (make demo-han-che)
+        run: make demo-han-che
+
       # F3.2: svc-files, svc-workflow không có bí mật trong biến môi trường; khởi động lại két → tự mở khóa (static
       # seal), svc-files khởi động lại lấy lại khóa kho từ két và nhận tệp; AppRole không đọc chéo bí mật
       - name: Két bí mật tự mở khóa, dịch vụ lấy bí mật qua AppRole (make demo-ket-bi-mat)
@@ -248,8 +253,9 @@ jobs:
       - name: Hội tụ IT/OT (make demo-it-ot)
         run: make demo-it-ot
 
-      # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL
-      # và tệp, khôi phục rồi kiểm lại: luồng chính chạy, sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục
+      # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL,
+      # tệp và két, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về cùng),
+      # sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục
       - name: Sao lưu, xóa dữ liệu, khôi phục rồi kiểm lại (make backup, make restore)
         run: |
           make backup
@@ -258,7 +264,7 @@ jobs:
           runs = json.load(sys.stdin)["runs"]
           assert len(runs) == 1 and runs[0]["complete"], runs'
           make down
-          docker volume rm moc_postgres_data moc_seaweedfs_data
+          docker volume rm moc_postgres_data moc_seaweedfs_data moc_openbao_data
           python3 scripts/moc.py backup restore --yes
           make smoke
           make audit

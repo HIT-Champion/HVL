@@ -59,7 +59,7 @@ MANIFEST = ".moc-install"           # danh sách tệp do make install quản l�
 STATE = "moc-reconcile.json"        # trong thư mục .git của bản sao: commit đã áp, băm tệp lúc cài
 RESTORING = ".moc-restoring"        # scripts/backup.py đặt trước khi dừng Mộc để khôi phục, xóa khi xong
 # Dịch vụ `moc backup create` tạm dừng (cùng danh sách WRITERS, DB_WRITERS trong scripts/backup.py)
-BACKUP_PAUSES = {"svc-files", "seaweedfs", "hasura", "svc-workflow", "flowable", "keycloak"}
+BACKUP_PAUSES = {"svc-files", "seaweedfs", "openbao", "hasura", "svc-workflow", "flowable", "keycloak"}
 
 
 class ReconcileError(Exception):

@@ -18,6 +18,7 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | `make demo-it-ot` | Có (F3.10) |
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | `make demo-pha-he` | Có (F3.9) |
 | (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
+| (iv) Zero-Trust + GitOps | Văn bản hạn chế: tệp mã hóa trong kho, chỉ người có tên mở được, bản mở có dấu tên | `make demo-han-che` | Có (F3.7) |
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
@@ -66,8 +67,8 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 - *"Hỏng giữa chừng thì sao?"* Thứ tự là kiểm băm tệp nóng → ghi gói → đọc lại so băm → một giao dịch CSDL → xóa
   bản nóng. Giao dịch kiểm CSDL còn đúng như gói (khóa dòng), lệch thì không đổi gì. Hỏng trước giao dịch thì CSDL
   chưa đổi gì, lượt sau làm lại và không ghi lại phần đã có. Hỏng sau giao dịch thì chỉ thừa bản nóng, không mất gì.
-- *"Văn bản hạn chế?"* Không vào hồ sơ nộp lưu: tệp của nó sẽ mã hóa riêng (F3.7). Nộp lưu bản mã hóa cần thêm bước
-  giữ khóa.
+- *"Văn bản hạn chế?"* Không vào hồ sơ nộp lưu: tệp của nó mã hóa bằng khóa riêng bọc trong két (F3.7). Nộp lưu
+  bản mã hóa cần đưa khóa đã bọc đi cùng gói lạnh và giữ két lâu như gói — chưa làm.
 
 ## (ii) Hội tụ IT/OT — `make demo-it-ot`
 
@@ -176,6 +177,53 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
   (freshclam chạy sẵn trong image `clamav/clamav`). Lớp sau là: tệp không bao giờ được thực thi trên máy chủ,
   PDF chỉ được đọc trong tiến trình con có giới hạn bộ nhớ, CPU và thời gian (F2.7).
 
+## (iv) Văn bản hạn chế — `make demo-han-che`
+
+**Điều muốn chứng minh:**
+
+- Không tin vào chỗ lưu: tệp đính kèm trong kho tệp và bản sao lưu chỉ là bản mã, người quản trị CSDL chỉ thấy khóa
+  đã bọc. Khóa của từng tệp bọc trong két, chỉ két mở được. (Trích yếu, nội dung soạn trên hệ thống vẫn nằm trong
+  CSDL, chỉ được che bằng phân quyền.)
+- Không tin vào vị trí trong mạng: mỗi lần mở tệp đều hỏi lại quyền theo người, theo văn bản. Người không có tên nhận
+  `404` y như tệp không tồn tại.
+- Bản rõ chỉ có trong bộ nhớ, trong khoảnh khắc trả về, mang tên người xem; mỗi lần mở đều vào sổ kiểm toán.
+
+**Lệnh in ra 6 bước:**
+
+1. Văn thư tải `nang-luong-….pdf` lên ở chế độ hạn chế. `svc-files` xin két một khóa AES-256 riêng cho tệp, mã hóa
+   rồi mới ghi: đọc thẳng đối tượng trong kho thấy bắt đầu bằng `MOC1`, không có đầu `%PDF`, không có chữ trong tệp.
+   CSDL chỉ giữ khóa đã bọc (`vault:v1:…`).
+2. Văn thư tiếp nhận văn bản hạn chế. Quy trình giao lãnh đạo khoa cho ý kiến chỉ đạo, và `svc-workflow` tự thêm lãnh
+   đạo khoa vào danh sách được xem — nhận việc mà không mở được văn bản thì vô nghĩa.
+3. Tổ trưởng Tổ Đào tạo không có tên: không đọc được văn bản, mở thẳng đường dẫn tệp → `404`.
+4. Lãnh đạo khoa mở tệp: bản giải mã trong bộ nhớ, trên trang có dòng "VĂN BẢN HẠN CHẾ — bản giải mã cho …, giờ…",
+   `Cache-Control: no-store`; băm khác bản gốc vì mỗi người, mỗi lần mở là một bản riêng.
+5. Thông báo việc mới của lãnh đạo khoa chỉ có nhãn "Văn bản hạn chế", không số ký hiệu, trích yếu, cơ quan ban hành.
+6. Sổ kiểm toán có dòng `file.decrypted` của lãnh đạo khoa; lần tổ trưởng bị từ chối không giải mã gì nên không có
+   dòng.
+
+**Trên giao diện:**
+
+- *Văn thư*: **Tiếp nhận văn bản**, tích "Hạn chế người xem" *trước khi* tải tệp (chỉ nhận PDF; đã có tệp thì ô này
+  khóa lại), tệp hiện "Đã quét — sạch, đã mã hóa". Trang văn bản: tệp có nhãn "Đã mã hóa", mục **Người được xem** có
+  lãnh đạo khoa, gỡ hoặc cấp thêm người được.
+- *Lãnh đạo khoa*: chuông ghi "Việc mới … Văn bản hạn chế"; mở tệp thấy tên mình đóng chéo trang.
+- *Tổ trưởng*: dán đường dẫn văn bản → "Không tìm thấy văn bản, hoặc bạn không có quyền xem."
+
+**Nếu giám khảo hỏi:**
+
+- *"Đây là văn bản mật à?"* Không. Đây là văn bản hạn chế người xem trong cơ quan (lương, kỷ luật, nhân sự). Văn bản
+  mật nhà nước phải dùng hệ thống, mật mã được cấp phép riêng theo Luật Bảo vệ bí mật nhà nước 2018; giao diện và tài
+  liệu đều ghi rõ điều này.
+- *"Lấy được ổ đĩa, bản sao lưu thì sao?"* Chỉ có bản mã và khóa đã bọc. Mở khóa phải qua két, két cần khóa mở két
+  trong `.env`. Bản sao lưu gồm cả két (để khôi phục được), nên `.env` phải giữ riêng, ngoài bản sao lưu.
+- *"Người có tên chụp màn hình, chuyển tiếp thì sao?"* Không chặn được. Tên người xem và giờ xem nằm trên mọi trang,
+  sổ kiểm toán ghi từng lần mở: lộ thì truy được từ bản nào.
+- *"Lãnh đạo khoa vốn đọc được mọi văn bản, sao còn cần có tên?"* Vai trò chưa đủ: văn bản hạn chế còn cần có tên.
+  Người nhận việc được tự thêm; văn thư, lãnh đạo khoa thêm hoặc gỡ người khác, mỗi lần đều vào sổ.
+- *"Tìm theo nội dung được không?"* Không: tệp mã hóa không được đọc chữ, nội dung văn bản hạn chế không vào chỉ mục,
+  vì một bản chữ trần nằm ngoài tệp là vô hiệu việc mã hóa. Tìm theo số ký hiệu, trích yếu vẫn được nếu có quyền.
+
 ## (iv) Két bí mật — `make demo-ket-bi-mat`
 
 **Điều muốn chứng minh:**
@@ -213,8 +261,8 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 - *"Ai cấu hình két?"* Lần đầu, `openbao/start.sh` cấu hình bằng token root rồi thu hồi nó ngay. Các lần sau chỉ
   dùng token khởi động: không đọc thẳng được bí mật, không sửa được policy, nhưng cấp được secret_id cho hai dịch vụ
   — nên volume của két phải được giữ như chính két.
-- *"Két dùng làm gì nữa?"* Khóa transit `moc-files` để mã hóa tệp của văn bản hạn chế (F3.7): `svc-files` chỉ xin
-  được khóa dữ liệu mới và mở khóa đã bọc, không bao giờ cầm khóa gốc.
+- *"Két dùng làm gì nữa?"* Khóa transit `moc-files` để mã hóa tệp của văn bản hạn chế (F3.7, `make demo-han-che`):
+  `svc-files` chỉ xin được khóa dữ liệu mới và mở khóa đã bọc, không bao giờ cầm khóa gốc.
 
 ## (iv) Tự phục hồi — `make demo-tu-phuc-hoi`
 

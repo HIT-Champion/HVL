@@ -97,6 +97,31 @@ class People(dict[str, Person]):
         return self.with_role("director")
 
 
+def brief_of(doc: dict[str, Any] | None) -> dict[str, Any]:
+    """Phần văn bản ghi kèm thông báo. Văn bản hạn chế (F3.7) chỉ có nhãn, không trích yếu, số ký hiệu — CSDL cũng
+    gọt cho mọi đường ghi (migration 1792281601600), đây là để khỏi gửi đi ngay từ đầu."""
+    if not doc:
+        return {}
+    if doc.get("restricted"):
+        return {**{k: doc[k] for k in ("urgency", "direction") if doc.get(k)}, "restricted": True}
+    return {k: doc[k] for k in ("summary", "symbol", "urgency", "direction") if doc.get(k)}
+
+
+async def load_people(hasura: HasuraClient, actor: Actor) -> People:
+    rows = (await hasura.as_service(actor, PEOPLE))["core_users"]
+    return People({r["id"]: Person(r["id"], r["role"], r["department_id"], r["full_name"]) for r in rows})
+
+
+async def task_people(flowable: FlowableClient, actor: Actor, task: Task, people: People) -> set[str]:
+    """Người phải làm một việc: người được giao đích danh, hoặc mọi người trong các nhóm ứng viên."""
+    if task.assignee:
+        return {task.assignee} if task.assignee in people else set()
+    found: set[str] = set()
+    for group in await flowable.candidate_groups(task.id):
+        found |= people.group(str(actor.tenant_id), group)
+    return found
+
+
 class Notifier:
     def __init__(self, hasura: HasuraClient, centrifugo_url: str = "", api_key: str = "", *,
                  timeout_s: float = 3.0, transport: httpx2.AsyncBaseTransport | None = None) -> None:
@@ -111,17 +136,10 @@ class Notifier:
             await self._http.aclose()
 
     async def people(self, actor: Actor) -> People:
-        rows = (await self.hasura.as_service(actor, PEOPLE))["core_users"]
-        return People({r["id"]: Person(r["id"], r["role"], r["department_id"], r["full_name"]) for r in rows})
+        return await load_people(self.hasura, actor)
 
     async def task_people(self, flowable: FlowableClient, actor: Actor, task: Task, people: People) -> set[str]:
-        """Người phải làm một việc: người được giao đích danh, hoặc mọi người trong các nhóm ứng viên."""
-        if task.assignee:
-            return {task.assignee} if task.assignee in people else set()
-        found: set[str] = set()
-        for group in await flowable.candidate_groups(task.id):
-            found |= people.group(str(actor.tenant_id), group)
-        return found
+        return await task_people(flowable, actor, task, people)
 
     async def send(self, actor: Actor, user_ids: Iterable[str], kind: str, key: str,
                    document_id: str | None, data: dict[str, Any]) -> list[str]:

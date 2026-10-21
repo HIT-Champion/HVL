@@ -337,8 +337,8 @@ AUDIT_VIEW = """query ($e: String!) {
 
 
 def test_director_sees_who_changed_what_but_not_the_content(world):
-    doc = received(world.clerk_a, incoming(world.tag, 112, restricted=True))
-    assert doc["id"] not in visible_ids(world.director_a)          # văn bản hạn chế: lãnh đạo không đọc được
+    # văn bản thường; văn bản hạn chế mà người xem không đọc được thì ẩn cả trạng thái (test_restricted.py, F3.7)
+    doc = received(world.clerk_a, incoming(world.tag, 112))
     sql(f"update office.documents set content_sha256 = '\\x{os.urandom(32).hex()}' where id = '{doc['id']}'")
     for viewer in (world.director_a, world.admin_a):
         row, hashed = viewer.gql(AUDIT_VIEW, {"e": doc["id"]})["core_audit_log"]

@@ -42,8 +42,8 @@ from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from .flowable import ExternalJob, FlowableClient, FlowableError, Task
-from .hasura import BRIEF, OVERDUE_DOCUMENTS, Actor, HasuraClient
-from .notify import Notifier, People
+from .hasura import BRIEF, OVERDUE_DOCUMENTS, READERS, Actor, HasuraClient
+from .notify import Notifier, People, brief_of
 
 log = logging.getLogger("svc_workflow")
 
@@ -140,13 +140,18 @@ class Deadlines:
     async def _overdue(self, actor: Actor, task: Task, doc_id: str, people: People, *, escalate: bool) -> None:
         brief = {k: v for k, v in (await self._brief(actor, doc_id)).items() if v}
         data = {"form_key": task.form_key, "task_id": task.id, **brief}
+        readers = await self._readers(actor, doc_id)
         holders = await self.notifier.task_people(self.flowable, actor, task, people)
+        if readers is not None:
+            holders &= readers
         await self.notifier.send(actor, holders, "task.overdue", f"task:{task.id}:overdue", doc_id, data)
         await self._record(actor, doc_id, "office.task.overdue", task, holders)
         if not escalate:
             return
         groups = [] if task.assignee else await self.flowable.candidate_groups(task.id)
         leaders = people.leaders(str(actor.tenant_id), task.assignee, groups)
+        if readers is not None:
+            leaders &= readers
         holder = people.get(task.assignee or "")
         extra = {"assignee_id": task.assignee, "assignee_name": holder.full_name} if holder else {}
         await self.notifier.send(actor, leaders, "task.escalated", f"task:{task.id}:escalated", doc_id,
@@ -166,8 +171,16 @@ class Deadlines:
             doc_id, kind, sla_task_id=task.id, form_key=task.form_key, notified=sorted(notified))})
 
     async def _brief(self, actor: Actor, doc_id: str) -> dict[str, Any]:
-        doc = (await self.hasura.as_service(actor, BRIEF, {"id": doc_id}))["office_documents_by_pk"]
-        return {k: doc.get(k) for k in ("summary", "symbol", "urgency", "direction")} if doc else {}
+        return brief_of((await self.hasura.as_service(actor, BRIEF, {"id": doc_id}))["office_documents_by_pk"])
+
+    async def _readers(self, actor: Actor, doc_id: str) -> set[str] | None:
+        """Văn bản hạn chế (F3.7): chỉ nhắc người có tên trong danh sách xem và người tạo — trưởng phòng, lãnh đạo
+        không có tên thì không được biết là có văn bản này, dù thông báo đã bỏ trích yếu. None: văn bản thường."""
+        data = await self.hasura.as_service(actor, READERS, {"id": doc_id})
+        doc = data["office_documents_by_pk"]
+        if not doc or not doc.get("restricted"):
+            return None
+        return ({r["user_id"] for r in data["office_document_acl"]} | {doc.get("created_by")}) - {None}
 
     # --- hạn giải quyết văn bản đến -------------------------------------------------------------------
 
@@ -184,6 +197,9 @@ class Deadlines:
                 users |= people.with_role("manager", dept)
             users |= {a["assigned_by"] for a in open_rows if a["assigned_by"]} | people.with_role("director")
             data = {k: row[k] for k in ("summary", "symbol", "due_on") if row.get(k)}
+            if row.get("restricted"):
+                users &= await self._readers(actor, row["id"]) or set()
+                data = {"due_on": row["due_on"], "restricted": True}
             sent = await self.notifier.send(actor, users & people.keys(), "document.overdue",
                                             f"doc:{row['id']}:overdue", row["id"], data)
             # ghi sự kiện cả khi không còn ai để báo: lần quét sau không lấy lại văn bản này

@@ -201,6 +201,24 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   dự thảo văn bản đi "Báo cáo sự cố" (Báo cáo, Khẩn) từ mẫu cho chuyên viên phụ trách, sự kiện `ot.alarm`, thông báo
   khẩn; còn dự thảo chưa trình của cùng cảm biến thì không dựng thêm. Cảm biến giả lập `ot/sensor.py` (dịch vụ chạy
   một lần `ot-sensor`), `make demo-it-ot` (cũng là bước CI), nhãn sự kiện và thông báo trên giao diện (#46).
+- Văn bản hạn chế truy cập (F3.7, màn (iv)): văn thư bật "Hạn chế người xem" trước khi tải tệp, tải lên
+  `POST /api/files?restricted=true` chỉ nhận PDF đọc được, không mật khẩu (415 `restricted_pdf_only`). `svc-files` xin
+  két OpenBao một khóa AES-256 riêng cho từng tệp (transit `moc-files`), mã hóa AES-GCM (gắn với đơn vị và tệp) rồi mới
+  lưu: kho chỉ có bản mã `MOC1…`, CSDL chỉ giữ khóa đã bọc (`core.files.wrapped_dek`); bản phát hành của văn bản hạn
+  chế cũng lưu mã hóa. Mở tệp: giải mã trong bộ nhớ, kiểm băm, đóng dấu tên người xem và giờ xem lên mọi trang, ghi
+  `file.decrypted` vào sổ kiểm toán (không ghi được sổ thì không trả tệp), `Cache-Control: no-store`, không ETag; thư
+  mục tạm của svc-files và của ClamAV là tmpfs. Bị gỡ khỏi danh sách là hết tải tệp mã hóa của văn bản, kể cả tệp
+  chính mình tạo. Văn bản hạn chế không được công khai trích yếu ở cổng xác thực (ràng buộc
+  `documents_restricted_private`; màn phát hành ẩn ô công khai). Danh sách người được xem: hàm `office.grant_document_access`,
+  `office.revoke_document_access` (văn thư, lãnh đạo đơn vị; kiểm vai trò, đơn vị, người còn hoạt động; không tự gỡ
+  mình), mỗi lần cấp, gỡ vào sổ kiểm toán; người phải làm bước quy trình kế tiếp được svc-workflow tự thêm; nhắc hạn,
+  leo thang, báo quá hạn chỉ tới người có tên. CSDL giữ
+  tệp khớp chế độ: văn bản hạn chế chỉ gắn tệp mã hóa và ngược lại, đã có tệp thì không đổi chế độ (trigger
+  `document_files_sealed`, `documents_restricted_sealed`); tiếp nhận lệch chế độ bị trả về form (`not_sealed`,
+  `sealed`). Giao diện: ô hạn chế ở màn tiếp nhận (khóa lại khi đã có tệp), nhãn "Đã mã hóa" ở tệp, mục "Người được
+  xem" trên trang văn bản. Sao lưu gồm cả két (volume `openbao_data`, dừng két trong lúc chụp); diễn tập ở CI xóa cả
+  két rồi kiểm tệp mã hóa từ trước vẫn mở được. `make demo-han-che` (cũng là bước CI), `make smoke` thêm 8 kiểm tra
+  (tổng 57), e2e `han-che.spec.ts`. Không dùng cho bí mật nhà nước (#47).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -230,6 +248,9 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   Phase 3 thành 09–20/11, Phase 4 (cũng là đệm) thành 21–25/11; giữ nguyên ngày đóng băng và ngày nộp.
 
 ### Đã sửa lỗi
+- Văn bản hạn chế giao cho người không đọc được: lãnh đạo nhận việc chỉ đạo, tổ trưởng nhận phân công mở văn bản ra
+  "không tìm thấy". Nay người phải làm việc đang mở được thêm vào danh sách được xem; `completeTask` từ chối (403
+  `restricted`) người không đọc được văn bản thay vì cho làm mù (#47).
 - `scripts/license-header.sh` bỏ qua im lặng các tệp `.vue`, `.html`, `.xml`, `.bpmn`, `.css`,
   `.scss`, `.mjs`, `.graphql`, `.lua` — các tệp này giờ được kiểm tra và tự chèn header; loại tệp
   chưa hỗ trợ được in ra dưới dạng cảnh báo.
@@ -241,6 +262,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   vị, quản trị đơn vị (chưa cài thì Keycloak bắt cài ở lần đăng nhập đầu); vai trò khác chỉ hỏi mã nếu đã tự cài.
   Client `moc-cli` của kịch bản dòng lệnh bỏ qua bước này và phải tắt trên server thật. `make seed` cài sẵn
   TOTP cho tài khoản mẫu, `make totp` in mã; `make smoke` thêm 2 kiểm tra, e2e đăng nhập kèm mã.
+- Thông báo về văn bản hạn chế không còn mang số ký hiệu, trích yếu, cơ quan ban hành: svc-workflow chỉ gửi nhãn,
+  trigger CSDL gọt nội dung cho mọi đường ghi và gọt cả thông báo đã gửi khi văn bản chuyển sang hạn chế. Tóm tắt dòng
+  sổ kiểm toán (`overview`) về văn bản hạn chế mà người xem sổ không đọc được chỉ còn tên trường, không còn giá trị
+  (hàm `office.audit_overview_seen`) (#47).
 
 <!--
 Mẫu cho bản phát hành kế tiếp:

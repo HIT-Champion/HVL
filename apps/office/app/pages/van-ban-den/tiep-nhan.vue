@@ -127,11 +127,18 @@ function message(field: string, code: string): string {
 const show = (field: string) => (tried.value && errors.value[field] ? message(field, errors.value[field]!) : undefined)
 const summaryLength = computed(() => [...multiLine(form.summary)].length)   // theo ký tự, như schema đếm
 
+// Văn bản hạn chế (F3.7): tệp tải lên ở chế độ hạn chế — chỉ PDF, svc-files mã hóa trước khi lưu. Đã có tệp thì không
+// đổi chế độ được nữa (tệp đã lưu theo chế độ cũ; svc-workflow và CSDL cũng chặn), phải gỡ tệp trước.
 function addFiles(list: FileList | null) {
   for (const file of Array.from(list ?? [])) {
     const item = reactive<PendingFile>({ key: nextKey++, name: file.name, size: file.size, progress: 0, state: 'uploading' })
     files.value.push(item)
-    upload(file, (p) => { item.progress = p })
+    if (form.restricted && file.type !== 'application/pdf') {
+      item.state = 'error'
+      item.message = t('receive.pdfOnly')
+      continue
+    }
+    upload(file, (p) => { item.progress = p }, form.restricted)
       .then((res) => { item.state = 'clean'; item.uploaded = res })
       .catch((e) => {
         if (e?.code === 'infected') {
@@ -217,8 +224,8 @@ async function save(register: boolean) {
           @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
         >
           <svg class="h-8 w-8 text-brand-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-          <span class="text-stone-600">{{ t('receive.drop') }}</span>
-          <input type="file" class="sr-only" multiple accept="application/pdf,image/*" @change="addFiles(($event.target as HTMLInputElement).files)">
+          <span class="text-stone-600">{{ form.restricted ? t('receive.dropRestricted') : t('receive.drop') }}</span>
+          <input type="file" class="sr-only" multiple :accept="form.restricted ? 'application/pdf' : 'application/pdf,image/*'" @change="addFiles(($event.target as HTMLInputElement).files)">
         </label>
 
         <ul class="mt-4 space-y-2">
@@ -234,7 +241,7 @@ async function save(register: boolean) {
             </div>
             <div v-else-if="f.state === 'clean'" class="mt-1 flex items-center gap-1 text-xs text-emerald-700">
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.6-4.4A11.9 11.9 0 0112 3a11.9 11.9 0 01-8.6 3.6A12 12 0 003 9c0 5.6 3.8 10.3 9 11.6 5.2-1.3 9-6 9-11.6 0-1-.1-2-.4-3z" /></svg>
-              {{ t('receive.clean') }}
+              {{ f.uploaded?.encrypted ? t('receive.cleanSealed') : t('receive.clean') }}
             </div>
             <div v-else class="mt-1 text-xs font-medium text-red-600">{{ f.message }}</div>
           </li>
@@ -288,9 +295,12 @@ async function save(register: boolean) {
             <input id="due_on" v-model="form.due_on" type="date" class="input" :min="today()" :aria-invalid="!!show('due_on')">
             <p v-if="show('due_on')" class="field-error">{{ show('due_on') }}</p>
           </div>
-          <label class="flex items-start gap-3 rounded-md border border-stone-200 p-3 text-sm">
-            <input v-model="form.restricted" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700">
-            <span><span class="font-medium">{{ t('receive.restricted') }}</span><br><span class="text-xs text-stone-500">{{ t('receive.restrictedHint') }}</span></span>
+          <label class="flex items-start gap-3 rounded-md border border-stone-200 p-3 text-sm" :class="{ 'opacity-60': files.length }">
+            <input v-model="form.restricted" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700" :disabled="files.length > 0" data-testid="restricted">
+            <span>
+              <span class="font-medium">{{ t('receive.restricted') }}</span><br>
+              <span class="text-xs text-stone-500">{{ files.length ? t('receive.restrictedLocked') : t('receive.restrictedHint') }}</span>
+            </span>
           </label>
         </div>
 

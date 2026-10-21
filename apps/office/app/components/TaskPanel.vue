@@ -30,6 +30,7 @@ const props = defineProps<{
   formKey: string
   documentId: string
   documentDue: string | null
+  restricted?: boolean
   users: PanelUser[]
   departments: PanelDepartment[]
   myDepartment: string | null
@@ -60,7 +61,8 @@ const result = ref('')
 // vbdi.duyetPhong, vbdi.duyetDonVi: ý kiến; trả lại thì bắt buộc
 const reviewNote = ref('')
 const returning = ref(false)
-// vbdi.phatHanh: mặc định không công khai trích yếu — phần lớn văn bản đi chỉ lưu hành nội bộ
+// vbdi.phatHanh: mặc định không công khai trích yếu — phần lớn văn bản đi chỉ lưu hành nội bộ;
+// văn bản hạn chế thì không bao giờ (CSDL và svc-workflow cũng chặn)
 const isPublic = ref(false)
 
 const handlers = computed(() => props.users.filter((u) => u.role === 'staff' || u.role === 'manager'))
@@ -121,7 +123,7 @@ function sendBack() {
 
 function issue() {
   if (!confirm(t('form.phatHanh.confirm'))) return
-  complete('issue', { is_public: isPublic.value })
+  complete('issue', { is_public: isPublic.value && !props.restricted })
 }
 
 function submitDone() {
@@ -242,7 +244,8 @@ function submitDone() {
 
     <!-- Văn thư cấp số, phát hành -->
     <form v-else-if="formKey === 'vbdi.phatHanh'" class="space-y-4 p-5" @submit.prevent="issue">
-      <label class="flex items-start gap-2 text-sm">
+      <p v-if="restricted" class="text-sm text-stone-600" data-testid="issue-private">{{ t('form.phatHanh.restricted') }}</p>
+      <label v-else class="flex items-start gap-2 text-sm">
         <input v-model="isPublic" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700">
         <span>{{ t('form.phatHanh.public') }}<span class="block text-xs text-stone-500">{{ t('form.phatHanh.publicHint') }}</span></span>
       </label>

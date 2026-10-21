@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import time
 import unicodedata
@@ -36,7 +37,8 @@ from svc_files.app import create_app
 from svc_files.auth import HASURA_CLAIMS, TokenVerifier
 from svc_files.clamav import ScanError, ScanResult
 from svc_files.config import Settings
-from svc_files.hasura import HasuraAuthError, HasuraError, StoredFile
+from svc_files.hasura import HasuraAuthError, HasuraError, Location, StoredFile
+from svc_files.sealed import VaultError
 from svc_files.search import SearchError
 from svc_files.storage import ObjectMissing, StorageError
 
@@ -166,8 +168,12 @@ class FakeHasura:
         self.files[file_id] = {"tenant_id": tenant_id, "created_by": actor_id, "request_id": request_id,
                                "object_key": object_key, **row}
 
+    fail_events: bool = False         # ghi sổ kiểm toán lỗi (Hasura vẫn đọc được)
+
     async def log_event(self, **event) -> None:
         self._check()
+        if self.fail_events:
+            raise HasuraError("không ghi được sổ")
         self.events.append(event)
 
     async def visible_file(self, token: str, file_id: uuid.UUID) -> StoredFile | None:
@@ -180,12 +186,13 @@ class FakeHasura:
             return None
         if row["created_by"] != ns["x-hasura-user-id"] and file_id not in self.shared:
             return None
-        return StoredFile(file_id, row["filename"], row["mime_type"], row["size_bytes"], row["sha256_hex"])
+        return StoredFile(file_id, row["filename"], row["mime_type"], row["size_bytes"], row["sha256_hex"],
+                          encrypted=row.get("wrapped_dek") is not None)
 
-    async def file_location(self, *, tenant_id, actor_id, request_id, file_id) -> str | None:
+    async def file_location(self, *, tenant_id, actor_id, request_id, file_id) -> Location | None:
         self._check()
         row = self.files.get(file_id)
-        return row["object_key"] if row and row["tenant_id"] == tenant_id else None
+        return Location(row["object_key"], row.get("wrapped_dek")) if row and row["tenant_id"] == tenant_id else None
 
     def add_document(self, tenant: uuid.UUID, summary: str, *, readers: set[str] | None = None, **cols) -> str:
         doc_id = str(uuid.uuid4())
@@ -394,6 +401,32 @@ class FakeMeili:
         return hits[offset:offset + limit]
 
 
+class FakeVault:
+    """Két giả: khóa dữ liệu ngẫu nhiên, "bọc" bằng cách ghi nhớ trong từ điển; đếm số lần mở khóa."""
+
+    def __init__(self) -> None:
+        self.keys: dict[str, bytes] = {}
+        self.down = False
+        self.unwrapped: list[str] = []
+
+    async def datakey(self) -> tuple[bytes, str]:
+        if self.down:
+            raise VaultError("két tắt")
+        key = os.urandom(32)
+        wrapped = f"vault:v1:{len(self.keys)}"
+        self.keys[wrapped] = key
+        return key, wrapped
+
+    async def unwrap(self, wrapped: str) -> bytes:
+        if self.down:
+            raise VaultError("két tắt")
+        self.unwrapped.append(wrapped)
+        return self.keys[wrapped]
+
+    async def aclose(self) -> None:
+        pass
+
+
 @pytest.fixture
 def settings() -> Settings:
     return Settings.from_env(
@@ -433,7 +466,13 @@ def meili() -> FakeMeili:
 
 
 @pytest.fixture
-def client(settings, scanner, store, verifier, hasura, meili):
-    app = create_app(settings, scanner=scanner, store=store, verifier=verifier, hasura=hasura, meili=meili)
+def vault() -> FakeVault:
+    return FakeVault()
+
+
+@pytest.fixture
+def client(settings, scanner, store, verifier, hasura, meili, vault):
+    app = create_app(settings, scanner=scanner, store=store, verifier=verifier, hasura=hasura, meili=meili,
+                     vault=vault)
     with TestClient(app) as c:
         yield c

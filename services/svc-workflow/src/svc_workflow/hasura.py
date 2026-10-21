@@ -118,6 +118,18 @@ class HasuraClient:
             headers["X-Hasura-Request-Id"] = actor.request_id
         return await self._call(query, variables or {}, headers)
 
+    async def as_user(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Hỏi bằng đúng vai trò và phiên của người gọi Action: quyền đọc do Hasura xét như khi chính họ hỏi."""
+        headers = {
+            "X-Hasura-Admin-Secret": self._secret,
+            "X-Hasura-Role": actor.role,
+            "X-Hasura-Tenant-Id": str(actor.tenant_id),
+            "X-Hasura-User-Id": actor.user_id,
+        }
+        if actor.department_id:
+            headers["X-Hasura-Department-Id"] = str(actor.department_id)
+        return await self._call(query, variables or {}, headers)
+
     async def as_system(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         """Việc nội bộ chỉ đọc, xuyên thuê ước (đối soát): khóa quản trị, không kèm vai trò."""
         return await self._call(query, variables or {}, {"X-Hasura-Admin-Secret": self._secret})
@@ -157,7 +169,7 @@ OUTGOING = """
 query Outgoing($id: uuid!) {
   office_documents_by_pk(id: $id) {
     id direction status created_by department_id signer_id process_id urgency summary body recipients
-    register_number symbol verify_code
+    register_number symbol verify_code restricted
   }
 }"""
 
@@ -169,7 +181,28 @@ mutation NumberOutgoing($id: uuid!, $code: String!) {
 # Vài dòng về văn bản để ghi vào thông báo (trích yếu, số ký hiệu) — giữ nguyên như lúc gửi
 BRIEF = """
 query Brief($id: uuid!) {
-  office_documents_by_pk(id: $id) { id direction summary symbol urgency created_by signer_id }
+  office_documents_by_pk(id: $id) { id direction summary symbol urgency created_by signer_id restricted }
+}"""
+
+# Văn bản hạn chế (F3.7): người phải làm việc đang mở được thêm vào danh sách xem; đã có tên thì giữ nguyên
+SHARE = """
+mutation ChoXem($rows: [office_document_acl_insert_input!]!) {
+  insert_office_document_acl(objects: $rows, on_conflict: {constraint: document_acl_pkey, update_columns: []}) {
+    affected_rows
+  }
+}"""
+
+# Văn bản hạn chế (F3.7): ai được nhắc hạn — người có tên trong danh sách xem và người tạo
+READERS = """
+query Readers($id: uuid!) {
+  office_documents_by_pk(id: $id) { restricted created_by }
+  office_document_acl(where: {document_id: {_eq: $id}}) { user_id }
+}"""
+
+# Hỏi bằng phiên của người gọi (as_user): null nếu người đó không đọc được văn bản
+VISIBLE = """
+query Visible($id: uuid!) {
+  office_documents_by_pk(id: $id) { id }
 }"""
 
 TASK_DONE = """
@@ -190,7 +223,7 @@ query OverdueDocuments($today: date!) {
   office_documents(where: {direction: {_eq: "in"}, status: {_eq: "in_progress"}, due_on: {_lt: $today},
                            _not: {events: {kind: {_eq: "office.document.overdue"}}}},
                    order_by: {due_on: asc}, limit: 100) {
-    id tenant_id summary symbol due_on
+    id tenant_id summary symbol due_on restricted
     assignments(where: {status: {_eq: "open"}}) { user_id department_id assigned_by }
   }
 }"""

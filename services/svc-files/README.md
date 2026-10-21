@@ -21,7 +21,7 @@ issue #19, #20.
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
 | Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
 | Đọc chữ bản scan, ảnh chụp (OCR) | Phase 4 (F4.1) |
-| Giải mã văn bản hạn chế, watermark khi tải | Phase 3 (F3.7) |
+| Văn bản hạn chế: lưu mã hóa (khóa riêng từng tệp từ két), tải về giải mã trong bộ nhớ, đóng dấu người xem, ghi sổ | **Xong** (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=`: không cần đăng nhập | **Xong** (F2.13) |
@@ -29,7 +29,7 @@ issue #19, #20.
 | `GET /api/registers/{in\|out}/{năm}` và `/pdf`: sổ đăng ký văn bản đến / đi theo mẫu NĐ 30, in A4 ngang | **Xong** (F2.8) |
 | Nộp lưu hồ sơ đã đóng sang bucket lạnh (Parquet + tệp + manifest có băm), `GET /api/case-files/{id}/archive` | **Xong** (F3.8) |
 | Phả hệ OpenLineage cho từng bước nộp lưu, kiểm chất lượng bảng Parquet trước khi ghi | **Xong** (F3.9) |
-| Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa — cùng đợt với F3.7 |
+| Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa |
 
 ## API
 
@@ -39,13 +39,14 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 
 | Đường dẫn | Kết quả |
 |---|---|
-| `POST /api/files` (multipart, trường `file`) | `201` `{id, object_key, filename, mime_type, size_bytes, sha256, scanned_at}` |
+| `POST /api/files` (multipart, trường `file`) | `201` `{id, object_key, filename, mime_type, size_bytes, sha256, scanned_at, encrypted}` |
+| | `?restricted=true` — tệp cho văn bản hạn chế, lưu mã hóa (mục Văn bản hạn chế): `415` `restricted_pdf_only` khi không phải PDF đọc được, không mật khẩu · `503` `vault_unavailable` khi két chưa sẵn sàng — **không lưu** |
 | | `401` thiếu hoặc sai token · `403` token không có `tenant_id` |
 | | `413` vượt `MOC_FILES_MAX_MB` · `400` tệp rỗng hoặc thiếu trường `file` |
 | | `422` `{code: "infected", signature}` — tệp nhiễm, **không lưu**, ghi vào sổ kiểm toán |
 | | `403` `unknown_tenant` — thuê ước trong token chưa có trong `core.tenants` |
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
-| `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` |
+| `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
 | `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
@@ -60,7 +61,8 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
 Tệp tải về luôn ở dạng `attachment`, kèm `X-Content-Type-Options: nosniff` và
 `Content-Security-Policy: sandbox` — tệp HTML hay SVG người dùng tải lên không chạy được như một trang của
-Mộc. Giao diện xem PDF bằng PDF.js nên không cần hiển thị inline. `ETag` là SHA-256 của tệp.
+Mộc. Giao diện xem PDF bằng PDF.js nên không cần hiển thị inline. `ETag` là SHA-256 của tệp (tệp mã hóa thì không
+có `ETag`: mỗi lần mở là một bản khác).
 
 Khóa đối tượng: `tenant/<tenant_id>/<yyyy>/<mm>/<id>` — thuê ước lấy từ token, không lấy từ dữ liệu client
 gửi; khóa không trả ra ngoài. Mỗi dòng nhật ký là một đối tượng JSON có `request_id` (lấy từ `X-Request-Id`
@@ -237,6 +239,33 @@ Chưa làm: dọn bản nóng khi giao dịch đã chạy mà svc-files không n
 Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` nộp lưu ngay một hồ sơ đã đóng (màn demo
 `make demo-nong-lanh`); `python -m svc_files.archive now --after-days 0` nộp lưu mọi hồ sơ đã đóng, in hồ sơ nào lỗi.
 
+### Văn bản hạn chế (F3.7)
+
+`sealed.py`. Không dùng cho bí mật nhà nước (Luật Bảo vệ bí mật nhà nước 2018 đòi hệ thống, mật mã được cấp phép).
+
+- **Tải lên** `POST /api/files?restricted=true`: quét ClamAV như mọi tệp, rồi chỉ nhận PDF mở được không cần mật
+  khẩu (cần đọc được để đóng dấu). Két cấp một khóa dữ liệu AES-256 riêng cho tệp (`transit/datakey/plaintext/
+  moc-files`): khóa rõ để mã hóa trong bộ nhớ rồi bỏ, khóa đã bọc (`vault:v1:…`) ghi vào `core.files.wrapped_dek`
+  cùng `encrypted = true`. Kho chỉ nhận bản mã `MOC1` + nonce 12 byte + AES-256-GCM với AAD = id đơn vị ‖ id tệp
+  (chép bản mã sang dòng tệp khác thì không mở được). `sha256`, `size_bytes` của dòng tệp là của bản rõ.
+- **Bản phát hành** của văn bản hạn chế (`/internal/issue`) cũng lưu mã hóa như vậy.
+- **Mở tệp** `GET /api/files/{id}`: kiểm quyền như mọi tệp — tệp mã hóa đã gắn vào văn bản thì chỉ theo quyền đọc
+  văn bản, kể cả với người tạo dòng tệp (bị gỡ khỏi danh sách xem là hết tải) — két mở khóa đã bọc (`transit/decrypt`), giải mã trong bộ
+  nhớ, so SHA-256 của bản rõ với CSDL, đóng dấu tên người xem và giờ xem (giờ Việt Nam) lên mọi trang — chữ chéo
+  giữa trang, một dòng đầu, một dòng cuối trang (WeasyPrint dựng lớp dấu, pypdf ghép) — rồi ghi `file.decrypted` vào
+  sổ kiểm toán; ghi sổ không được thì không trả tệp. Trả kèm `Cache-Control: no-store`, không `ETag`. Tối đa hai lần
+  mở cùng lúc (bản mã, bản rõ đều nằm trong bộ nhớ).
+- **Bản rõ không ghi xuống đĩa**: Starlette đệm tệp tải lên lớn ở `/tmp`, clamd ghi luồng nhận qua INSTREAM ra thư
+  mục tạm trước khi quét — `/tmp` của svc-files và của ClamAV đều là tmpfs (compose).
+- svc-files chỉ xin khóa mới và nhờ két mở khóa đã bọc, không lấy được khóa gốc `moc-files` (policy trong
+  `openbao/start.sh`). Mất két (volume `openbao_data`) là mất mọi tệp văn bản hạn chế — két nằm trong `make backup`.
+- Tệp mã hóa không được đọc chữ, không vào chỉ mục (mục Nội dung tệp PDF); văn bản hạn chế không vào hồ sơ nộp lưu.
+- Văn bản đi hạn chế: bản tải về nào cũng mang dấu người xem nên băm khác bản phát hành — người nhận kiểm ở cổng xác
+  thực bằng mã in cạnh mã QR, không kiểm theo băm được. Cổng xác thực không bao giờ hiện trích yếu của văn bản hạn chế
+  (ràng buộc `documents_restricted_private`: văn bản hạn chế không được `is_public`).
+- Chưa làm: xoay khóa `moc-files` rồi bọc lại khóa cũ (`transit/rewrap`); bản xem trước dự thảo văn bản đi hạn chế
+  (`/api/documents/{id}/preview`) chưa đóng dấu người xem.
+
 ### Gọi Hasura
 
 | Việc | Gọi bằng |
@@ -274,6 +303,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `SEAWEEDFS_S3_REGION` | `us-east-1` | |
 | `MOC_FILES_BUCKET` | `moc-files` | Tự tạo nếu chưa có |
 | `MOC_FILES_MAX_MB` | `25` | Phải nhỏ hơn `StreamMaxLength` của clamd |
+| `MOC_FILES_TRANSIT_KEY` | `moc-files` | Khóa transit trong két bọc khóa của tệp văn bản hạn chế (F3.7); không đặt `MOC_OPENBAO_ADDR` thì không nhận, không mở tệp mã hóa (`503`) |
 | `CLAMAV_HOST`, `CLAMAV_PORT` | `clamav`, `3310` | |
 | `CLAMAV_TIMEOUT_S` | `60` | |
 | `HASURA_URL` | `http://hasura:8080` | Gọi trong mạng nội bộ, không qua APISIX |

@@ -140,12 +140,16 @@
     "urgency": "Urgency",
     "dueOn": "Deadline",
     "restricted": "Restricted",
-    "restrictedHint": "Only the receiver and granted people can see it",
+    "restrictedHint": "Only the receiver and people granted access can read it. PDF only, stored encrypted; every view is stamped with the viewer’s name",
     "save": "Save",
     "saveAndRegister": "Save and register",
     "duplicate": "This document may already be received: {symbol} from {issuer}, dated {date}.",
     "saved": "Document saved.",
-    "registered": "Registered — number {n}."
+    "registered": "Registered — number {n}.",
+    "dropRestricted": "Drop PDF files here, or click to choose — files are encrypted before they are stored",
+    "cleanSealed": "Scanned — clean, encrypted",
+    "pdfOnly": "Restricted documents accept PDF files only",
+    "restrictedLocked": "Remove the uploaded files to change the restricted setting"
   },
   "doc": {
     "info": "Document details",
@@ -197,7 +201,18 @@
       "attachment": "Attachment",
       "draft": "Draft",
       "issued": "Issued copy"
-    }
+    },
+    "sealed": "Encrypted",
+    "sealedHint": "Stored encrypted. Downloads are stamped with the viewer’s name and every opening is written to the audit log",
+    "viewers": "Who can read",
+    "viewersHint": "Only the receiver and the people listed below can read this document. Whoever must handle the next step is added automatically; people added still need the usual role-based access (department, assigned work).",
+    "viewersEmpty": "Nobody yet.",
+    "viewerPick": "Choose a person",
+    "viewerAdd": "Grant access",
+    "viewerRemove": "Remove",
+    "viewerBy": "granted by {by} at {at}",
+    "viewerGranted": "{name} can now read this document",
+    "viewerRevoked": "{name} can no longer read this document"
   },
   "form": {
     "chiDao": {
@@ -239,6 +254,7 @@
     "phatHanh": {
       "public": "Show the subject on the public verification page",
       "publicHint": "If unchecked, only the number, date and issuer are shown.",
+      "restricted": "Restricted document: the verification page shows only number, date and issuer — the summary is never public.",
       "issue": "Number and issue",
       "confirm": "Assign the next outgoing number and issue this document? Numbers are sequential per year and cannot be taken back.",
       "issued": "Issued."
@@ -270,7 +286,9 @@
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
     "documents_body_length": "The body is longer than 20,000 characters.",
-    "invalid": "Some fields are not valid, see the highlighted fields."
+    "invalid": "Some fields are not valid, see the highlighted fields.",
+    "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",
+    "documents_restricted_sealed": "This document already has files, so its restricted setting cannot change"
   },
   "validation": {
     "required": "Required",
@@ -289,7 +307,10 @@
     "uniqueItems": "The same file is attached twice",
     "maxItems": "Too many files",
     "duplicate": "An incoming document with the same issuer, number and date already exists",
-    "unknown": "Not found, or not uploaded by you"
+    "unknown": "Not found, or not uploaded by you",
+    "not_sealed": "Restricted documents only take files uploaded in restricted mode — remove and upload again",
+    "sealed": "Encrypted files are for restricted documents only — remove and upload again",
+    "restricted": "Restricted documents never publish their summary"
   },
   "outgoing": {
     "title": "Outgoing documents",
@@ -368,7 +389,8 @@
     "documentIssued": "Document {symbol} issued",
     "documentProcessed": "{name} reported the result",
     "documentOverdue": "Document past its due date ({due})",
-    "otAlarm": "Temperature alert in {name}: {value} °C — incident report draft ready"
+    "otAlarm": "Temperature alert in {name}: {value} °C — incident report draft ready",
+    "restricted": "Restricted document"
   },
   "audit": {
     "title": "Audit log",
