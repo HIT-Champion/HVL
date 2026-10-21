@@ -55,3 +55,12 @@ plugins:
   - proxy-rewrite
   - limit-count
   - fault-injection
+  # F3.13: chỉ số cho Prometheus, bật toàn cục trong apisix.yaml
+  - prometheus
+
+plugin_attr:
+  prometheus:
+    # Cổng xuất chỉ số riêng, chỉ trong mạng nội bộ `moc` (không có trong ports của docker-compose.yml)
+    export_addr:
+      ip: 0.0.0.0
+      port: 9091

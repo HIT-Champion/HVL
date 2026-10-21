@@ -360,6 +360,65 @@ services:
     depends_on:
       keycloak: {condition: service_healthy}
 
+  # F3.13 — giám sát gọn: Prometheus thu chỉ số của cổng API (plugin prometheus của APISIX, cổng 9091 nội bộ),
+  # Grafana hiện bảng điều khiển nạp sẵn. Prometheus không mở cổng; Grafana chỉ nghe 127.0.0.1 trên máy chủ, không có
+  # tài khoản quản trị, chỉ xem ẩn danh (bảng điều khiển sửa trong repo, không sửa trên giao diện).
+  prometheus:
+    <<: *common
+    image: prom/prometheus:v3.15.0
+    profiles: [core]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${MOC_METRICS_RETENTION:-15d}
+    mem_limit: 512m
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      apisix: {condition: service_started}
+
+  # Grafana (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản; Mộc chỉ nạp cấu hình qua tệp
+  grafana:
+    <<: *common
+    image: grafana/grafana:13.2.3
+    profiles: [core]
+    environment:
+      GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/cong-api.json
+    mem_limit: 512m
+    # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - 127.0.0.1:${MOC_GRAFANA_PORT:-3300}:3000
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    depends_on:
+      prometheus: {condition: service_healthy}
+
   # F3.4 — sao lưu: không chạy thường trực, chỉ `moc backup` gọi (docker compose run), không có mạng. Kho restic
   # (MOC_BACKUP_DIR) gắn vào /repo lúc gọi, không khai ở đây: kho nên nằm trên ổ khác, ngoài thư mục cài.
   restic:
@@ -403,6 +462,7 @@ networks:
 volumes:
   postgres_data:
   seaweedfs_data:
+  prometheus_data:
   clamav_data:
   meili_data:
   openbao_data:

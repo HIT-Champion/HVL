@@ -841,3 +841,18 @@ Phase 2:
 - Chỗ khác kế hoạch: làm F3.5 trước F3.10 và F3.7 (thứ tự hàng đợi đêm 20/10) vì vừa một lượt kiểm trước 09:00; F3.10
   cần thêm context broker NGSI-LD, F3.7 cần mã hóa tệp — để phiên sau.
 - Phase 3 còn lại: F3.7, F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.13 (Phase 3):
+
+- **F3.13 xong (bản gọn).** Giám sát cổng API:
+  - APISIX bật plugin `prometheus` toàn cục, nhãn route theo id trong `gateway/apisix.yaml`; cổng xuất chỉ số 9091
+    chỉ trong mạng `moc`;
+  - dịch vụ `prometheus` (thu 15 giây, giữ `MOC_METRICS_RETENTION`) và `grafana` (nguồn dữ liệu và bảng điều khiển
+    "Mộc — cổng API" nạp từ `monitoring/`); Grafana chỉ nghe 127.0.0.1, không tạo tài khoản quản trị, chỉ xem ẩn danh;
+  - `make smoke` +1 (tổng 49): Prometheus đọc được APISIX, có số đếm theo route, Grafana có bảng điều khiển; mỗi
+    dịch vụ giới hạn 512 MB RAM; chỉ số không vào bản sao lưu.
+- Chỗ khác kế hoạch: hai dịch vụ nằm trong profile `core` chứ không profile riêng — các script vận hành (sao lưu,
+  khôi phục, reconciler) gọi compose với `--profile core --profile app`, để chung profile thì tự phục hồi và khôi
+  phục quản lý luôn cả giám sát; tốn thêm khoảng 300 MB RAM. Chưa có chỉ số của từng dịch vụ (svc-files,
+  svc-workflow, Hasura, PostgreSQL) và chưa có cảnh báo (Alertmanager) — để sau.
+- Phase 3 còn lại: F3.7, F3.10, F3.12, F3.14, F3.15.

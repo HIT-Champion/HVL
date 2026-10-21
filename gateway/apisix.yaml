@@ -90,6 +90,8 @@ global_rules:
         header_name: X-Request-Id
         include_in_response: true
         algorithm: uuid
+      # F3.13: đếm yêu cầu, mã trạng thái, độ trễ của mọi route; nhãn route là id trong tệp này (graphql, svc-files, …)
+      prometheus: {}
 
 routes:
   - id: keycloak

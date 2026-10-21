@@ -214,13 +214,14 @@ def sla_seconds() -> float | None:
 
 def wait_notification(session: Session, doc_id: str, kind: str, timeout: float) -> bool:
     deadline = time.time() + timeout
-    while time.time() < deadline:
+    while True:  # hỏi ít nhất một lần, kể cả khi các phần trước đã dùng hết thời gian chờ
         found = session.gql("""query ($d: uuid!, $k: String!) {
             core_notifications(where: {document_id: {_eq: $d}, kind: {_eq: $k}}) { id } }""", {"d": doc_id, "k": kind})
         if found["core_notifications"]:
             return True
+        if time.time() >= deadline:
+            return False
         time.sleep(2)
-    return False
 
 
 def main() -> None:
@@ -675,6 +676,36 @@ def main() -> None:
     ok("một phiên gọi GraphQL vượt giới hạn mỗi phút → 429")
     ping(clerk)
     ok("phiên khác vẫn gọi được, không bị chặn lây")
+
+    # F3.13: Prometheus thu được chỉ số của cổng API (lưu lượng của chính lượt smoke này), Grafana có bảng điều khiển
+    print("Giám sát")
+
+    def prometheus(expr: str) -> list:
+        try:
+            raw = compose("exec", "-T", "prometheus", "wget", "-q", "-O", "-",
+                          f"http://localhost:9090/api/v1/query?query={urllib.parse.quote(expr)}")
+            return json.loads(raw)["data"]["result"]
+        except (subprocess.CalledProcessError, ValueError, KeyError):  # chưa sẵn sàng: thử lại ở vòng sau
+            return []
+
+    for _ in range(10):  # lần thu chỉ số kế tiếp cách tối đa 15 giây
+        up, total = prometheus('up{job="apisix"}'), prometheus("sum(apisix_http_status)")
+        routes = {r["metric"].get("route") for r in prometheus("sum by (route) (apisix_http_status)")}
+        if up and up[0]["value"][1] == "1" and total and float(total[0]["value"][1]) > 0 \
+                and {"graphql", "svc-files"} <= routes:
+            break
+        time.sleep(5)
+    else:
+        fail(f"Prometheus chưa đọc được chỉ số của APISIX theo route: up={up}, yêu cầu={total},"
+             f" route={sorted(map(str, routes))}")
+    try:
+        dashboards = json.loads(compose("exec", "-T", "grafana", "wget", "-q", "-O", "-",
+                                        "http://localhost:3000/api/search?type=dash-db"))
+    except (subprocess.CalledProcessError, ValueError) as exc:
+        fail(f"không hỏi được Grafana: {exc}")
+    [d["title"] for d in dashboards] == ["Mộc — cổng API"] or fail(f"Grafana thiếu bảng điều khiển: {dashboards}")
+    ok(f"Prometheus đọc chỉ số cổng API ({float(total[0]['value'][1]):.0f} yêu cầu, {len(routes)} route); Grafana"
+       " có bảng điều khiển cho người xem ẩn danh")
 
     # Để cuối: thời gian các phần trên đã chạy cũng tính vào thời hạn đang chờ
     print("Nhắc hạn (timer Flowable)")

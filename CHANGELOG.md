@@ -192,6 +192,9 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   sang gì — đọc từ sổ kiểm toán qua view `office.document_history` (chính văn bản, tệp, giao việc, lần vào hồ sơ;
   không gồm danh sách được xem văn bản hạn chế); trường nội dung chỉ báo là đã đổi, không có hash. Cách hiện dòng sổ dùng chung với trang Sổ kiểm toán
   (`useAuditFormat`) (#44).
+- Giám sát gọn (F3.13): APISIX bật plugin `prometheus` (cổng chỉ số 9091 nội bộ); dịch vụ `prometheus` (v3.15.0,
+  không mở cổng) và `grafana` (13.2.3, chỉ `127.0.0.1:MOC_GRAFANA_PORT`, không tài khoản, chỉ xem) trong profile core;
+  bảng điều khiển "Mộc — cổng API" nạp sẵn; `make smoke` +1 (tổng 49) (#45).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

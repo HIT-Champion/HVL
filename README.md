@@ -122,6 +122,7 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | OpenBao 2 | Két bí mật: `svc-files`, `svc-workflow` lấy bí mật qua AppRole lúc khởi động; static seal tự mở khóa; khóa transit cho tệp mã hóa | `openbao/` |
 | `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, in sổ đăng ký; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
+| Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `monitoring/` |
 
 Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý
 (Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**), sao lưu, khôi
@@ -283,12 +284,26 @@ sudo cp ops/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enabl
   không thì reconciler dựng lại trong vòng một phút.
 - `make smoke` và `make demo-tu-phuc-hoi` gọi `reconcile.py --heal-only`: chỉ tự phục hồi, không kéo commit mới.
 
+### Giám sát
+
+APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 chỉ trong mạng nội bộ). Prometheus thu
+mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra ngoài. Grafana hiện bảng điều khiển
+**Mộc — cổng API** nạp sẵn: yêu cầu mỗi giây theo route, mã trạng thái (429 = vượt giới hạn tốc độ), tỉ lệ lỗi 5xx,
+độ trễ p95, băng thông, kết nối đang mở.
+
+- Grafana chỉ nghe `127.0.0.1:MOC_GRAFANA_PORT` (mặc định 3300) trên máy chủ — xem từ máy khác qua đường hầm SSH:
+  `ssh -L 3300:127.0.0.1:3300 máy-chủ` rồi mở `http://localhost:3300`.
+- Không có tài khoản Grafana: ai vào được cổng đó thì chỉ xem. Bảng điều khiển sửa trong
+  `monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
+- Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Mộc chỉ nạp cấu hình qua tệp, không liên kết mã.
+- Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
+
 ## Kiểm thử
 
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
 | `make test` | Test đơn vị của `svc-files`, `svc-workflow`; kiểm form theo `schemas/` trên cùng bộ ca thử với svc-workflow và CSDL ([`schemas/README.md`](schemas/README.md)) | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
-| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo; một lượt reconciler không thấy gì phải sửa; lập hồ sơ, nộp lưu, văn bản đã lưu vẫn xác thực được, phòng đọc đọc lại gói. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
+| `make smoke` | Đi trọn luồng văn bản đến và văn bản đi qua cổng APISIX, tra cổng xác thực không đăng nhập, nhận thông báo qua WebSocket, neo sổ kiểm toán rồi kiểm lại cả chuỗi; dữ liệu văn bản đến sai bị chặn ở svc-workflow và ở CSDL; chặn EICAR, chặn đường quản trị, cách ly đơn vị, giới hạn tốc độ; két đã mở khóa, dịch vụ không có bí mật trong biến môi trường, AppRole không đọc chéo; một lượt reconciler không thấy gì phải sửa; lập hồ sơ, nộp lưu, văn bản đã lưu vẫn xác thực được, phòng đọc đọc lại gói; Prometheus thu được chỉ số của cổng, Grafana có bảng điều khiển. Nhắc hạn chỉ kiểm khi `MOC_SLA_DURATION` ≤ 1 phút (`MOC_SLA_DURATION=PT20S make up` rồi `MOC_SLA_DURATION=PT20S make smoke`) | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Các luồng trên trình duyệt thật (Playwright, chạy trong container): form sai bị chặn trước khi gửi, kể cả thả tệp PDF vào trang xác thực: nguyên vẹn thì khớp, sửa một byte thì không; hai người dùng cùng lúc: chuyên viên trình, tổ trưởng thấy tin và việc mới không phải tải lại trang; lãnh đạo xem sổ kiểm toán; văn thư tải tệp EICAR bị chặn ngay, lãnh đạo thấy lần chặn trong sổ; lãnh đạo xem dashboard điều hành, văn thư không có mục này | Như trên |
 | `make demo-kiem-dich` | Màn demo (iv) kiểm dịch, dưới một phút: tệp sạch qua, tệp EICAR bị ClamAV chặn ở cửa ngõ, không lưu gì; lần chặn nằm trong sổ kiểm toán, neo ra ngoài CSDL rồi kiểm lại cả chuỗi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-ket-bi-mat` | Màn demo (iv) két bí mật, dưới một phút: dịch vụ không có bí mật trong biến môi trường; khởi động lại két thì két tự mở khóa; khởi động lại svc-files thì nó lấy lại khóa kho từ két và nhận tệp; AppRole không đọc chéo; sổ của két không chứa giá trị bí mật (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
