@@ -35,6 +35,8 @@ REQUIRED = (
 
 # tên dữ liệu ngôn ngữ của tesseract (đi vào argv, không qua shell): vie, eng, vie+eng
 OCR_LANG_RE = re.compile(r"[A-Za-z0-9_]{1,32}(?:\+[A-Za-z0-9_]{1,32}){0,3}")
+# tên chỉ mục đoạn của trợ lý hỏi đáp (F4.2): đi vào đường dẫn API của Meilisearch
+ASK_INDEX_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class ConfigError(RuntimeError):
@@ -95,6 +97,31 @@ class Settings:
     ai_summary: str = "fallback"        # fallback: chỉ khi quy tắc không ra trích yếu tin cậy cao · always
     agent_id: str = "moc-doc-reader"    # danh tính tác tử trong sổ kiểm toán (X-Hasura-User-Id của vai trò agent)
     tesseract_bin: str = "tesseract"
+    # F4.2 — trợ lý hỏi đáp trên kho văn bản (assist/): chỉ mục đoạn Meilisearch, câu trích, mô hình tùy chọn
+    ask_enabled: bool = True
+    ask_index: str = "chunks"           # chỉ mục đoạn, khác MOC_SEARCH_INDEX
+    ask_sync_interval_s: float = 5.0    # chu kỳ đồng bộ chỉ mục đoạn; 0 chỉ khi tắt trợ lý
+    ask_top_k: int = 5                  # số nguồn trả về
+    ask_candidates: int = 24            # số đoạn lấy từ Meilisearch trước hậu kiểm
+    ask_per_doc: int = 2                # số đoạn tối đa mỗi văn bản
+    # ngưỡng _rankingScore khi tìm theo từ khóa: 0 — chiến lược "frequency" đã buộc đoạn chứa từ hiếm nhất của câu
+    # hỏi, còn điểm "words" là số từ khớp / số từ của câu hỏi nên nguồn đúng mà dùng chữ khác vẫn điểm thấp (đo
+    # 21/10 trên kho mẫu: 88/CTSV đúng 0,12; đoạn lạc đề tới 0,41)
+    ask_min_score: float = 0.0
+    # ngưỡng khi tìm lai (từ khóa + nghĩa, tỷ trọng 0,5): đo 21/10 trên kho mẫu với Qwen3-Embedding-0.6B — nguồn đúng
+    # đứng đầu ≥ 0,88 ở cả 16 câu có đáp án, câu không có đáp án điểm cao nhất ≤ 0,70
+    ask_min_score_semantic: float = 0.75
+    ask_semantic_ratio: float = 0.5     # tỷ trọng tìm theo nghĩa
+    ask_deadline_s: float = 50.0        # hạn tổng một yêu cầu (dưới 60 giây của APISIX)
+    ask_model: str = "qwen3:1.7b"       # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL
+    ask_model_timeout_s: float = 40.0
+    ask_context_chars: int = 2800       # tổng ký tự nguồn gửi mô hình
+    ask_concurrency: int = 1            # số lượt sinh câu trả lời cùng lúc
+    ask_queue_s: float = 20.0           # chờ lượt sinh quá thì 503 busy
+    ai_embed_model: str = "qwen3-embedding:0.6b"    # rỗng: không nhúng, chỉ tìm từ khóa
+    ai_embed_dims: int = 1024
+    ai_embed_batch: int = 8             # số đoạn mỗi lô nhúng nền
+    assistant_id: str = "moc-assistant"  # danh tính trợ lý trong sổ kiểm toán (X-Hasura-User-Id của vai trò agent)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -158,6 +185,26 @@ class Settings:
                 ai_summary=env.get("MOC_AI_SUMMARY", "fallback").strip().lower(),
                 agent_id=env.get("MOC_AGENT_ID", "moc-doc-reader").strip(),
                 tesseract_bin=env.get("MOC_TESSERACT_BIN", "tesseract").strip(),
+                ask_enabled=_flag("MOC_ASK_ENABLED", env.get("MOC_ASK_ENABLED", "true")),
+                ask_index=env.get("MOC_ASK_INDEX", "chunks").strip(),
+                ask_sync_interval_s=float(env.get("MOC_ASK_SYNC_INTERVAL_S", "5")),
+                ask_top_k=int(env.get("MOC_ASK_TOP_K", "5")),
+                ask_candidates=int(env.get("MOC_ASK_CANDIDATES", "24")),
+                ask_per_doc=int(env.get("MOC_ASK_PER_DOC", "2")),
+                ask_min_score=float(env.get("MOC_ASK_MIN_SCORE", "0")),
+                ask_min_score_semantic=float(env.get("MOC_ASK_MIN_SCORE_SEMANTIC", "0.75")),
+                ask_semantic_ratio=float(env.get("MOC_ASK_SEMANTIC_RATIO", "0.5")),
+                ask_deadline_s=float(env.get("MOC_ASK_DEADLINE_S", "50")),
+                ask_model=(env.get("MOC_ASK_MODEL") or "").strip() or env.get("MOC_AI_MODEL", "qwen3:1.7b").strip(),
+                ask_model_timeout_s=float(env.get("MOC_ASK_MODEL_TIMEOUT_S", "40")),
+                ask_context_chars=int(env.get("MOC_ASK_CONTEXT_CHARS", "2800")),
+                ask_concurrency=int(env.get("MOC_ASK_CONCURRENCY", "1")),
+                ask_queue_s=float(env.get("MOC_ASK_QUEUE_S", "20")),
+                # biến có mà rỗng: tắt nhúng (compose truyền ${MOC_AI_EMBED_MODEL-…}); không có biến: mặc định
+                ai_embed_model=env.get("MOC_AI_EMBED_MODEL", "qwen3-embedding:0.6b").strip(),
+                ai_embed_dims=int(env.get("MOC_AI_EMBED_DIMS", "1024")),
+                ai_embed_batch=int(env.get("MOC_AI_EMBED_BATCH", "8")),
+                assistant_id=env.get("MOC_ASSISTANT_ID", "moc-assistant").strip(),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -177,6 +224,57 @@ class Settings:
             # bucket lạnh khóa ghi, còn bucket tệp thường phải xóa được
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")
         self._check_reader()
+        self._check_assistant()
+
+    def _check_assistant(self) -> None:
+        """Biến của trợ lý hỏi đáp (F4.2)."""
+        if not ASK_INDEX_RE.fullmatch(self.ask_index):
+            raise ConfigError("MOC_ASK_INDEX chỉ gồm chữ, số, '_', '-' (1–64 ký tự)")
+        if self.ask_index == self.search_index:
+            raise ConfigError("MOC_ASK_INDEX phải khác MOC_SEARCH_INDEX (chỉ mục đoạn khác chỉ mục văn bản)")
+        if self.ask_sync_interval_s < 0:
+            raise ConfigError("MOC_ASK_SYNC_INTERVAL_S phải ≥ 0 (0 chỉ khi MOC_ASK_ENABLED=false)")
+        if self.ask_enabled and self.ask_sync_interval_s == 0:
+            # Không có vòng nền thì chỉ mục đoạn không bao giờ được tạo (mọi câu hỏi 503), không nhận văn bản mới,
+            # không xóa đoạn của văn bản vừa hạn chế hay bị hủy. Không có cách dùng đúng nào nên dừng ngay, chỉ rõ cách
+            # tắt trợ lý. Test cần trợ lý mà không cần vòng nền thì tiêm chunk_indexer giả vào create_app.
+            raise ConfigError("MOC_ASK_SYNC_INTERVAL_S = 0 tắt vòng giữ chỉ mục đoạn, trợ lý hỏi đáp sẽ không có gì để "
+                              "tìm — đặt > 0, hoặc tắt trợ lý bằng MOC_ASK_ENABLED=false")
+        for name, value in (("MOC_ASK_MIN_SCORE", self.ask_min_score),
+                            ("MOC_ASK_MIN_SCORE_SEMANTIC", self.ask_min_score_semantic),
+                            ("MOC_ASK_SEMANTIC_RATIO", self.ask_semantic_ratio)):
+            if not 0 <= value <= 1:
+                raise ConfigError(f"{name} phải trong khoảng 0–1")
+        if not 0 < self.ask_deadline_s <= 55:
+            raise ConfigError("MOC_ASK_DEADLINE_S phải trong khoảng (0, 55] — dưới 60 giây của APISIX")
+        if self.ask_model_timeout_s <= 0:
+            raise ConfigError("MOC_ASK_MODEL_TIMEOUT_S phải > 0")
+        if self.ask_queue_s < 0:
+            raise ConfigError("MOC_ASK_QUEUE_S phải ≥ 0")
+        for name, count in (("MOC_ASK_TOP_K", self.ask_top_k), ("MOC_ASK_CANDIDATES", self.ask_candidates),
+                            ("MOC_ASK_PER_DOC", self.ask_per_doc), ("MOC_ASK_CONTEXT_CHARS", self.ask_context_chars),
+                            ("MOC_ASK_CONCURRENCY", self.ask_concurrency), ("MOC_AI_EMBED_DIMS", self.ai_embed_dims),
+                            ("MOC_AI_EMBED_BATCH", self.ai_embed_batch)):
+            if count < 1:
+                raise ConfigError(f"{name} phải ≥ 1")
+        if self.ai_url and not self.ask_model:
+            raise ConfigError("MOC_ASK_MODEL (hoặc MOC_AI_MODEL) không được rỗng khi có MOC_AI_URL")
+        if not 1 <= len(self.assistant_id) <= 64:
+            raise ConfigError("MOC_ASSISTANT_ID phải dài 1–64 ký tự")
+
+    def warnings(self) -> list[str]:
+        """Cấu hình chạy được nhưng dễ chậm: app ghi nhật ký ``config.warning`` lúc khởi động, không chặn."""
+        out: list[str] = []
+        if self.ai_url and self.ask_enabled:
+            # Ollama của compose giữ tối đa 2 mô hình (OLLAMA_MAX_LOADED_MODELS): trích yếu F4.1 (MOC_AI_MODEL) dò và
+            # nạp trước kể cả khi chỉ hỏi đáp, thêm mô hình sinh và mô hình nhúng F4.2
+            models = {self.ai_model, self.ask_model} | ({self.ai_embed_model} if self.ai_embed_model else set())
+            if len(models) > 2:
+                out.append(f"MOC_ASK_MODEL ({self.ask_model}) khác MOC_AI_MODEL ({self.ai_model}): Ollama phải giữ "
+                           f"{len(models)} mô hình nhưng compose chỉ cho 2 (OLLAMA_MAX_LOADED_MODELS) — mô hình bị nạp "
+                           "đi nạp lại, câu trả lời và đọc văn bản đến dễ quá giờ. Để trống MOC_ASK_MODEL và đặt mô "
+                           "hình muốn dùng vào MOC_AI_MODEL (dùng chung cho trích yếu và câu trả lời)")
+        return out
 
     def _check_reader(self) -> None:
         """Biến của tác tử đọc văn bản đến (F4.1)."""

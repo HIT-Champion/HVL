@@ -35,6 +35,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Phả hệ dữ liệu (F3.9): `core.lineage_events` chỉ thêm (trigger chặn sửa, xóa kể cả ghi thẳng CSDL); lãnh đạo, văn thư đọc của đơn vị mình; vai trò khác không thấy, không ai ghi | **Xong** — 2 test |
 | Liên thông văn bản trong hệ thống (F3.12): cột `office.documents.recipient_tenant_ids` (trigger `documents_recipient_units` — bỏ trùng, đơn vị có thật, khóa sau khi trình; `documents_recipient_units_other` — không gửi cho mình; `documents_restricted_local` — văn bản hạn chế không liên thông); view `office.dispatch_units` (mọi đơn vị trừ đơn vị của người xem); hộp thư đi `office.dispatches` — trigger tạo một dòng `pending` cho mỗi đơn vị nhận trong giao dịch phát hành; hàm `office.deliver_dispatch` (chỉ `service`, phiên của đơn vị nhận) tạo văn bản đến `received` kèm tệp, sự kiện ở hai bên, gọi lại thì trả nguyên dòng, trùng văn bản đã tiếp nhận thì nối vào (`duplicate`), vi phạm ràng buộc thì `failed`; chỉ mục `documents_source_once` chốt một văn bản đến cho mỗi văn bản gửi ở mỗi đơn vị; mỗi bên chỉ thấy phần của mình; sổ kiểm toán của cả hai đơn vị cùng ghi; còn dòng chờ giao thì chưa nộp lưu | **Xong** — 17 test |
 | Đọc văn bản đến (F4.1, migration `1792281601900_intake_suggestions`): bảng `office.intake_suggestions` (gợi ý của tác tử `moc-doc-reader` theo tệp, ghi đè khi đọc lại, ràng buộc từng cột, chỉ sáu trường của form tiếp nhận); vai trò `agent` chỉ ghi gợi ý và dòng sổ `intake.suggested` của đơn vị trong phiên — thuê ước, danh tính, giờ đọc do Hasura, CSDL đặt; gợi ý và dòng sổ cùng một giao dịch; tệp mã hóa, tệp của văn bản hạn chế không có gợi ý (trigger chặn ghi, xóa khi văn bản bật hạn chế hoặc tệp gắn vào văn bản hạn chế); `core.audit()` ghi `actor_kind` `agent`; `overview` thấy cách đọc, không thấy nội dung; view `office.v_intake_accuracy` (lãnh đạo, quản trị đơn vị: số gợi ý văn thư giữ nguyên theo trường, độ tin cậy; bỏ văn bản hạn chế) | **Xong** — 35 test |
+| Trợ lý hỏi đáp trên kho văn bản (F4.2, migration `1792281602000_assistant`): cột `core.file_texts.page_starts` (vị trí đầu mỗi trang trong chữ của PDF, để trích dẫn ghi số trang; ràng buộc `file_texts_page_starts` — chỉ khi `ok`, 1–200 trang, bắt đầu ở 0, không vượt độ dài chữ, không có null; dòng `ok` cũ bị xóa để đọc lại); vai trò `agent` ghi thêm được dòng sổ `assistant.answered` về `ai.questions` của tác tử `moc-assistant` — danh tính, thuê ước đặt sẵn từ phiên, không quyền nào khác; `overview` thấy chế độ, số đoạn, số nguồn, mô hình, thời gian, không thấy câu hỏi hay id văn bản nguồn; truy vấn nguồn của chỉ mục đoạn (khóa quản trị) và hậu kiểm bằng token người hỏi chạy đúng trên schema thật | **Xong** — 31 test |
 
 ## Vai trò
 
@@ -47,7 +48,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | `tenant_admin` — quản trị đơn vị | Không đọc văn bản; đọc phòng ban, sổ, danh mục | Thêm, sửa phòng ban |
 | `service` — `svc-workflow`, `svc-files` | Mọi dòng của thuê ước trong yêu cầu; dòng liên thông mà thuê ước là bên gửi hoặc bên nhận | Trạng thái, số, giao việc, tệp, dòng thời gian, sổ kiểm toán; giao văn bản liên thông qua hàm `office.deliver_dispatch` |
 | `verifier` — `svc-files` (cổng xác thực) | Chỉ khung nhìn `office.issued_documents`, tối đa một dòng mỗi lần | — |
-| `agent` — tác tử đọc văn bản đến trong `svc-files` (F4.1) | Chỉ `office.intake_suggestions` của thuê ước trong yêu cầu | Thêm, sửa gợi ý; thêm dòng sổ `intake.suggested` về tệp (`actor_kind` `agent`). Không đọc, ghi văn bản, không đọc `core.files`, không đọc sổ |
+| `agent` — tác tử trong `svc-files`: đọc văn bản đến (F4.1), trợ lý hỏi đáp (F4.2) | Chỉ `office.intake_suggestions` của thuê ước trong yêu cầu | Thêm, sửa gợi ý; thêm dòng sổ `intake.suggested` về tệp, `assistant.answered` về câu hỏi (`actor_kind` `agent`). Không đọc, ghi văn bản, không đọc `core.files`, không đọc sổ |
 
 Văn bản hạn chế (`restricted`) chỉ người tạo và người có tên trong `office.document_acl` đọc được, kể cả
 `clerk` và `director`; có tên vẫn phải có quyền theo vai trò ở bảng trên. `svc-workflow` (vai trò `service`) tự thêm
@@ -86,6 +87,11 @@ Tác tử đọc văn bản đến (F4.1) cũng nằm trong `svc-files` nhưng g
 thư bấm đọc ghi trong dữ liệu (`requested_by`, khóa `user_id` của dòng sổ). Thuê ước, danh tính tác tử là cột đặt sẵn
 từ phiên, gửi kèm trong dữ liệu thì Hasura từ chối. Gợi ý và dòng sổ đi trong một yêu cầu GraphQL nhiều trường —
 Hasura chạy trong một giao dịch, ghi sổ lỗi thì gợi ý cũng không được lưu.
+
+Trợ lý hỏi đáp (F4.2) dùng cùng vai trò `agent` với danh tính `moc-assistant` (`MOC_ASSISTANT_ID`), thuê ước của người
+hỏi; chỉ ghi một dòng sổ `assistant.answered` mỗi lượt hỏi, ghi xong mới trả lời. Văn bản người hỏi được xem do
+`svc-files` hỏi lại Hasura bằng **token của người hỏi** (hậu kiểm, như tìm kiếm F2.7); vòng chỉ mục đoạn đọc văn bản và
+chữ của tệp bằng khóa quản trị.
 
 ## Sổ kiểm toán chuỗi băm
 

@@ -295,7 +295,8 @@ services:
     build: ./services/svc-files
     image: moc/svc-files:${MOC_VERSION:-dev}
     profiles: [core]
-    # ai: tới Ollama (profile ai, F4.1) — chưa bật profile thì svc-files dò thấy không có, trích yếu theo quy tắc
+    # ai: tới Ollama (profile ai, F4.1, F4.2) — chưa bật profile thì svc-files dò thấy không có, trích yếu theo quy tắc,
+    # trợ lý hỏi đáp chỉ tìm theo từ khóa và trả câu trích nguyên văn
     networks: [moc, storage, secrets, ai]
     environment:
       <<: *oidc
@@ -321,6 +322,15 @@ services:
       MOC_AI_MODEL: ${MOC_AI_MODEL:-qwen3:1.7b}
       MOC_AI_TIMEOUT_S: ${MOC_AI_TIMEOUT_S:-20}
       MOC_AI_SUMMARY: ${MOC_AI_SUMMARY:-fallback}
+      # F4.2 — trợ lý hỏi đáp trên kho văn bản: chỉ mục đoạn `chunks` trong Meilisearch (chỉ văn bản người hỏi được
+      # xem, không bao giờ có văn bản hạn chế), câu trích nguyên văn kèm số ký hiệu và trang; có Ollama thì thêm tìm
+      # theo nghĩa (mô hình nhúng) và câu trả lời có trích dẫn. MOC_AI_EMBED_MODEL đặt rỗng thì chỉ tìm theo từ khóa;
+      # MOC_ASK_MODEL rỗng thì dùng MOC_AI_MODEL
+      MOC_ASK_ENABLED: ${MOC_ASK_ENABLED:-true}
+      MOC_AI_EMBED_MODEL: ${MOC_AI_EMBED_MODEL-qwen3-embedding:0.6b}
+      MOC_ASK_MODEL: ${MOC_ASK_MODEL:-}
+      MOC_ASK_DEADLINE_S: ${MOC_ASK_DEADLINE_S:-50}
+      MOC_ASK_MODEL_TIMEOUT_S: ${MOC_ASK_MODEL_TIMEOUT_S:-40}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
@@ -509,9 +519,12 @@ services:
 
   # F4.1 — mô hình ngôn ngữ cục bộ cho tác tử đọc văn bản đến, profile ai (tùy chọn: make up-ai). Ollama (MIT) chạy
   # Qwen3 (Apache-2.0) trên CPU; chỉ viết trích yếu khi quy tắc không ra trích yếu tin cậy — số, ngày, cơ quan luôn
-  # theo quy tắc. Chỉ nằm mạng ai (internal): không ra Internet, không mở cổng, chỉ svc-files tới được; chỉ nhận thân
-  # văn bản không hạn chế. Không bật profile thì mọi thứ vẫn chạy, trích yếu theo quy tắc. Trọng số tải một lần bằng
-  # make ai-model (dịch vụ ollama-pull bên dưới, cần Internet), nằm ở volume ollama_models.
+  # theo quy tắc. F4.2 — trợ lý hỏi đáp: mô hình nhúng Qwen3-Embedding-0.6B (Apache-2.0) tính véc-tơ cho đoạn văn bản
+  # và câu hỏi (tìm theo nghĩa); Qwen3 viết câu trả lời chỉ từ các đoạn đã lọc theo quyền người hỏi, svc-files kiểm
+  # trích dẫn trước khi trả. Chỉ nằm mạng ai (internal): không ra Internet, không mở cổng, chỉ svc-files tới được; chỉ
+  # nhận thân văn bản không hạn chế. Không bật profile thì mọi thứ vẫn chạy: trích yếu theo quy tắc, trợ lý tìm theo từ
+  # khóa và trả câu trích nguyên văn. Trọng số tải một lần bằng make ai-model (dịch vụ ollama-pull bên dưới, cần
+  # Internet), nằm ở volume ollama_models.
   ollama:
     <<: *common
     # ghim cả digest (index đa kiến trúc amd64, arm64) vì thẻ của Ollama có thể bị đẩy lại
@@ -521,12 +534,14 @@ services:
     environment:
       OLLAMA_KEEP_ALIVE: 30m
       OLLAMA_NUM_PARALLEL: "1"
-      OLLAMA_MAX_LOADED_MODELS: "1"
+      # mô hình sinh và mô hình nhúng (F4.2) cùng nằm trong RAM: mỗi câu hỏi dùng cả hai, không nạp đi nạp lại
+      OLLAMA_MAX_LOADED_MODELS: "2"
       # tắt tính năng đám mây của Ollama (suy luận từ xa, tìm kiếm web), thêm vào việc không có Internet
       OLLAMA_NO_CLOUD: "1"
     volumes:
       - ollama_models:/root/.ollama
-    # mặc định 6 GB, 4 lõi: đủ cho qwen3:1.7b (≈ 1,4 GB) cùng ngữ cảnh 4096; MOC_AI_CPUS không được vượt số lõi của máy
+    # mặc định 6 GB, 4 lõi: đủ cho qwen3:1.7b (≈ 1,4 GB) và qwen3-embedding:0.6b (≈ 0,65 GB) cùng nạp, kèm ngữ cảnh 4096
+    # của mô hình sinh và 2048 của mô hình nhúng; MOC_AI_CPUS không được vượt số lõi của máy
     mem_limit: ${MOC_AI_MEM_LIMIT:-6g}
     cpus: ${MOC_AI_CPUS:-4}
     healthcheck:
@@ -535,9 +550,10 @@ services:
       timeout: 5s
       retries: 30
 
-  # Tải trọng số mô hình một lần (make ai-model): chạy một máy chủ Ollama tạm, kéo MOC_AI_MODEL từ thư viện Ollama vào
-  # volume ollama_models rồi in danh sách kèm mã băm để so với DEPENDENCIES.md. Mạng riêng ai-pull có Internet; không
-  # chung mạng với dịch vụ nào khác. Profile riêng: bật profile ai thường trực không kéo theo dịch vụ chạy một lần này
+  # Tải trọng số mô hình một lần (make ai-model): chạy một máy chủ Ollama tạm, kéo MOC_AI_MODEL, mô hình nhúng
+  # MOC_AI_EMBED_MODEL (F4.2, bỏ qua khi rỗng) và MOC_ASK_MODEL (khi đặt riêng) từ thư viện Ollama vào volume
+  # ollama_models rồi in danh sách kèm mã băm để so với DEPENDENCIES.md. Mạng riêng ai-pull có Internet; không chung
+  # mạng với dịch vụ nào khác. Profile riêng: bật profile ai thường trực không kéo theo dịch vụ chạy một lần này
   ollama-pull:
     <<: *common
     image: ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c
@@ -550,9 +566,14 @@ services:
       - |
         ollama serve >/dev/null 2>&1 &
         for i in $$(seq 1 30); do ollama list >/dev/null 2>&1 && break; sleep 1; done
-        ollama pull "$$MOC_AI_MODEL" && ollama list
+        ollama pull "$$MOC_AI_MODEL" &&
+          { [ -z "$$MOC_AI_EMBED_MODEL" ] || ollama pull "$$MOC_AI_EMBED_MODEL"; } &&
+          { [ -z "$$MOC_ASK_MODEL" ] || ollama pull "$$MOC_ASK_MODEL"; } &&
+          ollama list
     environment:
       MOC_AI_MODEL: ${MOC_AI_MODEL:-qwen3:1.7b}
+      MOC_AI_EMBED_MODEL: ${MOC_AI_EMBED_MODEL-qwen3-embedding:0.6b}
+      MOC_ASK_MODEL: ${MOC_ASK_MODEL:-}
     volumes:
       - ollama_models:/root/.ollama
 

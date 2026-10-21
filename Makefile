@@ -29,7 +29,7 @@ ENV_FILE := .env
 PREFIX ?= /opt/moc
 
 .PHONY: help env check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
-        demo-doc-van-ban do-doc-van-ban van-ban-mau reconcile \
+        demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -60,10 +60,10 @@ up: $(ENV_FILE) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	@echo "Mộc đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
-up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai) cho tác tử đọc văn bản viết trích yếu — cần make ai-model trước
+up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai): tác tử đọc văn bản viết trích yếu, trợ lý hỏi đáp tìm theo nghĩa và viết câu trả lời — cần make ai-model trước
 	@$(COMPOSE) --profile ai up -d --wait ollama
 
-ai-model: $(ENV_FILE) ## Tải mô hình MOC_AI_MODEL (mặc định qwen3:1.7b) vào volume ollama_models — chạy một lần, cần Internet
+ai-model: $(ENV_FILE) ## Tải mô hình sinh MOC_AI_MODEL (mặc định qwen3:1.7b) và mô hình nhúng MOC_AI_EMBED_MODEL (mặc định qwen3-embedding:0.6b) vào volume ollama_models — chạy một lần, cần Internet
 	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
@@ -139,6 +139,15 @@ do-doc-van-ban: $(ENV_FILE) ## Đo tác tử đọc văn bản trên 14 mẫu se
 
 van-ban-mau: $(ENV_FILE) ## Sinh lại văn bản đến mẫu seed/van-ban-den (PDF, ảnh scan, nhãn) và TSV Tesseract cho test, trong container svc-files (cần make up)
 	@python3 scripts/van_ban_mau.py --mode container
+
+demo-hoi-dap: $(ENV_FILE) ## Màn hỏi đáp trên kho văn bản (F4.2): trợ lý trả câu trích kèm số ký hiệu, trang; chỉ trong văn bản người hỏi được xem; văn bản hạn chế không vào chỉ mục; sổ kiểm toán không có câu hỏi (docs/demo-script.md)
+	@python3 scripts/demo.py hoi-dap
+
+do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm hoặc recall@3 dưới ngưỡng)
+	@python3 scripts/demo.py do-hoi-dap
+
+hoi-dap-mau: $(ENV_FILE) ## Sinh lại kho văn bản mẫu nhiều trang seed/hoi-dap (PDF, cau-hoi.json) trong container svc-files (cần make up)
+	@python3 scripts/hoi_dap_mau.py --mode container
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py

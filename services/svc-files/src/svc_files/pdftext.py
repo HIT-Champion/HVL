@@ -22,6 +22,9 @@ thành tiến trình con (``extract_pdf``), giới hạn bộ nhớ, thời gian
 Tệp này chỉ dùng thư viện chuẩn và pypdf, chạy được bằng ``python -I pdftext.py`` không cần gói svc_files.
 
 PDF chỉ có ảnh (bản scan) không có lớp chữ: trạng thái ``empty``, để dành cho OCR (F4.1).
+
+Ranh giới trang (F4.2): ``clean()`` từng trang rồi nối bằng ``\n``; ``page_starts`` là vị trí ký tự đầu mỗi trang
+trong ``content`` — trợ lý hỏi đáp cắt đoạn theo trang và trích dẫn "tr. n" (assist/chunks.py).
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
-MAX_PAGES = 200          # đọc tối đa từng này trang đầu
+MAX_PAGES = 200          # đọc tối đa từng này trang đầu (cũng là số phần tử tối đa của page_starts trong CSDL)
 MAX_COUNT = 2**31 - 1    # số trang tệp tự khai (/Count) lớn hơn thế không vừa cột int: ghi null
 MAX_CHARS = 50_000       # giữ tối đa từng này ký tự (khớp ràng buộc của core.file_texts)
 MEMORY_MB = 1024         # giới hạn bộ nhớ ảo của tiến trình con
@@ -48,6 +51,8 @@ class PdfText:
     pages: int | None
     content: str
     note: str | None = None     # lý do khi failed: encrypted, timeout, PdfReadError…
+    # vị trí đầu trang 1..n trong content (F4.2); trang trống mang cùng vị trí với trang sau; None khi không ok
+    page_starts: list[int] | None = None
 
 
 def clean(text: str) -> str:
@@ -90,15 +95,43 @@ def extract(data: bytes, *, max_pages: int = MAX_PAGES, max_chars: int = MAX_CHA
         except IndexError:             # khai nhiều trang hơn số trang thật
             break
         part = page.extract_text() or ""
-        parts.append(part)
+        parts.append(clean(part))
         size += len(part)
         if size >= max_chars * 2:      # đủ chữ rồi, không đọc thêm trang
             break
     if reader.flattened_pages is not None:   # đã duyệt cây trang: biết số trang thật
         count = len(reader.flattened_pages)
     pages = count if 0 <= count <= MAX_COUNT else None
-    content = clean("\n".join(parts))[:max_chars].rstrip()
-    return PdfText("ok" if content else "empty", pages, content)
+    full, starts = join_pages(parts)
+    content = full[:max_chars].rstrip()
+    if not content:
+        return PdfText("empty", pages, "")
+    # trang bắt đầu sau điểm cắt thì bỏ
+    return PdfText("ok", pages, content, page_starts=[s for s in starts if s <= len(content)])
+
+
+def join_pages(parts: list[str]) -> tuple[str, list[int]]:
+    """Nối chữ các trang (đã clean) bằng ``\n``; trả về (nội dung, vị trí đầu từng trang).
+
+    Trang trống không thêm gì vào nội dung và mang cùng vị trí với trang có chữ kế sau (cuối tệp: độ dài nội dung).
+    """
+    content = ""
+    starts: list[int | None] = []
+    for part in parts:
+        if part:
+            if content:
+                content += "\n"
+            starts.append(len(content))
+            content += part
+        else:
+            starts.append(None)
+    following = len(content)
+    for i in range(len(starts) - 1, -1, -1):
+        if starts[i] is None:
+            starts[i] = following
+        else:
+            following = starts[i]
+    return content, [int(s) for s in starts if s is not None]
 
 
 def _failed(note: str) -> PdfText:
@@ -128,14 +161,27 @@ def _parse(out: bytes, max_chars: int) -> PdfText:
     hàng đợi."""
     try:
         got: dict[str, Any] = json.loads(out)
-        text = PdfText(str(got["status"]), got.get("pages"), str(got.get("content") or ""), got.get("note"))
+        text = PdfText(str(got["status"]), got.get("pages"), str(got.get("content") or ""), got.get("note"),
+                       got.get("page_starts"))
     except (ValueError, KeyError, TypeError, AttributeError):
         return _failed("bad output")
     pages_ok = text.pages is None or (type(text.pages) is int and 0 <= text.pages <= MAX_COUNT)
     if (text.status not in ("ok", "empty", "failed") or (text.status == "ok") != bool(text.content)
-            or len(text.content) > max_chars or not pages_ok or not isinstance(text.note, str | None)):
+            or len(text.content) > max_chars or not pages_ok or not isinstance(text.note, str | None)
+            or not _starts_ok(text.page_starts, text.status, len(text.content))):
         return _failed("bad output")
-    return PdfText(text.status, text.pages, text.content, text.note[:200] if text.note else None)
+    return PdfText(text.status, text.pages, text.content, text.note[:200] if text.note else None, text.page_starts)
+
+
+def _starts_ok(starts: Any, status: str, length: int) -> bool:
+    """Như ràng buộc file_texts_page_starts: null, hoặc (chỉ khi ok) 1..200 số nguyên không giảm, đầu 0, ≤ độ dài."""
+    if starts is None:
+        return True
+    if status != "ok" or not isinstance(starts, list) or not 1 <= len(starts) <= MAX_PAGES:
+        return False
+    if any(type(s) is not int for s in starts) or starts[0] != 0 or starts[-1] > length:
+        return False
+    return all(a <= b for a, b in zip(starts, starts[1:], strict=False))
 
 
 def _main(argv: list[str]) -> int:

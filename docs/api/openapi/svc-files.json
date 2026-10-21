@@ -78,6 +78,62 @@
         }
       }
     },
+    "/api/documents/ask": {
+      "post": {
+        "summary": "Hỏi đáp trên kho văn bản: câu trích nguyên văn có nguồn, tùy chọn câu trả lời do mô hình viết",
+        "description": "Chỉ tìm trong các văn bản người hỏi được xem (lọc trước theo vai trò trong Meilisearch, hậu kiểm bằng chính token người hỏi qua Hasura); văn bản hạn chế không bao giờ vào chỉ mục. `extract` trả câu trích nguyên văn kèm số ký hiệu, trang; `generate` thêm câu trả lời do mô hình chạy tại chỗ viết từ đúng các đoạn đó, mỗi câu có [n] do máy chủ gán theo bằng chứng. Mỗi lượt ghi một dòng `assistant.answered` của tác tử `moc-assistant` vào sổ kiểm toán — không có câu hỏi, câu trả lời; không ghi được sổ thì không trả lời. Người hỏi ngắt kết nối thì lượt bị hủy, không ghi sổ.",
+        "operationId": "ask_api_documents_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_question` — rỗng sau chuẩn hóa, quá 500 ký tự, có ký tự điều khiển, hoặc chỉ toàn từ dừng"
+          },
+          "401": {
+            "description": "`missing_token`, `invalid_token` (cả khi Hasura từ chối token lúc hậu kiểm)"
+          },
+          "403": {
+            "description": "`forbidden` — vai trò không phải văn thư, lãnh đạo, trưởng phòng, chuyên viên"
+          },
+          "503": {
+            "description": "`assistant_disabled` · `busy` (kèm `Retry-After: 10`, chờ lượt sinh quá `MOC_ASK_QUEUE_S`) · `search_unavailable` · `database_unavailable` — gồm cả khi chưa ghi được sổ kiểm toán: không ghi được sổ thì không trả lời"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/files": {
       "post": {
         "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
@@ -959,6 +1015,398 @@
           "bytes"
         ],
         "title": "ArchivedFileOut"
+      },
+      "AskAnswer": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Chữ thuần; mỗi ý kèm [n] trỏ tới `sources[n-1]`. Giao diện hiển thị như chữ, không như HTML"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "extract",
+              "model"
+            ],
+            "title": "Source",
+            "description": "extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Mô hình đã viết câu trả lời; null với câu trích"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "source",
+          "model"
+        ],
+        "title": "AskAnswer"
+      },
+      "AskIn": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Question",
+            "description": "Câu hỏi, tối đa 500 ký tự sau chuẩn hóa",
+            "examples": [
+              "Điều kiện xét học bổng khuyến khích học tập là gì?"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "extract",
+              "generate"
+            ],
+            "title": "Mode",
+            "description": "extract: chỉ câu trích nguyên văn (dưới 1 giây) · generate: thêm câu trả lời do mô hình viết (15–40 giây, chỉ khi `ai_available`)",
+            "default": "extract"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "out"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction",
+            "description": "Chỉ văn bản đến (in) hoặc văn bản đi (out)"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 2000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year",
+            "description": "Năm ban hành"
+          },
+          "type_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\s/\"\\\\-]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Code",
+            "description": "Mã loại văn bản, vd CV"
+          },
+          "ask_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask Id",
+            "description": "Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng sổ kiểm toán cùng một câu hỏi"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "AskIn"
+      },
+      "AskOut": {
+        "properties": {
+          "ask_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ask Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "passages_only",
+              "no_evidence"
+            ],
+            "title": "Status",
+            "description": "answered: có câu trả lời · passages_only: có đoạn liên quan, chưa trích được câu trả lời ngắn · no_evidence: không có văn bản nào người hỏi được xem có nội dung này"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AskAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Câu trả lời của mô hình nếu đạt, không thì câu trích; null khi không có"
+          },
+          "extract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AskAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Câu trích nguyên văn; null khi không câu nào đạt"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AskSource"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Theo thứ tự xếp hạng, tối đa `MOC_ASK_TOP_K`; [] khi no_evidence"
+          },
+          "semantic": {
+            "type": "boolean",
+            "title": "Semantic",
+            "description": "Lượt này có tìm theo nghĩa (mô hình nhúng)"
+          },
+          "ai_available": {
+            "type": "boolean",
+            "title": "Ai Available",
+            "description": "Mô hình viết câu trả lời đang sẵn sàng (gọi lại với mode=generate)"
+          },
+          "warnings": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "embed_unavailable",
+                "model_unavailable",
+                "model_timeout",
+                "model_rejected",
+                "model_declined"
+              ]
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ask_id",
+          "status",
+          "answer",
+          "extract",
+          "sources",
+          "semantic",
+          "ai_available",
+          "warnings",
+          "duration_ms"
+        ],
+        "title": "AskOut"
+      },
+      "AskSource": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Số trong dấu [n], từ 1"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Code"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "out"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "meta"
+            ],
+            "title": "Kind",
+            "description": "page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ)"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          },
+          "file_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "main",
+                  "attachment",
+                  "issued"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Role",
+            "description": "main: bản chính · attachment: tài liệu kèm theo · issued: bản phát hành văn bản đi"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page",
+            "description": "Trang trong tệp; null với đoạn meta hoặc chữ chưa có ranh giới trang"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt",
+            "description": "Đoạn trích ≤ 600 ký tự quanh câu khớp nhất"
+          },
+          "cited": {
+            "type": "boolean",
+            "title": "Cited",
+            "description": "Câu trả lời có trích nguồn này"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "document_id",
+          "symbol",
+          "type_code",
+          "type_name",
+          "summary",
+          "issuer_name",
+          "issued_on",
+          "direction",
+          "status",
+          "kind",
+          "file_id",
+          "file_role",
+          "page",
+          "excerpt",
+          "cited"
+        ],
+        "title": "AskSource"
       },
       "FileOut": {
         "properties": {

@@ -23,7 +23,9 @@ viên soạn công văn trả lời, xem trước → trình → tổ trưởng 
 mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Liên thông: công văn gửi Khoa Kinh tế trong hệ
 thống thành văn bản đến của bên nhận, cùng bản phát hành. Đọc văn bản đến (F4.1): tác tử moc-doc-reader đọc lớp chữ
 PDF văn thư vừa tải lên, gợi ý số ký hiệu, ngày ban hành, loại; tệp hạn chế không bị đọc, đơn vị khác không gọi được,
-mỗi lần đọc một dòng sổ kiểm toán (không OCR ở đây — make demo-doc-van-ban thử cả ảnh). Thông báo: tổ trưởng nhận tin
+mỗi lần đọc một dòng sổ kiểm toán (không OCR ở đây — make demo-doc-van-ban thử cả ảnh). Hỏi đáp (F4.2): trợ lý
+moc-assistant trả câu trích nguyên văn đúng trang của công văn hai trang; đơn vị khác, văn bản hạn chế không có nguồn;
+mỗi lượt hỏi một dòng sổ không chứa câu hỏi (không mô hình — make demo-hoi-dap). Thông báo: tổ trưởng nhận tin
 việc mới qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
 kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
 có con số tổng), văn thư không đọc được. Văn bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người
@@ -54,8 +56,8 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import (EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pdf,
-                     user_login)
+from moc_env import (EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pages,
+                     text_pdf, user_login)
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -551,6 +553,63 @@ def main() -> None:
                    f"select count(*) from core.file_texts where file_id = '{secret_pdf['id']}'").decode().strip()
     hidden == [] and read == "0" or fail(f"tệp của văn bản hạn chế bị đọc chữ hoặc tìm được: {hidden}, {read}")
     ok("văn bản hạn chế: tệp không bị đọc chữ, không tìm được theo nội dung (kể cả người tạo)")
+
+    # F4.2: trợ lý moc-assistant trả lời bằng câu trích nguyên văn kèm số ký hiệu và trang, chỉ trong văn bản người hỏi
+    # được xem. Vòng nền svc-files đọc chữ từng trang rồi đưa đoạn vào chỉ mục chunks (MOC_ASK_SYNC_INTERVAL_S); CI
+    # không bật mô hình nên đây là đường extract
+    print("Hỏi đáp trên kho văn bản (F4.2)")
+
+    def ask(session: Session, question: str) -> dict:
+        _, _, raw = request("POST", f"{PUBLIC_URL}/api/documents/ask", data=json.dumps({"question": question}).encode(),
+                            headers={**session.auth, "Content-Type": "application/json"}, timeout=60)
+        return json.loads(raw)
+
+    def sql(query: str) -> str:
+        return compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                       "-d", ENV.get("POSTGRES_DB", "moc"), "-c", query).decode().strip()
+
+    audit_before = int(sql("select coalesce(max(id), 0) from core.audit_log") or 0)
+    # Mỗi trang ≥ 40 ký tự không trắng, không thì bộ chia đoạn bỏ trang (assist/chunks.py MIN_CHARS); chỉ trang 2 có
+    # dấu TRANG2 và hạn nộp (trang 1 không có từ nào gần giống, kể cả khi Meilisearch chịu gõ sai)
+    paged = clerk.upload(f"hai-trang-{tag}.pdf", text_pages(
+        ["De nghi cac don vi to chuc tu danh gia chuong trinh dao tao nam hoc 2026-2027.",
+         "Noi dung cu the xem phu luc kem theo."],
+        ["Cac don vi gui bao cao tong hop ve Phong Dao tao theo mau kem theo.", f"TRANG2{tag} han nop 12/12/2026"]))
+    paged_id = clerk.gql(receive, {"d": {
+        **incoming, "symbol": f"126/ĐHCN-ĐT{tag}", "urgency": "normal", "file_ids": [paged["id"]],
+        "summary": f"Về việc tổ chức tự đánh giá chương trình đào tạo (kiểm tra {tag})",
+    }})["receiveIncoming"]["document_id"]
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": paged_id})
+    question = f"TRANG2{tag} hạn nộp là ngày nào?"
+    started, got = time.time(), {}
+    while time.time() - started < 120:
+        got = ask(director, question)
+        if any(s["document_id"] == paged_id for s in got["sources"]):
+            break
+        time.sleep(3)
+    first = (got.get("sources") or [{}])[0]
+    (got.get("status"), first.get("document_id"), first.get("kind"), first.get("page")) \
+        == ("answered", paged_id, "page", 2) and "12/12/2026" in ((got.get("answer") or {}).get("text") or "") \
+        or fail(f"sau {time.time() - started:.0f} giây trợ lý chưa trả câu trích ở trang 2 công văn hai trang: {got}")
+    ok(f"lãnh đạo hỏi “{question}” → câu trích có 12/12/2026, nguồn [1] {first.get('symbol')} · tr. 2 (sau"
+       f" {time.time() - started:.0f} giây, svc-files trả lời trong {got.get('duration_ms')} ms)")
+    # Câu chỉ có từ của riêng văn bản này: đơn vị khác không thấy gì, kể cả văn bản của mình có chữ "hạn", "ngày"
+    other = ask(other_tenant, f"TRANG2{tag} là gì?")
+    other["status"] == "no_evidence" and not any(s.get("document_id") == paged_id for s in other["sources"]) \
+        or fail(f"văn thư Khoa Kinh tế hỏi ra văn bản của Khoa CNTT: {other}")
+    sealed_ask = ask(clerk, f"MATKIN{tag} là gì?")
+    sealed_ask["status"] == "no_evidence" and sealed_ask["sources"] == [] \
+        or fail(f"hỏi nội dung văn bản hạn chế bằng chính người tạo vẫn có nguồn: {sealed_ask}")
+    ok("văn thư Khoa Kinh tế hỏi → no_evidence; nội dung văn bản hạn chế, hỏi bằng chính người tạo → no_evidence")
+    rows = [r.split("|", 3) for r in sql(
+        "select actor_kind, actor_id, entity, diff::text from core.audit_log where action = 'assistant.answered'"
+        f" and id > {audit_before} order by id").splitlines()]
+    len(rows) >= 3 and all(r[:3] == ["agent", "moc-assistant", "ai.questions"] for r in rows) \
+        or fail(f"sổ kiểm toán chưa có dòng assistant.answered của tác tử moc-assistant cho mỗi lượt hỏi: {rows}")
+    leaked = [r[3] for r in rows if f"TRANG2{tag}".casefold() in r[3].casefold() or f"MATKIN{tag}".casefold()
+              in r[3].casefold() or "12/12/2026" in r[3]]
+    leaked == [] or fail(f"diff của dòng sổ hỏi đáp có chữ của câu hỏi hoặc câu trả lời: {leaked}")
+    ok(f"{len(rows)} dòng sổ assistant.answered do moc-assistant (agent) ghi; diff không có câu hỏi, câu trả lời")
 
     # F4.1: tác tử moc-doc-reader đọc tệp văn thư vừa tải lên, trả gợi ý cho form tiếp nhận — không ghi vào văn bản
     print("Đọc văn bản đến (F4.1)")

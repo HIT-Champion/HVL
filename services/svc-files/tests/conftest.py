@@ -296,6 +296,7 @@ class FakeHasura:
         return [f for f in self.pdfs if f["id"] not in self.texts][:limit]
 
     async def save_text(self, *, file_id: str, tenant_id: str, **row) -> None:
+        """row: status, pages, content, note, page_starts (F4.2) — như SAVE_TEXT."""
         self._check()
         if file_id in self.rejected and row["note"] != "not saved":
             raise HasuraError("Hasura trả lỗi: integer out of range")
@@ -338,6 +339,74 @@ class FakeHasura:
 
         rows = sorted((r for r in self.documents.values() if changed(r) and r["id"] > after), key=lambda r: r["id"])
         return [{k: v for k, v in r.items() if k != "readers"} for r in rows[:limit]]
+
+    # --- trợ lý hỏi đáp (F4.2) ------------------------------------------------------------------------------
+
+    chunk_reads: list[str] = field(default_factory=list)    # `after` của từng lần đọc CHUNK_SOURCES
+    ask_calls: list[dict] = field(default_factory=list)     # mỗi lần hậu kiểm: cách gọi và các id hỏi
+
+    CHUNK_ROLES = ("main", "attachment", "issued")
+    CHUNK_FIELDS = ("id", "tenant_id", "direction", "status", "type_code", "symbol", "issuer_name", "issued_on",
+                    "summary", "restricted", "department_id", "created_by", "updated_at", "document_type")
+
+    async def chunk_sources(self, since, limit: int, after: str) -> list[dict]:
+        """Như CHUNK_SOURCES: văn bản đổi (sửa, tệp vừa đọc chữ, giao việc mới — kể cả giao việc đã hủy) từ `since`;
+        trả giao việc chưa hủy, tệp main/attachment/issued theo thứ tự gắn. Văn bản thêm bằng add_document mang
+        `files` (``{"role", "file_id", "added_at", "file": {"encrypted", "text": {...}}}``) và `assignments`
+        (``{"department_id", "user_id", "assigned_at", "status"}``)."""
+        self._check()
+        self.chunk_reads.append(after)
+        defaults = {"restricted": False, "department_id": None, "created_by": "u-van-thu",
+                    "document_type": {"name": "Công văn"}}
+
+        def files(r: dict) -> list[dict]:
+            return sorted((f for f in r.get("files") or [] if f.get("role") in self.CHUNK_ROLES),
+                          key=lambda f: f.get("added_at") or "")
+
+        def changed(r: dict) -> bool:
+            texts = [((f.get("file") or {}).get("text") or {}).get("extracted_at") for f in files(r)]
+            assigned = [a.get("assigned_at") for a in r.get("assignments") or []]
+            return any(t and datetime.fromisoformat(t) >= since for t in [r["updated_at"], *texts, *assigned])
+
+        rows = sorted((r for r in self.documents.values() if changed(r) and r["id"] > after), key=lambda r: r["id"])
+        out = []
+        for r in rows[:limit]:
+            row = {k: copy.deepcopy(r.get(k, defaults.get(k))) for k in self.CHUNK_FIELDS}
+            row["assignments"] = [{k: a.get(k) for k in ("department_id", "user_id", "assigned_at")}
+                                  for a in r.get("assignments") or [] if a.get("status") != "cancelled"]
+            row["files"] = [{"role": f["role"], "file_id": f.get("file_id"),
+                             "file": copy.deepcopy(f.get("file") or {})} for f in files(r)]
+            out.append(row)
+        return out
+
+    @staticmethod
+    def _ask_row(row: dict) -> dict:
+        keys = ("id", "direction", "status", "type_code", "symbol", "issuer_name", "issued_on", "summary")
+        return {**{k: row.get(k) for k in keys}, "restricted": bool(row.get("restricted")),
+                "document_type": copy.deepcopy(row.get("document_type") or {"name": "Công văn"})}
+
+    async def ask_documents(self, token: str, ids: list[str]) -> dict[str, dict]:
+        """Hậu kiểm bằng token người hỏi: như visible_documents (cùng thuê ước, `readers`), kèm cột restricted."""
+        self._check()
+        if self.reject_tokens:
+            raise HasuraAuthError("JWTExpired", "invalid-jwt")
+        ns = jwt.decode(token, options={"verify_signature": False})[HASURA_CLAIMS]
+        self.ask_calls.append({"by": "token", "sub": ns["x-hasura-user-id"], "ids": list(ids)})
+        out = {}
+        for doc_id in ids:
+            row = self.documents.get(doc_id)
+            if row and row["tenant_id"] == ns["x-hasura-tenant-id"] and (
+                row["readers"] is None or ns["x-hasura-user-id"] in row["readers"]
+            ):
+                out[doc_id] = self._ask_row(row)
+        return out
+
+    async def ask_documents_service(self, tenant_id, ids: list[str], **_session) -> dict[str, dict]:
+        """Vai trò service của đúng thuê ước: mọi văn bản không hạn chế."""
+        self._check()
+        self.ask_calls.append({"by": "service", "tenant_id": str(tenant_id), "ids": list(ids)})
+        return {doc_id: self._ask_row(row) for doc_id in ids if (row := self.documents.get(doc_id))
+                and row["tenant_id"] == str(tenant_id) and not row.get("restricted")}
 
     # --- liên thông trong hệ thống (F3.12) ------------------------------------------------------------------
 
@@ -390,6 +459,8 @@ class FakeHasura:
     AGENT_SUGGESTION_COLUMNS = {"file_id", "requested_by", "status", "method", "pages", "fields", "warnings",
                                 "summary_source", "model", "duration_ms"}
     AGENT_AUDIT_COLUMNS = {"request_id", "action", "entity", "entity_id", "diff"}
+    # check của quyền insert core_audit_log cho vai trò agent (F4.1 đọc văn bản đến, F4.2 trợ lý hỏi đáp)
+    AGENT_AUDIT_PAIRS = {("intake.suggested", "core.files"), ("assistant.answered", "ai.questions")}
 
     async def as_role(self, role: str, tenant_id, user_id: str, request_id: str, query: str, variables: dict) -> dict:
         """Như Hasura với quyền của vai trò agent (db/metadata, luồng A): cột được ghi, preset, check."""
@@ -409,7 +480,7 @@ class FakeHasura:
         event = variables["e"]
         if set(event) - self.AGENT_AUDIT_COLUMNS:
             raise HasuraError("cột không được phép", "validation-failed")
-        if event["action"] != "intake.suggested" or event["entity"] != "core.files":
+        if (event.get("action"), event.get("entity")) not in self.AGENT_AUDIT_PAIRS:
             raise HasuraError("check constraint of an insert permission has failed", "permission-error")
         out: dict = {"insert_core_audit_log": {"affected_rows": 1}}
         if name == "LuuGoiY":
@@ -422,7 +493,7 @@ class FakeHasura:
             self.suggestions[o["file_id"]] = {**o, "tenant_id": str(tenant_id), "agent_id": user_id,
                                               "read_at": read_at}
             out["insert_office_intake_suggestions_one"] = {"file_id": o["file_id"], "read_at": read_at}
-        elif name != "GhiSoTacTu":
+        elif name not in ("GhiSoTacTu", "GhiSoTroLy"):
             raise HasuraError(f"câu lạ {name}")
         self.agent_events.append({**event, "tenant_id": str(tenant_id), "actor_id": user_id, "actor_kind": "agent"})
         return out
@@ -447,6 +518,29 @@ def text_pdf(*lines: str, pages: int = 1) -> bytes:
     objs += [f"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 3 0 R>>>>"
              f"/Contents {4 + pages} 0 R>>".encode()] * pages
     objs.append(b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream")
+    out, offsets = b"%PDF-1.4\n", []
+    for i, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + obj + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    return out + b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+
+
+def pages_pdf(*pages: tuple[str, ...]) -> bytes:
+    """PDF nhiều trang, mỗi trang các dòng riêng (Helvetica, chỉ ASCII); trang ``()`` không có chữ (như trang scan)."""
+    def esc(line: str) -> str:
+        return line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    n = len(pages)
+    kids = " ".join(f"{4 + i} 0 R" for i in range(n))
+    objs = [b"<</Type/Catalog/Pages 2 0 R>>", f"<</Type/Pages/Kids[{kids}]/Count {n}>>".encode(),
+            b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>"]
+    objs += [f"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 3 0 R>>>>"
+             f"/Contents {4 + n + i} 0 R>>".encode() for i in range(n)]
+    for lines in pages:
+        stream = ("BT /F1 12 Tf 72 760 Td 14 TL " + " ".join(f"({esc(line)}) '" for line in lines) + " ET").encode()
+        objs.append(b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream")
     out, offsets = b"%PDF-1.4\n", []
     for i, obj in enumerate(objs, 1):
         offsets.append(len(out))
@@ -562,6 +656,289 @@ class FakeMeili:
         return hits[offset:offset + limit]
 
 
+# --- chỉ mục đoạn của trợ lý hỏi đáp (F4.2) ---------------------------------------------------------------------
+
+_FILTER_TOKEN = re.compile(r'\s*(?:("(?:[^"\\]|\\.)*")|(!=|>=|<=|=|>|<|\(|\)|\[|\]|,)|([^\s()\[\],=!<>"]+))')
+
+
+def _filter_tokens(expr: str) -> list[tuple[str, str]]:
+    out, pos = [], 0
+    while pos < len(expr):
+        m = _FILTER_TOKEN.match(expr, pos)
+        if not m or m.end() == pos:
+            if expr[pos:].strip():
+                raise ValueError(f"bộ lọc sai ở {pos}: {expr!r}")
+            break
+        pos = m.end()
+        if m.group(1) is not None:
+            out.append(("str", re.sub(r"\\(.)", r"\1", m.group(1)[1:-1])))
+        elif m.group(2) is not None:
+            out.append(("op", m.group(2)))
+        else:
+            out.append(("word", m.group(3)))
+    return out
+
+
+def meili_filter(expr, doc: dict) -> bool:
+    """Bộ lọc Meilisearch (tập con đủ cho F4.2) trên một tài liệu: ``=``, ``!=``, ``IN [...]``, ``IS [NOT] NULL``,
+    ``EXISTS``, ``AND``/``OR``/``NOT``, ngoặc; mảng khớp khi có phần tử bằng; chuỗi trong ngoặc kép có thoát ``\\"``
+    ``\\\\``. ``expr``: chuỗi, hoặc danh sách (AND) mà phần tử là chuỗi hoặc danh sách con (OR) như API."""
+    if expr is None:
+        return True
+    if isinstance(expr, list):
+        return all(any(meili_filter(x, doc) for x in e) if isinstance(e, list) else meili_filter(e, doc) for e in expr)
+    tokens = _filter_tokens(expr)
+    pos = 0
+
+    def peek(kind=None, value=None):
+        if pos >= len(tokens):
+            return False
+        k, v = tokens[pos]
+        return (kind is None or k == kind) and (value is None or (v.upper() if k == "word" else v) == value)
+
+    def take():
+        nonlocal pos
+        pos += 1
+        return tokens[pos - 1]
+
+    def value():
+        k, v = take()
+        if k == "str":
+            return v
+        if k != "word":
+            raise ValueError(f"cần giá trị: {expr!r}")
+        try:
+            return float(v) if "." in v else int(v)
+        except ValueError:
+            return v
+
+    def equal(a, b) -> bool:
+        if isinstance(a, list):
+            return any(equal(x, b) for x in a)
+        if isinstance(a, bool) or a is None:
+            return False
+        if isinstance(a, int | float) and isinstance(b, int | float):
+            return a == b
+        return str(a) == str(b)
+
+    def primary():
+        if peek("op", "("):
+            take()
+            got = disjunction()
+            if not peek("op", ")"):
+                raise ValueError(f"thiếu ')': {expr!r}")
+            take()
+            return got
+        if peek("word", "NOT"):
+            take()
+            return not primary()
+        _, attr = take()
+        here = doc.get(attr)
+        if peek("op", "="):
+            take()
+            return equal(here, value())
+        if peek("op", "!="):
+            take()
+            return not equal(here, value())
+        if peek("word", "IN"):
+            take()
+            if not peek("op", "["):
+                raise ValueError(f"thiếu '[': {expr!r}")
+            take()
+            values = []
+            while not peek("op", "]"):
+                values.append(value())
+                if peek("op", ","):
+                    take()
+            take()
+            return any(equal(here, v) for v in values)
+        if peek("word", "IS"):
+            take()
+            negate = peek("word", "NOT") and take() is not None
+            word = take()[1].upper()
+            if word != "NULL":
+                raise ValueError(f"chỉ hỗ trợ IS [NOT] NULL: {expr!r}")
+            is_null = attr in doc and doc[attr] is None
+            return not is_null if negate else is_null
+        if peek("word", "EXISTS"):
+            take()
+            return attr in doc
+        raise ValueError(f"toán tử không hỗ trợ trong bộ lọc giả: {expr!r}")
+
+    def conjunction():
+        got = primary()
+        while peek("word", "AND"):
+            take()
+            got = primary() and got
+        return got
+
+    def disjunction():
+        got = conjunction()
+        while peek("word", "OR"):
+            take()
+            got = conjunction() or got
+        return got
+
+    result = disjunction()
+    if pos != len(tokens):
+        raise ValueError(f"thừa ở cuối bộ lọc: {expr!r}")
+    return result
+
+
+@dataclass
+class FakeChunkIndex:
+    """Chỉ mục ``chunks`` giả (assist/meili.ChunkIndex): lọc thật theo cú pháp Meilisearch (meili_filter), cập nhật
+    một phần như PUT (giữ trường không gửi, gộp ``_vectors`` theo embedder), tìm từ khóa đơn giản trên chữ không dấu:
+    điểm = tỷ lệ từ của câu tìm có trong tài liệu (``scores`` đặt sẵn điểm cho từng id). ``frequency=True``: như
+    chiến lược ``frequency`` thật — tài liệu phải có từ hiếm nhất của câu tìm (ít tài liệu có nhất trong bộ lọc, bằng
+    nhau thì từ đứng trước; từ không tài liệu nào có thì bỏ qua)."""
+
+    docs: dict[str, dict] = field(default_factory=dict)
+    embedders: dict[str, dict] = field(default_factory=dict)
+    settings: list[dict] = field(default_factory=list)        # mỗi lần ensure_embedder: cấu hình đã áp
+    writes: list[tuple[str, list]] = field(default_factory=list)   # ("replace" | "update" | "delete", dữ liệu)
+    fetches: list[dict] = field(default_factory=list)
+    searches: list[dict] = field(default_factory=list)
+    multi_searches: list[list[dict]] = field(default_factory=list)
+    scores: dict[str, float] = field(default_factory=dict)
+    frequency: bool = False
+    waited: list[int] = field(default_factory=list)
+    down: bool = False
+    fail_tasks: bool = False      # tác vụ ghi được nhận nhưng xử lý lỗi (wait báo lỗi)
+    failed_tasks: set[int] = field(default_factory=set)       # chỉ các tác vụ này lỗi
+    embedder_fails: bool = False  # Meilisearch nhận rồi từ chối cấu hình embedder (tác vụ lỗi, không áp gì)
+    tasks: int = 0
+
+    def _task(self) -> int:
+        if self.down:
+            raise SearchError("Meilisearch tắt")
+        self.tasks += 1
+        return self.tasks
+
+    async def ping(self) -> bool:
+        return not self.down
+
+    async def aclose(self) -> None:
+        pass
+
+    async def ensure(self) -> int:
+        return self._task()
+
+    async def ensure_embedder(self, embedder: str | None, dims: int) -> int | None:
+        task = self._task()
+        if self.embedder_fails:
+            self.failed_tasks.add(task)
+            return task
+        removed = [name for name in self.embedders if name.startswith("emb_") and name != embedder]
+        for name in removed:
+            del self.embedders[name]
+            for d in self.docs.values():
+                (d.get("_vectors") or {}).pop(name, None)
+        if embedder:
+            self.embedders[embedder] = {"source": "userProvided", "dimensions": dims}
+        self.settings.append({"embedder": embedder, "dims": dims, "removed": removed})
+        return task
+
+    async def wait(self, task_uid: int, timeout_s: float = 30.0) -> None:
+        if self.down:
+            raise SearchError("Meilisearch tắt")
+        if self.fail_tasks or task_uid in self.failed_tasks:
+            raise SearchError(f"Tác vụ {task_uid} lỗi")
+        self.waited.append(task_uid)
+
+    async def fetch(self, filter, fields: list[str], limit: int, offset: int = 0) -> list[dict]:  # noqa: A002
+        if self.down:
+            raise SearchError("Meilisearch tắt")
+        self.fetches.append({"filter": filter, "fields": fields, "limit": limit, "offset": offset})
+        rows = [d for d in self.docs.values() if meili_filter(filter, d)]
+        return [{k: copy.deepcopy(d[k]) for k in fields if k in d} for d in rows[offset:offset + limit]]
+
+    async def count(self, filter) -> int:  # noqa: A002
+        if self.down:
+            raise SearchError("Meilisearch tắt")
+        return sum(meili_filter(filter, d) for d in self.docs.values())
+
+    async def replace(self, docs: list[dict]) -> int:
+        task = self._task()
+        self.writes.append(("replace", copy.deepcopy(docs)))
+        for d in docs:
+            self.docs.pop(d["id"], None)
+            self.docs[d["id"]] = copy.deepcopy(d)
+        return task
+
+    async def update(self, docs: list[dict]) -> int:
+        task = self._task()
+        self.writes.append(("update", copy.deepcopy(docs)))
+        for d in docs:
+            row = self.docs.setdefault(d["id"], {"id": d["id"]})
+            for k, v in copy.deepcopy(d).items():
+                if k == "_vectors" and isinstance(row.get(k), dict):
+                    row[k].update(v)
+                else:
+                    row[k] = v
+        return task
+
+    async def delete_ids(self, ids: list[str]) -> int:
+        task = self._task()
+        self.writes.append(("delete", list(ids)))
+        for i in ids:
+            self.docs.pop(i, None)
+        return task
+
+    async def delete_where(self, filter) -> int:  # noqa: A002
+        task = self._task()
+        gone = [i for i, d in self.docs.items() if meili_filter(filter, d)]
+        self.writes.append(("delete", gone))
+        for i in gone:
+            del self.docs[i]
+        return task
+
+    def _ranked(self, body: dict) -> list[tuple[float, int, dict]]:
+        words = fold(body.get("q") or "").split()
+        threshold = body.get("rankingScoreThreshold", 0.0)
+        fields = ("text", "symbol", "summary", "issuer_name")
+        rows = [(i, d, fold(" ".join(str(d.get(f) or "") for f in fields)).split())
+                for i, d in enumerate(self.docs.values()) if meili_filter(body.get("filter"), d)]
+        required = None
+        if self.frequency and body.get("matchingStrategy") == "frequency":
+            df = [(sum(w in text for _, _, text in rows), n, w) for n, w in enumerate(words)]
+            required = min(((c, n, w) for c, n, w in df if c), default=(0, 0, None))[2]
+        ranked = []
+        for i, d, text in rows:
+            matched = sum(w in text for w in words)
+            score = self.scores.get(d["id"], matched / len(words) if words else 1.0)
+            if (words and not matched and d["id"] not in self.scores) or score < threshold:
+                continue
+            if required is not None and required not in text:
+                continue
+            ranked.append((-score, i, d))
+        ranked.sort(key=lambda t: (t[0], t[1]))
+        return ranked
+
+    @staticmethod
+    def _hits(body: dict, ranked: list[tuple[float, int, dict]]) -> list[dict]:
+        offset, limit = body.get("offset", 0), body.get("limit", 20)
+        hits = []
+        for neg, _, d in ranked[offset:offset + limit]:
+            hit = {k: copy.deepcopy(d[k]) for k in body.get("attributesToRetrieve") or d if k in d}
+            if body.get("showRankingScore"):
+                hit["_rankingScore"] = -neg
+            hits.append(hit)
+        return hits
+
+    async def search(self, body: dict) -> list[dict]:
+        if self.down:
+            raise SearchError("Meilisearch tắt")
+        self.searches.append(copy.deepcopy(body))
+        return self._hits(body, self._ranked(body))
+
+    async def multi_search(self, bodies: list[dict]) -> list[tuple[list[dict], int]]:
+        if self.down:
+            raise SearchError("Meilisearch tắt")
+        self.multi_searches.append(copy.deepcopy(bodies))
+        return [(self._hits(b, ranked), len(ranked)) for b in bodies for ranked in [self._ranked(b)]]
+
+
 OLLAMA_MODEL = "qwen3:1.7b"
 GOOD_SUMMARY = "Về việc tổ chức họp giao ban công tác tháng 11 năm 2026"
 
@@ -630,6 +1007,10 @@ def settings() -> Settings:
             "HASURA_ADMIN_SECRET": "test",
             "MEILISEARCH_API_KEY": "test",
             "MOC_SEARCH_SYNC_INTERVAL_S": "0",
+            # trợ lý tắt: không vòng chỉ mục đoạn nào gọi Meilisearch thật (0 chỉ hợp lệ khi tắt; test trợ lý tự tiêm
+            # chunk_indexer giả vào create_app)
+            "MOC_ASK_ENABLED": "false",
+            "MOC_ASK_SYNC_INTERVAL_S": "0",
             "MOC_AUDIT_ANCHOR_INTERVAL_S": "0",
             "MOC_TEXT_INTERVAL_S": "0",
             "MOC_FILES_MAX_MB": "1",

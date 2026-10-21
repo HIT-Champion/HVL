@@ -57,6 +57,7 @@ ENV = {
     "SEAWEEDFS_S3_SECRET_KEY": "test", "HASURA_ADMIN_SECRET": "test", "MEILISEARCH_API_KEY": "test",
     "MOC_SEARCH_SYNC_INTERVAL_S": "0", "MOC_AUDIT_ANCHOR_INTERVAL_S": "0", "MOC_TEXT_INTERVAL_S": "0",
     "MOC_ARCHIVE_INTERVAL_S": "0", "MOC_FILES_MAX_MB": "1", "MOC_AI_URL": "",
+    "MOC_ASK_ENABLED": "false",     # không chạy vòng chỉ mục đoạn F4.2 (nó gọi Meilisearch thật)
 }
 
 

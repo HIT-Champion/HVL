@@ -8,10 +8,12 @@ Hasura quyết ai được đọc văn bản nào; tìm được cả theo chữ
 trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
 Văn bản đi gửi đơn vị khác trong hệ thống thì bản phát hành được chép sang kho của đơn vị nhận ở đây (liên thông).
 Văn thư tải văn bản đến lên thì tác tử `moc-doc-reader` đọc tệp (lớp chữ PDF hoặc OCR) và gợi ý thông tin tiếp nhận.
+Người dùng hỏi bằng lời thì trợ lý `moc-assistant` tìm đoạn liên quan trong các văn bản **chính họ được đọc** và trả
+lời bằng câu trích nguyên văn kèm số ký hiệu, số trang; mô hình chạy tại chỗ viết câu trả lời ngắn nếu có (F4.2).
 
 Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
-F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực), F3.12 (liên thông) và F4.1 (đọc văn
-bản đến) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực), F3.12 (liên thông), F4.1 (đọc văn
+bản đến) và F4.2 (hỏi đáp trên kho văn bản) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
 issue #19, #20.
 
 ## Trạng thái
@@ -24,6 +26,7 @@ issue #19, #20.
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
 | Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
 | `POST /api/files/{id}/read`: đọc văn bản đến (lớp chữ PDF hoặc OCR Tesseract), quy tắc gợi ý 6 trường, mô hình tùy chọn viết trích yếu, ghi sổ của tác tử | **Xong** (F4.1) |
+| `POST /api/documents/ask`: hỏi đáp trên các văn bản người hỏi được đọc — chỉ mục đoạn theo trang, quyền hai lớp, câu trích nguyên văn, mô hình tùy chọn viết câu trả lời có kiểm trích dẫn, ghi sổ của trợ lý | **Xong** (F4.2) |
 | Văn bản hạn chế: lưu mã hóa (khóa riêng từng tệp từ két), tải về giải mã trong bộ nhớ, đóng dấu người xem, ghi sổ | **Xong** (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
@@ -51,6 +54,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `403` `unknown_tenant` — thuê ước trong token chưa có trong `core.tenants` |
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
 | `POST /api/files/{id}/read` | Chỉ `clerk`, chỉ tệp chính mình tải lên. `?force=true` đọc lại. `200` `{file_id, status, method, pages, fields, warnings, summary_source, model, duration_ms, cached, read_at}` · `401` · `403` `forbidden` · `404` `not_found` (cả tệp người khác) · `409` `restricted` tệp mã hóa hoặc tệp đang gắn vào văn bản hạn chế (trước gợi ý đã lưu, trước khi đọc byte) · `413` `too_large` · `415` `unsupported` · `422` `unreadable` + `reason` · `503` `busy` (+ `Retry-After: 10`), `reader_disabled`, `ocr_unavailable`, `storage_unavailable`, `database_unavailable` — mục Đọc văn bản đến |
+| `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director`. Thân `{question, mode: extract\|generate, direction, year, type_code, ask_id}`. `200` `{ask_id, status, answer, extract, sources, semantic, ai_available, warnings, duration_ms}`, `Cache-Control: no-store` · `400` `invalid_question` · `401` · `403` `forbidden` · `422` thân sai · `503` `assistant_disabled`, `busy` (+ `Retry-After: 10`), `search_unavailable`, `database_unavailable` — mục Hỏi đáp trên kho văn bản |
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
@@ -62,7 +66,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `GET /healthz` | Tiến trình còn sống |
-| `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"`; `ai`: mô hình trích yếu (F4.1) đang sẵn sàng không — không ảnh hưởng `status` |
+| `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"`; `ai`: mô hình trích yếu (F4.1) đang sẵn sàng không; `assist: {index, semantic, model, embed_pending, embed_failed}` (F4.2): chỉ mục đoạn đã đồng bộ xong một lượt; tìm theo nghĩa được (mô hình nhúng sẵn sàng, đúng số chiều, embedder đã áp trong Meilisearch); mô hình viết câu trả lời sẵn sàng; số đoạn còn chờ nhúng và số đoạn làm mô hình nhúng lỗi (null khi không nhúng hoặc chưa đếm) — cả hai không ảnh hưởng `status` |
 
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
 Tệp tải về luôn ở dạng `attachment`, kèm `X-Content-Type-Options: nosniff` và
@@ -110,7 +114,9 @@ văn bản (bản chính, tài liệu kèm theo; không lấy bản phát hành 
 tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số ký hiệu, trích yếu, cơ quan ban hành.
 
 - **Đọc ở vòng nền**, mỗi `MOC_TEXT_INTERVAL_S` giây, các PDF **đã gắn vào văn bản** (bản chính, tài liệu kèm
-  theo) mà chưa đọc; còn tồn (vd tệp tải lên trước khi có F2.7) thì đọc tiếp ngay. Kết quả ghi vào
+  theo; từ F4.2 cả bản phát hành văn bản đi — chỉ trợ lý hỏi đáp dùng, chỉ mục tìm kiếm vẫn không lấy) mà chưa đọc;
+  còn tồn (vd tệp tải lên trước khi có F2.7) thì đọc tiếp ngay. Chữ từng trang nối bằng xuống dòng, vị trí đầu mỗi
+  trang lưu ở `page_starts` (F4.2: trích dẫn có số trang). Kết quả ghi vào
   `core.file_texts` (khóa quản trị; không vai trò người dùng nào đọc được bảng này), mỗi tệp một lần: `ok`, `empty`
   (không có lớp chữ — bản scan, để dành OCR F4.1), `failed` kèm lý do (`encrypted`, `timeout`, `memory`,
   `too large`, `missing` — kho không có đối tượng, `unreadable` — kho lỗi 5 lượt liền, `not saved` — CSDL không
@@ -221,6 +227,146 @@ các tệp khác giữ thời gian như khi không bật mô hình. Từ bản n
 
 Chưa làm: OCR bản scan cho tìm kiếm toàn văn (F2.7 chỉ đọc lớp chữ); so sánh PaddleOCR / VietOCR; dữ liệu
 `tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ volume nếu cần chính xác hơn).
+
+### Hỏi đáp trên kho văn bản (F4.2)
+
+`assist/`. Trang "Hỏi đáp văn bản" gọi `POST /api/documents/ask`: người dùng hỏi bằng lời (vd "Điều kiện xét học bổng
+khuyến khích học tập là gì?"), trợ lý tìm đoạn liên quan trong các văn bản **chính người hỏi được đọc** và trả câu trích
+nguyên văn kèm nguồn "88/CTSV · tr. 1". Văn thư, chuyên viên, trưởng phòng, lãnh đạo hỏi được; vai trò khác `403`. Mỗi
+câu hỏi độc lập, không lưu hội thoại.
+
+**Chỉ mục đoạn** (`chunks.py`, `index.py`, `meili.py`). Chỉ mục Meilisearch riêng `MOC_ASK_INDEX` (`chunks`), một tài
+liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
+
+- **Nguồn**: chữ PDF của F2.7 (`core.file_texts`, có `page_starts`), không đọc lại tệp. Văn bản đến: bản chính và tài
+  liệu kèm theo (đánh trang riêng từng tệp), mọi trạng thái trừ `cancelled`. Văn bản đi: chỉ khi `issued`, `archived`,
+  nguồn là bản phát hành — dự thảo chưa có giá trị, đổi liên tục. **Văn bản hạn chế không bao giờ có đoạn nào.**
+- **Cắt đoạn** theo từng trang, ≤ 1 200 ký tự, cắt ở ranh giới câu rồi khoảng trắng, đoạn sau mở đầu bằng câu cuối của
+  đoạn trước; không đoạn nào vượt trang. Bản scan, tệp lỗi, văn bản chưa có tệp: một đoạn "trích yếu" (loại, số ký
+  hiệu, ngày, cơ quan ban hành, trích yếu) — trích dẫn ghi "trích yếu", không bịa số trang.
+- **Mỗi đoạn mang thuộc tính quyền** chép từ văn bản: thuê ước, chiều, phòng, người tạo, phòng và người được giao
+  (giao việc chưa hủy).
+- **Vòng nền** mỗi `MOC_ASK_SYNC_INTERVAL_S` giây, như chỉ mục F2.7 (con trỏ thời gian lùi 60 giây, lật trang theo id).
+  Văn bản đổi khi: sửa văn bản, một tệp vừa đọc chữ, có giao việc mới. Đoạn mới hoặc đổi chữ thì ghi lại cả đoạn; chỉ
+  đổi thuộc tính quyền thì cập nhật một phần, giữ véc-tơ. Văn bản bật hạn chế, bị hủy, văn bản đi về dự thảo: xóa mọi
+  đoạn. Mọi tác vụ Meilisearch của một lượt phải xong thì con trỏ mới tiến; một tác vụ lỗi thì lượt sau đọc lại.
+- **Tìm theo nghĩa** (tùy chọn): embedder `userProvided` đặt tên theo mô hình (`emb_qwen3_embedding_0_6b`); svc-files
+  tự gọi Ollama `/api/embed` theo lô `MOC_AI_EMBED_BATCH` đoạn ở vòng nền, và không mở lô mới trong lúc một lượt hỏi
+  đang gọi Ollama (nhúng câu hỏi, viết câu trả lời). Meilisearch không vào mạng `ai`. Chưa có véc-tơ thì đoạn vẫn tìm được bằng từ khóa; không có mô hình (CI) thì
+  chỉ tìm từ khóa. Đổi `MOC_AI_EMBED_MODEL` là bỏ embedder cũ và nhúng lại từ đầu. Câu hỏi đưa đi nhúng mang tiền tố
+  chỉ dẫn mà Qwen3-Embedding cần (`Instruct: …\nQuery: …`); đoạn văn bản thì không.
+- **Khi nhúng lỗi.** Cấu hình tìm từ khóa và cấu hình embedder áp thành hai tác vụ: embedder bị Meilisearch từ chối thì
+  ghi `index_failed` (`stage: embedder`), thử lại mỗi 60 giây, còn đồng bộ và xóa đoạn vẫn chạy (`semantic: false`).
+  Lô nhúng lỗi vì quá giờ, mất kết nối, Ollama bận hay mất mô hình thì để lượt sau. Lỗi khác (HTTP 500, véc-tơ NaN…)
+  thì nhúng lại từng đoạn; đoạn vẫn lỗi trong khi mô hình nhúng được đoạn khác hoặc câu mẫu thì bị đánh dấu
+  `embed_model = "<mô hình>#failed"` (`embed_skipped` ghi id) để không chặn các đoạn sau: đoạn đó chỉ tìm được theo từ
+  khóa, được nhúng lại khi chữ đổi hoặc đổi mô hình. Véc-tơ đầu tiên Ollama trả mà khác `MOC_AI_EMBED_DIMS` chiều là
+  sai cấu hình: tắt tìm theo nghĩa, ghi lỗi `embed_dims_mismatch`, sửa biến rồi khởi động lại. `/readyz` báo số đoạn
+  chờ nhúng và số đoạn hỏng.
+
+**Quyền ở hai lớp, cả hai đứng trước mô hình và trước người dùng** (`scope.py`, `retrieve.py`):
+
+1. **Lọc trước** trong Meilisearch: thuê ước lấy từ token (luôn đứng đầu), rồi điều kiện theo vai trò viết đúng như
+   `office.document_visible` — văn thư, lãnh đạo: cả đơn vị; trưởng phòng: văn bản của phòng mình hoặc có giao việc
+   cho phòng mình (token không có phòng thì không tìm gì); chuyên viên: mình tạo, được giao cho mình, hoặc văn bản đi
+   của phòng mình. Lớp này chỉ quyết **độ phủ**.
+2. **Hậu kiểm** bằng Hasura với **token người hỏi** (như tìm kiếm F2.7), bỏ cả văn bản đang `restricted`. Lớp này quyết
+   **an toàn**: chỉ mục chậm vài giây sau khi bật hạn chế hay hủy giao việc cũng không lộ đoạn nào. svc-files không
+   viết lại quy tắc quyền. Số ký hiệu, trích yếu, trạng thái trả về lấy từ Hasura (bản mới nhất), không từ chỉ mục.
+
+**Tìm nới** (chỉ khi tìm theo từ khóa và chưa đủ đoạn). Chiến lược `frequency` của Meilisearch bỏ dần từ phổ biến của
+câu tìm nhưng luôn giữ từ hiếm nhất: hỏi "Điều kiện xét học bổng khuyến khích học tập là gì?" mà trong kho chỉ một văn
+bản có chữ "điều kiện" thì công văn trả lời (88/CTSV: "…xét chọn sinh viên có điểm … từ 3,2…") không bao giờ ra. Lượt
+nới gửi một `/multi-search`: mỗi từ của câu tìm một câu riêng trong cùng phạm vi, kèm số đoạn trong phạm vi. Mỗi từ
+nặng `ln(1 + N / df)` (từ không đoạn nào trong phạm vi có tính như `df` = 0,5, để phạm vi hẹp không làm vài từ phổ
+biến thành "cả câu hỏi"); đoạn có tổng trọng số ≥ 50 % câu hỏi được thêm sau kết quả chính, qua hậu kiểm như mọi
+đoạn. Nhật ký `office.assist.asked` ghi số đoạn nhờ tìm nới (`relaxed`). Khi tìm theo nghĩa, phần nghĩa đã phủ câu
+hỏi dùng chữ khác nên không nới.
+
+Không đoạn nào qua được hai lớp → `no_evidence`, **không gọi mô hình**; trả lời y hệt nhau dù văn bản không tồn tại hay
+người hỏi không được đọc.
+
+**Trả lời** (`vi.py`, `extract.py`, `grounding.py`, `answer.py`). Hai chế độ; giao diện gọi `extract` trước rồi tự gọi
+`generate` nếu `ai_available`, gửi lại `ask_id`.
+
+- `extract` (mặc định, tất định, không cần mô hình — đường của CI): câu tìm là tối đa 10 từ của câu hỏi đã bỏ từ dừng
+  (Meilisearch chỉ xét 10 từ đầu). Mỗi đoạn lấy câu có nhiều từ của câu hỏi nhất (so trên chữ bỏ dấu; bằng điểm thì câu
+  chỉ nhắc lại trích yếu, số ký hiệu xếp sau câu nội dung); giữ câu chung ≥ 34 % và ≥ 2 từ với câu hỏi; tối đa 3 câu, ưu tiên khác
+  văn bản, mỗi câu ≤ 320 ký tự. Mỗi dòng `“<câu nguyên văn>” [n]`, `n` là số thứ tự nguồn. Tách câu theo lớp chữ PDF:
+  dòng bị ngắt do dàn trang (dòng sau bắt đầu bằng chữ thường) nối lại; không tách ở `TP.`, `ThS.`, `PGS.`…, số thập
+  phân, số ký hiệu, số thứ tự đầu dòng.
+- `generate`: thêm câu trả lời do mô hình viết (`MOC_ASK_MODEL`, mặc định bằng `MOC_AI_MODEL`), chỉ khi mô hình sẵn
+  sàng và còn ≥ 5 giây trong hạn. Mô hình chỉ thấy **4 đoạn đầu đã hậu kiểm**, mỗi đoạn ≤ 700 ký tự quanh câu tốt nhất,
+  tổng ≤ `MOC_ASK_CONTEXT_CHARS`, bọc trong thẻ `<nguon so="1" ky_hieu="88/CTSV" trang="1">`; thẻ trùng tên trong chữ
+  văn bản bị bỏ, mọi `<` `>` còn lại đổi thành `‹` `›`; lời dặn bảo mô hình không làm theo yêu cầu nằm trong dữ liệu; mô
+  hình không có công cụ nào. `/api/chat` không stream, tắt suy nghĩ, ép JSON Schema `{du_can_cu, tra_loi}`, nhiệt độ
+  0,1, hạt giống cố định. **Đầu ra kiểm chặt**: 10–1 200 ký tự, không ký tự điều khiển / vô hình, không `http`, `<`,
+  `>`, ```` ``` ````. **Máy chủ gán trích dẫn, không phải mô hình** (Qwen3-1.7B viết đúng nội dung nhưng không ghi
+  `[n]`: 0/19 câu qua cách kiểm cũ): bỏ mọi `[n]` mô hình ghi, rồi với từng câu chọn đoạn chứa mọi số từ 2 chữ số của
+  câu (`3.2` khớp `3,2`, `200 000` khớp `200.000`, `15/11` khớp `15/11/2026`; số trong câu hỏi cũng được) và ≥ 60 % từ
+  mới của câu (từ không có trong câu hỏi), nhiều từ mới nhất thì được trích; `[n]` đặt trước dấu câu cuối. Một câu
+  không đoạn nào đạt là loại cả câu trả lời. Không đạt thì người dùng vẫn thấy câu trích, kèm `model_rejected`. Giao diện hiện câu trả lời dạng chữ thuần.
+- **Hạn và lượt.** Hạn tổng `MOC_ASK_DEADLINE_S` (50 giây, dưới 60 giây của APISIX); nhúng câu hỏi ≤ 5 giây (lỗi thì
+  tìm từ khóa, `embed_unavailable`); gọi mô hình ≤ `MOC_ASK_MODEL_TIMEOUT_S`. Một lượt `generate` một lúc
+  (`MOC_ASK_CONCURRENCY`), chờ quá `MOC_ASK_QUEUE_S` thì `503 busy` kèm `Retry-After: 10`; `extract` không phải chờ.
+  Người hỏi ngắt kết nối (nút "Dừng", Esc, đóng trang) thì lượt bị hủy: lời gọi Ollama ngắt, lượt sinh được nhả, không
+  trả lời nên không ghi sổ — chỉ nhật ký `office.assist.ask_cancelled`.
+- **Trợ lý có danh tính, có sổ.** Mỗi lượt hỏi ghi **một** dòng `assistant.answered` (thực thể `ai.questions`, id =
+  `ask_id`) bằng vai trò Hasura `agent`: preset ép `actor_id = moc-assistant`, `actor_kind = agent`, thuê ước. `diff`
+  chỉ có siêu dữ liệu: `user_id, ask_id, mode, status, answer_source, hits, cited` (số nguồn được trích), `documents`
+  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings` — **không câu hỏi, câu trả lời, đoạn
+  trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
+  hai dòng sổ cùng một thực thể.
+- **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
+  cited, semantic, model, warnings, duration_ms}, `office.assist.ask_failed` {code}, `office.assist.model_rejected`
+  {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` / `ai_unavailable` (khi đổi trạng thái),
+  `office.assist.embed_dims_mismatch` {dims, expected} (mức error), `office.assist.indexed` / `embedded` /
+  `embed_skipped` {ids} / `index_failed` {error, stage, reason}, `config.warning` {message} lúc khởi động.
+
+| Kết quả | Ý nghĩa |
+|---|---|
+| `status` | `answered` có câu trả lời · `passages_only` có đoạn liên quan mà không câu nào đủ khớp để trích · `no_evidence` không đoạn nào (`sources: []`) |
+| `answer`, `extract` | `{text, source: extract\|model, model}`; `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; null khi không có |
+| `sources[]` | Tối đa `MOC_ASK_TOP_K`, theo thứ tự xếp hạng, `n` từ 1: `document_id, symbol, type_code, type_name, summary, issuer_name, issued_on, direction, status` (từ Hasura), `kind: page\|meta, file_id, file_role: main\|attachment\|issued, page, excerpt` (≤ 600 ký tự quanh câu tốt nhất, một dòng), `cited` |
+| `semantic` · `ai_available` | Lượt này có tìm theo nghĩa · mô hình viết câu trả lời đang sẵn sàng |
+| `warnings` | `embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`, `model_declined` (mô hình nói không đủ căn cứ) |
+| `400 invalid_question` | Rỗng sau chuẩn hóa, > 500 ký tự, có ký tự điều khiển, chỉ toàn từ dừng |
+| `401` · `403` | Thiếu / sai token, Hasura từ chối token lúc hậu kiểm · vai trò không được hỏi |
+| `503` | `assistant_disabled` (`MOC_ASK_ENABLED=false`) · `busy` · `search_unavailable` (Meilisearch) · `database_unavailable` (Hasura, hoặc không ghi được sổ) |
+
+**Số đo** (`make do-hoi-dap` trên bản cài thử, 21/10/2026: kho mẫu `seed/hoi-dap/` 6 văn bản 14 trang + dữ liệu `make
+seed`, 19 câu có đáp án trong `cau-hoi.json` — 16 câu dương, 2 câu không có trong kho, 1 câu hỏi văn bản người hỏi không
+được xem; hỏi đúng người, qua APISIX; máy đo như trên). Kho mẫu nhỏ, câu hỏi do đội viết — **mức trần**, số thật khi
+có đơn vị chạy thử.
+
+| | Không bật `ai` (CI) | Bật `ai` (Qwen3-Embedding-0.6B + Qwen3-1.7B, CPU) |
+|---|---|---|
+| recall@3 (nguồn đúng trong 3 nguồn đầu, câu dương) | 16 / 16 | 16 / 16 |
+| Từ chối đúng (câu âm, câu bị cấm) | 3 / 3 (2 `no_evidence`, 1 `passages_only`) | 3 / 3 (`no_evidence`) |
+| Lượt có nguồn bị cấm (văn bản hạn chế, văn bản không được xem) | 0 | 0 |
+| Câu trích có từ khóa của đáp án | 15 / 16 | 15 / 16 |
+| Thời gian `extract` p50 / p95 | 20 / 61 ms | 0,44 / 0,70 s (gồm nhúng câu hỏi) |
+| Câu của mô hình qua kiểm · có từ khóa · trích đúng nguồn | — | 16 / 16 · 16 / 16 · 16 / 16 |
+| Thời gian `generate` p50 / p95 | — | 14,3 / 23,5 s |
+
+Câu tìm lai (tỷ trọng nghĩa 0,5) của câu dương có nguồn đúng đứng đầu với điểm ≥ 0,88, câu âm điểm cao nhất ≤ 0,70 —
+nên ngưỡng `MOC_ASK_MIN_SCORE_SEMANTIC` 0,75. Trước khi máy chủ tự gán trích dẫn, cùng mô hình chỉ qua kiểm 0 / 19
+(không ghi `[n]`). Nhúng 61 đoạn của kho mẫu mất khoảng 2 phút. Ngắt kết nối giữa lượt `generate` qua APISIX (`499`
+sau 4 giây): svc-files hủy lượt, không ghi sổ, câu hỏi kế tiếp chạy ngay.
+
+Chưa làm, giới hạn đã biết:
+
+- Gỡ tệp đính kèm mà không sửa văn bản (gọi thẳng `delete_office_document_files`): đoạn của tệp còn trong chỉ mục tới
+  lần văn bản đổi sau, và hậu kiểm theo văn bản không bắt được — như giới hạn đã ghi của F2.7 (giao diện luôn sửa văn
+  bản trong cùng lệnh).
+- Hủy một giao việc không đổi `updated_at` hay `assigned_at`, nên thuộc tính quyền của đoạn còn cũ tới lần văn bản đổi
+  sau. Việc này chỉ làm giảm độ phủ; hậu kiểm vẫn giữ an toàn.
+- Meilisearch chỉ xét 10 từ đầu của câu tìm; câu hỏi gõ không dấu bỏ được ít từ dừng hơn. Bản scan chỉ có đoạn "trích
+  yếu" (chưa OCR nền). Tách câu dựa trên lớp chữ PDF, có thể lệch với PDF dàn trang lạ.
+- Ngưỡng và hằng số kiểm (`RELAX_MIN`, độ phủ 60 %, ngưỡng câu trích) chỉnh trên kho mẫu nhỏ; cần đo lại trên kho
+  thật. Kiểm theo từ không bắt được câu sai mà dùng đúng chữ của nguồn (vd "loại Xuất sắc" khi nguồn có cả "Xuất sắc"
+  lẫn "Tốt"); câu có từ đệm không có trong nguồn ("… như sau:") có thể bị loại oan — người dùng vẫn có câu trích.
+- Tìm theo từ khóa không hiểu từ đồng nghĩa: câu hỏi dùng chữ khác hẳn văn bản chỉ ra khi bật tìm theo nghĩa.
 
 ### Văn bản đi và cổng xác thực
 
@@ -403,6 +549,10 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 | Đọc văn bản đến: vị trí tệp trong kho, tệp có gắn vào văn bản hạn chế nào không (`document_files.document.restricted`) | Như tải xuống: khóa quản trị + `X-Hasura-Role: service` + thuê ước trong token |
 | Đọc văn bản đến: gợi ý đã lưu, lưu gợi ý + ghi `intake.suggested` (một mutation) | Khóa quản trị + `X-Hasura-Role: agent` + thuê ước trong token + `X-Hasura-User-Id: <MOC_AGENT_ID>` — preset của vai trò ép danh tính, thuê ước |
 | Đọc văn bản đến: danh mục loại văn bản (giữ 10 phút) | Khóa quản trị, không kèm vai trò — danh mục chung, chỉ đọc |
+| Hỏi đáp: đọc văn bản vừa đổi kèm chữ theo trang, thuộc tính quyền để đồng bộ chỉ mục đoạn (`ChunkSources`) | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, mọi thuê ước; văn bản hạn chế chỉ đọc để xóa đoạn |
+| Hỏi đáp: hậu kiểm đoạn tìm được (`AskDocuments`) | Token của người hỏi — Hasura áp quyền đọc văn bản |
+| Hỏi đáp: ghi `assistant.answered` (`GhiSoTroLy`) | Khóa quản trị + `X-Hasura-Role: agent` + thuê ước trong token + `X-Hasura-User-Id: <MOC_ASSISTANT_ID>` — preset của vai trò ép danh tính, thuê ước |
+| Gợi ý giao việc (F4.3, có sẵn, chưa dùng): hậu kiểm bằng quyền dịch vụ (`AskDocumentsService`) | Khóa quản trị + `X-Hasura-Role: service` + thuê ước; không bao giờ văn bản hạn chế |
 
 ## Cấu hình
 
@@ -454,13 +604,27 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_READ_CONCURRENCY` | `1` | Số lượt đọc cùng lúc |
 | `MOC_READ_QUEUE_S` | `15` | Chờ lượt quá thì `503 busy` |
 | `MOC_READ_DEADLINE_S` | `50` | Hạn tổng một yêu cầu đọc (dưới 60 giây của APISIX) |
-| `MOC_AI_URL` | `http://ollama:11434` | Ollama của profile `ai`; rỗng: tắt mô hình |
+| `MOC_AI_URL` | `http://ollama:11434` | Ollama của profile `ai` (đọc văn bản đến và hỏi đáp dùng chung); rỗng: tắt mô hình |
 | `MOC_AI_MODEL` | `qwen3:1.7b` | Tên mô hình trong Ollama (thử `qwen3:4b` nếu máy đủ nhanh) |
 | `MOC_AI_TIMEOUT_S` | `20` | Hạn mô hình; quá thì trích yếu theo quy tắc (`model_timeout`) |
 | `MOC_AI_MAX_CHARS` | `3000` | Số ký tự thân văn bản gửi mô hình |
 | `MOC_AI_SUMMARY` | `fallback` | `fallback`: chỉ hỏi mô hình khi quy tắc không ra trích yếu tin cậy cao · `always`: luôn hỏi |
 | `MOC_AGENT_ID` | `moc-doc-reader` | Danh tính tác tử trong sổ kiểm toán |
 | `MOC_TESSERACT_BIN` | `tesseract` | Chương trình tesseract (test thay bằng bản giả) |
+| `MOC_ASK_ENABLED` | `true` | Hỏi đáp (F4.2); `false`: `503 assistant_disabled`, không chạy vòng chỉ mục đoạn, không dò mô hình |
+| `MOC_ASK_INDEX` | `chunks` | Chỉ mục đoạn trong Meilisearch, `[A-Za-z0-9_-]{1,64}`, khác `MOC_SEARCH_INDEX`; tự tạo và áp cấu hình khi khởi động |
+| `MOC_ASK_SYNC_INTERVAL_S` | `5` | Chu kỳ đồng bộ + nhúng chỉ mục đoạn; `0` chỉ hợp lệ khi `MOC_ASK_ENABLED=false` (bật trợ lý mà không có vòng nền thì chỉ mục đoạn không bao giờ có: svc-files từ chối khởi động) |
+| `MOC_ASK_TOP_K` · `MOC_ASK_CANDIDATES` · `MOC_ASK_PER_DOC` | `5` · `24` · `2` | Số nguồn trả về · số đoạn lấy từ Meilisearch mỗi lượt · số đoạn tối đa mỗi văn bản |
+| `MOC_ASK_MIN_SCORE` · `MOC_ASK_MIN_SCORE_SEMANTIC` | `0` · `0.75` | Ngưỡng `_rankingScore` khi tìm từ khóa · tìm lai (0–1). Từ khóa để 0: chiến lược `frequency` đã buộc đoạn chứa từ hiếm nhất của câu hỏi, điểm `words` thấp cả với nguồn đúng. Tìm lai 0,75: trên kho mẫu nguồn đúng đứng đầu ≥ 0,88, câu không có đáp án ≤ 0,70 |
+| `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1) |
+| `MOC_ASK_DEADLINE_S` | `50` | Hạn tổng một lượt hỏi, tối đa 55 (dưới 60 giây của APISIX) |
+| `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
+| `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |
+| `MOC_ASK_CONTEXT_CHARS` | `2800` | Tổng ký tự các đoạn gửi mô hình |
+| `MOC_ASK_CONCURRENCY` · `MOC_ASK_QUEUE_S` | `1` · `20` | Số lượt `generate` cùng lúc · chờ lượt quá thì `503 busy` |
+| `MOC_AI_EMBED_MODEL` | `qwen3-embedding:0.6b` | Mô hình nhúng trong Ollama (`bge-m3` thay được); đặt rỗng: không nhúng, chỉ tìm từ khóa |
+| `MOC_AI_EMBED_DIMS` · `MOC_AI_EMBED_BATCH` | `1024` · `8` | Số chiều véc-tơ, phải đúng của mô hình (sai thì tắt tìm theo nghĩa, ghi lỗi `embed_dims_mismatch`) · số đoạn mỗi lô nhúng nền |
+| `MOC_ASSISTANT_ID` | `moc-assistant` | Danh tính trợ lý trong sổ kiểm toán (`X-Hasura-User-Id` của vai trò agent) |
 
 ## Phát triển
 

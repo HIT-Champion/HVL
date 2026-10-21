@@ -87,15 +87,16 @@ query ChangedDocuments($since: timestamptz!, $limit: Int!, $after: uuid!) {
   }
 }"""
 
-# Lớp chữ của PDF (F2.7): tệp PDF chính hoặc đính kèm của một văn bản, chưa đọc chữ. Bỏ tệp đã mã hóa, tệp của
-# văn bản hạn chế (bản chữ trần sẽ vô hiệu việc mã hóa — F3.7; CSDL cũng chặn, xem migration file_texts), tệp chưa
-# gắn vào văn bản nào (chưa biết có hạn chế không), bản thảo và bản phát hành văn bản đi (chỉ mục không dùng).
+# Lớp chữ của PDF (F2.7): tệp PDF chính, đính kèm hoặc bản phát hành văn bản đi (F4.2: trợ lý hỏi đáp trích dẫn bản
+# phát hành; chỉ mục tìm kiếm F2.7 vẫn chỉ lấy main, attachment) của một văn bản, chưa đọc chữ. Bỏ tệp đã mã hóa, tệp
+# của văn bản hạn chế (bản chữ trần sẽ vô hiệu việc mã hóa — F3.7; CSDL cũng chặn, xem migration file_texts), tệp
+# chưa gắn vào văn bản nào (chưa biết có hạn chế không), bản thảo văn bản đi (chưa có giá trị, đổi liên tục).
 PENDING_TEXTS = """
 query PendingTexts($limit: Int!) {
   core_files(
     where: {_and: [
       {mime_type: {_eq: "application/pdf"}}, {encrypted: {_eq: false}},
-      {document_files: {role: {_in: ["main", "attachment"]}}},
+      {document_files: {role: {_in: ["main", "attachment", "issued"]}}},
       {_not: {text: {}}}, {_not: {document_files: {document: {restricted: {_eq: true}}}}}
     ]}
     order_by: [{created_at: asc}, {id: asc}]
@@ -107,6 +108,44 @@ SAVE_TEXT = """
 mutation SaveText($o: core_file_texts_insert_input!) {
   insert_core_file_texts_one(object: $o, on_conflict: {constraint: file_texts_pkey, update_columns: []}) { file_id }
 }"""
+
+# Chỉ mục đoạn của trợ lý hỏi đáp (F4.2, assist/index.py): như CHANGED_DOCUMENTS nhưng kèm chữ theo trang của từng
+# tệp, thuộc tính quyền (phòng, người tạo, giao việc chưa hủy) và bắt cả giao việc mới (không đổi updated_at văn bản).
+# Khóa quản trị, mọi thuê ước: văn bản hạn chế cũng được đọc — để xóa đoạn của nó (chunks.eligible), không lấy chữ.
+CHUNK_SOURCES = """
+query ChunkSources($since: timestamptz!, $limit: Int!, $after: uuid!) {
+  office_documents(
+    where: {_and: [{id: {_gt: $after}}, {_or: [
+      {updated_at: {_gte: $since}},
+      {files: {role: {_in: ["main", "attachment", "issued"]}, file: {text: {extracted_at: {_gte: $since}}}}},
+      {assignments: {assigned_at: {_gte: $since}}}
+    ]}]}
+    order_by: {id: asc}
+    limit: $limit
+  ) {
+    id tenant_id direction status type_code symbol issuer_name issued_on summary restricted department_id created_by
+    updated_at document_type { name }
+    assignments(where: {status: {_neq: "cancelled"}}) { department_id user_id assigned_at }
+    files(where: {role: {_in: ["main", "attachment", "issued"]}}, order_by: {added_at: asc}) {
+      role file_id file { encrypted text { status pages content page_starts extracted_at } }
+    }
+  }
+}"""
+
+# Hậu kiểm của trợ lý hỏi đáp (F4.2): bằng token người hỏi — Hasura áp quyền đọc; dữ liệu nguồn trả về là bản mới
+# nhất trong CSDL, không phải bản sao trong chỉ mục. ``direction``, ``status``, ``restricted``: retrieve.py áp
+# ``chunks.eligible`` — đoạn của văn bản vừa bật hạn chế, vừa hủy, vừa về dự thảo thì bỏ.
+_ASK_FIELDS = "id direction status type_code symbol issuer_name issued_on summary restricted document_type { name }"
+ASK_DOCUMENTS = f"""
+query AskDocuments($ids: [uuid!]!) {{
+  office_documents(where: {{id: {{_in: $ids}}}}) {{ {_ASK_FIELDS} }}
+}}"""
+
+# Như trên, phạm vi dịch vụ (F4.3 gợi ý giao việc): vai trò service của đúng thuê ước, không bao giờ văn bản hạn chế
+ASK_DOCUMENTS_SERVICE = f"""
+query AskDocumentsService($ids: [uuid!]!) {{
+  office_documents(where: {{_and: [{{id: {{_in: $ids}}}}, {{restricted: {{_eq: false}}}}]}}) {{ {_ASK_FIELDS} }}
+}}"""
 
 # Kết quả tìm kiếm: chỉ những văn bản người dùng được đọc, dữ liệu mới nhất từ CSDL
 VISIBLE_DOCUMENTS = """
@@ -427,10 +466,41 @@ class HasuraClient:
         return data["core_files"]
 
     async def save_text(self, *, file_id: str, tenant_id: str, status: str, pages: int | None, content: str,
-                        note: str | None) -> None:
+                        note: str | None, page_starts: list[int] | None = None) -> None:
+        """page_starts (F4.2): vị trí đầu từng trang trong content, gửi dạng mảng JSON; null khi không ``ok``."""
         await self._call(SAVE_TEXT, {"o": {"file_id": file_id, "tenant_id": tenant_id, "status": status,
-                                           "pages": pages, "content": content, "note": note}},
+                                           "pages": pages, "content": content, "note": note,
+                                           "page_starts": page_starts}},
                          {"X-Hasura-Admin-Secret": self._secret})
+
+    async def chunk_sources(self, since: datetime, limit: int, after: str) -> list[dict[str, Any]]:
+        """Văn bản đổi từ `since` (sửa văn bản, tệp vừa đọc chữ, giao việc mới) của mọi thuê ước, kèm chữ theo trang —
+        nguồn của chỉ mục đoạn (F4.2). Lật trang theo id như changed_documents; khóa quản trị: việc nội bộ, chỉ đọc."""
+        data = await self._call(
+            CHUNK_SOURCES,
+            {"since": since.isoformat(), "limit": limit, "after": after},
+            {"X-Hasura-Admin-Secret": self._secret},
+        )
+        return data["office_documents"]
+
+    async def ask_documents(self, token: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Trong các id cho trước, những văn bản người giữ token được đọc (hậu kiểm của trợ lý hỏi đáp, F4.2)."""
+        try:
+            data = await self._call(ASK_DOCUMENTS, {"ids": ids}, {"Authorization": f"Bearer {token}"})
+        except HasuraAuthError:
+            raise
+        except HasuraError as exc:
+            if exc.code == "validation-failed":  # vai trò không đọc văn bản (vd tenant_admin)
+                return {}
+            raise
+        return {row["id"]: row for row in data["office_documents"]}
+
+    async def ask_documents_service(self, tenant_id: uuid.UUID, ids: list[str], *, actor_id: str = "svc-files",
+                                    request_id: str = "") -> dict[str, dict[str, Any]]:
+        """Như ask_documents nhưng bằng vai trò service của đúng thuê ước (F4.3), không bao giờ văn bản hạn chế."""
+        data = await self._call(ASK_DOCUMENTS_SERVICE, {"ids": ids},
+                                self._as_service(tenant_id, actor_id, request_id or str(uuid.uuid4())))
+        return {row["id"]: row for row in data["office_documents"]}
 
     async def file_location(
         self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, file_id: uuid.UUID

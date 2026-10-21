@@ -19,6 +19,7 @@
     "incoming": "Incoming documents",
     "receive": "Receive document",
     "search": "Search",
+    "ask": "Ask",
     "logout": "Sign out",
     "language": "Tiếng Việt",
     "outgoing": "Outgoing",
@@ -388,7 +389,98 @@
       "out": "Outgoing"
     },
     "matchedContent": "Matched in content",
-    "matchedContentHint": "The words appear in the document body or in the text of an attached PDF, not in its reference or summary"
+    "matchedContentHint": "The words appear in the document body or in the text of an attached PDF, not in its reference or summary",
+    "askAssistant": "Ask the assistant"
+  },
+  "assist": {
+    "title": "Ask the documents",
+    "intro": "The assistant only searches documents you are allowed to see; restricted documents are never included. Every point cites a reference number and page so you can check it.",
+    "label": "Question",
+    "placeholder": "For example: What are the requirements for a merit scholarship?",
+    "keysHint": "Enter to ask, Shift+Enter for a new line",
+    "count": "{n}/{max} characters",
+    "ask": "Ask",
+    "any": "All",
+    "direction": {
+      "label": "Documents",
+      "in": "Incoming",
+      "out": "Outgoing"
+    },
+    "year": "Year",
+    "anyYear": "Any year",
+    "yearValue": "Year {year}",
+    "searching": "Searching the documents…",
+    "generating": "Writing an answer from the passages (may take up to 40 seconds)",
+    "elapsed": "{s} s",
+    "generatingHint": "The verbatim quote above is ready to use — press Stop or Esc if you do not want to wait.",
+    "waiting": "Waiting for the previous answer to finish…",
+    "stop": "Stop",
+    "stopped": "Stopped writing the answer — showing the verbatim quote.",
+    "generateFailed": "Could not write an answer: {reason}",
+    "retryGenerate": "Write the answer again",
+    "extractTitle": "Verbatim quote",
+    "modelTitle": "Assistant answer",
+    "modelNote": "Written by a language model — check the sources before relying on it",
+    "showExtract": "Show the verbatim quote",
+    "hideExtract": "Hide the verbatim quote",
+    "passagesOnly": "No short answer could be quoted — see the related passages below.",
+    "noEvidence": "No document you are allowed to see covers this. Try rephrasing, or use Search.",
+    "openSearch": "Search with this question",
+    "keyword": "Keyword search",
+    "semantic": "Keyword and meaning search",
+    "took": "{s} s",
+    "history": "Questions in this session",
+    "historyNote": "Questions and answers stay on this page only and are not stored on the server — reloading the page clears them.",
+    "source": {
+      "title": "Sources",
+      "n": "Source {n}",
+      "cite": "Source {n}: {label}",
+      "cited": "Cited",
+      "excerpt": "Passage",
+      "more": "Show the full passage",
+      "less": "Collapse the passage"
+    },
+    "openDocument": "Open document",
+    "openDocumentFor": "Open document {label}",
+    "page": "p. {n}",
+    "pageSpoken": "page {n}",
+    "summaryOnly": "summary",
+    "attachment": "attachment",
+    "citeLabel": "{symbol} · {where}",
+    "citeSpoken": "{symbol}, {where}",
+    "status": {
+      "answered": "Answered",
+      "passages_only": "Related passages only",
+      "no_evidence": "No evidence"
+    },
+    "warning": {
+      "embed_unavailable": "Meaning search was unavailable this time — results are by keyword only",
+      "model_unavailable": "The language model is not ready — showing the verbatim quote",
+      "model_timeout": "The model took too long — showing the verbatim quote",
+      "model_rejected": "The model answer failed the citation check, so it is not shown",
+      "model_declined": "The model found the passages insufficient to answer — showing the verbatim quote"
+    },
+    "error": {
+      "invalid_question": "The question is empty, longer than 500 characters, or only common words — be more specific (a topic, a number, a reference…).",
+      "missing_token": "Your session has expired — sign in again, then ask again.",
+      "invalid_token": "Your session has expired — sign in again, then ask again.",
+      "forbidden": "Only clerks, officers and managers can use Ask.",
+      "assistant_disabled": "The assistant is not enabled on the server — use Search.",
+      "busy": "The assistant is busy with another answer — try again in about 10 seconds.",
+      "search_unavailable": "The search index is temporarily unavailable — try again in a few minutes.",
+      "database_unavailable": "The audit log could not be written, so no answer was given — try again in a few minutes.",
+      "invalid_request": "Invalid request — reload the page and ask again.",
+      "not_found": "The server does not offer Ask yet — contact your administrator.",
+      "unavailable": "The assistant is temporarily not responding — try again in a few minutes.",
+      "client_timeout": "No result within the time limit — try again in a few minutes.",
+      "generic": "Could not ask: {msg}"
+    },
+    "live": {
+      "found": "Related passages found: {n}.",
+      "generating": "Writing an answer.",
+      "answered": "The assistant has answered.",
+      "extractOnly": "No model answer — showing the verbatim quote."
+    }
   },
   "error": {
     "generic": "Something went wrong: {msg}",
@@ -565,6 +657,9 @@
       },
       "intake": {
         "suggested": "Read document, suggested intake details"
+      },
+      "assistant": {
+        "answered": "Answered a question on the documents"
       }
     },
     "entity": {
@@ -584,6 +679,9 @@
         "files": "Uploaded file",
         "users": "User",
         "tenants": "Organisation"
+      },
+      "ai": {
+        "questions": "Question to the assistant"
       }
     },
     "col": {
@@ -665,8 +763,16 @@
       "found": "Fields found",
       "summary_source": "Summary source",
       "model": "Model",
-      "duration_ms": "Reading time",
-      "reason": "Reason"
+      "duration_ms": "Processing time",
+      "reason": "Reason",
+      "ask_id": "Question ID",
+      "mode": "Mode",
+      "answer_source": "Answer source",
+      "hits": "Passages found",
+      "cited": "Sources cited",
+      "semantic": "Meaning search",
+      "embed_model": "Embedding model",
+      "warnings": "Warnings"
     },
     "direction": {
       "in": "Incoming",
@@ -688,7 +794,8 @@
     },
     "agent": "{name} (agent)",
     "agents": {
-      "moc-doc-reader": "Document reader"
+      "moc-doc-reader": "Document reader",
+      "moc-assistant": "Q&A assistant"
     },
     "seconds": "{n} s",
     "readStatus": {
@@ -698,6 +805,15 @@
     },
     "summarySource": {
       "rule": "Rules",
+      "model": "Language model",
+      "none": "None"
+    },
+    "askMode": {
+      "extract": "Verbatim quote",
+      "generate": "Model-written answer"
+    },
+    "answerSource": {
+      "extract": "Verbatim quote",
       "model": "Language model",
       "none": "None"
     }

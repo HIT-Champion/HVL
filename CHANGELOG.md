@@ -284,6 +284,41 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   trống từng trường, thoát 1 khi PDF có chữ dưới ngưỡng — bước CI); `make smoke` +3 (tổng 63); e2e `doc-van-ban.spec.ts`
   (`make e2e` gắn văn bản mẫu vào container Playwright); CI kiểm cấu hình profile `ai`, `ai-pull`. Test: CSDL +35,
   svc-files +243, giao diện +13.
+- Trợ lý hỏi đáp trên kho văn bản (F4.2): trang "Hỏi đáp" (`/hoi-dap`: văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo
+  đơn vị; nút "Hỏi trợ lý" ở Tìm kiếm) — hỏi bằng câu tự nhiên, nhận **câu trích nguyên văn** từ văn bản chính người
+  hỏi được xem, mỗi câu kèm `[n]` trỏ nguồn "số ký hiệu · tr. n" (bản scan: "trích yếu"), đoạn trích, nút mở văn bản;
+  không có căn cứ thì một câu chung "Không tìm thấy văn bản nào bạn được xem có nội dung này". `POST
+  /api/documents/ask` (svc-files, gói `assist/`, tự viết, không LlamaIndex): chế độ `extract` tất định, không cần mô
+  hình (đường của CI); bật profile `ai` thì giao diện tự gọi tiếp `generate` — Qwen3 chạy tại chỗ viết câu trả lời
+  ngắn chỉ từ các đoạn đã hậu kiểm, ép JSON Schema; **máy chủ tự gán `[n]`** cho từng câu theo bằng chứng (bỏ mọi
+  `[n]` mô hình tự ghi): mỗi câu phải có một đoạn chứa phần lớn ý mới của câu và mọi số trong câu, một câu không có
+  căn cứ là bỏ cả câu trả lời, vẫn trả câu trích; nhãn "Do mô hình ngôn ngữ viết — đối chiếu nguồn trước khi dùng".
+  Câu hỏi, câu trả lời không lưu ở đâu cả; một lượt sinh một lúc (`503 busy`), nút "Dừng" hủy luôn lượt sinh trên máy
+  chủ, hạn tổng 50 giây.
+- Chỉ mục đoạn cho trợ lý: chữ PDF giữ ranh giới trang (cột `core.file_texts.page_starts`, migration
+  `1792281602000_assistant`); vòng nền svc-files cắt văn bản thành đoạn ≤ 1 200 ký tự trong từng trang và đồng bộ
+  sang chỉ mục Meilisearch `chunks` mỗi 5 giây — chỉ văn bản đến chưa hủy và văn bản đi đã phát hành. Tìm lai từ
+  khóa + theo nghĩa (embedder `userProvided`: svc-files tự nhúng qua Ollama bằng Qwen3-Embedding-0.6B, Apache-2.0,
+  `MOC_AI_EMBED_MODEL`); không có mô hình (CI) hoặc tìm lai lỗi thì tìm theo từ khóa, kèm một lượt **tìm nới** khi
+  chưa đủ đoạn — chiến lược `frequency` của Meilisearch luôn giữ từ hiếm nhất của câu hỏi ("điều kiện"), nên văn bản
+  trả lời không chứa từ đó không bao giờ ra; lượt nới tìm từng từ trong cùng phạm vi, cân theo độ hiếm, nhận đoạn có
+  ≥ 50 % trọng số câu hỏi, qua hậu kiểm như mọi đoạn. Đoạn mô hình nhúng không nhận được đánh dấu riêng, chỉ tìm
+  theo từ khóa, không chặn vòng nền; một lượt đồng bộ chỉ tiến khi mọi tác vụ Meilisearch thành công. Dùng lại
+  Meilisearch sẵn có thay Qdrant (QĐ-004 trong `docs/architecture.md`). Sẵn phạm vi dịch vụ và `similar_documents`
+  cho gợi ý giao việc (F4.3).
+- Tác tử `moc-assistant` có sổ: mỗi câu trả lời một dòng `assistant.answered` về `ai.questions` (vai trò Hasura
+  `agent`, như F4.1), chỉ siêu dữ liệu — chế độ, số đoạn, số nguồn được trích, mô hình, thời gian, cảnh báo; không ghi
+  được sổ thì không trả lời. Sổ kiểm toán hiện "Trợ lý hỏi đáp"; cột thời gian đổi tên chung "Thời gian xử lý".
+  `/readyz` của svc-files báo thêm `assist` (tìm theo nghĩa được chưa, số đoạn chờ nhúng, số đoạn nhúng lỗi). Cấu hình
+  sai bị báo: `MOC_AI_EMBED_DIMS` lệch số chiều thật thì tắt tìm theo nghĩa và ghi lỗi, `MOC_ASK_SYNC_INTERVAL_S=0`
+  khi bật trợ lý thì không khởi động. Profile `ai` giữ cùng lúc mô hình viết và mô hình nhúng
+  (`OLLAMA_MAX_LOADED_MODELS=2`).
+- Kho văn bản mẫu hư cấu `seed/hoi-dap/` (6 PDF, 14 trang, một văn bản hạn chế; ~135 KB) với 19 câu hỏi kiểm thử có
+  đáp án (`cau-hoi.json`), sinh lại bằng `make hoi-dap-mau`. `make demo-hoi-dap` (cũng là bước CI): văn thư hỏi ra câu
+  trích đúng trang, giảng viên hỏi cùng câu thì "Không tìm thấy", nội dung văn bản hạn chế không ai hỏi ra, sổ không
+  có chữ nào của câu hỏi. `make do-hoi-dap` (bước CI): recall@3, tỉ lệ từ chối đúng, p50 / p95; thoát 1 khi có nguồn
+  bị cấm hoặc recall@3 dưới 80 %. `make smoke` +3 (tổng 66); e2e `hoi-dap.spec.ts`. Test: CSDL +31,
+  svc-files +436, giao diện +15, scripts +18.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -318,6 +353,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   không cần `make reset`.
 - Tiếp nhận văn bản đến (F4.1): giao diện gọi tác tử đọc khi tệp quét sạch; `make down`, `make reset` dừng cả profile
   `ai`, `ai-pull`; `.gitignore` theo dõi `seed/van-ban-den/*.pdf`; `scripts/license-header.sh` coi `*.tsv` là dữ liệu.
+- Trợ lý hỏi đáp (F4.2): `make ai-model` kéo cả mô hình nhúng (`MOC_AI_EMBED_MODEL`, mặc định
+  `qwen3-embedding:0.6b`, khoảng 640 MB) và `MOC_ASK_MODEL` khi đặt riêng. Hàng đợi đọc chữ (F2.7) đọc thêm bản phát
+  hành của văn bản đi; migration `1792281602000` xóa các dòng chữ đã đọc để đọc lại một lần, lần này có ranh giới
+  trang — ngay sau khi nâng cấp, tìm theo nội dung có thể thiếu trong vài phút.
 
 ### Đã sửa lỗi
 - Bấm lại khi hoàn thành việc lâu (phát hành) hay hai lần gọi chen nhau không còn ghi hai lần (hai phân công, hai lần
@@ -357,6 +396,11 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   tệp mã hóa, hay tệp rõ còn gắn vào văn bản hạn chế (dữ liệu có từ trước F3.7) — nên không tới OCR, không tới mô
   hình; trigger `intake_suggestions_guard` chặn thêm ở CSDL việc lưu gợi ý của các tệp đó, xóa gợi ý khi văn bản bật
   hạn chế. Vai trò `agent` không đọc, ghi văn bản; dòng sổ và nhật ký của tác tử không mang nội dung văn bản.
+- Trợ lý hỏi đáp (F4.2) chỉ dựa trên văn bản người hỏi được xem: lọc trước theo vai trò ngay trong chỉ mục (viết như
+  `office.document_visible`), rồi hậu kiểm bằng Hasura với token người hỏi — cả hai trước mô hình và trước người dùng,
+  nên chỉ mục còn cũ cũng không làm lộ; văn bản hạn chế không bao giờ vào chỉ mục, bật hạn chế là xóa mọi đoạn. Chữ
+  văn bản đưa cho mô hình nằm trong thẻ riêng, thẻ giả trong văn bản bị bỏ. Dòng sổ và nhật ký của trợ lý không mang
+  câu hỏi, câu trả lời hay đoạn trích.
 - Action GitHub trong CI và quy trình phát hành ghim theo SHA commit, image công cụ CI ghim theo digest;
   workflow CI chỉ có quyền đọc kho.
 - Xác thực hai bước TOTP (F1.1): đăng nhập trình duyệt bắt buộc mã với văn thư, lãnh đạo phòng, lãnh đạo đơn

@@ -29,7 +29,9 @@ văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} v
 Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh — archive.py; phòng đọc
 /api/case-files/{id}/archive đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL. Liên thông trong hệ thống (F3.12):
 svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kho của đơn vị nhận — dispatch.py. Đọc văn bản đến
-(F4.1): văn thư gọi /api/files/{id}/read, tác tử đọc tệp vừa tải lên và gợi ý thông tin tiếp nhận — docread/.
+(F4.1): văn thư gọi /api/files/{id}/read, tác tử đọc tệp vừa tải lên và gợi ý thông tin tiếp nhận — docread/. Hỏi đáp
+trên kho văn bản (F4.2): /api/documents/ask trả câu trích nguyên văn có nguồn từ các văn bản người hỏi được xem, tùy
+chọn câu trả lời do mô hình viết; vòng nền giữ chỉ mục đoạn `chunks` — assist/.
 
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
@@ -62,6 +64,12 @@ from starlette.datastructures import UploadFile
 from . import __version__
 from .anchors import Anchorer, AnchorStore
 from .archive import ArchiveError, Archiver, ColdStore, read_package
+from .assist import api as assist_api
+from .assist.ai import AiClient, make_ai
+from .assist.answer import Assistant
+from .assist.index import ChunkIndexer
+from .assist.meili import ChunkIndex
+from .assist.retrieve import Retriever
 from .auth import AuthError, Principal, TokenVerifier
 from .clamav import ClamAVClient, ScanError
 from .config import Settings
@@ -326,6 +334,9 @@ def create_app(
     anchor_store: AnchorStore | None = None,
     vault: Vault | None = None,
     reader: Reader | None = None,
+    assistant: Assistant | None = None,
+    chunk_indexer: ChunkIndexer | None = None,
+    ai: AiClient | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -360,9 +371,25 @@ def create_app(
                       secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
     reader = reader or Reader(settings, hasura, store, summarizer=make_summarizer(
         settings.ai_url, settings.ai_model, max_chars=settings.ai_max_chars))
+    # Hỏi đáp trên kho văn bản (F4.2): chỉ mục đoạn riêng trên cùng Meilisearch, mô hình nhúng / sinh tùy chọn
+    ai = ai or make_ai(settings)
+    chunk_index = ChunkIndex(settings.meili_url, settings.meili_api_key, settings.ask_index)
+    chunk_indexer = chunk_indexer or ChunkIndexer(chunk_index, hasura, ai, dims=settings.ai_embed_dims,
+                                                  batch=settings.ai_embed_batch,
+                                                  interval_s=settings.ask_sync_interval_s)
+    assistant = assistant or Assistant(
+        settings,
+        # cùng một tên embedder với vòng nhúng nền (đặt theo ai.embed_model): véc-tơ câu hỏi khớp véc-tơ đoạn
+        retriever=Retriever(chunk_index, hasura, embedder=chunk_indexer.embedder,
+                            candidates=settings.ask_candidates, per_doc=settings.ask_per_doc,
+                            min_score=settings.ask_min_score, min_score_semantic=settings.ask_min_score_semantic,
+                            semantic_ratio=settings.ask_semantic_ratio),
+        ai=ai, indexer=chunk_indexer, hasura=hasura)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        for warning in settings.warnings():     # cấu hình chạy được nhưng dễ chậm (vd ba mô hình tranh hai chỗ)
+            log.warning(json.dumps({"event": "config.warning", "message": warning}, ensure_ascii=False))
         try:
             await asyncio.to_thread(store.ensure_bucket)
         except StorageError as exc:
@@ -372,12 +399,18 @@ def create_app(
         anchor = asyncio.create_task(anchorer.run()) if settings.anchor_interval_s > 0 else None
         texts = asyncio.create_task(extractor.run()) if settings.text_interval_s > 0 else None
         archive = asyncio.create_task(archiver.run()) if settings.archive_interval_s > 0 else None
-        ai = asyncio.create_task(reader.summarizer.run())     # dò Ollama mỗi 60 giây (F4.1); không có mô hình: về ngay
+        probe = asyncio.create_task(reader.summarizer.run())  # dò Ollama mỗi 60 giây (F4.1); không có mô hình: về ngay
+        # F4.2: vòng đồng bộ + nhúng chỉ mục đoạn, vòng dò mô hình của trợ lý — chỉ khi bật trợ lý
+        chunks = (asyncio.create_task(chunk_indexer.run())
+                  if settings.ask_enabled and settings.ask_sync_interval_s > 0 else None)
+        models = asyncio.create_task(ai.run()) if settings.ask_enabled else None
         yield
-        for task in (sync, anchor, texts, archive, ai):
+        for task in (sync, anchor, texts, archive, probe, chunks, models):
             if task is not None:
                 task.cancel()
         await reader.summarizer.aclose()
+        await ai.aclose()
+        await chunk_index.aclose()
         await meili.aclose()
         await hasura.aclose()
         if vault is not None:
@@ -395,6 +428,9 @@ def create_app(
     app.state.anchorer = anchorer
     app.state.meili = meili
     app.state.reader = reader
+    app.state.assistant = assistant
+    app.state.chunk_indexer = chunk_indexer
+    app.state.ai = ai
     bearer = HTTPBearer(auto_error=False)
 
     @app.middleware("http")
@@ -424,6 +460,8 @@ def create_app(
 
     # Đọc văn bản đến (F4.1): POST /api/files/{file_id}/read — docread/api.py
     docread_api.install(app, reader, current_principal)
+    # Hỏi đáp trên kho văn bản (F4.2): POST /api/documents/ask — assist/api.py
+    assist_api.install(app, assistant, current_principal)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
@@ -438,9 +476,16 @@ def create_app(
         # Tìm kiếm hỏng không chặn tải lên / tải xuống: báo "degraded" nhưng vẫn sẵn sàng nhận yêu cầu.
         status = "not_ready" if not ready else "ready" if search_ok else "degraded"
         # ai: mô hình trích yếu (F4.1, profile ai) — tùy chọn, không ảnh hưởng ready
+        # assist (F4.2): chỉ mục đoạn đã đồng bộ xong một lượt; tìm theo nghĩa được (mô hình nhúng sẵn sàng, đúng số
+        # chiều, embedder đã áp trong Meilisearch); mô hình viết câu trả lời sẵn sàng; số đoạn chờ nhúng / bị đánh dấu
+        # hỏng (null: không nhúng hoặc chưa đếm) — không ảnh hưởng ready (không có chúng vẫn tìm theo từ khóa)
         return JSONResponse(
             {"status": status, "clamav": clamd_ok, "storage": store_ok, "hasura": hasura_ok, "search": search_ok,
-             "ai": reader.summarizer.available},
+             "ai": reader.summarizer.available,
+             "assist": {"index": bool(chunk_indexer.ready),
+                        "semantic": ai.embed_available and bool(chunk_indexer.embedder_ready),
+                        "model": ai.chat_available, "embed_pending": chunk_indexer.embed_pending,
+                        "embed_failed": chunk_indexer.embed_failed}},
             status_code=200 if ready else 503,
         )
 

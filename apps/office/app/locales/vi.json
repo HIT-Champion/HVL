@@ -19,6 +19,7 @@
     "incoming": "Văn bản đến",
     "receive": "Tiếp nhận văn bản",
     "search": "Tìm kiếm",
+    "ask": "Hỏi đáp",
     "logout": "Đăng xuất",
     "language": "English",
     "outgoing": "Văn bản đi",
@@ -388,7 +389,98 @@
       "out": "Văn bản đi"
     },
     "matchedContent": "Khớp trong nội dung",
-    "matchedContentHint": "Từ cần tìm có trong nội dung văn bản hoặc trong chữ của tệp PDF đính kèm, không có trong số ký hiệu, trích yếu"
+    "matchedContentHint": "Từ cần tìm có trong nội dung văn bản hoặc trong chữ của tệp PDF đính kèm, không có trong số ký hiệu, trích yếu",
+    "askAssistant": "Hỏi trợ lý"
+  },
+  "assist": {
+    "title": "Hỏi đáp văn bản",
+    "intro": "Trợ lý chỉ tìm trong các văn bản bạn được xem; văn bản hạn chế không bao giờ được đưa vào. Mỗi ý có số ký hiệu và trang để bạn đối chiếu.",
+    "label": "Câu hỏi",
+    "placeholder": "Ví dụ: Điều kiện xét học bổng khuyến khích học tập là gì?",
+    "keysHint": "Enter để hỏi, Shift+Enter để xuống dòng",
+    "count": "{n}/{max} ký tự",
+    "ask": "Hỏi",
+    "any": "Tất cả",
+    "direction": {
+      "label": "Văn bản",
+      "in": "Văn bản đến",
+      "out": "Văn bản đi"
+    },
+    "year": "Năm",
+    "anyYear": "Mọi năm",
+    "yearValue": "Năm {year}",
+    "searching": "Đang tìm trong kho văn bản…",
+    "generating": "Đang soạn câu trả lời từ các đoạn trích (có thể mất đến 40 giây)",
+    "elapsed": "{s} giây",
+    "generatingHint": "Câu trích nguyên văn bên trên dùng được ngay — bấm Dừng hoặc nhấn Esc nếu không cần chờ.",
+    "waiting": "Đang chờ câu trả lời trước soạn xong…",
+    "stop": "Dừng",
+    "stopped": "Đã dừng soạn câu trả lời — đang hiện câu trích nguyên văn.",
+    "generateFailed": "Chưa soạn được câu trả lời: {reason}",
+    "retryGenerate": "Soạn lại câu trả lời",
+    "extractTitle": "Câu trích nguyên văn",
+    "modelTitle": "Trả lời của trợ lý",
+    "modelNote": "Do mô hình ngôn ngữ viết — đối chiếu nguồn trước khi dùng",
+    "showExtract": "Xem câu trích nguyên văn",
+    "hideExtract": "Ẩn câu trích nguyên văn",
+    "passagesOnly": "Chưa trích được câu trả lời ngắn — xem các đoạn liên quan bên dưới.",
+    "noEvidence": "Không tìm thấy văn bản nào bạn được xem có nội dung này. Thử diễn đạt khác hoặc dùng Tìm kiếm.",
+    "openSearch": "Tìm kiếm với câu này",
+    "keyword": "Tìm theo từ khóa",
+    "semantic": "Tìm theo từ khóa và theo nghĩa",
+    "took": "{s} giây",
+    "history": "Các câu hỏi trong phiên này",
+    "historyNote": "Câu hỏi và câu trả lời chỉ giữ trên trang này, không lưu ở máy chủ — tải lại trang là mất.",
+    "source": {
+      "title": "Nguồn",
+      "n": "Nguồn {n}",
+      "cite": "Nguồn {n}: {label}",
+      "cited": "Được trích",
+      "excerpt": "Đoạn trích",
+      "more": "Xem đủ đoạn trích",
+      "less": "Thu gọn đoạn trích"
+    },
+    "openDocument": "Mở văn bản",
+    "openDocumentFor": "Mở văn bản {label}",
+    "page": "tr. {n}",
+    "pageSpoken": "trang {n}",
+    "summaryOnly": "trích yếu",
+    "attachment": "tài liệu kèm theo",
+    "citeLabel": "{symbol} · {where}",
+    "citeSpoken": "{symbol}, {where}",
+    "status": {
+      "answered": "Đã trả lời",
+      "passages_only": "Chỉ có đoạn liên quan",
+      "no_evidence": "Không có căn cứ"
+    },
+    "warning": {
+      "embed_unavailable": "Lần này chưa tìm theo nghĩa được — kết quả chỉ theo từ khóa",
+      "model_unavailable": "Mô hình ngôn ngữ chưa sẵn sàng — đang hiện câu trích nguyên văn",
+      "model_timeout": "Mô hình trả lời quá lâu — đang hiện câu trích nguyên văn",
+      "model_rejected": "Câu trả lời của mô hình không qua kiểm tra trích dẫn nên không hiển thị",
+      "model_declined": "Mô hình thấy các đoạn trích chưa đủ căn cứ để trả lời — đang hiện câu trích nguyên văn"
+    },
+    "error": {
+      "invalid_question": "Câu hỏi trống, dài quá 500 ký tự hoặc chỉ gồm từ thông dụng — hỏi cụ thể hơn (việc gì, con số, số ký hiệu…).",
+      "missing_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi hỏi lại.",
+      "invalid_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi hỏi lại.",
+      "forbidden": "Hỏi đáp chỉ dành cho văn thư, chuyên viên và lãnh đạo.",
+      "assistant_disabled": "Trợ lý hỏi đáp chưa được bật trên máy chủ — dùng Tìm kiếm.",
+      "busy": "Trợ lý đang soạn câu trả lời khác — thử lại sau khoảng 10 giây.",
+      "search_unavailable": "Kho tìm kiếm tạm thời không truy cập được — thử lại sau ít phút.",
+      "database_unavailable": "Chưa ghi được sổ kiểm toán nên chưa trả lời — thử lại sau ít phút.",
+      "invalid_request": "Yêu cầu không hợp lệ — tải lại trang rồi hỏi lại.",
+      "not_found": "Máy chủ chưa có chức năng hỏi đáp — báo quản trị hệ thống.",
+      "unavailable": "Trợ lý tạm thời không phản hồi — thử lại sau ít phút.",
+      "client_timeout": "Quá thời gian chờ mà chưa có kết quả — thử lại sau ít phút.",
+      "generic": "Không hỏi được: {msg}"
+    },
+    "live": {
+      "found": "Đã tìm thấy {n} đoạn liên quan.",
+      "generating": "Đang soạn câu trả lời.",
+      "answered": "Trợ lý đã trả lời.",
+      "extractOnly": "Không có câu trả lời của mô hình — đang hiện câu trích nguyên văn."
+    }
   },
   "error": {
     "generic": "Có lỗi xảy ra: {msg}",
@@ -565,6 +657,9 @@
       },
       "intake": {
         "suggested": "Đọc văn bản, gợi ý thông tin tiếp nhận"
+      },
+      "assistant": {
+        "answered": "Trả lời câu hỏi trên kho văn bản"
       }
     },
     "entity": {
@@ -584,6 +679,9 @@
         "files": "Tệp tải lên",
         "users": "Người dùng",
         "tenants": "Đơn vị"
+      },
+      "ai": {
+        "questions": "Câu hỏi cho trợ lý"
       }
     },
     "col": {
@@ -665,8 +763,16 @@
       "found": "Trường đọc được",
       "summary_source": "Nguồn trích yếu",
       "model": "Mô hình",
-      "duration_ms": "Thời gian đọc",
-      "reason": "Lý do"
+      "duration_ms": "Thời gian xử lý",
+      "reason": "Lý do",
+      "ask_id": "Mã câu hỏi",
+      "mode": "Chế độ",
+      "answer_source": "Nguồn câu trả lời",
+      "hits": "Số đoạn tìm thấy",
+      "cited": "Số nguồn được trích",
+      "semantic": "Tìm theo nghĩa",
+      "embed_model": "Mô hình nhúng",
+      "warnings": "Cảnh báo"
     },
     "direction": {
       "in": "Đến",
@@ -688,7 +794,8 @@
     },
     "agent": "{name} (tác tử)",
     "agents": {
-      "moc-doc-reader": "Trợ lý đọc văn bản"
+      "moc-doc-reader": "Trợ lý đọc văn bản",
+      "moc-assistant": "Trợ lý hỏi đáp"
     },
     "seconds": "{n} giây",
     "readStatus": {
@@ -698,6 +805,15 @@
     },
     "summarySource": {
       "rule": "Quy tắc",
+      "model": "Mô hình ngôn ngữ",
+      "none": "Không có"
+    },
+    "askMode": {
+      "extract": "Trích câu nguyên văn",
+      "generate": "Mô hình viết câu trả lời"
+    },
+    "answerSource": {
+      "extract": "Câu trích nguyên văn",
       "model": "Mô hình ngôn ngữ",
       "none": "Không có"
     }

@@ -25,7 +25,7 @@ import uuid
 
 import pytest
 
-from conftest import TENANT_A, text_pdf
+from conftest import TENANT_A, pages_pdf, text_pdf
 from svc_files.hasura import HasuraError
 from svc_files.texts import MAX_TRIES, TextExtractor
 
@@ -49,8 +49,9 @@ def test_reads_pending_pdfs_and_saves_the_text(hasura, store):
     broken = pending(hasura, store, b"%PDF-1.4 hong")
     assert asyncio.run(extractor(hasura, store).run_once()) == 3
     assert hasura.texts[ok] == {"tenant_id": str(TENANT_A), "status": "ok", "pages": 1,
-                                "content": "Ke hoach tuyen sinh 2027", "note": None}
+                                "content": "Ke hoach tuyen sinh 2027", "note": None, "page_starts": [0]}
     assert (hasura.texts[scan]["status"], hasura.texts[scan]["content"]) == ("empty", "")
+    assert hasura.texts[scan]["page_starts"] is None and hasura.texts[broken]["page_starts"] is None
     assert hasura.texts[broken]["status"] == "failed" and hasura.texts[broken]["note"]
     assert asyncio.run(extractor(hasura, store).run_once()) == 0          # mỗi tệp chỉ đọc một lần
 
@@ -66,7 +67,7 @@ def test_too_large_files_are_not_read(hasura, store):
     big = pending(hasura, store, text_pdf("To qua"), size=2 * 1024 * 1024)
     asyncio.run(extractor(hasura, store).run_once())
     assert hasura.texts[big] == {"tenant_id": str(TENANT_A), "status": "failed", "pages": None, "content": "",
-                                 "note": "too large"}
+                                 "note": "too large", "page_starts": None}
 
 
 def test_storage_errors_leave_the_file_for_a_later_round_but_not_forever(hasura, store):
@@ -96,7 +97,7 @@ def test_a_result_the_database_rejects_does_not_block_the_queue(hasura, store):
     hasura.rejected.add(bad)
     assert asyncio.run(extractor(hasura, store).run_once()) == 2
     assert hasura.texts[bad] == {"tenant_id": str(TENANT_A), "status": "failed", "pages": None, "content": "",
-                                 "note": "not saved"}
+                                 "note": "not saved", "page_starts": None}
     assert hasura.texts[good]["status"] == "ok"
 
 
@@ -113,3 +114,14 @@ def test_hasura_down_saves_nothing_and_raises_to_the_loop(hasura, store):
         asyncio.run(worker.run_once())
     hasura.save_text = original
     assert hasura.texts == {}
+
+
+# --- chữ theo trang (F4.2) --------------------------------------------------------------------------------------
+
+
+def test_page_boundaries_are_saved_with_the_text(hasura, store):
+    doc = pending(hasura, store, pages_pdf(("Dieu 1. Pham vi ap dung",), (), ("Dieu 2. Han nop ho so 12/12/2026",)))
+    asyncio.run(extractor(hasura, store).run_once())
+    saved = hasura.texts[doc]
+    assert saved["pages"] == 3 and saved["page_starts"] == [0, 24, 24]      # trang 2 trống: cùng vị trí trang 3
+    assert saved["content"][saved["page_starts"][2]:].startswith("Dieu 2.")

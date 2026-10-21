@@ -33,8 +33,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections.abc import Sequence
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT =pathlib.Path(__file__).resolve().parent.parent
 # Chuỗi kiểm thử chuẩn EICAR (không phải mã độc thật), ghép từ hai nửa để chính tệp này không bị phần mềm diệt
 # virus chặn — dùng cho kiểm tra chặn (smoke.py) và màn demo kiểm dịch (demo.py)
 EICAR = ("X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").encode()
@@ -226,21 +227,34 @@ class Session:
 
 def text_pdf(*lines: str) -> bytes:
     """PDF một trang có lớp chữ (Helvetica, chỉ ASCII) — để kiểm tìm theo nội dung tệp (F2.7)."""
+    return text_pages(lines)
+
+
+def text_pages(*pages: Sequence[str]) -> bytes:
+    """PDF nhiều trang có lớp chữ (Helvetica, chỉ ASCII), mỗi tham số là các dòng của một trang — để kiểm câu trích
+    của trợ lý hỏi đáp ghi đúng trang (F4.2). Một trang thì ra đúng các byte text_pdf vẫn tạo."""
     def esc(line: str) -> str:
         return line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
-    stream = ("BT /F1 12 Tf 72 760 Td 14 TL " + " ".join(f"({esc(line)}) '" for line in lines) + " ET").encode()
-    objs = [b"<</Type/Catalog/Pages 2 0 R>>", b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
-            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>",
-            b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
-            b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream"]
+    # Số đối tượng: 1 catalog, 2 cây trang, 4 phông; trang đầu 3 + nội dung 5, các trang sau từ 6 (trang, nội dung)
+    page_ids = [3] + [6 + 2 * i for i in range(len(pages) - 1)]
+    objs = {1: b"<</Type/Catalog/Pages 2 0 R>>",
+            2: b"<</Type/Pages/Kids[%s]/Count %d>>" % (b" ".join(b"%d 0 R" % p for p in page_ids), len(pages)),
+            4: b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>"}
+    for page_id, lines in zip(page_ids, pages):
+        content = 5 if page_id == 3 else page_id + 1
+        stream = ("BT /F1 12 Tf 72 760 Td 14 TL " + " ".join(f"({esc(line)}) '" for line in lines) + " ET").encode()
+        objs[page_id] = (b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>"
+                         b"/Contents %d 0 R>>" % content)
+        objs[content] = b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream"
     out, offsets = b"%PDF-1.4\n", []
-    for i, obj in enumerate(objs, 1):
+    for i in range(1, len(objs) + 1):
         offsets.append(len(out))
-        out += b"%d 0 obj\n" % i + obj + b"\nendobj\n"
+        out += b"%d 0 obj\n" % i + objs[i] + b"\nendobj\n"
     xref = len(out)
-    out += b"xref\n0 6\n0000000000 65535 f \n" + b"".join(b"%010d 00000 n \n" % o for o in offsets)
-    return out + b"trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % xref
+    out += (b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+            + b"".join(b"%010d 00000 n \n" % o for o in offsets))
+    return out + b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
 
 
 def compose(*args: str, stdin: bytes | None = None) -> bytes:

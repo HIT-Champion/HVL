@@ -284,6 +284,17 @@ jobs:
       - name: Đo độ chính xác đọc văn bản đến (make do-doc-van-ban)
         run: make do-doc-van-ban
 
+      # F4.2: nạp kho văn bản mẫu nhiều trang → văn thư hỏi, nhận câu trích nguyên văn kèm "số ký hiệu · tr. n"; giảng
+      # viên phòng khác hỏi cùng câu → không tìm thấy; nội dung văn bản hạn chế không ai hỏi ra; sổ kiểm toán có dòng
+      # của tác tử moc-assistant, không mang câu hỏi. Không bật profile ai: tìm theo từ khóa, trả lời bằng câu trích
+      - name: Hỏi đáp trên kho văn bản (make demo-hoi-dap)
+        run: make demo-hoi-dap
+
+      # F4.2: chạy mọi câu hỏi có đáp án của bộ mẫu; đỏ khi câu về quyền hay văn bản hạn chế ra nguồn bị cấm, hoặc
+      # recall@3 của câu dương dưới ngưỡng
+      - name: Đo chất lượng hỏi đáp (make do-hoi-dap)
+        run: make do-hoi-dap
+
       # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL,
       # tệp và két, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về cùng),
       # sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục

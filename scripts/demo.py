@@ -52,6 +52,15 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Đo tác tử trên 14 văn bản mẫu seed/van-ban-den so với nhãn nhan.json: bảng đúng / sai / trống từng trường,
         riêng PDF có lớp chữ và bản scan, thời gian trung bình; thoát 1 khi PDF có lớp chữ dưới ngưỡng.
         (make do-doc-van-ban)
+    python3 scripts/demo.py hoi-dap
+        Hỏi đáp trên kho văn bản (F4.2, dưới hai phút, không cần mô hình): văn thư nạp kho mẫu seed/hoi-dap; trợ lý
+        moc-assistant trả câu trích nguyên văn kèm số ký hiệu và trang; giảng viên Bộ môn KTPM chỉ thấy văn bản mình
+        được xem; nội dung văn bản hạn chế không ai hỏi ra; sổ kiểm toán ghi lượt hỏi của tác tử, không có câu hỏi,
+        câu trả lời; bật profile ai thì mô hình viết câu trả lời có trích dẫn. (make demo-hoi-dap)
+    python3 scripts/demo.py do-hoi-dap
+        Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi): bảng trạng thái, nguồn top-3, đúng /
+        sai, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1
+        khi có nguồn bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), hoặc recall@3 dưới ngưỡng. (make do-hoi-dap)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -65,13 +74,15 @@ import re
 import subprocess
 import sys
 import time
+import unicodedata
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
-from moc_env import EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, request, text_pdf
+from moc_env import (EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, request, text_pdf,
+                     user_token)
 
 
 class DemoFailed(Exception):
@@ -1327,9 +1338,501 @@ def do_doc_van_ban() -> None:
           " không ô high nào sai")
 
 
+# --- F4.2 · Hỏi đáp trên kho văn bản ---------------------------------------------------------------------------------
+# Kho văn bản mẫu hư cấu đi kèm mã nguồn (sinh lại: make hoi-dap-mau); câu hỏi kèm đáp án trong cau-hoi.json
+ASK_DIR = ROOT / "seed" / "hoi-dap"
+ASK_URL = f"{PUBLIC_URL}/api/documents/ask"
+TOP = 3
+# Trạng thái không trả lời: câu âm, câu bị cấm đúng khi rơi vào một trong hai
+REFUSED = ("no_evidence", "passages_only")
+# Ngưỡng của make do-hoi-dap: recall@3 trên các câu dương — chốt lại sau lần đo đầu trên bản cài (số đo ghi ở
+# services/svc-files/README.md). Câu quyền, câu hạn chế có nguồn bị cấm thì luôn là lỗi
+RECALL_MIN = 0.8
+# Trưởng đơn vị phân công người xử lý sau khi lãnh đạo khoa giao (seed/users.csv); tên đơn vị trong ý kiến chỉ đạo
+MANAGERS = {"ĐT": "totruongdt", "KTPM": "truongbmktpm"}
+UNIT_NAMES = {"ĐT": "Tổ Đào tạo", "KTPM": "Bộ môn Kỹ thuật phần mềm", "HTTT": "Bộ môn Hệ thống thông tin",
+              "VP": "Văn phòng khoa"}
+ASK_DOCUMENT = """query ($s: String!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s}}) {
+  id restricted files { role file_id } } }"""
+ASK_AUDIT = """query ($e: String!) { core_audit_log(where: {action: {_eq: "assistant.answered"}, entity_id: {_eq: $e}},
+  order_by: {id: asc}) { id occurred_at entity actor_id actor_kind overview } }"""
+# /readyz của svc-files: "assist" cho biết chỉ mục, tìm theo nghĩa, mô hình đang dùng — in kèm số đo
+ASSIST_INFO = """import json, urllib.error, urllib.request
+try:
+    raw = urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()
+except urllib.error.HTTPError as exc:
+    raw = exc.read()
+print(json.dumps(json.loads(raw).get('assist')))
+"""
+_SESSIONS: dict[str, Session] = {}
+
+
+def who(username: str) -> Session:
+    """Một phiên cho mỗi tài khoản suốt lượt chạy: mỗi lần đăng nhập văn thư, lãnh đạo tốn một mã TOTP."""
+    if username not in _SESSIONS:
+        _SESSIONS[username] = Session(username)
+    return _SESSIONS[username]
+
+
+def ask_samples() -> dict[str, Any]:
+    path = ASK_DIR / "cau-hoi.json"
+    if not path.is_file():
+        raise DemoFailed(f"không có {path.relative_to(ROOT)} — kho mẫu đi kèm mã nguồn (sinh lại: make hoi-dap-mau)")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def flat(text: str | None) -> str:
+    """So chữ: NFC, gộp mọi khoảng trắng, không phân biệt hoa thường."""
+    return " ".join(unicodedata.normalize("NFC", text or "").split()).casefold()
+
+
+def same_symbol(got: str | None, want: str | None) -> bool:
+    return bool(want) and "".join((got or "").split()).casefold() == "".join(want.split()).casefold()
+
+
+def source_label(src: dict[str, Any]) -> str:
+    """Nhãn trích dẫn như giao diện: "88/CTSV · tr. 1", "… · tài liệu kèm theo, tr. 2", "… · trích yếu"."""
+    name = src.get("symbol") or (src.get("summary") or "?")[:40]
+    if src.get("kind") != "page" or src.get("page") is None:
+        return f"{name} · trích yếu"
+    part = "tài liệu kèm theo, " if src.get("file_role") == "attachment" else ""
+    return f"{name} · {part}tr. {src['page']}"
+
+
+def matches(src: dict[str, Any], want: dict[str, Any]) -> bool:
+    """Nguồn khớp một đáp án: cùng số ký hiệu (văn bản đi lấy số lúc phát hành, không biết trước: trích yếu chứa
+    chuỗi cho trước) và cùng trang; đoạn "trích yếu" không có trang nên không khớp đáp án có trang."""
+    if "symbol" in want:
+        same = same_symbol(src.get("symbol"), want["symbol"])
+    else:
+        same = bool(want.get("summary_contains")) and flat(want["summary_contains"]) in flat(src.get("summary"))
+    return same and ("page" not in want or (src.get("kind") == "page" and src.get("page") == want["page"]))
+
+
+def hit_rank(sources: list[dict[str, Any]], expect: Any) -> int | None:
+    """Thứ hạng (từ 1) của nguồn đầu tiên khớp một đáp án; None khi không có (câu âm: luôn None)."""
+    if not isinstance(expect, list):
+        return None
+    return next((i for i, src in enumerate(sources, 1) if any(matches(src, w) for w in expect)), None)
+
+
+def forbidden(sources: list[dict[str, Any]], symbols: list[str]) -> list[str]:
+    """Nhãn các nguồn mang số ký hiệu bị cấm (câu quyền, văn bản hạn chế)."""
+    return [source_label(s) for s in sources if any(same_symbol(s.get("symbol"), x) for x in symbols)]
+
+
+def keywords_in(text: str | None, keywords: list[str]) -> bool:
+    """Câu trả lời có đủ mọi từ khóa — so sau casefold và gộp khoảng trắng."""
+    body = flat(text)
+    return bool(keywords) and all(flat(k) in body for k in keywords)
+
+
+def answer_text(result: dict[str, Any]) -> str:
+    return (result.get("answer") or {}).get("text") or ""
+
+
+def restricted_symbols(data: dict[str, Any]) -> list[str]:
+    """Số ký hiệu văn bản hạn chế của kho mẫu: không câu hỏi nào, của bất kỳ ai, được có nguồn này."""
+    return [d["symbol"] for d in data["documents"] if d.get("restricted")]
+
+
+def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str]) -> dict:
+    """Chấm một lượt extract theo đáp án: câu dương đúng khi nguồn đáp án nằm trong 3 nguồn đầu; câu âm đúng khi
+    trợ lý không trả lời — no_evidence, hoặc passages_only (chỉ đưa đoạn liên quan trong văn bản được xem, không câu
+    trích nào đủ khớp: ngưỡng điểm tìm kiếm quyết định, không phải chuyện quyền); nguồn bị cấm (danh sách của câu +
+    văn bản hạn chế) ghi riêng, luôn là lỗi."""
+    expect = question["expect"]
+    sources = result.get("sources") or []
+    positive = isinstance(expect, list)
+    rank = hit_rank(sources, expect)
+    status = result.get("status") or "?"
+    return {"id": question["id"], "user": question["user"], "question": question["question"], "positive": positive,
+            "status": status, "top": [source_label(s) for s in sources[:TOP]], "rank": rank,
+            "correct": (rank is not None and rank <= TOP) if positive else status in REFUSED,
+            "keywords": keywords_in(answer_text(result), question.get("keywords", [])) if positive else None,
+            "forbidden": forbidden(sources, [*question.get("forbid", []), *restricted]),
+            "guarded": bool(question.get("forbid")), "seconds": seconds, "server_ms": result.get("duration_ms"),
+            "semantic": bool(result.get("semantic")), "warnings": list(result.get("warnings") or []), "model": None}
+
+
+def score_model(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str]) -> dict:
+    """Chấm lượt generate: câu trả lời do mô hình viết và qua kiểm (answer.source = model), chứa từ khóa, có [n] trỏ
+    tới nguồn đáp án."""
+    answer = result.get("answer") or {}
+    sources = result.get("sources") or []
+    by_model = answer.get("source") == "model"
+    expect = question["expect"]
+    cited = [s for s in sources if s.get("cited")]
+    return {"by_model": by_model, "name": answer.get("model"), "status": result.get("status") or "?",
+            "keywords": by_model and keywords_in(answer.get("text"), question.get("keywords", [])),
+            "cites": by_model and isinstance(expect, list) and any(matches(s, w) for s in cited for w in expect),
+            "forbidden": forbidden(sources, [*question.get("forbid", []), *restricted]),
+            "warnings": list(result.get("warnings") or []), "seconds": seconds}
+
+
+def percentile(values: list[float], p: float) -> float | None:
+    """Phân vị p (0–100), cách lấy hạng gần nhất: p50 của [1, 2, 3, 4] là 2, p95 là 4."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[max(1, -(-len(ordered) * p // 100)) - 1]
+
+
+def summarize(rows: list[dict]) -> dict[str, Any]:
+    pos = [r for r in rows if r["positive"]]
+    neg = [r for r in rows if not r["positive"]]
+    gen = [r for r in rows if r["model"]]
+    gen_pos = [r for r in gen if r["positive"]]
+    violations = [f"{r['id']} ({r['user']}): {', '.join(r['forbidden'])}" for r in rows if r["forbidden"]]
+    violations += [f"{r['id']} ({r['user']}, generate): {', '.join(r['model']['forbidden'])}"
+                   for r in gen if r["model"]["forbidden"]]
+    server = [r["server_ms"] for r in rows if isinstance(r["server_ms"], int)]
+    out: dict[str, Any] = {
+        "positives": len(pos), "recall": sum(r["correct"] for r in pos), "keywords": sum(bool(r["keywords"]) for r in pos),
+        "negatives": len(neg), "refused": sum(r["correct"] for r in neg),
+        "no_evidence": sum(r["status"] == "no_evidence" for r in neg), "guarded": sum(r["guarded"] for r in rows),
+        "violations": violations, "semantic": sum(r["semantic"] for r in rows), "asked": len(rows),
+        "p50": percentile([r["seconds"] for r in rows], 50), "p95": percentile([r["seconds"] for r in rows], 95),
+        "server_p50": percentile(server, 50), "server_p95": percentile(server, 95), "model": None}
+    if gen:
+        out["model"] = {
+            "asked": len(gen), "by_model": sum(r["model"]["by_model"] for r in gen), "positives": len(gen_pos),
+            "keywords": sum(bool(r["model"]["keywords"]) for r in gen_pos),
+            "cites": sum(bool(r["model"]["cites"]) for r in gen_pos),
+            "negatives": len(gen) - len(gen_pos),
+            "neg_answered": sum(r["model"]["by_model"] for r in gen if not r["positive"]),
+            "names": sorted({r["model"]["name"] for r in gen if r["model"]["name"]}),
+            "p50": percentile([r["model"]["seconds"] for r in gen], 50),
+            "p95": percentile([r["model"]["seconds"] for r in gen], 95)}
+    return out
+
+
+def verdict(summary: dict[str, Any]) -> list[str]:
+    """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN."""
+    problems = [f"nguồn bị cấm — {v}" for v in summary["violations"]]
+    if summary["positives"] and summary["recall"] < RECALL_MIN * summary["positives"]:
+        problems.append(f"recall@3 {summary['recall']}/{summary['positives']} dưới ngưỡng {RECALL_MIN:.0%}")
+    return problems
+
+
+def result_table(rows: list[dict]) -> str:
+    """Bảng markdown từng câu: trạng thái, nguồn top-3, đúng / sai, từ khóa, thời gian (thêm cột mô hình nếu có)."""
+    with_model = any(r["model"] for r in rows)
+    head = "| câu | người hỏi | trạng thái | nguồn top-3 | đúng | từ khóa | thời gian |"
+    line = "|---|---|---|---|---|---|---|"
+    if with_model:
+        head += " mô hình | từ khóa | trích đúng | thời gian |"
+        line += "---|---|---|---|"
+    out = [head, line]
+    mark = {True: "✓", False: "✗", None: "—"}
+    for r in rows:
+        question = r["question"] if len(r["question"]) <= 48 else r["question"][:47] + "…"
+        right = "✗ CẤM: " + ", ".join(r["forbidden"]) if r["forbidden"] else (
+            mark[r["correct"]] + (f" #{r['rank']}" if r["rank"] else ""))
+        cells = [f"{r['id']} {question}", r["user"], r["status"], "; ".join(r["top"]) or "—", right,
+                 mark[r["keywords"]], f"{r['seconds']:.1f} s"]
+        if with_model:
+            m = r["model"]
+            cells += (["—"] * 4 if m is None else [
+                ("viết" if m["by_model"] else ", ".join(m["warnings"]) or m["status"]),
+                mark[m["keywords"] if r["positive"] else None], mark[m["cites"] if r["positive"] else None],
+                f"{m['seconds']:.1f} s"])
+        out.append("| " + " | ".join(cells) + " |")
+    return "\n".join(out)
+
+
+def ask(session: Session, question: str, *, mode: str = "extract", ask_id: str | None = None) -> tuple[dict, float]:
+    """POST /api/documents/ask qua APISIX bằng token người hỏi → (kết quả, số giây). Token hết hạn giữa lượt đo dài
+    thì đăng nhập lại một lần; hết lượt sinh (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần."""
+    body: dict[str, Any] = {"question": question, "mode": mode}
+    if ask_id:
+        body["ask_id"] = ask_id
+    attempts = 0
+    while True:
+        started = time.monotonic()
+        try:
+            _, _, raw = request("POST", ASK_URL, data=json.dumps(body).encode(), timeout=25 if mode == "extract" else 70,
+                                headers={**session.auth, "Content-Type": "application/json"})
+            return json.loads(raw), time.monotonic() - started
+        except HTTPError as exc:
+            attempts += 1
+            if exc.status == 401 and attempts == 1:
+                session.token = user_token(session.username)
+                continue
+            if exc.status != 503 or error_detail(exc).get("code") != "busy" or attempts >= 3:
+                raise
+            time.sleep(10)
+
+
+def show_answer(result: dict[str, Any]) -> None:
+    """In câu trả lời và danh sách nguồn như trang Hỏi đáp."""
+    for line in answer_text(result).splitlines() or ["(không có câu trả lời)"]:
+        print(f"     {line}")
+    for src in result.get("sources") or []:
+        cited = "" if src.get("cited") else " (liên quan, không trích)"
+        print(f"     [{src['n']}] {source_label(src)} · {src.get('issuer_name') or '?'}{cited}")
+
+
+def refusal(result: dict[str, Any]) -> str:
+    """Kết quả của câu lẽ ra không có câu trả lời, in như giao diện: không tìm thấy gì; chỉ có đoạn liên quan mà không
+    câu nào đủ khớp; hoặc câu trích từ văn bản khác mà người hỏi được xem."""
+    labels = ", ".join(source_label(s) for s in result.get("sources") or [])
+    if result.get("status") == "no_evidence":
+        return "no_evidence: “Không tìm thấy văn bản nào bạn được xem có nội dung này”"
+    if result.get("status") == "passages_only":
+        return f"passages_only: “Chưa trích được câu trả lời ngắn” — đoạn liên quan trong văn bản được xem: {labels}"
+    return f"{result.get('status')}: câu trích từ văn bản khác mà người hỏi được xem: {labels}"
+
+
+def load_corpus(data: dict[str, Any]) -> tuple[dict[str, dict], int]:
+    """Nạp kho mẫu như văn thư: tải lên (văn bản hạn chế ở chế độ hạn chế, trước tiên — đọc chữ theo thứ tự tải
+    lên), tiếp nhận, vào sổ; lãnh đạo khoa giao đơn vị chủ trì, trưởng đơn vị phân công theo "assign". Văn bản đã có
+    (cùng số ký hiệu) thì bỏ qua → (văn bản theo số ký hiệu, số văn bản mới)."""
+    from seed_documents import DEPT, today
+
+    clerk, director = who("vanthu"), who("truongkhoa")
+    loaded: dict[str, dict] = {}
+    created = 0
+    for d in sorted(data["documents"], key=lambda d: not d["restricted"]):
+        found = clerk.gql(ASK_DOCUMENT, {"s": d["symbol"]})["office_documents"]
+        if found:
+            loaded[d["symbol"]] = found[0]
+            continue
+        file = clerk.upload(d["file"], (ASK_DIR / d["file"]).read_bytes(), restricted=d["restricted"])
+        doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+            "type_code": d["type_code"], "symbol": d["symbol"], "issuer_name": d["issuer_name"],
+            "issued_on": d["issued_on"], "summary": d["summary"], "urgency": "normal", "restricted": d["restricted"],
+            "file_ids": [file["id"]]}})["receiveIncoming"]["document_id"]
+        clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": doc_id})
+        assign = d.get("assign")
+        if assign:
+            director.complete(director.wait_task(doc_id, "vbden.chiDao"), "direct", {
+                "instruction": f"Giao {UNIT_NAMES[assign['lead']]} chủ trì nghiên cứu, triển khai.",
+                "lead_department_id": DEPT[assign["lead"]], "supports": [],
+                "due_on": (today() + timedelta(days=14)).isoformat()})
+            if assign.get("handler"):
+                manager = who(MANAGERS[assign["lead"]])
+                user_id = manager.gql("query ($u: String!) { core_users(where: {username: {_eq: $u}}) { id } }",
+                                      {"u": assign["handler"]})["core_users"][0]["id"]
+                manager.complete(manager.wait_task(doc_id, "vbden.phanCong"), "assign",
+                                 {"user_id": user_id, "note": "Đề nghị nghiên cứu, thực hiện."})
+        loaded[d["symbol"]] = {"id": doc_id, "restricted": d["restricted"],
+                               "files": [{"role": "main", "file_id": file["id"]}]}
+        created += 1
+    return loaded, created
+
+
+def wait_indexed(data: dict[str, Any], timeout_s: float) -> float:
+    """Đợi vòng nền svc-files đọc chữ từng trang rồi đưa đoạn vào chỉ mục: hỏi thử câu đầu của mỗi văn bản mẫu (đúng
+    người hỏi) tới khi văn bản đó có trong nguồn → số giây đã đợi."""
+    probes: dict[str, dict] = {}
+    for q in data["questions"]:
+        for want in q["expect"] if isinstance(q["expect"], list) else []:
+            if any(d["symbol"] == want.get("symbol") for d in data["documents"]):
+                probes.setdefault(want["symbol"], q)
+    started = time.monotonic()
+    while probes:
+        for symbol, q in list(probes.items()):
+            try:
+                sources = ask(who(q["user"]), q["question"])[0].get("sources") or []
+            except HTTPError as exc:        # Meilisearch, Hasura vừa khởi động: đợi tiếp; tắt trợ lý thì dừng
+                if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
+                    raise
+                sources = []
+            if any(same_symbol(s.get("symbol"), symbol) for s in sources):
+                del probes[symbol]
+        if not probes:
+            break
+        if time.monotonic() - started > timeout_s:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây chỉ mục đoạn chưa có {', '.join(probes)} — vòng nền svc-files"
+                             " (đọc chữ MOC_TEXT_INTERVAL_S, chỉ mục MOC_ASK_SYNC_INTERVAL_S) có chạy không?")
+        time.sleep(3)
+    return time.monotonic() - started
+
+
+def hoi_dap() -> None:
+    print("Màn F4.2 · Hỏi đáp trên kho văn bản — trợ lý moc-assistant chỉ tìm trong các văn bản người hỏi được xem, trả"
+          " câu trích nguyên văn kèm số ký hiệu và trang; văn bản hạn chế không bao giờ vào chỉ mục")
+    data = ask_samples()
+    qs = {q["id"]: q for q in data["questions"]}
+    sealed = restricted_symbols(data)
+
+    say(1, "Văn thư nạp kho mẫu seed/hoi-dap: tải lên, tiếp nhận, vào sổ; lãnh đạo khoa giao việc như cau-hoi.json")
+    loaded, created = load_corpus(data)
+    pages = sum(d["pages"] for d in data["documents"] if not d["restricted"])
+    again = "" if created == len(loaded) else ", còn lại đã nạp ở lần chạy trước"
+    ok(f"{len(loaded)} văn bản ({created} mới{again}): {len(loaded) - len(sealed)} văn bản {pages} trang + {len(sealed)}"
+       f" văn bản hạn chế ({', '.join(sealed)}, tệp mã hóa)")
+    took = wait_indexed(data, 90)
+    ok(f"svc-files đã đọc chữ từng trang và đưa đoạn vào chỉ mục (đợi {took:.0f} giây) — không cần mô hình nào")
+
+    q = qs["q01"]
+    say(2, f"{q['user']} hỏi: “{q['question']}”")
+    first, _ = ask(who(q["user"]), q["question"])
+    show_answer(first)
+    rank = hit_rank(first.get("sources") or [], q["expect"])
+    want = q["expect"][0]
+    if first.get("status") != "answered" or rank is None or rank > TOP or not keywords_in(answer_text(first),
+                                                                                          q["keywords"]):
+        raise DemoFailed(f"chưa trả đúng câu trích của {want['symbol']} tr. {want['page']} (có “{q['keywords'][0]}”):"
+                         f" trạng thái {first.get('status')},"
+                         f" nguồn {[source_label(s) for s in first.get('sources') or []]}")
+    search = "từ khóa và theo nghĩa" if first.get("semantic") else "từ khóa"
+    ok(f"nguồn [{rank}] {want['symbol']} · tr. {want['page']} ✓ khớp đáp án trong cau-hoi.json; câu trích có"
+       f" “{q['keywords'][0]}”; tìm theo {search}, svc-files trả lời trong {first.get('duration_ms')} ms")
+
+    q, guarded = qs["q14"], qs["q19"]
+    say(3, f"Cùng một câu, hai người hỏi: “{q['question']}” — trợ lý chỉ tìm trong văn bản người hỏi được xem")
+    got, _ = ask(who(q["user"]), q["question"])
+    rank = hit_rank(got.get("sources") or [], q["expect"])
+    if rank is None or rank > TOP or not keywords_in(answer_text(got), q["keywords"]):
+        raise DemoFailed(f"{q['user']} chưa được câu trích của {q['expect'][0]['symbol']}: {got.get('status')}, nguồn"
+                         f" {[source_label(s) for s in got.get('sources') or []]}")
+    ok(f"{q['user']} → [{rank}] {source_label(got['sources'][rank - 1])}: câu trích có “{q['keywords'][0]}”")
+    denied, _ = ask(who(guarded["user"]), guarded["question"])
+    leaked = forbidden(denied.get("sources") or [], [*guarded["forbid"], *sealed])
+    if leaked:
+        raise DemoFailed(f"{guarded['user']} hỏi ra văn bản không được xem: {leaked}")
+    ok(f"{guarded['user']} (Bộ môn KTPM) → {refusal(denied)} — {' và '.join(guarded['forbid'])} giao Tổ Đào tạo,"
+       " giảng viên KTPM không được xem; câu trả lời không để lộ các văn bản đó có tồn tại")
+    q = qs["q10"]
+    allowed, _ = ask(who(q["user"]), q["question"])
+    rank = hit_rank(allowed.get("sources") or [], q["expect"])
+    if rank is None or rank > TOP or not keywords_in(answer_text(allowed), q["keywords"]):
+        raise DemoFailed(f"giảng viên KTPM không hỏi được văn bản giao cho mình: {allowed.get('status')}, nguồn"
+                         f" {[source_label(s) for s in allowed.get('sources') or []]}")
+    ok(f"“{q['question']}” → {answer_text(allowed).splitlines()[0]} — {q['expect'][0]['symbol']} giao Bộ môn KTPM,"
+       f" giảng viên được phân công xử lý")
+
+    q = qs["q18"]
+    say(4, f"Văn bản hạn chế {', '.join(sealed)}: hỏi đúng cụm từ riêng của nó, bằng người tạo (vanthu) và lãnh đạo"
+           " khoa (có tên trong danh sách được xem)")
+    for name in ("vanthu", "truongkhoa"):
+        got, _ = ask(who(name), q["question"])
+        if forbidden(got.get("sources") or [], sealed):
+            raise DemoFailed(f"{name} hỏi nội dung văn bản hạn chế → {got.get('status')}, nguồn"
+                             f" {[source_label(s) for s in got.get('sources') or []]}")
+        ok(f"{name} → {refusal(got)}")
+    file_ids = [f["file_id"] for symbol in sealed for f in loaded[symbol]["files"]]
+    texts = psql("select count(*) from core.file_texts where file_id in (%s)" % ", ".join(f"'{f}'" for f in file_ids))
+    if texts != "0":
+        raise DemoFailed(f"core.file_texts có {texts} dòng của tệp văn bản hạn chế")
+    ok("core.file_texts: 0 dòng của tệp này — chữ của văn bản hạn chế không được đọc, không vào chỉ mục, không tới"
+       " mô hình, kể cả với người được xem văn bản")
+
+    say(5, "Lãnh đạo khoa đọc sổ kiểm toán: mỗi lượt hỏi một dòng của tác tử moc-assistant, không có câu hỏi, câu"
+           " trả lời")
+    rows = who("truongkhoa").gql(ASK_AUDIT, {"e": first["ask_id"]})["core_audit_log"]
+    if len(rows) != 1:
+        raise DemoFailed(f"lượt hỏi {first['ask_id']} có {len(rows)} dòng assistant.answered (cần đúng 1)")
+    row = rows[0]
+    overview = row["overview"] or {}
+    if (row["actor_id"], row["actor_kind"], row["entity"]) != ("moc-assistant", "agent", "ai.questions") \
+            or any(overview.get(k) is None for k in ("mode", "hits", "cited")):
+        raise DemoFailed(f"dòng #{row['id']} chưa đúng: {row['actor_id']}/{row['actor_kind']}/{row['entity']}, tóm tắt"
+                         f" {overview}")
+    diff = psql(f"select diff::text from core.audit_log where id = {int(row['id'])}").casefold()
+    words = [w for w in re.findall(r"\w+", qs["q01"]["question"]) if len(w) >= 3 and not w.isdigit()]
+    leaked = [w for w in words if w.casefold() in diff] + [s for s in ("15/QĐ-ĐHM", "tín chỉ") if s.casefold() in diff]
+    if leaked:
+        raise DemoFailed(f"diff của dòng #{row['id']} có chữ của câu hỏi, câu trả lời: {leaked}")
+    ok(f"dòng #{row['id']} assistant.answered · {row['occurred_at'][:19].replace('T', ' ')} · người thực hiện"
+       f" moc-assistant ({row['actor_kind']}) · mode {overview.get('mode')}, {overview.get('hits')} nguồn, trích"
+       f" {overview.get('cited')}, {overview.get('duration_ms')} ms")
+    ok("psql: diff của dòng không có từ nào của câu hỏi, không có câu trích, số ký hiệu — chỉ biết ai hỏi, lúc nào,"
+       " được mấy nguồn")
+
+    q = qs["q02"]
+    say(6, f"Câu trả lời do mô hình ngôn ngữ chạy tại chỗ viết (tùy chọn: profile ai) — {q['user']} hỏi"
+           f" “{q['question']}”")
+    base, _ = ask(who(q["user"]), q["question"])
+    if not base.get("ai_available"):
+        quote = answer_text(base).splitlines()[0] if answer_text(base) else "—"
+        print(f"   – chưa bật mô hình — trả lời bằng câu trích: {quote} (make ai-model && make up-ai)")
+    else:
+        got, took = ask(who(q["user"]), q["question"], mode="generate", ask_id=base["ask_id"])
+        show_answer(got)
+        answer = got.get("answer") or {}
+        if answer.get("source") == "model":
+            ok(f"{answer.get('model')} viết câu trả lời trong {took:.0f} giây; svc-files gắn [n] cho từng câu theo"
+               " bằng chứng (số, độ phủ) — giao diện ghi rõ “Do mô hình ngôn ngữ viết — đối chiếu nguồn”")
+        else:
+            print(f"   – mô hình không qua kiểm ({', '.join(got.get('warnings') or []) or got.get('status')}) — giữ câu"
+                  " trích nguyên văn, như giao diện hiện")
+        both = who("truongkhoa").gql(ASK_AUDIT, {"e": base["ask_id"]})["core_audit_log"]
+        modes = [(r["overview"] or {}).get("mode") for r in both]
+        if modes != ["extract", "generate"]:
+            raise DemoFailed(f"lượt hỏi hai pha chưa đủ hai dòng sổ cùng mã: {modes}")
+        ok("sổ kiểm toán: hai dòng cùng mã lượt hỏi (extract rồi generate)")
+
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/hoi-dap — hỏi “{qs['q14']['question']}”; sổ kiểm toán"
+          f" (truongkhoa): {PUBLIC_URL}/so-kiem-toan")
+
+
+def failure(exc: Exception) -> str:
+    """Trạng thái ghi vào bảng đo khi một lượt hỏi lỗi (HTTP, quá giờ) — lượt đo vẫn chạy tiếp các câu sau."""
+    if isinstance(exc, HTTPError):
+        return f"lỗi {exc.status} {error_detail(exc).get('code') or ''}".strip()
+    return f"lỗi {type(exc).__name__}"
+
+
+def do_hoi_dap() -> None:
+    print("Đo F4.2 · Trợ lý hỏi đáp trên mọi câu trong seed/hoi-dap/cau-hoi.json, đúng người hỏi, qua APISIX")
+    data = ask_samples()
+    sealed = restricted_symbols(data)
+    loaded, created = load_corpus(data)
+    took = wait_indexed(data, 120)
+    print(f"   kho mẫu: {len(loaded)} văn bản ({created} mới), chỉ mục sẵn sàng sau {took:.0f} giây")
+    try:
+        info = json.loads(compose("exec", "-T", "svc-files", "python", "-c", ASSIST_INFO))
+    except (subprocess.CalledProcessError, ValueError):
+        info = None
+    print(f"   svc-files /readyz assist: {json.dumps(info, ensure_ascii=False)}\n")
+    rows = []
+    for q in data["questions"]:
+        session = who(q["user"])
+        try:
+            got, seconds = ask(session, q["question"])
+        except (HTTPError, OSError) as exc:
+            got, seconds = {"status": failure(exc)}, 0.0
+        row = score(q, got, seconds, restricted=sealed)
+        if got.get("ai_available") and got.get("status") not in (None, "no_evidence"):
+            try:
+                gen, gen_seconds = ask(session, q["question"], mode="generate", ask_id=got.get("ask_id"))
+            except (HTTPError, OSError) as exc:
+                gen, gen_seconds = {"status": failure(exc)}, 0.0
+            row["model"] = score_model(q, gen, gen_seconds, restricted=sealed)
+        rows.append(row)
+        print(f"   {q['id']} {q['user']:<14} {row['status']:<14} {'✓' if row['correct'] else '✗'}"
+              f" {seconds:4.1f} s  {'; '.join(row['top']) or '—'}")
+
+    s = summarize(rows)
+    print("\n" + result_table(rows))
+    print(f"\nrecall@3 (câu dương): {s['recall']}/{s['positives']} · câu trích có từ khóa:"
+          f" {s['keywords']}/{s['positives']} · từ chối đúng (câu âm, câu bị cấm không được trả lời):"
+          f" {s['refused']}/{s['negatives']}, trong đó no_evidence {s['no_evidence']}")
+    print(f"an toàn: {len(s['violations'])} lượt có nguồn bị cấm ({s['guarded']} câu có danh sách cấm, văn bản hạn chế"
+          f" {', '.join(sealed)} cấm ở mọi câu) · tìm theo nghĩa {s['semantic']}/{s['asked']} lượt")
+    print(f"thời gian extract: p50 {s['p50']:.1f} s, p95 {s['p95']:.1f} s"
+          + (f" (svc-files tự đo p50 {s['server_p50']} ms, p95 {s['server_p95']} ms)" if s["server_p50"] is not None
+             else ""))
+    m = s["model"]
+    if m is None:
+        print("mô hình sinh: không (chưa bật profile ai — make ai-model && make up-ai rồi chạy lại)")
+    else:
+        print(f"mô hình sinh {', '.join(m['names']) or '?'}: qua kiểm {m['by_model']}/{m['asked']} · chứa từ khóa"
+              f" {m['keywords']}/{m['positives']} · trích đúng nguồn {m['cites']}/{m['positives']}"
+              f" · p50 {m['p50']:.1f} s, p95 {m['p95']:.1f} s · mô hình trả lời câu âm"
+              f" {m['neg_answered']}/{m['negatives']}")
+    problems = verdict(s)
+    if problems:
+        raise DemoFailed("; ".join(problems))
+    print(f"\n✓ không nguồn bị cấm nào; recall@3 {s['recall']}/{s['positives']} ≥ {RECALL_MIN:.0%}")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
-         "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban}
+         "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap}
 
 
 def main(argv: list[str] | None = None) -> int:

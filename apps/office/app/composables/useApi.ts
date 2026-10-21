@@ -97,11 +97,69 @@ export interface ReadResult {
   read_at: string
 }
 
+// Hỏi đáp trên kho văn bản (F4.2): trợ lý moc-assistant trong svc-files chỉ tìm trong các văn bản người hỏi được
+// xem (lọc theo vai trò trong chỉ mục, rồi hậu kiểm bằng chính token người hỏi), văn bản hạn chế không bao giờ vào
+// chỉ mục. Hai pha: extract trả câu trích nguyên văn (< 1 giây, không cần mô hình); generate nhờ mô hình ngôn ngữ
+// viết câu trả lời có trích dẫn [n], đã qua kiểm trích dẫn. Câu hỏi, câu trả lời không lưu ở đâu cả.
+export type AskMode = 'extract' | 'generate'
+export type AskStatus = 'answered' | 'passages_only' | 'no_evidence'
+
+export interface AskSource {
+  n: number                  // số trong dấu [n] của câu trả lời, từ 1, theo thứ tự xếp hạng
+  document_id: string
+  symbol: string | null
+  type_code: string
+  type_name: string | null
+  summary: string
+  issuer_name: string | null
+  issued_on: string | null
+  direction: 'in' | 'out'
+  status: string
+  kind: 'page' | 'meta'      // meta: văn bản chưa có chữ (bản scan, tệp lỗi) — chỉ trích yếu, không có trang
+  file_id: string | null
+  file_role: 'main' | 'attachment' | 'issued' | null
+  page: number | null
+  excerpt: string            // ≤ 600 ký tự quanh câu khớp nhất
+  cited: boolean             // câu trả lời có dấu [n] trỏ tới nguồn này
+}
+
+export interface AskAnswer {
+  text: string               // mỗi ý kèm dấu [n]; hiện bằng chữ thuần (components/AnswerText.vue), không dựng HTML
+  source: 'extract' | 'model'
+  model: string | null
+}
+
+export interface AskResult {
+  ask_id: string
+  status: AskStatus
+  answer: AskAnswer | null
+  extract: AskAnswer | null
+  sources: AskSource[]
+  semantic: boolean          // lượt này có tìm theo nghĩa (véc-tơ), không chỉ theo từ khóa
+  ai_available: boolean      // mô hình viết câu trả lời đang sẵn sàng
+  // embed_unavailable, model_unavailable, model_timeout, model_rejected, model_declined
+  warnings: string[]
+  duration_ms: number
+}
+
+export interface AskBody {
+  question: string
+  mode?: AskMode
+  direction?: 'in' | 'out'
+  year?: number
+  type_code?: string
+  ask_id?: string            // gửi lại ở lượt generate để hai dòng sổ kiểm toán cùng một câu hỏi
+}
+
 // Hạn chờ một lần đọc: svc-files tự dừng ở 50 s, APISIX ở 60 s
 const READ_TIMEOUT_MS = 60_000
 // Mã lỗi khi máy chủ không trả thân lỗi chuẩn (vd route chưa có, cổng trả lỗi)
 const READ_STATUS_CODES: Record<number, string> = { 403: 'forbidden', 404: 'not_found', 409: 'restricted',
   413: 'too_large', 415: 'unsupported', 422: 'unreadable' }
+// Hỏi đáp: tìm và trích dưới 1 giây nên chờ 20 s là đủ; viết câu trả lời thì svc-files tự dừng ở 50 s
+const ASK_TIMEOUT_MS: Record<AskMode, number> = { extract: 20_000, generate: 60_000 }
+const ASK_STATUS_CODES: Record<number, string> = { 400: 'invalid_question', 403: 'forbidden', 404: 'not_found',
+  422: 'invalid_request', 502: 'unavailable', 503: 'unavailable', 504: 'unavailable' }
 
 export function useApi() {
   const auth = useAuth()
@@ -240,5 +298,40 @@ export function useApi() {
     }
   }
 
-  return { gql, upload, download, preview, register, printRegister, search, readFile }
+  /** Hỏi trợ lý trên kho văn bản (F4.2). mode extract (mặc định): câu trích nguyên văn; generate: mô hình viết câu
+   *  trả lời — gửi kèm ask_id của lượt extract. signal: người dùng bấm Dừng. Lỗi: ApiError với mã của svc-files
+   *  (invalid_question, forbidden, assistant_disabled, busy, search_unavailable, database_unavailable…),
+   *  client_timeout khi quá hạn chờ, aborted khi người dùng dừng. */
+  async function ask(body: AskBody, signal?: AbortSignal): Promise<AskResult> {
+    const ctrl = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => { timedOut = true; ctrl.abort() }, ASK_TIMEOUT_MS[body.mode ?? 'extract'])
+    const stop = () => ctrl.abort()
+    if (signal?.aborted) ctrl.abort()
+    else signal?.addEventListener('abort', stop, { once: true })
+    try {
+      const res = await authFetch('/api/documents/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      })
+      if (res.ok) return await res.json() as AskResult
+      const data = await res.json().catch(() => ({}))
+      // lỗi của svc-files: {detail: {code, message}}; 422 của FastAPI: detail là mảng lỗi từng trường
+      const detail = typeof data.detail === 'object' && data.detail !== null && !Array.isArray(data.detail) ? data.detail : {}
+      throw new ApiError(detail.message ?? `HTTP ${res.status}`, detail.code ?? ASK_STATUS_CODES[res.status] ?? null, res.status)
+    } catch (e) {
+      if (ctrl.signal.aborted) {
+        const code = timedOut ? 'client_timeout' : 'aborted'
+        throw new ApiError(code, code)
+      }
+      throw e
+    } finally {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', stop)
+    }
+  }
+
+  return { gql, upload, download, preview, register, printRegister, search, readFile, ask }
 }

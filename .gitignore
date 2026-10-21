@@ -69,6 +69,8 @@ public/*.pdf
 *.pdf
 # Văn bản đến mẫu (giả lập) để thử, đo tác tử đọc văn bản F4.1 — sinh bằng make van-ban-mau
 !/seed/van-ban-den/*.pdf
+# Kho văn bản mẫu (giả lập) để thử, đo trợ lý hỏi đáp F4.2 — sinh bằng make hoi-dap-mau
+!/seed/hoi-dap/*.pdf
 
 # --- Docker overrides cục bộ -------------------------------------------------
 docker-compose.override.yml

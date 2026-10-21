@@ -155,3 +155,32 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   tầng theo đúng lộ trình tuyến tính.
 - **Hệ quả:** không có tự động mở rộng theo tải và không có khả năng chịu lỗi đa node — chấp nhận
   được với quy mô một SME; ghi rõ giới hạn này trong tài liệu vận hành.
+
+### QĐ-004: Trợ lý hỏi đáp dùng lại Meilisearch tìm lai, tự viết đường ống, không Qdrant / LlamaIndex
+
+- **Bối cảnh:** F4.2 — người dùng hỏi bằng câu tự nhiên trên kho văn bản, câu trả lời phải kèm số ký hiệu và trang,
+  và chỉ dựa trên văn bản người hỏi được xem. Kế hoạch ban đầu: Qdrant (kho véc-tơ) + bge-m3 + LlamaIndex trong một
+  dịch vụ `svc-ai` mới. Ràng buộc: máy 8 GB, CI không có mô hình nào, văn bản hạn chế (F3.7) không bao giờ được lộ.
+- **Phương án kho truy xuất:** Qdrant — thêm image và RAM, kho thứ hai phải đồng bộ thuộc tính quyền, không tìm theo
+  từ khóa tiếng Việt nên CI vẫn cần đường khác. pgvector — lọc quyền bằng đúng hàm `office.document_visible`, nhưng
+  phải thay image PostgreSQL của lõi bằng image tự dựng, và PostgreSQL không có cấu hình chữ tiếng Việt. Meilisearch —
+  đã chạy (F1.7), đã bỏ dấu tiếng Việt, bản CE (MIT) có tìm lai từ khóa + véc-tơ, F2.7 đã có mẫu lọc thuê ước + hậu
+  kiểm; không có join nên thuộc tính quyền phải chép vào từng đoạn.
+- **Phương án khung:** LlamaIndex kéo 28 gói phụ thuộc trực tiếp, NLTK và tiktoken tải dữ liệu từ Internet lúc chạy
+  (mạng `ai` không ra Internet), và không biết quyền của Mộc — lọc quyền, trích dẫn, kiểm câu trả lời vẫn phải tự viết.
+- **Quyết định:** chỉ mục đoạn Meilisearch `chunks` (một tài liệu mỗi đoạn, mỗi đoạn biết trang của nó), embedder
+  `userProvided`: `svc-files` tự gọi Ollama `/api/embed` (Qwen3-Embedding-0.6B, đổi sang bge-m3 bằng một biến). Không
+  dùng nguồn nhúng `ollama` của Meilisearch: Meilisearch sẽ phải vào mạng `ai`, và khi không có mô hình (CI) cả lô
+  thêm tài liệu lỗi, hỏng luôn đường từ khóa. Đường ống (cắt đoạn, lọc quyền, câu trích, gọi mô hình, kiểm trích dẫn)
+  tự viết trong gói `svc_files/assist/` — `svc-files` đã có client Meilisearch, client Hasura, chữ PDF của F2.7, mạng
+  `ai`; không thêm image, gói Python, route gateway nào.
+- **Quyền ở bước truy xuất, hai lớp, cả hai đứng trước mô hình và trước người dùng:** (1) lọc trước trong Meilisearch
+  theo vai trò, đúng như `office.document_visible` — văn bản hạn chế không bao giờ vào chỉ mục; (2) hậu kiểm bằng
+  Hasura với token người hỏi, bỏ mọi đoạn của văn bản người hỏi không đọc được hoặc `restricted`. Lớp 1 quyết độ phủ,
+  lớp 2 quyết an toàn: chỉ mục chậm vài giây sau khi bật hạn chế hay hủy giao việc vẫn không lộ đoạn nào. Không có
+  đoạn nào qua hậu kiểm thì không gọi mô hình.
+- **Hệ quả:** không có mô hình (CI, máy yếu) vẫn chạy đủ: tìm theo từ khóa + câu trích nguyên văn. Câu trả lời của mô
+  hình chỉ hiện khi qua kiểm trích dẫn và con số, không thì trả câu trích. Đồng bộ chỉ mục đoạn là việc của
+  `svc-files` (vòng nền, như F2.7). F4.3 (gợi ý giao việc) dự kiến dùng lại phần truy xuất qua route nội bộ, vai trò
+  `service`. Chi tiết:
+  `docs/mo-hinh-du-lieu.md` §3, README của `svc-files`.

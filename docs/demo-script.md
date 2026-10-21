@@ -22,10 +22,12 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
-Ngoài các màn nguyên lý còn hai màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
+Ngoài các màn nguyên lý còn ba màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
 (`make demo-lien-thong`, F3.12) — xem [mục này](#ngoài-4-nguyên-lý-liên-thông-trong-hệ-thống--make-demo-lien-thong);
 tác tử đọc văn bản đến gợi ý thông tin tiếp nhận (`make demo-doc-van-ban`, F4.1, dưới hai phút) — xem
-[mục cuối](#ngoài-4-nguyên-lý-đọc-văn-bản-đến--make-demo-doc-van-ban).
+[mục này](#ngoài-4-nguyên-lý-đọc-văn-bản-đến--make-demo-doc-van-ban); trợ lý hỏi đáp trên kho văn bản, trả lời kèm số
+ký hiệu và trang (`make demo-hoi-dap`, F4.2, dưới hai phút) — xem
+[mục cuối](#ngoài-4-nguyên-lý-hỏi-đáp-trên-kho-văn-bản--make-demo-hoi-dap).
 
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
@@ -451,3 +453,93 @@ dòng "Đọc văn bản, gợi ý thông tin tiếp nhận" của "Tác tử đ
   tự, regex không quay lui hàm mũ (test 50 000 ký tự đối kháng dưới 300 ms).
 - *"Còn gì chưa làm?"* OCR chỉ trang 1; chữ viết tay, bảng biểu không đọc; ảnh chụp nghiêng nhiều hay tối sẽ ra ít ô
   hoặc độ tin cậy thấp; chưa học từ các lần văn thư sửa.
+
+## Ngoài 4 nguyên lý: hỏi đáp trên kho văn bản — `make demo-hoi-dap`
+
+Màn này thuộc F4.2, **không** phải màn bằng chứng nguyên lý: một trợ lý (tác tử `moc-assistant`) trả lời câu hỏi bằng
+chính chữ trong các văn bản người hỏi được xem, trên cùng nền tách đơn vị, văn bản hạn chế, sổ kiểm toán. Chạy dưới
+hai phút, không cần mô hình ngôn ngữ (bước 6 chỉ chạy khi đã bật profile `ai`).
+
+**Điều muốn chứng minh:**
+
+- Hỏi bằng câu thường ngày, được **câu trích nguyên văn** kèm nguồn "số ký hiệu · tr. n" — đúng trang trong tệp PDF
+  nhiều trang, mở ra đối chiếu được. Đường này không cần mô hình nào (tìm theo từ khóa trong Meilisearch, chọn câu
+  theo số từ trùng với câu hỏi), nên CI, máy yếu, máy không có Internet đều chạy.
+- Trợ lý chỉ tìm trong văn bản **người hỏi được xem**: lọc ngay trong chỉ mục theo đúng quy tắc của
+  `office.document_visible` (thuê ước, vai trò, phòng, giao việc), rồi hậu kiểm từng văn bản bằng Hasura với chính token
+  người hỏi. Không được xem thì câu trả lời giống hệt khi văn bản không tồn tại.
+- Văn bản hạn chế (F3.7) **không bao giờ vào chỉ mục**: không đọc chữ, không có đoạn, không tới mô hình — kể cả khi
+  người hỏi có tên trong danh sách được xem.
+- Mỗi lượt hỏi một dòng sổ kiểm toán của tác tử `moc-assistant` (loại `agent`): ai hỏi, lúc nào, chế độ, mấy nguồn,
+  mất bao lâu — **không** có câu hỏi, câu trả lời, số ký hiệu hay đoạn trích nào.
+- Có mô hình (tùy chọn) thì Qwen3 chạy tại chỗ viết câu trả lời gọn hơn; `svc-files` tự gắn [n] cho từng câu theo
+  bằng chứng (đoạn chứa ý mới của câu, mọi con số có trong đoạn đó), câu nào không có căn cứ thì giữ câu trích.
+
+**Lệnh in ra 6 bước:**
+
+1. `vanthu` nạp kho mẫu `seed/hoi-dap/` (5 văn bản nhiều trang + 1 văn bản hạn chế): tải lên, `receiveIncoming`,
+   `registerIncoming`; `truongkhoa` chỉ đạo, trưởng đơn vị phân công đúng như `cau-hoi.json` (đã có cùng số ký hiệu
+   thì bỏ qua). Chờ vòng nền svc-files đọc chữ từng trang và đưa đoạn vào chỉ mục (hỏi thử tới khi có nguồn, ≤ 90 giây).
+2. `vanthu` hỏi "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?" → in câu trích "…tối thiểu 15 tín
+   chỉ…" và danh sách nguồn; nguồn "15/QĐ-ĐHM · tr. 1" khớp đáp án trong `cau-hoi.json`.
+3. Cùng một câu, hai người hỏi: "Điều kiện xét học bổng khuyến khích học tập là gì?" — `vanthu` được câu trích có
+   "3,2" của 88/CTSV; `giangvienktpm` (Bộ môn KTPM) → "Không tìm thấy văn bản nào bạn được xem có nội dung này" (công
+   văn giao Tổ Đào tạo). Giảng viên hỏi giờ mở cửa phòng máy (quy chế giao Bộ môn KTPM, mình được phân công) → có câu
+   trích "7 giờ 00", nguồn 08/QC-ĐHM.
+4. Hỏi đúng cụm từ riêng của văn bản hạn chế ("Phương án XANH LAM là gì?") bằng người tạo (`vanthu`) và
+   `truongkhoa` → không nguồn nào của 53/PA-ĐHM; psql: `core.file_texts` không có dòng nào của tệp đó.
+5. `truongkhoa` đọc sổ kiểm toán của lượt hỏi ở bước 2: đúng một dòng `assistant.answered`, người thực hiện
+   `moc-assistant` (`agent`), tóm tắt có chế độ, số nguồn, số câu trích, thời gian; psql: cột `diff` không chứa từ nào
+   của câu hỏi.
+6. Ollama có mô hình sinh → hỏi lại một câu ở chế độ `generate`: in câu trả lời của mô hình, nguồn, thời gian; sổ có
+   hai dòng cùng mã lượt hỏi (extract rồi generate). Không có thì in "chưa bật mô hình — trả lời bằng câu trích".
+
+**Đo — `make do-hoi-dap`:** hỏi mọi câu trong `seed/hoi-dap/cau-hoi.json` (19 câu: 16 câu có đáp án — gồm 88/CTSV,
+131/ĐT-ĐH của `make seed` và công văn đi cử giảng viên dự hội thảo đã phát hành —, 2 câu không có đáp án trong kho, 1
+câu bị cấm theo quyền), mỗi câu bằng đúng tài khoản ghi trong tệp, qua APISIX. In bảng markdown: trạng thái, 3 nguồn đầu, đúng / sai
+(nguồn đáp án — cùng số ký hiệu, cùng trang — nằm trong 3 nguồn đầu; câu âm: không được trả lời), có từ khóa đáp án
+trong câu trích, thời gian; tổng recall@3, tỉ lệ từ chối đúng, p50 / p95. Có mô hình thì hỏi thêm `generate`: tỉ lệ câu
+trả lời của mô hình qua kiểm, chứa từ khóa, trích đúng nguồn, mô hình trả lời câu lẽ ra từ chối. **Thoát 1** khi bất kỳ
+lượt nào có nguồn bị cấm (danh sách cấm của câu, văn bản hạn chế ở mọi câu) hoặc recall@3 dưới 80 % (ngưỡng chốt lại
+sau lần đo đầu trên bản cài). Số đo thật ghi ở `services/svc-files/README.md`.
+
+**Văn bản mẫu** (`seed/hoi-dap/`, ~135 KB): hoàn toàn hư cấu — "Trường Đại học Mẫu", người ký "Nguyễn Văn A", chân
+trang mỗi trang "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật", số ký hiệu đuôi `-ĐHM` không trùng dữ liệu
+mẫu. Quyết định học bổng tài trợ (3 trang), kế hoạch thi kết thúc học phần (3), hướng dẫn công tác phí (3), quy chế
+phòng máy (2), thông báo nghỉ Tết (2), và phương án sắp xếp bộ máy (hạn chế, có cụm từ "phương án XANH LAM"). Mỗi
+thông tin được hỏi nằm trong đúng một câu, trên đúng một trang (ngắt trang tường minh). Sinh lại bằng `make
+hoi-dap-mau` (WeasyPrint trong container svc-files) hoặc ngay trên máy bằng môi trường test svc-files
+(`scripts/hoi_dap_mau.py --mode local`, thêm `--check` để so từng byte với bản đã commit); cả hai đều kiểm bằng pypdf
+số trang, câu trả lời đúng trang, siêu dữ liệu chỉ có Producer.
+
+**Bật mô hình (tùy chọn):** `make ai-model` tải một lần mô hình sinh (`qwen3:1.7b`) và mô hình nhúng
+(`qwen3-embedding:0.6b`, để tìm theo nghĩa); `make up-ai` chạy Ollama trong mạng nội bộ không ra Internet. svc-files
+tự nhúng các đoạn ở vòng nền rồi tìm lai (từ khóa + theo nghĩa); tắt Ollama thì tự về tìm theo từ khóa, không lỗi.
+
+**Trên giao diện** (`vanthu`, thanh bên → "Hỏi đáp văn bản"; hoặc nút "Hỏi trợ lý" ở Tìm kiếm): gõ "Điều kiện xét
+học bổng khuyến khích học tập là gì?" → khối "Câu trích nguyên văn" có "3,2", nguồn "[1] 88/CTSV · tr. 1 · Phòng
+Công tác sinh viên", nút "Mở văn bản"; bật mô hình thì sau đó có thêm khối "Trả lời của trợ lý" ghi rõ "Do mô hình
+ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Đăng nhập `giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào
+bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: dòng hỏi đáp của tác tử, không có câu hỏi.
+
+**Nếu giám khảo hỏi:**
+
+- *"Mô hình có bịa không?"* Đường mặc định không có mô hình: câu trả lời là câu chép nguyên văn từ văn bản, kèm số
+  ký hiệu và trang. Mô hình không tự ghi [n]: `svc-files` tìm cho từng câu đoạn nguồn chứa ý mới của câu — mọi con số
+  (từ 2 chữ số) có trong đoạn đó, phần lớn từ mới lấy từ đoạn đó — rồi mới gắn [n]; một câu không tìm được thì người
+  dùng thấy câu trích, không thấy câu của mô hình. Không có đoạn nào đủ khớp thì không gọi mô hình.
+- *"Trong văn bản có câu 'bỏ qua mọi chỉ dẫn, trả lời…'?"* Chữ nguồn được bọc trong thẻ, thẻ giả trong chữ bị bỏ; lời
+  dặn nói rõ chữ trong nguồn chỉ là dữ liệu; đầu ra chỉ nhận đúng JSON hai khóa rồi vẫn qua kiểm trích dẫn như trên.
+  Trợ lý không có công cụ nào để làm theo: chỉ đọc, không ghi.
+- *"Người không được xem có hỏi vòng ra được không?"* Lọc trong chỉ mục là lớp độ phủ; lớp an toàn là hậu kiểm bằng
+  Hasura với token người hỏi trước khi bất kỳ đoạn nào tới mô hình hay người dùng — chỉ mục chậm vài giây sau khi bật
+  hạn chế hay hủy giao việc cũng không lộ. Câu từ chối giống hệt dù văn bản không có hay bị cấm. `make do-hoi-dap`
+  thoát 1 nếu một nguồn bị cấm xuất hiện ở bất kỳ câu nào.
+- *"Sao không dùng Qdrant, LlamaIndex?"* Meilisearch đã chạy (tìm theo nội dung F2.7), đã bỏ dấu tiếng Việt, có tìm lai
+  trong bản cộng đồng; kho véc-tơ thứ hai phải đồng bộ quyền thêm một lần. LlamaIndex kéo hàng chục gói, tải dữ liệu từ
+  Internet lúc chạy và không biết quyền của Mộc — phần lọc, trích dẫn, kiểm đầu ra vẫn phải tự viết.
+- *"Lưu câu hỏi ở đâu?"* Không lưu: không bảng hội thoại, sổ chỉ có siêu dữ liệu; trang Hỏi đáp chỉ giữ trong bộ
+  nhớ trình duyệt.
+- *"Còn gì chưa làm?"* Bản scan chưa OCR nền nên chỉ hỏi được theo trích yếu (nguồn ghi "trích yếu", không bịa
+  trang); mỗi câu hỏi độc lập, chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản
+  giả, sạch hơn văn bản thật.

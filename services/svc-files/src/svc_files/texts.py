@@ -19,6 +19,9 @@
 Không đọc lúc tải lên: lúc đó tệp chưa gắn vào văn bản nào, chưa biết văn bản có hạn chế không (tệp của văn bản
 hạn chế không được đọc chữ — hasura.PENDING_TEXTS). Đọc ở vòng nền còn bù được các tệp tải lên trước khi có F2.7.
 Vòng đồng bộ tìm kiếm (search.py) thấy chữ mới ghi thì đẩy lại văn bản sang Meilisearch.
+
+F4.2: ghi kèm ``page_starts`` (vị trí đầu từng trang trong nội dung) để trợ lý hỏi đáp cắt đoạn theo trang
+(assist/index.py); hàng đợi có thêm bản phát hành văn bản đi (role ``issued``).
 """
 
 from __future__ import annotations
@@ -41,7 +44,7 @@ MAX_TRIES = 5      # số lượt liền kho không đọc được một tệp 
 class _Hasura(Protocol):
     async def pending_texts(self, limit: int) -> list[dict[str, Any]]: ...
     async def save_text(self, *, file_id: str, tenant_id: str, status: str, pages: int | None, content: str,
-                        note: str | None) -> None: ...
+                        note: str | None, page_starts: list[int] | None) -> None: ...
 
 
 class _Store(Protocol):
@@ -100,14 +103,15 @@ class TextExtractor:
     async def _save(self, row: dict[str, Any], text: PdfText) -> None:
         try:
             await self.hasura.save_text(file_id=row["id"], tenant_id=row["tenant_id"], status=text.status,
-                                        pages=text.pages, content=text.content, note=text.note)
+                                        pages=text.pages, content=text.content, note=text.note,
+                                        page_starts=text.page_starts)
         except HasuraError as exc:
             # CSDL không nhận kết quả này: ghi "failed" trơn để hàng đợi đi tiếp. Hasura tắt thì lần ghi này cũng
             # lỗi và lỗi đi lên vòng ngoài — tệp chưa có dòng kết quả, lượt sau đọc lại.
             log.warning(json.dumps({"event": "core.file.text_rejected", "file_id": row["id"], "error": str(exc)},
                                    ensure_ascii=False))
             await self.hasura.save_text(file_id=row["id"], tenant_id=row["tenant_id"], status="failed",
-                                        pages=None, content="", note="not saved")
+                                        pages=None, content="", note="not saved", page_starts=None)
 
     async def run(self) -> None:
         while True:

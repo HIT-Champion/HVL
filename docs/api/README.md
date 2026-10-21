@@ -42,7 +42,7 @@ cũng nạp được.
 |---|---|---|
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
-| `POST /api/files`, `GET /api/files/{id}`, `GET /api/search`, `GET /api/documents/{id}/preview`, `GET /api/registers/…` | `svc-files` | Bắt buộc |
+| `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…` | `svc-files` | Bắt buộc |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
@@ -176,6 +176,9 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `GET /api/documents/{id}/preview` | PDF đúng thể thức NĐ 30 của dự thảo văn bản đi, chưa có số, in chữ "DỰ THẢO"; văn bản đã phát hành thì tải bản phát hành |
 | `GET /api/registers/{in\|out}/{năm}` | Văn thư, lãnh đạo đơn vị: sổ đăng ký văn bản đến / đi của một năm, đúng các cột của mẫu sổ NĐ 30 (Phụ lục IV); văn bản hạn chế người gọi không được đọc chỉ có số, ngày, số ký hiệu; `missing` là các số thiếu dòng |
 | `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, ra bản in A4 ngang để ký nhận, đóng sổ; mỗi lần in ghi `register.printed` vào sổ kiểm toán |
+| `POST /api/files/{id}/read` | Văn thư, chỉ tệp chính mình tải lên: tác tử đọc văn bản đến (F4.1) gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu, mỗi trường kèm độ tin cậy; không tạo văn bản. Một lượt đọc một lúc (`503 busy`) |
+| `POST /api/documents/ask` | Văn thư, chuyên viên, lãnh đạo: trợ lý hỏi đáp (F4.2) `{question, mode: extract\|generate}` → câu trả lời, mỗi câu kèm `[n]` trỏ nguồn (số ký hiệu, trang), chỉ từ văn bản người hỏi được đọc; không có căn cứ → `status: no_evidence`. Câu hỏi, câu trả lời không lưu |
+| `GET /api/case-files/{id}/archive` | Hồ sơ đã nộp lưu (F3.8): đọc lại từ gói trên bucket lạnh sau khi khớp băm với CSDL; chỉ văn bản người gọi được đọc |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
 
@@ -183,6 +186,8 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 curl -s -OJ "$MOC/api/files/$FILE" -H "Authorization: Bearer $TOKEN"
 curl -s -G "$MOC/api/search" -H "Authorization: Bearer $TOKEN" --data-urlencode 'q=tuyen sinh' --data-urlencode limit=10
 curl -s -OJ "$MOC/api/registers/in/2026/pdf" -H "Authorization: Bearer $TOKEN"     # token văn thư hoặc lãnh đạo đơn vị
+curl -s "$MOC/api/documents/ask" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"question": "Điều kiện xét học bổng khuyến khích học tập là gì?", "mode": "extract"}'
 
 # cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
 curl -s "$MOC/api/verify/ABCDE-23456"

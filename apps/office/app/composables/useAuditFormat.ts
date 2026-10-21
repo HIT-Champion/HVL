@@ -67,8 +67,12 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     if (value === null || value === undefined || value === '') return '—'
     if (typeof value === 'boolean') return value ? t('audit.yes') : t('audit.no')
     if (typeof value === 'string' && value.startsWith('\\x')) return `${value.slice(2, 12)}…`
-    // trạng thái văn bản; sự kiện đọc văn bản (intake.suggested) có trạng thái riêng: ok, empty, unreadable
-    if (col === 'status') return te(`status.${value}`) ? t(`status.${value}`) : label('audit.readStatus', String(value))
+    // trạng thái văn bản; sự kiện đọc văn bản (intake.suggested) có trạng thái riêng: ok, empty, unreadable; trợ lý
+    // hỏi đáp (assistant.answered, F4.2): answered, passages_only, no_evidence
+    if (col === 'status') {
+      if (te(`status.${value}`)) return t(`status.${value}`)
+      return te(`audit.readStatus.${value}`) ? t(`audit.readStatus.${value}`) : label('assist.status', String(value))
+    }
     if (col === 'urgency') return label('urgency', String(value))
     if (col === 'direction' || col === 'role') return label(`audit.${col}`, String(value))
     if (col === 'user_id' || col === 'signer_id') return names.value.get(String(value)) ?? String(value)
@@ -90,6 +94,13 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     if (col === 'method') return label('receive.read.method', String(value))
     if (col === 'summary_source') return label('audit.summarySource', String(value))
     if (col === 'reason') return label('receive.read.reason', String(value))
+    // trợ lý hỏi đáp (F4.2): chế độ hỏi, nguồn câu trả lời; cảnh báo ghi thành chuỗi "model_timeout,…"
+    if (col === 'mode') return label('audit.askMode', String(value))
+    if (col === 'answer_source') return label('audit.answerSource', String(value))
+    if (col === 'warnings') {
+      return String(value).split(',').map((k) => k.trim()).filter(Boolean)
+        .map((k) => label('assist.warning', k)).join('; ') || '—'
+    }
     return String(value)
   }
 
@@ -99,9 +110,9 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     const hidden: string[] = []
     for (const [col, value] of Object.entries(row.overview)) {
       if (HIDDEN.has(col)) continue
-      // sự kiện đọc văn bản chỉ ghi siêu dữ liệu: null là không có (không dùng mô hình, không lỗi), không phải trường
-      // nội dung bị ẩn
-      if (value === null && row.action === 'intake.suggested') continue
+      // sự kiện đọc văn bản, trợ lý hỏi đáp chỉ ghi siêu dữ liệu: null là không có (không dùng mô hình, không lỗi),
+      // không phải trường nội dung bị ẩn
+      if (value === null && (row.action === 'intake.suggested' || row.action === 'assistant.answered')) continue
       if (value === null) {
         hidden.push(label('audit.col', col))
         continue

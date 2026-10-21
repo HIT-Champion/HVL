@@ -58,7 +58,7 @@ sử dụng"*).
 | Flowable (REST) | 8.0.0 | Apache-2.0 | Động cơ quy trình BPMN | `flowable/flowable-rest:8.0.0` | 1 |
 | SeaweedFS | 4.48 | Apache-2.0 | Lưu trữ đối tượng chuẩn S3 | `chrislusf/seaweedfs:4.48` | 1 |
 | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc tệp tải lên (dịch vụ độc lập) | `clamav/clamav:1.5.4` | 1 |
-| Meilisearch (Community Edition) | v1.54.3 | MIT | Tìm kiếm toàn văn | `getmeili/meilisearch:v1.54.3` | 1 |
+| Meilisearch (Community Edition) | v1.54.3 | MIT | Tìm kiếm toàn văn; chỉ mục đoạn `chunks` của trợ lý hỏi đáp (F4.2): tìm lai từ khóa + véc-tơ trong bản CE, embedder `userProvided` (véc-tơ do `svc-files` tính bằng Ollama, Meilisearch không gọi mô hình nào, không vào mạng `ai`) | `getmeili/meilisearch:v1.54.3` | 1 |
 | nginx (unprivileged) | 1.30.6 | BSD-2-Clause | Phục vụ trang tĩnh của `app-office` sau APISIX | `nginxinc/nginx-unprivileged:1.30.6-alpine` | 1 |
 | Centrifugo | v6.9.7 | Apache-2.0 | Đẩy thông báo thời gian thực qua WebSocket | `centrifugo/centrifugo:v6.9.7` | 2 |
 
@@ -152,11 +152,9 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| Ollama | 0.35.1 | MIT | Chạy mô hình ngôn ngữ cục bộ (F4.1, profile `ai`, tùy chọn): chỉ viết trích yếu khi quy tắc không ra trích yếu tin cậy; mạng nội bộ riêng, không mở cổng, tắt tính năng đám mây (`OLLAMA_NO_CLOUD`). Bản ổn định mới nhất trước 06/10/2026, có `think` và `format` theo JSON Schema | `ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c` (image 02/10/2026) | 4 |
-| Qwen3-1.7B | `qwen3:1.7b` (Q4_K_M, khoảng 1,36 GB) | Apache-2.0 (đã kiểm model card và tệp LICENSE trên Hugging Face của đúng cỡ 1.7B; cỡ 4B cũng Apache-2.0) | Trọng số mô hình viết trích yếu (F4.1). Phát hành 04/2025. Máy đủ nhanh thì đổi `MOC_AI_MODEL=qwen3:4b` | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7` — so với `ollama list` | 4 |
-| bge-m3 | — | MIT | Mô hình nhúng văn bản cho tìm kiếm ngữ nghĩa | Tải qua Ollama | 4 |
-| Qdrant | v1.19.2 | Apache-2.0 | Cơ sở dữ liệu véc-tơ | `qdrant/qdrant:v1.19.2` | 4 |
-| LlamaIndex | 0.14 | MIT | Khung RAG và tác tử (khung AI duy nhất) | pip | 4 |
+| Ollama | 0.35.1 | MIT | Chạy mô hình ngôn ngữ cục bộ (profile `ai`, tùy chọn): viết trích yếu khi quy tắc không ra trích yếu tin cậy (F4.1); nhúng đoạn văn bản và câu hỏi (`/api/embed`), viết câu trả lời có trích dẫn cho trợ lý hỏi đáp (F4.2) — giữ cùng lúc mô hình viết và mô hình nhúng (`OLLAMA_MAX_LOADED_MODELS=2`); mạng nội bộ riêng, không mở cổng, tắt tính năng đám mây (`OLLAMA_NO_CLOUD`). Bản ổn định mới nhất trước 06/10/2026, có `think` và `format` theo JSON Schema | `ollama/ollama:0.35.1@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c` (image 02/10/2026) | 4 |
+| Qwen3-1.7B | `qwen3:1.7b` (Q4_K_M, khoảng 1,36 GB) | Apache-2.0 (đã kiểm model card và tệp LICENSE trên Hugging Face của đúng cỡ 1.7B; cỡ 4B cũng Apache-2.0) | Trọng số mô hình viết trích yếu (F4.1) và câu trả lời có trích dẫn của trợ lý hỏi đáp (F4.2, chỉ từ các đoạn đã lọc theo quyền người hỏi; `svc-files` kiểm trích dẫn, con số trước khi trả). Phát hành 04/2025. Máy đủ nhanh thì đổi `MOC_AI_MODEL=qwen3:4b` hoặc chỉ riêng trợ lý `MOC_ASK_MODEL=qwen3:4b` | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7` — so với `ollama list` | 4 |
+| Qwen3-Embedding-0.6B | `qwen3-embedding:0.6b` (Q8_0, 639 MB, 1024 chiều, ngữ cảnh 32K) | Apache-2.0 (khai trong model card `Qwen/Qwen3-Embedding-0.6B` và bản GGUF chính thức trên Hugging Face; kho không kèm tệp LICENSE, bản kê Ollama không có lớp giấy phép) | Mô hình nhúng đoạn văn bản và câu hỏi cho tìm theo nghĩa của trợ lý hỏi đáp (F4.2, `MOC_AI_EMBED_MODEL`; câu hỏi mang tiền tố `Instruct: …\nQuery: …`). Phát hành 05/06/2025 (bài báo arXiv 2506.05176); có trong thư viện Ollama từ 23/09/2025, Ollama hỗ trợ từ 0.12.1. MMTEB đa ngữ: trung bình 64,33, truy xuất 64,64 (bge-m3: 59,56 / 54,60 — bảng trong model card). Đổi `MOC_AI_EMBED_MODEL=bge-m3` được, cùng 1024 chiều, `svc-files` tự nhúng lại | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d` — so với `ollama list` | 4 |
 | Tesseract OCR (+ dữ liệu `vie`) | 5.5.0 (gói Debian trixie `tesseract-ocr` 5.5.0-1+b1, `tesseract-ocr-vie` 1:4.1.0-2) | Apache-2.0 | Nhận dạng chữ trên công văn scan, ảnh chụp khi tiếp nhận (F4.1, `svc-files`). Dữ liệu `vie` là bản tessdata_fast 4.1.0 (mô hình LSTM nhanh). Phiên bản gói lấy từ kho Debian theo image gốc — kiểm lại bằng `dpkg-query -W 'tesseract-ocr*'` trong image `svc-files` sau khi dựng | Gói hệ thống (apt) | 4 |
 | Presidio | 2.2 | MIT | Che thông tin cá nhân *(Could)* | pip | 4 |
 | Gotenberg | 8.37.0 | MIT | Sinh PDF *(Could)* | `gotenberg/gotenberg:8.37.0` | 4 |
@@ -166,7 +164,12 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 đọc giấy phép trên model card **của đúng kích cỡ đã chọn**. Không dùng Llama hoặc Gemma vì giấy phép
 trọng số không được OSI phê duyệt. F4.1 đã kiểm Qwen3-1.7B và Qwen3-4B (Apache-2.0); lớp giấy phép trong bản
 kê `qwen3:1.7b` của thư viện Ollama cũng là văn bản Apache-2.0. Ollama ghim theo ngày image lên Docker Hub
-(02/10/2026): trang GitHub ghi ngày bản thử nghiệm đầu tiên nên sớm hơn ngày phát hành thật.
+(02/10/2026): trang GitHub ghi ngày bản thử nghiệm đầu tiên nên sớm hơn ngày phát hành thật. F4.2 đã kiểm
+Qwen3-Embedding-0.6B: model card (`license: apache-2.0`) của `Qwen/Qwen3-Embedding-0.6B` và của bản GGUF chính thức
+`Qwen/Qwen3-Embedding-0.6B-GGUF`; khác `qwen3:1.7b`, bản kê `qwen3-embedding:0.6b` của thư viện Ollama chỉ có lớp
+trọng số (bản kê và lớp cấu hình `Q8_0`, họ `qwen3`, 595,78M tham số đã đối chiếu với registry của Ollama). Trợ lý hỏi
+đáp không thêm image, không thêm gói Python: đường ống truy xuất, lọc quyền, trích dẫn, kiểm câu trả lời tự viết
+trong `svc-files` (httpx2 sẵn có), kho véc-tơ là Meilisearch đã chạy.
 
 ## Thành phần đã cân nhắc nhưng không dùng
 
@@ -183,6 +186,9 @@ kê `qwen3:1.7b` của thư viện Ollama cũng là văn bản Apache-2.0. Ollam
 | Metabase | Bản mã nguồn mở không hỗ trợ đăng nhập OIDC (Keycloak); đọc thẳng CSDL, bỏ qua phân quyền thuê ước | Dashboard trong ứng dụng (ECharts) |
 | bpmn-js | MIT kèm điều khoản bắt buộc giữ watermark — không thuộc danh sách OSI | Hiển thị tiến trình do đội tự vẽ |
 | PaddleOCR, VietOCR | Kéo theo PaddlePaddle hoặc PyTorch (hàng trăm MB), image và CI chậm hẳn; Tesseract đủ cho công văn in | Tesseract + quy tắc bố cục NĐ 30 (F4.1) |
+| Qdrant (Apache-2.0) | Thêm một image và RAM; kho véc-tơ thứ hai phải đồng bộ thuộc tính quyền với CSDL; không tìm theo từ khóa tiếng Việt nên khi không có mô hình (CI) vẫn cần đường tìm khác. Meilisearch đã chạy, đã có tìm lai từ khóa + véc-tơ trong bản CE | Chỉ mục đoạn `chunks` trong Meilisearch (F4.2) |
+| LlamaIndex (MIT) | `llama-index-core` 0.14 kéo 28 gói phụ thuộc trực tiếp (numpy, SQLAlchemy, NLTK, tiktoken…); NLTK, tiktoken tải dữ liệu từ Internet lúc chạy, mà mạng `ai` không ra Internet; không làm hộ phần lọc quyền của Mộc, trích dẫn và kiểm câu trả lời — đúng phần phải tự viết | Đường ống tự viết trong `svc-files` (`svc_files/assist/`, F4.2) |
+| bge-m3 (MIT, 01/2024) | Phương án thay, không phải bị loại: `bge-m3:567m` F16 khoảng 1,2 GB (gấp đôi RAM), điểm truy xuất đa ngữ MMTEB thấp hơn (54,60 so với 64,64). Dùng được bằng `MOC_AI_EMBED_MODEL=bge-m3`, cùng 1024 chiều, không cần tiền tố câu hỏi | Qwen3-Embedding-0.6B (F4.2) |
 
 ## Kiểm tra tương thích giấy phép
 

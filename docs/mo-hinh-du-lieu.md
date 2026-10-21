@@ -68,7 +68,8 @@ create table core.file_texts (              -- lớp chữ của PDF để tìm 
   pages         int,
   content       text not null default '' check (char_length(content) <= 50000),
   note          text,                         -- lý do khi failed: encrypted, timeout, memory, too large…
-  extracted_at  timestamptz not null default now()
+  extracted_at  timestamptz not null default now(),
+  page_starts   int[]                         -- vị trí đầu mỗi trang trong content (F4.2, migration 1792281602000)
 );
 
 create table core.users (                   -- danh bạ, đồng bộ từ Keycloak (migration 1792281600400)
@@ -131,8 +132,8 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   của phiên; `jsonb::text` cho cùng một chuỗi với cùng một giá trị, nên tính lại được khi kiểm tra.
 - Người thực hiện: đọc `current_setting('hasura.user', true)` (Hasura đặt biến này trong mỗi giao dịch);
   dịch vụ ghi thẳng vào CSDL thì `set local moc.actor = '…'` trước khi ghi. `actor_kind` theo vai trò Hasura của
-  phiên: `service` → `service`, `agent` → `agent` (tác tử đọc văn bản đến, F4.1, migration 1792281601900), `admin` →
-  `system`, vai trò người dùng → `user`.
+  phiên: `service` → `service`, `agent` → `agent` (tác tử đọc văn bản đến, F4.1, migration 1792281601900; trợ lý
+  hỏi đáp, F4.2), `admin` → `system`, vai trò người dùng → `user`.
 - `core.audit_log` chỉ được ghi thêm (trigger chặn sửa, xóa, `truncate`). `core.audit_verify()` tính lại
   chuỗi, trả về dòng sai và loại lỗi (`hash`, `prev_hash`, `gap`, `head`).
 
@@ -165,8 +166,10 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   văn bản đến, văn bản gửi, số lần thử, lúc giao của lần gửi liên thông — migration 1792281601800, băm và mã tra cứu
   chụp từ văn bản gửi, lỗi giao vẫn ẩn; cách đọc, số trang, tên các trường tìm thấy, nguồn trích yếu, tên mô hình,
   thời gian, lý do của lượt đọc văn bản đến `intake.suggested` — migration 1792281601900, các khóa này chỉ hiện ở
-  dòng sự kiện đó). Lãnh đạo không đọc được văn bản hạn chế thì sổ
-  cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
+  dòng sự kiện đó; mã lượt hỏi, chế độ, nguồn câu trả lời, số đoạn, số nguồn được trích, có tìm theo nghĩa không, tên
+  mô hình sinh và mô hình nhúng, thời gian, mã cảnh báo của câu trả lời `assistant.answered` — migration
+  1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế
+  thì sổ cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
   vào, giao việc, lần vào hồ sơ, danh sách được xem) chỉ còn tên trường, mọi giá trị là null — trạng thái, độ khẩn,
@@ -198,6 +201,13 @@ dung văn bản hạn chế không vào chỉ mục (bản chữ trần sẽ vô
 CSDL: chữ của tệp gắn vào văn bản hạn chế bị bỏ qua khi ghi, và bị xóa khi văn bản bật hạn chế hoặc khi tệp được
 gắn vào văn bản hạn chế. Bảng không gắn sổ kiểm
 toán: chữ là dữ liệu dẫn xuất, tính lại được từ tệp mà băm đã nằm trong `core.files` và trong sổ.
+
+`page_starts` (F4.2, migration 1792281602000): vị trí ký tự đầu của từng trang trong `content`, để trợ lý hỏi đáp
+trích dẫn đúng số trang. Trang trống mang cùng vị trí với trang sau; trang bắt đầu sau điểm cắt 50 000 ký tự không có
+trong mảng. Ràng buộc `file_texts_page_starts`: chỉ có khi `status = 'ok'`, 1–200 phần tử, phần tử đầu là 0, phần tử
+cuối không vượt độ dài `content`, mảng một chiều không có null. `null` khi bản scan, tệp lỗi, hoặc dòng đọc trước F4.2
+(`svc-files` coi cả nội dung là một "trang" không số). Migration xóa mọi dòng `ok` cũ để vòng nền đọc lại một lần, lần
+này có ranh giới trang. Hàng đợi đọc chữ gồm bản chính, tài liệu kèm theo và bản phát hành (`issued`) của văn bản đi.
 
 **Gợi ý đọc văn bản đến** (`office.intake_suggestions`, F4.1, migration 1792281601900). Văn thư tải công văn lên màn
 tiếp nhận, bấm đọc (`POST /api/files/{id}/read`, §4.3); tác tử `moc-doc-reader` trong `svc-files` đọc lớp chữ PDF,
@@ -730,11 +740,28 @@ xóa dòng `dispatches`; `service` (phiên bên gửi hoặc bên nhận) chỉ 
 | Bảng | Được làm | Cột đặt sẵn |
 |---|---|---|
 | `office.intake_suggestions` | Thêm, đọc, sửa (upsert) gợi ý của đơn vị trong phiên; không xóa | `tenant_id`, `agent_id` |
-| `core.audit_log` | Chỉ thêm dòng `action = intake.suggested`, `entity = core.files` (cột `request_id`, `entity_id`, `diff`) | `tenant_id`, `actor_id`, `actor_kind = agent` |
+| `core.audit_log` | Chỉ thêm dòng `action = intake.suggested`, `entity = core.files`, hoặc `action = assistant.answered`, `entity = ai.questions` (F4.2) (cột `request_id`, `entity_id`, `diff`) | `tenant_id`, `actor_id`, `actor_kind = agent` |
 
 Ngoài hai bảng này `agent` không có quyền nào: không đọc, ghi văn bản, không đọc `core.files`, không đọc sổ. Tệp có
 được đọc hay không do `svc-files` hỏi Hasura bằng **token của văn thư** trước khi đọc byte; khóa ngoại kèm thuê ước
 chặn lưu gợi ý cho tệp của đơn vị khác.
+
+**Trợ lý hỏi đáp** (F4.2, migration 1792281602000). Tác tử thứ hai dùng chung vai trò `agent`, khác danh tính:
+`X-Hasura-User-Id` = `MOC_ASSISTANT_ID` (mặc định `moc-assistant`), `X-Hasura-Tenant-Id` = đơn vị của người hỏi. Vai
+trò không thêm quyền nào: tác tử chỉ ghi một dòng sổ `assistant.answered` cho mỗi lượt hỏi (§5), ghi xong mới trả lời.
+Trợ lý không đọc văn bản bằng vai trò của mình. Quyền được giữ ở hai lớp, cả hai đứng trước mô hình và trước người
+dùng:
+
+1. **Lọc trước** trong chỉ mục đoạn Meilisearch `chunks`: mỗi đoạn mang `tenant_id`, `direction`, `department_id`,
+   `created_by`, giao việc chưa hủy (`assignee_departments`, `assignee_users`); điều kiện tìm dựng theo vai trò đúng như
+   `office.document_visible` (`clerk`, `director`: mọi văn bản của đơn vị; `manager`: phòng mình soạn hoặc giao cho
+   phòng mình; `staff`: mình tạo, giao cho mình, văn bản đi của phòng mình; vai trò khác: 403). Văn bản hạn chế không
+   bao giờ vào chỉ mục.
+2. **Hậu kiểm** bằng Hasura với **token người hỏi** (như tìm kiếm F2.7): đoạn của văn bản Hasura không trả về, hoặc
+   trả về mà `restricted`, bị bỏ trước khi tới mô hình và người dùng.
+
+Lớp 1 quyết độ phủ, lớp 2 quyết an toàn: chỉ mục chậm vài giây sau khi văn bản bật hạn chế hay giao việc bị hủy cũng
+không lộ đoạn nào, lượt đồng bộ sau tự sửa. Vòng chỉ mục nền đọc văn bản, chữ của tệp bằng khóa quản trị (như F2.7).
 
 > **Không đặt tên vai trò là `admin`.** `admin` là vai trò có sẵn của Hasura, bỏ qua mọi quyền kể cả khi nằm
 > trong JWT. Chạy thử ở #18: token có `x-hasura-default-role: admin` đọc được dữ liệu của mọi thuê ước.
@@ -898,6 +925,7 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
+| `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
 | `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |
 
@@ -961,6 +989,7 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 | `office.document.arrived` | Văn bản đến do liên thông tạo (ở văn bản đến bên nhận). `data`: `dispatch_id`, `from_tenant_id`, `from_name`, `verify_code` (mã tra cứu của bên gửi) |
 | `core.file.rejected` | ClamAV chặn tệp |
 | `core.intake.suggested` | Tác tử đọc xong một tệp văn bản đến, có gợi ý (F4.1). Chỉ ở sổ kiểm toán, khuôn bên dưới |
+| `core.assistant.answered` | Trợ lý hỏi đáp trả lời một câu hỏi (F4.2). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
 
 Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
@@ -982,6 +1011,27 @@ số ký hiệu, trích yếu, tên tệp, chữ nhận dạng được.
 `status`: `ok` | `empty` | `unreadable`; `method`: `text` | `ocr`; `found`: tên các trường tìm thấy, cách nhau dấu
 phẩy; `summary_source`: `rule` | `model` | `none`; `model`: tên mô hình đã dùng hoặc null; `reason`: lý do khi
 `unreadable`. Lãnh đạo xem sổ thấy đủ các khóa này qua `overview` (§1).
+
+**Câu trả lời của trợ lý hỏi đáp** (F4.2): mỗi lượt hỏi (`extract`, rồi `generate` nếu có mô hình), `svc-files` ghi
+một dòng `core.audit_log` bằng vai trò `agent` **trước khi trả lời**: `action` `assistant.answered`, `entity`
+`ai.questions`, `entity_id` = `ask_id` (lượt `generate` gửi lại `ask_id` của lượt `extract`, hai dòng cùng
+`entity_id`), `actor_id` `moc-assistant`, `actor_kind` `agent`. Câu hỏi, câu trả lời không lưu ở đâu cả; `diff` chỉ
+có giá trị vô hướng, **không** câu hỏi, câu trả lời, số ký hiệu, đoạn trích.
+
+```json
+{
+  "user_id": "<sub người hỏi>", "ask_id": "5d1e…", "mode": "generate", "status": "answered",
+  "answer_source": "model", "hits": 5, "cited": 2, "documents": "<id>,<id>", "semantic": true,
+  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": ""
+}
+```
+
+`mode`: `extract` | `generate`; `status`: `answered` | `passages_only` | `no_evidence`; `answer_source`: `extract` |
+`model` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id các văn bản nguồn,
+cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình hoặc null; `warnings`:
+mã cảnh báo cách nhau dấu phẩy (`embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`,
+`model_declined`), rỗng nếu không có. Lãnh đạo xem sổ thấy mọi khóa qua `overview` (§1) trừ `documents`: id văn bản
+nguồn chỉ vai trò `service` đọc được.
 
 **Thông báo realtime** (đã làm): mỗi kết nối Centrifugo tự vào kênh riêng `personal:#<sub>` của người trong
 token (Centrifugo tự kiểm token Keycloak qua JWKS); trình duyệt không đăng ký được kênh nào khác. Sau mỗi bước,

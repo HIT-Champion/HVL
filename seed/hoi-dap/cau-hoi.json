@@ -1,0 +1,348 @@
+{
+  "version": 1,
+  "note": "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật.",
+  "documents": [
+    {
+      "file": "01-hoc-bong.pdf",
+      "symbol": "15/QĐ-ĐHM",
+      "type_code": "QĐ",
+      "issuer_name": "Trường Đại học Mẫu",
+      "issued_on": "2026-09-15",
+      "summary": "Quyết định ban hành Quy định xét, cấp học bổng tài trợ cho sinh viên đại học chính quy",
+      "pages": 3,
+      "restricted": false,
+      "assign": {
+        "lead": "ĐT",
+        "handler": "chuyenviendt"
+      }
+    },
+    {
+      "file": "02-thi-ket-thuc.pdf",
+      "symbol": "22/KH-ĐHM",
+      "type_code": "KH",
+      "issuer_name": "Trường Đại học Mẫu",
+      "issued_on": "2026-10-02",
+      "summary": "Kế hoạch tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027",
+      "pages": 3,
+      "restricted": false,
+      "assign": {
+        "lead": "ĐT",
+        "handler": "chuyenviendt"
+      }
+    },
+    {
+      "file": "03-cong-tac-phi.pdf",
+      "symbol": "31/HD-ĐHM",
+      "type_code": "HD",
+      "issuer_name": "Trường Đại học Mẫu",
+      "issued_on": "2026-09-28",
+      "summary": "Hướng dẫn thanh toán công tác phí trong nước năm 2026",
+      "pages": 3,
+      "restricted": false,
+      "assign": null
+    },
+    {
+      "file": "04-phong-may.pdf",
+      "symbol": "08/QC-ĐHM",
+      "type_code": "QC",
+      "issuer_name": "Trường Đại học Mẫu",
+      "issued_on": "2026-10-05",
+      "summary": "Quy chế sử dụng phòng máy tính thực hành",
+      "pages": 2,
+      "restricted": false,
+      "assign": {
+        "lead": "KTPM",
+        "handler": "giangvienktpm"
+      }
+    },
+    {
+      "file": "05-nghi-tet.pdf",
+      "symbol": "47/TB-ĐHM",
+      "type_code": "TB",
+      "issuer_name": "Trường Đại học Mẫu",
+      "issued_on": "2026-10-12",
+      "summary": "Thông báo lịch nghỉ Tết Nguyên đán Đinh Mùi năm 2027",
+      "pages": 2,
+      "restricted": false,
+      "assign": null
+    },
+    {
+      "file": "06-han-che.pdf",
+      "symbol": "53/PA-ĐHM",
+      "type_code": "PA",
+      "issuer_name": "Trường Đại học Mẫu",
+      "issued_on": "2026-10-14",
+      "summary": "Phương án sắp xếp tổ chức bộ máy khối hành chính năm 2027",
+      "pages": 1,
+      "restricted": true,
+      "assign": null
+    }
+  ],
+  "questions": [
+    {
+      "id": "q01",
+      "user": "vanthu",
+      "question": "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?",
+      "expect": [
+        {
+          "symbol": "15/QĐ-ĐHM",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "15 tín chỉ"
+      ],
+      "evidence": "Sinh viên được xét học bổng khi đăng ký tối thiểu 15 tín chỉ trong học kỳ."
+    },
+    {
+      "id": "q02",
+      "user": "chuyenviendt",
+      "question": "Mức học bổng loại Xuất sắc là bao nhiêu?",
+      "expect": [
+        {
+          "symbol": "15/QĐ-ĐHM",
+          "page": 2
+        }
+      ],
+      "keywords": [
+        "120%"
+      ],
+      "evidence": "Học bổng loại Xuất sắc bằng 120% mức học phí của học kỳ."
+    },
+    {
+      "id": "q03",
+      "user": "vanthu",
+      "question": "Học bổng được chuyển khoản trong bao lâu?",
+      "expect": [
+        {
+          "symbol": "15/QĐ-ĐHM",
+          "page": 3
+        }
+      ],
+      "keywords": [
+        "20 ngày"
+      ],
+      "evidence": "Học bổng được chuyển khoản cho sinh viên trong vòng 20 ngày kể từ ngày ký quyết định công nhận."
+    },
+    {
+      "id": "q04",
+      "user": "totruongdt",
+      "question": "Kỳ thi kết thúc học phần học kỳ I diễn ra khi nào?",
+      "expect": [
+        {
+          "symbol": "22/KH-ĐHM",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "04/01/2027"
+      ],
+      "evidence": "Kỳ thi kết thúc học phần học kỳ I diễn ra từ ngày 04/01/2027 đến ngày 16/01/2027."
+    },
+    {
+      "id": "q05",
+      "user": "totruongdt",
+      "question": "Hạn nộp đề thi và đáp án là ngày nào?",
+      "expect": [
+        {
+          "symbol": "22/KH-ĐHM",
+          "page": 2
+        }
+      ],
+      "keywords": [
+        "14/12/2026"
+      ],
+      "evidence": "Hạn nộp đề thi và đáp án về Tổ Đào tạo là ngày 14/12/2026."
+    },
+    {
+      "id": "q06",
+      "user": "vanthu",
+      "question": "Nhập điểm lên hệ thống trong bao nhiêu ngày?",
+      "expect": [
+        {
+          "symbol": "22/KH-ĐHM",
+          "page": 3
+        }
+      ],
+      "keywords": [
+        "10 ngày làm việc"
+      ],
+      "evidence": "Giảng viên nhập điểm lên hệ thống trong vòng 10 ngày làm việc sau buổi thi."
+    },
+    {
+      "id": "q07",
+      "user": "truongkhoa",
+      "question": "Phụ cấp lưu trú khi đi công tác là bao nhiêu?",
+      "expect": [
+        {
+          "symbol": "31/HD-ĐHM",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "200.000 đồng"
+      ],
+      "evidence": "Phụ cấp lưu trú khi đi công tác ngoài tỉnh là 200.000 đồng/ngày."
+    },
+    {
+      "id": "q08",
+      "user": "truongkhoa",
+      "question": "Tiền thuê phòng nghỉ được thanh toán tối đa bao nhiêu?",
+      "expect": [
+        {
+          "symbol": "31/HD-ĐHM",
+          "page": 2
+        }
+      ],
+      "keywords": [
+        "1.200.000 đồng"
+      ],
+      "evidence": "Tiền thuê phòng nghỉ được thanh toán tối đa 1.200.000 đồng/ngày/phòng."
+    },
+    {
+      "id": "q09",
+      "user": "vanthu",
+      "question": "Hồ sơ thanh toán gửi trong bao lâu?",
+      "expect": [
+        {
+          "symbol": "31/HD-ĐHM",
+          "page": 3
+        }
+      ],
+      "keywords": [
+        "15 ngày"
+      ],
+      "evidence": "Hồ sơ thanh toán gửi Phòng Kế hoạch – Tài chính trong vòng 15 ngày sau chuyến công tác."
+    },
+    {
+      "id": "q10",
+      "user": "giangvienktpm",
+      "question": "Phòng máy mở cửa từ mấy giờ?",
+      "expect": [
+        {
+          "symbol": "08/QC-ĐHM",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "7 giờ 00"
+      ],
+      "evidence": "Phòng máy mở cửa từ 7 giờ 00 đến 21 giờ 00, từ thứ Hai đến thứ Bảy."
+    },
+    {
+      "id": "q11",
+      "user": "truongbmktpm",
+      "question": "Tự ý cài đặt phần mềm bị xử lý thế nào?",
+      "expect": [
+        {
+          "symbol": "08/QC-ĐHM",
+          "page": 2
+        }
+      ],
+      "keywords": [
+        "30 ngày"
+      ],
+      "evidence": "Tự ý cài đặt phần mềm bị đình chỉ sử dụng phòng máy 30 ngày."
+    },
+    {
+      "id": "q12",
+      "user": "truongkhoa",
+      "question": "Cán bộ nghỉ Tết từ ngày nào?",
+      "expect": [
+        {
+          "symbol": "47/TB-ĐHM",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "04/02/2027"
+      ],
+      "evidence": "Cán bộ, giảng viên nghỉ Tết từ thứ Năm ngày 04/02/2027 đến hết Chủ nhật ngày 14/02/2027."
+    },
+    {
+      "id": "q13",
+      "user": "vanthu",
+      "question": "Trực cơ quan dịp nghỉ Tết ở đâu?",
+      "expect": [
+        {
+          "symbol": "47/TB-ĐHM",
+          "page": 2
+        }
+      ],
+      "keywords": [
+        "nhà C5"
+      ],
+      "evidence": "Trong thời gian nghỉ Tết, trực cơ quan đặt tại phòng 105 nhà C5."
+    },
+    {
+      "id": "q14",
+      "user": "vanthu",
+      "question": "Điều kiện xét học bổng khuyến khích học tập là gì?",
+      "expect": [
+        {
+          "symbol": "88/CTSV",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "3,2"
+      ],
+      "evidence": "Căn cứ Quy định về học bổng khuyến khích học tập của Trường, Phòng Công tác sinh viên đề nghị Khoa xét chọn sinh viên có điểm trung bình chung học kỳ từ 3,2 trở lên và điểm rèn luyện đạt loại Tốt."
+    },
+    {
+      "id": "q15",
+      "user": "vanthu",
+      "question": "Chuẩn đầu ra ngoại ngữ xét tốt nghiệp cần chứng chỉ gì?",
+      "expect": [
+        {
+          "symbol": "131/ĐT-ĐH",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "B1"
+      ],
+      "evidence": "Để chuẩn bị xét công nhận tốt nghiệp đợt tháng 12 năm 2026, Phòng Đào tạo đề nghị Khoa rà soát danh sách sinh viên dự kiến tốt nghiệp, đối chiếu đủ các điều kiện: hoàn thành chương trình đào tạo; đạt chuẩn đầu ra ngoại ngữ (chứng chỉ B1 theo Khung năng lực ngoại ngữ 6 bậc dùng cho Việt Nam); có chứng chỉ giáo dục quốc phòng – an ninh và chứng chỉ giáo dục thể chất."
+    },
+    {
+      "id": "q16",
+      "user": "vanthu",
+      "question": "Khoa cử giảng viên nào tham dự hội thảo chuyển đổi số?",
+      "expect": [
+        {
+          "summary_contains": "cử giảng viên tham dự hội thảo chuyển đổi số",
+          "page": 1
+        }
+      ],
+      "keywords": [
+        "Vũ Thị Mai"
+      ],
+      "evidence": "Phúc đáp Công văn số 47/KHCN của Phòng Khoa học và Hợp tác quốc tế, Khoa Công nghệ thông tin cử giảng viên Vũ Thị Mai, Bộ môn Kỹ thuật phần mềm, tham dự hội thảo và trình bày tham luận về ứng dụng nguồn mở trong quản lý văn bản."
+    },
+    {
+      "id": "q17",
+      "user": "vanthu",
+      "question": "Thủ tục cấp hộ chiếu công vụ?",
+      "expect": "none"
+    },
+    {
+      "id": "q18",
+      "user": "vanthu",
+      "question": "Phương án XANH LAM là gì?",
+      "expect": "none",
+      "forbid": [
+        "53/PA-ĐHM"
+      ]
+    },
+    {
+      "id": "q19",
+      "user": "giangvienktpm",
+      "question": "Điều kiện xét học bổng khuyến khích học tập là gì?",
+      "expect": "none",
+      "forbid": [
+        "15/QĐ-ĐHM",
+        "88/CTSV"
+      ]
+    }
+  ]
+}

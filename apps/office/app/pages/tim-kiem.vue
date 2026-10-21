@@ -28,6 +28,10 @@ const router = useRouter()
 
 const q = ref(String(route.query.q ?? ''))
 const direction = ref(String(route.query.direction ?? ''))
+// "Hỏi trợ lý" (F4.2): mang câu đang tìm sang trang Hỏi đáp, điền sẵn, không tự gửi
+const claims = useAuth().claims
+const canAsk = computed(() => ['clerk', 'staff', 'manager', 'director'].includes(claims.value?.role ?? ''))
+const askLink = computed(() => (q.value.trim() ? { path: '/hoi-dap', query: { q: q.value.trim() } } : { path: '/hoi-dap' }))
 const hits = ref<SearchHit[]>([])
 const next = ref<string | null>(null)
 // "Xem thêm" lấy tiếp đúng câu tìm đang hiện kết quả, dù ô tìm đã gõ khác: trang sau gắn với câu tìm (svc-files)
@@ -60,7 +64,12 @@ onMounted(() => { if (q.value) run() })
 
 <template>
   <div>
-    <PageHeader :title="t('search.title')" />
+    <PageHeader :title="t('search.title')">
+      <NuxtLink v-if="canAsk" :to="askLink" class="btn-secondary" data-testid="ask-assistant">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z" /></svg>
+        {{ t('search.askAssistant') }}
+      </NuxtLink>
+    </PageHeader>
     <form class="card mb-6 flex flex-col gap-3 p-4 sm:flex-row" @submit.prevent="run()">
       <input v-model="q" type="search" class="input flex-1" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
       <select v-model="direction" class="input sm:w-44">
