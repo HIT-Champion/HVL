@@ -297,7 +297,7 @@ sudo cp ops/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enabl
 | `make demo-pha-he` | Màn demo (iii) phả hệ + chất lượng: lượt nộp lưu gần nhất là một run OpenLineage với 4 bước; truy ngược gói lưu trữ về bảng nghiệp vụ và tệp gốc; bảng Parquet nào cũng đã kiểm số dòng = CSDL, cột bắt buộc không null trước khi ghi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
 | Diễn tập khôi phục | `make backup` hai lượt, xóa volume CSDL và tệp, `python3 scripts/moc.py backup restore --yes`, rồi `make smoke` và `make audit` phải qua (bước trong CI) | Hệ thống đang chạy + `make seed` |
-| `db/tests/` | 165 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
+| `db/tests/` | 168 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ thống
 từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → `make

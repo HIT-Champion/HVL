@@ -38,8 +38,6 @@ interface Row {
 }
 
 const PAGE = 50
-// cột không cần hiện: khóa, mốc thời gian tự đặt
-const HIDDEN = new Set(['id', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'object_key'])
 const groups = {
   all: null,
   documents: ['office.documents', 'office.case_files', 'office.case_file_documents'],
@@ -50,7 +48,7 @@ const groups = {
 } as const
 type Group = keyof typeof groups
 
-const { t, te } = useI18n()
+const { t } = useI18n()
 const { gql } = useApi()
 const route = useRoute()
 const router = useRouter()
@@ -132,59 +130,7 @@ async function load(append = false) {
 watch([group, doc], () => load())
 onMounted(() => load())
 
-// Dịch vụ ghi thay người dùng (vai trò service) thì actor_id vẫn là người đó; tài khoản dịch vụ, việc tự chạy và
-// ghi thẳng CSDL thì là "Hệ thống"
-function who(row: Row) {
-  const name = names.value.get(row.actor_id)
-  if (row.actor_kind === 'service') return name ? t('audit.service', { name }) : t('event.system')
-  if (row.actor_kind === 'system') return t('event.system')
-  return name ?? row.actor_id
-}
-
-function label(map: string, key: string) {
-  return te(`${map}.${key}`) ? t(`${map}.${key}`) : key
-}
-
-function show(col: string, value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'boolean') return value ? t('audit.yes') : t('audit.no')
-  if (typeof value === 'string' && value.startsWith('\\x')) return `${value.slice(2, 12)}…`
-  if (col === 'status') return label('status', String(value))
-  if (col === 'urgency') return label('urgency', String(value))
-  if (col === 'direction' || col === 'role') return label(`audit.${col}`, String(value))
-  if (col === 'user_id' || col === 'signer_id') return names.value.get(String(value)) ?? String(value)
-  if (col === 'department_id') return departments.value.get(String(value)) ?? String(value)
-  if (col === 'registered_at' || col === 'archived_at') return fmtDateTime(String(value))
-  if (col === 'due_on' || col === 'issued_on' || col === 'closed_on') return fmtDate(String(value))
-  // băm gói nộp lưu: sự kiện case_file.archived ghi dạng hex, không có tiền tố \x
-  if (col === 'archive_sha256') return `${String(value).replace(/^\\x/, '').slice(0, 10)}…`
-  if (col === 'size_bytes' && typeof value === 'number') return fmtSize(value)
-  return String(value)
-}
-
-// Các thay đổi để hiện: cột có giá trị trước, cột nội dung (giá trị ẩn) gom lại một dòng
-function changes(row: Row) {
-  const shown: { col: string; text: string }[] = []
-  const hidden: string[] = []
-  for (const [col, value] of Object.entries(row.overview)) {
-    if (HIDDEN.has(col) || col === 'document_id' || col === 'file_id' || col === 'case_file_id') continue
-    if (value === null) {
-      hidden.push(label('audit.col', col))
-      continue
-    }
-    if (!Array.isArray(value)) {
-      shown.push({ col: label('audit.col', col), text: show(col, value) })
-      continue
-    }
-    const [before, after] = value
-    if (row.action === 'insert' && (after === null || after === false)) continue
-    const text = row.action === 'insert' ? show(col, after)
-      : row.action === 'delete' ? show(col, before)
-        : `${show(col, before)} → ${show(col, after)}`
-    shown.push({ col: label('audit.col', col), text })
-  }
-  return { shown, hidden }
-}
+const { label, who, changes } = useAuditFormat(names, departments)
 
 // Văn bản mà dòng sổ thuộc về, để mở trang văn bản
 function documentOf(row: Row): string | null {

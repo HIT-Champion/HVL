@@ -1702,6 +1702,92 @@ input office_document_files_variance_order_by {
   version: order_by
 }
 
+"columns and relationships of \"office.document_history\""
+type office_document_history {
+  action: String
+  actor_id: String
+  actor_kind: String
+  "An object relationship"
+  document: office_documents
+  document_id: uuid
+  entity: String
+  id: bigint
+  occurred_at: timestamptz
+  overview(
+    "JSON select path"
+    path: String
+  ): jsonb
+}
+
+"Boolean expression to filter rows from the table \"office.document_history\". All fields are combined with a logical 'AND'."
+input office_document_history_bool_exp {
+  _and: [office_document_history_bool_exp!]
+  _not: office_document_history_bool_exp
+  _or: [office_document_history_bool_exp!]
+  action: String_comparison_exp
+  actor_id: String_comparison_exp
+  actor_kind: String_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  entity: String_comparison_exp
+  id: bigint_comparison_exp
+  occurred_at: timestamptz_comparison_exp
+  overview: jsonb_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.document_history\"."
+input office_document_history_order_by {
+  action: order_by
+  actor_id: order_by
+  actor_kind: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  entity: order_by
+  id: order_by
+  occurred_at: order_by
+  overview: order_by
+}
+
+"select columns of table \"office.document_history\""
+enum office_document_history_select_column {
+  "column name"
+  action
+  "column name"
+  actor_id
+  "column name"
+  actor_kind
+  "column name"
+  document_id
+  "column name"
+  entity
+  "column name"
+  id
+  "column name"
+  occurred_at
+  "column name"
+  overview
+}
+
+"Streaming cursor of the table \"office_document_history\""
+input office_document_history_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_history_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_history_stream_cursor_value_input {
+  action: String
+  actor_id: String
+  actor_kind: String
+  document_id: uuid
+  entity: String
+  id: bigint
+  occurred_at: timestamptz
+  overview: jsonb
+}
+
 "columns and relationships of \"office.document_types\""
 type office_document_types {
   code: String!
@@ -2414,6 +2500,19 @@ type query_root {
   ): [office_document_files!]!
   "fetch data from the table: \"office.document_files\" using primary key columns"
   office_document_files_by_pk(document_id: uuid!, file_id: uuid!): office_document_files
+  "fetch data from the table: \"office.document_history\""
+  office_document_history(
+    "distinct select on columns"
+    distinct_on: [office_document_history_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_history_order_by!]
+    "filter the rows returned"
+    where: office_document_history_bool_exp
+  ): [office_document_history!]!
   "fetch data from the table: \"office.document_types\""
   office_document_types(
     "distinct select on columns"
@@ -2713,6 +2812,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_document_files_bool_exp
   ): [office_document_files!]!
+  "fetch data from the table: \"office.document_history\""
+  office_document_history(
+    "distinct select on columns"
+    distinct_on: [office_document_history_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_history_order_by!]
+    "filter the rows returned"
+    where: office_document_history_bool_exp
+  ): [office_document_history!]!
+  "fetch data from the table in a streaming manner: \"office.document_history\""
+  office_document_history_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_history_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_history_bool_exp
+  ): [office_document_history!]!
   "fetch data from the table: \"office.document_types\""
   office_document_types(
     "distinct select on columns"

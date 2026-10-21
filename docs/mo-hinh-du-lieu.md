@@ -162,6 +162,14 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   1792281600900; mẫu mã độc, cỡ tệp của tệp bị ClamAV chặn — migration 1792281601100, tên tệp vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế thì sổ
   cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
   chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
+- **Lịch sử của một văn bản** (F3.5, tab "Lịch sử" trên trang văn bản): view `office.document_history` (migration
+  1792281601500) gồm các dòng sổ về chính văn bản, tệp gắn với nó (`entity_id` "<văn bản>/<tệp>"), các lần giao
+  việc, lần đưa vào hồ sơ (bỏ id hồ sơ); cột `document_id`, `id`, `occurred_at`, `actor_id`, `actor_kind`, `action`,
+  `entity`, `overview` — không có `diff`, không có hash. Không gồm danh sách được xem văn bản hạn chế
+  (`document_acl`): người có tên không được biết ai khác cũng có tên. `staff`, `manager`, `clerk`, `director` đọc khi
+  đọc được văn bản (computed field `visible` qua quan hệ `document`), tối đa 500 dòng mỗi lần. Mỗi nhánh của view nối
+  bằng `=` trên chỉ mục (`audit_log (entity, split_part(entity_id, '/', 1))` và chỉ mục riêng cho dòng hồ sơ), lọc
+  theo một văn bản không quét cả sổ.
 
 Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` ghi sự kiện `file.rejected` vào
 `core.audit_log` (màn demo kiểm dịch F3.1).

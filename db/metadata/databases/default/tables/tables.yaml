@@ -38,3 +38,4 @@
 - "!include office_case_files.yaml"
 - "!include office_case_file_documents.yaml"
 - "!include core_lineage_events.yaml"
+- "!include office_document_history.yaml"

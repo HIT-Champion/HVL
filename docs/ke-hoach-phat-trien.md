@@ -827,3 +827,17 @@ Phase 2:
   - Phả hệ mới phủ job nộp lưu (job dữ liệu duy nhất hiện có); "báo cáo" của dashboard (F3.11) đọc thẳng view, chưa có
     job nên chưa có run.
 - Phase 3 còn lại: F3.5, F3.7, F3.10, F3.12–F3.15.
+
+**20/10/2026** — F3.5 (Phase 3):
+
+- **F3.5 xong.** Tab "Lịch sử" trên trang văn bản:
+  - CSDL: view `office.document_history` (migration `1792281601500_document_history`) — các dòng sổ kiểm toán về văn
+    bản, tệp gắn với nó, giao việc, lần đưa vào hồ sơ; chỉ trường `overview` (cột nội dung chỉ có tên), không có hash,
+    không có danh sách được xem văn bản hạn chế; Hasura cho chuyên viên, tổ trưởng, văn thư, lãnh đạo đọc khi đọc
+    được văn bản; mỗi nhánh nối trên chỉ mục, không quét cả sổ;
+  - giao diện: tab "Lịch sử" cạnh "Dòng thời gian", tải khi mở; cách hiện một dòng sổ gom vào `useAuditFormat`, dùng
+    chung với trang Sổ kiểm toán;
+  - 3 test CSDL, e2e: chuyên viên mở tab Lịch sử của văn bản vừa xử lý.
+- Chỗ khác kế hoạch: làm F3.5 trước F3.10 và F3.7 (thứ tự hàng đợi đêm 20/10) vì vừa một lượt kiểm trước 09:00; F3.10
+  cần thêm context broker NGSI-LD, F3.7 cần mã hóa tệp — để phiên sau.
+- Phase 3 còn lại: F3.7, F3.10, F3.12–F3.15.

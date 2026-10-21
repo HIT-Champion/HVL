@@ -96,6 +96,13 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   await expect(staff.getByText('Báo cáo kết quả')).toBeVisible()
   await shot(staff, '5-da-xu-ly')
 
+  // Lịch sử (F3.5): chuyên viên — không riêng lãnh đạo — xem từng lần sửa văn bản, đọc từ sổ kiểm toán
+  await staff.getByRole('tab', { name: 'Lịch sử' }).click()
+  const history = staff.getByTestId('history')
+  await expect(history.getByText('Thêm · Văn bản', { exact: true })).toBeVisible()
+  await expect(history.getByText('Trạng thái:').first()).toBeVisible()
+  await shot(staff, '5b-lich-su')
+
   // 5. Tìm lại bằng chữ không dấu (Meilisearch đồng bộ sau vài giây)
   await expect(async () => {
     await staff.goto(`/tim-kiem?q=${encodeURIComponent(`ra soat chuong trinh ${tag}`)}`)

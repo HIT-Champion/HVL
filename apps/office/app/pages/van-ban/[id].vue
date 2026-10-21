@@ -20,8 +20,8 @@
 import { useI18n } from 'vue-i18n'
 import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
 
-// Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6) và khung xử lý việc đang
-// chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
+// Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
+// khung xử lý việc đang chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
 // Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
 
 interface Doc {
@@ -73,6 +73,39 @@ const submitting = ref(false)
 const signer = ref('')
 
 const id = computed(() => String(route.params.id))
+
+// Lịch sử (F3.5): các dòng sổ kiểm toán về văn bản — ai sửa gì, lúc nào — cho mọi người đọc được văn bản. Tải khi mở
+// tab; cột nội dung (trích yếu, tên tệp…) chỉ báo là đã đổi, như màn Sổ kiểm toán.
+interface HistoryRow {
+  id: number
+  occurred_at: string
+  actor_id: string
+  actor_kind: string
+  action: string
+  entity: string
+  overview: Record<string, unknown>
+}
+const side = ref<'timeline' | 'history'>('timeline')
+const history = ref<HistoryRow[] | null>(null)
+const userNames = computed(() => new Map(users.value.map((u) => [u.id, u.full_name])))
+const departmentNames = computed(() => new Map(departments.value.map((d) => [d.id, d.name])))
+const { label, who, changes } = useAuditFormat(userNames, departmentNames)
+
+async function openHistory() {
+  side.value = 'history'
+  const want = id.value      // đổi sang văn bản khác giữa chừng: bỏ kết quả của văn bản cũ
+  try {
+    const data = await gql<{ office_document_history: HistoryRow[] }>(`
+      query ($id: uuid!) {
+        office_document_history(where: {document_id: {_eq: $id}}, order_by: {id: desc}) {
+          id occurred_at actor_id actor_kind action entity overview
+        }
+      }`, { id: want })
+    if (want === id.value) history.value = data.office_document_history
+  } catch (e) {
+    notice.error(errorText(t, e))
+  }
+}
 const nameOf = (uid: string | null) => users.value.find((u) => u.id === uid)?.full_name ?? (uid ? uid.slice(0, 8) : '')
 
 async function load() {
@@ -101,6 +134,8 @@ async function load() {
     // bước "sửa dự thảo" làm bằng nút Trình lại ở dưới, không hiện khung xử lý riêng
     task.value = data.myTasks.find((x) => x.document_id === id.value && x.form_key !== 'vbdi.chinhSua') ?? null
     signer.value = doc.value?.signer_id ?? directors.value[0]?.id ?? ''
+    // tab Lịch sử đang mở: thao tác vừa xong (vào sổ, trình ký, xử lý) có dòng sổ mới
+    if (side.value === 'history') void openHistory()
   } catch (e) {
     notice.error(errorText(t, e))
   } finally {
@@ -194,7 +229,10 @@ const assignments = computed(() => {
   return roots.flatMap((r) => [r, ...all.filter((c) => c.parent_id === r.id)])
 })
 
-watch(id, load)
+watch(id, () => {
+  history.value = null      // lịch sử của văn bản trước: không hiện nhầm trong lúc tải
+  load()
+})
 onMounted(load)
 
 // có người vừa làm một bước với văn bản này (F2.5): tải lại để thấy trạng thái, việc và dòng thời gian mới
@@ -352,8 +390,23 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
         <!-- dòng thời gian -->
         <aside class="card h-fit p-5">
-          <h2 class="mb-4 text-sm font-semibold text-stone-800">{{ t('doc.timeline') }}</h2>
-          <ol class="relative space-y-5 border-l border-stone-200 pl-5">
+          <div role="tablist" class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold">
+            <button
+              role="tab" :aria-selected="side === 'timeline'" class="-mb-px border-b-2 pb-2"
+              :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
+              @click="side = 'timeline'"
+            >
+              {{ t('doc.timeline') }}
+            </button>
+            <button
+              role="tab" :aria-selected="side === 'history'" class="-mb-px border-b-2 pb-2"
+              :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
+              @click="openHistory"
+            >
+              {{ t('doc.history') }}
+            </button>
+          </div>
+          <ol v-if="side === 'timeline'" class="relative space-y-5 border-l border-stone-200 pl-5">
             <li v-for="(item, i) in timeline" :key="item.key" class="relative">
               <span class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white" :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'" />
               <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
@@ -361,6 +414,20 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
             </li>
           </ol>
+          <div v-else data-testid="history">
+            <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
+            <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
+            <ol class="space-y-4">
+              <li v-for="row in history ?? []" :key="row.id" class="text-sm">
+                <div class="font-medium text-stone-900">{{ label('audit.action', row.action) }} · {{ label('audit.entity', row.entity) }}</div>
+                <div class="text-xs text-stone-500">{{ who(row) }} · {{ fmtDateTime(row.occurred_at) }}</div>
+                <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>
+                <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
+                  {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
+                </div>
+              </li>
+            </ol>
+          </div>
           <NuxtLink
             v-if="claims?.role === 'director'" :to="{ path: '/so-kiem-toan', query: { van_ban: doc.id } }"
             class="mt-5 inline-block text-xs font-medium text-brand-700 hover:underline"

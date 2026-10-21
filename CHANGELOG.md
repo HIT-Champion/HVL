@@ -188,6 +188,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   `MOC_OPENLINEAGE_URL`. Bảng Parquet được kiểm số dòng = CSDL và cột bắt buộc không null trước khi ghi gì sang kho
   lạnh; trượt thì dừng, sự kiện FAIL nằm lại trong phả hệ. `make demo-pha-he` (cũng là bước CI); `make smoke` thêm 1
   kiểm tra (tổng 48). Chưa dựng Marquez trong compose (#43).
+- Tab "Lịch sử" trên trang văn bản (F3.5): ai đọc được văn bản thì xem từng lần sửa — ai, lúc nào, trường nào từ gì
+  sang gì — đọc từ sổ kiểm toán qua view `office.document_history` (chính văn bản, tệp, giao việc, lần vào hồ sơ;
+  không gồm danh sách được xem văn bản hạn chế); trường nội dung chỉ báo là đã đổi, không có hash. Cách hiện dòng sổ dùng chung với trang Sổ kiểm toán
+  (`useAuditFormat`) (#44).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
