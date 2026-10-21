@@ -62,6 +62,9 @@ const names = ref(new Map<string, string>())
 const departments = ref(new Map<string, string>())
 const loading = ref(true)
 const failure = ref('')
+// quản trị đơn vị xem sổ nhưng không đọc văn bản nghiệp vụ: không có đường mở văn bản
+const claims = useAuth().claims
+const canOpen = computed(() => claims.value?.role !== 'tenant_admin')
 let latest = 0 // đổi bộ lọc khi lần tải trước chưa xong: bỏ kết quả cũ
 
 // Giao việc của văn bản đang lọc (dòng sổ của giao việc mang id giao việc, không mang id văn bản). Quản trị đơn vị
@@ -130,7 +133,7 @@ async function load(append = false) {
 watch([group, doc], () => load())
 onMounted(() => load())
 
-const { label, who, changes } = useAuditFormat(names, departments)
+const { label, action, who, changes } = useAuditFormat(names, departments)
 
 // Văn bản mà dòng sổ thuộc về, để mở trang văn bản
 function documentOf(row: Row): string | null {
@@ -194,8 +197,8 @@ function anchored(row: Row) {
             <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDateTime(row.occurred_at) }}</td>
             <td class="px-4 py-3">{{ who(row) }}</td>
             <td class="px-4 py-3">
-              <div class="font-medium whitespace-nowrap">{{ label('audit.action', row.action) }} · {{ label('audit.entity', row.entity) }}</div>
-              <NuxtLink v-if="documentOf(row)" :to="`/van-ban/${documentOf(row)}`" class="text-xs text-brand-700 hover:underline">{{ t('audit.openDocument') }}</NuxtLink>
+              <div class="font-medium whitespace-nowrap">{{ action(row) }} · {{ label('audit.entity', row.entity) }}</div>
+              <NuxtLink v-if="canOpen && documentOf(row)" :to="`/van-ban/${documentOf(row)}`" class="text-xs text-brand-700 hover:underline">{{ t('audit.openDocument') }}</NuxtLink>
             </td>
             <td class="max-w-md px-4 py-3">
               <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>

@@ -19,7 +19,9 @@
 Thứ tự ghi khi hoàn thành một việc: kiểm quyền và dữ liệu → nhận việc (claim) trong Flowable → ghi
 PostgreSQL trong một giao dịch, kèm sự kiện mang ``task_id`` → hoàn thành việc trong Flowable. Gọi lại sau
 lỗi mạng: sự kiện có ``task_id`` đã có thì bỏ qua bước ghi, chỉ hoàn thành nốt trong Flowable — không giao
-việc hai lần (docs/mo-hinh-du-lieu.md §4.1, "idempotent theo taskId").
+việc hai lần (docs/mo-hinh-du-lieu.md §4.1, "idempotent theo taskId"). Hai lần gọi chen nhau (bấm lại khi chờ lâu)
+chạy lần lượt; CSDL còn chặn lần ghi thứ hai bằng chỉ mục duy nhất theo ``task_id``. Vào sổ, trình văn bản đi cũng
+một văn bản một lượt, và chỉ gắn quy trình khi văn bản chưa có — không khởi chạy hai quy trình cho một văn bản.
 
 Sau mỗi bước, người phải làm bước kế tiếp nhận thông báo (F2.5, notify.py). Thông báo gửi sau khi bước đã ghi
 xong và không bao giờ làm hỏng bước đó: lỗi chỉ ghi nhật ký.
@@ -27,12 +29,14 @@ xong và không bao giờ làm hỏng bước đó: lỗi chỉ ghi nhật ký.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
 import re
 import secrets
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -44,12 +48,13 @@ from .flowable import FlowableClient, FlowableError, Task
 from .forms import FORMS, ChiDao, Note, PhanCong, PhatHanh, XuLy
 from .hasura import (
     BRIEF,
+    CLAIM_PROCESS,
     DOCUMENT,
     NUMBER_OUTGOING,
     OPEN_ASSIGNMENTS,
     OUTGOING,
+    PROCESS_OF,
     REGISTER_INCOMING,
-    SET_PROCESS,
     SHARE,
     TASK_DONE,
     UNLINKED,
@@ -99,12 +104,40 @@ CONSTRAINT_MESSAGES = {
     "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và ngược lại",
     "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
     "documents_restricted_private": "Văn bản hạn chế không công khai trích yếu ở trang tra cứu",
+    "document_events_task_once": "Việc này đã được ghi ở một lần gọi khác",
 }
+
+# Chỉ mục duy nhất theo task_id của sự kiện: một việc Flowable chỉ ghi dữ liệu một lần (migration 1792281601700)
+TASK_ONCE = "document_events_task_once"
 
 RESTRICTED_NOT_SEALED = "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa)"
 SEALED_NOT_RESTRICTED = "Tệp đã mã hóa chỉ gắn được vào văn bản hạn chế"
 RESTRICTED_PUBLIC = CONSTRAINT_MESSAGES["documents_restricted_private"]
 
+
+
+class _Turns:
+    """Mỗi khóa một lượt: hai lần gọi cùng văn bản hay cùng việc (bấm đúp, bấm lại khi chờ lâu, job đối soát) chạy
+    lần lượt, lần sau thấy những gì lần trước đã ghi. Chỉ trong một tiến trình — svc-workflow chạy một tiến trình;
+    nhiều bản sao thì CSDL vẫn chặn ghi đôi (giành process_id, chỉ mục document_events_task_once), chỉ không chặn
+    được việc làm thừa trước lúc ghi (dựng PDF phát hành, khởi chạy quy trình rồi hủy)."""
+
+    def __init__(self) -> None:
+        self._locks: dict[str, tuple[asyncio.Lock, int]] = {}
+
+    @contextlib.asynccontextmanager
+    async def hold(self, key: str) -> AsyncIterator[None]:
+        lock, waiting = self._locks.get(key, (asyncio.Lock(), 0))
+        self._locks[key] = (lock, waiting + 1)
+        try:
+            async with lock:
+                yield
+        finally:
+            lock, waiting = self._locks[key]
+            if waiting == 1:
+                del self._locks[key]
+            else:
+                self._locks[key] = (lock, waiting - 1)
 
 
 def new_verify_code() -> str:
@@ -235,6 +268,7 @@ class Workflow:
         self.notifier = notifier
         self.sla_duration = sla_duration
         self.intake = intake
+        self._turns = _Turns()
 
     # --- tiếp nhận ------------------------------------------------------------------------------------
 
@@ -299,6 +333,10 @@ class Workflow:
             if exc.code == "restricted":  # văn thư khác không có tên: như không có văn bản, không lộ là có
                 raise WorkflowError("document_not_found", "Không tìm thấy văn bản", 404) from None
             raise
+        async with self._turns.hold(f"doc:{document_id.lower()}"):
+            return await self._register_incoming(actor, document_id)
+
+    async def _register_incoming(self, actor: Actor, document_id: str) -> dict[str, Any]:
         try:
             data = await self.hasura.as_service(actor, REGISTER_INCOMING, {"id": document_id})
         except HasuraError as exc:
@@ -322,6 +360,7 @@ class Workflow:
 
     async def _attach_process(self, actor: Actor, doc: dict[str, Any]) -> str:
         pid = await self.flowable.find_process(PROCESS_IN, doc["id"])
+        started = pid is None
         if pid is None:
             pid = await self.flowable.start_process(PROCESS_IN, doc["id"], {
                 "tenantId": str(actor.tenant_id),
@@ -332,17 +371,41 @@ class Workflow:
                 "leadDepartmentId": "",
                 "handlerId": "",
             })
-        await self.hasura.as_service(actor, SET_PROCESS, {"id": doc["id"], "pid": pid})
-        return pid
+        return await self._claim_process(actor, doc["id"], pid, started=started)
+
+    async def _claim_process(self, actor: Actor, doc_id: str, pid: str, *, started: bool) -> str:
+        """Ghi process_id khi văn bản chưa có. Lần gọi khác đã ghi trước thì theo phiên của lần đó và hủy phiên mình
+        vừa khởi chạy — không thì một văn bản có hai quy trình chạy song song, mỗi bước hai việc."""
+        try:
+            won = await self.hasura.as_service(actor, CLAIM_PROCESS, {"id": doc_id, "pid": pid})
+            if won["update_office_documents"]["affected_rows"]:
+                return pid
+            found = (await self.hasura.as_service(actor, PROCESS_OF, {"id": doc_id}))["office_documents_by_pk"]
+        except HasuraError as exc:
+            if started:  # quy trình đã chạy mà chưa chắc đã gắn: để lại dấu cho người vận hành đối chiếu
+                log.warning(json.dumps({"event": "office.process.unlinked", "document_id": doc_id, "process_id": pid,
+                                        "error": str(exc)}, ensure_ascii=False))
+            raise
+        winner = (found or {}).get("process_id")
+        if started and winner != pid:
+            try:
+                await self.flowable.delete_process(pid, "trùng: văn bản đã gắn quy trình khác")
+            except FlowableError as exc:
+                log.warning(json.dumps({"event": "office.process.duplicate_left", "document_id": doc_id,
+                                        "process_id": pid, "error": str(exc)}, ensure_ascii=False))
+        if not winner:
+            raise WorkflowError("document_not_found", "Không tìm thấy văn bản", 404)
+        return winner
 
     async def reconcile(self) -> int:
         """Gắn quy trình cho văn bản đã vào sổ mà chưa có (lỗi giữa chừng ở registerIncoming)."""
         rows = (await self.hasura.as_system(UNLINKED))["office_documents"]
         for row in rows:
             actor = Actor(SYSTEM_ACTOR, uuid.UUID(row["tenant_id"]), "service", None)
-            pid = await self._attach_process(actor, row)
-            await self._share(actor, pid, row["id"])
-            await self._announce(actor, pid, row["id"])
+            async with self._turns.hold(f"doc:{row['id'].lower()}"):
+                pid = await self._attach_process(actor, row)
+                await self._share(actor, pid, row["id"])
+                await self._announce(actor, pid, row["id"])
         return len(rows)
 
     # --- trình văn bản đi -----------------------------------------------------------------------------
@@ -350,7 +413,8 @@ class Workflow:
     async def submit_outgoing(self, actor: Actor, document_id: str, signer_id: str) -> dict[str, Any]:
         """Người soạn trình dự thảo cho lãnh đạo phòng duyệt: lần đầu, hoặc sau khi sửa theo ý kiến trả lại."""
         try:
-            return await self._submit_outgoing(actor, document_id, signer_id)
+            async with self._turns.hold(f"doc:{document_id.lower()}"):
+                return await self._submit_outgoing(actor, document_id, signer_id)
         except HasuraError as exc:
             raise _db_error(exc) from exc
         except FlowableError as exc:
@@ -381,8 +445,9 @@ class Workflow:
 
         first = doc["status"] == "draft"
         changes: dict[str, Any] = {"status": "in_review", "signer_id": signer_id}
-        if first:
-            changes["process_id"] = doc["process_id"] or await self._start_outgoing(actor, doc, signer_id)
+        process_id = doc["process_id"]
+        if first and not process_id:
+            process_id = await self._start_outgoing(actor, doc, signer_id)
         event = {
             "document_id": doc["id"],
             "kind": "office.document.submitted" if first else "office.document.resubmitted",
@@ -393,12 +458,13 @@ class Workflow:
         await self.hasura.as_service(actor, SUBMIT, {"doc": doc["id"], "set": changes, "event": event})
         if not first:
             await self._finish_revision(actor, doc, signer_id)
-        await self._share(actor, changes.get("process_id") or doc["process_id"], doc["id"])
-        await self._announce(actor, changes.get("process_id") or doc["process_id"], doc["id"])
+        await self._share(actor, process_id, doc["id"])
+        await self._announce(actor, process_id, doc["id"])
         return {"document_id": doc["id"], "status": "in_review"}
 
     async def _start_outgoing(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> str:
         pid = await self.flowable.find_process(PROCESS_OUT, doc["id"])
+        started = pid is None
         if pid is None:
             pid = await self.flowable.start_process(PROCESS_OUT, doc["id"], {
                 "tenantId": str(actor.tenant_id),
@@ -411,7 +477,7 @@ class Workflow:
                 "slaDuration": self.sla_duration,
                 "outcome": "",
             })
-        return pid
+        return await self._claim_process(actor, doc["id"], pid, started=started)
 
     async def _finish_revision(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> None:
         """Hoàn thành bước "sửa dự thảo" của người soạn: quy trình quay về duyệt cấp phòng, người ký có thể đổi."""
@@ -527,6 +593,10 @@ class Workflow:
     # --- hoàn thành việc --------------------------------------------------------------------------------
 
     async def complete_task(self, actor: Actor, task_id: str, outcome: str, data: dict[str, Any] | None) -> dict:
+        async with self._turns.hold(f"task:{task_id}"):
+            return await self._complete_task(actor, task_id, outcome, data)
+
+    async def _complete_task(self, actor: Actor, task_id: str, outcome: str, data: dict[str, Any] | None) -> dict:
         try:
             task = await self.flowable.task(task_id)
         except FlowableError as exc:
@@ -553,6 +623,20 @@ class Workflow:
                                                 f"{first['msg']}", 400) from exc
 
         doc_id = task.variables["documentId"]
+        saved = await self._saved_flow(actor, doc_id, task_id)
+        if saved:
+            # Lần gọi trước đã ghi CSDL rồi lỗi ở Flowable: hoàn thành nốt đúng kết quả đã ghi, không theo lựa chọn
+            # khác của lần bấm này. Kế hoạch chỉ còn để lấy ý kiến, thông báo thêm — dữ liệu đã sang bước sau (giao
+            # việc đã xong…) thì không dựng lại được, bỏ qua
+            again = None
+            if saved.get("outcome") == outcome:
+                with contextlib.suppress(WorkflowError):
+                    again = await self._plan(actor, task, doc_id, outcome, form)
+            else:
+                log.warning(json.dumps({"event": "office.task.retry_other_outcome", "task_id": task_id,
+                                        "saved": saved.get("outcome"), "asked": outcome}, ensure_ascii=False))
+            return await self._finish(actor, task, doc_id, saved, note=again.note if again else None,
+                                      after=again.after if again else None)
         plan = await self._plan(actor, task, doc_id, outcome, form)
 
         claimed = False
@@ -564,33 +648,62 @@ class Workflow:
                     raise WorkflowError("task_taken", "Việc này vừa có người khác nhận", 409) from exc
                 raise WorkflowError("workflow_unavailable", "Chưa gọi được động cơ quy trình", 503) from exc
             claimed = True
+        flow = plan.flow
         try:
-            if not await self._task_done(actor, doc_id, task_id):
+            if saved is None:
                 variables = plan.variables
                 if plan.prepare is not None:
                     variables = {**variables, **await plan.prepare()}
-                await self.hasura.as_service(actor, plan.mutation, variables)
+                # biến Flowable ghi cùng sự kiện: lần bấm lại hoàn thành đúng nhánh đã ghi
+                event = variables["event"]
+                variables = {**variables, "event": {**event, "data": {**event["data"], "flow": plan.flow}}}
+                try:
+                    await self.hasura.as_service(actor, plan.mutation, variables)
+                except HasuraError as exc:
+                    if TASK_ONCE not in str(exc):
+                        raise
+                    # bản sao svc-workflow khác vừa ghi xong việc này: hoàn thành nốt đúng kết quả nó đã ghi. Không
+                    # thấy sự kiện của chính văn bản này thì không coi là đã ghi
+                    found = await self._saved_flow(actor, doc_id, task_id)
+                    if found is None:
+                        raise
+                    flow = found or plan.flow
         except (HasuraError, WorkflowError) as exc:
             if claimed:
                 await self._unclaim(task_id)
             if isinstance(exc, WorkflowError):
                 raise
             raise _db_error(exc) from exc
+        return await self._finish(actor, task, doc_id, flow, note=plan.note, after=plan.after)
+
+    async def _finish(self, actor: Actor, task: Task, doc_id: str, flow: dict[str, Any], *, note: str | None = None,
+                      after: Callable[[], Awaitable[None]] | None = None) -> dict:
+        """Hoàn thành việc trong Flowable sau khi dữ liệu đã ghi, rồi báo người làm bước sau."""
         try:
-            await self.flowable.complete(task_id, plan.flow)
+            await self.flowable.complete(task.id, flow)
         except FlowableError as exc:
+            if exc.status == 404:
+                # lần gọi khác vừa hoàn thành việc này sau khi dữ liệu đã ghi: lần đó báo người làm bước sau
+                return {"task_id": task.id, "document_id": doc_id}
             # Dữ liệu đã ghi; người dùng bấm lại sẽ chỉ hoàn thành nốt trong Flowable
             raise WorkflowError("workflow_unavailable", "Đã lưu, nhưng chưa chuyển được bước tiếp — bấm lại", 503) from exc
         await self._share(actor, task.process_instance_id, doc_id)
-        await self._announce(actor, task.process_instance_id, doc_id, note=plan.note)
-        if plan.after is not None:
-            await self._quietly("after", doc_id, plan.after)
-        return {"task_id": task_id, "document_id": doc_id}
+        await self._announce(actor, task.process_instance_id, doc_id, note=note)
+        if after is not None:
+            await self._quietly("after", doc_id, after)
+        return {"task_id": task.id, "document_id": doc_id}
+
+    async def _saved_flow(self, actor: Actor, doc_id: str, task_id: str) -> dict[str, Any] | None:
+        """Sự kiện mang task_id của văn bản: dữ liệu của việc đã ghi ở một lần gọi trước. Trả biến Flowable đã ghi
+        cùng nó; None — chưa ghi; {} — ghi bởi bản trước khi có trường flow."""
+        done = await self.hasura.as_service(actor, TASK_DONE, {"doc": doc_id, "task": {"task_id": task_id}})
+        rows = done["office_document_events"]
+        if not rows:
+            return None
+        return (rows[0].get("data") or {}).get("flow") or {}
 
     async def _task_done(self, actor: Actor, doc_id: str, task_id: str) -> bool:
-        """Đã có sự kiện mang task_id: dữ liệu của việc này đã ghi ở một lần gọi trước."""
-        done = await self.hasura.as_service(actor, TASK_DONE, {"doc": doc_id, "task": {"task_id": task_id}})
-        return bool(done["office_document_events"])
+        return await self._saved_flow(actor, doc_id, task_id) is not None
 
     async def _check_owner(self, actor: Actor, task: Task) -> None:
         if task.assignee:

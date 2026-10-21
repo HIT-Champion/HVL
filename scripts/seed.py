@@ -134,6 +134,10 @@ def main() -> None:
     except HTTPError as exc:
         sys.exit(f"Keycloak từ chối: {exc}")
     if "--no-documents" not in sys.argv:
+        if not ENV.get("MOC_DEMO_TOTP_SECRET"):
+            # văn bản mẫu dựng bằng tài khoản văn thư, lãnh đạo qua client moc-cli — client này hỏi mã TOTP như trình duyệt
+            sys.exit("Thiếu MOC_DEMO_TOTP_SECRET trong .env nên không đăng nhập được tài khoản mẫu văn thư, lãnh đạo để "
+                     "dựng văn bản mẫu — thêm một chuỗi ngẫu nhiên rồi chạy lại make seed")
         wait_directory()
         import seed_documents
         seed_documents.run()

@@ -40,6 +40,7 @@ const attachments = ref<Attachment[]>([])
 const removed = ref<string[]>([])
 const loading = ref(true)
 const locked = ref(false)
+const restricted = ref(false)   // văn bản hạn chế: không giữ bản dở trong trình duyệt
 const saving = ref(false)
 const tried = ref(false)
 let nextKey = 1
@@ -58,6 +59,22 @@ const errors = computed(() => {
 })
 const uploading = computed(() => attachments.value.some((a) => a.state === 'uploading'))
 
+// Hết phiên giữa chừng: quay lại sau khi đăng nhập vẫn còn bản đang soạn (tệp đã tải lên giữ theo id)
+interface Kept { form: typeof form; files: { name: string; uploaded: UploadedFile; existing?: boolean }[]; removed: string[] }
+const draft = useFormDraft<Kept>(
+  () => (claims.value ? `${claims.value.userId}:van-ban-di:${editId.value ?? 'moi'}` : null),
+  () => (restricted.value ? null : {
+    form: { ...form }, removed: [...removed.value],
+    files: attachments.value.filter((a) => a.state === 'clean' && a.uploaded)
+      .map((a) => ({ name: a.name, uploaded: a.uploaded!, existing: a.existing })),
+  }),
+  (kept) => {
+    Object.assign(form, kept.form)
+    removed.value = kept.removed
+    attachments.value = kept.files.map((f) => ({ key: nextKey++, name: f.name, state: 'clean' as const, uploaded: f.uploaded, existing: f.existing }))
+  },
+)
+
 onMounted(async () => {
   if (claims.value?.role !== 'staff') return router.replace('/van-ban-di')
   try {
@@ -72,6 +89,8 @@ onMounted(async () => {
     incoming.value = data.office_documents
     if (route.query.reply) form.reply_to_id = String(route.query.reply)
     if (editId.value) await loadDraft(editId.value)
+    if (restricted.value) draft.clear()
+    else if (!locked.value && draft.resume()) notice.info(t('compose.restored'))
   } catch (e) {
     notice.error(errorText(t, e))
   } finally {
@@ -81,11 +100,12 @@ onMounted(async () => {
 
 async function loadDraft(id: string) {
   const data = await gql<{ office_documents_by_pk: {
-    status: string; created_by: string; type_code: string; summary: string; body: string | null; recipients: string[]
+    status: string; created_by: string; restricted: boolean; type_code: string; summary: string; body: string | null
+    recipients: string[]
     urgency: string; reply_to_id: string | null; files: { role: string; file: { id: string; filename: string } | null }[]
   } | null }>(`
     query ($id: uuid!) { office_documents_by_pk(id: $id) {
-      status created_by type_code summary body recipients urgency reply_to_id
+      status created_by restricted type_code summary body recipients urgency reply_to_id
       files(where: {role: {_eq: "attachment"}}) { role file { id filename } }
     } }`, { id })
   const doc = data.office_documents_by_pk
@@ -93,6 +113,7 @@ async function loadDraft(id: string) {
     locked.value = true
     return
   }
+  restricted.value = doc.restricted
   Object.assign(form, {
     type_code: doc.type_code, summary: doc.summary, body: doc.body ?? '', recipients: doc.recipients.join('\n'),
     urgency: doc.urgency, reply_to_id: doc.reply_to_id ?? '',
@@ -130,7 +151,7 @@ async function save() {
   try {
     let id = editId.value
     if (id) {
-      await gql(`
+      const data = await gql<{ update_office_documents_by_pk: { id: string } | null }>(`
         mutation ($id: uuid!, $set: office_documents_set_input!, $files: [office_document_files_insert_input!]!, $removed: [uuid!]!) {
           update_office_documents_by_pk(pk_columns: {id: $id}, _set: $set) { id }
           insert_office_document_files(objects: $files) { affected_rows }
@@ -139,6 +160,12 @@ async function save() {
         id, set: fields, removed: removed.value,
         files: fresh.map((a) => ({ document_id: id, file_id: a.uploaded!.id, role: 'attachment' })),
       })
+      // Hasura trả null khi dòng không còn khớp quyền sửa (vừa trình ở thẻ khác…): không có gì được lưu — quyền gắn,
+      // gỡ tệp cùng điều kiện — nên không báo "Đã lưu"
+      if (!data.update_office_documents_by_pk) {
+        notice.error(t('compose.notEditable'))
+        return
+      }
     } else {
       const data = await gql<{ insert_office_documents_one: { id: string } }>(
         'mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }',
@@ -146,6 +173,7 @@ async function save() {
       )
       id = data.insert_office_documents_one.id
     }
+    draft.clear()
     notice.ok(t('compose.saved'))
     await router.push(`/van-ban/${id}`)
   } catch (e) {

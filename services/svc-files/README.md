@@ -336,15 +336,16 @@ uv venv && uv pip install -r requirements-dev.txt     # hoặc: python -m venv .
 ### Test tích hợp với ClamAV, SeaweedFS, PostgreSQL + Hasura thật
 
 Đi trọn luồng: tải lên → bản ghi `core.files` → tải xuống; lãnh đạo chỉ xem được sau khi tệp gắn vào văn bản;
-thuê ước khác nhận 404; EICAR bị chặn và nằm trong chuỗi băm của sổ kiểm toán; thuê ước lạ không để lại
-tệp mồ côi; tìm kiếm trả đúng văn bản từng vai trò được đọc; đọc chữ PDF đã gắn vào văn bản (bỏ tệp của văn bản
+thuê ước khác nhận 404; EICAR bị chặn và nằm trong chuỗi băm của sổ kiểm toán; zip, PDF có mật khẩu và zip lồng
+quá sâu bị chặn (`unscannable`), PDF chỉ khóa quyền sửa vẫn nhận; thuê ước lạ không để lại tệp mồ côi; tìm kiếm trả đúng văn bản từng vai trò được đọc; đọc chữ PDF đã gắn vào văn bản (bỏ tệp của văn bản
 hạn chế, tệp chưa gắn) rồi tìm được theo nội dung. Hasura dựng bằng `db/tests/stack.sh` (schema và quyền lấy từ `db/` của cây mã nguồn) với khóa
 công khai RS256, vì svc-files chỉ nhận token RS256 như của Keycloak.
 
 ```bash
 K=$(mktemp -d)
 openssl genrsa -out $K/it.pem 2048 && openssl rsa -in $K/it.pem -pubout -out $K/it.pub
-docker run -d --name moc-it-clamav -p 127.0.0.1:13310:3310 clamav/clamav:1.5.4
+docker run -d --name moc-it-clamav -p 127.0.0.1:13310:3310 \
+  -e CLAMD_CONF_AlertEncrypted=yes -e CLAMD_CONF_AlertExceedsMax=yes clamav/clamav:1.5.4   # như docker-compose.yml
 docker run -d --name moc-it-seaweedfs -p 127.0.0.1:18333:8333 chrislusf/seaweedfs:4.48 \
   server -s3 -dir=/data -ip.bind=0.0.0.0 -volume.max=0 -master.volumeSizeLimitMB=512
 docker run -d --name moc-it-meili -p 127.0.0.1:17700:7700 -e MEILI_ENV=production -e MEILI_NO_ANALYTICS=true \

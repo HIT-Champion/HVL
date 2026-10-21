@@ -27,6 +27,7 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'network') return t('error.network')
     if (e.code === 'session') return t('error.session')
     if (e.code === 'infected') return t('error.infected')
+    if (e.code === 'unscannable') return t('error.unscannable')    // có mật khẩu, nén quá sâu: ClamAV không quét hết
     if (e.code === 'invalid') return t('error.invalid')            // svc-workflow trả lỗi từng trường (fields)
     if (e.code === 'duplicate') return t('error.documents_in_dedup')
     if (e.status === 413) return t('error.too_large')

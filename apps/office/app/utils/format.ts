@@ -14,30 +14,37 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
+// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang. Luôn theo giờ Việt Nam như
+// svc-workflow và CSDL, không theo múi giờ của máy người dùng (đi công tác, máy đặt sai múi giờ).
+
+const VN = 'Asia/Ho_Chi_Minh'
 
 export function fmtDate(value: string | null | undefined): string {
   if (!value) return '—'
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value)
-  return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
+  // ngày thuần (cột date: ngày ban hành, hạn giải quyết) không gắn múi giờ nào: đọc thẳng
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (day) return `${day[3]}/${day[2]}/${day[1]}`
+  return new Intl.DateTimeFormat('vi-VN', { timeZone: VN, day: '2-digit', month: '2-digit', year: 'numeric' })
+    .format(new Date(value))
 }
 
 export function fmtDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: VN, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   }).format(new Date(value))
 }
 
-// Hôm nay theo giờ Việt Nam (YYYY-MM-DD), như svc-workflow và CSDL — không theo múi giờ của máy người dùng
+// Hôm nay theo giờ Việt Nam (YYYY-MM-DD)
 export function today(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
+  return new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date())
 }
 
+// Cộng ngày trên lịch (YYYY-MM-DD), tính theo UTC để không vướng giờ mùa hè của máy người dùng
 export function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00`)
-  d.setDate(d.getDate() + days)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 // Số đo (nhiệt độ cảm biến…) theo kiểu Việt Nam: 41,5

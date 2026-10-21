@@ -58,7 +58,9 @@ actions:
       headers:
         - name: X-Moc-Action-Secret
           value_from_env: MOC_ACTION_SECRET
-      timeout: 30
+      # phát hành = cấp số + dựng PDF + quét ClamAV + lưu kho; máy chậm có thể quá 30 giây. Cổng (APISIX) chờ Hasura
+      # 100 giây, dài hơn số này: hết giờ thì người dùng thấy lỗi của Hasura, không phải 504 của cổng
+      timeout: 90
     permissions:
       - role: clerk
       - role: staff

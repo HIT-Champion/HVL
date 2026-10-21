@@ -39,6 +39,18 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     return te(`${map}.${key}`) ? t(`${map}.${key}`) : key
   }
 
+  // Trạm quét chặn tệp vì không mở được để quét (có mật khẩu, nén quá sâu — mẫu Heuristics.Encrypted.*,
+  // Heuristics.Limits.Exceeded.* của ClamAV, svc-files/clamav.py) khác với chặn vì nhiễm mã độc: cùng sự kiện
+  // file.rejected, nhãn theo mẫu
+  function action(row: AuditRow) {
+    const sig = row.overview.signature
+    if (row.action === 'file.rejected' && typeof sig === 'string'
+      && (sig.startsWith('Heuristics.Encrypted.') || sig.startsWith('Heuristics.Limits.Exceeded'))) {
+      return label('audit.action', 'file.unscannable')
+    }
+    return label('audit.action', row.action)
+  }
+
   // Dịch vụ ghi thay người dùng (vai trò service) thì actor_id vẫn là người đó; tài khoản dịch vụ, việc tự chạy và
   // ghi thẳng CSDL thì là "Hệ thống"
   function who(row: AuditRow) {
@@ -89,5 +101,5 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     return { shown, hidden }
   }
 
-  return { label, who, show, changes }
+  return { label, action, who, show, changes }
 }

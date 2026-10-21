@@ -24,9 +24,10 @@ mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đ�
 qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
 kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
 có con số tổng), văn thư không đọc được. Văn bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người
-xem, chỉ người có tên trong danh sách được xem (người nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả
-chuỗi ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị,
-đơn vị khác không thấy văn bản; văn thư đăng nhập trình duyệt phải nhập mã TOTP; giới hạn tốc độ.
+xem, chỉ người có tên trong danh sách được xem (người nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán:
+neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả chuỗi ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp
+EICAR, không token, đường quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập — trên trình duyệt hay qua
+client moc-cli của kịch bản — phải nhập mã TOTP; giới hạn tốc độ.
 """
 
 from __future__ import annotations
@@ -50,7 +51,8 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pdf
+from moc_env import (EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pdf,
+                     user_login)
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -299,6 +301,14 @@ def main() -> None:
     step = browser_login("chuyenviendt")
     step == "code" or fail(f"chuyên viên đăng nhập trình duyệt chưa vào được ({step})")
     ok("chuyên viên (vai trò không bắt buộc TOTP): đúng mật khẩu là vào")
+    try:
+        call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={
+            "grant_type": "password", "client_id": "moc-cli", "username": "vanthu",
+            "password": ENV["MOC_DEMO_PASSWORD"], "scope": "openid"})
+        fail("văn thư lấy được token qua client moc-cli chỉ bằng mật khẩu, không cần mã TOTP")
+    except HTTPError as exc:
+        exc.status in (400, 401) or fail(f"lấy token không kèm mã: HTTP {exc.status}")
+    ok("lấy token bằng mật khẩu (client moc-cli của kịch bản) cũng phải kèm mã TOTP — không là đường vòng")
 
     print("Trạm kiểm dịch")
     before = director.gql("{ core_audit_log_aggregate { aggregate { max { id } } } }")
@@ -731,9 +741,7 @@ def main() -> None:
 
     # Không dùng hết giới hạn đăng nhập ở đây: nó tính theo IP, make e2e chạy ngay sau từ cùng máy
     print("Giới hạn tốc độ")
-    _, headers = call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={
-        "grant_type": "password", "client_id": "moc-cli", "username": "vanthu",
-        "password": ENV["MOC_DEMO_PASSWORD"], "scope": "openid"})
+    _, headers = user_login("vanthu")
     login_limit = header(headers, "X-RateLimit-Limit")
     login_limit and login_limit == ENV.get("MOC_RATE_LOGIN_PER_MIN", login_limit) \
         or fail(f"đường đăng nhập không có giới hạn tốc độ như cấu hình ({login_limit})")

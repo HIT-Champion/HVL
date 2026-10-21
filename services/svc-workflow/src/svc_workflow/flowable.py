@@ -156,6 +156,10 @@ class FlowableClient:
         )
         return data["id"]
 
+    async def delete_process(self, process_id: str, reason: str) -> None:
+        """Hủy phiên vừa khởi chạy thừa (lần gọi khác đã gắn phiên của nó vào văn bản): chưa ai làm gì trong đó."""
+        await self._request("DELETE", f"/runtime/process-instances/{process_id}", params={"deleteReason": reason})
+
     # --- việc ---------------------------------------------------------------------------------------
 
     async def tasks_for(self, user_id: str, groups: list[str]) -> list[Task]:

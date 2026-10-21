@@ -52,7 +52,13 @@ async function load() {
   }
 }
 
-onMounted(load)
+// Quản trị đơn vị không có hộp việc (Action myTasks chỉ cho vai trò nghiệp vụ, menu cũng không có): trang đầu của
+// họ là sổ kiểm toán
+const claims = useAuth().claims
+onMounted(() => {
+  if (claims.value?.role === 'tenant_admin') void navigateTo('/so-kiem-toan', { replace: true })
+  else void load()
+})
 
 // việc mới, nhắc hạn đẩy tới (F2.5): tải lại hộp việc, không phải bấm Làm mới
 const { lastPush } = useNotifications()
@@ -72,7 +78,7 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
       {{ t('inbox.empty') }}
     </div>
 
-    <ul v-else class="space-y-3">
+    <ul v-else class="space-y-3" data-testid="inbox">
       <li v-for="task in tasks" :key="task.id">
         <NuxtLink
           :to="`/van-ban/${task.document_id}`"

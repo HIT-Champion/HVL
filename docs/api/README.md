@@ -72,13 +72,14 @@ Access token sống 5 phút; làm mới bằng refresh token.
     theo mẫu `app-office`. Giữ nguyên `protocolMappers` để token có claim của Hasura; đổi `clientId` và
     `redirectUris`.
   - Văn thư, lãnh đạo và quản trị đơn vị phải nhập mã TOTP sau mật khẩu ([`auth/README.md`](../../auth/README.md)).
-- **Script trên máy phát triển** dùng client `moc-cli`, luồng mật khẩu, không hỏi TOTP. Client này phải tắt trên
-  server thật (`MOC_CLI_CLIENT_ENABLED=false`).
+- **Script** dùng client `moc-cli`, luồng mật khẩu kèm mã TOTP (tham số `otp`) — hỏi mã theo đúng quy tắc của
+  trình duyệt. Không cần trên server thật thì tắt (`MOC_CLI_CLIENT_ENABLED=false`).
 
 ```bash
 export MOC=http://localhost:8080 MOC_DEMO_PASSWORD='…giá trị trong .env…'
+OTP=123456   # mã hiện tại trong ứng dụng xác thực; tài khoản mẫu: make totp
 TOKEN=$(curl -s "$MOC/realms/moc/protocol/openid-connect/token" -d grant_type=password -d client_id=moc-cli \
-  -d username=vanthu --data-urlencode "password=$MOC_DEMO_PASSWORD" | jq -r .access_token)
+  -d username=vanthu --data-urlencode "password=$MOC_DEMO_PASSWORD" -d otp=$OTP | jq -r .access_token)
 ```
 
 Token mang claim `https://hasura.io/jwt/claims` với người dùng, đơn vị, phòng và vai trò

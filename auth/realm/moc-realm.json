@@ -78,13 +78,38 @@
     {
       "id": "caf1a197-9781-4731-b8a2-5a9ae6ebe31d",
       "alias": "moc-cli-direct-grant",
-      "description": "Chỉ cho client moc-cli (make seed, make smoke, CI): mật khẩu, không hỏi TOTP. Trên server thật tắt moc-cli bằng MOC_CLI_CLIENT_ENABLED=false",
+      "description": "Client moc-cli (make seed, make smoke, CI): mật khẩu rồi mã TOTP (tham số otp) theo đúng quy tắc của trình duyệt — không là đường vòng qua xác thực hai bước",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
       "authenticationExecutions": [
         {"authenticator": "direct-grant-validate-username", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
-        {"authenticator": "direct-grant-validate-password", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false}
+        {"authenticator": "direct-grant-validate-password", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"flowAlias": "moc-cli-otp-bat-buoc", "requirement": "CONDITIONAL", "priority": 30, "autheticatorFlow": true, "userSetupAllowed": false},
+        {"flowAlias": "moc-cli-otp-tu-chon", "requirement": "CONDITIONAL", "priority": 40, "autheticatorFlow": true, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-cli-otp-bat-buoc",
+      "description": "Văn thư, lãnh đạo phòng, lãnh đạo đơn vị, quản trị đơn vị: bắt buộc mã TOTP; chưa cài TOTP thì không lấy được token (luồng này không cài được)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-bat-buoc-otp", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "direct-grant-validate-otp", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-cli-otp-tu-chon",
+      "description": "Vai trò khác đã tự cài TOTP: hỏi mã",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-configured", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-khong-bat-buoc-otp", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "direct-grant-validate-otp", "requirement": "REQUIRED", "priority": 30, "autheticatorFlow": false, "userSetupAllowed": false}
       ]
     }
   ],

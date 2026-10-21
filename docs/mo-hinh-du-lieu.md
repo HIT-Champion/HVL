@@ -612,8 +612,20 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
 cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác
-đã nhận thì 409) → ghi PostgreSQL trong một giao dịch, sự kiện mang `task_id` → hoàn thành việc trong Flowable.
-Gọi lại khi đã có sự kiện mang `task_id` thì bỏ qua bước ghi; CSDL từ chối thì trả việc về nhóm.
+đã nhận thì 409) → ghi PostgreSQL trong một giao dịch, sự kiện mang `task_id` và biến sẽ gửi Flowable (`flow`)
+→ hoàn thành việc trong Flowable. Gọi lại khi đã có sự kiện mang `task_id` thì bỏ qua bước ghi, hoàn thành việc
+bằng đúng `flow` đã ghi (lần bấm lại chọn khác cũng không đổi nhánh); CSDL từ chối thì trả việc về nhóm.
+
+Hai lần gọi chen nhau (bấm lại khi phát hành lâu, bấm đúp) không ghi hai lần:
+- Trong `svc-workflow`, các lần gọi cùng một việc, cùng một văn bản (vào sổ, trình, đối soát) chạy lần lượt.
+- Chỉ mục duy nhất `document_events_task_once` trên `(data->>'task_id')`: mỗi việc chỉ có một sự kiện, lần ghi thứ
+  hai bị chặn cả giao dịch (cả phân công đi kèm); `svc-workflow` đọc lại sự kiện đã ghi và hoàn thành nốt việc
+  theo `flow` của nó (không thấy sự kiện của văn bản này thì báo lỗi 409).
+  Sự kiện nhắc hạn mang `sla_task_id`, không thuộc chỉ mục.
+- `process_id` chỉ gắn khi văn bản chưa có (`update … where process_id is null`): lần gọi thua theo quy trình đã
+  gắn và hủy quy trình nó vừa khởi chạy. Hủy không được (Flowable không trả lời) thì quy trình thừa còn lại, nhật ký
+  ghi `office.process.duplicate_left` để dọn tay; ghi `process_id` lỗi sau khi đã khởi chạy thì nhật ký ghi
+  `office.process.unlinked`.
 
 Hasura gửi kèm tiêu đề `X-Moc-Action-Secret`; `svc-workflow` từ chối yêu cầu không mang đúng giá trị.
 

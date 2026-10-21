@@ -450,8 +450,10 @@ def create_app(
         responses={
             401: {"description": "Thiếu hoặc sai token"},
             413: {"description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"},
-            415: {"description": "restricted=true mà tệp không phải PDF đọc được, không mật khẩu"},
-            422: {"description": "Tệp chứa mã độc — đã chặn, không lưu, ghi vào sổ kiểm toán"},
+            415: {"description": "restricted=true mà tệp không phải PDF đọc được, không khóa (PDF phải nhập mật khẩu "
+                                 "mới mở thì bị chặn trước ở bước quét: 422 unscannable)"},
+            422: {"description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được "
+                                 "(unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"},
             503: {"description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng — không lưu"},
         },
     )
@@ -511,6 +513,10 @@ def create_app(
                 except HasuraError as exc:
                     # Tệp vẫn bị chặn; chỉ thiếu dòng trong sổ — nhật ký JSON ở trên vẫn còn.
                     log_event("core.file.audit_failed", request, error=str(exc))
+                if result.unscannable:
+                    raise _error(422, "unscannable", "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không "
+                                 "kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại",
+                                 signature=result.signature)
                 raise _error(422, "infected", "Tệp chứa mã độc nên đã bị chặn", signature=result.signature)
 
             file_id = uuid.uuid4()

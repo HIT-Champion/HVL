@@ -142,9 +142,17 @@ mutation Register($id: uuid!) {
   office_register_incoming(args: {document_id: $id}) { id status register_number process_id urgency due_on }
 }"""
 
-SET_PROCESS = """
-mutation SetProcess($id: uuid!, $pid: String!) {
-  update_office_documents_by_pk(pk_columns: {id: $id}, _set: {process_id: $pid}) { id }
+# Gắn quy trình chỉ khi văn bản chưa có: hai lần gọi chen nhau (bấm đúp, job đối soát) thì một lần thắng
+CLAIM_PROCESS = """
+mutation ClaimProcess($id: uuid!, $pid: String!) {
+  update_office_documents(where: {id: {_eq: $id}, process_id: {_is_null: true}}, _set: {process_id: $pid}) {
+    affected_rows
+  }
+}"""
+
+PROCESS_OF = """
+query ProcessOf($id: uuid!) {
+  office_documents_by_pk(id: $id) { process_id }
 }"""
 
 DOCUMENT = """
@@ -207,7 +215,7 @@ query Visible($id: uuid!) {
 
 TASK_DONE = """
 query TaskDone($doc: uuid!, $task: jsonb!) {
-  office_document_events(where: {document_id: {_eq: $doc}, data: {_contains: $task}}, limit: 1) { id }
+  office_document_events(where: {document_id: {_eq: $doc}, data: {_contains: $task}}, limit: 1) { id data }
 }"""
 
 # Đối soát: văn bản đã vào sổ mà chưa gắn quy trình (lỗi giữa chừng lúc registerIncoming)

@@ -68,6 +68,7 @@ const departments = ref<PanelDepartment[]>([])
 const task = ref<{ id: string; form_key: string } | null>(null)
 const loading = ref(true)
 const missing = ref(false)
+const failure = ref('')
 const registering = ref(false)
 const submitting = ref(false)
 const signer = ref('')
@@ -89,7 +90,7 @@ const side = ref<'timeline' | 'history'>('timeline')
 const history = ref<HistoryRow[] | null>(null)
 const userNames = computed(() => new Map(users.value.map((u) => [u.id, u.full_name])))
 const departmentNames = computed(() => new Map(departments.value.map((d) => [d.id, d.name])))
-const { label, who, changes } = useAuditFormat(userNames, departmentNames)
+const { label, action, who, changes } = useAuditFormat(userNames, departmentNames)
 
 async function openHistory() {
   side.value = 'history'
@@ -110,6 +111,7 @@ const nameOf = (uid: string | null) => users.value.find((u) => u.id === uid)?.fu
 
 async function load() {
   loading.value = true
+  failure.value = ''
   try {
     const data = await gql<{ office_documents_by_pk: Doc | null; core_users: PanelUser[]; office_departments: PanelDepartment[]; myTasks: { id: string; form_key: string; document_id: string }[] }>(`
       query ($id: uuid!) {
@@ -139,7 +141,9 @@ async function load() {
     viewers.value = null
     if (doc.value?.restricted && canManageViewers.value) void loadViewers()
   } catch (e) {
-    notice.error(errorText(t, e))
+    // lần đầu chưa có gì để hiện: báo lỗi ngay trên trang thay vì để trang trắng
+    if (doc.value) notice.error(errorText(t, e))
+    else failure.value = errorText(t, e)
   } finally {
     loading.value = false
   }
@@ -290,6 +294,10 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
     <p v-if="loading && !doc" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="missing" class="card p-8 text-center text-stone-500">{{ t('doc.notFound') }}</p>
+    <div v-else-if="failure" class="card flex flex-col items-center gap-3 p-8 text-center text-sm text-red-700" data-testid="doc-failure">
+      {{ failure }}
+      <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.retry') }}</button>
+    </div>
 
     <div v-else-if="doc" class="space-y-6">
       <!-- tiêu đề -->
@@ -498,7 +506,7 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
             <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
             <ol class="space-y-4">
               <li v-for="row in history ?? []" :key="row.id" class="text-sm">
-                <div class="font-medium text-stone-900">{{ label('audit.action', row.action) }} · {{ label('audit.entity', row.entity) }}</div>
+                <div class="font-medium text-stone-900">{{ action(row) }} · {{ label('audit.entity', row.entity) }}</div>
                 <div class="text-xs text-stone-500">{{ who(row) }} · {{ fmtDateTime(row.occurred_at) }}</div>
                 <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>
                 <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">

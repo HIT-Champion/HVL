@@ -121,6 +121,8 @@ def test_plain_upload_is_unchanged(client, make_token, store):
     assert obj["data"] == SECRET
 
 
+# PDF phải nhập mật khẩu mới mở: ClamAV thật (AlertEncrypted) chặn trước bước này — 422 unscannable, xem
+# test_upload và test tích hợp. Trạm quét giả ở đây không báo, nên check_pdf vẫn là lớp chặn sau (415)
 @pytest.mark.parametrize(("data", "mime"), [
     (b"van ban thuong", "text/plain"),
     (SECRET, "image/png"),

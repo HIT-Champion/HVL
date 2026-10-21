@@ -18,11 +18,16 @@
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
+import hmac
 import json
 import os
 import pathlib
+import struct
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -98,15 +103,77 @@ def wait_for(url: str, what: str, timeout_s: int = 300) -> None:
             time.sleep(2)
 
 
+TOTP_PERIOD = 30
+# Sổ mã TOTP đã gửi, theo địa chỉ hệ thống rồi theo tài khoản: chung cho mọi kịch bản trên máy (smoke, demo… chạy nối
+# nhau) và cho e2e (tests/e2e/helpers.ts — Playwright chạy trong container chỉ thấy tests/e2e). Keycloak không nhận lại
+# mã đã dùng và đếm mỗi mã bị từ chối là một lần đăng nhập sai: đủ failureFactor (10) thì khóa tài khoản
+_E2E_DIR = ROOT / "tests" / "e2e"
+_OTP_USED = (_E2E_DIR if _E2E_DIR.is_dir() else pathlib.Path(tempfile.gettempdir())) / ".otp-used.json"
+
+
+def totp_at(secret: str, counter: int) -> str:
+    """Mã TOTP (RFC 6238: HMAC-SHA1, 6 số) của khoảng 30 giây thứ counter. Keycloak dùng chính chuỗi khóa làm khóa."""
+    mac = hmac.new(secret.encode(), struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = mac[-1] & 0x0F
+    return str((struct.unpack(">I", mac[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000).zfill(6)
+
+
+def _otp_counter(username: str) -> int:
+    """Khoảng 30 giây chưa dùng mã của tài khoản. Realm nhận mã của khoảng hiện tại và một khoảng mỗi bên
+    (otpPolicyLookAheadWindow) nhưng không nhận lại mã đã dùng: mỗi tài khoản có ba mã mỗi 30 giây, hết thì đợi.
+    Dùng khoảng trước trước tiên — người dùng thật trên trình duyệt gõ mã hiện tại."""
+    with open(_OTP_USED, "a+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        try:
+            ledger = json.loads(f.read() or "{}")
+        except ValueError:
+            ledger = {}
+        used = ledger.setdefault(PUBLIC_URL, {})
+        now = time.time()
+        current = int(now // TOTP_PERIOD)
+        # sát cuối khoảng thì mã của khoảng trước sắp hết hạn trên server: bỏ qua
+        counter = max(current - 1 if now % TOTP_PERIOD < TOTP_PERIOD - 3 else current, used.get(username, 0) + 1)
+        if counter > current + 1:
+            time.sleep((counter - 1) * TOTP_PERIOD - now + 0.5)
+        used[username] = counter
+        f.seek(0)
+        f.truncate()
+        f.write(json.dumps(ledger))
+    return counter
+
+
+def user_login(username: str, password: str | None = None) -> tuple[dict, dict[str, str]]:
+    """Đăng nhập qua client moc-cli (luồng mật khẩu, qua APISIX như một ứng dụng thật) → (thân trả về, header).
+
+    Luồng của moc-cli hỏi mã TOTP như trình duyệt (văn thư, lãnh đạo, quản trị đơn vị; vai trò khác nếu đã tự cài):
+    gửi kèm mã tính từ MOC_DEMO_TOTP_SECRET mà make seed cài cho tài khoản mẫu. Vai trò không cần mã thì Keycloak bỏ
+    qua tham số này."""
+    form = {"grant_type": "password", "client_id": "moc-cli", "username": username,
+            "password": password or ENV["MOC_DEMO_PASSWORD"], "scope": "openid"}
+    secret = ENV.get("MOC_DEMO_TOTP_SECRET", "")
+    url = f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token"
+    if not secret:
+        return call_json("POST", url, form=form)
+    for attempt in range(4):
+        try:
+            return call_json("POST", url, form={**form, "otp": totp_at(secret, _otp_counter(username))})
+        except HTTPError as exc:
+            # 400 (không phải 401 như mã sai): không có tài khoản, sai mật khẩu, hoặc đang bị khóa tạm
+            if exc.status == 400 and "Invalid user credentials" in exc.body:
+                raise HTTPError(400, f"{exc.body} — Keycloak từ chối {username}: sai tên đăng nhập hoặc mật khẩu, "
+                                     "hoặc tài khoản đang tạm khóa vì đăng nhập sai liên tiếp (đợi một phút rồi "
+                                     "chạy lại)", url) from exc
+            # mã vừa bị trình duyệt (e2e) dùng mất: lấy mã kế tiếp. Đợi quá 1 giây — hai lần sai sát nhau thì
+            # Keycloak coi là dò mật khẩu, khóa tài khoản một phút (quickLoginCheckMilliSeconds mặc định 1000)
+            if exc.status != 401 or attempt == 3:
+                raise
+            time.sleep(1.5)
+    raise AssertionError("không tới được đây")
+
+
 def user_token(username: str, password: str | None = None) -> str:
-    """Token của tài khoản qua client moc-cli (luồng mật khẩu), lấy qua APISIX như một ứng dụng thật."""
-    data, _ = call_json(
-        "POST",
-        f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token",
-        form={"grant_type": "password", "client_id": "moc-cli", "username": username,
-              "password": password or ENV["MOC_DEMO_PASSWORD"], "scope": "openid"},
-    )
-    return data["access_token"]
+    return user_login(username, password)[0]["access_token"]
 
 
 class Session:

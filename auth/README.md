@@ -6,12 +6,17 @@
 | Phần | Nội dung |
 |---|---|
 | Client `app-office` | Công khai, Authorization Code + PKCE (S256), chuyển hướng về `MOC_PUBLIC_URL` |
-| Client `moc-cli` | Luồng mật khẩu cho `make seed`, `make smoke`, `make e2e` — tắt bằng `MOC_CLI_CLIENT_ENABLED=false` trên server thật |
+| Client `moc-cli` | Luồng mật khẩu cho `make seed`, `make smoke`, các màn demo, CI — không cần trên server thật thì tắt bằng `MOC_CLI_CLIENT_ENABLED=false` |
 | Client `svc-workflow` | Tài khoản dịch vụ, quyền `view-users`, đọc danh bạ |
 | Đăng nhập trình duyệt (luồng `moc-browser`) | Mật khẩu rồi mã TOTP. Bắt buộc với `clerk`, `manager`, `director`, `tenant_admin`: chưa cài thì Keycloak bắt cài bằng mã QR ngay lần đầu. `staff` chỉ bị hỏi mã nếu đã tự cài |
-| Luồng mật khẩu của `moc-cli` (`moc-cli-direct-grant`) | Chỉ kiểm mật khẩu, không hỏi TOTP — lý do phải tắt client này trên server thật |
+| Luồng mật khẩu của `moc-cli` (`moc-cli-direct-grant`) | Mật khẩu rồi mã TOTP (tham số `otp`) theo đúng quy tắc của `moc-browser`: không là đường vòng qua xác thực hai bước. Vai trò bắt buộc mà chưa cài TOTP thì không lấy được token (luồng này không cài được). Kịch bản trong `scripts/` tự tính mã từ `MOC_DEMO_TOTP_SECRET` (`moc_env.user_login`), không gửi lại mã đã dùng |
 | Mapper | Claim `https://hasura.io/jwt/claims`: `x-hasura-user-id`, `-tenant-id`, `-department-id`, `-default-role`, `-allowed-roles` |
 | User profile | `tenant_id`, `department_id`, `moc_role` (5 vai trò) — chỉ quản trị viên xem và sửa |
+
+Stack dựng từ bản mà `moc-cli-direct-grant` chưa hỏi TOTP vẫn giữ luồng cũ, vì realm không nạp lại: `make reset`
+(xóa toàn bộ dữ liệu), hoặc trong trang quản trị Keycloak mở Authentication → `moc-cli-direct-grant`, thêm hai
+subflow Conditional `moc-cli-otp-bat-buoc`, `moc-cli-otp-tu-chon` sau bước mật khẩu, giống hệt trong
+`moc-realm.json`.
 
 Tài khoản mẫu tạo bằng `make seed` (`seed/users.csv`), không nằm trong realm. Các tài khoản văn thư, lãnh đạo,
 quản trị được cài sẵn TOTP bằng khóa chung `MOC_DEMO_TOTP_SECRET`; `make totp` in mã hiện tại và khóa để thêm

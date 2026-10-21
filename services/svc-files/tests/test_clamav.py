@@ -78,6 +78,18 @@ def test_infected_stream_reports_signature():
     asyncio.run(run())
 
 
+@pytest.mark.parametrize(("reply", "unscannable"), [
+    (b"stream: Heuristics.Encrypted.Zip FOUND", True),
+    (b"stream: Heuristics.Encrypted.PDF FOUND", True),
+    (b"stream: Heuristics.Limits.Exceeded.MaxRecursion FOUND", True),
+    (b"stream: Eicar-Test-Signature FOUND", False),
+    (b"stream: Heuristics.Phishing.Email.SpoofedDomain FOUND", False),   # mẫu đáng ngờ: vẫn là nhiễm
+    (b"stream: OK", False),
+])
+def test_unscannable_is_told_apart_from_infected(reply, unscannable):
+    assert parse_reply(reply).unscannable is unscannable
+
+
 def test_ping():
     async def run():
         server, port, _ = await fake_clamd()

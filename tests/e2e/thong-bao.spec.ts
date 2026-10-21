@@ -33,7 +33,9 @@ test('thông báo realtime giữa hai người dùng', async ({ browser }) => {
   await bell.click()
   await expect(manager.getByText('Đang nhận thông báo trực tiếp')).toBeVisible()
   await bell.click()
-  await expect(manager.getByRole('link', { name: new RegExp(tag) })).toHaveCount(0)
+  // chỉ trong danh sách hộp việc: tin ở góc màn hình cũng mang trích yếu, không được tính là "hộp việc đã có"
+  const inboxItem = manager.getByTestId('inbox').getByRole('link', { name: new RegExp(tag) })
+  await expect(inboxItem).toHaveCount(0)
 
   // 2. Chuyên viên (trình duyệt khác) soạn và trình dự thảo
   const staff = await signIn(browser, 'chuyenviendt')
@@ -52,7 +54,7 @@ test('thông báo realtime giữa hai người dùng', async ({ browser }) => {
   const toast = manager.getByTestId('realtime-notice').filter({ hasText: tag })
   await expect(toast).toBeVisible()
   await expect(toast).toContainText('Việc mới: Duyệt dự thảo cấp phòng')
-  await expect(manager.getByRole('link', { name: new RegExp(tag) })).toBeVisible()
+  await expect(inboxItem).toBeVisible()
   await expect(manager.getByTestId('notification-count')).toBeVisible()
   await shot(manager, '12-thong-bao-realtime')
 

@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -61,6 +62,10 @@ class FakeFlowable:
     jobs_failed: list[tuple[str, str]] = field(default_factory=list)
     down: bool = False
     claim_conflict: bool = False
+    gone_on_complete: bool = False  # lần gọi khác vừa hoàn thành việc: Flowable trả 404
+    fail_complete: int = 0  # số lần hoàn thành việc tiếp theo lỗi (Flowable quá tải), các lệnh khác vẫn chạy
+    deleted: list[str] = field(default_factory=list)
+    slow: bool = False  # nhường lượt khi khởi chạy quy trình: hai lần gọi chen nhau như trên mạng thật
 
     def add_task(self, task_id: str, form_key: str, *, assignee: str | None = None, groups: list[str] | None = None,
                  tenant: uuid.UUID = TENANT, urgency: str = "normal", created: str = "2026-10-18T09:00:00Z",
@@ -98,6 +103,11 @@ class FakeFlowable:
     async def complete(self, task_id: str, variables: dict[str, Any]) -> None:
         if self.down:
             raise FlowableError("down")
+        if self.gone_on_complete:
+            raise FlowableError("gone", 404)
+        if self.fail_complete:
+            self.fail_complete -= 1
+            raise FlowableError("busy", 503)
         self.completed.append((task_id, variables))
         done = self.tasks.pop(task_id, None)
         if done is not None:
@@ -130,10 +140,18 @@ class FakeFlowable:
     async def start_process(self, key: str, business_key: str, variables: dict[str, Any]) -> str:
         if self.down:
             raise FlowableError("down")
+        if self.slow:
+            await asyncio.sleep(0)
         self.started.append(variables)
-        self.processes[business_key] = f"proc-{business_key}"
+        n = sum(1 for v in self.started if v.get("documentId") == business_key)
+        self.processes[business_key] = f"proc-{business_key}" + (f"-{n}" if n > 1 else "")
         self._follow(business_key, self.processes[business_key])
         return self.processes[business_key]
+
+    async def delete_process(self, process_id: str, reason: str) -> None:
+        self.deleted.append(process_id)
+        for task_id in [t.id for t in self.tasks.values() if t.process_instance_id == process_id]:
+            del self.tasks[task_id]
 
 
 @dataclass
@@ -144,6 +162,7 @@ class FakeHasura:
     departments: set[str] = field(default_factory=lambda: {str(DEPT_DT), str(DEPT_KTPM)})
     assignments: list[dict[str, Any]] = field(default_factory=list)
     events_with_task: set[str] = field(default_factory=set)
+    saved_flows: dict[str, dict[str, Any]] = field(default_factory=dict)  # task_id → biến Flowable ghi cùng sự kiện
     document: dict[str, Any] = field(default_factory=lambda: {
         "id": DOC, "direction": "in", "status": "registered", "urgency": "khan", "due_on": None,
         "registered_at": "2026-10-18T08:00:00Z", "process_id": None,
@@ -170,9 +189,18 @@ class FakeHasura:
     sealed: set[str] = field(default_factory=set)
     viewers: set[str] = field(default_factory=set)
     fail_share: bool = False
+    # lần gọi khác gắn quy trình này vào văn bản ngay trước lần ghi của mình (giành process_id thua)
+    rival_process: str | None = None
+    # bản sao svc-workflow khác ghi xong việc ngay sau lần kiểm TaskDone của mình (một lần)
+    done_elsewhere: bool = False
+    # chỉ mục task_once chặn lần ghi mà không có sự kiện nào của văn bản này mang task_id (một lần)
+    task_once_elsewhere: bool = False
+    slow: bool = False  # nhường lượt ở mỗi lần gọi: hai lần gọi chen nhau như trên mạng thật
 
     async def as_service(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         variables = variables or {}
+        if self.slow:
+            await asyncio.sleep(0)
         op = query.split("(")[0].split()[1] if query.strip().startswith(("query", "mutation")) else ""
         if op == "Register":
             if self.register_error:
@@ -191,6 +219,9 @@ class FakeHasura:
                                                 "verify_code": code}]}
         if op == "Document":
             return {"office_documents_by_pk": self.document if actor.tenant_id == TENANT else None}
+        if op == "ProcessOf":
+            doc = {DOC: self.document, OUT: self.outgoing}.get(variables["id"])
+            return {"office_documents_by_pk": {"process_id": doc["process_id"]} if doc else None}
         if op == "IntakeLookup":
             self.lookups.append(variables)
             same = [d for d in self.received if (d["symbol"], d["issuer_name"].lower(), d["issued_on"])
@@ -214,8 +245,16 @@ class FakeHasura:
                                if row["department_id"] == dept and row["role"] == "manager" and row["enabled"]],
             }
         if op == "TaskDone":
-            found = variables["task"]["task_id"] in self.events_with_task
-            return {"office_document_events": [{"id": 1}] if found else []}
+            task_id = variables["task"]["task_id"]
+            if self.done_elsewhere:
+                self.done_elsewhere = False
+                self.events_with_task.add(task_id)
+                return {"office_document_events": []}
+            if task_id not in self.events_with_task:
+                return {"office_document_events": []}
+            flow = self.saved_flows.get(task_id)
+            data = {"task_id": task_id, **({"flow": flow} if flow else {})}
+            return {"office_document_events": [{"id": 1, "data": data}]}
         if op == "SlaEvent":
             found = [w for w in self.writes if w[0] == "GhiSuKien" and w[1]["event"]["kind"] == variables["kind"]
                      and w[1]["event"]["data"].get("sla_task_id") == variables["task"]["sla_task_id"]]
@@ -248,9 +287,32 @@ class FakeHasura:
             raise HasuraError("Không gọi được Hasura")
         if self.fail_writes:
             raise HasuraError(self.fail_writes, "constraint-violation")
+        data = (variables.get("event") or {}).get("data", {})
+        task_id = data.get("task_id")
+        if task_id in self.events_with_task or (task_id and self.task_once_elsewhere):
+            # như chỉ mục duy nhất trong CSDL: cả giao dịch không ghi
+            self.task_once_elsewhere = False
+            raise HasuraError('duplicate key value violates unique constraint "document_events_task_once"',
+                              "constraint-violation")
         self.writes.append((op, variables, actor))
-        if "task_id" in (variables.get("event") or {}).get("data", {}):
-            self.events_with_task.add(variables["event"]["data"]["task_id"])
+        if task_id:
+            self.events_with_task.add(task_id)
+            if data.get("flow"):
+                self.saved_flows[task_id] = data["flow"]
+        if op == "Trinh":
+            self.outgoing.update(variables["set"])
+        if op == "XuLy":  # như CSDL: giao việc của người xử lý và của phòng đóng lại
+            for a in self.assignments:
+                if a["id"] in variables["ids"]:
+                    a["status"] = "done"
+        if op == "ClaimProcess":
+            doc = {DOC: self.document, OUT: self.outgoing}[variables["id"]]
+            if self.rival_process and not doc["process_id"]:
+                doc["process_id"] = self.rival_process
+            if doc["process_id"]:
+                return {"update_office_documents": {"affected_rows": 0}}
+            doc["process_id"] = variables["pid"]
+            return {"update_office_documents": {"affected_rows": 1}}
         if op == "TiepNhan":
             self.received.append({**variables["doc"], "id": NEW})
             return {"insert_office_documents_one": {"id": NEW}}

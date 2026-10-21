@@ -76,8 +76,25 @@ const form = reactive({
   restricted: false,
 })
 
+// Hết phiên giữa chừng: quay lại sau khi đăng nhập vẫn còn phần đã nhập và tệp đã quét. Văn bản hạn chế thì không
+// giữ (trích yếu không nằm lại trong trình duyệt)
+interface Kept { form: typeof form; files: { name: string; size: number; uploaded: UploadedFile }[] }
+const draft = useFormDraft<Kept>(
+  () => (claims.value ? `${claims.value.userId}:tiep-nhan` : null),
+  () => (form.restricted ? null : {
+    form: { ...form },
+    files: files.value.filter((f) => f.state === 'clean' && f.uploaded)
+      .map((f) => ({ name: f.name, size: f.size, uploaded: f.uploaded! })),
+  }),
+  (kept) => {
+    Object.assign(form, kept.form)
+    files.value = kept.files.map((f) => ({ key: nextKey++, name: f.name, size: f.size, progress: 100, state: 'clean' as const, uploaded: f.uploaded }))
+  },
+)
+
 onMounted(async () => {
   if (claims.value?.role !== 'clerk') return router.replace('/van-ban-den')
+  if (draft.resume()) notice.info(t('compose.restored'))
   const data = await gql<{ office_document_types: { code: string; name: string }[] }>(
     '{ office_document_types(order_by: {name: asc}) { code name } }',
   )
@@ -185,6 +202,7 @@ async function save(register: boolean) {
       'mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }', { d: payload.value },
     )
     id = data.receiveIncoming.document_id
+    draft.clear()
   } catch (e) {
     if (e instanceof ApiError && e.fields) serverErrors.value = e.fields
     notice.error(errorText(t, e))

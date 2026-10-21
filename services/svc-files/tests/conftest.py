@@ -88,6 +88,9 @@ def verifier(signing_key) -> TokenVerifier:
     return TokenVerifier(ISSUER, "http://unused/jwks", keys=StaticKeys(signing_key.public_key()))
 
 
+LOCKED_ZIP = b"PK\x03\x04\x14\x00\x01\x00"   # đầu tệp zip, cờ "có mật khẩu" bật
+
+
 class FakeScanner:
     """ClamAV giả: coi mọi tệp có chuỗi EICAR là nhiễm."""
 
@@ -105,6 +108,8 @@ class FakeScanner:
         self.scanned = data
         if b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE" in data:
             return ScanResult(clean=False, signature="Eicar-Test-Signature")
+        if data.startswith(LOCKED_ZIP):  # như ClamAV có AlertEncrypted: tệp nén có mật khẩu
+            return ScanResult(clean=False, signature="Heuristics.Encrypted.Zip")
         return ScanResult(clean=True)
 
 

@@ -128,6 +128,7 @@ export function useAuth() {
   }
 
   async function logout(): Promise<void> {
+    dropDrafts()
     await (await getManager()).signoutRedirect()
   }
 

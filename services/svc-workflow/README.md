@@ -18,6 +18,16 @@ Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hi
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
 xuất bằng `make api-docs`.
 
+**Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
+chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:
+chỉ mục duy nhất `document_events_task_once` (một việc một sự kiện — lỗi này thì đọc lại sự kiện đã ghi, hoàn
+thành nốt trong Flowable theo biến `flow` ghi kèm), và `process_id` chỉ gắn khi văn bản chưa có — lần gọi thua theo
+quy trình đã gắn, hủy quy trình nó vừa khởi chạy (`FlowableClient.delete_process`; lỗi thì nhật ký ghi
+`office.process.duplicate_left`). Nhiều bản sao thì vẫn có thể làm thừa trước lúc ghi (dựng PDF phát
+hành không dùng tới); dịch vụ hiện chạy một tiến trình. Còn một chỗ chưa gọn: lần gọi trước hết giờ chờ ở Hasura
+(90 giây) nhưng vẫn chạy xong, người dùng bấm lại thì lần sau báo "Việc không còn" (404) dù việc đã làm — tải lại
+trang là thấy bước mới.
+
 **Thông báo** (F2.5, `notify.py`): sau mỗi bước, người phải làm việc kế tiếp nhận thông báo — ghi
 `core.notifications` rồi đẩy qua HTTP API nội bộ của Centrifugo tới kênh riêng `personal:#<sub>`. Thông báo gửi
 sau khi bước đã ghi xong; lỗi ghi hay lỗi đẩy chỉ ghi nhật ký, không làm hỏng bước nghiệp vụ. Mỗi người nhận

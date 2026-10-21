@@ -48,8 +48,19 @@ def test_first_submission_starts_the_process_and_moves_to_review(workflow, hasur
     started = flowable.started[0]
     assert (started["departmentId"], started["drafterId"], started["signerId"]) == (str(DEPT_DT), "u-staff-dt", "u-director")
     (_, variables, who), = writes(hasura, "Trinh")
-    assert variables["set"] == {"status": "in_review", "signer_id": "u-director", "process_id": f"proc-{OUT}"}
+    assert variables["set"] == {"status": "in_review", "signer_id": "u-director"}
     assert variables["event"]["kind"] == "office.document.submitted" and who.user_id == "u-staff-dt"
+    assert hasura.outgoing["process_id"] == f"proc-{OUT}"   # gắn khi còn trống, trước lúc chuyển trạng thái
+
+
+def test_double_submission_submits_once(workflow, hasura, flowable):
+    hasura.slow = flowable.slow = True
+
+    async def twice():
+        return await asyncio.gather(*(workflow.submit_outgoing(DRAFTER, OUT, "u-director") for _ in range(2)))
+
+    assert run(twice()) == [{"document_id": OUT, "status": "in_review"}] * 2
+    assert len(writes(hasura, "Trinh")) == 1 and len(flowable.started) == 1 and flowable.deleted == []
 
 
 def test_only_the_drafter_submits(workflow, hasura):
@@ -129,6 +140,18 @@ def test_returning_needs_a_reason_and_sets_status(workflow, hasura, flowable):
     assert variables["status"] == "returned" and variables["event"]["note"] == "Sửa lại nơi nhận"
     assert flowable.completed == [("t-phong", {"outcome": "return"})]
 
+
+
+def test_retry_with_another_choice_finishes_the_saved_one(workflow, hasura, flowable):
+    hasura.outgoing["status"] = "in_review"
+    flowable.add_task("t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT)
+    flowable.fail_complete = 1
+    with pytest.raises(WorkflowError, match="Đã lưu"):
+        run(workflow.complete_task(MANAGER, "t-phong", "return", {"note": "Sửa lại nơi nhận"}))
+    # bấm lại nhưng chọn đồng ý: Flowable đi đúng nhánh đã ghi (trả lại), không ghi thêm
+    run(workflow.complete_task(MANAGER, "t-phong", "approve", {"note": "Đồng ý trình ký"}))
+    assert [w[0] for w in hasura.writes] == ["DoiTrangThai"]
+    assert flowable.completed == [("t-phong", {"outcome": "return"})]
 
 def test_signer_approval_sets_approved(workflow, hasura, flowable):
     hasura.outgoing.update(status="in_review", signer_id="u-director")

@@ -47,10 +47,10 @@
             "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
           },
           "415": {
-            "description": "restricted=true mà tệp không phải PDF đọc được, không mật khẩu"
+            "description": "restricted=true mà tệp không phải PDF đọc được, không khóa (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
           },
           "422": {
-            "description": "Tệp chứa mã độc — đã chặn, không lưu, ghi vào sổ kiểm toán"
+            "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"
           },
           "503": {
             "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng — không lưu"

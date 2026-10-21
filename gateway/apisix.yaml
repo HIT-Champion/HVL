@@ -44,6 +44,8 @@ upstreams:
       "keycloak:8080": 1
   - id: hasura
     type: roundrobin
+    # mặc định 60 giây; completeTask (phát hành) được Hasura chờ tới 90 giây (db/metadata/actions.yaml)
+    timeout: {connect: 6, send: 100, read: 100}
     nodes:
       "hasura:8080": 1
   - id: svc-files

@@ -202,7 +202,8 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   khẩn; còn dự thảo chưa trình của cùng cảm biến thì không dựng thêm. Cảm biến giả lập `ot/sensor.py` (dịch vụ chạy
   một lần `ot-sensor`), `make demo-it-ot` (cũng là bước CI), nhãn sự kiện và thông báo trên giao diện (#46).
 - Văn bản hạn chế truy cập (F3.7, màn (iv)): văn thư bật "Hạn chế người xem" trước khi tải tệp, tải lên
-  `POST /api/files?restricted=true` chỉ nhận PDF đọc được, không mật khẩu (415 `restricted_pdf_only`). `svc-files` xin
+  `POST /api/files?restricted=true` chỉ nhận PDF đọc được, không mật khẩu (415 `restricted_pdf_only`; PDF phải nhập
+  mật khẩu mới mở thì trạm quét chặn trước, 422 `unscannable` — mục Bảo mật). `svc-files` xin
   két OpenBao một khóa AES-256 riêng cho từng tệp (transit `moc-files`), mã hóa AES-GCM (gắn với đơn vị và tệp) rồi mới
   lưu: kho chỉ có bản mã `MOC1…`, CSDL chỉ giữ khóa đã bọc (`core.files.wrapped_dek`); bản phát hành của văn bản hạn
   chế cũng lưu mã hóa. Mở tệp: giải mã trong bộ nhớ, kiểm băm, đóng dấu tên người xem và giờ xem lên mọi trang, ghi
@@ -246,8 +247,35 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   `HIT-Champion/HVL`.
 - Kế hoạch: dời `v0.1.0` từ 21/10 sang 25/10 vì Phase 1 chưa bắt đầu; Phase 2 thành 26/10–08/11,
   Phase 3 thành 09–20/11, Phase 4 (cũng là đệm) thành 21–25/11; giữ nguyên ngày đóng băng và ngày nộp.
+- Hasura chờ `completeTask` tới 90 giây (trước là 30): phát hành gồm cấp số, dựng PDF, quét, lưu kho, máy chậm có thể
+  quá 30 giây. Cổng APISIX chờ Hasura 100 giây (mặc định 60).
 
 ### Đã sửa lỗi
+- Bấm lại khi hoàn thành việc lâu (phát hành) hay hai lần gọi chen nhau không còn ghi hai lần (hai phân công, hai lần
+  cấp số và dựng PDF): svc-workflow cho các lần gọi cùng một việc chạy lần lượt, lần sau thấy việc đã xong; CSDL có
+  chỉ mục duy nhất `document_events_task_once` theo `task_id` của sự kiện, nên lần ghi thứ hai (ví dụ từ bản sao
+  dịch vụ khác) bị chặn cả giao dịch và svc-workflow chỉ hoàn thành nốt việc trong Flowable. Sự kiện ghi kèm biến
+  gửi Flowable (`data.flow`): bấm lại sau lỗi "Đã lưu, nhưng chưa chuyển được bước tiếp" đi đúng nhánh đã ghi, kể cả
+  khi lần bấm lại chọn khác, và việc xử lý văn bản đến không còn kẹt ở lần bấm lại. Dữ liệu cũ đã trùng thì
+  migration cảnh báo và chỉ chặn từ sau dòng trùng cuối.
+- Vào sổ, trình văn bản đi bấm đúp, hay trùng lúc với job đối soát, không còn khởi chạy hai quy trình cho một văn bản
+  (mỗi bước hai việc, việc này đè trạng thái của việc kia): quy trình chỉ được gắn khi văn bản chưa có
+  (`update … where process_id is null`); lần gọi thua theo quy trình đã gắn và hủy quy trình nó vừa khởi chạy (hủy
+  không được thì nhật ký ghi `office.process.duplicate_left`).
+- Quản trị đơn vị mở app gặp lỗi (hộp việc chỉ dành cho người xử lý văn bản): trang đầu của vai trò này là Sổ kiểm
+  toán, và sổ không còn nút "Mở văn bản" (quản trị đơn vị không đọc nội dung nghiệp vụ). Trang văn bản tải lỗi thì hiện
+  lỗi kèm nút thử lại thay vì trang trống.
+- Ngày giờ trên giao diện luôn theo giờ Việt Nam, kể cả trên máy đặt múi giờ khác; ngày không kèm giờ (ngày ban hành,
+  hạn) không còn lệch một ngày ở múi giờ âm.
+- Danh sách văn bản đến, văn bản đi không còn cắt ở 200 dòng (văn bản cũ, dễ quá hạn, bị ẩn): mỗi lần 50 dòng, nút
+  "Xem thêm". Có văn bản mới vào sổ hay đổi trạng thái giữa hai lần bấm thì không lặp, không sót dòng; "Xem thêm" lỗi
+  thì báo ở góc màn hình, bảng đang xem vẫn còn.
+- Lưu dự thảo không còn sửa được (đã trình, đã đổi trạng thái) không còn báo "Đã lưu" khi CSDL không ghi gì.
+- Hết phiên đăng nhập giữa lúc soạn dự thảo hay tiếp nhận văn bản: phần đang nhập được giữ trong phiên của trình
+  duyệt (sessionStorage) và khôi phục khi quay lại; văn bản hạn chế không được giữ. Tự rời trang (chuyển sang trang
+  khác của ứng dụng) hay đăng xuất thì bỏ phần đang nhập, mở lại trang soạn là bắt đầu mới.
+- e2e thông báo tìm văn bản trong đúng hộp việc, không khớp nhầm thông báo nổi; test tích hợp tìm kiếm của svc-files
+  gắn tệp mã hóa vào văn bản hạn chế như ràng buộc của F3.7.
 - Văn bản hạn chế giao cho người không đọc được: lãnh đạo nhận việc chỉ đạo, tổ trưởng nhận phân công mở văn bản ra
   "không tìm thấy". Nay người phải làm việc đang mở được thêm vào danh sách được xem; `completeTask` từ chối (403
   `restricted`) người không đọc được văn bản thay vì cho làm mù (#47).
@@ -260,8 +288,18 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   workflow CI chỉ có quyền đọc kho.
 - Xác thực hai bước TOTP (F1.1): đăng nhập trình duyệt bắt buộc mã với văn thư, lãnh đạo phòng, lãnh đạo đơn
   vị, quản trị đơn vị (chưa cài thì Keycloak bắt cài ở lần đăng nhập đầu); vai trò khác chỉ hỏi mã nếu đã tự cài.
-  Client `moc-cli` của kịch bản dòng lệnh bỏ qua bước này và phải tắt trên server thật. `make seed` cài sẵn
-  TOTP cho tài khoản mẫu, `make totp` in mã; `make smoke` thêm 2 kiểm tra, e2e đăng nhập kèm mã.
+  `make seed` cài sẵn TOTP cho tài khoản mẫu, `make totp` in mã; `make smoke` thêm 2 kiểm tra, e2e đăng nhập kèm mã.
+- Client `moc-cli` (lấy token bằng mật khẩu cho kịch bản dòng lệnh) hỏi mã TOTP theo đúng quy tắc của trình duyệt,
+  tham số `otp`, thay vì bỏ qua bước này — không còn là đường vòng qua xác thực hai bước. Kịch bản trong `scripts/`
+  tự tính mã từ `MOC_DEMO_TOTP_SECRET`; kịch bản và e2e ghi chung một sổ mã đã dùng (`tests/e2e/.otp-used.json`, theo
+  địa chỉ hệ thống) nên không gửi lại mã đã dùng — Keycloak đếm mỗi mã bị từ chối là một lần đăng nhập sai, đủ 10 lần
+  thì khóa tài khoản; mã vẫn bị từ chối thì đợi quá 1 giây mới thử mã kế. `make smoke` thêm 1 kiểm tra (tổng 58). Realm chỉ
+  nạp ở lần khởi động đầu: stack đã dựng phải `make reset` (xóa dữ liệu) hoặc sửa tay luồng `moc-cli-direct-grant`
+  trong trang quản trị Keycloak (auth/README.md).
+- ClamAV báo tệp có mật khẩu (zip, 7z, rar, PDF phải nhập mật khẩu mới mở) và tệp giải nén vượt giới hạn quét (bom
+  nén, lồng quá sâu) thay vì coi là sạch (`AlertEncrypted`, `AlertExceedsMax`): svc-files chặn (422 `unscannable`,
+  kèm cách sửa), ghi `file.rejected` vào sổ kiểm toán với nhãn "Chặn tệp không quét được". PDF chỉ khóa quyền sửa,
+  in (mở không cần mật khẩu) vẫn nhận.
 - Thông báo về văn bản hạn chế không còn mang số ký hiệu, trích yếu, cơ quan ban hành: svc-workflow chỉ gửi nhãn,
   trigger CSDL gọt nội dung cho mọi đường ghi và gọt cả thông báo đã gửi khi văn bản chuyển sang hạn chế. Tóm tắt dòng
   sổ kiểm toán (`overview`) về văn bản hạn chế mà người xem sổ không đọc được chỉ còn tên trường, không còn giá trị

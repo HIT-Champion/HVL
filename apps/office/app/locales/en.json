@@ -11,7 +11,8 @@
     "none": "—",
     "required": "required",
     "optional": "optional",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "more": "Load more"
   },
   "nav": {
     "inbox": "My tasks",
@@ -282,6 +283,7 @@
     "documents_due_after_registered": "The deadline cannot be before the registration date.",
     "documents_summary": "The summary must be 10–500 characters.",
     "infected": "The file contains malware and was blocked.",
+    "unscannable": "The file is password-protected or nested too deeply for the malware scanner to check — blocked. Remove the password or unpack it, then upload again.",
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
@@ -347,6 +349,7 @@
     "attachmentsHint": "Annexes or tables (optional); files are virus-scanned before they are stored",
     "save": "Save draft",
     "saved": "Draft saved.",
+    "restored": "Restored your unsaved draft.",
     "notEditable": "This draft can no longer be edited: it was submitted, or you are not its author."
   },
   "verify": {
@@ -429,7 +432,8 @@
       "update": "Changed",
       "delete": "Deleted",
       "file": {
-        "rejected": "Blocked infected file"
+        "rejected": "Blocked infected file",
+        "unscannable": "Blocked unscannable file (password, nested too deeply)"
       },
       "register": {
         "printed": "Printed register"

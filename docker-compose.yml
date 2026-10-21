@@ -231,6 +231,11 @@ services:
       CLAMD_CONF_ConcurrentDatabaseReload: "no"
       CLAMD_CONF_StreamMaxLength: 64M
       CLAMD_CONF_TemporaryDirectory: /tmp
+      # tệp có mật khẩu (zip, 7z, rar, pdf phải nhập mật khẩu mới mở) và tệp giải nén vượt giới hạn quét (bom nén,
+      # lồng quá sâu) báo FOUND với mẫu Heuristics.Encrypted.* / Heuristics.Limits.Exceeded.* thay vì OK: không quét
+      # được bên trong thì không nhận (svc-files trả 422 unscannable)
+      CLAMD_CONF_AlertEncrypted: "yes"
+      CLAMD_CONF_AlertExceedsMax: "yes"
     # F3.7 — clamd ghi luồng nhận qua INSTREAM (và phần giải nén của PDF) ra thư mục tạm trước khi quét: để trong RAM,
     # bản rõ của văn bản hạn chế không xuống đĩa ở cả container quét
     tmpfs:

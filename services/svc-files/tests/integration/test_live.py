@@ -23,14 +23,19 @@ MOC_IT_JWT_PRIVATE_KEY; Hasura được dựng với khóa công khai tương �
 """
 
 import hashlib
+import io
 import json
 import os
+import struct
 import time
 import urllib.request
 import uuid
+import zipfile
+import zlib
 
 import boto3
 import jwt
+import pypdf
 import pytest
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi.testclient import TestClient
@@ -214,6 +219,90 @@ def test_eicar_is_blocked_and_chained_into_audit_log(app_client, tenants, token)
     assert sql("select * from core.audit_verify()") == []
 
 
+def _crc_table() -> list[int]:
+    table = []
+    for n in range(256):
+        for _ in range(8):
+            n = (n >> 1) ^ 0xEDB88320 if n & 1 else n >> 1
+        table.append(n)
+    return table
+
+
+CRC = _crc_table()
+
+
+def zip_with_password(name: str, data: bytes, password: bytes) -> bytes:
+    """Zip một tệp có mật khẩu, mã hóa ZipCrypto như phần lớn công cụ nén — zipfile đọc được kiểu này, không ghi được."""
+    keys = [0x12345678, 0x23456789, 0x34567890]
+
+    def update(c: int) -> None:
+        keys[0] = (keys[0] >> 8) ^ CRC[(keys[0] ^ c) & 0xFF]
+        keys[1] = ((keys[1] + (keys[0] & 0xFF)) * 134775813 + 1) & 0xFFFFFFFF
+        keys[2] = (keys[2] >> 8) ^ CRC[(keys[2] ^ (keys[1] >> 24)) & 0xFF]
+
+    def encrypt(plain: bytes) -> bytes:
+        out = bytearray()
+        for c in plain:
+            t = (keys[2] | 2) & 0xFFFF
+            out.append(c ^ (((t * (t ^ 1)) >> 8) & 0xFF))
+            update(c)
+        return bytes(out)
+
+    for c in password:
+        update(c)
+    crc = zlib.crc32(data)
+    body = encrypt(os.urandom(11) + bytes([crc >> 24]) + data)        # 12 byte đầu ZipCrypto, rồi tệp (không nén)
+    fname = name.encode()
+    local = struct.pack("<IHHHHHIIIHH", 0x04034B50, 20, 1, 0, 0, 0, crc, len(body), len(data), len(fname), 0)
+    central = struct.pack("<IHHHHHHIIIHHHHHII", 0x02014B50, 20, 20, 1, 0, 0, 0, crc, len(body), len(data),
+                          len(fname), 0, 0, 0, 0, 0, 0)
+    end = struct.pack("<IHHHHIIH", 0x06054B50, 0, 0, 1, 1, len(central) + len(fname), len(local) + len(fname) + len(body), 0)
+    return local + fname + body + central + fname + end
+
+
+def locked_pdf(user_password: str, owner_password: str) -> bytes:
+    writer = pypdf.PdfWriter(clone_from=pypdf.PdfReader(io.BytesIO(text_pdf("Bang diem hoc ky 1"))))
+    writer.encrypt(user_password=user_password, owner_password=owner_password, algorithm="AES-128")
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+def nested_zip(depth: int) -> bytes:
+    data = text_pdf("Bao cao tong ket")
+    for level in range(depth):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(f"lop-{level}.zip" if level else "bao-cao.pdf", data)
+        data = buf.getvalue()
+    return data
+
+
+def test_files_the_scanner_cannot_open_are_blocked(app_client, tenants, token):
+    """ClamAV có AlertEncrypted, AlertExceedsMax (như docker-compose.yml): tệp có mật khẩu, lồng quá sâu bị chặn."""
+    clerk = token("van-thu-a", "clerk", tenants[0])
+    secret = zip_with_password("bang-diem.pdf", text_pdf("Bang diem"), b"mk2026")
+    assert zipfile.ZipFile(io.BytesIO(secret)).read("bang-diem.pdf", pwd=b"mk2026").startswith(b"%PDF")
+    cases = {
+        "bang-diem.zip": (secret, "Heuristics.Encrypted.Zip"),
+        "bang-diem.pdf": (locked_pdf("mk2026", "chu-so-huu"), "Heuristics.Encrypted.PDF"),
+        "nen-nhieu-lop.zip": (nested_zip(25), "Heuristics.Limits.Exceeded"),
+    }
+    for name, (data, prefix) in cases.items():
+        r = upload(app_client, clerk, name, data)
+        assert r.status_code == 422, (name, r.text)
+        detail = r.json()["detail"]
+        assert detail["code"] == "unscannable" and detail["signature"].startswith(prefix), (name, detail)
+        (row,) = sql(f"""select diff ->> 'signature' from core.audit_log where action = 'file.rejected'
+                         and entity_id = '{hashlib.sha256(data).hexdigest()}' and tenant_id = '{tenants[0]}'""")
+        assert row[0] == detail["signature"]
+    # PDF chỉ khóa quyền sửa, in (không cần mật khẩu để mở — kiểu văn bản cơ quan hay gửi): vẫn quét được, nhận
+    r = upload(app_client, clerk, "quyet-dinh.pdf", locked_pdf("", "chu-so-huu"))
+    assert r.status_code == 201, r.text
+    r = upload(app_client, clerk, "bao-cao.zip", nested_zip(3))
+    assert r.status_code == 201, r.text
+
+
 def test_unknown_tenant_is_refused_and_leaves_no_object(app_client, live_settings, token):
     ghost = str(uuid.uuid4())
     r = upload(app_client, token("ai-do", "clerk", ghost), "a.pdf", PDF)
@@ -284,6 +373,10 @@ def test_search_finds_text_inside_pdfs(app_client, tenants, token):
 
     main = pdf_file(f"De nghi bo sung chung chi NOIDUNG{tag}", "Han nop truoc ngay 30/11")
     secret_file = pdf_file(f"Danh sach nang luong MATKIN{tag}")
+    # văn bản hạn chế chỉ gắn tệp tải lên ở chế độ hạn chế (F3.7, ràng buộc document_files_sealed); stack này không có
+    # két để mã hóa thật nên chỉ đánh dấu — đủ cho điều cần kiểm ở đây: không đọc chữ tệp của văn bản hạn chế
+    sql(f"update core.files set encrypted = true, wrapped_dek = 'vault:v1:thu' where id = '{secret_file}' "
+        "returning id")
     loose = pdf_file(f"Tep chua gan LOOSE{tag}")
     doc = receive(a, "van-thu-a", {
         "type_code": "CV", "symbol": f"77/PDF-{tag}", "issuer_name": "Phòng Đào tạo", "issued_on": "2026-10-15",

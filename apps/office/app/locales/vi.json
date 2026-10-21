@@ -11,7 +11,8 @@
     "none": "—",
     "required": "bắt buộc",
     "optional": "không bắt buộc",
-    "refresh": "Làm mới"
+    "refresh": "Làm mới",
+    "more": "Xem thêm"
   },
   "nav": {
     "inbox": "Hộp việc",
@@ -282,6 +283,7 @@
     "documents_due_after_registered": "Hạn giải quyết không được trước ngày vào sổ.",
     "documents_summary": "Trích yếu phải dài 10–500 ký tự.",
     "infected": "Tệp nhiễm mã độc, đã bị chặn.",
+    "unscannable": "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
@@ -347,6 +349,7 @@
     "attachmentsHint": "Phụ lục, bảng biểu đính kèm (không bắt buộc); tệp được quét virus trước khi lưu",
     "save": "Lưu dự thảo",
     "saved": "Đã lưu dự thảo.",
+    "restored": "Đã khôi phục phần đang soạn dở, chưa lưu.",
     "notEditable": "Dự thảo này không sửa được nữa: đã trình, hoặc không phải bạn soạn."
   },
   "verify": {
@@ -429,7 +432,8 @@
       "update": "Sửa",
       "delete": "Xóa",
       "file": {
-        "rejected": "Chặn tệp nhiễm mã độc"
+        "rejected": "Chặn tệp nhiễm mã độc",
+        "unscannable": "Chặn tệp không quét được (có mật khẩu, nén quá sâu)"
       },
       "register": {
         "printed": "In sổ đăng ký"
