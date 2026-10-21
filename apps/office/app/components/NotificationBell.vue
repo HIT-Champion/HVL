@@ -34,7 +34,7 @@ function outside(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', outside))
 onBeforeUnmount(() => document.removeEventListener('click', outside))
 
-const URGENT = new Set(['task.overdue', 'task.escalated', 'document.overdue'])
+const URGENT = new Set(['task.overdue', 'task.escalated', 'document.overdue', 'ot.alarm'])
 const rows = computed(() => items.value.map((n) => ({ n, ...describeNotification(t, n), urgent: URGENT.has(n.kind) })))
 
 async function go(n: AppNotification) {

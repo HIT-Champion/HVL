@@ -123,6 +123,7 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, in sổ đăng ký; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 | Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `monitoring/` |
+| Scorpio 6 + PostGIS (profile `iot`) | Context broker NGSI-LD: bản sao số của cảm biến, lịch sử đo; báo `svc-workflow` khi vượt ngưỡng | `ot/` |
 
 Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý
 (Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**), sao lưu, khôi
@@ -135,7 +136,7 @@ Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo h�
 |---|---|---|
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 |
 | GNU Make | 4.0 | điều phối lệnh |
-| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make demo-tu-phuc-hoi`, `make demo-nong-lanh`, `make demo-pha-he`, `make reconcile`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
+| Python | 3.10 | chỉ cho `make seed`, `make smoke`, `make audit`, `make demo-kiem-dich`, `make demo-ket-bi-mat`, `make demo-tu-phuc-hoi`, `make demo-nong-lanh`, `make demo-pha-he`, `make demo-it-ot`, `make reconcile`, `make backup`, `make restore`, `make install`, `make api-docs` (thư viện chuẩn, không cài thêm gì) |
 | RAM | 8 GB | cả hệ thống đo được khoảng 2,6 GB khi chạy (ClamAV 1 GB, Keycloak 0,6 GB, Flowable 0,3 GB) |
 | Đĩa trống | 10 GB | image khoảng 5 GB |
 
@@ -298,6 +299,39 @@ mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không m
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Mộc chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
 
+### Hội tụ IT/OT
+
+Profile `iot` (không bật mặc định, khoảng 550 MB RAM) thêm context broker NGSI-LD **Scorpio** (chuẩn ETSI) cùng
+CSDL PostGIS riêng của nó. Thiết bị cập nhật bản sao số của mình trong broker; `svc-workflow` giữ trong tenant NGSI-LD
+của mỗi đơn vị (`NGSILD-Tenant` = mã đơn vị; mã có dấu thì `t` + băm của mã) một subscription
+`temperature>MOC_OT_THRESHOLD`. Cảm biến vượt ngưỡng thì broker gọi `svc-workflow`, và dịch vụ dựng dự thảo văn bản
+đi "Báo cáo sự cố" (loại Báo cáo, độ khẩn "Khẩn") từ mẫu cho chuyên viên phụ trách cảm biến, ghi sự kiện `ot.alarm`
+vào dòng thời gian và báo người đó ngay. Còn dự thảo chưa trình (hoặc bị trả lại) của cùng cảm biến thì không dựng
+thêm, chỉ nhắc người phụ trách, mỗi ngày nhiều nhất một lần. Dự thảo đi tiếp theo luồng văn bản đi như mọi văn bản
+khác.
+
+```bash
+make demo-it-ot                       # bật profile iot, cảm biến giả lập 24 → 41 °C, dự thảo, trình
+docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT --responsible chuyenviendt \
+    --name "Phòng máy chủ tầng 3" --readings 30,36   # gửi tay vài lần đo
+```
+
+- Thực thể cảm biến `urn:ngsi-ld:TemperatureSensor:<mã>` có `name` (tên phòng), `responsible` (tên đăng nhập
+  chuyên viên phụ trách) và `temperature` (°C, `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động
+  của đúng đơn vị, có phòng; không thì sự kiện bị bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+- Broker và CSDL của nó không mở cổng ra máy chủ. Ba mạng nội bộ riêng: thiết bị ↔ broker (`iot-devices`), broker ↔
+  `svc-workflow` (`iot`), broker ↔ CSDL của nó (`iot-db`) — thiết bị không gọi được `svc-workflow`. Mỗi lần gọi
+  `POST /ot/notify/<tenant>` phải kèm token riêng của đơn vị (HMAC từ khóa Actions của `svc-workflow`), sai thì 401.
+- **Giới hạn:** broker không xác thực — ai vào được mạng thiết bị là ghi được vào tenant của đơn vị bất kỳ, kể cả
+  khai người phụ trách là một chuyên viên của đơn vị đó. Triển khai thật phải đặt cổng thiết bị trước broker (IoT
+  Agent hoặc PEP proxy của FIWARE) cấp tenant theo khóa của từng thiết bị; bản rút gọn chỉ có cảm biến giả lập.
+- Broker gửi mỗi thông báo một lần: ghi CSDL lỗi thì lần vượt ngưỡng đó mất, lần đo kế tiếp còn trên ngưỡng sẽ dựng
+  dự thảo.
+- Cần `MOC_NGSI_DB_PASSWORD` trong `.env` (`make env` tự sinh). Thiết bị thật đi qua gateway IoT (vd IoT Agent
+  của FIWARE) hoặc tự gửi NGSI-LD vào broker; lịch sử đo nằm trong broker (temporal API), không vào CSDL của Mộc
+  và không vào bản sao lưu.
+- `make down` tắt cả profile `iot` và `iot-sim` (cảm biến giả lập, chỉ chạy một lần khi gọi).
+
 ## Kiểm thử
 
 | Lệnh | Kiểm gì | Cần |
@@ -310,13 +344,14 @@ mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không m
 | `make demo-tu-phuc-hoi` | Màn demo (iv) tự phục hồi, dưới một phút: xóa hẳn container `svc-files`, dừng `centrifugo`; tải tệp hỏng; một lượt reconciler dựng lại cả hai, tải tệp lại được (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-nong-lanh` | Màn demo (i) nóng → lạnh, dưới một phút: lập hồ sơ từ văn bản đã xong, đóng, nộp lưu ngay; gói Parquet + tệp + manifest có băm nằm trong bucket lạnh có khóa ghi, chi tiết rời khỏi CSDL; văn bản vẫn tìm thấy, quét mã vẫn "khớp"; phòng đọc đọc lại gói, kiểm băm; xóa gói bị từ chối (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
 | `make demo-pha-he` | Màn demo (iii) phả hệ + chất lượng: lượt nộp lưu gần nhất là một run OpenLineage với 4 bước; truy ngược gói lưu trữ về bảng nghiệp vụ và tệp gốc; bảng Parquet nào cũng đã kiểm số dòng = CSDL, cột bắt buộc không null trước khi ghi (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed` |
+| `make demo-it-ot` | Màn demo (ii) hội tụ IT/OT: bật profile `iot`; cảm biến giả lập gửi 5 lần đo vào Scorpio, 2 lần vượt ngưỡng → đúng một dự thảo "Báo cáo sự cố" cho chuyên viên phụ trách, kèm thông báo; lịch sử đo nằm trong broker; trình → tổ trưởng có việc duyệt; thông báo giả sai token bị 401 (`docs/demo-script.md`) | Hệ thống đang chạy + `make seed`; lần đầu tải image Scorpio, PostGIS |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm bên ngoài CSDL, so với các mốc đã neo ra bucket lạnh có khóa ghi và với hash của văn bản đã phát hành; sửa lén thì chỉ ra dòng bị sửa (`db/README.md`, mục Sổ kiểm toán) | Hệ thống đang chạy |
 | Diễn tập khôi phục | `make backup` hai lượt, xóa volume CSDL và tệp, `python3 scripts/moc.py backup restore --yes`, rồi `make smoke` và `make audit` phải qua (bước trong CI) | Hệ thống đang chạy + `make seed` |
 | `db/tests/` | 168 test schema, quyền, ràng buộc chặn dữ liệu sai (chung bộ ca thử với form), sổ kiểm toán (kể cả các kiểu sửa lén, giữ nguyên qua dump và khôi phục), cấp số đến và đi, thông báo trên PostgreSQL + Hasura thật | xem `db/README.md` |
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ thống
 từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → `make
-demo-ket-bi-mat` → `make demo-tu-phuc-hoi` → `make demo-nong-lanh` → `make demo-pha-he`; diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install`
+demo-ket-bi-mat` → `make demo-tu-phuc-hoi` → `make demo-nong-lanh` → `make demo-pha-he` → `make demo-it-ot`; diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; rồi `make install`
 sang thư mục khác và chạy lại smoke từ bản cài; GitOps với repo git cục bộ: đẩy commit lên nhánh `deploy` thì
 reconciler áp vào bản cài, sửa tay `docker-compose.yml` đã cài thì reconciler đưa về; kiểm tài liệu API trong
 `docs/api/` khớp hệ thống vừa dựng; đồng thời quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các

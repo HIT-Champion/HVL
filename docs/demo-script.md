@@ -15,7 +15,7 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | Nguyên lý | Màn | Lệnh | Tình trạng |
 | --- | --- | --- | --- |
 | (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm và xác thực được | `make demo-nong-lanh` | Có (F3.8) |
-| (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | — | Chưa có (F3.10) |
+| (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | `make demo-it-ot` | Có (F3.10) |
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | `make demo-pha-he` | Có (F3.9) |
 | (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
@@ -68,6 +68,50 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
   chưa đổi gì, lượt sau làm lại và không ghi lại phần đã có. Hỏng sau giao dịch thì chỉ thừa bản nóng, không mất gì.
 - *"Văn bản hạn chế?"* Không vào hồ sơ nộp lưu: tệp của nó sẽ mã hóa riêng (F3.7). Nộp lưu bản mã hóa cần thêm bước
   giữ khóa.
+
+## (ii) Hội tụ IT/OT — `make demo-it-ot`
+
+**Điều muốn chứng minh:**
+
+- Thiết bị vận hành (OT) và hệ thống văn phòng (IT) nói chuyện qua một chuẩn mở: cảm biến cập nhật bản sao số của nó
+  trong context broker NGSI-LD (ETSI), Mộc đăng ký nhận sự kiện qua subscription — không viết giao thức riêng.
+- Sự kiện vật lý thành văn bản hành chính: nhiệt độ phòng máy chủ vượt ngưỡng → dự thảo "Báo cáo sự cố" dựng từ mẫu,
+  đứng tên chuyên viên phụ trách, đi đúng luồng văn bản đi (duyệt phòng → lãnh đạo ký → phát hành). Hệ thống dựng
+  nháp, con người kiểm tra và trình — không tự gửi gì.
+- Tách theo đơn vị và không tin mạng: mỗi đơn vị một tenant NGSI-LD (thực thể, lịch sử, subscription riêng); thiết
+  bị chỉ thấy broker, không gọi được svc-workflow; broker gọi svc-workflow phải kèm token riêng của đơn vị; broker
+  và CSDL của nó không mở cổng ra ngoài.
+
+**Lệnh in ra 6 bước** (lần đầu tải image Scorpio và PostGIS, khoảng 380 MB):
+
+1. Bật profile `iot` (Scorpio + PostGIS); svc-workflow tự đăng ký subscription `temperature>35` trong tenant của đơn
+   vị, kèm token. In thời gian broker sẵn sàng.
+2. Cảm biến giả lập (container chạy một lần, chỉ ở mạng `iot`) gửi 5 lần đo `24 → 29 → 33 → 37 → 41 °C`.
+3. Hai lần vượt ngưỡng → đúng **một** dự thảo và một thông báo (dự thảo cũ chưa trình thì chỉ nhắc, mỗi ngày
+   nhiều nhất một lần): loại Báo cáo, độ khẩn
+   "Khẩn", trích yếu và nội dung từ mẫu (giờ đo, nhiệt độ, ngưỡng, các mục để chuyên viên điền); dòng thời gian có sự
+   kiện `ot.alarm`; chuyên viên nhận thông báo ngay.
+4. Lịch sử đo nằm trong broker (NGSI-LD temporal API), cả các lần dưới ngưỡng: dữ liệu OT ở lại broker, Mộc chỉ
+   nhận sự kiện cần xử lý.
+5. Chuyên viên trình → tổ trưởng phòng có việc duyệt, như mọi văn bản đi.
+6. Thông báo giả: từ mạng thiết bị không tới được svc-workflow; từ mạng nội bộ (container svc-files) với token sai
+   → 401.
+
+Trên giao diện (`chuyenviendt`): chuông thông báo "Cảnh báo nhiệt độ…", mục Văn bản đi có dự thảo, dòng thời gian
+ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dựng dự thảo".
+
+**Nếu giám khảo hỏi:**
+
+- *"Sao không gắn cảm biến thật?"* Cảm biến thật chỉ thay container giả lập: cùng các lệnh NGSI-LD vào broker (qua
+  gateway IoT như IoT Agent của FIWARE, hoặc thiết bị tự gửi). Phía Mộc không đổi gì.
+- *"Thiết bị có chọn được người đứng tên dự thảo?"* Chỉ một chuyên viên đang hoạt động của đúng đơn vị đó; người khác,
+  vai trò khác hay đơn vị khác thì bỏ qua (ghi nhật ký). Dự thảo chỉ là nháp, người đứng tên quyết định có trình.
+- *"Thiết bị của đơn vị này có ghi giả vào đơn vị kia được không?"* Ở bản rút gọn thì được, nếu vào được mạng thiết
+  bị: Scorpio không xác thực, tenant do bên gửi khai. Triển khai thật đặt cổng thiết bị (IoT Agent / PEP proxy của
+  FIWARE) trước broker, cấp tenant theo khóa của từng thiết bị. Phía Mộc không đổi: vẫn chỉ tin subscription.
+- *"Vì sao broker riêng chứ không ghi thẳng vào CSDL?"* Bản sao số (trạng thái, lịch sử, truy vấn theo không gian)
+  là việc của context broker theo chuẩn; Mộc không phải nơi giữ dữ liệu cảm biến, chỉ nhận sự kiện cần thành văn bản.
+- *"Tốn bao nhiêu?"* Profile `iot` không bật mặc định: Scorpio ~400 MB RAM, PostGIS ~130 MB.
 
 ## (iii) Phả hệ và kiểm chất lượng — `make demo-pha-he`
 

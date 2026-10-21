@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he reconcile \
+.PHONY: help env check build up down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -60,11 +60,11 @@ up: $(ENV_FILE) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (
 	@echo "Mộc đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) down
+	@$(COMPOSE) --profile iot --profile iot-sim down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Mộc trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) down -v
+	@$(COMPOSE) --profile iot --profile iot-sim down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
@@ -112,6 +112,9 @@ demo-nong-lanh: $(ENV_FILE) ## Màn demo (i) nóng → lạnh: lập hồ sơ, n
 
 demo-pha-he: $(ENV_FILE) ## Màn demo (iii) phả hệ + chất lượng: lượt nộp lưu truy ngược về bảng nghiệp vụ, bảng nào cũng được kiểm (docs/demo-script.md)
 	@python3 scripts/demo.py pha-he
+
+demo-it-ot: $(ENV_FILE) ## Màn demo (ii) IT/OT: bật broker NGSI-LD, cảm biến vượt ngưỡng → dự thảo "Báo cáo sự cố" vào luồng văn bản đi (docs/demo-script.md)
+	@python3 scripts/demo.py it-ot
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py

@@ -856,3 +856,28 @@ Phase 2:
   phục quản lý luôn cả giám sát; tốn thêm khoảng 300 MB RAM. Chưa có chỉ số của từng dịch vụ (svc-files,
   svc-workflow, Hasura, PostgreSQL) và chưa có cảnh báo (Alertmanager) — để sau.
 - Phase 3 còn lại: F3.7, F3.10, F3.12, F3.14, F3.15.
+
+**20/10/2026** — F3.10 (Phase 3):
+
+- **F3.10 xong (bản rút gọn), màn (ii).** Hội tụ IT/OT:
+  - profile `iot`: Scorpio 6.0.2 (bản java mặc định, không Kafka) + PostGIS riêng; không mở cổng, CSDL broker ở
+    mạng riêng chỉ broker nối được;
+  - `svc-workflow` giữ subscription `temperature>ngưỡng` trong tenant NGSI-LD của từng đơn vị, nhận thông báo ở
+    `/ot/notify/{mã đơn vị}` kèm token HMAC riêng từng đơn vị; vượt ngưỡng → dự thảo "Báo cáo sự cố" (Báo cáo, Khẩn)
+    từ mẫu, sự kiện `ot.alarm`, thông báo khẩn cho chuyên viên phụ trách; chống trùng khi dự thảo cũ chưa trình;
+  - cảm biến giả lập `ot/sensor.py` (thư viện chuẩn, chạy một lần); `make demo-it-ot` (bước CI): 5 lần đo, đúng một
+    dự thảo, lịch sử đo trong broker, trình → tổ trưởng có việc duyệt, sai token → 401;
+  - 14 test đơn vị (`test_ot.py`); giao diện: nhãn sự kiện ở dòng thời gian, thông báo khẩn.
+- Chỗ khác kế hoạch:
+  - profile riêng `iot` chứ không `core` (~550 MB RAM, chỉ bật cho màn này); Scorpio bắt buộc PostGIS nên thêm image
+    `postgis/postgis:16-3.5-alpine` (GPL-2.0, dịch vụ độc lập — bản 16-3.6 mới đẩy 19/10, quá mới);
+  - người đứng tên dự thảo do cảm biến khai (`responsible` = tên đăng nhập chuyên viên) vì chỉ người soạn mới trình
+    được văn bản đi; người khai sai vai trò hay khác đơn vị thì bỏ qua;
+  - token xác thực broker suy từ `MOC_ACTION_SECRET` (không thêm bí mật mới); lịch sử đo ở lại broker, không vào
+    CSDL của Mộc và không vào bản sao lưu; chưa có giao diện xem cảm biến;
+  - Scorpio không xác thực: thiết bị vào được mạng `iot-devices` là ghi được vào tenant bất kỳ. Thiết bị tách khỏi
+    svc-workflow bằng mạng riêng; cổng thiết bị cấp tenant theo khóa (IoT Agent / PEP proxy) để phiên sau;
+  - lỗi của Scorpio 6.0.2 với tenant: ngữ cảnh của subscription cất theo tenant nhưng lúc gửi thông báo lại tìm ở tenant
+    mặc định → mọi thông báo bị bỏ (thử trên stack rời trước đó qua được vì broker còn ra Internet). Vòng qua bằng một
+    subscription "neo" tạm dừng ở tenant mặc định; nên báo lỗi cho dự án Scorpio.
+- Phase 3 còn lại: F3.7, F3.12, F3.14, F3.15.

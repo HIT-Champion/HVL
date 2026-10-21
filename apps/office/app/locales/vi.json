@@ -92,7 +92,10 @@
     },
     "drafted": "Tạo dự thảo",
     "system": "Hệ thống",
-    "notified": "Đã báo: {names}"
+    "notified": "Đã báo: {names}",
+    "ot": {
+      "alarm": "Cảm biến {name} đo {value} °C, vượt ngưỡng {threshold} °C — hệ thống dựng dự thảo"
+    }
   },
   "inbox": {
     "title": "Hộp việc",
@@ -364,7 +367,8 @@
     "taskEscalated": "{name} chưa làm xong «{task}» đúng hạn",
     "documentIssued": "Đã phát hành văn bản {symbol}",
     "documentProcessed": "{name} đã báo kết quả xử lý",
-    "documentOverdue": "Văn bản quá hạn giải quyết ({due})"
+    "documentOverdue": "Văn bản quá hạn giải quyết ({due})",
+    "otAlarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố"
   },
   "audit": {
     "title": "Sổ kiểm toán",

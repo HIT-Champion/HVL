@@ -35,16 +35,17 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from . import __version__
 from .config import ConfigError, Settings
 from .directory import Directory
 from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
-from .hasura import Actor, HasuraClient
+from .hasura import Actor, HasuraClient, HasuraError
 from .notify import Notifier
 from .openbao import with_secrets
+from .ot import TOKEN_HEADER, OtBridge
 from .schemas import FormSchema, SchemaFileError
 from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
@@ -155,6 +156,7 @@ def create_app(
     directory: Directory | None = None,
     files: FilesClient | None = None,
     notifier: Notifier | None = None,
+    ot: OtBridge | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -172,6 +174,9 @@ def create_app(
         raise ConfigError(f"MOC_SCHEMAS_DIR: {exc}") from exc
     workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration, intake=intake)
     deadlines = Deadlines(hasura, flowable, notifier, sla_duration=settings.sla_duration)
+    ot = ot or (OtBridge(hasura, notifier, settings.ngsi_url, secret=settings.action_secret,
+                         threshold=settings.ot_threshold, notify_url=settings.ot_notify_url)
+                if settings.ngsi_url else None)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -186,6 +191,8 @@ def create_app(
         if settings.sla_poll_interval_s > 0:
             tasks.append(asyncio.create_task(
                 _every(settings.sla_poll_interval_s, "office.sla.jobs_handled", deadlines.run_jobs)))
+        if ot is not None and settings.ot_interval_s > 0:
+            tasks.append(asyncio.create_task(_every(settings.ot_interval_s, "ot.subscriptions_ensured", ot.ensure_all)))
         try:
             yield
         finally:
@@ -193,6 +200,8 @@ def create_app(
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             await directory.aclose()
+            if ot is not None:
+                await ot.aclose()
             await notifier.aclose()
             await files.aclose()
             await flowable.aclose()
@@ -208,6 +217,7 @@ def create_app(
     app.state.workflow = workflow
     app.state.deadlines = deadlines
     app.state.directory = directory
+    app.state.ot = ot
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
@@ -218,6 +228,34 @@ def create_app(
         checks = {"hasura": await hasura.ping(), "flowable": await flowable.ping()}
         ok = all(checks.values())
         return JSONResponse({"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503)
+
+    @app.post("/ot/notify/{tenant}", status_code=204,
+              summary="Nhận thông báo của subscription NGSI-LD: cảm biến vượt ngưỡng → dự thảo báo cáo sự cố (F3.10)",
+              description="Chỉ context broker gọi, kèm header X-Moc-OT-Token của đơn vị (broker nhận token khi "
+                          "svc-workflow tạo subscription). Thân là Notification NGSI-LD (format normalized).",
+              responses={401: {"description": "Thiếu hoặc sai token của đơn vị"},
+                         404: {"description": "Chưa cấu hình MOC_NGSI_URL"},
+                         503: {"description": "Chưa ghi được CSDL, broker sẽ báo lỗi gửi"}})
+    async def ot_notify(tenant: str, request: Request) -> Response:
+        if ot is None:
+            return _error(404, "not_found", "Chưa bật IT/OT (MOC_NGSI_URL)")
+        if not ot.check(tenant, request.headers.get(TOKEN_HEADER, "")):
+            return _error(401, "unauthorized", "Sai token của đơn vị")
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError("không phải đối tượng JSON")
+        except ValueError:
+            return _error(400, "bad_request", "Thông báo không phải Notification NGSI-LD")
+        try:
+            await ot.handle(tenant, body)
+        except ValueError:
+            return _error(400, "bad_request", "Thông báo không có danh sách thực thể")
+        except HasuraError as exc:
+            log.warning(json.dumps({"event": "ot.alarm_failed", "tenant": tenant, "error": str(exc)},
+                                   ensure_ascii=False))
+            return _error(503, "unavailable", "Chưa ghi được dự thảo, thử lại sau")
+        return Response(status_code=204)
 
     @app.post("/actions/{name}",
               summary="Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",

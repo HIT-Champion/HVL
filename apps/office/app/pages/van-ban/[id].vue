@@ -203,7 +203,10 @@ const timeline = computed(() => {
             ? t(`event.${e.kind}`, { task: t(`task.${e.data.form_key}`) })
             : e.kind === 'office.document.overdue'
               ? t('event.office.document.overdue', { due: fmtDate(e.data.due_on) })
-              : t(`event.${e.kind}`)
+              : e.kind === 'ot.alarm'
+                ? t('event.ot.alarm', { name: e.data.name, value: fmtNumber(e.data.temperature),
+                                        threshold: fmtNumber(e.data.threshold) })
+                : t(`event.${e.kind}`)
     let note = e.note
     // nhắc hạn do hệ thống gửi: ghi ai đã được báo
     if (Array.isArray(e.data.notified) && e.data.notified.length) {

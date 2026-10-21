@@ -317,12 +317,15 @@ services:
     build: {context: ./services/svc-workflow, additional_contexts: {schemas: ./schemas}}
     image: moc/svc-workflow:${MOC_VERSION:-dev}
     profiles: [core]
-    networks: [moc, secrets]
+    networks: [moc, secrets, iot]
     environment:
       # F3.2 — khóa Hasura, khóa Actions, mật khẩu Flowable, khóa Centrifugo, client secret lấy từ két (AppRole)
       MOC_OPENBAO_ADDR: http://openbao:8200
       MOC_OPENBAO_SECRET_PATH: moc/data/svc-workflow
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
+      # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
+      MOC_NGSI_URL: http://scorpio:9090
+      MOC_OT_THRESHOLD: ${MOC_OT_THRESHOLD:-35}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -419,6 +422,67 @@ services:
     depends_on:
       prometheus: {condition: service_healthy}
 
+  # F3.10 — hội tụ IT/OT (màn ii), profile iot (tùy chọn: `make demo-it-ot` tự bật). Context broker NGSI-LD giữ bản
+  # sao số của cảm biến; mỗi đơn vị một tenant NGSI-LD. Không mở cổng nào ra máy chủ. Ba mạng riêng: thiết bị ↔ broker
+  # (iot-devices), broker ↔ svc-workflow (iot: thiết bị không gọi được svc-workflow), broker ↔ CSDL của nó (iot-db).
+  # Broker không xác thực: ai vào được iot-devices là ghi được vào tenant bất kỳ — thiết bị thật đi qua cổng thiết bị
+  # (IoT Agent / PEP proxy cấp tenant theo khóa của thiết bị), bản rút gọn chỉ có cảm biến giả lập.
+  scorpio-db:
+    <<: *common
+    # PostGIS (GPL-2.0) — dịch vụ độc lập, Scorpio bắt buộc (dữ liệu vị trí NGSI-LD); ghim cả digest vì thẻ được đẩy lại
+    image: postgis/postgis:16-3.5-alpine@sha256:47e961a569fd52ff31f0fe205ed91eeab17d9f5fff6722e6d7ea6b588748b293
+    profiles: [iot]
+    networks: [iot-db]
+    environment:
+      POSTGRES_USER: scorpio
+      POSTGRES_PASSWORD: ${MOC_NGSI_DB_PASSWORD:-}
+      POSTGRES_DB: ngb
+    volumes:
+      - scorpio_data:/var/lib/postgresql/data
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scorpio -d ngb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  scorpio:
+    <<: *common
+    image: scorpiobroker/all-in-one-runner:java-6.0.2
+    profiles: [iot]
+    networks: [iot, iot-devices, iot-db]
+    environment:
+      DBHOST: scorpio-db
+      DBUSER: scorpio
+      DBPASS: ${MOC_NGSI_DB_PASSWORD:-}
+      DBNAME: ngb
+      JAVA_TOOL_OPTIONS: -Xmx384m
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://localhost:9090/q/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    depends_on:
+      scorpio-db: {condition: service_healthy}
+
+  # Cảm biến nhiệt độ giả lập: chạy một lần (docker compose run), gửi các lần đo vào broker như một thiết bị OT. Profile
+  # riêng: bật profile iot thường trực (COMPOSE_PROFILES) không kéo theo dịch vụ chạy một lần này
+  ot-sensor:
+    <<: *common
+    image: moc/svc-workflow:${MOC_VERSION:-dev}
+    pull_policy: never  # image của đội, dựng cùng svc-workflow — không kéo từ Docker Hub
+    profiles: [iot-sim]
+    restart: "no"
+    healthcheck:
+      disable: true
+    networks: [iot-devices]
+    entrypoint: ["python", "/ot/sensor.py"]
+    environment:
+      MOC_NGSI_URL: http://scorpio:9090
+    volumes:
+      - ./ot/sensor.py:/ot/sensor.py:ro
+
   # F3.4 — sao lưu: không chạy thường trực, chỉ `moc backup` gọi (docker compose run), không có mạng. Kho restic
   # (MOC_BACKUP_DIR) gắn vào /repo lúc gọi, không khai ở đây: kho nên nằm trên ổ khác, ngoài thư mục cài.
   restic:
@@ -458,11 +522,22 @@ networks:
   secrets:
     driver: bridge
     internal: true
+  # F3.10: broker NGSI-LD ↔ svc-workflow; thiết bị ↔ broker; broker ↔ CSDL của nó. Không ra Internet
+  iot:
+    driver: bridge
+    internal: true
+  iot-devices:
+    driver: bridge
+    internal: true
+  iot-db:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres_data:
   seaweedfs_data:
   prometheus_data:
+  scorpio_data:
   clamav_data:
   meili_data:
   openbao_data:

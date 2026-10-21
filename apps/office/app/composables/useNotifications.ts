@@ -49,6 +49,8 @@ export function describeNotification(t: Translate, n: Pick<RealtimeMessage, 'kin
       return { title: t('notify.documentProcessed', { name: d.by_name || someone }), detail: doc, note }
     case 'document.overdue':
       return { title: t('notify.documentOverdue', { due: fmtDate(d.due_on) }), detail: doc, note }
+    case 'ot.alarm':
+      return { title: t('notify.otAlarm', { name: d.name ?? '', value: fmtNumber(d.temperature) }), detail: doc, note }
     default:
       return { title: n.kind, detail: doc, note }
   }

@@ -712,7 +712,7 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 | `office.document.overdue` | Văn bản đến qua hạn giải quyết mà chưa xử lý xong |
 | `office.case_file.archived` | Hồ sơ nộp lưu xong |
 | `core.file.rejected` | ClamAV chặn tệp |
-| `ot.alarm` | Cảm biến vượt ngưỡng (F3.10) |
+| `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
 
 **Thông báo realtime** (đã làm): mỗi kết nối Centrifugo tự vào kênh riêng `personal:#<sub>` của người trong
 token (Centrifugo tự kiểm token Keycloak qua JWKS); trình duyệt không đăng ký được kênh nào khác. Sau mỗi bước,
@@ -726,6 +726,7 @@ qua HTTP API nội bộ của Centrifugo:
 | `document.issued` | Người soạn, người ký | Văn thư phát hành văn bản đi |
 | `document.processed` | Lãnh đạo đã chỉ đạo, lãnh đạo phòng đã phân công | Người xử lý báo xong |
 | `document.overdue` | Người xử lý, người giao việc, lãnh đạo đơn vị | Văn bản đến qua hạn giải quyết |
+| `ot.alarm` | Chuyên viên phụ trách cảm biến | Cảm biến vượt ngưỡng, hệ thống vừa dựng dự thảo báo cáo sự cố (F3.10); `data`: tên phòng, nhiệt độ, ngưỡng, trích yếu |
 
 Dashboard điều hành (F3.11) không dùng kênh realtime: số liệu tính lúc mở trang, có nút làm mới (§2.5).
 

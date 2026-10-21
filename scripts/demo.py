@@ -31,6 +31,10 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py tu-phuc-hoi
         (iv) Tự phục hồi: xóa hẳn container svc-files, dừng centrifugo; một lượt reconciler (systemd timer chạy mỗi
         60 giây) dựng lại đúng như compose khai báo, tải tệp lại được. (make demo-tu-phuc-hoi)
+    python3 scripts/demo.py it-ot
+        (ii) Hội tụ IT/OT: bật context broker NGSI-LD (profile iot); cảm biến nhiệt độ phòng máy chủ giả lập gửi các
+        lần đo, vượt ngưỡng thì svc-workflow dựng dự thảo "Báo cáo sự cố" từ mẫu cho chuyên viên phụ trách; chuyên viên
+        trình, dự thảo vào luồng văn bản đi. (make demo-it-ot)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -45,6 +49,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
@@ -583,8 +588,169 @@ def pha_he() -> None:
        f" '{first['job']['namespace']}'; tên dataset theo quy ước postgres://host:port/db.schema.bảng, s3://bucket/key")
 
 
+OT_SENSOR = "phong-may-chu"
+OT_ROOM = "Phòng máy chủ tầng 3"
+OT_STAFF = "chuyenviendt"
+OT_SUBSCRIPTION = "urn:ngsi-ld:Subscription:moc-ot-alarm"
+
+OT_DRAFTS = """
+query ($sensor: jsonb!) {
+  office_documents(where: {direction: {_eq: "out"}, events: {kind: {_eq: "ot.alarm"}, data: {_contains: $sensor}}},
+                   order_by: {created_at: desc}) {
+    id status type_code urgency summary body created_by events(where: {kind: {_eq: "ot.alarm"}}) { data }
+  }
+}"""
+
+SUBMIT = "mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }"
+
+# Gửi một thông báo giả (token sai) tới svc-workflow, in mã HTTP nhận được hoặc "không tới được"
+OT_PROBE = """
+import sys, urllib.error, urllib.request
+req = urllib.request.Request(sys.argv[1], data=b'{"data": []}', method="POST",
+                             headers={"Content-Type": "application/json", "X-Moc-OT-Token": "sai"})
+try:
+    print(urllib.request.urlopen(req, timeout=5).status)
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+except OSError:
+    print("không tới được")
+"""
+
+
+def iot(*args: str) -> bytes:
+    return compose("--profile", "iot", "--profile", "iot-sim", *args)
+
+
+def ngsi_tenant(code: str) -> str:
+    """Tên tenant NGSI-LD của đơn vị, như svc_workflow.ot.ngsi_tenant: mã có dấu thì "t" + băm."""
+    if code.isascii() and code.isalnum() and len(code) <= 20:
+        return code
+    return "t" + hashlib.sha256(code.encode()).hexdigest()[:16]
+
+
+def ot_query(threshold: float) -> str:
+    """Điều kiện q của subscription, như svc_workflow.ot.query_for."""
+    return f"temperature>{int(threshold) if threshold.is_integer() else format(Decimal(repr(threshold)), 'f')}"
+
+
+def ngsi(path: str, tenant: str) -> tuple[int, Any]:
+    """Đọc broker từ trong container của nó (broker không mở cổng ra máy chủ)."""
+    out = iot("exec", "-T", "scorpio", "curl", "-s", "-w", "\n%{http_code}", "-H", f"NGSILD-Tenant: {tenant}",
+              f"http://localhost:9090/ngsi-ld/v1{path}").decode()
+    body, _, code = out.rpartition("\n")
+    try:
+        return int(code), json.loads(body) if body.strip() else None
+    except ValueError:
+        return int(code) if code.isdigit() else 0, body
+
+
+def ot_drafts(staff: Session, sensor: str) -> list[dict[str, Any]]:
+    return staff.gql(OT_DRAFTS, {"sensor": {"sensor": sensor}})["office_documents"]
+
+
+def it_ot() -> None:
+    print("Màn (ii) · Hội tụ IT/OT: cảm biến nhiệt độ (OT) → bản sao số NGSI-LD → subscription → dự thảo \"Báo cáo sự"
+          " cố\" trong luồng văn bản đi (IT) — hệ thống dựng nháp, con người kiểm tra và trình")
+    staff, manager = Session(OT_STAFF), Session("totruongdt")
+    unit = psql("select t.code from core.tenants t join core.users u on u.tenant_id = t.id"
+                f" where u.username = '{OT_STAFF}'")
+    tenant = ngsi_tenant(unit)
+    threshold = float(ENV.get("MOC_OT_THRESHOLD") or 35)
+    sensor = f"urn:ngsi-ld:TemperatureSensor:{OT_SENSOR}"
+
+    say(1, "Bật context broker NGSI-LD (profile iot: Scorpio + PostGIS); svc-workflow đăng ký subscription")
+    if not ENV.get("MOC_NGSI_DB_PASSWORD") or ENV["MOC_NGSI_DB_PASSWORD"].startswith("change_me"):
+        raise DemoFailed("chưa đặt MOC_NGSI_DB_PASSWORD trong .env: thêm dòng MOC_NGSI_DB_PASSWORD=<chuỗi ngẫu nhiên>"
+                         " (make env mới tự sinh)")
+    t0 = time.monotonic()
+    iot("up", "-d", "--wait", "--wait-timeout", "300", "scorpio")
+    ready = time.monotonic() - t0
+    want = ot_query(threshold)
+    deadline = time.monotonic() + 60
+    while True:
+        code, sub = ngsi(f"/subscriptions/{OT_SUBSCRIPTION}", tenant)
+        if code == 200 and isinstance(sub, dict) and sub.get("q") == want:
+            break
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau 60 giây đơn vị {unit} vẫn chưa có subscription {want} (HTTP {code}: {sub})")
+        time.sleep(2)
+    uri = sub["notification"]["endpoint"]["uri"]
+    ok(f"Scorpio sẵn sàng sau {ready:.0f} giây; đơn vị {unit} (tenant NGSI-LD {tenant}) có subscription \"{want}\" →"
+       f" {uri.split('//', 1)[-1]}, kèm token riêng của đơn vị; broker không mở cổng ra ngoài")
+
+    # lần chạy trước dừng giữa chừng còn để dự thảo mở thì trình nốt: cảm biến còn dự thảo mở thì không dựng thêm
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    for old in ot_drafts(staff, sensor):
+        if old["status"] == "draft":
+            staff.gql(SUBMIT, {"d": old["id"], "s": signer})
+            print(f"       (dự thảo còn mở từ lần chạy trước {old['id'][:8]}… đã trình nốt)")
+    before = {d["id"] for d in ot_drafts(staff, sensor)}
+
+    readings = [threshold - 11, threshold - 6, threshold - 2, threshold + 2, threshold + 6]
+    say(2, f"Cảm biến {OT_ROOM} gửi các lần đo: {' → '.join(f'{r:g}' for r in readings)} °C (ngưỡng {threshold:g} °C)")
+    out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", OT_SENSOR, "--name", OT_ROOM,
+              "--responsible", OT_STAFF, "--readings", ",".join(f"{r:g}" for r in readings), "--interval", "1")
+    sent = [json.loads(line) for line in out.decode().splitlines() if line.startswith("{")]
+    if len(sent) != len(readings) or any(r.get("status") != 204 for r in sent):
+        raise DemoFailed(f"cảm biến chưa gửi đủ: {sent}")
+    ok(f"{len(sent)} lần đo vào bản sao số {sensor}; 2 lần cuối vượt ngưỡng")
+
+    say(3, "Vượt ngưỡng → svc-workflow dựng dự thảo \"Báo cáo sự cố\" từ mẫu cho chuyên viên phụ trách")
+    deadline = time.monotonic() + 30
+    while not [d for d in ot_drafts(staff, sensor) if d["id"] not in before] and time.monotonic() < deadline:
+        time.sleep(1)
+    time.sleep(2)  # lần vượt ngưỡng thứ hai tới sau: không được dựng dự thảo thứ hai
+    drafts = [d for d in ot_drafts(staff, sensor) if d["id"] not in before]
+    if len(drafts) != 1:
+        raise DemoFailed(f"phải có đúng 1 dự thảo mới cho 2 lần vượt ngưỡng, có {len(drafts)}")
+    doc = drafts[0]
+    alarm = doc["events"][0]["data"]
+    if (doc["status"], doc["type_code"], doc["urgency"]) != ("draft", "BC", "khan") or alarm["temperature"] <= threshold:
+        raise DemoFailed(f"dự thảo chưa đúng: {doc['status']}, {doc['type_code']}, {doc['urgency']}, {alarm}")
+    print(f"       trích yếu: {doc['summary']}")
+    print(f"       nội dung:  {doc['body'].splitlines()[0]}")
+    notes = staff.gql("""query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}, kind: {_eq: "ot.alarm"}})
+        { id } }""", {"d": doc["id"]})["core_notifications"]
+    if len(notes) != 1:
+        raise DemoFailed(f"chuyên viên phải nhận đúng 1 thông báo ot.alarm, có {len(notes)}")
+    ok("đúng 1 dự thảo cho 2 lần vượt ngưỡng (chống trùng): Báo cáo, độ khẩn \"Khẩn\", đứng tên chuyên viên phụ trách;"
+       " dòng thời gian có sự kiện ot.alarm; chuyên viên nhận thông báo ngay")
+
+    say(4, "Lịch sử đo nằm trong bản sao số (NGSI-LD temporal API)")
+    # broker ghi lịch sử sau khi trả lời lệnh cập nhật (bất đồng bộ): chờ tới khi có đủ các lần vừa gửi, so cả giờ đo
+    # (lần chạy trước gửi cùng các giá trị)
+    want = {(r["temperature"], r["observedAt"]) for r in sent}
+    deadline = time.monotonic() + 30
+    while True:
+        code, history = ngsi(f"/temporal/entities/{sensor}?attrs=temperature&lastN=50", tenant)
+        points = {(v.get("value"), v.get("observedAt")) for v in (history or {}).get("temperature", [])} \
+            if code == 200 and isinstance(history, dict) else set()
+        if want <= points:
+            break
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau 30 giây lịch sử đo vẫn thiếu: HTTP {code}, thiếu {sorted(want - points)}")
+        time.sleep(1)
+    ok(f"broker giữ lịch sử: đủ {len(want)} lần vừa đo (cả các lần dưới ngưỡng) trong {len(points)} lần gần nhất — dữ liệu"
+       " OT ở broker, Mộc chỉ nhận sự kiện cần xử lý")
+
+    say(5, "Chuyên viên kiểm tra, trình → dự thảo vào luồng văn bản đi: tổ trưởng có việc duyệt")
+    staff.gql(SUBMIT, {"d": doc["id"], "s": signer})
+    manager.wait_task(doc["id"], "vbdi.duyetPhong")
+    ok("trình lên lãnh đạo khoa; tổ trưởng phòng nhận việc duyệt như mọi văn bản đi — hệ thống không tự trình")
+
+    say(6, "Chỉ broker gọi được svc-workflow: thiết bị không tới được, dịch vụ khác thiếu token đúng → 401")
+    url = f"http://svc-workflow:8000/ot/notify/{quote(tenant, safe='')}"
+    from_device = iot("run", "--rm", "-T", "--entrypoint", "python", "ot-sensor", "-c", OT_PROBE, url).decode().strip()
+    from_inside = compose("exec", "-T", "svc-files", "python", "-c", OT_PROBE, url).decode().strip()
+    if (from_device, from_inside) != ("không tới được", "401"):
+        raise DemoFailed(f"thông báo giả: từ mạng thiết bị phải không tới được (nhận {from_device}), từ svc-files với"
+                         f" token sai phải 401 (nhận {from_inside})")
+    ok("mạng thiết bị chỉ thấy broker, không tới được svc-workflow; thông báo giả từ mạng nội bộ (svc-files) với token"
+       " sai bị từ chối (401) — token mỗi đơn vị suy từ khóa của svc-workflow, chỉ broker giữ")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "ket-bi-mat": ket_bi_mat, "tu-phuc-hoi": tu_phuc_hoi,
-         "pha-he": pha_he}
+         "pha-he": pha_he, "it-ot": it_ot}
 
 
 def main(argv: list[str] | None = None) -> int:

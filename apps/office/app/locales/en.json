@@ -92,7 +92,10 @@
     },
     "drafted": "Draft created",
     "system": "System",
-    "notified": "Informed: {names}"
+    "notified": "Informed: {names}",
+    "ot": {
+      "alarm": "Sensor {name} read {value} °C, above the {threshold} °C threshold — draft created by the system"
+    }
   },
   "inbox": {
     "title": "My tasks",
@@ -364,7 +367,8 @@
     "taskEscalated": "{name} has not finished “{task}” on time",
     "documentIssued": "Document {symbol} issued",
     "documentProcessed": "{name} reported the result",
-    "documentOverdue": "Document past its due date ({due})"
+    "documentOverdue": "Document past its due date ({due})",
+    "otAlarm": "Temperature alert in {name}: {value} °C — incident report draft ready"
   },
   "audit": {
     "title": "Audit log",

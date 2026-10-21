@@ -195,6 +195,12 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - Giám sát gọn (F3.13): APISIX bật plugin `prometheus` (cổng chỉ số 9091 nội bộ); dịch vụ `prometheus` (v3.15.0,
   không mở cổng) và `grafana` (13.2.3, chỉ `127.0.0.1:MOC_GRAFANA_PORT`, không tài khoản, chỉ xem) trong profile core;
   bảng điều khiển "Mộc — cổng API" nạp sẵn; `make smoke` +1 (tổng 49) (#45).
+- Hội tụ IT/OT rút gọn (F3.10, màn (ii)): profile `iot` với context broker NGSI-LD Scorpio 6.0.2 và CSDL PostGIS
+  riêng (không mở cổng); `svc-workflow` giữ subscription `temperature>MOC_OT_THRESHOLD` trong tenant NGSI-LD của mỗi
+  đơn vị và nhận thông báo ở `POST /ot/notify/{mã đơn vị}` (token HMAC riêng từng đơn vị): cảm biến vượt ngưỡng →
+  dự thảo văn bản đi "Báo cáo sự cố" (Báo cáo, Khẩn) từ mẫu cho chuyên viên phụ trách, sự kiện `ot.alarm`, thông báo
+  khẩn; còn dự thảo chưa trình của cùng cảm biến thì không dựng thêm. Cảm biến giả lập `ot/sensor.py` (dịch vụ chạy
+  một lần `ot-sensor`), `make demo-it-ot` (cũng là bước CI), nhãn sự kiện và thông báo trên giao diện (#46).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

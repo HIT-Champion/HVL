@@ -6,6 +6,48 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/ot/notify/{tenant}": {
+      "post": {
+        "summary": "Nhận thông báo của subscription NGSI-LD: cảm biến vượt ngưỡng → dự thảo báo cáo sự cố (F3.10)",
+        "description": "Chỉ context broker gọi, kèm header X-Moc-OT-Token của đơn vị (broker nhận token khi svc-workflow tạo subscription). Thân là Notification NGSI-LD (format normalized).",
+        "operationId": "ot_notify_ot_notify__tenant__post",
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tenant"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token của đơn vị"
+          },
+          "404": {
+            "description": "Chưa cấu hình MOC_NGSI_URL"
+          },
+          "503": {
+            "description": "Chưa ghi được CSDL, broker sẽ báo lỗi gửi"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/actions/{name}": {
       "post": {
         "summary": "Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",

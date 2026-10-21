@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -61,6 +62,12 @@ class Settings:
     directory_sync_interval_s: float
     reconcile_interval_s: float
     sla_poll_interval_s: float
+    # F3.10 IT/OT: context broker NGSI-LD (Scorpio, profile iot); để trống thì tắt. Ngưỡng nhiệt độ (°C) dựng báo cáo
+    # sự cố; địa chỉ broker gọi lại svc-workflow; chu kỳ kiểm subscription của các đơn vị
+    ngsi_url: str = ""
+    ot_threshold: float = 35.0
+    ot_notify_url: str = "http://svc-workflow:8000"
+    ot_interval_s: float = 15.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -89,6 +96,10 @@ class Settings:
                 directory_sync_interval_s=float(env.get("MOC_DIRECTORY_SYNC_INTERVAL_S", "15")),
                 reconcile_interval_s=float(env.get("MOC_RECONCILE_INTERVAL_S", "300")),
                 sla_poll_interval_s=float(env.get("MOC_SLA_POLL_INTERVAL_S", "5")),
+                ngsi_url=env.get("MOC_NGSI_URL", "").rstrip("/"),
+                ot_threshold=float(env.get("MOC_OT_THRESHOLD", "35")),
+                ot_notify_url=env.get("MOC_OT_NOTIFY_URL", "http://svc-workflow:8000").rstrip("/"),
+                ot_interval_s=float(env.get("MOC_OT_SUBSCRIPTION_INTERVAL_S", "15")),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -99,3 +110,5 @@ class Settings:
             parse_duration(self.sla_duration)
         except ValueError as exc:
             raise ConfigError(f"MOC_SLA_DURATION: {exc}") from exc
+        if not math.isfinite(self.ot_threshold):
+            raise ConfigError("MOC_OT_THRESHOLD phải là một số (°C)")
