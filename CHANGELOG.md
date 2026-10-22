@@ -356,6 +356,32 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   ≥ 80 %, không ô `high` nào sai); `make do-doc-van-ban` còn thoát 1 khi cả kho dưới 20 văn bản hay số ký hiệu, ngày ban
   hành đúng không quá nửa; ngưỡng TSV chốt cho cả 7 bản scan. Số đo trên 22 văn bản: số ký hiệu đúng 20/22, ngày ban
   hành đúng 22/22 (bảng đủ trong README svc-files).
+- Ký số văn bản đi (F4.5, **chỉ minh họa** — không có giá trị pháp lý như chữ ký số công cộng): `/internal/issue` ký bản
+  phát hành không hạn chế theo PAdES B-B (chữ ký chứng nhận không cho sửa, ô ký ẩn) **trước khi băm**, nên
+  `content_sha256`, sổ kiểm toán, bản liên thông và cổng xác thực đều theo bản đã ký. Khóa RSA-3072 của từng đơn vị
+  (`moc-ky-so-<đơn vị>`) sinh và nằm trong Transit của két, `svc-files` chỉ nhờ két ký; chứng thư 1 năm do CA nội bộ một
+  tầng trong két cấp (`openbao/start.sh` dựng mount `pki`, CA `moc-root`, role `moc-van-thu` khi khởi tạo két mới). Tự
+  kiểm bằng pyHanko trước khi lưu; tệp và dòng `core.file_signatures` ghi trong một mutation. Két chưa có PKI → ký số tự
+  tắt (nhật ký `office.signing.disabled`, dò lại sau 5 phút); ký lỗi → phát hành không ký
+  (`office.document.sign_failed`); két không trả lời → `503 signing_unavailable`. Văn bản hạn chế không bao giờ ký. Tắt
+  bằng `MOC_SIGN_ENABLED=false`.
+- Migration `1792281602200_file_signatures`: bảng `core.file_signatures` (chuẩn, giờ ký tự khai, người ký, CA, số
+  sê-ri, vân tay chứng thư, khóa và phiên bản Transit; sổ kiểm toán), `svc-files` chỉ thêm; khung nhìn cổng xác thực
+  `office.issued_documents` thêm năm cột chữ ký, tìm theo băm nên văn bản đã nộp lưu vẫn hiện chữ ký; chỉ mục
+  `core.files (tenant_id, sha256)`. `/api/verify*` trả thêm `document.signature` (`illustrative: true`).
+- Cổng xác thực `/xac-thuc/<mã>` có khối "Chữ ký số (minh họa)": chuẩn, người ký, CA, số sê-ri, giờ ký, chú thích luôn
+  hiện "chỉ để minh họa — không có giá trị pháp lý…"; văn bản không ký (trước F4.5, ký số tắt hay ký lỗi) hay văn bản
+  hạn chế ghi "không có chữ ký số, tính nguyên vẹn vẫn kiểm bằng SHA-256".
+- `python -m svc_files.signing verify [--ca TỆP] < tệp.pdf` (trong container svc-files): kiểm bằng pyHanko, chỉ tin CA
+  nội bộ, không tải gì từ mạng; dòng đầu nói kết quả (hợp lệ / đã sửa sau khi ký / không khớp nội dung / CA lạ / không
+  có chữ ký / không đọc được), mã thoát 0/1/2.
+- Màn demo `make demo-ky-so` (8 bước, cũng là bước CI): CA trong két → phát hành → `/ByteRange` phủ cả tệp, cổng xác
+  thực có chữ ký, CSDL cùng số sê-ri → CLI hợp lệ → thêm một lớp sửa ghi nối: "đã bị sửa sau khi ký", băm cả tệp
+  không khớp → lật một bit: "không khớp nội dung" → văn bản hạn chế phát hành không chữ ký → văn bản cũ xác thực như
+  trước. `make smoke` +5 kiểm (bỏ qua, in lý do, khi két chưa có PKI hay tắt ký số); e2e `van-ban-di.spec.ts` kiểm
+  khối chữ ký. QĐ-007 trong `docs/architecture.md`, mục ký số ở README, README svc-files, `docs/mo-hinh-du-lieu.md`,
+  `docs/demo-script.md`. Phụ thuộc mới của svc-files: pyHanko 0.37.0, pyhanko-certvalidator 0.32.1 và 15 gói kéo
+  theo, ghim kèm băm (`DEPENDENCIES.md`). Test: CSDL +28, svc-files +28, scripts +22, giao diện +5.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -441,6 +467,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   trả 401 thì bỏ token, lấy token mới và gửi lại đúng một lần (nhiều lời gọi cùng lúc chỉ hỏi Keycloak một lần).
 
 ### Bảo mật
+- Ký số (F4.5): khóa ký của từng đơn vị không ra khỏi két (policy `svc-files` chỉ có `transit/keys|sign/moc-ky-so-*`
+  và `pki/sign/moc-van-thu`, không `export`, `backup`). Ai chiếm được `svc-files` vẫn ký được, xoay được khóa ký và xin
+  được chứng thư cho khóa tự sinh, nhưng không mang khóa riêng đi được — cùng mức tin như khóa dữ liệu `moc-files`
+  (README mục Két bí mật). Két khởi tạo trước F4.5 không ký số cho tới khi quản trị nâng cấp tay (README).
 - Văn bản hạn chế (F3.7) không bao giờ có gợi ý đọc tự động (F4.1): svc-files trả `409` trước khi đọc byte nào —
   tệp mã hóa, hay tệp rõ còn gắn vào văn bản hạn chế (dữ liệu có từ trước F3.7) — nên không tới OCR, không tới mô
   hình; trigger `intake_suggestions_guard` chặn thêm ở CSDL việc lưu gợi ý của các tệp đó, xóa gợi ý khi văn bản bật

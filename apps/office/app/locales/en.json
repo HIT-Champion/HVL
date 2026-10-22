@@ -623,6 +623,16 @@
     "summary": "Subject",
     "summaryHidden": "Not public",
     "sha256": "SHA-256 of the issued copy",
+    "signature": {
+      "title": "Digital signature (illustrative)",
+      "level": "Signature standard",
+      "signer": "Signed by",
+      "ca": "Certificate issued by",
+      "serial": "Certificate serial number",
+      "signedAt": "Signed at (time stated in the signature)",
+      "illustrative": "The signature uses Mộc's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
+      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above."
+    },
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
     "footer": "Mộc — open-source e-office. No login required on this page."

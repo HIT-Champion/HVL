@@ -22,7 +22,8 @@ sổ kiểm toán. Tải xuống: hỏi Hasura bằng chính token người dùn
 đọc từ SeaweedFS. Tìm kiếm (F1.7): Meilisearch xếp hạng, Hasura lọc theo quyền — chi tiết ở search.py.
 
 Văn bản đi (F2.4): svc-workflow gọi /internal/issue bằng token tài khoản dịch vụ khi văn thư phát hành —
-dựng PDF có số, mã QR từ dữ liệu trong CSDL, quét, lưu như mọi tệp. Người được đọc dự thảo xem trước bản PDF
+dựng PDF có số, mã QR từ dữ liệu trong CSDL, ký số PAdES bằng khóa của đơn vị trong két (F4.5, chỉ minh họa —
+signing.py; văn bản hạn chế không ký), quét, lưu như mọi tệp. Người được đọc dự thảo xem trước bản PDF
 ở /api/documents/{id}/preview. Cổng xác thực (F2.13): /api/verify trả thông tin công khai của đúng một văn
 bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập. Sổ đăng ký văn bản đến / đi (F2.8):
 văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} và in ra PDF để ký nhận, đóng sổ — registers.py.
@@ -46,6 +47,7 @@ import json
 import logging
 import os
 import re
+import time
 import unicodedata
 import uuid
 from collections.abc import Iterator
@@ -84,6 +86,7 @@ from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
 from .sealed import SealError, Vault, VaultError, check_pdf, seal, unseal, watermark
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
+from .signing import DocumentSigner, SigningError, SigningOff, SigningUnavailable, preload as preload_signing
 from .storage import ObjectStore, StorageError, object_key, s3_client
 from .texts import TextExtractor
 
@@ -159,6 +162,18 @@ class IssueOut(BaseModel):
     size_bytes: int
 
 
+class VerifiedSignature(BaseModel):
+    """Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Mộc, chỉ minh họa, không có giá trị pháp lý như chữ ký số
+    công cộng. svc-files đã tự kiểm chữ ký lúc ký; kiểm lại tệp: python -m svc_files.signing verify."""
+
+    level: Literal["PAdES-B-B"] = Field(description="Chuẩn chữ ký: PAdES mức B-B, không có dấu thời gian tin cậy")
+    signer: str = Field(description="Người ký: CN chứng thư của đơn vị phát hành")
+    ca: str = Field(description="CN của CA nội bộ cấp chứng thư")
+    serial: str = Field(description="Số sê-ri chứng thư, hex thường")
+    signed_at: datetime = Field(description="Giờ ký tự ghi trong chữ ký (không có dấu thời gian tin cậy)")
+    illustrative: Literal[True] = Field(True, description="Luôn true: chữ ký chỉ để minh họa")
+
+
 class VerifiedDocument(BaseModel):
     symbol: str
     issued_on: date
@@ -170,6 +185,9 @@ class VerifiedDocument(BaseModel):
     sha256: str
     verify_code: str
     status: Literal["issued", "archived"]
+    signature: VerifiedSignature | None = Field(
+        None, description="Chữ ký số của bản phát hành (F4.5, chỉ minh họa); null: văn bản phát hành khi ký số "
+                          "chưa bật hoặc ký lỗi, hoặc văn bản hạn chế")
 
 
 class VerifyOut(BaseModel):
@@ -303,9 +321,9 @@ def _error(status: int, code: str, message: str, **extra: object) -> HTTPExcepti
     return HTTPException(status_code=status, detail={"code": code, "message": message, **extra})
 
 
-def log_event(event: str, request: Request, **fields: object) -> None:
+def log_event(event: str, request: Request, *, level: int = logging.INFO, **fields: object) -> None:
     record = {"event": event, "request_id": request.state.request_id, **fields}
-    log.info(json.dumps(record, ensure_ascii=False, default=str))
+    log.log(level, json.dumps(record, ensure_ascii=False, default=str))
 
 
 UPLOAD_BODY = {
@@ -338,6 +356,7 @@ def create_app(
     assistant: Assistant | None = None,
     chunk_indexer: ChunkIndexer | None = None,
     ai: AiClient | None = None,
+    signer: DocumentSigner | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -370,6 +389,10 @@ def create_app(
     if vault is None and settings.vault_addr:
         vault = Vault(settings.vault_addr, role_id_file=settings.vault_role_id_file,
                       secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
+        # Ký số bản phát hành (F4.5): khóa transit của đơn vị, CA nội bộ của két. Test tự tiêm bộ ký (két giả)
+        signer = signer or DocumentSigner(vault)
+    if not settings.sign_enabled:
+        signer = None
     reader = reader or Reader(settings, hasura, store, summarizer=make_summarizer(
         settings.ai_url, settings.ai_model, max_chars=settings.ai_max_chars))
     # Hỏi đáp trên kho văn bản (F4.2): chỉ mục đoạn riêng trên cùng Meilisearch, mô hình nhúng / sinh tùy chọn
@@ -386,6 +409,16 @@ def create_app(
                             min_score=settings.ask_min_score, min_score_semantic=settings.ask_min_score_semantic,
                             semantic_ratio=settings.ask_semantic_ratio),
         ai=ai, indexer=chunk_indexer, hasura=hasura)
+
+    async def _probe_signer() -> None:
+        try:
+            if await signer.ready():
+                await asyncio.to_thread(preload_signing)    # nạp pyHanko ngoài event loop
+        except SigningUnavailable as exc:
+            log.warning(json.dumps({"event": "office.signing.unavailable", "error": str(exc)}, ensure_ascii=False))
+        except Exception as exc:  # noqa: BLE001 — task nền: lỗi lạ (nạp pyHanko…) phải ra nhật ký, không chết lặng
+            log.error(json.dumps({"event": "office.signing.unavailable", "error": f"{type(exc).__name__}: {exc}"},
+                                 ensure_ascii=False))
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -405,8 +438,10 @@ def create_app(
         chunks = (asyncio.create_task(chunk_indexer.run())
                   if settings.ask_enabled and settings.ask_sync_interval_s > 0 else None)
         models = asyncio.create_task(ai.run()) if settings.ask_enabled else None
+        # F4.5: dò két một lần để nhật ký khởi động có dòng office.signing.ready / disabled; lỗi để lần phát hành dò lại
+        signing = asyncio.create_task(_probe_signer()) if signer is not None else None
         yield
-        for task in (sync, anchor, texts, archive, probe, chunks, models):
+        for task in (sync, anchor, texts, archive, probe, chunks, models, signing):
             if task is not None:
                 task.cancel()
         await reader.summarizer.aclose()
@@ -432,6 +467,7 @@ def create_app(
     app.state.assistant = assistant
     app.state.chunk_indexer = chunk_indexer
     app.state.ai = ai
+    app.state.signer = signer
     bearer = HTTPBearer(auto_error=False)
 
     @app.middleware("http")
@@ -866,7 +902,35 @@ def create_app(
         if row["status"] != "approved" or not row["symbol"] or not row["verify_code"]:
             raise _error(409, "not_numbered", "Văn bản chưa được duyệt và cấp số")
 
-        pdf = await asyncio.to_thread(render_pdf, letter_from(row, verify_base=f"{settings.public_url}/xac-thuc"))
+        # Ký số (F4.5): ký trước khi băm — băm, sự kiện issued, sổ kiểm toán, bản liên thông, cổng xác thực đều theo
+        # bản đã ký. Văn bản hạn chế không ký (mỗi lần xem bị viết lại để đóng dấu tên người xem). Két chưa có PKI,
+        # từ chối hay pyHanko lỗi: phát hành không ký; két không trả lời: 503, không lưu gì, văn thư bấm lại
+        will_sign = False
+        if signer is not None and not row.get("restricted"):
+            try:
+                will_sign = await signer.ready()
+            except SigningUnavailable as exc:
+                log_event("office.document.sign_failed", request, level=logging.ERROR, document_id=body.document_id,
+                          error=str(exc))
+                raise _error(503, "signing_unavailable", "Két ký số chưa sẵn sàng, thử lại sau") from exc
+        verify_base = f"{settings.public_url}/xac-thuc"
+        pdf = await asyncio.to_thread(render_pdf, letter_from(row, verify_base=verify_base))
+        record, sign_ms = None, 0
+        if will_sign:
+            tenant, started = row["tenant"], time.monotonic()
+            try:
+                pdf, record = await signer.sign(
+                    pdf, tenant_id=body.tenant_id, org_name=tenant["name"], parent_name=tenant.get("parent_name"),
+                    place_name=tenant.get("place_name"), symbol=row["symbol"],
+                    verify_url=f"{verify_base}/{row['verify_code']}")
+            except SigningUnavailable as exc:
+                log_event("office.document.sign_failed", request, level=logging.ERROR, document_id=body.document_id,
+                          error=str(exc))
+                raise _error(503, "signing_unavailable", "Két ký số chưa sẵn sàng, thử lại sau") from exc
+            except (SigningOff, SigningError) as exc:   # thiếu cấu hình hoặc lỗi ký: phát hành không ký, báo to
+                log_event("office.document.sign_failed", request, level=logging.ERROR, document_id=body.document_id,
+                          error=str(exc))
+            sign_ms = round((time.monotonic() - started) * 1000)
         digest = hashlib.sha256(pdf).hexdigest()
         # Tệp do hệ thống dựng vẫn qua trạm kiểm dịch như mọi tệp: core.files chỉ có tệp đã quét
         try:
@@ -893,14 +957,18 @@ def create_app(
             await hasura.insert_file(
                 tenant_id=body.tenant_id, actor_id=body.actor_id, request_id=rid, file_id=file_id, object_key=key,
                 filename=row["symbol"].replace("/", "-") + ".pdf", mime_type="application/pdf",
-                size_bytes=len(pdf), sha256_hex=digest, scanned_at=scanned_at, wrapped_dek=wrapped,
+                size_bytes=len(pdf), sha256_hex=digest, scanned_at=scanned_at, wrapped_dek=wrapped, signature=record,
             )
         except HasuraError as exc:
             await discard(request, key)
             raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng, chưa lưu bản phát hành") from exc
         log_event("office.document.rendered", request, tenant_id=body.tenant_id, actor_id=body.actor_id,
                   document_id=body.document_id, file_id=file_id, size_bytes=len(pdf), encrypted=wrapped is not None,
-                  caller=caller)
+                  signed=record is not None, caller=caller)
+        if record is not None:
+            log_event("office.document.signed", request, tenant_id=body.tenant_id, document_id=body.document_id,
+                      file_id=file_id, key_name=record.key_name, key_version=record.key_version, serial=record.serial,
+                      duration_ms=sign_ms)
         return IssueOut(file_id=file_id, sha256=digest, size_bytes=len(pdf))
 
     # Mỗi lúc một lượt chép liên thông: svc-workflow gọi lại khi lần trước quá hạn chờ thì lần sau đợi lần trước xong
@@ -1063,10 +1131,16 @@ def create_app(
         if row is None:
             out = VerifyOut(result="not_found")
         else:
+            signature = None
+            if row.get("signature_level"):      # F4.5: văn bản cũ, văn bản hạn chế không có chữ ký
+                signature = VerifiedSignature(level=row["signature_level"], signer=row["signer_name"],
+                                              ca=row["signer_ca"], serial=row["certificate_serial"],
+                                              signed_at=row["signed_at"])
             out = VerifyOut(result="valid", document=VerifiedDocument(
                 symbol=row["symbol"], issued_on=row["issued_on"], type_name=row["type_name"],
                 issuer_name=row["issuer_name"], parent_name=row["parent_name"], summary=row["summary"],
                 sha256=row["content_sha256"], verify_code=row["verify_code"], status=row["status"],
+                signature=signature,
             ))
         return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
 

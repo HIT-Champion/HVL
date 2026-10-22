@@ -72,6 +72,21 @@ create table core.file_texts (              -- lớp chữ của PDF để tìm 
   page_starts   int[]                         -- vị trí đầu mỗi trang trong content (F4.2, migration 1792281602000)
 );
 
+create table core.file_signatures (         -- chữ ký số PAdES của bản phát hành (F4.5, migration 1792281602200)
+  file_id       uuid primary key,             -- (tenant_id, file_id) tham chiếu core.files, xóa tệp thì xóa theo
+  tenant_id     uuid not null,                -- preset từ phiên
+  level         text not null default 'PAdES-B-B' check (level in ('PAdES-B-B')),
+  signed_at     timestamptz not null,         -- giờ ký tự khai trong chữ ký (không có dấu thời gian tin cậy)
+  signer_name   text not null,                -- CN chứng thư lá: "<đơn vị>, <cơ quan chủ quản>", 1–64 ký tự
+  ca_name       text not null,                -- CN của CA nội bộ, 1–64 ký tự
+  serial        text not null,                -- số sê-ri chứng thư, hex thường 2–64 ký tự
+  cert_sha256   bytea not null,               -- vân tay chứng thư lá (32 byte); chứng thư nằm sẵn trong PDF
+  not_after     timestamptz not null,         -- hạn chứng thư lá
+  key_name      text not null,                -- khóa transit 'moc-ky-so-<tenant_id>'
+  key_version   int  not null check (key_version > 0),
+  created_at    timestamptz not null default now()
+);
+
 create table core.users (                   -- danh bạ, đồng bộ từ Keycloak (migration 1792281600400)
   id             text primary key,             -- sub của Keycloak
   tenant_id      uuid not null references core.tenants,
@@ -212,6 +227,26 @@ cuối không vượt độ dài `content`, mảng một chiều không có null
 (`svc-files` coi cả nội dung là một "trang" không số). Migration xóa mọi dòng `ok` cũ để vòng nền đọc lại một lần, lần
 này có ranh giới trang. Hàng đợi đọc chữ gồm bản chính, tài liệu kèm theo và bản phát hành (`issued`) của văn bản đi.
 
+**Chữ ký số của bản phát hành** (`core.file_signatures`, F4.5, migration 1792281602200 — **chỉ minh họa**, không có giá
+trị pháp lý như chữ ký số công cộng). `svc-files` ký PDF văn bản đi lúc phát hành bằng khóa transit của đơn vị, chứng
+thư do CA nội bộ trong két cấp (§4.3; quyết định kiến trúc: `docs/architecture.md` QĐ-007), rồi lưu tệp đã ký và một
+dòng ở đây.
+
+- Một dòng mỗi tệp đã ký, ghi **trong cùng mutation** với dòng `core.files` của bản phát hành (Hasura chạy hai trường
+  gốc trong một giao dịch): không có tệp đã ký mà thiếu dòng chữ ký, hay ngược lại. Khóa ngoại `(tenant_id, file_id)` →
+  `core.files (tenant_id, id)` `on delete cascade`: không gắn được chữ ký vào tệp của đơn vị khác.
+- Không lưu chứng thư (đã nằm trong PDF), chỉ lưu vân tay `cert_sha256`. Không thêm cột vào `core.files` (bảng chung
+  cho mọi tệp).
+- Ràng buộc mang tên mặc định của PostgreSQL (`file_signatures_<cột>_check`): `level` chỉ `PAdES-B-B`; `serial` khớp
+  `^[0-9a-f]{2,64}$` (hex thường, không dấu hai chấm); `cert_sha256` đúng 32 byte; `key_name` khớp
+  `^moc-ky-so-[0-9a-f-]{36}$`; `signer_name`, `ca_name` 1–64 ký tự.
+- Trigger `core.audit('file_id')`: sổ kiểm toán có dòng `insert` với `entity = 'core.file_signatures'`, `entity_id` =
+  id tệp. `overview` của dòng này chỉ giữ giá trị `file_id`; các cột khác còn tên, giá trị null (bản tối thiểu chưa
+  thêm nhánh riêng vào `core.audit_overview`).
+- Không ký văn bản hạn chế (mỗi lần mở đều viết lại PDF để đóng tên người xem, chữ ký hỏng ngay) và không ký lại văn
+  bản đã phát hành trước F4.5 (băm, QR và sổ kiểm toán đã cố định): chúng không có dòng ở đây.
+- Không vai trò nào đọc bảng này; cổng xác thực đọc năm cột chữ ký qua view `office.issued_documents` (§2.5).
+
 **Gợi ý đọc văn bản đến** (`office.intake_suggestions`, F4.1, migration 1792281601900). Văn thư tải công văn lên màn
 tiếp nhận, bấm đọc (`POST /api/files/{id}/read`, §4.3); tác tử `moc-doc-reader` trong `svc-files` đọc lớp chữ PDF,
 không có thì nhận dạng chữ (Tesseract), rồi gợi ý sáu trường của form tiếp nhận. Văn thư đối chiếu, sửa rồi mới lưu —
@@ -326,8 +361,10 @@ giữ một khóa S3 đọc được mọi bucket, nên tách bucket không thê
 (Object Lock ở bucket lạnh đặt theo bucket), sao lưu và giám sát theo số đơn vị. Ranh giới thật là thuê ước lấy từ token
 cộng ràng buộc trong CSDL và AAD của bản mã ở trên. Một bucket nóng (tiền tố `tenant/<id>/`), một bucket lạnh khóa
 ghi (gói nộp lưu dưới `cold/<id>/`, mốc neo sổ kiểm toán chung cả nền tảng vì chuỗi băm là một), một khóa transit
-`moc-files` (mỗi tệp một khóa dữ liệu riêng). Đơn vị cần tách vật lý (cơ quan khác, yêu cầu pháp lý) thì chạy một bản
-cài Mộc riêng.
+`moc-files` (mỗi tệp một khóa dữ liệu riêng). Riêng khóa **ký số** văn bản đi (F4.5, minh họa) là của từng đơn vị —
+khóa transit `moc-ky-so-<tenant_id>`, `svc-files` tự tạo ở lần phát hành đầu — vì chứng thư phải cho biết đơn vị nào
+phát hành; đây là danh tính chứ không phải ranh giới cách ly. Đơn vị cần tách vật lý (cơ quan khác, yêu cầu pháp lý)
+thì chạy một bản cài Mộc riêng.
 
 ---
 
@@ -734,6 +771,13 @@ aggregate.
 |---|---|---|
 | `office.v_assignment_suggestion_accuracy` | `tenant_id`, `status`, `confidence`, `suggested`, `decided`, `kept_unit`, `due_compared`, `kept_due`, `due_abs_error_days` | Theo kết quả (`suggested`, `none`, `failed`) và độ tin cậy: số gợi ý; số văn bản đã giao chủ trì sau lúc gợi ý; số giữ đúng đơn vị gợi ý; số có cả hạn gợi ý và hạn đã giao; số giữ đúng hạn; tổng số ngày lệch hạn (chia cho `due_compared` ra sai số trung bình) |
 
+**Khung nhìn của cổng xác thực** (`office.issued_documents`, F2.13): một dòng mỗi văn bản đi đã phát hành hoặc đã nộp
+lưu; chỉ vai trò `verifier` đọc, mỗi lần một dòng (§3, §4.3). F4.5 (migration 1792281602200) thêm năm cột chữ ký ở cuối.
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.issued_documents` | `verify_code`, `content_sha256`, `symbol`, `issued_on`, `type_code`, `type_name`, `issuer_name`, `parent_name`, `summary` (chỉ văn bản công khai, không hạn chế), `status`; F4.5: `signature_level`, `signed_at`, `signer_name`, `signer_ca`, `certificate_serial` | Cổng xác thực tra theo mã hoặc băm. Năm cột chữ ký lấy từ `core.file_signatures` của tệp cùng đơn vị có `sha256` bằng `content_sha256`, không qua `office.document_files`: nộp lưu (F3.8) xóa dòng gắn tệp nhưng giữ tệp (kho lạnh) và chữ ký, nên văn bản đã nộp lưu vẫn hiện chữ ký. Tệp khác cùng nội dung (tải lên lại, bản liên thông ở đơn vị nhận) không có dòng chữ ký; `limit 1` giữ một dòng mỗi văn bản; chỉ mục `files_tenant_sha256` cho lần tra. Null khi bản phát hành không ký (trước F4.5, văn bản hạn chế, két chưa có PKI, ký lỗi) |
+
 Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
 được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
@@ -867,6 +911,18 @@ Không vai trò người dùng nào sửa được `status`, `register_number`, 
 
 **Không có vai trò ẩn danh.** Cổng xác thực đi qua `svc-files` (§4.3), không cho truy vấn bảng — nếu không,
 người ngoài liệt kê được mọi văn bản đã phát hành.
+
+**Chữ ký số** (F4.5, migration 1792281602200, chỉ minh họa):
+
+| Vai trò | `core.file_signatures` | `office.issued_documents` |
+|---|---|---|
+| `service` | Chỉ thêm, cột `file_id`, `level`, `signed_at`, `signer_name`, `ca_name`, `serial`, `cert_sha256`, `not_after`, `key_name`, `key_version`; `tenant_id` đặt sẵn từ phiên. Không đọc, sửa, xóa: `svc-files` ghi bằng `insert_core_file_signatures { affected_rows }` cùng mutation với `insert_core_files_one` (`returning` cần quyền đọc nên không dùng) | — |
+| `verifier` | Không có | Thêm năm cột chữ ký vào các cột đã có; `limit: 1` giữ nguyên |
+| Vai trò người dùng, `agent` | Không có | Không có |
+
+Khóa ngoại `(tenant_id, file_id)` → `core.files` chặn phiên của đơn vị này gắn chữ ký vào tệp của đơn vị khác. Sổ kiểm
+toán ghi dòng `core.file_signatures` như mọi bảng; `director`, `tenant_admin` thấy dòng đó ở màn Sổ kiểm toán với tên
+các cột, giá trị chỉ có ở `file_id` (bản tối thiểu chưa thêm nhánh vào `core.audit_overview`).
 
 ---
 
@@ -1019,12 +1075,12 @@ Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
 | `GET /api/documents/{id}/preview` | Người đọc được văn bản đi | PDF đúng thể thức của dự thảo, chưa có số, in chữ "DỰ THẢO" |
 | `GET /api/registers/{in\|out}/{year}` | `clerk`, `director` | Sổ đăng ký một năm, cột theo mẫu NĐ 30 Phụ lục IV; dòng văn bản hạn chế người gọi không đọc được chỉ có số, ngày, số ký hiệu |
 | `GET /api/registers/{in\|out}/{year}/pdf` | `clerk`, `director` | Như trên, ra PDF A4 ngang để ký nhận, đóng sổ; ghi `register.printed` vào sổ kiểm toán |
-| `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status}}`; `summary` chỉ có khi `is_public` |
+| `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status, signature}}`; `summary` chỉ có khi `is_public`; `signature` (F4.5, chỉ minh họa) luôn có mặt: `{level, signer, ca, serial, signed_at, illustrative: true}`, hoặc `null` khi bản phát hành không ký |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
-| `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
+| `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, ký số (F4.5, chỉ minh họa — xem dưới), quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}`, `sha256` là băm của bản đã ký. 503 `signing_unavailable` khi két không trả lời (không lưu gì, văn thư bấm lại) |
 | `POST /internal/similar-documents` | Chỉ tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`svc-workflow`), không qua APISIX, không có trong `/openapi.json` | Gợi ý giao việc (F4.3): `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15) → `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` — văn bản đến khác đã giao (`in_progress`, `done`, `archived`) tương tự theo trích yếu, điểm giảm dần, đã hậu kiểm bỏ văn bản hạn chế; dùng lại phần truy xuất của trợ lý hỏi đáp (phạm vi vai trò `service` của thuê ước). Không trả chữ nào (`terms` chỉ là số từ của câu tìm), nhật ký không ghi trích yếu. 404 `not_found`; 409 `not_incoming`, `restricted` (không tìm gì thêm); 503 `assistant_disabled` (`MOC_ASK_ENABLED=false`), `search_unavailable`, `database_unavailable` |
 | `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |
 
@@ -1043,7 +1099,29 @@ họ được đọc theo đúng thứ tự xếp hạng. Không trả tổng s�
 
 `/api/verify` (đã làm): `svc-files` tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`. Vai
 trò này chỉ đọc được khung nhìn đó, tối đa một dòng mỗi lần, và không có trong token của người dùng. Khung nhìn
-chỉ có văn bản đi đã phát hành; trích yếu bị ẩn khi văn bản không công khai hoặc là văn bản hạn chế.
+chỉ có văn bản đi đã phát hành; trích yếu bị ẩn khi văn bản không công khai hoặc là văn bản hạn chế. Từ F4.5 câu trả
+lời có thêm `document.signature` lấy từ năm cột chữ ký của khung nhìn (§2.5) — CSDL ghi lại chữ ký `svc-files` đã tự
+kiểm lúc ký; trình duyệt vẫn chỉ băm cả tệp như trước, tệp không rời máy người dùng.
+
+**Ký số khi phát hành** (F4.5, **chỉ minh họa**, không có giá trị pháp lý như chữ ký số công cộng; quyết định kiến trúc
+`docs/architecture.md` QĐ-007). Trong `/internal/issue`, `svc-files` ký **sau khi dựng PDF, trước khi băm**: dựng →
+ký → tự kiểm chữ ký → SHA-256 → ClamAV → lưu → `core.files` cùng `core.file_signatures` trong một mutation (§1). Băm
+trả cho `svc-workflow`, `content_sha256`, sự kiện `issued`, sổ kiểm toán, bản liên thông và cổng xác thực đều theo bản
+đã ký; `svc-workflow` không đổi. QR mã hóa URL theo mã tra cứu cấp lúc cấp số, nên QR không đổi.
+
+- Chữ ký PAdES B-B (`ETSI.CAdES.detached`, SHA-256), chữ ký chứng nhận không cho sửa thêm (`NO_CHANGES`), ô ký ẩn
+  `MocKySo`; không dấu thời gian tin cậy, không thông tin kiểm dài hạn: giờ ký là giờ tự khai.
+- Khóa ký: khóa transit `moc-ky-so-<tenant_id>` (rsa-3072, PKCS#1 v1.5) trong két OpenBao, `svc-files` tạo ở lần phát
+  hành đầu của đơn vị. Chứng thư: CSR do chính Transit ký → `pki/sign/moc-van-thu` (CN "<đơn vị>, <cơ quan chủ
+  quản>", tối đa 64 ký tự) → gắn vào phiên bản khóa (`set-certificate`). Khóa riêng không ra khỏi két; mỗi lần ký là
+  một lần gọi `transit/sign`, két ghi sổ.
+- Không ký: văn bản hạn chế (mỗi lần mở đều viết lại PDF để đóng tên người xem); `MOC_SIGN_ENABLED=false` (không gọi
+  Transit, PKI); két chưa có PKI (két khởi tạo trước F4.5 — README mục Két bí mật), két từ chối, ký hoặc tự kiểm lỗi —
+  các trường hợp này vẫn phát hành (201), không có dòng chữ ký, ghi nhật ký (§5); két chưa có PKI thì dò lại sau 5 phút.
+  Két không trả lời (mạng, 5xx, hết giờ): 503 `signing_unavailable`, không lưu gì.
+- Văn bản phát hành trước F4.5 không ký lại (băm, QR, sổ kiểm toán đã cố định): cổng trả `signature: null`.
+- Kiểm đầy đủ phần mật mã (chỉ tin đúng CA của két) trong container `svc-files`: `python -m svc_files.signing verify`
+  đọc PDF từ stdin, mã thoát 0 hợp lệ, 1 sửa sau khi ký / không khớp / CA lạ / không có chữ ký, 2 không đọc được.
 
 ---
 
@@ -1094,6 +1172,24 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 
 Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
 đến; không bao giờ mang `task_id` — chỉ mục `document_events_task_once` là chỉ mục duy nhất cho cả bảng.
+
+**Nhật ký ký số của `svc-files`** (F4.5, chỉ minh họa). Ký số không thêm loại sự kiện vào `office.document_events`:
+`office.document.issued` giữ nguyên, băm trong đó là băm bản đã ký. `svc-files` ghi các dòng sau vào nhật ký JSON của
+mình (`docker compose logs svc-files`; hai dòng `office.document.*` kèm `request_id` của lượt phát hành, các dòng
+`office.signing.*` của bộ ký thì không); chữ ký thành công còn có dòng
+`core.file_signatures` trong sổ kiểm toán (§1). Không dòng nào chứa trích yếu hay PDF.
+
+| `event` | Khi | Trường |
+|---|---|---|
+| `office.document.signed` | Ký và tự kiểm xong một bản phát hành | `tenant_id`, `document_id`, `file_id`, `key_name`, `key_version`, `serial`, `duration_ms` |
+| `office.document.sign_failed` | Ký lỗi: két từ chối, pyHanko lỗi, tự kiểm không đạt (phát hành không ký), hoặc két không trả lời (503) | `document_id`, `error` |
+| `office.signing.ready` | Bộ ký dò két thấy có CA (lúc khởi động, hoặc lần dò lại sau khi tắt) | `ca`, `serial` |
+| `office.signing.disabled` | Bộ ký tự tắt: két chưa có PKI (`reason` `no_pki`, một lần mỗi lượt dò) hoặc két từ chối quyền (`forbidden`); dò lại sau `retry_s` giây | `reason`, `retry_s` |
+| `office.signing.unavailable` | Lần dò lúc khởi động không tới được két (lần phát hành sau dò lại) | `error` |
+| `office.signing.key_created` | Lần phát hành đầu của đơn vị: két tạo khóa ký `moc-ky-so-<đơn vị>` | `key_name` |
+| `office.signing.certificate_issued` | CA nội bộ cấp chứng thư cho khóa ký của đơn vị | `key_name`, `key_version`, `serial`, `not_after` |
+
+Dòng `office.document.rendered` sẵn có thêm trường `signed` (bản phát hành có chữ ký hay không).
 
 **Lượt đọc văn bản đến** (F4.1): mỗi lần tác tử đọc thật một tệp (không tính lần trả bản đã lưu), `svc-files` ghi
 một dòng `core.audit_log` bằng vai trò `agent`: `action` `intake.suggested`, `entity` `core.files`, `entity_id` = id

@@ -72,6 +72,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Đo tác tử leave-one-out trên lịch sử seed/giao-viec (python -m svc_workflow.advisor evaluate trong
         svc-workflow): top-1/2/3, độ phủ, đúng theo độ tin cậy, sai số hạn, thời gian; thoát 1 khi có căn cứ là văn
         bản hạn chế, hoặc top-1 dưới ngưỡng. (make do-giao-viec)
+    python3 scripts/demo.py ky-so
+        Ký số văn bản đi (F4.5, CHỈ MINH HỌA — CA nội bộ trong két, không có giá trị pháp lý như chữ ký số công cộng):
+        CA gốc mẫu trong két OpenBao; văn thư phát hành, bản PDF ký PAdES bằng khóa của đơn vị nằm trong Transit của
+        két; cổng xác thực cho biết ai ký, CA nào cấp; pyHanko trong svc-files báo hợp lệ, báo "đã bị sửa sau khi ký"
+        khi thêm một chú thích, báo không khớp khi lật một bit; văn bản hạn chế không được ký; văn bản cũ không chữ
+        ký vẫn xác thực như cũ. (make demo-ky-so)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -79,6 +85,7 @@ Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import re
@@ -2415,10 +2422,212 @@ def do_giao_viec() -> None:
     print(f"\n✓ không căn cứ nào là văn bản hạn chế; top-1 {m['top1']}/{m['total']} ≥ {MIN_TOP1:.0%}")
 
 
+# --- F4.5 · Ký số văn bản đi (PKI nội bộ trong két, chỉ minh họa) -----------------------------------------------------
+# Chứng thư PEM ở stdin, đọc trong svc-files (cryptography có sẵn): CN, O, hạn, cỡ khóa, có tự ký không
+CA_INFO = """import sys
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+c = x509.load_pem_x509_certificate(sys.stdin.buffer.read())
+for oid in (NameOID.COMMON_NAME, NameOID.ORGANIZATION_NAME):
+    print(c.subject.get_attributes_for_oid(oid)[0].value)
+print(c.not_valid_after_utc.date().isoformat())
+print(c.public_key().key_size, c.subject == c.issuer)
+"""
+SIGNED_DOC = """query ($id: uuid!) { office_documents_by_pk(id: $id) { status symbol verify_code content_sha256
+  files(where: {role: {_eq: "issued"}}) { file_id } } }"""
+# Dòng chữ ký của bản phát hành — bảng core.file_signatures không vai trò nào đọc được, chỉ psql
+SIGNATURE_ROW = """select s.key_name, s.key_version, s.serial, s.not_after::date from core.file_signatures s
+  join office.document_files df on df.file_id = s.file_id and df.role = 'issued' where df.document_id = '{doc}'"""
+RESTRICTED_SIGNED = """select count(*) from core.file_signatures s join office.document_files df on df.file_id = s.file_id
+  join office.documents d on d.id = df.document_id where d.restricted"""
+# Văn bản phát hành không có chữ ký (trước khi bật ký số, ký số tắt hay ký lỗi), còn ở kho nóng, không hạn chế — mới nhất
+UNSIGNED_ISSUED = """select d.verify_code, d.symbol from office.documents d
+  join office.document_files df on df.document_id = d.id and df.role = 'issued'
+  left join core.file_signatures s on s.file_id = df.file_id
+ where d.direction = 'out' and d.status = 'issued' and not d.restricted and s.file_id is null
+ order by d.issued_on desc, d.symbol desc limit 1"""
+
+
+def pem_fingerprint(pem: str) -> str:
+    """Vân tay SHA-256 của chứng thư đầu tiên trong PEM (băm phần DER, tức base64 giữa hai dòng BEGIN/END), dạng
+    AB:CD:… như trình duyệt, trình đọc PDF hiện — để đối chiếu khi nhập CA vào trình đọc PDF."""
+    lines = [line.strip() for line in pem.strip().splitlines()]
+    start = lines.index("-----BEGIN CERTIFICATE-----") + 1
+    der = base64.b64decode("".join(lines[start:lines.index("-----END CERTIFICATE-----", start)]))
+    digest = hashlib.sha256(der).hexdigest().upper()
+    return ":".join(digest[i:i + 2] for i in range(0, len(digest), 2))
+
+
+def local_time(iso: str) -> str:
+    """Giờ ISO 8601 (có "Z" hay độ lệch) → giờ máy chạy demo, dạng 14:05:09 23/10/2026."""
+    return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%H:%M:%S %d/%m/%Y")
+
+
+def issue_outgoing(staff: Session, manager: Session, director: Session, clerk: Session, draft: dict[str, Any], *,
+                   public: bool) -> tuple[str, float]:
+    """Chuyên viên soạn → trình → tổ trưởng duyệt → lãnh đạo khoa ký duyệt → văn thư phát hành → (id văn bản, số giây
+    của riêng bước phát hành: cấp số, dựng PDF, ký, quét, lưu)."""
+    doc_id = staff.gql(DRAFT, {"o": draft})["insert_office_documents_one"]["id"]
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    staff.gql(SUBMIT, {"d": doc_id, "s": signer})
+    manager.complete(manager.wait_task(doc_id, "vbdi.duyetPhong"), "approve", {})
+    director.complete(director.wait_task(doc_id, "vbdi.duyetDonVi"), "approve", {})
+    task = clerk.wait_task(doc_id, "vbdi.phatHanh")
+    started = time.monotonic()
+    clerk.complete(task, "issue", {"is_public": public})
+    return doc_id, time.monotonic() - started
+
+
+def cli_lines(lines: list[str]) -> None:
+    for line in lines:
+        print(f"   │ {line}")
+
+
+def ky_so() -> None:
+    # nạp trong hàm: test của các màn khác thay moc_env bằng bản giả không có các tên này
+    from moc_env import INCREMENTAL_EDIT, byte_range_end, flip_in_signed_stream, signature_cli, vault_ca_pem
+
+    print("Màn F4.5 · Ký số văn bản đi — CHỈ MINH HỌA: CA nội bộ trong két OpenBao, không có giá trị pháp lý như chữ ký"
+          " số công cộng. Bản phát hành ký PAdES bằng khóa của đơn vị nằm trong két; ai cũng kiểm được người ký và biết"
+          " tệp có bị sửa sau khi ký không")
+    tag = uuid.uuid4().hex[:6].upper()
+    staff, manager, director, clerk = (Session(u) for u in ("chuyenviendt", "totruongdt", "truongkhoa", "vanthu"))
+
+    say(1, "CA nội bộ trong két OpenBao — chứng thư mẫu, không thuộc danh sách tin cậy công cộng nào")
+    pem = vault_ca_pem()
+    if pem is None:
+        raise DemoFailed("két chưa có CA nội bộ (pki/ca/pem): két khởi tạo trước F4.5 nên ký số tự tắt, mọi thứ khác"
+                         " vẫn chạy như cũ — xem README mục Két bí mật")
+    info = compose("exec", "-T", "svc-files", "python", "-c", CA_INFO, stdin=pem.encode()).decode().strip()
+    cn, org, expires, size = info.splitlines()
+    bits, self_signed = size.split()
+    if "MẪU" not in cn or "chỉ minh họa" not in cn or self_signed != "True":
+        raise DemoFailed(f"CA của két không phải CA gốc mẫu, chỉ minh họa: {cn} / {org}")
+    ok(f"CN \"{cn}\" · O \"{org}\" · CA gốc tự ký, RSA {bits} bit, hạn tới {expires}")
+    ok(f"vân tay SHA-256 {pem_fingerprint(pem)}")
+    ok("đọc pki/ca/pem không cần token: chỉ là chứng thư công khai; khóa riêng của CA sinh ngay trong két (internal)")
+
+    say(2, "Chuyên viên soạn công văn → tổ trưởng duyệt → lãnh đạo khoa ký duyệt → văn thư phát hành (công khai)")
+    tenant = staff.gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+    first = psql(f"select count(*) from core.file_signatures where tenant_id = '{tenant}'") == "0"
+    doc_id, took = issue_outgoing(staff, manager, director, clerk, {
+        "type_code": "CV", "recipients": ["Phòng Đào tạo"],
+        "summary": f"Về việc báo cáo kết quả tự đánh giá chương trình đào tạo ngành Kỹ thuật phần mềm (demo {tag})",
+        "body": "Khoa Công nghệ thông tin báo cáo kết quả tự đánh giá chương trình đào tạo ngành Kỹ thuật phần mềm.\n"
+                "Đề nghị Phòng Đào tạo tổng hợp, báo cáo Ban Giám hiệu.",
+    }, public=True)
+    doc = clerk.gql(SIGNED_DOC, {"id": doc_id})["office_documents_by_pk"]
+    if doc["status"] != "issued" or not doc["files"]:
+        raise DemoFailed(f"công văn chưa phát hành: {doc}")
+    ok(f"{doc['symbol']} phát hành trong {took:.1f} giây: cấp số → dựng PDF → ký bằng khóa của đơn vị trong két → tự"
+       " kiểm chữ ký → băm SHA-256 → ClamAV → lưu")
+    if first:
+        ok("lần ký đầu của đơn vị: két sinh khóa RSA-3072 trong Transit, CA nội bộ cấp chứng thư cho khóa đó — các lần"
+           " sau dùng lại")
+
+    say(3, "Bản phát hành mang chữ ký PAdES; cổng xác thực (không đăng nhập) cho biết ai ký, CA nào cấp")
+    _, _, pdf = request("GET", f"{PUBLIC_URL}/api/files/{doc['files'][0]['file_id']}", headers=clerk.auth)
+    sha = hashlib.sha256(pdf).hexdigest()
+    if hexed(doc["content_sha256"]) != sha:
+        raise DemoFailed(f"băm tệp tải về {sha} khác content_sha256 {doc['content_sha256']}")
+    if b"/ByteRange" not in pdf or b"/ETSI.CAdES.detached" not in pdf or byte_range_end(pdf) != len(pdf):
+        raise DemoFailed("bản phát hành không có chữ ký PAdES phủ toàn bộ tệp (/ByteRange, /ETSI.CAdES.detached) — xem"
+                         " nhật ký svc-files: office.document.sign_failed, office.signing.disabled")
+    ok(f"SHA-256 {sha[:16]}… = content_sha256 trong CSDL: băm, mã QR, sổ kiểm toán đều theo bản ĐÃ ký; tệp có"
+       " /ByteRange, /SubFilter /ETSI.CAdES.detached, chữ ký phủ tới byte cuối")
+    found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{doc['verify_code']}")
+    sig = (found.get("document") or {}).get("signature") or {}
+    if found.get("result") != "valid" or sig.get("level") != "PAdES-B-B" or sig.get("illustrative") is not True:
+        raise DemoFailed(f"cổng xác thực chưa trả khối chữ ký: {found}")
+    ok(f"/api/verify/{doc['verify_code']} → signature: chuẩn {sig['level']} · ký bởi \"{sig['signer']}\" · CA"
+       f" \"{sig['ca']}\"")
+    ok(f"số sê-ri chứng thư {sig['serial']} · ký lúc {local_time(sig['signed_at'])} (giờ tự ghi trong chữ ký, không có"
+       " dấu thời gian tin cậy) · illustrative: true")
+    row = psql(SIGNATURE_ROW.format(doc=doc_id)).split("|")
+    if len(row) != 4 or row[0] != f"moc-ky-so-{tenant}" or row[2] != sig["serial"]:
+        raise DemoFailed(f"core.file_signatures không khớp cổng xác thực: {row}")
+    ok(f"psql core.file_signatures: khóa Transit {row[0]} phiên bản {row[1]}, chứng thư hạn tới {row[3]} — CSDL chỉ giữ"
+       " vân tay chứng thư, chứng thư nằm trong PDF")
+
+    say(4, "Kiểm bằng pyHanko trong svc-files (python -m svc_files.signing verify) — chỉ tin CA của két")
+    code, lines = signature_cli(pdf)
+    cli_lines(lines)
+    if code != 0 or not lines or not lines[0].startswith("Chữ ký hợp lệ"):
+        raise DemoFailed(f"CLI không xác nhận chữ ký của bản phát hành (thoát {code})")
+    ok("thoát 0: băm phần đã ký khớp, chữ ký RSA đúng, chuỗi chứng thư về CA nội bộ, chữ ký chứng nhận không cho sửa")
+
+    say(5, "Sửa sau khi ký: thêm một chú thích vào bản phát hành, ghi nối sau phần đã ký như trình đọc PDF lưu ghi chú")
+    edited = compose("exec", "-T", "svc-files", "python", "-c", INCREMENTAL_EDIT, stdin=pdf)
+    end = byte_range_end(edited)
+    if not edited.startswith(pdf) or end != len(pdf):
+        raise DemoFailed(f"lớp sửa không ghi nối sau bản đã ký (cuối /ByteRange {end}, bản ký {len(pdf)} byte)")
+    code, lines = signature_cli(edited)
+    if code != 1 or not lines or not lines[0].startswith("Văn bản đã bị sửa sau khi ký"):
+        cli_lines(lines)
+        raise DemoFailed(f"CLI chưa báo sửa sau khi ký (thoát {code})")
+    ok(f"CLI thoát 1: {lines[0]}")
+    whole, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(edited).hexdigest()}")
+    part, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(edited[:end]).hexdigest()}")
+    if whole.get("result") != "not_found" or part.get("result") != "valid" \
+            or (part.get("document") or {}).get("symbol") != doc["symbol"]:
+        raise DemoFailed(f"cổng xác thực: cả tệp {whole.get('result')}, phần đã ký {part.get('result')}")
+    ok(f"cổng xác thực: băm cả tệp → không khớp; băm phần đầu tệp tới cuối /ByteRange ({end} byte) → đúng"
+       f" {doc['symbol']} — phần đã ký còn nguyên, {len(edited) - end} byte thêm vào không do đơn vị ký")
+
+    say(6, "Lật một bit trong phần đã ký (dữ liệu một stream của tệp)")
+    flipped = flip_in_signed_stream(pdf)
+    code, lines = signature_cli(flipped)
+    if code != 1 or not lines or not lines[0].startswith("Chữ ký không khớp nội dung"):
+        cli_lines(lines)
+        raise DemoFailed(f"CLI chưa báo chữ ký không khớp nội dung (thoát {code})")
+    found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(flipped).hexdigest()}")
+    if found.get("result") != "not_found":
+        raise DemoFailed(f"tệp đã lật một bit vẫn khớp ở cổng xác thực: {found}")
+    ok(f"CLI thoát 1: {lines[0]} — cổng xác thực: không khớp")
+
+    say(7, "Văn bản hạn chế không được ký")
+    secret_id, _ = issue_outgoing(staff, manager, director, clerk, {
+        "type_code": "CV", "recipients": ["Phòng Tổ chức cán bộ"], "restricted": True,
+        "summary": f"Về việc danh sách đề nghị nâng lương trước hạn năm 2026 (demo {tag})",
+        "body": "Khoa Công nghệ thông tin gửi danh sách đề nghị nâng lương trước hạn năm 2026 (kèm theo).",
+    }, public=False)
+    secret = clerk.gql(SIGNED_DOC, {"id": secret_id})["office_documents_by_pk"]
+    if secret["status"] != "issued" or not secret["files"]:
+        raise DemoFailed(f"văn bản hạn chế chưa phát hành: {secret}")
+    file_id = secret["files"][0]["file_id"]
+    state = (psql(f"select wrapped_dek is not null from core.files where id = '{file_id}'"),
+             psql(f"select count(*) from core.file_signatures where file_id = '{file_id}'"), psql(RESTRICTED_SIGNED))
+    if state != ("t", "0", "0"):
+        raise DemoFailed(f"văn bản hạn chế: mã hóa {state[0]}, chữ ký của nó {state[1]}, chữ ký gắn văn bản hạn chế"
+                         f" {state[2]}")
+    check, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{secret['verify_code']}")
+    if check.get("result") != "valid" or (check.get("document") or {}).get("signature") is not None:
+        raise DemoFailed(f"cổng xác thực trả về văn bản hạn chế chưa đúng: {check}")
+    ok(f"{secret['symbol']} (hạn chế) phát hành: tệp mã hóa trong kho, không có chữ ký — mỗi lần mở là một bản viết lại"
+       " có dấu tên người xem nên chữ ký sẽ hỏng ngay; tra mã ở cổng xác thực → khớp, signature: null")
+    ok("psql: 0 chữ ký gắn với văn bản hạn chế trên cả hệ thống")
+
+    say(8, "Văn bản phát hành không có chữ ký số (trước khi bật ký số) vẫn xác thực như cũ")
+    old = psql(UNSIGNED_ISSUED)
+    if not old:
+        print("   – bỏ qua: chưa có văn bản phát hành nào không có chữ ký (két có PKI nội bộ ngay từ khi cài)")
+    else:
+        code_old, symbol_old = old.split("|")
+        found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{code_old}")
+        if found.get("result") != "valid" or (found.get("document") or {}).get("signature") is not None:
+            raise DemoFailed(f"văn bản cũ {symbol_old} không còn xác thực như cũ: {found}")
+        ok(f"{symbol_old}: tra mã → khớp, signature: null — không ký lại văn bản cũ (băm, mã QR, sổ kiểm toán đã cố"
+           " định); trang xác thực ghi không có chữ ký số")
+
+    print(f"\nXem trên giao diện (người ngoài, không đăng nhập): {PUBLIC_URL}/xac-thuc/{doc['verify_code']} — khối \"Chữ"
+          f" ký số (minh họa)\"; bản PDF (văn thư): {PUBLIC_URL}/van-ban/{doc_id} — trình đọc PDF báo chữ ký chưa tin"
+          " cậy cho tới khi nhập CA nội bộ (docs/demo-script.md)")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
-         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec}
+         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -49,6 +49,9 @@ from svc_files.storage import ObjectMissing, StorageError
 ISSUER = "https://moc.example/realms/moc"
 TENANT_A = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000a")
 
+# cột chữ ký số của office.issued_documents (F4.5)
+SIGNATURE_COLUMNS = ("signature_level", "signed_at", "signer_name", "signer_ca", "certificate_serial")
+
 # Chuỗi kiểm thử EICAR, tách hai nửa để chính tệp mã nguồn này không bị phần mềm diệt virus chặn.
 EICAR = ("X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").encode()
 
@@ -172,12 +175,13 @@ class FakeHasura:
     async def aclose(self) -> None:
         pass
 
-    async def insert_file(self, *, tenant_id, actor_id, request_id, file_id, object_key, **row) -> None:
+    async def insert_file(self, *, tenant_id, actor_id, request_id, file_id, object_key, signature=None, **row) -> None:
         self._check()
         if self.fail_code:
             raise HasuraError("bị từ chối", self.fail_code)
+        # signature: dòng core.file_signatures ghi cùng mutation (F4.5), None khi phát hành không ký
         self.files[file_id] = {"tenant_id": tenant_id, "created_by": actor_id, "request_id": request_id,
-                               "object_key": object_key, **row}
+                               "object_key": object_key, "signature": signature, **row}
 
     fail_events: bool = False         # ghi sổ kiểm toán lỗi (Hasura vẫn đọc được)
 
@@ -281,7 +285,9 @@ class FakeHasura:
                 return {"verify_code": row["verify_code"], "content_sha256": row["content_sha256"],
                         "symbol": row["symbol"], "issued_on": row["issued_on"], "type_name": row["document_type"]["name"],
                         "issuer_name": row["tenant"]["name"], "parent_name": row["tenant"]["parent_name"],
-                        "summary": row["summary"] if row.get("is_public") else None, "status": row["status"]}
+                        "summary": row["summary"] if row.get("is_public") else None, "status": row["status"],
+                        # chữ ký số (F4.5): null với văn bản cũ, văn bản hạn chế
+                        **{col: row.get(col) for col in SIGNATURE_COLUMNS}}
         return None
 
     # --- lớp chữ của PDF (F2.7) ---------------------------------------------------------------------------

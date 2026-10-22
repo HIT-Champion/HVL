@@ -20,7 +20,10 @@ văn thư tải công văn lên (qua ClamAV) → nhập văn bản (Action recei
 và ở CSDL, theo cùng schemas/van-ban-den.json với form) → vào sổ, có số đến → lãnh đạo khoa chỉ đạo, giao
 Tổ Đào tạo chủ trì → tổ trưởng phân công chuyên viên → chuyên viên báo xong. Rồi luồng văn bản đi: chuyên
 viên soạn công văn trả lời, xem trước → trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư phát hành PDF có
-mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Liên thông: công văn gửi Khoa Kinh tế trong hệ
+mã QR; người ngoài tra mã và băm ở cổng xác thực không cần đăng nhập. Ký số (F4.5, chỉ minh họa): bản phát hành ký
+PAdES bằng khóa của đơn vị trong két OpenBao, cổng xác thực cho biết ai ký; pyHanko trong svc-files báo hợp lệ, phát
+hiện lớp sửa thêm sau khi ký và một bit bị lật (két khởi tạo trước F4.5 chưa có PKI nội bộ thì bỏ qua).
+Liên thông: công văn gửi Khoa Kinh tế trong hệ
 thống thành văn bản đến của bên nhận, cùng bản phát hành. Đọc văn bản đến (F4.1): tác tử moc-doc-reader đọc lớp chữ
 PDF văn thư vừa tải lên, gợi ý số ký hiệu, ngày ban hành, loại; tệp hạn chế không bị đọc, đơn vị khác không gọi được,
 mỗi lần đọc một dòng sổ kiểm toán (không OCR ở đây — make demo-doc-van-ban thử cả ảnh). Hỏi đáp (F4.2): trợ lý
@@ -58,8 +61,9 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import (EICAR, ENV, PUBLIC_URL, REALM, HTTPError, Session, call_json, compose, request, text_pages,
-                     text_pdf, user_login)
+from moc_env import (EICAR, ENV, INCREMENTAL_EDIT, PUBLIC_URL, REALM, HTTPError, Session, byte_range_end, call_json,
+                     compose, flip_in_signed_stream, request, signature_cli, text_pages, text_pdf, user_login,
+                     vault_ca_pem)
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -499,6 +503,58 @@ def main() -> None:
     changed = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(tampered).hexdigest()}")[0]["result"]
     (same, changed) == ("valid", "not_found") or fail(f"tra theo băm sai: nguyên vẹn {same}, đã sửa {changed}")
     ok("tệp nguyên vẹn → khớp; sửa một byte → không khớp")
+
+    # F4.5: bản phát hành ký PAdES bằng khóa của đơn vị trong Transit, chứng thư do CA nội bộ trong két cấp — chỉ minh
+    # họa. Két khởi tạo trước F4.5 (chưa có PKI nội bộ) hay MOC_SIGN_ENABLED=false thì phát hành không ký: bỏ qua
+    print("Ký số văn bản đi (F4.5, chỉ minh họa)")
+    signature = found["document"].get("signature")
+    # cùng bộ giá trị tắt với config.py của svc-files (_flag)
+    if signature is None and ENV.get("MOC_SIGN_ENABLED", "true").strip().lower() in ("0", "false", "no", "off"):
+        print(f"  – bỏ qua: MOC_SIGN_ENABLED={ENV['MOC_SIGN_ENABLED']}, phát hành không ký")
+    elif signature is None and vault_ca_pem() is None:
+        print("  – bỏ qua: két khởi tạo trước F4.5 chưa có CA nội bộ, ký số tự tắt (README mục Két bí mật)")
+    else:
+        signature or fail("két có CA nội bộ mà bản phát hành không có chữ ký số — xem nhật ký svc-files"
+                          " (office.document.sign_failed, office.signing.disabled)")
+        (signature.get("level"), signature.get("illustrative")) == ("PAdES-B-B", True) and signature.get("signed_at") \
+            and (signature.get("signer") or "").startswith("Khoa Công nghệ thông tin") \
+            and "chỉ minh họa" in (signature.get("ca") or "") \
+            and b"/ETSI.CAdES.detached" in released and byte_range_end(released) == len(released) \
+            or fail(f"bản phát hành chưa có chữ ký PAdES phủ cả tệp, hoặc khối chữ ký ở cổng xác thực sai: {signature}")
+        ok(f"cổng xác thực: chữ ký {signature['level']} của {signature['signer']}, CA \"{signature['ca']}\""
+           " (illustrative); chữ ký phủ tới byte cuối bản phát hành")
+        code, lines = signature_cli(released)
+        code == 0 and lines and lines[0].startswith("Chữ ký hợp lệ") \
+            or fail(f"pyHanko trong svc-files không xác nhận chữ ký bản phát hành (thoát {code}): {lines[:3]}")
+        ok("python -m svc_files.signing verify (pyHanko, chỉ tin CA của két): hợp lệ, thoát 0")
+        edited = compose("exec", "-T", "svc-files", "python", "-c", INCREMENTAL_EDIT, stdin=released)
+        code, lines = signature_cli(edited)
+        signed = edited[:byte_range_end(edited) or 0]
+        whole = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(edited).hexdigest()}")[0]["result"]
+        part = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(signed).hexdigest()}")[0]["result"]
+        code == 1 and lines and lines[0].startswith("Văn bản đã bị sửa sau khi ký") \
+            and (whole, part) == ("not_found", "valid") \
+            or fail(f"thêm lớp sửa sau khi ký: CLI thoát {code} {lines[:1]}, tra cả tệp {whole}, phần đã ký {part}")
+        ok("thêm một chú thích ghi nối sau chữ ký: CLI báo đã bị sửa sau khi ký (thoát 1); tra băm cả tệp → không khớp,"
+           " băm phần đã ký → đúng bản phát hành")
+        code, lines = signature_cli(flip_in_signed_stream(released))
+        code == 1 and lines and lines[0].startswith("Chữ ký không khớp nội dung") \
+            or fail(f"lật một bit trong phần đã ký: CLI thoát {code} {lines[:1]}")
+        ok("lật một bit trong phần đã ký: CLI báo chữ ký không khớp nội dung (thoát 1)")
+        tenant = clerk.gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+        stored = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U",
+                         ENV.get("POSTGRES_USER", "moc"), "-d", ENV.get("POSTGRES_DB", "moc"), "-c",
+                         f"select key_name, serial, (select count(*) from core.file_signatures x join"
+                         f" office.document_files df on df.file_id = x.file_id join office.documents d on d.id ="
+                         f" df.document_id where d.restricted) from core.file_signatures"
+                         f" where file_id = '{issued['files'][0]['file_id']}'").decode().strip()
+        stored == f"moc-ky-so-{tenant}|{signature['serial']}|0" \
+            or fail(f"CSDL: dòng core.file_signatures của bản phát hành chưa đúng (khóa|sê-ri|chữ ký văn bản hạn chế):"
+                    f" {stored}")
+        # văn bản hạn chế: lượt smoke đầu chưa phát hành văn bản đi hạn chế nào (màn demo-ky-so bước 7 kiểm thật); các
+        # lượt sau trên cùng kho (sau khôi phục, từ bản cài) thì có, nên phép đếm toàn kho mới có nghĩa
+        ok("CSDL: chữ ký của bản phát hành ghi khóa moc-ky-so-<đơn vị> (Transit), cùng số sê-ri với cổng xác thực;"
+           " trong kho không chữ ký nào gắn với văn bản hạn chế")
 
     # F3.12: công văn gửi Khoa Kinh tế trong hệ thống — phát hành xong thì văn thư bên nhận tự có văn bản đến kèm đúng
     # bản phát hành. svc-workflow chép ngay sau lần phát hành; trượt thì vòng đối soát nền làm lại

@@ -105,6 +105,10 @@ test('luồng văn bản đi và cổng xác thực trên giao diện', async ({
   await expect(outsider.getByTestId('verify-valid')).toContainText(/\d{2,}\/CNTT-ĐT/)
   await outsider.locator('#verify-file').setInputFiles({ name: 'cong-van-nhan-duoc.pdf', mimeType: 'application/pdf', buffer: pdf })
   await expect(outsider.getByTestId('verify-match')).toContainText('khớp từng byte')
+  // bản phát hành có chữ ký số PAdES bằng PKI nội bộ trong két (F4.5), cổng nói rõ chỉ minh họa
+  const signature = outsider.getByTestId('verify-signature')
+  await expect(signature).toContainText('PAdES')
+  await expect(signature).toContainText('minh họa')
   await shot(outsider, '10-xac-thuc-khop')
   const tampered = Buffer.from(pdf)
   tampered[Math.floor(tampered.length / 2)] ^= 1

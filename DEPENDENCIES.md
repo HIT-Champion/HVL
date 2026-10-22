@@ -118,6 +118,35 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
 | DuckDB | 1.5.6 | MIT | Nộp lưu hồ sơ (F3.8, `svc-files`): ghi bảng văn bản, giao việc, dòng thời gian thành Parquet (nén zstd) và đọc lại cho phòng đọc. Một wheel nhúng, không kéo thêm gói Python, không chạy máy chủ riêng | pip | 3 |
 | openlineage-python | 1.53 | Apache-2.0 | Dự kiến phát sự kiện truy vết dữ liệu. **Chưa đưa vào**: svc-files dựng sự kiện OpenLineage 2-0-2 bằng thư viện chuẩn (F3.9, `svc_files.lineage`) | pip | 3 |
+| pyHanko (+ pyhanko-certvalidator, asn1crypto, tzlocal, lxml, aiohttp và 7 gói con, oscrypto, uritools, certifi; tzdata chỉ trên Windows) | 0.37.0 · 0.32.1 | MIT (lxml BSD-3, aiohttp Apache-2.0/MIT, certifi MPL-2.0, aiohappyeyeballs PSF-2.0) | Ký số PAdES bản phát hành bằng khóa trong Transit, kiểm chữ ký (svc-files, F4.5, chỉ minh họa) | pip | 4 |
+
+**Ký số văn bản đi (F4.5, chỉ minh họa)** thêm một gói khai trực tiếp, pyHanko, cùng các gói nó kéo theo. Ghim bản mới
+nhất phát hành trước 06/10/2026 (quy tắc hai tuần); ngày lấy từ PyPI (lần tải lên đầu tiên của bản đó), giấy phép từ
+METADATA của gói. Không thêm image, gói npm hay route gateway.
+
+| Gói | Bản | Phát hành | Giấy phép | Vì sao có |
+|---|---|---|---|---|
+| pyHanko | 0.37.0 | 31/08/2026 | MIT (kèm `pdf_utils/LICENSE.PyPDF2`, BSD-3) | Khai trực tiếp: dựng chữ ký CMS/PAdES, ghi PDF, kiểm chữ ký; 0.38.0 (17/10) quá mới |
+| pyhanko-certvalidator | 0.32.1 | 10/09/2026 | MIT | pyHanko đòi `>=0.32.0,<0.33` — kiểm chuỗi chứng thư |
+| asn1crypto | 1.5.1 | 15/03/2022 | MIT | pyHanko, certvalidator — cấu trúc ASN.1 |
+| tzlocal | 5.4.4 | 29/06/2026 | MIT | pyHanko |
+| lxml | 6.1.3 | 02/09/2026 | BSD-3-Clause | pyHanko (bắt buộc; Mộc không dùng phần XMP) |
+| aiohttp | 3.14.4 | 05/10/2026 | Apache-2.0 AND MIT | pyHanko, certvalidator đều bắt buộc; **không dùng tới**: không tải chứng thư, CRL, OCSP qua mạng, không TSA. 3.14.5 (11/10) quá mới |
+| aiohappyeyeballs | 2.7.1 | 01/07/2026 | PSF-2.0 | aiohttp |
+| aiosignal | 1.4.0 | 03/07/2025 | Apache-2.0 | aiohttp |
+| attrs | 26.1.0 | 19/03/2026 | MIT | aiohttp |
+| frozenlist | 1.8.0 | 06/10/2025 | Apache-2.0 | aiohttp |
+| multidict | 6.9.1 | 21/09/2026 | Apache-2.0 | aiohttp, yarl. aiohttp 3.14.4 đòi `multidict<7.0`, nên không dùng 7.0.0 (26/09) |
+| propcache | 0.5.4 | 16/09/2026 | Apache-2.0 | aiohttp, yarl |
+| yarl | 1.25.1 | 15/09/2026 | Apache-2.0 | aiohttp |
+| oscrypto | 1.3.0 | 18/03/2022 | MIT | certvalidator; **không nạp** lúc chạy (kiểm chữ ký dùng `cryptography`) |
+| uritools | 6.1.3 | 23/07/2026 | MIT | certvalidator |
+| certifi | 2026.7.22 | 22/07/2026 | MPL-2.0 | certvalidator (gói CA công cộng, Mộc không dùng: chỉ tin CA nội bộ của két); bản 10/2026 quá mới |
+| tzdata | 2026.5 | 03/10/2026 | Apache-2.0 | tzlocal, chỉ trên Windows (`sys_platform == 'win32'`): có trong tệp khóa, không cài vào image |
+
+Gói đã có trong khóa, giữ nguyên bản: `cryptography` 50.0.2 (pyHanko đòi ≥ 48), `idna` 3.20, `typing-extensions`
+4.16.0. Image `svc-files` nặng thêm khoảng 15 MB (lxml, aiohttp; có wheel manylinux cho CPython 3.13). Khóa ký và CA
+không phải gói: chúng nằm trong két OpenBao sẵn có (mount `transit`, `pki`).
 
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
@@ -129,7 +158,7 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa. Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
+| OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa; PKI nội bộ (CA minh họa) và khóa ký transit của từng đơn vị cho văn bản đi (F4.5). Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
 | Kestra | v2.0.5 | Apache-2.0 | Dự kiến chạy job ngầm. **Chưa đưa vào**: nộp lưu nóng → lạnh (F3.8) chạy thành vòng nền trong `svc-files` — một job mỗi giờ không đáng thêm một máy chủ Java ~1 GB RAM | `kestra/kestra:v2.0.5` | 3 |
 | Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage). **Chưa đưa vào compose**: sự kiện lưu trong `core.lineage_events` (F3.9); đặt `MOC_OPENLINEAGE_URL` thì svc-files gửi sang Marquez | `marquezproject/marquez:0.51.1` | 3 |
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (F3.10, profile `iot`): bản sao số, lịch sử đo, subscription báo `svc-workflow` khi vượt ngưỡng. Bản java mặc định (không Kafka), không mở cổng ra ngoài | `scorpiobroker/all-in-one-runner:java-6.0.2` (image 03/07/2026) | 3 |
@@ -158,7 +187,6 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 | Tesseract OCR (+ dữ liệu `vie`) | 5.5.0 (gói Debian trixie `tesseract-ocr` 5.5.0-1+b1, `tesseract-ocr-vie` 1:4.1.0-2) | Apache-2.0 | Nhận dạng chữ trên công văn scan, ảnh chụp khi tiếp nhận (F4.1, `svc-files`). Dữ liệu `vie` là bản tessdata_fast 4.1.0 (mô hình LSTM nhanh). Phiên bản gói lấy từ kho Debian theo image gốc — kiểm lại bằng `dpkg-query -W 'tesseract-ocr*'` trong image `svc-files` sau khi dựng | Gói hệ thống (apt) | 4 |
 | Presidio | 2.2 | MIT | Che thông tin cá nhân *(Could)* | pip | 4 |
 | Gotenberg | 8.37.0 | MIT | Sinh PDF *(Could)* | `gotenberg/gotenberg:8.37.0` | 4 |
-| pyHanko | 0.37 | MIT | Ký số PDF *(Could)* | pip | 4 |
 
 **Ghi chú:** trọng số mô hình có giấy phép riêng, tách khỏi giấy phép của Ollama. Trước khi dùng phải
 đọc giấy phép trên model card **của đúng kích cỡ đã chọn**. Không dùng Llama hoặc Gemma vì giấy phép
@@ -198,12 +226,16 @@ thư viện chuẩn Python (`statistics.median_low`). Không mô hình nào ch�
 | bge-m3 (MIT, 01/2024) | Phương án thay, không phải bị loại: `bge-m3:567m` F16 khoảng 1,2 GB (gấp đôi RAM), điểm truy xuất đa ngữ MMTEB thấp hơn (54,60 so với 64,64). Dùng được bằng `MOC_AI_EMBED_MODEL=bge-m3`, cùng 1024 chiều, không cần tiền tố câu hỏi | Qwen3-Embedding-0.6B (F4.2) |
 | scikit-learn (BSD-3-Clause) | Thêm gói (kéo numpy, SciPy) vào `svc-workflow` cho một bộ phân loại học từ vài chục văn bản đã giao; phải huấn luyện lại mỗi khi thêm đơn vị hay có văn bản mới, và khó chỉ ra vì sao chọn đơn vị đó | Bỏ phiếu theo các văn bản tương tự đã giao (kNN có trọng số trên phần truy xuất của F4.2), căn cứ hiện kèm gợi ý (F4.3) |
 | Mô hình sinh (Qwen3) chọn đơn vị chủ trì | 15–45 giây CPU mỗi văn bản; CI không có mô hình; không giải thích được vì sao chọn đơn vị đó, lại có thể bịa đơn vị không có lãnh đạo phòng | Bỏ phiếu như trên — không cần mô hình, tốt dần khi có thêm văn bản đã giao (F4.3) |
+| Cấp khóa ký bằng `pki/issue` của OpenBao | Két sinh khóa rồi trả cả khóa riêng: khóa nằm trong RAM và đĩa của `svc-files`, dịch vụ phải tự giữ kín | Khóa ký trong Transit, không rời két; chứng thư qua `pki/sign` cho CSR do Transit ký (F4.5) |
+| Dịch vụ dấu thời gian TSA (PAdES B-T) | Cần một dịch vụ TSA ngoài; demo phải chạy không có mạng ngoài | PAdES B-B, giờ ký tự khai, CLI và cổng xác thực ghi rõ (F4.5) |
+| Trình kiểm PAdES bằng JavaScript ở cổng xác thực | Thêm một thư viện lớn vào trang công khai, trong khi trình duyệt chỉ cần băm tệp | Trình duyệt băm như F2.13; kiểm mật mã đầy đủ bằng pyHanko trong `svc-files` (`python -m svc_files.signing verify`) (F4.5) |
 
 ## Kiểm tra tương thích giấy phép
 
 Giấy phép được chấp nhận trong Mộc (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
 
-- ✅ Apache-2.0, MIT, BSD-2/3-Clause, PostgreSQL License, ISC, MPL-2.0
+- ✅ Apache-2.0, MIT, BSD-2/3-Clause, PostgreSQL License, ISC, MPL-2.0, PSF-2.0 (giấy phép dễ dãi được OSI phê
+  duyệt, của chính Python và image `python`; F4.5: aiohappyeyeballs)
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
   trong ba giấy phép), Pango (nạp động), phông Liberation.
 - ⚠️ GPL-2.0/3.0, AGPL-3.0 — chấp nhận được khi chạy như **dịch vụ độc lập** giao tiếp qua mạng,

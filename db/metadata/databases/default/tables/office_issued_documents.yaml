@@ -17,6 +17,8 @@
 # Cổng xác thực (F2.13): thông tin công khai của văn bản đã phát hành (khung nhìn, migration 1792281600500).
 # Chỉ vai trò verifier đọc được: svc-files dùng khóa quản trị + X-Hasura-Role: verifier và luôn tra đúng một
 # văn bản theo mã tra cứu hoặc băm — không vai trò người dùng nào thấy bảng này, nên không liệt kê được.
+# F4.5 (migration 1792281602200): thêm chuẩn chữ ký, giờ ký, người ký, CA, số sê-ri của chữ ký số PAdES (chỉ minh họa);
+# null khi bản phát hành không ký.
 table:
   name: issued_documents
   schema: office
@@ -24,6 +26,6 @@ select_permissions:
   - role: verifier
     permission:
       columns: [verify_code, content_sha256, symbol, issued_on, type_code, type_name, issuer_name, parent_name,
-                summary, status]
+                summary, status, signature_level, signed_at, signer_name, signer_ca, certificate_serial]
       filter: {}
       limit: 1

@@ -256,8 +256,9 @@ services:
       - meili_data:/meili_data
 
   # F3.2 — két bí mật (openbao/start.sh): svc-files, svc-workflow lấy bí mật qua AppRole lúc khởi động thay vì nhận
-  # qua biến môi trường; khóa transit moc-files cho F3.7. Static seal: khởi động lại là tự mở khóa. Không mở cổng ra
-  # ngoài. Chạy bằng root chỉ để ghi tệp đăng nhập cho từng dịch vụ; máy chủ chạy bằng người dùng openbao.
+  # qua biến môi trường; khóa transit moc-files cho F3.7; F4.5 — PKI nội bộ (CA moc-root, chỉ minh họa) cấp chứng thư
+  # cho khóa ký transit moc-ky-so-<đơn vị>. Static seal: khởi động lại là tự mở khóa. Không mở cổng ra ngoài. Chạy
+  # bằng root chỉ để ghi tệp đăng nhập cho từng dịch vụ; máy chủ chạy bằng người dùng openbao.
   openbao:
     <<: *common
     image: openbao/openbao:2.7.1
@@ -331,6 +332,10 @@ services:
       MOC_ASK_MODEL: ${MOC_ASK_MODEL:-}
       MOC_ASK_DEADLINE_S: ${MOC_ASK_DEADLINE_S:-50}
       MOC_ASK_MODEL_TIMEOUT_S: ${MOC_ASK_MODEL_TIMEOUT_S:-40}
+      # F4.5 — ký số PAdES bản phát hành văn bản đi bằng khóa Transit của đơn vị, chứng thư do CA nội bộ trong két
+      # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
+      # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (README mục Két bí mật)
+      MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế

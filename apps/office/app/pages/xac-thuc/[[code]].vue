@@ -22,8 +22,20 @@ import { useI18n } from 'vue-i18n'
 // Cổng xác thực văn bản (F2.13), công khai. Tra bằng mã in cạnh mã QR (quét QR là mở thẳng trang này), hoặc
 // thả tệp PDF: trình duyệt tự tính SHA-256 (Web Crypto) và chỉ gửi mã băm đi tra — tệp không rời khỏi máy.
 // Có mã rồi thì thả tệp để so: khớp từng byte với bản đã phát hành mới báo "khớp".
+// Bản phát hành từ F4.5 có chữ ký số PAdES bằng PKI nội bộ trong két (chỉ minh họa, không có giá trị pháp lý): trang
+// hiện chuẩn, người ký, CA, số sê-ri, giờ ký tự khai — lấy từ CSDL, svc-files đã tự kiểm chữ ký lúc ký; kiểm đầy đủ
+// phần mật mã thì dùng pyHanko trong svc-files. Văn bản cũ hoặc hạn chế không có chữ ký số (signature: null).
 
 definePageMeta({ layout: 'public' })
+
+interface VerifiedSignature {
+  level: string
+  signer: string
+  ca: string
+  serial: string
+  signed_at: string
+  illustrative: boolean
+}
 
 interface Verified {
   symbol: string
@@ -35,6 +47,7 @@ interface Verified {
   sha256: string
   verify_code: string
   status: string
+  signature: VerifiedSignature | null
 }
 
 const { t } = useI18n()
@@ -161,6 +174,22 @@ onMounted(() => { if (code.value) lookup(code.value) })
         <div><dt class="text-stone-500">{{ t('verify.code') }}</dt><dd class="font-mono font-semibold tracking-wider">{{ readableCode }}</dd></div>
         <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('verify.sha256') }}</dt><dd class="font-mono text-xs break-all text-stone-700">{{ found.sha256 }}</dd></div>
       </dl>
+      <!-- chữ ký số PAdES (F4.5, chỉ minh họa): luôn kèm câu nói rõ không có giá trị pháp lý -->
+      <div v-if="found.signature" class="mx-5 mb-5 rounded-md border border-stone-200 p-4" data-testid="verify-signature">
+        <h2 class="flex items-center gap-2 text-sm font-semibold text-stone-900">
+          <svg class="h-4 w-4 shrink-0 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 7.125L16.862 4.487" /></svg>
+          {{ t('verify.signature.title') }}
+        </h2>
+        <dl class="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+          <div><dt class="text-stone-500">{{ t('verify.signature.level') }}</dt><dd class="font-medium">{{ found.signature.level }}</dd></div>
+          <div><dt class="text-stone-500">{{ t('verify.signature.signedAt') }}</dt><dd class="font-medium">{{ fmtDateTime(found.signature.signed_at) }}</dd></div>
+          <div><dt class="text-stone-500">{{ t('verify.signature.signer') }}</dt><dd class="font-medium">{{ found.signature.signer }}</dd></div>
+          <div><dt class="text-stone-500">{{ t('verify.signature.ca') }}</dt><dd class="font-medium">{{ found.signature.ca }}</dd></div>
+          <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('verify.signature.serial') }}</dt><dd class="font-mono text-xs break-all text-stone-700">{{ found.signature.serial }}</dd></div>
+        </dl>
+        <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">{{ t('verify.signature.illustrative') }}</p>
+      </div>
+      <p v-else class="mx-5 mb-5 text-xs text-stone-500" data-testid="verify-unsigned">{{ t('verify.signature.none') }}</p>
       <div v-if="match !== null" class="mx-5 mb-5 rounded-md px-4 py-3 text-sm font-medium" data-testid="verify-match"
            :class="match ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'">
         {{ match ? t('verify.match') : t('verify.mismatch') }}<span v-if="fileName" class="block text-xs font-normal opacity-90">{{ fileName }}</span>

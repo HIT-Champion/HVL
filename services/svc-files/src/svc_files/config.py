@@ -78,6 +78,9 @@ class Settings:
     vault_role_id_file: str = "/run/openbao/role_id"
     vault_secret_id_file: str = "/run/openbao/secret_id"
     transit_key: str = "moc-files"
+    # F4.5 — ký số PAdES bản phát hành bằng khóa transit của đơn vị, chứng thư từ CA nội bộ trong két (chỉ minh họa);
+    # chỉ có tác dụng khi có két. false: phát hành không ký, không gọi transit hay PKI
+    sign_enabled: bool = True
     # F4.1 — tác tử đọc văn bản đến (docread/): lớp chữ của PDF hoặc OCR (Tesseract), quy tắc, mô hình tùy chọn
     read_enabled: bool = True
     read_max_bytes: int = 25 * 1024 * 1024
@@ -166,6 +169,7 @@ class Settings:
                 vault_role_id_file=env.get("MOC_OPENBAO_ROLE_ID_FILE", "/run/openbao/role_id"),
                 vault_secret_id_file=env.get("MOC_OPENBAO_SECRET_ID_FILE", "/run/openbao/secret_id"),
                 transit_key=env.get("MOC_FILES_TRANSIT_KEY", "moc-files"),
+                sign_enabled=_flag("MOC_SIGN_ENABLED", env.get("MOC_SIGN_ENABLED", "true")),
                 read_enabled=_flag("MOC_READ_ENABLED", env.get("MOC_READ_ENABLED", "true")),
                 read_max_bytes=int(env.get("MOC_READ_MAX_MB") or env.get("MOC_FILES_MAX_MB", "25")) * 1024 * 1024,
                 read_text_pages=int(env.get("MOC_READ_TEXT_PAGES", "3")),

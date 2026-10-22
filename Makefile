@@ -30,6 +30,7 @@ PREFIX ?= /opt/moc
 
 .PHONY: help env check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
+        demo-ky-so \
         reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
@@ -93,7 +94,7 @@ smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 
 PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble
 
-e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, thông báo, sổ kiểm toán, sổ đăng ký, kiểm dịch, văn bản hạn chế, đọc văn bản đến
+e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, ký số, thông báo, sổ kiểm toán, sổ đăng ký, kiểm dịch, văn bản hạn chế, đọc văn bản đến
 	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \
 	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e \
 	  -v "$(CURDIR)/seed/van-ban-den:/mau:ro" -e MOC_SAMPLES_DIR=/mau $(PLAYWRIGHT_IMAGE) \
@@ -155,6 +156,9 @@ demo-giao-viec: $(ENV_FILE) ## Màn gợi ý giao việc (F4.3): văn bản mớ
 
 do-giao-viec: $(ENV_FILE) ## Đo tác tử gợi ý giao việc leave-one-out trên lịch sử seed/giao-viec: top-1/2/3, độ phủ, sai số hạn, thời gian (thoát 1 khi căn cứ là văn bản hạn chế hoặc top-1 dưới ngưỡng)
 	@python3 scripts/demo.py do-giao-viec
+
+demo-ky-so: $(ENV_FILE) ## Màn ký số (F4.5, chỉ minh họa): văn bản đi ký PAdES bằng khóa của đơn vị trong két, CA nội bộ; cổng xác thực báo người ký; pyHanko phát hiện sửa sau khi ký, lật một bit; văn bản hạn chế không ký (docs/demo-script.md)
+	@python3 scripts/demo.py ky-so
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py

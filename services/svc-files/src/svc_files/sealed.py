@@ -40,10 +40,12 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import httpx2
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from httpx2 import USE_CLIENT_DEFAULT
 from pypdf import PageObject, PdfReader, PdfWriter, Transformation
 
 MAGIC = b"MOC1"
@@ -57,7 +59,11 @@ class SealError(Exception):
 
 
 class VaultError(Exception):
-    """Két chưa sẵn sàng hoặc từ chối."""
+    """Két chưa sẵn sàng hoặc từ chối. status: mã HTTP két trả; None khi không gọi hoặc không đăng nhập được két."""
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 def _aad(tenant_id: uuid.UUID, file_id: uuid.UUID) -> bytes:
@@ -81,7 +87,10 @@ def unseal(blob: bytes, key: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) ->
 
 class Vault:
     """Khóa dữ liệu từ transit của két. Đăng nhập AppRole khi cần (token 1 giờ, giữ trong bộ nhớ, dùng lại tới gần
-    hết hạn); đọc lại role_id/secret_id mỗi lần đăng nhập vì két cấp secret_id mới mỗi lần khởi động."""
+    hết hạn); đọc lại role_id/secret_id mỗi lần đăng nhập vì két cấp secret_id mới mỗi lần khởi động.
+
+    Ký số (F4.5, signing.py): khóa ký từng đơn vị trong transit (tạo, xin CSR, gắn chứng thư, ký), chứng thư từ PKI
+    nội bộ của két. Không có hàm xuất khóa: policy của svc-files cũng không cho."""
 
     def __init__(self, addr: str, *, role_id_file: str, secret_id_file: str, key: str = "moc-files",
                  timeout_s: float = 5.0, transport: httpx2.AsyncBaseTransport | None = None) -> None:
@@ -101,37 +110,46 @@ class Vault:
         except OSError as exc:
             raise VaultError(f"không đọc được thông tin đăng nhập két: {exc}") from None
         r = await self._http.post("/v1/auth/approle/login", json={"role_id": role_id, "secret_id": secret_id})
-        if r.status_code != 200:
+        if r.status_code != 200:   # không mang status: như két chưa sẵn sàng (vừa khởi động lại, secret_id mới)
             raise VaultError(f"két từ chối đăng nhập AppRole: HTTP {r.status_code}")
         auth = r.json()["auth"]
         self._token = str(auth["client_token"])
         self._until = time.monotonic() + max(30.0, float(auth.get("lease_duration") or 0) * 0.8)
         return self._token
 
-    async def _post(self, path: str, body: dict[str, object]) -> dict[str, object]:
+    async def _request(self, method: str, path: str, body: dict[str, object] | None = None, *, auth: bool = True,
+                       raw: bool = False, timeout_s: float | None = None) -> Any:
+        """Gọi két. raw: trả nguyên thân (text), không thì trường ``data`` của JSON. Thân không phải 200 thì
+        VaultError mang mã HTTP; 403 khi có token thì đăng nhập lại và thử một lần (token bị thu hồi)."""
+        timeout = USE_CLIENT_DEFAULT if timeout_s is None else timeout_s
         try:
             for attempt in (1, 2):
-                async with self._lock:
-                    token = self._token if self._token and time.monotonic() < self._until else await self._login()
-                r = await self._http.post(path, json=body, headers={"X-Vault-Token": token})
-                if r.status_code == 403 and attempt == 1:  # token bị thu hồi (két khởi động lại): đăng nhập lại
+                headers = {}
+                if auth:
+                    async with self._lock:
+                        token = self._token if self._token and time.monotonic() < self._until else await self._login()
+                    headers["X-Vault-Token"] = token
+                r = await self._http.request(method, path, json=body, headers=headers, timeout=timeout)
+                if r.status_code == 403 and auth and attempt == 1:  # token bị thu hồi (két khởi động lại): đăng nhập
                     self._token = None
                     continue
                 if r.status_code != 200:
-                    raise VaultError(f"két trả HTTP {r.status_code} ở {path}")
+                    raise VaultError(f"két trả HTTP {r.status_code} ở {path}", status=r.status_code)
+                if raw:
+                    return r.text
                 data = r.json()["data"]
                 if not isinstance(data, dict):
-                    raise VaultError(f"két trả dữ liệu lạ ở {path}")
+                    raise VaultError(f"két trả dữ liệu lạ ở {path}", status=r.status_code)
                 return data
         except httpx2.HTTPError as exc:
             raise VaultError(f"không gọi được két: {type(exc).__name__}") from None
         except (KeyError, TypeError, ValueError) as exc:  # thân trả về không phải JSON đúng dạng
-            raise VaultError(f"két trả dữ liệu lạ ở {path}: {type(exc).__name__}") from None
-        raise VaultError("két từ chối sau khi đăng nhập lại")
+            raise VaultError(f"két trả dữ liệu lạ ở {path}: {type(exc).__name__}", status=200) from None
+        raise VaultError("két từ chối sau khi đăng nhập lại", status=403)
 
     async def datakey(self) -> tuple[bytes, str]:
         """Khóa dữ liệu mới → (khóa rõ 32 byte, khóa đã bọc ``vault:v1:…``)."""
-        data = await self._post(f"/v1/transit/datakey/plaintext/{self.key}", {"bits": 256})
+        data = await self._request("POST", f"/v1/transit/datakey/plaintext/{self.key}", {"bits": 256})
         try:
             key, wrapped = base64.b64decode(str(data["plaintext"]), validate=True), str(data["ciphertext"])
         except (KeyError, ValueError) as exc:
@@ -142,11 +160,57 @@ class Vault:
 
     async def unwrap(self, wrapped: str) -> bytes:
         """Khóa đã bọc → khóa rõ; két ghi sổ mỗi lần mở."""
-        data = await self._post(f"/v1/transit/decrypt/{self.key}", {"ciphertext": wrapped})
+        data = await self._request("POST", f"/v1/transit/decrypt/{self.key}", {"ciphertext": wrapped})
         try:
             return base64.b64decode(str(data["plaintext"]), validate=True)
         except (KeyError, ValueError) as exc:
             raise VaultError(f"két trả khóa rõ lạ: {type(exc).__name__}") from None
+
+    # --- ký số (F4.5) ----------------------------------------------------------------------------------------
+
+    async def pki_ca_pem(self) -> str:
+        """Chứng thư CA nội bộ (PEM), không cần token. Chưa dựng CA: két trả 204/403/404 — VaultError mang mã đó."""
+        return str(await self._request("GET", "/v1/pki/ca/pem", auth=False, raw=True))
+
+    async def transit_key(self, name: str) -> dict[str, Any] | None:
+        """Thông tin khóa transit (``latest_version``, ``keys.<v>.{public_key, certificate_chain}``); chưa có: None."""
+        try:
+            return await self._request("GET", f"/v1/transit/keys/{name}")
+        except VaultError as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    async def transit_create_key(self, name: str) -> None:
+        """Tạo khóa ký RSA-3072 (két sinh khóa, không cho xuất). Đã có thì két chỉ cảnh báo, không lỗi."""
+        await self._request("POST", f"/v1/transit/keys/{name}", {"type": "rsa-3072"}, timeout_s=30.0)
+
+    async def transit_csr(self, name: str, version: int) -> str:
+        """CSR do chính khóa transit ký (chủ thể rỗng: CN do role PKI đặt)."""
+        data = await self._request("POST", f"/v1/transit/keys/{name}/csr", {"version": version})
+        return str(data["csr"])
+
+    async def pki_sign(self, role: str, csr: str, cn: str) -> dict[str, Any]:
+        """Cấp chứng thư cho CSR theo role → ``certificate``, ``issuing_ca``, ``serial_number``, ``expiration``."""
+        return await self._request("POST", f"/v1/pki/sign/{role}", {
+            "csr": csr, "common_name": cn, "exclude_cn_from_sans": True, "format": "pem"})
+
+    async def transit_set_certificate(self, name: str, version: int, chain: str) -> None:
+        """Gắn chuỗi chứng thư (lá rồi CA, PEM) vào đúng phiên bản khóa."""
+        await self._request("POST", f"/v1/transit/keys/{name}/set-certificate",
+                            {"version": version, "certificate_chain": chain})
+
+    async def transit_sign(self, name: str, data: bytes, *, version: int) -> bytes:
+        """Chữ ký RSA PKCS#1 v1.5 trên SHA-256(data) bằng đúng phiên bản khóa; két ghi sổ từng lần ký."""
+        out = await self._request("POST", f"/v1/transit/sign/{name}/sha2-256", {
+            "input": base64.b64encode(data).decode(), "signature_algorithm": "pkcs1v15", "key_version": version})
+        prefix, _, sig = str(out.get("signature") or "").rpartition(":")
+        if prefix != f"vault:v{version}":
+            raise VaultError(f"két ký bằng phiên bản khóa khác ({prefix or 'không rõ'})", status=200)
+        try:
+            return base64.b64decode(sig, validate=True)
+        except ValueError:
+            raise VaultError("két trả chữ ký không đúng dạng", status=200) from None
 
 
 # --- PDF: kiểm lúc tải lên, đóng dấu người xem lúc đọc -----------------------------------------------------------

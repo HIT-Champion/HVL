@@ -65,7 +65,7 @@ Mộc, quản lý văn bản đến và đi theo Nghị định 30/2020/NĐ-CP v
 | Quá hạn giải quyết mà không ai nhắc | Hạn theo từng việc được giao, tự nhắc rồi leo thang; văn bản khẩn lên đầu | [P] |
 | Nhập sai, vào sổ trùng | Chặn nhập sai ở cả form, máy chủ và CSDL theo một JSON Schema dùng chung (Poka-yoke); chặn vào sổ trùng | [P] |
 | Tệp đính kèm có thể chứa mã độc | Quét virus trước khi lưu | Lõi |
-| Không kiểm được văn bản nhận được là thật | Văn bản phát hành có mã QR; cổng xác thực công khai, ai cũng kiểm được | Lõi + [D] |
+| Không kiểm được văn bản nhận được là thật | Văn bản phát hành có mã QR và chữ ký số (minh họa); cổng xác thực công khai, ai cũng kiểm được | Lõi + [D] |
 | Hồ sơ bị sửa lén sau khi lưu | Sổ kiểm toán chuỗi băm; lưu trữ hồ sơ sang kho lạnh có băm | Lõi + [D] |
 | Văn bản nhạy cảm bị lộ | Lưu mã hóa, chỉ giải mã trong bộ nhớ khi người có quyền xem | [P] |
 | Lãnh đạo không biết việc nghẽn ở đâu | Dashboard điều hành từ số liệu thật | [D] |
@@ -90,6 +90,13 @@ thể thức NĐ 30. Sau đó dự thảo được trình lãnh đạo phòng du
 ký duyệt, rồi văn thư cấp số đi. Hệ thống dựng PDF có số, ký hiệu, ngày, **mã QR và SHA-256**. Người ngoài quét
 mã QR, không cần đăng nhập, thấy văn bản có thật. Thả tệp nhận được vào trang xác thực: tệp nguyên vẹn thì
 "khớp", sửa một byte thì "không khớp".
+
+**Ký số văn bản đi — chỉ minh họa.** Bản phát hành được `svc-files` ký số PAdES (chữ ký chứng nhận, không cho sửa
+thêm) bằng khóa riêng của đơn vị nằm trong két OpenBao: khóa không rời két, két ghi sổ từng lần ký; chứng thư do CA
+nội bộ trong két cấp. Băm SHA-256, mã QR và cổng xác thực đều theo bản đã ký; cổng hiện khối "Chữ ký số (minh họa)"
+với người ký, CA, số sê-ri và giờ ký. Trình đọc PDF thấy chữ ký nhưng báo chưa tin cậy — đúng như vậy: CA tự dựng,
+không phải chữ ký số công cộng, **không có giá trị pháp lý**. Không ký văn bản hạn chế (mỗi lần mở đều đóng tên người
+xem lên tệp) và văn bản đã phát hành trước đó. Thử: `make demo-ky-so`.
 
 Văn thư và lãnh đạo khoa xem **sổ đăng ký văn bản đến, văn bản đi** theo năm, đúng các cột của mẫu sổ trong NĐ 30,
 rồi in ra PDF để ký nhận và đóng sổ — nghị định bắt in khi đăng ký bằng hệ thống. Sổ luôn liền số từ 01, kể cả văn
@@ -127,8 +134,8 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 | Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `processes/` |
 | `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; thông báo sau mỗi bước, nhắc hạn theo timer BPMN; đồng bộ danh bạ Keycloak | `services/svc-workflow/` |
 | Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người; tự kiểm token Keycloak | `realtime/` |
-| OpenBao 2 | Két bí mật: `svc-files`, `svc-workflow` lấy bí mật qua AppRole lúc khởi động; static seal tự mở khóa; khóa transit cho tệp mã hóa | `openbao/` |
-| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, in sổ đăng ký; cổng xác thực công khai | `services/svc-files/` |
+| OpenBao 2 | Két bí mật: `svc-files`, `svc-workflow` lấy bí mật qua AppRole lúc khởi động; static seal tự mở khóa; khóa transit cho tệp mã hóa; PKI nội bộ (CA minh họa) và khóa ký transit của từng đơn vị | `openbao/` |
+| `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tải xuống theo quyền, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, ký số PAdES (minh họa), in sổ đăng ký; cổng xác thực công khai | `services/svc-files/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 | Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `monitoring/` |
 | Scorpio 6 + PostGIS (profile `iot`) | Context broker NGSI-LD: bản sao số của cảm biến, lịch sử đo; báo `svc-workflow` khi vượt ngưỡng | `ot/` |
@@ -136,7 +143,8 @@ họ, và dòng thời gian văn bản ghi lại cả hai lần.
 Phần còn lại theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md): bằng chứng 4 nguyên lý
 (Phase 3), AI (Phase 4). Đã có dashboard điều hành cho lãnh đạo đơn vị (trang **Điều hành**), sao lưu, khôi
 phục một lệnh (`make backup`, `make restore`), két bí mật OpenBao, reconciler GitOps và tự phục hồi.
-Văn bản phát hành có mã QR và SHA-256, chưa có chữ ký số theo hạ tầng khóa công khai.
+Văn bản phát hành có mã QR, SHA-256 và chữ ký số PAdES bằng CA nội bộ trong két — chỉ minh họa, không thay chữ ký
+số công cộng.
 
 ## Yêu cầu hệ thống
 
@@ -233,8 +241,10 @@ python3 scripts/moc.py tenant check KTCK     # Organization, thành viên, danh 
 - Tài khoản khác của đơn vị (văn thư, lãnh đạo…) tạo trong trang quản trị Keycloak với `tenant_id`, `department_id`,
   `moc_role`, rồi chạy lại `tenant create` để đưa vào Organization; `tenant check` chỉ ra tài khoản còn thiếu hoặc
   lạc sang Organization của đơn vị khác (thoát 1). `make seed` tự làm việc này cho hai đơn vị mẫu.
-- Không có bucket hay khóa riêng cho từng đơn vị: cách ly nằm ở token, quyền Hasura, ràng buộc CSDL và mã hóa gắn
-  với đơn vị — lý do ở [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) §1.
+- Không có bucket hay khóa dữ liệu riêng cho từng đơn vị: cách ly nằm ở token, quyền Hasura, ràng buộc CSDL và mã
+  hóa gắn với đơn vị — lý do ở [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) §1. Riêng khóa ký số văn bản đi
+  (F4.5, minh họa) là của từng đơn vị, để chứng thư nói được đơn vị nào phát hành; `svc-files` tự tạo nó trong két ở
+  lần phát hành đầu của đơn vị.
 
 ### Sao lưu và khôi phục
 
@@ -271,7 +281,9 @@ Lúc khởi động, mỗi dịch vụ đăng nhập két [OpenBao](https://open
 phần bí mật của mình; két ghi sổ mọi lần đăng nhập và đọc (`docker compose logs openbao`, giá trị đã băm HMAC). Két
 dùng *static seal*: khởi động lại là tự mở khóa, không cần người nhập khóa. Két cũng giữ khóa `moc-files` (transit)
 bọc khóa của từng tệp văn bản hạn chế: `svc-files` chỉ xin được khóa mới và nhờ két mở khóa đã bọc, không lấy được
-khóa gốc. Thử: `make demo-ket-bi-mat`, `make demo-han-che` (`docs/demo-script.md`).
+khóa gốc. Từ F4.5 két có thêm PKI nội bộ để ký số văn bản đi (chỉ minh họa): CA gốc `moc-root` trong mount `pki`,
+khóa ký `moc-ky-so-<đơn vị>` trong transit; `svc-files` nhờ két ký từng bản phát hành, không lấy được khóa riêng. Thử:
+`make demo-ket-bi-mat`, `make demo-han-che`, `make demo-ky-so` (`docs/demo-script.md`).
 
 Nói rõ giới hạn:
 
@@ -285,9 +297,60 @@ Nói rõ giới hạn:
   mật từ `.env`, nhưng khóa transit mới khác: tệp văn bản hạn chế đã lưu không mở được nữa.
 - **Đổi `MOC_OPENBAO_SEAL_KEY` sau khi két đã khởi tạo thì két không mở được nữa.** Bản cài có từ trước khi có két:
   thêm vào `.env` của bản cài một dòng `MOC_OPENBAO_SEAL_KEY=` với chuỗi ngẫu nhiên dài (vd. `openssl rand -hex 32`).
-- Đổi cấu hình két (thêm khóa, policy) cần token quản trị. Lần đầu khởi tạo, `openbao/start.sh` cấu hình bằng token
-  root rồi thu hồi nó. Token khởi động không đọc thẳng được bí mật và không sửa được policy, nhưng cấp được secret_id
-  nên làm được mọi việc hai dịch vụ làm được: giữ volume `openbao_data` như chính két.
+- Đổi cấu hình két (thêm khóa, policy, PKI) cần token quản trị. Lần đầu khởi tạo, `openbao/start.sh` cấu hình bằng
+  token root rồi thu hồi nó; các lần khởi động sau chỉ dùng token khởi động. Token khởi động không đọc thẳng được bí
+  mật và không sửa được policy, nhưng cấp được secret_id nên làm được mọi việc hai dịch vụ làm được: giữ volume
+  `openbao_data` như chính két.
+- **PKI nội bộ (F4.5): CA gốc trong két, khóa ký từng đơn vị trong Transit; chỉ minh họa.** CA một tầng tự dựng
+  (rsa-4096, 10 năm, không CRL, không OCSP), chứng thư của đơn vị sống 1 năm, không có dấu thời gian tin cậy: chữ ký
+  không có giá trị pháp lý như chữ ký số công cộng. CA và khóa ký nằm trong volume `openbao_data`, đã có trong `make
+  backup`. Policy của `svc-files` cho tạo, đọc, ký bằng `transit/keys/moc-ky-so-*`; glob này phủ cả `config`, `rotate`,
+  `trim` và `import` của các khóa đó, và `pki/sign/moc-van-thu` ký mọi CSR. Ai chiếm được `svc-files` thì ký được, xoay
+  được khóa ký, xin được chứng thư cho khóa tự sinh, nhưng không xuất được khóa riêng (không có `transit/export`,
+  `transit/backup`). Mức tin này như trước: `svc-files` vốn đã mở được mọi khóa dữ liệu `moc-files`.
+- **Két khởi tạo trước F4.5 không ký số** cho tới khi người quản trị nâng cấp tay hoặc dựng lại két: két đó chưa có
+  PKI, policy của `svc-files` chưa có quyền ký, mà token khởi động không thêm được. `svc-files` thấy két chưa có CA thì
+  tự tắt ký số (nhật ký `office.signing.disabled`, dò lại mỗi 5 phút): văn bản vẫn phát hành như cũ, chỉ không có chữ
+  ký số; mọi thứ khác chạy như trước. Dựng PKI lỗi lúc khởi tạo két mới cũng vậy: `start.sh` ghi "chưa dựng được PKI
+  nội bộ", két vẫn lên, và không tự thử lại.
+- Nâng cấp tay một két cũ (một lần; dừng timer reconciler trước như mục GitOps bên dưới):
+  1. Thêm tạm vào cuối `openbao/openbao.hcl` một listener chỉ nghe trong container, bật lại endpoint tạo token root bằng
+     khóa phục hồi (OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không
+     dùng được ở đây), rồi `docker compose restart openbao`:
+     ```hcl
+     listener "tcp" {
+       address                                  = "127.0.0.1:8210"
+       tls_disable                              = true
+       disable_unauthed_generate_root_endpoints = false
+     }
+     ```
+  2. Tạo token root bằng khóa phục hồi, ghi vào `root-token` cạnh khóa phục hồi trong volume `openbao_data`. Khóa phục
+     hồi, mã OTP và token chỉ đi qua tệp tạm (quyền 600) và stdin, không qua tham số dòng lệnh (`ps` nhìn thấy); bước
+     nào không ra giá trị thì dừng, không ghi `root-token` rỗng:
+     ```bash
+     docker compose exec openbao sh -c '
+       set -eu; umask 077
+       A=http://127.0.0.1:8210/v1/sys/generate-root; K=/openbao/file/moc
+       get() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
+       init=$(wget -qO- --post-data "{}" $A/attempt)     # két tự sinh mã OTP một lần
+       otp=$(echo "$init" | get otp); nonce=$(echo "$init" | get nonce)
+       [ -n "$otp" ] && [ -n "$nonce" ] || { echo "không mở được lượt tạo token root (đang có lượt dở?)"; exit 1; }
+       printf "{\"key\":\"%s\",\"nonce\":\"%s\"}" "$(cat $K/recovery-key)" "$nonce" > $K/.generate-root
+       enc=$(wget -qO- --post-file $K/.generate-root $A/update | get encoded_token); rm -f $K/.generate-root
+       [ -n "$enc" ] || { echo "két không nhận khóa phục hồi"; exit 1; }
+       printf "{\"encoded_token\":\"%s\",\"otp\":\"%s\"}" "$enc" "$otp" |
+         bao write -field=token sys/decode-token - > $K/root-token.new
+       [ -s $K/root-token.new ] && mv $K/root-token.new $K/root-token'
+     ```
+     Báo "đang có lượt dở" (lần chạy trước hỏng giữa chừng): hủy lượt đó bằng `docker compose exec -e
+     BAO_ADDR=http://127.0.0.1:8210 openbao bao delete sys/generate-root/attempt` rồi chạy lại. Các bước này chưa diễn
+     tập trên một két thật đã có dữ liệu: sao lưu (`make backup`) trước khi làm.
+  3. Gỡ listener vừa thêm, `docker compose restart openbao`. Thấy token root, `start.sh` chạy lại phần cấu hình — làm
+     lại được, không đổi bí mật, khóa `moc-files` hay AppRole; thêm PKI và policy mới của `svc-files` — rồi thu hồi
+     token. Nhật ký két có "đã dựng PKI nội bộ"; `svc-files` bật ký số ở lần dò kế tiếp (hoặc `docker compose
+     restart svc-files`).
+- Cách cuối cùng là dựng lại két (xóa volume `openbao_data` rồi khởi động lại): bí mật nạp lại từ `.env`, có PKI, nhưng
+  khóa `moc-files` mới khác nên tệp văn bản hạn chế đã lưu không mở được nữa — **không làm trên máy có dữ liệu thật**.
 - Đổi bí mật trong `.env` rồi `make up`: két được dựng lại và nạp bí mật mới, `svc-files`, `svc-workflow` khởi động
   lại theo (`depends_on … restart: true`, cần Docker Compose 2.17 trở lên).
 
@@ -445,7 +508,9 @@ The first application on the core is an e-Office that manages incoming and outgo
 official documents under Vietnam's Decree 30/2020 on clerical work: an official letter is
 received, registered, assigned, handled, answered and archived without getting lost, missing
 its deadline unnoticed or being silently altered. Every issued document carries a QR code, and a
-public verification portal lets anyone check that a copy is genuine and unmodified. It targets
+public verification portal lets anyone check that a copy is genuine and unmodified. Issued documents
+also carry an illustrative PAdES signature made with a per-unit key that never leaves the OpenBao
+vault, certified by an internal CA (not a public trust service, no legal validity). It targets
 small and medium-sized enterprises, schools and public agencies that have no in-house IT team
 and no software budget.
 

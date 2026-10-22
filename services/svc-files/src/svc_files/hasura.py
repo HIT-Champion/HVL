@@ -32,13 +32,24 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx2
+
+if TYPE_CHECKING:
+    from .signing import SignatureRecord
 
 INSERT_FILE = """
 mutation InsertFile($o: core_files_insert_input!) {
   insert_core_files_one(object: $o) { id }
+}"""
+
+# Bản phát hành có chữ ký số (F4.5): tệp và dòng chữ ký trong cùng một giao dịch của Hasura; affected_rows nên vai
+# trò service không cần quyền đọc core_file_signatures
+INSERT_SIGNED_FILE = """
+mutation InsertSignedFile($o: core_files_insert_input!, $s: core_file_signatures_insert_input!) {
+  insert_core_files_one(object: $o) { id }
+  insert_core_file_signatures(objects: [$s]) { affected_rows }
 }"""
 
 LOG_EVENT = """
@@ -177,11 +188,12 @@ query Letter($id: uuid!, $tenant: uuid!) {
 }"""
 
 # Cổng xác thực: đúng một văn bản đã phát hành, theo mã tra cứu hoặc theo băm (vai trò verifier, chỉ đọc
-# khung nhìn office.issued_documents)
+# khung nhìn office.issued_documents). Năm cột chữ ký số (F4.5) null với văn bản không ký
 VERIFY = """
 query Verify($where: office_issued_documents_bool_exp!) {
   office_issued_documents(where: $where, limit: 1) {
     verify_code content_sha256 symbol issued_on type_name issuer_name parent_name summary status
+    signature_level signed_at signer_name signer_ca certificate_serial
   }
 }"""
 
@@ -354,10 +366,12 @@ class HasuraClient:
         sha256_hex: str,
         scanned_at: datetime,
         wrapped_dek: str | None = None,
+        signature: SignatureRecord | None = None,
     ) -> None:
         """Thêm dòng core.files; tenant_id và created_by do Hasura đặt từ phiên, không gửi trong dữ liệu.
 
-        wrapped_dek: tệp đã mã hóa (F3.7) — size_bytes, sha256_hex vẫn là của bản rõ."""
+        wrapped_dek: tệp đã mã hóa (F3.7) — size_bytes, sha256_hex vẫn là của bản rõ.
+        signature: bản phát hành có chữ ký số (F4.5) — thêm dòng core.file_signatures trong cùng mutation."""
         row: dict[str, Any] = {
             "id": str(file_id),
             "object_key": object_key,
@@ -369,7 +383,23 @@ class HasuraClient:
         }
         if wrapped_dek is not None:
             row.update(encrypted=True, wrapped_dek=wrapped_dek)
-        await self._call(INSERT_FILE, {"o": row}, self._as_service(tenant_id, actor_id, request_id))
+        session = self._as_service(tenant_id, actor_id, request_id)
+        if signature is None:
+            await self._call(INSERT_FILE, {"o": row}, session)
+            return
+        sig = {
+            "file_id": str(file_id),
+            "level": signature.level,
+            "signed_at": signature.signed_at.isoformat(),
+            "signer_name": signature.signer_name,
+            "ca_name": signature.ca_name,
+            "serial": signature.serial,
+            "cert_sha256": _bytea(signature.cert_sha256),
+            "not_after": signature.not_after.isoformat(),
+            "key_name": signature.key_name,
+            "key_version": signature.key_version,
+        }
+        await self._call(INSERT_SIGNED_FILE, {"o": row, "s": sig}, session)
 
     async def log_event(
         self,

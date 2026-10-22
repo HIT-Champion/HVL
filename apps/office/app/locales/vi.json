@@ -623,6 +623,16 @@
     "summary": "Trích yếu",
     "summaryHidden": "Không công khai",
     "sha256": "SHA-256 của bản phát hành",
+    "signature": {
+      "title": "Chữ ký số (minh họa)",
+      "level": "Chuẩn chữ ký",
+      "signer": "Ký bởi",
+      "ca": "Chứng thư do",
+      "serial": "Số sê-ri chứng thư",
+      "signedAt": "Ký lúc (giờ tự ghi trong chữ ký)",
+      "illustrative": "Chữ ký dùng hạ tầng khóa công khai nội bộ của Mộc, chỉ để minh họa — không có giá trị pháp lý như chữ ký số công cộng. Trình đọc PDF sẽ báo chữ ký chưa tin cậy vì CA nội bộ này không nằm trong danh sách tin cậy công cộng.",
+      "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên."
+    },
     "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
     "footer": "Mộc — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."

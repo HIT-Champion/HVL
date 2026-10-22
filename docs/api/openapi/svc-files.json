@@ -1984,6 +1984,17 @@
               "archived"
             ],
             "title": "Status"
+          },
+          "signature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifiedSignature"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chữ ký số của bản phát hành (F4.5, chỉ minh họa); null: văn bản phát hành khi ký số chưa bật hoặc ký lỗi, hoặc văn bản hạn chế"
           }
         },
         "type": "object",
@@ -1999,6 +2010,54 @@
           "status"
         ],
         "title": "VerifiedDocument"
+      },
+      "VerifiedSignature": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "const": "PAdES-B-B",
+            "title": "Level",
+            "description": "Chuẩn chữ ký: PAdES mức B-B, không có dấu thời gian tin cậy"
+          },
+          "signer": {
+            "type": "string",
+            "title": "Signer",
+            "description": "Người ký: CN chứng thư của đơn vị phát hành"
+          },
+          "ca": {
+            "type": "string",
+            "title": "Ca",
+            "description": "CN của CA nội bộ cấp chứng thư"
+          },
+          "serial": {
+            "type": "string",
+            "title": "Serial",
+            "description": "Số sê-ri chứng thư, hex thường"
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Signed At",
+            "description": "Giờ ký tự ghi trong chữ ký (không có dấu thời gian tin cậy)"
+          },
+          "illustrative": {
+            "type": "boolean",
+            "const": true,
+            "title": "Illustrative",
+            "description": "Luôn true: chữ ký chỉ để minh họa",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "signer",
+          "ca",
+          "serial",
+          "signed_at"
+        ],
+        "title": "VerifiedSignature",
+        "description": "Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Mộc, chỉ minh họa, không có giá trị pháp lý như chữ ký số\ncông cộng. svc-files đã tự kiểm chữ ký lúc ký; kiểm lại tệp: python -m svc_files.signing verify."
       },
       "VerifyOut": {
         "properties": {

@@ -221,3 +221,48 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   Chưa xét ngày lễ khi tính hạn; chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
   thêm một dòng tác tử ở Sổ kiểm toán và tab Lịch sử — dòng sổ không mang trích yếu, không mang căn cứ. Chi tiết:
   `docs/mo-hinh-du-lieu.md` §1, §3, §4.2, README của `svc-workflow`.
+
+### QĐ-007: Ký số PDF: khóa ký trong Transit, CA nội bộ một tầng trong két, pyHanko; chỉ minh họa
+
+> QĐ-006 dành cho F4.4. Chữ ký ở đây **chỉ để minh họa**: CA tự dựng trong két, không phải dịch vụ chứng thực chữ ký số
+> công cộng, chữ ký không có giá trị pháp lý.
+
+- **Bối cảnh:** F4.5 — bản phát hành văn bản đi đã có mã QR và SHA-256 (F2.13), cổng xác thực cho người ngoài kiểm "có
+  thật, nguyên vẹn", nhưng PDF chưa mang chữ ký số nên trình đọc PDF không cho biết ai phát hành. Ràng buộc: demo phải
+  chạy không có mạng ngoài; két OpenBao (F3.2) đã giữ khóa dữ liệu `moc-files` (F3.7) như một "HSM mềm"; phát hành là
+  việc chính, ký số chỉ ở mức Could nên két thiếu thứ gì thì văn bản vẫn phải phát hành được; stack đang chạy có dữ liệu
+  thật, không khởi tạo lại két được (khóa `moc-files` sẽ đổi).
+- **Phương án giữ khóa:** `pki/issue` — két sinh khóa rồi trả cả khóa riêng, khóa nằm trong RAM và đĩa của `svc-files`.
+  Một khóa chung "Hệ thống Mộc" — chứng thư không cho biết đơn vị nào phát hành. USB token, ký ở trình duyệt — ngoài
+  phạm vi. **Transit** — khóa riêng sinh và ở lại trong két, `svc-files` chỉ gửi băm cần ký.
+- **Phương án CA:** CA gốc + CA trung gian — két chỉ có một nút, CA gốc không thể để ngoại tuyến nên tầng trung gian
+  không tăng an toàn, chỉ thêm một chứng thư phải xoay. CA ngoài két (tệp khóa) — thêm một bí mật phải giữ.
+- **Phương án dạng chữ ký:** PAdES B-T (có dấu thời gian tin cậy) — cần dịch vụ TSA, demo không có mạng ngoài. Ô ký hiện
+  hình — PDF đã in chức vụ, tên người ký; một hộp chữ ký dễ bị hiểu nhầm là chữ ký số công cộng.
+- **Quyết định:**
+  1. **Khóa ký trong Transit (Q1):** mỗi đơn vị một khóa `moc-ky-so-<tenant_id>` (rsa-3072), `svc-files` tạo ở lần phát
+     hành đầu. Chứng thư lấy theo chuỗi: CSR do chính Transit ký (`transit/keys/<k>/csr`) → `pki/sign/moc-van-thu`
+     (`svc-files` đặt CN "<đơn vị>, <cơ quan chủ quản>"; quá 64 byte UTF-8 thì chỉ tên đơn vị) → `set-certificate` gắn
+     vào đúng phiên bản khóa. pyHanko (MIT) dựng CMS/PAdES và ghi PDF; một lớp `Signer` của Mộc gửi phần thuộc tính đã
+     ký tới `transit/sign/<k>/sha2-256` (PKCS#1 v1.5). Policy của `svc-files` có `transit/keys/moc-ky-so-*`,
+     `transit/sign/moc-ky-so-*`, `pki/sign/moc-van-thu`; không có `transit/export`, `transit/backup`.
+  2. **PKI một tầng trong két (Q2):** mount `pki`, CA gốc `moc-root` kiểu `internal` (rsa-4096, 10 năm, CN "CA nội bộ
+     Mộc - MẪU, chỉ minh họa"); role `moc-van-thu` cấp chứng thư 1 năm, KU DigitalSignature + ContentCommitment, EKU
+     Document Signing. Không CRL, không OCSP. CA và khóa ký nằm trong volume `openbao_data`, đã có trong `make backup`.
+  3. **Bật PKI trong `setup()` của `openbao/start.sh` (Q3, bản tối thiểu):** két mới (cài mới, CI) dựng PKI và policy
+     mới lúc khởi tạo, bằng token root trước khi thu hồi nó. Dựng PKI lỗi chỉ ghi nhật ký, két vẫn lên, `svc-files` tự
+     tắt ký số. **Két khởi tạo trước F4.5 không tự nâng cấp:** token khởi động không sửa được policy, nên két đó không
+     ký cho tới khi quản trị nâng cấp tay (tạo lại token root bằng khóa phục hồi, khởi động lại két để `setup()` chạy
+     lại) hoặc dựng lại két — README mục Két bí mật. Bản đầy đủ của hợp đồng (listener 127.0.0.1 chỉ mở ở lần khởi động
+     cần nâng cấp, tự tạo token root một lần) đã cắt khỏi bản này.
+  4. **Ký trong `/internal/issue`, sau khi dựng PDF, trước khi băm (Q4):** băm, `content_sha256`, sổ kiểm toán, bản liên
+     thông và cổng xác thực đều theo bản đã ký; `svc-workflow` không đổi. `svc-files` tự kiểm chữ ký trước khi lưu.
+  5. **PAdES B-B, chữ ký chứng nhận không cho sửa (Q5):** `ETSI.CAdES.detached`, SHA-256, `certify=True`,
+     `NO_CHANGES`, ô ký ẩn; không TSA, không LTV — giờ ký là giờ tự khai, CLI và cổng xác thực nói rõ.
+- **Hệ quả:** ai chiếm được `svc-files` thì ký được (như mọi HSM: gọi được là ký được), xoay được khóa ký (glob phủ
+  `config`, `rotate`), xin được chứng thư cho khóa tự sinh qua `pki/sign`, nhưng không mang khóa riêng đi được, và két
+  ghi sổ từng lần ký — mức tin như `moc-files` hiện nay. Văn bản hạn chế không ký (mỗi lần mở đều viết lại PDF), văn bản
+  phát hành trước F4.5 không ký lại. Trình đọc PDF báo chữ ký "chưa tin cậy" cho tới khi nhập CA nội bộ — đúng như mong
+  đợi. Thêm pyHanko 0.37.0 và 16 gói kéo theo (`DEPENDENCIES.md`), image `svc-files` nặng thêm khoảng 15 MB; lần phát
+  hành đầu của mỗi đơn vị chậm thêm chừng nửa giây trên máy dev (két sinh khóa RSA, máy yếu lâu hơn). Chi tiết:
+  `docs/mo-hinh-du-lieu.md` §1, §3, §4.3, §5, README của `svc-files`, README mục Két bí mật.

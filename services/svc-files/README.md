@@ -30,6 +30,7 @@ issue #19, #20.
 | `/internal/similar-documents`: văn bản đến tương tự đã giao cho tác tử gợi ý giao việc — câu tìm từ trích yếu, dùng lại truy xuất F4.2, hậu kiểm quyền dịch vụ, không trả chữ | **Xong** (F4.3) |
 | Văn bản hạn chế: lưu mã hóa (khóa riêng từng tệp từ két), tải về giải mã trong bộ nhớ, đóng dấu người xem, ghi sổ | **Xong** (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
+| Ký số PAdES bản phát hành bằng khóa của đơn vị trong két, CA nội bộ (chỉ minh họa); `signature` ở cổng xác thực; `python -m svc_files.signing verify` | **Xong** (F4.5, bản tối thiểu) |
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=`: không cần đăng nhập | **Xong** (F2.13) |
 | Neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi (S3 Object Lock) | **Xong** (F2.12) |
@@ -61,10 +62,10 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
 | `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
 | `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
-| `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456` |
+| `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456`. `document.signature`: chữ ký số của bản phát hành `{level, signer, ca, serial, signed_at, illustrative: true}`, `null` với văn bản cũ, văn bản hạn chế (F4.5) |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
-| `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
+| `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` — `sha256` của bản đã ký số (F4.5) · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng; `signing_unavailable` két không trả lời khi ký — **không lưu**. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `POST /internal/similar-documents` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15; thừa trường → `422`). `200` `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` · `404` `not_found` · `409` `not_incoming`, `restricted` · `503` `assistant_disabled`, `search_unavailable`, `database_unavailable` (mục Văn bản tương tự cho tác tử gợi ý giao việc) |
 | `GET /healthz` | Tiến trình còn sống |
@@ -465,12 +466,81 @@ trước chưa làm căn cứ được; trích yếu quá ngắn hay chỉ có t
   "V/v …" dưới số, "Kính gửi"), nội dung, nơi nhận kèm "Lưu: VT, <phòng>.", chức vụ và tên người ký, giờ ký duyệt
   trên Mộc. Bản phát hành có mã QR dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. Mọi chữ người dùng nhập được thoát
   HTML. Phông Liberation Serif (cùng số đo Times New Roman) cài trong image.
-- **Không phải chữ ký số.** "Đã duyệt trên hệ thống Mộc" chỉ ghi lại việc người ký bấm duyệt trong Mộc. Tính toàn
-  vẹn đến từ SHA-256 của tệp, lưu trong CSDL và trong sổ kiểm toán chuỗi băm, kiểm được ở cổng xác thực.
+- **"Đã duyệt trên hệ thống Mộc"** chỉ ghi lại việc người ký bấm duyệt trong Mộc. Tính toàn vẹn đến từ SHA-256 của
+  tệp, lưu trong CSDL và trong sổ kiểm toán chuỗi băm, kiểm được ở cổng xác thực. Từ F4.5 bản phát hành (không hạn
+  chế) có thêm chữ ký số PAdES bằng PKI nội bộ — chỉ minh họa (mục Ký số văn bản đi).
 - **Dữ liệu dựng lấy từ CSDL**, không từ người gọi: `/internal/issue` chỉ nhận id văn bản, thuê ước, người thực
   hiện. Bản phát hành vẫn qua ClamAV và vào `core.files` như mọi tệp.
 - **Cổng xác thực** tra khung nhìn `office.issued_documents` bằng vai trò Hasura `verifier`, mỗi lần đúng một văn
   bản. Nhật ký chỉ ghi cách tra (mã hay băm) và kết quả.
+
+### Ký số văn bản đi (F4.5, chỉ minh họa)
+
+`signing.py`. **Chỉ minh họa, không có giá trị pháp lý như chữ ký số công cộng**: chứng thư do CA nội bộ trong két
+của Mộc cấp (CN "CA nội bộ Mộc - MẪU, chỉ minh họa"), CA này không nằm trong danh sách tin cậy nào nên trình đọc PDF
+báo chữ ký "chưa tin cậy" — đúng như mong đợi (nhập chứng thư CA vào trình đọc thì báo hợp lệ).
+
+- **Khóa ký không rời két.** Mỗi đơn vị một khóa transit `moc-ky-so-<id đơn vị>` (RSA-3072), svc-files tạo ở lần ký
+  đầu. svc-files chỉ gửi phần thuộc tính đã ký sang `transit/sign/<khóa>/sha2-256` (PKCS#1 v1.5); két ghi sổ từng
+  lần ký. Policy của svc-files không có `transit/export`, `transit/backup`.
+- **Chứng thư.** CA gốc một tầng dựng trong `setup()` của `openbao/start.sh`. Phiên bản khóa chưa có chứng thư thì:
+  CSR do chính transit ký (`transit/keys/<khóa>/csr`) → `pki/sign/moc-van-thu` với CN "<đơn vị>, <cơ quan chủ quản>"
+  (quá 64 byte UTF-8 thì chỉ tên đơn vị: chữ có dấu tốn 2–3 byte, "Khoa Công nghệ thông tin, Trường Đại học Công
+  nghiệp" là 67 byte) → kiểm chứng thư mang đúng khóa công khai của transit → gắn chuỗi lá + CA vào
+  phiên bản khóa (`set-certificate`). Chứng thư lá sống 1 năm, KU DigitalSignature + ContentCommitment, EKU Document
+  Signing. Hai lần phát hành đầu của một đơn vị chạy song song vẫn chỉ tạo một khóa, xin một chứng thư.
+- **Luồng `/internal/issue`**: dựng PDF → ký → tự kiểm → SHA-256 → ClamAV → lưu → thêm `core.files` và
+  `core.file_signatures` trong **một** mutation. Băm trả svc-workflow, `content_sha256`, sự kiện `issued`, sổ kiểm
+  toán, bản liên thông (chép nguyên byte), cổng xác thực đều theo bản đã ký — svc-workflow không đổi. Mã QR mã hóa
+  URL theo mã tra cứu nên không đổi.
+- **Dạng chữ ký**: PAdES B-B (`ETSI.CAdES.detached`, SHA-256), chữ ký chứng nhận không cho sửa (DocMDP P=1), ô ký ẩn
+  `MocKySo`, lý do "Phát hành văn bản <số ký hiệu>", địa danh, liên hệ là URL xác thực. Bản đã ký được tự kiểm bằng
+  pyHanko với đúng CA của két (phủ cả tệp, không có sửa đổi sau khi ký); không đạt thì phát hành không ký.
+- **Văn bản hạn chế không ký**: mỗi lần mở bị viết lại để đóng dấu người xem nên chữ ký hỏng ngay lần đầu; người nhận
+  kiểm bằng mã. **Văn bản phát hành trước F4.5** giữ nguyên (ký lại sẽ đổi băm đã ghi sổ): `signature: null`.
+- **Kiểm mật mã một tệp** bằng pyHanko, chỉ tin CA của két, không tải gì từ mạng:
+
+  ```bash
+  docker compose exec -T svc-files python -m svc_files.signing verify < van-ban.pdf
+  # CA mặc định đọc từ két; --ca <tệp> là đường dẫn TRONG container (chép vào trước bằng docker compose cp)
+  ```
+
+  Dòng đầu nói kết quả; mã thoát `0` hợp lệ · `1` đã sửa sau khi ký (lớp sửa bổ sung, byte nối thêm), chữ ký không
+  khớp nội dung, chứng thư không do CA nội bộ Mộc cấp, không có chữ ký · `2` không đọc được PDF hoặc không lấy được CA
+  (mặc định `$MOC_OPENBAO_ADDR/v1/pki/ca/pem`, không cần token). Chứng thư đã hết hạn mà hợp lệ tại giờ ký tự khai thì
+  vẫn `0`, kèm một dòng ghi chú.
+
+| Tình huống | `/internal/issue` | Nhật ký |
+|---|---|---|
+| Ký được | `201`, PDF đã ký, có dòng `core.file_signatures` | `office.document.signed` {key_name, key_version, serial, duration_ms} |
+| Văn bản hạn chế, `MOC_SIGN_ENABLED=false`, không có két | `201`, không ký | — |
+| Két chưa có CA (`pki/ca/pem` trả 204/403/404: két khởi tạo trước F4.5) | `201`, không ký; 300 giây sau dò lại | `office.signing.disabled` {reason: no_pki}, một lần mỗi lượt dò |
+| Két từ chối khóa ký hay `pki/sign` (`403`, policy cũ) | `201`, không ký; 300 giây sau dò lại | `office.document.sign_failed` + `office.signing.disabled` {reason: forbidden} |
+| pyHanko lỗi, tự kiểm không đạt, két trả `400` | `201`, không ký | `office.document.sign_failed` (mức error) |
+| Két không trả lời (mạng, 5xx, hết giờ) | **`503` `signing_unavailable`**, không lưu gì, văn thư bấm lại | `office.document.sign_failed` |
+| Lần ký đầu của đơn vị | `201`, chậm hơn chừng nửa giây trên máy dev (két sinh RSA-3072, máy yếu lâu hơn) | `office.signing.key_created`, `office.signing.certificate_issued` |
+
+Lúc khởi động svc-files dò két một lần, nhật ký có `office.signing.ready` hoặc `office.signing.disabled`. Nhật ký
+không chứa trích yếu hay PDF. Ký và tự kiểm một PDF chạy trong event loop, đo trong test (két giả) khoảng 30–50 ms.
+
+Giới hạn:
+- Không dấu thời gian tin cậy (PAdES B-T cần dịch vụ TSA), không thông tin kiểm dài hạn (LTV), không CRL/OCSP: giờ
+  ký là giờ tự khai — CLI và cổng xác thực ghi rõ.
+- Chứng thư chỉ xin khi phiên bản khóa chưa có; chưa tự cấp lại khi sắp hết hạn, khi đơn vị đổi tên hay két đổi CA.
+  Chứng thư hết hạn thì tự kiểm không đạt, văn bản phát hành không ký (nhật ký báo `sign_failed`); xoay khóa transit
+  (`transit/keys/<khóa>/rotate`, token quản trị) thì svc-files đọc lại khóa sau lần tự kiểm hỏng đó (hoặc khi khởi
+  động lại) và xin chứng thư cho phiên bản mới.
+- Két khởi tạo trước F4.5 chưa có PKI: ký số tự tắt, mọi thứ khác chạy như cũ cho tới khi két được nâng cấp (README
+  gốc, mục Két bí mật).
+- Cổng xác thực chưa có link tải chứng thư CA; lấy thẳng từ két (`pki/ca/pem`).
+
+Rủi ro đã chấp nhận:
+- Glob `transit/keys/moc-ky-so-*` trong policy của svc-files phủ cả `config` và `rotate`: ai chiếm svc-files có thể
+  xoay khóa hay bật `exportable` — vẫn không xuất được vì không có quyền `transit/export`, `transit/backup`; chữ ký cũ
+  vẫn kiểm được vì chứng thư nằm trong PDF. Không chặn được bằng `deny` (glob đặt sau thắng).
+- `pki/sign/moc-van-thu` ký mọi CSR: ai chiếm svc-files xin được chứng thư cho khóa tự sinh. Không thêm quyền thực vì
+  vốn đã gọi được `transit/sign` — như mọi HSM, gọi được là ký được nhưng không mang khóa đi được, và két ghi sổ từng
+  lần ký. Mức tin này như hiện nay: svc-files vốn đã mở được mọi khóa dữ liệu `moc-files`.
 
 ### Liên thông trong hệ thống (F3.12)
 
@@ -624,6 +694,7 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 | Kiểm người dùng có được xem tệp | Token của người dùng — Hasura áp quyền của vai trò |
 | Lọc kết quả tìm kiếm theo quyền | Token của người dùng |
 | Thêm dòng `core.files`, ghi `file.rejected`, đọc `object_key` | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng, request id lấy từ token đã kiểm |
+| Bản phát hành có chữ ký số: `core.files` + `core.file_signatures` trong một mutation (F4.5) | Như trên, thuê ước trong yêu cầu của svc-workflow; dòng chữ ký không có vai trò nào đọc, cổng xác thực đọc qua `office.issued_documents` |
 | Đọc văn bản mới sửa để đồng bộ chỉ mục | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, không nhận tham số từ người dùng |
 | Tìm PDF chờ đọc chữ, ghi `core.file_texts` | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
 | Đọc văn bản để dựng bản xem trước | Token của người dùng |
@@ -666,6 +737,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_FILES_BUCKET` | `moc-files` | Tự tạo nếu chưa có |
 | `MOC_FILES_MAX_MB` | `25` | Phải nhỏ hơn `StreamMaxLength` của clamd |
 | `MOC_FILES_TRANSIT_KEY` | `moc-files` | Khóa transit trong két bọc khóa của tệp văn bản hạn chế (F3.7); không đặt `MOC_OPENBAO_ADDR` thì không nhận, không mở tệp mã hóa (`503`) |
+| `MOC_SIGN_ENABLED` | `true` | Ký số PAdES bản phát hành (F4.5, chỉ minh họa); `false`: phát hành không ký, không gọi transit hay PKI. Chỉ có tác dụng khi có `MOC_OPENBAO_ADDR` |
 | `CLAMAV_HOST`, `CLAMAV_PORT` | `clamav`, `3310` | |
 | `CLAMAV_TIMEOUT_S` | `60` | |
 | `HASURA_URL` | `http://hasura:8080` | Gọi trong mạng nội bộ, không qua APISIX |
@@ -761,6 +833,12 @@ Sửa `pyproject.toml`, rồi sinh lại hai tệp khóa và cập nhật `DEPEN
 uv pip compile pyproject.toml --universal --python-version 3.12 --generate-hashes --no-header -o requirements.txt
 uv pip compile pyproject.toml --extra dev --universal --python-version 3.12 --generate-hashes --no-header -o requirements-dev.txt
 ```
+
+`uv` giữ các bản đã ghim trong tệp khóa. Gói mới và gói nó kéo theo phải là bản phát hành ít nhất hai tuần
+(`DEPENDENCIES.md`): thêm `--exclude-newer-package <gói>=<ngày>` cho từng gói mới vào cả hai lệnh. pyHanko (F4.5) sinh
+với `--exclude-newer-package <gói>=2026-10-06T00:00:00Z` cho pyhanko, pyhanko-certvalidator, asn1crypto, tzlocal,
+tzdata, lxml, aiohttp, aiohappyeyeballs, aiosignal, attrs, frozenlist, multidict, propcache, yarl, oscrypto, uritools,
+certifi.
 
 ## Ghi chú khi đưa vào Compose (#13)
 

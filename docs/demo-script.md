@@ -22,14 +22,16 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
-Ngoài các màn nguyên lý còn bốn màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
+Ngoài các màn nguyên lý còn năm màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
 (`make demo-lien-thong`, F3.12) — xem [mục này](#ngoài-4-nguyên-lý-liên-thông-trong-hệ-thống--make-demo-lien-thong);
 tác tử đọc văn bản đến gợi ý thông tin tiếp nhận (`make demo-doc-van-ban`, F4.1, dưới hai phút) — xem
 [mục này](#ngoài-4-nguyên-lý-đọc-văn-bản-đến--make-demo-doc-van-ban); trợ lý hỏi đáp trên kho văn bản, trả lời kèm số
 ký hiệu và trang (`make demo-hoi-dap`, F4.2, dưới hai phút) — xem
 [mục này](#ngoài-4-nguyên-lý-hỏi-đáp-trên-kho-văn-bản--make-demo-hoi-dap); tác tử gợi ý đơn vị chủ trì và hạn cho
 văn bản vừa vào sổ, kèm căn cứ (`make demo-giao-viec`, F4.3) — xem
-[mục cuối](#ngoài-4-nguyên-lý-gợi-ý-giao-việc--make-demo-giao-viec).
+[mục này](#ngoài-4-nguyên-lý-gợi-ý-giao-việc--make-demo-giao-viec); ký số PAdES bản phát hành văn bản đi bằng PKI nội
+bộ trong két, **chỉ minh họa** (`make demo-ky-so`, F4.5) — xem
+[mục cuối](#ngoài-4-nguyên-lý-ký-số-văn-bản-đi-minh-họa--make-demo-ky-so).
 
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
@@ -635,3 +637,102 @@ khối này.
   hậu kiểm danh sách căn cứ bằng token người xem trước khi hiện.
 - *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn chưa xét ngày lễ; chỉ
   dựa vào trích yếu (đầu nội dung công văn toàn khuôn mẫu "Căn cứ…", "Kính gửi…"); dữ liệu mẫu nhỏ, hai đơn vị hợp lệ.
+
+## Ngoài 4 nguyên lý: ký số văn bản đi (minh họa) — `make demo-ky-so`
+
+**Chỉ minh họa, không có giá trị pháp lý như chữ ký số công cộng.** Chữ ký dùng một CA nội bộ trong két OpenBao của
+Mộc, không phải chứng thư của tổ chức cung cấp dịch vụ chứng thực chữ ký số công cộng; CN, O của CA, khối ở cổng xác
+thực và dòng đầu của lệnh kiểm đều ghi "chỉ minh họa". Màn này thuộc F4.5, **không** phải màn bằng chứng nguyên lý.
+Chạy khoảng một phút (phát hành hai văn bản).
+
+**Lời dẫn — nói ngay câu đầu:** *"Đây là bản minh họa chữ ký số bằng hạ tầng khóa công khai nội bộ, không có giá trị
+pháp lý như chữ ký số công cộng. Nó cho thấy Mộc gắn chữ ký PAdES vào bản phát hành mà khóa ký không ra khỏi két, và
+người ngoài kiểm được ai ký, tệp có bị sửa sau khi ký hay không."*
+
+**Điều muốn chứng minh:**
+
+- Văn thư phát hành như mọi khi, không thêm bước: bản PDF tự có chữ ký PAdES B-B của đơn vị — chữ ký chứng nhận, không
+  cho sửa (DocMDP), ô ký ẩn. Chứng thư do CA nội bộ trong két cấp.
+- Khóa ký của từng đơn vị là khóa Transit `moc-ky-so-<đơn vị>` (RSA-3072) trong két: svc-files gửi phần cần ký sang
+  két, két trả chữ ký; policy của svc-files không có quyền xuất khóa. CA gốc (RSA-4096) cũng sinh ngay trong két.
+- Ký trước khi băm: SHA-256 trong CSDL, mã QR, sổ kiểm toán, bản liên thông và cổng xác thực đều theo bản đã ký.
+- Kiểm ở hai nơi: cổng xác thực (không đăng nhập) cho biết người ký, CA, số sê-ri, giờ ký; tra theo băm của phần đầu
+  tệp tới cuối `/ByteRange` thì chỉ ra được "phần đã ký còn nguyên, phần thêm vào không do đơn vị ký". Lệnh
+  `python -m svc_files.signing verify` (pyHanko trong svc-files) kiểm đủ phần mật mã, chỉ tin CA của két.
+- Văn bản hạn chế không ký; văn bản phát hành trước khi bật ký số không ký lại, vẫn xác thực như cũ.
+
+**Lệnh in ra 8 bước:**
+
+1. Đọc chứng thư CA thẳng trong container két (`pki/ca/pem`, không cần token): CN "CA nội bộ Mộc - MẪU, chỉ minh họa",
+   O, CA gốc tự ký RSA 4096 bit, hạn, vân tay SHA-256 (để đối chiếu khi nhập vào trình đọc PDF). Két cài trước F4.5
+   chưa có PKI nội bộ thì màn dừng ở đây và nói rõ (ký số tự tắt, mọi thứ khác chạy như cũ).
+2. `chuyenviendt` soạn công văn → `totruongdt` duyệt → `truongkhoa` ký duyệt → `vanthu` phát hành công khai. In thời
+   gian riêng bước phát hành (cấp số, dựng PDF, ký bằng khóa trong két, tự kiểm chữ ký, ClamAV, lưu); lần ký đầu của
+   đơn vị thì báo két vừa sinh khóa, CA vừa cấp chứng thư.
+3. Tải bản phát hành: SHA-256 bằng `content_sha256`; tệp có `/ByteRange`, `/ETSI.CAdES.detached`, chữ ký phủ tới byte
+   cuối. `/api/verify/<mã>` có `signature`: chuẩn `PAdES-B-B`, ký bởi "Khoa Công nghệ thông tin" (CN tối đa 64 byte
+   UTF-8: tên kèm "Trường Đại học Công nghiệp" dài hơn nên chỉ còn tên đơn vị), CA, số sê-ri, giờ ký (tự ghi, không có
+   dấu thời gian tin cậy), `illustrative: true`. psql `core.file_signatures`: khóa `moc-ky-so-<đơn vị>`, phiên bản, cùng
+   số sê-ri.
+4. `python -m svc_files.signing verify` trong svc-files (tệp qua stdin): in nguyên các dòng — "Chữ ký hợp lệ — PKI nội
+   bộ Mộc (MẪU), chỉ minh họa…", ký bởi, CA, số sê-ri, giờ ký, phủ toàn bộ tệp — thoát 0.
+5. Sửa sau khi ký: thêm một chú thích "Đã sửa sau khi ký" vào trang 1, ghi nối sau phần đã ký như trình đọc PDF lưu
+   ghi chú (pypdf, chế độ ghi nối). Lệnh kiểm thoát 1, "Văn bản đã bị sửa sau khi ký…"; cổng xác thực: băm cả tệp →
+   không khớp, băm phần đầu tệp tới cuối `/ByteRange` → đúng công văn vừa phát hành.
+6. Lật một bit trong dữ liệu một stream thuộc phần đã ký: lệnh kiểm thoát 1, "Chữ ký không khớp nội dung…"; cổng xác
+   thực: không khớp.
+7. Phát hành một công văn **hạn chế**: tệp mã hóa trong kho, không có dòng `core.file_signatures`; tra mã ở cổng xác
+   thực → khớp, `signature: null`. psql: không chữ ký nào trên cả hệ thống gắn với văn bản hạn chế.
+8. Có văn bản phát hành trước khi bật ký số thì tra mã → khớp, `signature: null`; không có (két có PKI ngay từ khi
+   cài) thì in "bỏ qua".
+
+**Trên giao diện** (người ngoài, không đăng nhập — đường dẫn in cuối màn): `/xac-thuc/<mã>` có khối "Chữ ký số (minh
+họa)": chuẩn chữ ký, ký bởi, chứng thư do, số sê-ri, giờ ký, và câu chú thích màu hổ phách "chỉ để minh họa — không
+có giá trị pháp lý như chữ ký số công cộng". Văn bản hạn chế, văn bản cũ: "Văn bản này không có chữ ký số…". Thả bản
+phát hành vào: "khớp từng byte" như trước.
+
+**Tùy chọn — mở bằng trình đọc PDF** (nói trước: trình đọc sẽ báo chữ ký **chưa tin cậy** / không rõ danh tính, vì
+CA nội bộ không nằm trong danh sách tin cậy công cộng; đó là hành vi đúng):
+
+1. `vanthu` tải bản phát hành ở màn văn bản. Mở bằng Adobe Acrobat Reader hoặc Okular: thấy chữ ký chứng nhận của
+   "Khoa Công nghệ thông tin", lý do "Phát hành văn bản <số ký hiệu>", trạng thái chưa tin
+   cậy.
+2. Lấy chứng thư CA (trong thư mục mã nguồn hoặc thư mục cài):
+   `docker compose exec -T openbao wget -qO- http://127.0.0.1:8200/v1/pki/ca/pem > moc-ca-noi-bo-MAU.pem` — so vân tay
+   SHA-256 với dòng in ở bước 1.
+3. Adobe: Edit → Preferences → Signatures → Identities & Trusted Certificates → Trusted Certificates → Import, chọn tệp
+   `.pem`, đánh dấu "Use this certificate as a trusted root". Okular (Poppler đọc kho chứng thư NSS, mặc định
+   `~/.pki/nssdb`): `certutil -d sql:$HOME/.pki/nssdb -A -n "CA noi bo Moc - MAU" -t "C,C,C" -i moc-ca-noi-bo-MAU.pem`.
+   Mở lại PDF: chữ ký hợp lệ, tài liệu chưa bị sửa từ khi ký. Thử xong thì gỡ CA khỏi trình đọc (Adobe: xóa trong
+   Trusted Certificates; NSS: `certutil -d sql:$HOME/.pki/nssdb -D -n "CA noi bo Moc - MAU"`). Đường menu có thể khác
+   theo phiên bản trình đọc.
+4. Thêm một ghi chú trong trình đọc rồi lưu: trình đọc báo tài liệu đã bị sửa sau chữ ký chứng nhận — đúng như bước 5
+   của lệnh.
+
+**Số đo** (stack thử của CI trên máy dev, 22/10/2026): riêng bước ký, đo trong container `svc-files` — lần đầu của một
+đơn vị (két sinh khóa RSA-3072, CA cấp chứng thư, ký, tự kiểm) 0,27–0,46 giây; các lần sau 0,04 giây (trung vị 5 lần).
+Cả lượt phát hành có ký ở màn này 0,4–1,0 giây (hai lần chạy), nên ký số chỉ thêm chừng 0,04 giây mỗi văn bản, trừ
+lần đầu của đơn vị; cả màn 26–36 giây.
+
+**Nếu giám khảo hỏi:**
+
+- *"Chữ ký này có giá trị pháp lý không?"* Không — chỉ minh họa. Muốn có giá trị pháp lý cần chứng thư số do tổ chức
+  cung cấp dịch vụ chứng thực chữ ký số công cộng cấp (thường kèm USB token hay HSM và dịch vụ dấu thời gian); ngoài
+  phạm vi. Phần làm được ở đây — ký đúng chuẩn PAdES, khóa không rời két, kiểm được — vẫn dùng lại khi thay CA.
+- *"Khóa riêng nằm ở đâu?"* Trong Transit của két, mỗi đơn vị một khóa. svc-files chỉ gửi phần cần ký (thuộc tính đã
+  ký) và nhận lại chữ ký; policy của svc-files không có `transit/export` hay `transit/backup`. Ai chiếm được svc-files
+  thì ký được (như mọi HSM: gọi được là ký được) nhưng không mang khóa đi được; két ghi sổ từng lần ký.
+- *"Giờ ký có tin được không?"* Không có dấu thời gian tin cậy (PAdES B-T cần dịch vụ TSA bên ngoài, demo phải chạy
+  không cần mạng ngoài): giờ ký là giờ svc-files tự ghi, lệnh kiểm và cổng xác thực ghi rõ điều này. Chứng thư lá sống
+  một năm; hết hạn thì lệnh kiểm kiểm tại giờ ký tự ghi và báo.
+- *"Sao văn bản hạn chế không ký?"* Mỗi lần mở, tệp bị viết lại toàn bộ để đóng dấu tên người xem — chữ ký hỏng ngay
+  lần mở đầu. Người nhận văn bản hạn chế kiểm bằng mã và SHA-256 như trước.
+- *"Văn bản phát hành trước đây?"* Không ký lại: băm, mã QR, sổ kiểm toán đã cố định. Cổng xác thực ghi "không có chữ
+  ký số", vẫn kiểm bằng SHA-256.
+- *"Két cài trước F4.5?"* Két đó không có PKI nội bộ nên ký số tự tắt: phát hành như cũ, nhật ký svc-files có
+  `office.signing.disabled`. Cài mới (và CI) thì có PKI ngay.
+- *"Còn gì chưa làm?"* Không dấu thời gian tin cậy, không thông tin kiểm dài hạn (LTV), không CRL/OCSP; cổng xác thực
+  chưa có nút tải chứng thư CA (lấy bằng lệnh ở trên); trang xác thực chưa tự báo "sửa sau khi ký" khi thả tệp (lệnh
+  kiểm báo, và tra theo băm phần đã ký thì cổng trả đúng văn bản); chưa có bước demo xin xuất khóa để thấy két từ chối;
+  két cài trước F4.5 chưa tự nâng cấp lên có PKI; chứng thư chưa tự cấp lại khi sắp hết hạn; mỗi đơn vị một khóa, chưa
+  ký theo từng người.

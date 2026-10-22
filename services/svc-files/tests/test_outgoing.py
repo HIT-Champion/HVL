@@ -207,7 +207,7 @@ def test_verify_by_code_needs_no_login(client, issued, code):
     assert body["document"] == {
         "symbol": "05/TB-CNTT", "issued_on": "2026-10-19", "type_name": "Thông báo",
         "issuer_name": "Khoa Công nghệ thông tin", "parent_name": "Trường Đại học Thử", "summary": None,
-        "sha256": "cd" * 32, "verify_code": "ABCDE23456", "status": "issued",
+        "sha256": "cd" * 32, "verify_code": "ABCDE23456", "status": "issued", "signature": None,
     }
 
 

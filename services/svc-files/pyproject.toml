@@ -35,6 +35,7 @@ dependencies = [
   "duckdb==1.5.6",
   "segno>=1.6,<2",
   "pypdf>=6.19,<7",
+  "pyhanko==0.37.0",    # ký số PAdES văn bản đi (F4.5, chỉ minh họa)
   "pillow>=12.3,<13",   # OCR (F4.1): mở, xoay, thu ảnh trước khi gửi tesseract — trước đây chỉ có gián tiếp qua WeasyPrint
 ]
 
