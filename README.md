@@ -1,5 +1,7 @@
 # Signet
 
+**English:** [README.en.md](README.en.md)
+
 > **Lõi nền tảng nguồn mở, tự cài, đóng dấu tin cậy lên mọi thứ đi qua nó** — kèm ứng dụng đầu tiên chạy trên lõi:
 > **Văn phòng điện tử** quản lý văn bản đến, văn bản đi theo Nghị định 30/2020/NĐ-CP.
 
@@ -46,7 +48,7 @@ tổ chức tự cài, tự làm chủ. Ứng dụng mới chỉ cần cắm và
 | Biết ai đã làm | Mọi lời gọi mang danh tính SSO, kể cả của tác tử AI; vai trò quan trọng bắt buộc xác thực hai bước | Keycloak, APISIX | ① ② |
 | Sạch | Tệp được quét mã độc trước khi lưu, tệp bẩn không chạm tới kho | `svc-files` + ClamAV | ① |
 | Không sửa lén được | Mọi thay đổi vào sổ kiểm toán chuỗi băm; mốc đầu chuỗi neo ra ngoài CSDL, sửa lén thì `make audit` chỉ ra dòng bị sửa | PostgreSQL, schema `core` | ⑥ |
-| Kiểm chứng được từ bên ngoài | Văn bản phát hành mang mã QR, SHA-256 và chữ ký số (minh họa); cổng xác thực công khai, không cần đăng nhập | `svc-files`, route `/api/verify` | ④ ⑥ |
+| Kiểm chứng được từ bên ngoài | Văn bản phát hành mang mã QR, SHA-256 và chữ ký số (minh họa, không có giá trị pháp lý); cổng xác thực công khai, không cần đăng nhập | `svc-files`, route `/api/verify` | ④ ⑥ |
 
 ## Tính năng
 
@@ -99,7 +101,8 @@ yếu, tìm theo nghĩa và viết câu trả lời: `make ai-model` (tải mô 
 
 ### Ảnh chụp màn hình
 
-Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu.
+Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt, trang nào cũng có bản
+tiếng Anh.
 
 | Văn thư tải công văn lên, tác tử điền sẵn các ô | Lãnh đạo xem việc nghẽn ở đâu | Người nhận tự kiểm văn bản, không cần đăng nhập |
 |---|---|---|
@@ -324,6 +327,6 @@ code, a SHA-256 hash and an illustrative PAdES signature from an internal CA (no
 read incoming letters, answer questions with quoted sources, and suggest assignments — always as suggestions, running
 on the organisation's own server, with personal data masked before it reaches a model.
 
-Built for the Vietnam National Olympiad in Informatics 2026, Open Source Software track. Formerly named *Mộc*; the
+Built for the Vietnam Student Olympiad in Informatics 2026, Open Source Software track. Formerly named *Mộc*; the
 technical codename `moc` remains in code and configuration. Licensed under Apache-2.0. Contributions welcome — see
-`CONTRIBUTING.md`.
+`CONTRIBUTING.md`. Full English version of this page: [README.en.md](README.en.md).

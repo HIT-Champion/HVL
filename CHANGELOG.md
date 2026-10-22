@@ -8,6 +8,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- README tiếng Anh (`README.en.md`, F2.11): dịch đúng README.md (bài toán, tính năng, trợ lý AI, bằng chứng 4
+  nguyên lý, kiến trúc, cài đặt, vận hành, kiểm thử), liên kết hai chiều ở đầu hai tệp.
 - Giới hạn tốc độ ở cổng APISIX (F1.2), vượt thì trả 429: đường nhận mật khẩu và cấp token theo địa chỉ IP
   (`MOC_RATE_LOGIN_PER_MIN`, mặc định 60/phút), GraphQL và tệp theo phiên đăng nhập (`MOC_RATE_API_PER_MIN`,
   mặc định 300/phút). Giao diện báo "thao tác quá nhanh" thay cho lỗi chung; `make smoke` thêm 3 kiểm tra.
