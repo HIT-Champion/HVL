@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-COPYRIGHT_HOLDER="${MOC_COPYRIGHT_HOLDER:-Mộc Team}"
+COPYRIGHT_HOLDER="${MOC_COPYRIGHT_HOLDER:-Signet Team}"
 COPYRIGHT_YEAR="${MOC_COPYRIGHT_YEAR:-2026}"
 
 # Dấu hiệu nhận biết header đã tồn tại

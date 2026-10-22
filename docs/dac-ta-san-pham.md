@@ -1,4 +1,4 @@
-# Đặc tả sản phẩm Mộc — Văn phòng điện tử trên DX-OS Open-Core
+# Đặc tả sản phẩm Signet — Văn phòng điện tử trên DX-OS Open-Core
 
 > Lập ngày 15/10/2026. Thay hướng "luồng phê duyệt đề xuất mua sắm / tạm ứng / nghỉ phép" của kế hoạch
 > ngày 05/10.
@@ -11,10 +11,10 @@
 
 ## 0. Tóm tắt
 
-Mộc là một lõi **DX-OS Open-Core** (Tầng 1, không giao diện) cùng hai ứng dụng Tầng 2 chạy trên lõi.
+Signet là một lõi **DX-OS Open-Core** (Tầng 1, không giao diện) cùng hai ứng dụng Tầng 2 chạy trên lõi.
 
 **Lõi** cung cấp 4 dịch vụ đề bắt buộc — định danh, cổng API, dữ liệu có cấu trúc và phi cấu trúc,
-quy trình — và một lớp **tin cậy** dùng chung: lõi "đóng mộc" lên mọi thứ đi qua nó.
+quy trình — và một lớp **tin cậy** dùng chung: lõi "đóng dấu" lên mọi thứ đi qua nó.
 
 - **Biết ai đã làm:** mọi lời gọi mang danh tính SSO, kể cả tác tử AI.
 - **Sạch:** tệp được quét mã độc trước khi lưu.
@@ -182,7 +182,7 @@ TOTP bắt buộc cho `clerk`, `manager`, `director`. Tài khoản dùng thử c
 | F2.10 | `make seed` qua API: ~50 văn bản ở nhiều trạng thái, văn bản đến lấy từ công văn đã công bố công khai |
 | F2.11 | Cộng đồng: đơn vị chạy thử dùng bản online, README tiếng Anh, "good first issue" |
 | F2.12 | **Sổ kiểm toán chuỗi băm** (trước là F3.5): mọi thay đổi vào chuỗi băm SHA-256; `dxos audit verify` chỉ ra dòng bị sửa; neo hash đầu chuỗi ra ngoài CSDL. Hash của mọi văn bản phát hành nằm trong chuỗi |
-| F2.13 | **Cổng xác thực văn bản** (trước là F3.6, `apps/verify`): quét QR hoặc nhập mã → số ký hiệu, ngày, cơ quan ban hành, trích yếu (nếu văn bản được đánh dấu công khai) và kết quả khớp. Thả tệp PDF vào → **trình duyệt tự tính SHA-256, không tải tệp lên** → so khớp. Văn thư dùng cùng chức năng khi tiếp nhận văn bản đến từ một hệ thống Mộc khác (NĐ 30, Điều 21) |
+| F2.13 | **Cổng xác thực văn bản** (trước là F3.6, `apps/verify`): quét QR hoặc nhập mã → số ký hiệu, ngày, cơ quan ban hành, trích yếu (nếu văn bản được đánh dấu công khai) và kết quả khớp. Thả tệp PDF vào → **trình duyệt tự tính SHA-256, không tải tệp lên** → so khớp. Văn thư dùng cùng chức năng khi tiếp nhận văn bản đến từ một hệ thống Signet khác (NĐ 30, Điều 21) |
 
 ### 4.2. Should — Phase 3 (`v0.5.0`)
 
@@ -310,6 +310,8 @@ Chỉ trình bày số đo thật. Chỉ số nào chưa đo được thì nói 
    "DX-Lab" trùng ứng dụng của HaUI và tên Trạm thực hành số trong chủ đề cuộc thi; "AgentLab" trùng
    dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL`;
    tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi trường `MOC_*`.
+   **Đổi 23/10/2026: Signet** — nhẫn ấn đóng dấu lên văn bản, giữ ý "đóng dấu" của tên cũ; chỉ đổi tên hiển thị
+   (giao diện, tài liệu, chuỗi in ra, header giấy phép "Signet Team"), tên kỹ thuật `moc` giữ nguyên.
 2. **Đơn vị chạy thử**: văn thư khoa nào đồng ý dùng thử; nếu không, dùng phương án dự phòng ở kế hoạch §1.1.
    Khoa thường không có con dấu riêng; văn bản mang dấu do văn thư trường phát hành. Cần hỏi khoa có tự
    đánh số văn bản đi (thông báo, kế hoạch nội bộ) không. Nếu không, luồng văn bản đi chạy thử ở văn thư

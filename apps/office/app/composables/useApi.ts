@@ -1,4 +1,4 @@
-// Copyright 2026 Mộc Team
+// Copyright 2026 Signet Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Gọi lõi Mộc qua APISIX cùng tên miền: GraphQL (Hasura) cho dữ liệu và thao tác nghiệp vụ, REST của
+// Gọi lõi Signet qua APISIX cùng tên miền: GraphQL (Hasura) cho dữ liệu và thao tác nghiệp vụ, REST của
 // svc-files cho tệp và tìm kiếm. Mọi yêu cầu mang access token của người dùng.
 
 export class ApiError extends Error {

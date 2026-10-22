@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,8 +69,8 @@ VAULT = "/data/openbao"                 # chỗ volume két OpenBao gắn vào c
 HOST = "moc"                            # tên máy ghi vào snapshot: cố định, để restic tìm ra lượt trước và chỉ đọc
 TAG = "moc"                             # tệp đã đổi (container mỗi lần một tên khác)
 MANIFEST = "manifest.json"
-# Đặt trước khi dừng Mộc để khôi phục, xóa khi Mộc đã chạy lại: còn tệp này thì reconciler (F3.3) không dựng lại Mộc
-# trên dữ liệu khôi phục dở dang
+# Đặt trước khi dừng Signet để khôi phục, xóa khi Signet đã chạy lại: còn tệp này thì reconciler (F3.3) không dựng
+# lại Signet trên dữ liệu khôi phục dở dang
 RESTORING = ROOT / ".moc-restoring"
 # Những gì restic tạo trong kho — chỉ trả quyền sở hữu những mục này, không đụng tệp khác trong thư mục
 REPO_ENTRIES = "/repo/config /repo/keys /repo/data /repo/index /repo/snapshots /repo/locks"
@@ -152,7 +152,7 @@ def _guard(repo: pathlib.Path) -> Iterator[None]:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise BackupError(f"một lệnh sao lưu hoặc khôi phục khác đang chạy trên kho {repo}") from None
-        # F3.3: khóa chung với reconciler (scripts/reconcile.py) trên thư mục chạy Mộc — reconciler không dựng lại
+        # F3.3: khóa chung với reconciler (scripts/reconcile.py) trên thư mục chạy Signet — reconciler không dựng lại
         # dịch vụ giữa lúc khôi phục. Reconciler đang áp cấu hình mới thì đợi nó xong (tối đa 30 phút).
         deadline = time.monotonic() + 1800
         while True:
@@ -393,7 +393,7 @@ def _restore_db(db: str, snapshot: str) -> None:
 
 
 def _check_readable(target: dict[str, Any], manifest: dict[str, Any]) -> None:
-    """Trước khi dừng Mộc: lượt còn đủ mọi phần ghi trong manifest, kho không hỏng, bản dump đọc được trọn vẹn
+    """Trước khi dừng Signet: lượt còn đủ mọi phần ghi trong manifest, kho không hỏng, bản dump đọc được trọn vẹn
     (restic kiểm hash từng khối khi đọc). Hỏng thì dừng ở đây, chưa đụng tới dữ liệu đang có."""
     wanted = {f"{db}.dump": part["snapshot"] for db, part in manifest["databases"].items()}
     wanted[FILES.lstrip("/")] = manifest["files"]["snapshot"]
@@ -418,14 +418,14 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         manifest = json.loads(_call(restic("dump", target["parts"][MANIFEST], f"/{MANIFEST}"),
                                     "không đọc được manifest"))
         head = manifest["audit"]
-        print(f"Lượt {manifest['run']}, sao lưu lúc {_when(manifest['run'])} (Mộc {manifest['version']}):"
+        print(f"Lượt {manifest['run']}, sao lưu lúc {_when(manifest['run'])} (Signet {manifest['version']}):"
               f" CSDL {', '.join(manifest['databases'])}; tệp {_size(manifest['files']['bytes'])};"
               f" {'két' if 'vault' in manifest else 'chưa có két (giữ két đang có)'};"
               f" sổ kiểm toán tới dòng #{head['id']}.")
         current = ENV.get("MOC_VERSION") or "dev"
         if manifest["version"] != current:
-            print(f"  · đang chạy Mộc {current}: bản mới hơn thì Hasura tự chạy migration còn thiếu khi khởi động;"
-                  f" bản cũ hơn bản sao lưu thì nên cài đúng Mộc {manifest['version']} trước")
+            print(f"  · đang chạy Signet {current}: bản mới hơn thì Hasura tự chạy migration còn thiếu khi khởi động;"
+                  f" bản cũ hơn bản sao lưu thì nên cài đúng Signet {manifest['version']} trước")
         if "postgres" in _services("running"):
             extra = sorted(set(_databases()) - set(manifest["databases"]))
             if extra:
@@ -433,8 +433,8 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         if not yes:
             if not sys.stdin.isatty():
                 raise BackupError("không hỏi lại được (không chạy trên terminal): thêm --yes")
-            answer = input("Mộc sẽ DỪNG; CSDL và tệp hiện có bị THAY bằng bản sao lưu, mọi thay đổi sau lúc sao lưu sẽ"
-                           " mất (muốn giữ trạng thái hiện tại thì make backup trước). Khôi phục? [y/N] ")
+            answer = input("Signet sẽ DỪNG; CSDL và tệp hiện có bị THAY bằng bản sao lưu, mọi thay đổi sau lúc sao"
+                           " lưu sẽ mất (muốn giữ trạng thái hiện tại thì make backup trước). Khôi phục? [y/N] ")
             if answer.strip().lower() not in ("y", "yes", "c", "co", "có"):
                 print("Không khôi phục.")
                 return None
@@ -443,9 +443,9 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         started = time.monotonic()
         try:
             RESTORING.write_text(f"{manifest['run']}\n", encoding="utf-8")
-            _call([*COMPOSE, "down"], "không dừng được Mộc")
+            _call([*COMPOSE, "down"], "không dừng được Signet")
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "300", "postgres"], "PostgreSQL không lên")
-            print("  ✓ Đã dừng Mộc, chỉ chạy PostgreSQL", flush=True)
+            print("  ✓ Đã dừng Signet, chỉ chạy PostgreSQL", flush=True)
             for db, part in manifest["databases"].items():
                 _restore_db(db, part["snapshot"])
                 print(f"  ✓ CSDL {db}", flush=True)
@@ -470,13 +470,14 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
                     "version": manifest["version"]}
             event = _psql(RESTORED_SQL, actor=actor, run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
             print(f"  ✓ Lần khôi phục ghi vào sổ kiểm toán: dòng #{event}", flush=True)
-            _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"], "Mộc chưa chạy lại được — xem: make logs")
+            _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"],
+                  "Signet chưa chạy lại được — xem: make logs")
             RESTORING.unlink(missing_ok=True)
         except BaseException:
-            print(f"✗ Khôi phục dừng giữa chừng; Mộc có thể đang dừng. Sửa lỗi bên dưới rồi chạy lại: python3"
+            print(f"✗ Khôi phục dừng giữa chừng; Signet có thể đang dừng. Sửa lỗi bên dưới rồi chạy lại: python3"
                   f" scripts/moc.py backup restore {manifest['run']}", file=sys.stderr)
             raise
-        print(f"  ✓ Mộc chạy lại. Xong trong {_seconds(time.monotonic() - started)}.")
+        print(f"  ✓ Signet chạy lại. Xong trong {_seconds(time.monotonic() - started)}.")
     print("Kiểm lại cả chuỗi sổ kiểm toán và mốc neo: make audit")
     return {**manifest, "restored_event": int(event)}
 

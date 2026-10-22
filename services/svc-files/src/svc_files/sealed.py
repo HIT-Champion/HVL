@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ def seal(plain: bytes, key: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) -> 
 
 def unseal(blob: bytes, key: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) -> bytes:
     if not blob.startswith(MAGIC) or len(blob) < len(MAGIC) + NONCE + 16:
-        raise SealError("không phải bản mã của Mộc")
+        raise SealError("không phải bản mã của Signet")
     nonce = blob[len(MAGIC):len(MAGIC) + NONCE]
     try:
         return AESGCM(key).decrypt(nonce, blob[len(MAGIC) + NONCE:], _aad(tenant_id, file_id))

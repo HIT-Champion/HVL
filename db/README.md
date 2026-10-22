@@ -1,6 +1,6 @@
 # db — schema PostgreSQL và metadata Hasura
 
-Dữ liệu có cấu trúc của Mộc (F1.3): schema `core` dùng chung cho mọi ứng dụng, schema `office` của ứng dụng
+Dữ liệu có cấu trúc của Signet (F1.3): schema `core` dùng chung cho mọi ứng dụng, schema `office` của ứng dụng
 Văn phòng điện tử, cùng quyền đọc ghi theo vai trò và thuê ước. Mô hình và lý do của từng bảng:
 [`docs/mo-hinh-du-lieu.md`](../docs/mo-hinh-du-lieu.md). Chủ: mảng AI · issue #18.
 

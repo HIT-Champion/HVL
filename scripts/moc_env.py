@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -183,7 +183,7 @@ def user_token(username: str, password: str | None = None) -> str:
 
 
 class Session:
-    """Một người dùng gọi Mộc qua cổng APISIX."""
+    """Một người dùng gọi Signet qua cổng APISIX."""
 
     def __init__(self, username: str):
         self.username = username
@@ -335,7 +335,7 @@ def vault_ca_pem() -> str | None:
 
 def signature_cli(pdf: bytes) -> tuple[int, list[str]]:
     """Kiểm chữ ký số của tệp PDF bằng pyHanko trong svc-files (python -m svc_files.signing verify, chỉ tin CA của két)
-    → (mã thoát, các dòng in ra). 0: hợp lệ; 1: đã sửa sau khi ký, không khớp nội dung, không do CA Mộc cấp, không có
+    → (mã thoát, các dòng in ra). 0: hợp lệ; 1: đã sửa sau khi ký, không khớp nội dung, không do CA Signet cấp, không có
     chữ ký; 2: không đọc được tệp như PDF, không lấy được chứng thư CA. Dòng đầu là kết luận."""
     try:
         out = compose("exec", "-T", "svc-files", "python", "-m", "svc_files.signing", "verify", stdin=pdf)

@@ -4,7 +4,8 @@
 > chính thức, và được giữ lại làm hồ sơ nghiên cứu. Hướng đi hiện tại của dự án nằm ở
 > [`../ke-hoach-phat-trien.md`](../ke-hoach-phat-trien.md); phân tích đề chính thức ở
 > [`../olp-2026-de-thi.md`](../olp-2026-de-thi.md). Chỗ nào mâu thuẫn, hai tài liệu đó được ưu tiên.
-> Khi viết các tài liệu này, dự án còn mang tên **DX-Lab**; từ 15/10/2026 sản phẩm đổi tên thành **Mộc**.
+> Khi viết các tài liệu này, dự án còn mang tên **DX-Lab**; từ 15/10/2026 sản phẩm đổi tên thành **Mộc**,
+> từ 23/10/2026 là **Signet**.
 
 | Tài liệu | Nội dung | Trạng thái |
 |---|---|---|

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
-  "description": "Mộc — kiểm thử đầu-cuối trên trình duyệt thật (Playwright)",
+  "description": "Signet — kiểm thử đầu-cuối trên trình duyệt thật (Playwright)",
   "scripts": {
     "test": "playwright test"
   },

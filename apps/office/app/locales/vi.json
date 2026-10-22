@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Mộc",
+    "name": "Signet",
     "tagline": "Văn phòng điện tử",
     "loading": "Đang tải…",
     "retry": "Thử lại",
@@ -327,7 +327,7 @@
       "sourceCode": "Mã xác thực của bên gửi",
       "hashMatch": "SHA-256 khớp bản phát hành",
       "hashMismatch": "SHA-256 KHÔNG khớp bản phát hành của bên gửi — báo quản trị hệ thống",
-      "fromHint": "Văn bản đi của đơn vị khác cùng dùng Mộc, tự chuyển sang khi bên gửi phát hành. Tệp là bản sao của bản phát hành; mở trang xác thực để đối chiếu.",
+      "fromHint": "Văn bản đi của đơn vị khác cùng dùng Signet, tự chuyển sang khi bên gửi phát hành. Tệp là bản sao của bản phát hành; mở trang xác thực để đối chiếu.",
       "manualHint": "Văn thư đã tiếp nhận văn bản này từ bản giấy hoặc thư điện tử; bên gửi phát hành qua liên thông sau đó nên chỉ nối vào, tệp đính kèm là bản văn thư tải lên. Mở trang xác thực để đối chiếu với bản phát hành."
     }
   },
@@ -604,7 +604,7 @@
   },
   "verify": {
     "title": "Xác thực văn bản",
-    "subtitle": "Kiểm tra một văn bản do đơn vị dùng Mộc phát hành có thật và còn nguyên vẹn hay không.",
+    "subtitle": "Kiểm tra một văn bản do đơn vị dùng Signet phát hành có thật và còn nguyên vẹn hay không.",
     "code": "Mã xác thực",
     "codeHint": "10 ký tự in cạnh mã QR, ví dụ ABCDE-23456",
     "lookup": "Tra cứu",
@@ -613,7 +613,7 @@
     "checking": "Đang tra cứu…",
     "valid": "Văn bản có thật, do đơn vị dưới đây phát hành",
     "notFound": "Không tìm thấy văn bản nào khớp",
-    "notFoundHint": "Kiểm tra lại mã. Nếu tra bằng tệp: tệp đã bị sửa, hoặc không phải văn bản phát hành trên Mộc.",
+    "notFoundHint": "Kiểm tra lại mã. Nếu tra bằng tệp: tệp đã bị sửa, hoặc không phải văn bản phát hành trên Signet.",
     "match": "Tệp khớp từng byte với bản đã phát hành",
     "mismatch": "Tệp KHÔNG khớp với văn bản có mã này: có thể đã bị sửa",
     "compare": "Thả tệp PDF bạn nhận được để so với bản gốc",
@@ -631,12 +631,12 @@
       "ca": "Chứng thư do",
       "serial": "Số sê-ri chứng thư",
       "signedAt": "Ký lúc (giờ tự ghi trong chữ ký)",
-      "illustrative": "Chữ ký dùng hạ tầng khóa công khai nội bộ của Mộc, chỉ để minh họa — không có giá trị pháp lý như chữ ký số công cộng. Trình đọc PDF sẽ báo chữ ký chưa tin cậy vì CA nội bộ này không nằm trong danh sách tin cậy công cộng.",
+      "illustrative": "Chữ ký dùng hạ tầng khóa công khai nội bộ của Signet, chỉ để minh họa — không có giá trị pháp lý như chữ ký số công cộng. Trình đọc PDF sẽ báo chữ ký chưa tin cậy vì CA nội bộ này không nằm trong danh sách tin cậy công cộng.",
       "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên."
     },
     "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
-    "footer": "Mộc — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
+    "footer": "Signet — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
   },
   "notify": {
     "title": "Thông báo",

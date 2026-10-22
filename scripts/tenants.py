@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 """Đơn vị (thuê ước) và Keycloak Organizations (F3.12): `moc tenant create | list | check`, dùng chung với make seed.
 
-Một đơn vị của Mộc gồm:
+Một đơn vị của Signet gồm:
   - một dòng core.tenants (mã viết trong ký hiệu văn bản, tên, thông tin in trên văn bản đi) và các phòng trong
     office.departments — ghi bằng psql trong container postgres với `set local moc.actor`, nên sổ kiểm toán ghi ai làm;
   - một Organization trong Keycloak: alias suy từ mã (ĐT → dt), thuộc tính tenant_id = id của đơn vị; mọi tài khoản có
@@ -495,7 +495,7 @@ def plan_organization(orgs: list[dict[str, Any]], tenant_id: str | None, code: s
         raise TenantError(f"alias {alias} đã thuộc Organization {clash.get('name')!r} "
                           f"({'tenant_id ' + owner if owner else 'không gắn đơn vị nào'}) — chọn alias khác: --alias")
     return "created", {"name": org_name, "alias": alias, "enabled": True,
-                       "description": f"Đơn vị {code} trong Mộc (core.tenants)",
+                       "description": f"Đơn vị {code} trong Signet (core.tenants)",
                        "attributes": {"tenant_id": [tenant_id] if tenant_id else []},
                        "domains": [{"name": d} for d in domains]}
 
@@ -760,7 +760,7 @@ def consistency(tenants: list[dict[str, Any]], orgs: list[dict[str, Any]], membe
         for o in orgs:
             tid = org_tenant(o)
             if tid is None:
-                notes.append(f"Organization {o.get('alias')} không mang tenant_id: không thuộc Mộc, bỏ qua")
+                notes.append(f"Organization {o.get('alias')} không mang tenant_id: không thuộc Signet, bỏ qua")
             elif tid not in by_id:
                 problems.append((set(), f"Organization {o.get('alias')} mang tenant_id {tid} không có trong "
                                         "core.tenants"))
@@ -790,7 +790,7 @@ def consistency(tenants: list[dict[str, Any]], orgs: list[dict[str, Any]], membe
                 notes.append(f"{name} ({code}): chưa có email — Keycloak không cho sửa hồ sơ thành viên Organization "
                              "thiếu email")
             if first(u.get("attributes"), "moc_role") not in ROLES:
-                notes.append(f"{name} ({code}): chưa có moc_role hợp lệ — không vào được Mộc, danh bạ bỏ qua")
+                notes.append(f"{name} ({code}): chưa có moc_role hợp lệ — không vào được Signet, danh bạ bỏ qua")
         elif hit:
             why = f"thuộc đơn vị {code_of(tid)} (tenant_id {tid})" if tid else "không có thuộc tính tenant_id"
             problems.append((hit, f"{name}: là thành viên Organization "
@@ -893,7 +893,7 @@ def render_create(r: dict[str, Any]) -> None:
     for line in r["shared"]:
         print(f"  · {line}")
     if not r["dry_run"]:
-        first_login = (f"{admin['username']} đăng nhập Mộc, đổi mật khẩu" + (", cài TOTP. " if admin["status"] == "created"
+        first_login = (f"{admin['username']} đăng nhập Signet, đổi mật khẩu" + (", cài TOTP. " if admin["status"] == "created"
                                                                               else ". ")
                        if admin["status"] in ("created", "reset") else "")
         print(f"Tiếp theo: {first_login}Tài khoản khác của đơn vị tạo trong trang quản trị Keycloak (tenant_id = "
@@ -911,7 +911,7 @@ def cmd_create(args: argparse.Namespace) -> int:
     except TenantError as exc:
         return _emit(args, str(exc), 1)
     except Unavailable as exc:
-        return _emit(args, f"{exc}. Mộc có đang chạy không? (make ps)", 2)
+        return _emit(args, f"{exc}. Signet có đang chạy không? (make ps)", 2)
     if args.json:
         print(json.dumps(result, ensure_ascii=False))
     else:
@@ -934,7 +934,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     try:
         rows = database().query(TENANTS_SQL)
     except (TenantError, Unavailable) as exc:
-        return _emit(args, f"{exc}. Mộc có đang chạy không? (make ps)", 2)
+        return _emit(args, f"{exc}. Signet có đang chạy không? (make ps)", 2)
     error = None
     orgs: list[dict[str, Any]] = []
     members: dict[str, list[dict[str, Any]]] = {}
@@ -973,7 +973,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         data = database().query(CHECK_SQL)
         orgs, members, users, enabled = _keycloak_view()
     except (TenantError, Unavailable) as exc:
-        return _emit(args, f"{exc}. Mộc có đang chạy không? (make ps)", 2)
+        return _emit(args, f"{exc}. Signet có đang chạy không? (make ps)", 2)
     report = consistency(data["tenants"], orgs, members, users, data["users"], args.codes)
     if not enabled:
         report.problems.insert(0, "realm chưa bật Organizations — chạy make seed (đơn vị mẫu) hoặc "

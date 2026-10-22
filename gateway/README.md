@@ -5,7 +5,7 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
 
 - Danh sách trắng: `/realms/<realm>/*`, `/resources/*` → Keycloak; `/v1/graphql` → Hasura; `/api/files*`,
   `/api/search` → svc-files; còn lại → giao diện.
-- Đường quản trị bị chặn tường minh (404): `/admin`, `/realms/*` khác realm của Mộc, `/console`, `/v1/*`,
+- Đường quản trị bị chặn tường minh (404): `/admin`, `/realms/*` khác realm của Signet, `/console`, `/v1/*`,
   `/v2/*`, `/healthz`, `/flowable-rest/*`.
 - Kiểm JWT ở biên (`openid-connect`, chỉ Bearer, khóa qua JWKS nội bộ của Keycloak); Hasura và svc-files
   vẫn kiểm lại. Tiêu đề `X-Hasura-Admin-Secret` từ ngoài vào bị gỡ, cả tên cũ `X-Hasura-Access-Key`

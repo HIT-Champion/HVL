@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,6 +78,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+# tên cũ của sản phẩm: PDF mẫu đã commit và số đo đọc văn bản dựng từ chuỗi này — đổi là in lại, đo lại
 NOTE = "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật."
 MOTTO = "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"
 MOTTO2 = "Độc lập - Tự do - Hạnh phúc"

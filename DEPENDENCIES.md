@@ -1,6 +1,6 @@
 # Danh mục phần mềm thượng nguồn và giấy phép
 
-Tài liệu này làm rõ mọi thư viện, gói và phần mềm thượng nguồn mà Mộc phụ thuộc vào — yêu cầu
+Tài liệu này làm rõ mọi thư viện, gói và phần mềm thượng nguồn mà Signet phụ thuộc vào — yêu cầu
 bắt buộc theo tiêu chí chấm điểm PoF #5 (*"Có thông tin làm rõ các thư viện, gói đính kèm được
 sử dụng"*).
 
@@ -10,10 +10,10 @@ sử dụng"*).
    Mọi phần mềm thượng nguồn được nạp lúc chạy qua image Docker chính thức có ghim thẻ phiên bản và
    digest, hoặc qua trình quản lý gói (`npm`, `pip`) với tệp khóa phiên bản (lockfile).
 2. **Không chỉnh sửa upstream.** Mã nguồn của các dự án thượng nguồn được dùng ở dạng **nguyên
-   bản**. Mọi tùy biến của Mộc nằm ở lớp cấu hình, plugin hoặc adapter riêng.
+   bản**. Mọi tùy biến của Signet nằm ở lớp cấu hình, plugin hoặc adapter riêng.
 3. **Ưu tiên thư viện sẵn có của hệ thống** thay vì đóng gói kèm bản riêng.
 4. **Kiểm tra tương thích giấy phép.** Mọi thành phần mới phải có giấy phép được OSI phê duyệt và
-   tương thích với Apache-2.0 của Mộc.
+   tương thích với Apache-2.0 của Signet.
 
 ## Cách đọc
 
@@ -32,7 +32,7 @@ sử dụng"*).
 - **Phase**: thời điểm thành phần được đưa vào, theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md).
   Thành phần đánh dấu *Could* chỉ được thêm nếu còn thời gian.
 - **Copyleft (GPL, AGPL)**: chỉ dùng ở dạng **dịch vụ độc lập giao tiếp qua mạng**, không liên kết
-  vào mã của Mộc, nên giấy phép của chúng không lan sang Mộc.
+  vào mã của Signet, nên giấy phép của chúng không lan sang Signet.
 
 ## Công cụ dựng và vận hành
 
@@ -52,8 +52,8 @@ sử dụng"*).
 | OSV-Scanner | 2.6.0 | Apache-2.0 | CI: đối chiếu tệp khóa phụ thuộc với cơ sở dữ liệu lỗ hổng OSV | `ghcr.io/google/osv-scanner:v2.6.0` |
 
 > **Ghi chú tương thích:** Make và Git là *công cụ dựng*, được gọi như tiến trình độc lập và không
-> liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Mộc. Cả hai đều là phần
-> mềm nguồn mở — Mộc không dùng bất kỳ công cụ nguồn đóng hay tự chế nào để dựng
+> liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Signet. Cả hai đều là phần
+> mềm nguồn mở — Signet không dùng bất kỳ công cụ nguồn đóng hay tự chế nào để dựng
 > (tiêu chí PoF #4). CI trên GitHub Actions chỉ gọi lại đúng các lệnh `make` ở trên, nên dựng và kiểm
 > thử trên máy riêng không cần GitHub.
 
@@ -98,7 +98,7 @@ Thư viện gián tiếp (khoảng 600 gói, đều chỉ dùng lúc dựng; tra
 giấy phép MIT, ISC, Apache-2.0, BSD, BlueOak-1.0.0, MPL-2.0 hoặc CC0 — đã quét `node_modules` ngày
 18/10/2026, không có giấy phép ngoài danh sách OSI.
 
-**Ghi chú:** BTC gợi ý "Nuxt 3 / Vue 3". Mộc dùng **Nuxt 4** (vẫn chạy trên Vue 3) vì đây là dòng
+**Ghi chú:** BTC gợi ý "Nuxt 3 / Vue 3". Signet dùng **Nuxt 4** (vẫn chạy trên Vue 3) vì đây là dòng
 chính hiện tại; dòng Nuxt 3 chỉ còn nhận bản vá bảo trì. Dùng `vue-i18n` trực tiếp thay cho
 `@nuxtjs/i18n`: ứng dụng chạy hoàn toàn trên trình duyệt, không cần định tuyến theo ngôn ngữ. Nhận thông báo từ
 Centrifugo bằng WebSocket có sẵn của trình duyệt (`app/composables/useRealtime.ts`, theo giao thức JSON công khai
@@ -120,7 +120,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | WeasyPrint (+ pydyf, tinycss2, cssselect2, tinyhtml5, webencodings) | 70.0 | BSD-3-Clause (tinyhtml5: MIT) | Dựng PDF văn bản đi đúng thể thức NĐ 30 từ khuôn HTML (`svc-files`) | pip | 2 |
 | fontTools (+ Brotli, zopfli) | 4.66 | MIT (zopfli: Apache-2.0) | Nhúng và nén phông vào PDF (WeasyPrint kéo theo) | pip | 2 |
 | Pillow | 13.0 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
-| Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Mộc dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
+| Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Signet dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
 | pypdf | 6.21.1 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
@@ -140,7 +140,7 @@ METADATA của gói. Không thêm image, gói npm hay route gateway.
 | pyhanko-certvalidator | 0.32.1 | 10/09/2026 | MIT | pyHanko đòi `>=0.32.0,<0.33` — kiểm chuỗi chứng thư |
 | asn1crypto | 1.5.1 | 15/03/2022 | MIT | pyHanko, certvalidator — cấu trúc ASN.1 |
 | tzlocal | 5.4.4 | 29/06/2026 | MIT | pyHanko |
-| lxml | 6.1.3 | 02/09/2026 | BSD-3-Clause | pyHanko (bắt buộc; Mộc không dùng phần XMP) |
+| lxml | 6.1.3 | 02/09/2026 | BSD-3-Clause | pyHanko (bắt buộc; Signet không dùng phần XMP) |
 | aiohttp | 3.14.4 | 05/10/2026 | Apache-2.0 AND MIT | pyHanko, certvalidator đều bắt buộc; **không dùng tới**: không tải chứng thư, CRL, OCSP qua mạng, không TSA. 3.14.5 (11/10) quá mới |
 | aiohappyeyeballs | 2.7.1 | 01/07/2026 | PSF-2.0 | aiohttp |
 | aiosignal | 1.4.0 | 03/07/2025 | Apache-2.0 | aiohttp |
@@ -151,7 +151,7 @@ METADATA của gói. Không thêm image, gói npm hay route gateway.
 | yarl | 1.25.1 | 15/09/2026 | Apache-2.0 | aiohttp |
 | oscrypto | 1.3.0 | 18/03/2022 | MIT | certvalidator; **không nạp** lúc chạy (kiểm chữ ký dùng `cryptography`) |
 | uritools | 6.1.3 | 23/07/2026 | MIT | certvalidator |
-| certifi | 2026.10.19 | 20/10/2026 | MPL-2.0 | certvalidator (gói CA công cộng, Mộc không dùng: chỉ tin CA nội bộ của két). Nâng từ 2026.7.22 theo ngoại lệ vá bảo mật: GHSA-6q48-6c7w-9gw2, gốc emSign có CA trung gian lộ khóa |
+| certifi | 2026.10.19 | 20/10/2026 | MPL-2.0 | certvalidator (gói CA công cộng, Signet không dùng: chỉ tin CA nội bộ của két). Nâng từ 2026.7.22 theo ngoại lệ vá bảo mật: GHSA-6q48-6c7w-9gw2, gốc emSign có CA trung gian lộ khóa |
 | tzdata | 2026.5 | 03/10/2026 | Apache-2.0 | tzlocal, chỉ trên Windows (`sys_platform == 'win32'`): có trong tệp khóa, không cài vào image |
 
 Gói đã có trong khóa, giữ nguyên bản: `cryptography` 50.0.2 (pyHanko đòi ≥ 48), `idna` 3.20, `typing-extensions`
@@ -172,7 +172,7 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 | Kestra | v2.0.5 | Apache-2.0 | Dự kiến chạy job ngầm. **Chưa đưa vào**: nộp lưu nóng → lạnh (F3.8) chạy thành vòng nền trong `svc-files` — một job mỗi giờ không đáng thêm một máy chủ Java ~1 GB RAM | `kestra/kestra:v2.0.5` | 3 |
 | Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage). **Chưa đưa vào compose**: sự kiện lưu trong `core.lineage_events` (F3.9); đặt `MOC_OPENLINEAGE_URL` thì svc-files gửi sang Marquez | `marquezproject/marquez:0.51.1` | 3 |
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (F3.10, profile `iot`): bản sao số, lịch sử đo, subscription báo `svc-workflow` khi vượt ngưỡng. Bản java mặc định (không Kafka), không mở cổng ra ngoài | `scorpiobroker/all-in-one-runner:java-6.0.2` (image 03/07/2026) | 3 |
-| PostGIS | 16-3.5 | GPL-2.0 | CSDL riêng của Scorpio (broker bắt buộc phần mở rộng `postgis`); dịch vụ độc lập, mạng riêng chỉ broker nối được, Mộc không liên kết mã | `postgis/postgis:16-3.5-alpine`, ghim digest (image 31/08/2026) | 3 |
+| PostGIS | 16-3.5 | GPL-2.0 | CSDL riêng của Scorpio (broker bắt buộc phần mở rộng `postgis`); dịch vụ độc lập, mạng riêng chỉ broker nối được, Signet không liên kết mã | `postgis/postgis:16-3.5-alpine`, ghim digest (image 31/08/2026) | 3 |
 | Prometheus | v3.15.0 | Apache-2.0 | Thu chỉ số của cổng API (plugin `prometheus` của APISIX) mỗi 15 giây; không mở cổng ra ngoài (F3.13) | `prom/prometheus:v3.15.0` | 3 |
 | Grafana (OSS) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát: bảng điều khiển nạp từ `monitoring/` (dịch vụ độc lập, chỉ nghe 127.0.0.1, chỉ xem, không tài khoản) (F3.13) | `grafana/grafana:13.2.3` | 3 |
 | restic | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
@@ -237,7 +237,7 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 | bpmn-js | MIT kèm điều khoản bắt buộc giữ watermark — không thuộc danh sách OSI | Hiển thị tiến trình do đội tự vẽ |
 | PaddleOCR, VietOCR | Kéo theo PaddlePaddle hoặc PyTorch (hàng trăm MB), image và CI chậm hẳn; Tesseract đủ cho công văn in | Tesseract + quy tắc bố cục NĐ 30 (F4.1) |
 | Qdrant (Apache-2.0) | Thêm một image và RAM; kho véc-tơ thứ hai phải đồng bộ thuộc tính quyền với CSDL; không tìm theo từ khóa tiếng Việt nên khi không có mô hình (CI) vẫn cần đường tìm khác. Meilisearch đã chạy, đã có tìm lai từ khóa + véc-tơ trong bản CE | Chỉ mục đoạn `chunks` trong Meilisearch (F4.2) |
-| LlamaIndex (MIT) | `llama-index-core` 0.14 kéo 28 gói phụ thuộc trực tiếp (numpy, SQLAlchemy, NLTK, tiktoken…); NLTK, tiktoken tải dữ liệu từ Internet lúc chạy, mà mạng `ai` không ra Internet; không làm hộ phần lọc quyền của Mộc, trích dẫn và kiểm câu trả lời — đúng phần phải tự viết | Đường ống tự viết trong `svc-files` (`svc_files/assist/`, F4.2) |
+| LlamaIndex (MIT) | `llama-index-core` 0.14 kéo 28 gói phụ thuộc trực tiếp (numpy, SQLAlchemy, NLTK, tiktoken…); NLTK, tiktoken tải dữ liệu từ Internet lúc chạy, mà mạng `ai` không ra Internet; không làm hộ phần lọc quyền của Signet, trích dẫn và kiểm câu trả lời — đúng phần phải tự viết | Đường ống tự viết trong `svc-files` (`svc_files/assist/`, F4.2) |
 | bge-m3 (MIT, 01/2024) | Phương án thay, không phải bị loại: `bge-m3:567m` F16 khoảng 1,2 GB (gấp đôi RAM), điểm truy xuất đa ngữ MMTEB thấp hơn (54,60 so với 64,64). Dùng được bằng `MOC_AI_EMBED_MODEL=bge-m3`, cùng 1024 chiều, không cần tiền tố câu hỏi | Qwen3-Embedding-0.6B (F4.2) |
 | scikit-learn (BSD-3-Clause) | Thêm gói (kéo numpy, SciPy) vào `svc-workflow` cho một bộ phân loại học từ vài chục văn bản đã giao; phải huấn luyện lại mỗi khi thêm đơn vị hay có văn bản mới, và khó chỉ ra vì sao chọn đơn vị đó | Bỏ phiếu theo các văn bản tương tự đã giao (kNN có trọng số trên phần truy xuất của F4.2), căn cứ hiện kèm gợi ý (F4.3) |
 | Mô hình sinh (Qwen3) chọn đơn vị chủ trì | 15–45 giây CPU mỗi văn bản; CI không có mô hình; không giải thích được vì sao chọn đơn vị đó, lại có thể bịa đơn vị không có lãnh đạo phòng | Bỏ phiếu như trên — không cần mô hình, tốt dần khi có thêm văn bản đã giao (F4.3) |
@@ -249,7 +249,7 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 
 ## Kiểm tra tương thích giấy phép
 
-Giấy phép được chấp nhận trong Mộc (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
+Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
 
 - ✅ Apache-2.0, MIT, BSD-2/3-Clause, PostgreSQL License, ISC, MPL-2.0, PSF-2.0 (giấy phép dễ dãi được OSI phê
   duyệt, của chính Python và image `python`; F4.5: aiohappyeyeballs)

@@ -1,4 +1,4 @@
--- Copyright 2026 Mộc Team
+-- Copyright 2026 Signet Team
 --
 -- Licensed under the Apache License, Version 2.0 (the "License");
 -- you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
--- Liên thông văn bản trong hệ thống (F3.12): văn bản đi chọn đơn vị nhận là đơn vị khác dùng Mộc; văn thư phát hành thì
--- mỗi đơn vị nhận có một văn bản đến `received` (source_id trỏ về văn bản đi), kèm bản sao tệp phát hành. Mô tả:
+-- Liên thông văn bản trong hệ thống (F3.12): văn bản đi chọn đơn vị nhận là đơn vị khác dùng Signet; văn thư phát
+-- hành thì mỗi đơn vị nhận có một văn bản đến `received` (source_id trỏ về văn bản đi), kèm bản sao tệp phát hành.
+-- Mô tả:
 -- docs/mo-hinh-du-lieu.md §2.2 (bảng), §4.2 (luồng, đúng một lần), §5 (sự kiện).
 --
 -- Đúng một lần, kể cả khi dịch vụ chết giữa chừng hay chạy nhiều bản sao:

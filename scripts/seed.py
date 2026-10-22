@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ def otp_credential(secret: str) -> dict:
     """TOTP với khóa cho trước (MOC_DEMO_TOTP_SECRET), cùng thông số với otpPolicy* của realm."""
     return {
         "type": "otp",
-        "userLabel": "Mộc — tài khoản mẫu",
+        "userLabel": "Signet — tài khoản mẫu",
         "secretData": json.dumps({"value": secret}),
         "credentialData": json.dumps({"subType": "totp", "digits": 6, "counter": 0, "period": 30,
                                       "algorithm": "HmacSHA1"}),

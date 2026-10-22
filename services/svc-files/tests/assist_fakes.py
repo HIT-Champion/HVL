@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ def passage(text: str, *, document_id: str | None = None, page: int | None = 1, 
 
 def ask_token(signing_key, *, sub: str = "u-van-thu", role: str = "clerk", department: str | None = None,
               tenant: str = str(TENANT_A), default_role: bool = True) -> str:
-    """Token như Keycloak của Mộc: một vai trò cho cả allowed-roles và default-role, kèm phòng nếu có."""
+    """Token như Keycloak của Signet: một vai trò cho cả allowed-roles và default-role, kèm phòng nếu có."""
     now = int(time.time())
     ns: dict[str, Any] = {"x-hasura-user-id": sub, "x-hasura-allowed-roles": [role], "x-hasura-tenant-id": tenant}
     if default_role:

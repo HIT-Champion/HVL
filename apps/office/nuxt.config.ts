@@ -1,4 +1,4 @@
-// Copyright 2026 Mộc Team
+// Copyright 2026 Signet Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,11 +32,11 @@ export default defineNuxtConfig({
   vite: { plugins: [tailwindcss(), formsPlugin(schemas)] },
   app: {
     head: {
-      title: 'Mộc — Văn phòng điện tử',
+      title: 'Signet — Văn phòng điện tử',
       htmlAttrs: { lang: 'vi' },
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { name: 'description', content: 'Mộc — văn phòng điện tử nguồn mở: văn bản đến, văn bản đi, hộp việc' },
+        { name: 'description', content: 'Signet — văn phòng điện tử nguồn mở: văn bản đến, văn bản đi, hộp việc' },
       ],
       link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
     },

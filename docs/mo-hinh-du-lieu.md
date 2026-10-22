@@ -347,8 +347,8 @@ sai; văn bản chuyển sang hạn chế thì thông báo đã gửi về nó c
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
-create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — README, mục Thêm đơn vị). Ranh giới giữa
-các đơn vị nằm ở nhiều lớp, lớp sau không tin lớp trước:
+create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
+giới giữa các đơn vị nằm ở nhiều lớp, lớp sau không tin lớp trước:
 
 - *Danh tính*: đơn vị của một người là thuộc tính `tenant_id` của tài khoản Keycloak, đi vào JWT
   (`x-hasura-tenant-id`); người dùng không tự khai được. Organization của Keycloak (alias suy từ mã, thuộc tính
@@ -371,7 +371,7 @@ ghi (gói nộp lưu dưới `cold/<id>/`, mốc neo sổ kiểm toán chung c�
 `moc-files` (mỗi tệp một khóa dữ liệu riêng). Riêng khóa **ký số** văn bản đi (F4.5, minh họa) là của từng đơn vị —
 khóa transit `moc-ky-so-<tenant_id>`, `svc-files` tự tạo ở lần phát hành đầu — vì chứng thư phải cho biết đơn vị nào
 phát hành; đây là danh tính chứ không phải ranh giới cách ly. Đơn vị cần tách vật lý (cơ quan khác, yêu cầu pháp lý)
-thì chạy một bản cài Mộc riêng.
+thì chạy một bản cài Signet riêng.
 
 ---
 
@@ -540,8 +540,8 @@ Văn bản đến liên thông trong hệ thống bắt đầu ở `received` nh
 tạo (§4.2).
 
 **Liên thông trong hệ thống** (F3.12, migration `1792281601800_dispatches`). Văn bản đi chọn đơn vị nhận là đơn vị
-khác dùng Mộc; văn thư phát hành thì mỗi đơn vị nhận có một văn bản đến `received` (`source_id` trỏ về văn bản đi) kèm
-bản sao tệp phát hành — luồng và cách giữ đúng một lần ở §4.2.
+khác dùng Signet; văn thư phát hành thì mỗi đơn vị nhận có một văn bản đến `received` (`source_id` trỏ về văn bản
+đi) kèm bản sao tệp phát hành — luồng và cách giữ đúng một lần ở §4.2.
 
 ```sql
 alter table office.documents
@@ -733,7 +733,7 @@ create table core.lineage_events (
   (`dataQualityAssertions`); trượt thì bước `tables` FAIL, job dừng, không ghi gì sang bucket lạnh.
 - Chỉ thêm: trigger chặn sửa, xóa. Không chứa tên hồ sơ, trích yếu, tên tệp (thông báo lỗi chỉ có tên lớp lỗi). Ghi
   phả hệ lỗi không chặn việc nộp lưu.
-- `dataQualityAssertions` nằm ở dataset đầu ra của bước `tables` (mở rộng của Mộc) và ở `inputFacets` của bảng đầu
+- `dataQualityAssertions` nằm ở dataset đầu ra của bước `tables` (mở rộng của Signet) và ở `inputFacets` của bảng đầu
   vào bước `manifest` (đúng đặc tả OpenLineage, Marquez hiển thị được).
 - Quyền: `director`, `clerk` đọc của đơn vị mình (§3); không vai trò nào ghi.
 
@@ -1113,7 +1113,7 @@ Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
 `GET /api/files/{id}` (đã làm ở #19): svc-files hỏi Hasura `core_files_by_pk` **bằng token của người gọi** —
 Hasura trả dòng khi người gọi là người tải lên hoặc đọc được văn bản có gắn tệp — rồi mới lấy `object_key`
 bằng vai trò `service`. Không có tệp và không được xem đều trả 404. Tệp luôn trả về dạng `attachment` kèm
-`Content-Security-Policy: sandbox`, để tệp HTML/SVG người dùng tải lên không chạy được trên tên miền của Mộc.
+`Content-Security-Policy: sandbox`, để tệp HTML/SVG người dùng tải lên không chạy được trên tên miền của Signet.
 
 `GET /api/search` (đã làm ở #20): Meilisearch tìm với điều kiện `tenant_id` lấy từ token và chỉ trả về id;
 svc-files hỏi lại Hasura `office_documents(where: {id: {_in: …}})` bằng token của người gọi, giữ những văn bản
@@ -1142,7 +1142,7 @@ trả cho `svc-workflow`, `content_sha256`, sự kiện `issued`, sổ kiểm to
   quản>", tối đa 64 ký tự) → gắn vào phiên bản khóa (`set-certificate`). Khóa riêng không ra khỏi két; mỗi lần ký là
   một lần gọi `transit/sign`, két ghi sổ.
 - Không ký: văn bản hạn chế (mỗi lần mở đều viết lại PDF để đóng tên người xem); `MOC_SIGN_ENABLED=false` (không gọi
-  Transit, PKI); két chưa có PKI (két khởi tạo trước F4.5 — README mục Két bí mật), két từ chối, ký hoặc tự kiểm lỗi —
+  Transit, PKI); két chưa có PKI (két khởi tạo trước F4.5 — `van-hanh.md` mục Két bí mật), két từ chối, ký hoặc tự kiểm lỗi —
   các trường hợp này vẫn phát hành (201), không có dòng chữ ký, ghi nhật ký (§5); két chưa có PKI thì dò lại sau 5 phút.
   Két không trả lời (mạng, 5xx, hết giờ): 503 `signing_unavailable`, không lưu gì.
 - Văn bản phát hành trước F4.5 không ký lại (băm, QR, sổ kiểm toán đã cố định): cổng trả `signature: null`.

@@ -1,4 +1,4 @@
-// Copyright 2026 Mộc Team
+// Copyright 2026 Signet Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { PASSWORD, TOTP_SECRET, shot, signIn } from './helpers'
 
 // Liên thông văn bản trong hệ thống (F3.12) trên giao diện: chuyên viên Khoa CNTT soạn công văn, tích "Khoa Kinh tế"
-// trong danh sách đơn vị cùng dùng Mộc (tên tự vào ô nơi nhận) → trình → tổ trưởng đồng ý → lãnh đạo khoa ký → văn
+// trong danh sách đơn vị cùng dùng Signet (tên tự vào ô nơi nhận) → trình → tổ trưởng đồng ý → lãnh đạo khoa ký → văn
 // thư CNTT phát hành, thẻ liên thông báo "Đã chuyển" → văn thư Khoa Kinh tế được báo, thấy văn bản đến chip
 // "Liên thông", mở ra có "Nhận từ Khoa Công nghệ thông tin", mã xác thực của bên gửi, tệp cùng SHA-256 với bản phát
 // hành; vào sổ như mọi văn bản đến.

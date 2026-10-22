@@ -1,6 +1,6 @@
 # app-office — Văn phòng điện tử
 
-Ứng dụng Tầng 2 trên lõi Mộc: hộp việc, văn bản đến (tiếp nhận, vào sổ, chỉ đạo, phân công, xử lý), văn bản đi
+Ứng dụng Tầng 2 trên lõi Signet: hộp việc, văn bản đến (tiếp nhận, vào sổ, chỉ đạo, phân công, xử lý), văn bản đi
 (soạn, trình, duyệt, phát hành), sổ đăng ký in được, cổng xác thực công khai, thông báo tức thời, dòng thời gian,
 tìm kiếm. Nuxt 4 ở
 chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi dữ liệu lấy qua cổng cùng tên miền —

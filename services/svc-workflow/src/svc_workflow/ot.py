@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ def subscription(tenant: str, threshold: float, notify_url: str, tok: str) -> di
     return {
         "id": SUBSCRIPTION_ID,
         "type": "Subscription",
-        "description": "Mộc: nhiệt độ vượt ngưỡng → dự thảo báo cáo sự cố",
+        "description": "Signet: nhiệt độ vượt ngưỡng → dự thảo báo cáo sự cố",
         "entities": [{"type": SENSOR_TYPE}],
         "watchedAttributes": ["temperature"],
         "q": query_for(threshold),
@@ -162,7 +162,7 @@ def anchor(notify_url: str) -> dict[str, Any]:
     return {
         "id": ANCHOR_ID,
         "type": "Subscription",
-        "description": "Mộc: giữ ngữ cảnh JSON-LD của các subscription ở tenant mặc định; tạm dừng, không gửi gì",
+        "description": "Signet: giữ ngữ cảnh JSON-LD của các subscription ở tenant mặc định; tạm dừng, không gửi gì",
         "isActive": False,
         "entities": [{"type": SENSOR_TYPE}],
         "watchedAttributes": ["temperature"],

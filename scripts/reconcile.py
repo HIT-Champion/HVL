@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ Mỗi lượt đưa hệ thống đang chạy về đúng trạng thái khai tro
 
   1. GitOps (khi đặt MOC_GITOPS_DIR — một bản sao git riêng của reconciler, chỉ dùng khi chạy từ bản cài):
      `git fetch` nhánh MOC_GITOPS_BRANCH (mặc định `deploy`). Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm
-     lúc cài) → dựng image của commit đó, dừng Mộc, cài lại đúng commit vào thư mục này (`install.sh`), chạy lại.
+     lúc cài) → dựng image của commit đó, dừng Signet, cài lại đúng commit vào thư mục này (`install.sh`), chạy lại.
      Cài hỏng giữa chừng thì cài lại commit cũ. Commit áp lỗi thì không thử lại mỗi phút: đợi commit kế tiếp.
   2. Tự phục hồi: container unhealthy → khởi động lại; dịch vụ khai trong compose mà thiếu container hoặc đã dừng →
      `docker compose up -d` đúng các dịch vụ đó.
 
 Bỏ qua lượt khi đang sao lưu, khôi phục, cài đặt (cùng một khóa với `moc backup` và `install.sh`), khi lần khôi phục
-trước dừng giữa chừng (dữ liệu dở dang, không chạy lại Mộc trên đó) hay có dịch vụ đang tạm dừng có chủ ý. Dịch vụ
+trước dừng giữa chừng (dữ liệu dở dang, không chạy lại Signet trên đó) hay có dịch vụ đang tạm dừng có chủ ý. Dịch vụ
 còn tạm dừng từ một lần sao lưu bị giết cứng thì chạy lại. Bảo trì tay thì tắt timer trước.
 
     python3 scripts/reconcile.py                          # một lượt, in từng việc đã làm
@@ -57,7 +57,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
 MANIFEST = ".moc-install"           # danh sách tệp do make install quản lý (scripts/install.sh)
 STATE = "moc-reconcile.json"        # trong thư mục .git của bản sao: commit đã áp, băm tệp lúc cài
-RESTORING = ".moc-restoring"        # scripts/backup.py đặt trước khi dừng Mộc để khôi phục, xóa khi xong
+RESTORING = ".moc-restoring"        # scripts/backup.py đặt trước khi dừng Signet để khôi phục, xóa khi xong
 # Dịch vụ `moc backup create` tạm dừng (cùng danh sách WRITERS, DB_WRITERS trong scripts/backup.py)
 BACKUP_PAUSES = {"svc-files", "seaweedfs", "openbao", "hasura", "svc-workflow", "flowable", "keycloak"}
 
@@ -102,7 +102,7 @@ def write_private(path: pathlib.Path, data: str) -> None:
 
 @contextlib.contextmanager
 def ops_lock(wait_s: float = 0) -> Iterator[bool]:
-    """Khóa chung với `moc backup` và `install.sh` (flock trên thư mục chạy Mộc): False khi lệnh khác giữ quá
+    """Khóa chung với `moc backup` và `install.sh` (flock trên thư mục chạy Signet): False khi lệnh khác giữ quá
     `wait_s` giây."""
     fd = os.open(ROOT, os.O_RDONLY)
     deadline = time.monotonic() + wait_s
@@ -237,11 +237,11 @@ def gitops(report: dict[str, Any]) -> None:
     changed = drift(state.get("files", {}), installed_files()) if state.get("commit") == target else []
     if state.get("commit") == target and not changed:
         return
-    # áp lỗi (kể cả lần đưa tệp sửa tay về) thì chỉ thử lại khi có commit mới: không dừng Mộc mỗi phút
+    # áp lỗi (kể cả lần đưa tệp sửa tay về) thì chỉ thử lại khi có commit mới: không dừng Signet mỗi phút
     if state.get("failed") == target:
         report["problems"].append(f"commit {target[:12]} áp lỗi lần trước — sửa trên nhánh {branch} rồi đẩy commit mới")
         return
-    # kiểm trước khi dừng Mộc. Không ghi "failed": thêm khóa vào danh sách thì lượt sau áp được, không cần commit mới
+    # kiểm trước khi dừng Signet. Không ghi "failed": thêm khóa vào danh sách thì lượt sau áp được, không cần commit mới
     signers = setting("MOC_GITOPS_ALLOWED_SIGNERS")
     if signers:
         verify_signature(git, target, signers)
@@ -283,7 +283,7 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
     env = checkout(git, src, target)
     if not (src / "scripts" / "install.sh").is_file():
         raise ReconcileError("commit không có scripts/install.sh")
-    # dựng image trước khi dừng Mộc: lỗi dựng thì hệ thống cũ vẫn chạy; install.sh dựng lại sau đó trúng bộ nhớ đệm
+    # dựng image trước khi dừng Signet: lỗi dựng thì hệ thống cũ vẫn chạy; install.sh dựng lại sau đó trúng bộ nhớ đệm
     _run([*COMPOSE, "build"], cwd=src, env=env, timeout=1800)
     _run([*COMPOSE, "down"], timeout=300)
     try:
@@ -291,7 +291,7 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
     except (ReconcileError, subprocess.TimeoutExpired, OSError) as exc:
         if not previous:
             raise
-        # Mộc đang dừng, tệp đã cài có thể dở dang: cài lại commit đang chạy trước đó (image của nó vẫn còn)
+        # Signet đang dừng, tệp đã cài có thể dở dang: cài lại commit đang chạy trước đó (image của nó vẫn còn)
         try:
             install(src, checkout(git, src, previous))
         except (ReconcileError, subprocess.TimeoutExpired, OSError) as again:
@@ -310,7 +310,7 @@ def reconcile(*, heal_only: bool = False, wait_s: float = 0) -> dict[str, Any]:
             return report
         if (ROOT / RESTORING).exists():
             report["skipped"] = "lần khôi phục trước dừng giữa chừng"
-            report["problems"].append("dữ liệu có thể dở dang, không chạy lại Mộc trên đó — chạy lại: python3"
+            report["problems"].append("dữ liệu có thể dở dang, không chạy lại Signet trên đó — chạy lại: python3"
                                       " scripts/moc.py backup restore")
             return report
         if not heal_only:
@@ -324,7 +324,8 @@ def reconcile(*, heal_only: bool = False, wait_s: float = 0) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="reconcile", description="Một lượt reconciler GitOps + tự phục hồi của Mộc")
+    parser = argparse.ArgumentParser(prog="reconcile",
+                                     description="Một lượt reconciler GitOps + tự phục hồi của Signet")
     parser.add_argument("--json", action="store_true", help="in kết quả JSON ở dòng cuối")
     parser.add_argument("--heal-only", action="store_true", help="chỉ tự phục hồi, không kéo commit từ git")
     parser.add_argument("--wait", type=float, default=0, metavar="GIÂY",

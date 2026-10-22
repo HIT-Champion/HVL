@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -171,7 +171,7 @@ class IssueOut(BaseModel):
 
 
 class VerifiedSignature(BaseModel):
-    """Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Mộc, chỉ minh họa, không có giá trị pháp lý như chữ ký số
+    """Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Signet, chỉ minh họa, không có giá trị pháp lý như chữ ký số
     công cộng. svc-files đã tự kiểm chữ ký lúc ký; kiểm lại tệp: python -m svc_files.signing verify."""
 
     level: Literal["PAdES-B-B"] = Field(description="Chuẩn chữ ký: PAdES mức B-B, không có dấu thời gian tin cậy")
@@ -317,7 +317,7 @@ def content_disposition(filename: str) -> str:
 
 
 # Tệp người dùng tải lên có thể là HTML hay SVG chứa script: không bao giờ để trình duyệt hiển thị nó
-# như một trang của Mộc. Giao diện xem PDF bằng PDF.js (đọc qua fetch), không cần hiển thị inline.
+# như một trang của Signet. Giao diện xem PDF bằng PDF.js (đọc qua fetch), không cần hiển thị inline.
 DOWNLOAD_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'none'; sandbox",
@@ -461,7 +461,7 @@ def create_app(
             await vault.aclose()
 
     app = FastAPI(
-        title="Mộc — svc-files",
+        title="Signet — svc-files",
         version=__version__,
         description="Tải tệp lên qua trạm kiểm dịch ClamAV, tải xuống theo quyền, tìm văn bản. Gọi qua cổng APISIX "
                     "với token Bearer do Keycloak cấp (docs/api/README.md).",

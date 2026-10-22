@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ FIELD = "MocKySo"               # ô ký ẩn
 LEVEL = "PAdES-B-B"
 RETRY_OFF_S = 300.0             # két thiếu PKI / từ chối: phát hành không ký, chừng ấy giây sau mới dò lại
 CN_MAX = 64                     # ub-common-name (RFC 5280), đếm theo byte UTF-8 như cryptography và nhiều bộ kiểm
-ILLUSTRATIVE = "PKI nội bộ Mộc (MẪU), chỉ minh họa, không có giá trị pháp lý như chữ ký số công cộng"
+ILLUSTRATIVE = "PKI nội bộ Signet (MẪU), chỉ minh họa, không có giá trị pháp lý như chữ ký số công cộng"
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 Status = Literal["valid", "modified", "broken", "untrusted", "unsigned", "unreadable"]
@@ -73,7 +73,7 @@ MESSAGES: dict[str, str] = {
     "modified": "Văn bản đã bị sửa sau khi ký: chữ ký còn đúng cho phần đã ký, phần thêm vào sau đó ({n} byte) "
                 "không được ký.",
     "broken": "Chữ ký không khớp nội dung: tệp đã bị sửa trong phần đã ký.",
-    "untrusted": "Chữ ký đúng về mật mã nhưng chứng thư không do CA nội bộ Mộc cấp.",
+    "untrusted": "Chữ ký đúng về mật mã nhưng chứng thư không do CA nội bộ Signet cấp.",
     "unsigned": "Tệp không có chữ ký số.",
     "unreadable": "Không đọc được tệp như PDF.",
 }
@@ -500,7 +500,7 @@ def _report(v: Verdict) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m svc_files.signing",
-                                     description=f"Kiểm chữ ký số PDF của Mộc — {ILLUSTRATIVE}.")
+                                     description=f"Kiểm chữ ký số PDF của Signet — {ILLUSTRATIVE}.")
     commands = parser.add_subparsers(dest="command", required=True)
     verify = commands.add_parser("verify", help="kiểm chữ ký của tệp PDF đọc từ stdin, chỉ tin CA nội bộ của két")
     verify.add_argument("--ca", metavar="TỆP",

@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 """Cảm biến nhiệt độ giả lập (F3.10): gửi các lần đo vào context broker NGSI-LD như một thiết bị OT.
 
-Chạy trong mạng iot của Mộc (dịch vụ ``ot-sensor``, profile iot), chỉ thư viện chuẩn:
+Chạy trong mạng iot của Signet (dịch vụ ``ot-sensor``, profile iot), chỉ thư viện chuẩn:
 
     docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT --responsible chuyenviendt \\
         --name "Phòng máy chủ tầng 3" --readings 24,29,33,37,41

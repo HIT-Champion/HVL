@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# F3.3 — một lượt reconciler GitOps + tự phục hồi của Mộc (scripts/reconcile.py). Tệp MẪU: sửa đường dẫn, người
-# dùng cho đúng máy chủ rồi cài (README mục "GitOps và tự phục hồi"):
+# F3.3 — một lượt reconciler GitOps + tự phục hồi của Signet (scripts/reconcile.py). Tệp MẪU: sửa đường dẫn, người
+# dùng cho đúng máy chủ rồi cài (docs/van-hanh.md mục "GitOps và tự phục hồi"):
 #
 #   sudo cp ops/systemd/moc-reconcile.service ops/systemd/moc-reconcile.timer /etc/systemd/system/
 #   sudo systemctl daemon-reload && sudo systemctl enable --now moc-reconcile.timer
@@ -24,7 +24,7 @@
 # Chạy trên máy chủ, không trong container: không gắn socket Docker vào container nào.
 
 [Unit]
-Description=Mộc — reconciler GitOps và tự phục hồi (một lượt)
+Description=Signet — reconciler GitOps và tự phục hồi (một lượt)
 Wants=network-online.target docker.service
 After=network-online.target docker.service
 

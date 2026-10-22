@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,8 +50,8 @@ def main() -> None:
     if not secret:
         sys.exit("Chưa có MOC_DEMO_TOTP_SECRET trong .env — thêm một chuỗi ngẫu nhiên rồi chạy lại make seed")
     key = base64.b32encode(secret.encode()).decode().rstrip("=")
-    label = urllib.parse.quote("Mộc:tài khoản mẫu")
-    uri = f"otpauth://totp/{label}?secret={key}&issuer={urllib.parse.quote('Mộc')}&digits={DIGITS}&period={PERIOD}"
+    label = urllib.parse.quote("Signet:tài khoản mẫu")
+    uri = f"otpauth://totp/{label}?secret={key}&issuer={urllib.parse.quote('Signet')}&digits={DIGITS}&period={PERIOD}"
     users = [line.split(",")[0] for line in (ROOT / "seed" / "users.csv").read_text(encoding="utf-8").splitlines()
              if line.strip() and not line.startswith("#") and line.split(",")[3] in MFA_ROLES]
     print(f"Mã hiện tại: {totp(secret)}  (còn {PERIOD - int(time.time()) % PERIOD} giây)")

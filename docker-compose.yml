@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# Mộc — điều phối hai tầng của DX-OS Open-Core (docs/architecture.md).
+# Signet — điều phối hai tầng của DX-OS Open-Core (docs/architecture.md).
 #
 # NGUYÊN TẮC: tệp này chỉ ĐIỀU PHỐI phần mềm nguồn mở thượng nguồn ở dạng
 # NGUYÊN BẢN qua image chính thức có ghim phiên bản; mã của đội (svc-*, app-*)
@@ -337,7 +337,7 @@ services:
       MOC_ASK_MODEL_TIMEOUT_S: ${MOC_ASK_MODEL_TIMEOUT_S:-40}
       # F4.5 — ký số PAdES bản phát hành văn bản đi bằng khóa Transit của đơn vị, chứng thư do CA nội bộ trong két
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
-      # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (README mục Két bí mật)
+      # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
       MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
     volumes:
       - openbao_svc_files:/run/openbao:ro
@@ -400,7 +400,7 @@ services:
       # iss trong token là URL công khai; khóa công khai lấy qua mạng nội bộ
       CENTRIFUGO_CLIENT_TOKEN_JWKS_PUBLIC_ENDPOINT: http://keycloak:8080/realms/${MOC_REALM:-moc}/protocol/openid-connect/certs
       CENTRIFUGO_CLIENT_TOKEN_ISSUER: ${MOC_PUBLIC_URL:?}/realms/${MOC_REALM:-moc}
-      # chỉ trang của chính Mộc được mở WebSocket (chặn trang lạ dùng phiên của người dùng)
+      # chỉ trang của chính Signet được mở WebSocket (chặn trang lạ dùng phiên của người dùng)
       CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${MOC_PUBLIC_URL:?}
     volumes:
       - ./realtime:/centrifugo:ro
@@ -436,7 +436,7 @@ services:
     depends_on:
       apisix: {condition: service_started}
 
-  # Grafana (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản; Mộc chỉ nạp cấu hình qua tệp
+  # Grafana (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản; Signet chỉ nạp cấu hình qua tệp
   grafana:
     <<: *common
     image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572

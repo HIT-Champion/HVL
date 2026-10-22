@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Mộc Team
+ * Copyright 2026 Signet Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 @import "tailwindcss";
 
-/* Màu của Mộc: xanh lá đậm (gỗ, cây) làm màu chính, hổ phách cho văn bản khẩn */
+/* Màu của Signet (giữ từ thời tên Mộc): xanh lá đậm làm màu chính, hổ phách cho văn bản khẩn */
 @theme {
   --color-brand-50: #f0fdfa;
   --color-brand-100: #ccfbf1;

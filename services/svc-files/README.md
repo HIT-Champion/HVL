@@ -1,6 +1,6 @@
 # svc-files
 
-Cửa duy nhất để tệp vào và ra khỏi kho đối tượng của Mộc. Tệp tải lên được **quét ClamAV trước**,
+Cửa duy nhất để tệp vào và ra khỏi kho đối tượng của Signet. Tệp tải lên được **quét ClamAV trước**,
 sạch mới ghi vào SeaweedFS và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp
 chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
@@ -75,7 +75,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
 Tệp tải về luôn ở dạng `attachment`, kèm `X-Content-Type-Options: nosniff` và
 `Content-Security-Policy: sandbox` — tệp HTML hay SVG người dùng tải lên không chạy được như một trang của
-Mộc. Giao diện xem PDF bằng PDF.js nên không cần hiển thị inline. `ETag` là SHA-256 của tệp (tệp mã hóa thì không
+Signet. Giao diện xem PDF bằng PDF.js nên không cần hiển thị inline. `ETag` là SHA-256 của tệp (tệp mã hóa thì không
 có `ETag`: mỗi lần mở là một bản khác).
 
 Khóa đối tượng: `tenant/<tenant_id>/<yyyy>/<mm>/<id>` — thuê ước lấy từ token, không lấy từ dữ liệu client
@@ -593,9 +593,9 @@ Căn cứ: Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị 
 - **Dựng PDF** (`render.py`): khuôn HTML theo thể thức NĐ 30, Phụ lục I — cơ quan chủ quản, tên đơn vị, số ký
   hiệu, quốc hiệu, tiêu ngữ, địa danh và ngày (ngày dưới 10, tháng 1–2 có số 0), tên loại và trích yếu (công văn:
   "V/v …" dưới số, "Kính gửi"), nội dung, nơi nhận kèm "Lưu: VT, <phòng>.", chức vụ và tên người ký, giờ ký duyệt
-  trên Mộc. Bản phát hành có mã QR dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. Mọi chữ người dùng nhập được thoát
+  trên Signet. Bản phát hành có mã QR dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. Mọi chữ người dùng nhập được thoát
   HTML. Phông Liberation Serif (cùng số đo Times New Roman) cài trong image.
-- **"Đã duyệt trên hệ thống Mộc"** chỉ ghi lại việc người ký bấm duyệt trong Mộc. Tính toàn vẹn đến từ SHA-256 của
+- **"Đã duyệt trên hệ thống Signet"** chỉ ghi lại việc người ký bấm duyệt trong Signet. Tính toàn vẹn đến từ SHA-256 của
   tệp, lưu trong CSDL và trong sổ kiểm toán chuỗi băm, kiểm được ở cổng xác thực. Từ F4.5 bản phát hành (không hạn
   chế) có thêm chữ ký số PAdES bằng PKI nội bộ — chỉ minh họa (mục Ký số văn bản đi).
 - **Dữ liệu dựng lấy từ CSDL**, không từ người gọi: `/internal/issue` chỉ nhận id văn bản, thuê ước, người thực
@@ -606,8 +606,8 @@ Căn cứ: Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị 
 ### Ký số văn bản đi (F4.5, chỉ minh họa)
 
 `signing.py`. **Chỉ minh họa, không có giá trị pháp lý như chữ ký số công cộng**: chứng thư do CA nội bộ trong két
-của Mộc cấp (CN "CA nội bộ Mộc - MẪU, chỉ minh họa"), CA này không nằm trong danh sách tin cậy nào nên trình đọc PDF
-báo chữ ký "chưa tin cậy" — đúng như mong đợi (nhập chứng thư CA vào trình đọc thì báo hợp lệ).
+của Signet cấp (CN "CA nội bộ Signet - MẪU, chỉ minh họa"), CA này không nằm trong danh sách tin cậy nào nên trình
+đọc PDF báo chữ ký "chưa tin cậy" — đúng như mong đợi (nhập chứng thư CA vào trình đọc thì báo hợp lệ).
 
 - **Khóa ký không rời két.** Mỗi đơn vị một khóa transit `moc-ky-so-<id đơn vị>` (RSA-3072), svc-files tạo ở lần ký
   đầu. svc-files chỉ gửi phần thuộc tính đã ký sang `transit/sign/<khóa>/sha2-256` (PKCS#1 v1.5); két ghi sổ từng
@@ -635,8 +635,8 @@ báo chữ ký "chưa tin cậy" — đúng như mong đợi (nhập chứng th�
   ```
 
   Dòng đầu nói kết quả; mã thoát `0` hợp lệ · `1` đã sửa sau khi ký (lớp sửa bổ sung, byte nối thêm), chữ ký không
-  khớp nội dung, chứng thư không do CA nội bộ Mộc cấp, không có chữ ký · `2` không đọc được PDF hoặc không lấy được CA
-  (mặc định `$MOC_OPENBAO_ADDR/v1/pki/ca/pem`, không cần token). Chứng thư đã hết hạn mà hợp lệ tại giờ ký tự khai thì
+  khớp nội dung, chứng thư không do CA nội bộ Signet cấp, không có chữ ký · `2` không đọc được PDF hoặc không lấy
+  được CA (mặc định `$MOC_OPENBAO_ADDR/v1/pki/ca/pem`, không cần token). Chứng thư đã hết hạn mà hợp lệ tại giờ ký tự khai thì
   vẫn `0`, kèm một dòng ghi chú.
 
 | Tình huống | `/internal/issue` | Nhật ký |
@@ -659,8 +659,8 @@ Giới hạn:
   Chứng thư hết hạn thì tự kiểm không đạt, văn bản phát hành không ký (nhật ký báo `sign_failed`); xoay khóa transit
   (`transit/keys/<khóa>/rotate`, token quản trị) thì svc-files đọc lại khóa sau lần tự kiểm hỏng đó (hoặc khi khởi
   động lại) và xin chứng thư cho phiên bản mới.
-- Két khởi tạo trước F4.5 chưa có PKI: ký số tự tắt, mọi thứ khác chạy như cũ cho tới khi két được nâng cấp (README
-  gốc, mục Két bí mật).
+- Két khởi tạo trước F4.5 chưa có PKI: ký số tự tắt, mọi thứ khác chạy như cũ cho tới khi két được nâng cấp
+  ([`docs/van-hanh.md`](../../docs/van-hanh.md#két-bí-mật), mục Két bí mật).
 - Cổng xác thực chưa có link tải chứng thư CA; lấy thẳng từ két (`pki/ca/pem`).
 
 Rủi ro đã chấp nhận:

@@ -1,4 +1,4 @@
-// Copyright 2026 Mộc Team
+// Copyright 2026 Signet Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 import { defineConfig } from '@playwright/test'
 
-// Chạy trên Mộc đang chạy thật (make up && make seed): đăng nhập Keycloak, đi qua APISIX như người dùng.
+// Chạy trên Signet đang chạy thật (make up && make seed): đăng nhập Keycloak, đi qua APISIX như người dùng.
 export default defineConfig({
   testDir: '.',
   timeout: 120_000,

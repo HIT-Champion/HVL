@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# Cài Mộc ra ngoài thư mục mã nguồn (tiêu chí PoF #4): dựng image của đội gắn thẻ phiên bản, chép
+# Cài Signet ra ngoài thư mục mã nguồn (tiêu chí PoF #4): dựng image của đội gắn thẻ phiên bản, chép
 # docker-compose.yml cùng mọi tệp cấu hình mà container gắn vào sang PREFIX, rồi kiểm tra bản cài
 # không còn trỏ về thư mục mã nguồn. Sau đó xóa cả thư mục mã nguồn đi hệ thống vẫn chạy:
 #
@@ -124,11 +124,11 @@ do_install() {
   lock_dest "$dest"
   # .env và kho sao lưu (backups/) được giữ lại khi gỡ: cài lại vào đó vẫn được
   if [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vxE '\.env|backups|\.moc-install\.tmp' || true)" ]; then
-    die "$dest đã có tệp nhưng không phải bản cài Mộc — chọn thư mục trống hoặc chưa có"
+    die "$dest đã có tệp nhưng không phải bản cài Signet — chọn thư mục trống hoặc chưa có"
   fi
   # Thay thư mục cấu hình dưới container đang chạy thì container còn giữ thư mục cũ đã xóa
   if [ -n "$(running_from "$dest")" ]; then
-    die "Mộc đang chạy từ $dest — dừng trước (cd $dest && docker compose down), cài lại rồi chạy lại"
+    die "Signet đang chạy từ $dest — dừng trước (cd $dest && docker compose down), cài lại rồi chạy lại"
   fi
   ver="${MOC_VERSION:-$(src_version)}"
   [[ "$ver" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || die "phiên bản '$ver' không dùng làm thẻ image được"
@@ -160,10 +160,10 @@ do_install() {
   done
   # Image của đội đã dựng ở trên: bỏ `build:` và cấm tải, để thiếu image thì báo lỗi chứ không kéo nhầm
   # một image cùng tên trên registry
-  { echo "# Sinh bởi make install (Mộc $ver) — đừng sửa tay: sửa trong mã nguồn rồi cài lại."
+  { echo "# Sinh bởi make install (Signet $ver) — đừng sửa tay: sửa trong mã nguồn rồi cài lại."
     sed -E 's#^( +)build: .+$#\1pull_policy: never#' "$SRC/docker-compose.yml"
   } > "$dest/docker-compose.yml"
-  printf 'Mộc %s\nmã nguồn: %s\ncài lúc: %s\n' "$ver" \
+  printf 'Signet %s\nmã nguồn: %s\ncài lúc: %s\n' "$ver" \
     "$(git -C "$SRC" -c safe.directory="$SRC" rev-parse --short HEAD 2>/dev/null || echo không-rõ)" \
     "$(date +%Y-%m-%dT%H:%M:%S%z)" > "$dest/VERSION"
   # __pycache__: do python3 scripts/seed.py tạo ra khi chạy từ bản cài
@@ -191,7 +191,7 @@ do_install() {
   done < <(cd "$dest" && "${COMPOSE[@]}" config --images)
 
   cat <<EOF
-Đã cài Mộc $ver vào $dest. Chạy từ đó:
+Đã cài Signet $ver vào $dest. Chạy từ đó:
   cd $dest && docker compose up -d --wait
   python3 scripts/seed.py     # dữ liệu mẫu, lần đầu
   python3 scripts/smoke.py    # kiểm tra nhanh
@@ -206,14 +206,14 @@ EOF
 do_uninstall() {
   local dest
   dest="$(prefix "${1:-}")"
-  [ -f "$dest/$MANIFEST" ] || die "$dest không phải bản cài Mộc (không có $MANIFEST)"
+  [ -f "$dest/$MANIFEST" ] || die "$dest không phải bản cài Signet (không có $MANIFEST)"
   lock_dest "$dest"
   if [ -n "$(running_from "$dest")" ]; then
-    die "Mộc đang chạy từ $dest — dừng trước: cd $dest && docker compose down"
+    die "Signet đang chạy từ $dest — dừng trước: cd $dest && docker compose down"
   fi
   remove_managed "$dest"
   find "$dest" -mindepth 1 -type d -empty -delete
-  echo "Đã gỡ Mộc khỏi $dest. Giữ lại $dest/.env (mật khẩu), kho sao lưu (nếu có) và dữ liệu trong các volume Docker của project moc."
+  echo "Đã gỡ Signet khỏi $dest. Giữ lại $dest/.env (mật khẩu), kho sao lưu (nếu có) và dữ liệu trong các volume Docker của project moc."
   echo "Xóa cả dữ liệu: docker volume rm \$(docker volume ls -q --filter label=com.docker.compose.project=moc)"
 }
 

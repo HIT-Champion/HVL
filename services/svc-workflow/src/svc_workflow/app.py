@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -226,7 +226,7 @@ def create_app(
             await hasura.aclose()
 
     app = FastAPI(
-        title="Mộc svc-workflow",
+        title="Signet svc-workflow",
         version=__version__,
         description="Hasura Actions của Văn phòng điện tử. API nội bộ: chỉ Hasura gọi, không qua cổng APISIX; "
                     "ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",

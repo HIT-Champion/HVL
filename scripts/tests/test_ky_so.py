@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -231,10 +231,10 @@ class IncrementalEditTest(unittest.TestCase):
 
 class ComposeHelpersTest(unittest.TestCase):
     def test_signature_cli_valid(self) -> None:
-        run, calls = fake_run(0, "Chữ ký hợp lệ — PKI nội bộ Mộc (MẪU)\nKý bởi: Khoa CNTT\n".encode())
+        run, calls = fake_run(0, "Chữ ký hợp lệ — PKI nội bộ Signet (MẪU)\nKý bởi: Khoa CNTT\n".encode())
         with mock.patch.object(env.subprocess, "run", run):
             code, lines = env.signature_cli(b"%PDF-1.7 da ky")
-        self.assertEqual((code, lines), (0, ["Chữ ký hợp lệ — PKI nội bộ Mộc (MẪU)", "Ký bởi: Khoa CNTT"]))
+        self.assertEqual((code, lines), (0, ["Chữ ký hợp lệ — PKI nội bộ Signet (MẪU)", "Ký bởi: Khoa CNTT"]))
         self.assertEqual(calls, [{"cmd": [*COMPOSE, "exec", "-T", "svc-files", "python", "-m", "svc_files.signing",
                                           "verify"], "cwd": env.ROOT, "input": b"%PDF-1.7 da ky"}])
 

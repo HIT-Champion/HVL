@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -886,7 +886,7 @@ def it_ot() -> None:
             raise DemoFailed(f"sau 30 giây lịch sử đo vẫn thiếu: HTTP {code}, thiếu {sorted(want - points)}")
         time.sleep(1)
     ok(f"broker giữ lịch sử: đủ {len(want)} lần vừa đo (cả các lần dưới ngưỡng) trong {len(points)} lần gần nhất — dữ liệu"
-       " OT ở broker, Mộc chỉ nhận sự kiện cần xử lý")
+       " OT ở broker, Signet chỉ nhận sự kiện cần xử lý")
 
     say(5, "Chuyên viên kiểm tra, trình → dự thảo vào luồng văn bản đi: tổ trưởng có việc duyệt")
     staff.gql(SUBMIT, {"d": doc["id"], "s": signer})
@@ -2504,7 +2504,7 @@ def ky_so() -> None:
     pem = vault_ca_pem()
     if pem is None:
         raise DemoFailed("két chưa có CA nội bộ (pki/ca/pem): két khởi tạo trước F4.5 nên ký số tự tắt, mọi thứ khác"
-                         " vẫn chạy như cũ — xem README mục Két bí mật")
+                         " vẫn chạy như cũ — xem docs/van-hanh.md mục Két bí mật")
     info = compose("exec", "-T", "svc-files", "python", "-c", CA_INFO, stdin=pem.encode()).decode().strip()
     cn, org, expires, size = info.splitlines()
     bits, self_signed = size.split()
@@ -2675,7 +2675,7 @@ def pii_letter(tag: str) -> list[str]:
             "Toi de nghi cap 02 ban sao bang tot nghiep.",
             f"Le phi chuyen vao so tai khoan {v['account']}.",
             f"Ma ho so: {tag}",
-            "Van ban gia lap de chay thu Moc, khong phai van ban that."]
+            "Van ban gia lap de chay thu Signet, khong phai van ban that."]
 
 
 def _split(digits: str, sizes: tuple[int, ...]) -> list[str]:
@@ -2848,7 +2848,7 @@ def che_pii() -> None:
             "issued_on": (today() - timedelta(days=1)).isoformat(), "summary": PII_SUMMARY, "urgency": "normal",
             "file_ids": [file["id"]]}})["receiveIncoming"]["document_id"]
         number = None
-        ok(f"don-de-nghi-{tag}.pdf: PDF một trang có lớp chữ, chân trang “Van ban gia lap de chay thu Moc…”")
+        ok(f"don-de-nghi-{tag}.pdf: PDF một trang có lớp chữ, chân trang “Van ban gia lap de chay thu Signet…”")
     if number is None:
         number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
                            {"id": doc_id})["registerIncoming"]["register_number"]
@@ -2984,7 +2984,7 @@ DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ke
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="demo", description="Màn demo bằng chứng nguyên lý thiết kế của Mộc")
+    parser = argparse.ArgumentParser(prog="demo", description="Màn demo bằng chứng nguyên lý thiết kế của Signet")
     parser.add_argument("man", choices=sorted(DEMOS), help="màn cần chạy")
     args = parser.parse_args(argv)
     started = time.monotonic()
@@ -2994,7 +2994,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n✗ {exc}", file=sys.stderr)
         return 1
     except (HTTPError, RuntimeError, subprocess.CalledProcessError, OSError) as exc:
-        print(f"\n✗ Không chạy được màn demo: {exc}. Mộc có đang chạy và đã make seed chưa?", file=sys.stderr)
+        print(f"\n✗ Không chạy được màn demo: {exc}. Signet có đang chạy và đã make seed chưa?", file=sys.stderr)
         return 1
     print(f"\nXong trong {time.monotonic() - started:.0f} giây.")
     return 0

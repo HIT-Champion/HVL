@@ -1,4 +1,4 @@
-# Tài liệu API của Mộc
+# Tài liệu API của Signet
 
 Mọi ứng dụng gọi lõi qua **một cổng duy nhất**: APISIX ở `MOC_PUBLIC_URL` (máy phát triển:
 `http://localhost:8080`). Ứng dụng có thể là Văn phòng điện tử, một ứng dụng Tầng 2 khác, script hay tác tử AI.
@@ -235,7 +235,7 @@ và gửi access token Keycloak trong lệnh đầu tiên. Centrifugo tự kiể
 
 Token sai thì Centrifugo đóng kết nối với mã `3500`; trang khác tên miền (`Origin`) không mở được kết nối. Mở
 kết nối giới hạn theo địa chỉ IP (`MOC_RATE_REALTIME_PER_MIN`). Tin đẩy lúc mất kết nối không gửi lại: nối lại
-thì đọc lại `core_notifications`. Giao diện Mộc làm đúng như vậy trong
+thì đọc lại `core_notifications`. Giao diện Signet làm đúng như vậy trong
 [`apps/office/app/composables/useRealtime.ts`](../../apps/office/app/composables/useRealtime.ts).
 
 ## 5. Sổ kiểm toán: `core_audit_log` (lãnh đạo, quản trị đơn vị)

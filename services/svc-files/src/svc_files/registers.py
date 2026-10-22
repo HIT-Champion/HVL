@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -256,7 +256,7 @@ def register_html(reg: Register) -> str:
 <html lang="vi"><head><meta charset="utf-8">
 <title>{_e(reg.title)} năm {reg.year} — {_e(reg.org_name)}</title>
 <meta name="author" content="{_e(reg.org_name)}">
-<meta name="generator" content="Mộc">
+<meta name="generator" content="Signet">
 <style>{CSS}</style></head>
 <body>
 <section class="cover">
@@ -264,7 +264,7 @@ def register_html(reg: Register) -> str:
   <div class="rule"></div>
   <h1>{_e(reg.title)}</h1>
   <div class="meta">{''.join(f'<div>{_e(m)}</div>' for m in meta)}</div>
-  <div class="note">In từ hệ thống Mộc lúc {printed}. Văn bản đăng ký trên hệ thống; bản in đủ các trường theo mẫu sổ
+  <div class="note">In từ hệ thống Signet lúc {printed}. Văn bản đăng ký trên hệ thống; bản in đủ các trường theo mẫu sổ
   đăng ký (Nghị định 30/2020/NĐ-CP, Điều 16, Điều 22, Phụ lục IV) để ký nhận và đóng sổ. {_e(check)}{_e(hidden_note)}
   </div>
 </section>

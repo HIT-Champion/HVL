@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -170,7 +170,7 @@ def letter_html(letter: Letter) -> str:
         stamp = '<div class="stamp">Dự thảo — chưa ký duyệt</div>'
     else:
         when = letter.approved_at.astimezone(VN).strftime("%H:%M ngày %d/%m/%Y") if letter.approved_at else ""
-        stamp = f'<div class="stamp">Đã duyệt trên hệ thống Mộc<br>{when}</div>'
+        stamp = f'<div class="stamp">Đã duyệt trên hệ thống Signet<br>{when}</div>'
     sign = f"""
   <td class="sign">
     <div class="who">{_e(letter.signer_title or 'Thủ trưởng đơn vị')}</div>
@@ -184,7 +184,7 @@ def letter_html(letter: Letter) -> str:
         qr = segno.make(letter.verify_url or letter.verify_code, error="m").svg_data_uri(scale=4, border=0)
         verify = f"""
 <div class="verify"><img src="{qr}" alt="Mã QR xác thực">
-<div>Văn bản phát hành trên hệ thống Mộc. Kiểm tra văn bản còn nguyên vẹn: quét mã QR, hoặc mở
+<div>Văn bản phát hành trên hệ thống Signet. Kiểm tra văn bản còn nguyên vẹn: quét mã QR, hoặc mở
 {_e(letter.verify_url.rsplit('/', 1)[0] if letter.verify_url else 'trang xác thực')} và nhập mã
 <div class="code">{display_code(letter.verify_code)}</div>
 Tệp PDF bị sửa dù một ký tự sẽ không còn khớp mã băm SHA-256 đã lưu khi phát hành.</div></div>"""
@@ -194,7 +194,7 @@ Tệp PDF bị sửa dù một ký tự sẽ không còn khớp mã băm SHA-256
 <html lang="vi"><head><meta charset="utf-8">
 <title>{_e(letter.type_name)} {_e(letter.symbol or '(dự thảo)')} — {_e(letter.summary)}</title>
 <meta name="author" content="{_e(letter.org_name)}">
-<meta name="generator" content="Mộc">
+<meta name="generator" content="Signet">
 <style>{CSS}</style></head>
 <body>{watermark}{head}{intro}
 <div class="body">{_paragraphs(letter.body)}</div>

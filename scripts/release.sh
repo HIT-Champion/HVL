@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# Tạo gói phát hành Mộc ở định dạng MỞ (.tar.gz).
+# Tạo gói phát hành Signet ở định dạng MỞ (.tar.gz).
 #
 # Tiêu chí chấm điểm PoF #3 trừ 3 điểm nếu "sử dụng các định dạng không phải là
 # mở cho bản phát hành (vd., zip, .rar, .arj)" và trừ 3 điểm nếu "dự án không
@@ -76,7 +76,7 @@ fi
 mkdir -p "$DIST"
 
 echo "==> Gắn thẻ phiên bản $TAG"
-git tag -a "$TAG" -m "Mộc $VERSION"
+git tag -a "$TAG" -m "Signet $VERSION"
 
 echo "==> Sinh gói nguồn $DIST/moc-$VERSION.tar.gz"
 git archive --format=tar.gz \

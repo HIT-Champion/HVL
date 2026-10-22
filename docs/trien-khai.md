@@ -1,6 +1,6 @@
 # Triển khai lên máy chủ (VPS)
 
-Mộc chạy trên một máy chủ Linux bằng Docker Compose, cài ra thư mục riêng (`/opt/moc`) như mục "Cài ra ngoài thư
+Signet chạy trên một máy chủ Linux bằng Docker Compose, cài ra thư mục riêng (`/opt/moc`) như mục "Cài ra ngoài thư
 mục mã nguồn" của [README](../README.md). Trên máy chủ thêm hai thứ so với máy dev:
 
 - **Caddy** nhận HTTPS ở cổng 443 (tự xin và gia hạn chứng thư Let's Encrypt, cổng 80 tự chuyển sang 443) rồi chuyển
@@ -25,7 +25,7 @@ trên trình duyệt, màn kiểm dịch, ký số, che thông tin cá nhân, ki
 |---|---|---|
 | Máy chủ | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 40 GB đĩa | Cả hệ thống dùng khoảng 3,5 GB RAM khi chạy (đo lúc diễn tập, chưa bật mô hình); các image khoảng 2,3 GB, lúc dựng cần thêm chỗ cho image nền và bộ đệm. Bật mô hình ngôn ngữ (profile `ai`, F4.1–F4.2) thì cần 16 GB |
 | Tên miền | một bản ghi A trỏ về IP máy chủ | vd `moc.example.vn`; có IPv6 thì thêm bản ghi AAAA. Let's Encrypt cần cổng 80 và 443 mở |
-| Tài khoản | SSH vào được, có `sudo` | Các bước cài phần nền cần `sudo`; Mộc chạy bằng người dùng `moc` |
+| Tài khoản | SSH vào được, có `sudo` | Các bước cài phần nền cần `sudo`; Signet chạy bằng người dùng `moc` |
 
 Đặt tên miền trước: Let's Encrypt chỉ cấp chứng thư khi tên miền đã trỏ đúng IP (`dig +short moc.example.vn`).
 
@@ -44,7 +44,7 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_C
 sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 docker --version && docker compose version     # cần Docker ≥ 24.0, compose ≥ 2.20
 
-# Người vận hành moc: chạy Mộc, sao lưu, reconciler. Nhóm docker có quyền ngang root trên máy — chỉ người vận hành
+# Người vận hành moc: chạy Signet, sao lưu, reconciler. Nhóm docker có quyền ngang root trên máy — chỉ người vận hành
 sudo adduser --disabled-password --gecos "" moc
 sudo usermod -aG docker moc
 sudo install -d -o moc -g moc /opt/moc /var/backups/moc     # thư mục cài, kho sao lưu (để trống)
@@ -54,7 +54,7 @@ sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sud
 ```
 
 Docker tự mở cổng của container mà **không qua ufw**, nên chặn bằng tường lửa không đủ: cổng của APISIX phải gắn vào
-`127.0.0.1` ở bước 3. Các cổng khác của Mộc (Keycloak quản trị 8180, Grafana 3300) đã chỉ nghe `127.0.0.1`.
+`127.0.0.1` ở bước 3. Các cổng khác của Signet (Keycloak quản trị 8180, Grafana 3300) đã chỉ nghe `127.0.0.1`.
 
 Máy 8 GB nên thêm 4 GB swap cho lần dựng image đầu tiên:
 `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile` (thêm
@@ -171,12 +171,12 @@ docker compose logs --tail 3 apisix                                   # cột đ
 ```
 
 Kho ở `/var/backups/moc` vẫn nằm trên cùng máy chủ: chép thêm ra ngoài (`rsync -a /var/backups/moc/ máy-khác:…`;
-kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: README mục "Sao lưu và khôi phục".
+kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục".
 
-**Tự phục hồi và GitOps** (tùy chọn): README mục "GitOps và tự phục hồi" — systemd timer `ops/systemd/` chạy
-`reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn commit mới trên nhánh
-`deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh `deploy`) và đặt
-`MOC_GITOPS_DIR` như README — không dùng chung `~/HVL`.
+**Tự phục hồi và GitOps** (tùy chọn): [`van-hanh.md`](van-hanh.md) mục "GitOps và tự phục hồi" — systemd timer
+`ops/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
+commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
+`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/HVL`.
 
 **Nâng cấp tay** (không dùng GitOps):
 
@@ -207,5 +207,5 @@ khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait olla
   (trang metadata bị chặn ở APISIX), chưa có vai trò CSDL riêng quyền hẹp.
 - **Mọi tài khoản mẫu của `seed.py` dùng chung `MOC_DEMO_PASSWORD`.** Hợp với máy demo; máy có dữ liệu thật thì không
   chạy `seed.py` (bước 3).
-- **GitOps kiểm chữ ký commit chỉ khi đặt `MOC_GITOPS_ALLOWED_SIGNERS`** (README mục GitOps): để trống thì ai đẩy
+- **GitOps kiểm chữ ký commit chỉ khi đặt `MOC_GITOPS_ALLOWED_SIGNERS`** (`van-hanh.md` mục GitOps): để trống thì ai đẩy
   được lên nhánh `deploy` là cài được lên máy chủ.

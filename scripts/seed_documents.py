@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -178,7 +178,7 @@ h1 {{ font-size: 14pt; text-align: center; margin: 14pt 0 0; }} .sum {{ text-ali
 {"".join(f"<p>{e(line)}</p>" for line in body.split(chr(10)))}
 <p>Trân trọng./.</p>
 <div class="sign"><div class="b">TRƯỞNG PHÒNG</div><div style="margin-top: 22mm">(Đã ký)</div></div>
-<div class="note">Văn bản giả lập để chạy thử Mộc, không phải văn bản thật.</div>
+<div class="note">Văn bản giả lập để chạy thử Signet, không phải văn bản thật.</div>
 </body></html>"""
 
 

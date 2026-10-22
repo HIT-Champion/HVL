@@ -100,7 +100,7 @@ docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.
 | ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` | −5 |
 | ☐ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin | −5 |
 
-> ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Mộc. Nguyên tắc
+> ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Signet. Nguyên tắc
 > an toàn: `docker-compose.yml` kéo image thượng nguồn **nguyên bản có ghim thẻ phiên bản**; mọi
 > tùy biến nằm ở `.env`, tệp cấu hình riêng, hoặc adapter do đội tự viết.
 

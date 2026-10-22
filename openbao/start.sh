@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 # Token khởi động không đọc thẳng được bí mật và không sửa được policy, vai trò hay cấu hình két. Nhưng nó cấp được
 # secret_id, nên ai cầm nó làm được mọi việc hai dịch vụ làm được (đọc bí mật của chúng, mở khóa dữ liệu bằng
 # transit): volume openbao_data phải được giữ như chính két. Đổi cấu hình két về sau (thêm khóa, policy) cần quyền
-# quản trị — xem README mục Két bí mật. Vì vậy két khởi tạo trước F4.5 không tự có PKI: ký số tự tắt cho tới khi
+# quản trị — xem docs/van-hanh.md mục Két bí mật. Vì vậy két khởi tạo trước F4.5 không tự có PKI: ký số tự tắt cho tới khi
 # người quản trị nâng cấp tay hoặc dựng lại két.
 set -eu
 
@@ -88,7 +88,7 @@ policy_of() {
     printf 'path "transit/datakey/plaintext/moc-files" { capabilities = ["update"] }\n'
     printf 'path "transit/decrypt/moc-files" { capabilities = ["update"] }\n'
     # F4.5: khóa ký văn bản của từng đơn vị — tạo, đọc, xin CSR, gắn chứng thư, ký. Không có transit/export hay
-    # transit/backup nên khóa riêng không ra khỏi két. Glob cũng phủ keys/<k>/{config,rotate} (README, rủi ro)
+    # transit/backup nên khóa riêng không ra khỏi két. Glob cũng phủ keys/<k>/{config,rotate} (README svc-files, rủi ro)
     printf 'path "transit/keys/moc-ky-so-*" { capabilities = ["create", "read", "update"] }\n'
     printf 'path "transit/sign/moc-ky-so-*" { capabilities = ["update"] }\n'
     printf 'path "pki/sign/moc-van-thu" { capabilities = ["update"] }\n'
@@ -133,8 +133,8 @@ setup_pki() {
   # CA gốc tạo một lần, tên issuer cố định: có rồi thì giữ nguyên (tạo lại là đổi CA, chứng thư đã cấp thành lạ)
   bao read pki/issuer/moc-root >/dev/null 2>&1 \
     || bao write pki/root/generate/internal - >/dev/null <<'EOF' || return 1
-{"issuer_name": "moc-root", "common_name": "CA nội bộ Mộc - MẪU, chỉ minh họa",
- "organization": ["Mộc - PKI nội bộ, chỉ minh họa"], "country": ["VN"],
+{"issuer_name": "moc-root", "common_name": "CA nội bộ Signet - MẪU, chỉ minh họa",
+ "organization": ["Signet - PKI nội bộ, chỉ minh họa"], "country": ["VN"],
  "key_type": "rsa", "key_bits": 4096, "ttl": "87600h", "exclude_cn_from_sans": true}
 EOF
   # ghi đè cả role mỗi lần (POST thay toàn bộ, trường bỏ trống về mặc định). EKU 1.3.6.1.4.1.311.10.3.12 là Document
@@ -144,7 +144,7 @@ EOF
  "use_csr_common_name": false, "use_csr_sans": false, "allow_ip_sans": false,
  "server_flag": false, "client_flag": false, "code_signing_flag": false, "email_protection_flag": false,
  "key_usage": ["DigitalSignature", "ContentCommitment"], "ext_key_usage_oids": ["1.3.6.1.4.1.311.10.3.12"],
- "organization": ["Mộc - PKI nội bộ, chỉ minh họa"], "country": ["VN"], "key_type": "rsa", "key_bits": 3072,
+ "organization": ["Signet - PKI nội bộ, chỉ minh họa"], "country": ["VN"], "key_type": "rsa", "key_bits": 3072,
  "ttl": "8760h", "max_ttl": "8760h"}
 EOF
 }
@@ -172,11 +172,11 @@ setup() {
     bao write "auth/approle/role/$s" token_policies="$s" token_ttl=1h token_max_ttl=4h secret_id_ttl=0 >/dev/null
   done
   # ký số chỉ ở mức Could: PKI lỗi thì két vẫn chạy như trước, svc-files phát hành không ký (ghi cảnh báo). Không
-  # thử lại lần sau — setup chỉ chạy khi còn token root (README mục Két bí mật, nâng cấp tay)
+  # thử lại lần sau — setup chỉ chạy khi còn token root (docs/van-hanh.md mục Két bí mật)
   if setup_pki; then
     log "đã dựng PKI nội bộ (CA moc-root, role moc-van-thu) — ký số chỉ minh họa"
   else
-    log "chưa dựng được PKI nội bộ — két vẫn chạy, văn bản phát hành không có chữ ký số (README mục Két bí mật)"
+    log "chưa dựng được PKI nội bộ — két vẫn chạy, văn bản phát hành không có chữ ký số (docs/van-hanh.md mục Két bí mật)"
   fi
   policy_bootstrap | bao policy write moc-bootstrap - >/dev/null
   # token định kỳ: không hết hạn nếu được gia hạn trong một năm (mỗi lần khởi động và mỗi ngày, xem run). Chu kỳ

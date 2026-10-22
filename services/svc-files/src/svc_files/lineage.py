@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ Quy ước tên dataset (theo quy ước đặt tên của OpenLineage):
 
 Kiểm chất lượng: mỗi bảng Parquet vừa dựng được DuckDB đọc lại (trước khi ghi sang lạnh) — số dòng phải bằng số dòng
 lấy từ CSDL, các cột bắt buộc không có null. Kết quả là facet ``dataQualityAssertions``: ở bước ``tables`` nằm trong
-facet của dataset vừa ghi (mở rộng của Mộc — đặc tả định nghĩa facet này cho đầu vào), ở bước ``manifest`` nằm trong
+facet của dataset vừa ghi (mở rộng của Signet — đặc tả định nghĩa facet này cho đầu vào), ở bước ``manifest`` nằm trong
 ``inputFacets`` của bảng đầu vào (đúng đặc tả, Marquez hiển thị được). Trượt một mục thì bước ``tables`` FAIL, job dừng
 (cảnh báo trong nhật ký, ``quality_ok = false`` trong bảng phả hệ).
 

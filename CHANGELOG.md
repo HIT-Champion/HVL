@@ -1,6 +1,6 @@
 # Lịch sử thay đổi
 
-Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này.
+Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộc) được ghi lại trong tệp này.
 
 Định dạng theo [Keep a Changelog 1.1.0](https://keepachangelog.com/vi/1.1.0/),
 đánh phiên bản theo [Semantic Versioning 2.0.0](https://semver.org/lang/vi/).
@@ -384,6 +384,17 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   qua `https://`.
 
 ### Đã sửa đổi
+- Đổi tên hiển thị Mộc → **Signet** (nhẫn ấn đóng dấu lên văn bản, giữ ý "đóng dấu" của tên cũ): giao diện (`<title>`,
+  thanh bên, trang đăng nhập, cổng xác thực, biểu tượng con dấu thay hình cây), realm Keycloak (`displayName`, tên
+  client), tiêu đề API, chuỗi in ra của CLI và script, bảng điều khiển Grafana "Signet — cổng API", PDF phát hành và sổ
+  in, mẫu issue, tài liệu, header giấy phép `Signet Team`. Tên mã kỹ thuật `moc` giữ nguyên: biến `MOC_*`, realm `moc`,
+  client id, project compose, image, `scripts/moc.py`, `/opt/moc`, tiêu đề `X-Moc-*`, gói `moc-X.Y.Z.tar.gz`. Bản cài
+  cũ: Keycloak chỉ nạp realm ở lần khởi động đầu nên trang đăng nhập Keycloak còn tên Mộc tới khi đổi Display name của
+  realm trong trang quản trị; két đã dựng PKI giữ CA tên cũ (chữ ký vẫn kiểm được), két mới có "CA nội bộ Signet - MẪU".
+  Văn bản mẫu đã commit (kho văn bản đến, kho hỏi đáp) giữ chân trang "chạy thử Mộc" — đổi là phải in lại PDF, đo lại.
+- README viết lại gọn (bài toán, bốn con dấu của lõi, tính năng, bằng chứng bốn nguyên lý, kiến trúc, cài đặt, kiểm
+  thử); sáu mục vận hành (thêm đơn vị, sao lưu, két bí mật, GitOps, giám sát, IT/OT) chuyển nguyên văn sang
+  `docs/van-hanh.md`, các chỗ trỏ "README mục …" trỏ theo.
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
   đính kèm (`insert_office_document_files_one`, `delete_office_document_files`): văn bản đến kèm tệp vào qua Action
   `receiveIncoming(data: jsonb!)`, nên không đi vòng được lớp kiểm của svc-workflow. Sửa văn bản đến chưa vào sổ
@@ -479,8 +490,8 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   kiểm. Cách nâng phiên bản: `DEPENDENCIES.md` mục Cách đọc.
 - GitOps chỉ áp commit đã ký khi đặt `MOC_GITOPS_ALLOWED_SIGNERS` (tệp allowed_signers, khóa SSH của người được đẩy
   nhánh `deploy`): reconciler `git verify-commit` trước khi dừng Mộc; chưa ký, khóa lạ, chữ ký OpenPGP/X.509 (kể cả khi
-  keyring của người dùng `moc` tin khóa đó) thì không áp, Mộc chạy tiếp bản cũ. Để trống thì như trước (README mục
-  GitOps; `docs/git_flow.md` mục 7: đẩy nhánh bằng `git merge --no-ff -S`). Test scripts +4.
+  keyring của người dùng `moc` tin khóa đó) thì không áp, Mộc chạy tiếp bản cũ. Để trống thì như trước (`docs/van-hanh.md`
+  mục GitOps; `docs/git_flow.md` mục 7: đẩy nhánh bằng `git merge --no-ff -S`). Test scripts +4.
 - Không phát hành lại một phiên bản: `release.sh` dừng trước khi gắn thẻ khi thẻ `vX.Y.Z` đã có trên `origin` (không
   hỏi được `origin` cũng dừng) hay chỉ có ở máy (gợi ý gỡ thẻ của lần chạy dở); workflow Release dừng khi thẻ đã có
   Release, kể cả bản nháp mà GitHub để lại khi xóa thẻ của Release đã đăng; action không ghi đè tệp cùng tên, thiếu
@@ -489,7 +500,8 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - Ký số (F4.5): khóa ký của từng đơn vị không ra khỏi két (policy `svc-files` chỉ có `transit/keys|sign/moc-ky-so-*`
   và `pki/sign/moc-van-thu`, không `export`, `backup`). Ai chiếm được `svc-files` vẫn ký được, xoay được khóa ký và xin
   được chứng thư cho khóa tự sinh, nhưng không mang khóa riêng đi được — cùng mức tin như khóa dữ liệu `moc-files`
-  (README mục Két bí mật). Két khởi tạo trước F4.5 không ký số cho tới khi quản trị nâng cấp tay (README).
+  (`docs/van-hanh.md` mục Két bí mật). Két khởi tạo trước F4.5 không ký số cho tới khi quản trị nâng cấp tay (cùng
+  mục).
 - Che thông tin cá nhân (F4.4): sổ kiểm toán cố ý giữ bản gốc (có phân quyền và chuỗi băm, che vào là sửa chứng cứ), số
   chỗ đã che chỉ ghi ở nhật ký. Chưa che: họ tên, địa chỉ, số dính chữ (`ĐT0912…`), CMND và số tài khoản không có từ
   khóa; nhật ký Hasura, PostgreSQL, Keycloak, Meilisearch và `error_log` của APISIX, nginx (vẫn có `?q=…` khi một plugin

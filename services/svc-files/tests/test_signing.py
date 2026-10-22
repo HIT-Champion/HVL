@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ from svc_files.signing import (
 )
 
 TENANT_B = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000b")
-CA_CN = "CA nội bộ Mộc - MẪU, chỉ minh họa"
+CA_CN = "CA nội bộ Signet - MẪU, chỉ minh họa"
 SIGNER = "Khoa Công nghệ thông tin, Trường Đại học Thử"     # tên đơn vị, cơ quan chủ quản của FakeHasura.add_letter
 DOC_SIGNING = x509.ObjectIdentifier("1.3.6.1.4.1.311.10.3.12")
 
@@ -62,7 +62,7 @@ DOC_SIGNING = x509.ObjectIdentifier("1.3.6.1.4.1.311.10.3.12")
 def _name(cn: str) -> x509.Name:
     # cryptography chặn CN quá 64 byte UTF-8: PKI giả cũng kiểm luôn rằng svc-files không xin CN dài hơn
     return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn),
-                      x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Mộc - PKI nội bộ, chỉ minh họa"),
+                      x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Signet - PKI nội bộ, chỉ minh họa"),
                       x509.NameAttribute(NameOID.COUNTRY_NAME, "VN")])
 
 
@@ -623,14 +623,14 @@ def cli(monkeypatch, capsys, tmp_path, pki):
 
 def test_cli_exit_codes_and_messages(cli, signed, monkeypatch):
     code, lines = cli(signed)
-    assert code == 0 and lines[0] == ("Chữ ký hợp lệ — PKI nội bộ Mộc (MẪU), chỉ minh họa, không có giá trị pháp lý "
+    assert code == 0 and lines[0] == ("Chữ ký hợp lệ — PKI nội bộ Signet (MẪU), chỉ minh họa, không có giá trị pháp lý "
                                       "như chữ ký số công cộng.")
     assert f"Ký bởi: {SIGNER}" in lines and f"CA: {CA_CN}" in lines
     assert any(line.startswith("Ký lúc (tự khai, không có dấu thời gian tin cậy): ") for line in lines)
     assert lines[-1] == "Phủ toàn bộ tệp, không có sửa đổi sau khi ký"
     code, lines = cli(_incremental_edit(signed))
     assert code == 1 and lines[0].startswith("Văn bản đã bị sửa sau khi ký: chữ ký còn đúng cho phần đã ký")
-    assert lines[-1].startswith("Ghi chú: PKI nội bộ Mộc (MẪU), chỉ minh họa")
+    assert lines[-1].startswith("Ghi chú: PKI nội bộ Signet (MẪU), chỉ minh họa")
     code, lines = cli(_flip_in_stream(signed))
     assert code == 1 and lines[0] == "Chữ ký không khớp nội dung: tệp đã bị sửa trong phần đã ký."
     assert cli(one_page_pdf()) == (1, ["Tệp không có chữ ký số."])
@@ -667,7 +667,7 @@ def test_cli_rejects_a_foreign_ca(cli, signed, tmp_path):
     other = tmp_path / "khac.pem"
     other.write_text(FakePki("CA khác").pem)
     code, lines = cli(signed, "--ca", str(other))
-    assert code == 1 and lines[0] == "Chữ ký đúng về mật mã nhưng chứng thư không do CA nội bộ Mộc cấp."
+    assert code == 1 and lines[0] == "Chữ ký đúng về mật mã nhưng chứng thư không do CA nội bộ Signet cấp."
 
 
 # --- cổng xác thực ------------------------------------------------------------------------------------------------

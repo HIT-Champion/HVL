@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 [project]
 name = "svc-files"
 version = "0.1.0"
-description = "Mộc — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS; dựng PDF văn bản đi; cổng xác thực"
+description = "Signet — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS; dựng PDF văn bản đi; cổng xác thực"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [

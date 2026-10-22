@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -302,7 +302,7 @@ def main() -> None:
     # F3.3: một lượt reconciler trên hệ thống vừa dựng — mọi dịch vụ khai trong compose đều có container chạy, không
     # có gì phải sửa (màn phá rồi tự dựng lại: make demo-tu-phuc-hoi)
     print("Tự phục hồi")
-    # --heal-only: smoke không kéo commit mới về (không tự cài lại Mộc); timer đang chạy một lượt thì đợi nó xong
+    # --heal-only: smoke không kéo commit mới về (không tự cài lại Signet); timer đang chạy một lượt thì đợi nó xong
     rec = subprocess.run([sys.executable, str(pathlib.Path(__file__).with_name("reconcile.py")), "--json",
                           "--heal-only", "--wait", "300"], capture_output=True, text=True)
     try:
@@ -540,7 +540,7 @@ def main() -> None:
     if signature is None and ENV.get("MOC_SIGN_ENABLED", "true").strip().lower() in ("0", "false", "no", "off"):
         print(f"  – bỏ qua: MOC_SIGN_ENABLED={ENV['MOC_SIGN_ENABLED']}, phát hành không ký")
     elif signature is None and vault_ca_pem() is None:
-        print("  – bỏ qua: két khởi tạo trước F4.5 chưa có CA nội bộ, ký số tự tắt (README mục Két bí mật)")
+        print("  – bỏ qua: két khởi tạo trước F4.5 chưa có CA nội bộ, ký số tự tắt (docs/van-hanh.md mục Két bí mật)")
     else:
         signature or fail("két có CA nội bộ mà bản phát hành không có chữ ký số — xem nhật ký svc-files"
                           " (office.document.sign_failed, office.signing.disabled)")
@@ -1127,7 +1127,7 @@ def main() -> None:
                                         "http://localhost:3000/api/search?type=dash-db"))
     except (subprocess.CalledProcessError, ValueError) as exc:
         fail(f"không hỏi được Grafana: {exc}")
-    [d["title"] for d in dashboards] == ["Mộc — cổng API"] or fail(f"Grafana thiếu bảng điều khiển: {dashboards}")
+    [d["title"] for d in dashboards] == ["Signet — cổng API"] or fail(f"Grafana thiếu bảng điều khiển: {dashboards}")
     ok(f"Prometheus đọc chỉ số cổng API ({float(total[0]['value'][1]):.0f} yêu cầu, {len(routes)} route); Grafana"
        " có bảng điều khiển cho người xem ẩn danh")
 

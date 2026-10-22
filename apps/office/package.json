@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Mộc — Văn phòng điện tử (Tầng 2)",
+  "description": "Signet — Văn phòng điện tử (Tầng 2)",
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt generate",

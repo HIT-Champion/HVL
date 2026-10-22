@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ AUDIT_VIEW = """query ($e: String!) {
   core_audit_log(where: {entity: {_eq: "core.file_signatures"}, entity_id: {_eq: $e}}, order_by: {id: asc}) {
     action entity entity_id actor_id actor_kind overview } }"""
 
-CA = "CA nội bộ Mộc - MẪU, chỉ minh họa"
+CA = "CA nội bộ Signet - MẪU, chỉ minh họa"
 SIGNED_AT = datetime(2026, 10, 23, 3, 12, 45, tzinfo=timezone.utc)
 SIGNATURE_COLUMNS = ("signature_level", "signed_at", "signer_name", "signer_ca", "certificate_serial")
 

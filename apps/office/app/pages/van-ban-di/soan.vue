@@ -1,5 +1,5 @@
 <!--
-  Copyright 2026 Mộc Team
+  Copyright 2026 Signet Team
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import type { UploadedFile } from '~/composables/useApi'
 // Soạn hoặc sửa dự thảo văn bản đi (F2.4). Chuyên viên nhập trích yếu, nội dung, nơi nhận; svc-files dựng
 // PDF đúng thể thức NĐ 30 từ đây. Số, ký hiệu, ngày ban hành do văn thư cấp khi phát hành, không nhập tay.
 // Kiểm trên form theo ràng buộc của CSDL (độ dài trích yếu, nội dung); svc-workflow kiểm lại khi trình.
-// Gửi trong hệ thống (F3.12): tích đơn vị nhận cùng dùng Mộc — phát hành xong, văn bản tự vào sổ chờ của văn thư
+// Gửi trong hệ thống (F3.12): tích đơn vị nhận cùng dùng Signet — phát hành xong, văn bản tự vào sổ chờ của văn thư
 // đơn vị đó (recipient_tenant_ids). Văn bản hạn chế không gửi liên thông (tệp mã hóa theo đơn vị).
 
 // Khóa trang theo cả ?id=: từ "Sửa" một dự thảo sang "Soạn văn bản" ở thanh bên (cùng đường dẫn, khác query) thì

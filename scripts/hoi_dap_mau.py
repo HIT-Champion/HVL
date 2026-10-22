@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
+# tên cũ của sản phẩm: PDF mẫu đã commit và số đo trợ lý dựng từ chuỗi này — đổi là in lại, đo lại
 NOTE = "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật."
 ISSUER = "Trường Đại học Mẫu"
 MOTTO = "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"

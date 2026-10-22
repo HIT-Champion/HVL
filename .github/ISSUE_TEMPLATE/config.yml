@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,4 +18,4 @@ blank_issues_enabled: true
 contact_links:
   - name: Câu hỏi sử dụng
     url: https://github.com/HIT-Champion/HVL/discussions/categories/q-a
-    about: Đặt câu hỏi về cách cài đặt và vận hành Mộc
+    about: Đặt câu hỏi về cách cài đặt và vận hành Signet

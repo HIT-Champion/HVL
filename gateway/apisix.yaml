@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Cổng duy nhất của Mộc (F1.2). Danh sách trắng: đường dẫn nào không có ở đây thì về giao diện,
+# Cổng duy nhất của Signet (F1.2). Danh sách trắng: đường dẫn nào không có ở đây thì về giao diện,
 # và các đường dẫn quản trị của thành phần lõi bị chặn tường minh (route "chan").
 #
 #   /realms/<realm>/*, /resources/*  → Keycloak (đăng nhập)          — không cần token

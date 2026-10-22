@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Lệnh vận hành Mộc trên máy chủ — chỉ dùng thư viện chuẩn, chạy được ngay trong thư mục cài (make install).
+"""Lệnh vận hành Signet trên máy chủ — chỉ dùng thư viện chuẩn, chạy được ngay trong thư mục cài (make install).
 
     python3 scripts/moc.py audit verify [--anchors TỆP ...] [--json]
         Tính lại toàn bộ sổ kiểm toán bên ngoài CSDL, so với các mốc neo trong bucket lạnh (và trong tệp, nếu
@@ -33,7 +33,7 @@
         Các lượt trong kho; kiểm cấu trúc kho.
 
     python3 scripts/moc.py backup restore [LƯỢT] [--yes]
-        Dừng Mộc, thay mọi CSDL và tệp bằng một lượt (mặc định lượt mới nhất), ghi lần khôi phục vào sổ kiểm
+        Dừng Signet, thay mọi CSDL và tệp bằng một lượt (mặc định lượt mới nhất), ghi lần khôi phục vào sổ kiểm
         toán, chạy lại. Hỏi lại trước khi thay, trừ khi có --yes. (make restore)
 
     python3 scripts/moc.py tenant create --code MÃ --name TÊN --admin TÊN_ĐĂNG_NHẬP [--department "MÃ=Tên" ...]
@@ -226,7 +226,7 @@ def verify(args: argparse.Namespace) -> int:
             report = check(snap.rows(), snap.head, anchors, snap.documents,
                            recorded=snap.recorded if bucket is not None else None, as_of=snap.now)
     except Unavailable as exc:
-        print(f"✗ {exc}. Mộc có đang chạy không? (make ps)", file=sys.stderr)
+        print(f"✗ {exc}. Signet có đang chạy không? (make ps)", file=sys.stderr)
         return 2
     if bucket is not None:
         gaps += coverage(report, bucket)
@@ -294,7 +294,7 @@ def positive(value: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="moc", description="Lệnh vận hành Mộc trên máy chủ")
+    parser = argparse.ArgumentParser(prog="moc", description="Lệnh vận hành Signet trên máy chủ")
     groups = parser.add_subparsers(dest="group", required=True)
     audit = groups.add_parser("audit", help="sổ kiểm toán chuỗi băm (F2.12)").add_subparsers(dest="cmd", required=True)
     v = audit.add_parser("verify", help="tính lại chuỗi, so mốc neo và hash văn bản")
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     ls.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     ls.set_defaults(run=backup.cmd_list)
     b.add_parser("check", help="kiểm cấu trúc kho (restic check)").set_defaults(run=backup.cmd_check)
-    r = b.add_parser("restore", help="dừng Mộc, thay CSDL và tệp bằng một lượt sao lưu, chạy lại")
+    r = b.add_parser("restore", help="dừng Signet, thay CSDL và tệp bằng một lượt sao lưu, chạy lại")
     r.add_argument("run_id", nargs="?", metavar="LƯỢT", help="mã lượt trong backup list; mặc định: lượt mới nhất")
     r.add_argument("--yes", action="store_true", help="không hỏi lại")
     r.set_defaults(run=backup.cmd_restore)

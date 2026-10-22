@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -347,7 +347,7 @@ class LetterTests(unittest.TestCase):
         # các số không được che, và chân trang giả lập
         for phrase in ("cap ngay 05/3/2021", "02 ban sao", "sinh nam 2005", "Ma ho so: A1B2C3"):
             self.assertIn(phrase, text)
-        self.assertEqual(lines[-1], "Van ban gia lap de chay thu Moc, khong phai van ban that.")
+        self.assertEqual(lines[-1], "Van ban gia lap de chay thu Signet, khong phai van ban that.")
 
     def test_question_and_metadata_carry_no_personal_data(self):
         forms = demo.spellings(demo.PII_DEMO)

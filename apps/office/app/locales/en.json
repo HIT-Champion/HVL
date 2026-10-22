@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Mộc",
+    "name": "Signet",
     "tagline": "e-Office",
     "loading": "Loading…",
     "retry": "Retry",
@@ -327,7 +327,7 @@
       "sourceCode": "Sender’s verification code",
       "hashMatch": "SHA-256 matches the issued copy",
       "hashMismatch": "SHA-256 does NOT match the sender’s issued copy — report it to the administrator",
-      "fromHint": "An outgoing document of another unit on Mộc, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
+      "fromHint": "An outgoing document of another unit on Signet, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
       "manualHint": "The clerk registered this document from paper or email; the sender's in-system dispatch arrived later and was only linked, so the attached file is the one the clerk uploaded. Open the verification page to compare it with the issued copy."
     }
   },
@@ -604,7 +604,7 @@
   },
   "verify": {
     "title": "Verify a document",
-    "subtitle": "Check that a document issued through Mộc is genuine and unaltered.",
+    "subtitle": "Check that a document issued through Signet is genuine and unaltered.",
     "code": "Verification code",
     "codeHint": "10 characters printed next to the QR code, e.g. ABCDE-23456",
     "lookup": "Look up",
@@ -613,7 +613,7 @@
     "checking": "Checking…",
     "valid": "Genuine document, issued by the organisation below",
     "notFound": "No matching document",
-    "notFoundHint": "Check the code. When checking a file: it was altered, or it was not issued through Mộc.",
+    "notFoundHint": "Check the code. When checking a file: it was altered, or it was not issued through Signet.",
     "match": "The file matches the issued copy byte for byte",
     "mismatch": "The file does NOT match the document with this code: it may have been altered",
     "compare": "Drop the PDF you received to compare it with the original",
@@ -631,12 +631,12 @@
       "ca": "Certificate issued by",
       "serial": "Certificate serial number",
       "signedAt": "Signed at (time stated in the signature)",
-      "illustrative": "The signature uses Mộc's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
+      "illustrative": "The signature uses Signet's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
       "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above."
     },
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
-    "footer": "Mộc — open-source e-office. No login required on this page."
+    "footer": "Signet — open-source e-office. No login required on this page."
   },
   "notify": {
     "title": "Notifications",

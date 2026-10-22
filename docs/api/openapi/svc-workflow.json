@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Mộc svc-workflow",
+    "title": "Signet svc-workflow",
     "description": "Hasura Actions của Văn phòng điện tử. API nội bộ: chỉ Hasura gọi, không qua cổng APISIX; ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
     "version": "0.1.0"
   },

@@ -74,7 +74,7 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 
 - *"Lạnh là ở đâu?"* Bucket `moc-cold` của SeaweedFS, có khóa ghi, chung với mốc neo sổ kiểm toán. Triển khai thật
   thì trỏ `MOC_COLD_BUCKET` sang ổ rẻ hơn hoặc kho S3 khác. Parquet là định dạng cột mở: công cụ nào cũng đọc được,
-  không cần Mộc.
+  không cần Signet.
 - *"Sao không dùng Kestra?"* Một job mỗi giờ không đáng thêm một máy chủ Java khoảng 1 GB RAM. Job là vòng nền trong
   svc-files, như vòng neo sổ kiểm toán. DuckDB nhúng trong svc-files, không chạy máy chủ riêng.
 - *"Hỏng giữa chừng thì sao?"* Thứ tự là kiểm băm tệp nóng → ghi gói → đọc lại so băm → một giao dịch CSDL → xóa
@@ -88,7 +88,7 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 **Điều muốn chứng minh:**
 
 - Thiết bị vận hành (OT) và hệ thống văn phòng (IT) nói chuyện qua một chuẩn mở: cảm biến cập nhật bản sao số của nó
-  trong context broker NGSI-LD (ETSI), Mộc đăng ký nhận sự kiện qua subscription — không viết giao thức riêng.
+  trong context broker NGSI-LD (ETSI), Signet đăng ký nhận sự kiện qua subscription — không viết giao thức riêng.
 - Sự kiện vật lý thành văn bản hành chính: nhiệt độ phòng máy chủ vượt ngưỡng → dự thảo "Báo cáo sự cố" dựng từ mẫu,
   đứng tên chuyên viên phụ trách, đi đúng luồng văn bản đi (duyệt phòng → lãnh đạo ký → phát hành). Hệ thống dựng
   nháp, con người kiểm tra và trình — không tự gửi gì.
@@ -105,7 +105,7 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
    nhiều nhất một lần): loại Báo cáo, độ khẩn
    "Khẩn", trích yếu và nội dung từ mẫu (giờ đo, nhiệt độ, ngưỡng, các mục để chuyên viên điền); dòng thời gian có sự
    kiện `ot.alarm`; chuyên viên nhận thông báo ngay.
-4. Lịch sử đo nằm trong broker (NGSI-LD temporal API), cả các lần dưới ngưỡng: dữ liệu OT ở lại broker, Mộc chỉ
+4. Lịch sử đo nằm trong broker (NGSI-LD temporal API), cả các lần dưới ngưỡng: dữ liệu OT ở lại broker, Signet chỉ
    nhận sự kiện cần xử lý.
 5. Chuyên viên trình → tổ trưởng phòng có việc duyệt, như mọi văn bản đi.
 6. Thông báo giả: từ mạng thiết bị không tới được svc-workflow; từ mạng nội bộ (container svc-files) với token sai
@@ -117,14 +117,14 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 **Nếu giám khảo hỏi:**
 
 - *"Sao không gắn cảm biến thật?"* Cảm biến thật chỉ thay container giả lập: cùng các lệnh NGSI-LD vào broker (qua
-  gateway IoT như IoT Agent của FIWARE, hoặc thiết bị tự gửi). Phía Mộc không đổi gì.
+  gateway IoT như IoT Agent của FIWARE, hoặc thiết bị tự gửi). Phía Signet không đổi gì.
 - *"Thiết bị có chọn được người đứng tên dự thảo?"* Chỉ một chuyên viên đang hoạt động của đúng đơn vị đó; người khác,
   vai trò khác hay đơn vị khác thì bỏ qua (ghi nhật ký). Dự thảo chỉ là nháp, người đứng tên quyết định có trình.
 - *"Thiết bị của đơn vị này có ghi giả vào đơn vị kia được không?"* Ở bản rút gọn thì được, nếu vào được mạng thiết
   bị: Scorpio không xác thực, tenant do bên gửi khai. Triển khai thật đặt cổng thiết bị (IoT Agent / PEP proxy của
-  FIWARE) trước broker, cấp tenant theo khóa của từng thiết bị. Phía Mộc không đổi: vẫn chỉ tin subscription.
+  FIWARE) trước broker, cấp tenant theo khóa của từng thiết bị. Phía Signet không đổi: vẫn chỉ tin subscription.
 - *"Vì sao broker riêng chứ không ghi thẳng vào CSDL?"* Bản sao số (trạng thái, lịch sử, truy vấn theo không gian)
-  là việc của context broker theo chuẩn; Mộc không phải nơi giữ dữ liệu cảm biến, chỉ nhận sự kiện cần thành văn bản.
+  là việc của context broker theo chuẩn; Signet không phải nơi giữ dữ liệu cảm biến, chỉ nhận sự kiện cần thành văn bản.
 - *"Tốn bao nhiêu?"* Profile `iot` không bật mặc định: Scorpio ~400 MB RAM, PostGIS ~130 MB.
 
 ## (iii) Phả hệ và kiểm chất lượng — `make demo-pha-he`
@@ -294,7 +294,7 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
    còn container)", "chạy lại centrifugo (đã dừng: …)".
 4. Hai dịch vụ về `running (healthy)` (svc-files lấy lại bí mật từ két F3.2), văn thư tải tệp → `201`.
 
-**Phần GitOps** (chạy trong CI, bước "GitOps"; trên máy chủ xem README mục "GitOps và tự phục hồi"):
+**Phần GitOps** (chạy trong CI, bước "GitOps"; trên máy chủ xem `van-hanh.md` mục "GitOps và tự phục hồi"):
 
 - Đẩy một commit lên nhánh `deploy` của repo → lượt reconciler kế tiếp in "áp commit … (nhánh deploy: cũ → mới)",
   tệp `VERSION` của bản cài mang commit mới, smoke vẫn qua.
@@ -303,7 +303,7 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 
 **Đối chiếu bốn nguyên tắc OpenGitOps 1.0:**
 
-| Nguyên tắc | Ở Mộc |
+| Nguyên tắc | Ở Signet |
 | --- | --- |
 | Khai báo (declarative) | Toàn bộ hệ thống khai trong `docker-compose.yml` + cấu hình từng thành phần (realm Keycloak, metadata Hasura, cổng APISIX, cấu hình két); không bước dựng tay nào ngoài `.env` |
 | Có phiên bản, bất biến (versioned and immutable) | Trạng thái mong muốn là một commit git; image dựng theo commit (`MOC_VERSION` = `git describe`), tệp `VERSION` của bản cài ghi commit; lùi phiên bản = đẩy commit cũ lên `deploy` |
@@ -312,11 +312,11 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 
 **Nếu giám khảo hỏi:**
 
-- *"Sao không dùng Argo CD hay Flux?"* Hai công cụ đó chạy trên Kubernetes; Mộc nhắm máy chủ đơn vị chạy Docker
+- *"Sao không dùng Argo CD hay Flux?"* Hai công cụ đó chạy trên Kubernetes; Signet nhắm máy chủ đơn vị chạy Docker
   Compose. Reconciler là một script thư viện chuẩn Python, đọc được trong vài phút.
 - *"Docker có `restart: unless-stopped` rồi mà?"* Chính sách đó chỉ chạy lại container còn tồn tại và không chạy lại
   container bị `docker stop`. Container bị xóa hẳn, hay cấu hình lệch khỏi git, thì chỉ reconciler đưa về được.
-- *"Áp commit có làm gián đoạn không?"* Có, khoảng một phút: reconciler dựng image trước, rồi dừng Mộc, cài lại đúng
+- *"Áp commit có làm gián đoạn không?"* Có, khoảng một phút: reconciler dựng image trước, rồi dừng Signet, cài lại đúng
   commit và chạy lại. Commit áp lỗi thì reconciler đợi commit kế tiếp chứ không thử lại liên tục.
 - *"`.env` thì sao?"* Không nằm trong git (chứa bí mật), reconciler không đụng tới; đổi `.env` vẫn là việc của
   người vận hành.
@@ -550,7 +550,7 @@ bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: d�
   thoát 1 nếu một nguồn bị cấm xuất hiện ở bất kỳ câu nào.
 - *"Sao không dùng Qdrant, LlamaIndex?"* Meilisearch đã chạy (tìm theo nội dung F2.7), đã bỏ dấu tiếng Việt, có tìm lai
   trong bản cộng đồng; kho véc-tơ thứ hai phải đồng bộ quyền thêm một lần. LlamaIndex kéo hàng chục gói, tải dữ liệu từ
-  Internet lúc chạy và không biết quyền của Mộc — phần lọc, trích dẫn, kiểm đầu ra vẫn phải tự viết.
+  Internet lúc chạy và không biết quyền của Signet — phần lọc, trích dẫn, kiểm đầu ra vẫn phải tự viết.
 - *"Lưu câu hỏi ở đâu?"* Không lưu: không bảng hội thoại, sổ chỉ có siêu dữ liệu; trang Hỏi đáp chỉ giữ trong bộ
   nhớ trình duyệt.
 - *"Còn gì chưa làm?"* Bản scan chưa OCR nền nên chỉ hỏi được theo trích yếu (nguồn ghi "trích yếu", không bịa
@@ -643,12 +643,12 @@ khối này.
 ## Ngoài 4 nguyên lý: ký số văn bản đi (minh họa) — `make demo-ky-so`
 
 **Chỉ minh họa, không có giá trị pháp lý như chữ ký số công cộng.** Chữ ký dùng một CA nội bộ trong két OpenBao của
-Mộc, không phải chứng thư của tổ chức cung cấp dịch vụ chứng thực chữ ký số công cộng; CN, O của CA, khối ở cổng xác
+Signet, không phải chứng thư của tổ chức cung cấp dịch vụ chứng thực chữ ký số công cộng; CN, O của CA, khối ở cổng xác
 thực và dòng đầu của lệnh kiểm đều ghi "chỉ minh họa". Màn này thuộc F4.5, **không** phải màn bằng chứng nguyên lý.
 Chạy khoảng một phút (phát hành hai văn bản).
 
 **Lời dẫn — nói ngay câu đầu:** *"Đây là bản minh họa chữ ký số bằng hạ tầng khóa công khai nội bộ, không có giá trị
-pháp lý như chữ ký số công cộng. Nó cho thấy Mộc gắn chữ ký PAdES vào bản phát hành mà khóa ký không ra khỏi két, và
+pháp lý như chữ ký số công cộng. Nó cho thấy Signet gắn chữ ký PAdES vào bản phát hành mà khóa ký không ra khỏi két, và
 người ngoài kiểm được ai ký, tệp có bị sửa sau khi ký hay không."*
 
 **Điều muốn chứng minh:**
@@ -665,8 +665,8 @@ người ngoài kiểm được ai ký, tệp có bị sửa sau khi ký hay kh�
 
 **Lệnh in ra 8 bước:**
 
-1. Đọc chứng thư CA thẳng trong container két (`pki/ca/pem`, không cần token): CN "CA nội bộ Mộc - MẪU, chỉ minh họa",
-   O, CA gốc tự ký RSA 4096 bit, hạn, vân tay SHA-256 (để đối chiếu khi nhập vào trình đọc PDF). Két cài trước F4.5
+1. Đọc chứng thư CA thẳng trong container két (`pki/ca/pem`, không cần token): CN "CA nội bộ Signet - MẪU, chỉ minh
+   họa", O, CA gốc tự ký RSA 4096 bit, hạn, vân tay SHA-256 (để đối chiếu khi nhập vào trình đọc PDF). Két cài trước F4.5
    chưa có PKI nội bộ thì màn dừng ở đây và nói rõ (ký số tự tắt, mọi thứ khác chạy như cũ).
 2. `chuyenviendt` soạn công văn → `totruongdt` duyệt → `truongkhoa` ký duyệt → `vanthu` phát hành công khai. In thời
    gian riêng bước phát hành (cấp số, dựng PDF, ký bằng khóa trong két, tự kiểm chữ ký, ClamAV, lưu); lần ký đầu của
@@ -677,7 +677,7 @@ người ngoài kiểm được ai ký, tệp có bị sửa sau khi ký hay kh�
    dấu thời gian tin cậy), `illustrative: true`. psql `core.file_signatures`: khóa `moc-ky-so-<đơn vị>`, phiên bản, cùng
    số sê-ri.
 4. `python -m svc_files.signing verify` trong svc-files (tệp qua stdin): in nguyên các dòng — "Chữ ký hợp lệ — PKI nội
-   bộ Mộc (MẪU), chỉ minh họa…", ký bởi, CA, số sê-ri, giờ ký, phủ toàn bộ tệp — thoát 0.
+   bộ Signet (MẪU), chỉ minh họa…", ký bởi, CA, số sê-ri, giờ ký, phủ toàn bộ tệp — thoát 0.
 5. Sửa sau khi ký: thêm một chú thích "Đã sửa sau khi ký" vào trang 1, ghi nối sau phần đã ký như trình đọc PDF lưu
    ghi chú (pypdf, chế độ ghi nối). Lệnh kiểm thoát 1, "Văn bản đã bị sửa sau khi ký…"; cổng xác thực: băm cả tệp →
    không khớp, băm phần đầu tệp tới cuối `/ByteRange` → đúng công văn vừa phát hành.
@@ -704,9 +704,10 @@ CA nội bộ không nằm trong danh sách tin cậy công cộng; đó là hà
    SHA-256 với dòng in ở bước 1.
 3. Adobe: Edit → Preferences → Signatures → Identities & Trusted Certificates → Trusted Certificates → Import, chọn tệp
    `.pem`, đánh dấu "Use this certificate as a trusted root". Okular (Poppler đọc kho chứng thư NSS, mặc định
-   `~/.pki/nssdb`): `certutil -d sql:$HOME/.pki/nssdb -A -n "CA noi bo Moc - MAU" -t "C,C,C" -i moc-ca-noi-bo-MAU.pem`.
+   `~/.pki/nssdb`):
+   `certutil -d sql:$HOME/.pki/nssdb -A -n "CA noi bo Signet - MAU" -t "C,C,C" -i moc-ca-noi-bo-MAU.pem`.
    Mở lại PDF: chữ ký hợp lệ, tài liệu chưa bị sửa từ khi ký. Thử xong thì gỡ CA khỏi trình đọc (Adobe: xóa trong
-   Trusted Certificates; NSS: `certutil -d sql:$HOME/.pki/nssdb -D -n "CA noi bo Moc - MAU"`). Đường menu có thể khác
+   Trusted Certificates; NSS: `certutil -d sql:$HOME/.pki/nssdb -D -n "CA noi bo Signet - MAU"`). Đường menu có thể khác
    theo phiên bản trình đọc.
 4. Thêm một ghi chú trong trình đọc rồi lưu: trình đọc báo tài liệu đã bị sửa sau chữ ký chứng nhận — đúng như bước 5
    của lệnh.

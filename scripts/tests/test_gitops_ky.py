@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 """GitOps chỉ áp commit đã ký (scripts/reconcile.py, MOC_GITOPS_ALLOWED_SIGNERS): repo git và khóa SSH thật trong thư
 mục tạm — commit ký bằng khóa trong danh sách được áp; khóa lạ, không ký, chữ ký OpenPGP (dù gpg của người dùng báo tốt)
-thì không, và Mộc không bị dừng (apply không được gọi). Không cần Docker. Chạy: python3 -m unittest discover -s
+thì không, và Signet không bị dừng (apply không được gọi). Không cần Docker. Chạy: python3 -m unittest discover -s
 scripts/tests (make test)."""
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ class SignedGitopsTest(unittest.TestCase):
         report: dict[str, Any] = {"commit": None, "applied": None, "actions": [], "problems": []}
         with self.assertRaisesRegex(reconcile.ReconcileError, unsigned[:12]):
             reconcile.gitops(report)
-        self.assertEqual(applied, [], "commit chưa ký: không được dừng Mộc để cài")
+        self.assertEqual(applied, [], "commit chưa ký: không được dừng Signet để cài")
 
         signed = self.commit("ký đúng", key="duoc-phep")
         with contextlib.redirect_stdout(io.StringIO()):

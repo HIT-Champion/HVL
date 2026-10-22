@@ -1,4 +1,4 @@
-# Quy trình Git của Mộc
+# Quy trình Git của Signet
 
 > Áp dụng cho cả đội (**Backend · AI · Frontend**) và người đóng góp bên ngoài.
 > Mục tiêu: nhánh `main` lúc nào cũng chạy được, lịch sử commit đọc được, và bản thân repo là bằng
@@ -299,7 +299,7 @@ git merge --ff-only v0.1.0          # hoặc origin/main, nếu commit đó đã
 git push origin deploy
 ```
 
-Máy chủ bật kiểm chữ ký (`MOC_GITOPS_ALLOWED_SIGNERS`, README mục GitOps) thì đầu nhánh phải là commit do người
+Máy chủ bật kiểm chữ ký (`MOC_GITOPS_ALLOWED_SIGNERS`, `van-hanh.md` mục GitOps) thì đầu nhánh phải là commit do người
 trong danh sách ký bằng khóa SSH — thay dòng `--ff-only` bằng:
 
 ```bash

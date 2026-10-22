@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ---------------------------------------------------------------------------
-# Mộc — điều phối dựng, chạy và phát hành.
+# Signet — điều phối dựng, chạy và phát hành.
 # Toàn bộ công cụ sử dụng đều là phần mềm nguồn mở (tiêu chí PoF #4).
 # Chạy `make help` để xem danh sách lệnh.
 # ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 
 up: env-ready ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
-	@echo "Mộc đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
+	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
 up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai): tác tử đọc văn bản viết trích yếu, trợ lý hỏi đáp tìm theo nghĩa và viết câu trả lời — cần make ai-model trước
 	@$(COMPOSE) --profile ai up -d --wait ollama
@@ -82,7 +82,7 @@ down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
 	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
-	@read -p "Xóa toàn bộ dữ liệu của Mộc trên máy này? [y/N] " a && [ "$$a" = y ]
+	@read -p "Xóa toàn bộ dữ liệu của Signet trên máy này? [y/N] " a && [ "$$a" = y ]
 	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống

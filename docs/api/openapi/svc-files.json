@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Mộc — svc-files",
+    "title": "Signet — svc-files",
     "description": "Tải tệp lên qua trạm kiểm dịch ClamAV, tải xuống theo quyền, tìm văn bản. Gọi qua cổng APISIX với token Bearer do Keycloak cấp (docs/api/README.md).",
     "version": "0.1.0"
   },
@@ -2050,7 +2050,7 @@
           "signed_at"
         ],
         "title": "VerifiedSignature",
-        "description": "Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Mộc, chỉ minh họa, không có giá trị pháp lý như chữ ký số\ncông cộng. svc-files đã tự kiểm chữ ký lúc ký; kiểm lại tệp: python -m svc_files.signing verify."
+        "description": "Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Signet, chỉ minh họa, không có giá trị pháp lý như chữ ký số\ncông cộng. svc-files đã tự kiểm chữ ký lúc ký; kiểm lại tệp: python -m svc_files.signing verify."
       },
       "VerifyOut": {
         "properties": {

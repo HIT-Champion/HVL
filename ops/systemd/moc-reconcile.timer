@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 # không chạy chồng lượt mới.
 
 [Unit]
-Description=Mộc — reconciler GitOps và tự phục hồi mỗi 60 giây
+Description=Signet — reconciler GitOps và tự phục hồi mỗi 60 giây
 
 [Timer]
 OnBootSec=2min

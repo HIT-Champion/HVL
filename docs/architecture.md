@@ -1,4 +1,4 @@
-# Kiến trúc Mộc
+# Kiến trúc Signet
 
 > Tài liệu này ghi lại kiến trúc hệ thống, bản đồ công cụ nguồn mở, và các quyết định kỹ thuật
 > kèm lý do. Trạng thái hiện tại: **đang khảo sát công cụ** (giai đoạn 1 của `ROADMAP.md`).
@@ -7,7 +7,7 @@
 
 ### 1.1. Open-Core: điều phối, không viết lại
 
-Mộc **không** viết lại các phần mềm đã có bản nguồn mở trưởng thành. Nó là **lớp điều phối**
+Signet **không** viết lại các phần mềm đã có bản nguồn mở trưởng thành. Nó là **lớp điều phối**
 (orchestration layer) gắn kết chúng thành một hệ thống vận hành thống nhất. Giá trị của dự án
 nằm ở *lớp keo* — cách các thành phần được nối, chuẩn hóa và đồng bộ — không nằm ở bản thân
 các thành phần.
@@ -122,7 +122,7 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
-- **Bối cảnh:** Mộc lắp ghép nhiều phần mềm thượng nguồn có giấy phép khác nhau. Tiêu chí chấm
+- **Bối cảnh:** Signet lắp ghép nhiều phần mềm thượng nguồn có giấy phép khác nhau. Tiêu chí chấm
   điểm PoF #2 trừ 5 điểm nếu *"mã nguồn tự thân chứa sự không tương thích của các giấy phép"*.
 - **Phương án:** MIT (đơn giản nhất) · Apache-2.0 (permissive, có điều khoản sáng chế) ·
   GPL-3.0 / AGPL-3.0 (copyleft mạnh).
@@ -167,7 +167,8 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   đã chạy (F1.7), đã bỏ dấu tiếng Việt, bản CE (MIT) có tìm lai từ khóa + véc-tơ, F2.7 đã có mẫu lọc thuê ước + hậu
   kiểm; không có join nên thuộc tính quyền phải chép vào từng đoạn.
 - **Phương án khung:** LlamaIndex kéo 28 gói phụ thuộc trực tiếp, NLTK và tiktoken tải dữ liệu từ Internet lúc chạy
-  (mạng `ai` không ra Internet), và không biết quyền của Mộc — lọc quyền, trích dẫn, kiểm câu trả lời vẫn phải tự viết.
+  (mạng `ai` không ra Internet), và không biết quyền của Signet — lọc quyền, trích dẫn, kiểm câu trả lời vẫn phải
+  tự viết.
 - **Quyết định:** chỉ mục đoạn Meilisearch `chunks` (một tài liệu mỗi đoạn, mỗi đoạn biết trang của nó), embedder
   `userProvided`: `svc-files` tự gọi Ollama `/api/embed` (Qwen3-Embedding-0.6B, đổi sang bge-m3 bằng một biến). Không
   dùng nguồn nhúng `ollama` của Meilisearch: Meilisearch sẽ phải vào mạng `ai`, và khi không có mô hình (CI) cả lô
@@ -276,7 +277,7 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   việc chính, ký số chỉ ở mức Could nên két thiếu thứ gì thì văn bản vẫn phải phát hành được; stack đang chạy có dữ liệu
   thật, không khởi tạo lại két được (khóa `moc-files` sẽ đổi).
 - **Phương án giữ khóa:** `pki/issue` — két sinh khóa rồi trả cả khóa riêng, khóa nằm trong RAM và đĩa của `svc-files`.
-  Một khóa chung "Hệ thống Mộc" — chứng thư không cho biết đơn vị nào phát hành. USB token, ký ở trình duyệt — ngoài
+  Một khóa chung "Hệ thống Signet" — chứng thư không cho biết đơn vị nào phát hành. USB token, ký ở trình duyệt — ngoài
   phạm vi. **Transit** — khóa riêng sinh và ở lại trong két, `svc-files` chỉ gửi băm cần ký.
 - **Phương án CA:** CA gốc + CA trung gian — két chỉ có một nút, CA gốc không thể để ngoại tuyến nên tầng trung gian
   không tăng an toàn, chỉ thêm một chứng thư phải xoay. CA ngoài két (tệp khóa) — thêm một bí mật phải giữ.
@@ -286,18 +287,18 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   1. **Khóa ký trong Transit (Q1):** mỗi đơn vị một khóa `moc-ky-so-<tenant_id>` (rsa-3072), `svc-files` tạo ở lần phát
      hành đầu. Chứng thư lấy theo chuỗi: CSR do chính Transit ký (`transit/keys/<k>/csr`) → `pki/sign/moc-van-thu`
      (`svc-files` đặt CN "<đơn vị>, <cơ quan chủ quản>"; quá 64 byte UTF-8 thì chỉ tên đơn vị) → `set-certificate` gắn
-     vào đúng phiên bản khóa. pyHanko (MIT) dựng CMS/PAdES và ghi PDF; một lớp `Signer` của Mộc gửi phần thuộc tính đã
-     ký tới `transit/sign/<k>/sha2-256` (PKCS#1 v1.5). Policy của `svc-files` có `transit/keys/moc-ky-so-*`,
+     vào đúng phiên bản khóa. pyHanko (MIT) dựng CMS/PAdES và ghi PDF; một lớp `Signer` của Signet gửi phần thuộc
+     tính đã ký tới `transit/sign/<k>/sha2-256` (PKCS#1 v1.5). Policy của `svc-files` có `transit/keys/moc-ky-so-*`,
      `transit/sign/moc-ky-so-*`, `pki/sign/moc-van-thu`; không có `transit/export`, `transit/backup`.
   2. **PKI một tầng trong két (Q2):** mount `pki`, CA gốc `moc-root` kiểu `internal` (rsa-4096, 10 năm, CN "CA nội bộ
-     Mộc - MẪU, chỉ minh họa"); role `moc-van-thu` cấp chứng thư 1 năm, KU DigitalSignature + ContentCommitment, EKU
+     Signet - MẪU, chỉ minh họa"); role `moc-van-thu` cấp chứng thư 1 năm, KU DigitalSignature + ContentCommitment, EKU
      Document Signing. Không CRL, không OCSP. CA và khóa ký nằm trong volume `openbao_data`, đã có trong `make backup`.
   3. **Bật PKI trong `setup()` của `openbao/start.sh` (Q3, bản tối thiểu):** két mới (cài mới, CI) dựng PKI và policy
      mới lúc khởi tạo, bằng token root trước khi thu hồi nó. Dựng PKI lỗi chỉ ghi nhật ký, két vẫn lên, `svc-files` tự
      tắt ký số. **Két khởi tạo trước F4.5 không tự nâng cấp:** token khởi động không sửa được policy, nên két đó không
      ký cho tới khi quản trị nâng cấp tay (tạo lại token root bằng khóa phục hồi, khởi động lại két để `setup()` chạy
-     lại) hoặc dựng lại két — README mục Két bí mật. Bản đầy đủ của hợp đồng (listener 127.0.0.1 chỉ mở ở lần khởi động
-     cần nâng cấp, tự tạo token root một lần) đã cắt khỏi bản này.
+     lại) hoặc dựng lại két — `van-hanh.md` mục Két bí mật. Bản đầy đủ của hợp đồng (listener 127.0.0.1 chỉ mở
+     ở lần khởi động cần nâng cấp, tự tạo token root một lần) đã cắt khỏi bản này.
   4. **Ký trong `/internal/issue`, sau khi dựng PDF, trước khi băm (Q4):** băm, `content_sha256`, sổ kiểm toán, bản liên
      thông và cổng xác thực đều theo bản đã ký; `svc-workflow` không đổi. `svc-files` tự kiểm chữ ký trước khi lưu.
   5. **PAdES B-B, chữ ký chứng nhận không cho sửa (Q5):** `ETSI.CAdES.detached`, SHA-256, `certify=True`,
@@ -308,4 +309,4 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   phát hành trước F4.5 không ký lại. Trình đọc PDF báo chữ ký "chưa tin cậy" cho tới khi nhập CA nội bộ — đúng như mong
   đợi. Thêm pyHanko 0.37.0 và 16 gói kéo theo (`DEPENDENCIES.md`), image `svc-files` nặng thêm khoảng 15 MB; lần phát
   hành đầu của mỗi đơn vị chậm thêm chừng nửa giây trên máy dev (két sinh khóa RSA, máy yếu lâu hơn). Chi tiết:
-  `docs/mo-hinh-du-lieu.md` §1, §3, §4.3, §5, README của `svc-files`, README mục Két bí mật.
+  `docs/mo-hinh-du-lieu.md` §1, §3, §4.3, §5, README của `svc-files`, `van-hanh.md` mục Két bí mật.

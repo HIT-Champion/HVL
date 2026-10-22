@@ -1,6 +1,6 @@
-# Hướng dẫn đóng góp cho Mộc
+# Hướng dẫn đóng góp cho Signet
 
-Cảm ơn bạn đã quan tâm tới Mộc. Dự án hoan nghênh mọi đóng góp: báo lỗi, đề xuất tính năng,
+Cảm ơn bạn đã quan tâm tới Signet. Dự án hoan nghênh mọi đóng góp: báo lỗi, đề xuất tính năng,
 cải thiện tài liệu, bổ sung dịch vụ cho lõi nền tảng hoặc ứng dụng chạy trên lõi.
 
 Tệp này tóm tắt những điều bắt buộc. Quy trình Git chi tiết (nhánh, commit, pull request, phát
@@ -21,8 +21,8 @@ trách mảng đó trong issue hoặc pull request:
 
 Trước khi viết dòng mã đầu tiên, hãy nắm ba ràng buộc không được vi phạm:
 
-1. **Không fork-và-sửa phần mềm thượng nguồn.** Mộc *điều phối* các dự án nguồn mở ở dạng
-   nguyên bản. Mọi tùy biến phải nằm ở lớp cấu hình, plugin, hoặc adapter của riêng Mộc.
+1. **Không fork-và-sửa phần mềm thượng nguồn.** Signet *điều phối* các dự án nguồn mở ở dạng
+   nguyên bản. Mọi tùy biến phải nằm ở lớp cấu hình, plugin, hoặc adapter của riêng Signet.
    Nếu cần vá upstream, hãy gửi patch lên chính dự án đó rồi ghim phiên bản.
 2. **Không bundle mã nguồn của dự án khác vào kho này.** Phụ thuộc được khai báo qua image
    Docker có ghim thẻ phiên bản, hoặc qua trình quản lý gói — không sao chép cây mã vào repo.
@@ -99,7 +99,7 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
 ## Báo lỗi
 
 Mở issue theo mẫu có sẵn tại `.github/ISSUE_TEMPLATE/`. Một báo lỗi hữu ích cần có: bước tái
-hiện, kết quả mong đợi, kết quả thực tế, phiên bản Mộc (`git describe --tags`), và nhật ký
+hiện, kết quả mong đợi, kết quả thực tế, phiên bản Signet (`git describe --tags`), và nhật ký
 liên quan (`make logs`).
 
 ## Giấy phép của phần đóng góp

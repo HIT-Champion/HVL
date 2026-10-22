@@ -2,7 +2,7 @@
 
 > Lập ngày 01/10/2026 · cập nhật 05/10/2026 sau rà soát · **cập nhật 15/10/2026: đổi bài toán nghiệp vụ
 > sang quản lý văn bản, đổi tên sản phẩm thành Mộc** · **cập nhật 18/10/2026: dời lịch Phase 1–4** (xem §7 —
-> Nhật ký thay đổi).
+> Nhật ký thay đổi) · **23/10/2026: đổi tên hiển thị thành Signet** (đặc tả §10).
 > Dựa trên [`olp-2026-de-thi.md`](olp-2026-de-thi.md). Phạm vi sản phẩm: [`dac-ta-san-pham.md`](dac-ta-san-pham.md).
 > Mô hình dữ liệu: [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
 > Khung thời gian: **01/10 → 06/12/2026** (hạn nộp 17:00), chung kết **10/12/2026**.
@@ -43,15 +43,15 @@
 ## 1. Bài toán sản phẩm giải quyết
 
 > Các tổ chức nhỏ chuyển đổi số bằng cách mua thêm phần mềm, nhưng mỗi phần mềm lại là một ốc đảo
-> dữ liệu, hoặc buộc họ lệ thuộc một nhà cung cấp. **Mộc** là lõi nền tảng nguồn mở, tự cài, cung cấp
-> sẵn định danh, cổng API, dữ liệu và quy trình cho mọi ứng dụng. Lõi "đóng mộc" lên mọi thứ đi qua nó:
+> dữ liệu, hoặc buộc họ lệ thuộc một nhà cung cấp. **Signet** là lõi nền tảng nguồn mở, tự cài, cung cấp
+> sẵn định danh, cổng API, dữ liệu và quy trình cho mọi ứng dụng. Lõi "đóng dấu" lên mọi thứ đi qua nó:
 > biết ai đã làm, tệp được quét mã độc trước khi lưu, mọi thay đổi vào sổ kiểm toán nên không sửa lén
 > được, và những gì tổ chức phát hành ra ngoài thì người nhận kiểm chứng được. Ứng dụng Văn phòng điện
 > tử chạy trên lõi cho thấy một công văn có thể đi trọn vòng đời — tiếp nhận, vào sổ, chỉ đạo, xử lý,
 > trả lời, lưu trữ — mà không thất lạc, không quá hạn mà không ai hay, không bị sửa lén; và người nhận
 > kiểm tra được văn bản là thật.
 
-| Tầng bài toán                             | Ai gặp                                                                  | Vấn đề                                                                                                                                                                                                                                                                       | Mộc giải bằng                                                                                                                                                        |
+| Tầng bài toán                             | Ai gặp                                                                  | Vấn đề                                                                                                                                                                                                                                                                       | Signet giải bằng                                                                                                                                                        |
 | -------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Nền tảng** (đề giao)             | SME, cơ quan nhà nước đang chuyển đổi số                        | Phần mềm rời rạc → ốc đảo dữ liệu; hệ thống nguyên khối → lệ thuộc một nhà cung cấp; ứng dụng nào cũng phải dựng lại đăng nhập, lưu tệp, phân quyền, quy trình                                                                               | Lõi Tầng 1 dùng chung, không giao diện, nguồn mở, tự cài; lớp tin cậy dùng chung (danh tính, quét mã độc, sổ kiểm toán chuỗi băm, API xác thực) |
 | **Nghiệp vụ** (ứng dụng minh họa) | Văn thư, chuyên viên, lãnh đạo của khoa, trường, cơ quan nhỏ | Công văn giấy và bản scan qua email, Zalo; sổ tay hoặc Excel; không biết văn bản đang ở đâu, quá hạn chưa; khó tìm lại; không kiểm được văn bản điện tử nhận được là thật; phần mềm quản lý văn bản phổ biến là sản phẩm đóng | Văn phòng điện tử (quản lý văn bản theo NĐ 30/2020) + cổng xác thực văn bản, chạy trên lõi                                                            |
@@ -75,12 +75,12 @@ Dữ liệu nội bộ của đơn vị chạy thử **không** đưa vào repo.
 
 ### 1.2. Số đo thành công
 
-| Chỉ số                                                         | Hiện trạng (đo ở Phase 1)                 | Sau khi dùng Mộc (đo ở Phase 4)         |
+| Chỉ số                                                         | Hiện trạng (đo ở Phase 1)                 | Sau khi dùng Signet (đo ở Phase 4)         |
 | ---------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------- |
 | Thời gian từ khi văn bản đến tới khi được giao xử lý | Hỏi văn thư, đếm 20 văn bản gần nhất | Tính từ dòng thời gian văn bản        |
 | Tỷ lệ văn bản xử lý quá hạn                              | Sổ tay / Excel của văn thư                | Hạn giải quyết so với lúc hoàn thành |
 | Thời gian tìm lại một văn bản cũ                          | Bấm giờ 5 lần tìm                         | Bấm giờ 5 lần tìm trên hệ thống      |
-| Số bước chuyển tay (in, ký, mang đi, nhắn tin nhắc)      | Quan sát quy trình hiện tại               | So với quy trình trên Mộc               |
+| Số bước chuyển tay (in, ký, mang đi, nhắn tin nhắc)      | Quan sát quy trình hiện tại               | So với quy trình trên Signet               |
 
 Chỉ trình bày **số đo thật**. Chỉ số nào chưa đo được thì nói rõ là chưa đo, không ước đoán.
 

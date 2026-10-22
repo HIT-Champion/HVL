@@ -3,7 +3,7 @@
 ## Cam kết
 
 Với tư cách thành viên, người đóng góp và người điều hành, chúng tôi cam kết biến việc tham gia
-Mộc thành trải nghiệm không quấy rối cho tất cả mọi người, không phân biệt tuổi tác, hình
+Signet thành trải nghiệm không quấy rối cho tất cả mọi người, không phân biệt tuổi tác, hình
 thể, khuyết tật, dân tộc, giới tính, trình độ kinh nghiệm, học vấn, hoàn cảnh kinh tế, quốc tịch,
 ngoại hình, chủng tộc, tôn giáo hay bản dạng và xu hướng tính dục.
 

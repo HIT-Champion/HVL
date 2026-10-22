@@ -1,5 +1,5 @@
 <!--
-  Copyright 2026 Mộc Team
+  Copyright 2026 Signet Team
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
 // Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
 // khung xử lý việc đang chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
 // Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
-// Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Mộc có thẻ trạng thái chuyển từng đơn vị;
+// Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Signet có thẻ trạng thái chuyển từng đơn vị;
 // văn bản đến nhận theo đường này có thẻ "Nhận từ …" với mã xác thực của bên gửi và đối chiếu SHA-256 tệp.
 
 interface Dispatch {
