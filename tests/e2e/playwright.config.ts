@@ -25,6 +25,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
+    channel: process.env.MOC_E2E_CHANNEL,
     baseURL: process.env.MOC_PUBLIC_URL ?? 'http://localhost:8080',
     locale: 'vi-VN',
     timezoneId: 'Asia/Ho_Chi_Minh',
