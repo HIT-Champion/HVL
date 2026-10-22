@@ -135,7 +135,7 @@ demo-lien-thong: $(ENV_FILE) ## Màn liên thông (F3.12): CNTT phát hành → 
 demo-doc-van-ban: $(ENV_FILE) ## Màn đọc văn bản đến (F4.1): văn thư tải công văn, tác tử đọc (lớp chữ PDF / OCR) gợi ý số, ngày, cơ quan, loại, trích yếu; vào sổ; văn bản hạn chế không đọc (docs/demo-script.md)
 	@python3 scripts/demo.py doc-van-ban
 
-do-doc-van-ban: $(ENV_FILE) ## Đo tác tử đọc văn bản trên 14 mẫu seed/van-ban-den: bảng đúng/sai/trống từng trường, thời gian (thoát 1 khi PDF có chữ dưới ngưỡng)
+do-doc-van-ban: $(ENV_FILE) ## Đo tác tử đọc văn bản trên 22 mẫu seed/van-ban-den: bảng đúng/sai/trống từng trường, thời gian (thoát 1 khi PDF có chữ dưới ngưỡng, cả kho dưới 20 văn bản, số ký hiệu hay ngày ban hành đúng không quá nửa)
 	@python3 scripts/demo.py do-doc-van-ban
 
 van-ban-mau: $(ENV_FILE) ## Sinh lại văn bản đến mẫu seed/van-ban-den (PDF, ảnh scan, nhãn) và TSV Tesseract cho test, trong container svc-files (cần make up)

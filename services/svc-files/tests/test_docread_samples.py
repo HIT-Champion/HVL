@@ -17,10 +17,11 @@
 
 """Đo quy tắc trên văn bản mẫu (F4.1, seed/van-ban-den, nhãn trong nhan.json) — không cần Docker, không OCR.
 
-10 PDF có lớp chữ: pypdf theo bố cục ngay trong tiến trình (tệp tin cậy của kho mã) → ``text_lines`` → ``suggest``.
-Ngưỡng (như scripts/demo.py do-doc-van-ban): số ký hiệu, ngày ban hành, loại ≥ 9/10 đúng; cơ quan ban hành
-≥ 8/10; có trích yếu ≥ 8/10; không trường ``high`` nào sai. Bản scan: TSV Tesseract trong tests/fixtures/ocr (sinh
-bằng make van-ban-mau khi image có tesseract) — chỉ in số đo, ngưỡng chốt sau lần đo đầu.
+Mọi PDF có lớp chữ trong nhan.json (số mẫu đọc từ nhãn, không ghi cứng): pypdf theo bố cục ngay trong tiến trình
+(tệp tin cậy của kho mã) → ``text_lines`` → ``suggest``. Ngưỡng theo tỉ lệ (như scripts/demo.py do-doc-van-ban): số ký
+hiệu, ngày ban hành, loại ≥ 90 % đúng; cơ quan ban hành ≥ 80 %; có trích yếu ≥ 80 %; không trường ``high`` nào sai.
+Bản scan: TSV Tesseract trong tests/fixtures/ocr (sinh bằng make van-ban-mau khi image có tesseract) — ngưỡng chốt
+sau lần đo đầu: 11–14 đo 21/10, cả 7 bản (thêm 20–22) đo 22/10.
 
     uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s tests/test_docread_samples.py
 in bảng số đo.
@@ -43,8 +44,14 @@ SAMPLES = pathlib.Path(__file__).resolve().parents[3] / "seed" / "van-ban-den"
 FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "ocr"
 TODAY = date(2026, 10, 21)
 FIELDS = ("symbol", "issued_on", "type_code", "issuer_name", "urgency")
-TEXT_MIN = {"symbol": 9, "issued_on": 9, "type_code": 9, "issuer_name": 8, "summary": 8}
-TSV_MIN = {"symbol": 3, "issued_on": 4, "type_code": 4, "issuer_name": 3, "summary": 4}   # đo 21/10, tesseract 5.5.0 + vie 4.1.0
+TEXT_MIN = {"symbol": 90, "issued_on": 90, "type_code": 90, "issuer_name": 80, "summary": 80}     # % số PDF có chữ
+# Bản scan: ngưỡng đo 21/10 (tesseract 5.5.0 + vie 4.1.0) trên đúng 4 bản scan đầu, không áp cho bản thêm sau
+TSV_MIN = {"symbol": 3, "issued_on": 4, "type_code": 4, "issuer_name": 3, "summary": 4}
+TSV_BASE = ("11-cong-van-anh-300dpi.jpg", "12-quyet-dinh-anh-mo.jpg", "13-thong-bao-ban-scan.pdf", "14-giay-moi-xam.png")
+# cả 7 bản scan, đo 22/10 (cùng tesseract): 20 đọc số ký hiệu "07/CĐÐ-UBND", 21 lấy "Chi Nhánh Cần Thơ" làm cơ quan.
+# Số tuyệt đối trên đúng 7 bản: thêm bản scan thì test đỏ để chốt lại ngưỡng, không âm thầm nới
+TSV_ALL = 7
+TSV_ALL_MIN = {"symbol": 5, "issued_on": 7, "type_code": 7, "issuer_name": 5, "summary": 7}
 
 pytestmark = pytest.mark.skipif(not (SAMPLES / "nhan.json").is_file(), reason="không có seed/van-ban-den (image)")
 
@@ -137,36 +144,48 @@ def test_text_pdfs_meet_the_thresholds():
         got = suggest(text_lines(read_text_pdf((SAMPLES / sample["file"]).read_bytes())), today=TODAY,
                       type_codes=CATALOG)
         results.append((sample["file"], sample["fields"], got))
-    assert len(results) == 10
+    n = len(results)
+    assert n >= 15, f"nhan.json chỉ có {n} PDF có lớp chữ"
     measured = score(results)
     print("\n" + report("PDF có lớp chữ (quy tắc, không mô hình)", measured))
     t = measured["table"]
     for f, minimum in TEXT_MIN.items():
         got = t[f]["có"] if f == "summary" else t[f]["đúng"]
-        assert got >= minimum, f"{f}: {got}/10 < {minimum}\n" + report("PDF có lớp chữ", measured)
+        assert 100 * got >= minimum * n, f"{f}: {got}/{n} < {minimum} %\n" + report("PDF có lớp chữ", measured)
     assert not measured["wrong"], "trường high sai:\n" + "\n".join(measured["wrong"])
 
 
 def test_ocr_fixtures_if_present():
     fixtures = {p.stem: p for p in FIXTURES.glob("*.tsv")} if FIXTURES.is_dir() else {}
-    scans = [s for s in labels() if s["kind"] == "scan" and pathlib.Path(s["file"]).stem in fixtures]
-    if not scans:
+    scans = [s for s in labels() if s["kind"] == "scan"]
+    if not any(pathlib.Path(s["file"]).stem in fixtures for s in scans):
         pytest.skip("chưa có TSV Tesseract của bản scan (make van-ban-mau khi image svc-files có tesseract)")
+    # đã có TSV thì phải đủ cho mọi bản scan trong nhãn: thiếu một tệp không được làm ngưỡng tự tắt
+    missing = [s["file"] for s in scans if pathlib.Path(s["file"]).stem not in fixtures]
+    assert not missing, f"thiếu TSV của {missing} (make van-ban-mau)"
     results = []
     for sample in scans:
         tsv = fixtures[pathlib.Path(sample["file"]).stem].read_text(encoding="utf-8")
         results.append((sample["file"], sample["fields"], suggest(tsv_lines([tsv]), today=TODAY, type_codes=CATALOG)))
-    measured = score(results)
-    print("\n" + report("Bản scan (TSV Tesseract)", measured))
+    every = score(results)
+    print("\n" + report("Bản scan (TSV Tesseract)", every))
+    assert every["n"] == TSV_ALL, f"{every['n']} bản scan, ngưỡng TSV_ALL_MIN chốt cho {TSV_ALL}: đo lại rồi chốt lại"
+    for f, minimum in TSV_ALL_MIN.items():
+        got = every["table"][f]["có"] if f == "summary" else every["table"][f]["đúng"]
+        assert got >= minimum, f"{f}: {got}/{TSV_ALL} < {minimum}\n" + report("Bản scan", every)
+    base = score([r for r in results if r[0] in TSV_BASE])
+    assert base["n"] == len(TSV_BASE)
+    print(report("Bản scan 11–14 (có ngưỡng)", base))
     for f, minimum in TSV_MIN.items():
-        got = measured["table"][f]["có"] if f == "summary" else measured["table"][f]["đúng"]
-        assert got >= minimum
+        got = base["table"][f]["có"] if f == "summary" else base["table"][f]["đúng"]
+        assert got >= minimum, f"{f}: {got}/{len(TSV_BASE)} < {minimum}\n" + report("Bản scan 11–14", base)
 
 
 def test_samples_are_small_fictional_and_leak_no_local_path():
     names = sorted(p.name for p in SAMPLES.iterdir())
     listed = [s["file"] for s in labels()]
     assert sorted(listed + ["nhan.json"]) == names
+    assert len(listed) >= 20, f"{len(listed)} văn bản mẫu: \"Hoàn thành khi\" của Phase 4 đo trên ít nhất 20"
     assert sum(p.stat().st_size for p in SAMPLES.iterdir()) <= 3 * 1024 * 1024
     for name in listed:
         data = (SAMPLES / name).read_bytes()

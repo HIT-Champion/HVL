@@ -49,9 +49,10 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         một ô rồi vào sổ; sổ kiểm toán ghi lần đọc (chỉ siêu dữ liệu); tệp hạn chế không bị đọc; bật profile ai thì
         mô hình viết trích yếu cho văn bản không có dòng V/v. (make demo-doc-van-ban)
     python3 scripts/demo.py do-doc-van-ban
-        Đo tác tử trên 14 văn bản mẫu seed/van-ban-den so với nhãn nhan.json: bảng đúng / sai / trống từng trường,
-        riêng PDF có lớp chữ và bản scan, thời gian trung bình; thoát 1 khi PDF có lớp chữ dưới ngưỡng.
-        (make do-doc-van-ban)
+        Đo tác tử trên mọi văn bản mẫu seed/van-ban-den (22: 15 PDF có lớp chữ, 7 ảnh/bản scan) so với nhãn
+        nhan.json: bảng đúng / sai / trống từng trường, riêng PDF có lớp chữ và bản scan, tỉ lệ số ký hiệu, ngày ban
+        hành đúng trên cả kho, thời gian trung bình; thoát 1 khi PDF có lớp chữ dưới ngưỡng, hay cả kho dưới 20 văn
+        bản hoặc số ký hiệu, ngày ban hành đúng không quá nửa. (make do-doc-van-ban)
     python3 scripts/demo.py hoi-dap
         Hỏi đáp trên kho văn bản (F4.2, dưới hai phút, không cần mô hình): văn thư nạp kho mẫu seed/hoi-dap; trợ lý
         moc-assistant trả câu trích nguyên văn kèm số ký hiệu và trang; giảng viên Bộ môn KTPM chỉ thấy văn bản mình
@@ -1038,8 +1039,9 @@ READ_FIELDS = ("type_code", "symbol", "issued_on", "issuer_name", "urgency")
 FIELD_NAMES = {"type_code": "Loại", "symbol": "Số, ký hiệu", "issued_on": "Ngày ban hành",
                "issuer_name": "Cơ quan ban hành", "urgency": "Độ khẩn", "summary": "Trích yếu"}
 SAMPLE_MIME = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
-# Ngưỡng trên 10 PDF có lớp chữ — như services/svc-files/tests/test_docread_samples.py; thêm: không trường high nào sai
-TEXT_MIN = {"symbol": 9, "issued_on": 9, "type_code": 9, "issuer_name": 8, "summary": 8}
+# Ngưỡng theo tỉ lệ (%) trên các PDF có lớp chữ — như services/svc-files/tests/test_docread_samples.py; thêm: không
+# trường high nào sai
+TEXT_MIN = {"symbol": 90, "issued_on": 90, "type_code": 90, "issuer_name": 80, "summary": 80}
 # /readyz của svc-files (trong container, cổng không mở ra máy chủ): "ai": true khi Ollama có mô hình (profile ai)
 AI_READY = """import json, urllib.error, urllib.request
 try:
@@ -1337,16 +1339,27 @@ def do_doc_van_ban() -> None:
             print(f"\nTrung bình {sum(took[kind]) / len(took[kind]):.1f} giây/tệp từ lúc gọi tới lúc có gợi ý{inside}")
     print(f"Trích yếu bằng mô hình: {', '.join(sorted(models)) if models else 'không (chưa bật profile ai)'}")
 
+    every = score_reads(results["text"] + results["scan"])
+    whole = every["table"]
+    print(f"\nCả kho {every['n']} văn bản (\"Hoàn thành khi\" của Phase 4: trên 20 công văn mẫu): số ký hiệu đúng"
+          f" {whole['symbol']['đúng']}/{every['n']}, ngày ban hành đúng {whole['issued_on']['đúng']}/{every['n']}")
+
     measured = score_reads(results["text"])
-    t = measured["table"]
-    below = [f"{f} {t[f]['có'] if f == 'summary' else t[f]['đúng']}/{measured['n']} < {minimum}"
-             for f, minimum in TEXT_MIN.items() if (t[f]["có"] if f == "summary" else t[f]["đúng"]) < minimum]
-    if len(results["text"]) != 10:
-        below.append(f"có {len(results['text'])} PDF có lớp chữ, cần 10")
+    t, n = measured["table"], measured["n"]
+    right = {f: t[f]["có"] if f == "summary" else t[f]["đúng"] for f in TEXT_MIN}
+    below = [f"PDF có lớp chữ: {FIELD_NAMES[f].lower()} {right[f]}/{n} < {minimum} %"
+             for f, minimum in TEXT_MIN.items() if 100 * right[f] < minimum * n]
+    if not n:
+        below.append("nhan.json không có PDF có lớp chữ")
+    # "Hoàn thành khi" của Phase 4: trên 20 công văn mẫu, số ký hiệu và ngày ban hành đúng ở phần lớn văn bản
+    if every["n"] < 20:
+        below.append(f"cả kho chỉ có {every['n']} văn bản, cần ít nhất 20")
+    below += [f"cả kho: {FIELD_NAMES[f].lower()} đúng {whole[f]['đúng']}/{every['n']}, chưa quá nửa"
+              for f in ("symbol", "issued_on") if 2 * whole[f]["đúng"] <= every["n"]]
     if below or measured["wrong"]:
-        raise DemoFailed("PDF có lớp chữ dưới ngưỡng: " + "; ".join(below + measured["wrong"]))
-    print("\n✓ PDF có lớp chữ đạt ngưỡng: số ký hiệu, ngày ban hành, loại ≥ 9/10; cơ quan ban hành, trích yếu ≥ 8/10;"
-          " không ô high nào sai")
+        raise DemoFailed("Dưới ngưỡng: " + "; ".join(below + measured["wrong"]))
+    print(f"\n✓ {n} PDF có lớp chữ đạt ngưỡng: số ký hiệu, ngày ban hành, loại ≥ 90 %; cơ quan ban hành, trích yếu"
+          f" ≥ 80 %; không ô high nào sai · cả kho {every['n']} văn bản: số ký hiệu, ngày ban hành đúng quá nửa")
 
 
 # --- F4.2 · Hỏi đáp trên kho văn bản ---------------------------------------------------------------------------------

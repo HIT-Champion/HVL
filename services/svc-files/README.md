@@ -199,9 +199,37 @@ có nhãn "Gợi ý". **Tác tử không tạo văn bản**: văn thư đối ch
 | `warnings` | `future_date`, `invalid_date`, `symbol_no_number`, `type_conflict`, `low_text`, `truncated`, `model_unavailable` (cần mà chưa có mô hình), `model_timeout`, `model_rejected`, `model_skipped` (không đủ thời gian) |
 | `422 reason` | `password` PDF phải nhập mật khẩu · `corrupt` (cả tesseract sập) · `no_text` không chữ không ảnh · `timeout` · `memory` (cả tesseract bị giết vì hết bộ nhớ) · `too_many_pixels` |
 
-**Số đo** (`make do-doc-van-ban` trên stack thật, 21/10/2026, 10 PDF có chữ + 4 bản scan trong `seed/van-ban-den/`;
-máy đo: AMD Ryzen 7 7735HS, 16 luồng, một lượt đọc một lúc, tesseract 5.5.0 + `vie` 4.1.0). Mẫu hư cấu in sạch hơn công
-văn thật — đây là **mức trần**; số thật đo bằng view `office.v_intake_accuracy` khi có đơn vị chạy thử.
+**Số đo** (`make do-doc-van-ban` trên stack thật, 22/10/2026, 22 văn bản trong `seed/van-ban-den/`: 15 PDF có
+chữ + 7 ảnh / bản scan; máy đo: AMD Ryzen 7 7735HS, 16 luồng, một lượt đọc một lúc, tesseract 5.5.0 + `vie` 4.1.0). Mẫu hư cấu in sạch hơn
+công văn thật — đây là **mức trần**; số thật đo bằng view `office.v_intake_accuracy` khi có đơn vị chạy thử. Mẫu 15–22
+thêm sau để đo "Hoàn thành khi" của Phase 4 và khó hơn 14 mẫu đầu (ký hiệu ba đoạn, có năm, số có chữ cái phụ; ngày
+viết không theo NĐ 30; cơ quan chủ quản hai dòng, văn bản liên tịch, cơ quan ngoài ngành giáo dục; ảnh chụp nghiêng
+3,2°, bản scan nền xám, PDF scan 3 trang).
+
+Cả kho 22 văn bản: **số ký hiệu đúng 20/22, ngày ban hành đúng 22/22**.
+
+| Trường | PDF có chữ (15): đúng / sai / trống | Bản scan (7, OCR): đúng / sai / trống | `high` sai |
+|---|---|---|---|
+| Số, ký hiệu | 15 / 0 / 0 | 5 / 2 / 0 | 0 |
+| Ngày ban hành | 15 / 0 / 0 | 7 / 0 / 0 | 0 |
+| Cơ quan ban hành | 12 / 3 / 0 | 5 / 2 / 0 | 0 |
+| Loại văn bản | 14 / 0 / 1 | 7 / 0 / 0 | 0 |
+| Độ khẩn | 15 / 0 / 0 | 6 / 0 / 1 | 0 |
+| Trích yếu (có gợi ý / trùng ≥ 60% từ) | 14 / 14 | 7 / 7 | — |
+
+Chỗ sai của bản scan (đều do OCR, không ô nào được chấm `high` trên bản cài): số ký hiệu của 11 đọc "131/ĐT1-ĐHM", của
+20 (ảnh chụp nghiêng) đọc "07/CĐÐ-UBND"; dấu "HỎA TỐC" của 20 không nhận ra; cơ quan của 14 thành "Cõ phần", của 21
+(nền xám) chỉ lấy dòng "Chi Nhánh Cần Thơ". Sai của PDF có chữ: xem đoạn dưới.
+
+Đo trước 5 PDF có chữ mới (15–19) bằng quy tắc, không cần Docker (như `tests/test_docread_samples.py`, 22/10/2026):
+số ký hiệu 5/5, ngày ban hành 5/5 (một `medium`: ngày viết `12/10/2026`), loại 4/5, cơ quan ban hành 2/5, có trích
+yếu 4/5; không ô `high` nào sai. Trống: "KẾ HOẠCH LIÊN TỊCH" không phải tên loại trong danh mục, ký hiệu `KHLT` cũng
+không, nên không có loại, không có trích yếu. Sai (đều `medium`): văn bản của Văn phòng UBND thành "Văn phòng tỉnh
+Mẫu"; văn bản liên tịch chỉ lấy cơ quan dòng cuối; tên bệnh viện đã có tên riêng vẫn bị nối "tỉnh Mẫu" của dòng chủ
+quản. Không sửa quy tắc cho các mẫu này (không phải lỗi đọc thể thức NĐ 30).
+
+Lần đo trước (21/10/2026, 14 mẫu đầu: 10 PDF có chữ + 4 bản scan; máy đo: AMD Ryzen 7 7735HS, 16 luồng, tesseract
+5.5.0 + `vie` 4.1.0):
 
 | Trường | PDF có chữ: đúng / sai / trống | Bản scan (OCR): đúng / sai / trống | `high` sai |
 |---|---|---|---|
@@ -216,16 +244,19 @@ văn thật — đây là **mức trần**; số thật đo bằng view `office.
 đọc bằng OCR hạ xuống tối đa `medium`: vẫn điền sẵn, nhãn "Gợi ý (chưa chắc)", văn thư đối chiếu bản gốc. Ô sai còn lại
 là dấu (`Cõ phần` thay `Cổ phần`, `medium`).
 
-| Thời gian một lần đọc | Trung bình | Lớn nhất |
+| Thời gian một lần đọc (21/10, 14 mẫu đầu) | Trung bình | Lớn nhất |
 |---|---|---|
 | PDF có chữ, không mô hình | 0,6 giây | 0,7 giây |
 | Ảnh / PDF scan (OCR 1 trang) | 1,2 giây | 1,5 giây |
 | PDF có chữ + trích yếu bằng `qwen3:1.7b` (CPU, mô hình đã nạp) | 4,1 giây | 4,1 giây |
 | Ảnh scan + trích yếu bằng `qwen3:1.7b` | 6,6 giây | 6,6 giây |
 
-Mô hình chỉ chạy khi quy tắc chưa ra trích yếu chắc chắn: trên 14 mẫu là 2 lần (giấy mời không có dòng V/v, ảnh xám),
-các tệp khác giữ thời gian như khi không bật mô hình. Từ bản này chữ OCR không trường nào `high` nên mọi ảnh, bản scan
-đều qua mô hình khi bật `ai` (thêm khoảng 3,5–6 giây).
+Lần đo 22/10 trên cả 22 văn bản (không mô hình): PDF có chữ trung bình 0,6 giây, lâu nhất 0,7 giây; ảnh / bản scan
+trung bình 1,3 giây, lâu nhất 1,9 giây (13, PDF chỉ có ảnh).
+
+Mô hình chỉ chạy khi quy tắc chưa ra trích yếu chắc chắn: trên 14 mẫu đầu là 2 lần (giấy mời không có dòng V/v, ảnh
+xám), các tệp khác giữ thời gian như khi không bật mô hình. Từ bản này chữ OCR không trường nào `high` nên mọi ảnh, bản
+scan đều qua mô hình khi bật `ai` (thêm khoảng 3,5–6 giây).
 
 Chưa làm: OCR bản scan cho tìm kiếm toàn văn (F2.7 chỉ đọc lớp chữ); so sánh PaddleOCR / VietOCR; dữ liệu
 `tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ volume nếu cần chính xác hơn).

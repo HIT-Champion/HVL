@@ -262,8 +262,8 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   bố cục NĐ 30), chữ từ OCR không trường nào được mức "chắc chắn". Đọc trong tiến trình con có giới hạn bộ nhớ / CPU /
   thời gian (quá giờ giết cả nhóm tiến trình), Pillow có trần điểm ảnh, một lượt đọc một lúc (`503 busy`), hạn tổng 50
   giây. Không bao giờ ghi đè chữ văn thư đã gõ: chỉ điền ô trống, ô còn mặc định chưa chạm, ô tác tử điền mà chưa sửa;
-  độ tin cậy thấp chỉ hiện "Gợi ý: … [Dùng]". Số đo trên 14 văn bản mẫu (mức trần — mẫu sạch hơn công văn thật): PDF có
-  chữ 10/10 mọi trường, 0,6 giây; bản scan 3–4/4 từng trường, 1,2 giây (bảng ở README svc-files).
+  độ tin cậy thấp chỉ hiện "Gợi ý: … [Dùng]". Số đo trên 14 văn bản mẫu đầu (mức trần — mẫu sạch hơn công văn thật): PDF
+  có chữ 10/10 mọi trường, 0,6 giây; bản scan 3–4/4 từng trường, 1,2 giây (bảng ở README svc-files).
 - Tác tử có danh tính và có sổ: vai trò Hasura mới `agent` (svc-files gọi bằng khóa quản trị + `X-Hasura-Role: agent`,
   preset ép danh tính `moc-doc-reader`, `actor_kind = agent`, thuê ước) chỉ thêm / sửa gợi ý và thêm dòng sổ
   `intake.suggested` về tệp của đơn vị trong phiên, không có quyền nào trên văn bản. Migration
@@ -278,12 +278,12 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   yếu**, chỉ khi quy tắc chưa ra trích yếu chắc chắn: thân văn bản trong thẻ riêng, ép JSON Schema, đầu ra kiểm chặt
   (độ dài, một dòng, không liên kết, địa chỉ thư, dãy số dài) — sai thì giữ trích yếu theo quy tắc. Không bật `ai`
   (mặc định, CI) thì mọi thứ vẫn chạy, trích yếu theo quy tắc. `/readyz` của svc-files báo thêm `ai`.
-- Văn bản đến mẫu hư cấu `seed/van-ban-den/` (10 PDF có lớp chữ, 4 ảnh / bản scan, nhãn đúng trong `nhan.json`, ~1 MB)
-  và `scripts/van_ban_mau.py` sinh lại (`make van-ban-mau`); TSV Tesseract của 4 bản scan cho test. `make
-  demo-doc-van-ban` (6 bước, cũng là bước CI) và `make do-doc-van-ban` (đo trên 14 mẫu qua APISIX, bảng đúng / sai /
-  trống từng trường, thoát 1 khi PDF có chữ dưới ngưỡng — bước CI); `make smoke` +3 (tổng 63); e2e `doc-van-ban.spec.ts`
-  (`make e2e` gắn văn bản mẫu vào container Playwright); CI kiểm cấu hình profile `ai`, `ai-pull`. Test: CSDL +35,
-  svc-files +243, giao diện +13.
+- Văn bản đến mẫu hư cấu `seed/van-ban-den/` (lúc đầu 10 PDF có lớp chữ, 4 ảnh / bản scan, ~1 MB; nay 22 văn bản, xem
+  gạch cuối mục; nhãn đúng trong `nhan.json`) và `scripts/van_ban_mau.py` sinh lại (`make van-ban-mau`); TSV Tesseract
+  của bản scan cho test. `make demo-doc-van-ban` (6 bước, cũng là bước CI) và `make do-doc-van-ban` (đo trên mọi mẫu qua
+  APISIX, bảng đúng / sai / trống từng trường, thoát 1 khi PDF có chữ dưới ngưỡng — bước CI); `make smoke` +3 (tổng
+  63); e2e `doc-van-ban.spec.ts` (`make e2e` gắn văn bản mẫu vào container Playwright); CI kiểm cấu hình profile `ai`,
+  `ai-pull`. Test: CSDL +35, svc-files +243, giao diện +13.
 - Trợ lý hỏi đáp trên kho văn bản (F4.2): trang "Hỏi đáp" (`/hoi-dap`: văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo
   đơn vị; nút "Hỏi trợ lý" ở Tìm kiếm) — hỏi bằng câu tự nhiên, nhận **câu trích nguyên văn** từ văn bản chính người
   hỏi được xem, mỗi câu kèm `[n]` trỏ nguồn "số ký hiệu · tr. n" (bản scan: "trích yếu"), đoạn trích, nút mở văn bản;
@@ -346,6 +346,16 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   dữ liệu chia cụm gọn và chỉ 2 đơn vị nên cao hơn thực tế), sai số hạn trung bình 1,1 ngày, một lần gợi ý p50 71 ms.
   `make smoke` +5 (tổng 71); e2e `giao-viec.spec.ts`. Test: CSDL +47, svc-files +54, svc-workflow +93, giao
   diện +13, scripts +24.
+- Kho văn bản đến mẫu của F4.1 (`seed/van-ban-den/`) lên 22 văn bản (15 PDF có lớp chữ, 7 ảnh / bản scan) để đo đúng
+  "Hoàn thành khi" của Phase 4 (trên 20 công văn mẫu). 8 mẫu mới thêm ở cuối, khó hơn 14 mẫu đầu: hướng dẫn hai trang,
+  nghị quyết HĐND, thông báo kết luận, kế hoạch liên tịch, công văn bệnh viện; ký hiệu ba đoạn, có năm, số có chữ cái
+  phụ; ngày viết không theo NĐ 30 ("ngày 5 tháng 03", `12/10/2026`); ảnh chụp điện thoại nghiêng 3,2° trên mặt bàn, bản
+  scan nền xám, PDF scan 3 trang. Nội dung 14 mẫu cũ giữ nguyên; cả 22 tệp in bằng `make van-ban-mau` trong image
+  svc-files nên chạy lại ra đúng từng byte (10 PDF cũ khác byte bản trước vì bản phông nhúng; mẫu 04 ngắt một dòng khác,
+  chữ không đổi). Ngưỡng của `make do-doc-van-ban` và `test_docread_samples.py` đổi sang tỉ lệ cùng độ nghiêm (≥ 90 % /
+  ≥ 80 %, không ô `high` nào sai); `make do-doc-van-ban` còn thoát 1 khi cả kho dưới 20 văn bản hay số ký hiệu, ngày ban
+  hành đúng không quá nửa; ngưỡng TSV chốt cho cả 7 bản scan. Số đo trên 22 văn bản: số ký hiệu đúng 20/22, ngày ban
+  hành đúng 22/22 (bảng đủ trong README svc-files).
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp

@@ -412,21 +412,28 @@ mô hình ngôn ngữ.
    có dòng V/v): trích yếu do mô hình viết (`source: model`, `medium`). Không thì in "chưa bật mô hình — trích yếu theo
    quy tắc".
 
-**Đo độ chính xác — `make do-doc-van-ban`:** tải lần lượt 14 văn bản mẫu (10 PDF có lớp chữ, 4 ảnh/bản scan) như
+**Đo độ chính xác — `make do-doc-van-ban`:** tải lần lượt 22 văn bản mẫu (15 PDF có lớp chữ, 7 ảnh/bản scan) như
 `vanthu`, gọi đọc (`force=true`), so với nhãn: mỗi trường **đúng** (bằng nhãn sau chuẩn hóa: số ký hiệu bỏ khoảng
 trắng, không phân biệt hoa thường; cơ quan gộp khoảng trắng), **sai** (điền mà khác), **trống**; trích yếu có / trùng
-≥ 60% từ với nhãn; riêng các ô `high`; in bảng markdown cho PDF có lớp chữ và cho bản scan, thời gian trung bình.
-Thoát 1 khi PDF có lớp chữ dưới ngưỡng: số ký hiệu, ngày ban hành, loại ≥ 9/10 đúng; cơ quan ban hành, có trích yếu
-≥ 8/10; không ô `high` nào sai. `make test` chạy cùng phép đo trên 10 PDF ngay trong tiến trình
-(`services/svc-files/tests/test_docread_samples.py`, không cần Docker). Số đo trên bản cài ghi ở
-`services/svc-files/README.md`.
+≥ 60% từ với nhãn; riêng các ô `high`; in bảng markdown cho PDF có lớp chữ và cho bản scan, thời gian trung bình, và
+tỉ lệ số ký hiệu, ngày ban hành đúng trên cả 22 văn bản ("Hoàn thành khi" của Phase 4: trên 20 công văn mẫu).
+Thoát 1 khi PDF có lớp chữ dưới ngưỡng: số ký hiệu, ngày ban hành, loại ≥ 90 % đúng; cơ quan ban hành, có trích yếu
+≥ 80 %; không ô `high` nào sai — hoặc cả kho dưới 20 văn bản, hay số ký hiệu, ngày ban hành đúng không quá nửa kho.
+`make test` chạy cùng phép đo trên mọi PDF có lớp chữ ngay trong tiến trình
+(`services/svc-files/tests/test_docread_samples.py`, không cần Docker). Lần đo trên bản cài (22/10/2026): số ký
+hiệu đúng 20/22, ngày ban hành đúng 22/22; bảng đầy đủ ở `services/svc-files/README.md`.
 
-**Văn bản mẫu** (`seed/van-ban-den/`, < 3 MB): hoàn toàn hư cấu — cơ quan đều có chữ "Mẫu", người ký "Nguyễn Văn A",
-chân trang "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật". Gồm công văn (có V/v, có dấu "KHẨN", địa danh
-"TP. Hồ Chí Minh"), quyết định, thông báo, kế hoạch, thông tư (ký hiệu có năm), giấy mời không V/v, tờ trình, báo
-cáo; ảnh JPG 300 dpi, ảnh JPG mờ 200 dpi, PDF chỉ có ảnh, PNG xám. Sinh lại bằng `make van-ban-mau` (in PDF bằng
-WeasyPrint, vẽ ảnh bằng Pillow trong container svc-files, hạt giống cố định; image có tesseract thì ghi luôn TSV
-OCR cho test). Ảnh vẽ từ cùng dữ liệu chứ không chụp từ PDF (image không có trình rasterize PDF).
+**Văn bản mẫu** (`seed/van-ban-den/`, < 3 MB): hoàn toàn hư cấu — cơ quan đều có chữ "Mẫu", người ký "Nguyễn Văn A" (văn
+bản liên tịch thêm "Nguyễn Văn B"), chân trang "Văn bản giả lập để chạy thử Mộc, không phải văn bản thật". Gồm công văn
+(có V/v, có dấu "KHẨN", địa danh "TP. Hồ Chí Minh"), quyết định, thông báo, kế hoạch, thông tư (ký hiệu có năm), giấy
+mời không V/v, tờ trình, báo cáo; ảnh JPG 300 dpi, ảnh JPG mờ 200 dpi, PDF chỉ có ảnh, PNG xám. Mẫu 15–22 khó hơn, gần
+văn bản đến thật của một trường đại học: hướng dẫn hai trang ký hiệu ba đoạn (`118/HD-SGDĐT-GDĐH`), nghị quyết HĐND
+(`05/2026/NQ-HĐND`), thông báo kết luận số có chữ cái phụ (`152a/TB-VP`), kế hoạch liên tịch hai cơ quan, công văn bệnh
+viện (cơ quan chủ quản hai dòng, ngày viết `12/10/2026`), ngày viết không theo NĐ 30 ("ngày 5 tháng 03"); ảnh chụp điện
+thoại nghiêng 3,2° trên mặt bàn (công điện hỏa tốc), bản scan nền xám mực nhạt (công văn ngân hàng), PDF scan 3 trang
+150 dpi. Sinh lại bằng `make van-ban-mau` (in PDF bằng WeasyPrint, vẽ ảnh bằng Pillow trong container svc-files, hạt
+giống cố định; image có tesseract thì ghi luôn TSV OCR cho test). Ảnh vẽ từ dữ liệu văn bản chứ không chụp từ PDF (image
+không có trình rasterize PDF).
 
 **Bật mô hình (tùy chọn):** `make ai-model` tải mô hình một lần (`qwen3:1.7b`, cần Internet), `make up-ai` chạy
 Ollama trong mạng nội bộ không ra Internet, chỉ svc-files gọi tới. svc-files dò lại mỗi 60 giây, không phải khởi
