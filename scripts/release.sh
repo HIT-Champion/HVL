@@ -53,6 +53,26 @@ fi
 
 TAG="v$VERSION"
 DIST="dist"
+
+# Phiên bản đã phát hành thì không gắn lại: người dùng đã tải gói và .sha256 của nó, thay gói cùng tên là phá cách kiểm
+if git remote get-url origin > /dev/null 2>&1; then
+  if ! remote_tag="$(git ls-remote --tags origin "refs/tags/$TAG")"; then
+    echo "Lỗi: không hỏi được origin để biết thẻ $TAG đã có chưa — kiểm mạng rồi chạy lại." >&2
+    exit 1
+  fi
+  if [ -n "$remote_tag" ]; then
+    echo "Lỗi: thẻ $TAG đã có trên origin (đã phát hành). Phát hành phiên bản mới; sửa ghi chú thì sửa trên trang" \
+         "Release." >&2
+    exit 1
+  fi
+fi
+# chưa có trên origin mà có ở máy: thường là lần trước gắn thẻ rồi dừng giữa chừng — chưa ai tải, gỡ thẻ là đủ
+if git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+  echo "Lỗi: thẻ $TAG đã có ở máy này nhưng chưa đẩy lên origin (lần trước dừng giữa chừng?). Xem lại rồi gỡ:" \
+       "git tag -d $TAG, chạy lại." >&2
+  exit 1
+fi
+
 mkdir -p "$DIST"
 
 echo "==> Gắn thẻ phiên bản $TAG"

@@ -481,6 +481,11 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   nhánh `deploy`): reconciler `git verify-commit` trước khi dừng Mộc; chưa ký, khóa lạ, chữ ký OpenPGP/X.509 (kể cả khi
   keyring của người dùng `moc` tin khóa đó) thì không áp, Mộc chạy tiếp bản cũ. Để trống thì như trước (README mục
   GitOps; `docs/git_flow.md` mục 7: đẩy nhánh bằng `git merge --no-ff -S`). Test scripts +4.
+- Không phát hành lại một phiên bản: `release.sh` dừng trước khi gắn thẻ khi thẻ `vX.Y.Z` đã có trên `origin` (không
+  hỏi được `origin` cũng dừng) hay chỉ có ở máy (gợi ý gỡ thẻ của lần chạy dở); workflow Release dừng khi thẻ đã có
+  Release, kể cả bản nháp mà GitHub để lại khi xóa thẻ của Release đã đăng; action không ghi đè tệp cùng tên, thiếu
+  tệp thì lỗi, và một bước sau báo lỗi khi không tải lên đủ hai tệp. Gói `.tar.gz`, `.sha256` người dùng đã tải về
+  không bị thay dưới cùng tên. Test scripts +14 (chạy lệnh của bước workflow với `gh` giả).
 - Ký số (F4.5): khóa ký của từng đơn vị không ra khỏi két (policy `svc-files` chỉ có `transit/keys|sign/moc-ky-so-*`
   và `pki/sign/moc-van-thu`, không `export`, `backup`). Ai chiếm được `svc-files` vẫn ký được, xoay được khóa ký và xin
   được chứng thư cho khóa tự sinh, nhưng không mang khóa riêng đi được — cùng mức tin như khóa dữ liệu `moc-files`
