@@ -16,7 +16,7 @@ Hệ quả bắt buộc, áp dụng không ngoại lệ:
 
 | Được phép | Không được phép |
 |---|---|
-| Kéo image thượng nguồn có ghim thẻ phiên bản | Sao chép cây mã upstream vào kho này |
+| Kéo image thượng nguồn có ghim thẻ phiên bản và digest | Sao chép cây mã upstream vào kho này |
 | Ghi đè cấu hình qua `.env` và tệp cấu hình riêng | Sửa trực tiếp mã nguồn upstream |
 | Viết plugin/adapter theo cơ chế mở rộng chính thức | Fork rồi vá vào bản fork |
 | Gửi patch lên chính dự án thượng nguồn | Giữ bản vá riêng không công bố |

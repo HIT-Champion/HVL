@@ -197,6 +197,20 @@ def drift(recorded: dict[str, str], now: dict[str, str]) -> list[str]:
     return sorted(f for f in set(recorded) | set(now) if recorded.get(f) != now.get(f))
 
 
+def verify_signature(git: list[str], commit: str, signers: str) -> None:
+    """MOC_GITOPS_ALLOWED_SIGNERS: chỉ áp commit ký bằng khóa SSH có trong tệp allowed_signers (định dạng của
+    `ssh-keygen -Y`, như `gpg.ssh.allowedSignersFile` của git). Chữ ký OpenPGP, X.509 không được nhận dù khóa có trong
+    keyring của người chạy reconciler: chỉ danh sách này quyết định ai được đưa mã lên máy chủ."""
+    path = pathlib.Path(signers).expanduser().resolve()
+    if not path.is_file():
+        raise ReconcileError(f"MOC_GITOPS_ALLOWED_SIGNERS: không có tệp {path}")
+    proc = _run([*git, "-c", f"gpg.ssh.allowedSignersFile={path}", "-c", "gpg.openpgp.program=false",
+                 "-c", "gpg.x509.program=false", "verify-commit", "--raw", commit], check=False)
+    if proc.returncode != 0:
+        detail = " ".join((proc.stderr or proc.stdout).split())[:200] or "không có chữ ký"
+        raise ReconcileError(f"commit {commit[:12]} không ký bằng khóa trong {path}, không áp ({detail})")
+
+
 def gitops(report: dict[str, Any]) -> None:
     src_setting = setting("MOC_GITOPS_DIR")
     if not src_setting:
@@ -227,6 +241,10 @@ def gitops(report: dict[str, Any]) -> None:
     if state.get("failed") == target:
         report["problems"].append(f"commit {target[:12]} áp lỗi lần trước — sửa trên nhánh {branch} rồi đẩy commit mới")
         return
+    # kiểm trước khi dừng Mộc. Không ghi "failed": thêm khóa vào danh sách thì lượt sau áp được, không cần commit mới
+    signers = setting("MOC_GITOPS_ALLOWED_SIGNERS")
+    if signers:
+        verify_signature(git, target, signers)
     if state.get("commit") != target:
         reason = f"nhánh {branch}: {str(state.get('commit', 'chưa áp'))[:12]} → {target[:12]}"
     else:

@@ -93,7 +93,7 @@ totp: $(ENV_FILE) ## Mã TOTP của tài khoản mẫu văn thư, lãnh đạo; 
 smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 	@python3 scripts/smoke.py
 
-PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble
+PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
 
 e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, ký số, thông báo, sổ kiểm toán, sổ đăng ký, kiểm dịch, văn bản hạn chế, đọc văn bản đến
 	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \

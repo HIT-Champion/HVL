@@ -299,9 +299,17 @@ git merge --ff-only v0.1.0          # hoặc origin/main, nếu commit đó đã
 git push origin deploy
 ```
 
-- **Chỉ fast-forward**, không commit thẳng lên `deploy`.
+Máy chủ bật kiểm chữ ký (`MOC_GITOPS_ALLOWED_SIGNERS`, README mục GitOps) thì đầu nhánh phải là commit do người
+trong danh sách ký bằng khóa SSH — thay dòng `--ff-only` bằng:
+
+```bash
+git merge --no-ff -S -m "deploy: v0.1.0" v0.1.0   # -S: ký bằng user.signingkey (gpg.format=ssh)
+git verify-commit HEAD                            # thấy Good "git" signature trước khi đẩy
+```
+
+- **Chỉ fast-forward** (bật kiểm chữ ký: chỉ commit gộp có ký như trên), không commit thẳng lên `deploy`.
 - Lỗi trên server → sửa bằng PR vào `main` như bình thường, rồi đẩy lại `deploy`.
-- Tạo nhánh lần đầu: `git push origin main:deploy`.
+- Tạo nhánh lần đầu: `git push origin main:deploy` (bật kiểm chữ ký thì máy chủ chỉ áp từ lần gộp có ký đầu tiên).
 
 ---
 

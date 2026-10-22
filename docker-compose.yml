@@ -49,7 +49,7 @@ services:
 
   postgres:
     <<: *common
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     profiles: [core]
     environment:
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
@@ -71,7 +71,7 @@ services:
   # F1.1 — SSO. Realm nạp từ auth/realm/ ở lần đầu (bỏ qua nếu realm đã có).
   keycloak:
     <<: *common
-    image: quay.io/keycloak/keycloak:26.7.5
+    image: quay.io/keycloak/keycloak:26.7.5@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
     profiles: [core]
     command: ["start", "--import-realm"]
     environment:
@@ -113,7 +113,7 @@ services:
   # F1.2 — cổng duy nhất mở ra ngoài
   apisix:
     <<: *common
-    image: apache/apisix:3.18.0-debian
+    image: apache/apisix:3.18.0-debian@sha256:84e6b5e787e9f889ebff88161cb9a16599bafcffa236c6b54c7f779a0655940d
     profiles: [core]
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
@@ -134,7 +134,7 @@ services:
   # F1.3 — GraphQL tự sinh, quyền theo vai trò và thuê ước; migrations + metadata tự áp từ db/
   hasura:
     <<: *common
-    image: hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3
+    image: hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3@sha256:c799b59f3b9f60609cfd1c0a0405dfcf56a5009a414298c28409af50c05e0919
     profiles: [core]
     volumes:
       - ./db/migrations:/hasura-migrations:ro
@@ -164,7 +164,7 @@ services:
   # F1.4 — động cơ quy trình BPMN; chỉ svc-workflow gọi, không qua APISIX
   flowable:
     <<: *common
-    image: flowable/flowable-rest:8.0.0
+    image: flowable/flowable-rest:8.0.0@sha256:708dfa32f27b93180bb6e7a30684d881d995fe257f5b8413e14b20a55c25672d
     profiles: [core]
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowable
@@ -197,7 +197,7 @@ services:
   # được qua khóa ghi (S3 Object Lock) của bucket lạnh — container khác, kể cả PostgreSQL, không được tới đó (F2.12).
   seaweedfs:
     <<: *common
-    image: chrislusf/seaweedfs:4.48
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     profiles: [core]
     networks: [storage]
     # Không có tệp danh tính thì cổng S3 không kiểm khóa: sinh tệp từ .env trước khi chạy
@@ -226,7 +226,7 @@ services:
   # F1.6 — trạm kiểm dịch. Giữ volume chữ ký để không tải lại mỗi lần khởi động.
   clamav:
     <<: *common
-    image: clamav/clamav:1.5.4
+    image: clamav/clamav:1.5.4@sha256:638d90201ee7ee6a82d249a2fc23b132e578673b5f1f2766852b127676ca1ef6
     profiles: [core]
     environment:
       CLAMD_CONF_ConcurrentDatabaseReload: "no"
@@ -247,7 +247,7 @@ services:
   # F1.7 — tìm kiếm toàn văn; chỉ svc-files gọi
   meilisearch:
     <<: *common
-    image: getmeili/meilisearch:v1.54.3
+    image: getmeili/meilisearch:v1.54.3@sha256:e68913ab7d6f5b159529e472cfd362ce3c741fafd3c127961b2142abbe41b3c9
     profiles: [core]
     environment:
       MEILI_ENV: production
@@ -262,7 +262,7 @@ services:
   # bằng root chỉ để ghi tệp đăng nhập cho từng dịch vụ; máy chủ chạy bằng người dùng openbao.
   openbao:
     <<: *common
-    image: openbao/openbao:2.7.1
+    image: openbao/openbao:2.7.1@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79cf554379ea32034797d2acf
     profiles: [core]
     # chỉ mạng secrets: container khác (APISIX, Hasura…) không tới được két, kể cả lúc két chưa khởi tạo
     networks: [secrets]
@@ -390,7 +390,7 @@ services:
   # F2.5 — đẩy thông báo tới trình duyệt qua WebSocket (/realtime ở APISIX); tự kiểm token Keycloak
   centrifugo:
     <<: *common
-    image: centrifugo/centrifugo:v6.9.7
+    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
     profiles: [core]
     command: ["centrifugo", "--config", "/centrifugo/config.yaml"]
     environment:
@@ -416,7 +416,7 @@ services:
   # tài khoản quản trị, chỉ xem ẩn danh (bảng điều khiển sửa trong repo, không sửa trên giao diện).
   prometheus:
     <<: *common
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
     profiles: [core]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -437,7 +437,7 @@ services:
   # Grafana (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản; Mộc chỉ nạp cấu hình qua tệp
   grafana:
     <<: *common
-    image: grafana/grafana:13.2.3
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
     profiles: [core]
     environment:
       GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "true"
@@ -496,7 +496,7 @@ services:
 
   scorpio:
     <<: *common
-    image: scorpiobroker/all-in-one-runner:java-6.0.2
+    image: scorpiobroker/all-in-one-runner:java-6.0.2@sha256:eade45746bd745f738b951b7f398ba0e4e338c8097dab76111e96c6adb3d1e98
     profiles: [iot]
     networks: [iot, iot-devices, iot-db]
     environment:
@@ -594,7 +594,7 @@ services:
   # F3.4 — sao lưu: không chạy thường trực, chỉ `moc backup` gọi (docker compose run), không có mạng. Kho restic
   # (MOC_BACKUP_DIR) gắn vào /repo lúc gọi, không khai ở đây: kho nên nằm trên ổ khác, ngoài thư mục cài.
   restic:
-    image: restic/restic:0.19.1
+    image: restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
     profiles: [backup]
     network_mode: none
     # stdout là bản dump khi khôi phục: không để Docker chép vào nhật ký trên đĩa

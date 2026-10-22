@@ -7,8 +7,8 @@ sử dụng"*).
 ## Nguyên tắc phụ thuộc
 
 1. **Không bundle.** Kho mã nguồn này **không** chứa bản sao mã nguồn của bất kỳ dự án nào khác.
-   Mọi phần mềm thượng nguồn được nạp lúc chạy qua image Docker chính thức có ghim thẻ phiên bản,
-   hoặc qua trình quản lý gói (`npm`, `pip`) với tệp khóa phiên bản (lockfile).
+   Mọi phần mềm thượng nguồn được nạp lúc chạy qua image Docker chính thức có ghim thẻ phiên bản và
+   digest, hoặc qua trình quản lý gói (`npm`, `pip`) với tệp khóa phiên bản (lockfile).
 2. **Không chỉnh sửa upstream.** Mã nguồn của các dự án thượng nguồn được dùng ở dạng **nguyên
    bản**. Mọi tùy biến của Mộc nằm ở lớp cấu hình, plugin hoặc adapter riêng.
 3. **Ưu tiên thư viện sẵn có của hệ thống** thay vì đóng gói kèm bản riêng.
@@ -20,6 +20,11 @@ sử dụng"*).
 - **Phiên bản ghim**: thành phần đã chạy (Phase 1) ghi đúng thẻ trong `docker-compose.yml` — cập nhật
   18/10/2026; thành phần phase sau là bản ổn định mới nhất tại 09/10/2026, chốt lại khi đưa vào. Chỉ
   chọn bản đã phát hành ít nhất hai tuần.
+- **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
+  ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
+  (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
+  máy mới vẫn chạy đúng bản đã kiểm. Nâng phiên bản thì đổi cả hai: digest lấy bằng
+  `docker buildx imagetools inspect <thẻ>` (dòng `Digest:`, là index đa nền tảng).
 - **Phase**: thời điểm thành phần được đưa vào, theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md).
   Thành phần đánh dấu *Could* chỉ được thêm nếu còn thời gian.
 - **Copyleft (GPL, AGPL)**: chỉ dùng ở dạng **dịch vụ độc lập giao tiếp qua mạng**, không liên kết

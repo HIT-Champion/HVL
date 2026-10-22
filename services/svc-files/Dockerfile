@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Dựng: docker build -t moc/svc-files services/svc-files
-FROM python:3.13.16-slim
+FROM python:3.13.16-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
 
 # OMP_THREAD_LIMIT=1: tesseract (F4.1) chỉ dùng một luồng OpenMP, không chiếm hết CPU của các dịch vụ khác trên máy
 # (ocr.py cũng đặt lại biến này cho tiến trình tesseract)

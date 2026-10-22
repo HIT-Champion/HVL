@@ -207,5 +207,5 @@ khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait olla
   (trang metadata bị chặn ở APISIX), chưa có vai trò CSDL riêng quyền hẹp.
 - **Mọi tài khoản mẫu của `seed.py` dùng chung `MOC_DEMO_PASSWORD`.** Hợp với máy demo; máy có dữ liệu thật thì không
   chạy `seed.py` (bước 3).
-- **GitOps không kiểm chữ ký commit**: ai đẩy được lên nhánh `deploy` là cài được lên máy chủ.
-- **Image ghim theo tag**, chỉ PostGIS và Ollama ghim thêm digest: một tag bị đẩy lại thì lần kéo sau nhận image khác.
+- **GitOps kiểm chữ ký commit chỉ khi đặt `MOC_GITOPS_ALLOWED_SIGNERS`** (README mục GitOps): để trống thì ai đẩy
+  được lên nhánh `deploy` là cài được lên máy chủ.

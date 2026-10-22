@@ -387,6 +387,22 @@ sudo cp ops/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enabl
 - Bảo trì tay (`docker compose down`, sửa cấu hình thử) thì tắt timer trước: `sudo systemctl stop moc-reconcile.timer`,
   không thì reconciler dựng lại trong vòng một phút.
 - `make smoke` và `make demo-tu-phuc-hoi` gọi `reconcile.py --heal-only`: chỉ tự phục hồi, không kéo commit mới.
+- **Chỉ áp commit đã ký** (nên bật trên máy chủ thật): đặt `MOC_GITOPS_ALLOWED_SIGNERS` là tệp allowed_signers
+  liệt kê khóa SSH của người được đẩy nhánh `deploy`. Reconciler `git verify-commit` commit đầu nhánh trước khi dừng
+  Mộc; chưa ký, ký bằng khóa lạ, hay ký OpenPGP/X.509 (kể cả khi khóa có trong keyring của người dùng `moc`) thì
+  không áp, Mộc chạy tiếp bản cũ, lượt sau kiểm lại (thêm khóa vào tệp là áp được, không cần commit mới).
+
+```bash
+# máy người đẩy nhánh deploy (một lần): ký commit bằng khóa SSH sẵn có (.pub khi khóa nằm trong ssh-agent,
+# không dùng agent thì trỏ tới tệp khóa riêng ~/.ssh/id_ed25519)
+git config --global gpg.format ssh && git config --global user.signingkey ~/.ssh/id_ed25519.pub
+# máy chủ: danh sách khóa được phép (chỉ root sửa được; id_ed25519.pub chép từ máy người đẩy), rồi bật
+sudo install -d /etc/moc && echo "vuong@hvl namespaces=\"git\" $(cat id_ed25519.pub)" | sudo tee /etc/moc/allowed_signers
+echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
+```
+
+  Đầu nhánh `deploy` phải là commit do người trong danh sách ký: đưa bản lên bằng `git merge --no-ff -S` thay cho
+  `--ff-only` (`docs/git_flow.md` mục 7) — commit gộp trên GitHub mang chữ ký OpenPGP của GitHub, không được nhận.
 
 ### Giám sát
 

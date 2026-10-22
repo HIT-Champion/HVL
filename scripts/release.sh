@@ -72,4 +72,4 @@ echo ""
 echo "Đã tạo bản phát hành $TAG:"
 ls -lh "$DIST/moc-$VERSION.tar.gz"*
 echo ""
-echo "Bước tiếp theo:  git push origin main --tags"
+echo "Bước tiếp theo:  git push origin $TAG    # chỉ thẻ này; GitHub Actions tạo Release kèm .tar.gz, .sha256"
