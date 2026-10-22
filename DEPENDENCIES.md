@@ -171,6 +171,13 @@ trọng số (bản kê và lớp cấu hình `Q8_0`, họ `qwen3`, 595,78M tham
 đáp không thêm image, không thêm gói Python: đường ống truy xuất, lọc quyền, trích dẫn, kiểm câu trả lời tự viết
 trong `svc-files` (httpx2 sẵn có), kho véc-tơ là Meilisearch đã chạy.
 
+**F4.3 không thêm phụ thuộc** — không gói Python, gói npm, image hay route gateway nào. Tác tử gợi ý giao việc
+`moc-assigner` (`svc-workflow`) dùng lại: phần truy xuất của trợ lý hỏi đáp trong `svc-files` (chỉ mục đoạn `chunks`
+trên Meilisearch v1.54.3, tìm lai với Qwen3-Embedding qua Ollama khi bật profile `ai`, chỉ từ khóa khi không), gọi qua
+route nội bộ bằng httpx2 sẵn có; Pydantic cho thân yêu cầu; Flowable REST 8.0.0 cho nhánh song song (`parallelGateway`,
+boundary timer — BPMN chuẩn) và việc giao ra ngoài (external worker, như nhắc hạn); bỏ phiếu và hạn đề xuất tính bằng
+thư viện chuẩn Python (`statistics.median_low`). Không mô hình nào chọn đơn vị: CI không bật profile `ai` vẫn chạy đủ.
+
 ## Thành phần đã cân nhắc nhưng không dùng
 
 | Thành phần | Lý do | Thay bằng |
@@ -189,6 +196,8 @@ trong `svc-files` (httpx2 sẵn có), kho véc-tơ là Meilisearch đã chạy.
 | Qdrant (Apache-2.0) | Thêm một image và RAM; kho véc-tơ thứ hai phải đồng bộ thuộc tính quyền với CSDL; không tìm theo từ khóa tiếng Việt nên khi không có mô hình (CI) vẫn cần đường tìm khác. Meilisearch đã chạy, đã có tìm lai từ khóa + véc-tơ trong bản CE | Chỉ mục đoạn `chunks` trong Meilisearch (F4.2) |
 | LlamaIndex (MIT) | `llama-index-core` 0.14 kéo 28 gói phụ thuộc trực tiếp (numpy, SQLAlchemy, NLTK, tiktoken…); NLTK, tiktoken tải dữ liệu từ Internet lúc chạy, mà mạng `ai` không ra Internet; không làm hộ phần lọc quyền của Mộc, trích dẫn và kiểm câu trả lời — đúng phần phải tự viết | Đường ống tự viết trong `svc-files` (`svc_files/assist/`, F4.2) |
 | bge-m3 (MIT, 01/2024) | Phương án thay, không phải bị loại: `bge-m3:567m` F16 khoảng 1,2 GB (gấp đôi RAM), điểm truy xuất đa ngữ MMTEB thấp hơn (54,60 so với 64,64). Dùng được bằng `MOC_AI_EMBED_MODEL=bge-m3`, cùng 1024 chiều, không cần tiền tố câu hỏi | Qwen3-Embedding-0.6B (F4.2) |
+| scikit-learn (BSD-3-Clause) | Thêm gói (kéo numpy, SciPy) vào `svc-workflow` cho một bộ phân loại học từ vài chục văn bản đã giao; phải huấn luyện lại mỗi khi thêm đơn vị hay có văn bản mới, và khó chỉ ra vì sao chọn đơn vị đó | Bỏ phiếu theo các văn bản tương tự đã giao (kNN có trọng số trên phần truy xuất của F4.2), căn cứ hiện kèm gợi ý (F4.3) |
+| Mô hình sinh (Qwen3) chọn đơn vị chủ trì | 15–45 giây CPU mỗi văn bản; CI không có mô hình; không giải thích được vì sao chọn đơn vị đó, lại có thể bịa đơn vị không có lãnh đạo phòng | Bỏ phiếu như trên — không cần mô hình, tốt dần khi có thêm văn bản đã giao (F4.3) |
 
 ## Kiểm tra tương thích giấy phép
 

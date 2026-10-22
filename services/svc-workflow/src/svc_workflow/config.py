@@ -71,6 +71,14 @@ class Settings:
     # F3.12 liên thông: chu kỳ vòng nền chuyển dòng chờ đến hạn và báo dòng đã chuyển mà chưa báo — ngắn hơn
     # MOC_RECONCILE_INTERVAL_S để lần thử lại (30 giây, 1 phút, 2 phút…) đúng hẹn
     dispatch_interval_s: float = 30.0
+    # F4.3 tác tử gợi ý giao việc: false thì worker vẫn nhận việc moc-goi-y nhưng hoàn thành ngay, không gọi svc-files,
+    # không ghi gì; chu kỳ nhận việc (0: không chạy, nhánh gợi ý tự hết sau PT10M); hạn gọi svc-files; ngưỡng điểm
+    # _rankingScore của một căn cứ; danh tính tác tử (actor_id của sổ, agent_id của bảng gợi ý)
+    suggest_enabled: bool = True
+    suggest_poll_interval_s: float = 2.0
+    suggest_timeout_s: float = 10.0
+    suggest_min_score: float = 0.3
+    assigner_id: str = "moc-assigner"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -104,6 +112,11 @@ class Settings:
                 ot_notify_url=env.get("MOC_OT_NOTIFY_URL", "http://svc-workflow:8000").rstrip("/"),
                 ot_interval_s=float(env.get("MOC_OT_SUBSCRIPTION_INTERVAL_S", "15")),
                 dispatch_interval_s=float(env.get("MOC_DISPATCH_INTERVAL_S", "30")),
+                suggest_enabled=_flag("MOC_SUGGEST_ENABLED", env.get("MOC_SUGGEST_ENABLED", "true")),
+                suggest_poll_interval_s=float(env.get("MOC_SUGGEST_POLL_INTERVAL_S", "2")),
+                suggest_timeout_s=float(env.get("MOC_SUGGEST_TIMEOUT_S", "10")),
+                suggest_min_score=float(env.get("MOC_SUGGEST_MIN_SCORE", "0.3")),
+                assigner_id=env.get("MOC_ASSIGNER_ID", "moc-assigner").strip(),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -116,3 +129,21 @@ class Settings:
             raise ConfigError(f"MOC_SLA_DURATION: {exc}") from exc
         if not math.isfinite(self.ot_threshold):
             raise ConfigError("MOC_OT_THRESHOLD phải là một số (°C)")
+        if not (math.isfinite(self.suggest_poll_interval_s) and self.suggest_poll_interval_s >= 0):
+            raise ConfigError("MOC_SUGGEST_POLL_INTERVAL_S phải ≥ 0 (0: không nhận việc gợi ý giao việc)")
+        # cả một việc gợi ý ≤ hạn gọi svc-files + 10 giây, phải xong trước khi khóa việc (PT1M) hết
+        if not (math.isfinite(self.suggest_timeout_s) and 0 < self.suggest_timeout_s <= 40):
+            raise ConfigError("MOC_SUGGEST_TIMEOUT_S phải trong khoảng (0, 40] giây")
+        if not (math.isfinite(self.suggest_min_score) and 0 <= self.suggest_min_score <= 1):
+            raise ConfigError("MOC_SUGGEST_MIN_SCORE phải trong khoảng [0, 1] (thang _rankingScore)")
+        if not 1 <= len(self.assigner_id) <= 64:
+            raise ConfigError("MOC_ASSIGNER_ID phải có 1–64 ký tự")
+
+
+def _flag(name: str, value: str) -> bool:
+    v = value.strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    raise ConfigError(f"{name} chỉ nhận true hoặc false")

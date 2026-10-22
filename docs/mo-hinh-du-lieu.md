@@ -133,7 +133,7 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 - Người thực hiện: đọc `current_setting('hasura.user', true)` (Hasura đặt biến này trong mỗi giao dịch);
   dịch vụ ghi thẳng vào CSDL thì `set local moc.actor = '…'` trước khi ghi. `actor_kind` theo vai trò Hasura của
   phiên: `service` → `service`, `agent` → `agent` (tác tử đọc văn bản đến, F4.1, migration 1792281601900; trợ lý
-  hỏi đáp, F4.2), `admin` → `system`, vai trò người dùng → `user`.
+  hỏi đáp, F4.2; tác tử gợi ý giao việc, F4.3), `admin` → `system`, vai trò người dùng → `user`.
 - `core.audit_log` chỉ được ghi thêm (trigger chặn sửa, xóa, `truncate`). `core.audit_verify()` tính lại
   chuỗi, trả về dòng sai và loại lỗi (`hash`, `prev_hash`, `gap`, `head`).
 
@@ -168,7 +168,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   thời gian, lý do của lượt đọc văn bản đến `intake.suggested` — migration 1792281601900, các khóa này chỉ hiện ở
   dòng sự kiện đó; mã lượt hỏi, chế độ, nguồn câu trả lời, số đoạn, số nguồn được trích, có tìm theo nghĩa không, tên
   mô hình sinh và mô hình nhúng, thời gian, mã cảnh báo của câu trả lời `assistant.answered` — migration
-  1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn). Lãnh đạo không đọc được văn bản hạn chế
+  1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý, số ngày đề xuất,
+  độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
+  `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó). Lãnh đạo không đọc được văn bản hạn chế
   thì sổ cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
@@ -180,11 +182,12 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   việc, lần đưa vào hồ sơ (bỏ id hồ sơ), lần gửi liên thông của văn bản đi (`office.dispatches`, migration
   1792281601800 — dòng sổ thuộc đơn vị gửi nên chỉ hiện ở văn bản đi; văn bản đến bên nhận có lịch sử riêng trong sổ
   của đơn vị nhận); cột `document_id`, `id`, `occurred_at`, `actor_id`, `actor_kind`, `action`,
-  `entity`, `overview` — không có `diff`, không có hash. Không gồm danh sách được xem văn bản hạn chế
-  (`document_acl`): người có tên không được biết ai khác cũng có tên. `staff`, `manager`, `clerk`, `director` đọc khi
-  đọc được văn bản (computed field `visible` qua quan hệ `document`), tối đa 500 dòng mỗi lần. Mỗi nhánh của view nối
-  bằng `=` trên chỉ mục (`audit_log (entity, split_part(entity_id, '/', 1))` và chỉ mục riêng cho dòng hồ sơ), lọc
-  theo một văn bản không quét cả sổ.
+  `entity`, `overview` — không có `diff`, không có hash. Dòng `assignment.suggested` của tác tử gợi ý giao việc (F4.3)
+  mang `entity` `office.documents`, `entity_id` = id văn bản nên tự hiện ở đây. Không gồm danh sách được xem văn bản
+  hạn chế (`document_acl`): người có tên không được biết ai khác cũng có tên. `staff`, `manager`, `clerk`, `director`
+  đọc khi đọc được văn bản (computed field `visible` qua quan hệ `document`), tối đa 500 dòng mỗi lần. Mỗi nhánh của
+  view nối bằng `=` trên chỉ mục (`audit_log (entity, split_part(entity_id, '/', 1))` và chỉ mục riêng cho dòng hồ sơ),
+  lọc theo một văn bản không quét cả sổ.
 
 Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` ghi sự kiện `file.rejected` vào
 `core.audit_log` (màn demo kiểm dịch F3.1).
@@ -246,6 +249,54 @@ create table office.intake_suggestions (    -- một dòng mỗi tệp: bản g�
   mutation nhiều trường trong một giao dịch, ghi sổ lỗi thì gợi ý cũng không được lưu.
 - Không vai trò người dùng nào đọc, ghi bảng này; giao diện nhận gợi ý qua API của `svc-files`. Lãnh đạo, quản trị
   đơn vị xem số đo qua view `office.v_intake_accuracy` (§2.5).
+
+**Gợi ý giao việc** (`office.assignment_suggestions`, F4.3, migration 1792281602100). Văn bản đến vừa vào sổ thì nhánh
+BPMN song song `goiYGiaoViec` (§4.2) giao việc cho tác tử `moc-assigner` trong `svc-workflow`: tìm các văn bản đến tương
+tự đã giao (`svc-files`, §4.3), mỗi căn cứ bỏ phiếu cho đơn vị chủ trì gốc của nó, lưu đơn vị thắng, hạn đề xuất, độ
+tin cậy và căn cứ. Lãnh đạo thấy gợi ý ở đầu form chỉ đạo; "Dùng gợi ý" chỉ điền form, lãnh đạo vẫn bấm "Giao xử lý".
+Quyết định kiến trúc: `docs/architecture.md` QĐ-005.
+
+```sql
+create table office.assignment_suggestions (   -- một dòng mỗi văn bản đến, kể cả khi không gợi ý được
+  document_id   uuid primary key,              -- (tenant_id, document_id) tham chiếu office.documents, xóa theo
+  tenant_id     uuid not null,                 -- preset từ phiên
+  agent_id      text not null,                 -- preset X-Hasura-User-Id của phiên agent (moc-assigner)
+  process_id    text,                          -- phiên Flowable đã giao việc gợi ý
+  status        text not null check (status in ('suggested', 'none', 'failed')),
+  reason        text,             -- none: no_similar | no_history | no_valid_unit | low_confidence;
+                                  -- failed: timeout | unavailable
+  department_id uuid,             -- đơn vị chủ trì gợi ý, (tenant_id, department_id) tham chiếu office.departments
+  confidence    text check (confidence in ('high', 'medium', 'low')),
+  share         real check (share > 0 and share <= 1),   -- tỉ phần phiếu của đơn vị thắng
+  due_days      int  check (due_days between 1 and 365), -- null: văn bản đã ghi hạn, hoặc căn cứ không có hạn
+  due_on        date,                          -- ngày vào sổ + due_days, đẩy qua thứ Bảy, Chủ nhật
+  evidence      jsonb not null default '[]',   -- [{document_id, score, department_id, days}], ≤ 5 phần tử, ≤ 2 KB
+  candidates    int  not null default 0,       -- số văn bản svc-files trả về (0–100)
+  semantic      boolean not null default false, -- có tìm theo nghĩa (mô hình nhúng)
+  duration_ms   int  not null check (duration_ms >= 0),
+  created_at    timestamptz not null default now()
+);
+```
+
+- Ràng buộc `assignment_suggestions_shape`: `suggested` phải có đơn vị, độ tin cậy, tỉ phần và không có lý do; `none`,
+  `failed` phải có lý do đúng loại, không có đơn vị, độ tin cậy, tỉ phần, hạn, căn cứ. `assignment_suggestions_due`:
+  `due_days` và `due_on` cùng có hoặc cùng không. Ràng buộc của từng cột mang tên mặc định
+  (`assignment_suggestions_<cột>_check`).
+- **Căn cứ chỉ có id và số**, không có trích yếu hay số ký hiệu. Giao diện đọc số ký hiệu, trích yếu của căn cứ bằng
+  **token người xem** (`office_documents where id in …, restricted = false`), nên gợi ý không cho ai thấy văn bản mình
+  không được đọc.
+- **Văn bản hạn chế không bao giờ có gợi ý, không bao giờ làm căn cứ.** `svc-files` không tìm cho văn bản hạn chế và bỏ
+  văn bản hạn chế khỏi kết quả; trigger `assignment_suggestions_guard` chặn thêm ở CSDL: văn bản đích hạn chế hoặc là
+  văn bản đi, hay một căn cứ là văn bản hạn chế → `assignment_suggestions_sealed` (`check_violation`). Trigger khóa
+  `for share` văn bản đích và các căn cứ, nên bật hạn chế chạy song song phải đợi lần ghi xong (rồi dọn), hoặc lần ghi
+  đợi lần bật hạn chế xong (rồi bị chặn). Văn bản bật hạn chế sau đó (trigger
+  `documents_drop_restricted_assignment_suggestions`): xóa gợi ý của chính nó, gỡ nó khỏi căn cứ của các gợi ý khác;
+  đơn vị, độ tin cậy, hạn của các gợi ý đó giữ nguyên.
+- Bảng không gắn trigger sổ kiểm toán. Cùng giao dịch với dòng gợi ý (một mutation nhiều trường), tác tử ghi dòng sổ
+  `assignment.suggested` chỉ có số và mã (§5); dòng sổ gắn vào văn bản nên hiện ở tab Lịch sử. Không ghi
+  `office.document_events`: dòng thời gian là việc của người.
+- Chỉ `director` đọc (§3); không ai sửa, xóa. Lãnh đạo, quản trị đơn vị xem số đo giữ / đổi gợi ý qua view
+  `office.v_assignment_suggestion_accuracy` (§2.5).
 
 **Thông báo** (`core.notifications`): dịch vụ ghi bằng vai trò `service`; mỗi người chỉ đọc thông báo của mình
 và chỉ sửa được `read_at`. Thông báo về văn bản hạn chế (F3.7) không mang nội dung: trigger `notifications_restricted`
@@ -672,6 +723,17 @@ aggregate; vai trò khác không thấy.
 |---|---|---|
 | `office.v_intake_accuracy` | `field`, `confidence`, `suggested`, `kept` | Theo trường và độ tin cậy: số gợi ý, số gợi ý văn thư giữ nguyên. Số ký hiệu so không phân biệt hoa thường, bỏ khoảng trắng; cơ quan ban hành so không phân biệt hoa thường, gộp khoảng trắng; ngày so dạng `YYYY-MM-DD`; trường khác so đúng từng ký tự |
 
+**Số đo gợi ý giao việc** (F4.3, migration 1792281602100): `office.v_assignment_suggestion_accuracy` đối chiếu gợi ý
+với việc chủ trì gốc lãnh đạo thật sự giao (`assignments` vai trò `lead`, không có `parent_id`, chưa hủy). Chỉ tính
+quyết định **sau** lúc gợi ý — giao trước đó thì gợi ý không góp phần. Giao cho một người thì tính về phòng của người
+đó (`core.users`), như `v_overdue_by_department`. Không cần ghi thêm gì lúc chỉ đạo: hành vi giữ hay đổi đã là phản
+hồi. Văn bản bật hạn chế thì gợi ý của nó bị xóa, ra khỏi phép đếm. `director`, `tenant_admin` đọc, lọc thuê ước, có
+aggregate.
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.v_assignment_suggestion_accuracy` | `tenant_id`, `status`, `confidence`, `suggested`, `decided`, `kept_unit`, `due_compared`, `kept_due`, `due_abs_error_days` | Theo kết quả (`suggested`, `none`, `failed`) và độ tin cậy: số gợi ý; số văn bản đã giao chủ trì sau lúc gợi ý; số giữ đúng đơn vị gợi ý; số có cả hạn gợi ý và hạn đã giao; số giữ đúng hạn; tổng số ngày lệch hạn (chia cho `due_compared` ra sai số trung bình) |
+
 Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
 được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
@@ -740,9 +802,10 @@ xóa dòng `dispatches`; `service` (phiên bên gửi hoặc bên nhận) chỉ 
 | Bảng | Được làm | Cột đặt sẵn |
 |---|---|---|
 | `office.intake_suggestions` | Thêm, đọc, sửa (upsert) gợi ý của đơn vị trong phiên; không xóa | `tenant_id`, `agent_id` |
-| `core.audit_log` | Chỉ thêm dòng `action = intake.suggested`, `entity = core.files`, hoặc `action = assistant.answered`, `entity = ai.questions` (F4.2) (cột `request_id`, `entity_id`, `diff`) | `tenant_id`, `actor_id`, `actor_kind = agent` |
+| `office.assignment_suggestions` | Thêm gợi ý giao việc (F4.3); chỉ đọc được cột `document_id` (văn bản đã có gợi ý chưa); không sửa, xóa | `tenant_id`, `agent_id` |
+| `core.audit_log` | Chỉ thêm dòng `action = intake.suggested`, `entity = core.files`; `action = assistant.answered`, `entity = ai.questions` (F4.2); hoặc `action = assignment.suggested`, `entity = office.documents` (F4.3) (cột `request_id`, `entity_id`, `diff`) | `tenant_id`, `actor_id`, `actor_kind = agent` |
 
-Ngoài hai bảng này `agent` không có quyền nào: không đọc, ghi văn bản, không đọc `core.files`, không đọc sổ. Tệp có
+Ngoài các bảng này `agent` không có quyền nào: không đọc, ghi văn bản, không đọc `core.files`, không đọc sổ. Tệp có
 được đọc hay không do `svc-files` hỏi Hasura bằng **token của văn thư** trước khi đọc byte; khóa ngoại kèm thuê ước
 chặn lưu gợi ý cho tệp của đơn vị khác.
 
@@ -762,6 +825,25 @@ dùng:
 
 Lớp 1 quyết độ phủ, lớp 2 quyết an toàn: chỉ mục chậm vài giây sau khi văn bản bật hạn chế hay giao việc bị hủy cũng
 không lộ đoạn nào, lượt đồng bộ sau tự sửa. Vòng chỉ mục nền đọc văn bản, chữ của tệp bằng khóa quản trị (như F2.7).
+
+**Tác tử gợi ý giao việc** (F4.3, migration 1792281602100). Tác tử thứ ba dùng chung vai trò `agent`, nằm trong
+`svc-workflow`: `X-Hasura-User-Id` = `MOC_ASSIGNER_ID` (mặc định `moc-assigner`), `X-Hasura-Tenant-Id` = đơn vị của
+văn bản. Bằng vai trò này tác tử chỉ hỏi văn bản đã có gợi ý chưa và lưu gợi ý cùng dòng sổ `assignment.suggested`
+(bảng trên). Phần đọc dùng vai trò `service` sẵn có của `svc-workflow`: văn bản đích, lịch sử giao việc của các văn bản
+tương tự (chỉ văn bản đến không hạn chế), danh sách phòng có lãnh đạo phòng đang hoạt động. Tìm văn bản tương tự là
+việc của `svc-files` (`POST /internal/similar-documents`, §4.3): phạm vi vai trò `service` của thuê ước, chỉ văn bản đến
+đã giao (`in_progress`, `done`, `archived`), hậu kiểm bỏ văn bản hạn chế, chỉ trả id và điểm.
+
+Quyền đọc gợi ý:
+
+| Vai trò | Đọc `office.assignment_suggestions` |
+|---|---|
+| `director` | Mọi cột, gợi ý của văn bản mình đọc được (`tenant_id = X-Hasura-Tenant-Id` và `document.visible`); quan hệ `document`, `department` |
+| `clerk`, `staff`, `manager`, `tenant_admin` | Không có bảng này: gợi ý thuộc bước chỉ đạo của lãnh đạo đơn vị. Dòng sổ `assignment.suggested` (không có căn cứ) vẫn hiện ở tab Lịch sử cho người đọc được văn bản |
+| `agent` | Chỉ cột `document_id` của đơn vị trong phiên |
+
+Căn cứ chỉ có id: giao diện hỏi lại `office_documents(where: {id: {_in: …}, restricted: {_eq: false}})` bằng token
+người xem rồi mới hiện số ký hiệu, trích yếu — căn cứ người xem không đọc được thì không hiện.
 
 > **Không đặt tên vai trò là `admin`.** `admin` là vai trò có sẵn của Hasura, bỏ qua mọi quyền kể cả khi nằm
 > trong JWT. Chạy thử ở #18: token có `x-hasura-default-role: admin` đọc được dữ liệu của mọi thuê ước.
@@ -911,6 +993,22 @@ Mỗi lần ghi một sự kiện `office.task.overdue` / `office.task.escalated
 đã qua hạn, báo người xử lý, người giao việc và lãnh đạo đơn vị một lần (`office.document.overdue`).
 Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 
+**Gợi ý giao việc** (F4.3, QĐ-005 trong `docs/architecture.md`). Trong `van-ban-den`, `vaoSo` dẫn tới cổng song song
+`tachGoiY` tách hai nhánh, không nối lại:
+
+- `chiDao` như cũ (cả timer nhắc hạn `hanChiDao`): lúc vào sổ lãnh đạo đã có việc, thông báo đi ngay.
+- Service task `goiYGiaoViec` (external worker, topic `moc-goi-y`, không vào hộp việc của ai) → end `daGoiY`. Timer
+  ngắt `boGoiY` (`PT10M`, hằng) → end `khongGoiY`: lưới an toàn khi không ai nhận việc (`MOC_SUGGEST_POLL_INTERVAL_S=0`,
+  `svc-workflow` dừng). Không có terminate end event: nhánh gợi ý lỗi hay quá giờ không chặn chỉ đạo.
+
+`svc-workflow` tự lấy việc `moc-goi-y` về (vòng nền mỗi 2 giây, như `moc-sla`). Mỗi việc: bỏ qua nếu tắt gợi ý, lãnh
+đạo đã chỉ đạo xong, văn bản hạn chế hay là văn bản đi, hoặc đã có gợi ý; gọi `svc-files` tìm văn bản tương tự (hạn
+`MOC_SUGGEST_TIMEOUT_S`); đọc lịch sử giao việc chủ trì gốc của chúng, bỏ phiếu, chỉ giữ phòng có lãnh đạo phòng đang
+hoạt động (chỉ đạo cho phòng không có lãnh đạo phòng bị từ chối `no_manager`); lưu gợi ý và dòng sổ trong một giao dịch
+bằng vai trò `agent` (§3) rồi hoàn thành việc. `svc-files` không trả lời → dòng `failed`, không thử lại: lãnh đạo giao
+như thường lệ. Chỉ gợi ý đơn vị chủ trì và hạn; người xử lý vẫn do lãnh đạo phòng phân công (`vbden.phanCong`).
+Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
+
 ### 4.3. API REST của `svc-files`
 
 | Đường dẫn (qua APISIX) | Ai gọi | Làm gì |
@@ -927,6 +1025,7 @@ Văn bản khẩn: biến `urgency` để hộp việc xếp lên đầu.
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}` |
+| `POST /internal/similar-documents` | Chỉ tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`svc-workflow`), không qua APISIX, không có trong `/openapi.json` | Gợi ý giao việc (F4.3): `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15) → `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` — văn bản đến khác đã giao (`in_progress`, `done`, `archived`) tương tự theo trích yếu, điểm giảm dần, đã hậu kiểm bỏ văn bản hạn chế; dùng lại phần truy xuất của trợ lý hỏi đáp (phạm vi vai trò `service` của thuê ước). Không trả chữ nào (`terms` chỉ là số từ của câu tìm), nhật ký không ghi trích yếu. 404 `not_found`; 409 `not_incoming`, `restricted` (không tìm gì thêm); 503 `assistant_disabled` (`MOC_ASK_ENABLED=false`), `search_unavailable`, `database_unavailable` |
 | `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |
 
 `GET /api/files/{id}` (đã làm ở #19): svc-files hỏi Hasura `core_files_by_pk` **bằng token của người gọi** —
@@ -990,6 +1089,7 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 | `core.file.rejected` | ClamAV chặn tệp |
 | `core.intake.suggested` | Tác tử đọc xong một tệp văn bản đến, có gợi ý (F4.1). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `core.assistant.answered` | Trợ lý hỏi đáp trả lời một câu hỏi (F4.2). Chỉ ở sổ kiểm toán, khuôn bên dưới |
+| `core.assignment.suggested` | Tác tử gợi ý giao việc xong một văn bản đến, có gợi ý hay không (F4.3). Ở sổ kiểm toán và tab Lịch sử của văn bản, khuôn bên dưới |
 | `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
 
 Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
@@ -1032,6 +1132,27 @@ cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`,
 mã cảnh báo cách nhau dấu phẩy (`embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`,
 `model_declined`), rỗng nếu không có. Lãnh đạo xem sổ thấy mọi khóa qua `overview` (§1) trừ `documents`: id văn bản
 nguồn chỉ vai trò `service` đọc được.
+
+**Gợi ý giao việc** (F4.3): mỗi văn bản đến tác tử xét xong (có gợi ý, không gợi ý được, hay `svc-files` không trả
+lời), `svc-workflow` ghi một dòng `core.audit_log` bằng vai trò `agent`, **cùng giao dịch** với dòng
+`office.assignment_suggestions`: `action` `assignment.suggested`, `entity` `office.documents`, `entity_id` = id văn
+bản, `request_id` `goi-y:<id việc Flowable>`, `actor_id` `moc-assigner`, `actor_kind` `agent` (hai cột cuối đặt sẵn từ
+phiên). Các trường hợp bỏ qua (tắt gợi ý hay trợ lý hỏi đáp, đã chỉ đạo xong, văn bản hạn chế, đã có gợi ý) không ghi
+gì. `diff` chỉ có giá trị vô hướng, **không** trích yếu, số ký hiệu hay id văn bản căn cứ (`evidence` là số đếm):
+
+```json
+{
+  "outcome": "suggested", "outcome_reason": null, "department_id": "5cc3…", "due_days": 10,
+  "confidence": "high", "evidence": 4, "candidates": 12, "semantic": false, "duration_ms": 183
+}
+```
+
+`outcome`: `suggested` | `none` | `failed`; `outcome_reason`: lý do khi không gợi ý (`no_similar`, `no_history`,
+`no_valid_unit`, `low_confidence`, `timeout`, `unavailable`), null khi có gợi ý; `department_id`: đơn vị gợi ý hoặc
+null; `due_days`: số ngày đề xuất hoặc null; `evidence`: số căn cứ; `candidates`: số văn bản `svc-files` trả về;
+`semantic`: có tìm theo nghĩa. Khóa là `outcome`, `outcome_reason` (không phải `status`, `reason`) để giao diện không
+lẫn với nhãn của F4.1, F4.2. Dòng gắn vào văn bản nên hiện ở tab Lịch sử cho người đọc được văn bản; lãnh đạo xem sổ
+thấy mọi khóa qua `overview` (§1).
 
 **Thông báo realtime** (đã làm): mỗi kết nối Centrifugo tự vào kênh riêng `personal:#<sub>` của người trong
 token (Centrifugo tự kiểm token Keycloak qua JWKS); trình duyệt không đăng ký được kênh nào khác. Sau mỗi bước,

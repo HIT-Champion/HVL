@@ -22,12 +22,14 @@ Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao di�
 | (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
-Ngoài các màn nguyên lý còn ba màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
+Ngoài các màn nguyên lý còn bốn màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
 (`make demo-lien-thong`, F3.12) — xem [mục này](#ngoài-4-nguyên-lý-liên-thông-trong-hệ-thống--make-demo-lien-thong);
 tác tử đọc văn bản đến gợi ý thông tin tiếp nhận (`make demo-doc-van-ban`, F4.1, dưới hai phút) — xem
 [mục này](#ngoài-4-nguyên-lý-đọc-văn-bản-đến--make-demo-doc-van-ban); trợ lý hỏi đáp trên kho văn bản, trả lời kèm số
 ký hiệu và trang (`make demo-hoi-dap`, F4.2, dưới hai phút) — xem
-[mục cuối](#ngoài-4-nguyên-lý-hỏi-đáp-trên-kho-văn-bản--make-demo-hoi-dap).
+[mục này](#ngoài-4-nguyên-lý-hỏi-đáp-trên-kho-văn-bản--make-demo-hoi-dap); tác tử gợi ý đơn vị chủ trì và hạn cho
+văn bản vừa vào sổ, kèm căn cứ (`make demo-giao-viec`, F4.3) — xem
+[mục cuối](#ngoài-4-nguyên-lý-gợi-ý-giao-việc--make-demo-giao-viec).
 
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
@@ -543,3 +545,86 @@ bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: d�
 - *"Còn gì chưa làm?"* Bản scan chưa OCR nền nên chỉ hỏi được theo trích yếu (nguồn ghi "trích yếu", không bịa
   trang); mỗi câu hỏi độc lập, chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản
   giả, sạch hơn văn bản thật.
+
+## Ngoài 4 nguyên lý: gợi ý giao việc — `make demo-giao-viec`
+
+Màn này thuộc F4.3, **không** phải màn bằng chứng nguyên lý: văn bản đến vừa vào sổ thì một tác tử (`moc-assigner`)
+tìm các văn bản tương tự đã giao, gợi ý cho lãnh đạo khoa đơn vị chủ trì và hạn xử lý, kèm căn cứ. Tác tử chỉ gợi ý,
+lãnh đạo quyết định. Không cần mô hình ngôn ngữ. Lần đầu nạp lịch sử mẫu mất khoảng hai phút, các lần sau dưới hai
+phút (bước 10 khởi động lại svc-files).
+
+**Điều muốn chứng minh:**
+
+- Gợi ý **không chắn** việc của người: trong quy trình văn bản đến, nhánh `goiYGiaoViec` (external-worker, topic
+  `moc-goi-y`) chạy song song với bước `chiDao` từ lúc vào sổ. Lãnh đạo có việc ngay, gợi ý tới sau vài giây;
+  svc-files hay svc-workflow ngừng thì chỉ mất gợi ý, văn bản vẫn đi.
+- Gợi ý **giải thích được**: lấy các văn bản đến tương tự đã giao (truy xuất của F4.2, câu tìm chỉ từ trích yếu), mỗi
+  văn bản bỏ một phiếu cho đơn vị chủ trì đã giao, trọng số là điểm tương tự; độ tin cậy theo số căn cứ và tỉ phần
+  phiếu; hạn đề xuất là trung vị số ngày các văn bản đó được giao. Chỉ gợi ý đơn vị có lãnh đạo phòng — đúng điều kiện
+  để giao được.
+- Văn bản hạn chế (F3.7) **không được gợi ý và không làm căn cứ**: không vào chỉ mục; svc-files hậu kiểm; trigger CSDL
+  chặn ghi gợi ý cho văn bản hạn chế hay có căn cứ hạn chế, và gỡ căn cứ khi một văn bản bị bật hạn chế sau đó.
+- Mỗi gợi ý một dòng sổ kiểm toán của tác tử (loại `agent`): đơn vị, độ tin cậy, số căn cứ, thời gian — **không** có
+  trích yếu. Danh sách căn cứ nằm ở bảng `office.assignment_suggestions`, chỉ lãnh đạo khoa đọc.
+- Đo được: view `office.v_assignment_suggestion_accuracy` đếm số lần lãnh đạo giữ hay đổi gợi ý; `make do-giao-viec` đo
+  trên lịch sử.
+
+**Lệnh in ra 10 bước:**
+
+1. `vanthu` nạp lịch sử `seed/giao-viec/lich-su.json`: 27 văn bản không kèm tệp trong 9 cụm (Tổ Đào tạo — học bổng,
+   học phí, đề cương, tốt nghiệp, thời khóa biểu; Bộ môn KTPM — nghiên cứu khoa học, hội thảo, phòng máy, bản quyền phần
+   mềm), 2 văn bản giao thẳng một người, 1 mồi hạn chế; `truongkhoa` giao như trong tệp (đã có cùng số ký hiệu thì bỏ
+   qua).
+2. Đợi chỉ mục: hỏi trợ lý bằng trích yếu văn bản nạp sau cùng tới khi văn bản có trong nguồn (≤ 120 giây).
+3. Văn thư vào sổ "Về việc xét cấp học bổng khuyến khích học tập học kỳ II năm học 2026–2027" → việc chỉ đạo có
+   trong ≤ 5 giây; vài giây sau có dòng gợi ý: Tổ Đào tạo, độ tin cậy, hạn đề xuất, căn cứ (số ký hiệu, đơn vị đã
+   giao, điểm, số ngày).
+4. psql: không căn cứ nào của mọi dòng gợi ý là văn bản hạn chế; mồi 05/CTSV-GVM (hạn chế, trích yếu gần như trùng cụm
+   học bổng nhưng giao Bộ môn KTPM) không là căn cứ của dòng nào.
+5. `truongkhoa` giao theo gợi ý (đơn vị + hạn) → view: `decided` +1, `kept_unit` +1, `kept_due` +1 (so trước/sau,
+   vì seed và lịch sử cũng có gợi ý).
+6. Sáu ca có nhãn còn lại (học phí, tốt nghiệp, đề cương, nghiên cứu khoa học, phòng máy, hội thảo — văn thư vào sổ
+   một văn bản hạn chế R trước các ca): bảng kỳ vọng / gợi ý / độ tin cậy / hạn / số căn cứ; lệch nhãn chỉ cảnh báo.
+   Lãnh đạo giao các ca theo nhãn — thành lịch sử cho lần chạy sau.
+7. Ca không liên quan "Thông báo lịch tiếp công dân định kỳ của Ủy ban nhân dân phường" → `none` (in lý do): không
+   đủ văn bản tương tự thì tác tử không đoán.
+8. Văn bản hạn chế R: 0 dòng gợi ý, 0 dòng sổ `assignment.suggested`.
+9. psql sổ kiểm toán: mỗi văn bản thử đúng một dòng `assignment.suggested` của `moc-assigner` (`agent`), khóa `diff`
+   thuộc danh sách trắng, không có chữ nào của trích yếu hay số ký hiệu.
+10. `docker compose stop svc-files` → văn thư vào sổ một văn bản → việc chỉ đạo vẫn có trong ≤ 5 giây, dòng gợi ý
+    `failed` (`unavailable`) trong ≤ 20 giây, không thử lại → svc-files khởi động lại, đợi khỏe hẳn (luôn chạy, kể cả
+    khi bước này lỗi).
+
+**Đo — `make do-giao-viec`:** gửi id 29 văn bản lịch sử (27 giao đơn vị, 2 giao người) vào
+`python -m svc_workflow.advisor evaluate` trong container svc-workflow: mỗi văn bản được gợi ý như vừa vào sổ
+(svc-files loại chính nó khỏi kết quả), rồi so với đơn vị chủ trì và hạn đã giao thật; không ghi CSDL, không ghi sổ. In bảng từng văn
+bản; top-1 (`none`, `failed` tính là sai), độ phủ, top-2 / top-3 (vô nghĩa khi số đơn vị hợp lệ ≤ k — in kèm số đơn
+vị), đúng theo độ tin cậy, gốc so sánh "luôn đoán đơn vị đông nhất", sai số hạn (trung bình tuyệt đối, tỉ lệ lệch ≤ 1
+ngày), p50 / p95 thời gian một lần gợi ý; psql thêm p50 / p95 từ lúc vào sổ tới lúc có gợi ý trên dòng thật. **Thoát
+1** khi có căn cứ là văn bản hạn chế (cả mồi) hoặc top-1 dưới 60 % (ngưỡng chốt lại sau lần đo đầu trên bản cài, số
+đo ghi ở `services/svc-workflow/README.md`).
+
+**Dữ liệu mẫu** (`seed/giao-viec/lich-su.json`): hư cấu, số ký hiệu đuôi `-GVM` không trùng dữ liệu mẫu khác. Dữ
+liệu mẫu chỉ có Tổ Đào tạo và Bộ môn KTPM có lãnh đạo phòng nên chỉ có **hai đơn vị hợp lệ**: top-1 dễ cao ảo, đọc
+cùng gốc so sánh. Mỗi cụm có chung cụm từ đặc trưng trong 10 từ đầu của trích yếu (Meilisearch chỉ xét 10 từ đầu và
+luôn giữ từ hiếm nhất của câu tìm). `scripts/tests/test_giao_viec.py` kiểm nhãn các ca không mâu thuẫn với seed và
+kho hỏi đáp (không lấy chủ đề "thi kết thúc học phần", hai nguồn giao hai đơn vị khác nhau), không có từ chỉ một văn
+bản có.
+
+**Trên giao diện** (`truongkhoa`): văn thư vào sổ một văn bản đến về học bổng; lãnh đạo mở việc chỉ đạo → khối "Gợi ý
+giao việc" ở đầu form: chip độ tin cậy, "Đơn vị chủ trì: Tổ Đào tạo", hạn đề xuất, căn cứ dẫn tới 88/CTSV và các
+văn bản tương tự mình đọc được. "Dùng gợi ý" chỉ điền form, không gửi; chip "Theo gợi ý" / "Khác gợi ý" cho thấy
+mình đang theo hay lệch gợi ý. Tab Lịch sử của văn bản có dòng "Tác tử gợi ý giao việc". Văn bản hạn chế không hiện
+khối này.
+
+**Nếu giám khảo hỏi:**
+
+- *"Sao không để mô hình ngôn ngữ chọn đơn vị?"* Mỗi văn bản tốn 15–45 giây CPU, CI không có mô hình, và không giải
+  thích được vì sao. Bỏ phiếu trên các văn bản tương tự chạy ngay trên chỉ mục sẵn có, căn cứ là chính các văn bản đó.
+  Bật profile `ai` thì câu tìm có thêm tìm theo nghĩa (vẫn áp ngưỡng điểm riêng của tìm theo nghĩa).
+- *"Gợi ý sai thì sao?"* Lãnh đạo đổi trong form như thường; view đo tỉ lệ giữ / đổi — hành vi đó đã là phản hồi,
+  không cần nút "gợi ý sai". Không đủ văn bản tương tự, hay phiếu chia đều, thì không gợi ý.
+- *"Căn cứ có làm lộ văn bản hạn chế?"* Ba lớp: không vào chỉ mục; svc-files hậu kiểm; trigger CSDL. Giao diện còn
+  hậu kiểm danh sách căn cứ bằng token người xem trước khi hiện.
+- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn chưa xét ngày lễ; chỉ
+  dựa vào trích yếu (đầu nội dung công văn toàn khuôn mẫu "Căn cứ…", "Kính gửi…"); dữ liệu mẫu nhỏ, hai đơn vị hợp lệ.

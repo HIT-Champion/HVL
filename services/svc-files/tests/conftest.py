@@ -408,6 +408,15 @@ class FakeHasura:
         return {doc_id: self._ask_row(row) for doc_id in ids if (row := self.documents.get(doc_id))
                 and row["tenant_id"] == str(tenant_id) and not row.get("restricted")}
 
+    async def similar_target(self, tenant_id, document_id, **_session) -> dict | None:
+        """Văn bản đích của /internal/similar-documents (F4.3): vai trò service của đúng thuê ước, kể cả hạn chế."""
+        self._check()
+        row = self.documents.get(str(document_id))
+        if row is None or row["tenant_id"] != str(tenant_id):
+            return None
+        return {"id": row["id"], "direction": row["direction"], "restricted": bool(row.get("restricted")),
+                "summary": row["summary"]}
+
     # --- liên thông trong hệ thống (F3.12) ------------------------------------------------------------------
 
     dispatches: dict[str, dict] = field(default_factory=dict)

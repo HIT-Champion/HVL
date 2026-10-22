@@ -482,6 +482,43 @@
       "extractOnly": "No model answer — showing the verbatim quote."
     }
   },
+  "assign": {
+    "suggest": {
+      "title": "Assignment suggestion",
+      "searching": "No assignment suggestion yet — when the agent is on, it usually arrives within seconds…",
+      "unit": "Lead unit",
+      "due": "Suggested deadline",
+      "dueDays": "{date} ({n} day, as for similar documents) | {date} ({n} days, as for similar documents)",
+      "dueFromDocument": "As written on the document ({date})",
+      "evidence": "Based on {n} similar document assigned before | Based on {n} similar documents assigned before",
+      "days": "{n} day | {n} days",
+      "apply": "Use suggestion",
+      "applyHint": "Only fills in the lead unit and deadline in the form below; nothing is assigned yet.",
+      "kept": "As suggested",
+      "changed": "Differs from suggestion",
+      "note": "The agent only suggests; the director decides. The suggestion is recorded in the audit log.",
+      "nothing": "No assignment suggestion: {reason}.",
+      "nothingPlain": "No assignment suggestion.",
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence"
+      },
+      "outcome": {
+        "suggested": "Suggested",
+        "none": "No suggestion",
+        "failed": "Failed"
+      },
+      "reason": {
+        "no_similar": "no similar document has been assigned before",
+        "no_history": "the similar documents were not assigned to any unit",
+        "no_valid_unit": "the units that led similar documents have no department head to take the task",
+        "low_confidence": "similar documents went to different units, not confident enough",
+        "timeout": "searching for similar documents took too long",
+        "unavailable": "the document search service is temporarily unavailable"
+      }
+    }
+  },
   "error": {
     "generic": "Something went wrong: {msg}",
     "network": "Cannot reach the server. Check your connection and retry.",
@@ -660,6 +697,9 @@
       },
       "assistant": {
         "answered": "Answered a question on the documents"
+      },
+      "assignment": {
+        "suggested": "Suggested an assignment"
       }
     },
     "entity": {
@@ -772,7 +812,13 @@
       "cited": "Sources cited",
       "semantic": "Meaning search",
       "embed_model": "Embedding model",
-      "warnings": "Warnings"
+      "warnings": "Warnings",
+      "outcome": "Outcome",
+      "outcome_reason": "Reason",
+      "due_days": "Suggested deadline",
+      "confidence": "Confidence",
+      "evidence": "Evidence documents",
+      "candidates": "Similar documents found"
     },
     "direction": {
       "in": "Incoming",
@@ -795,7 +841,8 @@
     "agent": "{name} (agent)",
     "agents": {
       "moc-doc-reader": "Document reader",
-      "moc-assistant": "Q&A assistant"
+      "moc-assistant": "Q&A assistant",
+      "moc-assigner": "Assignment suggester"
     },
     "seconds": "{n} s",
     "readStatus": {

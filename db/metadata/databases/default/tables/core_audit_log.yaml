@@ -21,16 +21,20 @@
 # Lãnh đạo và quản trị đơn vị xem sổ của đơn vị mình (màn "Sổ kiểm toán", F2.12): ai, lúc nào, làm gì, cột nào
 # đổi, hash của dòng. Không đọc được cột diff: chỉ trường `overview`, giữ giá trị của các cột không chứa nội
 # dung (hàm core.audit_overview, migration 1792281600700, 1792281600900, 1792281601100, 1792281601300,
-# 1792281601800, 1792281601900, 1792281602000), để sổ không lộ văn bản hạn chế. Dòng của văn bản hạn chế mà người
-# xem không đọc được chỉ còn tên cột (office.audit_overview_seen, migration 1792281601600, F3.7).
+# 1792281601800, 1792281601900, 1792281602000, 1792281602100), để sổ không lộ văn bản hạn chế. Dòng của văn bản hạn
+# chế mà người xem không đọc được chỉ còn tên cột (office.audit_overview_seen, migration 1792281601600, F3.7).
 #
-# Vai trò `agent` (tác tử trong svc-files) chỉ ghi được hai loại dòng sổ; người ghi (actor_id = X-Hasura-User-Id,
-# actor_kind = agent) và thuê ước đặt sẵn từ phiên, gửi lên bị từ chối:
+# Vai trò `agent` (tác tử trong svc-files, svc-workflow) chỉ ghi được ba loại dòng sổ; người ghi (actor_id =
+# X-Hasura-User-Id, actor_kind = agent) và thuê ước đặt sẵn từ phiên, gửi lên bị từ chối:
 # - `intake.suggested` về một tệp (`core.files`) — tác tử đọc văn bản đến `moc-doc-reader` (F4.1). Màn xem sổ thấy
 #   cách đọc, số trang, tên các trường tìm thấy… (migration 1792281601900), không thấy giá trị của trường nào.
 # - `assistant.answered` về một câu hỏi (`ai.questions`, entity_id = ask_id) — trợ lý hỏi đáp `moc-assistant`
 #   (F4.2). Màn xem sổ thấy chế độ, số đoạn tìm được, số nguồn được trích, mô hình, thời gian… (migration
 #   1792281602000); diff không có câu hỏi, câu trả lời, đoạn trích; id các văn bản nguồn chỉ vai trò service đọc được.
+# - `assignment.suggested` về một văn bản đến (`office.documents`, entity_id = id văn bản) — tác tử gợi ý giao việc
+#   `moc-assigner` trong svc-workflow (F4.3), cùng giao dịch với dòng office.assignment_suggestions. Màn xem sổ và tab
+#   Lịch sử thấy kết quả, đơn vị gợi ý, số ngày, độ tin cậy, số căn cứ, thời gian… (migration 1792281602100); diff
+#   không có trích yếu, không có id văn bản căn cứ.
 table:
   name: audit_log
   schema: core
@@ -58,6 +62,7 @@ insert_permissions:
         _or:
           - {action: {_eq: intake.suggested}, entity: {_eq: core.files}}
           - {action: {_eq: assistant.answered}, entity: {_eq: ai.questions}}
+          - {action: {_eq: assignment.suggested}, entity: {_eq: office.documents}}
 select_permissions:
   - role: director
     permission: &oversight

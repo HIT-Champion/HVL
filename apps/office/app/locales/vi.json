@@ -482,6 +482,43 @@
       "extractOnly": "Không có câu trả lời của mô hình — đang hiện câu trích nguyên văn."
     }
   },
+  "assign": {
+    "suggest": {
+      "title": "Gợi ý giao việc",
+      "searching": "Chưa có gợi ý giao việc — nếu tác tử đang bật, gợi ý thường tới sau vài giây…",
+      "unit": "Đơn vị chủ trì",
+      "due": "Hạn đề xuất",
+      "dueDays": "{date} ({n} ngày, như các văn bản tương tự)",
+      "dueFromDocument": "Theo hạn ghi trên văn bản ({date})",
+      "evidence": "Căn cứ: {n} văn bản tương tự đã giao",
+      "days": "{n} ngày",
+      "apply": "Dùng gợi ý",
+      "applyHint": "Chỉ điền sẵn đơn vị chủ trì và hạn vào form bên dưới, chưa giao việc.",
+      "kept": "Theo gợi ý",
+      "changed": "Khác gợi ý",
+      "note": "Tác tử chỉ gợi ý, lãnh đạo quyết định. Gợi ý đã ghi vào sổ kiểm toán.",
+      "nothing": "Không có gợi ý giao việc: {reason}.",
+      "nothingPlain": "Không có gợi ý giao việc.",
+      "confidence": {
+        "high": "Tin cậy cao",
+        "medium": "Tin cậy vừa",
+        "low": "Tin cậy thấp"
+      },
+      "outcome": {
+        "suggested": "Đã gợi ý",
+        "none": "Không gợi ý",
+        "failed": "Không gợi ý được (lỗi)"
+      },
+      "reason": {
+        "no_similar": "chưa có văn bản tương tự đã giao",
+        "no_history": "các văn bản tương tự chưa được giao cho đơn vị nào",
+        "no_valid_unit": "đơn vị từng chủ trì các văn bản tương tự hiện không có lãnh đạo phòng nhận việc",
+        "low_confidence": "các văn bản tương tự được giao cho nhiều đơn vị khác nhau, chưa đủ tin cậy",
+        "timeout": "tìm văn bản tương tự quá thời gian cho phép",
+        "unavailable": "dịch vụ tìm văn bản tạm thời không sẵn sàng"
+      }
+    }
+  },
   "error": {
     "generic": "Có lỗi xảy ra: {msg}",
     "network": "Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
@@ -660,6 +697,9 @@
       },
       "assistant": {
         "answered": "Trả lời câu hỏi trên kho văn bản"
+      },
+      "assignment": {
+        "suggested": "Gợi ý giao việc"
       }
     },
     "entity": {
@@ -772,7 +812,13 @@
       "cited": "Số nguồn được trích",
       "semantic": "Tìm theo nghĩa",
       "embed_model": "Mô hình nhúng",
-      "warnings": "Cảnh báo"
+      "warnings": "Cảnh báo",
+      "outcome": "Kết quả",
+      "outcome_reason": "Lý do",
+      "due_days": "Hạn đề xuất",
+      "confidence": "Độ tin cậy",
+      "evidence": "Số văn bản căn cứ",
+      "candidates": "Số văn bản tương tự"
     },
     "direction": {
       "in": "Đến",
@@ -795,7 +841,8 @@
     "agent": "{name} (tác tử)",
     "agents": {
       "moc-doc-reader": "Trợ lý đọc văn bản",
-      "moc-assistant": "Trợ lý hỏi đáp"
+      "moc-assistant": "Trợ lý hỏi đáp",
+      "moc-assigner": "Tác tử gợi ý giao việc"
     },
     "seconds": "{n} giây",
     "readStatus": {

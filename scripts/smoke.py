@@ -25,14 +25,16 @@ thống thành văn bản đến của bên nhận, cùng bản phát hành. Đ�
 PDF văn thư vừa tải lên, gợi ý số ký hiệu, ngày ban hành, loại; tệp hạn chế không bị đọc, đơn vị khác không gọi được,
 mỗi lần đọc một dòng sổ kiểm toán (không OCR ở đây — make demo-doc-van-ban thử cả ảnh). Hỏi đáp (F4.2): trợ lý
 moc-assistant trả câu trích nguyên văn đúng trang của công văn hai trang; đơn vị khác, văn bản hạn chế không có nguồn;
-mỗi lượt hỏi một dòng sổ không chứa câu hỏi (không mô hình — make demo-hoi-dap). Thông báo: tổ trưởng nhận tin
-việc mới qua WebSocket (Centrifugo) ngay khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ
-kiểm khi MOC_SLA_DURATION ngắn, CI đặt PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ
-có con số tổng), văn thư không đọc được. Văn bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người
-xem, chỉ người có tên trong danh sách được xem (người nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán:
-neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả chuỗi ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp
-EICAR, không token, đường quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập — trên trình duyệt hay qua
-client moc-cli của kịch bản — phải nhập mã TOTP; giới hạn tốc độ.
+mỗi lượt hỏi một dòng sổ không chứa câu hỏi (không mô hình — make demo-hoi-dap). Gợi ý giao việc (F4.3): văn bản mới về
+học bổng được tác tử moc-assigner gợi ý Tổ Đào tạo, căn cứ có 88/CTSV; không căn cứ nào là văn bản hạn chế, văn bản hạn
+chế không được gợi ý; mỗi gợi ý một dòng sổ không chứa trích yếu; lãnh đạo giao theo gợi ý thì view đo tỉ lệ giữ tăng 1
+(make demo-giao-viec thử thêm khi svc-files tắt). Thông báo: tổ trưởng nhận tin việc mới qua WebSocket (Centrifugo) ngay
+khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ kiểm khi MOC_SLA_DURATION ngắn, CI đặt
+PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ có con số tổng), văn thư không đọc được. Văn
+bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người xem, chỉ người có tên trong danh sách được xem (người
+nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả chuỗi
+ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị, đơn vị khác không thấy văn
+bản; văn thư đăng nhập — trên trình duyệt hay qua client moc-cli của kịch bản — phải nhập mã TOTP; giới hạn tốc độ.
 """
 
 from __future__ import annotations
@@ -610,6 +612,96 @@ def main() -> None:
               in r[3].casefold() or "12/12/2026" in r[3]]
     leaked == [] or fail(f"diff của dòng sổ hỏi đáp có chữ của câu hỏi hoặc câu trả lời: {leaked}")
     ok(f"{len(rows)} dòng sổ assistant.answered do moc-assistant (agent) ghi; diff không có câu hỏi, câu trả lời")
+
+    # F4.3: văn bản vừa vào sổ thì tác tử moc-assigner (nhánh BPMN song song với bước chỉ đạo) tìm các văn bản tương tự
+    # đã giao, gợi ý đơn vị chủ trì + hạn kèm căn cứ; make seed đã giao 88/CTSV (học bổng) cho Tổ Đào tạo. Trích yếu
+    # thử không có "học kỳ II": Meilisearch (matchingStrategy frequency) luôn giữ từ hiếm nhất của câu tìm, mà "II" chỉ
+    # có ở vài văn bản seed khác — 88/CTSV là "học kỳ I"
+    print("Gợi ý giao việc (F4.3)")
+    suggestion_query = """query ($id: uuid!) { office_assignment_suggestions_by_pk(document_id: $id) {
+      status reason department_id confidence due_on evidence created_at } }"""
+
+    def kept() -> tuple[int, int]:
+        rows = director.gql("{ office_v_assignment_suggestion_accuracy { decided kept_unit } }")[
+            "office_v_assignment_suggestion_accuracy"]
+        return sum(r["decided"] for r in rows), sum(r["kept_unit"] for r in rows)
+
+    scholarship = director.gql('{ office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: "88/CTSV"}}) { id } }'
+                               )["office_documents"]
+    scholarship or fail("không có văn bản 88/CTSV của make seed")
+    scholarship_id = scholarship[0]["id"]
+    started = time.time()
+    while not any(s.get("document_id") == scholarship_id
+                  for s in ask(director, "xét cấp học bổng khuyến khích học tập").get("sources") or []):
+        time.time() - started < 90 or fail("sau 90 giây chỉ mục đoạn chưa có 88/CTSV — vòng nền svc-files có chạy"
+                                           " không?")
+        time.sleep(3)
+    bare = {**incoming, "urgency": "normal", "file_ids": [], "issuer_name": "Phòng Công tác sinh viên"}
+    sealed_id = clerk.gql(receive, {"d": {
+        **bare, "symbol": f"130/CTSV-GV{tag}", "restricted": True,
+        "summary": f"Về việc xét cấp học bổng khuyến khích học tập cho sinh viên khó khăn (kiểm tra {tag})",
+    }})["receiveIncoming"]["document_id"]
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": sealed_id})
+    case_summary = f"Về việc xét cấp học bổng khuyến khích học tập năm học 2026–2027 (kiểm tra {tag})"
+    case_id = clerk.gql(receive, {"d": {**bare, "symbol": f"131/CTSV-GV{tag}", "summary": case_summary}})[
+        "receiveIncoming"]["document_id"]
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": case_id})
+    started, hint = time.time(), None
+    while hint is None and time.time() - started < 20:
+        hint = director.gql(suggestion_query, {"id": case_id})["office_assignment_suggestions_by_pk"]
+        hint or time.sleep(1)
+    found_at = time.time()
+    evidence = (hint or {}).get("evidence") or []
+    evidence_ids = [str(e.get("document_id")) for e in evidence]
+    # 88/CTSV là văn bản học bổng duy nhất make seed đã giao. Kho đã chạy make demo-giao-viec (hay bản cài khôi phục từ
+    # sao lưu của kho đó), hay đã chạy smoke nhiều lần (văn bản kiểm tra của lần trước cũng đã giao Tổ Đào tạo), có thêm
+    # văn bản học bổng giao Tổ Đào tạo giống bằng hoặc hơn: 5 chỗ căn cứ có thể đầy bằng chúng mà không có 88/CTSV — khi
+    # đó cả 5 phải là văn bản đến học bổng không hạn chế, cùng thuê ước, có giao Tổ Đào tạo chủ trì (đối chiếu bảng giao
+    # việc, không tin dòng gợi ý). Chỉ uuid đã kiểm mới vào câu SQL
+    ids = [i for i in evidence_ids if re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", i)]
+    crowded = len(ids) == 5 and all(e.get("department_id") == DEPT_DT for e in evidence) and sql(
+        "select count(*) from office.documents d where d.direction = 'in' and not d.restricted"
+        f" and d.summary ilike '%học bổng%' and d.id = any('{{{','.join(ids)}}}'::uuid[])"
+        f" and d.tenant_id = (select tenant_id from office.documents where id = '{case_id}')"
+        " and exists (select 1 from office.assignments a left join core.users u on u.id = a.user_id"
+        " where a.tenant_id = d.tenant_id and a.document_id = d.id and a.role = 'lead' and a.parent_id is null"
+        f" and a.status <> 'cancelled' and coalesce(a.department_id, u.department_id) = '{DEPT_DT}')") == "5"
+    hint and hint["status"] == "suggested" and hint["department_id"] == DEPT_DT \
+        and (scholarship_id in evidence_ids or crowded) \
+        or fail(f"sau {found_at - started:.0f} giây chưa có gợi ý Tổ Đào tạo với căn cứ 88/CTSV (hoặc 5 căn cứ học bổng"
+                f" giao Tổ Đào tạo): {hint}")
+    basis = "căn cứ có 88/CTSV" if scholarship_id in evidence_ids else \
+        "5 căn cứ đều là văn bản học bổng giao Tổ Đào tạo (kho đã có văn bản học bổng khác giao Tổ Đào tạo," \
+        " 88/CTSV ngoài top 5)"
+    ok(f"văn bản mới về học bổng → sau {found_at - started:.0f} giây tác tử gợi ý Tổ Đào tạo (độ tin cậy"
+       f" {hint['confidence']}), {basis}")
+    sealed_evidence = sql(
+        "select count(*) from office.assignment_suggestions s cross join lateral jsonb_array_elements(s.evidence) e"
+        " join office.documents d on d.tenant_id = s.tenant_id and d.id = (e->>'document_id')::uuid where d.restricted")
+    sealed_evidence == "0" or fail(f"{sealed_evidence} căn cứ gợi ý là văn bản hạn chế")
+    ok("không gợi ý nào lấy văn bản hạn chế làm căn cứ (psql, mọi dòng office.assignment_suggestions)")
+    rows = [r.split("|", 2) for r in sql(
+        "select actor_kind, actor_id, diff::text from core.audit_log where action = 'assignment.suggested'"
+        f" and entity_id = '{case_id}'").splitlines()]
+    allowed = {"outcome", "outcome_reason", "department_id", "due_days", "confidence", "evidence", "candidates",
+               "semantic", "duration_ms"}
+    len(rows) == 1 and rows[0][:2] == ["agent", "moc-assigner"] and set(json.loads(rows[0][2])) <= allowed \
+        and not any(w in rows[0][2].casefold() for w in ("học bổng", "khuyến khích", f"kiểm tra {tag}".casefold())) \
+        or fail(f"dòng sổ assignment.suggested chưa đúng (một dòng của moc-assigner, không chữ văn bản): {rows}")
+    ok("một dòng sổ assignment.suggested do moc-assigner (agent) ghi; diff chỉ có đơn vị, độ tin cậy, số đếm")
+    before = kept()
+    director.complete(director.wait_task(case_id, "vbden.chiDao"), "direct", {
+        "instruction": "Giao Tổ Đào tạo chủ trì thực hiện, báo cáo đúng hạn.",
+        "lead_department_id": hint["department_id"], "supports": [],
+        "due_on": hint["due_on"] or (date.today() + timedelta(days=7)).isoformat()})
+    after = kept()
+    after == (before[0] + 1, before[1] + 1) or fail(f"view đo gợi ý chưa đếm lần giữ: trước {before}, sau {after}")
+    ok("lãnh đạo khoa giao theo gợi ý → office_v_assignment_suggestion_accuracy: decided +1, kept_unit +1")
+    time.sleep(max(0.0, 3 - (time.time() - found_at)))
+    sql(f"select (select count(*) from office.assignment_suggestions where document_id = '{sealed_id}'),"
+        f" (select count(*) from core.audit_log where action = 'assignment.suggested' and entity_id = '{sealed_id}')"
+        ) == "0|0" or fail("văn bản hạn chế có dòng gợi ý hoặc dòng sổ assignment.suggested")
+    ok("văn bản hạn chế (cùng chủ đề học bổng) không có dòng gợi ý, không có dòng sổ của tác tử")
 
     # F4.1: tác tử moc-doc-reader đọc tệp văn thư vừa tải lên, trả gợi ý cho form tiếp nhận — không ghi vào văn bản
     print("Đọc văn bản đến (F4.1)")

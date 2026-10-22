@@ -65,6 +65,7 @@ from . import __version__
 from .anchors import Anchorer, AnchorStore
 from .archive import ArchiveError, Archiver, ColdStore, read_package
 from .assist import api as assist_api
+from .assist import similar
 from .assist.ai import AiClient, make_ai
 from .assist.answer import Assistant
 from .assist.index import ChunkIndexer
@@ -836,6 +837,9 @@ def create_app(
         except AuthError as exc:
             headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
             raise HTTPException(exc.status, {"code": exc.code, "message": exc.message}, headers) from exc
+
+    # Văn bản tương tự cho tác tử gợi ý giao việc (F4.3): POST /internal/similar-documents — assist/similar.py
+    similar.install(app, assistant, hasura, service_caller)
 
     async def _scan_bytes(data: bytes) -> bool:
         async def chunks() -> AsyncIterator[bytes]:

@@ -14,8 +14,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Gọi svc-files để dựng bản phát hành của văn bản đi (PDF có số, mã QR, SHA-256), và để chép bản phát hành sang
-đơn vị nhận khi liên thông văn bản trong hệ thống (F3.12).
+"""Gọi svc-files để dựng bản phát hành của văn bản đi (PDF có số, mã QR, SHA-256), để chép bản phát hành sang
+đơn vị nhận khi liên thông văn bản trong hệ thống (F3.12), và để tìm văn bản đến tương tự cho tác tử gợi ý giao việc
+(F4.3).
 
 svc-files không tin mạng nội bộ (zero-trust): mỗi yêu cầu mang token của tài khoản dịch vụ svc-workflow, lấy
 từ Keycloak bằng client credentials — cùng client dùng để đọc danh bạ, không thêm bí mật nào.
@@ -23,6 +24,7 @@ từ Keycloak bằng client credentials — cùng client dùng để đọc danh
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from typing import Any
@@ -33,9 +35,22 @@ from .hasura import Actor
 
 
 class FilesError(Exception):
-    def __init__(self, message: str, status: int | None = None) -> None:
+    """svc-files không trả lời hoặc từ chối. code: ``detail.code`` trong thân lỗi của svc-files, nếu đọc được."""
+
+    def __init__(self, message: str, status: int | None = None, code: str | None = None) -> None:
         super().__init__(message)
         self.status = status
+        self.code = code
+
+
+def _detail_code(r: httpx2.Response) -> str | None:
+    try:
+        body = r.json()
+    except ValueError:
+        return None
+    detail = body.get("detail") if isinstance(body, dict) else None
+    code = detail.get("code") if isinstance(detail, dict) else None
+    return str(code) if code else None
 
 
 # svc-files từ chối chép (409): dòng liên thông không còn chờ, văn bản chưa phát hành, văn bản hạn chế hoặc tệp đã mã
@@ -63,7 +78,10 @@ class DispatchFileError(FilesError):
 
 
 class ServiceToken:
-    """Access token của tài khoản dịch vụ; dùng lại tới gần lúc hết hạn."""
+    """Access token của tài khoản dịch vụ; dùng lại tới gần lúc hết hạn.
+
+    Hạn tính theo giờ thật (``time.time``) như ``exp`` của token, không theo ``time.monotonic``: đồng hồ monotonic đứng
+    yên khi máy ngủ hay VM bị tạm dừng, thức dậy token đã hết hạn mà vẫn tưởng còn."""
 
     def __init__(self, keycloak_url: str, realm: str, client_id: str, client_secret: str, *,
                  transport: httpx2.AsyncBaseTransport | None = None) -> None:
@@ -72,24 +90,31 @@ class ServiceToken:
         self._http = httpx2.AsyncClient(base_url=keycloak_url, timeout=15, transport=transport)
         self._token = ""
         self._expires_at = 0.0
+        self._lock = asyncio.Lock()          # nhiều lời gọi cùng lúc thấy token hết hạn: chỉ một lần hỏi Keycloak
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
+    def forget(self, token: str) -> None:
+        """Bỏ ``token`` nếu vẫn đang giữ nó (lời gọi khác có thể đã lấy token mới): lần ``get`` sau lấy token mới."""
+        if self._token == token:
+            self._token = ""
+
     async def get(self) -> str:
-        if self._token and time.monotonic() < self._expires_at:
+        async with self._lock:
+            if self._token and time.time() < self._expires_at:
+                return self._token
+            try:
+                r = await self._http.post(self._path, data=self._form)
+            except httpx2.HTTPError as exc:
+                raise FilesError(f"Không gọi được Keycloak: {exc}") from exc
+            if r.status_code != 200:
+                raise FilesError(f"Keycloak từ chối tài khoản dịch vụ: HTTP {r.status_code}", r.status_code)
+            body = r.json()
+            self._token = body["access_token"]
+            # trừ hao 30 giây: token không hết hạn giữa đường
+            self._expires_at = time.time() + max(float(body.get("expires_in", 60)) - 30, 0)
             return self._token
-        try:
-            r = await self._http.post(self._path, data=self._form)
-        except httpx2.HTTPError as exc:
-            raise FilesError(f"Không gọi được Keycloak: {exc}") from exc
-        if r.status_code != 200:
-            raise FilesError(f"Keycloak từ chối tài khoản dịch vụ: HTTP {r.status_code}", r.status_code)
-        body = r.json()
-        self._token = body["access_token"]
-        # trừ hao 30 giây: token không hết hạn giữa đường
-        self._expires_at = time.monotonic() + max(float(body.get("expires_in", 60)) - 30, 0)
-        return self._token
 
 
 class FilesClient:
@@ -102,21 +127,51 @@ class FilesClient:
         await self._http.aclose()
         await self._token.aclose()
 
+    async def _post(self, path: str, body: dict[str, Any], headers: dict[str, str] | None = None) -> httpx2.Response:
+        """POST kèm token dịch vụ. svc-files trả 401 — token hết hạn sớm hơn ta tính (đồng hồ bị chỉnh, khóa Keycloak
+        đổi) — thì bỏ token, lấy token mới, gửi lại đúng một lần: 401 nghĩa là svc-files chưa làm gì. Lỗi mạng
+        (``httpx2.HTTPError``) đi thẳng lên để từng hàm báo theo cách của nó."""
+        for attempt in (1, 2):
+            token = await self._token.get()
+            r = await self._http.post(path, headers={**(headers or {}), "Authorization": f"Bearer {token}"}, json=body)
+            if r.status_code != 401 or attempt == 2:
+                break
+            self._token.forget(token)
+        return r
+
     async def issue(self, actor: Actor, document_id: str) -> dict[str, Any]:
         """Dựng PDF phát hành từ dữ liệu trong CSDL, quét, lưu → {file_id, sha256, size_bytes}."""
-        headers = {"Authorization": f"Bearer {await self._token.get()}"}
-        if actor.request_id:
-            headers["X-Request-Id"] = actor.request_id
+        headers = {"X-Request-Id": actor.request_id} if actor.request_id else {}
         try:
-            r = await self._http.post("/internal/issue", headers=headers, json={
+            r = await self._post("/internal/issue", {
                 "tenant_id": str(actor.tenant_id),
                 "document_id": str(uuid.UUID(document_id)),
                 "actor_id": actor.user_id,
-            })
+            }, headers)
         except httpx2.HTTPError as exc:
             raise FilesError(f"Không gọi được svc-files: {exc}") from exc
         if r.status_code != 201:
             raise FilesError(f"svc-files trả {r.status_code}: {r.text[:300]}", r.status_code)
+        return r.json()
+
+    async def similar(self, tenant_id: uuid.UUID, document_id: str, *, limit: int = 15) -> dict[str, Any]:
+        """Tác tử gợi ý giao việc (F4.3): văn bản đến tương tự văn bản này đã giao xử lý →
+        ``{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}``.
+
+        svc-files tự đọc trích yếu bằng vai trò service và chỉ trả id với điểm (đã loại chính nó, văn bản hạn chế, văn
+        bản chưa giao) — không chữ nào của văn bản đi qua đây. Lỗi: ``FilesError`` có ``status`` và ``code`` (404
+        ``not_found``, 409 ``not_incoming``/``restricted``, 503 ``assistant_disabled``/``search_unavailable``…).
+        """
+        try:
+            r = await self._post("/internal/similar-documents", {
+                "tenant_id": str(tenant_id),
+                "document_id": str(uuid.UUID(document_id)),
+                "limit": limit,
+            })
+        except httpx2.HTTPError as exc:
+            raise FilesError(f"Không gọi được svc-files: {exc}") from exc
+        if r.status_code != 200:
+            raise FilesError(f"svc-files trả {r.status_code}: {r.text[:300]}", r.status_code, _detail_code(r))
         return r.json()
 
     async def dispatch_file(self, dispatch_id: str, *, actor_id: str = "svc-workflow") -> dict[str, Any]:
@@ -126,9 +181,8 @@ class FilesClient:
         định được tệp. Bản sao mang id định trước trong dòng (``dispatches.file_id``) nên gọi lại không chép hai lần —
         201 lần đầu, 200 khi đã có.
         """
-        headers = {"Authorization": f"Bearer {await self._token.get()}"}
         try:
-            r = await self._http.post("/internal/dispatch-file", headers=headers, json={
+            r = await self._post("/internal/dispatch-file", {
                 "dispatch_id": str(uuid.UUID(dispatch_id)),
                 "actor_id": actor_id,
             })

@@ -18,6 +18,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import type { SuggestApply } from '~/utils/assignSuggest'
 
 // Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong processes/*.bpmn20.xml).
 // Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
@@ -94,6 +95,16 @@ async function complete(outcome: string, data: Record<string, unknown>) {
   }
 }
 
+// Gợi ý giao việc (F4.3): "Dùng gợi ý" chỉ điền form — giao cho phòng được gợi ý (bỏ phòng đó khỏi phòng phối hợp),
+// đặt hạn nếu có hạn gợi ý. Không gửi gì: lãnh đạo sửa nếu muốn rồi tự bấm "Giao xử lý".
+const suggestedLead = computed(() => (direct.leadKind === 'department' ? direct.lead_department_id || null : null))
+function takeSuggestion(p: SuggestApply) {
+  direct.leadKind = 'department'
+  direct.lead_department_id = p.department_id
+  direct.supports = direct.supports.filter((d) => d !== p.department_id)
+  if (p.due_on) direct.due_on = p.due_on
+}
+
 function submitDirect() {
   tried.value = true
   if (Object.keys(directErrors.value).length) return
@@ -141,6 +152,11 @@ function submitDone() {
 
     <!-- Lãnh đạo đơn vị chỉ đạo -->
     <form v-if="formKey === 'vbden.chiDao'" class="space-y-4 p-5" novalidate @submit.prevent="submitDirect">
+      <!-- gợi ý của tác tử; văn bản hạn chế không bao giờ có gợi ý -->
+      <AssignSuggestion
+        v-if="!restricted" :document-id="documentId" :departments="departments" :chosen="suggestedLead"
+        :document-due="documentDue" @apply="takeSuggestion"
+      />
       <div>
         <label class="label" for="instruction">{{ t('form.chiDao.instruction') }}</label>
         <textarea id="instruction" v-model="direct.instruction" rows="3" class="input" maxlength="2000"

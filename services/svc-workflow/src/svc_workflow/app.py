@@ -38,6 +38,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from . import __version__
+from .advisor import Advisor
 from .config import ConfigError, Settings
 from .directory import Directory
 from .dispatch import Dispatcher
@@ -180,6 +181,9 @@ def create_app(
     ot = ot or (OtBridge(hasura, notifier, settings.ngsi_url, secret=settings.action_secret,
                          threshold=settings.ot_threshold, notify_url=settings.ot_notify_url)
                 if settings.ngsi_url else None)
+    # F4.3: tác tử gợi ý giao việc nhận việc moc-goi-y của nhánh song song với bước chỉ đạo; không chạy thì nhánh tự
+    # hết sau PT10M (timer boGoiY), văn bản vẫn tới lãnh đạo như thường
+    advisor = Advisor(hasura, flowable, files, settings) if settings.suggest_poll_interval_s > 0 else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -197,6 +201,9 @@ def create_app(
         if settings.sla_poll_interval_s > 0:
             tasks.append(asyncio.create_task(
                 _every(settings.sla_poll_interval_s, "office.sla.jobs_handled", deadlines.run_jobs)))
+        if advisor is not None:
+            tasks.append(asyncio.create_task(
+                _every(settings.suggest_poll_interval_s, "office.assign.jobs_handled", advisor.run_jobs)))
         if ot is not None and settings.ot_interval_s > 0:
             tasks.append(asyncio.create_task(_every(settings.ot_interval_s, "ot.subscriptions_ensured", ot.ensure_all)))
         try:
@@ -223,6 +230,7 @@ def create_app(
     app.state.workflow = workflow
     app.state.dispatcher = dispatcher
     app.state.deadlines = deadlines
+    app.state.advisor = advisor
     app.state.directory = directory
     app.state.ot = ot
 

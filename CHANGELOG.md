@@ -319,6 +319,33 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   có chữ nào của câu hỏi. `make do-hoi-dap` (bước CI): recall@3, tỉ lệ từ chối đúng, p50 / p95; thoát 1 khi có nguồn
   bị cấm hoặc recall@3 dưới 80 %. `make smoke` +3 (tổng 66); e2e `hoi-dap.spec.ts`. Test: CSDL +31,
   svc-files +436, giao diện +15, scripts +18.
+- Tác tử gợi ý giao việc (F4.3): vào sổ một văn bản đến thì quy trình `van-ban-den` tách hai nhánh song song — bước
+  chỉ đạo như cũ (lãnh đạo có việc ngay) và việc giao ra ngoài `goiYGiaoViec` (topic `moc-goi-y`, timer ngắt 10 phút;
+  không nối lại, nên svc-files hay tác tử lỗi không chặn văn bản giây nào). Tác tử `moc-assigner` của svc-workflow
+  (`advisor.py`) lấy các văn bản đến **đã giao** giống văn bản này qua route nội bộ `POST /internal/similar-documents`
+  của svc-files (chỉ token dịch vụ, không có trong OpenAPI, không có route APISIX; câu tìm từ trích yếu; dùng lại truy
+  xuất và hậu kiểm F4.2, tìm theo từ khóa luôn kèm lượt tìm nới để từ hiếm như "II" của "học kỳ II" không quyết văn
+  bản nào được xét; có mô hình nhúng thì tìm lai, tối đa 3 giây), rồi bỏ phiếu kNN có trọng số, không cần mô hình
+  (`suggest.py`): đơn vị chủ trì (chỉ phòng có lãnh đạo phòng), độ tin cậy cao / vừa / thấp, hạn = trung vị số ngày
+  của các căn cứ (đẩy qua thứ Bảy, Chủ nhật; văn bản đã ghi hạn thì không gợi ý hạn), tối đa 5 căn cứ. Không đủ văn
+  bản tương tự thì không gợi ý; svc-files không trả lời thì ghi `failed`, không thử lại. Biến `MOC_SUGGEST_ENABLED`,
+  `MOC_SUGGEST_POLL_INTERVAL_S`, `MOC_SUGGEST_TIMEOUT_S`, `MOC_SUGGEST_MIN_SCORE`, `MOC_ASSIGNER_ID`. Khác kế hoạch:
+  nhánh song song từ lúc vào sổ thay cho "ngay trước bước chỉ đạo" (QĐ-005 trong `docs/architecture.md`).
+- Khối "Gợi ý giao việc" ở đầu form chỉ đạo của lãnh đạo đơn vị: đơn vị chủ trì, độ tin cậy bằng chữ, hạn đề xuất
+  ("n ngày, như các văn bản tương tự"), tối đa 3 căn cứ "số ký hiệu — trích yếu → đơn vị · số ngày" đọc bằng token
+  người xem (chỉ văn bản người xem đọc được). "Dùng gợi ý" chỉ điền form, lãnh đạo sửa nếu muốn rồi tự bấm giao; chip
+  "Theo gợi ý" / "Khác gợi ý". Văn bản hạn chế không hiện khối.
+- Gợi ý lưu ở bảng `office.assignment_suggestions` (migration `1792281602100`, một dòng mỗi văn bản; căn cứ chỉ là id,
+  điểm, đơn vị, số ngày) cùng một dòng sổ `assignment.suggested` của `moc-assigner` (vai trò Hasura `agent`) trong
+  một mutation — tự hiện ở tab Lịch sử, không có trích yếu; chỉ lãnh đạo đơn vị đọc gợi ý. View
+  `office.v_assignment_suggestion_accuracy`: tỉ lệ lãnh đạo giữ đơn vị, giữ hạn, sai số hạn trên dữ liệu thật.
+- `make demo-giao-viec` (10 bước, cũng là bước CI; lịch sử giao việc hư cấu `seed/giao-viec/lich-su.json`: 29 văn bản
+  của Tổ Đào tạo và Bộ môn KTPM, một mồi hạn chế) — kể cả dừng svc-files: văn bản vẫn tới bước chỉ đạo ngay, gợi ý
+  ghi `failed`. `make do-giao-viec` (bước CI): leave-one-out top-1/2/3, độ phủ, sai số hạn, p50 / p95; thoát 1 khi căn
+  cứ là văn bản hạn chế hoặc top-1 dưới 60 %. Trên dữ liệu thử: top-1 29/29 (gốc "luôn đoán đơn vị đông nhất" 55 %;
+  dữ liệu chia cụm gọn và chỉ 2 đơn vị nên cao hơn thực tế), sai số hạn trung bình 1,1 ngày, một lần gợi ý p50 71 ms.
+  `make smoke` +5 (tổng 71); e2e `giao-viec.spec.ts`. Test: CSDL +47, svc-files +54, svc-workflow +93, giao
+  diện +13, scripts +24.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -357,6 +384,14 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   `qwen3-embedding:0.6b`, khoảng 640 MB) và `MOC_ASK_MODEL` khi đặt riêng. Hàng đợi đọc chữ (F2.7) đọc thêm bản phát
   hành của văn bản đi; migration `1792281602000` xóa các dòng chữ đã đọc để đọc lại một lần, lần này có ranh giới
   trang — ngay sau khi nâng cấp, tìm theo nội dung có thể thiếu trong vài phút.
+- Gợi ý giao việc (F4.3): "Báo cáo xong" cập nhật văn bản trước giao việc, cùng thứ tự khóa với tác tử, nên hai
+  bên không chờ vòng nhau. Test BPMN của nhắc hạn chỉ xét timer gắn vào việc của người, tìm worker nhắc hạn theo topic
+  `moc-sla`.
+- Trợ lý hỏi đáp (F4.2): tìm theo từ khóa luôn kèm lượt tìm nới (không chỉ khi chưa đủ đoạn), rồi xếp chung mọi đoạn
+  theo tỷ lệ trọng số câu hỏi mà đoạn có. Trước đây đoạn của lượt chính luôn đứng trước: hỏi "Điều kiện xét học bổng
+  khuyến khích học tập là gì?" khi kho có vài công văn "đủ điều kiện xét tốt nghiệp" thì ba nguồn đầu đều lạc đề, công
+  văn trả lời đứng thứ tư. Từ phổ biến (kết quả mỗi từ chỉ lấy một số đoạn đầu) vẫn được tính cho đoạn có nguyên văn
+  từ đó; lượt nới lỗi thì giữ kết quả lượt chính.
 
 ### Đã sửa lỗi
 - Bấm lại khi hoàn thành việc lâu (phát hành) hay hai lần gọi chen nhau không còn ghi hai lần (hai phân công, hai lần
@@ -390,6 +425,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
 - `scripts/license-header.sh` bỏ qua im lặng các tệp `.vue`, `.html`, `.xml`, `.bpmn`, `.css`,
   `.scss`, `.mjs`, `.graphql`, `.lua` — các tệp này giờ được kiểm tra và tự chèn header; loại tệp
   chưa hỗ trợ được in ra dưới dạng cảnh báo.
+- svc-workflow gọi svc-files (phát hành, gửi liên thông, tìm văn bản tương tự) không còn hỏng "token không hợp lệ"
+  sau khi máy chủ ngủ hay VM bị tạm dừng: token dịch vụ giữ trong bộ nhớ tính hạn theo đồng hồ monotonic, đồng hồ này
+  đứng yên lúc máy ngủ nên token đã hết hạn vẫn được dùng. Nay tính theo giờ thật như `exp` của token; svc-files vẫn
+  trả 401 thì bỏ token, lấy token mới và gửi lại đúng một lần (nhiều lời gọi cùng lúc chỉ hỏi Keycloak một lần).
 
 ### Bảo mật
 - Văn bản hạn chế (F3.7) không bao giờ có gợi ý đọc tự động (F4.1): svc-files trả `409` trước khi đọc byte nào —
@@ -401,6 +440,11 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   nên chỉ mục còn cũ cũng không làm lộ; văn bản hạn chế không bao giờ vào chỉ mục, bật hạn chế là xóa mọi đoạn. Chữ
   văn bản đưa cho mô hình nằm trong thẻ riêng, thẻ giả trong văn bản bị bỏ. Dòng sổ và nhật ký của trợ lý không mang
   câu hỏi, câu trả lời hay đoạn trích.
+- Văn bản hạn chế không bao giờ có gợi ý giao việc và không bao giờ làm căn cứ (F4.3): svc-files từ chối văn bản
+  đích hạn chế trước khi tìm, chỉ mục không có đoạn của văn bản hạn chế, hậu kiểm bỏ văn bản vừa bật hạn chế; trigger
+  `assignment_suggestions_guard` khóa văn bản đích và các căn cứ rồi chặn ở CSDL, bật hạn chế sau đó thì xóa gợi ý của
+  văn bản và gỡ nó khỏi căn cứ của gợi ý khác. Dòng sổ, nhật ký của tác tử và lệnh đo không mang trích yếu hay chữ nào
+  của văn bản.
 - Action GitHub trong CI và quy trình phát hành ghim theo SHA commit, image công cụ CI ghim theo digest;
   workflow CI chỉ có quyền đọc kho.
 - Xác thực hai bước TOTP (F1.1): đăng nhập trình duyệt bắt buộc mã với văn thư, lãnh đạo phòng, lãnh đạo đơn

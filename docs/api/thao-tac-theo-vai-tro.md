@@ -12,8 +12,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `clerk` (văn thư) | `vanthu` | 38 | 8 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
 | `staff` (chuyên viên) | `chuyenviendt` | 31 | 23 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 31 | 13 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 49 | 6 | [`graphql/director.graphql`](graphql/director.graphql) |
-| `tenant_admin` (quản trị đơn vị) | `quantri` | 21 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 53 | 6 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `tenant_admin` (quản trị đơn vị) | `quantri` | 23 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
 
@@ -37,6 +37,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `core_users` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `core_users_by_pk` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `myTasks` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_assignment_suggestions` |  |  |  | ✓ |  |
+| `office_assignment_suggestions_by_pk` |  |  |  | ✓ |  |
 | `office_assignments` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_assignments_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_case_file_documents` | ✓ | ✓ | ✓ | ✓ |  |
@@ -62,6 +64,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_documents_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_registers` | ✓ |  |  | ✓ | ✓ |
 | `office_registers_by_pk` | ✓ |  |  | ✓ | ✓ |
+| `office_v_assignment_suggestion_accuracy` |  |  |  | ✓ | ✓ |
+| `office_v_assignment_suggestion_accuracy_aggregate` |  |  |  | ✓ | ✓ |
 | `office_v_document_counts` |  |  |  | ✓ |  |
 | `office_v_intake_accuracy` |  |  |  | ✓ | ✓ |
 | `office_v_intake_accuracy_aggregate` |  |  |  | ✓ | ✓ |

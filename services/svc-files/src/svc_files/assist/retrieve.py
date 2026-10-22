@@ -26,12 +26,15 @@
 Tìm lai (từ khóa + nghĩa) lỗi — embedder chưa có trong Meilisearch lúc khởi động hay khi đổi mô hình — thì tìm lại
 một lần chỉ bằng từ khóa (``Retrieval.hybrid_error``), không trả lỗi cho người hỏi.
 
-**Tìm nới** (chỉ khi tìm theo từ khóa, không tìm theo nghĩa, mà chưa đủ đoạn): chiến lược ``frequency`` của
-Meilisearch bỏ dần từ phổ biến nhưng luôn giữ từ hiếm nhất của câu hỏi — câu "Điều kiện xét học bổng …" mà chỉ một văn
-bản có chữ "điều kiện" thì văn bản trả lời (không có chữ đó) không bao giờ ra. Lượt nới tìm từng từ riêng trong cùng
-phạm vi (một ``/multi-search``), cho mỗi từ trọng số ``ln(1 + N / df)`` (``N`` số đoạn trong phạm vi, ``df`` số đoạn có
-từ đó; từ không đoạn nào có tính như ``df`` = 0,5), giữ đoạn có tổng trọng số ≥ ``RELAX_MIN`` của cả câu hỏi, xếp sau
-kết quả chính, hậu kiểm như mọi đoạn khác.
+**Tìm nới** (mỗi lần tìm theo từ khóa, không tìm theo nghĩa): chiến lược ``frequency`` của Meilisearch bỏ dần từ
+phổ biến nhưng luôn giữ từ hiếm nhất của câu hỏi — câu "Điều kiện xét học bổng …" mà vài văn bản về xét tốt nghiệp có
+chữ "điều kiện" thì lượt chính chỉ ra các văn bản đó, văn bản trả lời (không có chữ "điều kiện") không bao giờ ra. Lượt
+nới tìm từng từ riêng trong cùng phạm vi (một ``/multi-search``), cho mỗi từ trọng số ``ln(1 + N / df)`` (``N`` số đoạn
+trong phạm vi, ``df`` số đoạn có từ đó; từ không đoạn nào có tính như ``df`` = 0,5), thêm đoạn có tổng trọng số ≥
+``RELAX_MIN`` của cả câu hỏi, hậu kiểm như mọi đoạn khác. Mỗi từ chỉ lấy ``candidates`` đoạn đầu, nên từ phổ biến
+còn được tính cho đoạn nào có nguyên văn từ đó (bỏ dấu như Meilisearch). Trợ lý xếp chung đoạn lượt chính và đoạn nới
+theo tỷ lệ trọng số đó; tìm văn bản tương tự (F4.3) lấy điểm cao hơn giữa ``_rankingScore`` và tỷ lệ, xem ``similar``.
+Lượt nới lỗi thì giữ kết quả lượt chính.
 
 Dữ liệu nguồn trả về (số ký hiệu, trích yếu, trạng thái…) lấy từ Hasura — bản mới nhất, không phải bản sao trong chỉ
 mục. Không trả số kết quả của Meilisearch theo từng văn bản: con số đó tính cả văn bản người hỏi không được đọc.
@@ -40,11 +43,13 @@ mục. Không trả số kết quả của Meilisearch theo từng văn bản: c
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeVar
 
+from ..docread.rules import fold
 from ..search import SearchError, _quoted
 from .chunks import eligible
 from .scope import NOTHING, Scope
@@ -52,6 +57,7 @@ from .scope import NOTHING, Scope
 FIELDS = ["id", "document_id", "kind", "file_id", "file_role", "page", "seq", "text"]
 MORE_ROUNDS = 2            # thiếu đoạn mà Meilisearch còn kết quả: lấy thêm tối đa từng này lượt
 RELAX_MIN = 0.5            # tìm nới: đoạn phải có từ chiếm ≥ tỷ lệ này trọng số của câu hỏi
+WORD = re.compile(r"\w+")
 
 T = TypeVar("T")
 
@@ -92,6 +98,14 @@ class DocHit:
     document_id: str
     score: float
     doc: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class Similar:
+    """Kết quả tìm văn bản tương tự (F4.3) — ``Retriever.similar``."""
+    hits: list[DocHit]      # đã hậu kiểm, điểm giảm dần
+    semantic: bool          # lượt này có tìm theo nghĩa
+    error: str | None = None    # tìm lai lỗi nên đã tìm lại chỉ bằng từ khóa — chỉ ghi nhật ký
 
 
 class _Index(Protocol):
@@ -208,7 +222,7 @@ class Retriever:
         candidates = 0
 
         def take(hit: dict[str, Any], score: float) -> bool:
-            """Thêm đoạn nếu văn bản đã qua hậu kiểm và chưa đủ đoạn; True khi đã đủ ``limit``."""
+            """Thêm đoạn nếu văn bản đã qua hậu kiểm, đoạn chưa có và văn bản chưa đủ đoạn; True khi đã thêm."""
             doc_id, chunk_id = str(hit["document_id"]), str(hit["id"])
             row = checked.get(doc_id)
             if row is None or chunk_id in seen or per_doc.get(doc_id, 0) >= self.per_doc:
@@ -220,32 +234,51 @@ class Retriever:
                 file_id=hit.get("file_id"), file_role=hit.get("file_role"), page=hit.get("page"),
                 text=hit.get("text") or "", score=score, doc=source_doc(row),
             ))
-            return len(passages) == limit
+            return True
 
+        main: dict[str, dict[str, Any]] = {}       # mọi đoạn lượt chính đã đọc, theo thứ tự Meilisearch
         async with aclosing(self._rounds(scope, body)) as rounds:
             async for hits, readable in rounds:
                 candidates += len(hits)
                 checked = readable
                 known.update(str(h["document_id"]) for h in hits)
                 for hit in hits:
-                    if take(hit, float(hit.get("_rankingScore") or 0.0)):
-                        return passages, candidates, 0
+                    main.setdefault(str(hit["id"]), hit)
+                for hit in hits:
+                    if take(hit, float(hit.get("_rankingScore") or 0.0)) and len(passages) == limit:
+                        break
+                if len(passages) == limit:
+                    break
         if "hybrid" in body:
             return passages, candidates, 0
-        found = len(passages)
-        relaxed = await self._relaxed(body)
+        # Tìm theo từ khóa luôn nới (đầu tệp), kể cả khi lượt chính đã đủ, rồi xếp chung mọi đoạn theo tỷ lệ trọng số
+        # câu hỏi mà đoạn có: đoạn chỉ khớp từ hiếm nhất ("điều kiện" của "đủ điều kiện xét tốt nghiệp") không đứng
+        # trước đoạn trả lời có gần đủ câu hỏi. Lượt nới lỗi: kết quả lượt chính vẫn dùng được.
+        try:
+            weighed = await self._relaxed(body, floor=0.0, also=list(main.values()))
+        except SearchError:
+            return passages, candidates, 0
+        if not weighed:
+            return passages, candidates, 0
+        share = {str(h["id"]): s for h, s in weighed}
+        relaxed = [(h, s) for h, s in weighed if s >= RELAX_MIN and str(h["id"]) not in main]
         new = sorted({str(h["document_id"]) for h, _ in relaxed} - known)
         if new:
             readable = await self._readable(scope, new)
             checked = {**checked, **{d: r for d in new if (r := readable.get(d)) is not None and eligible(r)}}
-        for hit, score in relaxed:
-            if take(hit, score):
+        pool = [(h, share.get(i, float(h.get("_rankingScore") or 0.0))) for i, h in main.items()] + relaxed
+        pool.sort(key=lambda x: -x[1])              # sort ổn định: cùng điểm thì đoạn lượt chính trước
+        passages, seen, per_doc = [], set(), {}
+        for hit, score in pool:
+            if take(hit, score) and len(passages) == limit:
                 break
-        return passages, candidates, len(passages) - found
+        return passages, candidates, sum(p.chunk_id not in main for p in passages)
 
-    async def _relaxed(self, body: dict[str, Any]) -> list[tuple[dict[str, Any], float]]:
-        """Tìm nới (xem đầu tệp): (đoạn, tỷ lệ trọng số) ≥ ``RELAX_MIN``, cao trước, tối đa ``candidates`` đoạn. Câu
-        tìm dưới hai từ thì không nới: lượt chính đã tìm từng từ."""
+    async def _relaxed(self, body: dict[str, Any], floor: float = RELAX_MIN, also: list[dict[str, Any]] | None = None
+                       ) -> list[tuple[dict[str, Any], float]]:
+        """Tìm nới (xem đầu tệp): (đoạn, tỷ lệ trọng số) ≥ ``floor``, cao trước, tối đa ``candidates`` đoạn —
+        ``floor`` = 0 thì mọi đoạn đã thấy, kể cả các đoạn ``also`` (để xếp đoạn lượt chính). Câu tìm dưới hai từ thì
+        không nới: lượt chính đã tìm từng từ."""
         terms = list(dict.fromkeys(w.casefold() for w in str(body.get("q") or "").split()))
         if len(terms) < 2:
             return []
@@ -260,35 +293,71 @@ class Retriever:
             return []
         weights = [math.log(1 + total / max(df, 0.5)) for _, df in results[1:]]
         mass = sum(weights)
-        got: dict[str, tuple[dict[str, Any], float]] = {}
-        for (hits, _), weight in zip(results[1:], weights, strict=True):
-            for hit in hits:
-                first, have = got.get(str(hit["id"]), (hit, 0.0))
-                got[str(hit["id"])] = (first, have + weight)
-        ranked = sorted(((hit, have / mass) for hit, have in got.values() if have / mass >= RELAX_MIN),
+        hits = {str(h["id"]): h for h in also or ()}
+        found: dict[str, set[int]] = {}             # đoạn → các từ có đoạn đó trong kết quả
+        for n, (term_hits, _) in enumerate(results[1:]):
+            for hit in term_hits:
+                hits.setdefault(str(hit["id"]), hit)
+                found.setdefault(str(hit["id"]), set()).add(n)
+        # mỗi từ chỉ lấy ``candidates`` đoạn đầu: từ có ở nhiều đoạn hơn thì đoạn đứng sau không có trong kết quả của
+        # từ đó — tính cả từ có nguyên văn trong đoạn, kẻo đoạn có đủ câu hỏi bị xếp sau đoạn chỉ có từ phổ biến
+        folded = [fold(t).casefold() for t in terms]
+
+        def share(chunk_id: str, hit: dict[str, Any]) -> float:
+            text = fold(str(hit.get("text") or "")).casefold()
+            words = set(WORD.findall(text))
+            return sum(w for n, (t, w) in enumerate(zip(folded, weights, strict=True))
+                       if n in found.get(chunk_id, ()) or (t in words if WORD.fullmatch(t) else t in text)) / mass
+
+        ranked = sorted(((hit, s) for chunk_id, hit in hits.items() if (s := share(chunk_id, hit)) >= floor),
                         key=lambda x: -x[1])
-        return ranked[: self.candidates]
+        return ranked if floor <= 0 else ranked[: self.candidates]
 
     async def similar_documents(self, scope: Scope, *, q: str, vector: list[float] | None, limit: int = 10,
                                 where: tuple[str, ...] = ()) -> list[DocHit]:
+        """Như ``similar`` nhưng chỉ trả danh sách văn bản (bỏ cờ tìm theo nghĩa, lỗi tìm lai)."""
+        return (await self.similar(scope, q=q, vector=vector, limit=limit, where=where)).hits
+
+    async def similar(self, scope: Scope, *, q: str, vector: list[float] | None, limit: int = 10,
+                      where: tuple[str, ...] = ()) -> Similar:
         """Văn bản tương tự (F4.3): gộp đoạn theo văn bản, điểm = điểm cao nhất; đã hậu kiểm như ``search``.
         ``where``: điều kiện thêm, viết sẵn (vd ``'document_id != "…"'``) — chỉ truyền chuỗi do mã dựng."""
         if scope.where == NOTHING or limit <= 0:
-            return []
+            return Similar([], False)
 
         async def collect(body: dict[str, Any]) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
             best: dict[str, float] = {}
             readable: dict[str, dict[str, Any]] = {}
+            seen: set[str] = set()                   # văn bản đã hậu kiểm, qua hay không
             async with aclosing(self._rounds(scope, body)) as rounds:
                 async for hits, readable in rounds:
+                    seen.update(str(h["document_id"]) for h in hits)
                     for hit in hits:
                         doc_id = str(hit["document_id"])
                         if doc_id in readable:
                             best[doc_id] = max(best.get(doc_id, 0.0), float(hit.get("_rankingScore") or 0.0))
                     if len(best) >= limit:
                         break
+            if "hybrid" in body:
+                return best, readable
+            # Tìm theo từ khóa luôn nới (đầu tệp), kể cả khi lượt chính đã đủ: trích yếu hay có từ hiếm không nói gì
+            # về chủ đề ("II" của học kỳ, năm học) mà frequency vẫn bắt mọi văn bản phải có. Điểm = điểm cao hơn giữa
+            # _rankingScore và tỷ lệ trọng số từ chung — cùng thang [0, 1], cùng tăng theo độ phủ câu tìm.
+            try:
+                relaxed = await self._relaxed(body)
+            except SearchError:                      # lượt nới lỗi: kết quả lượt chính vẫn dùng được
+                return best, readable
+            new = sorted({str(h["document_id"]) for h, _ in relaxed} - seen)
+            if new:
+                rows = await self._readable(scope, new)
+                readable = {**readable, **{d: r for d in new if (r := rows.get(d)) is not None and eligible(r)}}
+            for hit, share in relaxed:
+                doc_id = str(hit["document_id"])
+                if doc_id in readable:
+                    best[doc_id] = max(best.get(doc_id, 0.0), share)
             return best, readable
 
-        (best, readable), _, _ = await self._hybrid_or_keywords(scope, q, vector, list(where), collect)
+        (best, readable), semantic, error = await self._hybrid_or_keywords(scope, q, vector, list(where), collect)
         ranked = sorted(best.items(), key=lambda kv: -kv[1])[:limit]
-        return [DocHit(doc_id, score, source_doc(readable[doc_id])) for doc_id, score in ranked]
+        return Similar([DocHit(doc_id, score, source_doc(readable[doc_id])) for doc_id, score in ranked],
+                       semantic, error)

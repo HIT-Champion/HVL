@@ -147,6 +147,13 @@ query AskDocumentsService($ids: [uuid!]!) {{
   office_documents(where: {{_and: [{{id: {{_in: $ids}}}}, {{restricted: {{_eq: false}}}}]}}) {{ {_ASK_FIELDS} }}
 }}"""
 
+# Văn bản đích của tác tử gợi ý giao việc (F4.3, /internal/similar-documents): vai trò service lọc thuê ước nên văn
+# bản của thuê ước khác trả null; đọc cả văn bản hạn chế để route từ chối (409) trước khi tìm gì
+SIMILAR_TARGET = """
+query SimilarTarget($id: uuid!) {
+  office_documents_by_pk(id: $id) { id direction restricted summary }
+}"""
+
 # Kết quả tìm kiếm: chỉ những văn bản người dùng được đọc, dữ liệu mới nhất từ CSDL
 VISIBLE_DOCUMENTS = """
 query VisibleDocuments($ids: [uuid!]!) {
@@ -501,6 +508,13 @@ class HasuraClient:
         data = await self._call(ASK_DOCUMENTS_SERVICE, {"ids": ids},
                                 self._as_service(tenant_id, actor_id, request_id or str(uuid.uuid4())))
         return {row["id"]: row for row in data["office_documents"]}
+
+    async def similar_target(self, tenant_id: uuid.UUID, document_id: uuid.UUID, *, request_id: str = "",
+                             actor_id: str = "svc-files") -> dict[str, Any] | None:
+        """``{id, direction, restricted, summary}`` của văn bản đích (F4.3) trong đúng thuê ước, None khi không có."""
+        data = await self.as_role("service", tenant_id, actor_id, request_id or str(uuid.uuid4()), SIMILAR_TARGET,
+                                  {"id": str(document_id)})
+        return data.get("office_documents_by_pk")
 
     async def file_location(
         self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, file_id: uuid.UUID

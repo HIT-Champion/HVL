@@ -177,12 +177,15 @@ def test_overdue_incoming_documents_are_reported_once(deadlines, hasura):
 def test_every_user_task_has_a_non_interrupting_sla_timer(name):
     process = ET.parse(PROCESSES / f"{name}.bpmn20.xml").getroot().find(f"{BPMN}process")
     tasks = {t.get("id") for t in process.iter(f"{BPMN}userTask")}
-    timers = {b.get("attachedToRef"): b for b in process.iter(f"{BPMN}boundaryEvent")}
+    # chỉ xét timer gắn vào việc của người; timer ngắt của nhánh gợi ý giao việc (F4.3) kiểm ở test_advisor
+    timers = {b.get("attachedToRef"): b for b in process.iter(f"{BPMN}boundaryEvent")
+              if b.get("attachedToRef") in tasks}
     assert tasks and tasks <= set(timers)
     for boundary in timers.values():
         assert boundary.get("cancelActivity") == "false"
         assert boundary.find(f"{BPMN}timerEventDefinition/{BPMN}timeCycle").text == "R2/${slaDuration}"
-    (worker,) = [s for s in process.iter(f"{BPMN}serviceTask") if s.get(f"{FLOWABLE}type") == "external-worker"]
-    assert worker.get(f"{FLOWABLE}topic") == "moc-sla"
+    # worker nhắc hạn tìm theo topic: quy trình còn việc giao ra ngoài khác (moc-goi-y)
+    (worker,) = [s for s in process.iter(f"{BPMN}serviceTask") if s.get(f"{FLOWABLE}type") == "external-worker"
+                 and s.get(f"{FLOWABLE}topic") == "moc-sla"]
     flows = {(f.get("sourceRef"), f.get("targetRef")) for f in process.iter(f"{BPMN}sequenceFlow")}
     assert {(b.get("id"), worker.get("id")) for b in timers.values()} <= flows

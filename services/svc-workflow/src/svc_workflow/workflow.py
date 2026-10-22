@@ -204,13 +204,15 @@ mutation PhanCong($child: office_assignments_insert_input!, $event: office_docum
   insert_office_document_events_one(object: $event) { id }
 }"""
 
+# văn bản trước, giao việc sau: khóa dòng văn bản trước khi trigger sổ kiểm toán giữ core.audit_head — cùng thứ tự với
+# lúc tác tử gợi ý giao việc (F4.3) khóa văn bản căn cứ rồi mới ghi sổ, nên hai bên không chờ vòng nhau (deadlock)
 PROCESSED = """
 mutation XuLy($ids: [uuid!]!, $note: String!, $now: timestamptz!, $doc: uuid!,
               $event: office_document_events_insert_input!) {
+  update_office_documents_by_pk(pk_columns: {id: $doc}, _set: {status: "done"}) { id }
   update_office_assignments(where: {id: {_in: $ids}}, _set: {status: "done", result_note: $note, completed_at: $now}) {
     affected_rows
   }
-  update_office_documents_by_pk(pk_columns: {id: $doc}, _set: {status: "done"}) { id }
   insert_office_document_events_one(object: $event) { id }
 }"""
 

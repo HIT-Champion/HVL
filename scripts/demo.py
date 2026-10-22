@@ -61,6 +61,16 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi): bảng trạng thái, nguồn top-3, đúng /
         sai, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1
         khi có nguồn bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), hoặc recall@3 dưới ngưỡng. (make do-hoi-dap)
+    python3 scripts/demo.py giao-viec
+        Gợi ý giao việc (F4.3, không cần mô hình): văn thư nạp lịch sử giao việc mẫu seed/giao-viec; văn bản mới vào sổ
+        thì lãnh đạo khoa có việc chỉ đạo ngay, vài giây sau tác tử moc-assigner gợi ý đơn vị chủ trì và hạn kèm căn
+        cứ (các văn bản tương tự đã giao); dùng gợi ý thì view đo tỉ lệ giữ tăng 1; văn bản hạn chế không gợi ý, không
+        làm căn cứ; sổ kiểm toán ghi lần gợi ý (không chữ văn bản); tắt svc-files thì văn bản vẫn tới bước chỉ đạo,
+        gợi ý ghi failed. (make demo-giao-viec)
+    python3 scripts/demo.py do-giao-viec
+        Đo tác tử leave-one-out trên lịch sử seed/giao-viec (python -m svc_workflow.advisor evaluate trong
+        svc-workflow): top-1/2/3, độ phủ, đúng theo độ tin cậy, sai số hạn, thời gian; thoát 1 khi có căn cứ là văn
+        bản hạn chế, hoặc top-1 dưới ngưỡng. (make do-giao-viec)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -76,6 +86,7 @@ import sys
 import time
 import unicodedata
 import uuid
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -1830,9 +1841,571 @@ def do_hoi_dap() -> None:
     print(f"\n✓ không nguồn bị cấm nào; recall@3 {s['recall']}/{s['positives']} ≥ {RECALL_MIN:.0%}")
 
 
+# --- F4.3 · Gợi ý giao việc -----------------------------------------------------------------------------------------
+# Lịch sử giao việc hư cấu (số ký hiệu đuôi -GVM) làm căn cứ cho tác tử moc-assigner, các ca có nhãn, một mồi hạn chế
+GV_PATH = ROOT / "seed" / "giao-viec" / "lich-su.json"
+# Ngưỡng của make do-giao-viec: top-1 leave-one-out trên lịch sử (none tính là sai) — chốt lại sau lần đo đầu trên bản
+# cài, ghi số đo vào services/svc-workflow/README.md. Căn cứ là văn bản hạn chế thì luôn là lỗi
+MIN_TOP1 = 0.6
+GV_DOCUMENT = """query ($s: String!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s}}) {
+  id status restricted } }"""
+SUGGESTION = """query ($id: uuid!) { office_assignment_suggestions_by_pk(document_id: $id) {
+    status reason department_id confidence share due_days due_on evidence candidates semantic duration_ms created_at }
+  office_documents_by_pk(id: $id) { registered_at } }"""
+ACCURACY = """{ office_v_assignment_suggestion_accuracy { status confidence suggested decided kept_unit due_compared
+  kept_due } }"""
+# Căn cứ trỏ tới văn bản hạn chế, trên mọi dòng gợi ý đã lưu (trigger CSDL chặn lúc ghi, gỡ khi bật hạn chế sau)
+SEALED_EVIDENCE = """select count(*) from office.assignment_suggestions s
+  cross join lateral jsonb_array_elements(s.evidence) e
+  join office.documents d on d.tenant_id = s.tenant_id and d.id = (e->>'document_id')::uuid
+ where d.restricted"""
+# Vào sổ → có dòng gợi ý, trên dòng thật (seed, lịch sử, các lần chạy demo, smoke)
+SUGGEST_LATENCY = """select count(*), percentile_disc(0.5) within group (order by x),
+       percentile_disc(0.95) within group (order by x)
+  from (select extract(epoch from s.created_at - d.registered_at)::numeric(10, 1) as x
+          from office.assignment_suggestions s
+          join office.documents d on d.tenant_id = s.tenant_id and d.id = s.document_id
+         where d.registered_at is not null) t"""
+# Khóa diff của dòng sổ assignment.suggested (hợp đồng F4.3 §6): chỉ giá trị vô hướng, không chữ văn bản
+SUGGEST_DIFF_KEYS = {"outcome", "outcome_reason", "department_id", "due_days", "confidence", "evidence", "candidates",
+                     "semantic", "duration_ms"}
+CONFIDENCE = {"high": "cao", "medium": "vừa", "low": "thấp"}
+_TOKEN_AT: dict[str, float] = {}
+
+
+def gv(username: str) -> Session:
+    """who() kèm làm mới token: token Keycloak sống 5 phút, lần nạp lịch sử đầu tiên cộng các bước đợi có thể lâu hơn
+    (mỗi lần làm mới tốn một mã TOTP của văn thư, lãnh đạo)."""
+    session = who(username)
+    now = time.monotonic()
+    if now - _TOKEN_AT.setdefault(username, now) > 240:
+        session.token = user_token(username)
+        _TOKEN_AT[username] = now
+    return session
+
+
+def gv_samples() -> dict[str, Any]:
+    if not GV_PATH.is_file():
+        raise DemoFailed(f"không có {GV_PATH.relative_to(ROOT)} — lịch sử giao việc mẫu đi kèm mã nguồn")
+    return json.loads(GV_PATH.read_text(encoding="utf-8"))
+
+
+def unit_code(department_id: str | None) -> str:
+    """Mã đơn vị của seed (ĐT, KTPM…) theo id phòng; phòng lạ thì 8 ký tự đầu của id."""
+    from seed_documents import DEPT
+
+    if not department_id:
+        return "—"
+    return next((code for code, dept in DEPT.items() if dept == department_id), department_id[:8])
+
+
+def unit_name(department_id: str | None) -> str:
+    code = unit_code(department_id)
+    return UNIT_NAMES.get(code, code)
+
+
+def receive_bare(d: dict[str, Any], symbol: str, *, restricted: bool = False) -> str:
+    """Văn thư tiếp nhận văn bản không kèm tệp (svc-files đưa trích yếu vào chỉ mục thành đoạn meta) rồi vào sổ → id."""
+    from seed_documents import today
+
+    clerk = gv("vanthu")
+    doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+        "type_code": d["type_code"], "symbol": symbol, "issuer_name": d["issuer_name"],
+        "issued_on": (today() - timedelta(days=3)).isoformat(), "summary": d["summary"], "urgency": "normal",
+        "restricted": restricted, "file_ids": []}})["receiveIncoming"]["document_id"]
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": doc_id})
+    return doc_id
+
+
+def direct(doc_id: str, *, due_on: str, department_id: str | None = None, user_id: str | None = None,
+           task: str | None = None) -> None:
+    """Lãnh đạo khoa giao một phòng chủ trì hoặc giao thẳng một người, không phòng phối hợp."""
+    director = gv("truongkhoa")
+    task = task or director.wait_task(doc_id, "vbden.chiDao")
+    if department_id:
+        lead: dict[str, Any] = {"lead_department_id": department_id}
+        instruction = f"Giao {unit_name(department_id)} chủ trì thực hiện, báo cáo đúng hạn."
+    else:
+        lead, instruction = {"lead_user_id": user_id}, "Giao đồng chí chủ trì thực hiện, báo cáo đúng hạn."
+    director.complete(task, "direct", {"instruction": instruction, **lead, "supports": [], "due_on": due_on})
+
+
+def file_away(doc_id: str, task: str | None = None) -> None:
+    """Lãnh đạo khoa lưu văn bản, không giao xử lý."""
+    director = gv("truongkhoa")
+    director.complete(task or director.wait_task(doc_id, "vbden.chiDao"), "file", {"note": "Lưu để biết."})
+
+
+def load_history(data: dict[str, Any]) -> tuple[dict[str, str], int]:
+    """Nạp lịch sử như văn thư và lãnh đạo khoa: mồi hạn chế trước, rồi history, people — tiếp nhận không kèm tệp, vào
+    sổ, giao đơn vị chủ trì (lead) hoặc giao thẳng một người (lead_user), hạn = hôm nay + due_in. Văn bản đã có (cùng
+    số ký hiệu) thì bỏ qua; lần chạy trước dừng giữa chừng thì làm nốt bước còn thiếu → (id theo số ký hiệu, số mới)."""
+    from seed_documents import DEPT, today
+
+    users: dict[str, str] = {}
+    ids: dict[str, str] = {}
+    created = 0
+    for d in [data["bait"], *data["history"], *data["people"]]:
+        found = gv("vanthu").gql(GV_DOCUMENT, {"s": d["symbol"]})["office_documents"]
+        if found:
+            doc_id, status = found[0]["id"], found[0]["status"]
+            if status == "received":
+                gv("vanthu").gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                                 {"id": doc_id})
+        else:
+            doc_id, status = receive_bare(d, d["symbol"], restricted=bool(d.get("restricted"))), "registered"
+            created += 1
+        if status in ("received", "registered"):
+            due_on = (today() + timedelta(days=d["due_in"])).isoformat()
+            if d.get("lead_user"):
+                if d["lead_user"] not in users:
+                    users[d["lead_user"]] = gv("truongkhoa").gql(
+                        "query ($u: String!) { core_users(where: {username: {_eq: $u}}) { id } }",
+                        {"u": d["lead_user"]})["core_users"][0]["id"]
+                direct(doc_id, due_on=due_on, user_id=users[d["lead_user"]])
+            else:
+                direct(doc_id, due_on=due_on, department_id=DEPT[d["lead"]])
+        ids[d["symbol"]] = doc_id
+    return ids, created
+
+
+def wait_history_indexed(data: dict[str, Any], timeout_s: float, *, settle: bool) -> float:
+    """Đợi vòng nền svc-files đưa trích yếu văn bản lịch sử nạp sau cùng vào chỉ mục đoạn (MOC_ASK_SYNC_INTERVAL_S):
+    lãnh đạo khoa hỏi trợ lý đúng trích yếu đó tới khi văn bản có trong nguồn → số giây đã đợi. settle: vừa nạp văn
+    bản mới — đoạn có thể vào chỉ mục lúc văn bản còn "registered", tác tử chỉ lấy căn cứ đã giao (in_progress…) nên
+    đợi thêm hai vòng đồng bộ để trạng thái trong chỉ mục theo kịp."""
+    last = (data["people"] or data["history"])[-1]
+    started = time.monotonic()
+    while True:
+        try:
+            sources = ask(gv("truongkhoa"), last["summary"])[0].get("sources") or []
+        except HTTPError as exc:            # Meilisearch, Hasura vừa khởi động: đợi tiếp; tắt trợ lý thì dừng
+            if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
+                raise
+            sources = []
+        if any(same_symbol(s.get("symbol"), last["symbol"]) for s in sources):
+            if settle:
+                time.sleep(2 * float(ENV.get("MOC_ASK_SYNC_INTERVAL_S") or 5) + 1)
+            return time.monotonic() - started
+        if time.monotonic() - started > timeout_s:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây chỉ mục đoạn chưa có {last['symbol']} — vòng nền svc-files"
+                             " (MOC_ASK_SYNC_INTERVAL_S) có chạy không, trợ lý có bật (MOC_ASK_ENABLED) không?")
+        time.sleep(3)
+
+
+def wait_suggestion(doc_id: str, timeout_s: float) -> tuple[dict | None, dict | None]:
+    """Dòng gợi ý của văn bản (lãnh đạo khoa đọc, hỏi lại mỗi giây) tới khi có hoặc hết giờ → (dòng, văn bản)."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        got = gv("truongkhoa").gql(SUGGESTION, {"id": doc_id})
+        row = got["office_assignment_suggestions_by_pk"]
+        if row or time.monotonic() >= deadline:
+            return row, got["office_documents_by_pk"]
+        time.sleep(1)
+
+
+def wait_suggestions(docs: dict[str, str], timeout_s: float) -> dict[str, dict | None]:
+    """Như wait_suggestion cho nhiều văn bản một lúc → dòng gợi ý theo khóa (None: hết giờ vẫn chưa có)."""
+    rows: dict[str, dict | None] = dict.fromkeys(docs)
+    deadline = time.monotonic() + timeout_s
+    while True:
+        for key, doc_id in docs.items():
+            if rows[key] is None:
+                rows[key] = wait_suggestion(doc_id, 0)[0]
+        if all(rows.values()) or time.monotonic() >= deadline:
+            return rows
+        time.sleep(1)
+
+
+def lag(row: dict[str, Any], doc: dict[str, Any] | None) -> str:
+    """created_at của dòng gợi ý − registered_at của văn bản, như "2.4 giây"."""
+    try:
+        start = datetime.fromisoformat(((doc or {}).get("registered_at") or "").replace("Z", "+00:00"))
+        end = datetime.fromisoformat((row.get("created_at") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return "?"
+    return f"{(end - start).total_seconds():.1f} giây"
+
+
+def evidence_labels(row: dict[str, Any]) -> list[str]:
+    """Căn cứ in như giao diện: số ký hiệu (đơn vị đã giao, điểm, số ngày) — lãnh đạo khoa đọc số ký hiệu."""
+    evidence = row.get("evidence") or []
+    if not evidence:
+        return []
+    symbols = {d["id"]: d["symbol"] for d in gv("truongkhoa").gql(
+        "query ($ids: [uuid!]!) { office_documents(where: {id: {_in: $ids}}) { id symbol } }",
+        {"ids": [e["document_id"] for e in evidence]})["office_documents"]}
+    return [f"{symbols.get(e['document_id'], '?')} ({unit_code(e.get('department_id'))}, {e.get('score', 0):.2f}"
+            + (f", {e['days']} ngày)" if e.get("days") else ")") for e in evidence]
+
+
+def accuracy() -> dict[str, int]:
+    """Tổng các cột đếm của view office.v_assignment_suggestion_accuracy trong đơn vị (lãnh đạo khoa đọc)."""
+    rows = gv("truongkhoa").gql(ACCURACY)["office_v_assignment_suggestion_accuracy"]
+    return {k: sum(r[k] for r in rows) for k in ("suggested", "decided", "kept_unit", "due_compared", "kept_due")}
+
+
+def summary_words(text: str) -> list[str]:
+    """Từ của trích yếu đủ dài để đối chiếu với diff sổ kiểm toán (bỏ số, từ hai chữ)."""
+    return [w for w in re.findall(r"\w+", text) if len(w) >= 3 and not w.isdigit()]
+
+
+def audit_problems(rows: list[list[str]], docs: dict[str, str], texts: dict[str, list[str]]) -> list[str]:
+    """Dòng sổ assignment.suggested (entity_id, actor_id, actor_kind, diff) của các văn bản đã gợi ý: mỗi văn bản đúng
+    một dòng của moc-assigner (agent), khóa diff ⊆ SUGGEST_DIFF_KEYS, diff không chứa chữ nào của trích yếu, số ký
+    hiệu."""
+    problems = []
+    seen = Counter(r[0] for r in rows)
+    problems += [f"{key}: {seen[doc_id]} dòng (cần 1)" for key, doc_id in docs.items() if seen[doc_id] != 1]
+    for entity_id, actor_id, actor_kind, diff in rows:
+        if (actor_id, actor_kind) != ("moc-assigner", "agent"):
+            problems.append(f"{entity_id}: người thực hiện {actor_id}/{actor_kind}")
+        try:
+            keys = set(json.loads(diff))
+        except ValueError:
+            keys = {"?"}
+        if keys - SUGGEST_DIFF_KEYS:
+            problems.append(f"{entity_id}: khóa lạ {sorted(keys - SUGGEST_DIFF_KEYS)}")
+        bare = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "", diff.casefold())
+        leaked = [w for w in texts.get(entity_id, []) if w.casefold() in bare]
+        if leaked:
+            problems.append(f"{entity_id}: diff có chữ của văn bản {leaked}")
+    return problems
+
+
+def giao_viec() -> None:
+    from seed_documents import DEPT, today
+
+    print("Màn F4.3 · Gợi ý giao việc — tác tử moc-assigner chạy song song với bước chỉ đạo, tìm các văn bản tương tự"
+          " đã giao, gợi ý đơn vị chủ trì và hạn kèm căn cứ; lãnh đạo khoa quyết định")
+    data = gv_samples()
+    tag = uuid.uuid4().hex[:6].upper()
+    bait = data["bait"]
+
+    say(1, "Văn thư nạp lịch sử giao việc seed/giao-viec (không kèm tệp), lãnh đạo khoa giao như lich-su.json")
+    ids, created = load_history(data)
+    again = "" if created == len(ids) else ", còn lại đã nạp ở lần chạy trước"
+    ok(f"{len(ids)} văn bản ({created} mới{again}): {len(data['history'])} giao đơn vị, {len(data['people'])} giao"
+       f" thẳng một người, mồi hạn chế {bait['symbol']} — trích yếu gần như trùng cụm học bổng của Tổ Đào tạo nhưng"
+       f" giao {UNIT_NAMES[bait['lead']]}")
+
+    say(2, "Đợi svc-files đưa trích yếu vào chỉ mục đoạn (chỉ mục chung với trợ lý hỏi đáp F4.2)")
+    took = wait_history_indexed(data, 120, settle=created > 0)
+    ok(f"trợ lý tìm ra {(data['people'] or data['history'])[-1]['symbol']} theo trích yếu (đợi {took:.0f} giây)")
+
+    case = next(c for c in data["cases"] if c["key"] == "hoc-bong")
+    say(3, f"Văn thư vào sổ “{case['summary']}” — lãnh đạo khoa có việc chỉ đạo ngay, gợi ý tới sau vài giây")
+    started = time.monotonic()
+    doc_id = receive_bare(case, f"{case['symbol']}-{tag}")
+    try:
+        task = gv("truongkhoa").wait_task(doc_id, "vbden.chiDao", 5)
+    except RuntimeError as exc:
+        raise DemoFailed(f"vào sổ xong 5 giây chưa có việc chỉ đạo — nhánh gợi ý chắn bước chỉ đạo? {exc}") from exc
+    to_task = time.monotonic() - started
+    row, doc = wait_suggestion(doc_id, 30)
+    waited = time.monotonic() - started
+    if not row or row["status"] != "suggested":
+        raise DemoFailed(f"sau {waited:.0f} giây {case['symbol']}-{tag} chưa có gợi ý: {row} — svc-workflow có chạy"
+                         " vòng nền MOC_SUGGEST_POLL_INTERVAL_S, svc-files có trả văn bản tương tự không?")
+    ok(f"việc chỉ đạo có sau {to_task:.1f} giây (nhánh gợi ý chạy song song, không chắn); dòng gợi ý có sau"
+       f" {waited:.1f} giây (vào sổ → dòng gợi ý: {lag(row, doc)})")
+    due = (f"hạn đề xuất {row['due_on']} ({row['due_days']} ngày, như các văn bản tương tự)" if row["due_on"]
+           else "theo hạn ghi trên văn bản")
+    ok(f"đơn vị chủ trì: {unit_name(row['department_id'])} · độ tin cậy {CONFIDENCE.get(row['confidence'])} (tỉ phần"
+       f" phiếu {row['share']:.0%}) · {due}")
+    search = "từ khóa và theo nghĩa" if row["semantic"] else "từ khóa"
+    ok(f"căn cứ: {'; '.join(evidence_labels(row))} — trong {row['candidates']} văn bản tương tự (tìm theo {search},"
+       f" {row['duration_ms']} ms)")
+    if unit_code(row["department_id"]) != case["expect"]["lead"]:
+        print(f"   · khác nhãn {case['expect']['lead']} của lich-su.json — số đo ở make do-giao-viec")
+
+    say(4, "Căn cứ chỉ là văn bản không hạn chế: psql trên mọi dòng office.assignment_suggestions")
+    bait_id = str(uuid.UUID(ids[bait["symbol"]]))
+    sealed = psql(SEALED_EVIDENCE)
+    baited = psql("select count(*) from office.assignment_suggestions"
+                  f" where evidence @> '[{{\"document_id\": \"{bait_id}\"}}]'::jsonb")
+    if (sealed, baited) != ("0", "0"):
+        raise DemoFailed(f"có căn cứ là văn bản hạn chế: {sealed} căn cứ hạn chế, {baited} dòng lấy mồi"
+                         f" {bait['symbol']}")
+    ok(f"{psql('select count(*) from office.assignment_suggestions')} dòng gợi ý, 0 căn cứ là văn bản hạn chế; mồi"
+       f" {bait['symbol']} không là căn cứ của dòng nào — văn bản hạn chế không vào chỉ mục, trigger CSDL chặn thêm")
+
+    say(5, "Lãnh đạo khoa bấm “Dùng gợi ý” (đơn vị + hạn) rồi giao — view đo tỉ lệ giữ gợi ý tăng đúng 1")
+    before = accuracy()
+    direct(doc_id, task=task, department_id=row["department_id"],
+           due_on=row["due_on"] or (today() + timedelta(days=10)).isoformat())
+    after = accuracy()
+    delta = {k: after[k] - before[k] for k in after}
+    want = {"decided": 1, "kept_unit": 1, **({"kept_due": 1} if row["due_on"] else {})}
+    if any(delta[k] != v for k, v in want.items()):
+        raise DemoFailed(f"view office.v_assignment_suggestion_accuracy chưa đếm đúng lần giữ gợi ý: {delta}")
+    ok(f"decided +1, kept_unit +1{', kept_due +1' if row['due_on'] else ''} (so trước/sau: seed, lịch sử cũng có gợi"
+       f" ý) — tổng trong đơn vị: giữ đơn vị {after['kept_unit']}/{after['decided']}, giữ hạn"
+       f" {after['kept_due']}/{after['due_compared']}")
+
+    say(6, "Các ca có nhãn còn lại — văn thư vào sổ thêm văn bản hạn chế R trước các ca (kiểm ở bước 8)")
+    sealed_id = receive_bare(bait, f"{bait['symbol']}-{tag}", restricted=True)
+    others = [c for c in data["cases"] if c["key"] != "hoc-bong"]
+    docs = {c["key"]: receive_bare(c, f"{c['symbol']}-{tag}") for c in others}
+    rows = wait_suggestions(docs, 30)
+    last_row = time.monotonic()
+    print("\n   | ca | văn bản | kỳ vọng | gợi ý | tin cậy | hạn | căn cứ |\n   |---|---|---|---|---|---|---|")
+    for c in others:
+        r = rows[c["key"]] or {"status": "chưa có", "reason": None}
+        want_unit = c["expect"].get("lead") or c["expect"].get("status")
+        got = unit_code(r.get("department_id")) if r["status"] == "suggested" else f"{r['status']}/{r.get('reason')}"
+        hit = got == want_unit or (want_unit == "none" and r["status"] == "none")
+        print(f"   | {c['key']} | {c['symbol']}-{tag} | {want_unit} | {'✓' if hit else '·'} {got} |"
+              f" {CONFIDENCE.get(r.get('confidence'), '—')} | {r.get('due_days') or '—'} |"
+              f" {len(r.get('evidence') or [])} |")
+    missed = [c["key"] for c in others if c["expect"].get("lead") and (rows[c["key"]] or {}).get("department_id")
+              != DEPT[c["expect"]["lead"]]]
+    if missed:
+        print(f"   · lệch nhãn: {', '.join(missed)} — chỉ cảnh báo, số đánh giá ở make do-giao-viec")
+    for c in others:
+        if c["expect"].get("lead"):
+            r = rows[c["key"]] or {}
+            direct(docs[c["key"]], department_id=DEPT[c["expect"]["lead"]],
+                   due_on=r.get("due_on") or (today() + timedelta(days=10)).isoformat())
+    ok("lãnh đạo khoa giao các ca theo nhãn — thành lịch sử cho lần sau, tác tử tốt dần khi có thêm dữ liệu")
+
+    unrelated = next(c for c in others if c["expect"].get("status") == "none")
+    say(7, f"Ca không liên quan “{unrelated['summary']}” → không gợi ý")
+    r = rows[unrelated["key"]]
+    if not r or r["status"] != "none":
+        raise DemoFailed(f"ca không liên quan lẽ ra không có gợi ý: {r}")
+    ok(f"none/{r['reason']} — không đủ văn bản tương tự (ngưỡng MOC_SUGGEST_MIN_SCORE) thì tác tử không đoán bừa,"
+       " giao diện chỉ hiện một dòng mờ")
+    file_away(docs[unrelated["key"]])
+
+    say(8, f"Văn bản hạn chế R {bait['symbol']}-{tag} (trích yếu như cụm học bổng): không gợi ý, không dòng sổ")
+    time.sleep(max(0.0, 3 - (time.monotonic() - last_row)))
+    found = psql(f"select (select count(*) from office.assignment_suggestions where document_id = '{sealed_id}'),"
+                 f" (select count(*) from core.audit_log where action = 'assignment.suggested'"
+                 f" and entity_id = '{sealed_id}')")
+    if found != "0|0":
+        raise DemoFailed(f"văn bản hạn chế có dòng gợi ý | dòng sổ: {found}")
+    ok("psql: 0 dòng gợi ý, 0 dòng sổ assignment.suggested — tác tử bỏ qua văn bản hạn chế, trigger CSDL chặn thêm")
+    file_away(sealed_id)
+
+    say(9, "psql: mỗi gợi ý một dòng sổ của tác tử, không có chữ văn bản")
+    checked = {"hoc-bong": doc_id, **docs}
+    texts = {doc_id: [*summary_words(case["summary"]), f"{case['symbol']}-{tag}"]}
+    texts.update({docs[c["key"]]: [*summary_words(c["summary"]), f"{c['symbol']}-{tag}"] for c in others})
+    audit = [line.split("|", 3) for line in psql(
+        "select entity_id, actor_id, actor_kind, diff::text from core.audit_log where action = 'assignment.suggested'"
+        f" and entity_id in ({', '.join(repr(str(uuid.UUID(d))) for d in checked.values())}) order by id").splitlines()]
+    problems = audit_problems(audit, checked, texts)
+    if problems:
+        raise DemoFailed("dòng sổ assignment.suggested chưa đúng: " + "; ".join(problems))
+    ok(f"{len(audit)} dòng assignment.suggested · người thực hiện moc-assigner (agent) · khóa diff thuộc"
+       f" {{{', '.join(sorted(SUGGEST_DIFF_KEYS))}}}")
+    ok("diff::text không có từ nào của trích yếu, không số ký hiệu — chỉ đơn vị, độ tin cậy, số đếm; căn cứ nằm ở"
+       " bảng gợi ý, chỉ lãnh đạo khoa đọc")
+
+    say(10, "svc-files tạm dừng: văn bản vẫn tới bước chỉ đạo ngay, tác tử ghi failed rồi thôi (không thử lại)")
+    stopped, probe_task = False, None
+    try:
+        stopped = True
+        compose("stop", "svc-files")
+        started = time.monotonic()
+        probe = receive_bare({"type_code": "CV", "issuer_name": "Phòng Công tác sinh viên",
+                              "summary": f"Về việc thử gợi ý giao việc khi svc-files tạm dừng (thử {tag})"},
+                             f"309/CTSV-GVM-{tag}")
+        try:
+            probe_task = gv("truongkhoa").wait_task(probe, "vbden.chiDao", 5)
+        except RuntimeError as exc:
+            raise DemoFailed(f"svc-files tắt, vào sổ xong 5 giây chưa có việc chỉ đạo: {exc}") from exc
+        to_task = time.monotonic() - started
+        r, _ = wait_suggestion(probe, 20)
+        if not r or r["status"] != "failed":
+            raise DemoFailed(f"svc-files tắt mà sau 20 giây dòng gợi ý chưa là failed: {r}")
+        ok(f"svc-files dừng; việc chỉ đạo có sau {to_task:.1f} giây; gợi ý failed/{r['reason']} sau"
+           f" {time.monotonic() - started:.1f} giây — lãnh đạo giao như thường lệ")
+    finally:
+        if stopped:
+            took = restart("svc-files")
+            print(f"   ✓ svc-files chạy lại, sẵn sàng sau {took:.0f} giây")
+    if probe_task:
+        file_away(probe, probe_task)
+
+    print(f"\nXem trên giao diện (truongkhoa): {PUBLIC_URL}/van-ban/{doc_id} — tab Lịch sử có dòng “Tác tử gợi ý giao"
+          " việc”; văn bản đến mới vào sổ có khối “Gợi ý giao việc” ở đầu form chỉ đạo")
+
+
+def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Số đo leave-one-out trên các dòng evaluate (hợp đồng F4.3 §5.2) có đáp án actual.department_id: độ phủ; top-1
+    (none, failed là sai), top-2, top-3 (theo ranking); đúng theo độ tin cậy; sai số hạn (MAE, lệch ≤ 1 ngày); p50/p95
+    duration_ms; gốc so sánh "luôn đoán đơn vị đông nhất"."""
+    labelled = [r for r in rows if (r.get("actual") or {}).get("department_id")]
+    total = len(labelled)
+
+    def right(r: dict[str, Any], k: int) -> bool:
+        actual = r["actual"]["department_id"]
+        top1 = r.get("status") == "suggested" and r.get("department_id") == actual
+        return top1 or (k > 1 and actual in (r.get("ranking") or [])[:k])
+
+    suggested = [r for r in labelled if r.get("status") == "suggested"]
+    by_confidence = {c: {"n": sum(r.get("confidence") == c for r in suggested),
+                         "correct": sum(r.get("confidence") == c and right(r, 1) for r in suggested)}
+                     for c in ("high", "medium", "low")}
+    errors = [abs(r["due_days"] - r["actual"]["days"]) for r in suggested
+              if isinstance(r.get("due_days"), int) and isinstance(r["actual"].get("days"), int)]
+    ms = [r["duration_ms"] for r in rows if isinstance(r.get("duration_ms"), int)]
+    units = Counter(r["actual"]["department_id"] for r in labelled)
+    return {
+        "rows": len(rows), "total": total, "suggested": len(suggested),
+        "coverage": len(suggested) / total if total else 0.0,
+        "top1": sum(right(r, 1) for r in labelled), "top2": sum(right(r, 2) for r in labelled),
+        "top3": sum(right(r, 3) for r in labelled),
+        "top1_rate": sum(right(r, 1) for r in labelled) / total if total else 0.0,
+        "by_confidence": by_confidence,
+        "outcomes": dict(Counter(f"{r.get('status')}/{r.get('reason')}" for r in labelled
+                                 if r.get("status") != "suggested")),
+        "due_compared": len(errors), "due_mae": sum(errors) / len(errors) if errors else None,
+        "due_within1": sum(e <= 1 for e in errors),
+        "p50_ms": percentile(ms, 50), "p95_ms": percentile(ms, 95),
+        "semantic": sum(bool(r.get("semantic")) for r in rows),
+        "units": len(units), "majority": max(units.values()) / total if total else 0.0,
+    }
+
+
+def gv_verdict(m: dict[str, Any], leaks: list[str]) -> list[str]:
+    """Lý do thoát 1 (rỗng: đạt): mọi căn cứ là văn bản hạn chế; top-1 dưới MIN_TOP1; không đo được dòng nào."""
+    problems = [f"căn cứ là văn bản hạn chế — {leak}" for leak in leaks]
+    if not m["total"]:
+        problems.append("evaluate không trả dòng nào có đáp án")
+    elif m["top1_rate"] < MIN_TOP1:
+        problems.append(f"top-1 {m['top1']}/{m['total']} ({m['top1_rate']:.0%}) dưới ngưỡng {MIN_TOP1:.0%}")
+    return problems
+
+
+def gv_tenant() -> str:
+    return gv("truongkhoa").gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+
+
+def run_evaluate(tenant: str, documents: list[str]) -> list[dict[str, Any]]:
+    """Leave-one-out trong container svc-workflow: mỗi văn bản được gợi ý như vừa vào sổ (svc-files đã loại chính nó),
+    so với đơn vị và hạn đã giao thật; không ghi CSDL, sổ, không in chữ văn bản (hợp đồng F4.3 §5.2)."""
+    body = json.dumps({"tenant_id": tenant, "documents": documents}).encode()
+    try:
+        out = compose("exec", "-T", "svc-workflow", "python", "-m", "svc_workflow.advisor", "evaluate", stdin=body)
+    except subprocess.CalledProcessError as exc:
+        tail = (exc.stderr or b"").decode(errors="replace").strip().splitlines()[-5:]
+        raise DemoFailed(f"evaluate trong svc-workflow lỗi (mã {exc.returncode}): {' | '.join(tail)}") from exc
+    text = out.decode().strip()
+    for candidate in (text, (text.splitlines() or [""])[-1]):
+        try:
+            return json.loads(candidate)["rows"]
+        except (ValueError, KeyError, TypeError):
+            continue
+    raise DemoFailed(f"evaluate không trả JSON {{\"rows\": …}}: {text[-300:]}")
+
+
+def restricted_among(ids: list[str]) -> set[str]:
+    """Các id là văn bản hạn chế (psql, không lọc quyền)."""
+    if not ids:
+        return set()
+    try:
+        listed = ", ".join(f"'{uuid.UUID(i)}'" for i in ids)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise DemoFailed(f"căn cứ trong kết quả evaluate không phải id văn bản: {exc}") from exc
+    return set(psql(f"select id from office.documents where restricted and id in ({listed})").split())
+
+
+def evidence_ids(row: dict[str, Any]) -> list[str]:
+    return [e["document_id"] if isinstance(e, dict) else e for e in row.get("evidence") or []]
+
+
+def evidence_leaks(rows: list[dict[str, Any]], symbols: dict[str, str], bait_id: str) -> list[str]:
+    """Căn cứ của các dòng evaluate trỏ tới văn bản hạn chế (cả mồi) → nhãn "văn bản → căn cứ"."""
+    sealed = restricted_among(sorted({e for r in rows for e in evidence_ids(r)})) | {bait_id}
+    return [f"{symbols.get(r.get('document_id'), r.get('document_id'))} → {e}" for r in rows for e in evidence_ids(r)
+            if e in sealed]
+
+
+def stored_leaks() -> int:
+    return int(psql(SEALED_EVIDENCE) or 0)
+
+
+def valid_units() -> int:
+    """Số đơn vị có lãnh đạo phòng đang bật — đơn vị duy nhất tác tử được gợi ý (svc-workflow từ chối giao nơi khác)."""
+    rows = gv("truongkhoa").gql("""{ core_users(where: {role: {_eq: "manager"}, enabled: {_eq: true},
+        department_id: {_is_null: false}}) { department_id } }""")["core_users"]
+    return len({r["department_id"] for r in rows})
+
+
+def suggestion_latency() -> tuple[int, float | None, float | None]:
+    """(số dòng, p50, p95) giây từ lúc vào sổ tới lúc có dòng gợi ý, trên mọi dòng thật trong CSDL."""
+    n, p50, p95 = (psql(SUGGEST_LATENCY).split("|") + ["", "", ""])[:3]
+    return int(n or 0), float(p50) if p50 else None, float(p95) if p95 else None
+
+
+def gv_table(rows: list[dict[str, Any]], symbols: dict[str, str]) -> str:
+    """Bảng markdown từng văn bản: đơn vị đã giao, gợi ý, tin cậy, xếp hạng, hạn gợi ý / thật, số căn cứ, thời gian."""
+    out = ["| văn bản | đã giao | gợi ý | tin cậy | xếp hạng | hạn gợi ý / thật | căn cứ | ms |",
+           "|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        actual = r.get("actual") or {}
+        if r.get("status") == "suggested":
+            got = ("✓ " if r.get("department_id") == actual.get("department_id") else "✗ ") + unit_code(
+                r.get("department_id"))
+        else:
+            got = f"✗ {r.get('status')}/{r.get('reason')}"
+        due = f"{r.get('due_days') or '—'} / {actual.get('days') or '—'}"
+        name = symbols.get(r.get("document_id"), r.get("document_id"))
+        ranking = ", ".join(unit_code(u) for u in r.get("ranking") or []) or "—"
+        out.append(f"| {name} | {unit_code(actual.get('department_id'))} | {got} |"
+                   f" {CONFIDENCE.get(r.get('confidence'), '—')} | {ranking} | {due} | {len(evidence_ids(r))} |"
+                   f" {r.get('duration_ms', '—')} |")
+    return "\n".join(out)
+
+
+def do_giao_viec() -> None:
+    print("Đo F4.3 · Tác tử gợi ý giao việc, leave-one-out trên lịch sử seed/giao-viec: mỗi văn bản được gợi ý như vừa"
+          " vào sổ, các văn bản còn lại làm căn cứ, so với đơn vị chủ trì và hạn đã giao thật")
+    data = gv_samples()
+    ids, created = load_history(data)
+    took = wait_history_indexed(data, 120, settle=created > 0)
+    print(f"   lịch sử: {len(ids)} văn bản ({created} mới), chỉ mục sẵn sàng sau {took:.0f} giây")
+    measured = {ids[d["symbol"]]: d["symbol"] for d in [*data["history"], *data["people"]]}
+    rows = run_evaluate(gv_tenant(), list(measured))
+    units = valid_units()
+    m = metrics(rows)
+    print("\n" + gv_table(rows, measured))
+    print(f"\ntop-1: {m['top1']}/{m['total']} ({m['top1_rate']:.0%}; none, failed tính là sai) · độ phủ"
+          f" {m['suggested']}/{m['total']} ({m['coverage']:.0%}) · gốc so sánh “luôn đoán đơn vị đông nhất”:"
+          f" {m['majority']:.0%}")
+    print(f"top-2: {m['top2']}/{m['total']}, top-3: {m['top3']}/{m['total']} — vô nghĩa khi số đơn vị hợp lệ ≤ k: hiện"
+          f" có {units} đơn vị có lãnh đạo phòng, đáp án thuộc {m['units']} đơn vị")
+    print("đúng theo độ tin cậy: " + ", ".join(f"{CONFIDENCE[c]} {v['correct']}/{v['n']}"
+                                               for c, v in m["by_confidence"].items())
+          + (" · không gợi ý: " + ", ".join(f"{k} {v}" for k, v in sorted(m["outcomes"].items()))
+             if m["outcomes"] else ""))
+    if m["due_compared"]:
+        print(f"hạn: so được {m['due_compared']} văn bản, sai số tuyệt đối trung bình {m['due_mae']:.1f} ngày, lệch"
+              f" ≤ 1 ngày {m['due_within1']}/{m['due_compared']}")
+    print(f"thời gian một lần gợi ý (svc-files + bỏ phiếu): p50 {m['p50_ms']} ms, p95 {m['p95_ms']} ms · tìm theo"
+          f" nghĩa {m['semantic']}/{m['rows']}")
+    n, p50, p95 = suggestion_latency()
+    if n:
+        print(f"dòng thật (vào sổ → có dòng gợi ý): p50 {p50} s, p95 {p95} s trên {n} văn bản")
+    leaks = evidence_leaks(rows, measured, str(uuid.UUID(ids[data["bait"]["symbol"]])))
+    stored = stored_leaks()
+    if stored:
+        leaks.append(f"{stored} căn cứ hạn chế trong office.assignment_suggestions")
+    print(f"an toàn: {len(leaks)} căn cứ là văn bản hạn chế (kết quả đo + bảng gợi ý; mồi {data['bait']['symbol']}"
+          " tính là hạn chế)")
+    problems = gv_verdict(m, leaks)
+    if problems:
+        raise DemoFailed("; ".join(problems))
+    print(f"\n✓ không căn cứ nào là văn bản hạn chế; top-1 {m['top1']}/{m['total']} ≥ {MIN_TOP1:.0%}")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
-         "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap}
+         "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
+         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec}
 
 
 def main(argv: list[str] | None = None) -> int:

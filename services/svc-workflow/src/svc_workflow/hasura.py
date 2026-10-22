@@ -19,6 +19,7 @@
 Mỗi yêu cầu mang thuê ước và người thực hiện của Action đang xử lý — lấy từ biến phiên Hasura gửi sang,
 không từ dữ liệu client. Trigger sổ kiểm toán đọc các giá trị này nên mỗi thay đổi ghi đúng người làm.
 Nhiều mutation trong một yêu cầu chạy trong một giao dịch: hoặc ghi hết, hoặc không ghi gì.
+Tác tử gợi ý giao việc (F4.3, advisor.py) lưu gợi ý và ghi sổ bằng vai trò ``agent`` (``as_agent``).
 """
 
 from __future__ import annotations
@@ -133,6 +134,21 @@ class HasuraClient:
     async def as_system(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         """Việc nội bộ chỉ đọc, xuyên thuê ước (đối soát): khóa quản trị, không kèm vai trò."""
         return await self._call(query, variables or {}, {"X-Hasura-Admin-Secret": self._secret})
+
+    async def as_agent(self, tenant_id: uuid.UUID, agent_id: str, query: str, variables: dict[str, Any] | None = None,
+                       *, request_id: str = "") -> dict[str, Any]:
+        """Tác tử (F4.3, gợi ý giao việc): vai trò ``agent``, danh tính tác tử ở ``X-Hasura-User-Id``. Preset của vai
+        trò ép thuê ước, ``agent_id`` của gợi ý, ``actor_id`` và ``actor_kind = agent`` của dòng sổ — dữ liệu gửi lên
+        không giả được; vai trò này không đọc, không sửa văn bản (db/metadata)."""
+        headers = {
+            "X-Hasura-Admin-Secret": self._secret,
+            "X-Hasura-Role": "agent",
+            "X-Hasura-Tenant-Id": str(tenant_id),
+            "X-Hasura-User-Id": agent_id,
+        }
+        if request_id:
+            headers["X-Hasura-Request-Id"] = request_id
+        return await self._call(query, variables or {}, headers)
 
 
 # --- truy vấn dùng chung -------------------------------------------------------------------------------

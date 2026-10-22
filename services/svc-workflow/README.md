@@ -62,6 +62,54 @@ chừng). Bên nhận đã tiếp nhận tay văn bản này thì dòng thành `
 từ chối dữ liệu thì `failed`, không thử lại (chưa có thao tác gửi lại). Mỗi dòng một lượt (`dispatch:<id>`), mỗi
 người nhận một thông báo (khóa `doc:<văn bản đến>:document.incoming`); sự kiện liên thông không mang `task_id`.
 
+**Tác tử gợi ý giao việc** (F4.3, `advisor.py`, `suggest.py`): vào sổ xong, quy trình `van-ban-den` tách hai nhánh
+song song (cổng `tachGoiY`): bước chỉ đạo như cũ, và việc giao ra ngoài `goiYGiaoViec` (topic `moc-goi-y`). Nhánh gợi ý
+không nối lại, không có terminate: lãnh đạo có việc "Cho ý kiến chỉ đạo" ngay lúc vào sổ, không chờ tác tử; quá 10 phút
+không ai nhận việc (dịch vụ dừng, `MOC_SUGGEST_POLL_INTERVAL_S=0`) thì timer ngắt `boGoiY` (`PT10M`, hằng) dọn nhánh.
+Mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây dịch vụ nhận tối đa 5 việc (khóa `PT1M`, chạy cùng lúc), với mỗi việc:
+
+1. lãnh đạo đã chỉ đạo (không còn việc `vbden.chiDao` mở), văn bản không phải văn bản đến, văn bản hạn chế, hoặc đã có
+   gợi ý → bỏ qua, không ghi gì;
+2. hỏi svc-files `POST /internal/similar-documents` (token tài khoản dịch vụ, hạn `MOC_SUGGEST_TIMEOUT_S`): tối đa 15
+   văn bản đến đã giao (`in_progress`/`done`/`archived`) tìm theo trích yếu — svc-files chỉ trả id và điểm, đã loại
+   văn bản hạn chế. Hết giờ → dòng `failed/timeout`; không gọi được hay lỗi 5xx → `failed/unavailable`; trợ lý tắt
+   (`503 assistant_disabled`), `404`, `409` → bỏ qua. **Không thử lại**: dòng `failed` là kết quả cuối, lãnh đạo giao
+   như thường lệ;
+3. đọc lần giao chủ trì đầu tiên của các văn bản đủ điểm (`MOC_SUGGEST_MIN_SCORE`; lọc lại văn bản hạn chế), giao thẳng
+   một người thì tính phòng của người đó; chỉ giữ phòng có thật và có lãnh đạo phòng đang bật — đúng điều kiện chỉ đạo
+   không báo `no_manager`;
+4. bỏ phiếu (kNN có trọng số, không cần mô hình): 5 căn cứ điểm cao nhất, mỗi căn cứ một phiếu nặng bằng điểm cho đơn
+   vị đã chủ trì nó; hòa thì điểm đơn lẻ cao hơn, rồi id nhỏ hơn. Tin cậy **cao** khi ≥ 3 căn cứ ủng hộ và ≥ 70 % phiếu,
+   **vừa** khi ≥ 2 căn cứ và ≥ 50 %, **thấp** khi ≥ 40 %; dưới nữa thì không gợi ý (`none/low_confidence`). Không có
+   văn bản tương tự, chưa văn bản nào được giao, hoặc đơn vị không có lãnh đạo phòng → `none` với lý do
+   `no_similar`/`no_history`/`no_valid_unit`;
+5. hạn: trung vị (thấp) số ngày từ lúc vào sổ (giờ VN) tới hạn của các căn cứ ủng hộ, chỉ tính 1..365 ngày; hạn đề xuất
+   = ngày vào sổ + số ngày, rơi vào thứ Bảy/Chủ nhật thì sang thứ Hai, sớm nhất là ngày mai. Văn bản đã ghi hạn giải
+   quyết thì không gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
+6. lưu dòng `office.assignment_suggestions` (căn cứ chỉ có id, điểm, đơn vị, số ngày) và một dòng sổ
+   `assignment.suggested` trong **cùng một mutation**, bằng vai trò `agent` danh tính `MOC_ASSIGNER_ID` (preset ép thuê
+   ước, `agent_id`, `actor_id`, `actor_kind = agent`), mã yêu cầu `goi-y:<id việc>`. `diff` có đúng 9 khóa vô hướng:
+   `outcome`, `outcome_reason`, `department_id`, `due_days`, `confidence`, `evidence` (số căn cứ), `candidates`,
+   `semantic`, `duration_ms` — không trích yếu, không id căn cứ. CSDL báo `assignment_suggestions_pkey` (lần chạy khác
+   đã lưu) hay `assignment_suggestions_sealed` (văn bản hoặc căn cứ vừa thành hạn chế) → bỏ qua.
+
+Lỗi lạ, CSDL hay Flowable không trả lời → báo lỗi việc, Flowable giao lại sau 30 giây; hết lượt thử thì việc vào hàng
+việc chết và timer dọn nhánh. Timer bắn lúc dịch vụ đang giữ việc thì báo hoàn thành nhận 404 — chỉ ghi nhật ký. Nhật ký
+`office.assign.suggested` mỗi việc: `tenant_id`, `document_id`, `outcome` (`suggested`/`none`/`failed`/`skipped`),
+`reason`, `confidence`, `candidates`, `semantic`, `duration_ms` — không có chữ của văn bản. Tác tử chỉ gợi ý; lãnh đạo
+dùng hay sửa ở form chỉ đạo, view `office.v_assignment_suggestion_accuracy` đo tỉ lệ giữ gợi ý.
+
+Đo trên lịch sử (`make do-giao-viec`): `python -m svc_workflow.advisor evaluate` đọc stdin
+`{"tenant_id": "…", "documents": ["id", …]}`, với mỗi văn bản bỏ phiếu lại như thể nó vừa vào sổ (svc-files đã loại
+chính nó — leave-one-out) rồi in stdout `{"rows": [{document_id, actual: {department_id, days}, status, reason,
+department_id, ranking, confidence, due_days, evidence, semantic, duration_ms}]}`. Không ghi CSDL, không ghi sổ, không in
+chữ văn bản; svc-files từ chối thì dòng `failed` với lý do (`restricted`, `not_found`, `timeout`, `unavailable`…). Chạy
+trong container: `docker compose exec -T svc-workflow python -m svc_workflow.advisor evaluate < ids.json`.
+
+Giới hạn: chưa xét ngày lễ (chưa có lịch nghỉ, chỉ tránh thứ Bảy/Chủ nhật); chỉ gợi ý đơn vị chủ trì và hạn, **không**
+gợi ý người xử lý (việc của bước phân công); ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác top-1 dễ cao ảo — đọc kèm
+số căn cứ và số đơn vị. Ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt theo lần đo đầu trên stack thật.
+
 **Văn bản hạn chế** (F3.7): sau mỗi bước, người phải làm việc đang mở được thêm vào danh sách xem
 (`office.document_acl`, đã có tên thì giữ nguyên); người không đọc được văn bản thì `completeTask` từ chối (`403`
 `restricted`), `registerIncoming` trả `404` như không có văn bản. Phát hành không được công khai trích yếu (`400`,
@@ -71,7 +119,7 @@ leo thang, báo quá hạn chỉ tới người có tên trong danh sách xem v�
 Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp không đổi); đồng bộ danh bạ Keycloak →
 `core.users` mỗi `MOC_DIRECTORY_SYNC_INTERVAL_S` giây; mỗi `MOC_RECONCILE_INTERVAL_S` giây đối soát văn bản đã
 vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn giải quyết; nhận việc nhắc hạn của Flowable; mỗi
-`MOC_DISPATCH_INTERVAL_S` giây chuyển tiếp liên thông.
+`MOC_DISPATCH_INTERVAL_S` giây chuyển tiếp liên thông; mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây nhận việc gợi ý giao việc.
 
 ## Cấu hình
 
@@ -103,13 +151,18 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_OT_THRESHOLD` | `35` | Ngưỡng nhiệt độ (°C) của subscription |
 | `MOC_OT_NOTIFY_URL` | `http://svc-workflow:8000` | Địa chỉ broker dùng để gọi lại dịch vụ |
 | `MOC_OT_SUBSCRIPTION_INTERVAL_S` | `15` | Chu kỳ kiểm subscription; `0` tắt vòng nền |
+| `MOC_SUGGEST_ENABLED` | `true` | Tác tử gợi ý giao việc (F4.3). `false`: vẫn nhận việc `moc-goi-y` nhưng hoàn thành ngay, không gọi svc-files, không ghi gì |
+| `MOC_SUGGEST_POLL_INTERVAL_S` | `2` | Chu kỳ nhận việc gợi ý; `0` không chạy vòng nền — nhánh gợi ý tự hết sau `PT10M` |
+| `MOC_SUGGEST_TIMEOUT_S` | `10` | Hạn gọi svc-files (0–40 giây); cả một việc ≤ hạn + 10 giây, dưới khóa việc `PT1M` |
+| `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
+| `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
 
 ## Phát triển
 
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 303 test đơn vị với Flowable, Hasura, svc-files, Centrifugo giả lập
+.venv/bin/python -m pytest          # 396 test đơn vị với Flowable, Hasura, svc-files, Centrifugo giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

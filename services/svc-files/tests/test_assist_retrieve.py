@@ -233,10 +233,11 @@ def corpus(hasura, index, **readers) -> tuple[str, str, str]:
 def test_relaxed_pass_finds_the_answer_that_lacks_the_rarest_question_word(make_token, hasura, index):
     frame, answer, _ = corpus(hasura, index)
     got = run(retriever(index, hasura).search(scope_of(make_token), q=QUESTION, vector=None))
-    # lượt chính chỉ ra văn bản có chữ "điều kiện"; lượt nới thêm văn bản trả lời, không thêm văn bản chỉ có "học tập"
+    # lượt chính chỉ ra văn bản có chữ "điều kiện"; lượt nới thêm văn bản trả lời, không thêm văn bản chỉ có "học tập".
+    # Xếp chung theo tỷ lệ trọng số: văn bản trả lời có gần đủ câu hỏi đứng trước văn bản chỉ có "điều kiện … học"
     assert [s["matchingStrategy"] for s in index.searches] == ["frequency"]
-    assert [p.document_id for p in got.passages] == [frame, answer] and got.relaxed == 1
-    assert 0.5 <= got.passages[1].score < 1
+    assert [p.document_id for p in got.passages] == [answer, frame] and got.relaxed == 1
+    assert 0.5 <= got.passages[0].score < 1 and got.passages[1].score < 0.5
     (bodies,) = index.multi_searches
     scope_filter = index.searches[0]["filter"]
     assert bodies[0] == {"filter": scope_filter, "q": "", "limit": 0}
@@ -266,11 +267,73 @@ def test_question_words_missing_from_the_askers_scope_keep_their_weight(make_tok
     assert [p.document_id for p in got.passages] == [review] and got.relaxed == 0 and len(index.multi_searches) == 1
 
 
+def test_relaxed_pass_runs_even_when_the_main_pass_is_enough(make_token, hasura, index):
+    # lượt chính đã đủ một đoạn (văn bản có "điều kiện") nhưng văn bản trả lời có nhiều trọng số câu hỏi hơn: từ hiếm
+    # của câu hỏi không quyết văn bản nào được trả
+    frame, answer, _ = corpus(hasura, index)
+    got = run(retriever(index, hasura).search(scope_of(make_token), q=QUESTION, vector=None, limit=1))
+    assert [p.document_id for p in got.passages] == [answer] and got.relaxed == 1 and len(index.multi_searches) == 1
+
+
+def test_main_passages_that_cover_the_question_keep_meilisearch_order(make_token, hasura, index):
+    # mọi đoạn có đủ từ của câu hỏi: tỷ lệ bằng nhau (1), giữ thứ tự xếp hạng của Meilisearch
+    index.frequency = True
+    first = add(hasura, "Công văn một", ["Hướng dẫn xét học bổng khuyến khích học tập cho sinh viên năm thứ nhất."])
+    second = add(hasura, "Công văn hai", ["Thông báo xét học bổng khuyến khích học tập học kỳ hai cho các lớp."])
+    sync(hasura, index)
+    index.scores.update({c: 0.9 if d["document_id"] == second else 0.8 for c, d in index.docs.items()})
+    got = run(retriever(index, hasura).search(scope_of(make_token), q="xét học bổng", vector=None))
+    assert [p.document_id for p in got.passages] == [second, first] and got.relaxed == 0
+    assert [p.score for p in got.passages] == [1.0, 1.0]
+
+
+def test_a_passage_with_every_question_word_is_not_pushed_out_by_cut_word_lists(make_token, hasura, index):
+    # mỗi từ chỉ lấy `candidates` đoạn đầu: từ phổ biến có ở 5 đoạn nên kết quả của nó dừng ở 3 kế hoạch tuyển sinh
+    # đại học, không có kế hoạch tuyển sinh thạc sĩ (có đủ câu hỏi, đứng đầu lượt chính) — vẫn tính được các từ đó
+    # cho nó vì có nguyên văn trong đoạn, nên nó không bị xếp sau các đoạn chỉ có từ phổ biến
+    index.frequency = True
+    fillers = [add(hasura, f"Công văn {n}", ["Kế hoạch tuyển sinh đại học chính quy của trường năm 2027."])
+               for n in range(4)]
+    master = add(hasura, "Công văn năm",
+                 ["Kế hoạch tuyển sinh thạc sĩ khóa mới của Khoa Công nghệ thông tin năm 2027."])
+    sync(hasura, index)
+    # cùng điểm thì Meilisearch xếp theo thứ tự trong chỉ mục: đoạn thạc sĩ nằm cuối, sau cả bốn kế hoạch kia
+    index.docs = dict(sorted(index.docs.items(), key=lambda kv: kv[1]["document_id"] == master))
+    first = list(dict.fromkeys(d["document_id"] for d in index.docs.values()))[:3]
+    assert set(first) <= set(fillers)
+    got = run(retriever(index, hasura, candidates=3).search(scope_of(make_token), q="kế hoạch tuyển sinh thạc",
+                                                             vector=None))
+    assert [p.document_id for p in got.passages] == [master, *first] and got.relaxed == 3
+    assert got.passages[0].score == 1.0 and all(0.5 <= p.score < 1 for p in got.passages[1:])
+
+
+def test_main_passages_past_the_limit_are_ranked_too(make_token, hasura, index):
+    # lượt chính dừng lấy ở `limit` nhưng mọi đoạn nó đã đọc đều được xếp chung: đoạn có từ hiếm nhất đứng sau bốn đoạn
+    # có hai từ phổ biến trong lượt chính, lên đầu khi xếp theo trọng số — và không bị đếm là đoạn nhờ tìm nới
+    for n in range(4):
+        add(hasura, f"Công văn {n}", ["Lịch thi học kỳ một của các lớp sinh viên năm thứ hai trong khoa."])
+    exchange = add(hasura, "Công văn bốn", ["Chương trình trao đổi Erasmus cho sinh viên năm thứ ba trong khoa."])
+    sync(hasura, index)
+    got = run(retriever(index, hasura).search(scope_of(make_token), q="lịch thi Erasmus", vector=None, limit=1))
+    assert [p.document_id for p in got.passages] == [exchange] and got.relaxed == 0
+    assert 0.5 <= got.passages[0].score < 1
+
+
+def test_a_failed_relaxed_pass_keeps_the_main_passages(make_token, hasura, index):
+    frame, _, _ = corpus(hasura, index)
+
+    async def down(bodies):
+        raise SearchError("multi-search quá thời gian")
+
+    index.multi_search = down
+    got = run(retriever(index, hasura).search(scope_of(make_token), q=QUESTION, vector=None))
+    assert [p.document_id for p in got.passages] == [frame] and got.relaxed == 0
+    hits = run(retriever(index, hasura).similar_documents(service_scope(TENANT_A), q=QUESTION, vector=None))
+    assert [h.document_id for h in hits] == [frame]
+
+
 def test_no_relaxed_pass_when_not_needed(make_token, hasura, index):
     frame, answer, _ = corpus(hasura, index)
-    # đủ đoạn từ lượt chính
-    got = run(retriever(index, hasura).search(scope_of(make_token), q=QUESTION, vector=None, limit=1))
-    assert [p.document_id for p in got.passages] == [frame] and index.multi_searches == []
     # một từ: lượt chính đã tìm đúng từ đó
     run(retriever(index, hasura).search(scope_of(make_token), q="kiện", vector=None))
     assert index.multi_searches == []
@@ -422,8 +485,9 @@ def test_similar_documents_groups_chunks_by_document(hasura, index):
     assert len(long_chunks) > 2
     index.scores.update({c: 0.5 for c in long_chunks} | {long_chunks[-1]: 0.95})
     index.scores.update({c: 0.9 for c, d in index.docs.items() if d["document_id"] != long})
+    # câu tìm một từ: không nới (điểm nới là tỷ lệ từ chung, sẽ phủ điểm đặt sẵn của từng đoạn)
     hits = run(retriever(index, hasura).similar_documents(
-        service_scope(TENANT_A), q="hoc bong", vector=None, limit=10,
+        service_scope(TENANT_A), q="hocbong", vector=None, limit=10,
         where=(f'document_id != "{itself}"', 'status IN ["received", "in_progress"]')))
     assert all(isinstance(h, DocHit) for h in hits)
     # điểm của văn bản = điểm cao nhất trong các đoạn (đoạn cuối của văn bản dài); tự nó, văn bản mật: bỏ
@@ -431,5 +495,5 @@ def test_similar_documents_groups_chunks_by_document(hasura, index):
     assert hits[1].doc["summary"] == "Thông báo học bổng"
     assert f'document_id != "{itself}"' in index.searches[-1]["filter"]
     assert json.dumps(index.searches[-1]["filter"]).count("tenant_id") == 1
-    assert run(retriever(index, hasura).similar_documents(service_scope(TENANT_A), q="hoc bong", vector=None,
+    assert run(retriever(index, hasura).similar_documents(service_scope(TENANT_A), q="hocbong", vector=None,
                                                           limit=1))[0].document_id == long

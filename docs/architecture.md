@@ -181,6 +181,43 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   đoạn nào qua hậu kiểm thì không gọi mô hình.
 - **Hệ quả:** không có mô hình (CI, máy yếu) vẫn chạy đủ: tìm theo từ khóa + câu trích nguyên văn. Câu trả lời của mô
   hình chỉ hiện khi qua kiểm trích dẫn và con số, không thì trả câu trích. Đồng bộ chỉ mục đoạn là việc của
-  `svc-files` (vòng nền, như F2.7). F4.3 (gợi ý giao việc) dự kiến dùng lại phần truy xuất qua route nội bộ, vai trò
-  `service`. Chi tiết:
+  `svc-files` (vòng nền, như F2.7). F4.3 (gợi ý giao việc) dùng lại phần truy xuất này qua route nội bộ
+  `POST /internal/similar-documents`, vai trò `service` (QĐ-005). Chi tiết:
   `docs/mo-hinh-du-lieu.md` §3, README của `svc-files`.
+
+### QĐ-005: Tác tử gợi ý giao việc: nhánh BPMN song song, kNN trên Retriever F4.2, không mô hình
+
+- **Bối cảnh:** F4.3 — văn bản đến vừa vào sổ, lãnh đạo đơn vị mở việc "Cho ý kiến chỉ đạo" đã thấy gợi ý đơn vị chủ
+  trì, hạn và căn cứ; người quyết định vẫn là lãnh đạo. Kế hoạch ban đầu: một bước máy chạy ngay trước chỉ đạo. Ràng
+  buộc: dịch vụ nào chết thì văn bản vẫn phải tới lãnh đạo ngay; CI không có mô hình nào; văn bản hạn chế (F3.7) không
+  bao giờ có gợi ý, không bao giờ làm căn cứ; gợi ý phải giải thích được.
+- **Phương án vị trí trong quy trình:** bước tuần tự kèm timer N giây trước `chiDao` — lúc báo lãnh đạo chưa có việc
+  người nào, văn bản nào cũng chậm thêm độ trễ bắt timer của Flowable, timer nhắc hạn tính muộn hơn. Tuần tự, worker tự
+  giới hạn giờ — `svc-workflow` chết là văn bản kẹt hẳn. Chạy nền trong `registerIncoming` — không nằm trong BPMN, mất
+  việc khi dịch vụ khởi động lại.
+- **Phương án ai làm gì:** `svc-files` làm worker — thêm bí mật và đường mạng tới Flowable, chép quy tắc "phòng chủ trì
+  phải có lãnh đạo phòng" của `svc-workflow`. `svc-workflow` gọi thẳng Meilisearch — chép lọc quyền và hậu kiểm của
+  F4.2. Hasura Event Trigger — không nằm trong BPMN, thêm đường gọi vào.
+- **Phương án thuật toán:** mô hình sinh (Qwen3) chọn đơn vị — 15–45 giây CPU mỗi văn bản, CI không có mô hình, không
+  giải thích được. Bảng luật từ khóa → đơn vị — bảo trì bằng tay. scikit-learn — thêm gói, ít dữ liệu, huấn luyện lại
+  mỗi khi thêm đơn vị.
+- **Quyết định:**
+  1. **Nhánh BPMN song song từ lúc vào sổ:** `vaoSo` → cổng song song `tachGoiY` tách hai nhánh — `chiDao` giữ nguyên
+     (cả timer nhắc hạn), và việc giao ra ngoài `goiYGiaoViec` (external worker, topic `moc-goi-y`) có timer ngắt
+     `PT10M` dọn nhánh khi không ai nhận việc. Hai nhánh không nối lại, không có terminate end event: nhánh gợi ý lỗi
+     hay quá giờ không chặn chỉ đạo giây nào.
+  2. **Ai gọi ai:** worker `svc_workflow/advisor.py` gọi `POST /internal/similar-documents` của `svc-files` bằng token
+     dịch vụ sẵn có. `svc-files` chỉ truy xuất — dùng lại `Retriever` của F4.2 với phạm vi vai trò `service`, hậu kiểm,
+     loại văn bản hạn chế, chỉ trả id và điểm. `svc-workflow` đọc lịch sử giao việc, bỏ phiếu, chỉ giữ đơn vị có lãnh
+     đạo phòng đang hoạt động (đúng điều kiện chỉ đạo đòi), rồi lưu gợi ý và dòng sổ trong một giao dịch bằng vai trò
+     Hasura `agent`, danh tính `moc-assigner`.
+  3. **kNN có trọng số, không cần mô hình:** lấy tối đa 15 văn bản đến tương tự đã giao (câu tìm chỉ từ trích yếu), giữ
+     văn bản có điểm từ ngưỡng trở lên, 5 văn bản đầu làm căn cứ; mỗi căn cứ bỏ phiếu cho đơn vị chủ trì gốc của nó với
+     trọng số là điểm; độ tin cậy theo số căn cứ ủng hộ và tỉ phần phiếu; hạn đề xuất là trung vị số ngày xử lý của các
+     căn cứ ủng hộ (văn bản đã ghi hạn thì không gợi ý hạn).
+- **Hệ quả:** tắt `svc-files` thì văn bản vẫn tới lãnh đạo ngay, chỉ có dòng `failed`; CI chạy đủ bằng tìm theo từ khóa
+  và bỏ phiếu. Gợi ý giải thích được ("vì 3 văn bản tương tự đã giao Tổ Đào tạo") và tốt dần khi có thêm văn bản đã
+  giao; ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác đo được dễ cao ảo — số đo luôn báo kèm số văn bản, số đơn vị.
+  Chưa xét ngày lễ khi tính hạn; chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
+  thêm một dòng tác tử ở Sổ kiểm toán và tab Lịch sử — dòng sổ không mang trích yếu, không mang căn cứ. Chi tiết:
+  `docs/mo-hinh-du-lieu.md` §1, §3, §4.2, README của `svc-workflow`.

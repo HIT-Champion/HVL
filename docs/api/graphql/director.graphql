@@ -43,6 +43,19 @@ type CompleteTaskOutput {
   task_id: String!
 }
 
+"Boolean expression to compare columns of type \"Float\". All fields are combined with logical 'AND'."
+input Float_comparison_exp {
+  _eq: Float
+  _gt: Float
+  _gte: Float
+  _in: [Float!]
+  _is_null: Boolean
+  _lt: Float
+  _lte: Float
+  _neq: Float
+  _nin: [Float!]
+}
+
 "Boolean expression to compare columns of type \"Int\". All fields are combined with logical 'AND'."
 input Int_comparison_exp {
   _eq: Int
@@ -1166,6 +1179,144 @@ type mutation_root {
     "updates to execute, in order"
     updates: [core_notifications_updates!]!
   ): [core_notifications_mutation_response]
+}
+
+"columns and relationships of \"office.assignment_suggestions\""
+type office_assignment_suggestions {
+  agent_id: String!
+  candidates: Int!
+  confidence: String
+  created_at: timestamptz!
+  "An object relationship"
+  department: office_departments
+  department_id: uuid
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  due_days: Int
+  due_on: date
+  duration_ms: Int!
+  evidence(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  process_id: String
+  reason: String
+  semantic: Boolean!
+  share: Float
+  status: String!
+  tenant_id: uuid!
+}
+
+"Boolean expression to filter rows from the table \"office.assignment_suggestions\". All fields are combined with a logical 'AND'."
+input office_assignment_suggestions_bool_exp {
+  _and: [office_assignment_suggestions_bool_exp!]
+  _not: office_assignment_suggestions_bool_exp
+  _or: [office_assignment_suggestions_bool_exp!]
+  agent_id: String_comparison_exp
+  candidates: Int_comparison_exp
+  confidence: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  due_days: Int_comparison_exp
+  due_on: date_comparison_exp
+  duration_ms: Int_comparison_exp
+  evidence: jsonb_comparison_exp
+  process_id: String_comparison_exp
+  reason: String_comparison_exp
+  semantic: Boolean_comparison_exp
+  share: Float_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.assignment_suggestions\"."
+input office_assignment_suggestions_order_by {
+  agent_id: order_by
+  candidates: order_by
+  confidence: order_by
+  created_at: order_by
+  department: office_departments_order_by
+  department_id: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  due_days: order_by
+  due_on: order_by
+  duration_ms: order_by
+  evidence: order_by
+  process_id: order_by
+  reason: order_by
+  semantic: order_by
+  share: order_by
+  status: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.assignment_suggestions\""
+enum office_assignment_suggestions_select_column {
+  "column name"
+  agent_id
+  "column name"
+  candidates
+  "column name"
+  confidence
+  "column name"
+  created_at
+  "column name"
+  department_id
+  "column name"
+  document_id
+  "column name"
+  due_days
+  "column name"
+  due_on
+  "column name"
+  duration_ms
+  "column name"
+  evidence
+  "column name"
+  process_id
+  "column name"
+  reason
+  "column name"
+  semantic
+  "column name"
+  share
+  "column name"
+  status
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_assignment_suggestions\""
+input office_assignment_suggestions_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_assignment_suggestions_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_assignment_suggestions_stream_cursor_value_input {
+  agent_id: String
+  candidates: Int
+  confidence: String
+  created_at: timestamptz
+  department_id: uuid
+  document_id: uuid
+  due_days: Int
+  due_on: date
+  duration_ms: Int
+  evidence: jsonb
+  process_id: String
+  reason: String
+  semantic: Boolean
+  share: Float
+  status: String
+  tenant_id: uuid
 }
 
 "columns and relationships of \"office.assignments\""
@@ -2875,6 +3026,218 @@ input office_revoke_document_access_args {
   user_id: String
 }
 
+"columns and relationships of \"office.v_assignment_suggestion_accuracy\""
+type office_v_assignment_suggestion_accuracy {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"aggregated selection of \"office.v_assignment_suggestion_accuracy\""
+type office_v_assignment_suggestion_accuracy_aggregate {
+  aggregate: office_v_assignment_suggestion_accuracy_aggregate_fields
+  nodes: [office_v_assignment_suggestion_accuracy!]!
+}
+
+"aggregate fields of \"office.v_assignment_suggestion_accuracy\""
+type office_v_assignment_suggestion_accuracy_aggregate_fields {
+  avg: office_v_assignment_suggestion_accuracy_avg_fields
+  count(columns: [office_v_assignment_suggestion_accuracy_select_column!], distinct: Boolean): Int!
+  max: office_v_assignment_suggestion_accuracy_max_fields
+  min: office_v_assignment_suggestion_accuracy_min_fields
+  stddev: office_v_assignment_suggestion_accuracy_stddev_fields
+  stddev_pop: office_v_assignment_suggestion_accuracy_stddev_pop_fields
+  stddev_samp: office_v_assignment_suggestion_accuracy_stddev_samp_fields
+  sum: office_v_assignment_suggestion_accuracy_sum_fields
+  var_pop: office_v_assignment_suggestion_accuracy_var_pop_fields
+  var_samp: office_v_assignment_suggestion_accuracy_var_samp_fields
+  variance: office_v_assignment_suggestion_accuracy_variance_fields
+}
+
+"aggregate avg on columns"
+type office_v_assignment_suggestion_accuracy_avg_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"Boolean expression to filter rows from the table \"office.v_assignment_suggestion_accuracy\". All fields are combined with a logical 'AND'."
+input office_v_assignment_suggestion_accuracy_bool_exp {
+  _and: [office_v_assignment_suggestion_accuracy_bool_exp!]
+  _not: office_v_assignment_suggestion_accuracy_bool_exp
+  _or: [office_v_assignment_suggestion_accuracy_bool_exp!]
+  confidence: String_comparison_exp
+  decided: Int_comparison_exp
+  due_abs_error_days: Int_comparison_exp
+  due_compared: Int_comparison_exp
+  kept_due: Int_comparison_exp
+  kept_unit: Int_comparison_exp
+  status: String_comparison_exp
+  suggested: Int_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"aggregate max on columns"
+type office_v_assignment_suggestion_accuracy_max_fields {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"aggregate min on columns"
+type office_v_assignment_suggestion_accuracy_min_fields {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"Ordering options when selecting data from \"office.v_assignment_suggestion_accuracy\"."
+input office_v_assignment_suggestion_accuracy_order_by {
+  confidence: order_by
+  decided: order_by
+  due_abs_error_days: order_by
+  due_compared: order_by
+  kept_due: order_by
+  kept_unit: order_by
+  status: order_by
+  suggested: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_assignment_suggestion_accuracy\""
+enum office_v_assignment_suggestion_accuracy_select_column {
+  "column name"
+  confidence
+  "column name"
+  decided
+  "column name"
+  due_abs_error_days
+  "column name"
+  due_compared
+  "column name"
+  kept_due
+  "column name"
+  kept_unit
+  "column name"
+  status
+  "column name"
+  suggested
+  "column name"
+  tenant_id
+}
+
+"aggregate stddev on columns"
+type office_v_assignment_suggestion_accuracy_stddev_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_v_assignment_suggestion_accuracy_stddev_pop_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_v_assignment_suggestion_accuracy_stddev_samp_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"Streaming cursor of the table \"office_v_assignment_suggestion_accuracy\""
+input office_v_assignment_suggestion_accuracy_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_assignment_suggestion_accuracy_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_assignment_suggestion_accuracy_stream_cursor_value_input {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"aggregate sum on columns"
+type office_v_assignment_suggestion_accuracy_sum_fields {
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  suggested: Int
+}
+
+"aggregate var_pop on columns"
+type office_v_assignment_suggestion_accuracy_var_pop_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate var_samp on columns"
+type office_v_assignment_suggestion_accuracy_var_samp_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate variance on columns"
+type office_v_assignment_suggestion_accuracy_variance_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
 "columns and relationships of \"office.v_document_counts\""
 type office_v_document_counts {
   direction: String
@@ -3444,6 +3807,21 @@ type query_root {
   "fetch data from the table: \"core.users\" using primary key columns"
   core_users_by_pk(id: String!): core_users
   myTasks: [WorkTask!]!
+  "fetch data from the table: \"office.assignment_suggestions\""
+  office_assignment_suggestions(
+    "distinct select on columns"
+    distinct_on: [office_assignment_suggestions_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignment_suggestions_order_by!]
+    "filter the rows returned"
+    where: office_assignment_suggestions_bool_exp
+  ): [office_assignment_suggestions!]!
+  "fetch data from the table: \"office.assignment_suggestions\" using primary key columns"
+  office_assignment_suggestions_by_pk(document_id: uuid!): office_assignment_suggestions
   "fetch data from the table: \"office.assignments\""
   office_assignments(
     "distinct select on columns"
@@ -3648,6 +4026,32 @@ type query_root {
   ): [office_registers!]!
   "fetch data from the table: \"office.registers\" using primary key columns"
   office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): [office_v_assignment_suggestion_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): office_v_assignment_suggestion_accuracy_aggregate!
   "fetch data from the table: \"office.v_document_counts\""
   office_v_document_counts(
     "distinct select on columns"
@@ -3947,6 +4351,30 @@ type subscription_root {
     "filter the rows returned"
     where: core_users_bool_exp
   ): [core_users!]!
+  "fetch data from the table: \"office.assignment_suggestions\""
+  office_assignment_suggestions(
+    "distinct select on columns"
+    distinct_on: [office_assignment_suggestions_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignment_suggestions_order_by!]
+    "filter the rows returned"
+    where: office_assignment_suggestions_bool_exp
+  ): [office_assignment_suggestions!]!
+  "fetch data from the table: \"office.assignment_suggestions\" using primary key columns"
+  office_assignment_suggestions_by_pk(document_id: uuid!): office_assignment_suggestions
+  "fetch data from the table in a streaming manner: \"office.assignment_suggestions\""
+  office_assignment_suggestions_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_assignment_suggestions_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_assignment_suggestions_bool_exp
+  ): [office_assignment_suggestions!]!
   "fetch data from the table: \"office.assignments\""
   office_assignments(
     "distinct select on columns"
@@ -4268,6 +4696,41 @@ type subscription_root {
     "filter the rows returned"
     where: office_registers_bool_exp
   ): [office_registers!]!
+  "fetch data from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): [office_v_assignment_suggestion_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): office_v_assignment_suggestion_accuracy_aggregate!
+  "fetch data from the table in a streaming manner: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_assignment_suggestion_accuracy_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): [office_v_assignment_suggestion_accuracy!]!
   "fetch data from the table: \"office.v_document_counts\""
   office_v_document_counts(
     "distinct select on columns"

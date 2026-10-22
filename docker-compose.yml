@@ -360,6 +360,14 @@ services:
       # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
       MOC_NGSI_URL: http://scorpio:9090
       MOC_OT_THRESHOLD: ${MOC_OT_THRESHOLD:-35}
+      # F4.3 — tác tử gợi ý giao việc moc-assigner: nhánh BPMN song song từ lúc vào sổ (topic moc-goi-y), tìm văn bản
+      # đến tương tự đã giao qua route nội bộ của svc-files, bỏ phiếu đơn vị chủ trì. Không cần mô hình; svc-files
+      # không trả lời thì văn bản vẫn tới lãnh đạo, chỉ không có gợi ý (không phụ thuộc svc-files ở depends_on)
+      MOC_SUGGEST_ENABLED: ${MOC_SUGGEST_ENABLED:-true}
+      MOC_SUGGEST_POLL_INTERVAL_S: ${MOC_SUGGEST_POLL_INTERVAL_S:-2}
+      MOC_SUGGEST_TIMEOUT_S: ${MOC_SUGGEST_TIMEOUT_S:-10}
+      MOC_SUGGEST_MIN_SCORE: ${MOC_SUGGEST_MIN_SCORE:-0.3}
+      MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}

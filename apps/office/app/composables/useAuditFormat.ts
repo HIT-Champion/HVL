@@ -32,6 +32,10 @@ export interface AuditRow {
 const HIDDEN = new Set(['id', 'tenant_id', 'created_at', 'updated_at', 'created_by', 'object_key', 'document_id',
   'file_id', 'case_file_id'])
 
+// sự kiện của tác tử chỉ ghi siêu dữ liệu (không có cột nội dung bị ẩn): đọc văn bản (F4.1), trợ lý hỏi đáp (F4.2),
+// gợi ý giao việc (F4.3)
+const META_ONLY = new Set(['intake.suggested', 'assistant.answered', 'assignment.suggested'])
+
 // units: tên đơn vị khác trong hệ thống (liên thông, F3.12) — không có thì hiện id
 export function useAuditFormat(names: { value: Map<string, string> }, departments: { value: Map<string, string> },
   units?: { value: Map<string, string> }) {
@@ -101,6 +105,14 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
       return String(value).split(',').map((k) => k.trim()).filter(Boolean)
         .map((k) => label('assist.warning', k)).join('; ') || '—'
     }
+    // gợi ý giao việc (assignment.suggested, F4.3): kết quả, lý do không gợi ý, độ tin cậy, số ngày đề xuất. Khóa là
+    // outcome / outcome_reason (không phải status / reason) để không lẫn nhãn trạng thái văn bản, lý do đọc tệp
+    if (col === 'outcome') return label('assign.suggest.outcome', String(value))
+    if (col === 'outcome_reason') return label('assign.suggest.reason', String(value))
+    if (col === 'confidence') return label('assign.suggest.confidence', String(value))
+    if (col === 'due_days' && Number.isInteger(Number(value))) {
+      return t('assign.suggest.days', { n: Number(value) }, Number(value))
+    }
     return String(value)
   }
 
@@ -110,9 +122,9 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
     const hidden: string[] = []
     for (const [col, value] of Object.entries(row.overview)) {
       if (HIDDEN.has(col)) continue
-      // sự kiện đọc văn bản, trợ lý hỏi đáp chỉ ghi siêu dữ liệu: null là không có (không dùng mô hình, không lỗi),
-      // không phải trường nội dung bị ẩn
-      if (value === null && (row.action === 'intake.suggested' || row.action === 'assistant.answered')) continue
+      // sự kiện đọc văn bản, trợ lý hỏi đáp, gợi ý giao việc chỉ ghi siêu dữ liệu: null là không có (không dùng mô
+      // hình, không lỗi, có gợi ý nên không có lý do), không phải trường nội dung bị ẩn
+      if (value === null && META_ONLY.has(row.action)) continue
       if (value === null) {
         hidden.push(label('audit.col', col))
         continue

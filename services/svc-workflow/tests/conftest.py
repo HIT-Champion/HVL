@@ -63,8 +63,12 @@ class FakeFlowable:
     # việc Flowable tạo tiếp sau khi một việc xong / khi quy trình bắt đầu (id việc mới, form, tham số add_task)
     follow_ups: dict[str, list[tuple[str, str, dict[str, Any]]]] = field(default_factory=dict)
     jobs: list[ExternalJob] = field(default_factory=list)
+    # topic của từng việc giao ra ngoài (id việc → topic); không ghi thì là việc nhắc hạn moc-sla
+    topics: dict[str, str] = field(default_factory=dict)
+    acquired: list[tuple[str, dict[str, Any]]] = field(default_factory=list)  # (topic, count/lock) mỗi lần nhận
     jobs_done: list[str] = field(default_factory=list)
     jobs_failed: list[tuple[str, str]] = field(default_factory=list)
+    jobs_retry: dict[str, str] = field(default_factory=dict)  # id việc → retry_after của lần báo lỗi cuối
     down: bool = False
     claim_conflict: bool = False
     gone_on_complete: bool = False  # lần gọi khác vừa hoàn thành việc: Flowable trả 404
@@ -124,7 +128,10 @@ class FakeFlowable:
         return [t for t in self.tasks.values() if t.process_instance_id == process_instance_id]
 
     async def acquire_jobs(self, topic: str, worker_id: str, **kwargs: Any) -> list[ExternalJob]:
-        jobs, self.jobs = self.jobs, []
+        """Như Flowable: chỉ giao việc đúng topic, việc của topic khác nằm lại chờ worker của nó."""
+        self.acquired.append((topic, kwargs))
+        jobs = [j for j in self.jobs if self.topics.get(j.id, "moc-sla") == topic]
+        self.jobs = [j for j in self.jobs if j not in jobs]
         return jobs
 
     async def complete_job(self, job_id: str, worker_id: str) -> None:
@@ -132,6 +139,7 @@ class FakeFlowable:
 
     async def fail_job(self, job_id: str, worker_id: str, message: str, retry_after: str = "PT1M") -> None:
         self.jobs_failed.append((job_id, message))
+        self.jobs_retry[job_id] = retry_after
 
     async def tasks_for(self, user_id: str, groups: list[str]) -> list[Task]:
         if self.down:
@@ -217,6 +225,92 @@ class FakeHasura:
     fail_dispatch_query: bool = False
     fail_notified: int = 0  # số lần DispatchNotified tiếp theo lỗi (dịch vụ dừng ngay sau khi báo)
     fail_fail: bool = False  # FailDispatch lỗi (Hasura không gọi được)
+    # gợi ý giao việc (F4.3): văn bản đến đã có (id → dòng kèm assignments), dòng gợi ý đã lưu, sổ của tác tử, mọi lần
+    # gọi bằng vai trò agent; lỗi CSDL khi lưu (mã ràng buộc/trigger) hoặc khi đọc
+    past: dict[str, dict[str, Any]] = field(default_factory=dict)
+    suggestions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    agent_audit: list[dict[str, Any]] = field(default_factory=list)
+    agent_calls: list[tuple[str, dict[str, Any], uuid.UUID, str, str]] = field(default_factory=list)
+    suggest_reads: list[str] = field(default_factory=list)
+    save_error: str | None = None
+    fail_suggest_reads: bool = False
+
+    def add_past(self, doc_id: str, *, department: uuid.UUID | str | None = None, user: str | None = None,
+                 registered_at: str = "2026-09-01T02:00:00Z", due_on: str | None = None,
+                 lead_due: str | None = None, restricted: bool = False, direction: str = "in",
+                 cancelled: bool = False) -> None:
+        """Văn bản đến đã giao: một lần giao chủ trì (phòng, hoặc thẳng một người) — như _plan_direct ghi."""
+        lead = {"department_id": str(department) if department else None, "user_id": user,
+                "due_on": lead_due, "role": "lead", "parent_id": None,
+                "status": "cancelled" if cancelled else "open", "assigned_at": registered_at}
+        self.past[doc_id] = {"id": doc_id, "direction": direction, "restricted": restricted,
+                             "registered_at": registered_at, "due_on": due_on,
+                             "assignments": [lead] if department or user else []}
+
+    def _sealed(self, doc_id: str) -> bool:
+        doc = self.document if doc_id == DOC else self.past.get(doc_id)
+        return bool(doc and (doc.get("restricted") or doc.get("direction") != "in"))
+
+    async def _suggest_op(self, op: str, actor: Actor, variables: dict[str, Any]) -> dict[str, Any] | None:
+        """Các truy vấn vai trò service của tác tử gợi ý giao việc; None nếu không phải."""
+        if op not in {"GiaoViecVanBan", "GiaoViecLichSu", "GiaoViecNguoiChuTri", "GiaoViecDonVi"}:
+            return None
+        self.suggest_reads.append(op)
+        if self.fail_suggest_reads:
+            raise HasuraError("Không gọi được Hasura")
+        assert actor.role == "service"
+        if op == "GiaoViecVanBan":
+            doc = {**self.document, "restricted": self.document.get("restricted", False)} \
+                if variables["id"] == DOC else self.past.get(variables["id"])
+            if doc is None or actor.tenant_id != TENANT:
+                return {"office_documents_by_pk": None}
+            return {"office_documents_by_pk": {k: doc.get(k) for k in
+                                               ("id", "direction", "restricted", "registered_at", "due_on")}}
+        if op == "GiaoViecLichSu":
+            rows = []
+            for doc_id in variables["ids"]:
+                doc = self.past.get(doc_id)
+                if doc is None or doc["direction"] != "in" or doc["restricted"]:
+                    continue
+                leads = sorted((a for a in doc["assignments"] if a["role"] == "lead" and a["parent_id"] is None
+                                and a["status"] != "cancelled"), key=lambda a: a["assigned_at"])
+                rows.append({"id": doc_id, "registered_at": doc["registered_at"], "due_on": doc["due_on"],
+                             "assignments": [{k: a[k] for k in ("department_id", "user_id", "due_on")}
+                                             for a in leads[:1]]})
+            return {"office_documents": rows}
+        if op == "GiaoViecNguoiChuTri":
+            return {"core_users": [{"id": u, "department_id": self.users[u]["department_id"]}
+                                   for u in variables["users"] if u in self.users]}
+        return {"office_departments": [{"id": d} for d in sorted(self.departments)],
+                "core_users": [{"department_id": r["department_id"]} for r in self.users.values()
+                               if r["role"] == "manager" and r["enabled"] and r["department_id"]]}
+
+    async def as_agent(self, tenant_id: uuid.UUID, agent_id: str, query: str, variables: dict[str, Any] | None = None,
+                       *, request_id: str = "") -> dict[str, Any]:
+        """Vai trò agent: chỉ đọc document_id của gợi ý; lưu gợi ý + dòng sổ cùng giao dịch, như trigger CSDL chặn."""
+        variables = variables or {}
+        op = query.split("(")[0].split()[1]
+        self.agent_calls.append((op, variables, tenant_id, agent_id, request_id))
+        if op == "GiaoViecDaGoiY":
+            if self.fail_suggest_reads:
+                raise HasuraError("Không gọi được Hasura")
+            row = self.suggestions.get(variables["id"])
+            return {"office_assignment_suggestions_by_pk": {"document_id": row["document_id"]} if row else None}
+        assert op == "LuuGoiYGiaoViec", op
+        row, entry = variables["o"], variables["e"]
+        assert "tenant_id" not in row and "agent_id" not in row     # preset của vai trò agent đặt
+        assert not {"actor_id", "actor_kind", "tenant_id"} & set(entry)
+        if self.save_error:
+            raise HasuraError(self.save_error, "constraint-violation")
+        if row["document_id"] in self.suggestions:
+            raise HasuraError('duplicate key value violates unique constraint "assignment_suggestions_pkey"',
+                              "constraint-violation")
+        if self._sealed(row["document_id"]) or any(self._sealed(e["document_id"]) for e in row["evidence"]):
+            raise HasuraError("assignment_suggestions_sealed: văn bản hạn chế", "constraint-violation")
+        self.suggestions[row["document_id"]] = {**row, "tenant_id": str(tenant_id), "agent_id": agent_id}
+        self.agent_audit.append({**entry, "tenant_id": str(tenant_id), "actor_id": agent_id, "actor_kind": "agent"})
+        return {"insert_office_assignment_suggestions_one": {"document_id": row["document_id"]},
+                "insert_core_audit_log": {"affected_rows": 1}}
 
     def add_dispatch(self, to: str, doc: str = OUT) -> dict[str, Any]:
         """Như trigger documents_dispatch: một dòng pending mỗi (văn bản, đơn vị) — có rồi thì thôi."""
@@ -320,6 +414,9 @@ class FakeHasura:
             await asyncio.sleep(0)
         op = query.split("(")[0].split()[1] if query.strip().startswith(("query", "mutation")) else ""
         found = await self._dispatch_op(op, actor, variables)
+        if found is not None:
+            return found
+        found = await self._suggest_op(op, actor, variables)
         if found is not None:
             return found
         if op == "Register":
@@ -485,6 +582,23 @@ class FakeFiles:
     explode: bool = False  # lỗi không lường trước
     delay: float = 0.0
     hook: Callable[[str], None] | None = None  # chạy ngay khi được gọi: lần gọi khác chen vào giữa
+    # văn bản tương tự (F4.3): câu trả lời chung hoặc theo từng văn bản đích, lỗi svc-files trả, độ trễ, các lần gọi
+    similar_answer: dict[str, Any] = field(default_factory=lambda: {"hits": [], "terms": 0, "semantic": False,
+                                                                   "duration_ms": 5})
+    similar_answers: dict[str, dict[str, Any] | Exception] = field(default_factory=dict)
+    similar_error: Exception | None = None
+    similar_delay: float = 0.0
+    similar_calls: list[tuple[uuid.UUID, str, int]] = field(default_factory=list)
+
+    async def similar(self, tenant_id: uuid.UUID, document_id: str, *, limit: int = 15) -> dict[str, Any]:
+        self.similar_calls.append((tenant_id, document_id, limit))
+        await asyncio.sleep(self.similar_delay)
+        if self.similar_error is not None:
+            raise self.similar_error
+        answer = self.similar_answers.get(document_id, self.similar_answer)
+        if isinstance(answer, Exception):
+            raise answer
+        return {"document_id": document_id, **answer, "hits": answer["hits"][:limit]}
 
     async def dispatch_file(self, dispatch_id: str) -> dict[str, Any]:
         self.dispatch_tries += 1

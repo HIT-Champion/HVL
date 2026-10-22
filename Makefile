@@ -29,7 +29,8 @@ ENV_FILE := .env
 PREFIX ?= /opt/moc
 
 .PHONY: help env check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
-        demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau reconcile \
+        demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
+        reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
 help: ## Hiển thị danh sách lệnh
@@ -148,6 +149,12 @@ do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/
 
 hoi-dap-mau: $(ENV_FILE) ## Sinh lại kho văn bản mẫu nhiều trang seed/hoi-dap (PDF, cau-hoi.json) trong container svc-files (cần make up)
 	@python3 scripts/hoi_dap_mau.py --mode container
+
+demo-giao-viec: $(ENV_FILE) ## Màn gợi ý giao việc (F4.3): văn bản mới vào sổ, tác tử gợi ý đơn vị chủ trì và hạn kèm căn cứ; văn bản hạn chế không gợi ý, không làm căn cứ; svc-files tắt vẫn chỉ đạo được (docs/demo-script.md)
+	@python3 scripts/demo.py giao-viec
+
+do-giao-viec: $(ENV_FILE) ## Đo tác tử gợi ý giao việc leave-one-out trên lịch sử seed/giao-viec: top-1/2/3, độ phủ, sai số hạn, thời gian (thoát 1 khi căn cứ là văn bản hạn chế hoặc top-1 dưới ngưỡng)
+	@python3 scripts/demo.py do-giao-viec
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py

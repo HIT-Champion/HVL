@@ -27,6 +27,7 @@ issue #19, #20.
 | Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
 | `POST /api/files/{id}/read`: đọc văn bản đến (lớp chữ PDF hoặc OCR Tesseract), quy tắc gợi ý 6 trường, mô hình tùy chọn viết trích yếu, ghi sổ của tác tử | **Xong** (F4.1) |
 | `POST /api/documents/ask`: hỏi đáp trên các văn bản người hỏi được đọc — chỉ mục đoạn theo trang, quyền hai lớp, câu trích nguyên văn, mô hình tùy chọn viết câu trả lời có kiểm trích dẫn, ghi sổ của trợ lý | **Xong** (F4.2) |
+| `/internal/similar-documents`: văn bản đến tương tự đã giao cho tác tử gợi ý giao việc — câu tìm từ trích yếu, dùng lại truy xuất F4.2, hậu kiểm quyền dịch vụ, không trả chữ | **Xong** (F4.3) |
 | Văn bản hạn chế: lưu mã hóa (khóa riêng từng tệp từ két), tải về giải mã trong bộ nhớ, đóng dấu người xem, ghi sổ | **Xong** (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
 | `GET /api/documents/{id}/preview`: PDF dự thảo cho người được đọc | **Xong** (F2.4) |
@@ -65,6 +66,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
+| `POST /internal/similar-documents` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15; thừa trường → `422`). `200` `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` · `404` `not_found` · `409` `not_incoming`, `restricted` · `503` `assistant_disabled`, `search_unavailable`, `database_unavailable` (mục Văn bản tương tự cho tác tử gợi ý giao việc) |
 | `GET /healthz` | Tiến trình còn sống |
 | `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"`; `ai`: mô hình trích yếu (F4.1) đang sẵn sàng không; `assist: {index, semantic, model, embed_pending, embed_failed}` (F4.2): chỉ mục đoạn đã đồng bộ xong một lượt; tìm theo nghĩa được (mô hình nhúng sẵn sàng, đúng số chiều, embedder đã áp trong Meilisearch); mô hình viết câu trả lời sẵn sàng; số đoạn còn chờ nhúng và số đoạn làm mô hình nhúng lỗi (null khi không nhúng hoặc chưa đếm) — cả hai không ảnh hưởng `status` |
 
@@ -274,14 +276,18 @@ liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
    **an toàn**: chỉ mục chậm vài giây sau khi bật hạn chế hay hủy giao việc cũng không lộ đoạn nào. svc-files không
    viết lại quy tắc quyền. Số ký hiệu, trích yếu, trạng thái trả về lấy từ Hasura (bản mới nhất), không từ chỉ mục.
 
-**Tìm nới** (chỉ khi tìm theo từ khóa và chưa đủ đoạn). Chiến lược `frequency` của Meilisearch bỏ dần từ phổ biến của
-câu tìm nhưng luôn giữ từ hiếm nhất: hỏi "Điều kiện xét học bổng khuyến khích học tập là gì?" mà trong kho chỉ một văn
-bản có chữ "điều kiện" thì công văn trả lời (88/CTSV: "…xét chọn sinh viên có điểm … từ 3,2…") không bao giờ ra. Lượt
-nới gửi một `/multi-search`: mỗi từ của câu tìm một câu riêng trong cùng phạm vi, kèm số đoạn trong phạm vi. Mỗi từ
-nặng `ln(1 + N / df)` (từ không đoạn nào trong phạm vi có tính như `df` = 0,5, để phạm vi hẹp không làm vài từ phổ
-biến thành "cả câu hỏi"); đoạn có tổng trọng số ≥ 50 % câu hỏi được thêm sau kết quả chính, qua hậu kiểm như mọi
-đoạn. Nhật ký `office.assist.asked` ghi số đoạn nhờ tìm nới (`relaxed`). Khi tìm theo nghĩa, phần nghĩa đã phủ câu
-hỏi dùng chữ khác nên không nới.
+**Tìm nới** (mỗi lần tìm theo từ khóa). Chiến lược `frequency` của Meilisearch bỏ dần từ phổ biến của câu tìm nhưng
+luôn giữ từ hiếm nhất: hỏi "Điều kiện xét học bổng khuyến khích học tập là gì?" mà trong kho vài văn bản về xét tốt
+nghiệp có chữ "điều kiện" thì lượt chính chỉ ra các văn bản đó, công văn trả lời (88/CTSV: "…xét chọn sinh viên có
+điểm … từ 3,2…") không bao giờ ra. Lượt nới gửi một `/multi-search`: mỗi từ của câu tìm một câu riêng trong cùng phạm
+vi, kèm số đoạn trong phạm vi. Mỗi từ nặng `ln(1 + N / df)` (từ không đoạn nào trong phạm vi có tính như `df` = 0,5,
+để phạm vi hẹp không làm vài từ phổ biến thành "cả câu hỏi"); đoạn có tổng trọng số ≥ 50 % câu hỏi được thêm, qua hậu
+kiểm như mọi đoạn. Rồi **mọi đoạn xếp chung theo tỷ lệ trọng số** câu hỏi mà đoạn có — kể cả các đoạn lượt chính đã
+đọc nhưng chưa lấy; cùng tỷ lệ thì giữ thứ tự của Meilisearch: đoạn chỉ có "điều kiện … xét" không đứng trước đoạn có
+gần đủ câu hỏi, dù lượt chính đã đủ đoạn. Kết quả của mỗi từ chỉ lấy `candidates` đoạn đầu, nên từ phổ biến còn được
+tính cho đoạn có nguyên văn từ đó (bỏ dấu như Meilisearch) — đoạn có đủ câu hỏi không bị chấm thấp vì đứng sau trong
+kết quả của từ phổ biến. Lượt nới lỗi thì giữ kết quả lượt chính. Nhật ký `office.assist.asked` ghi số đoạn nhờ tìm nới
+(`relaxed`). Khi tìm theo nghĩa, phần nghĩa đã phủ câu hỏi dùng chữ khác nên không nới.
 
 Không đoạn nào qua được hai lớp → `no_evidence`, **không gọi mô hình**; trả lời y hệt nhau dù văn bản không tồn tại hay
 người hỏi không được đọc.
@@ -367,6 +373,59 @@ Chưa làm, giới hạn đã biết:
   thật. Kiểm theo từ không bắt được câu sai mà dùng đúng chữ của nguồn (vd "loại Xuất sắc" khi nguồn có cả "Xuất sắc"
   lẫn "Tốt"); câu có từ đệm không có trong nguồn ("… như sau:") có thể bị loại oan — người dùng vẫn có câu trích.
 - Tìm theo từ khóa không hiểu từ đồng nghĩa: câu hỏi dùng chữ khác hẳn văn bản chỉ ra khi bật tìm theo nghĩa.
+
+### Văn bản tương tự cho tác tử gợi ý giao việc (F4.3)
+
+`assist/similar.py`. Văn thư vào sổ một văn bản đến thì quy trình mở nhánh song song `goiYGiaoViec`; tác tử
+`moc-assigner` của svc-workflow nhận việc, gọi `POST /internal/similar-documents` để lấy các văn bản đến **đã giao**
+giống văn bản này, rồi tự bỏ phiếu chọn đơn vị chủ trì và hạn từ lịch sử giao việc của chúng (README svc-workflow).
+svc-files **chỉ truy xuất**: không chọn đơn vị, không lưu gợi ý, không ghi sổ.
+
+- **Gọi được**: chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` như `/internal/issue` (`401`, `403`
+  `not_a_service` với token người dùng). Không có trong `/openapi.json`, APISIX không có route tới. Không có biến cấu
+  hình mới: route chạy theo `MOC_ASK_ENABLED` — tắt trợ lý thì chỉ mục đoạn không đồng bộ, route trả `503
+  assistant_disabled` và tác tử bỏ qua văn bản.
+- **Văn bản đích** đọc bằng vai trò service của **đúng thuê ước trong yêu cầu** (`SimilarTarget`): thuê ước khác hay
+  không có → `404 not_found`; văn bản đi → `409 not_incoming`; văn bản hạn chế → `409 restricted` — dừng ở đó, không
+  gọi Meilisearch, không nhúng.
+- **Câu tìm chỉ lấy từ trích yếu**: chuẩn hóa NFC, gộp khoảng trắng; bỏ **một** tiền tố khuôn mẫu ở đầu ("Về việc",
+  "V/v", "V/v:", "Thông báo", "Kế hoạch", "Giấy mời", "Quyết định", "Công văn", "Tờ trình", không phân biệt hoa
+  thường); bỏ chữ "việc"; rồi lấy tối đa 10 term như câu hỏi F4.2. "Về việc xét cấp học bổng khuyến khích học tập học
+  kỳ II năm học 2026–2027" → `xét cấp học bổng khuyến khích tập kỳ II năm`. Không dùng nội dung tệp: Meilisearch chỉ
+  xét 10 từ đầu, mà đầu công văn toàn khuôn mẫu ("Căn cứ…", "Kính gửi…"). Trích yếu chỉ có khuôn mẫu → `hits: []`,
+  không tìm.
+- **Tìm theo nghĩa (tùy chọn)**: có mô hình nhúng và Meilisearch đã có embedder thì nhúng trích yếu kèm chỉ dẫn riêng
+  của Qwen3-Embedding ("…retrieve earlier letters about the same matter"), tối đa **3 giây**, trong lúc đó vòng nhúng
+  nền không mở lô mới. Quá giờ, lỗi, hay tìm lai bị Meilisearch từ chối thì tìm lại chỉ bằng từ khóa
+  (`semantic: false`) — CI không có mô hình vẫn chạy đủ.
+- **Truy xuất** dùng lại `Retriever` của F4.2 (`Retriever.similar`) trên chỉ mục đoạn: lọc trước thuê ước (luôn đứng
+  đầu), `direction = "in"`, `status IN ["in_progress", "done", "archived"]` (đã có người nhận xử lý), trừ chính văn bản
+  đích; gộp đoạn theo văn bản, điểm = `_rankingScore` cao nhất trong các đoạn (4 chữ số), giảm dần, tối đa `limit`.
+  Tìm theo từ khóa thì **luôn chạy thêm lượt tìm nới** của F4.2 (mỗi từ một câu, cân theo độ hiếm), kể cả khi lượt chính
+  đã đủ: chiến lược `frequency` bắt mọi văn bản phải có từ hiếm nhất của trích yếu, mà từ hiếm thường không nói gì về
+  chủ đề — "học kỳ II" thì chỉ văn bản có chữ "II" được xét, 88/CTSV ("học kỳ I", cùng chủ đề) không bao giờ ra. Điểm
+  văn bản = số lớn hơn giữa `_rankingScore` và tỷ lệ trọng số từ chung (cùng thang 0–1, cùng tăng theo độ phủ câu tìm).
+  **Hậu kiểm** bằng vai trò service của thuê ước: văn bản hạn chế (kể cả vừa bật, chỉ mục chưa kịp xóa), văn bản vừa
+  hủy bị bỏ; chiều, trạng thái kiểm lại trên bản mới nhất từ Hasura. Văn bản hạn chế không bao giờ có đoạn trong chỉ
+  mục, nên không bao giờ làm căn cứ.
+- **Không có ngưỡng điểm ở đây**: ngưỡng `MOC_SUGGEST_MIN_SCORE` thuộc svc-workflow. Điểm tìm theo từ khóa và điểm
+  tìm lai có phân bố khác nhau (ngưỡng tìm lai `MOC_ASK_MIN_SCORE_SEMANTIC` vẫn áp như F4.2).
+- **Không trả chữ văn bản, nhật ký không có chữ**: kết quả chỉ có id và điểm. Nhật ký `office.assist.similar`
+  {tenant_id, document_id, caller, hits, terms, semantic, duration_ms, error} — `error` là lỗi tìm lai đã lùi về từ
+  khóa; lần bị từ chối chỉ có `code` (`not_found`, `restricted`, `search_unavailable`…), `error` (lỗi Meilisearch,
+  Hasura nếu có) và `duration_ms`. Không có trích yếu, không có câu tìm.
+
+| Kết quả | Ý nghĩa |
+|---|---|
+| `hits[]` | `{document_id, score}` — văn bản đến đã giao, đã hậu kiểm, điểm giảm dần, ≤ `limit` |
+| `terms` | Số term của câu tìm (0: trích yếu chỉ có khuôn mẫu, không tìm) — không gửi chữ |
+| `semantic` · `duration_ms` | Lượt này có tìm theo nghĩa · thời gian xử lý ở svc-files |
+| `404 not_found` | Không có văn bản trong thuê ước `tenant_id` |
+| `409 not_incoming` · `409 restricted` | Văn bản đi · văn bản hạn chế — không tìm gì thêm |
+| `503` | `assistant_disabled` (`MOC_ASK_ENABLED=false`) · `search_unavailable` (Meilisearch) · `database_unavailable` (Hasura) |
+
+Giới hạn: chỉ mục đoạn đồng bộ mỗi `MOC_ASK_SYNC_INTERVAL_S` giây, nên văn bản vừa chuyển sang "đang xử lý" vài giây
+trước chưa làm căn cứ được; trích yếu quá ngắn hay chỉ có từ chung thì ít kết quả đúng.
 
 ### Văn bản đi và cổng xác thực
 
@@ -552,7 +611,8 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 | Hỏi đáp: đọc văn bản vừa đổi kèm chữ theo trang, thuộc tính quyền để đồng bộ chỉ mục đoạn (`ChunkSources`) | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, mọi thuê ước; văn bản hạn chế chỉ đọc để xóa đoạn |
 | Hỏi đáp: hậu kiểm đoạn tìm được (`AskDocuments`) | Token của người hỏi — Hasura áp quyền đọc văn bản |
 | Hỏi đáp: ghi `assistant.answered` (`GhiSoTroLy`) | Khóa quản trị + `X-Hasura-Role: agent` + thuê ước trong token + `X-Hasura-User-Id: <MOC_ASSISTANT_ID>` — preset của vai trò ép danh tính, thuê ước |
-| Gợi ý giao việc (F4.3, có sẵn, chưa dùng): hậu kiểm bằng quyền dịch vụ (`AskDocumentsService`) | Khóa quản trị + `X-Hasura-Role: service` + thuê ước; không bao giờ văn bản hạn chế |
+| Gợi ý giao việc (F4.3): đọc văn bản đích (`SimilarTarget`) | Khóa quản trị + `X-Hasura-Role: service` + thuê ước trong yêu cầu của svc-workflow + `X-Hasura-User-Id: svc-files` — văn bản thuê ước khác trả null |
+| Gợi ý giao việc (F4.3): hậu kiểm văn bản tương tự (`AskDocumentsService`) | Khóa quản trị + `X-Hasura-Role: service` + thuê ước; không bao giờ văn bản hạn chế |
 
 ## Cấu hình
 
