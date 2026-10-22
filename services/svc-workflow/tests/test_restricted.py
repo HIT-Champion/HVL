@@ -40,6 +40,7 @@ CLERK_GROUP = f"t:{TENANT}:clerk"
 MANAGER_GROUP = f"t:{TENANT}:d:{DEPT_DT}:manager"
 CLERK = actor("clerk", "u-clerk")
 DIRECTOR = actor("director", "u-director")
+DRAFTER = actor("staff", "u-staff-dt", dept=DEPT_DT)
 CREATED = datetime(2026, 10, 19, 9, 0, tzinfo=UTC)
 
 
@@ -124,6 +125,26 @@ def test_next_step_holder_is_shared_too(workflow, hasura, flowable):
     run(workflow.complete_task(DIRECTOR, "t1", "direct", {"instruction": "Chuyên viên An xử lý",
                                                           "lead_user_id": "u-staff-dt"}))
     assert (DOC, "u-staff-dt", "u-director") in shared(hasura)
+
+
+def test_submitting_again_does_not_bring_back_a_revoked_reader(workflow, hasura, flowable):
+    hasura.outgoing.update(status="in_review", process_id="p-out", signer_id="u-director", restricted=True)
+    hasura.viewers = {"u-staff-dt"}     # văn thư vừa gỡ lãnh đạo phòng khỏi danh sách xem
+    flowable.add_task("t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT, process="p-out")
+    # người soạn (không có quyền cấp, gỡ) gọi lại submitOutgoing khi không còn bước nào để hoàn thành
+    assert run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))["status"] == "in_review"
+    assert shared(hasura) == [] and hasura.notifications == [] and flowable.completed == []
+
+
+def test_retry_that_finishes_the_revision_still_shares_with_the_reviewer(workflow, hasura, flowable):
+    hasura.outgoing.update(status="in_review", process_id="p-out", signer_id="u-director", restricted=True)
+    hasura.viewers = {"u-staff-dt"}
+    flowable.add_task("t-sua", "vbdi.chinhSua", assignee="u-staff-dt", doc=OUT, process="p-out")
+    flowable.then("t-sua", "t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT)
+    run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))   # lần trước đã ghi CSDL, lỗi lúc hoàn thành bước sửa
+    assert flowable.completed == [("t-sua", {"signerId": "u-director"})]
+    assert shared(hasura) == [(OUT, "u-manager-dt", "u-staff-dt")]
+    assert hasura.sent() == {"task.assigned": {"u-manager-dt"}}
 
 
 def test_someone_who_cannot_read_the_document_cannot_act_on_it(workflow, hasura, flowable):

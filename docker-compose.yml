@@ -306,6 +306,8 @@ services:
       MOC_OPENBAO_ADDR: http://openbao:8200
       MOC_OPENBAO_SECRET_PATH: moc/data/svc-files
       MOC_FILES_MAX_MB: ${MOC_FILES_MAX_MB:-25}
+      # F3.7 — PDF của văn bản hạn chế nhiều trang hơn thì không nhận (415), không đóng dấu (422)
+      MOC_RESTRICTED_MAX_PAGES: ${MOC_RESTRICTED_MAX_PAGES:-500}
       # in vào mã QR của văn bản đi phát hành: <MOC_PUBLIC_URL>/xac-thuc/<mã>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
       # F2.12 — neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi

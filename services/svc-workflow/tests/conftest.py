@@ -60,6 +60,7 @@ class FakeFlowable:
     claims: list[tuple[str, str | None]] = field(default_factory=list)
     completed: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     started: list[dict[str, Any]] = field(default_factory=list)
+    variables: dict[str, dict[str, Any]] = field(default_factory=dict)  # biến của từng phiên quy trình (id → biến)
     # việc Flowable tạo tiếp sau khi một việc xong / khi quy trình bắt đầu (id việc mới, form, tham số add_task)
     follow_ups: dict[str, list[tuple[str, str, dict[str, Any]]]] = field(default_factory=dict)
     jobs: list[ExternalJob] = field(default_factory=list)
@@ -158,6 +159,7 @@ class FakeFlowable:
         self.started.append(variables)
         n = sum(1 for v in self.started if v.get("documentId") == business_key)
         self.processes[business_key] = f"proc-{business_key}" + (f"-{n}" if n > 1 else "")
+        self.variables[self.processes[business_key]] = dict(variables)
         self._follow(business_key, self.processes[business_key])
         return self.processes[business_key]
 
@@ -165,6 +167,11 @@ class FakeFlowable:
         self.deleted.append(process_id)
         for task_id in [t.id for t in self.tasks.values() if t.process_instance_id == process_id]:
             del self.tasks[task_id]
+
+    async def set_variables(self, process_id: str, variables: dict[str, Any]) -> None:
+        if self.down:
+            raise FlowableError("down")
+        self.variables.setdefault(process_id, {}).update(variables)
 
 
 @dataclass
@@ -191,6 +198,7 @@ class FakeHasura:
     notifications: list[dict[str, Any]] = field(default_factory=list)
     overdue: list[dict[str, Any]] = field(default_factory=list)
     fail_writes: str | None = None
+    fail_once: str | None = None  # tên mutation lỗi một lần như Hasura hết giờ chờ: không ghi gì, lần gọi sau ghi được
     fail_notify: bool = False
     register_error: str | None = None
     # tiếp nhận văn bản đến: loại văn bản có trong danh mục, tệp → người tải lên, văn bản đến đã có
@@ -502,6 +510,9 @@ class FakeHasura:
             return {"insert_core_notifications": {"returning": created}}
         # còn lại là mutation ghi
         if op == "ChoXem" and self.fail_share:
+            raise HasuraError("Không gọi được Hasura")
+        if op == self.fail_once:
+            self.fail_once = None
             raise HasuraError("Không gọi được Hasura")
         if self.fail_writes:
             raise HasuraError(self.fail_writes, "constraint-violation")

@@ -46,9 +46,8 @@ if [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
-if ! grep -q "## \[$VERSION\]" CHANGELOG.md; then
-  echo "Lỗi: CHANGELOG.md chưa có mục '## [$VERSION]'." >&2
-  echo "Mỗi bản phát hành phải có ghi chép thay đổi (tiêu chí PoF #6)." >&2
+# Mỗi bản phát hành phải có ghi chép thay đổi (tiêu chí PoF #6) — kiểm trước khi gắn thẻ: thẻ đã đẩy thì không gắn lại
+if ! ./scripts/release-notes.sh "$VERSION" > /dev/null; then
   exit 1
 fi
 

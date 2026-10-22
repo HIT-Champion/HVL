@@ -26,6 +26,10 @@ import type { UploadedFile } from '~/composables/useApi'
 // Gửi trong hệ thống (F3.12): tích đơn vị nhận cùng dùng Mộc — phát hành xong, văn bản tự vào sổ chờ của văn thư
 // đơn vị đó (recipient_tenant_ids). Văn bản hạn chế không gửi liên thông (tệp mã hóa theo đơn vị).
 
+// Khóa trang theo cả ?id=: từ "Sửa" một dự thảo sang "Soạn văn bản" ở thanh bên (cùng đường dẫn, khác query) thì
+// dựng trang mới — không thì form còn nội dung, tệp, cờ hạn chế của dự thảo trước và Lưu tạo văn bản mới chép từ nó
+definePageMeta({ key: (r) => r.fullPath })
+
 interface Attachment { key: number; name: string; state: 'uploading' | 'clean' | 'error'; message?: string; uploaded?: UploadedFile; existing?: boolean }
 interface Unit { id: string; code: string; name: string; parent_name: string | null }
 
@@ -144,7 +148,13 @@ function addFiles(list: FileList | null) {
   for (const file of Array.from(list ?? [])) {
     const item = reactive<Attachment>({ key: nextKey++, name: file.name, state: 'uploading' })
     attachments.value.push(item)
-    upload(file)
+    // dự thảo hạn chế: tệp phải lưu mã hóa như văn bản (CSDL chặn gắn tệp thường), và chỉ nhận PDF như màn tiếp nhận
+    if (restricted.value && file.type !== 'application/pdf') {
+      item.state = 'error'
+      item.message = t('receive.pdfOnly')
+      continue
+    }
+    upload(file, undefined, restricted.value)
       .then((res) => { item.state = 'clean'; item.uploaded = res })
       .catch((e) => { item.state = 'error'; item.message = errorText(t, e) })
   }
@@ -286,7 +296,7 @@ async function save() {
           </li>
         </ul>
         <label class="btn-secondary cursor-pointer">
-          <input type="file" class="sr-only" multiple @change="addFiles(($event.target as HTMLInputElement).files)">
+          <input type="file" class="sr-only" multiple :accept="restricted ? 'application/pdf' : undefined" @change="addFiles(($event.target as HTMLInputElement).files)">
           + {{ t('compose.attachments') }}
         </label>
         <p class="mt-1 text-xs text-stone-500">{{ t('compose.attachmentsHint') }}</p>

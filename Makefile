@@ -28,7 +28,7 @@ ENV_FILE := .env
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
-.PHONY: help env check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
+.PHONY: help env env-ready check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
@@ -45,21 +45,30 @@ $(ENV_FILE):
 
 env: ## Sinh .env từ .env.example, thay mọi change_me bằng chuỗi ngẫu nhiên
 	@test ! -f $(ENV_FILE) || { echo "Đã có $(ENV_FILE) — xóa đi nếu muốn sinh lại." >&2; exit 1; }
-	@./scripts/gen-env.sh .env.example > $(ENV_FILE)
+	@# umask trước khi ghi: tệp chứa bí mật không lúc nào đọc được bởi người khác; sinh lỗi thì không để lại tệp dở
+	@umask 077 && ./scripts/gen-env.sh .env.example > $(ENV_FILE).tmp && mv $(ENV_FILE).tmp $(ENV_FILE) \
+	  || { rm -f $(ENV_FILE).tmp; exit 1; }
 	@chmod 600 $(ENV_FILE)
 	@echo "Đã tạo $(ENV_FILE). Mật khẩu của các tài khoản mẫu là giá trị MOC_DEMO_PASSWORD trong tệp này."
+
+# .env chép tay từ .env.example mà quên sửa: mật khẩu, khóa (cả khóa quản trị Hasura) ai đọc mã nguồn cũng biết
+env-ready: $(ENV_FILE)
+	@! grep -qE '^[A-Z0-9_]+=change_me' $(ENV_FILE) || { echo "$(ENV_FILE) còn giá trị mẫu change_me:" \
+	  $$(grep -oE '^[A-Z0-9_]+=change_me' $(ENV_FILE) | cut -d= -f1) \
+	  "— đổi thành chuỗi ngẫu nhiên, hoặc xóa $(ENV_FILE) rồi make env" >&2; exit 1; }
 
 check: ## Kiểm tra tiền điều kiện của môi trường
 	@command -v docker >/dev/null || { echo "Thiếu Docker Engine >= 24.0"; exit 1; }
 	@docker compose version >/dev/null || { echo "Thiếu plugin docker compose v2"; exit 1; }
 	@test -f $(ENV_FILE) || { echo "Thiếu $(ENV_FILE) — chạy: make env"; exit 1; }
+	@$(MAKE) --no-print-directory env-ready
 	@$(COMPOSE) config -q && echo "Cú pháp Docker Compose hợp lệ."
 	@echo "Môi trường sẵn sàng."
 
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: $(ENV_FILE) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	@echo "Mộc đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
@@ -180,7 +189,7 @@ restore: $(ENV_FILE) ## Khôi phục lượt sao lưu mới nhất (hỏi lại 
 api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
 	@python3 scripts/api_docs.py
 
-install: $(ENV_FILE) ## Cài ra ngoài thư mục mã nguồn, chạy từ đó — dùng: make install PREFIX=/opt/moc
+install: env-ready ## Cài ra ngoài thư mục mã nguồn, chạy từ đó — dùng: make install PREFIX=/opt/moc
 	@MOC_VERSION="$(MOC_VERSION)" ./scripts/install.sh install "$(PREFIX)"
 
 uninstall: ## Gỡ bản cài, giữ .env và dữ liệu — dùng: make uninstall PREFIX=/opt/moc

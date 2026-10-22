@@ -84,7 +84,7 @@ from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, Stored
 from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
-from .sealed import SealError, Vault, VaultError, check_pdf, seal, unseal, watermark
+from .sealed import SealError, Vault, VaultError, run_check_pdf, run_watermark, seal, unseal
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .signing import DocumentSigner, SigningError, SigningOff, SigningUnavailable, preload as preload_signing
 from .storage import ObjectStore, StorageError, object_key, s3_client
@@ -93,6 +93,9 @@ from .texts import TextExtractor
 CHUNK_SIZE = 64 * 1024
 # Phần đầu và biên của multipart cộng thêm vào kích thước tệp
 MULTIPART_OVERHEAD = 64 * 1024
+# Văn bản hạn chế (F3.7): chờ lượt kiểm / đóng dấu PDF quá chừng này thì 503 busy
+SEALING_QUEUE_S = 10.0
+RETRY_AFTER = "10"
 MIME_RE = re.compile(r"^[\w.+-]+/[\w.+-]+$")
 
 log = logging.getLogger("svc_files")
@@ -542,6 +545,24 @@ def create_app(
             raise _error(503, "vault_unavailable", "Két khóa chưa sẵn sàng, tệp chưa được lưu") from exc
         return await asyncio.to_thread(seal, plain, dek, tenant_id, file_id), wrapped
 
+    # Kiểm PDF lúc tải lên và giải mã + đóng dấu lúc xem văn bản hạn chế tốn CPU và bộ nhớ (mỗi lượt một tiến trình con
+    # tới MEMORY_MB): chung tối đa hai lượt cùng lúc. Chờ lượt có hạn — đầy thì 503 busy, không treo yêu cầu
+    sealing = asyncio.Semaphore(2)
+
+    @asynccontextmanager
+    async def sealing_slot() -> AsyncIterator[None]:
+        try:
+            await asyncio.wait_for(sealing.acquire(), SEALING_QUEUE_S)
+        except TimeoutError:
+            raise HTTPException(
+                503, {"code": "busy", "message": "Đang kiểm, đóng dấu tệp văn bản hạn chế khác, thử lại sau ít giây"},
+                {"Retry-After": RETRY_AFTER},
+            ) from None
+        try:
+            yield
+        finally:
+            sealing.release()
+
     async def discard(request: Request, key: str) -> None:
         """Gỡ đối tượng vừa ghi khi không thêm được dòng CSDL — không để tệp mồ côi trong kho."""
         try:
@@ -560,11 +581,14 @@ def create_app(
         responses={
             401: {"description": "Thiếu hoặc sai token"},
             413: {"description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"},
-            415: {"description": "restricted=true mà tệp không phải PDF đọc được, không khóa (PDF phải nhập mật khẩu "
-                                 "mới mở thì bị chặn trước ở bước quét: 422 unscannable)"},
+            415: {"description": "restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa "
+                                 "MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ "
+                                 "(`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 "
+                                 "unscannable)"},
             422: {"description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được "
                                  "(unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"},
-            503: {"description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng — không lưu"},
+            503: {"description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` "
+                                 "(kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — không lưu"},
         },
     )
     async def upload_file(
@@ -641,11 +665,13 @@ def create_app(
                 if mime != "application/pdf":
                     raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF (để đóng dấu người xem)")
                 plain = await upload.read()
+                pages = settings.restricted_max_pages
                 try:
-                    await asyncio.to_thread(check_pdf, plain)
+                    async with sealing_slot():      # PDF người dùng tải lên: chỉ mở trong tiến trình con có giới hạn
+                        await run_check_pdf(plain, max_pages=pages)
                 except SealError as exc:
-                    raise _error(415, "restricted_pdf_only",
-                                 f"Văn bản hạn chế chỉ nhận tệp PDF đọc được, không đặt mật khẩu: {exc}") from exc
+                    raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF đọc được, không đặt "
+                                 f"mật khẩu, tối đa {pages} trang: {exc}", reason=exc.reason) from exc
                 blob, wrapped = await seal_bytes(request, plain, principal.tenant_id, file_id)
                 del plain
                 body, stored_size = io.BytesIO(blob), len(blob)
@@ -713,8 +739,11 @@ def create_app(
             200: {"content": {"application/octet-stream": {}}, "description": "Nội dung tệp, luôn ở dạng tải về"},
             401: {"description": "Thiếu hoặc sai token"},
             404: {"description": "Không có tệp, hoặc người gọi không được xem — hai trường hợp trả như nhau"},
+            422: {"description": "Tệp mã hóa giải mã được nhưng không đóng dấu người xem được (`unstampable`, "
+                                 "`reason`): PDF quá MOC_RESTRICTED_MAX_PAGES trang, quá nặng hoặc hỏng — không trả tệp"},
             500: {"description": "Tệp mã hóa không mở được: bản mã hỏng hoặc không khớp tệp"},
-            503: {"description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng"},
+            503: {"description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi "
+                                 "đang mở, kiểm tệp hạn chế khác"},
         },
     )
     async def download_file(
@@ -763,8 +792,6 @@ def create_app(
             },
         )
 
-    sealing = asyncio.Semaphore(2)      # giải mã + đóng dấu tốn CPU và bộ nhớ: tối đa hai bản cùng lúc
-
     async def open_sealed(request: Request, principal: Principal, meta: StoredFile, loc: Location) -> Response:
         """Tệp của văn bản hạn chế (F3.7): giải mã trong bộ nhớ, kiểm băm, đóng dấu người xem, ghi sổ rồi mới trả."""
         rid = request.state.request_id
@@ -773,7 +800,7 @@ def create_app(
         wrapped = loc.wrapped_dek
         who = principal.display_name or principal.user_id
         # Bản mã cũng nằm trong RAM: đọc kho, mở khóa đều trong giới hạn số lượt cùng lúc, không chỉ bước giải mã
-        async with sealing:
+        async with sealing_slot():
             try:
                 blob = b"".join(await asyncio.to_thread(lambda: list(store.read_stream(loc.object_key, CHUNK_SIZE))))
             except StorageError as exc:
@@ -786,18 +813,27 @@ def create_app(
                 raise _error(503, "vault_unavailable", "Két khóa chưa sẵn sàng, chưa mở được tệp") from exc
             at = datetime.now(UTC)
 
-            def unseal_and_stamp() -> bytes:
+            def unseal_checked() -> bytes:
                 plain = unseal(blob, dek, principal.tenant_id, meta.id)
                 if hashlib.sha256(plain).hexdigest() != meta.sha256:
                     raise SealError("băm bản rõ không khớp CSDL")
-                return watermark(plain, who, at)
+                return plain
 
             try:
-                out = await asyncio.to_thread(unseal_and_stamp)
+                plain = await asyncio.to_thread(unseal_checked)
             except SealError as exc:
                 log_event("core.file.unseal_failed", request, tenant_id=principal.tenant_id, file_id=meta.id,
                           error=str(exc))
                 raise _error(500, "sealed_corrupt", "Tệp mã hóa không mở được (hỏng hoặc không khớp tệp)") from exc
+            # Bản rõ là PDF do người dùng tải lên: đóng dấu trong tiến trình con có giới hạn, qua ống, không xuống đĩa
+            try:
+                out = await run_watermark(plain, who, at, max_pages=settings.restricted_max_pages)
+            except SealError as exc:
+                log_event("core.file.stamp_failed", request, tenant_id=principal.tenant_id, file_id=meta.id,
+                          reason=exc.reason)
+                raise _error(422, "unstampable", f"Không đóng dấu được tên người xem lên tệp nên chưa mở: {exc}",
+                             reason=exc.reason) from exc
+            del plain
         # Mỗi lần mở đều vào sổ kiểm toán; không ghi được sổ thì không trả bản rõ
         try:
             await hasura.log_event(tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=rid,

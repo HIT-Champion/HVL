@@ -106,6 +106,25 @@ routes:
     upstream_id: keycloak
     plugins:
       limit-count:
+        group: dang-nhap
+        count: ${{MOC_RATE_LOGIN_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều lần đăng nhập từ địa chỉ này, thử lại sau một phút."
+
+  # Mọi POST khác vào realm (…/token/, …/token;x, …) cũng tới Keycloak: không cho viết khác đường để né giới hạn trên.
+  # Cùng group nên chung một bộ đếm với route dang-nhap (cấu hình phải giống hệt); priority để thắng route keycloak
+  - id: dang-nhap-post
+    uri: /realms/${{MOC_REALM}}/*
+    methods: [POST]
+    priority: 10
+    upstream_id: keycloak
+    plugins:
+      limit-count:
+        group: dang-nhap
         count: ${{MOC_RATE_LOGIN_PER_MIN}}
         time_window: 60
         key_type: var
@@ -122,8 +141,9 @@ routes:
     plugins:
       proxy-rewrite:
         headers:
-          # khóa quản trị Hasura không bao giờ được đi từ ngoài vào
-          remove: [X-Hasura-Admin-Secret]
+          # khóa quản trị Hasura không bao giờ được đi từ ngoài vào; tên cũ X-Hasura-Access-Key thì Hasura 2.51
+          # đã không nhận, gỡ để phòng xa
+          remove: [X-Hasura-Admin-Secret, X-Hasura-Access-Key]
 
   - id: svc-files
     uris: ["/api/files", "/api/files/*", "/api/search", "/api/documents/*", "/api/registers/*", "/api/case-files/*"]

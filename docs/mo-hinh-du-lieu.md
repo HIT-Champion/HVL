@@ -190,7 +190,14 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
   vào, giao việc, lần vào hồ sơ, danh sách được xem) chỉ còn tên trường, mọi giá trị là null — trạng thái, độ khẩn,
-  hạn, người ký cũng không lộ. Ai có tên trong danh sách được xem vẫn thấy qua `entity_id` của dòng `document_acl`. Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
+  hạn, người ký cũng không lộ. Dòng danh sách được xem (`office.document_acl`) mang người được cấp ở `entity_id`
+  ("<văn bản>/<người>") và người cấp ở `actor_id` — hai cột thô mà overview không che được — nên với văn bản hạn chế
+  người xem không đọc được thì không hiện cả dòng: bộ lọc quyền của hai vai trò có thêm trường tính toán `visible`
+  (`office.audit_log_visible(r, hasura_session)`, migration 1792281602400; không cấp cho vai trò nào chọn, lược đồ
+  GraphQL không đổi). Lọc kiểu gì (`where` trên `entity_id`, `actor_id`, aggregate, `by_pk`) cũng không ra dòng đó;
+  văn bản không tra được thì cũng ẩn. Người đọc được văn bản (người tạo, có tên trong danh sách) thấy như cũ. Không
+  dòng sổ nào bị sửa, chuỗi băm không đổi; đổi lại, người không đọc được văn bản không còn biết có lần cấp, gỡ quyền
+  xem, dãy `id` họ thấy có chỗ hở. Mốc neo mở cho hai vai trò này `audit_id`, `anchored_at`: chuỗi
   chung cho cả nền tảng nên mốc không thuộc riêng đơn vị nào.
 - **Lịch sử của một văn bản** (F3.5, tab "Lịch sử" trên trang văn bản): view `office.document_history` (migration
   1792281601500) gồm các dòng sổ về chính văn bản, tệp gắn với nó (`entity_id` "<văn bản>/<tệp>"), các lần giao
@@ -694,7 +701,8 @@ hồ sơ `closed` từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định 365); một
 2. Hàm `office.archive_case_file(p jsonb)` (Hasura đưa ra thành mutation, chỉ khóa quản trị gọi được), một giao dịch
    có khóa dòng: kiểm hồ sơ còn `closed` và CSDL còn đúng như gói (đúng văn bản, dòng thời gian, liên kết tệp) — lệch
    thì raise, không đổi gì; rồi `case_files` ghi `archive_key`, `archive_sha256`, `archived_at`, `status =
-   'archived'`; văn bản `archived`; xóa `document_events`, `document_files` của các văn bản đó; tệp đổi `storage_tier
+   'archived'`; văn bản `archived`; ghi `office.archived_document_facts` (lúc xong, tệp bản chính — §2.5, migration
+   1792281602300) rồi mới xóa `document_events`, `document_files` của các văn bản đó; tệp đổi `storage_tier
    = 'cold'`; sự kiện `case_file.archived` kèm băm vào `core.audit_log`. **Giữ** dòng `documents` rút gọn (vẫn tìm
    thấy, cổng xác thực vẫn trả lời — `office.issued_documents` gồm cả `archived`) và `assignments` (căn cứ quyền xem,
    cột "đơn vị nhận" của sổ đăng ký). Hai lượt cùng lúc: lượt sau đợi khóa, thấy hồ sơ đã `archived`, rollback.
@@ -729,8 +737,8 @@ create table core.lineage_events (
   vào bước `manifest` (đúng đặc tả OpenLineage, Marquez hiển thị được).
 - Quyền: `director`, `clerk` đọc của đơn vị mình (§3); không vai trò nào ghi.
 
-Thống kê điều hành (§2.5) tính thời gian xử lý từ dòng thời gian: văn bản đã nộp lưu không còn trong số đó (mặc định
-nộp lưu sau một năm, ngoài cửa sổ 12 tháng của dashboard).
+Thống kê điều hành và số đo đọc văn bản đến (§2.5) tính từ dòng thời gian, liên kết tệp mà nộp lưu gỡ đi: văn bản
+đã nộp lưu vẫn được đếm như trước nhờ bản giữ lại `office.archived_document_facts` (migration 1792281602300, §2.5).
 
 ### 2.5. Khung nhìn cho báo cáo
 
@@ -748,13 +756,30 @@ ký vẫn cho biết có bao nhiêu văn bản. Nhờ vậy mọi số chia trê
 |---|---|---|
 | `office.v_document_counts` | `direction`, `restricted`, `status`, `urgency`, `overdue`, `documents` | Văn bản đến theo trạng thái, văn bản khẩn chưa xong, số quá hạn (văn bản đến chưa xong — chờ vào sổ, chờ chỉ đạo, đang xử lý — mà đã qua `due_on`). Dòng `restricted = true`: số văn bản hạn chế, `status`, `urgency`, `overdue` để null |
 | `office.v_overdue_by_department` | `department_id`, `code`, `name`, `in_progress`, `overdue` | Văn bản đến đang xử lý theo phòng chủ trì: việc chủ trì gốc giao cho phòng, hoặc giao cho một người thì tính về phòng của người đó (`core.users`). Phòng chưa có việc vẫn có dòng, số 0. Không xác định được phòng thì vào dòng `department_id` null ("Chưa rõ phòng"), để tổng luôn bằng số văn bản đang xử lý |
-| `office.v_processing_time` | `month`, `documents`, `total_hours`, `with_due`, `on_time` | Thời gian từ vào sổ đến khi xong, theo tháng xong. Lúc xong là sự kiện `office.document.processed` (báo xong) hoặc `office.document.filed` (cho lưu) trên dòng thời gian, ghi cùng giao dịch với trạng thái `done`. Trả tổng số giờ để giao diện tự chia, gộp nhiều tháng không lệch; `on_time` đếm trong số `with_due` (văn bản có hạn) |
+| `office.v_processing_time` | `month`, `documents`, `total_hours`, `with_due`, `on_time` | Thời gian từ vào sổ đến khi xong, theo tháng xong. Lúc xong là sự kiện `office.document.processed` (báo xong) hoặc `office.document.filed` (cho lưu) trên dòng thời gian, ghi cùng giao dịch với trạng thái `done` (văn bản đã nộp lưu: bản giữ lại, xem dưới). Trả tổng số giờ để giao diện tự chia, gộp nhiều tháng không lệch; `on_time` đếm trong số `with_due` (văn bản có hạn) |
 | `office.v_outgoing_by_month` | `month`, `documents` | Văn bản đi đã phát hành theo tháng ban hành |
 
 **Số đo đọc văn bản đến** (F4.1, migration 1792281601900): `office.v_intake_accuracy` đối chiếu gợi ý đã lưu với
 văn bản văn thư đã lưu từ tệp đó (tệp là bản chính của văn bản đến chưa hủy), cho biết văn thư giữ nguyên bao nhiêu
 gợi ý trên dữ liệu thật. Văn bản hạn chế không vào phép đếm. `director`, `tenant_admin` đọc, lọc thuê ước, có
 aggregate; vai trò khác không thấy.
+
+**Văn bản đã nộp lưu vẫn trong số liệu** (migration 1792281602300). Nộp lưu (§2.4) xóa dòng thời gian và liên kết tệp
+mà `v_processing_time` (lúc xong) và `v_intake_accuracy` (tệp bản chính) đọc. `office.archive_case_file` chép trước
+hai thứ ấy vào bảng dưới, trong cùng giao dịch; hai view lấy từ dòng sống như cũ và chỉ dùng bản giữ lại khi dòng sống
+không còn — văn bản chưa nộp lưu tính y như trước. Văn bản nộp lưu trước migration được điền lại từ sổ kiểm toán:
+lúc xong là lần cuối trạng thái chuyển sang `done` (cùng giao dịch với sự kiện, lệch vài mili giây), bản chính là dòng
+`document_files` vai trò `main` bị xóa lúc nộp lưu. Dữ liệu dẫn xuất: không gắn sổ kiểm toán, không đưa vào Hasura
+(không vai trò nào đọc, ghi).
+
+```sql
+create table office.archived_document_facts (   -- một dòng mỗi văn bản nộp lưu
+  document_id    uuid primary key,              -- (tenant_id, document_id) → office.documents
+  tenant_id      uuid not null,
+  finished_at    timestamptz,                   -- sự kiện processed / filed cuối cùng; null: không có
+  main_file_ids  uuid[] not null default '{}'   -- tệp bản chính lúc nộp lưu
+);
+```
 
 | View | Cột | Dùng cho |
 |---|---|---|
@@ -818,7 +843,8 @@ thì người xem phải là người tạo hoặc có trong `office.document_ac
 `office.grant_document_access(document_id, user_id)`, `office.revoke_document_access(document_id, user_id)` (Hasura
 đưa ra thành mutation, truyền phiên của người gọi vào `hasura_session`): hàm kiểm vai trò, người gọi đọc được văn bản, văn bản đang hạn chế,
 người được cấp cùng đơn vị và còn hoạt động, không tự gỡ mình; cấp lại người đã có thì giữ người cấp lần đầu. Mỗi lần
-cấp, gỡ là một dòng sổ kiểm toán (`office.document_acl`, `entity_id` "<văn bản>/<người>"). `svc-workflow` (vai trò
+cấp, gỡ là một dòng sổ kiểm toán (`office.document_acl`, `entity_id` "<văn bản>/<người>"); lãnh đạo, quản trị đơn vị
+không đọc được văn bản thì không thấy dòng đó (§1, migration 1792281602400). `svc-workflow` (vai trò
 `service`) tự thêm người phải làm các việc đang mở của quy trình sau mỗi bước, để không ai nhận việc mà không mở được
 văn bản. Tệp phải khớp chế độ: văn bản hạn chế chỉ gắn tệp mã hóa, văn bản thường chỉ gắn tệp thường (trigger
 `document_files_sealed`); đã có tệp thì không bật, tắt hạn chế được nữa (`documents_restricted_sealed`). Tệp mã hóa đã

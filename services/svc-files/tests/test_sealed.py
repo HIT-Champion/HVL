@@ -18,10 +18,14 @@
 
 import asyncio
 import base64
+import dataclasses
+import functools
 import hashlib
 import io
 import json
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
 import httpx2
@@ -32,6 +36,7 @@ from pypdf import PdfReader, PdfWriter
 from conftest import EICAR, TENANT_A, text_pdf
 from svc_files import sealed
 from svc_files.app import create_app
+from svc_files.config import ConfigError
 from svc_files.sealed import SealError, Vault, VaultError
 
 SECRET = text_pdf("NOI DUNG HAN CHE so 7", pages=2)
@@ -231,6 +236,120 @@ def test_encrypted_files_never_stream_ciphertext(client, make_token, hasura, sto
     hasura.visible_file = without_flag
     r = client.get(f"/api/files/{file_id}", headers=auth(token))
     assert r.status_code == 200 and r.content.startswith(b"%PDF") and not r.content.startswith(b"MOC1")
+
+
+# --- giới hạn: tiến trình con, trần số trang, chờ lượt ---------------------------------------------------------------
+
+def app_with(settings, scanner, store, verifier, hasura, meili, vault, **changes):
+    return create_app(dataclasses.replace(settings, **changes), scanner=scanner, store=store, verifier=verifier,
+                      hasura=hasura, meili=meili, vault=vault)
+
+
+def test_page_cap_setting(settings):
+    assert settings.restricted_max_pages == 500
+    with pytest.raises(ConfigError):
+        dataclasses.replace(settings, restricted_max_pages=0)
+
+
+def test_check_pdf_refuses_more_pages_than_the_cap():
+    assert sealed.check_pdf(SECRET, max_pages=2) == 2
+    with pytest.raises(SealError) as e:
+        sealed.check_pdf(SECRET, max_pages=1)
+    assert e.value.reason == "too_many_pages"
+
+
+def test_child_process_checks_and_stamps_like_in_process():
+    at = datetime(2026, 10, 20, 3, 15, tzinfo=UTC)
+    assert asyncio.run(sealed.run_check_pdf(SECRET, max_pages=500)) == 2
+    out = asyncio.run(sealed.run_watermark(SECRET, "Nguyễn Văn An (vanthu)", at, max_pages=500))
+    assert page_text(out) == page_text(sealed.watermark(SECRET, "Nguyễn Văn An (vanthu)", at))
+    assert all("NOI DUNG HAN CHE so 7" in t and "10:15 20/10/2026" in t for t in page_text(out))
+
+
+@pytest.mark.parametrize(("call", "reason"), [
+    (lambda: sealed.run_check_pdf(SECRET, max_pages=1), "too_many_pages"),
+    (lambda: sealed.run_check_pdf(b"%PDF-1.7 hong", max_pages=500), "corrupt"),
+    (lambda: sealed.run_check_pdf(SECRET, max_pages=500, timeout_s=0.001), "timeout"),
+    (lambda: sealed.run_watermark(SECRET, "An", datetime.now(UTC), max_pages=1), "too_many_pages"),
+    # 32 MB không đủ cho WeasyPrint: tiến trình con hết bộ nhớ, svc-files chỉ nhận một lỗi có lý do
+    (lambda: sealed.run_watermark(SECRET, "An", datetime.now(UTC), max_pages=500, memory_mb=32), "memory"),
+])
+def test_child_failures_are_seal_errors_with_a_reason(call, reason):
+    with pytest.raises(SealError) as e:
+        asyncio.run(call())
+    assert e.value.reason == reason and str(e.value)
+
+
+def test_restricted_upload_over_the_page_cap_is_refused(settings, scanner, store, verifier, hasura, meili, vault,
+                                                        make_token):
+    with TestClient(app_with(settings, scanner, store, verifier, hasura, meili, vault, restricted_max_pages=1)) as c:
+        r = upload(c, make_token())
+    assert r.status_code == 415
+    detail = r.json()["detail"]
+    assert (detail["code"], detail["reason"]) == ("restricted_pdf_only", "too_many_pages")
+    assert "tối đa 1 trang" in detail["message"]
+    assert not store.objects and not hasura.files
+
+
+def test_too_heavy_restricted_upload_is_a_clean_415(client, make_token, store, hasura, monkeypatch):
+    monkeypatch.setattr("svc_files.app.run_check_pdf", functools.partial(sealed.run_check_pdf, timeout_s=0.001))
+    r = upload(client, make_token())
+    assert r.status_code == 415
+    assert (r.json()["detail"]["code"], r.json()["detail"]["reason"]) == ("restricted_pdf_only", "timeout")
+    assert not store.objects and not hasura.files
+
+
+@pytest.mark.parametrize(("limits", "reason"), [({"timeout_s": 0.001}, "timeout"), ({"memory_mb": 32}, "memory")])
+def test_view_that_cannot_be_stamped_is_a_clean_422(client, make_token, hasura, monkeypatch, log_records, limits,
+                                                    reason):
+    token = make_token()
+    file_id = upload(client, token).json()["id"]
+    monkeypatch.setattr("svc_files.app.run_watermark", functools.partial(sealed.run_watermark, **limits))
+    r = client.get(f"/api/files/{file_id}", headers=auth(token))
+    assert r.status_code == 422 and b"NOI DUNG" not in r.content
+    assert (r.json()["detail"]["code"], r.json()["detail"]["reason"]) == ("unstampable", reason)
+    assert not [e for e in hasura.events if e["action"] == "file.decrypted"]
+    (event,) = [e for e in log_records if e["event"] == "core.file.stamp_failed"]
+    assert event["file_id"] == file_id and event["reason"] == reason
+
+
+def test_file_over_a_lowered_page_cap_is_not_stamped(client, settings, scanner, store, verifier, hasura, meili, vault,
+                                                     make_token):
+    """Tệp tải lên trước khi có trần (hoặc trước khi hạ trần): không đóng dấu, không trả bản rõ."""
+    token = make_token()
+    file_id = upload(client, token).json()["id"]
+    with TestClient(app_with(settings, scanner, store, verifier, hasura, meili, vault, restricted_max_pages=1)) as c:
+        r = c.get(f"/api/files/{file_id}", headers=auth(token))
+    assert r.status_code == 422 and r.json()["detail"]["reason"] == "too_many_pages"
+    assert not [e for e in hasura.events if e["action"] == "file.decrypted"]
+
+
+def test_busy_sealing_slots_answer_503_with_retry_after(client, make_token, store, monkeypatch):
+    token = make_token()
+    file_id = upload(client, token).json()["id"]
+    entered, release = threading.Semaphore(0), threading.Event()
+
+    async def slow_stamp(pdf, who, at, *, max_pages):
+        entered.release()
+        await asyncio.to_thread(release.wait, 10)
+        return pdf
+
+    monkeypatch.setattr("svc_files.app.run_watermark", slow_stamp)
+    monkeypatch.setattr("svc_files.app.SEALING_QUEUE_S", 0.1)
+    with ThreadPoolExecutor(2) as pool:
+        views = [pool.submit(client.get, f"/api/files/{file_id}", headers=auth(token)) for _ in range(2)]
+        try:
+            assert entered.acquire(timeout=10) and entered.acquire(timeout=10)   # hai lượt đang đóng dấu
+            r = client.get(f"/api/files/{file_id}", headers=auth(token))
+            assert r.status_code == 503 and r.headers["retry-after"] == "10"
+            assert r.json()["detail"]["code"] == "busy"
+            before = dict(store.objects)
+            r = upload(client, token)                   # kiểm lúc tải lên dùng chung hai lượt đó
+            assert r.status_code == 503 and r.json()["detail"]["code"] == "busy" and store.objects == before
+        finally:
+            release.set()
+        assert [v.result().status_code for v in views] == [200, 200]
+    assert client.get(f"/api/files/{file_id}", headers=auth(token)).status_code == 200   # lượt đã trả lại
 
 
 # --- phát hành văn bản đi hạn chế ------------------------------------------------------------------------------------

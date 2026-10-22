@@ -34,28 +34,32 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Tên thẻ chỉ được đúng dạng của scripts/release.sh: các bước sau đọc phiên bản qua biến môi trường V, không
+      # chèn ${{ }} vào lệnh shell — tên thẻ git có thể chứa $( ), ;, | mà bộ lọc v*.*.* không chặn
       - name: Xác định phiên bản
         id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+            || { echo "::error::Thẻ '$GITHUB_REF_NAME' không đúng dạng vMAJOR.MINOR.PATCH"; exit 1; }
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Sinh gói nguồn .tar.gz
+        env:
+          V: ${{ steps.ver.outputs.version }}
         run: |
-          V="${{ steps.ver.outputs.version }}"
           mkdir -p dist
           git archive --format=tar.gz --prefix="moc-$V/" \
                       -o "dist/moc-$V.tar.gz" "$GITHUB_REF_NAME"
           ( cd dist && sha256sum "moc-$V.tar.gz" > "moc-$V.tar.gz.sha256" )
 
+      # Không có mục [X.Y.Z] thật (khối mẫu trong chú thích HTML không tính) thì dừng, không đăng Release với ghi chú
+      # rỗng — release.sh đã kiểm trước khi gắn thẻ, bước này chặn thẻ gắn tay
       - name: Trích ghi chú phát hành từ CHANGELOG
+        env:
+          V: ${{ steps.ver.outputs.version }}
         run: |
-          V="${{ steps.ver.outputs.version }}"
-          awk -v v="$V" '
-            $0 ~ "^## \\[" v "\\]" { p = 1; next }
-            p && /^## \[/           { exit }
-            p                       { print }
-          ' CHANGELOG.md > dist/RELEASE_NOTES.md
-          test -s dist/RELEASE_NOTES.md \
-            || echo "Xem CHANGELOG.md để biết chi tiết thay đổi." > dist/RELEASE_NOTES.md
+          ./scripts/release-notes.sh "$V" > dist/RELEASE_NOTES.md \
+            || { echo "::error::CHANGELOG.md chưa có mục [$V] — xem lỗi ở trên"; exit 1; }
 
       - name: Tạo bản phát hành trên GitHub
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2

@@ -20,6 +20,10 @@ sử dụng"*).
 - **Phiên bản ghim**: thành phần đã chạy (Phase 1) ghi đúng thẻ trong `docker-compose.yml` — cập nhật
   18/10/2026; thành phần phase sau là bản ổn định mới nhất tại 09/10/2026, chốt lại khi đưa vào. Chỉ
   chọn bản đã phát hành ít nhất hai tuần.
+- **Ngoại lệ vá bảo mật**: bản đang ghim có lỗ hổng đã công bố (OSV-Scanner trong CI báo) mà bản vá chưa đủ hai
+  tuần thì dùng bản vá ngay, ghi ở đây. 22/10/2026: Pillow 13.0.0 (PyPI 16/10, vá các GHSA của 12.3.0) và pypdf
+  6.21.1 (17/10, vá 5 GHSA của 6.19.0) — cả hai đọc tệp người dùng tải lên (`svc-files`); certifi 2026.10.19 (20/10,
+  bỏ gốc emSign có CA trung gian lộ khóa, GHSA-6q48-6c7w-9gw2).
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -115,10 +119,10 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | PyJWT (+ cryptography) | 2.15 · 50.0 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files`; mã hóa con trỏ trang tìm kiếm | pip | 1 |
 | WeasyPrint (+ pydyf, tinycss2, cssselect2, tinyhtml5, webencodings) | 70.0 | BSD-3-Clause (tinyhtml5: MIT) | Dựng PDF văn bản đi đúng thể thức NĐ 30 từ khuôn HTML (`svc-files`) | pip | 2 |
 | fontTools (+ Brotli, zopfli) | 4.66 | MIT (zopfli: Apache-2.0) | Nhúng và nén phông vào PDF (WeasyPrint kéo theo) | pip | 2 |
-| Pillow | 12.3 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
+| Pillow | 13.0 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
 | Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Mộc dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
-| pypdf | 6.19 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
+| pypdf | 6.21.1 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
@@ -147,7 +151,7 @@ METADATA của gói. Không thêm image, gói npm hay route gateway.
 | yarl | 1.25.1 | 15/09/2026 | Apache-2.0 | aiohttp |
 | oscrypto | 1.3.0 | 18/03/2022 | MIT | certvalidator; **không nạp** lúc chạy (kiểm chữ ký dùng `cryptography`) |
 | uritools | 6.1.3 | 23/07/2026 | MIT | certvalidator |
-| certifi | 2026.7.22 | 22/07/2026 | MPL-2.0 | certvalidator (gói CA công cộng, Mộc không dùng: chỉ tin CA nội bộ của két); bản 10/2026 quá mới |
+| certifi | 2026.10.19 | 20/10/2026 | MPL-2.0 | certvalidator (gói CA công cộng, Mộc không dùng: chỉ tin CA nội bộ của két). Nâng từ 2026.7.22 theo ngoại lệ vá bảo mật: GHSA-6q48-6c7w-9gw2, gốc emSign có CA trung gian lộ khóa |
 | tzdata | 2026.5 | 03/10/2026 | Apache-2.0 | tzlocal, chỉ trên Windows (`sys_platform == 'win32'`): có trong tệp khóa, không cài vào image |
 
 Gói đã có trong khóa, giữ nguyên bản: `cryptography` 50.0.2 (pyHanko đòi ≥ 48), `idna` 3.20, `typing-extensions`
@@ -213,7 +217,7 @@ thư viện chuẩn Python (`statistics.median_low`). Không mô hình nào ch�
 
 **F4.4 không thêm phụ thuộc** — không gói Python, gói npm, image hay route gateway nào. Bộ che thông tin cá nhân
 `pii.py` (`svc-files`, bản chép y hệt trong `svc-workflow`) chỉ dùng thư viện chuẩn Python (`re`, `unicodedata`,
-`logging`); test dùng uvicorn 0.54.0 (`AccessFormatter` thật) và pypdf 6.19.0 (đọc kho mẫu) sẵn có. Nhật ký truy cập
+`logging`); test dùng uvicorn 0.54.0 (`AccessFormatter` thật) và pypdf (đọc kho mẫu) sẵn có. Nhật ký truy cập
 bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (`access_log_format`, `http_configuration_snippet`) và
 `map`, `log_format` của nginx trong image giao diện; giao diện chỉ thêm một biểu thức chính quy nhận nhãn che.
 

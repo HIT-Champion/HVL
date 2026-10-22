@@ -455,6 +455,23 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   nên không bao giờ chạy. Nay thử tối đa bốn mã liền nhau, cách nhau 1,5 giây — ba mã đang hiệu lực đều đã bị
   dùng thì đợi sang khoảng 30 giây mới (test scripts +4).
 
+- Soạn văn bản đi: đang sửa một dự thảo mà bấm "Soạn văn bản đi" ở thanh bên (cùng trang, chỉ bỏ `?id=`) thì form
+  còn nội dung, tệp, cờ hạn chế của dự thảo trước và Lưu tạo một văn bản mới chép từ nó. Nay đổi `?id=` là dựng lại
+  trang (e2e `van-ban-di.spec.ts` kiểm); dự thảo hạn chế chỉ cho chọn tệp PDF ngay ở ô chọn tệp.
+- Trình văn bản đi (`submitOutgoing`): lần trình đầu lỗi sau khi quy trình đã khởi chạy, trình lại với người ký khác
+  thì việc ký vẫn giao cho người chọn lần trước — nay ghi lại người ký vào quy trình trước khi ghi CSDL; quy trình đã
+  qua bước duyệt cấp phòng thì từ chối (409 `signer_locked`). Trả lại đã ghi mà Flowable chưa sang bước sửa, người
+  soạn trình lại ngay thì CSDL là "đang duyệt" còn quy trình quay về bước sửa, người soạn kẹt — nay trả 409
+  `return_pending`, không ghi gì. Test svc-workflow +7.
+- Nộp lưu hồ sơ (F3.8) không còn làm tụt số liệu dashboard điều hành (F3.11) và số đo đọc văn bản đến (F4.1): hàm
+  nộp lưu gỡ dòng thời gian, liên kết tệp mà hai khung nhìn tính từ đó, nên văn bản đã nộp lưu rơi khỏi số văn bản,
+  số giờ, số đúng hạn của các tháng cũ. Nay lúc xong và tệp bản chính giữ ở `office.archived_document_facts` trong
+  cùng giao dịch; văn bản nộp lưu trước bản sửa được điền lại từ sổ kiểm toán khi chạy migration. Test CSDL +1.
+- Ghi chú trang Release lấy từ CHANGELOG: mục cuối kéo theo khối mẫu trong chú thích HTML (trang v0.1.0 đã đăng có
+  các dòng `### Đã thêm … -->` thừa), thiếu mục thì vẫn đăng Release với một câu thay thế. Nay
+  `scripts/release-notes.sh` (dùng ở `release.sh` và workflow Release) bỏ qua chú thích HTML; thiếu mục, hay mục chỉ
+  có tiêu đề nhóm, thì `release.sh` không gắn thẻ và workflow dừng. Test scripts +5.
+
 ### Bảo mật
 - Mọi image bên thứ ba (`docker-compose.yml`, các `Dockerfile`, image Playwright của `make e2e`) ghim thêm digest
   (`thẻ@sha256:…`, index đa nền tảng đã chạy CI): thẻ bị đẩy lại không đổi được bản máy chủ kéo về. Ba thẻ đã bị đẩy
@@ -506,6 +523,30 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   trigger CSDL gọt nội dung cho mọi đường ghi và gọt cả thông báo đã gửi khi văn bản chuyển sang hạn chế. Tóm tắt dòng
   sổ kiểm toán (`overview`) về văn bản hạn chế mà người xem sổ không đọc được chỉ còn tên trường, không còn giá trị
   (hàm `office.audit_overview_seen`) (#47).
+
+- Pillow 12.3.0 → 13.0.0, pypdf 6.19.0 → 6.21.1 (`svc-files`): vá các lỗ hổng OSV-Scanner báo trong CI (Pillow các
+  GHSA đọc ảnh, pypdf 5 GHSA) — cả hai đọc tệp người dùng tải lên; certifi 2026.7.22 → 2026.10.19 (bỏ gốc emSign có
+  CA trung gian lộ khóa). Ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
+- Giới hạn đăng nhập theo IP (F1.2) không còn né được bằng cách viết khác đường (`…/token/`, `…/token;x`): mọi POST
+  vào realm qua route `dang-nhap-post`, chung bộ đếm với route đăng nhập. Cổng gỡ thêm `X-Hasura-Access-Key` từ phía
+  ngoài (tên cũ của khóa quản trị; Hasura 2.51 đã không nhận — kiểm 22/10 — gỡ để phòng xa).
+- Realm `moc` đặt luồng direct grant mặc định là `moc-cli-direct-grant`: client có sẵn `admin-cli` (lấy token bằng
+  mật khẩu) cũng phải gửi mã TOTP, không còn là đường vòng qua xác thực hai bước. Stack đã dựng: `make reset` hoặc
+  đặt tay (auth/README.md). `make smoke` +3 (tổng 79): đường token viết khác vẫn bị đếm, `admin-cli` không có mã bị
+  từ chối, khóa quản trị Hasura từ ngoài (cả tên cũ) không có tác dụng.
+- Văn bản hạn chế (F3.7): PDF người dùng tải lên chỉ được kiểm, đóng dấu người xem trong tiến trình con `python -I`
+  có trần bộ nhớ, CPU, thời gian (như OCR), tối đa `MOC_RESTRICTED_MAX_PAGES` trang (mặc định 500). Trước đây pypdf
+  chạy ngay trong svc-files, không trần trang, hai lượt cùng lúc mà chờ không hạn: một tệp nhiều trang tí hon làm
+  treo mọi lần mở tệp hạn chế. Tải lên quá trần, quá nặng: 415 `restricted_pdf_only` kèm `reason`; mở tệp không đóng
+  dấu được: 422 `unstampable`; chờ lượt quá 10 giây: 503 `busy` kèm `Retry-After`. Test svc-files +14.
+- Sổ kiểm toán không còn lộ danh sách được xem văn bản hạn chế (F3.7) cho lãnh đạo, quản trị đơn vị không đọc được
+  văn bản: `overview` đã che nhưng cột thô `entity_id` (`<văn bản>/<người được cấp>`) và `actor_id` (người cấp) thì
+  không. Nay cả dòng bị lọc ở quyền Hasura (`office.audit_log_visible`); không sửa dòng sổ nào, chuỗi băm và `make
+  audit` giữ nguyên. Test CSDL +1.
+- `make env` tạo `.env` quyền 600 (trước đây theo umask, thường 644: người dùng khác trên máy đọc được mật khẩu);
+  `make up`, `make install`, `make check` từ chối khi `.env` còn giá trị `change_me` và in tên biến.
+- Workflow Release kiểm tên thẻ đúng dạng `vMAJOR.MINOR.PATCH` và đọc phiên bản qua biến môi trường, không chèn
+  `${{ }}` vào lệnh shell — tên thẻ chứa `$( )` không chạy được lệnh trong job có quyền ghi kho.
 
 ## [0.1.0] - 2026-10-18
 

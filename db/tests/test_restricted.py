@@ -278,12 +278,91 @@ def test_audit_overview_hides_values_of_restricted_documents_the_viewer_cannot_r
         assert row["entity"] == "office.documents" and row["action"] == "insert"       # vẫn biết ai làm gì
         assert set(row["overview"]) >= {"status", "urgency"}                           # cột nào đổi
         assert row["overview"]["status"] is None and row["overview"]["urgency"] is None
-        acl = viewer.gql(OVERVIEW, {"e": f"{doc['id']}/{w.staff_a1.sub}"})["core_audit_log"][0]
-        assert acl["overview"]["user_id"] is None
+        # dòng danh sách được xem: entity_id mang người được cấp nên không hiện cả dòng (migration 1792281602400)
+        assert viewer.gql(OVERVIEW, {"e": f"{doc['id']}/{w.staff_a1.sub}"})["core_audit_log"] == []
 
     w.clerk_a.gql(GRANT, {"d": doc["id"], "u": w.director_a.sub})
     row = w.director_a.gql(OVERVIEW, {"e": doc["id"]})["core_audit_log"][0]
     assert row["overview"]["status"] == [None, "received"]
     assert row["overview"]["urgency"] == [None, "khan"]
     assert row["overview"]["summary"] is None                                       # nội dung vẫn ẩn như mọi văn bản
+    [acl] = w.director_a.gql(OVERVIEW, {"e": f"{doc['id']}/{w.staff_a1.sub}"})["core_audit_log"]
+    assert acl["overview"]["user_id"] == [None, w.staff_a1.sub]                     # đọc được văn bản: thấy như cũ
     assert w.admin_a.gql(OVERVIEW, {"e": doc["id"]})["core_audit_log"][0]["overview"]["status"] is None
+    assert w.admin_a.gql(OVERVIEW, {"e": f"{doc['id']}/{w.staff_a1.sub}"})["core_audit_log"] == []
+
+
+ACL_AUDIT = """query ($w: core_audit_log_bool_exp!) {
+  core_audit_log(where: $w, order_by: {id: asc}) { id action entity entity_id actor_id overview }
+  core_audit_log_aggregate(where: $w) { aggregate { count } }
+}"""
+
+AUDIT_BY_PK = """query ($id: bigint!) { core_audit_log_by_pk(id: $id) { entity_id actor_id } }"""
+
+
+def test_audit_log_does_not_list_viewers_of_restricted_documents_the_viewer_cannot_read(people):
+    """Dòng sổ của office.document_acl mang người được cấp ở entity_id ("<văn bản>/<người>") và người cấp ở actor_id —
+    hai cột lãnh đạo, quản trị đơn vị chọn và lọc được. Văn bản hạn chế mà người xem không đọc được thì dòng đó không
+    hiện, lọc kiểu gì cũng vậy (bộ lọc quyền `visible`, migration 1792281602400); đọc được thì thấy như cũ. Không dòng
+    sổ nào bị sửa: chuỗi băm vẫn khớp."""
+    w = people
+    doc = received(w.clerk_a, incoming(w.tag, 431, restricted=True))
+    w.clerk_a.gql(GRANT, {"d": doc["id"], "u": w.staff_a1.sub})
+    w.clerk_a.gql(REVOKE, {"d": doc["id"], "u": w.staff_a1.sub})
+    w.clerk_a.gql(GRANT, {"d": doc["id"], "u": w.manager_a1.sub})
+    acl_ids = [int(r[0]) for r in sql("select id from core.audit_log where entity = 'office.document_acl' "
+                                      f"and entity_id like '{doc['id']}/%' order by id")]
+    assert len(acl_ids) == 3
+    prefix = f"{doc['id']}/"
+    scoped = [                                                   # mọi cách khoanh đúng các dòng đó
+        {"entity": {"_eq": "office.document_acl"}, "entity_id": {"_like": f"{prefix}%"}},
+        {"entity_id": {"_eq": f"{prefix}{w.staff_a1.sub}"}},
+        {"entity_id": {"_regex": f"^{doc['id']}/"}},
+        {"id": {"_in": acl_ids}},
+        {"_or": [{"id": {"_eq": acl_ids[0]}}, {"entity_id": {"_ilike": f"{prefix.upper()}%"}}]},
+        {"actor_id": {"_eq": w.clerk_a.sub}, "entity_id": {"_nlike": doc["id"]},
+         "_not": {"entity_id": {"_nilike": f"{prefix}%"}}},
+    ]
+    broad = [                                    # lọc rộng: dòng khác vẫn ra, dòng của văn bản này thì không
+        {"entity": {"_eq": "office.document_acl"}},
+        {"actor_id": {"_eq": w.clerk_a.sub}},
+        {"entity_id": {"_like": f"%{w.manager_a1.sub}"}},
+    ]
+    for viewer in (w.director_a, w.admin_a):
+        for where in scoped:
+            data = viewer.gql(ACL_AUDIT, {"w": where})
+            assert data["core_audit_log"] == [], (viewer.role, where)
+            assert data["core_audit_log_aggregate"]["aggregate"]["count"] == 0, (viewer.role, where)
+        for where in broad:
+            rows = viewer.gql(ACL_AUDIT, {"w": where})["core_audit_log"]
+            assert not [r for r in rows if r["entity_id"].startswith(prefix)], (viewer.role, where)
+        for audit_id in acl_ids:
+            assert viewer.gql(AUDIT_BY_PK, {"id": audit_id})["core_audit_log_by_pk"] is None
+        # dòng về chính văn bản vẫn hiện như trước (chỉ tên cột)
+        assert [r["entity"] for r in viewer.gql(ACL_AUDIT, {"w": {"entity_id": {"_eq": doc["id"]}}})[
+            "core_audit_log"]] == ["office.documents"]
+
+    # dịch vụ (svc-files, svc-workflow) đọc sổ như cũ
+    rows = w.service_a.gql("""query ($p: String!) {
+      core_audit_log(where: {entity_id: {_like: $p}}, order_by: {id: asc}) { id } }""", {"p": f"{prefix}%"})
+    assert [int(r["id"]) for r in rows["core_audit_log"]] == acl_ids
+
+    # lãnh đạo có tên trong danh sách: thấy đủ như trước — người được cấp, người cấp, giá trị trong overview
+    w.clerk_a.gql(GRANT, {"d": doc["id"], "u": w.director_a.sub})
+    rows = w.director_a.gql(ACL_AUDIT, {"w": scoped[0]})["core_audit_log"]
+    assert [(r["action"], r["entity_id"], r["actor_id"], r["overview"]["user_id"]) for r in rows] == [
+        ("insert", f"{prefix}{w.staff_a1.sub}", w.clerk_a.sub, [None, w.staff_a1.sub]),
+        ("delete", f"{prefix}{w.staff_a1.sub}", w.clerk_a.sub, [w.staff_a1.sub, None]),
+        ("insert", f"{prefix}{w.manager_a1.sub}", w.clerk_a.sub, [None, w.manager_a1.sub]),
+        ("insert", f"{prefix}{w.director_a.sub}", w.clerk_a.sub, [None, w.director_a.sub]),
+    ]
+    assert w.director_a.gql(AUDIT_BY_PK, {"id": acl_ids[0]})["core_audit_log_by_pk"] == {
+        "entity_id": f"{prefix}{w.staff_a1.sub}", "actor_id": w.clerk_a.sub}
+    # quản trị đơn vị không đọc văn bản nào: vẫn không thấy
+    assert w.admin_a.gql(ACL_AUDIT, {"w": scoped[0]})["core_audit_log"] == []
+
+    # bỏ hạn chế (chưa có tệp nên đổi được): như overview, dòng của văn bản thường hiện cho cả quản trị đơn vị
+    sql(f"update office.documents set restricted = false where id = '{doc['id']}'")
+    assert len(w.admin_a.gql(ACL_AUDIT, {"w": scoped[0]})["core_audit_log"]) == 4
+
+    assert sql("select audit_id, problem from core.audit_verify()") == []

@@ -175,13 +175,13 @@
             "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
           },
           "415": {
-            "description": "restricted=true mà tệp không phải PDF đọc được, không khóa (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
+            "description": "restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
           },
           "422": {
             "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"
           },
           "503": {
-            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng — không lưu"
+            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — không lưu"
           }
         },
         "requestBody": {
@@ -240,21 +240,14 @@
           "404": {
             "description": "Không có tệp, hoặc người gọi không được xem — hai trường hợp trả như nhau"
           },
+          "422": {
+            "description": "Tệp mã hóa giải mã được nhưng không đóng dấu người xem được (`unstampable`, `reason`): PDF quá MOC_RESTRICTED_MAX_PAGES trang, quá nặng hoặc hỏng — không trả tệp"
+          },
           "500": {
             "description": "Tệp mã hóa không mở được: bản mã hỏng hoặc không khớp tệp"
           },
           "503": {
-            "description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang mở, kiểm tệp hạn chế khác"
           }
         }
       }

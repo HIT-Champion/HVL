@@ -20,10 +20,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
+import httpx2
 import pytest
 
 from conftest import DEPT_DT, OTHER, OUT, TENANT, actor
+from svc_workflow.flowable import FlowableClient
 from svc_workflow.workflow import BASE32, WorkflowError, new_verify_code
 
 DRAFTER = actor("staff", "u-staff-dt", dept=DEPT_DT)
@@ -152,6 +155,85 @@ def test_retrying_a_submission_does_not_write_twice(workflow, hasura, flowable):
     flowable.add_task("t-sua", "vbdi.chinhSua", assignee="u-staff-dt", doc=OUT, process="p-out")
     run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
     assert not hasura.writes and flowable.completed == [("t-sua", {"signerId": "u-director"})]
+
+
+def test_first_submission_retried_with_another_signer_moves_the_signer_in_the_process(workflow, hasura, flowable):
+    hasura.users["u-director-2"] = {"id": "u-director-2", "department_id": None, "role": "director", "enabled": True}
+    flowable.then(OUT, "t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT)
+    hasura.fail_once = "Trinh"      # quy trình đã khởi chạy và gắn, ghi trạng thái thì Hasura hết giờ chờ
+    with pytest.raises(WorkflowError) as err:
+        run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert err.value.status == 503 and hasura.outgoing["status"] == "draft"
+    pid = hasura.outgoing["process_id"]
+    assert flowable.variables[pid]["signerId"] == "u-director"
+
+    # trình lại, chọn người ký khác: Flowable giao việc ký cho đúng người CSDL ghi (bản phát hành in tên người này)
+    run(workflow.submit_outgoing(DRAFTER, OUT, "u-director-2"))
+    assert flowable.variables[pid]["signerId"] == "u-director-2" and len(flowable.started) == 1
+    (_, variables, _), = writes(hasura, "Trinh")
+    assert variables["set"] == {"status": "in_review", "signer_id": "u-director-2"}
+    assert variables["event"]["kind"] == "office.document.submitted"
+
+
+def test_found_process_takes_the_signer_of_this_submission(workflow, hasura, flowable):
+    flowable.processes[OUT] = "p-old"       # lần trình trước khởi chạy được mà chưa gắn được vào văn bản
+    flowable.variables["p-old"] = {"signerId": "u-director-cu"}
+    flowable.add_task("t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT, process="p-old")
+    run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert hasura.outgoing["process_id"] == "p-old" and not flowable.started
+    assert flowable.variables["p-old"]["signerId"] == "u-director"
+
+
+def test_signer_cannot_move_once_the_signing_task_exists(workflow, hasura, flowable):
+    hasura.outgoing.update(process_id="p-out")
+    flowable.variables["p-out"] = {"signerId": "u-director-cu"}
+    flowable.add_task("t-ky", "vbdi.duyetDonVi", assignee="u-director-cu", doc=OUT, process="p-out")
+    with pytest.raises(WorkflowError) as err:
+        run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert (err.value.code, err.value.status) == ("signer_locked", 409)
+    assert not hasura.writes and flowable.variables["p-out"] == {"signerId": "u-director-cu"}
+
+
+def test_flowable_client_overwrites_process_variables_with_put():
+    seen = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append((request.method, request.url.path, json.loads(request.content)))
+        return httpx2.Response(201, json=json.loads(request.content))
+
+    async def put() -> None:
+        client = FlowableClient("http://flowable:8080/flowable-rest/service", "rest-admin", "x",
+                                transport=httpx2.MockTransport(handler))
+        try:
+            await client.set_variables("p-1", {"signerId": "u-director-2"})
+        finally:
+            await client.aclose()
+
+    run(put())
+    # PUT ghi đè biến đã có (POST thì Flowable trả 409 khi biến đã có)
+    assert seen == [("PUT", "/flowable-rest/service/runtime/process-instances/p-1/variables",
+                     [{"name": "signerId", "type": "string", "value": "u-director-2"}])]
+
+
+def test_resubmission_waits_until_the_return_reaches_the_process(workflow, hasura, flowable):
+    hasura.outgoing.update(status="in_review", process_id="p-out", signer_id="u-director")
+    flowable.add_task("t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT, process="p-out")
+    flowable.then("t-phong", "t-sua", "vbdi.chinhSua", assignee="u-staff-dt", doc=OUT)
+    flowable.fail_complete = 1
+    with pytest.raises(WorkflowError, match="Đã lưu"):
+        run(workflow.complete_task(MANAGER, "t-phong", "return", {"note": "Sửa lại nơi nhận"}))
+    hasura.outgoing["status"] = "returned"      # như CSDL sau DoiTrangThai; Flowable vẫn ở bước duyệt cấp phòng
+
+    with pytest.raises(WorkflowError) as err:
+        run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert (err.value.code, err.value.status) == ("return_pending", 409)
+    assert not writes(hasura, "Trinh") and hasura.outgoing["status"] == "returned"
+
+    # lãnh đạo phòng bấm lại: Flowable sang bước sửa; người soạn trình lại được
+    run(workflow.complete_task(MANAGER, "t-phong", "return", {"note": "Sửa lại nơi nhận"}))
+    run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    assert len(writes(hasura, "Trinh")) == 1 and hasura.outgoing["status"] == "in_review"
+    assert flowable.completed == [("t-phong", {"outcome": "return"}), ("t-sua", {"signerId": "u-director"})]
 
 
 def test_department_approval_records_event_and_moves_to_signer(workflow, hasura, flowable):

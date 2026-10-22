@@ -50,7 +50,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | Đường dẫn | Kết quả |
 |---|---|
 | `POST /api/files` (multipart, trường `file`) | `201` `{id, object_key, filename, mime_type, size_bytes, sha256, scanned_at, encrypted}` |
-| | `?restricted=true` — tệp cho văn bản hạn chế, lưu mã hóa (mục Văn bản hạn chế): `415` `restricted_pdf_only` khi không phải PDF đọc được, không mật khẩu · `503` `vault_unavailable` khi két chưa sẵn sàng — **không lưu** |
+| | `?restricted=true` — tệp cho văn bản hạn chế, lưu mã hóa (mục Văn bản hạn chế): `415` `restricted_pdf_only` + `reason` khi không phải PDF đọc được, không mật khẩu, tối đa `MOC_RESTRICTED_MAX_PAGES` trang, hoặc quá nặng để kiểm (`timeout`, `memory`) · `503` `vault_unavailable` khi két chưa sẵn sàng, `busy` (+ `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — **không lưu** |
 | | `401` thiếu hoặc sai token · `403` token không có `tenant_id` |
 | | `413` vượt `MOC_FILES_MAX_MB` · `400` tệp rỗng hoặc thiếu trường `file` |
 | | `422` `{code: "infected", signature}` — tệp nhiễm, **không lưu**, ghi vào sổ kiểm toán |
@@ -58,7 +58,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
 | `POST /api/files/{id}/read` | Chỉ `clerk`, chỉ tệp chính mình tải lên. `?force=true` đọc lại. `200` `{file_id, status, method, pages, fields, warnings, summary_source, model, duration_ms, cached, read_at}` · `401` · `403` `forbidden` · `404` `not_found` (cả tệp người khác) · `409` `restricted` tệp mã hóa hoặc tệp đang gắn vào văn bản hạn chế (trước gợi ý đã lưu, trước khi đọc byte) · `413` `too_large` · `415` `unsupported` · `422` `unreadable` + `reason` · `503` `busy` (+ `Retry-After: 10`), `reader_disabled`, `ocr_unavailable`, `storage_unavailable`, `database_unavailable` — mục Đọc văn bản đến |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director`. Thân `{question, mode: extract\|generate, direction, year, type_code, ask_id}`. `200` `{ask_id, status, answer, extract, sources, semantic, ai_available, warnings, duration_ms}`, `Cache-Control: no-store` · `400` `invalid_question` · `401` · `403` `forbidden` · `422` thân sai · `503` `assistant_disabled`, `busy` (+ `Retry-After: 10`), `search_unavailable`, `database_unavailable` — mục Hỏi đáp trên kho văn bản |
-| `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng |
+| `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `422` `unstampable` + `reason` không đóng dấu được (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng), `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng, `busy` (+ `Retry-After: 10`) |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
 | `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
@@ -805,6 +805,15 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
   giữa trang, một dòng đầu, một dòng cuối trang (WeasyPrint dựng lớp dấu, pypdf ghép) — rồi ghi `file.decrypted` vào
   sổ kiểm toán; ghi sổ không được thì không trả tệp. Trả kèm `Cache-Control: no-store`, không `ETag`. Tối đa hai lần
   mở cùng lúc (bản mã, bản rõ đều nằm trong bộ nhớ).
+- **PDF do người dùng tải lên không mở trong tiến trình svc-files** (như mục Nội dung tệp PDF, Đọc văn bản đến): kiểm
+  lúc tải lên và đóng dấu lúc xem chạy `sealed.py` thành tiến trình con `python -I` — `RLIMIT_AS` 1 GB, hạn 20 giây
+  (kiểm) / 30 giây (đóng dấu), `RLIMIT_CPU` = hạn + 5; quá hạn thì giết cả nhóm. PDF vào, bản có dấu ra qua ống
+  stdin/stdout, không xuống đĩa; tiến trình con không ghi nhật ký. Kiểm và đóng dấu chung hai lượt cùng lúc; chờ lượt
+  quá 10 giây thì `503 busy` kèm `Retry-After: 10`, không treo yêu cầu.
+- **Trần số trang** `MOC_RESTRICTED_MAX_PAGES` (mặc định 500): tệp hàng vạn trang tí hon làm mỗi lần xem tốn hàng
+  phút. Tải lên quá trần, quá nặng (hết giờ, hết bộ nhớ) → `415 restricted_pdf_only` kèm `reason` (`too_many_pages`,
+  `timeout`, `memory`, `password`, `corrupt`…); lúc xem (tệp có từ trước khi có trần, hoặc trần vừa hạ) → `422
+  unstampable` kèm `reason`, ghi `core.file.stamp_failed`, không trả tệp. Đo 22/10: đóng dấu 500 trang ~3 giây.
 - **Bản rõ không ghi xuống đĩa**: Starlette đệm tệp tải lên lớn ở `/tmp`, clamd ghi luồng nhận qua INSTREAM ra thư
   mục tạm trước khi quét — `/tmp` của svc-files và của ClamAV đều là tmpfs (compose).
 - svc-files chỉ xin khóa mới và nhờ két mở khóa đã bọc, không lấy được khóa gốc `moc-files` (policy trong
@@ -866,6 +875,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_FILES_BUCKET` | `moc-files` | Tự tạo nếu chưa có |
 | `MOC_FILES_MAX_MB` | `25` | Phải nhỏ hơn `StreamMaxLength` của clamd |
 | `MOC_FILES_TRANSIT_KEY` | `moc-files` | Khóa transit trong két bọc khóa của tệp văn bản hạn chế (F3.7); không đặt `MOC_OPENBAO_ADDR` thì không nhận, không mở tệp mã hóa (`503`) |
+| `MOC_RESTRICTED_MAX_PAGES` | `500` | Trần số trang PDF của văn bản hạn chế (≥ 1): quá thì không nhận (`415`), không đóng dấu (`422`) |
 | `MOC_SIGN_ENABLED` | `true` | Ký số PAdES bản phát hành (F4.5, chỉ minh họa); `false`: phát hành không ký, không gọi transit hay PKI. Chỉ có tác dụng khi có `MOC_OPENBAO_ADDR` |
 | `CLAMAV_HOST`, `CLAMAV_PORT` | `clamav`, `3310` | |
 | `CLAMAV_TIMEOUT_S` | `60` | |
@@ -967,7 +977,8 @@ uv pip compile pyproject.toml --extra dev --universal --python-version 3.12 --ge
 (`DEPENDENCIES.md`): thêm `--exclude-newer-package <gói>=<ngày>` cho từng gói mới vào cả hai lệnh. pyHanko (F4.5) sinh
 với `--exclude-newer-package <gói>=2026-10-06T00:00:00Z` cho pyhanko, pyhanko-certvalidator, asn1crypto, tzlocal,
 tzdata, lxml, aiohttp, aiohappyeyeballs, aiosignal, attrs, frozenlist, multidict, propcache, yarl, oscrypto, uritools,
-certifi.
+certifi. Vá bảo mật chưa đủ hai tuần (`DEPENDENCIES.md`, mục Cách đọc): gói khai trực tiếp thì nâng cận dưới trong
+`pyproject.toml` (pillow, pypdf), gói kéo theo thì thêm `-P <gói>==<bản>` vào cả hai lệnh (certifi 2026.10.19).
 
 ## Ghi chú khi đưa vào Compose (#13)
 

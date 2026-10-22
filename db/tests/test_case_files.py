@@ -22,12 +22,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from conftest import ADMIN_SECRET, GraphQLError, SQLError, World, gql_raw, insert_file, sql
+from conftest import ADMIN_SECRET, GraphQLError, Service, SQLError, User, World, gql_raw, insert_file, sql
 
 CREATE = """
 mutation ($o: office_case_files_insert_input!) {
@@ -254,3 +255,86 @@ def test_audit_shows_case_file_code_and_package_hash_not_title(world: World):
     assert archived["action"] == "case_file.archived"
     assert {k: v for k, v in archived["overview"].items() if v is not None} == {
         "code": "HS-01", "archive_sha256": digest, "documents": 3, "files": 2}
+
+
+TIMES = "{ office_v_processing_time { month documents total_hours with_due on_time } }"
+ACCURACY = "{ office_v_intake_accuracy { field confidence suggested kept } }"
+
+
+def test_archiving_keeps_dashboard_and_intake_figures():
+    """Nộp lưu gỡ dòng thời gian, liên kết tệp của văn bản, mà dashboard điều hành (v_processing_time) lấy lúc xong từ
+    dòng thời gian, số đo đọc văn bản đến (v_intake_accuracy) nối gợi ý với văn bản qua liên kết tệp bản chính. Bản giữ
+    lại lúc nộp lưu (migration 1792281602300) giữ nguyên mọi con số. Đơn vị riêng nên số đếm biết trước; một văn bản
+    cùng tháng không nộp lưu để thấy số cộng đúng cả hai nguồn."""
+    tag = uuid.uuid4().hex[:6].upper()
+    tenant = _one(f"insert into core.tenants (code, name) values ('N{tag}', 'Đơn vị thử nộp lưu') returning id")
+    dept = _one(f"insert into office.departments (tenant_id, code, name) values ('{tenant}', 'ĐT', 'Phòng Đào tạo') "
+                "returning id")
+    reg = _one(f"insert into office.registers (tenant_id, direction, year) values ('{tenant}', 'in', 2025) "
+               "returning id")
+    clerk, director = User(f"van-thu-{tag}", "clerk", tenant), User(f"lanh-dao-{tag}", "director", tenant)
+    svc = Service(f"svc-{tag}", "service", tenant)
+
+    def incoming_done(n: int, due: str) -> str:              # vào sổ 06/01/2025 8 giờ, đã xử lý xong
+        return _one(
+            "insert into office.documents (tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, "
+            "summary, register_id, register_number, registered_at, due_on, created_by) values "
+            f"('{tenant}', 'in', 'done', 'CV', '{n}/UBND-VP', 'UBND tỉnh', '2025-01-02', "
+            f"'Văn bản đến thử nộp lưu số {n}', '{reg}', {n}, '2025-01-06 08:00+07', {due}, '{clerk.sub}') "
+            "returning id")
+
+    def event(doc: str, kind: str, at: str) -> None:
+        sql(f"insert into office.document_events (tenant_id, document_id, kind, actor_id, actor_kind, created_at) "
+            f"values ('{tenant}', '{doc}', '{kind}', 'chuyen-vien', 'user', '{at}')")
+
+    def attach(doc: str, role: str, fields: dict) -> str:   # tệp, gợi ý tác tử đã đọc, liên kết vào văn bản
+        file_id = insert_file(svc, clerk)
+        sql("insert into office.intake_suggestions (file_id, tenant_id, requested_by, agent_id, status, method, "
+            f"pages, fields, duration_ms) values ('{file_id}', '{tenant}', '{clerk.sub}', 'moc-doc-reader', 'ok', "
+            f"'text', 1, '{json.dumps(fields, ensure_ascii=False)}', 10)")
+        sql(f"insert into office.document_files (tenant_id, document_id, file_id, role, added_by) "
+            f"values ('{tenant}', '{doc}', '{file_id}', '{role}', '{clerk.sub}')")
+        return file_id
+
+    def guess(value: str, confidence: str) -> dict:
+        return {"value": value, "confidence": confidence, "source": "rule"}
+
+    # nộp lưu: báo xong 07/01 rồi cho lưu 08/01 (lần cuối là lúc xong) — 48 giờ, đúng hạn 10/01
+    archived = incoming_done(1, "'2025-01-10'")
+    event(archived, "office.document.processed", "2025-01-07 08:00+07")
+    event(archived, "office.document.filed", "2025-01-08 08:00+07")
+    main = attach(archived, "main", {"symbol": guess("1/UBND-VP", "high"), "summary": guess("Khác hẳn", "low")})
+    extra = attach(archived, "attachment", {"symbol": guess("99/UBND-VP", "high")})     # đính kèm: không tính
+    # không nộp lưu: xong 09/01 — 72 giờ, không có hạn; văn thư sửa số ký hiệu gợi ý
+    staying = incoming_done(2, "null")
+    event(staying, "office.document.processed", "2025-01-09 08:00+07")
+    attach(staying, "main", {"symbol": guess("7/UBND-VP", "high")})
+
+    def figures() -> tuple[list, list]:
+        accuracy = sorted((r["field"], r["confidence"], r["suggested"], r["kept"])
+                          for r in director.gql(ACCURACY)["office_v_intake_accuracy"])
+        return director.gql(TIMES)["office_v_processing_time"], accuracy
+
+    expected = ([{"month": "2025-01-01", "documents": 2, "total_hours": 120.0, "with_due": 1, "on_time": 1}],
+                [("summary", "low", 1, 0), ("symbol", "high", 2, 1)])
+    assert figures() == expected
+
+    cf = _one(f"insert into office.case_files (tenant_id, department_id, year, code, title, created_by) values "
+              f"('{tenant}', '{dept}', 2025, 'HS-{tag}', 'Hồ sơ thử nộp lưu giữ số liệu', 'chuyen-vien') returning id")
+    sql(f"insert into office.case_file_documents (tenant_id, case_file_id, document_id, added_by) "
+        f"values ('{tenant}', '{cf}', '{archived}', 'chuyen-vien')")
+    sql(f"update office.case_files set status = 'closed' where id = '{cf}'")
+    events = [int(r[0]) for r in sql(f"select id from office.document_events where document_id = '{archived}'")]
+    body = _admin(ARCHIVE, {"p": {
+        "id": cf, "archive_key": f"cold/{tenant}/case/{cf}/", "archive_sha256": hashlib.sha256(b"m").hexdigest(),
+        "bucket": "moc-cold", "documents": [archived], "events": events,
+        "links": [{"document_id": archived, "file_id": f} for f in (main, extra)], "cold_files": [main, extra],
+        "files": 2}})
+    assert "errors" not in body and body["data"]["office_archive_case_file"][0]["status"] == "archived", body
+    # chi tiết đã rời OLTP như trước, chỉ còn bản giữ lại
+    assert _one(f"select count(*) from office.document_events where document_id = '{archived}'") == "0"
+    assert _one(f"select count(*) from office.document_files where document_id = '{archived}'") == "0"
+    assert sql("select finished_at = '2025-01-08 08:00+07', main_file_ids = array['" + main + "']::uuid[] "
+               f"from office.archived_document_facts where document_id = '{archived}'") == [["t", "t"]]
+
+    assert figures() == expected

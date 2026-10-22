@@ -78,6 +78,10 @@ class Settings:
     vault_role_id_file: str = "/run/openbao/role_id"
     vault_secret_id_file: str = "/run/openbao/secret_id"
     transit_key: str = "moc-files"
+    # trần số trang PDF của văn bản hạn chế (nhận lúc tải lên, đóng dấu lúc xem). Văn bản hành chính (NĐ 30/2020) thường
+    # vài trang, kèm phụ lục hiếm quá vài trăm; 25 MB bản scan ~ 50–250 trang. Đo 22/10: đóng dấu 500 trang ~3 giây,
+    # 2000 trang ~13 giây trong tiến trình con — 500 đủ rộng mà mỗi lần xem vẫn nhanh
+    restricted_max_pages: int = 500
     # F4.5 — ký số PAdES bản phát hành bằng khóa transit của đơn vị, chứng thư từ CA nội bộ trong két (chỉ minh họa);
     # chỉ có tác dụng khi có két. false: phát hành không ký, không gọi transit hay PKI
     sign_enabled: bool = True
@@ -169,6 +173,7 @@ class Settings:
                 vault_role_id_file=env.get("MOC_OPENBAO_ROLE_ID_FILE", "/run/openbao/role_id"),
                 vault_secret_id_file=env.get("MOC_OPENBAO_SECRET_ID_FILE", "/run/openbao/secret_id"),
                 transit_key=env.get("MOC_FILES_TRANSIT_KEY", "moc-files"),
+                restricted_max_pages=int(env.get("MOC_RESTRICTED_MAX_PAGES", "500")),
                 sign_enabled=_flag("MOC_SIGN_ENABLED", env.get("MOC_SIGN_ENABLED", "true")),
                 read_enabled=_flag("MOC_READ_ENABLED", env.get("MOC_READ_ENABLED", "true")),
                 read_max_bytes=int(env.get("MOC_READ_MAX_MB") or env.get("MOC_FILES_MAX_MB", "25")) * 1024 * 1024,
@@ -227,6 +232,8 @@ class Settings:
         if self.cold_bucket == self.bucket:
             # bucket lạnh khóa ghi, còn bucket tệp thường phải xóa được
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")
+        if self.restricted_max_pages < 1:
+            raise ConfigError("MOC_RESTRICTED_MAX_PAGES phải ≥ 1")
         self._check_reader()
         self._check_assistant()
 

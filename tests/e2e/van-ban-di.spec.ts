@@ -70,6 +70,12 @@ test('luồng văn bản đi và cổng xác thực trên giao diện', async ({
   await staff.reload()
   await expect(staff.getByText('Dự thảo bị trả lại: Ghi rõ số học phần đã rà soát.')).toBeVisible()
   await staff.getByRole('link', { name: 'Sửa dự thảo' }).click()
+  await expect(staff.getByLabel('Trích yếu nội dung')).toHaveValue(summary)
+  // đang sửa mà bấm soạn mới ở thanh bên (cùng đường dẫn, bỏ ?id=): form trống, không mang dự thảo đang sửa theo
+  await staff.getByRole('link', { name: 'Soạn văn bản đi' }).click()
+  await expect(staff.getByLabel('Trích yếu nội dung')).toHaveValue('')
+  await staff.goBack()
+  await expect(staff.getByLabel('Trích yếu nội dung')).toHaveValue(summary)
   await staff.getByLabel('Nội dung', { exact: true }).fill(`${body}\nKhoa đã rà soát 42 học phần của 3 ngành đào tạo.`)
   await staff.getByRole('button', { name: 'Lưu dự thảo' }).click()
   await staff.getByRole('button', { name: 'Trình lại' }).click()

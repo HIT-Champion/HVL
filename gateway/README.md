@@ -8,7 +8,10 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
 - Đường quản trị bị chặn tường minh (404): `/admin`, `/realms/*` khác realm của Mộc, `/console`, `/v1/*`,
   `/v2/*`, `/healthz`, `/flowable-rest/*`.
 - Kiểm JWT ở biên (`openid-connect`, chỉ Bearer, khóa qua JWKS nội bộ của Keycloak); Hasura và svc-files
-  vẫn kiểm lại. Tiêu đề `X-Hasura-Admin-Secret` từ ngoài vào bị gỡ.
+  vẫn kiểm lại. Tiêu đề `X-Hasura-Admin-Secret` từ ngoài vào bị gỡ, cả tên cũ `X-Hasura-Access-Key`
+  (Hasura 2.51 đã không nhận — gỡ để phòng xa).
+- Giới hạn đăng nhập theo IP (`MOC_RATE_LOGIN_PER_MIN`) đếm chung cho đường cấp token, biểu mẫu đăng nhập và **mọi
+  POST khác vào realm** (route `dang-nhap-post`): viết khác đường (`…/token/`, `…/token;x`) không né được bộ đếm.
 - Mỗi yêu cầu có `X-Request-Id` (giữ nguyên tới sổ kiểm toán).
 
 Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.

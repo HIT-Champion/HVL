@@ -29,6 +29,7 @@
   "otpPolicyLookAheadWindow": 1,
   "otpPolicyCodeReusable": false,
   "browserFlow": "moc-browser",
+  "directGrantFlow": "moc-cli-direct-grant",
   "authenticationFlows": [
     {
       "alias": "moc-browser",

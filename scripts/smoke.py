@@ -56,6 +56,7 @@ import struct
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -257,6 +258,17 @@ def main() -> None:
         except HTTPError as exc:
             exc.status == 404 or fail(f"{path} trả {exc.status}")
     ok("đường quản trị của Hasura, Keycloak, Flowable bị chặn ở cổng")
+    # đường cấp token viết khác đi (dấu / cuối) vẫn tới Keycloak: phải bị đếm chung bộ đếm đăng nhập theo IP
+    variant = urllib.request.Request(f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token/", method="POST",
+                                     data=b"grant_type=password",
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(variant, timeout=30) as resp:
+            seen = dict(resp.headers)
+    except urllib.error.HTTPError as exc:
+        seen = dict(exc.headers)
+    header(seen, "X-RateLimit-Limit") or fail("POST …/token/ không bị giới hạn số lần đăng nhập theo IP")
+    ok("giới hạn đăng nhập theo IP đếm cả đường cấp token viết khác (…/token/)")
 
     # F3.2: két tự mở khóa (static seal); svc-files, svc-workflow không nhận bí mật qua biến môi trường mà lấy từ két
     # bằng AppRole của riêng mình
@@ -321,6 +333,22 @@ def main() -> None:
     except HTTPError as exc:
         exc.status in (400, 401) or fail(f"lấy token không kèm mã: HTTP {exc.status}")
     ok("lấy token bằng mật khẩu (client moc-cli của kịch bản) cũng phải kèm mã TOTP — không là đường vòng")
+    # client có sẵn admin-cli của realm cũng cho luồng mật khẩu: theo directGrantFlow của realm. Tài khoản khác
+    # vanthu: hai lần sai liền nhau dưới 1 giây Keycloak coi là dò mật khẩu và khóa tạm
+    try:
+        call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token", form={
+            "grant_type": "password", "client_id": "admin-cli", "username": "totruongdt",
+            "password": ENV["MOC_DEMO_PASSWORD"], "scope": "openid"})
+        fail("lãnh đạo phòng lấy được token qua client admin-cli của realm chỉ bằng mật khẩu")
+    except HTTPError as exc:
+        exc.status in (400, 401) or fail(f"admin-cli không kèm mã: HTTP {exc.status}")
+    ok("client admin-cli có sẵn của realm cũng phải kèm mã TOTP (luồng mật khẩu mặc định của realm)")
+    # khóa quản trị Hasura gửi kèm token người dùng: cổng gỡ cả tên cũ, văn thư vẫn chỉ là văn thư
+    for name in ("X-Hasura-Admin-Secret", "X-Hasura-Access-Key"):
+        data, _ = call_json("POST", f"{PUBLIC_URL}/v1/graphql", {"query": "{ core_audit_log(limit: 1) { diff } }"},
+                            headers={**clerk.auth, name: ENV["HASURA_ADMIN_SECRET"]})
+        (data or {}).get("errors") or fail(f"{name} đi qua cổng: văn thư đọc được cột diff của sổ kiểm toán")
+    ok("khóa quản trị Hasura từ ngoài vào (X-Hasura-Admin-Secret, tên cũ X-Hasura-Access-Key) bị gỡ ở cổng")
 
     print("Trạm kiểm dịch")
     before = director.gql("{ core_audit_log_aggregate { aggregate { max { id } } } }")

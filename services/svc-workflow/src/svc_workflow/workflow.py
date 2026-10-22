@@ -439,10 +439,12 @@ class Workflow:
         if doc["created_by"] != actor.user_id:
             raise WorkflowError("not_your_document", "Chỉ người soạn mới trình được dự thảo này", 403)
         if doc["status"] == "in_review" and doc["signer_id"] == signer_id:
-            # gọi lại sau lỗi mạng: dữ liệu đã ghi, chỉ hoàn thành nốt bước sửa trong Flowable nếu còn
-            await self._finish_revision(actor, doc, signer_id)
-            await self._share(actor, doc["process_id"], doc["id"])
-            await self._announce(actor, doc["process_id"], doc["id"])
+            # gọi lại sau lỗi mạng: dữ liệu đã ghi, chỉ hoàn thành nốt bước sửa trong Flowable nếu còn. Không còn gì để
+            # hoàn thành thì lần trước đã cấp quyền xem, đã báo; cấp lại thì người soạn (không có quyền cấp, gỡ) gọi lại
+            # lúc nào cũng thêm lại được người mà văn thư, lãnh đạo đơn vị vừa gỡ khỏi danh sách xem
+            if await self._finish_revision(actor, doc, signer_id):
+                await self._share(actor, doc["process_id"], doc["id"])
+                await self._announce(actor, doc["process_id"], doc["id"])
             return {"document_id": doc["id"], "status": "in_review"}
         if doc["status"] not in ("draft", "returned"):
             raise WorkflowError("wrong_status", "Văn bản đã trình, không trình lại được", 409)
@@ -462,8 +464,19 @@ class Workflow:
         first = doc["status"] == "draft"
         changes: dict[str, Any] = {"status": "in_review", "signer_id": signer_id}
         process_id = doc["process_id"]
+        revision: Task | None = None
         if first and not process_id:
             process_id = await self._start_outgoing(actor, doc, signer_id)
+        elif first:
+            # lần trình trước đã khởi chạy, gắn quy trình rồi lỗi lúc ghi: lần này có thể chọn người ký khác
+            await self._set_signer(process_id, signer_id)
+        else:
+            # trả lại đã ghi mà Flowable chưa sang bước sửa (lỗi lúc chuyển bước): ghi in_review lúc này thì lần bấm
+            # lại của người duyệt đưa quy trình về bước sửa khi CSDL đã là in_review — người soạn kẹt, không sửa được
+            revision = await self._revision_task(actor, doc)
+            if revision is None:
+                raise WorkflowError("return_pending", "Bước trả lại dự thảo của người duyệt chưa hoàn tất, thử lại sau "
+                                                      "ít phút", 409)
         event = {
             "document_id": doc["id"],
             "kind": "office.document.submitted" if first else "office.document.resubmitted",
@@ -472,8 +485,8 @@ class Workflow:
             "data": {"signer_id": signer_id},
         }
         await self.hasura.as_service(actor, SUBMIT, {"doc": doc["id"], "set": changes, "event": event})
-        if not first:
-            await self._finish_revision(actor, doc, signer_id)
+        if revision is not None:
+            await self.flowable.complete(revision.id, {"signerId": signer_id})
         await self._share(actor, process_id, doc["id"])
         await self._announce(actor, process_id, doc["id"])
         return {"document_id": doc["id"], "status": "in_review"}
@@ -506,15 +519,38 @@ class Workflow:
                 "slaDuration": self.sla_duration,
                 "outcome": "",
             })
-        return await self._claim_process(actor, doc["id"], pid, started=started)
+        linked = await self._claim_process(actor, doc["id"], pid, started=started)
+        if linked != pid or not started:
+            # phiên có từ trước (lần trình trước khởi chạy mà chưa gắn được, hoặc lần gọi khác vừa gắn): signerId là
+            # người ký của lần đó
+            await self._set_signer(linked, signer_id)
+        return linked
 
-    async def _finish_revision(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> None:
-        """Hoàn thành bước "sửa dự thảo" của người soạn: quy trình quay về duyệt cấp phòng, người ký có thể đổi."""
+    async def _set_signer(self, process_id: str, signer_id: str) -> None:
+        """Ghi người ký vào phiên quy trình đã có, trước khi ghi CSDL — không thì việc ký (vbdi.duyetDonVi) giao cho
+        người chọn lần trước, còn bản phát hành ghi người chọn lần này. Việc ký nhận người được giao lúc tạo: quy
+        trình đã qua bước duyệt cấp phòng thì đổi biến không còn tác dụng, từ chối."""
+        if any(t.form_key != "vbdi.duyetPhong" for t in await self.flowable.process_tasks(process_id)):
+            raise WorkflowError("signer_locked", "Dự thảo đã qua bước duyệt cấp phòng, không đổi được người ký", 409)
+        await self.flowable.set_variables(process_id, {"signerId": signer_id})
+
+    async def _revision_task(self, actor: Actor, doc: dict[str, Any]) -> Task | None:
+        """Việc "sửa dự thảo" đang mở của người soạn trong quy trình của văn bản."""
         if not doc["process_id"]:
-            return
+            return None
         for task in await self.flowable.tasks_for(actor.user_id, []):
             if task.process_instance_id == doc["process_id"] and task.form_key == "vbdi.chinhSua":
-                await self.flowable.complete(task.id, {"signerId": signer_id})
+                return task
+        return None
+
+    async def _finish_revision(self, actor: Actor, doc: dict[str, Any], signer_id: str) -> bool:
+        """Hoàn thành bước "sửa dự thảo" của người soạn: quy trình quay về duyệt cấp phòng, người ký có thể đổi.
+        False — không còn việc này để hoàn thành."""
+        task = await self._revision_task(actor, doc)
+        if task is None:
+            return False
+        await self.flowable.complete(task.id, {"signerId": signer_id})
+        return True
 
     async def _outgoing(self, actor: Actor, doc_id: str) -> dict[str, Any]:
         try:

@@ -198,8 +198,7 @@ def test_unexpected_error_in_notification_still_returns_the_step(workflow, hasur
 
 
 def test_retrying_a_step_does_not_notify_twice(workflow, hasura, flowable):
-    hasura.outgoing.update(status="in_review", process_id="p-out", signer_id="u-director")
-    flowable.add_task("t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT, process="p-out")
+    flowable.then(OUT, "t-phong", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT)
     run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
-    run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))
+    run(workflow.submit_outgoing(DRAFTER, OUT, "u-director"))   # gọi lại: không còn bước nào để hoàn thành
     assert [n["key"] for n in hasura.notifications] == ["task:t-phong:assigned"]

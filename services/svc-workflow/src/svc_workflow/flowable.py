@@ -160,6 +160,11 @@ class FlowableClient:
         """Hủy phiên vừa khởi chạy thừa (lần gọi khác đã gắn phiên của nó vào văn bản): chưa ai làm gì trong đó."""
         await self._request("DELETE", f"/runtime/process-instances/{process_id}", params={"deleteReason": reason})
 
+    async def set_variables(self, process_id: str, variables: dict[str, Any]) -> None:
+        """Ghi biến của phiên quy trình: PUT tạo biến chưa có, ghi đè biến đã có (POST thì 409 khi đã có). Chỉ tác dụng
+        với việc tạo sau đó — việc đang mở giữ người được giao lúc tạo."""
+        await self._request("PUT", f"/runtime/process-instances/{process_id}/variables", json=_variables(variables))
+
     # --- việc ---------------------------------------------------------------------------------------
 
     async def tasks_for(self, user_id: str, groups: list[str]) -> list[Task]:
