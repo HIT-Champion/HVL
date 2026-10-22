@@ -122,6 +122,7 @@ services:
       MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
       MOC_RATE_VERIFY_PER_MIN: ${MOC_RATE_VERIFY_PER_MIN:-30}
       MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
+      MOC_TRUSTED_PROXY: ${MOC_TRUSTED_PROXY:-127.0.0.1/32}
     volumes:
       - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro

@@ -13,6 +13,25 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
 
 Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.
 
+## Sau proxy TLS trên máy chủ (F1.9)
+
+Trên máy chủ, Caddy nhận HTTPS rồi chuyển vào APISIX chỉ nghe `127.0.0.1` ([`docs/trien-khai.md`](../docs/trien-khai.md)).
+APISIX 3.18 thay `X-Forwarded-Proto`, `-Host`, `-Port` bằng giá trị nó thấy (`http`, cổng 9080), trừ khi yêu cầu tới
+từ địa chỉ trong `apisix.trusted_addresses`. `config.yaml` khai dải `MOC_TRUSTED_PROXY` (mặc định `127.0.0.1/32`:
+không ai tới APISIX từ loopback của chính container, tức không tin ai) cho hai việc:
+
+- `trusted_addresses`: yêu cầu từ dải này giữ `X-Forwarded-Proto`, `-Host`, `-Port` của proxy. `issuer` và trang
+  đăng nhập theo `KC_HOSTNAME`, nhưng `token_endpoint`, `jwks_uri` Keycloak dựng theo chính các tiêu đề này
+  (`KC_HOSTNAME_BACKCHANNEL_DYNAMIC`, `KC_PROXY_HEADERS=xforwarded`): thiếu dải tin cậy thì `token_endpoint` ra
+  `http://…`, trình duyệt chặn lần đăng nhập. Yêu cầu từ ngoài dải: các tiêu đề đó bị thay, `X-Forwarded-For` gửi
+  kèm bị bỏ.
+- `real_ip_from` + `real_ip_header: X-Forwarded-For`: `$remote_addr` là IP người dùng, nên giới hạn tốc độ đăng
+  nhập, cổng xác thực đếm riêng từng người, nhật ký truy cập ghi IP người dùng. Thiếu nó thì mọi người dùng chung một
+  bộ đếm (IP gateway của mạng Docker).
+
+Proxy không gửi `X-Forwarded-Port` (Caddy mặc định không gửi) thì APISIX điền cổng của nó và Keycloak trả
+`https://tên-miền:9080/…`: Caddyfile phải có `header_up X-Forwarded-Port 443`.
+
 ## Nhật ký truy cập không có chuỗi truy vấn (F4.4)
 
 APISIX và nginx của giao diện **không ghi chuỗi truy vấn và Referer**. Trang Tìm kiếm, Hỏi đáp đặt câu tìm lên URL

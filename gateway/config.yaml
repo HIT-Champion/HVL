@@ -31,6 +31,12 @@ apisix:
   dns_resolver_valid: 5
   ssl:
     enable: false
+  # F1.9: trên máy chủ, proxy TLS (Caddy, docs/trien-khai.md) đứng trước APISIX. APISIX 3.18 ghi đè X-Forwarded-Proto,
+  # -Host, -Port bằng giá trị nó thấy (http, cổng 9080) trừ khi yêu cầu tới từ địa chỉ tin cậy — không thì Keycloak
+  # tưởng người dùng ở http, trả token_endpoint http://… và trình duyệt chặn lần đăng nhập. Mặc định 127.0.0.1/32: không
+  # ai tới APISIX từ loopback của chính container, nghĩa là không tin ai (máy dev, CI)
+  trusted_addresses:
+    - "${{MOC_TRUSTED_PROXY:=127.0.0.1/32}}"
 
 nginx_config:
   error_log_level: warn
@@ -55,8 +61,12 @@ nginx_config:
   http:
     # svc-files tự giới hạn theo MOC_FILES_MAX_MB; ở biên chỉ chặn yêu cầu quá lớn rõ ràng
     client_max_body_size: 64m
-    # Giới hạn đăng nhập đếm theo IP nguồn. Đặt APISIX sau một proxy TLS thì mọi yêu cầu mang IP của proxy:
-    # khai real_ip_from (IP của proxy) và real_ip_header ở đây, nếu không cả hệ thống dùng chung một bộ đếm.
+    # Giới hạn đăng nhập, cổng xác thực đếm theo IP nguồn. Sau proxy TLS mọi yêu cầu mang IP của proxy: lấy IP người
+    # dùng từ X-Forwarded-For, chỉ khi yêu cầu tới từ MOC_TRUSTED_PROXY (như trusted_addresses ở trên)
+    real_ip_header: X-Forwarded-For
+    real_ip_recursive: "on"
+    real_ip_from:
+      - "${{MOC_TRUSTED_PROXY:=127.0.0.1/32}}"
     # F4.4: không ghi chuỗi truy vấn (ô tìm kiếm ?q=…, mã đăng nhập ?code=…&state=…) và Referer (URL đầy đủ của trang
     # trước). Các trường khác giữ như định dạng mặc định của APISIX 3.18: "$request" thành phương thức, đường dẫn, giao
     # thức; "$upstream_scheme://$upstream_host$upstream_uri" giữ nguyên trừ ?…. APISIX bọc chuỗi này trong '…' khi

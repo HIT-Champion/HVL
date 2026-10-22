@@ -417,6 +417,12 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   giao việc — 81 023 ký tự, 747 chuỗi số ứng viên, **0 chỗ bị che**; 15/15 đột biến bị giết. QĐ-006 trong
   `docs/architecture.md`, mục che thông tin cá nhân ở README svc-files, `docs/demo-script.md`, `gateway/README.md`.
   Test: svc-files +62, svc-workflow +6, scripts +19, giao diện +3.
+- Tài liệu triển khai lên máy chủ [`docs/trien-khai.md`](docs/trien-khai.md) (F1.9): Caddy nhận HTTPS (Let's Encrypt)
+  trước APISIX chỉ nghe `127.0.0.1`, người vận hành `moc`, tường lửa, cài ra `/opt/moc`, lệnh kiểm sau khi lên, sao lưu
+  hằng đêm, nâng cấp. Biến `.env` mới `MOC_TRUSTED_PROXY` (mặc định `127.0.0.1/32`, không tin ai): APISIX giữ
+  `X-Forwarded-Proto`, `-Host`, `-Port` và lấy IP người dùng từ `X-Forwarded-For` chỉ với yêu cầu từ dải này
+  (`gateway/README.md`). Diễn tập 22/10/2026 trên máy dev: proxy TLS ở cổng 443 trước bản cài, smoke, e2e, màn demo
+  qua `https://`.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -500,6 +506,17 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   sau khi máy chủ ngủ hay VM bị tạm dừng: token dịch vụ giữ trong bộ nhớ tính hạn theo đồng hồ monotonic, đồng hồ này
   đứng yên lúc máy ngủ nên token đã hết hạn vẫn được dùng. Nay tính theo giờ thật như `exp` của token; svc-files vẫn
   trả 401 thì bỏ token, lấy token mới và gửi lại đúng một lần (nhiều lời gọi cùng lúc chỉ hỏi Keycloak một lần).
+- Đặt sau proxy TLS (máy chủ có HTTPS) thì không đăng nhập được: APISIX 3.18 thay `X-Forwarded-Proto` của proxy bằng
+  `http`, Keycloak trả `token_endpoint` dạng `http://…`, trình duyệt chặn (nội dung hỗn hợp, CSP `connect-src
+  'self'`); mọi người dùng chung một bộ đếm giới hạn tốc độ. Nay khai `MOC_TRUSTED_PROXY` (xem phần Đã thêm).
+- `make demo-che-pii`, `make demo-hoi-dap` trên bản cài mới: bước đợi chỉ mục dừng ngay khi văn bản có trong nguồn
+  qua trích yếu (vào chỉ mục lúc tiếp nhận), lúc chữ các trang chưa được đọc, nên câu trả lời thiếu đoạn cần trích
+  và màn đỏ. Nay đợi tới khi một trang của văn bản có trong nguồn (test scripts +4).
+- Kịch bản dòng lệnh (smoke, demo) đỏ "Invalid user credentials" khi mã TOTP của khoảng 30 giây vừa được dùng ở
+  nơi khác (đăng nhập trên trình duyệt, e2e chạy từ thư mục mã nguồn trong khi kịch bản chạy từ bản cài — hai nơi
+  không chung sổ mã): Keycloak 26 trả 400 cho mã đã dùng y như sai mật khẩu, còn bước thử mã kế tiếp chỉ chờ 401
+  nên không bao giờ chạy. Nay thử tối đa bốn mã liền nhau, cách nhau 1,5 giây — ba mã đang hiệu lực đều đã bị
+  dùng thì đợi sang khoảng 30 giây mới (test scripts +4).
 
 ### Bảo mật
 - Ký số (F4.5): khóa ký của từng đơn vị không ra khỏi két (policy `svc-files` chỉ có `transit/keys|sign/moc-ky-so-*`

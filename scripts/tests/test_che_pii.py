@@ -254,6 +254,47 @@ class SettledLogsTests(unittest.TestCase):
         self.assertTrue(any(p.startswith("apisix: không có dòng truy cập") for p in demo.log_problems(got, [])))
 
 
+class WaitPiiAnswerTests(unittest.TestCase):
+    """Bước 4 đợi trang của lá đơn vào chỉ mục đoạn. Trên bản cài mới nguồn "trích yếu" (vào chỉ mục lúc tiếp nhận,
+    không có số điện thoại) có trước: chưa tính là xong."""
+
+    DOC = "c300d5bb-1234-4abc-8def-000000000002"
+
+    def setUp(self):
+        self.now = 100.0
+        self.asked = 0
+        self._saved = (demo.time, demo.ask)
+        demo.time = types.SimpleNamespace(monotonic=lambda: self.now, sleep=self.sleep)
+
+    def tearDown(self):
+        demo.time, demo.ask = self._saved
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+    def serve(self, *answers: dict[str, Any]) -> None:
+        def ask(session: Any, question: str) -> tuple[dict[str, Any], None]:
+            self.assertEqual(question, demo.PII_QUESTION)
+            self.asked += 1
+            return answers[min(self.asked, len(answers)) - 1], None
+        demo.ask = ask
+
+    def answer(self, *kinds: str) -> dict[str, Any]:
+        return {"status": "answered", "sources": [
+            {"document_id": self.DOC, "kind": kind, "page": 1 if kind == "page" else None} for kind in kinds]}
+
+    def test_summary_source_alone_keeps_waiting_for_the_page(self):
+        summary, page = self.answer("meta"), self.answer("meta", "page")
+        self.serve(summary, summary, page)
+        self.assertIs(demo.wait_pii_answer(object(), self.DOC, 90), page)
+        self.assertEqual(self.asked, 3)
+
+    def test_times_out_when_only_the_summary_is_indexed(self):
+        self.serve(self.answer("meta"))
+        with self.assertRaises(demo.DemoFailed):
+            demo.wait_pii_answer(object(), self.DOC, 10)
+
+
 class AccessLineTests(unittest.TestCase):
     def test_access_line_formats(self):
         sample = access("/api/search")

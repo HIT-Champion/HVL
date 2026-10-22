@@ -243,6 +243,43 @@ class SummaryTest(unittest.TestCase):
         self.assertIn("no_evidence", plain[-1])
 
 
+class WaitIndexedTest(unittest.TestCase):
+    """Bước đợi chỉ mục chỉ xong khi một trang của văn bản có trong nguồn: trích yếu vào chỉ mục lúc tiếp nhận, trước
+    khi chữ các trang được đọc — bản cài mới mà dừng đợi lúc đó thì các câu hỏi sau thiếu đoạn trả lời."""
+
+    DATA = {"questions": [POSITIVE], "documents": [{"symbol": "15/QĐ-ĐHM"}]}
+
+    def setUp(self) -> None:
+        self.now, self.asked = 100.0, 0
+        self._saved = (demo.time, demo.ask, demo.who)
+        demo.time = types.SimpleNamespace(monotonic=lambda: self.now, sleep=self.sleep)
+        demo.who = lambda user: user
+
+    def tearDown(self) -> None:
+        demo.time, demo.ask, demo.who = self._saved
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+    def serve(self, *answers: dict[str, Any]) -> None:
+        def ask(session: Any, question: str) -> tuple[dict[str, Any], None]:
+            self.assertEqual((session, question), (POSITIVE["user"], POSITIVE["question"]))
+            self.asked += 1
+            return answers[min(self.asked, len(answers)) - 1], None
+        demo.ask = ask
+
+    def test_summary_source_alone_keeps_waiting(self) -> None:
+        meta = result("passages_only", [src("15/QĐ-ĐHM", kind="meta")])
+        self.serve(meta, meta, result("answered", [src("15/QĐ-ĐHM", kind="meta"), src("15/QĐ-ĐHM", 1)]))
+        demo.wait_indexed(self.DATA, 90)
+        self.assertEqual(self.asked, 3)
+
+    def test_times_out_when_only_the_summary_is_indexed(self) -> None:
+        self.serve(result("passages_only", [src("15/QĐ-ĐHM", kind="meta")]))
+        with self.assertRaises(demo.DemoFailed):
+            demo.wait_indexed(self.DATA, 10)
+
+
 class SamplesTest(unittest.TestCase):
     """seed/hoi-dap/cau-hoi.json là đầu ra của hoi_dap_mau.py; câu hỏi đủ loại như hợp đồng F4.2 §10."""
 

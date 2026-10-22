@@ -1661,7 +1661,8 @@ def load_corpus(data: dict[str, Any]) -> tuple[dict[str, dict], int]:
 
 def wait_indexed(data: dict[str, Any], timeout_s: float) -> float:
     """Đợi vòng nền svc-files đọc chữ từng trang rồi đưa đoạn vào chỉ mục: hỏi thử câu đầu của mỗi văn bản mẫu (đúng
-    người hỏi) tới khi văn bản đó có trong nguồn → số giây đã đợi."""
+    người hỏi) tới khi một trang của văn bản đó có trong nguồn → số giây đã đợi. Nguồn "trích yếu" không tính: trích
+    yếu vào chỉ mục ngay lúc tiếp nhận, trước khi chữ các trang được đọc (bản cài mới thì trả lời lúc đó còn thiếu)."""
     probes: dict[str, dict] = {}
     for q in data["questions"]:
         for want in q["expect"] if isinstance(q["expect"], list) else []:
@@ -1676,7 +1677,7 @@ def wait_indexed(data: dict[str, Any], timeout_s: float) -> float:
                 if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
                     raise
                 sources = []
-            if any(same_symbol(s.get("symbol"), symbol) for s in sources):
+            if any(same_symbol(s.get("symbol"), symbol) and s.get("kind") == "page" for s in sources):
                 del probes[symbol]
         if not probes:
             break
@@ -2801,7 +2802,8 @@ def settled_logs(since: str, last_request: float, timeout_s: float = 15.0) -> di
 
 
 def wait_pii_answer(clerk: Session, doc_id: str, timeout_s: float) -> dict[str, Any]:
-    """Hỏi PII_QUESTION (extract) tới khi lá đơn có trong nguồn — vòng nền svc-files đã đưa đoạn vào chỉ mục."""
+    """Hỏi PII_QUESTION (extract) tới khi trang của lá đơn có trong nguồn — vòng nền svc-files đã đưa đoạn vào chỉ mục.
+    Nguồn "trích yếu" của lá đơn có trước (vào chỉ mục lúc tiếp nhận) nhưng không có số điện thoại: chưa tính."""
     started = time.monotonic()
     while True:
         try:
@@ -2810,7 +2812,7 @@ def wait_pii_answer(clerk: Session, doc_id: str, timeout_s: float) -> dict[str, 
             if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
                 raise
             got = {}
-        if any(s.get("document_id") == doc_id for s in got.get("sources") or []):
+        if any(s.get("document_id") == doc_id and s.get("kind") == "page" for s in got.get("sources") or []):
             return got
         if time.monotonic() - started > timeout_s:
             raise DemoFailed(f"sau {timeout_s:.0f} giây trợ lý chưa có lá đơn {PII_SYMBOL} trong nguồn — vòng nền svc-files"

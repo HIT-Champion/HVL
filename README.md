@@ -216,6 +216,8 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 - Nâng cấp: dừng bản cài, `make install` lại với cùng `PREFIX`. Compose, cấu hình và image được thay; `.env`
   của bản cài được giữ, chỉ đổi `MOC_VERSION`.
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
+- Lên máy chủ có tên miền và HTTPS: [`docs/trien-khai.md`](docs/trien-khai.md) — Caddy trước APISIX,
+  `MOC_HTTP_PORT=127.0.0.1:8080`, `MOC_TRUSTED_PROXY` để APISIX tin tiêu đề `X-Forwarded-*` của Caddy.
 
 ### Thêm đơn vị (thuê ước)
 
@@ -470,6 +472,7 @@ tệp khóa phụ thuộc (OSV-Scanner).
 | [`docs/architecture.md`](docs/architecture.md) | Kiến trúc H-P-D-I, bản đồ công cụ, quyết định kỹ thuật |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
 | [`docs/api/`](docs/api/README.md) | Tài liệu API: lấy token, gọi GraphQL và REST qua cổng; schema GraphQL theo vai trò và OpenAPI xuất tự động (`make api-docs`) |
+| [`docs/trien-khai.md`](docs/trien-khai.md) | Triển khai lên máy chủ (VPS): HTTPS bằng Caddy trước APISIX, người vận hành, tường lửa, kiểm sau khi lên, sao lưu hằng đêm, nâng cấp |
 | [`docs/pof-checklist.md`](docs/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
 | [`docs/nghien-cuu/`](docs/nghien-cuu/) | Nghiên cứu trước khi có đề thi (lưu trữ) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Danh mục phần mềm thượng nguồn + giấy phép |

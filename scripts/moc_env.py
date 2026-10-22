@@ -161,15 +161,19 @@ def user_login(username: str, password: str | None = None) -> tuple[dict, dict[s
         try:
             return call_json("POST", url, form={**form, "otp": totp_at(secret, _otp_counter(username))})
         except HTTPError as exc:
-            # 400 (không phải 401 như mã sai): không có tài khoản, sai mật khẩu, hoặc đang bị khóa tạm
-            if exc.status == 400 and "Invalid user credentials" in exc.body:
-                raise HTTPError(400, f"{exc.body} — Keycloak từ chối {username}: sai tên đăng nhập hoặc mật khẩu, "
-                                     "hoặc tài khoản đang tạm khóa vì đăng nhập sai liên tiếp (đợi một phút rồi "
-                                     "chạy lại)", url) from exc
-            # mã vừa bị trình duyệt (e2e) dùng mất: lấy mã kế tiếp. Đợi quá 1 giây — hai lần sai sát nhau thì
+            # Keycloak 26 trả cùng một lỗi 400 "Invalid user credentials" cho sai mật khẩu, mã sai, mã đã dùng và
+            # tài khoản đang tạm khóa. Mã có thể vừa bị dùng ngoài sổ (đăng nhập trên trình duyệt, e2e chạy từ thư
+            # mục mã nguồn còn kịch bản chạy từ bản cài): thử mã kế tiếp, tối đa bốn mã — cả ba mã đang hiệu lực có
+            # thể đã bị dùng (e2e đăng nhập liên tiếp), mã thứ tư thì _otp_counter đợi sang khoảng 30 giây mới.
+            # Mật khẩu sai thật thì tốn bốn lần sai trong failureFactor 10. Đợi quá 1 giây: hai lần sai sát nhau thì
             # Keycloak coi là dò mật khẩu, khóa tài khoản một phút (quickLoginCheckMilliSeconds mặc định 1000)
-            if exc.status != 401 or attempt == 3:
+            if exc.status != 400 or "Invalid user credentials" not in exc.body:
                 raise
+            if attempt == 3:
+                raise HTTPError(400, f"{exc.body} — Keycloak từ chối {username} với bốn mã TOTP liền nhau: sai tên "
+                                     "đăng nhập hoặc mật khẩu, MOC_DEMO_TOTP_SECRET khác khóa đã cài, hoặc tài khoản "
+                                     "đang tạm khóa vì đăng nhập sai liên tiếp (đợi một phút rồi chạy lại)",
+                                url) from exc
             time.sleep(1.5)
     raise AssertionError("không tới được đây")
 
