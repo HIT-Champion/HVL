@@ -19,11 +19,11 @@
 // trích dẫn "88/CTSV · tr. 1" theo đúng chữ trong vi.json / en.json, và hai bộ khóa ngôn ngữ khớp nhau.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import type { AskResult, AskSource } from '../app/composables/useApi.ts'
 
-const { MAX_QUESTION, blocks, citeLabel, cleanQuestion, needsGenerate, segments, sourceAnchor, tidy } =
+const { MASK_RE, MAX_QUESTION, blocks, citeLabel, cleanQuestion, hasMask, needsGenerate, segments, sourceAnchor, tidy } =
   await import('../app/utils/answer.ts')
 
 type Messages = { [key: string]: string | Messages }
@@ -158,6 +158,38 @@ test('khối hiện: câu trả lời của mô hình và câu trích; mô hình
   assert.deepEqual(blocks({ answer: SAMPLE.answer, extract: null }), { model: null, extract: SAMPLE.answer })
   assert.deepEqual(blocks({ answer: null, extract: null }), { model: null, extract: null })
   assert.deepEqual(blocks({ answer: { ...model, text: '' }, extract: null }), { model: null, extract: null })
+})
+
+test('nhãn che thông tin cá nhân (F4.4): nhận đúng nhãn, không nhầm với dấu trích dẫn', () => {
+  for (const s of ['Số liên hệ là [SĐT-1].', '[CCCD]', 'gửi [EMAIL-12]', '[STK-999]', 'CMND [CMND-3] cấp năm 2010']) {
+    assert.equal(hasMask(s), true, s)
+  }
+  for (const s of ['[1]', '[SĐT-1000]', '[SDT-1]', '[sđt-1]', 'SĐT-1', '[SĐT 1]', '[EMAIL-]', '[SĐT-01x]', '', null, undefined]) {
+    assert.equal(hasMask(s), false, String(s))
+  }
+  // nhãn giữ nguyên là chữ, dấu [n] cạnh nó vẫn là trích dẫn
+  const sources = [source(1)]
+  assert.deepEqual(segments('Số liên hệ là [SĐT-1] [1].', sources),
+    [{ text: 'Số liên hệ là [SĐT-1] ' }, { n: 1, source: sources[0] }, { text: '.' }])
+  // không có cờ g: gọi nhiều lần cùng một chữ cho cùng kết quả (lastIndex không đổi)
+  assert.equal(MASK_RE.flags.includes('g'), false)
+  assert.deepEqual([1, 2, 3].map(() => hasMask('[SĐT-1]')), [true, true, true])
+})
+
+test('mẫu nhãn che giống hệt LABEL_RE của svc-files (pii.py)', (t) => {
+  const file = new URL('../../../services/svc-files/src/svc_files/pii.py', import.meta.url)
+  if (!existsSync(file)) {
+    t.skip('không có services/svc-files trong cây mã')
+    return
+  }
+  const m = readFileSync(file, 'utf8').match(/^LABEL_RE = re\.compile\(r"(.+)"\)$/m)
+  assert.ok(m, 'không thấy LABEL_RE trong pii.py')
+  assert.equal(MASK_RE.source, m[1])
+})
+
+test('dòng nhắc che thông tin cá nhân có ở hai ngôn ngữ, chỉ tới câu trích nguyên văn', () => {
+  assert.match(tVi('assist.maskedNote'), /câu trích nguyên văn/)
+  assert.match(tEn('assist.maskedNote'), /verbatim quote/)
 })
 
 test('kết quả thiếu trường vẫn dùng được: mảng rỗng, nguồn theo n, cảnh báo không trùng', () => {

@@ -34,6 +34,11 @@ Theo đúng thứ tự, mỗi bước chặn được thì chặn trước khi t
 Không có đoạn nào → ``no_evidence``, không gọi mô hình; giống hệt dù văn bản không tồn tại hay người hỏi không được
 đọc. Nhật ký không bao giờ có câu hỏi, câu trả lời, đoạn trích: chỉ độ dài, số term, số đoạn, thời gian.
 
+Che thông tin cá nhân (F4.4): mô hình chỉ đọc bản che. Mỗi lượt ``generate`` một ``pii.Masker``: câu hỏi che trước
+(số trong câu hỏi nhận nhãn ``[SĐT-1]``), rồi các đoạn — cùng số thì cùng nhãn, mô hình vẫn biết "số này của ai". Tìm
+kiếm, câu trích nguyên văn và nguồn trả người hỏi (người có quyền đọc văn bản) giữ số thật; câu trả lời của mô hình
+giữ nhãn. Số chỗ đã che ghi ở khóa ``masked`` của nhật ký, không vào sổ.
+
 Vòng nhúng nền chỉ bị giữ (``hold``) **trong lúc** lượt hỏi gọi Ollama (nhúng câu hỏi, sinh), không phải mỗi lượt hỏi:
 câu trích không cần mô hình thì không giữ gì. Người hỏi ngắt kết nối thì api.py hủy lượt (``CancelledError``): lời
 gọi Ollama bị ngắt, lượt sinh được nhả; không trả lời nên không ghi sổ, chỉ có nhật ký ``office.assist.ask_cancelled``.
@@ -50,6 +55,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Protocol
 
+from .. import pii
 from ..auth import Principal
 from ..hasura import HasuraAuthError, HasuraError
 from ..search import SearchError
@@ -214,8 +220,10 @@ class Assistant:
         cited = list(quoted.cited)
         model_text: str | None = None
         model: str | None = None
+        masked = 0                  # số chỗ đã che trong chữ gửi mô hình viết câu trả lời
         if body.mode == "generate" and passages:
-            model_text, model, warning = await self._generate(question, passages, quoted.best, deadline, request_id)
+            model_text, model, warning, masked = await self._generate(question, passages, quoted.best, deadline,
+                                                                      request_id)
             if warning:
                 warnings.append(warning)
             if model_text:
@@ -251,7 +259,8 @@ class Assistant:
         _log("office.assist.asked", request_id, tenant_id=principal.tenant_id, actor_id=principal.user_id,
              mode=body.mode, status=status, q_length=len(question), terms=len(vi.terms(question)),
              candidates=found.candidates, relaxed=found.relaxed, hits=len(passages), cited=len(cited),
-             semantic=found.semantic, model=model, warnings=",".join(warnings), duration_ms=duration_ms)
+             semantic=found.semantic, model=model, warnings=",".join(warnings), masked=masked,
+             duration_ms=duration_ms)
         cited_set = set(cited)
         return {
             "ask_id": ask_id, "status": status, "answer": answer_out, "extract": extract_out,
@@ -261,29 +270,33 @@ class Assistant:
         }
 
     async def _generate(self, question: str, passages: list[Passage], best: dict[str, tuple[int, int]],
-                        deadline: float, request_id: str) -> tuple[str | None, str | None, str | None]:
-        """(câu trả lời đã kiểm, mô hình đã gọi, cảnh báo)."""
+                        deadline: float, request_id: str) -> tuple[str | None, str | None, str | None, int]:
+        """(câu trả lời đã kiểm, mô hình đã gọi, cảnh báo, số chỗ đã che trong chữ gửi mô hình)."""
         if not self.ai.chat_available:
-            return None, None, "model_unavailable"
+            return None, None, "model_unavailable", 0
         left = deadline - self._clock()
         if left < MODEL_MIN_S:
-            return None, None, "model_timeout"
-        srcs = grounding.sources(passages, best, max_chars=self.settings.ask_context_chars)
+            return None, None, "model_timeout", 0
+        # Một bộ che cho cả lượt: câu hỏi che trước để số trong câu hỏi nhận nhãn số 1. ``best`` vẫn tính trên chữ
+        # gốc (câu trích nguyên văn), sources() đổi sang toạ độ bản che. Mô hình đọc và validate kiểm cùng một bản che
+        masker = pii.Masker()
+        asked = masker.mask(question).text
+        srcs = grounding.sources(passages, best, max_chars=self.settings.ask_context_chars, masker=masker)
         async with self._holding():
-            result = await self.ai.chat(grounding.messages(srcs, question), format=grounding.FORMAT,
+            result = await self.ai.chat(grounding.messages(srcs, asked), format=grounding.FORMAT,
                                         options=grounding.OPTIONS,
                                         timeout_s=min(self.settings.ask_model_timeout_s, left - SAVE_RESERVE_S))
         model = self.ai.chat_model
         if result.content is None:
-            return None, model, result.warning or "model_unavailable"
-        verdict = grounding.validate(result.content, srcs, question)
+            return None, model, result.warning or "model_unavailable", masker.total
+        verdict = grounding.validate(result.content, srcs, asked)
         if verdict.text:
-            return verdict.text, model, None
+            return verdict.text, model, None, masker.total
         if verdict.declined:
-            return None, model, "model_declined"
+            return None, model, "model_declined", masker.total
         # chỉ mã lý do: đầu ra của mô hình có thể chép chữ của văn bản
-        _log("office.assist.model_rejected", request_id, model=model, reason=verdict.reason)
-        return None, model, "model_rejected"
+        _log("office.assist.model_rejected", request_id, model=model, reason=verdict.reason, masked=masker.total)
+        return None, model, "model_rejected", masker.total
 
     @asynccontextmanager
     async def _holding(self) -> AsyncIterator[None]:

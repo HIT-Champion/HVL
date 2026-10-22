@@ -314,6 +314,14 @@ jobs:
       - name: Ký số văn bản đi, chỉ minh họa (make demo-ky-so)
         run: make demo-ky-so
 
+      # F4.4: văn thư tải một lá đơn giả lập có số CCCD, số điện thoại, email, số tài khoản → tìm theo số CCCD ra đúng
+      # đơn, trợ lý trích nguyên văn có đúng số điện thoại (người được xem văn bản thấy bản gốc); tệp EICAR tên có số
+      # điện thoại bị chặn, sổ kiểm toán giữ tên gốc; nhật ký apisix, app-office, svc-files, svc-workflow từ lúc bắt
+      # đầu màn không còn giá trị nào ở mọi cách viết, dòng truy cập không còn chuỗi truy vấn. Không bật profile ai: in
+      # bản che mô hình sẽ nhận. Đo trên kho mẫu và đột biến mã (make do-che-pii) đã chạy trong make test
+      - name: Che thông tin cá nhân trong nhật ký và chữ gửi mô hình (make demo-che-pii)
+        run: make demo-che-pii
+
       # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL,
       # tệp và két, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về cùng),
       # sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục

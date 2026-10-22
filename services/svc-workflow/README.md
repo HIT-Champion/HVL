@@ -121,6 +121,15 @@ Vòng nền: deploy `processes/*.bpmn20.xml` khi khởi động (bỏ qua tệp 
 vào sổ mà chưa có quy trình và báo văn bản đến đã qua hạn giải quyết; nhận việc nhắc hạn của Flowable; mỗi
 `MOC_DISPATCH_INTERVAL_S` giây chuyển tiếp liên thông; mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây nhận việc gợi ý giao việc.
 
+**Nhật ký không có thông tin cá nhân** (F4.4): `_setup_logging` gọi `pii.install_log_redaction`, nên mọi dòng của
+dịch vụ, `uvicorn.error` và `uvicorn.access` đi qua bộ lọc `PiiFilter` — số định danh, số điện thoại, email, số tài
+khoản thành `[CCCD]`, `[SĐT]`, `[EMAIL]`, `[STK]`, kể cả trong traceback của `office.action.failed`; dòng truy cập bỏ
+chuỗi truy vấn. `svc_workflow/pii.py` là bản chép y hệt byte của `svc_files/pii.py` (QĐ-006): sửa ở svc-files rồi chép
+sang, `tests/test_pii_copy.py` đỏ ngay khi hai bản lệch nhau. svc-workflow không gọi mô hình nào nên chỉ dùng phần
+nhật ký; sổ kiểm toán không che. Đếm chỗ cần che trong một đoạn chữ, không in giá trị: `docker compose exec -T
+svc-workflow python -m svc_workflow.pii count < tệp`. Loại, nhãn, giới hạn: README svc-files mục
+[Che thông tin cá nhân (F4.4)](../svc-files/README.md#che-thông-tin-cá-nhân-f44).
+
 ## Cấu hình
 
 Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi

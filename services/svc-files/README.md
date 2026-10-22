@@ -28,6 +28,7 @@ issue #19, #20.
 | `POST /api/files/{id}/read`: đọc văn bản đến (lớp chữ PDF hoặc OCR Tesseract), quy tắc gợi ý 6 trường, mô hình tùy chọn viết trích yếu, ghi sổ của tác tử | **Xong** (F4.1) |
 | `POST /api/documents/ask`: hỏi đáp trên các văn bản người hỏi được đọc — chỉ mục đoạn theo trang, quyền hai lớp, câu trích nguyên văn, mô hình tùy chọn viết câu trả lời có kiểm trích dẫn, ghi sổ của trợ lý | **Xong** (F4.2) |
 | `/internal/similar-documents`: văn bản đến tương tự đã giao cho tác tử gợi ý giao việc — câu tìm từ trích yếu, dùng lại truy xuất F4.2, hậu kiểm quyền dịch vụ, không trả chữ | **Xong** (F4.3) |
+| Che thông tin cá nhân (số định danh, điện thoại, email, số tài khoản) trong chữ gửi mô hình và trong nhật ký; câu trích, nguồn, sổ kiểm toán giữ bản gốc | **Xong** (F4.4) |
 | Văn bản hạn chế: lưu mã hóa (khóa riêng từng tệp từ két), tải về giải mã trong bộ nhớ, đóng dấu người xem, ghi sổ | **Xong** (F3.7) |
 | `/internal/issue`: dựng PDF có số, mã QR (WeasyPrint) → quét → lưu bản phát hành | **Xong** (F2.4) |
 | Ký số PAdES bản phát hành bằng khóa của đơn vị trong két, CA nội bộ (chỉ minh họa); `signature` ở cổng xác thực; `python -m svc_files.signing verify` | **Xong** (F4.5, bản tối thiểu) |
@@ -458,6 +459,134 @@ svc-files **chỉ truy xuất**: không chọn đơn vị, không lưu gợi ý,
 
 Giới hạn: chỉ mục đoạn đồng bộ mỗi `MOC_ASK_SYNC_INTERVAL_S` giây, nên văn bản vừa chuyển sang "đang xử lý" vài giây
 trước chưa làm căn cứ được; trích yếu quá ngắn hay chỉ có từ chung thì ít kết quả đúng.
+
+### Che thông tin cá nhân (F4.4)
+
+`pii.py` — tự viết, chỉ dùng `re` của thư viện chuẩn (QĐ-006 trong
+[`docs/architecture.md`](../../docs/architecture.md)); `svc_workflow/pii.py` là bản chép y hệt byte, test của
+svc-workflow đỏ ngay khi hai bản lệch nhau. Mô hình ngôn ngữ và nhật ký **không thấy** số định danh, số điện thoại,
+email, số tài khoản mà bộ nhận dạng nhận ra trong văn bản (cách viết sót: mục giới hạn bên dưới); người có quyền đọc
+văn bản thì vẫn thấy số thật: chỉ mục tìm kiếm, câu trích nguyên văn, nguồn trả người hỏi và sổ kiểm toán giữ bản gốc.
+Che luôn bật, không có biến cấu hình để tắt.
+
+| Loại | Nhãn ở nhật ký, lối ra mô hình | Nhãn trong ngữ cảnh F4.2 | Nhận khi |
+|---|---|---|---|
+| Số định danh / CCCD 12 số | `[CCCD]` | `[CCCD-n]` | 3 số đầu là một trong 63 mã tỉnh (Thông tư 59/2021/TT-BCA), chữ số thứ 4 là 0–3, năm sinh không ở tương lai; **hoặc** 12 số bất kỳ ngay sau từ khóa ("CCCD", "căn cước", "số định danh"…) |
+| CMND | `[CMND]` | `[CMND-n]` | **chỉ** ngay sau từ khóa ("CMND", "CMT", "chứng minh nhân dân"…), 9 hoặc 12 số |
+| Điện thoại | `[SĐT]` | `[SĐT-n]` | di động 10 số có đầu số đã cấp (10/2026, gồm 095), máy bàn `02x` 11 số, di động 11 số cũ; `+84`, `(+84)`, `0084`, `+84 (0)`, `84…` liền, mã vùng `(024)`; viết liền hay theo nhóm (nhóm đầu ≥ 3 chữ số, trừ sau `+84` / mã vùng) |
+| Email | `[EMAIL]` | `[EMAIL-n]` | cú pháp địa chỉ có tên miền cấp cao (`user@localhost`, `@pytest.fixture` không khớp) |
+| Số tài khoản | `[STK]` | `[STK-n]` | **chỉ** ngay sau từ khóa ("số tài khoản", "STK", "tài khoản ngân hàng số"…), 6–19 chữ số |
+
+Từ khóa so trên bản bỏ dấu, không phân biệt hoa thường. Không che: UUID, số ký hiệu (`131/ĐT-ĐHM`), ngày, tiền, tổng đài
+1800 / 1900, số 8 chữ số, mã số thuế 10 số sau "MST" / "mã số thuế", dãy số nhỏ của bảng, lịch ("Tuần 01 02 03 04 05
+06", "phòng 08 12 15 20 22"), dãy đếm ("001⏎002⏎003⏎004"). Nhận theo cấu trúc, không theo "dãy số đủ dài": chuỗi số ứng
+viên (các nhóm chữ số cách nhau **một** dấu cách, chấm, gạch, tab, cách hẹp hay xuống dòng; `_` là ranh giới như dấu
+cách) → cụm tối đa 6 nhóm liền nhau, nhóm đầu ≥ 3 chữ số → kiểm mã tỉnh, thế kỷ, đầu số. Che xong một số có thể gỡ điều
+kiện chặn của số bên cạnh (`001205000017,0084…@…`), nên bộ che lặp tới khi bản che không còn gì để che (tối đa 3 lượt):
+bản che idempotent. Thời gian tuyến tính theo độ dài chữ (chuỗi bệnh lý 100 000 ký tự ≤ 500 ms, văn bản 20 000 ký tự cỡ
+10 ms).
+
+- **Chữ gửi mô hình, lớp 1 — lối ra.** Mọi lời gọi Ollama đều che trước khi gửi: nhúng đoạn và câu hỏi (F4.2), nhúng
+  trích yếu (F4.3), viết câu trả lời (F4.2) ở `assist/ai.py`; viết trích yếu (F4.1) ở `docread/summarize.py` — che
+  **trước** khi cắt `MOC_AI_MAX_CHARS`, để không lọt mẩu số vắt qua chỗ cắt. Không byte chữ nào tới `MOC_AI_URL` mà
+  chưa qua bộ che. Trích yếu mô hình viết ra có nhãn thì bị loại như trích yếu có số điện thoại (`model_rejected`).
+  Bản che idempotent: `chat` (viết câu trả lời) mà còn phải che thêm nghĩa là chỗ gọi đã quên che → cảnh báo
+  `office.assist.pii_at_egress` `{"masked": n}` — bình thường không bao giờ có, có là lỗi. `embed` che mà không ghi
+  gì: đoạn nhúng ở vòng nền luôn mang chữ gốc. Đầu vào nhúng mang nhãn `[SĐT]`, nên tìm theo nghĩa không phân biệt
+  hai số; tìm theo từ khóa vẫn dùng số gốc.
+- **Lớp 2 — ngữ cảnh F4.2** (`assist/answer.py`, `assist/grounding.py`). Mỗi lượt `generate` một bộ che đánh số:
+  câu hỏi che trước (số trong câu hỏi nhận nhãn số 1), rồi các đoạn. Cùng giá trị thì cùng nhãn (`+84 912…` và
+  `0912…` là một số; email so chữ thường), nên mô hình vẫn biết số nào của ai. Phần kiểm trích dẫn đọc đúng bản che mô
+  hình đã đọc. Số ký hiệu ở đầu mỗi nguồn không qua bộ che của lượt, chỉ qua lối ra.
+- **Trích dẫn giữ nguyên.** Câu tốt nhất vẫn chọn trên chữ gốc (câu trích nguyên văn). Dựng ngữ cảnh: che cả đoạn,
+  đổi vị trí câu tốt nhất sang bản che (`Masked.window`), **rồi mới** cắt ≤ 700 ký tự — cửa sổ không bao giờ cắt đôi
+  một con số. `[n]`, trang, số ký hiệu không đổi; nhãn không có dạng `[n]` nên không bị hiểu là trích dẫn. Câu trả lời
+  của mô hình giữ nhãn, không điền số thật trở lại (mô hình có thể đặt nhãn sai chỗ, gán số người này cho người khác);
+  trang Hỏi đáp ghi "số thật nằm trong văn bản nguồn: xem câu trích nguyên văn và các nguồn bên dưới" và tự mở
+  khối câu trích.
+- **Nhật ký.** `_setup_logging` gọi `pii.install_log_redaction`: bộ lọc `PiiFilter` gắn vào logger của dịch vụ,
+  `uvicorn`, `uvicorn.error`, `uvicorn.access` và handler của chúng. Bộ lọc che chuỗi cuối cùng của bản ghi (message đã
+  ghép tham số, traceback, stack); dòng truy cập của uvicorn **bỏ chuỗi truy vấn** (`GET /api/search?… HTTP/1.1`),
+  vì chuỗi đã mã hóa phần trăm (`0912%20345%20678`) thì không regex nào thấy. Che hỏng thì cả dòng thành
+  `core.log.redaction_failed`: thà mất một dòng. Tệp nhiễm tên `don-0912345678.txt`: dòng `core.file.rejected` ghi
+  `don-[SĐT].txt`, còn dòng sổ `file.rejected` giữ tên gốc — sổ có phân quyền và chuỗi băm, che vào sổ thì mất giá
+  trị chứng cứ. APISIX và nginx của giao diện cũng bỏ chuỗi truy vấn và Referer:
+  [`gateway/README.md`](../../gateway/README.md).
+- **Số chỗ đã che** (không bao giờ có giá trị) ở khóa `masked`, không vào sổ kiểm toán:
+
+  | Sự kiện | `masked` |
+  |---|---|
+  | `office.assist.asked` | tổng số chỗ bộ che của lượt `generate` đã che — câu hỏi và cả đoạn, kể cả số nằm ngoài cửa sổ 700 ký tự; 0 khi không hỏi mô hình |
+  | `office.assist.model_rejected` | như trên, cho lượt mô hình viết bị loại |
+  | `office.intake.read` | số chỗ đã che trong phần chữ thật sự gửi mô hình viết trích yếu (trước chỗ cắt `MOC_AI_MAX_CHARS`); 0 khi không gọi mô hình hay trả gợi ý đã lưu |
+  | `office.assist.pii_at_egress` (cảnh báo) | số chỗ lối ra `chat` phải che thêm — chỉ xuất hiện khi có lỗi |
+
+- **Dòng lệnh** (đọc stdin, svc-workflow dùng `svc_workflow.pii`):
+
+  ```bash
+  docker compose exec -T svc-files python -m svc_files.pii mask  < don.txt   # bản che, nhãn trơn [SĐT]
+  docker compose exec -T svc-files python -m svc_files.pii count < don.txt   # {"chars", "total", "spans"} — không in giá trị
+  ```
+
+**Đo — `make do-che-pii`** (không cần Docker; `test_pii_corpus.py` và `test_pii_mutation.py` đã chạy trong
+`make test`). Che nhầm trên kho mẫu (đo 22/10/2026, 22 văn bản đến), đọc như bản chạy thật (lớp chữ và bố cục của
+PDF, TSV OCR có sẵn) — tổng 81 023 ký tự, 747 chuỗi số ứng viên, 0 chỗ bị che:
+
+| Nguồn | Tệp / chuỗi | Ký tự | Chuỗi số ứng viên | Bị che |
+|---|---|---|---|---|
+| `seed/van-ban-den`, PDF có lớp chữ | 15 | 37 416 | 370 | **0** |
+| `seed/van-ban-den`, bản scan (TSV OCR) | 7 | 6 442 | 68 | **0** |
+| `seed/hoi-dap`, mọi trang | 6 | 19 957 | 144 | **0** |
+| Nhãn, câu hỏi, lịch sử giao việc | 1 248 chuỗi | 17 208 | 165 | **0** |
+
+Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp (`test_pii.py`), vì kho mẫu không có — và không được có —
+dữ liệu thật mang thông tin cá nhân: 95 chỗ dương tính trong 84 chuỗi đều bị che (cả số ngắt dòng, tên tệp
+`don_0912…`), 80 chuỗi âm tính khó (giấy tờ, ngày, tiền, UUID, hex, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng,
+email giả…) không bị che, 1 144 ca đột biến dữ liệu vào (11 toán tử) đúng kỳ vọng. Đột biến mã: 15 đột biến của
+`pii.py` (bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số, bỏ cổng mã số thuế, giữ chuỗi truy vấn, xuống dòng không
+là phân cách, bỏ điều kiện nhóm đầu ≥ 3 chữ số, che một lượt…) — **15/15 bị test giết**, khoảng 1,5 giây. Có chỗ che
+nhầm, sót một ca dương tính hay một đột biến sống sót thì lệnh thoát 1.
+
+**Giới hạn:**
+
+- **Sót có chủ đích:** số dính chữ (`ĐT0912…`), số có hai ký tự trắng liền (hai dấu cách, dòng trống, cách rồi
+  xuống dòng), CCCD sau `/`; số viết từng cặp (`09 12 34 56 78`: nhóm đầu 2 chữ số), `84 912 345 678` (bỏ dấu cộng mà
+  có cách — viết liền `84912345678` thì che), số viết theo nhóm nối bằng phẩy không cách (`0912 345 678,0987 654 321`;
+  hai dãy ≥ 9 chữ số liền nối bằng phẩy thì che cả hai); số máy bàn kiểu cũ 10 số (trước 2017), số nước ngoài; CMND
+  và số tài khoản không có từ khóa; chữ không ở dạng NFC có thể sót từ khóa.
+- **Che nhầm có chủ đích:** dãy mã 3 chữ số trùng dạng CCCD hợp lệ (mã tỉnh, chữ số thế kỷ, năm sinh đều đúng), như
+  `012 045 078 090`, `010.203.040.506`, danh sách mã tỉnh `001 002 004 006` — mơ hồ với CCCD viết 3-3-3-3, che dư là
+  phía an toàn.
+- **Xuống dòng:** một ký tự trắng bất kỳ (dấu cách, xuống dòng, `\r\n`, tab, cách không ngắt, cách hẹp) là phân cách
+  nhóm, nên số bị dàn trang ngắt dòng trong lớp chữ PDF, OCR ("0912 345⏎678", "001205⏎000017") bị che ở mọi lối ra:
+  nhúng đoạn, trích yếu F4.1, ngữ cảnh F4.2. Số cách bởi dòng trống thì không: ngữ cảnh F4.2 gộp khoảng trắng rồi che
+  lại bằng cùng bộ che, còn nhúng đoạn và trích yếu F4.1 gửi nguyên (đoạn của `chunks.py` và chữ trích yếu bỏ dòng
+  trống giữa hai dòng nên ít gặp). Ngược lại, số cuối dòng ghép được với số đầu dòng sau: cột bảng tách mỗi ô một dòng
+  có thể thành một số và bị che (che thừa; dãy đếm đã loại). Sau từ khóa, trọn chuỗi vắt dòng sai độ dài thì lùi về
+  cuối một dòng ("CMND số 123456789⏎2. Địa chỉ" che 9 số). Mã số thuế bị cửa sổ cắt mất từ khóa "MST" đứng trước
+  thì bị che như số điện thoại (che thừa).
+- **Không làm:** họ tên, địa chỉ (cần nhận dạng thực thể, chưa có mô hình tiếng Việt nhẹ), hộ chiếu, biển số xe,
+  giấy phép lái xe, số BHXH. Điểm mở rộng: thêm một nguồn khoảng vào `find()` và một nhãn vào `LABELS`, sửa
+  `LABEL_RE` cùng `MASK_RE` của app-office (test so hai mẫu).
+- **Che quá tay trong chữ gửi mô hình:** bộ nhận dạng không phân biệt cá nhân với tổ chức, nên email và số máy bàn
+  của cơ quan cũng bị che — hỏi "email phòng đào tạo" thì mô hình trả `[EMAIL-1]`, câu trích có địa chỉ thật. Kho
+  hỏi đáp mẫu không có chỗ nào bị che, nên số đo `make do-hoi-dap` không đổi.
+- **Danh mục đổi theo thời gian:** đầu số di động mới phải thêm vào `MOBILE_PREFIXES`; chưa xác nhận số định danh của
+  người đăng ký khai sinh sau khi sắp xếp tỉnh (07/2025) còn nằm trong 63 mã tỉnh — nếu không, chỉ đường từ khóa bắt
+  được.
+- **Véc-tơ nhúng cũ:** đoạn đã nhúng trước F4.4 (trên chữ chưa che) giữ véc-tơ cũ trong Meilisearch tới khi nhúng lại
+  (đổi `MOC_AI_EMBED_MODEL` hoặc dựng lại chỉ mục).
+- **Nhật ký ngoài phạm vi:** Hasura (http-log khi lỗi), PostgreSQL (`DETAIL` của lỗi ràng buộc), Keycloak (tên đăng nhập
+  khi đăng nhập sai), Meilisearch và Ollama (khi bật `OLLAMA_DEBUG`) không qua bộ lọc nào; `make demo-che-pii` đọc nhật
+  ký Hasura, PostgreSQL, Keycloak, Meilisearch và chỉ cảnh báo. `error_log` của APISIX và nginx có định dạng cố định:
+  yêu cầu nào làm một plugin ghi lỗi (token hết hạn khi đang ở trang Tìm kiếm, phía sau lỗi…) thì dòng lỗi vẫn có
+  `request: "GET …?q=…"`; Referer thì không còn câu tìm vì giao diện gửi `Referrer-Policy: strict-origin`. Bản ghi của
+  logger khác không có handler, rơi vào `logging.lastResort` (WARNING trở lên), không qua `PiiFilter`.
+- **Gỡ lỗi tìm kiếm khó hơn** vì nhật ký truy cập không còn câu tìm; bù lại `core.search` vẫn có `q_length`, `hits`,
+  `request_id`.
+
+Căn cứ: Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị định 356/2025/NĐ-CP (cùng hiệu lực từ 01/01/2026) xếp số
+điện thoại, số định danh cá nhân vào dữ liệu cá nhân cơ bản, thông tin ngân hàng vào nhóm nhạy cảm.
 
 ### Văn bản đi và cổng xác thực
 

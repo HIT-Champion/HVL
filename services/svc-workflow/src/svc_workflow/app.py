@@ -37,7 +37,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
-from . import __version__
+from . import __version__, pii
 from .advisor import Advisor
 from .config import ConfigError, Settings
 from .directory import Directory
@@ -56,13 +56,18 @@ log = logging.getLogger("svc_workflow")
 
 
 def _setup_logging() -> None:
-    """Mỗi dòng nhật ký là một đối tượng JSON trên stdout."""
+    """Mỗi dòng nhật ký là một đối tượng JSON trên stdout.
+
+    F4.4: dòng của dịch vụ (kể cả traceback của ``office.action.failed``), uvicorn.error, uvicorn.access đều qua bộ
+    che PII; dòng truy cập bỏ chuỗi truy vấn. Uvicorn dựng logger và handler của nó trước khi gọi factory."""
     if not log.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(handler)
         log.setLevel(logging.INFO)
         log.propagate = False
+    # ngoài nhánh trên: logger đã có handler từ trước (fixture của test) vẫn phải được che
+    pii.install_log_redaction(log)
 
 
 def _error_doc(description: str) -> dict[str, Any]:

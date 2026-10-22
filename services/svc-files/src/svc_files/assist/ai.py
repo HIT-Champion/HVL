@@ -29,6 +29,10 @@ theo từ khóa, trả câu trích nguyên văn.
   nhúng đầu) mà khác ``MOC_AI_EMBED_DIMS`` chiều là sai cấu hình: tắt nhúng tới khi khởi động lại, ghi lỗi rõ.
 - Sinh: ``POST /api/chat`` không stream, tắt suy nghĩ, đầu ra ép theo JSON Schema (grounding.py dựng lời dặn và kiểm).
 - Không sửa ``docread/summarize.py``: tác tử đọc văn bản đến dò mô hình trích yếu riêng.
+- **Che thông tin cá nhân ở lối ra** (F4.4, pii.py): không byte chữ nào tới Ollama mà chưa qua bộ che. ``embed`` che
+  từng chuỗi (đoạn văn bản, câu hỏi, trích yếu F4.3 đều chỉ ra mô hình qua đây); ``chat`` che nội dung mọi message.
+  Bản che idempotent: answer.py đã che câu hỏi và nguồn bằng nhãn đánh số ``[SĐT-1]`` thì ở đây không còn gì để che —
+  còn phải che thêm nghĩa là chỗ gọi đã quên, ghi cảnh báo ``office.assist.pii_at_egress`` (chỉ số chỗ đã che).
 """
 
 from __future__ import annotations
@@ -43,6 +47,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx2
 
+from .. import pii
 from .meili import embedder_name  # tên embedder theo mô hình — luồng B đặt ở meili.py (§4.3)
 
 if TYPE_CHECKING:
@@ -116,6 +121,21 @@ class NullAi:
 
     async def aclose(self) -> None:
         return None
+
+
+def _masked(messages: list[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+    """Message gửi ``/api/chat`` với ``content`` đã che (nhãn trơn), và số chỗ phải che thêm ở lối ra."""
+    out: list[dict[str, str]] = []
+    total = 0
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, str):
+            m = pii.mask(content)
+            if m.spans:
+                total += len(m.spans)
+                message = {**message, "content": m.text}
+        out.append(message)
+    return out, total
 
 
 def _vectors(data: object, count: int, dims: int) -> list[list[float]] | None:
@@ -239,7 +259,8 @@ class OllamaAi:
         if not self.embed_available:
             self.embed_error = "model_unavailable"
             return None
-        inputs = [query_text(self.embed_model, t) if query else t for t in texts]
+        # che sau khi thêm tiền tố: chữ gửi đi đúng là chữ đã che
+        inputs = [pii.mask_text(query_text(self.embed_model, t) if query else t) for t in texts]
         body = {"model": self.embed_model, "input": inputs, "truncate": True, "keep_alive": KEEP_ALIVE,
                 "options": EMBED_OPTIONS}
         timeout_s = max(timeout_s, 0.1)
@@ -276,6 +297,9 @@ class OllamaAi:
                    timeout_s: float) -> ChatResult:
         if not self.chat_available:
             return ChatResult(None, "model_unavailable")
+        messages, masked = _masked(messages)
+        if masked:
+            log.warning(json.dumps({"event": "office.assist.pii_at_egress", "masked": masked}, ensure_ascii=False))
         body = {"model": self.chat_model, "stream": False, "think": False, "keep_alive": KEEP_ALIVE,
                 "format": format, "options": options, "messages": messages}
         timeout_s = max(timeout_s, 0.1)

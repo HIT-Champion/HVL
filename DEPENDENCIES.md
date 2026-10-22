@@ -185,7 +185,6 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 | Qwen3-1.7B | `qwen3:1.7b` (Q4_K_M, khoảng 1,36 GB) | Apache-2.0 (đã kiểm model card và tệp LICENSE trên Hugging Face của đúng cỡ 1.7B; cỡ 4B cũng Apache-2.0) | Trọng số mô hình viết trích yếu (F4.1) và câu trả lời có trích dẫn của trợ lý hỏi đáp (F4.2, chỉ từ các đoạn đã lọc theo quyền người hỏi; `svc-files` kiểm trích dẫn, con số trước khi trả). Phát hành 04/2025. Máy đủ nhanh thì đổi `MOC_AI_MODEL=qwen3:4b` hoặc chỉ riêng trợ lý `MOC_ASK_MODEL=qwen3:4b` | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7` — so với `ollama list` | 4 |
 | Qwen3-Embedding-0.6B | `qwen3-embedding:0.6b` (Q8_0, 639 MB, 1024 chiều, ngữ cảnh 32K) | Apache-2.0 (khai trong model card `Qwen/Qwen3-Embedding-0.6B` và bản GGUF chính thức trên Hugging Face; kho không kèm tệp LICENSE, bản kê Ollama không có lớp giấy phép) | Mô hình nhúng đoạn văn bản và câu hỏi cho tìm theo nghĩa của trợ lý hỏi đáp (F4.2, `MOC_AI_EMBED_MODEL`; câu hỏi mang tiền tố `Instruct: …\nQuery: …`). Phát hành 05/06/2025 (bài báo arXiv 2506.05176); có trong thư viện Ollama từ 23/09/2025, Ollama hỗ trợ từ 0.12.1. MMTEB đa ngữ: trung bình 64,33, truy xuất 64,64 (bge-m3: 59,56 / 54,60 — bảng trong model card). Đổi `MOC_AI_EMBED_MODEL=bge-m3` được, cùng 1024 chiều, `svc-files` tự nhúng lại | Tải một lần qua Ollama (`make ai-model`, profile `ai-pull`); bản kê `sha256:ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d` — so với `ollama list` | 4 |
 | Tesseract OCR (+ dữ liệu `vie`) | 5.5.0 (gói Debian trixie `tesseract-ocr` 5.5.0-1+b1, `tesseract-ocr-vie` 1:4.1.0-2) | Apache-2.0 | Nhận dạng chữ trên công văn scan, ảnh chụp khi tiếp nhận (F4.1, `svc-files`). Dữ liệu `vie` là bản tessdata_fast 4.1.0 (mô hình LSTM nhanh). Phiên bản gói lấy từ kho Debian theo image gốc — kiểm lại bằng `dpkg-query -W 'tesseract-ocr*'` trong image `svc-files` sau khi dựng | Gói hệ thống (apt) | 4 |
-| Presidio | 2.2 | MIT | Che thông tin cá nhân *(Could)* | pip | 4 |
 | Gotenberg | 8.37.0 | MIT | Sinh PDF *(Could)* | `gotenberg/gotenberg:8.37.0` | 4 |
 
 **Ghi chú:** trọng số mô hình có giấy phép riêng, tách khỏi giấy phép của Ollama. Trước khi dùng phải
@@ -205,6 +204,12 @@ trên Meilisearch v1.54.3, tìm lai với Qwen3-Embedding qua Ollama khi bật p
 route nội bộ bằng httpx2 sẵn có; Pydantic cho thân yêu cầu; Flowable REST 8.0.0 cho nhánh song song (`parallelGateway`,
 boundary timer — BPMN chuẩn) và việc giao ra ngoài (external worker, như nhắc hạn); bỏ phiếu và hạn đề xuất tính bằng
 thư viện chuẩn Python (`statistics.median_low`). Không mô hình nào chọn đơn vị: CI không bật profile `ai` vẫn chạy đủ.
+
+**F4.4 không thêm phụ thuộc** — không gói Python, gói npm, image hay route gateway nào. Bộ che thông tin cá nhân
+`pii.py` (`svc-files`, bản chép y hệt trong `svc-workflow`) chỉ dùng thư viện chuẩn Python (`re`, `unicodedata`,
+`logging`); test dùng uvicorn 0.54.0 (`AccessFormatter` thật) và pypdf 6.19.0 (đọc kho mẫu) sẵn có. Nhật ký truy cập
+bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (`access_log_format`, `http_configuration_snippet`) và
+`map`, `log_format` của nginx trong image giao diện; giao diện chỉ thêm một biểu thức chính quy nhận nhãn che.
 
 ## Thành phần đã cân nhắc nhưng không dùng
 
@@ -229,6 +234,8 @@ thư viện chuẩn Python (`statistics.median_low`). Không mô hình nào ch�
 | Cấp khóa ký bằng `pki/issue` của OpenBao | Két sinh khóa rồi trả cả khóa riêng: khóa nằm trong RAM và đĩa của `svc-files`, dịch vụ phải tự giữ kín | Khóa ký trong Transit, không rời két; chứng thư qua `pki/sign` cho CSR do Transit ký (F4.5) |
 | Dịch vụ dấu thời gian TSA (PAdES B-T) | Cần một dịch vụ TSA ngoài; demo phải chạy không có mạng ngoài | PAdES B-B, giờ ký tự khai, CLI và cổng xác thực ghi rõ (F4.5) |
 | Trình kiểm PAdES bằng JavaScript ở cổng xác thực | Thêm một thư viện lớn vào trang công khai, trong khi trình duyệt chỉ cần băm tệp | Trình duyệt băm như F2.13; kiểm mật mã đầy đủ bằng pyHanko trong `svc-files` (`python -m svc_files.signing verify`) (F4.5) |
+| Presidio (MIT) | `presidio-analyzer` 2.2 bắt buộc kéo spaCy, numpy, phonenumbers, tldextract, regex, pydantic, PyYAML, click; bộ máy NLP spaCy cần tải thêm mô hình ngôn ngữ (không có pipeline tiếng Việt chính thức); bộ nhận dạng dựng sẵn không có định dạng Việt Nam (CCCD, đầu số di động, số tài khoản) nên vẫn phải tự viết regex | `pii.py` tự viết, chỉ thư viện chuẩn, nhận theo cấu trúc (mã tỉnh, đầu số đã cấp), chạy được trong bộ lọc nhật ký (F4.4) |
+| phonenumbers (Apache-2.0) | Metadata lớn phải ghim và cập nhật theo bản phát hành; không biết CCCD, CMND hay số tài khoản; luật số di động Việt Nam chỉ là "10 số, đầu số đã cấp" | Danh sách `MOBILE_PREFIXES` có ngày và nguồn trong `pii.py` (F4.4) |
 
 ## Kiểm tra tương thích giấy phép
 

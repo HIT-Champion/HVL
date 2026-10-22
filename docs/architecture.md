@@ -222,10 +222,53 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   thêm một dòng tác tử ở Sổ kiểm toán và tab Lịch sử — dòng sổ không mang trích yếu, không mang căn cứ. Chi tiết:
   `docs/mo-hinh-du-lieu.md` §1, §3, §4.2, README của `svc-workflow`.
 
+### QĐ-006: Che PII: tự viết, che ở lối ra mô hình và ở bộ lọc nhật ký, bỏ chuỗi truy vấn ở nhật ký truy cập, không che sổ kiểm toán
+
+- **Bối cảnh:** F4.4 — văn bản đến (đơn của người dân, hồ sơ sinh viên) chứa số định danh, số điện thoại, email, số
+  tài khoản. Chữ văn bản đi ra mô hình ở năm đường (trích yếu F4.1; nhúng câu hỏi, nhúng đoạn, viết câu trả lời F4.2;
+  nhúng trích yếu F4.3), còn nhật ký ghi lại câu tìm qua chuỗi truy vấn (`/api/search?q=…` ở uvicorn, APISIX, nginx của
+  giao diện), tên tệp bị chặn, thông điệp lỗi. Ràng buộc: người có quyền đọc văn bản vẫn phải tìm được theo số và thấy
+  số thật; trích dẫn F4.2 (`[n]`, trang) không được lệch; CI không có mô hình; máy 8 GB. Đề thi nêu "rà soát & che
+  giấu PII" ở cụm ②; Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 có hiệu lực từ 01/01/2026.
+- **Phương án bộ nhận dạng:** Presidio (kế hoạch ban đầu) — kéo spaCy, numpy, phonenumbers, pydantic…, bộ máy NLP
+  cần thêm mô hình ngôn ngữ (spaCy không có pipeline tiếng Việt chính thức) mà bộ nhận dạng dựng sẵn không có định
+  dạng Việt Nam, nên vẫn phải tự viết regex. phonenumbers — metadata lớn phải ghim và cập nhật, không biết CCCD hay số
+  tài khoản. Luật lỏng "0 + 9–11 chữ số" — che cả đuôi UUID, mã số thuế, số hiệu dài (các chuỗi âm tính trong
+  `test_pii.py`); luật theo cấu trúc che nhầm 0 chỗ trên kho mẫu: 81 023 ký tự, 747 chuỗi số ứng viên, đo lại bằng
+  `make do-che-pii`.
+- **Phương án chỗ che cho mô hình:** che trong chỉ mục — mất tìm theo số, phải nhúng lại toàn bộ, câu trích không còn
+  khớp văn bản gốc. Che sau khi cắt cửa sổ ngữ cảnh — lọt mẩu số bị cắt đôi ("…liên hệ 0912 345"). Điền số thật trở
+  lại vào câu trả lời của mô hình — mô hình có thể đặt nhãn sai chỗ, gán số người này cho người khác.
+- **Quyết định:**
+  1. **Tự viết** `pii.py` (khoảng 500 dòng, chỉ `re` của thư viện chuẩn): nhận theo cấu trúc (mã tỉnh, thế kỷ, năm
+     sinh, đầu số đã cấp, `+84`, mã vùng), CMND và số tài khoản chỉ khi có từ khóa; thời gian tuyến tính, đủ nhanh để
+     chạy trong bộ lọc nhật ký. Không thêm phụ thuộc nào.
+  2. **Che cho mô hình ở hai lớp:** (a) lối ra — mọi lời gọi Ollama (nhúng, chat, trích yếu) qua bộ che, bất biến
+     "không byte chữ nào tới `MOC_AI_URL` mà chưa che"; lớp này idempotent (bộ che lặp tới điểm bất động), ở `chat` mà
+     còn phải che thêm thì ghi cảnh báo `office.assist.pii_at_egress`. (b) chỗ dựng ngữ cảnh F4.2 — một bộ che đánh
+     số `[SĐT-1]` cho mỗi lượt hỏi, cùng giá trị cùng nhãn, để phần kiểm trích dẫn đọc đúng bản mô hình đã đọc.
+  3. **Che sau khi chọn câu, trước khi cắt cửa sổ:** câu tốt nhất chọn trên chữ gốc, đổi vị trí sang bản che rồi mới
+     cắt; chỉ mục, câu trích nguyên văn, nguồn trả người dùng không đổi.
+  4. **Nhật ký:** bộ lọc `logging.Filter` che chuỗi cuối cùng (message, traceback, stack) ở logger dịch vụ và uvicorn;
+     ở nhật ký truy cập (uvicorn, APISIX, nginx) **bỏ chuỗi truy vấn và Referer** thay vì che bằng regex — chuỗi đã mã
+     hóa phần trăm (`0912%20345%20678`) thì regex không thấy, họ tên thì không nhận dạng được. Che hỏng thì bỏ cả dòng.
+  5. **Dùng chung bằng bản chép y hệt byte** `svc_workflow/pii.py`, test so byte — như tiền lệ hai bản `openbao.py`;
+     không làm gói chung (phải đổi compose, hai Dockerfile, cài đặt, phát hành chỉ vì một tệp).
+  6. **Sổ kiểm toán không che:** sổ có phân quyền và chuỗi băm, che vào sổ làm sai băm và mất giá trị chứng cứ; số chỗ
+     đã che chỉ ghi ở nhật ký (khóa `masked`), không vào `diff`. Không băm hay giả danh giá trị trong nhật ký (không
+     gian số điện thoại cỡ 10⁹, băm không khóa dò ngược được), không có biến tắt che.
+- **Hệ quả:** CI không bật mô hình vẫn kiểm đủ bằng test đơn vị (mô hình giả ghi lại yêu cầu) và `make demo-che-pii`
+  (đọc `docker compose logs`). Kho mẫu không có chỗ nào bị che, nên ngữ cảnh của bộ đo hỏi đáp y hệt trước F4.4. Mô
+  hình trả `[EMAIL-1]` khi được hỏi email của cơ quan — giao diện chỉ người dùng sang câu trích nguyên văn. Sót có chủ
+  đích (số dính chữ, họ tên, địa chỉ, CMND không từ khóa…), véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại, nhật ký
+  Hasura, PostgreSQL, Keycloak và `error_log` của APISIX, nginx nằm ngoài phạm vi. Hai danh mục (mã tỉnh, đầu số di
+  động) đổi theo thời gian, có ngày và nguồn trong mã. Chi tiết: README của `svc-files` (mục "Che thông tin cá nhân"),
+  `gateway/README.md`.
+
 ### QĐ-007: Ký số PDF: khóa ký trong Transit, CA nội bộ một tầng trong két, pyHanko; chỉ minh họa
 
-> QĐ-006 dành cho F4.4. Chữ ký ở đây **chỉ để minh họa**: CA tự dựng trong két, không phải dịch vụ chứng thực chữ ký số
-> công cộng, chữ ký không có giá trị pháp lý.
+> Chữ ký ở đây **chỉ để minh họa**: CA tự dựng trong két, không phải dịch vụ chứng thực chữ ký số công cộng, chữ ký
+> không có giá trị pháp lý.
 
 - **Bối cảnh:** F4.5 — bản phát hành văn bản đi đã có mã QR và SHA-256 (F2.13), cổng xác thực cho người ngoài kiểm "có
   thật, nguyên vẹn", nhưng PDF chưa mang chữ ký số nên trình đọc PDF không cho biết ai phát hành. Ràng buộc: demo phải

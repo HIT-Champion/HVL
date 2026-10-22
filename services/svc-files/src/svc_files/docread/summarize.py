@@ -28,6 +28,9 @@ trích yếu theo quy tắc — không phải khởi động lại svc-files khi
 - Đầu ra được kiểm chặt (``check``): sai thì ``model_rejected``, trích yếu theo quy tắc giữ nguyên. Văn thư luôn đối
   chiếu trước khi lưu.
 - Văn bản hạn chế không bao giờ tới đây: reader trả 409 trước khi đọc byte của tệp.
+- Che thông tin cá nhân (F4.4, pii.py): thân văn bản che **trước** khi cắt ``MOC_AI_MAX_CHARS`` — cắt trước thì số
+  vắt qua chỗ cắt thành mẩu ("…liên hệ 0912 345") mà bộ che không nhận ra. Mô hình chỉ thấy nhãn ``[SĐT]``; trích yếu
+  có nhãn thì bị loại như trích yếu có số điện thoại. ``SummaryResult.masked``: số chỗ đã che trong chữ gửi đi.
 """
 
 from __future__ import annotations
@@ -41,6 +44,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 import httpx2
+
+from .. import pii
 
 log = logging.getLogger("svc_files")
 
@@ -73,6 +78,7 @@ LEAK_RE = re.compile(r"http|www\.|[@<>]|\d{6,}", re.IGNORECASE)
 class SummaryResult:
     text: str | None
     warning: str | None         # model_unavailable · model_timeout · model_rejected
+    masked: int = 0             # số chỗ đã che trong chữ gửi mô hình (0: không gửi gì)
 
 
 class Summarizer(Protocol):
@@ -111,8 +117,8 @@ def check(content: str) -> str | None:
 
     Phải là JSON có khóa ``trich_yeu`` kiểu chuỗi. Chuẩn hóa: NFC, gộp khoảng trắng thành một dòng, bỏ ngoặc kép bao
     ngoài, bỏ tiền tố "Trích yếu:". Không đạt: ngoài 10–300 ký tự, có ký tự điều khiển / vô hình, có ``http``,
-    ``www.``, ``@``, ``<``, ``>``, hay từ 6 chữ số liền nhau trở lên (liên kết, thư điện tử, thẻ, số điện thoại / tài
-    khoản — trích yếu hành chính không có).
+    ``www.``, ``@``, ``<``, ``>``, từ 6 chữ số liền nhau trở lên (liên kết, thư điện tử, thẻ, số điện thoại / tài
+    khoản — trích yếu hành chính không có), hay nhãn che ``[SĐT]``, ``[CCCD-1]``… (mô hình chép lại chỗ đã che).
     """
     try:
         got = json.loads(content)
@@ -126,7 +132,7 @@ def check(content: str) -> str | None:
         return None
     if INVISIBLE_RE.search(text) or any(unicodedata.category(ch) in ("Cc", "Cf", "Co", "Cs", "Cn") for ch in text):
         return None
-    if LEAK_RE.search(text):
+    if LEAK_RE.search(text) or pii.LABEL_RE.search(text):
         return None
     return text
 
@@ -184,37 +190,45 @@ class OllamaSummarizer:
                                        ensure_ascii=False))
             await asyncio.sleep(self.interval_s)
 
-    def payload(self, text: str) -> dict[str, Any]:
-        body = TAG_RE.sub(" ", text)[: self.max_chars]
+    def payload(self, text: str) -> tuple[dict[str, Any], int]:
+        """(thân yêu cầu ``/api/chat``, số chỗ đã che trong chữ gửi đi). Lối ra duy nhất của chữ văn bản tới mô hình
+        trích yếu: bỏ thẻ, che, rồi mới cắt ``max_chars``."""
+        m = pii.mask(TAG_RE.sub(" ", text))
+        body = m.text[: self.max_chars]
+        sent = shift = 0                # shift: chênh độ dài bản che so với chữ gốc trước khoảng đang xét
+        for span, label in zip(m.spans, m.labels):
+            if span.start + shift < self.max_chars:        # nhãn bắt đầu trong phần gửi đi (kể cả nhãn bị cắt)
+                sent += 1
+            shift += len(label) - (span.end - span.start)
         return {
             "model": self.model, "stream": False, "think": False, "keep_alive": KEEP_ALIVE, "format": FORMAT,
             "options": OPTIONS,
             "messages": [{"role": "system", "content": SYSTEM},
                          {"role": "user", "content": "<van_ban>\n" + body + "\n</van_ban>"}],
-        }
+        }, sent
 
     async def summarize(self, text: str, *, timeout_s: float) -> SummaryResult:
         if not self.available:
             return SummaryResult(None, "model_unavailable")
         timeout_s = max(timeout_s, 0.1)
+        payload, masked = self.payload(text)
         try:
             # timeout của httpx tính từng bước (kết nối, đọc…): wait_for chặn tổng thời gian
-            r = await asyncio.wait_for(self._http.post("/api/chat", json=self.payload(text), timeout=timeout_s),
-                                       timeout_s)
+            r = await asyncio.wait_for(self._http.post("/api/chat", json=payload, timeout=timeout_s), timeout_s)
         except (TimeoutError, httpx2.TimeoutException):
-            return SummaryResult(None, "model_timeout")
+            return SummaryResult(None, "model_timeout", masked)
         except httpx2.HTTPError:
-            return SummaryResult(None, "model_unavailable")
+            return SummaryResult(None, "model_unavailable", masked)
         if r.status_code == 404:        # mô hình bị gỡ khỏi Ollama: lượt dò sau kiểm lại
             self._set(False)
         if r.status_code != 200:
-            return SummaryResult(None, "model_unavailable")
+            return SummaryResult(None, "model_unavailable", masked)
         try:
             content = r.json()["message"]["content"]
         except (ValueError, KeyError, TypeError):
-            return SummaryResult(None, "model_rejected")
+            return SummaryResult(None, "model_rejected", masked)
         text_out = check(content) if isinstance(content, str) else None
-        return SummaryResult(text_out, None if text_out else "model_rejected")
+        return SummaryResult(text_out, None if text_out else "model_rejected", masked)
 
 
 def make_summarizer(url: str, model: str, *, max_chars: int) -> Summarizer:

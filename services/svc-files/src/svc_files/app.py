@@ -63,7 +63,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
-from . import __version__
+from . import __version__, pii
 from .anchors import Anchorer, AnchorStore
 from .archive import ArchiveError, Archiver, ColdStore, read_package
 from .assist import api as assist_api
@@ -99,13 +99,18 @@ log = logging.getLogger("svc_files")
 
 
 def _setup_logging() -> None:
-    """Mỗi dòng nhật ký là một đối tượng JSON trên stdout; uvicorn chỉ cấu hình logger của riêng nó."""
+    """Mỗi dòng nhật ký là một đối tượng JSON trên stdout; uvicorn chỉ cấu hình logger của riêng nó.
+
+    F4.4: dòng của dịch vụ, uvicorn.error, uvicorn.access đều qua bộ che PII; dòng truy cập bỏ chuỗi truy vấn
+    (``/api/search?…``). Uvicorn dựng logger và handler của nó trước khi gọi factory, nên gắn được cả vào handler."""
     if not log.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(handler)
         log.setLevel(logging.INFO)
         log.propagate = False
+    # ngoài nhánh trên: logger đã có handler từ trước (fixture của test) vẫn phải được che
+    pii.install_log_redaction(log)
 
 
 class FileOut(BaseModel):

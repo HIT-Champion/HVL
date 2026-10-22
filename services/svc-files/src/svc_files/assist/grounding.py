@@ -34,6 +34,10 @@
   - câu chỉ nhắc lại câu hỏi (không có term mới) đi kèm trích dẫn của câu có căn cứ liền trước (câu đầu: liền sau);
     cả câu trả lời chỉ nhắc lại câu hỏi → ``unsupported``.
   Dấu ``[n]`` đặt trước dấu câu cuối câu: "… loại Tốt [2].". Không đạt thì người dùng chỉ thấy câu trích nguyên văn.
+- **Che thông tin cá nhân** (F4.4): ``sources(..., masker=…)`` che cả đoạn bằng nhãn đánh số của lượt hỏi
+  (``[SĐT-1]``), đổi câu tốt nhất sang toạ độ bản che (``Masked.window``) **rồi mới** cắt ≤ 700 ký tự — cửa sổ không
+  bao giờ cắt đôi một con số (che sau khi cắt thì mẩu "…345 678" lọt ra). ``validate`` kiểm trên đúng bản che mô hình
+  đã đọc; câu trả lời giữ nhãn, số thật ở câu trích nguyên văn. Nhãn không chứa ``<>`` và không có dạng ``[n]``.
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from .. import pii
 from . import vi
 from .extract import CITE_LIKE_RE, excerpt, unmark
 from .retrieve import Passage
@@ -115,14 +120,25 @@ def _page(passage: Passage) -> str:
     return str(passage.page) if isinstance(passage.page, int) else ""
 
 
-def sources(passages: Sequence[Passage], best: dict[str, tuple[int, int]], *, max_chars: int) -> list[Source]:
+def sources(passages: Sequence[Passage], best: dict[str, tuple[int, int]], *, max_chars: int,
+            masker: pii.Masker | None = None) -> list[Source]:
+    """Ngữ cảnh gửi mô hình: tối đa ``MAX_SOURCES`` đoạn đầu, mỗi đoạn ≤ ``SOURCE_CHARS`` ký tự quanh câu tốt nhất
+    (``best``: toạ độ trên chữ gốc). Có ``masker`` thì che cả đoạn trước, rồi cắt cửa sổ trên bản che."""
     out: list[Source] = []
     left = max_chars
     for i, passage in enumerate(passages[:MAX_SOURCES]):
         budget = min(SOURCE_CHARS, left)
         if budget < MIN_SOURCE_CHARS:
             break
-        text = clean(excerpt(passage.text, best.get(passage.chunk_id), budget))
+        text, span = passage.text, best.get(passage.chunk_id)
+        if masker is not None:
+            m = masker.mask(text)
+            text, span = m.text, (m.window(span) if span is not None else None)
+        text = clean(excerpt(text, span, budget))
+        if masker is not None:
+            # excerpt gộp khoảng trắng, clean bỏ thẻ: số cách bởi dòng trống ("0912\n\n345 678") chỉ thành số ở bước
+            # này — che nốt bằng cùng bộ che, để lối ra không phải che thêm và validate kiểm đúng chữ mô hình đọc
+            text = masker.mask(text).text
         out.append(Source(i + 1, _symbol(passage.doc.get("symbol")), _page(passage), text))
         left -= len(text)
     return out

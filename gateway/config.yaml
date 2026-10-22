@@ -42,11 +42,26 @@ nginx_config:
     - MOC_RATE_API_PER_MIN
     - MOC_RATE_VERIFY_PER_MIN
     - MOC_RATE_REALTIME_PER_MIN
+  # F4.4: đường dẫn bỏ chuỗi truy vấn cho access_log_format bên dưới. $request_uri (đường dẫn client gửi) và
+  # $upstream_uri (APISIX ghép sẵn ?… vào) đều mang chuỗi truy vấn; log_format không cắt chuỗi được nên dùng map:
+  # giữ phần trước dấu ? đầu tiên (nhóm khớp đặt tên moc_dd…)
+  http_configuration_snippet: |
+    map $request_uri $moc_duong_dan {
+        "~^(?<moc_dd>[^?]*)" $moc_dd;
+    }
+    map $upstream_uri $moc_duong_dan_upstream {
+        "~^(?<moc_dd_upstream>[^?]*)" $moc_dd_upstream;
+    }
   http:
     # svc-files tự giới hạn theo MOC_FILES_MAX_MB; ở biên chỉ chặn yêu cầu quá lớn rõ ràng
     client_max_body_size: 64m
     # Giới hạn đăng nhập đếm theo IP nguồn. Đặt APISIX sau một proxy TLS thì mọi yêu cầu mang IP của proxy:
     # khai real_ip_from (IP của proxy) và real_ip_header ở đây, nếu không cả hệ thống dùng chung một bộ đếm.
+    # F4.4: không ghi chuỗi truy vấn (ô tìm kiếm ?q=…, mã đăng nhập ?code=…&state=…) và Referer (URL đầy đủ của trang
+    # trước). Các trường khác giữ như định dạng mặc định của APISIX 3.18: "$request" thành phương thức, đường dẫn, giao
+    # thức; "$upstream_scheme://$upstream_host$upstream_uri" giữ nguyên trừ ?…. APISIX bọc chuỗi này trong '…' khi
+    # dựng nginx.conf: không dùng dấu nháy đơn bên trong
+    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream"'
 
 # Chỉ bật plugin đang dùng
 plugins:

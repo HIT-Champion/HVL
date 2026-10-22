@@ -78,6 +78,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         két; cổng xác thực cho biết ai ký, CA nào cấp; pyHanko trong svc-files báo hợp lệ, báo "đã bị sửa sau khi ký"
         khi thêm một chú thích, báo không khớp khi lật một bit; văn bản hạn chế không được ký; văn bản cũ không chữ
         ký vẫn xác thực như cũ. (make demo-ky-so)
+    python3 scripts/demo.py che-pii
+        Che thông tin cá nhân (F4.4, không cần mô hình): văn thư tải một lá đơn giả lập có số CCCD, số điện thoại,
+        email, số tài khoản; tìm theo số CCCD ra đúng lá đơn, trợ lý trích nguyên văn có đúng số điện thoại (người
+        được xem văn bản thấy bản gốc); tệp EICAR tên có số điện thoại bị chặn, sổ kiểm toán giữ tên gốc; nhật ký
+        apisix, app-office, svc-files, svc-workflow từ lúc bắt đầu màn không còn giá trị nào ở bất kỳ cách viết nào,
+        dòng truy cập không còn chuỗi truy vấn; bật profile ai thì mô hình chỉ thấy nhãn [SĐT-1]. (make demo-che-pii)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -2624,10 +2630,355 @@ def ky_so() -> None:
           " cậy cho tới khi nhập CA nội bộ (docs/demo-script.md)")
 
 
+# --- F4.4 · Che thông tin cá nhân ----------------------------------------------------------------------------------
+# Giá trị giả lập: hợp lệ về định dạng nên có thể trùng số thật — số ví dụ phổ biến, CCCD đuôi 0000xx, email
+# @example.com (RFC 2606). Cùng bộ với services/svc-files/tests/test_pii.py; scripts/tests/test_che_pii.py dùng lại
+PII_DEMO = {"cccd": "001205000017", "phone": "0912 345 678", "landline": "(024) 3000 0000",
+            "email": "nguyenvanb@example.com", "account": "0011 0041 23456"}
+PII_QUESTION = "Số điện thoại liên hệ của người làm đơn đề nghị cấp bản sao bằng tốt nghiệp là gì?"
+# Lá đơn tiếp nhận một lần cho mỗi đơn vị (chạy lại thì dùng lại, như màn đọc văn bản đến): bản sao trùng nhau không
+# chen nhau trong nguồn của trợ lý. Trích yếu, số ký hiệu, cơ quan không có thông tin cá nhân
+PII_SYMBOL = "01/ĐN-GL"
+PII_ISSUER = "Người làm đơn (giả lập)"
+PII_SUMMARY = "Về việc đề nghị cấp bản sao bằng tốt nghiệp"
+# Tệp EICAR tên có số điện thoại: nhật ký core.file.rejected của svc-files ghi tên đã che, sổ kiểm toán giữ tên gốc
+PII_FILE = "don-0912345678.txt"
+PII_FILE_MASKED = "don-[SĐT].txt"
+# Nhật ký đi qua bộ che (lọt là đỏ màn) và nhật ký ngoài phạm vi F4.4 (Hasura, Meilisearch, Keycloak, PostgreSQL không
+# qua bộ lọc nào: lọt chỉ cảnh báo)
+PII_LOGGED = ("apisix", "app-office", "svc-files", "svc-workflow")
+PII_UNFILTERED = ("hasura", "meilisearch", "keycloak", "postgres")
+# Dòng truy cập phải có, không chuỗi truy vấn: (dịch vụ, nhãn, đường dẫn chấp nhận). APISIX và nginx của giao diện
+# lấy đường dẫn từ $request_uri cắt ở dấu ? đầu tiên (không phải $uri: try_files của ứng dụng một trang đổi $uri thành
+# /index.html), nên /tim-kiem?q=… được ghi là GET /tim-kiem
+PII_ACCESS = (("apisix", "/api/search", ("/api/search",)), ("apisix", "/tim-kiem", ("/tim-kiem",)),
+              ("svc-files", "/api/search", ("/api/search",)), ("app-office", "/tim-kiem", ("/tim-kiem",)))
+QUERY_MARKS = ("/api/search?q", "/tim-kiem?q")
+# Nhãn đã che, như svc_files.pii.LABEL_RE (test so hai mẫu)
+MASK_LABEL_RE = re.compile(r"\[(?:CCCD|CMND|SĐT|EMAIL|STK)(?:-\d{1,3})?\]")
+# Cách chia nhóm thường gặp theo số chữ số (ngoài cách viết của chính giá trị)
+PII_SPLITS = {10: ((4, 3, 3), (3, 3, 4)), 11: ((3, 4, 4), (4, 3, 4)), 12: ((3, 3, 3, 3), (4, 4, 4)), 13: ((4, 4, 5),)}
+PII_DOCUMENT = """query ($s: String!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s},
+  status: {_neq: "cancelled"}}, order_by: {created_at: asc}) { id register_number } }"""
+
+
+def pii_letter(tag: str) -> list[str]:
+    """Các dòng của lá đơn giả lập (một trang; chữ ASCII vì text_pdf chỉ có Helvetica): đủ năm giá trị của PII_DEMO và
+    vài số không được che — năm sinh, ngày cấp, số bản sao, mã hồ sơ."""
+    v = PII_DEMO
+    return ["CONG HOA XA HOI CHU NGHIA VIET NAM", "Doc lap - Tu do - Hanh phuc",
+            "DON DE NGHI CAP BAN SAO BANG TOT NGHIEP", "Kinh gui: Phong Dao tao, Truong Dai hoc Mau",
+            f"Toi la Nguyen Van B, sinh nam 2005, so CCCD {v['cccd']} cap ngay 05/3/2021.",
+            f"So dien thoai lien he cua nguoi lam don de nghi: {v['phone']}.",
+            f"Dien thoai co quan: {v['landline']}. Email: {v['email']}.",
+            "Toi de nghi cap 02 ban sao bang tot nghiep.",
+            f"Le phi chuyen vao so tai khoan {v['account']}.",
+            f"Ma ho so: {tag}",
+            "Van ban gia lap de chay thu Moc, khong phai van ban that."]
+
+
+def _split(digits: str, sizes: tuple[int, ...]) -> list[str]:
+    out, at = [], 0
+    for size in sizes:
+        out.append(digits[at:at + size])
+        at += size
+    return out
+
+
+def spellings(values: dict[str, str]) -> list[str]:
+    """Mọi cách viết của các giá trị giả lập mà một dòng nhật ký có thể mang: như đã viết; số liền; theo nhóm (của
+    chính giá trị và cách chia thường gặp) với dấu cách, chấm, gạch; điện thoại thêm +84, (+84), 0084, 84 thay số 0
+    đầu; email chữ thường; mỗi cách viết thêm dạng mã hóa URL (%20, %40, %2B…) và dấu cách thành "+"."""
+    out: dict[str, None] = {}
+    for value in values.values():
+        forms = [value]
+        if "@" in value:
+            forms.append(value.lower())
+        else:
+            digits = "".join(re.findall(r"\d", value))
+            groups = re.findall(r"\d+", value)
+            forms.append(digits)
+            splits = [groups, *(_split(digits, sizes) for sizes in PII_SPLITS.get(len(digits), ()))]
+            forms += [sep.join(g) for g in splits if len(g) > 1 for sep in " .-"]
+            if digits[:1] == "0" and len(digits) in (10, 11):        # điện thoại: mã nước thay số 0 đầu
+                national = [groups[0][1:], *groups[1:]] if len(groups[0]) > 1 else groups[1:]
+                for cc in ("+84", "(+84)", "0084", "84"):
+                    forms += [cc + digits[1:], f"{cc} {digits[1:]}", f"{cc} {' '.join(national)}"]
+        for form in list(forms):
+            forms.append(quote(form, safe=""))
+            if " " in form:
+                forms.append(form.replace(" ", "+"))
+        for form in forms:
+            out.setdefault(form, None)
+    return list(out)
+
+
+def leaks(text: str, forms: list[str]) -> list[str]:
+    """Các cách viết có trong ``text`` (không phân biệt hoa thường). Cách viết mở đầu / kết thúc bằng chữ số thì không
+    tính khi dính liền chữ số khác: đó là một phần của số dài hơn (mốc thời gian, mã toàn số), không phải giá trị này."""
+    low = text.casefold()
+    found = []
+    for form in forms:
+        f = form.casefold()
+        pattern = (r"(?<!\d)" if f[:1].isdigit() else "") + re.escape(f) + (r"(?!\d)" if f[-1:].isdigit() else "")
+        if re.search(pattern, low):
+            found.append(form)
+    return found
+
+
+def access_lines(text: str, *paths: str) -> list[str]:
+    """Các dòng nhật ký truy cập của một trong ``paths``: đường dẫn đứng ngay sau phương thức HTTP, tiếp theo là chuỗi
+    truy vấn, khoảng trắng hoặc dấu nháy — "GET /api/search HTTP/1.1" (APISIX, nginx), "GET /api/search?… HTTP/1.1"
+    (uvicorn); không nhận /api/search-khac."""
+    pattern = re.compile(r"\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) (?:%s)(?=[?\s\"]|$)"
+                         % "|".join(map(re.escape, paths)))
+    return [line for line in text.splitlines() if pattern.search(line)]
+
+
+def log_problems(logs: dict[str, str], forms: list[str]) -> list[str]:
+    """Lý do màn đỏ ở bước đọc nhật ký (rỗng: đạt): giá trị nào lọt ở dịch vụ nào; dòng còn ?q=; thiếu dòng truy cập
+    phải có; svc-files không ghi tên tệp đã che."""
+    problems = []
+    for service in PII_LOGGED:
+        text = logs.get(service, "")
+        found = leaks(text, forms)
+        if found:
+            problems.append(f"{service}: lọt {', '.join(found[:6])}" + (f" (+{len(found) - 6})" if len(found) > 6 else ""))
+        queried = [line for line in text.splitlines() if any(mark in line for mark in QUERY_MARKS)]
+        if queried:
+            problems.append(f"{service}: {len(queried)} dòng còn chuỗi truy vấn, vd {queried[0].strip()[:160]}")
+    for service, label, paths in PII_ACCESS:
+        if not access_lines(logs.get(service, ""), *paths):
+            problems.append(f"{service}: không có dòng truy cập {label} — nhật ký truy cập bị tắt, hay đọc sai dịch vụ?")
+    if PII_FILE_MASKED not in logs.get("svc-files", "") and "don-[S\\u0110T].txt" not in logs.get("svc-files", ""):
+        problems.append(f"svc-files: không có dòng core.file.rejected ghi {PII_FILE_MASKED}")
+    return problems
+
+
+def log_events(text: str, event: str) -> list[dict[str, Any]]:
+    """Các dòng nhật ký JSON có ``event`` cho trước, theo thứ tự (bỏ dòng không phải JSON: dòng truy cập…)."""
+    out = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict) and record.get("event") == event:
+            out.append(record)
+    return out
+
+
+def utc_mark() -> str:
+    """Mốc cho docker compose logs --since: giờ UTC, lùi một giây (mốc tính theo giây, không bỏ sót dòng nào)."""
+    return (datetime.now(timezone.utc) - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def service_logs(since: str, *services: str) -> dict[str, str]:
+    """docker compose logs từ mốc ``since`` của từng dịch vụ, không tiền tố tên, không màu → {dịch vụ: chữ}."""
+    return {s: compose("logs", "--since", since, "--no-log-prefix", "--no-color", s).decode(errors="replace")
+            for s in services}
+
+
+# APISIX ghi nhật ký truy cập có đệm (nginx.conf của APISIX: access_log … buffer=16384 flush=3): dòng ra sau yêu cầu tới
+# 3 giây. Đọc sớm thì thiếu dòng truy cập (màn đỏ sai), tệ hơn là dòng còn giá trị chưa ra (màn xanh sai)
+LOG_FLUSH_S = 4.0
+
+
+def settled_logs(since: str, last_request: float, timeout_s: float = 15.0) -> dict[str, str]:
+    """Nhật ký của PII_LOGGED từ mốc ``since``, đọc khi đệm đã xả: đợi tới ``last_request`` (time.monotonic() sau yêu
+    cầu cuối của màn) + LOG_FLUSH_S, rồi đọc lại tới khi có đủ dòng truy cập của PII_ACCESS hoặc hết ``timeout_s`` —
+    hết giờ thì trả lần đọc cuối để log_problems báo thiếu."""
+    time.sleep(max(0.0, last_request + LOG_FLUSH_S - time.monotonic()))
+    deadline = time.monotonic() + timeout_s
+    while True:
+        logs = service_logs(since, *PII_LOGGED)
+        if all(access_lines(logs.get(s, ""), *paths) for s, _, paths in PII_ACCESS) or time.monotonic() >= deadline:
+            return logs
+        time.sleep(1)
+
+
+def wait_pii_answer(clerk: Session, doc_id: str, timeout_s: float) -> dict[str, Any]:
+    """Hỏi PII_QUESTION (extract) tới khi lá đơn có trong nguồn — vòng nền svc-files đã đưa đoạn vào chỉ mục."""
+    started = time.monotonic()
+    while True:
+        try:
+            got, _ = ask(clerk, PII_QUESTION)
+        except HTTPError as exc:            # Meilisearch, Hasura vừa khởi động: đợi tiếp; tắt trợ lý thì dừng
+            if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
+                raise
+            got = {}
+        if any(s.get("document_id") == doc_id for s in got.get("sources") or []):
+            return got
+        if time.monotonic() - started > timeout_s:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây trợ lý chưa có lá đơn {PII_SYMBOL} trong nguồn — vòng nền svc-files"
+                             " (MOC_ASK_SYNC_INTERVAL_S) có chạy không?")
+        time.sleep(3)
+
+
+def che_pii() -> None:
+    print("Màn F4.4 · Che thông tin cá nhân — người được xem văn bản thấy bản gốc; mô hình ngôn ngữ và nhật ký chỉ thấy"
+          " nhãn [SĐT], [CCCD]…; nhật ký truy cập không còn chuỗi truy vấn")
+    from seed_documents import today
+
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = who("vanthu")
+    forms = spellings(PII_DEMO)
+    cccd, phone = PII_DEMO["cccd"], PII_DEMO["phone"]
+
+    since = utc_mark()
+    say(1, f"Mốc nhật ký {since} (UTC) — bước 6 đọc mọi dòng nhật ký từ mốc này")
+    ok(f"giá trị giả lập, đúng định dạng nhưng không của ai: CCCD {cccd}, di động {phone}, máy bàn"
+       f" {PII_DEMO['landline']}, email {PII_DEMO['email']}, số tài khoản {PII_DEMO['account']}")
+
+    say(2, "Văn thư tải lên “Đơn đề nghị cấp bản sao bằng tốt nghiệp” (hư cấu) có đủ năm giá trị, tiếp nhận với trích"
+           " yếu không có thông tin cá nhân, vào sổ")
+    found = clerk.gql(PII_DOCUMENT, {"s": PII_SYMBOL})["office_documents"]
+    if found:
+        doc_id, number = found[0]["id"], found[0]["register_number"]
+        print(f"   – {PII_SYMBOL} đã được tiếp nhận ở lần chạy trước — dùng lại, không tải thêm bản nào (chặn trùng)")
+    else:
+        file = clerk.upload(f"don-de-nghi-{tag}.pdf", text_pdf(*pii_letter(tag)))
+        doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+            "type_code": "CV", "symbol": PII_SYMBOL, "issuer_name": PII_ISSUER,
+            "issued_on": (today() - timedelta(days=1)).isoformat(), "summary": PII_SUMMARY, "urgency": "normal",
+            "file_ids": [file["id"]]}})["receiveIncoming"]["document_id"]
+        number = None
+        ok(f"don-de-nghi-{tag}.pdf: PDF một trang có lớp chữ, chân trang “Van ban gia lap de chay thu Moc…”")
+    if number is None:
+        number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                           {"id": doc_id})["registerIncoming"]["register_number"]
+    ok(f"{PII_SYMBOL} trong sổ, số đến {number}; trích yếu “{PII_SUMMARY}”")
+
+    say(3, f"Văn thư gõ số CCCD {cccd} vào ô Tìm kiếm — chỉ mục tìm kiếm giữ bản gốc")
+    started = time.monotonic()
+    while True:
+        hits = call_json("GET", f"{PUBLIC_URL}/api/search?q={quote(cccd)}", headers=clerk.auth)[0]["hits"]
+        hit = next((h for h in hits if h["id"] == doc_id), None)
+        if hit and hit.get("matched_content"):
+            break
+        if time.monotonic() - started > 60:
+            raise DemoFailed(f"sau 60 giây tìm {cccd} chưa ra {PII_SYMBOL} (khớp nội dung tệp): {hits[:3]} — vòng nền"
+                             " svc-files đọc chữ PDF (MOC_TEXT_INTERVAL_S) có chạy không?")
+        time.sleep(2)
+    ok(f"ra đúng lá đơn {PII_SYMBOL}, khớp trong nội dung tệp PDF (sau {time.monotonic() - started:.0f} giây)")
+    request("GET", f"{PUBLIC_URL}/tim-kiem?q={quote(cccd)}", timeout=15)
+    ok("mở /tim-kiem?q=… như khi tải lại trang Tìm kiếm — APISIX và nginx của giao diện có dòng truy cập để kiểm ở bước 6")
+
+    say(4, f"Văn thư hỏi trợ lý: “{PII_QUESTION}”")
+    base = wait_pii_answer(clerk, doc_id, 90)
+    show_answer(base)
+    cited = [s for s in base.get("sources") or [] if s.get("cited") and s.get("document_id") == doc_id]
+    if base.get("status") != "answered" or phone not in answer_text(base) or not cited:
+        raise DemoFailed(f"chưa trích được câu có số điện thoại của lá đơn: trạng thái {base.get('status')}, nguồn"
+                         f" {[source_label(s) for s in base.get('sources') or []]}")
+    ok(f"câu trích nguyên văn có đúng số {phone}, nguồn [{cited[0]['n']}] {source_label(cited[0])} — người được xem văn"
+       " bản thấy bản gốc: chỉ mục, câu trích, nguồn không che")
+
+    say(5, f"Văn thư tải tệp EICAR tên {PII_FILE} — ClamAV chặn; tên tệp mang số điện thoại")
+    before = int(psql("select coalesce(max(id), 0) from core.audit_log") or 0)
+    try:
+        clerk.upload(PII_FILE, EICAR, "text/plain")
+        raise DemoFailed("tệp EICAR không bị chặn")
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        if exc.status != 422 or detail.get("code") != "infected":
+            raise DemoFailed(f"tệp EICAR trả {exc.status} {detail or exc.body[:200]}") from exc
+    last_request = time.monotonic()
+    ok(f"{PII_FILE} → 422 infected ({detail.get('signature')})")
+    kept = psql("select diff->>'filename' from core.audit_log where id > %d and action = 'file.rejected'"
+                " order by id desc limit 1" % before)
+    if kept != PII_FILE:
+        raise DemoFailed(f"dòng sổ file.rejected mới nhất ghi tên {kept!r}, cần tên gốc {PII_FILE}")
+    ok(f"psql: dòng sổ file.rejected giữ tên gốc {kept} — sổ kiểm toán có phân quyền và chuỗi băm, không che (che làm"
+       " sai băm, mất giá trị chứng cứ)")
+
+    say(6, f"Đọc nhật ký từ mốc ở bước 1: docker compose logs {' '.join(PII_LOGGED)}")
+    logs = settled_logs(since, last_request)
+    problems = log_problems(logs, forms)
+    if problems:
+        raise DemoFailed("nhật ký chưa sạch:\n   - " + "\n   - ".join(problems))
+    total = sum(len(text.splitlines()) for text in logs.values())
+    ok(f"{total} dòng của {len(PII_LOGGED)} dịch vụ: không có giá trị nào ở {len(forms)} cách viết (liền, theo nhóm,"
+       " chấm, gạch, +84, %20, %40…)")
+    ok("svc-workflow chỉ được quét để chắc không lọt từ chỗ khác: màn không đưa giá trị nào qua nó — bộ lọc nhật ký của"
+       " svc-workflow do test đơn vị kiểm (tests/test_pii_logging.py)")
+    for service, label, paths in PII_ACCESS:
+        line = " ".join(access_lines(logs[service], *paths)[-1].split())
+        ok(f"{service} ({label}): {line if len(line) <= 100 else line[:99] + '…'}")
+    ok(f"svc-files: core.file.rejected ghi {PII_FILE_MASKED}; sổ kiểm toán ở bước 5 vẫn giữ tên gốc")
+    warned = []
+    for service in PII_UNFILTERED:
+        try:
+            found_here = leaks(service_logs(since, service)[service], forms)
+        except subprocess.CalledProcessError:
+            print(f"   – {service}: không đọc được nhật ký")
+            continue
+        if found_here:
+            warned.append(service)
+            print(f"   – cảnh báo {service}: có {', '.join(found_here[:4])} — nhật ký này không qua bộ che (ngoài phạm"
+                  " vi F4.4, xem README svc-files)")
+    if not warned:
+        ok(f"{', '.join(PII_UNFILTERED)} (không qua bộ che, lọt chỉ cảnh báo): không thấy giá trị nào")
+
+    say(7, "Chữ gửi mô hình ngôn ngữ chạy tại chỗ (tùy chọn: profile ai) — che trước khi rời svc-files")
+    if base.get("ai_available"):
+        mark = utc_mark()
+        got, took = ask(clerk, PII_QUESTION, mode="generate", ask_id=base["ask_id"])
+        answer = got.get("answer") or {}
+        warnings = list(got.get("warnings") or [])
+        if answer.get("source") == "model":
+            show_answer(got)
+            leaked = leaks(answer.get("text") or "", forms)
+            if leaked:
+                raise DemoFailed(f"câu trả lời của mô hình có giá trị gốc: {leaked}")
+            labels = list(dict.fromkeys(MASK_LABEL_RE.findall(answer.get("text") or "")))
+            ok(f"{answer.get('model')} viết trong {took:.0f} giây, không có giá trị gốc nào"
+               + (f"; ghi {', '.join(labels)} — mô hình chưa từng thấy số thật, số thật ở câu trích bước 4" if labels
+                  else ""))
+            if not any(label.startswith("[SĐT") for label in labels):
+                print("   – câu trả lời không nhắc nhãn [SĐT-1] (mô hình diễn đạt khác) — vẫn không có số gốc")
+        else:
+            print(f"   – mô hình không qua kiểm ({', '.join(warnings) or got.get('status')}) — giữ câu trích nguyên văn")
+        time.sleep(1)
+        text = service_logs(mark, "svc-files")["svc-files"]
+        leaked = leaks(text, forms)
+        if leaked:
+            raise DemoFailed(f"nhật ký svc-files của lượt generate có {leaked}")
+        if answer.get("source") == "model" or {"model_rejected", "model_declined"} & set(warnings):
+            asked = [e for e in log_events(text, "office.assist.asked") if e.get("mode") == "generate"]
+            masked = asked[-1].get("masked") if asked else None
+            if not isinstance(masked, int) or masked < 2:
+                raise DemoFailed(f"nhật ký office.assist.asked của lượt generate ghi masked = {masked!r} (cần ≥ 2)")
+            if log_events(text, "office.assist.pii_at_egress"):
+                raise DemoFailed("có office.assist.pii_at_egress: lối ra Ollama còn phải che — chỗ dựng ngữ cảnh đã quên"
+                                 " che")
+            ok(f"nhật ký office.assist.asked của lượt này: masked = {masked} chỗ đã che trong câu hỏi và các đoạn gửi mô"
+               " hình; không có office.assist.pii_at_egress — ngữ cảnh đã che trước khi tới lối ra")
+    else:
+        print("   – chưa bật mô hình (make ai-model && make up-ai) — bản che mà lối ra Ollama sẽ gửi đi:")
+        masked_text = compose("exec", "-T", "svc-files", "python", "-m", "svc_files.pii", "mask",
+                              stdin="\n".join(pii_letter(tag)).encode()).decode()
+        for line in masked_text.strip().splitlines():
+            print(f"     {line}")
+        leaked = leaks(masked_text, forms)
+        labels = MASK_LABEL_RE.findall(masked_text)
+        if leaked or len(labels) != len(PII_DEMO):
+            raise DemoFailed(f"bản che còn {leaked or 'đủ giá trị'}, có {len(labels)} nhãn (cần {len(PII_DEMO)})")
+        ok(f"python -m svc_files.pii mask trong container svc-files: {len(labels)} nhãn {', '.join(labels)}, không còn"
+           " giá trị gốc; năm sinh, ngày cấp, số bản sao giữ nguyên. Trợ lý đánh số nhãn theo lượt hỏi ([SĐT-1]…)")
+
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/tim-kiem — gõ {cccd}; {PUBLIC_URL}/hoi-dap — hỏi “{PII_QUESTION}”"
+          f" (bật mô hình: câu trả lời ghi [SĐT-1], dòng nhắc số thật ở câu trích nguyên văn); lá đơn:"
+          f" {PUBLIC_URL}/van-ban/{doc_id}")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
-         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so}
+         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii}
 
 
 def main(argv: list[str] | None = None) -> int:

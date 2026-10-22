@@ -382,6 +382,41 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   khối chữ ký. QĐ-007 trong `docs/architecture.md`, mục ký số ở README, README svc-files, `docs/mo-hinh-du-lieu.md`,
   `docs/demo-script.md`. Phụ thuộc mới của svc-files: pyHanko 0.37.0, pyhanko-certvalidator 0.32.1 và 15 gói kéo
   theo, ghim kèm băm (`DEPENDENCIES.md`). Test: CSDL +28, svc-files +28, scripts +22, giao diện +5.
+- Che thông tin cá nhân (F4.4): bộ nhận dạng `pii.py` tự viết, chỉ dùng `re` của thư viện chuẩn — không Presidio,
+  không thêm phụ thuộc (`DEPENDENCIES.md` xếp Presidio, phonenumbers vào "đã cân nhắc nhưng không dùng"). Nhận theo
+  cấu trúc, không theo "dãy số đủ dài": số định danh / CCCD 12 số (mã tỉnh, chữ số thế kỷ, năm sinh), số điện thoại
+  (đầu số di động đã cấp, máy bàn `02x`, `+84`, mã vùng `(024)`, viết liền hay theo nhóm), email; CMND và số tài khoản
+  chỉ khi đứng sau từ khóa. Nhóm số cách nhau một ký tự trắng bất kỳ, nên số bị dàn trang ngắt dòng trong chữ PDF, OCR
+  ("0912 345⏎678") vẫn bị che; nhóm đầu ≥ 3 chữ số, nên dãy số nhỏ của bảng, lịch ("Tuần 01 02 03 04 05 06") không bị
+  che; bộ che lặp tới điểm bất động (idempotent). Không che UUID, số ký hiệu, ngày, tiền, tổng đài 1800 / 1900, mã số
+  thuế sau "MST". Dòng lệnh `python -m svc_files.pii mask|count` (`count` không in giá trị); `svc_workflow/pii.py` là
+  bản chép y hệt byte, test đỏ khi hai bản lệch.
+- Mô hình chạy tại chỗ chỉ nhận bản đã che (F4.4): mọi lời gọi Ollama — nhúng đoạn, câu hỏi, trích yếu (F4.2, F4.3),
+  viết câu trả lời (F4.2), viết trích yếu (F4.1, che trước khi cắt `MOC_AI_MAX_CHARS`) — qua bộ che ở lối ra; `chat`
+  còn phải che thêm thì cảnh báo `office.assist.pii_at_egress`. Ngữ cảnh F4.2 dùng nhãn đánh số theo lượt (`[SĐT-1]`,
+  cùng số cùng nhãn ở câu hỏi và đoạn), che rồi mới cắt cửa sổ 700 ký tự nên không lọt mẩu số, trích dẫn `[n]` và
+  trang không lệch. Chỉ mục tìm kiếm, câu trích nguyên văn, nguồn trả người hỏi và sổ kiểm toán giữ số thật. Trích yếu
+  mô hình viết có nhãn che bị loại (`model_rejected`). `office.assist.asked`, `office.assist.model_rejected`,
+  `office.intake.read` thêm khóa `masked` (số chỗ đã che, không có giá trị). Kho mẫu không có chỗ nào bị che, nên số
+  đo `make do-hoi-dap` không đổi.
+- Nhật ký không mang thông tin cá nhân (F4.4): svc-files, svc-workflow gắn `PiiFilter` vào logger dịch vụ và uvicorn
+  (`uvicorn.error`, `uvicorn.access`), che cả traceback; che hỏng thì cả dòng thành `core.log.redaction_failed`. Tệp bị
+  chặn tên `don-0912345678.txt` ghi `don-[SĐT].txt` ở nhật ký, sổ kiểm toán giữ tên gốc. Nhật ký truy cập của uvicorn,
+  APISIX (`gateway/config.yaml`) và nginx của app-office bỏ chuỗi truy vấn (`?q=…`, `?code=…`); APISIX, nginx bỏ cả
+  Referer, và giao diện gửi `Referrer-Policy: strict-origin` (trước là `same-origin`) nên Referer chỉ còn gốc tên miền.
+  Bỏ hẳn chứ không che bằng regex: chuỗi truy vấn mã hóa phần trăm thì bộ che không nhận ra (`gateway/README.md`).
+- Trang Hỏi đáp: câu trả lời mô hình viết có nhãn che (`[SĐT-1]`…) thì ghi rõ số thật nằm trong văn bản nguồn (câu trích
+  nguyên văn, các nguồn bên dưới) và tự mở khối câu trích (F4.4); mẫu nhãn của giao diện trùng `LABEL_RE` của `pii.py`
+  (test so hai mẫu).
+- Màn demo `make demo-che-pii` (F4.4, 7 bước, cũng là bước CI): văn thư nhận lá đơn hư cấu có CCCD, số di động, máy bàn,
+  email, số tài khoản → tìm theo số CCCD ra đúng đơn, trợ lý trích nguyên văn có số thật → tệp EICAR tên có số điện
+  thoại bị chặn → nhật ký `apisix`, `app-office`, `svc-files`, `svc-workflow` không còn giá trị nào ở mọi cách viết,
+  dòng truy cập không còn `?q` → bật mô hình thì `office.assist.asked` có `masked` ≥ 2, không bật thì in bản che.
+  `make do-che-pii` (không cần Docker, đã chạy trong `make test`): che nhầm trên kho mẫu và 15 đột biến mã của `pii.py`.
+  Đo 22/10/2026: 22 văn bản đến (15 PDF có lớp chữ, 7 bản scan), 6 văn bản hỏi đáp, 1 248 chuỗi nhãn, câu hỏi, lịch sử
+  giao việc — 81 023 ký tự, 747 chuỗi số ứng viên, **0 chỗ bị che**; 15/15 đột biến bị giết. QĐ-006 trong
+  `docs/architecture.md`, mục che thông tin cá nhân ở README svc-files, `docs/demo-script.md`, `gateway/README.md`.
+  Test: svc-files +62, svc-workflow +6, scripts +19, giao diện +3.
 
 ### Đã sửa đổi
 - Văn thư không còn ghi thẳng bảng văn bản (`insert_office_documents_one`, `update_office_documents`) lẫn bảng tệp
@@ -471,6 +506,10 @@ Mọi thay đổi đáng chú ý của Mộc được ghi lại trong tệp này
   và `pki/sign/moc-van-thu`, không `export`, `backup`). Ai chiếm được `svc-files` vẫn ký được, xoay được khóa ký và xin
   được chứng thư cho khóa tự sinh, nhưng không mang khóa riêng đi được — cùng mức tin như khóa dữ liệu `moc-files`
   (README mục Két bí mật). Két khởi tạo trước F4.5 không ký số cho tới khi quản trị nâng cấp tay (README).
+- Che thông tin cá nhân (F4.4): sổ kiểm toán cố ý giữ bản gốc (có phân quyền và chuỗi băm, che vào là sửa chứng cứ), số
+  chỗ đã che chỉ ghi ở nhật ký. Chưa che: họ tên, địa chỉ, số dính chữ (`ĐT0912…`), CMND và số tài khoản không có từ
+  khóa; nhật ký Hasura, PostgreSQL, Keycloak, Meilisearch và `error_log` của APISIX, nginx (vẫn có `?q=…` khi một plugin
+  ghi lỗi) không qua bộ che; véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại (README svc-files).
 - Văn bản hạn chế (F3.7) không bao giờ có gợi ý đọc tự động (F4.1): svc-files trả `409` trước khi đọc byte nào —
   tệp mã hóa, hay tệp rõ còn gắn vào văn bản hạn chế (dữ liệu có từ trước F3.7) — nên không tới OCR, không tới mô
   hình; trigger `intake_suggestions_guard` chặn thêm ở CSDL việc lưu gợi ý của các tệp đó, xóa gợi ý khi văn bản bật

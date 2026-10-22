@@ -102,6 +102,16 @@ export function blocks(res: Pick<AskResult, 'answer' | 'extract'>): { model: Ask
   return { model, extract }
 }
 
+// Nhãn che thông tin cá nhân (F4.4) mà svc-files đặt vào chữ gửi mô hình: [SĐT-1], [CCCD-2], [EMAIL], [STK-3]… —
+// đúng mẫu LABEL_RE của services/svc-files/src/svc_files/pii.py (test so hai mẫu). Không phải dấu trích dẫn: CITE chỉ
+// nhận số trong ngoặc vuông
+export const MASK_RE = /\[(?:CCCD|CMND|SĐT|EMAIL|STK)(?:-\d{1,3})?\]/u
+
+/** Câu trả lời của mô hình có nhãn che không: mô hình chỉ thấy nhãn, số thật nằm trong văn bản nguồn. */
+export function hasMask(text: string | null | undefined): boolean {
+  return !!text && MASK_RE.test(text)
+}
+
 /** Kết quả từ máy chủ, phòng trường thiếu: sources, warnings luôn là mảng; nguồn xếp theo n, đoạn trích luôn là chuỗi;
  *  cảnh báo không trùng. */
 export function tidy(res: AskResult): AskResult {

@@ -421,6 +421,7 @@
     "extractTitle": "Verbatim quote",
     "modelTitle": "Assistant answer",
     "modelNote": "Written by a language model — check the sources before relying on it",
+    "maskedNote": "Phone numbers, ID numbers, emails and bank account numbers are masked before the text is sent to the model — the real values are in the source documents: see the verbatim quote and the sources below.",
     "showExtract": "Show the verbatim quote",
     "hideExtract": "Hide the verbatim quote",
     "passagesOnly": "No short answer could be quoted — see the related passages below.",

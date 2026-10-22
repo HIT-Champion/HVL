@@ -31,6 +31,7 @@ PREFIX ?= /opt/moc
 .PHONY: help env check build up up-ai ai-model down reset restart logs ps seed totp smoke e2e test api-docs audit demo-kiem-dich demo-han-che demo-ket-bi-mat demo-tu-phuc-hoi demo-nong-lanh demo-pha-he demo-it-ot demo-lien-thong \
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
+        demo-che-pii do-che-pii \
         reconcile \
         backup restore install uninstall license-check license-fix lint release clean
 
@@ -159,6 +160,13 @@ do-giao-viec: $(ENV_FILE) ## Đo tác tử gợi ý giao việc leave-one-out tr
 
 demo-ky-so: $(ENV_FILE) ## Màn ký số (F4.5, chỉ minh họa): văn bản đi ký PAdES bằng khóa của đơn vị trong két, CA nội bộ; cổng xác thực báo người ký; pyHanko phát hiện sửa sau khi ký, lật một bit; văn bản hạn chế không ký (docs/demo-script.md)
 	@python3 scripts/demo.py ky-so
+
+demo-che-pii: $(ENV_FILE) ## Màn che thông tin cá nhân (F4.4): đơn giả lập có CCCD, số điện thoại, email, STK — tìm và trích nguyên văn vẫn có số thật; nhật ký apisix, app-office, svc-files, svc-workflow không còn giá trị nào, không còn chuỗi truy vấn; mô hình chỉ thấy nhãn (docs/demo-script.md)
+	@python3 scripts/demo.py che-pii
+
+do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 15 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
+	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
+	  tests/test_pii_corpus.py tests/test_pii_mutation.py
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
 	@python3 scripts/reconcile.py

@@ -421,6 +421,7 @@
     "extractTitle": "Câu trích nguyên văn",
     "modelTitle": "Trả lời của trợ lý",
     "modelNote": "Do mô hình ngôn ngữ viết — đối chiếu nguồn trước khi dùng",
+    "maskedNote": "Số điện thoại, số định danh, email, số tài khoản trong văn bản được che trước khi gửi mô hình — số thật nằm trong văn bản nguồn: xem câu trích nguyên văn và các nguồn bên dưới.",
     "showExtract": "Xem câu trích nguyên văn",
     "hideExtract": "Ẩn câu trích nguyên văn",
     "passagesOnly": "Chưa trích được câu trả lời ngắn — xem các đoạn liên quan bên dưới.",

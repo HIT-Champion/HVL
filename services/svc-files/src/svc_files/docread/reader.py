@@ -33,7 +33,8 @@
 7. Một mutation vai trò ``agent``: lưu gợi ý + ghi một dòng sổ ``intake.suggested`` (chỉ siêu dữ liệu) cùng giao dịch,
    **rồi mới trả kết quả** — không ghi được sổ thì không trả gợi ý. Đọc hỏng (422) chỉ ghi dòng sổ.
 
-Nhật ký không bao giờ có chữ của văn bản: chỉ số trang, số ký tự, tên các trường tìm thấy.
+Nhật ký không bao giờ có chữ của văn bản: chỉ số trang, số ký tự, tên các trường tìm thấy, và số chỗ thông tin cá
+nhân đã che trong chữ gửi mô hình (``masked``, F4.4 — summarize.py che; không vào sổ).
 """
 
 from __future__ import annotations
@@ -240,7 +241,7 @@ class Reader:
                 self._log("office.intake.read", request_id, file_id=file_id, tenant_id=principal.tenant_id,
                           actor_id=principal.user_id, method=row["method"], pages=row["pages"], chars=None,
                           found=",".join(k for k in FOUND_ORDER if k in (row["fields"] or {})),
-                          duration_ms=_ms(start), model=row["model"], cached=True)
+                          duration_ms=_ms(start), model=row["model"], cached=True, masked=0)
                 return self._out(row, cached=True)
         if meta.size_bytes > self.settings.read_max_bytes:
             raise self._too_large()
@@ -283,7 +284,7 @@ class Reader:
         if text.truncated and "truncated" not in warnings:
             warnings.append("truncated")
         body = suggestion.body or "\n".join(line.text for line in text.lines)
-        model, warning = await self._summary(fields, body, deadline)
+        model, warning, masked = await self._summary(fields, body, deadline)
         if warning and warning not in warnings:
             warnings.append(warning)
 
@@ -305,7 +306,7 @@ class Reader:
                             "Chưa ghi được sổ kiểm toán nên chưa trả gợi ý — thử lại sau") from exc
         self._log("office.intake.read", request_id, file_id=file_id, tenant_id=tenant, actor_id=principal.user_id,
                   method=text.method, pages=text.pages, chars=sum(len(line.text) for line in text.lines),
-                  found=diff["found"], duration_ms=duration_ms, model=model, cached=False)
+                  found=diff["found"], duration_ms=duration_ms, model=model, cached=False, masked=masked)
         return self._out({**row, "read_at": read_at}, cached=False)
 
     # --- từng bước -------------------------------------------------------------------------------------------
@@ -402,22 +403,23 @@ class Reader:
             return rules.Suggestion({}, (), "")
 
     async def _summary(self, fields: dict[str, dict[str, str]], body: str, deadline: float,
-                       ) -> tuple[str | None, str | None]:
-        """Trích yếu bằng mô hình khi cần; trả (tên mô hình đã gọi, cảnh báo). Thành công thì ghi đè ``summary``."""
+                       ) -> tuple[str | None, str | None, int]:
+        """Trích yếu bằng mô hình khi cần; trả (tên mô hình đã gọi, cảnh báo, số chỗ đã che trong chữ gửi mô hình).
+        Thành công thì ghi đè ``summary``."""
         rule = fields.get("summary")
         if self.settings.ai_summary != "always" and rule is not None and rule["confidence"] == "high":
-            return None, None
+            return None, None, 0
         model = self.summarizer
         if not model.available:
-            return None, "model_unavailable"
+            return None, "model_unavailable", 0
         left = deadline - time.monotonic()
         if left < MODEL_MIN_S or not body.strip():
-            return None, "model_skipped"
+            return None, "model_skipped", 0
         result = await model.summarize(body, timeout_s=min(self.settings.ai_timeout_s, left - MODEL_MARGIN_S))
         if result.text:
             fields["summary"] = {"value": result.text[:MAX_VALUE], "confidence": "medium", "source": "model"}
-            return model.model, None
-        return model.model, result.warning or "model_rejected"
+            return model.model, None, result.masked
+        return model.model, result.warning or "model_rejected", result.masked
 
     # --- dữ liệu ra ------------------------------------------------------------------------------------------
 

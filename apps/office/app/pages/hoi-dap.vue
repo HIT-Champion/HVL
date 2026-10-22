@@ -20,7 +20,7 @@
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '~/composables/useApi'
 import type { AskBody, AskResult, AskSource } from '~/composables/useApi'
-import { MAX_QUESTION, blocks, citeLabel, cleanQuestion, needsGenerate, sourceAnchor, tidy } from '~/utils/answer'
+import { MAX_QUESTION, blocks, citeLabel, cleanQuestion, hasMask, needsGenerate, sourceAnchor, tidy } from '~/utils/answer'
 
 // Hỏi đáp trên kho văn bản (F4.2). Trợ lý moc-assistant (svc-files) chỉ tìm trong các văn bản người hỏi được xem,
 // văn bản hạn chế không bao giờ vào chỉ mục. Hai pha cho mỗi câu hỏi: extract trả ngay câu trích nguyên văn kèm
@@ -207,7 +207,8 @@ async function generate(key: number, ctrl: AbortController) {
     // lượt generate tìm lại từ đầu: [n] của câu trả lời trỏ vào nguồn của chính lượt này
     cur.result = res
     cur.gen = 'done'
-    cur.showExtract = false
+    // câu trả lời có nhãn che (F4.4: mô hình chỉ thấy [SĐT-1]…) thì mở sẵn câu trích nguyên văn — số thật ở đó
+    cur.showExtract = hasMask(blocks(res).model?.text)
     cur.opened = []
     if (blocks(res).model) say(t('assist.live.answered'))
     else if (res.status === 'no_evidence') say(t('assist.noEvidence'))
@@ -345,6 +346,10 @@ onBeforeUnmount(() => {
                   </span>
                 </div>
                 <AnswerText :text="blocks(turn.result).model!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
+                <!-- F4.4: chữ gửi mô hình đã che, mô hình viết nhãn [SĐT-1] thay cho số -->
+                <p v-if="hasMask(blocks(turn.result).model!.text)" class="mt-2 text-xs text-sky-900" data-testid="ask-masked">
+                  {{ t('assist.maskedNote') }}
+                </p>
                 <button
                   v-if="blocks(turn.result).extract" type="button"
                   class="mt-3 text-xs font-medium text-brand-700 underline underline-offset-2"

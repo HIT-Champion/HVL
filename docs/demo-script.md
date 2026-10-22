@@ -31,7 +31,9 @@ ký hiệu và trang (`make demo-hoi-dap`, F4.2, dưới hai phút) — xem
 văn bản vừa vào sổ, kèm căn cứ (`make demo-giao-viec`, F4.3) — xem
 [mục này](#ngoài-4-nguyên-lý-gợi-ý-giao-việc--make-demo-giao-viec); ký số PAdES bản phát hành văn bản đi bằng PKI nội
 bộ trong két, **chỉ minh họa** (`make demo-ky-so`, F4.5) — xem
-[mục cuối](#ngoài-4-nguyên-lý-ký-số-văn-bản-đi-minh-họa--make-demo-ky-so).
+[mục này](#ngoài-4-nguyên-lý-ký-số-văn-bản-đi-minh-họa--make-demo-ky-so). Màn che thông tin cá nhân trong chữ
+gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng chứng cho cụm ② của đề — xem
+[mục cuối](#ngoài-4-nguyên-lý-che-thông-tin-cá-nhân--make-demo-che-pii).
 
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
@@ -736,3 +738,87 @@ lần đầu của đơn vị; cả màn 26–36 giây.
   kiểm báo, và tra theo băm phần đã ký thì cổng trả đúng văn bản); chưa có bước demo xin xuất khóa để thấy két từ chối;
   két cài trước F4.5 chưa tự nâng cấp lên có PKI; chứng thư chưa tự cấp lại khi sắp hết hạn; mỗi đơn vị một khóa, chưa
   ký theo từng người.
+
+## Ngoài 4 nguyên lý: che thông tin cá nhân — `make demo-che-pii`
+
+Màn này thuộc F4.4, **không** phải màn bằng chứng nguyên lý: là bằng chứng cho cụm ② của đề ("Đa thuê ước, Biên
+mạng, Cá thể hóa" — mục "rà soát & che giấu PII"). Văn thư nhận một lá đơn hư cấu có số CCCD, số di động, số máy bàn,
+email và số tài khoản. Người có quyền đọc văn bản vẫn tìm được theo số và thấy số thật; mô hình ngôn ngữ và nhật ký thì
+không. Không cần mô hình (bước 7 có hai nhánh). Lần đầu đợi svc-files đọc chữ và đưa đoạn vào chỉ mục, thường dưới hai
+phút; các lần sau dùng lại lá đơn, dưới một phút.
+
+**Điều muốn chứng minh:**
+
+- Che **đúng chỗ**: chỉ mục tìm kiếm, câu trích nguyên văn, nguồn trả người hỏi và sổ kiểm toán giữ bản gốc — người
+  có quyền đọc văn bản cần số thật để làm việc. Chỉ chữ ra khỏi phạm vi quyền đọc — chữ gửi mô hình, nhật ký — bị che.
+- Mô hình **chỉ nhận bản đã che**: mọi lời gọi Ollama đi qua bộ che ở lối ra; ngữ cảnh hỏi đáp dùng nhãn đánh số
+  `[SĐT-1]` cho mỗi lượt, che trước khi cắt cửa sổ nên không lọt mẩu số, trích dẫn `[n]` và trang không lệch. Bộ che
+  nhận theo định dạng nên có ca sót đã biết (họ tên, địa chỉ, số dính chữ… — README svc-files).
+- Nhật ký của `apisix`, `app-office`, `svc-files` không còn giá trị nào, ở **mọi cách viết** (liền, theo nhóm, có
+  chấm, `+84`, mã hóa phần trăm như trong URL, chữ hoa). Nhật ký truy cập vẫn có dòng `/api/search`, `/tim-kiem`
+  nhưng không còn `?q=…`. `svc-workflow` cũng được quét, nhưng màn không đưa giá trị nào qua nó — bộ lọc nhật ký của
+  nó do test đơn vị kiểm.
+- Tên tệp bị chặn: nhật ký ghi `don-[SĐT].txt`, sổ kiểm toán giữ tên gốc — sổ có chuỗi băm, là chứng cứ.
+- Không che nhầm: kho mẫu (công văn, văn bản hỏi đáp nhiều trang, nhãn, câu hỏi, lịch sử giao việc) 0 chỗ bị che
+  (`make do-che-pii`).
+
+**Lệnh in ra 7 bước:**
+
+1. Lấy mốc thời gian (UTC): bước 6, 7 chỉ đọc nhật ký từ lúc này.
+2. `vanthu` tải lên "Đơn đề nghị cấp bản sao bằng tốt nghiệp" (PDF một trang, hư cấu, chân trang "Van ban gia lap…":
+   CCCD `001205000017`, di động `0912 345 678`, máy bàn `(024) 3000 0000`, email `nguyenvanb@example.com`, số tài
+   khoản `0011 0041 23456`; có cả số không được che — "sinh năm 2005", "cấp ngày 05/3/2021", "02 bản sao"),
+   `receiveIncoming` với trích yếu không có thông tin cá nhân, rồi `registerIncoming`. Đã có lá đơn số `01/ĐN-GL` từ
+   lần chạy trước thì dùng lại, để trợ lý không gặp nhiều bản trùng.
+3. Tìm theo số CCCD qua APISIX (`/api/search?q=001205000017`, đợi ≤ 60 giây cho svc-files đọc chữ PDF) → ra đúng lá
+   đơn, khớp nội dung: tìm kiếm vẫn dùng số gốc. Mở thêm `/tim-kiem?q=…` như khi tải lại trang Tìm kiếm, để APISIX và
+   nginx của giao diện có dòng truy cập cho bước 6.
+4. Đợi chỉ mục đoạn (≤ 90 giây), `vanthu` hỏi "Số điện thoại liên hệ của người làm đơn đề nghị cấp bản sao bằng tốt
+   nghiệp là gì?" → câu trích nguyên văn có **`0912 345 678`**, nguồn [1] là lá đơn.
+5. Tải tệp thử EICAR tên `don-0912345678.txt` → `422 infected`; psql: dòng sổ `file.rejected` mới nhất giữ tên gốc.
+6. Đợi 4 giây sau yêu cầu cuối (APISIX ghi nhật ký truy cập có đệm, xả mỗi 3 giây — đọc sớm thì thiếu dòng, có thể ra
+   màn xanh sai), rồi đọc `docker compose logs --since <mốc>` của `apisix`, `app-office`, `svc-files`, `svc-workflow`
+   tới khi đủ dòng truy cập (tối đa 15 giây): không còn giá trị nào; có dòng truy cập `/api/search` ở APISIX và
+   svc-files (`GET /api/search?… HTTP/1.1`), `/tim-kiem` ở APISIX và app-office; không dòng nào có `/api/search?q`,
+   `/tim-kiem?q`; dòng `core.file.rejected` ghi `don-[SĐT].txt`. In vài dòng truy cập mẫu; svc-workflow chỉ được quét
+   (màn không đưa giá trị qua nó). Nhật ký Hasura, Meilisearch, Keycloak, PostgreSQL nằm ngoài phạm vi: có giá trị thì
+   chỉ cảnh báo.
+7. Đã bật mô hình (`make ai-model && make up-ai`) → hỏi lại cùng câu ở chế độ "mô hình viết": câu trả lời không có giá
+   trị gốc nào, thường ghi `[SĐT-1]`; nhật ký `office.assist.asked` của lượt này có `masked` ≥ 2, không có
+   `office.assist.pii_at_egress`. Chưa bật → chạy `python -m svc_files.pii mask` trong container svc-files với chữ của
+   lá đơn, in bản che — đúng chữ lối ra Ollama sẽ gửi: 5 nhãn `[CCCD]`, `[SĐT]`, `[SĐT]`, `[EMAIL]`, `[STK]`; năm
+   sinh, ngày cấp, số bản sao giữ nguyên.
+
+Bước nào sai thì dừng, thoát 1 — kể cả khi chỉ một cách viết của một giá trị lọt vào một dòng nhật ký.
+
+**Đo — `make do-che-pii`** (không cần Docker, vài giây): đọc kho mẫu như bản chạy thật (lớp chữ và bố cục PDF, TSV
+OCR, mọi trang văn bản hỏi đáp, mọi chuỗi trong nhãn, câu hỏi, lịch sử giao việc), in bảng số ký tự, số chuỗi số ứng
+viên, số chỗ bị che — phải là 0 ở mọi nguồn; rồi chạy 15 đột biến mã của bộ che (bỏ kiểm mã tỉnh, nới đầu số, bỏ vùng
+bảo vệ UUID, giữ chuỗi truy vấn…) — cả 15 phải bị test giết. Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp
+(`test_pii.py`): kho mẫu không có, và không được có, dữ liệu thật mang thông tin cá nhân. Số đo ghi ở
+`services/svc-files/README.md`.
+
+**Trên giao diện** (`vanthu`): Tìm kiếm, gõ `001205000017` → lá đơn "Về việc đề nghị cấp bản sao bằng tốt nghiệp",
+khớp nội dung. Hỏi đáp, hỏi câu ở bước 4 → "Câu trích nguyên văn" có `0912 345 678`. Bật mô hình thì khối "Trả lời
+của trợ lý" ghi `[SĐT-1]`, kèm dòng "Số điện thoại, số định danh, email, số tài khoản trong văn bản được che trước khi
+gửi mô hình — số thật nằm trong văn bản nguồn: xem câu trích nguyên văn và các nguồn bên dưới", và khối
+câu trích tự mở.
+
+**Nếu giám khảo hỏi:**
+
+- *"Sao không dùng Presidio?"* Presidio kéo spaCy, numpy và một mô hình ngôn ngữ, mà bộ nhận dạng dựng sẵn không có
+  định dạng Việt Nam — vẫn phải tự viết regex. Bộ che tự viết chỉ dùng thư viện chuẩn, nhận theo cấu trúc (mã tỉnh của
+  số định danh, đầu số di động đã cấp, `+84`, mã vùng), đủ nhanh để chạy trên mọi dòng nhật ký. QĐ-006.
+- *"Sao không che luôn trong CSDL, chỉ mục?"* Văn thư phải tìm được đơn theo số CCCD, chuyên viên phải gọi lại cho
+  người làm đơn. Che là việc của chỗ chữ ra khỏi phạm vi quyền đọc: mô hình (dù chạy tại chỗ) và nhật ký (ai vào được
+  máy chủ đều đọc được). Sổ kiểm toán không che: sổ có phân quyền và chuỗi băm, che vào sổ là sửa chứng cứ.
+- *"Che nhầm số ký hiệu, ngày tháng, số tiền thì sao?"* Không che chuỗi số chỉ vì đủ dài: số ký hiệu `131/…`, ngày,
+  tiền, UUID, mã số thuế sau "MST", tổng đài 1900, dãy số nhỏ của bảng đều có test âm tính; trên kho mẫu (81 023 ký
+  tự, 747 chuỗi số ứng viên) 0 chỗ bị che — `make do-che-pii` đo lại được. Luật lỏng "0 + 9–11 chữ số" thì che cả đuôi
+  UUID và mã số thuế.
+- *"Mô hình chỉ thấy `[SĐT-1]` thì trả lời được gì?"* Đúng câu "số điện thoại liên hệ là [SĐT-1]", có trích dẫn; số
+  thật nằm ngay ở câu trích nguyên văn bên dưới, giao diện nói rõ. Không điền số thật trở lại vào câu của mô hình: mô
+  hình có thể đặt nhãn sai chỗ, gán số người này cho người khác.
+- *"Còn gì chưa làm?"* Họ tên, địa chỉ (cần nhận dạng thực thể tiếng Việt), hộ chiếu, biển số xe; số dính chữ
+  (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura, PostgreSQL, Keycloak và `error_log` của
+  APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại.
