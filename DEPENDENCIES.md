@@ -175,7 +175,10 @@ Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dị
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
 chạy, không sửa), HarfBuzz (MIT) và phông Liberation 2.1 (SIL OFL 1.1) — cùng số đo với Times New Roman mà
 NĐ 30/2020 quy định, có đủ dấu tiếng Việt; từ F4.1 thêm Tesseract cùng dữ liệu tiếng Việt (mục Trí tuệ nhân tạo),
-gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
+gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python. pip của image nền chỉ dùng lúc dựng: cài xong thư
+viện thì gỡ khỏi image, cùng các bản sao thư viện nó mang theo (`pip/_vendor`: certifi, urllib3, msgpack, setuptools
+bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ensurepip/_bundled` của image nền (cùng các bản sao đó, nằm
+trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 
 ## Vận hành và bốn nguyên lý thiết kế
 
