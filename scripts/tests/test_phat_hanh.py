@@ -18,20 +18,28 @@
 "## [X.Y.Z]" của CHANGELOG; khối mẫu trong chú thích HTML không tính; thiếu mục, hay mục chỉ có tiêu đề nhóm, thì
 lỗi chứ không ra ghi chú rỗng. Không phát hành lại: release.sh dừng trước khi gắn khi thẻ đã có trên origin hay ở máy,
 không hỏi được origin cũng dừng; release.yml dừng khi thẻ đã có Release, kể cả nháp (chạy lệnh của bước với gh giả), và
-báo lỗi khi action không tải lên đủ hai tệp. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
+báo lỗi khi action không tải lên đủ hai tệp. Trang Release (scripts/release_body.py): dòng chỉ gói .tar.gz chính thức,
+phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
+Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "release-notes.sh"
 RELEASE = SCRIPT.parent / "release.sh"
+BODY = SCRIPT.parent / "release_body.py"
+spec = importlib.util.spec_from_file_location("release_body", BODY)
+release_body = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(release_body)
 WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "release.yml"
 # repo thử không đọc cấu hình git của máy (khóa ký thẻ, hook…), tên người gắn thẻ cố định; bỏ mọi GIT_* thừa hưởng —
 # chạy từ hook git thì GIT_DIR, GIT_INDEX_FILE trỏ về repo thật và lệnh git của test sẽ ghi vào đó
@@ -281,6 +289,92 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         self.assertIn("fail_on_unmatched_files: true", action)
         self.assertIn("ASSETS: ${{ steps.gh_release.outputs.assets }}", action)
 
+
+class ReleaseBodyTest(unittest.TestCase):
+    """scripts/release_body.py: trang Release ngắn — tóm tắt hiện ra, ghi chép đầy đủ gập lại, không gãy dòng."""
+
+    URL = "https://github.com/HIT-Champion/HVL"
+    NOTES = ("Bản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng,\n"
+             "dựng từ mã nguồn bằng make.\n"
+             "\n"
+             "- Văn bản đi: soạn, duyệt, ký,\n"
+             "  cấp số, phát hành PDF có mã QR.\n"
+             "\n"
+             "### Đã thêm\n"
+             "- Cổng xác thực, xem [docs/api/](docs/api/README.md) và\n"
+             "  [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/).\n"
+             "- Sổ đăng ký.\n"
+             "\n"
+             "### Đã sửa lỗi\n"
+             "- Lỗi gấp.\n")
+
+    def test_summary_shows_and_changes_fold(self) -> None:
+        out = release_body.body("1.1.0", self.NOTES, self.URL)
+        head, rest = out.split("<details>", 1)
+        self.assertTrue(head.startswith("**Gói phát hành chính thức: `moc-1.1.0.tar.gz`**"))
+        self.assertIn("`sha256sum -c moc-1.1.0.tar.gz.sha256`", head)
+        self.assertIn('"Source code (zip)"', head)
+        self.assertIn("\n\nBản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng, dựng từ mã nguồn bằng "
+                      "make.\n\n- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR.\n\n", head)
+        self.assertNotIn("### Đã thêm", head)
+        self.assertIn("<summary>Toàn bộ ghi chép thay đổi của 1.1.0 (3 mục)</summary>\n\n### Đã thêm\n", rest)
+        self.assertTrue(rest.endswith("- Lỗi gấp.\n\n</details>\n"))
+
+    def test_continuation_lines_join_and_relative_links_point_at_the_tag(self) -> None:
+        out = release_body.body("1.1.0", self.NOTES, self.URL)
+        self.assertIn("- Cổng xác thực, xem [docs/api/](https://github.com/HIT-Champion/HVL/blob/v1.1.0/docs/api/"
+                      "README.md) và [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/).\n- Sổ đăng ký.\n\n"
+                      "### Đã sửa lỗi\n", out)
+
+    def test_without_summary_only_the_folded_changes(self) -> None:
+        out = release_body.body("1.1.1", "### Đã sửa lỗi\n- Lỗi gấp.\n", self.URL)
+        first, second = out.split("\n\n", 1)
+        self.assertIn("`moc-1.1.1.tar.gz`", first)
+        self.assertTrue(second.startswith("<details>\n<summary>Toàn bộ ghi chép thay đổi của 1.1.1 (1 mục)</summary>"))
+
+    def test_entry_reads_the_section_and_fails_without_one(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "CHANGELOG.md"
+            path.write_text(CHANGELOG, encoding="utf-8")
+            ok = subprocess.run([sys.executable, str(BODY), "0.2.0", str(path)], capture_output=True, text=True)
+            missing = subprocess.run([sys.executable, str(BODY), "0.3.0", str(path)], capture_output=True, text=True)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertIn("(2 mục)</summary>\n\n### Đã thêm\n- Tính năng của 0.2.0.\n\n### Đã sửa lỗi\n", ok.stdout)
+        self.assertNotIn("Khung dự án", ok.stdout)
+        self.assertEqual(missing.returncode, 1)
+        self.assertIn("chưa có mục '## [0.3.0]'", missing.stderr)
+        self.assertEqual(missing.stdout, "")
+
+
+class WorkflowNotesTest(unittest.TestCase):
+    """release.yml, bước "Trích ghi chú phát hành từ CHANGELOG": chạy thật lệnh của bước — trang Release dựng bằng
+    release_body.py; thiếu mục thì dừng."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = pathlib.Path(tmp.name)
+        (self.dir / "scripts").mkdir()
+        shutil.copy(SCRIPT, self.dir / "scripts" / "release-notes.sh")
+        shutil.copy(BODY, self.dir / "scripts" / "release_body.py")
+        (self.dir / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
+        (self.dir / "dist").mkdir()
+
+    def step(self, version: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["bash", "-e", "-c", step_script("Trích ghi chú phát hành từ CHANGELOG")], cwd=self.dir,
+                              env={**os.environ, "V": version}, capture_output=True, text=True)
+
+    def test_page_starts_with_the_official_package(self) -> None:
+        proc = self.step("0.2.0")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        page = (self.dir / "dist" / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+        self.assertTrue(page.startswith("**Gói phát hành chính thức: `moc-0.2.0.tar.gz`**"))
+        self.assertIn("- Tính năng của 0.2.0.\n", page)
+
+    def test_missing_section_stops(self) -> None:
+        proc = self.step("0.3.0")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("::error::CHANGELOG.md chưa có mục [0.3.0]", proc.stdout)
 
 if __name__ == "__main__":
     unittest.main()
