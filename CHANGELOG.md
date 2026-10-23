@@ -16,6 +16,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   sửa lỗi gộp vào `develop` đi kèm một bản vá để lúc chấm `develop` và `main` cùng nội dung. `docs/git_flow.md` ghi
   lệnh thiết lập repo (merge commit, bật secret scanning) và lý do giữ `develop` làm nhánh mặc định; mục 11 ghi đúng
   mốc chuyển quy trình (sau `v1.0.0`) và việc các lượt chạy cũ đã bị xóa khỏi trang Actions.
+- Tài liệu phục vụ cuộc thi chuyển vào `docs/du-thi/` (phân tích đề, tóm tắt thể lệ, bảng tự chấm PoF, kế hoạch
+  phát triển, thư mục `nghien-cuu/`), kèm trang mục lục; `docs/` chỉ còn tài liệu về sản phẩm. Mọi liên kết và chỗ
+  nhắc đường dẫn (README, đặc tả, mô hình dữ liệu, README dịch vụ, chú thích BPMN và `flowable.py`) đã sửa theo.
 
 ### Đã sửa lỗi
 - Tên 4 job CI có dấu `#` (`Giấy phép (PoF #2)`…) bị YAML hiểu phần từ ` #` là chú thích: trang Actions hiện

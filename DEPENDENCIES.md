@@ -29,7 +29,7 @@ sử dụng"*).
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
   máy mới vẫn chạy đúng bản đã kiểm. Nâng phiên bản thì đổi cả hai: digest lấy bằng
   `docker buildx imagetools inspect <thẻ>` (dòng `Digest:`, là index đa nền tảng).
-- **Phase**: thời điểm thành phần được đưa vào, theo [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md).
+- **Phase**: thời điểm thành phần được đưa vào, theo [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md).
   Thành phần đánh dấu *Could* chỉ được thêm nếu còn thời gian.
 - **Copyleft (GPL, AGPL)**: chỉ dùng ở dạng **dịch vụ độc lập giao tiếp qua mạng**, không liên kết
   vào mã của Signet, nên giấy phép của chúng không lan sang Signet.

@@ -297,11 +297,11 @@ that the API documentation in `docs/api/` matches the freshly built system; scan
 | [`docs/architecture.md`](docs/architecture.md) | H-P-D-I architecture, tool map, technical decisions |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Data model, permissions, Hasura Actions, event formats |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Product specification: problem, users, features |
-| [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md) | Development plan by phase, assignments, risks |
+| [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Development plan by phase, assignments, risks |
 | [`docs/git_flow.md`](docs/git_flow.md) | Git workflow: branches, commits, pull requests, releases |
-| [`docs/pof-checklist.md`](docs/pof-checklist.md) | Self-assessment against the 50-point PoF criteria |
-| [`docs/olp-2026-brief.md`](docs/olp-2026-brief.md), [`docs/olp-2026-de-thi.md`](docs/olp-2026-de-thi.md) | The DX-OS theme, rules, judging criteria; analysis of the official problem statement |
-| [`docs/nghien-cuu/`](docs/nghien-cuu/) | Research done before the problem statement was published (archived) |
+| [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Self-assessment against the 50-point PoF criteria |
+| [`docs/du-thi/olp-2026-brief.md`](docs/du-thi/olp-2026-brief.md), [`docs/du-thi/olp-2026-de-thi.md`](docs/du-thi/olp-2026-de-thi.md) | The DX-OS theme, rules, judging criteria; analysis of the official problem statement |
+| [`docs/du-thi/nghien-cuu/`](docs/du-thi/nghien-cuu/) | Research done before the problem statement was published (archived) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Upstream software, pinned versions, licenses |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributing guide |

@@ -20,7 +20,7 @@
 <!--
   Quy trình xử lý văn bản đến (F2.3, NĐ 30/2020 Điều 23–24). Văn thư vào sổ thì svc-workflow khởi chạy
   quy trình với businessKey = id văn bản. Dữ liệu nghiệp vụ nằm ở PostgreSQL; quy trình chỉ giữ bước đang
-  đến và ai phải làm (docs/ke-hoach-phat-trien.md §2.1).
+  đến và ai phải làm (docs/du-thi/ke-hoach-phat-trien.md §2.1).
 
   Nhóm ứng viên: t:<tenantId>:director, t:<tenantId>:d:<departmentId>:manager — svc-workflow ánh xạ từ
   vai trò và phòng trong token. Biến do svc-workflow đặt khi hoàn thành việc:

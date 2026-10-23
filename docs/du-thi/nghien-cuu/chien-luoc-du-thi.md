@@ -285,7 +285,7 @@ hành image, cách chấm module nằm ở repo riêng) nên hỏi tại đó.
   cụ và bẫy giấy phép (vẫn đúng và hữu ích). **Điều chỉnh**: hạ CSKH/bảo hành từ *domain của sản
   phẩm* xuống *phụ tải chứng minh thay được* (mục 3a ở đây). Câu hỏi cho BTC ở mục 9 nay đã có
   kênh để hỏi (mục 5.3).
-- [`architecture.md`](../architecture.md) — cần sửa hai chỗ: (1) lệnh cấm fork tuyệt đối đang được
+- [`architecture.md`](../../architecture.md) — cần sửa hai chỗ: (1) lệnh cấm fork tuyệt đối đang được
   trình bày như ràng buộc bắt buộc, thực tế là chính sách của đội; (2) QĐ-002 ép mọi ứng dụng
   dùng chung PostgreSQL sẽ vỡ nếu chọn Frappe (chạy MariaDB). Bổ sung bản đồ thay thế ở mục 4
   vào phần "Bản đồ công cụ".

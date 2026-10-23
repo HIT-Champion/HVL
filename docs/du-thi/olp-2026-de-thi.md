@@ -260,7 +260,7 @@ của đội.
 
 > Cập nhật 15/10/2026: thay hướng "luồng phê duyệt đề xuất" bằng quản lý văn bản đến / đi theo
 > NĐ 30/2020, kèm cổng xác thực văn bản công khai. So sánh phương án, kho mã các đội khác, phạm vi và
-> kịch bản demo: [`dac-ta-san-pham.md`](dac-ta-san-pham.md).
+> kịch bản demo: [`dac-ta-san-pham.md`](../dac-ta-san-pham.md).
 
 Lý do:
 

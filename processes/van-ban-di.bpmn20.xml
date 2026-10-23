@@ -20,7 +20,7 @@
 <!--
   Quy trình duyệt và phát hành văn bản đi (F2.4, NĐ 30/2020 Điều 13–15). Chuyên viên trình (Action
   submitOutgoing) thì svc-workflow khởi chạy quy trình với businessKey = id văn bản. Dữ liệu nghiệp vụ nằm ở
-  PostgreSQL; quy trình chỉ giữ bước đang đến và ai phải làm (docs/ke-hoach-phat-trien.md §2.1).
+  PostgreSQL; quy trình chỉ giữ bước đang đến và ai phải làm (docs/du-thi/ke-hoach-phat-trien.md §2.1).
 
   Bị trả lại ở bước nào cũng về người soạn (vbdi.chinhSua); người soạn sửa rồi trình lại bằng submitOutgoing,
   quy trình quay về bước duyệt cấp phòng — một văn bản chỉ có một phiên quy trình.

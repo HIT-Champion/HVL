@@ -236,7 +236,7 @@ quy định của BTC và không bảo đảm mức điểm cụ thể.
 ## 6. Việc cần làm tiếp (kế hoạch của đội)
 
 - [ ] Rà soát bộ khung repo đã có: LICENSE, header giấy phép, CHANGELOG, README, CI và workflow
-  phát hành; bổ sung bằng chứng theo `docs/pof-checklist.md`, không tự chấm đủ điểm từ bộ khung.
+  phát hành; bổ sung bằng chứng theo `docs/du-thi/pof-checklist.md`, không tự chấm đủ điểm từ bộ khung.
 - [ ] Kiểm chứng repo công khai và bug tracker được sử dụng thực tế; tạo bản phát hành có phiên bản
   trước thời điểm nộp bài.
 - [ ] Chốt stack open-source cụ thể cho từng trục H / P / D / I, kèm bảng giấy phép để kiểm tra

@@ -3,7 +3,7 @@
 Xử lý **Hasura Actions** của Văn phòng điện tử và nối PostgreSQL (qua Hasura) với Flowable (BPMN). Ứng dụng
 chỉ nói chuyện với GraphQL; thao tác nghiệp vụ là Action, Hasura chuyển sang đây kèm biến phiên lấy từ JWT —
 thuê ước, người dùng, vai trò không do client tự khai. Flowable giữ trạng thái quy trình (đang ở bước nào, ai
-phải làm); PostgreSQL giữ dữ liệu nghiệp vụ ([`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md) §2.1).
+phải làm); PostgreSQL giữ dữ liệu nghiệp vụ ([`docs/du-thi/ke-hoach-phat-trien.md`](../../docs/du-thi/ke-hoach-phat-trien.md) §2.1).
 Chủ: issue #15.
 
 | Action | Vai trò | Làm gì |

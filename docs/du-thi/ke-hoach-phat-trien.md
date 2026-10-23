@@ -3,8 +3,8 @@
 > Lập ngày 01/10/2026 · cập nhật 05/10/2026 sau rà soát · **cập nhật 15/10/2026: đổi bài toán nghiệp vụ
 > sang quản lý văn bản, đổi tên sản phẩm thành Mộc** · **cập nhật 18/10/2026: dời lịch Phase 1–4** (xem §7 —
 > Nhật ký thay đổi) · **23/10/2026: đổi tên hiển thị thành Signet** (đặc tả §10).
-> Dựa trên [`olp-2026-de-thi.md`](olp-2026-de-thi.md). Phạm vi sản phẩm: [`dac-ta-san-pham.md`](dac-ta-san-pham.md).
-> Mô hình dữ liệu: [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
+> Dựa trên [`olp-2026-de-thi.md`](olp-2026-de-thi.md). Phạm vi sản phẩm: [`dac-ta-san-pham.md`](../dac-ta-san-pham.md).
+> Mô hình dữ liệu: [`mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md).
 > Khung thời gian: **01/10 → 06/12/2026** (hạn nộp 17:00), chung kết **10/12/2026**.
 
 ---
@@ -60,7 +60,7 @@ vòng trường; không phát hành riêng `v0.2.0`, `v0.5.0`, `v0.9.0`. Bản n
 | **Nghiệp vụ** (ứng dụng minh họa) | Văn thư, chuyên viên, lãnh đạo của khoa, trường, cơ quan nhỏ | Công văn giấy và bản scan qua email, Zalo; sổ tay hoặc Excel; không biết văn bản đang ở đâu, quá hạn chưa; khó tìm lại; không kiểm được văn bản điện tử nhận được là thật; phần mềm quản lý văn bản phổ biến là sản phẩm đóng | Văn phòng điện tử (quản lý văn bản theo NĐ 30/2020) + cổng xác thực văn bản, chạy trên lõi                                                            |
 
 Vì sao chọn bài toán này, vai trò người dùng, phạm vi chức năng, kịch bản demo:
-[`dac-ta-san-pham.md`](dac-ta-san-pham.md).
+[`dac-ta-san-pham.md`](../dac-ta-san-pham.md).
 
 ### 1.1. Đơn vị chạy thử
 
@@ -146,7 +146,7 @@ Tránh để Flowable và PostgreSQL cùng giữ trạng thái văn bản rồi 
   `van-ban-den` với `businessKey = document.id` → ghi `process_id`. Lỗi giữa chừng → **job đối soát**
   (mỗi 5 phút) tìm văn bản đã vào sổ mà chưa có process, so khớp với Flowable theo `businessKey` và sửa
   lệch. `submitOutgoing` làm theo cùng cách với `van-ban-di`.
-- Bảng, quyền, Actions, task và định dạng sự kiện: [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
+- Bảng, quyền, Actions, task và định dạng sự kiện: [`mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md).
 
 ### 2.2. Phần mã đội tự viết ("lớp keo" — nơi chứa tính nguyên gốc)
 
@@ -192,13 +192,13 @@ hai spike chạy song song với những ngày đầu Phase 1.
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | 0.1 | Hỏi BTC các câu còn lại ở `olp-2026-de-thi.md` §8 trên nhóm Telegram (câu 1 về hạn nộp đã rõ)                                                                                                                                                                                                                                | Frontend           |
 | 0.2 | Chốt gọn (mỗi QĐ ≤ nửa trang): **QĐ-004** kiến trúc 3 tầng · **QĐ-005** stack lõi + thay thế thành phần non-OSI · **QĐ-006** GitOps = Compose + reconciler · **QĐ-007** ngôn ngữ                                                                                                                 | Cả đội          |
-| 0.3 | Mô hình dữ liệu (`core.tenants`, `core.files`, `core.audit_log`, `office.documents`, `office.registers`, `office.assignments`…) + danh sách Hasura Actions + định dạng sự kiện — để 3 người code song song không giẫm nhau. Bản nháp: [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md)                              | Backend + AI       |
+| 0.3 | Mô hình dữ liệu (`core.tenants`, `core.files`, `core.audit_log`, `office.documents`, `office.registers`, `office.assignments`…) + danh sách Hasura Actions + định dạng sự kiện — để 3 người code song song không giẫm nhau. Bản nháp: [`mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md)                              | Backend + AI       |
 | 0.4 | ✅ **Đã có server 16 GB RAM (server của Minh).** Còn: xin tài khoản SSH riêng cho đội; hỏi Minh server có đang chạy dịch vụ khác không (RAM còn trống, cổng 80/443 đã bị dùng chưa) và có giữ chạy liên tục đến hết 10/12 không; ghi lại CPU, đĩa, hệ điều hành; trỏ tên miền; cài Docker | Backend            |
 | 0.5 | **Spike 1:** Keycloak → APISIX → Hasura. APISIX kiểm JWT ở biên; Hasura đọc `tenant_id` + vai trò qua `claims_map`. Lưu ý: `iss` trong token là URL công khai, còn Hasura lấy JWKS qua URL nội bộ                                                                                                                  | Backend + Frontend |
 | 0.6 | **Spike 2:** `flowable/flowable-rest:8.0.0` + PostgreSQL, deploy 1 BPMN qua REST, đổi mật khẩu mặc định của user `rest-admin`                                                                                                                                                                                                | Backend            |
 | 0.7 | Lập GitHub Project + 6 milestone; điền lịch thi; xác nhận với trường đội đã có trong danh sách đăng ký                                                                                                                                                                                                                       | Frontend           |
 | 0.8 | Liên hệ **đơn vị chạy thử** (§1.1) — văn thư văn phòng khoa — nhờ giảng viên hướng dẫn giới thiệu; một buổi hỏi quy trình văn thư, và hỏi khoa có tự đánh số văn bản đi không; chốt đơn vị hoặc chuyển sang phương án dự phòng trước 25/10                                           | AI                 |
-| 0.9 | Cả đội đồng ý **bài toán nghiệp vụ** theo [`dac-ta-san-pham.md`](dac-ta-san-pham.md) và **tên sản phẩm Mộc** (đã đổi trong tài liệu và cấu hình 15/10; §10 của đặc tả)                                                                                                                               | Cả đội          |
+| 0.9 | Cả đội đồng ý **bài toán nghiệp vụ** theo [`dac-ta-san-pham.md`](../dac-ta-san-pham.md) và **tên sản phẩm Mộc** (đã đổi trong tài liệu và cấu hình 15/10; §10 của đặc tả)                                                                                                                               | Cả đội          |
 
 Dời sang Phase 1: viết lại `architecture.md` đầy đủ, đổi profile `docker-compose.yml` thành
 `core / app / ops / ai`, cập nhật `README.md`, `ROADMAP.md`, `DEPENDENCIES.md`.
@@ -339,7 +339,7 @@ Người làm AI **bắt đầu 2 spike từ Phase 2** (tuần 26/10), lúc kh�
 | F4.6             | **Thu góp ý và đo kết quả**: đơn vị chạy thử + ≥ 5 người ngoài đội dùng bản online và để lại issue; đo các chỉ số "sau" theo §1.2                                                                                                                                                                                                                                    | —                                                                      | —                                              |
 
 Không dùng framework AI: truy xuất, trả lời và tác tử tự viết trong `svc-files` (QĐ-004 trong
-[`architecture.md`](architecture.md)). Không dùng Llama hoặc Gemma vì trọng số không mang giấy phép OSI.
+[`architecture.md`](../architecture.md)). Không dùng Llama hoặc Gemma vì trọng số không mang giấy phép OSI.
 
 ### Hoàn thành khi
 
@@ -426,7 +426,7 @@ lượng; (2) chọn Qwen3 4B nếu 8B không vừa; (3) lúc demo [I] tạm t�
 - **Docker Hub**: CI đăng nhập để không bị giới hạn lượt tải image ẩn danh (§5).
 - **Nhóm Telegram của BTC**: hỏi đáp.
 - Không dùng API trả phí: mô hình ngôn ngữ chạy bằng Ollama trên server.
-- Phần mềm: tất cả mang giấy phép OSI, ghim phiên bản trong [`DEPENDENCIES.md`](../DEPENDENCIES.md);
+- Phần mềm: tất cả mang giấy phép OSI, ghim phiên bản trong [`DEPENDENCIES.md`](../../DEPENDENCIES.md);
   phông Liberation Serif thay Times New Roman.
 
 ### 4.4. Dữ liệu
@@ -458,7 +458,7 @@ tên miền theo năm. Không nâng cấp server trừ khi số đo RAM thật b
 1. Thông số và quyền truy cập server: CPU, đĩa, hệ điều hành, tài khoản SSH riêng, cổng 80/443 (việc 0.4).
 2. Tên miền.
 3. Đơn vị chạy thử và tên giảng viên hướng dẫn (việc 0.8).
-4. Máy của từng thành viên: Docker Compose v2, cấu hình Git theo [`git_flow.md`](git_flow.md) §4.1,
+4. Máy của từng thành viên: Docker Compose v2, cấu hình Git theo [`git_flow.md`](../git_flow.md) §4.1,
    `make check` chạy sạch.
 
 ---
@@ -540,7 +540,7 @@ tên miền theo năm. Không nâng cấp server trừ khi số đo RAM thật b
   vẽ BPMN; spike AI dời sớm lên Phase 2.
 - Điền thành viên: Backend @Vanvuong2005827 · AI @HoangTechCS-AIE · Frontend @nguyenlehoainam.
 
-**15/10/2026** — đổi bài toán nghiệp vụ, lý do đầy đủ ở [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §1:
+**15/10/2026** — đổi bài toán nghiệp vụ, lý do đầy đủ ở [`dac-ta-san-pham.md`](../dac-ta-san-pham.md) §1:
 
 - **Bài toán:** từ "luồng phê duyệt đề xuất mua sắm / tạm ứng / nghỉ phép" sang **quản lý văn bản đến / đi
   theo NĐ 30/2020** + **cổng xác thực văn bản** công khai. Lý do: đề định nghĩa Tầng 2 là "cổng dịch vụ
@@ -555,7 +555,7 @@ tên miền theo năm. Không nâng cấp server trừ khi số đo RAM thật b
   bản; tác tử gợi ý giao việc; ký số chỉ minh họa.
 - **Không làm:** thêm văn bản mật, liên thông Trục văn bản quốc gia, chữ ký số công cộng.
 - Thêm việc 0.9 (chốt bài toán, tên sản phẩm) và bản nháp mô hình dữ liệu
-  [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
+  [`mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md).
 - **Tên sản phẩm:** DX-Lab → **Mộc** (theo chữ "đóng mộc"). "DX-Lab" là tên Trạm thực hành số trong chủ
   đề cuộc thi và trùng ứng dụng của đội HaUI. Tên kỹ thuật đổi theo: Compose project và CSDL mặc định
   `moc`, biến môi trường `MOC_*`, gói phát hành `moc-<phiên bản>.tar.gz`. Repo giữ tên `HVL`.
