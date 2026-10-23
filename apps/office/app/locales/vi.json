@@ -384,6 +384,7 @@
     "empty": "Không có văn bản nào khớp.",
     "more": "Xem thêm",
     "any": "Tất cả",
+    "directionLabel": "Văn bản đến hay đi",
     "direction": {
       "in": "Văn bản đến",
       "out": "Văn bản đi"

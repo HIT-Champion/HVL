@@ -64,8 +64,8 @@ OPTIONS = {"temperature": 0.1, "num_ctx": 4096, "num_predict": 160, "seed": 7}
 TAG_RE = re.compile(r"<\s*/?\s*van_ban\s*>", re.IGNORECASE)
 # ký tự điều khiển, vô hình — như $defs/text của schemas/van-ban-den.json (ở đây cả xuống dòng: trích yếu một dòng)
 INVISIBLE_RE = re.compile(
-    "[\u0000-\u001f\u007f-\u009f­ᅟᅠ​-‏‪-‮⁠-⁤⁦-⁩ㅤ﻿"
-    "ﾠ  ]"
+    "[\u0000-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff"
+    "\uffa0\u2028\u2029]"
 )
 PREFIX_RE = re.compile(r"^(?:trích\s*yếu|trich\s*yeu)\s*[:：\-–—]\s*", re.IGNORECASE)
 QUOTES = {'"': '"', "'": "'", "“": "”", "‘": "’", "«": "»", "„": "“"}

@@ -171,6 +171,17 @@ class Settings:
             raise ConfigError("MOC_ASSIGNER_ID phải có 1–64 ký tự")
         self._check_channels()
 
+    def warnings(self) -> list[str]:
+        """Cấu hình chạy được nhưng có phần không dùng được: app ghi nhật ký ``config.warning`` một lần lúc khởi động,
+        không chặn — bản đang chạy không dừng chỉ vì một kênh phụ cấu hình chưa đúng."""
+        out: list[str] = []
+        if self.smtp_host and self.smtp_tls == "none" and self.smtp_user:
+            out.append("MOC_SMTP_TLS=none mà có MOC_SMTP_USER: svc-workflow không đăng nhập máy chủ thư qua kết nối "
+                       "không mã hóa (mật khẩu sẽ đi dạng rõ), nên mọi thư email báo lỗi gửi. Đặt "
+                       "MOC_SMTP_TLS=starttls hoặc ssl; máy chủ thư nội bộ không cần đăng nhập thì để trống "
+                       "MOC_SMTP_USER")
+        return out
+
     def _check_channels(self) -> None:
         """Cấu hình kênh ngoài sai thì dừng lúc khởi động, không để thư dồn lại rồi hỏng hết lúc gửi."""
         if self.smtp_tls not in SMTP_PORTS:

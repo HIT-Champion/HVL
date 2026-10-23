@@ -195,6 +195,8 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        for warning in settings.warnings():     # cấu hình chạy được nhưng có phần không dùng được (vd kênh email)
+            log.warning(json.dumps({"event": "config.warning", "message": warning}, ensure_ascii=False))
         tasks = [asyncio.create_task(_deploy_processes(flowable, settings.processes_dir))]
         if settings.directory_sync_interval_s > 0:
             tasks.append(asyncio.create_task(directory.run(settings.directory_sync_interval_s)))
@@ -247,6 +249,12 @@ def create_app(
     app.state.ot = ot
     app.state.router = router
 
+    @app.exception_handler(WorkflowError)
+    async def refused(request: Request, exc: WorkflowError) -> JSONResponse:
+        # Lỗi nghiệp vụ ném ra khỏi route (vd /ot/notify, khai trả 204) → thân lỗi định dạng Action như _error().
+        # /actions/{name} tự bắt WorkflowError trước để ghi nhật ký kèm người gọi, nên không đi qua đây.
+        return _error(exc.status, exc.code, exc.message, exc.fields)
+
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
@@ -265,24 +273,25 @@ def create_app(
                          404: {"description": "Chưa cấu hình MOC_NGSI_URL"},
                          503: {"description": "Chưa ghi được CSDL, broker sẽ báo lỗi gửi"}})
     async def ot_notify(tenant: str, request: Request) -> Response:
+        # Khai trả 204 nên chỉ có một return (204 không thân); lỗi ném WorkflowError cho bộ xử lý chung ở trên
         if ot is None:
-            return _error(404, "not_found", "Chưa bật IT/OT (MOC_NGSI_URL)")
+            raise WorkflowError("not_found", "Chưa bật IT/OT (MOC_NGSI_URL)", 404)
         if not ot.check(tenant, request.headers.get(TOKEN_HEADER, "")):
-            return _error(401, "unauthorized", "Sai token của đơn vị")
+            raise WorkflowError("unauthorized", "Sai token của đơn vị", 401)
         try:
             body = await request.json()
             if not isinstance(body, dict):
                 raise ValueError("không phải đối tượng JSON")
-        except ValueError:
-            return _error(400, "bad_request", "Thông báo không phải Notification NGSI-LD")
+        except ValueError as exc:
+            raise WorkflowError("bad_request", "Thông báo không phải Notification NGSI-LD") from exc
         try:
             await ot.handle(tenant, body)
-        except ValueError:
-            return _error(400, "bad_request", "Thông báo không có danh sách thực thể")
+        except ValueError as exc:
+            raise WorkflowError("bad_request", "Thông báo không có danh sách thực thể") from exc
         except HasuraError as exc:
             log.warning(json.dumps({"event": "ot.alarm_failed", "tenant": tenant, "error": str(exc)},
                                    ensure_ascii=False))
-            return _error(503, "unavailable", "Chưa ghi được dự thảo, thử lại sau")
+            raise WorkflowError("unavailable", "Chưa ghi được dự thảo, thử lại sau", 503) from exc
         return Response(status_code=204)
 
     @app.post("/actions/{name}",
