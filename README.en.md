@@ -337,6 +337,7 @@ the commit history for secrets (gitleaks) and the dependency lock files for know
 | Document | Content |
 |---|---|
 | [`docs/demo-script.md`](docs/demo-script.md) | Demo script: the four principles and the business demos, one command each |
+| [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md) | Feature maturity: the level of each feature with its evidence (tests, CI steps, demos) and known limitations; coverage of the seven Tier 1 service clusters of the problem statement |
 | [`docs/van-hanh.md`](docs/van-hanh.md) | Operations: adding units, backup, secrets vault, GitOps, monitoring, IT/OT |
 | [`docs/trien-khai.md`](docs/trien-khai.md) | Deploying to a server: HTTPS with Caddy in front of APISIX, operator account, firewall, nightly backup, upgrades |
 | [`docs/api/`](docs/api/README.md) | API documentation: getting a token, calling GraphQL and REST through the gateway; per-role GraphQL schema and generated OpenAPI |
