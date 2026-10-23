@@ -81,12 +81,14 @@ jobs:
           ( cd dist && sha256sum "moc-$V.tar.gz" > "moc-$V.tar.gz.sha256" )
 
       # Không có mục [X.Y.Z] thật (khối mẫu trong chú thích HTML không tính) thì dừng, không đăng Release với ghi chú
-      # rỗng — release.sh đã kiểm trước khi gắn thẻ, bước này chặn thẻ gắn tay
+      # rỗng — release.sh đã kiểm trước khi gắn thẻ, bước này chặn thẻ gắn tay. Trang Release (scripts/release_body.py):
+      # dòng chỉ gói chính thức (GitHub tự gắn "Source code (zip)", PoF #3 trừ điểm định dạng không mở), phần tóm tắt
+      # đầu mục, toàn bộ ghi chép gập lại
       - name: Trích ghi chú phát hành từ CHANGELOG
         env:
           V: ${{ steps.ver.outputs.version }}
         run: |
-          ./scripts/release-notes.sh "$V" > dist/RELEASE_NOTES.md \
+          python3 scripts/release_body.py "$V" > dist/RELEASE_NOTES.md \
             || { echo "::error::CHANGELOG.md chưa có mục [$V] — xem lỗi ở trên"; exit 1; }
 
       - name: Tạo bản phát hành trên GitHub

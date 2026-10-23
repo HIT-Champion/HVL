@@ -62,7 +62,7 @@ hành (chuyển mục CHANGELOG) làm bằng một PR vào `develop`, rồi PR t
 
 - `<loại>` giống loại commit (mục 3.2): `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`.
 - Chữ thường, không dấu, nối bằng gạch ngang, tối đa ~5 từ.
-- Nhánh sửa gấp bản đã phát hành: `hotfix/<phiên-bản-mới>`, ví dụ `hotfix/0.2.1`.
+- Nhánh sửa gấp bản đã phát hành: `hotfix/<phiên-bản-mới>`, ví dụ `hotfix/1.1.1`.
 - CI (job "Quy trình nhánh và tiêu đề PR") từ chối PR vào `develop` từ nhánh không có `<loại>/`, có chữ
   hoa hay có dấu; thiếu số issue thì chỉ nhắc.
 
@@ -288,49 +288,53 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
 
 ## 6. Phát hành
 
-Lịch: `v0.1.0` 18/10 (đã phát hành) · bản cho vòng trường: trước 01/11 · `v1.0.0`: 03/12. Các lệnh dưới
-đây lấy `0.2.0` làm ví dụ.
+Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10, bản cho vòng trường (cả hai đã phát hành) · `v1.1.0` 03/12, bản nộp chấm
+(mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ.
 
 Đây là lúc duy nhất `main` nhận thay đổi.
 
 ```bash
-# 1. Chốt ghi chép thay đổi trên develop: PR (nhánh chore/<issue>-chot-0-2-0) chuyển các dòng của mục
-#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [0.2.0] - 2026-10-30", để lại tiêu đề
+# 1. Chốt ghi chép thay đổi trên develop: PR (nhánh chore/<issue>-chot-1-1-0) chuyển các dòng của mục
+#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [1.1.0] - 2026-12-03", viết 3–8 dòng tóm tắt ngay dưới
+#    tiêu đề đó (trang Release hiện phần này, phần còn lại gập lại), để lại tiêu đề
 #    "## [Chưa phát hành]" trống (CI đòi có mục này)
-#    tiêu đề PR: chore(release): chốt ghi chép thay đổi v0.2.0  → review → squash merge vào develop
+#    tiêu đề PR: chore(release): chốt ghi chép thay đổi v1.1.0  → review → squash merge vào develop
 
-# 2. PR phát hành develop → main, tiêu đề đúng "chore(release): v0.2.0"
-gh pr create --base main --head develop --title "chore(release): v0.2.0" --body "Phát hành v0.2.0"
-#    CI kiểm: nguồn là develop, CHANGELOG có mục [0.2.0] có dòng thay đổi, thẻ v0.2.0 chưa có
+# 2. PR phát hành develop → main, tiêu đề đúng "chore(release): v1.1.0"
+gh pr create --base main --head develop --title "chore(release): v1.1.0" --body "Phát hành v1.1.0"
+#    CI kiểm: nguồn là develop, CHANGELOG có mục [1.1.0] có dòng thay đổi, thẻ v1.1.0 chưa có
 #    → review → Create a merge commit
 
 # 3. Gắn thẻ trên main mới nhất, cây làm việc sạch:
 git switch main && git pull
-make release VERSION=0.2.0       # tạo thẻ v0.2.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
+make release VERSION=1.1.0       # tạo thẻ v1.1.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
 
 # 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, rồi tạo Release kèm .tar.gz, .sha256
-git push origin v0.2.0
+git push origin v1.1.0
 ```
 
 **Bản vá nóng** — lỗi của bản đã phát hành cần sửa ngay, không chờ phase sau:
 
 ```bash
-git fetch origin && git switch -c hotfix/0.2.1 origin/main
-# sửa, commit "fix(…): …"; thêm mục "## [0.2.1] - <ngày>" ngay dưới "## [Chưa phát hành]" của CHANGELOG.md,
+git fetch origin && git switch -c hotfix/1.1.1 origin/main
+# sửa, commit "fix(…): …"; thêm mục "## [1.1.1] - <ngày>" ngay dưới "## [Chưa phát hành]" của CHANGELOG.md,
 # ghi dòng sửa vào đó
-git push -u origin hotfix/0.2.1
-gh pr create --base main --title "chore(release): v0.2.1" --body "Sửa gấp …"   # → review → merge commit
-git switch main && git pull && make release VERSION=0.2.1 && git push origin v0.2.1
+git push -u origin hotfix/1.1.1
+gh pr create --base main --title "chore(release): v1.1.1" --body "Sửa gấp …"   # → review → merge commit
+git switch main && git pull && make release VERSION=1.1.1 && git push origin v1.1.1
 # gộp ngược vào develop qua một nhánh riêng (không sửa thẳng develop hay main được):
-git switch -c chore/gop-nguoc-0-2-1 origin/develop && git merge --no-ff origin/main
-#    CHANGELOG.md xung đột ở đầu tệp thì giữ cả mục [Chưa phát hành] của develop lẫn mục [0.2.1]
-git push -u origin chore/gop-nguoc-0-2-1
-gh pr create --base develop --title "chore(release): gộp ngược v0.2.1 vào develop" --body ""
+git switch -c chore/gop-nguoc-1-1-1 origin/develop && git merge --no-ff origin/main
+#    CHANGELOG.md xung đột ở đầu tệp thì giữ cả mục [Chưa phát hành] của develop lẫn mục [1.1.1]
+git push -u origin chore/gop-nguoc-1-1-1
+gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào develop" --body ""
 #    → review → Create a merge commit (không squash: giữ quan hệ cha con để lần phát hành sau không xung đột)
 ```
 
-- Phiên bản theo **Semantic Versioning**; trước `v1.0.0` tăng số giữa cho mỗi phase, số cuối cho bản vá nóng.
-- Ghi chú phát hành ghi rõ: **tệp chính thức là `.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)").
+- Phiên bản theo **Semantic Versioning**: số giữa tăng khi có tính năng mới, số cuối cho bản vá nóng, số đầu chỉ
+  tăng khi bản cài cũ không nâng cấp tại chỗ được.
+- `release.yml` dựng trang Release bằng `scripts/release_body.py`: dòng đầu ghi **tệp chính thức là
+  `moc-X.Y.Z.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)" mà PoF #3 trừ điểm định dạng không mở), rồi
+  phần tóm tắt, toàn bộ ghi chép thay đổi gập lại.
 - Không xóa hay gắn lại thẻ đã đẩy — ruleset thẻ `v*` chặn hẳn, `release.yml` và `release.sh` cũng từ
   chối phát hành lại. Phát hành nhầm thì ra bản vá `vX.Y.Z+1`.
 
@@ -343,7 +347,7 @@ Reconciler trên server kéo nhánh `deploy` mỗi 60 giây. Chỉ Backend (@Van
 ```bash
 git fetch origin
 git switch deploy && git pull --ff-only
-git merge --ff-only v0.2.0          # thẻ phát hành trên main
+git merge --ff-only v1.1.0          # thẻ phát hành trên main
 git push origin deploy
 ```
 
@@ -351,13 +355,13 @@ Máy chủ bật kiểm chữ ký (`MOC_GITOPS_ALLOWED_SIGNERS`, `van-hanh.md` m
 trong danh sách ký bằng khóa SSH — thay dòng `--ff-only` bằng:
 
 ```bash
-git merge --no-ff -S -m "deploy: v0.2.0" v0.2.0   # -S: ký bằng user.signingkey (gpg.format=ssh)
+git merge --no-ff -S -m "deploy: v1.1.0" v1.1.0   # -S: ký bằng user.signingkey (gpg.format=ssh)
 git verify-commit HEAD                            # thấy Good "git" signature trước khi đẩy
 ```
 
 - **Chỉ fast-forward** (bật kiểm chữ ký: chỉ commit gộp có ký như trên), không commit thẳng lên `deploy`.
 - Lỗi trên server → bản vá nóng (mục 6), rồi đưa `deploy` lên thẻ mới.
-- Tạo nhánh lần đầu: `git push origin v0.2.0^{commit}:refs/heads/deploy` (bật kiểm chữ ký thì máy chủ chỉ
+- Tạo nhánh lần đầu: `git push origin v1.1.0^{commit}:refs/heads/deploy` (bật kiểm chữ ký thì máy chủ chỉ
   áp từ lần gộp có ký đầu tiên).
 
 ---
@@ -367,7 +371,7 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 | Từ | Quy tắc |
 |---|---|
 | **26/11** | Đóng băng tính năng: chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` |
-| **03/12** | Phát hành `v1.0.0` |
+| **03/12** | Phát hành `v1.1.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.1.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
 | **05/12 → 10/12** | Không đẩy `deploy` trừ khi cả đội đồng ý (sự cố chặn demo) |
 | **17:00 06/12** | **Không push bất cứ gì lên repo này** — kể cả nhánh mới. Slide, video làm ở repo riêng |
 
@@ -390,9 +394,11 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 
 ## 10. Thiết lập GitHub một lần (người quản trị repo)
 
-- **Nhánh mặc định là `develop`** (Settings → General → Default branch): PR mới tự trỏ vào `develop`,
-  `Closes #N` đóng issue khi gộp vào `develop`, và nhánh mặc định không bao giờ bị tự xóa sau khi gộp
-  PR phát hành.
+- **Nhánh mặc định là `develop`** (Settings → General → Default branch, hay
+  `gh repo edit --default-branch develop`): PR mới tự trỏ vào `develop`, và nhánh mặc định không bao giờ bị tự
+  xóa sau khi gộp PR phát hành. Không để `main` làm mặc định: GitHub chỉ đọc `Closes #N` trong PR nhắm vào nhánh
+  mặc định, PR vào nhánh khác không nối, không đóng được issue. Giám khảo clone nhánh mặc định: ruleset giữ
+  `develop` luôn xanh CI, và lúc chấm `develop` cùng nội dung với `main` (mục 8).
 - **Ruleset** (Settings → Rules → Rulesets), khai sẵn trong `.github/rulesets/`, tạo bằng
   `gh api -X POST repos/HIT-Champion/HVL/rulesets --input .github/rulesets/<tệp>.json`:
   - `develop.json` — nhánh `develop`: bắt buộc PR, 1 duyệt, 8 job CI xanh (mục 5.4); chỉ squash hoặc
@@ -405,7 +411,12 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 - **Merge** (Settings → General → Pull Requests):
   - bật *Allow merge commits* và *Allow squash merging*, tắt *Allow rebase merging*;
   - nội dung commit mặc định của cả hai lấy tiêu đề + mô tả PR;
-  - bật *Automatically delete head branches*.
+  - bật *Automatically delete head branches*;
+  - bằng lệnh: `gh repo edit --enable-merge-commit --enable-squash-merge --enable-rebase-merge=false
+    --delete-branch-on-merge`, rồi `gh api -X PATCH repos/HIT-Champion/HVL -f merge_commit_title=PR_TITLE
+    -f merge_commit_message=PR_BODY -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY`.
+- **Code security** (Settings → Code security): bật *Secret scanning* và *Push protection* (miễn phí với repo
+  công khai), chặn từ lúc push thay vì đợi job gitleaks của CI.
 - **Issues**:
   - bật Issues;
   - tạo nhãn `backend`, `ai`, `frontend`, `bug`, `feature`, `docs`, `good first issue`;
@@ -417,8 +428,8 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 
 | Giai đoạn | Cách làm thực tế |
 |---|---|
-| Đến 23/10/2026 | Mã được gộp vào `main` **tại máy** rồi đẩy lên theo đợt, không qua pull request, không có review trên GitHub. Một đợt đẩy nhiều commit sát nhau thì CI tự hủy các lượt đang chờ, mỗi đợt chỉ lượt cuối chạy đủ: đó là các lượt *Cancelled* trên trang Actions. Thẻ `v0.1.0` từng bị gắn lại; mỗi lần như vậy workflow Release chạy lại và thay gói `.tar.gz` cùng `.sha256` đã đăng. |
-| Từ 23/10/2026 | Git Flow như các mục trên: mọi thay đổi qua PR vào `develop`, CI và một người duyệt là bắt buộc (ruleset); `main` chỉ nhận PR phát hành; thẻ `v*` không sửa, không xóa được. |
+| Đến `v1.0.0` (23/10/2026) | Mã được gộp **tại máy** rồi đẩy lên theo đợt, không qua pull request, không có review trên GitHub. Một đợt đẩy nhiều commit sát nhau thì CI tự hủy các lượt đang chờ (*Cancelled*), mỗi đợt chỉ lượt cuối chạy đủ; các lượt *Cancelled* này cùng nhiều lượt chạy khác của giai đoạn này đã bị xóa khỏi trang Actions ngày 23/10/2026. Thẻ `v0.1.0` từng bị gắn lại; mỗi lần như vậy workflow Release chạy lại và thay gói `.tar.gz` cùng `.sha256` đã đăng. Commit chuyển sang Git Flow và bản phát hành `v1.0.0` cũng đẩy thẳng lên `develop`, `main`, trước khi bật ruleset. |
+| Sau `v1.0.0` | Git Flow như các mục trên: mọi thay đổi qua PR vào `develop`, CI và một người duyệt là bắt buộc (ruleset); `main` chỉ nhận PR phát hành; thẻ `v*` không sửa, không xóa được. |
 
 Vì sao đổi: gộp tại máy không để lại dấu vết review nào trên GitHub; commit không nối được với issue
 (không có `Closes #`); `main` có lúc đỏ CI mà không có gì chặn; và gắn lại thẻ làm hỏng tổng kiểm của

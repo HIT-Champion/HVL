@@ -46,7 +46,7 @@ env:
 
 jobs:
   license:
-    name: Giấy phép (PoF #2)
+    name: "Giấy phép (PoF #2)"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -72,7 +72,7 @@ jobs:
           echo "Không có mã nguồn dự án khác bị bundle vào kho."
 
   build:
-    name: Dựng từ mã nguồn (PoF #4)
+    name: "Dựng từ mã nguồn (PoF #4)"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -104,7 +104,7 @@ jobs:
         run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
 
   docs:
-    name: Tài liệu (PoF #6)
+    name: "Tài liệu (PoF #6)"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -181,7 +181,7 @@ jobs:
         run: docker logs --tail 200 moc-db-it-hasura || true
 
   stack:
-    name: Chạy thử toàn hệ thống (PoF #4)
+    name: "Chạy thử toàn hệ thống (PoF #4)"
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 40

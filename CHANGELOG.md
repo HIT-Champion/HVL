@@ -7,7 +7,35 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 
 ## [Chưa phát hành]
 
+### Đã sửa đổi
+- Trang Release ngắn lại (`scripts/release_body.py`): dòng chỉ gói chính thức `moc-X.Y.Z.tar.gz` kèm lệnh kiểm
+  `.sha256` (GitHub tự gắn "Source code (zip)" vào mọi bản phát hành mà không gỡ được, PoF #3), phần tóm tắt viết
+  ngay dưới tiêu đề phiên bản trong CHANGELOG, rồi toàn bộ ghi chép gập lại. Dòng tiếp nối được nối lại: GitHub hiện
+  mỗi dấu xuống dòng của mô tả Release thành một dòng mới. Mục [1.0.0], [0.1.0] thêm phần tóm tắt. Test scripts +6.
+- Lịch phát hành: `v1.0.0` (23/10) là bản cho vòng trường, bản nộp chấm là `v1.1.0` (03/12); sau `v1.1.0`, mỗi bản
+  sửa lỗi gộp vào `develop` đi kèm một bản vá để lúc chấm `develop` và `main` cùng nội dung. `docs/git_flow.md` ghi
+  lệnh thiết lập repo (merge commit, bật secret scanning) và lý do giữ `develop` làm nhánh mặc định; mục 11 ghi đúng
+  mốc chuyển quy trình (sau `v1.0.0`) và việc các lượt chạy cũ đã bị xóa khỏi trang Actions.
+
+### Đã sửa lỗi
+- Tên 4 job CI có dấu `#` (`Giấy phép (PoF #2)`…) bị YAML hiểu phần từ ` #` là chú thích: trang Actions hiện
+  `Giấy phép (PoF`, và ruleset đòi đúng tên có `#` thì không PR nào gộp được. Tên đặt trong ngoặc kép; test mới kiểm
+  mọi job ruleset đòi đều có thật. Test scripts +2.
+
 ## [1.0.0] - 2026-10-23
+
+Bản cho vòng trường. Văn phòng điện tử chạy đủ luồng văn bản đến và văn bản đi theo NĐ 30/2020 trên lõi dùng chung
+(Keycloak, APISIX, Hasura, Flowable), dựng từ mã nguồn bằng `make`.
+
+- Văn bản đến: kiểm dịch ClamAV, poka-yoke ba lớp, vào sổ, chỉ đạo, xử lý, nhắc hạn, thông báo realtime.
+- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR; sổ đăng ký đến / đi in được; liên thông giữa các
+  đơn vị.
+- Tin cậy: sổ kiểm toán chuỗi băm neo ra kho không xóa được, cổng xác thực văn bản công khai, văn bản hạn chế mã
+  hóa, ký số PAdES (chỉ minh họa).
+- AI: đọc văn bản đến, trợ lý hỏi đáp có trích nguồn, gợi ý giao việc; che thông tin cá nhân trước khi gửi mô hình.
+- Vận hành: cài ra ngoài thư mục mã nguồn, sao lưu và khôi phục một lệnh, GitOps tự phục hồi, két bí mật OpenBao,
+  giám sát, Cloudflare Tunnel.
+- CI dựng toàn hệ thống trên mọi thay đổi rồi chạy `make seed` → `make smoke` → `make e2e` cùng các màn demo.
 
 ### Đã thêm
 - Hộp việc của `giamkhao` không còn trống sau `make seed`: có công văn khẩn 152/ĐT-ĐH chờ xử lý và dự thảo phúc đáp
@@ -596,6 +624,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `${{ }}` vào lệnh shell — tên thẻ chứa `$( )` không chạy được lệnh trong job có quyền ghi kho.
 
 ## [0.1.0] - 2026-10-18
+
+Bộ khung dự án: giấy phép Apache-2.0, dựng từ mã nguồn bằng Make và Docker Compose, cấu hình qua `.env`, CI kiểm
+header giấy phép, gói phát hành `.tar.gz`, mẫu báo lỗi và PR, tài liệu.
 
 ### Đã thêm
 - Khung dự án nguồn mở: giấy phép Apache-2.0 (toàn văn + thông báo mục đích + header từng tệp).
