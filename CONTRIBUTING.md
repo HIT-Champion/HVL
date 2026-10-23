@@ -63,15 +63,16 @@ nhánh thẳng trên repo, không cần fork — xem [`docs/git_flow.md`](docs/g
 
 ## Quy ước commit
 
-Theo [Conventional Commits](https://www.conventionalcommits.org/), mô tả viết tiếng Việt có dấu:
+Theo [Conventional Commits](https://www.conventionalcommits.org/). Commit, tiêu đề và mô tả PR viết **tiếng Anh**
+(từ 23/10/2026, commit cũ giữ tiếng Việt — xem [`docs/git_flow.md`](docs/git_flow.md) mục 3.1):
 
 ```
 <loại>(<phạm vi>): <mô tả ngắn, ≤ 72 ký tự>
 
-feat(workflow): thêm bước giám đốc duyệt khi số tiền vượt ngưỡng
-fix(files): chặn tệp khi ClamAV không phản hồi thay vì cho qua
-docs(readme): bổ sung phát biểu bài toán và bảng chức năng
-ci: ghim phiên bản action checkout
+feat(workflow): add a director approval step above the amount threshold
+fix(files): block files when ClamAV times out instead of storing them
+docs(readme): add the problem statement and the feature table
+ci: pin the checkout action version
 ```
 
 - **Loại**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.

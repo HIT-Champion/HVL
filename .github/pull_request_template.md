@@ -1,39 +1,40 @@
 <!--
-PR tính năng, sửa lỗi, tài liệu: nhánh đích là develop. Tiêu đề theo Conventional Commits, ví dụ:
-  feat(workflow): thêm bước giám đốc duyệt khi số tiền vượt ngưỡng
-Khi gộp bằng "Squash and merge", tiêu đề này trở thành commit trên develop; CI kiểm tiêu đề.
-PR phát hành (develop → main): tiêu đề đúng "chore(release): vX.Y.Z". Xem docs/git_flow.md mục 6.
+Feature, fix and docs PRs target develop. Write the title and description in English (docs/git_flow.md 3.1);
+the title follows Conventional Commits, e.g.:
+  feat(workflow): add a director approval step above the amount threshold
+With "Squash and merge" the title and description become the commit on develop; CI checks the title.
+Release PRs (develop → main): the title is exactly "chore(release): vX.Y.Z". See docs/git_flow.md section 6.
 -->
 
-## Nội dung thay đổi
+## Summary
 
-<!-- Mô tả ngắn gọn thay đổi này làm gì và VÌ SAO cần thiết. -->
+<!-- What this change does and WHY it is needed. -->
 
 Closes #
 
-## Mảng và thành phần
+## Areas and components
 
 - [ ] Backend
 - [ ] AI
 - [ ] Frontend
-- [ ] Hạ tầng / CI / tài liệu chung
+- [ ] Infrastructure / CI / shared docs
 
-<!-- Thành phần chính (phạm vi commit): gateway · auth · db · workflow · files · realtime · office · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
+<!-- Main component (commit scope): gateway · auth · db · workflow · files · realtime · office · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
 
-## Danh mục kiểm tra
+## Checklist
 
-- [ ] Tiêu đề PR theo Conventional Commits; mô tả có `Closes #<số-issue>`
-- [ ] *(Thành viên đội)* Đã gắn nhãn mảng và milestone của phase hiện tại
-- [ ] `make license-check` chạy sạch, không có CẢNH BÁO loại tệp chưa hỗ trợ
-- [ ] `make check` chạy sạch — cấu hình Compose hợp lệ
-- [ ] Đã thêm hoặc cập nhật test cho phần thay đổi (nếu có thể kiểm thử)
-- [ ] Tài liệu của tính năng được cập nhật **trong chính PR này**
-- [ ] Tham số cấu hình mới (nếu có) đã được khai báo trong `.env.example` kèm chú thích
-- [ ] `CHANGELOG.md` mục `[Chưa phát hành]` đã được cập nhật (với thay đổi người dùng thấy được)
-- [ ] Phần mềm thượng nguồn mới (nếu có) đã được ghi vào `DEPENDENCIES.md` kèm giấy phép OSI
-- [ ] Không fork-sửa và không bundle mã nguồn của dự án thượng nguồn nào
-- [ ] Không có bí mật, `.env`, dữ liệu thật, trọng số mô hình trong thay đổi
+- [ ] The PR title follows Conventional Commits; the description has `Closes #<issue>`
+- [ ] *(Team members)* Area label and the current phase milestone are set
+- [ ] `make license-check` passes with no warning about unsupported file types
+- [ ] `make check` passes — the Compose configuration is valid
+- [ ] Tests are added or updated for the change (where it can be tested)
+- [ ] The feature documentation is updated **in this PR**
+- [ ] New configuration (if any) is declared in `.env.example` with a comment
+- [ ] `CHANGELOG.md` section `[Chưa phát hành]` is updated (user-visible changes, written in Vietnamese)
+- [ ] New upstream software (if any) is recorded in `DEPENDENCIES.md` with its OSI license
+- [ ] No upstream project is forked, patched or bundled
+- [ ] No secrets, `.env`, real data or model weights in the change
 
-## Cách kiểm chứng
+## How to verify
 
-<!-- Các bước để người review tự chạy và xác nhận thay đổi hoạt động. -->
+<!-- Steps for the reviewer to run and confirm that the change works. -->
