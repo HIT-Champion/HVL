@@ -35,8 +35,11 @@ cd "$REPO_ROOT"
 COPYRIGHT_HOLDER="${MOC_COPYRIGHT_HOLDER:-Signet Team}"
 COPYRIGHT_YEAR="${MOC_COPYRIGHT_YEAR:-2026}"
 
-# Dấu hiệu nhận biết header đã tồn tại
+# Dấu hiệu nhận biết header đã tồn tại. Khối REUSE-Ignore: công cụ reuse bỏ qua dòng này, không đọc nhầm thành
+# khai giấy phép của chính tệp này.
+# REUSE-IgnoreStart
 MARKER="SPDX-License-Identifier: Apache-2.0"
+# REUSE-IgnoreEnd
 
 # Sinh phần thân header (chưa có ký tự chú thích)
 header_body() {
@@ -66,7 +69,7 @@ EOF
 #   ""                — loại tệp chưa hỗ trợ
 comment_style_for() {
   case "$1" in
-    *.sh|*.bash|*.py|*.yml|*.yaml|*.toml|*.cfg|*.conf|*.conf.template|*.ini|*.graphql|*.gql|Makefile|*/Makefile|Dockerfile|*/Dockerfile|*.Dockerfile|*.mk)
+    *.sh|*.bash|*.py|*.yml|*.yaml|*.toml|*.cfg|*.conf|*.conf.template|*.ini|*.graphql|*.gql|Makefile|*/Makefile|Dockerfile|*/Dockerfile|*.Dockerfile|*.mk|*.env.example)
       echo "line #" ;;
     *.js|*.mjs|*.cjs|*.ts|*.mts|*.cts|*.jsx|*.tsx|*.go|*.java|*.c|*.h|*.cpp|*.rs|*.kt)
       echo "line //" ;;
@@ -80,14 +83,14 @@ comment_style_for() {
   esac
 }
 
-# Tệp không phải mã nguồn: tài liệu, dữ liệu, hình ảnh, phông chữ, cấu hình công cụ.
-# Mẫu bắt đầu bằng * để khớp cả tệp nằm trong thư mục con (vd. services/x/.dockerignore).
+# Tệp không phải mã nguồn: tài liệu, dữ liệu, hình ảnh, phông chữ, cấu hình công cụ — giấy phép của chúng khai trong
+# REUSE.toml. Mẫu bắt đầu bằng * để khớp cả tệp nằm trong thư mục con (vd. services/x/.dockerignore).
 # Định dạng JSON không có cú pháp chú thích nên không thể mang header.
 is_non_source() {
   case "$1" in
     *.md|*.txt|LICENSE|NOTICE|*.json|*.lock|*.csv|*.tsv|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.svg|\
     *.woff|*.woff2|*.ttf|*.otf|*.gitkeep|*.gitignore|*.gitattributes|*.dockerignore|*.editorconfig|\
-    *.env.example|*.nvmrc|*.python-version)
+    *.nvmrc|*.python-version)
       return 0 ;;
   esac
   return 1

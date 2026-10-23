@@ -21,7 +21,9 @@ giấy phép khác nhau. Giấy phép permissive giúp bảo đảm không phát
 giấy phép giữa các thành phần (xem DEPENDENCIES.md).
 
 Toàn văn giấy phép: xem tệp LICENSE ở thư mục gốc.
-Mỗi tệp mã nguồn đều mang thông báo giấy phép ở phần đầu tệp.
+Mỗi tệp mã nguồn đều mang thông báo giấy phép ở phần đầu tệp. Tệp không chèn được
+thông báo (JSON, ảnh, PDF, tài liệu, dữ liệu mẫu) được khai trong REUSE.toml theo chuẩn
+REUSE (https://reuse.software); kiểm toàn bộ kho bằng lệnh `reuse lint`.
 
 THÀNH PHẦN THỨ BA
 -----------------

@@ -355,5 +355,10 @@ the commit history for secrets (gitleaks) and the dependency lock files for know
 Released under the **Apache License 2.0**, an OSI-approved license. Full text: [`LICENSE`](LICENSE). Why this license
 was chosen: [`NOTICE`](NOTICE).
 
+Every file carries copyright and licensing information following the [REUSE](https://reuse.software) specification:
+source files have an Apache-2.0 header (`make license-check`), and files that cannot hold a header (JSON, images, PDF,
+docs) are declared in [`REUSE.toml`](REUSE.toml). Check the whole repository with
+`uvx --from reuse==5.0.2 reuse lint`.
+
 Signet **orchestrates** upstream open-source software in its original form; it does not copy or modify their source
 code into this repository. See [`DEPENDENCIES.md`](DEPENDENCIES.md).

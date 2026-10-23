@@ -50,6 +50,7 @@ sử dụng"*).
 | actionlint | 1.7.12 | MIT | CI: kiểm cú pháp và lỗi thường gặp trong `.github/workflows/` | `rhysd/actionlint:1.7.12` |
 | gitleaks | 8.30.1 | MIT | CI: quét bí mật lộ trong toàn bộ lịch sử commit | `ghcr.io/gitleaks/gitleaks:v8.30.1` |
 | OSV-Scanner | 2.6.0 | Apache-2.0 | CI: đối chiếu tệp khóa phụ thuộc với cơ sở dữ liệu lỗ hổng OSV | `ghcr.io/google/osv-scanner:v2.6.0` |
+| REUSE tool | 5.0.2 | GPL-3.0-or-later | Kiểm mọi tệp đều có thông tin bản quyền và giấy phép theo chuẩn REUSE (`REUSE.toml`); chạy tay, chỉ đọc kho | `uvx --from reuse==5.0.2 reuse lint` |
 
 > **Ghi chú tương thích:** Make và Git là *công cụ dựng*, được gọi như tiến trình độc lập và không
 > liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Signet. Cả hai đều là phần
@@ -91,12 +92,22 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
-| PDF.js (`pdfjs-dist`) | 6.4 | Apache-2.0 | Xem PDF ngay trên trang | npm | 2 |
 | Apache ECharts | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
 
-Thư viện gián tiếp (khoảng 600 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
-giấy phép MIT, ISC, Apache-2.0, BSD, BlueOak-1.0.0, MPL-2.0 hoặc CC0 — đã quét `node_modules` ngày
-18/10/2026, không có giấy phép ngoài danh sách OSI.
+Thư viện gián tiếp (khoảng 700 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
+giấy phép MIT, ISC, Apache-2.0, BSD-2/3-Clause, BlueOak-1.0.0, MPL-2.0 hoặc 0BSD, đều được OSI phê duyệt. Quét
+`package-lock.json` ngày 23/10/2026, ngoài danh sách đó chỉ có năm gói dưới đây. Không gói nào trong số này nằm
+trong trang phát hành (đã tìm trong thư mục trang tĩnh của image `app-office`).
+
+| Gói | Giấy phép | Kéo theo bởi | Ghi chú |
+|---|---|---|---|
+| `caniuse-lite` | CC-BY-4.0 | browserslist, autoprefixer | Bảng dữ liệu trình duyệt nào hỗ trợ tính năng nào, chỉ đọc lúc dựng CSS. CC-BY-4.0 là giấy phép mở cho dữ liệu, không thuộc danh sách OSI (OSI chỉ duyệt giấy phép phần mềm) |
+| `mdn-data` | CC0-1.0 | css-tree (nén CSS lúc dựng) | Dữ liệu cú pháp CSS của MDN. CC0 đưa tác phẩm vào phạm vi công cộng, không thuộc danh sách OSI |
+| `@speed-highlight/core` | CC0-1.0 | youch (trang báo lỗi của máy chủ phát triển Nuxt) | Chỉ chạy lúc phát triển |
+| `node-forge` | BSD-3-Clause OR GPL-2.0 | listhen (máy chủ phát triển của Nuxt) | Gói cho chọn giấy phép, Signet dùng theo BSD-3-Clause. Chỉ chạy lúc phát triển |
+| `type-fest` | MIT OR CC0-1.0 | dot-prop | Chỉ có kiểu TypeScript, Signet dùng theo MIT |
+
+Quét lại: `python3 -c "import json,collections;p=json.load(open('apps/office/package-lock.json'))['packages'];print(collections.Counter(v.get('license') for k,v in p.items() if k))"`.
 
 **Ghi chú:** BTC gợi ý "Nuxt 3 / Vue 3". Signet dùng **Nuxt 4** (vẫn chạy trên Vue 3) vì đây là dòng
 chính hiện tại; dòng Nuxt 3 chỉ còn nhận bản vá bảo trì. Dùng `vue-i18n` trực tiếp thay cho
@@ -256,6 +267,9 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   duyệt, của chính Python và image `python`; F4.5: aiohappyeyeballs)
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
   trong ba giấy phép), Pango (nạp động), phông Liberation.
+- ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
+  `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
+  theo BSD-3-Clause, `type-fest` theo MIT.
 - ⚠️ GPL-2.0/3.0, AGPL-3.0 — chấp nhận được khi chạy như **dịch vụ độc lập** giao tiếp qua mạng,
   không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic

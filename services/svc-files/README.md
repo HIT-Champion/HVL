@@ -75,7 +75,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
 Tệp tải về luôn ở dạng `attachment`, kèm `X-Content-Type-Options: nosniff` và
 `Content-Security-Policy: sandbox` — tệp HTML hay SVG người dùng tải lên không chạy được như một trang của
-Signet. Giao diện xem PDF bằng PDF.js nên không cần hiển thị inline. `ETag` là SHA-256 của tệp (tệp mã hóa thì không
+Signet. Giao diện lấy tệp bằng fetch kèm token rồi lưu về máy nên không cần hiển thị inline. `ETag` là SHA-256 của tệp (tệp mã hóa thì không
 có `ETag`: mỗi lần mở là một bản khác).
 
 Khóa đối tượng: `tenant/<tenant_id>/<yyyy>/<mm>/<id>` — thuê ước lấy từ token, không lấy từ dữ liệu client
