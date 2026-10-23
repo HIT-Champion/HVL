@@ -14,8 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Sinh bản phát hành khi đẩy thẻ phiên bản.
+# Sinh bản phát hành khi đẩy thẻ phiên bản (thẻ trên main, docs/git_flow.md mục 6).
 # Gói nguồn dùng định dạng MỞ .tar.gz (tiêu chí PoF #3 trừ điểm nếu dùng .zip/.rar).
+# Đẩy thẻ thì GitHub chạy bản release.yml ở commit được gắn thẻ: các chốt dưới đây chỉ có ở thẻ gắn sau khi chúng vào
+# main, thẻ cũ (v0.1.0) chỉ được ruleset thẻ v* (cấm sửa, cấm xóa) bảo vệ.
 name: Release
 
 on:
@@ -42,6 +44,14 @@ jobs:
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
             || { echo "::error::Thẻ '$GITHUB_REF_NAME' không đúng dạng vMAJOR.MINOR.PATCH"; exit 1; }
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Chỉ phát hành từ main (docs/git_flow.md mục 6): thẻ gắn trên develop hay nhánh khác thì dừng. GITHUB_REF là
+      # refs/tags/<thẻ>, merge-base tự bóc thẻ có chú thích ra commit; origin/main có sẵn nhờ fetch-depth: 0
+      - name: Thẻ nằm trên main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_REF" origin/main \
+            || { echo "::error::Thẻ $GITHUB_REF_NAME không nằm trên main — gộp PR phát hành vào main rồi gắn thẻ trên main"
+                 exit 1; }
 
       # Thẻ đã có Release thì dừng: không thay gói nguồn, .sha256 và ghi chú mà người dùng đã tải — sửa ghi chú thì sửa
       # trên trang Release. Xét cả bản nháp: xóa thẻ của Release đã đăng thì GitHub chuyển Release đó thành nháp, mà

@@ -395,6 +395,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   qua `https://`.
 
 ### Đã sửa đổi
+- Quy trình Git chuyển sang Git Flow (`docs/git_flow.md`): `develop` là nhánh mặc định, mọi pull request vào đó;
+  `main` chỉ nhận PR phát hành `chore(release): vX.Y.Z` từ `develop` hoặc `hotfix/X.Y.Z`. Workflow mới **PR**
+  (`scripts/check_pr.py`) kiểm nhánh nguồn, tiêu đề theo Conventional Commits với loại và phạm vi trong danh sách,
+  và với PR vào `main` thì CHANGELOG có mục phiên bản có dòng thay đổi, thẻ chưa có; CI chạy cho cả `develop` và
+  `main`, hủy lượt cũ trên mọi nhánh trừ `main`; workflow Release dừng khi thẻ không nằm trên `main`. Ruleset khai
+  trong `.github/rulesets/` (PR, 1 duyệt, 8 job xanh; thẻ `v*` không sửa, không xóa được). Mục 11 của `git_flow.md`
+  ghi cách làm thực tế trước và sau 23/10/2026. Test scripts +21.
 - Đổi tên hiển thị Mộc → **Signet** (nhẫn ấn đóng dấu lên văn bản, giữ ý "đóng dấu" của tên cũ): giao diện (`<title>`,
   thanh bên, trang đăng nhập, cổng xác thực, biểu tượng con dấu thay hình cây), realm Keycloak (`displayName`, tên
   client), tiêu đề API, chuỗi in ra của CLI và script, bảng điều khiển Grafana "Signet — cổng API", PDF phát hành và sổ

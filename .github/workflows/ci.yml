@@ -20,20 +20,23 @@
 # Máy chạy ghim ubuntu-24.04 (ubuntu-latest chuyển sang Ubuntu 26 từ 19/10/2026); chỉ đổi sau khi đã chạy thử.
 name: CI
 
+# develop: mọi PR tính năng gộp vào đây; main: chỉ PR phát hành (docs/git_flow.md). Quy trình của PR (nhánh nguồn,
+# tiêu đề) kiểm ở .github/workflows/pr.yml
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# PR đẩy commit mới thì hủy lượt chạy cũ; trên main thì chạy đủ mọi commit
+# Có commit mới thì hủy lượt cũ của cùng nhánh hay PR, chỉ lượt mới nhất đáng chạy; main thì chạy đủ mọi commit vì mỗi
+# commit trên main là một bản phát hành
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   UV_VERSION: "0.12.19"
