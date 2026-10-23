@@ -82,7 +82,7 @@ log = logging.getLogger("svc_workflow")
 
 
 class WorkflowError(Exception):
-    """Lỗi trả về cho người dùng qua Hasura: mã máy đọc + câu tiếng Việt."""
+    """Lỗi trả về cho bên gọi (Hasura, context broker): mã máy đọc + câu tiếng Việt."""
 
     def __init__(self, code: str, message: str, status: int = 400, fields: dict[str, str] | None = None) -> None:
         super().__init__(message)

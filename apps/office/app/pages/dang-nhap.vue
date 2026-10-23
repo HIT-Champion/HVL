@@ -40,7 +40,14 @@ onMounted(async () => {
       <h1 class="text-xl font-semibold text-brand-800">{{ $t('app.name') }}</h1>
       <p class="mt-1 text-sm text-stone-500">{{ $t('app.tagline') }}</p>
       <p v-if="!failed" class="mt-6 text-sm text-stone-600">{{ $t('app.loading') }}</p>
-      <button v-else class="btn-primary mt-6 w-full" @click="auth.login('/')">{{ $t('app.retry') }}</button>
+      <template v-else>
+        <button class="btn-primary mt-6 w-full" @click="auth.login('/')">{{ $t('app.retry') }}</button>
+        <!-- đăng nhập lỗi: xem hệ thống có đang gián đoạn không (trang công khai) -->
+        <NuxtLink to="/trang-thai"
+                  class="mt-3 inline-block text-xs text-stone-500 hover:text-brand-700 hover:underline">
+          {{ $t('health.title') }}
+        </NuxtLink>
+      </template>
     </div>
   </div>
 </template>

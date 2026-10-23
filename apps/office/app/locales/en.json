@@ -384,6 +384,7 @@
     "empty": "No matching documents.",
     "more": "Load more",
     "any": "All",
+    "directionLabel": "Incoming or outgoing",
     "direction": {
       "in": "Incoming",
       "out": "Outgoing"
@@ -637,6 +638,69 @@
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
     "footer": "Signet — open-source e-office. No login required on this page."
+  },
+  "health": {
+    "title": "System status",
+    "subtitle": "Operational state of Signet's components. Refreshes automatically, no sign-in needed.",
+    "overall": {
+      "ok": "All components operational",
+      "degraded": "Some components are having problems",
+      "down": "Service disruption"
+    },
+    "overallHint": {
+      "ok": "Sign-in, document processing, storage and search are all available.",
+      "degraded": "Core features still work; features relying on the affected components may be slow or paused.",
+      "down": "An essential component is not responding; many actions will not go through."
+    },
+    "state": {
+      "ok": "Operational",
+      "degraded": "Partial",
+      "down": "Down",
+      "off": "Off"
+    },
+    "layer": {
+      "nguoi-dung": "Users",
+      "loi": "Core",
+      "quy-trinh": "Process",
+      "du-lieu": "Data",
+      "tri-tue": "Intelligence"
+    },
+    "component": {
+      "cong-api": "API gateway",
+      "dang-nhap": "Single sign-on",
+      "csdl": "Database",
+      "ket-khoa": "Key vault",
+      "quet-ma-doc": "Malware scanning",
+      "quy-trinh": "Workflow",
+      "luu-tru": "File storage",
+      "tim-kiem": "Search",
+      "tro-ly-ai": "AI assistant"
+    },
+    "checkedAt": "Checked at {time}",
+    "autoRefresh": "Refreshes every 30 seconds",
+    "version": "Version",
+    "uptime": "Uptime",
+    "uptimeHint": "Since the file service last started",
+    "backup": "Last backup",
+    "backupNone": "None yet",
+    "backupHint": "Most recent complete backup run recorded by the system",
+    "ai": "AI assistant",
+    "aiOn": "On",
+    "aiOff": "Off",
+    "aiSemantic": "Writes cited answers, semantic search",
+    "aiKeyword": "Writes cited answers, keyword search",
+    "aiOffHint": "No language model enabled: the assistant still searches by keyword and quotes passages verbatim",
+    "aiSemanticOnly": "Answer model not ready: the assistant searches by meaning and quotes passages verbatim",
+    "units": {
+      "day": "d",
+      "hour": "h",
+      "minute": "min",
+      "less": "under 1 min"
+    },
+    "rateLimited": "Status loaded too often in one minute; the page will retry in a few seconds.",
+    "unreachable": "Could not load the status: the API gateway may be down. The page will retry.",
+    "stale": "Showing the result of the previous load.",
+    "note": "This page only shows the overall state — no host names, addresses or business figures. Detailed metrics (API gateway traffic and latency) are on the Grafana dashboard for operators."
   },
   "notify": {
     "title": "Notifications",

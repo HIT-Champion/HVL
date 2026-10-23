@@ -18,14 +18,18 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
+import inspect
 import json
 import pathlib
+import textwrap
 from datetime import UTC, datetime
 from typing import Any
 
 import httpx2
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from conftest import DEPT_DT, TENANT
@@ -39,6 +43,7 @@ NOW = datetime(2026, 10, 20, 2, 30, tzinfo=UTC)
 SECRET = "bi-mat-action"
 SENSOR = "urn:ngsi-ld:TemperatureSensor:phong-may-chu"
 SCHEMAS = pathlib.Path(__file__).resolve().parents[3] / "schemas"
+OPENAPI = pathlib.Path(__file__).resolve().parents[3] / "docs" / "api" / "openapi" / "svc-workflow.json"
 
 
 def run(coro):
@@ -367,6 +372,59 @@ def test_ot_is_off_without_broker_url(hasura, flowable):
     with client_for(hasura, flowable, env=env) as c:
         r = c.post("/ot/notify/CNTT", json=notification(), headers={TOKEN_HEADER: token(SECRET, "CNTT")})
         assert r.status_code == 404
+
+
+def action_error(code: str, message: str) -> dict[str, Any]:
+    return {"message": message, "extensions": {"code": code}}
+
+
+def test_notify_errors_keep_the_action_error_format(hasura, flowable, bridge, db):
+    # Route khai 204 nên lỗi được ném ra (WorkflowError); bộ xử lý chung trả mã HTTP và thân lỗi như trước
+    def post(c: TestClient, content: bytes, token_of: str | None = "CNTT") -> tuple[int, Any]:
+        headers = {"Content-Type": "application/json"}
+        if token_of:
+            headers[TOKEN_HEADER] = token(SECRET, token_of)
+        r = c.post("/ot/notify/CNTT", content=content, headers=headers)
+        assert r.headers["content-type"] == "application/json"
+        return r.status_code, r.json()
+
+    body = json.dumps(notification(sensor(41))).encode()
+    wrong_token = action_error("unauthorized", "Sai token của đơn vị")
+    not_notification = action_error("bad_request", "Thông báo không phải Notification NGSI-LD")
+    with client_for(hasura, flowable, bridge) as c:
+        assert post(c, body, None) == (401, wrong_token)
+        assert post(c, body, "KT") == (401, wrong_token)
+        assert post(c, b"[]") == (400, not_notification)
+        assert post(c, b"{") == (400, not_notification)
+        assert post(c, b'{"data": "x"}') == (400, action_error("bad_request", "Thông báo không có danh sách thực thể"))
+        db.fail = True
+        assert post(c, body) == (503, action_error("unavailable", "Chưa ghi được dự thảo, thử lại sau"))
+    env = {k: v for k, v in ENV.items() if k != "MOC_NGSI_URL"}
+    with client_for(hasura, flowable, env=env) as c:
+        assert post(c, body) == (404, action_error("not_found", "Chưa bật IT/OT (MOC_NGSI_URL)"))
+    assert db.drafts == []
+
+
+def test_notify_success_has_no_body_and_openapi_is_unchanged(hasura, flowable, bridge, db):
+    with client_for(hasura, flowable, bridge) as c:
+        r = c.post("/ot/notify/CNTT", json=notification(sensor(41)), headers={TOKEN_HEADER: token(SECRET, "CNTT")})
+        assert r.status_code == 204 and r.content == b"" and "content-type" not in r.headers
+        assert len(db.drafts) == 1
+        # Ném WorkflowError thay vì trả thân lỗi không đổi tài liệu: route trùng từng trường với docs/api/
+        doc = c.get("/openapi.json").json()["paths"]["/ot/notify/{tenant}"]
+    assert doc == json.loads(OPENAPI.read_text(encoding="utf-8"))["paths"]["/ot/notify/{tenant}"]
+    assert set(doc["post"]["responses"]) == {"204", "401", "404", "422", "503"}
+
+
+def test_no_content_routes_have_no_return_with_body(hasura, flowable):
+    # Kiểm lại luật SonarQube python:S8400 trong CI: route khai 204 chỉ trả Response rỗng, lỗi thì ném ra
+    app = client_for(hasura, flowable).app
+    routes = [r for r in app.routes if isinstance(r, APIRoute) and r.status_code == 204]
+    assert [r.path for r in routes] == ["/ot/notify/{tenant}"]
+    for route in routes:
+        tree = ast.parse(textwrap.dedent(inspect.getsource(route.endpoint)))
+        returns = {ast.unparse(n.value) if n.value else "" for n in ast.walk(tree) if isinstance(n, ast.Return)}
+        assert returns <= {"", "None", "Response(status_code=204)"}, (route.path, sorted(returns))
 
 
 def test_threshold_must_be_a_number():

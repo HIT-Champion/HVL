@@ -14,10 +14,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Mọi trang cần đăng nhập, trừ trang nhận kết quả đăng nhập từ Keycloak và cổng xác thực văn bản (công khai).
+// Mọi trang cần đăng nhập, trừ trang nhận kết quả đăng nhập từ Keycloak, cổng xác thực văn bản và trạng thái hệ thống
+// (công khai).
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path.replace(/\/$/, '') === '/dang-nhap') return
   if (to.path === '/xac-thuc' || to.path.startsWith('/xac-thuc/')) return
+  if (to.path.replace(/\/$/, '') === '/trang-thai') return
   const auth = useAuth()
   if (auth.user.value && !auth.user.value.expired) return
   const restored = await auth.restore()

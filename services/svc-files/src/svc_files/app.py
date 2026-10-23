@@ -32,7 +32,8 @@ Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh 
 svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kho của đơn vị nhận — dispatch.py. Đọc văn bản đến
 (F4.1): văn thư gọi /api/files/{id}/read, tác tử đọc tệp vừa tải lên và gợi ý thông tin tiếp nhận — docread/. Hỏi đáp
 trên kho văn bản (F4.2): /api/documents/ask trả câu trích nguyên văn có nguồn từ các văn bản người hỏi được xem, tùy
-chọn câu trả lời do mô hình viết; vòng nền giữ chỉ mục đoạn `chunks` — assist/.
+chọn câu trả lời do mô hình viết; vòng nền giữ chỉ mục đoạn `chunks` — assist/. Trạng thái hệ thống: /api/status gom
+tình trạng các thành phần cho trang công khai /trang-thai, đã làm sạch và lưu đệm — status.py.
 
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
@@ -87,6 +88,7 @@ from .render import letter_from, render_pdf
 from .sealed import SealError, Vault, VaultError, run_check_pdf, run_watermark, seal, unseal
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .signing import DocumentSigner, SigningError, SigningOff, SigningUnavailable, preload as preload_signing
+from .status import StatusBoard, default_board
 from .storage import ObjectStore, StorageError, object_key, s3_client
 from .texts import TextExtractor
 
@@ -201,6 +203,43 @@ class VerifiedDocument(BaseModel):
 class VerifyOut(BaseModel):
     result: Literal["valid", "not_found"]
     document: VerifiedDocument | None = None
+
+
+class StatusComponent(BaseModel):
+    id: str = Field(description="Mã thành phần, vd cong-api, dang-nhap, csdl, quy-trinh, tro-ly-ai")
+    layer: str = Field(description="Mã tầng trong `layers`")
+    label: str = Field(description="Tên tiếng Việt, vd Đăng nhập một lần")
+    software: str = Field(description="Phần mềm nguồn mở đảm nhận (không kèm phiên bản), vd Keycloak")
+    status: Literal["ok", "degraded", "down", "off"] = Field(
+        description="ok: hoạt động · degraded: chạy một phần · down: gián đoạn (không trả lời, quá hạn dò) · off: "
+                    "tắt theo cấu hình (vd chưa bật mô hình ngôn ngữ)")
+
+
+class StatusLayer(BaseModel):
+    id: str
+    label: str
+
+
+class StatusAi(BaseModel):
+    enabled: bool = Field(description="Mô hình viết câu trả lời của trợ lý đang sẵn sàng")
+    model: str | None = Field(description="Tên mô hình khi bật, vd qwen3:1.7b; null khi tắt")
+    semantic: bool = Field(description="Tìm theo nghĩa được (mô hình nhúng sẵn sàng)")
+
+
+class StatusOut(BaseModel):
+    """Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thái, không tên máy, địa chỉ hay số liệu nghiệp vụ."""
+
+    status: Literal["ok", "degraded", "down"] = Field(
+        description="down: có thành phần thiết yếu gián đoạn · degraded: thành phần khác gián đoạn hoặc chạy một phần")
+    checked_at: datetime = Field(description="Lúc dò; kết quả lưu đệm MOC_STATUS_CACHE_S giây (mặc định 10)")
+    version: str = Field(description="Phiên bản Signet đang chạy (MOC_VERSION)")
+    uptime_s: int = Field(description="Số giây svc-files đã chạy liên tục từ lần khởi động gần nhất")
+    last_backup_at: datetime | None = Field(
+        description="Lượt sao lưu gần nhất (`moc backup create`) mà CSDL biết; null: chưa có")
+    ai: StatusAi
+    layers: list[StatusLayer] = Field(description="Các tầng theo thứ tự hiện: người dùng → lõi → quy trình → dữ liệu "
+                                                  "→ trí tuệ nhân tạo")
+    components: list[StatusComponent]
 
 
 VERIFY_CODE_RE = re.compile(r"[^A-Z2-7]")
@@ -365,6 +404,7 @@ def create_app(
     chunk_indexer: ChunkIndexer | None = None,
     ai: AiClient | None = None,
     signer: DocumentSigner | None = None,
+    status_board: StatusBoard | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -417,6 +457,9 @@ def create_app(
                             min_score=settings.ask_min_score, min_score_semantic=settings.ask_min_score_semantic,
                             semantic_ratio=settings.ask_semantic_ratio),
         ai=ai, indexer=chunk_indexer, hasura=hasura)
+    # Trạng thái hệ thống (công khai): dò bằng chính các client trên, thêm APISIX, Keycloak, svc-workflow qua HTTP
+    status_board = status_board or default_board(settings, scanner=scanner, store=store, hasura=hasura, meili=meili,
+                                                 vault=vault, ai=ai)
 
     async def _probe_signer() -> None:
         try:
@@ -453,6 +496,7 @@ def create_app(
             if task is not None:
                 task.cancel()
         await reader.summarizer.aclose()
+        await status_board.aclose()
         await ai.aclose()
         await chunk_index.aclose()
         await meili.aclose()
@@ -476,6 +520,7 @@ def create_app(
     app.state.chunk_indexer = chunk_indexer
     app.state.ai = ai
     app.state.signer = signer
+    app.state.status_board = status_board
     bearer = HTTPBearer(auto_error=False)
 
     @app.middleware("http")
@@ -1208,6 +1253,16 @@ def create_app(
         sha256: Annotated[str, Query(pattern=r"^[0-9a-fA-F]{64}$", description="SHA-256 của tệp, 64 ký tự hex")],
     ) -> JSONResponse:
         return await _verify(request, "sha256", sha256_hex=sha256.lower())
+
+    # --- trạng thái hệ thống (không cần đăng nhập; APISIX giới hạn tốc độ theo IP) ---------------------------
+
+    @app.get("/api/status", response_model=StatusOut,
+             responses={429: {"description": "Vượt giới hạn theo địa chỉ IP (APISIX)"}},
+             summary="Trạng thái vận hành các thành phần của Signet (không cần đăng nhập, lưu đệm 10 giây)")
+    async def system_status() -> JSONResponse:
+        # qua model: chỉ các trường khai ở StatusOut ra ngoài, kể cả khi status.py sau này gom thêm gì
+        out = StatusOut.model_validate(await status_board.report())
+        return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
 
     # --- phòng đọc hồ sơ đã nộp lưu (F3.8) ----------------------------------------------------------------
 

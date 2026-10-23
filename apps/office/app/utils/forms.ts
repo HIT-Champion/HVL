@@ -59,8 +59,13 @@ function rank(code: string): number {
  */
 export function formErrors(validate: Validate, schema: JsonSchema, data: unknown, today: string): FieldErrors {
   // Map chứ không phải {}: tên trường do người gửi đặt, có thể là "constructor", "toString"…
-  const found = new Map<string, string[]>()
-  const add = (name: string, code: string) => found.set(name, [...(found.get(name) ?? []), code])
+  // Một trường sai nhiều điều thì giữ ngay lúc gom điều đứng trước trong PRIORITY, cùng hạng thì điều gặp trước — như
+  // min(codes, key=rank) của svc-workflow; không cần mảng mã rồi reduce() (mảng rỗng thì reduce() ném lỗi)
+  const found = new Map<string, string>()
+  const add = (name: string, code: string) => {
+    const kept = found.get(name)
+    if (kept === undefined || rank(code) < rank(kept)) found.set(name, code)
+  }
   if (!validate(data)) {
     for (const e of validate.errors ?? []) add(fieldOf(e), e.keyword)
   }
@@ -76,15 +81,13 @@ export function formErrors(validate: Validate, schema: JsonSchema, data: unknown
       const value = (data as Record<string, unknown>)[name]
       if (!rule || found.has(name) || typeof value !== 'string') continue
       if ((rule === 'not-after-today' && value > today) || (rule === 'not-before-today' && value < today)) {
-        found.set(name, ['x-moc-date'])
+        found.set(name, 'x-moc-date')
       }
     }
   }
   const errors: FieldErrors = {}
-  for (const [name, codes] of found) {
-    Object.defineProperty(errors, name, {
-      value: codes.reduce((best, c) => (rank(c) < rank(best) ? c : best)), enumerable: true, writable: true,
-    })
+  for (const [name, code] of found) {
+    Object.defineProperty(errors, name, { value: code, enumerable: true, writable: true })
   }
   return errors
 }

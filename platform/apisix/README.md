@@ -14,6 +14,11 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
 - Giới hạn đăng nhập theo IP (`MOC_RATE_LOGIN_PER_MIN`) đếm chung cho đường cấp token, biểu mẫu đăng nhập và **mọi
   POST khác vào realm** (route `dang-nhap-post`): viết khác đường (`…/token/`, `…/token;x`) không né được bộ đếm.
 - Mỗi yêu cầu có `X-Request-Id` (giữ nguyên tới sổ kiểm toán).
+- `GET /api/status` (route `trang-thai`, trạng thái hệ thống) như cổng xác thực: không cần token, giới hạn theo IP
+  (`MOC_RATE_STATUS_PER_MIN`, mặc định 30/phút). Chỉ đúng đường này; `/api/*` chưa khai báo vẫn rơi vào route `chan`.
+- Máy chủ trạng thái của APISIX (`apisix.status`, `GET /status/ready` ở cổng 7085) chỉ nghe trong mạng nội bộ,
+  không publish ra máy chủ: svc-files hỏi nó cho dòng "Cổng API" của trang trạng thái (`200` mọi worker đã nạp cấu
+  hình, `503` còn worker chưa nạp).
 
 Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.
 

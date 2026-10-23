@@ -134,6 +134,14 @@ class Vault:
     async def aclose(self) -> None:
         await self._http.aclose()
 
+    async def ping(self) -> bool:
+        """Két đã khởi tạo và đã mở khóa (``/v1/sys/health``, không cần token) — trang trạng thái hệ thống."""
+        try:
+            r = await self._http.get("/v1/sys/health", params={"standbyok": "true"})
+        except httpx2.HTTPError:
+            return False
+        return r.status_code == 200
+
     async def _login(self) -> str:
         try:
             role_id, secret_id = (p.read_text().strip() for p in self._files)

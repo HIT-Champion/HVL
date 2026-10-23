@@ -129,6 +129,12 @@ class Settings:
     ai_embed_dims: int = 1024
     ai_embed_batch: int = 8             # số đoạn mỗi lô nhúng nền
     assistant_id: str = "moc-assistant"  # danh tính trợ lý trong sổ kiểm toán (X-Hasura-User-Id của vai trò agent)
+    # Trang trạng thái hệ thống, công khai (GET /api/status — status.py)
+    version: str = "dev"                # MOC_VERSION: phiên bản Signet đang chạy (thẻ image)
+    gateway_status_url: str = "http://apisix:7085/status/ready"    # máy chủ trạng thái của APISIX, chỉ mạng nội bộ
+    workflow_url: str = "http://svc-workflow:8000"                  # /readyz của svc-workflow: Flowable và Hasura
+    status_cache_s: float = 10.0        # lưu đệm kết quả gom cho mọi người gọi: gọi dồn không thành lời gọi vào lõi
+    status_timeout_s: float = 3.0       # hạn mỗi lần dò một thành phần, quá thì báo gián đoạn
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -214,6 +220,11 @@ class Settings:
                 ai_embed_dims=int(env.get("MOC_AI_EMBED_DIMS", "1024")),
                 ai_embed_batch=int(env.get("MOC_AI_EMBED_BATCH", "8")),
                 assistant_id=env.get("MOC_ASSISTANT_ID", "moc-assistant").strip(),
+                version=env.get("MOC_VERSION", "dev").strip() or "dev",
+                gateway_status_url=env.get("MOC_GATEWAY_STATUS_URL", "http://apisix:7085/status/ready").strip(),
+                workflow_url=env.get("MOC_WORKFLOW_URL", "http://svc-workflow:8000").strip().rstrip("/"),
+                status_cache_s=float(env.get("MOC_STATUS_CACHE_S", "10")),
+                status_timeout_s=float(env.get("MOC_STATUS_TIMEOUT_S", "3")),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -236,6 +247,18 @@ class Settings:
             raise ConfigError("MOC_RESTRICTED_MAX_PAGES phải ≥ 1")
         self._check_reader()
         self._check_assistant()
+        self._check_status()
+
+    def _check_status(self) -> None:
+        """Biến của trang trạng thái hệ thống (công khai, status.py)."""
+        if self.status_cache_s < 1:
+            # trang không cần đăng nhập: không lưu đệm thì mỗi lần ai đó gọi là một lượt dò mọi thành phần lõi
+            raise ConfigError("MOC_STATUS_CACHE_S phải ≥ 1")
+        if not 0 < self.status_timeout_s <= 10:
+            raise ConfigError("MOC_STATUS_TIMEOUT_S phải trong khoảng (0, 10]")
+        for name, url in (("MOC_GATEWAY_STATUS_URL", self.gateway_status_url), ("MOC_WORKFLOW_URL", self.workflow_url)):
+            if url and not url.startswith(("http://", "https://")):
+                raise ConfigError(f"{name} phải là URL http(s)://…, hoặc rỗng để không dò thành phần đó")
 
     def _check_assistant(self) -> None:
         """Biến của trợ lý hỏi đáp (F4.2)."""

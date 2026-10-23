@@ -450,6 +450,55 @@ def test_starttls_and_ssl(monkeypatch, clock, tls, expected):
     assert _FakeSmtp.calls[len(expected):] == expected
 
 
+def test_plain_connection_never_carries_the_smtp_login(monkeypatch, clock):
+    # MOC_SMTP_TLS=none mà có MOC_SMTP_USER: không nối, không đăng nhập (mật khẩu sẽ đi dạng rõ). Thư báo lỗi gửi như
+    # mọi lỗi khác: last_error, dòng nhật ký delivery_failed, thử lại theo nhịp thường trong khi sửa cấu hình
+    _FakeSmtp.calls = []
+    monkeypatch.setattr(channels.smtplib, "SMTP", _FakeSmtp)
+    monkeypatch.setattr(channels.smtplib, "SMTP_SSL", _FakeSsl)
+    cfg = SmtpConfig("mail.example.com", 25, "none", "signet@example.com", "signet", "mat-khau-smtp")
+    outbox = Outbox(due())
+    router = make_router(outbox, smtp=cfg, clock=clock)
+    with raw_log() as stream:
+        run(router.run())
+    assert _FakeSmtp.calls == []
+    row = outbox.rows[1]
+    assert (row["status"], row["attempts"], row["last_error"]) == ("pending", 1, channels.PLAIN_LOGIN)
+    assert row["next_attempt_at"] == clock() + timedelta(seconds=30)
+    (line,) = [json.loads(x) for x in stream.getvalue().splitlines()]
+    assert (line["event"], line["error"], line["final"]) == ("core.notification.delivery_failed",
+                                                              channels.PLAIN_LOGIN, False)
+    assert "mat-khau-smtp" not in stream.getvalue()
+    msg = router.message(1, due()["notification"], NAME, EMAIL)
+    with pytest.raises(channels.Failure):
+        send_smtp(cfg, msg)                     # gọi thẳng như trong luồng riêng: cũng không nối
+    assert _FakeSmtp.calls == []
+    # không có tài khoản thì none gửi như trước (relay nội bộ, Mailpit), không đăng nhập
+    send_smtp(SmtpConfig("mail.example.com", 25, "none", "signet@example.com"), msg)
+    assert _FakeSmtp.calls == [("connect", "_FakeSmtp", "mail.example.com", 25, False), ("send", EMAIL), ("quit",)]
+
+
+def test_plain_login_settings_warn_once_at_startup(hasura, flowable):
+    from fastapi.testclient import TestClient
+
+    env = {**ENV, "MOC_SMTP_HOST": "mail.example.com", "MOC_SMTP_FROM": "signet@example.com", "MOC_SMTP_TLS": "none",
+           "MOC_SMTP_USER": "nguoi-gui-thu", "MOC_SMTP_PASSWORD": "mat-khau-smtp", "MOC_NOTIFY_INTERVAL_S": "0",
+           "MOC_SLA_POLL_INTERVAL_S": "0", "MOC_SUGGEST_POLL_INTERVAL_S": "0"}
+    settings = Settings.from_env(env)           # không chặn khởi động: bản đang chạy vẫn lên, chỉ kênh email báo lỗi
+    assert len(settings.warnings()) == 1
+    with raw_log() as stream:
+        app = create_app(settings, hasura=hasura, flowable=flowable, directory=_NoDirectory())  # type: ignore[arg-type]
+        with TestClient(app):
+            pass
+    warned = [line["message"] for line in map(json.loads, stream.getvalue().splitlines())
+              if line["event"] == "config.warning"]
+    assert len(warned) == 1 and warned[0].startswith("MOC_SMTP_TLS=none mà có MOC_SMTP_USER")
+    assert "mat-khau-smtp" not in stream.getvalue() and "nguoi-gui-thu" not in stream.getvalue()
+    # không tài khoản, hoặc có mã hóa, hoặc kênh email tắt: không cảnh báo
+    for extra in ({"MOC_SMTP_USER": ""}, {"MOC_SMTP_TLS": "starttls"}, {"MOC_SMTP_TLS": "ssl"}, {"MOC_SMTP_HOST": ""}):
+        assert Settings.from_env({**env, **extra}).warnings() == []
+
+
 # --- webhook tới http.server cục bộ --------------------------------------------------------------------------------
 
 class _Hook(ThreadingHTTPServer):

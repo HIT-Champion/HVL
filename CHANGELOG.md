@@ -41,6 +41,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   sách cần ngoại lệ có lý do trong `.github/license-exceptions.json`. Job CI "Giấy phép (PoF #2)" chạy cả hai: 769 gói
   (npm 690, Python 73, action 6) đều đạt, 22 gói qua nhờ ngoại lệ. `SECURITY.md`: phiên bản được hỗ trợ, báo lỗ hổng
   riêng tư qua GitHub, thời gian phản hồi, phạm vi kể cả bản chạy thử trực tuyến. Test scripts +22.
+- Trang công khai **Trạng thái hệ thống** `/trang-thai` (không cần đăng nhập, tự làm mới mỗi 30 giây): tình trạng chung
+  và từng thành phần theo tầng người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo, phiên bản, thời gian chạy, giờ
+  sao lưu gần nhất, trợ lý AI bật hay tắt kèm tên mô hình; có đường tới từ trang đăng nhập lỗi, chân trang cổng xác
+  thực, thanh bên. `GET /api/status` của `svc-files` gom ở phía máy chủ (lưu đệm 10 giây cho mọi người, mỗi lần dò tối
+  đa 3 giây), chỉ trả nhãn cố định, không tên máy, địa chỉ hay số liệu; APISIX giới hạn 30 lần/phút mỗi IP
+  (`MOC_RATE_STATUS_PER_MIN`). `moc backup create` ghi dòng `system.backed_up` vào sổ kiểm toán. Test svc-files +36,
+  office +9, e2e +1.
 - Ứng dụng thứ hai trên lõi, Không gian cá nhân P.A.R.A (`/ca-nhan/`, `apps/ca-nhan`): mỗi người cất tệp của mình
   trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ — tải lên qua `svc-files` (ClamAV), chuyển, tải về; client
   Keycloak riêng `app-ca-nhan`, cùng phiên SSO với Văn phòng điện tử; schema riêng `personal` có quyền đến từng dòng,
@@ -95,6 +102,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - brotli 1.2.0 → 1.2.1, brotlicffi 1.2.0.2 → 1.2.1.0 (`svc-files`, gói kéo theo của fontTools mà WeasyPrint dùng):
   vá lỗi ghi tràn bộ nhớ trong bộ giải nén Brotli (PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) mà OSV-Scanner trong CI
   báo từ 23/10. Bản vá phát hành 22/10: ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
+- Sửa các lỗi SonarQube tìm thấy ở lần quét đầu (23/10/2026). `POST /ot/notify/{tenant}` của `svc-workflow` khai trả
+  204 mà có 5 nhánh `return` thân lỗi (5 BLOCKER `python:S8400`): lỗi nay ném `WorkflowError` cho một bộ xử lý chung;
+  mã HTTP, thân lỗi và OpenAPI không đổi. `MOC_SMTP_TLS=none` đi cùng `MOC_SMTP_USER` từng đăng nhập máy chủ thư qua
+  kết nối không mã hóa, mật khẩu đi dạng rõ: nay không đăng nhập, thư email báo lỗi gửi, lúc khởi động ghi một dòng
+  `config.warning` (không chặn khởi động). Ô tìm kiếm, ô chọn văn bản đến hay đi và ô lý do lưu có tên cho trình đọc
+  màn hình, nút Tìm ghi `type="submit"`, kiểm form không còn `reduce()` thiếu giá trị đầu. Ký tự điều khiển hai chiều
+  trong mã `svc-files` viết bằng mã thoát. Test mới chạy lại các luật này mà không cần SonarQube: route khai 204 không
+  `return` thân, ký tự hai chiều ở `services/`, `apps/`, `scripts/`, nhãn ô nhập và `type` của nút trong form ở mọi
+  tệp `.vue`. Các cảnh báo còn lại là báo nhầm, không chèn `NOSONAR`. Test svc-workflow +5, office +3, scripts +2.
 
 ### Bảo mật
 - Image `svc-files`, `svc-workflow` (cả `ot-sensor`, dùng chung image) gỡ pip ngay sau khi cài thư viện: pip 26.2.1
