@@ -123,10 +123,12 @@ theo từ khóa và trả câu trích, `svc-files` dò lại mô hình mỗi 60 
 đạo vẫn có việc chỉ đạo, chỉ mất gợi ý giao việc. ClamAV ngừng: tải tệp bị từ chối, vì thà chặn còn hơn lưu tệp chưa
 quét; Meilisearch ngừng: trợ lý báo `503 search_unavailable` chứ không trả lời mò. Liên thông giữa hai đơn vị ghi outbox
 trong cùng giao dịch phát hành, vòng nền gửi lại giãn dần từ 30 giây tới 1 giờ; container chết hẳn thì reconciler dựng
-lại trong vòng một phút.
+lại trong vòng một phút. Ai cũng xem được thành phần nào đang chạy, chậm hay ngừng ở trang công khai `/trang-thai` —
+không cần đăng nhập, không lộ địa chỉ hay lỗi nội bộ.
 
 **Bằng chứng:** [`docs/demo-script.md`](../demo-script.md) (các mục "Nếu giám khảo hỏi"); `make demo-giao-viec` (bước
-10: dừng `svc-files` giữa chừng); `make demo-tu-phuc-hoi`; `services/svc-files/README.md` (mã lỗi `503` của trợ lý).
+10: dừng `svc-files` giữa chừng); `make demo-tu-phuc-hoi`; `services/svc-files/README.md` (mã lỗi `503` của trợ lý);
+[`docs/van-hanh.md`](../van-hanh.md) (trang trạng thái, `GET /api/status`).
 
 ## 8. Không có Internet có chạy được không?
 

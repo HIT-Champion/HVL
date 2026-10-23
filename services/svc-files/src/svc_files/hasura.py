@@ -52,6 +52,17 @@ mutation InsertSignedFile($o: core_files_insert_input!, $s: core_file_signatures
   insert_core_file_signatures(objects: [$s]) { affected_rows }
 }"""
 
+# Lần sao lưu gần nhất (trang trạng thái hệ thống): dòng sổ của nền tảng do `moc backup create` ghi sau mỗi lượt trọn
+# vẹn; CSDL vừa khôi phục không có dòng của chính lượt đó (ghi sau lúc dump) nên lấy thêm giờ sao lưu ghi trong dòng
+# system.restored. Lọc tenant_id null, xếp theo occurred_at: đi theo chỉ mục audit_log_tenant_time, không quét cả sổ
+LAST_BACKUP = """
+query LastBackup {
+  backed_up: core_audit_log(where: {tenant_id: {_is_null: true}, action: {_eq: "system.backed_up"}},
+                            order_by: {occurred_at: desc}, limit: 1) { occurred_at }
+  restored: core_audit_log(where: {tenant_id: {_is_null: true}, action: {_eq: "system.restored"}},
+                           order_by: {occurred_at: desc}, limit: 1) { backed_up_at: diff(path: "$.backed_up_at") }
+}"""
+
 LOG_EVENT = """
 mutation LogEvent($o: core_audit_log_insert_input!) {
   insert_core_audit_log(objects: [$o]) { affected_rows }
@@ -615,6 +626,21 @@ class HasuraClient:
         data = await self._call(AUDIT_HEAD, {}, {"X-Hasura-Admin-Secret": self._secret})
         head = data["core_audit_head"][0]
         return int(head["last_id"]), _hex(head["last_hash"])
+
+    async def last_backup(self) -> datetime | None:
+        """Giờ của lượt sao lưu gần nhất mà CSDL biết; chưa sao lưu lần nào thì None."""
+        data = await self._call(LAST_BACKUP, {}, {"X-Hasura-Admin-Secret": self._secret})
+        found = [row.get("occurred_at") for row in data.get("backed_up") or []]
+        found += [row.get("backed_up_at") for row in data.get("restored") or []]
+        times = []
+        for value in found:
+            try:
+                at = datetime.fromisoformat(str(value))
+            except ValueError:
+                continue
+            if at.tzinfo is not None:
+                times.append(at)
+        return max(times, default=None)
 
     async def record_anchor(self, audit_id: int, hash_hex: str, location: str) -> None:
         await self._call(RECORD_ANCHOR, {"o": {"audit_id": audit_id, "hash": _bytea(hash_hex), "location": location}},
