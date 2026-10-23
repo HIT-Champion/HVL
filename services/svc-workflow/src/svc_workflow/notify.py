@@ -22,6 +22,9 @@ Action, timer bắn lại không sinh thông báo thứ hai và không đẩy l�
 
 Kênh riêng là ``personal:#<sub>``: Centrifugo tự đưa mỗi kết nối vào kênh của đúng người trong token Keycloak đã
 kiểm, trình duyệt không tự đăng ký được kênh của người khác (platform/centrifugo/config.yaml).
+
+Kênh ngoài (email, webhook — channels.py) chỉ khi được cấu hình: dòng thông báo mang thêm cột ``channels``, CSDL tạo
+dòng chờ gửi trong cùng giao dịch, vòng nền của ``Router`` gửi sau. Không cấu hình thì dòng ghi y như trước.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from typing import Any
 
 import httpx2
 
+from .channels import Router
 from .flowable import FlowableClient, Task
 from .hasura import Actor, HasuraClient
 
@@ -124,8 +128,10 @@ async def task_people(flowable: FlowableClient, actor: Actor, task: Task, people
 
 class Notifier:
     def __init__(self, hasura: HasuraClient, centrifugo_url: str = "", api_key: str = "", *,
-                 timeout_s: float = 3.0, transport: httpx2.AsyncBaseTransport | None = None) -> None:
+                 timeout_s: float = 3.0, transport: httpx2.AsyncBaseTransport | None = None,
+                 router: Router | None = None) -> None:
         self.hasura = hasura
+        self.router = router
         self._key = api_key
         # không cấu hình Centrifugo thì chỉ lưu thông báo, người dùng thấy khi tải lại trang
         self._http = (httpx2.AsyncClient(base_url=centrifugo_url, timeout=timeout_s, transport=transport)
@@ -151,9 +157,12 @@ class Notifier:
         if not users:
             return []
         rows = [{"user_id": u, "kind": kind, "key": key, "document_id": document_id, "data": data} for u in users]
+        queued = self.router is not None and self.router.route(kind, data, rows)
         result = await self.hasura.as_service(actor, NOTIFY, {"rows": rows})
         created = result["insert_core_notifications"]["returning"]
         await self._push(created)
+        if queued and created and self.router is not None:
+            self.router.wake()
         return [row["user_id"] for row in created]
 
     async def _push(self, rows: list[dict[str, Any]]) -> None:

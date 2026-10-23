@@ -57,14 +57,19 @@ unfinished() {
 }
 
 # Bí mật dịch vụ cần, dạng JSON, đọc từ biến môi trường: TÊN (tên biến trong dịch vụ) hoặc TÊN=BIẾN (tên biến ở đây).
-# Giá trị do `make env` sinh chỉ gồm chữ và số; vẫn thoát \ và " cho chắc.
+# Hậu tố `?` (TÊN?): bí mật tùy chọn — rỗng thì bỏ khỏi két, vd mật khẩu SMTP khi chưa bật email. Giá trị do
+# `make env` sinh chỉ gồm chữ và số; vẫn thoát \ và " cho chắc.
 secrets_json() {
   sep='{'
   for pair in "$@"; do
+    case $pair in *\?) optional=1; pair=${pair%\?} ;; *) optional='' ;; esac
     name=${pair%%=*}
     var=${pair#*=}
     eval "value=\${$var:-}"
-    [ -n "$value" ] || die "thiếu biến môi trường $var"
+    if [ -z "$value" ]; then
+      [ -n "$optional" ] && continue
+      die "thiếu biến môi trường $var"
+    fi
     printf '%s"%s":"%s"' "$sep" "$name" "$(printf %s "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')"
     sep=','
   done
@@ -75,8 +80,9 @@ secrets_of() {
   case $1 in
     svc-files) secrets_json SEAWEEDFS_S3_ACCESS_KEY SEAWEEDFS_S3_SECRET_KEY HASURA_ADMIN_SECRET \
                  MEILISEARCH_API_KEY=MEILI_MASTER_KEY ;;
+    # mật khẩu SMTP, URL webhook (có khóa trong đường dẫn) của thông báo đa kênh: chỉ có khi đã cấu hình
     svc-workflow) secrets_json HASURA_ADMIN_SECRET MOC_ACTION_SECRET FLOWABLE_ADMIN_PASSWORD CENTRIFUGO_API_KEY \
-                    MOC_DIRECTORY_CLIENT_SECRET ;;
+                    MOC_DIRECTORY_CLIENT_SECRET 'MOC_SMTP_PASSWORD?' 'MOC_NOTIFY_WEBHOOK_URL?' ;;
     *) die "không biết dịch vụ $1" ;;
   esac
 }
