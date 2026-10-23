@@ -53,6 +53,7 @@ sử dụng"*).
 | gitleaks | 8.30.1 | MIT | CI: quét bí mật lộ trong toàn bộ lịch sử commit | `ghcr.io/gitleaks/gitleaks:v8.30.1` |
 | OSV-Scanner | 2.6.0 | Apache-2.0 | CI: đối chiếu tệp khóa phụ thuộc với cơ sở dữ liệu lỗ hổng OSV | `ghcr.io/google/osv-scanner:v2.6.0` |
 | REUSE tool | 5.0.2 | GPL-3.0-or-later | Kiểm mọi tệp đều có thông tin bản quyền và giấy phép theo chuẩn REUSE (`REUSE.toml`); chạy tay, chỉ đọc kho | `uvx --from reuse==5.0.2 reuse lint` |
+| Syft | 1.54.1 | Apache-2.0 | `make sbom`, CI, bản phát hành: SBOM CycloneDX của cây mã nguồn (tệp khóa npm, `requirements*.txt`, action CI), đầu vào của `make license-audit`; chỉ đọc kho, hỏi PyPI giấy phép gói Python | `ghcr.io/anchore/syft:v1.54.1` (image 06/10/2026) |
 
 > **Ghi chú tương thích:** Make và Git là *công cụ dựng*, được gọi như tiến trình độc lập và không
 > liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Signet. Cả hai đều là phần
@@ -109,7 +110,8 @@ trong trang phát hành (đã tìm trong thư mục trang tĩnh của image `app
 | `node-forge` | BSD-3-Clause OR GPL-2.0 | listhen (máy chủ phát triển của Nuxt) | Gói cho chọn giấy phép, Signet dùng theo BSD-3-Clause. Chỉ chạy lúc phát triển |
 | `type-fest` | MIT OR CC0-1.0 | dot-prop | Chỉ có kiểu TypeScript, Signet dùng theo MIT |
 
-Quét lại: `python3 -c "import json,collections;p=json.load(open('apps/office/package-lock.json'))['packages'];print(collections.Counter(v.get('license') for k,v in p.items() if k))"`.
+Quét lại: `python3 -c "import json,collections;p=json.load(open('apps/office/package-lock.json'))['packages'];print(collections.Counter(v.get('license') for k,v in p.items() if k))"`,
+hoặc kiểm cả gói npm lẫn Python theo chính sách bằng `make sbom && make license-audit` (mục cuối).
 
 **Ghi chú:** BTC gợi ý "Nuxt 3 / Vue 3". Signet dùng **Nuxt 4** (vẫn chạy trên Vue 3) vì đây là dòng
 chính hiện tại; dòng Nuxt 3 chỉ còn nhận bản vá bảo trì. Dùng `vue-i18n` trực tiếp thay cho
@@ -269,8 +271,11 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 
 Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
 
-- ✅ Apache-2.0, MIT, BSD-2/3-Clause, PostgreSQL License, ISC, MPL-2.0, PSF-2.0 (giấy phép dễ dãi được OSI phê
-  duyệt, của chính Python và image `python`; F4.5: aiohappyeyeballs)
+- ✅ Apache-2.0, MIT, MIT-0, BSD-2/3-Clause, 0BSD, ISC, BlueOak-1.0.0, PostgreSQL License, MPL-2.0 (giấy phép dễ dãi
+  được OSI phê duyệt) và PSF-2.0 (giấy phép dễ dãi của chính Python và image `python`; F4.5: aiohappyeyeballs). SPDX
+  đánh dấu OSI phê duyệt cho Python-2.0, bộ giấy phép của Python mở đầu bằng PSF-2.0, chứ không cho riêng PSF-2.0.
+- ✅ MIT-CMU chỉ cho Pillow (ngoại lệ có lý do): một dạng HPND, dễ dãi, chỉ đòi giữ thông báo bản quyền; SPDX đánh dấu
+  OSI phê duyệt cho HPND nhưng chưa cho riêng MIT-CMU.
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
   trong ba giấy phép), Pango (nạp động), phông Liberation.
 - ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
@@ -280,3 +285,20 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
   License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
+
+**Kiểm tự động, cả gói gián tiếp.** `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft (tệp khóa npm kể cả gói
+chỉ dùng lúc dựng, `requirements*.txt`, action trong `.github/workflows/`; giấy phép gói Python hỏi PyPI vì
+`requirements.txt` không ghi). `make license-audit` (`scripts/license_audit.py`) xét từng gói theo đúng danh sách trên:
+biểu thức `A OR B` qua khi một nhánh được nhận, `A AND B` phải qua cả hai; copyleft yếu qua nhưng được liệt kê riêng;
+GPL, AGPL, giấy phép khác và giấy phép chưa rõ thì không qua, trừ khi có ngoại lệ ghi lý do trong
+`.github/license-exceptions.json`. Ngoại lệ cho gói ngoài danh sách phải trùng giấy phép SBOM ghi (gói đổi giấy phép thì
+ngoại lệ hết tác dụng); ngoại lệ cho gói SBOM không rõ giấy phép ghi giấy phép đội đã đọc trong gói và phiên bản đã
+đọc. CI (job "Giấy phép (PoF #2)") chạy hai lệnh này trên mọi pull request; từ bản sau 1.0.0, mỗi bản phát hành kèm
+SBOM `moc-X.Y.Z.cdx.json`.
+Syft không đọc `Dockerfile`, `docker-compose.yml`: image thượng nguồn và giấy phép của chúng là các bảng ở trên.
+
+Lần quét 23/10/2026 (Syft 1.54.1): 769 gói khác nhau — npm 690, Python 73, action CI 6 — đều đạt; 22 gói qua nhờ ngoại
+lệ: 4 gói npm dữ liệu và công cụ dựng mang CC-BY-4.0, CC0-1.0 (mục Tầng 2, `mdn-data` có hai bản), Pillow (MIT-CMU), 11
+gói Python mà PyPI chỉ khai giấy phép bằng classifier hay chữ tự do (WeasyPrint và các gói nó kéo theo, segno, DuckDB,
+python-dateutil, colorama — giấy phép đọc từ tệp LICENSE trong wheel) và 6 action CI (giấy phép đọc ở đúng thẻ đã
+ghim). Copyleft yếu: Pyphen (chọn MPL-1.1).
