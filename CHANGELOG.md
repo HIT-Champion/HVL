@@ -10,6 +10,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ### Đã thêm
 - README (cả bản tiếng Anh) có mục "Cấu trúc thư mục": mỗi thư mục chứa gì, mã đội tự viết nằm đâu, các tác tử AI
   (F4.1–F4.4) ở tệp nào, test của từng phần ở đâu.
+- Tài liệu đánh giá AI [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md): với đọc văn bản đến, trợ lý hỏi đáp, gợi ý giao
+  việc và bộ che thông tin cá nhân (F4.1–F4.4) — mục đích, mô hình và công cụ kèm phiên bản, giấy phép (trỏ
+  `DEPENDENCIES.md`), dữ liệu đo và cách làm nhãn, lệnh đo lại, số đo kèm ngày, máy và nguồn, phần chưa đo, giới hạn,
+  cơ chế an toàn kèm tệp mã. Thêm lần đo trợ lý hỏi đáp trên bản online (23/10/2026, Qwen3-1.7B và
+  Qwen3-Embedding-0.6B trên CPU): recall@3 16/16, 0 nguồn bị cấm, câu trả lời của mô hình qua kiểm 16/16, p50 8,9
+  giây. Bảng Tài liệu của README (cả bản tiếng Anh) có thêm dòng này.
 
 ### Đã sửa đổi
 - Trang Release ngắn lại (`scripts/release_body.py`): dòng chỉ gói chính thức `moc-X.Y.Z.tar.gz` kèm lệnh kiểm
