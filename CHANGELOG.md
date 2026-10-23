@@ -73,6 +73,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Nay WeasyPrint nạp trước khi đặt trần, mọi việc sau đó nằm trong `try`, hết bộ nhớ cả lúc ghi kết quả thì thoát
   bằng mã riêng; tiến trình con chết vì tín hiệu (trừ SIGXCPU) là hết bộ nhớ — tệp chỉ đi qua pypdf, mã C chỉ vẽ lớp
   dấu; bỏ đoán theo lời báo lỗi, chỉ tin MemoryError và ENOMEM. Test svc-files +13.
+- brotli 1.2.0 → 1.2.1, brotlicffi 1.2.0.2 → 1.2.1.0 (`svc-files`, gói kéo theo của fontTools mà WeasyPrint dùng):
+  vá lỗi ghi tràn bộ nhớ trong bộ giải nén Brotli (PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) mà OSV-Scanner trong CI
+  báo từ 23/10. Bản vá phát hành 22/10: ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
 
 ## [1.0.0] - 2026-10-23
 
