@@ -24,5 +24,5 @@ subflow Conditional `moc-cli-otp-bat-buoc`, `moc-cli-otp-tu-chon` sau bước m�
 `moc-cli-direct-grant` chọn Bind flow → Direct grant flow (không thì `admin-cli` lấy được token chỉ bằng mật khẩu).
 
 Tài khoản mẫu tạo bằng `make seed` (`seed/users.csv`), không nằm trong realm. Các tài khoản văn thư, lãnh đạo,
-quản trị được cài sẵn TOTP bằng khóa chung `MOC_DEMO_TOTP_SECRET`; `make totp` in mã hiện tại và khóa để thêm
-vào ứng dụng xác thực. Còn làm: giao diện đăng nhập riêng (`auth/themes/`).
+tổ trưởng, trưởng bộ môn, quản trị được cài sẵn TOTP bằng khóa chung `MOC_DEMO_TOTP_SECRET`; `make totp` in mã
+hiện tại và khóa để thêm vào ứng dụng xác thực. Còn làm: giao diện đăng nhập riêng (`auth/themes/`).

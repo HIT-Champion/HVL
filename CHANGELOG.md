@@ -8,6 +8,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Hộp việc của `giamkhao` không còn trống sau `make seed`: có công văn khẩn 152/ĐT-ĐH chờ xử lý và dự thảo phúc đáp
+  bị tổ trưởng trả lại chờ sửa — giám khảo đăng nhập là thấy ngay luồng làm việc của chuyên viên.
 - Cloudflare Tunnel (F1.9, profile `tunnel`, tùy chọn): máy không có IP công khai (laptop, máy ở nhà) ra Internet có
   HTTPS mà không mở cổng nào — dịch vụ `cloudflared` (`cloudflare/cloudflared:2026.10.0`, Apache-2.0, ghim digest) gọi
   ra Cloudflare và chuyển yêu cầu vào APISIX qua mạng Docker; token đọc từ tệp ngoài repo (`MOC_TUNNEL_TOKEN_FILE`,
@@ -431,6 +433,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   từ đó; lượt nới lỗi thì giữ kết quả lượt chính.
 
 ### Đã sửa lỗi
+- Ô chữ đại diện ở đầu trang lấy chữ đầu của từ cuối trong họ tên và không viết hoa: "Tài khoản Giám khảo" ra "k".
+  Nay lấy chữ đầu của tên (claim `family_name` — firstName của Keycloak là họ và đệm), viết hoa: G. README ghi thiếu tổ
+  trưởng, trưởng bộ môn trong các vai trò bắt buộc TOTP; lời nhắc cuối `seed.py` thêm lệnh của bản cài
+  (`python3 scripts/totp.py` — `/opt/moc` không có Makefile).
 - Sau Cloudflare Tunnel, `seed.py` và `smoke.py` dừng với "APISIX chưa sẵn sàng" dù trang vẫn mở được: Browser
   Integrity Check của Cloudflare trả 403 cho User-Agent mặc định `Python-urllib`. Các kịch bản giờ gửi
   `User-Agent: Signet-scripts`.

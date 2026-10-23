@@ -202,10 +202,11 @@ make seed
 ```
 
 Open <http://localhost:8080> and sign in with a sample account; the shared password is the value of
-`MOC_DEMO_PASSWORD` in `.env`. Clerks, managers and unit administrators must use two-factor authentication: after the
-password, enter a TOTP code. `make seed` gives these accounts a shared key (`MOC_DEMO_TOTP_SECRET`); `make totp` prints
-the current code and the key, which you can add once to an authenticator app on your phone (FreeOTP, Aegis, Google
-Authenticator). Real accounts in these roles set up TOTP with a QR code on first sign-in.
+`MOC_DEMO_PASSWORD` in `.env`. Clerks, faculty leaders, team and division heads, and unit administrators must use
+two-factor authentication: after the password, enter a TOTP code. `make seed` gives these accounts a shared key
+(`MOC_DEMO_TOTP_SECRET`); `make totp` prints the current code and the key, which you can add once to an authenticator
+app on your phone (FreeOTP, Aegis, Google Authenticator). Real accounts in these roles set up TOTP with a QR code on
+first sign-in.
 
 | Account | Role | Sees |
 |---|---|---|
@@ -216,9 +217,10 @@ Authenticator). Real accounts in these roles set up TOTP with a QR code on first
 | `quantri` | Unit administrator | The faculty's audit log; cannot read document contents |
 | `vanthukt`, `truongkhoakt` | Faculty of Economics | Only Faculty of Economics documents |
 
-Judges can try it quickly as `giamkhao` (an officer, no TOTP needed). The document verification portal needs no
-login: <http://localhost:8080/xac-thuc>; codes of the issued sample documents are on each document's detail page
-(Outgoing documents, Issued tab).
+Judges can try it quickly as `giamkhao` (an officer, no TOTP needed): the inbox already holds an urgent letter to
+handle and a reply draft the team head sent back for changes. The document verification portal needs no login:
+<http://localhost:8080/xac-thuc>; codes of the issued sample documents are on each document's detail page (Outgoing
+documents, Issued tab).
 
 Stop: `make down` (keeps data) · wipe all data: `make reset` · list every command: `make help`.
 The Keycloak admin console is only reachable on the server itself: <http://127.0.0.1:8180/admin> (`KEYCLOAK_ADMIN_*`

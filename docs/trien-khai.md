@@ -201,7 +201,8 @@ docker compose logs --tail 3 apisix                                   # cột đ
   lấy gateway thật bằng `docker inspect $(docker compose ps -q apisix) --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'`, sửa
   `/opt/moc/.env` rồi `docker compose up -d apisix`.
 - Mở `https://moc.example.vn` trên trình duyệt, đăng nhập `vanthu` (mật khẩu `MOC_DEMO_PASSWORD`, mã TOTP từ
-  `python3 scripts/totp.py`). Tài khoản cho giám khảo: `giamkhao` (chuyên viên, không cần TOTP).
+  `python3 scripts/totp.py`). Tài khoản cho giám khảo: `giamkhao` (chuyên viên, không cần TOTP; hộp việc có sẵn hai
+  việc).
 - Phát hành một văn bản đi rồi **quét mã QR trên bản PDF bằng điện thoại thật** → "khớp" (điều kiện của Phase 2).
 
 ## 7. Vận hành

@@ -36,6 +36,8 @@ DEPT = {
     "HTTT": "8dec217d-fa1e-4fb3-9505-5f6033ba340e",
     "VP": "ecd87efb-e9a1-4113-a46a-f599a9d15574",
 }
+# người duyệt dự thảo cấp phòng của mỗi người soạn mẫu (cùng phòng trong seed/users.csv)
+MANAGER = {"chuyenviendt": "totruongdt", "giamkhao": "totruongdt", "giangvienktpm": "truongbmktpm"}
 TYPE_NAMES = {"CV": "Công văn", "TB": "Thông báo", "KH": "Kế hoạch", "GM": "Giấy mời", "BC": "Báo cáo"}
 
 
@@ -76,6 +78,11 @@ CNTT = [
                 "họp xét của Khoa và danh sách đề nghị gửi về Phòng trước ngày 15/11/2026."),
     Sample("47/KHCN", "Phòng Khoa học và Hợp tác quốc tế", "CV", "Về việc cử giảng viên tham gia hội thảo chuyển đổi số trong giáo dục đại học", 7, stop="assigned", lead="KTPM", handler="giangvienktpm"),
     Sample("140/ĐT-ĐH", "Phòng Đào tạo", "CV", "Về việc cập nhật đề cương chi tiết học phần theo chuẩn đầu ra mới", 8, "khan", "assigned", lead="ĐT", supports=("KTPM",)),
+    # giám khảo đăng nhập là thấy ngay một việc khẩn chờ xử lý (cùng dự thảo phúc đáp bị trả lại ở OUT_CNTT)
+    Sample("152/ĐT-ĐH", "Phòng Đào tạo", "CV", "Về việc góp ý dự thảo Quy định đào tạo trình độ đại học theo hệ thống tín chỉ", 2, "khan", "assigned", lead="ĐT", handler="giamkhao", due_in=5,
+           body="Phòng Đào tạo gửi kèm dự thảo Quy định đào tạo trình độ đại học theo hệ thống tín chỉ (sửa đổi), đề "
+                "nghị Khoa lấy ý kiến giảng viên, chuyên viên.\nÝ kiến tập trung vào: điều kiện đăng ký học vượt, cách "
+                "tính điểm trung bình tích lũy, xử lý học vụ. Văn bản góp ý gửi về Phòng Đào tạo trước ngày 06/11/2026."),
     Sample("95/CTSV", "Phòng Công tác sinh viên", "TB", "Thông báo tổ chức tuần sinh hoạt công dân cho sinh viên khóa mới", 12, stop="done"),
     Sample("118/ĐT-ĐH", "Phòng Đào tạo", "CV", "Về việc báo cáo khối lượng giảng dạy năm học 2025–2026", 15, stop="done", lead="ĐT"),
     Sample("38/KHCN", "Phòng Khoa học và Hợp tác quốc tế", "CV", "Về việc nghiệm thu đề tài nghiên cứu khoa học sinh viên năm 2026", 20, stop="done", lead="KTPM", handler="giangvienktpm"),
@@ -100,6 +107,7 @@ class Draft:
     drafter: str = "chuyenviendt"
     is_public: bool = False
     reply_to: str | None = None   # số ký hiệu của văn bản đến được trả lời
+    return_note: str = "Bổ sung số liệu giảng viên thỉnh giảng, ghi rõ số tiết quy đổi."   # ý kiến khi stop="returned"
 
 
 OUT_CNTT = [
@@ -131,6 +139,14 @@ OUT_CNTT = [
           "Bộ môn Kỹ thuật phần mềm thông báo tuyển sinh viên năm thứ ba, năm thứ tư tham gia nhóm nghiên cứu phần mềm "
           "nguồn mở năm học 2026–2027.",
           ("Sinh viên các khóa",), stop="draft", drafter="giangvienktpm"),
+    # việc thứ hai trong hộp việc của giám khảo: sửa dự thảo theo ý kiến tổ trưởng
+    Draft("CV", "Về việc góp ý dự thảo Quy định đào tạo trình độ đại học theo hệ thống tín chỉ",
+          "Phúc đáp Công văn số 152/ĐT-ĐH của Phòng Đào tạo, Khoa Công nghệ thông tin tổng hợp ý kiến góp ý như sau:\n"
+          "1. Điều kiện đăng ký học vượt: đề nghị giữ mức điểm trung bình tích lũy từ 2,5 trở lên.\n"
+          "2. Xử lý học vụ: đề nghị thêm một lần cảnh báo trước khi buộc thôi học.\n"
+          "Khoa trân trọng đề nghị Phòng Đào tạo tổng hợp.",
+          ("Phòng Đào tạo",), stop="returned", drafter="giamkhao", reply_to="152/ĐT-ĐH",
+          return_note="Bổ sung ý kiến của Bộ môn Kỹ thuật phần mềm về cách tính điểm trung bình tích lũy rồi trình lại."),
 ]
 
 
@@ -288,10 +304,10 @@ def _run_outgoing(clerk_name: str, director_name: str, drafts: list[Draft]) -> i
                     {"d": doc_id, "s": signer})
         if d.stop == "in_review":
             continue
-        manager = person("totruongdt" if d.drafter == "chuyenviendt" else "truongbmktpm")
+        manager = person(MANAGER[d.drafter])
         task = manager.wait_task(doc_id, "vbdi.duyetPhong")
         if d.stop == "returned":
-            manager.complete(task, "return", {"note": "Bổ sung số liệu giảng viên thỉnh giảng, ghi rõ số tiết quy đổi."})
+            manager.complete(task, "return", {"note": d.return_note})
             continue
         manager.complete(task, "approve", {"note": "Đồng ý, trình lãnh đạo khoa ký."})
         director.complete(director.wait_task(doc_id, "vbdi.duyetDonVi"), "approve", {})

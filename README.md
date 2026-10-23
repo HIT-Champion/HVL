@@ -195,10 +195,10 @@ make seed
 ```
 
 Mở <http://localhost:8080> và đăng nhập bằng một tài khoản mẫu; mật khẩu chung là giá trị `MOC_DEMO_PASSWORD` trong
-`.env`. Văn thư, lãnh đạo và quản trị đơn vị bắt buộc xác thực hai bước: sau mật khẩu nhập mã TOTP. `make seed` cài
-sẵn cho các tài khoản này một khóa chung (`MOC_DEMO_TOTP_SECRET`); `make totp` in mã hiện tại và khóa để thêm một lần
-vào ứng dụng xác thực trên điện thoại (FreeOTP, Aegis, Google Authenticator). Tài khoản thật thuộc các vai trò này tự
-cài TOTP bằng mã QR ở lần đăng nhập đầu.
+`.env`. Văn thư, lãnh đạo, tổ trưởng, trưởng bộ môn và quản trị đơn vị bắt buộc xác thực hai bước: sau mật khẩu nhập
+mã TOTP. `make seed` cài sẵn cho các tài khoản này một khóa chung (`MOC_DEMO_TOTP_SECRET`); `make totp` in mã hiện
+tại và khóa để thêm một lần vào ứng dụng xác thực trên điện thoại (FreeOTP, Aegis, Google Authenticator). Tài khoản
+thật thuộc các vai trò này tự cài TOTP bằng mã QR ở lần đăng nhập đầu.
 
 | Tài khoản | Vai trò | Thấy gì |
 |---|---|---|
@@ -209,7 +209,8 @@ cài TOTP bằng mã QR ở lần đăng nhập đầu.
 | `quantri` | Quản trị đơn vị | Sổ kiểm toán của khoa; không đọc nội dung văn bản |
 | `vanthukt`, `truongkhoakt` | Khoa Kinh tế | Chỉ văn bản của Khoa Kinh tế |
 
-Ban giám khảo thử nhanh bằng `giamkhao` (chuyên viên, không cần TOTP). Cổng xác thực văn bản không cần đăng nhập:
+Ban giám khảo thử nhanh bằng `giamkhao` (chuyên viên, không cần TOTP): hộp việc có sẵn một công văn khẩn chờ xử lý
+và một dự thảo phúc đáp bị tổ trưởng trả lại chờ sửa. Cổng xác thực văn bản không cần đăng nhập:
 <http://localhost:8080/xac-thuc>; mã của các văn bản mẫu đã phát hành có trên trang chi tiết văn bản (mục Văn bản đi,
 tab Đã phát hành).
 

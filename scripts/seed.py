@@ -153,8 +153,8 @@ def main() -> None:
         seed_documents.run()
     print(f"Xong. Mở {PUBLIC_URL} — đăng nhập vanthu, truongkhoa, totruongdt, chuyenviendt, giamkhao… "
           "(mật khẩu: MOC_DEMO_PASSWORD trong .env)")
-    print("Văn thư, lãnh đạo, quản trị còn phải nhập mã TOTP: make totp in mã hiện tại và khóa để thêm vào "
-          "ứng dụng xác thực trên điện thoại.")
+    print("Văn thư, lãnh đạo, tổ trưởng, quản trị còn phải nhập mã TOTP: make totp (bản cài: python3 scripts/totp.py) "
+          "in mã hiện tại và khóa để thêm vào ứng dụng xác thực trên điện thoại.")
 
 
 if __name__ == "__main__":
