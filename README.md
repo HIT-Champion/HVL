@@ -269,11 +269,12 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 Nhắc hạn chỉ kiểm được khi thời hạn mỗi bước ngắn (thật là `PT24H`): `MOC_SLA_DURATION=PT20S make up` rồi
 `MOC_SLA_DURATION=PT20S make smoke`.
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request: dựng hệ thống
-từ mã nguồn bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → 12 màn demo (màn
-kiểm dịch đã nằm trong smoke); diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; `make install` sang thư mục
-khác và smoke lại từ bản cài; GitOps với repo git cục bộ; kiểm tài liệu API trong `docs/api/` khớp hệ thống vừa dựng;
-quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ bảng trên cho mọi pull request đổi mã (PR chỉ
+đổi tài liệu `.md` không dựng hệ thống; phần dựng chia ba máy chạy song song, khoảng 12 phút): dựng hệ thống từ mã nguồn
+bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → 12 màn demo (màn kiểm dịch đã nằm
+trong smoke); diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; `make install` sang thư mục khác và smoke lại từ
+bản cài; GitOps với repo git cục bộ; kiểm tài liệu API trong `docs/api/` khớp hệ thống vừa dựng; quét bí mật trong lịch
+sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
 
 ## Tài liệu
 
