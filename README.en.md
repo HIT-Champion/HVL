@@ -316,6 +316,7 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.m
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii` | Measure the AI agents on labelled samples: right / wrong / empty per field, recall@3, coverage | A running system (`do-che-pii` does not need one) |
 | `make do-so-lieu-sau` | The "after" metrics of spec §8 (F4.6): time until a document is assigned, overdue rate, 5 timed searches for old documents; the "before" column reads not measured; prints a table, writes `out/so-lieu-sau.json` | A running system + `make seed` |
 | `db/tests/` | Schema, permissions by role and unit, constraints, audit log (including tampering attempts) on real PostgreSQL + Hasura | see [`db/README.md`](db/README.md) |
+| `make sbom`, `make license-audit` | CycloneDX SBOM of the source tree into `dist/` (Syft); the license of every npm package, Python package and CI action, transitive ones included, against the policy in `DEPENDENCIES.md` | Docker, network access to PyPI |
 
 Reminders can only be tested with short step deadlines (the real one is `PT24H`): `MOC_SLA_DURATION=PT20S make up`,
 then `MOC_SLA_DURATION=PT20S make smoke`.
@@ -326,7 +327,9 @@ three parallel runners, about 12 minutes): it builds the system from source with
 seed` → `make smoke` → `make e2e` → 12 demos (the quarantine demo is part of smoke); rehearses backup, wiping the data,
 restoring and running smoke again; runs `make install` into another directory and smoke from the installation; GitOps
 against a local git repository; checks that the API documentation in `docs/api/` matches the freshly built system; scans
-the commit history for secrets (gitleaks) and the dependency lock files for known vulnerabilities (OSV-Scanner).
+the commit history for secrets (gitleaks) and the dependency lock files for known vulnerabilities (OSV-Scanner);
+generates a CycloneDX SBOM of the source tree (`make sbom`, Syft) and checks the license of every package in it,
+transitive ones included (`make license-audit`). Every release after 1.0.0 ships that SBOM.
 
 ## Documentation
 
@@ -351,6 +354,7 @@ the commit history for secrets (gitleaks) and the dependency lock files for know
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Upstream software, pinned versions, licenses |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributing guide |
+| [`SECURITY.md`](SECURITY.md) | Security policy (Vietnamese): supported versions, private vulnerability reporting, response times, scope |
 | [`ROADMAP.md`](ROADMAP.md) | Roadmap |
 
 ## Reporting bugs and contributing
@@ -358,6 +362,7 @@ the commit history for secrets (gitleaks) and the dependency lock files for know
 - **Bugs / feature requests**: open an issue at <https://github.com/HIT-Champion/HVL/issues>
 - **Code contributions**: read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request
 - **Code of conduct**: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+- **Security vulnerabilities**: do not open a public issue — report privately, see [`SECURITY.md`](SECURITY.md)
 
 ## License
 

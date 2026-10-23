@@ -43,6 +43,8 @@ env:
   ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
   GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
   OSV_SCANNER_IMAGE: ghcr.io/google/osv-scanner:v2.6.0@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa
+  # make sbom đọc biến này thay cho giá trị mặc định trong Makefile — hai chỗ phải trùng (test scripts kiểm)
+  SYFT_IMAGE: ghcr.io/anchore/syft:v1.54.1@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa
 
 jobs:
   license:
@@ -70,6 +72,18 @@ jobs:
             fi
           done
           echo "Không có mã nguồn dự án khác bị bundle vào kho."
+
+      # Header chỉ nói giấy phép của mã đội viết; gói kéo theo (gián tiếp, kể cả gói chỉ dùng lúc dựng) cũng không được
+      # mang giấy phép xung đột (PoF #2 trừ điểm "xung đột giấy phép"). Syft liệt kê mọi gói trong tệp khóa npm,
+      # requirements*.txt và action của workflow thành SBOM CycloneDX; giấy phép gói Python hỏi PyPI vì requirements.txt
+      # không ghi
+      - name: Danh mục thành phần SBOM CycloneDX (make sbom)
+        run: make sbom
+
+      # Chính sách lấy từ DEPENDENCIES.md (mục "Kiểm tra tương thích giấy phép"); gói ngoài chính sách hay chưa rõ giấy
+      # phép chỉ qua khi có ngoại lệ ghi lý do trong .github/license-exceptions.json
+      - name: Giấy phép mọi gói trong SBOM (make license-audit)
+        run: make license-audit
 
   build:
     name: "Dựng từ mã nguồn (PoF #4)"
