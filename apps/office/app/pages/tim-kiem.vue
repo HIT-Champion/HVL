@@ -71,13 +71,13 @@ onMounted(() => { if (q.value) run() })
       </NuxtLink>
     </PageHeader>
     <form class="card mb-6 flex flex-col gap-3 p-4 sm:flex-row" @submit.prevent="run()">
-      <input v-model="q" type="search" class="input flex-1" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
-      <select v-model="direction" class="input sm:w-44">
+      <input v-model="q" type="search" class="input flex-1" :aria-label="t('search.title')" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
+      <select v-model="direction" class="input sm:w-44" :aria-label="t('search.directionLabel')">
         <option value="">{{ t('search.any') }}</option>
         <option value="in">{{ t('search.direction.in') }}</option>
         <option value="out">{{ t('search.direction.out') }}</option>
       </select>
-      <button class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
+      <button type="submit" class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
     </form>
 
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>

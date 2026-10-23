@@ -251,8 +251,8 @@ def test_malformed_output_is_rejected(content):
     ("Điểm trung bình chung <b>từ 3,2</b> [1].", "bad_text"),
     ("```\nđiểm từ 3,2 trở lên [1]\n```", "bad_text"),
     ("Điểm trung bình chung\u0007 từ 3,2 trở lên [1].", "bad_text"),
-    ("Điểm trung bình chung​ từ 3,2 trở lên [1].", "bad_text"),
-    ("Điểm trung bình chung‮ từ 3,2 trở lên [1].", "bad_text"),
+    ("Điểm trung bình chung\u200b từ 3,2 trở lên [1].", "bad_text"),
+    ("Điểm trung bình chung\u202e từ 3,2 trở lên [1].", "bad_text"),
 ])
 def test_bad_length_and_forbidden_text(text, reason):
     assert validate(reply(text), srcs_of(PAGE_88), QUESTION).reason == reason

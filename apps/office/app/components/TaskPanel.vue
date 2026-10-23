@@ -200,7 +200,7 @@ function submitDone() {
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
         <div class="flex items-end gap-2">
-          <input v-model="fileNote" class="input w-56" :placeholder="t('form.chiDao.fileNote')">
+          <input v-model="fileNote" class="input w-56" :aria-label="t('form.chiDao.fileNote')" :placeholder="t('form.chiDao.fileNote')">
           <button type="button" class="btn-secondary" :disabled="busy" @click="complete('file', { note: fileNote.trim() || null })">{{ t('form.chiDao.file') }}</button>
         </div>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.chiDao.direct') }}</button>

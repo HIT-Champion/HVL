@@ -70,6 +70,9 @@ ACTOR = "svc-workflow"
 KINDS = ("task.assigned", "task.overdue", "task.escalated", "document.issued", "document.processed",
          "document.overdue", "document.incoming", "ot.alarm")
 SMTP_PORTS = {"starttls": 587, "ssl": 465, "none": 25}
+# Lý do ghi vào last_error khi MOC_SMTP_TLS=none đi cùng MOC_SMTP_USER (SmtpConfig.plain_login)
+PLAIN_LOGIN = ("Không đăng nhập máy chủ thư qua kết nối không mã hóa (MOC_SMTP_TLS=none, có MOC_SMTP_USER): "
+               "dùng starttls hoặc ssl")
 WEBHOOK_FORMATS = ("json", "ntfy")
 MAX_ATTEMPTS = 5
 BATCH = 20
@@ -200,6 +203,11 @@ class SmtpConfig:
     password: str = field(default="", repr=False)
     timeout_s: float = 15.0
 
+    @property
+    def plain_login(self) -> bool:
+        """Có tài khoản mà kết nối không mã hóa: đăng nhập sẽ gửi mật khẩu dạng rõ, nên không bao giờ đăng nhập."""
+        return self.tls == "none" and bool(self.user)
+
 
 @dataclass(frozen=True)
 class WebhookConfig:
@@ -227,6 +235,11 @@ class Failure(Exception):
 
 def send_smtp(cfg: SmtpConfig, msg: EmailMessage) -> None:
     """Gửi một thư bằng smtplib (thư viện chuẩn) — chặn, nên Router gọi trong luồng riêng."""
+    if cfg.plain_login:
+        # Không nối, không đăng nhập. Thư báo lỗi gửi như mọi lỗi khác (last_error, nhật ký) và được thử lại theo nhịp
+        # thường như lỗi đăng nhập ở smtp_failure; cấu hình chỉ đọc lúc khởi động nên thư chỉ đi nếu người vận hành sửa
+        # .env và khởi động lại dịch vụ trước lần thử cuối
+        raise Failure(PLAIN_LOGIN)
     context = ssl.create_default_context()
     if cfg.tls == "ssl":
         client: smtplib.SMTP = smtplib.SMTP_SSL(cfg.host, cfg.port, timeout=cfg.timeout_s, context=context)

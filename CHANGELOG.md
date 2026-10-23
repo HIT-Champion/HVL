@@ -84,6 +84,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - brotli 1.2.0 → 1.2.1, brotlicffi 1.2.0.2 → 1.2.1.0 (`svc-files`, gói kéo theo của fontTools mà WeasyPrint dùng):
   vá lỗi ghi tràn bộ nhớ trong bộ giải nén Brotli (PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) mà OSV-Scanner trong CI
   báo từ 23/10. Bản vá phát hành 22/10: ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
+- Sửa các lỗi SonarQube tìm thấy ở lần quét đầu (23/10/2026). `POST /ot/notify/{tenant}` của `svc-workflow` khai trả
+  204 mà có 5 nhánh `return` thân lỗi (5 BLOCKER `python:S8400`): lỗi nay ném `WorkflowError` cho một bộ xử lý chung;
+  mã HTTP, thân lỗi và OpenAPI không đổi. `MOC_SMTP_TLS=none` đi cùng `MOC_SMTP_USER` từng đăng nhập máy chủ thư qua
+  kết nối không mã hóa, mật khẩu đi dạng rõ: nay không đăng nhập, thư email báo lỗi gửi, lúc khởi động ghi một dòng
+  `config.warning` (không chặn khởi động). Ô tìm kiếm, ô chọn văn bản đến hay đi và ô lý do lưu có tên cho trình đọc
+  màn hình, nút Tìm ghi `type="submit"`, kiểm form không còn `reduce()` thiếu giá trị đầu. Ký tự điều khiển hai chiều
+  trong mã `svc-files` viết bằng mã thoát. Test mới chạy lại các luật này mà không cần SonarQube: route khai 204 không
+  `return` thân, ký tự hai chiều ở `services/`, `apps/`, `scripts/`, nhãn ô nhập và `type` của nút trong form ở mọi
+  tệp `.vue`. Các cảnh báo còn lại là báo nhầm, không chèn `NOSONAR`. Test svc-workflow +5, office +3, scripts +2.
 
 ### Bảo mật
 - Image `svc-files`, `svc-workflow` (cả `ot-sensor`, dùng chung image) gỡ pip ngay sau khi cài thư viện: pip 26.2.1

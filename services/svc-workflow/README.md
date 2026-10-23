@@ -198,9 +198,9 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
 | `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
 | `MOC_SMTP_HOST` | trống | Máy chủ thư; trống thì tắt kênh email |
-| `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa — chỉ trong mạng nội bộ, vd Mailpit) |
+| `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa, chỉ cho relay nội bộ như Mailpit, không bao giờ đăng nhập — xem dưới bảng) |
 | `MOC_SMTP_PORT` | theo `MOC_SMTP_TLS` | `587` (starttls), `465` (ssl), `25` (none) |
-| `MOC_SMTP_USER`, `MOC_SMTP_PASSWORD` | trống | Đăng nhập SMTP khi có `MOC_SMTP_USER`; mật khẩu lấy từ két |
+| `MOC_SMTP_USER`, `MOC_SMTP_PASSWORD` | trống | Đăng nhập SMTP khi có `MOC_SMTP_USER`, chỉ qua `starttls` hoặc `ssl`; mật khẩu lấy từ két |
 | `MOC_SMTP_FROM` | trống | Người gửi, vd `Signet <signet@ten-mien>`; bắt buộc (có `@`) khi đặt `MOC_SMTP_HOST` |
 | `MOC_NOTIFY_WEBHOOK_URL` | trống | URL `http`/`https` nhận tin; lấy từ két; trống thì tắt kênh webhook |
 | `MOC_NOTIFY_WEBHOOK_FORMAT` | `json` | `json` (`{"text": …}`: Mattermost, Slack) hoặc `ntfy` |
@@ -208,12 +208,18 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_NOTIFY_INTERVAL_S` | `5` | Chu kỳ vòng nền gửi thông báo ngoài; `0` tắt (dòng chờ nằm nguyên tới khi bật lại) |
 | `MOC_PUBLIC_URL` | trống | Địa chỉ trang web cho liên kết trong thư, tin webhook; trống thì không kèm liên kết |
 
+`MOC_SMTP_TLS=none` mà có `MOC_SMTP_USER`: svc-workflow không nối máy chủ thư để mật khẩu không đi qua kết nối rõ.
+Dịch vụ vẫn chạy, lúc khởi động ghi một dòng `config.warning`; mỗi thư báo lỗi với lý do trong `last_error` và được
+thử lại 4 lần (sau 30, 60, 120, 240 giây) rồi thành `failed`. Cấu hình chỉ đọc lúc khởi động: sửa `.env` (chuyển
+sang `starttls`/`ssl`, hoặc bỏ `MOC_SMTP_USER` nếu relay không cần đăng nhập) rồi khởi động lại svc-workflow trong
+khoảng 7,5 phút đó thì thư đang chờ vẫn đi; quá thời gian đó thư không gửi lại.
+
 ## Phát triển
 
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 456 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
+.venv/bin/python -m pytest          # 461 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

@@ -384,6 +384,7 @@
     "empty": "No matching documents.",
     "more": "Load more",
     "any": "All",
+    "directionLabel": "Incoming or outgoing",
     "direction": {
       "in": "Incoming",
       "out": "Outgoing"
