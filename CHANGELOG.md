@@ -20,6 +20,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   cơ chế an toàn kèm tệp mã. Thêm lần đo trợ lý hỏi đáp trên bản online (23/10/2026, Qwen3-1.7B và
   Qwen3-Embedding-0.6B trên CPU): recall@3 16/16, 0 nguồn bị cấm, câu trả lời của mô hình qua kiểm 16/16, p50 8,9
   giây. Bảng Tài liệu của README (cả bản tiếng Anh) có thêm dòng này.
+- Hồ sơ chất vấn: `docs/du-thi/hoi-dap-hoi-dong.md` gồm 13 câu hội đồng dễ hỏi (lên 100.000 người dùng, nguồn mở và
+  khóa nhà cung cấp, lõi dùng lại cho ứng dụng khác, bảo mật, AI bịa và dữ liệu ra ngoài, sao lưu và tự phục hồi, chạy
+  không Internet, chi phí, giấy phép, việc chưa làm), mỗi câu trả lời kèm đường dẫn, lệnh `make`, bước CI làm bằng
+  chứng. `docs/demo-script.md` thêm mục "Phương án dự phòng" (mất mạng, hỏng laptop, AI chậm, TOTP không qua, bước demo
+  lỗi; máy dự phòng chạy tại chỗ không cần Internet, video) và checklist T-1 ngày, T-1 giờ, T-5 phút.
 
 ### Đã sửa đổi
 - CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và
