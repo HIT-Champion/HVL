@@ -171,6 +171,42 @@ permissions: [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) (both in Vietn
 > Signet was formerly named **Mộc**. The technical codename `moc` remains in code and configuration: `MOC_*`
 > variables, realm `moc`, the `scripts/moc.py` command, `moc/*` images, the `/opt/moc` install directory.
 
+## Repository layout
+
+The team's own code lives in `apps/`, `services/` and `db/`. The configuration directories at the root (`auth/`,
+`gateway/`…) configure the open source software the core uses, as listed in the Architecture table.
+
+```
+apps/office/             e-Office interface (Nuxt 4, TypeScript): app/pages, app/components…; tests/
+services/
+  svc-workflow/          Hasura Actions, workflows, notifications, deadline reminders (Python, FastAPI); tests/
+    src/svc_workflow/    advisor.py + suggest.py: assignment suggestion agent (F4.3); ot.py: sensor → incident report
+  svc-files/             Files, quarantine, search, PDF rendering, signing, verification portal (Python, FastAPI);
+                         tests/
+    src/svc_files/       docread/: incoming-document reader (F4.1) · assist/: Q&A over the document store (F4.2) ·
+                         pii.py: personal data masking (F4.4)
+db/
+  migrations/default/    PostgreSQL schema (core, office), constraints, hash-chained audit log
+  metadata/              Hasura: permissions by role and unit, Actions
+  tests/                 Tests against a real PostgreSQL + Hasura
+schemas/                 Form JSON Schemas, shared by the interface, the services and the database
+processes/               BPMN workflows for incoming and outgoing documents; svc-workflow deploys them to Flowable
+auth/ gateway/ realtime/ Keycloak, APISIX, Centrifugo configuration
+openbao/ monitoring/     OpenBao configuration; Prometheus + Grafana
+ot/                      Simulated sensor (profile iot)
+ops/systemd/             Timer that runs the GitOps reconciler on the server
+scripts/                 Operations commands (moc.py, seed, smoke, backup, audit, reconcile, demo), install
+                         (install.sh), repository tooling (check_pr.py, release*, license-header.sh, api_docs.py);
+                         tests/
+seed/                    Sample data: units, accounts, simulated documents for demos and for measuring the AI agents
+tests/e2e/               Browser tests (Playwright)
+docs/                    Product documentation: architecture, data model, deployment, operations; api/: API docs
+docs/du-thi/             Contest documents: problem analysis, PoF self-assessment, development plan, research
+.github/                 CI, releases, PR checks, rulesets, issue and PR templates
+docker-compose.yml       The whole system, split into profiles core, app, ai, iot…
+Makefile                 Entry point for every command: make env, up, seed, test, smoke, install…
+```
+
 ## System requirements
 
 | Component | Minimum version | Notes |
