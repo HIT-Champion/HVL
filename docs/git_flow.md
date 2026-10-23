@@ -119,7 +119,7 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `gateway` | APISIX: route, plugin | Backend |
 | `auth` | Keycloak: realm, vai trò, mapper, trang đăng nhập | Frontend · Backend |
 | `db` | Schema, migration, metadata Hasura, ràng buộc, sổ kiểm toán | AI |
-| `workflow` | Flowable, `svc-workflow`, `processes/*.bpmn` | Backend |
+| `workflow` | Flowable, `svc-workflow`, `services/svc-workflow/processes/*.bpmn` | Backend |
 | `files` | `svc-files`, SeaweedFS, ClamAV, tìm kiếm | AI |
 | `realtime` | Centrifugo | Backend |
 | `office` | `apps/office` — giao diện web | Frontend |

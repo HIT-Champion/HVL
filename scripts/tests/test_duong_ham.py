@@ -87,7 +87,7 @@ class KeycloakForwardedPortTest(unittest.TestCase):
     """Cloudflare không gửi X-Forwarded-Port: route Keycloak đặt 443 khi proto https từ proxy tin cậy."""
 
     def test_map_sets_443_only_for_trusted_https_without_port(self) -> None:
-        text = (ROOT / "gateway" / "config.yaml").read_text(encoding="utf-8")
+        text = (ROOT / "platform" / "apisix" / "config.yaml").read_text(encoding="utf-8")
         start = text.index("geo $realip_remote_addr $moc_proxy_tin_cay {")
         geo = text[start:text.index("\n    }", start)]    # "}" đầu tiên là của ${{…}}
         self.assertIn("default 0;", geo)
@@ -103,7 +103,7 @@ class KeycloakForwardedPortTest(unittest.TestCase):
         self.assertNotIn("$http_x_forwarded", body)
 
     def test_every_keycloak_route_uses_the_port(self) -> None:
-        text = (ROOT / "gateway" / "apisix.yaml").read_text(encoding="utf-8")
+        text = (ROOT / "platform" / "apisix" / "apisix.yaml").read_text(encoding="utf-8")
         self.assertIn("X-Forwarded-Port: $moc_cong_chuyen_tiep", text)
         routes = text.split("\nroutes:\n", 1)[1].split("\n  - id: ")
         keycloak = [r for r in routes if "upstream_id: keycloak" in r]

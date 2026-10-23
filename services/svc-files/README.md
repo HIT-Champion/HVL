@@ -511,7 +511,7 @@ bản che idempotent. Thời gian tuyến tính theo độ dài chữ (chuỗi b
   `core.log.redaction_failed`: thà mất một dòng. Tệp nhiễm tên `don-0912345678.txt`: dòng `core.file.rejected` ghi
   `don-[SĐT].txt`, còn dòng sổ `file.rejected` giữ tên gốc — sổ có phân quyền và chuỗi băm, che vào sổ thì mất giá
   trị chứng cứ. APISIX và nginx của giao diện cũng bỏ chuỗi truy vấn và Referer:
-  [`gateway/README.md`](../../gateway/README.md).
+  [`platform/apisix/README.md`](../../platform/apisix/README.md).
 - **Số chỗ đã che** (không bao giờ có giá trị) ở khóa `masked`, không vào sổ kiểm toán:
 
   | Sự kiện | `masked` |
@@ -612,7 +612,7 @@ của Signet cấp (CN "CA nội bộ Signet - MẪU, chỉ minh họa"), CA nà
 - **Khóa ký không rời két.** Mỗi đơn vị một khóa transit `moc-ky-so-<id đơn vị>` (RSA-3072), svc-files tạo ở lần ký
   đầu. svc-files chỉ gửi phần thuộc tính đã ký sang `transit/sign/<khóa>/sha2-256` (PKCS#1 v1.5); két ghi sổ từng
   lần ký. Policy của svc-files không có `transit/export`, `transit/backup`.
-- **Chứng thư.** CA gốc một tầng dựng trong `setup()` của `openbao/start.sh`. Phiên bản khóa chưa có chứng thư thì:
+- **Chứng thư.** CA gốc một tầng dựng trong `setup()` của `platform/openbao/start.sh`. Phiên bản khóa chưa có chứng thư thì:
   CSR do chính transit ký (`transit/keys/<khóa>/csr`) → `pki/sign/moc-van-thu` với CN "<đơn vị>, <cơ quan chủ quản>"
   (quá 64 byte UTF-8 thì chỉ tên đơn vị: chữ có dấu tốn 2–3 byte, "Khoa Công nghệ thông tin, Trường Đại học Công
   nghiệp" là 67 byte) → kiểm chứng thư mang đúng khóa công khai của transit → gắn chuỗi lá + CA vào
@@ -817,7 +817,7 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 - **Bản rõ không ghi xuống đĩa**: Starlette đệm tệp tải lên lớn ở `/tmp`, clamd ghi luồng nhận qua INSTREAM ra thư
   mục tạm trước khi quét — `/tmp` của svc-files và của ClamAV đều là tmpfs (compose).
 - svc-files chỉ xin khóa mới và nhờ két mở khóa đã bọc, không lấy được khóa gốc `moc-files` (policy trong
-  `openbao/start.sh`). Mất két (volume `openbao_data`) là mất mọi tệp văn bản hạn chế — két nằm trong `make backup`.
+  `platform/openbao/start.sh`). Mất két (volume `openbao_data`) là mất mọi tệp văn bản hạn chế — két nằm trong `make backup`.
 - Tệp mã hóa không được đọc chữ, không vào chỉ mục (mục Nội dung tệp PDF); văn bản hạn chế không vào hồ sơ nộp lưu.
 - Văn bản đi hạn chế: bản tải về nào cũng mang dấu người xem nên băm khác bản phát hành — người nhận kiểm ở cổng xác
   thực bằng mã in cạnh mã QR, không kiểm theo băm được. Cổng xác thực không bao giờ hiện trích yếu của văn bản hạn chế
@@ -857,7 +857,7 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 ## Cấu hình
 
 Bí mật (khóa S3, khóa quản trị Hasura, khóa Meilisearch) không truyền qua biến môi trường. Khi có `MOC_OPENBAO_ADDR`,
-lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc chúng (F3.2, `openbao/start.sh`); bí
+lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc chúng (F3.2, `platform/openbao/start.sh`); bí
 mật trong két đè lên biến cùng tên. Không đặt `MOC_OPENBAO_ADDR` thì đọc thẳng biến môi trường (test, chạy tay).
 Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
 

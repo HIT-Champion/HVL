@@ -264,7 +264,7 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   đích (số dính chữ, họ tên, địa chỉ, CMND không từ khóa…), véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại, nhật ký
   Hasura, PostgreSQL, Keycloak và `error_log` của APISIX, nginx nằm ngoài phạm vi. Hai danh mục (mã tỉnh, đầu số di
   động) đổi theo thời gian, có ngày và nguồn trong mã. Chi tiết: README của `svc-files` (mục "Che thông tin cá nhân"),
-  `gateway/README.md`.
+  `platform/apisix/README.md`.
 
 ### QĐ-007: Ký số PDF: khóa ký trong Transit, CA nội bộ một tầng trong két, pyHanko; chỉ minh họa
 
@@ -293,7 +293,7 @@ Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → p
   2. **PKI một tầng trong két (Q2):** mount `pki`, CA gốc `moc-root` kiểu `internal` (rsa-4096, 10 năm, CN "CA nội bộ
      Signet - MẪU, chỉ minh họa"); role `moc-van-thu` cấp chứng thư 1 năm, KU DigitalSignature + ContentCommitment, EKU
      Document Signing. Không CRL, không OCSP. CA và khóa ký nằm trong volume `openbao_data`, đã có trong `make backup`.
-  3. **Bật PKI trong `setup()` của `openbao/start.sh` (Q3, bản tối thiểu):** két mới (cài mới, CI) dựng PKI và policy
+  3. **Bật PKI trong `setup()` của `platform/openbao/start.sh` (Q3, bản tối thiểu):** két mới (cài mới, CI) dựng PKI và policy
      mới lúc khởi tạo, bằng token root trước khi thu hồi nó. Dựng PKI lỗi chỉ ghi nhật ký, két vẫn lên, `svc-files` tự
      tắt ký số. **Két khởi tạo trước F4.5 không tự nâng cấp:** token khởi động không sửa được policy, nên két đó không
      ký cho tới khi quản trị nâng cấp tay (tạo lại token root bằng khóa phục hồi, khởi động lại két để `setup()` chạy

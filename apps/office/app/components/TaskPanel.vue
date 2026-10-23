@@ -20,7 +20,7 @@
 import { useI18n } from 'vue-i18n'
 import type { SuggestApply } from '~/utils/assignSuggest'
 
-// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong processes/*.bpmn20.xml).
+// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong services/svc-workflow/processes/*.bpmn20.xml).
 // Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
 
 export interface PanelUser { id: string; full_name: string; role: string; department_id: string | null }

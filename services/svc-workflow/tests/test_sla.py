@@ -34,7 +34,7 @@ from svc_workflow.sla import Deadlines, parse_duration
 DIRECTOR_GROUP = f"t:{TENANT}:director"
 MANAGER_GROUP = f"t:{TENANT}:d:{DEPT_DT}:manager"
 CREATED = datetime(2026, 10, 19, 9, 0, tzinfo=UTC)
-PROCESSES = pathlib.Path(__file__).resolve().parents[3] / "processes"
+PROCESSES = pathlib.Path(__file__).resolve().parents[1] / "processes"
 BPMN = "{http://www.omg.org/spec/BPMN/20100524/MODEL}"
 FLOWABLE = "{http://flowable.org/bpmn}"
 

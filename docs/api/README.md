@@ -52,7 +52,7 @@ Cổng trả `404` cho các đường còn lại:
 - API quản trị và nội bộ: `/v1/metadata`, `/v2/query`, `/console`, `/admin`, `/flowable-rest/*`, `/healthz`,
   `/metrics`, …
 - WebSocket tới Hasura, nên chưa dùng được `subscription` của GraphQL; thông báo đẩy đi qua `/realtime` (§4).
-  Danh sách đầy đủ ở [`gateway/apisix.yaml`](../../gateway/apisix.yaml).
+  Danh sách đầy đủ ở [`platform/apisix/apisix.yaml`](../../platform/apisix/apisix.yaml).
 
 Token thiếu, sai chữ ký hoặc hết hạn bị cổng trả `401` trước khi tới Hasura hay `svc-files`. Hai dịch vụ này
 vẫn kiểm lại token (zero-trust).
@@ -68,10 +68,10 @@ Access token sống 5 phút; làm mới bằng refresh token.
 
 - **Ứng dụng trên trình duyệt** dùng Authorization Code + PKCE (S256) với client công khai, như client
   `app-office`.
-  - Muốn thêm một ứng dụng Tầng 2: thêm client vào [`auth/realm/moc-realm.json`](../../auth/realm/moc-realm.json)
+  - Muốn thêm một ứng dụng Tầng 2: thêm client vào [`platform/keycloak/realm/moc-realm.json`](../../platform/keycloak/realm/moc-realm.json)
     theo mẫu `app-office`. Giữ nguyên `protocolMappers` để token có claim của Hasura; đổi `clientId` và
     `redirectUris`.
-  - Văn thư, lãnh đạo và quản trị đơn vị phải nhập mã TOTP sau mật khẩu ([`auth/README.md`](../../auth/README.md)).
+  - Văn thư, lãnh đạo và quản trị đơn vị phải nhập mã TOTP sau mật khẩu ([`platform/keycloak/README.md`](../../platform/keycloak/README.md)).
 - **Script** dùng client `moc-cli`, luồng mật khẩu kèm mã TOTP (tham số `otp`) — hỏi mã theo đúng quy tắc của
   trình duyệt. Không cần trên server thật thì tắt (`MOC_CLI_CLIENT_ENABLED=false`).
 
@@ -280,6 +280,6 @@ Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"],
 | `svc-workflow` → `svc-files` `POST /internal/issue` | Token tài khoản dịch vụ `svc-workflow` (client credentials của Keycloak) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → Flowable REST, Keycloak | Tài khoản dịch vụ | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
 | `svc-workflow` → Flowable `external-job-api` | Tự lấy việc nhắc hạn (topic `moc-sla`) do timer trong BPMN tạo | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
-| `svc-workflow` → Centrifugo `POST /api/batch` (cổng nội bộ 9000) | Tiêu đề `X-API-Key` (`CENTRIFUGO_API_KEY`) | [`realtime/config.yaml`](../../realtime/config.yaml) |
+| `svc-workflow` → Centrifugo `POST /api/batch` (cổng nội bộ 9000) | Tiêu đề `X-API-Key` (`CENTRIFUGO_API_KEY`) | [`platform/centrifugo/config.yaml`](../../platform/centrifugo/config.yaml) |
 | `svc-files` → SeaweedFS, bucket lạnh `moc-cold` | S3, bucket bật Object Lock; ghi mốc neo sổ kiểm toán kèm hạn giữ COMPLIANCE | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `scripts/moc.py` trên máy chủ → PostgreSQL, `svc-files` | `docker compose exec` (không mở thêm cổng) | [`db/README.md`](../../db/README.md#sổ-kiểm-toán-chuỗi-băm) |

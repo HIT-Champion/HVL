@@ -17,7 +17,7 @@
 # F3.3 — một lượt reconciler GitOps + tự phục hồi của Signet (scripts/reconcile.py). Tệp MẪU: sửa đường dẫn, người
 # dùng cho đúng máy chủ rồi cài (docs/van-hanh.md mục "GitOps và tự phục hồi"):
 #
-#   sudo cp ops/systemd/moc-reconcile.service ops/systemd/moc-reconcile.timer /etc/systemd/system/
+#   sudo cp platform/systemd/moc-reconcile.service platform/systemd/moc-reconcile.timer /etc/systemd/system/
 #   sudo systemctl daemon-reload && sudo systemctl enable --now moc-reconcile.timer
 #   journalctl -u moc-reconcile -f        # xem từng lượt
 #

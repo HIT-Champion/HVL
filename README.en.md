@@ -152,17 +152,17 @@ the applications, here the e-Office. Only the APISIX gateway is exposed.
 
 | Component | Role | Directory |
 |---|---|---|
-| Keycloak 26 | SSO, TOTP; roles, unit and department go into the token for Hasura | `auth/realm/` |
-| Apache APISIX 3 | The only exposed gateway: path allow-list, JWT check at the edge, admin paths blocked, rate limits for login (per IP) and API (per session) | `gateway/` |
+| Keycloak 26 | SSO, TOTP; roles, unit and department go into the token for Hasura | `platform/keycloak/realm/` |
+| Apache APISIX 3 | The only exposed gateway: path allow-list, JWT check at the edge, admin paths blocked, rate limits for login (per IP) and API (per session) | `platform/apisix/` |
 | Hasura 2 + PostgreSQL 16 | Generated GraphQL, row-level permissions by role and unit, hash-chained audit log | `db/` |
-| Flowable 8 | BPMN processes for handling incoming documents and approving and issuing outgoing ones | `processes/` |
+| Flowable 8 | BPMN processes for handling incoming documents and approving and issuing outgoing ones | `services/svc-workflow/processes/` |
 | `svc-workflow` | Hasura Actions: registration, submitting outgoing documents, task inbox, completing tasks, issuing; notifications, reminders; Keycloak directory sync; sensor alerts | `services/svc-workflow/` |
 | `svc-files` | Uploads through ClamAV into SeaweedFS, Meilisearch search; outgoing-document PDFs with a QR code, PAdES signature (illustrative), printed registers; verification portal; the AI agents | `services/svc-files/` |
-| Centrifugo 6 | Pushes notifications to the browser over WebSocket, one channel per person | `realtime/` |
-| OpenBao 2 | Secrets vault: services fetch secrets via AppRole at start-up; encryption keys for restricted documents; internal CA and per-unit signing keys | `openbao/` |
+| Centrifugo 6 | Pushes notifications to the browser over WebSocket, one channel per person | `platform/centrifugo/` |
+| OpenBao 2 | Secrets vault: services fetch secrets via AppRole at start-up; encryption keys for restricted documents; internal CA and per-unit signing keys | `platform/openbao/` |
 | `app-office` | The e-Office interface (Nuxt 4, Tailwind), Vietnamese / English | `apps/office/` |
-| Prometheus 3 + Grafana 13 | API gateway monitoring: request count, status codes, latency per route; internal network only | `monitoring/` |
-| Scorpio 6 + PostGIS (profile `iot`) | NGSI-LD context broker: digital twins of sensors, measurement history | `ot/` |
+| Prometheus 3 + Grafana 13 | API gateway monitoring: request count, status codes, latency per route; internal network only | `platform/monitoring/` |
+| Scorpio 6 + PostGIS (profile `iot`) | NGSI-LD context broker: digital twins of sensors, measurement history | `services/ot-sensor/` |
 | Ollama (profile `ai`, optional) | Local language model on its own internal network, cloud features off | `docker-compose.yml` |
 
 The H-P-D-I model, tool map and technical decisions: [`docs/architecture.md`](docs/architecture.md). Data model and
@@ -173,28 +173,31 @@ permissions: [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) (both in Vietn
 
 ## Repository layout
 
-The team's own code lives in `apps/`, `services/` and `db/`. The configuration directories at the root (`auth/`,
-`gateway/`…) configure the open source software the core uses, as listed in the Architecture table.
+The team's own code lives in `apps/`, `services/` and `db/`. `platform/` only holds configuration and start-up scripts
+for the open source software the core uses unmodified (official images, no changes to upstream code), as listed in the
+Architecture table.
 
 ```
 apps/office/             e-Office interface (Nuxt 4, TypeScript): app/pages, app/components…; tests/
 services/
   svc-workflow/          Hasura Actions, workflows, notifications, deadline reminders (Python, FastAPI); tests/
     src/svc_workflow/    advisor.py + suggest.py: assignment suggestion agent (F4.3); ot.py: sensor → incident report
+    processes/           BPMN workflows for incoming and outgoing documents; svc-workflow deploys them at start-up
   svc-files/             Files, quarantine, search, PDF rendering, signing, verification portal (Python, FastAPI);
                          tests/
     src/svc_files/       docread/: incoming-document reader (F4.1) · assist/: Q&A over the document store (F4.2) ·
                          pii.py: personal data masking (F4.4)
+  ot-sensor/             Simulated temperature sensor (profile iot)
 db/
   migrations/default/    PostgreSQL schema (core, office), constraints, hash-chained audit log
   metadata/              Hasura: permissions by role and unit, Actions
   tests/                 Tests against a real PostgreSQL + Hasura
 schemas/                 Form JSON Schemas, shared by the interface, the services and the database
-processes/               BPMN workflows for incoming and outgoing documents; svc-workflow deploys them to Flowable
-auth/ gateway/ realtime/ Keycloak, APISIX, Centrifugo configuration
-openbao/ monitoring/     OpenBao configuration; Prometheus + Grafana
-ot/                      Simulated sensor (profile iot)
-ops/systemd/             Timer that runs the GitOps reconciler on the server
+platform/                Configuration for open source software used unmodified
+  keycloak/ apisix/      Keycloak realm; APISIX gateway routes and plugins
+  centrifugo/ openbao/   Centrifugo configuration; OpenBao vault configuration and initialisation script
+  monitoring/            Prometheus + Grafana
+  systemd/               Timer that runs the GitOps reconciler on the server
 scripts/                 Operations commands (moc.py, seed, smoke, backup, audit, reconcile, demo), install
                          (install.sh), repository tooling (check_pr.py, release*, license-header.sh, api_docs.py);
                          tests/

@@ -44,7 +44,7 @@ from svc_workflow.hasura import Actor, HasuraClient
 from svc_workflow.sla import Deadlines
 from test_app import ENV, NoDirectory
 
-PROCESSES = pathlib.Path(__file__).resolve().parents[3] / "processes"
+PROCESSES = pathlib.Path(__file__).resolve().parents[1] / "processes"
 BPMN = "{http://www.omg.org/spec/BPMN/20100524/MODEL}"
 FLOWABLE = "{http://flowable.org/bpmn}"
 DIRECTOR_GROUP = f"t:{TENANT}:director"

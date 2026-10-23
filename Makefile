@@ -180,7 +180,7 @@ do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số ch�
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
 	  tests/test_pii_corpus.py tests/test_pii_mutation.py
 
-reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
+reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py
 
 backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (MOC_BACKUP_DIR, mặc định ./backups)

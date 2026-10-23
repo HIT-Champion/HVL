@@ -14,18 +14,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# F3.13 — Prometheus thu chỉ số trong mạng nội bộ của Signet; không mở cổng ra ngoài, Grafana đọc qua mạng `moc`.
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+# Bảng điều khiển nạp từ platform/monitoring/grafana/dashboards (gắn chỉ đọc); sửa trong repo rồi cài lại
+apiVersion: 1
 
-scrape_configs:
-  # Cổng API: plugin prometheus của APISIX xuất chỉ số ở cổng 9091 (gateway/config.yaml, không mở ra ngoài)
-  - job_name: apisix
-    metrics_path: /apisix/prometheus/metrics
-    static_configs:
-      - targets: ["apisix:9091"]
-
-  - job_name: prometheus
-    static_configs:
-      - targets: ["localhost:9090"]
+providers:
+  - name: moc
+    folder: Signet
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

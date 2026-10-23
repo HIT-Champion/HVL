@@ -1,4 +1,4 @@
-# gateway — Apache APISIX
+# platform/apisix — Apache APISIX
 
 APISIX chạy standalone (không etcd, không Admin API): route trong `apisix.yaml`, cấu hình trong `config.yaml`,
 giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nhất mở ra ngoài (`MOC_HTTP_PORT`). Chủ: #14.
@@ -18,7 +18,7 @@ Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.
 
 ## Sau proxy TLS trên máy chủ (F1.9)
 
-Trên máy chủ, Caddy nhận HTTPS rồi chuyển vào APISIX chỉ nghe `127.0.0.1` ([`docs/trien-khai.md`](../docs/trien-khai.md)).
+Trên máy chủ, Caddy nhận HTTPS rồi chuyển vào APISIX chỉ nghe `127.0.0.1` ([`docs/trien-khai.md`](../../docs/trien-khai.md)).
 APISIX 3.18 thay `X-Forwarded-Proto`, `-Host`, `-Port` bằng giá trị nó thấy (`http`, cổng 9080), trừ khi yêu cầu tới
 từ địa chỉ trong `apisix.trusted_addresses`. `config.yaml` khai dải `MOC_TRUSTED_PROXY` (mặc định `127.0.0.1/32`:
 không ai tới APISIX từ loopback của chính container, tức không tin ai) cho hai việc:
@@ -41,7 +41,7 @@ APISIX và nginx của giao diện **không ghi chuỗi truy vấn và Referer**
 (`/tim-kiem?q=…`, `/api/search?q=…`), bước đăng nhập mang `?code=…&state=…`, còn Referer là URL đầy đủ của trang
 trước. Chuỗi truy vấn đã mã hóa phần trăm (`0912%20345%20678`, `ten%40example.com`) nên bộ che thông tin cá nhân của
 dịch vụ không nhận ra, và họ tên thì không nhận dạng được — nên bỏ hẳn, không che bằng regex (QĐ-006 trong
-[`docs/architecture.md`](../docs/architecture.md)).
+[`docs/architecture.md`](../../docs/architecture.md)).
 
 APISIX, `config.yaml` khóa `nginx_config`:
 

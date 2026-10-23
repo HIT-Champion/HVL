@@ -134,7 +134,7 @@ svc-workflow python -m svc_workflow.pii count < tệp`. Loại, nhãn, giới h�
 
 Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi
 trường: khi có `MOC_OPENBAO_ADDR`, lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc
-chúng (F3.2, `openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Két chưa sẵn sàng thì
+chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Két chưa sẵn sàng thì
 thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
 
 | Biến | Mặc định | Ghi chú |

@@ -145,17 +145,17 @@ Tầng 1 là lõi — định danh, cổng API, dữ liệu, quy trình và lớ
 
 | Thành phần | Vai trò | Thư mục |
 |---|---|---|
-| Keycloak 26 | SSO, TOTP; vai trò, đơn vị, phòng đưa vào token cho Hasura | `auth/realm/` |
-| Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị, giới hạn tốc độ đăng nhập (theo IP) và API (theo phiên) | `gateway/` |
+| Keycloak 26 | SSO, TOTP; vai trò, đơn vị, phòng đưa vào token cho Hasura | `platform/keycloak/realm/` |
+| Apache APISIX 3 | Cổng duy nhất mở ra ngoài: danh sách trắng đường dẫn, kiểm JWT ở biên, chặn đường quản trị, giới hạn tốc độ đăng nhập (theo IP) và API (theo phiên) | `platform/apisix/` |
 | Hasura 2 + PostgreSQL 16 | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng, sổ kiểm toán chuỗi băm | `db/` |
-| Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `processes/` |
+| Flowable 8 | Quy trình BPMN xử lý văn bản đến, duyệt và phát hành văn bản đi | `services/svc-workflow/processes/` |
 | `svc-workflow` | Hasura Actions: vào sổ, trình văn bản đi, hộp việc, hoàn thành việc, phát hành; thông báo, nhắc hạn; đồng bộ danh bạ Keycloak; nhận cảnh báo cảm biến | `services/svc-workflow/` |
 | `svc-files` | Tải tệp qua ClamAV vào SeaweedFS, tìm kiếm Meilisearch; dựng PDF văn bản đi có mã QR, ký số PAdES (minh họa), in sổ; cổng xác thực; các tác tử AI | `services/svc-files/` |
-| Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người | `realtime/` |
-| OpenBao 2 | Két bí mật: dịch vụ lấy bí mật qua AppRole lúc khởi động; khóa mã hóa văn bản hạn chế; CA nội bộ và khóa ký của từng đơn vị | `openbao/` |
+| Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người | `platform/centrifugo/` |
+| OpenBao 2 | Két bí mật: dịch vụ lấy bí mật qua AppRole lúc khởi động; khóa mã hóa văn bản hạn chế; CA nội bộ và khóa ký của từng đơn vị | `platform/openbao/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
-| Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `monitoring/` |
-| Scorpio 6 + PostGIS (profile `iot`) | Context broker NGSI-LD: bản sao số của cảm biến, lịch sử đo | `ot/` |
+| Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `platform/monitoring/` |
+| Scorpio 6 + PostGIS (profile `iot`) | Context broker NGSI-LD: bản sao số của cảm biến, lịch sử đo | `services/ot-sensor/` |
 | Ollama (profile `ai`, tùy chọn) | Mô hình ngôn ngữ cục bộ, mạng nội bộ riêng, tắt tính năng đám mây | `docker-compose.yml` |
 
 Mô hình H-P-D-I, bản đồ công cụ và các quyết định kỹ thuật: [`docs/architecture.md`](docs/architecture.md). Mô hình
@@ -166,27 +166,29 @@ dữ liệu và quyền: [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md).
 
 ## Cấu trúc thư mục
 
-Mã đội tự viết nằm ở `apps/`, `services/` và `db/`. Các thư mục cấu hình ở gốc (`auth/`, `gateway/`…) là cấu hình
-của phần mềm nguồn mở mà lõi dùng, theo bảng ở mục Kiến trúc.
+Mã đội tự viết nằm ở `apps/`, `services/` và `db/`. `platform/` chỉ chứa cấu hình và script khởi động cho các phần
+mềm nguồn mở mà lõi dùng nguyên bản (image chính thức, không sửa mã thượng nguồn), theo bảng ở mục Kiến trúc.
 
 ```
 apps/office/             Giao diện Văn phòng điện tử (Nuxt 4, TypeScript): app/pages, app/components…; tests/
 services/
   svc-workflow/          Hasura Actions, quy trình, thông báo, nhắc hạn (Python, FastAPI); tests/
     src/svc_workflow/    advisor.py + suggest.py: tác tử gợi ý giao việc (F4.3); ot.py: cảm biến → báo cáo sự cố
+    processes/           Quy trình BPMN văn bản đến, văn bản đi; svc-workflow nạp vào Flowable lúc khởi động
   svc-files/             Tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực (Python, FastAPI); tests/
     src/svc_files/       docread/: đọc văn bản đến (F4.1) · assist/: hỏi đáp trên kho văn bản (F4.2) ·
                          pii.py: che thông tin cá nhân (F4.4)
+  ot-sensor/             Cảm biến nhiệt độ giả lập (profile iot)
 db/
   migrations/default/    Lược đồ PostgreSQL (core, office), ràng buộc, sổ kiểm toán chuỗi băm
   metadata/              Hasura: quyền theo vai trò và đơn vị, Actions
   tests/                 Test trên PostgreSQL + Hasura thật
 schemas/                 JSON Schema của form, dùng chung cho giao diện, dịch vụ và CSDL
-processes/               Quy trình BPMN văn bản đến, văn bản đi; svc-workflow nạp vào Flowable
-auth/ gateway/ realtime/ Cấu hình Keycloak, APISIX, Centrifugo
-openbao/ monitoring/     Cấu hình OpenBao; Prometheus + Grafana
-ot/                      Cảm biến giả lập (profile iot)
-ops/systemd/             Hẹn giờ chạy reconciler GitOps trên máy chủ
+platform/                Cấu hình cho phần mềm nguồn mở dùng nguyên bản
+  keycloak/ apisix/      Realm Keycloak; route, plugin của cổng APISIX
+  centrifugo/ openbao/   Cấu hình Centrifugo; cấu hình và script khởi tạo két OpenBao
+  monitoring/            Prometheus + Grafana
+  systemd/               Hẹn giờ chạy reconciler GitOps trên máy chủ
 scripts/                 Lệnh vận hành (moc.py, seed, smoke, backup, audit, reconcile, demo), cài đặt (install.sh),
                          công cụ của repo (check_pr.py, release*, license-header.sh, api_docs.py); tests/
 seed/                    Dữ liệu mẫu: đơn vị, tài khoản, văn bản giả lập để demo và đo các tác tử AI

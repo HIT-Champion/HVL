@@ -271,7 +271,7 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 - *"Khóa mở két để đâu?"* `MOC_OPENBAO_SEAL_KEY` trong `.env`, khóa phục hồi và token khởi động trong volume của két,
   `role_id`/`secret_id` của dịch vụ trong volume riêng của dịch vụ đó. Ai có quyền Docker trên máy chủ vẫn đọc được
   két. Static seal đổi an toàn lấy khả năng tự phục hồi; bản thật nên dùng KMS hoặc HSM (seal `pkcs11`, `awskms`…).
-- *"Ai cấu hình két?"* Lần đầu, `openbao/start.sh` cấu hình bằng token root rồi thu hồi nó ngay. Các lần sau chỉ
+- *"Ai cấu hình két?"* Lần đầu, `platform/openbao/start.sh` cấu hình bằng token root rồi thu hồi nó ngay. Các lần sau chỉ
   dùng token khởi động: không đọc thẳng được bí mật, không sửa được policy, nhưng cấp được secret_id cho hai dịch vụ
   — nên volume của két phải được giữ như chính két.
 - *"Két dùng làm gì nữa?"* Khóa transit `moc-files` để mã hóa tệp của văn bản hạn chế (F3.7, `make demo-han-che`):

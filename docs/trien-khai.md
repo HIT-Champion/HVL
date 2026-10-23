@@ -176,7 +176,7 @@ Internet ──HTTPS──▶ Cloudflare ◀── đường hầm (cloudflared 
 
 Bỏ qua bước 5. `cloudflared` tới APISIX từ một địa chỉ trong mạng Docker `moc` nên `MOC_TRUSTED_PROXY` như với Caddy.
 Cloudflare gửi `X-Forwarded-Proto: https` và `X-Forwarded-For` (IP người dùng) nhưng không gửi `X-Forwarded-Port`:
-APISIX tự lấy 443 cho các route của Keycloak (`map` `moc_cong_chuyen_tiep` trong `gateway/config.yaml`), không thì
+APISIX tự lấy 443 cho các route của Keycloak (`map` `moc_cong_chuyen_tiep` trong `platform/apisix/config.yaml`), không thì
 Keycloak trả địa chỉ token `https://…:9080/…` và trình duyệt không đăng nhập được. Bước 6 kiểm như với Caddy, thay
 `moc.example.vn` bằng tên miền của tunnel. Tắt tunnel: bỏ `tunnel` khỏi `COMPOSE_PROFILES` (và `MOC_EXTRA_PROFILES`)
 rồi `docker compose --profile tunnel rm -sf cloudflared`.
@@ -221,7 +221,7 @@ Kho ở `/var/backups/moc` vẫn nằm trên cùng máy chủ: chép thêm ra ng
 kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục".
 
 **Tự phục hồi và GitOps** (tùy chọn): [`van-hanh.md`](van-hanh.md) mục "GitOps và tự phục hồi" — systemd timer
-`ops/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
+`platform/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
 `deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/HVL`.
 

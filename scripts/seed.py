@@ -42,7 +42,7 @@ def seed_tenants() -> None:
     print("  đơn vị, phòng ban: xong")
 
 
-# Khớp authenticatorConfig "moc-vai-tro-bat-buoc-otp" trong auth/realm/moc-realm.json
+# Khớp authenticatorConfig "moc-vai-tro-bat-buoc-otp" trong platform/keycloak/realm/moc-realm.json
 MFA_ROLES = {"clerk", "manager", "director", "tenant_admin"}
 
 

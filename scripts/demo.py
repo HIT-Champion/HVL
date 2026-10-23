@@ -330,7 +330,7 @@ def han_che() -> None:
     print(f"\nXem trên giao diện (văn thư): {PUBLIC_URL}/van-ban/{doc_id} — khóa ở tệp đính kèm, mục người được xem")
 
 
-# Bí mật svc-files, svc-workflow cần (tên trong .env) — cùng danh sách openbao/start.sh nạp vào két
+# Bí mật svc-files, svc-workflow cần (tên trong .env) — cùng danh sách platform/openbao/start.sh nạp vào két
 SECRETS = {"svc-files": ("SEAWEEDFS_S3_ACCESS_KEY", "SEAWEEDFS_S3_SECRET_KEY", "HASURA_ADMIN_SECRET",
                          "MEILI_MASTER_KEY"),
            "svc-workflow": ("HASURA_ADMIN_SECRET", "MOC_ACTION_SECRET", "FLOWABLE_ADMIN_PASSWORD",
@@ -481,7 +481,7 @@ def tu_phuc_hoi() -> None:
     for line in out.splitlines():
         print(f"   {line}")
     if code == 0 and "không có gì phải làm" in out and compose("ps", "-q", "svc-files").decode().strip():
-        # máy chủ đã bật timer (ops/systemd/) và lượt của timer chạy trước lượt này
+        # máy chủ đã bật timer (platform/systemd/) và lượt của timer chạy trước lượt này
         print("   (timer reconciler của máy chủ đã dựng lại trước lượt gọi tay này)")
     elif code != 0 or "dựng lại svc-files" not in out or "chạy lại centrifugo" not in out:
         raise DemoFailed("reconciler không dựng lại đủ hai dịch vụ")
@@ -499,7 +499,7 @@ def tu_phuc_hoi() -> None:
     ok(f"svc-files, centrifugo healthy sau {time.monotonic() - started:.0f} giây kể từ lượt reconciler; tải tệp → "
        f"201 (SHA-256 {stored['sha256'][:16]}…)")
 
-    print("\nTrên máy chủ thật: ops/systemd/moc-reconcile.timer · nhật ký: journalctl -u moc-reconcile")
+    print("\nTrên máy chủ thật: platform/systemd/moc-reconcile.timer · nhật ký: journalctl -u moc-reconcile")
 
 
 CREATE_CASE_FILE = """
