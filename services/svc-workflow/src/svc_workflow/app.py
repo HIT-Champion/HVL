@@ -39,6 +39,7 @@ from fastapi.responses import JSONResponse, Response
 
 from . import __version__, pii
 from .advisor import Advisor
+from .channels import Router
 from .config import ConfigError, Settings
 from .directory import Directory
 from .dispatch import Dispatcher
@@ -174,7 +175,9 @@ def create_app(
                                        settings.directory_client_secret, hasura)
     files = files or FilesClient(settings.files_url, ServiceToken(
         settings.keycloak_url, settings.realm, settings.directory_client_id, settings.directory_client_secret))
-    notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key)
+    # kênh ngoài (email, webhook): None khi chưa cấu hình — chỉ có chuông trên web như trước
+    router = Router.from_settings(hasura, settings) if notifier is None else getattr(notifier, "router", None)
+    notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key, router=router)
     try:
         intake = FormSchema.load(Path(settings.schemas_dir) / "van-ban-den.json")
     except SchemaFileError as exc:
@@ -211,6 +214,8 @@ def create_app(
                 _every(settings.suggest_poll_interval_s, "office.assign.jobs_handled", advisor.run_jobs)))
         if ot is not None and settings.ot_interval_s > 0:
             tasks.append(asyncio.create_task(_every(settings.ot_interval_s, "ot.subscriptions_ensured", ot.ensure_all)))
+        if router is not None and settings.notify_interval_s > 0:
+            tasks.append(asyncio.create_task(router.serve(settings.notify_interval_s)))
         try:
             yield
         finally:
@@ -221,6 +226,8 @@ def create_app(
             if ot is not None:
                 await ot.aclose()
             await notifier.aclose()
+            if router is not None:
+                await router.aclose()
             await files.aclose()
             await flowable.aclose()
             await hasura.aclose()
@@ -238,6 +245,7 @@ def create_app(
     app.state.advisor = advisor
     app.state.directory = directory
     app.state.ot = ot
+    app.state.router = router
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:

@@ -792,7 +792,8 @@
       "core": {
         "files": "Uploaded file",
         "users": "User",
-        "tenants": "Organisation"
+        "tenants": "Organisation",
+        "notification_deliveries": "Notification delivery (email, webhook)"
       },
       "ai": {
         "questions": "Question to the assistant"

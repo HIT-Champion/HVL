@@ -106,6 +106,7 @@ create table core.notifications (           -- thông báo từng người (F2.5
   key          text not null,                -- chống gửi trùng: unique (tenant_id, user_id, key)
   document_id  uuid,
   data         jsonb not null default '{}',  -- form_key, trích yếu, số ký hiệu… lúc gửi; câu chữ dựng ở giao diện
+  channels     text[] not null default '{}', -- kênh ngoài cần gửi: email, webhook (migration 1792281602600)
   created_at   timestamptz not null default now(),
   read_at      timestamptz
 );
@@ -346,6 +347,12 @@ create table office.assignment_suggestions (   -- một dòng mỗi văn bản �
 và chỉ sửa được `read_at`. Thông báo về văn bản hạn chế (F3.7) không mang nội dung: trigger `notifications_restricted`
 gọt `summary`, `symbol`, `issuer_name`, `note` khỏi `data` và gắn `restricted: true` ở mọi lần ghi, kể cả dịch vụ ghi
 sai; văn bản chuyển sang hạn chế thì thông báo đã gửi về nó cũng bị gọt (`documents_restricted_notifications`). Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
+Kênh ngoài (email, webhook; migration 1792281602600): svc-workflow khai ở cột `channels` lúc ghi; trigger
+`notifications_deliveries` tạo trong cùng giao dịch một dòng `core.notification_deliveries` cho mỗi kênh (hộp thư đi:
+`status` `pending` → `sent` | `failed` | `skipped`, `attempts`, `last_error` chỉ tên lỗi và mã, `next_attempt_at`,
+`sent_at`; unique `(notification_id, channel)`). Bảng này gắn sổ kiểm toán — lần gửi ra ngoài hệ thống phải truy được
+— và không có địa chỉ email, URL hay nội dung: người nhận đọc từ `core.users` lúc gửi. Chỉ `service` của đơn vị đọc và
+ghi kết quả; người dùng không đọc (mô tả: `services/svc-workflow/README.md`).
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant

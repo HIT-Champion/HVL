@@ -200,10 +200,10 @@ của nó (loại `agent`).
 Chưa có trục streaming sự kiện (Kafka…): sự kiện nằm trong PostgreSQL (dòng thời gian văn bản, outbox liên thông), đủ
 cho một máy. Chưa có thực thi kịch bản serverless (cụm ⑤) và công cụ low-code: form, quy trình viết bằng mã (JSON Schema
 trong `schemas/`, BPMN XML), chưa có trình thiết kế quy trình trên giao diện (bpmn-js bị loại vì giấy phép). Thông báo
-mới có trong ứng dụng và đẩy qua WebSocket (Centrifugo), chưa gửi email, SMS hay Zalo. Một máy, không chịu lỗi nhiều
-nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel, chưa lên VPS thật. Ký số chỉ minh họa bằng CA nội
-bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên kho văn bản giả lập, chưa có đơn vị
-dùng thật.
+gửi trong ứng dụng qua WebSocket (Centrifugo) và, khi cấu hình, qua email và webhook chat; chưa có SMS, Zalo, chưa cho
+từng người chọn kênh. Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel,
+chưa lên VPS thật. Ký số chỉ minh họa bằng CA nội bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật;
+số đo AI trên kho văn bản giả lập, chưa có đơn vị dùng thật.
 
 **Bằng chứng:** [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §6 "Không làm — và lý do";
 [`docs/dac-ta-san-pham.md`](../dac-ta-san-pham.md) §4.4; [`docs/trien-khai.md`](../trien-khai.md) §8; các mục "Còn gì

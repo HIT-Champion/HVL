@@ -24,6 +24,7 @@
 #   profile core — Tầng 1, lõi headless: chỉ APISIX mở cổng ra ngoài
 #   profile app  — Tầng 2, ứng dụng Văn phòng điện tử
 #   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
+#   profile mail   — Mailpit, hộp thư thử cho thông báo email (chỉ để demo, MOC_EXTRA_PROFILES=mail)
 #
 #   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
@@ -296,6 +297,9 @@ services:
       FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:?}
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
+      # tùy chọn (thông báo đa kênh của svc-workflow): rỗng thì không nạp
+      MOC_SMTP_PASSWORD: ${MOC_SMTP_PASSWORD:-}
+      MOC_NOTIFY_WEBHOOK_URL: ${MOC_NOTIFY_WEBHOOK_URL:-}
     volumes:
       - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
@@ -397,6 +401,18 @@ services:
       MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
+      # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP) và webhook (Mattermost, Slack, ntfy) qua hộp thư đi
+      # core.notification_deliveries. MOC_SMTP_HOST và MOC_NOTIFY_WEBHOOK_URL đều rỗng (mặc định) thì tắt hẳn. Mật
+      # khẩu SMTP và URL webhook lấy từ két; liên kết trong thư: <MOC_PUBLIC_URL>/van-ban/<id>
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_SMTP_HOST: ${MOC_SMTP_HOST:-}
+      MOC_SMTP_PORT: ${MOC_SMTP_PORT:-}
+      MOC_SMTP_TLS: ${MOC_SMTP_TLS:-starttls}
+      MOC_SMTP_USER: ${MOC_SMTP_USER:-}
+      MOC_SMTP_FROM: ${MOC_SMTP_FROM:-}
+      MOC_NOTIFY_WEBHOOK_FORMAT: ${MOC_NOTIFY_WEBHOOK_FORMAT:-json}
+      MOC_NOTIFY_EMAIL_KINDS: ${MOC_NOTIFY_EMAIL_KINDS:-}
+      MOC_NOTIFY_WEBHOOK_KINDS: ${MOC_NOTIFY_WEBHOOK_KINDS:-}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
       - ./services/svc-workflow/processes:/app/processes:ro
@@ -406,7 +422,26 @@ services:
       openbao: {condition: service_healthy, restart: true}
       hasura: {condition: service_healthy}
       flowable: {condition: service_healthy}
-    # Không phụ thuộc centrifugo: thiếu nó thì thông báo vẫn lưu, chỉ không đẩy tức thời
+    # Không phụ thuộc centrifugo: thiếu nó thì thông báo vẫn lưu, chỉ không đẩy tức thời. Không phụ thuộc mailpit:
+    # máy chủ thư chưa lên thì thư nằm chờ ở hộp thư đi, vòng nền thử lại
+
+  # Hộp thư thử cho thông báo email (profile mail, chỉ để demo và kiểm thử): nhận mọi thư svc-workflow gửi tới
+  # mailpit:1025, không chuyển tiếp ra ngoài, xem trên giao diện web chỉ mở ở 127.0.0.1. Không thuộc core, app: cài
+  # thật thì svc-workflow gửi qua máy chủ thư của đơn vị (docs/trien-khai.md mục 7); thư nằm trong tệp tạm, không có
+  # volume, mất khi container dừng; tối đa 500 thư
+  mailpit:
+    <<: *common
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    profiles: [mail]
+    environment:
+      TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
+      MP_MAX_MESSAGES: "500"
+      # không gọi GitHub hỏi bản mới, không tra DNS ngược địa chỉ người gửi
+      MP_DISABLE_VERSION_CHECK: "true"
+      MP_SMTP_DISABLE_RDNS: "true"
+    ports:
+      - "127.0.0.1:${MOC_MAIL_UI_PORT:-8025}:8025"
+    mem_limit: 128m
 
   # F2.5 — đẩy thông báo tới trình duyệt qua WebSocket (/realtime ở APISIX); tự kiểm token Keycloak
   centrifugo:

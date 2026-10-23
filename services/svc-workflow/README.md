@@ -33,6 +33,35 @@ trang là thấy bước mới.
 sau khi bước đã ghi xong; lỗi ghi hay lỗi đẩy chỉ ghi nhật ký, không làm hỏng bước nghiệp vụ. Mỗi người nhận
 một lần cho mỗi khóa (gọi lại Action không gửi trùng).
 
+**Thông báo qua email, webhook** (`channels.py`, chỉ khi đặt `MOC_SMTP_HOST` hoặc `MOC_NOTIFY_WEBHOOK_URL`; mặc định
+tắt, mọi thứ như trên): lúc ghi thông báo, `Router.route` khai kênh ngoài ở cột `channels` của từng dòng
+`core.notifications` — email cho mỗi người nhận, webhook một tin cho cả sự kiện (gắn vào dòng của người nhận đầu tiên).
+Trigger CSDL tạo một dòng `core.notification_deliveries` `pending` cho mỗi kênh trong cùng giao dịch (hộp thư đi như
+liên thông): thông báo đã lưu thì không mất thư khi dịch vụ dừng; gọi lại cùng khóa không thêm dòng. Vòng nền
+`Router.serve` chạy ngay khi có thông báo mới và mỗi `MOC_NOTIFY_INTERVAL_S` giây, mỗi lượt tối đa 20 dòng đến hạn của
+mọi đơn vị:
+
+- email: `smtplib` của thư viện chuẩn, chạy ở luồng riêng, STARTTLS hoặc SSL theo `MOC_SMTP_TLS`; địa chỉ, họ tên đọc
+  từ danh bạ (`core.users`, đồng bộ từ Keycloak) lúc gửi. Tiêu đề `[Signet] <như chuông>`, thân có số ký hiệu, trích
+  yếu, ý kiến và liên kết `<MOC_PUBLIC_URL>/van-ban/<id>`; `Message-ID` cố định theo dòng, `Auto-Submitted:
+  auto-generated`;
+- webhook: `POST` JSON `{"text": …}` (incoming webhook của Mattermost, Slack) hoặc, với
+  `MOC_NOTIFY_WEBHOOK_FORMAT=ntfy`, thân là chữ thuần, tiêu đề và liên kết ở tham số `title`, `click`. Webhook là kênh
+  chung nên tin không có tên người ("Người được giao"), không có ý kiến; thông báo của văn bản hạn chế không lên webhook
+  (xét lúc ghi và lúc gửi, vì CSDL gọt thông báo khi văn bản chuyển sang hạn chế).
+
+Câu chữ lấy như chuông (`apps/office/app/locales/vi.json`, `task.*`, `notify.*`; `tests/test_channels.py` đối chiếu
+hai bên). Kết quả mỗi dòng: `sent`; lỗi tạm (không nối được, hết giờ, SMTP 4xx, HTTP 408, 429, 5xx) thì thử lại sau
+30 s·2^lần, tối đa 5 lần rồi `failed`; bị từ chối hẳn (SMTP 5xx với người nhận hay nội dung, HTTP 4xx khác, chuyển
+hướng) thì `failed` ngay; `skipped` khi người nhận chưa có email, đã khóa, kênh đã tắt sau lúc xếp hàng, hoặc văn bản
+hạn chế trên webhook. Gửi ít nhất một lần, không phải đúng một lần: dừng giữa lúc gửi và lúc ghi kết quả thì lượt sau
+gửi lại (cùng `Message-ID`). Ghi kết quả có khóa lạc quan (còn `pending`, đúng số lần thử), giả định một tiến trình
+như các vòng nền khác. Hộp thư đi không lưu địa chỉ, URL hay nội dung; `last_error` và nhật ký
+(`core.notification.delivered`, `delivery_failed`, `delivery_skipped`) chỉ có id dòng, kênh, loại, số lần thử, tên lớp
+lỗi kèm mã SMTP/HTTP — không chép thông điệp lỗi của smtplib, httpx2 vì chúng mang địa chỉ người nhận, URL webhook.
+Mỗi lần xếp hàng và mỗi kết quả vào sổ kiểm toán chuỗi băm (đã gửi cho ai, qua kênh nào, lúc nào, thử mấy lần). Thử
+trên máy không cần máy chủ thư: profile `mail` (Mailpit) — xem [docs/trien-khai.md](../../docs/trien-khai.md) mục 7.
+
 **Nhắc hạn** (`sla.py`): mỗi việc trong BPMN có timer `R2/${slaDuration}`; timer bắn thì Flowable tạo việc giao
 ra ngoài (external worker, topic `moc-sla`), dịch vụ lấy về mỗi `MOC_SLA_POLL_INTERVAL_S` giây: quá một thời
 hạn thì nhắc người phải làm, quá hai thì báo thêm lãnh đạo của họ.
@@ -136,7 +165,8 @@ svc-workflow python -m svc_workflow.pii count < tệp`. Loại, nhãn, giới h�
 
 Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi
 trường: khi có `MOC_OPENBAO_ADDR`, lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc
-chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Két chưa sẵn sàng thì
+chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Mật khẩu SMTP và
+URL webhook (thường chứa khóa) cũng đi qua két, là bí mật tùy chọn: rỗng thì két không có. Két chưa sẵn sàng thì
 thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
 
 | Biến | Mặc định | Ghi chú |
@@ -167,13 +197,23 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_SUGGEST_TIMEOUT_S` | `10` | Hạn gọi svc-files (0–40 giây); cả một việc ≤ hạn + 10 giây, dưới khóa việc `PT1M` |
 | `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
 | `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
+| `MOC_SMTP_HOST` | trống | Máy chủ thư; trống thì tắt kênh email |
+| `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa — chỉ trong mạng nội bộ, vd Mailpit) |
+| `MOC_SMTP_PORT` | theo `MOC_SMTP_TLS` | `587` (starttls), `465` (ssl), `25` (none) |
+| `MOC_SMTP_USER`, `MOC_SMTP_PASSWORD` | trống | Đăng nhập SMTP khi có `MOC_SMTP_USER`; mật khẩu lấy từ két |
+| `MOC_SMTP_FROM` | trống | Người gửi, vd `Signet <signet@ten-mien>`; bắt buộc (có `@`) khi đặt `MOC_SMTP_HOST` |
+| `MOC_NOTIFY_WEBHOOK_URL` | trống | URL `http`/`https` nhận tin; lấy từ két; trống thì tắt kênh webhook |
+| `MOC_NOTIFY_WEBHOOK_FORMAT` | `json` | `json` (`{"text": …}`: Mattermost, Slack) hoặc `ntfy` |
+| `MOC_NOTIFY_EMAIL_KINDS`, `MOC_NOTIFY_WEBHOOK_KINDS` | trống (mọi loại) | Chỉ gửi các loại này, cách nhau bằng dấu phẩy, vd `task.overdue,task.escalated`; loại lạ thì dịch vụ dừng khi khởi động |
+| `MOC_NOTIFY_INTERVAL_S` | `5` | Chu kỳ vòng nền gửi thông báo ngoài; `0` tắt (dòng chờ nằm nguyên tới khi bật lại) |
+| `MOC_PUBLIC_URL` | trống | Địa chỉ trang web cho liên kết trong thư, tin webhook; trống thì không kèm liên kết |
 
 ## Phát triển
 
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 396 test đơn vị với Flowable, Hasura, svc-files, Centrifugo giả lập
+.venv/bin/python -m pytest          # 456 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa
