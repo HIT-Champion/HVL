@@ -177,7 +177,9 @@ do_install() {
   fi
   grep -q '^MOC_VERSION=' "$dest/.env" || printf '\n# Do make install đặt: thẻ image của đội và profile chạy mặc định\n' >> "$dest/.env"
   set_env "$dest/.env" MOC_VERSION "$ver"
-  set_env "$dest/.env" COMPOSE_PROFILES core,app
+  # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài
+  extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
+  set_env "$dest/.env" COMPOSE_PROFILES "core,app${extra:+,$extra}"
 
   echo "==> Kiểm tra bản cài không cần thư mục mã nguồn"
   check="$(inspect_compose "$dest")" || die "compose trong $dest không hợp lệ"

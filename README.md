@@ -236,7 +236,8 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
   cài được giữ, chỉ đổi `MOC_VERSION`.
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
 - Lên máy chủ có tên miền và HTTPS: [`docs/trien-khai.md`](docs/trien-khai.md) — Caddy trước APISIX,
-  `MOC_HTTP_PORT=127.0.0.1:8080`, `MOC_TRUSTED_PROXY` để APISIX tin tiêu đề `X-Forwarded-*` của Caddy.
+  `MOC_HTTP_PORT=127.0.0.1:8080`, `MOC_TRUSTED_PROXY` để APISIX tin tiêu đề `X-Forwarded-*` của Caddy. Máy không có IP
+  công khai (laptop, máy ở nhà): Cloudflare Tunnel, profile `tunnel` (mục 5b), không mở cổng nào.
 
 ## Vận hành
 

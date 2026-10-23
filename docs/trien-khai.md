@@ -8,6 +8,8 @@ mục mã nguồn" của [README](../README.md). Trên máy chủ thêm hai th�
 - **APISIX chỉ nghe `127.0.0.1`**: từ Internet chỉ vào được qua Caddy. Trang quản trị Keycloak và Grafana vốn đã chỉ
   nghe `127.0.0.1`, xem từ xa qua đường hầm SSH.
 
+Máy không có IP công khai (laptop, máy ở nhà): thay Caddy bằng Cloudflare Tunnel — mục 5b.
+
 ```
 Internet ──443/80──▶ Caddy (máy chủ) ──▶ 127.0.0.1:8080 APISIX ──▶ giao diện, Keycloak, Hasura, svc-files, …
                                          (mạng nội bộ Docker, không cổng nào khác mở ra ngoài)
@@ -24,7 +26,7 @@ trên trình duyệt, màn kiểm dịch, ký số, che thông tin cá nhân, ki
 | Thứ cần | Tối thiểu | Ghi chú |
 |---|---|---|
 | Máy chủ | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 40 GB đĩa | Cả hệ thống dùng khoảng 3,5 GB RAM khi chạy (đo lúc diễn tập, chưa bật mô hình); các image khoảng 2,3 GB, lúc dựng cần thêm chỗ cho image nền và bộ đệm. Bật mô hình ngôn ngữ (profile `ai`, F4.1–F4.2) thì cần 16 GB |
-| Tên miền | một bản ghi A trỏ về IP máy chủ | vd `moc.example.vn`; có IPv6 thì thêm bản ghi AAAA. Let's Encrypt cần cổng 80 và 443 mở |
+| Tên miền | một bản ghi A trỏ về IP máy chủ | vd `moc.example.vn`; có IPv6 thì thêm bản ghi AAAA. Let's Encrypt cần cổng 80 và 443 mở. Cloudflare Tunnel (mục 5b): không cần IP công khai, tên miền dùng nameserver của Cloudflare |
 | Tài khoản | SSH vào được, có `sudo` | Các bước cài phần nền cần `sudo`; Signet chạy bằng người dùng `moc` |
 
 Đặt tên miền trước: Let's Encrypt chỉ cấp chứng thư khi tên miền đã trỏ đúng IP (`dig +short moc.example.vn`).
@@ -135,6 +137,50 @@ của chính nó (9080) và Keycloak trả địa chỉ `https://moc.example.vn:
 trên là để chặn việc đó. Không giới hạn cỡ yêu cầu ở Caddy: APISIX chặn trên 64 MB, `svc-files` chặn theo
 `MOC_FILES_MAX_MB`.
 
+## 5b. Hoặc: Cloudflare Tunnel (máy không có IP công khai)
+
+Máy ở nhà, laptop, máy sau NAT không nhận được kết nối từ Internet: thay Caddy bằng Cloudflare Tunnel. Dịch vụ
+`cloudflared` (profile `tunnel`, tắt mặc định) gọi ra Cloudflare, nhận yêu cầu của tên miền — HTTPS do Cloudflare lo —
+rồi chuyển vào APISIX qua mạng Docker. Máy không mở cổng nào, không cần Caddy, ufw không phải mở 80/443. Cần tên miền
+đã chuyển nameserver sang Cloudflare (gói Free được).
+
+```
+Internet ──HTTPS──▶ Cloudflare ◀── đường hầm (cloudflared gọi ra) ── cloudflared ──▶ apisix:9080 ──▶ …
+```
+
+1. Trên Cloudflare (Zero Trust → Networks → Tunnels): Create a tunnel → Cloudflared, đặt tên (vd `signet`). Ở bước
+   cài, chép chuỗi token sau `--token` — không cần chạy lệnh cài của Cloudflare. Thêm route **Public hostname** (giao
+   diện mới gọi là Published application): hostname (vd `signet.example.vn`), Service **HTTP**, URL **`apisix:9080`**.
+   Trang này chỉ cho đi tiếp khi tunnel đã kết nối: làm bước 2–4 rồi quay lại thêm route.
+2. Lưu token ra tệp ngoài repo, chỉ người vận hành đọc được (lệnh hỏi token, không để lại trong lịch sử shell):
+
+   ```bash
+   read -rsp "Token: " t && (umask 077 && printf 'TUNNEL_TOKEN=%s\n' "$t" > /home/moc/cloudflared-tunnel); unset t
+   ```
+
+3. Bước 3 ở trên, thay bộ `sed` bằng:
+
+   ```bash
+   sed -i -e 's#^MOC_PUBLIC_URL=.*#MOC_PUBLIC_URL=https://signet.example.vn#' \
+          -e 's#^MOC_HTTP_PORT=.*#MOC_HTTP_PORT=127.0.0.1:8080#' \
+          -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=172.16.0.0/12#' \
+          -e 's#^MOC_EXTRA_PROFILES=.*#MOC_EXTRA_PROFILES=tunnel#' \
+          -e 's#^MOC_BACKUP_DIR=.*#MOC_BACKUP_DIR=/var/backups/moc#' .env
+   ```
+
+   Token để chỗ khác thì đặt thêm `MOC_TUNNEL_TOKEN_FILE`. `.env` cũ chưa có hai biến `MOC_EXTRA_PROFILES`,
+   `MOC_TUNNEL_TOKEN_FILE` thì thêm tay (mẫu ở `.env.example`).
+4. Bước 4 như trên. `make install` ghi `COMPOSE_PROFILES=core,app,tunnel` vào `/opt/moc/.env`, nên `docker compose up
+   -d --wait` trong `/opt/moc` dựng cả `cloudflared`; trong thư mục mã nguồn `make up`, `make down`, `make ps` cũng
+   kèm profile `tunnel`. Kiểm: `docker compose logs cloudflared | grep -c 'Registered tunnel connection'` ra 4.
+
+Bỏ qua bước 5. `cloudflared` tới APISIX từ một địa chỉ trong mạng Docker `moc` nên `MOC_TRUSTED_PROXY` như với Caddy.
+Cloudflare gửi `X-Forwarded-Proto: https` và `X-Forwarded-For` (IP người dùng) nhưng không gửi `X-Forwarded-Port`:
+APISIX tự lấy 443 cho các route của Keycloak (`map` `moc_cong_chuyen_tiep` trong `gateway/config.yaml`), không thì
+Keycloak trả địa chỉ token `https://…:9080/…` và trình duyệt không đăng nhập được. Bước 6 kiểm như với Caddy, thay
+`moc.example.vn` bằng tên miền của tunnel. Tắt tunnel: bỏ `tunnel` khỏi `COMPOSE_PROFILES` (và `MOC_EXTRA_PROFILES`)
+rồi `docker compose --profile tunnel rm -sf cloudflared`.
+
 ## 6. Kiểm sau khi lên
 
 ```bash
@@ -202,7 +248,11 @@ khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait olla
   dịch vụ → OpenBao, …). Mạng này không mở ra ngoài, nhưng một container bị chiếm quyền thì thấy được lưu lượng chưa
   mã hóa trong đó.
 - **`MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy**: container nào cũng gửi được `X-Forwarded-For`
-  giả để né giới hạn tốc độ đăng nhập. Muốn hẹp hơn thì đặt đúng gateway lấy ở bước 6 (`172.x.0.1/32`).
+  giả để né giới hạn tốc độ đăng nhập. Muốn hẹp hơn thì đặt đúng gateway lấy ở bước 6 (`172.x.0.1/32`); với Cloudflare
+  Tunnel là dải của mạng `moc` (`docker network inspect moc_moc --format '{{(index .IPAM.Config 0).Subnet}}'`).
+- **Cloudflare Tunnel (mục 5b): TLS kết thúc ở Cloudflare**, Cloudflare thấy nội dung yêu cầu trước khi chuyển vào
+  đường hầm — hợp với máy demo, cân nhắc với dữ liệu thật. Máy tắt hay mất mạng là trang ngừng; Cloudflare gói Free
+  giới hạn mỗi yêu cầu 100 MB (APISIX đã chặn trên 64 MB).
 - **Hasura nối CSDL bằng `POSTGRES_USER`**, là siêu người dùng của Postgres. Quyền theo vai trò nằm ở metadata Hasura
   (trang metadata bị chặn ở APISIX), chưa có vai trò CSDL riêng quyền hẹp.
 - **Mọi tài khoản mẫu của `seed.py` dùng chung `MOC_DEMO_PASSWORD`.** Hợp với máy demo; máy có dữ liệu thật thì không

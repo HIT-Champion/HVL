@@ -85,6 +85,14 @@ plugin_configs:
         rejected_code: 429
         rejected_msg: "Quá nhiều yêu cầu trong một phút, thử lại sau ít giây."
 
+  # F1.9: cổng ngoài cho Keycloak sau proxy không gửi X-Forwarded-Port (map moc_cong_chuyen_tiep, config.yaml)
+  - id: cong-keycloak
+    plugins:
+      proxy-rewrite:
+        headers:
+          set:
+            X-Forwarded-Port: $moc_cong_chuyen_tiep
+
 global_rules:
   - id: 1
     plugins:
@@ -99,11 +107,13 @@ routes:
   - id: keycloak
     uris: ["/realms/${{MOC_REALM}}", "/realms/${{MOC_REALM}}/*", "/resources/*"]
     upstream_id: keycloak
+    plugin_config_id: cong-keycloak
 
   # Đường cụ thể hơn route keycloak nên được chọn trước: biểu mẫu đăng nhập, quên mật khẩu, cấp và làm mới token
   - id: dang-nhap
     uris: ["/realms/${{MOC_REALM}}/protocol/openid-connect/token", "/realms/${{MOC_REALM}}/login-actions/*"]
     upstream_id: keycloak
+    plugin_config_id: cong-keycloak
     plugins:
       limit-count:
         group: dang-nhap
@@ -122,6 +132,7 @@ routes:
     methods: [POST]
     priority: 10
     upstream_id: keycloak
+    plugin_config_id: cong-keycloak
     plugins:
       limit-count:
         group: dang-nhap

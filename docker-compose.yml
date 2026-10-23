@@ -23,6 +23,7 @@
 #
 #   profile core — Tầng 1, lõi headless: chỉ APISIX mở cổng ra ngoài
 #   profile app  — Tầng 2, ứng dụng Văn phòng điện tử
+#   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
 #
 #   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
@@ -130,6 +131,20 @@ services:
       - ${MOC_HTTP_PORT:-8080}:9080
     depends_on:
       keycloak: {condition: service_healthy}
+
+  # F1.9 — Cloudflare Tunnel (profile tunnel, tùy chọn): máy không có IP công khai (laptop, máy ở nhà) vẫn ra Internet
+  # có HTTPS mà không mở cổng nào. cloudflared gọi ra Cloudflare, nhận yêu cầu của tên miền rồi chuyển vào APISIX qua
+  # mạng moc — trên trang Tunnels của Cloudflare khai dịch vụ http://apisix:9080. Token để ngoài repo, một dòng
+  # TUNNEL_TOKEN=…, quyền 600 (docs/trien-khai.md mục 5b); không có tệp thì compose báo lỗi khi bật profile
+  cloudflared:
+    <<: *common
+    image: cloudflare/cloudflared:2026.10.0@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
+    profiles: [tunnel]
+    command: ["tunnel", "--no-autoupdate", "run"]
+    env_file: ["${MOC_TUNNEL_TOKEN_FILE:-/home/moc/cloudflared-tunnel}"]
+    mem_limit: 256m
+    depends_on:
+      apisix: {condition: service_started}
 
   # F1.3 — GraphQL tự sinh, quyền theo vai trò và thuê ước; migrations + metadata tự áp từ db/
   hasura:

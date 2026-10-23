@@ -244,7 +244,9 @@ python3 scripts/seed.py                 # sample data, first time only
   images are replaced; the installation's `.env` is kept, only `MOC_VERSION` changes.
 - Uninstall: `make uninstall PREFIX=/opt/moc` removes exactly the installed files, keeping `.env` and the data.
 - On a server with a domain name and HTTPS: [`docs/trien-khai.md`](docs/trien-khai.md) (Vietnamese) — Caddy in front
-  of APISIX, `MOC_HTTP_PORT=127.0.0.1:8080`, `MOC_TRUSTED_PROXY` so APISIX trusts Caddy's `X-Forwarded-*` headers.
+  of APISIX, `MOC_HTTP_PORT=127.0.0.1:8080`, `MOC_TRUSTED_PROXY` so APISIX trusts Caddy's `X-Forwarded-*` headers. On
+  a machine without a public IP (a laptop, a machine at home): Cloudflare Tunnel, profile `tunnel` (section 5b), with
+  no port opened.
 
 ## Operations
 

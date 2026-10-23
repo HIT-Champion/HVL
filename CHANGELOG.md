@@ -8,6 +8,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Cloudflare Tunnel (F1.9, profile `tunnel`, tùy chọn): máy không có IP công khai (laptop, máy ở nhà) ra Internet có
+  HTTPS mà không mở cổng nào — dịch vụ `cloudflared` (`cloudflare/cloudflared:2026.10.0`, Apache-2.0, ghim digest) gọi
+  ra Cloudflare và chuyển yêu cầu vào APISIX qua mạng Docker; token đọc từ tệp ngoài repo (`MOC_TUNNEL_TOKEN_FILE`,
+  mặc định `/home/moc/cloudflared-tunnel`). Biến mới `MOC_EXTRA_PROFILES` (vd `tunnel`): `make up/down/ps/logs` kèm
+  các profile này, `make install` ghi `COMPOSE_PROFILES=core,app,<…>` cho bản cài. Cổng APISIX: proxy tin cậy nói
+  `https` mà không gửi `X-Forwarded-Port` (Cloudflare không gửi) thì route Keycloak nhận cổng 443, không phải 9080 —
+  không thì không đăng nhập được qua tunnel. `docs/trien-khai.md` mục 5b; test scripts +7.
 - README tiếng Anh (`README.en.md`, F2.11): dịch đúng README.md (bài toán, tính năng, trợ lý AI, bằng chứng 4
   nguyên lý, kiến trúc, cài đặt, vận hành, kiểm thử), liên kết hai chiều ở đầu hai tệp.
 - Giới hạn tốc độ ở cổng APISIX (F1.2), vượt thì trả 429: đường nhận mật khẩu và cấp token theo địa chỉ IP

@@ -23,8 +23,11 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-COMPOSE := docker compose --profile core --profile app
 ENV_FILE := .env
+# Profile thêm khai trong .env (MOC_EXTRA_PROFILES=tunnel,…) đi cùng mọi lệnh compose của Makefile, như
+# COMPOSE_PROFILES trong bản cài (make install)
+EXTRA_PROFILES := $(shell sed -n 's/^MOC_EXTRA_PROFILES=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr ',' ' ')
+COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXTRA_PROFILES),--profile $(p)))
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
