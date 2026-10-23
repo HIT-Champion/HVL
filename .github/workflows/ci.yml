@@ -257,8 +257,23 @@ jobs:
 
       # Xuất lại schema GraphQL theo vai trò và OpenAPI từ hệ thống vừa dựng, so với docs/api/ trong commit
       - name: Tài liệu API trong docs/api/ khớp mã (make api-docs)
+        id: api-docs
         if: matrix.phan == 'luong-chinh'
         run: python3 scripts/api_docs.py --check
+
+      # Tài liệu cũ thì sinh bản mới ngay trên hệ thống vừa dựng và tải lên (artifact docs-api-<lần chạy>): người sửa PR
+      # chép về docs/api/ rồi commit, không phải dựng cả hệ thống ở máy
+      - name: Sinh lại docs/api/ khi không khớp
+        if: failure() && steps.api-docs.outcome == 'failure'
+        run: python3 scripts/api_docs.py
+
+      - name: Tải lên docs/api/ vừa sinh
+        if: failure() && steps.api-docs.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-api-${{ github.run_attempt }}
+          path: docs/api/
+          retention-days: 7
 
       - name: Luồng chính qua cổng APISIX, EICAR bị chặn (make smoke)
         if: matrix.phan == 'luong-chinh'

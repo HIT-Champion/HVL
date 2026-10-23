@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import pathlib
 import sys
 
@@ -256,6 +257,9 @@ def main() -> None:
     if check:
         if stale:
             print(f"\n✗ Tài liệu API đã cũ so với mã: {', '.join(stale)}")
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                print("  Trên CI: tải artifact docs-api-<lần chạy> của job \"Chạy thử: luong-chinh\" "
+                      "(gh run download), chép vào docs/api/ rồi commit.")
             sys.exit("  Chạy `make up && make seed && make api-docs` rồi commit thư mục docs/api/.")
         print(f"✓ Tài liệu API trong docs/api/ khớp hệ thống đang chạy ({len(files)} tệp)")
     elif stale:

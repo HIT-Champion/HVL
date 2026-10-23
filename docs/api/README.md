@@ -32,7 +32,14 @@ make up && make seed && make api-docs
 ```
 
 CI dựng hệ thống từ mã nguồn rồi chạy `scripts/api_docs.py --check`. Lệnh này báo lỗi nếu `docs/api/` lệch với
-hệ thống vừa dựng, nên tài liệu không cũ đi so với mã. Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
+hệ thống vừa dựng, nên tài liệu không cũ đi so với mã. Khi lệch, CI sinh bản mới trên chính hệ thống đó và tải lên
+thành artifact `docs-api-<lần chạy>` của job "Chạy thử: luong-chinh"; không cần dựng ở máy:
+
+```bash
+gh run download <run-id> -n docs-api-1 -D docs/api   # <run-id> lấy ở trang Checks của PR
+```
+
+Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
 đọc OpenAPI 3.1, ví dụ Swagger UI hay Redoc chạy cục bộ. Các tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào
 cũng nạp được.
 
