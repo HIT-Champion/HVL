@@ -25,6 +25,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   không Internet, chi phí, giấy phép, việc chưa làm), mỗi câu trả lời kèm đường dẫn, lệnh `make`, bước CI làm bằng
   chứng. `docs/demo-script.md` thêm mục "Phương án dự phòng" (mất mạng, hỏng laptop, AI chậm, TOTP không qua, bước demo
   lỗi; máy dự phòng chạy tại chỗ không cần Internet, video) và checklist T-1 ngày, T-1 giờ, T-5 phút.
+- Chuỗi cung ứng: `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft 1.54.1 (image ghim digest), bản phát hành
+  đính kèm `moc-X.Y.Z.cdx.json` cùng `.sha256`; `make license-audit` (`scripts/license_audit.py`, chỉ thư viện chuẩn)
+  kiểm giấy phép của mọi gói kể cả gói gián tiếp theo chính sách của `DEPENDENCIES.md`, gói chưa rõ hay ngoài chính
+  sách cần ngoại lệ có lý do trong `.github/license-exceptions.json`. Job CI "Giấy phép (PoF #2)" chạy cả hai: 769 gói
+  (npm 690, Python 73, action 6) đều đạt, 22 gói qua nhờ ngoại lệ. `SECURITY.md`: phiên bản được hỗ trợ, báo lỗ hổng
+  riêng tư qua GitHub, thời gian phản hồi, phạm vi kể cả bản chạy thử trực tuyến. Test scripts +22.
 
 ### Đã sửa đổi
 - CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và

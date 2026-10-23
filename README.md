@@ -302,6 +302,7 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm ngoài CSDL, so với mốc đã neo ra kho lạnh và hash của văn bản đã phát hành | Hệ thống đang chạy |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii` | Đo các tác tử AI trên bộ mẫu có đáp án: đúng / sai / trống từng trường, recall@3, độ phủ | Hệ thống đang chạy (`do-che-pii` không cần) |
 | `db/tests/` | Schema, quyền theo vai trò và đơn vị, ràng buộc, sổ kiểm toán (kể cả các kiểu sửa lén) trên PostgreSQL + Hasura thật | xem [`db/README.md`](db/README.md) |
+| `make sbom`, `make license-audit` | Danh mục thành phần SBOM CycloneDX của cây mã nguồn vào `dist/` (Syft); giấy phép của mọi gói npm, Python, action CI, kể cả gói gián tiếp, theo chính sách trong `DEPENDENCIES.md` | Docker, mạng tới PyPI |
 
 Nhắc hạn chỉ kiểm được khi thời hạn mỗi bước ngắn (thật là `PT24H`): `MOC_SLA_DURATION=PT20S make up` rồi
 `MOC_SLA_DURATION=PT20S make smoke`.
@@ -311,7 +312,9 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) chạy toàn bộ b�
 bằng đúng các lệnh `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → 12 màn demo (màn kiểm dịch đã nằm
 trong smoke); diễn tập sao lưu, xóa dữ liệu, khôi phục rồi smoke lại; `make install` sang thư mục khác và smoke lại từ
 bản cài; GitOps với repo git cục bộ; kiểm tài liệu API trong `docs/api/` khớp hệ thống vừa dựng; quét bí mật trong lịch
-sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner).
+sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ thuộc (OSV-Scanner); sinh SBOM CycloneDX của cây mã nguồn
+(`make sbom`, Syft) rồi kiểm giấy phép của mọi gói, kể cả gói gián tiếp (`make license-audit`). Từ bản sau 1.0.0, mỗi
+bản phát hành kèm SBOM đó.
 
 ## Tài liệu
 
@@ -334,6 +337,7 @@ sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ 
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Danh mục phần mềm thượng nguồn, phiên bản ghim, giấy phép |
 | [`CHANGELOG.md`](CHANGELOG.md) | Lịch sử thay đổi |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Hướng dẫn đóng góp |
+| [`SECURITY.md`](SECURITY.md) | Chính sách bảo mật: phiên bản được hỗ trợ, báo lỗ hổng riêng tư, thời gian phản hồi, phạm vi |
 | [`ROADMAP.md`](ROADMAP.md) | Lộ trình phát triển |
 
 ## Báo lỗi và đóng góp
@@ -341,6 +345,7 @@ sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ 
 - **Báo lỗi / đề xuất tính năng**: mở issue tại <https://github.com/HIT-Champion/HVL/issues>
 - **Đóng góp mã nguồn**: đọc [`CONTRIBUTING.md`](CONTRIBUTING.md) trước khi mở pull request
 - **Quy tắc ứng xử**: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
+- **Lỗ hổng bảo mật**: không mở issue công khai — báo riêng tư theo [`SECURITY.md`](SECURITY.md)
 
 ## Giấy phép
 
