@@ -15,14 +15,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Thông báo từng người (F2.5). svc-workflow ghi (vai trò service) rồi đẩy qua Centrifugo; mỗi người chỉ đọc
-# thông báo của chính mình và chỉ sửa được read_at (đánh dấu đã đọc). Không ai xóa qua GraphQL.
+# thông báo của chính mình và chỉ sửa được read_at (đánh dấu đã đọc). Không ai xóa qua GraphQL. channels: kênh ngoài
+# (email, webhook) cần gửi thêm — trigger tạo dòng core.notification_deliveries; người dùng không thấy cột này.
 table:
   name: notifications
   schema: core
 insert_permissions:
   - role: service
     permission:
-      columns: [user_id, kind, key, document_id, data]
+      columns: [user_id, kind, key, document_id, data, channels]
       set:
         tenant_id: X-Hasura-Tenant-Id
       check: {}
@@ -45,7 +46,7 @@ select_permissions:
     permission: *own_select
   - role: service
     permission:
-      columns: [id, user_id, kind, key, document_id, data, created_at, read_at]
+      columns: [id, user_id, kind, key, document_id, data, channels, created_at, read_at]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
 update_permissions:
   - role: clerk
