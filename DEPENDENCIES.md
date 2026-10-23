@@ -23,7 +23,9 @@ sử dụng"*).
 - **Ngoại lệ vá bảo mật**: bản đang ghim có lỗ hổng đã công bố (OSV-Scanner trong CI báo) mà bản vá chưa đủ hai
   tuần thì dùng bản vá ngay, ghi ở đây. 22/10/2026: Pillow 13.0.0 (PyPI 16/10, vá các GHSA của 12.3.0) và pypdf
   6.21.1 (17/10, vá 5 GHSA của 6.19.0) — cả hai đọc tệp người dùng tải lên (`svc-files`); certifi 2026.10.19 (20/10,
-  bỏ gốc emSign có CA trung gian lộ khóa, GHSA-6q48-6c7w-9gw2).
+  bỏ gốc emSign có CA trung gian lộ khóa, GHSA-6q48-6c7w-9gw2). 23/10/2026: brotli 1.2.1 và brotlicffi 1.2.1.0 (22/10,
+  vá lỗi ghi tràn bộ nhớ trong bộ giải nén, PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) — gói kéo theo của fontTools mà
+  WeasyPrint dùng trong `svc-files`.
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
