@@ -123,6 +123,7 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `files` | `svc-files`, SeaweedFS, ClamAV, tìm kiếm | AI |
 | `realtime` | Centrifugo | Backend |
 | `office` | `apps/office` — giao diện web | Frontend |
+| `ca-nhan` | `apps/ca-nhan` — Không gian cá nhân P.A.R.A, ứng dụng thứ hai trên lõi | Frontend |
 | `ai` | `svc-ai`: RAG, OCR, tác tử | AI |
 | `data` | Kestra, nóng → lạnh, lineage | AI |
 | `ops` | Compose, reconciler, sao lưu, giám sát, OpenBao | Backend |
@@ -182,7 +183,7 @@ trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự b
 # <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, ≤ 72 ký tự, không chấm cuối>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
-# Phạm vi: gateway auth db workflow files realtime office ai data ops cli scripts e2e ci deps docs release
+# Phạm vi: gateway auth db workflow files realtime office ca-nhan ai data ops cli scripts e2e ci deps docs release
 #
 # Thân (tùy chọn, tiếng Anh): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #

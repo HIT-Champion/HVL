@@ -25,6 +25,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   không Internet, chi phí, giấy phép, việc chưa làm), mỗi câu trả lời kèm đường dẫn, lệnh `make`, bước CI làm bằng
   chứng. `docs/demo-script.md` thêm mục "Phương án dự phòng" (mất mạng, hỏng laptop, AI chậm, TOTP không qua, bước demo
   lỗi; máy dự phòng chạy tại chỗ không cần Internet, video) và checklist T-1 ngày, T-1 giờ, T-5 phút.
+- Ứng dụng thứ hai trên lõi, Không gian cá nhân P.A.R.A (`/ca-nhan/`, `apps/ca-nhan`): mỗi người cất tệp của mình
+  trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ — tải lên qua `svc-files` (ClamAV), chuyển, tải về; client
+  Keycloak riêng `app-ca-nhan`, cùng phiên SSO với Văn phòng điện tử; schema riêng `personal` có quyền đến từng dòng,
+  mỗi lần xếp, chuyển vào sổ kiểm toán của lõi. Không sửa dòng nào trong `services/`; cách thêm một ứng dụng:
+  `docs/them-ung-dung.md`. Bản cài cũ thêm client bằng `moc realm clients` (`make seed` cũng gọi); `make demo-ca-nhan`.
 
 ### Đã sửa đổi
 - CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và

@@ -18,6 +18,8 @@
 
 1. Đơn vị và phòng ban: seed/tenants.sql (id cố định).
 2. Tài khoản: seed/users.csv → Keycloak Admin REST qua cổng quản trị nội bộ (127.0.0.1).
+   Client của ứng dụng trên trình duyệt còn thiếu so với moc-realm.json (realm nạp trước khi có ứng dụng đó) được
+   thêm trước — `moc realm clients` (realm_clients.py).
 3. Mỗi đơn vị mẫu một Organization trong Keycloak, tài khoản mẫu là thành viên (F3.12) — cùng các hàm của
    `moc tenant create` (tenants.py).
 4. Văn bản: chạy kịch bản nghiệp vụ qua API như người dùng thật (seed_documents.py) — không chèn thẳng
@@ -30,6 +32,7 @@ import json
 import sys
 import time
 
+import realm_clients
 import tenants
 from moc_env import ENV, KEYCLOAK_ADMIN_URL, PUBLIC_URL, REALM, ROOT, HTTPError, Session, call_json, compose, wait_for
 from tenants import admin_token
@@ -137,6 +140,7 @@ def main() -> None:
     print("Nạp dữ liệu mẫu:")
     seed_tenants()
     try:
+        print("  " + realm_clients.describe(realm_clients.run(ENV)))
         seed_users()
         seed_organizations()
     except HTTPError as exc:

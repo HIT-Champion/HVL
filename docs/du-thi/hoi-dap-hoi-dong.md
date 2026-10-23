@@ -31,11 +31,15 @@ trị (`/console`, `/v1/metadata`, `/admin`…) trả 404. Ứng dụng nào cũ
 GraphQL cho dữ liệu, REST cho tệp, tìm kiếm, WebSocket cho thông báo; riêng cổng xác thực văn bản không cần token — và
 đơn vị, vai trò luôn lấy từ token. Dữ liệu dùng chung nằm ở schema `core` (đơn vị, tệp, sổ kiểm toán, thông báo); Văn
 phòng điện tử có schema `office` riêng, ứng dụng mới thêm schema của nó và một client Keycloak theo mẫu `app-office`,
-không sửa `core`. Hiện mới có một ứng dụng Tầng 2 (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`); `smoke.py`
-và các màn demo thao tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Phần nghiệp vụ văn phòng phía
-máy chủ (Actions vào sổ, phát hành, dựng PDF văn bản đi) còn nằm chung trong `svc-workflow`, `svc-files`.
+không sửa `core`. Có hai ứng dụng Tầng 2: Văn phòng điện tử (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`)
+và Không gian cá nhân P.A.R.A (`app-ca-nhan`, `/ca-nhan/`). Ứng dụng thứ hai chỉ thêm schema `personal`, client
+`app-ca-nhan`, một route APISIX và một service compose, không sửa dòng nào trong `services/`, và dùng chung phiên đăng
+nhập, sổ kiểm toán, quét mã độc của lõi. `smoke.py` và các màn demo thao tác như người dùng qua đúng cổng đó, bằng token
+của tài khoản mẫu. Phần nghiệp vụ văn phòng phía máy chủ (Actions vào sổ, phát hành, dựng PDF văn bản đi) còn nằm chung
+trong `svc-workflow`, `svc-files`.
 
 **Bằng chứng:** README mục "Kiến trúc"; [`docs/api/README.md`](../api/README.md) (§1 "Muốn thêm một ứng dụng Tầng 2");
+[`docs/them-ung-dung.md`](../them-ung-dung.md) (các bước thêm ứng dụng, mẫu là `apps/ca-nhan`), `make demo-ca-nhan`;
 [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `platform/apisix/apisix.yaml`; `make smoke` (chặn đường quản
 trị); CI job `stack`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)".
 

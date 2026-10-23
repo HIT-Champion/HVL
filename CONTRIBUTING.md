@@ -29,6 +29,10 @@ Trước khi viết dòng mã đầu tiên, hãy nắm ba ràng buộc không đ
 3. **Không nhảy cóc trục.** Tính năng thuộc trục [I] chỉ được nhận nếu dữ liệu nó tiêu thụ đã do
    [D] chuẩn hóa và sự kiện nó lắng nghe đã do [P] sinh ra.
 
+Muốn thêm một **ứng dụng mới** (Tầng 2) trên lõi, làm theo
+[`docs/them-ung-dung.md`](docs/them-ung-dung.md): client Keycloak, route APISIX, service compose, schema riêng
+và quyền Hasura — không sửa mã của lõi (`services/`), ví dụ đầy đủ là Không gian cá nhân `apps/ca-nhan/`.
+
 ## Quy trình đóng góp
 
 ```bash
@@ -77,7 +81,7 @@ ci: pin the checkout action version
 
 - **Loại**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.
 - **Phạm vi** theo thành phần: `gateway`, `auth`, `db`, `workflow`, `files`, `realtime`, `office`,
-  `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
+  `ca-nhan`, `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
 - Chân commit ghi `Closes #<số-issue>` để tự đóng issue khi gộp vào `develop`.
 - CI kiểm tiêu đề pull request theo đúng quy ước này, vì khi squash nó thành dòng đầu của commit.
 

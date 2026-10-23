@@ -22,6 +22,7 @@
 #   /api/files/*, /api/search, /api/documents/*, /api/registers/*, /api/case-files/* → svc-files — cần token
 #   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
+#   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Kiểm token ở biên bằng JWKS của Keycloak (zero-trust: Hasura và svc-files vẫn kiểm lại).
@@ -56,6 +57,11 @@ upstreams:
     type: roundrobin
     nodes:
       "app-office:8080": 1
+  # Không gian cá nhân P.A.R.A (apps/ca-nhan): ứng dụng thứ hai, gọi lõi qua đúng các route ở dưới như app-office
+  - id: app-ca-nhan
+    type: roundrobin
+    nodes:
+      "app-ca-nhan:8080": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -218,6 +224,13 @@ routes:
         abort:
           http_status: 404
           body: "{\"error\":\"not_found\"}"
+
+  # Trang tĩnh của ứng dụng thứ hai (docs/them-ung-dung.md). Thêm một ứng dụng chỉ cần một upstream và một route như
+  # thế này: dữ liệu, tệp, đăng nhập vẫn đi qua các route của lõi ở trên, cùng kiểm token, giới hạn tốc độ
+  - id: app-ca-nhan
+    uris: ["/ca-nhan", "/ca-nhan/*"]
+    methods: [GET, HEAD]
+    upstream_id: app-ca-nhan
 
   - id: app-office
     uri: /*
