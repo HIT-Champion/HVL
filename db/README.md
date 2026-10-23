@@ -71,7 +71,7 @@ Keycloak đưa vào claim `https://hasura.io/jwt/claims`:
 
 | Claim | Ghi chú |
 |---|---|
-| `x-hasura-allowed-roles`, `x-hasura-default-role` | Thuộc tính người dùng `moc_role` (`auth/README.md`) |
+| `x-hasura-allowed-roles`, `x-hasura-default-role` | Thuộc tính người dùng `moc_role` (`platform/keycloak/README.md`) |
 | `x-hasura-user-id` | `sub` |
 | `x-hasura-tenant-id` | UUID của `core.tenants`; thiếu thì không thấy gì |
 | `x-hasura-department-id` | UUID của `office.departments`; bắt buộc với `staff`, `manager` — `staff` thiếu claim này không tạo được dự thảo |

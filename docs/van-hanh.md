@@ -85,7 +85,7 @@ Nói rõ giới hạn:
   mật từ `.env`, nhưng khóa transit mới khác: tệp văn bản hạn chế đã lưu không mở được nữa.
 - **Đổi `MOC_OPENBAO_SEAL_KEY` sau khi két đã khởi tạo thì két không mở được nữa.** Bản cài có từ trước khi có két:
   thêm vào `.env` của bản cài một dòng `MOC_OPENBAO_SEAL_KEY=` với chuỗi ngẫu nhiên dài (vd. `openssl rand -hex 32`).
-- Đổi cấu hình két (thêm khóa, policy, PKI) cần token quản trị. Lần đầu khởi tạo, `openbao/start.sh` cấu hình bằng
+- Đổi cấu hình két (thêm khóa, policy, PKI) cần token quản trị. Lần đầu khởi tạo, `platform/openbao/start.sh` cấu hình bằng
   token root rồi thu hồi nó; các lần khởi động sau chỉ dùng token khởi động. Token khởi động không đọc thẳng được bí
   mật và không sửa được policy, nhưng cấp được secret_id nên làm được mọi việc hai dịch vụ làm được: giữ volume
   `openbao_data` như chính két.
@@ -102,7 +102,7 @@ Nói rõ giới hạn:
   ký số; mọi thứ khác chạy như trước. Dựng PKI lỗi lúc khởi tạo két mới cũng vậy: `start.sh` ghi "chưa dựng được PKI
   nội bộ", két vẫn lên, và không tự thử lại.
 - Nâng cấp tay một két cũ (một lần; dừng timer reconciler trước như mục GitOps bên dưới):
-  1. Thêm tạm vào cuối `openbao/openbao.hcl` một listener chỉ nghe trong container, bật lại endpoint tạo token root bằng
+  1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` một listener chỉ nghe trong container, bật lại endpoint tạo token root bằng
      khóa phục hồi (OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không
      dùng được ở đây), rồi `docker compose restart openbao`:
      ```hcl
@@ -145,7 +145,7 @@ Nói rõ giới hạn:
 ## GitOps và tự phục hồi
 
 `scripts/reconcile.py` đưa hệ thống đang chạy về đúng trạng thái khai trong git, mỗi lượt một lần gọi. Trên máy chủ,
-systemd timer gọi nó mỗi 60 giây (tệp mẫu [`ops/systemd/`](../ops/systemd/), chạy trên máy chủ chứ không trong
+systemd timer gọi nó mỗi 60 giây (tệp mẫu [`platform/systemd/`](../platform/systemd/), chạy trên máy chủ chứ không trong
 container: không gắn socket Docker vào container nào). Mỗi lượt:
 
 - **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
@@ -161,7 +161,7 @@ container: không gắn socket Docker vào container nào). Mỗi lượt:
 git clone -b deploy https://github.com/HIT-Champion/HVL.git /opt/moc-src
 echo "MOC_GITOPS_DIR=/opt/moc-src" >> /opt/moc/.env
 python3 /opt/moc/scripts/reconcile.py          # thử một lượt
-sudo cp ops/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enable --now moc-reconcile.timer
+sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enable --now moc-reconcile.timer
 ```
 
 - Áp một commit là cài lại toàn bộ: Signet dừng khoảng một phút (`install.sh` không thay cấu hình dưới container đang
@@ -200,7 +200,7 @@ mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không m
 - Grafana chỉ nghe `127.0.0.1:MOC_GRAFANA_PORT` (mặc định 3300) trên máy chủ — xem từ máy khác qua đường hầm SSH:
   `ssh -L 3300:127.0.0.1:3300 máy-chủ` rồi mở `http://localhost:3300`.
 - Không có tài khoản Grafana: ai vào được cổng đó thì chỉ xem. Bảng điều khiển sửa trong
-  `monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
+  `platform/monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
 

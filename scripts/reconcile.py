@@ -17,7 +17,7 @@
 
 """Reconciler GitOps và tự phục hồi (F3.3) — một lượt mỗi lần gọi, chỉ dùng thư viện chuẩn.
 
-Chạy trên máy chủ bằng systemd timer mỗi 60 giây (`ops/systemd/`), không gắn socket Docker vào container nào.
+Chạy trên máy chủ bằng systemd timer mỗi 60 giây (`platform/systemd/`), không gắn socket Docker vào container nào.
 Mỗi lượt đưa hệ thống đang chạy về đúng trạng thái khai trong git:
 
   1. GitOps (khi đặt MOC_GITOPS_DIR — một bản sao git riêng của reconciler, chỉ dùng khi chạy từ bản cài):

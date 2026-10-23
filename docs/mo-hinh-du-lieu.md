@@ -821,7 +821,7 @@ JWT do Keycloak cấp, mapper đưa vào claim `https://hasura.io/jwt/claims`:
 | `x-hasura-allowed-roles`, `x-hasura-default-role` | thuộc tính người dùng `moc_role` (một vai trò mỗi người) |
 
 Ba thuộc tính `tenant_id`, `department_id`, `moc_role` khai trong user profile của realm
-(`auth/realm/moc-realm.json`): chỉ quản trị viên xem và sửa được, người dùng không tự đổi đơn vị hay vai trò
+(`platform/keycloak/realm/moc-realm.json`): chỉ quản trị viên xem và sửa được, người dùng không tự đổi đơn vị hay vai trò
 của mình. Dùng một thuộc tính cho cả hai claim vai trò để không bao giờ lệch nhau; giá trị bị giới hạn trong 5
 vai trò nghiệp vụ, nên không gán được vai trò `admin` của Hasura.
 

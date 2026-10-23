@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# F3.2 — cấu hình máy chủ OpenBao (một nút). openbao/start.sh chạy máy chủ với tệp này rồi tự cấu hình két.
+# F3.2 — cấu hình máy chủ OpenBao (một nút). platform/openbao/start.sh chạy máy chủ với tệp này rồi tự cấu hình két.
 
 # OpenBao 2.x bỏ storage "file": raft một nút, dữ liệu trong volume openbao_data
 storage "raft" {

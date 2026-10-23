@@ -21,7 +21,7 @@ khi tải lại trang, nên lỗi đẩy chỉ ghi nhật ký. Khóa chống tr�
 Action, timer bắn lại không sinh thông báo thứ hai và không đẩy lại.
 
 Kênh riêng là ``personal:#<sub>``: Centrifugo tự đưa mỗi kết nối vào kênh của đúng người trong token Keycloak đã
-kiểm, trình duyệt không tự đăng ký được kênh của người khác (realtime/config.yaml).
+kiểm, trình duyệt không tự đăng ký được kênh của người khác (platform/centrifugo/config.yaml).
 """
 
 from __future__ import annotations

@@ -23,6 +23,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Tài liệu phục vụ cuộc thi chuyển vào `docs/du-thi/` (phân tích đề, tóm tắt thể lệ, bảng tự chấm PoF, kế hoạch
   phát triển, thư mục `nghien-cuu/`), kèm trang mục lục; `docs/` chỉ còn tài liệu về sản phẩm. Mọi liên kết và chỗ
   nhắc đường dẫn (README, đặc tả, mô hình dữ liệu, README dịch vụ, chú thích BPMN và `flowable.py`) đã sửa theo.
+- Cấu hình của phần mềm nguồn mở dùng nguyên bản gom vào `platform/`: `auth/` → `platform/keycloak/`, `gateway/` →
+  `platform/apisix/`, `realtime/` → `platform/centrifugo/`, `openbao/`, `monitoring/` → `platform/openbao/`,
+  `platform/monitoring/`, `ops/systemd/` → `platform/systemd/`, kèm trang `platform/README.md`. BPMN vào thư mục của
+  dịch vụ nạp nó (`services/svc-workflow/processes/`), cảm biến giả lập vào `services/ot-sensor/`. Gốc repo từ 15 còn 10
+  thư mục. Compose, `install.sh`, test, tài liệu đổi đường dẫn theo; đường dẫn trong container không đổi. Cài lại vào
+  bản cài theo bố cục cũ thì `make install` xóa các tệp cũ (theo MANIFEST) và cả thư mục cha đã rỗng.
 
 ### Đã sửa lỗi
 - Tên 4 job CI có dấu `#` (`Giấy phép (PoF #2)`…) bị YAML hiểu phần từ ` #` là chú thích: trang Actions hiện

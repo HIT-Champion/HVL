@@ -38,7 +38,7 @@ MANIFEST=.moc-install
 # (compose chỉ đọc ở đây profile core, app nên không thấy bind mount của nó)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
          scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/tenants.py scripts/demo.py scripts/reconcile.py
-         seed ot/sensor.py)
+         seed services/ot-sensor/sensor.py)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -91,12 +91,16 @@ running_from() {
 }
 
 # Xóa các tệp lần cài trước đã chép (theo MANIFEST); không đụng .env. keep: giữ chính tệp MANIFEST
+# Thư mục cha còn rỗng thì bỏ luôn: bản cài theo bố cục cũ (auth/, gateway/… trước khi dời vào platform/) không để
+# lại thư mục trống
 remove_managed() {
-  local dest=$1 keep=${2:-} rel
+  local dest=$1 keep=${2:-} rel dir
   [ -f "$dest/$MANIFEST" ] || return 0
   while IFS= read -r rel; do
     case "$rel" in "" | . | .env | /* | .. | ../* | */../* | */..) die "đường dẫn lạ trong $dest/$MANIFEST: '$rel'" ;; esac
     rm -rf -- "${dest:?}/$rel"
+    dir=$(dirname -- "$rel")
+    while [ "$dir" != . ] && rmdir -- "$dest/$dir" 2>/dev/null; do dir=$(dirname -- "$dir"); done
   done < "$dest/$MANIFEST"
   [ -n "$keep" ] || rm -f -- "$dest/$MANIFEST"
 }
@@ -200,7 +204,7 @@ do_install() {
   python3 scripts/moc.py audit verify   # kiểm sổ kiểm toán
   python3 scripts/demo.py kiem-dich     # màn demo kiểm dịch (docs/demo-script.md)
   python3 scripts/moc.py backup create  # sao lưu CSDL và tệp vào MOC_BACKUP_DIR (mặc định $dest/backups)
-  python3 scripts/reconcile.py         # một lượt GitOps + tự phục hồi (timer mẫu: ops/systemd/)
+  python3 scripts/reconcile.py         # một lượt GitOps + tự phục hồi (timer mẫu: platform/systemd/)
 Bản cài dùng chung tên project và dữ liệu "moc" với bản chạy trong thư mục mã nguồn: dừng bản đó trước (make down).
 EOF
 }

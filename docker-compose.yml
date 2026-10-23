@@ -69,7 +69,7 @@ services:
       timeout: 5s
       retries: 30
 
-  # F1.1 — SSO. Realm nạp từ auth/realm/ ở lần đầu (bỏ qua nếu realm đã có).
+  # F1.1 — SSO. Realm nạp từ platform/keycloak/realm/ ở lần đầu (bỏ qua nếu realm đã có).
   keycloak:
     <<: *common
     image: quay.io/keycloak/keycloak:26.7.5@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
@@ -90,12 +90,12 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50
-      # giá trị thay vào auth/realm/moc-realm.json khi nạp
+      # giá trị thay vào platform/keycloak/realm/moc-realm.json khi nạp
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
       MOC_CLI_CLIENT_ENABLED: ${MOC_CLI_CLIENT_ENABLED:-false}
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
     volumes:
-      - ./auth/realm:/opt/keycloak/data/import:ro
+      - ./platform/keycloak/realm:/opt/keycloak/data/import:ro
     ports:
       # trang quản trị: chỉ trên máy chủ, không qua APISIX
       - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
@@ -125,8 +125,8 @@ services:
       MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
       MOC_TRUSTED_PROXY: ${MOC_TRUSTED_PROXY:-127.0.0.1/32}
     volumes:
-      - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+      - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./platform/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
     ports:
       - ${MOC_HTTP_PORT:-8080}:9080
     depends_on:
@@ -271,7 +271,7 @@ services:
     volumes:
       - meili_data:/meili_data
 
-  # F3.2 — két bí mật (openbao/start.sh): svc-files, svc-workflow lấy bí mật qua AppRole lúc khởi động thay vì nhận
+  # F3.2 — két bí mật (platform/openbao/start.sh): svc-files, svc-workflow lấy bí mật qua AppRole lúc khởi động thay vì nhận
   # qua biến môi trường; khóa transit moc-files cho F3.7; F4.5 — PKI nội bộ (CA moc-root, chỉ minh họa) cấp chứng thư
   # cho khóa ký transit moc-ky-so-<đơn vị>. Static seal: khởi động lại là tự mở khóa. Không mở cổng ra ngoài. Chạy
   # bằng root chỉ để ghi tệp đăng nhập cho từng dịch vụ; máy chủ chạy bằng người dùng openbao.
@@ -296,7 +296,7 @@ services:
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:?}
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
     volumes:
-      - ./openbao:/moc:ro
+      - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
       - openbao_svc_files:/run/moc/svc-files
       - openbao_svc_workflow:/run/moc/svc-workflow
@@ -395,7 +395,7 @@ services:
       MOC_REALM: ${MOC_REALM:-moc}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
-      - ./processes:/app/processes:ro
+      - ./services/svc-workflow/processes:/app/processes:ro
       - openbao_svc_workflow:/run/openbao:ro
     depends_on:
       # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
@@ -418,7 +418,7 @@ services:
       # chỉ trang của chính Signet được mở WebSocket (chặn trang lạ dùng phiên của người dùng)
       CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${MOC_PUBLIC_URL:?}
     volumes:
-      - ./realtime:/centrifugo:ro
+      - ./platform/centrifugo:/centrifugo:ro
     mem_limit: 256m
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/health || exit 1"]
@@ -441,7 +441,7 @@ services:
       - --storage.tsdb.retention.time=${MOC_METRICS_RETENTION:-15d}
     mem_limit: 512m
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./platform/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]
@@ -474,9 +474,9 @@ services:
     mem_limit: 512m
     # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ
     volumes:
-      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./platform/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./platform/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./platform/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     ports:
       - 127.0.0.1:${MOC_GRAFANA_PORT:-3300}:3000
     healthcheck:
@@ -546,7 +546,7 @@ services:
     environment:
       MOC_NGSI_URL: http://scorpio:9090
     volumes:
-      - ./ot/sensor.py:/ot/sensor.py:ro
+      - ./services/ot-sensor/sensor.py:/ot/sensor.py:ro
 
   # F4.1 — mô hình ngôn ngữ cục bộ cho tác tử đọc văn bản đến, profile ai (tùy chọn: make up-ai). Ollama (MIT) chạy
   # Qwen3 (Apache-2.0) trên CPU; chỉ viết trích yếu khi quy tắc không ra trích yếu tin cậy — số, ngày, cơ quan luôn

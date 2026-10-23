@@ -168,13 +168,13 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa; PKI nội bộ (CA minh họa) và khóa ký transit của từng đơn vị cho văn bản đi (F4.5). Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
+| OpenBao | 2.7.1 | MPL-2.0 | Két bí mật và khóa (thay HashiCorp Vault): `svc-files`, `svc-workflow` lấy bí mật qua AppRole, static seal tự mở khóa, khóa transit cho tệp mã hóa; PKI nội bộ (CA minh họa) và khóa ký transit của từng đơn vị cho văn bản đi (F4.5). Image nguyên bản, chỉ thêm tệp cấu hình và script khởi động của đội (`platform/openbao/`) | `openbao/openbao:2.7.1` (image 01/10/2026) | 3 |
 | Kestra | v2.0.5 | Apache-2.0 | Dự kiến chạy job ngầm. **Chưa đưa vào**: nộp lưu nóng → lạnh (F3.8) chạy thành vòng nền trong `svc-files` — một job mỗi giờ không đáng thêm một máy chủ Java ~1 GB RAM | `kestra/kestra:v2.0.5` | 3 |
 | Marquez | 0.51.1 | Apache-2.0 | Lưu và hiển thị phả hệ dữ liệu (lineage). **Chưa đưa vào compose**: sự kiện lưu trong `core.lineage_events` (F3.9); đặt `MOC_OPENLINEAGE_URL` thì svc-files gửi sang Marquez | `marquezproject/marquez:0.51.1` | 3 |
 | Scorpio Broker | 6.0.2 | BSD-3-Clause | Context broker NGSI-LD cho dữ liệu cảm biến (F3.10, profile `iot`): bản sao số, lịch sử đo, subscription báo `svc-workflow` khi vượt ngưỡng. Bản java mặc định (không Kafka), không mở cổng ra ngoài | `scorpiobroker/all-in-one-runner:java-6.0.2` (image 03/07/2026) | 3 |
 | PostGIS | 16-3.5 | GPL-2.0 | CSDL riêng của Scorpio (broker bắt buộc phần mở rộng `postgis`); dịch vụ độc lập, mạng riêng chỉ broker nối được, Signet không liên kết mã | `postgis/postgis:16-3.5-alpine`, ghim digest (image 31/08/2026) | 3 |
 | Prometheus | v3.15.0 | Apache-2.0 | Thu chỉ số của cổng API (plugin `prometheus` của APISIX) mỗi 15 giây; không mở cổng ra ngoài (F3.13) | `prom/prometheus:v3.15.0` | 3 |
-| Grafana (OSS) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát: bảng điều khiển nạp từ `monitoring/` (dịch vụ độc lập, chỉ nghe 127.0.0.1, chỉ xem, không tài khoản) (F3.13) | `grafana/grafana:13.2.3` | 3 |
+| Grafana (OSS) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát: bảng điều khiển nạp từ `platform/monitoring/` (dịch vụ độc lập, chỉ nghe 127.0.0.1, chỉ xem, không tài khoản) (F3.13) | `grafana/grafana:13.2.3` | 3 |
 | cloudflared | 2026.10.0 | Apache-2.0 | Cloudflare Tunnel (F1.9, profile `tunnel`, tùy chọn): máy không có IP công khai ra Internet có HTTPS mà không mở cổng — gọi ra Cloudflare, chuyển yêu cầu vào APISIX qua mạng Docker; token để ngoài repo | `cloudflare/cloudflared:2026.10.0` (image 05/10/2026) | 1 |
 | restic | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
 | Vector | 0.59.0 | MPL-2.0 | Thu gom log *(Could)* | `timberio/vector:0.59.0-debian` | 3 |

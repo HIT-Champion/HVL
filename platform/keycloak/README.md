@@ -1,4 +1,4 @@
-# auth — Keycloak
+# platform/keycloak — Keycloak
 
 `realm/moc-realm.json` được Keycloak nạp ở lần khởi động đầu (bỏ qua nếu realm đã có — sửa tệp thì
 `make reset`, hoặc sửa qua trang quản trị). Giá trị `${...}` lấy từ biến môi trường của container. Chủ: #21.
@@ -25,4 +25,4 @@ subflow Conditional `moc-cli-otp-bat-buoc`, `moc-cli-otp-tu-chon` sau bước m�
 
 Tài khoản mẫu tạo bằng `make seed` (`seed/users.csv`), không nằm trong realm. Các tài khoản văn thư, lãnh đạo,
 tổ trưởng, trưởng bộ môn, quản trị được cài sẵn TOTP bằng khóa chung `MOC_DEMO_TOTP_SECRET`; `make totp` in mã
-hiện tại và khóa để thêm vào ứng dụng xác thực. Còn làm: giao diện đăng nhập riêng (`auth/themes/`).
+hiện tại và khóa để thêm vào ứng dụng xác thực. Còn làm: giao diện đăng nhập riêng (`platform/keycloak/themes/`).
