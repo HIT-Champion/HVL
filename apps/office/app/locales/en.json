@@ -26,7 +26,9 @@
     "compose": "Draft a document",
     "register": "Registers",
     "audit": "Audit log",
-    "board": "Overview"
+    "board": "Overview",
+    "metrics": "Metrics",
+    "feedback": "Feedback"
   },
   "role": {
     "clerk": "Clerk",
@@ -537,7 +539,11 @@
     "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",
     "documents_restricted_sealed": "This document already has files, so its restricted setting cannot change",
     "documents_restricted_local": "Restricted documents cannot be sent to other units within the system.",
-    "documents_recipient_units": "Invalid receiving unit (unknown, or your own unit), or the document was already submitted so its receiving units can no longer change."
+    "documents_recipient_units": "Invalid receiving unit (unknown, or your own unit), or the document was already submitted so its receiving units can no longer change.",
+    "feedback_rate": "You have sent a lot of feedback in a short time: at most 3 in 10 minutes and 20 in 24 hours. Try again later.",
+    "feedback_rating": "Choose a satisfaction level from 1 to 5.",
+    "feedback_comment": "Feedback is longer than 500 characters.",
+    "feedback_screen": "Could not attach the current screen to your feedback. Reload the page and send again."
   },
   "validation": {
     "required": "Required",
@@ -932,5 +938,109 @@
     "average": "Average",
     "status": "Status",
     "underHour": "under 1 hour"
+  },
+  "feedback": {
+    "button": "Feedback",
+    "title": "Feedback on the e-Office",
+    "screen": "Screen: {screen}",
+    "screenDocument": "Document details",
+    "allScreens": "All screens",
+    "rating": "Satisfaction",
+    "ratingValue": "Level {n}/5",
+    "low": "Not satisfied",
+    "high": "Very satisfied",
+    "comment": "A few words",
+    "placeholder": "What is inconvenient, what should change…",
+    "privacy": "Do not write names, ID card numbers or phone numbers.",
+    "send": "Send feedback",
+    "sent": "Feedback sent. Thank you!",
+    "mineLink": "Feedback you sent",
+    "pageTitle": "Feedback",
+    "pageSubtitle": "A 1–5 satisfaction level and a few words about the e-Office, sent with the Feedback button in the top bar; the current screen is attached automatically.",
+    "summary": "Unit summary",
+    "sampleNote": "Sample unit (make seed): this feedback comes from people trying the system, not from users at a real unit.",
+    "none": "No feedback yet.",
+    "average": "Average score",
+    "count": "Feedback",
+    "distribution": "By level",
+    "screenColumn": "Screen",
+    "withComment": "With text",
+    "last": "Latest",
+    "recent": "Recent feedback",
+    "anonymous": "The sender is not shown. The time sent is.",
+    "yours": "Yours",
+    "mine": "Your feedback",
+    "mineHint": "Only you see this list. Unit leaders and unit administrators can read the text and the time sent, not who sent it.",
+    "noneMine": "You have not sent any feedback yet."
+  },
+  "metrics": {
+    "title": "Metrics",
+    "subtitle": "Before / after metrics from spec §8, computed from your unit's data when the page opens. Counts and hours only; restricted documents are left out.",
+    "forbidden": "Only unit leaders can view this page.",
+    "sampleNote": "Computed on sample data (make seed): the sample script runs every step within seconds, not at a real working pace.",
+    "table": "The four indicators of spec §8",
+    "indicator": "Indicator",
+    "before": "Before",
+    "after": "After (on the system)",
+    "how": "How it is measured",
+    "notMeasured": "Not measured — no pilot unit yet",
+    "noData": "No data yet",
+    "beforeNote": "The Before column is measured at a pilot unit the old way: asking the clerk, paper logs, a stopwatch, observation. There is no pilot unit yet, so there are no figures, and the page does not fill in estimates. How to measure and read: docs/so-lieu-sau.md.",
+    "month": "Month",
+    "allMonths": "All months",
+    "median": "Median",
+    "unit": {
+      "second": "s",
+      "minute": "min",
+      "hour": "h",
+      "day": "days"
+    },
+    "assign": {
+      "name": "Time from arrival to assignment",
+      "value": "Median {median} · p90 {p90}",
+      "count": "{n} documents assigned · {waiting} still waiting",
+      "how": "From intake (or arrival from another unit) to the first time a leader assigns the lead. Cancelled and restricted documents are left out.",
+      "byMonth": "Time to assignment, by month of arrival",
+      "arrived": "Arrived",
+      "assigned": "Assigned",
+      "handled": "To a handler",
+      "monthHint": "Median and p90 in the All months row are recomputed over every document, not added up from the months. Last column: median time until the document reaches a person who handles it."
+    },
+    "overdue": {
+      "name": "Share of documents handled late",
+      "value": "{pct}% ({late}/{judged} documents)",
+      "count": "Of these, {open} not finished and past the deadline · {pending} not yet due, not counted",
+      "how": "Deadline compared with the time finished, in Vietnam time; a document not finished and past its deadline counts as late. Documents without a deadline are left out.",
+      "byMonth": "Late documents by deadline month",
+      "dueMonth": "Deadline month",
+      "judged": "Known",
+      "late": "Late",
+      "open": "Open, late",
+      "pending": "Not yet due",
+      "monthHint": "Differs from the on-time figure on the Overview page: that page only counts finished documents, by month finished."
+    },
+    "search": {
+      "name": "Time to find an old document again",
+      "value": "Median {median} · slowest {max}",
+      "count": "{n} searches, found {found}/{n}",
+      "how": "Time 5 searches for the reference numbers of the oldest incoming documents: system latency, not including the time a person spends typing and reading.",
+      "run": "Run {n} searches",
+      "running": "Measuring…",
+      "runs": "Searches",
+      "symbol": "Reference number",
+      "latency": "Time",
+      "rank": "Position in results",
+      "notFound": "Not found",
+      "note": "Measured in this browser, one search at a time, so it includes your network round trip; results are not saved. make do-so-lieu-sau measures the same way on the server."
+    },
+    "searchFew": "Only {n} incoming documents have a reference number to search for; {want} are needed.",
+    "handoffs": {
+      "name": "Manual hand-offs (print, sign, carry, reminder messages)",
+      "value": "Qualitative comparison, no figure",
+      "how": "The paper process compared with the process on the system, step by step: docs/so-lieu-sau.md."
+    },
+    "feedback": "User feedback",
+    "feedbackValue": "Average score {avg}/5 over {n} feedback",
+    "feedbackLink": "View feedback"
   }
 }

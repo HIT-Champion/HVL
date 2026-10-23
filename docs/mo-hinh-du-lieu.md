@@ -41,6 +41,7 @@ create table core.tenants (                 -- cơ quan, đơn vị dùng hệ t
   parent_name text,                          -- cơ quan chủ quản: 'Trường Đại học …'
   place_name  text,                          -- địa danh trước ngày tháng: 'Hà Nội'
   head_title  text,                          -- chức vụ người đứng đầu ở phần ký: 'Trưởng khoa'
+  sample_data boolean not null default false, -- đơn vị mẫu do make seed nạp; số đo F4.6 ghi rõ (§2.5)
   created_at  timestamptz not null default now()
 );
 
@@ -137,7 +138,8 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 
 **Chuỗi băm** (cài ở #18 — `db/migrations/`, cách dùng ở `db/README.md`):
 
-- Trigger `core.audit()` gắn vào mọi bảng nghiệp vụ (trừ `office.document_events`), ghi các cột đã đổi.
+- Trigger `core.audit()` gắn vào mọi bảng nghiệp vụ (trừ `office.document_events` và `office.feedback` — góp ý
+  không gắn sổ để lãnh đạo đọc sổ không biết ai góp ý gì, §2.5), ghi các cột đã đổi.
 - Trigger `before insert` trên `core.audit_log` khóa dòng đầu chuỗi `core.audit_head (last_id, last_hash)`,
   cấp `id = last_id + 1`, đặt `occurred_at`, `prev_hash`, `hash` — người ghi không chọn được các cột này.
   Khóa dòng thay cho `pg_advisory_xact_lock`: ở `READ COMMITTED` giao dịch sau đợi rồi đọc đầu chuỗi mới;
@@ -795,6 +797,47 @@ aggregate.
 | View | Cột | Dùng cho |
 |---|---|---|
 | `office.v_assignment_suggestion_accuracy` | `tenant_id`, `status`, `confidence`, `suggested`, `decided`, `kept_unit`, `due_compared`, `kept_due`, `due_abs_error_days` | Theo kết quả (`suggested`, `none`, `failed`) và độ tin cậy: số gợi ý; số văn bản đã giao chủ trì sau lúc gợi ý; số giữ đúng đơn vị gợi ý; số có cả hạn gợi ý và hạn đã giao; số giữ đúng hạn; tổng số ngày lệch hạn (chia cho `due_compared` ra sai số trung bình) |
+
+**Góp ý và số đo "sau"** (F4.6, migration 1792281602700, 1792281602750; cách đo, cách đọc:
+[`so-lieu-sau.md`](so-lieu-sau.md)). Người đã đăng nhập gửi góp ý: mức hài lòng 1–5, vài dòng, khuôn đường dẫn màn
+hình. Bảng không có họ tên, vai trò, phòng, trình duyệt, IP; không gắn sổ kiểm toán (sổ ghi người thực hiện từng dòng,
+lãnh đạo đọc sổ của đơn vị sẽ biết ai góp ý gì); không vai trò nào sửa, xóa.
+
+```sql
+create table office.feedback (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references core.tenants,
+  user_id     text not null,                 -- sub Keycloak, Hasura đặt từ token; không vai trò nào đọc cột này
+  rating      int  not null,                 -- feedback_rating: 1–5
+  comment     text,                          -- feedback_comment: null hoặc 1–500 ký tự, đã gọt khoảng trắng
+  screen      text not null,                 -- feedback_screen: khuôn đường dẫn, vd '/van-ban/:id', ≤ 80 ký tự
+  created_at  timestamptz not null default now()   -- trigger đặt, người gửi không chọn
+);
+```
+
+- `feedback_screen`: chỉ chữ thường, gạch nối và `:id`, tối đa 6 đoạn, không chuỗi truy vấn — id văn bản hay
+  `?q=<số CCCD>` không lọt vào bảng.
+- Trigger `before insert` `office.feedback_guard()`: gọt khoảng trắng hai đầu của `comment` (chỉ còn khoảng trắng thì
+  null), đặt `created_at = now()`, khóa tư vấn theo (đơn vị, người gửi) rồi đếm: quá 3 góp ý trong 10 phút hay 20 trong
+  24 giờ thì lỗi `check_violation` có câu `feedback_rate: …`. Lỗi raise không có tên ràng buộc đi kèm: Hasura trả mã
+  `permission-error`, câu `Check constraint violation. feedback_rate: …`, nên giao diện tìm tên trong câu. Đếm cả dòng
+  thêm trước đó trong cùng câu lệnh (mutation nhiều dòng) và các lần gửi song song.
+- Hàm `office.feedback_mine(feedback, hasura_session)` → trường `mine`: góp ý này của người đang xem. Người gửi lọc góp
+  ý của mình mà không ai đọc được `user_id`.
+- Quyền: `clerk`, `staff`, `manager`, `director`, `tenant_admin` thêm được (chỉ `rating`, `comment`, `screen`; Hasura
+  đặt `tenant_id`, `user_id` từ token). `clerk`, `staff`, `manager` chỉ đọc góp ý của mình; `director`,
+  `tenant_admin` đọc mọi góp ý của đơn vị (không có `user_id`), có aggregate. `service`, `agent` không có quyền nào.
+
+Ba view số đo "sau" theo đặc tả §8 (migration 1792281602750). Như dashboard: chỉ số đếm và số giờ, văn bản hạn chế,
+văn bản đã hủy không tính, tháng theo giờ Việt Nam. Mỗi view có một dòng mỗi tháng (mỗi màn hình) và một dòng `month`
+(`screen`) null cho tất cả — trung vị, p90 không cộng từ các tháng được nên dòng tổng tính lại (grouping sets). Cột
+`sample` lấy từ `core.tenants.sample_data`.
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.v_time_to_assign` | `tenant_id`, `sample`, `month`, `arrived`, `assigned`, `median_hours`, `p90_hours`, `handled`, `handled_median_hours`, `handled_p90_hours`, `waiting` | (a) Từ lúc văn bản đến (`documents.created_at`) tới lần đầu giao chủ trì gốc (`assignments.assigned_at`), và tới lần đầu văn bản tới tay một người (`handled_*`); `percentile_cont`, giờ âm tính 0; `waiting`: chưa giao, còn chờ vào sổ hay chỉ đạo. Theo tháng văn bản đến. Chỉ `director` đọc |
+| `office.v_overdue_rate` | `tenant_id`, `sample`, `month`, `judged`, `on_time`, `late`, `late_open`, `pending` | (b) Hạn giải quyết so với lúc xong (sự kiện `processed` / `filed` cuối cùng, hay bản giữ lại khi đã nộp lưu); chưa xong mà qua hạn tính là quá hạn (`late_open`), chưa tới hạn chỉ đếm ở `pending`. Theo tháng của hạn. Chỉ `director` đọc |
+| `office.v_feedback_summary` | `tenant_id`, `sample`, `screen`, `feedback`, `rating_total`, `rating_1`…`rating_5`, `with_comment`, `last_at` | Góp ý theo màn hình: số góp ý, tổng điểm (giao diện tự chia ra điểm trung bình), số theo từng mức, số có nội dung, lần gửi gần nhất. Không có nội dung, người gửi. `director`, `tenant_admin` đọc |
 
 **Khung nhìn của cổng xác thực** (`office.issued_documents`, F2.13): một dòng mỗi văn bản đi đã phát hành hoặc đã nộp
 lưu; chỉ vai trò `verifier` đọc, mỗi lần một dòng (§3, §4.3). F4.5 (migration 1792281602200) thêm năm cột chữ ký ở cuối.

@@ -84,6 +84,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         được xem văn bản thấy bản gốc); tệp EICAR tên có số điện thoại bị chặn, sổ kiểm toán giữ tên gốc; nhật ký
         apisix, app-office, svc-files, svc-workflow từ lúc bắt đầu màn không còn giá trị nào ở bất kỳ cách viết nào,
         dòng truy cập không còn chuỗi truy vấn; bật profile ai thì mô hình chỉ thấy nhãn [SĐT-1]. (make demo-che-pii)
+    python3 scripts/demo.py do-so-lieu-sau
+        Số đo "sau" của đặc tả §8 (F4.6, docs/so-lieu-sau.md) bằng quyền lãnh đạo đơn vị: thời gian từ khi văn bản
+        đến tới khi được giao xử lý (trung vị, p90), tỷ lệ xử lý quá hạn, 5 lần tìm lại văn bản đến cũ nhất qua
+        /api/search (độ trễ hệ thống), số bước chuyển tay chỉ so sánh định tính; cột "trước" ghi chưa đo. In bảng,
+        ghi out/so-lieu-sau.json; thoát 1 khi không đủ 5 văn bản để tìm hoặc một lần tìm không ra văn bản cần tìm
+        trong 20 kết quả đầu. (make do-so-lieu-sau)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -2977,10 +2983,211 @@ def che_pii() -> None:
           f" {PUBLIC_URL}/van-ban/{doc_id}")
 
 
+# --- F4.6 · Số đo "sau" (đặc tả §8) ----------------------------------------------------------------------------------
+# Bốn chỉ số của docs/dac-ta-san-pham.md §8 trên hệ thống đang chạy, đọc bằng quyền lãnh đạo đơn vị qua APISIX như
+# trang Số đo: (a), (b) từ khung nhìn office.v_time_to_assign, office.v_overdue_rate (migration 1792281602750) — chỉ
+# số đếm, số giờ, văn bản hạn chế không tính; (c) bấm giờ 5 lần tìm lại văn bản đến cũ nhất qua /api/search, lần lượt,
+# không lượt khởi động: độ trễ hệ thống, không gồm thời gian người gõ, đọc; (d) chỉ so sánh định tính. Cột "trước"
+# luôn là "chưa đo" — chưa có đơn vị chạy thử. Cách đo, cách đọc: docs/so-lieu-sau.md.
+SL_ACCOUNT = "truongkhoa"              # lãnh đạo Khoa CNTT của seed (seed/users.csv)
+SL_RUNS = 5
+SL_POOL = 25                           # số văn bản đến cũ nhất để chọn ra 5 số ký hiệu khác nhau
+SL_LIMIT = 20                          # văn bản cần tìm phải nằm trong 20 kết quả đầu
+SL_BEFORE = "chưa đo"
+SL_JSON = ROOT / "out" / "so-lieu-sau.json"
+SL_QUERY = """{
+  core_tenants { code name }
+  office_v_time_to_assign { sample month arrived assigned median_hours p90_hours handled handled_median_hours
+    handled_p90_hours waiting }
+  office_v_overdue_rate { sample month judged on_time late late_open pending }
+  office_v_feedback_summary(where: {screen: {_is_null: true}}) { sample feedback rating_total with_comment }
+  office_documents(where: {direction: {_eq: "in"}, restricted: {_eq: false}, status: {_neq: "cancelled"},
+    symbol: {_is_null: false}}, order_by: [{created_at: asc}, {id: asc}], limit: %d) { id symbol }
+}""" % SL_POOL
+SL_NAMES = {
+    "time_to_assign": "Thời gian từ khi văn bản đến tới khi được giao xử lý",
+    "overdue_rate": "Tỷ lệ văn bản xử lý quá hạn",
+    "search": "Thời gian tìm lại một văn bản cũ",
+    "handoffs": "Số bước chuyển tay (in, ký, mang đi, nhắn tin nhắc)",
+}
+SL_HOW = {
+    "time_to_assign": "office.v_time_to_assign: lúc tiếp nhận (hoặc liên thông tới) → lần đầu giao chủ trì",
+    "overdue_rate": "office.v_overdue_rate: hạn giải quyết so với lúc xong; chưa xong mà qua hạn tính là trễ",
+    "search": f"{SL_RUNS} lần GET /api/search theo số ký hiệu của văn bản đến cũ nhất, lần lượt",
+    "handoffs": "so quy trình giấy với quy trình trên hệ thống",
+}
+
+
+def sl_targets(docs: list[dict[str, Any]], n: int = SL_RUNS) -> list[dict[str, str]]:
+    """Văn bản cần tìm lại: theo thứ tự đã xếp (cũ nhất trước), mỗi số ký hiệu một lần — như pickSearchTargets của
+    trang Số đo (apps/office/app/utils/metrics.ts)."""
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for d in docs:
+        symbol = (d.get("symbol") or "").strip()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        out.append({"document_id": d["id"], "symbol": symbol})
+        if len(out) == n:
+            break
+    return out
+
+
+def sl_rank(hits: list[dict[str, Any]], doc_id: str) -> int | None:
+    """Vị trí của văn bản cần tìm trong kết quả, 1 là đầu; None: không thấy."""
+    return next((i for i, h in enumerate(hits, 1) if h.get("id") == doc_id), None)
+
+
+def sl_median(values: list[float]) -> float | None:
+    s = sorted(values)
+    if not s:
+        return None
+    mid = len(s) // 2
+    return s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2
+
+
+def sl_number(x: float) -> str:
+    """Một chữ số thập phân, dấu phẩy, bỏ ",0": 19,2 · 4 · 0,5."""
+    text = f"{round(x, 1):.1f}"
+    return (text[:-2] if text.endswith(".0") else text).replace(".", ",")
+
+
+def sl_hours(hours: float | None) -> str:
+    """Như fmtDuration của trang Số đo: dưới 1 phút ra giây, dưới 1 giờ ra phút, dưới 2 ngày ra giờ, còn lại ra ngày.
+    Dữ liệu mẫu đi hết các bước trong vài giây nên phải hiện được giây."""
+    if hours is None or hours != hours or hours in (float("inf"), float("-inf")):
+        return "—"
+    h = max(0.0, float(hours))
+    if h < 1 / 60:
+        return f"{round(h * 3600)} giây"
+    if h < 1:
+        return f"{sl_number(h * 60)} phút"
+    if h < 48:
+        return f"{sl_number(h)} giờ"
+    return f"{sl_number(h / 24)} ngày"
+
+
+def _sl_split(rows: list[dict[str, Any]]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """(dòng mọi tháng, các tháng cũ trước), bỏ cột sample (ghi một lần ở tenant)."""
+    clean = [{k: v for k, v in r.items() if k != "sample"} for r in rows]
+    total = next((r for r in clean if r.get("month") is None), None)
+    return total, sorted((r for r in clean if r.get("month") is not None), key=lambda r: r["month"])
+
+
+def sl_report(data: dict[str, Any], runs: list[dict[str, Any]], *, measured_at: str) -> dict[str, Any]:
+    """Kết quả một lần đo, đúng khuôn của out/so-lieu-sau.json (docs/so-lieu-sau.md)."""
+    views = data.get("office_v_time_to_assign", []), data.get("office_v_overdue_rate", []), \
+        data.get("office_v_feedback_summary", [])
+    tenant = (data.get("core_tenants") or [{}])[0]
+    assign_all, assign_months = _sl_split(views[0])
+    overdue_all, overdue_months = _sl_split(views[1])
+    feedback = views[2][0] if views[2] else None
+    ms = [r["ms"] for r in runs]
+    return {
+        "measured_at": measured_at,
+        "account": SL_ACCOUNT,
+        "tenant": {"code": tenant.get("code"), "name": tenant.get("name"),
+                   "sample": any(r.get("sample") for rows in views for r in rows)},
+        "before": SL_BEFORE,
+        "time_to_assign": {"all": assign_all, "months": assign_months},
+        "overdue_rate": {"all": overdue_all, "months": overdue_months,
+                         "late_pct": (100 * overdue_all["late"] / overdue_all["judged"]
+                                      if overdue_all and overdue_all["judged"] else None)},
+        "search": {"kind": "độ trễ hệ thống", "endpoint": "/api/search", "limit": SL_LIMIT, "runs": runs,
+                   "median_ms": sl_median(ms), "max_ms": max(ms) if ms else None,
+                   "found": sum(r["rank"] is not None for r in runs)},
+        "handoffs": {"kind": "định tính", "value": None, "doc": "docs/so-lieu-sau.md"},
+        "feedback": {"count": feedback["feedback"] if feedback else 0,
+                     "average": feedback["rating_total"] / feedback["feedback"]
+                     if feedback and feedback["feedback"] else None,
+                     "with_comment": feedback["with_comment"] if feedback else 0},
+    }
+
+
+def sl_after(report: dict[str, Any]) -> dict[str, str]:
+    """Cột "sau" của bảng: chưa có dòng nào thì "chưa có dữ liệu" (không phải 0)."""
+    assign, overdue, search = report["time_to_assign"]["all"], report["overdue_rate"], report["search"]
+    after = {"handoffs": "so sánh định tính — docs/so-lieu-sau.md"}
+    if assign and assign["assigned"]:
+        after["time_to_assign"] = (f"trung vị {sl_hours(assign['median_hours'])}, p90 {sl_hours(assign['p90_hours'])}"
+                                   f" ({assign['assigned']} văn bản đã giao, {assign['waiting']} còn chờ)")
+    else:
+        after["time_to_assign"] = "chưa có dữ liệu"
+    if overdue["late_pct"] is not None:
+        a = overdue["all"]
+        after["overdue_rate"] = (f"{sl_number(overdue['late_pct'])} % ({a['late']}/{a['judged']} văn bản; trong đó"
+                                 f" {a['late_open']} chưa xong đã qua hạn; {a['pending']} chưa tới hạn chưa tính)")
+    else:
+        after["overdue_rate"] = "chưa có dữ liệu"
+    if search["runs"]:
+        after["search"] = (f"trung vị {sl_number(search['median_ms'])} ms, chậm nhất {sl_number(search['max_ms'])} ms"
+                           f" ({len(search['runs'])} lần, tìm thấy {search['found']}/{len(search['runs'])}) — độ trễ"
+                           " hệ thống qua APISIX, không gồm thời gian người gõ, đọc")
+    else:
+        after["search"] = "chưa đo được"
+    return after
+
+
+def sl_table(report: dict[str, Any]) -> str:
+    """Bảng markdown đúng 4 dòng của đặc tả §8: Chỉ số | Trước | Sau | Cách đo."""
+    after = sl_after(report)
+    out = ["| Chỉ số | Trước | Sau | Cách đo |", "|---|---|---|---|"]
+    for key, name in SL_NAMES.items():
+        out.append(f"| {name} | {report['before']} | {after[key]} | {SL_HOW[key]} |")
+    return "\n".join(out)
+
+
+def sl_problems(report: dict[str, Any]) -> list[str]:
+    """Lý do thoát 1 (rỗng: đạt). Thiếu dữ liệu cho (a), (b) không phải lỗi: chỉ in "chưa có dữ liệu"."""
+    runs = report["search"]["runs"]
+    problems = []
+    if len(runs) < SL_RUNS:
+        problems.append(f"chỉ có {len(runs)} văn bản đến có số ký hiệu để tìm lại, cần {SL_RUNS} (đã make seed chưa?)")
+    problems += [f"tìm “{r['symbol']}” không thấy văn bản {r['document_id']} trong {SL_LIMIT} kết quả đầu"
+                 for r in runs if r["rank"] is None]
+    return problems
+
+
+def do_so_lieu_sau() -> None:
+    print(f"Số đo \"sau\" theo đặc tả §8 (F4.6) trên hệ thống đang chạy, đọc bằng quyền lãnh đạo đơn vị ({SL_ACCOUNT})"
+          " qua cổng APISIX; cột \"trước\" chưa đo — chưa có đơn vị chạy thử")
+    leader = who(SL_ACCOUNT)
+    data = leader.gql(SL_QUERY)
+    runs = []
+    for target in sl_targets(data["office_documents"]):
+        url = f"{PUBLIC_URL}/api/search?q={quote(target['symbol'], safe='')}&limit={SL_LIMIT}"
+        started = time.perf_counter()
+        body, _ = call_json("GET", url, headers=leader.auth)
+        ms = (time.perf_counter() - started) * 1000
+        runs.append({**target, "ms": round(ms, 1), "rank": sl_rank((body or {}).get("hits") or [],
+                                                                   target["document_id"])})
+    report = sl_report(data, runs, measured_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    tenant = report["tenant"]
+    print(f"   đơn vị: {tenant['name']} ({tenant['code']})")
+    print("\n" + sl_table(report))
+    for r in runs:
+        print(f"   tìm “{r['symbol']}”: {sl_number(r['ms'])} ms, "
+              + (f"thứ {r['rank']} trong kết quả" if r["rank"] else f"không thấy trong {SL_LIMIT} kết quả đầu"))
+    if report["feedback"]["count"]:
+        print(f"   góp ý: {report['feedback']['count']}, điểm trung bình {sl_number(report['feedback']['average'])}/5")
+    if tenant["sample"]:
+        print("\nDữ liệu mẫu (make seed): kịch bản mẫu đi hết các bước trong vài giây, không phải nhịp làm việc thật —"
+              " các số trên không phải số đo \"sau\" của một đơn vị.")
+    SL_JSON.parent.mkdir(parents=True, exist_ok=True)
+    SL_JSON.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"\nĐã ghi {SL_JSON.relative_to(ROOT)}")
+    problems = sl_problems(report)
+    if problems:
+        raise DemoFailed("; ".join(problems))
+    print(f"\n✓ đo đủ {SL_RUNS} lần tìm, văn bản cần tìm đều nằm trong {SL_LIMIT} kết quả đầu")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
-         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii}
+         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
+         "do-so-lieu-sau": do_so_lieu_sau}
 
 
 def main(argv: list[str] | None = None) -> int:

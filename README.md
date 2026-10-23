@@ -301,6 +301,7 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 | `make demo-*` | Các màn demo ở trên; sai bước nào thì dừng và thoát 1 | Như trên |
 | `make audit` | Tính lại sổ kiểm toán chuỗi băm ngoài CSDL, so với mốc đã neo ra kho lạnh và hash của văn bản đã phát hành | Hệ thống đang chạy |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii` | Đo các tác tử AI trên bộ mẫu có đáp án: đúng / sai / trống từng trường, recall@3, độ phủ | Hệ thống đang chạy (`do-che-pii` không cần) |
+| `make do-so-lieu-sau` | Số đo "sau" của đặc tả §8 (F4.6): thời gian tới khi giao xử lý, tỷ lệ quá hạn, 5 lần tìm lại văn bản cũ; cột "trước" ghi chưa đo; in bảng, ghi `out/so-lieu-sau.json` | Hệ thống đang chạy + `make seed` |
 | `db/tests/` | Schema, quyền theo vai trò và đơn vị, ràng buộc, sổ kiểm toán (kể cả các kiểu sửa lén) trên PostgreSQL + Hasura thật | xem [`db/README.md`](db/README.md) |
 
 Nhắc hạn chỉ kiểm được khi thời hạn mỗi bước ngắn (thật là `PT24H`): `MOC_SLA_DURATION=PT20S make up` rồi
@@ -326,6 +327,7 @@ sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ 
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Đặc tả sản phẩm: bài toán, người dùng, chức năng |
 | [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md) | Đánh giá AI: từng tác tử — mô hình, phiên bản, giấy phép, dữ liệu đo, số đo có ngày và máy, giới hạn, cơ chế an toàn |
+| [`docs/so-lieu-sau.md`](docs/so-lieu-sau.md) | Số đo "sau" theo đặc tả §8 và góp ý trong ứng dụng (F4.6): cách tính từng chỉ số, vì sao cột "trước" chưa đo, dữ liệu mẫu, góp ý thu gì và ai thấy gì |
 | [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Kế hoạch phát triển theo phase, phân công, rủi ro |
 | [`docs/git_flow.md`](docs/git_flow.md) | Quy trình Git: nhánh, commit, pull request, phát hành |
 | [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
