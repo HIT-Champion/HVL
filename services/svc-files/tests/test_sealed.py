@@ -19,10 +19,12 @@
 import asyncio
 import base64
 import dataclasses
+import errno
 import functools
 import hashlib
 import io
 import json
+import signal
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -271,13 +273,35 @@ def test_child_process_checks_and_stamps_like_in_process():
     (lambda: sealed.run_check_pdf(b"%PDF-1.7 hong", max_pages=500), "corrupt"),
     (lambda: sealed.run_check_pdf(SECRET, max_pages=500, timeout_s=0.001), "timeout"),
     (lambda: sealed.run_watermark(SECRET, "An", datetime.now(UTC), max_pages=1), "too_many_pages"),
-    # 32 MB không đủ cho WeasyPrint: tiến trình con hết bộ nhớ, svc-files chỉ nhận một lỗi có lý do
+    # 32 MB thấp hơn cả lúc rảnh (WeasyPrint nạp trước khi đặt trần): cấp phát đầu tiên đã hỏng — MemoryError, hay mã
+    # C của WeasyPrint sập (SIGABRT, SIGTRAP, SIGSEGV tùy bản dựng); svc-files chỉ nhận một lỗi có lý do
     (lambda: sealed.run_watermark(SECRET, "An", datetime.now(UTC), max_pages=500, memory_mb=32), "memory"),
 ])
 def test_child_failures_are_seal_errors_with_a_reason(call, reason):
     with pytest.raises(SealError) as e:
         asyncio.run(call())
     assert e.value.reason == reason and str(e.value)
+
+
+@pytest.mark.parametrize(("returncode", "reason"), [
+    (-signal.SIGXCPU, "timeout"), (-signal.SIGKILL, "memory"), (-signal.SIGABRT, "memory"), (-signal.SIGTRAP, "memory"),
+    (-signal.SIGSEGV, "memory"), (sealed.EXIT_MEMORY, "memory"), (1, "corrupt"), (None, "corrupt"),
+])
+def test_child_exit_code_maps_to_a_reason_without_looking_at_the_cap(returncode, reason):
+    """Lý do chỉ suy từ mã thoát, không từ cỡ trần: test dùng trần 32 MB, bản thật 1024 MB phải ra cùng lý do."""
+    assert sealed._exit_reason(returncode) == reason
+
+
+@pytest.mark.parametrize(("exc", "memory"), [
+    (MemoryError(), True),
+    (OSError(errno.ENOMEM, "Cannot allocate memory"), True),
+    (OSError("cannot load library 'libpango-1.0-0': cannot open shared object file"), False),
+    (ValueError("bad allocation table in xref"), False),   # lời báo nhắc "alloc" không làm tệp hỏng thành hết bộ nhớ
+    (KeyError("/Root"), False),
+])
+def test_only_real_out_of_memory_errors_are_memory(exc, memory):
+    assert sealed._out_of_memory(exc) is memory
+    assert sealed._unreadable(exc, "không đọc được PDF").reason == ("memory" if memory else "corrupt")
 
 
 def test_restricted_upload_over_the_page_cap_is_refused(settings, scanner, store, verifier, hasura, meili, vault,

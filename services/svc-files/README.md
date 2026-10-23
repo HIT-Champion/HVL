@@ -808,9 +808,11 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
   mở cùng lúc (bản mã, bản rõ đều nằm trong bộ nhớ).
 - **PDF do người dùng tải lên không mở trong tiến trình svc-files** (như mục Nội dung tệp PDF, Đọc văn bản đến): kiểm
   lúc tải lên và đóng dấu lúc xem chạy `sealed.py` thành tiến trình con `python -I` — `RLIMIT_AS` 1 GB, hạn 20 giây
-  (kiểm) / 30 giây (đóng dấu), `RLIMIT_CPU` = hạn + 5; quá hạn thì giết cả nhóm. PDF vào, bản có dấu ra qua ống
-  stdin/stdout, không xuống đĩa; tiến trình con không ghi nhật ký. Kiểm và đóng dấu chung hai lượt cùng lúc; chờ lượt
-  quá 10 giây thì `503 busy` kèm `Retry-After: 10`, không treo yêu cầu.
+  (kiểm) / 30 giây (đóng dấu), `RLIMIT_CPU` = hạn + 5; quá hạn thì giết cả nhóm. Tiến trình con đóng dấu nạp WeasyPrint
+  trước khi đặt trần; chết vì tín hiệu (trừ `SIGXCPU` — hết giờ) là hết bộ nhớ (`memory`), không phải tệp hỏng: tệp chỉ
+  đi qua pypdf, mã C chỉ vẽ lớp dấu. PDF vào, bản có dấu ra qua ống stdin/stdout, không xuống đĩa; tiến trình con không
+  ghi nhật ký. Kiểm và đóng dấu chung hai lượt cùng lúc; chờ lượt quá 10 giây thì `503 busy` kèm `Retry-After: 10`,
+  không treo yêu cầu.
 - **Trần số trang** `MOC_RESTRICTED_MAX_PAGES` (mặc định 500): tệp hàng vạn trang tí hon làm mỗi lần xem tốn hàng
   phút. Tải lên quá trần, quá nặng (hết giờ, hết bộ nhớ) → `415 restricted_pdf_only` kèm `reason` (`too_many_pages`,
   `timeout`, `memory`, `password`, `corrupt`…); lúc xem (tệp có từ trước khi có trần, hoặc trần vừa hạ) → `422
