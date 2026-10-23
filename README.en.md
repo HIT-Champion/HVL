@@ -315,12 +315,13 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.m
 Reminders can only be tested with short step deadlines (the real one is `PT24H`): `MOC_SLA_DURATION=PT20S make up`,
 then `MOC_SLA_DURATION=PT20S make smoke`.
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the whole table above on every pull request: it
-builds the system from source with exactly `make env` → `make up` → `make seed` → `make smoke` → `make e2e` → 12 demos
-(the quarantine demo is part of smoke); rehearses backup, wiping the data, restoring and running smoke again; runs
-`make install` into another directory and smoke from the installation; GitOps against a local git repository; checks
-that the API documentation in `docs/api/` matches the freshly built system; scans the commit history for secrets
-(gitleaks) and the dependency lock files for known vulnerabilities (OSV-Scanner).
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the whole table above on every pull request that
+changes code (a pull request that only changes `.md` documentation skips the system build; the build is split across
+three parallel runners, about 12 minutes): it builds the system from source with exactly `make env` → `make up` → `make
+seed` → `make smoke` → `make e2e` → 12 demos (the quarantine demo is part of smoke); rehearses backup, wiping the data,
+restoring and running smoke again; runs `make install` into another directory and smoke from the installation; GitOps
+against a local git repository; checks that the API documentation in `docs/api/` matches the freshly built system; scans
+the commit history for secrets (gitleaks) and the dependency lock files for known vulnerabilities (OSV-Scanner).
 
 ## Documentation
 
