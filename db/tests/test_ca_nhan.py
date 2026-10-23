@@ -146,7 +146,7 @@ def test_audit_rows_without_folder_names(world: World) -> None:
     seen = world.director_a.gql(AUDIT_VIEW, {"e": file_id})["core_audit_log"]
     assert [r["action"] for r in seen] == ["insert", "update"]
     assert all("para" in r["overview"] and r["overview"]["para"] is None for r in seen)   # chỉ tên cột
-    assert seen[0]["overview"]["file_id"] == file_id
+    assert seen[0]["overview"]["file_id"] == [None, file_id]   # cột không chứa nội dung: cặp cũ, mới như test_audit
     director_b = User(f"hieu-truong-b-{world.tag}", "director", world.tenant_b)
     assert director_b.gql(AUDIT_VIEW, {"e": file_id})["core_audit_log"] == []   # sổ của đơn vị khác
 
