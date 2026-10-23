@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
-
 export class ApiError extends Error {
     code;
     status;
@@ -211,7 +209,14 @@ export function useApi() {
             signal?.removeEventListener('abort', stop);
         }
     }
+    async function readArchive(caseId) {
+        const res = await authFetch(`/api/case-files/${caseId}/archive`);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new ApiError(body.detail?.message ?? `HTTP ${res.status}`, body.detail?.code ?? null, res.status);
+        return body;
+    }
     return {
+        readArchive,
         gql,
         upload,
         download,

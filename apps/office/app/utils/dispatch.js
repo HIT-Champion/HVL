@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
-
 export function toggleRecipient(text, name, on) {
     const lines = text.split('\n');
     const same = (line)=>line.trim() === name.trim();

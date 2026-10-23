@@ -2,7 +2,7 @@
 
 Ứng dụng Tầng 2 trên lõi Signet: hộp việc, văn bản đến (tiếp nhận, vào sổ, chỉ đạo, phân công, xử lý), văn bản đi
 (soạn, trình, duyệt, phát hành), sổ đăng ký in được, cổng xác thực công khai, thông báo tức thời, dòng thời gian,
-tìm kiếm. Nuxt 4 ở
+tìm kiếm và hồ sơ công việc/nộp lưu. Nuxt 4 JavaScript ở
 chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi dữ liệu lấy qua cổng cùng tên miền —
 `/v1/graphql` (Hasura), `/api/*` (svc-files), `/realms/moc` (Keycloak), `/realtime` (Centrifugo, WebSocket). Chủ: #22.
 
@@ -11,7 +11,7 @@ chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi 
 | `app/pages/` | `index` (hộp việc), `van-ban-den/` (danh sách, tiếp nhận), `van-ban-di/` (danh sách, soạn), `van-ban/[id]` (chi tiết; tab Dòng thời gian | Lịch sử — dòng sổ kiểm toán về văn bản, F3.5), `tim-kiem` (cả chữ trong tệp PDF, nhãn "Khớp trong nội dung"), `so-dang-ky` (văn thư, lãnh đạo đơn vị: sổ đến / đi theo năm, in PDF), `so-kiem-toan` (lãnh đạo, quản trị đơn vị), `dieu-hanh` (dashboard điều hành, lãnh đạo đơn vị; biểu đồ ECharts qua `app/components/EChart.vue`, kèm bảng số), `xac-thuc/[[code]]` (công khai, không đăng nhập) |
 | `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm, sổ đăng ký), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo), `useAuditFormat` (hiện một dòng sổ kiểm toán: nhãn, người làm, trường đã đổi — trang Sổ kiểm toán và tab Lịch sử) |
 | `app/components/TaskPanel.vue` | Khung xử lý theo `formKey` của BPMN |
-| `scripts/forms.mjs`, `app/utils/forms.ts` | Biên dịch `schemas/*.json` (gốc repo) thành mã kiểm form lúc dựng; quy lỗi về `{trường: mã}` như svc-workflow |
+| `scripts/forms.mjs`, `app/utils/forms.js` | Biên dịch `schemas/*.json` (gốc repo) thành mã kiểm form lúc dựng; quy lỗi về `{trường: mã}` như svc-workflow |
 | `tests/` | Test kiểm form trên bộ ca thử dùng chung `schemas/*.cases.json` (`npm test`, Node 24) |
 | `app/components/NotificationBell.vue` | Chuông: số chưa đọc, 20 tin mới nhất, đánh dấu đã đọc |
 | `app/locales/` | Tiếng Việt, tiếng Anh |
@@ -36,3 +36,46 @@ make e2e                                                 # kiểm thử trên tr
 
 Image dựng từ `apps/office` cộng ngữ cảnh phụ `schemas` (compose tự đưa vào): dựng tay thì
 `docker build --build-context schemas=schemas -t moc/app-office apps/office` ở gốc repo.
+
+## Chạy FE local trên Windows
+
+Cần Node.js 24+, Python 3 và Docker Desktop. Backend ở `http://localhost:8080`.
+Từ gốc repo, sau khi dựng stack và nạp demo:
+
+```powershell
+python -X utf8 apps/office/scripts/setup-local.py
+powershell -ExecutionPolicy Bypass -File apps/office/scripts/dev.ps1
+```
+
+Mở `http://localhost:3000`; Nuxt tự proxy API vào stack Docker. Script setup chỉ cho phép
+realm local, thêm callback SSO cổng 3000 và bật theme đăng nhập Signet; không in mật khẩu.
+`/__fe` là trang thử component chỉ trong dev. Mã thực thi FE dùng JavaScript; `forms.d.ts`
+chỉ khai báo module ảo của bộ kiểm form.
+
+- Dev: thông báo tự tải lại mỗi 15 giây.
+- Bản Docker cổng 8080: WebSocket Centrifugo, đã kiểm thử nhận thông báo thật.
+- Sau khi sửa, dựng bản nghiệm thu bằng
+  `docker compose --profile app up -d --build --force-recreate app-office`.
+- Chạy `npm run check`, `npm test` ở thư mục này với Node 24.
+- Cài phụ thuộc E2E bằng `npm ci` trong `tests/e2e`; từ gốc repo chạy
+  `node tests/e2e/run-local.mjs` (Windows dùng Edge có sẵn; Linux cài Chromium theo Playwright).
+
+Xem [hướng dẫn nghiệm thu](../../docs/fe-nghiem-thu-local.md) và
+[sơ đồ nghiệp vụ](../../docs/so-do-nghiep-vu-fe.md).
+
+## Hệ giao diện hiện tại
+
+Butter là phương án anh chọn sau lượt reroll: sidebar trái thu/mở và nhớ lựa chọn,
+nền giấy sáng, butter và olive, component bo nhẹ. Hộp việc ưu tiên công việc khẩn/quá hạn,
+mỗi việc xuất hiện một lần và mở thẳng màn xử lý. Chuyển động ngắn có hỗ trợ reduced motion;
+menu điện thoại hỗ trợ bàn phím, Escape và trả lại focus.
+
+Đọc [DESIGN.md](../../DESIGN.md) trước khi thêm màn hình, [PRODUCT.md](../../PRODUCT.md)
+để giữ đúng nhiệm vụ/nghiệp vụ, và [báo cáo Butter](../../docs/fe-butter-local.md) cho bằng chứng kiểm thử.
+
+## Kết nối BE/AI mới
+
+Nhánh `feat/fe-butter-ai-integration` dựa trên `origin/develop` ngày 23/10/2026.
+Xem [phạm vi tích hợp và kiểm thử](../../docs/fe-ai-be-integration.md).
+Các API đọc tệp, hỏi đáp có nguồn, gợi ý giao việc và liên thông được giữ theo upstream.
+Danh sách đến/đi dùng phân trang “Xem thêm”; ô tìm chỉ lọc tập đã tải.

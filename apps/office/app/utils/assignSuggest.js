@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
-
 export const POLL_MS = 3000;
 export const WAIT_MS = 60000;
 export const MAX_POLLS = Math.ceil(WAIT_MS / POLL_MS);

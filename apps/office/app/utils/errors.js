@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
-
 import { ApiError } from '~/composables/useApi';
 const CONSTRAINTS = [
     'documents_in_dedup',

@@ -248,7 +248,9 @@ async function save() {
 <template>
   <div class="max-w-3xl">
     <NuxtLink :to="editId ? `/van-ban/${editId}` : '/van-ban-di'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
-    <PageHeader :title="editId ? t('compose.editTitle') : t('compose.title')" :subtitle="t('compose.subtitle')" />
+    <PageHeader :title="editId ? t('compose.editTitle') : t('compose.title')" :subtitle="t('compose.subtitle')">
+      <NuxtLink v-if="editId" to="/van-ban-di/soan" class="btn-secondary" :aria-label="t('nav.compose')">{{ t('desk.compose') }}</NuxtLink>
+    </PageHeader>
 
     <p v-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <div v-else-if="initialFailure" class="moc-state" role="alert"><span>{{ initialFailure }}</span><button type="button" class="btn-secondary" @click="loadInitial">{{ t('app.retry') }}</button></div>

@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
-
 export const MAX_QUESTION = 500;
 const CITE = /\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\]/g;
 export function segments(text, sources) {

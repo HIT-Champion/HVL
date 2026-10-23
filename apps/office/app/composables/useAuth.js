@@ -14,8 +14,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Định dạng ngày giờ theo kiểu Việt Nam (dd/mm/yyyy), dùng chung cho mọi trang.
-
 import { UserManager, WebStorageStateStore } from 'oidc-client-ts';
 const HASURA = 'https://hasura.io/jwt/claims';
 const user = ref(null);

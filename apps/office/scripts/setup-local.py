@@ -16,13 +16,47 @@
 
 """Allow FE dev callbacks on the LOCAL demo realm only; never print credentials."""
 from pathlib import Path
-import sys
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
+from urllib.request import Request, urlopen
+import json
+import time
 
 ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT / "scripts"))
-from moc_env import KEYCLOAK_ADMIN_URL, PUBLIC_URL, REALM, call_json, wait_for
-from seed import admin_token
+ENV = dict(line.split('=', 1) for line in (ROOT / '.env').read_text(encoding='utf-8').splitlines()
+           if line.strip() and not line.lstrip().startswith('#') and '=' in line)
+PUBLIC_URL = ENV.get('MOC_PUBLIC_URL', 'http://localhost:8080').rstrip('/')
+KEYCLOAK_ADMIN_URL = 'http://127.0.0.1:' + ENV.get('KEYCLOAK_ADMIN_PORT', '8180')
+REALM = ENV.get('MOC_REALM', 'moc')
+
+def call_json(method, url, body=None, *, headers=None, form=None):
+    request_headers = dict(headers or {})
+    payload = None
+    if form is not None:
+        payload = urlencode(form).encode()
+        request_headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    elif body is not None:
+        payload = json.dumps(body).encode()
+        request_headers['Content-Type'] = 'application/json'
+    request_headers['User-Agent'] = 'Signet-FE-local-setup'
+    with urlopen(Request(url, data=payload, headers=request_headers, method=method), timeout=20) as response:
+        data = response.read()
+        return (json.loads(data) if data else None), response.status
+
+def wait_for(url, label, timeout_s=120):
+    deadline = time.monotonic() + timeout_s
+    while True:
+        try:
+            call_json('GET', url)
+            return
+        except OSError:
+            if time.monotonic() >= deadline: raise RuntimeError(label + ' unavailable') from None
+            time.sleep(1)
+
+def admin_token():
+    data, _ = call_json('POST', KEYCLOAK_ADMIN_URL + '/realms/master/protocol/openid-connect/token',
+        form={'grant_type': 'password', 'client_id': 'admin-cli',
+              'username': ENV.get('KEYCLOAK_ADMIN_USER', 'admin'), 'password': ENV['KEYCLOAK_ADMIN_PASSWORD']})
+    return data['access_token']
 
 
 def main():
