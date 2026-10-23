@@ -86,10 +86,16 @@ hành (chuyển mục CHANGELOG) làm bằng một PR vào `develop`, rồi PR t
 <chân — tùy chọn: Closes #12 · Refs #12 · Co-authored-by: … · BREAKING CHANGE: …>
 ```
 
-- **Dòng đầu ≤ 72 ký tự**, viết tiếng Việt có dấu, bắt đầu bằng động từ, chữ thường, không chấm cuối.
+- **Dòng đầu ≤ 72 ký tự**, viết **tiếng Anh**, bắt đầu bằng động từ ở thể mệnh lệnh (`add`, `fix`, `move`…),
+  chữ thường, không chấm cuối. Thân commit cũng viết tiếng Anh.
 - Thân và chân cách dòng đầu **một dòng trống**; xuống dòng ở khoảng 72 ký tự.
 - `Closes #12` (từ khóa tiếng Anh) để GitHub tự đóng issue khi merge vào nhánh mặc định `develop`;
   `Refs #12` để chỉ liên kết.
+
+Từ 23/10/2026 (sau `v1.0.0`), commit, tiêu đề và mô tả PR viết tiếng Anh: lịch sử Git là thứ người ngoài đội —
+cộng đồng nguồn mở, người muốn đóng góp — đọc đầu tiên, và mô tả PR thành thân commit khi *Squash and merge*.
+Commit trước mốc này giữ nguyên tiếng Việt, không viết lại lịch sử. Issue viết tiếng Việt, tiêu đề kèm bản tiếng
+Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Việt vì người dùng là cơ quan, trường học Việt Nam.
 
 ### 3.2. Loại commit
 
@@ -136,35 +142,35 @@ Thay đổi chạm nhiều phạm vi → chọn phạm vi chính, hoặc bỏ tr
 **Tốt:**
 
 ```
-feat(workflow): thêm bước giám đốc duyệt khi số tiền vượt ngưỡng
+feat(workflow): add a director approval step above the amount threshold
 
-Ngưỡng đọc từ biến DXOS_APPROVAL_THRESHOLD thay vì ghi cứng trong BPMN,
-để mỗi tổ chức tự đặt theo quy chế của mình.
+Read the threshold from DXOS_APPROVAL_THRESHOLD instead of hard-coding
+it in the BPMN, so that each organization sets it by its own rules.
 
 Closes #27
 ```
 
 ```
-fix(files): chặn tệp khi ClamAV không phản hồi thay vì cho qua
+fix(files): block files when ClamAV times out instead of storing them
 
-Trước đây hết thời gian chờ thì tệp vẫn được lưu, trái nguyên tắc
-zero-trust. Giờ coi như tệp không an toàn và trả lỗi 503.
+A scan that timed out still stored the file, against the zero-trust
+principle. Treat such a file as unsafe and return 503.
 
 Closes #41
 ```
 
 ```
-docs(readme): bổ sung phát biểu bài toán và bảng chức năng
+docs(readme): add the problem statement and the feature table
 ```
 
 **Chưa tốt:**
 
 | Commit | Vấn đề | Nên viết |
 |---|---|---|
-| `update` | Không nói gì | `fix(office): sửa nút Duyệt bị ẩn trên màn hình nhỏ` |
-| `fix bug` | Lỗi nào, ở đâu? | `fix(auth): sửa vòng lặp chuyển hướng khi token hết hạn` |
+| `update` | Không nói gì | `fix(office): show the Approve button on small screens` |
+| `fix bug` | Lỗi nào, ở đâu? | `fix(auth): stop the redirect loop when the token expires` |
 | `WIP` | Không dùng cho commit đã merge | Gộp lại khi squash merge (mục 5) |
-| `feat: làm xong phase 1` | Quá to, không review được | Tách thành nhiều PR nhỏ |
+| `feat: finish phase 1` | Quá to, không review được | Tách thành nhiều PR nhỏ |
 
 ### 3.5. Mẫu commit cho trình soạn thảo
 
@@ -173,12 +179,12 @@ Lưu khối dưới đây thành tệp `~/.gitmessage-moc`, rồi chạy
 trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự bị bỏ.
 
 ```
-# <loại>(<phạm vi>): <mô tả ngắn, ≤ 72 ký tự, không chấm cuối>
+# <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, ≤ 72 ký tự, không chấm cuối>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
 # Phạm vi: gateway auth db workflow files realtime office ai data ops cli scripts e2e ci deps docs release
 #
-# Thân (tùy chọn): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
+# Thân (tùy chọn, tiếng Anh): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #
 # Chân (tùy chọn):
 # Closes #<số-issue>            tự đóng issue khi merge vào develop
