@@ -164,6 +164,40 @@ dữ liệu và quyền: [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md).
 > Signet trước đây tên **Mộc**. Tên mã kỹ thuật `moc` vẫn giữ trong mã và cấu hình: biến `MOC_*`, realm `moc`, lệnh
 > `scripts/moc.py`, image `moc/*`, thư mục cài `/opt/moc`.
 
+## Cấu trúc thư mục
+
+Mã đội tự viết nằm ở `apps/`, `services/` và `db/`. Các thư mục cấu hình ở gốc (`auth/`, `gateway/`…) là cấu hình
+của phần mềm nguồn mở mà lõi dùng, theo bảng ở mục Kiến trúc.
+
+```
+apps/office/             Giao diện Văn phòng điện tử (Nuxt 4, TypeScript): app/pages, app/components…; tests/
+services/
+  svc-workflow/          Hasura Actions, quy trình, thông báo, nhắc hạn (Python, FastAPI); tests/
+    src/svc_workflow/    advisor.py + suggest.py: tác tử gợi ý giao việc (F4.3); ot.py: cảm biến → báo cáo sự cố
+  svc-files/             Tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực (Python, FastAPI); tests/
+    src/svc_files/       docread/: đọc văn bản đến (F4.1) · assist/: hỏi đáp trên kho văn bản (F4.2) ·
+                         pii.py: che thông tin cá nhân (F4.4)
+db/
+  migrations/default/    Lược đồ PostgreSQL (core, office), ràng buộc, sổ kiểm toán chuỗi băm
+  metadata/              Hasura: quyền theo vai trò và đơn vị, Actions
+  tests/                 Test trên PostgreSQL + Hasura thật
+schemas/                 JSON Schema của form, dùng chung cho giao diện, dịch vụ và CSDL
+processes/               Quy trình BPMN văn bản đến, văn bản đi; svc-workflow nạp vào Flowable
+auth/ gateway/ realtime/ Cấu hình Keycloak, APISIX, Centrifugo
+openbao/ monitoring/     Cấu hình OpenBao; Prometheus + Grafana
+ot/                      Cảm biến giả lập (profile iot)
+ops/systemd/             Hẹn giờ chạy reconciler GitOps trên máy chủ
+scripts/                 Lệnh vận hành (moc.py, seed, smoke, backup, audit, reconcile, demo), cài đặt (install.sh),
+                         công cụ của repo (check_pr.py, release*, license-header.sh, api_docs.py); tests/
+seed/                    Dữ liệu mẫu: đơn vị, tài khoản, văn bản giả lập để demo và đo các tác tử AI
+tests/e2e/               Test trình duyệt (Playwright)
+docs/                    Tài liệu sản phẩm: kiến trúc, mô hình dữ liệu, triển khai, vận hành; api/: tài liệu API
+docs/du-thi/             Tài liệu dự thi: phân tích đề, bảng tự chấm PoF, kế hoạch phát triển, nghiên cứu
+.github/                 CI, phát hành, kiểm PR, ruleset, mẫu issue và PR
+docker-compose.yml       Toàn hệ thống, chia profile core, app, ai, iot…
+Makefile                 Lối vào mọi lệnh: make env, up, seed, test, smoke, install…
+```
+
 ## Yêu cầu hệ thống
 
 | Thành phần | Phiên bản tối thiểu | Ghi chú |

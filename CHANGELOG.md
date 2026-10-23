@@ -7,6 +7,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 
 ## [Chưa phát hành]
 
+### Đã thêm
+- README (cả bản tiếng Anh) có mục "Cấu trúc thư mục": mỗi thư mục chứa gì, mã đội tự viết nằm đâu, các tác tử AI
+  (F4.1–F4.4) ở tệp nào, test của từng phần ở đâu.
+
 ### Đã sửa đổi
 - Trang Release ngắn lại (`scripts/release_body.py`): dòng chỉ gói chính thức `moc-X.Y.Z.tar.gz` kèm lệnh kiểm
   `.sha256` (GitHub tự gắn "Source code (zip)" vào mọi bản phát hành mà không gỡ được, PoF #3), phần tóm tắt viết
