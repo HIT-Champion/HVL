@@ -19,9 +19,11 @@ cùng khóa không thêm dòng, chỉ dịch vụ của đơn vị đọc và gh
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
-from conftest import ADMIN_SECRET, GraphQLError, SQLError, gql_raw, sql
+from conftest import ADMIN_SECRET, GraphQLError, SQLError, User, gql_raw, sql
 
 NOTIFY = """
 mutation ($rows: [core_notifications_insert_input!]!) {
@@ -58,6 +60,11 @@ query ($now: timestamptz!, $ids: [bigint!]!) {
 
 @pytest.fixture(scope="module")
 def people(world):
+    # Người nhận riêng của module: world dùng chung cả phiên, thông báo gửi ở đây không được lọt vào số đếm của
+    # test_notifications. Quyền đọc vẫn thử bằng người của world (admin_a) và bằng chính người nhận
+    own = {k: User(f"kenh-{u.sub}", u.role, u.tenant, u.department)
+           for k in ("director_a", "staff_a1", "staff_a2", "clerk_b") for u in [getattr(world, k)]}
+    world = dataclasses.replace(world, **own)
     rows = [{"id": u.sub, "department_id": u.department, "username": u.sub, "full_name": f"Người {u.role}",
              "email": f"{u.role}-{world.tag.lower()}@example.com", "role": u.role}
             for u in (world.director_a, world.staff_a1, world.staff_a2)]
@@ -65,8 +72,8 @@ def people(world):
       insert_core_users(objects: $o, on_conflict: {constraint: users_pkey, update_columns: [email]}) { affected_rows }
     }"""
     world.service_a.gql(upsert, {"o": rows})
-    world.service_b.gql(upsert, {"o": [{"id": world.clerk_b.sub, "username": "vt-b", "full_name": "Văn thư B",
-                                        "role": "clerk"}]})
+    world.service_b.gql(upsert, {"o": [{"id": world.clerk_b.sub, "username": world.clerk_b.sub,
+                                        "full_name": "Văn thư B", "role": "clerk"}]})
     return world
 
 
@@ -154,7 +161,7 @@ def test_due_query_joins_the_directory_across_tenants(people):
                    headers={"X-Hasura-Admin-Secret": ADMIN_SECRET})
     rows = body["data"]["core_notification_deliveries"]
     assert [(r["tenant_id"], r["channel"]) for r in rows] == [(w.tenant_a, "email"), (w.tenant_b, "webhook")]
-    # tên do module test khác ghi trước cũng được (upsert chỉ đổi email); email và trạng thái là của danh bạ
+    # email và trạng thái lấy từ danh bạ
     assert rows[0]["recipient"]["email"] == f"staff-{w.tag.lower()}@example.com" and rows[0]["recipient"]["enabled"]
     assert rows[0]["notification"]["kind"] == "task.assigned"
     assert rows[1]["recipient"]["email"] is None
