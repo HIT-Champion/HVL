@@ -317,7 +317,7 @@ def content_disposition(filename: str) -> str:
 
 
 # Tệp người dùng tải lên có thể là HTML hay SVG chứa script: không bao giờ để trình duyệt hiển thị nó
-# như một trang của Signet. Giao diện xem PDF bằng PDF.js (đọc qua fetch), không cần hiển thị inline.
+# như một trang của Signet. Giao diện lấy tệp bằng fetch kèm token rồi lưu về máy, không cần hiển thị inline.
 DOWNLOAD_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'none'; sandbox",

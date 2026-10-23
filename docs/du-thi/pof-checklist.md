@@ -33,13 +33,14 @@ git shortlog -sn                                            # đóng góp có nh
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
 | ☐ | Giấy phép được OSI phê duyệt | `LICENSE` — Apache-2.0 | điều kiện loại trừ |
-| ☐ | Ghi giấy phép trong **từng tệp mã** | Header Apache-2.0 đầu mỗi tệp | −5 |
+| ☐ | Ghi giấy phép trong **từng tệp mã** | Header Apache-2.0 đầu mỗi tệp; tệp không chèn được header (JSON, ảnh, PDF, tài liệu) khai trong `REUSE.toml` | −5 |
 | ☐ | Không xung đột giấy phép giữa các thành phần | `DEPENDENCIES.md`, mục kiểm tra tương thích | −5 |
 | ☐ | Có thông báo về **mục đích** của giấy phép | `NOTICE`, mục "Mục đích của giấy phép" | −5 |
 | ☐ | Có **bản sao toàn văn** giấy phép | `LICENSE` (11 KB, toàn văn Apache-2.0) | −5 |
 
 ```bash
 make license-check     # kiểm tra header trong từng tệp mã
+uvx --from reuse==5.0.2 reuse lint   # mọi tệp có thông tin bản quyền, giấy phép (chuẩn REUSE)
 head -3 LICENSE        # xác nhận là toàn văn, không phải link
 ```
 

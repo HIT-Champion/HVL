@@ -341,6 +341,10 @@ quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết 
 Phát hành theo **Apache License 2.0** — một giấy phép được OSI phê duyệt. Toàn văn: [`LICENSE`](LICENSE). Mục đích
 lựa chọn giấy phép: [`NOTICE`](NOTICE).
 
+Mọi tệp đều có thông tin bản quyền và giấy phép theo chuẩn [REUSE](https://reuse.software): tệp mã mang header
+Apache-2.0 (`make license-check`), tệp không chèn được header (JSON, ảnh, PDF, tài liệu) khai trong
+[`REUSE.toml`](REUSE.toml). Kiểm toàn bộ kho: `uvx --from reuse==5.0.2 reuse lint`.
+
 Signet **điều phối** các phần mềm nguồn mở thượng nguồn ở dạng nguyên bản, không sao chép và không chỉnh sửa mã nguồn
 của chúng vào kho này. Xem [`DEPENDENCIES.md`](DEPENDENCIES.md).
 
