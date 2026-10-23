@@ -9,11 +9,11 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 38 | 8 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
-| `staff` (chuyên viên) | `chuyenviendt` | 31 | 23 | [`graphql/staff.graphql`](graphql/staff.graphql) |
-| `manager` (lãnh đạo phòng) | `totruongdt` | 31 | 13 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 53 | 6 | [`graphql/director.graphql`](graphql/director.graphql) |
-| `tenant_admin` (quản trị đơn vị) | `quantri` | 23 | 11 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
+| `clerk` (văn thư) | `vanthu` | 40 | 10 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `staff` (chuyên viên) | `chuyenviendt` | 33 | 25 | [`graphql/staff.graphql`](graphql/staff.graphql) |
+| `manager` (lãnh đạo phòng) | `totruongdt` | 33 | 15 | [`graphql/manager.graphql`](graphql/manager.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 59 | 8 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `tenant_admin` (quản trị đơn vị) | `quantri` | 27 | 13 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
 
@@ -62,16 +62,22 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_documents` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_documents_aggregate` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_documents_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
+| `office_feedback` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `office_feedback_aggregate` |  |  |  | ✓ | ✓ |
+| `office_feedback_by_pk` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_registers` | ✓ |  |  | ✓ | ✓ |
 | `office_registers_by_pk` | ✓ |  |  | ✓ | ✓ |
 | `office_v_assignment_suggestion_accuracy` |  |  |  | ✓ | ✓ |
 | `office_v_assignment_suggestion_accuracy_aggregate` |  |  |  | ✓ | ✓ |
 | `office_v_document_counts` |  |  |  | ✓ |  |
+| `office_v_feedback_summary` |  |  |  | ✓ | ✓ |
 | `office_v_intake_accuracy` |  |  |  | ✓ | ✓ |
 | `office_v_intake_accuracy_aggregate` |  |  |  | ✓ | ✓ |
 | `office_v_outgoing_by_month` |  |  |  | ✓ |  |
 | `office_v_overdue_by_department` |  |  |  | ✓ |  |
+| `office_v_overdue_rate` |  |  |  | ✓ |  |
 | `office_v_processing_time` |  |  |  | ✓ |  |
+| `office_v_time_to_assign` |  |  |  | ✓ |  |
 
 ## Thao tác ghi (`mutation`)
 
@@ -92,6 +98,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `insert_office_document_files_one` |  | ✓ |  |  |  |
 | `insert_office_documents` |  | ✓ |  |  |  |
 | `insert_office_documents_one` |  | ✓ |  |  |  |
+| `insert_office_feedback` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `insert_office_feedback_one` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_grant_document_access` | ✓ |  |  | ✓ |  |
 | `office_revoke_document_access` | ✓ |  |  | ✓ |  |
 | `receiveIncoming` | ✓ |  |  |  |  |
