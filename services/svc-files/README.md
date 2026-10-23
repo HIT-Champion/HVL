@@ -981,7 +981,8 @@ uv pip compile pyproject.toml --extra dev --universal --python-version 3.12 --ge
 với `--exclude-newer-package <gói>=2026-10-06T00:00:00Z` cho pyhanko, pyhanko-certvalidator, asn1crypto, tzlocal,
 tzdata, lxml, aiohttp, aiohappyeyeballs, aiosignal, attrs, frozenlist, multidict, propcache, yarl, oscrypto, uritools,
 certifi. Vá bảo mật chưa đủ hai tuần (`DEPENDENCIES.md`, mục Cách đọc): gói khai trực tiếp thì nâng cận dưới trong
-`pyproject.toml` (pillow, pypdf), gói kéo theo thì thêm `-P <gói>==<bản>` vào cả hai lệnh (certifi 2026.10.19).
+`pyproject.toml` (pillow, pypdf), gói kéo theo thì thêm `-P <gói>==<bản>` vào cả hai lệnh (certifi 2026.10.19;
+brotli 1.2.1, brotlicffi 1.2.1.0).
 
 ## Ghi chú khi đưa vào Compose (#13)
 
