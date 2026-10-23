@@ -19,7 +19,7 @@ Closes #
 - [ ] Frontend
 - [ ] Infrastructure / CI / shared docs
 
-<!-- Main component (commit scope): gateway · auth · db · workflow · files · realtime · office · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
+<!-- Main component (commit scope): gateway · auth · db · workflow · files · realtime · office · ca-nhan · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
 
 ## Checklist
 

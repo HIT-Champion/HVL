@@ -133,15 +133,18 @@ command**, under a minute, printing every step with a ✓, repeatable any number
 
 Business demos, run the same way: `make demo-lien-thong` (exchange between two units), `make demo-doc-van-ban`,
 `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (AI assistants), `make demo-ky-so` (digital
-signature, illustrative).
+signature, illustrative), `make demo-ca-nhan` (a second application on the same core).
 
 ## Architecture
 
 Tier 1 is the core — identity, API gateway, data, workflow and the trust layer — with no user interface. Tier 2 holds
-the applications, here the e-Office. Only the APISIX gateway is exposed.
+the applications: the e-Office, and the P.A.R.A personal space — a second application plugged into the same core
+without changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). Only the APISIX
+gateway is exposed.
 
 ```
  Browser ──► APISIX :8080 ─┬─ /             → app-office (Nuxt, static pages; public /xac-thuc)       Tier 2
+                           ├─ /ca-nhan/      → app-ca-nhan (P.A.R.A personal space, static pages)
             (JWT check,    ├─ /realms/moc/*  → Keycloak (SSO login, TOTP)
              X-Request-Id) ├─ /v1/graphql    → Hasura ─┬─ PostgreSQL (core, office)                  Tier 1
                            │                           └─ Actions → svc-workflow → Flowable (BPMN)
@@ -162,6 +165,7 @@ the applications, here the e-Office. Only the APISIX gateway is exposed.
 | Centrifugo 6 | Pushes notifications to the browser over WebSocket, one channel per person | `platform/centrifugo/` |
 | OpenBao 2 | Secrets vault: services fetch secrets via AppRole at start-up; encryption keys for restricted documents; internal CA and per-unit signing keys | `platform/openbao/` |
 | `app-office` | The e-Office interface (Nuxt 4, Tailwind), Vietnamese / English | `apps/office/` |
+| `app-ca-nhan` | P.A.R.A personal space: each person's files in four folders, its own Keycloak client, calls the core through the gateway like any application | `apps/ca-nhan/` |
 | Prometheus 3 + Grafana 13 | API gateway monitoring: request count, status codes, latency per route; internal network only | `platform/monitoring/` |
 | Scorpio 6 + PostGIS (profile `iot`) | NGSI-LD context broker: digital twins of sensors, measurement history | `services/ot-sensor/` |
 | Ollama (profile `ai`, optional) | Local language model on its own internal network, cloud features off | `docker-compose.yml` |
@@ -180,6 +184,7 @@ Architecture table.
 
 ```
 apps/office/             e-Office interface (Nuxt 4, TypeScript): app/pages, app/components…; tests/
+apps/ca-nhan/            P.A.R.A personal space (plain JavaScript, nginx): public/; tests/
 services/
   svc-workflow/          Hasura Actions, workflows, notifications, deadline reminders (Python, FastAPI); tests/
     src/svc_workflow/    advisor.py + suggest.py: assignment suggestion agent (F4.3); ot.py: sensor → incident report
@@ -190,7 +195,7 @@ services/
                          pii.py: personal data masking (F4.4)
   ot-sensor/             Simulated temperature sensor (profile iot)
 db/
-  migrations/default/    PostgreSQL schema (core, office), constraints, hash-chained audit log
+  migrations/default/    PostgreSQL schema (core, office, personal), constraints, hash-chained audit log
   metadata/              Hasura: permissions by role and unit, Actions
   tests/                 Tests against a real PostgreSQL + Hasura
 schemas/                 Form JSON Schemas, shared by the interface, the services and the database
@@ -339,6 +344,7 @@ transitive ones included (`make license-audit`). Every release after 1.0.0 ships
 | [`docs/van-hanh.md`](docs/van-hanh.md) | Operations: adding units, backup, secrets vault, GitOps, monitoring, IT/OT |
 | [`docs/trien-khai.md`](docs/trien-khai.md) | Deploying to a server: HTTPS with Caddy in front of APISIX, operator account, firewall, nightly backup, upgrades |
 | [`docs/api/`](docs/api/README.md) | API documentation: getting a token, calling GraphQL and REST through the gateway; per-role GraphQL schema and generated OpenAPI |
+| [`docs/them-ung-dung.md`](docs/them-ung-dung.md) | Adding a new application on the core: Keycloak client, APISIX route, compose service, its own schema and permissions; worked example: the P.A.R.A personal space |
 | [`docs/architecture.md`](docs/architecture.md) | H-P-D-I architecture, tool map, technical decisions |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Data model, permissions, Hasura Actions, event formats |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Product specification: problem, users, features |

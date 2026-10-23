@@ -435,6 +435,13 @@ class Keycloak:
         """Mật khẩu tạm: Keycloak tự thêm yêu cầu đổi mật khẩu ở lần đăng nhập kế tiếp."""
         self._req("PUT", f"/users/{user_id}/reset-password", {"type": "password", "value": value, "temporary": True})
 
+    # client của ứng dụng: realm_clients.py thêm client còn thiếu vào realm đã nạp từ trước
+    def clients(self) -> list[dict[str, Any]]:
+        return self._all("/clients")
+
+    def create_client(self, rep: dict[str, Any]) -> str:
+        return self._created_id(self._req("POST", "/clients", rep)[1])
+
 
 def admin_token() -> str:
     """Token quản trị Keycloak (realm master, KEYCLOAK_ADMIN_* trong .env), qua cổng quản trị nội bộ."""

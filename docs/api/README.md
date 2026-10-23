@@ -53,6 +53,7 @@ cũng nạp được.
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
+| `GET /ca-nhan/` và trang tĩnh dưới đó | Không gian cá nhân P.A.R.A (`app-ca-nhan`), ứng dụng thứ hai trên lõi | — |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
 
 Cổng trả `404` cho các đường còn lại:
@@ -78,7 +79,8 @@ Access token sống 5 phút; làm mới bằng refresh token.
   `app-office`.
   - Muốn thêm một ứng dụng Tầng 2: thêm client vào [`platform/keycloak/realm/moc-realm.json`](../../platform/keycloak/realm/moc-realm.json)
     theo mẫu `app-office`. Giữ nguyên `protocolMappers` để token có claim của Hasura; đổi `clientId` và
-    `redirectUris`.
+    `redirectUris`. Bản cài đã chạy thì thêm client vào realm bằng `python3 scripts/moc.py realm clients`. Các bước
+    còn lại và ví dụ đầy đủ (client `app-ca-nhan`): [`docs/them-ung-dung.md`](../them-ung-dung.md).
   - Văn thư, lãnh đạo và quản trị đơn vị phải nhập mã TOTP sau mật khẩu ([`platform/keycloak/README.md`](../../platform/keycloak/README.md)).
 - **Script** dùng client `moc-cli`, luồng mật khẩu kèm mã TOTP (tham số `otp`) — hỏi mã theo đúng quy tắc của
   trình duyệt. Không cần trên server thật thì tắt (`MOC_CLI_CLIENT_ENABLED=false`).

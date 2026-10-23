@@ -1,0 +1,91 @@
+<!doctype html>
+<!--
+  Copyright 2026 Signet Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signet — Không gian cá nhân</title>
+  <meta name="description" content="Signet — lưu trữ cá nhân theo P.A.R.A: Dự án, Lĩnh vực, Tài nguyên, Lưu trữ">
+  <link rel="icon" type="image/svg+xml" href="/ca-nhan/favicon.svg">
+  <link rel="stylesheet" href="/ca-nhan/style.css">
+  <!-- thư viện trước, mã của trang sau: cả hai chạy theo thứ tự sau khi đọc xong trang -->
+  <script src="/ca-nhan/lib/oidc-client-ts.min.js" defer></script>
+  <script type="module" src="/ca-nhan/app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/ca-nhan/">
+      <img src="/ca-nhan/favicon.svg" alt="" width="28" height="28">
+      <span><strong>Không gian cá nhân</strong><small>Signet · P.A.R.A</small></span>
+    </a>
+    <nav class="top-nav" aria-label="Ứng dụng">
+      <a href="/">Văn phòng điện tử</a>
+      <span id="who" class="who"></span>
+      <button id="logout" type="button" class="btn ghost" hidden>Đăng xuất</button>
+    </nav>
+  </header>
+
+  <main>
+    <p id="status" class="status" role="status">Đang đăng nhập…</p>
+
+    <div id="space" class="space" hidden>
+      <nav class="folders" aria-label="Thư mục P.A.R.A">
+        <ul id="folders"></ul>
+      </nav>
+
+      <section class="panel" aria-labelledby="folder-title">
+        <div class="panel-head">
+          <div>
+            <h1 id="folder-title"></h1>
+            <p id="folder-hint" class="hint"></p>
+          </div>
+          <div class="upload">
+            <label class="btn primary" for="file" id="upload-label">Tải tệp lên</label>
+            <input id="file" type="file" class="visually-hidden">
+            <progress id="progress" max="100" value="0" hidden></progress>
+          </div>
+        </div>
+
+        <div id="message" class="message" hidden>
+          <span id="message-text"></span>
+          <button id="retry" type="button" class="btn link" hidden>Thử xếp lại</button>
+        </div>
+
+        <table id="items" class="items" hidden>
+          <thead>
+            <tr>
+              <th scope="col">Tên tệp</th>
+              <th scope="col">Dung lượng</th>
+              <th scope="col">Quét sạch lúc</th>
+              <th scope="col"><span class="visually-hidden">Thao tác</span></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p id="empty" class="empty" hidden>Thư mục trống. Tải tệp lên, hoặc chuyển tệp từ thư mục khác sang.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    Tệp tải lên được trạm quét mã độc của lõi kiểm trước khi lưu; mỗi lần xếp, chuyển tệp vào sổ kiểm toán chuỗi băm của
+    đơn vị. Ứng dụng này không tự làm các việc đó — lõi Signet làm, cho mọi ứng dụng cắm vào nó.
+  </footer>
+</body>
+</html>

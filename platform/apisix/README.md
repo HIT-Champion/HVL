@@ -4,7 +4,8 @@ APISIX chạy standalone (không etcd, không Admin API): route trong `apisix.ya
 giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nhất mở ra ngoài (`MOC_HTTP_PORT`). Chủ: #14.
 
 - Danh sách trắng: `/realms/<realm>/*`, `/resources/*` → Keycloak; `/v1/graphql` → Hasura; `/api/files*`,
-  `/api/search` → svc-files; còn lại → giao diện.
+  `/api/search` → svc-files; `/ca-nhan`, `/ca-nhan/*` (chỉ GET, HEAD) → `app-ca-nhan`, Không gian cá nhân
+  ([`docs/them-ung-dung.md`](../../docs/them-ung-dung.md)); còn lại → giao diện Văn phòng điện tử.
 - Đường quản trị bị chặn tường minh (404): `/admin`, `/realms/*` khác realm của Signet, `/console`, `/v1/*`,
   `/v2/*`, `/healthz`, `/flowable-rest/*`.
 - Kiểm JWT ở biên (`openid-connect`, chỉ Bearer, khóa qua JWKS nội bộ của Keycloak); Hasura và svc-files
@@ -68,7 +69,8 @@ APISIX, `config.yaml` khóa `nginx_config`:
 - Các trường khác giữ như định dạng mặc định của APISIX 3.18, kể cả đích phía sau
   (`"$upstream_scheme://$upstream_host…"`, có ích khi gỡ lỗi đường đổi hướng như `/realtime`); bỏ `$http_referer`.
 
-nginx của app-office, `apps/office/nginx/default.conf.template` (tệp được include trong khối `http`):
+nginx của app-office, `apps/office/nginx/default.conf.template` (tệp được include trong khối `http`; app-ca-nhan
+dùng đúng khối này trong `apps/ca-nhan/nginx/default.conf.template`):
 
 ```nginx
 map $request_uri $moc_duong_dan {
