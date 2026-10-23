@@ -17,7 +17,7 @@
 # Kiểm tra tự động trên mọi thay đổi: điều kiện chấm điểm PoF, test đơn vị, schema và quyền trên CSDL
 # thật, dựng toàn bộ hệ thống rồi chạy seed → smoke → e2e, quét bí mật và lỗ hổng phụ thuộc.
 # Action ngoài ghim theo SHA commit, image công cụ ghim theo digest — đổi phiên bản thì đổi cả hai.
-# Máy chạy ghim ubuntu-24.04 (ubuntu-latest chuyển sang Ubuntu 26 từ 19/10/2026); chỉ đổi sau khi đã chạy thử.
+# Máy chạy ghim ubuntu-24.04 (ubuntu-latest chuyển sang Ubuntu 26 cho ổn định môi trường CI); chỉ đổi sau khi đã chạy thử.
 name: CI
 
 # develop: mọi PR tính năng gộp vào đây; main: chỉ PR phát hành (docs/git_flow.md). Quy trình của PR (nhánh nguồn,

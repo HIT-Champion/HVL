@@ -7,6 +7,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 
 ## [Chưa phát hành]
 
+## [1.0.0] - 2026-10-23
+
 ### Đã thêm
 - Hộp việc của `giamkhao` không còn trống sau `make seed`: có công văn khẩn 152/ĐT-ĐH chờ xử lý và dự thảo phúc đáp
   bị tổ trưởng trả lại chờ sửa — giám khảo đăng nhập là thấy ngay luồng làm việc của chuyên viên.
