@@ -56,6 +56,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Nhắc hạn, báo lãnh đạo (F2.3): dòng nhắc được ghi vào dòng thời gian văn bản trước khi gửi thông báo. Trước
   đây gửi trước rồi mới ghi, người bấm thông báo mở văn bản ngay có thể chưa thấy dòng nhắc; `make smoke` thỉnh
   thoảng đỏ vì đọc trúng khoảng đó. Test svc-workflow +1.
+- Văn bản hạn chế quá nặng để đóng dấu có lúc bị báo "không đọc được PDF" thay vì "PDF quá nặng, vượt giới hạn bộ
+  nhớ": tiến trình con nạp WeasyPrint sau khi đặt trần bộ nhớ, dlopen thư viện pango hỏng lại báo "cannot open
+  shared object file" (OSError); mã C của WeasyPrint hết bộ nhớ thì chết bằng SIGTRAP hay SIGSEGV tùy bản dựng, bị
+  coi là tệp hỏng. Bản sửa ở 1.0.0 chỉ cứu test (trần ≤ 64 MB thì coi là hết bộ nhớ): trần 96–160 MB vẫn báo sai.
+  Nay WeasyPrint nạp trước khi đặt trần, mọi việc sau đó nằm trong `try`, hết bộ nhớ cả lúc ghi kết quả thì thoát
+  bằng mã riêng; tiến trình con chết vì tín hiệu (trừ SIGXCPU) là hết bộ nhớ — tệp chỉ đi qua pypdf, mã C chỉ vẽ lớp
+  dấu; bỏ đoán theo lời báo lỗi, chỉ tin MemoryError và ENOMEM. Test svc-files +13.
 
 ## [1.0.0] - 2026-10-23
 

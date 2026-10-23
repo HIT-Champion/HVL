@@ -39,10 +39,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import errno
 import html
 import io
 import json
 import os
+import signal
 import sys
 import time
 import uuid
@@ -61,6 +63,7 @@ NONCE = 12
 VN = timezone(timedelta(hours=7))
 MAX_STAMPS = 8          # số cỡ trang khác nhau được dựng lớp dấu riêng; nhiều hơn thì co giãn lớp dấu đầu tiên
 MEMORY_MB = 1024        # RLIMIT_AS của tiến trình con (WeasyPrint + pypdf lúc rảnh ~260 MB bộ nhớ ảo)
+EXIT_MEMORY = 3         # mã thoát của tiến trình con khi hết bộ nhớ cả lúc ghi kết quả (không ghi nổi dòng JSON)
 CHECK_TIMEOUT_S = 20.0  # hạn kiểm PDF lúc tải lên
 STAMP_TIMEOUT_S = 30.0  # hạn đóng dấu lúc xem: cộng thời gian chờ lượt vẫn dưới 60 giây của APISIX
 # lý do PDF không nhận, không đóng dấu được — tiến trình con chỉ trả mã, lời báo do svc-files đặt
@@ -244,8 +247,14 @@ class Vault:
 # check_pdf, watermark đọc ngay trong tiến trình hiện tại — chỉ gọi trong tiến trình con hoặc với tệp tin cậy (test);
 # svc-files gọi run_check_pdf, run_watermark.
 
+def _out_of_memory(exc: BaseException) -> bool:
+    """Lỗi vì hết bộ nhớ (vượt RLIMIT_AS): MemoryError của Python, hoặc lệnh hệ thống trả ENOMEM (mmap, tạo luồng).
+    Không đoán theo lời báo lỗi: tệp hỏng có lời báo nhắc "alloc" vẫn là tệp hỏng."""
+    return isinstance(exc, MemoryError) or (isinstance(exc, OSError) and exc.errno == errno.ENOMEM)
+
+
 def _unreadable(exc: Exception, message: str) -> SealError:
-    return SealError(f"{message}: {type(exc).__name__}", reason="memory" if isinstance(exc, MemoryError) else "corrupt")
+    return SealError(f"{message}: {type(exc).__name__}", reason="memory" if _out_of_memory(exc) else "corrupt")
 
 
 def check_pdf(data: bytes, max_pages: int | None = None) -> int:
@@ -332,12 +341,16 @@ def _main(argv: list[str]) -> int:
 
     op = argv[1]
     max_pages, memory_mb, cpu_s = (int(a) for a in argv[2:5])
+    if op == "stamp":
+        # nạp WeasyPrint trước khi đặt trần: dưới trần, dlopen thư viện pango không ánh xạ nổi lại báo "cannot open
+        # shared object file" (OSError, không phải MemoryError) — hết bộ nhớ thành "tệp hỏng". Trần tính cả phần đã nạp
+        import weasyprint  # noqa: F401
     memory = memory_mb * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_s, cpu_s))
-    data = sys.stdin.buffer.read()
     body = b""
-    try:
+    try:  # mọi việc sau khi đặt trần đều trong try: MemoryError không lọt ra thành mã thoát 1 ("corrupt")
+        data = sys.stdin.buffer.read()
         if op == "check":
             head: dict[str, Any] = {"status": "ok", "pages": check_pdf(data, max_pages)}
         else:
@@ -345,16 +358,11 @@ def _main(argv: list[str]) -> int:
             head = {"status": "ok"}
     except SealError as exc:
         head = {"status": "failed", "reason": exc.reason}
-    except MemoryError:
-        head = {"status": "failed", "reason": "memory"}
-    except (OSError, Exception) as exc:  # noqa: BLE001 — tệp hỏng kiểu gì cũng chỉ là "không đọc được"
-        msg = str(exc).lower()
-        if "memory" in msg or "alloc" in msg or getattr(exc, "errno", None) == 12:
-            head = {"status": "failed", "reason": "memory"}
-        else:
-            head = {"status": "failed", "reason": "corrupt"}
+    except Exception as exc:  # noqa: BLE001 — tệp hỏng kiểu gì cũng chỉ là "không đọc được"
+        head = {"status": "failed", "reason": "memory" if _out_of_memory(exc) else "corrupt"}
     sys.stdout.buffer.write(json.dumps(head).encode() + b"\n")
     sys.stdout.buffer.write(body)
+    sys.stdout.buffer.flush()
     return 0
 
 
@@ -365,12 +373,22 @@ def _failed(reason: str, max_pages: int) -> SealError:
     return SealError(message, reason=reason)
 
 
+def _exit_reason(returncode: int | None) -> str:
+    """Lý do khi tiến trình con không thoát 0. Chết vì tín hiệu: SIGXCPU (hết RLIMIT_CPU) → timeout, tín hiệu khác →
+    memory. Khác ocr.py (tesseract đọc thẳng tệp, sập là tệp hỏng): ở đây tệp chỉ qua pypdf (Python thuần, zlib), mã C
+    (pango, fontconfig của WeasyPrint) chỉ vẽ lớp dấu của mình — sập ở đó là hết bộ nhớ dưới RLIMIT_AS: GLib dừng bằng
+    SIGABRT hay SIGTRAP tùy bản dựng, có khi SIGSEGV sau một malloc hỏng. EXIT_MEMORY → memory; mã khác → corrupt."""
+    if returncode is not None and returncode < 0:
+        return "timeout" if -returncode == signal.SIGXCPU else "memory"
+    return "memory" if returncode == EXIT_MEMORY else "corrupt"
+
+
 async def _isolated(op: str, data: bytes, extra: list[str], *, max_pages: int, timeout_s: float,
                     memory_mb: int) -> tuple[dict[str, Any], bytes]:
     """Chạy tệp này thành tiến trình con có giới hạn → (dòng JSON đầu, phần còn lại của stdout). Tệp không đọc được,
     quá nặng (hết giờ, hết CPU, hết bộ nhớ, tiến trình con sập), kết quả sai dạng: SealError mang ``reason``."""
     # nhập ở đây, không ở đầu tệp: tiến trình con chạy tệp này như script, không có gói svc_files
-    from .docread.ocr import _kill_group, _killed
+    from .docread.ocr import _kill_group
 
     timeout_s = max(timeout_s, 0.001)
     proc = await asyncio.create_subprocess_exec(
@@ -389,11 +407,7 @@ async def _isolated(op: str, data: bytes, extra: list[str], *, max_pages: int, t
         _kill_group(proc)
     rc = proc.returncode
     if rc != 0:
-        # chết vì tín hiệu: SIGXCPU (hết RLIMIT_CPU) → timeout, SIGKILL, SIGABRT → memory; tự thoát mã khác 0: corrupt
-        reason = _killed(rc) if rc is not None and rc < 0 else "corrupt"
-        if reason == "corrupt" and memory_mb <= 64:
-            reason = "memory"
-        raise _failed(reason, max_pages)
+        raise _failed(_exit_reason(rc), max_pages)
     # kết quả của tiến trình con đọc tệp không tin cậy: kiểm dạng trước khi dùng
     line, _, body = out.partition(b"\n")
     try:
@@ -430,4 +444,7 @@ async def run_watermark(pdf: bytes, who: str, at: datetime, *, max_pages: int, t
 
 
 if __name__ == "__main__":
-    sys.exit(_main(sys.argv))
+    try:
+        sys.exit(_main(sys.argv))
+    except MemoryError:  # hết bộ nhớ cả lúc ghi kết quả: báo bằng mã thoát, việc này không cần cấp phát
+        os._exit(EXIT_MEMORY)
