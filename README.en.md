@@ -103,7 +103,8 @@ AI in Signet only **suggests**; people decide. Everything runs on the organisati
 All four work **without a language model** (rules, OCR, full-text search), so they run in CI, on weak machines and
 offline. Turn on the local model (Ollama with Qwen3 1.7B and Qwen3-Embedding 0.6B, on CPU) to write summaries, search
 by meaning and write answers: `make ai-model` (downloads the models once), then `make up-ai`. Method and full numbers
-(Vietnamese): [`services/svc-files/README.md`](services/svc-files/README.md).
+(Vietnamese): [`services/svc-files/README.md`](services/svc-files/README.md); evaluation of each agent (data, dated
+measurements, limitations, safety mechanisms): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 
 ### Screenshots
 
@@ -337,6 +338,7 @@ the commit history for secrets (gitleaks) and the dependency lock files for know
 | [`docs/architecture.md`](docs/architecture.md) | H-P-D-I architecture, tool map, technical decisions |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Data model, permissions, Hasura Actions, event formats |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Product specification: problem, users, features |
+| [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md) | AI evaluation: for each agent — model, version, license, evaluation data, dated measurements with the machine used, limitations, safety mechanisms |
 | [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Development plan by phase, assignments, risks |
 | [`docs/git_flow.md`](docs/git_flow.md) | Git workflow: branches, commits, pull requests, releases |
 | [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Self-assessment against the 50-point PoF criteria |

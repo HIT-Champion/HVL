@@ -104,7 +104,9 @@ dùng hay sửa ở form chỉ đạo, view `office.v_assignment_suggestion_accu
 chính nó — leave-one-out) rồi in stdout `{"rows": [{document_id, actual: {department_id, days}, status, reason,
 department_id, ranking, confidence, due_days, evidence, semantic, duration_ms}]}`. Không ghi CSDL, không ghi sổ, không in
 chữ văn bản; svc-files từ chối thì dòng `failed` với lý do (`restricted`, `not_found`, `timeout`, `unavailable`…). Chạy
-trong container: `docker compose exec -T svc-workflow python -m svc_workflow.advisor evaluate < ids.json`.
+trong container: `docker compose exec -T svc-workflow python -m svc_workflow.advisor evaluate < ids.json`. Số đo
+(top-1, gốc so sánh, sai số hạn, độ trễ) và giới hạn của chúng: [`docs/danh-gia-ai.md`](../../docs/danh-gia-ai.md),
+mục F4.3.
 
 Giới hạn: chưa xét ngày lễ (chưa có lịch nghỉ, chỉ tránh thứ Bảy/Chủ nhật); chỉ gợi ý đơn vị chủ trì và hạn, **không**
 gợi ý người xử lý (việc của bước phân công); ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác top-1 dễ cao ảo — đọc kèm

@@ -97,7 +97,8 @@ AI trong Signet chỉ **gợi ý**, người quyết định; mọi thứ chạy
 Cả bốn chạy được **không cần mô hình ngôn ngữ** (quy tắc, OCR, tìm kiếm toàn văn), nên CI, máy yếu, máy không có
 Internet đều chạy. Bật mô hình cục bộ (Ollama với Qwen3 1,7B và Qwen3-Embedding 0,6B, chạy trên CPU) để viết trích
 yếu, tìm theo nghĩa và viết câu trả lời: `make ai-model` (tải mô hình một lần) rồi `make up-ai`. Cách làm và số đo
-đầy đủ: [`services/svc-files/README.md`](services/svc-files/README.md).
+đầy đủ: [`services/svc-files/README.md`](services/svc-files/README.md); đánh giá từng tác tử (dữ liệu đo, số đo có
+ngày và máy, giới hạn, cơ chế an toàn): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 
 ### Ảnh chụp màn hình
 
@@ -323,6 +324,7 @@ sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ 
 | [`docs/architecture.md`](docs/architecture.md) | Kiến trúc H-P-D-I, bản đồ công cụ, quyết định kỹ thuật |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Đặc tả sản phẩm: bài toán, người dùng, chức năng |
+| [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md) | Đánh giá AI: từng tác tử — mô hình, phiên bản, giấy phép, dữ liệu đo, số đo có ngày và máy, giới hạn, cơ chế an toàn |
 | [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Kế hoạch phát triển theo phase, phân công, rủi ro |
 | [`docs/git_flow.md`](docs/git_flow.md) | Quy trình Git: nhánh, commit, pull request, phát hành |
 | [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |

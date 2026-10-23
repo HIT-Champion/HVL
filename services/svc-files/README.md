@@ -391,7 +391,8 @@ có đơn vị chạy thử.
 Câu tìm lai (tỷ trọng nghĩa 0,5) của câu dương có nguồn đúng đứng đầu với điểm ≥ 0,88, câu âm điểm cao nhất ≤ 0,70 —
 nên ngưỡng `MOC_ASK_MIN_SCORE_SEMANTIC` 0,75. Trước khi máy chủ tự gán trích dẫn, cùng mô hình chỉ qua kiểm 0 / 19
 (không ghi `[n]`). Nhúng 61 đoạn của kho mẫu mất khoảng 2 phút. Ngắt kết nối giữa lượt `generate` qua APISIX (`499`
-sau 4 giây): svc-files hủy lượt, không ghi sổ, câu hỏi kế tiếp chạy ngay.
+sau 4 giây): svc-files hủy lượt, không ghi sổ, câu hỏi kế tiếp chạy ngay. Lần đo trên bản online (máy khác, 23/10/2026)
+và đánh giá chung các tác tử AI: [`docs/danh-gia-ai.md`](../../docs/danh-gia-ai.md).
 
 Chưa làm, giới hạn đã biết:
 
