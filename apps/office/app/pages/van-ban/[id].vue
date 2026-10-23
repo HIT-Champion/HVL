@@ -163,7 +163,11 @@ async function refreshDispatches() {
 }
 onBeforeUnmount(() => { if (dispatchTimer) clearTimeout(dispatchTimer) })
 
+// Thông báo realtime của văn bản và nút thao tác (phát hành, vào sổ…) có thể cùng gọi load(): lượt cũ về sau không
+// được đè lượt mới — không thì văn bản vừa phát hành hiện lại "Đã duyệt" và thẻ liên thông thôi hỏi lại
+let seq = 0
 async function load() {
+  const mine = ++seq
   loading.value = true
   failure.value = ''
   try {
@@ -190,6 +194,7 @@ async function load() {
         office_dispatch_units(order_by: {name: asc}) { id name }
         myTasks { id form_key document_id }
       }`, { id: id.value })
+    if (mine !== seq) return
     doc.value = data.office_documents_by_pk
     missing.value = !doc.value
     users.value = data.core_users
@@ -205,11 +210,12 @@ async function load() {
     viewers.value = null
     if (doc.value?.restricted && canManageViewers.value) void loadViewers()
   } catch (e) {
+    if (mine !== seq) return
     // lần đầu chưa có gì để hiện: báo lỗi ngay trên trang thay vì để trang trắng
     if (doc.value) notice.error(errorText(t, e))
     else failure.value = errorText(t, e)
   } finally {
-    loading.value = false
+    if (mine === seq) loading.value = false
   }
 }
 

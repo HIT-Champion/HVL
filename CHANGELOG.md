@@ -431,6 +431,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   từ đó; lượt nới lỗi thì giữ kết quả lượt chính.
 
 ### Đã sửa lỗi
+- Sau Cloudflare Tunnel, `seed.py` và `smoke.py` dừng với "APISIX chưa sẵn sàng" dù trang vẫn mở được: Browser
+  Integrity Check của Cloudflare trả 403 cho User-Agent mặc định `Python-urllib`. Các kịch bản giờ gửi
+  `User-Agent: Signet-scripts`.
+- Trang văn bản: thông báo realtime đến đúng lúc bấm thao tác (vd lời nhắc quá hạn khi văn thư phát hành) làm hai
+  lượt tải chồng nhau, lượt cũ về sau đè lượt mới — văn bản vừa phát hành hiện lại "Đã duyệt", thẻ liên thông
+  thôi hỏi lại trạng thái. Lượt tải cũ giờ bỏ kết quả (như trang văn bản đến); hộp việc cũng vậy.
 - Bấm lại khi hoàn thành việc lâu (phát hành) hay hai lần gọi chen nhau không còn ghi hai lần (hai phân công, hai lần
   cấp số và dựng PDF): svc-workflow cho các lần gọi cùng một việc chạy lần lượt, lần sau thấy việc đã xong; CSDL có
   chỉ mục duy nhất `document_events_task_once` theo `task_id` của sự kiện, nên lần ghi thứ hai (ví dụ từ bản sao

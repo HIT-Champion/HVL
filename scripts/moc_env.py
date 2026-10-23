@@ -61,6 +61,9 @@ ENV = load_env()
 PUBLIC_URL = ENV["MOC_PUBLIC_URL"].rstrip("/")
 REALM = ENV.get("MOC_REALM", "moc")
 KEYCLOAK_ADMIN_URL = f"http://127.0.0.1:{ENV.get('KEYCLOAK_ADMIN_PORT', '8180')}"
+# Sau Cloudflare (docs/trien-khai.md mục 5b), Browser Integrity Check bật sẵn trả 403 cho User-Agent mặc định
+# "Python-urllib/3.x": seed, smoke… đi qua MOC_PUBLIC_URL nên tự xưng tên riêng
+USER_AGENT = "Signet-scripts"
 
 
 class HTTPError(Exception):
@@ -72,7 +75,7 @@ class HTTPError(Exception):
 
 def request(method: str, url: str, *, data: bytes | None = None, headers: dict[str, str] | None = None,
             timeout: float = 60) -> tuple[int, dict[str, str], bytes]:
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    req = urllib.request.Request(url, data=data, method=method, headers={"User-Agent": USER_AGENT, **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, dict(resp.headers), resp.read()

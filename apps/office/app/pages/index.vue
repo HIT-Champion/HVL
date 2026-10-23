@@ -36,7 +36,10 @@ const tasks = ref<InboxTask[]>([])
 const loading = ref(true)
 const failure = ref('')
 
+// việc mới đẩy tới lúc đang tải dở: lượt cũ về sau không đè danh sách mới hơn
+let seq = 0
 async function load() {
+  const mine = ++seq
   loading.value = true
   failure.value = ''
   try {
@@ -44,11 +47,11 @@ async function load() {
       myTasks { id name form_key created_at due_on urgency document_id
         document { symbol summary issuer_name register_number status } }
     }`)
-    tasks.value = data.myTasks
+    if (mine === seq) tasks.value = data.myTasks
   } catch (e) {
-    failure.value = errorText(t, e)
+    if (mine === seq) failure.value = errorText(t, e)
   } finally {
-    loading.value = false
+    if (mine === seq) loading.value = false
   }
 }
 

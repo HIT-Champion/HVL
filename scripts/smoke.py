@@ -62,9 +62,9 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import (EICAR, ENV, INCREMENTAL_EDIT, PUBLIC_URL, REALM, HTTPError, Session, byte_range_end, call_json,
-                     compose, flip_in_signed_stream, request, signature_cli, text_pages, text_pdf, user_login,
-                     vault_ca_pem)
+from moc_env import (EICAR, ENV, INCREMENTAL_EDIT, PUBLIC_URL, REALM, USER_AGENT, HTTPError, Session, byte_range_end,
+                     call_json, compose, flip_in_signed_stream, request, signature_cli, text_pages, text_pdf,
+                     user_login, vault_ca_pem)
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -113,6 +113,7 @@ def browser_login(username: str) -> str:
     Keycloak hỏi tiếp mã TOTP, "code" nếu đã chuyển về giao diện kèm mã cấp quyền."""
     jar = http.cookiejar.CookieJar(policy=BrowserCookies())
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener.addheaders = [("User-Agent", USER_AGENT)]
     query = urllib.parse.urlencode({"client_id": "app-office", "redirect_uri": f"{PUBLIC_URL}/", "response_type": "code",
                                     "scope": "openid", "code_challenge": "x" * 43, "code_challenge_method": "S256"})
     page = opener.open(f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/auth?{query}", timeout=30).read().decode()
@@ -261,7 +262,8 @@ def main() -> None:
     # đường cấp token viết khác đi (dấu / cuối) vẫn tới Keycloak: phải bị đếm chung bộ đếm đăng nhập theo IP
     variant = urllib.request.Request(f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token/", method="POST",
                                      data=b"grant_type=password",
-                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+                                     headers={"Content-Type": "application/x-www-form-urlencoded",
+                                              "User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(variant, timeout=30) as resp:
             seen = dict(resp.headers)
