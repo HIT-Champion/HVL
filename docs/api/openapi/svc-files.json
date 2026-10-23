@@ -729,6 +729,27 @@
         }
       }
     },
+    "/api/status": {
+      "get": {
+        "summary": "Trạng thái vận hành các thành phần của Signet (không cần đăng nhập, lưu đệm 10 giây)",
+        "operationId": "system_status_api_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Vượt giới hạn theo địa chỉ IP (APISIX)"
+          }
+        }
+      }
+    },
     "/api/case-files/{case_file_id}/archive": {
       "get": {
         "summary": "Phòng đọc: đọc lại gói lưu trữ của hồ sơ đã nộp lưu từ bucket lạnh, kiểm băm",
@@ -1880,6 +1901,175 @@
           "next_cursor"
         ],
         "title": "SearchOut"
+      },
+      "StatusAi": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Mô hình viết câu trả lời của trợ lý đang sẵn sàng"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Tên mô hình khi bật, vd qwen3:1.7b; null khi tắt"
+          },
+          "semantic": {
+            "type": "boolean",
+            "title": "Semantic",
+            "description": "Tìm theo nghĩa được (mô hình nhúng sẵn sàng)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "model",
+          "semantic"
+        ],
+        "title": "StatusAi"
+      },
+      "StatusComponent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Mã thành phần, vd cong-api, dang-nhap, csdl, quy-trinh, tro-ly-ai"
+          },
+          "layer": {
+            "type": "string",
+            "title": "Layer",
+            "description": "Mã tầng trong `layers`"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Tên tiếng Việt, vd Đăng nhập một lần"
+          },
+          "software": {
+            "type": "string",
+            "title": "Software",
+            "description": "Phần mềm nguồn mở đảm nhận (không kèm phiên bản), vd Keycloak"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "off"
+            ],
+            "title": "Status",
+            "description": "ok: hoạt động · degraded: chạy một phần · down: gián đoạn (không trả lời, quá hạn dò) · off: tắt theo cấu hình (vd chưa bật mô hình ngôn ngữ)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "layer",
+          "label",
+          "software",
+          "status"
+        ],
+        "title": "StatusComponent"
+      },
+      "StatusLayer": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "StatusLayer"
+      },
+      "StatusOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "title": "Status",
+            "description": "down: có thành phần thiết yếu gián đoạn · degraded: thành phần khác gián đoạn hoặc chạy một phần"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At",
+            "description": "Lúc dò; kết quả lưu đệm MOC_STATUS_CACHE_S giây (mặc định 10)"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "Phiên bản Signet đang chạy (MOC_VERSION)"
+          },
+          "uptime_s": {
+            "type": "integer",
+            "title": "Uptime S",
+            "description": "Số giây svc-files đã chạy liên tục từ lần khởi động gần nhất"
+          },
+          "last_backup_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Backup At",
+            "description": "Lượt sao lưu gần nhất (`moc backup create`) mà CSDL biết; null: chưa có"
+          },
+          "ai": {
+            "$ref": "#/components/schemas/StatusAi"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/StatusLayer"
+            },
+            "type": "array",
+            "title": "Layers",
+            "description": "Các tầng theo thứ tự hiện: người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/StatusComponent"
+            },
+            "type": "array",
+            "title": "Components"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checked_at",
+          "version",
+          "uptime_s",
+          "last_backup_at",
+          "ai",
+          "layers",
+          "components"
+        ],
+        "title": "StatusOut",
+        "description": "Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thái, không tên máy, địa chỉ hay số liệu nghiệp vụ."
       },
       "ValidationError": {
         "properties": {

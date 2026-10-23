@@ -184,6 +184,11 @@ class FakeHasura:
                                "object_key": object_key, "signature": signature, **row}
 
     fail_events: bool = False         # ghi sổ kiểm toán lỗi (Hasura vẫn đọc được)
+    backup_at: datetime | None = None   # lượt sao lưu gần nhất CSDL biết (trang trạng thái hệ thống)
+
+    async def last_backup(self) -> datetime | None:
+        self._check()
+        return self.backup_at
 
     async def log_event(self, **event) -> None:
         self._check()
@@ -1006,6 +1011,9 @@ class FakeVault:
             raise VaultError("két tắt")
         self.unwrapped.append(wrapped)
         return self.keys[wrapped]
+
+    async def ping(self) -> bool:
+        return not self.down
 
     async def aclose(self) -> None:
         pass

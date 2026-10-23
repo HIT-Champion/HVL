@@ -8,7 +8,7 @@ Có hai loại API:
 - **REST** (`svc-files`) cho tệp, tìm kiếm, bản xem trước văn bản đi và cổng xác thực.
 
 Dù gọi theo cách nào, người gọi cũng phải có token Keycloak, và đơn vị lẫn vai trò luôn lấy từ token. Ngoại lệ
-duy nhất là cổng xác thực văn bản đã phát hành (`/api/verify`), ai cũng gọi được.
+là cổng xác thực văn bản đã phát hành (`/api/verify`) và trạng thái hệ thống (`/api/status`), ai cũng gọi được.
 
 ## Tệp trong thư mục này
 
@@ -44,6 +44,7 @@ cũng nạp được.
 | `POST /v1/graphql` | Hasura | Bắt buộc |
 | `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…` | `svc-files` | Bắt buộc |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
+| `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
 
@@ -181,6 +182,7 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `GET /api/case-files/{id}/archive` | Hồ sơ đã nộp lưu (F3.8): đọc lại từ gói trên bucket lạnh sau khi khớp băm với CSDL; chỉ văn bản người gọi được đọc |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
+| `GET /api/status` | **Không cần token.** Tình trạng từng thành phần (`ok`, `degraded`, `down`, `off`) theo tầng, tình trạng chung, phiên bản, thời gian chạy, giờ sao lưu gần nhất, trợ lý AI bật hay tắt; lưu đệm 10 giây, không có địa chỉ nội bộ hay số liệu |
 
 ```bash
 curl -s -OJ "$MOC/api/files/$FILE" -H "Authorization: Bearer $TOKEN"
@@ -192,10 +194,13 @@ curl -s "$MOC/api/documents/ask" -H "Authorization: Bearer $TOKEN" -H 'Content-T
 # cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
 curl -s "$MOC/api/verify/ABCDE-23456"
 curl -s "$MOC/api/verify?sha256=$(sha256sum cong-van-nhan-duoc.pdf | cut -d' ' -f1)"
+
+# trạng thái hệ thống, không đăng nhập
+curl -s "$MOC/api/status"
 ```
 
-Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi đúng hai đường trên; ứng dụng khác
-cũng dùng được để tự kiểm văn bản nhận được.
+Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi đúng hai đường xác thực trên; ứng dụng
+khác cũng dùng được để tự kiểm văn bản nhận được. Trang `/trang-thai` gọi `/api/status` mỗi 30 giây.
 
 Tệp được gắn vào văn bản bằng GraphQL (`file_ids` của `receiveIncoming`, `files` khi chuyên viên tạo dự thảo, hoặc
 `insert_office_document_files_one`), không qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
@@ -267,6 +272,7 @@ Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"],
   - GraphQL và tệp: theo token, `MOC_RATE_API_PER_MIN` (mặc định 300/phút).
   - Cổng xác thực: theo địa chỉ IP, `MOC_RATE_VERIFY_PER_MIN` (mặc định 30/phút).
   - Mở kết nối `/realtime`: theo địa chỉ IP, `MOC_RATE_REALTIME_PER_MIN` (mặc định 60/phút).
+  - Trạng thái hệ thống: theo địa chỉ IP, `MOC_RATE_STATUS_PER_MIN` (mặc định 30/phút).
   - Phản hồi có `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (giây).
 - **Thuê ước**: không gửi `tenant_id`; Hasura và `svc-files` lấy từ token. Người của đơn vị này không đọc được
   dữ liệu của đơn vị khác (`make smoke` kiểm).

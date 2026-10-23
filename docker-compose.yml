@@ -123,6 +123,7 @@ services:
       MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
       MOC_RATE_VERIFY_PER_MIN: ${MOC_RATE_VERIFY_PER_MIN:-30}
       MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
+      MOC_RATE_STATUS_PER_MIN: ${MOC_RATE_STATUS_PER_MIN:-30}
       MOC_TRUSTED_PROXY: ${MOC_TRUSTED_PROXY:-127.0.0.1/32}
     volumes:
       - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
@@ -354,6 +355,9 @@ services:
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
       MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
+      # Trang trạng thái hệ thống (/api/status, công khai): phiên bản đang chạy; svc-files còn dò APISIX (cổng trạng
+      # thái 7085 nội bộ), JWKS của Keycloak, /readyz của svc-workflow
+      MOC_VERSION: ${MOC_VERSION:-dev}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế

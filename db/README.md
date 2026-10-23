@@ -131,7 +131,9 @@ trích yếu bằng token người xem.
   ghi mốc neo) tạm dừng từ trước khi dump CSDL tới khi chép xong bucket, nên mốc trong bucket và bảng
   `core.audit_anchors` cùng một thời điểm: khôi phục xong `make audit` vẫn khớp. Lần khôi phục thêm một dòng
   `system.restored` của nền tảng (`tenant_id` null, `entity_id` là mã lượt, `diff` có đầu chuỗi lúc sao lưu) ngay
-  sau đầu chuỗi vừa khôi phục: các dòng ghi sau lúc sao lưu không còn là vì khôi phục, và sổ ghi rõ điều đó.
+  sau đầu chuỗi vừa khôi phục: các dòng ghi sau lúc sao lưu không còn là vì khôi phục, và sổ ghi rõ điều đó. Lượt
+  sao lưu trọn vẹn ghi dòng `system.backed_up` cùng dạng (sau lúc dump), để trang trạng thái hệ thống biết giờ sao
+  lưu gần nhất.
 - **Màn xem sổ** cho `director`, `tenant_admin`: đọc dòng sổ của đơn vị mình, không đọc được cột `diff`, chỉ đọc
   trường `overview` (hàm `office.audit_overview_seen`, dựa trên `core.audit_overview`): cột chứa nội dung (trích
   yếu, nội dung, tên tệp, ý kiến…) có tên nhưng giá trị null; dòng về văn bản hạn chế mà người xem không đọc được
