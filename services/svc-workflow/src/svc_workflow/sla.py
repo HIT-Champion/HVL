@@ -24,8 +24,8 @@ worker, topic ``moc-sla``); vòng nền ở đây nhận việc đó, tìm việ
   - quá hai thời hạn → báo thêm lãnh đạo của họ (``task.escalated``)
 
 Việc đã xong trước khi timer bắn thì timer tự hủy; việc mở chưa tới hạn (của bước sau) thì bỏ qua. Mỗi lần nhắc
-ghi một sự kiện vào dòng thời gian văn bản. Khóa chống trùng của thông báo làm cho việc nhận lại sau lỗi không gửi
-hai lần.
+ghi một sự kiện vào dòng thời gian văn bản rồi mới gửi. Khóa chống trùng của thông báo làm cho việc nhận lại sau lỗi
+không gửi hai lần.
 
 Riêng hạn giải quyết của văn bản đến (ngày, do lãnh đạo ghi khi chỉ đạo) không nằm trong quy trình: vòng nền
 ``overdue_documents`` tìm văn bản đang xử lý đã qua hạn và báo người xử lý cùng lãnh đạo, mỗi văn bản một lần.
@@ -144,8 +144,8 @@ class Deadlines:
         holders = await self.notifier.task_people(self.flowable, actor, task, people)
         if readers is not None:
             holders &= readers
-        await self.notifier.send(actor, holders, "task.overdue", f"task:{task.id}:overdue", doc_id, data)
         await self._record(actor, doc_id, "office.task.overdue", task, holders)
+        await self.notifier.send(actor, holders, "task.overdue", f"task:{task.id}:overdue", doc_id, data)
         if not escalate:
             return
         groups = [] if task.assignee else await self.flowable.candidate_groups(task.id)
@@ -154,13 +154,14 @@ class Deadlines:
             leaders &= readers
         holder = people.get(task.assignee or "")
         extra = {"assignee_id": task.assignee, "assignee_name": holder.full_name} if holder else {}
+        await self._record(actor, doc_id, "office.task.escalated", task, leaders)
         await self.notifier.send(actor, leaders, "task.escalated", f"task:{task.id}:escalated", doc_id,
                                  {**data, **extra})
-        await self._record(actor, doc_id, "office.task.escalated", task, leaders)
 
     async def _record(self, actor: Actor, doc_id: str, kind: str, task: Task, notified: set[str]) -> None:
-        """Ghi lần nhắc vào dòng thời gian, một lần cho mỗi việc. Xét theo sự kiện đã có chứ không theo "vừa gửi":
-        gửi xong mà ghi lỗi thì lần nhận lại việc không gửi nữa (khóa chống trùng) nhưng vẫn phải ghi."""
+        """Ghi lần nhắc vào dòng thời gian, một lần cho mỗi việc, TRƯỚC khi gửi: người bấm thông báo mở văn bản ra đã
+        thấy dòng nhắc. Xét theo sự kiện đã có: ghi xong mà gửi lỗi thì lần nhận lại việc bỏ qua bước ghi rồi gửi
+        lại, khóa chống trùng không cho ai nhận hai lần."""
         if not notified:
             return
         found = await self.hasura.as_service(actor, SLA_EVENT, {
