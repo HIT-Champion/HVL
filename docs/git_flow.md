@@ -317,7 +317,8 @@ gh pr create --base main --head develop --title "chore(release): v1.1.0" --body 
 git switch main && git pull
 make release VERSION=1.1.0       # tạo thẻ v1.1.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
 
-# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, rồi tạo Release kèm .tar.gz, .sha256
+# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, rồi tạo Release kèm .tar.gz, SBOM .cdx.json
+#    (make sbom) và .sha256 của cả hai
 git push origin v1.1.0
 ```
 
@@ -424,7 +425,10 @@ git verify-commit HEAD                            # thấy Good "git" signature 
     --delete-branch-on-merge`, rồi `gh api -X PATCH repos/HIT-Champion/HVL -f merge_commit_title=PR_TITLE
     -f merge_commit_message=PR_BODY -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY`.
 - **Code security** (Settings → Code security): bật *Secret scanning* và *Push protection* (miễn phí với repo
-  công khai), chặn từ lúc push thay vì đợi job gitleaks của CI.
+  công khai), chặn từ lúc push thay vì đợi job gitleaks của CI; bật *Private vulnerability reporting* để người ngoài
+  báo lỗ hổng riêng tư theo `SECURITY.md` — bằng lệnh:
+  `gh api -X PUT repos/HIT-Champion/HVL/private-vulnerability-reporting`; kiểm:
+  `gh api repos/HIT-Champion/HVL/private-vulnerability-reporting` trả `{"enabled": true}`.
 - **Issues**:
   - bật Issues;
   - tạo nhãn `backend`, `ai`, `frontend`, `bug`, `feature`, `docs`, `good first issue`;

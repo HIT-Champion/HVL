@@ -101,10 +101,15 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
 - Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng.
 - Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md`
   kèm giấy phép và kiểm tra tính tương thích với Apache-2.0.
+- Thêm hay nâng gói npm, Python thì chạy `make sbom && make license-audit` (cần Docker và mạng): CI kiểm giấy phép của
+  mọi gói, kể cả gói gián tiếp. Gói ngoài chính sách hay chưa rõ giấy phép cần ngoại lệ ghi lý do trong
+  `.github/license-exceptions.json`.
 
 ## Báo lỗi
 
-Mở issue theo mẫu có sẵn tại `.github/ISSUE_TEMPLATE/`. Một báo lỗi hữu ích cần có: bước tái
+**Lỗ hổng bảo mật thì không mở issue**: báo riêng tư theo [`SECURITY.md`](SECURITY.md).
+
+Lỗi khác: mở issue theo mẫu có sẵn tại `.github/ISSUE_TEMPLATE/`. Một báo lỗi hữu ích cần có: bước tái
 hiện, kết quả mong đợi, kết quả thực tế, phiên bản Signet (`git describe --tags`), và nhật ký
 liên quan (`make logs`).
 
