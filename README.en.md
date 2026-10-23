@@ -342,6 +342,7 @@ the commit history for secrets (gitleaks) and the dependency lock files for know
 | [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Development plan by phase, assignments, risks |
 | [`docs/git_flow.md`](docs/git_flow.md) | Git workflow: branches, commits, pull requests, releases |
 | [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Self-assessment against the 50-point PoF criteria |
+| [`docs/du-thi/hoi-dap-hoi-dong.md`](docs/du-thi/hoi-dap-hoi-dong.md) | Questions the jury is likely to ask, with answers and evidence in the repo (in Vietnamese) |
 | [`docs/du-thi/olp-2026-brief.md`](docs/du-thi/olp-2026-brief.md), [`docs/du-thi/olp-2026-de-thi.md`](docs/du-thi/olp-2026-de-thi.md) | The DX-OS theme, rules, judging criteria; analysis of the official problem statement |
 | [`docs/du-thi/nghien-cuu/`](docs/du-thi/nghien-cuu/) | Research done before the problem statement was published (archived) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Upstream software, pinned versions, licenses |

@@ -12,6 +12,10 @@ Trên máy chủ đã `make install`, chạy `python3 scripts/demo.py <màn>` tr
 
 Khi trình bày: terminal chạy lệnh một bên, trình duyệt mở giao diện ở bên kia (đường dẫn in ở cuối mỗi màn).
 
+Trước buổi trình diễn làm theo [checklist](#checklist-trước-giờ-trình-diễn); sự cố giữa buổi xử lý theo
+[phương án dự phòng](#phương-án-dự-phòng). Câu hội đồng hay hỏi và câu trả lời của đội:
+[`du-thi/hoi-dap-hoi-dong.md`](du-thi/hoi-dap-hoi-dong.md).
+
 | Nguyên lý | Màn | Lệnh | Tình trạng |
 | --- | --- | --- | --- |
 | (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm và xác thực được | `make demo-nong-lanh` | Có (F3.8) |
@@ -823,3 +827,112 @@ câu trích tự mở.
 - *"Còn gì chưa làm?"* Họ tên, địa chỉ (cần nhận dạng thực thể tiếng Việt), hộ chiếu, biển số xe; số dính chữ
   (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura, PostgreSQL, Keycloak và `error_log` của
   APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại.
+
+## Phương án dự phòng
+
+Bản trình diễn chính là bản online <https://signet.htechcs.com>: laptop của đội chạy bản cài `/opt/moc`, ra Internet
+qua Cloudflare Tunnel (profile `tunnel`, [`trien-khai.md`](trien-khai.md) mục 5b). Hỏng thì lùi theo thứ tự **bản
+online → máy dự phòng chạy tại chỗ → video quay sẵn**, không gỡ lỗi trước hội đồng quá một phút. Trên bản cài, lệnh là
+`python3 scripts/…` và `docker compose …` trong `/opt/moc` (bản cài không có `Makefile`); trên máy dự phòng là `make …`
+trong thư mục mã nguồn. Kịch bản 5 phút ở [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §7 có cột dự phòng cho từng màn.
+
+**Mất Internet hoặc Cloudflare** (trang online không mở được, hoặc hiện trang lỗi của Cloudflare):
+
+- Chỉ mạng phòng thi hỏng: cho máy trình chiếu dùng 4G của điện thoại (phát Wi-Fi), mở lại bản online. Laptop chạy
+  bản online vẫn sống thì `cloudflared` tự nối lại khi mạng bên đó về, không phải làm gì trên laptop.
+- Không chờ được: sang máy dự phòng.
+
+**Máy dự phòng** (dựng từ hôm trước theo checklist): cùng bản phát hành, `MOC_PUBLIC_URL=http://localhost:8080`, đã
+`make seed`, đã tải mô hình.
+
+- Khởi động không cần mạng: `docker compose --profile core --profile app up -d --wait` rồi `make up-ai`, kiểm bằng
+  `make smoke`. Không dùng `make up` lúc này: lệnh đó luôn kèm `--build`.
+- Giữ `localhost`, không đổi sang IP trong mạng LAN: trình duyệt chỉ cho dùng Web Crypto (đăng nhập PKCE, tính SHA-256
+  ở trang xác thực) trên `https` hoặc `localhost`.
+- Mã QR trên văn bản phát hành ở máy này trỏ về `localhost`, điện thoại của giám khảo không mở được: thay bằng mở
+  `/xac-thuc` trên máy trình chiếu, nhập mã tra cứu hoặc thả tệp PDF vào.
+
+**Laptop chạy bản online tắt, treo hoặc khởi động lại:**
+
+- Khởi động lại được: Docker chạy lại mọi container (`restart: unless-stopped`) khi dịch vụ Docker bật cùng máy, két
+  tự mở khóa, không phải nhập gì. Trong `/opt/moc`: `docker compose ps` tới khi không còn dịch vụ nào `starting` hay
+  `unhealthy` (ClamAV nạp chữ ký khoảng một phút); thiếu container hay còn `unhealthy` thì
+  `python3 scripts/reconcile.py --heal-only`.
+- Vài phút chưa lên: máy dự phòng, hoặc video.
+- Chỉ máy trình chiếu hỏng: bản online mở được từ bất kỳ máy nào có trình duyệt (máy của thành viên khác, máy của
+  BTC); `giamkhao` không cần TOTP.
+
+**AI chậm hoặc không có:**
+
+- Câu trích nguyên văn hiện trước (dưới một giây, không cần mô hình), khối "Trả lời của trợ lý" tới sau: trên bản
+  online (đo 23/10/2026) mô hình viết mất p50 8,9 giây, p95 21,1 giây. Chờ lâu thì bấm "Dừng", trang giữ câu trích.
+- Lần hỏi đầu sau một lúc không dùng chậm hơn vì phải nạp lại mô hình: Ollama chỉ giữ mô hình trong RAM 30 phút sau
+  lần dùng cuối (`OLLAMA_KEEP_ALIVE`). Hỏi thử một câu trước màn AI.
+- Mô hình làm cả máy chậm, hay Ollama lỗi: `docker compose --profile ai stop ollama`; `svc-files` dò lại trong 60 giây
+  rồi về tìm theo từ khóa và trả câu trích. Mọi màn demo chạy được không cần mô hình: bước dùng mô hình của
+  `demo-doc-van-ban`, `demo-hoi-dap` tự in "chưa bật mô hình…".
+
+**Đăng nhập TOTP không qua:**
+
+- Mã bị từ chối: thường do đồng hồ điện thoại lệch (mã đổi mỗi 30 giây). Bật giờ tự động trên điện thoại, hoặc lấy mã
+  tính theo đồng hồ của chính máy chủ: `make totp` (bản cài: `python3 scripts/totp.py`) in mã hiện tại và số giây còn
+  lại.
+- Gõ sai nhiều lần: Keycloak tạm khóa tài khoản (chống dò mật khẩu, 10 lần sai); APISIX trả `429` khi một IP đăng nhập
+  quá `MOC_RATE_LOGIN_PER_MIN` lần mỗi phút (mặc định 60). Mở khóa trong trang quản trị Keycloak (chỉ nghe trên máy
+  chủ, `http://127.0.0.1:8180/admin`; từ xa qua đường hầm SSH như `trien-khai.md` mục 7), hoặc đợi rồi thử lại.
+- Không chờ được: đi tiếp bằng `giamkhao` (chuyên viên, không cần TOTP) cho phần xử lý, trình văn bản; phần của văn
+  thư, lãnh đạo cho chạy bằng `make demo-*` (script tự tính mã TOTP từ `MOC_DEMO_TOTP_SECRET`).
+
+**Một bước demo báo lỗi:**
+
+- Lệnh dừng ở bước sai, in tên bước, thoát 1. Chạy lại ngay được: mỗi màn chạy lại bao nhiêu lần cũng được.
+- Dịch vụ chết hay `unhealthy`: `make ps` (bản cài: `docker compose ps`), rồi một lượt tự phục hồi
+  `python3 scripts/reconcile.py --heal-only`; xem lỗi bằng `docker compose logs --tail 50 <dịch vụ>`.
+- Vẫn lỗi: bỏ màn đó, mở lượt CI xanh của đúng commit đang chạy — job "Chạy thử toàn hệ thống (PoF #4)" có từng bước
+  `make demo-*` kèm nhật ký — rồi đi tiếp; còn giờ thì quay lại.
+- Dữ liệu demo hỏng tới mức không dùng được: khôi phục lượt sao lưu lấy hôm trước,
+  `python3 scripts/moc.py backup restore <lượt>` (hỏi lại trước khi thay dữ liệu; Signet dừng trong lúc khôi phục). Chỉ
+  làm khi còn thời gian, không thì sang máy dự phòng.
+
+**Video quay sẵn:** lớp cuối, không phụ thuộc mạng hay máy chủ. Lưu trên máy trình chiếu và một USB, không đưa vào
+repo ([`git_flow.md`](git_flow.md)).
+
+## Checklist trước giờ trình diễn
+
+### T-1 ngày
+
+- [ ] Bản online chạy đúng bản phát hành sẽ trình bày (`cat /opt/moc/VERSION`); CI của commit đó xanh.
+- [ ] Trên bản online, trong `/opt/moc`: `python3 scripts/smoke.py`, `python3 scripts/moc.py audit verify`; chạy một
+      lượt mỗi màn sẽ trình diễn (`python3 scripts/demo.py <màn>`) cho dữ liệu có sẵn; đo lại trợ lý bằng
+      `python3 scripts/demo.py do-hoi-dap`.
+- [ ] Sao lưu sau khi chạy thử: `python3 scripts/moc.py backup create`, ghi lại tên lượt (`backup list`).
+- [ ] Máy dự phòng, khi còn mạng: lấy đúng thẻ phát hành, `make env` (nếu chưa có `.env`), `make up`, `make seed`,
+      `make ai-model`, `make up-ai`, `make smoke`, chạy thử các màn. Rồi **tắt mạng**, `make down`, khởi động lại bằng
+      `docker compose --profile core --profile app up -d --wait` và `make up-ai`, chạy `make smoke` lần nữa: phải qua
+      khi không có Internet.
+- [ ] Quay video các màn chính trên bản online: đăng nhập, văn bản đến → vào sổ → chỉ đạo, phát hành rồi quét mã QR,
+      hỏi đáp, kiểm dịch, tự phục hồi. Chép vào máy trình chiếu và USB.
+- [ ] Điện thoại: ứng dụng xác thực đã thêm khóa của tài khoản mẫu (khóa do `make totp` in ra), giờ đặt tự động; một
+      máy có 4G để phát Wi-Fi.
+- [ ] Laptop chạy bản online và máy trình chiếu: tắt chế độ ngủ, hoãn cập nhật hệ điều hành, cắm sạc.
+
+### T-1 giờ
+
+- [ ] Ở phòng thi, trên máy trình chiếu: mở <https://signet.htechcs.com>, đăng nhập `giamkhao`, đăng xuất, đăng nhập
+      `vanthu` bằng mã trên điện thoại — qua được thì mạng và đồng hồ đều ổn.
+- [ ] Trên bản online: `docker compose --profile ai ps` không có dịch vụ nào `unhealthy` hay `exited`, có `cloudflared`
+      và `ollama`.
+- [ ] Cả phòng thường ra Internet qua một IP: cổng xác thực nhận tối đa `MOC_RATE_VERIFY_PER_MIN` lượt mỗi phút mỗi IP
+      (mặc định 30). Nhiều giám khảo cùng quét QR thì dùng 4G, hoặc nâng giới hạn trong `/opt/moc/.env` rồi
+      `docker compose up -d apisix` (chỉ trên máy demo).
+- [ ] Máy dự phòng đang chạy (`make ps`), đã đăng nhập sẵn; video mở sẵn, dừng ở khung đầu.
+
+### T-5 phút
+
+- [ ] Hỏi trợ lý một câu trên bản online để mô hình nằm sẵn trong RAM.
+- [ ] Mỗi tài khoản sẽ dùng (văn thư, lãnh đạo, `giamkhao`) mở trong một hồ sơ trình duyệt riêng hoặc một trình duyệt
+      khác — các cửa sổ ẩn danh dùng chung phiên đăng nhập; mở sẵn trang cần dùng, thêm tab `/xac-thuc` và "Hỏi đáp
+      văn bản".
+- [ ] Terminal ở `/opt/moc` (máy dự phòng: thư mục mã nguồn), gõ sẵn lệnh của màn demo đầu tiên.
+- [ ] Tắt thông báo của hệ điều hành, phóng to chữ trình duyệt.
+- [ ] Nhắc nhau thứ tự lùi: bản online → máy dự phòng → video.

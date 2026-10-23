@@ -328,6 +328,7 @@ sử commit (gitleaks) và lỗ hổng đã biết trong các tệp khóa phụ 
 | [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Kế hoạch phát triển theo phase, phân công, rủi ro |
 | [`docs/git_flow.md`](docs/git_flow.md) | Quy trình Git: nhánh, commit, pull request, phát hành |
 | [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
+| [`docs/du-thi/hoi-dap-hoi-dong.md`](docs/du-thi/hoi-dap-hoi-dong.md) | Câu hội đồng dễ hỏi, trả lời kèm bằng chứng trong repo |
 | [`docs/du-thi/olp-2026-brief.md`](docs/du-thi/olp-2026-brief.md), [`docs/du-thi/olp-2026-de-thi.md`](docs/du-thi/olp-2026-de-thi.md) | Chủ đề DX-OS, thể lệ, tiêu chí chấm; phân tích đề thi chính thức |
 | [`docs/du-thi/nghien-cuu/`](docs/du-thi/nghien-cuu/) | Nghiên cứu trước khi có đề thi (lưu trữ) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Danh mục phần mềm thượng nguồn, phiên bản ghim, giấy phép |
