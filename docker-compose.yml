@@ -22,7 +22,7 @@
 # dựng từ thư mục trong repo. Không chép, không sửa mã của dự án khác (PoF #5).
 #
 #   profile core — Tầng 1, lõi headless: chỉ APISIX mở cổng ra ngoài
-#   profile app  — Tầng 2, ứng dụng Văn phòng điện tử
+#   profile app  — Tầng 2, ứng dụng Văn phòng điện tử và Không gian cá nhân P.A.R.A
 #   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
 #   profile mail   — Mailpit, hộp thư thử cho thông báo email (chỉ để demo, MOC_EXTRA_PROFILES=mail)
 #
@@ -124,6 +124,7 @@ services:
       MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
       MOC_RATE_VERIFY_PER_MIN: ${MOC_RATE_VERIFY_PER_MIN:-30}
       MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
+      MOC_RATE_STATUS_PER_MIN: ${MOC_RATE_STATUS_PER_MIN:-30}
       MOC_TRUSTED_PROXY: ${MOC_TRUSTED_PROXY:-127.0.0.1/32}
     volumes:
       - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
@@ -358,6 +359,9 @@ services:
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
       MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
+      # Trang trạng thái hệ thống (/api/status, công khai): phiên bản đang chạy; svc-files còn dò APISIX (cổng trạng
+      # thái 7085 nội bộ), JWKS của Keycloak, /readyz của svc-workflow
+      MOC_VERSION: ${MOC_VERSION:-dev}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
@@ -668,6 +672,17 @@ services:
     # schemas/ ở gốc repo nằm ngoài thư mục dựng: đưa vào bằng ngữ cảnh phụ (viết một dòng để make install thay được)
     build: {context: ./apps/office, additional_contexts: {schemas: ./schemas}}
     image: moc/app-office:${MOC_VERSION:-dev}
+    profiles: [app]
+    environment:
+      MOC_REALM: ${MOC_REALM:-moc}
+
+  # Không gian cá nhân P.A.R.A ([H]): ứng dụng thứ hai trên lõi (docs/them-ung-dung.md). Trang tĩnh ở /ca-nhan/, client
+  # Keycloak riêng app-ca-nhan; tệp, dữ liệu đi qua đúng các route của lõi như app-office. Không dịch vụ nào của lõi
+  # phải đổi để có ứng dụng này
+  app-ca-nhan:
+    <<: *common
+    build: ./apps/ca-nhan
+    image: moc/app-ca-nhan:${MOC_VERSION:-dev}
     profiles: [app]
     environment:
       MOC_REALM: ${MOC_REALM:-moc}

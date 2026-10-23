@@ -125,6 +125,9 @@ async function logout() {
       </nav>
       <div class="absolute inset-x-0 bottom-0 border-t border-stone-200 p-4 text-xs text-stone-500">
         {{ tenantName }}
+        <NuxtLink to="/trang-thai" class="mt-1 block text-stone-400 hover:text-brand-700 hover:underline">
+          {{ t('health.title') }}
+        </NuxtLink>
       </div>
     </aside>
     <div v-if="open" class="fixed inset-0 z-30 bg-black/30 md:hidden" @click="open = false" />

@@ -35,6 +35,7 @@ PREFIX ?= /opt/moc
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
+        demo-ca-nhan \
         do-so-lieu-sau \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
@@ -119,6 +120,7 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 	@python3 -m unittest discover -s scripts/tests
 	@cd apps/office && npm test
+	@cd apps/ca-nhan && npm test
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
@@ -183,6 +185,9 @@ demo-che-pii: $(ENV_FILE) ## Màn che thông tin cá nhân (F4.4): đơn giả l
 do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 15 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
 	  tests/test_pii_corpus.py tests/test_pii_mutation.py
+
+demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
+	@python3 scripts/demo_ca_nhan.py
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py

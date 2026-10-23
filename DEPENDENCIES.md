@@ -44,7 +44,7 @@ sử dụng"*).
 | Docker Compose v2 | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | Caddy | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | Python | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
-| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh (chỉ ở bước dựng image) | `node:24.20.0-slim` |
+| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan` (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests` | `node:24.20.0-slim` |
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
 | Git | ≥ 2.30 | GPL-2.0 | Quản lý mã nguồn, sinh gói phát hành | Gói hệ thống |
@@ -73,7 +73,7 @@ sử dụng"*).
 | SeaweedFS | 4.48 | Apache-2.0 | Lưu trữ đối tượng chuẩn S3 | `chrislusf/seaweedfs:4.48` | 1 |
 | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc tệp tải lên (dịch vụ độc lập) | `clamav/clamav:1.5.4` | 1 |
 | Meilisearch (Community Edition) | v1.54.3 | MIT | Tìm kiếm toàn văn; chỉ mục đoạn `chunks` của trợ lý hỏi đáp (F4.2): tìm lai từ khóa + véc-tơ trong bản CE, embedder `userProvided` (véc-tơ do `svc-files` tính bằng Ollama, Meilisearch không gọi mô hình nào, không vào mạng `ai`) | `getmeili/meilisearch:v1.54.3` | 1 |
-| nginx (unprivileged) | 1.30.6 | BSD-2-Clause | Phục vụ trang tĩnh của `app-office` sau APISIX | `nginxinc/nginx-unprivileged:1.30.6-alpine` | 1 |
+| nginx (unprivileged) | 1.30.6 | BSD-2-Clause | Phục vụ trang tĩnh của `app-office`, `app-ca-nhan` sau APISIX | `nginxinc/nginx-unprivileged:1.30.6-alpine` | 1 |
 | Centrifugo | v6.9.7 | Apache-2.0 | Đẩy thông báo thời gian thực qua WebSocket | `centrifugo/centrifugo:v6.9.7` | 2 |
 
 **Ghi chú:**
@@ -91,7 +91,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 |---|---|---|---|---|---|
 | Nuxt | 4.5.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | Vue | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
-| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak | npm | 1 |
+| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |

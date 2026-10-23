@@ -4,7 +4,8 @@ APISIX chạy standalone (không etcd, không Admin API): route trong `apisix.ya
 giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nhất mở ra ngoài (`MOC_HTTP_PORT`). Chủ: #14.
 
 - Danh sách trắng: `/realms/<realm>/*`, `/resources/*` → Keycloak; `/v1/graphql` → Hasura; `/api/files*`,
-  `/api/search` → svc-files; còn lại → giao diện.
+  `/api/search` → svc-files; `/ca-nhan`, `/ca-nhan/*` (chỉ GET, HEAD) → `app-ca-nhan`, Không gian cá nhân
+  ([`docs/them-ung-dung.md`](../../docs/them-ung-dung.md)); còn lại → giao diện Văn phòng điện tử.
 - Đường quản trị bị chặn tường minh (404): `/admin`, `/realms/*` khác realm của Signet, `/console`, `/v1/*`,
   `/v2/*`, `/healthz`, `/flowable-rest/*`.
 - Kiểm JWT ở biên (`openid-connect`, chỉ Bearer, khóa qua JWKS nội bộ của Keycloak); Hasura và svc-files
@@ -13,6 +14,11 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
 - Giới hạn đăng nhập theo IP (`MOC_RATE_LOGIN_PER_MIN`) đếm chung cho đường cấp token, biểu mẫu đăng nhập và **mọi
   POST khác vào realm** (route `dang-nhap-post`): viết khác đường (`…/token/`, `…/token;x`) không né được bộ đếm.
 - Mỗi yêu cầu có `X-Request-Id` (giữ nguyên tới sổ kiểm toán).
+- `GET /api/status` (route `trang-thai`, trạng thái hệ thống) như cổng xác thực: không cần token, giới hạn theo IP
+  (`MOC_RATE_STATUS_PER_MIN`, mặc định 30/phút). Chỉ đúng đường này; `/api/*` chưa khai báo vẫn rơi vào route `chan`.
+- Máy chủ trạng thái của APISIX (`apisix.status`, `GET /status/ready` ở cổng 7085) chỉ nghe trong mạng nội bộ,
+  không publish ra máy chủ: svc-files hỏi nó cho dòng "Cổng API" của trang trạng thái (`200` mọi worker đã nạp cấu
+  hình, `503` còn worker chưa nạp).
 
 Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.
 
@@ -63,7 +69,8 @@ APISIX, `config.yaml` khóa `nginx_config`:
 - Các trường khác giữ như định dạng mặc định của APISIX 3.18, kể cả đích phía sau
   (`"$upstream_scheme://$upstream_host…"`, có ích khi gỡ lỗi đường đổi hướng như `/realtime`); bỏ `$http_referer`.
 
-nginx của app-office, `apps/office/nginx/default.conf.template` (tệp được include trong khối `http`):
+nginx của app-office, `apps/office/nginx/default.conf.template` (tệp được include trong khối `http`; app-ca-nhan
+dùng đúng khối này trong `apps/ca-nhan/nginx/default.conf.template`):
 
 ```nginx
 map $request_uri $moc_duong_dan {

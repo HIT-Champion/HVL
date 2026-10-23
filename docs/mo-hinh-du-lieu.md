@@ -12,7 +12,7 @@
 
 - **Hai schema, đúng ranh giới 3 tầng.** `core` là dữ liệu dùng chung của lõi (thuê ước, tệp, sổ kiểm toán)
   — ứng dụng nào cũng dùng. `office` là dữ liệu riêng của ứng dụng Văn phòng điện tử. Ứng dụng khác cắm vào
-  lõi thì có schema riêng của nó, không sửa `core`.
+  lõi thì có schema riêng của nó, không sửa `core` — vd `personal` của Không gian cá nhân (§2.6).
 - **Mọi bảng nghiệp vụ có `tenant_id`**; quyền Hasura luôn lọc theo `X-Hasura-Tenant-Id`.
 - **Keycloak là nguồn sự thật về người dùng.** Bảng nghiệp vụ chỉ lưu `sub` (kiểu `text`); phòng ban của
   người dùng đi trong JWT (`department_id`). `core.users` là **bản sao chỉ đọc** do `svc-workflow` đồng bộ
@@ -220,7 +220,9 @@ Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` gh
 Khôi phục từ bản sao lưu (`moc backup restore`, F3.4) ghi sự kiện `system.restored` của nền tảng (`tenant_id` null,
 `entity` = `backup`, `entity_id` = mã lượt) ngay sau đầu chuỗi vừa khôi phục. Bản sao lưu gồm mọi CSDL (`pg_dump
 -Fc`) và cả volume SeaweedFS (tệp, bucket lạnh với mốc neo); chỉ mục Meilisearch dựng lại từ CSDL khi `svc-files`
-khởi động.
+khởi động. Lượt sao lưu trọn vẹn (`moc backup create`) ghi sự kiện `system.backed_up` cùng dạng, sau lúc dump nên
+không nằm trong chính lượt đó; trang trạng thái hệ thống (`GET /api/status`) lấy giờ sao lưu gần nhất từ dòng này
+hoặc từ `backed_up_at` của `system.restored`.
 
 **Lớp chữ của PDF** (`core.file_texts`, F2.7): `svc-files` đọc ở vòng nền các PDF đã gắn vào văn bản, trong tiến
 trình con có giới hạn, rồi ghi bằng khóa quản trị; vòng đồng bộ tìm kiếm đưa vào trường `content` của
@@ -856,6 +858,23 @@ lưu; chỉ vai trò `verifier` đọc, mỗi lần một dòng (§3, §4.3). F4
 Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
 được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
+
+### 2.6. Schema `personal` — Không gian cá nhân P.A.R.A (ứng dụng thứ hai)
+
+Không thuộc Văn phòng điện tử: đây là schema của ứng dụng thứ hai `apps/ca-nhan` (migration
+`1792281602500_personal_space`), đặt ở mục này để không đánh số lại §3–§6. Cách một ứng dụng cắm vào lõi:
+[`them-ung-dung.md`](them-ung-dung.md). Ứng dụng không có bảng tệp riêng: tệp vẫn là dòng `core.files` do `svc-files`
+thêm sau khi ClamAV quét sạch; bảng dưới chỉ ghi tệp nào của ai nằm ở thư mục nào.
+
+| Bảng | Cột | Ràng buộc, ghi chú |
+|---|---|---|
+| `personal.items` | `file_id` (khóa chính), `tenant_id`, `owner_id` (`sub`), `para`, `created_at`, `updated_at` | `para` ∈ `projects`, `areas`, `resources`, `archives` (`items_para`) — Dự án, Lĩnh vực, Tài nguyên, Lưu trữ. Khóa ngoại `(tenant_id, file_id)` → `core.files (tenant_id, id)`, xóa tệp thì mục xóa theo. Trigger `items_guard`: chỉ xếp được tệp có `created_by` là chính chủ, cùng đơn vị, không mã hóa (tệp mã hóa thuộc văn bản hạn chế, đi theo quyền đọc văn bản — F3.7); thêm rồi thì không đổi tệp, chủ, đơn vị; mốc thời gian do CSDL đặt. Sổ kiểm toán: `core.audit('file_id')` |
+
+Quyền: `clerk`, `staff`, `manager`, `director` thêm (chỉ `file_id`, `para`; `tenant_id`, `owner_id` đặt sẵn từ
+token), đọc và chuyển thư mục (chỉ cột `para`) mục của chính mình trong đơn vị mình; không ai xóa (§0). Quan hệ
+`file` đọc `core.files` theo đúng quyền của vai trò ở `core_files.yaml` — người tải lên thấy tệp của mình; không thêm
+quan hệ ngược vào metadata của lõi. `tenant_admin` không đọc `core.files` nên không có không gian cá nhân. `overview`
+của sổ chỉ giữ giá trị `file_id`: lãnh đạo xem sổ thấy ai xếp, chuyển tệp nào, không thấy tên thư mục.
 
 ---
 

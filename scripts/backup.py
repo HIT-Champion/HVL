@@ -58,7 +58,7 @@ from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
-from audit_chain import HEAD_SQL, RESTORED_SQL
+from audit_chain import BACKED_UP_SQL, HEAD_SQL, RESTORED_SQL
 from moc_env import ENV, ROOT
 
 COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
@@ -203,6 +203,14 @@ def _psql(script: str, db: str = MAIN_DB, **variables: str) -> str:
     return _call(cmd, "không chạy được lệnh trên CSDL", input=script.encode()).decode().strip()
 
 
+def _actor() -> str:
+    """Người chạy lệnh, ghi vào sổ kiểm toán như os:<tên người dùng của máy chủ>."""
+    try:
+        return f"os:{getpass.getuser()}"
+    except (KeyError, OSError):
+        return "os:?"
+
+
 def _databases() -> list[str]:
     return _psql("select datname from pg_database where not datistemplate and datname <> 'postgres'"
                  " order by datname;").split()
@@ -336,6 +344,15 @@ def create(keep: int | None = None) -> dict[str, Any]:
         if head["id"]:
             print(f"  ✓ Sổ kiểm toán tới dòng #{head['id']} ({head['hash'][:12]}…)")
         print(f"  · tạm dừng ghi CSDL {_seconds(manifest['db_paused_s'])}, tải tệp {_seconds(manifest['paused_s'])}")
+        # Lượt đã trọn: ghi vào sổ để trang trạng thái hệ thống biết lần sao lưu gần nhất. Ghi không được thì lượt sao
+        # lưu vẫn dùng được, chỉ trang trạng thái chưa thấy lượt này
+        diff = {"run": rid, "audit_id": head["id"], "version": manifest["version"]}
+        try:
+            event = _psql(BACKED_UP_SQL, actor=_actor(), run=rid, diff=json.dumps(diff, ensure_ascii=False))
+            print(f"  ✓ Lần sao lưu ghi vào sổ kiểm toán: dòng #{event}")
+        except BackupError as exc:
+            print(f"  ⚠ Chưa ghi được lần sao lưu vào sổ kiểm toán ({exc}) — trang trạng thái hệ thống chưa thấy lượt"
+                  " này", file=sys.stderr)
         if keep:
             dropped = keep_latest(keep)
             print(f"  · giữ {keep} lượt mới nhất" + (f", đã xóa: {', '.join(dropped)}" if dropped else ""))
@@ -462,13 +479,9 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
                 _call(restic("restore", f"{manifest['vault']['snapshot']}:{VAULT}", "--target", VAULT, "--delete"),
                       "không khôi phục được két")
                 print("  ✓ Két (volume OpenBao)", flush=True)
-            try:
-                actor = f"os:{getpass.getuser()}"
-            except (KeyError, OSError):
-                actor = "os:?"
             diff = {"run": manifest["run"], "backed_up_at": manifest["created_at"], "audit_id": head["id"],
                     "version": manifest["version"]}
-            event = _psql(RESTORED_SQL, actor=actor, run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
+            event = _psql(RESTORED_SQL, actor=_actor(), run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
             print(f"  ✓ Lần khôi phục ghi vào sổ kiểm toán: dòng #{event}", flush=True)
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"],
                   "Signet chưa chạy lại được — xem: make logs")

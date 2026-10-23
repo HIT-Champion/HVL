@@ -126,15 +126,18 @@ phút, in từng bước kèm ✓, chạy lại bao nhiêu lần cũng được 
 | (iv) GitOps | Tự phục hồi: xóa container, reconciler dựng lại theo khai báo trong git | `make demo-tu-phuc-hoi` |
 
 Các màn nghiệp vụ, cùng cách chạy: `make demo-lien-thong` (liên thông hai đơn vị), `make demo-doc-van-ban`,
-`make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (trợ lý AI), `make demo-ky-so` (ký số, minh họa).
+`make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (trợ lý AI), `make demo-ky-so` (ký số, minh họa),
+`make demo-ca-nhan` (ứng dụng thứ hai trên cùng lõi).
 
 ## Kiến trúc
 
-Tầng 1 là lõi — định danh, cổng API, dữ liệu, quy trình và lớp tin cậy — không có giao diện. Tầng 2 là ứng dụng, ở
-đây là Văn phòng điện tử. Chỉ cổng APISIX mở ra ngoài.
+Tầng 1 là lõi — định danh, cổng API, dữ liệu, quy trình và lớp tin cậy — không có giao diện. Tầng 2 là ứng dụng:
+Văn phòng điện tử, và Không gian cá nhân P.A.R.A — ứng dụng thứ hai cắm vào cùng lõi mà không sửa dòng mã nào của lõi
+([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Chỉ cổng APISIX mở ra ngoài.
 
 ```
  Trình duyệt ──► APISIX :8080 ─┬─ /             → app-office (Nuxt, trang tĩnh; /xac-thuc công khai)  Tầng 2
+                               ├─ /ca-nhan/      → app-ca-nhan (Không gian cá nhân, trang tĩnh)
                 (kiểm JWT,     ├─ /realms/moc/*  → Keycloak (đăng nhập SSO, TOTP)
                  X-Request-Id) ├─ /v1/graphql    → Hasura ─┬─ PostgreSQL (core, office)               Tầng 1
                                │                           └─ Actions → svc-workflow → Flowable (BPMN)
@@ -155,6 +158,7 @@ Tầng 1 là lõi — định danh, cổng API, dữ liệu, quy trình và lớ
 | Centrifugo 6 | Đẩy thông báo tới trình duyệt qua WebSocket, kênh riêng từng người | `platform/centrifugo/` |
 | OpenBao 2 | Két bí mật: dịch vụ lấy bí mật qua AppRole lúc khởi động; khóa mã hóa văn bản hạn chế; CA nội bộ và khóa ký của từng đơn vị | `platform/openbao/` |
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
+| `app-ca-nhan` | Không gian cá nhân P.A.R.A: tệp của mỗi người trong bốn thư mục, client Keycloak riêng, gọi lõi qua cổng như mọi ứng dụng | `apps/ca-nhan/` |
 | Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `platform/monitoring/` |
 | Scorpio 6 + PostGIS (profile `iot`) | Context broker NGSI-LD: bản sao số của cảm biến, lịch sử đo | `services/ot-sensor/` |
 | Ollama (profile `ai`, tùy chọn) | Mô hình ngôn ngữ cục bộ, mạng nội bộ riêng, tắt tính năng đám mây | `docker-compose.yml` |
@@ -172,6 +176,7 @@ mềm nguồn mở mà lõi dùng nguyên bản (image chính thức, không s�
 
 ```
 apps/office/             Giao diện Văn phòng điện tử (Nuxt 4, TypeScript): app/pages, app/components…; tests/
+apps/ca-nhan/            Không gian cá nhân P.A.R.A (JavaScript thuần, nginx): public/; tests/
 services/
   svc-workflow/          Hasura Actions, quy trình, thông báo, nhắc hạn (Python, FastAPI); tests/
     src/svc_workflow/    advisor.py + suggest.py: tác tử gợi ý giao việc (F4.3); ot.py: cảm biến → báo cáo sự cố
@@ -181,7 +186,7 @@ services/
                          pii.py: che thông tin cá nhân (F4.4)
   ot-sensor/             Cảm biến nhiệt độ giả lập (profile iot)
 db/
-  migrations/default/    Lược đồ PostgreSQL (core, office), ràng buộc, sổ kiểm toán chuỗi băm
+  migrations/default/    Lược đồ PostgreSQL (core, office, personal), ràng buộc, sổ kiểm toán chuỗi băm
   metadata/              Hasura: quyền theo vai trò và đơn vị, Actions
   tests/                 Test trên PostgreSQL + Hasura thật
 schemas/                 JSON Schema của form, dùng chung cho giao diện, dịch vụ và CSDL
@@ -326,6 +331,7 @@ bản phát hành kèm SBOM đó.
 | [`docs/van-hanh.md`](docs/van-hanh.md) | Vận hành: thêm đơn vị, sao lưu, két bí mật, GitOps, giám sát, IT/OT |
 | [`docs/trien-khai.md`](docs/trien-khai.md) | Triển khai lên máy chủ: HTTPS bằng Caddy trước APISIX, người vận hành, tường lửa, sao lưu hằng đêm, nâng cấp |
 | [`docs/api/`](docs/api/README.md) | Tài liệu API: lấy token, gọi GraphQL và REST qua cổng; schema GraphQL theo vai trò và OpenAPI xuất tự động |
+| [`docs/them-ung-dung.md`](docs/them-ung-dung.md) | Thêm một ứng dụng mới trên lõi: client Keycloak, route APISIX, service compose, schema riêng và quyền; ví dụ Không gian cá nhân P.A.R.A |
 | [`docs/architecture.md`](docs/architecture.md) | Kiến trúc H-P-D-I, bản đồ công cụ, quyết định kỹ thuật |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Đặc tả sản phẩm: bài toán, người dùng, chức năng |

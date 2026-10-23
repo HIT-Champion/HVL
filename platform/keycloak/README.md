@@ -6,6 +6,7 @@
 | Phần | Nội dung |
 |---|---|
 | Client `app-office` | Công khai, Authorization Code + PKCE (S256), chuyển hướng về `MOC_PUBLIC_URL` |
+| Client `app-ca-nhan` | Không gian cá nhân P.A.R.A (`apps/ca-nhan`, [`docs/them-ung-dung.md`](../../docs/them-ung-dung.md)): như `app-office` — công khai, Authorization Code + PKCE (S256), cùng 5 mapper claim Hasura — nhưng chỉ chuyển hướng về `MOC_PUBLIC_URL/ca-nhan/*`. Cùng phiên SSO: đã đăng nhập Văn phòng điện tử thì không hỏi lại mật khẩu |
 | Client `moc-cli` | Luồng mật khẩu cho `make seed`, `make smoke`, các màn demo, CI — không cần trên server thật thì tắt bằng `MOC_CLI_CLIENT_ENABLED=false` |
 | Client `svc-workflow` | Tài khoản dịch vụ, quyền `view-users`, đọc danh bạ |
 | Đăng nhập trình duyệt (luồng `moc-browser`) | Mật khẩu rồi mã TOTP. Bắt buộc với `clerk`, `manager`, `director`, `tenant_admin`: chưa cài thì Keycloak bắt cài bằng mã QR ngay lần đầu. `staff` chỉ bị hỏi mã nếu đã tự cài |
@@ -13,6 +14,11 @@
 | Mapper | Claim `https://hasura.io/jwt/claims`: `x-hasura-user-id`, `-tenant-id`, `-department-id`, `-default-role`, `-allowed-roles` |
 | User profile | `tenant_id`, `department_id`, `moc_role` (5 vai trò) — chỉ quản trị viên xem và sửa |
 | Organizations (`organizationsEnabled`) | Mỗi đơn vị một Organization: alias suy từ mã đơn vị (`CNTT` → `cntt`, `ĐT` → `dt`), thuộc tính `tenant_id` = id trong `core.tenants`; mọi tài khoản có `tenant_id` đó là thành viên (unmanaged) và không thuộc Organization nào khác. Đây là lớp quản lý thành viên và quản trị: gom tài khoản theo đơn vị, chỗ gắn tên miền email hay IdP riêng của đơn vị về sau. **Token vẫn lấy đơn vị từ thuộc tính `tenant_id`** qua mapper ở trên, không đổi: claim `organization` của Keycloak (scope tùy chọn `organization`, client của Signet không xin) là danh sách alias, nằm ngoài namespace `https://hasura.io/jwt/claims` nên Hasura không đọc, và tài khoản thuộc nhiều Organization thì không suy ra được đúng một đơn vị. Tạo bằng `python3 scripts/moc.py tenant create`, kiểm bằng `tenant check`; `make seed` tạo cho hai đơn vị mẫu. Thành viên Organization phải có email (Keycloak từ chối sửa hồ sơ thiếu email) |
+
+Stack dựng trước khi có một ứng dụng (vd `app-ca-nhan`) không có client của ứng dụng đó, vì realm không nạp lại:
+`python3 scripts/moc.py realm clients` (`make seed` cũng gọi) thêm các client ứng dụng trên trình duyệt có trong
+`moc-realm.json` mà realm đang chạy chưa có, thay `${...}` bằng giá trị trong `.env`. Không sửa client đã có, không
+dựng lại `moc-cli`, `svc-workflow` (client dòng lệnh, dịch vụ) nếu quản trị đã gỡ. `--dry-run` chỉ in việc sẽ làm.
 
 Stack dựng từ bản trước F3.12 chưa bật Organizations trong realm (realm không nạp lại): `tenant create` hoặc `make
 seed` tự bật (Admin REST, gửi lại nguyên bản realm như trang quản trị), không cần `make reset`.

@@ -1,9 +1,9 @@
 # Vận hành Signet
 
-Các việc của người quản trị trên một bản cài đang chạy: thêm đơn vị, sao lưu và khôi phục, két bí mật, GitOps và tự
-phục hồi, giám sát, hội tụ IT/OT. Cài lần đầu: [README](../README.md), mục "Cài đặt từ mã nguồn"; lên máy chủ có tên
-miền và HTTPS: [`trien-khai.md`](trien-khai.md). Lệnh vận hành là `python3 scripts/moc.py …` (tên mã kỹ thuật `moc`
-giữ từ tên cũ của sản phẩm).
+Các việc của người quản trị trên một bản cài đang chạy: thêm đơn vị, sao lưu và khôi phục, két bí mật, GitOps và tự phục
+hồi, giám sát, trang trạng thái hệ thống, hội tụ IT/OT. Cài lần đầu: [README](../README.md), mục "Cài đặt từ mã nguồn";
+lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md). Lệnh vận hành là `python3 scripts/moc.py …` (tên mã
+kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
 
 ## Thêm đơn vị (thuê ước)
 
@@ -61,6 +61,8 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
   root trong container (để đọc tệp của SeaweedFS): ổ NFS phải cho root ghi (`no_root_squash`).
 - Chỉ mục tìm kiếm và chữ ký ClamAV không sao lưu: `svc-files` dựng lại chỉ mục từ CSDL khi khởi động, ClamAV tự
   tải chữ ký.
+- Lượt sao lưu xong ghi dòng `system.backed_up` vào sổ kiểm toán; trang trạng thái hệ thống hiện giờ của lượt gần
+  nhất từ dòng đó. Ghi không được thì lệnh chỉ cảnh báo, bản sao lưu vẫn dùng được.
 
 ## Két bí mật
 
@@ -203,6 +205,29 @@ mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không m
   `platform/monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
+
+## Trang trạng thái hệ thống
+
+`<MOC_PUBLIC_URL>/trang-thai` là trang công khai, không cần đăng nhập: người dùng tự xem Signet có đang chạy bình
+thường không trước khi gọi bộ phận kỹ thuật. Trang đăng nhập (khi lỗi), chân trang của cổng xác thực và thanh bên sau
+khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 30 giây khi đang mở.
+
+- **Hiện gì:** tình trạng chung và từng thành phần (*Hoạt động*, *Một phần*, *Gián đoạn*, *Tắt*) theo tầng người
+  dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo: Cổng API, Đăng nhập một lần, CSDL, Két khóa, Quét mã độc, Quy
+  trình, Lưu trữ tệp, Tìm kiếm, Trợ lý AI; phiên bản (`MOC_VERSION`), thời gian `svc-files` chạy liên tục, giờ sao
+  lưu gần nhất, trợ lý AI bật hay tắt kèm tên mô hình.
+- **Đọc thế nào:** Cổng API, Đăng nhập một lần, CSDL, Quét mã độc, Quy trình, Lưu trữ tệp gián đoạn thì tình trạng
+  chung là *Hệ thống đang gián đoạn*. Két khóa, Tìm kiếm, Trợ lý AI gián đoạn, hoặc thành phần nào chỉ chạy một phần,
+  thì *Một số thành phần đang gặp sự cố*: văn bản hạn chế và ký số (két), tìm kiếm, hỏi đáp tạm không dùng được, còn
+  lại vẫn chạy. Trợ lý AI *Tắt* (chưa bật profile `ai`, hoặc tắt hỏi đáp) là cấu hình, không phải sự cố.
+- **Không lộ gì:** chỉ có nhãn cố định và trạng thái; không tên máy, địa chỉ IP, URL nội bộ, phiên bản từng thành phần,
+  số người dùng hay số văn bản, thông báo lỗi. Lý do cụ thể nằm trong nhật ký của `svc-files` (sự kiện
+  `core.status.changed`, ghi khi một thành phần đổi trạng thái): `docker compose logs svc-files | grep status.changed`.
+- **Không thành đường tấn công:** `svc-files` lưu đệm kết quả 10 giây cho mọi người (`MOC_STATUS_CACHE_S`), mỗi lần
+  dò một thành phần tối đa 3 giây (`MOC_STATUS_TIMEOUT_S`); APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` (mặc định 30)
+  lần một phút mỗi địa chỉ IP, vượt thì `429`.
+- Trang chỉ trả lời "đang chạy hay không" ngay lúc này; diễn biến theo thời gian, độ trễ, tỉ lệ lỗi xem ở Grafana (mục
+  Giám sát). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
 
 ## Hội tụ IT/OT
 

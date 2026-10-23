@@ -21,7 +21,9 @@
 #   /v1/graphql                      → Hasura                       — cần token
 #   /api/files/*, /api/search, /api/documents/*, /api/registers/*, /api/case-files/* → svc-files — cần token
 #   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
+#   /api/status                      → svc-files (trạng thái hệ thống) — không cần token
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
+#   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Kiểm token ở biên bằng JWKS của Keycloak (zero-trust: Hasura và svc-files vẫn kiểm lại).
@@ -35,6 +37,8 @@
 #     mã tra cứu hàng loạt
 #   - mở kết nối thông báo realtime: theo địa chỉ IP (MOC_RATE_REALTIME_PER_MIN) — chỉ đếm lần mở WebSocket,
 #     tin đẩy trên kết nối đã mở không bị đếm
+#   - trạng thái hệ thống, không cần đăng nhập: theo địa chỉ IP (MOC_RATE_STATUS_PER_MIN) — svc-files còn lưu đệm kết
+#     quả 10 giây cho mọi người gọi, gọi dồn không thành lời gọi vào các thành phần lõi
 
 upstreams:
   - id: keycloak
@@ -56,6 +60,11 @@ upstreams:
     type: roundrobin
     nodes:
       "app-office:8080": 1
+  # Không gian cá nhân P.A.R.A (apps/ca-nhan): ứng dụng thứ hai, gọi lõi qua đúng các route ở dưới như app-office
+  - id: app-ca-nhan
+    type: roundrobin
+    nodes:
+      "app-ca-nhan:8080": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -178,6 +187,22 @@ routes:
         rejected_code: 429
         rejected_msg: "Tra cứu quá nhiều trong một phút, thử lại sau ít giây."
 
+  # Trạng thái hệ thống (trang /trang-thai): ai cũng gọi được, không cần token — chỉ đọc; svc-files gom tình trạng các
+  # thành phần, trả chữ cố định đã làm sạch (không tên máy, địa chỉ, số liệu nghiệp vụ), lưu đệm 10 giây
+  - id: trang-thai
+    uri: /api/status
+    methods: [GET]
+    upstream_id: svc-files
+    plugins:
+      limit-count:
+        count: ${{MOC_RATE_STATUS_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Xem trạng thái quá nhiều lần trong một phút, thử lại sau ít giây."
+
   # Thông báo realtime (F2.5): WebSocket tới Centrifugo. Trình duyệt không gắn được header Authorization vào
   # WebSocket, nên token Keycloak đi trong lệnh connect đầu tiên và Centrifugo tự kiểm (JWKS, iss); chỉ cổng
   # WebSocket của Centrifugo được nối ra, HTTP API của nó ở cổng nội bộ khác
@@ -218,6 +243,13 @@ routes:
         abort:
           http_status: 404
           body: "{\"error\":\"not_found\"}"
+
+  # Trang tĩnh của ứng dụng thứ hai (docs/them-ung-dung.md). Thêm một ứng dụng chỉ cần một upstream và một route như
+  # thế này: dữ liệu, tệp, đăng nhập vẫn đi qua các route của lõi ở trên, cùng kiểm token, giới hạn tốc độ
+  - id: app-ca-nhan
+    uris: ["/ca-nhan", "/ca-nhan/*"]
+    methods: [GET, HEAD]
+    upstream_id: app-ca-nhan
 
   - id: app-office
     uri: /*

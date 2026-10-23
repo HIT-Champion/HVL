@@ -73,6 +73,15 @@ values (null, :'actor', 'system', 'system.restored', 'backup', :'run', :'diff'::
 returning id;
 """
 
+# Lượt sao lưu trọn vẹn (moc backup create, đã có manifest) cũng thành một dòng sổ của nền tảng: trang trạng thái hệ
+# thống (svc-files, /api/status) đọc giờ lượt gần nhất từ đây. Ghi sau lúc dump nên không có trong chính lượt đó; khôi
+# phục lượt đó thì dòng system.restored mang giờ sao lưu (backed_up_at). Biến psql như RESTORED_SQL.
+BACKED_UP_SQL = """
+insert into core.audit_log (tenant_id, actor_id, actor_kind, action, entity, entity_id, diff)
+values (null, :'actor', 'system', 'system.backed_up', 'backup', :'run', :'diff'::jsonb)
+returning id;
+"""
+
 # Lúc đọc (đầu giao dịch): mốc neo sau lúc này chưa thể có dòng của nó trong lần đọc
 NOW_SQL = "select json_build_object('now', extract(epoch from now()))::text"
 

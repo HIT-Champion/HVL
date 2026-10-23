@@ -39,12 +39,13 @@ issue #19, #20.
 | Nộp lưu hồ sơ đã đóng sang bucket lạnh (Parquet + tệp + manifest có băm), `GET /api/case-files/{id}/archive` | **Xong** (F3.8) |
 | Phả hệ OpenLineage cho từng bước nộp lưu, kiểm chất lượng bảng Parquet trước khi ghi | **Xong** (F3.9) |
 | `/internal/dispatch-file`: chép bản phát hành sang kho của đơn vị nhận trong hệ thống (kiểm băm, quét, id định trước) | **Xong** (F3.12) |
+| `GET /api/status`: trạng thái vận hành từng thành phần theo tầng cho trang công khai `/trang-thai`, lưu đệm 10 giây, không lộ địa chỉ nội bộ | **Xong** |
 | Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa |
 
 ## API
 
 Đi qua APISIX ở `/api/files/*`, `/api/search`, `/api/documents/*`, `/api/registers/*`, `/api/verify`,
-`/api/case-files/*`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
+`/api/case-files/*`, `/api/status`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
 xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-files.json) (`make api-docs`).
 
 | Đường dẫn | Kết quả |
@@ -65,6 +66,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
 | `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456`. `document.signature`: chữ ký số của bản phát hành `{level, signer, ca, serial, signed_at, illustrative: true}`, `null` với văn bản cũ, văn bản hạn chế (F4.5) |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
+| `GET /api/status` | **Không cần token.** `200` `{status, checked_at, version, uptime_s, last_backup_at, ai: {enabled, model, semantic}, layers, components: [{id, layer, label, software, status}]}`, `Cache-Control: no-store`; trạng thái `ok` · `degraded` · `down` (thành phần) và `off` (tắt theo cấu hình). Mọi người gọi trong 10 giây nhận cùng một kết quả · `429` quá `MOC_RATE_STATUS_PER_MIN` lần một phút mỗi IP (APISIX) — mục Trạng thái hệ thống |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` — `sha256` của bản đã ký số (F4.5) · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng; `signing_unavailable` két không trả lời khi ký — **không lưu**. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
@@ -828,6 +830,37 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 - Chưa làm: xoay khóa `moc-files` rồi bọc lại khóa cũ (`transit/rewrap`); bản xem trước dự thảo văn bản đi hạn chế
   (`/api/documents/{id}/preview`) chưa đóng dấu người xem.
 
+### Trạng thái hệ thống
+
+`GET /api/status` (`status.py`) cho trang công khai `/trang-thai` của `apps/office`. Không cần đăng nhập nên chỉ trả
+chữ cố định: mã, nhãn tiếng Việt, tên phần mềm và trạng thái của từng thành phần, xếp theo tầng người dùng → lõi →
+quy trình → dữ liệu → trí tuệ nhân tạo; phiên bản (`MOC_VERSION`), thời gian svc-files chạy liên tục, giờ sao lưu gần
+nhất, trợ lý AI bật hay tắt kèm tên mô hình. Không có tên máy, địa chỉ IP, URL nội bộ, phiên bản từng thành phần, số
+người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ vào nhật ký (`core.status.changed`, ghi khi một thành phần
+đổi trạng thái).
+
+| Mã | Nhãn | Dò bằng | Gián đoạn thì cả hệ thống |
+|---|---|---|---|
+| `cong-api` | Cổng API | `GET /status/ready` của APISIX (cổng 7085, chỉ trong mạng nội bộ); `503` — còn worker chưa nạp cấu hình: `degraded` | `down` |
+| `dang-nhap` | Đăng nhập một lần | JWKS của realm (`MOC_OIDC_JWKS_URL`) có ít nhất một khóa | `down` |
+| `csdl` | CSDL | `/healthz` của Hasura | `down` |
+| `ket-khoa` | Két khóa | `/v1/sys/health` của OpenBao, kể cả nút dự phòng; không đặt `MOC_OPENBAO_ADDR`: `off` | `degraded` |
+| `quet-ma-doc` | Quét mã độc | `PING` tới clamd | `down` |
+| `quy-trinh` | Quy trình | `/readyz` của svc-workflow; Flowable còn mà Hasura mất: `degraded` | `down` |
+| `luu-tru` | Lưu trữ tệp | `HeadBucket` bucket tệp trên SeaweedFS | `down` |
+| `tim-kiem` | Tìm kiếm | `/health` của Meilisearch | `degraded` |
+| `tro-ly-ai` | Trợ lý AI | Mô hình viết câu trả lời có trong Ollama: `ok`; chỉ còn mô hình nhúng: `degraded`; không có mô hình nào, `MOC_AI_URL` rỗng hay `MOC_ASK_ENABLED=false`: `off` | `degraded` |
+
+- **Chống khuếch đại:** kết quả lưu đệm `MOC_STATUS_CACHE_S` giây cho mọi người gọi; hết hạn thì chỉ một lượt dò chạy,
+  ai gọi trong lúc đó chờ chung lượt ấy. Mỗi lần dò có hạn `MOC_STATUS_TIMEOUT_S` giây, quá hạn là `down`; lần dò cũ
+  còn treo thì lượt sau chờ tiếp chính lần đó, không mở lần mới. APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` lần một
+  phút mỗi IP. Bao nhiêu người gọi trong 10 giây cũng chỉ là một lượt dò mỗi thành phần (test: 50 lượt gọi cùng lúc).
+- **Sao lưu gần nhất:** dòng `system.backed_up` mới nhất trong sổ kiểm toán (`moc backup create` ghi sau mỗi lượt sao
+  lưu), hoặc giờ của lượt vừa khôi phục (`system.restored`), lấy cái mới hơn; chưa có thì `null`.
+- **Tên mô hình** bỏ phần trước dấu `/` cuối (registry có thể là tên máy nội bộ), chỉ nhận `[0-9A-Za-z._:-]`; phiên
+  bản chỉ nhận `[0-9A-Za-z._+-]`, lạ thì trả `dev`.
+- Hợp đồng trả về khóa bằng mô hình pydantic `StatusOut`: thêm trường mới phải sửa mô hình, không lọt qua tình cờ.
+
 ### Gọi Hasura
 
 | Việc | Gọi bằng |
@@ -842,6 +875,7 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 | Đọc văn bản để dựng bản phát hành | Khóa quản trị + `X-Hasura-Role: service` + thuê ước trong yêu cầu của svc-workflow |
 | Đọc sổ đăng ký một năm | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người dùng lấy từ token đã kiểm; rồi token của người dùng để biết dòng nào được đọc |
 | Tra cứu ở cổng xác thực | Khóa quản trị + `X-Hasura-Role: verifier` |
+| Trạng thái hệ thống: giờ sao lưu gần nhất (`LastBackup`, dòng sổ kiểm toán không thuộc đơn vị nào) | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, không nhận tham số từ người dùng |
 | Đọc đầu chuỗi sổ kiểm toán, ghi mốc neo | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
 | Đọc hồ sơ, văn bản, tệp để nộp lưu; gọi hàm `office_archive_case_file` | Khóa quản trị, không kèm vai trò, `X-Hasura-User-Id: svc-files:archive` — việc nội bộ; id hồ sơ lấy từ CSDL hoặc lệnh chạy tay. Hàm không cấp quyền cho vai trò nào |
 | Phòng đọc: tìm hồ sơ, lọc văn bản người gọi đọc được | Token của người dùng; ghi `case_file.read` như ghi `register.printed` |
@@ -930,6 +964,10 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_AI_EMBED_MODEL` | `qwen3-embedding:0.6b` | Mô hình nhúng trong Ollama (`bge-m3` thay được); đặt rỗng: không nhúng, chỉ tìm từ khóa |
 | `MOC_AI_EMBED_DIMS` · `MOC_AI_EMBED_BATCH` | `1024` · `8` | Số chiều véc-tơ, phải đúng của mô hình (sai thì tắt tìm theo nghĩa, ghi lỗi `embed_dims_mismatch`) · số đoạn mỗi lô nhúng nền |
 | `MOC_ASSISTANT_ID` | `moc-assistant` | Danh tính trợ lý trong sổ kiểm toán (`X-Hasura-User-Id` của vai trò agent) |
+| `MOC_VERSION` | `dev` | Phiên bản hiện ở trang trạng thái; compose truyền cùng thẻ image. Chỉ nhận `[0-9A-Za-z._+-]`, tối đa 64 ký tự, lạ thì hiện `dev` |
+| `MOC_GATEWAY_STATUS_URL` | `http://apisix:7085/status/ready` | Điểm sẵn sàng của APISIX; rỗng: Cổng API `off` |
+| `MOC_WORKFLOW_URL` | `http://svc-workflow:8000` | svc-workflow cho dòng Quy trình (`/readyz`); rỗng: `off` |
+| `MOC_STATUS_CACHE_S` · `MOC_STATUS_TIMEOUT_S` | `10` · `3` | Lưu đệm kết quả trạng thái (≥ 1) · hạn mỗi lần dò một thành phần (0–10) |
 
 ## Phát triển
 

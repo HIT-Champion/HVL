@@ -386,6 +386,7 @@
     "empty": "Không có văn bản nào khớp.",
     "more": "Xem thêm",
     "any": "Tất cả",
+    "directionLabel": "Văn bản đến hay đi",
     "direction": {
       "in": "Văn bản đến",
       "out": "Văn bản đi"
@@ -643,6 +644,69 @@
     "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
     "footer": "Signet — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
+  },
+  "health": {
+    "title": "Trạng thái hệ thống",
+    "subtitle": "Tình trạng vận hành các thành phần của Signet. Trang tự cập nhật, không cần đăng nhập.",
+    "overall": {
+      "ok": "Mọi thành phần hoạt động bình thường",
+      "degraded": "Một số thành phần đang gặp sự cố",
+      "down": "Hệ thống đang gián đoạn"
+    },
+    "overallHint": {
+      "ok": "Đăng nhập, xử lý văn bản, lưu trữ và tìm kiếm đều sẵn sàng.",
+      "degraded": "Chức năng chính vẫn dùng được; chức năng dựa vào thành phần bị ảnh hưởng có thể chậm hoặc tạm dừng.",
+      "down": "Một thành phần thiết yếu không trả lời, nhiều thao tác sẽ chưa thực hiện được."
+    },
+    "state": {
+      "ok": "Hoạt động",
+      "degraded": "Một phần",
+      "down": "Gián đoạn",
+      "off": "Tắt"
+    },
+    "layer": {
+      "nguoi-dung": "Người dùng",
+      "loi": "Lõi",
+      "quy-trinh": "Quy trình",
+      "du-lieu": "Dữ liệu",
+      "tri-tue": "Trí tuệ nhân tạo"
+    },
+    "component": {
+      "cong-api": "Cổng API",
+      "dang-nhap": "Đăng nhập một lần",
+      "csdl": "CSDL",
+      "ket-khoa": "Két khóa",
+      "quet-ma-doc": "Quét mã độc",
+      "quy-trinh": "Quy trình",
+      "luu-tru": "Lưu trữ tệp",
+      "tim-kiem": "Tìm kiếm",
+      "tro-ly-ai": "Trợ lý AI"
+    },
+    "checkedAt": "Kiểm lúc {time}",
+    "autoRefresh": "Tự cập nhật mỗi 30 giây",
+    "version": "Phiên bản",
+    "uptime": "Chạy liên tục",
+    "uptimeHint": "Từ lần khởi động gần nhất của dịch vụ tệp",
+    "backup": "Sao lưu gần nhất",
+    "backupNone": "Chưa có",
+    "backupHint": "Lượt sao lưu trọn vẹn gần nhất mà hệ thống ghi nhận",
+    "ai": "Trợ lý AI",
+    "aiOn": "Bật",
+    "aiOff": "Tắt",
+    "aiSemantic": "Viết câu trả lời có trích dẫn, tìm theo nghĩa",
+    "aiKeyword": "Viết câu trả lời có trích dẫn, tìm theo từ khóa",
+    "aiOffHint": "Chưa bật mô hình ngôn ngữ: trợ lý vẫn tìm theo từ khóa và trả câu trích nguyên văn",
+    "aiSemanticOnly": "Mô hình viết câu trả lời chưa sẵn sàng: trợ lý tìm theo nghĩa và trả câu trích nguyên văn",
+    "units": {
+      "day": "ngày",
+      "hour": "giờ",
+      "minute": "phút",
+      "less": "dưới 1 phút"
+    },
+    "rateLimited": "Tải trạng thái quá nhiều lần trong một phút, trang sẽ tự thử lại sau ít giây.",
+    "unreachable": "Không tải được trạng thái: có thể cổng API đang gián đoạn. Trang sẽ tự thử lại.",
+    "stale": "Đang hiện kết quả của lần tải trước.",
+    "note": "Trang chỉ cho biết tình trạng chung, không có tên máy, địa chỉ hay số liệu nghiệp vụ. Chỉ số chi tiết (lưu lượng, độ trễ của cổng API) xem ở bảng Grafana dành cho người vận hành."
   },
   "notify": {
     "title": "Thông báo",

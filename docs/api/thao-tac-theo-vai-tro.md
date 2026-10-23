@@ -9,10 +9,10 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 40 | 10 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
-| `staff` (chuyên viên) | `chuyenviendt` | 33 | 25 | [`graphql/staff.graphql`](graphql/staff.graphql) |
-| `manager` (lãnh đạo phòng) | `totruongdt` | 33 | 15 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 59 | 8 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `clerk` (văn thư) | `vanthu` | 42 | 15 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `staff` (chuyên viên) | `chuyenviendt` | 35 | 30 | [`graphql/staff.graphql`](graphql/staff.graphql) |
+| `manager` (lãnh đạo phòng) | `totruongdt` | 35 | 20 | [`graphql/manager.graphql`](graphql/manager.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 61 | 13 | [`graphql/director.graphql`](graphql/director.graphql) |
 | `tenant_admin` (quản trị đơn vị) | `quantri` | 27 | 13 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
@@ -78,6 +78,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_v_overdue_rate` |  |  |  | ✓ |  |
 | `office_v_processing_time` |  |  |  | ✓ |  |
 | `office_v_time_to_assign` |  |  |  | ✓ |  |
+| `personal_items` | ✓ | ✓ | ✓ | ✓ |  |
+| `personal_items_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 
 ## Thao tác ghi (`mutation`)
 
@@ -100,6 +102,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `insert_office_documents_one` |  | ✓ |  |  |  |
 | `insert_office_feedback` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `insert_office_feedback_one` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `insert_personal_items` | ✓ | ✓ | ✓ | ✓ |  |
+| `insert_personal_items_one` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_grant_document_access` | ✓ |  |  | ✓ |  |
 | `office_revoke_document_access` | ✓ |  |  | ✓ |  |
 | `receiveIncoming` | ✓ |  |  |  |  |
@@ -120,5 +124,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `update_office_documents` |  | ✓ |  |  |  |
 | `update_office_documents_by_pk` |  | ✓ |  |  |  |
 | `update_office_documents_many` |  | ✓ |  |  |  |
+| `update_personal_items` | ✓ | ✓ | ✓ | ✓ |  |
+| `update_personal_items_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
+| `update_personal_items_many` | ✓ | ✓ | ✓ | ✓ |  |
 
 `subscription` có trong schema của Hasura nhưng chưa gọi được qua cổng (chưa mở WebSocket), nên không liệt kê.
