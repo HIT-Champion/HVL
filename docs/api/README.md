@@ -32,7 +32,14 @@ make up && make seed && make api-docs
 ```
 
 CI dựng hệ thống từ mã nguồn rồi chạy `scripts/api_docs.py --check`. Lệnh này báo lỗi nếu `docs/api/` lệch với
-hệ thống vừa dựng, nên tài liệu không cũ đi so với mã. Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
+hệ thống vừa dựng, nên tài liệu không cũ đi so với mã. Khi lệch, CI sinh bản mới trên chính hệ thống đó và tải lên
+thành artifact `docs-api-<lần chạy>` của job "Chạy thử: luong-chinh"; không cần dựng ở máy:
+
+```bash
+gh run download <run-id> -n docs-api-1 -D docs/api   # <run-id> lấy ở trang Checks của PR
+```
+
+Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
 đọc OpenAPI 3.1, ví dụ Swagger UI hay Redoc chạy cục bộ. Các tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào
 cũng nạp được.
 
@@ -239,6 +246,10 @@ Token sai thì Centrifugo đóng kết nối với mã `3500`; trang khác tên 
 kết nối giới hạn theo địa chỉ IP (`MOC_RATE_REALTIME_PER_MIN`). Tin đẩy lúc mất kết nối không gửi lại: nối lại
 thì đọc lại `core_notifications`. Giao diện Signet làm đúng như vậy trong
 [`apps/office/app/composables/useRealtime.ts`](../../apps/office/app/composables/useRealtime.ts).
+
+Bản cài có cấu hình máy chủ thư hoặc webhook thì cùng thông báo đó còn đi qua email, kênh chat (svc-workflow gửi ở
+nền, [README của svc-workflow](../../services/svc-workflow/README.md) mục "Thông báo qua email, webhook"). Ứng dụng
+không phải làm gì thêm; bảng hộp thư đi `core_notification_deliveries` không mở cho vai trò người dùng.
 
 ## 5. Sổ kiểm toán: `core_audit_log` (lãnh đạo, quản trị đơn vị)
 

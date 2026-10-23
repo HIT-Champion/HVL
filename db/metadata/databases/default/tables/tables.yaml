@@ -23,6 +23,7 @@
 - "!include core_audit_anchors.yaml"
 - "!include core_users.yaml"
 - "!include core_notifications.yaml"
+- "!include core_notification_deliveries.yaml"
 - "!include office_departments.yaml"
 - "!include office_document_types.yaml"
 - "!include office_registers.yaml"

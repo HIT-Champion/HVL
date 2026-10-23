@@ -729,7 +729,8 @@
       "core": {
         "files": "Tệp tải lên",
         "users": "Người dùng",
-        "tenants": "Đơn vị"
+        "tenants": "Đơn vị",
+        "notification_deliveries": "Gửi thông báo qua email, webhook"
       },
       "ai": {
         "questions": "Câu hỏi cho trợ lý"

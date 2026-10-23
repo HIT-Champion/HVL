@@ -241,6 +241,25 @@ Biến `.env` mới của bản mới (CHANGELOG ghi rõ) thêm vào `/opt/moc/.
 **Mô hình ngôn ngữ** (tùy chọn, máy 16 GB): `docker compose --profile ai-pull run --rm ollama-pull` (tải trọng số
 khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait ollama`.
 
+**Thông báo qua email, webhook** (tùy chọn; mặc định chỉ có chuông trên web): khai máy chủ thư của đơn vị trong
+`/opt/moc/.env` — `MOC_SMTP_HOST`, `MOC_SMTP_TLS=starttls` (hoặc `ssl`), `MOC_SMTP_USER`, `MOC_SMTP_PASSWORD`,
+`MOC_SMTP_FROM=Signet <signet@moc.example.vn>` — và/hoặc `MOC_NOTIFY_WEBHOOK_URL` của kênh chat chung (incoming webhook
+Mattermost, Slack; ntfy thì thêm `MOC_NOTIFY_WEBHOOK_FORMAT=ntfy`), rồi `docker compose up -d --wait`: két nạp lại mật
+khẩu SMTP và URL webhook, svc-workflow khởi động lại. Người nhận email là địa chỉ trong Keycloak: tài khoản chưa có
+email thì chỉ thấy chuông. Lần gửi xem trong CSDL (chỉ trạng thái, số lần thử, tên lỗi):
+
+```bash
+docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"' _ \
+  "select channel, status, count(*), max(attempts), string_agg(distinct last_error, ', ')
+     from core.notification_deliveries group by 1, 2"
+```
+
+Thử trên máy, không cần máy chủ thư: đặt `MOC_EXTRA_PROFILES=mail`, `MOC_SMTP_HOST=mailpit`, `MOC_SMTP_PORT=1025`,
+`MOC_SMTP_TLS=none`, `MOC_SMTP_FROM=signet@moc.example` rồi `make up` — Mailpit (hộp thư thử, profile `mail`) nhận mọi
+thư mà không chuyển đi đâu, xem ở `http://127.0.0.1:8025` (chỉ mở trên máy; đổi cổng bằng `MOC_MAIL_UI_PORT`). Mailpit
+không thuộc profile `core`, `app`: là công cụ demo, thư nằm trong tệp tạm của container, không có volume (tối đa 500
+thư, mất khi container dừng), không dùng làm máy chủ thư thật.
+
 ## 8. Giới hạn đã biết
 
 - **Chưa chạy trên VPS thật**: đã diễn tập đủ các bước trên một máy (xem đầu tài liệu) với chứng thư tự ký và nginx
@@ -258,5 +277,9 @@ khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait olla
   (trang metadata bị chặn ở APISIX), chưa có vai trò CSDL riêng quyền hẹp.
 - **Mọi tài khoản mẫu của `seed.py` dùng chung `MOC_DEMO_PASSWORD`.** Hợp với máy demo; máy có dữ liệu thật thì không
   chạy `seed.py` (bước 3).
+- **Thông báo email, webhook gửi ít nhất một lần**: svc-workflow dừng đúng lúc vừa gửi mà chưa ghi kết quả thì lần sau
+  gửi lại (thư cùng `Message-ID`, hộp thư thường gộp). Webhook là một URL chung cho cả bản cài, mọi đơn vị cùng đổ về
+  một kênh chat; mỗi lần gửi thêm hai dòng sổ kiểm toán. Chưa đo tải gửi thư; một lượt vòng nền gửi tuần tự tối đa 20
+  dòng.
 - **GitOps kiểm chữ ký commit chỉ khi đặt `MOC_GITOPS_ALLOWED_SIGNERS`** (`van-hanh.md` mục GitOps): để trống thì ai đẩy
   được lên nhánh `deploy` là cài được lên máy chủ.
