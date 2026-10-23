@@ -1131,6 +1131,20 @@ input jsonb_comparison_exp {
 "mutation root"
 type mutation_root {
   completeTask(data: jsonb, outcome: String!, taskId: String!): CompleteTaskOutput
+  "insert data into the table: \"office.feedback\""
+  insert_office_feedback(
+    "the rows to be inserted"
+    objects: [office_feedback_insert_input!]!
+    "upsert condition"
+    on_conflict: office_feedback_on_conflict
+  ): office_feedback_mutation_response
+  "insert a single row into the table: \"office.feedback\""
+  insert_office_feedback_one(
+    "the row to be inserted"
+    object: office_feedback_insert_input!
+    "upsert condition"
+    on_conflict: office_feedback_on_conflict
+  ): office_feedback
   "insert data into the table: \"personal.items\""
   insert_personal_items(
     "the rows to be inserted"
@@ -2993,6 +3007,184 @@ type office_documents_variance_fields {
   register_number: Float
 }
 
+"Góp ý của người dùng Văn phòng điện tử (F4.6): mức hài lòng 1–5, vài dòng, khuôn đường dẫn màn hình; không họ tên, vai trò, IP"
+type office_feedback {
+  comment: String
+  created_at: timestamptz!
+  id: uuid!
+  "Góp ý này của chính người đang xem"
+  mine: Boolean
+  rating: Int!
+  screen: String!
+}
+
+"aggregated selection of \"office.feedback\""
+type office_feedback_aggregate {
+  aggregate: office_feedback_aggregate_fields
+  nodes: [office_feedback!]!
+}
+
+"aggregate fields of \"office.feedback\""
+type office_feedback_aggregate_fields {
+  avg: office_feedback_avg_fields
+  count(columns: [office_feedback_select_column!], distinct: Boolean): Int!
+  max: office_feedback_max_fields
+  min: office_feedback_min_fields
+  stddev: office_feedback_stddev_fields
+  stddev_pop: office_feedback_stddev_pop_fields
+  stddev_samp: office_feedback_stddev_samp_fields
+  sum: office_feedback_sum_fields
+  var_pop: office_feedback_var_pop_fields
+  var_samp: office_feedback_var_samp_fields
+  variance: office_feedback_variance_fields
+}
+
+"aggregate avg on columns"
+type office_feedback_avg_fields {
+  rating: Float
+}
+
+"Boolean expression to filter rows from the table \"office.feedback\". All fields are combined with a logical 'AND'."
+input office_feedback_bool_exp {
+  _and: [office_feedback_bool_exp!]
+  _not: office_feedback_bool_exp
+  _or: [office_feedback_bool_exp!]
+  comment: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  id: uuid_comparison_exp
+  mine: Boolean_comparison_exp
+  rating: Int_comparison_exp
+  screen: String_comparison_exp
+}
+
+"unique or primary key constraints on table \"office.feedback\""
+enum office_feedback_constraint {
+  "unique or primary key constraint on columns \"id\""
+  feedback_pkey
+}
+
+"input type for inserting data into table \"office.feedback\""
+input office_feedback_insert_input {
+  comment: String
+  rating: Int
+  screen: String
+}
+
+"aggregate max on columns"
+type office_feedback_max_fields {
+  comment: String
+  created_at: timestamptz
+  id: uuid
+  rating: Int
+  screen: String
+}
+
+"aggregate min on columns"
+type office_feedback_min_fields {
+  comment: String
+  created_at: timestamptz
+  id: uuid
+  rating: Int
+  screen: String
+}
+
+"response of any mutation on the table \"office.feedback\""
+type office_feedback_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [office_feedback!]!
+}
+
+"on_conflict condition type for table \"office.feedback\""
+input office_feedback_on_conflict {
+  constraint: office_feedback_constraint!
+  update_columns: [office_feedback_update_column!]! = []
+  where: office_feedback_bool_exp
+}
+
+"Ordering options when selecting data from \"office.feedback\"."
+input office_feedback_order_by {
+  comment: order_by
+  created_at: order_by
+  id: order_by
+  mine: order_by
+  rating: order_by
+  screen: order_by
+}
+
+"select columns of table \"office.feedback\""
+enum office_feedback_select_column {
+  "column name"
+  comment
+  "column name"
+  created_at
+  "column name"
+  id
+  "column name"
+  rating
+  "column name"
+  screen
+}
+
+"aggregate stddev on columns"
+type office_feedback_stddev_fields {
+  rating: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_feedback_stddev_pop_fields {
+  rating: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_feedback_stddev_samp_fields {
+  rating: Float
+}
+
+"Streaming cursor of the table \"office_feedback\""
+input office_feedback_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_feedback_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_feedback_stream_cursor_value_input {
+  comment: String
+  created_at: timestamptz
+  id: uuid
+  rating: Int
+  screen: String
+}
+
+"aggregate sum on columns"
+type office_feedback_sum_fields {
+  rating: Int
+}
+
+"placeholder for update columns of table \"office.feedback\" (current role has no relevant permissions)"
+enum office_feedback_update_column {
+  "placeholder (do not use)"
+  _PLACEHOLDER
+}
+
+"aggregate var_pop on columns"
+type office_feedback_var_pop_fields {
+  rating: Float
+}
+
+"aggregate var_samp on columns"
+type office_feedback_var_samp_fields {
+  rating: Float
+}
+
+"aggregate variance on columns"
+type office_feedback_variance_fields {
+  rating: Float
+}
+
 input office_grant_document_access_args {
   document_id: uuid
   user_id: String
@@ -3343,6 +3535,109 @@ input office_v_document_counts_stream_cursor_value_input {
   urgency: String
 }
 
+"columns and relationships of \"office.v_feedback_summary\""
+type office_v_feedback_summary {
+  feedback: Int
+  last_at: timestamptz
+  rating_1: Int
+  rating_2: Int
+  rating_3: Int
+  rating_4: Int
+  rating_5: Int
+  rating_total: Int
+  sample: Boolean
+  screen: String
+  tenant_id: uuid
+  with_comment: Int
+}
+
+"Boolean expression to filter rows from the table \"office.v_feedback_summary\". All fields are combined with a logical 'AND'."
+input office_v_feedback_summary_bool_exp {
+  _and: [office_v_feedback_summary_bool_exp!]
+  _not: office_v_feedback_summary_bool_exp
+  _or: [office_v_feedback_summary_bool_exp!]
+  feedback: Int_comparison_exp
+  last_at: timestamptz_comparison_exp
+  rating_1: Int_comparison_exp
+  rating_2: Int_comparison_exp
+  rating_3: Int_comparison_exp
+  rating_4: Int_comparison_exp
+  rating_5: Int_comparison_exp
+  rating_total: Int_comparison_exp
+  sample: Boolean_comparison_exp
+  screen: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  with_comment: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_feedback_summary\"."
+input office_v_feedback_summary_order_by {
+  feedback: order_by
+  last_at: order_by
+  rating_1: order_by
+  rating_2: order_by
+  rating_3: order_by
+  rating_4: order_by
+  rating_5: order_by
+  rating_total: order_by
+  sample: order_by
+  screen: order_by
+  tenant_id: order_by
+  with_comment: order_by
+}
+
+"select columns of table \"office.v_feedback_summary\""
+enum office_v_feedback_summary_select_column {
+  "column name"
+  feedback
+  "column name"
+  last_at
+  "column name"
+  rating_1
+  "column name"
+  rating_2
+  "column name"
+  rating_3
+  "column name"
+  rating_4
+  "column name"
+  rating_5
+  "column name"
+  rating_total
+  "column name"
+  sample
+  "column name"
+  screen
+  "column name"
+  tenant_id
+  "column name"
+  with_comment
+}
+
+"Streaming cursor of the table \"office_v_feedback_summary\""
+input office_v_feedback_summary_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_feedback_summary_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_feedback_summary_stream_cursor_value_input {
+  feedback: Int
+  last_at: timestamptz
+  rating_1: Int
+  rating_2: Int
+  rating_3: Int
+  rating_4: Int
+  rating_5: Int
+  rating_total: Int
+  sample: Boolean
+  screen: String
+  tenant_id: uuid
+  with_comment: Int
+}
+
 "columns and relationships of \"office.v_intake_accuracy\""
 type office_v_intake_accuracy {
   confidence: String
@@ -3599,6 +3894,85 @@ input office_v_overdue_by_department_stream_cursor_value_input {
   tenant_id: uuid
 }
 
+"columns and relationships of \"office.v_overdue_rate\""
+type office_v_overdue_rate {
+  judged: Int
+  late: Int
+  late_open: Int
+  month: date
+  on_time: Int
+  pending: Int
+  sample: Boolean
+  tenant_id: uuid
+}
+
+"Boolean expression to filter rows from the table \"office.v_overdue_rate\". All fields are combined with a logical 'AND'."
+input office_v_overdue_rate_bool_exp {
+  _and: [office_v_overdue_rate_bool_exp!]
+  _not: office_v_overdue_rate_bool_exp
+  _or: [office_v_overdue_rate_bool_exp!]
+  judged: Int_comparison_exp
+  late: Int_comparison_exp
+  late_open: Int_comparison_exp
+  month: date_comparison_exp
+  on_time: Int_comparison_exp
+  pending: Int_comparison_exp
+  sample: Boolean_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_overdue_rate\"."
+input office_v_overdue_rate_order_by {
+  judged: order_by
+  late: order_by
+  late_open: order_by
+  month: order_by
+  on_time: order_by
+  pending: order_by
+  sample: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_overdue_rate\""
+enum office_v_overdue_rate_select_column {
+  "column name"
+  judged
+  "column name"
+  late
+  "column name"
+  late_open
+  "column name"
+  month
+  "column name"
+  on_time
+  "column name"
+  pending
+  "column name"
+  sample
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_v_overdue_rate\""
+input office_v_overdue_rate_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_overdue_rate_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_overdue_rate_stream_cursor_value_input {
+  judged: Int
+  late: Int
+  late_open: Int
+  month: date
+  on_time: Int
+  pending: Int
+  sample: Boolean
+  tenant_id: uuid
+}
+
 "columns and relationships of \"office.v_processing_time\""
 type office_v_processing_time {
   documents: Int
@@ -3664,6 +4038,103 @@ input office_v_processing_time_stream_cursor_value_input {
   tenant_id: uuid
   total_hours: float8
   with_due: Int
+}
+
+"columns and relationships of \"office.v_time_to_assign\""
+type office_v_time_to_assign {
+  arrived: Int
+  assigned: Int
+  handled: Int
+  handled_median_hours: float8
+  handled_p90_hours: float8
+  median_hours: float8
+  month: date
+  p90_hours: float8
+  sample: Boolean
+  tenant_id: uuid
+  waiting: Int
+}
+
+"Boolean expression to filter rows from the table \"office.v_time_to_assign\". All fields are combined with a logical 'AND'."
+input office_v_time_to_assign_bool_exp {
+  _and: [office_v_time_to_assign_bool_exp!]
+  _not: office_v_time_to_assign_bool_exp
+  _or: [office_v_time_to_assign_bool_exp!]
+  arrived: Int_comparison_exp
+  assigned: Int_comparison_exp
+  handled: Int_comparison_exp
+  handled_median_hours: float8_comparison_exp
+  handled_p90_hours: float8_comparison_exp
+  median_hours: float8_comparison_exp
+  month: date_comparison_exp
+  p90_hours: float8_comparison_exp
+  sample: Boolean_comparison_exp
+  tenant_id: uuid_comparison_exp
+  waiting: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_time_to_assign\"."
+input office_v_time_to_assign_order_by {
+  arrived: order_by
+  assigned: order_by
+  handled: order_by
+  handled_median_hours: order_by
+  handled_p90_hours: order_by
+  median_hours: order_by
+  month: order_by
+  p90_hours: order_by
+  sample: order_by
+  tenant_id: order_by
+  waiting: order_by
+}
+
+"select columns of table \"office.v_time_to_assign\""
+enum office_v_time_to_assign_select_column {
+  "column name"
+  arrived
+  "column name"
+  assigned
+  "column name"
+  handled
+  "column name"
+  handled_median_hours
+  "column name"
+  handled_p90_hours
+  "column name"
+  median_hours
+  "column name"
+  month
+  "column name"
+  p90_hours
+  "column name"
+  sample
+  "column name"
+  tenant_id
+  "column name"
+  waiting
+}
+
+"Streaming cursor of the table \"office_v_time_to_assign\""
+input office_v_time_to_assign_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_time_to_assign_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_time_to_assign_stream_cursor_value_input {
+  arrived: Int
+  assigned: Int
+  handled: Int
+  handled_median_hours: float8
+  handled_p90_hours: float8
+  median_hours: float8
+  month: date
+  p90_hours: float8
+  sample: Boolean
+  tenant_id: uuid
+  waiting: Int
 }
 
 "column ordering options"
@@ -4152,6 +4623,34 @@ type query_root {
   ): office_documents_aggregate!
   "fetch data from the table: \"office.documents\" using primary key columns"
   office_documents_by_pk(id: uuid!): office_documents
+  "fetch data from the table: \"office.feedback\""
+  office_feedback(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch aggregated fields from the table: \"office.feedback\""
+  office_feedback_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): office_feedback_aggregate!
+  "fetch data from the table: \"office.feedback\" using primary key columns"
+  office_feedback_by_pk(id: uuid!): office_feedback
   "fetch data from the table: \"office.registers\""
   office_registers(
     "distinct select on columns"
@@ -4206,6 +4705,19 @@ type query_root {
     "filter the rows returned"
     where: office_v_document_counts_bool_exp
   ): [office_v_document_counts!]!
+  "fetch data from the table: \"office.v_feedback_summary\""
+  office_v_feedback_summary(
+    "distinct select on columns"
+    distinct_on: [office_v_feedback_summary_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_feedback_summary_order_by!]
+    "filter the rows returned"
+    where: office_v_feedback_summary_bool_exp
+  ): [office_v_feedback_summary!]!
   "fetch data from the table: \"office.v_intake_accuracy\""
   office_v_intake_accuracy(
     "distinct select on columns"
@@ -4258,6 +4770,19 @@ type query_root {
     "filter the rows returned"
     where: office_v_overdue_by_department_bool_exp
   ): [office_v_overdue_by_department!]!
+  "fetch data from the table: \"office.v_overdue_rate\""
+  office_v_overdue_rate(
+    "distinct select on columns"
+    distinct_on: [office_v_overdue_rate_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_overdue_rate_order_by!]
+    "filter the rows returned"
+    where: office_v_overdue_rate_bool_exp
+  ): [office_v_overdue_rate!]!
   "fetch data from the table: \"office.v_processing_time\""
   office_v_processing_time(
     "distinct select on columns"
@@ -4271,6 +4796,19 @@ type query_root {
     "filter the rows returned"
     where: office_v_processing_time_bool_exp
   ): [office_v_processing_time!]!
+  "fetch data from the table: \"office.v_time_to_assign\""
+  office_v_time_to_assign(
+    "distinct select on columns"
+    distinct_on: [office_v_time_to_assign_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_time_to_assign_order_by!]
+    "filter the rows returned"
+    where: office_v_time_to_assign_bool_exp
+  ): [office_v_time_to_assign!]!
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"
@@ -4828,6 +5366,43 @@ type subscription_root {
     "filter the rows returned"
     where: office_documents_bool_exp
   ): [office_documents!]!
+  "fetch data from the table: \"office.feedback\""
+  office_feedback(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch aggregated fields from the table: \"office.feedback\""
+  office_feedback_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): office_feedback_aggregate!
+  "fetch data from the table: \"office.feedback\" using primary key columns"
+  office_feedback_by_pk(id: uuid!): office_feedback
+  "fetch data from the table in a streaming manner: \"office.feedback\""
+  office_feedback_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_feedback_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
   "fetch data from the table: \"office.registers\""
   office_registers(
     "distinct select on columns"
@@ -4909,6 +5484,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_v_document_counts_bool_exp
   ): [office_v_document_counts!]!
+  "fetch data from the table: \"office.v_feedback_summary\""
+  office_v_feedback_summary(
+    "distinct select on columns"
+    distinct_on: [office_v_feedback_summary_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_feedback_summary_order_by!]
+    "filter the rows returned"
+    where: office_v_feedback_summary_bool_exp
+  ): [office_v_feedback_summary!]!
+  "fetch data from the table in a streaming manner: \"office.v_feedback_summary\""
+  office_v_feedback_summary_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_feedback_summary_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_feedback_summary_bool_exp
+  ): [office_v_feedback_summary!]!
   "fetch data from the table: \"office.v_intake_accuracy\""
   office_v_intake_accuracy(
     "distinct select on columns"
@@ -4988,6 +5585,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_v_overdue_by_department_bool_exp
   ): [office_v_overdue_by_department!]!
+  "fetch data from the table: \"office.v_overdue_rate\""
+  office_v_overdue_rate(
+    "distinct select on columns"
+    distinct_on: [office_v_overdue_rate_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_overdue_rate_order_by!]
+    "filter the rows returned"
+    where: office_v_overdue_rate_bool_exp
+  ): [office_v_overdue_rate!]!
+  "fetch data from the table in a streaming manner: \"office.v_overdue_rate\""
+  office_v_overdue_rate_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_overdue_rate_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_overdue_rate_bool_exp
+  ): [office_v_overdue_rate!]!
   "fetch data from the table: \"office.v_processing_time\""
   office_v_processing_time(
     "distinct select on columns"
@@ -5010,6 +5629,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_v_processing_time_bool_exp
   ): [office_v_processing_time!]!
+  "fetch data from the table: \"office.v_time_to_assign\""
+  office_v_time_to_assign(
+    "distinct select on columns"
+    distinct_on: [office_v_time_to_assign_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_time_to_assign_order_by!]
+    "filter the rows returned"
+    where: office_v_time_to_assign_bool_exp
+  ): [office_v_time_to_assign!]!
+  "fetch data from the table in a streaming manner: \"office.v_time_to_assign\""
+  office_v_time_to_assign_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_time_to_assign_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_time_to_assign_bool_exp
+  ): [office_v_time_to_assign!]!
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"

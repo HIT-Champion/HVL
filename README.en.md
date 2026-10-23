@@ -319,6 +319,7 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.m
 | `make demo-*` | The demos above; any failing step stops with exit code 1 | Same as above |
 | `make audit` | Recomputes the hash-chained audit log outside the database, compares it with the anchor in cold storage and with the hashes of issued documents | A running system |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii` | Measure the AI agents on labelled samples: right / wrong / empty per field, recall@3, coverage | A running system (`do-che-pii` does not need one) |
+| `make do-so-lieu-sau` | The "after" metrics of spec §8 (F4.6): time until a document is assigned, overdue rate, 5 timed searches for old documents; the "before" column reads not measured; prints a table, writes `out/so-lieu-sau.json` | A running system + `make seed` |
 | `db/tests/` | Schema, permissions by role and unit, constraints, audit log (including tampering attempts) on real PostgreSQL + Hasura | see [`db/README.md`](db/README.md) |
 | `make sbom`, `make license-audit` | CycloneDX SBOM of the source tree into `dist/` (Syft); the license of every npm package, Python package and CI action, transitive ones included, against the policy in `DEPENDENCIES.md` | Docker, network access to PyPI |
 
@@ -349,6 +350,7 @@ transitive ones included (`make license-audit`). Every release after 1.0.0 ships
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Data model, permissions, Hasura Actions, event formats |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Product specification: problem, users, features |
 | [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md) | AI evaluation: for each agent — model, version, license, evaluation data, dated measurements with the machine used, limitations, safety mechanisms |
+| [`docs/so-lieu-sau.md`](docs/so-lieu-sau.md) | The "after" metrics of spec §8 and in-app feedback (F4.6): how each metric is computed, why the "before" column is not measured yet, sample data, what feedback collects and who sees it (in Vietnamese) |
 | [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Development plan by phase, assignments, risks |
 | [`docs/git_flow.md`](docs/git_flow.md) | Git workflow: branches, commits, pull requests, releases |
 | [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Self-assessment against the 50-point PoF criteria |

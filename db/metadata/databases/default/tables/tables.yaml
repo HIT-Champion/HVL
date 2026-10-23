@@ -48,3 +48,7 @@
 - "!include office_assignment_suggestions.yaml"
 - "!include office_v_assignment_suggestion_accuracy.yaml"
 - "!include personal_items.yaml"
+- "!include office_feedback.yaml"
+- "!include office_v_time_to_assign.yaml"
+- "!include office_v_overdue_rate.yaml"
+- "!include office_v_feedback_summary.yaml"
