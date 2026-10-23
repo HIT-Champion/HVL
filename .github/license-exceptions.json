@@ -1,0 +1,133 @@
+{
+  "ghi_chu": [
+    "Ngoại lệ của scripts/license_audit.py; chính sách: DEPENDENCIES.md, mục 'Kiểm tra tương thích giấy phép'.",
+    "goi: purl không kèm phiên bản. giay_phep: biểu thức SPDX. ly_do: bắt buộc.",
+    "Gói có giấy phép ngoài danh sách được nhận: giay_phep phải trùng giấy phép SBOM ghi.",
+    "Gói SBOM không rõ giấy phép (không ghi, hay chữ tự do): giay_phep là giấy phép đội đã đọc trong gói",
+    "(LICENSE, METADATA) ngày 23/10/2026, bắt buộc phien_ban — nâng bản thì đọc lại rồi sửa phien_ban."
+  ],
+  "ngoai_le": [
+    {
+      "goi": "pkg:npm/caniuse-lite",
+      "giay_phep": "CC-BY-4.0",
+      "ly_do": "Bảng dữ liệu trình duyệt nào hỗ trợ tính năng nào (browserslist, autoprefixer kéo theo), chỉ đọc lúc dựng CSS, không nằm trong trang phát hành. CC-BY-4.0 là giấy phép mở cho dữ liệu, OSI chỉ duyệt giấy phép phần mềm (DEPENDENCIES.md, Tầng 2)"
+    },
+    {
+      "goi": "pkg:npm/mdn-data",
+      "giay_phep": "CC0-1.0",
+      "ly_do": "Dữ liệu cú pháp CSS của MDN, css-tree đọc lúc nén CSS khi dựng, không nằm trong trang phát hành. CC0 đưa tác phẩm vào phạm vi công cộng (DEPENDENCIES.md, Tầng 2)"
+    },
+    {
+      "goi": "pkg:npm/@speed-highlight/core",
+      "giay_phep": "CC0-1.0",
+      "ly_do": "youch kéo theo cho trang báo lỗi của máy chủ phát triển Nuxt, chỉ chạy lúc phát triển, không nằm trong trang phát hành (DEPENDENCIES.md, Tầng 2)"
+    },
+    {
+      "goi": "pkg:pypi/pillow",
+      "giay_phep": "MIT-CMU",
+      "ly_do": "Pillow khai trực tiếp trong svc-files (DEPENDENCIES.md). MIT-CMU là một dạng HPND: dễ dãi, chỉ đòi giữ thông báo bản quyền, không copyleft; SPDX ghi HPND được OSI phê duyệt nhưng chưa đánh dấu riêng MIT-CMU"
+    },
+    {
+      "goi": "pkg:pypi/weasyprint",
+      "phien_ban": "70.0",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "PyPI chỉ khai classifier 'BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/pydyf",
+      "phien_ban": "0.12.1",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "WeasyPrint kéo theo. PyPI chỉ khai classifier 'BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/tinycss2",
+      "phien_ban": "1.5.1",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "WeasyPrint kéo theo. PyPI chỉ khai classifier 'BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/cssselect2",
+      "phien_ban": "0.10.1",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "WeasyPrint kéo theo. PyPI chỉ khai classifier 'BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/webencodings",
+      "phien_ban": "0.6.1",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "WeasyPrint kéo theo (qua tinycss2, cssselect2, tinyhtml5). PyPI chỉ khai classifier 'BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/tinyhtml5",
+      "phien_ban": "2.1.0",
+      "giay_phep": "MIT",
+      "ly_do": "WeasyPrint kéo theo. PyPI chỉ khai classifier 'MIT License'; tệp LICENSE trong wheel là MIT"
+    },
+    {
+      "goi": "pkg:pypi/pyphen",
+      "phien_ban": "0.18.1",
+      "giay_phep": "GPL-2.0-or-later OR LGPL-2.1-or-later OR MPL-1.1",
+      "ly_do": "WeasyPrint kéo theo, ngắt từ khi dàn chữ, dùng nguyên bản. PyPI chỉ khai classifier; tệp LICENSE trong wheel ghi ba giấy phép cho chọn, Signet dùng theo MPL-1.1 (DEPENDENCIES.md)"
+    },
+    {
+      "goi": "pkg:pypi/segno",
+      "phien_ban": "1.6.6",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "Mã QR trên văn bản phát hành (svc-files). PyPI chỉ khai classifier 'BSD License'; tệp LICENSE trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/duckdb",
+      "phien_ban": "1.5.6",
+      "giay_phep": "MIT AND Apache-2.0",
+      "ly_do": "Nộp lưu hồ sơ (svc-files). PyPI chỉ khai classifier 'MIT License'; wheel có LICENSE MIT, riêng gói con duckdb/experimental/spark kèm LICENSE Apache-2.0 (Signet không dùng gói con này)"
+    },
+    {
+      "goi": "pkg:pypi/python-dateutil",
+      "phien_ban": "2.9.0.post0",
+      "giay_phep": "Apache-2.0 AND BSD-3-Clause",
+      "ly_do": "botocore kéo theo. PyPI ghi 'Dual License'; tệp LICENSE trong wheel: đóng góp từ 01/12/2017 theo Apache-2.0, toàn bộ mã theo BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:pypi/colorama",
+      "phien_ban": "0.4.6",
+      "giay_phep": "BSD-3-Clause",
+      "ly_do": "pytest kéo theo, chỉ cài trên Windows (sys_platform == 'win32'), chỉ dùng khi chạy test. PyPI chỉ khai classifier 'BSD License'; tệp LICENSE.txt trong wheel là BSD ba điều khoản"
+    },
+    {
+      "goi": "pkg:github/actions/checkout",
+      "phien_ban": "v7.0.1",
+      "giay_phep": "MIT",
+      "ly_do": "Action của CI, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v7.0.1 (GitHub API /license?ref=) là MIT"
+    },
+    {
+      "goi": "pkg:github/actions/setup-node",
+      "phien_ban": "v7.0.0",
+      "giay_phep": "MIT",
+      "ly_do": "Action của CI, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v7.0.0 là MIT"
+    },
+    {
+      "goi": "pkg:github/actions/upload-artifact",
+      "phien_ban": "v7.0.1",
+      "giay_phep": "MIT",
+      "ly_do": "Action của CI, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v7.0.1 là MIT"
+    },
+    {
+      "goi": "pkg:github/astral-sh/setup-uv",
+      "phien_ban": "v10.2.0",
+      "giay_phep": "MIT",
+      "ly_do": "Action của CI, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v10.2.0 là MIT"
+    },
+    {
+      "goi": "pkg:github/docker/login-action",
+      "phien_ban": "v4.6.0",
+      "giay_phep": "Apache-2.0",
+      "ly_do": "Action của CI, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v4.6.0 là Apache-2.0"
+    },
+    {
+      "goi": "pkg:github/softprops/action-gh-release",
+      "phien_ban": "v2.6.2",
+      "giay_phep": "MIT",
+      "ly_do": "Action của workflow phát hành, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v2.6.2 là MIT"
+    }
+  ]
+}

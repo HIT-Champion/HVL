@@ -35,6 +35,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mặc định tắt. Hộp thư đi `core.notification_deliveries` tạo cùng giao dịch với thông báo, gửi ở nền, thử lại tối
   đa 5 lần có giãn cách, mỗi lần ghi sổ kiểm toán; webhook không có tên người, không có văn bản hạn chế; nhật ký không
   có địa chỉ email, URL. Mailpit (profile `mail`) làm hộp thư thử cho demo. Test svc-workflow +41, scripts +8.
+- Chuỗi cung ứng: `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft 1.54.1 (image ghim digest), bản phát hành
+  đính kèm `moc-X.Y.Z.cdx.json` cùng `.sha256`; `make license-audit` (`scripts/license_audit.py`, chỉ thư viện chuẩn)
+  kiểm giấy phép của mọi gói kể cả gói gián tiếp theo chính sách của `DEPENDENCIES.md`, gói chưa rõ hay ngoài chính
+  sách cần ngoại lệ có lý do trong `.github/license-exceptions.json`. Job CI "Giấy phép (PoF #2)" chạy cả hai: 769 gói
+  (npm 690, Python 73, action 6) đều đạt, 22 gói qua nhờ ngoại lệ. `SECURITY.md`: phiên bản được hỗ trợ, báo lỗ hổng
+  riêng tư qua GitHub, thời gian phản hồi, phạm vi kể cả bản chạy thử trực tuyến. Test scripts +22.
 
 ### Đã sửa đổi
 - CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và

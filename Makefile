@@ -36,7 +36,7 @@ PREFIX ?= /opt/moc
         demo-ky-so \
         demo-che-pii do-che-pii \
         reconcile \
-        backup restore install uninstall license-check license-fix lint release clean
+        backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
 help: ## Hiển thị danh sách lệnh
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -203,6 +203,28 @@ license-check: ## Kiểm tra header giấy phép trong từng tệp mã (tiêu c
 
 license-fix: ## Tự chèn header giấy phép vào các tệp còn thiếu
 	@./scripts/license-header.sh fix
+
+# Syft (Anchore) đọc tệp khóa npm (kể cả gói chỉ dùng lúc dựng), requirements*.txt và action trong .github/workflows/;
+# requirements.txt không ghi giấy phép nên --enrich python hỏi PyPI giấy phép của từng gói Python (cần mạng). Không đọc
+# Dockerfile, docker-compose.yml: image thượng nguồn và giấy phép của chúng ghi ở DEPENDENCIES.md. CI ghi đè bằng biến
+# môi trường cùng tên trong .github/workflows/ci.yml — đổi phiên bản thì đổi cả hai (test scripts kiểm hai chỗ trùng)
+SYFT_IMAGE ?= ghcr.io/anchore/syft:v1.54.1@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa
+SBOM_VERSION = $(or $(VERSION),$(shell git describe --tags --always 2>/dev/null | sed 's/^v//'),dev)
+SBOM = dist/moc-$(SBOM_VERSION).cdx.json
+
+sbom: ## Danh mục thành phần SBOM CycloneDX của cây mã nguồn (Syft): dist/moc-<phiên bản>.cdx.json kèm .sha256 — dùng: make sbom [VERSION=1.1.0]; cần Docker, mạng tới PyPI
+	@mkdir -p dist
+	@docker run --rm -e SYFT_CHECK_FOR_APP_UPDATE=false -e SYFT_JAVASCRIPT_INCLUDE_DEV_DEPENDENCIES=true \
+	  -v "$(CURDIR):/src:ro" $(SYFT_IMAGE) scan dir:/src --enrich python --source-name moc \
+	  --source-version "$(SBOM_VERSION)" --exclude './**/node_modules/**' --exclude './**/.venv/**' \
+	  --exclude './dist/**' --exclude './.git/**' -o cyclonedx-json > $(SBOM).tmp || { rm -f $(SBOM).tmp; exit 1; }
+	@mv $(SBOM).tmp $(SBOM)
+	@cd dist && sha256sum $(notdir $(SBOM)) > $(notdir $(SBOM)).sha256
+	@echo "Đã tạo $(SBOM) và $(notdir $(SBOM)).sha256. Kiểm giấy phép: make license-audit"
+
+license-audit: ## Kiểm giấy phép mọi gói (kể cả gián tiếp) trong SBOM của make sbom theo DEPENDENCIES.md; ngoại lệ có lý do ở .github/license-exceptions.json
+	@test -f $(SBOM) || { echo "Chưa có $(SBOM) — chạy make sbom trước (cùng VERSION nếu có)." >&2; exit 1; }
+	@python3 scripts/license_audit.py $(SBOM)
 
 lint: license-check ## Chạy toàn bộ kiểm tra tĩnh
 	@$(COMPOSE) config -q && echo "Docker Compose hợp lệ."

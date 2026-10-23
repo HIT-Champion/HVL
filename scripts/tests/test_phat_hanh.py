@@ -18,8 +18,8 @@
 "## [X.Y.Z]" của CHANGELOG; khối mẫu trong chú thích HTML không tính; thiếu mục, hay mục chỉ có tiêu đề nhóm, thì
 lỗi chứ không ra ghi chú rỗng. Không phát hành lại: release.sh dừng trước khi gắn khi thẻ đã có trên origin hay ở máy,
 không hỏi được origin cũng dừng; release.yml dừng khi thẻ đã có Release, kể cả nháp (chạy lệnh của bước với gh giả), và
-báo lỗi khi action không tải lên đủ hai tệp. Trang Release (scripts/release_body.py): dòng chỉ gói .tar.gz chính thức,
-phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
+báo lỗi khi action không tải lên đủ bốn tệp (gói, SBOM, hai .sha256). Trang Release (scripts/release_body.py): dòng chỉ
+gói .tar.gz chính thức và SBOM, phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
@@ -275,12 +275,12 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         return subprocess.run(["bash", "-e", "-c", step_script("Kiểm gói đã tải lên")], env=env, capture_output=True,
                               text=True)
 
-    def test_upload_check_needs_both_files(self) -> None:
-        self.assertEqual(self.assets('[{"name": "moc-0.2.0.tar.gz"}, {"name": "moc-0.2.0.tar.gz.sha256"}]')
-                         .returncode, 0)
-        skipped = self.assets('[{"name": "moc-0.2.0.tar.gz.sha256"}]')
+    def test_upload_check_needs_all_four_files(self) -> None:
+        names = ["moc-0.2.0.tar.gz", "moc-0.2.0.tar.gz.sha256", "moc-0.2.0.cdx.json", "moc-0.2.0.cdx.json.sha256"]
+        self.assertEqual(self.assets(json.dumps([{"name": n} for n in names])).returncode, 0)
+        skipped = self.assets(json.dumps([{"name": n} for n in names[1:]]))
         self.assertEqual(skipped.returncode, 1)
-        self.assertIn("Chỉ tải lên 1/2 tệp", skipped.stdout)
+        self.assertIn("Chỉ tải lên 3/4 tệp", skipped.stdout)
         self.assertEqual(self.assets(None).returncode, 1)
 
     def test_action_does_not_overwrite_assets(self) -> None:
@@ -288,6 +288,15 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         self.assertIn("overwrite_files: false", action)
         self.assertIn("fail_on_unmatched_files: true", action)
         self.assertIn("ASSETS: ${{ steps.gh_release.outputs.assets }}", action)
+
+    def test_sbom_is_made_from_the_tag_and_attached(self) -> None:
+        # make sbom sinh dist/moc-$V.cdx.json (+ .sha256) trước khi tạo Release; action tải cả hai lên
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertLess(text.index("name: Sinh SBOM CycloneDX (make sbom)"), text.index("softprops/action-gh-release@"))
+        self.assertIn('run: make sbom VERSION="$V"', text)
+        files = text.split("files: |", 1)[1]
+        self.assertIn("dist/*.cdx.json\n", files)
+        self.assertIn("dist/*.cdx.json.sha256\n", files)
 
 
 class ReleaseBodyTest(unittest.TestCase):
@@ -313,6 +322,7 @@ class ReleaseBodyTest(unittest.TestCase):
         head, rest = out.split("<details>", 1)
         self.assertTrue(head.startswith("**Gói phát hành chính thức: `moc-1.1.0.tar.gz`**"))
         self.assertIn("`sha256sum -c moc-1.1.0.tar.gz.sha256`", head)
+        self.assertIn("(SBOM CycloneDX): `moc-1.1.0.cdx.json`", head)
         self.assertIn('"Source code (zip)"', head)
         self.assertIn("\n\nBản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng, dựng từ mã nguồn bằng "
                       "make.\n\n- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR.\n\n", head)
