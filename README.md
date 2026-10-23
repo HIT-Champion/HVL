@@ -321,6 +321,7 @@ bản phát hành kèm SBOM đó.
 | Tài liệu | Nội dung |
 |---|---|
 | [`docs/demo-script.md`](docs/demo-script.md) | Kịch bản demo: 4 nguyên lý và các màn nghiệp vụ, mỗi màn một lệnh |
+| [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md) | Mức hoàn thiện từng tính năng kèm bằng chứng (test, bước CI, màn demo) và hạn chế đã biết; độ phủ 7 cụm dịch vụ Tầng 1 của đề |
 | [`docs/van-hanh.md`](docs/van-hanh.md) | Vận hành: thêm đơn vị, sao lưu, két bí mật, GitOps, giám sát, IT/OT |
 | [`docs/trien-khai.md`](docs/trien-khai.md) | Triển khai lên máy chủ: HTTPS bằng Caddy trước APISIX, người vận hành, tường lửa, sao lưu hằng đêm, nâng cấp |
 | [`docs/api/`](docs/api/README.md) | Tài liệu API: lấy token, gọi GraphQL và REST qua cổng; schema GraphQL theo vai trò và OpenAPI xuất tự động |
