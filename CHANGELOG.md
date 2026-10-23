@@ -21,6 +21,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Tên 4 job CI có dấu `#` (`Giấy phép (PoF #2)`…) bị YAML hiểu phần từ ` #` là chú thích: trang Actions hiện
   `Giấy phép (PoF`, và ruleset đòi đúng tên có `#` thì không PR nào gộp được. Tên đặt trong ngoặc kép; test mới kiểm
   mọi job ruleset đòi đều có thật. Test scripts +2.
+- Nhắc hạn, báo lãnh đạo (F2.3): dòng nhắc được ghi vào dòng thời gian văn bản trước khi gửi thông báo. Trước
+  đây gửi trước rồi mới ghi, người bấm thông báo mở văn bản ngay có thể chưa thấy dòng nhắc; `make smoke` thỉnh
+  thoảng đỏ vì đọc trúng khoảng đó. Test svc-workflow +1.
 
 ## [1.0.0] - 2026-10-23
 
