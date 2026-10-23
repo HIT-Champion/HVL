@@ -1,6 +1,6 @@
 # Kịch bản demo — bằng chứng 4 nguyên lý thiết kế
 
-Đề thi (`olp-2026-de-thi.md` §3.2) yêu cầu sản phẩm "được xây dựng dựa trên" 4 nguyên lý, kèm gợi ý bằng chứng
+Đề thi (`du-thi/olp-2026-de-thi.md` §3.2) yêu cầu sản phẩm "được xây dựng dựa trên" 4 nguyên lý, kèm gợi ý bằng chứng
 cho từng nguyên lý. Mỗi màn dưới đây:
 
 - chạy bằng **một lệnh** trên hệ thống đang chạy (`make up`, `make seed`), xong trong **dưới một phút**;

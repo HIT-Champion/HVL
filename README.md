@@ -286,11 +286,11 @@ quét bí mật trong lịch sử commit (gitleaks) và lỗ hổng đã biết 
 | [`docs/architecture.md`](docs/architecture.md) | Kiến trúc H-P-D-I, bản đồ công cụ, quyết định kỹ thuật |
 | [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md) | Mô hình dữ liệu, quyền, Hasura Actions, định dạng sự kiện |
 | [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md) | Đặc tả sản phẩm: bài toán, người dùng, chức năng |
-| [`docs/ke-hoach-phat-trien.md`](docs/ke-hoach-phat-trien.md) | Kế hoạch phát triển theo phase, phân công, rủi ro |
+| [`docs/du-thi/ke-hoach-phat-trien.md`](docs/du-thi/ke-hoach-phat-trien.md) | Kế hoạch phát triển theo phase, phân công, rủi ro |
 | [`docs/git_flow.md`](docs/git_flow.md) | Quy trình Git: nhánh, commit, pull request, phát hành |
-| [`docs/pof-checklist.md`](docs/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
-| [`docs/olp-2026-brief.md`](docs/olp-2026-brief.md), [`docs/olp-2026-de-thi.md`](docs/olp-2026-de-thi.md) | Chủ đề DX-OS, thể lệ, tiêu chí chấm; phân tích đề thi chính thức |
-| [`docs/nghien-cuu/`](docs/nghien-cuu/) | Nghiên cứu trước khi có đề thi (lưu trữ) |
+| [`docs/du-thi/pof-checklist.md`](docs/du-thi/pof-checklist.md) | Bảng tự chấm 50 điểm PoF |
+| [`docs/du-thi/olp-2026-brief.md`](docs/du-thi/olp-2026-brief.md), [`docs/du-thi/olp-2026-de-thi.md`](docs/du-thi/olp-2026-de-thi.md) | Chủ đề DX-OS, thể lệ, tiêu chí chấm; phân tích đề thi chính thức |
+| [`docs/du-thi/nghien-cuu/`](docs/du-thi/nghien-cuu/) | Nghiên cứu trước khi có đề thi (lưu trữ) |
 | [`DEPENDENCIES.md`](DEPENDENCIES.md) | Danh mục phần mềm thượng nguồn, phiên bản ghim, giấy phép |
 | [`CHANGELOG.md`](CHANGELOG.md) | Lịch sử thay đổi |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Hướng dẫn đóng góp |

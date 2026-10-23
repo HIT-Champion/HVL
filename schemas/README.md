@@ -2,7 +2,7 @@
 
 Mỗi tệp `*.json` ở đây mô tả dữ liệu của một form. Ba lớp kiểm theo cùng một tệp, nên một quy tắc chỉ viết một
 lần mà form, máy chủ và CSDL không nói khác nhau (poka-yoke, F2.2 trong
-[`docs/ke-hoach-phat-trien.md`](../docs/ke-hoach-phat-trien.md)):
+[`docs/du-thi/ke-hoach-phat-trien.md`](../docs/du-thi/ke-hoach-phat-trien.md)):
 
 | Lớp | Ở đâu | Kiểm bằng | Chặn được |
 |---|---|---|---|

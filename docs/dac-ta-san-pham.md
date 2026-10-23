@@ -2,8 +2,8 @@
 
 > Lập ngày 15/10/2026. Thay hướng "luồng phê duyệt đề xuất mua sắm / tạm ứng / nghỉ phép" của kế hoạch
 > ngày 05/10.
-> Liên quan: phân tích đề [`olp-2026-de-thi.md`](olp-2026-de-thi.md) · kế hoạch theo phase
-> [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) · mô hình dữ liệu [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
+> Liên quan: phân tích đề [`olp-2026-de-thi.md`](du-thi/olp-2026-de-thi.md) · kế hoạch theo phase
+> [`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md) · mô hình dữ liệu [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
 > Mã chức năng (F2.x, F3.x, F4.x) dùng chung với kế hoạch. Hai tài liệu lệch nhau về **lịch** thì kế
 > hoạch đúng; lệch về **phạm vi sản phẩm** thì tài liệu này đúng.
 
@@ -62,7 +62,7 @@ coi là thiếu R7, và theo ghi chú ở tiêu chí PoF #2 ("giải quyết đ�
 ### 1.2. Các đội khác đang làm gì
 
 Kho mã OLP 2026 công khai trên GitHub, tra ngày 15/10/2026 (cùng 2 kho tra ngày 09/09 ở
-[`nghien-cuu/nghien-cuu-chu-de-2026.md`](nghien-cuu/nghien-cuu-chu-de-2026.md) §5.5):
+[`nghien-cuu/nghien-cuu-chu-de-2026.md`](du-thi/nghien-cuu/nghien-cuu-chu-de-2026.md) §5.5):
 
 | Kho | Ứng dụng | Ghi chú |
 |---|---|---|
@@ -318,7 +318,7 @@ Chỉ trình bày số đo thật. Chỉ số nào chưa đo được thì nói 
    trường hoặc bằng dữ liệu mẫu.
 3. **Mẫu văn bản đi làm trước**: đề xuất công văn và thông báo.
 4. Hỏi BTC: trang đăng nhập do Keycloak phát ra có bị coi là giao diện của Tầng 1 không
-   ([`olp-2026-de-thi.md`](olp-2026-de-thi.md) §8).
+   ([`olp-2026-de-thi.md`](du-thi/olp-2026-de-thi.md) §8).
 
 ---
 

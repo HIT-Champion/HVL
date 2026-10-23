@@ -2,7 +2,7 @@
 
 > **Bản nháp** cho việc 0.3 / issue #6 — lập ngày 15/10/2026, Backend rà và cùng chốt trong PR.
 > Phạm vi sản phẩm: [`dac-ta-san-pham.md`](dac-ta-san-pham.md). Nguồn sự thật giữa Flowable và PostgreSQL:
-> [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §2.1.
+> [`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md) §2.1.
 > Sau khi chốt, `db/migrations/` (#18) và `db/metadata/actions.*` (#15) làm theo tài liệu này; đổi mô hình
 > thì sửa tài liệu trong cùng PR.
 

@@ -13,7 +13,7 @@ lời bằng câu trích nguyên văn kèm số ký hiệu, số trang; mô hìn
 
 Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
 F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực), F3.12 (liên thông), F4.1 (đọc văn
-bản đến) và F4.2 (hỏi đáp trên kho văn bản) trong [`docs/ke-hoach-phat-trien.md`](../../docs/ke-hoach-phat-trien.md). Chủ: mảng AI ·
+bản đến) và F4.2 (hỏi đáp trên kho văn bản) trong [`docs/du-thi/ke-hoach-phat-trien.md`](../../docs/du-thi/ke-hoach-phat-trien.md). Chủ: mảng AI ·
 issue #19, #20.
 
 ## Trạng thái
