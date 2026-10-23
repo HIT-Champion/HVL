@@ -1,5 +1,5 @@
 # =============================================================================
-# Mộc — Git Ignore
+# Signet — Git Ignore
 # Tuân thủ tiêu chí đánh giá PoF (Tiêu chí #4, #5)
 # =============================================================================
 
@@ -21,6 +21,8 @@
 /volumes/
 /storage/
 /backups/
+# scripts/backup.py đặt trong lúc khôi phục (F3.3: reconciler không dựng lại Signet trên dữ liệu dở dang)
+/.moc-restoring
 *.db
 *.sqlite
 *.sqlite3
@@ -65,6 +67,10 @@ htmlcov/
 # --- Tài liệu nhị phân & Thể lệ cuộc thi ------------------------------------
 public/*.pdf
 *.pdf
+# Văn bản đến mẫu (giả lập) để thử, đo tác tử đọc văn bản F4.1 — sinh bằng make van-ban-mau
+!/seed/van-ban-den/*.pdf
+# Kho văn bản mẫu (giả lập) để thử, đo trợ lý hỏi đáp F4.2 — sinh bằng make hoi-dap-mau
+!/seed/hoi-dap/*.pdf
 
 # --- Docker overrides cục bộ -------------------------------------------------
 docker-compose.override.yml

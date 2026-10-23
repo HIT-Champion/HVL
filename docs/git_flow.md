@@ -1,27 +1,32 @@
-# Quy trình Git của Mộc
+# Quy trình Git của Signet
 
 > Áp dụng cho cả đội (**Backend · AI · Frontend**) và người đóng góp bên ngoài.
-> Mục tiêu: nhánh `main` lúc nào cũng chạy được, lịch sử commit đọc được, và bản thân repo là bằng
-> chứng cho các tiêu chí PoF #1 (dùng repo thật), #3 (phát hành theo phiên bản), #6 (bug tracker,
-> changelog).
+> Mục tiêu: `main` chỉ chứa các bản đã phát hành, `develop` lúc nào cũng chạy được, lịch sử commit đọc
+> được, và bản thân repo là bằng chứng cho các tiêu chí PoF #1 (dùng repo thật), #3 (phát hành theo
+> phiên bản), #6 (bug tracker, changelog).
 
 ---
 
 ## 0. Tóm tắt một màn hình
 
 ```
- issue #12 ─► nhánh feat/12-keycloak-realm ─► commit nhỏ ─► Pull Request ─► CI xanh + 1 review
+ issue #12 ─► nhánh feat/12-keycloak-realm (tách từ develop) ─► commit nhỏ ─► PR vào develop
                                                                                  │
-                                                                     squash merge vào main
+                                                    CI xanh + 1 review ─► squash merge vào develop
                                                                                  │
-                   cuối mỗi phase: make release VERSION=x.y.z ─► thẻ vX.Y.Z ─► GitHub Release (.tar.gz)
+ cuối mỗi phase: PR develop → main "chore(release): vX.Y.Z" ─► merge commit ─► thẻ vX.Y.Z trên main
                                                                                  │
-                                    đưa lên server: fast-forward nhánh deploy ◄──┘
+                  GitHub Release (.tar.gz) ◄── Actions ◄─────────────────────────┤
+                                                                                 │
+                                  đưa lên server: nhánh deploy theo thẻ ◄────────┘
+
+ lỗi gấp sau phát hành: hotfix/X.Y.Z từ main ─► PR vào main ─► thẻ ─► PR main → develop (gộp ngược)
 ```
 
 **7 luật vàng:**
 
-1. Không ai push thẳng lên `main`. Mọi thay đổi đi qua Pull Request.
+1. Không ai push thẳng lên `develop` hay `main`. Mọi thay đổi đi qua Pull Request; **`main` chỉ nhận
+   PR phát hành** (mục 6).
 2. Mỗi việc bắt đầu từ một **issue**. Nhánh và commit đều ghi số issue.
 3. Commit message theo **Conventional Commits** (mục 3).
 4. Mỗi PR cần **CI xanh** và **1 người ở mảng khác** duyệt.
@@ -33,15 +38,19 @@
 
 ## 1. Mô hình nhánh
 
-Đội dùng **GitHub Flow** (một nhánh chính + nhánh ngắn hạn), không dùng Git Flow cổ điển
-(`develop`, `release/*`, `hotfix/*`): với 3 người trong 9 tuần, thêm nhánh chỉ thêm việc merge.
+Đội dùng **Git Flow** rút gọn: tính năng gộp vào `develop`, `main` chỉ nhận bản phát hành. Người tải
+mã từ `main` hay từ trang Release luôn nhận một phiên bản đã chốt, có ghi chép thay đổi; phần đang làm
+dở nằm ở `develop`. So với Git Flow đầy đủ, đội bỏ nhánh `release/*`: với 3 người, việc chốt bản phát
+hành (chuyển mục CHANGELOG) làm bằng một PR vào `develop`, rồi PR thẳng `develop` → `main`.
 
 | Nhánh | Vai trò | Ai được ghi | Cách ghi |
 |---|---|---|---|
-| `main` | Mã mới nhất, **luôn chạy được** | Không ai push trực tiếp | Squash merge từ PR |
-| `deploy` | Đúng phiên bản đang chạy trên server; reconciler kéo nhánh này | Backend | Fast-forward từ thẻ phát hành hoặc từ `main` đã qua CI |
-| `<loại>/<issue>-<mô-tả>` | Nhánh làm việc, sống **≤ 3 ngày** | Người làm issue | Commit, push thoải mái |
-| Thẻ `vX.Y.Z` | Bản phát hành | Backend | `make release` (mục 6) |
+| `develop` | **Nhánh mặc định**: mã mới nhất, **luôn chạy được** | Không ai push trực tiếp | Squash merge từ PR |
+| `main` | Chỉ các bản đã phát hành; mỗi commit gộp trên `main` mang một thẻ | Không ai push trực tiếp | Merge commit từ PR phát hành (mục 6) |
+| `deploy` | Đúng phiên bản đang chạy trên server; reconciler kéo nhánh này | Backend | Theo thẻ phát hành (mục 7) |
+| `<loại>/<issue>-<mô-tả>` | Nhánh làm việc tách từ `develop`, sống **≤ 3 ngày** | Người làm issue | Commit, push thoải mái |
+| `hotfix/X.Y.Z` | Sửa gấp một lỗi của bản đã phát hành, tách từ `main` | Người sửa | PR vào `main`, rồi gộp ngược vào `develop` |
+| Thẻ `vX.Y.Z` | Bản phát hành, gắn trên `main` | Backend | `make release` (mục 6); không sửa, không xóa được |
 
 ---
 
@@ -53,6 +62,9 @@
 
 - `<loại>` giống loại commit (mục 3.2): `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`.
 - Chữ thường, không dấu, nối bằng gạch ngang, tối đa ~5 từ.
+- Nhánh sửa gấp bản đã phát hành: `hotfix/<phiên-bản-mới>`, ví dụ `hotfix/0.2.1`.
+- CI (job "Quy trình nhánh và tiêu đề PR") từ chối PR vào `develop` từ nhánh không có `<loại>/`, có chữ
+  hoa hay có dấu; thiếu số issue thì chỉ nhắc.
 
 | Đúng | Sai |
 |---|---|
@@ -76,7 +88,8 @@
 
 - **Dòng đầu ≤ 72 ký tự**, viết tiếng Việt có dấu, bắt đầu bằng động từ, chữ thường, không chấm cuối.
 - Thân và chân cách dòng đầu **một dòng trống**; xuống dòng ở khoảng 72 ký tự.
-- `Closes #12` (từ khóa tiếng Anh) để GitHub tự đóng issue khi merge vào `main`; `Refs #12` để chỉ liên kết.
+- `Closes #12` (từ khóa tiếng Anh) để GitHub tự đóng issue khi merge vào nhánh mặc định `develop`;
+  `Refs #12` để chỉ liên kết.
 
 ### 3.2. Loại commit
 
@@ -107,13 +120,16 @@
 | `ai` | `svc-ai`: RAG, OCR, tác tử | AI |
 | `data` | Kestra, nóng → lạnh, lineage | AI |
 | `ops` | Compose, reconciler, sao lưu, giám sát, OpenBao | Backend |
-| `cli` | Lệnh `dxos` | Backend |
+| `cli` | Lệnh `scripts/moc.py` | Backend |
+| `scripts` | Các kịch bản khác trong `scripts/`: seed, smoke, demo, phát hành | Ai cũng được |
+| `e2e` | Kiểm thử trình duyệt Playwright, `tests/e2e/` | Frontend |
 | `ci` | CI/CD | Backend |
 | `deps` | Nâng hoặc ghim phiên bản, `DEPENDENCIES.md` | Ai cũng được |
 | `docs` | Tài liệu chung | Ai cũng được |
 | `release` | Phát hành | Backend |
 
-Thay đổi chạm nhiều phạm vi → chọn phạm vi chính, hoặc bỏ trống: `feat: …`.
+Thay đổi chạm nhiều phạm vi → chọn phạm vi chính, hoặc bỏ trống: `feat: …`. CI kiểm tiêu đề PR theo
+đúng hai bảng trên (`scripts/check_pr.py`): thêm loại hay phạm vi thì sửa cả hai nơi.
 
 ### 3.4. Ví dụ
 
@@ -160,12 +176,12 @@ trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự b
 # <loại>(<phạm vi>): <mô tả ngắn, ≤ 72 ký tự, không chấm cuối>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
-# Phạm vi: gateway auth db workflow files realtime office ai data ops cli ci deps docs release
+# Phạm vi: gateway auth db workflow files realtime office ai data ops cli scripts e2e ci deps docs release
 #
 # Thân (tùy chọn): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #
 # Chân (tùy chọn):
-# Closes #<số-issue>            tự đóng issue khi merge vào main
+# Closes #<số-issue>            tự đóng issue khi merge vào develop
 # Refs #<số-issue>              chỉ liên kết
 # Co-authored-by: Tên <email>   khi làm cặp
 # BREAKING CHANGE: <mô tả>      khi phá vỡ API hoặc cấu hình cũ
@@ -226,18 +242,18 @@ xong thì chạy lại `make license-fix`, vì trình vẽ có thể xóa chú t
 ### 5.1. Các bước
 
 ```bash
-git switch main && git pull                      # 1. lấy main mới nhất
+git switch develop && git pull                   # 1. lấy develop mới nhất
 git switch -c feat/12-keycloak-realm             # 2. tạo nhánh từ issue #12
 # ... sửa, commit nhỏ ...
-git fetch origin && git rebase origin/main       # 3. cập nhật theo main trước khi mở PR
+git fetch origin && git rebase origin/develop    # 3. cập nhật theo develop trước khi mở PR
 git push -u origin feat/12-keycloak-realm        # 4. đẩy nhánh
-gh pr create --fill                              # 5. mở PR (hoặc mở trên giao diện GitHub)
+gh pr create --base develop --fill               # 5. mở PR vào develop (nhánh mặc định của repo)
 ```
 
 ### 5.2. Yêu cầu với PR
 
 - **Tiêu đề PR = commit message dòng đầu**, theo mục 3 — vì khi squash merge, tiêu đề PR trở thành
-  commit duy nhất trên `main`.
+  commit duy nhất trên `develop`. CI kiểm tiêu đề mỗi lần mở hay sửa PR.
 - Mô tả điền theo mẫu `.github/pull_request_template.md` và có dòng `Closes #<issue>`.
 - Gắn **nhãn mảng** (`backend` / `ai` / `frontend`) và **milestone** của phase hiện tại.
 - PR nhỏ: lý tưởng dưới ~400 dòng thay đổi. To hơn thì tách.
@@ -257,31 +273,66 @@ gh pr create --fill                              # 5. mở PR (hoặc mở trên
 
 ### 5.4. Merge
 
-- Điều kiện: **CI xanh** (3 job: Giấy phép, Dựng từ mã nguồn, Tài liệu) + **1 duyệt**.
-- Cách merge: **Squash and merge** — mọi commit nhỏ của nhánh gộp thành một commit sạch trên `main`.
-- Người mở PR tự merge sau khi được duyệt, rồi **xóa nhánh**.
+- Điều kiện: **CI xanh** (8 job: 7 job của workflow CI — Giấy phép, Dựng từ mã nguồn, Tài liệu, Test
+  đơn vị dịch vụ, Schema và quyền trên CSDL thật, Chạy thử toàn hệ thống, Quét bí mật và lỗ hổng phụ
+  thuộc — và job "Quy trình nhánh và tiêu đề PR" của workflow PR) + **1 duyệt**. Ruleset của repo
+  chặn nút merge tới khi đủ. Job chạy thử toàn hệ thống mất khoảng 15–25 phút; lỗi thì tải
+  `stack-logs` ở trang lượt chạy để xem nhật ký từng dịch vụ và vết Playwright.
+- Cách merge vào `develop`: **Squash and merge** — mọi commit nhỏ của nhánh gộp thành một commit sạch.
+  Riêng PR gộp ngược sau bản vá nóng (mục 6) dùng **Create a merge commit**.
+- Cách merge vào `main` (PR phát hành, mục 6): **Create a merge commit**, giữ nguyên các commit của
+  `develop`.
+- Người mở PR tự merge sau khi được duyệt; nhánh làm việc tự xóa sau khi gộp.
 
 ---
 
 ## 6. Phát hành
 
-Lịch theo kế hoạch: `v0.1.0` 25/10 · `v0.2.0` 08/11 · `v0.5.0` 20/11 · `v0.9.0` 25/11 · `v1.0.0` 03/12.
+Lịch: `v0.1.0` 18/10 (đã phát hành) · bản cho vòng trường: trước 01/11 · `v1.0.0`: 03/12. Các lệnh dưới
+đây lấy `0.2.0` làm ví dụ.
+
+Đây là lúc duy nhất `main` nhận thay đổi.
 
 ```bash
-# 1. PR chuyển các mục "[Chưa phát hành]" trong CHANGELOG.md sang "## [0.1.0] - 2026-10-25"
-#    tiêu đề PR: chore(release): v0.1.0  → review → squash merge
+# 1. Chốt ghi chép thay đổi trên develop: PR (nhánh chore/<issue>-chot-0-2-0) chuyển các dòng của mục
+#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [0.2.0] - 2026-10-30", để lại tiêu đề
+#    "## [Chưa phát hành]" trống (CI đòi có mục này)
+#    tiêu đề PR: chore(release): chốt ghi chép thay đổi v0.2.0  → review → squash merge vào develop
 
-# 2. Trên main mới nhất, cây làm việc sạch:
+# 2. PR phát hành develop → main, tiêu đề đúng "chore(release): v0.2.0"
+gh pr create --base main --head develop --title "chore(release): v0.2.0" --body "Phát hành v0.2.0"
+#    CI kiểm: nguồn là develop, CHANGELOG có mục [0.2.0] có dòng thay đổi, thẻ v0.2.0 chưa có
+#    → review → Create a merge commit
+
+# 3. Gắn thẻ trên main mới nhất, cây làm việc sạch:
 git switch main && git pull
-make release VERSION=0.1.0       # tạo thẻ v0.1.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
+make release VERSION=0.2.0       # tạo thẻ v0.2.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
 
-# 3. Đẩy thẻ — GitHub Actions tự tạo GitHub Release kèm .tar.gz và .sha256
-git push origin v0.1.0
+# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, rồi tạo Release kèm .tar.gz, .sha256
+git push origin v0.2.0
 ```
 
-- Phiên bản theo **Semantic Versioning**; trước `v1.0.0` tăng số giữa cho mỗi phase.
+**Bản vá nóng** — lỗi của bản đã phát hành cần sửa ngay, không chờ phase sau:
+
+```bash
+git fetch origin && git switch -c hotfix/0.2.1 origin/main
+# sửa, commit "fix(…): …"; thêm mục "## [0.2.1] - <ngày>" ngay dưới "## [Chưa phát hành]" của CHANGELOG.md,
+# ghi dòng sửa vào đó
+git push -u origin hotfix/0.2.1
+gh pr create --base main --title "chore(release): v0.2.1" --body "Sửa gấp …"   # → review → merge commit
+git switch main && git pull && make release VERSION=0.2.1 && git push origin v0.2.1
+# gộp ngược vào develop qua một nhánh riêng (không sửa thẳng develop hay main được):
+git switch -c chore/gop-nguoc-0-2-1 origin/develop && git merge --no-ff origin/main
+#    CHANGELOG.md xung đột ở đầu tệp thì giữ cả mục [Chưa phát hành] của develop lẫn mục [0.2.1]
+git push -u origin chore/gop-nguoc-0-2-1
+gh pr create --base develop --title "chore(release): gộp ngược v0.2.1 vào develop" --body ""
+#    → review → Create a merge commit (không squash: giữ quan hệ cha con để lần phát hành sau không xung đột)
+```
+
+- Phiên bản theo **Semantic Versioning**; trước `v1.0.0` tăng số giữa cho mỗi phase, số cuối cho bản vá nóng.
 - Ghi chú phát hành ghi rõ: **tệp chính thức là `.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)").
-- Không xóa hay gắn lại thẻ đã đẩy. Phát hành nhầm thì ra bản vá `vX.Y.Z+1`.
+- Không xóa hay gắn lại thẻ đã đẩy — ruleset thẻ `v*` chặn hẳn, `release.yml` và `release.sh` cũng từ
+  chối phát hành lại. Phát hành nhầm thì ra bản vá `vX.Y.Z+1`.
 
 ---
 
@@ -292,13 +343,22 @@ Reconciler trên server kéo nhánh `deploy` mỗi 60 giây. Chỉ Backend (@Van
 ```bash
 git fetch origin
 git switch deploy && git pull --ff-only
-git merge --ff-only v0.1.0          # hoặc origin/main, nếu commit đó đã qua CI
+git merge --ff-only v0.2.0          # thẻ phát hành trên main
 git push origin deploy
 ```
 
-- **Chỉ fast-forward**, không commit thẳng lên `deploy`.
-- Lỗi trên server → sửa bằng PR vào `main` như bình thường, rồi đẩy lại `deploy`.
-- Tạo nhánh lần đầu: `git push origin main:deploy`.
+Máy chủ bật kiểm chữ ký (`MOC_GITOPS_ALLOWED_SIGNERS`, `van-hanh.md` mục GitOps) thì đầu nhánh phải là commit do người
+trong danh sách ký bằng khóa SSH — thay dòng `--ff-only` bằng:
+
+```bash
+git merge --no-ff -S -m "deploy: v0.2.0" v0.2.0   # -S: ký bằng user.signingkey (gpg.format=ssh)
+git verify-commit HEAD                            # thấy Good "git" signature trước khi đẩy
+```
+
+- **Chỉ fast-forward** (bật kiểm chữ ký: chỉ commit gộp có ký như trên), không commit thẳng lên `deploy`.
+- Lỗi trên server → bản vá nóng (mục 6), rồi đưa `deploy` lên thẻ mới.
+- Tạo nhánh lần đầu: `git push origin v0.2.0^{commit}:refs/heads/deploy` (bật kiểm chữ ký thì máy chủ chỉ
+  áp từ lần gộp có ký đầu tiên).
 
 ---
 
@@ -317,30 +377,52 @@ git push origin deploy
 
 | Tình huống | Cách xử lý |
 |---|---|
-| Nhánh bị tụt so với `main` | `git fetch origin && git rebase origin/main`, sửa xung đột, `git push --force-with-lease` |
-| Xung đột ở tệp khóa (`package-lock.json`…) | Lấy bản của `main`, chạy lại trình cài gói để sinh lại tệp khóa, commit |
+| Nhánh bị tụt so với `develop` | `git fetch origin && git rebase origin/develop`, sửa xung đột, `git push --force-with-lease` |
+| Lỡ mở PR vào `main` | Bấm **Edit** cạnh tiêu đề PR, đổi nhánh đích sang `develop` — CI chặn PR không phải phát hành vào `main` |
+| Xung đột ở tệp khóa (`package-lock.json`…) | Lấy bản của `develop`, chạy lại trình cài gói để sinh lại tệp khóa, commit |
 | Viết sai commit message, **chưa push** | `git commit --amend` |
-| Viết sai commit message, đã push **nhánh của mình** | `git commit --amend` rồi `git push --force-with-lease` (không bao giờ làm trên `main`) |
+| Viết sai commit message, đã push **nhánh của mình** | `git commit --amend` rồi `git push --force-with-lease` (không bao giờ làm trên `develop`, `main`) |
 | Lỡ commit bí mật | **Đổi bí mật đó ngay** (coi như đã lộ), báo cả đội, rồi mới gỡ khỏi mã |
-| PR đã merge gây lỗi | Mở PR `revert`: `git revert <sha>` — không sửa lịch sử `main` |
+| PR đã merge gây lỗi | Mở PR `revert` vào `develop`: `git revert <sha>` — không sửa lịch sử `develop`, `main`. Lỗi đã nằm trong bản phát hành → bản vá nóng (mục 6) |
 | Muốn bỏ hết thay đổi chưa commit | `git restore .` (kiểm tra kỹ trước — không lấy lại được) |
 
 ---
 
 ## 10. Thiết lập GitHub một lần (người quản trị repo)
 
-- **Bảo vệ nhánh `main`**:
-  - bắt buộc qua PR, 1 duyệt;
-  - bắt buộc 3 job CI xanh;
-  - cấm force push và cấm xóa nhánh.
+- **Nhánh mặc định là `develop`** (Settings → General → Default branch): PR mới tự trỏ vào `develop`,
+  `Closes #N` đóng issue khi gộp vào `develop`, và nhánh mặc định không bao giờ bị tự xóa sau khi gộp
+  PR phát hành.
+- **Ruleset** (Settings → Rules → Rulesets), khai sẵn trong `.github/rulesets/`, tạo bằng
+  `gh api -X POST repos/HIT-Champion/HVL/rulesets --input .github/rulesets/<tệp>.json`:
+  - `develop.json` — nhánh `develop`: bắt buộc PR, 1 duyệt, 8 job CI xanh (mục 5.4); chỉ squash hoặc
+    merge commit; cấm force push, cấm xóa;
+  - `main.json` — nhánh `main`: như trên nhưng chỉ merge commit; job "Quy trình nhánh và tiêu đề PR"
+    chỉ cho PR phát hành vào;
+  - `tags.json` — thẻ `v*`: không ai sửa hay xóa được, kể cả quản trị;
+  - `tag-creation.json` — thẻ `v*`: chỉ quản trị repo được tạo.
 - **Bảo vệ nhánh `deploy`**: cấm force push; chỉ Backend được push.
-- **Merge**:
-  - chỉ bật *Squash merging*, nội dung commit mặc định lấy tiêu đề + mô tả PR;
+- **Merge** (Settings → General → Pull Requests):
+  - bật *Allow merge commits* và *Allow squash merging*, tắt *Allow rebase merging*;
+  - nội dung commit mặc định của cả hai lấy tiêu đề + mô tả PR;
   - bật *Automatically delete head branches*.
 - **Issues**:
   - bật Issues;
   - tạo nhãn `backend`, `ai`, `frontend`, `bug`, `feature`, `docs`, `good first issue`;
   - tạo milestone `Phase 0` … `Phase 5` theo kế hoạch.
+
+---
+
+## 11. Quy trình qua các giai đoạn
+
+| Giai đoạn | Cách làm thực tế |
+|---|---|
+| Đến 23/10/2026 | Mã được gộp vào `main` **tại máy** rồi đẩy lên theo đợt, không qua pull request, không có review trên GitHub. Một đợt đẩy nhiều commit sát nhau thì CI tự hủy các lượt đang chờ, mỗi đợt chỉ lượt cuối chạy đủ: đó là các lượt *Cancelled* trên trang Actions. Thẻ `v0.1.0` từng bị gắn lại; mỗi lần như vậy workflow Release chạy lại và thay gói `.tar.gz` cùng `.sha256` đã đăng. |
+| Từ 23/10/2026 | Git Flow như các mục trên: mọi thay đổi qua PR vào `develop`, CI và một người duyệt là bắt buộc (ruleset); `main` chỉ nhận PR phát hành; thẻ `v*` không sửa, không xóa được. |
+
+Vì sao đổi: gộp tại máy không để lại dấu vết review nào trên GitHub; commit không nối được với issue
+(không có `Closes #`); `main` có lúc đỏ CI mà không có gì chặn; và gắn lại thẻ làm hỏng tổng kiểm của
+người đã tải bản phát hành. Các luật ở mục 1, 5, 6 và ruleset ở mục 10 chặn đúng những chỗ đó.
 
 ---
 
@@ -352,7 +434,7 @@ git log --oneline --graph -20           # lịch sử gần đây
 git diff / git diff --staged            # xem thay đổi chưa / đã stage
 git add -p                              # chọn từng đoạn để commit
 git switch -c <nhánh>                   # tạo và chuyển nhánh
-git fetch origin && git rebase origin/main
+git fetch origin && git rebase origin/develop
 git push --force-with-lease             # đẩy lại nhánh của mình sau rebase/amend
-gh pr create --fill / gh pr checks / gh pr merge --squash --delete-branch
+gh pr create --base develop --fill / gh pr checks / gh pr merge --squash --delete-branch
 ```

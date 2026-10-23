@@ -1,0 +1,76 @@
+{
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [],
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false,
+        "allowed_merge_methods": [
+          "merge"
+        ]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": true,
+        "required_status_checks": [
+          {
+            "context": "Giấy phép (PoF #2)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Dựng từ mã nguồn (PoF #4)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Tài liệu (PoF #6)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Test đơn vị dịch vụ và kiểm form",
+            "integration_id": 15368
+          },
+          {
+            "context": "Schema và quyền trên CSDL thật",
+            "integration_id": 15368
+          },
+          {
+            "context": "Chạy thử toàn hệ thống (PoF #4)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Quét bí mật và lỗ hổng phụ thuộc",
+            "integration_id": 15368
+          },
+          {
+            "context": "Quy trình nhánh và tiêu đề PR",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}

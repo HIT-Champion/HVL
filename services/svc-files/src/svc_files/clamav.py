@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,10 +33,19 @@ class ScanError(Exception):
     """clamd không trả lời được. Tệp chưa quét thì không bao giờ được coi là sạch."""
 
 
+# Mẫu ClamAV báo khi không quét hết được tệp (AlertEncrypted, AlertExceedsMax trong docker-compose.yml): có mật khẩu
+# hoặc giải nén vượt giới hạn. Không phải mã độc đã biết, nhưng cũng không biết bên trong có gì
+UNSCANNABLE = ("Heuristics.Encrypted.", "Heuristics.Limits.Exceeded")
+
+
 @dataclass(frozen=True)
 class ScanResult:
     clean: bool
     signature: str | None = None
+
+    @property
+    def unscannable(self) -> bool:
+        return not self.clean and (self.signature or "").startswith(UNSCANNABLE)
 
 
 def parse_reply(raw: bytes) -> ScanResult:

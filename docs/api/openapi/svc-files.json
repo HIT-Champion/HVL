@@ -1,0 +1,2090 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Signet — svc-files",
+    "description": "Tải tệp lên qua trạm kiểm dịch ClamAV, tải xuống theo quyền, tìm văn bản. Gọi qua cổng APISIX với token Bearer do Keycloak cấp (docs/api/README.md).",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/files/{file_id}/read": {
+      "post": {
+        "summary": "Đọc văn bản đến vừa tải lên (lớp chữ PDF hoặc OCR), gợi ý thông tin tiếp nhận",
+        "description": "Chỉ văn thư, chỉ tệp chính mình tải lên. Tác tử `moc-doc-reader` đọc tệp, quy tắc tìm số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu; có mô hình ngôn ngữ thì mô hình chỉ viết trích yếu. Mỗi lần đọc thật ghi một dòng `intake.suggested` vào sổ kiểm toán (chỉ siêu dữ liệu, không có nội dung văn bản) cùng giao dịch lưu gợi ý. Đã có gợi ý thì trả luôn (`cached`), trừ khi `force=true`. Không tạo văn bản: văn thư đối chiếu, sửa rồi mới lưu.",
+        "operationId": "read_file_api_files__file_id__read_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: đọc lại dù đã có gợi ý lưu (nút Đọc lại)",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "true: đọc lại dù đã có gợi ý lưu (nút Đọc lại)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token (`missing_token`, `invalid_token`)"
+          },
+          "403": {
+            "description": "`forbidden` — không phải văn thư"
+          },
+          "404": {
+            "description": "`not_found` — không có tệp, không xem được, không do người gọi tải lên, hoặc không còn trong kho"
+          },
+          "409": {
+            "description": "`restricted` — tệp của văn bản hạn chế: không đọc (kiểm trước khi đọc byte)"
+          },
+          "413": {
+            "description": "`too_large` — tệp lớn hơn `MOC_READ_MAX_MB`"
+          },
+          "415": {
+            "description": "`unsupported` — byte đầu không phải PDF, JPEG, PNG, TIFF (không tin mime khai)"
+          },
+          "422": {
+            "description": "`unreadable` kèm `reason`: password, corrupt, no_text, timeout, memory, too_many_pixels — đã ghi `intake.suggested` (status unreadable) vào sổ kiểm toán"
+          },
+          "503": {
+            "description": "`busy` (kèm `Retry-After: 10`) chờ lượt quá `MOC_READ_QUEUE_S` · `reader_disabled` · `ocr_unavailable` · `storage_unavailable` · `database_unavailable` — gồm cả khi chưa ghi được sổ kiểm toán: không ghi được sổ thì không trả gợi ý"
+          }
+        }
+      }
+    },
+    "/api/documents/ask": {
+      "post": {
+        "summary": "Hỏi đáp trên kho văn bản: câu trích nguyên văn có nguồn, tùy chọn câu trả lời do mô hình viết",
+        "description": "Chỉ tìm trong các văn bản người hỏi được xem (lọc trước theo vai trò trong Meilisearch, hậu kiểm bằng chính token người hỏi qua Hasura); văn bản hạn chế không bao giờ vào chỉ mục. `extract` trả câu trích nguyên văn kèm số ký hiệu, trang; `generate` thêm câu trả lời do mô hình chạy tại chỗ viết từ đúng các đoạn đó, mỗi câu có [n] do máy chủ gán theo bằng chứng. Mỗi lượt ghi một dòng `assistant.answered` của tác tử `moc-assistant` vào sổ kiểm toán — không có câu hỏi, câu trả lời; không ghi được sổ thì không trả lời. Người hỏi ngắt kết nối thì lượt bị hủy, không ghi sổ.",
+        "operationId": "ask_api_documents_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_question` — rỗng sau chuẩn hóa, quá 500 ký tự, có ký tự điều khiển, hoặc chỉ toàn từ dừng"
+          },
+          "401": {
+            "description": "`missing_token`, `invalid_token` (cả khi Hasura từ chối token lúc hậu kiểm)"
+          },
+          "403": {
+            "description": "`forbidden` — vai trò không phải văn thư, lãnh đạo, trưởng phòng, chuyên viên"
+          },
+          "503": {
+            "description": "`assistant_disabled` · `busy` (kèm `Retry-After: 10`, chờ lượt sinh quá `MOC_ASK_QUEUE_S`) · `search_unavailable` · `database_unavailable` — gồm cả khi chưa ghi được sổ kiểm toán: không ghi được sổ thì không trả lời"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/files": {
+      "post": {
+        "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
+        "operationId": "upload_file_api_files_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restricted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Tệp của văn bản hạn chế (F3.7): chỉ nhận PDF; lưu mã hóa bằng khóa dữ liệu riêng do két cấp, chỉ gắn được vào văn bản hạn chế, xem có dấu tên người xem",
+              "default": false,
+              "title": "Restricted"
+            },
+            "description": "Tệp của văn bản hạn chế (F3.7): chỉ nhận PDF; lưu mã hóa bằng khóa dữ liệu riêng do két cấp, chỉ gắn được vào văn bản hạn chế, xem có dấu tên người xem"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "413": {
+            "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
+          },
+          "415": {
+            "description": "restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
+          },
+          "422": {
+            "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"
+          },
+          "503": {
+            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — không lưu"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{file_id}": {
+      "get": {
+        "summary": "Tải tệp xuống, nếu người gọi được xem tệp",
+        "description": "Tệp của văn bản hạn chế (F3.7) được giải mã trong bộ nhớ, đóng dấu tên người xem và giờ xem lên mọi trang; mỗi lần mở ghi một dòng `file.decrypted` vào sổ kiểm toán — không ghi được sổ thì không trả tệp.",
+        "operationId": "download_file_api_files__file_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nội dung tệp, luôn ở dạng tải về",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Không có tệp, hoặc người gọi không được xem — hai trường hợp trả như nhau"
+          },
+          "422": {
+            "description": "Tệp mã hóa giải mã được nhưng không đóng dấu người xem được (`unstampable`, `reason`): PDF quá MOC_RESTRICTED_MAX_PAGES trang, quá nặng hoặc hỏng — không trả tệp"
+          },
+          "500": {
+            "description": "Tệp mã hóa không mở được: bản mã hỏng hoặc không khớp tệp"
+          },
+          "503": {
+            "description": "CSDL, kho đối tượng hoặc két khóa không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang mở, kiểm tệp hạn chế khác"
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "summary": "Tìm văn bản theo số ký hiệu, trích yếu, cơ quan ban hành, nội dung",
+        "operationId": "search_api_search_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Gõ có dấu hay không dấu đều được",
+              "title": "Q"
+            },
+            "description": "Gõ có dấu hay không dấu đều được"
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "in",
+                    "out"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "received",
+                    "registered",
+                    "in_progress",
+                    "done",
+                    "draft",
+                    "in_review",
+                    "returned",
+                    "approved",
+                    "issued",
+                    "archived",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[^\\s/\"\\\\-]{1,10}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type Code"
+            }
+          },
+          {
+            "name": "urgency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "normal",
+                    "khan",
+                    "thuong_khan",
+                    "hoa_toc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Urgency"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next_cursor` của trang trước",
+              "title": "Cursor"
+            },
+            "description": "`next_cursor` của trang trước"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Câu tìm trống, hoặc `cursor` sai, không phải của câu tìm này"
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "503": {
+            "description": "Meilisearch hoặc CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/preview": {
+      "get": {
+        "summary": "Xem trước văn bản đi dưới dạng PDF đúng thể thức, chưa có số và mã xác thực",
+        "operationId": "preview_document_api_documents__document_id__preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bản PDF in chữ DỰ THẢO",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Không có văn bản đi, hoặc người gọi không được đọc — hai trường hợp trả như nhau"
+          },
+          "409": {
+            "description": "Văn bản đã phát hành: tải bản phát hành thay vì xem trước"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/registers/{direction}/{year}": {
+      "get": {
+        "summary": "Sổ đăng ký văn bản đến / đi của một năm, đúng các cột sẽ in",
+        "operationId": "register_json_api_registers__direction___year__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "direction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string",
+              "description": "in: sổ văn bản đến; out: sổ văn bản đi",
+              "title": "Direction"
+            },
+            "description": "in: sổ văn bản đến; out: sổ văn bản đi"
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/registers/{direction}/{year}/pdf": {
+      "get": {
+        "summary": "In sổ đăng ký văn bản đến / đi của một năm ra PDF để ký nhận, đóng sổ (NĐ 30/2020, Điều 16, 22)",
+        "operationId": "register_pdf_api_registers__direction___year__pdf_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "direction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string",
+              "description": "in: sổ văn bản đến; out: sổ văn bản đi",
+              "title": "Direction"
+            },
+            "description": "in: sổ văn bản đến; out: sổ văn bản đi"
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sổ A4 ngang: bìa, bảng theo mẫu, chỗ ký của văn thư",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify/{code}": {
+      "get": {
+        "summary": "Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)",
+        "operationId": "verify_by_code_api_verify__code__get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "valid: văn bản đã phát hành; not_found: không có văn bản nào khớp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify": {
+      "get": {
+        "summary": "Tra văn bản đã phát hành theo SHA-256 của tệp PDF (trình duyệt tự tính, không tải tệp lên)",
+        "operationId": "verify_by_hash_api_verify_get",
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{64}$",
+              "description": "SHA-256 của tệp, 64 ký tự hex",
+              "title": "Sha256"
+            },
+            "description": "SHA-256 của tệp, 64 ký tự hex"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "valid: văn bản đã phát hành; not_found: không có văn bản nào khớp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOut"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "CSDL không sẵn sàng"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/case-files/{case_file_id}/archive": {
+      "get": {
+        "summary": "Phòng đọc: đọc lại gói lưu trữ của hồ sơ đã nộp lưu từ bucket lạnh, kiểm băm",
+        "operationId": "case_file_archive_api_case_files__case_file_id__archive_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có hồ sơ, hoặc người gọi không được xem"
+          },
+          "409": {
+            "description": "Hồ sơ chưa nộp lưu"
+          },
+          "502": {
+            "description": "Gói trong bucket lạnh không khớp băm ghi trong CSDL"
+          },
+          "503": {
+            "description": "Chưa đọc được CSDL hoặc bucket lạnh"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ArchiveOut": {
+        "properties": {
+          "case_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case File Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "closed_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed On"
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Archived At"
+          },
+          "archive_key": {
+            "type": "string",
+            "title": "Archive Key",
+            "description": "Tiền tố của gói trong bucket lạnh (khóa ghi S3 Object Lock)"
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "title": "Manifest Sha256",
+            "description": "Băm manifest.json đọc từ bucket lạnh — đã so khớp với CSDL"
+          },
+          "retain_until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Retain Until",
+            "description": "Hạn giữ khóa ghi của gói"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDocumentOut"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "Văn bản người gọi đọc được (cùng quy tắc như trước khi nộp lưu), đọc từ bảng Parquet trong gói (DuckDB)"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivedFileOut"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Tệp của các văn bản trên"
+          },
+          "hidden": {
+            "type": "integer",
+            "title": "Hidden",
+            "description": "Số văn bản trong gói người gọi không được đọc — chỉ biết có, không biết là gì"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_file_id",
+          "code",
+          "title",
+          "closed_on",
+          "archived_at",
+          "archive_key",
+          "manifest_sha256",
+          "retain_until",
+          "documents",
+          "files",
+          "hidden"
+        ],
+        "title": "ArchiveOut"
+      },
+      "ArchivedDocumentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction"
+          },
+          "type_code": {
+            "type": "string",
+            "title": "Type Code"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "register_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Register Number"
+          },
+          "verify_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify Code"
+          },
+          "content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "type_code",
+          "symbol",
+          "issuer_name",
+          "issued_on",
+          "summary",
+          "register_number",
+          "verify_code",
+          "content_sha256"
+        ],
+        "title": "ArchivedDocumentOut"
+      },
+      "ArchivedFileOut": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "mime_type",
+          "sha256",
+          "bytes"
+        ],
+        "title": "ArchivedFileOut"
+      },
+      "AskAnswer": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Chữ thuần; mỗi ý kèm [n] trỏ tới `sources[n-1]`. Giao diện hiển thị như chữ, không như HTML"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "extract",
+              "model"
+            ],
+            "title": "Source",
+            "description": "extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Mô hình đã viết câu trả lời; null với câu trích"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "source",
+          "model"
+        ],
+        "title": "AskAnswer"
+      },
+      "AskIn": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Question",
+            "description": "Câu hỏi, tối đa 500 ký tự sau chuẩn hóa",
+            "examples": [
+              "Điều kiện xét học bổng khuyến khích học tập là gì?"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "extract",
+              "generate"
+            ],
+            "title": "Mode",
+            "description": "extract: chỉ câu trích nguyên văn (dưới 1 giây) · generate: thêm câu trả lời do mô hình viết (15–40 giây, chỉ khi `ai_available`)",
+            "default": "extract"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "out"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction",
+            "description": "Chỉ văn bản đến (in) hoặc văn bản đi (out)"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 2000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year",
+            "description": "Năm ban hành"
+          },
+          "type_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^\\s/\"\\\\-]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Code",
+            "description": "Mã loại văn bản, vd CV"
+          },
+          "ask_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask Id",
+            "description": "Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng sổ kiểm toán cùng một câu hỏi"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "AskIn"
+      },
+      "AskOut": {
+        "properties": {
+          "ask_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ask Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "answered",
+              "passages_only",
+              "no_evidence"
+            ],
+            "title": "Status",
+            "description": "answered: có câu trả lời · passages_only: có đoạn liên quan, chưa trích được câu trả lời ngắn · no_evidence: không có văn bản nào người hỏi được xem có nội dung này"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AskAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Câu trả lời của mô hình nếu đạt, không thì câu trích; null khi không có"
+          },
+          "extract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AskAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Câu trích nguyên văn; null khi không câu nào đạt"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AskSource"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Theo thứ tự xếp hạng, tối đa `MOC_ASK_TOP_K`; [] khi no_evidence"
+          },
+          "semantic": {
+            "type": "boolean",
+            "title": "Semantic",
+            "description": "Lượt này có tìm theo nghĩa (mô hình nhúng)"
+          },
+          "ai_available": {
+            "type": "boolean",
+            "title": "Ai Available",
+            "description": "Mô hình viết câu trả lời đang sẵn sàng (gọi lại với mode=generate)"
+          },
+          "warnings": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "embed_unavailable",
+                "model_unavailable",
+                "model_timeout",
+                "model_rejected",
+                "model_declined"
+              ]
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ask_id",
+          "status",
+          "answer",
+          "extract",
+          "sources",
+          "semantic",
+          "ai_available",
+          "warnings",
+          "duration_ms"
+        ],
+        "title": "AskOut"
+      },
+      "AskSource": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Số trong dấu [n], từ 1"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Code"
+          },
+          "type_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Name"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "out"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "page",
+              "meta"
+            ],
+            "title": "Kind",
+            "description": "page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ)"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          },
+          "file_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "main",
+                  "attachment",
+                  "issued"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Role",
+            "description": "main: bản chính · attachment: tài liệu kèm theo · issued: bản phát hành văn bản đi"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page",
+            "description": "Trang trong tệp; null với đoạn meta hoặc chữ chưa có ranh giới trang"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt",
+            "description": "Đoạn trích ≤ 600 ký tự quanh câu khớp nhất"
+          },
+          "cited": {
+            "type": "boolean",
+            "title": "Cited",
+            "description": "Câu trả lời có trích nguồn này"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "document_id",
+          "symbol",
+          "type_code",
+          "type_name",
+          "summary",
+          "issuer_name",
+          "issued_on",
+          "direction",
+          "status",
+          "kind",
+          "file_id",
+          "file_role",
+          "page",
+          "excerpt",
+          "cited"
+        ],
+        "title": "AskSource"
+      },
+      "FileOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "scanned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Scanned At"
+          },
+          "encrypted": {
+            "type": "boolean",
+            "title": "Encrypted",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "mime_type",
+          "size_bytes",
+          "sha256",
+          "scanned_at"
+        ],
+        "title": "FileOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ReadField": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "issued_on: ngày ISO; urgency: normal | khan | thuong_khan | hoa_toc; type_code: mã trong danh mục loại văn bản"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "description": "high, medium: giao diện điền sẵn; low: chỉ hiện gợi ý, văn thư bấm Dùng"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "model"
+            ],
+            "title": "Source",
+            "description": "rule: quy tắc; model: mô hình ngôn ngữ (chỉ trích yếu)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "confidence",
+          "source"
+        ],
+        "title": "ReadField"
+      },
+      "ReadOut": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "description": "ok: tìm được ít nhất một trường; empty: đọc được mà không ra trường nào"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "text",
+              "ocr"
+            ],
+            "title": "Method",
+            "description": "text: lớp chữ của PDF; ocr: nhận dạng chữ bản scan, ảnh"
+          },
+          "pages": {
+            "type": "integer",
+            "title": "Pages",
+            "description": "Số trang của tệp"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ReadField"
+            },
+            "propertyNames": {
+              "enum": [
+                "type_code",
+                "symbol",
+                "issued_on",
+                "issuer_name",
+                "summary",
+                "urgency"
+              ]
+            },
+            "type": "object",
+            "title": "Fields",
+            "description": "Chỉ có khóa đã tìm thấy"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Mã cố định: future_date, invalid_date, symbol_no_number, type_conflict, low_text, truncated, model_unavailable, model_timeout, model_rejected, model_skipped"
+          },
+          "summary_source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "model",
+              "none"
+            ],
+            "title": "Summary Source"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Mô hình ngôn ngữ đã gọi; null nếu không gọi"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached",
+            "description": "true: gợi ý đã lưu từ lần đọc trước (không đọc lại, không ghi sổ)"
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "status",
+          "method",
+          "pages",
+          "fields",
+          "warnings",
+          "summary_source",
+          "model",
+          "duration_ms",
+          "cached",
+          "read_at"
+        ],
+        "title": "ReadOut"
+      },
+      "RegisterEntryOut": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number",
+            "description": "Số đến (sổ đến) hoặc số văn bản đi (sổ đi)"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Mở văn bản trên giao diện; null khi dòng bị che"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "description": "Văn bản hạn chế người gọi không được đọc: chỉ có số, ngày, số ký hiệu"
+          },
+          "cells": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cells",
+            "description": "Giá trị từng cột, đúng thứ tự `columns`; ô Ký nhận để trống"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "document_id",
+          "hidden",
+          "cells"
+        ],
+        "title": "RegisterEntryOut"
+      },
+      "RegisterOut": {
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns",
+            "description": "Cột theo mẫu sổ đăng ký, NĐ 30/2020/NĐ-CP Phụ lục IV"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/RegisterEntryOut"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "last_number": {
+            "type": "integer",
+            "title": "Last Number",
+            "description": "Số cuối đã cấp trong năm"
+          },
+          "missing": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Missing",
+            "description": "Số đã cấp mà không có dòng — sổ phải liền số, bình thường rỗng"
+          }
+        },
+        "type": "object",
+        "required": [
+          "direction",
+          "year",
+          "title",
+          "org_name",
+          "columns",
+          "entries",
+          "last_number",
+          "missing"
+        ],
+        "title": "RegisterOut"
+      },
+      "SearchHit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "received",
+              "registered",
+              "in_progress",
+              "done",
+              "draft",
+              "in_review",
+              "returned",
+              "approved",
+              "issued",
+              "archived",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "type_code": {
+            "type": "string",
+            "title": "Type Code"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "khan",
+              "thuong_khan",
+              "hoa_toc"
+            ],
+            "title": "Urgency"
+          },
+          "register_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Register Number"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered At"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due On"
+          },
+          "matched_content": {
+            "type": "boolean",
+            "title": "Matched Content",
+            "description": "Khớp trong nội dung (văn bản đi, chữ của tệp PDF đính kèm), không khớp số ký hiệu, trích yếu, cơ quan ban hành",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "status",
+          "type_code",
+          "symbol",
+          "issuer_name",
+          "issued_on",
+          "summary",
+          "urgency",
+          "register_number",
+          "registered_at",
+          "due_on"
+        ],
+        "title": "SearchHit"
+      },
+      "SearchOut": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "type": "array",
+            "title": "Hits"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Gửi lại ở tham số `cursor` để lấy trang sau; null khi đã hết"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hits",
+          "next_cursor"
+        ],
+        "title": "SearchOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerifiedDocument": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "issued_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Issued On"
+          },
+          "type_name": {
+            "type": "string",
+            "title": "Type Name"
+          },
+          "issuer_name": {
+            "type": "string",
+            "title": "Issuer Name"
+          },
+          "parent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Name"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "verify_code": {
+            "type": "string",
+            "title": "Verify Code"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "issued",
+              "archived"
+            ],
+            "title": "Status"
+          },
+          "signature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifiedSignature"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chữ ký số của bản phát hành (F4.5, chỉ minh họa); null: văn bản phát hành khi ký số chưa bật hoặc ký lỗi, hoặc văn bản hạn chế"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "issued_on",
+          "type_name",
+          "issuer_name",
+          "parent_name",
+          "summary",
+          "sha256",
+          "verify_code",
+          "status"
+        ],
+        "title": "VerifiedDocument"
+      },
+      "VerifiedSignature": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "const": "PAdES-B-B",
+            "title": "Level",
+            "description": "Chuẩn chữ ký: PAdES mức B-B, không có dấu thời gian tin cậy"
+          },
+          "signer": {
+            "type": "string",
+            "title": "Signer",
+            "description": "Người ký: CN chứng thư của đơn vị phát hành"
+          },
+          "ca": {
+            "type": "string",
+            "title": "Ca",
+            "description": "CN của CA nội bộ cấp chứng thư"
+          },
+          "serial": {
+            "type": "string",
+            "title": "Serial",
+            "description": "Số sê-ri chứng thư, hex thường"
+          },
+          "signed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Signed At",
+            "description": "Giờ ký tự ghi trong chữ ký (không có dấu thời gian tin cậy)"
+          },
+          "illustrative": {
+            "type": "boolean",
+            "const": true,
+            "title": "Illustrative",
+            "description": "Luôn true: chữ ký chỉ để minh họa",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "signer",
+          "ca",
+          "serial",
+          "signed_at"
+        ],
+        "title": "VerifiedSignature",
+        "description": "Chữ ký số của bản phát hành (F4.5) — PKI nội bộ của Signet, chỉ minh họa, không có giá trị pháp lý như chữ ký số\ncông cộng. svc-files đã tự kiểm chữ ký lúc ký; kiểm lại tệp: python -m svc_files.signing verify."
+      },
+      "VerifyOut": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "not_found"
+            ],
+            "title": "Result"
+          },
+          "document": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifiedDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "result"
+        ],
+        "title": "VerifyOut"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

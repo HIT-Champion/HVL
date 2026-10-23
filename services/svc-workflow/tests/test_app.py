@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,14 +21,14 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import DOC, TENANT
+from conftest import DOC, OUT, SCHEMAS, TENANT
 from svc_workflow.app import create_app
 from svc_workflow.config import ConfigError, Settings
 
 ENV = {
     "HASURA_ADMIN_SECRET": "h", "MOC_ACTION_SECRET": "bi-mat-action", "FLOWABLE_ADMIN_PASSWORD": "f",
     "MOC_DIRECTORY_CLIENT_SECRET": "d", "MOC_DIRECTORY_SYNC_INTERVAL_S": "0", "MOC_RECONCILE_INTERVAL_S": "0",
-    "MOC_PROCESSES_DIR": "/khong-co",
+    "MOC_PROCESSES_DIR": "/khong-co", "MOC_SCHEMAS_DIR": str(SCHEMAS),
 }
 
 
@@ -64,6 +64,13 @@ def test_register_incoming_is_for_clerks_only(client):
     assert r.status_code == 200 and r.json()["register_number"] == 7
 
 
+def test_submit_outgoing_is_for_staff_only(client):
+    r = call(client, "submitOutgoing", "clerk", {"documentId": OUT, "signerId": "u-director"})
+    assert r.status_code == 403 and r.json()["extensions"]["code"] == "forbidden"
+    # chuyên viên được gọi; người trong phiên không phải người soạn nên bị từ chối ở bước nghiệp vụ
+    r = call(client, "submitOutgoing", "staff", {"documentId": OUT, "signerId": "u-director"})
+    assert r.status_code == 403 and r.json()["extensions"]["code"] == "not_your_document"
+
 def test_errors_use_hasura_action_format(client):
     r = call(client, "completeTask", "staff", {"taskId": "khong-co", "outcome": "done", "data": {}})
     assert r.status_code == 404
@@ -80,6 +87,14 @@ def test_missing_session_is_bad_request(client):
                     headers={"X-Moc-Action-Secret": "bi-mat-action"})
     assert r.status_code == 400
 
+
+def test_openapi_documents_action_contract(client):
+    spec = client.get("/openapi.json").json()
+    op = spec["paths"]["/actions/{name}"]["post"]
+    assert "session_variables" in op["requestBody"]["content"]["application/json"]["schema"]["properties"]
+    assert "X-Moc-Action-Secret" in [p["name"] for p in op["parameters"]]
+    assert {"401", "403", "409"} <= set(op["responses"])
+    assert "/healthz" not in spec["paths"] and "/readyz" not in spec["paths"]
 
 def test_config_requires_secrets():
     with pytest.raises(ConfigError, match="MOC_ACTION_SECRET"):

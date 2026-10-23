@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:schema:van-ban-den",
+  "title": "Tiếp nhận văn bản đến",
+  "description": "Dữ liệu văn thư nhập khi tiếp nhận một văn bản đến (F2.2). Ba lớp cùng kiểm theo tệp này: form trên trình duyệt (Ajv, biên dịch sẵn lúc build), Action receiveIncoming trong svc-workflow (jsonschema) và ràng buộc CHECK trong PostgreSQL (migration 1792281600800). Xem schemas/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-moc-nfc": true,
+  "required": ["type_code", "symbol", "issuer_name", "issued_on", "summary"],
+  "properties": {
+    "type_code": {
+      "title": "Loại văn bản",
+      "description": "Mã trong office.document_types, vd. CV, TB, QĐ",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10
+    },
+    "symbol": {
+      "title": "Số, ký hiệu",
+      "description": "Như in trên văn bản, vd. 123/UBND-VX",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "$ref": "#/$defs/line"
+    },
+    "issuer_name": {"title": "Cơ quan ban hành", "type": "string", "minLength": 1, "maxLength": 200, "$ref": "#/$defs/line"},
+    "issued_on": {
+      "title": "Ngày ban hành",
+      "type": "string",
+      "format": "date",
+      "pattern": "^(19|20)[0-9]{2}-",
+      "x-moc-date": "not-after-today"
+    },
+    "summary": {"title": "Trích yếu", "type": "string", "minLength": 10, "maxLength": 500, "$ref": "#/$defs/text"},
+    "urgency": {"title": "Độ khẩn", "enum": ["normal", "khan", "thuong_khan", "hoa_toc"], "default": "normal"},
+    "due_on": {
+      "title": "Hạn giải quyết",
+      "type": ["string", "null"],
+      "format": "date",
+      "pattern": "^(19|20)[0-9]{2}-",
+      "x-moc-date": "not-before-today",
+      "default": null
+    },
+    "restricted": {
+      "title": "Văn bản hạn chế",
+      "description": "Chỉ người được giao và lãnh đạo đơn vị đọc được",
+      "type": "boolean",
+      "default": false
+    },
+    "file_ids": {
+      "title": "Tệp đã quét",
+      "description": "Mã tệp svc-files trả về sau khi quét sạch; tệp đầu là bản chính",
+      "type": "array",
+      "items": {"type": "string", "format": "uuid"},
+      "uniqueItems": true,
+      "maxItems": 20,
+      "default": []
+    }
+  },
+  "$defs": {
+    "line": {
+      "$comment": "Một dòng; không ký tự điều khiển, ký tự vô hình; không khoảng trắng ở đầu hoặc cuối. Tập ký tự viết tường minh để Ajv, Python re và PostgreSQL hiểu giống nhau (khoảng trắng đúng bằng \\s của JavaScript).",
+      "not": {
+        "type": "string",
+        "pattern": "[\u0000-\t\u000b\f\u000e-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\n\r\u2028\u2029]|^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]|[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"
+      }
+    },
+    "text": {
+      "$comment": "Được xuống dòng (\\n, \\r); không ký tự điều khiển khác, ký tự vô hình; không khoảng trắng ở đầu hoặc cuối.",
+      "not": {
+        "type": "string",
+        "pattern": "[\u0000-\t\u000b\f\u000e-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\u2028\u2029]|^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]|[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"
+      }
+    }
+  }
+}

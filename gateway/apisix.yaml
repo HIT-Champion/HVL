@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,27 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Cổng duy nhất của Mộc (F1.2). Danh sách trắng: đường dẫn nào không có ở đây thì về giao diện,
+# Cổng duy nhất của Signet (F1.2). Danh sách trắng: đường dẫn nào không có ở đây thì về giao diện,
 # và các đường dẫn quản trị của thành phần lõi bị chặn tường minh (route "chan").
 #
 #   /realms/<realm>/*, /resources/*  → Keycloak (đăng nhập)          — không cần token
 #   /v1/graphql                      → Hasura                       — cần token
-#   /api/files, /api/files/*, /api/search → svc-files                — cần token
+#   /api/files/*, /api/search, /api/documents/*, /api/registers/*, /api/case-files/* → svc-files — cần token
+#   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
+#   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Kiểm token ở biên bằng JWKS của Keycloak (zero-trust: Hasura và svc-files vẫn kiểm lại).
+#
+# Giới hạn tốc độ (số yêu cầu mỗi phút đặt trong .env), vượt thì trả 429:
+#   - đường nhận mật khẩu và cấp token: theo địa chỉ IP (MOC_RATE_LOGIN_PER_MIN) — chặn dò mật khẩu hàng
+#     loạt; Keycloak còn tự khóa từng tài khoản sau 10 lần sai (bruteForceProtected trong realm)
+#   - GraphQL và tệp: theo phiên đăng nhập (MOC_RATE_API_PER_MIN) — không theo IP, để cả văn phòng dùng
+#     chung một IP không bị chặn lây vì một người; mở phiên mới lại phải qua giới hạn đăng nhập
+#   - cổng xác thực văn bản, không cần đăng nhập: theo địa chỉ IP (MOC_RATE_VERIFY_PER_MIN) — không dò được
+#     mã tra cứu hàng loạt
+#   - mở kết nối thông báo realtime: theo địa chỉ IP (MOC_RATE_REALTIME_PER_MIN) — chỉ đếm lần mở WebSocket,
+#     tin đẩy trên kết nối đã mở không bị đếm
 
 upstreams:
   - id: keycloak
@@ -32,6 +44,8 @@ upstreams:
       "keycloak:8080": 1
   - id: hasura
     type: roundrobin
+    # mặc định 60 giây; completeTask (phát hành) được Hasura chờ tới 90 giây (db/metadata/actions.yaml)
+    timeout: {connect: 6, send: 100, read: 100}
     nodes:
       "hasura:8080": 1
   - id: svc-files
@@ -42,6 +56,10 @@ upstreams:
     type: roundrobin
     nodes:
       "app-office:8080": 1
+  - id: centrifugo
+    type: roundrobin
+    nodes:
+      "centrifugo:8000": 1
 
 plugin_configs:
   - id: can-token
@@ -57,6 +75,23 @@ plugin_configs:
         set_access_token_header: false
         set_id_token_header: false
         set_userinfo_header: false
+      # Đếm theo token sau khi openid-connect đã kiểm (token giả bị trả 401 trước, không tạo bộ đếm)
+      limit-count:
+        count: ${{MOC_RATE_API_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: http_authorization
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều yêu cầu trong một phút, thử lại sau ít giây."
+
+  # F1.9: cổng ngoài cho Keycloak sau proxy không gửi X-Forwarded-Port (map moc_cong_chuyen_tiep, config.yaml)
+  - id: cong-keycloak
+    plugins:
+      proxy-rewrite:
+        headers:
+          set:
+            X-Forwarded-Port: $moc_cong_chuyen_tiep
 
 global_rules:
   - id: 1
@@ -65,11 +100,49 @@ global_rules:
         header_name: X-Request-Id
         include_in_response: true
         algorithm: uuid
+      # F3.13: đếm yêu cầu, mã trạng thái, độ trễ của mọi route; nhãn route là id trong tệp này (graphql, svc-files, …)
+      prometheus: {}
 
 routes:
   - id: keycloak
     uris: ["/realms/${{MOC_REALM}}", "/realms/${{MOC_REALM}}/*", "/resources/*"]
     upstream_id: keycloak
+    plugin_config_id: cong-keycloak
+
+  # Đường cụ thể hơn route keycloak nên được chọn trước: biểu mẫu đăng nhập, quên mật khẩu, cấp và làm mới token
+  - id: dang-nhap
+    uris: ["/realms/${{MOC_REALM}}/protocol/openid-connect/token", "/realms/${{MOC_REALM}}/login-actions/*"]
+    upstream_id: keycloak
+    plugin_config_id: cong-keycloak
+    plugins:
+      limit-count:
+        group: dang-nhap
+        count: ${{MOC_RATE_LOGIN_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều lần đăng nhập từ địa chỉ này, thử lại sau một phút."
+
+  # Mọi POST khác vào realm (…/token/, …/token;x, …) cũng tới Keycloak: không cho viết khác đường để né giới hạn trên.
+  # Cùng group nên chung một bộ đếm với route dang-nhap (cấu hình phải giống hệt); priority để thắng route keycloak
+  - id: dang-nhap-post
+    uri: /realms/${{MOC_REALM}}/*
+    methods: [POST]
+    priority: 10
+    upstream_id: keycloak
+    plugin_config_id: cong-keycloak
+    plugins:
+      limit-count:
+        group: dang-nhap
+        count: ${{MOC_RATE_LOGIN_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều lần đăng nhập từ địa chỉ này, thử lại sau một phút."
 
   - id: graphql
     uri: /v1/graphql
@@ -79,14 +152,51 @@ routes:
     plugins:
       proxy-rewrite:
         headers:
-          # khóa quản trị Hasura không bao giờ được đi từ ngoài vào
-          remove: [X-Hasura-Admin-Secret]
+          # khóa quản trị Hasura không bao giờ được đi từ ngoài vào; tên cũ X-Hasura-Access-Key thì Hasura 2.51
+          # đã không nhận, gỡ để phòng xa
+          remove: [X-Hasura-Admin-Secret, X-Hasura-Access-Key]
 
   - id: svc-files
-    uris: ["/api/files", "/api/files/*", "/api/search"]
+    uris: ["/api/files", "/api/files/*", "/api/search", "/api/documents/*", "/api/registers/*", "/api/case-files/*"]
     methods: [GET, POST]
     upstream_id: svc-files
     plugin_config_id: can-token
+
+  # Cổng xác thực văn bản đã phát hành (F2.13): ai cũng gọi được, không cần token — chỉ đọc, mỗi lần đúng một
+  # văn bản theo mã tra cứu hoặc băm, không liệt kê được
+  - id: xac-thuc
+    uris: ["/api/verify", "/api/verify/*"]
+    methods: [GET]
+    upstream_id: svc-files
+    plugins:
+      limit-count:
+        count: ${{MOC_RATE_VERIFY_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Tra cứu quá nhiều trong một phút, thử lại sau ít giây."
+
+  # Thông báo realtime (F2.5): WebSocket tới Centrifugo. Trình duyệt không gắn được header Authorization vào
+  # WebSocket, nên token Keycloak đi trong lệnh connect đầu tiên và Centrifugo tự kiểm (JWKS, iss); chỉ cổng
+  # WebSocket của Centrifugo được nối ra, HTTP API của nó ở cổng nội bộ khác
+  - id: realtime
+    uri: /realtime
+    methods: [GET]
+    upstream_id: centrifugo
+    enable_websocket: true
+    plugins:
+      proxy-rewrite:
+        uri: /connection/websocket
+      limit-count:
+        count: ${{MOC_RATE_REALTIME_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Mở kết nối thông báo quá nhiều lần trong một phút, thử lại sau ít giây."
 
   # Giao diện quản trị và API nội bộ của các thành phần lõi: không bao giờ qua cổng
   - id: chan

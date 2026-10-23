@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "note": "Lịch sử giao việc hư cấu để thử, đo tác tử gợi ý giao việc (F4.3) — không phải văn bản thật, không có người thật. Số ký hiệu đuôi -GVM không trùng dữ liệu mẫu của make seed và seed/hoi-dap. Nạp bởi scripts/demo.py giao-viec, do-giao-viec: văn thư tiếp nhận không kèm tệp, vào sổ; lãnh đạo khoa giao đơn vị chủ trì (lead) hoặc giao thẳng một người (lead_user), hạn = ngày nạp + due_in. Chỉ Tổ Đào tạo (ĐT) và Bộ môn KTPM có lãnh đạo phòng trong seed/users.csv nên chỉ có hai đơn vị hợp lệ.",
+  "history": [
+    {"symbol": "17/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "CV", "topic": "hoc-bong", "summary": "Về việc xét cấp học bổng khuyến khích học tập học kỳ II năm học 2026–2027 cho sinh viên chính quy", "lead": "ĐT", "due_in": 10},
+    {"symbol": "21/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "CV", "topic": "hoc-bong", "summary": "Về việc xét cấp học bổng khuyến khích học tập học kỳ I năm học 2026–2027", "lead": "ĐT", "due_in": 12},
+    {"symbol": "26/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "TB", "topic": "hoc-bong", "summary": "Thông báo xét cấp học bổng khuyến khích học tập cho sinh viên khóa 2026", "lead": "ĐT", "due_in": 9},
+    {"symbol": "31/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "CV", "topic": "hoc-phi", "summary": "Về việc miễn, giảm học phí cho sinh viên thuộc diện chính sách học kỳ I năm học 2026–2027", "lead": "ĐT", "due_in": 10},
+    {"symbol": "34/KHTC-GVM", "issuer_name": "Phòng Kế hoạch – Tài chính", "type_code": "CV", "topic": "hoc-phi", "summary": "Về việc miễn, giảm học phí cho sinh viên thuộc diện chính sách học kỳ II năm học 2025–2026", "lead": "ĐT", "due_in": 11},
+    {"symbol": "38/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "CV", "topic": "hoc-phi", "summary": "Về việc miễn, giảm học phí cho sinh viên thuộc diện chính sách năm học 2025–2026", "lead": "ĐT", "due_in": 9},
+    {"symbol": "52/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "de-cuong", "summary": "Về việc rà soát, cập nhật đề cương chi tiết học phần theo chuẩn đầu ra học kỳ II năm học 2026–2027", "lead": "ĐT", "due_in": 10},
+    {"symbol": "55/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "de-cuong", "summary": "Về việc rà soát, cập nhật đề cương chi tiết học phần theo chuẩn đầu ra năm học 2026–2027", "lead": "ĐT", "due_in": 12},
+    {"symbol": "58/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "de-cuong", "summary": "Về việc rà soát, cập nhật đề cương chi tiết học phần học kỳ II năm học 2025–2026", "lead": "ĐT", "due_in": 8},
+    {"symbol": "61/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "tot-nghiep", "summary": "Về việc xét công nhận tốt nghiệp cho sinh viên chính quy đợt tháng 12 năm 2026", "lead": "ĐT", "due_in": 10},
+    {"symbol": "64/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "tot-nghiep", "summary": "Về việc xét công nhận tốt nghiệp cho sinh viên chính quy đợt tháng 6 năm 2026", "lead": "ĐT", "due_in": 11},
+    {"symbol": "67/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "tot-nghiep", "summary": "Về việc xét công nhận tốt nghiệp cho sinh viên chính quy đợt tháng 3 năm 2026", "lead": "ĐT", "due_in": 9},
+    {"symbol": "71/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "TB", "topic": "thoi-khoa-bieu", "summary": "Thông báo điều chỉnh thời khóa biểu học kỳ II năm học 2026–2027", "lead": "ĐT", "due_in": 10},
+    {"symbol": "74/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "thoi-khoa-bieu", "summary": "Về việc điều chỉnh thời khóa biểu học kỳ II năm học 2026–2027 lần thứ hai", "lead": "ĐT", "due_in": 11},
+    {"symbol": "77/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "thoi-khoa-bieu", "summary": "Về việc điều chỉnh thời khóa biểu học kỳ II năm học 2026–2027 cho các lớp học phần ghép", "lead": "ĐT", "due_in": 9},
+    {"symbol": "23/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "nckh", "summary": "Về việc đăng ký đề tài nghiên cứu khoa học của sinh viên năm 2027", "lead": "KTPM", "due_in": 14},
+    {"symbol": "27/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "nckh", "summary": "Về việc đăng ký đề tài nghiên cứu khoa học của giảng viên năm 2027", "lead": "KTPM", "due_in": 15},
+    {"symbol": "29/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "nckh", "summary": "Về việc đăng ký đề tài nghiên cứu khoa học của giảng viên năm 2026", "lead": "KTPM", "due_in": 13},
+    {"symbol": "33/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "hoi-thao", "summary": "Về việc cử giảng viên tham gia hội thảo khoa học chuyển đổi số", "lead": "KTPM", "due_in": 14},
+    {"symbol": "36/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "hoi-thao", "summary": "Về việc đăng ký tham gia hội thảo khoa học chuyển đổi số trong giáo dục", "lead": "KTPM", "due_in": 15},
+    {"symbol": "39/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "hoi-thao", "summary": "Về việc cử giảng viên tham gia hội thảo chuyển đổi số trong giáo dục đại học", "lead": "KTPM", "due_in": 13},
+    {"symbol": "12/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "topic": "phong-may", "summary": "Về việc bảo trì máy tính phòng thực hành năm 2026", "lead": "KTPM", "due_in": 14},
+    {"symbol": "15/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "topic": "phong-may", "summary": "Về việc bảo trì máy tính phòng thực hành năm 2027", "lead": "KTPM", "due_in": 15},
+    {"symbol": "18/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "topic": "phong-may", "summary": "Về việc bảo trì máy tính phòng thực hành năm học 2026–2027", "lead": "KTPM", "due_in": 13},
+    {"symbol": "42/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "topic": "phan-mem", "summary": "Về việc gia hạn bản quyền phần mềm cho phòng máy thực hành năm 2026", "lead": "KTPM", "due_in": 14},
+    {"symbol": "45/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "topic": "phan-mem", "summary": "Về việc gia hạn bản quyền phần mềm cho phòng máy thực hành năm 2027", "lead": "KTPM", "due_in": 15},
+    {"symbol": "48/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "topic": "phan-mem", "summary": "Về việc gia hạn bản quyền phần mềm dùng trong phòng máy thực hành", "lead": "KTPM", "due_in": 13}
+  ],
+  "people": [
+    {"symbol": "81/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "topic": "thoi-khoa-bieu", "summary": "Về việc điều chỉnh thời khóa biểu học kỳ II năm học 2026–2027 cho lớp chất lượng cao", "lead_user": "chuyenviendt", "due_in": 10},
+    {"symbol": "49/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "topic": "nckh", "summary": "Về việc nghiệm thu đề tài nghiên cứu khoa học của sinh viên năm 2026", "lead_user": "giangvienktpm", "due_in": 14}
+  ],
+  "cases": [
+    {"key": "hoc-bong", "symbol": "301/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "CV", "summary": "Về việc xét cấp học bổng khuyến khích học tập học kỳ II năm học 2026–2027", "expect": {"lead": "ĐT"}},
+    {"key": "hoc-phi", "symbol": "302/KHTC-GVM", "issuer_name": "Phòng Kế hoạch – Tài chính", "type_code": "CV", "summary": "Về việc miễn, giảm học phí cho sinh viên thuộc diện chính sách học kỳ II năm học 2026–2027", "expect": {"lead": "ĐT"}},
+    {"key": "tot-nghiep", "symbol": "303/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "summary": "Về việc xét công nhận tốt nghiệp cho sinh viên chính quy đợt tháng 3 năm 2027", "expect": {"lead": "ĐT"}},
+    {"key": "de-cuong", "symbol": "304/ĐT-GVM", "issuer_name": "Phòng Đào tạo", "type_code": "CV", "summary": "Về việc rà soát đề cương chi tiết học phần theo chuẩn đầu ra mới", "expect": {"lead": "ĐT"}},
+    {"key": "nckh", "symbol": "305/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "CV", "summary": "Về việc đăng ký đề tài nghiên cứu khoa học của sinh viên năm học 2026–2027", "expect": {"lead": "KTPM"}},
+    {"key": "phong-may", "symbol": "306/QTTB-GVM", "issuer_name": "Phòng Quản trị thiết bị", "type_code": "CV", "summary": "Về việc bảo trì máy tính phòng thực hành năm học 2026–2027", "expect": {"lead": "KTPM"}},
+    {"key": "hoi-thao", "symbol": "307/KHCN-GVM", "issuer_name": "Phòng Khoa học và Hợp tác quốc tế", "type_code": "GM", "summary": "Giấy mời tham gia hội thảo khoa học chuyển đổi số trong giáo dục", "expect": {"lead": "KTPM"}},
+    {"key": "khong-lien-quan", "symbol": "308/UBND-GVM", "issuer_name": "Ủy ban nhân dân phường Mẫu", "type_code": "TB", "summary": "Thông báo lịch tiếp công dân định kỳ của Ủy ban nhân dân phường", "expect": {"status": "none"}}
+  ],
+  "bait": {"symbol": "05/CTSV-GVM", "issuer_name": "Phòng Công tác sinh viên", "type_code": "CV", "summary": "Về việc xét cấp học bổng khuyến khích học tập cho sinh viên có hoàn cảnh khó khăn", "lead": "KTPM", "due_in": 3, "restricted": true}
+}

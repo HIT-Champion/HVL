@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -104,6 +104,21 @@ def test_rejected_token_raises_auth_error():
         run(client(rec).visible_file("t", FILE))
 
 
+def test_file_location_runs_as_service_and_reports_restricted_documents():
+    rec = Recorder((200, {"data": {"core_files_by_pk": {
+        "object_key": f"tenant/{TENANT}/2026/10/{FILE}", "wrapped_dek": None,
+        "restricted_links": [{"document_id": str(uuid.uuid4())}]}}}))
+    loc = run(client(rec).file_location(tenant_id=TENANT, actor_id="u-van-thu", request_id="req-1", file_id=FILE))
+    headers, body = rec.last
+    assert headers["x-hasura-role"] == "service" and headers["x-hasura-tenant-id"] == str(TENANT)
+    # chỉ lấy liên kết tới văn bản đang hạn chế, một dòng là đủ
+    assert "document_files(where: {document: {restricted: {_eq: true}}}, limit: 1)" in body["query"]
+    assert loc.restricted is True and loc.wrapped_dek is None and loc.object_key.endswith(str(FILE))
+    rec.reply = (200, {"data": {"core_files_by_pk": {"object_key": "k", "wrapped_dek": None, "restricted_links": []}}})
+    loc = run(client(rec).file_location(tenant_id=TENANT, actor_id="u", request_id="r", file_id=FILE))
+    assert loc.restricted is False
+
+
 @pytest.mark.parametrize("reply", [
     httpx2.ConnectError("không nối được"),
     (500, {"error": "lỗi máy chủ"}),
@@ -123,8 +138,87 @@ def test_log_event_sends_details_as_jsonb():
     assert headers["x-hasura-role"] == "service"
     assert body["variables"]["o"]["diff"] == {"signature": "Eicar"}
     assert body["variables"]["o"]["action"] == "file.rejected"
+    assert body["variables"]["o"]["actor_kind"] == "user"
+
+
+def test_dispatch_source_reads_with_admin_secret_and_returns_hex_hashes():
+    rec = Recorder((200, {"data": {"office_dispatches_by_pk": {
+        "id": "d-1", "tenant_id": str(TENANT), "to_tenant_id": "t-2", "status": "pending", "file_id": str(FILE),
+        "source_sha256": "\\x" + "ab" * 32,
+        "document": {"id": "doc-1", "status": "issued", "restricted": False, "content_sha256": "\\x" + "ab" * 32,
+                     "files": [{"file": {"id": "f-1", "object_key": "k", "filename": "a.pdf",
+                                         "mime_type": "application/pdf", "size_bytes": 10, "sha256": "\\x" + "ab" * 32,
+                                         "encrypted": False, "storage_tier": "hot"}}]},
+    }}}))
+    row = run(client(rec).dispatch_source(uuid.uuid4()))
+    headers, _ = rec.last
+    assert headers["x-hasura-admin-secret"] == "bi-mat" and "x-hasura-role" not in headers
+    assert row["source_sha256"] == row["document"]["content_sha256"] == row["document"]["issued"][0]["sha256"] \
+        == "ab" * 32
+    assert "files" not in row["document"]
 
 
 def test_ping():
     assert run(client(Recorder((200, {}))).ping()) is True
     assert run(client(Recorder(httpx2.ConnectError("x"))).ping()) is False
+
+
+# --- lớp chữ và trợ lý hỏi đáp (F2.7, F4.2) -----------------------------------------------------------------------
+
+
+def test_pending_texts_include_issued_files():
+    rec = Recorder((200, {"data": {"core_files": []}}))
+    run(client(rec).pending_texts(5))
+    _, body = rec.last
+    assert '{document_files: {role: {_in: ["main", "attachment", "issued"]}}}' in body["query"]
+
+
+def test_save_text_sends_page_starts_as_a_json_array():
+    rec = Recorder((200, {"data": {"insert_core_file_texts_one": {"file_id": str(FILE)}}}))
+    run(client(rec).save_text(file_id=str(FILE), tenant_id=str(TENANT), status="ok", pages=2, content="ab\ncd",
+                              note=None, page_starts=[0, 3]))
+    headers, body = rec.last
+    assert headers["x-hasura-admin-secret"] == "bi-mat" and "x-hasura-role" not in headers
+    assert body["variables"]["o"]["page_starts"] == [0, 3]
+    run(client(rec).save_text(file_id=str(FILE), tenant_id=str(TENANT), status="empty", pages=1, content="",
+                              note=None))
+    assert rec.last[1]["variables"]["o"]["page_starts"] is None
+
+
+def test_chunk_sources_reads_every_tenant_with_admin_secret():
+    rec = Recorder((200, {"data": {"office_documents": [{"id": "d-1"}]}}))
+    rows = run(client(rec).chunk_sources(datetime(2026, 10, 21, tzinfo=UTC), 20, str(uuid.UUID(int=0))))
+    headers, body = rec.last
+    assert rows == [{"id": "d-1"}]
+    assert headers["x-hasura-admin-secret"] == "bi-mat" and "x-hasura-role" not in headers
+    assert body["variables"] == {"since": "2026-10-21T00:00:00+00:00", "limit": 20, "after": str(uuid.UUID(int=0))}
+    query = body["query"]
+    assert "{assignments: {assigned_at: {_gte: $since}}}" in query          # giao việc mới cũng là thay đổi
+    assert 'assignments(where: {status: {_neq: "cancelled"}})' in query
+    assert "page_starts" in query and "restricted" in query and "encrypted" in query
+
+
+def test_ask_documents_forwards_the_user_token():
+    rec = Recorder((200, {"data": {"office_documents": [
+        {"id": "d-1", "restricted": False, "document_type": {"name": "Công văn"}}]}}))
+    got = run(client(rec).ask_documents("token-nguoi-hoi", ["d-1", "d-2"]))
+    headers, body = rec.last
+    assert headers["authorization"] == "Bearer token-nguoi-hoi" and "x-hasura-admin-secret" not in headers
+    assert body["variables"] == {"ids": ["d-1", "d-2"]} and "restricted" in body["query"]
+    assert list(got) == ["d-1"]
+
+
+def test_ask_documents_for_a_role_without_documents_is_empty_and_rejected_token_raises():
+    rec = Recorder((200, {"errors": [{"message": "field not found", "extensions": {"code": "validation-failed"}}]}))
+    assert run(client(rec).ask_documents("t", ["d-1"])) == {}
+    rec = Recorder((200, {"errors": [{"message": "JWTExpired", "extensions": {"code": "invalid-jwt"}}]}))
+    with pytest.raises(HasuraAuthError):
+        run(client(rec).ask_documents("t", ["d-1"]))
+
+
+def test_ask_documents_service_runs_as_service_of_the_tenant_and_skips_restricted():
+    rec = Recorder((200, {"data": {"office_documents": []}}))
+    run(client(rec).ask_documents_service(TENANT, ["d-1"]))
+    headers, body = rec.last
+    assert headers["x-hasura-role"] == "service" and headers["x-hasura-tenant-id"] == str(TENANT)
+    assert "{restricted: {_eq: false}}" in body["query"]

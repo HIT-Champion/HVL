@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -152,6 +152,16 @@ class Service(User):
 
 
 @dataclass(frozen=True)
+class Agent(Service):
+    """Tác tử đọc văn bản đến trong svc-files (F4.1): khóa quản trị + vai trò agent + thuê ước của văn thư bấm đọc;
+    sub là danh tính tác tử (MOC_AGENT_ID, mặc định moc-doc-reader)."""
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {**super().headers, "X-Hasura-Role": "agent"}
+
+
+@dataclass(frozen=True)
 class World:
     tenant_a: str
     tenant_b: str
@@ -216,6 +226,17 @@ mutation ($o: office_documents_insert_input!) {
 }"""
 
 
+def received(clerk: User, doc: dict) -> dict:
+    """Văn bản đến như Action receiveIncoming ghi (F2.2): vai trò service thay mặt văn thư, người tạo là văn thư.
+
+    Văn thư không còn quyền ghi thẳng bảng văn bản; stack test này không có svc-workflow nên ghi như svc-workflow
+    ghi. Phần kiểm của svc-workflow có test riêng (services/svc-workflow/tests/test_intake.py).
+    """
+    svc = Service(clerk.sub, "service", clerk.tenant)
+    row = {**doc, "direction": "in", "status": "received", "created_by": clerk.sub}
+    return svc.gql(INSERT_DOC, {"o": row})["insert_office_documents_one"]
+
+
 def incoming(tag: str, n: int, **overrides) -> dict:
     doc = {
         "type_code": "CV",
@@ -238,8 +259,8 @@ def visible_ids(user: User) -> set[str]:
     return {d["id"] for d in user.gql("{ office_documents { id } }")["office_documents"]}
 
 
-def insert_file(service: Service, owner: User, name: str = "cong-van.pdf") -> str:
-    """Giả lập svc-files: tệp đã qua ClamAV, người tải lên là owner."""
+def insert_file(service: Service, owner: User, name: str = "cong-van.pdf", *, encrypted: bool = False) -> str:
+    """Giả lập svc-files: tệp đã qua ClamAV, người tải lên là owner; encrypted = tải lên ở chế độ hạn chế (F3.7)."""
     file_id = str(uuid.uuid4())
     svc = Service(owner.sub, "service", service.tenant)
     svc.gql(
@@ -252,6 +273,7 @@ def insert_file(service: Service, owner: User, name: str = "cong-van.pdf") -> st
             "size_bytes": 1024,
             "sha256": "\\x" + hashlib.sha256(file_id.encode()).hexdigest(),
             "scanned_at": "2026-10-18T09:00:00+07:00",
+            **({"encrypted": True, "wrapped_dek": "vault:v1:thu"} if encrypted else {}),
         }},
     )
     return file_id

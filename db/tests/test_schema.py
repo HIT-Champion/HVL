@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -93,7 +93,8 @@ def test_cannot_point_to_department_of_other_tenant(world):
 
 
 def test_incoming_cannot_use_outgoing_register(world):
-    reg = sql(f"insert into office.registers (tenant_id, direction, year) values ('{world.tenant_a}', 'out', 2026) returning id")[0][0]
+    # năm 2099: sổ đi của năm nay do test cấp số văn bản đi tạo
+    reg = sql(f"insert into office.registers (tenant_id, direction, year) values ('{world.tenant_a}', 'out', 2099) returning id")[0][0]
     with pytest.raises(SQLError, match="foreign key"):
         sql(doc_sql(world.tenant_a, status="registered", register_id=reg, register_number=1,
                     registered_at="2026-10-18T08:00:00+07:00"))

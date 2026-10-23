@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,24 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Phục vụ giao diện tĩnh sau APISIX. ${MOC_REALM} do image nginx thay từ biến môi trường lúc khởi động.
+
+# F4.4: nhật ký truy cập không ghi chuỗi truy vấn (trang Tìm kiếm, Hỏi đáp đặt câu tìm vào ?q=…) và Referer. Tệp này
+# được include trong khối http nên khai map, log_format ở đây được. Đường dẫn lấy từ $request_uri (đúng như client
+# gửi), giữ phần trước dấu ? đầu tiên; không dùng $uri vì try_files đổi nó thành /index.html. Các trường khác giữ như
+# định dạng main của image. envsubst chỉ thay biến môi trường đã khai, nên biến nginx ở đây giữ nguyên.
+map $request_uri $moc_duong_dan {
+    "~^(?<moc_dd>[^?]*)" $moc_dd;
+}
+log_format moc_khong_truy_van '$remote_addr - $remote_user [$time_local] '
+                              '"$request_method $moc_duong_dan $server_protocol" '
+                              '$status $body_bytes_sent "$http_user_agent" "$http_x_forwarded_for"';
+
 server {
     listen 8080;
     server_name _;
     root /usr/share/nginx/html;
     server_tokens off;
+    access_log /var/log/nginx/access.log moc_khong_truy_van;
 
     # nginx chỉ kế thừa add_header khi khối con không có add_header nào, nên mỗi location tự include
     # security-headers.conf. $csp_scripts: băm của các đoạn script nội tuyến, tính lúc dựng image (scripts/csp-hashes.mjs)

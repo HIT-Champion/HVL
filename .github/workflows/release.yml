@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Sinh bản phát hành khi đẩy thẻ phiên bản.
+# Sinh bản phát hành khi đẩy thẻ phiên bản (thẻ trên main, docs/git_flow.md mục 6).
 # Gói nguồn dùng định dạng MỞ .tar.gz (tiêu chí PoF #3 trừ điểm nếu dùng .zip/.rar).
+# Đẩy thẻ thì GitHub chạy bản release.yml ở commit được gắn thẻ: các chốt dưới đây chỉ có ở thẻ gắn sau khi chúng vào
+# main, thẻ cũ (v0.1.0) chỉ được ruleset thẻ v* (cấm sửa, cấm xóa) bảo vệ.
 name: Release
 
 on:
@@ -28,39 +30,86 @@ permissions:
 jobs:
   release:
     name: Phát hành gói nguồn
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
+      # Tên thẻ chỉ được đúng dạng của scripts/release.sh: các bước sau đọc phiên bản qua biến môi trường V, không
+      # chèn ${{ }} vào lệnh shell — tên thẻ git có thể chứa $( ), ;, | mà bộ lọc v*.*.* không chặn
       - name: Xác định phiên bản
         id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+            || { echo "::error::Thẻ '$GITHUB_REF_NAME' không đúng dạng vMAJOR.MINOR.PATCH"; exit 1; }
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # Chỉ phát hành từ main (docs/git_flow.md mục 6): thẻ gắn trên develop hay nhánh khác thì dừng. GITHUB_REF là
+      # refs/tags/<thẻ>, merge-base tự bóc thẻ có chú thích ra commit; origin/main có sẵn nhờ fetch-depth: 0
+      - name: Thẻ nằm trên main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_REF" origin/main \
+            || { echo "::error::Thẻ $GITHUB_REF_NAME không nằm trên main — gộp PR phát hành vào main rồi gắn thẻ trên main"
+                 exit 1; }
+
+      # Thẻ đã có Release thì dừng: không thay gói nguồn, .sha256 và ghi chú mà người dùng đã tải — sửa ghi chú thì sửa
+      # trên trang Release. Xét cả bản nháp: xóa thẻ của Release đã đăng thì GitHub chuyển Release đó thành nháp, mà
+      # .../releases/tags/<thẻ> chỉ thấy Release đã đăng, còn action gặp nháp cũ thì đăng lại nó với gói của commit cũ.
+      # gh lỗi (mạng, quyền) thì phép gán lỗi và bước dừng (bash -e)
+      - name: Chặn phát hành lại
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          list=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+                   --jq '.[] | [.tag_name, (if .draft then "nháp" else "đã đăng" end), .html_url] | @tsv')
+          found=$(awk -F'\t' -v t="$GITHUB_REF_NAME" \
+                    '$1 == t { printf "%s%s %s", sep, $2, $3; sep = "; " }' <<< "$list")
+          if [ -n "$found" ]; then
+            echo "::error::$GITHUB_REF_NAME đã có Release ($found) — phát hành phiên bản mới, không phát hành lại." \
+                 "Nháp do lần chạy trước dừng giữa chừng thì xóa nháp trên trang Release rồi chạy lại"
+            exit 1
+          fi
 
       - name: Sinh gói nguồn .tar.gz
+        env:
+          V: ${{ steps.ver.outputs.version }}
         run: |
-          V="${{ steps.ver.outputs.version }}"
           mkdir -p dist
           git archive --format=tar.gz --prefix="moc-$V/" \
                       -o "dist/moc-$V.tar.gz" "$GITHUB_REF_NAME"
           ( cd dist && sha256sum "moc-$V.tar.gz" > "moc-$V.tar.gz.sha256" )
 
+      # Không có mục [X.Y.Z] thật (khối mẫu trong chú thích HTML không tính) thì dừng, không đăng Release với ghi chú
+      # rỗng — release.sh đã kiểm trước khi gắn thẻ, bước này chặn thẻ gắn tay
       - name: Trích ghi chú phát hành từ CHANGELOG
+        env:
+          V: ${{ steps.ver.outputs.version }}
         run: |
-          V="${{ steps.ver.outputs.version }}"
-          awk -v v="$V" '
-            $0 ~ "^## \\[" v "\\]" { p = 1; next }
-            p && /^## \[/           { exit }
-            p                       { print }
-          ' CHANGELOG.md > dist/RELEASE_NOTES.md
-          test -s dist/RELEASE_NOTES.md \
-            || echo "Xem CHANGELOG.md để biết chi tiết thay đổi." > dist/RELEASE_NOTES.md
+          ./scripts/release-notes.sh "$V" > dist/RELEASE_NOTES.md \
+            || { echo "::error::CHANGELOG.md chưa có mục [$V] — xem lỗi ở trên"; exit 1; }
 
       - name: Tạo bản phát hành trên GitHub
-        uses: softprops/action-gh-release@v2
+        id: gh_release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           body_path: dist/RELEASE_NOTES.md
+          # không ghi đè tệp cùng tên trên Release (mặc định của action là ghi đè); gặp tệp trùng thì action chỉ ghi
+          # log và vẫn xanh — bước sau mới báo lỗi. Thiếu tệp trong dist thì lỗi chứ không đăng Release thiếu gói
+          overwrite_files: false
+          fail_on_unmatched_files: true
           files: |
             dist/*.tar.gz
             dist/*.tar.gz.sha256
+
+      # output assets chỉ gồm tệp thật sự tải lên: thiếu một trong hai là tệp cũ cùng tên còn trên Release (gói và
+      # .sha256 có thể không phải của thẻ này) — lỗi để người phát hành xem lại trang Release
+      - name: Kiểm gói đã tải lên
+        env:
+          ASSETS: ${{ steps.gh_release.outputs.assets }}
+        run: |
+          n=$(jq length <<< "${ASSETS:-[]}")
+          if [ "$n" != 2 ]; then
+            echo "::error::Chỉ tải lên $n/2 tệp — Release đã có tệp cùng tên từ trước, xem lại trang Release"
+            exit 1
+          fi

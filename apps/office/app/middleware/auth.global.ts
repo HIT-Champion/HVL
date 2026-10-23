@@ -1,4 +1,4 @@
-// Copyright 2026 Mộc Team
+// Copyright 2026 Signet Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Mọi trang cần đăng nhập, trừ trang nhận kết quả đăng nhập từ Keycloak.
+// Mọi trang cần đăng nhập, trừ trang nhận kết quả đăng nhập từ Keycloak và cổng xác thực văn bản (công khai).
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path.replace(/\/$/, '') === '/dang-nhap') return
+  if (to.path === '/xac-thuc' || to.path.startsWith('/xac-thuc/')) return
   const auth = useAuth()
   if (auth.user.value && !auth.user.value.expired) return
   const restored = await auth.restore()

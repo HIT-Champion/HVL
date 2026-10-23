@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,36 +28,106 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
-from . import __version__
-from .config import Settings
+from . import __version__, pii
+from .advisor import Advisor
+from .config import ConfigError, Settings
 from .directory import Directory
+from .dispatch import Dispatcher
+from .files import FilesClient, ServiceToken
 from .flowable import FlowableClient, FlowableError
-from .hasura import Actor, HasuraClient
+from .hasura import Actor, HasuraClient, HasuraError
+from .notify import Notifier
+from .openbao import with_secrets
+from .ot import TOKEN_HEADER, OtBridge
+from .schemas import FormSchema, SchemaFileError
+from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
 
 log = logging.getLogger("svc_workflow")
 
 
 def _setup_logging() -> None:
-    """Mỗi dòng nhật ký là một đối tượng JSON trên stdout."""
+    """Mỗi dòng nhật ký là một đối tượng JSON trên stdout.
+
+    F4.4: dòng của dịch vụ (kể cả traceback của ``office.action.failed``), uvicorn.error, uvicorn.access đều qua bộ
+    che PII; dòng truy cập bỏ chuỗi truy vấn. Uvicorn dựng logger và handler của nó trước khi gọi factory."""
     if not log.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("%(message)s"))
         log.addHandler(handler)
         log.setLevel(logging.INFO)
         log.propagate = False
+    # ngoài nhánh trên: logger đã có handler từ trước (fixture của test) vẫn phải được che
+    pii.install_log_redaction(log)
 
 
-def _error(status: int, code: str, message: str) -> JSONResponse:
-    # Định dạng lỗi Hasura chuyển nguyên cho client: errors[0].message và extensions.code
-    return JSONResponse({"message": message, "extensions": {"code": code}}, status_code=status)
+def _error_doc(description: str) -> dict[str, Any]:
+    return {"description": description, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["message", "extensions"],
+        "properties": {
+            "message": {"type": "string", "description": "Câu tiếng Việt, Hasura chuyển nguyên cho người dùng"},
+            "extensions": {"type": "object", "required": ["code"], "properties": {
+                "code": {"type": "string"},
+                "fields": {"type": "object", "additionalProperties": {"type": "string"},
+                           "description": "Trường sai → mã lỗi, cùng mã với form (schemas/README.md)"},
+            }},
+        },
+    }}}}
+
+
+# Thân yêu cầu đọc bằng tay để lỗi nào cũng trả đúng định dạng Action, nên khai cho tài liệu OpenAPI ở đây.
+ACTION_DOC: dict[str, Any] = {
+    "parameters": [{
+        "name": "X-Moc-Action-Secret", "in": "header", "required": True, "schema": {"type": "string"},
+        "description": "Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET)",
+    }],
+    "requestBody": {
+        "required": True,
+        "content": {"application/json": {"schema": {
+            "type": "object",
+            "required": ["action", "input", "session_variables"],
+            "properties": {
+                "action": {"type": "object", "required": ["name"],
+                           "properties": {"name": {"type": "string", "description": "Trùng {name} trên đường dẫn"}}},
+                "input": {"type": "object", "description": "Đối số của Action, khai trong db/metadata/actions.graphql"},
+                "session_variables": {
+                    "type": "object", "additionalProperties": {"type": "string"},
+                    "description": "Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, "
+                                   "x-hasura-tenant-id, x-hasura-department-id",
+                },
+            },
+        }}},
+    },
+    "responses": {
+        "200": {"description": "Kết quả của Action, đúng kiểu trả về khai trong db/metadata/actions.graphql"},
+        "400": _error_doc("Sai định dạng Action; dữ liệu văn bản đến, kết quả hoặc dữ liệu của việc không hợp lệ"),
+        "401": _error_doc("Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi"),
+        "403": _error_doc("Vai trò không được dùng Action này, hoặc việc không giao cho người gọi"),
+        "404": _error_doc("Không có văn bản hoặc việc"),
+        "409": _error_doc("Văn bản đến trùng văn bản đã tiếp nhận, văn bản sai trạng thái, việc vừa có người khác "
+                          "nhận, hoặc CSDL từ chối"),
+        "500": _error_doc("Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký"),
+        "503": _error_doc("Chưa gọi được Flowable hoặc CSDL, thử lại sau"),
+    },
+}
+
+
+def _error(status: int, code: str, message: str, fields: dict[str, str] | None = None) -> JSONResponse:
+    # Định dạng lỗi Hasura chuyển nguyên cho client: errors[0].message và extensions (code, fields)
+    extensions: dict[str, Any] = {"code": code}
+    if fields:
+        extensions["fields"] = fields
+    return JSONResponse({"message": message, "extensions": extensions}, status_code=status)
 
 
 async def _deploy_processes(flowable: FlowableClient, directory: str) -> None:
@@ -91,15 +161,34 @@ def create_app(
     hasura: HasuraClient | None = None,
     flowable: FlowableClient | None = None,
     directory: Directory | None = None,
+    files: FilesClient | None = None,
+    notifier: Notifier | None = None,
+    ot: OtBridge | None = None,
 ) -> FastAPI:
     _setup_logging()
-    settings = settings or Settings.from_env()
+    settings = settings or Settings.from_env(with_secrets(os.environ))
     hasura = hasura or HasuraClient(settings.hasura_url, settings.hasura_admin_secret,
                                     timeout_s=settings.hasura_timeout_s)
     flowable = flowable or FlowableClient(settings.flowable_url, settings.flowable_user, settings.flowable_password)
     directory = directory or Directory(settings.keycloak_url, settings.realm, settings.directory_client_id,
                                        settings.directory_client_secret, hasura)
-    workflow = Workflow(hasura, flowable, sla_duration=settings.sla_duration)
+    files = files or FilesClient(settings.files_url, ServiceToken(
+        settings.keycloak_url, settings.realm, settings.directory_client_id, settings.directory_client_secret))
+    notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key)
+    try:
+        intake = FormSchema.load(Path(settings.schemas_dir) / "van-ban-den.json")
+    except SchemaFileError as exc:
+        raise ConfigError(f"MOC_SCHEMAS_DIR: {exc}") from exc
+    dispatcher = Dispatcher(hasura, files, notifier)
+    workflow = Workflow(hasura, flowable, files, notifier=notifier, sla_duration=settings.sla_duration, intake=intake,
+                        dispatcher=dispatcher)
+    deadlines = Deadlines(hasura, flowable, notifier, sla_duration=settings.sla_duration)
+    ot = ot or (OtBridge(hasura, notifier, settings.ngsi_url, secret=settings.action_secret,
+                         threshold=settings.ot_threshold, notify_url=settings.ot_notify_url)
+                if settings.ngsi_url else None)
+    # F4.3: tác tử gợi ý giao việc nhận việc moc-goi-y của nhánh song song với bước chỉ đạo; không chạy thì nhánh tự
+    # hết sau PT10M (timer boGoiY), văn bản vẫn tới lãnh đạo như thường
+    advisor = Advisor(hasura, flowable, files, settings) if settings.suggest_poll_interval_s > 0 else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -109,6 +198,19 @@ def create_app(
         if settings.reconcile_interval_s > 0:
             tasks.append(asyncio.create_task(
                 _every(settings.reconcile_interval_s, "office.process.reconciled", workflow.reconcile)))
+            tasks.append(asyncio.create_task(
+                _every(settings.reconcile_interval_s, "office.document.overdue_notified", deadlines.overdue_documents)))
+        if settings.dispatch_interval_s > 0:
+            tasks.append(asyncio.create_task(
+                _every(settings.dispatch_interval_s, "office.dispatch.reconciled", dispatcher.reconcile)))
+        if settings.sla_poll_interval_s > 0:
+            tasks.append(asyncio.create_task(
+                _every(settings.sla_poll_interval_s, "office.sla.jobs_handled", deadlines.run_jobs)))
+        if advisor is not None:
+            tasks.append(asyncio.create_task(
+                _every(settings.suggest_poll_interval_s, "office.assign.jobs_handled", advisor.run_jobs)))
+        if ot is not None and settings.ot_interval_s > 0:
+            tasks.append(asyncio.create_task(_every(settings.ot_interval_s, "ot.subscriptions_ensured", ot.ensure_all)))
         try:
             yield
         finally:
@@ -116,24 +218,68 @@ def create_app(
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             await directory.aclose()
+            if ot is not None:
+                await ot.aclose()
+            await notifier.aclose()
+            await files.aclose()
             await flowable.aclose()
             await hasura.aclose()
 
-    app = FastAPI(title="Mộc svc-workflow", version=__version__, lifespan=lifespan)
+    app = FastAPI(
+        title="Signet svc-workflow",
+        version=__version__,
+        description="Hasura Actions của Văn phòng điện tử. API nội bộ: chỉ Hasura gọi, không qua cổng APISIX; "
+                    "ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
+        lifespan=lifespan,
+    )
     app.state.workflow = workflow
+    app.state.dispatcher = dispatcher
+    app.state.deadlines = deadlines
+    app.state.advisor = advisor
     app.state.directory = directory
+    app.state.ot = ot
 
-    @app.get("/healthz")
+    @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/readyz")
+    @app.get("/readyz", include_in_schema=False)
     async def readyz() -> JSONResponse:
         checks = {"hasura": await hasura.ping(), "flowable": await flowable.ping()}
         ok = all(checks.values())
         return JSONResponse({"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503)
 
-    @app.post("/actions/{name}")
+    @app.post("/ot/notify/{tenant}", status_code=204,
+              summary="Nhận thông báo của subscription NGSI-LD: cảm biến vượt ngưỡng → dự thảo báo cáo sự cố (F3.10)",
+              description="Chỉ context broker gọi, kèm header X-Moc-OT-Token của đơn vị (broker nhận token khi "
+                          "svc-workflow tạo subscription). Thân là Notification NGSI-LD (format normalized).",
+              responses={401: {"description": "Thiếu hoặc sai token của đơn vị"},
+                         404: {"description": "Chưa cấu hình MOC_NGSI_URL"},
+                         503: {"description": "Chưa ghi được CSDL, broker sẽ báo lỗi gửi"}})
+    async def ot_notify(tenant: str, request: Request) -> Response:
+        if ot is None:
+            return _error(404, "not_found", "Chưa bật IT/OT (MOC_NGSI_URL)")
+        if not ot.check(tenant, request.headers.get(TOKEN_HEADER, "")):
+            return _error(401, "unauthorized", "Sai token của đơn vị")
+        try:
+            body = await request.json()
+            if not isinstance(body, dict):
+                raise ValueError("không phải đối tượng JSON")
+        except ValueError:
+            return _error(400, "bad_request", "Thông báo không phải Notification NGSI-LD")
+        try:
+            await ot.handle(tenant, body)
+        except ValueError:
+            return _error(400, "bad_request", "Thông báo không có danh sách thực thể")
+        except HasuraError as exc:
+            log.warning(json.dumps({"event": "ot.alarm_failed", "tenant": tenant, "error": str(exc)},
+                                   ensure_ascii=False))
+            return _error(503, "unavailable", "Chưa ghi được dự thảo, thử lại sau")
+        return Response(status_code=204)
+
+    @app.post("/actions/{name}",
+              summary="Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",
+              openapi_extra=ACTION_DOC)
     async def action(name: str, request: Request) -> JSONResponse:
         given = request.headers.get("x-moc-action-secret", "")
         if not hmac.compare_digest(given.encode(), settings.action_secret.encode()):
@@ -150,8 +296,14 @@ def create_app(
 
         started = asyncio.get_running_loop().time()
         try:
-            if name == "registerIncoming" and actor.role == "clerk":
-                result: Any = await workflow.register_incoming(actor, str(payload.get("documentId", "")))
+            if name == "receiveIncoming" and actor.role == "clerk":
+                result: Any = await workflow.receive_incoming(actor, payload.get("data"))
+            elif name == "registerIncoming" and actor.role == "clerk":
+                result = await workflow.register_incoming(actor, str(payload.get("documentId", "")))
+            elif name == "submitOutgoing" and actor.role == "staff":
+                result = await workflow.submit_outgoing(
+                    actor, str(payload.get("documentId", "")), str(payload.get("signerId", "")),
+                )
             elif name == "myTasks":
                 result = await workflow.my_tasks(actor)
             elif name == "completeTask":
@@ -162,8 +314,8 @@ def create_app(
                 return _error(403, "forbidden", "Vai trò không được dùng thao tác này")
         except WorkflowError as exc:
             log.info(json.dumps({"event": "office.action.rejected", "action": name, "code": exc.code,
-                                 "user_id": actor.user_id, "request_id": actor.request_id}))
-            return _error(exc.status, exc.code, exc.message)
+                                 "fields": exc.fields, "user_id": actor.user_id, "request_id": actor.request_id}))
+            return _error(exc.status, exc.code, exc.message, exc.fields)
         except Exception:  # noqa: BLE001 — không để lộ chi tiết nội bộ cho client
             log.exception(json.dumps({"event": "office.action.failed", "action": name, "request_id": actor.request_id}))
             return _error(500, "internal", "Lỗi không mong đợi; đã ghi nhật ký với mã " + (actor.request_id or "?"))

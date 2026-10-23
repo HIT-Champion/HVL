@@ -1,5 +1,5 @@
 <!--
-  Copyright 2026 Mộc Team
+  Copyright 2026 Signet Team
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -36,7 +36,10 @@ const tasks = ref<InboxTask[]>([])
 const loading = ref(true)
 const failure = ref('')
 
+// việc mới đẩy tới lúc đang tải dở: lượt cũ về sau không đè danh sách mới hơn
+let seq = 0
 async function load() {
+  const mine = ++seq
   loading.value = true
   failure.value = ''
   try {
@@ -44,15 +47,25 @@ async function load() {
       myTasks { id name form_key created_at due_on urgency document_id
         document { symbol summary issuer_name register_number status } }
     }`)
-    tasks.value = data.myTasks
+    if (mine === seq) tasks.value = data.myTasks
   } catch (e) {
-    failure.value = errorText(t, e)
+    if (mine === seq) failure.value = errorText(t, e)
   } finally {
-    loading.value = false
+    if (mine === seq) loading.value = false
   }
 }
 
-onMounted(load)
+// Quản trị đơn vị không có hộp việc (Action myTasks chỉ cho vai trò nghiệp vụ, menu cũng không có): trang đầu của
+// họ là sổ kiểm toán
+const claims = useAuth().claims
+onMounted(() => {
+  if (claims.value?.role === 'tenant_admin') void navigateTo('/so-kiem-toan', { replace: true })
+  else void load()
+})
+
+// việc mới, nhắc hạn đẩy tới (F2.5): tải lại hộp việc, không phải bấm Làm mới
+const { lastPush } = useNotifications()
+watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
 </script>
 
 <template>
@@ -62,13 +75,13 @@ onMounted(load)
     </PageHeader>
 
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-else-if="loading && !tasks.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <div v-else-if="!tasks.length" class="card flex flex-col items-center gap-2 p-12 text-center text-stone-500">
       <svg class="h-10 w-10 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       {{ t('inbox.empty') }}
     </div>
 
-    <ul v-else class="space-y-3">
+    <ul v-else class="space-y-3" data-testid="inbox">
       <li v-for="task in tasks" :key="task.id">
         <NuxtLink
           :to="`/van-ban/${task.document_id}`"

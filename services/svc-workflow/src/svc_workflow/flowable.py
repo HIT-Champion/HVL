@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +35,16 @@ class FlowableError(Exception):
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
+
+
+@dataclass(frozen=True)
+class ExternalJob:
+    """Việc Flowable giao ra ngoài (external worker): ở đây là bước "nhắc hạn" sau timer quá hạn."""
+
+    id: str
+    process_instance_id: str
+    element_id: str
+    variables: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -84,6 +94,8 @@ class FlowableClient:
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._http = httpx2.AsyncClient(base_url=base_url, auth=(user, password), timeout=timeout_s, transport=transport)
+        # API external worker nằm cạnh REST API chính: …/flowable-rest/external-job-api
+        self._jobs = base_url.rstrip("/").removesuffix("/service") + "/external-job-api/acquire/jobs"
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -144,6 +156,15 @@ class FlowableClient:
         )
         return data["id"]
 
+    async def delete_process(self, process_id: str, reason: str) -> None:
+        """Hủy phiên vừa khởi chạy thừa (lần gọi khác đã gắn phiên của nó vào văn bản): chưa ai làm gì trong đó."""
+        await self._request("DELETE", f"/runtime/process-instances/{process_id}", params={"deleteReason": reason})
+
+    async def set_variables(self, process_id: str, variables: dict[str, Any]) -> None:
+        """Ghi biến của phiên quy trình: PUT tạo biến chưa có, ghi đè biến đã có (POST thì 409 khi đã có). Chỉ tác dụng
+        với việc tạo sau đó — việc đang mở giữ người được giao lúc tạo."""
+        await self._request("PUT", f"/runtime/process-instances/{process_id}/variables", json=_variables(variables))
+
     # --- việc ---------------------------------------------------------------------------------------
 
     async def tasks_for(self, user_id: str, groups: list[str]) -> list[Task]:
@@ -171,6 +192,14 @@ class FlowableClient:
         row["variables"] = variables
         return _task(row)
 
+    async def process_tasks(self, process_instance_id: str) -> list[Task]:
+        """Việc đang mở của một phiên quy trình — sau mỗi bước, để báo người phải làm bước kế tiếp."""
+        data = await self._request(
+            "POST", "/query/tasks",
+            json={"processInstanceId": process_instance_id, "includeProcessVariables": True, "size": 50},
+        )
+        return [_task(row) for row in data["data"]]
+
     async def candidate_groups(self, task_id: str) -> list[str]:
         links = await self._request("GET", f"/runtime/tasks/{task_id}/identitylinks")
         return [link["group"] for link in links if link.get("group") and link.get("type") == "candidate"]
@@ -183,3 +212,30 @@ class FlowableClient:
         await self._request(
             "POST", f"/runtime/tasks/{task_id}", json={"action": "complete", "variables": _variables(variables)},
         )
+
+    # --- việc giao ra ngoài (external worker) ----------------------------------------------------------
+
+    async def acquire_jobs(self, topic: str, worker_id: str, *, count: int = 20,
+                           lock: str = "PT2M") -> list[ExternalJob]:
+        """Nhận và khóa tối đa count việc của topic; quá hạn khóa mà chưa xong thì Flowable giao lại."""
+        rows = await self._request("POST", self._jobs, json={
+            "topic": topic, "workerId": worker_id, "numberOfTasks": count, "lockDuration": lock,
+        })
+        return [
+            ExternalJob(
+                id=row["id"],
+                process_instance_id=row.get("processInstanceId") or "",
+                element_id=row.get("elementId") or "",
+                variables={v["name"]: v.get("value") for v in row.get("variables") or []},
+            )
+            for row in rows or []
+        ]
+
+    async def complete_job(self, job_id: str, worker_id: str) -> None:
+        await self._request("POST", f"{self._jobs}/{job_id}/complete", json={"workerId": worker_id})
+
+    async def fail_job(self, job_id: str, worker_id: str, message: str, retry_after: str = "PT1M") -> None:
+        """Báo lỗi: Flowable bớt một lần thử và giao lại sau retry_after; hết lượt thử thì vào hàng việc chết."""
+        await self._request("POST", f"{self._jobs}/{job_id}/fail", json={
+            "workerId": worker_id, "errorMessage": message[:255], "retryTimeout": retry_after,
+        })

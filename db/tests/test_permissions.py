@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ from conftest import (
     insert_file,
     make_token,
     outgoing,
+    received,
     visible_ids,
 )
 
@@ -45,23 +46,14 @@ mutation ($o: office_document_files_insert_input!) {
 # --- ghi trực tiếp: cột đặt sẵn từ token, không tin dữ liệu client gửi -----------------------------
 
 
-def test_clerk_creates_incoming_with_server_side_presets(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 1)})["insert_office_documents_one"]
-    assert doc["tenant_id"] == world.tenant_a
-    assert doc["direction"] == "in"
-    assert doc["status"] == "received"
-    assert doc["created_by"] == world.clerk_a.sub
-
-
-@pytest.mark.parametrize("field, value", [
-    ("status", "registered"),
-    ("tenant_id", "00000000-0000-0000-0000-000000000000"),
-    ("created_by", "nguoi-khac"),
-    ("register_number", 1),
-])
-def test_clerk_cannot_set_protected_columns(world, field, value):
-    with pytest.raises(GraphQLError, match=field):
-        world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 2, **{field: value})})
+def test_clerk_writes_incoming_only_through_the_action(world):
+    """Văn bản đến chỉ vào qua Action receiveIncoming: svc-workflow kiểm lại theo schemas/van-ban-den.json (F2.2),
+    tự đặt đơn vị, người tạo, chiều, trạng thái. Văn thư ghi thẳng bảng thì không có mutation nào để gọi."""
+    with pytest.raises(GraphQLError, match="insert_office_documents_one"):
+        world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 1)})
+    doc = received(world.clerk_a, incoming(world.tag, 2))
+    with pytest.raises(GraphQLError, match="update_office_documents"):
+        world.clerk_a.gql(UPDATE_DOC, {"id": doc["id"], "set": {"summary": "Về việc sửa thẳng không qua Action"}})
 
 
 def test_staff_draft_is_outgoing_of_own_department(world):
@@ -81,21 +73,6 @@ def test_manager_and_director_have_no_direct_insert(world):
             user.gql(INSERT_DOC, {"o": outgoing(2)})
 
 
-def test_clerk_cannot_change_status(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 4)})["insert_office_documents_one"]
-    with pytest.raises(GraphQLError, match="status"):
-        world.clerk_a.gql(UPDATE_DOC, {"id": doc["id"], "set": {"status": "registered"}})
-
-
-def test_clerk_edits_only_while_received(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 5)})["insert_office_documents_one"]
-    fixed = {"summary": "Về việc triển khai chuyển đổi số năm học 2026–2027 (đã sửa)"}
-    assert world.clerk_a.gql(UPDATE_DOC, {"id": doc["id"], "set": fixed})["update_office_documents"]["affected_rows"] == 1
-
-    world.service_a.gql(UPDATE_DOC, {"id": doc["id"], "set": {"status": "cancelled"}})
-    assert world.clerk_a.gql(UPDATE_DOC, {"id": doc["id"], "set": fixed})["update_office_documents"]["affected_rows"] == 0
-
-
 def test_staff_edits_only_own_draft(world):
     doc = world.staff_a1.gql(INSERT_DOC, {"o": outgoing(3)})["insert_office_documents_one"]
     change = {"summary": "Thông báo lịch họp giao ban tháng 11 (sửa lần 2)"}
@@ -107,7 +84,7 @@ def test_staff_edits_only_own_draft(world):
 
 
 def test_tenants_are_isolated(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 6)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 6))
     assert doc["id"] in visible_ids(world.clerk_a)
     assert doc["id"] not in visible_ids(world.clerk_b)
     by_pk = world.clerk_b.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { id } }", {"id": doc["id"]})
@@ -121,7 +98,7 @@ def test_tenants_are_isolated(world):
 
 def test_session_headers_from_client_are_ignored(world):
     """Ở chế độ JWT, Hasura chỉ tin claim trong token; tiêu đề X-Hasura-Tenant-Id do client gửi bị bỏ qua."""
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 7)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 7))
     body = world.clerk_b.raw("{ office_documents { id } }", **{"X-Hasura-Tenant-Id": world.tenant_a})
     assert doc["id"] not in {d["id"] for d in body["data"]["office_documents"]}
 
@@ -151,7 +128,7 @@ def test_outgoing_draft_visible_within_department_only(world):
 
 
 def test_assignment_grants_visibility(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 8)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 8))
     assert doc["id"] not in visible_ids(world.manager_a2)
     assert doc["id"] not in visible_ids(world.staff_a2)
 
@@ -170,7 +147,7 @@ def test_assignment_grants_visibility(world):
 
 
 def test_restricted_document_needs_acl(world):
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 9, restricted=True)})["insert_office_documents_one"]
+    doc = received(world.clerk_a, incoming(world.tag, 9, restricted=True))
     assert doc["id"] in visible_ids(world.clerk_a)          # người tạo vẫn thấy
     assert doc["id"] not in visible_ids(world.director_a)
 
@@ -209,9 +186,12 @@ def test_uploader_sees_own_file_until_attached(world):
     assert file_id not in files(world.director_a)
     assert file_id not in files(world.clerk_b)
 
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 10)})["insert_office_documents_one"]
-    link = world.clerk_a.gql(ATTACH, {"o": {"document_id": doc["id"], "file_id": file_id, "role": "main"}})
-    assert link["insert_office_document_files_one"]["added_by"] == world.clerk_a.sub
+    # gắn khi tiếp nhận, như Action receiveIncoming ghi
+    doc = received(world.clerk_a, {**incoming(world.tag, 10), "files": {"data": [
+        {"file_id": file_id, "role": "main", "added_by": world.clerk_a.sub}]}})
+    links = world.clerk_a.gql("query ($d: uuid!) { office_document_files(where: {document_id: {_eq: $d}}) { added_by } }",
+                              {"d": doc["id"]})["office_document_files"]
+    assert links == [{"added_by": world.clerk_a.sub}]
     assert file_id in files(world.director_a)
     assert file_id not in files(world.clerk_b)
 
@@ -230,31 +210,43 @@ def test_cannot_attach_someone_elses_file(world):
         world.staff_a1.gql(ATTACH, {"o": {"document_id": draft["id"], "file_id": file_id, "role": "draft"}})
 
 
-def test_cannot_attach_to_document_past_first_step(world):
-    file_id = insert_file(world.service_a, world.clerk_a)
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 11)})["insert_office_documents_one"]
-    world.service_a.gql(UPDATE_DOC, {"id": doc["id"], "set": {"status": "cancelled"}})
+def test_cannot_attach_to_draft_past_first_step(world):
+    file_id = insert_file(world.service_a, world.staff_a1)
+    draft = world.staff_a1.gql(INSERT_DOC, {"o": outgoing(11)})["insert_office_documents_one"]
+    world.service_a.gql(UPDATE_DOC, {"id": draft["id"], "set": {"status": "in_review"}})
     with pytest.raises(GraphQLError, match="check constraint|permission"):
-        world.clerk_a.gql(ATTACH, {"o": {"document_id": doc["id"], "file_id": file_id, "role": "main"}})
+        world.staff_a1.gql(ATTACH, {"o": {"document_id": draft["id"], "file_id": file_id, "role": "attachment"}})
 
 
-def test_clerk_cannot_attach_as_issued(world):
-    file_id = insert_file(world.service_a, world.clerk_a)
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 12)})["insert_office_documents_one"]
+def test_staff_cannot_attach_as_issued(world):
+    file_id = insert_file(world.service_a, world.staff_a1)
+    draft = world.staff_a1.gql(INSERT_DOC, {"o": outgoing(12)})["insert_office_documents_one"]
     with pytest.raises(GraphQLError, match="check constraint|permission"):
-        world.clerk_a.gql(ATTACH, {"o": {"document_id": doc["id"], "file_id": file_id, "role": "issued"}})
+        world.staff_a1.gql(ATTACH, {"o": {"document_id": draft["id"], "file_id": file_id, "role": "issued"}})
 
 
-def test_clerk_can_detach_while_received(world):
-    file_id = insert_file(world.service_a, world.clerk_a)
-    doc = world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, 13)})["insert_office_documents_one"]
-    world.clerk_a.gql(ATTACH, {"o": {"document_id": doc["id"], "file_id": file_id, "role": "attachment"}})
-    gone = world.clerk_a.gql(
+def test_staff_can_detach_from_own_draft(world):
+    file_id = insert_file(world.service_a, world.staff_a1)
+    draft = world.staff_a1.gql(INSERT_DOC, {"o": outgoing(13)})["insert_office_documents_one"]
+    world.staff_a1.gql(ATTACH, {"o": {"document_id": draft["id"], "file_id": file_id, "role": "attachment"}})
+    gone = world.staff_a1.gql(
         """mutation ($d: uuid!, $f: uuid!) {
              delete_office_document_files(where: {document_id: {_eq: $d}, file_id: {_eq: $f}}) { affected_rows } }""",
-        {"d": doc["id"], "f": file_id},
+        {"d": draft["id"], "f": file_id},
     )
     assert gone["delete_office_document_files"]["affected_rows"] == 1
+
+
+def test_clerk_has_no_direct_write_on_document_files(world):
+    """Tệp của văn bản đến gắn qua Action receiveIncoming (đủ kiểm: tối đa 20 tệp, một bản chính, đúng người tải),
+    nên văn thư không gắn, không gỡ thẳng được — kể cả vào văn bản hạn chế mình không thấy."""
+    file_id = insert_file(world.service_a, world.clerk_a)
+    doc = received(world.clerk_a, incoming(world.tag, 14, restricted=True))
+    with pytest.raises(GraphQLError, match="insert_office_document_files_one"):
+        world.clerk_a.gql(ATTACH, {"o": {"document_id": doc["id"], "file_id": file_id, "role": "main"}})
+    with pytest.raises(GraphQLError, match="delete_office_document_files"):
+        world.clerk_a.gql("mutation ($d: uuid!) { delete_office_document_files(where: {document_id: {_eq: $d}}) "
+                          "{ affected_rows } }", {"d": doc["id"]})
 
 
 def test_user_without_department_claim_sees_no_department_documents(world):

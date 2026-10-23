@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ def test_register_starts_process_and_links_it(workflow, hasura, flowable):
     out = run(workflow.register_incoming(actor("clerk", "u-clerk"), DOC))
     assert out == {"document_id": DOC, "register_number": 7}
     assert flowable.started[0]["tenantId"] == str(TENANT) and flowable.started[0]["urgency"] == "khan"
-    assert hasura.writes[-1][0] == "SetProcess" and hasura.writes[-1][1]["pid"] == f"proc-{DOC}"
+    assert hasura.writes[-1][0] == "ClaimProcess" and hasura.writes[-1][1]["pid"] == f"proc-{DOC}"
 
 
 def test_register_reuses_existing_process(workflow, hasura, flowable):
@@ -58,8 +58,39 @@ def test_register_keeps_number_when_flowable_is_down(workflow, hasura, flowable)
     flowable.down = True
     out = run(workflow.register_incoming(actor("clerk"), DOC))
     assert out["register_number"] == 7          # số đã cấp; job đối soát khởi chạy quy trình sau
-    assert not any(w[0] == "SetProcess" for w in hasura.writes)
+    assert not any(w[0] == "ClaimProcess" for w in hasura.writes)
 
+
+def test_double_register_starts_one_process(workflow, hasura, flowable):
+    hasura.slow = flowable.slow = True
+
+    async def twice():
+        return await asyncio.gather(*(workflow.register_incoming(actor("clerk"), DOC) for _ in range(2)))
+
+    assert run(twice()) == [{"document_id": DOC, "register_number": 7}] * 2
+    assert len(flowable.started) == 1 and flowable.deleted == []
+    assert hasura.document["process_id"] == f"proc-{DOC}"
+
+
+def test_register_losing_the_race_cancels_its_own_process(workflow, hasura, flowable):
+    hasura.rival_process = "proc-rival"            # job đối soát gắn quy trình ngay trước lần ghi của mình
+    run(workflow.register_incoming(actor("clerk"), DOC))
+    assert flowable.deleted == [f"proc-{DOC}"] and hasura.document["process_id"] == "proc-rival"
+
+
+def test_found_process_is_never_cancelled(workflow, hasura, flowable):
+    flowable.processes[DOC] = "proc-old"           # phiên tìm thấy chứ không do mình khởi chạy: không hủy
+    hasura.rival_process = "proc-rival"
+    run(workflow.register_incoming(actor("clerk"), DOC))
+    assert flowable.started == [] and flowable.deleted == []
+
+
+
+def test_link_failing_after_start_leaves_a_trace(workflow, hasura, flowable, caplog):
+    hasura.fail_writes = "Không gọi được Hasura"     # vào sổ xong, quy trình đã chạy, ghi process_id lỗi
+    out = run(workflow.register_incoming(actor("clerk"), DOC))
+    assert out["register_number"] == 7 and len(flowable.started) == 1
+    assert any("office.process.unlinked" in r.message and f"proc-{DOC}" in r.message for r in caplog.records)
 
 def test_register_maps_errors(workflow, hasura):
     with pytest.raises(WorkflowError) as e:
@@ -216,6 +247,70 @@ def test_retry_after_database_write_only_finishes_flowable(workflow, flowable, h
     assert hasura.writes == []
     assert flowable.completed and flowable.completed[0][0] == "t1"
 
+
+def test_concurrent_completion_writes_once(workflow, flowable, hasura):
+    flowable.add_task("t1", "vbden.chiDao", groups=[DIRECTOR_GROUP])
+    hasura.slow = True
+
+    async def twice():
+        return await asyncio.gather(*(workflow.complete_task(actor("director", "u-director"), "t1", "direct",
+                                                             direct_data()) for _ in range(2)), return_exceptions=True)
+
+    first, second = run(twice())
+    assert first == {"task_id": "t1", "document_id": DOC}
+    assert isinstance(second, WorkflowError) and second.code == "task_not_found"   # lần sau thấy việc đã xong
+    assert [w[0] for w in hasura.writes] == ["ChiDao"] and len(flowable.completed) == 1
+
+
+def test_write_blocked_by_task_index_still_finishes_flowable(workflow, flowable, hasura):
+    flowable.add_task("t1", "vbden.chiDao", groups=[DIRECTOR_GROUP])
+    hasura.done_elsewhere = True                   # bản sao khác ghi xong ngay sau lần kiểm: chỉ mục chặn lần ghi này
+    out = run(workflow.complete_task(actor("director", "u-director"), "t1", "direct", direct_data()))
+    assert out == {"task_id": "t1", "document_id": DOC} and hasura.writes == []
+    assert flowable.completed[0][0] == "t1" and flowable.claims == [("t1", "u-director")]
+
+
+def test_task_completed_elsewhere_after_write_is_not_an_error(workflow, flowable, hasura):
+    flowable.add_task("t1", "vbden.chiDao", groups=[DIRECTOR_GROUP])
+    flowable.gone_on_complete = True
+    out = run(workflow.complete_task(actor("director", "u-director"), "t1", "direct", direct_data()))
+    assert out == {"task_id": "t1", "document_id": DOC} and [w[0] for w in hasura.writes] == ["ChiDao"]
+
+
+
+def test_event_carries_the_flowable_variables(workflow, flowable, hasura):
+    flowable.add_task("t1", "vbden.chiDao", groups=[DIRECTOR_GROUP])
+    run(workflow.complete_task(actor("director", "u-director"), "t1", "direct", direct_data()))
+    (_, variables, _), = [w for w in hasura.writes if w[0] == "ChiDao"]
+    assert variables["event"]["data"]["flow"] == flowable.completed[0][1]
+
+
+def test_retry_after_flowable_error_finishes_what_was_saved(workflow, flowable, hasura):
+    hasura.assignments = [
+        {"id": "a-lead", "parent_id": None, "department_id": str(DEPT_DT), "user_id": None, "role": "lead",
+         "due_on": None, "status": "open"},
+        {"id": "a-me", "parent_id": "a-lead", "department_id": None, "user_id": "u-staff-dt", "role": "lead",
+         "due_on": None, "status": "open"},
+    ]
+    flowable.add_task("t3", "vbden.xuLy", assignee="u-staff-dt")
+    flowable.fail_complete = 1
+    staff = actor("staff", "u-staff-dt", dept=DEPT_DT)
+    with pytest.raises(WorkflowError, match="Đã lưu") as err:
+        run(workflow.complete_task(staff, "t3", "done", {"result_note": "Đã xong"}))
+    assert err.value.status == 503 and all(a["status"] == "done" for a in hasura.assignments)
+    # bấm lại: giao việc đã đóng nên không dựng lại kế hoạch được — vẫn hoàn thành nốt trong Flowable, không ghi thêm
+    out = run(workflow.complete_task(staff, "t3", "done", {"result_note": "Đã xong"}))
+    assert out == {"task_id": "t3", "document_id": DOC}
+    assert [w[0] for w in hasura.writes] == ["XuLy"] and flowable.completed == [("t3", {"outcome": "done"})]
+
+
+def test_index_conflict_without_own_event_is_refused(workflow, flowable, hasura):
+    flowable.add_task("t1", "vbden.chiDao", groups=[DIRECTOR_GROUP])
+    hasura.task_once_elsewhere = True               # chỉ mục chặn, nhưng không có sự kiện nào của văn bản này
+    with pytest.raises(WorkflowError) as err:
+        run(workflow.complete_task(actor("director", "u-director"), "t1", "direct", direct_data()))
+    assert err.value.status == 409 and "lần gọi khác" in err.value.message
+    assert flowable.claims == [("t1", "u-director"), ("t1", None)] and flowable.completed == []
 
 def test_database_rejection_returns_task_to_group(workflow, flowable, hasura):
     flowable.add_task("t1", "vbden.chiDao", groups=[DIRECTOR_GROUP])

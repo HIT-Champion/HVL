@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,13 +20,14 @@
 [project]
 name = "svc-workflow"
 version = "0.1.0"
-description = "Mộc — Hasura Actions của Văn phòng điện tử, nối PostgreSQL với Flowable"
+description = "Signet — Hasura Actions của Văn phòng điện tử, nối PostgreSQL với Flowable"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.143.3,<0.144",
   "uvicorn>=0.54,<0.55",
   "httpx2>=2.13,<3",
+  "jsonschema>=4.26,<5",
 ]
 
 [project.optional-dependencies]

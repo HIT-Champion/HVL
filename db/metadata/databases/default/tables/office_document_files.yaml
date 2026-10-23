@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Gắn tệp vào văn bản. Người dùng chỉ gắn tệp do chính mình tải lên, vào văn bản mình còn được sửa,
-# và gỡ được khi văn bản còn ở bước đó. Bản phát hành ('issued') chỉ svc-workflow gắn.
+# Gắn tệp vào văn bản. Chuyên viên chỉ gắn tệp do chính mình tải lên, vào dự thảo mình còn được sửa, và gỡ được
+# khi dự thảo còn ở bước đó. Tệp của văn bản đến gắn qua Action receiveIncoming (svc-workflow kiểm theo
+# schemas/van-ban-den.json, F2.2), nên văn thư không ghi thẳng bảng này. Bản phát hành ('issued') chỉ svc-workflow gắn.
 # Khóa ngoại (tenant_id, …) trong CSDL bảo đảm văn bản và tệp cùng một thuê ước.
 table:
   name: document_files
@@ -32,17 +33,6 @@ object_relationships:
         remote_table: {name: files, schema: core}
         column_mapping: {file_id: id}
 insert_permissions:
-  - role: clerk
-    permission:
-      columns: [document_id, file_id, role]
-      set:
-        tenant_id: X-Hasura-Tenant-Id
-        added_by: X-Hasura-User-Id
-      check: &clerk_editable
-        _and:
-          - document: {direction: {_eq: in}, status: {_eq: received}}
-          - file: {created_by: {_eq: X-Hasura-User-Id}}
-          - role: {_in: [main, attachment]}
   - role: staff
     permission:
       columns: [document_id, file_id, role]
@@ -55,7 +45,8 @@ insert_permissions:
               direction: {_eq: out}
               status: {_in: [draft, returned]}
               created_by: {_eq: X-Hasura-User-Id}
-          - file: {created_by: {_eq: X-Hasura-User-Id}}
+          # tệp đã nộp lưu (F3.8) chỉ còn trong bucket lạnh: không gắn lại vào dự thảo
+          - file: {created_by: {_eq: X-Hasura-User-Id}, storage_tier: {_eq: hot}}
           - role: {_in: [draft, attachment]}
   - role: service
     permission:
@@ -82,12 +73,6 @@ select_permissions:
       columns: [tenant_id, document_id, file_id, role, version, added_by, added_at]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
 delete_permissions:
-  - role: clerk
-    permission:
-      filter:
-        _and:
-          - tenant_id: {_eq: X-Hasura-Tenant-Id}
-          - *clerk_editable
   - role: staff
     permission:
       filter:

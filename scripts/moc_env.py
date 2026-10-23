@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,18 +18,28 @@
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
+import hmac
 import json
 import os
 import pathlib
+import re
+import struct
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from collections.abc import Sequence
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT =pathlib.Path(__file__).resolve().parent.parent
+# Chuỗi kiểm thử chuẩn EICAR (không phải mã độc thật), ghép từ hai nửa để chính tệp này không bị phần mềm diệt
+# virus chặn — dùng cho kiểm tra chặn (smoke.py) và màn demo kiểm dịch (demo.py)
+EICAR = ("X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*").encode()
 
 
 def load_env() -> dict[str, str]:
@@ -51,6 +61,9 @@ ENV = load_env()
 PUBLIC_URL = ENV["MOC_PUBLIC_URL"].rstrip("/")
 REALM = ENV.get("MOC_REALM", "moc")
 KEYCLOAK_ADMIN_URL = f"http://127.0.0.1:{ENV.get('KEYCLOAK_ADMIN_PORT', '8180')}"
+# Sau Cloudflare (docs/trien-khai.md mục 5b), Browser Integrity Check bật sẵn trả 403 cho User-Agent mặc định
+# "Python-urllib/3.x": seed, smoke… đi qua MOC_PUBLIC_URL nên tự xưng tên riêng
+USER_AGENT = "Signet-scripts"
 
 
 class HTTPError(Exception):
@@ -62,7 +75,7 @@ class HTTPError(Exception):
 
 def request(method: str, url: str, *, data: bytes | None = None, headers: dict[str, str] | None = None,
             timeout: float = 60) -> tuple[int, dict[str, str], bytes]:
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    req = urllib.request.Request(url, data=data, method=method, headers={"User-Agent": USER_AGENT, **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, dict(resp.headers), resp.read()
@@ -95,19 +108,85 @@ def wait_for(url: str, what: str, timeout_s: int = 300) -> None:
             time.sleep(2)
 
 
+TOTP_PERIOD = 30
+# Sổ mã TOTP đã gửi, theo địa chỉ hệ thống rồi theo tài khoản: chung cho mọi kịch bản trên máy (smoke, demo… chạy nối
+# nhau) và cho e2e (tests/e2e/helpers.ts — Playwright chạy trong container chỉ thấy tests/e2e). Keycloak không nhận lại
+# mã đã dùng và đếm mỗi mã bị từ chối là một lần đăng nhập sai: đủ failureFactor (10) thì khóa tài khoản
+_E2E_DIR = ROOT / "tests" / "e2e"
+_OTP_USED = (_E2E_DIR if _E2E_DIR.is_dir() else pathlib.Path(tempfile.gettempdir())) / ".otp-used.json"
+
+
+def totp_at(secret: str, counter: int) -> str:
+    """Mã TOTP (RFC 6238: HMAC-SHA1, 6 số) của khoảng 30 giây thứ counter. Keycloak dùng chính chuỗi khóa làm khóa."""
+    mac = hmac.new(secret.encode(), struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = mac[-1] & 0x0F
+    return str((struct.unpack(">I", mac[offset:offset + 4])[0] & 0x7FFFFFFF) % 1_000_000).zfill(6)
+
+
+def _otp_counter(username: str) -> int:
+    """Khoảng 30 giây chưa dùng mã của tài khoản. Realm nhận mã của khoảng hiện tại và một khoảng mỗi bên
+    (otpPolicyLookAheadWindow) nhưng không nhận lại mã đã dùng: mỗi tài khoản có ba mã mỗi 30 giây, hết thì đợi.
+    Dùng khoảng trước trước tiên — người dùng thật trên trình duyệt gõ mã hiện tại."""
+    with open(_OTP_USED, "a+", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        try:
+            ledger = json.loads(f.read() or "{}")
+        except ValueError:
+            ledger = {}
+        used = ledger.setdefault(PUBLIC_URL, {})
+        now = time.time()
+        current = int(now // TOTP_PERIOD)
+        # sát cuối khoảng thì mã của khoảng trước sắp hết hạn trên server: bỏ qua
+        counter = max(current - 1 if now % TOTP_PERIOD < TOTP_PERIOD - 3 else current, used.get(username, 0) + 1)
+        if counter > current + 1:
+            time.sleep((counter - 1) * TOTP_PERIOD - now + 0.5)
+        used[username] = counter
+        f.seek(0)
+        f.truncate()
+        f.write(json.dumps(ledger))
+    return counter
+
+
+def user_login(username: str, password: str | None = None) -> tuple[dict, dict[str, str]]:
+    """Đăng nhập qua client moc-cli (luồng mật khẩu, qua APISIX như một ứng dụng thật) → (thân trả về, header).
+
+    Luồng của moc-cli hỏi mã TOTP như trình duyệt (văn thư, lãnh đạo, quản trị đơn vị; vai trò khác nếu đã tự cài):
+    gửi kèm mã tính từ MOC_DEMO_TOTP_SECRET mà make seed cài cho tài khoản mẫu. Vai trò không cần mã thì Keycloak bỏ
+    qua tham số này."""
+    form = {"grant_type": "password", "client_id": "moc-cli", "username": username,
+            "password": password or ENV["MOC_DEMO_PASSWORD"], "scope": "openid"}
+    secret = ENV.get("MOC_DEMO_TOTP_SECRET", "")
+    url = f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token"
+    if not secret:
+        return call_json("POST", url, form=form)
+    for attempt in range(4):
+        try:
+            return call_json("POST", url, form={**form, "otp": totp_at(secret, _otp_counter(username))})
+        except HTTPError as exc:
+            # Keycloak 26 trả cùng một lỗi 400 "Invalid user credentials" cho sai mật khẩu, mã sai, mã đã dùng và
+            # tài khoản đang tạm khóa. Mã có thể vừa bị dùng ngoài sổ (đăng nhập trên trình duyệt, e2e chạy từ thư
+            # mục mã nguồn còn kịch bản chạy từ bản cài): thử mã kế tiếp, tối đa bốn mã — cả ba mã đang hiệu lực có
+            # thể đã bị dùng (e2e đăng nhập liên tiếp), mã thứ tư thì _otp_counter đợi sang khoảng 30 giây mới.
+            # Mật khẩu sai thật thì tốn bốn lần sai trong failureFactor 10. Đợi quá 1 giây: hai lần sai sát nhau thì
+            # Keycloak coi là dò mật khẩu, khóa tài khoản một phút (quickLoginCheckMilliSeconds mặc định 1000)
+            if exc.status != 400 or "Invalid user credentials" not in exc.body:
+                raise
+            if attempt == 3:
+                raise HTTPError(400, f"{exc.body} — Keycloak từ chối {username} với bốn mã TOTP liền nhau: sai tên "
+                                     "đăng nhập hoặc mật khẩu, MOC_DEMO_TOTP_SECRET khác khóa đã cài, hoặc tài khoản "
+                                     "đang tạm khóa vì đăng nhập sai liên tiếp (đợi một phút rồi chạy lại)",
+                                url) from exc
+            time.sleep(1.5)
+    raise AssertionError("không tới được đây")
+
+
 def user_token(username: str, password: str | None = None) -> str:
-    """Token của tài khoản qua client moc-cli (luồng mật khẩu), lấy qua APISIX như một ứng dụng thật."""
-    data, _ = call_json(
-        "POST",
-        f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token",
-        form={"grant_type": "password", "client_id": "moc-cli", "username": username,
-              "password": password or ENV["MOC_DEMO_PASSWORD"], "scope": "openid"},
-    )
-    return data["access_token"]
+    return user_login(username, password)[0]["access_token"]
 
 
 class Session:
-    """Một người dùng gọi Mộc qua cổng APISIX."""
+    """Một người dùng gọi Signet qua cổng APISIX."""
 
     def __init__(self, username: str):
         self.username = username
@@ -141,17 +220,128 @@ class Session:
             {"t": task_id, "o": outcome, "d": data},
         )
 
-    def upload(self, filename: str, content: bytes, mime: str = "application/pdf") -> dict:
+    def upload(self, filename: str, content: bytes, mime: str = "application/pdf", *, restricted: bool = False) -> dict:
+        """restricted: tải lên cho văn bản hạn chế (F3.7) — svc-files mã hóa trước khi lưu, chỉ nhận PDF."""
         boundary = uuid.uuid4().hex
         body = (
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
             f"Content-Type: {mime}\r\n\r\n"
         ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
-        _, _, raw = request("POST", f"{PUBLIC_URL}/api/files", data=body,
+        url = f"{PUBLIC_URL}/api/files" + ("?restricted=true" if restricted else "")
+        _, _, raw = request("POST", url, data=body,
                             headers={**self.auth, "Content-Type": f"multipart/form-data; boundary={boundary}"})
         return json.loads(raw)
+
+
+def text_pdf(*lines: str) -> bytes:
+    """PDF một trang có lớp chữ (Helvetica, chỉ ASCII) — để kiểm tìm theo nội dung tệp (F2.7)."""
+    return text_pages(lines)
+
+
+def text_pages(*pages: Sequence[str]) -> bytes:
+    """PDF nhiều trang có lớp chữ (Helvetica, chỉ ASCII), mỗi tham số là các dòng của một trang — để kiểm câu trích
+    của trợ lý hỏi đáp ghi đúng trang (F4.2). Một trang thì ra đúng các byte text_pdf vẫn tạo."""
+    def esc(line: str) -> str:
+        return line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    # Số đối tượng: 1 catalog, 2 cây trang, 4 phông; trang đầu 3 + nội dung 5, các trang sau từ 6 (trang, nội dung)
+    page_ids = [3] + [6 + 2 * i for i in range(len(pages) - 1)]
+    objs = {1: b"<</Type/Catalog/Pages 2 0 R>>",
+            2: b"<</Type/Pages/Kids[%s]/Count %d>>" % (b" ".join(b"%d 0 R" % p for p in page_ids), len(pages)),
+            4: b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>"}
+    for page_id, lines in zip(page_ids, pages):
+        content = 5 if page_id == 3 else page_id + 1
+        stream = ("BT /F1 12 Tf 72 760 Td 14 TL " + " ".join(f"({esc(line)}) '" for line in lines) + " ET").encode()
+        objs[page_id] = (b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 4 0 R>>>>"
+                         b"/Contents %d 0 R>>" % content)
+        objs[content] = b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream"
+    out, offsets = b"%PDF-1.4\n", []
+    for i in range(1, len(objs) + 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + objs[i] + b"\nendobj\n"
+    xref = len(out)
+    out += (b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+            + b"".join(b"%010d 00000 n \n" % o for o in offsets))
+    return out + b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
 
 
 def compose(*args: str, stdin: bytes | None = None) -> bytes:
     cmd = ["docker", "compose", "--profile", "core", "--profile", "app", *args]
     return subprocess.run(cmd, cwd=ROOT, input=stdin, check=True, capture_output=True).stdout
+
+
+# --- F4.5 · Ký số PAdES văn bản đi (PKI nội bộ trong két, chỉ minh họa): dùng chung cho smoke.py, demo.py ----------
+# /ByteRange [a b c d] của một chữ ký: phần đã ký là byte [a, a+b) và [c, c+d); khoảng giữa là chữ ký (/Contents)
+_BYTE_RANGE = re.compile(rb"/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]")
+# stream có dữ liệu là cấu trúc PDF (đối tượng nén, bảng xref): lật byte ở đó thì tệp không đọc được nữa
+_STRUCTURE_STREAM = re.compile(rb"/Type\s*/(?:ObjStm|XRef)\b")
+
+
+def _byte_ranges(pdf: bytes) -> list[tuple[int, int, int, int]]:
+    """Các /ByteRange hợp lệ trong tệp: bắt đầu từ byte 0, khoảng chữ ký nằm giữa hai phần, phần sau không vượt tệp."""
+    ranges = [tuple(map(int, m.groups())) for m in _BYTE_RANGE.finditer(pdf)]
+    return [(a, b, c, d) for a, b, c, d in ranges if a == 0 < b < c and c + d <= len(pdf)]
+
+
+def byte_range_end(pdf: bytes) -> int | None:
+    """Cuối phần đã ký của lần ký sau cùng (c + d của /ByteRange [0 b c d]); tệp không có chữ ký thì None.
+
+    Bằng độ dài tệp: chữ ký phủ cả tệp. Nhỏ hơn: có byte thêm vào sau khi ký — băm tệp[:cuối] trùng băm bản phát hành
+    thì phần đã ký còn nguyên, phần thêm vào không do đơn vị phát hành ký (cổng xác thực báo "sửa sau khi ký")."""
+    return max((c + d for _, _, c, d in _byte_ranges(pdf)), default=None)
+
+
+def flip_in_signed_stream(pdf: bytes) -> bytes:
+    """Bản sao PDF lật một bit ở byte thứ 8 trong dữ liệu của stream đầu tiên nằm trong khoảng ký thứ nhất (byte
+    [0, b) của /ByteRange). Cấu trúc PDF (bảng xref, đối tượng nén, chữ ký) còn nguyên nên trình kiểm vẫn đọc được tệp,
+    nhưng nội dung đã ký đã đổi: phải báo chữ ký không khớp nội dung. Lật một byte bất kỳ có thể rơi vào bảng xref hay
+    chính chữ ký, khi đó tệp không còn đọc được như PDF. Tệp không có chữ ký, không có stream phù hợp: ValueError."""
+    signed = min((b for _, b, _, _ in _byte_ranges(pdf)), default=0)
+    for m in re.finditer(rb"(?<!end)stream(?:\r\n|\n)", pdf[:signed]):
+        head = pdf[max(pdf.rfind(b" obj", 0, m.start()), 0):m.start()]    # từ điển của đối tượng mang stream
+        pos = m.end() + 7
+        if not _STRUCTURE_STREAM.search(head) and pos < pdf.find(b"endstream", m.end(), signed):
+            out = bytearray(pdf)
+            out[pos] ^= 0x01
+            return bytes(out)
+    raise ValueError("không có stream nào nằm trong phần đã ký (/ByteRange) để lật byte")
+
+
+# Chạy trong svc-files (pypdf có sẵn), PDF đã ký ở stdin: thêm một lớp sửa bổ sung thật — chú thích FreeText "Đã sửa sau
+# khi ký" trên trang 1, ghi nối sau bản đã ký như trình đọc PDF lưu ghi chú — rồi in tệp mới ra stdout. Chế độ ghi nối
+# của pypdf 6 nhận tệp gốc ở tham số đầu (clone_from là chép lại cả tệp). Dùng:
+# compose("exec", "-T", "svc-files", "python", "-c", INCREMENTAL_EDIT, stdin=pdf)
+INCREMENTAL_EDIT = """import io, sys
+from pypdf import PdfReader, PdfWriter
+from pypdf.annotations import FreeText
+signed = sys.stdin.buffer.read()
+writer = PdfWriter(PdfReader(io.BytesIO(signed)), incremental=True)
+writer.add_annotation(page_number=0, annotation=FreeText(text="Đã sửa sau khi ký", rect=(72, 72, 360, 108)))
+out = io.BytesIO()
+writer.write(out)
+edited = out.getvalue()
+if not edited.startswith(signed):
+    sys.exit("pypdf không ghi nối: phần đã ký bị viết lại")
+sys.stdout.buffer.write(edited)
+"""
+
+
+def vault_ca_pem() -> str | None:
+    """Chứng thư CA nội bộ (PEM) đọc thẳng trong container két — pki/ca/pem không cần token. Két khởi tạo trước F4.5
+    (chưa có PKI nội bộ, ký số tự tắt) thì None."""
+    try:
+        pem = compose("exec", "-T", "openbao", "wget", "-qO-", "http://127.0.0.1:8200/v1/pki/ca/pem").decode()
+    except subprocess.CalledProcessError:
+        return None
+    return pem if pem.startswith("-----BEGIN CERTIFICATE-----") else None
+
+
+def signature_cli(pdf: bytes) -> tuple[int, list[str]]:
+    """Kiểm chữ ký số của tệp PDF bằng pyHanko trong svc-files (python -m svc_files.signing verify, chỉ tin CA của két)
+    → (mã thoát, các dòng in ra). 0: hợp lệ; 1: đã sửa sau khi ký, không khớp nội dung, không do CA Signet cấp, không có
+    chữ ký; 2: không đọc được tệp như PDF, không lấy được chứng thư CA. Dòng đầu là kết luận."""
+    try:
+        out = compose("exec", "-T", "svc-files", "python", "-m", "svc_files.signing", "verify", stdin=pdf)
+        return 0, out.decode(errors="replace").splitlines()
+    except subprocess.CalledProcessError as exc:
+        return exc.returncode, (exc.stdout or exc.stderr or b"").decode(errors="replace").splitlines()

@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,6 +76,18 @@ def test_infected_stream_reports_signature():
         assert not result.clean and result.signature == "Eicar-Test-Signature"
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(("reply", "unscannable"), [
+    (b"stream: Heuristics.Encrypted.Zip FOUND", True),
+    (b"stream: Heuristics.Encrypted.PDF FOUND", True),
+    (b"stream: Heuristics.Limits.Exceeded.MaxRecursion FOUND", True),
+    (b"stream: Eicar-Test-Signature FOUND", False),
+    (b"stream: Heuristics.Phishing.Email.SpoofedDomain FOUND", False),   # mẫu đáng ngờ: vẫn là nhiễm
+    (b"stream: OK", False),
+])
+def test_unscannable_is_told_apart_from_infected(reply, unscannable):
+    assert parse_reply(reply).unscannable is unscannable
 
 
 def test_ping():

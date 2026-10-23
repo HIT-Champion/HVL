@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,13 @@
 
 - "!include core_tenants.yaml"
 - "!include core_files.yaml"
+- "!include core_file_texts.yaml"
+- "!include core_file_signatures.yaml"
 - "!include core_audit_log.yaml"
+- "!include core_audit_head.yaml"
+- "!include core_audit_anchors.yaml"
 - "!include core_users.yaml"
+- "!include core_notifications.yaml"
 - "!include office_departments.yaml"
 - "!include office_document_types.yaml"
 - "!include office_registers.yaml"
@@ -26,3 +31,18 @@
 - "!include office_document_acl.yaml"
 - "!include office_assignments.yaml"
 - "!include office_document_events.yaml"
+- "!include office_issued_documents.yaml"
+- "!include office_v_document_counts.yaml"
+- "!include office_v_overdue_by_department.yaml"
+- "!include office_v_processing_time.yaml"
+- "!include office_v_outgoing_by_month.yaml"
+- "!include office_case_files.yaml"
+- "!include office_case_file_documents.yaml"
+- "!include core_lineage_events.yaml"
+- "!include office_document_history.yaml"
+- "!include office_dispatch_units.yaml"
+- "!include office_dispatches.yaml"
+- "!include office_intake_suggestions.yaml"
+- "!include office_v_intake_accuracy.yaml"
+- "!include office_assignment_suggestions.yaml"
+- "!include office_v_assignment_suggestion_accuracy.yaml"

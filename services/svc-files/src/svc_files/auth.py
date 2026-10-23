@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,8 +47,21 @@ class Principal:
     tenant_id: uuid.UUID
     roles: tuple[str, ...]
     department_id: str | None = None
+    # Tên hiển thị (claim name, preferred_username của Keycloak): in lên bản xem văn bản hạn chế (F3.7)
+    display_name: str = ""
     # Token gốc, để hỏi Hasura thay mặt người dùng (quyền do Hasura quyết, không viết lại ở đây).
     token: str = field(default="", repr=False, compare=False)
+    # Vai trò Hasura áp cho token này (x-hasura-default-role; thiếu thì vai trò duy nhất trong allowed-roles; rỗng khi
+    # không xác định được). Trợ lý hỏi đáp (F4.2) dựng điều kiện lọc trước theo vai trò này — Hasura vẫn hậu kiểm.
+    role: str = ""
+
+
+def default_role(claim: object, roles: tuple[str, ...]) -> str:
+    """Vai trò Hasura dùng khi yêu cầu không gửi ``X-Hasura-Role``: claim mặc định nếu nó nằm trong allowed-roles
+    (Hasura từ chối token có vai trò mặc định ngoài danh sách), thiếu claim thì vai trò duy nhất, còn lại rỗng."""
+    if isinstance(claim, str) and claim:
+        return claim if claim in roles else ""
+    return roles[0] if len(roles) == 1 else ""
 
 
 class SigningKeySource(Protocol):
@@ -71,6 +84,43 @@ class TokenVerifier:
         self._keys = keys or jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=300, timeout=5)
 
     def verify(self, token: str) -> Principal:
+        claims = self._decode(token)
+        ns = claims.get(HASURA_CLAIMS)
+        if not isinstance(ns, dict):
+            ns = {}
+        tenant_raw = ns.get("x-hasura-tenant-id")
+        try:
+            tenant_id = uuid.UUID(str(tenant_raw))
+        except ValueError as exc:
+            raise AuthError(403, "no_tenant", "Tài khoản chưa được gán đơn vị (tenant_id)") from exc
+
+        raw_roles = ns.get("x-hasura-allowed-roles") or []
+        roles = tuple(str(r) for r in raw_roles) if isinstance(raw_roles, list) else ()
+        name = " ".join(str(claims.get("name") or "").split())[:120]
+        login = " ".join(str(claims.get("preferred_username") or "").split())[:60]
+        display = f"{name} ({login})" if name and login and login != name else name or login
+        return Principal(
+            user_id=str(ns.get("x-hasura-user-id") or claims["sub"]),
+            tenant_id=tenant_id,
+            roles=roles,
+            department_id=ns.get("x-hasura-department-id"),
+            display_name=display,
+            token=token,
+            role=default_role(ns.get("x-hasura-default-role"), roles),
+        )
+
+    def verify_service(self, token: str, clients: frozenset[str]) -> str:
+        """Token tài khoản dịch vụ (client credentials của Keycloak): trả client_id nếu được phép gọi API nội bộ.
+
+        Người dùng không lấy được token mang client_id của dịch vụ khi không có bí mật của client đó.
+        """
+        claims = self._decode(token)
+        client = claims.get("azp") or claims.get("client_id")
+        if client not in clients:
+            raise AuthError(403, "not_a_service", "Chỉ dịch vụ nội bộ được gọi")
+        return str(client)
+
+    def _decode(self, token: str) -> dict[str, Any]:
         try:
             key = self._keys.get_signing_key_from_jwt(token).key
             claims = jwt.decode(
@@ -86,21 +136,4 @@ class TokenVerifier:
             raise AuthError(503, "jwks_unavailable", "Không lấy được khóa công khai của Keycloak") from exc
         except jwt.PyJWTError as exc:
             raise AuthError(401, "invalid_token", "Token không hợp lệ hoặc đã hết hạn") from exc
-
-        ns = claims.get(HASURA_CLAIMS)
-        if not isinstance(ns, dict):
-            ns = {}
-        tenant_raw = ns.get("x-hasura-tenant-id")
-        try:
-            tenant_id = uuid.UUID(str(tenant_raw))
-        except ValueError as exc:
-            raise AuthError(403, "no_tenant", "Tài khoản chưa được gán đơn vị (tenant_id)") from exc
-
-        roles = ns.get("x-hasura-allowed-roles") or []
-        return Principal(
-            user_id=str(ns.get("x-hasura-user-id") or claims["sub"]),
-            tenant_id=tenant_id,
-            roles=tuple(str(r) for r in roles) if isinstance(roles, list) else (),
-            department_id=ns.get("x-hasura-department-id"),
-            token=token,
-        )
+        return claims

@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,17 @@
 # Handler là svc-workflow trong mạng nội bộ. Hasura gửi kèm X-Moc-Action-Secret để svc-workflow chỉ nhận
 # yêu cầu từ Hasura; X-Request-Id của client được chuyển tiếp để nối nhật ký.
 actions:
+  - name: receiveIncoming
+    definition:
+      kind: synchronous
+      handler: '{{MOC_WORKFLOW_URL}}/actions/receiveIncoming'
+      forward_client_headers: true
+      headers:
+        - name: X-Moc-Action-Secret
+          value_from_env: MOC_ACTION_SECRET
+      timeout: 30
+    permissions:
+      - role: clerk
   - name: registerIncoming
     definition:
       kind: synchronous
@@ -28,6 +39,17 @@ actions:
       timeout: 30
     permissions:
       - role: clerk
+  - name: submitOutgoing
+    definition:
+      kind: synchronous
+      handler: '{{MOC_WORKFLOW_URL}}/actions/submitOutgoing'
+      forward_client_headers: true
+      headers:
+        - name: X-Moc-Action-Secret
+          value_from_env: MOC_ACTION_SECRET
+      timeout: 30
+    permissions:
+      - role: staff
   - name: completeTask
     definition:
       kind: synchronous
@@ -36,7 +58,9 @@ actions:
       headers:
         - name: X-Moc-Action-Secret
           value_from_env: MOC_ACTION_SECRET
-      timeout: 30
+      # phát hành = cấp số + dựng PDF + quét ClamAV + lưu kho; máy chậm có thể quá 30 giây. Cổng (APISIX) chờ Hasura
+      # 100 giây, dài hơn số này: hết giờ thì người dùng thấy lỗi của Hasura, không phải 504 của cổng
+      timeout: 90
     permissions:
       - role: clerk
       - role: staff
@@ -61,7 +85,21 @@ custom_types:
   enums: []
   input_objects: []
   objects:
+    - name: ReceiveIncomingOutput
+      relationships:
+        - name: document
+          type: object
+          source: default
+          remote_table: {schema: office, name: documents}
+          field_mapping: {document_id: id}
     - name: RegisterIncomingOutput
+      relationships:
+        - name: document
+          type: object
+          source: default
+          remote_table: {schema: office, name: documents}
+          field_mapping: {document_id: id}
+    - name: SubmitOutgoingOutput
       relationships:
         - name: document
           type: object

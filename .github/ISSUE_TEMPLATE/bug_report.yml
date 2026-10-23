@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: Báo lỗi
-description: Báo cáo một lỗi của Mộc
+description: Báo cáo một lỗi của Signet
 title: "[Lỗi]: "
 labels: ["bug"]
 body:
@@ -67,7 +67,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Phiên bản Mộc
+      label: Phiên bản Signet
       description: "Kết quả của lệnh: git describe --tags --always"
       placeholder: v0.1.0
     validations:

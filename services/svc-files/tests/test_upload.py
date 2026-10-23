@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import uuid
 
 import pytest
 
-from conftest import EICAR, TENANT_A
+from conftest import EICAR, LOCKED_ZIP, TENANT_A
 from svc_files.app import clean_filename, clean_mime
 
 PDF = b"%PDF-1.7\n% cong van mau\n" + b"x" * 1000
@@ -88,6 +88,18 @@ def test_infected_file_is_rejected_and_audited(client, make_token, store, hasura
     assert event["entity_id"] == hashlib.sha256(EICAR).hexdigest()
     assert event["details"]["filename"] == "hoa-don.pdf.exe"
     assert event["details"]["signature"] == "Eicar-Test-Signature"
+
+
+def test_password_protected_file_is_blocked_as_unscannable(client, make_token, store, hasura):
+    data = LOCKED_ZIP + b"\x00" * 64
+    r = client.post("/api/files", headers=auth(make_token(sub="u-1")), files={"file": ("bang-diem.zip", data)})
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert detail["code"] == "unscannable" and detail["signature"] == "Heuristics.Encrypted.Zip"
+    assert "mật khẩu" in detail["message"]
+    assert store.objects == {} and hasura.files == {}
+    (event,) = hasura.events                       # vẫn là một lần chặn ở cửa ngõ, có trong sổ kiểm toán
+    assert event["action"] == "file.rejected" and event["details"]["signature"] == "Heuristics.Encrypted.Zip"
 
 
 def test_infected_file_is_still_blocked_when_audit_fails(client, make_token, store, hasura):

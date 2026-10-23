@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 # Văn bản đến / đi. Quy tắc ai đọc được văn bản nào nằm ở một chỗ: hàm office.document_visible
 # (migration 1792281600200), gắn vào đây thành trường `visible`; các bảng con lọc theo document.visible.
 #
-# Người dùng chỉ ghi trực tiếp khi văn bản còn ở bước đầu (văn thư: received; chuyên viên: draft,
-# returned). status, số, ký hiệu văn bản đi, băm, mã tra cứu, process_id chỉ đổi qua Hasura Actions
-# do svc-workflow xử lý (vai trò service) — docs/mo-hinh-du-lieu.md §3, §4.
+# Văn bản đến chỉ vào qua Action receiveIncoming (svc-workflow kiểm lại theo schemas/van-ban-den.json —
+# poka-yoke lớp 2, F2.2), nên văn thư không có quyền ghi thẳng bảng này. Chuyên viên ghi trực tiếp dự thảo
+# văn bản đi khi còn ở bước đầu (draft, returned). status, số, ký hiệu văn bản đi, băm, mã tra cứu, process_id
+# chỉ đổi qua Hasura Actions do svc-workflow xử lý (vai trò service) — docs/mo-hinh-du-lieu.md §3, §4.
+# Đơn vị nhận trong hệ thống (recipient_tenant_ids, F3.12) chuyên viên chọn lúc soạn; CSDL kiểm đơn vị có thật, không
+# phải đơn vị mình, không với văn bản hạn chế, và không đổi được sau khi trình (migration 1792281601800).
 table:
   name: documents
   schema: office
@@ -49,6 +52,23 @@ object_relationships:
       manual_configuration:
         remote_table: {name: documents, schema: office}
         column_mapping: {source_id: id}
+  # văn bản đến do liên thông trong hệ thống tạo ra (F3.12): lượt gửi đã sinh ra nó
+  - name: dispatch_in
+    using:
+      manual_configuration:
+        remote_table: {name: dispatches, schema: office}
+        column_mapping: {id: incoming_document_id}
+  # người ký văn bản đi, người tạo: danh bạ core.users (không có khóa ngoại — core không phụ thuộc office)
+  - name: signer
+    using:
+      manual_configuration:
+        remote_table: {name: users, schema: core}
+        column_mapping: {signer_id: id}
+  - name: creator
+    using:
+      manual_configuration:
+        remote_table: {name: users, schema: core}
+        column_mapping: {created_by: id}
 array_relationships:
   - name: files
     using:
@@ -65,6 +85,12 @@ array_relationships:
       manual_configuration:
         remote_table: {name: document_events, schema: office}
         column_mapping: {id: document_id}
+  # văn bản đi gửi đơn vị khác trong hệ thống (F3.12): mỗi đơn vị nhận một dòng
+  - name: dispatches
+    using:
+      manual_configuration:
+        remote_table: {name: dispatches, schema: office}
+        column_mapping: {id: document_id}
 computed_fields:
   - name: visible
     definition:
@@ -72,18 +98,9 @@ computed_fields:
       session_argument: hasura_session
     comment: Người gọi có được đọc văn bản này không — quy tắc ở docs/mo-hinh-du-lieu.md §3
 insert_permissions:
-  - role: clerk
-    permission:
-      columns: [type_code, symbol, issuer_name, issued_on, summary, urgency, restricted, due_on]
-      set:
-        tenant_id: X-Hasura-Tenant-Id
-        created_by: X-Hasura-User-Id
-        direction: in
-        status: received
-      check: {}
   - role: staff
     permission:
-      columns: [type_code, summary, urgency, restricted, recipients, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id]
       set:
         tenant_id: X-Hasura-Tenant-Id
         created_by: X-Hasura-User-Id
@@ -93,19 +110,19 @@ insert_permissions:
       check: {}
   - role: service
     permission:
-      columns: [id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency, restricted,
-                is_public, register_id, register_number, registered_at, due_on, department_id, signer_id,
-                recipients, reply_to_id, source_id, process_id, created_by]
+      columns: [id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body, urgency,
+                restricted, is_public, register_id, register_number, registered_at, due_on, department_id,
+                signer_id, recipients, reply_to_id, source_id, process_id, created_by]
       set:
         tenant_id: X-Hasura-Tenant-Id
       check: {}
 select_permissions:
   - role: clerk
     permission: &user_select
-      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency,
-                restricted, is_public, register_id, register_number, registered_at, due_on, department_id,
-                signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id, process_id,
-                created_by, created_at, updated_at]
+      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
+                urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
+                department_id, signer_id, recipients, recipient_tenant_ids, reply_to_id, content_sha256,
+                verify_code, source_id, process_id, created_by, created_at, updated_at]
       filter:
         _and:
           - tenant_id: {_eq: X-Hasura-Tenant-Id}
@@ -119,24 +136,16 @@ select_permissions:
     permission: *user_select
   - role: service
     permission:
-      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency,
-                restricted, is_public, register_id, register_number, registered_at, due_on, department_id,
-                signer_id, recipients, reply_to_id, content_sha256, verify_code, source_id, process_id,
-                created_by, created_at, updated_at]
+      columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,
+                urgency, restricted, is_public, register_id, register_number, registered_at, due_on,
+                department_id, signer_id, recipients, recipient_tenant_ids, reply_to_id, content_sha256,
+                verify_code, source_id, process_id, created_by, created_at, updated_at]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       allow_aggregations: true
 update_permissions:
-  - role: clerk
-    permission:
-      columns: [type_code, symbol, issuer_name, issued_on, summary, urgency, restricted, due_on]
-      filter:
-        tenant_id: {_eq: X-Hasura-Tenant-Id}
-        direction: {_eq: in}
-        status: {_eq: received}
-      check: {}
   - role: staff
     permission:
-      columns: [type_code, summary, urgency, restricted, recipients, reply_to_id]
+      columns: [type_code, summary, body, urgency, restricted, recipients, recipient_tenant_ids, reply_to_id]
       filter:
         tenant_id: {_eq: X-Hasura-Tenant-Id}
         direction: {_eq: out}
@@ -145,8 +154,8 @@ update_permissions:
       check: {}
   - role: service
     permission:
-      columns: [status, type_code, symbol, issuer_name, issued_on, summary, urgency, restricted, is_public,
-                register_id, register_number, registered_at, due_on, department_id, signer_id, recipients,
-                reply_to_id, content_sha256, verify_code, source_id, process_id]
+      columns: [status, type_code, symbol, issuer_name, issued_on, summary, body, urgency, restricted,
+                is_public, register_id, register_number, registered_at, due_on, department_id, signer_id,
+                recipients, reply_to_id, content_sha256, verify_code, source_id, process_id]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       check: {tenant_id: {_eq: X-Hasura-Tenant-Id}}

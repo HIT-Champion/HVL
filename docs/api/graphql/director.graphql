@@ -1,0 +1,4904 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# Schema GraphQL mà vai trò `director` (lãnh đạo đơn vị) thấy qua cổng APISIX: POST /v1/graphql.
+# Tệp sinh tự động bằng `make api-docs` từ hệ thống đang chạy, không sửa tay; CI báo lỗi khi tệp cũ.
+# subscription_root có trong schema của Hasura nhưng cổng chưa mở WebSocket, nên chưa gọi được qua cổng.
+
+schema {
+  query: query_root
+  mutation: mutation_root
+  subscription: subscription_root
+}
+
+"Boolean expression to compare columns of type \"Boolean\". All fields are combined with logical 'AND'."
+input Boolean_comparison_exp {
+  _eq: Boolean
+  _gt: Boolean
+  _gte: Boolean
+  _in: [Boolean!]
+  _is_null: Boolean
+  _lt: Boolean
+  _lte: Boolean
+  _neq: Boolean
+  _nin: [Boolean!]
+}
+
+type CompleteTaskOutput {
+  document: office_documents
+  document_id: uuid!
+  task_id: String!
+}
+
+"Boolean expression to compare columns of type \"Float\". All fields are combined with logical 'AND'."
+input Float_comparison_exp {
+  _eq: Float
+  _gt: Float
+  _gte: Float
+  _in: [Float!]
+  _is_null: Boolean
+  _lt: Float
+  _lte: Float
+  _neq: Float
+  _nin: [Float!]
+}
+
+"Boolean expression to compare columns of type \"Int\". All fields are combined with logical 'AND'."
+input Int_comparison_exp {
+  _eq: Int
+  _gt: Int
+  _gte: Int
+  _in: [Int!]
+  _is_null: Boolean
+  _lt: Int
+  _lte: Int
+  _neq: Int
+  _nin: [Int!]
+}
+
+"Boolean expression to compare columns of type \"String\". All fields are combined with logical 'AND'."
+input String_array_comparison_exp {
+  "is the array contained in the given array value"
+  _contained_in: [String!]
+  "does the array contain the given value"
+  _contains: [String!]
+  _eq: [String!]
+  _gt: [String!]
+  _gte: [String!]
+  _in: [[String!]!]
+  _is_null: Boolean
+  _lt: [String!]
+  _lte: [String!]
+  _neq: [String!]
+  _nin: [[String!]!]
+}
+
+"Boolean expression to compare columns of type \"String\". All fields are combined with logical 'AND'."
+input String_comparison_exp {
+  _eq: String
+  _gt: String
+  _gte: String
+  "does the column match the given case-insensitive pattern"
+  _ilike: String
+  _in: [String!]
+  "does the column match the given POSIX regular expression, case insensitive"
+  _iregex: String
+  _is_null: Boolean
+  "does the column match the given pattern"
+  _like: String
+  _lt: String
+  _lte: String
+  _neq: String
+  "does the column NOT match the given case-insensitive pattern"
+  _nilike: String
+  _nin: [String!]
+  "does the column NOT match the given POSIX regular expression, case insensitive"
+  _niregex: String
+  "does the column NOT match the given pattern"
+  _nlike: String
+  "does the column NOT match the given POSIX regular expression, case sensitive"
+  _nregex: String
+  "does the column NOT match the given SQL regular expression"
+  _nsimilar: String
+  "does the column match the given POSIX regular expression, case sensitive"
+  _regex: String
+  "does the column match the given SQL regular expression"
+  _similar: String
+}
+
+type WorkTask {
+  created_at: timestamptz!
+  document: office_documents
+  document_id: uuid!
+  due_on: date
+  form_key: String!
+  id: String!
+  name: String!
+  urgency: String!
+}
+
+scalar bigint
+
+"Boolean expression to compare columns of type \"bigint\". All fields are combined with logical 'AND'."
+input bigint_comparison_exp {
+  _eq: bigint
+  _gt: bigint
+  _gte: bigint
+  _in: [bigint!]
+  _is_null: Boolean
+  _lt: bigint
+  _lte: bigint
+  _neq: bigint
+  _nin: [bigint!]
+}
+
+scalar bytea
+
+"Boolean expression to compare columns of type \"bytea\". All fields are combined with logical 'AND'."
+input bytea_comparison_exp {
+  _eq: bytea
+  _gt: bytea
+  _gte: bytea
+  _in: [bytea!]
+  _is_null: Boolean
+  _lt: bytea
+  _lte: bytea
+  _neq: bytea
+  _nin: [bytea!]
+}
+
+"columns and relationships of \"core.audit_anchors\""
+type core_audit_anchors {
+  anchored_at: timestamptz!
+  audit_id: bigint!
+}
+
+"aggregated selection of \"core.audit_anchors\""
+type core_audit_anchors_aggregate {
+  aggregate: core_audit_anchors_aggregate_fields
+  nodes: [core_audit_anchors!]!
+}
+
+"aggregate fields of \"core.audit_anchors\""
+type core_audit_anchors_aggregate_fields {
+  avg: core_audit_anchors_avg_fields
+  count(columns: [core_audit_anchors_select_column!], distinct: Boolean): Int!
+  max: core_audit_anchors_max_fields
+  min: core_audit_anchors_min_fields
+  stddev: core_audit_anchors_stddev_fields
+  stddev_pop: core_audit_anchors_stddev_pop_fields
+  stddev_samp: core_audit_anchors_stddev_samp_fields
+  sum: core_audit_anchors_sum_fields
+  var_pop: core_audit_anchors_var_pop_fields
+  var_samp: core_audit_anchors_var_samp_fields
+  variance: core_audit_anchors_variance_fields
+}
+
+"aggregate avg on columns"
+type core_audit_anchors_avg_fields {
+  audit_id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.audit_anchors\". All fields are combined with a logical 'AND'."
+input core_audit_anchors_bool_exp {
+  _and: [core_audit_anchors_bool_exp!]
+  _not: core_audit_anchors_bool_exp
+  _or: [core_audit_anchors_bool_exp!]
+  anchored_at: timestamptz_comparison_exp
+  audit_id: bigint_comparison_exp
+}
+
+"aggregate max on columns"
+type core_audit_anchors_max_fields {
+  anchored_at: timestamptz
+  audit_id: bigint
+}
+
+"aggregate min on columns"
+type core_audit_anchors_min_fields {
+  anchored_at: timestamptz
+  audit_id: bigint
+}
+
+"Ordering options when selecting data from \"core.audit_anchors\"."
+input core_audit_anchors_order_by {
+  anchored_at: order_by
+  audit_id: order_by
+}
+
+"select columns of table \"core.audit_anchors\""
+enum core_audit_anchors_select_column {
+  "column name"
+  anchored_at
+  "column name"
+  audit_id
+}
+
+"aggregate stddev on columns"
+type core_audit_anchors_stddev_fields {
+  audit_id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_audit_anchors_stddev_pop_fields {
+  audit_id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_audit_anchors_stddev_samp_fields {
+  audit_id: Float
+}
+
+"Streaming cursor of the table \"core_audit_anchors\""
+input core_audit_anchors_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_audit_anchors_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_audit_anchors_stream_cursor_value_input {
+  anchored_at: timestamptz
+  audit_id: bigint
+}
+
+"aggregate sum on columns"
+type core_audit_anchors_sum_fields {
+  audit_id: bigint
+}
+
+"aggregate var_pop on columns"
+type core_audit_anchors_var_pop_fields {
+  audit_id: Float
+}
+
+"aggregate var_samp on columns"
+type core_audit_anchors_var_samp_fields {
+  audit_id: Float
+}
+
+"aggregate variance on columns"
+type core_audit_anchors_variance_fields {
+  audit_id: Float
+}
+
+"columns and relationships of \"core.audit_log\""
+type core_audit_log {
+  action: String!
+  actor_id: String!
+  actor_kind: String!
+  entity: String!
+  entity_id: String!
+  hash: bytea!
+  id: bigint!
+  occurred_at: timestamptz!
+  "Cột đã đổi → [cũ, mới]; cột chứa nội dung (trích yếu, nội dung, tên tệp, ý kiến…) chỉ có tên, giá trị null"
+  overview(
+    "JSON select path"
+    path: String
+  ): jsonb
+  prev_hash: bytea!
+}
+
+"aggregated selection of \"core.audit_log\""
+type core_audit_log_aggregate {
+  aggregate: core_audit_log_aggregate_fields
+  nodes: [core_audit_log!]!
+}
+
+"aggregate fields of \"core.audit_log\""
+type core_audit_log_aggregate_fields {
+  avg: core_audit_log_avg_fields
+  count(columns: [core_audit_log_select_column!], distinct: Boolean): Int!
+  max: core_audit_log_max_fields
+  min: core_audit_log_min_fields
+  stddev: core_audit_log_stddev_fields
+  stddev_pop: core_audit_log_stddev_pop_fields
+  stddev_samp: core_audit_log_stddev_samp_fields
+  sum: core_audit_log_sum_fields
+  var_pop: core_audit_log_var_pop_fields
+  var_samp: core_audit_log_var_samp_fields
+  variance: core_audit_log_variance_fields
+}
+
+"aggregate avg on columns"
+type core_audit_log_avg_fields {
+  id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.audit_log\". All fields are combined with a logical 'AND'."
+input core_audit_log_bool_exp {
+  _and: [core_audit_log_bool_exp!]
+  _not: core_audit_log_bool_exp
+  _or: [core_audit_log_bool_exp!]
+  action: String_comparison_exp
+  actor_id: String_comparison_exp
+  actor_kind: String_comparison_exp
+  entity: String_comparison_exp
+  entity_id: String_comparison_exp
+  hash: bytea_comparison_exp
+  id: bigint_comparison_exp
+  occurred_at: timestamptz_comparison_exp
+  overview: jsonb_comparison_exp
+  prev_hash: bytea_comparison_exp
+}
+
+"aggregate max on columns"
+type core_audit_log_max_fields {
+  action: String
+  actor_id: String
+  actor_kind: String
+  entity: String
+  entity_id: String
+  id: bigint
+  occurred_at: timestamptz
+}
+
+"aggregate min on columns"
+type core_audit_log_min_fields {
+  action: String
+  actor_id: String
+  actor_kind: String
+  entity: String
+  entity_id: String
+  id: bigint
+  occurred_at: timestamptz
+}
+
+"Ordering options when selecting data from \"core.audit_log\"."
+input core_audit_log_order_by {
+  action: order_by
+  actor_id: order_by
+  actor_kind: order_by
+  entity: order_by
+  entity_id: order_by
+  hash: order_by
+  id: order_by
+  occurred_at: order_by
+  overview: order_by
+  prev_hash: order_by
+}
+
+"select columns of table \"core.audit_log\""
+enum core_audit_log_select_column {
+  "column name"
+  action
+  "column name"
+  actor_id
+  "column name"
+  actor_kind
+  "column name"
+  entity
+  "column name"
+  entity_id
+  "column name"
+  hash
+  "column name"
+  id
+  "column name"
+  occurred_at
+  "column name"
+  prev_hash
+}
+
+"aggregate stddev on columns"
+type core_audit_log_stddev_fields {
+  id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_audit_log_stddev_pop_fields {
+  id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_audit_log_stddev_samp_fields {
+  id: Float
+}
+
+"Streaming cursor of the table \"core_audit_log\""
+input core_audit_log_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_audit_log_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_audit_log_stream_cursor_value_input {
+  action: String
+  actor_id: String
+  actor_kind: String
+  entity: String
+  entity_id: String
+  hash: bytea
+  id: bigint
+  occurred_at: timestamptz
+  prev_hash: bytea
+}
+
+"aggregate sum on columns"
+type core_audit_log_sum_fields {
+  id: bigint
+}
+
+"aggregate var_pop on columns"
+type core_audit_log_var_pop_fields {
+  id: Float
+}
+
+"aggregate var_samp on columns"
+type core_audit_log_var_samp_fields {
+  id: Float
+}
+
+"aggregate variance on columns"
+type core_audit_log_variance_fields {
+  id: Float
+}
+
+"columns and relationships of \"core.files\""
+type core_files {
+  created_at: timestamptz!
+  created_by: String!
+  "An array relationship"
+  document_files(
+    "distinct select on columns"
+    distinct_on: [office_document_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_files_order_by!]
+    "filter the rows returned"
+    where: office_document_files_bool_exp
+  ): [office_document_files!]!
+  encrypted: Boolean!
+  filename: String!
+  id: uuid!
+  mime_type: String!
+  scanned_at: timestamptz!
+  sha256: bytea!
+  size_bytes: bigint!
+  storage_tier: String!
+}
+
+"Boolean expression to filter rows from the table \"core.files\". All fields are combined with a logical 'AND'."
+input core_files_bool_exp {
+  _and: [core_files_bool_exp!]
+  _not: core_files_bool_exp
+  _or: [core_files_bool_exp!]
+  created_at: timestamptz_comparison_exp
+  created_by: String_comparison_exp
+  document_files: office_document_files_bool_exp
+  encrypted: Boolean_comparison_exp
+  filename: String_comparison_exp
+  id: uuid_comparison_exp
+  mime_type: String_comparison_exp
+  scanned_at: timestamptz_comparison_exp
+  sha256: bytea_comparison_exp
+  size_bytes: bigint_comparison_exp
+  storage_tier: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"core.files\"."
+input core_files_order_by {
+  created_at: order_by
+  created_by: order_by
+  document_files_aggregate: office_document_files_aggregate_order_by
+  encrypted: order_by
+  filename: order_by
+  id: order_by
+  mime_type: order_by
+  scanned_at: order_by
+  sha256: order_by
+  size_bytes: order_by
+  storage_tier: order_by
+}
+
+"select columns of table \"core.files\""
+enum core_files_select_column {
+  "column name"
+  created_at
+  "column name"
+  created_by
+  "column name"
+  encrypted
+  "column name"
+  filename
+  "column name"
+  id
+  "column name"
+  mime_type
+  "column name"
+  scanned_at
+  "column name"
+  sha256
+  "column name"
+  size_bytes
+  "column name"
+  storage_tier
+}
+
+"Streaming cursor of the table \"core_files\""
+input core_files_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_files_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_files_stream_cursor_value_input {
+  created_at: timestamptz
+  created_by: String
+  encrypted: Boolean
+  filename: String
+  id: uuid
+  mime_type: String
+  scanned_at: timestamptz
+  sha256: bytea
+  size_bytes: bigint
+  storage_tier: String
+}
+
+"columns and relationships of \"core.lineage_events\""
+type core_lineage_events {
+  event(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  event_time: timestamptz!
+  event_type: String!
+  id: bigint!
+  inputs: [String!]!
+  job: String!
+  outputs: [String!]!
+  parent_run_id: uuid
+  quality_ok: Boolean
+  run_id: uuid!
+}
+
+"aggregated selection of \"core.lineage_events\""
+type core_lineage_events_aggregate {
+  aggregate: core_lineage_events_aggregate_fields
+  nodes: [core_lineage_events!]!
+}
+
+"aggregate fields of \"core.lineage_events\""
+type core_lineage_events_aggregate_fields {
+  avg: core_lineage_events_avg_fields
+  count(columns: [core_lineage_events_select_column!], distinct: Boolean): Int!
+  max: core_lineage_events_max_fields
+  min: core_lineage_events_min_fields
+  stddev: core_lineage_events_stddev_fields
+  stddev_pop: core_lineage_events_stddev_pop_fields
+  stddev_samp: core_lineage_events_stddev_samp_fields
+  sum: core_lineage_events_sum_fields
+  var_pop: core_lineage_events_var_pop_fields
+  var_samp: core_lineage_events_var_samp_fields
+  variance: core_lineage_events_variance_fields
+}
+
+"aggregate avg on columns"
+type core_lineage_events_avg_fields {
+  id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.lineage_events\". All fields are combined with a logical 'AND'."
+input core_lineage_events_bool_exp {
+  _and: [core_lineage_events_bool_exp!]
+  _not: core_lineage_events_bool_exp
+  _or: [core_lineage_events_bool_exp!]
+  event: jsonb_comparison_exp
+  event_time: timestamptz_comparison_exp
+  event_type: String_comparison_exp
+  id: bigint_comparison_exp
+  inputs: String_array_comparison_exp
+  job: String_comparison_exp
+  outputs: String_array_comparison_exp
+  parent_run_id: uuid_comparison_exp
+  quality_ok: Boolean_comparison_exp
+  run_id: uuid_comparison_exp
+}
+
+"aggregate max on columns"
+type core_lineage_events_max_fields {
+  event_time: timestamptz
+  event_type: String
+  id: bigint
+  inputs: [String!]
+  job: String
+  outputs: [String!]
+  parent_run_id: uuid
+  run_id: uuid
+}
+
+"aggregate min on columns"
+type core_lineage_events_min_fields {
+  event_time: timestamptz
+  event_type: String
+  id: bigint
+  inputs: [String!]
+  job: String
+  outputs: [String!]
+  parent_run_id: uuid
+  run_id: uuid
+}
+
+"Ordering options when selecting data from \"core.lineage_events\"."
+input core_lineage_events_order_by {
+  event: order_by
+  event_time: order_by
+  event_type: order_by
+  id: order_by
+  inputs: order_by
+  job: order_by
+  outputs: order_by
+  parent_run_id: order_by
+  quality_ok: order_by
+  run_id: order_by
+}
+
+"select columns of table \"core.lineage_events\""
+enum core_lineage_events_select_column {
+  "column name"
+  event
+  "column name"
+  event_time
+  "column name"
+  event_type
+  "column name"
+  id
+  "column name"
+  inputs
+  "column name"
+  job
+  "column name"
+  outputs
+  "column name"
+  parent_run_id
+  "column name"
+  quality_ok
+  "column name"
+  run_id
+}
+
+"aggregate stddev on columns"
+type core_lineage_events_stddev_fields {
+  id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_lineage_events_stddev_pop_fields {
+  id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_lineage_events_stddev_samp_fields {
+  id: Float
+}
+
+"Streaming cursor of the table \"core_lineage_events\""
+input core_lineage_events_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_lineage_events_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_lineage_events_stream_cursor_value_input {
+  event: jsonb
+  event_time: timestamptz
+  event_type: String
+  id: bigint
+  inputs: [String!]
+  job: String
+  outputs: [String!]
+  parent_run_id: uuid
+  quality_ok: Boolean
+  run_id: uuid
+}
+
+"aggregate sum on columns"
+type core_lineage_events_sum_fields {
+  id: bigint
+}
+
+"aggregate var_pop on columns"
+type core_lineage_events_var_pop_fields {
+  id: Float
+}
+
+"aggregate var_samp on columns"
+type core_lineage_events_var_samp_fields {
+  id: Float
+}
+
+"aggregate variance on columns"
+type core_lineage_events_variance_fields {
+  id: Float
+}
+
+"columns and relationships of \"core.notifications\""
+type core_notifications {
+  created_at: timestamptz!
+  data(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  document_id: uuid
+  id: bigint!
+  kind: String!
+  read_at: timestamptz
+}
+
+"aggregated selection of \"core.notifications\""
+type core_notifications_aggregate {
+  aggregate: core_notifications_aggregate_fields
+  nodes: [core_notifications!]!
+}
+
+"aggregate fields of \"core.notifications\""
+type core_notifications_aggregate_fields {
+  avg: core_notifications_avg_fields
+  count(columns: [core_notifications_select_column!], distinct: Boolean): Int!
+  max: core_notifications_max_fields
+  min: core_notifications_min_fields
+  stddev: core_notifications_stddev_fields
+  stddev_pop: core_notifications_stddev_pop_fields
+  stddev_samp: core_notifications_stddev_samp_fields
+  sum: core_notifications_sum_fields
+  var_pop: core_notifications_var_pop_fields
+  var_samp: core_notifications_var_samp_fields
+  variance: core_notifications_variance_fields
+}
+
+"aggregate avg on columns"
+type core_notifications_avg_fields {
+  id: Float
+}
+
+"Boolean expression to filter rows from the table \"core.notifications\". All fields are combined with a logical 'AND'."
+input core_notifications_bool_exp {
+  _and: [core_notifications_bool_exp!]
+  _not: core_notifications_bool_exp
+  _or: [core_notifications_bool_exp!]
+  created_at: timestamptz_comparison_exp
+  data: jsonb_comparison_exp
+  document_id: uuid_comparison_exp
+  id: bigint_comparison_exp
+  kind: String_comparison_exp
+  read_at: timestamptz_comparison_exp
+}
+
+"aggregate max on columns"
+type core_notifications_max_fields {
+  created_at: timestamptz
+  document_id: uuid
+  id: bigint
+  kind: String
+  read_at: timestamptz
+}
+
+"aggregate min on columns"
+type core_notifications_min_fields {
+  created_at: timestamptz
+  document_id: uuid
+  id: bigint
+  kind: String
+  read_at: timestamptz
+}
+
+"response of any mutation on the table \"core.notifications\""
+type core_notifications_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [core_notifications!]!
+}
+
+"Ordering options when selecting data from \"core.notifications\"."
+input core_notifications_order_by {
+  created_at: order_by
+  data: order_by
+  document_id: order_by
+  id: order_by
+  kind: order_by
+  read_at: order_by
+}
+
+"primary key columns input for table: core.notifications"
+input core_notifications_pk_columns_input {
+  id: bigint!
+}
+
+"select columns of table \"core.notifications\""
+enum core_notifications_select_column {
+  "column name"
+  created_at
+  "column name"
+  data
+  "column name"
+  document_id
+  "column name"
+  id
+  "column name"
+  kind
+  "column name"
+  read_at
+}
+
+"input type for updating data in table \"core.notifications\""
+input core_notifications_set_input {
+  read_at: timestamptz
+}
+
+"aggregate stddev on columns"
+type core_notifications_stddev_fields {
+  id: Float
+}
+
+"aggregate stddev_pop on columns"
+type core_notifications_stddev_pop_fields {
+  id: Float
+}
+
+"aggregate stddev_samp on columns"
+type core_notifications_stddev_samp_fields {
+  id: Float
+}
+
+"Streaming cursor of the table \"core_notifications\""
+input core_notifications_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_notifications_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_notifications_stream_cursor_value_input {
+  created_at: timestamptz
+  data: jsonb
+  document_id: uuid
+  id: bigint
+  kind: String
+  read_at: timestamptz
+}
+
+"aggregate sum on columns"
+type core_notifications_sum_fields {
+  id: bigint
+}
+
+input core_notifications_updates {
+  "sets the columns of the filtered rows to the given values"
+  _set: core_notifications_set_input
+  "filter the rows which have to be updated"
+  where: core_notifications_bool_exp!
+}
+
+"aggregate var_pop on columns"
+type core_notifications_var_pop_fields {
+  id: Float
+}
+
+"aggregate var_samp on columns"
+type core_notifications_var_samp_fields {
+  id: Float
+}
+
+"aggregate variance on columns"
+type core_notifications_variance_fields {
+  id: Float
+}
+
+"columns and relationships of \"core.tenants\""
+type core_tenants {
+  code: String!
+  head_title: String
+  id: uuid!
+  name: String!
+  org_ident: String
+  parent_name: String
+  place_name: String
+}
+
+"Boolean expression to filter rows from the table \"core.tenants\". All fields are combined with a logical 'AND'."
+input core_tenants_bool_exp {
+  _and: [core_tenants_bool_exp!]
+  _not: core_tenants_bool_exp
+  _or: [core_tenants_bool_exp!]
+  code: String_comparison_exp
+  head_title: String_comparison_exp
+  id: uuid_comparison_exp
+  name: String_comparison_exp
+  org_ident: String_comparison_exp
+  parent_name: String_comparison_exp
+  place_name: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"core.tenants\"."
+input core_tenants_order_by {
+  code: order_by
+  head_title: order_by
+  id: order_by
+  name: order_by
+  org_ident: order_by
+  parent_name: order_by
+  place_name: order_by
+}
+
+"select columns of table \"core.tenants\""
+enum core_tenants_select_column {
+  "column name"
+  code
+  "column name"
+  head_title
+  "column name"
+  id
+  "column name"
+  name
+  "column name"
+  org_ident
+  "column name"
+  parent_name
+  "column name"
+  place_name
+}
+
+"Streaming cursor of the table \"core_tenants\""
+input core_tenants_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_tenants_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_tenants_stream_cursor_value_input {
+  code: String
+  head_title: String
+  id: uuid
+  name: String
+  org_ident: String
+  parent_name: String
+  place_name: String
+}
+
+"columns and relationships of \"core.users\""
+type core_users {
+  department_id: uuid
+  email: String
+  enabled: Boolean!
+  full_name: String!
+  id: String!
+  role: String!
+  username: String!
+}
+
+"Boolean expression to filter rows from the table \"core.users\". All fields are combined with a logical 'AND'."
+input core_users_bool_exp {
+  _and: [core_users_bool_exp!]
+  _not: core_users_bool_exp
+  _or: [core_users_bool_exp!]
+  department_id: uuid_comparison_exp
+  email: String_comparison_exp
+  enabled: Boolean_comparison_exp
+  full_name: String_comparison_exp
+  id: String_comparison_exp
+  role: String_comparison_exp
+  username: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"core.users\"."
+input core_users_order_by {
+  department_id: order_by
+  email: order_by
+  enabled: order_by
+  full_name: order_by
+  id: order_by
+  role: order_by
+  username: order_by
+}
+
+"select columns of table \"core.users\""
+enum core_users_select_column {
+  "column name"
+  department_id
+  "column name"
+  email
+  "column name"
+  enabled
+  "column name"
+  full_name
+  "column name"
+  id
+  "column name"
+  role
+  "column name"
+  username
+}
+
+"Streaming cursor of the table \"core_users\""
+input core_users_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_users_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_users_stream_cursor_value_input {
+  department_id: uuid
+  email: String
+  enabled: Boolean
+  full_name: String
+  id: String
+  role: String
+  username: String
+}
+
+"ordering argument of a cursor"
+enum cursor_ordering {
+  "ascending ordering of the cursor"
+  ASC
+  "descending ordering of the cursor"
+  DESC
+}
+
+scalar date
+
+"Boolean expression to compare columns of type \"date\". All fields are combined with logical 'AND'."
+input date_comparison_exp {
+  _eq: date
+  _gt: date
+  _gte: date
+  _in: [date!]
+  _is_null: Boolean
+  _lt: date
+  _lte: date
+  _neq: date
+  _nin: [date!]
+}
+
+scalar float8
+
+"Boolean expression to compare columns of type \"float8\". All fields are combined with logical 'AND'."
+input float8_comparison_exp {
+  _eq: float8
+  _gt: float8
+  _gte: float8
+  _in: [float8!]
+  _is_null: Boolean
+  _lt: float8
+  _lte: float8
+  _neq: float8
+  _nin: [float8!]
+}
+
+scalar jsonb
+
+input jsonb_cast_exp {
+  String: String_comparison_exp
+}
+
+"Boolean expression to compare columns of type \"jsonb\". All fields are combined with logical 'AND'."
+input jsonb_comparison_exp {
+  _cast: jsonb_cast_exp
+  "is the column contained in the given json value"
+  _contained_in: jsonb
+  "does the column contain the given json value at the top level"
+  _contains: jsonb
+  _eq: jsonb
+  _gt: jsonb
+  _gte: jsonb
+  "does the string exist as a top-level key in the column"
+  _has_key: String
+  "do all of these strings exist as top-level keys in the column"
+  _has_keys_all: [String!]
+  "do any of these strings exist as top-level keys in the column"
+  _has_keys_any: [String!]
+  _in: [jsonb!]
+  _is_null: Boolean
+  "does the jsonpath return any item for the specified JSON value"
+  _jsonb_path_exists: String
+  "does the jsonpath predicate check return true for the specified JSON value"
+  _jsonb_path_match: String
+  _lt: jsonb
+  _lte: jsonb
+  _neq: jsonb
+  _nin: [jsonb!]
+}
+
+"mutation root"
+type mutation_root {
+  completeTask(data: jsonb, outcome: String!, taskId: String!): CompleteTaskOutput
+  "execute VOLATILE function \"office.grant_document_access\" which returns \"office.document_acl\""
+  office_grant_document_access(
+    "input parameters for function \"office_grant_document_access\""
+    args: office_grant_document_access_args!
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "execute VOLATILE function \"office.revoke_document_access\" which returns \"office.document_acl\""
+  office_revoke_document_access(
+    "input parameters for function \"office_revoke_document_access\""
+    args: office_revoke_document_access_args!
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "update data of the table: \"core.notifications\""
+  update_core_notifications(
+    "sets the columns of the filtered rows to the given values"
+    _set: core_notifications_set_input
+    "filter the rows which have to be updated"
+    where: core_notifications_bool_exp!
+  ): core_notifications_mutation_response
+  "update single row of the table: \"core.notifications\""
+  update_core_notifications_by_pk(
+    "sets the columns of the filtered rows to the given values"
+    _set: core_notifications_set_input
+    pk_columns: core_notifications_pk_columns_input!
+  ): core_notifications
+  "update multiples rows of table: \"core.notifications\""
+  update_core_notifications_many(
+    "updates to execute, in order"
+    updates: [core_notifications_updates!]!
+  ): [core_notifications_mutation_response]
+}
+
+"columns and relationships of \"office.assignment_suggestions\""
+type office_assignment_suggestions {
+  agent_id: String!
+  candidates: Int!
+  confidence: String
+  created_at: timestamptz!
+  "An object relationship"
+  department: office_departments
+  department_id: uuid
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  due_days: Int
+  due_on: date
+  duration_ms: Int!
+  evidence(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  process_id: String
+  reason: String
+  semantic: Boolean!
+  share: Float
+  status: String!
+  tenant_id: uuid!
+}
+
+"Boolean expression to filter rows from the table \"office.assignment_suggestions\". All fields are combined with a logical 'AND'."
+input office_assignment_suggestions_bool_exp {
+  _and: [office_assignment_suggestions_bool_exp!]
+  _not: office_assignment_suggestions_bool_exp
+  _or: [office_assignment_suggestions_bool_exp!]
+  agent_id: String_comparison_exp
+  candidates: Int_comparison_exp
+  confidence: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  due_days: Int_comparison_exp
+  due_on: date_comparison_exp
+  duration_ms: Int_comparison_exp
+  evidence: jsonb_comparison_exp
+  process_id: String_comparison_exp
+  reason: String_comparison_exp
+  semantic: Boolean_comparison_exp
+  share: Float_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.assignment_suggestions\"."
+input office_assignment_suggestions_order_by {
+  agent_id: order_by
+  candidates: order_by
+  confidence: order_by
+  created_at: order_by
+  department: office_departments_order_by
+  department_id: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  due_days: order_by
+  due_on: order_by
+  duration_ms: order_by
+  evidence: order_by
+  process_id: order_by
+  reason: order_by
+  semantic: order_by
+  share: order_by
+  status: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.assignment_suggestions\""
+enum office_assignment_suggestions_select_column {
+  "column name"
+  agent_id
+  "column name"
+  candidates
+  "column name"
+  confidence
+  "column name"
+  created_at
+  "column name"
+  department_id
+  "column name"
+  document_id
+  "column name"
+  due_days
+  "column name"
+  due_on
+  "column name"
+  duration_ms
+  "column name"
+  evidence
+  "column name"
+  process_id
+  "column name"
+  reason
+  "column name"
+  semantic
+  "column name"
+  share
+  "column name"
+  status
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_assignment_suggestions\""
+input office_assignment_suggestions_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_assignment_suggestions_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_assignment_suggestions_stream_cursor_value_input {
+  agent_id: String
+  candidates: Int
+  confidence: String
+  created_at: timestamptz
+  department_id: uuid
+  document_id: uuid
+  due_days: Int
+  due_on: date
+  duration_ms: Int
+  evidence: jsonb
+  process_id: String
+  reason: String
+  semantic: Boolean
+  share: Float
+  status: String
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.assignments\""
+type office_assignments {
+  assigned_at: timestamptz!
+  assigned_by: String!
+  "An array relationship"
+  children(
+    "distinct select on columns"
+    distinct_on: [office_assignments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignments_order_by!]
+    "filter the rows returned"
+    where: office_assignments_bool_exp
+  ): [office_assignments!]!
+  completed_at: timestamptz
+  "An object relationship"
+  department: office_departments
+  department_id: uuid
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  due_on: date
+  id: uuid!
+  instruction: String
+  "An object relationship"
+  parent: office_assignments
+  parent_id: uuid
+  result_note: String
+  role: String!
+  status: String!
+  user_id: String
+}
+
+"order by aggregate values of table \"office.assignments\""
+input office_assignments_aggregate_order_by {
+  count: order_by
+  max: office_assignments_max_order_by
+  min: office_assignments_min_order_by
+}
+
+"Boolean expression to filter rows from the table \"office.assignments\". All fields are combined with a logical 'AND'."
+input office_assignments_bool_exp {
+  _and: [office_assignments_bool_exp!]
+  _not: office_assignments_bool_exp
+  _or: [office_assignments_bool_exp!]
+  assigned_at: timestamptz_comparison_exp
+  assigned_by: String_comparison_exp
+  children: office_assignments_bool_exp
+  completed_at: timestamptz_comparison_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  due_on: date_comparison_exp
+  id: uuid_comparison_exp
+  instruction: String_comparison_exp
+  parent: office_assignments_bool_exp
+  parent_id: uuid_comparison_exp
+  result_note: String_comparison_exp
+  role: String_comparison_exp
+  status: String_comparison_exp
+  user_id: String_comparison_exp
+}
+
+"order by max() on columns of table \"office.assignments\""
+input office_assignments_max_order_by {
+  assigned_at: order_by
+  assigned_by: order_by
+  completed_at: order_by
+  department_id: order_by
+  document_id: order_by
+  due_on: order_by
+  id: order_by
+  instruction: order_by
+  parent_id: order_by
+  result_note: order_by
+  role: order_by
+  status: order_by
+  user_id: order_by
+}
+
+"order by min() on columns of table \"office.assignments\""
+input office_assignments_min_order_by {
+  assigned_at: order_by
+  assigned_by: order_by
+  completed_at: order_by
+  department_id: order_by
+  document_id: order_by
+  due_on: order_by
+  id: order_by
+  instruction: order_by
+  parent_id: order_by
+  result_note: order_by
+  role: order_by
+  status: order_by
+  user_id: order_by
+}
+
+"Ordering options when selecting data from \"office.assignments\"."
+input office_assignments_order_by {
+  assigned_at: order_by
+  assigned_by: order_by
+  children_aggregate: office_assignments_aggregate_order_by
+  completed_at: order_by
+  department: office_departments_order_by
+  department_id: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  due_on: order_by
+  id: order_by
+  instruction: order_by
+  parent: office_assignments_order_by
+  parent_id: order_by
+  result_note: order_by
+  role: order_by
+  status: order_by
+  user_id: order_by
+}
+
+"select columns of table \"office.assignments\""
+enum office_assignments_select_column {
+  "column name"
+  assigned_at
+  "column name"
+  assigned_by
+  "column name"
+  completed_at
+  "column name"
+  department_id
+  "column name"
+  document_id
+  "column name"
+  due_on
+  "column name"
+  id
+  "column name"
+  instruction
+  "column name"
+  parent_id
+  "column name"
+  result_note
+  "column name"
+  role
+  "column name"
+  status
+  "column name"
+  user_id
+}
+
+"Streaming cursor of the table \"office_assignments\""
+input office_assignments_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_assignments_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_assignments_stream_cursor_value_input {
+  assigned_at: timestamptz
+  assigned_by: String
+  completed_at: timestamptz
+  department_id: uuid
+  document_id: uuid
+  due_on: date
+  id: uuid
+  instruction: String
+  parent_id: uuid
+  result_note: String
+  role: String
+  status: String
+  user_id: String
+}
+
+"columns and relationships of \"office.case_file_documents\""
+type office_case_file_documents {
+  added_at: timestamptz!
+  added_by: String!
+  "An object relationship"
+  case_file: office_case_files
+  case_file_id: uuid!
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  tenant_id: uuid!
+}
+
+"order by aggregate values of table \"office.case_file_documents\""
+input office_case_file_documents_aggregate_order_by {
+  count: order_by
+  max: office_case_file_documents_max_order_by
+  min: office_case_file_documents_min_order_by
+}
+
+"Boolean expression to filter rows from the table \"office.case_file_documents\". All fields are combined with a logical 'AND'."
+input office_case_file_documents_bool_exp {
+  _and: [office_case_file_documents_bool_exp!]
+  _not: office_case_file_documents_bool_exp
+  _or: [office_case_file_documents_bool_exp!]
+  added_at: timestamptz_comparison_exp
+  added_by: String_comparison_exp
+  case_file: office_case_files_bool_exp
+  case_file_id: uuid_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"order by max() on columns of table \"office.case_file_documents\""
+input office_case_file_documents_max_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file_id: order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"order by min() on columns of table \"office.case_file_documents\""
+input office_case_file_documents_min_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file_id: order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"Ordering options when selecting data from \"office.case_file_documents\"."
+input office_case_file_documents_order_by {
+  added_at: order_by
+  added_by: order_by
+  case_file: office_case_files_order_by
+  case_file_id: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.case_file_documents\""
+enum office_case_file_documents_select_column {
+  "column name"
+  added_at
+  "column name"
+  added_by
+  "column name"
+  case_file_id
+  "column name"
+  document_id
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_case_file_documents\""
+input office_case_file_documents_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_case_file_documents_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_case_file_documents_stream_cursor_value_input {
+  added_at: timestamptz
+  added_by: String
+  case_file_id: uuid
+  document_id: uuid
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.case_files\""
+type office_case_files {
+  archive_key: String
+  archive_sha256: bytea
+  archived_at: timestamptz
+  "An array relationship"
+  case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  closed_on: date
+  code: String!
+  created_at: timestamptz!
+  created_by: String!
+  "An object relationship"
+  department: office_departments
+  department_id: uuid!
+  id: uuid!
+  retention_years: Int
+  status: String!
+  tenant_id: uuid!
+  title: String!
+  year: Int!
+}
+
+"Boolean expression to filter rows from the table \"office.case_files\". All fields are combined with a logical 'AND'."
+input office_case_files_bool_exp {
+  _and: [office_case_files_bool_exp!]
+  _not: office_case_files_bool_exp
+  _or: [office_case_files_bool_exp!]
+  archive_key: String_comparison_exp
+  archive_sha256: bytea_comparison_exp
+  archived_at: timestamptz_comparison_exp
+  case_file_documents: office_case_file_documents_bool_exp
+  closed_on: date_comparison_exp
+  code: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  created_by: String_comparison_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  id: uuid_comparison_exp
+  retention_years: Int_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  title: String_comparison_exp
+  year: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.case_files\"."
+input office_case_files_order_by {
+  archive_key: order_by
+  archive_sha256: order_by
+  archived_at: order_by
+  case_file_documents_aggregate: office_case_file_documents_aggregate_order_by
+  closed_on: order_by
+  code: order_by
+  created_at: order_by
+  created_by: order_by
+  department: office_departments_order_by
+  department_id: order_by
+  id: order_by
+  retention_years: order_by
+  status: order_by
+  tenant_id: order_by
+  title: order_by
+  year: order_by
+}
+
+"select columns of table \"office.case_files\""
+enum office_case_files_select_column {
+  "column name"
+  archive_key
+  "column name"
+  archive_sha256
+  "column name"
+  archived_at
+  "column name"
+  closed_on
+  "column name"
+  code
+  "column name"
+  created_at
+  "column name"
+  created_by
+  "column name"
+  department_id
+  "column name"
+  id
+  "column name"
+  retention_years
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  title
+  "column name"
+  year
+}
+
+"Streaming cursor of the table \"office_case_files\""
+input office_case_files_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_case_files_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_case_files_stream_cursor_value_input {
+  archive_key: String
+  archive_sha256: bytea
+  archived_at: timestamptz
+  closed_on: date
+  code: String
+  created_at: timestamptz
+  created_by: String
+  department_id: uuid
+  id: uuid
+  retention_years: Int
+  status: String
+  tenant_id: uuid
+  title: String
+  year: Int
+}
+
+"columns and relationships of \"office.departments\""
+type office_departments {
+  code: String!
+  id: uuid!
+  name: String!
+}
+
+"Boolean expression to filter rows from the table \"office.departments\". All fields are combined with a logical 'AND'."
+input office_departments_bool_exp {
+  _and: [office_departments_bool_exp!]
+  _not: office_departments_bool_exp
+  _or: [office_departments_bool_exp!]
+  code: String_comparison_exp
+  id: uuid_comparison_exp
+  name: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.departments\"."
+input office_departments_order_by {
+  code: order_by
+  id: order_by
+  name: order_by
+}
+
+"select columns of table \"office.departments\""
+enum office_departments_select_column {
+  "column name"
+  code
+  "column name"
+  id
+  "column name"
+  name
+}
+
+"Streaming cursor of the table \"office_departments\""
+input office_departments_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_departments_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_departments_stream_cursor_value_input {
+  code: String
+  id: uuid
+  name: String
+}
+
+"columns and relationships of \"office.dispatch_units\""
+type office_dispatch_units {
+  code: String
+  id: uuid
+  name: String
+  parent_name: String
+}
+
+"Boolean expression to filter rows from the table \"office.dispatch_units\". All fields are combined with a logical 'AND'."
+input office_dispatch_units_bool_exp {
+  _and: [office_dispatch_units_bool_exp!]
+  _not: office_dispatch_units_bool_exp
+  _or: [office_dispatch_units_bool_exp!]
+  code: String_comparison_exp
+  id: uuid_comparison_exp
+  name: String_comparison_exp
+  parent_name: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.dispatch_units\"."
+input office_dispatch_units_order_by {
+  code: order_by
+  id: order_by
+  name: order_by
+  parent_name: order_by
+}
+
+"select columns of table \"office.dispatch_units\""
+enum office_dispatch_units_select_column {
+  "column name"
+  code
+  "column name"
+  id
+  "column name"
+  name
+  "column name"
+  parent_name
+}
+
+"Streaming cursor of the table \"office_dispatch_units\""
+input office_dispatch_units_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_dispatch_units_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_dispatch_units_stream_cursor_value_input {
+  code: String
+  id: uuid
+  name: String
+  parent_name: String
+}
+
+"columns and relationships of \"office.dispatches\""
+type office_dispatches {
+  attempts: Int!
+  created_at: timestamptz!
+  delivered_at: timestamptz
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  "An object relationship"
+  from_unit: office_dispatch_units
+  id: uuid!
+  "An object relationship"
+  incoming: office_documents
+  incoming_document_id: uuid
+  last_error: String
+  source_sha256: bytea!
+  source_verify_code: String!
+  status: String!
+  tenant_id: uuid!
+  to_tenant_id: uuid!
+  "An object relationship"
+  to_unit: office_dispatch_units
+}
+
+"order by aggregate values of table \"office.dispatches\""
+input office_dispatches_aggregate_order_by {
+  avg: office_dispatches_avg_order_by
+  count: order_by
+  max: office_dispatches_max_order_by
+  min: office_dispatches_min_order_by
+  stddev: office_dispatches_stddev_order_by
+  stddev_pop: office_dispatches_stddev_pop_order_by
+  stddev_samp: office_dispatches_stddev_samp_order_by
+  sum: office_dispatches_sum_order_by
+  var_pop: office_dispatches_var_pop_order_by
+  var_samp: office_dispatches_var_samp_order_by
+  variance: office_dispatches_variance_order_by
+}
+
+"order by avg() on columns of table \"office.dispatches\""
+input office_dispatches_avg_order_by {
+  attempts: order_by
+}
+
+"Boolean expression to filter rows from the table \"office.dispatches\". All fields are combined with a logical 'AND'."
+input office_dispatches_bool_exp {
+  _and: [office_dispatches_bool_exp!]
+  _not: office_dispatches_bool_exp
+  _or: [office_dispatches_bool_exp!]
+  attempts: Int_comparison_exp
+  created_at: timestamptz_comparison_exp
+  delivered_at: timestamptz_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  from_unit: office_dispatch_units_bool_exp
+  id: uuid_comparison_exp
+  incoming: office_documents_bool_exp
+  incoming_document_id: uuid_comparison_exp
+  last_error: String_comparison_exp
+  source_sha256: bytea_comparison_exp
+  source_verify_code: String_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  to_tenant_id: uuid_comparison_exp
+  to_unit: office_dispatch_units_bool_exp
+}
+
+"order by max() on columns of table \"office.dispatches\""
+input office_dispatches_max_order_by {
+  attempts: order_by
+  created_at: order_by
+  delivered_at: order_by
+  document_id: order_by
+  id: order_by
+  incoming_document_id: order_by
+  last_error: order_by
+  source_verify_code: order_by
+  status: order_by
+  tenant_id: order_by
+  to_tenant_id: order_by
+}
+
+"order by min() on columns of table \"office.dispatches\""
+input office_dispatches_min_order_by {
+  attempts: order_by
+  created_at: order_by
+  delivered_at: order_by
+  document_id: order_by
+  id: order_by
+  incoming_document_id: order_by
+  last_error: order_by
+  source_verify_code: order_by
+  status: order_by
+  tenant_id: order_by
+  to_tenant_id: order_by
+}
+
+"Ordering options when selecting data from \"office.dispatches\"."
+input office_dispatches_order_by {
+  attempts: order_by
+  created_at: order_by
+  delivered_at: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  from_unit: office_dispatch_units_order_by
+  id: order_by
+  incoming: office_documents_order_by
+  incoming_document_id: order_by
+  last_error: order_by
+  source_sha256: order_by
+  source_verify_code: order_by
+  status: order_by
+  tenant_id: order_by
+  to_tenant_id: order_by
+  to_unit: office_dispatch_units_order_by
+}
+
+"select columns of table \"office.dispatches\""
+enum office_dispatches_select_column {
+  "column name"
+  attempts
+  "column name"
+  created_at
+  "column name"
+  delivered_at
+  "column name"
+  document_id
+  "column name"
+  id
+  "column name"
+  incoming_document_id
+  "column name"
+  last_error
+  "column name"
+  source_sha256
+  "column name"
+  source_verify_code
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  to_tenant_id
+}
+
+"order by stddev() on columns of table \"office.dispatches\""
+input office_dispatches_stddev_order_by {
+  attempts: order_by
+}
+
+"order by stddev_pop() on columns of table \"office.dispatches\""
+input office_dispatches_stddev_pop_order_by {
+  attempts: order_by
+}
+
+"order by stddev_samp() on columns of table \"office.dispatches\""
+input office_dispatches_stddev_samp_order_by {
+  attempts: order_by
+}
+
+"Streaming cursor of the table \"office_dispatches\""
+input office_dispatches_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_dispatches_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_dispatches_stream_cursor_value_input {
+  attempts: Int
+  created_at: timestamptz
+  delivered_at: timestamptz
+  document_id: uuid
+  id: uuid
+  incoming_document_id: uuid
+  last_error: String
+  source_sha256: bytea
+  source_verify_code: String
+  status: String
+  tenant_id: uuid
+  to_tenant_id: uuid
+}
+
+"order by sum() on columns of table \"office.dispatches\""
+input office_dispatches_sum_order_by {
+  attempts: order_by
+}
+
+"order by var_pop() on columns of table \"office.dispatches\""
+input office_dispatches_var_pop_order_by {
+  attempts: order_by
+}
+
+"order by var_samp() on columns of table \"office.dispatches\""
+input office_dispatches_var_samp_order_by {
+  attempts: order_by
+}
+
+"order by variance() on columns of table \"office.dispatches\""
+input office_dispatches_variance_order_by {
+  attempts: order_by
+}
+
+"columns and relationships of \"office.document_acl\""
+type office_document_acl {
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  granted_at: timestamptz!
+  granted_by: String!
+  "An object relationship"
+  user: core_users
+  user_id: String!
+}
+
+"Boolean expression to filter rows from the table \"office.document_acl\". All fields are combined with a logical 'AND'."
+input office_document_acl_bool_exp {
+  _and: [office_document_acl_bool_exp!]
+  _not: office_document_acl_bool_exp
+  _or: [office_document_acl_bool_exp!]
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  granted_at: timestamptz_comparison_exp
+  granted_by: String_comparison_exp
+  user: core_users_bool_exp
+  user_id: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.document_acl\"."
+input office_document_acl_order_by {
+  document: office_documents_order_by
+  document_id: order_by
+  granted_at: order_by
+  granted_by: order_by
+  user: core_users_order_by
+  user_id: order_by
+}
+
+"select columns of table \"office.document_acl\""
+enum office_document_acl_select_column {
+  "column name"
+  document_id
+  "column name"
+  granted_at
+  "column name"
+  granted_by
+  "column name"
+  user_id
+}
+
+"Streaming cursor of the table \"office_document_acl\""
+input office_document_acl_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_acl_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_acl_stream_cursor_value_input {
+  document_id: uuid
+  granted_at: timestamptz
+  granted_by: String
+  user_id: String
+}
+
+"columns and relationships of \"office.document_events\""
+type office_document_events {
+  actor_id: String!
+  actor_kind: String!
+  created_at: timestamptz!
+  data(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  id: bigint!
+  kind: String!
+  note: String
+}
+
+"order by aggregate values of table \"office.document_events\""
+input office_document_events_aggregate_order_by {
+  avg: office_document_events_avg_order_by
+  count: order_by
+  max: office_document_events_max_order_by
+  min: office_document_events_min_order_by
+  stddev: office_document_events_stddev_order_by
+  stddev_pop: office_document_events_stddev_pop_order_by
+  stddev_samp: office_document_events_stddev_samp_order_by
+  sum: office_document_events_sum_order_by
+  var_pop: office_document_events_var_pop_order_by
+  var_samp: office_document_events_var_samp_order_by
+  variance: office_document_events_variance_order_by
+}
+
+"order by avg() on columns of table \"office.document_events\""
+input office_document_events_avg_order_by {
+  id: order_by
+}
+
+"Boolean expression to filter rows from the table \"office.document_events\". All fields are combined with a logical 'AND'."
+input office_document_events_bool_exp {
+  _and: [office_document_events_bool_exp!]
+  _not: office_document_events_bool_exp
+  _or: [office_document_events_bool_exp!]
+  actor_id: String_comparison_exp
+  actor_kind: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  data: jsonb_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  id: bigint_comparison_exp
+  kind: String_comparison_exp
+  note: String_comparison_exp
+}
+
+"order by max() on columns of table \"office.document_events\""
+input office_document_events_max_order_by {
+  actor_id: order_by
+  actor_kind: order_by
+  created_at: order_by
+  document_id: order_by
+  id: order_by
+  kind: order_by
+  note: order_by
+}
+
+"order by min() on columns of table \"office.document_events\""
+input office_document_events_min_order_by {
+  actor_id: order_by
+  actor_kind: order_by
+  created_at: order_by
+  document_id: order_by
+  id: order_by
+  kind: order_by
+  note: order_by
+}
+
+"Ordering options when selecting data from \"office.document_events\"."
+input office_document_events_order_by {
+  actor_id: order_by
+  actor_kind: order_by
+  created_at: order_by
+  data: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  id: order_by
+  kind: order_by
+  note: order_by
+}
+
+"select columns of table \"office.document_events\""
+enum office_document_events_select_column {
+  "column name"
+  actor_id
+  "column name"
+  actor_kind
+  "column name"
+  created_at
+  "column name"
+  data
+  "column name"
+  document_id
+  "column name"
+  id
+  "column name"
+  kind
+  "column name"
+  note
+}
+
+"order by stddev() on columns of table \"office.document_events\""
+input office_document_events_stddev_order_by {
+  id: order_by
+}
+
+"order by stddev_pop() on columns of table \"office.document_events\""
+input office_document_events_stddev_pop_order_by {
+  id: order_by
+}
+
+"order by stddev_samp() on columns of table \"office.document_events\""
+input office_document_events_stddev_samp_order_by {
+  id: order_by
+}
+
+"Streaming cursor of the table \"office_document_events\""
+input office_document_events_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_events_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_events_stream_cursor_value_input {
+  actor_id: String
+  actor_kind: String
+  created_at: timestamptz
+  data: jsonb
+  document_id: uuid
+  id: bigint
+  kind: String
+  note: String
+}
+
+"order by sum() on columns of table \"office.document_events\""
+input office_document_events_sum_order_by {
+  id: order_by
+}
+
+"order by var_pop() on columns of table \"office.document_events\""
+input office_document_events_var_pop_order_by {
+  id: order_by
+}
+
+"order by var_samp() on columns of table \"office.document_events\""
+input office_document_events_var_samp_order_by {
+  id: order_by
+}
+
+"order by variance() on columns of table \"office.document_events\""
+input office_document_events_variance_order_by {
+  id: order_by
+}
+
+"columns and relationships of \"office.document_files\""
+type office_document_files {
+  added_at: timestamptz!
+  added_by: String!
+  "An object relationship"
+  document: office_documents
+  document_id: uuid!
+  "An object relationship"
+  file: core_files
+  file_id: uuid!
+  role: String!
+  version: Int!
+}
+
+"order by aggregate values of table \"office.document_files\""
+input office_document_files_aggregate_order_by {
+  avg: office_document_files_avg_order_by
+  count: order_by
+  max: office_document_files_max_order_by
+  min: office_document_files_min_order_by
+  stddev: office_document_files_stddev_order_by
+  stddev_pop: office_document_files_stddev_pop_order_by
+  stddev_samp: office_document_files_stddev_samp_order_by
+  sum: office_document_files_sum_order_by
+  var_pop: office_document_files_var_pop_order_by
+  var_samp: office_document_files_var_samp_order_by
+  variance: office_document_files_variance_order_by
+}
+
+"order by avg() on columns of table \"office.document_files\""
+input office_document_files_avg_order_by {
+  version: order_by
+}
+
+"Boolean expression to filter rows from the table \"office.document_files\". All fields are combined with a logical 'AND'."
+input office_document_files_bool_exp {
+  _and: [office_document_files_bool_exp!]
+  _not: office_document_files_bool_exp
+  _or: [office_document_files_bool_exp!]
+  added_at: timestamptz_comparison_exp
+  added_by: String_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  file: core_files_bool_exp
+  file_id: uuid_comparison_exp
+  role: String_comparison_exp
+  version: Int_comparison_exp
+}
+
+"order by max() on columns of table \"office.document_files\""
+input office_document_files_max_order_by {
+  added_at: order_by
+  added_by: order_by
+  document_id: order_by
+  file_id: order_by
+  role: order_by
+  version: order_by
+}
+
+"order by min() on columns of table \"office.document_files\""
+input office_document_files_min_order_by {
+  added_at: order_by
+  added_by: order_by
+  document_id: order_by
+  file_id: order_by
+  role: order_by
+  version: order_by
+}
+
+"Ordering options when selecting data from \"office.document_files\"."
+input office_document_files_order_by {
+  added_at: order_by
+  added_by: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  file: core_files_order_by
+  file_id: order_by
+  role: order_by
+  version: order_by
+}
+
+"select columns of table \"office.document_files\""
+enum office_document_files_select_column {
+  "column name"
+  added_at
+  "column name"
+  added_by
+  "column name"
+  document_id
+  "column name"
+  file_id
+  "column name"
+  role
+  "column name"
+  version
+}
+
+"order by stddev() on columns of table \"office.document_files\""
+input office_document_files_stddev_order_by {
+  version: order_by
+}
+
+"order by stddev_pop() on columns of table \"office.document_files\""
+input office_document_files_stddev_pop_order_by {
+  version: order_by
+}
+
+"order by stddev_samp() on columns of table \"office.document_files\""
+input office_document_files_stddev_samp_order_by {
+  version: order_by
+}
+
+"Streaming cursor of the table \"office_document_files\""
+input office_document_files_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_files_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_files_stream_cursor_value_input {
+  added_at: timestamptz
+  added_by: String
+  document_id: uuid
+  file_id: uuid
+  role: String
+  version: Int
+}
+
+"order by sum() on columns of table \"office.document_files\""
+input office_document_files_sum_order_by {
+  version: order_by
+}
+
+"order by var_pop() on columns of table \"office.document_files\""
+input office_document_files_var_pop_order_by {
+  version: order_by
+}
+
+"order by var_samp() on columns of table \"office.document_files\""
+input office_document_files_var_samp_order_by {
+  version: order_by
+}
+
+"order by variance() on columns of table \"office.document_files\""
+input office_document_files_variance_order_by {
+  version: order_by
+}
+
+"columns and relationships of \"office.document_history\""
+type office_document_history {
+  action: String
+  actor_id: String
+  actor_kind: String
+  "An object relationship"
+  document: office_documents
+  document_id: uuid
+  entity: String
+  id: bigint
+  occurred_at: timestamptz
+  overview(
+    "JSON select path"
+    path: String
+  ): jsonb
+}
+
+"Boolean expression to filter rows from the table \"office.document_history\". All fields are combined with a logical 'AND'."
+input office_document_history_bool_exp {
+  _and: [office_document_history_bool_exp!]
+  _not: office_document_history_bool_exp
+  _or: [office_document_history_bool_exp!]
+  action: String_comparison_exp
+  actor_id: String_comparison_exp
+  actor_kind: String_comparison_exp
+  document: office_documents_bool_exp
+  document_id: uuid_comparison_exp
+  entity: String_comparison_exp
+  id: bigint_comparison_exp
+  occurred_at: timestamptz_comparison_exp
+  overview: jsonb_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.document_history\"."
+input office_document_history_order_by {
+  action: order_by
+  actor_id: order_by
+  actor_kind: order_by
+  document: office_documents_order_by
+  document_id: order_by
+  entity: order_by
+  id: order_by
+  occurred_at: order_by
+  overview: order_by
+}
+
+"select columns of table \"office.document_history\""
+enum office_document_history_select_column {
+  "column name"
+  action
+  "column name"
+  actor_id
+  "column name"
+  actor_kind
+  "column name"
+  document_id
+  "column name"
+  entity
+  "column name"
+  id
+  "column name"
+  occurred_at
+  "column name"
+  overview
+}
+
+"Streaming cursor of the table \"office_document_history\""
+input office_document_history_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_history_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_history_stream_cursor_value_input {
+  action: String
+  actor_id: String
+  actor_kind: String
+  document_id: uuid
+  entity: String
+  id: bigint
+  occurred_at: timestamptz
+  overview: jsonb
+}
+
+"columns and relationships of \"office.document_types\""
+type office_document_types {
+  code: String!
+  in_symbol: Boolean!
+  name: String!
+}
+
+"Boolean expression to filter rows from the table \"office.document_types\". All fields are combined with a logical 'AND'."
+input office_document_types_bool_exp {
+  _and: [office_document_types_bool_exp!]
+  _not: office_document_types_bool_exp
+  _or: [office_document_types_bool_exp!]
+  code: String_comparison_exp
+  in_symbol: Boolean_comparison_exp
+  name: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.document_types\"."
+input office_document_types_order_by {
+  code: order_by
+  in_symbol: order_by
+  name: order_by
+}
+
+"select columns of table \"office.document_types\""
+enum office_document_types_select_column {
+  "column name"
+  code
+  "column name"
+  in_symbol
+  "column name"
+  name
+}
+
+"Streaming cursor of the table \"office_document_types\""
+input office_document_types_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_document_types_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_document_types_stream_cursor_value_input {
+  code: String
+  in_symbol: Boolean
+  name: String
+}
+
+"columns and relationships of \"office.documents\""
+type office_documents {
+  "An array relationship"
+  assignments(
+    "distinct select on columns"
+    distinct_on: [office_assignments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignments_order_by!]
+    "filter the rows returned"
+    where: office_assignments_bool_exp
+  ): [office_assignments!]!
+  body: String
+  content_sha256: bytea
+  created_at: timestamptz!
+  created_by: String!
+  "An object relationship"
+  creator: core_users
+  "An object relationship"
+  department: office_departments
+  department_id: uuid
+  direction: String!
+  "An object relationship"
+  dispatch_in: office_dispatches
+  "An array relationship"
+  dispatches(
+    "distinct select on columns"
+    distinct_on: [office_dispatches_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatches_order_by!]
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "An object relationship"
+  document_type: office_document_types
+  due_on: date
+  "An array relationship"
+  events(
+    "distinct select on columns"
+    distinct_on: [office_document_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_events_order_by!]
+    "filter the rows returned"
+    where: office_document_events_bool_exp
+  ): [office_document_events!]!
+  "An array relationship"
+  files(
+    "distinct select on columns"
+    distinct_on: [office_document_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_files_order_by!]
+    "filter the rows returned"
+    where: office_document_files_bool_exp
+  ): [office_document_files!]!
+  id: uuid!
+  is_public: Boolean!
+  issued_on: date
+  issuer_name: String
+  process_id: String
+  recipient_tenant_ids: [uuid!]!
+  recipients: [String!]!
+  "An object relationship"
+  register: office_registers
+  register_id: uuid
+  register_number: Int
+  registered_at: timestamptz
+  "An object relationship"
+  reply_to: office_documents
+  reply_to_id: uuid
+  restricted: Boolean!
+  "An object relationship"
+  signer: core_users
+  signer_id: String
+  "An object relationship"
+  source: office_documents
+  source_id: uuid
+  status: String!
+  summary: String!
+  symbol: String
+  tenant_id: uuid!
+  type_code: String!
+  updated_at: timestamptz!
+  urgency: String!
+  verify_code: String
+}
+
+"aggregated selection of \"office.documents\""
+type office_documents_aggregate {
+  aggregate: office_documents_aggregate_fields
+  nodes: [office_documents!]!
+}
+
+"aggregate fields of \"office.documents\""
+type office_documents_aggregate_fields {
+  avg: office_documents_avg_fields
+  count(columns: [office_documents_select_column!], distinct: Boolean): Int!
+  max: office_documents_max_fields
+  min: office_documents_min_fields
+  stddev: office_documents_stddev_fields
+  stddev_pop: office_documents_stddev_pop_fields
+  stddev_samp: office_documents_stddev_samp_fields
+  sum: office_documents_sum_fields
+  var_pop: office_documents_var_pop_fields
+  var_samp: office_documents_var_samp_fields
+  variance: office_documents_variance_fields
+}
+
+"aggregate avg on columns"
+type office_documents_avg_fields {
+  register_number: Float
+}
+
+"Boolean expression to filter rows from the table \"office.documents\". All fields are combined with a logical 'AND'."
+input office_documents_bool_exp {
+  _and: [office_documents_bool_exp!]
+  _not: office_documents_bool_exp
+  _or: [office_documents_bool_exp!]
+  assignments: office_assignments_bool_exp
+  body: String_comparison_exp
+  content_sha256: bytea_comparison_exp
+  created_at: timestamptz_comparison_exp
+  created_by: String_comparison_exp
+  creator: core_users_bool_exp
+  department: office_departments_bool_exp
+  department_id: uuid_comparison_exp
+  direction: String_comparison_exp
+  dispatch_in: office_dispatches_bool_exp
+  dispatches: office_dispatches_bool_exp
+  document_type: office_document_types_bool_exp
+  due_on: date_comparison_exp
+  events: office_document_events_bool_exp
+  files: office_document_files_bool_exp
+  id: uuid_comparison_exp
+  is_public: Boolean_comparison_exp
+  issued_on: date_comparison_exp
+  issuer_name: String_comparison_exp
+  process_id: String_comparison_exp
+  recipient_tenant_ids: uuid_array_comparison_exp
+  recipients: String_array_comparison_exp
+  register: office_registers_bool_exp
+  register_id: uuid_comparison_exp
+  register_number: Int_comparison_exp
+  registered_at: timestamptz_comparison_exp
+  reply_to: office_documents_bool_exp
+  reply_to_id: uuid_comparison_exp
+  restricted: Boolean_comparison_exp
+  signer: core_users_bool_exp
+  signer_id: String_comparison_exp
+  source: office_documents_bool_exp
+  source_id: uuid_comparison_exp
+  status: String_comparison_exp
+  summary: String_comparison_exp
+  symbol: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  type_code: String_comparison_exp
+  updated_at: timestamptz_comparison_exp
+  urgency: String_comparison_exp
+  verify_code: String_comparison_exp
+}
+
+"aggregate max on columns"
+type office_documents_max_fields {
+  body: String
+  created_at: timestamptz
+  created_by: String
+  department_id: uuid
+  direction: String
+  due_on: date
+  id: uuid
+  issued_on: date
+  issuer_name: String
+  process_id: String
+  recipient_tenant_ids: [uuid!]
+  recipients: [String!]
+  register_id: uuid
+  register_number: Int
+  registered_at: timestamptz
+  reply_to_id: uuid
+  signer_id: String
+  source_id: uuid
+  status: String
+  summary: String
+  symbol: String
+  tenant_id: uuid
+  type_code: String
+  updated_at: timestamptz
+  urgency: String
+  verify_code: String
+}
+
+"aggregate min on columns"
+type office_documents_min_fields {
+  body: String
+  created_at: timestamptz
+  created_by: String
+  department_id: uuid
+  direction: String
+  due_on: date
+  id: uuid
+  issued_on: date
+  issuer_name: String
+  process_id: String
+  recipient_tenant_ids: [uuid!]
+  recipients: [String!]
+  register_id: uuid
+  register_number: Int
+  registered_at: timestamptz
+  reply_to_id: uuid
+  signer_id: String
+  source_id: uuid
+  status: String
+  summary: String
+  symbol: String
+  tenant_id: uuid
+  type_code: String
+  updated_at: timestamptz
+  urgency: String
+  verify_code: String
+}
+
+"Ordering options when selecting data from \"office.documents\"."
+input office_documents_order_by {
+  assignments_aggregate: office_assignments_aggregate_order_by
+  body: order_by
+  content_sha256: order_by
+  created_at: order_by
+  created_by: order_by
+  creator: core_users_order_by
+  department: office_departments_order_by
+  department_id: order_by
+  direction: order_by
+  dispatch_in: office_dispatches_order_by
+  dispatches_aggregate: office_dispatches_aggregate_order_by
+  document_type: office_document_types_order_by
+  due_on: order_by
+  events_aggregate: office_document_events_aggregate_order_by
+  files_aggregate: office_document_files_aggregate_order_by
+  id: order_by
+  is_public: order_by
+  issued_on: order_by
+  issuer_name: order_by
+  process_id: order_by
+  recipient_tenant_ids: order_by
+  recipients: order_by
+  register: office_registers_order_by
+  register_id: order_by
+  register_number: order_by
+  registered_at: order_by
+  reply_to: office_documents_order_by
+  reply_to_id: order_by
+  restricted: order_by
+  signer: core_users_order_by
+  signer_id: order_by
+  source: office_documents_order_by
+  source_id: order_by
+  status: order_by
+  summary: order_by
+  symbol: order_by
+  tenant_id: order_by
+  type_code: order_by
+  updated_at: order_by
+  urgency: order_by
+  verify_code: order_by
+}
+
+"select columns of table \"office.documents\""
+enum office_documents_select_column {
+  "column name"
+  body
+  "column name"
+  content_sha256
+  "column name"
+  created_at
+  "column name"
+  created_by
+  "column name"
+  department_id
+  "column name"
+  direction
+  "column name"
+  due_on
+  "column name"
+  id
+  "column name"
+  is_public
+  "column name"
+  issued_on
+  "column name"
+  issuer_name
+  "column name"
+  process_id
+  "column name"
+  recipient_tenant_ids
+  "column name"
+  recipients
+  "column name"
+  register_id
+  "column name"
+  register_number
+  "column name"
+  registered_at
+  "column name"
+  reply_to_id
+  "column name"
+  restricted
+  "column name"
+  signer_id
+  "column name"
+  source_id
+  "column name"
+  status
+  "column name"
+  summary
+  "column name"
+  symbol
+  "column name"
+  tenant_id
+  "column name"
+  type_code
+  "column name"
+  updated_at
+  "column name"
+  urgency
+  "column name"
+  verify_code
+}
+
+"aggregate stddev on columns"
+type office_documents_stddev_fields {
+  register_number: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_documents_stddev_pop_fields {
+  register_number: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_documents_stddev_samp_fields {
+  register_number: Float
+}
+
+"Streaming cursor of the table \"office_documents\""
+input office_documents_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_documents_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_documents_stream_cursor_value_input {
+  body: String
+  content_sha256: bytea
+  created_at: timestamptz
+  created_by: String
+  department_id: uuid
+  direction: String
+  due_on: date
+  id: uuid
+  is_public: Boolean
+  issued_on: date
+  issuer_name: String
+  process_id: String
+  recipient_tenant_ids: [uuid!]
+  recipients: [String!]
+  register_id: uuid
+  register_number: Int
+  registered_at: timestamptz
+  reply_to_id: uuid
+  restricted: Boolean
+  signer_id: String
+  source_id: uuid
+  status: String
+  summary: String
+  symbol: String
+  tenant_id: uuid
+  type_code: String
+  updated_at: timestamptz
+  urgency: String
+  verify_code: String
+}
+
+"aggregate sum on columns"
+type office_documents_sum_fields {
+  register_number: Int
+}
+
+"aggregate var_pop on columns"
+type office_documents_var_pop_fields {
+  register_number: Float
+}
+
+"aggregate var_samp on columns"
+type office_documents_var_samp_fields {
+  register_number: Float
+}
+
+"aggregate variance on columns"
+type office_documents_variance_fields {
+  register_number: Float
+}
+
+input office_grant_document_access_args {
+  document_id: uuid
+  user_id: String
+}
+
+"columns and relationships of \"office.registers\""
+type office_registers {
+  direction: String!
+  id: uuid!
+  last_number: Int!
+  year: Int!
+}
+
+"Boolean expression to filter rows from the table \"office.registers\". All fields are combined with a logical 'AND'."
+input office_registers_bool_exp {
+  _and: [office_registers_bool_exp!]
+  _not: office_registers_bool_exp
+  _or: [office_registers_bool_exp!]
+  direction: String_comparison_exp
+  id: uuid_comparison_exp
+  last_number: Int_comparison_exp
+  year: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.registers\"."
+input office_registers_order_by {
+  direction: order_by
+  id: order_by
+  last_number: order_by
+  year: order_by
+}
+
+"select columns of table \"office.registers\""
+enum office_registers_select_column {
+  "column name"
+  direction
+  "column name"
+  id
+  "column name"
+  last_number
+  "column name"
+  year
+}
+
+"Streaming cursor of the table \"office_registers\""
+input office_registers_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_registers_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_registers_stream_cursor_value_input {
+  direction: String
+  id: uuid
+  last_number: Int
+  year: Int
+}
+
+input office_revoke_document_access_args {
+  document_id: uuid
+  user_id: String
+}
+
+"columns and relationships of \"office.v_assignment_suggestion_accuracy\""
+type office_v_assignment_suggestion_accuracy {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"aggregated selection of \"office.v_assignment_suggestion_accuracy\""
+type office_v_assignment_suggestion_accuracy_aggregate {
+  aggregate: office_v_assignment_suggestion_accuracy_aggregate_fields
+  nodes: [office_v_assignment_suggestion_accuracy!]!
+}
+
+"aggregate fields of \"office.v_assignment_suggestion_accuracy\""
+type office_v_assignment_suggestion_accuracy_aggregate_fields {
+  avg: office_v_assignment_suggestion_accuracy_avg_fields
+  count(columns: [office_v_assignment_suggestion_accuracy_select_column!], distinct: Boolean): Int!
+  max: office_v_assignment_suggestion_accuracy_max_fields
+  min: office_v_assignment_suggestion_accuracy_min_fields
+  stddev: office_v_assignment_suggestion_accuracy_stddev_fields
+  stddev_pop: office_v_assignment_suggestion_accuracy_stddev_pop_fields
+  stddev_samp: office_v_assignment_suggestion_accuracy_stddev_samp_fields
+  sum: office_v_assignment_suggestion_accuracy_sum_fields
+  var_pop: office_v_assignment_suggestion_accuracy_var_pop_fields
+  var_samp: office_v_assignment_suggestion_accuracy_var_samp_fields
+  variance: office_v_assignment_suggestion_accuracy_variance_fields
+}
+
+"aggregate avg on columns"
+type office_v_assignment_suggestion_accuracy_avg_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"Boolean expression to filter rows from the table \"office.v_assignment_suggestion_accuracy\". All fields are combined with a logical 'AND'."
+input office_v_assignment_suggestion_accuracy_bool_exp {
+  _and: [office_v_assignment_suggestion_accuracy_bool_exp!]
+  _not: office_v_assignment_suggestion_accuracy_bool_exp
+  _or: [office_v_assignment_suggestion_accuracy_bool_exp!]
+  confidence: String_comparison_exp
+  decided: Int_comparison_exp
+  due_abs_error_days: Int_comparison_exp
+  due_compared: Int_comparison_exp
+  kept_due: Int_comparison_exp
+  kept_unit: Int_comparison_exp
+  status: String_comparison_exp
+  suggested: Int_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"aggregate max on columns"
+type office_v_assignment_suggestion_accuracy_max_fields {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"aggregate min on columns"
+type office_v_assignment_suggestion_accuracy_min_fields {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"Ordering options when selecting data from \"office.v_assignment_suggestion_accuracy\"."
+input office_v_assignment_suggestion_accuracy_order_by {
+  confidence: order_by
+  decided: order_by
+  due_abs_error_days: order_by
+  due_compared: order_by
+  kept_due: order_by
+  kept_unit: order_by
+  status: order_by
+  suggested: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_assignment_suggestion_accuracy\""
+enum office_v_assignment_suggestion_accuracy_select_column {
+  "column name"
+  confidence
+  "column name"
+  decided
+  "column name"
+  due_abs_error_days
+  "column name"
+  due_compared
+  "column name"
+  kept_due
+  "column name"
+  kept_unit
+  "column name"
+  status
+  "column name"
+  suggested
+  "column name"
+  tenant_id
+}
+
+"aggregate stddev on columns"
+type office_v_assignment_suggestion_accuracy_stddev_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_v_assignment_suggestion_accuracy_stddev_pop_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_v_assignment_suggestion_accuracy_stddev_samp_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"Streaming cursor of the table \"office_v_assignment_suggestion_accuracy\""
+input office_v_assignment_suggestion_accuracy_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_assignment_suggestion_accuracy_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_assignment_suggestion_accuracy_stream_cursor_value_input {
+  confidence: String
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  status: String
+  suggested: Int
+  tenant_id: uuid
+}
+
+"aggregate sum on columns"
+type office_v_assignment_suggestion_accuracy_sum_fields {
+  decided: Int
+  due_abs_error_days: Int
+  due_compared: Int
+  kept_due: Int
+  kept_unit: Int
+  suggested: Int
+}
+
+"aggregate var_pop on columns"
+type office_v_assignment_suggestion_accuracy_var_pop_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate var_samp on columns"
+type office_v_assignment_suggestion_accuracy_var_samp_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"aggregate variance on columns"
+type office_v_assignment_suggestion_accuracy_variance_fields {
+  decided: Float
+  due_abs_error_days: Float
+  due_compared: Float
+  kept_due: Float
+  kept_unit: Float
+  suggested: Float
+}
+
+"columns and relationships of \"office.v_document_counts\""
+type office_v_document_counts {
+  direction: String
+  documents: Int
+  overdue: Boolean
+  restricted: Boolean
+  status: String
+  tenant_id: uuid
+  urgency: String
+}
+
+"Boolean expression to filter rows from the table \"office.v_document_counts\". All fields are combined with a logical 'AND'."
+input office_v_document_counts_bool_exp {
+  _and: [office_v_document_counts_bool_exp!]
+  _not: office_v_document_counts_bool_exp
+  _or: [office_v_document_counts_bool_exp!]
+  direction: String_comparison_exp
+  documents: Int_comparison_exp
+  overdue: Boolean_comparison_exp
+  restricted: Boolean_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+  urgency: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_document_counts\"."
+input office_v_document_counts_order_by {
+  direction: order_by
+  documents: order_by
+  overdue: order_by
+  restricted: order_by
+  status: order_by
+  tenant_id: order_by
+  urgency: order_by
+}
+
+"select columns of table \"office.v_document_counts\""
+enum office_v_document_counts_select_column {
+  "column name"
+  direction
+  "column name"
+  documents
+  "column name"
+  overdue
+  "column name"
+  restricted
+  "column name"
+  status
+  "column name"
+  tenant_id
+  "column name"
+  urgency
+}
+
+"Streaming cursor of the table \"office_v_document_counts\""
+input office_v_document_counts_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_document_counts_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_document_counts_stream_cursor_value_input {
+  direction: String
+  documents: Int
+  overdue: Boolean
+  restricted: Boolean
+  status: String
+  tenant_id: uuid
+  urgency: String
+}
+
+"columns and relationships of \"office.v_intake_accuracy\""
+type office_v_intake_accuracy {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"aggregated selection of \"office.v_intake_accuracy\""
+type office_v_intake_accuracy_aggregate {
+  aggregate: office_v_intake_accuracy_aggregate_fields
+  nodes: [office_v_intake_accuracy!]!
+}
+
+"aggregate fields of \"office.v_intake_accuracy\""
+type office_v_intake_accuracy_aggregate_fields {
+  avg: office_v_intake_accuracy_avg_fields
+  count(columns: [office_v_intake_accuracy_select_column!], distinct: Boolean): Int!
+  max: office_v_intake_accuracy_max_fields
+  min: office_v_intake_accuracy_min_fields
+  stddev: office_v_intake_accuracy_stddev_fields
+  stddev_pop: office_v_intake_accuracy_stddev_pop_fields
+  stddev_samp: office_v_intake_accuracy_stddev_samp_fields
+  sum: office_v_intake_accuracy_sum_fields
+  var_pop: office_v_intake_accuracy_var_pop_fields
+  var_samp: office_v_intake_accuracy_var_samp_fields
+  variance: office_v_intake_accuracy_variance_fields
+}
+
+"aggregate avg on columns"
+type office_v_intake_accuracy_avg_fields {
+  kept: Float
+  suggested: Float
+}
+
+"Boolean expression to filter rows from the table \"office.v_intake_accuracy\". All fields are combined with a logical 'AND'."
+input office_v_intake_accuracy_bool_exp {
+  _and: [office_v_intake_accuracy_bool_exp!]
+  _not: office_v_intake_accuracy_bool_exp
+  _or: [office_v_intake_accuracy_bool_exp!]
+  confidence: String_comparison_exp
+  field: String_comparison_exp
+  kept: Int_comparison_exp
+  suggested: Int_comparison_exp
+}
+
+"aggregate max on columns"
+type office_v_intake_accuracy_max_fields {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"aggregate min on columns"
+type office_v_intake_accuracy_min_fields {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"Ordering options when selecting data from \"office.v_intake_accuracy\"."
+input office_v_intake_accuracy_order_by {
+  confidence: order_by
+  field: order_by
+  kept: order_by
+  suggested: order_by
+}
+
+"select columns of table \"office.v_intake_accuracy\""
+enum office_v_intake_accuracy_select_column {
+  "column name"
+  confidence
+  "column name"
+  field
+  "column name"
+  kept
+  "column name"
+  suggested
+}
+
+"aggregate stddev on columns"
+type office_v_intake_accuracy_stddev_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_v_intake_accuracy_stddev_pop_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_v_intake_accuracy_stddev_samp_fields {
+  kept: Float
+  suggested: Float
+}
+
+"Streaming cursor of the table \"office_v_intake_accuracy\""
+input office_v_intake_accuracy_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_intake_accuracy_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_intake_accuracy_stream_cursor_value_input {
+  confidence: String
+  field: String
+  kept: Int
+  suggested: Int
+}
+
+"aggregate sum on columns"
+type office_v_intake_accuracy_sum_fields {
+  kept: Int
+  suggested: Int
+}
+
+"aggregate var_pop on columns"
+type office_v_intake_accuracy_var_pop_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate var_samp on columns"
+type office_v_intake_accuracy_var_samp_fields {
+  kept: Float
+  suggested: Float
+}
+
+"aggregate variance on columns"
+type office_v_intake_accuracy_variance_fields {
+  kept: Float
+  suggested: Float
+}
+
+"columns and relationships of \"office.v_outgoing_by_month\""
+type office_v_outgoing_by_month {
+  documents: Int
+  month: date
+  tenant_id: uuid
+}
+
+"Boolean expression to filter rows from the table \"office.v_outgoing_by_month\". All fields are combined with a logical 'AND'."
+input office_v_outgoing_by_month_bool_exp {
+  _and: [office_v_outgoing_by_month_bool_exp!]
+  _not: office_v_outgoing_by_month_bool_exp
+  _or: [office_v_outgoing_by_month_bool_exp!]
+  documents: Int_comparison_exp
+  month: date_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_outgoing_by_month\"."
+input office_v_outgoing_by_month_order_by {
+  documents: order_by
+  month: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_outgoing_by_month\""
+enum office_v_outgoing_by_month_select_column {
+  "column name"
+  documents
+  "column name"
+  month
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_v_outgoing_by_month\""
+input office_v_outgoing_by_month_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_outgoing_by_month_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_outgoing_by_month_stream_cursor_value_input {
+  documents: Int
+  month: date
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.v_overdue_by_department\""
+type office_v_overdue_by_department {
+  code: String
+  department_id: uuid
+  in_progress: Int
+  name: String
+  overdue: Int
+  tenant_id: uuid
+}
+
+"Boolean expression to filter rows from the table \"office.v_overdue_by_department\". All fields are combined with a logical 'AND'."
+input office_v_overdue_by_department_bool_exp {
+  _and: [office_v_overdue_by_department_bool_exp!]
+  _not: office_v_overdue_by_department_bool_exp
+  _or: [office_v_overdue_by_department_bool_exp!]
+  code: String_comparison_exp
+  department_id: uuid_comparison_exp
+  in_progress: Int_comparison_exp
+  name: String_comparison_exp
+  overdue: Int_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_overdue_by_department\"."
+input office_v_overdue_by_department_order_by {
+  code: order_by
+  department_id: order_by
+  in_progress: order_by
+  name: order_by
+  overdue: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.v_overdue_by_department\""
+enum office_v_overdue_by_department_select_column {
+  "column name"
+  code
+  "column name"
+  department_id
+  "column name"
+  in_progress
+  "column name"
+  name
+  "column name"
+  overdue
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_v_overdue_by_department\""
+input office_v_overdue_by_department_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_overdue_by_department_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_overdue_by_department_stream_cursor_value_input {
+  code: String
+  department_id: uuid
+  in_progress: Int
+  name: String
+  overdue: Int
+  tenant_id: uuid
+}
+
+"columns and relationships of \"office.v_processing_time\""
+type office_v_processing_time {
+  documents: Int
+  month: date
+  on_time: Int
+  tenant_id: uuid
+  total_hours: float8
+  with_due: Int
+}
+
+"Boolean expression to filter rows from the table \"office.v_processing_time\". All fields are combined with a logical 'AND'."
+input office_v_processing_time_bool_exp {
+  _and: [office_v_processing_time_bool_exp!]
+  _not: office_v_processing_time_bool_exp
+  _or: [office_v_processing_time_bool_exp!]
+  documents: Int_comparison_exp
+  month: date_comparison_exp
+  on_time: Int_comparison_exp
+  tenant_id: uuid_comparison_exp
+  total_hours: float8_comparison_exp
+  with_due: Int_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.v_processing_time\"."
+input office_v_processing_time_order_by {
+  documents: order_by
+  month: order_by
+  on_time: order_by
+  tenant_id: order_by
+  total_hours: order_by
+  with_due: order_by
+}
+
+"select columns of table \"office.v_processing_time\""
+enum office_v_processing_time_select_column {
+  "column name"
+  documents
+  "column name"
+  month
+  "column name"
+  on_time
+  "column name"
+  tenant_id
+  "column name"
+  total_hours
+  "column name"
+  with_due
+}
+
+"Streaming cursor of the table \"office_v_processing_time\""
+input office_v_processing_time_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_v_processing_time_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_v_processing_time_stream_cursor_value_input {
+  documents: Int
+  month: date
+  on_time: Int
+  tenant_id: uuid
+  total_hours: float8
+  with_due: Int
+}
+
+"column ordering options"
+enum order_by {
+  "in ascending order, nulls last"
+  asc
+  "in ascending order, nulls first"
+  asc_nulls_first
+  "in ascending order, nulls last"
+  asc_nulls_last
+  "in descending order, nulls first"
+  desc
+  "in descending order, nulls first"
+  desc_nulls_first
+  "in descending order, nulls last"
+  desc_nulls_last
+}
+
+type query_root {
+  "fetch data from the table: \"core.audit_anchors\""
+  core_audit_anchors(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): [core_audit_anchors!]!
+  "fetch aggregated fields from the table: \"core.audit_anchors\""
+  core_audit_anchors_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): core_audit_anchors_aggregate!
+  "fetch data from the table: \"core.audit_log\""
+  core_audit_log(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): [core_audit_log!]!
+  "fetch aggregated fields from the table: \"core.audit_log\""
+  core_audit_log_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): core_audit_log_aggregate!
+  "fetch data from the table: \"core.audit_log\" using primary key columns"
+  core_audit_log_by_pk(id: bigint!): core_audit_log
+  "fetch data from the table: \"core.files\""
+  core_files(
+    "distinct select on columns"
+    distinct_on: [core_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_files_order_by!]
+    "filter the rows returned"
+    where: core_files_bool_exp
+  ): [core_files!]!
+  "fetch data from the table: \"core.files\" using primary key columns"
+  core_files_by_pk(id: uuid!): core_files
+  "fetch data from the table: \"core.lineage_events\""
+  core_lineage_events(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): [core_lineage_events!]!
+  "fetch aggregated fields from the table: \"core.lineage_events\""
+  core_lineage_events_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): core_lineage_events_aggregate!
+  "fetch data from the table: \"core.lineage_events\" using primary key columns"
+  core_lineage_events_by_pk(id: bigint!): core_lineage_events
+  "fetch data from the table: \"core.notifications\""
+  core_notifications(
+    "distinct select on columns"
+    distinct_on: [core_notifications_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_notifications_order_by!]
+    "filter the rows returned"
+    where: core_notifications_bool_exp
+  ): [core_notifications!]!
+  "fetch aggregated fields from the table: \"core.notifications\""
+  core_notifications_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_notifications_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_notifications_order_by!]
+    "filter the rows returned"
+    where: core_notifications_bool_exp
+  ): core_notifications_aggregate!
+  "fetch data from the table: \"core.notifications\" using primary key columns"
+  core_notifications_by_pk(id: bigint!): core_notifications
+  "fetch data from the table: \"core.tenants\""
+  core_tenants(
+    "distinct select on columns"
+    distinct_on: [core_tenants_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_tenants_order_by!]
+    "filter the rows returned"
+    where: core_tenants_bool_exp
+  ): [core_tenants!]!
+  "fetch data from the table: \"core.tenants\" using primary key columns"
+  core_tenants_by_pk(id: uuid!): core_tenants
+  "fetch data from the table: \"core.users\""
+  core_users(
+    "distinct select on columns"
+    distinct_on: [core_users_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_users_order_by!]
+    "filter the rows returned"
+    where: core_users_bool_exp
+  ): [core_users!]!
+  "fetch data from the table: \"core.users\" using primary key columns"
+  core_users_by_pk(id: String!): core_users
+  myTasks: [WorkTask!]!
+  "fetch data from the table: \"office.assignment_suggestions\""
+  office_assignment_suggestions(
+    "distinct select on columns"
+    distinct_on: [office_assignment_suggestions_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignment_suggestions_order_by!]
+    "filter the rows returned"
+    where: office_assignment_suggestions_bool_exp
+  ): [office_assignment_suggestions!]!
+  "fetch data from the table: \"office.assignment_suggestions\" using primary key columns"
+  office_assignment_suggestions_by_pk(document_id: uuid!): office_assignment_suggestions
+  "fetch data from the table: \"office.assignments\""
+  office_assignments(
+    "distinct select on columns"
+    distinct_on: [office_assignments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignments_order_by!]
+    "filter the rows returned"
+    where: office_assignments_bool_exp
+  ): [office_assignments!]!
+  "fetch data from the table: \"office.assignments\" using primary key columns"
+  office_assignments_by_pk(id: uuid!): office_assignments
+  "fetch data from the table: \"office.case_file_documents\""
+  office_case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_file_documents\" using primary key columns"
+  office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
+  "fetch data from the table: \"office.case_files\""
+  office_case_files(
+    "distinct select on columns"
+    distinct_on: [office_case_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_files_order_by!]
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.case_files\" using primary key columns"
+  office_case_files_by_pk(id: uuid!): office_case_files
+  "fetch data from the table: \"office.departments\""
+  office_departments(
+    "distinct select on columns"
+    distinct_on: [office_departments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_departments_order_by!]
+    "filter the rows returned"
+    where: office_departments_bool_exp
+  ): [office_departments!]!
+  "fetch data from the table: \"office.departments\" using primary key columns"
+  office_departments_by_pk(id: uuid!): office_departments
+  "fetch data from the table: \"office.dispatch_units\""
+  office_dispatch_units(
+    "distinct select on columns"
+    distinct_on: [office_dispatch_units_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatch_units_order_by!]
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table: \"office.dispatches\""
+  office_dispatches(
+    "distinct select on columns"
+    distinct_on: [office_dispatches_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatches_order_by!]
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "fetch data from the table: \"office.dispatches\" using primary key columns"
+  office_dispatches_by_pk(id: uuid!): office_dispatches
+  "fetch data from the table: \"office.document_acl\""
+  office_document_acl(
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "fetch data from the table: \"office.document_acl\" using primary key columns"
+  office_document_acl_by_pk(document_id: uuid!, user_id: String!): office_document_acl
+  "fetch data from the table: \"office.document_events\""
+  office_document_events(
+    "distinct select on columns"
+    distinct_on: [office_document_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_events_order_by!]
+    "filter the rows returned"
+    where: office_document_events_bool_exp
+  ): [office_document_events!]!
+  "fetch data from the table: \"office.document_events\" using primary key columns"
+  office_document_events_by_pk(id: bigint!): office_document_events
+  "fetch data from the table: \"office.document_files\""
+  office_document_files(
+    "distinct select on columns"
+    distinct_on: [office_document_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_files_order_by!]
+    "filter the rows returned"
+    where: office_document_files_bool_exp
+  ): [office_document_files!]!
+  "fetch data from the table: \"office.document_files\" using primary key columns"
+  office_document_files_by_pk(document_id: uuid!, file_id: uuid!): office_document_files
+  "fetch data from the table: \"office.document_history\""
+  office_document_history(
+    "distinct select on columns"
+    distinct_on: [office_document_history_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_history_order_by!]
+    "filter the rows returned"
+    where: office_document_history_bool_exp
+  ): [office_document_history!]!
+  "fetch data from the table: \"office.document_types\""
+  office_document_types(
+    "distinct select on columns"
+    distinct_on: [office_document_types_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_types_order_by!]
+    "filter the rows returned"
+    where: office_document_types_bool_exp
+  ): [office_document_types!]!
+  "fetch data from the table: \"office.document_types\" using primary key columns"
+  office_document_types_by_pk(code: String!): office_document_types
+  "fetch data from the table: \"office.documents\""
+  office_documents(
+    "distinct select on columns"
+    distinct_on: [office_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_documents_order_by!]
+    "filter the rows returned"
+    where: office_documents_bool_exp
+  ): [office_documents!]!
+  "fetch aggregated fields from the table: \"office.documents\""
+  office_documents_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_documents_order_by!]
+    "filter the rows returned"
+    where: office_documents_bool_exp
+  ): office_documents_aggregate!
+  "fetch data from the table: \"office.documents\" using primary key columns"
+  office_documents_by_pk(id: uuid!): office_documents
+  "fetch data from the table: \"office.registers\""
+  office_registers(
+    "distinct select on columns"
+    distinct_on: [office_registers_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_registers_order_by!]
+    "filter the rows returned"
+    where: office_registers_bool_exp
+  ): [office_registers!]!
+  "fetch data from the table: \"office.registers\" using primary key columns"
+  office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): [office_v_assignment_suggestion_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): office_v_assignment_suggestion_accuracy_aggregate!
+  "fetch data from the table: \"office.v_document_counts\""
+  office_v_document_counts(
+    "distinct select on columns"
+    distinct_on: [office_v_document_counts_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_document_counts_order_by!]
+    "filter the rows returned"
+    where: office_v_document_counts_bool_exp
+  ): [office_v_document_counts!]!
+  "fetch data from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): [office_v_intake_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): office_v_intake_accuracy_aggregate!
+  "fetch data from the table: \"office.v_outgoing_by_month\""
+  office_v_outgoing_by_month(
+    "distinct select on columns"
+    distinct_on: [office_v_outgoing_by_month_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_outgoing_by_month_order_by!]
+    "filter the rows returned"
+    where: office_v_outgoing_by_month_bool_exp
+  ): [office_v_outgoing_by_month!]!
+  "fetch data from the table: \"office.v_overdue_by_department\""
+  office_v_overdue_by_department(
+    "distinct select on columns"
+    distinct_on: [office_v_overdue_by_department_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_overdue_by_department_order_by!]
+    "filter the rows returned"
+    where: office_v_overdue_by_department_bool_exp
+  ): [office_v_overdue_by_department!]!
+  "fetch data from the table: \"office.v_processing_time\""
+  office_v_processing_time(
+    "distinct select on columns"
+    distinct_on: [office_v_processing_time_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_processing_time_order_by!]
+    "filter the rows returned"
+    where: office_v_processing_time_bool_exp
+  ): [office_v_processing_time!]!
+}
+
+type subscription_root {
+  "fetch data from the table: \"core.audit_anchors\""
+  core_audit_anchors(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): [core_audit_anchors!]!
+  "fetch aggregated fields from the table: \"core.audit_anchors\""
+  core_audit_anchors_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_anchors_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_anchors_order_by!]
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): core_audit_anchors_aggregate!
+  "fetch data from the table in a streaming manner: \"core.audit_anchors\""
+  core_audit_anchors_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_audit_anchors_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_audit_anchors_bool_exp
+  ): [core_audit_anchors!]!
+  "fetch data from the table: \"core.audit_log\""
+  core_audit_log(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): [core_audit_log!]!
+  "fetch aggregated fields from the table: \"core.audit_log\""
+  core_audit_log_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_audit_log_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_audit_log_order_by!]
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): core_audit_log_aggregate!
+  "fetch data from the table: \"core.audit_log\" using primary key columns"
+  core_audit_log_by_pk(id: bigint!): core_audit_log
+  "fetch data from the table in a streaming manner: \"core.audit_log\""
+  core_audit_log_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_audit_log_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_audit_log_bool_exp
+  ): [core_audit_log!]!
+  "fetch data from the table: \"core.files\""
+  core_files(
+    "distinct select on columns"
+    distinct_on: [core_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_files_order_by!]
+    "filter the rows returned"
+    where: core_files_bool_exp
+  ): [core_files!]!
+  "fetch data from the table: \"core.files\" using primary key columns"
+  core_files_by_pk(id: uuid!): core_files
+  "fetch data from the table in a streaming manner: \"core.files\""
+  core_files_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_files_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_files_bool_exp
+  ): [core_files!]!
+  "fetch data from the table: \"core.lineage_events\""
+  core_lineage_events(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): [core_lineage_events!]!
+  "fetch aggregated fields from the table: \"core.lineage_events\""
+  core_lineage_events_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_lineage_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_lineage_events_order_by!]
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): core_lineage_events_aggregate!
+  "fetch data from the table: \"core.lineage_events\" using primary key columns"
+  core_lineage_events_by_pk(id: bigint!): core_lineage_events
+  "fetch data from the table in a streaming manner: \"core.lineage_events\""
+  core_lineage_events_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_lineage_events_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_lineage_events_bool_exp
+  ): [core_lineage_events!]!
+  "fetch data from the table: \"core.notifications\""
+  core_notifications(
+    "distinct select on columns"
+    distinct_on: [core_notifications_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_notifications_order_by!]
+    "filter the rows returned"
+    where: core_notifications_bool_exp
+  ): [core_notifications!]!
+  "fetch aggregated fields from the table: \"core.notifications\""
+  core_notifications_aggregate(
+    "distinct select on columns"
+    distinct_on: [core_notifications_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_notifications_order_by!]
+    "filter the rows returned"
+    where: core_notifications_bool_exp
+  ): core_notifications_aggregate!
+  "fetch data from the table: \"core.notifications\" using primary key columns"
+  core_notifications_by_pk(id: bigint!): core_notifications
+  "fetch data from the table in a streaming manner: \"core.notifications\""
+  core_notifications_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_notifications_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_notifications_bool_exp
+  ): [core_notifications!]!
+  "fetch data from the table: \"core.tenants\""
+  core_tenants(
+    "distinct select on columns"
+    distinct_on: [core_tenants_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_tenants_order_by!]
+    "filter the rows returned"
+    where: core_tenants_bool_exp
+  ): [core_tenants!]!
+  "fetch data from the table: \"core.tenants\" using primary key columns"
+  core_tenants_by_pk(id: uuid!): core_tenants
+  "fetch data from the table in a streaming manner: \"core.tenants\""
+  core_tenants_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_tenants_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_tenants_bool_exp
+  ): [core_tenants!]!
+  "fetch data from the table: \"core.users\""
+  core_users(
+    "distinct select on columns"
+    distinct_on: [core_users_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_users_order_by!]
+    "filter the rows returned"
+    where: core_users_bool_exp
+  ): [core_users!]!
+  "fetch data from the table: \"core.users\" using primary key columns"
+  core_users_by_pk(id: String!): core_users
+  "fetch data from the table in a streaming manner: \"core.users\""
+  core_users_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_users_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_users_bool_exp
+  ): [core_users!]!
+  "fetch data from the table: \"office.assignment_suggestions\""
+  office_assignment_suggestions(
+    "distinct select on columns"
+    distinct_on: [office_assignment_suggestions_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignment_suggestions_order_by!]
+    "filter the rows returned"
+    where: office_assignment_suggestions_bool_exp
+  ): [office_assignment_suggestions!]!
+  "fetch data from the table: \"office.assignment_suggestions\" using primary key columns"
+  office_assignment_suggestions_by_pk(document_id: uuid!): office_assignment_suggestions
+  "fetch data from the table in a streaming manner: \"office.assignment_suggestions\""
+  office_assignment_suggestions_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_assignment_suggestions_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_assignment_suggestions_bool_exp
+  ): [office_assignment_suggestions!]!
+  "fetch data from the table: \"office.assignments\""
+  office_assignments(
+    "distinct select on columns"
+    distinct_on: [office_assignments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_assignments_order_by!]
+    "filter the rows returned"
+    where: office_assignments_bool_exp
+  ): [office_assignments!]!
+  "fetch data from the table: \"office.assignments\" using primary key columns"
+  office_assignments_by_pk(id: uuid!): office_assignments
+  "fetch data from the table in a streaming manner: \"office.assignments\""
+  office_assignments_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_assignments_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_assignments_bool_exp
+  ): [office_assignments!]!
+  "fetch data from the table: \"office.case_file_documents\""
+  office_case_file_documents(
+    "distinct select on columns"
+    distinct_on: [office_case_file_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_file_documents_order_by!]
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_file_documents\" using primary key columns"
+  office_case_file_documents_by_pk(case_file_id: uuid!, document_id: uuid!): office_case_file_documents
+  "fetch data from the table in a streaming manner: \"office.case_file_documents\""
+  office_case_file_documents_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_case_file_documents_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_case_file_documents_bool_exp
+  ): [office_case_file_documents!]!
+  "fetch data from the table: \"office.case_files\""
+  office_case_files(
+    "distinct select on columns"
+    distinct_on: [office_case_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_case_files_order_by!]
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.case_files\" using primary key columns"
+  office_case_files_by_pk(id: uuid!): office_case_files
+  "fetch data from the table in a streaming manner: \"office.case_files\""
+  office_case_files_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_case_files_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_case_files_bool_exp
+  ): [office_case_files!]!
+  "fetch data from the table: \"office.departments\""
+  office_departments(
+    "distinct select on columns"
+    distinct_on: [office_departments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_departments_order_by!]
+    "filter the rows returned"
+    where: office_departments_bool_exp
+  ): [office_departments!]!
+  "fetch data from the table: \"office.departments\" using primary key columns"
+  office_departments_by_pk(id: uuid!): office_departments
+  "fetch data from the table in a streaming manner: \"office.departments\""
+  office_departments_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_departments_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_departments_bool_exp
+  ): [office_departments!]!
+  "fetch data from the table: \"office.dispatch_units\""
+  office_dispatch_units(
+    "distinct select on columns"
+    distinct_on: [office_dispatch_units_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatch_units_order_by!]
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table in a streaming manner: \"office.dispatch_units\""
+  office_dispatch_units_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_dispatch_units_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_dispatch_units_bool_exp
+  ): [office_dispatch_units!]!
+  "fetch data from the table: \"office.dispatches\""
+  office_dispatches(
+    "distinct select on columns"
+    distinct_on: [office_dispatches_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_dispatches_order_by!]
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "fetch data from the table: \"office.dispatches\" using primary key columns"
+  office_dispatches_by_pk(id: uuid!): office_dispatches
+  "fetch data from the table in a streaming manner: \"office.dispatches\""
+  office_dispatches_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_dispatches_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_dispatches_bool_exp
+  ): [office_dispatches!]!
+  "fetch data from the table: \"office.document_acl\""
+  office_document_acl(
+    "distinct select on columns"
+    distinct_on: [office_document_acl_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_acl_order_by!]
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "fetch data from the table: \"office.document_acl\" using primary key columns"
+  office_document_acl_by_pk(document_id: uuid!, user_id: String!): office_document_acl
+  "fetch data from the table in a streaming manner: \"office.document_acl\""
+  office_document_acl_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_acl_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_acl_bool_exp
+  ): [office_document_acl!]!
+  "fetch data from the table: \"office.document_events\""
+  office_document_events(
+    "distinct select on columns"
+    distinct_on: [office_document_events_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_events_order_by!]
+    "filter the rows returned"
+    where: office_document_events_bool_exp
+  ): [office_document_events!]!
+  "fetch data from the table: \"office.document_events\" using primary key columns"
+  office_document_events_by_pk(id: bigint!): office_document_events
+  "fetch data from the table in a streaming manner: \"office.document_events\""
+  office_document_events_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_events_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_events_bool_exp
+  ): [office_document_events!]!
+  "fetch data from the table: \"office.document_files\""
+  office_document_files(
+    "distinct select on columns"
+    distinct_on: [office_document_files_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_files_order_by!]
+    "filter the rows returned"
+    where: office_document_files_bool_exp
+  ): [office_document_files!]!
+  "fetch data from the table: \"office.document_files\" using primary key columns"
+  office_document_files_by_pk(document_id: uuid!, file_id: uuid!): office_document_files
+  "fetch data from the table in a streaming manner: \"office.document_files\""
+  office_document_files_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_files_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_files_bool_exp
+  ): [office_document_files!]!
+  "fetch data from the table: \"office.document_history\""
+  office_document_history(
+    "distinct select on columns"
+    distinct_on: [office_document_history_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_history_order_by!]
+    "filter the rows returned"
+    where: office_document_history_bool_exp
+  ): [office_document_history!]!
+  "fetch data from the table in a streaming manner: \"office.document_history\""
+  office_document_history_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_history_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_history_bool_exp
+  ): [office_document_history!]!
+  "fetch data from the table: \"office.document_types\""
+  office_document_types(
+    "distinct select on columns"
+    distinct_on: [office_document_types_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_document_types_order_by!]
+    "filter the rows returned"
+    where: office_document_types_bool_exp
+  ): [office_document_types!]!
+  "fetch data from the table: \"office.document_types\" using primary key columns"
+  office_document_types_by_pk(code: String!): office_document_types
+  "fetch data from the table in a streaming manner: \"office.document_types\""
+  office_document_types_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_document_types_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_document_types_bool_exp
+  ): [office_document_types!]!
+  "fetch data from the table: \"office.documents\""
+  office_documents(
+    "distinct select on columns"
+    distinct_on: [office_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_documents_order_by!]
+    "filter the rows returned"
+    where: office_documents_bool_exp
+  ): [office_documents!]!
+  "fetch aggregated fields from the table: \"office.documents\""
+  office_documents_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_documents_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_documents_order_by!]
+    "filter the rows returned"
+    where: office_documents_bool_exp
+  ): office_documents_aggregate!
+  "fetch data from the table: \"office.documents\" using primary key columns"
+  office_documents_by_pk(id: uuid!): office_documents
+  "fetch data from the table in a streaming manner: \"office.documents\""
+  office_documents_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_documents_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_documents_bool_exp
+  ): [office_documents!]!
+  "fetch data from the table: \"office.registers\""
+  office_registers(
+    "distinct select on columns"
+    distinct_on: [office_registers_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_registers_order_by!]
+    "filter the rows returned"
+    where: office_registers_bool_exp
+  ): [office_registers!]!
+  "fetch data from the table: \"office.registers\" using primary key columns"
+  office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table in a streaming manner: \"office.registers\""
+  office_registers_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_registers_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_registers_bool_exp
+  ): [office_registers!]!
+  "fetch data from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): [office_v_assignment_suggestion_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_assignment_suggestion_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_assignment_suggestion_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): office_v_assignment_suggestion_accuracy_aggregate!
+  "fetch data from the table in a streaming manner: \"office.v_assignment_suggestion_accuracy\""
+  office_v_assignment_suggestion_accuracy_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_assignment_suggestion_accuracy_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_assignment_suggestion_accuracy_bool_exp
+  ): [office_v_assignment_suggestion_accuracy!]!
+  "fetch data from the table: \"office.v_document_counts\""
+  office_v_document_counts(
+    "distinct select on columns"
+    distinct_on: [office_v_document_counts_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_document_counts_order_by!]
+    "filter the rows returned"
+    where: office_v_document_counts_bool_exp
+  ): [office_v_document_counts!]!
+  "fetch data from the table in a streaming manner: \"office.v_document_counts\""
+  office_v_document_counts_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_document_counts_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_document_counts_bool_exp
+  ): [office_v_document_counts!]!
+  "fetch data from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): [office_v_intake_accuracy!]!
+  "fetch aggregated fields from the table: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_v_intake_accuracy_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_intake_accuracy_order_by!]
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): office_v_intake_accuracy_aggregate!
+  "fetch data from the table in a streaming manner: \"office.v_intake_accuracy\""
+  office_v_intake_accuracy_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_intake_accuracy_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_intake_accuracy_bool_exp
+  ): [office_v_intake_accuracy!]!
+  "fetch data from the table: \"office.v_outgoing_by_month\""
+  office_v_outgoing_by_month(
+    "distinct select on columns"
+    distinct_on: [office_v_outgoing_by_month_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_outgoing_by_month_order_by!]
+    "filter the rows returned"
+    where: office_v_outgoing_by_month_bool_exp
+  ): [office_v_outgoing_by_month!]!
+  "fetch data from the table in a streaming manner: \"office.v_outgoing_by_month\""
+  office_v_outgoing_by_month_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_outgoing_by_month_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_outgoing_by_month_bool_exp
+  ): [office_v_outgoing_by_month!]!
+  "fetch data from the table: \"office.v_overdue_by_department\""
+  office_v_overdue_by_department(
+    "distinct select on columns"
+    distinct_on: [office_v_overdue_by_department_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_overdue_by_department_order_by!]
+    "filter the rows returned"
+    where: office_v_overdue_by_department_bool_exp
+  ): [office_v_overdue_by_department!]!
+  "fetch data from the table in a streaming manner: \"office.v_overdue_by_department\""
+  office_v_overdue_by_department_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_overdue_by_department_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_overdue_by_department_bool_exp
+  ): [office_v_overdue_by_department!]!
+  "fetch data from the table: \"office.v_processing_time\""
+  office_v_processing_time(
+    "distinct select on columns"
+    distinct_on: [office_v_processing_time_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_v_processing_time_order_by!]
+    "filter the rows returned"
+    where: office_v_processing_time_bool_exp
+  ): [office_v_processing_time!]!
+  "fetch data from the table in a streaming manner: \"office.v_processing_time\""
+  office_v_processing_time_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_v_processing_time_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_v_processing_time_bool_exp
+  ): [office_v_processing_time!]!
+}
+
+scalar timestamptz
+
+"Boolean expression to compare columns of type \"timestamptz\". All fields are combined with logical 'AND'."
+input timestamptz_comparison_exp {
+  _eq: timestamptz
+  _gt: timestamptz
+  _gte: timestamptz
+  _in: [timestamptz!]
+  _is_null: Boolean
+  _lt: timestamptz
+  _lte: timestamptz
+  _neq: timestamptz
+  _nin: [timestamptz!]
+}
+
+scalar uuid
+
+"Boolean expression to compare columns of type \"uuid\". All fields are combined with logical 'AND'."
+input uuid_array_comparison_exp {
+  "is the array contained in the given array value"
+  _contained_in: [uuid!]
+  "does the array contain the given value"
+  _contains: [uuid!]
+  _eq: [uuid!]
+  _gt: [uuid!]
+  _gte: [uuid!]
+  _in: [[uuid!]!]
+  _is_null: Boolean
+  _lt: [uuid!]
+  _lte: [uuid!]
+  _neq: [uuid!]
+  _nin: [[uuid!]!]
+}
+
+"Boolean expression to compare columns of type \"uuid\". All fields are combined with logical 'AND'."
+input uuid_comparison_exp {
+  _eq: uuid
+  _gt: uuid
+  _gte: uuid
+  _in: [uuid!]
+  _is_null: Boolean
+  _lt: uuid
+  _lte: uuid
+  _neq: uuid
+  _nin: [uuid!]
+}

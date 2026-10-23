@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Dựng: docker build -t moc/svc-workflow services/svc-workflow
-FROM python:3.13.16-slim
+FROM python:3.13.16-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -30,6 +30,10 @@ COPY requirements.txt ./
 RUN pip install --require-hashes -r requirements.txt
 
 COPY src/ ./src/
+# JSON Schema dùng chung với giao diện (schemas/ ở gốc repo; compose đưa vào bằng additional_contexts, dựng tay thì
+# docker build --build-context schemas=schemas services/svc-workflow): dựng cùng image để form (biên dịch vào
+# app-office lúc dựng) và svc-workflow luôn kiểm theo cùng một bản
+COPY --from=schemas . ./schemas/
 
 RUN useradd --system --uid 10001 --no-create-home svc
 USER 10001

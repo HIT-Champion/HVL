@@ -1,0 +1,3004 @@
+#!/usr/bin/env python3
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+"""Màn demo bằng chứng các nguyên lý thiết kế (docs/demo-script.md): mỗi màn một lệnh, dưới một phút, chạy trên
+hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện chuẩn, chạy được trong thư mục cài (make install).
+
+    python3 scripts/demo.py nong-lanh
+        (i) Vòng đời dữ liệu nóng → lạnh: chuyên viên lập hồ sơ, đóng; svc-files nộp lưu thành gói Parquet + tệp +
+        manifest có băm trên bucket lạnh khóa ghi, gỡ chi tiết khỏi CSDL nghiệp vụ; văn bản vẫn tìm thấy, quét QR vẫn
+        khớp, phòng đọc đọc lại gói bằng DuckDB. (make demo-nong-lanh)
+    python3 scripts/demo.py kiem-dich
+        (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
+        kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
+    python3 scripts/demo.py han-che
+        (iv) Văn bản hạn chế: tệp mã hóa từng tệp bằng khóa từ két OpenBao trước khi vào kho; người nhận việc tự có
+        tên trong danh sách được xem, người khác 404; mở ra là bản giải mã trong bộ nhớ có dấu tên người xem, mỗi lần
+        mở một dòng sổ kiểm toán; thông báo không mang nội dung. (make demo-han-che)
+    python3 scripts/demo.py ket-bi-mat
+        (iv) Két bí mật: dịch vụ không nhận bí mật qua biến môi trường mà lấy từ két OpenBao bằng AppRole riêng;
+        khởi động lại két thì két tự mở khóa, dịch vụ khởi động lại vẫn lấy được bí mật. (make demo-ket-bi-mat)
+    python3 scripts/demo.py tu-phuc-hoi
+        (iv) Tự phục hồi: xóa hẳn container svc-files, dừng centrifugo; một lượt reconciler (systemd timer chạy mỗi
+        60 giây) dựng lại đúng như compose khai báo, tải tệp lại được. (make demo-tu-phuc-hoi)
+    python3 scripts/demo.py it-ot
+        (ii) Hội tụ IT/OT: bật context broker NGSI-LD (profile iot); cảm biến nhiệt độ phòng máy chủ giả lập gửi các
+        lần đo, vượt ngưỡng thì svc-workflow dựng dự thảo "Báo cáo sự cố" từ mẫu cho chuyên viên phụ trách; chuyên viên
+        trình, dự thảo vào luồng văn bản đi. (make demo-it-ot)
+    python3 scripts/demo.py lien-thong
+        Liên thông văn bản trong hệ thống (F3.12, không thuộc 4 nguyên lý): Khoa CNTT phát hành công văn gửi Khoa
+        Kinh tế; bên nhận tự có văn bản đến cùng tệp (cùng SHA-256), cùng mã xác thực; vào sổ, lãnh đạo có việc chỉ
+        đạo; sổ kiểm toán của cả hai đơn vị ghi lại; văn bản hạn chế không gửi được. (make demo-lien-thong)
+    python3 scripts/demo.py doc-van-ban
+        Đọc văn bản đến (F4.1, dưới hai phút, không cần mô hình): văn thư tải công văn mẫu, tác tử moc-doc-reader đọc
+        lớp chữ (ảnh thì OCR) và gợi ý số ký hiệu, ngày, cơ quan, loại, độ khẩn, trích yếu kèm độ tin cậy; văn thư sửa
+        một ô rồi vào sổ; sổ kiểm toán ghi lần đọc (chỉ siêu dữ liệu); tệp hạn chế không bị đọc; bật profile ai thì
+        mô hình viết trích yếu cho văn bản không có dòng V/v. (make demo-doc-van-ban)
+    python3 scripts/demo.py do-doc-van-ban
+        Đo tác tử trên mọi văn bản mẫu seed/van-ban-den (22: 15 PDF có lớp chữ, 7 ảnh/bản scan) so với nhãn
+        nhan.json: bảng đúng / sai / trống từng trường, riêng PDF có lớp chữ và bản scan, tỉ lệ số ký hiệu, ngày ban
+        hành đúng trên cả kho, thời gian trung bình; thoát 1 khi PDF có lớp chữ dưới ngưỡng, hay cả kho dưới 20 văn
+        bản hoặc số ký hiệu, ngày ban hành đúng không quá nửa. (make do-doc-van-ban)
+    python3 scripts/demo.py hoi-dap
+        Hỏi đáp trên kho văn bản (F4.2, dưới hai phút, không cần mô hình): văn thư nạp kho mẫu seed/hoi-dap; trợ lý
+        moc-assistant trả câu trích nguyên văn kèm số ký hiệu và trang; giảng viên Bộ môn KTPM chỉ thấy văn bản mình
+        được xem; nội dung văn bản hạn chế không ai hỏi ra; sổ kiểm toán ghi lượt hỏi của tác tử, không có câu hỏi,
+        câu trả lời; bật profile ai thì mô hình viết câu trả lời có trích dẫn. (make demo-hoi-dap)
+    python3 scripts/demo.py do-hoi-dap
+        Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi): bảng trạng thái, nguồn top-3, đúng /
+        sai, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1
+        khi có nguồn bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), hoặc recall@3 dưới ngưỡng. (make do-hoi-dap)
+    python3 scripts/demo.py giao-viec
+        Gợi ý giao việc (F4.3, không cần mô hình): văn thư nạp lịch sử giao việc mẫu seed/giao-viec; văn bản mới vào sổ
+        thì lãnh đạo khoa có việc chỉ đạo ngay, vài giây sau tác tử moc-assigner gợi ý đơn vị chủ trì và hạn kèm căn
+        cứ (các văn bản tương tự đã giao); dùng gợi ý thì view đo tỉ lệ giữ tăng 1; văn bản hạn chế không gợi ý, không
+        làm căn cứ; sổ kiểm toán ghi lần gợi ý (không chữ văn bản); tắt svc-files thì văn bản vẫn tới bước chỉ đạo,
+        gợi ý ghi failed. (make demo-giao-viec)
+    python3 scripts/demo.py do-giao-viec
+        Đo tác tử leave-one-out trên lịch sử seed/giao-viec (python -m svc_workflow.advisor evaluate trong
+        svc-workflow): top-1/2/3, độ phủ, đúng theo độ tin cậy, sai số hạn, thời gian; thoát 1 khi có căn cứ là văn
+        bản hạn chế, hoặc top-1 dưới ngưỡng. (make do-giao-viec)
+    python3 scripts/demo.py ky-so
+        Ký số văn bản đi (F4.5, CHỈ MINH HỌA — CA nội bộ trong két, không có giá trị pháp lý như chữ ký số công cộng):
+        CA gốc mẫu trong két OpenBao; văn thư phát hành, bản PDF ký PAdES bằng khóa của đơn vị nằm trong Transit của
+        két; cổng xác thực cho biết ai ký, CA nào cấp; pyHanko trong svc-files báo hợp lệ, báo "đã bị sửa sau khi ký"
+        khi thêm một chú thích, báo không khớp khi lật một bit; văn bản hạn chế không được ký; văn bản cũ không chữ
+        ký vẫn xác thực như cũ. (make demo-ky-so)
+    python3 scripts/demo.py che-pii
+        Che thông tin cá nhân (F4.4, không cần mô hình): văn thư tải một lá đơn giả lập có số CCCD, số điện thoại,
+        email, số tài khoản; tìm theo số CCCD ra đúng lá đơn, trợ lý trích nguyên văn có đúng số điện thoại (người
+        được xem văn bản thấy bản gốc); tệp EICAR tên có số điện thoại bị chặn, sổ kiểm toán giữ tên gốc; nhật ký
+        apisix, app-office, svc-files, svc-workflow từ lúc bắt đầu màn không còn giá trị nào ở bất kỳ cách viết nào,
+        dòng truy cập không còn chuỗi truy vấn; bật profile ai thì mô hình chỉ thấy nhãn [SĐT-1]. (make demo-che-pii)
+
+Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import json
+import re
+import subprocess
+import sys
+import time
+import unicodedata
+import uuid
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from typing import Any
+from urllib.parse import quote
+
+from moc_env import (EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, request, text_pdf,
+                     user_token)
+
+
+class DemoFailed(Exception):
+    pass
+
+
+def say(n: int, text: str) -> None:
+    print(f"\n{n}. {text}")
+
+
+def ok(text: str) -> None:
+    print(f"   ✓ {text}")
+
+
+def psql(query: str) -> str:
+    out = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                  "-d", ENV.get("POSTGRES_DB", "moc"), "-c", query)
+    return out.decode().strip()
+
+
+def moc(*args: str) -> tuple[int, str, str]:
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "moc.py"), *args], cwd=ROOT, capture_output=True,
+                       text=True)
+    return r.returncode, r.stdout, r.stderr
+
+
+def error_detail(exc: HTTPError) -> dict[str, Any]:
+    try:
+        detail = json.loads(exc.body).get("detail")
+    except (ValueError, AttributeError):
+        return {}
+    return detail if isinstance(detail, dict) else {"message": detail}
+
+
+def vault_status() -> dict[str, Any]:
+    """`bao status` trong container két; két đang khóa thì lệnh thoát 2 nhưng vẫn in trạng thái."""
+    try:
+        raw = compose("exec", "-T", "openbao", "bao", "status", "-format=json")
+    except subprocess.CalledProcessError as exc:
+        raw = exc.stdout or b"{}"
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return {"error": raw.decode(errors="replace")[:200]}
+
+
+def last_audit_id(director: Session) -> int:
+    agg = director.gql("{ core_audit_log_aggregate { aggregate { max { id } } } }")["core_audit_log_aggregate"]
+    return agg["aggregate"]["max"]["id"] or 0
+
+
+def kiem_dich() -> None:
+    print("Màn (iv) · Kiểm dịch tại cửa ngõ — mọi tệp tải lên qua cổng APISIX đều đi qua ClamAV trước khi vào kho")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk, director = Session("vanthu"), Session("truongkhoa")
+
+    say(1, "Văn thư tải lên một công văn bình thường")
+    clean = clerk.upload(f"cong-van-{tag}.pdf", text_pdf("Cong van de nghi phoi hop", f"Ma thu {tag}"))
+    ok(f"cong-van-{tag}.pdf → 201: ClamAV báo sạch, đã lưu vào kho (SHA-256 {clean['sha256'][:16]}…)")
+
+    say(2, "Văn thư tải lên hoa-don.pdf chứa chuỗi kiểm thử EICAR (chuẩn để thử phần mềm diệt virus, vô hại)")
+    name = f"hoa-don-{tag}.pdf"
+    before = last_audit_id(director)
+    try:
+        clerk.upload(name, EICAR)
+        raise DemoFailed("tệp EICAR không bị chặn")
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        if exc.status != 422 or detail.get("code") != "infected":
+            raise DemoFailed(f"tệp EICAR trả {exc.status} {detail or exc.body[:200]}") from exc
+    ok(f"{name} → 422 infected: ClamAV báo {detail.get('signature')} — tệp bị chặn ngay ở cửa ngõ")
+
+    sha = hashlib.sha256(EICAR).hexdigest()
+    say(3, "Không có gì của tệp nhiễm lọt vào hệ thống")
+    stored = psql(f"select count(*) from core.files where sha256 = '\\x{sha}'")
+    if stored != "0":
+        raise DemoFailed(f"core.files có {stored} dòng với SHA-256 của tệp EICAR")
+    ok(f"core.files: 0 dòng có SHA-256 {sha[:16]}… — tệp không được ghi nhận, svc-files không ghi gì vào kho")
+
+    say(4, "Lần chặn nằm trong sổ kiểm toán chuỗi băm — lãnh đạo khoa đọc sổ của đơn vị, đúng quyền của mình")
+    rows = director.gql(
+        """query ($h: String!, $after: bigint!) {
+             core_audit_log(where: {action: {_eq: "file.rejected"}, entity_id: {_eq: $h}, id: {_gt: $after}},
+                            order_by: {id: desc}, limit: 1) { id occurred_at actor_id hash overview }
+           }""", {"h": sha, "after": before})["core_audit_log"]
+    if not rows:
+        raise DemoFailed(f"sổ kiểm toán không có dòng file.rejected của {name}")
+    row = rows[0]
+    overview = row["overview"]
+    clerk_id = clerk.gql('{ core_users(where: {username: {_eq: "vanthu"}}) { id } }')["core_users"][0]["id"]
+    if not overview.get("signature") or overview.get("filename") is not None or row["actor_id"] != clerk_id:
+        raise DemoFailed(f"dòng #{row['id']} không đúng: người tải {row['actor_id']}, tóm tắt {overview}")
+    ok(f"dòng #{row['id']} file.rejected · {row['occurred_at'][:19].replace('T', ' ')} · người tải: vanthu · "
+       f"mẫu mã độc {row['overview']['signature']} · tên tệp ẩn (có thể nói lên nội dung) · "
+       f"hash dòng {str(row['hash']).removeprefix(chr(92) + 'x')[:16]}…")
+
+    say(5, "Neo đầu chuỗi ra bucket lạnh khóa ghi, rồi tính lại cả chuỗi bên ngoài CSDL")
+    code, out, err = moc("audit", "anchor")
+    if code != 0 or not out.strip():
+        raise DemoFailed(f"không neo được đầu chuỗi:\n{out}{err}")
+    print("   " + out.strip().splitlines()[0])
+    # Kho lưu giờ ghi mốc theo giây: verify bỏ qua mốc ghi trong 2 giây trước lúc đọc CSDL (đối chiếu ở lần sau),
+    # nên đợi qua khoảng đó để mốc vừa neo được đối chiếu ngay lần này
+    time.sleep(3)
+    code, out, err = moc("audit", "verify", "--json")
+    try:
+        report = json.loads(out.strip().splitlines()[-1])
+    except (ValueError, IndexError) as exc:
+        raise DemoFailed(f"moc audit verify không trả kết quả:\n{out}{err}") from exc
+    anchored = (report.get("latest_anchor") or {}).get("audit_id") or 0
+    if code != 0 or not report["ok"] or not report["complete"] or anchored < row["id"]:
+        reasons = [f"{p['kind']} ở dòng #{p['audit_id']}" for p in report["problems"]] + report["gaps"]
+        if anchored < row["id"]:
+            reasons.append(f"mốc neo mới nhất ở dòng #{anchored}, chưa tới dòng #{row['id']}")
+        raise DemoFailed("sổ kiểm toán chưa được xác nhận:\n   - " + "\n   - ".join(reasons or [err.strip()]))
+    ok(f"{report['rows']} dòng, chuỗi liền mạch tới #{report['last_id']}, đã neo tới dòng mới nhất — sửa hay xóa "
+       f"dòng #{row['id']} đều bị phát hiện")
+
+    print(f"\nXem trên giao diện (lãnh đạo khoa): {PUBLIC_URL}/so-kiem-toan?loai=files — dòng \"Chặn tệp nhiễm mã độc\"")
+
+
+# Đọc thẳng đối tượng trong kho tệp từ container svc-files (khóa kho lấy từ két như svc-files): 4 byte đầu, cỡ,
+# có đầu PDF hay chữ cần tìm không
+PEEK = """import os, sys
+from svc_files.config import Settings
+from svc_files.openbao import with_secrets
+from svc_files.storage import s3_client
+s = Settings.from_env(with_secrets(os.environ))
+c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)
+b = c.get_object(Bucket=s.bucket, Key=sys.argv[1])['Body'].read()
+print(b[:4].decode('latin-1'), len(b), b'%PDF' in b, sys.argv[2].encode() in b)
+"""
+
+# Chữ trên trang đầu của PDF đưa vào stdin (pypdf có sẵn trong svc-files)
+PAGE_TEXT = "import io, sys, pypdf; print(pypdf.PdfReader(io.BytesIO(sys.stdin.buffer.read())).pages[0].extract_text())"
+
+
+def han_che() -> None:
+    print("Màn (iv) · Văn bản hạn chế — tệp mã hóa trong kho, chỉ người có tên mới mở được, mỗi lần mở có dấu tên "
+          "và vào sổ")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk, director, manager = Session("vanthu"), Session("truongkhoa"), Session("totruongdt")
+
+    say(1, "Văn thư tải lên danh sách nâng lương trước hạn ở chế độ hạn chế")
+    marker = f"MATKIN{tag}"
+    pdf = clerk.upload(f"nang-luong-{tag}.pdf", text_pdf("Danh sach nang luong truoc han nam 2026", f"Ma thu {marker}"),
+                       restricted=True)
+    if not pdf.get("encrypted"):
+        raise DemoFailed(f"tệp tải lên ở chế độ hạn chế không được mã hóa: {pdf}")
+    key, wrapped = psql(f"select object_key, split_part(wrapped_dek, ':', 1) || ':' || split_part(wrapped_dek, ':', 2) "
+                        f"from core.files where id = '{pdf['id']}'").split("|")
+    head, size, has_pdf, has_marker = compose("exec", "-T", "svc-files", "python", "-c", PEEK, key,
+                                              marker).decode().split()
+    if (head, has_pdf, has_marker) != ("MOC1", "False", "False") or wrapped != "vault:v1":
+        raise DemoFailed(f"đối tượng trong kho chưa phải bản mã: {head} {has_pdf} {has_marker}, khóa {wrapped}")
+    ok(f"svc-files xin két OpenBao một khóa AES-256 riêng cho tệp, mã hóa (AES-GCM) rồi mới lưu: trong kho là {size} "
+       f"byte bắt đầu bằng MOC1, không có đầu %PDF, không có chữ {marker}")
+    ok(f"CSDL chỉ giữ khóa đã bọc bằng khóa của két ({wrapped}:…) — lấy được CSDL và kho tệp cũng không đọc được")
+
+    say(2, "Văn thư tiếp nhận văn bản hạn chế; quy trình giao lãnh đạo khoa cho ý kiến chỉ đạo")
+    symbol = f"88/ĐHCN-TCCB{tag}"
+    doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+        "type_code": "CV", "symbol": symbol, "issuer_name": "Trường Đại học Công nghiệp",
+        "issued_on": datetime.now(timezone(timedelta(hours=7))).date().isoformat(), "urgency": "normal",  # giờ VN
+        "restricted": True, "summary": f"Về việc nâng lương trước hạn năm 2026 (demo {tag})", "file_ids": [pdf["id"]],
+    }})["receiveIncoming"]["document_id"]
+    number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                       {"id": doc_id})["registerIncoming"]["register_number"]
+    names = {u["id"]: u["username"] for u in clerk.gql("{ core_users { id username } }")["core_users"]}
+    viewers = clerk.gql("query ($d: uuid!) { office_document_acl(where: {document_id: {_eq: $d}}) { user_id } }",
+                        {"d": doc_id})["office_document_acl"]
+    if "truongkhoa" not in [names.get(v["user_id"]) for v in viewers]:
+        raise DemoFailed(f"lãnh đạo nhận việc mà không có tên trong danh sách được xem: {viewers}")
+    ok(f"{symbol} vào sổ, số đến {number}; svc-workflow tự thêm người nhận việc vào danh sách được xem: "
+       f"{', '.join(sorted(names.get(v['user_id'], v['user_id']) for v in viewers))}")
+
+    say(3, "Tổ trưởng Tổ Đào tạo không có tên trong danh sách")
+    seen = manager.gql("query ($d: uuid!) { office_documents_by_pk(id: $d) { id } }", {"d": doc_id})
+    try:
+        request("GET", f"{PUBLIC_URL}/api/files/{pdf['id']}", headers=manager.auth)
+        raise DemoFailed("tổ trưởng không có tên vẫn tải được tệp")
+    except HTTPError as exc:
+        if exc.status != 404:
+            raise DemoFailed(f"tổ trưởng tải tệp trả {exc.status}") from exc
+    if seen["office_documents_by_pk"] is not None:
+        raise DemoFailed("tổ trưởng không có tên vẫn đọc được văn bản")
+    ok("không đọc được văn bản; mở thẳng đường dẫn tệp → 404, y như tệp không tồn tại")
+
+    say(4, "Lãnh đạo khoa mở tệp: giải mã trong bộ nhớ, đóng dấu tên người xem và giờ xem lên mọi trang")
+    _, headers, opened = request("GET", f"{PUBLIC_URL}/api/files/{pdf['id']}", headers=director.auth)
+    text = compose("exec", "-T", "svc-files", "python", "-c", PAGE_TEXT, stdin=opened).decode()
+    stamp = next((line.strip() for line in text.splitlines() if "VĂN BẢN HẠN CHẾ" in line), None)
+    cache = next((v for k, v in headers.items() if k.lower() == "cache-control"), "")
+    if not stamp or marker not in text or "no-store" not in cache:
+        raise DemoFailed(f"bản mở ra chưa có dấu người xem hoặc cho lưu đệm ({cache}):\n{text[:400]}")
+    ok(f"dấu trên trang: \"{stamp}\"")
+    sha = hashlib.sha256(opened).hexdigest()
+    ok(f"Cache-Control: {cache}; mỗi người, mỗi lần mở là một bản khác (SHA-256 {sha[:12]}… ≠ bản gốc "
+       f"{pdf['sha256'][:12]}…) — bản rõ không ghi xuống đĩa")
+
+    say(5, "Thông báo việc mới gửi lãnh đạo khoa không mang nội dung văn bản")
+    started, notes = time.time(), []
+    while not notes and time.time() - started < 15:
+        notes = director.gql("query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}}) { kind data } }",
+                             {"d": doc_id})["core_notifications"]
+        notes or time.sleep(1)
+    if not notes or any({"summary", "symbol", "issuer_name"} & set(n["data"]) for n in notes):
+        raise DemoFailed(f"thông báo về văn bản hạn chế mang nội dung: {notes}")
+    ok(f"{notes[0]['kind']}: {json.dumps(notes[0]['data'], ensure_ascii=False)} — CSDL gọt nội dung cho mọi đường ghi")
+
+    say(6, "Sổ kiểm toán: ai đã mở tệp, lúc nào")
+    rows = director.gql("""query ($e: String!) { core_audit_log(where: {action: {_eq: "file.decrypted"},
+        entity_id: {_eq: $e}}, order_by: {id: asc}) { id occurred_at actor_id } }""",
+                        {"e": pdf["id"]})["core_audit_log"]
+    if [names.get(r["actor_id"]) for r in rows] != ["truongkhoa"]:
+        raise DemoFailed(f"sổ kiểm toán chưa đúng lần mở: {rows}")
+    ok(f"dòng #{rows[0]['id']} file.decrypted · {rows[0]['occurred_at'][:19].replace('T', ' ')} · truongkhoa — "
+       f"lần tổ trưởng bị từ chối không giải mã gì nên không có dòng")
+
+    print(f"\nXem trên giao diện (văn thư): {PUBLIC_URL}/van-ban/{doc_id} — khóa ở tệp đính kèm, mục người được xem")
+
+
+# Bí mật svc-files, svc-workflow cần (tên trong .env) — cùng danh sách openbao/start.sh nạp vào két
+SECRETS = {"svc-files": ("SEAWEEDFS_S3_ACCESS_KEY", "SEAWEEDFS_S3_SECRET_KEY", "HASURA_ADMIN_SECRET",
+                         "MEILI_MASTER_KEY"),
+           "svc-workflow": ("HASURA_ADMIN_SECRET", "MOC_ACTION_SECRET", "FLOWABLE_ADMIN_PASSWORD",
+                            "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET")}
+
+
+def env_hashes(service: str) -> dict[str, str]:
+    """SHA-256 từng biến môi trường của dịch vụ: so với bí mật mà không đưa bí mật ra khỏi container."""
+    out = compose("exec", "-T", service, "python", "-c",
+                  "import hashlib, json, os\nprint(json.dumps({k: hashlib.sha256(v.encode()).hexdigest()"
+                  " for k, v in os.environ.items()}))")
+    return json.loads(out)
+
+
+def restart(service: str, *wait_also: str) -> float:
+    started = time.monotonic()
+    compose("restart", service)
+    compose("up", "-d", "--wait", "--wait-timeout", "120", service, *wait_also)
+    return time.monotonic() - started
+
+
+def ket_bi_mat() -> None:
+    print("Màn (iv) · Két bí mật — dịch vụ lấy bí mật từ két OpenBao bằng AppRole riêng, không qua biến môi trường")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = Session("vanthu")
+
+    say(1, "svc-files, svc-workflow không có bí mật nào trong biến môi trường")
+    for service, names in SECRETS.items():
+        hashed = env_hashes(service)
+        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names}
+        leaked = sorted(f"{wanted[h]} (biến {k})" for k, h in hashed.items() if h in wanted)
+        if leaked:
+            raise DemoFailed(f"{service} còn nhận bí mật qua biến môi trường: {', '.join(leaked)}")
+        found = sorted(k for k in hashed if k.startswith("MOC_OPENBAO_"))
+        ok(f"{service}: 0/{len(names)} bí mật trong env (so băm giá trị) — chỉ có địa chỉ két: {', '.join(found)}")
+
+    say(2, "Khởi động lại két: static seal tự mở khóa, không ai phải nhập khóa")
+    since = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # svc-files, svc-workflow phụ thuộc két (restart: true) nên khởi động lại theo: chờ cả hai sẵn sàng
+    took = restart("openbao", "svc-files", "svc-workflow")
+    seal = vault_status()
+    if seal.get("sealed") is not False or seal.get("type") != "static":
+        raise DemoFailed(f"két chưa mở khóa sau khi khởi động lại: {seal}")
+    ok(f"openbao khởi động lại, mở khóa và cấp lại AppRole; hai dịch vụ lấy lại bí mật — sẵn sàng sau {took:.0f} "
+       f"giây · seal {seal['type']}, sealed={seal['sealed']}")
+
+    say(3, "Khởi động lại svc-files: đăng nhập két bằng AppRole, lấy khóa kho S3, rồi nhận tệp như thường")
+    took = restart("svc-files")
+    stored = clerk.upload(f"sau-khoi-dong-{tag}.pdf", text_pdf("Kiem tra ket bi mat", f"Ma thu {tag}"))
+    ok(f"svc-files sẵn sàng sau {took:.0f} giây; tải tệp → 201, vào kho bằng khóa S3 lấy từ két "
+       f"(SHA-256 {stored['sha256'][:16]}…)")
+
+    say(4, "Mỗi dịch vụ chỉ đọc được bí mật của mình")
+    cross = compose("exec", "-T", "svc-workflow", "python", "-c",
+                    "import os\nfrom svc_workflow.config import ConfigError\n"
+                    "from svc_workflow.openbao import with_secrets\n"
+                    "try:\n    with_secrets({**os.environ, 'MOC_OPENBAO_SECRET_PATH': 'moc/data/svc-files'},\n"
+                    "                 attempts=1)\n"
+                    "    print('read')\nexcept ConfigError as exc:\n    print('refused', exc)\n").decode().strip()
+    if not cross.startswith("refused") or "403" not in cross:
+        raise DemoFailed(f"svc-workflow đọc được bí mật của svc-files: {cross}")
+    ok("AppRole svc-workflow đọc moc/data/svc-files → két từ chối (403)")
+
+    say(5, "Két ghi sổ mọi lần truy cập; giá trị bí mật trong sổ đã băm HMAC")
+    logs = compose("logs", "--no-log-prefix", "--since", since, "openbao").decode()
+    if any(ENV[n] in logs for names in SECRETS.values() for n in names):
+        raise DemoFailed("sổ truy cập của két chứa giá trị bí mật")
+    reads = []
+    for line in logs.splitlines():
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict) or entry.get("type") != "response":
+            continue
+        path = (entry.get("request") or {}).get("path")
+        role = ((entry.get("auth") or {}).get("metadata") or {}).get("role_name")
+        if path in ("auth/approle/login", "moc/data/svc-files", "moc/data/svc-workflow") and role:
+            what = "đăng nhập" if path.startswith("auth/") else f"đọc {path}"
+            if entry.get("error"):
+                # lỗi của két có dạng "1 error occurred:\n\t* permission denied\n": gom về một dòng
+                reason = " ".join(str(entry["error"]).replace("1 error occurred:", "").replace("*", " ").split())
+                what += f" → bị từ chối ({reason})"
+            try:   # sổ ghi giờ UTC, in theo giờ máy
+                at = datetime.strptime(entry["time"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                when = at.astimezone().strftime("%H:%M:%S")
+            except (KeyError, TypeError, ValueError):
+                when = "?"
+            reads.append(f"{when} {role} {what}")
+    if not any(r.endswith("svc-files đọc moc/data/svc-files") for r in reads):
+        raise DemoFailed(f"sổ của két không có lần svc-files đọc bí mật: {reads}")
+    if not any("svc-workflow đọc moc/data/svc-files → bị từ chối" in r for r in reads):
+        raise DemoFailed(f"sổ của két không ghi lần svc-workflow đọc chéo bị từ chối: {reads}")
+    for r in reads[-4:]:
+        print(f"   · {r}")
+    ok(f"{len(reads)} lần đăng nhập/đọc từ lúc khởi động lại két, kể cả lần đọc chéo bị từ chối; không giá trị bí "
+       f"mật nào xuất hiện rõ trong sổ")
+
+    print("\nXem sổ của két: docker compose logs openbao · trạng thái: docker compose exec openbao bao status")
+
+
+def service_state(service: str) -> str:
+    """Trạng thái container của dịch vụ: "không có", "running (healthy)", "exited"…"""
+    raw = compose("ps", "-a", "--format", "json", service).decode().strip()
+    rows = json.loads(raw) if raw.startswith("[") else [json.loads(line) for line in raw.splitlines() if line]
+    if not rows:
+        return "không có container"
+    row = rows[0]
+    return f"{row.get('State')}" + (f" ({row['Health']})" if row.get("Health") else "")
+
+
+def reconcile_pass() -> tuple[int, str]:
+    """Một lượt tự phục hồi (không kéo commit từ git); timer của máy chủ đang chạy một lượt thì đợi nó xong."""
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "reconcile.py"), "--heal-only", "--wait", "300"],
+                       cwd=ROOT, capture_output=True, text=True)
+    return r.returncode, (r.stdout + r.stderr).strip()
+
+
+def tu_phuc_hoi() -> None:
+    print("Màn (iv) · Tự phục hồi — reconciler đưa hệ thống đang chạy về đúng trạng thái khai trong compose (git)")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = Session("vanthu")
+
+    say(1, "Trước khi phá: một lượt reconciler thấy hệ thống đã khớp khai báo")
+    code, out = reconcile_pass()
+    if code != 0 or "không có gì phải làm" not in out:
+        raise DemoFailed(f"hệ thống chưa khớp khai báo trước khi bắt đầu:\n{out}")
+    for line in out.splitlines():
+        print(f"   {line}")
+
+    say(2, "Phá: xóa hẳn container svc-files (docker rm -f), dừng centrifugo (docker stop)")
+    files_id = compose("ps", "-q", "svc-files").decode().strip()
+    realtime_id = compose("ps", "-q", "centrifugo").decode().strip()
+    if not files_id or not realtime_id:
+        raise DemoFailed("svc-files hoặc centrifugo không chạy")
+    subprocess.run(["docker", "rm", "-f", files_id], check=True, capture_output=True)
+    subprocess.run(["docker", "stop", realtime_id], check=True, capture_output=True)
+    try:
+        clerk.upload(f"luc-hong-{tag}.pdf", text_pdf("Thu khi svc-files mat", f"Ma thu {tag}"))
+        raise DemoFailed("svc-files đã bị xóa mà vẫn nhận tệp")
+    except HTTPError as exc:
+        ok(f"svc-files: {service_state('svc-files')} · centrifugo: {service_state('centrifugo')} · tải tệp → "
+           f"{exc.status} (cổng không tới được dịch vụ)")
+
+    say(3, "Một lượt reconciler — systemd timer gọi mỗi 60 giây, ở đây gọi ngay cho khỏi chờ")
+    started = time.monotonic()
+    code, out = reconcile_pass()
+    for line in out.splitlines():
+        print(f"   {line}")
+    if code == 0 and "không có gì phải làm" in out and compose("ps", "-q", "svc-files").decode().strip():
+        # máy chủ đã bật timer (ops/systemd/) và lượt của timer chạy trước lượt này
+        print("   (timer reconciler của máy chủ đã dựng lại trước lượt gọi tay này)")
+    elif code != 0 or "dựng lại svc-files" not in out or "chạy lại centrifugo" not in out:
+        raise DemoFailed("reconciler không dựng lại đủ hai dịch vụ")
+
+    say(4, "Hệ thống trở lại: dịch vụ healthy, tải tệp được")
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        states = {s: service_state(s) for s in ("svc-files", "centrifugo")}
+        if all(v == "running (healthy)" for v in states.values()):
+            break
+        time.sleep(2)
+    else:
+        raise DemoFailed(f"sau 2 phút vẫn chưa healthy: {states}")
+    stored = clerk.upload(f"sau-phuc-hoi-{tag}.pdf", text_pdf("Thu sau khi tu phuc hoi", f"Ma thu {tag}"))
+    ok(f"svc-files, centrifugo healthy sau {time.monotonic() - started:.0f} giây kể từ lượt reconciler; tải tệp → "
+       f"201 (SHA-256 {stored['sha256'][:16]}…)")
+
+    print("\nTrên máy chủ thật: ops/systemd/moc-reconcile.timer · nhật ký: journalctl -u moc-reconcile")
+
+
+CREATE_CASE_FILE = """
+mutation ($o: office_case_files_insert_input!) { insert_office_case_files_one(object: $o) { id code } }"""
+ADD_TO_CASE_FILE = """
+mutation ($o: office_case_file_documents_insert_input!) {
+  insert_office_case_file_documents_one(object: $o) { document_id }
+}"""
+CLOSE_CASE_FILE = """
+mutation ($id: uuid!) {
+  update_office_case_files(where: {id: {_eq: $id}}, _set: {status: "closed"}) { affected_rows }
+}"""
+
+# Văn bản người lập hồ sơ được đưa vào (cùng quy tắc với quyền Hasura): đã xong, không hạn chế, chưa thuộc hồ sơ nào;
+# văn bản đi của phòng mình, văn bản đến giao cho mình (tổ trưởng: giao cho phòng mình). Chọn người có nhiều văn bản
+# như thế nhất, để chạy demo nhiều lần sau một lần seed vẫn còn văn bản.
+FILEABLE = """
+select u.username, d.id from office.documents d join core.users u on u.tenant_id = d.tenant_id
+ where u.role in ('staff', 'manager') and u.enabled and not d.restricted
+   and not exists (select 1 from office.case_file_documents c where c.document_id = d.id)
+   and ((d.direction = 'out' and d.status = 'issued' and d.department_id = u.department_id)
+     or (d.direction = 'in' and d.status = 'done' and exists (select 1 from office.assignments a
+          where a.document_id = d.id and a.status <> 'cancelled'
+            and ((u.role = 'staff' and a.user_id = u.id)
+              or (u.role = 'manager' and a.department_id = u.department_id)))))
+ order by u.role = 'staff' desc, d.direction = 'out' desc, d.created_at"""
+
+
+def oltp_detail(ids: list[str]) -> dict[str, int]:
+    """Số dòng chi tiết của các văn bản trong CSDL nghiệp vụ (OLTP)."""
+    inlist = ", ".join(f"'{i}'" for i in ids)
+    row = psql(f"select (select count(*) from office.document_files where document_id in ({inlist})),"
+               f" (select count(*) from office.document_events where document_id in ({inlist})),"
+               f" (select count(*) from office.assignments where document_id in ({inlist}))")
+    files, events, assignments = (int(x) for x in row.split("|"))
+    return {"liên kết tệp": files, "dòng thời gian": events, "giao việc": assignments}
+
+
+def nong_lanh() -> None:
+    print("Màn (i) · Vòng đời dữ liệu: nóng → lạnh — hồ sơ đã đóng được nộp lưu thành gói Parquet + tệp + manifest có"
+          " băm trên bucket lạnh khóa ghi; CSDL nghiệp vụ chỉ giữ bản ghi rút gọn")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = Session("vanthu")
+
+    say(1, "Chuyên viên lập hồ sơ công việc, đưa văn bản đã xong vào, đóng hồ sơ (NĐ 30/2020, Điều 28–29)")
+    # văn bản đi đã phát hành (có mã QR) và văn bản đến đã xử lý xong mà người lập hồ sơ được đưa vào
+    by_user: dict[str, list[str]] = {}
+    for row in psql(FILEABLE).splitlines():
+        username, doc_id = row.split("|")
+        by_user.setdefault(username, []).append(doc_id)
+    if not by_user:
+        raise DemoFailed("không còn văn bản đã xong nào chưa nộp lưu — chạy make seed (hoặc make smoke) để có thêm")
+    username = max(by_user, key=lambda u: min(len(by_user[u]), 3))   # bằng nhau thì giữ thứ tự: chuyên viên trước
+    ids = by_user[username][:3]
+    staff = Session(username)
+    docs = {}
+    for row in psql("select id, direction, coalesce(symbol, ''), coalesce(verify_code, ''), summary from"
+                    f" office.documents where id in ({', '.join(repr(i) for i in ids)})").splitlines():
+        i, direction, symbol, code, summary = row.split("|", 4)
+        docs[i] = {"direction": direction, "symbol": symbol, "verify_code": code, "summary": summary}
+    cf = staff.gql(CREATE_CASE_FILE, {"o": {"year": datetime.now().year, "code": f"HS-{tag}",
+                                            "title": f"Hồ sơ thử nộp lưu {tag}", "retention_years": 10}})
+    cf = cf["insert_office_case_files_one"]
+    for i in ids:
+        staff.gql(ADD_TO_CASE_FILE, {"o": {"case_file_id": cf["id"], "document_id": i}})
+    staff.gql(CLOSE_CASE_FILE, {"id": cf["id"]})
+    for d in docs.values():
+        ok(f"{'đi' if d['direction'] == 'out' else 'đến'} {d['symbol']} — {d['summary'][:60]}")
+    before = oltp_detail(ids)
+    ok(f"{username} lập hồ sơ {cf['code']}, đóng (ngày đóng do CSDL đặt); trong CSDL nghiệp vụ: "
+       + ", ".join(f"{v} dòng {k}" for k, v in before.items()))
+
+    say(2, "Nộp lưu (job svc-files; vòng nền chạy mỗi giờ cho hồ sơ đóng quá MOC_ARCHIVE_AFTER_DAYS, ở đây gọi ngay)")
+    started = time.monotonic()
+    out = compose("exec", "-T", "svc-files", "python", "-m", "svc_files.archive", "now", "--case-file", cf["id"])
+    result = json.loads(out.decode().strip().splitlines()[-1])
+    if "error" in result:
+        raise DemoFailed(f"nộp lưu lỗi: {result['error']}")
+    done = result["archived"][0]
+    ok(f"gói s3://moc-cold/{done['archive_key']} — {done['documents']} văn bản, {done['files']} tệp,"
+       f" {done['bytes']:,} byte, {time.monotonic() - started:.1f} giây".replace(",", "."))
+    ok(f"manifest-{done['archive_sha256'][:16]}….json — băm của nó ghi vào case_files.archive_sha256 và sổ kiểm toán;"
+       " mọi đối tượng khóa ghi COMPLIANCE 10 năm")
+
+    say(3, "CSDL nghiệp vụ chỉ còn bản ghi rút gọn")
+    after = oltp_detail(ids)
+    if after["liên kết tệp"] or after["dòng thời gian"] or after["giao việc"] != before["giao việc"]:
+        raise DemoFailed(f"CSDL sau nộp lưu chưa đúng: {after}")
+    states = psql(f"select string_agg(distinct status, ',') from office.documents where id in"
+                  f" ({', '.join(repr(i) for i in ids)})")
+    if states != "archived":
+        raise DemoFailed(f"văn bản chưa ở trạng thái archived: {states}")
+    ok(f"văn bản: trạng thái archived (dòng rút gọn: số, ký hiệu, trích yếu, băm, mã tra cứu);"
+       f" liên kết tệp {before['liên kết tệp']} → 0, dòng thời gian {before['dòng thời gian']} → 0;"
+       f" giữ {before['giao việc']} dòng giao việc (căn cứ quyền xem, sổ đăng ký)")
+    ok("tệp: bản trong bucket nóng đã xóa, core.files chuyển storage_tier = cold")
+
+    say(4, "Vẫn tìm thấy, vẫn xác thực được, đọc lại được từ kho lạnh")
+    out_doc = next((d for d in docs.values() if d["verify_code"]), None)
+    if out_doc:
+        verified, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{out_doc['verify_code']}")
+        if verified.get("result") != "valid" or verified["document"]["status"] != "archived":
+            raise DemoFailed(f"cổng xác thực trả {verified}")
+        ok(f"quét QR {out_doc['verify_code']} → khớp: {out_doc['symbol']} (trạng thái archived, không đăng nhập)")
+    first = next(iter(docs.values()))
+    deadline = time.monotonic() + 30
+    while True:
+        found, _ = call_json("GET", f"{PUBLIC_URL}/api/search?q={quote(first['symbol'])}", headers=clerk.auth)
+        hits = found["hits"]
+        hit = next((h for h in hits if h.get("status") == "archived"), None)
+        if hit or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    if not hit:
+        raise DemoFailed(f"tìm '{first['symbol']}' không ra văn bản đã nộp lưu")
+    ok(f"văn thư tìm '{first['symbol']}' → ra văn bản, trạng thái archived")
+    room, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/{cf['id']}/archive", headers=clerk.auth)
+    if room["manifest_sha256"] != done["archive_sha256"] or len(room["documents"]) != len(ids):
+        raise DemoFailed(f"phòng đọc trả {room}")
+    ok(f"phòng đọc: manifest khớp băm trong CSDL; DuckDB đọc documents.parquet ra {len(room['documents'])} văn bản: "
+       + ", ".join(d["symbol"] or "?" for d in room["documents"]))
+
+    say(5, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
+    try_delete = (
+        "import os, sys\n"
+        "from svc_files.config import Settings\n"
+        "from svc_files.openbao import with_secrets\n"
+        "from svc_files.storage import s3_client\n"
+        "s = Settings.from_env(with_secrets(os.environ))\n"
+        "c = s3_client(s.s3_endpoint, s.s3_access_key, s.s3_secret_key, s.s3_region)\n"
+        "key = f'{sys.argv[1]}manifest-{sys.argv[2]}.json'\n"
+        "v = c.list_object_versions(Bucket=s.cold_bucket, Prefix=key)['Versions'][0]\n"
+        "try:\n"
+        "    c.delete_object(Bucket=s.cold_bucket, Key=v['Key'], VersionId=v['VersionId'])\n"
+        "    print('deleted')\n"
+        "except Exception as exc:\n"
+        "    print('refused', type(exc).__name__)\n"
+    )
+    refused = compose("exec", "-T", "svc-files", "python", "-c", try_delete, done["archive_key"],
+                      done["archive_sha256"]).decode().strip()
+    if not refused.startswith("refused"):
+        raise DemoFailed(f"xóa được manifest trong bucket lạnh: {refused}")
+    ok(f"xóa manifest bằng khóa quản trị kho → {refused.split()[-1]}")
+    event = psql("select id from core.audit_log where action = 'case_file.archived' and entity_id ="
+                 f" '{cf['id']}'")
+    ok(f"sổ kiểm toán dòng #{event}: case_file.archived kèm archive_sha256 — lần nộp lưu cũng nằm trong chuỗi băm")
+
+
+LINEAGE_RUNS = """query { core_lineage_events(where: {job: {_eq: "moc.case_file.archive"}, event_type: {_eq: "COMPLETE"}},
+  order_by: {id: desc}, limit: 1) { run_id outputs } }"""
+LINEAGE_OF = """query ($run: uuid!) { core_lineage_events(order_by: {id: asc},
+  where: {_or: [{run_id: {_eq: $run}}, {parent_run_id: {_eq: $run}}]}) {
+  run_id parent_run_id job event_type inputs outputs quality_ok event } }"""
+QUALITY_FAILED = """query { core_lineage_events_aggregate(where: {quality_ok: {_eq: false}}) { aggregate { count } } }"""
+
+
+def short(name: str) -> str:
+    """Rút gọn tên dataset để in: bỏ namespace postgres, bỏ tiền tố cold/<tenant>/case/<id>/, băm còn 8 ký tự."""
+    name = name.removeprefix("postgres://postgres:5432/")
+    if "/case/" in name:
+        name = "…/" + name.split("/case/", 1)[1].split("/", 1)[1]
+    elif name.startswith("s3://") and "/tenant/" in name:
+        name = name.split("/tenant/", 1)[0] + "/tenant/…/" + name.rsplit("/", 1)[1][:8] + "…"
+    folder, _, base = name.rpartition("/")
+    if "-" in base:                                # documents-<sha256>.parquet, manifest-<sha256>.json
+        head, _, tail = base.rpartition("-")
+        base = f"{head}-{tail[:8]}…{tail[64:]}" if len(tail) > 64 else base
+    elif len(base) == 64:                          # files/<sha256>
+        base = f"{base[:8]}…"
+    return f"{folder}/{base}" if folder else base
+
+
+def pha_he() -> None:
+    print("Màn (iii) · Quản trị dữ liệu: phả hệ + kiểm chất lượng — mỗi bước nộp lưu là một run OpenLineage; gói lưu trữ"
+          " truy ngược được về bảng nghiệp vụ; bảng Parquet nào cũng được kiểm số dòng và null trước khi ghi")
+    director = Session("truongkhoa")
+
+    say(1, "Lượt nộp lưu gần nhất (chưa có thì chạy màn (i) trước)")
+    runs = director.gql(LINEAGE_RUNS)["core_lineage_events"]
+    if not runs:
+        nong_lanh()
+        runs = director.gql(LINEAGE_RUNS)["core_lineage_events"]
+    if not runs:
+        raise DemoFailed("nộp lưu xong mà không có sự kiện phả hệ nào trong core.lineage_events")
+    run = runs[0]["run_id"]
+    events = director.gql(LINEAGE_OF, {"run": run})["core_lineage_events"]
+    steps = [e for e in events if e["parent_run_id"] == run]
+    names = [e["job"].rsplit(".", 1)[1] for e in steps]
+    if names != ["files", "tables", "manifest", "commit"] or any(e["event_type"] != "COMPLETE" for e in steps):
+        raise DemoFailed(f"lượt nộp lưu {run} thiếu bước: {[(e['job'], e['event_type']) for e in steps]}")
+    ok(f"run {run[:8]}… của job moc.case_file.archive: START → 4 run con (files, tables, manifest, commit) → COMPLETE;"
+       " lãnh đạo đọc qua Hasura, chỉ đơn vị mình")
+    for e in steps:
+        ins = ", ".join(sorted({short(i) for i in e["inputs"]}))
+        outs = ", ".join(sorted({short(o) for o in e["outputs"]}))
+        print(f"       · {e['job'].rsplit('.', 1)[1]:<8} {ins}\n                  → {outs}")
+
+    say(2, "Truy ngược: gói lưu trữ ← bảng Parquet / tệp ← bảng nghiệp vụ, bucket nóng")
+    # bước commit ghi ngược vào chính các bảng nghiệp vụ: bỏ ra, phả hệ của gói dừng ở nguồn
+    produced = {o: e for e in steps if not e["job"].endswith(".commit") for o in e["outputs"]}
+    manifest = runs[0]["outputs"][0]
+    seen: set[str] = set()
+    expanded: set[str] = set()      # mỗi bước chỉ in đầu vào một lần
+
+    def trace(name: str, depth: int) -> None:
+        print(f"       {'   ' * depth}{'← ' if depth else ''}{short(name)}")
+        step = produced.get(name)
+        if name in seen or not step:
+            return
+        seen.add(name)
+        if step["run_id"] in expanded:
+            print(f"       {'   ' * (depth + 1)}← (cùng bước {step['job'].rsplit('.', 1)[1]}, như trên)")
+            return
+        expanded.add(step["run_id"])
+        for parent in sorted(set(step["inputs"])):
+            trace(parent, depth + 1)
+    trace(manifest, 0)
+    tables = next(e for e in steps if e["job"].endswith(".tables"))
+    if not any(i.endswith("moc.office.documents") for i in tables["inputs"]):
+        raise DemoFailed("phả hệ không dẫn bảng Parquet về office.documents")
+    ok("manifest dẫn về documents/assignments/events.parquet và từng tệp; Parquet dẫn về office.documents,"
+       " office.assignments, office.document_events")
+
+    say(3, "Kiểm chất lượng của từng bảng trước khi ghi sang bucket lạnh")
+    for out in tables["event"]["outputs"]:
+        checks = out["facets"]["dataQualityAssertions"]["assertions"]
+        rows = out["outputFacets"]["outputStatistics"]["rowCount"]
+        not_null = [a for a in checks if a["assertion"] == "not_null"]
+        same = next(a for a in checks if a["assertion"] == "row_count_equals_source")
+        if not all(a["success"] for a in checks):
+            raise DemoFailed(f"{short(out['name'])}: {checks}")
+        ok(f"{short(out['namespace'] + '/' + out['name'])}: {rows} dòng = số dòng trong CSDL"
+           f" ({'✓' if same['success'] else '✗'}); {len(not_null)} cột bắt buộc không null ✓")
+    failed = director.gql(QUALITY_FAILED)["core_lineage_events_aggregate"]["aggregate"]["count"]
+    ok(f"bảng trượt kiểm thì job dừng trước khi ghi gì sang lạnh, sự kiện FAIL nằm lại trong phả hệ — đơn vị này hiện"
+       f" có {failed} bước trượt")
+
+    say(4, "Sự kiện theo đặc tả OpenLineage — chuyển được sang Marquez (MOC_OPENLINEAGE_URL)")
+    first = events[0]["event"]
+    ok(f"{first['schemaURL']} · producer {first['producer'].rsplit('/', 2)[-1]} · namespace job"
+       f" '{first['job']['namespace']}'; tên dataset theo quy ước postgres://host:port/db.schema.bảng, s3://bucket/key")
+
+
+OT_SENSOR = "phong-may-chu"
+OT_ROOM = "Phòng máy chủ tầng 3"
+OT_STAFF = "chuyenviendt"
+OT_SUBSCRIPTION = "urn:ngsi-ld:Subscription:moc-ot-alarm"
+
+OT_DRAFTS = """
+query ($sensor: jsonb!) {
+  office_documents(where: {direction: {_eq: "out"}, events: {kind: {_eq: "ot.alarm"}, data: {_contains: $sensor}}},
+                   order_by: {created_at: desc}) {
+    id status type_code urgency summary body created_by events(where: {kind: {_eq: "ot.alarm"}}) { data }
+  }
+}"""
+
+SUBMIT = "mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }"
+
+# Gửi một thông báo giả (token sai) tới svc-workflow, in mã HTTP nhận được hoặc "không tới được"
+OT_PROBE = """
+import sys, urllib.error, urllib.request
+req = urllib.request.Request(sys.argv[1], data=b'{"data": []}', method="POST",
+                             headers={"Content-Type": "application/json", "X-Moc-OT-Token": "sai"})
+try:
+    print(urllib.request.urlopen(req, timeout=5).status)
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+except OSError:
+    print("không tới được")
+"""
+
+
+def iot(*args: str) -> bytes:
+    return compose("--profile", "iot", "--profile", "iot-sim", *args)
+
+
+def ngsi_tenant(code: str) -> str:
+    """Tên tenant NGSI-LD của đơn vị, như svc_workflow.ot.ngsi_tenant: mã có dấu thì "t" + băm."""
+    if code.isascii() and code.isalnum() and len(code) <= 20:
+        return code
+    return "t" + hashlib.sha256(code.encode()).hexdigest()[:16]
+
+
+def ot_query(threshold: float) -> str:
+    """Điều kiện q của subscription, như svc_workflow.ot.query_for."""
+    return f"temperature>{int(threshold) if threshold.is_integer() else format(Decimal(repr(threshold)), 'f')}"
+
+
+def ngsi(path: str, tenant: str) -> tuple[int, Any]:
+    """Đọc broker từ trong container của nó (broker không mở cổng ra máy chủ)."""
+    out = iot("exec", "-T", "scorpio", "curl", "-s", "-w", "\n%{http_code}", "-H", f"NGSILD-Tenant: {tenant}",
+              f"http://localhost:9090/ngsi-ld/v1{path}").decode()
+    body, _, code = out.rpartition("\n")
+    try:
+        return int(code), json.loads(body) if body.strip() else None
+    except ValueError:
+        return int(code) if code.isdigit() else 0, body
+
+
+def ot_drafts(staff: Session, sensor: str) -> list[dict[str, Any]]:
+    return staff.gql(OT_DRAFTS, {"sensor": {"sensor": sensor}})["office_documents"]
+
+
+def it_ot() -> None:
+    print("Màn (ii) · Hội tụ IT/OT: cảm biến nhiệt độ (OT) → bản sao số NGSI-LD → subscription → dự thảo \"Báo cáo sự"
+          " cố\" trong luồng văn bản đi (IT) — hệ thống dựng nháp, con người kiểm tra và trình")
+    staff, manager = Session(OT_STAFF), Session("totruongdt")
+    unit = psql("select t.code from core.tenants t join core.users u on u.tenant_id = t.id"
+                f" where u.username = '{OT_STAFF}'")
+    tenant = ngsi_tenant(unit)
+    threshold = float(ENV.get("MOC_OT_THRESHOLD") or 35)
+    sensor = f"urn:ngsi-ld:TemperatureSensor:{OT_SENSOR}"
+
+    say(1, "Bật context broker NGSI-LD (profile iot: Scorpio + PostGIS); svc-workflow đăng ký subscription")
+    if not ENV.get("MOC_NGSI_DB_PASSWORD") or ENV["MOC_NGSI_DB_PASSWORD"].startswith("change_me"):
+        raise DemoFailed("chưa đặt MOC_NGSI_DB_PASSWORD trong .env: thêm dòng MOC_NGSI_DB_PASSWORD=<chuỗi ngẫu nhiên>"
+                         " (make env mới tự sinh)")
+    t0 = time.monotonic()
+    iot("up", "-d", "--wait", "--wait-timeout", "300", "scorpio")
+    ready = time.monotonic() - t0
+    want = ot_query(threshold)
+    deadline = time.monotonic() + 60
+    while True:
+        code, sub = ngsi(f"/subscriptions/{OT_SUBSCRIPTION}", tenant)
+        if code == 200 and isinstance(sub, dict) and sub.get("q") == want:
+            break
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau 60 giây đơn vị {unit} vẫn chưa có subscription {want} (HTTP {code}: {sub})")
+        time.sleep(2)
+    uri = sub["notification"]["endpoint"]["uri"]
+    ok(f"Scorpio sẵn sàng sau {ready:.0f} giây; đơn vị {unit} (tenant NGSI-LD {tenant}) có subscription \"{want}\" →"
+       f" {uri.split('//', 1)[-1]}, kèm token riêng của đơn vị; broker không mở cổng ra ngoài")
+
+    # lần chạy trước dừng giữa chừng còn để dự thảo mở thì trình nốt: cảm biến còn dự thảo mở thì không dựng thêm
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    for old in ot_drafts(staff, sensor):
+        if old["status"] == "draft":
+            staff.gql(SUBMIT, {"d": old["id"], "s": signer})
+            print(f"       (dự thảo còn mở từ lần chạy trước {old['id'][:8]}… đã trình nốt)")
+    before = {d["id"] for d in ot_drafts(staff, sensor)}
+
+    readings = [threshold - 11, threshold - 6, threshold - 2, threshold + 2, threshold + 6]
+    say(2, f"Cảm biến {OT_ROOM} gửi các lần đo: {' → '.join(f'{r:g}' for r in readings)} °C (ngưỡng {threshold:g} °C)")
+    out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", OT_SENSOR, "--name", OT_ROOM,
+              "--responsible", OT_STAFF, "--readings", ",".join(f"{r:g}" for r in readings), "--interval", "1")
+    sent = [json.loads(line) for line in out.decode().splitlines() if line.startswith("{")]
+    if len(sent) != len(readings) or any(r.get("status") != 204 for r in sent):
+        raise DemoFailed(f"cảm biến chưa gửi đủ: {sent}")
+    ok(f"{len(sent)} lần đo vào bản sao số {sensor}; 2 lần cuối vượt ngưỡng")
+
+    say(3, "Vượt ngưỡng → svc-workflow dựng dự thảo \"Báo cáo sự cố\" từ mẫu cho chuyên viên phụ trách")
+    deadline = time.monotonic() + 30
+    while not [d for d in ot_drafts(staff, sensor) if d["id"] not in before] and time.monotonic() < deadline:
+        time.sleep(1)
+    time.sleep(2)  # lần vượt ngưỡng thứ hai tới sau: không được dựng dự thảo thứ hai
+    drafts = [d for d in ot_drafts(staff, sensor) if d["id"] not in before]
+    if len(drafts) != 1:
+        raise DemoFailed(f"phải có đúng 1 dự thảo mới cho 2 lần vượt ngưỡng, có {len(drafts)}")
+    doc = drafts[0]
+    alarm = doc["events"][0]["data"]
+    if (doc["status"], doc["type_code"], doc["urgency"]) != ("draft", "BC", "khan") or alarm["temperature"] <= threshold:
+        raise DemoFailed(f"dự thảo chưa đúng: {doc['status']}, {doc['type_code']}, {doc['urgency']}, {alarm}")
+    print(f"       trích yếu: {doc['summary']}")
+    print(f"       nội dung:  {doc['body'].splitlines()[0]}")
+    notes = staff.gql("""query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}, kind: {_eq: "ot.alarm"}})
+        { id } }""", {"d": doc["id"]})["core_notifications"]
+    if len(notes) != 1:
+        raise DemoFailed(f"chuyên viên phải nhận đúng 1 thông báo ot.alarm, có {len(notes)}")
+    ok("đúng 1 dự thảo cho 2 lần vượt ngưỡng (chống trùng): Báo cáo, độ khẩn \"Khẩn\", đứng tên chuyên viên phụ trách;"
+       " dòng thời gian có sự kiện ot.alarm; chuyên viên nhận thông báo ngay")
+
+    say(4, "Lịch sử đo nằm trong bản sao số (NGSI-LD temporal API)")
+    # broker ghi lịch sử sau khi trả lời lệnh cập nhật (bất đồng bộ): chờ tới khi có đủ các lần vừa gửi, so cả giờ đo
+    # (lần chạy trước gửi cùng các giá trị)
+    want = {(r["temperature"], r["observedAt"]) for r in sent}
+    deadline = time.monotonic() + 30
+    while True:
+        code, history = ngsi(f"/temporal/entities/{sensor}?attrs=temperature&lastN=50", tenant)
+        points = {(v.get("value"), v.get("observedAt")) for v in (history or {}).get("temperature", [])} \
+            if code == 200 and isinstance(history, dict) else set()
+        if want <= points:
+            break
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau 30 giây lịch sử đo vẫn thiếu: HTTP {code}, thiếu {sorted(want - points)}")
+        time.sleep(1)
+    ok(f"broker giữ lịch sử: đủ {len(want)} lần vừa đo (cả các lần dưới ngưỡng) trong {len(points)} lần gần nhất — dữ liệu"
+       " OT ở broker, Signet chỉ nhận sự kiện cần xử lý")
+
+    say(5, "Chuyên viên kiểm tra, trình → dự thảo vào luồng văn bản đi: tổ trưởng có việc duyệt")
+    staff.gql(SUBMIT, {"d": doc["id"], "s": signer})
+    manager.wait_task(doc["id"], "vbdi.duyetPhong")
+    ok("trình lên lãnh đạo khoa; tổ trưởng phòng nhận việc duyệt như mọi văn bản đi — hệ thống không tự trình")
+
+    say(6, "Chỉ broker gọi được svc-workflow: thiết bị không tới được, dịch vụ khác thiếu token đúng → 401")
+    url = f"http://svc-workflow:8000/ot/notify/{quote(tenant, safe='')}"
+    from_device = iot("run", "--rm", "-T", "--entrypoint", "python", "ot-sensor", "-c", OT_PROBE, url).decode().strip()
+    from_inside = compose("exec", "-T", "svc-files", "python", "-c", OT_PROBE, url).decode().strip()
+    if (from_device, from_inside) != ("không tới được", "401"):
+        raise DemoFailed(f"thông báo giả: từ mạng thiết bị phải không tới được (nhận {from_device}), từ svc-files với"
+                         f" token sai phải 401 (nhận {from_inside})")
+    ok("mạng thiết bị chỉ thấy broker, không tới được svc-workflow; thông báo giả từ mạng nội bộ (svc-files) với token"
+       " sai bị từ chối (401) — token mỗi đơn vị suy từ khóa của svc-workflow, chỉ broker giữ")
+
+
+DISPATCH_UNITS = "{ office_dispatch_units(order_by: {name: asc}) { id code name } }"
+DRAFT = "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id } }"
+ISSUED = "query ($id: uuid!) { office_documents_by_pk(id: $id) { status symbol verify_code content_sha256 } }"
+ARRIVED = """query ($s: uuid!) { office_documents(where: {source_id: {_eq: $s}}) { id status symbol issuer_name
+  files { role file_id file { sha256 } } } }"""
+INCOMING_NOTE = """query ($d: uuid!) { core_notifications(where: {document_id: {_eq: $d}, kind: {_eq: "document.incoming"}})
+  { data } }"""
+DISPATCH_OUT = "query ($d: uuid!) { office_dispatches(where: {document_id: {_eq: $d}}) { id status delivered_at } }"
+DISPATCH_IN = """query ($d: uuid!) { office_dispatches(where: {incoming_document_id: {_eq: $d}}) {
+  id status source_verify_code source_sha256 } }"""
+AUDIT_OF = """query ($ids: [String!]!) { core_audit_log(where: {entity_id: {_in: $ids}}, order_by: {id: asc}) {
+  id action entity actor_kind } }"""
+
+
+def hexed(bytea: str | None) -> str:
+    return (bytea or "").removeprefix("\\x")
+
+
+def lien_thong() -> None:
+    print("Màn F3.12 · Liên thông văn bản trong hệ thống — Khoa CNTT phát hành công văn gửi Khoa Kinh tế; bên nhận tự có"
+          " văn bản đến cùng tệp, cùng mã xác thực, rồi vào sổ, chỉ đạo như mọi văn bản đến")
+    tag = uuid.uuid4().hex[:6].upper()
+    staff, manager, director, clerk = (Session(u) for u in ("chuyenviendt", "totruongdt", "truongkhoa", "vanthu"))
+    kt_clerk, kt_director = Session("vanthukt"), Session("truongkhoakt")
+
+    say(1, "Chuyên viên CNTT soạn công văn, chọn Khoa Kinh tế trong danh sách đơn vị trong hệ thống")
+    units = staff.gql(DISPATCH_UNITS)["office_dispatch_units"]
+    own = staff.gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+    kt = next((u for u in units if u["code"] == "KT"), None)
+    if kt is None:
+        raise DemoFailed(f"danh sách đơn vị trong hệ thống không có Khoa Kinh tế (mã KT): {units} — chạy make seed")
+    if any(u["id"] == own for u in units):
+        raise DemoFailed("danh sách đơn vị nhận có cả đơn vị của người soạn")
+    sent = staff.gql(DRAFT, {"o": {
+        "type_code": "CV", "recipients": [kt["name"]], "recipient_tenant_ids": [kt["id"]],
+        "summary": f"Về việc phối hợp tổ chức hội thảo khoa học liên khoa (demo {tag})",
+        "body": "Khoa Công nghệ thông tin đề nghị Khoa Kinh tế cử cán bộ tham gia ban tổ chức hội thảo.\n"
+                "Danh sách gửi về Văn phòng khoa trước ngày 15 tháng sau.",
+    }})["insert_office_documents_one"]["id"]
+    ok(f"danh sách chọn được: {', '.join(u['name'] for u in units)} (không có đơn vị mình); dự thảo gửi {kt['name']}")
+
+    say(2, "Trình → tổ trưởng duyệt → lãnh đạo khoa ký → văn thư CNTT phát hành")
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    staff.gql(SUBMIT, {"d": sent, "s": signer})
+    manager.complete(manager.wait_task(sent, "vbdi.duyetPhong"), "approve", {})
+    director.complete(director.wait_task(sent, "vbdi.duyetDonVi"), "approve", {})
+    clerk.complete(clerk.wait_task(sent, "vbdi.phatHanh"), "issue", {"is_public": False})
+    issued_at = time.monotonic()
+    src = clerk.gql(ISSUED, {"id": sent})["office_documents_by_pk"]
+    if src["status"] != "issued":
+        raise DemoFailed(f"công văn chưa phát hành: {src}")
+    sha, code = hexed(src["content_sha256"]), src["verify_code"]
+    ok(f"{src['symbol']} phát hành: mã xác thực {code[:5]}-{code[5:]}, SHA-256 {sha[:16]}…")
+
+    say(3, "Khoa Kinh tế tự nhận văn bản đến — không ai gửi thư điện tử, không ai tải tệp lên lại")
+    # svc-workflow chuyển ngay sau lần phát hành; trượt thì vòng đối soát nền làm lại
+    deadline = time.monotonic() + 90
+    while not (arrived := kt_clerk.gql(ARRIVED, {"s": sent})["office_documents"]):
+        if time.monotonic() > deadline:
+            raise DemoFailed("sau 90 giây Khoa Kinh tế chưa có văn bản đến từ công văn vừa phát hành")
+        time.sleep(1)
+    took = time.monotonic() - issued_at
+    doc = arrived[0]
+    main = [f for f in doc["files"] if f["role"] == "main"]
+    if len(arrived) != 1 or doc["status"] != "received" or len(main) != 1 or doc["symbol"] != src["symbol"]:
+        raise DemoFailed(f"văn bản đến chưa đúng: {arrived}")
+    _, _, body = request("GET", f"{PUBLIC_URL}/api/files/{main[0]['file_id']}", headers=kt_clerk.auth)
+    got = hashlib.sha256(body).hexdigest()
+    if got != sha or hexed((main[0]["file"] or {}).get("sha256")) != sha:
+        raise DemoFailed(f"tệp bên nhận không trùng bản phát hành: {got} ≠ {sha}")
+    ok(f"{took:.0f} giây sau phát hành: văn bản đến {doc['symbol']} của {doc['issuer_name']}, trạng thái received"
+       " (chờ vào sổ)")
+    ok(f"văn thư KT tải tệp chính về: SHA-256 {got[:16]}… trùng từng byte bản phát hành — bản sao nằm trong kho của Khoa"
+       " Kinh tế, đã qua ClamAV")
+    deadline = time.monotonic() + 15
+    while not (notes := kt_clerk.gql(INCOMING_NOTE, {"d": doc["id"]})["core_notifications"]):
+        if time.monotonic() > deadline:
+            raise DemoFailed("văn thư Khoa Kinh tế chưa nhận thông báo văn bản đến mới")
+        time.sleep(1)
+    out = clerk.gql(DISPATCH_OUT, {"d": sent})["office_dispatches"]
+    if [r["status"] for r in out] != ["delivered"] or not out[0]["delivered_at"]:
+        raise DemoFailed(f"bên gửi chưa thấy đã chuyển: {out}")
+    at = datetime.fromisoformat(out[0]["delivered_at"]).astimezone().strftime("%H:%M:%S")
+    ok(f"vanthukt nhận thông báo văn bản đến mới (từ {notes[0]['data'].get('from_name')}); bên gửi thấy trạng thái"
+       f" delivered lúc {at}, không thấy gì thêm của bên nhận")
+
+    say(4, "Bên nhận kiểm ở cổng xác thực bằng mã của bên gửi (không cần đăng nhập)")
+    link = kt_clerk.gql(DISPATCH_IN, {"d": doc["id"]})["office_dispatches"]
+    if len(link) != 1 or link[0]["source_verify_code"] != code or hexed(link[0]["source_sha256"]) != sha:
+        raise DemoFailed(f"văn bản đến không mang mã xác thực, băm của bên gửi: {link}")
+    by_code, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{code}")
+    by_hash, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={got}")
+    if by_code.get("result") != "valid" or by_code["document"]["sha256"] != got or by_hash.get("result") != "valid":
+        raise DemoFailed(f"cổng xác thực trả {by_code} / {by_hash}")
+    ok(f"mã {code[:5]}-{code[5:]} (giao diện hiện cạnh văn bản đến) → khớp: {by_code['document']['symbol']} do"
+       f" {by_code['document']['issuer_name']} phát hành; tra theo SHA-256 của tệp nhận được cũng khớp")
+
+    say(5, "Văn thư KT vào sổ — văn bản vào luồng văn bản đến bình thường của Khoa Kinh tế")
+    number = kt_clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                          {"id": doc["id"]})["registerIncoming"]["register_number"]
+    kt_director.wait_task(doc["id"], "vbden.chiDao")
+    ok(f"số đến {number} trong sổ đến của Khoa Kinh tế; truongkhoakt có việc cho ý kiến chỉ đạo (vbden.chiDao)")
+    if clerk.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { id } }",
+                 {"id": doc["id"]})["office_documents_by_pk"] is not None:
+        raise DemoFailed("Khoa CNTT đọc được văn bản đến của Khoa Kinh tế")
+    ok("Khoa CNTT không đọc được văn bản đến của Khoa Kinh tế — mỗi đơn vị chỉ thấy phần của mình")
+
+    say(6, "Sổ kiểm toán của cả hai đơn vị ghi lại — mỗi lãnh đạo đọc sổ của đơn vị mình")
+    ours = director.gql(AUDIT_OF, {"ids": [link[0]["id"]]})["core_audit_log"]
+    theirs = kt_director.gql(AUDIT_OF, {"ids": [doc["id"], main[0]["file_id"]]})["core_audit_log"]
+    peek = kt_director.gql(AUDIT_OF, {"ids": [link[0]["id"], sent]})["core_audit_log"]
+    if not {("office.dispatches", "insert"), ("office.dispatches", "update")} <= {(r["entity"], r["action"])
+                                                                                  for r in ours}:
+        raise DemoFailed(f"sổ Khoa CNTT thiếu dòng liên thông: {ours}")
+    copied = [r for r in theirs if (r["entity"], r["action"]) == ("core.files", "insert")]
+    if not copied or not any((r["entity"], r["action"]) == ("office.documents", "insert") for r in theirs):
+        raise DemoFailed(f"sổ Khoa Kinh tế thiếu văn bản đến hoặc bản sao tệp: {theirs}")
+    if peek:
+        raise DemoFailed(f"lãnh đạo Khoa Kinh tế đọc được sổ của Khoa CNTT: {peek}")
+    ok(f"sổ Khoa CNTT: {len(ours)} dòng office.dispatches (tạo trong giao dịch phát hành → delivered),"
+       f" từ dòng #{ours[0]['id']}")
+    ok(f"sổ Khoa Kinh tế: {len(theirs)} dòng — văn bản đến, vào sổ, bản sao tệp (người thực hiện:"
+       f" {copied[0]['actor_kind']}); lãnh đạo Khoa Kinh tế không đọc được dòng nào của Khoa CNTT")
+
+    say(7, "Văn bản hạn chế không gửi được trong hệ thống")
+    try:
+        staff.gql(DRAFT, {"o": {
+            "type_code": "CV", "recipients": [kt["name"]], "recipient_tenant_ids": [kt["id"]], "restricted": True,
+            "summary": f"Về việc danh sách nâng lương trước hạn (demo {tag})", "body": "Danh sách kèm theo.",
+        }})
+        raise DemoFailed("văn bản hạn chế vẫn chọn được đơn vị nhận trong hệ thống")
+    except RuntimeError as exc:
+        if "documents_restricted_local" not in str(exc):
+            raise DemoFailed(f"bị từ chối nhưng không vì ràng buộc documents_restricted_local: {exc}") from exc
+    ok("dự thảo hạn chế chọn Khoa Kinh tế → CSDL từ chối (documents_restricted_local); svc-workflow, svc-files cũng"
+       " chặn — tệp hạn chế mã hóa theo khóa của đơn vị gửi, không rời đơn vị")
+
+    print(f"\nXem trên giao diện (vanthukt): {PUBLIC_URL}/van-ban/{doc['id']} — chip \"Liên thông\", \"Nhận từ"
+          f" {doc['issuer_name']}\"; bên gửi (vanthu): {PUBLIC_URL}/van-ban/{sent}")
+
+
+# --- F4.1 · Đọc văn bản đến ------------------------------------------------------------------------------------------
+# Văn bản mẫu hư cấu đi kèm mã nguồn (sinh lại: make van-ban-mau), nhãn đúng của từng tệp trong nhan.json
+SAMPLES_DIR = ROOT / "seed" / "van-ban-den"
+READ_FIELDS = ("type_code", "symbol", "issued_on", "issuer_name", "urgency")
+FIELD_NAMES = {"type_code": "Loại", "symbol": "Số, ký hiệu", "issued_on": "Ngày ban hành",
+               "issuer_name": "Cơ quan ban hành", "urgency": "Độ khẩn", "summary": "Trích yếu"}
+SAMPLE_MIME = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
+# Ngưỡng theo tỉ lệ (%) trên các PDF có lớp chữ — như services/svc-files/tests/test_docread_samples.py; thêm: không
+# trường high nào sai
+TEXT_MIN = {"symbol": 90, "issued_on": 90, "type_code": 90, "issuer_name": 80, "summary": 80}
+# /readyz của svc-files (trong container, cổng không mở ra máy chủ): "ai": true khi Ollama có mô hình (profile ai)
+AI_READY = """import json, urllib.error, urllib.request
+try:
+    raw = urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()
+except urllib.error.HTTPError as exc:
+    raw = exc.read()
+print(json.dumps(json.loads(raw).get('ai')))
+"""
+RECEIVED_BEFORE = """query ($s: String!, $d: date!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s},
+  issued_on: {_eq: $d}}, order_by: {created_at: asc}) { id status issuer_name register_number } }"""
+READ_AUDIT = """query ($f: String!) { core_audit_log(where: {action: {_eq: "intake.suggested"}, entity_id: {_eq: $f}},
+  order_by: {id: asc}) { id occurred_at entity actor_id actor_kind overview } }"""
+
+
+def sample_labels() -> list[dict[str, Any]]:
+    path = SAMPLES_DIR / "nhan.json"
+    if not path.is_file():
+        raise DemoFailed(f"không có {path.relative_to(ROOT)} — văn bản mẫu đi kèm mã nguồn (sinh lại: make van-ban-mau)")
+    return json.loads(path.read_text(encoding="utf-8"))["samples"]
+
+
+def upload_sample(clerk: Session, name: str) -> dict[str, Any]:
+    path = SAMPLES_DIR / name
+    return clerk.upload(name, path.read_bytes(), SAMPLE_MIME.get(path.suffix.lower(), "application/octet-stream"))
+
+
+def read_file(clerk: Session, file_id: str, *, force: bool = False) -> dict[str, Any]:
+    """POST /api/files/{id}/read qua APISIX: tác tử moc-doc-reader đọc tệp, trả gợi ý — không ghi gì vào văn bản.
+    Hết lượt OCR (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần."""
+    url = f"{PUBLIC_URL}/api/files/{file_id}/read" + ("?force=true" if force else "")
+    attempts = 0
+    while True:
+        try:
+            _, _, raw = request("POST", url, data=b"", headers=clerk.auth, timeout=90)
+            return json.loads(raw)
+        except HTTPError as exc:
+            attempts += 1
+            if exc.status != 503 or error_detail(exc).get("code") != "busy" or attempts == 3:
+                raise
+            time.sleep(10)
+
+
+def expected(field: str, labels: dict[str, Any]) -> str | None:
+    """Nhãn của trường; "normal" (không có dấu độ khẩn) coi như không có gì để gợi ý."""
+    want = labels.get(field)
+    return None if field == "urgency" and want == "normal" else want
+
+
+def same_value(field: str, got: str, want: str | None) -> bool:
+    """So như tests/test_docread_samples.py: số ký hiệu bỏ khoảng trắng, không phân biệt hoa thường; cơ quan gộp
+    khoảng trắng; trích yếu trùng ≥ 60% từ của nhãn; còn lại bằng nhau."""
+    if want is None:
+        return False
+    if field == "symbol":
+        return "".join(got.split()).casefold() == "".join(want.split()).casefold()
+    if field == "issuer_name":
+        return " ".join(got.split()).casefold() == " ".join(want.split()).casefold()
+    if field == "summary":
+        words = set(re.findall(r"\w+", want.casefold()))
+        return len(words & set(re.findall(r"\w+", got.casefold()))) >= 0.6 * max(len(words), 1)
+    return got == want
+
+
+def misses(fields: dict[str, Any], labels: dict[str, Any]) -> list[str]:
+    """Các ô gợi ý khác nhãn hoặc bỏ trống trong khi nhãn có giá trị."""
+    out = []
+    for name in (*READ_FIELDS, "summary"):
+        got, want = fields.get(name), expected(name, labels)
+        if got is None:
+            if want is not None:
+                out.append(f"{name}: trống, nhãn {want!r}")
+        elif not same_value(name, str(got["value"]), want):
+            out.append(f"{name}: {got['value']!r} ≠ nhãn {want!r}")
+    return out
+
+
+def show_fields(result: dict[str, Any], labels: dict[str, Any]) -> tuple[int, list[str]]:
+    """In bảng gợi ý so với nhãn; trả (số trường đúng trên 6, các trường high sai)."""
+    fields = result.get("fields") or {}
+    right, wrong_high = 0, []
+    print(f"   {'trường':<17} {'tin cậy':<8} {'nguồn':<6} nhãn  gợi ý")
+    for name in (*READ_FIELDS, "summary"):
+        got, want = fields.get(name), expected(name, labels)
+        if got is None:
+            mark = "✓" if want is None else "·"
+            right += want is None
+            print(f"   {FIELD_NAMES[name]:<17} {'—':<8} {'—':<6} {mark:<5} (không gợi ý)")
+            continue
+        good = same_value(name, str(got["value"]), want)
+        right += good
+        if got["confidence"] == "high" and not good:
+            wrong_high.append(f"{name} = {got['value']!r}, nhãn {want!r}")
+        value = str(got["value"])
+        value = value if len(value) <= 70 else value[:69] + "…"
+        print(f"   {FIELD_NAMES[name]:<17} {got['confidence']:<8} {got['source']:<6} {'✓' if good else '✗':<5} {value}")
+    if result.get("warnings"):
+        print(f"   cảnh báo: {', '.join(result['warnings'])}")
+    return right, wrong_high
+
+
+def ai_ready() -> bool:
+    try:
+        return json.loads(compose("exec", "-T", "svc-files", "python", "-c", AI_READY)) is True
+    except (subprocess.CalledProcessError, ValueError):
+        return False
+
+
+def doc_van_ban() -> None:
+    print("Màn F4.1 · Đọc văn bản đến — tác tử moc-doc-reader đọc tệp văn thư vừa tải lên, gợi ý các ô tiếp nhận kèm độ"
+          " tin cậy; văn thư kiểm, sửa, quyết. Gợi ý không tự ghi vào văn bản; văn bản hạn chế không bị đọc")
+    tag = uuid.uuid4().hex[:6].upper()
+    labels = {s["file"]: s for s in sample_labels()}
+    clerk, director = Session("vanthu"), Session("truongkhoa")
+
+    say(1, "Văn thư tải công văn 01-cong-van.pdf (PDF có lớp chữ, hai dòng đầu, V/v hai dòng) và bấm Đọc văn bản")
+    letter = labels["01-cong-van.pdf"]
+    file = upload_sample(clerk, letter["file"])
+    first = read_file(clerk, file["id"])
+    if first.get("method") != "text" or first.get("cached") or first.get("status") != "ok":
+        raise DemoFailed(f"đọc PDF có lớp chữ chưa đúng: {first}")
+    right, wrong = show_fields(first, letter["fields"])
+    missing = [f for f in ("symbol", "issued_on", "type_code") if f not in first["fields"]]
+    if wrong or missing:
+        raise DemoFailed("gợi ý chưa đúng: " + "; ".join(wrong + [f"thiếu {f}" for f in missing]))
+    ok(f"đọc lớp chữ {first['pages']} trang trong {first['duration_ms']} ms: {right}/6 ô khớp nhãn, không ô high nào"
+       " sai; ô medium, low là ô văn thư cần kiểm kỹ")
+    again = read_file(clerk, file["id"])
+    if not again.get("cached") or again.get("fields") != first["fields"]:
+        raise DemoFailed(f"bấm lại không trả gợi ý đã lưu: cached={again.get('cached')}")
+    ok("bấm lại: trả ngay gợi ý đã lưu (cached), không đọc lại tệp, không ghi thêm dòng sổ kiểm toán")
+
+    say(2, "Tải ảnh chụp của chính công văn đó (11-cong-van-anh-300dpi.jpg): không có lớp chữ, tác tử OCR bằng Tesseract")
+    photo = labels["11-cong-van-anh-300dpi.jpg"]
+    image = upload_sample(clerk, photo["file"])
+    started = time.monotonic()
+    try:
+        scanned = read_file(clerk, image["id"])
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        hint = " — image svc-files chưa có tesseract-ocr-vie?" if detail.get("code") == "ocr_unavailable" else ""
+        raise DemoFailed(f"đọc ảnh trả {exc.status} {detail or exc.body[:200]}{hint}") from exc
+    took = time.monotonic() - started
+    if scanned.get("method") != "ocr" or scanned.get("status") != "ok":
+        raise DemoFailed(f"đọc ảnh chưa đúng: method {scanned.get('method')}, status {scanned.get('status')}")
+    right, wrong = show_fields(scanned, photo["fields"])
+    ok(f"OCR trang 1 trong {took:.1f} giây: {right}/6 ô khớp nhãn"
+       + (f" — {len(wrong)} ô high sai: {'; '.join(wrong)}" if wrong else "; chữ OCR nhầm thì độ tin cậy hạ xuống"))
+
+    say(3, "Văn thư kiểm gợi ý, sửa ô Cơ quan ban hành (medium) cho đủ tên trường, rồi lưu và vào sổ")
+    values = {k: v["value"] for k, v in first["fields"].items()}
+    data = {k: values.get(k) or letter["fields"][k] for k in ("type_code", "symbol", "issued_on", "summary")}
+    data.update(urgency=values.get("urgency", "normal"), file_ids=[file["id"]],
+                issuer_name=f"{values.get('issuer_name') or letter['fields']['issuer_name']}, Trường Đại học Mẫu")
+    before = clerk.gql(RECEIVED_BEFORE, {"s": data["symbol"], "d": data["issued_on"]})["office_documents"]
+    if before:
+        doc_id, number = before[0]["id"], before[0]["register_number"]
+        print(f"   – {data['symbol']} đã được tiếp nhận ở lần chạy trước — bỏ qua bước tiếp nhận (chặn trùng)")
+    else:
+        doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }",
+                           {"d": data})["receiveIncoming"]["document_id"]
+        number = None
+        ok(f"Cơ quan ban hành: “{values.get('issuer_name')}” → “{data['issuer_name']}”; các ô khác giữ gợi ý — "
+           "receiveIncoming kiểm lại theo schemas/van-ban-den.json như khi gõ tay")
+    if number is None:
+        number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                           {"id": doc_id})["registerIncoming"]["register_number"]
+        ok(f"{data['symbol']} vào sổ, số đến {number} — từ đây là luồng văn bản đến bình thường")
+    else:
+        ok(f"{data['symbol']} đã vào sổ ở lần chạy trước, số đến {number}")
+
+    say(4, "Lãnh đạo khoa đọc sổ kiểm toán: lần đọc do tác tử thực hiện, sổ chỉ có siêu dữ liệu")
+    rows = director.gql(READ_AUDIT, {"f": file["id"]})["core_audit_log"]
+    if len(rows) != 1:
+        raise DemoFailed(f"tệp {file['id']} có {len(rows)} dòng intake.suggested (cần đúng 1: lần bấm lại không ghi)")
+    row = rows[0]
+    overview = row["overview"] or {}
+    shown = json.dumps(overview, ensure_ascii=False)
+    leaked = [f for f in ("symbol", "issuer_name", "summary") if f in values and str(values[f]) in shown]
+    if (row["actor_id"], row["actor_kind"], row["entity"]) != ("moc-doc-reader", "agent", "core.files") or leaked:
+        raise DemoFailed(f"dòng #{row['id']} chưa đúng: {row['actor_id']}/{row['actor_kind']}, lộ {leaked}: {shown}")
+    ok(f"dòng #{row['id']} intake.suggested · {row['occurred_at'][:19].replace('T', ' ')} · người thực hiện"
+       f" moc-doc-reader ({row['actor_kind']}) · method {overview.get('method')}, tìm được {overview.get('found')},"
+       f" {overview.get('duration_ms')} ms")
+    ok("không có số ký hiệu, cơ quan, trích yếu hay chữ nào của văn bản trong sổ — chỉ biết ai nhờ đọc, đọc ra những ô nào")
+
+    say(5, "Tệp của văn bản hạn chế (mã hóa khi tải lên): tác tử không đọc")
+    sealed = clerk.upload(f"han-che-{tag}.pdf", text_pdf("CONG HOA XA HOI CHU NGHIA VIET NAM", f"So: 77/QD-MAU{tag}",
+                                                       "Danh sach nang luong truoc han nam 2026"), restricted=True)
+    try:
+        read_file(clerk, sealed["id"])
+        raise DemoFailed("tệp của văn bản hạn chế vẫn đọc được")
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        if exc.status != 409 or detail.get("code") != "restricted":
+            raise DemoFailed(f"tệp hạn chế trả {exc.status} {detail or exc.body[:200]}") from exc
+    kept = psql(f"select count(*) from office.intake_suggestions where file_id = '{sealed['id']}'")
+    if kept != "0":
+        raise DemoFailed(f"office.intake_suggestions có {kept} dòng cho tệp hạn chế")
+    ok(f"409 restricted: {detail.get('message')} — kiểm trước khi đọc byte, không tới OCR, không tới mô hình")
+    ok("office.intake_suggestions: 0 dòng cho tệp này; CSDL cũng chặn lưu gợi ý của tệp mã hóa (trigger)")
+
+    say(6, "Trích yếu bằng mô hình ngôn ngữ chạy tại chỗ (tùy chọn: profile ai, không ra Internet)")
+    if not ai_ready():
+        print("   – chưa bật mô hình — trích yếu theo quy tắc (make ai-model, xem docs)")
+    else:
+        invite = labels["06-giay-moi.pdf"]
+        drafted = read_file(clerk, upload_sample(clerk, invite["file"])["id"])
+        summary = drafted["fields"].get("summary") or {}
+        if drafted.get("summary_source") != "model" or summary.get("source") != "model":
+            raise DemoFailed(f"mô hình sẵn sàng mà trích yếu không do mô hình viết: cảnh báo {drafted.get('warnings')}")
+        ok(f"giấy mời không có dòng V/v: {drafted.get('model')} viết trích yếu “{summary['value']}” (medium — văn thư"
+           " kiểm); số, ngày, cơ quan vẫn do quy tắc")
+
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/van-ban-den/tiep-nhan — tải tệp, các ô có nhãn \"Gợi ý\"; văn bản"
+          f" vừa vào sổ: {PUBLIC_URL}/van-ban/{doc_id}; sổ kiểm toán (truongkhoa): {PUBLIC_URL}/so-kiem-toan?loai=files")
+
+
+def score_reads(results: list[tuple[str, dict[str, Any], dict[str, Any]]]) -> dict[str, Any]:
+    """Mỗi trường: đúng / sai (điền mà khác — tệ hơn bỏ trống) / trống, riêng ô high; trích yếu: có / trùng ≥ 60% từ."""
+    table = {f: {"đúng": 0, "sai": 0, "trống": 0, "high": 0, "high_sai": 0} for f in READ_FIELDS}
+    table["summary"] = {"có": 0, "khớp": 0, "high": 0, "high_sai": 0}
+    wrong: list[str] = []
+    for name, labels, fields in results:
+        for f in READ_FIELDS:
+            got, want = fields.get(f), expected(f, labels)
+            if got is None:
+                table[f]["đúng" if want is None else "trống"] += 1
+                continue
+            good = same_value(f, str(got["value"]), want)
+            table[f]["đúng" if good else "sai"] += 1
+            if got["confidence"] == "high":
+                table[f]["high"] += 1
+                if not good:
+                    table[f]["high_sai"] += 1
+                    wrong.append(f"{name}: {f} = {got['value']!r} (high), nhãn {want!r}")
+        got = fields.get("summary")
+        if got is not None:
+            good = same_value("summary", str(got["value"]), labels["summary"])
+            table["summary"]["có"] += 1
+            table["summary"]["khớp"] += good
+            if got["confidence"] == "high":
+                table["summary"]["high"] += 1
+                if not good:
+                    table["summary"]["high_sai"] += 1
+                    wrong.append(f"{name}: summary = {got['value']!r} (high), nhãn {labels['summary']!r}")
+    return {"n": len(results), "table": table, "wrong": wrong}
+
+
+def accuracy_table(title: str, measured: dict[str, Any]) -> str:
+    n, t = measured["n"], measured["table"]
+    rows = [f"### {title} — {n} tệp", "| trường | đúng | sai | trống | high (sai) |", "|---|---|---|---|---|"]
+    rows += [f"| {f} | {t[f]['đúng']}/{n} | {t[f]['sai']} | {t[f]['trống']} | {t[f]['high']} ({t[f]['high_sai']}) |"
+             for f in READ_FIELDS]
+    s = t["summary"]
+    rows.append(f"| summary | có {s['có']}/{n}, trùng ≥ 60% từ {s['khớp']}/{n} | | | {s['high']} ({s['high_sai']}) |")
+    return "\n".join(rows)
+
+
+def do_doc_van_ban() -> None:
+    print("Đo F4.1 · Tác tử đọc từng văn bản mẫu trong seed/van-ban-den qua APISIX như văn thư (force=true), so với nhãn"
+          " nhan.json")
+    clerk = Session("vanthu")
+    results: dict[str, list] = {"text": [], "scan": []}
+    took: dict[str, list[float]] = {"text": [], "scan": []}
+    server: dict[str, list[int]] = {"text": [], "scan": []}
+    models: set[str] = set()
+    print()
+    for sample in sample_labels():
+        name, kind = sample["file"], sample["kind"]
+        file = upload_sample(clerk, name)
+        started = time.monotonic()
+        try:
+            got = read_file(clerk, file["id"], force=True)
+        except HTTPError as exc:
+            detail = error_detail(exc)
+            got = {"method": "lỗi", "fields": {}, "warnings": [f"{exc.status} {detail.get('code')}"
+                                                              f" {detail.get('reason') or ''}".strip()]}
+        took[kind].append(time.monotonic() - started)
+        if isinstance(got.get("duration_ms"), int):
+            server[kind].append(got["duration_ms"])
+        if got.get("model"):
+            models.add(got["model"])
+        fields = got.get("fields") or {}
+        results[kind].append((name, sample["fields"], fields))
+        wrong = misses(fields, sample["fields"])
+        note = f" · cảnh báo {', '.join(got['warnings'])}" if got.get("warnings") else ""
+        print(f"   {name:<30} {got.get('method', '?'):<4} {took[kind][-1]:5.1f} s  {6 - len(wrong)}/6 ô khớp{note}")
+        for miss in wrong:
+            print(f"      ✗ {miss[:110]}")
+
+    for kind, title in (("text", "PDF có lớp chữ"), ("scan", "Ảnh, bản scan (OCR)")):
+        if results[kind]:
+            print("\n" + accuracy_table(title, score_reads(results[kind])))
+            inside = f" (svc-files tự đo {sum(server[kind]) / len(server[kind]):.0f} ms)" if server[kind] else ""
+            print(f"\nTrung bình {sum(took[kind]) / len(took[kind]):.1f} giây/tệp từ lúc gọi tới lúc có gợi ý{inside}")
+    print(f"Trích yếu bằng mô hình: {', '.join(sorted(models)) if models else 'không (chưa bật profile ai)'}")
+
+    every = score_reads(results["text"] + results["scan"])
+    whole = every["table"]
+    print(f"\nCả kho {every['n']} văn bản (\"Hoàn thành khi\" của Phase 4: trên 20 công văn mẫu): số ký hiệu đúng"
+          f" {whole['symbol']['đúng']}/{every['n']}, ngày ban hành đúng {whole['issued_on']['đúng']}/{every['n']}")
+
+    measured = score_reads(results["text"])
+    t, n = measured["table"], measured["n"]
+    right = {f: t[f]["có"] if f == "summary" else t[f]["đúng"] for f in TEXT_MIN}
+    below = [f"PDF có lớp chữ: {FIELD_NAMES[f].lower()} {right[f]}/{n} < {minimum} %"
+             for f, minimum in TEXT_MIN.items() if 100 * right[f] < minimum * n]
+    if not n:
+        below.append("nhan.json không có PDF có lớp chữ")
+    # "Hoàn thành khi" của Phase 4: trên 20 công văn mẫu, số ký hiệu và ngày ban hành đúng ở phần lớn văn bản
+    if every["n"] < 20:
+        below.append(f"cả kho chỉ có {every['n']} văn bản, cần ít nhất 20")
+    below += [f"cả kho: {FIELD_NAMES[f].lower()} đúng {whole[f]['đúng']}/{every['n']}, chưa quá nửa"
+              for f in ("symbol", "issued_on") if 2 * whole[f]["đúng"] <= every["n"]]
+    if below or measured["wrong"]:
+        raise DemoFailed("Dưới ngưỡng: " + "; ".join(below + measured["wrong"]))
+    print(f"\n✓ {n} PDF có lớp chữ đạt ngưỡng: số ký hiệu, ngày ban hành, loại ≥ 90 %; cơ quan ban hành, trích yếu"
+          f" ≥ 80 %; không ô high nào sai · cả kho {every['n']} văn bản: số ký hiệu, ngày ban hành đúng quá nửa")
+
+
+# --- F4.2 · Hỏi đáp trên kho văn bản ---------------------------------------------------------------------------------
+# Kho văn bản mẫu hư cấu đi kèm mã nguồn (sinh lại: make hoi-dap-mau); câu hỏi kèm đáp án trong cau-hoi.json
+ASK_DIR = ROOT / "seed" / "hoi-dap"
+ASK_URL = f"{PUBLIC_URL}/api/documents/ask"
+TOP = 3
+# Trạng thái không trả lời: câu âm, câu bị cấm đúng khi rơi vào một trong hai
+REFUSED = ("no_evidence", "passages_only")
+# Ngưỡng của make do-hoi-dap: recall@3 trên các câu dương — chốt lại sau lần đo đầu trên bản cài (số đo ghi ở
+# services/svc-files/README.md). Câu quyền, câu hạn chế có nguồn bị cấm thì luôn là lỗi
+RECALL_MIN = 0.8
+# Trưởng đơn vị phân công người xử lý sau khi lãnh đạo khoa giao (seed/users.csv); tên đơn vị trong ý kiến chỉ đạo
+MANAGERS = {"ĐT": "totruongdt", "KTPM": "truongbmktpm"}
+UNIT_NAMES = {"ĐT": "Tổ Đào tạo", "KTPM": "Bộ môn Kỹ thuật phần mềm", "HTTT": "Bộ môn Hệ thống thông tin",
+              "VP": "Văn phòng khoa"}
+ASK_DOCUMENT = """query ($s: String!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s}}) {
+  id restricted files { role file_id } } }"""
+ASK_AUDIT = """query ($e: String!) { core_audit_log(where: {action: {_eq: "assistant.answered"}, entity_id: {_eq: $e}},
+  order_by: {id: asc}) { id occurred_at entity actor_id actor_kind overview } }"""
+# /readyz của svc-files: "assist" cho biết chỉ mục, tìm theo nghĩa, mô hình đang dùng — in kèm số đo
+ASSIST_INFO = """import json, urllib.error, urllib.request
+try:
+    raw = urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5).read()
+except urllib.error.HTTPError as exc:
+    raw = exc.read()
+print(json.dumps(json.loads(raw).get('assist')))
+"""
+_SESSIONS: dict[str, Session] = {}
+
+
+def who(username: str) -> Session:
+    """Một phiên cho mỗi tài khoản suốt lượt chạy: mỗi lần đăng nhập văn thư, lãnh đạo tốn một mã TOTP."""
+    if username not in _SESSIONS:
+        _SESSIONS[username] = Session(username)
+    return _SESSIONS[username]
+
+
+def ask_samples() -> dict[str, Any]:
+    path = ASK_DIR / "cau-hoi.json"
+    if not path.is_file():
+        raise DemoFailed(f"không có {path.relative_to(ROOT)} — kho mẫu đi kèm mã nguồn (sinh lại: make hoi-dap-mau)")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def flat(text: str | None) -> str:
+    """So chữ: NFC, gộp mọi khoảng trắng, không phân biệt hoa thường."""
+    return " ".join(unicodedata.normalize("NFC", text or "").split()).casefold()
+
+
+def same_symbol(got: str | None, want: str | None) -> bool:
+    return bool(want) and "".join((got or "").split()).casefold() == "".join(want.split()).casefold()
+
+
+def source_label(src: dict[str, Any]) -> str:
+    """Nhãn trích dẫn như giao diện: "88/CTSV · tr. 1", "… · tài liệu kèm theo, tr. 2", "… · trích yếu"."""
+    name = src.get("symbol") or (src.get("summary") or "?")[:40]
+    if src.get("kind") != "page" or src.get("page") is None:
+        return f"{name} · trích yếu"
+    part = "tài liệu kèm theo, " if src.get("file_role") == "attachment" else ""
+    return f"{name} · {part}tr. {src['page']}"
+
+
+def matches(src: dict[str, Any], want: dict[str, Any]) -> bool:
+    """Nguồn khớp một đáp án: cùng số ký hiệu (văn bản đi lấy số lúc phát hành, không biết trước: trích yếu chứa
+    chuỗi cho trước) và cùng trang; đoạn "trích yếu" không có trang nên không khớp đáp án có trang."""
+    if "symbol" in want:
+        same = same_symbol(src.get("symbol"), want["symbol"])
+    else:
+        same = bool(want.get("summary_contains")) and flat(want["summary_contains"]) in flat(src.get("summary"))
+    return same and ("page" not in want or (src.get("kind") == "page" and src.get("page") == want["page"]))
+
+
+def hit_rank(sources: list[dict[str, Any]], expect: Any) -> int | None:
+    """Thứ hạng (từ 1) của nguồn đầu tiên khớp một đáp án; None khi không có (câu âm: luôn None)."""
+    if not isinstance(expect, list):
+        return None
+    return next((i for i, src in enumerate(sources, 1) if any(matches(src, w) for w in expect)), None)
+
+
+def forbidden(sources: list[dict[str, Any]], symbols: list[str]) -> list[str]:
+    """Nhãn các nguồn mang số ký hiệu bị cấm (câu quyền, văn bản hạn chế)."""
+    return [source_label(s) for s in sources if any(same_symbol(s.get("symbol"), x) for x in symbols)]
+
+
+def keywords_in(text: str | None, keywords: list[str]) -> bool:
+    """Câu trả lời có đủ mọi từ khóa — so sau casefold và gộp khoảng trắng."""
+    body = flat(text)
+    return bool(keywords) and all(flat(k) in body for k in keywords)
+
+
+def answer_text(result: dict[str, Any]) -> str:
+    return (result.get("answer") or {}).get("text") or ""
+
+
+def restricted_symbols(data: dict[str, Any]) -> list[str]:
+    """Số ký hiệu văn bản hạn chế của kho mẫu: không câu hỏi nào, của bất kỳ ai, được có nguồn này."""
+    return [d["symbol"] for d in data["documents"] if d.get("restricted")]
+
+
+def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str]) -> dict:
+    """Chấm một lượt extract theo đáp án: câu dương đúng khi nguồn đáp án nằm trong 3 nguồn đầu; câu âm đúng khi
+    trợ lý không trả lời — no_evidence, hoặc passages_only (chỉ đưa đoạn liên quan trong văn bản được xem, không câu
+    trích nào đủ khớp: ngưỡng điểm tìm kiếm quyết định, không phải chuyện quyền); nguồn bị cấm (danh sách của câu +
+    văn bản hạn chế) ghi riêng, luôn là lỗi."""
+    expect = question["expect"]
+    sources = result.get("sources") or []
+    positive = isinstance(expect, list)
+    rank = hit_rank(sources, expect)
+    status = result.get("status") or "?"
+    return {"id": question["id"], "user": question["user"], "question": question["question"], "positive": positive,
+            "status": status, "top": [source_label(s) for s in sources[:TOP]], "rank": rank,
+            "correct": (rank is not None and rank <= TOP) if positive else status in REFUSED,
+            "keywords": keywords_in(answer_text(result), question.get("keywords", [])) if positive else None,
+            "forbidden": forbidden(sources, [*question.get("forbid", []), *restricted]),
+            "guarded": bool(question.get("forbid")), "seconds": seconds, "server_ms": result.get("duration_ms"),
+            "semantic": bool(result.get("semantic")), "warnings": list(result.get("warnings") or []), "model": None}
+
+
+def score_model(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str]) -> dict:
+    """Chấm lượt generate: câu trả lời do mô hình viết và qua kiểm (answer.source = model), chứa từ khóa, có [n] trỏ
+    tới nguồn đáp án."""
+    answer = result.get("answer") or {}
+    sources = result.get("sources") or []
+    by_model = answer.get("source") == "model"
+    expect = question["expect"]
+    cited = [s for s in sources if s.get("cited")]
+    return {"by_model": by_model, "name": answer.get("model"), "status": result.get("status") or "?",
+            "keywords": by_model and keywords_in(answer.get("text"), question.get("keywords", [])),
+            "cites": by_model and isinstance(expect, list) and any(matches(s, w) for s in cited for w in expect),
+            "forbidden": forbidden(sources, [*question.get("forbid", []), *restricted]),
+            "warnings": list(result.get("warnings") or []), "seconds": seconds}
+
+
+def percentile(values: list[float], p: float) -> float | None:
+    """Phân vị p (0–100), cách lấy hạng gần nhất: p50 của [1, 2, 3, 4] là 2, p95 là 4."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[max(1, -(-len(ordered) * p // 100)) - 1]
+
+
+def summarize(rows: list[dict]) -> dict[str, Any]:
+    pos = [r for r in rows if r["positive"]]
+    neg = [r for r in rows if not r["positive"]]
+    gen = [r for r in rows if r["model"]]
+    gen_pos = [r for r in gen if r["positive"]]
+    violations = [f"{r['id']} ({r['user']}): {', '.join(r['forbidden'])}" for r in rows if r["forbidden"]]
+    violations += [f"{r['id']} ({r['user']}, generate): {', '.join(r['model']['forbidden'])}"
+                   for r in gen if r["model"]["forbidden"]]
+    server = [r["server_ms"] for r in rows if isinstance(r["server_ms"], int)]
+    out: dict[str, Any] = {
+        "positives": len(pos), "recall": sum(r["correct"] for r in pos), "keywords": sum(bool(r["keywords"]) for r in pos),
+        "negatives": len(neg), "refused": sum(r["correct"] for r in neg),
+        "no_evidence": sum(r["status"] == "no_evidence" for r in neg), "guarded": sum(r["guarded"] for r in rows),
+        "violations": violations, "semantic": sum(r["semantic"] for r in rows), "asked": len(rows),
+        "p50": percentile([r["seconds"] for r in rows], 50), "p95": percentile([r["seconds"] for r in rows], 95),
+        "server_p50": percentile(server, 50), "server_p95": percentile(server, 95), "model": None}
+    if gen:
+        out["model"] = {
+            "asked": len(gen), "by_model": sum(r["model"]["by_model"] for r in gen), "positives": len(gen_pos),
+            "keywords": sum(bool(r["model"]["keywords"]) for r in gen_pos),
+            "cites": sum(bool(r["model"]["cites"]) for r in gen_pos),
+            "negatives": len(gen) - len(gen_pos),
+            "neg_answered": sum(r["model"]["by_model"] for r in gen if not r["positive"]),
+            "names": sorted({r["model"]["name"] for r in gen if r["model"]["name"]}),
+            "p50": percentile([r["model"]["seconds"] for r in gen], 50),
+            "p95": percentile([r["model"]["seconds"] for r in gen], 95)}
+    return out
+
+
+def verdict(summary: dict[str, Any]) -> list[str]:
+    """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN."""
+    problems = [f"nguồn bị cấm — {v}" for v in summary["violations"]]
+    if summary["positives"] and summary["recall"] < RECALL_MIN * summary["positives"]:
+        problems.append(f"recall@3 {summary['recall']}/{summary['positives']} dưới ngưỡng {RECALL_MIN:.0%}")
+    return problems
+
+
+def result_table(rows: list[dict]) -> str:
+    """Bảng markdown từng câu: trạng thái, nguồn top-3, đúng / sai, từ khóa, thời gian (thêm cột mô hình nếu có)."""
+    with_model = any(r["model"] for r in rows)
+    head = "| câu | người hỏi | trạng thái | nguồn top-3 | đúng | từ khóa | thời gian |"
+    line = "|---|---|---|---|---|---|---|"
+    if with_model:
+        head += " mô hình | từ khóa | trích đúng | thời gian |"
+        line += "---|---|---|---|"
+    out = [head, line]
+    mark = {True: "✓", False: "✗", None: "—"}
+    for r in rows:
+        question = r["question"] if len(r["question"]) <= 48 else r["question"][:47] + "…"
+        right = "✗ CẤM: " + ", ".join(r["forbidden"]) if r["forbidden"] else (
+            mark[r["correct"]] + (f" #{r['rank']}" if r["rank"] else ""))
+        cells = [f"{r['id']} {question}", r["user"], r["status"], "; ".join(r["top"]) or "—", right,
+                 mark[r["keywords"]], f"{r['seconds']:.1f} s"]
+        if with_model:
+            m = r["model"]
+            cells += (["—"] * 4 if m is None else [
+                ("viết" if m["by_model"] else ", ".join(m["warnings"]) or m["status"]),
+                mark[m["keywords"] if r["positive"] else None], mark[m["cites"] if r["positive"] else None],
+                f"{m['seconds']:.1f} s"])
+        out.append("| " + " | ".join(cells) + " |")
+    return "\n".join(out)
+
+
+def ask(session: Session, question: str, *, mode: str = "extract", ask_id: str | None = None) -> tuple[dict, float]:
+    """POST /api/documents/ask qua APISIX bằng token người hỏi → (kết quả, số giây). Token hết hạn giữa lượt đo dài
+    thì đăng nhập lại một lần; hết lượt sinh (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần."""
+    body: dict[str, Any] = {"question": question, "mode": mode}
+    if ask_id:
+        body["ask_id"] = ask_id
+    attempts = 0
+    while True:
+        started = time.monotonic()
+        try:
+            _, _, raw = request("POST", ASK_URL, data=json.dumps(body).encode(), timeout=25 if mode == "extract" else 70,
+                                headers={**session.auth, "Content-Type": "application/json"})
+            return json.loads(raw), time.monotonic() - started
+        except HTTPError as exc:
+            attempts += 1
+            if exc.status == 401 and attempts == 1:
+                session.token = user_token(session.username)
+                continue
+            if exc.status != 503 or error_detail(exc).get("code") != "busy" or attempts >= 3:
+                raise
+            time.sleep(10)
+
+
+def show_answer(result: dict[str, Any]) -> None:
+    """In câu trả lời và danh sách nguồn như trang Hỏi đáp."""
+    for line in answer_text(result).splitlines() or ["(không có câu trả lời)"]:
+        print(f"     {line}")
+    for src in result.get("sources") or []:
+        cited = "" if src.get("cited") else " (liên quan, không trích)"
+        print(f"     [{src['n']}] {source_label(src)} · {src.get('issuer_name') or '?'}{cited}")
+
+
+def refusal(result: dict[str, Any]) -> str:
+    """Kết quả của câu lẽ ra không có câu trả lời, in như giao diện: không tìm thấy gì; chỉ có đoạn liên quan mà không
+    câu nào đủ khớp; hoặc câu trích từ văn bản khác mà người hỏi được xem."""
+    labels = ", ".join(source_label(s) for s in result.get("sources") or [])
+    if result.get("status") == "no_evidence":
+        return "no_evidence: “Không tìm thấy văn bản nào bạn được xem có nội dung này”"
+    if result.get("status") == "passages_only":
+        return f"passages_only: “Chưa trích được câu trả lời ngắn” — đoạn liên quan trong văn bản được xem: {labels}"
+    return f"{result.get('status')}: câu trích từ văn bản khác mà người hỏi được xem: {labels}"
+
+
+def load_corpus(data: dict[str, Any]) -> tuple[dict[str, dict], int]:
+    """Nạp kho mẫu như văn thư: tải lên (văn bản hạn chế ở chế độ hạn chế, trước tiên — đọc chữ theo thứ tự tải
+    lên), tiếp nhận, vào sổ; lãnh đạo khoa giao đơn vị chủ trì, trưởng đơn vị phân công theo "assign". Văn bản đã có
+    (cùng số ký hiệu) thì bỏ qua → (văn bản theo số ký hiệu, số văn bản mới)."""
+    from seed_documents import DEPT, today
+
+    clerk, director = who("vanthu"), who("truongkhoa")
+    loaded: dict[str, dict] = {}
+    created = 0
+    for d in sorted(data["documents"], key=lambda d: not d["restricted"]):
+        found = clerk.gql(ASK_DOCUMENT, {"s": d["symbol"]})["office_documents"]
+        if found:
+            loaded[d["symbol"]] = found[0]
+            continue
+        file = clerk.upload(d["file"], (ASK_DIR / d["file"]).read_bytes(), restricted=d["restricted"])
+        doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+            "type_code": d["type_code"], "symbol": d["symbol"], "issuer_name": d["issuer_name"],
+            "issued_on": d["issued_on"], "summary": d["summary"], "urgency": "normal", "restricted": d["restricted"],
+            "file_ids": [file["id"]]}})["receiveIncoming"]["document_id"]
+        clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": doc_id})
+        assign = d.get("assign")
+        if assign:
+            director.complete(director.wait_task(doc_id, "vbden.chiDao"), "direct", {
+                "instruction": f"Giao {UNIT_NAMES[assign['lead']]} chủ trì nghiên cứu, triển khai.",
+                "lead_department_id": DEPT[assign["lead"]], "supports": [],
+                "due_on": (today() + timedelta(days=14)).isoformat()})
+            if assign.get("handler"):
+                manager = who(MANAGERS[assign["lead"]])
+                user_id = manager.gql("query ($u: String!) { core_users(where: {username: {_eq: $u}}) { id } }",
+                                      {"u": assign["handler"]})["core_users"][0]["id"]
+                manager.complete(manager.wait_task(doc_id, "vbden.phanCong"), "assign",
+                                 {"user_id": user_id, "note": "Đề nghị nghiên cứu, thực hiện."})
+        loaded[d["symbol"]] = {"id": doc_id, "restricted": d["restricted"],
+                               "files": [{"role": "main", "file_id": file["id"]}]}
+        created += 1
+    return loaded, created
+
+
+def wait_indexed(data: dict[str, Any], timeout_s: float) -> float:
+    """Đợi vòng nền svc-files đọc chữ từng trang rồi đưa đoạn vào chỉ mục: hỏi thử câu đầu của mỗi văn bản mẫu (đúng
+    người hỏi) tới khi một trang của văn bản đó có trong nguồn → số giây đã đợi. Nguồn "trích yếu" không tính: trích
+    yếu vào chỉ mục ngay lúc tiếp nhận, trước khi chữ các trang được đọc (bản cài mới thì trả lời lúc đó còn thiếu)."""
+    probes: dict[str, dict] = {}
+    for q in data["questions"]:
+        for want in q["expect"] if isinstance(q["expect"], list) else []:
+            if any(d["symbol"] == want.get("symbol") for d in data["documents"]):
+                probes.setdefault(want["symbol"], q)
+    started = time.monotonic()
+    while probes:
+        for symbol, q in list(probes.items()):
+            try:
+                sources = ask(who(q["user"]), q["question"])[0].get("sources") or []
+            except HTTPError as exc:        # Meilisearch, Hasura vừa khởi động: đợi tiếp; tắt trợ lý thì dừng
+                if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
+                    raise
+                sources = []
+            if any(same_symbol(s.get("symbol"), symbol) and s.get("kind") == "page" for s in sources):
+                del probes[symbol]
+        if not probes:
+            break
+        if time.monotonic() - started > timeout_s:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây chỉ mục đoạn chưa có {', '.join(probes)} — vòng nền svc-files"
+                             " (đọc chữ MOC_TEXT_INTERVAL_S, chỉ mục MOC_ASK_SYNC_INTERVAL_S) có chạy không?")
+        time.sleep(3)
+    return time.monotonic() - started
+
+
+def hoi_dap() -> None:
+    print("Màn F4.2 · Hỏi đáp trên kho văn bản — trợ lý moc-assistant chỉ tìm trong các văn bản người hỏi được xem, trả"
+          " câu trích nguyên văn kèm số ký hiệu và trang; văn bản hạn chế không bao giờ vào chỉ mục")
+    data = ask_samples()
+    qs = {q["id"]: q for q in data["questions"]}
+    sealed = restricted_symbols(data)
+
+    say(1, "Văn thư nạp kho mẫu seed/hoi-dap: tải lên, tiếp nhận, vào sổ; lãnh đạo khoa giao việc như cau-hoi.json")
+    loaded, created = load_corpus(data)
+    pages = sum(d["pages"] for d in data["documents"] if not d["restricted"])
+    again = "" if created == len(loaded) else ", còn lại đã nạp ở lần chạy trước"
+    ok(f"{len(loaded)} văn bản ({created} mới{again}): {len(loaded) - len(sealed)} văn bản {pages} trang + {len(sealed)}"
+       f" văn bản hạn chế ({', '.join(sealed)}, tệp mã hóa)")
+    took = wait_indexed(data, 90)
+    ok(f"svc-files đã đọc chữ từng trang và đưa đoạn vào chỉ mục (đợi {took:.0f} giây) — không cần mô hình nào")
+
+    q = qs["q01"]
+    say(2, f"{q['user']} hỏi: “{q['question']}”")
+    first, _ = ask(who(q["user"]), q["question"])
+    show_answer(first)
+    rank = hit_rank(first.get("sources") or [], q["expect"])
+    want = q["expect"][0]
+    if first.get("status") != "answered" or rank is None or rank > TOP or not keywords_in(answer_text(first),
+                                                                                          q["keywords"]):
+        raise DemoFailed(f"chưa trả đúng câu trích của {want['symbol']} tr. {want['page']} (có “{q['keywords'][0]}”):"
+                         f" trạng thái {first.get('status')},"
+                         f" nguồn {[source_label(s) for s in first.get('sources') or []]}")
+    search = "từ khóa và theo nghĩa" if first.get("semantic") else "từ khóa"
+    ok(f"nguồn [{rank}] {want['symbol']} · tr. {want['page']} ✓ khớp đáp án trong cau-hoi.json; câu trích có"
+       f" “{q['keywords'][0]}”; tìm theo {search}, svc-files trả lời trong {first.get('duration_ms')} ms")
+
+    q, guarded = qs["q14"], qs["q19"]
+    say(3, f"Cùng một câu, hai người hỏi: “{q['question']}” — trợ lý chỉ tìm trong văn bản người hỏi được xem")
+    got, _ = ask(who(q["user"]), q["question"])
+    rank = hit_rank(got.get("sources") or [], q["expect"])
+    if rank is None or rank > TOP or not keywords_in(answer_text(got), q["keywords"]):
+        raise DemoFailed(f"{q['user']} chưa được câu trích của {q['expect'][0]['symbol']}: {got.get('status')}, nguồn"
+                         f" {[source_label(s) for s in got.get('sources') or []]}")
+    ok(f"{q['user']} → [{rank}] {source_label(got['sources'][rank - 1])}: câu trích có “{q['keywords'][0]}”")
+    denied, _ = ask(who(guarded["user"]), guarded["question"])
+    leaked = forbidden(denied.get("sources") or [], [*guarded["forbid"], *sealed])
+    if leaked:
+        raise DemoFailed(f"{guarded['user']} hỏi ra văn bản không được xem: {leaked}")
+    ok(f"{guarded['user']} (Bộ môn KTPM) → {refusal(denied)} — {' và '.join(guarded['forbid'])} giao Tổ Đào tạo,"
+       " giảng viên KTPM không được xem; câu trả lời không để lộ các văn bản đó có tồn tại")
+    q = qs["q10"]
+    allowed, _ = ask(who(q["user"]), q["question"])
+    rank = hit_rank(allowed.get("sources") or [], q["expect"])
+    if rank is None or rank > TOP or not keywords_in(answer_text(allowed), q["keywords"]):
+        raise DemoFailed(f"giảng viên KTPM không hỏi được văn bản giao cho mình: {allowed.get('status')}, nguồn"
+                         f" {[source_label(s) for s in allowed.get('sources') or []]}")
+    ok(f"“{q['question']}” → {answer_text(allowed).splitlines()[0]} — {q['expect'][0]['symbol']} giao Bộ môn KTPM,"
+       f" giảng viên được phân công xử lý")
+
+    q = qs["q18"]
+    say(4, f"Văn bản hạn chế {', '.join(sealed)}: hỏi đúng cụm từ riêng của nó, bằng người tạo (vanthu) và lãnh đạo"
+           " khoa (có tên trong danh sách được xem)")
+    for name in ("vanthu", "truongkhoa"):
+        got, _ = ask(who(name), q["question"])
+        if forbidden(got.get("sources") or [], sealed):
+            raise DemoFailed(f"{name} hỏi nội dung văn bản hạn chế → {got.get('status')}, nguồn"
+                             f" {[source_label(s) for s in got.get('sources') or []]}")
+        ok(f"{name} → {refusal(got)}")
+    file_ids = [f["file_id"] for symbol in sealed for f in loaded[symbol]["files"]]
+    texts = psql("select count(*) from core.file_texts where file_id in (%s)" % ", ".join(f"'{f}'" for f in file_ids))
+    if texts != "0":
+        raise DemoFailed(f"core.file_texts có {texts} dòng của tệp văn bản hạn chế")
+    ok("core.file_texts: 0 dòng của tệp này — chữ của văn bản hạn chế không được đọc, không vào chỉ mục, không tới"
+       " mô hình, kể cả với người được xem văn bản")
+
+    say(5, "Lãnh đạo khoa đọc sổ kiểm toán: mỗi lượt hỏi một dòng của tác tử moc-assistant, không có câu hỏi, câu"
+           " trả lời")
+    rows = who("truongkhoa").gql(ASK_AUDIT, {"e": first["ask_id"]})["core_audit_log"]
+    if len(rows) != 1:
+        raise DemoFailed(f"lượt hỏi {first['ask_id']} có {len(rows)} dòng assistant.answered (cần đúng 1)")
+    row = rows[0]
+    overview = row["overview"] or {}
+    if (row["actor_id"], row["actor_kind"], row["entity"]) != ("moc-assistant", "agent", "ai.questions") \
+            or any(overview.get(k) is None for k in ("mode", "hits", "cited")):
+        raise DemoFailed(f"dòng #{row['id']} chưa đúng: {row['actor_id']}/{row['actor_kind']}/{row['entity']}, tóm tắt"
+                         f" {overview}")
+    diff = psql(f"select diff::text from core.audit_log where id = {int(row['id'])}").casefold()
+    words = [w for w in re.findall(r"\w+", qs["q01"]["question"]) if len(w) >= 3 and not w.isdigit()]
+    leaked = [w for w in words if w.casefold() in diff] + [s for s in ("15/QĐ-ĐHM", "tín chỉ") if s.casefold() in diff]
+    if leaked:
+        raise DemoFailed(f"diff của dòng #{row['id']} có chữ của câu hỏi, câu trả lời: {leaked}")
+    ok(f"dòng #{row['id']} assistant.answered · {row['occurred_at'][:19].replace('T', ' ')} · người thực hiện"
+       f" moc-assistant ({row['actor_kind']}) · mode {overview.get('mode')}, {overview.get('hits')} nguồn, trích"
+       f" {overview.get('cited')}, {overview.get('duration_ms')} ms")
+    ok("psql: diff của dòng không có từ nào của câu hỏi, không có câu trích, số ký hiệu — chỉ biết ai hỏi, lúc nào,"
+       " được mấy nguồn")
+
+    q = qs["q02"]
+    say(6, f"Câu trả lời do mô hình ngôn ngữ chạy tại chỗ viết (tùy chọn: profile ai) — {q['user']} hỏi"
+           f" “{q['question']}”")
+    base, _ = ask(who(q["user"]), q["question"])
+    if not base.get("ai_available"):
+        quote = answer_text(base).splitlines()[0] if answer_text(base) else "—"
+        print(f"   – chưa bật mô hình — trả lời bằng câu trích: {quote} (make ai-model && make up-ai)")
+    else:
+        got, took = ask(who(q["user"]), q["question"], mode="generate", ask_id=base["ask_id"])
+        show_answer(got)
+        answer = got.get("answer") or {}
+        if answer.get("source") == "model":
+            ok(f"{answer.get('model')} viết câu trả lời trong {took:.0f} giây; svc-files gắn [n] cho từng câu theo"
+               " bằng chứng (số, độ phủ) — giao diện ghi rõ “Do mô hình ngôn ngữ viết — đối chiếu nguồn”")
+        else:
+            print(f"   – mô hình không qua kiểm ({', '.join(got.get('warnings') or []) or got.get('status')}) — giữ câu"
+                  " trích nguyên văn, như giao diện hiện")
+        both = who("truongkhoa").gql(ASK_AUDIT, {"e": base["ask_id"]})["core_audit_log"]
+        modes = [(r["overview"] or {}).get("mode") for r in both]
+        if modes != ["extract", "generate"]:
+            raise DemoFailed(f"lượt hỏi hai pha chưa đủ hai dòng sổ cùng mã: {modes}")
+        ok("sổ kiểm toán: hai dòng cùng mã lượt hỏi (extract rồi generate)")
+
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/hoi-dap — hỏi “{qs['q14']['question']}”; sổ kiểm toán"
+          f" (truongkhoa): {PUBLIC_URL}/so-kiem-toan")
+
+
+def failure(exc: Exception) -> str:
+    """Trạng thái ghi vào bảng đo khi một lượt hỏi lỗi (HTTP, quá giờ) — lượt đo vẫn chạy tiếp các câu sau."""
+    if isinstance(exc, HTTPError):
+        return f"lỗi {exc.status} {error_detail(exc).get('code') or ''}".strip()
+    return f"lỗi {type(exc).__name__}"
+
+
+def do_hoi_dap() -> None:
+    print("Đo F4.2 · Trợ lý hỏi đáp trên mọi câu trong seed/hoi-dap/cau-hoi.json, đúng người hỏi, qua APISIX")
+    data = ask_samples()
+    sealed = restricted_symbols(data)
+    loaded, created = load_corpus(data)
+    took = wait_indexed(data, 120)
+    print(f"   kho mẫu: {len(loaded)} văn bản ({created} mới), chỉ mục sẵn sàng sau {took:.0f} giây")
+    try:
+        info = json.loads(compose("exec", "-T", "svc-files", "python", "-c", ASSIST_INFO))
+    except (subprocess.CalledProcessError, ValueError):
+        info = None
+    print(f"   svc-files /readyz assist: {json.dumps(info, ensure_ascii=False)}\n")
+    rows = []
+    for q in data["questions"]:
+        session = who(q["user"])
+        try:
+            got, seconds = ask(session, q["question"])
+        except (HTTPError, OSError) as exc:
+            got, seconds = {"status": failure(exc)}, 0.0
+        row = score(q, got, seconds, restricted=sealed)
+        if got.get("ai_available") and got.get("status") not in (None, "no_evidence"):
+            try:
+                gen, gen_seconds = ask(session, q["question"], mode="generate", ask_id=got.get("ask_id"))
+            except (HTTPError, OSError) as exc:
+                gen, gen_seconds = {"status": failure(exc)}, 0.0
+            row["model"] = score_model(q, gen, gen_seconds, restricted=sealed)
+        rows.append(row)
+        print(f"   {q['id']} {q['user']:<14} {row['status']:<14} {'✓' if row['correct'] else '✗'}"
+              f" {seconds:4.1f} s  {'; '.join(row['top']) or '—'}")
+
+    s = summarize(rows)
+    print("\n" + result_table(rows))
+    print(f"\nrecall@3 (câu dương): {s['recall']}/{s['positives']} · câu trích có từ khóa:"
+          f" {s['keywords']}/{s['positives']} · từ chối đúng (câu âm, câu bị cấm không được trả lời):"
+          f" {s['refused']}/{s['negatives']}, trong đó no_evidence {s['no_evidence']}")
+    print(f"an toàn: {len(s['violations'])} lượt có nguồn bị cấm ({s['guarded']} câu có danh sách cấm, văn bản hạn chế"
+          f" {', '.join(sealed)} cấm ở mọi câu) · tìm theo nghĩa {s['semantic']}/{s['asked']} lượt")
+    print(f"thời gian extract: p50 {s['p50']:.1f} s, p95 {s['p95']:.1f} s"
+          + (f" (svc-files tự đo p50 {s['server_p50']} ms, p95 {s['server_p95']} ms)" if s["server_p50"] is not None
+             else ""))
+    m = s["model"]
+    if m is None:
+        print("mô hình sinh: không (chưa bật profile ai — make ai-model && make up-ai rồi chạy lại)")
+    else:
+        print(f"mô hình sinh {', '.join(m['names']) or '?'}: qua kiểm {m['by_model']}/{m['asked']} · chứa từ khóa"
+              f" {m['keywords']}/{m['positives']} · trích đúng nguồn {m['cites']}/{m['positives']}"
+              f" · p50 {m['p50']:.1f} s, p95 {m['p95']:.1f} s · mô hình trả lời câu âm"
+              f" {m['neg_answered']}/{m['negatives']}")
+    problems = verdict(s)
+    if problems:
+        raise DemoFailed("; ".join(problems))
+    print(f"\n✓ không nguồn bị cấm nào; recall@3 {s['recall']}/{s['positives']} ≥ {RECALL_MIN:.0%}")
+
+
+# --- F4.3 · Gợi ý giao việc -----------------------------------------------------------------------------------------
+# Lịch sử giao việc hư cấu (số ký hiệu đuôi -GVM) làm căn cứ cho tác tử moc-assigner, các ca có nhãn, một mồi hạn chế
+GV_PATH = ROOT / "seed" / "giao-viec" / "lich-su.json"
+# Ngưỡng của make do-giao-viec: top-1 leave-one-out trên lịch sử (none tính là sai) — chốt lại sau lần đo đầu trên bản
+# cài, ghi số đo vào services/svc-workflow/README.md. Căn cứ là văn bản hạn chế thì luôn là lỗi
+MIN_TOP1 = 0.6
+GV_DOCUMENT = """query ($s: String!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s}}) {
+  id status restricted } }"""
+SUGGESTION = """query ($id: uuid!) { office_assignment_suggestions_by_pk(document_id: $id) {
+    status reason department_id confidence share due_days due_on evidence candidates semantic duration_ms created_at }
+  office_documents_by_pk(id: $id) { registered_at } }"""
+ACCURACY = """{ office_v_assignment_suggestion_accuracy { status confidence suggested decided kept_unit due_compared
+  kept_due } }"""
+# Căn cứ trỏ tới văn bản hạn chế, trên mọi dòng gợi ý đã lưu (trigger CSDL chặn lúc ghi, gỡ khi bật hạn chế sau)
+SEALED_EVIDENCE = """select count(*) from office.assignment_suggestions s
+  cross join lateral jsonb_array_elements(s.evidence) e
+  join office.documents d on d.tenant_id = s.tenant_id and d.id = (e->>'document_id')::uuid
+ where d.restricted"""
+# Vào sổ → có dòng gợi ý, trên dòng thật (seed, lịch sử, các lần chạy demo, smoke)
+SUGGEST_LATENCY = """select count(*), percentile_disc(0.5) within group (order by x),
+       percentile_disc(0.95) within group (order by x)
+  from (select extract(epoch from s.created_at - d.registered_at)::numeric(10, 1) as x
+          from office.assignment_suggestions s
+          join office.documents d on d.tenant_id = s.tenant_id and d.id = s.document_id
+         where d.registered_at is not null) t"""
+# Khóa diff của dòng sổ assignment.suggested (hợp đồng F4.3 §6): chỉ giá trị vô hướng, không chữ văn bản
+SUGGEST_DIFF_KEYS = {"outcome", "outcome_reason", "department_id", "due_days", "confidence", "evidence", "candidates",
+                     "semantic", "duration_ms"}
+CONFIDENCE = {"high": "cao", "medium": "vừa", "low": "thấp"}
+_TOKEN_AT: dict[str, float] = {}
+
+
+def gv(username: str) -> Session:
+    """who() kèm làm mới token: token Keycloak sống 5 phút, lần nạp lịch sử đầu tiên cộng các bước đợi có thể lâu hơn
+    (mỗi lần làm mới tốn một mã TOTP của văn thư, lãnh đạo)."""
+    session = who(username)
+    now = time.monotonic()
+    if now - _TOKEN_AT.setdefault(username, now) > 240:
+        session.token = user_token(username)
+        _TOKEN_AT[username] = now
+    return session
+
+
+def gv_samples() -> dict[str, Any]:
+    if not GV_PATH.is_file():
+        raise DemoFailed(f"không có {GV_PATH.relative_to(ROOT)} — lịch sử giao việc mẫu đi kèm mã nguồn")
+    return json.loads(GV_PATH.read_text(encoding="utf-8"))
+
+
+def unit_code(department_id: str | None) -> str:
+    """Mã đơn vị của seed (ĐT, KTPM…) theo id phòng; phòng lạ thì 8 ký tự đầu của id."""
+    from seed_documents import DEPT
+
+    if not department_id:
+        return "—"
+    return next((code for code, dept in DEPT.items() if dept == department_id), department_id[:8])
+
+
+def unit_name(department_id: str | None) -> str:
+    code = unit_code(department_id)
+    return UNIT_NAMES.get(code, code)
+
+
+def receive_bare(d: dict[str, Any], symbol: str, *, restricted: bool = False) -> str:
+    """Văn thư tiếp nhận văn bản không kèm tệp (svc-files đưa trích yếu vào chỉ mục thành đoạn meta) rồi vào sổ → id."""
+    from seed_documents import today
+
+    clerk = gv("vanthu")
+    doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+        "type_code": d["type_code"], "symbol": symbol, "issuer_name": d["issuer_name"],
+        "issued_on": (today() - timedelta(days=3)).isoformat(), "summary": d["summary"], "urgency": "normal",
+        "restricted": restricted, "file_ids": []}})["receiveIncoming"]["document_id"]
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": doc_id})
+    return doc_id
+
+
+def direct(doc_id: str, *, due_on: str, department_id: str | None = None, user_id: str | None = None,
+           task: str | None = None) -> None:
+    """Lãnh đạo khoa giao một phòng chủ trì hoặc giao thẳng một người, không phòng phối hợp."""
+    director = gv("truongkhoa")
+    task = task or director.wait_task(doc_id, "vbden.chiDao")
+    if department_id:
+        lead: dict[str, Any] = {"lead_department_id": department_id}
+        instruction = f"Giao {unit_name(department_id)} chủ trì thực hiện, báo cáo đúng hạn."
+    else:
+        lead, instruction = {"lead_user_id": user_id}, "Giao đồng chí chủ trì thực hiện, báo cáo đúng hạn."
+    director.complete(task, "direct", {"instruction": instruction, **lead, "supports": [], "due_on": due_on})
+
+
+def file_away(doc_id: str, task: str | None = None) -> None:
+    """Lãnh đạo khoa lưu văn bản, không giao xử lý."""
+    director = gv("truongkhoa")
+    director.complete(task or director.wait_task(doc_id, "vbden.chiDao"), "file", {"note": "Lưu để biết."})
+
+
+def load_history(data: dict[str, Any]) -> tuple[dict[str, str], int]:
+    """Nạp lịch sử như văn thư và lãnh đạo khoa: mồi hạn chế trước, rồi history, people — tiếp nhận không kèm tệp, vào
+    sổ, giao đơn vị chủ trì (lead) hoặc giao thẳng một người (lead_user), hạn = hôm nay + due_in. Văn bản đã có (cùng
+    số ký hiệu) thì bỏ qua; lần chạy trước dừng giữa chừng thì làm nốt bước còn thiếu → (id theo số ký hiệu, số mới)."""
+    from seed_documents import DEPT, today
+
+    users: dict[str, str] = {}
+    ids: dict[str, str] = {}
+    created = 0
+    for d in [data["bait"], *data["history"], *data["people"]]:
+        found = gv("vanthu").gql(GV_DOCUMENT, {"s": d["symbol"]})["office_documents"]
+        if found:
+            doc_id, status = found[0]["id"], found[0]["status"]
+            if status == "received":
+                gv("vanthu").gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                                 {"id": doc_id})
+        else:
+            doc_id, status = receive_bare(d, d["symbol"], restricted=bool(d.get("restricted"))), "registered"
+            created += 1
+        if status in ("received", "registered"):
+            due_on = (today() + timedelta(days=d["due_in"])).isoformat()
+            if d.get("lead_user"):
+                if d["lead_user"] not in users:
+                    users[d["lead_user"]] = gv("truongkhoa").gql(
+                        "query ($u: String!) { core_users(where: {username: {_eq: $u}}) { id } }",
+                        {"u": d["lead_user"]})["core_users"][0]["id"]
+                direct(doc_id, due_on=due_on, user_id=users[d["lead_user"]])
+            else:
+                direct(doc_id, due_on=due_on, department_id=DEPT[d["lead"]])
+        ids[d["symbol"]] = doc_id
+    return ids, created
+
+
+def wait_history_indexed(data: dict[str, Any], timeout_s: float, *, settle: bool) -> float:
+    """Đợi vòng nền svc-files đưa trích yếu văn bản lịch sử nạp sau cùng vào chỉ mục đoạn (MOC_ASK_SYNC_INTERVAL_S):
+    lãnh đạo khoa hỏi trợ lý đúng trích yếu đó tới khi văn bản có trong nguồn → số giây đã đợi. settle: vừa nạp văn
+    bản mới — đoạn có thể vào chỉ mục lúc văn bản còn "registered", tác tử chỉ lấy căn cứ đã giao (in_progress…) nên
+    đợi thêm hai vòng đồng bộ để trạng thái trong chỉ mục theo kịp."""
+    last = (data["people"] or data["history"])[-1]
+    started = time.monotonic()
+    while True:
+        try:
+            sources = ask(gv("truongkhoa"), last["summary"])[0].get("sources") or []
+        except HTTPError as exc:            # Meilisearch, Hasura vừa khởi động: đợi tiếp; tắt trợ lý thì dừng
+            if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
+                raise
+            sources = []
+        if any(same_symbol(s.get("symbol"), last["symbol"]) for s in sources):
+            if settle:
+                time.sleep(2 * float(ENV.get("MOC_ASK_SYNC_INTERVAL_S") or 5) + 1)
+            return time.monotonic() - started
+        if time.monotonic() - started > timeout_s:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây chỉ mục đoạn chưa có {last['symbol']} — vòng nền svc-files"
+                             " (MOC_ASK_SYNC_INTERVAL_S) có chạy không, trợ lý có bật (MOC_ASK_ENABLED) không?")
+        time.sleep(3)
+
+
+def wait_suggestion(doc_id: str, timeout_s: float) -> tuple[dict | None, dict | None]:
+    """Dòng gợi ý của văn bản (lãnh đạo khoa đọc, hỏi lại mỗi giây) tới khi có hoặc hết giờ → (dòng, văn bản)."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        got = gv("truongkhoa").gql(SUGGESTION, {"id": doc_id})
+        row = got["office_assignment_suggestions_by_pk"]
+        if row or time.monotonic() >= deadline:
+            return row, got["office_documents_by_pk"]
+        time.sleep(1)
+
+
+def wait_suggestions(docs: dict[str, str], timeout_s: float) -> dict[str, dict | None]:
+    """Như wait_suggestion cho nhiều văn bản một lúc → dòng gợi ý theo khóa (None: hết giờ vẫn chưa có)."""
+    rows: dict[str, dict | None] = dict.fromkeys(docs)
+    deadline = time.monotonic() + timeout_s
+    while True:
+        for key, doc_id in docs.items():
+            if rows[key] is None:
+                rows[key] = wait_suggestion(doc_id, 0)[0]
+        if all(rows.values()) or time.monotonic() >= deadline:
+            return rows
+        time.sleep(1)
+
+
+def lag(row: dict[str, Any], doc: dict[str, Any] | None) -> str:
+    """created_at của dòng gợi ý − registered_at của văn bản, như "2.4 giây"."""
+    try:
+        start = datetime.fromisoformat(((doc or {}).get("registered_at") or "").replace("Z", "+00:00"))
+        end = datetime.fromisoformat((row.get("created_at") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return "?"
+    return f"{(end - start).total_seconds():.1f} giây"
+
+
+def evidence_labels(row: dict[str, Any]) -> list[str]:
+    """Căn cứ in như giao diện: số ký hiệu (đơn vị đã giao, điểm, số ngày) — lãnh đạo khoa đọc số ký hiệu."""
+    evidence = row.get("evidence") or []
+    if not evidence:
+        return []
+    symbols = {d["id"]: d["symbol"] for d in gv("truongkhoa").gql(
+        "query ($ids: [uuid!]!) { office_documents(where: {id: {_in: $ids}}) { id symbol } }",
+        {"ids": [e["document_id"] for e in evidence]})["office_documents"]}
+    return [f"{symbols.get(e['document_id'], '?')} ({unit_code(e.get('department_id'))}, {e.get('score', 0):.2f}"
+            + (f", {e['days']} ngày)" if e.get("days") else ")") for e in evidence]
+
+
+def accuracy() -> dict[str, int]:
+    """Tổng các cột đếm của view office.v_assignment_suggestion_accuracy trong đơn vị (lãnh đạo khoa đọc)."""
+    rows = gv("truongkhoa").gql(ACCURACY)["office_v_assignment_suggestion_accuracy"]
+    return {k: sum(r[k] for r in rows) for k in ("suggested", "decided", "kept_unit", "due_compared", "kept_due")}
+
+
+def summary_words(text: str) -> list[str]:
+    """Từ của trích yếu đủ dài để đối chiếu với diff sổ kiểm toán (bỏ số, từ hai chữ)."""
+    return [w for w in re.findall(r"\w+", text) if len(w) >= 3 and not w.isdigit()]
+
+
+def audit_problems(rows: list[list[str]], docs: dict[str, str], texts: dict[str, list[str]]) -> list[str]:
+    """Dòng sổ assignment.suggested (entity_id, actor_id, actor_kind, diff) của các văn bản đã gợi ý: mỗi văn bản đúng
+    một dòng của moc-assigner (agent), khóa diff ⊆ SUGGEST_DIFF_KEYS, diff không chứa chữ nào của trích yếu, số ký
+    hiệu."""
+    problems = []
+    seen = Counter(r[0] for r in rows)
+    problems += [f"{key}: {seen[doc_id]} dòng (cần 1)" for key, doc_id in docs.items() if seen[doc_id] != 1]
+    for entity_id, actor_id, actor_kind, diff in rows:
+        if (actor_id, actor_kind) != ("moc-assigner", "agent"):
+            problems.append(f"{entity_id}: người thực hiện {actor_id}/{actor_kind}")
+        try:
+            keys = set(json.loads(diff))
+        except ValueError:
+            keys = {"?"}
+        if keys - SUGGEST_DIFF_KEYS:
+            problems.append(f"{entity_id}: khóa lạ {sorted(keys - SUGGEST_DIFF_KEYS)}")
+        bare = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "", diff.casefold())
+        leaked = [w for w in texts.get(entity_id, []) if w.casefold() in bare]
+        if leaked:
+            problems.append(f"{entity_id}: diff có chữ của văn bản {leaked}")
+    return problems
+
+
+def giao_viec() -> None:
+    from seed_documents import DEPT, today
+
+    print("Màn F4.3 · Gợi ý giao việc — tác tử moc-assigner chạy song song với bước chỉ đạo, tìm các văn bản tương tự"
+          " đã giao, gợi ý đơn vị chủ trì và hạn kèm căn cứ; lãnh đạo khoa quyết định")
+    data = gv_samples()
+    tag = uuid.uuid4().hex[:6].upper()
+    bait = data["bait"]
+
+    say(1, "Văn thư nạp lịch sử giao việc seed/giao-viec (không kèm tệp), lãnh đạo khoa giao như lich-su.json")
+    ids, created = load_history(data)
+    again = "" if created == len(ids) else ", còn lại đã nạp ở lần chạy trước"
+    ok(f"{len(ids)} văn bản ({created} mới{again}): {len(data['history'])} giao đơn vị, {len(data['people'])} giao"
+       f" thẳng một người, mồi hạn chế {bait['symbol']} — trích yếu gần như trùng cụm học bổng của Tổ Đào tạo nhưng"
+       f" giao {UNIT_NAMES[bait['lead']]}")
+
+    say(2, "Đợi svc-files đưa trích yếu vào chỉ mục đoạn (chỉ mục chung với trợ lý hỏi đáp F4.2)")
+    took = wait_history_indexed(data, 120, settle=created > 0)
+    ok(f"trợ lý tìm ra {(data['people'] or data['history'])[-1]['symbol']} theo trích yếu (đợi {took:.0f} giây)")
+
+    case = next(c for c in data["cases"] if c["key"] == "hoc-bong")
+    say(3, f"Văn thư vào sổ “{case['summary']}” — lãnh đạo khoa có việc chỉ đạo ngay, gợi ý tới sau vài giây")
+    started = time.monotonic()
+    doc_id = receive_bare(case, f"{case['symbol']}-{tag}")
+    try:
+        task = gv("truongkhoa").wait_task(doc_id, "vbden.chiDao", 5)
+    except RuntimeError as exc:
+        raise DemoFailed(f"vào sổ xong 5 giây chưa có việc chỉ đạo — nhánh gợi ý chắn bước chỉ đạo? {exc}") from exc
+    to_task = time.monotonic() - started
+    row, doc = wait_suggestion(doc_id, 30)
+    waited = time.monotonic() - started
+    if not row or row["status"] != "suggested":
+        raise DemoFailed(f"sau {waited:.0f} giây {case['symbol']}-{tag} chưa có gợi ý: {row} — svc-workflow có chạy"
+                         " vòng nền MOC_SUGGEST_POLL_INTERVAL_S, svc-files có trả văn bản tương tự không?")
+    ok(f"việc chỉ đạo có sau {to_task:.1f} giây (nhánh gợi ý chạy song song, không chắn); dòng gợi ý có sau"
+       f" {waited:.1f} giây (vào sổ → dòng gợi ý: {lag(row, doc)})")
+    due = (f"hạn đề xuất {row['due_on']} ({row['due_days']} ngày, như các văn bản tương tự)" if row["due_on"]
+           else "theo hạn ghi trên văn bản")
+    ok(f"đơn vị chủ trì: {unit_name(row['department_id'])} · độ tin cậy {CONFIDENCE.get(row['confidence'])} (tỉ phần"
+       f" phiếu {row['share']:.0%}) · {due}")
+    search = "từ khóa và theo nghĩa" if row["semantic"] else "từ khóa"
+    ok(f"căn cứ: {'; '.join(evidence_labels(row))} — trong {row['candidates']} văn bản tương tự (tìm theo {search},"
+       f" {row['duration_ms']} ms)")
+    if unit_code(row["department_id"]) != case["expect"]["lead"]:
+        print(f"   · khác nhãn {case['expect']['lead']} của lich-su.json — số đo ở make do-giao-viec")
+
+    say(4, "Căn cứ chỉ là văn bản không hạn chế: psql trên mọi dòng office.assignment_suggestions")
+    bait_id = str(uuid.UUID(ids[bait["symbol"]]))
+    sealed = psql(SEALED_EVIDENCE)
+    baited = psql("select count(*) from office.assignment_suggestions"
+                  f" where evidence @> '[{{\"document_id\": \"{bait_id}\"}}]'::jsonb")
+    if (sealed, baited) != ("0", "0"):
+        raise DemoFailed(f"có căn cứ là văn bản hạn chế: {sealed} căn cứ hạn chế, {baited} dòng lấy mồi"
+                         f" {bait['symbol']}")
+    ok(f"{psql('select count(*) from office.assignment_suggestions')} dòng gợi ý, 0 căn cứ là văn bản hạn chế; mồi"
+       f" {bait['symbol']} không là căn cứ của dòng nào — văn bản hạn chế không vào chỉ mục, trigger CSDL chặn thêm")
+
+    say(5, "Lãnh đạo khoa bấm “Dùng gợi ý” (đơn vị + hạn) rồi giao — view đo tỉ lệ giữ gợi ý tăng đúng 1")
+    before = accuracy()
+    direct(doc_id, task=task, department_id=row["department_id"],
+           due_on=row["due_on"] or (today() + timedelta(days=10)).isoformat())
+    after = accuracy()
+    delta = {k: after[k] - before[k] for k in after}
+    want = {"decided": 1, "kept_unit": 1, **({"kept_due": 1} if row["due_on"] else {})}
+    if any(delta[k] != v for k, v in want.items()):
+        raise DemoFailed(f"view office.v_assignment_suggestion_accuracy chưa đếm đúng lần giữ gợi ý: {delta}")
+    ok(f"decided +1, kept_unit +1{', kept_due +1' if row['due_on'] else ''} (so trước/sau: seed, lịch sử cũng có gợi"
+       f" ý) — tổng trong đơn vị: giữ đơn vị {after['kept_unit']}/{after['decided']}, giữ hạn"
+       f" {after['kept_due']}/{after['due_compared']}")
+
+    say(6, "Các ca có nhãn còn lại — văn thư vào sổ thêm văn bản hạn chế R trước các ca (kiểm ở bước 8)")
+    sealed_id = receive_bare(bait, f"{bait['symbol']}-{tag}", restricted=True)
+    others = [c for c in data["cases"] if c["key"] != "hoc-bong"]
+    docs = {c["key"]: receive_bare(c, f"{c['symbol']}-{tag}") for c in others}
+    rows = wait_suggestions(docs, 30)
+    last_row = time.monotonic()
+    print("\n   | ca | văn bản | kỳ vọng | gợi ý | tin cậy | hạn | căn cứ |\n   |---|---|---|---|---|---|---|")
+    for c in others:
+        r = rows[c["key"]] or {"status": "chưa có", "reason": None}
+        want_unit = c["expect"].get("lead") or c["expect"].get("status")
+        got = unit_code(r.get("department_id")) if r["status"] == "suggested" else f"{r['status']}/{r.get('reason')}"
+        hit = got == want_unit or (want_unit == "none" and r["status"] == "none")
+        print(f"   | {c['key']} | {c['symbol']}-{tag} | {want_unit} | {'✓' if hit else '·'} {got} |"
+              f" {CONFIDENCE.get(r.get('confidence'), '—')} | {r.get('due_days') or '—'} |"
+              f" {len(r.get('evidence') or [])} |")
+    missed = [c["key"] for c in others if c["expect"].get("lead") and (rows[c["key"]] or {}).get("department_id")
+              != DEPT[c["expect"]["lead"]]]
+    if missed:
+        print(f"   · lệch nhãn: {', '.join(missed)} — chỉ cảnh báo, số đánh giá ở make do-giao-viec")
+    for c in others:
+        if c["expect"].get("lead"):
+            r = rows[c["key"]] or {}
+            direct(docs[c["key"]], department_id=DEPT[c["expect"]["lead"]],
+                   due_on=r.get("due_on") or (today() + timedelta(days=10)).isoformat())
+    ok("lãnh đạo khoa giao các ca theo nhãn — thành lịch sử cho lần sau, tác tử tốt dần khi có thêm dữ liệu")
+
+    unrelated = next(c for c in others if c["expect"].get("status") == "none")
+    say(7, f"Ca không liên quan “{unrelated['summary']}” → không gợi ý")
+    r = rows[unrelated["key"]]
+    if not r or r["status"] != "none":
+        raise DemoFailed(f"ca không liên quan lẽ ra không có gợi ý: {r}")
+    ok(f"none/{r['reason']} — không đủ văn bản tương tự (ngưỡng MOC_SUGGEST_MIN_SCORE) thì tác tử không đoán bừa,"
+       " giao diện chỉ hiện một dòng mờ")
+    file_away(docs[unrelated["key"]])
+
+    say(8, f"Văn bản hạn chế R {bait['symbol']}-{tag} (trích yếu như cụm học bổng): không gợi ý, không dòng sổ")
+    time.sleep(max(0.0, 3 - (time.monotonic() - last_row)))
+    found = psql(f"select (select count(*) from office.assignment_suggestions where document_id = '{sealed_id}'),"
+                 f" (select count(*) from core.audit_log where action = 'assignment.suggested'"
+                 f" and entity_id = '{sealed_id}')")
+    if found != "0|0":
+        raise DemoFailed(f"văn bản hạn chế có dòng gợi ý | dòng sổ: {found}")
+    ok("psql: 0 dòng gợi ý, 0 dòng sổ assignment.suggested — tác tử bỏ qua văn bản hạn chế, trigger CSDL chặn thêm")
+    file_away(sealed_id)
+
+    say(9, "psql: mỗi gợi ý một dòng sổ của tác tử, không có chữ văn bản")
+    checked = {"hoc-bong": doc_id, **docs}
+    texts = {doc_id: [*summary_words(case["summary"]), f"{case['symbol']}-{tag}"]}
+    texts.update({docs[c["key"]]: [*summary_words(c["summary"]), f"{c['symbol']}-{tag}"] for c in others})
+    audit = [line.split("|", 3) for line in psql(
+        "select entity_id, actor_id, actor_kind, diff::text from core.audit_log where action = 'assignment.suggested'"
+        f" and entity_id in ({', '.join(repr(str(uuid.UUID(d))) for d in checked.values())}) order by id").splitlines()]
+    problems = audit_problems(audit, checked, texts)
+    if problems:
+        raise DemoFailed("dòng sổ assignment.suggested chưa đúng: " + "; ".join(problems))
+    ok(f"{len(audit)} dòng assignment.suggested · người thực hiện moc-assigner (agent) · khóa diff thuộc"
+       f" {{{', '.join(sorted(SUGGEST_DIFF_KEYS))}}}")
+    ok("diff::text không có từ nào của trích yếu, không số ký hiệu — chỉ đơn vị, độ tin cậy, số đếm; căn cứ nằm ở"
+       " bảng gợi ý, chỉ lãnh đạo khoa đọc")
+
+    say(10, "svc-files tạm dừng: văn bản vẫn tới bước chỉ đạo ngay, tác tử ghi failed rồi thôi (không thử lại)")
+    stopped, probe_task = False, None
+    try:
+        stopped = True
+        compose("stop", "svc-files")
+        started = time.monotonic()
+        probe = receive_bare({"type_code": "CV", "issuer_name": "Phòng Công tác sinh viên",
+                              "summary": f"Về việc thử gợi ý giao việc khi svc-files tạm dừng (thử {tag})"},
+                             f"309/CTSV-GVM-{tag}")
+        try:
+            probe_task = gv("truongkhoa").wait_task(probe, "vbden.chiDao", 5)
+        except RuntimeError as exc:
+            raise DemoFailed(f"svc-files tắt, vào sổ xong 5 giây chưa có việc chỉ đạo: {exc}") from exc
+        to_task = time.monotonic() - started
+        r, _ = wait_suggestion(probe, 20)
+        if not r or r["status"] != "failed":
+            raise DemoFailed(f"svc-files tắt mà sau 20 giây dòng gợi ý chưa là failed: {r}")
+        ok(f"svc-files dừng; việc chỉ đạo có sau {to_task:.1f} giây; gợi ý failed/{r['reason']} sau"
+           f" {time.monotonic() - started:.1f} giây — lãnh đạo giao như thường lệ")
+    finally:
+        if stopped:
+            took = restart("svc-files")
+            print(f"   ✓ svc-files chạy lại, sẵn sàng sau {took:.0f} giây")
+    if probe_task:
+        file_away(probe, probe_task)
+
+    print(f"\nXem trên giao diện (truongkhoa): {PUBLIC_URL}/van-ban/{doc_id} — tab Lịch sử có dòng “Tác tử gợi ý giao"
+          " việc”; văn bản đến mới vào sổ có khối “Gợi ý giao việc” ở đầu form chỉ đạo")
+
+
+def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Số đo leave-one-out trên các dòng evaluate (hợp đồng F4.3 §5.2) có đáp án actual.department_id: độ phủ; top-1
+    (none, failed là sai), top-2, top-3 (theo ranking); đúng theo độ tin cậy; sai số hạn (MAE, lệch ≤ 1 ngày); p50/p95
+    duration_ms; gốc so sánh "luôn đoán đơn vị đông nhất"."""
+    labelled = [r for r in rows if (r.get("actual") or {}).get("department_id")]
+    total = len(labelled)
+
+    def right(r: dict[str, Any], k: int) -> bool:
+        actual = r["actual"]["department_id"]
+        top1 = r.get("status") == "suggested" and r.get("department_id") == actual
+        return top1 or (k > 1 and actual in (r.get("ranking") or [])[:k])
+
+    suggested = [r for r in labelled if r.get("status") == "suggested"]
+    by_confidence = {c: {"n": sum(r.get("confidence") == c for r in suggested),
+                         "correct": sum(r.get("confidence") == c and right(r, 1) for r in suggested)}
+                     for c in ("high", "medium", "low")}
+    errors = [abs(r["due_days"] - r["actual"]["days"]) for r in suggested
+              if isinstance(r.get("due_days"), int) and isinstance(r["actual"].get("days"), int)]
+    ms = [r["duration_ms"] for r in rows if isinstance(r.get("duration_ms"), int)]
+    units = Counter(r["actual"]["department_id"] for r in labelled)
+    return {
+        "rows": len(rows), "total": total, "suggested": len(suggested),
+        "coverage": len(suggested) / total if total else 0.0,
+        "top1": sum(right(r, 1) for r in labelled), "top2": sum(right(r, 2) for r in labelled),
+        "top3": sum(right(r, 3) for r in labelled),
+        "top1_rate": sum(right(r, 1) for r in labelled) / total if total else 0.0,
+        "by_confidence": by_confidence,
+        "outcomes": dict(Counter(f"{r.get('status')}/{r.get('reason')}" for r in labelled
+                                 if r.get("status") != "suggested")),
+        "due_compared": len(errors), "due_mae": sum(errors) / len(errors) if errors else None,
+        "due_within1": sum(e <= 1 for e in errors),
+        "p50_ms": percentile(ms, 50), "p95_ms": percentile(ms, 95),
+        "semantic": sum(bool(r.get("semantic")) for r in rows),
+        "units": len(units), "majority": max(units.values()) / total if total else 0.0,
+    }
+
+
+def gv_verdict(m: dict[str, Any], leaks: list[str]) -> list[str]:
+    """Lý do thoát 1 (rỗng: đạt): mọi căn cứ là văn bản hạn chế; top-1 dưới MIN_TOP1; không đo được dòng nào."""
+    problems = [f"căn cứ là văn bản hạn chế — {leak}" for leak in leaks]
+    if not m["total"]:
+        problems.append("evaluate không trả dòng nào có đáp án")
+    elif m["top1_rate"] < MIN_TOP1:
+        problems.append(f"top-1 {m['top1']}/{m['total']} ({m['top1_rate']:.0%}) dưới ngưỡng {MIN_TOP1:.0%}")
+    return problems
+
+
+def gv_tenant() -> str:
+    return gv("truongkhoa").gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+
+
+def run_evaluate(tenant: str, documents: list[str]) -> list[dict[str, Any]]:
+    """Leave-one-out trong container svc-workflow: mỗi văn bản được gợi ý như vừa vào sổ (svc-files đã loại chính nó),
+    so với đơn vị và hạn đã giao thật; không ghi CSDL, sổ, không in chữ văn bản (hợp đồng F4.3 §5.2)."""
+    body = json.dumps({"tenant_id": tenant, "documents": documents}).encode()
+    try:
+        out = compose("exec", "-T", "svc-workflow", "python", "-m", "svc_workflow.advisor", "evaluate", stdin=body)
+    except subprocess.CalledProcessError as exc:
+        tail = (exc.stderr or b"").decode(errors="replace").strip().splitlines()[-5:]
+        raise DemoFailed(f"evaluate trong svc-workflow lỗi (mã {exc.returncode}): {' | '.join(tail)}") from exc
+    text = out.decode().strip()
+    for candidate in (text, (text.splitlines() or [""])[-1]):
+        try:
+            return json.loads(candidate)["rows"]
+        except (ValueError, KeyError, TypeError):
+            continue
+    raise DemoFailed(f"evaluate không trả JSON {{\"rows\": …}}: {text[-300:]}")
+
+
+def restricted_among(ids: list[str]) -> set[str]:
+    """Các id là văn bản hạn chế (psql, không lọc quyền)."""
+    if not ids:
+        return set()
+    try:
+        listed = ", ".join(f"'{uuid.UUID(i)}'" for i in ids)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise DemoFailed(f"căn cứ trong kết quả evaluate không phải id văn bản: {exc}") from exc
+    return set(psql(f"select id from office.documents where restricted and id in ({listed})").split())
+
+
+def evidence_ids(row: dict[str, Any]) -> list[str]:
+    return [e["document_id"] if isinstance(e, dict) else e for e in row.get("evidence") or []]
+
+
+def evidence_leaks(rows: list[dict[str, Any]], symbols: dict[str, str], bait_id: str) -> list[str]:
+    """Căn cứ của các dòng evaluate trỏ tới văn bản hạn chế (cả mồi) → nhãn "văn bản → căn cứ"."""
+    sealed = restricted_among(sorted({e for r in rows for e in evidence_ids(r)})) | {bait_id}
+    return [f"{symbols.get(r.get('document_id'), r.get('document_id'))} → {e}" for r in rows for e in evidence_ids(r)
+            if e in sealed]
+
+
+def stored_leaks() -> int:
+    return int(psql(SEALED_EVIDENCE) or 0)
+
+
+def valid_units() -> int:
+    """Số đơn vị có lãnh đạo phòng đang bật — đơn vị duy nhất tác tử được gợi ý (svc-workflow từ chối giao nơi khác)."""
+    rows = gv("truongkhoa").gql("""{ core_users(where: {role: {_eq: "manager"}, enabled: {_eq: true},
+        department_id: {_is_null: false}}) { department_id } }""")["core_users"]
+    return len({r["department_id"] for r in rows})
+
+
+def suggestion_latency() -> tuple[int, float | None, float | None]:
+    """(số dòng, p50, p95) giây từ lúc vào sổ tới lúc có dòng gợi ý, trên mọi dòng thật trong CSDL."""
+    n, p50, p95 = (psql(SUGGEST_LATENCY).split("|") + ["", "", ""])[:3]
+    return int(n or 0), float(p50) if p50 else None, float(p95) if p95 else None
+
+
+def gv_table(rows: list[dict[str, Any]], symbols: dict[str, str]) -> str:
+    """Bảng markdown từng văn bản: đơn vị đã giao, gợi ý, tin cậy, xếp hạng, hạn gợi ý / thật, số căn cứ, thời gian."""
+    out = ["| văn bản | đã giao | gợi ý | tin cậy | xếp hạng | hạn gợi ý / thật | căn cứ | ms |",
+           "|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        actual = r.get("actual") or {}
+        if r.get("status") == "suggested":
+            got = ("✓ " if r.get("department_id") == actual.get("department_id") else "✗ ") + unit_code(
+                r.get("department_id"))
+        else:
+            got = f"✗ {r.get('status')}/{r.get('reason')}"
+        due = f"{r.get('due_days') or '—'} / {actual.get('days') or '—'}"
+        name = symbols.get(r.get("document_id"), r.get("document_id"))
+        ranking = ", ".join(unit_code(u) for u in r.get("ranking") or []) or "—"
+        out.append(f"| {name} | {unit_code(actual.get('department_id'))} | {got} |"
+                   f" {CONFIDENCE.get(r.get('confidence'), '—')} | {ranking} | {due} | {len(evidence_ids(r))} |"
+                   f" {r.get('duration_ms', '—')} |")
+    return "\n".join(out)
+
+
+def do_giao_viec() -> None:
+    print("Đo F4.3 · Tác tử gợi ý giao việc, leave-one-out trên lịch sử seed/giao-viec: mỗi văn bản được gợi ý như vừa"
+          " vào sổ, các văn bản còn lại làm căn cứ, so với đơn vị chủ trì và hạn đã giao thật")
+    data = gv_samples()
+    ids, created = load_history(data)
+    took = wait_history_indexed(data, 120, settle=created > 0)
+    print(f"   lịch sử: {len(ids)} văn bản ({created} mới), chỉ mục sẵn sàng sau {took:.0f} giây")
+    measured = {ids[d["symbol"]]: d["symbol"] for d in [*data["history"], *data["people"]]}
+    rows = run_evaluate(gv_tenant(), list(measured))
+    units = valid_units()
+    m = metrics(rows)
+    print("\n" + gv_table(rows, measured))
+    print(f"\ntop-1: {m['top1']}/{m['total']} ({m['top1_rate']:.0%}; none, failed tính là sai) · độ phủ"
+          f" {m['suggested']}/{m['total']} ({m['coverage']:.0%}) · gốc so sánh “luôn đoán đơn vị đông nhất”:"
+          f" {m['majority']:.0%}")
+    print(f"top-2: {m['top2']}/{m['total']}, top-3: {m['top3']}/{m['total']} — vô nghĩa khi số đơn vị hợp lệ ≤ k: hiện"
+          f" có {units} đơn vị có lãnh đạo phòng, đáp án thuộc {m['units']} đơn vị")
+    print("đúng theo độ tin cậy: " + ", ".join(f"{CONFIDENCE[c]} {v['correct']}/{v['n']}"
+                                               for c, v in m["by_confidence"].items())
+          + (" · không gợi ý: " + ", ".join(f"{k} {v}" for k, v in sorted(m["outcomes"].items()))
+             if m["outcomes"] else ""))
+    if m["due_compared"]:
+        print(f"hạn: so được {m['due_compared']} văn bản, sai số tuyệt đối trung bình {m['due_mae']:.1f} ngày, lệch"
+              f" ≤ 1 ngày {m['due_within1']}/{m['due_compared']}")
+    print(f"thời gian một lần gợi ý (svc-files + bỏ phiếu): p50 {m['p50_ms']} ms, p95 {m['p95_ms']} ms · tìm theo"
+          f" nghĩa {m['semantic']}/{m['rows']}")
+    n, p50, p95 = suggestion_latency()
+    if n:
+        print(f"dòng thật (vào sổ → có dòng gợi ý): p50 {p50} s, p95 {p95} s trên {n} văn bản")
+    leaks = evidence_leaks(rows, measured, str(uuid.UUID(ids[data["bait"]["symbol"]])))
+    stored = stored_leaks()
+    if stored:
+        leaks.append(f"{stored} căn cứ hạn chế trong office.assignment_suggestions")
+    print(f"an toàn: {len(leaks)} căn cứ là văn bản hạn chế (kết quả đo + bảng gợi ý; mồi {data['bait']['symbol']}"
+          " tính là hạn chế)")
+    problems = gv_verdict(m, leaks)
+    if problems:
+        raise DemoFailed("; ".join(problems))
+    print(f"\n✓ không căn cứ nào là văn bản hạn chế; top-1 {m['top1']}/{m['total']} ≥ {MIN_TOP1:.0%}")
+
+
+# --- F4.5 · Ký số văn bản đi (PKI nội bộ trong két, chỉ minh họa) -----------------------------------------------------
+# Chứng thư PEM ở stdin, đọc trong svc-files (cryptography có sẵn): CN, O, hạn, cỡ khóa, có tự ký không
+CA_INFO = """import sys
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+c = x509.load_pem_x509_certificate(sys.stdin.buffer.read())
+for oid in (NameOID.COMMON_NAME, NameOID.ORGANIZATION_NAME):
+    print(c.subject.get_attributes_for_oid(oid)[0].value)
+print(c.not_valid_after_utc.date().isoformat())
+print(c.public_key().key_size, c.subject == c.issuer)
+"""
+SIGNED_DOC = """query ($id: uuid!) { office_documents_by_pk(id: $id) { status symbol verify_code content_sha256
+  files(where: {role: {_eq: "issued"}}) { file_id } } }"""
+# Dòng chữ ký của bản phát hành — bảng core.file_signatures không vai trò nào đọc được, chỉ psql
+SIGNATURE_ROW = """select s.key_name, s.key_version, s.serial, s.not_after::date from core.file_signatures s
+  join office.document_files df on df.file_id = s.file_id and df.role = 'issued' where df.document_id = '{doc}'"""
+RESTRICTED_SIGNED = """select count(*) from core.file_signatures s join office.document_files df on df.file_id = s.file_id
+  join office.documents d on d.id = df.document_id where d.restricted"""
+# Văn bản phát hành không có chữ ký (trước khi bật ký số, ký số tắt hay ký lỗi), còn ở kho nóng, không hạn chế — mới nhất
+UNSIGNED_ISSUED = """select d.verify_code, d.symbol from office.documents d
+  join office.document_files df on df.document_id = d.id and df.role = 'issued'
+  left join core.file_signatures s on s.file_id = df.file_id
+ where d.direction = 'out' and d.status = 'issued' and not d.restricted and s.file_id is null
+ order by d.issued_on desc, d.symbol desc limit 1"""
+
+
+def pem_fingerprint(pem: str) -> str:
+    """Vân tay SHA-256 của chứng thư đầu tiên trong PEM (băm phần DER, tức base64 giữa hai dòng BEGIN/END), dạng
+    AB:CD:… như trình duyệt, trình đọc PDF hiện — để đối chiếu khi nhập CA vào trình đọc PDF."""
+    lines = [line.strip() for line in pem.strip().splitlines()]
+    start = lines.index("-----BEGIN CERTIFICATE-----") + 1
+    der = base64.b64decode("".join(lines[start:lines.index("-----END CERTIFICATE-----", start)]))
+    digest = hashlib.sha256(der).hexdigest().upper()
+    return ":".join(digest[i:i + 2] for i in range(0, len(digest), 2))
+
+
+def local_time(iso: str) -> str:
+    """Giờ ISO 8601 (có "Z" hay độ lệch) → giờ máy chạy demo, dạng 14:05:09 23/10/2026."""
+    return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%H:%M:%S %d/%m/%Y")
+
+
+def issue_outgoing(staff: Session, manager: Session, director: Session, clerk: Session, draft: dict[str, Any], *,
+                   public: bool) -> tuple[str, float]:
+    """Chuyên viên soạn → trình → tổ trưởng duyệt → lãnh đạo khoa ký duyệt → văn thư phát hành → (id văn bản, số giây
+    của riêng bước phát hành: cấp số, dựng PDF, ký, quét, lưu)."""
+    doc_id = staff.gql(DRAFT, {"o": draft})["insert_office_documents_one"]["id"]
+    signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
+    staff.gql(SUBMIT, {"d": doc_id, "s": signer})
+    manager.complete(manager.wait_task(doc_id, "vbdi.duyetPhong"), "approve", {})
+    director.complete(director.wait_task(doc_id, "vbdi.duyetDonVi"), "approve", {})
+    task = clerk.wait_task(doc_id, "vbdi.phatHanh")
+    started = time.monotonic()
+    clerk.complete(task, "issue", {"is_public": public})
+    return doc_id, time.monotonic() - started
+
+
+def cli_lines(lines: list[str]) -> None:
+    for line in lines:
+        print(f"   │ {line}")
+
+
+def ky_so() -> None:
+    # nạp trong hàm: test của các màn khác thay moc_env bằng bản giả không có các tên này
+    from moc_env import INCREMENTAL_EDIT, byte_range_end, flip_in_signed_stream, signature_cli, vault_ca_pem
+
+    print("Màn F4.5 · Ký số văn bản đi — CHỈ MINH HỌA: CA nội bộ trong két OpenBao, không có giá trị pháp lý như chữ ký"
+          " số công cộng. Bản phát hành ký PAdES bằng khóa của đơn vị nằm trong két; ai cũng kiểm được người ký và biết"
+          " tệp có bị sửa sau khi ký không")
+    tag = uuid.uuid4().hex[:6].upper()
+    staff, manager, director, clerk = (Session(u) for u in ("chuyenviendt", "totruongdt", "truongkhoa", "vanthu"))
+
+    say(1, "CA nội bộ trong két OpenBao — chứng thư mẫu, không thuộc danh sách tin cậy công cộng nào")
+    pem = vault_ca_pem()
+    if pem is None:
+        raise DemoFailed("két chưa có CA nội bộ (pki/ca/pem): két khởi tạo trước F4.5 nên ký số tự tắt, mọi thứ khác"
+                         " vẫn chạy như cũ — xem docs/van-hanh.md mục Két bí mật")
+    info = compose("exec", "-T", "svc-files", "python", "-c", CA_INFO, stdin=pem.encode()).decode().strip()
+    cn, org, expires, size = info.splitlines()
+    bits, self_signed = size.split()
+    if "MẪU" not in cn or "chỉ minh họa" not in cn or self_signed != "True":
+        raise DemoFailed(f"CA của két không phải CA gốc mẫu, chỉ minh họa: {cn} / {org}")
+    ok(f"CN \"{cn}\" · O \"{org}\" · CA gốc tự ký, RSA {bits} bit, hạn tới {expires}")
+    ok(f"vân tay SHA-256 {pem_fingerprint(pem)}")
+    ok("đọc pki/ca/pem không cần token: chỉ là chứng thư công khai; khóa riêng của CA sinh ngay trong két (internal)")
+
+    say(2, "Chuyên viên soạn công văn → tổ trưởng duyệt → lãnh đạo khoa ký duyệt → văn thư phát hành (công khai)")
+    tenant = staff.gql("{ core_tenants { id } }")["core_tenants"][0]["id"]
+    first = psql(f"select count(*) from core.file_signatures where tenant_id = '{tenant}'") == "0"
+    doc_id, took = issue_outgoing(staff, manager, director, clerk, {
+        "type_code": "CV", "recipients": ["Phòng Đào tạo"],
+        "summary": f"Về việc báo cáo kết quả tự đánh giá chương trình đào tạo ngành Kỹ thuật phần mềm (demo {tag})",
+        "body": "Khoa Công nghệ thông tin báo cáo kết quả tự đánh giá chương trình đào tạo ngành Kỹ thuật phần mềm.\n"
+                "Đề nghị Phòng Đào tạo tổng hợp, báo cáo Ban Giám hiệu.",
+    }, public=True)
+    doc = clerk.gql(SIGNED_DOC, {"id": doc_id})["office_documents_by_pk"]
+    if doc["status"] != "issued" or not doc["files"]:
+        raise DemoFailed(f"công văn chưa phát hành: {doc}")
+    ok(f"{doc['symbol']} phát hành trong {took:.1f} giây: cấp số → dựng PDF → ký bằng khóa của đơn vị trong két → tự"
+       " kiểm chữ ký → băm SHA-256 → ClamAV → lưu")
+    if first:
+        ok("lần ký đầu của đơn vị: két sinh khóa RSA-3072 trong Transit, CA nội bộ cấp chứng thư cho khóa đó — các lần"
+           " sau dùng lại")
+
+    say(3, "Bản phát hành mang chữ ký PAdES; cổng xác thực (không đăng nhập) cho biết ai ký, CA nào cấp")
+    _, _, pdf = request("GET", f"{PUBLIC_URL}/api/files/{doc['files'][0]['file_id']}", headers=clerk.auth)
+    sha = hashlib.sha256(pdf).hexdigest()
+    if hexed(doc["content_sha256"]) != sha:
+        raise DemoFailed(f"băm tệp tải về {sha} khác content_sha256 {doc['content_sha256']}")
+    if b"/ByteRange" not in pdf or b"/ETSI.CAdES.detached" not in pdf or byte_range_end(pdf) != len(pdf):
+        raise DemoFailed("bản phát hành không có chữ ký PAdES phủ toàn bộ tệp (/ByteRange, /ETSI.CAdES.detached) — xem"
+                         " nhật ký svc-files: office.document.sign_failed, office.signing.disabled")
+    ok(f"SHA-256 {sha[:16]}… = content_sha256 trong CSDL: băm, mã QR, sổ kiểm toán đều theo bản ĐÃ ký; tệp có"
+       " /ByteRange, /SubFilter /ETSI.CAdES.detached, chữ ký phủ tới byte cuối")
+    found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{doc['verify_code']}")
+    sig = (found.get("document") or {}).get("signature") or {}
+    if found.get("result") != "valid" or sig.get("level") != "PAdES-B-B" or sig.get("illustrative") is not True:
+        raise DemoFailed(f"cổng xác thực chưa trả khối chữ ký: {found}")
+    ok(f"/api/verify/{doc['verify_code']} → signature: chuẩn {sig['level']} · ký bởi \"{sig['signer']}\" · CA"
+       f" \"{sig['ca']}\"")
+    ok(f"số sê-ri chứng thư {sig['serial']} · ký lúc {local_time(sig['signed_at'])} (giờ tự ghi trong chữ ký, không có"
+       " dấu thời gian tin cậy) · illustrative: true")
+    row = psql(SIGNATURE_ROW.format(doc=doc_id)).split("|")
+    if len(row) != 4 or row[0] != f"moc-ky-so-{tenant}" or row[2] != sig["serial"]:
+        raise DemoFailed(f"core.file_signatures không khớp cổng xác thực: {row}")
+    ok(f"psql core.file_signatures: khóa Transit {row[0]} phiên bản {row[1]}, chứng thư hạn tới {row[3]} — CSDL chỉ giữ"
+       " vân tay chứng thư, chứng thư nằm trong PDF")
+
+    say(4, "Kiểm bằng pyHanko trong svc-files (python -m svc_files.signing verify) — chỉ tin CA của két")
+    code, lines = signature_cli(pdf)
+    cli_lines(lines)
+    if code != 0 or not lines or not lines[0].startswith("Chữ ký hợp lệ"):
+        raise DemoFailed(f"CLI không xác nhận chữ ký của bản phát hành (thoát {code})")
+    ok("thoát 0: băm phần đã ký khớp, chữ ký RSA đúng, chuỗi chứng thư về CA nội bộ, chữ ký chứng nhận không cho sửa")
+
+    say(5, "Sửa sau khi ký: thêm một chú thích vào bản phát hành, ghi nối sau phần đã ký như trình đọc PDF lưu ghi chú")
+    edited = compose("exec", "-T", "svc-files", "python", "-c", INCREMENTAL_EDIT, stdin=pdf)
+    end = byte_range_end(edited)
+    if not edited.startswith(pdf) or end != len(pdf):
+        raise DemoFailed(f"lớp sửa không ghi nối sau bản đã ký (cuối /ByteRange {end}, bản ký {len(pdf)} byte)")
+    code, lines = signature_cli(edited)
+    if code != 1 or not lines or not lines[0].startswith("Văn bản đã bị sửa sau khi ký"):
+        cli_lines(lines)
+        raise DemoFailed(f"CLI chưa báo sửa sau khi ký (thoát {code})")
+    ok(f"CLI thoát 1: {lines[0]}")
+    whole, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(edited).hexdigest()}")
+    part, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(edited[:end]).hexdigest()}")
+    if whole.get("result") != "not_found" or part.get("result") != "valid" \
+            or (part.get("document") or {}).get("symbol") != doc["symbol"]:
+        raise DemoFailed(f"cổng xác thực: cả tệp {whole.get('result')}, phần đã ký {part.get('result')}")
+    ok(f"cổng xác thực: băm cả tệp → không khớp; băm phần đầu tệp tới cuối /ByteRange ({end} byte) → đúng"
+       f" {doc['symbol']} — phần đã ký còn nguyên, {len(edited) - end} byte thêm vào không do đơn vị ký")
+
+    say(6, "Lật một bit trong phần đã ký (dữ liệu một stream của tệp)")
+    flipped = flip_in_signed_stream(pdf)
+    code, lines = signature_cli(flipped)
+    if code != 1 or not lines or not lines[0].startswith("Chữ ký không khớp nội dung"):
+        cli_lines(lines)
+        raise DemoFailed(f"CLI chưa báo chữ ký không khớp nội dung (thoát {code})")
+    found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify?sha256={hashlib.sha256(flipped).hexdigest()}")
+    if found.get("result") != "not_found":
+        raise DemoFailed(f"tệp đã lật một bit vẫn khớp ở cổng xác thực: {found}")
+    ok(f"CLI thoát 1: {lines[0]} — cổng xác thực: không khớp")
+
+    say(7, "Văn bản hạn chế không được ký")
+    secret_id, _ = issue_outgoing(staff, manager, director, clerk, {
+        "type_code": "CV", "recipients": ["Phòng Tổ chức cán bộ"], "restricted": True,
+        "summary": f"Về việc danh sách đề nghị nâng lương trước hạn năm 2026 (demo {tag})",
+        "body": "Khoa Công nghệ thông tin gửi danh sách đề nghị nâng lương trước hạn năm 2026 (kèm theo).",
+    }, public=False)
+    secret = clerk.gql(SIGNED_DOC, {"id": secret_id})["office_documents_by_pk"]
+    if secret["status"] != "issued" or not secret["files"]:
+        raise DemoFailed(f"văn bản hạn chế chưa phát hành: {secret}")
+    file_id = secret["files"][0]["file_id"]
+    state = (psql(f"select wrapped_dek is not null from core.files where id = '{file_id}'"),
+             psql(f"select count(*) from core.file_signatures where file_id = '{file_id}'"), psql(RESTRICTED_SIGNED))
+    if state != ("t", "0", "0"):
+        raise DemoFailed(f"văn bản hạn chế: mã hóa {state[0]}, chữ ký của nó {state[1]}, chữ ký gắn văn bản hạn chế"
+                         f" {state[2]}")
+    check, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{secret['verify_code']}")
+    if check.get("result") != "valid" or (check.get("document") or {}).get("signature") is not None:
+        raise DemoFailed(f"cổng xác thực trả về văn bản hạn chế chưa đúng: {check}")
+    ok(f"{secret['symbol']} (hạn chế) phát hành: tệp mã hóa trong kho, không có chữ ký — mỗi lần mở là một bản viết lại"
+       " có dấu tên người xem nên chữ ký sẽ hỏng ngay; tra mã ở cổng xác thực → khớp, signature: null")
+    ok("psql: 0 chữ ký gắn với văn bản hạn chế trên cả hệ thống")
+
+    say(8, "Văn bản phát hành không có chữ ký số (trước khi bật ký số) vẫn xác thực như cũ")
+    old = psql(UNSIGNED_ISSUED)
+    if not old:
+        print("   – bỏ qua: chưa có văn bản phát hành nào không có chữ ký (két có PKI nội bộ ngay từ khi cài)")
+    else:
+        code_old, symbol_old = old.split("|")
+        found, _ = call_json("GET", f"{PUBLIC_URL}/api/verify/{code_old}")
+        if found.get("result") != "valid" or (found.get("document") or {}).get("signature") is not None:
+            raise DemoFailed(f"văn bản cũ {symbol_old} không còn xác thực như cũ: {found}")
+        ok(f"{symbol_old}: tra mã → khớp, signature: null — không ký lại văn bản cũ (băm, mã QR, sổ kiểm toán đã cố"
+           " định); trang xác thực ghi không có chữ ký số")
+
+    print(f"\nXem trên giao diện (người ngoài, không đăng nhập): {PUBLIC_URL}/xac-thuc/{doc['verify_code']} — khối \"Chữ"
+          f" ký số (minh họa)\"; bản PDF (văn thư): {PUBLIC_URL}/van-ban/{doc_id} — trình đọc PDF báo chữ ký chưa tin"
+          " cậy cho tới khi nhập CA nội bộ (docs/demo-script.md)")
+
+
+# --- F4.4 · Che thông tin cá nhân ----------------------------------------------------------------------------------
+# Giá trị giả lập: hợp lệ về định dạng nên có thể trùng số thật — số ví dụ phổ biến, CCCD đuôi 0000xx, email
+# @example.com (RFC 2606). Cùng bộ với services/svc-files/tests/test_pii.py; scripts/tests/test_che_pii.py dùng lại
+PII_DEMO = {"cccd": "001205000017", "phone": "0912 345 678", "landline": "(024) 3000 0000",
+            "email": "nguyenvanb@example.com", "account": "0011 0041 23456"}
+PII_QUESTION = "Số điện thoại liên hệ của người làm đơn đề nghị cấp bản sao bằng tốt nghiệp là gì?"
+# Lá đơn tiếp nhận một lần cho mỗi đơn vị (chạy lại thì dùng lại, như màn đọc văn bản đến): bản sao trùng nhau không
+# chen nhau trong nguồn của trợ lý. Trích yếu, số ký hiệu, cơ quan không có thông tin cá nhân
+PII_SYMBOL = "01/ĐN-GL"
+PII_ISSUER = "Người làm đơn (giả lập)"
+PII_SUMMARY = "Về việc đề nghị cấp bản sao bằng tốt nghiệp"
+# Tệp EICAR tên có số điện thoại: nhật ký core.file.rejected của svc-files ghi tên đã che, sổ kiểm toán giữ tên gốc
+PII_FILE = "don-0912345678.txt"
+PII_FILE_MASKED = "don-[SĐT].txt"
+# Nhật ký đi qua bộ che (lọt là đỏ màn) và nhật ký ngoài phạm vi F4.4 (Hasura, Meilisearch, Keycloak, PostgreSQL không
+# qua bộ lọc nào: lọt chỉ cảnh báo)
+PII_LOGGED = ("apisix", "app-office", "svc-files", "svc-workflow")
+PII_UNFILTERED = ("hasura", "meilisearch", "keycloak", "postgres")
+# Dòng truy cập phải có, không chuỗi truy vấn: (dịch vụ, nhãn, đường dẫn chấp nhận). APISIX và nginx của giao diện
+# lấy đường dẫn từ $request_uri cắt ở dấu ? đầu tiên (không phải $uri: try_files của ứng dụng một trang đổi $uri thành
+# /index.html), nên /tim-kiem?q=… được ghi là GET /tim-kiem
+PII_ACCESS = (("apisix", "/api/search", ("/api/search",)), ("apisix", "/tim-kiem", ("/tim-kiem",)),
+              ("svc-files", "/api/search", ("/api/search",)), ("app-office", "/tim-kiem", ("/tim-kiem",)))
+QUERY_MARKS = ("/api/search?q", "/tim-kiem?q")
+# Nhãn đã che, như svc_files.pii.LABEL_RE (test so hai mẫu)
+MASK_LABEL_RE = re.compile(r"\[(?:CCCD|CMND|SĐT|EMAIL|STK)(?:-\d{1,3})?\]")
+# Cách chia nhóm thường gặp theo số chữ số (ngoài cách viết của chính giá trị)
+PII_SPLITS = {10: ((4, 3, 3), (3, 3, 4)), 11: ((3, 4, 4), (4, 3, 4)), 12: ((3, 3, 3, 3), (4, 4, 4)), 13: ((4, 4, 5),)}
+PII_DOCUMENT = """query ($s: String!) { office_documents(where: {direction: {_eq: "in"}, symbol: {_eq: $s},
+  status: {_neq: "cancelled"}}, order_by: {created_at: asc}) { id register_number } }"""
+
+
+def pii_letter(tag: str) -> list[str]:
+    """Các dòng của lá đơn giả lập (một trang; chữ ASCII vì text_pdf chỉ có Helvetica): đủ năm giá trị của PII_DEMO và
+    vài số không được che — năm sinh, ngày cấp, số bản sao, mã hồ sơ."""
+    v = PII_DEMO
+    return ["CONG HOA XA HOI CHU NGHIA VIET NAM", "Doc lap - Tu do - Hanh phuc",
+            "DON DE NGHI CAP BAN SAO BANG TOT NGHIEP", "Kinh gui: Phong Dao tao, Truong Dai hoc Mau",
+            f"Toi la Nguyen Van B, sinh nam 2005, so CCCD {v['cccd']} cap ngay 05/3/2021.",
+            f"So dien thoai lien he cua nguoi lam don de nghi: {v['phone']}.",
+            f"Dien thoai co quan: {v['landline']}. Email: {v['email']}.",
+            "Toi de nghi cap 02 ban sao bang tot nghiep.",
+            f"Le phi chuyen vao so tai khoan {v['account']}.",
+            f"Ma ho so: {tag}",
+            "Van ban gia lap de chay thu Signet, khong phai van ban that."]
+
+
+def _split(digits: str, sizes: tuple[int, ...]) -> list[str]:
+    out, at = [], 0
+    for size in sizes:
+        out.append(digits[at:at + size])
+        at += size
+    return out
+
+
+def spellings(values: dict[str, str]) -> list[str]:
+    """Mọi cách viết của các giá trị giả lập mà một dòng nhật ký có thể mang: như đã viết; số liền; theo nhóm (của
+    chính giá trị và cách chia thường gặp) với dấu cách, chấm, gạch; điện thoại thêm +84, (+84), 0084, 84 thay số 0
+    đầu; email chữ thường; mỗi cách viết thêm dạng mã hóa URL (%20, %40, %2B…) và dấu cách thành "+"."""
+    out: dict[str, None] = {}
+    for value in values.values():
+        forms = [value]
+        if "@" in value:
+            forms.append(value.lower())
+        else:
+            digits = "".join(re.findall(r"\d", value))
+            groups = re.findall(r"\d+", value)
+            forms.append(digits)
+            splits = [groups, *(_split(digits, sizes) for sizes in PII_SPLITS.get(len(digits), ()))]
+            forms += [sep.join(g) for g in splits if len(g) > 1 for sep in " .-"]
+            if digits[:1] == "0" and len(digits) in (10, 11):        # điện thoại: mã nước thay số 0 đầu
+                national = [groups[0][1:], *groups[1:]] if len(groups[0]) > 1 else groups[1:]
+                for cc in ("+84", "(+84)", "0084", "84"):
+                    forms += [cc + digits[1:], f"{cc} {digits[1:]}", f"{cc} {' '.join(national)}"]
+        for form in list(forms):
+            forms.append(quote(form, safe=""))
+            if " " in form:
+                forms.append(form.replace(" ", "+"))
+        for form in forms:
+            out.setdefault(form, None)
+    return list(out)
+
+
+def leaks(text: str, forms: list[str]) -> list[str]:
+    """Các cách viết có trong ``text`` (không phân biệt hoa thường). Cách viết mở đầu / kết thúc bằng chữ số thì không
+    tính khi dính liền chữ số khác: đó là một phần của số dài hơn (mốc thời gian, mã toàn số), không phải giá trị này."""
+    low = text.casefold()
+    found = []
+    for form in forms:
+        f = form.casefold()
+        pattern = (r"(?<!\d)" if f[:1].isdigit() else "") + re.escape(f) + (r"(?!\d)" if f[-1:].isdigit() else "")
+        if re.search(pattern, low):
+            found.append(form)
+    return found
+
+
+def access_lines(text: str, *paths: str) -> list[str]:
+    """Các dòng nhật ký truy cập của một trong ``paths``: đường dẫn đứng ngay sau phương thức HTTP, tiếp theo là chuỗi
+    truy vấn, khoảng trắng hoặc dấu nháy — "GET /api/search HTTP/1.1" (APISIX, nginx), "GET /api/search?… HTTP/1.1"
+    (uvicorn); không nhận /api/search-khac."""
+    pattern = re.compile(r"\b(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) (?:%s)(?=[?\s\"]|$)"
+                         % "|".join(map(re.escape, paths)))
+    return [line for line in text.splitlines() if pattern.search(line)]
+
+
+def log_problems(logs: dict[str, str], forms: list[str]) -> list[str]:
+    """Lý do màn đỏ ở bước đọc nhật ký (rỗng: đạt): giá trị nào lọt ở dịch vụ nào; dòng còn ?q=; thiếu dòng truy cập
+    phải có; svc-files không ghi tên tệp đã che."""
+    problems = []
+    for service in PII_LOGGED:
+        text = logs.get(service, "")
+        found = leaks(text, forms)
+        if found:
+            problems.append(f"{service}: lọt {', '.join(found[:6])}" + (f" (+{len(found) - 6})" if len(found) > 6 else ""))
+        queried = [line for line in text.splitlines() if any(mark in line for mark in QUERY_MARKS)]
+        if queried:
+            problems.append(f"{service}: {len(queried)} dòng còn chuỗi truy vấn, vd {queried[0].strip()[:160]}")
+    for service, label, paths in PII_ACCESS:
+        if not access_lines(logs.get(service, ""), *paths):
+            problems.append(f"{service}: không có dòng truy cập {label} — nhật ký truy cập bị tắt, hay đọc sai dịch vụ?")
+    if PII_FILE_MASKED not in logs.get("svc-files", "") and "don-[S\\u0110T].txt" not in logs.get("svc-files", ""):
+        problems.append(f"svc-files: không có dòng core.file.rejected ghi {PII_FILE_MASKED}")
+    return problems
+
+
+def log_events(text: str, event: str) -> list[dict[str, Any]]:
+    """Các dòng nhật ký JSON có ``event`` cho trước, theo thứ tự (bỏ dòng không phải JSON: dòng truy cập…)."""
+    out = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict) and record.get("event") == event:
+            out.append(record)
+    return out
+
+
+def utc_mark() -> str:
+    """Mốc cho docker compose logs --since: giờ UTC, lùi một giây (mốc tính theo giây, không bỏ sót dòng nào)."""
+    return (datetime.now(timezone.utc) - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def service_logs(since: str, *services: str) -> dict[str, str]:
+    """docker compose logs từ mốc ``since`` của từng dịch vụ, không tiền tố tên, không màu → {dịch vụ: chữ}."""
+    return {s: compose("logs", "--since", since, "--no-log-prefix", "--no-color", s).decode(errors="replace")
+            for s in services}
+
+
+# APISIX ghi nhật ký truy cập có đệm (nginx.conf của APISIX: access_log … buffer=16384 flush=3): dòng ra sau yêu cầu tới
+# 3 giây. Đọc sớm thì thiếu dòng truy cập (màn đỏ sai), tệ hơn là dòng còn giá trị chưa ra (màn xanh sai)
+LOG_FLUSH_S = 4.0
+
+
+def settled_logs(since: str, last_request: float, timeout_s: float = 15.0) -> dict[str, str]:
+    """Nhật ký của PII_LOGGED từ mốc ``since``, đọc khi đệm đã xả: đợi tới ``last_request`` (time.monotonic() sau yêu
+    cầu cuối của màn) + LOG_FLUSH_S, rồi đọc lại tới khi có đủ dòng truy cập của PII_ACCESS hoặc hết ``timeout_s`` —
+    hết giờ thì trả lần đọc cuối để log_problems báo thiếu."""
+    time.sleep(max(0.0, last_request + LOG_FLUSH_S - time.monotonic()))
+    deadline = time.monotonic() + timeout_s
+    while True:
+        logs = service_logs(since, *PII_LOGGED)
+        if all(access_lines(logs.get(s, ""), *paths) for s, _, paths in PII_ACCESS) or time.monotonic() >= deadline:
+            return logs
+        time.sleep(1)
+
+
+def wait_pii_answer(clerk: Session, doc_id: str, timeout_s: float) -> dict[str, Any]:
+    """Hỏi PII_QUESTION (extract) tới khi trang của lá đơn có trong nguồn — vòng nền svc-files đã đưa đoạn vào chỉ mục.
+    Nguồn "trích yếu" của lá đơn có trước (vào chỉ mục lúc tiếp nhận) nhưng không có số điện thoại: chưa tính."""
+    started = time.monotonic()
+    while True:
+        try:
+            got, _ = ask(clerk, PII_QUESTION)
+        except HTTPError as exc:            # Meilisearch, Hasura vừa khởi động: đợi tiếp; tắt trợ lý thì dừng
+            if exc.status != 503 or error_detail(exc).get("code") == "assistant_disabled":
+                raise
+            got = {}
+        if any(s.get("document_id") == doc_id and s.get("kind") == "page" for s in got.get("sources") or []):
+            return got
+        if time.monotonic() - started > timeout_s:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây trợ lý chưa có lá đơn {PII_SYMBOL} trong nguồn — vòng nền svc-files"
+                             " (MOC_ASK_SYNC_INTERVAL_S) có chạy không?")
+        time.sleep(3)
+
+
+def che_pii() -> None:
+    print("Màn F4.4 · Che thông tin cá nhân — người được xem văn bản thấy bản gốc; mô hình ngôn ngữ và nhật ký chỉ thấy"
+          " nhãn [SĐT], [CCCD]…; nhật ký truy cập không còn chuỗi truy vấn")
+    from seed_documents import today
+
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk = who("vanthu")
+    forms = spellings(PII_DEMO)
+    cccd, phone = PII_DEMO["cccd"], PII_DEMO["phone"]
+
+    since = utc_mark()
+    say(1, f"Mốc nhật ký {since} (UTC) — bước 6 đọc mọi dòng nhật ký từ mốc này")
+    ok(f"giá trị giả lập, đúng định dạng nhưng không của ai: CCCD {cccd}, di động {phone}, máy bàn"
+       f" {PII_DEMO['landline']}, email {PII_DEMO['email']}, số tài khoản {PII_DEMO['account']}")
+
+    say(2, "Văn thư tải lên “Đơn đề nghị cấp bản sao bằng tốt nghiệp” (hư cấu) có đủ năm giá trị, tiếp nhận với trích"
+           " yếu không có thông tin cá nhân, vào sổ")
+    found = clerk.gql(PII_DOCUMENT, {"s": PII_SYMBOL})["office_documents"]
+    if found:
+        doc_id, number = found[0]["id"], found[0]["register_number"]
+        print(f"   – {PII_SYMBOL} đã được tiếp nhận ở lần chạy trước — dùng lại, không tải thêm bản nào (chặn trùng)")
+    else:
+        file = clerk.upload(f"don-de-nghi-{tag}.pdf", text_pdf(*pii_letter(tag)))
+        doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+            "type_code": "CV", "symbol": PII_SYMBOL, "issuer_name": PII_ISSUER,
+            "issued_on": (today() - timedelta(days=1)).isoformat(), "summary": PII_SUMMARY, "urgency": "normal",
+            "file_ids": [file["id"]]}})["receiveIncoming"]["document_id"]
+        number = None
+        ok(f"don-de-nghi-{tag}.pdf: PDF một trang có lớp chữ, chân trang “Van ban gia lap de chay thu Signet…”")
+    if number is None:
+        number = clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }",
+                           {"id": doc_id})["registerIncoming"]["register_number"]
+    ok(f"{PII_SYMBOL} trong sổ, số đến {number}; trích yếu “{PII_SUMMARY}”")
+
+    say(3, f"Văn thư gõ số CCCD {cccd} vào ô Tìm kiếm — chỉ mục tìm kiếm giữ bản gốc")
+    started = time.monotonic()
+    while True:
+        hits = call_json("GET", f"{PUBLIC_URL}/api/search?q={quote(cccd)}", headers=clerk.auth)[0]["hits"]
+        hit = next((h for h in hits if h["id"] == doc_id), None)
+        if hit and hit.get("matched_content"):
+            break
+        if time.monotonic() - started > 60:
+            raise DemoFailed(f"sau 60 giây tìm {cccd} chưa ra {PII_SYMBOL} (khớp nội dung tệp): {hits[:3]} — vòng nền"
+                             " svc-files đọc chữ PDF (MOC_TEXT_INTERVAL_S) có chạy không?")
+        time.sleep(2)
+    ok(f"ra đúng lá đơn {PII_SYMBOL}, khớp trong nội dung tệp PDF (sau {time.monotonic() - started:.0f} giây)")
+    request("GET", f"{PUBLIC_URL}/tim-kiem?q={quote(cccd)}", timeout=15)
+    ok("mở /tim-kiem?q=… như khi tải lại trang Tìm kiếm — APISIX và nginx của giao diện có dòng truy cập để kiểm ở bước 6")
+
+    say(4, f"Văn thư hỏi trợ lý: “{PII_QUESTION}”")
+    base = wait_pii_answer(clerk, doc_id, 90)
+    show_answer(base)
+    cited = [s for s in base.get("sources") or [] if s.get("cited") and s.get("document_id") == doc_id]
+    if base.get("status") != "answered" or phone not in answer_text(base) or not cited:
+        raise DemoFailed(f"chưa trích được câu có số điện thoại của lá đơn: trạng thái {base.get('status')}, nguồn"
+                         f" {[source_label(s) for s in base.get('sources') or []]}")
+    ok(f"câu trích nguyên văn có đúng số {phone}, nguồn [{cited[0]['n']}] {source_label(cited[0])} — người được xem văn"
+       " bản thấy bản gốc: chỉ mục, câu trích, nguồn không che")
+
+    say(5, f"Văn thư tải tệp EICAR tên {PII_FILE} — ClamAV chặn; tên tệp mang số điện thoại")
+    before = int(psql("select coalesce(max(id), 0) from core.audit_log") or 0)
+    try:
+        clerk.upload(PII_FILE, EICAR, "text/plain")
+        raise DemoFailed("tệp EICAR không bị chặn")
+    except HTTPError as exc:
+        detail = error_detail(exc)
+        if exc.status != 422 or detail.get("code") != "infected":
+            raise DemoFailed(f"tệp EICAR trả {exc.status} {detail or exc.body[:200]}") from exc
+    last_request = time.monotonic()
+    ok(f"{PII_FILE} → 422 infected ({detail.get('signature')})")
+    kept = psql("select diff->>'filename' from core.audit_log where id > %d and action = 'file.rejected'"
+                " order by id desc limit 1" % before)
+    if kept != PII_FILE:
+        raise DemoFailed(f"dòng sổ file.rejected mới nhất ghi tên {kept!r}, cần tên gốc {PII_FILE}")
+    ok(f"psql: dòng sổ file.rejected giữ tên gốc {kept} — sổ kiểm toán có phân quyền và chuỗi băm, không che (che làm"
+       " sai băm, mất giá trị chứng cứ)")
+
+    say(6, f"Đọc nhật ký từ mốc ở bước 1: docker compose logs {' '.join(PII_LOGGED)}")
+    logs = settled_logs(since, last_request)
+    problems = log_problems(logs, forms)
+    if problems:
+        raise DemoFailed("nhật ký chưa sạch:\n   - " + "\n   - ".join(problems))
+    total = sum(len(text.splitlines()) for text in logs.values())
+    ok(f"{total} dòng của {len(PII_LOGGED)} dịch vụ: không có giá trị nào ở {len(forms)} cách viết (liền, theo nhóm,"
+       " chấm, gạch, +84, %20, %40…)")
+    ok("svc-workflow chỉ được quét để chắc không lọt từ chỗ khác: màn không đưa giá trị nào qua nó — bộ lọc nhật ký của"
+       " svc-workflow do test đơn vị kiểm (tests/test_pii_logging.py)")
+    for service, label, paths in PII_ACCESS:
+        line = " ".join(access_lines(logs[service], *paths)[-1].split())
+        ok(f"{service} ({label}): {line if len(line) <= 100 else line[:99] + '…'}")
+    ok(f"svc-files: core.file.rejected ghi {PII_FILE_MASKED}; sổ kiểm toán ở bước 5 vẫn giữ tên gốc")
+    warned = []
+    for service in PII_UNFILTERED:
+        try:
+            found_here = leaks(service_logs(since, service)[service], forms)
+        except subprocess.CalledProcessError:
+            print(f"   – {service}: không đọc được nhật ký")
+            continue
+        if found_here:
+            warned.append(service)
+            print(f"   – cảnh báo {service}: có {', '.join(found_here[:4])} — nhật ký này không qua bộ che (ngoài phạm"
+                  " vi F4.4, xem README svc-files)")
+    if not warned:
+        ok(f"{', '.join(PII_UNFILTERED)} (không qua bộ che, lọt chỉ cảnh báo): không thấy giá trị nào")
+
+    say(7, "Chữ gửi mô hình ngôn ngữ chạy tại chỗ (tùy chọn: profile ai) — che trước khi rời svc-files")
+    if base.get("ai_available"):
+        mark = utc_mark()
+        got, took = ask(clerk, PII_QUESTION, mode="generate", ask_id=base["ask_id"])
+        answer = got.get("answer") or {}
+        warnings = list(got.get("warnings") or [])
+        if answer.get("source") == "model":
+            show_answer(got)
+            leaked = leaks(answer.get("text") or "", forms)
+            if leaked:
+                raise DemoFailed(f"câu trả lời của mô hình có giá trị gốc: {leaked}")
+            labels = list(dict.fromkeys(MASK_LABEL_RE.findall(answer.get("text") or "")))
+            ok(f"{answer.get('model')} viết trong {took:.0f} giây, không có giá trị gốc nào"
+               + (f"; ghi {', '.join(labels)} — mô hình chưa từng thấy số thật, số thật ở câu trích bước 4" if labels
+                  else ""))
+            if not any(label.startswith("[SĐT") for label in labels):
+                print("   – câu trả lời không nhắc nhãn [SĐT-1] (mô hình diễn đạt khác) — vẫn không có số gốc")
+        else:
+            print(f"   – mô hình không qua kiểm ({', '.join(warnings) or got.get('status')}) — giữ câu trích nguyên văn")
+        time.sleep(1)
+        text = service_logs(mark, "svc-files")["svc-files"]
+        leaked = leaks(text, forms)
+        if leaked:
+            raise DemoFailed(f"nhật ký svc-files của lượt generate có {leaked}")
+        if answer.get("source") == "model" or {"model_rejected", "model_declined"} & set(warnings):
+            asked = [e for e in log_events(text, "office.assist.asked") if e.get("mode") == "generate"]
+            masked = asked[-1].get("masked") if asked else None
+            if not isinstance(masked, int) or masked < 2:
+                raise DemoFailed(f"nhật ký office.assist.asked của lượt generate ghi masked = {masked!r} (cần ≥ 2)")
+            if log_events(text, "office.assist.pii_at_egress"):
+                raise DemoFailed("có office.assist.pii_at_egress: lối ra Ollama còn phải che — chỗ dựng ngữ cảnh đã quên"
+                                 " che")
+            ok(f"nhật ký office.assist.asked của lượt này: masked = {masked} chỗ đã che trong câu hỏi và các đoạn gửi mô"
+               " hình; không có office.assist.pii_at_egress — ngữ cảnh đã che trước khi tới lối ra")
+    else:
+        print("   – chưa bật mô hình (make ai-model && make up-ai) — bản che mà lối ra Ollama sẽ gửi đi:")
+        masked_text = compose("exec", "-T", "svc-files", "python", "-m", "svc_files.pii", "mask",
+                              stdin="\n".join(pii_letter(tag)).encode()).decode()
+        for line in masked_text.strip().splitlines():
+            print(f"     {line}")
+        leaked = leaks(masked_text, forms)
+        labels = MASK_LABEL_RE.findall(masked_text)
+        if leaked or len(labels) != len(PII_DEMO):
+            raise DemoFailed(f"bản che còn {leaked or 'đủ giá trị'}, có {len(labels)} nhãn (cần {len(PII_DEMO)})")
+        ok(f"python -m svc_files.pii mask trong container svc-files: {len(labels)} nhãn {', '.join(labels)}, không còn"
+           " giá trị gốc; năm sinh, ngày cấp, số bản sao giữ nguyên. Trợ lý đánh số nhãn theo lượt hỏi ([SĐT-1]…)")
+
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/tim-kiem — gõ {cccd}; {PUBLIC_URL}/hoi-dap — hỏi “{PII_QUESTION}”"
+          f" (bật mô hình: câu trả lời ghi [SĐT-1], dòng nhắc số thật ở câu trích nguyên văn); lá đơn:"
+          f" {PUBLIC_URL}/van-ban/{doc_id}")
+
+
+DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
+         "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
+         "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
+         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="demo", description="Màn demo bằng chứng nguyên lý thiết kế của Signet")
+    parser.add_argument("man", choices=sorted(DEMOS), help="màn cần chạy")
+    args = parser.parse_args(argv)
+    started = time.monotonic()
+    try:
+        DEMOS[args.man]()
+    except DemoFailed as exc:
+        print(f"\n✗ {exc}", file=sys.stderr)
+        return 1
+    except (HTTPError, RuntimeError, subprocess.CalledProcessError, OSError) as exc:
+        print(f"\n✗ Không chạy được màn demo: {exc}. Signet có đang chạy và đã make seed chưa?", file=sys.stderr)
+        return 1
+    print(f"\nXong trong {time.monotonic() - started:.0f} giây.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

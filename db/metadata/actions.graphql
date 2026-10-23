@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +18,18 @@
 # kèm biến phiên lấy từ JWT; svc-workflow không tin thuê ước hay người dùng do client gửi.
 
 type Mutation {
+  "Văn thư tiếp nhận văn bản đến (trạng thái received); data đúng schemas/van-ban-den.json, kèm file_ids đã quét"
+  receiveIncoming(data: jsonb!): ReceiveIncomingOutput
+}
+
+type Mutation {
   "Văn thư vào sổ văn bản đến: cấp số đến, khởi chạy quy trình van-ban-den"
   registerIncoming(documentId: uuid!): RegisterIncomingOutput
+}
+
+type Mutation {
+  "Người soạn trình dự thảo văn bản đi (lần đầu hoặc sau khi sửa), chọn lãnh đạo đơn vị ký"
+  submitOutgoing(documentId: uuid!, signerId: String!): SubmitOutgoingOutput
 }
 
 type Mutation {
@@ -32,9 +42,18 @@ type Query {
   myTasks: [WorkTask!]!
 }
 
+type ReceiveIncomingOutput {
+  document_id: uuid!
+}
+
 type RegisterIncomingOutput {
   document_id: uuid!
   register_number: Int!
+}
+
+type SubmitOutgoingOutput {
+  document_id: uuid!
+  status: String!
 }
 
 type CompleteTaskOutput {

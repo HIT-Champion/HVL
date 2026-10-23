@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Mộc",
+    "name": "Signet",
     "tagline": "Văn phòng điện tử",
     "loading": "Đang tải…",
     "retry": "Thử lại",
@@ -11,15 +11,22 @@
     "none": "—",
     "required": "bắt buộc",
     "optional": "không bắt buộc",
-    "refresh": "Làm mới"
+    "refresh": "Làm mới",
+    "more": "Xem thêm"
   },
   "nav": {
     "inbox": "Hộp việc",
     "incoming": "Văn bản đến",
     "receive": "Tiếp nhận văn bản",
     "search": "Tìm kiếm",
+    "ask": "Hỏi đáp",
     "logout": "Đăng xuất",
-    "language": "English"
+    "language": "English",
+    "outgoing": "Văn bản đi",
+    "compose": "Soạn văn bản đi",
+    "register": "Sổ đăng ký",
+    "audit": "Sổ kiểm toán",
+    "board": "Điều hành"
   },
   "role": {
     "clerk": "Văn thư",
@@ -29,6 +36,8 @@
     "tenant_admin": "Quản trị đơn vị"
   },
   "status": {
+    "closed": "Đã đóng",
+    "open": "Đang mở",
     "received": "Chờ vào sổ",
     "registered": "Chờ chỉ đạo",
     "in_progress": "Đang xử lý",
@@ -39,7 +48,11 @@
     "in_review": "Đang trình",
     "returned": "Bị trả lại",
     "approved": "Đã duyệt",
-    "issued": "Đã phát hành"
+    "issued": "Đã phát hành",
+    "pending": "Đang chuyển",
+    "delivered": "Đã chuyển",
+    "duplicate": "Bên nhận đã có",
+    "failed": "Không chuyển được"
   },
   "urgency": {
     "normal": "Thường",
@@ -52,6 +65,12 @@
       "chiDao": "Cho ý kiến chỉ đạo",
       "phanCong": "Phân công xử lý",
       "xuLy": "Xử lý văn bản"
+    },
+    "vbdi": {
+      "duyetPhong": "Duyệt dự thảo cấp phòng",
+      "duyetDonVi": "Duyệt và ký văn bản",
+      "chinhSua": "Sửa dự thảo theo ý kiến",
+      "phatHanh": "Cấp số và phát hành"
     }
   },
   "event": {
@@ -62,9 +81,31 @@
         "directed": "Chỉ đạo",
         "assigned": "Phân công cho {name}",
         "processed": "Báo cáo kết quả",
-        "filed": "Lưu, không xử lý"
+        "filed": "Lưu, không xử lý",
+        "submitted": "Trình duyệt",
+        "resubmitted": "Trình lại sau khi sửa",
+        "reviewed": "Lãnh đạo phòng đồng ý",
+        "returned": "Trả lại để sửa",
+        "approved": "Ký duyệt",
+        "numbered": "Cấp số {symbol}",
+        "issued": "Phát hành",
+        "overdue": "Quá hạn giải quyết ({due})",
+        "dispatched": "Chuyển liên thông tới {name}",
+        "dispatch_duplicate": "{name} đã có văn bản này, không tạo bản trùng",
+        "arrived": "Nhận liên thông từ {name}"
+      },
+      "task": {
+        "overdue": "Quá hạn bước «{task}», đã nhắc",
+        "escalated": "Quá hạn hai lần bước «{task}», đã báo lãnh đạo"
       }
-    }
+    },
+    "drafted": "Tạo dự thảo",
+    "system": "Hệ thống",
+    "notified": "Đã báo: {names}",
+    "ot": {
+      "alarm": "Cảm biến {name} đo {value} °C, vượt ngưỡng {threshold} °C — hệ thống dựng dự thảo"
+    },
+    "sourceCode": "Mã xác thực của bên gửi: {code}"
   },
   "inbox": {
     "title": "Hộp việc",
@@ -89,7 +130,8 @@
     "issuer": "Cơ quan ban hành",
     "summary": "Trích yếu",
     "status": "Trạng thái",
-    "due": "Hạn xử lý"
+    "due": "Hạn xử lý",
+    "dispatched": "Liên thông"
   },
   "receive": {
     "title": "Tiếp nhận văn bản đến",
@@ -109,12 +151,102 @@
     "urgency": "Độ khẩn",
     "dueOn": "Hạn giải quyết",
     "restricted": "Hạn chế người xem",
-    "restrictedHint": "Chỉ người tiếp nhận và người được cấp quyền xem được",
+    "restrictedHint": "Chỉ người tiếp nhận và người được cấp quyền xem được. Chỉ nhận tệp PDF, lưu mã hóa; mỗi lần xem có dấu tên người xem",
     "save": "Lưu văn bản",
     "saveAndRegister": "Lưu và vào sổ",
     "duplicate": "Văn bản này có thể đã được tiếp nhận: {symbol} của {issuer}, ngày {date}.",
     "saved": "Đã lưu văn bản.",
-    "registered": "Đã vào sổ — số đến {n}."
+    "registered": "Đã vào sổ — số đến {n}.",
+    "dropRestricted": "Kéo thả tệp PDF vào đây, hoặc bấm để chọn — tệp được mã hóa trước khi lưu",
+    "cleanSealed": "Đã quét — sạch, đã mã hóa",
+    "pdfOnly": "Văn bản hạn chế chỉ nhận tệp PDF",
+    "restrictedLocked": "Gỡ hết tệp đã tải để đổi chế độ hạn chế",
+    "read": {
+      "button": "Đọc văn bản",
+      "reread": "Đọc lại",
+      "forFile": "{action}: {name}",
+      "reading": "Đang đọc văn bản… {s} giây",
+      "readingHint": "Bản scan có thể mất đến 30 giây.",
+      "started": "Đang đọc tệp {name}.",
+      "done": "Đã đọc bằng {method} — điền sẵn {n} ô.",
+      "doneNone": "Đã đọc bằng {method} — không điền thêm ô nào.",
+      "doneOther": "Đã đọc bằng {method} — form đang theo tệp {name} nên không tự điền; {n} gợi ý khác hiện dưới các ô.",
+      "doneOtherNone": "Đã đọc bằng {method} — không khác gì các ô đang có (form đang theo tệp {name}).",
+      "cached": "kết quả lần đọc trước",
+      "empty": "Không đọc được thông tin — nhập tay.",
+      "restricted": "Văn bản hạn chế không đọc tự động.",
+      "confirmNote": "Các ô có nhãn Gợi ý do tác tử đọc văn bản điền sẵn. Đối chiếu với bản gốc trước khi lưu — bấm lưu là văn thư xác nhận.",
+      "offer": "Gợi ý: {value}",
+      "use": "Dùng",
+      "useFor": "Dùng gợi ý: {value}",
+      "method": {
+        "text": "lớp chữ PDF",
+        "ocr": "nhận dạng chữ (OCR)"
+      },
+      "field": {
+        "type_code": "loại văn bản",
+        "symbol": "số ký hiệu",
+        "issued_on": "ngày ban hành",
+        "issuer_name": "cơ quan ban hành",
+        "summary": "trích yếu",
+        "urgency": "độ khẩn"
+      },
+      "warning": {
+        "future_date": "Ngày đọc được muộn hơn hôm nay — đối chiếu với bản gốc.",
+        "invalid_date": "Ngày ghi trên văn bản không có thật — nhập tay.",
+        "symbol_no_number": "Văn bản chưa điền số, chỉ có ký hiệu — kiểm tra bản gốc.",
+        "type_conflict": "Tiêu đề và ký hiệu chỉ hai loại văn bản khác nhau — đã lấy theo tiêu đề, kiểm tra lại.",
+        "low_text": "Đọc được rất ít chữ — bản scan có thể mờ hoặc nghiêng.",
+        "truncated": "Văn bản dài, chỉ đọc phần đầu.",
+        "model_unavailable": "Chưa bật mô hình ngôn ngữ — trích yếu theo quy tắc.",
+        "model_timeout": "Mô hình ngôn ngữ trả lời quá lâu — trích yếu theo quy tắc.",
+        "model_rejected": "Trích yếu của mô hình không đạt kiểm tra nên đã bỏ — trích yếu theo quy tắc.",
+        "model_skipped": "Lần này không hỏi mô hình ngôn ngữ — trích yếu theo quy tắc."
+      },
+      "error": {
+        "missing_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi bấm Đọc văn bản.",
+        "invalid_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi bấm Đọc văn bản.",
+        "forbidden": "Chỉ văn thư được dùng chức năng đọc văn bản.",
+        "not_found": "Không tìm thấy tệp để đọc (tệp đã bị gỡ, hoặc không do bạn tải lên) — tải lên lại.",
+        "restricted": "Văn bản hạn chế không đọc tự động — nhập tay.",
+        "too_large": "Tệp quá lớn để đọc tự động — nhập tay.",
+        "unsupported": "Chỉ đọc được tệp PDF, JPEG, PNG, TIFF — nhập tay.",
+        "unreadable": "Không đọc được tệp ({reason}) — nhập tay.",
+        "busy": "Đang đọc văn bản khác — đợi một lát rồi bấm Đọc văn bản.",
+        "reader_disabled": "Chức năng đọc văn bản chưa được bật — nhập tay.",
+        "ocr_unavailable": "Máy chủ chưa có bộ nhận dạng chữ (OCR) nên chưa đọc được bản scan — nhập tay.",
+        "storage_unavailable": "Kho tệp tạm thời không truy cập được — thử lại sau ít phút.",
+        "database_unavailable": "Chưa ghi được sổ kiểm toán nên chưa trả gợi ý — thử lại sau ít phút.",
+        "client_timeout": "Đọc quá 60 giây chưa xong — bấm Đọc văn bản để thử lại, hoặc nhập tay.",
+        "generic": "Không đọc được văn bản: {msg}"
+      },
+      "reason": {
+        "password": "PDF có mật khẩu",
+        "corrupt": "tệp hỏng",
+        "no_text": "không có chữ hay ảnh để đọc",
+        "timeout": "quá thời gian cho phép",
+        "memory": "vượt bộ nhớ cho phép",
+        "too_many_pixels": "ảnh quá lớn",
+        "unknown": "lỗi không rõ"
+      }
+    },
+    "suggest": {
+      "high": "Gợi ý",
+      "medium": "Gợi ý (chưa chắc)",
+      "model": "Gợi ý của mô hình",
+      "edited": "Đã sửa",
+      "hint": "Tác tử đọc văn bản điền sẵn ô này ({source}, {confidence}). Đối chiếu với bản gốc trước khi lưu.",
+      "editedHint": "Văn thư đã sửa. Tác tử đọc được: {value}",
+      "source": {
+        "rule": "đọc theo quy tắc",
+        "model": "do mô hình ngôn ngữ viết"
+      },
+      "confidence": {
+        "high": "độ tin cậy cao",
+        "medium": "độ tin cậy trung bình",
+        "low": "độ tin cậy thấp"
+      }
+    }
   },
   "doc": {
     "info": "Thông tin văn bản",
@@ -134,12 +266,70 @@
     "support": "Phối hợp",
     "info_role": "Để biết",
     "timeline": "Dòng thời gian",
+    "history": "Lịch sử",
+    "historyHint": "Từ sổ kiểm toán: ai đổi gì, lúc nào. Trường nội dung (trích yếu, tên tệp…) chỉ báo là đã đổi.",
+    "historyEmpty": "Chưa có dòng nào trong sổ kiểm toán.",
     "register": "Vào sổ",
     "registerConfirm": "Vào sổ văn bản này? Số đến được cấp tự động, liên tiếp theo năm.",
     "notFound": "Không tìm thấy văn bản, hoặc bạn không có quyền xem.",
     "restricted": "Hạn chế",
     "assignmentDone": "Đã xong",
-    "assignmentOpen": "Đang xử lý"
+    "assignmentOpen": "Đang xử lý",
+    "draft": "Dự thảo",
+    "body": "Nội dung",
+    "recipients": "Nơi nhận",
+    "department": "Phòng soạn thảo",
+    "signer": "Người ký",
+    "replyTo": "Trả lời văn bản",
+    "createdBy": "Người soạn",
+    "preview": "Tải bản xem trước (PDF)",
+    "edit": "Sửa dự thảo",
+    "submit": "Trình ký",
+    "resubmit": "Trình lại",
+    "submitTitle": "Trình dự thảo",
+    "submitHint": "Lãnh đạo phòng duyệt trước, rồi người ký duyệt. Bị trả lại thì dự thảo về bạn để sửa.",
+    "returnedHint": "Dự thảo bị trả lại: {note}",
+    "signerPick": "Lãnh đạo đơn vị ký",
+    "submitted": "Đã trình. Dự thảo đang chờ lãnh đạo phòng duyệt.",
+    "verifyCode": "Mã xác thực",
+    "verifyOpen": "Mở trang xác thực",
+    "fileRole": {
+      "main": "Văn bản",
+      "attachment": "Kèm theo",
+      "draft": "Dự thảo",
+      "issued": "Bản phát hành"
+    },
+    "sealed": "Đã mã hóa",
+    "sealedHint": "Tệp lưu mã hóa. Bản tải về có dấu tên người xem, mỗi lần mở đều ghi vào sổ kiểm toán",
+    "viewers": "Người được xem",
+    "viewersHint": "Chỉ người tiếp nhận và người có tên dưới đây đọc được văn bản. Người phải làm bước tiếp theo được tự thêm; người được thêm vẫn cần quyền theo vai trò (phòng, việc được giao).",
+    "viewersEmpty": "Chưa cấp cho ai.",
+    "viewerPick": "Chọn người",
+    "viewerAdd": "Cấp quyền xem",
+    "viewerRemove": "Gỡ",
+    "viewerBy": "{by} cấp lúc {at}",
+    "viewerGranted": "Đã cấp quyền xem cho {name}",
+    "viewerRevoked": "Đã gỡ quyền xem của {name}",
+    "dispatch": {
+      "title": "Liên thông trong hệ thống",
+      "plannedHint": "Phát hành xong, văn bản tự chuyển tới văn thư các đơn vị dưới đây, kèm bản PDF đã phát hành.",
+      "sentHint": "Văn bản tự chuyển tới văn thư từng đơn vị, kèm bản PDF đã phát hành; bên nhận vào sổ, xử lý như văn bản đến khác.",
+      "status": {
+        "pending": "Đang chuyển",
+        "delivered": "Đã chuyển",
+        "duplicate": "Bên nhận đã có",
+        "failed": "Không chuyển được"
+      },
+      "deliveredAt": "Đã chuyển lúc {at}",
+      "duplicateHint": "Đơn vị nhận đã tiếp nhận văn bản này trước đó, không tạo bản trùng.",
+      "retrying": "Lần thử thứ {n} chưa được: {error} — hệ thống tự thử lại",
+      "from": "Nhận từ {name}",
+      "sourceCode": "Mã xác thực của bên gửi",
+      "hashMatch": "SHA-256 khớp bản phát hành",
+      "hashMismatch": "SHA-256 KHÔNG khớp bản phát hành của bên gửi — báo quản trị hệ thống",
+      "fromHint": "Văn bản đi của đơn vị khác cùng dùng Signet, tự chuyển sang khi bên gửi phát hành. Tệp là bản sao của bản phát hành; mở trang xác thực để đối chiếu.",
+      "manualHint": "Văn thư đã tiếp nhận văn bản này từ bản giấy hoặc thư điện tử; bên gửi phát hành qua liên thông sau đó nên chỉ nối vào, tệp đính kèm là bản văn thư tải lên. Mở trang xác thực để đối chiếu với bản phát hành."
+    }
   },
   "form": {
     "chiDao": {
@@ -169,11 +359,27 @@
       "done": "Báo cáo xong"
     },
     "pick": "— Chọn —",
-    "done": "Đã chuyển bước tiếp theo."
+    "done": "Đã chuyển bước tiếp theo.",
+    "duyet": {
+      "note": "Ý kiến",
+      "approve": "Đồng ý, trình ký",
+      "sign": "Ký duyệt",
+      "return": "Trả lại",
+      "returnNote": "Ghi rõ lý do trả lại, cần sửa gì",
+      "preview": "Xem bản PDF trước khi duyệt"
+    },
+    "phatHanh": {
+      "public": "Công khai trích yếu trên cổng xác thực",
+      "publicHint": "Người tra mã thấy cả trích yếu; không chọn thì chỉ thấy số, ngày, cơ quan ban hành.",
+      "restricted": "Văn bản hạn chế: trang tra cứu chỉ hiện số, ngày, cơ quan ban hành — không công khai trích yếu.",
+      "issue": "Cấp số và phát hành",
+      "confirm": "Cấp số đi và phát hành văn bản này? Số được cấp liên tiếp theo năm và không thu hồi được.",
+      "issued": "Đã phát hành."
+    }
   },
   "search": {
     "title": "Tìm kiếm văn bản",
-    "placeholder": "Số ký hiệu, trích yếu, cơ quan ban hành — gõ không dấu cũng được",
+    "placeholder": "Số ký hiệu, trích yếu, cơ quan ban hành, nội dung tệp PDF — gõ không dấu cũng được",
     "button": "Tìm",
     "empty": "Không có văn bản nào khớp.",
     "more": "Xem thêm",
@@ -181,6 +387,137 @@
     "direction": {
       "in": "Văn bản đến",
       "out": "Văn bản đi"
+    },
+    "matchedContent": "Khớp trong nội dung",
+    "matchedContentHint": "Từ cần tìm có trong nội dung văn bản hoặc trong chữ của tệp PDF đính kèm, không có trong số ký hiệu, trích yếu",
+    "askAssistant": "Hỏi trợ lý"
+  },
+  "assist": {
+    "title": "Hỏi đáp văn bản",
+    "intro": "Trợ lý chỉ tìm trong các văn bản bạn được xem; văn bản hạn chế không bao giờ được đưa vào. Mỗi ý có số ký hiệu và trang để bạn đối chiếu.",
+    "label": "Câu hỏi",
+    "placeholder": "Ví dụ: Điều kiện xét học bổng khuyến khích học tập là gì?",
+    "keysHint": "Enter để hỏi, Shift+Enter để xuống dòng",
+    "count": "{n}/{max} ký tự",
+    "ask": "Hỏi",
+    "any": "Tất cả",
+    "direction": {
+      "label": "Văn bản",
+      "in": "Văn bản đến",
+      "out": "Văn bản đi"
+    },
+    "year": "Năm",
+    "anyYear": "Mọi năm",
+    "yearValue": "Năm {year}",
+    "searching": "Đang tìm trong kho văn bản…",
+    "generating": "Đang soạn câu trả lời từ các đoạn trích (có thể mất đến 40 giây)",
+    "elapsed": "{s} giây",
+    "generatingHint": "Câu trích nguyên văn bên trên dùng được ngay — bấm Dừng hoặc nhấn Esc nếu không cần chờ.",
+    "waiting": "Đang chờ câu trả lời trước soạn xong…",
+    "stop": "Dừng",
+    "stopped": "Đã dừng soạn câu trả lời — đang hiện câu trích nguyên văn.",
+    "generateFailed": "Chưa soạn được câu trả lời: {reason}",
+    "retryGenerate": "Soạn lại câu trả lời",
+    "extractTitle": "Câu trích nguyên văn",
+    "modelTitle": "Trả lời của trợ lý",
+    "modelNote": "Do mô hình ngôn ngữ viết — đối chiếu nguồn trước khi dùng",
+    "maskedNote": "Số điện thoại, số định danh, email, số tài khoản trong văn bản được che trước khi gửi mô hình — số thật nằm trong văn bản nguồn: xem câu trích nguyên văn và các nguồn bên dưới.",
+    "showExtract": "Xem câu trích nguyên văn",
+    "hideExtract": "Ẩn câu trích nguyên văn",
+    "passagesOnly": "Chưa trích được câu trả lời ngắn — xem các đoạn liên quan bên dưới.",
+    "noEvidence": "Không tìm thấy văn bản nào bạn được xem có nội dung này. Thử diễn đạt khác hoặc dùng Tìm kiếm.",
+    "openSearch": "Tìm kiếm với câu này",
+    "keyword": "Tìm theo từ khóa",
+    "semantic": "Tìm theo từ khóa và theo nghĩa",
+    "took": "{s} giây",
+    "history": "Các câu hỏi trong phiên này",
+    "historyNote": "Câu hỏi và câu trả lời chỉ giữ trên trang này, không lưu ở máy chủ — tải lại trang là mất.",
+    "source": {
+      "title": "Nguồn",
+      "n": "Nguồn {n}",
+      "cite": "Nguồn {n}: {label}",
+      "cited": "Được trích",
+      "excerpt": "Đoạn trích",
+      "more": "Xem đủ đoạn trích",
+      "less": "Thu gọn đoạn trích"
+    },
+    "openDocument": "Mở văn bản",
+    "openDocumentFor": "Mở văn bản {label}",
+    "page": "tr. {n}",
+    "pageSpoken": "trang {n}",
+    "summaryOnly": "trích yếu",
+    "attachment": "tài liệu kèm theo",
+    "citeLabel": "{symbol} · {where}",
+    "citeSpoken": "{symbol}, {where}",
+    "status": {
+      "answered": "Đã trả lời",
+      "passages_only": "Chỉ có đoạn liên quan",
+      "no_evidence": "Không có căn cứ"
+    },
+    "warning": {
+      "embed_unavailable": "Lần này chưa tìm theo nghĩa được — kết quả chỉ theo từ khóa",
+      "model_unavailable": "Mô hình ngôn ngữ chưa sẵn sàng — đang hiện câu trích nguyên văn",
+      "model_timeout": "Mô hình trả lời quá lâu — đang hiện câu trích nguyên văn",
+      "model_rejected": "Câu trả lời của mô hình không qua kiểm tra trích dẫn nên không hiển thị",
+      "model_declined": "Mô hình thấy các đoạn trích chưa đủ căn cứ để trả lời — đang hiện câu trích nguyên văn"
+    },
+    "error": {
+      "invalid_question": "Câu hỏi trống, dài quá 500 ký tự hoặc chỉ gồm từ thông dụng — hỏi cụ thể hơn (việc gì, con số, số ký hiệu…).",
+      "missing_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi hỏi lại.",
+      "invalid_token": "Phiên đăng nhập đã hết — đăng nhập lại rồi hỏi lại.",
+      "forbidden": "Hỏi đáp chỉ dành cho văn thư, chuyên viên và lãnh đạo.",
+      "assistant_disabled": "Trợ lý hỏi đáp chưa được bật trên máy chủ — dùng Tìm kiếm.",
+      "busy": "Trợ lý đang soạn câu trả lời khác — thử lại sau khoảng 10 giây.",
+      "search_unavailable": "Kho tìm kiếm tạm thời không truy cập được — thử lại sau ít phút.",
+      "database_unavailable": "Chưa ghi được sổ kiểm toán nên chưa trả lời — thử lại sau ít phút.",
+      "invalid_request": "Yêu cầu không hợp lệ — tải lại trang rồi hỏi lại.",
+      "not_found": "Máy chủ chưa có chức năng hỏi đáp — báo quản trị hệ thống.",
+      "unavailable": "Trợ lý tạm thời không phản hồi — thử lại sau ít phút.",
+      "client_timeout": "Quá thời gian chờ mà chưa có kết quả — thử lại sau ít phút.",
+      "generic": "Không hỏi được: {msg}"
+    },
+    "live": {
+      "found": "Đã tìm thấy {n} đoạn liên quan.",
+      "generating": "Đang soạn câu trả lời.",
+      "answered": "Trợ lý đã trả lời.",
+      "extractOnly": "Không có câu trả lời của mô hình — đang hiện câu trích nguyên văn."
+    }
+  },
+  "assign": {
+    "suggest": {
+      "title": "Gợi ý giao việc",
+      "searching": "Chưa có gợi ý giao việc — nếu tác tử đang bật, gợi ý thường tới sau vài giây…",
+      "unit": "Đơn vị chủ trì",
+      "due": "Hạn đề xuất",
+      "dueDays": "{date} ({n} ngày, như các văn bản tương tự)",
+      "dueFromDocument": "Theo hạn ghi trên văn bản ({date})",
+      "evidence": "Căn cứ: {n} văn bản tương tự đã giao",
+      "days": "{n} ngày",
+      "apply": "Dùng gợi ý",
+      "applyHint": "Chỉ điền sẵn đơn vị chủ trì và hạn vào form bên dưới, chưa giao việc.",
+      "kept": "Theo gợi ý",
+      "changed": "Khác gợi ý",
+      "note": "Tác tử chỉ gợi ý, lãnh đạo quyết định. Gợi ý đã ghi vào sổ kiểm toán.",
+      "nothing": "Không có gợi ý giao việc: {reason}.",
+      "nothingPlain": "Không có gợi ý giao việc.",
+      "confidence": {
+        "high": "Tin cậy cao",
+        "medium": "Tin cậy vừa",
+        "low": "Tin cậy thấp"
+      },
+      "outcome": {
+        "suggested": "Đã gợi ý",
+        "none": "Không gợi ý",
+        "failed": "Không gợi ý được (lỗi)"
+      },
+      "reason": {
+        "no_similar": "chưa có văn bản tương tự đã giao",
+        "no_history": "các văn bản tương tự chưa được giao cho đơn vị nào",
+        "no_valid_unit": "đơn vị từng chủ trì các văn bản tương tự hiện không có lãnh đạo phòng nhận việc",
+        "low_confidence": "các văn bản tương tự được giao cho nhiều đơn vị khác nhau, chưa đủ tin cậy",
+        "timeout": "tìm văn bản tương tự quá thời gian cho phép",
+        "unavailable": "dịch vụ tìm văn bản tạm thời không sẵn sàng"
+      }
     }
   },
   "error": {
@@ -191,13 +528,409 @@
     "documents_due_after_registered": "Hạn giải quyết không được trước ngày vào sổ.",
     "documents_summary": "Trích yếu phải dài 10–500 ký tự.",
     "infected": "Tệp nhiễm mã độc, đã bị chặn.",
+    "unscannable": "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
-    "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị."
+    "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
+    "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
+    "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
+    "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
+    "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",
+    "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
+    "documents_restricted_local": "Văn bản hạn chế không gửi liên thông trong hệ thống.",
+    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ (không có, hoặc là chính đơn vị mình), hoặc văn bản đã trình nên không đổi được đơn vị nhận."
   },
   "validation": {
     "required": "Không được để trống",
     "summaryLength": "Cần 10–500 ký tự",
     "dateFuture": "Không được sau hôm nay",
-    "dueBefore": "Hạn phải từ hôm nay trở đi"
+    "dueBefore": "Hạn phải từ hôm nay trở đi",
+    "between": "Cần {min}–{max} ký tự",
+    "max": "Tối đa {max} ký tự",
+    "format": "Không đúng định dạng",
+    "not": "Có khoảng trắng thừa ở đầu hoặc cuối, xuống dòng hoặc ký tự ẩn",
+    "nfc": "Chữ tiếng Việt chưa ở dạng dựng sẵn (Unicode NFC)",
+    "year": "Năm phải từ 1900 đến 2099",
+    "enum": "Không có trong danh mục",
+    "type": "Sai kiểu dữ liệu",
+    "additionalProperties": "Trường không có trong mẫu",
+    "uniqueItems": "Một tệp được đính kèm hai lần",
+    "maxItems": "Quá số tệp cho phép",
+    "duplicate": "Đã có văn bản đến trùng cơ quan ban hành, số ký hiệu và ngày ban hành",
+    "unknown": "Không tìm thấy, hoặc không do bạn tải lên",
+    "not_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế — gỡ tệp và tải lại",
+    "sealed": "Tệp đã mã hóa chỉ dùng cho văn bản hạn chế — gỡ tệp và tải lại",
+    "restricted": "Văn bản hạn chế không công khai trích yếu"
+  },
+  "outgoing": {
+    "title": "Văn bản đi",
+    "compose": "Soạn văn bản đi",
+    "empty": "Chưa có văn bản đi nào.",
+    "tab": {
+      "drafts": "Dự thảo",
+      "review": "Đang trình",
+      "issued": "Đã phát hành",
+      "all": "Tất cả"
+    },
+    "symbol": "Số, ký hiệu",
+    "summary": "Trích yếu",
+    "department": "Phòng soạn",
+    "status": "Trạng thái",
+    "issuedOn": "Ngày ban hành",
+    "unnumbered": "Chưa cấp số"
+  },
+  "compose": {
+    "title": "Soạn văn bản đi",
+    "editTitle": "Sửa dự thảo",
+    "subtitle": "Nội dung được dựng thành PDF đúng thể thức NĐ 30/2020; số, ký hiệu và ngày ban hành do văn thư cấp khi phát hành.",
+    "type": "Loại văn bản",
+    "summary": "Trích yếu nội dung",
+    "summaryHint": "10–500 ký tự. Công văn ghi theo dạng \"Về việc …\"",
+    "body": "Nội dung",
+    "bodyHint": "Mỗi dòng là một đoạn, tự thụt đầu dòng khi in",
+    "recipients": "Nơi nhận",
+    "recipientsHint": "Mỗi dòng một nơi nhận; công văn in thành \"Kính gửi\"",
+    "urgency": "Độ khẩn",
+    "replyTo": "Trả lời văn bản đến",
+    "replyNone": "— Không —",
+    "attachments": "Tài liệu kèm theo",
+    "attachmentsHint": "Phụ lục, bảng biểu đính kèm (không bắt buộc); tệp được quét virus trước khi lưu",
+    "save": "Lưu dự thảo",
+    "saved": "Đã lưu dự thảo.",
+    "restored": "Đã khôi phục phần đang soạn dở, chưa lưu.",
+    "notEditable": "Dự thảo này không sửa được nữa: đã trình, hoặc không phải bạn soạn.",
+    "units": "Gửi trong hệ thống",
+    "unitsHint": "Phát hành xong, văn bản tự chuyển tới văn thư các đơn vị được chọn, kèm bản PDF đã phát hành. Tích một đơn vị thì tên được thêm vào ô nơi nhận.",
+    "unitsRestricted": "Văn bản hạn chế không gửi liên thông trong hệ thống: tệp chỉ mở được ở đơn vị mình."
+  },
+  "verify": {
+    "title": "Xác thực văn bản",
+    "subtitle": "Kiểm tra một văn bản do đơn vị dùng Signet phát hành có thật và còn nguyên vẹn hay không.",
+    "code": "Mã xác thực",
+    "codeHint": "10 ký tự in cạnh mã QR, ví dụ ABCDE-23456",
+    "lookup": "Tra cứu",
+    "file": "Hoặc thả tệp PDF bạn nhận được vào đây",
+    "fileHint": "Tệp không rời khỏi máy bạn: trình duyệt tự tính SHA-256 rồi chỉ gửi mã băm đi tra.",
+    "checking": "Đang tra cứu…",
+    "valid": "Văn bản có thật, do đơn vị dưới đây phát hành",
+    "notFound": "Không tìm thấy văn bản nào khớp",
+    "notFoundHint": "Kiểm tra lại mã. Nếu tra bằng tệp: tệp đã bị sửa, hoặc không phải văn bản phát hành trên Signet.",
+    "match": "Tệp khớp từng byte với bản đã phát hành",
+    "mismatch": "Tệp KHÔNG khớp với văn bản có mã này: có thể đã bị sửa",
+    "compare": "Thả tệp PDF bạn nhận được để so với bản gốc",
+    "symbol": "Số, ký hiệu",
+    "issuedOn": "Ngày ban hành",
+    "issuer": "Cơ quan ban hành",
+    "type": "Loại văn bản",
+    "summary": "Trích yếu",
+    "summaryHidden": "Không công khai",
+    "sha256": "SHA-256 của bản phát hành",
+    "signature": {
+      "title": "Chữ ký số (minh họa)",
+      "level": "Chuẩn chữ ký",
+      "signer": "Ký bởi",
+      "ca": "Chứng thư do",
+      "serial": "Số sê-ri chứng thư",
+      "signedAt": "Ký lúc (giờ tự ghi trong chữ ký)",
+      "illustrative": "Chữ ký dùng hạ tầng khóa công khai nội bộ của Signet, chỉ để minh họa — không có giá trị pháp lý như chữ ký số công cộng. Trình đọc PDF sẽ báo chữ ký chưa tin cậy vì CA nội bộ này không nằm trong danh sách tin cậy công cộng.",
+      "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên."
+    },
+    "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
+    "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
+    "footer": "Signet — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
+  },
+  "notify": {
+    "title": "Thông báo",
+    "empty": "Chưa có thông báo nào",
+    "markAll": "Đánh dấu đã đọc hết",
+    "live": "Đang nhận thông báo trực tiếp",
+    "offline": "Chưa nối được kênh thông báo trực tiếp — vẫn xem được thông báo đã có, đang thử nối lại",
+    "someone": "Người được giao",
+    "note": "Ý kiến: {note}",
+    "taskAssigned": "Việc mới: {task}",
+    "taskOverdue": "Quá hạn: {task}",
+    "taskEscalated": "{name} chưa làm xong «{task}» đúng hạn",
+    "documentIssued": "Đã phát hành văn bản {symbol}",
+    "documentProcessed": "{name} đã báo kết quả xử lý",
+    "documentOverdue": "Văn bản quá hạn giải quyết ({due})",
+    "otAlarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố",
+    "restricted": "Văn bản hạn chế",
+    "documentIncoming": "Văn bản đến liên thông từ {name}"
+  },
+  "audit": {
+    "title": "Sổ kiểm toán",
+    "subtitle": "Mọi thay đổi dữ liệu của đơn vị, nối thành chuỗi băm SHA-256: sửa hay xóa lén một dòng đều bị phát hiện.",
+    "anchored": "Chuỗi đã được neo ra ngoài CSDL đến dòng #{id}, lúc {at}.",
+    "notAnchored": "Chuỗi chưa được neo ra ngoài CSDL.",
+    "how": "Mỗi lần neo, hệ thống chép hash của dòng mới nhất ra kho lưu trữ khóa ghi, không ai xóa hay sửa được, kể cả quản trị. Quản trị máy chủ kiểm cả chuỗi bằng lệnh make audit.",
+    "group": {
+      "all": "Tất cả",
+      "documents": "Văn bản",
+      "assignments": "Giao việc",
+      "files": "Tệp",
+      "people": "Người dùng, quyền xem",
+      "catalog": "Danh mục"
+    },
+    "forDocument": "Của một văn bản",
+    "clear": "Bỏ lọc",
+    "empty": "Chưa có thay đổi nào.",
+    "when": "Thời điểm",
+    "who": "Người thực hiện",
+    "what": "Thao tác",
+    "changes": "Thay đổi",
+    "chain": "Dòng sổ",
+    "service": "{name} (qua hệ thống)",
+    "yes": "Có",
+    "no": "Không",
+    "hidden": "Trường khác đã đổi: {cols}",
+    "hiddenHint": "Sổ không hiện giá trị của các trường này, để không lộ nội dung văn bản hạn chế",
+    "openDocument": "Mở văn bản",
+    "openAudit": "Xem trong sổ kiểm toán",
+    "isAnchored": "Đã neo",
+    "notYet": "Chưa neo",
+    "more": "Xem thêm",
+    "action": {
+      "insert": "Thêm",
+      "update": "Sửa",
+      "delete": "Xóa",
+      "file": {
+        "rejected": "Chặn tệp nhiễm mã độc",
+        "unscannable": "Chặn tệp không quét được (có mật khẩu, nén quá sâu)"
+      },
+      "register": {
+        "printed": "In sổ đăng ký"
+      },
+      "case_file": {
+        "archived": "Nộp lưu hồ sơ",
+        "read": "Đọc hồ sơ lưu trữ"
+      },
+      "intake": {
+        "suggested": "Đọc văn bản, gợi ý thông tin tiếp nhận"
+      },
+      "assistant": {
+        "answered": "Trả lời câu hỏi trên kho văn bản"
+      },
+      "assignment": {
+        "suggested": "Gợi ý giao việc"
+      }
+    },
+    "entity": {
+      "office": {
+        "documents": "Văn bản",
+        "assignments": "Giao việc",
+        "document_files": "Tệp của văn bản",
+        "document_acl": "Quyền xem văn bản",
+        "departments": "Phòng ban",
+        "registers": "Sổ đăng ký",
+        "document_types": "Loại văn bản",
+        "case_files": "Hồ sơ",
+        "case_file_documents": "Văn bản trong hồ sơ",
+        "dispatches": "Liên thông văn bản"
+      },
+      "core": {
+        "files": "Tệp tải lên",
+        "users": "Người dùng",
+        "tenants": "Đơn vị"
+      },
+      "ai": {
+        "questions": "Câu hỏi cho trợ lý"
+      }
+    },
+    "col": {
+      "status": "Trạng thái",
+      "urgency": "Độ khẩn",
+      "direction": "Chiều",
+      "register_number": "Số trong sổ",
+      "registered_at": "Vào sổ lúc",
+      "due_on": "Hạn giải quyết",
+      "issued_on": "Ngày ban hành",
+      "restricted": "Hạn chế",
+      "is_public": "Công khai",
+      "role": "Vai trò",
+      "enabled": "Còn hoạt động",
+      "department_id": "Phòng",
+      "user_id": "Người",
+      "signer_id": "Người ký",
+      "content_sha256": "hash văn bản",
+      "sha256": "hash tệp",
+      "summary": "trích yếu",
+      "body": "nội dung",
+      "symbol": "số ký hiệu",
+      "issuer_name": "cơ quan ban hành",
+      "type_code": "loại",
+      "recipients": "nơi nhận",
+      "verify_code": "mã tra cứu",
+      "filename": "tên tệp",
+      "instruction": "ý kiến chỉ đạo",
+      "result_note": "kết quả xử lý",
+      "full_name": "họ tên",
+      "email": "thư điện tử",
+      "name": "tên",
+      "signature": "mẫu mã độc",
+      "process_id": "quy trình",
+      "register_id": "sổ",
+      "reply_to_id": "trả lời văn bản",
+      "source_id": "văn bản nguồn",
+      "parent_id": "giao từ",
+      "assigned_by": "người giao",
+      "assigned_at": "giao lúc",
+      "completed_at": "xong lúc",
+      "mime_type": "kiểu tệp",
+      "size_bytes": "cỡ tệp",
+      "scanned_at": "quét lúc",
+      "encrypted": "mã hóa",
+      "wrapped_dek": "khóa mã hóa",
+      "storage_tier": "lớp lưu trữ",
+      "version": "phiên bản",
+      "added_by": "người gắn",
+      "added_at": "gắn lúc",
+      "granted_by": "người cấp",
+      "granted_at": "cấp lúc",
+      "code": "mã",
+      "org_ident": "mã định danh",
+      "username": "tên đăng nhập",
+      "year": "năm",
+      "entries": "số dòng",
+      "masked": "dòng bị che",
+      "closed_on": "Ngày đóng",
+      "retention_years": "Thời hạn bảo quản (năm)",
+      "archived_at": "Nộp lưu lúc",
+      "archive_sha256": "hash gói lưu trữ",
+      "case_file_id": "Hồ sơ",
+      "documents": "Số văn bản",
+      "files": "Số tệp",
+      "title": "tên hồ sơ",
+      "recipient_tenant_ids": "đơn vị nhận trong hệ thống",
+      "to_tenant_id": "Đơn vị nhận",
+      "incoming_document_id": "văn bản đến bên nhận",
+      "source_verify_code": "mã xác thực bên gửi",
+      "source_sha256": "hash bản phát hành",
+      "attempts": "Số lần thử",
+      "last_error": "lỗi gần nhất",
+      "delivered_at": "Chuyển lúc",
+      "next_attempt_at": "thử lại lúc",
+      "notified_at": "báo lúc",
+      "method": "Cách đọc",
+      "pages": "Số trang",
+      "found": "Trường đọc được",
+      "summary_source": "Nguồn trích yếu",
+      "model": "Mô hình",
+      "duration_ms": "Thời gian xử lý",
+      "reason": "Lý do",
+      "ask_id": "Mã câu hỏi",
+      "mode": "Chế độ",
+      "answer_source": "Nguồn câu trả lời",
+      "hits": "Số đoạn tìm thấy",
+      "cited": "Số nguồn được trích",
+      "semantic": "Tìm theo nghĩa",
+      "embed_model": "Mô hình nhúng",
+      "warnings": "Cảnh báo",
+      "outcome": "Kết quả",
+      "outcome_reason": "Lý do",
+      "due_days": "Hạn đề xuất",
+      "confidence": "Độ tin cậy",
+      "evidence": "Số văn bản căn cứ",
+      "candidates": "Số văn bản tương tự"
+    },
+    "direction": {
+      "in": "Đến",
+      "out": "Đi"
+    },
+    "role": {
+      "lead": "Chủ trì",
+      "support": "Phối hợp",
+      "info": "Để biết",
+      "main": "Tệp chính",
+      "attachment": "Đính kèm",
+      "draft": "Dự thảo",
+      "issued": "Bản phát hành",
+      "clerk": "Văn thư",
+      "staff": "Chuyên viên",
+      "manager": "Lãnh đạo phòng",
+      "director": "Lãnh đạo đơn vị",
+      "tenant_admin": "Quản trị đơn vị"
+    },
+    "agent": "{name} (tác tử)",
+    "agents": {
+      "moc-doc-reader": "Trợ lý đọc văn bản",
+      "moc-assistant": "Trợ lý hỏi đáp",
+      "moc-assigner": "Tác tử gợi ý giao việc"
+    },
+    "seconds": "{n} giây",
+    "readStatus": {
+      "ok": "Có gợi ý",
+      "empty": "Không ra thông tin",
+      "unreadable": "Không đọc được"
+    },
+    "summarySource": {
+      "rule": "Quy tắc",
+      "model": "Mô hình ngôn ngữ",
+      "none": "Không có"
+    },
+    "askMode": {
+      "extract": "Trích câu nguyên văn",
+      "generate": "Mô hình viết câu trả lời"
+    },
+    "answerSource": {
+      "extract": "Câu trích nguyên văn",
+      "model": "Mô hình ngôn ngữ",
+      "none": "Không có"
+    }
+  },
+  "register": {
+    "title": "Sổ đăng ký văn bản",
+    "subtitle": "Đúng các cột của mẫu sổ (Nghị định 30/2020/NĐ-CP, Phụ lục IV). In ra giấy để ký nhận và đóng sổ cuối năm.",
+    "year": "Năm",
+    "yearOption": "Năm {year}",
+    "book": {
+      "den": "Sổ văn bản đến",
+      "di": "Sổ văn bản đi"
+    },
+    "print": "In sổ (PDF)",
+    "printing": "Đang dựng bản in…",
+    "none": "Sổ năm {year} chưa có văn bản nào.",
+    "continuous": "Sổ liền số, từ số 01 đến số {last}.",
+    "gaps": "Sổ thiếu dòng của số: {numbers}. Báo quản trị hệ thống trước khi in.",
+    "how": "Bấm vào một dòng để mở văn bản. Cột Ký nhận, Số lượng bản để trống, ghi tay trên bản in. Mỗi lần in được ghi vào sổ kiểm toán.",
+    "masked": "{n} dòng là văn bản hạn chế bạn không được đọc: chỉ có số, ngày, số ký hiệu."
+  },
+  "board": {
+    "title": "Điều hành",
+    "subtitle": "Số liệu văn bản của đơn vị, tính lúc mở trang. Chỉ có số đếm; văn bản hạn chế chỉ có con số tổng, không chia theo trạng thái hay phòng.",
+    "forbidden": "Chỉ lãnh đạo đơn vị xem được trang này.",
+    "open": "Văn bản đến chưa xong",
+    "openHint": "Chờ vào sổ, chờ chỉ đạo, đang xử lý",
+    "overdue": "Quá hạn",
+    "overdueHint": "Chưa xử lý xong (kể cả chờ vào sổ) mà đã qua hạn giải quyết",
+    "urgent": "Khẩn chưa xong",
+    "urgentHint": "Khẩn, thượng khẩn, hỏa tốc",
+    "avgDays": "Số ngày trung bình",
+    "daysValue": "{n} ngày",
+    "avgHint": "Từ vào sổ đến khi xong, 12 tháng gần nhất · {done} văn bản",
+    "noneDone": "Chưa có văn bản nào xử lý xong",
+    "byStatus": "Văn bản đến theo trạng thái",
+    "byDepartment": "Văn bản đến đang xử lý theo phòng chủ trì",
+    "processing": "Thời gian xử lý theo tháng xong",
+    "outgoing": "Văn bản đi phát hành theo tháng",
+    "inTime": "Trong hạn",
+    "late": "Quá hạn",
+    "inProgress": "Đang xử lý",
+    "department": "Phòng",
+    "month": "Tháng",
+    "finished": "Đã xong",
+    "onTime": "Đúng hạn",
+    "issued": "Đã phát hành",
+    "count": "Số văn bản",
+    "empty": "Chưa có số liệu",
+    "avgTime": "Thời gian xử lý trung bình",
+    "avgHours": "Số giờ trung bình",
+    "hoursValue": "{n} giờ",
+    "onTimePct": "{pct}% đúng hạn (trong số có hạn)",
+    "restricted": "{n} văn bản hạn chế không được chia vào các số liệu trên trang này, để không ai suy ra được trạng thái của chúng.",
+    "noDepartment": "Chưa rõ phòng",
+    "unitHours": "giờ",
+    "unitDays": "ngày",
+    "average": "Trung bình",
+    "status": "Trạng thái",
+    "underHour": "dưới 1 giờ"
   }
 }

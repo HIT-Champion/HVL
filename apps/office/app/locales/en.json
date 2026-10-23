@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Mộc",
+    "name": "Signet",
     "tagline": "e-Office",
     "loading": "Loading…",
     "retry": "Retry",
@@ -11,15 +11,22 @@
     "none": "—",
     "required": "required",
     "optional": "optional",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "more": "Load more"
   },
   "nav": {
     "inbox": "My tasks",
     "incoming": "Incoming documents",
     "receive": "Receive document",
     "search": "Search",
+    "ask": "Ask",
     "logout": "Sign out",
-    "language": "Tiếng Việt"
+    "language": "Tiếng Việt",
+    "outgoing": "Outgoing",
+    "compose": "Draft a document",
+    "register": "Registers",
+    "audit": "Audit log",
+    "board": "Overview"
   },
   "role": {
     "clerk": "Clerk",
@@ -29,6 +36,8 @@
     "tenant_admin": "Unit administrator"
   },
   "status": {
+    "closed": "Closed",
+    "open": "Open",
     "received": "Awaiting registration",
     "registered": "Awaiting direction",
     "in_progress": "In progress",
@@ -39,7 +48,11 @@
     "in_review": "In review",
     "returned": "Returned",
     "approved": "Approved",
-    "issued": "Issued"
+    "issued": "Issued",
+    "pending": "Sending",
+    "delivered": "Delivered",
+    "duplicate": "Already received",
+    "failed": "Failed"
   },
   "urgency": {
     "normal": "Normal",
@@ -52,6 +65,12 @@
       "chiDao": "Give direction",
       "phanCong": "Assign within department",
       "xuLy": "Handle document"
+    },
+    "vbdi": {
+      "duyetPhong": "Review draft (department)",
+      "duyetDonVi": "Approve and sign",
+      "chinhSua": "Revise draft",
+      "phatHanh": "Number and issue"
     }
   },
   "event": {
@@ -62,9 +81,31 @@
         "directed": "Directed",
         "assigned": "Assigned to {name}",
         "processed": "Reported result",
-        "filed": "Filed without action"
+        "filed": "Filed without action",
+        "submitted": "Submitted for review",
+        "resubmitted": "Resubmitted after revision",
+        "reviewed": "Approved by department head",
+        "returned": "Returned for revision",
+        "approved": "Approved and signed",
+        "numbered": "Numbered {symbol}",
+        "issued": "Issued",
+        "overdue": "Past due date ({due})",
+        "dispatched": "Dispatched within the system to {name}",
+        "dispatch_duplicate": "{name} already had this document — no duplicate created",
+        "arrived": "Received from {name} within the system"
+      },
+      "task": {
+        "overdue": "Step “{task}” overdue, reminder sent",
+        "escalated": "Step “{task}” overdue twice, leader informed"
       }
-    }
+    },
+    "drafted": "Draft created",
+    "system": "System",
+    "notified": "Informed: {names}",
+    "ot": {
+      "alarm": "Sensor {name} read {value} °C, above the {threshold} °C threshold — draft created by the system"
+    },
+    "sourceCode": "Sender’s verification code: {code}"
   },
   "inbox": {
     "title": "My tasks",
@@ -89,7 +130,8 @@
     "issuer": "Issuer",
     "summary": "Summary",
     "status": "Status",
-    "due": "Due"
+    "due": "Due",
+    "dispatched": "Inter-unit"
   },
   "receive": {
     "title": "Receive an incoming document",
@@ -109,12 +151,102 @@
     "urgency": "Urgency",
     "dueOn": "Deadline",
     "restricted": "Restricted",
-    "restrictedHint": "Only the receiver and granted people can see it",
+    "restrictedHint": "Only the receiver and people granted access can read it. PDF only, stored encrypted; every view is stamped with the viewer’s name",
     "save": "Save",
     "saveAndRegister": "Save and register",
     "duplicate": "This document may already be received: {symbol} from {issuer}, dated {date}.",
     "saved": "Document saved.",
-    "registered": "Registered — number {n}."
+    "registered": "Registered — number {n}.",
+    "dropRestricted": "Drop PDF files here, or click to choose — files are encrypted before they are stored",
+    "cleanSealed": "Scanned — clean, encrypted",
+    "pdfOnly": "Restricted documents accept PDF files only",
+    "restrictedLocked": "Remove the uploaded files to change the restricted setting",
+    "read": {
+      "button": "Read document",
+      "reread": "Read again",
+      "forFile": "{action}: {name}",
+      "reading": "Reading the document… {s} s",
+      "readingHint": "A scanned copy can take up to 30 seconds.",
+      "started": "Reading {name}.",
+      "done": "Read via {method} — {n} field prefilled. | Read via {method} — {n} fields prefilled.",
+      "doneNone": "Read via {method} — no more fields to prefill.",
+      "doneOther": "Read via {method} — the form follows {name}, so nothing was filled in; {n} different suggestion is shown under the fields. | Read via {method} — the form follows {name}, so nothing was filled in; {n} different suggestions are shown under the fields.",
+      "doneOtherNone": "Read via {method} — nothing differs from the fields already filled in (the form follows {name}).",
+      "cached": "result of an earlier read",
+      "empty": "No details found — please enter them manually.",
+      "restricted": "Restricted documents are not read automatically.",
+      "confirmNote": "Fields tagged Suggested were prefilled by the document reader agent. Check them against the original before saving — saving means the clerk confirms them.",
+      "offer": "Suggestion: {value}",
+      "use": "Use",
+      "useFor": "Use suggestion: {value}",
+      "method": {
+        "text": "the PDF text layer",
+        "ocr": "text recognition (OCR)"
+      },
+      "field": {
+        "type_code": "document type",
+        "symbol": "reference number",
+        "issued_on": "issue date",
+        "issuer_name": "issuing body",
+        "summary": "summary",
+        "urgency": "urgency"
+      },
+      "warning": {
+        "future_date": "The date read is later than today — check it against the original.",
+        "invalid_date": "The date on the document does not exist — please enter it manually.",
+        "symbol_no_number": "The document has a symbol but no number — check the original.",
+        "type_conflict": "The title and the reference number point to different document types — the title was used, please check.",
+        "low_text": "Very little text was found — the scan may be blurred or skewed.",
+        "truncated": "Long document: only the beginning was read.",
+        "model_unavailable": "No language model is enabled — summary taken by rules.",
+        "model_timeout": "The language model took too long — summary taken by rules.",
+        "model_rejected": "The model’s summary failed the checks and was discarded — summary taken by rules.",
+        "model_skipped": "The language model was not asked this time — summary taken by rules."
+      },
+      "error": {
+        "missing_token": "Your session has expired — sign in again, then click Read document.",
+        "invalid_token": "Your session has expired — sign in again, then click Read document.",
+        "forbidden": "Only clerks can use document reading.",
+        "not_found": "File not found for reading (removed, or not uploaded by you) — upload it again.",
+        "restricted": "Restricted documents are not read automatically — please enter the details manually.",
+        "too_large": "The file is too large to read automatically — please enter the details manually.",
+        "unsupported": "Only PDF, JPEG, PNG and TIFF files can be read — please enter the details manually.",
+        "unreadable": "The file could not be read ({reason}) — please enter the details manually.",
+        "busy": "Another document is being read — wait a moment, then click Read document.",
+        "reader_disabled": "Document reading is not enabled — please enter the details manually.",
+        "ocr_unavailable": "The server has no text recognition (OCR), so scans cannot be read — please enter the details manually.",
+        "storage_unavailable": "File storage is temporarily unavailable — try again in a few minutes.",
+        "database_unavailable": "The audit log could not be written, so no suggestions were returned — try again in a few minutes.",
+        "client_timeout": "Reading took more than 60 seconds — click Read document to try again, or enter the details manually.",
+        "generic": "The document could not be read: {msg}"
+      },
+      "reason": {
+        "password": "password-protected PDF",
+        "corrupt": "damaged file",
+        "no_text": "no text or image to read",
+        "timeout": "took too long",
+        "memory": "out of memory",
+        "too_many_pixels": "image too large",
+        "unknown": "unknown error"
+      }
+    },
+    "suggest": {
+      "high": "Suggested",
+      "medium": "Suggested (unsure)",
+      "model": "Suggested by model",
+      "edited": "Edited",
+      "hint": "Prefilled by the document reader agent ({source}, {confidence}). Check it against the original before saving.",
+      "editedHint": "Edited by the clerk. The agent read: {value}",
+      "source": {
+        "rule": "read by rules",
+        "model": "written by a language model"
+      },
+      "confidence": {
+        "high": "high confidence",
+        "medium": "medium confidence",
+        "low": "low confidence"
+      }
+    }
   },
   "doc": {
     "info": "Document details",
@@ -134,12 +266,70 @@
     "support": "Support",
     "info_role": "For information",
     "timeline": "Timeline",
+    "history": "History",
+    "historyHint": "From the audit log: who changed what, and when. Content fields (summary, file names…) only show that they changed.",
+    "historyEmpty": "No audit log entries yet.",
     "register": "Register",
     "registerConfirm": "Register this document? The number is assigned automatically, consecutively per year.",
     "notFound": "Document not found, or you are not allowed to see it.",
     "restricted": "Restricted",
     "assignmentDone": "Done",
-    "assignmentOpen": "In progress"
+    "assignmentOpen": "In progress",
+    "draft": "Draft",
+    "body": "Body",
+    "recipients": "Recipients",
+    "department": "Drafting unit",
+    "signer": "Signer",
+    "replyTo": "In reply to",
+    "createdBy": "Drafted by",
+    "preview": "Download preview (PDF)",
+    "edit": "Edit draft",
+    "submit": "Submit for signing",
+    "resubmit": "Resubmit",
+    "submitTitle": "Submit draft",
+    "submitHint": "The department head reviews first, then the signer. If returned, the draft comes back to you.",
+    "returnedHint": "Draft returned: {note}",
+    "signerPick": "Signing director",
+    "submitted": "Submitted. Waiting for the department head.",
+    "verifyCode": "Verification code",
+    "verifyOpen": "Open verification page",
+    "fileRole": {
+      "main": "Document",
+      "attachment": "Attachment",
+      "draft": "Draft",
+      "issued": "Issued copy"
+    },
+    "sealed": "Encrypted",
+    "sealedHint": "Stored encrypted. Downloads are stamped with the viewer’s name and every opening is written to the audit log",
+    "viewers": "Who can read",
+    "viewersHint": "Only the receiver and the people listed below can read this document. Whoever must handle the next step is added automatically; people added still need the usual role-based access (department, assigned work).",
+    "viewersEmpty": "Nobody yet.",
+    "viewerPick": "Choose a person",
+    "viewerAdd": "Grant access",
+    "viewerRemove": "Remove",
+    "viewerBy": "granted by {by} at {at}",
+    "viewerGranted": "{name} can now read this document",
+    "viewerRevoked": "{name} can no longer read this document",
+    "dispatch": {
+      "title": "Dispatch within the system",
+      "plannedHint": "Once issued, the document goes straight to the clerks of the units below, with the issued PDF.",
+      "sentHint": "The document goes straight to each unit’s clerk with the issued PDF; they register and handle it like any incoming document.",
+      "status": {
+        "pending": "Sending",
+        "delivered": "Delivered",
+        "duplicate": "Already received",
+        "failed": "Failed"
+      },
+      "deliveredAt": "Delivered at {at}",
+      "duplicateHint": "The receiving unit had already registered this document, so no duplicate was created.",
+      "retrying": "Attempt {n} failed: {error} — retrying automatically",
+      "from": "Received from {name}",
+      "sourceCode": "Sender’s verification code",
+      "hashMatch": "SHA-256 matches the issued copy",
+      "hashMismatch": "SHA-256 does NOT match the sender’s issued copy — report it to the administrator",
+      "fromHint": "An outgoing document of another unit on Signet, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
+      "manualHint": "The clerk registered this document from paper or email; the sender's in-system dispatch arrived later and was only linked, so the attached file is the one the clerk uploaded. Open the verification page to compare it with the issued copy."
+    }
   },
   "form": {
     "chiDao": {
@@ -169,11 +359,27 @@
       "done": "Report done"
     },
     "pick": "— Choose —",
-    "done": "Moved to the next step."
+    "done": "Moved to the next step.",
+    "duyet": {
+      "note": "Comment",
+      "approve": "Approve, send to signer",
+      "sign": "Approve and sign",
+      "return": "Return",
+      "returnNote": "Say why it is returned and what to change",
+      "preview": "Read the PDF before approving"
+    },
+    "phatHanh": {
+      "public": "Show the subject on the public verification page",
+      "publicHint": "If unchecked, only the number, date and issuer are shown.",
+      "restricted": "Restricted document: the verification page shows only number, date and issuer — the summary is never public.",
+      "issue": "Number and issue",
+      "confirm": "Assign the next outgoing number and issue this document? Numbers are sequential per year and cannot be taken back.",
+      "issued": "Issued."
+    }
   },
   "search": {
     "title": "Search documents",
-    "placeholder": "Reference, summary, issuer — diacritics optional",
+    "placeholder": "Reference, summary, issuer, PDF text — diacritics optional",
     "button": "Search",
     "empty": "No matching documents.",
     "more": "Load more",
@@ -181,6 +387,137 @@
     "direction": {
       "in": "Incoming",
       "out": "Outgoing"
+    },
+    "matchedContent": "Matched in content",
+    "matchedContentHint": "The words appear in the document body or in the text of an attached PDF, not in its reference or summary",
+    "askAssistant": "Ask the assistant"
+  },
+  "assist": {
+    "title": "Ask the documents",
+    "intro": "The assistant only searches documents you are allowed to see; restricted documents are never included. Every point cites a reference number and page so you can check it.",
+    "label": "Question",
+    "placeholder": "For example: What are the requirements for a merit scholarship?",
+    "keysHint": "Enter to ask, Shift+Enter for a new line",
+    "count": "{n}/{max} characters",
+    "ask": "Ask",
+    "any": "All",
+    "direction": {
+      "label": "Documents",
+      "in": "Incoming",
+      "out": "Outgoing"
+    },
+    "year": "Year",
+    "anyYear": "Any year",
+    "yearValue": "Year {year}",
+    "searching": "Searching the documents…",
+    "generating": "Writing an answer from the passages (may take up to 40 seconds)",
+    "elapsed": "{s} s",
+    "generatingHint": "The verbatim quote above is ready to use — press Stop or Esc if you do not want to wait.",
+    "waiting": "Waiting for the previous answer to finish…",
+    "stop": "Stop",
+    "stopped": "Stopped writing the answer — showing the verbatim quote.",
+    "generateFailed": "Could not write an answer: {reason}",
+    "retryGenerate": "Write the answer again",
+    "extractTitle": "Verbatim quote",
+    "modelTitle": "Assistant answer",
+    "modelNote": "Written by a language model — check the sources before relying on it",
+    "maskedNote": "Phone numbers, ID numbers, emails and bank account numbers are masked before the text is sent to the model — the real values are in the source documents: see the verbatim quote and the sources below.",
+    "showExtract": "Show the verbatim quote",
+    "hideExtract": "Hide the verbatim quote",
+    "passagesOnly": "No short answer could be quoted — see the related passages below.",
+    "noEvidence": "No document you are allowed to see covers this. Try rephrasing, or use Search.",
+    "openSearch": "Search with this question",
+    "keyword": "Keyword search",
+    "semantic": "Keyword and meaning search",
+    "took": "{s} s",
+    "history": "Questions in this session",
+    "historyNote": "Questions and answers stay on this page only and are not stored on the server — reloading the page clears them.",
+    "source": {
+      "title": "Sources",
+      "n": "Source {n}",
+      "cite": "Source {n}: {label}",
+      "cited": "Cited",
+      "excerpt": "Passage",
+      "more": "Show the full passage",
+      "less": "Collapse the passage"
+    },
+    "openDocument": "Open document",
+    "openDocumentFor": "Open document {label}",
+    "page": "p. {n}",
+    "pageSpoken": "page {n}",
+    "summaryOnly": "summary",
+    "attachment": "attachment",
+    "citeLabel": "{symbol} · {where}",
+    "citeSpoken": "{symbol}, {where}",
+    "status": {
+      "answered": "Answered",
+      "passages_only": "Related passages only",
+      "no_evidence": "No evidence"
+    },
+    "warning": {
+      "embed_unavailable": "Meaning search was unavailable this time — results are by keyword only",
+      "model_unavailable": "The language model is not ready — showing the verbatim quote",
+      "model_timeout": "The model took too long — showing the verbatim quote",
+      "model_rejected": "The model answer failed the citation check, so it is not shown",
+      "model_declined": "The model found the passages insufficient to answer — showing the verbatim quote"
+    },
+    "error": {
+      "invalid_question": "The question is empty, longer than 500 characters, or only common words — be more specific (a topic, a number, a reference…).",
+      "missing_token": "Your session has expired — sign in again, then ask again.",
+      "invalid_token": "Your session has expired — sign in again, then ask again.",
+      "forbidden": "Only clerks, officers and managers can use Ask.",
+      "assistant_disabled": "The assistant is not enabled on the server — use Search.",
+      "busy": "The assistant is busy with another answer — try again in about 10 seconds.",
+      "search_unavailable": "The search index is temporarily unavailable — try again in a few minutes.",
+      "database_unavailable": "The audit log could not be written, so no answer was given — try again in a few minutes.",
+      "invalid_request": "Invalid request — reload the page and ask again.",
+      "not_found": "The server does not offer Ask yet — contact your administrator.",
+      "unavailable": "The assistant is temporarily not responding — try again in a few minutes.",
+      "client_timeout": "No result within the time limit — try again in a few minutes.",
+      "generic": "Could not ask: {msg}"
+    },
+    "live": {
+      "found": "Related passages found: {n}.",
+      "generating": "Writing an answer.",
+      "answered": "The assistant has answered.",
+      "extractOnly": "No model answer — showing the verbatim quote."
+    }
+  },
+  "assign": {
+    "suggest": {
+      "title": "Assignment suggestion",
+      "searching": "No assignment suggestion yet — when the agent is on, it usually arrives within seconds…",
+      "unit": "Lead unit",
+      "due": "Suggested deadline",
+      "dueDays": "{date} ({n} day, as for similar documents) | {date} ({n} days, as for similar documents)",
+      "dueFromDocument": "As written on the document ({date})",
+      "evidence": "Based on {n} similar document assigned before | Based on {n} similar documents assigned before",
+      "days": "{n} day | {n} days",
+      "apply": "Use suggestion",
+      "applyHint": "Only fills in the lead unit and deadline in the form below; nothing is assigned yet.",
+      "kept": "As suggested",
+      "changed": "Differs from suggestion",
+      "note": "The agent only suggests; the director decides. The suggestion is recorded in the audit log.",
+      "nothing": "No assignment suggestion: {reason}.",
+      "nothingPlain": "No assignment suggestion.",
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence"
+      },
+      "outcome": {
+        "suggested": "Suggested",
+        "none": "No suggestion",
+        "failed": "Failed"
+      },
+      "reason": {
+        "no_similar": "no similar document has been assigned before",
+        "no_history": "the similar documents were not assigned to any unit",
+        "no_valid_unit": "the units that led similar documents have no department head to take the task",
+        "low_confidence": "similar documents went to different units, not confident enough",
+        "timeout": "searching for similar documents took too long",
+        "unavailable": "the document search service is temporarily unavailable"
+      }
     }
   },
   "error": {
@@ -191,13 +528,409 @@
     "documents_due_after_registered": "The deadline cannot be before the registration date.",
     "documents_summary": "The summary must be 10–500 characters.",
     "infected": "The file contains malware and was blocked.",
+    "unscannable": "The file is password-protected or nested too deeply for the malware scanner to check — blocked. Remove the password or unpack it, then upload again.",
     "too_large": "The file is too large.",
-    "noRole": "Your account has no role or unit yet. Contact your unit administrator."
+    "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
+    "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
+    "documents_body_length": "The body is longer than 20,000 characters.",
+    "invalid": "Some fields are not valid, see the highlighted fields.",
+    "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",
+    "documents_restricted_sealed": "This document already has files, so its restricted setting cannot change",
+    "documents_restricted_local": "Restricted documents cannot be sent to other units within the system.",
+    "documents_recipient_units": "Invalid receiving unit (unknown, or your own unit), or the document was already submitted so its receiving units can no longer change."
   },
   "validation": {
     "required": "Required",
     "summaryLength": "10–500 characters",
     "dateFuture": "Cannot be in the future",
-    "dueBefore": "Must be today or later"
+    "dueBefore": "Must be today or later",
+    "between": "{min}–{max} characters",
+    "max": "At most {max} characters",
+    "format": "Invalid format",
+    "not": "Extra spaces at the start or end, line breaks or hidden characters",
+    "nfc": "Text is not in composed Unicode form (NFC)",
+    "year": "The year must be between 1900 and 2099",
+    "enum": "Not in the list",
+    "type": "Wrong data type",
+    "additionalProperties": "Field not in the form",
+    "uniqueItems": "The same file is attached twice",
+    "maxItems": "Too many files",
+    "duplicate": "An incoming document with the same issuer, number and date already exists",
+    "unknown": "Not found, or not uploaded by you",
+    "not_sealed": "Restricted documents only take files uploaded in restricted mode — remove and upload again",
+    "sealed": "Encrypted files are for restricted documents only — remove and upload again",
+    "restricted": "Restricted documents never publish their summary"
+  },
+  "outgoing": {
+    "title": "Outgoing documents",
+    "compose": "Draft a document",
+    "empty": "No outgoing documents yet.",
+    "tab": {
+      "drafts": "Drafts",
+      "review": "In review",
+      "issued": "Issued",
+      "all": "All"
+    },
+    "symbol": "Number",
+    "summary": "Subject",
+    "department": "Drafting unit",
+    "status": "Status",
+    "issuedOn": "Issued on",
+    "unnumbered": "Not numbered"
+  },
+  "compose": {
+    "title": "Draft an outgoing document",
+    "editTitle": "Edit draft",
+    "subtitle": "The text is typeset as a PDF following Decree 30/2020; the clerk assigns the number and date when issuing.",
+    "type": "Document type",
+    "summary": "Subject",
+    "summaryHint": "10–500 characters",
+    "body": "Body",
+    "bodyHint": "Each line is a paragraph",
+    "recipients": "Recipients",
+    "recipientsHint": "One recipient per line",
+    "urgency": "Urgency",
+    "replyTo": "In reply to",
+    "replyNone": "— None —",
+    "attachments": "Attachments",
+    "attachmentsHint": "Annexes or tables (optional); files are virus-scanned before they are stored",
+    "save": "Save draft",
+    "saved": "Draft saved.",
+    "restored": "Restored your unsaved draft.",
+    "notEditable": "This draft can no longer be edited: it was submitted, or you are not its author.",
+    "units": "Send within the system",
+    "unitsHint": "Once issued, the document goes straight to the clerks of the selected units, with the issued PDF. Ticking a unit adds its name to the recipients.",
+    "unitsRestricted": "Restricted documents are not sent to other units: their files can only be opened in your own unit."
+  },
+  "verify": {
+    "title": "Verify a document",
+    "subtitle": "Check that a document issued through Signet is genuine and unaltered.",
+    "code": "Verification code",
+    "codeHint": "10 characters printed next to the QR code, e.g. ABCDE-23456",
+    "lookup": "Look up",
+    "file": "Or drop the PDF you received here",
+    "fileHint": "The file never leaves your computer: your browser computes its SHA-256 and only the hash is sent.",
+    "checking": "Checking…",
+    "valid": "Genuine document, issued by the organisation below",
+    "notFound": "No matching document",
+    "notFoundHint": "Check the code. When checking a file: it was altered, or it was not issued through Signet.",
+    "match": "The file matches the issued copy byte for byte",
+    "mismatch": "The file does NOT match the document with this code: it may have been altered",
+    "compare": "Drop the PDF you received to compare it with the original",
+    "symbol": "Number",
+    "issuedOn": "Issued on",
+    "issuer": "Issuer",
+    "type": "Type",
+    "summary": "Subject",
+    "summaryHidden": "Not public",
+    "sha256": "SHA-256 of the issued copy",
+    "signature": {
+      "title": "Digital signature (illustrative)",
+      "level": "Signature standard",
+      "signer": "Signed by",
+      "ca": "Certificate issued by",
+      "serial": "Certificate serial number",
+      "signedAt": "Signed at (time stated in the signature)",
+      "illustrative": "The signature uses Signet's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
+      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above."
+    },
+    "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
+    "rateLimited": "Too many lookups. Wait a minute and try again.",
+    "footer": "Signet — open-source e-office. No login required on this page."
+  },
+  "notify": {
+    "title": "Notifications",
+    "empty": "No notifications yet",
+    "markAll": "Mark all as read",
+    "live": "Receiving live notifications",
+    "offline": "Live channel not connected — existing notifications are still shown, reconnecting",
+    "someone": "The assignee",
+    "note": "Comment: {note}",
+    "taskAssigned": "New task: {task}",
+    "taskOverdue": "Overdue: {task}",
+    "taskEscalated": "{name} has not finished “{task}” on time",
+    "documentIssued": "Document {symbol} issued",
+    "documentProcessed": "{name} reported the result",
+    "documentOverdue": "Document past its due date ({due})",
+    "otAlarm": "Temperature alert in {name}: {value} °C — incident report draft ready",
+    "restricted": "Restricted document",
+    "documentIncoming": "Incoming document from {name} (within the system)"
+  },
+  "audit": {
+    "title": "Audit log",
+    "subtitle": "Every data change in your organisation, linked into a SHA-256 hash chain: editing or deleting a row in secret is detected.",
+    "anchored": "The chain is anchored outside the database up to row #{id}, at {at}.",
+    "notAnchored": "The chain has not been anchored outside the database yet.",
+    "how": "Each anchor copies the hash of the newest row to write-locked storage that nobody can delete or change, administrators included. Server administrators check the whole chain with make audit.",
+    "group": {
+      "all": "All",
+      "documents": "Documents",
+      "assignments": "Assignments",
+      "files": "Files",
+      "people": "Users, access",
+      "catalog": "Catalogues"
+    },
+    "forDocument": "For one document",
+    "clear": "Clear filter",
+    "empty": "No changes yet.",
+    "when": "When",
+    "who": "By",
+    "what": "Action",
+    "changes": "Changes",
+    "chain": "Row",
+    "service": "{name} (via system)",
+    "yes": "Yes",
+    "no": "No",
+    "hidden": "Other fields changed: {cols}",
+    "hiddenHint": "The log does not show these values, so restricted documents stay private",
+    "openDocument": "Open document",
+    "openAudit": "View in audit log",
+    "isAnchored": "Anchored",
+    "notYet": "Not yet anchored",
+    "more": "Load more",
+    "action": {
+      "insert": "Created",
+      "update": "Changed",
+      "delete": "Deleted",
+      "file": {
+        "rejected": "Blocked infected file",
+        "unscannable": "Blocked unscannable file (password, nested too deeply)"
+      },
+      "register": {
+        "printed": "Printed register"
+      },
+      "case_file": {
+        "archived": "Case file archived",
+        "read": "Archived case file read"
+      },
+      "intake": {
+        "suggested": "Read document, suggested intake details"
+      },
+      "assistant": {
+        "answered": "Answered a question on the documents"
+      },
+      "assignment": {
+        "suggested": "Suggested an assignment"
+      }
+    },
+    "entity": {
+      "office": {
+        "documents": "Document",
+        "assignments": "Assignment",
+        "document_files": "Document file",
+        "document_acl": "Document access",
+        "departments": "Department",
+        "registers": "Register",
+        "document_types": "Document type",
+        "case_files": "Case file",
+        "case_file_documents": "Document in case file",
+        "dispatches": "Inter-unit dispatch"
+      },
+      "core": {
+        "files": "Uploaded file",
+        "users": "User",
+        "tenants": "Organisation"
+      },
+      "ai": {
+        "questions": "Question to the assistant"
+      }
+    },
+    "col": {
+      "status": "Status",
+      "urgency": "Urgency",
+      "direction": "Direction",
+      "register_number": "Register number",
+      "registered_at": "Registered at",
+      "due_on": "Due",
+      "issued_on": "Issued on",
+      "restricted": "Restricted",
+      "is_public": "Public",
+      "role": "Role",
+      "enabled": "Active",
+      "department_id": "Department",
+      "user_id": "Person",
+      "signer_id": "Signer",
+      "content_sha256": "document hash",
+      "sha256": "file hash",
+      "summary": "summary",
+      "body": "body",
+      "symbol": "reference",
+      "issuer_name": "issuer",
+      "type_code": "type",
+      "recipients": "recipients",
+      "verify_code": "lookup code",
+      "filename": "file name",
+      "instruction": "instruction",
+      "result_note": "result",
+      "full_name": "full name",
+      "email": "email",
+      "name": "name",
+      "signature": "malware signature",
+      "process_id": "process",
+      "register_id": "register",
+      "reply_to_id": "reply to",
+      "source_id": "source document",
+      "parent_id": "delegated from",
+      "assigned_by": "assigned by",
+      "assigned_at": "assigned at",
+      "completed_at": "completed at",
+      "mime_type": "file type",
+      "size_bytes": "file size",
+      "scanned_at": "scanned at",
+      "encrypted": "encrypted",
+      "wrapped_dek": "encryption key",
+      "storage_tier": "storage tier",
+      "version": "version",
+      "added_by": "added by",
+      "added_at": "added at",
+      "granted_by": "granted by",
+      "granted_at": "granted at",
+      "code": "code",
+      "org_ident": "organisation id",
+      "username": "username",
+      "year": "year",
+      "entries": "rows",
+      "masked": "masked rows",
+      "closed_on": "Closed on",
+      "retention_years": "Retention (years)",
+      "archived_at": "Archived at",
+      "archive_sha256": "archive package hash",
+      "case_file_id": "Case file",
+      "documents": "Documents",
+      "files": "Files",
+      "title": "case file title",
+      "recipient_tenant_ids": "receiving units",
+      "to_tenant_id": "Receiving unit",
+      "incoming_document_id": "receiver’s incoming document",
+      "source_verify_code": "sender’s verification code",
+      "source_sha256": "issued copy hash",
+      "attempts": "Attempts",
+      "last_error": "last error",
+      "delivered_at": "Delivered at",
+      "next_attempt_at": "next attempt at",
+      "notified_at": "notified at",
+      "method": "Read via",
+      "pages": "Pages",
+      "found": "Fields found",
+      "summary_source": "Summary source",
+      "model": "Model",
+      "duration_ms": "Processing time",
+      "reason": "Reason",
+      "ask_id": "Question ID",
+      "mode": "Mode",
+      "answer_source": "Answer source",
+      "hits": "Passages found",
+      "cited": "Sources cited",
+      "semantic": "Meaning search",
+      "embed_model": "Embedding model",
+      "warnings": "Warnings",
+      "outcome": "Outcome",
+      "outcome_reason": "Reason",
+      "due_days": "Suggested deadline",
+      "confidence": "Confidence",
+      "evidence": "Evidence documents",
+      "candidates": "Similar documents found"
+    },
+    "direction": {
+      "in": "Incoming",
+      "out": "Outgoing"
+    },
+    "role": {
+      "lead": "Lead",
+      "support": "Support",
+      "info": "For information",
+      "main": "Main file",
+      "attachment": "Attachment",
+      "draft": "Draft",
+      "issued": "Issued copy",
+      "clerk": "Clerk",
+      "staff": "Officer",
+      "manager": "Department head",
+      "director": "Director",
+      "tenant_admin": "Administrator"
+    },
+    "agent": "{name} (agent)",
+    "agents": {
+      "moc-doc-reader": "Document reader",
+      "moc-assistant": "Q&A assistant",
+      "moc-assigner": "Assignment suggester"
+    },
+    "seconds": "{n} s",
+    "readStatus": {
+      "ok": "Suggestions found",
+      "empty": "No details found",
+      "unreadable": "Unreadable"
+    },
+    "summarySource": {
+      "rule": "Rules",
+      "model": "Language model",
+      "none": "None"
+    },
+    "askMode": {
+      "extract": "Verbatim quote",
+      "generate": "Model-written answer"
+    },
+    "answerSource": {
+      "extract": "Verbatim quote",
+      "model": "Language model",
+      "none": "None"
+    }
+  },
+  "register": {
+    "title": "Document registers",
+    "subtitle": "The columns of the statutory register template (Decree 30/2020/NĐ-CP, Appendix IV). Print on paper for signatures and the year-end closing.",
+    "year": "Year",
+    "yearOption": "Year {year}",
+    "book": {
+      "den": "Incoming register",
+      "di": "Outgoing register"
+    },
+    "print": "Print register (PDF)",
+    "printing": "Rendering…",
+    "none": "The {year} register has no documents yet.",
+    "continuous": "No gaps: numbers 01 to {last}.",
+    "gaps": "Rows missing for numbers: {numbers}. Tell your system administrator before printing.",
+    "how": "Click a row to open the document. The Signature and Copies columns stay blank for handwriting on the printout. Every print is recorded in the audit log.",
+    "masked": "{n} rows are restricted documents you cannot read: only number, dates and reference are shown."
+  },
+  "board": {
+    "title": "Overview",
+    "subtitle": "Document figures for your unit, computed when the page opens. Counts only; restricted documents appear as a single total, not broken down by status or department.",
+    "forbidden": "Only unit leaders can view this page.",
+    "open": "Incoming not finished",
+    "openHint": "Awaiting registration, direction or processing",
+    "overdue": "Overdue",
+    "overdueHint": "Not finished (including awaiting registration) and past the deadline",
+    "urgent": "Urgent not finished",
+    "urgentHint": "Urgent, very urgent, express",
+    "avgDays": "Average days",
+    "daysValue": "{n} days",
+    "avgHint": "From registration to done, last 12 months · {done} documents",
+    "noneDone": "No document has been finished yet",
+    "byStatus": "Incoming documents by status",
+    "byDepartment": "Incoming in progress by lead department",
+    "processing": "Processing time by month finished",
+    "outgoing": "Outgoing documents issued by month",
+    "inTime": "On schedule",
+    "late": "Overdue",
+    "inProgress": "In progress",
+    "department": "Department",
+    "month": "Month",
+    "finished": "Finished",
+    "onTime": "On time",
+    "issued": "Issued",
+    "count": "Documents",
+    "empty": "No data yet",
+    "avgTime": "Average processing time",
+    "avgHours": "Average hours",
+    "hoursValue": "{n} hours",
+    "onTimePct": "{pct}% on time (of those with a deadline)",
+    "restricted": "{n} restricted documents are left out of the breakdowns on this page, so nobody can infer their status.",
+    "noDepartment": "No department",
+    "unitHours": "hours",
+    "unitDays": "days",
+    "average": "Average",
+    "status": "Status",
+    "underHour": "under 1 hour"
   }
 }

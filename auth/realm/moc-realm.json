@@ -1,6 +1,6 @@
 {
   "realm": "moc",
-  "displayName": "Mộc",
+  "displayName": "Signet",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
@@ -9,6 +9,7 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
+  "organizationsEnabled": true,
   "bruteForceProtected": true,
   "failureFactor": 10,
   "accessTokenLifespan": 300,
@@ -21,10 +22,113 @@
     "en"
   ],
   "defaultLocale": "vi",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyCodeReusable": false,
+  "browserFlow": "moc-browser",
+  "directGrantFlow": "moc-cli-direct-grant",
+  "authenticationFlows": [
+    {
+      "alias": "moc-browser",
+      "description": "Đăng nhập trên trình duyệt: mật khẩu, rồi mã TOTP — bắt buộc với văn thư, lãnh đạo, quản trị đơn vị; với vai trò khác chỉ hỏi khi người đó đã tự cài TOTP",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "auth-cookie", "requirement": "ALTERNATIVE", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"flowAlias": "moc-browser-forms", "requirement": "ALTERNATIVE", "priority": 20, "autheticatorFlow": true, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-browser-forms",
+      "description": "Mật khẩu, rồi TOTP theo vai trò",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "auth-username-password-form", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"flowAlias": "moc-otp-bat-buoc", "requirement": "CONDITIONAL", "priority": 20, "autheticatorFlow": true, "userSetupAllowed": false},
+        {"flowAlias": "moc-otp-tu-chon", "requirement": "CONDITIONAL", "priority": 30, "autheticatorFlow": true, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-otp-bat-buoc",
+      "description": "Văn thư, lãnh đạo phòng, lãnh đạo đơn vị, quản trị đơn vị: bắt buộc TOTP; chưa cài thì Keycloak bắt cài ngay ở lần đăng nhập này",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-bat-buoc-otp", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "auth-otp-form", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-otp-tu-chon",
+      "description": "Vai trò khác đã tự cài TOTP: hỏi mã",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-configured", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-khong-bat-buoc-otp", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "auth-otp-form", "requirement": "REQUIRED", "priority": 30, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "id": "caf1a197-9781-4731-b8a2-5a9ae6ebe31d",
+      "alias": "moc-cli-direct-grant",
+      "description": "Client moc-cli (make seed, make smoke, CI): mật khẩu rồi mã TOTP (tham số otp) theo đúng quy tắc của trình duyệt — không là đường vòng qua xác thực hai bước",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "direct-grant-validate-username", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "direct-grant-validate-password", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"flowAlias": "moc-cli-otp-bat-buoc", "requirement": "CONDITIONAL", "priority": 30, "autheticatorFlow": true, "userSetupAllowed": false},
+        {"flowAlias": "moc-cli-otp-tu-chon", "requirement": "CONDITIONAL", "priority": 40, "autheticatorFlow": true, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-cli-otp-bat-buoc",
+      "description": "Văn thư, lãnh đạo phòng, lãnh đạo đơn vị, quản trị đơn vị: bắt buộc mã TOTP; chưa cài TOTP thì không lấy được token (luồng này không cài được)",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-bat-buoc-otp", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "direct-grant-validate-otp", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "alias": "moc-cli-otp-tu-chon",
+      "description": "Vai trò khác đã tự cài TOTP: hỏi mã",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-configured", "requirement": "REQUIRED", "priority": 10, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "conditional-user-attribute", "authenticatorConfig": "moc-vai-tro-khong-bat-buoc-otp", "requirement": "REQUIRED", "priority": 20, "autheticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "direct-grant-validate-otp", "requirement": "REQUIRED", "priority": 30, "autheticatorFlow": false, "userSetupAllowed": false}
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "moc-vai-tro-bat-buoc-otp",
+      "config": {"attribute_name": "moc_role", "attribute_expected_value": "^(clerk|manager|director|tenant_admin)$", "regex": "true", "not": "false", "include_group_attributes": "false"}
+    },
+    {
+      "alias": "moc-vai-tro-khong-bat-buoc-otp",
+      "config": {"attribute_name": "moc_role", "attribute_expected_value": "^(clerk|manager|director|tenant_admin)$", "regex": "true", "not": "true", "include_group_attributes": "false"}
+    }
+  ],
   "clients": [
     {
       "clientId": "app-office",
-      "name": "Mộc — Văn phòng điện tử",
+      "name": "Signet — Văn phòng điện tử",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -125,13 +229,16 @@
     },
     {
       "clientId": "moc-cli",
-      "name": "Mộc — kịch bản dòng lệnh",
+      "name": "Signet — kịch bản dòng lệnh",
       "enabled": ${MOC_CLI_CLIENT_ENABLED:true},
       "publicClient": true,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
+      "authenticationFlowBindingOverrides": {
+        "direct_grant": "caf1a197-9781-4731-b8a2-5a9ae6ebe31d"
+      },
       "protocolMappers": [
         {
           "name": "hasura-user-id",
@@ -213,7 +320,7 @@
     },
     {
       "clientId": "svc-workflow",
-      "name": "Mộc — svc-workflow",
+      "name": "Signet — svc-workflow",
       "enabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
@@ -244,7 +351,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"Họ và đệm\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"required\": {\"roles\": [\"user\"]}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"Tên\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"required\": {\"roles\": [\"user\"]}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"tenant_id\", \"displayName\": \"Đơn vị (tenant_id)\", \"validations\": {\"pattern\": {\"pattern\": \"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\", \"error-message\": \"Phải là UUID của core.tenants\"}}, \"permissions\": {\"view\": [\"admin\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"moc\"}, {\"name\": \"department_id\", \"displayName\": \"Phòng (department_id)\", \"validations\": {\"pattern\": {\"pattern\": \"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\", \"error-message\": \"Phải là UUID của office.departments\"}}, \"permissions\": {\"view\": [\"admin\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"moc\"}, {\"name\": \"moc_role\", \"displayName\": \"Vai trò\", \"validations\": {\"options\": {\"options\": [\"clerk\", \"staff\", \"manager\", \"director\", \"tenant_admin\"]}}, \"annotations\": {\"inputType\": \"select\"}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"moc\"}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}, {\"name\": \"moc\", \"displayHeader\": \"Mộc\", \"displayDescription\": \"Đơn vị, phòng và vai trò — đưa vào token cho Hasura\"}]}"
+            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"Họ và đệm\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"required\": {\"roles\": [\"user\"]}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"Tên\", \"validations\": {\"length\": {\"max\": 255}, \"person-name-prohibited-characters\": {}}, \"required\": {\"roles\": [\"user\"]}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"tenant_id\", \"displayName\": \"Đơn vị (tenant_id)\", \"validations\": {\"pattern\": {\"pattern\": \"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\", \"error-message\": \"Phải là UUID của core.tenants\"}}, \"permissions\": {\"view\": [\"admin\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"moc\"}, {\"name\": \"department_id\", \"displayName\": \"Phòng (department_id)\", \"validations\": {\"pattern\": {\"pattern\": \"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$\", \"error-message\": \"Phải là UUID của office.departments\"}}, \"permissions\": {\"view\": [\"admin\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"moc\"}, {\"name\": \"moc_role\", \"displayName\": \"Vai trò\", \"validations\": {\"options\": {\"options\": [\"clerk\", \"staff\", \"manager\", \"director\", \"tenant_admin\"]}}, \"annotations\": {\"inputType\": \"select\"}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"group\": \"moc\"}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}, {\"name\": \"moc\", \"displayHeader\": \"Signet\", \"displayDescription\": \"Đơn vị, phòng và vai trò — đưa vào token cho Hasura\"}]}"
           ]
         }
       }

@@ -1,23 +1,26 @@
 {
   "name": "moc-app-office",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Mộc — Văn phòng điện tử (Tầng 2)",
+  "description": "Signet — Văn phòng điện tử (Tầng 2)",
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt generate",
     "typecheck": "nuxt typecheck",
+    "test": "node --test tests/*.test.ts",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "echarts": "6.1.0",
     "nuxt": "4.5.2",
     "oidc-client-ts": "3.5.0",
     "vue-i18n": "11.4.13"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
+    "ajv": "8.20.0",
     "tailwindcss": "4.3.3"
   },
   "engines": {

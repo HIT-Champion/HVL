@@ -1,6 +1,6 @@
-# Hướng dẫn đóng góp cho Mộc
+# Hướng dẫn đóng góp cho Signet
 
-Cảm ơn bạn đã quan tâm tới Mộc. Dự án hoan nghênh mọi đóng góp: báo lỗi, đề xuất tính năng,
+Cảm ơn bạn đã quan tâm tới Signet. Dự án hoan nghênh mọi đóng góp: báo lỗi, đề xuất tính năng,
 cải thiện tài liệu, bổ sung dịch vụ cho lõi nền tảng hoặc ứng dụng chạy trên lõi.
 
 Tệp này tóm tắt những điều bắt buộc. Quy trình Git chi tiết (nhánh, commit, pull request, phát
@@ -21,8 +21,8 @@ trách mảng đó trong issue hoặc pull request:
 
 Trước khi viết dòng mã đầu tiên, hãy nắm ba ràng buộc không được vi phạm:
 
-1. **Không fork-và-sửa phần mềm thượng nguồn.** Mộc *điều phối* các dự án nguồn mở ở dạng
-   nguyên bản. Mọi tùy biến phải nằm ở lớp cấu hình, plugin, hoặc adapter của riêng Mộc.
+1. **Không fork-và-sửa phần mềm thượng nguồn.** Signet *điều phối* các dự án nguồn mở ở dạng
+   nguyên bản. Mọi tùy biến phải nằm ở lớp cấu hình, plugin, hoặc adapter của riêng Signet.
    Nếu cần vá upstream, hãy gửi patch lên chính dự án đó rồi ghim phiên bản.
 2. **Không bundle mã nguồn của dự án khác vào kho này.** Phụ thuộc được khai báo qua image
    Docker có ghim thẻ phiên bản, hoặc qua trình quản lý gói — không sao chép cây mã vào repo.
@@ -40,9 +40,9 @@ git clone https://github.com/<tài-khoản-của-bạn>/HVL.git
 cd HVL
 git remote add upstream https://github.com/HIT-Champion/HVL.git
 
-# 3. Tạo nhánh từ main mới nhất của repo gốc
+# 3. Tạo nhánh từ develop mới nhất của repo gốc (nhánh mặc định; main chỉ chứa bản đã phát hành)
 git fetch upstream
-git switch -c feat/<số-issue>-<mô-tả-ngắn> upstream/main   # hoặc fix/, docs/, refactor/, test/
+git switch -c feat/<số-issue>-<mô-tả-ngắn> upstream/develop   # hoặc fix/, docs/, refactor/, test/
 
 # 4. Cấu hình môi trường
 cp .env.example .env
@@ -53,13 +53,13 @@ make license-check    # bảo đảm mọi tệp mã có header giấy phép
 make check            # kiểm tra môi trường + cú pháp Compose
 
 # 6. Commit theo quy ước bên dưới, đẩy lên bản fork,
-#    rồi mở pull request vào nhánh main của HIT-Champion/HVL
+#    rồi mở pull request vào nhánh develop của HIT-Champion/HVL
 git push -u origin feat/<số-issue>-<mô-tả-ngắn>
 ```
 
-Pull request cần **CI xanh** và được **một người duy trì duyệt**, sau đó được gộp bằng
-*Squash and merge*. Thành viên đội tạo nhánh thẳng trên repo, không cần fork — xem
-[`docs/git_flow.md`](docs/git_flow.md).
+Pull request cần **CI xanh** và được **một người duy trì duyệt**, sau đó được gộp vào `develop` bằng
+*Squash and merge*. `main` chỉ nhận bản phát hành do người duy trì gộp từ `develop`. Thành viên đội tạo
+nhánh thẳng trên repo, không cần fork — xem [`docs/git_flow.md`](docs/git_flow.md).
 
 ## Quy ước commit
 
@@ -76,8 +76,9 @@ ci: ghim phiên bản action checkout
 
 - **Loại**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.
 - **Phạm vi** theo thành phần: `gateway`, `auth`, `db`, `workflow`, `files`, `realtime`, `office`,
-  `ai`, `data`, `ops`, `cli`, `ci`, `deps`, `docs`, `release`.
-- Chân commit ghi `Closes #<số-issue>` để tự đóng issue khi gộp vào `main`.
+  `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
+- Chân commit ghi `Closes #<số-issue>` để tự đóng issue khi gộp vào `develop`.
+- CI kiểm tiêu đề pull request theo đúng quy ước này, vì khi squash nó thành dòng đầu của commit.
 
 Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`](docs/git_flow.md) mục 3.
 
@@ -99,7 +100,7 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
 ## Báo lỗi
 
 Mở issue theo mẫu có sẵn tại `.github/ISSUE_TEMPLATE/`. Một báo lỗi hữu ích cần có: bước tái
-hiện, kết quả mong đợi, kết quả thực tế, phiên bản Mộc (`git describe --tags`), và nhật ký
+hiện, kết quả mong đợi, kết quả thực tế, phiên bản Signet (`git describe --tags`), và nhật ký
 liên quan (`make logs`).
 
 ## Giấy phép của phần đóng góp

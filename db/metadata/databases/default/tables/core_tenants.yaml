@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,32 +14,40 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Mỗi người chỉ thấy thuê ước của mình. Tạo thuê ước: `dxos tenant create` (Phase 3), không qua GraphQL.
+# Mỗi người chỉ thấy thuê ước của mình. Tạo thuê ước: `python3 scripts/moc.py tenant create` (F3.12, ghi thẳng vào
+# CSDL trên máy chủ, kèm Organization trong Keycloak), không qua GraphQL.
+# Quản trị đơn vị sửa được thông tin in trên văn bản đi: cơ quan chủ quản, địa danh, chức vụ người đứng đầu.
 table:
   name: tenants
   schema: core
 select_permissions:
   - role: clerk
     permission:
-      columns: [id, code, name, org_ident]
+      columns: [id, code, name, org_ident, parent_name, place_name, head_title]
       filter: {id: {_eq: X-Hasura-Tenant-Id}}
   - role: staff
     permission:
-      columns: [id, code, name, org_ident]
+      columns: [id, code, name, org_ident, parent_name, place_name, head_title]
       filter: {id: {_eq: X-Hasura-Tenant-Id}}
   - role: manager
     permission:
-      columns: [id, code, name, org_ident]
+      columns: [id, code, name, org_ident, parent_name, place_name, head_title]
       filter: {id: {_eq: X-Hasura-Tenant-Id}}
   - role: director
     permission:
-      columns: [id, code, name, org_ident]
+      columns: [id, code, name, org_ident, parent_name, place_name, head_title]
       filter: {id: {_eq: X-Hasura-Tenant-Id}}
   - role: tenant_admin
     permission:
-      columns: [id, code, name, org_ident]
+      columns: [id, code, name, org_ident, parent_name, place_name, head_title]
       filter: {id: {_eq: X-Hasura-Tenant-Id}}
   - role: service
     permission:
-      columns: [id, code, name, org_ident, created_at]
+      columns: [id, code, name, org_ident, parent_name, place_name, head_title, created_at]
       filter: {id: {_eq: X-Hasura-Tenant-Id}}
+update_permissions:
+  - role: tenant_admin
+    permission:
+      columns: [parent_name, place_name, head_title]
+      filter: {id: {_eq: X-Hasura-Tenant-Id}}
+      check: {id: {_eq: X-Hasura-Tenant-Id}}

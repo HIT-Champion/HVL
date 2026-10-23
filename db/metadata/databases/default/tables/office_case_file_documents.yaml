@@ -1,0 +1,79 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Văn bản trong hồ sơ (F3.8). Trigger trong CSDL chỉ nhận văn bản đã xử lý xong (đến: done, đi: issued), không hạn
+# chế, vào hồ sơ còn mở; mỗi văn bản thuộc một hồ sơ. Gỡ được khi hồ sơ còn mở.
+table:
+  name: case_file_documents
+  schema: office
+object_relationships:
+  - name: case_file
+    using:
+      manual_configuration:
+        remote_table: {name: case_files, schema: office}
+        column_mapping: {case_file_id: id}
+  - name: document
+    using:
+      manual_configuration:
+        remote_table: {name: documents, schema: office}
+        column_mapping: {document_id: id}
+insert_permissions:
+  - role: staff
+    permission: &add
+      columns: [case_file_id, document_id]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+        added_by: X-Hasura-User-Id
+      # hồ sơ của phòng mình; văn bản mình đọc được và thuộc phòng mình (văn bản đi của phòng, văn bản đến giao cho
+      # phòng hoặc cho mình) — không đưa văn bản phòng khác vào hồ sơ rồi đọc qua phòng đọc
+      check:
+        case_file:
+          tenant_id: {_eq: X-Hasura-Tenant-Id}
+          department_id: {_eq: X-Hasura-Department-Id}
+        document:
+          visible: {_eq: true}
+          _or:
+            - department_id: {_eq: X-Hasura-Department-Id}
+            - assignments: {department_id: {_eq: X-Hasura-Department-Id}}
+            - assignments: {user_id: {_eq: X-Hasura-User-Id}}
+  - role: manager
+    permission: *add
+select_permissions:
+  - role: staff
+    permission: &department_select
+      columns: &columns [tenant_id, case_file_id, document_id, added_by, added_at]
+      filter:
+        case_file:
+          tenant_id: {_eq: X-Hasura-Tenant-Id}
+          department_id: {_eq: X-Hasura-Department-Id}
+  - role: manager
+    permission: *department_select
+  - role: clerk
+    permission: &tenant_select
+      columns: *columns
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+  - role: director
+    permission: *tenant_select
+delete_permissions:
+  - role: staff
+    permission: &remove
+      filter:
+        case_file:
+          tenant_id: {_eq: X-Hasura-Tenant-Id}
+          department_id: {_eq: X-Hasura-Department-Id}
+          status: {_eq: open}
+  - role: manager
+    permission: *remove

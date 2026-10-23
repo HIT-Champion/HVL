@@ -72,7 +72,7 @@ git push origin main --tags
 | ☐ | **Không** cấu hình bằng cách sửa tay tệp header | Mọi tham số nằm trong `.env` | −5 |
 | ☐ | Cấu hình được **trước khi** dịch | `cp .env.example .env` rồi mới `make build` | −5 |
 | ☐ | Dịch bằng **công cụ nguồn mở** | Docker, Compose, Make, Git — đều là PMNM | −5 |
-| ☐ | Chạy được **ngoài thư mục mã nguồn** | Đường dẫn tương đối theo biến môi trường | −5 |
+| ☐ | Chạy được **ngoài thư mục mã nguồn** | `make install PREFIX=/opt/moc` (README, mục "Cài ra ngoài thư mục mã nguồn"); CI chạy smoke từ bản cài | −5 |
 
 **Bài kiểm tra thực tế bắt buộc làm trước ngày chấm** — giả lập đúng thao tác của giám khảo:
 
@@ -82,6 +82,11 @@ git clone <URL-repo> && cd HVL
 cp .env.example .env
 make check && make build && make up
 # Hệ thống phải chạy được mà không cần sửa bất kỳ tệp mã nào.
+
+# Chạy ngoài thư mục mã nguồn: cài, xóa hẳn mã nguồn, chạy từ PREFIX
+make down && make install PREFIX=/tmp/pof-test/opt-moc
+cd /tmp/pof-test && rm -rf HVL && cd opt-moc
+docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.py
 ```
 
 ---
@@ -95,7 +100,7 @@ make check && make build && make up
 | ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` | −5 |
 | ☐ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin | −5 |
 
-> ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Mộc. Nguyên tắc
+> ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Signet. Nguyên tắc
 > an toàn: `docker-compose.yml` kéo image thượng nguồn **nguyên bản có ghim thẻ phiên bản**; mọi
 > tùy biến nằm ở `.env`, tệp cấu hình riêng, hoặc adapter do đội tự viết.
 

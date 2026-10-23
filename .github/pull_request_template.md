@@ -1,8 +1,8 @@
 <!--
-Tiêu đề PR phải theo Conventional Commits, ví dụ:
+PR tính năng, sửa lỗi, tài liệu: nhánh đích là develop. Tiêu đề theo Conventional Commits, ví dụ:
   feat(workflow): thêm bước giám đốc duyệt khi số tiền vượt ngưỡng
-Khi gộp bằng "Squash and merge", tiêu đề này trở thành commit trên main.
-Xem docs/git_flow.md.
+Khi gộp bằng "Squash and merge", tiêu đề này trở thành commit trên develop; CI kiểm tiêu đề.
+PR phát hành (develop → main): tiêu đề đúng "chore(release): vX.Y.Z". Xem docs/git_flow.md mục 6.
 -->
 
 ## Nội dung thay đổi
@@ -18,7 +18,7 @@ Closes #
 - [ ] Frontend
 - [ ] Hạ tầng / CI / tài liệu chung
 
-<!-- Thành phần chính (phạm vi commit): gateway · auth · db · workflow · files · realtime · office · ai · data · ops · cli · ci · deps · docs · release -->
+<!-- Thành phần chính (phạm vi commit): gateway · auth · db · workflow · files · realtime · office · ai · data · ops · cli · scripts · e2e · ci · deps · docs · release -->
 
 ## Danh mục kiểm tra
 

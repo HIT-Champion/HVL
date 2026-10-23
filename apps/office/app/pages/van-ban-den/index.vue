@@ -1,5 +1,5 @@
 <!--
-  Copyright 2026 Mộc Team
+  Copyright 2026 Signet Team
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ interface Row {
   due_on: string | null
   issued_on: string | null
   restricted: boolean
+  source_id: string | null   // nhận liên thông từ đơn vị khác trong hệ thống (F3.12)
 }
 
 const { t } = useI18n()
@@ -51,28 +52,50 @@ const tab = computed<Tab>(() => (String(route.query.tab ?? '') in tabs ? (route.
 const rows = ref<Row[]>([])
 const loading = ref(true)
 const failure = ref('')
+const more = ref(false)
+// Từng trang, "Xem thêm" nối tiếp — không cắt cứng ở một số dòng (văn bản cũ, dễ quá hạn, vẫn tới được).
+// Danh sách đổi giữa hai lần lấy thì nextPage/mergePage (utils/paging.ts) lo không lặp, không sót dòng
+const notice = useNotice()
+let seq = 0
 
-async function load() {
+async function load(append = false) {
+  const mine = ++seq
   loading.value = true
-  failure.value = ''
+  if (!append) {
+    failure.value = ''
+    rows.value = []
+  }
+  const page = nextPage(rows.value.length)
   const statuses = tabs[tab.value]
   try {
     const data = await gql<{ office_documents: Row[] }>(`
-      query ($where: office_documents_bool_exp!) {
-        office_documents(where: $where, order_by: [{registered_at: desc_nulls_first}, {created_at: desc}], limit: 200) {
-          id symbol issuer_name summary status urgency register_number registered_at due_on issued_on restricted
+      query ($where: office_documents_bool_exp!, $offset: Int!, $limit: Int!) {
+        office_documents(where: $where, order_by: [{registered_at: desc_nulls_first}, {created_at: desc}, {id: asc}], limit: $limit, offset: $offset) {
+          id symbol issuer_name summary status urgency register_number registered_at due_on issued_on restricted source_id
         }
-      }`, { where: { direction: { _eq: 'in' }, ...(statuses ? { status: { _in: statuses } } : {}) } })
-    rows.value = data.office_documents
+      }`, {
+      where: { direction: { _eq: 'in' }, ...(statuses ? { status: { _in: statuses } } : {}) },
+      ...page,
+    })
+    if (mine !== seq) return   // đã đổi tab trong lúc chờ: bỏ kết quả cũ
+    const merged = mergePage(rows.value, data.office_documents)
+    rows.value = merged.rows
+    more.value = merged.more
   } catch (e) {
-    failure.value = errorText(t, e)
+    // lỗi khi "Xem thêm": giữ nguyên bảng đang hiện, báo ở góc màn hình — bấm lại được
+    if (mine === seq && append) notice.error(errorText(t, e))
+    else if (mine === seq) failure.value = errorText(t, e)
   } finally {
-    loading.value = false
+    if (mine === seq) loading.value = false
   }
 }
 
-watch(tab, load)
-onMounted(load)
+watch(tab, () => load())
+onMounted(() => load())
+
+// văn bản liên thông từ đơn vị khác vừa tới (văn thư được báo): hiện ngay trong danh sách
+const { lastPush } = useNotifications()
+watch(lastPush, (n) => { if (n?.kind === 'document.incoming') load() })
 </script>
 
 <template>
@@ -96,7 +119,7 @@ onMounted(load)
     </div>
 
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-else-if="loading && !rows.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('incoming.empty') }}</p>
     <div v-else class="card overflow-x-auto">
       <table class="w-full text-sm">
@@ -122,6 +145,7 @@ onMounted(load)
                 {{ row.issuer_name }}
                 <UrgencyChip :urgency="row.urgency" quiet />
                 <span v-if="row.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
+                <span v-if="row.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">{{ t('incoming.dispatched') }}</span>
               </div>
             </td>
             <td class="px-4 py-3"><StatusChip :status="row.status" /></td>
@@ -129,6 +153,9 @@ onMounted(load)
           </tr>
         </tbody>
       </table>
+      <div v-if="more" class="border-t border-stone-100 p-3 text-center">
+        <button class="btn-secondary" :disabled="loading" data-testid="list-more" @click="load(true)">{{ t('app.more') }}</button>
+      </div>
     </div>
   </div>
 </template>

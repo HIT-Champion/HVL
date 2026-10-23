@@ -1,0 +1,60 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Gợi ý giao việc (F4.3, migration 1792281602100): tác tử moc-assigner trong svc-workflow ghi một dòng mỗi văn bản đến —
+# đơn vị chủ trì, hạn đề xuất, độ tin cậy, căn cứ (id văn bản tương tự đã giao, điểm, đơn vị, số ngày; không có chữ văn
+# bản). Vai trò `agent` (khóa quản trị + X-Hasura-Role: agent) chỉ thêm dòng và hỏi văn bản đã có dòng chưa: thuê ước
+# và danh tính tác tử đặt sẵn từ phiên, gửi lên bị từ chối; khóa ngoại (tenant_id, document_id) chặn gợi ý cho văn bản
+# của đơn vị khác. Chỉ lãnh đạo đơn vị đọc (gợi ý thuộc bước chỉ đạo), khi đọc được văn bản; giao diện đọc số ký hiệu,
+# trích yếu của căn cứ bằng token người xem. Không ai sửa, xóa: văn bản bật hạn chế thì trigger xóa dòng của nó và gỡ
+# nó khỏi căn cứ của các dòng khác.
+table:
+  name: assignment_suggestions
+  schema: office
+object_relationships:
+  - name: document
+    using:
+      manual_configuration:
+        remote_table: {name: documents, schema: office}
+        column_mapping: {document_id: id}
+  - name: department
+    using:
+      manual_configuration:
+        remote_table: {name: departments, schema: office}
+        column_mapping: {department_id: id}
+insert_permissions:
+  - role: agent
+    permission:
+      columns: [document_id, process_id, status, reason, department_id, confidence, share, due_days, due_on, evidence,
+                candidates, semantic, duration_ms]
+      set:
+        tenant_id: X-Hasura-Tenant-Id
+        agent_id: X-Hasura-User-Id
+      check: {}
+select_permissions:
+  # tác tử chỉ cần biết văn bản đã có gợi ý chưa (mỗi văn bản một lần) và đọc lại khóa của dòng vừa thêm
+  - role: agent
+    permission:
+      columns: [document_id]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
+  - role: director
+    permission:
+      columns: [document_id, tenant_id, agent_id, process_id, status, reason, department_id, confidence, share,
+                due_days, due_on, evidence, candidates, semantic, duration_ms, created_at]
+      filter:
+        _and:
+          - tenant_id: {_eq: X-Hasura-Tenant-Id}
+          - document: {visible: {_eq: true}}

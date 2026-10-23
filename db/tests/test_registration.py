@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from conftest import INSERT_DOC, GraphQLError, Service, incoming, sql
+from conftest import INSERT_DOC, GraphQLError, Service, incoming, received, sql
 
 REGISTER = """
 mutation ($id: uuid!) {
@@ -32,7 +32,7 @@ mutation ($id: uuid!) {
 
 
 def receive(world, n: int) -> str:
-    return world.clerk_a.gql(INSERT_DOC, {"o": incoming(world.tag, n)})["insert_office_documents_one"]["id"]
+    return received(world.clerk_a, incoming(world.tag, n))["id"]
 
 
 def register(service: Service, doc_id: str) -> dict:
@@ -125,3 +125,56 @@ def test_directory_is_per_tenant_and_read_only(world):
     assert "errors" in body
     changes = sql(f"select action from core.audit_log where entity = 'core.users' and entity_id = '{sub}' order by id")
     assert changes == [["insert"], ["update"]]
+
+
+# --- chống ghi đôi: quy trình chỉ gắn khi văn bản chưa có, một việc chỉ ghi một lần -----------------------
+
+CLAIM_PROCESS = """
+mutation ($id: uuid!, $pid: String!) {
+  update_office_documents(where: {id: {_eq: $id}, process_id: {_is_null: true}}, _set: {process_id: $pid}) {
+    affected_rows
+  }
+}"""
+
+DIRECT = """
+mutation ($a: office_assignments_insert_input!, $e: office_document_events_insert_input!) {
+  insert_office_assignments_one(object: $a) { id }
+  insert_office_document_events_one(object: $e) { id }
+}"""
+
+EVENT = """
+mutation ($e: office_document_events_insert_input!) { insert_office_document_events_one(object: $e) { id } }"""
+
+
+def test_process_is_linked_only_while_empty(world):
+    svc = as_clerk(world.service_a, world.clerk_a)
+    doc = register(svc, receive(world, 9105))["id"]
+    claim = {"id": doc, "pid": f"p-{world.tag}-1"}
+    assert world.service_b.gql(CLAIM_PROCESS, claim)["update_office_documents"]["affected_rows"] == 0
+    assert svc.gql(CLAIM_PROCESS, claim)["update_office_documents"]["affected_rows"] == 1
+    # lần gọi chen sau (bấm đúp, job đối soát) không ghi đè: nó theo phiên đã gắn và hủy phiên của mình
+    assert svc.gql(CLAIM_PROCESS, {**claim, "pid": f"p-{world.tag}-2"})["update_office_documents"]["affected_rows"] == 0
+    assert sql(f"select process_id from office.documents where id = '{doc}'") == [[claim["pid"]]]
+
+
+def test_a_task_is_written_once(world):
+    svc = Service(world.director_a.sub, "service", world.tenant_a)
+    doc = register(as_clerk(world.service_a, world.clerk_a), receive(world, 9106))["id"]
+    task = f"t-{uuid.uuid4()}"
+    event = {"document_id": doc, "kind": "office.document.directed", "actor_id": world.director_a.sub,
+             "actor_kind": "user", "data": {"task_id": task}}
+    lead = {"document_id": doc, "instruction": "Giao Phòng Đào tạo chủ trì", "assigned_by": world.director_a.sub,
+            "role": "lead", "department_id": world.dept_a1}
+    svc.gql(DIRECT, {"a": lead, "e": event})
+    # lần ghi thứ hai của cùng việc (hai lần gọi chen nhau): bị chặn, phân công trong cùng giao dịch cũng không ghi
+    with pytest.raises(GraphQLError, match="document_events_task_once"):
+        svc.gql(DIRECT, {"a": {**lead, "role": "support", "department_id": world.dept_a2}, "e": event})
+    assert sql(f"select role from office.assignments where document_id = '{doc}'") == [["lead"]]
+    # nhắc hạn của cùng việc mang khóa khác, ghi nhiều lần được; sự kiện không gắn việc cũng vậy
+    for _ in range(2):
+        svc.gql(EVENT, {"e": {**event, "kind": "office.task.overdue", "data": {"sla_task_id": task}}})
+        svc.gql(EVENT, {"e": {**event, "kind": "office.document.overdue", "data": {}}})
+    kinds = sql(f"select kind from office.document_events where document_id = '{doc}' and kind <> "
+                f"'office.document.registered' order by id")
+    assert [k for (k,) in kinds] == ["office.document.directed"] + ["office.task.overdue",
+                                                                     "office.document.overdue"] * 2

@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,9 +74,25 @@ class XuLy(_Form):
     result_note: Annotated[Text, Field(max_length=4000)]
 
 
-# formKey → outcome → kiểu dữ liệu
+class TraLai(_Form):
+    """vbdi.duyetPhong, vbdi.duyetDonVi, outcome = return: trả dự thảo về người soạn, phải nói rõ sửa gì."""
+
+    note: Annotated[Text, Field(max_length=2000)]
+
+
+class PhatHanh(_Form):
+    """vbdi.phatHanh, outcome = issue: văn thư cấp số, phát hành; is_public cho cổng xác thực hiện trích yếu."""
+
+    is_public: bool = False
+
+
+# formKey → outcome → kiểu dữ liệu. vbdi.chinhSua không có ở đây: người soạn sửa xong thì trình lại bằng
+# Action submitOutgoing, không hoàn thành việc bằng completeTask.
 FORMS: dict[str, dict[str, type[_Form]]] = {
     "vbden.chiDao": {"direct": ChiDao, "file": Note},
     "vbden.phanCong": {"assign": PhanCong, "self": Note},
     "vbden.xuLy": {"done": XuLy},
+    "vbdi.duyetPhong": {"approve": Note, "return": TraLai},
+    "vbdi.duyetDonVi": {"approve": Note, "return": TraLai},
+    "vbdi.phatHanh": {"issue": PhatHanh},
 }

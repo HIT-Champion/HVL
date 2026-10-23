@@ -1,4 +1,4 @@
-# Copyright 2026 Mộc Team
+# Copyright 2026 Signet Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 [project]
 name = "svc-files"
 version = "0.1.0"
-description = "Mộc — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS"
+description = "Signet — dịch vụ tệp: kiểm dịch ClamAV rồi mới lưu vào SeaweedFS; dựng PDF văn bản đi; cổng xác thực"
 license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -29,7 +29,14 @@ dependencies = [
   "python-multipart>=0.0.32",
   "boto3>=1.43,<2",
   "pyjwt[crypto]>=2.15,<3",
+  "cryptography>=50,<51",
   "httpx2>=2.13,<3",
+  "weasyprint>=70,<71",
+  "duckdb==1.5.6",
+  "segno>=1.6,<2",
+  "pypdf>=6.21.1,<7",  # 6.21.1: vá GHSA-39mj, -5hx5, -7mh2, -9mx8, -qfv9 (OSV 22/10)
+  "pyhanko==0.37.0",    # ký số PAdES văn bản đi (F4.5, chỉ minh họa)
+  "pillow>=13,<14",     # OCR (F4.1): mở, xoay, thu ảnh trước khi gửi tesseract — trước đây chỉ có gián tiếp qua WeasyPrint
 ]
 
 [project.optional-dependencies]
