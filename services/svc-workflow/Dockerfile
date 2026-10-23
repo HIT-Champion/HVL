@@ -25,9 +25,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Thư viện cài từ PyPI theo tệp khóa có băm; không chép thư viện vào repo (PoF #5).
+# Thư viện cài từ PyPI theo tệp khóa có băm; không chép thư viện vào repo (PoF #5). Cài xong thì gỡ pip: lúc chạy
+# không dùng, mà pip của image nền mang theo bản sao cũ của certifi, urllib3, msgpack, setuptools (pip/_vendor) có lỗ
+# hổng đã có bản sửa (1 CRITICAL, 4 HIGH khi quét image 23/10/2026)
 COPY requirements.txt ./
-RUN pip install --require-hashes -r requirements.txt
+RUN pip install --require-hashes -r requirements.txt \
+ && python -m pip uninstall -y pip
 
 COPY src/ ./src/
 # JSON Schema dùng chung với giao diện (schemas/ ở gốc repo; compose đưa vào bằng additional_contexts, dựng tay thì

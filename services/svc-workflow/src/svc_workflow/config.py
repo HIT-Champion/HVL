@@ -21,8 +21,11 @@ from __future__ import annotations
 import math
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from email.utils import parseaddr
+from urllib.parse import urlsplit
 
+from .channels import KINDS, SMTP_PORTS, WEBHOOK_FORMATS
 from .sla import parse_duration
 
 REQUIRED = (
@@ -79,6 +82,22 @@ class Settings:
     suggest_timeout_s: float = 10.0
     suggest_min_score: float = 0.3
     assigner_id: str = "moc-assigner"
+    # Định tuyến thông báo đa kênh (channels.py): ngoài chuông trên web, gửi thêm qua email (SMTP) và webhook. Trống máy
+    # chủ thư và URL webhook thì tắt, như trước. Cổng 0: theo kiểu TLS (587 starttls, 465 ssl, 25 none). Loại thông báo
+    # trống: mọi loại. Mật khẩu SMTP và URL webhook (khóa nằm trong đường dẫn) là bí mật, lấy từ két như các bí mật
+    # khác. Địa chỉ công khai để thư, tin webhook dẫn về đúng văn bản
+    smtp_host: str = ""
+    smtp_port: int = 0
+    smtp_tls: str = "starttls"
+    smtp_user: str = ""
+    smtp_password: str = field(default="", repr=False)
+    smtp_from: str = ""
+    notify_webhook_url: str = field(default="", repr=False)
+    notify_webhook_format: str = "json"
+    notify_email_kinds: tuple[str, ...] = ()
+    notify_webhook_kinds: tuple[str, ...] = ()
+    notify_interval_s: float = 5.0
+    public_url: str = ""
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -117,6 +136,18 @@ class Settings:
                 suggest_timeout_s=float(env.get("MOC_SUGGEST_TIMEOUT_S", "10")),
                 suggest_min_score=float(env.get("MOC_SUGGEST_MIN_SCORE", "0.3")),
                 assigner_id=env.get("MOC_ASSIGNER_ID", "moc-assigner").strip(),
+                smtp_host=env.get("MOC_SMTP_HOST", "").strip(),
+                smtp_port=int(env.get("MOC_SMTP_PORT", "").strip() or 0),
+                smtp_tls=env.get("MOC_SMTP_TLS", "").strip().lower() or "starttls",
+                smtp_user=env.get("MOC_SMTP_USER", "").strip(),
+                smtp_password=env.get("MOC_SMTP_PASSWORD", ""),
+                smtp_from=env.get("MOC_SMTP_FROM", "").strip(),
+                notify_webhook_url=env.get("MOC_NOTIFY_WEBHOOK_URL", "").strip(),
+                notify_webhook_format=env.get("MOC_NOTIFY_WEBHOOK_FORMAT", "").strip().lower() or "json",
+                notify_email_kinds=_kinds(env.get("MOC_NOTIFY_EMAIL_KINDS", "")),
+                notify_webhook_kinds=_kinds(env.get("MOC_NOTIFY_WEBHOOK_KINDS", "")),
+                notify_interval_s=float(env.get("MOC_NOTIFY_INTERVAL_S", "5")),
+                public_url=env.get("MOC_PUBLIC_URL", "").strip().rstrip("/"),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -138,6 +169,35 @@ class Settings:
             raise ConfigError("MOC_SUGGEST_MIN_SCORE phải trong khoảng [0, 1] (thang _rankingScore)")
         if not 1 <= len(self.assigner_id) <= 64:
             raise ConfigError("MOC_ASSIGNER_ID phải có 1–64 ký tự")
+        self._check_channels()
+
+    def _check_channels(self) -> None:
+        """Cấu hình kênh ngoài sai thì dừng lúc khởi động, không để thư dồn lại rồi hỏng hết lúc gửi."""
+        if self.smtp_tls not in SMTP_PORTS:
+            raise ConfigError("MOC_SMTP_TLS chỉ nhận starttls, ssl hoặc none")
+        if not 0 <= self.smtp_port <= 65535:
+            raise ConfigError("MOC_SMTP_PORT phải trong khoảng 1–65535 (để trống: theo MOC_SMTP_TLS)")
+        if self.smtp_host and "@" not in parseaddr(self.smtp_from)[1]:
+            raise ConfigError("Đặt MOC_SMTP_HOST thì phải có MOC_SMTP_FROM là một địa chỉ email, vd signet@don-vi.vn")
+        if self.notify_webhook_url:
+            url = urlsplit(self.notify_webhook_url)
+            if url.scheme not in ("http", "https") or not url.hostname:
+                # không in URL: khóa của webhook nằm trong đường dẫn
+                raise ConfigError("MOC_NOTIFY_WEBHOOK_URL phải là địa chỉ http:// hoặc https://")
+        if self.notify_webhook_format not in WEBHOOK_FORMATS:
+            raise ConfigError("MOC_NOTIFY_WEBHOOK_FORMAT chỉ nhận json hoặc ntfy")
+        for name, kinds in (("MOC_NOTIFY_EMAIL_KINDS", self.notify_email_kinds),
+                            ("MOC_NOTIFY_WEBHOOK_KINDS", self.notify_webhook_kinds)):
+            unknown = sorted(set(kinds) - set(KINDS))
+            if unknown:
+                raise ConfigError(f"{name}: không có loại thông báo {', '.join(unknown)} (có: {', '.join(KINDS)})")
+        if not (math.isfinite(self.notify_interval_s) and self.notify_interval_s >= 0):
+            raise ConfigError("MOC_NOTIFY_INTERVAL_S phải ≥ 0 (0: không gửi qua kênh ngoài)")
+
+
+def _kinds(value: str) -> tuple[str, ...]:
+    """Danh sách loại thông báo cách nhau bằng dấu phẩy; trống là mọi loại."""
+    return tuple(k.strip() for k in value.split(",") if k.strip())
 
 
 def _flag(name: str, value: str) -> bool:

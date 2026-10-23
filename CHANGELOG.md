@@ -28,8 +28,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Bảng mức hoàn thiện [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): 43 tính năng F1.1–F4.6, mỗi tính năng một
   mức (Hoàn thiện 32, Dùng được 5, Minh họa 2, Một phần 1, Chưa làm 3; định nghĩa ở đầu tệp) kèm bằng chứng — tệp test
   và số hàm test đếm tĩnh (tổng 1 425, cách đếm ghi rõ), bước CI, màn demo hay kịch bản e2e — và hạn chế đã biết. Độ
-  phủ 29 năng lực của 7 cụm dịch vụ Tầng 1 theo đề: 17 hoàn thiện, 4 chưa có (kịch bản serverless, API nạp lô, trục
-  streaming sự kiện, định tuyến thông báo đa kênh). Lệnh đếm lại, kiểm lại ở cuối tệp.
+  phủ 29 năng lực của 7 cụm dịch vụ Tầng 1 theo đề: 17 hoàn thiện, 3 chưa có (kịch bản serverless, API nạp lô, trục
+  streaming sự kiện). Lệnh đếm lại, kiểm lại ở cuối tệp.
+- Thông báo đa kênh: ngoài chuông trên web, `svc-workflow` gửi thêm email (SMTP, STARTTLS/SSL) tới địa chỉ trong
+  danh bạ và tin tóm tắt lên webhook (Mattermost, Slack, ntfy) khi đặt `MOC_SMTP_HOST`, `MOC_NOTIFY_WEBHOOK_URL` —
+  mặc định tắt. Hộp thư đi `core.notification_deliveries` tạo cùng giao dịch với thông báo, gửi ở nền, thử lại tối
+  đa 5 lần có giãn cách, mỗi lần ghi sổ kiểm toán; webhook không có tên người, không có văn bản hạn chế; nhật ký không
+  có địa chỉ email, URL. Mailpit (profile `mail`) làm hộp thư thử cho demo. Test svc-workflow +41, scripts +8.
 - Chuỗi cung ứng: `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft 1.54.1 (image ghim digest), bản phát hành
   đính kèm `moc-X.Y.Z.cdx.json` cùng `.sha256`; `make license-audit` (`scripts/license_audit.py`, chỉ thư viện chuẩn)
   kiểm giấy phép của mọi gói kể cả gói gián tiếp theo chính sách của `DEPENDENCIES.md`, gói chưa rõ hay ngoài chính
@@ -59,6 +64,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   dịch vụ nạp nó (`services/svc-workflow/processes/`), cảm biến giả lập vào `services/ot-sensor/`. Gốc repo từ 15 còn 10
   thư mục. Compose, `install.sh`, test, tài liệu đổi đường dẫn theo; đường dẫn trong container không đổi. Cài lại vào
   bản cài theo bố cục cũ thì `make install` xóa các tệp cũ (theo MANIFEST) và cả thư mục cha đã rỗng.
+- CI: bước "Tài liệu API trong docs/api/ khớp mã" lệch thì sinh lại `docs/api/` trên chính hệ thống vừa dựng và tải
+  lên thành artifact `docs-api-<lần chạy>` (giữ 7 ngày); người sửa PR chép về rồi commit, không phải dựng cả hệ thống
+  ở máy. `docs/api/README.md` có lệnh `gh run download`.
 
 ### Đã sửa lỗi
 - `DEPENDENCIES.md` liệt kê PDF.js (`pdfjs-dist`) dù giao diện không dùng: tệp được lấy bằng fetch rồi lưu về máy.
@@ -82,6 +90,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - brotli 1.2.0 → 1.2.1, brotlicffi 1.2.0.2 → 1.2.1.0 (`svc-files`, gói kéo theo của fontTools mà WeasyPrint dùng):
   vá lỗi ghi tràn bộ nhớ trong bộ giải nén Brotli (PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) mà OSV-Scanner trong CI
   báo từ 23/10. Bản vá phát hành 22/10: ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
+
+### Bảo mật
+- Image `svc-files`, `svc-workflow` (cả `ot-sensor`, dùng chung image) gỡ pip ngay sau khi cài thư viện: pip 26.2.1
+  của image nền `python:3.13.16-slim` mang theo bản sao cũ của certifi 2026.6.17 (GHSA-6q48-6c7w-9gw2, CRITICAL: gốc
+  emSign có CA trung gian lộ khóa), urllib3 2.7.0 (CVE-2026-97687, CVE-2026-97689), msgpack 1.1.2
+  (GHSA-6v7p-g79w-8964), setuptools 70.3.0 (CVE-2025-47273). Gói của dịch vụ đã ở bản vá, lúc chạy không dùng pip;
+  không thêm, không nâng gói nào. Trivy 0.75.0 quét lại image dựng mới (23/10/2026): lỗ hổng HIGH/CRITICAL có bản sửa
+  của mỗi image từ 5 (1 CRITICAL, 4 HIGH) còn 0, phần Python không còn lỗ hổng nào; HIGH/CRITICAL còn lại đều là gói
+  Debian chưa có bản sửa.
 
 ## [1.0.0] - 2026-10-23
 
