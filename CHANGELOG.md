@@ -80,6 +80,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   vá lỗi ghi tràn bộ nhớ trong bộ giải nén Brotli (PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) mà OSV-Scanner trong CI
   báo từ 23/10. Bản vá phát hành 22/10: ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
 
+### Bảo mật
+- Image `svc-files`, `svc-workflow` (cả `ot-sensor`, dùng chung image) gỡ pip ngay sau khi cài thư viện: pip 26.2.1
+  của image nền `python:3.13.16-slim` mang theo bản sao cũ của certifi 2026.6.17 (GHSA-6q48-6c7w-9gw2, CRITICAL: gốc
+  emSign có CA trung gian lộ khóa), urllib3 2.7.0 (CVE-2026-97687, CVE-2026-97689), msgpack 1.1.2
+  (GHSA-6v7p-g79w-8964), setuptools 70.3.0 (CVE-2025-47273). Gói của dịch vụ đã ở bản vá, lúc chạy không dùng pip;
+  không thêm, không nâng gói nào. Trivy 0.75.0 quét lại image dựng mới (23/10/2026): lỗ hổng HIGH/CRITICAL có bản sửa
+  của mỗi image từ 5 (1 CRITICAL, 4 HIGH) còn 0, phần Python không còn lỗ hổng nào; HIGH/CRITICAL còn lại đều là gói
+  Debian chưa có bản sửa.
+
 ## [1.0.0] - 2026-10-23
 
 Bản cho vòng trường. Văn phòng điện tử chạy đủ luồng văn bản đến và văn bản đi theo NĐ 30/2020 trên lõi dùng chung
