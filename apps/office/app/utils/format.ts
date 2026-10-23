@@ -53,6 +53,13 @@ export function fmtNumber(value: unknown): string {
   return Number.isFinite(n) ? new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(n) : '—'
 }
 
+// Chữ trong ô đại diện ở đầu trang: chữ đầu của tên, viết hoa — "Giám khảo" ra G, không phải "k" của "khảo" như khi
+// lấy từ cuối của họ tên. Thiếu tên thì lấy từ cuối của họ tên
+export function initialOf(givenName: string, name: string): string {
+  const word = givenName.trim() || name.trim().split(/\s+/).pop() || ''
+  return word ? word.charAt(0).toLocaleUpperCase('vi') : '?'
+}
+
 export function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`

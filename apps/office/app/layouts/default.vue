@@ -138,8 +138,8 @@ async function logout() {
           <div class="text-sm font-medium text-stone-900">{{ claims.name }}</div>
           <div class="text-xs text-stone-500">{{ claims.role ? t(`role.${claims.role}`) : t('error.noRole') }}</div>
         </div>
-        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800" aria-hidden="true">
-          {{ claims?.name?.split(' ').pop()?.[0] ?? '?' }}
+        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800" aria-hidden="true" data-testid="avatar-initial">
+          {{ initialOf(claims?.givenName ?? '', claims?.name ?? '') }}
         </div>
         <button class="btn-secondary" @click="logout">{{ t('nav.logout') }}</button>
       </header>

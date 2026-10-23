@@ -28,6 +28,9 @@ export interface Claims {
   departmentId: string | null
   role: Role | null
   name: string
+  // tên, không phải họ: firstName của Keycloak là họ và đệm, lastName là tên (scripts/tenants.py, seed/users.csv) — nên
+  // tên nằm ở claim family_name
+  givenName: string
   username: string
 }
 
@@ -93,6 +96,7 @@ export function useAuth() {
       departmentId: h['x-hasura-department-id'] ?? null,
       role: (h['x-hasura-default-role'] as Role) ?? null,
       name: profile.name ?? profile.preferred_username ?? '',
+      givenName: profile.family_name ?? '',
       username: profile.preferred_username ?? '',
     }
   })
