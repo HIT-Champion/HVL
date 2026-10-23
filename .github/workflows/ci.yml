@@ -86,7 +86,7 @@ jobs:
 
       - name: Mọi profile đều phân giải được và có dịch vụ
         run: |
-          for p in core app iot iot-sim ai ai-pull; do
+          for p in core app iot iot-sim ai ai-pull mail; do
             services=$(docker compose --profile "$p" config --services) \
               || { echo "::error::Profile '$p' không hợp lệ"; exit 1; }
             test -n "$services" || { echo "::error::Profile '$p' không có dịch vụ nào"; exit 1; }

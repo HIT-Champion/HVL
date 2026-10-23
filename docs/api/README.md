@@ -245,6 +245,10 @@ kết nối giới hạn theo địa chỉ IP (`MOC_RATE_REALTIME_PER_MIN`). Tin
 thì đọc lại `core_notifications`. Giao diện Signet làm đúng như vậy trong
 [`apps/office/app/composables/useRealtime.ts`](../../apps/office/app/composables/useRealtime.ts).
 
+Bản cài có cấu hình máy chủ thư hoặc webhook thì cùng thông báo đó còn đi qua email, kênh chat (svc-workflow gửi ở
+nền, [README của svc-workflow](../../services/svc-workflow/README.md) mục "Thông báo qua email, webhook"). Ứng dụng
+không phải làm gì thêm; bảng hộp thư đi `core_notification_deliveries` không mở cho vai trò người dùng.
+
 ## 5. Sổ kiểm toán: `core_audit_log` (lãnh đạo, quản trị đơn vị)
 
 Mọi thay đổi dữ liệu nghiệp vụ vào sổ kiểm toán chuỗi băm. Vai trò `director`, `tenant_admin` đọc được dòng sổ

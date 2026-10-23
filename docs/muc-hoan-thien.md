@@ -172,15 +172,15 @@ chưa phủ hết năng lực của cụm.
 | ⑥ | Trục streaming sự kiện | — | **Chưa có** | Không có broker (Kafka hay tương đương). Sự kiện nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`); Centrifugo chỉ đẩy tới trình duyệt. `DEPENDENCIES.md` nêu Hasura Event Triggers thay Redpanda, nhưng `db/metadata` chưa khai event trigger nào |
 | ⑥ | GitOps | `scripts/reconcile.py`, `platform/systemd/` | Hoàn thiện | F3.3; Compose + reconciler, không Argo CD |
 | ⑥ | Sao lưu, khôi phục thảm họa | restic, `scripts/backup.py` | Hoàn thiện | F3.4; kho sao lưu trên cùng máy chủ, chép ra ngoài bằng tay |
-| ⑦ Truyền thông, giao vận | Định tuyến thông báo đa kênh | — | **Chưa có** | Một kênh: thông báo trong ứng dụng (`core.notifications` + Centrifugo, `svc_workflow/notify.py`). Không email, SMS, Zalo, Telegram, không bộ định tuyến theo kênh |
+| ⑦ Truyền thông, giao vận | Định tuyến thông báo đa kênh | `svc_workflow/channels.py`, hộp thư đi `core.notification_deliveries`; Mailpit (profile `mail`) để thử | Một phần | Chuông trên web (Centrifugo) cộng email (SMTP) và webhook chat (Mattermost, Slack, ntfy), tắt mặc định; trigger tạo dòng chờ gửi trong cùng giao dịch ghi thông báo, lỗi tạm thử lại giãn dần. Chưa SMS, Zalo; webhook một URL cho cả bản cài; chưa cho từng người chọn kênh |
 | ⑦ | WebSocket thời gian thực | Centrifugo, `platform/centrifugo/config.yaml`, route `/realtime` | Hoàn thiện | F2.5 |
 | ⑦ | Hàng đợi bất đồng bộ chống chối bỏ | Hộp thư đi `office.dispatches` (`svc_workflow/dispatch.py`); việc giao ra ngoài của Flowable (topic `moc-goi-y`, `moc-sla`) | Một phần | Liên thông (F3.12) có thử lại lùi dần, so SHA-256, ghi sổ kiểm toán cả hai đơn vị trong cùng giao dịch. Chưa có hàng đợi dùng chung cho ứng dụng khác, chưa có biên nhận ký số |
 
-**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 2, Minh họa 1, Một phần 5, **Chưa có 4**.
+**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 2, Minh họa 1, Một phần 6, **Chưa có 3**.
 
-- Chưa có: kịch bản serverless (⑤), API nạp lô (⑤), trục streaming sự kiện (⑥), định tuyến thông báo đa kênh (⑦).
-- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), log truy
-  vết phân tán (⑥), hàng đợi chống chối bỏ (⑦).
+- Chưa có: kịch bản serverless (⑤), API nạp lô (⑤), trục streaming sự kiện (⑥).
+- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), log truy vết
+  phân tán (⑥), định tuyến thông báo đa kênh (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
 - Bốn dịch vụ bắt buộc (SSO, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình) đều ở mức Hoàn thiện.
 
 ## 4. Kiểm lại
@@ -211,7 +211,7 @@ Các ô "Chưa có", "Chưa làm" ở mục 2, mục 3:
 ```bash
 git grep -n event_triggers -- db/metadata                                  # rỗng: chưa có Hasura Event Trigger
 git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez|coraza|parseable' -- docker-compose.yml   # rỗng
-git grep -niwE 'smtp|sms' -- services platform docker-compose.yml        # rỗng: thông báo một kênh
+git grep -niwE 'sms|zalo' -- services platform docker-compose.yml        # rỗng: chưa có SMS, Zalo
 grep -n job_name platform/monitoring/prometheus.yml                        # chỉ apisix và chính prometheus
 grep -nE '^  [a-z]+:$|^    name:|^      - name:' .github/workflows/ci.yml  # job và bước CI
 ```
