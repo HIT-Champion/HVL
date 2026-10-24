@@ -53,7 +53,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | Mã | Chức năng | Mức | Test tự động | Đầu-cuối trong CI · trình diễn | Hạn chế đã biết |
 |---|---|---|---|---|---|
 | F1.1 | SSO + MFA: Keycloak, vai trò, `tenant_id` và `department_id` trong token | Hoàn thiện | svc-files `test_auth_config.py` 17 (kiểm token Keycloak); scripts `test_dang_nhap.py` 4 | smoke: 5 tài khoản đăng nhập qua cổng, văn thư phải nhập TOTP, luồng mật khẩu của `moc-cli` và `admin-cli` cũng đòi TOTP; e2e: mọi kịch bản đăng nhập qua Keycloak kèm TOTP (`tests/e2e/helpers.ts`) | Realm chỉ nạp ở lần khởi động đầu: sửa `platform/keycloak/realm/moc-realm.json` sau đó phải `make reset` hoặc sửa trong trang quản trị Keycloak. Xác thực hai bước chỉ có TOTP |
-| F1.2 | Cổng API zero-trust: APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, `X-Request-Id` | Hoàn thiện | — (cấu hình khai báo `platform/apisix/apisix.yaml`, kiểm bằng smoke) | smoke: GraphQL không token → 401; đường quản trị Hasura, Keycloak, Flowable bị chặn; khóa quản trị Hasura gửi từ ngoài bị gỡ; đăng nhập quá giới hạn theo IP, GraphQL quá giới hạn theo phiên → 429 | Chưa có WAF (F3.15) |
+| F1.2 | Cổng API zero-trust: APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, `X-Request-Id` | Hoàn thiện | — (cấu hình khai báo `platform/apisix/apisix.yaml`, kiểm bằng smoke) | smoke: GraphQL không token → 401; đường quản trị Hasura, Keycloak, Flowable bị chặn; khóa quản trị Hasura gửi từ ngoài bị gỡ; đăng nhập quá giới hạn theo IP, GraphQL quá giới hạn theo phiên → 429; tải tấn công bị WAF chặn ở cổng → 403 (F3.15) | WAF ở cổng (F3.15) mới ở mức Dùng được: smoke, e2e qua WAF chưa chạy xanh trên CI |
 | F1.3 | Dữ liệu có cấu trúc: PostgreSQL 16 + Hasura v2 CE, GraphQL tự sinh, quyền theo vai trò và đơn vị tới từng dòng, migrations và metadata tự áp | Hoàn thiện | db `test_schema.py` 15, `test_permissions.py` 23 | job `db`; smoke: văn thư Khoa Kinh tế không thấy văn bản Khoa CNTT, không tải được tệp (404); văn thư không ghi thẳng được bảng văn bản | `svc-files`, `svc-workflow` giữ khóa quản trị Hasura (lấy từ két): quyền cấp dòng không giới hạn chính hai dịch vụ này |
 | F1.4 | Quy trình BPMN: Flowable REST 8, Hasura Actions → `svc-workflow`, callback, job đối soát | Hoàn thiện | svc-workflow `test_workflow.py` 32, `test_app.py` 8 | smoke: vào sổ khởi chạy quy trình → chỉ đạo → phân công → báo xong, dòng thời gian đủ 4 bước; e2e `van-ban-den.spec.ts`, `van-ban-di.spec.ts` | Đơn vị gắn vào quy trình bằng biến `tenantId` và nhóm ứng viên `t:<đơn vị>:…`, không dùng tenant của Flowable. Lệch giữa Flowable và CSDL chỉ được sửa ở lượt đối soát kế tiếp (`MOC_RECONCILE_INTERVAL_S`) |
 | F1.5 | Dữ liệu phi cấu trúc: SeaweedFS, tải lên và tải xuống chỉ qua `svc-files` | Hoàn thiện | svc-files `test_upload.py` 18, `test_download.py` 10 | smoke: văn thư tải công văn lên, quét sạch; đơn vị khác tải tệp → 404 | Một bucket chung, đơn vị tách bằng tiền tố `tenant/<id>/` — có chủ ý, lý do ở `docs/mo-hinh-du-lieu.md` |
@@ -98,7 +98,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | F3.12 | Liên thông văn bản giữa các đơn vị; thêm đơn vị bằng một lệnh | Hoàn thiện | svc-files `test_dispatch.py` 12; svc-workflow `test_dispatch.py` 28; db `test_dispatch.py` 16; scripts `test_tenants.py` 31; office `dispatch.test.ts` 4 | bước CI `make demo-lien-thong` và "Thêm đơn vị bằng một lệnh (moc tenant create, check)"; smoke: mỗi đơn vị một Organization, công văn tới đơn vị nhận; e2e `lien-thong.spec.ts` | Chưa gửi lại được dòng liên thông `failed`; danh sách đơn vị nhận hiện cho mọi người dùng; văn bản hạn chế không liên thông (chủ ý) |
 | F3.13 | Giám sát: Prometheus + Grafana | Dùng được | — | smoke 1 kiểm: Prometheus đọc được chỉ số cổng API, Grafana có bảng điều khiển nạp sẵn | Chỉ thu chỉ số của APISIX (`platform/monitoring/prometheus.yml`); chưa có chỉ số từng dịch vụ, chưa có cảnh báo |
 | F3.14 | Log tập trung (Vector, Parseable) | Dùng được | svc-workflow `test_request_id.py` 10; scripts `test_log_tap_trung.py` 29; `platform/logs/vector.test.yaml` 29 ca (`vector test`) | bước CI `make demo-log-tap-trung` | Profile `logs` tắt mặc định; chỉ thu 5 dịch vụ (APISIX, hai ứng dụng web, `svc-files`, `svc-workflow`), không thu Hasura, Keycloak, PostgreSQL, Meilisearch; cổng fluent không xác thực (chỉ 127.0.0.1); Vector dùng tài khoản quản trị Parseable; Parseable chạy root (bỏ mọi capability), luôn mở CORS cho `cdn.parseable.com`; che lần hai không bắt số viết tách nhóm không có từ khóa đứng trước, họ tên; bật, tắt phải tạo lại 5 container; log không vào bản sao lưu (`docs/van-hanh.md`, mục Log tập trung) |
-| F3.15 | WAF (Coraza) | Chưa làm | — | — | Không có trong `docker-compose.yml` hay cấu hình APISIX |
+| F3.15 | WAF ở cổng: Coraza + OWASP CRS (plugin proxy-wasm của APISIX) | Dùng được | scripts `test_waf.py` 22 (cấu hình: image ghim digest và băm, pha rewrite, WAF thấy thân yêu cầu, chặn mặc định, `MOC_WAF` sai bị từ chối ở `make up`, ở reconciler GitOps trước khi dừng Signet và lúc khởi động, loại trừ gỡ theo id có lý do và chỉ trên khóa giao diện còn gửi, chặn JSON lồng sâu); svc-files `test_upload.py`, `test_download.py` (tên tệp có `' " ; = :` giữ nguyên, tải về an toàn) | smoke 7 kiểm: SQLi, XSS, duyệt thư mục, SQLi trong biến GraphQL không token, tải lên `.php` → 403 có `X-Request-Id`, không lộ luật; dòng chặn của Coraza mang đúng `request_id`; JSON lồng 100 tầng → 400, cổng vẫn trả lời; chữ thật qua: GraphQL có nháy, gạch, `_is_null`; tải lên tên có `' ; = :`; dự thảo có đề mục I./II./III.; khối ký, "File …?", `http://<IP>`, "03 file (…)" ở nội dung và ô Tìm kiếm. Chưa chạy xanh trên CI | Lên Hoàn thiện khi smoke và e2e qua WAF xanh trên CI. Dò chặn nhầm trên 7 389 yêu cầu dựng từ dữ liệu mẫu: 0 với chữ của dữ liệu mẫu, 28 với câu tự viết đặt vào ô không dành cho chúng (Cơ quan ban hành, Nơi nhận) — gặp chữ thật bị chặn thì người quản trị thêm loại trừ trong `apisix.yaml`. Coraza 3.3.3 — bản mới nhất có dạng WebAssembly — còn bốn cách lẩn WAF mức medium; hai lỗ mức high có biện pháp ở cổng (`platform/apisix/README.md`, mục WAF). Nội dung tệp không qua WAF (ClamAV soi). Cổng tốn thêm ~0,4–0,8 GB RAM |
 
 F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 
@@ -131,10 +131,9 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | Mức | Số | Tính năng |
 |---|---|---|
 | Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 7 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F4.6 |
+| Dùng được | 8 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F3.15, F4.6 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
-| Chưa làm | 1 | F3.15 |
 
 ## 3. Độ phủ 7 cụm dịch vụ Tầng 1
 
@@ -151,7 +150,7 @@ chưa phủ hết năng lực của cụm.
 | ① | Trạm kiểm dịch tệp | ClamAV, `services/svc-files/src/svc_files/clamav.py` | Hoàn thiện | F1.6, F3.1 |
 | ① | Mã hóa | Transit của OpenBao + AES-GCM, `services/svc-files/src/svc_files/sealed.py` | Hoàn thiện | F3.7 |
 | ① | Chữ ký số (PKI, HSM) | PKI nội bộ trong OpenBao + pyHanko, `services/svc-files/src/svc_files/signing.py` | Minh họa | F4.5. Không HSM — đặc tả §4.4 xếp HSM, chữ ký số công cộng vào "Không làm" |
-| ② Đa thuê ước, biên mạng | API Gateway zero-trust | APISIX, `platform/apisix/` | Hoàn thiện | F1.2; chưa có WAF (F3.15) |
+| ② Đa thuê ước, biên mạng | API Gateway zero-trust | APISIX, `platform/apisix/` | Hoàn thiện | F1.2; WAF Coraza + OWASP CRS ở cổng (F3.15, Dùng được) |
 | ② | Rà soát và che PII | `services/svc-files/src/svc_files/pii.py` (bản chép ở `svc-workflow`) | Hoàn thiện | F4.4; các giới hạn ở mục 2.4 |
 | ② | Đa thuê ước cách ly dữ liệu | `tenant_id` + quyền Hasura (`db/metadata/`), Keycloak Organizations, `scripts/tenants.py` | Hoàn thiện | F1.3, F3.12; một realm, một bucket chia theo tiền tố |
 | ② | Dịch thuật, bản địa hóa đa ngôn ngữ | `apps/office/app/locales/` | Một phần | F2.9: bản địa hóa giao diện Việt / Anh; lõi không có dịch vụ dịch thuật nào cho ứng dụng dùng chung |
@@ -210,7 +209,7 @@ Các ô "Chưa có", "Chưa làm" ở mục 2, mục 3:
 
 ```bash
 git grep -n event_triggers -- db/metadata                                  # rỗng: chưa có Hasura Event Trigger
-git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez|coraza' -- docker-compose.yml   # rỗng
+git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez' -- docker-compose.yml   # rỗng
 git grep -niwE 'sms|zalo' -- services platform docker-compose.yml        # rỗng: chưa có SMS, Zalo
 grep -n job_name platform/monitoring/prometheus.yml                        # chỉ apisix và chính prometheus
 grep -nE '^  [a-z]+:$|^    name:|^      - name:' .github/workflows/ci.yml  # job và bước CI
