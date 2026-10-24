@@ -28,3 +28,12 @@ Impeccable detector không có findings. REUSE kiểm bản quyền/giấy phép
 
 Ảnh, log và board tương tác tại `.cache/signet-refinement/` (không commit); Taste tại
 `apps/office/.taste-skill/signet-refinement-final/`. Chạy ứng dụng: http://localhost:8080.
+
+
+## Edge navigation and motion — 24 October 2026
+
+User requested flush sidebar edges, hover instead of a collapse button, and more smooth component motion. The focal interaction is a 320ms masked navigation reveal from a fixed 76px rail to a 244px overlay. The workspace does not move. Focus within expands it; pointer departure has a 140ms tolerance. No-hover devices use the existing accessible touch drawer, now flush to viewport edges. The stored collapse preference is no longer consumed.
+
+Supporting feedback covers actual route changes, task-list filtering/reordering, notification popovers, transient notices, button presses, navigation icons and field focus. No animation dependency, scroll reveals or perpetual decorative motion was added. Reduced motion removes transitions and spatial effects.
+
+Validation: 51 JavaScript/Vue files compile; all 3 responsive/recovery E2E cases pass, including rapid repeated hover, keyboard opening, stable main position, edge geometry, reduced motion, notification Escape and mobile focus return. Dedicated live captures verified 1440px rail/open navigation, notification popover and 390/320px mobile drawer without overflow or browser errors. Artifacts are local under `.cache/signet-refinement/sidebar-rail.png`, `sidebar-expanded.png`, `motion-notifications.png` and `edge-mobile-*.png`. This pass changes only FE, tests and design documentation; no push.
