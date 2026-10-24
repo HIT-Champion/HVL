@@ -160,6 +160,7 @@ Văn phòng điện tử, và Không gian cá nhân P.A.R.A — ứng dụng th�
 | `app-office` | Giao diện Văn phòng điện tử (Nuxt 4, Tailwind), tiếng Việt / tiếng Anh | `apps/office/` |
 | `app-ca-nhan` | Không gian cá nhân P.A.R.A: tệp của mỗi người trong bốn thư mục, client Keycloak riêng, gọi lõi qua cổng như mọi ứng dụng | `apps/ca-nhan/` |
 | Prometheus 3 + Grafana 13 | Giám sát cổng API: số yêu cầu, mã trạng thái, độ trễ theo route; chỉ trong mạng nội bộ | `platform/monitoring/` |
+| Vector 0.59 + Parseable 3.2 (profile `logs`, tùy chọn) | Log tập trung: thu log của các dịch vụ đã che thông tin cá nhân qua driver log của Docker, che lần hai, tra theo mã yêu cầu; chỉ nghe 127.0.0.1 | `platform/logs/` |
 | Scorpio 6 + PostGIS (profile `iot`) | Context broker NGSI-LD: bản sao số của cảm biến, lịch sử đo | `services/ot-sensor/` |
 | Ollama (profile `ai`, tùy chọn) | Mô hình ngôn ngữ cục bộ, mạng nội bộ riêng, tắt tính năng đám mây | `docker-compose.yml` |
 
@@ -194,6 +195,7 @@ platform/                Cấu hình cho phần mềm nguồn mở dùng nguyên
   keycloak/ apisix/      Realm Keycloak; route, plugin của cổng APISIX
   centrifugo/ openbao/   Cấu hình Centrifugo; cấu hình và script khởi tạo két OpenBao
   monitoring/            Prometheus + Grafana
+  logs/                  Vector + tệp compose phủ của log tập trung (profile logs)
   systemd/               Hẹn giờ chạy reconciler GitOps trên máy chủ
 scripts/                 Lệnh vận hành (moc.py, seed, smoke, backup, audit, reconcile, demo), cài đặt (install.sh),
                          công cụ của repo (check_pr.py, release*, license-header.sh, api_docs.py); tests/
@@ -293,6 +295,7 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 | [Két bí mật](docs/van-hanh.md#két-bí-mật) OpenBao: giới hạn, nâng cấp két cũ để ký số | `make demo-ket-bi-mat` |
 | [GitOps và tự phục hồi](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer, chỉ áp commit đã ký | `make reconcile` |
 | [Giám sát](docs/van-hanh.md#giám-sát) cổng API bằng Prometheus + Grafana | đường hầm SSH tới cổng 3300 |
+| [Log tập trung](docs/van-hanh.md#log-tập-trung): Vector + Parseable, tra theo mã yêu cầu `X-Request-Id` | `make logs-up`, `make logs-tra ID=…`, `make demo-log-tap-trung` |
 | [Hội tụ IT/OT](docs/van-hanh.md#hội-tụ-itot): broker NGSI-LD, cảm biến | `make demo-it-ot` |
 | [Kiểm sổ kiểm toán](db/README.md) ngoài CSDL | `make audit` |
 
@@ -327,7 +330,7 @@ bản phát hành kèm SBOM đó.
 |---|---|
 | [`docs/demo-script.md`](docs/demo-script.md) | Kịch bản demo: 4 nguyên lý và các màn nghiệp vụ, mỗi màn một lệnh |
 | [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md) | Mức hoàn thiện từng tính năng kèm bằng chứng (test, bước CI, màn demo) và hạn chế đã biết; độ phủ 7 cụm dịch vụ Tầng 1 của đề |
-| [`docs/van-hanh.md`](docs/van-hanh.md) | Vận hành: thêm đơn vị, sao lưu, két bí mật, GitOps, giám sát, IT/OT |
+| [`docs/van-hanh.md`](docs/van-hanh.md) | Vận hành: thêm đơn vị, sao lưu, két bí mật, GitOps, giám sát, log tập trung, IT/OT |
 | [`docs/trien-khai.md`](docs/trien-khai.md) | Triển khai lên máy chủ: HTTPS bằng Caddy trước APISIX, người vận hành, tường lửa, sao lưu hằng đêm, nâng cấp |
 | [`docs/api/`](docs/api/README.md) | Tài liệu API: lấy token, gọi GraphQL và REST qua cổng; schema GraphQL theo vai trò và OpenAPI xuất tự động |
 | [`docs/them-ung-dung.md`](docs/them-ung-dung.md) | Thêm một ứng dụng mới trên lõi: client Keycloak, route APISIX, service compose, schema riêng và quyền; ví dụ Không gian cá nhân P.A.R.A |

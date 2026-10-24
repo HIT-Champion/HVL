@@ -229,6 +229,175 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
 - Trang chỉ trả lời "đang chạy hay không" ngay lúc này; diễn biến theo thời gian, độ trễ, tỉ lệ lỗi xem ở Grafana (mục
   Giám sát). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
 
+## Log tập trung
+
+Profile `logs` (tắt mặc định) gom log của các dịch vụ về một chỗ để tra theo **mã yêu cầu**. APISIX gắn mã
+`X-Request-Id` cho mọi yêu cầu (giữ mã client tự gửi, trả lại ở header của phản hồi) và ghi ở cuối dòng truy cập;
+Hasura chuyển mã sang `svc-workflow`; `svc-workflow` ghi mã trong nhật ký, gửi tiếp sang Hasura và `svc-files`. Cùng
+một mã nằm ở dòng log của APISIX, `svc-workflow`, `svc-files` và ở cột `request_id` của sổ kiểm toán
+`core.audit_log`.
+
+Đường đi: driver log `fluentd` của Docker → **Vector** 0.59 (cổng `127.0.0.1:24224` trên máy chủ, tách mã yêu cầu, che
+lần hai) → **Parseable** 3.2 (lưu trên volume `parseable_data`, API và giao diện ở `127.0.0.1:8400`, tài khoản `moc`).
+Driver đặt trong tệp compose phủ [`platform/logs/docker-compose.logs.yml`](../platform/logs/docker-compose.logs.yml),
+chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docker`. `docker logs`, `make logs` vẫn đọc được như cũ
+(Docker giữ bản cục bộ 10 MB × 3 cho driver ngoài).
+
+- **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ đã che thông tin cá nhân
+  trong nhật ký (F4.4). **Không thu** Hasura, Keycloak, PostgreSQL, Meilisearch, OpenBao…: nhật ký của chúng chưa
+  che, đưa vào kho log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
+  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (29 ca; bỏ một luật nào thì có ca đỏ):
+  - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;
+  - giá trị của khóa có chữ `password`, `passwd`, `pwd`, `secret`, `token`, `api key`, `private key`, `credential`,
+    `session`, kể cả có tiền tố, hậu tố (`HASURA_ADMIN_SECRET=`, `POSTGRES_PASSWORD=`, `access_token`,
+    `client_secret`, `x-api-key`): trong nháy kép, nháy đơn (dict Python trong traceback), hoặc không nháy (tới khóa kế
+    tiếp, kể cả mật khẩu có dấu cách); nháy mở mà không đóng (dòng bị cắt giữa giá trị: `password="X…`,
+    `{'password': 'X…`) thì tới hết dòng, trong một chuỗi của dòng JSON thì tới hết chuỗi đó;
+  - giá trị đứng sau cờ dòng lệnh dài có chữ `passw`, `pwd`, `secret`, `token`, `key`, `credential`:
+    `'--password', 'X'`, `'--api-key', 'X'` (list Python), `["--db-password", "X"]` (mảng JSON), `--password X` (cả ở
+    đầu dòng);
+  - cả giá trị của `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`: trong nháy thì tới hết nháy (nháy
+    không đóng thì như trên); không nháy thì tới **hết dòng** (nhiều cặp `a=b; c=d`, `Digest username="u",
+    response="…"`), riêng trong một chuỗi của dòng JSON thì tới hết chuỗi đó;
+  - mật khẩu trong chuỗi kết nối `scheme://người:mật-khẩu@máy`;
+  - chuỗi truy vấn của URL có `/` đứng trước `?` (tuyệt đối, tương đối, `máy:cổng/đường-dẫn` như
+    `svc-files:8000/api/search?q=…`): không nháy, trong nháy đơn (`URL('…?q=…')`), trong nháy kép (cả giá trị trong
+    nháy là URL thì bỏ hết chuỗi truy vấn, kể cả có dấu cách);
+  - email (cả chữ có dấu, `@` viết `\u0040` hay `%40`), số điện thoại `0…`, `+84…`, `84…` (di động 10 số, cố định 11
+    số), CCCD 12 số, kể cả dính chữ (`sđt0912…`) và hai số liền nhau;
+  - số đứng sau từ khóa (cách tới 20 ký tự không phải chữ số), kể cả viết tách nhóm: `CCCD`/`căn cước`, `CMND`/`chứng
+    minh` (từ 9 số), `STK`/`tài khoản`, `MST`/`mã số thuế` (từ 6 số), `SĐT`/`điện thoại`/`fax`/`tel`/`phone` (từ 8
+    số), vd `CMND 123456789`, `STK 0011004123456`, `MST 0101234567`, `SĐT: 0912 345 678`. Từ khóa dính chữ cái phía
+    sau (`telemetry`, `telegram`) không tính.
+
+  Dòng JSON được giải mã rồi viết lại (khóa xếp theo chữ cái) trước khi che: ký tự thoát (`pass\u0077ord`) không giấu
+  được chữ; khóa bí mật ở mọi tầng, mọi kiểu giá trị (số, `null`, object lồng) bị thay cả giá trị — kể cả khóa vô hại
+  như `max_tokens`. Dòng không phải JSON thì được giải mã các chuỗi `\u00XX` là ký tự ASCII in được (trừ khi đứng sau
+  một dấu `\` thật; chữ số hex là chữ hoa hay thường, nhiều mã liền nhau) trước khi che: khóa viết thoát trong đoạn
+  JSON nằm giữa dòng thường (`ERROR {"pass\u0077ord": …}`) cũng bị che. Dòng dài hơn 16 KiB Docker cắt làm nhiều bản
+  ghi: Vector ghép lại (theo container và mã mảnh, xong ngay ở mảnh cuối) trước khi che (đã thử với driver thật: dòng
+  40 000 byte vẫn tách được `request_id`, mật khẩu vắt qua chỗ cắt vẫn bị che); dòng thường không bị gộp; thông điệp
+  cắt ở 16 384 ký tự. Lỗi lúc chạy bước che thì bỏ dòng, không gửi nguyên văn (`drop_on_error: true`, có
+  test tĩnh trong `scripts/tests/test_log_tap_trung.py` vì `vector test` không gây được lỗi lúc chạy).
+
+  Chỉ là lưới an toàn cho dòng lọt qua (dòng lỗi nginx, traceback), **không thay** lớp che của từng dịch vụ (F4.4).
+  **Còn lọt** (đã thử 24/10/2026):
+  - số không có từ khóa đứng trước mà viết tách nhóm (`0912 345 678`, `0912.345.678`, `(+84) 912-345-678`,
+    `(+84)912345678`, `+84 912345678`, `84-912-345-678`, `024 3869 1234`) hoặc không đúng dạng số điện thoại, CCCD
+    (CMND 9 số, số tài khoản, mã số thuế đứng một mình như `123456789`, `0011004123456`, `0101234567`); từ khóa dính
+    chữ cái phía sau (`phones 0912 345 671`);
+  - họ tên, địa chỉ; số dính liền chữ số khác;
+  - khóa không có các chữ trên: `pass`, `passphrase`, `pin`, `otp`, `auth`, `key`, `signature` (cả
+    `X-Amz-Signature`), khóa tiếng Việt (`mat_khau`, `khoa_bi_mat`);
+  - cờ dòng lệnh ngắn: `'-p', 'X'`, `-pX`; giá trị cờ bắt đầu bằng `-` (`--password -X`); thân khóa PEM (base64 đứng
+    riêng một dòng);
+  - header dạng cặp trong list, tuple, mảng JSON (`[(b'authorization', b'Digest …')]`, `Headers([('cookie',
+    'sid=…')])`, `{"headers": [["Cookie", "sid=…"]]}`): chỉ được che khi giá trị là token `Bearer`/`Basic`, JWT, hay
+    cặp có khóa chứa chữ `session` (`KEYCLOAK_SESSION=…`, `AUTH_SESSION_ID=…`, `session=…`);
+  - chuỗi JSON nằm trong chuỗi JSON (thoát hai tầng: `{"body": "{\"inner\": \"{\\\"password\\\": …}\"}"}`; thoát
+    một tầng thì vẫn che); giá trị có `\u0022` (dấu `"` viết thoát; Python, Node viết `\"`): bước giải mã đổi nó thành
+    `"` nên phần sau lọt (`"ab\u0022cd X"` thành `"[REDACTED]"cd X"`);
+  - hai giá trị nháy đơn không đóng trên cùng một dòng (`Cookie: 'a ; token: 'X`): phần sau dấu nháy thứ hai;
+  - chuỗi truy vấn không có `/` đứng trước (`search?q=…`); chuỗi truy vấn có dấu cách chỉ bỏ tới dấu cách đầu khi
+    không nháy, trong nháy đơn (`URL('svc-files:8000/x?q=Tran Thi B')` còn `Thi B`) hay nằm giữa chuỗi nháy kép
+    (`msg="tim svc-files:8000/a?q=Do Thi I"`);
+  - số sau từ khóa tách nhóm bằng dấu cách không ngắt (U+00A0); từ khóa gõ dạng Unicode tổ hợp (NFD);
+  - ký tự nhiều byte nằm đúng chỗ Docker cắt thành `�`; dòng quá 64 mảnh (khoảng 1 MiB) hoặc mảnh cuối tới sau 10
+    giây thì che từng phần (bí mật vắt qua chỗ chia lọt).
+
+  **Che thừa** (không lọt, chỉ mất chữ): khóa vô hại có chữ `token`, `session`, `pwd` (`max_tokens`,
+  `session_timeout=3600`, `PWD=/app`); số, kể cả ngày giờ, nằm trong 20 ký tự sau từ khóa (`tài khoản a lúc
+  2026-10-24 10:00` thành `tài khoản a lúc [STK]:00`); đoạn giống số điện thoại, CCCD trong chuỗi hex (mã
+  `uuid4().hex`) — cột `request_id` tách trước khi che nên vẫn tra đúng; phần còn lại của dòng sau `Authorization`,
+  `Cookie` không nháy, sau nháy không đóng (dòng JSON: của chuỗi đó), sau giá trị cờ dòng lệnh không nháy (tới khóa
+  `a=` kế tiếp: `--password X --host db` thành `--password [REDACTED]`, `--no-password db_moc --format c`,
+  `--sort-key name` cũng bị che); từ dài từ 8 ký tự đứng sau chữ `basic`, `bearer` (`basic authentication`); dấu `,`
+  `;` ngay sau giá trị bị che (`token=X,user=a` thành `token=[REDACTED]user=a`).
+- **Cột** của luồng `moc`: `service`, `container`, `stream` (stdout/stderr), `timestamp`, `event`, `request_id` (dòng
+  JSON của `svc-files`, `svc-workflow`; dòng của APISIX; chỉ mã đúng dạng `[A-Za-z0-9._:-]{1,128}`, như `event`),
+  `message`; Parseable thêm `p_timestamp` (giờ nhận, UTC), `p_src_ip` (IP của Vector trong mạng `logs`),
+  `p_user_agent` (của Vector).
+
+```bash
+make logs-up                       # bật: Vector, Parseable; tạo lại 5 container; đặt giữ log; tới lần make up sau
+make logs-tra ID=<mã>              # dòng của mọi dịch vụ mang mã, 60 phút gần nhất (PHUT=… để đổi)
+make demo-log-tap-trung            # màn demo: một mã đi qua APISIX → svc-workflow → svc-files
+make logs-down                     # tắt: 5 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
+```
+
+- **Bật lâu dài:** thêm `logs` vào `MOC_EXTRA_PROFILES` trong `.env` (vd `MOC_EXTRA_PROFILES=tunnel,logs`) rồi chạy
+  `make up` (hoặc `make logs-up`); từ đó `make up`, `make down`, `make ps`… tự nạp tệp phủ và profile, và mỗi lần
+  `make up` thêm mật khẩu vào `.env` cũ nếu thiếu, tạo luồng, đặt lại thời gian giữ log (kể cả sau khi xóa volume
+  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 5 dịch vụ về
+  `json-file` (Vector, Parseable vẫn chạy nhưng không nhận gì).
+- **Mật khẩu:** `MOC_LOGS_PASSWORD` do `make env` sinh; `.env` sinh trước F3.14 thiếu dòng này thì `make logs-up` (và
+  `make up` khi `logs` có trong `MOC_EXTRA_PROFILES`) tự thêm một chuỗi ngẫu nhiên đúng như `make env` (không in ra).
+  Dòng có mà rỗng thì hai lệnh này dừng; Parseable cũng không khởi động khi mật khẩu rỗng (biến `P_ADDR` rỗng) — không
+  bao giờ mở cổng nhận đăng nhập rỗng. Như các mật khẩu khác của repo (`POSTGRES_PASSWORD`…), mật khẩu này hiện
+  nguyên văn trong `docker compose config` và `docker inspect` của `parseable` (biến `P_PASSWORD`; Parseable 3.2.4
+  không đọc mật khẩu từ tệp). Vector đọc từ compose secret: không có trong biến môi trường, cấu hình, log của Vector.
+- **Mã yêu cầu lấy ở đâu:** header `X-Request-Id` của phản hồi (công cụ phát triển của trình duyệt, tab Network); câu
+  lỗi "đã ghi nhật ký với mã …" của Hasura Actions; cột `request_id` của sổ kiểm toán. Việc nền không có yêu cầu gốc
+  (tác tử gợi ý giao việc) dùng mã `goi-y:<việc>`.
+- **Giao diện:** `http://127.0.0.1:8400`, tài khoản `moc`, mật khẩu `MOC_LOGS_PASSWORD`; từ máy khác qua đường hầm
+  SSH: `ssh -L 8400:127.0.0.1:8400 máy-chủ`. Tra bằng SQL trên luồng `moc`, vd
+  `select p_timestamp, service, event, message from moc where service = 'svc-workflow' order by p_timestamp desc
+  limit 50`. Gói giao diện có tham chiếu tới máy chủ ngoài (phông chữ, công cụ hỗ trợ của Parseable) — chưa kiểm lúc
+  chạy có tải không; đường chính là `make logs-tra` và API. Xem rủi ro CORS ở dưới.
+- **Giữ log:** `MOC_LOGS_RETENTION_DAYS` ngày (mặc định 7); Parseable xóa dữ liệu cũ mỗi ngày lúc 00:00 UTC. Đổi số
+  ngày thì chạy lại `python3 scripts/log_tap_trung.py init`. Kho log **không** nằm trong bản sao lưu (`make backup`).
+- **Xóa hẳn log đã lưu:** sau `make logs-down`, `docker volume rm moc_parseable_data` (`make reset` cũng xóa).
+- **Bản cài** (`make install`): `MOC_EXTRA_PROFILES` có `logs` thì `install.sh` ghi `COMPOSE_FILE` (tệp phủ) vào `.env`
+  của bản cài, `docker compose` gõ tay và reconciler đều nạp; `.env` của bản cài phải có `MOC_LOGS_PASSWORD`; chạy
+  `python3 scripts/log_tap_trung.py init` trong thư mục cài một lần để đặt thời gian giữ log. Reconciler chỉ dựng lại
+  profile `core`, `app`: Vector, Parseable tự khởi động lại nhờ `restart: unless-stopped`, không được tự phục hồi khi
+  mất container.
+- **Kiểm cấu hình** không cần bật, không mạng, chỉ gắn tệp trong repo (CI có thể chạy cùng lệnh):
+
+  ```bash
+  V=timberio/vector:0.59.0-distroless-static@sha256:2138c72ef15477d3a60126da851407a198ec61d2ff4cd600a4e69db5f6a29ff7
+  M=(-v "$PWD/platform/logs:/etc/vector:ro"
+     -v "$PWD/platform/logs/kiem-tra/mat-khau-gia.txt:/run/secrets/moc_logs_password:ro")
+  docker run --rm --network none "${M[@]}" "$V" validate --deny-warnings /etc/vector/vector.yaml
+  docker run --rm --network none "${M[@]}" "$V" test /etc/vector/vector.yaml /etc/vector/vector.test.yaml
+  ```
+
+**Rủi ro, hạn chế người vận hành cần biết:**
+
+- **Bật hay tắt phải tạo lại 5 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`): vài
+  giây gián đoạn; đổi driver log chỉ có hiệu lực khi tạo lại container.
+- **Cổng fluent `127.0.0.1:24224` không cần đăng nhập** (driver `fluentd` của Docker không có xác thực): tiến trình
+  nào trên máy chủ cũng gửi được dòng giả vào kho log (dòng giả vẫn qua bước che). Máy chủ dùng chung nhiều người thì
+  đây là hạn chế thật.
+- **Vector dùng tài khoản quản trị duy nhất `moc` của Parseable** (qua compose secret, không qua biến môi trường): chưa
+  tách tài khoản chỉ được nạp; ai đọc được secret trong container Vector là có toàn quyền kho log.
+- **Parseable chạy bằng root** trong container, nhưng bỏ mọi capability (`cap_drop: [ALL]`) và
+  `no-new-privileges`. Không chạy được bằng uid khác 0: trên volume mới Parseable không tạo được thư mục và dừng
+  ("Permission denied", đã thử 23/10/2026). Image distroless, không có shell nên không có healthcheck; chỉ ở mạng
+  `logs`, không tới được dịch vụ nào khác của Signet. Mạng `logs` không `internal` (phải mở cổng 127.0.0.1) nên
+  Parseable, Vector ra Internet được; đã tắt kiểm bản cập nhật và gửi số liệu sử dụng của Parseable.
+- **CORS của Parseable cho `https://cdn.parseable.com`:** Parseable 3.2.4 luôn cho nguồn này gọi API kèm thông tin
+  đăng nhập (preflight 200, `access-control-allow-credentials: true`); nguồn khác thì không. Không tắt được:
+  `P_CORS=false` còn mở cho **mọi** nguồn, `P_ALLOW_ORIGINS` chỉ thêm nguồn (đã thử 23/10/2026). Nghĩa là trang trên
+  `cdn.parseable.com` mở trong trình duyệt đang đăng nhập giao diện Parseable có thể đọc kho log. Gói giao diện còn
+  tham chiếu `orchestrator.cloud-staging.parseable.com`. Giảm rủi ro: tra bằng `make logs-tra`; dùng giao diện thì
+  dùng xong đóng trình duyệt hoặc dùng hồ sơ trình duyệt riêng.
+- **Mất log khi Parseable hoặc Vector chết lâu:** Parseable không nhận thì Vector giữ tới 10 000 dòng trong bộ nhớ rồi
+  bỏ dòng mới; Vector chết thì Docker đệm trong bộ nhớ có giới hạn (`mode: non-blocking`, `max-buffer-size: 4m`) rồi
+  bỏ — dịch vụ không bị chặn. Bản cục bộ (`docker logs`) vẫn còn. Đo bằng driver thật (kiểm thử độc lập, 23/10/2026):
+  dừng Vector (`docker stop -t 1`) thì mất 13 dòng đang trong lô của Vector; dòng của container chạy lâu ghi lúc
+  Vector chết vẫn tới sau khi Vector chạy lại; container ngắn hạn ghi lúc Vector chết thì mất hết (0/100 000 dòng).
+- **Lớp che của Vector không thay được F4.4:** chỉ thu dịch vụ đã che; dịch vụ mới muốn thu thì phải che trong chính nó
+  trước.
+- `X-Request-Id` do client đặt được (APISIX giữ mã client gửi). `svc-workflow` chỉ nhận mã khớp
+  `[A-Za-z0-9._:-]{1,128}`, mã khác thì thay bằng mã mới (trả lại ở header); `svc-files` chưa kiểm (như từ trước):
+  chuỗi tùy ý vào nhật ký và các dòng sổ kiểm toán nó ghi. Vector chỉ đưa mã đúng dạng đó vào cột `request_id`;
+  `make logs-tra` kiểm mã trước khi ghép vào câu SQL.
+- Không có tracing (span, thời gian từng chặng): chỉ nối dòng theo mã. Docker rootless và Docker Desktop (dockerd
+  không chung mạng với máy chủ): chưa thử cổng `127.0.0.1:24224`. RAM lúc nghỉ khoảng 18 MiB (Vector) và 45 MiB
+  (Parseable) — `docker stats` trên máy dev ngày 23/10/2026; dưới tải chưa đo.
+
 ## Hội tụ IT/OT
 
 Profile `iot` (không bật mặc định, khoảng 550 MB RAM) thêm context broker NGSI-LD **Scorpio** (chuẩn ETSI) cùng
