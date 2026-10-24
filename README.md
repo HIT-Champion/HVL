@@ -6,8 +6,8 @@
 > **Văn phòng điện tử** quản lý văn bản đến, văn bản đi theo Nghị định 30/2020/NĐ-CP.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-[![CI](https://github.com/HIT-Champion/HVL/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HIT-Champion/HVL/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/HIT-Champion/HVL)](https://github.com/HIT-Champion/HVL/releases)
+[![CI](https://github.com/HIT-Champion/Signet/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HIT-Champion/Signet/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/HIT-Champion/Signet)](https://github.com/HIT-Champion/Signet/releases)
 
 Sản phẩm dự thi **Olympic Tin học Sinh viên Việt Nam 2026 — nội dung Phần mềm Nguồn mở (OLP PMNM 2026)**, chủ đề
 DX-OS Open-Core.
@@ -171,8 +171,8 @@ Toàn bộ công cụ dùng để dựng Signet đều là phần mềm nguồn 
 
 ```bash
 # 1. Lấy mã nguồn
-git clone https://github.com/HIT-Champion/HVL.git
-cd HVL
+git clone https://github.com/HIT-Champion/Signet.git
+cd Signet
 
 # 2. Cấu hình (KHÔNG sửa mã nguồn để cấu hình — mọi tham số nằm trong .env)
 make env              # sinh .env từ .env.example, mật khẩu ngẫu nhiên; hoặc: cp .env.example .env rồi sửa
@@ -282,7 +282,7 @@ Nhắc hạn chỉ kiểm được khi hạn ngắn: `MOC_SLA_DURATION=PT20S mak
 | Mã TOTP bị từ chối | Đồng hồ điện thoại lệch (mã đổi mỗi 30 giây): bật giờ tự động, hoặc lấy mã theo đồng hồ máy chủ bằng `make totp`. Sai 10 lần thì Keycloak tạm khóa tài khoản |
 | Máy chậm hoặc hết RAM sau khi bật AI | Mô hình cần thêm tới 6 GB RAM. Tắt bằng `docker compose --profile ai stop ollama`; các tác tử tự về chế độ không cần mô hình |
 
-Chưa gỡ được thì [mở issue theo mẫu báo lỗi](https://github.com/HIT-Champion/HVL/issues/new?template=bug_report.yml),
+Chưa gỡ được thì [mở issue theo mẫu báo lỗi](https://github.com/HIT-Champion/Signet/issues/new?template=bug_report.yml),
 kèm kết quả `make ps` và đoạn `make logs` của dịch vụ lỗi.
 
 ## Tài liệu
@@ -321,11 +321,11 @@ Makefile             Lối vào mọi lệnh: make env, up, seed, test, smoke, i
 ## Đóng góp và liên hệ
 
 - **Báo lỗi, đề xuất tính năng:** mở issue theo
-  [mẫu báo lỗi](https://github.com/HIT-Champion/HVL/issues/new?template=bug_report.yml) hoặc
-  [mẫu đề xuất](https://github.com/HIT-Champion/HVL/issues/new?template=feature_request.yml); xem
-  [mọi issue](https://github.com/HIT-Champion/HVL/issues).
+  [mẫu báo lỗi](https://github.com/HIT-Champion/Signet/issues/new?template=bug_report.yml) hoặc
+  [mẫu đề xuất](https://github.com/HIT-Champion/Signet/issues/new?template=feature_request.yml); xem
+  [mọi issue](https://github.com/HIT-Champion/Signet/issues).
 - **Lịch sử thay đổi:** [`CHANGELOG.md`](CHANGELOG.md) theo Keep a Changelog; các bản phát hành ở
-  [Releases](https://github.com/HIT-Champion/HVL/releases).
+  [Releases](https://github.com/HIT-Champion/Signet/releases).
 - **Đóng góp mã nguồn:** đọc [`CONTRIBUTING.md`](CONTRIBUTING.md) và quy trình Git
   [`docs/git_flow.md`](docs/git_flow.md) trước khi mở pull request; tuân theo
   [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).

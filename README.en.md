@@ -7,8 +7,8 @@
 > 30/2020/NĐ-CP on clerical work.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-[![CI](https://github.com/HIT-Champion/HVL/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HIT-Champion/HVL/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/HIT-Champion/HVL)](https://github.com/HIT-Champion/HVL/releases)
+[![CI](https://github.com/HIT-Champion/Signet/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HIT-Champion/Signet/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/HIT-Champion/Signet)](https://github.com/HIT-Champion/Signet/releases)
 
 Built for the **Vietnam Student Olympiad in Informatics 2026 — Open Source Software track (OLP PMNM 2026)**, theme
 DX-OS Open-Core. Most project documentation is written in Vietnamese; this page is a translation of
@@ -178,8 +178,8 @@ Every tool used to build Signet is open-source software. No closed-source or hom
 
 ```bash
 # 1. Get the source
-git clone https://github.com/HIT-Champion/HVL.git
-cd HVL
+git clone https://github.com/HIT-Champion/Signet.git
+cd Signet
 
 # 2. Configure (do NOT edit source code to configure — every parameter lives in .env)
 make env              # creates .env from .env.example with random passwords; or: cp .env.example .env and edit
@@ -292,7 +292,7 @@ GitOps, and scans for secrets and vulnerable dependencies. Reminders can only be
 | The machine slows down or runs out of RAM after turning on AI | The model needs up to 6 GB more RAM. Turn it off with `docker compose --profile ai stop ollama`; the agents fall back to working without a model |
 
 Still stuck?
-[Open an issue with the bug report template](https://github.com/HIT-Champion/HVL/issues/new?template=bug_report.yml),
+[Open an issue with the bug report template](https://github.com/HIT-Champion/Signet/issues/new?template=bug_report.yml),
 including the output of `make ps` and the `make logs` excerpt of the failing service.
 
 ## Documentation
@@ -333,11 +333,11 @@ Makefile             Entry point for every command: make env, up, seed, test, sm
 ## Contributing and contact
 
 - **Bugs, feature requests:** open an issue with the
-  [bug report template](https://github.com/HIT-Champion/HVL/issues/new?template=bug_report.yml) or the
-  [feature request template](https://github.com/HIT-Champion/HVL/issues/new?template=feature_request.yml); see
-  [all issues](https://github.com/HIT-Champion/HVL/issues).
+  [bug report template](https://github.com/HIT-Champion/Signet/issues/new?template=bug_report.yml) or the
+  [feature request template](https://github.com/HIT-Champion/Signet/issues/new?template=feature_request.yml); see
+  [all issues](https://github.com/HIT-Champion/Signet/issues).
 - **Change history:** [`CHANGELOG.md`](CHANGELOG.md) following Keep a Changelog; releases are on
-  [Releases](https://github.com/HIT-Champion/HVL/releases).
+  [Releases](https://github.com/HIT-Champion/Signet/releases).
 - **Code contributions:** read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the Git workflow
   [`docs/git_flow.md`](docs/git_flow.md) before opening a pull request; follow the
   [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
