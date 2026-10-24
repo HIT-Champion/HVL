@@ -781,6 +781,10 @@
       },
       "assignment": {
         "suggested": "Suggested an assignment"
+      },
+      "import": {
+        "created": "Import batch created",
+        "finished": "Import batch finished"
       }
     },
     "entity": {
@@ -800,7 +804,8 @@
         "files": "Uploaded file",
         "users": "User",
         "tenants": "Organisation",
-        "notification_deliveries": "Notification delivery (email, webhook)"
+        "notification_deliveries": "Notification delivery (email, webhook)",
+        "import_jobs": "Import batch"
       },
       "ai": {
         "questions": "Question to the assistant"
@@ -900,7 +905,14 @@
       "due_days": "Suggested deadline",
       "confidence": "Confidence",
       "evidence": "Evidence documents",
-      "candidates": "Similar documents found"
+      "candidates": "Similar documents found",
+      "kind": "Batch type",
+      "format": "File format",
+      "register": "Registered",
+      "total": "Rows",
+      "ok": "Rows done",
+      "duplicate": "Duplicate rows",
+      "failed": "Failed rows"
     },
     "direction": {
       "in": "Incoming",
@@ -945,6 +957,9 @@
       "extract": "Verbatim quote",
       "model": "Language model",
       "none": "None"
+    },
+    "importKind": {
+      "incoming": "Incoming documents"
     }
   },
   "register": {

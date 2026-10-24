@@ -362,6 +362,9 @@ services:
       # Trang trạng thái hệ thống (/api/status, công khai): phiên bản đang chạy; svc-files còn dò APISIX (cổng trạng
       # thái 7085 nội bộ), JWKS của Keycloak, /readyz của svc-workflow
       MOC_VERSION: ${MOC_VERSION:-dev}
+      # Nạp lô văn bản đến (/api/imports): trần byte một lô được ghi vào kho — tổng cỡ đã giải nén các mục zip mà các
+      # dòng trỏ tới, mỗi lần trỏ tính một lần. Các trần khác của lô: mặc định (services/svc-files/README.md)
+      MOC_IMPORT_STORE_MAX_MB: ${MOC_IMPORT_STORE_MAX_MB:-200}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế

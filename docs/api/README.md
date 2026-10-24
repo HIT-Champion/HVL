@@ -49,7 +49,7 @@ cũng nạp được.
 |---|---|---|
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
-| `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…` | `svc-files` | Bắt buộc |
+| `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…`, `POST /api/imports/incoming`, `GET /api/imports…` | `svc-files` | Bắt buộc |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
@@ -189,6 +189,10 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `POST /api/files/{id}/read` | Văn thư, chỉ tệp chính mình tải lên: tác tử đọc văn bản đến (F4.1) gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu, mỗi trường kèm độ tin cậy; không tạo văn bản. Một lượt đọc một lúc (`503 busy`) |
 | `POST /api/documents/ask` | Văn thư, chuyên viên, lãnh đạo: trợ lý hỏi đáp (F4.2) `{question, mode: extract\|generate}` → câu trả lời, mỗi câu kèm `[n]` trỏ nguồn (số ký hiệu, trang), chỉ từ văn bản người hỏi được đọc; không có căn cứ → `status: no_evidence`. Câu hỏi, câu trả lời không lưu |
 | `GET /api/case-files/{id}/archive` | Hồ sơ đã nộp lưu (F3.8): đọc lại từ gói trên bucket lạnh sau khi khớp băm với CSDL; chỉ văn bản người gọi được đọc |
+| `POST /api/imports/incoming` (multipart, trường `data`, `archive` tùy chọn) | Văn thư: nạp lô văn bản đến — tệp NDJSON hoặc CSV cùng trường với `receiveIncoming` (thêm `files`: tên tệp trong zip `archive`), tối đa 1000 dòng, tổng tệp các dòng trỏ tới (mỗi lần trỏ tính một lần) tối đa 200 MB; `?register=true` vào sổ từng văn bản (tối đa 200 dòng). Trả `202` + `Location` ngay, xử lý nền; mỗi dòng đi đúng đường tiếp nhận lẻ (ClamAV, Action thay mặt văn thư). `Idempotency-Key` gửi lại trả đúng lô cũ (`200`) |
+| `GET /api/imports/{id}` | Người tạo lô: trạng thái `queued`/`running`/`done`, số dòng đã nhận, còn chờ, đạt, trùng, lỗi; lô của người khác → `404` |
+| `GET /api/imports/{id}/rows` | Người tạo lô: kết quả từng dòng (số dòng, mã lỗi, lý do, lỗi theo trường, id văn bản, số đến); `?status=failed`, trang sau `after=<next_after>` |
+| `GET /api/imports` | Các lô của chính người gọi, mới trước |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
 | `GET /api/status` | **Không cần token.** Tình trạng từng thành phần (`ok`, `degraded`, `down`, `off`) theo tầng, tình trạng chung, phiên bản, thời gian chạy, giờ sao lưu gần nhất, trợ lý AI bật hay tắt; lưu đệm 10 giây, không có địa chỉ nội bộ hay số liệu |
@@ -199,6 +203,12 @@ curl -s -G "$MOC/api/search" -H "Authorization: Bearer $TOKEN" --data-urlencode 
 curl -s -OJ "$MOC/api/registers/in/2026/pdf" -H "Authorization: Bearer $TOKEN"     # token văn thư hoặc lãnh đạo đơn vị
 curl -s "$MOC/api/documents/ask" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"question": "Điều kiện xét học bổng khuyến khích học tập là gì?", "mode": "extract"}'
+
+# nạp lô văn bản đến (token văn thư): 202 + Location, rồi hỏi trạng thái và lỗi từng dòng
+curl -s "$MOC/api/imports/incoming" -H "Authorization: Bearer $TOKEN" -H 'Idempotency-Key: lo-2026-10-23' \
+  -F 'data=@van-ban-den.csv;type=text/csv' -F 'archive=@tep.zip;type=application/zip'
+curl -s "$MOC/api/imports/$LO" -H "Authorization: Bearer $TOKEN"
+curl -s "$MOC/api/imports/$LO/rows?status=failed" -H "Authorization: Bearer $TOKEN"
 
 # cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
 curl -s "$MOC/api/verify/ABCDE-23456"
@@ -296,6 +306,7 @@ Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"],
 |---|---|---|
 | Hasura → `svc-workflow` `POST /actions/{name}` | Tiêu đề `X-Moc-Action-Secret` và biến phiên lấy từ JWT | [`openapi/svc-workflow.json`](openapi/svc-workflow.json) |
 | `svc-files`, `svc-workflow` → Hasura | Khóa quản trị + `X-Hasura-Role: service` + đơn vị, người dùng, request id lấy từ token | [`db/README.md`](../../db/README.md#dịch-vụ-gọi-hasura) |
+| `svc-files` → Hasura Action `receiveIncoming`, `registerIncoming` (nạp lô) | Khóa quản trị + `X-Hasura-Role: clerk` + đơn vị, người, phòng của văn thư tạo lô (lấy từ token đã kiểm lúc tạo lô) — thay mặt văn thư cho từng dòng; dòng không thành văn bản thì gỡ tệp đã lưu cho dòng bằng khóa quản trị không kèm vai trò, `X-Hasura-User-Id: svc-files:import` (chỉ tệp chưa gắn văn bản của người tạo lô) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → `svc-files` `POST /internal/issue` | Token tài khoản dịch vụ `svc-workflow` (client credentials của Keycloak) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → Flowable REST, Keycloak | Tài khoản dịch vụ | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
 | `svc-workflow` → Flowable `external-job-api` | Tự lấy việc nhắc hạn (topic `moc-sla`) do timer trong BPMN tạo | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |

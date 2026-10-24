@@ -105,6 +105,8 @@ export function useAuditFormat(names: { value: Map<string, string> }, department
       return String(value).split(',').map((k) => k.trim()).filter(Boolean)
         .map((k) => label('assist.warning', k)).join('; ') || '—'
     }
+    // lô nạp (import.created, import.finished): loại lô — số dòng, định dạng hiện như ghi
+    if (col === 'kind') return label('audit.importKind', String(value))
     // gợi ý giao việc (assignment.suggested, F4.3): kết quả, lý do không gợi ý, độ tin cậy, số ngày đề xuất. Khóa là
     // outcome / outcome_reason (không phải status / reason) để không lẫn nhãn trạng thái văn bản, lý do đọc tệp
     if (col === 'outcome') return label('assign.suggest.outcome', String(value))

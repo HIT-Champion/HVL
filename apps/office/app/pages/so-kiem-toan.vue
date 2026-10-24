@@ -40,7 +40,8 @@ interface Row {
 const PAGE = 50
 const groups = {
   all: null,
-  documents: ['office.documents', 'office.case_files', 'office.case_file_documents', 'office.dispatches'],
+  documents: ['office.documents', 'office.case_files', 'office.case_file_documents', 'office.dispatches',
+    'core.import_jobs'],
   assignments: ['office.assignments'],
   files: ['office.document_files', 'core.files'],
   people: ['core.users', 'office.document_acl'],

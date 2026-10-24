@@ -39,6 +39,10 @@ OCR_LANG_RE = re.compile(r"[A-Za-z0-9_]{1,32}(?:\+[A-Za-z0-9_]{1,32}){0,3}")
 ASK_INDEX_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
+# Lô nạp (imports/): tệp dữ liệu + zip cộng phần đầu multipart phải lọt client_max_body_size 64m của APISIX
+IMPORT_GATEWAY_BYTES = 63 * 1024 * 1024
+
+
 class ConfigError(RuntimeError):
     """Thiếu hoặc sai biến môi trường — dịch vụ dừng ngay khi khởi động."""
 
@@ -135,6 +139,22 @@ class Settings:
     workflow_url: str = "http://svc-workflow:8000"                  # /readyz của svc-workflow: Flowable và Hasura
     status_cache_s: float = 10.0        # lưu đệm kết quả gom cho mọi người gọi: gọi dồn không thành lời gọi vào lõi
     status_timeout_s: float = 3.0       # hạn mỗi lần dò một thành phần, quá thì báo gián đoạn
+    # Lô nạp văn bản đến (POST /api/imports/incoming — imports/): một tệp NDJSON/CSV + zip tệp đính kèm tùy chọn,
+    # xử lý nền từng mẻ. Zip giữ tạm trong thư mục spool (tmpfs /tmp của compose) tới khi lô xong
+    import_interval_s: float = 2.0      # chu kỳ vòng nền khi rảnh; 0: tắt vòng nền và không nhận lô mới (503)
+    import_chunk: int = 20              # số dòng mỗi mẻ, rồi nhường lô khác của cùng hoặc khác đơn vị
+    import_max_rows: int = 1000         # trần số dòng mỗi lô
+    # trần riêng của lô có vào sổ (register=true): mỗi dòng khởi chạy một quy trình Flowable, một lượt gợi ý giao
+    # việc và thông báo tới lãnh đạo
+    import_register_max_rows: int = 200
+    import_data_max_bytes: int = 5 * 1024 * 1024    # trần tệp dữ liệu NDJSON/CSV
+    import_zip_max_bytes: int = 50 * 1024 * 1024    # trần zip tệp đính kèm — cả yêu cầu dưới 64m của APISIX
+    import_max_open: int = 3            # số lô chưa xong cùng lúc của MỘT ĐƠN VỊ (mọi người trong đơn vị cộng lại)
+    import_spool_dir: str = "/tmp/moc-nap-lo"
+    import_spool_bytes: int = 200 * 1024 * 1024     # tổng zip đang giữ; quá thì 503 busy, gửi lại sau
+    # trần byte một lô được ghi vào kho: tổng cỡ (đã giải nén) các mục zip mà các dòng trỏ tới, mỗi lần trỏ tính một
+    # lần — không có trần này thì zip 8 KB trỏ lặp lại thành hàng chục MB trong kho
+    import_store_max_bytes: int = 200 * 1024 * 1024
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -225,6 +245,16 @@ class Settings:
                 workflow_url=env.get("MOC_WORKFLOW_URL", "http://svc-workflow:8000").strip().rstrip("/"),
                 status_cache_s=float(env.get("MOC_STATUS_CACHE_S", "10")),
                 status_timeout_s=float(env.get("MOC_STATUS_TIMEOUT_S", "3")),
+                import_interval_s=float(env.get("MOC_IMPORT_INTERVAL_S", "2")),
+                import_chunk=int(env.get("MOC_IMPORT_CHUNK", "20")),
+                import_max_rows=int(env.get("MOC_IMPORT_MAX_ROWS", "1000")),
+                import_register_max_rows=int(env.get("MOC_IMPORT_REGISTER_MAX_ROWS", "200")),
+                import_data_max_bytes=int(env.get("MOC_IMPORT_DATA_MAX_MB", "5")) * 1024 * 1024,
+                import_zip_max_bytes=int(env.get("MOC_IMPORT_ZIP_MAX_MB", "50")) * 1024 * 1024,
+                import_max_open=int(env.get("MOC_IMPORT_MAX_OPEN", "3")),
+                import_spool_dir=env.get("MOC_IMPORT_SPOOL_DIR", "/tmp/moc-nap-lo").strip(),
+                import_spool_bytes=int(env.get("MOC_IMPORT_SPOOL_MB", "200")) * 1024 * 1024,
+                import_store_max_bytes=int(env.get("MOC_IMPORT_STORE_MAX_MB", "200")) * 1024 * 1024,
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -248,6 +278,28 @@ class Settings:
         self._check_reader()
         self._check_assistant()
         self._check_status()
+        self._check_imports()
+
+    def _check_imports(self) -> None:
+        """Biến của lô nạp văn bản đến (imports/)."""
+        if self.import_interval_s < 0:
+            raise ConfigError("MOC_IMPORT_INTERVAL_S phải ≥ 0 (0: tắt lô nạp)")
+        if not 1 <= self.import_chunk <= 200:
+            raise ConfigError("MOC_IMPORT_CHUNK phải trong 1–200")
+        if not 1 <= self.import_max_rows <= 100_000:
+            raise ConfigError("MOC_IMPORT_MAX_ROWS phải trong 1–100000")
+        if not 1 <= self.import_register_max_rows <= self.import_max_rows:
+            raise ConfigError("MOC_IMPORT_REGISTER_MAX_ROWS phải trong 1–MOC_IMPORT_MAX_ROWS")
+        if self.import_data_max_bytes < 1 or self.import_zip_max_bytes < 1 or self.import_spool_bytes < 1:
+            raise ConfigError("MOC_IMPORT_DATA_MAX_MB, MOC_IMPORT_ZIP_MAX_MB, MOC_IMPORT_SPOOL_MB phải ≥ 1")
+        if self.import_zip_max_bytes > self.import_spool_bytes:
+            raise ConfigError("MOC_IMPORT_ZIP_MAX_MB không được lớn hơn MOC_IMPORT_SPOOL_MB")
+        if self.import_max_open < 1:
+            raise ConfigError("MOC_IMPORT_MAX_OPEN phải ≥ 1")
+        if self.import_store_max_bytes < 1:
+            raise ConfigError("MOC_IMPORT_STORE_MAX_MB phải ≥ 1")
+        if not self.import_spool_dir.startswith("/"):
+            raise ConfigError("MOC_IMPORT_SPOOL_DIR phải là đường dẫn tuyệt đối")
 
     def _check_status(self) -> None:
         """Biến của trang trạng thái hệ thống (công khai, status.py)."""
@@ -308,6 +360,10 @@ class Settings:
                            f"{len(models)} mô hình nhưng compose chỉ cho 2 (OLLAMA_MAX_LOADED_MODELS) — mô hình bị nạp "
                            "đi nạp lại, câu trả lời và đọc văn bản đến dễ quá giờ. Để trống MOC_ASK_MODEL và đặt mô "
                            "hình muốn dùng vào MOC_AI_MODEL (dùng chung cho trích yếu và câu trả lời)")
+        if self.import_data_max_bytes + self.import_zip_max_bytes > IMPORT_GATEWAY_BYTES:
+            out.append("MOC_IMPORT_DATA_MAX_MB + MOC_IMPORT_ZIP_MAX_MB vượt 63 MB: APISIX nhận thân yêu cầu tối đa 64m "
+                       "(client_max_body_size, platform/apisix/config.yaml) nên lô lớn bị cổng từ chối (413) trước khi "
+                       "tới svc-files")
         return out
 
     def _check_reader(self) -> None:

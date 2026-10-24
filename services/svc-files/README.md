@@ -40,12 +40,13 @@ issue #19, #20.
 | Phả hệ OpenLineage cho từng bước nộp lưu, kiểm chất lượng bảng Parquet trước khi ghi | **Xong** (F3.9) |
 | `/internal/dispatch-file`: chép bản phát hành sang kho của đơn vị nhận trong hệ thống (kiểm băm, quét, id định trước) | **Xong** (F3.12) |
 | `GET /api/status`: trạng thái vận hành từng thành phần theo tầng cho trang công khai `/trang-thai`, lưu đệm 10 giây, không lộ địa chỉ nội bộ | **Xong** |
+| `POST /api/imports/incoming`: nạp lô văn bản đến (NDJSON/CSV + zip tệp đính kèm), xử lý nền theo mẻ, mỗi dòng đi đúng đường tiếp nhận lẻ, báo lỗi từng dòng | **Xong** (cụm ⑤) |
 | Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa |
 
 ## API
 
 Đi qua APISIX ở `/api/files/*`, `/api/search`, `/api/documents/*`, `/api/registers/*`, `/api/verify`,
-`/api/case-files/*`, `/api/status`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
+`/api/case-files/*`, `/api/status`, `/api/imports*`. OpenAPI tự sinh ở `/openapi.json` (chỉ trong mạng nội bộ), bản
 xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-files.json) (`make api-docs`).
 
 | Đường dẫn | Kết quả |
@@ -68,6 +69,10 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
 | `GET /api/status` | **Không cần token.** `200` `{status, checked_at, version, uptime_s, last_backup_at, ai: {enabled, model, semantic}, layers, components: [{id, layer, label, software, status}]}`, `Cache-Control: no-store`; trạng thái `ok` · `degraded` · `down` (thành phần) và `off` (tắt theo cấu hình). Mọi người gọi trong 10 giây nhận cùng một kết quả · `429` quá `MOC_RATE_STATUS_PER_MIN` lần một phút mỗi IP (APISIX) — mục Trạng thái hệ thống |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
+| `POST /api/imports/incoming` (multipart, trường `data`, `archive` tùy chọn) | Chỉ `clerk`. Query `format=ndjson\|csv` (thiếu thì đoán theo đuôi tệp, Content-Type), `register=true\|false` (mặc định `false`); header `Idempotency-Key` tùy chọn. `202` `ImportOut` + `Location: /api/imports/{id}` · `200` gửi lại cùng khóa, cùng nội dung: lô cũ · `400` `missing_file`, `unknown_format`, `bad_encoding`, `bad_header`, `bad_format`, `empty`, `bad_archive`, `bad_idempotency_key` · `403` `forbidden`, `unknown_tenant` · `409` `idempotency_conflict` · `413` `too_large`, `too_many_rows` · `422` `infected`, `unscannable` chính tệp dữ liệu (ghi `file.rejected`, không có lô) · `429` `too_many_imports` (+ `Retry-After: 60`) · `503` `imports_disabled`, `busy` (+ `Retry-After: 60`), `scanner_unavailable`, `database_unavailable` — mục Nạp lô văn bản đến |
+| `GET /api/imports/{id}` | Chỉ người tạo lô. `200` `ImportOut` `{id, kind, status: queued\|running\|done, filename, format, register, total, pending, ok, duplicate, failed, note, created_at, started_at, finished_at}`, `Cache-Control: no-store` · `404` `not_found` không có lô hoặc lô của người khác (kể cả cùng đơn vị) · `401` · `503` |
+| `GET /api/imports/{id}/rows` | Như trên. `status=pending\|ok\|duplicate\|failed`, `after` (số dòng cuối của trang trước), `limit` 1–500 (100). `200` `{rows: [{line, status, code, message, fields, document_id, register_number}], next_after}` — không trả lại dữ liệu đã gửi |
+| `GET /api/imports` | `200` `{imports: [ImportOut]}` — lô của chính người gọi, mới trước; `limit` 1–50 (20) |
 | `POST /internal/issue` | Chỉ token tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`403` với token người dùng). `201` `{file_id, sha256, size_bytes}` — `sha256` của bản đã ký số (F4.5) · `409` văn bản chưa cấp số · `503` ClamAV, kho, CSDL không sẵn sàng; `signing_unavailable` két không trả lời khi ký — **không lưu**. Không có trong OpenAPI công khai, APISIX không có route tới |
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `POST /internal/similar-documents` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15; thừa trường → `422`). `200` `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` · `404` `not_found` · `409` `not_incoming`, `restricted` · `503` `assistant_disabled`, `search_unavailable`, `database_unavailable` (mục Văn bản tương tự cho tác tử gợi ý giao việc) |
@@ -861,6 +866,148 @@ người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ v
   bản chỉ nhận `[0-9A-Za-z._+-]`, lạ thì trả `dev`.
 - Hợp đồng trả về khóa bằng mô hình pydantic `StatusOut`: thêm trường mới phải sửa mô hình, không lọt qua tình cờ.
 
+### Nạp lô văn bản đến (cụm ⑤)
+
+`imports/`. Văn thư — hay ứng dụng khác gọi bằng token của văn thư — gửi một tệp NDJSON hoặc CSV nhiều văn bản đến, kèm
+zip tệp đính kèm tùy chọn. svc-files kiểm cả tệp ngay trong yêu cầu, trả `202`, rồi xử lý nền từng mẻ và báo kết quả
+theo dòng. Lô không có đường ghi thứ hai: mỗi dòng đi đúng đường tiếp nhận một văn bản lẻ.
+
+```
+POST /api/imports/incoming ─► token → vai trò clerk → bật? → Content-Length → form (data, archive)
+  → data qua quarantine() (ClamAV; nhiễm: file.rejected, 422, không có lô)
+  → đọc NDJSON/CSV trong luồng riêng (lỗi dòng: dòng failed; restricted không phải true/false: bad_value)
+  → archive? chép vào spool <lô>.zip, kiểm zip, đối chiếu tên tệp các dòng cần, trần tổng byte sẽ ghi vào kho
+  → một mutation: core.import_jobs + core.import_rows + sổ import.created → 202 + Location
+vòng nền: lô đến giờ (run_after) → người tạo còn là văn thư đang bật? → mẻ ≤ MOC_IMPORT_CHUNK dòng chờ, mỗi dòng:
+  giành dòng (cập nhật có điều kiện: claimed_until + mã lượt giữ claim_id) → tra trùng trước
+  → mỗi tệp trong zip qua ingest() (ClamAV → kho → core.files)
+  → Action receiveIncoming thay mặt văn thư → [register=true] registerIncoming → ghi kết quả dòng
+  → dòng không thành văn bản: gỡ tệp đã lưu cho dòng (core.files chưa gắn văn bản + đối tượng trong kho)
+  → hết dòng chờ: đóng lô (số đếm; trigger ghi import.finished cùng giao dịch, đúng một lần) → xóa zip
+```
+
+- **Cùng đường với tiếp nhận lẻ.** Tệp đính kèm qua đúng `ingest()` của `POST /api/files`: quét ClamAV, tệp của văn bản
+  hạn chế lưu mã hóa, nhiễm thì ghi `file.rejected` với `request_id` `<lô>:<dòng>`. Dữ liệu qua đúng Action
+  `receiveIncoming` — kiểm schema `van-ban-den.json`, tra danh mục loại, tệp phải do chính người gửi tải lên, chặn
+  trùng, ghi văn bản và dòng sổ kiểm toán chuỗi băm của nó — với phiên của văn thư tạo lô: vai trò `clerk`, đơn vị,
+  người, phòng lấy từ token đã kiểm lúc tạo lô. `register=true` thì gọi tiếp `registerIncoming` (cấp số đến, khởi chạy
+  quy trình, báo lãnh đạo) như nút "Vào sổ".
+- **Không tự sửa dữ liệu** (khoảng trắng, NFC): ứng dụng khác gọi API cũng phải gửi dữ liệu sạch như form. Sai thì dòng
+  `failed` kèm lỗi theo trường (`fields`, cùng mã với form tiếp nhận — `schemas/README.md`).
+- **Kiểm trước khi lưu tệp, gỡ tệp khi bị từ chối.** `restricted` quyết định tệp lưu mã hóa hay bản rõ, nên được kiểm
+  chặt ngay lúc đọc tệp: không phải `true`/`false` JSON (NDJSON) hay ô `true`/`false` (CSV, không phân biệt hoa thường)
+  thì dòng `bad_value`, không tệp nào của dòng vào kho — văn bản có ý hạn chế không bao giờ để lại bản rõ. Các trường
+  khác do Action quyết (schema, danh mục loại, trùng…), sau khi tệp đã qua trạm quét và vào kho: dòng kết thúc mà không
+  thành văn bản (bị từ chối, trùng, tệp sau bị chặn, hết lượt, người tạo bị khóa) thì vòng nền gỡ các tệp đã lưu cho
+  dòng — dòng `core.files` (khóa quản trị, người trong sổ `svc-files:import`, chỉ tệp của người tạo lô, trong đơn vị,
+  chưa gắn văn bản nào, chưa được đặt vào không gian cá nhân) rồi đối tượng trong kho. Gỡ lỗi thì dòng vẫn xong, nhật
+  ký `core.import.files_left` ghi id tệp còn lại.
+- **Quyền.** Chỉ văn thư tạo lô; chỉ người tạo xem lô và dòng (người khác cùng hay khác đơn vị đều `404`). Không vai trò
+  người dùng nào đọc hai bảng qua GraphQL. Đầu mỗi mẻ vòng nền đọc lại danh bạ (`core_users`): người tạo bị khóa hoặc
+  không còn là văn thư thì mọi dòng chờ thành `actor_revoked` — vòng nền đóng vai họ bằng khóa quản trị, nên quyền phải
+  còn lúc từng dòng được ghi. Chưa có trong danh bạ (chưa đồng bộ) thì vẫn chạy: Action không dựa vào `core_users`.
+
+**Định dạng.** Các trường `data` của `receiveIncoming`: `type_code`, `symbol`, `issuer_name`, `issued_on`, `summary` bắt
+buộc; `urgency`, `due_on`, `restricted`, `file_ids` tùy chọn. Thêm `files`: tên tệp trong zip, tệp đầu là bản chính.
+`file_ids` (tệp đã tải qua `/api/files`) chuyển nguyên, id của `files` nối sau, tổng tối đa 20. Trường lạ chuyển nguyên
+để Action báo theo trường. Mẫu: [`seed/nap-lo/van-ban-den.csv`](../../seed/nap-lo/van-ban-den.csv) — 200 dòng, có dòng
+sai cố ý (`make nap-lo-mau` sinh lại, `scripts/nap_lo_mau.py`).
+
+- NDJSON: UTF-8 (BOM đầu tệp thì bỏ), mỗi dòng một object JSON ≤ 64 KiB, lồng tối đa 32 cấp (đếm bằng một lượt duyệt
+  tuyến tính trước khi đọc JSON). Số dòng là dòng vật lý tính từ 1; dòng trống bỏ qua nhưng vẫn đếm. `NaN`, `Infinity`
+  là JSON sai; số tràn số thực (`1e999`) là `bad_value`.
+- CSV: UTF-8 (BOM của Excel nhận), dấu phẩy, dòng tiêu đề bắt buộc, chỉ gồm các cột trên. Số dòng như hàng Excel
+  (tiêu đề là 1). Ô trống thì bỏ khóa (mặc định của schema áp); `restricted` nhận `true`/`false`; `files`, `file_ids`
+  cách nhau bằng `;`. Ngoặc kép hỏng làm lệch mọi dòng sau nên cả tệp `400 bad_format`.
+- Zip: kiểm lúc tạo lô — mở được, ≤ 5000 mục, tên chuẩn hóa NFC không trùng; dòng trỏ tên không có trong zip thì lỗi
+  ngay. Zip **không** quét nguyên khối (một mục nhiễm sẽ làm hỏng cả lô): từng mục được quét lúc dòng của nó chạy, đọc
+  có trần (`read(limit + 1)`) nên không sợ bom zip. Zip chưa quét chỉ nằm ở spool trên tmpfs `/tmp` của svc-files (như
+  Starlette đệm tệp tải lên), không bao giờ vào kho; lô xong thì xóa.
+
+**Giới hạn** (mục Cấu hình; compose chỉ truyền `MOC_IMPORT_STORE_MAX_MB`, các biến `MOC_IMPORT_*` khác là mặc định):
+1000 dòng mỗi lô, 200 khi `register=true` (mỗi dòng khởi chạy một quy trình Flowable, một lượt gợi ý giao việc, thông
+báo tới lãnh đạo); tệp dữ liệu 5 MB, zip 50 MB (cả yêu cầu dưới 64m của APISIX); mỗi tệp trong zip ≤
+`MOC_FILES_MAX_MB`; tổng byte một lô ghi vào kho ≤ 200 MB (`MOC_IMPORT_STORE_MAX_MB`, `413 too_large` lúc gửi): cộng cỡ
+đã giải nén của các mục mà các dòng trỏ tới, **mỗi lần trỏ tính một lần** — mỗi dòng lưu một bản, nên một zip nhỏ trỏ
+lặp lại không thành hàng chục MB trong kho; 3 lô chưa xong mỗi đơn vị (`429`); tổng zip đang giữ 200 MB (`503 busy`).
+
+**Gửi lại không nhân đôi.**
+
+- `Idempotency-Key` (1–200 ký tự ASCII in được, theo đơn vị và người gửi; ràng buộc `import_jobs_key` trong CSDL nên
+  hai yêu cầu chen nhau vẫn an toàn): cùng tệp, zip, định dạng, `register` → `200` lô cũ; khác → `409
+  idempotency_conflict`.
+- Không khóa: lô mới, dòng đã nạp báo `duplicate` (chỉ mục chặn trùng `documents_in_dedup` của văn bản đến). Dòng có
+  tệp được tra trùng trước khi đưa tệp vào kho (không quét, lưu lại); dòng bị Action từ chối thì lưu tệp rồi gỡ lại.
+  Gửi lại cùng lô vì thế không đổi số văn bản, số tệp trong kho.
+- Mất phản hồi (Action đã ghi mà svc-files không nhận được trả lời, hay dịch vụ dừng giữa lời gọi): mỗi lượt tăng
+  `attempts` có khóa lạc quan; lượt sau gặp `duplicate` thì tra lại văn bản trùng — do chính người tạo lô tạo sau lúc
+  tạo lô, chưa dòng nào nhận — thì nhận về là `ok`. Vào sổ cũng vậy: `wrong_status` thì đọc lại số đến.
+
+**Mã lỗi của dòng** (`GET /api/imports/{id}/rows?status=failed`); lỗi một dòng không hỏng dòng khác:
+
+| Mã | Khi nào |
+|---|---|
+| `bad_json`, `not_object`, `line_too_long` | NDJSON: dòng không phải JSON, không phải object, dài hơn 64 KiB — lỗi ngay lúc tạo lô |
+| `bad_line` | CSV: hàng thừa hoặc thiếu ô so với tiêu đề |
+| `bad_value` | Dòng có ký tự NUL, ký tự thay thế lẻ (`\ud800`–`\udfff`), số tràn số thực (`1e999`), lồng quá 32 cấp (kiểm trước khi đọc JSON, như nhau trên mọi bản Python); `restricted` không phải `true`/`false` — lỗi ngay lúc tạo lô, không tệp nào vào kho |
+| `bad_files` | `files` không phải danh sách tên, quá 20 tệp, tên lặp; `file_ids` không phải danh sách khi dòng có `files` |
+| `invalid` | Action báo dữ liệu sai: trích yếu ngắn, ngày không có thật, loại không có trong danh mục… — `fields` theo trường. Các mã khác của Action (`constraint`, `rejected`…) giữ nguyên |
+| `duplicate` (trạng thái, không phải mã lỗi) | Văn bản đến cùng số ký hiệu, cơ quan ban hành, ngày ban hành đã có — cả dòng trùng dòng trước trong cùng tệp |
+| `missing_attachment` | Tên trong `files` không có trong zip, hoặc dòng có `files` mà không gửi zip |
+| `too_large` | Tệp trong zip vượt `MOC_FILES_MAX_MB` (tổng cả lô vượt `MOC_IMPORT_STORE_MAX_MB` thì cả yêu cầu `413`) |
+| `infected`, `unscannable` | Trạm quét chặn tệp (kèm tên mẫu mã độc, ghi `file.rejected`); mục zip đặt mật khẩu nên không quét được |
+| `restricted_pdf_only`, `vault_unavailable` | Văn bản hạn chế: tệp không phải PDF đọc được; chưa cấu hình két (F3.7) |
+| `archive_lost` | Zip không còn (svc-files khởi động lại, tmpfs mất) — `note` của lô báo gửi lại kèm tệp nén |
+| `register_failed` | Đã tiếp nhận (`document_id` có trong kết quả) nhưng vào sổ lỗi — văn thư vào sổ trên giao diện |
+| `actor_revoked` | Người tạo lô bị khóa hoặc không còn là văn thư |
+| `forbidden` | Hasura từ chối phiên hay quyền của vai trò |
+| `unavailable` | Lõi không sẵn sàng sau 20 lượt (lùi dần, cộng lại khoảng 16 phút) |
+| `internal` | Lỗi không mong đợi sau 3 lượt — đã ghi nhật ký với mã yêu cầu `<lô>:<dòng>` |
+
+**Lỗi tạm, khởi động lại.**
+
+- Lõi bận (Hasura, svc-workflow, ClamAV, kho, két không trả lời): dòng giữ `pending`, lô lùi `run_after`
+  `min(60, 2^lượt)` giây, `note` báo "Tạm dừng … thử lại lúc …"; lô khác (cùng hay khác đơn vị) vẫn chạy. Mỗi mẻ xong
+  thì lô nhường lô khác.
+- Mọi trạng thái nằm trong CSDL (hàng đợi bền như hộp thư đi): svc-files khởi động lại thì vòng nền làm tiếp đúng bước
+  dở — tệp đã lưu (id trong `result` của dòng) không lưu lần hai, văn bản đã tạo được nhận về như trên. Zip trên tmpfs
+  thì mất: dòng còn cần tệp thành `archive_lost`; dòng không cần tệp hoặc đã lưu đủ tệp vẫn chạy. Lúc khởi động spool
+  được tạo `0700`, phần nhận dở và zip của lô đã xong bị xóa.
+- Giành dòng: vòng nền nhận một dòng bằng một cập nhật có điều kiện (`attempts` khớp, chưa ai giữ hoặc quá hạn giữ),
+  đặt `claimed_until` = bây giờ + 5 phút (gia hạn mỗi lần lưu tiến độ) và mã lượt giữ `claim_id`, nhận về dòng như
+  đang có trong CSDL. Chỉ một bên thắng; vòng khác không thấy dòng đang được giữ, nên hai tiến trình (vd hai bản
+  svc-files) làm hai phần khác nhau của lô.
+  Lõi bận thì thả dòng ngay. Tiến trình chết giữa một dòng thì dòng đó chờ hết hạn giữ (≤ 5 phút) rồi được làm lại;
+  các dòng khác chạy tiếp ngay. Một bước kéo dài quá 5 phút (hay đồng hồ hai tiến trình lệch nhau quá 5 phút) thì vòng
+  khác nhận lại dòng sớm: lưu tiến độ, thả dòng, ghi kết quả đều kèm `claim_id` trong điều kiện, nên vòng cũ biết mình
+  đã mất dòng ở lần ghi kế tiếp — không ghi gì thêm, gỡ tệp vừa lưu mà chưa kịp ghi vào dòng. Vì vậy tệp một dòng
+  không nằm lại trong kho hai bản; văn bản không nhân đôi nhờ chặn trùng của Action và việc nhận về ở trên. Thường
+  svc-files chạy một worker uvicorn.
+- `ok`, `duplicate`, `failed` của lô đang chạy đếm thẳng từ dòng; lô đóng thì chụp lại (ràng buộc: tổng khớp).
+- Sổ kiểm toán: `import.created` (cùng mutation tạo lô, người làm là văn thư) và `import.finished` (trigger
+  `import_jobs_finished` của CSDL ghi trong giao dịch chuyển lô sang `done`, `actor_kind` `service`: lệnh đóng chỉ đổi
+  lô chưa `done`, nên hai vòng cùng đóng thì sổ vẫn một dòng). Màn Sổ kiểm toán thấy loại lô, định dạng, có vào sổ
+  không, số dòng; không thấy tên tệp.
+  Hai bảng không gắn trigger `core.audit()` (mỗi mẻ đổi `run_after` và từng dòng: sổ phình mà không thêm gì); mỗi văn
+  bản tạo ra vẫn có dòng sổ của nó.
+- Nhật ký JSON: `core.import.created`, `core.import.chunk`, `core.import.paused`, `core.import.finished`,
+  `core.import.actor_revoked`, `core.import.lease_lost`, `core.import.spool_cleaned`, `core.import.files_dropped`,
+  `core.import.files_left` —
+  không có dữ liệu dòng, tên tệp trong zip. Mỗi tệp gỡ có dòng sổ `delete core.files` (người `svc-files:import`,
+  `request_id` `<lô>:<dòng>`).
+
+**Thêm loại lô**: migration mở rộng check `kind` của `core.import_jobs`; một handler trong `imports/runner.py` (`kind`,
+vai trò được tạo lô, đặc tả cột, `process`, `abandon`) đăng ký trong `app.py`; giá trị mới trong `Kind` của
+`imports/api.py`.
+
+**Demo**: `make demo-nap-lo` (văn thư Khoa Kinh tế `vanthukt`): 200 dòng NDJSON + zip, dòng EICAR bị chặn và không vào
+kho, dòng có tệp bị Action từ chối được gỡ tệp, gửi lại không đổi số văn bản và số tệp, gửi lại cùng khóa nhận lô cũ,
+5 dòng CSV có vào sổ.
+
+Chưa làm: màn "Nhập lô" trong `apps/office`; chạy tiếp sau khi khởi động lại, giữ dòng khi hai tiến trình cùng chạy mới
+kiểm bằng test đơn vị (và câu GraphQL của chúng trên CSDL thật, `db/tests/test_import_jobs.py`), chưa thử trên hệ
+thống chạy thật; chưa có job dọn định kỳ tệp mà lần gỡ bị lỗi để lại (nhật ký `core.import.files_left`).
+
 ### Gọi Hasura
 
 | Việc | Gọi bằng |
@@ -890,6 +1037,10 @@ người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ v
 | Hỏi đáp: ghi `assistant.answered` (`GhiSoTroLy`) | Khóa quản trị + `X-Hasura-Role: agent` + thuê ước trong token + `X-Hasura-User-Id: <MOC_ASSISTANT_ID>` — preset của vai trò ép danh tính, thuê ước |
 | Gợi ý giao việc (F4.3): đọc văn bản đích (`SimilarTarget`) | Khóa quản trị + `X-Hasura-Role: service` + thuê ước trong yêu cầu của svc-workflow + `X-Hasura-User-Id: svc-files` — văn bản thuê ước khác trả null |
 | Gợi ý giao việc (F4.3): hậu kiểm văn bản tương tự (`AskDocumentsService`) | Khóa quản trị + `X-Hasura-Role: service` + thuê ước; không bao giờ văn bản hạn chế |
+| Nạp lô: tạo lô (lô + dòng + `import.created` một mutation), xem lô và dòng, ghi tiến độ, kết quả dòng, đóng lô, tra trùng trước, đọc danh bạ người tạo | Khóa quản trị + `X-Hasura-Role: service` + thuê ước, người tạo lô (từ token đã kiểm lúc tạo); câu đọc của API lọc thêm `created_by` |
+| Nạp lô: tìm lô đến giờ của mọi đơn vị, id lô chưa xong để dọn spool lúc khởi động | Khóa quản trị, không kèm vai trò — việc nội bộ, chỉ đọc, không nhận tham số từ người dùng |
+| Nạp lô: gỡ tệp đã lưu cho dòng không thành văn bản (`PERSONAL_FILES`, `DROP_FILES`) | Khóa quản trị, không kèm vai trò (vai trò `service` không xóa được `core.files`), `X-Hasura-User-Id: svc-files:import`, request id `<lô>:<dòng>`; điều kiện trong câu: id tệp lấy từ kết quả của dòng, đúng đơn vị và người tạo lô, chưa gắn văn bản, chưa đặt vào không gian cá nhân |
+| Nạp lô: `receiveIncoming`, `registerIncoming` cho từng dòng (`Hasura.act_as`) | Khóa quản trị + `X-Hasura-Role: clerk` + thuê ước, người, phòng của người tạo lô (từ token đã kiểm lúc tạo) + `X-Request-Id` `<lô>:<dòng>`, hạn 35 giây — Hasura áp quyền của văn thư như khi họ tự gửi |
 
 ## Cấu hình
 
@@ -968,6 +1119,14 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_GATEWAY_STATUS_URL` | `http://apisix:7085/status/ready` | Điểm sẵn sàng của APISIX; rỗng: Cổng API `off` |
 | `MOC_WORKFLOW_URL` | `http://svc-workflow:8000` | svc-workflow cho dòng Quy trình (`/readyz`); rỗng: `off` |
 | `MOC_STATUS_CACHE_S` · `MOC_STATUS_TIMEOUT_S` | `10` · `3` | Lưu đệm kết quả trạng thái (≥ 1) · hạn mỗi lần dò một thành phần (0–10) |
+| `MOC_IMPORT_INTERVAL_S` | `2` | Chu kỳ vòng nền nạp lô khi rảnh; `0` tắt vòng nền **và** API tạo lô trả `503 imports_disabled` (không nhận lô sẽ không bao giờ chạy) |
+| `MOC_IMPORT_CHUNK` | `20` | Số dòng mỗi mẻ (1–200), rồi nhường lô khác |
+| `MOC_IMPORT_MAX_ROWS` | `1000` | Trần số dòng mỗi lô (1–100000); vượt → `413 too_many_rows` |
+| `MOC_IMPORT_REGISTER_MAX_ROWS` | `200` | Trần riêng của lô `register=true` (1–`MOC_IMPORT_MAX_ROWS`): mỗi dòng khởi chạy một quy trình, một lượt gợi ý giao việc, thông báo |
+| `MOC_IMPORT_DATA_MAX_MB` · `MOC_IMPORT_ZIP_MAX_MB` | `5` · `50` | Tệp dữ liệu · zip tệp đính kèm; cộng lại quá 63 MB thì svc-files ghi `config.warning` (APISIX nhận tối đa 64m) |
+| `MOC_IMPORT_MAX_OPEN` | `3` | Số lô chưa xong của một đơn vị; đủ thì `429 too_many_imports` |
+| `MOC_IMPORT_SPOOL_DIR` · `MOC_IMPORT_SPOOL_MB` | `/tmp/moc-nap-lo` · `200` | Thư mục giữ zip tới khi lô xong (đường tuyệt đối, tạo `0700`) · tổng byte đang giữ, đầy thì `503 busy`; không nhỏ hơn `MOC_IMPORT_ZIP_MAX_MB`. tmpfs `/tmp` của svc-files là 512m (compose), dùng chung với đệm tải lên |
+| `MOC_IMPORT_STORE_MAX_MB` | `200` | Trần byte một lô được ghi vào kho (≥ 1): tổng cỡ đã giải nén của các mục zip mà các dòng trỏ tới, mỗi lần trỏ tính một lần; vượt → `413 too_large` lúc gửi, không tạo lô. Compose truyền biến này |
 
 ## Phát triển
 
