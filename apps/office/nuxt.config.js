@@ -52,6 +52,7 @@ export default defineNuxtConfig({
     plugins: [tailwindcss(), formsPlugin(schemas)]
   },
   app: {
+    pageTransition: { name: 'sg-page', mode: 'out-in' },
     head: {
       title: 'Signet — Văn phòng điện tử',
       htmlAttrs: {
