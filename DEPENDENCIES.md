@@ -47,7 +47,7 @@ sử dụng"*).
 | Docker Compose v2 | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | Caddy | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | Python | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
-| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan` (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests` | `node:24.20.0-slim` |
+| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin` (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests` | `node:24.20.0-slim` |
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
 | Git | ≥ 2.30 | GPL-2.0 | Quản lý mã nguồn, sinh gói phát hành | Gói hệ thống |
@@ -73,7 +73,7 @@ sử dụng"*).
 | Keycloak | 26.7.5 | Apache-2.0 | Định danh tập trung: SSO, MFA, vai trò người dùng | `quay.io/keycloak/keycloak:26.7.5` | 1 |
 | Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian` | 1 |
 | PostgreSQL | 16 | PostgreSQL License | Cơ sở dữ liệu quan hệ chính (QĐ-002) | `postgres:16-alpine` | 1 |
-| Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
+| Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions, Event Triggers (luồng `core.app_events` tới webhook của ứng dụng cài bằng `moc app install`; `hasura-cli` có sẵn trong image áp metadata trộn) | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
 | Flowable (REST) | 8.0.0 | Apache-2.0 | Động cơ quy trình BPMN | `flowable/flowable-rest:8.0.0` | 1 |
 | SeaweedFS | 4.48 | Apache-2.0 | Lưu trữ đối tượng chuẩn S3 | `chrislusf/seaweedfs:4.48` | 1 |
 | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc tệp tải lên (dịch vụ độc lập) | `clamav/clamav:1.5.4` | 1 |
@@ -96,7 +96,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 |---|---|---|---|---|---|
 | Nuxt | 4.5.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | Vue | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
-| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
+| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
@@ -186,6 +186,10 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python. pip
 viện thì gỡ khỏi image, cùng các bản sao thư viện nó mang theo (`pip/_vendor`: certifi, urllib3, msgpack, setuptools
 bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ensurepip/_bundled` của image nền (cùng các bản sao đó, nằm
 trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
+
+Phần máy chủ của Bảng tin (`apps/bang-tin`) dựng từ cùng image `python:3.13.16-slim`, chỉ thư viện chuẩn, không
+cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ thư viện chuẩn (`scripts/yaml_nho.py`): không
+thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
 
 ## Vận hành và bốn nguyên lý thiết kế
 

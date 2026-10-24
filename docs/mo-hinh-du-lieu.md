@@ -380,6 +380,22 @@ quản trị, chỉ tệp chưa gắn văn bản của người tạo lô).
 Khóa ngoại `(job_id, tenant_id)` kèm thuê ước, xóa lô thì xóa dòng. Chỉ `service` của đơn vị đọc, ghi;
 không vai trò người dùng nào có quyền — API `/api/imports` (§4.3) kiểm token, chỉ cho người tạo xem lô của mình.
 
+**Ứng dụng cắm bằng manifest** (migration 1792281603200; `moc app install`, [`them-ung-dung.md`](them-ung-dung.md)
+mục 1). `core.apps` một dòng mỗi ứng dụng đã cài: `name` (khóa), `title`, `path` (unique giữa các ứng dụng chưa gỡ),
+`schema_name` (unique; không được là `core`, `office`, `personal`, `public`, `moc_app`), `version`, `manifest` (jsonb,
+như lúc cài, không bí mật),
+`manifest_sha256`, `installed_at`, `updated_at`, `removed_at` (gỡ không xóa dòng, không xóa dữ liệu của ứng dụng).
+`core.app_migrations` khóa `(app, version)`: `name`, `sha256` nội dung — áp rồi thì không áp lại, nội dung đổi thì lệnh
+từ chối. Cả hai gắn `core.audit()`, không vai trò nào đọc qua GraphQL (lệnh đọc bằng `psql`). `core.app_events` là
+luồng sự kiện **đã làm sạch** cho ứng dụng: `id` (= `office.document_events.id`, khóa chống trùng cho người nghe),
+`tenant_id`, `document_id`, `kind`, `occurred_at` — trigger `app_events_publish` (security definer) chép mỗi dòng
+`office.document_events` có `kind` trong danh sách trắng (`office.document.received`, `.registered`, `.issued`) về văn
+bản không hạn chế; không `data`, không người làm (hàm chép đặt `hasura.user` = `null` trong lúc ghi, nên
+`session_variables` của sự kiện Hasura là `null`). Hasura Event Trigger của từng ứng dụng nằm trên bảng này (§5).
+Schema `moc_app` chỉ có hàm `moc_app.migration_done` (security definer): vai trò CSDL `moc_appdb_<schema>` của từng
+ứng dụng gọi nó cuối mỗi migration để kiểm đối tượng vừa tạo rồi ghi `core.app_migrations`
+([`them-ung-dung.md`](them-ung-dung.md) mục 1.4).
+
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
 create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
 giới giữa các đơn vị nằm ở nhiều lớp, lớp sau không tin lớp trước:
@@ -1266,6 +1282,12 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 ```
 
 `id` là ULID. `request_id` lấy từ `X-Request-Id` để nối sự kiện với log.
+
+Ứng dụng cắm bằng manifest không nhận khuôn trên: Hasura Event Trigger `app_<tên>` trên `core.app_events` (§1) gọi
+webhook của ứng dụng với thân sự kiện chuẩn của Hasura (không biến đổi): `event.op` = `INSERT`, `event.data.new` =
+`{"id", "tenant_id", "document_id", "kind", "occurred_at"}`, `event.session_variables` = `null`; mọi loại trong danh
+sách trắng, ứng dụng tự bỏ loại không khai (`MOC_APP_EVENT_KINDS`). Header `X-Moc-Hook-Secret`; giao ít nhất một lần,
+chống trùng bằng `event.data.new.id`.
 
 | `type` | Phát khi |
 |---|---|

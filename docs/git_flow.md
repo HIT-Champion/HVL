@@ -124,6 +124,7 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `realtime` | Centrifugo | Backend |
 | `office` | `apps/office` — giao diện web | Frontend |
 | `ca-nhan` | `apps/ca-nhan` — Không gian cá nhân P.A.R.A, ứng dụng thứ hai trên lõi | Frontend |
+| `bang-tin` | `apps/bang-tin` — Bảng tin đơn vị, ứng dụng thứ ba, cắm bằng `moc app install` | Frontend · Backend |
 | `ai` | `svc-ai`: RAG, OCR, tác tử | AI |
 | `data` | Kestra, nóng → lạnh, lineage | AI |
 | `ops` | Compose, reconciler, sao lưu, giám sát, OpenBao | Backend |

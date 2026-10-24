@@ -31,7 +31,12 @@ COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXT
 # Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 5 dịch vụ sang
 # fluentd → Vector. Chỉ nạp khi bật; tắt thì docker compose chỉ đọc docker-compose.yml như cũ. export: lệnh con
 # (demo.py, moc.py… gọi docker compose) cũng nạp tệp phủ
-LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml
+# Ứng dụng cài bằng manifest (moc app install, docs/them-ung-dung.md): tệp phủ compose sinh trong .moc-apps/. Có thì
+# đi cùng mọi COMPOSE_FILE mà Makefile tự đặt (log tập trung); không đặt thì compose đọc COMPOSE_FILE trong .env
+APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
+APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
+BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
+LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
 LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow
 # Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
 LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
@@ -86,8 +91,10 @@ build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
 up: env-ready $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync --files)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
+	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync)
 	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
 up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai): tác tử đọc văn bản viết trích yếu, trợ lý hỏi đáp tìm theo nghĩa và viết câu trả lời — cần make ai-model trước
@@ -125,8 +132,8 @@ logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable
 logs-down: env-ready ## Tắt log tập trung: 5 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
 	@! echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || { echo "Bỏ logs khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
 	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
-	@COMPOSE_FILE=docker-compose.yml $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
-	@COMPOSE_FILE=docker-compose.yml $(COMPOSE) --profile logs rm -sf vector parseable
+	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
+	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) --profile logs rm -sf vector parseable
 
 logs-tra: $(ENV_FILE) ## Tra log tập trung theo mã yêu cầu (header X-Request-Id, câu "đã ghi nhật ký với mã …"): make logs-tra ID=<mã> [PHUT=60]
 	@python3 scripts/log_tap_trung.py tra "$(ID)" --phut "$(or $(PHUT),60)"
@@ -160,6 +167,8 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@python3 -m unittest discover -s scripts/tests
 	@cd apps/office && npm test
 	@cd apps/ca-nhan && npm test
+	@cd apps/bang-tin && node --test tests/*.test.js
+	@python3 -m unittest discover -s apps/bang-tin/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
@@ -233,6 +242,22 @@ nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến m�
 
 demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
 	@python3 scripts/demo_ca_nhan.py
+
+.PHONY: app-install app-list app-remove demo-cai-ung-dung
+
+app-install: env-ready ## Cắm ứng dụng bằng manifest, không sửa lõi: make app-install APP=apps/bang-tin/app.yaml [DRY=1]
+	@test -n "$(APP)" || { echo "Thiếu tham số: make app-install APP=apps/<thư mục>/app.yaml" >&2; exit 1; }
+	@python3 scripts/moc.py app install "$(APP)" $(if $(DRY),--dry-run)
+
+app-list: $(ENV_FILE) ## Ứng dụng đã cài bằng manifest: đường, image, migration đã áp, sự kiện nghe
+	@python3 scripts/moc.py app list
+
+app-remove: env-ready ## Gỡ ứng dụng cài bằng manifest, GIỮ dữ liệu: make app-remove APP=bang-tin [DRY=1]
+	@test -n "$(APP)" || { echo "Thiếu tham số: make app-remove APP=<tên>" >&2; exit 1; }
+	@python3 scripts/moc.py app remove "$(APP)" $(if $(DRY),--dry-run)
+
+demo-cai-ung-dung: $(ENV_FILE) ## Cắm Bảng tin bằng một lệnh: cài, SSO, sự kiện, cài lại, gỡ giữ dữ liệu; lõi không đổi
+	@python3 scripts/demo.py cai-ung-dung
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py

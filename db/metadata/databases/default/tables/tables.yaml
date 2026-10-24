@@ -14,6 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+- "!include core_app_events.yaml"
 - "!include core_tenants.yaml"
 - "!include core_files.yaml"
 - "!include core_file_texts.yaml"
