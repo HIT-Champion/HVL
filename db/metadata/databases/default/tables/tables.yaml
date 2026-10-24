@@ -48,3 +48,5 @@
 - "!include office_assignment_suggestions.yaml"
 - "!include office_v_assignment_suggestion_accuracy.yaml"
 - "!include personal_items.yaml"
+- "!include core_import_jobs.yaml"
+- "!include core_import_rows.yaml"

@@ -84,6 +84,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         được xem văn bản thấy bản gốc); tệp EICAR tên có số điện thoại bị chặn, sổ kiểm toán giữ tên gốc; nhật ký
         apisix, app-office, svc-files, svc-workflow từ lúc bắt đầu màn không còn giá trị nào ở bất kỳ cách viết nào,
         dòng truy cập không còn chuỗi truy vấn; bật profile ai thì mô hình chỉ thấy nhãn [SĐT-1]. (make demo-che-pii)
+    python3 scripts/demo.py nap-lo
+        Nạp lô văn bản đến qua API (cụm ⑤ Tầng 1): văn thư Khoa Kinh tế gửi 200 văn bản đến một lần (NDJSON + zip tệp
+        đính kèm, scripts/nap_lo_mau.py); svc-files xử lý nền, mỗi dòng đi đúng đường tiếp nhận lẻ (ClamAV, Action
+        receiveIncoming thay mặt văn thư); lỗi từng dòng đúng bảng dòng sai cố ý, tệp EICAR trong zip bị chặn, mỗi văn
+        bản một dòng sổ kiểm toán, dòng có tệp bị Action từ chối được gỡ tệp; gửi lại không nhân đôi văn bản hay tệp;
+        lô 5 dòng register=true có số đến trong sổ. (make demo-nap-lo)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -106,6 +112,7 @@ from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
 
+import nap_lo_mau
 from moc_env import (EICAR, ENV, PUBLIC_URL, ROOT, HTTPError, Session, call_json, compose, request, text_pdf,
                      user_token)
 
@@ -2977,10 +2984,213 @@ def che_pii() -> None:
           f" {PUBLIC_URL}/van-ban/{doc_id}")
 
 
+# --- Nạp lô văn bản đến (cụm ⑤ Tầng 1) -----------------------------------------------------------------------------
+
+IMPORTS_URL = f"{PUBLIC_URL}/api/imports"
+IMPORT_AUDIT = """query ($id: String!) {
+  core_audit_log(where: {entity: {_eq: "core.import_jobs"}, entity_id: {_eq: $id}}, order_by: {id: asc}) {
+    id action actor_kind overview } }"""
+VN = timezone(timedelta(hours=7))
+
+
+def send_batch(session: Session, data: bytes, name: str, *, archive: bytes | None = None, key: str | None = None,
+               query: str = "") -> tuple[int, dict[str, str], dict[str, Any]]:
+    """POST /api/imports/incoming → (mã HTTP, tiêu đề chữ thường, thân JSON)."""
+    parts = [("data", name, "text/csv" if name.endswith(".csv") else "application/x-ndjson", data)]
+    if archive is not None:
+        parts.append(("archive", "tep.zip", "application/zip", archive))
+    body, content_type = nap_lo_mau.multipart(parts)
+    headers = {**session.auth, "Content-Type": content_type, **({"Idempotency-Key": key} if key else {})}
+    status, got, raw = request("POST", f"{IMPORTS_URL}/incoming{query}", data=body, headers=headers, timeout=120)
+    return status, {k.lower(): v for k, v in got.items()}, json.loads(raw)
+
+
+def wait_batch(session: Session, job_id: str, timeout_s: float = 180) -> dict[str, Any]:
+    """Hỏi trạng thái lô mỗi giây tới khi done."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        job, _ = call_json("GET", f"{IMPORTS_URL}/{job_id}", headers=session.auth)
+        if job["status"] == "done":
+            return job
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau {timeout_s:.0f} giây lô {job_id} chưa xong: {job}")
+        time.sleep(1)
+
+
+def batch_rows(session: Session, job_id: str, status: str) -> list[dict[str, Any]]:
+    """Mọi dòng có trạng thái ``status`` của lô (đi hết các trang next_after)."""
+    out: list[dict[str, Any]] = []
+    after = 0
+    while True:
+        page, _ = call_json("GET", f"{IMPORTS_URL}/{job_id}/rows?status={status}&limit=500&after={after}",
+                            headers=session.auth)
+        out += page["rows"]
+        if page["next_after"] is None:
+            return out
+        after = page["next_after"]
+
+
+def tally(job: dict[str, Any]) -> str:
+    return f"đạt {job['ok']} · trùng {job['duplicate']} · lỗi {job['failed']}"
+
+
+def row_problems(rows: list[dict[str, Any]]) -> list[str]:
+    """Dòng lỗi / trùng lệch bảng BAD của scripts/nap_lo_mau.py (rỗng: đúng từng dòng, đúng mã, đúng lỗi theo
+    trường)."""
+    got = {r["line"]: r for r in rows}
+    problems = [f"dòng {n} không có trong bảng dòng sai: {r['status']} {r['code']} {r['message']}"
+                for n, r in sorted(got.items()) if n not in nap_lo_mau.BAD]
+    for n, (code, fields) in sorted(nap_lo_mau.BAD.items()):
+        row = got.get(n)
+        if row is None:
+            problems.append(f"dòng {n} mong đợi {code} mà không lỗi")
+            continue
+        have = "duplicate" if row["status"] == "duplicate" else row["code"]
+        if have != code or (fields is not None and row["fields"] != fields):
+            problems.append(f"dòng {n}: mong đợi {code} {fields or ''}, nhận {have} {row['fields'] or ''}")
+    return problems
+
+
+def nap_lo() -> None:
+    print("Màn cụm ⑤ · Nạp lô văn bản đến qua API — 200 văn bản đến trong một lần gửi; mỗi dòng đi đúng đường tiếp nhận"
+          " lẻ: ClamAV, Action receiveIncoming thay mặt văn thư, sổ kiểm toán")
+    tag = uuid.uuid4().hex[:6].upper()
+    clerk, director, other = Session("vanthukt"), Session("truongkhoakt"), Session("vanthu")
+    rows = nap_lo_mau.rows(tag)
+    data = nap_lo_mau.ndjson(rows)
+    archive = nap_lo_mau.archive(rows, eicar=EICAR, pdf=lambda name: text_pdf("Van ban den mau", f"{name} {tag}"))
+    want, key, name = nap_lo_mau.expected(), f"demo-nap-lo-{tag}", f"van-ban-den-{tag}.ndjson"
+    attached = sum(1 for r in rows if r.get("files"))
+
+    say(1, f"Văn thư Khoa Kinh tế gửi {len(rows)} văn bản đến (NDJSON) kèm zip {attached} tệp đính kèm, có"
+           " Idempotency-Key")
+    status, headers, job = send_batch(clerk, data, name, archive=archive, key=key)
+    if status != 202 or headers.get("location") != f"/api/imports/{job['id']}" or job["total"] != len(rows):
+        raise DemoFailed(f"tạo lô trả {status} {headers.get('location')} {job}")
+    ok(f"202 Accepted sau một lần gửi ({len(data) // 1024} KB dữ liệu, zip {len(archive) // 1024} KB): lô"
+       f" {job['id'][:8]}…, {job['total']} dòng, {job['failed']} dòng hỏng ngay lúc đọc (JSON sai, tệp không có trong"
+       f" zip), {job['pending']} dòng chờ vòng nền; Location {headers['location'][:22]}…")
+
+    say(2, "Sai vai trò, sai đơn vị")
+    try:
+        send_batch(director, data, name)
+        raise DemoFailed("lãnh đạo khoa tạo được lô nạp")
+    except HTTPError as exc:
+        if exc.status != 403 or error_detail(exc).get("code") != "forbidden":
+            raise DemoFailed(f"lãnh đạo khoa gửi lô: {exc.status} {error_detail(exc)}") from exc
+    try:
+        call_json("GET", f"{IMPORTS_URL}/{job['id']}", headers=other.auth)
+        raise DemoFailed("văn thư Khoa CNTT đọc được lô của Khoa Kinh tế")
+    except HTTPError as exc:
+        if exc.status != 404:
+            raise DemoFailed(f"văn thư Khoa CNTT đọc lô: {exc.status} {error_detail(exc)}") from exc
+    ok("truongkhoakt gửi lô → 403 forbidden (chỉ văn thư nạp lô); vanthu (Khoa CNTT) đọc lô → 404, như lô không có")
+
+    say(3, "svc-files xử lý nền theo mẻ — văn thư hỏi trạng thái tới khi xong")
+    started = time.monotonic()
+    done = wait_batch(clerk, job["id"])
+    took = time.monotonic() - started
+    if Counter({k: done[k] for k in want}) != want:
+        raise DemoFailed(f"lô xong với {tally(done)}, mong đợi {dict(want)}")
+    bad = batch_rows(clerk, job["id"], "failed") + batch_rows(clerk, job["id"], "duplicate")
+    if problems := row_problems(bad):
+        raise DemoFailed("kết quả từng dòng lệch bảng dòng sai cố ý:\n   - " + "\n   - ".join(problems))
+    ok(f"xong sau {took:.0f} giây: {tally(done)} — đúng từng dòng với bảng dòng sai cố ý của scripts/nap_lo_mau.py")
+    print("   dòng | kết quả   | mã                 | lý do")
+    for r in sorted(bad, key=lambda x: x["line"]):
+        print(f"   {r['line']:>4} | {r['status']:<9} | {r['code'] or '':<18} | {(r['message'] or '')[:64]}")
+
+    say(4, "Tệp EICAR trong zip bị chặn như tải lên lẻ; mỗi văn bản một dòng sổ kiểm toán")
+    infected = next(r for r in bad if r["line"] == nap_lo_mau.INFECTED)
+    sha = hashlib.sha256(EICAR).hexdigest()
+    stored = psql(f"select count(*) from core.files where sha256 = '\\x{sha}'")
+    rejected = psql("select count(*) from core.audit_log where action = 'file.rejected'"
+                    f" and request_id = '{job['id']}:{nap_lo_mau.INFECTED}'")
+    if "Eicar" not in (infected["message"] or "") or stored != "0" or rejected != "1":
+        raise DemoFailed(f"dòng EICAR: {infected['message']}; core.files {stored} dòng; file.rejected {rejected} dòng")
+    ok(f"dòng {infected['line']}: {infected['message']}; core.files 0 dòng có SHA-256 {sha[:16]}…; sổ có file.rejected"
+       f" mang request_id {job['id'][:8]}…:{infected['line']}")
+    # dòng có tệp mà Action từ chối (ngày không có thật, loại lạ…): tệp đã quét, vào kho rồi được gỡ lại
+    rejected = [n for n, (code, _) in sorted(nap_lo_mau.BAD.items()) if code == "invalid" and rows[n - 1].get("files")]
+    per_row = sum(len(rows[n - 1]["files"]) for n in rejected)
+    requests = ", ".join(f"'{job['id']}:{n}'" for n in rejected)
+    trail = "select count(*) from core.audit_log where entity = 'core.files' and request_id in ({}) and {}"
+    inserted = psql(trail.format(requests, "action = 'insert'"))
+    dropped = psql(trail.format(requests, "action = 'delete' and actor_id = 'svc-files:import'"))
+    if not rejected or inserted != str(per_row) or dropped != str(per_row):
+        raise DemoFailed(f"dòng bị Action từ chối {rejected}: sổ có {inserted} insert, {dropped} delete core.files,"
+                         f" mong đợi {per_row}")
+    ok(f"dòng {', '.join(map(str, rejected))} có tệp mà Action từ chối: {per_row} tệp đã qua trạm quét, vào kho rồi"
+       f" được gỡ lại (sổ: {inserted} insert, {dropped} delete core.files bởi svc-files:import) — không để lại tệp mồ"
+       " côi")
+    pattern = f"%-{tag}/%"
+    docs = psql(f"select count(*) from office.documents where direction = 'in' and symbol like '{pattern}'")
+    logged = psql("select count(*) || '/' || count(distinct a.entity_id) from core.audit_log a join office.documents d"
+                  " on a.entity = 'office.documents' and a.action = 'insert' and a.entity_id = d.id::text"
+                  f" where d.direction = 'in' and d.symbol like '{pattern}'")
+    if docs != str(want["ok"]) or logged != f"{want['ok']}/{want['ok']}":
+        raise DemoFailed(f"{docs} văn bản đến mang tag {tag}, dòng sổ insert (tổng/văn bản) {logged}")
+    ok(f"{docs} văn bản đến mới, mỗi văn bản đúng một dòng sổ insert office.documents — như tiếp nhận từng văn bản")
+    events = director.gql(IMPORT_AUDIT, {"id": job["id"]})["core_audit_log"]
+    if [(e["action"], e["actor_kind"]) for e in events] != [("import.created", "user"), ("import.finished", "service")]:
+        raise DemoFailed(f"sổ kiểm toán của lô: {events}")
+    overview = events[1]["overview"] or {}
+    if overview.get("ok") != want["ok"] or overview.get("filename") is not None:
+        raise DemoFailed(f"tóm tắt dòng import.finished: {overview}")
+    ok(f"truongkhoakt đọc sổ: import.created (văn thư) → import.finished (svc-files) #{events[1]['id']}: đạt"
+       f" {overview['ok']}, trùng {overview.get('duplicate')}, lỗi {overview.get('failed')} — tên tệp không lên"
+       " tóm tắt")
+
+    say(5, "Gửi lại đúng tệp, không kèm khóa — lô mới, không văn bản nào nhân đôi")
+    files_sql = ("select count(*) from core.files where created_by::text ="
+                 " (select id::text from core.users where username = 'vanthukt')")
+    files_before = psql(files_sql)
+    status, _, again = send_batch(clerk, data, name, archive=archive)
+    if status != 202 or again["id"] == job["id"]:
+        raise DemoFailed(f"gửi lại trả {status} {again}")
+    redo = wait_batch(clerk, again["id"])
+    if (redo["ok"], redo["duplicate"], redo["failed"]) != (0, want["ok"] + want["duplicate"], want["failed"]):
+        raise DemoFailed(f"lô gửi lại: {tally(redo)}")
+    docs_after, files_after = psql(f"select count(*) from office.documents where direction = 'in' and symbol like"
+                                   f" '{pattern}'"), psql(files_sql)
+    if docs_after != docs or files_after != files_before:
+        raise DemoFailed(f"gửi lại làm đổi số văn bản ({docs} → {docs_after}) hoặc số tệp ({files_before} →"
+                         f" {files_after})")
+    ok(f"lô {again['id'][:8]}…: {tally(redo)}; vẫn {docs} văn bản, {files_after} tệp của vanthukt — dòng trùng tra"
+       " trước khi đưa tệp vào kho, dòng bị từ chối gỡ tệp vừa lưu")
+
+    say(6, "Gửi lại với Idempotency-Key của bước 1")
+    status, headers, same = send_batch(clerk, data, name, archive=archive, key=key)
+    if status != 200 or same["id"] != job["id"]:
+        raise DemoFailed(f"gửi lại cùng khóa trả {status} {same.get('id')}")
+    ok(f"200 OK, đúng lô {same['id'][:8]}… ({tally(same)}) — không tạo lô mới")
+
+    say(7, "Lô CSV 5 dòng register=true: tiếp nhận rồi vào sổ, có số đến")
+    five = [{k: v for k, v in r.items() if k != "files"} for r in nap_lo_mau.rows(f"{tag}S")[:5]]
+    status, _, small = send_batch(clerk, nap_lo_mau.csv_text(five, broken=None).encode(), f"vao-so-{tag}.csv",
+                                  query="?register=true")
+    if status != 202 or small["register"] is not True:
+        raise DemoFailed(f"lô vào sổ trả {status} {small}")
+    small = wait_batch(clerk, small["id"])
+    numbers = [r["register_number"] for r in batch_rows(clerk, small["id"], "ok")]
+    if small["ok"] != 5 or len(numbers) != 5 or None in numbers:
+        raise DemoFailed(f"lô vào sổ: {tally(small)}, số đến {numbers}")
+    book, _ = call_json("GET", f"{PUBLIC_URL}/api/registers/in/{datetime.now(VN).year}", headers=clerk.auth)
+    listed = {e["number"] for e in book["entries"]}
+    if not set(numbers) <= listed or book["missing"]:
+        raise DemoFailed(f"sổ đến thiếu số {sorted(set(numbers) - listed)} hoặc báo thiếu dòng {book['missing']}")
+    ok(f"đạt 5, số đến {', '.join(map(str, sorted(numbers)))}; sổ đến năm {book['year']} có đủ các số đó, không thiếu"
+       " dòng nào")
+
+    print(f"\nLô: GET {IMPORTS_URL}/{job['id']} (giao diện \"Nhập lô\" ở bản sau); văn bản đến số ký hiệu có"
+          f" \"-{tag}/\" trong danh sách văn bản đến của vanthukt")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
-         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii}
+         "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
+         "nap-lo": nap_lo}
 
 
 def main(argv: list[str] | None = None) -> int:
