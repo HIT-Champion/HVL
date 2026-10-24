@@ -110,6 +110,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - CI: bước "Tài liệu API trong docs/api/ khớp mã" lệch thì sinh lại `docs/api/` trên chính hệ thống vừa dựng và tải
   lên thành artifact `docs-api-<lần chạy>` (giữ 7 ngày); người sửa PR chép về rồi commit, không phải dựng cả hệ thống
   ở máy. `docs/api/README.md` có lệnh `gh run download`.
+- `ROADMAP.md` viết lại theo hiện trạng: trước đây gần như mọi mục còn `[ ]` và viết theo lúc chọn công cụ ("Chốt
+  nền tảng …"). Nay giữ khung giai đoạn 0, bốn không gian H-P-D-I, giai đoạn 5 và Ngoài phạm vi; mục đã xong ghi `[x]`
+  kèm thành phần và mã F hay tệp làm bằng chứng (`docs/muc-hoan-thien.md`), mục làm dở ghi rõ phần còn thiếu, việc
+  đang làm ghi số PR nếu có. Thêm mục "Sau vòng trường": việc còn thiếu thật xếp theo ưu tiên, kèm lý do, không gắn
+  ngày.
 
 ### Đã sửa lỗi
 - `DEPENDENCIES.md` liệt kê PDF.js (`pdfjs-dist`) dù giao diện không dùng: tệp được lấy bằng fetch rồi lưu về máy.
