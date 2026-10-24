@@ -60,3 +60,5 @@ dashboard, kiểm toán, realtime, hồ sơ và nộp lưu đã có kiểm thử
 - Một hệ component nhất quán cho toàn bộ màn hình nghiệp vụ.
 
 Cập nhật 24/10/2026: giao diện dùng sans nhất quán; mật độ thoáng vừa, ưu tiên đọc từng công việc. Người dùng chọn logo Liền mạch: hai nét nối thành chữ S; dùng cho sidebar, favicon và nhận diện. Giữ Butter nhưng tăng phân biệt nền/chữ và giới hạn vùng đọc.
+
+Cập nhật 24/10/2026: sidebar liền mép màn hình, desktop mở/thu theo hover và focus, bỏ nút thu gọn. Người dùng muốn nhiều motion mượt hơn; ưu tiên điều hướng, phản hồi thao tác và chuyển trạng thái, giữ vùng đọc đứng yên. Thiết bị cảm ứng dùng menu chạm.
