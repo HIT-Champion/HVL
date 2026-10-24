@@ -143,6 +143,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   ngày.
 
 ### Đã sửa lỗi
+- Tài liệu ghi lệch với mã (#119): `DEPENDENCIES.md` nói Hasura dùng Event Triggers và Redpanda được thay bằng
+  Event Triggers, nhưng `db/metadata` không khai trigger nào — nay ghi đúng: sự kiện nằm trong bảng PostgreSQL,
+  Centrifugo đẩy tới trình duyệt, trục sự kiện chưa có. `docs/muc-hoan-thien.md` thôi ghi "chưa có bước CI" cho
+  `make demo-log-tap-trung`, `make do-so-lieu-sau`, `make demo-nap-lo` (đã chạy trong CI từ #111); `ROADMAP.md`
+  ghi log tập trung là Một phần thay vì Đang làm.
 - `DEPENDENCIES.md` liệt kê PDF.js (`pdfjs-dist`) dù giao diện không dùng: tệp được lấy bằng fetch rồi lưu về máy.
   Bỏ dòng đó, sửa chú thích cùng ý trong `svc-files`. Câu "gói npm gián tiếp không có giấy phép ngoài danh sách OSI"
   cũng sai: có thêm bảng năm gói ngoại lệ, đều chỉ dùng lúc dựng, lúc phát triển, không nằm trong trang phát hành —

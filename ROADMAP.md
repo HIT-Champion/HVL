@@ -146,8 +146,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       (`docs/van-hanh.md`, mục Trang trạng thái hệ thống)
 - [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana mới thu chỉ số của APISIX, chưa có chỉ số
       từng dịch vụ, chưa có cảnh báo
-- [ ] **Đang làm** (#105): log tập trung bằng Vector + Parseable, bật theo profile `logs`; `X-Request-Id` đi xuyên
-      `svc-workflow` (F3.14)
+- [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
+      định; `X-Request-Id` đi xuyên `svc-workflow`; mới thu 5 dịch vụ, chưa thu Hasura, Keycloak, PostgreSQL
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
