@@ -73,7 +73,7 @@ sử dụng"*).
 | Keycloak | 26.7.5 | Apache-2.0 | Định danh tập trung: SSO, MFA, vai trò người dùng | `quay.io/keycloak/keycloak:26.7.5` | 1 |
 | Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian` | 1 |
 | PostgreSQL | 16 | PostgreSQL License | Cơ sở dữ liệu quan hệ chính (QĐ-002) | `postgres:16-alpine` | 1 |
-| Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions, Event Triggers | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
+| Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
 | Flowable (REST) | 8.0.0 | Apache-2.0 | Động cơ quy trình BPMN | `flowable/flowable-rest:8.0.0` | 1 |
 | SeaweedFS | 4.48 | Apache-2.0 | Lưu trữ đối tượng chuẩn S3 | `chrislusf/seaweedfs:4.48` | 1 |
 | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc tệp tải lên (dịch vụ độc lập) | `clamav/clamav:1.5.4` | 1 |
@@ -254,7 +254,7 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 |---|---|---|
 | HashiCorp Vault | BUSL-1.1 từ v1.15 (08/2023) — không phải OSI | OpenBao |
 | n8n | Sustainable Use License — không phải OSI | Kestra |
-| Redpanda | BSL-1.1 — không phải OSI | Hasura Event Triggers (không cần message broker) |
+| Redpanda | BSL-1.1 — không phải OSI | Chưa thay: sự kiện ghi vào bảng PostgreSQL trong cùng giao dịch (`office.document_events`, `core.lineage_events`, hộp thư đi `core.notification_deliveries`), Centrifugo đẩy tới trình duyệt; trục sự kiện dự kiến dùng Hasura Event Triggers, chưa khai ([`ROADMAP.md`](ROADMAP.md)) |
 | MongoDB | SSPL-1.0 — không phải OSI | PostgreSQL |
 | immudb | BUSL-1.1 từ 12/2023 — không phải OSI | Sổ kiểm toán chuỗi băm trong PostgreSQL |
 | FIWARE Orion / Orion-LD | Bắt buộc MongoDB (SSPL); Orion cổ điển không hỗ trợ NGSI-LD | Scorpio Broker |
