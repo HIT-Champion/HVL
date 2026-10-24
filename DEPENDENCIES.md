@@ -57,6 +57,8 @@ sử dụng"*).
 | OSV-Scanner | 2.6.0 | Apache-2.0 | CI: đối chiếu tệp khóa phụ thuộc với cơ sở dữ liệu lỗ hổng OSV | `ghcr.io/google/osv-scanner:v2.6.0` |
 | REUSE tool | 5.0.2 | GPL-3.0-or-later | Kiểm mọi tệp đều có thông tin bản quyền và giấy phép theo chuẩn REUSE (`REUSE.toml`); chạy tay, chỉ đọc kho | `uvx --from reuse==5.0.2 reuse lint` |
 | Syft | 1.54.1 | Apache-2.0 | `make sbom`, CI, bản phát hành: SBOM CycloneDX của cây mã nguồn (tệp khóa npm, `requirements*.txt`, action CI), đầu vào của `make license-audit`; chỉ đọc kho, hỏi PyPI giấy phép gói Python | `ghcr.io/anchore/syft:v1.54.1` (image 06/10/2026) |
+| Chromium | bản có `--headless=new` | BSD-3-Clause | Chỉ khi sửa sơ đồ kiến trúc của README: chụp từng khung SVG (`python3 scripts/so_do_kien_truc.py gif`); không thuộc sản phẩm, không chạy trong CI | Gói hệ thống |
+| FFmpeg | ≥ 6.0 | LGPL-2.1-or-later (GPL-2.0-or-later tùy bản dựng) | Chỉ khi sửa sơ đồ kiến trúc: ghép các khung thành GIF với một bảng màu chung; gọi như tiến trình độc lập | Gói hệ thống |
 
 > **Ghi chú tương thích:** Make và Git là *công cụ dựng*, được gọi như tiến trình độc lập và không
 > liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Signet. Cả hai đều là phần
@@ -290,6 +292,10 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
   License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
+- Logo các dự án trong sơ đồ kiến trúc (`docs/anh/logo/`, ảnh `docs/anh/kien-truc-tong-the*.gif`) không phải thành
+  phần phần mềm: là nhãn hiệu của chủ sở hữu, chỉ dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng, không thuộc
+  giấy phép Apache-2.0 của Signet; khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ghi ở
+  `docs/anh/logo/NGUON.md`.
 
 **Kiểm tự động, cả gói gián tiếp.** `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft (tệp khóa npm kể cả gói
 chỉ dùng lúc dựng, `requirements*.txt`, action trong `.github/workflows/`; giấy phép gói Python hỏi PyPI vì
