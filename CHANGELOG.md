@@ -72,6 +72,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Cách đo: [`docs/so-lieu-sau.md`](docs/so-lieu-sau.md). Test db +30, office +21, scripts +16.
 
 ### Đã sửa đổi
+- README (cả bản tiếng Anh) viết lại thành 12 mục, cài đặt lên khoảng giữa trang thay vì dòng 221: Giới thiệu, Kiến
+  trúc, Tính năng, Bằng chứng 4 nguyên lý, Công nghệ và giấy phép (phiên bản, giấy phép, vai trò từng thành phần),
+  Cài đặt từ mã nguồn, Chạy thử (bản online signet.htechcs.com, tài khoản, địa chỉ), Vận hành và kiểm thử, Xử lý sự
+  cố, Tài liệu, Đóng góp và liên hệ (nhóm phát triển), Giấy phép. Sơ đồ ASCII thay bằng sơ đồ kiến trúc động (GIF,
+  tiếng Việt và tiếng Anh): luồng yêu cầu chạy trái sang phải, màu theo H-P-D-I, viền đậm là mã của đội, logo trên
+  các phần mềm nguồn mở dùng nguyên bản; sinh lại bằng `python3 scripts/so_do_kien_truc.py gif` (Chromium và
+  FFmpeg, chỉ khi sửa sơ đồ). Logo khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ở
+  `docs/anh/logo/NGUON.md` (#108).
 - CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và
   các màn lõi; màn AI, nộp lưu, ký số, sao lưu và khôi phục; cài đặt và GitOps), phần nào cũng tự dựng và nạp
   mẫu — khoảng 27 phút còn khoảng 12 phút, vẫn chạy đủ mọi bước. PR chỉ đổi tài liệu (`*.md`, ảnh trong `docs/`,

@@ -48,3 +48,19 @@ path = [
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 Signet Team"
 SPDX-License-Identifier = "Apache-2.0"
+
+# Logo của các dự án nguồn mở trong sơ đồ kiến trúc: nhãn hiệu và tác phẩm của chủ sở hữu từng dự án, chỉ để nhận diện
+# thành phần, không thuộc giấy phép Apache-2.0 của Signet (LICENSES/LicenseRef-Logos.txt; nguồn từng tệp:
+# docs/anh/logo/NGUON.md). Khai sau khối trên nên ghi đè "**.png" cho các tệp này.
+[[annotations]]
+path = "docs/anh/logo/*.png"
+precedence = "closest"
+SPDX-FileCopyrightText = "Chủ sở hữu từng dự án, xem docs/anh/logo/NGUON.md"
+SPDX-License-Identifier = "LicenseRef-Logos"
+
+# Ảnh sơ đồ kiến trúc: đội vẽ (scripts/so_do_kien_truc.py), bên trong có các logo ở trên
+[[annotations]]
+path = ["docs/anh/kien-truc-tong-the.gif", "docs/anh/kien-truc-tong-the.en.gif"]
+precedence = "closest"
+SPDX-FileCopyrightText = ["2026 Signet Team", "Logo: chủ sở hữu từng dự án, xem docs/anh/logo/NGUON.md"]
+SPDX-License-Identifier = "Apache-2.0 AND LicenseRef-Logos"
