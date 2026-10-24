@@ -317,7 +317,7 @@ onBeforeUnmount(()=>{
 
           <!-- lỗi tìm -->
           <div v-else-if="turn.phase === 'error'" class="mt-3 flex flex-wrap items-center gap-3 text-sm" data-testid="ask-error">
-            <span class="font-medium text-red-700"><span aria-hidden="true">⚠ </span>{{ turn.error }}</span>
+            <span class="font-medium text-red-700"><svg class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" /></svg>{{ turn.error }}</span>
             <button type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" :disabled="searching" @click="search(turn.key)">{{ t('app.retry') }}</button>
           </div>
 
@@ -375,12 +375,12 @@ onBeforeUnmount(()=>{
                 <span class="basis-full text-xs text-stone-500">{{ t('assist.generatingHint') }}</span>
               </div>
               <div v-else-if="turn.gen === 'stopped' || turn.gen === 'failed'" class="mt-3 flex flex-wrap items-center gap-3 text-sm text-amber-900" data-testid="ask-generate-note">
-                <span><span aria-hidden="true">⚠ </span>{{ turn.gen === 'stopped' ? t('assist.stopped') : t('assist.generateFailed', { reason: turn.genError }) }}</span>
+                <span><svg class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" /></svg>{{ turn.gen === 'stopped' ? t('assist.stopped') : t('assist.generateFailed', { reason: turn.genError }) }}</span>
                 <button v-if="needsGenerate(turn.result)" type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" @click="queueGenerate(turn.key)">{{ t('assist.retryGenerate') }}</button>
               </div>
 
               <ul v-if="warningTexts(turn.result).length" class="mt-3 space-y-1 text-xs text-amber-900" data-testid="ask-warnings">
-                <li v-for="w in warningTexts(turn.result)" :key="w"><span aria-hidden="true">⚠ </span>{{ w }}</li>
+                <li v-for="w in warningTexts(turn.result)" :key="w"><svg class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" /></svg>{{ w }}</li>
               </ul>
 
               <!-- nguồn -->
@@ -402,7 +402,7 @@ onBeforeUnmount(()=>{
                     <p class="mt-0.5 text-xs text-stone-500">{{ metaLine(s) }}</p>
                     <p
                       v-if="s.excerpt" :id="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
-                      class="mt-2 border-l-2 border-stone-200 pl-3 text-sm break-words whitespace-pre-line text-stone-600"
+                      class="mt-2 border-l border-stone-200 pl-3 text-sm break-words whitespace-pre-line text-stone-600"
                       :class="{ 'line-clamp-3': s.excerpt.length > LONG_EXCERPT && !turn.opened.includes(s.n) }"
                     >
                       <span class="sr-only">{{ t('assist.source.excerpt') }}: </span>{{ s.excerpt }}

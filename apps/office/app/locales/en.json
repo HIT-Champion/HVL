@@ -1037,5 +1037,18 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "closeNav": "Close navigation"
+  },
+  "pageError": {
+    "notFound": "Page not found",
+    "notFoundDetail": "This link no longer exists or has changed. Return to your tasks to continue.",
+    "title": "Unable to open this page",
+    "detail": "Something went wrong while loading this page. Return to your tasks and try again.",
+    "home": "Back to my tasks"
+  },
+  "authCallback": {
+    "title": "Signing in",
+    "detail": "Signet is opening your workspace.",
+    "failed": "Unable to sign in",
+    "retryDetail": "Your sign-in session may have expired. Please sign in again."
   }
 }

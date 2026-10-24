@@ -1037,5 +1037,18 @@
     "collapse": "Thu gọn thanh bên",
     "expand": "Mở rộng thanh bên",
     "closeNav": "Đóng điều hướng"
+  },
+  "pageError": {
+    "notFound": "Không tìm thấy trang",
+    "notFoundDetail": "Đường dẫn này không còn tồn tại hoặc đã được thay đổi. Anh/chị có thể trở về hộp việc để tiếp tục.",
+    "title": "Chưa thể mở trang",
+    "detail": "Đã có lỗi khi tải trang. Vui lòng quay lại hộp việc và thử lại.",
+    "home": "Về hộp việc"
+  },
+  "authCallback": {
+    "title": "Đang đăng nhập",
+    "detail": "Signet đang mở không gian làm việc của anh/chị.",
+    "failed": "Chưa thể đăng nhập",
+    "retryDetail": "Phiên đăng nhập có thể đã hết hạn. Vui lòng thử đăng nhập lại."
   }
 }

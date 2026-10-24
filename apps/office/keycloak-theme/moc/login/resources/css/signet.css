@@ -1,0 +1,76 @@
+/*
+ * Copyright 2026 Signet Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-Regular.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-Medium.ttf) format("truetype");font-weight:500;font-display:swap}
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-SemiBold.ttf) format("truetype");font-weight:600;font-display:swap}
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-Bold.ttf) format("truetype");font-weight:700;font-display:swap}
+
+
+/* Shared Signet materials: Butter identity, neutral canvas, olive actions. */
+:root{color-scheme:light;--signet-ground:#f4f5f1;--signet-ink:#202820;--signet-muted:#515b50;--signet-edge:#d9ddd4;--signet-olive:#555b3f;--pf-v5-global--primary-color--100:#555b3f;--pf-v5-global--primary-color--200:#42492e;--pf-v5-global--active-color--100:#555b3f;--pf-v5-global--link--Color:#555b3f;--pf-v5-global--FontFamily--sans-serif:'Be Vietnam Pro','Segoe UI',system-ui,sans-serif}
+html,body,.pf-v5-c-login{background:var(--signet-ground)!important;color:var(--signet-ink);font-family:'Be Vietnam Pro','Segoe UI',system-ui,sans-serif;font-synthesis:none;-webkit-font-smoothing:antialiased}
+body{margin:0;font-size:14px;line-height:1.5}
+button,input,select,textarea{font:inherit}
+a{color:var(--signet-olive);text-underline-offset:3px}
+::selection{background:#eee3bc;color:#202820}
+:focus-visible{outline:2px solid #666d4c;outline-offset:3px}
+.pf-v5-c-login{display:flex;flex-direction:column;justify-content:center;min-height:100dvh;padding:40px 24px;align-items:center}
+.pf-v5-c-login__container{display:flex;flex-direction:column;width:480px;max-width:100%;margin:auto;padding:0;grid-template-columns:minmax(0,1fr);gap:28px}
+.pf-v5-c-login__header{padding:0;text-align:left}
+#kc-header-wrapper{display:flex;align-items:center;justify-content:center;gap:10px;padding:0;color:#30342a!important;font-family:inherit;font-size:28px;font-weight:700;letter-spacing:-.04em;line-height:1.2;text-transform:none}
+#kc-header-wrapper::before{content:"";display:block;width:44px;height:44px;border:1px solid #e0d3a5;border-radius:10px;background:#eee3bc url(../img/signet-symbol.svg) center/28px no-repeat;flex-shrink:0}
+.pf-v5-c-login .pf-v5-c-login__main{width:100%;align-self:stretch;min-width:0;background:#fff;border:1px solid var(--signet-edge);border-radius:12px;box-shadow:none;overflow:hidden}
+.pf-v5-c-login__main-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:30px 32px 0;border:0}
+#kc-page-title{min-width:0;margin:0;color:var(--signet-ink);font-family:inherit;font-size:24px;font-weight:700;letter-spacing:-.025em;line-height:1.35;overflow-wrap:anywhere}
+.pf-v5-c-login__main-header-utilities{flex-shrink:0;margin:0;align-self:flex-start;max-width:150px}
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control{min-height:40px}
+.pf-v5-c-login__main-header-utilities select{border:0;background:transparent;box-shadow:none;font-size:13px;padding-inline:10px 30px;min-width:0}
+.pf-v5-c-login__main-body{padding:26px 32px 32px}
+.pf-v5-c-form{gap:22px}
+.pf-v5-c-form__group-label{padding-bottom:8px!important}
+.pf-v5-c-form__label{color:var(--signet-ink);font-size:14px;font-weight:500}
+.pf-v5-c-form-control{--pf-v5-c-form-control--after--BorderBottomWidth:0;border:1px solid #898a79;border-radius:8px;background:#fff;min-height:44px;transition:border-color 160ms,box-shadow 160ms}
+.pf-v5-c-form-control::before,.pf-v5-c-form-control::after{border:0!important}
+.pf-v5-c-form-control:focus-within{border-color:#666d4c;box-shadow:0 0 0 2px #e9ead8}
+.pf-v5-c-form-control input,.pf-v5-c-form-control select,.pf-v5-c-form-control textarea{min-height:42px;color:var(--signet-ink);caret-color:var(--signet-olive);font-family:inherit;font-size:14px}
+.pf-v5-c-form-control input{padding:10px 12px}
+.pf-v5-c-form-control input:focus{outline:0}
+.pf-v5-c-form-control.pf-m-error{border-color:#b42318}
+.pf-v5-c-input-group{gap:0;border:1px solid #898a79;border-radius:8px;overflow:visible;background:white;transition:border-color 160ms,box-shadow 160ms}
+.pf-v5-c-input-group:focus-within{border-color:#666d4c;box-shadow:0 0 0 2px #e9ead8}
+.pf-v5-c-input-group .pf-v5-c-form-control{border:0;box-shadow:none}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control{height:44px;min-width:44px;padding:0;border-radius:0 8px 8px 0;color:var(--signet-muted);background:transparent}
+.pf-v5-c-button.pf-m-control::after{border:0}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover{background:#efeee3}
+.pf-v5-c-button.pf-m-primary{background:var(--signet-olive);color:#fff;border:0;border-radius:8px;min-height:44px;padding:10px 16px;font-family:inherit;font-size:14px;font-weight:500;transition:background-color 160ms,transform 180ms cubic-bezier(.16,1,.3,1)}
+.pf-v5-c-button.pf-m-primary::after{border:0}
+.pf-v5-c-button.pf-m-primary:hover{background:#42492e}
+.pf-v5-c-button.pf-m-primary:active{transform:translateY(1px) scale(.99)}
+.pf-v5-c-button.pf-m-primary:disabled{color:#666a59;background:#ece7df;cursor:not-allowed}
+.pf-v5-c-login__main-footer{background:transparent;color:var(--signet-muted);font-size:13px}
+.pf-v5-c-login__main-footer:empty{display:none}
+.pf-v5-c-alert{border-radius:8px;border:1px solid #edb4ad;background:#fff4f2;color:#8e271d;padding:12px;font-size:14px}
+.pf-v5-c-helper-text,.pf-v5-c-form__helper-text{font-size:13px}
+#kc-otp-login-form .pf-v5-c-tile{border-radius:8px}
+#kc-totp-settings{padding-left:20px}#kc-totp-settings li{margin-bottom:16px}
+#kc-totp-secret-key{overflow-wrap:anywhere}
+#kc-form-options,#kc-info,#kc-info-wrapper{color:var(--signet-muted);font-size:13px}
+@media(max-width:540px){.pf-v5-c-login{padding:28px 18px}.pf-v5-c-login__container{gap:24px}.pf-v5-c-login__main-header{padding:24px 22px 0;gap:14px;flex-wrap:wrap}.pf-v5-c-login__main-body{padding:22px}.pf-v5-c-login__main-header-utilities{max-width:100%}#kc-page-title{font-size:22px}.pf-v5-c-form-control input,.pf-v5-c-form-control select{font-size:16px}.pf-v5-c-login__main-header-utilities select{font-size:13px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}.pf-v5-c-button.pf-m-primary:active{transform:none}}

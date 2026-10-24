@@ -79,3 +79,23 @@ Nhánh `feat/fe-butter-ai-integration` dựa trên `origin/develop` ngày 23/10/
 Xem [phạm vi tích hợp và kiểm thử](../../docs/fe-ai-be-integration.md).
 Các API đọc tệp, hỏi đáp có nguồn, gợi ý giao việc và liên thông được giữ theo upstream.
 Danh sách đến/đi dùng phân trang “Xem thêm”; ô tìm chỉ lọc tập đã tải.
+
+
+## Theme đăng nhập Signet
+
+Theme FE nằm tại `apps/office/keycloak-theme/moc/login`, kế thừa template Keycloak.
+Để dùng theme trên stack local, thêm mount chỉ đọc vào `docker-compose.override.yml`
+ở gốc repo (tệp local được ignore), giữ nguyên các override đang có:
+
+```yaml
+services:
+  keycloak:
+    volumes:
+      - ./apps/office/keycloak-theme:/opt/keycloak/themes:ro
+```
+
+Realm cần chọn login theme `moc` (tên kỹ thuật được giữ để tương thích cấu hình hiện có).
+Sau khi đổi theme, chạy `docker compose up -d --no-deps --force-recreate keycloak`
+và đợi service healthy; tải lại trang đăng nhập bằng Ctrl+F5. Chỉ rebuild app-office
+không cập nhật được màn do Keycloak phục vụ. Theme dùng `css/signet.css` để tránh cache
+CSS cũ, self-host font và không đổi template hay cơ chế xác thực upstream.

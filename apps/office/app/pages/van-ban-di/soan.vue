@@ -281,7 +281,7 @@ async function save() {
 
       <div>
         <label class="label" for="body">{{ t('compose.body') }}</label>
-        <textarea id="body" v-model="form.body" rows="12" class="input font-serif leading-relaxed" :aria-invalid="tried && !!errors.body" />
+        <textarea id="body" v-model="form.body" rows="12" class="input font-sans leading-relaxed" :aria-invalid="tried && !!errors.body" />
         <p v-if="tried && errors.body" class="field-error">{{ errors.body }}</p>
         <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.bodyHint') }}</p>
       </div>

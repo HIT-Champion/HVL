@@ -149,8 +149,8 @@ Warm yellow and olive give the workspace its character; white work surfaces pres
 
 ### Hierarchy
 
-- **Wordmark:** The sidebar pairs a 25px/700 wordmark with a 32px Liền mạch SVG mark; collapsed navigation retains the mark. Public identity uses 26px/700, authentication identity 40px/700 with a 40px mark. Favicon uses the same strokes on butter.
-- **Headline:** The inbox uses the headline token, becoming 27px at the small-screen breakpoint. General office headings use 24px; authentication uses 28px, weight 500, reducing to 24px on small screens.
+- **Wordmark:** The sidebar pairs a 25px/700 wordmark with a 32px Liền mạch SVG mark; collapsed navigation retains the mark. Public identity uses 26px/700, authentication identity 28px/700 with a 28px mark inside a 44px Butter tile. Favicon uses the same strokes on butter.
+- **Headline:** The inbox uses the headline token, becoming 27px at the small-screen breakpoint. General office headings use 24px; authentication uses 24px/700, reducing to 22px on small screens.
 - **Highlighted title:** Attention tasks use the highlight-title token, reducing to 18px at 1200px and below.
 - **Row title:** Normal task titles use the row-title token, wrap freely and have a 64ch maximum width. Section headings use 16px at weight 600.
 - **Body:** Base body is 16px/1.5; navigation and ordinary controls use 14px. Small-screen inputs use 16px to preserve usability.
@@ -174,13 +174,17 @@ Panels and authentication are flat at rest. Tone, thin boundaries and spacing es
 
 ## Shapes
 
-Controls and navigation use gently rounded control corners; panels use the panel radius; the flush sidebar has square outer corners. Chips keep the compact chip radius. Authentication retains its existing 14px panel and 7px field/button corners. These exceptions describe implemented authentication rather than extending the office radius scale.
+Controls and navigation use gently rounded control corners; panels use the panel radius; the flush sidebar has square outer corners. Chips keep the compact chip radius. Authentication uses the same 12px panel and 8px field/button corners. Its logo tile uses 10px corners.
 
 ## Components
 
 ### Buttons
 
 Olive primary actions use white text; hover deepens the fill. Secondary actions use white with a stone boundary, while ghost actions use muted olive text. Shared buttons have a 44px minimum height, 8px/14px padding and control corners. Disabled buttons use muted neutral fill and text. Pressing moves enabled buttons down 1px and scales them to .98. Control feedback lasts 160–180ms.
+
+### Authentication and recovery
+
+Keycloak inherits upstream templates and authentication behavior. The Signet stylesheet is `keycloak-theme/moc/login/resources/css/signet.css`; changing the filename from moc.css avoids stale browser CSS from earlier previews. Authentication uses a 480px maximum form, neutral ground, white panel, olive actions, sans headings and consistent focus feedback. Locale selection wraps on small screens. Username/password, OTP and invalid-credential states share this theme. Callback/retry and the application error page share Signet identity and recovery actions. Verification stays publicly accessible. Document compose and body rendering also use the shared sans family.
 
 ### Inputs / Fields
 

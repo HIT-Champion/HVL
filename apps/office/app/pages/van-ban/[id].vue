@@ -477,7 +477,7 @@ watch(lastPush, (n)=>{
           <!-- nội dung văn bản đi -->
           <section v-if="outgoing" class="card p-5">
             <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.body') }}</h2>
-            <div class="space-y-2 font-serif text-[15px] leading-relaxed whitespace-pre-line text-stone-800">{{ doc.body }}</div>
+            <div class="space-y-2 font-sans text-[15px] leading-relaxed whitespace-pre-line text-stone-800">{{ doc.body }}</div>
           </section>
 
           <!-- thông tin -->

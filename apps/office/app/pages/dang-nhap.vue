@@ -34,13 +34,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center p-6">
-    <div class="card w-full max-w-sm p-8 text-center">
-      <img src="/favicon.svg" alt="" class="mx-auto mb-4 h-12 w-12">
-      <h1 class="text-xl font-semibold text-brand-800">{{ $t('app.name') }}</h1>
-      <p class="mt-1 text-sm text-stone-500">{{ $t('app.tagline') }}</p>
-      <p v-if="!failed" class="mt-6 text-sm text-stone-600">{{ $t('app.loading') }}</p>
-      <button v-else class="btn-primary mt-6 w-full" @click="auth.login('/')">{{ $t('app.retry') }}</button>
-    </div>
-  </div>
+  <main class="flex min-h-screen items-center justify-center px-5 py-10">
+    <section class="w-full max-w-md" aria-labelledby="callback-title">
+      <div class="moc-public-wordmark mb-7 justify-center"><img src="/brand/signet-symbol.svg" alt="" class="h-9 w-9"><span>{{ $t('app.name') }}</span></div>
+      <div class="card p-7 sm:p-8" aria-live="polite">
+        <h1 id="callback-title" class="text-2xl font-bold">{{ $t(failed ? 'authCallback.failed' : 'authCallback.title') }}</h1>
+        <p class="mt-3 text-sm leading-relaxed text-stone-600">{{ $t(failed ? 'authCallback.retryDetail' : 'authCallback.detail') }}</p>
+        <button v-if="failed" class="btn-primary mt-6 w-full" @click="auth.login('/')">{{ $t('app.retry') }}</button>
+      </div>
+    </section>
+  </main>
 </template>
