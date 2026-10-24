@@ -43,7 +43,11 @@ cột bắt buộc không null) trước khi ghi bất cứ gì sang bucket lạ
 Một hồ sơ lỗi không chặn các hồ sơ khác: lượt nền ghi lỗi rồi làm hồ sơ kế tiếp, giờ sau thử lại.
 
 Phòng đọc: ``read_package`` tải manifest theo ``archive_sha256`` trong CSDL, kiểm băm, rồi DuckDB đọc
-``documents-….parquet`` — dùng cho ``GET /api/case-files/{id}/archive``.
+``documents-….parquet`` — dùng cho ``GET /api/case-files/{id}/archive``; ``read_archived_file`` đọc một tệp trong gói,
+so băm với manifest — ``GET /api/case-files/{id}/archive/files/{file_id}`` đóng dấu người xem rồi mới trả.
+
+Nộp lưu theo yêu cầu (``POST /api/case-files/{id}/archive``, lãnh đạo phòng): gọi đúng ``Archiver.archive`` như vòng
+nền, không đợi đủ ngày.
 
 Chạy tay trong container (nộp lưu ngay một hồ sơ đã đóng, không đợi đủ ngày):
 
@@ -147,6 +151,15 @@ class ArchiveError(Exception):
 
 class QualityError(ArchiveError):
     """Bảng Parquet không đạt kiểm chất lượng (F3.9). Thông báo chỉ có ký hiệu hồ sơ và tên bảng."""
+
+
+class ArchiveStateError(ArchiveError):
+    """Hồ sơ không ở trạng thái `closed` lúc bắt đầu lượt nộp lưu (``status``: trạng thái đang có, ``None`` khi không
+    có hồ sơ) — vd lượt khác vừa nộp lưu xong."""
+
+    def __init__(self, status: str | None, message: str) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 def package_prefix(tenant_id: str, case_file_id: str) -> str:
@@ -271,6 +284,9 @@ class Archiver:
         self.interval_s = interval_s
         self.clock = clock
         self.failed_at: dict[str, datetime] = {}     # hồ sơ lỗi ở lượt nền → lúc lỗi
+        # Một lượt nộp lưu mỗi lúc trong một tiến trình: vòng nền giữ khóa cho từng hồ sơ, nút "Nộp lưu" (POST của
+        # app) giữ khóa trước khi gọi archive(). Lệnh tay chạy tiến trình riêng — khi đó hàm SQL làm trọng tài
+        self.lock = asyncio.Lock()
         self.lineage = Lineage(lambda q, v: self._admin(q, v), lineage_url, clock=lambda: self.clock())
 
     async def _admin(self, query: str, variables: dict[str, Any], request_id: str = "") -> dict[str, Any]:
@@ -298,9 +314,9 @@ class Archiver:
         data = await self._admin(CASE_FILE, {"id": case_file_id})
         cf = data["office_case_files_by_pk"]
         if cf is None:
-            raise ArchiveError(f"không có hồ sơ {case_file_id}")
+            raise ArchiveStateError(None, f"không có hồ sơ {case_file_id}")
         if cf["status"] != "closed":
-            raise ArchiveError(f"hồ sơ {cf['code']} đang {cf['status']}, chỉ nộp lưu hồ sơ đã đóng")
+            raise ArchiveStateError(cf["status"], f"hồ sơ {cf['code']} đang {cf['status']}, chỉ nộp lưu hồ sơ đã đóng")
         links = cf.pop("case_file_documents")
         if not links:
             raise ArchiveError(f"hồ sơ {cf['code']} không có văn bản nào")
@@ -485,7 +501,8 @@ class Archiver:
         failed: list[dict[str, str]] = []
         for case_file_id in await self.due(after_days):
             try:
-                done.append(await self.archive(case_file_id))
+                async with self.lock:
+                    done.append(await self.archive(case_file_id))
                 self.failed_at.pop(case_file_id, None)
             except Exception as exc:  # noqa: BLE001 — một hồ sơ hỏng không được chặn các hồ sơ khác
                 self.failed_at[case_file_id] = self.clock()
@@ -505,12 +522,27 @@ class Archiver:
             await asyncio.sleep(delay)
 
 
-def read_package(cold: ColdStore, archive_key: str, archive_sha256: str) -> dict[str, Any]:
-    """Phòng đọc: tải manifest theo băm trong CSDL, kiểm băm, đọc danh sách văn bản từ Parquet bằng DuckDB."""
+def read_manifest(cold: ColdStore, archive_key: str, archive_sha256: str) -> dict[str, Any]:
+    """Manifest của gói, tải theo băm trong CSDL và kiểm băm — mọi đường đọc gói đi qua đây trước."""
     manifest_bytes = cold.get(manifest_key(archive_key, archive_sha256))
     if _sha256(manifest_bytes) != archive_sha256:
         raise ArchiveError("manifest trong bucket lạnh không khớp archive_sha256 trong CSDL")
-    manifest = json.loads(manifest_bytes)
+    manifest: dict[str, Any] = json.loads(manifest_bytes)
+    return manifest
+
+
+def read_archived_file(cold: ColdStore, archive_key: str, entry: dict[str, Any]) -> bytes:
+    """Phòng đọc xem tệp: byte của một tệp trong gói (``entry``: một dòng ``files`` của manifest đã kiểm băm), so băm
+    với manifest trước khi trả. Chỉ đọc — không ghi gì vào bucket lạnh."""
+    data = cold.get(f"{archive_key}{entry['path']}")
+    if _sha256(data) != entry["sha256"]:
+        raise ArchiveError("tệp trong gói không khớp băm ghi trong manifest")
+    return data
+
+
+def read_package(cold: ColdStore, archive_key: str, archive_sha256: str) -> dict[str, Any]:
+    """Phòng đọc: tải manifest theo băm trong CSDL, kiểm băm, đọc danh sách văn bản từ Parquet bằng DuckDB."""
+    manifest = read_manifest(cold, archive_key, archive_sha256)
     table = manifest["tables"]["documents"]
     data = cold.get(f"{archive_key}{table['path']}")
     if _sha256(data) != table["sha256"]:

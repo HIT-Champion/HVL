@@ -151,6 +151,55 @@ export interface AskBody {
   ask_id?: string            // gửi lại ở lượt generate để hai dòng sổ kiểm toán cùng một câu hỏi
 }
 
+// Hồ sơ đã nộp lưu (F3.8): gói đọc lại từ bucket lạnh, manifest đã so băm với CSDL (svc-files, archive.py). Chỉ văn
+// bản người xem đọc được; tệp gắn với các văn bản đó, PDF mở được trong phòng đọc (bản có dấu tên người xem)
+export interface ArchivedDocument {
+  id: string
+  direction: 'in' | 'out'
+  type_code: string
+  symbol: string | null
+  issuer_name: string | null
+  issued_on: string | null
+  summary: string
+  register_number: number | null
+  verify_code: string | null
+  content_sha256: string | null
+}
+
+export interface ArchivedFile {
+  file_id: string
+  filename: string
+  mime_type: string
+  sha256: string
+  bytes: number
+  document_ids: string[]
+  viewable: boolean
+}
+
+export interface ArchivePackage {
+  case_file_id: string
+  code: string
+  title: string
+  closed_on: string | null
+  archived_at: string
+  archive_key: string
+  manifest_sha256: string
+  retain_until: string
+  documents: ArchivedDocument[]
+  files: ArchivedFile[]
+  hidden: number             // số văn bản trong gói người xem không đọc được
+}
+
+export interface ArchiveRun {
+  case_file_id: string
+  code: string
+  archive_key: string
+  archive_sha256: string
+  documents: number
+  files: number
+  bytes: number
+}
+
 // Hạn chờ một lần đọc: svc-files tự dừng ở 50 s, APISIX ở 60 s
 const READ_TIMEOUT_MS = 60_000
 // Mã lỗi khi máy chủ không trả thân lỗi chuẩn (vd route chưa có, cổng trả lỗi)
@@ -333,5 +382,43 @@ export function useApi() {
     }
   }
 
-  return { gql, upload, download, preview, register, printRegister, search, readFile, ask }
+  // --- hồ sơ, nộp lưu, phòng đọc (F3.8) ---------------------------------------------------------------------------
+
+  /** Lỗi của svc-files ({detail: {code, message, reason}}) thành ApiError. */
+  async function serviceError(res: Response): Promise<ApiError> {
+    const body = await res.json().catch(() => ({}))
+    const raw = body.detail
+    const detail = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw : {}
+    return new ApiError(detail.message ?? `HTTP ${res.status}`, detail.code ?? null, res.status, null,
+      detail.reason ?? null)
+  }
+
+  /** Nộp lưu ngay hồ sơ đã đóng (chỉ lãnh đạo phòng của phòng có hồ sơ): svc-files ghi gói Parquet + tệp + manifest có
+   *  băm vào bucket lạnh khóa ghi, đọc lại so băm rồi mới chuyển CSDL sang archived. Lỗi: ApiError với mã của svc-files
+   *  (forbidden, not_closed, already_archived, archive_failed, busy…). */
+  async function archiveCaseFile(id: string): Promise<ArchiveRun> {
+    const res = await authFetch(`/api/case-files/${encodeURIComponent(id)}/archive`, { method: 'POST' })
+    if (!res.ok) throw await serviceError(res)
+    return await res.json() as ArchiveRun
+  }
+
+  /** Phòng đọc: gói lưu trữ của hồ sơ đã nộp lưu, đọc lại từ bucket lạnh (mỗi lần mở ghi case_file.read vào sổ). */
+  async function readingRoom(id: string): Promise<ArchivePackage> {
+    const res = await authFetch(`/api/case-files/${encodeURIComponent(id)}/archive`)
+    if (!res.ok) throw await serviceError(res)
+    return await res.json() as ArchivePackage
+  }
+
+  /** Phòng đọc xem một tệp PDF trong gói: bản có dấu tên người xem, giờ xem (mỗi lần mở ghi case_file.file_viewed).
+   *  Trả object URL để hiện trong khung xem — gọi URL.revokeObjectURL khi đóng. */
+  async function viewArchivedFile(caseFileId: string, fileId: string): Promise<string> {
+    const path = `${encodeURIComponent(caseFileId)}/archive/files/${encodeURIComponent(fileId)}`
+    const res = await authFetch(`/api/case-files/${path}`)
+    if (!res.ok) throw await serviceError(res)
+    // ép kiểu application/pdf: khung xem chỉ hiện PDF, không bao giờ coi byte trả về là một trang HTML
+    return URL.createObjectURL(new Blob([await res.arrayBuffer()], { type: 'application/pdf' }))
+  }
+
+  return { gql, upload, download, preview, register, printRegister, search, readFile, ask, archiveCaseFile, readingRoom,
+    viewArchivedFile }
 }

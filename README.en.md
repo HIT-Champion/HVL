@@ -119,7 +119,7 @@ repeatable any number of times — the presentation script is [`docs/demo-script
 
 | Principle | Demo | Command |
 |---|---|---|
-| (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match" | `make demo-nong-lanh` |
+| (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match"; in the UI: build case files, department heads archive, the reading room shows files stamped with the viewer's name | `make demo-nong-lanh` |
 | (ii) IT/OT convergence | Temperature sensor → NGSI-LD (Scorpio) → above the threshold, a draft "incident report" enters the outgoing document workflow | `make demo-it-ot` |
 | (iii) Data governance | OpenLineage provenance: the archive package traces back to the business tables and original files; row counts and required columns checked before writing | `make demo-pha-he` |
 | (iv) Zero-Trust | Quarantine: an EICAR file is blocked at the door, and the block is written to the audit log | `make demo-kiem-dich` |

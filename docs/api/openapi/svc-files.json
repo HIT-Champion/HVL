@@ -1146,7 +1146,7 @@
             "description": "Hồ sơ chưa nộp lưu"
           },
           "502": {
-            "description": "Gói trong bucket lạnh không khớp băm ghi trong CSDL"
+            "description": "`archive_mismatch`: gói trong bucket lạnh không khớp băm ghi trong CSDL, hoặc thiếu một phần của gói"
           },
           "503": {
             "description": "Chưa đọc được CSDL hoặc bucket lạnh"
@@ -1160,6 +1160,128 @@
                 }
               }
             }
+          }
+        }
+      },
+      "post": {
+        "summary": "Nộp lưu ngay hồ sơ đã đóng (lãnh đạo phòng): gói Parquet + tệp + manifest vào bucket lạnh",
+        "description": "Cùng các bước như vòng nộp lưu nền: kiểm băm tệp nóng, ghi gói khóa ghi, đọc lại so băm, hàm SQL `office.archive_case_file` một giao dịch. Giành được lượt rồi mới kiểm lại hồ sơ và ghi `case_file.archive_requested` vào sổ kiểm toán, sau đó mới làm; CSDL ghi `case_file.archived` khi xong.",
+        "operationId": "archive_case_file_api_case_files__case_file_id__archive_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveRunOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "`forbidden`: chỉ lãnh đạo phòng (`manager`) nộp lưu hồ sơ của phòng mình"
+          },
+          "404": {
+            "description": "Không có hồ sơ, hoặc hồ sơ không thuộc phòng của người gọi"
+          },
+          "409": {
+            "description": "`not_closed` hồ sơ còn mở · `already_archived` đã nộp lưu (kể cả lượt khác vừa xong) · `archive_failed` + `message`: không nộp lưu được (văn bản không còn ở trạng thái nộp lưu được, đang gửi liên thông, tệp trong kho nóng không khớp băm…) · `archive_conflict`: CSDL từ chối vì hồ sơ hay văn bản đổi trong lúc nộp lưu — CSDL không đổi gì"
+          },
+          "503": {
+            "description": "CSDL, kho đối tượng hoặc sổ kiểm toán chưa sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang có lượt nộp lưu khác trong tiến trình (nút bấm hay vòng nền) — chưa ghi sổ"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/case-files/{case_file_id}/archive/files/{file_id}": {
+      "get": {
+        "summary": "Phòng đọc: xem một tệp trong gói lưu trữ (chỉ xem, PDF có dấu tên người xem)",
+        "description": "Cùng quy tắc quyền như `GET /api/case-files/{id}/archive`: hồ sơ người gọi xem được, tệp gắn với văn bản người gọi đọc được. Tệp đọc từ bucket lạnh, so băm với manifest (manifest đã so với CSDL), đóng dấu tên người xem và giờ xem lên mọi trang, ghi `case_file.file_viewed` vào sổ kiểm toán — ghi không được thì không trả tệp. Không ghi gì vào bucket lạnh.",
+        "operationId": "view_archived_file_api_case_files__case_file_id__archive_files__file_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case File Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bản PDF có dấu tên người xem và giờ xem trên mọi trang, `Content-Disposition: inline`",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Không có hồ sơ, tệp không thuộc gói, hoặc người gọi không đọc được văn bản nào gắn tệp này — các trường hợp trả như nhau"
+          },
+          "409": {
+            "description": "Hồ sơ chưa nộp lưu"
+          },
+          "415": {
+            "description": "`not_viewable`: tệp không phải PDF — phòng đọc chỉ mở bản PDF đóng dấu được"
+          },
+          "422": {
+            "description": "`unstampable` + `reason`: PDF không đóng dấu được (quá MOC_RESTRICTED_MAX_PAGES trang, quá nặng, hỏng) — không trả tệp"
+          },
+          "502": {
+            "description": "`archive_mismatch`: manifest không khớp băm trong CSDL, tệp không khớp băm trong manifest, hoặc gói thiếu manifest hay tệp — không trả tệp"
+          },
+          "503": {
+            "description": "CSDL, bucket lạnh hoặc sổ kiểm toán chưa sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang đóng dấu tệp khác"
           }
         }
       }
@@ -1252,6 +1374,60 @@
           "hidden"
         ],
         "title": "ArchiveOut"
+      },
+      "ArchiveRunOut": {
+        "properties": {
+          "case_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case File Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "archive_key": {
+            "type": "string",
+            "title": "Archive Key",
+            "description": "Tiền tố của gói trong bucket lạnh (khóa ghi S3 Object Lock)"
+          },
+          "archive_sha256": {
+            "type": "string",
+            "title": "Archive Sha256",
+            "description": "Băm manifest của gói — cũng là case_files.archive_sha256"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes",
+            "description": "Tổng số byte tệp và bảng Parquet đã ghi vào gói"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "Run OpenLineage của lượt nộp lưu (core.lineage_events, F3.9)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_file_id",
+          "code",
+          "archive_key",
+          "archive_sha256",
+          "documents",
+          "files",
+          "bytes",
+          "run_id"
+        ],
+        "title": "ArchiveRunOut",
+        "description": "Kết quả nộp lưu theo yêu cầu: gói đã nằm trong bucket lạnh, đọc lại khớp băm, CSDL đã chuyển `archived`."
       },
       "ArchivedDocumentOut": {
         "properties": {
@@ -1361,6 +1537,12 @@
       },
       "ArchivedFileOut": {
         "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id",
+            "description": "Mở trong phòng đọc: GET /api/case-files/{id}/archive/files/{file_id}"
+          },
           "filename": {
             "type": "string",
             "title": "Filename"
@@ -1376,14 +1558,31 @@
           "bytes": {
             "type": "integer",
             "title": "Bytes"
+          },
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Document Ids",
+            "description": "Văn bản người gọi đọc được có gắn tệp này"
+          },
+          "viewable": {
+            "type": "boolean",
+            "title": "Viewable",
+            "description": "Xem được trong phòng đọc (PDF, đóng dấu người xem); tệp khác chỉ hiện băm, cỡ"
           }
         },
         "type": "object",
         "required": [
+          "file_id",
           "filename",
           "mime_type",
           "sha256",
-          "bytes"
+          "bytes",
+          "document_ids",
+          "viewable"
         ],
         "title": "ArchivedFileOut"
       },
