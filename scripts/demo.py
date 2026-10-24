@@ -508,9 +508,21 @@ def tu_phuc_hoi() -> None:
         time.sleep(2)
     else:
         raise DemoFailed(f"sau 2 phút vẫn chưa healthy: {states}")
-    stored = clerk.upload(f"sau-phuc-hoi-{tag}.pdf", text_pdf("Thu sau khi tu phuc hoi", f"Ma thu {tag}"))
-    ok(f"svc-files, centrifugo healthy sau {time.monotonic() - started:.0f} giây kể từ lượt reconciler; tải tệp → "
-       f"201 (SHA-256 {stored['sha256'][:16]}…)")
+    healthy = time.monotonic()
+    # APISIX hỏi lại DNS mỗi 5 giây (dns_resolver_valid): vừa healthy thì cổng có thể còn trỏ địa chỉ container cũ và
+    # trả 502/503 một lúc. Thử lại tối đa 30 giây, in đúng số giây đã chờ
+    while True:
+        try:
+            stored = clerk.upload(f"sau-phuc-hoi-{tag}.pdf", text_pdf("Thu sau khi tu phuc hoi", f"Ma thu {tag}"))
+            break
+        except HTTPError as exc:
+            if exc.status not in (502, 503) or time.monotonic() - healthy > 30:
+                raise
+            time.sleep(2)
+    gateway = time.monotonic() - healthy
+    ok(f"svc-files, centrifugo healthy sau {healthy - started:.0f} giây kể từ lượt reconciler; tải tệp → 201"
+       + (f" sau {gateway:.0f} giây chờ cổng nhận container mới" if gateway >= 1 else "")
+       + f" (SHA-256 {stored['sha256'][:16]}…)")
 
     print("\nTrên máy chủ thật: platform/systemd/moc-reconcile.timer · nhật ký: journalctl -u moc-reconcile")
 
