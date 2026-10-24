@@ -84,6 +84,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `svc-files` (nhật ký, lời gọi Hasura nên vào `core.audit_log.request_id`, lời gọi `svc-files`), mã sai dạng thì
   thay bằng mã mới; APISIX ghi mã yêu cầu ở cuối dòng log truy cập. Rủi ro (CORS của Parseable, mất log khi Vector dừng)
   và cách tắt: `docs/van-hanh.md`, mục Log tập trung. Test svc-workflow +10, scripts +29, `vector test` 29 ca.
+- Tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7): trang Tự chẩn đoán `/tu-chan-doan` — 12 câu do đội tự
+  viết theo bốn không gian Con người, Quy trình, Dữ liệu, Trí tuệ, mỗi câu 5 mức quan sát được (vi/en, có JSON
+  Schema), radar ECharts, cảnh báo lệch nền theo nguyên lý tiến hóa tuyến tính H → P → D → I, không gian nên làm
+  trước, bước tiếp theo trỏ đúng trang Signet mà vai trò người xem mở được. Cạnh mỗi không gian là bằng chứng đo được
+  của chính đơn vị lấy từ các view đã có (dashboard, số đo F4.6, độ chính xác tác tử F4.1/F4.3, hồ sơ nộp lưu), chỉ số
+  chưa có dữ liệu thì không hiện. Lãnh đạo đơn vị lưu kết quả vào `office.maturity_assessments` (CSDL kiểm đủ bộ câu
+  và tính điểm, cách ly theo đơn vị, tối đa 5 lần lưu mỗi giờ, không sửa, xóa, gắn sổ kiểm toán) để xem tiến bộ; lãnh
+  đạo phòng làm được nhưng không lưu. Không phải bộ chỉ số chính thức, không quy đổi DTI. Nguồn, cách chấm, giới hạn:
+  [`docs/tu-chan-doan.md`](docs/tu-chan-doan.md). Test office +18, db +18.
 
 ### Đã sửa đổi
 - README (cả bản tiếng Anh) viết lại thành 12 mục, cài đặt lên khoảng giữa trang thay vì dòng 221: Giới thiệu, Kiến
