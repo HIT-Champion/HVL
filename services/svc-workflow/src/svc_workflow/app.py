@@ -29,7 +29,9 @@ import hmac
 import json
 import logging
 import os
-from collections.abc import AsyncIterator
+import re
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -54,6 +56,8 @@ from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
 
 log = logging.getLogger("svc_workflow")
+# Mã yêu cầu nhận từ X-Request-Id: cùng luật với bước tách mã của Vector và make logs-tra (log tập trung F3.14)
+REQUEST_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 
 
 def _setup_logging() -> None:
@@ -241,6 +245,20 @@ def create_app(
                     "ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def request_id(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        # APISIX gắn X-Request-Id (giữ mã client tự gửi), Hasura chuyển tiếp sang Action (forward_client_headers); gọi
+        # thẳng (khi phát triển) thì tự sinh. Mã sai dạng (dài, dấu cách, ký tự điều khiển…) cũng thay bằng mã mới: mọi
+        # mã trong nhật ký, sổ kiểm toán đều tra được. Trả lại ở header để người gọi tra nhật ký, log tập trung (F3.14)
+        rid = request.headers.get("x-request-id", "")
+        if not REQUEST_ID.fullmatch(rid):
+            rid = uuid.uuid4().hex
+        request.state.request_id = rid
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = rid
+        return response
+
     app.state.workflow = workflow
     app.state.dispatcher = dispatcher
     app.state.deadlines = deadlines
@@ -307,7 +325,7 @@ def create_app(
             payload = body.get("input") or {}
             if (body.get("action") or {}).get("name") != name:
                 return _error(400, "bad_request", "Tên Action không khớp đường dẫn")
-            actor = Actor.from_session(session, request.headers.get("x-request-id", ""))
+            actor = Actor.from_session(session, request.state.request_id)
         except (ValueError, KeyError, TypeError):
             return _error(400, "bad_request", "Yêu cầu không đúng định dạng Action")
 

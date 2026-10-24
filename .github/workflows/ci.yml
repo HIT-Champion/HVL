@@ -107,6 +107,22 @@ jobs:
             echo "profile $p: $(wc -w <<<"$services") dịch vụ"
           done
 
+      # F3.14: profile logs (tắt mặc định) cùng tệp phủ đổi driver log của 5 dịch vụ sang fluentd phân giải được
+      - name: Profile log tập trung phân giải được
+        env:
+          COMPOSE_FILE: docker-compose.yml:platform/logs/docker-compose.logs.yml
+        run: docker compose --profile core --profile app --profile logs config -q
+
+      # Bước che lần hai của Vector: cấu hình hợp lệ, mỗi luật che có ca trong platform/logs/vector.test.yaml (bỏ hay
+      # nới một luật thì có ca đỏ). Image đúng dòng ghim digest trong docker-compose.yml
+      - name: Log tập trung — cấu hình Vector và các luật che (vector validate, vector test)
+        run: |
+          image=$(sed -n '/^  vector:$/,/^    image:/s/^    image: //p' docker-compose.yml)
+          m=(-v "$PWD/platform/logs:/etc/vector:ro"
+             -v "$PWD/platform/logs/kiem-tra/mat-khau-gia.txt:/run/secrets/moc_logs_password:ro")
+          docker run --rm --network none "${m[@]}" "$image" validate --deny-warnings /etc/vector/vector.yaml
+          docker run --rm --network none "${m[@]}" "$image" test /etc/vector/vector.yaml /etc/vector/vector.test.yaml
+
       - name: Script khả thi và đúng cú pháp
         run: |
           for f in scripts/*.sh db/tests/stack.sh; do
@@ -362,6 +378,15 @@ jobs:
           if grep -q 'tạo mới\|đặt lại' <<<"$out"; then echo "chạy lại mà vẫn tạo mới hoặc đặt lại mật khẩu"; exit 1; fi
           python3 scripts/moc.py tenant list
           python3 scripts/moc.py tenant check
+
+      # F3.14: bật profile logs (Vector, Parseable; 5 dịch vụ chuyển sang driver fluentd) → một mã X-Request-Id tự đặt
+      # đi qua APISIX → svc-workflow → svc-files, tra Parseable ra đủ dòng của ba dịch vụ, sổ kiểm toán ghi cùng mã, kho
+      # log không còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log của các dịch vụ
+      - name: Log tập trung tra theo mã yêu cầu (make logs-up, make demo-log-tap-trung)
+        if: matrix.phan == 'luong-chinh'
+        run: |
+          make logs-up
+          make demo-log-tap-trung
 
       # F4.1: văn thư tải công văn PDF có chữ → tác tử moc-doc-reader gợi ý số ký hiệu, ngày, cơ quan, loại, trích yếu;
       # ảnh chụp → nhận dạng chữ (Tesseract); văn thư sửa một ô rồi vào sổ; sổ kiểm toán có dòng của tác tử, không mang

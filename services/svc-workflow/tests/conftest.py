@@ -600,9 +600,12 @@ class FakeFiles:
     similar_error: Exception | None = None
     similar_delay: float = 0.0
     similar_calls: list[tuple[uuid.UUID, str, int]] = field(default_factory=list)
+    similar_request_ids: list[str] = field(default_factory=list)
 
-    async def similar(self, tenant_id: uuid.UUID, document_id: str, *, limit: int = 15) -> dict[str, Any]:
+    async def similar(self, tenant_id: uuid.UUID, document_id: str, *, limit: int = 15,
+                      request_id: str = "") -> dict[str, Any]:
         self.similar_calls.append((tenant_id, document_id, limit))
+        self.similar_request_ids.append(request_id)
         await asyncio.sleep(self.similar_delay)
         if self.similar_error is not None:
             raise self.similar_error

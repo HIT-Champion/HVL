@@ -91,8 +91,9 @@ nginx_config:
     # F4.4: không ghi chuỗi truy vấn (ô tìm kiếm ?q=…, mã đăng nhập ?code=…&state=…) và Referer (URL đầy đủ của trang
     # trước). Các trường khác giữ như định dạng mặc định của APISIX 3.18: "$request" thành phương thức, đường dẫn, giao
     # thức; "$upstream_scheme://$upstream_host$upstream_uri" giữ nguyên trừ ?…. APISIX bọc chuỗi này trong '…' khi
-    # dựng nginx.conf: không dùng dấu nháy đơn bên trong
-    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream"'
+    # dựng nginx.conf: không dùng dấu nháy đơn bên trong. "$apisix_request_id" cuối dòng như mặc định: log tập trung
+    # (F3.14) nối dòng của APISIX với svc-files, svc-workflow theo mã yêu cầu
+    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream" "$apisix_request_id"'
 
 # Chỉ bật plugin đang dùng
 plugins:

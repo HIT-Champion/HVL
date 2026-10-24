@@ -167,6 +167,7 @@ gateway is exposed.
 | `app-office` | The e-Office interface (Nuxt 4, Tailwind), Vietnamese / English | `apps/office/` |
 | `app-ca-nhan` | P.A.R.A personal space: each person's files in four folders, its own Keycloak client, calls the core through the gateway like any application | `apps/ca-nhan/` |
 | Prometheus 3 + Grafana 13 | API gateway monitoring: request count, status codes, latency per route; internal network only | `platform/monitoring/` |
+| Vector 0.59 + Parseable 3.2 (profile `logs`, optional) | Centralised logs: collects the logs of the services that already mask personal data through Docker's logging driver, masks a second time, searchable by request id; listens on 127.0.0.1 only | `platform/logs/` |
 | Scorpio 6 + PostGIS (profile `iot`) | NGSI-LD context broker: digital twins of sensors, measurement history | `services/ot-sensor/` |
 | Ollama (profile `ai`, optional) | Local language model on its own internal network, cloud features off | `docker-compose.yml` |
 
@@ -203,6 +204,7 @@ platform/                Configuration for open source software used unmodified
   keycloak/ apisix/      Keycloak realm; APISIX gateway routes and plugins
   centrifugo/ openbao/   Centrifugo configuration; OpenBao vault configuration and initialisation script
   monitoring/            Prometheus + Grafana
+  logs/                  Vector + the compose override for centralised logs (profile logs)
   systemd/               Timer that runs the GitOps reconciler on the server
 scripts/                 Operations commands (moc.py, seed, smoke, backup, audit, reconcile, demo), install
                          (install.sh), repository tooling (check_pr.py, release*, license-header.sh, api_docs.py);
@@ -306,6 +308,7 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.m
 | [Secrets vault](docs/van-hanh.md#két-bí-mật) OpenBao: limits, upgrading an old vault for digital signatures | `make demo-ket-bi-mat` |
 | [GitOps and self-healing](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer, applies signed commits only | `make reconcile` |
 | [Monitoring](docs/van-hanh.md#giám-sát) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
+| [Centralised logs](docs/van-hanh.md#log-tập-trung): Vector + Parseable, search by the `X-Request-Id` request id | `make logs-up`, `make logs-tra ID=…`, `make demo-log-tap-trung` |
 | [IT/OT convergence](docs/van-hanh.md#hội-tụ-itot): NGSI-LD broker, sensors | `make demo-it-ot` |
 | [Checking the audit log](db/README.md) outside the database | `make audit` |
 
@@ -341,7 +344,7 @@ transitive ones included (`make license-audit`). Every release after 1.0.0 ships
 |---|---|
 | [`docs/demo-script.md`](docs/demo-script.md) | Demo script: the four principles and the business demos, one command each |
 | [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md) | Feature maturity: the level of each feature with its evidence (tests, CI steps, demos) and known limitations; coverage of the seven Tier 1 service clusters of the problem statement |
-| [`docs/van-hanh.md`](docs/van-hanh.md) | Operations: adding units, backup, secrets vault, GitOps, monitoring, IT/OT |
+| [`docs/van-hanh.md`](docs/van-hanh.md) | Operations: adding units, backup, secrets vault, GitOps, monitoring, centralised logs, IT/OT |
 | [`docs/trien-khai.md`](docs/trien-khai.md) | Deploying to a server: HTTPS with Caddy in front of APISIX, operator account, firewall, nightly backup, upgrades |
 | [`docs/api/`](docs/api/README.md) | API documentation: getting a token, calling GraphQL and REST through the gateway; per-role GraphQL schema and generated OpenAPI |
 | [`docs/them-ung-dung.md`](docs/them-ung-dung.md) | Adding a new application on the core: Keycloak client, APISIX route, compose service, its own schema and permissions; worked example: the P.A.R.A personal space |

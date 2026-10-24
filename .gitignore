@@ -79,6 +79,8 @@ docker-compose.*.local.yml
 # --- Nhật ký & Tệp tạm -------------------------------------------------------
 *.log
 logs/
+# Cấu hình log tập trung (F3.14) là mã nguồn, không phải nhật ký
+!/platform/logs/
 tmp/
 temp/
 .cache/

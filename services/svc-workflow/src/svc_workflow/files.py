@@ -154,20 +154,22 @@ class FilesClient:
             raise FilesError(f"svc-files trả {r.status_code}: {r.text[:300]}", r.status_code)
         return r.json()
 
-    async def similar(self, tenant_id: uuid.UUID, document_id: str, *, limit: int = 15) -> dict[str, Any]:
+    async def similar(self, tenant_id: uuid.UUID, document_id: str, *, limit: int = 15,
+                      request_id: str = "") -> dict[str, Any]:
         """Tác tử gợi ý giao việc (F4.3): văn bản đến tương tự văn bản này đã giao xử lý →
         ``{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}``.
 
         svc-files tự đọc trích yếu bằng vai trò service và chỉ trả id với điểm (đã loại chính nó, văn bản hạn chế, văn
         bản chưa giao) — không chữ nào của văn bản đi qua đây. Lỗi: ``FilesError`` có ``status`` và ``code`` (404
         ``not_found``, 409 ``not_incoming``/``restricted``, 503 ``assistant_disabled``/``search_unavailable``…).
+        ``request_id`` (``goi-y:<việc>``) đi sang svc-files ở ``X-Request-Id``: tra nhật ký hai bên cùng một mã.
         """
         try:
             r = await self._post("/internal/similar-documents", {
                 "tenant_id": str(tenant_id),
                 "document_id": str(uuid.UUID(document_id)),
                 "limit": limit,
-            })
+            }, {"X-Request-Id": request_id} if request_id else None)
         except httpx2.HTTPError as exc:
             raise FilesError(f"Không gọi được svc-files: {exc}") from exc
         if r.status_code != 200:

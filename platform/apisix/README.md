@@ -60,14 +60,16 @@ APISIX, `config.yaml` khóa `nginx_config`:
         "~^(?<moc_dd_upstream>[^?]*)" $moc_dd_upstream;
     }
   http:
-    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream"'
+    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream" "$apisix_request_id"'
 ```
 
 - `log_format` của nginx không cắt chuỗi được, nên hai `map` giữ phần trước dấu `?` đầu tiên: của `$request_uri`
   (đường dẫn đúng như client gửi, như phần đường dẫn của `"$request"` cũ) và của `$upstream_uri` (APISIX đã ghép
   `?…` vào). Dòng của `/api/search?q=001205000017` ghi `"GET /api/search HTTP/1.1"`.
 - Các trường khác giữ như định dạng mặc định của APISIX 3.18, kể cả đích phía sau
-  (`"$upstream_scheme://$upstream_host…"`, có ích khi gỡ lỗi đường đổi hướng như `/realtime`); bỏ `$http_referer`.
+  (`"$upstream_scheme://$upstream_host…"`, có ích khi gỡ lỗi đường đổi hướng như `/realtime`) và mã yêu cầu
+  `"$apisix_request_id"` ở cuối dòng (log tập trung F3.14 dùng để nối dòng của APISIX với svc-files, svc-workflow —
+  `docs/van-hanh.md` mục Log tập trung); bỏ `$http_referer`.
 
 nginx của app-office, `apps/office/nginx/default.conf.template` (tệp được include trong khối `http`; app-ca-nhan
 dùng đúng khối này trong `apps/ca-nhan/nginx/default.conf.template`):

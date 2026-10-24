@@ -1,0 +1,192 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Vector (profile logs, F3.14 — docs/van-hanh.md mục Log tập trung): nhận log của apisix, app-office, app-ca-nhan,
+# svc-files, svc-workflow qua driver fluentd của Docker (platform/logs/docker-compose.logs.yml), tách mã yêu cầu,
+# che lần hai thứ không được rời máy, gửi Parseable. Lớp che chính vẫn ở từng dịch vụ (F4.4); ở đây chỉ là lưới an
+# toàn cho dòng lọt qua (dòng lỗi nginx, traceback). Kiểm: vector validate, vector test
+# (platform/logs/vector.test.yaml).
+secret:
+  tep:
+    type: directory
+    path: /run/secrets          # compose secret moc_logs_password (environment: MOC_LOGS_PASSWORD)
+    remove_trailing_whitespace: true
+
+sources:
+  docker:
+    type: fluent
+    mode: tcp
+    address: 0.0.0.0:24224      # compose chỉ mở 127.0.0.1:MOC_LOGS_FLUENT_PORT trên máy chủ
+    connection_limit: 64
+
+transforms:
+  # Docker cắt dòng dài hơn 16 KiB thành nhiều bản ghi (partial_message, partial_id, partial_last): ghép lại trước khi
+  # che, không thì bí mật nằm vắt qua chỗ cắt lọt qua. Bản ghi thường đi tiếp ngay. Nhóm theo container và mã mảnh:
+  # mảnh của hai container (hay stdout, stderr của một container) xen nhau không bị trộn
+  ghep:
+    type: reduce
+    inputs: [docker]
+    group_by: [container_id, partial_id]
+    merge_strategies:
+      log: concat_raw
+    ends_when:
+      type: vrl
+      source: .partial_message != "true" || .partial_last == "true"
+    max_events: 64              # dòng tới 1 MiB; quá thì gửi phần đã ghép
+    expire_after_ms: 10000      # mảnh cuối không tới (container chết) thì gửi phần đã có
+
+  moc:
+    type: remap
+    inputs: [ghep]
+    drop_on_error: true         # lỗi lúc chạy thì bỏ dòng, không gửi nguyên văn chưa che
+    source: |
+      service = string(."com.docker.compose.service") ?? "khong-ro"
+      line = string(.log) ?? string(.message) ?? ""
+      out = {"service": service, "container": string(.container_name) ?? "", "stream": string(.source) ?? "",
+             "timestamp": .timestamp}
+      msg = line
+      rid = ""
+      is_json = false
+      # Dòng JSON của svc-files, svc-workflow: lấy event, request_id. Viết lại dòng từ bản đã giải mã: ký tự thoát
+      # (\u0040 thay @…) không giấu được chữ khỏi bước che, xuống dòng và ký tự điều khiển được thoát lại
+      parsed, err = parse_json(line)
+      if err == null && is_object(parsed) {
+        is_json = true
+        ev = string(parsed.event) ?? ""
+        if match(ev, r'^[A-Za-z0-9._:-]{1,128}$') { out.event = ev }
+        rid = string(parsed.request_id) ?? ""
+        # Khóa bí mật ở mọi tầng (kể cả giá trị là số, null, object lồng): thay cả giá trị trước khi viết lại
+        flat = flatten(object!(parsed))
+        for_each(flat) -> |k, _v| {
+          if match(k, r'(?i)passw|pwd|secret|token|api[_-]?key|private[_-]?key|credential|session|authoriz|cookie') {
+            flat = set!(flat, [k], "[REDACTED]")
+          }
+        }
+        msg = encode_json(unflatten(flat))
+      } else {
+        # Dòng lỗi nginx của APISIX: ..., request_id: "…"; dòng truy cập APISIX: trường cuối "$apisix_request_id".
+        # Dòng nginx của app-office kết thúc bằng "$http_x_forwarded_for" (IP): không lấy làm mã
+        m, err = parse_regex(line, r'request_id: "(?P<rid>[^"]*)"')
+        if err != null && service == "apisix" {
+          m, err = parse_regex(line, r'^\S+ - \S+ \[[^\]]*\] .*"(?P<rid>[^"]*)"\s*$')
+        }
+        if err == null { rid = string(m.rid) ?? "" }
+      }
+      # Chỉ nhận mã đúng dạng, cùng luật với svc-workflow và make logs-tra: mã dài, có dấu cách, PII… bỏ
+      if match(rid, r'^[A-Za-z0-9._:-]{1,128}$') { out.request_id = rid }
+
+      # Dòng không phải JSON có thể chứa đoạn JSON viết thoát (pass\u0077ord): giải mã các chuỗi \u00XX là ký tự
+      # ASCII in được trước khi che. Chỉ là mã thoát khi đứng sau số chẵn dấu \ (\\u… là dấu \ thật rồi chữ u)
+      msg = replace_with(msg, r'(^|[^\\])((?:\\\\)*)((?:\\u00(?:[2-6][0-9a-fA-F]|7[0-9a-eA-E]))+)') -> |m| {
+        d, e = parse_json("\"" + (string(m.captures[2]) ?? "") + "\"")
+        (string(m.captures[0]) ?? "") + (string(m.captures[1]) ?? "") + (string(d) ?? string(m.captures[2]) ?? "")
+      }
+      # Ba dấu tạm của bước che có sẵn trong dòng (dòng giả, giá trị chứa ␟) thì bỏ trước: không chen được vào bước che
+      msg = replace(msg, r'[␟␝␞]', "")
+      # Token Bearer/Basic, JWT che trước khi đánh dấu khóa: dấu = đệm cuối base64 (Basic dXNlcjpwYXNzd29yZA==) không
+      # bị coi là một cặp khóa=giá trị chen dấu ␟ vào giữa
+      msg = replace(msg, r'(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}', "${1} [REDACTED]")
+      msg = replace(msg, r'eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*', "[JWT]")
+
+      # Che lần hai. Ba dấu chỉ dùng trong lúc che, xóa ngay sau: ␟ trước mỗi khóa (a=, "a":, 'a':) để giá trị không
+      # có nháy, kể cả có dấu cách, dừng ở khóa kế tiếp; ␝ sau Authorization:, Cookie:, Set-Cookie: (che cả giá trị:
+      # trong nháy thì tới hết nháy; không nháy thì tới hết dòng, kể cả Digest username="u", response="…", trong dòng
+      # JSON thì tới hết chuỗi); ␞ sau khóa có chữ password, secret, token, api key, session… kể cả có tiền tố, hậu tố
+      # (HASURA_ADMIN_SECRET=, access_token, x-api-key), và sau đối số dòng lệnh như --password ('--password', 'X' của
+      # list Python, mảng JSON, hay --password X). \x27 là dấu nháy đơn (dict Python in trong traceback). Giá trị dạng
+      # a=b cũng bị đánh ␟ ở đầu: luật giá trị cho phép một ␟ ngay sau ␝, ␞. Nháy mở mà không đóng (dòng bị cắt giữa
+      # giá trị: %.200s, repr(x)[:n]): dòng thường che tới hết dòng, trong dòng JSON tới hết chuỗi
+      msg = replace(msg, r'(^|[\s,;{(\[])(["\x27]?[\w.-]+["\x27]?\s*[:=])', "${1}␟${2}")
+      msg = replace(msg, r'(?i)([\w-]*(?:authorization|cookie)[\w-]*\\?["\x27]?\s*[:=]\s*)', "${1}␝")
+      msg = replace(msg, r'(?i)([\w-]*(?:passw|pwd|secret|token)[\w-]*\\?["\x27]?\s*[:=]\s*)', "${1}␞")
+      msg = replace(msg, r'(?i)([\w-]*(?:api[_-]?key|private[_-]?key|credential|session)[\w-]*\\?["\x27]?\s*[:=]\s*)',
+                    "${1}␞")
+      msg = replace(msg, r'(?i)(["\x27]--?[\w-]*(?:passw|pwd|secret|token|key|credential)[\w-]*\\?["\x27]\s*,\s*)',
+                    "${1}␞")
+      msg = replace(msg, r'(?i)((?:^|\s)--?[\w-]*(?:passw|pwd|secret|token|key|credential)[\w-]*\s+)([^\s-])',
+                    "${1}␞${2}")
+      msg = replace(msg, r'␝␟?\\?"(?:[^"\\]|\\.)*"', "\"[REDACTED]\"")
+      msg = replace(msg, r'␝␟?\x27(?:[^\x27\\]|\\.)*\x27', "'[REDACTED]'")
+      if is_json {
+        msg = replace(msg, r'␝␟?[^"\s\\](?:[^"\\\n]|\\.)*', "[REDACTED]")
+      } else {
+        msg = replace(msg, r'␝␟?.+', "[REDACTED]")
+      }
+      msg = replace(msg, r'␞␟?\\?"(?:[^"\\]|\\.)*"', "\"[REDACTED]\"")
+      msg = replace(msg, r'␞␟?\x27(?:[^\x27\\]|\\.)*\x27', "'[REDACTED]'")
+      msg = replace(msg, r'␞␟?[^"\x27\s␟␞][^␟"\n]*?(\s*␟|"|$)', "[REDACTED]${1}")
+      if is_json {
+        msg = replace(msg, r'␞␟?\x27(?:[^"\\\n]|\\.)*', "[REDACTED]")
+      } else {
+        msg = replace(msg, r'␞␟?\\?["\x27].*', "[REDACTED]")
+      }
+      msg = replace(msg, r'[␟␝␞]', "")
+      # Mật khẩu trong chuỗi kết nối: scheme://người:mật-khẩu@máy
+      msg = replace(msg, r'(?i)([a-z][a-z0-9+.-]*://[^:/\s@"\x27]*:)[^@\s/"\x27]+@', "${1}[REDACTED]@")
+      # Chuỗi truy vấn (câu tìm, ?code=…&state=…) của mọi chuỗi có / trước ? (URL tuyệt đối, tương đối, máy:cổng/đường
+      # dẫn): trong nháy (giá trị có dấu cách, trường JSON, referrer) hoặc không (dòng request của nginx, uvicorn)
+      msg = replace(msg, r'(?P<u>"[^\s"?/]*/[^\s"?]*)\?(?:[^"\\]|\\.)*"', "${u}\"")
+      msg = replace(msg, r'(?P<u>(?:^|[\s=(\x27])[^\s"\x27?/]*/[^\s"\x27?]*)\?[^\s"\x27]*', "${u}")
+      # Lưới thô cho PII, không thay F4.4. Email cả chữ có dấu, @ viết %40 (\u0040 đã giải mã ở trên). Số đứng sau từ
+      # khóa, kể cả viết tách nhóm: CCCD, CMND từ 9 số; số tài khoản, mã số thuế từ 6 số; số điện thoại từ 8 số. Từ
+      # khóa không dính chữ cái phía sau (telemetry không phải tel), giữa từ khóa và số tới 20 ký tự không phải chữ số.
+      # CCCD 12 số; số điện thoại 0…, +84…, 84… (di động 10 số, cố định 11 số) kể cả không có từ khóa, dính chữ
+      # (sđt0912…), chỉ cần không dính chữ số khác. Mỗi luật số không từ khóa chạy hai lần: hai số liền nhau chỉ cách
+      # một ký tự
+      msg = replace(msg, r'(?i)[\p{L}\p{N}._%+-]+(?:@|%40)[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}', "[EMAIL]")
+      msg = replace(msg, r'(?i)(\b(?:cccd|c[ăa]n c[ưu][ớo]c)(?:[^\p{L}\d\n][^\d\n]{0,19}?)?)\d(?:[ .-]?\d){8,}',
+                    "${1}[CCCD]")
+      msg = replace(msg, r'(?i)(\b(?:cmnd|cmt|ch[ứu]ng minh)(?:[^\p{L}\d\n][^\d\n]{0,19}?)?)\d(?:[ .-]?\d){8,}',
+                    "${1}[CMND]")
+      msg = replace(msg, r'(?i)(\b(?:stk|t[àa]i kho[ảa]n)(?:[^\p{L}\d\n][^\d\n]{0,19}?)?)\d(?:[ .-]?\d){5,}',
+                    "${1}[STK]")
+      msg = replace(msg, r'(?i)(\b(?:mst|m[ãa] s[ốo] thu[ếe])(?:[^\p{L}\d\n][^\d\n]{0,19}?)?)\d(?:[ .-]?\d){5,}',
+                    "${1}[MST]")
+      msg = replace(msg,
+        r'(?i)(\b(?:s[đd]t|tel|fax|phone|đi[ệe]n tho[ạa]i)(?:[^\p{L}\d\n+][^\d\n]{0,19}?)?)\+?\d(?:[ .()-]{0,2}\d){7,}',
+        "${1}[SĐT]")
+      msg = replace(msg, r'(^|\D)0\d{11}(\D|$)', "${1}[CCCD]${2}")
+      msg = replace(msg, r'(^|\D)0\d{11}(\D|$)', "${1}[CCCD]${2}")
+      msg = replace(msg, r'(^|\D)(?:\+?84|0)(?:[35789]\d{8}|2\d{9})(\D|$)', "${1}[SĐT]${2}")
+      msg = replace(msg, r'(^|\D)(?:\+?84|0)(?:[35789]\d{8}|2\d{9})(\D|$)', "${1}[SĐT]${2}")
+      out.message = truncate(msg, 16384)
+      # Chỉ gửi các trường trên: container_id, nhãn khác của bản ghi gốc không đi tiếp
+      . = out
+
+sinks:
+  parseable:
+    type: http
+    inputs: [moc]
+    uri: http://parseable:8000/api/v1/ingest
+    method: post
+    encoding:
+      codec: json
+    compression: gzip
+    auth:
+      strategy: basic
+      user: moc
+      # Vector ≥ 0.57 mặc định không thay ${…} trong cấu hình: mật khẩu lấy từ secret, không từ biến môi trường
+      password: "SECRET[tep.moc_logs_password]"
+    request:
+      headers:
+        X-P-Stream: moc         # scripts/log_tap_trung.py (STREAM) tra đúng luồng này
+    batch:
+      max_events: 500
+      timeout_secs: 2
+    buffer:
+      type: memory
+      max_events: 10000
+      when_full: drop_newest    # Parseable chết lâu thì bỏ dòng mới, không để dịch vụ chờ
