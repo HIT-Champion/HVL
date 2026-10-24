@@ -1122,5 +1122,65 @@
     "feedback": "User feedback",
     "feedbackValue": "Average score {avg}/5 over {n} feedback",
     "feedbackLink": "View feedback"
+  },
+  "lineage": {
+    "nav": "Data lineage",
+    "title": "Data lineage",
+    "subtitle": "Which view each Overview chart reads and which tables each view reads — computed from the database catalog when the page opens, not declared by hand — plus the latest archiving run. Names of tables, views and edges only, no document data.",
+    "source": "Data source",
+    "sourceOf": "Data source: {chart}",
+    "kpis": "Summary cards",
+    "chart": "Chart",
+    "allCharts": "All charts",
+    "graph": "Lineage graph",
+    "graphHint": "Data flows left to right: table → view → chart; table → Parquet → archive package. Dashed: the last archiving step writing back to the database. Hover a node to see its full name.",
+    "kind": {
+      "chart": "Chart",
+      "view": "View",
+      "table": "Table",
+      "job": "Archiving step",
+      "object": "Stored object (S3)"
+    },
+    "edge": {
+      "read": "reads",
+      "archive": "archiving",
+      "commit": "archiving writes to the database"
+    },
+    "sourceKind": {
+      "table": "table",
+      "partitioned_table": "partitioned table",
+      "view": "view",
+      "materialized_view": "materialized view",
+      "foreign_table": "foreign table"
+    },
+    "objects": "{n} objects",
+    "rows": "{n} rows",
+    "readAt": "Catalog read at {time}. Report views are plain views: Overview figures are recomputed on every visit, there is no stale snapshot.",
+    "sources": "Sources of each chart",
+    "view": "View",
+    "readsFrom": "Reads from",
+    "through": "via {view}",
+    "missing": "This view is not in the catalog",
+    "archive": "Latest archiving run",
+    "archiveTotals": "Your unit has {runs} finished archiving runs; {failed} steps failed a quality check.",
+    "archiveNone": "No archiving run of your unit has recorded lineage yet.",
+    "archiveRun": "Run {run}… · finished {time}",
+    "step": "Step",
+    "steps": {
+      "files": "Copy files hot → cold",
+      "tables": "Tables → Parquet + checks",
+      "manifest": "Build package (manifest)",
+      "commit": "Write back to database"
+    },
+    "inputs": "Inputs",
+    "outputs": "Outputs",
+    "quality": "Quality check",
+    "passed": "Passed",
+    "failedCheck": "Failed",
+    "notChecked": "Not checked",
+    "reports": "All report views ({n})",
+    "reportsHint": "Every office.v_… view in the database, including views no Overview chart uses yet (e.g. those of the Metrics page).",
+    "usedBy": "Used by",
+    "export": "Download OpenLineage (.jsonl)"
   }
 }

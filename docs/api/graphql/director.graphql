@@ -3245,6 +3245,67 @@ input office_registers_stream_cursor_value_input {
   year: Int
 }
 
+"columns and relationships of \"office.report_lineage\""
+type office_report_lineage {
+  consumer: String
+  depth: Int
+  report: String
+  source: String
+  source_kind: String
+}
+
+"Boolean expression to filter rows from the table \"office.report_lineage\". All fields are combined with a logical 'AND'."
+input office_report_lineage_bool_exp {
+  _and: [office_report_lineage_bool_exp!]
+  _not: office_report_lineage_bool_exp
+  _or: [office_report_lineage_bool_exp!]
+  consumer: String_comparison_exp
+  depth: Int_comparison_exp
+  report: String_comparison_exp
+  source: String_comparison_exp
+  source_kind: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.report_lineage\"."
+input office_report_lineage_order_by {
+  consumer: order_by
+  depth: order_by
+  report: order_by
+  source: order_by
+  source_kind: order_by
+}
+
+"select columns of table \"office.report_lineage\""
+enum office_report_lineage_select_column {
+  "column name"
+  consumer
+  "column name"
+  depth
+  "column name"
+  report
+  "column name"
+  source
+  "column name"
+  source_kind
+}
+
+"Streaming cursor of the table \"office_report_lineage\""
+input office_report_lineage_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_report_lineage_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_report_lineage_stream_cursor_value_input {
+  consumer: String
+  depth: Int
+  report: String
+  source: String
+  source_kind: String
+}
+
 input office_revoke_document_access_args {
   document_id: uuid
   user_id: String
@@ -4666,6 +4727,19 @@ type query_root {
   ): [office_registers!]!
   "fetch data from the table: \"office.registers\" using primary key columns"
   office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table: \"office.report_lineage\""
+  office_report_lineage(
+    "distinct select on columns"
+    distinct_on: [office_report_lineage_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_report_lineage_order_by!]
+    "filter the rows returned"
+    where: office_report_lineage_bool_exp
+  ): [office_report_lineage!]!
   "fetch data from the table: \"office.v_assignment_suggestion_accuracy\""
   office_v_assignment_suggestion_accuracy(
     "distinct select on columns"
@@ -5427,6 +5501,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_registers_bool_exp
   ): [office_registers!]!
+  "fetch data from the table: \"office.report_lineage\""
+  office_report_lineage(
+    "distinct select on columns"
+    distinct_on: [office_report_lineage_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_report_lineage_order_by!]
+    "filter the rows returned"
+    where: office_report_lineage_bool_exp
+  ): [office_report_lineage!]!
+  "fetch data from the table in a streaming manner: \"office.report_lineage\""
+  office_report_lineage_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_report_lineage_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_report_lineage_bool_exp
+  ): [office_report_lineage!]!
   "fetch data from the table: \"office.v_assignment_suggestion_accuracy\""
   office_v_assignment_suggestion_accuracy(
     "distinct select on columns"

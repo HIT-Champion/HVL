@@ -23,6 +23,8 @@ import { useI18n } from 'vue-i18n'
 // xử lý, văn bản khẩn, văn bản đi theo tháng. Số liệu lấy từ bốn khung nhìn chỉ có số đếm (migration
 // 1792281601200) qua Hasura bằng token của người xem: Hasura lọc theo thuê ước trong token, vai trò khác bị từ
 // chối. Văn bản hạn chế không vào phép chia nào, chỉ có con số tổng (lý do ở migration).
+// Nút "Nguồn số liệu" của từng biểu đồ mở trang Phả hệ (F3.9): biểu đồ nào dùng khung nhìn nào khai ở
+// app/utils/lineage.ts, tests/lineage.test.ts đối chiếu với QUERY và các computed dưới đây.
 
 interface Count {
   direction: string
@@ -227,11 +229,19 @@ const outgoingChart = computed(() => ({
           </div>
         </div>
       </div>
-      <p v-if="restricted" class="text-xs text-stone-500" data-testid="board-restricted">{{ t('board.restricted', { n: restricted }) }}</p>
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <p v-if="restricted" class="text-xs text-stone-500" data-testid="board-restricted">
+          {{ t('board.restricted', { n: restricted }) }}
+        </p>
+        <SourceLink chart="kpis" class="ml-auto" />
+      </div>
 
       <div class="grid gap-4 xl:grid-cols-2">
         <section class="card p-4" data-testid="board-status">
-          <h2 class="font-medium text-stone-900">{{ t('board.byStatus') }}</h2>
+          <div class="flex items-start justify-between gap-3">
+            <h2 class="font-medium text-stone-900">{{ t('board.byStatus') }}</h2>
+            <SourceLink chart="status" />
+          </div>
           <EChart :option="statusChart" :label="byStatus.map((r) => `${t(`status.${r.status}`)}: ${r.documents}`).join(', ')" />
           <table class="mt-2 w-full text-sm">
             <thead class="text-left text-xs text-stone-500">
@@ -247,7 +257,10 @@ const outgoingChart = computed(() => ({
         </section>
 
         <section class="card p-4" data-testid="board-departments">
-          <h2 class="font-medium text-stone-900">{{ t('board.byDepartment') }}</h2>
+          <div class="flex items-start justify-between gap-3">
+            <h2 class="font-medium text-stone-900">{{ t('board.byDepartment') }}</h2>
+            <SourceLink chart="departments" />
+          </div>
           <p v-if="!departments.length" class="py-12 text-center text-sm text-stone-500">{{ t('board.empty') }}</p>
           <template v-else>
             <EChart :option="departmentChart" :height="departmentHeight" :label="departments.map((r) => `${departmentName(r)}: ${r.in_progress}, ${t('board.late')} ${r.overdue}`).join('; ')" />
@@ -267,7 +280,14 @@ const outgoingChart = computed(() => ({
         </section>
 
         <section class="card p-4" data-testid="board-processing">
-          <h2 class="font-medium text-stone-900">{{ t('board.processing') }} <span class="text-sm font-normal text-stone-500">({{ inHours ? t('board.unitHours') : t('board.unitDays') }})</span></h2>
+          <div class="flex items-start justify-between gap-3">
+            <h2 class="font-medium text-stone-900">
+              {{ t('board.processing') }}
+              <span class="text-sm font-normal text-stone-500"
+                >({{ inHours ? t('board.unitHours') : t('board.unitDays') }})</span>
+            </h2>
+            <SourceLink chart="processing" />
+          </div>
           <EChart :option="processingChart" :label="processingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${duration(r.total_hours / r.documents)}`).join(', ') || t('board.noneDone')" />
           <table class="mt-2 w-full text-sm">
             <thead class="text-left text-xs text-stone-500">
@@ -285,7 +305,10 @@ const outgoingChart = computed(() => ({
         </section>
 
         <section class="card p-4" data-testid="board-outgoing">
-          <h2 class="font-medium text-stone-900">{{ t('board.outgoing') }}</h2>
+          <div class="flex items-start justify-between gap-3">
+            <h2 class="font-medium text-stone-900">{{ t('board.outgoing') }}</h2>
+            <SourceLink chart="outgoing" />
+          </div>
           <EChart :option="outgoingChart" :label="outgoingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${r.documents}`).join(', ') || t('board.empty')" />
           <table class="mt-2 w-full text-sm">
             <thead class="text-left text-xs text-stone-500">

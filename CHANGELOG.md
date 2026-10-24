@@ -84,6 +84,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `svc-files` (nhật ký, lời gọi Hasura nên vào `core.audit_log.request_id`, lời gọi `svc-files`), mã sai dạng thì
   thay bằng mã mới; APISIX ghi mã yêu cầu ở cuối dòng log truy cập. Rủi ro (CORS của Parseable, mất log khi Vector dừng)
   và cách tắt: `docs/van-hanh.md`, mục Log tập trung. Test svc-workflow +10, scripts +29, `vector test` 29 ca.
+- Phả hệ trên báo cáo tổng hợp (F3.9, F3.11): khung nhìn `office.report_lineage` tính từ catalog PostgreSQL lúc truy
+  vấn khung nhìn báo cáo `office.v_*` nào đọc bảng, view nào (đệ quy qua view lồng, không khai tay — sửa view là phả
+  hệ đổi theo), chỉ có tên và cạnh, lãnh đạo đơn vị đọc như dashboard. Trang Phả hệ số liệu (`/pha-he`) và nút "Nguồn
+  số liệu" trên từng biểu đồ của trang Điều hành: đồ thị ECharts biểu đồ → khung nhìn → bảng, nối với lượt nộp lưu gần
+  nhất (bảng → Parquet → gói lưu trữ, số dòng đã kiểm), bảng nguồn đi kèm, tải phả hệ dạng OpenLineage (JSON Lines);
+  biểu đồ nào đọc khung nhìn nào khai một chỗ, có test đối chiếu với truy vấn thật của trang. Bước `commit` của nộp
+  lưu khai thêm `office.archived_document_facts`; `make demo-pha-he` thêm bước in phả hệ báo cáo, smoke thêm 2 kiểm.
+  Test db +6, office +13, scripts +4, e2e +1.
 
 ### Đã sửa đổi
 - README (cả bản tiếng Anh) viết lại thành 12 mục, cài đặt lên khoảng giữa trang thay vì dòng 221: Giới thiệu, Kiến

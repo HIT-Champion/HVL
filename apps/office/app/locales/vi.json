@@ -1122,5 +1122,65 @@
     "feedback": "Góp ý của người dùng",
     "feedbackValue": "Điểm trung bình {avg}/5 trên {n} góp ý",
     "feedbackLink": "Xem góp ý"
+  },
+  "lineage": {
+    "nav": "Phả hệ số liệu",
+    "title": "Phả hệ số liệu",
+    "subtitle": "Biểu đồ nào của trang Điều hành lấy số từ khung nhìn nào, khung nhìn đọc bảng nào — tính từ catalog CSDL lúc mở trang, không khai tay — cùng lượt nộp lưu gần nhất. Chỉ có tên bảng, khung nhìn và cạnh, không có dữ liệu văn bản.",
+    "source": "Nguồn số liệu",
+    "sourceOf": "Nguồn số liệu: {chart}",
+    "kpis": "Thẻ số liệu đầu trang",
+    "chart": "Biểu đồ",
+    "allCharts": "Mọi biểu đồ",
+    "graph": "Đồ thị phả hệ",
+    "graphHint": "Dữ liệu chảy từ trái sang phải: bảng → khung nhìn → biểu đồ; bảng → Parquet → gói lưu trữ. Nét đứt: bước cuối của nộp lưu ghi lại vào CSDL. Rê chuột lên một nút để xem tên đầy đủ.",
+    "kind": {
+      "chart": "Biểu đồ",
+      "view": "Khung nhìn",
+      "table": "Bảng",
+      "job": "Bước nộp lưu",
+      "object": "Đối tượng lưu trữ (S3)"
+    },
+    "edge": {
+      "read": "đọc",
+      "archive": "nộp lưu",
+      "commit": "nộp lưu ghi vào CSDL"
+    },
+    "sourceKind": {
+      "table": "bảng",
+      "partitioned_table": "bảng phân vùng",
+      "view": "khung nhìn",
+      "materialized_view": "khung nhìn vật lý hóa",
+      "foreign_table": "bảng ngoài"
+    },
+    "objects": "{n} đối tượng",
+    "rows": "{n} dòng",
+    "readAt": "Đọc catalog lúc {time}. Khung nhìn báo cáo là view thường: số trên trang Điều hành tính lại mỗi lần mở, không có bản chụp cũ.",
+    "sources": "Nguồn của từng biểu đồ",
+    "view": "Khung nhìn",
+    "readsFrom": "Đọc từ",
+    "through": "qua {view}",
+    "missing": "Không thấy khung nhìn này trong catalog",
+    "archive": "Lượt nộp lưu gần nhất",
+    "archiveTotals": "Đơn vị có {runs} lượt nộp lưu đã xong; {failed} bước trượt kiểm chất lượng.",
+    "archiveNone": "Chưa có lượt nộp lưu nào của đơn vị ghi phả hệ.",
+    "archiveRun": "Run {run}… · xong lúc {time}",
+    "step": "Bước",
+    "steps": {
+      "files": "Chép tệp nóng → lạnh",
+      "tables": "Bảng → Parquet + kiểm",
+      "manifest": "Lập gói (manifest)",
+      "commit": "Ghi lại vào CSDL"
+    },
+    "inputs": "Đầu vào",
+    "outputs": "Đầu ra",
+    "quality": "Kiểm chất lượng",
+    "passed": "Đạt",
+    "failedCheck": "Trượt",
+    "notChecked": "Không kiểm",
+    "reports": "Mọi khung nhìn báo cáo ({n})",
+    "reportsHint": "Mọi view office.v_… trong CSDL, kể cả khung nhìn chưa có biểu đồ trên trang Điều hành (vd của trang Số đo).",
+    "usedBy": "Biểu đồ dùng",
+    "export": "Tải OpenLineage (.jsonl)"
   }
 }

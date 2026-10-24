@@ -96,9 +96,9 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
 - [ ] **Một phần** — vòng đời nóng → lạnh (F3.8, mức Dùng được): hồ sơ đã đóng nộp lưu thành Parquet + tệp + manifest
       có băm trên bucket khóa ghi (`make demo-nong-lanh`); chưa có giao diện lập hồ sơ, nộp lưu, phòng đọc
 - [ ] **Đang làm**: giao diện lập hồ sơ, nộp lưu và phòng đọc xem tệp (F3.8, nguyên lý i)
-- [ ] **Một phần** — phả hệ dữ liệu (F3.9, mức Dùng được): OpenLineage cho lượt nộp lưu, kiểm số dòng và cột bắt buộc
-      trước khi ghi Parquet (`make demo-pha-he`); chưa có phả hệ "báo cáo ← bảng", chưa có màn xem đồ thị
-- [ ] **Đang làm**: phả hệ cho báo cáo của dashboard và màn xem đồ thị phả hệ (F3.9, F3.11, nguyên lý iii)
+- [x] Phả hệ dữ liệu (F3.9): OpenLineage cho lượt nộp lưu, kiểm số dòng và cột bắt buộc trước khi ghi Parquet
+      (`make demo-pha-he`); phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL, trang Phả hệ số liệu
+      (`/pha-he`) vẽ đồ thị, mỗi biểu đồ ở trang Điều hành có nút Nguồn số liệu
 - [ ] **Một phần** — từ điển dữ liệu: bảng, quyền, định dạng sự kiện ghi ở
       [`docs/mo-hinh-du-lieu.md`](docs/mo-hinh-du-lieu.md); chưa có lớp ngữ nghĩa báo cáo — chỉ số, chiều định nghĩa
       một lần, dùng chung — nên mỗi báo cáo là một view viết tay (cụm ③, mức Một phần)

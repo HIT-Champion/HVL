@@ -463,9 +463,12 @@ class Archiver:
         }}, request_id)
         if [row["status"] for row in result["office_archive_case_file"]] != ["archived"]:
             raise ArchiveError(f"hồ sơ {cf['code']}: CSDL không xác nhận đã nộp lưu")
+        # đầu ra: các bảng hàm SQL ghi — kể cả số liệu giữ lại cho báo cáo (archived_document_facts, mà
+        # office.v_processing_time đọc): trang Phả hệ nối được biểu đồ ← bảng ← lượt nộp lưu
         await self._step(cf["tenant_id"], "commit", request_id, [manifest_out],
                          [pg(t) for t in ("office.case_files", "office.documents", "office.document_events",
-                                          "office.document_files", "core.files", "core.audit_log")])
+                                          "office.document_files", "office.archived_document_facts", "core.files",
+                                          "core.audit_log")])
         progress["step"] = None
 
         # Bước 5: bản nóng
