@@ -117,6 +117,23 @@ jobs:
       - name: Workflow GitHub Actions hợp lệ (actionlint)
         run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
 
+      # Bước có "if: matrix.phan == '…'" gọi sai tên phần (đổi tên, bỏ phần) thì bị bỏ qua âm thầm mà job vẫn xanh:
+      # tên phần trong điều kiện nào cũng phải có trong ma trận, phần nào trong ma trận cũng phải có bước
+      - name: Bước chạy thử khớp các phần trong ma trận
+        run: |
+          python3 - <<'PY'
+          import re
+          text = open(".github/workflows/ci.yml", encoding="utf-8").read()
+          phases = [p.strip() for p in re.search(r"^ +phan: \[(.*)\]$", text, re.M).group(1).split(",")]
+          used = [p for line in text.splitlines() if line.lstrip().startswith("if:")
+                  for p in re.findall(r"matrix\.phan == '([^']*)'", line)]
+          print(f"{len(phases)} phần: " + ", ".join(f"{p} ({used.count(p)} bước)" for p in phases))
+          unknown = sorted(set(used) - set(phases))
+          empty = [p for p in phases if p not in used]
+          assert not unknown, f"bước gọi phần không có trong ma trận: {unknown}"
+          assert not empty, f"phần không có bước nào: {empty}"
+          PY
+
   docs:
     name: "Tài liệu (PoF #6)"
     runs-on: ubuntu-24.04
@@ -224,10 +241,11 @@ jobs:
             echo "PR chỉ đổi tài liệu, không dựng hệ thống:"; cat <<<"$files"
           fi
 
-  # Ba phần chạy song song trên ba máy. Phần nào cũng tự dựng và nạp mẫu (≈ 3 phút) rồi chạy nhóm bước của mình theo
-  # đúng thứ tự cũ: luồng chính, e2e, các màn lõi | màn AI, nộp lưu, ký số, sao lưu và khôi phục | cài đặt, GitOps.
-  # Bước cần trạng thái do bước trước để lại thì ở cùng phần: phả hệ sau nộp lưu, đo sau màn nạp dữ liệu, nộp lưu và
-  # ký số trước sao lưu để bản khôi phục có cả hồ sơ lạnh, CA và khóa ký
+  # Năm phần chạy song song trên năm máy. Phần nào cũng tự dựng và nạp mẫu (≈ 3 phút) rồi chạy nhóm bước của mình theo
+  # đúng thứ tự cũ: luồng chính, các màn lõi | e2e | màn AI và số đo | nộp lưu, phả hệ, ký số, sao lưu và khôi phục |
+  # cài đặt, GitOps. Bước cần trạng thái do bước trước để lại thì ở cùng phần: phả hệ sau nộp lưu, đo "sau" sau màn
+  # giao việc, nộp lưu và ký số trước sao lưu để bản khôi phục có cả hồ sơ lạnh, CA và khóa ký. Job build kiểm tên phần
+  # trong điều kiện từng bước khớp ma trận
   chay-thu:
     name: "Chạy thử: ${{ matrix.phan }}"
     needs: [build, thay-doi]
@@ -237,13 +255,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phan: [luong-chinh, ai-sao-luu, cai-dat]
+        phan: [luong-chinh, e2e, ai, sao-luu, cai-dat]
     env:
       # gồm cả profile iot: khi lỗi, nhật ký có cả broker NGSI-LD (màn IT/OT tự bật profile này)
       COMPOSE: docker compose --profile core --profile app --profile iot
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      # Thời hạn mỗi bước rút còn 20 giây để make smoke chờ được timer nhắc hạn và báo lãnh đạo (≈ 1 phút)
+      # Thời hạn mỗi bước rút còn 20 giây để make smoke chờ được timer nhắc hạn và báo lãnh đạo (≈ 1 phút). Chỉ smoke
+      # của luong-chinh kiểm nhắc hạn; smoke chạy lại ở phần khác đặt PT24H trên lệnh để khỏi chờ timer lần nữa
       MOC_SLA_DURATION: PT20S
+      # Python in ngay từng dòng: mốc thời gian trong nhật ký smoke, demo là lúc chạy thật, không phải lúc xả bộ đệm
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -294,7 +315,7 @@ jobs:
         run: make smoke
 
       - name: Văn bản đến, văn bản đi, thông báo realtime trên trình duyệt thật (make e2e)
-        if: matrix.phan == 'luong-chinh'
+        if: matrix.phan == 'e2e'
         run: make e2e
 
       # Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A với client Keycloak riêng, SSO
@@ -325,13 +346,13 @@ jobs:
       # văn bản vẫn tìm thấy, cổng xác thực vẫn "khớp", phòng đọc kiểm băm; xóa gói bị từ chối. Chạy trước diễn tập
       # sao lưu để bản sao lưu có cả hồ sơ đã nộp lưu
       - name: Nộp lưu hồ sơ nóng → lạnh (make demo-nong-lanh)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'sao-luu'
         run: make demo-nong-lanh
 
       # F3.9: lượt nộp lưu vừa rồi có run OpenLineage cho từng bước trong core.lineage_events; gói truy ngược về bảng
       # nghiệp vụ; bảng Parquet nào cũng đã qua kiểm số dòng và null
       - name: Phả hệ và kiểm chất lượng (make demo-pha-he)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'sao-luu'
         run: make demo-pha-he
 
       # F3.10: bật profile iot (Scorpio + PostGIS); cảm biến giả lập vượt ngưỡng → đúng một dự thảo "Báo cáo sự cố"
@@ -373,25 +394,25 @@ jobs:
       # ảnh chụp → nhận dạng chữ (Tesseract); văn thư sửa một ô rồi vào sổ; sổ kiểm toán có dòng của tác tử, không mang
       # nội dung; tệp văn bản hạn chế bị từ chối, không có gợi ý nào được lưu. Không bật profile ai: trích yếu theo quy tắc
       - name: Đọc văn bản đến (make demo-doc-van-ban)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make demo-doc-van-ban
 
       # F4.1: đo độ chính xác trên bộ văn bản mẫu có nhãn; chỉ đỏ khi PDF có chữ dưới ngưỡng, ảnh scan chỉ in số đo
       - name: Đo độ chính xác đọc văn bản đến (make do-doc-van-ban)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make do-doc-van-ban
 
       # F4.2: nạp kho văn bản mẫu nhiều trang → văn thư hỏi, nhận câu trích nguyên văn kèm "số ký hiệu · tr. n"; giảng
       # viên phòng khác hỏi cùng câu → không tìm thấy; nội dung văn bản hạn chế không ai hỏi ra; sổ kiểm toán có dòng
       # của tác tử moc-assistant, không mang câu hỏi. Không bật profile ai: tìm theo từ khóa, trả lời bằng câu trích
       - name: Hỏi đáp trên kho văn bản (make demo-hoi-dap)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make demo-hoi-dap
 
       # F4.2: chạy mọi câu hỏi có đáp án của bộ mẫu; đỏ khi câu về quyền hay văn bản hạn chế ra nguồn bị cấm, hoặc
       # recall@3 của câu dương dưới ngưỡng
       - name: Đo chất lượng hỏi đáp (make do-hoi-dap)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make do-hoi-dap
 
       # F4.3: nạp lịch sử giao việc mẫu → văn bản đến mới có gợi ý đơn vị chủ trì, hạn, căn cứ trước khi lãnh đạo mở
@@ -399,20 +420,20 @@ jobs:
       # kiểm toán có dòng của tác tử moc-assigner, không mang trích yếu; dừng svc-files thì văn bản vẫn tới lãnh đạo
       # ngay, gợi ý ghi failed (bước này luôn khởi động lại svc-files). Không bật profile ai: tìm theo từ khóa, bỏ phiếu
       - name: Gợi ý giao việc (make demo-giao-viec)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make demo-giao-viec
 
       # F4.3: bỏ một ra (leave-one-out) trên lịch sử giao việc mẫu: top-1/2/3, độ phủ, sai số hạn, độ trễ; đỏ khi căn cứ
       # có văn bản hạn chế hoặc top-1 dưới ngưỡng
       - name: Đo gợi ý giao việc (make do-giao-viec)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make do-giao-viec
 
       # F4.6: số đo "sau" của đặc tả §8 bằng quyền lãnh đạo đơn vị, sau màn giao việc để có văn bản đã giao: (a), (b)
       # từ view, 5 lần tìm lại văn bản đến cũ nhất qua /api/search; đỏ khi thiếu văn bản để tìm hoặc một lần tìm không
       # ra. Số trên dữ liệu mẫu, không phải số đo của đơn vị thật
       - name: Số đo "sau" theo đặc tả §8 (make do-so-lieu-sau)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make do-so-lieu-sau
 
       # F4.5 (chỉ minh họa): két trong CI luôn mới nên setup() đã dựng PKI nội bộ → văn bản đi phát hành có chữ ký
@@ -420,7 +441,7 @@ jobs:
       # pyHanko trong svc-files kiểm chữ ký hợp lệ, sửa sau khi ký hay lật một byte trong phần đã ký đều bị bắt;
       # không có chữ ký nào gắn với văn bản hạn chế. Trước bước sao lưu: khôi phục mang cả CA và khóa ký về cùng két
       - name: Ký số văn bản đi, chỉ minh họa (make demo-ky-so)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'sao-luu'
         run: make demo-ky-so
 
       # F4.4: văn thư tải một lá đơn giả lập có số CCCD, số điện thoại, email, số tài khoản → tìm theo số CCCD ra đúng
@@ -429,14 +450,14 @@ jobs:
       # đầu màn không còn giá trị nào ở mọi cách viết, dòng truy cập không còn chuỗi truy vấn. Không bật profile ai: in
       # bản che mô hình sẽ nhận. Đo trên kho mẫu và đột biến mã (make do-che-pii) đã chạy trong make test
       - name: Che thông tin cá nhân trong nhật ký và chữ gửi mô hình (make demo-che-pii)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'ai'
         run: make demo-che-pii
 
       # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL,
       # tệp và két, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về cùng),
       # sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục
       - name: Sao lưu, xóa dữ liệu, khôi phục rồi kiểm lại (make backup, make restore)
-        if: matrix.phan == 'ai-sao-luu'
+        if: matrix.phan == 'sao-luu'
         run: |
           make backup
           python3 scripts/moc.py backup create --keep 1
@@ -446,10 +467,12 @@ jobs:
           make down
           docker volume rm moc_postgres_data moc_seaweedfs_data moc_openbao_data
           python3 scripts/moc.py backup restore --yes
-          make smoke
+          MOC_SLA_DURATION=PT24H make smoke
           make audit
 
-      # Dừng bản chạy trong thư mục mã nguồn, cài sang thư mục khác rồi chạy lại từ đó (dùng chung dữ liệu)
+      # Dừng bản chạy trong thư mục mã nguồn, cài sang thư mục khác rồi chạy lại từ đó (dùng chung dữ liệu). Kiểm nhanh
+      # bằng script của bản cài: cổng, trạng thái, đăng nhập, GraphQL, tải tệp; bước GitOps ngay sau chạy smoke đủ trên
+      # cùng bản cài này
       - name: Cài ra ngoài thư mục mã nguồn và chạy từ đó (make install)
         if: matrix.phan == 'cai-dat'
         run: |
@@ -457,7 +480,18 @@ jobs:
           make install PREFIX="$RUNNER_TEMP/moc"
           cd "$RUNNER_TEMP/moc"
           docker compose up -d --wait --wait-timeout 600
-          python3 scripts/smoke.py
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "scripts")
+          from moc_env import PUBLIC_URL, Session, call_json, text_pdf
+          status, _ = call_json("GET", f"{PUBLIC_URL}/api/status")
+          assert status["status"] in ("ok", "degraded"), status
+          clerk = Session("vanthu")
+          clerk.gql("{ office_documents(limit: 1) { id } }")
+          stored = clerk.upload("sau-khi-cai.pdf", text_pdf("Kiem nhanh sau khi cai"))
+          print(f"bản cài {status['version']} ({status['status']}): đăng nhập, GraphQL, tải tệp đạt,"
+                f" SHA-256 {stored['sha256'][:16]}…")
+          PY
 
       # F3.3 GitOps với repo git cục bộ: nhánh deploy là trạng thái mong muốn của bản cài. Reconciler áp commit mới
       # được đẩy lên, rồi đưa tệp đã cài bị sửa tay về đúng commit đó; smoke lại sau cùng
@@ -484,7 +518,7 @@ jobs:
           out=$(python3 scripts/reconcile.py)
           grep -q 'sửa tay' <<<"$out"
           if grep -q '^# sửa tay' docker-compose.yml; then exit 1; fi
-          python3 scripts/smoke.py
+          MOC_SLA_DURATION=PT24H python3 scripts/smoke.py
 
       - name: Trạng thái và nhật ký dịch vụ khi lỗi
         if: failure()
@@ -507,7 +541,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # Đúng tên job mà ruleset yêu cầu (.github/rulesets/): đạt khi cả ba phần đạt, hoặc khi PR chỉ đổi tài liệu
+  # Đúng tên job mà ruleset yêu cầu (.github/rulesets/): đạt khi cả năm phần đạt, hoặc khi PR chỉ đổi tài liệu
   stack:
     name: "Chạy thử toàn hệ thống (PoF #4)"
     needs: [thay-doi, chay-thu]
@@ -515,7 +549,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Cả ba phần chạy thử đều đạt
+      - name: Cả năm phần chạy thử đều đạt
         env:
           MA: ${{ needs.thay-doi.outputs.ma }}
           THAY_DOI: ${{ needs.thay-doi.result }}
