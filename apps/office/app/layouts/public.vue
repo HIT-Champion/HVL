@@ -37,9 +37,8 @@ function toggleLocale() {
   <div class="moc-public flex min-h-screen flex-col">
     <header class="border-b border-stone-200">
       <div class="mx-auto flex h-16 w-full max-w-3xl items-center gap-3 px-4">
-        <img src="/favicon.svg" alt="" class="h-8 w-8">
         <div class="flex-1">
-          <div class="moc-public-wordmark text-brand-800">{{ t('app.name') }}</div>
+          <div class="moc-public-wordmark text-brand-800"><svg class="sg-brand-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M45 10H26c-9 0-16 7-16 16s7 16 16 16h12" stroke="currentColor" stroke-width="9" stroke-linecap="round"/><path d="M19 54h19c9 0 16-7 16-16s-7-16-16-16H26" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></svg><span>{{ t('app.name') }}</span></div>
           <div class="text-xs text-stone-500">{{ t('verify.title') }}</div>
         </div>
         <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>

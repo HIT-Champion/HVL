@@ -6,52 +6,52 @@ colors:
   action-hover: "#42492e"
   focus: "#666d4c"
   focus-soft: "#e9ead8"
-  sidebar: "#f2ebd4"
-  sidebar-edge: "#e7dfc3"
+  sidebar: "#eee3bc"
+  sidebar-edge: "#e0d3a5"
   nav-hover: "#eae2c8"
   nav-active: "#fffdf5"
   nav-ink: "#424734"
-  ground: "#faf9f4"
+  ground: "#f4f5f1"
   surface: "#fff"
-  ink: "#30342a"
-  muted: "#666a59"
-  edge: "#e2e2d6"
+  ink: "#202820"
+  muted: "#515b50"
+  edge: "#d9ddd4"
   field-edge: "#898a79"
-  attention: "#f6eedc"
-  attention-edge: "#d5c396"
+  attention: "#fffdf6"
+  attention-edge: "#cbb57a"
   attention-divider: "#dfd3b7"
   row-hover: "#f7f8f1"
   overdue: "#a02727"
 typography:
   wordmark:
-    fontFamily: "Lora, Georgia, serif"
-    fontSize: "31px"
-    fontWeight: 500
+    fontFamily: "Be Vietnam Pro, Segoe UI, sans-serif"
+    fontSize: "25px"
+    fontWeight: 700
     lineHeight: 1.2
-    letterSpacing: "-0.035em"
+    letterSpacing: "-0.04em"
   headline:
-    fontFamily: '"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif'
+    fontFamily: '"Be Vietnam Pro", "Segoe UI", system-ui, sans-serif'
     fontSize: "28px"
-    fontWeight: 600
-    lineHeight: 1.3
+    fontWeight: 700
+    lineHeight: 1.25
     letterSpacing: "-0.025em"
   highlight-title:
-    fontFamily: '"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif'
-    fontSize: "20px"
+    fontFamily: '"Be Vietnam Pro", "Segoe UI", system-ui, sans-serif'
+    fontSize: "19px"
     fontWeight: 600
-    lineHeight: 1.45
+    lineHeight: 1.5
   row-title:
-    fontFamily: '"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif'
-    fontSize: "16px"
+    fontFamily: '"Be Vietnam Pro", "Segoe UI", system-ui, sans-serif'
+    fontSize: "17px"
     fontWeight: 600
     lineHeight: 1.5
   body:
-    fontFamily: '"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif'
-    fontSize: "14px"
+    fontFamily: '"Be Vietnam Pro", "Segoe UI", system-ui, sans-serif'
+    fontSize: "16px"
     lineHeight: 1.5
   metadata:
-    fontFamily: '"Segoe UI", system-ui, -apple-system, "Noto Sans", Arial, sans-serif'
-    fontSize: "13px"
+    fontFamily: '"Be Vietnam Pro", "Segoe UI", system-ui, sans-serif'
+    fontSize: "14px"
     lineHeight: 1.5
 rounded:
   chip: "4px"
@@ -94,7 +94,7 @@ components:
   attention-card:
     backgroundColor: "{colors.attention}"
     rounded: "{rounded.panel}"
-    padding: "22px 24px 0"
+    padding: "20px 24px 0"
   chip:
     rounded: "{rounded.chip}"
     padding: "2px 8px"
@@ -106,14 +106,14 @@ components:
 
 **Creative North Star: "Butter operational workspace"**
 
-Butter places warm yellow navigation beside a bright work canvas and white content. Dark olive actions and clear sans-serif reading text keep the interface practical. Lora supplies a modest vintage cue through identity alone.
+Butter places warm yellow navigation beside a bright work canvas and white content. Dark olive actions and clear sans-serif reading text keep the interface practical. The Liền mạch logo uses two looping strokes suggesting an S and continuity. Stronger ink and a neutral bright canvas clarify the reading surface.
 
-This records the implemented local Butter system selected by the user after the interactive reroll. It replaces the prior wine system. It describes the implemented source; selecting the direction does not imply acceptance of every resulting screen. Surface composition belongs in its surface brief.
+This records the implemented Butter system selected after the interactive reroll and refined on 24/10/2026. The user chose moderately airy density that prioritizes reading individual tasks and selected the Liền mạch logo from three explored directions. This is a refinement of Butter. It replaces the prior wine system. It describes the implemented source; selecting the direction does not imply acceptance of every resulting screen. Surface composition belongs in its surface brief.
 
 **Key Characteristics:**
 
 - Butter navigation, warm white canvas and olive actions.
-- Lora identity with sans-serif document work.
+- Liền mạch S mark and a sans-serif wordmark with sans-serif document work.
 - Readable titles, labelled deadlines and real business state.
 - Flat surfaces distinguished by tone, thin boundaries and space.
 - Collapsible navigation with deliberate, reducible motion.
@@ -144,25 +144,25 @@ Warm yellow and olive give the workspace its character; white work surfaces pres
 
 ## Typography
 
-**Wordmark Font:** Lora, Georgia, serif.
-**Body and Heading Font:** Segoe UI, system-ui, Apple system, Noto Sans, Arial, sans-serif. Authentication uses its shorter Segoe UI/system stack.
+**Wordmark Font:** Be Vietnam Pro, Segoe UI, sans-serif.
+**Body and Heading Font:** Be Vietnam Pro, Segoe UI, system-ui, sans-serif. Four self-hosted weights (400, 500, 600, 700) use font-display: swap; the office disables synthesized font weights. Authentication uses the same supplied font family and weights.
 
 ### Hierarchy
 
-- **Wordmark:** The sidebar uses the wordmark token; collapsed navigation shows the initial. Public identity uses 28px, authentication identity 40px.
+- **Wordmark:** The sidebar pairs a 25px/700 wordmark with a 32px Liền mạch SVG mark; collapsed navigation retains the mark. Public identity uses 26px/700, authentication identity 40px/700 with a 40px mark. Favicon uses the same strokes on butter.
 - **Headline:** The inbox uses the headline token, becoming 27px at the small-screen breakpoint. General office headings use 24px; authentication uses 28px, weight 500, reducing to 24px on small screens.
 - **Highlighted title:** Attention tasks use the highlight-title token, reducing to 18px at 1200px and below.
-- **Row title:** Normal task titles use the row-title token, wrap freely and have a 70ch maximum width. Section headings use 16px at weight 600.
-- **Body:** Navigation, ordinary work and controls use the body scale. Small-screen inputs use 16px to preserve usability.
-- **Metadata:** Task identity, task labels and deadline text use the metadata scale. Status/urgency chips retain compact 12px type.
+- **Row title:** Normal task titles use the row-title token, wrap freely and have a 64ch maximum width. Section headings use 16px at weight 600.
+- **Body:** Base body is 16px/1.5; navigation and ordinary controls use 14px. Small-screen inputs use 16px to preserve usability.
+- **Metadata:** Task identity, task labels and deadline text use 14px; section counts and utility context use 13px. Status/urgency chips retain compact 12px type.
 
-**The Work Type Rule.** Reserve Lora for identity; use sans-serif for office headings and document work.
+**The Work Type Rule.** Use Be Vietnam Pro for identity, headings and work. Weight, measure and proximity establish hierarchy.
 
 ## Layout
 
-Desktop uses a left sidebar grid track of 244px, collapsing to 92px. A 16px left inset produces sidebar panels of 228px and 76px. The panel is sticky, begins 16px from the top and spans viewport height minus 32px. Main workspace width is capped at 1380px, with 42px top and 56px horizontal padding. A quiet utility row precedes the work surface.
+Desktop uses a left sidebar grid track of 244px, collapsing to 92px. A 16px left inset produces sidebar panels of 228px and 76px. The panel is sticky, begins 16px from the top and spans viewport height minus 32px. Main workspace width is capped at 1440px with 28px top and 40px horizontal padding. The centered inbox reading column caps at 1080px. The utility row uses 20px bottom padding, followed by a 28px sheet inset. Heading and toolbar spacing and task-group gaps use 24px.
 
-The shell collapses over 260ms using cubic-bezier(.16,1,.3,1); labels fade over 110ms. The preference persists under `signet.sidebar.collapsed`. Icons retain accessible names and collapsed title hints. Staff see four primary destinations; clerk, director and tenant administrator destinations remain role-driven. Search remains a sidebar utility; verification is in the footer.
+The shell collapses over 260ms using cubic-bezier(.16,1,.3,1); labels fade over 110ms. The preference persists under `signet.sidebar.collapsed`. Icons retain accessible names and collapsed title hints. Staff see permitted primary destinations including Q&A; clerk, director and tenant administrator destinations remain role-driven. Search remains a sidebar utility; verification is in the footer.
 
 At 1200px and below, workspace padding becomes 32px/28px and the date hides. At 900px and below, navigation becomes a 256px fixed drawer with 10px inset and a scrim; the content uses 20px/24px padding. Opening moves focus into navigation, traps Tab, makes the workspace inert and locks body scrolling. Closed mobile navigation is inert; Escape, scrim or navigation closes it and returns focus to the trigger. At 640px and below, horizontal padding becomes 18px, search occupies its own toolbar line and filters share the next line with refresh.
 
@@ -200,7 +200,7 @@ The sidebar uses 14px labels and inline stroked SVG icons. Hover darkens the but
 
 ### Document rows
 
-Each task is one document link containing title, identity, actual work, labelled deadline and arrow. There are no nested buttons. Normal rows use a three-column identity/deadline/arrow grid; small screens place deadline below identity. Attention titles are larger and show explicit urgency/overdue labels, with task action and deadline along the bottom. The inbox grouping policy is surface-specific.
+Each task is one document link containing title, identity, actual work, labelled deadline and arrow. There are no nested buttons. Normal rows use 20px/24px padding and a three-column identity/deadline/arrow grid; small screens place deadline below identity. Attention titles use 19px/600, with 16px identity bottom spacing and 12px above the footer; they show explicit urgency/overdue labels, with task action and deadline along the bottom. The inbox grouping policy is surface-specific.
 
 ### Case selection
 
@@ -215,7 +215,7 @@ Shared keyboard focus is a 2px olive outline with a 3px offset; row focus is ins
 ### Do:
 
 - **Do** preserve butter navigation, warm white surroundings and olive actions.
-- **Do** reserve Lora for identity and use sans-serif for document work.
+- **Do** use Be Vietnam Pro throughout identity and work and preserve the chosen Liền mạch mark.
 - **Do** preserve real state labels, readable titles and explicit deadlines.
 - **Do** preserve accessible collapsed names, drawer focus behavior and reduced motion.
 - **Do** adapt forms and tables consistently without changing business rules.

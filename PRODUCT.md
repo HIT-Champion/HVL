@@ -58,3 +58,5 @@ dashboard, kiểm toán, realtime, hồ sơ và nộp lưu đã có kiểm thử
 - Quyền backend là nguồn quyết định; menu chỉ hỗ trợ định hướng.
 - Trạng thái rỗng, lỗi, quá hạn và tải dữ liệu phải đọc được và có cách tiếp tục.
 - Một hệ component nhất quán cho toàn bộ màn hình nghiệp vụ.
+
+Cập nhật 24/10/2026: giao diện dùng sans nhất quán; mật độ thoáng vừa, ưu tiên đọc từng công việc. Người dùng chọn logo Liền mạch: hai nét nối thành chữ S; dùng cho sidebar, favicon và nhận diện. Giữ Butter nhưng tăng phân biệt nền/chữ và giới hạn vùng đọc.

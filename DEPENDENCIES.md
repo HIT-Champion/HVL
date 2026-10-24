@@ -276,3 +276,9 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
   License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
+
+### Font giao diện Be Vietnam Pro
+
+Các bản Regular/Medium/SemiBold/Bold được lấy từ kho Google Fonts (`ofl/bevietnampro`),
+tác giả Be Vietnam Pro Project Authors, giấy phép OFL-1.1 kèm từng thư mục font.
+Tự phục vụ trong app và theme đăng nhập; không gọi Google Fonts lúc chạy.

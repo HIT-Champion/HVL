@@ -24,21 +24,25 @@
   --pf-v5-global--active-color--100: #555b3f;
   --pf-v5-global--link--Color: #555b3f;
   --pf-v5-global--BackgroundColor--100: #ffffff;
-  --pf-v5-global--BackgroundColor--200: #faf9f4;
-  --pf-v5-global--Color--100: #30342a;
-  --pf-v5-global--FontFamily--sans-serif: 'Segoe UI', system-ui, sans-serif;
+  --pf-v5-global--BackgroundColor--200: #f4f5f1;
+  --pf-v5-global--Color--100: #202820;
+  --pf-v5-global--FontFamily--sans-serif: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
 }
-body, .pf-v5-c-login { background: #faf9f4 !important; color: #30342a; font-family: 'Segoe UI', system-ui, sans-serif; }
+body, .pf-v5-c-login { background: #f4f5f1 !important; color: #202820; font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; }
 .pf-v5-c-login__main { background: #ffffff; border: 1px solid #e2e2d6; border-radius: 14px; box-shadow: none; }
 .pf-v5-c-login__header { color: #555b3f; }
-#kc-header-wrapper { font-family: 'Lora', Georgia, serif; color: #555b3f !important; font-size: 40px; letter-spacing: -.04em; text-transform: none; }
-#kc-page-title { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 28px; font-weight: 500; color: #30342a; }
+#kc-header-wrapper { font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; color: #555b3f !important; font-size: 40px; letter-spacing: -.04em; text-transform: none; }
+#kc-page-title { font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif; font-size: 28px; font-weight: 500; color: #202820; }
 .pf-v5-c-form-control { border-radius: 7px; border-color: #898a79; background: #ffffff; }
 .pf-v5-c-button.pf-m-primary { background: #555b3f; border-radius: 7px; min-height: 42px; }
 a { color: #555b3f; }
 :focus-visible { outline: 2px solid #555b3f; outline-offset: 3px; }
 
-@font-face { font-family:Lora; src:url(../fonts/lora.ttf) format("truetype"); font-weight:400 700; font-display:swap; }
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-Regular.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-Medium.ttf) format("truetype");font-weight:500;font-display:swap}
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-SemiBold.ttf) format("truetype");font-weight:600;font-display:swap}
+@font-face{font-family:"Be Vietnam Pro";src:url(../fonts/be-vietnam-pro/BeVietnamPro-Bold.ttf) format("truetype");font-weight:700;font-display:swap}
+
 
 /* Keep PatternFly's header and focus accents in the same olive as the app. */
 .pf-v5-c-login__main-header { border-top: 2px solid #555b3f; }
@@ -49,3 +53,6 @@ a { color: #555b3f; }
 }
 
 .pf-v5-c-button.pf-m-primary:hover { background:#42492e; }
+
+#kc-header-wrapper{font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px}
+#kc-header-wrapper::before{content:"";display:block;width:40px;height:40px;background:url(../img/signet-symbol.svg) center/contain no-repeat;flex-shrink:0}

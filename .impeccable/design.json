@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-23T15:07:04.880156+00:00",
+  "generatedAt": "2026-10-24T12:00:00+07:00",
   "title": "Design System: Signet Butter office workspace",
   "extensions": {
     "colorMeta": {
@@ -24,7 +24,7 @@
       },
       "ground": {
         "role": "neutral",
-        "displayName": "Warm white canvas"
+        "displayName": "Neutral bright canvas"
       },
       "attention": {
         "role": "warning",
@@ -34,11 +34,11 @@
     "typographyMeta": {
       "wordmark": {
         "displayName": "Identity only",
-        "purpose": "Lora reserved for the Signet identity."
+        "purpose": "25px/700 Be Vietnam Pro wordmark paired with a 32px Liền mạch mark; mark alone when collapsed."
       },
       "row-title": {
         "displayName": "Task title",
-        "purpose": "16px sans for normal tasks."
+        "purpose": "17px/600 sans titles with 64ch maximum, 16px on phones."
       }
     },
     "motion": [
@@ -78,7 +78,35 @@
         "value": "8px 0 30px #30342a14",
         "purpose": "Open mobile navigation only."
       }
-    ]
+    ],
+    "identity": {
+      "selectedOn": "2026-10-24",
+      "name": "Liền mạch",
+      "description": "Two looping strokes suggesting an S and continuity; user selected from three directions.",
+      "markSize": "32px",
+      "wordmark": "Be Vietnam Pro 25px/700",
+      "publicWordmark": "Be Vietnam Pro 26px/700",
+      "authenticationWordmark": "Be Vietnam Pro 40px/700"
+    },
+    "layout": {
+      "workspaceMaxWidth": "1440px",
+      "workspacePadding": "28px 40px 20px",
+      "inboxMaxWidth": "1080px",
+      "density": "Moderately airy; prioritize reading individual tasks.",
+      "taskGroupGap": "24px"
+    },
+    "fontDelivery": {
+      "family": "Be Vietnam Pro",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ],
+      "source": "Self-hosted TTF",
+      "display": "swap",
+      "officeFontSynthesis": "none"
+    }
   },
   "components": [
     {
@@ -87,7 +115,7 @@
       "refersTo": "button-primary",
       "description": "Olive action with a clear keyboard focus.",
       "html": "<button class=\"ds ds-primary\">Soạn mới</button>",
-      "css": ".ds-primary{font:14px \"Segoe UI\",system-ui,sans-serif;background:#555b3f;color:white;border:0;border-radius:8px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background 140ms}.ds-primary:hover{background:#42492e}.ds-primary:active{transform:translateY(1px)}.ds-primary:disabled{background:#ece7df;color:#666a59;cursor:not-allowed}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-primary{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;background:#555b3f;color:white;border:0;border-radius:8px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background 140ms}.ds-primary:hover{background:#42492e}.ds-primary:active{transform:translateY(1px)}.ds-primary:disabled{background:#ece7df;color:#666a59;cursor:not-allowed}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Secondary action",
@@ -95,7 +123,7 @@
       "refersTo": "button-secondary",
       "description": "White button for a secondary action.",
       "html": "<button class=\"ds ds-secondary\">Thử lại</button>",
-      "css": ".ds-secondary{font:14px \"Segoe UI\",system-ui,sans-serif;background:white;color:#363d2c;border:1px solid #aaa995;border-radius:8px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background 140ms}.ds-secondary:hover{background:#faf8f4}.ds-secondary:active{transform:translateY(1px)}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-secondary{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;background:white;color:#363d2c;border:1px solid #aaa995;border-radius:8px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background 140ms}.ds-secondary:hover{background:#faf8f4}.ds-secondary:active{transform:translateY(1px)}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Quiet action",
@@ -103,7 +131,7 @@
       "refersTo": "button-ghost",
       "description": "Muted tertiary control.",
       "html": "<button class=\"ds ds-ghost\">Làm mới</button>",
-      "css": ".ds-ghost{font:14px \"Segoe UI\",system-ui,sans-serif;color:#555b48;border:0;background:transparent;border-radius:8px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background 140ms}.ds-ghost:hover{background:#efeee3}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-ghost{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;color:#555b48;border:0;background:transparent;border-radius:8px;padding:8px 14px;min-height:44px;cursor:pointer;transition:background 140ms}.ds-ghost:hover{background:#efeee3}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Text field",
@@ -111,7 +139,7 @@
       "refersTo": "input",
       "description": "44px white field with an olive focus boundary.",
       "html": "<label class=\"ds-field-label\">Tên văn bản<input class=\"ds ds-field\" placeholder=\"Nhập tên văn bản\"></label>",
-      "css": ".ds-field-label{font:14px \"Segoe UI\",system-ui,sans-serif;display:block;color:#454b39}.ds-field{font:14px \"Segoe UI\",system-ui,sans-serif;display:block;margin-top:8px;min-height:44px;background:white;color:#30342a;border:1px solid #898a79;border-radius:8px;padding:8px 12px}.ds-field::placeholder{color:#666a59}.ds-field:focus{border-color:#666d4c}.ds-field:disabled{background:#efeee3}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-field-label{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;display:block;color:#454b39}.ds-field{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;display:block;margin-top:8px;min-height:44px;background:white;color:#202820;border:1px solid #898a79;border-radius:8px;padding:8px 12px}.ds-field::placeholder{color:#666a59}.ds-field:focus{border-color:#666d4c}.ds-field:disabled{background:#efeee3}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Sidebar destination",
@@ -119,7 +147,7 @@
       "refersTo": "navigation",
       "description": "Near-white active state on the butter sidebar.",
       "html": "<nav class=\"ds-nav\"><a class=\"ds ds-nav-link\" href=\"#\" aria-current=\"page\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><path d=\"M4 5h16v14H4zM4 12h4l2 3h4l2-3h4\"/></svg>Hộp việc</a><a class=\"ds ds-nav-link\" href=\"#\">Văn bản đến</a></nav>",
-      "css": ".ds-nav{font:14px \"Segoe UI\",system-ui,sans-serif;background:#f2ebd4;padding:14px;border:1px solid #e7dfc3;border-radius:12px;width:228px}.ds-nav-link{display:flex;align-items:center;gap:11px;min-height:44px;color:#424734;padding:11px 13px;border-radius:8px;text-decoration:none;transition:background 140ms}.ds-nav-link[aria-current]{background:#fffdf5;color:#303722;font-weight:600}.ds-nav-link:hover{background:#eae2c8}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-nav{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;background:#eee3bc;padding:14px;border:1px solid #e0d3a5;border-radius:12px;width:228px}.ds-nav-link{display:flex;align-items:center;gap:11px;min-height:44px;color:#424734;padding:11px 13px;border-radius:8px;text-decoration:none;transition:background 140ms}.ds-nav-link[aria-current]{background:#fffdf5;color:#303722;font-weight:600}.ds-nav-link:hover{background:#eae2c8}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Urgency label",
@@ -127,7 +155,7 @@
       "refersTo": "chip",
       "description": "Text remains explicit; the background is not the only code.",
       "html": "<span class=\"ds-chip\">Khẩn</span>",
-      "css": ".ds-chip{font:14px \"Segoe UI\",system-ui,sans-serif;font-size:12px;font-weight:500;color:#664717;background:#ead4a3;box-shadow:0 0 0 1px #bfa46b;border-radius:4px;padding:2px 8px;white-space:nowrap}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-chip{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;font-size:12px;font-weight:500;color:#664717;background:#ead4a3;box-shadow:0 0 0 1px #bfa46b;border-radius:4px;padding:2px 8px;white-space:nowrap}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Work surface",
@@ -135,15 +163,15 @@
       "refersTo": "card",
       "description": "White surface with a quiet boundary and 12px corners.",
       "html": "<section class=\"ds-panel\">Hồ sơ công việc</section>",
-      "css": ".ds-panel{font:14px \"Segoe UI\",system-ui,sans-serif;background:white;color:#30342a;border:1px solid #e2e2d6;border-radius:12px;padding:24px}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-panel{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;background:white;color:#202820;border:1px solid #d9ddd4;border-radius:12px;padding:24px}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Attention surface",
       "kind": "custom",
       "refersTo": "attention-card",
-      "description": "Warm attention surface without decorative metrics.",
+      "description": "Near-white attention paper with an ochre boundary; actual urgent or overdue work only.",
       "html": "<section class=\"ds-attention\"><h2>Cần chú ý</h2><p>Văn bản được giao xử lý</p><a class=\"ds\" href=\"#\">Xử lý văn bản →</a></section>",
-      "css": ".ds-attention{font:14px \"Segoe UI\",system-ui,sans-serif;background:#f6eedc;color:#30342a;border:1px solid #d5c396;border-radius:12px;padding:22px 24px}.ds-attention h2{font-size:16px;margin:0 0 16px;font-weight:600}.ds-attention p{font-size:16px}.ds-attention a{color:#555b3f;display:inline-block;min-height:44px;padding-top:12px;text-underline-offset:3px}.ds-attention a:hover{color:#303722}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-attention{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;background:#fffdf6;color:#202820;border:1px solid #cbb57a;border-radius:12px;padding:20px 24px}.ds-attention h2{font-size:16px;margin:0 0 16px;font-weight:600}.ds-attention p{font-size:16px}.ds-attention a{color:#555b3f;display:inline-block;min-height:44px;padding-top:12px;text-underline-offset:3px}.ds-attention a:hover{color:#303722}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     },
     {
       "name": "Case selector",
@@ -151,15 +179,15 @@
       "refersTo": "navigation",
       "description": "Selected case is explicit and left aligned.",
       "html": "<button class=\"ds ds-case\" aria-pressed=\"true\"><small>HS-2026 · 2026</small><strong>Hồ sơ công việc</strong><span>Đang lập</span></button>",
-      "css": ".ds-case{font:14px \"Segoe UI\",system-ui,sans-serif;display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #e2e2d6;border-radius:8px;padding:18px 16px;color:#30342a;cursor:pointer;background:white;transition:background 140ms}.ds-case[aria-pressed=true]{background:#f2ebd4}.ds-case:hover{background:#f7f8f1}.ds-case small,.ds-case span{display:block;font-size:13px;color:#666a59}.ds-case strong{display:block;font-size:16px;line-height:1.5;margin:6px 0 7px}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
+      "css": ".ds-case{font:14px \"Be Vietnam Pro\",\"Segoe UI\",system-ui,sans-serif;display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #e2e2d6;border-radius:8px;padding:18px 16px;color:#30342a;cursor:pointer;background:white;transition:background 140ms}.ds-case[aria-pressed=true]{background:#f2ebd4}.ds-case:hover{background:#f7f8f1}.ds-case small,.ds-case span{display:block;font-size:13px;color:#515b50}.ds-case strong{display:block;font-size:16px;line-height:1.5;margin:6px 0 7px}.ds:focus-visible{outline:2px solid #666d4c;outline-offset:3px}"
     }
   ],
   "narrative": {
     "northStar": "Butter operational workspace",
-    "overview": "Butter places warm yellow navigation beside a bright work canvas and white content. Dark olive actions and clear sans-serif reading text keep the interface practical. Lora supplies a modest vintage cue through identity alone.\n\nThis records the implemented local Butter system selected by the user after the interactive reroll. It replaces the prior wine system. It describes the implemented source; selecting the direction does not imply acceptance of every resulting screen. Surface composition belongs in its surface brief.",
+    "overview": "Butter navigation sits beside a neutral bright canvas, white work surfaces, stronger ink and olive actions. On 24/10/2026 the user chose moderately airy reading density and selected the Liền mạch S mark from three logo directions. Be Vietnam Pro carries identity and interface. This refines Butter; it does not imply final screen acceptance.",
     "keyCharacteristics": [
-      "Butter navigation, warm white canvas and olive actions.",
-      "Lora identity with sans-serif document work.",
+      "Butter navigation, neutral bright canvas and olive actions.",
+      "Liền mạch S mark and Be Vietnam Pro throughout identity and document work.",
       "Readable titles, labelled deadlines and real business state.",
       "Flat surfaces distinguished by tone, thin boundaries and space.",
       "Collapsible navigation with deliberate, reducible motion."
@@ -167,7 +195,7 @@
     "rules": [],
     "dos": [
       "Do preserve butter navigation, warm white surroundings and olive actions.",
-      "Do reserve Lora for identity and use sans-serif for document work.",
+      "Do use Be Vietnam Pro throughout identity and work and preserve the chosen Liền mạch mark.",
       "Do preserve real state labels, readable titles and explicit deadlines.",
       "Do preserve accessible collapsed names, drawer focus behavior and reduced motion.",
       "Do adapt forms and tables consistently without changing business rules."
