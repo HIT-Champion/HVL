@@ -120,6 +120,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   không thêm, không nâng gói nào. Trivy 0.75.0 quét lại image dựng mới (23/10/2026): lỗ hổng HIGH/CRITICAL có bản sửa
   của mỗi image từ 5 (1 CRITICAL, 4 HIGH) còn 0, phần Python không còn lỗ hổng nào; HIGH/CRITICAL còn lại đều là gói
   Debian chưa có bản sửa.
+- Nâng pypdf 6.21.1 → 6.21.2 trong `svc-files` (GHSA-6c7f-9265-g8fw, GHSA-gmh7-3g9r-mjh5, GHSA-jr96-gvgh-j3r4,
+  HIGH: PDF tải lên dị dạng làm bước đọc chữ chạy rất lâu); gói kéo theo của `apps/office`: serialize-javascript
+  7.1.2 → 7.1.3 (GHSA-m5mm-p8h7-m29v), fast-uri 3.1.8 → 3.1.9 (chỉ lúc dựng, bốn GHSA). Ngoại lệ vá bảo mật ghi ở
+  `DEPENDENCIES.md`.
 
 ## [1.0.0] - 2026-10-23
 
