@@ -160,7 +160,7 @@ container: không gắn socket Docker vào container nào). Mỗi lượt:
 
 ```bash
 # trên máy chủ, đã make install PREFIX=/opt/moc; người vận hành moc thuộc nhóm docker
-git clone -b deploy https://github.com/HIT-Champion/HVL.git /opt/moc-src
+git clone -b deploy https://github.com/HIT-Champion/Signet.git /opt/moc-src
 echo "MOC_GITOPS_DIR=/opt/moc-src" >> /opt/moc/.env
 python3 /opt/moc/scripts/reconcile.py          # thử một lượt
 sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl enable --now moc-reconcile.timer

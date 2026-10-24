@@ -42,7 +42,7 @@
 
 | Hạng mục | Thực tế | Đánh giá |
 |---|---|---|
-| Kho mã | `github.com/HIT-Champion/HVL`, **công khai**, Issues đã bật | Đạt điều kiện cần của tiêu chí #1 |
+| Kho mã | `github.com/HIT-Champion/Signet`, **công khai**, Issues đã bật | Đạt điều kiện cần của tiêu chí #1 |
 | Lịch sử | **1 commit** (15/06/2026), 1 nhánh làm việc `hoangnh/docs/brief`, 0 tag, 0 release, 0 issue | Rủi ro −5 ở #1 và −5 ở #3 nếu không đổi |
 | Giấy phép | `LICENSE` toàn văn Apache-2.0, `NOTICE` có mục đích giấy phép, `scripts/license-header.sh check` **sạch** trên toàn bộ tệp | Đạt #2 ở mức khung |
 | Build | `Makefile` gọi `docker compose --profile all build` nhưng `docker-compose.yml` chỉ có 1 dịch vụ `postgres` dùng `image:`; không có `build:` nào | `make build` hiện **không build gì**; chưa chứng minh được #4 |

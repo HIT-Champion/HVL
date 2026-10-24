@@ -12,7 +12,7 @@ pull request hay thảo luận công khai về nó.
 | `develop` (chưa phát hành) | ✅ — bản vá gộp vào đây, bản đã phát hành nhận qua [bản vá nóng](docs/git_flow.md#6-phát-hành) |
 | Các bản cũ hơn (0.1.0) | ❌ — hãy nâng lên bản mới nhất |
 
-Danh sách bản phát hành: [trang Releases](https://github.com/HIT-Champion/HVL/releases); thay đổi của từng bản:
+Danh sách bản phát hành: [trang Releases](https://github.com/HIT-Champion/Signet/releases); thay đổi của từng bản:
 [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Cách báo lỗ hổng
@@ -20,7 +20,7 @@ Danh sách bản phát hành: [trang Releases](https://github.com/HIT-Champion/H
 Dùng tính năng báo lỗ hổng riêng tư của GitHub (*private vulnerability reporting*):
 
 1. Mở tab **Security** của kho → **Report a vulnerability**, hoặc vào thẳng
-   <https://github.com/HIT-Champion/HVL/security/advisories/new>.
+   <https://github.com/HIT-Champion/Signet/security/advisories/new>.
 2. Điền mẫu báo cáo. Chỉ bạn và nhóm duy trì đọc được; mọi trao đổi tiếp theo diễn ra ngay trong báo cáo đó.
 
 Không thấy nút **Report a vulnerability** nghĩa là tính năng chưa được bật — người quản trị kho bật trong Settings →

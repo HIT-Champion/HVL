@@ -72,6 +72,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Cách đo: [`docs/so-lieu-sau.md`](docs/so-lieu-sau.md). Test db +30, office +21, scripts +16.
 
 ### Đã sửa đổi
+- Repo đổi tên `HIT-Champion/HVL` → `HIT-Champion/Signet` (#112): đường dẫn trong hướng dẫn đóng góp, chính sách
+  bảo mật, mẫu issue, tài liệu triển khai, vận hành, quy trình nhánh, `scripts/release_body.py` và producer của sự
+  kiện OpenLineage; lệnh `cd HVL` sau khi clone thành `cd Signet`. GitHub vẫn chuyển hướng đường dẫn cũ.
 - CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và
   các màn lõi; màn AI, nộp lưu, ký số, sao lưu và khôi phục; cài đặt và GitOps), phần nào cũng tự dựng và nạp
   mẫu — khoảng 27 phút còn khoảng 12 phút, vẫn chạy đủ mọi bước. PR chỉ đổi tài liệu (`*.md`, ảnh trong `docs/`,

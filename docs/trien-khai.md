@@ -67,8 +67,8 @@ Máy 8 GB nên thêm 4 GB swap cho lần dựng image đầu tiên:
 Từ đây chạy bằng người dùng `moc` (`sudo -iu moc`).
 
 ```bash
-git clone https://github.com/HIT-Champion/HVL.git ~/HVL
-cd ~/HVL
+git clone https://github.com/HIT-Champion/Signet.git ~/Signet
+cd ~/Signet
 make env          # sinh .env, mọi mật khẩu ngẫu nhiên
 ```
 
@@ -102,7 +102,7 @@ make check
 ## 4. Cài và chạy
 
 ```bash
-cd ~/HVL
+cd ~/Signet
 make install PREFIX=/opt/moc                    # dựng image của đội (lần đầu lâu), chép sang /opt/moc
 cd /opt/moc
 docker compose up -d --wait --wait-timeout 900  # lần đầu ClamAV tải chữ ký, vài phút
@@ -223,15 +223,15 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 **Tự phục hồi và GitOps** (tùy chọn): [`van-hanh.md`](van-hanh.md) mục "GitOps và tự phục hồi" — systemd timer
 `platform/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
-`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/HVL`.
+`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`.
 
 **Nâng cấp tay** (không dùng GitOps):
 
 ```bash
 cd /opt/moc && python3 scripts/moc.py backup create     # sao lưu trước
-cd ~/HVL && git pull
+cd ~/Signet && git pull
 cd /opt/moc && docker compose down
-cd ~/HVL && make install PREFIX=/opt/moc         # giữ .env của bản cài, chỉ đổi MOC_VERSION
+cd ~/Signet && make install PREFIX=/opt/moc         # giữ .env của bản cài, chỉ đổi MOC_VERSION
 cd /opt/moc && docker compose up -d --wait --wait-timeout 900
 ```
 

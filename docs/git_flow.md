@@ -409,7 +409,7 @@ git verify-commit HEAD                            # thấy Good "git" signature 
   mặc định, PR vào nhánh khác không nối, không đóng được issue. Giám khảo clone nhánh mặc định: ruleset giữ
   `develop` luôn xanh CI, và lúc chấm `develop` cùng nội dung với `main` (mục 8).
 - **Ruleset** (Settings → Rules → Rulesets), khai sẵn trong `.github/rulesets/`, tạo bằng
-  `gh api -X POST repos/HIT-Champion/HVL/rulesets --input .github/rulesets/<tệp>.json`:
+  `gh api -X POST repos/HIT-Champion/Signet/rulesets --input .github/rulesets/<tệp>.json`:
   - `develop.json` — nhánh `develop`: bắt buộc PR, 1 duyệt, 8 job CI xanh (mục 5.4); chỉ squash hoặc
     merge commit; cấm force push, cấm xóa;
   - `main.json` — nhánh `main`: như trên nhưng chỉ merge commit; job "Quy trình nhánh và tiêu đề PR"
@@ -422,13 +422,13 @@ git verify-commit HEAD                            # thấy Good "git" signature 
   - nội dung commit mặc định của cả hai lấy tiêu đề + mô tả PR;
   - bật *Automatically delete head branches*;
   - bằng lệnh: `gh repo edit --enable-merge-commit --enable-squash-merge --enable-rebase-merge=false
-    --delete-branch-on-merge`, rồi `gh api -X PATCH repos/HIT-Champion/HVL -f merge_commit_title=PR_TITLE
+    --delete-branch-on-merge`, rồi `gh api -X PATCH repos/HIT-Champion/Signet -f merge_commit_title=PR_TITLE
     -f merge_commit_message=PR_BODY -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY`.
 - **Code security** (Settings → Code security): bật *Secret scanning* và *Push protection* (miễn phí với repo
   công khai), chặn từ lúc push thay vì đợi job gitleaks của CI; bật *Private vulnerability reporting* để người ngoài
   báo lỗ hổng riêng tư theo `SECURITY.md` — bằng lệnh:
-  `gh api -X PUT repos/HIT-Champion/HVL/private-vulnerability-reporting`; kiểm:
-  `gh api repos/HIT-Champion/HVL/private-vulnerability-reporting` trả `{"enabled": true}`.
+  `gh api -X PUT repos/HIT-Champion/Signet/private-vulnerability-reporting`; kiểm:
+  `gh api repos/HIT-Champion/Signet/private-vulnerability-reporting` trả `{"enabled": true}`.
 - **Issues**:
   - bật Issues;
   - tạo nhãn `backend`, `ai`, `frontend`, `bug`, `feature`, `docs`, `good first issue`;
