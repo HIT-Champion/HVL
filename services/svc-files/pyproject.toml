@@ -34,7 +34,7 @@ dependencies = [
   "weasyprint>=70,<71",
   "duckdb==1.5.6",
   "segno>=1.6,<2",
-  "pypdf>=6.21.1,<7",  # 6.21.1: vá GHSA-39mj, -5hx5, -7mh2, -9mx8, -qfv9 (OSV 22/10)
+  "pypdf>=6.21.2,<7",  # 6.21.2 vá GHSA-6c7f, -gmh7, -jr96 (OSV 24/10); 6.21.1 vá 5 GHSA (OSV 22/10)
   "pyhanko==0.37.0",    # ký số PAdES văn bản đi (F4.5, chỉ minh họa)
   "pillow>=13,<14",     # OCR (F4.1): mở, xoay, thu ảnh trước khi gửi tesseract — trước đây chỉ có gián tiếp qua WeasyPrint
 ]

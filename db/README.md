@@ -41,6 +41,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Nộp lưu không làm mất số liệu (migration `1792281602300_archived_stats`): bảng `office.archived_document_facts` (lúc xong, tệp bản chính của văn bản nộp lưu) ghi trong `office.archive_case_file` trước khi gỡ dòng thời gian, liên kết tệp; `v_processing_time`, `v_intake_accuracy` dùng bản giữ lại khi dòng sống không còn; văn bản nộp lưu trước đó điền lại từ sổ kiểm toán. Sổ không lộ danh sách được xem (migration `1792281602400_audit_acl_rows`): xem mục Sổ kiểm toán | **Xong** — 2 test (đã tính ở hai dòng Hồ sơ, Văn bản hạn chế) |
 | Không gian cá nhân P.A.R.A — ứng dụng thứ hai trên lõi (`apps/ca-nhan`, migration `1792281602500_personal_space`, [`docs/them-ung-dung.md`](../docs/them-ung-dung.md)): schema riêng `personal`, không sửa `core`; bảng `personal.items` (tệp nào của ai ở thư mục nào trong bốn thư mục `projects`, `areas`, `resources`, `archives` — ràng buộc `items_para`); thuê ước, chủ do Hasura đặt từ token, mỗi người chỉ thấy, chỉ chuyển mục của mình, chỉ đổi được thư mục, không ai xóa; trigger `items_guard` chỉ cho xếp tệp chính mình tải lên, không mã hóa, cùng đơn vị (cả khi ghi thẳng CSDL); khóa ngoại kèm thuê ước tới `core.files`; sổ kiểm toán qua `core.audit('file_id')` có sẵn — `overview` chỉ giữ `file_id`, không lộ tên thư mục; clerk, staff, manager, director có không gian, `tenant_admin` không (không đọc `core.files`) | **Xong** — 11 test |
 | Thông báo đa kênh (migration `1792281602600_notification_deliveries`): cột `core.notifications.channels` (kênh ngoài svc-workflow khai lúc ghi: `email`, `webhook`); hộp thư đi `core.notification_deliveries` — trigger `notifications_deliveries` tạo một dòng `pending` cho mỗi kênh trong giao dịch ghi thông báo, gọi lại cùng khóa không thêm dòng; chỉ `service` của đơn vị đọc và ghi kết quả (không thêm, không xóa, không đổi kênh), không vai trò người dùng nào đọc; không lưu địa chỉ, URL, nội dung; `sent` phải có `sent_at`; gắn sổ kiểm toán | **Xong** — 6 test |
+| Góp ý và số đo "sau" (F4.6, migration `1792281602700_feedback`, `1792281602750_success_metrics`, [`docs/so-lieu-sau.md`](../docs/so-lieu-sau.md)): bảng `office.feedback` (mức 1–5, nội dung ≤ 500 ký tự, khuôn đường dẫn màn hình — ràng buộc `feedback_rating`, `feedback_comment`, `feedback_screen`); trigger `feedback_guard` — gọt khoảng trắng, giờ gửi do CSDL đặt, chặn gửi dồn 3 góp ý mỗi 10 phút, 20 mỗi 24 giờ (lỗi `feedback_rate:`), kể cả gửi song song; trường `mine`; **không gắn sổ kiểm toán** (có chủ ý, xem Vai trò). Cột `core.tenants.sample_data` (đơn vị mẫu của `make seed`); view `office.v_time_to_assign`, `v_overdue_rate`, `v_feedback_summary` — chỉ số đếm, số giờ, văn bản hạn chế không tính | **Xong** — 30 test (`test_feedback.py` 22, `test_success_metrics.py` 8) |
 | Lô nạp khối lớn (cụm ⑤, migration `1792281602800_import_jobs`): `core.import_jobs` (một lô: loại — hiện chỉ `incoming`, người tạo, phòng, định dạng, băm tệp dữ liệu và zip, `Idempotency-Key` duy nhất theo đơn vị và người tạo, `run_after` cho vòng nền, số đếm chụp lúc đóng — ràng buộc tổng khớp khi `done`), `core.import_rows` (một dòng của tệp: dữ liệu chỉ giữ khi còn chờ, `attempts` 0–20, `claimed_until` và `claim_id` — vòng nền giữ dòng khi đang làm, vòng đã mất dòng không ghi được, kết quả, mã lỗi khi `failed`; khóa ngoại kèm thuê ước, xóa lô thì xóa theo); chỉ `service` của đơn vị đọc, ghi, không vai trò người dùng nào có quyền; không gắn trigger `core.audit()` — `svc-files` ghi `import.created` cùng mutation tạo lô, trigger `import_jobs_finished` ghi `import.finished` đúng một lần khi lô chuyển sang `done` (hai vòng cùng đóng vẫn một dòng); `core.audit_overview` cho thấy loại lô, định dạng, có vào sổ không, số dòng, không thấy tên tệp | **Xong** — 40 test |
 
 ## Vai trò
@@ -63,6 +64,13 @@ trường `visible` của `office_documents`; tệp, giao việc, dòng thời g
 
 Liên thông (F3.12): dòng `office.dispatches` hiện ở bên gửi khi đọc được văn bản đi, ở bên nhận khi đã có văn bản
 đến và đọc được nó; quan hệ sang văn bản của bên kia trả null, chỉ có tên đơn vị kia (`to_unit` / `from_unit`).
+
+Góp ý (F4.6): mọi vai trò người dùng gửi được, chỉ ba cột `rating`, `comment`, `screen` — `tenant_id`, `user_id`
+Hasura đặt từ token. `clerk`, `staff`, `manager` chỉ đọc góp ý của mình; `director`, `tenant_admin` đọc mọi góp ý
+của đơn vị và tổng hợp nhưng không có cột `user_id`; trường `mine` cho mỗi người lọc góp ý của chính mình. Không ai
+sửa, xóa; `service`, `agent` không có quyền. Bảng không gắn `core.audit()` — ngoại lệ có chủ ý: dòng sổ ghi người
+thực hiện, lãnh đạo đọc sổ của đơn vị qua `overview` sẽ biết ai góp ý gì. Ba view số đo "sau" chỉ `director` đọc
+(`v_feedback_summary` thêm `tenant_admin`).
 
 > ⚠️ **Không bao giờ để vai trò `admin` lọt vào token.** `admin` là vai trò có sẵn của Hasura và bỏ qua
 > mọi quyền — đã thử: token có `x-hasura-default-role: admin` đọc được văn bản và sổ kiểm toán của **mọi**
@@ -163,7 +171,7 @@ với mã yêu cầu `<lô>:<dòng>`.
    (`date +%s%3N` cho số phiên bản). **Không sửa migration đã merge** — viết migration mới.
 2. Bảng mới: thêm tệp `metadata/databases/default/tables/<schema>_<bảng>.yaml` và một dòng trong
    `tables.yaml`. Bảng nghiệp vụ có `tenant_id` thì mọi quyền đều lọc `tenant_id = X-Hasura-Tenant-Id`, và
-   gắn `core.audit()`.
+   gắn `core.audit()` (không gắn thì ghi lý do trong migration, như `office.feedback`).
 3. Đặt tên cho ràng buộc `check` (vd `documents_in_identity`): Hasura trả tên này trong lỗi, svc-workflow và
    giao diện dịch thành câu tiếng Việt. Ràng buộc cho dữ liệu người dùng nhập theo form phải khớp schema ở
    `schemas/` (xem `schemas/README.md`), kèm ca thử trong `schemas/*.cases.json`.
