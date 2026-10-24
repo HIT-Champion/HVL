@@ -79,7 +79,7 @@ METADATA = f"{STATE}/hasura-metadata"
 HASURA_ENV = f"{STATE}/hasura.env"
 CORE_GATEWAY = "platform/apisix/apisix.yaml"
 CORE_METADATA = "db/metadata"
-SCHEMA = "schemas/app-manifest.json"
+SCHEMA = "scripts/app-manifest.schema.json"
 FORMAT = 1                                   # định dạng bản ghi .moc-apps/apps/<tên>.json
 
 # Danh sách trắng sự kiện của lõi: PHẢI trùng mảng trong core.app_events_publish() (migration 1792281603200; test kiểm)
@@ -144,8 +144,8 @@ _TYPES: dict[str, Callable[[Any], bool]] = {
 
 
 def schema_errors(value: Any, schema: dict[str, Any], root: dict[str, Any], where: str = "") -> list[str]:
-    """Lỗi của value theo schema — chỉ các từ khóa trong SCHEMA_KEYWORDS (test kiểm schemas/app-manifest.json không
-    dùng từ khóa nào khác). where: đường tới giá trị, vd `events.kinds[0]`."""
+    """Lỗi của value theo schema — chỉ các từ khóa trong SCHEMA_KEYWORDS (test kiểm scripts/app-manifest.schema.json
+    không dùng từ khóa nào khác). where: đường tới giá trị, vd `events.kinds[0]`."""
     here = where or "(gốc)"
     if "$ref" in schema:
         ref = schema["$ref"]

@@ -623,7 +623,7 @@ def fake_system(root: pathlib.Path) -> Any:
 class Flow(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = pathlib.Path(tempfile.mkdtemp())
-        for rel in ("platform/apisix/apisix.yaml", "db/metadata", "schemas/app-manifest.json",
+        for rel in ("platform/apisix/apisix.yaml", "db/metadata", "scripts/app-manifest.schema.json",
                     "platform/keycloak/realm/moc-realm.json"):
             src, dst = REPO / rel, self.tmp / rel
             dst.parent.mkdir(parents=True, exist_ok=True)

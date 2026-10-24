@@ -63,7 +63,8 @@ create trigger audit after insert or update or delete on core.app_migrations
 -- cứu, băm, ý kiến chỉ đạo…), không người làm. Văn bản hạn chế không lộ cả sự tồn tại. Ứng dụng muốn biết thêm thì hỏi
 -- GraphQL bằng token của người dùng — Hasura xét quyền như mọi lần đọc khác. Mỗi ứng dụng khai `events` trong manifest
 -- có một Hasura Event Trigger trên bảng này (metadata do moc app sinh); Hasura tự gửi lại khi webhook lỗi.
--- Danh sách loại phải trùng EVENT_KINDS trong scripts/ung_dung.py và enum trong schemas/app-manifest.json (test kiểm).
+-- Danh sách loại phải trùng EVENT_KINDS trong scripts/ung_dung.py và enum trong scripts/app-manifest.schema.json
+-- (test kiểm).
 -- Hasura gửi thân sự kiện chuẩn của nó, có session_variables lấy từ biến hasura.user của giao dịch (người làm việc):
 -- hàm chép đặt hasura.user = 'null' trong lúc ghi core.app_events (mệnh đề SET của hàm, tự trả lại khi hàm xong), nên
 -- ứng dụng nhận session_variables null — không biết ai đã làm.

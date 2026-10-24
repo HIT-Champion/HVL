@@ -29,8 +29,8 @@ lệnh báo đúng bước (`✗ bước 5/8 (Keycloak): …`) và cách chạy 
 
 ### 1.1. Manifest
 
-Cấu trúc đầy đủ: [`schemas/app-manifest.json`](../schemas/app-manifest.json) (JSON Schema 2020-12). Lệnh kiểm
-toàn bộ trước bước đầu tiên và in mọi lỗi một lượt. Đọc bằng bộ đọc YAML thư viện chuẩn (`scripts/yaml_nho.py`,
+Cấu trúc đầy đủ: [`scripts/app-manifest.schema.json`](../scripts/app-manifest.schema.json) (JSON Schema 2020-12). Lệnh
+kiểm toàn bộ trước bước đầu tiên và in mọi lỗi một lượt. Đọc bằng bộ đọc YAML thư viện chuẩn (`scripts/yaml_nho.py`,
 không cần PyYAML trong thư mục cài): không nhận chuỗi nhiều dòng `|` `>`, thẻ `!`, `yes`/`no` không nháy.
 
 | Khóa | Nghĩa | Lõi kiểm thêm |

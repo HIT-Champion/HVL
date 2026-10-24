@@ -43,7 +43,7 @@ RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/sm
          scripts/realm_clients.py scripts/demo_ca_nhan.py
          seed services/ot-sensor/sensor.py
          platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
-         scripts/ung_dung.py scripts/yaml_nho.py schemas/app-manifest.json)
+         scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 

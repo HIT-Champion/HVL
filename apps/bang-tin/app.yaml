@@ -16,8 +16,8 @@
 
 # Bảng tin đơn vị — ứng dụng thứ ba, cắm vào lõi bằng MỘT lệnh, không sửa tệp nào ngoài thư mục này:
 #   python3 scripts/moc.py app install apps/bang-tin/app.yaml     (make app-install APP=apps/bang-tin/app.yaml)
-# Cấu trúc tệp: schemas/app-manifest.json; cách làm và giới hạn: docs/them-ung-dung.md mục 1. Không có bí mật ở đây:
-# header webhook và client secret do lệnh sinh lúc cài (.moc-apps/bang-tin.env).
+# Cấu trúc tệp: scripts/app-manifest.schema.json; cách làm và giới hạn: docs/them-ung-dung.md mục 1. Không có bí mật
+# ở đây: header webhook và client secret do lệnh sinh lúc cài (.moc-apps/bang-tin.env).
 
 name: bang-tin
 title: Bảng tin đơn vị

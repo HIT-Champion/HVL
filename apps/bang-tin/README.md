@@ -14,7 +14,7 @@ tin cậy và giới hạn: [`docs/them-ung-dung.md`](../../docs/them-ung-dung.m
 
 | Tệp | Nội dung |
 |---|---|
-| `app.yaml` | Manifest (`schemas/app-manifest.json`): đường `/bang-tin`, image dựng từ thư mục này, schema `bang_tin`, quyền Hasura, danh tính dịch vụ, sự kiện nghe |
+| `app.yaml` | Manifest (`scripts/app-manifest.schema.json`): đường `/bang-tin`, image dựng từ thư mục này, schema `bang_tin`, quyền Hasura, danh tính dịch vụ, sự kiện nghe |
 | `migrations/0001_tin/up.sql` | Bảng `bang_tin.tin`, chạy bằng vai trò CSDL riêng `moc_appdb_bang_tin` (chỉ làm chủ schema `bang_tin`) |
 | `server.py` | Python thư viện chuẩn, không root: trang tĩnh ở `:8080` (CSP `script-src 'self'`, nhật ký không ghi chuỗi truy vấn); webhook `POST /su-kien` ở `:8081` (chỉ trong mạng nội bộ, kiểm header bí mật, trùng là đã ghi, lỗi → 503 để Hasura gửi lại) |
 | `public/` | Trang duy nhất; `auth.js` đăng nhập Authorization Code + PKCE (oidc-client-ts, `response_mode=fragment`), `tin.js` câu GraphQL và phần không đụng trình duyệt, `app.js` vẽ danh sách bằng `textContent` |
