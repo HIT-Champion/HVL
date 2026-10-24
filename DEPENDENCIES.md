@@ -201,13 +201,15 @@ trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 | cloudflared | 2026.10.0 | Apache-2.0 | Cloudflare Tunnel (F1.9, profile `tunnel`, tùy chọn): máy không có IP công khai ra Internet có HTTPS mà không mở cổng — gọi ra Cloudflare, chuyển yêu cầu vào APISIX qua mạng Docker; token để ngoài repo | `cloudflare/cloudflared:2026.10.0` (image 05/10/2026) | 1 |
 | Mailpit | v1.31.4 | MIT | Hộp thư thử cho thông báo email của `svc-workflow` (profile `mail`, chỉ để demo, kiểm thử): nhận mọi thư qua SMTP trong mạng Docker, không chuyển tiếp ra ngoài, giao diện web chỉ nghe 127.0.0.1; không hỏi bản mới. Cài thật thì gửi qua máy chủ thư của đơn vị | `axllent/mailpit:v1.31.4`, ghim digest (image 03/10/2026) | 4 |
 | restic | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
-| Vector | 0.59.0 | MPL-2.0 | Thu gom log *(Could)* | `timberio/vector:0.59.0-debian` | 3 |
-| Parseable | 3.2 | AGPL-3.0 | Lưu và tra cứu log *(Could)* | `parseable/parseable` (ghim thẻ khi đưa vào) | 3 |
+| Vector | 0.59.0 | MPL-2.0 | Thu log của 5 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
+| Parseable | 3.2.4 | AGPL-3.0 | Lưu và tra log tập trung (F3.14, profile `logs`): dịch vụ độc lập, chỉ nghe 127.0.0.1, chạy root nhưng bỏ mọi capability, basic auth (mật khẩu rỗng thì không mở cổng), giữ `MOC_LOGS_RETENTION_DAYS` ngày, tắt kiểm bản mới và gửi số liệu sử dụng | `quay.io/parseablehq/parseable:v3.2.4`, ghim digest (image 02/10/2026) | 3 |
 | Coraza | 3.8 | Apache-2.0 | Tường lửa ứng dụng web tại gateway *(Could)* | Plugin proxy-wasm cho APISIX | 3 |
 
 **Ghi chú:**
 
 - Grafana: chỉ dùng `grafana/grafana` (AGPL-3.0). `grafana/grafana-enterprise` là bản độc quyền.
+- Parseable: bản 3.x chỉ phát hành trên Quay (`quay.io/parseablehq/parseable`); `parseable/parseable` trên Docker Hub
+  dừng ở 2.8.0 (29/05/2026).
 - Marquez: bản phát hành gần nhất là 0.51.1 (03/2025), mã nguồn vẫn có commit năm 2026 nhưng nhịp chậm.
   Theo dõi trong Phase 3; nếu gặp lỗi chặn thì chuyển sang chỉ lưu sự kiện OpenLineage vào PostgreSQL. F3.9 đã làm
   theo hướng đó (`core.lineage_events`): tránh thêm máy chủ Java và CSDL riêng (~1 GB RAM) cho một job mỗi giờ.

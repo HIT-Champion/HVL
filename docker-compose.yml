@@ -25,6 +25,7 @@
 #   profile app  — Tầng 2, ứng dụng Văn phòng điện tử và Không gian cá nhân P.A.R.A
 #   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
 #   profile mail   — Mailpit, hộp thư thử cho thông báo email (chỉ để demo, MOC_EXTRA_PROFILES=mail)
+#   profile logs   — log tập trung Vector + Parseable (tắt mặc định; make logs-up; docs/van-hanh.md mục Log tập trung)
 #
 #   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
@@ -529,6 +530,65 @@ services:
     depends_on:
       prometheus: {condition: service_healthy}
 
+  # ---- Log tập trung (F3.14), profile logs — tắt mặc định (docs/van-hanh.md mục Log tập trung) ---------------------
+  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của apisix, app-office, app-ca-nhan, svc-files,
+  # svc-workflow (5 dịch vụ đã che thông tin cá nhân, F4.4) sang fluentd: dockerd gửi dòng log vào Vector qua cổng
+  # 127.0.0.1. Không gắn docker.sock, không đọc /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ
+  # nào khác của Signet. Không dùng x-common (mạng moc); log của chính chúng ghi json-file, không gửi vào mình.
+  vector:
+    image: timberio/vector:0.59.0-distroless-static@sha256:2138c72ef15477d3a60126da851407a198ec61d2ff4cd600a4e69db5f6a29ff7
+    profiles: [logs]
+    restart: unless-stopped
+    command: ["--config", "/etc/vector/vector.yaml"]
+    # Không read_only: compose chép secret nguồn environment vào container trước khi chạy, Docker từ chối chép vào
+    # rootfs chỉ đọc ("container rootfs is marked read-only")
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # chưa đo dưới tải; lúc nghỉ ≈ 18 MiB
+    networks: [logs]
+    ports:
+      - 127.0.0.1:${MOC_LOGS_FLUENT_PORT:-24224}:24224    # dockerd trên máy chủ gửi vào đây; không xác thực
+    # Vector ≥ 0.57 không thay ${…} trong tệp cấu hình: mật khẩu Parseable đi qua compose secret (/run/secrets)
+    secrets: [moc_logs_password]
+    volumes:
+      - ./platform/logs/vector.yaml:/etc/vector/vector.yaml:ro
+    depends_on:
+      parseable: {condition: service_started}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  # Parseable (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản. API và giao diện chỉ nghe 127.0.0.1, tài khoản moc
+  # (basic auth), giữ log MOC_LOGS_RETENTION_DAYS ngày (scripts/log_tap_trung.py init đặt). Image distroless, không
+  # có shell nên không có healthcheck (make logs-up chờ /api/v1/readiness). Chạy bằng root nhưng bỏ mọi capability:
+  # uid khác 0 không tạo được thư mục trên volume mới (Parseable dừng: "Permission denied")
+  parseable:
+    image: quay.io/parseablehq/parseable:v3.2.4@sha256:fccd5124553cda66c2e01d01d98bd4077cee819842717d2e884e2dc6aa8025d1
+    profiles: [logs]
+    restart: unless-stopped
+    command: ["/usr/bin/parseable", "local-store"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m                       # chưa đo dưới tải; lúc nghỉ ≈ 45 MiB
+    networks: [logs]
+    ports:
+      - 127.0.0.1:${MOC_LOGS_PORT:-8400}:8000
+    environment:
+      P_USERNAME: moc
+      P_PASSWORD: ${MOC_LOGS_PASSWORD:-}
+      # Mật khẩu rỗng thì Parseable nhận đăng nhập rỗng: để P_ADDR rỗng, Parseable từ chối khởi động
+      P_ADDR: ${MOC_LOGS_PASSWORD:+0.0.0.0:8000}
+      P_STAGING_DIR: /parseable/data/staging
+      P_FS_DIR: /parseable/data/store
+      P_CHECK_UPDATE: "false"               # mặc định gọi download.parseable.io
+      P_SEND_ANONYMOUS_USAGE_DATA: "false"  # mặc định gửi số liệu sử dụng cho analytics.parseable.io
+    volumes:
+      - parseable_data:/parseable/data
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
   # F3.10 — hội tụ IT/OT (màn ii), profile iot (tùy chọn: `make demo-it-ot` tự bật). Context broker NGSI-LD giữ bản
   # sao số của cảm biến; mỗi đơn vị một tenant NGSI-LD. Không mở cổng nào ra máy chủ. Ba mạng riêng: thiết bị ↔ broker
   # (iot-devices), broker ↔ svc-workflow (iot: thiết bị không gọi được svc-workflow), broker ↔ CSDL của nó (iot-db).
@@ -693,6 +753,9 @@ services:
 networks:
   moc:
     driver: bridge
+  # F3.14 (profile logs): chỉ vector, parseable. Không internal: phải mở cổng 127.0.0.1 (mạng internal không mở được)
+  logs:
+    driver: bridge
   # chỉ seaweedfs và svc-files; không ra Internet
   storage:
     driver: bridge
@@ -723,6 +786,8 @@ volumes:
   postgres_data:
   seaweedfs_data:
   prometheus_data:
+  # log tập trung (F3.14, profile logs); không sao lưu, giữ MOC_LOGS_RETENTION_DAYS ngày
+  parseable_data:
   scorpio_data:
   clamav_data:
   meili_data:
@@ -732,3 +797,8 @@ volumes:
   openbao_svc_workflow:
   # trọng số mô hình ngôn ngữ (F4.1, profile ai); không sao lưu: tải lại được bằng make ai-model
   ollama_models:
+
+secrets:
+  # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ
+  moc_logs_password:
+    environment: MOC_LOGS_PASSWORD

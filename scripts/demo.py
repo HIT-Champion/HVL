@@ -96,6 +96,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         receiveIncoming thay mặt văn thư); lỗi từng dòng đúng bảng dòng sai cố ý, tệp EICAR trong zip bị chặn, mỗi văn
         bản một dòng sổ kiểm toán, dòng có tệp bị Action từ chối được gỡ tệp; gửi lại không nhân đôi văn bản hay tệp;
         lô 5 dòng register=true có số đến trong sổ. (make demo-nap-lo)
+    python3 scripts/demo.py log-tap-trung
+        Log tập trung (F3.14, profile logs — chưa bật thì màn tự bật bằng make logs-up và để nguyên): văn thư phát hành
+        một công văn với X-Request-Id tự đặt; yêu cầu đi qua APISIX → Hasura → svc-workflow → svc-files; tra
+        Parseable theo mã đó ra dòng của cả ba dịch vụ, sổ kiểm toán có dòng cùng mã; không đăng nhập thì không đọc
+        được kho log; không dòng nào có token, cookie, chuỗi truy vấn; docker logs vẫn đọc được. (make
+        demo-log-tap-trung)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -782,6 +788,9 @@ query ($sensor: jsonb!) {
 }"""
 
 SUBMIT = "mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }"
+# như Session.complete (moc_env.py), gọi tay để gửi kèm X-Request-Id
+COMPLETE_TASK = ("mutation ($t: String!, $o: String!, $d: jsonb) { completeTask(taskId: $t, outcome: $o, data: $d) {"
+                 " task_id } }")
 
 # Gửi một thông báo giả (token sai) tới svc-workflow, in mã HTTP nhận được hoặc "không tới được"
 OT_PROBE = """
@@ -2496,9 +2505,10 @@ def local_time(iso: str) -> str:
 
 
 def issue_outgoing(staff: Session, manager: Session, director: Session, clerk: Session, draft: dict[str, Any], *,
-                   public: bool) -> tuple[str, float]:
+                   public: bool, request_id: str | None = None) -> tuple[str, float]:
     """Chuyên viên soạn → trình → tổ trưởng duyệt → lãnh đạo khoa ký duyệt → văn thư phát hành → (id văn bản, số giây
-    của riêng bước phát hành: cấp số, dựng PDF, ký, quét, lưu)."""
+    của riêng bước phát hành: cấp số, dựng PDF, ký, quét, lưu). ``request_id``: bước phát hành gửi kèm X-Request-Id
+    tự đặt (màn log tập trung), APISIX phải trả lại đúng mã đó."""
     doc_id = staff.gql(DRAFT, {"o": draft})["insert_office_documents_one"]["id"]
     signer = staff.gql('{ core_users(where: {username: {_eq: "truongkhoa"}}) { id } }')["core_users"][0]["id"]
     staff.gql(SUBMIT, {"d": doc_id, "s": signer})
@@ -2506,7 +2516,17 @@ def issue_outgoing(staff: Session, manager: Session, director: Session, clerk: S
     director.complete(director.wait_task(doc_id, "vbdi.duyetDonVi"), "approve", {})
     task = clerk.wait_task(doc_id, "vbdi.phatHanh")
     started = time.monotonic()
-    clerk.complete(task, "issue", {"is_public": public})
+    if request_id is None:
+        clerk.complete(task, "issue", {"is_public": public})
+        return doc_id, time.monotonic() - started
+    variables = {"t": task, "o": "issue", "d": {"is_public": public}}
+    data, headers = call_json("POST", f"{PUBLIC_URL}/v1/graphql", {"query": COMPLETE_TASK, "variables": variables},
+                              headers={**clerk.auth, "X-Request-Id": request_id})
+    if data.get("errors"):
+        raise RuntimeError(f"{clerk.username}: {data['errors'][0].get('message')}")
+    echoed = {k.lower(): v for k, v in headers.items()}.get("x-request-id")
+    if echoed != request_id:
+        raise DemoFailed(f"APISIX trả X-Request-Id {echoed!r}, không phải mã đã gửi {request_id!r} (plugin request-id)")
     return doc_id, time.monotonic() - started
 
 
@@ -3404,11 +3424,149 @@ def nap_lo() -> None:
           f" \"-{tag}/\" trong danh sách văn bản đến của vanthukt")
 
 
+# --- F3.14 · Log tập trung (make demo-log-tap-trung) ------------------------------------------------------------
+# Một yêu cầu phát hành đi qua đủ ba dịch vụ đã che PII mà log tập trung thu: APISIX (dòng truy cập, mã ở cuối dòng),
+# svc-workflow (office.action.done), svc-files (office.document.rendered…)
+LOG_TRACED = ("apisix", "svc-workflow", "svc-files")
+# Không dòng nào trong kho log được có: token (Bearer, JWT), chuỗi truy vấn của ô tìm kiếm hay của lần đăng nhập
+LOG_FORBIDDEN = ("Bearer ey", "eyJ", "?q=", "?code=", "?state=")
+LOGS_WAIT_S = 60.0
+
+
+def traced_services(rows: list[dict[str, Any]]) -> set[str]:
+    return {str(r["service"]) for r in rows if r.get("service")}
+
+
+def log_leaks(rows: list[dict[str, Any]], secrets: list[str]) -> list[str]:
+    """Dòng log nào mang dấu hiệu cấm hay chính giá trị bí mật (token của phiên, mật khẩu…) → "dịch vụ: dấu hiệu".
+    Bí mật ngắn dưới 8 ký tự bỏ qua (khớp nhầm); không in giá trị bí mật ra."""
+    found = []
+    for row in rows:
+        text = json.dumps(row, ensure_ascii=False)
+        marks = [m for m in LOG_FORBIDDEN if m in text]
+        marks += ["giá trị bí mật" for s in secrets if s and len(s) >= 8 and s in text][:1]
+        found += [f"{row.get('service') or '?'}: {m}" for m in marks]
+    return found
+
+
+def log_driver(service: str) -> str:
+    """Driver log của container đang chạy của dịch vụ (fluentd khi log tập trung đang thu nó); không chạy thì ""."""
+    cid = compose("ps", "-q", service).decode().split()
+    if not cid:
+        return ""
+    out = subprocess.run(["docker", "inspect", "-f", "{{.HostConfig.LogConfig.Type}}", cid[0]], capture_output=True,
+                         text=True, check=True)
+    return out.stdout.strip()
+
+
+def log_tap_trung() -> None:
+    # nạp trong hàm: test của các màn khác thay moc_env bằng bản giả không có các tên này
+    import log_tap_trung as lt
+    from moc_env import load_env
+
+    print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → svc-files; Vector thu log của"
+          " các dịch vụ đã che thông tin cá nhân (F4.4), che lần hai, gửi Parseable; tra theo mã ra dòng của cả ba")
+    logged = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow")
+
+    say(1, "Log tập trung (profile logs): Vector, Parseable chạy; 5 dịch vụ gửi log qua driver fluentd của Docker")
+    turned_on = False
+    try:
+        request("GET", f"{lt.base_url(ENV)}/api/v1/liveness", timeout=5)
+        running = True
+    except (HTTPError, OSError):
+        running = False
+    drivers = {s: log_driver(s) for s in logged}
+    if not running or any(d != "fluentd" for d in drivers.values()):
+        if not (ROOT / "Makefile").is_file():
+            raise DemoFailed("log tập trung chưa bật và đây là bản cài (không có Makefile): thêm logs vào"
+                             " MOC_EXTRA_PROFILES rồi cài lại (make install) — docs/van-hanh.md mục Log tập trung")
+        print("   chưa bật: make logs-up (tạo lại 5 container, giữ nguyên dữ liệu)")
+        subprocess.run(["make", "--no-print-directory", "logs-up"], cwd=ROOT, check=True)
+        turned_on = True
+        drivers = {s: log_driver(s) for s in logged}
+    if any(d != "fluentd" for d in drivers.values()):
+        raise DemoFailed(f"dịch vụ chưa gửi log qua fluentd: {drivers}")
+    env = load_env()        # make logs-up có thể vừa thêm MOC_LOGS_PASSWORD vào .env
+    api = lt.client(env)
+    ok(f"Parseable ở {api.base_url} (chỉ 127.0.0.1); driver log: " + ", ".join(f"{s} {d}" for s, d in drivers.items()))
+
+    say(2, "Văn thư phát hành một công văn, yêu cầu phát hành mang X-Request-Id tự đặt")
+    rid = f"demo-log-{uuid.uuid4().hex[:12]}"
+    mark = utc_mark()
+    tag = uuid.uuid4().hex[:6].upper()
+    staff, manager, director, clerk = (Session(u) for u in ("chuyenviendt", "totruongdt", "truongkhoa", "vanthu"))
+    doc_id, took = issue_outgoing(staff, manager, director, clerk, {
+        "type_code": "CV", "recipients": ["Phòng Đào tạo"],
+        "summary": f"Về việc tổng hợp nhật ký hệ thống theo mã yêu cầu (demo {tag})",
+        "body": "Khoa Công nghệ thông tin gửi Phòng Đào tạo kết quả thử log tập trung.",
+    }, public=False, request_id=rid)
+    sent = time.monotonic()
+    ok(f"X-Request-Id {rid}: APISIX giữ mã client gửi và trả lại ở header; phát hành xong trong {took:.1f} giây")
+
+    say(3, f"Tra Parseable theo mã (make logs-tra ID={rid}) — đợi Vector gửi, tối đa {LOGS_WAIT_S:.0f} giây")
+    deadline = time.monotonic() + LOGS_WAIT_S
+    rows: list[dict[str, Any]] = []
+    while True:
+        try:
+            rows = api.find(rid, 15)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        missing = [s for s in LOG_TRACED if s not in traced_services(rows)]
+        if not missing or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    cli_lines(lt.table(rows, 70))
+    if missing:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng của {', '.join(missing)} mang mã {rid} —"
+                         " xem: docker compose --profile logs logs vector")
+    ok(f"{len(rows)} dòng của {', '.join(sorted(traced_services(rows)))} cùng mã, sau {time.monotonic() - sent:.0f}"
+       " giây kể từ yêu cầu")
+
+    say(4, "Sổ kiểm toán ghi cùng mã: svc-workflow, svc-files gửi mã sang Hasura (core.audit_log.request_id)")
+    audit = [line.split("|") for line in psql(
+        f"select action, count(*) from core.audit_log where request_id = '{rid}' group by action order by action"
+    ).splitlines() if line]
+    if not audit:
+        raise DemoFailed(f"core.audit_log không có dòng nào mang request_id {rid} (văn bản {doc_id})")
+    ok("psql core.audit_log: " + ", ".join(f"{a} ×{n}" for a, n in audit))
+
+    say(5, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
+    for who_, auth in (("không đăng nhập", None), ("sai mật khẩu", lt.auth_header(lt.USER, uuid.uuid4().hex))):
+        try:
+            request("GET", f"{api.base_url}/api/v1/logstream", headers={"Authorization": auth} if auth else None,
+                    timeout=10)
+            raise DemoFailed(f"Parseable cho đọc danh sách luồng khi {who_}")
+        except HTTPError as exc:
+            if exc.status not in (401, 403):
+                raise
+            ok(f"{who_}: HTTP {exc.status}")
+    leaked = log_leaks(rows, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""), env.get("HASURA_ADMIN_SECRET", ""),
+                              env.get("MOC_ACTION_SECRET", "")])
+    if leaked:
+        raise DemoFailed(f"kho log có dấu hiệu cấm: {', '.join(leaked[:6])}")
+    ok(f"không dòng nào chứa {', '.join(LOG_FORBIDDEN)}, token phiên của văn thư hay khóa của hệ thống")
+
+    say(6, "docker logs vẫn đọc được (dual logging của Docker): bản cục bộ cũng có mã")
+    time.sleep(max(0.0, sent + LOG_FLUSH_S - time.monotonic()))
+    local = service_logs(mark, "apisix", "svc-workflow")
+    without = [s for s, text in local.items() if rid not in text]
+    if without:
+        raise DemoFailed(f"docker compose logs của {', '.join(without)} không có mã {rid}")
+    ok("docker compose logs apisix, svc-workflow: có dòng mang mã")
+
+    print(f"\n   Giao diện: {api.base_url} — tài khoản {lt.USER}, mật khẩu là MOC_LOGS_PASSWORD trong .env; giữ"
+          f" {env.get('MOC_LOGS_RETENTION_DAYS') or '7'} ngày")
+    if turned_on:
+        print("   Màn này đã bật log tập trung và để nguyên. Tắt: make logs-down (tạo lại 5 container)")
+    else:
+        print("   Tắt: bỏ logs khỏi MOC_EXTRA_PROFILES (nếu có) rồi make logs-down")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
-         "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo}
+         "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung}
 
 
 def main(argv: list[str] | None = None) -> int:

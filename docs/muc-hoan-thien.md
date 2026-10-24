@@ -97,7 +97,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | F3.11 | [D] Dashboard điều hành (ECharts, bốn view số đếm qua Hasura) | Hoàn thiện | db `test_dashboard.py` 6 | smoke 2 kiểm (số chia khớp văn bản lãnh đạo đọc được, văn thư không đọc được); e2e `dieu-hanh.spec.ts` | Bốn view cố định (`office.v_*`); muốn báo cáo mới phải viết view mới |
 | F3.12 | Liên thông văn bản giữa các đơn vị; thêm đơn vị bằng một lệnh | Hoàn thiện | svc-files `test_dispatch.py` 12; svc-workflow `test_dispatch.py` 28; db `test_dispatch.py` 16; scripts `test_tenants.py` 31; office `dispatch.test.ts` 4 | bước CI `make demo-lien-thong` và "Thêm đơn vị bằng một lệnh (moc tenant create, check)"; smoke: mỗi đơn vị một Organization, công văn tới đơn vị nhận; e2e `lien-thong.spec.ts` | Chưa gửi lại được dòng liên thông `failed`; danh sách đơn vị nhận hiện cho mọi người dùng; văn bản hạn chế không liên thông (chủ ý) |
 | F3.13 | Giám sát: Prometheus + Grafana | Dùng được | — | smoke 1 kiểm: Prometheus đọc được chỉ số cổng API, Grafana có bảng điều khiển nạp sẵn | Chỉ thu chỉ số của APISIX (`platform/monitoring/prometheus.yml`); chưa có chỉ số từng dịch vụ, chưa có cảnh báo |
-| F3.14 | Log tập trung (Vector, Parseable) | Chưa làm | — | — | Không có trong `docker-compose.yml`; mỗi dịch vụ chỉ có nhật ký container |
+| F3.14 | Log tập trung (Vector, Parseable) | Dùng được | svc-workflow `test_request_id.py` 10; scripts `test_log_tap_trung.py` 29; `platform/logs/vector.test.yaml` 29 ca (`vector test`) | `make demo-log-tap-trung` (chưa có bước CI) | Profile `logs` tắt mặc định; chỉ thu 5 dịch vụ (APISIX, hai ứng dụng web, `svc-files`, `svc-workflow`), không thu Hasura, Keycloak, PostgreSQL, Meilisearch; cổng fluent không xác thực (chỉ 127.0.0.1); Vector dùng tài khoản quản trị Parseable; Parseable chạy root (bỏ mọi capability), luôn mở CORS cho `cdn.parseable.com`; che lần hai không bắt số viết tách nhóm không có từ khóa đứng trước, họ tên; bật, tắt phải tạo lại 5 container; log không vào bản sao lưu (`docs/van-hanh.md`, mục Log tập trung) |
 | F3.15 | WAF (Coraza) | Chưa làm | — | — | Không có trong `docker-compose.yml` hay cấu hình APISIX |
 
 F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
@@ -131,10 +131,10 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | Mức | Số | Tính năng |
 |---|---|---|
 | Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 6 | F1.9, F2.9, F3.8, F3.9, F3.13, F4.6 |
+| Dùng được | 7 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F4.6 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
-| Chưa làm | 2 | F3.14, F3.15 |
+| Chưa làm | 1 | F3.15 |
 
 ## 3. Độ phủ 7 cụm dịch vụ Tầng 1
 
@@ -167,7 +167,7 @@ chưa phủ hết năng lực của cụm.
 | ⑤ Quy trình, tự động hóa | BPMN quản lý trạng thái luồng phê duyệt | Flowable 8, `services/svc-workflow/processes/*.bpmn20.xml` | Hoàn thiện | F1.4, F2.3, F2.4 |
 | ⑤ | Thực thi kịch bản serverless | — | **Chưa có** | Không có nơi chạy kịch bản do người dùng nạp. Kestra đã cân nhắc nhưng chưa đưa vào (`DEPENDENCIES.md`); việc nền là vòng lặp viết cứng trong `svc-files`, `svc-workflow` |
 | ⑤ | API nạp dữ liệu khối lớn theo lô | `POST /api/imports/incoming` của svc-files (`svc_files/imports/`), bảng `core.import_jobs`, `core.import_rows` | Dùng được | Văn bản đến: tệp NDJSON/CSV + zip tệp đính kèm, xử lý nền theo mẻ; mỗi dòng qua đúng ClamAV và Action `receiveIncoming` thay mặt văn thư, lỗi từng dòng, gửi lại không nhân đôi, chạy tiếp sau khi svc-files khởi động lại. svc-files `test_imports_*.py` 107; db `test_import_jobs.py` 18; `make demo-nap-lo` (chưa là bước CI). Chưa có màn "Nhập lô" trên giao diện — gọi API; mới có một loại lô (văn bản đến); zip tệp đính kèm mất khi svc-files khởi động lại (dòng còn cần tệp báo `archive_lost`) |
-| ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`); `svc-files` ghi mã này vào nhật ký và vào `core.audit_log.request_id` ở các dòng nó tự ghi | Một phần | `svc-workflow` chưa mang mã này; không có log tập trung (F3.14), không tracing. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
+| ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`) và ghi nó ở cuối dòng log truy cập; `svc-files`, `svc-workflow` ghi mã này vào nhật ký, chuyển tiếp sang Hasura và vào `core.audit_log.request_id`; log tập trung (F3.14, profile `logs`) tra theo mã: `make logs-tra ID=…` | Dùng được | Tắt mặc định; không tracing (không span, không đo thời gian từng chặng); Hasura, Keycloak, PostgreSQL không vào log tập trung. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
 | ⑥ | Kiểm toán bất biến | Sổ kiểm toán chuỗi băm (`db/migrations/default/1792281600100_core_schema/`), neo ra bucket khóa ghi, `scripts/audit_chain.py` | Hoàn thiện | F2.12 |
 | ⑥ | Trục streaming sự kiện | — | **Chưa có** | Không có broker (Kafka hay tương đương). Sự kiện nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`); Centrifugo chỉ đẩy tới trình duyệt. `DEPENDENCIES.md` nêu Hasura Event Triggers thay Redpanda, nhưng `db/metadata` chưa khai event trigger nào |
 | ⑥ | GitOps | `scripts/reconcile.py`, `platform/systemd/` | Hoàn thiện | F3.3; Compose + reconciler, không Argo CD |
@@ -176,11 +176,11 @@ chưa phủ hết năng lực của cụm.
 | ⑦ | WebSocket thời gian thực | Centrifugo, `platform/centrifugo/config.yaml`, route `/realtime` | Hoàn thiện | F2.5 |
 | ⑦ | Hàng đợi bất đồng bộ chống chối bỏ | Hộp thư đi `office.dispatches` (`svc_workflow/dispatch.py`); việc giao ra ngoài của Flowable (topic `moc-goi-y`, `moc-sla`) | Một phần | Liên thông (F3.12) có thử lại lùi dần, so SHA-256, ghi sổ kiểm toán cả hai đơn vị trong cùng giao dịch. Chưa có hàng đợi dùng chung cho ứng dụng khác, chưa có biên nhận ký số |
 
-**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 3, Minh họa 1, Một phần 6, **Chưa có 2**.
+**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 4, Minh họa 1, Một phần 5, **Chưa có 2**.
 
 - Chưa có: kịch bản serverless (⑤), trục streaming sự kiện (⑥).
-- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), log truy vết
-  phân tán (⑥), định tuyến thông báo đa kênh (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
+- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), định tuyến
+  thông báo đa kênh (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
 - Bốn dịch vụ bắt buộc (SSO, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình) đều ở mức Hoàn thiện.
 
 ## 4. Kiểm lại
@@ -210,7 +210,7 @@ Các ô "Chưa có", "Chưa làm" ở mục 2, mục 3:
 
 ```bash
 git grep -n event_triggers -- db/metadata                                  # rỗng: chưa có Hasura Event Trigger
-git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez|coraza|parseable' -- docker-compose.yml   # rỗng
+git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez|coraza' -- docker-compose.yml   # rỗng
 git grep -niwE 'sms|zalo' -- services platform docker-compose.yml        # rỗng: chưa có SMS, Zalo
 grep -n job_name platform/monitoring/prometheus.yml                        # chỉ apisix và chính prometheus
 grep -nE '^  [a-z]+:$|^    name:|^      - name:' .github/workflows/ci.yml  # job và bước CI

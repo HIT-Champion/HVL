@@ -73,6 +73,17 @@ class Actor:
         return []
 
 
+def _traced(headers: dict[str, str], request_id: str) -> dict[str, str]:
+    """Mã yêu cầu đi cùng lời gọi: ``X-Hasura-Request-Id`` thành biến phiên, trigger sổ kiểm toán ghi vào
+    ``core.audit_log.request_id``; ``X-Request-Id`` để nhật ký của Hasura (``docker logs``, không vào log tập trung)
+    mang cùng mã.
+    Mã rỗng (việc nền không có yêu cầu gốc) thì không gửi gì."""
+    if request_id:
+        headers["X-Hasura-Request-Id"] = request_id
+        headers["X-Request-Id"] = request_id
+    return headers
+
+
 class HasuraClient:
     def __init__(
         self,
@@ -115,9 +126,7 @@ class HasuraClient:
             "X-Hasura-Tenant-Id": str(actor.tenant_id),
             "X-Hasura-User-Id": actor.user_id,
         }
-        if actor.request_id:
-            headers["X-Hasura-Request-Id"] = actor.request_id
-        return await self._call(query, variables or {}, headers)
+        return await self._call(query, variables or {}, _traced(headers, actor.request_id))
 
     async def as_user(self, actor: Actor, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         """Hỏi bằng đúng vai trò và phiên của người gọi Action: quyền đọc do Hasura xét như khi chính họ hỏi."""
@@ -129,7 +138,7 @@ class HasuraClient:
         }
         if actor.department_id:
             headers["X-Hasura-Department-Id"] = str(actor.department_id)
-        return await self._call(query, variables or {}, headers)
+        return await self._call(query, variables or {}, _traced(headers, actor.request_id))
 
     async def as_system(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         """Việc nội bộ chỉ đọc, xuyên thuê ước (đối soát): khóa quản trị, không kèm vai trò."""
@@ -146,9 +155,7 @@ class HasuraClient:
             "X-Hasura-Tenant-Id": str(tenant_id),
             "X-Hasura-User-Id": agent_id,
         }
-        if request_id:
-            headers["X-Hasura-Request-Id"] = request_id
-        return await self._call(query, variables or {}, headers)
+        return await self._call(query, variables or {}, _traced(headers, request_id))
 
 
 # --- truy vấn dùng chung -------------------------------------------------------------------------------

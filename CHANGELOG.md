@@ -70,6 +70,20 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   xử lý (trung vị, p90), tỷ lệ xử lý quá hạn, 5 lần tìm lại văn bản cũ qua API (độ trễ hệ thống), số bước chuyển tay
   so sánh định tính; cột "trước" ghi chưa đo, số trên đơn vị mẫu (`core.tenants.sample_data`) ghi rõ là dữ liệu mẫu.
   Cách đo: [`docs/so-lieu-sau.md`](docs/so-lieu-sau.md). Test db +30, office +21, scripts +16.
+- Log tập trung (F3.14, profile `logs`, tắt mặc định): tệp compose phủ `platform/logs/docker-compose.logs.yml` đổi
+  driver log của APISIX, app-office, app-ca-nhan, `svc-files`, `svc-workflow` sang fluentd, gửi Vector 0.59.0 rồi
+  Parseable v3.2.4 (chỉ nghe 127.0.0.1, bỏ mọi capability, mật khẩu do `make env`, `make up` hay `make logs-up` sinh,
+  mật khẩu rỗng thì không mở cổng, giữ `MOC_LOGS_RETENTION_DAYS` ngày). Vector ghép dòng Docker cắt ở 16 KiB rồi che
+  lần hai: token Bearer/Basic (cả có `=` đệm), JWT; giá trị của khóa mật khẩu, bí mật, token, khóa API, phiên (cả có
+  tiền tố, hậu tố, dict Python, mật khẩu có dấu cách, nháy không đóng, khóa ở mọi tầng của dòng JSON, khóa viết
+  thoát) và của cờ dòng lệnh như `--password`; Authorization (không nháy thì tới hết dòng, cả Digest), Cookie nhiều
+  cặp; mật khẩu trong chuỗi kết nối; chuỗi truy vấn của URL; email (cả có dấu), số điện thoại (cả +84), CCCD;
+  CMND, số tài khoản, mã số thuế khi có từ khóa đứng trước; số viết tách nhóm không có từ khóa, họ tên vẫn lọt
+  (danh sách ở `docs/van-hanh.md`). Không gắn `docker.sock`, `docker logs` vẫn đọc được; `make logs-up`,
+  `make logs-tra ID=…`, `make logs-down`, `make demo-log-tap-trung`. `svc-workflow` mang `X-Request-Id` như
+  `svc-files` (nhật ký, lời gọi Hasura nên vào `core.audit_log.request_id`, lời gọi `svc-files`), mã sai dạng thì
+  thay bằng mã mới; APISIX ghi mã yêu cầu ở cuối dòng log truy cập. Rủi ro (CORS của Parseable, mất log khi Vector dừng)
+  và cách tắt: `docs/van-hanh.md`, mục Log tập trung. Test svc-workflow +10, scripts +29, `vector test` 29 ca.
 
 ### Đã sửa đổi
 - README (cả bản tiếng Anh) viết lại thành 12 mục, cài đặt lên khoảng giữa trang thay vì dòng 221: Giới thiệu, Kiến

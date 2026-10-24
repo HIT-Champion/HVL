@@ -56,7 +56,7 @@ NGINX = ROOT / "apps" / "office" / "nginx" / "default.conf.template"
 # nginx-unprivileged 1.30.6. F4.4 chỉ đổi phần mang chuỗi truy vấn, bỏ Referer; các trường khác giữ nguyên.
 APISIX_DEFAULT = ('$remote_addr - $remote_user [$time_local] $http_host "$request" $status $body_bytes_sent '
                   '$request_time "$http_referer" "$http_user_agent" $upstream_addr $upstream_status '
-                  '$upstream_response_time "$upstream_scheme://$upstream_host$upstream_uri"')
+                  '$upstream_response_time "$upstream_scheme://$upstream_host$upstream_uri" "$apisix_request_id"')
 NGINX_MAIN = ('$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" '
               '"$http_user_agent" "$http_x_forwarded_for"')
 # Biến nginx mang chuỗi truy vấn (đã mã hóa phần trăm: regex che không thấy) hoặc Referer

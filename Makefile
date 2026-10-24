@@ -28,6 +28,16 @@ ENV_FILE := .env
 # COMPOSE_PROFILES trong bản cài (make install)
 EXTRA_PROFILES := $(shell sed -n 's/^MOC_EXTRA_PROFILES=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr ',' ' ')
 COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXTRA_PROFILES),--profile $(p)))
+# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 5 dịch vụ sang
+# fluentd → Vector. Chỉ nạp khi bật; tắt thì docker compose chỉ đọc docker-compose.yml như cũ. export: lệnh con
+# (demo.py, moc.py… gọi docker compose) cũng nạp tệp phủ
+LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml
+LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow
+# Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
+LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
+ifneq ($(LOGS_ON),)
+export COMPOSE_FILE := $(LOGS_COMPOSE_FILE)
+endif
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
@@ -38,6 +48,7 @@ PREFIX ?= /opt/moc
         demo-nap-lo nap-lo-mau \
         demo-ca-nhan \
         do-so-lieu-sau \
+        logs-env logs-up logs-down logs-tra demo-log-tap-trung \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
@@ -74,8 +85,9 @@ check: ## Kiểm tra tiền điều kiện của môi trường
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: env-ready ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
+	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
 	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
 up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai): tác tử đọc văn bản viết trích yếu, trợ lý hỏi đáp tìm theo nghĩa và viết câu trả lời — cần make ai-model trước
@@ -85,16 +97,42 @@ ai-model: $(ENV_FILE) ## Tải mô hình sinh MOC_AI_MODEL (mặc định qwen3:
 	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Signet trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down -v
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
 logs: ## Theo dõi nhật ký của mọi dịch vụ
 	@$(COMPOSE) logs -f --tail=100
+
+logs-env: $(ENV_FILE)
+	@# .env sinh trước F3.14 thiếu mật khẩu: sinh đúng như make env (scripts/gen-env.sh), không in giá trị
+	@grep -q '^MOC_LOGS_PASSWORD=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Log tập trung (F3.14), make up / make logs-up thêm\nMOC_LOGS_PASSWORD=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) && echo "Đã thêm MOC_LOGS_PASSWORD (ngẫu nhiên) vào $(ENV_FILE)."; }
+	@sed -n 's/^MOC_LOGS_PASSWORD=//p' $(ENV_FILE) | tail -n 1 | grep -q . || { echo "MOC_LOGS_PASSWORD trong" \
+	  "$(ENV_FILE) rỗng: Parseable không khởi động với mật khẩu rỗng — đặt một chuỗi ngẫu nhiên" >&2; exit 1; }
+
+logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; apisix, app-office, app-ca-nhan, svc-files, svc-workflow gửi log qua driver fluentd (tạo lại 5 container). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
+	@COMPOSE_FILE=$(LOGS_COMPOSE_FILE) $(COMPOSE) --profile logs up -d --wait vector parseable $(LOGGED_SERVICES)
+	@python3 scripts/log_tap_trung.py init
+	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 5 dịch vụ về json-file" \
+	  "(Vector, Parseable vẫn chạy mà không nhận gì) — bật lâu dài thì thêm logs vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
+
+logs-down: env-ready ## Tắt log tập trung: 5 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
+	@! echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || { echo "Bỏ logs khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
+	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
+	@COMPOSE_FILE=docker-compose.yml $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
+	@COMPOSE_FILE=docker-compose.yml $(COMPOSE) --profile logs rm -sf vector parseable
+
+logs-tra: $(ENV_FILE) ## Tra log tập trung theo mã yêu cầu (header X-Request-Id, câu "đã ghi nhật ký với mã …"): make logs-tra ID=<mã> [PHUT=60]
+	@python3 scripts/log_tap_trung.py tra "$(ID)" --phut "$(or $(PHUT),60)"
+
+demo-log-tap-trung: $(ENV_FILE) ## Màn log tập trung (F3.14): một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → svc-files; Parseable trả dòng của cả ba cùng mã, sổ kiểm toán cùng mã; không lộ token; docker logs vẫn đọc được
+	@python3 scripts/demo.py log-tap-trung
 
 ps: ## Liệt kê trạng thái các dịch vụ
 	@$(COMPOSE) ps

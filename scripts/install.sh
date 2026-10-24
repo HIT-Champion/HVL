@@ -36,11 +36,12 @@ MANIFEST=.moc-install
 # Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py
 # (cả sao lưu, thêm đơn vị, client ứng dụng của realm), màn demo (demo.py, demo_ca_nhan.py), reconciler GitOps
 # (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây profile core, app nên không thấy bind mount
-# của nó)
+# của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
          scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/tenants.py scripts/demo.py scripts/reconcile.py
          scripts/realm_clients.py scripts/demo_ca_nhan.py
-         seed services/ot-sensor/sensor.py)
+         seed services/ot-sensor/sensor.py
+         platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -186,6 +187,13 @@ do_install() {
   # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài
   extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
   set_env "$dest/.env" COMPOSE_PROFILES "core,app${extra:+,$extra}"
+  # Log tập trung (F3.14, profile logs): tệp phủ đổi driver log của 5 dịch vụ. docker compose đọc COMPOSE_FILE trong
+  # .env của bản cài (reconciler, lệnh gõ tay); bỏ logs thì trả về chỉ docker-compose.yml
+  if [[ ",$extra," == *,logs,* ]]; then
+    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml:platform/logs/docker-compose.logs.yml
+  elif grep -q '^COMPOSE_FILE=' "$dest/.env"; then
+    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml
+  fi
 
   echo "==> Kiểm tra bản cài không cần thư mục mã nguồn"
   check="$(inspect_compose "$dest")" || die "compose trong $dest không hợp lệ"
