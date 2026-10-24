@@ -484,7 +484,7 @@ jobs:
           import sys
           sys.path.insert(0, "scripts")
           from moc_env import PUBLIC_URL, Session, call_json, text_pdf
-          status = call_json("GET", f"{PUBLIC_URL}/api/status")
+          status, _ = call_json("GET", f"{PUBLIC_URL}/api/status")
           assert status["status"] in ("ok", "degraded"), status
           clerk = Session("vanthu")
           clerk.gql("{ office_documents(limit: 1) { id } }")
