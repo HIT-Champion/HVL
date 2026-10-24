@@ -160,27 +160,27 @@ Warm yellow and olive give the workspace its character; white work surfaces pres
 
 ## Layout
 
-Desktop uses a left sidebar grid track of 244px, collapsing to 92px. A 16px left inset produces sidebar panels of 228px and 76px. The panel is sticky, begins 16px from the top and spans viewport height minus 32px. Main workspace width is capped at 1440px with 28px top and 40px horizontal padding. The centered inbox reading column caps at 1080px. The utility row uses 20px bottom padding, followed by a 28px sheet inset. Heading and toolbar spacing and task-group gaps use 24px.
+Desktop reserves a fixed 76px icon rail. The 244px sidebar is fixed flush to the left, top and bottom viewport edges, with square outer corners. A clip-path reveals the expanded navigation over the workspace without shifting the reading column. Pointer entry opens immediately; pointer exit waits 140ms before closing to tolerate small accidental exits. Focus within also opens the sidebar. The manual collapse control and stored collapse preference are removed.
 
-The shell collapses over 260ms using cubic-bezier(.16,1,.3,1); labels fade over 110ms. The preference persists under `signet.sidebar.collapsed`. Icons retain accessible names and collapsed title hints. Staff see permitted primary destinations including Q&A; clerk, director and tenant administrator destinations remain role-driven. Search remains a sidebar utility; verification is in the footer.
+The reveal lasts 320ms with cubic-bezier(.16,1,.3,1); labels fade and slide independently. Active and hover backgrounds scale from a 48px icon target into the full navigation row. Icons retain accessible names and collapsed title hints. Permitted destinations remain role-driven; search stays below primary navigation and verification in the footer.
 
-At 1200px and below, workspace padding becomes 32px/28px and the date hides. At 900px and below, navigation becomes a 256px fixed drawer with 10px inset and a scrim; the content uses 20px/24px padding. Opening moves focus into navigation, traps Tab, makes the workspace inert and locks body scrolling. Closed mobile navigation is inert; Escape, scrim or navigation closes it and returns focus to the trigger. At 640px and below, horizontal padding becomes 18px, search occupies its own toolbar line and filters share the next line with refresh.
+Main workspace width caps at 1440px with 28px top and 40px horizontal padding. The inbox reading column caps at 1080px. At 1200px and below, workspace padding becomes 32px/28px and the date hides. At 900px and below, or on devices without hover, navigation becomes a flush 256px touch drawer with a scrim. Opening moves focus into navigation, traps Tab, makes the workspace inert and locks body scrolling. Closed mobile navigation is inert; Escape, scrim or navigation closes it and returns focus to the trigger. At 640px and below, horizontal padding becomes 18px, search occupies its own toolbar line and filters share the next line with refresh.
 
 Incoming/outgoing document tables become labelled stacked rows on small screens. Register and audit tables retain a 1050px minimum width in focusable scroll regions, with a scrolling hint and sticky first column below 900px.
 
 ## Elevation & Depth
 
-Panels and authentication are flat at rest. Tone, thin boundaries and spacing establish depth. The open mobile drawer alone uses a soft lateral shadow (`8px 0 30px #30342a14`) and a dark translucent scrim (`rgb(48 52 42 / .4)`).
+Panels and authentication are flat at rest. Tone, thin boundaries and spacing establish depth. The desktop reveal uses a lateral shadow (`12px 0 28px #30342a12`); the open mobile drawer uses a soft lateral shadow (`8px 0 30px #30342a14`) and a dark translucent scrim (`rgb(48 52 42 / .4)`).
 
 ## Shapes
 
-Controls and navigation use gently rounded control corners; panels and the sidebar use the panel radius. Chips keep the compact chip radius. Authentication retains its existing 14px panel and 7px field/button corners. These exceptions describe implemented authentication rather than extending the office radius scale.
+Controls and navigation use gently rounded control corners; panels use the panel radius; the flush sidebar has square outer corners. Chips keep the compact chip radius. Authentication retains its existing 14px panel and 7px field/button corners. These exceptions describe implemented authentication rather than extending the office radius scale.
 
 ## Components
 
 ### Buttons
 
-Olive primary actions use white text; hover deepens the fill. Secondary actions use white with a stone boundary, while ghost actions use muted olive text. Shared buttons have a 44px minimum height, 8px/14px padding and control corners. Disabled buttons use muted neutral fill and text. Pressing moves enabled buttons down 1px. Background, text and boundary transitions last 140ms.
+Olive primary actions use white text; hover deepens the fill. Secondary actions use white with a stone boundary, while ghost actions use muted olive text. Shared buttons have a 44px minimum height, 8px/14px padding and control corners. Disabled buttons use muted neutral fill and text. Pressing moves enabled buttons down 1px and scales them to .98. Control feedback lasts 160–180ms.
 
 ### Inputs / Fields
 
@@ -196,7 +196,7 @@ White cards use a fine structural edge and panel corners. Attention uses warm pa
 
 ### Navigation
 
-The sidebar uses 14px labels and inline stroked SVG icons. Hover darkens the butter fill; active links use near-white fill and stronger text. Account and logout sit below navigation. The collapse toggle has an explicit expanded state, persistent preference and an accessible name. Ctrl/Cmd K routes to global search.
+The sidebar uses 14px labels and inline stroked SVG icons. Hover darkens the butter fill; active links use near-white fill and stronger text. Account and logout sit below navigation. The sidebar opens on hover and focus, while touch devices use the labelled menu trigger. Ctrl/Cmd K routes to global search.
 
 ### Document rows
 
@@ -208,7 +208,7 @@ Case selectors are full-width, left-aligned buttons with 18px/16px padding, 16px
 
 ### Focus and motion
 
-Shared keyboard focus is a 2px olive outline with a 3px offset; row focus is inset by 4px. Hover moves the task arrow 2px. Filtering and realtime list updates use 140ms opacity/translation and 180ms repositioning transitions. Reduced-motion preferences remove animations, transition durations, smooth scrolling and spatial press/hover effects.
+Shared keyboard focus is a 2px olive outline with a 3px offset; row focus is inset by 4px. Sidebar reveal is the focal interaction. Supporting motion expresses actual state changes: route transitions enter over 180–260ms and exit over 100–120ms; task filters/reordering use 220–280ms entrances and 110–140ms exits; notification popovers use a top-right reveal over 160–240ms and faster exits; transient notices slide in and reposition over 200–300ms. The scrim fades. Task arrows move 4px on hover/focus; navigation icons move 2px on hover. There are no scroll reveals, looping decorative animations or new animation dependencies. Reduced-motion preferences remove animation, transition durations, smooth scrolling and spatial press/hover effects while preserving all state changes.
 
 ## Do's and Don'ts
 
