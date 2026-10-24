@@ -41,6 +41,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Nộp lưu không làm mất số liệu (migration `1792281602300_archived_stats`): bảng `office.archived_document_facts` (lúc xong, tệp bản chính của văn bản nộp lưu) ghi trong `office.archive_case_file` trước khi gỡ dòng thời gian, liên kết tệp; `v_processing_time`, `v_intake_accuracy` dùng bản giữ lại khi dòng sống không còn; văn bản nộp lưu trước đó điền lại từ sổ kiểm toán. Sổ không lộ danh sách được xem (migration `1792281602400_audit_acl_rows`): xem mục Sổ kiểm toán | **Xong** — 2 test (đã tính ở hai dòng Hồ sơ, Văn bản hạn chế) |
 | Không gian cá nhân P.A.R.A — ứng dụng thứ hai trên lõi (`apps/ca-nhan`, migration `1792281602500_personal_space`, [`docs/them-ung-dung.md`](../docs/them-ung-dung.md)): schema riêng `personal`, không sửa `core`; bảng `personal.items` (tệp nào của ai ở thư mục nào trong bốn thư mục `projects`, `areas`, `resources`, `archives` — ràng buộc `items_para`); thuê ước, chủ do Hasura đặt từ token, mỗi người chỉ thấy, chỉ chuyển mục của mình, chỉ đổi được thư mục, không ai xóa; trigger `items_guard` chỉ cho xếp tệp chính mình tải lên, không mã hóa, cùng đơn vị (cả khi ghi thẳng CSDL); khóa ngoại kèm thuê ước tới `core.files`; sổ kiểm toán qua `core.audit('file_id')` có sẵn — `overview` chỉ giữ `file_id`, không lộ tên thư mục; clerk, staff, manager, director có không gian, `tenant_admin` không (không đọc `core.files`) | **Xong** — 11 test |
 | Thông báo đa kênh (migration `1792281602600_notification_deliveries`): cột `core.notifications.channels` (kênh ngoài svc-workflow khai lúc ghi: `email`, `webhook`); hộp thư đi `core.notification_deliveries` — trigger `notifications_deliveries` tạo một dòng `pending` cho mỗi kênh trong giao dịch ghi thông báo, gọi lại cùng khóa không thêm dòng; chỉ `service` của đơn vị đọc và ghi kết quả (không thêm, không xóa, không đổi kênh), không vai trò người dùng nào đọc; không lưu địa chỉ, URL, nội dung; `sent` phải có `sent_at`; gắn sổ kiểm toán | **Xong** — 6 test |
+| Lô nạp khối lớn (cụm ⑤, migration `1792281602800_import_jobs`): `core.import_jobs` (một lô: loại — hiện chỉ `incoming`, người tạo, phòng, định dạng, băm tệp dữ liệu và zip, `Idempotency-Key` duy nhất theo đơn vị và người tạo, `run_after` cho vòng nền, số đếm chụp lúc đóng — ràng buộc tổng khớp khi `done`), `core.import_rows` (một dòng của tệp: dữ liệu chỉ giữ khi còn chờ, `attempts` 0–20, `claimed_until` và `claim_id` — vòng nền giữ dòng khi đang làm, vòng đã mất dòng không ghi được, kết quả, mã lỗi khi `failed`; khóa ngoại kèm thuê ước, xóa lô thì xóa theo); chỉ `service` của đơn vị đọc, ghi, không vai trò người dùng nào có quyền; không gắn trigger `core.audit()` — `svc-files` ghi `import.created` cùng mutation tạo lô, trigger `import_jobs_finished` ghi `import.finished` đúng một lần khi lô chuyển sang `done` (hai vòng cùng đóng vẫn một dòng); `core.audit_overview` cho thấy loại lô, định dạng, có vào sổ không, số dòng, không thấy tên tệp | **Xong** — 40 test |
 
 ## Vai trò
 
@@ -103,6 +104,19 @@ Tác tử gợi ý giao việc (F4.3) nằm trong `svc-workflow`, cùng vai trò
 `assignment.suggested` trong một yêu cầu GraphQL nhiều trường (một giao dịch). Văn bản, lịch sử giao việc, danh bạ đọc
 bằng vai trò `service` sẵn có. Lãnh đạo đọc gợi ý bằng token của mình; căn cứ chỉ có id, giao diện hỏi lại số ký hiệu,
 trích yếu bằng token người xem.
+
+Nạp lô văn bản đến (`svc-files` `/api/imports`, migration 1792281602800): lô, dòng và dòng sổ `import.created` ghi bằng
+vai trò `service` với thuê ước, người dùng lấy từ token của văn thư đã kiểm lúc tạo lô; không vai trò người dùng nào có
+quyền trên `core.import_jobs`, `core.import_rows`. Vòng nền tìm lô đến giờ của mọi đơn vị bằng khóa quản trị không kèm
+vai trò (chỉ đọc). Mỗi dòng được ghi bằng đúng Action `receiveIncoming` (và `registerIncoming` khi lô có vào sổ) với
+**phiên của văn thư tạo lô**: khóa quản trị kèm `X-Hasura-Role: clerk`, `X-Hasura-Tenant-Id`, `X-Hasura-User-Id`,
+`X-Hasura-Department-Id` lấy từ token đã kiểm lúc tạo lô, không từ dữ liệu của lô. Hasura áp quyền gọi Action của vai
+trò `clerk` như khi văn thư tự gửi; đầu mỗi mẻ `svc-files` kiểm lại danh bạ, văn thư bị khóa hay đổi vai trò thì dòng
+còn chờ dừng (`actor_revoked`). Dòng kết thúc mà không thành văn bản thì `svc-files` gỡ các tệp đã lưu cho dòng bằng
+khóa quản trị không kèm vai trò, `X-Hasura-User-Id: svc-files:import` (vai trò `service` không có quyền xóa
+`core.files`): câu xóa chỉ nhận tệp của người tạo lô trong đơn vị, chưa gắn văn bản nào (khóa ngoại của
+`office.document_files` cũng chặn), tệp đã đặt vào không gian cá nhân thì giữ; sổ kiểm toán có dòng `delete core.files`
+với mã yêu cầu `<lô>:<dòng>`.
 
 ## Sổ kiểm toán chuỗi băm
 

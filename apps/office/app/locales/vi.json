@@ -775,6 +775,10 @@
       },
       "assignment": {
         "suggested": "Gợi ý giao việc"
+      },
+      "import": {
+        "created": "Tạo lô nạp văn bản",
+        "finished": "Xong lô nạp văn bản"
       }
     },
     "entity": {
@@ -794,7 +798,8 @@
         "files": "Tệp tải lên",
         "users": "Người dùng",
         "tenants": "Đơn vị",
-        "notification_deliveries": "Gửi thông báo qua email, webhook"
+        "notification_deliveries": "Gửi thông báo qua email, webhook",
+        "import_jobs": "Lô nạp văn bản"
       },
       "ai": {
         "questions": "Câu hỏi cho trợ lý"
@@ -894,7 +899,14 @@
       "due_days": "Hạn đề xuất",
       "confidence": "Độ tin cậy",
       "evidence": "Số văn bản căn cứ",
-      "candidates": "Số văn bản tương tự"
+      "candidates": "Số văn bản tương tự",
+      "kind": "Loại lô",
+      "format": "Định dạng tệp",
+      "register": "Vào sổ",
+      "total": "Số dòng",
+      "ok": "Dòng đạt",
+      "duplicate": "Dòng trùng",
+      "failed": "Dòng lỗi"
     },
     "direction": {
       "in": "Đến",
@@ -939,6 +951,9 @@
       "extract": "Câu trích nguyên văn",
       "model": "Mô hình ngôn ngữ",
       "none": "Không có"
+    },
+    "importKind": {
+      "incoming": "Văn bản đến"
     }
   },
   "register": {

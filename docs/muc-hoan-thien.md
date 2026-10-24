@@ -166,7 +166,7 @@ chưa phủ hết năng lực của cụm.
 | ④ | Trộn dữ liệu sinh biểu mẫu, báo cáo động | WeasyPrint: `svc_files/render.py` (văn bản đi), `svc_files/registers.py` (sổ đăng ký); dự thảo "Báo cáo sự cố" (`svc_workflow/ot.py`) | Dùng được | Có kiểm trong CI, nhưng khuôn viết trong mã: đổi mẫu phải sửa mã |
 | ⑤ Quy trình, tự động hóa | BPMN quản lý trạng thái luồng phê duyệt | Flowable 8, `services/svc-workflow/processes/*.bpmn20.xml` | Hoàn thiện | F1.4, F2.3, F2.4 |
 | ⑤ | Thực thi kịch bản serverless | — | **Chưa có** | Không có nơi chạy kịch bản do người dùng nạp. Kestra đã cân nhắc nhưng chưa đưa vào (`DEPENDENCIES.md`); việc nền là vòng lặp viết cứng trong `svc-files`, `svc-workflow` |
-| ⑤ | API nạp dữ liệu khối lớn theo lô | — | **Chưa có** | Không có API nhập lô. Hasura sinh `insert_<bảng>` nhận nhiều dòng cho bảng mà vai trò có quyền thêm, nhưng văn bản chỉ vào qua Action, mỗi lần một văn bản; `make seed` cũng gọi từng văn bản |
+| ⑤ | API nạp dữ liệu khối lớn theo lô | `POST /api/imports/incoming` của svc-files (`svc_files/imports/`), bảng `core.import_jobs`, `core.import_rows` | Dùng được | Văn bản đến: tệp NDJSON/CSV + zip tệp đính kèm, xử lý nền theo mẻ; mỗi dòng qua đúng ClamAV và Action `receiveIncoming` thay mặt văn thư, lỗi từng dòng, gửi lại không nhân đôi, chạy tiếp sau khi svc-files khởi động lại. svc-files `test_imports_*.py` 107; db `test_import_jobs.py` 18; `make demo-nap-lo` (chưa là bước CI). Chưa có màn "Nhập lô" trên giao diện — gọi API; mới có một loại lô (văn bản đến); zip tệp đính kèm mất khi svc-files khởi động lại (dòng còn cần tệp báo `archive_lost`) |
 | ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`); `svc-files` ghi mã này vào nhật ký và vào `core.audit_log.request_id` ở các dòng nó tự ghi | Một phần | `svc-workflow` chưa mang mã này; không có log tập trung (F3.14), không tracing. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
 | ⑥ | Kiểm toán bất biến | Sổ kiểm toán chuỗi băm (`db/migrations/default/1792281600100_core_schema/`), neo ra bucket khóa ghi, `scripts/audit_chain.py` | Hoàn thiện | F2.12 |
 | ⑥ | Trục streaming sự kiện | — | **Chưa có** | Không có broker (Kafka hay tương đương). Sự kiện nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`); Centrifugo chỉ đẩy tới trình duyệt. `DEPENDENCIES.md` nêu Hasura Event Triggers thay Redpanda, nhưng `db/metadata` chưa khai event trigger nào |
@@ -176,9 +176,9 @@ chưa phủ hết năng lực của cụm.
 | ⑦ | WebSocket thời gian thực | Centrifugo, `platform/centrifugo/config.yaml`, route `/realtime` | Hoàn thiện | F2.5 |
 | ⑦ | Hàng đợi bất đồng bộ chống chối bỏ | Hộp thư đi `office.dispatches` (`svc_workflow/dispatch.py`); việc giao ra ngoài của Flowable (topic `moc-goi-y`, `moc-sla`) | Một phần | Liên thông (F3.12) có thử lại lùi dần, so SHA-256, ghi sổ kiểm toán cả hai đơn vị trong cùng giao dịch. Chưa có hàng đợi dùng chung cho ứng dụng khác, chưa có biên nhận ký số |
 
-**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 2, Minh họa 1, Một phần 6, **Chưa có 3**.
+**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 3, Minh họa 1, Một phần 6, **Chưa có 2**.
 
-- Chưa có: kịch bản serverless (⑤), API nạp lô (⑤), trục streaming sự kiện (⑥).
+- Chưa có: kịch bản serverless (⑤), trục streaming sự kiện (⑥).
 - Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), log truy vết
   phân tán (⑥), định tuyến thông báo đa kênh (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
 - Bốn dịch vụ bắt buộc (SSO, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình) đều ở mức Hoàn thiện.
