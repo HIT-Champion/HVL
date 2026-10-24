@@ -26,7 +26,9 @@
     "compose": "Soạn văn bản đi",
     "register": "Sổ đăng ký",
     "audit": "Sổ kiểm toán",
-    "board": "Điều hành"
+    "board": "Điều hành",
+    "metrics": "Số đo",
+    "feedback": "Góp ý"
   },
   "role": {
     "clerk": "Văn thư",
@@ -538,7 +540,11 @@
     "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",
     "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
     "documents_restricted_local": "Văn bản hạn chế không gửi liên thông trong hệ thống.",
-    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ (không có, hoặc là chính đơn vị mình), hoặc văn bản đã trình nên không đổi được đơn vị nhận."
+    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ (không có, hoặc là chính đơn vị mình), hoặc văn bản đã trình nên không đổi được đơn vị nhận.",
+    "feedback_rate": "Bạn đã gửi nhiều góp ý trong thời gian ngắn: tối đa 3 góp ý mỗi 10 phút, 20 góp ý mỗi 24 giờ. Thử lại sau.",
+    "feedback_rating": "Chọn mức hài lòng từ 1 đến 5.",
+    "feedback_comment": "Nội dung góp ý dài quá 500 ký tự.",
+    "feedback_screen": "Không gắn được màn hình đang dùng vào góp ý. Tải lại trang rồi gửi lại."
   },
   "validation": {
     "required": "Không được để trống",
@@ -997,5 +1003,109 @@
     "average": "Trung bình",
     "status": "Trạng thái",
     "underHour": "dưới 1 giờ"
+  },
+  "feedback": {
+    "button": "Góp ý",
+    "title": "Góp ý về Văn phòng điện tử",
+    "screen": "Màn hình: {screen}",
+    "screenDocument": "Chi tiết văn bản",
+    "allScreens": "Mọi màn hình",
+    "rating": "Mức hài lòng",
+    "ratingValue": "Mức {n}/5",
+    "low": "Chưa hài lòng",
+    "high": "Rất hài lòng",
+    "comment": "Vài dòng góp ý",
+    "placeholder": "Điều gì chưa tiện, nên sửa gì…",
+    "privacy": "Đừng ghi họ tên, số CCCD, số điện thoại.",
+    "send": "Gửi góp ý",
+    "sent": "Đã gửi góp ý. Cảm ơn bạn!",
+    "mineLink": "Góp ý đã gửi",
+    "pageTitle": "Góp ý",
+    "pageSubtitle": "Mức hài lòng 1–5 và vài dòng về Văn phòng điện tử, gửi bằng nút Góp ý trên thanh trên; màn hình đang dùng tự gắn kèm.",
+    "summary": "Tổng hợp của đơn vị",
+    "sampleNote": "Đơn vị mẫu (make seed): góp ý ở đây là của người dùng thử hệ thống, không phải người dùng ở đơn vị thật.",
+    "none": "Chưa có góp ý nào.",
+    "average": "Điểm trung bình",
+    "count": "Số góp ý",
+    "distribution": "Theo mức",
+    "screenColumn": "Màn hình",
+    "withComment": "Có nội dung",
+    "last": "Gần nhất",
+    "recent": "Góp ý gần đây",
+    "anonymous": "Không hiện người gửi. Giờ gửi vẫn hiện.",
+    "yours": "Của bạn",
+    "mine": "Góp ý của bạn",
+    "mineHint": "Chỉ bạn thấy danh sách này. Lãnh đạo, quản trị đơn vị đọc được nội dung và giờ gửi, không thấy người gửi.",
+    "noneMine": "Bạn chưa gửi góp ý nào."
+  },
+  "metrics": {
+    "title": "Số đo",
+    "subtitle": "Số đo trước / sau theo đặc tả §8, tính từ dữ liệu của đơn vị lúc mở trang. Chỉ có số đếm và số giờ; văn bản hạn chế không tính.",
+    "forbidden": "Chỉ lãnh đạo đơn vị xem được trang này.",
+    "sampleNote": "Số tính trên dữ liệu mẫu (make seed): kịch bản mẫu đi hết các bước trong vài giây, không phải nhịp làm việc thật.",
+    "table": "Bốn chỉ số của đặc tả §8",
+    "indicator": "Chỉ số",
+    "before": "Trước",
+    "after": "Sau (trên hệ thống)",
+    "how": "Cách đo",
+    "notMeasured": "Chưa đo — chưa có đơn vị chạy thử",
+    "noData": "Chưa có dữ liệu",
+    "beforeNote": "Cột Trước đo ở đơn vị chạy thử theo cách làm cũ: hỏi văn thư, sổ tay, bấm giờ, quan sát. Chưa có đơn vị chạy thử nên chưa có số nào, trang không điền số ước đoán. Cách đo và cách đọc: docs/so-lieu-sau.md.",
+    "month": "Tháng",
+    "allMonths": "Mọi tháng",
+    "median": "Trung vị",
+    "unit": {
+      "second": "giây",
+      "minute": "phút",
+      "hour": "giờ",
+      "day": "ngày"
+    },
+    "assign": {
+      "name": "Thời gian từ khi văn bản đến tới khi được giao xử lý",
+      "value": "Trung vị {median} · p90 {p90}",
+      "count": "{n} văn bản đã giao · {waiting} văn bản còn chờ",
+      "how": "Từ lúc tiếp nhận (hoặc liên thông tới) đến lần đầu lãnh đạo giao chủ trì. Văn bản đã hủy, văn bản hạn chế không tính.",
+      "byMonth": "Thời gian tới khi giao xử lý, theo tháng văn bản đến",
+      "arrived": "Đến",
+      "assigned": "Đã giao",
+      "handled": "Tới người xử lý",
+      "monthHint": "Trung vị, p90 của dòng Mọi tháng tính lại trên toàn bộ văn bản, không cộng từ các tháng. Cột cuối: trung vị thời gian tới khi văn bản tới tay một người xử lý."
+    },
+    "overdue": {
+      "name": "Tỷ lệ văn bản xử lý quá hạn",
+      "value": "{pct}% ({late}/{judged} văn bản)",
+      "count": "Trong đó {open} văn bản chưa xong đã qua hạn · {pending} văn bản chưa tới hạn chưa tính",
+      "how": "Hạn giải quyết so với lúc xong, theo giờ Việt Nam; văn bản chưa xong mà đã qua hạn tính là quá hạn. Văn bản không có hạn không tính.",
+      "byMonth": "Quá hạn theo tháng của hạn giải quyết",
+      "dueMonth": "Tháng của hạn",
+      "judged": "Đã rõ",
+      "late": "Quá hạn",
+      "open": "Chưa xong, quá hạn",
+      "pending": "Chưa tới hạn",
+      "monthHint": "Khác số đúng hạn của trang Điều hành: trang đó chỉ đếm văn bản đã xong, theo tháng xong."
+    },
+    "search": {
+      "name": "Thời gian tìm lại một văn bản cũ",
+      "value": "Trung vị {median} · chậm nhất {max}",
+      "count": "{n} lần tìm, thấy {found}/{n}",
+      "how": "Bấm giờ 5 lần tìm số ký hiệu của các văn bản đến cũ nhất: độ trễ hệ thống, không gồm thời gian người gõ và đọc.",
+      "run": "Đo {n} lần tìm",
+      "running": "Đang đo…",
+      "runs": "Các lần tìm",
+      "symbol": "Số, ký hiệu",
+      "latency": "Thời gian",
+      "rank": "Vị trí trong kết quả",
+      "notFound": "Không thấy",
+      "note": "Đo ngay trên trình duyệt này, lần lượt từng lần, nên có cả thời gian đi về qua mạng của bạn; kết quả không lưu lại. Lệnh make do-so-lieu-sau đo cùng cách trên máy chủ."
+    },
+    "searchFew": "Chỉ có {n} văn bản đến có số ký hiệu để tìm, cần {want}.",
+    "handoffs": {
+      "name": "Số bước chuyển tay (in, ký, mang đi, nhắn tin nhắc)",
+      "value": "So sánh định tính, không có số",
+      "how": "So quy trình giấy với quy trình trên hệ thống, từng bước: docs/so-lieu-sau.md."
+    },
+    "feedback": "Góp ý của người dùng",
+    "feedbackValue": "Điểm trung bình {avg}/5 trên {n} góp ý",
+    "feedbackLink": "Xem góp ý"
   }
 }
