@@ -427,6 +427,13 @@ jobs:
         if: matrix.phan == 'ai-sao-luu'
         run: make do-giao-viec
 
+      # F4.6: số đo "sau" của đặc tả §8 bằng quyền lãnh đạo đơn vị, sau màn giao việc để có văn bản đã giao: (a), (b)
+      # từ view, 5 lần tìm lại văn bản đến cũ nhất qua /api/search; đỏ khi thiếu văn bản để tìm hoặc một lần tìm không
+      # ra. Số trên dữ liệu mẫu, không phải số đo của đơn vị thật
+      - name: Số đo "sau" theo đặc tả §8 (make do-so-lieu-sau)
+        if: matrix.phan == 'ai-sao-luu'
+        run: make do-so-lieu-sau
+
       # F4.5 (chỉ minh họa): két trong CI luôn mới nên setup() đã dựng PKI nội bộ → văn bản đi phát hành có chữ ký
       # PAdES bằng khóa transit của đơn vị, băm khớp content_sha256, cổng xác thực trả signature (illustrative);
       # pyHanko trong svc-files kiểm chữ ký hợp lệ, sửa sau khi ký hay lật một byte trong phần đã ký đều bị bắt;

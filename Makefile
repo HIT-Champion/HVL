@@ -46,6 +46,7 @@ PREFIX ?= /opt/moc
         demo-ky-so \
         demo-che-pii do-che-pii \
         demo-ca-nhan \
+        do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
@@ -209,6 +210,9 @@ demo-giao-viec: $(ENV_FILE) ## Màn gợi ý giao việc (F4.3): văn bản mớ
 
 do-giao-viec: $(ENV_FILE) ## Đo tác tử gợi ý giao việc leave-one-out trên lịch sử seed/giao-viec: top-1/2/3, độ phủ, sai số hạn, thời gian (thoát 1 khi căn cứ là văn bản hạn chế hoặc top-1 dưới ngưỡng)
 	@python3 scripts/demo.py do-giao-viec
+
+do-so-lieu-sau: $(ENV_FILE) ## Số đo "sau" của đặc tả §8 (F4.6) trên hệ thống đang chạy: thời gian từ văn bản đến tới khi giao xử lý (trung vị, p90), tỷ lệ quá hạn, 5 lần tìm lại văn bản cũ qua API (độ trễ hệ thống); in bảng, ghi out/so-lieu-sau.json (thoát 1 khi không đo được)
+	@python3 scripts/demo.py do-so-lieu-sau
 
 demo-ky-so: $(ENV_FILE) ## Màn ký số (F4.5, chỉ minh họa): văn bản đi ký PAdES bằng khóa của đơn vị trong két, CA nội bộ; cổng xác thực báo người ký; pyHanko phát hiện sửa sau khi ký, lật một bit; văn bản hạn chế không ký (docs/demo-script.md)
 	@python3 scripts/demo.py ky-so

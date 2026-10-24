@@ -111,7 +111,7 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | F4.3 | Tác tử gợi ý giao việc: nhánh song song từ lúc vào sổ, lãnh đạo quyết | Hoàn thiện | svc-workflow `test_advisor.py` 31, `test_suggest.py` 17; svc-files `test_assist_similar.py` 26; db `test_assignment_suggestions.py` 17; scripts `test_giao_viec.py` 24; office `assignSuggest.test.ts` 13 | bước CI `make demo-giao-viec`, `make do-giao-viec` (đỏ khi top-1 dưới 60 %); smoke 5 kiểm; e2e `giao-viec.spec.ts` | Top-1 29/29 đo trên lịch sử giả lập chia cụm gọn, chỉ 2 đơn vị — cao hơn thực tế (CHANGELOG [1.0.0]); hạn gợi ý chưa xét ngày lễ (`services/svc-workflow/README.md`) |
 | F4.4 | Che thông tin cá nhân trong nhật ký và trong chữ gửi mô hình | Hoàn thiện | svc-files `test_pii*.py` 40 (gồm đo trên kho mẫu và 15 đột biến mã); svc-workflow `test_pii_copy.py` 3, `test_pii_logging.py` 2; scripts `test_che_pii.py` 23 | bước CI `make demo-che-pii`; `make do-che-pii` chạy sẵn trong `make test` (job `unit`) | Chưa che họ tên, địa chỉ, số dính chữ (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi trước; nhật ký Hasura, PostgreSQL, Keycloak, Meilisearch không qua bộ che (CHANGELOG [1.0.0], mục Bảo mật) |
 | F4.5 | Ký số PAdES bản phát hành bằng PKI nội bộ trong két — chỉ minh họa | Minh họa | svc-files `test_signing.py` 28; db `test_file_signatures.py` 14; scripts `test_ky_so.py` 22; office `verify.test.ts` (đã tính ở F2.13) | bước CI `make demo-ky-so`; smoke 5 kiểm (bỏ qua khi két chưa có PKI); e2e `van-ban-di.spec.ts` kiểm khối chữ ký ở cổng xác thực | Không có giá trị pháp lý như chữ ký số công cộng; không HSM; ai chiếm được `svc-files` ký được bằng khóa của đơn vị; két dựng trước F4.5 phải nâng cấp tay để ký |
-| F4.6 | Thu góp ý, đo số liệu "sau" theo đặc tả §8 | Chưa làm | — | — | Repo chưa có số đo trước / sau nào theo `docs/dac-ta-san-pham.md` §8. Các lệnh `make do-*` đo tác tử AI, không phải số đo này |
+| F4.6 | Thu góp ý, đo số liệu "sau" theo đặc tả §8 | Dùng được | db `test_feedback.py` 22, `test_success_metrics.py` 8; office `feedback.test.ts` 11, `metrics.test.ts` 10; scripts `test_so_lieu_sau.py` 16 | job `db`; `make do-so-lieu-sau` (chưa có bước CI); trang Số đo `/so-do` của lãnh đạo đơn vị, nút Góp ý và trang `/gop-y` | Cột "trước" của cả bốn chỉ số chưa đo — chưa có đơn vị chạy thử; số trên bản demo tính trên dữ liệu mẫu (seed đi hết các bước trong vài giây); thời gian tìm lại văn bản cũ là độ trễ hệ thống, không phải thời gian người tìm; số bước chuyển tay chỉ so sánh định tính; chưa có ≥ 5 người ngoài đội góp ý như kế hoạch; góp ý không hiện người gửi nhưng không ẩn danh (giờ gửi chính xác, khuôn màn hình có thể lộ vai trò), không lọc CCCD, số điện thoại trong nội dung (`docs/so-lieu-sau.md`) |
 
 ### 2.5. Ngoài danh sách F — kiểm chất lượng của dự án
 
@@ -131,10 +131,10 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | Mức | Số | Tính năng |
 |---|---|---|
 | Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 6 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14 |
+| Dùng được | 7 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F4.6 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
-| Chưa làm | 2 | F3.15, F4.6 |
+| Chưa làm | 1 | F3.15 |
 
 ## 3. Độ phủ 7 cụm dịch vụ Tầng 1
 

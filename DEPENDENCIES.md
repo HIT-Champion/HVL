@@ -25,7 +25,10 @@ sử dụng"*).
   6.21.1 (17/10, vá 5 GHSA của 6.19.0) — cả hai đọc tệp người dùng tải lên (`svc-files`); certifi 2026.10.19 (20/10,
   bỏ gốc emSign có CA trung gian lộ khóa, GHSA-6q48-6c7w-9gw2). 23/10/2026: brotli 1.2.1 và brotlicffi 1.2.1.0 (22/10,
   vá lỗi ghi tràn bộ nhớ trong bộ giải nén, PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) — gói kéo theo của fontTools mà
-  WeasyPrint dùng trong `svc-files`.
+  WeasyPrint dùng trong `svc-files`. 24/10/2026: pypdf 6.21.2 (21/10, vá GHSA-6c7f-9265-g8fw, GHSA-gmh7-3g9r-mjh5,
+  GHSA-jr96-gvgh-j3r4, HIGH: PDF dị dạng làm chạy rất lâu); serialize-javascript 7.1.3 (22/10, GHSA-m5mm-p8h7-m29v)
+  và fast-uri 3.1.9 (19/10, bốn GHSA mức LOW/MODERATE) — gói kéo theo khi dựng `apps/office`, chọn đúng bản vá chứ
+  không lấy bản mới hơn (serialize-javascript 7.1.4 ra 23/10).
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -137,7 +140,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | Pillow | 13.0 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
 | Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Signet dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
-| pypdf | 6.21.1 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
+| pypdf | 6.21.2 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
