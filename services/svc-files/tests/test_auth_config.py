@@ -167,3 +167,41 @@ def test_three_models_for_two_ollama_slots_is_a_warning_not_an_error():
     assert Settings.from_env({**ai, "MOC_AI_URL": "", "MOC_ASK_MODEL": "qwen3:4b"}).warnings() == []
     (warning,) = Settings.from_env({**ai, "MOC_ASK_MODEL": "qwen3:4b"}).warnings()
     assert "qwen3:4b" in warning and "qwen3:1.7b" in warning and "OLLAMA_MAX_LOADED_MODELS" in warning
+
+
+# --- biến của lô nạp văn bản đến (imports/) -------------------------------------------------------------------------
+
+def test_import_settings_defaults():
+    s = Settings.from_env(BASE)
+    assert (s.import_interval_s, s.import_chunk, s.import_max_open) == (2.0, 20, 3)
+    assert (s.import_max_rows, s.import_register_max_rows) == (1000, 200)
+    assert (s.import_data_max_bytes, s.import_zip_max_bytes) == (5 * 1024 * 1024, 50 * 1024 * 1024)
+    assert (s.import_spool_dir, s.import_spool_bytes) == ("/tmp/moc-nap-lo", 200 * 1024 * 1024)
+    assert s.import_store_max_bytes == 200 * 1024 * 1024
+    assert Settings.from_env({**BASE, "MOC_IMPORT_STORE_MAX_MB": "30"}).import_store_max_bytes == 30 * 1024 * 1024
+    assert s.warnings() == []
+
+
+@pytest.mark.parametrize("env", [
+    {"MOC_IMPORT_INTERVAL_S": "-1"}, {"MOC_IMPORT_CHUNK": "0"}, {"MOC_IMPORT_CHUNK": "201"},
+    {"MOC_IMPORT_MAX_ROWS": "0"}, {"MOC_IMPORT_MAX_ROWS": "100001"},
+    {"MOC_IMPORT_REGISTER_MAX_ROWS": "0"}, {"MOC_IMPORT_MAX_ROWS": "100", "MOC_IMPORT_REGISTER_MAX_ROWS": "101"},
+    {"MOC_IMPORT_DATA_MAX_MB": "0"}, {"MOC_IMPORT_ZIP_MAX_MB": "0"}, {"MOC_IMPORT_SPOOL_MB": "0"},
+    {"MOC_IMPORT_ZIP_MAX_MB": "60", "MOC_IMPORT_SPOOL_MB": "50"}, {"MOC_IMPORT_MAX_OPEN": "0"},
+    {"MOC_IMPORT_SPOOL_DIR": "nap-lo"}, {"MOC_IMPORT_MAX_ROWS": "nhieu"},
+    {"MOC_IMPORT_STORE_MAX_MB": "0"}, {"MOC_IMPORT_STORE_MAX_MB": "-5"}, {"MOC_IMPORT_STORE_MAX_MB": "200MB"},
+])
+def test_bad_import_settings_stop_startup(env):
+    with pytest.raises(ConfigError):
+        Settings.from_env({**BASE, **env})
+
+
+def test_import_interval_zero_turns_imports_off():
+    s = Settings.from_env({**BASE, "MOC_IMPORT_INTERVAL_S": "0", "MOC_IMPORT_REGISTER_MAX_ROWS": "1000"})
+    assert s.import_interval_s == 0 and s.import_register_max_rows == 1000
+
+
+def test_import_request_over_the_gateway_limit_is_a_warning():
+    assert Settings.from_env({**BASE, "MOC_IMPORT_DATA_MAX_MB": "13", "MOC_IMPORT_ZIP_MAX_MB": "50"}).warnings() == []
+    (warning,) = Settings.from_env({**BASE, "MOC_IMPORT_DATA_MAX_MB": "14", "MOC_IMPORT_ZIP_MAX_MB": "50"}).warnings()
+    assert "63 MB" in warning and "client_max_body_size" in warning

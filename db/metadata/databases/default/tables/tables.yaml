@@ -52,3 +52,5 @@
 - "!include office_v_time_to_assign.yaml"
 - "!include office_v_overdue_rate.yaml"
 - "!include office_v_feedback_summary.yaml"
+- "!include core_import_jobs.yaml"
+- "!include core_import_rows.yaml"

@@ -205,6 +205,363 @@
         }
       }
     },
+    "/api/imports/{kind}": {
+      "post": {
+        "summary": "Nạp lô: gửi tệp NDJSON/CSV nhiều văn bản đến (kèm zip tệp đính kèm), xử lý nền",
+        "description": "Chỉ văn thư. Mỗi dòng đi đúng đường tiếp nhận lẻ: tệp đính kèm qua trạm quét ClamAV rồi mới vào kho, Action `receiveIncoming` thay mặt người gửi (cách ly đơn vị, sổ kiểm toán chuỗi băm từng văn bản), tùy chọn `registerIncoming`. Lỗi một dòng không hỏng dòng khác. Trả 202 và `Location` của lô; theo dõi ở GET /api/imports/{id}, lỗi từng dòng ở /rows. Gửi lại cùng tệp không nhân đôi: dòng đã nạp báo `duplicate`; kèm `Idempotency-Key` thì nhận lại đúng lô cũ (200).",
+        "operationId": "create_import_api_imports__kind__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "const": "incoming",
+              "type": "string",
+              "description": "Loại lô; hiện có incoming (văn bản đến)",
+              "title": "Kind"
+            },
+            "description": "Loại lô; hiện có incoming (văn bản đến)"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ndjson",
+                    "csv"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Thiếu thì đoán theo đuôi tên tệp (.ndjson, .jsonl, .csv) rồi theo Content-Type",
+              "title": "Format"
+            },
+            "description": "Thiếu thì đoán theo đuôi tên tệp (.ndjson, .jsonl, .csv) rồi theo Content-Type"
+          },
+          {
+            "name": "register",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Vào sổ từng văn bản sau khi tiếp nhận (cấp số đến, khởi chạy quy trình, báo lãnh đạo). Lô có vào sổ tối đa MOC_IMPORT_REGISTER_MAX_ROWS dòng",
+              "default": false,
+              "title": "Register"
+            },
+            "description": "Vào sổ từng văn bản sau khi tiếp nhận (cấp số đến, khởi chạy quy trình, báo lãnh đạo). Lô có vào sổ tối đa MOC_IMPORT_REGISTER_MAX_ROWS dòng"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tùy chọn, 1–200 ký tự ASCII in được: gửi lại cùng khóa trả đúng lô cũ",
+              "title": "Idempotency-Key"
+            },
+            "description": "Tùy chọn, 1–200 ký tự ASCII in được: gửi lại cùng khóa trả đúng lô cũ"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Gửi lại cùng Idempotency-Key, cùng nội dung: lô đã tạo trước đó",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`missing_file` · `unknown_format` · `bad_encoding` (không phải UTF-8) · `bad_header` (CSV thiếu cột bắt buộc, có cột lạ) · `bad_format` (CSV hỏng cấu trúc) · `empty` · `bad_archive` (zip hỏng, quá 5000 mục, tên trùng) · `bad_idempotency_key` · `empty_file`"
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "`forbidden` — không phải văn thư · `unknown_tenant`"
+          },
+          "409": {
+            "description": "`idempotency_conflict` — cùng Idempotency-Key mà khác tệp, định dạng hoặc register"
+          },
+          "413": {
+            "description": "`too_large` (thân yêu cầu, tệp dữ liệu MOC_IMPORT_DATA_MAX_MB, zip MOC_IMPORT_ZIP_MAX_MB, tổng cỡ tệp các dòng trỏ tới — mỗi lần trỏ tính một lần — MOC_IMPORT_STORE_MAX_MB) · `too_many_rows` (MOC_IMPORT_MAX_ROWS; register=true: MOC_IMPORT_REGISTER_MAX_ROWS)"
+          },
+          "422": {
+            "description": "`infected` / `unscannable` — chính tệp dữ liệu bị trạm quét chặn, đã ghi `file.rejected` vào sổ kiểm toán, không tạo lô"
+          },
+          "429": {
+            "description": "`too_many_imports` — đơn vị đã có MOC_IMPORT_MAX_OPEN lô chưa xong (kèm `Retry-After`)"
+          },
+          "503": {
+            "description": "`imports_disabled` (MOC_IMPORT_INTERVAL_S=0) · `busy` (chỗ giữ zip đầy, kèm `Retry-After`) · `scanner_unavailable` · `database_unavailable`"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "data"
+                ],
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "NDJSON (mỗi dòng một object) hoặc CSV có tiêu đề, UTF-8; cùng trường với receiveIncoming(data), thêm `files`: tên tệp trong zip, tệp đầu là bản chính"
+                  },
+                  "archive": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Zip tệp đính kèm (tùy chọn)"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{job_id}": {
+      "get": {
+        "summary": "Trạng thái một lô nạp: đã nhận, đang chờ, đạt, trùng, lỗi",
+        "operationId": "get_import_api_imports__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "`not_found` — không có lô, hoặc lô của người khác (kể cả cùng đơn vị) — hai trường hợp như nhau"
+          },
+          "503": {
+            "description": "`database_unavailable`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{job_id}/rows": {
+      "get": {
+        "summary": "Kết quả từng dòng của lô nạp (số dòng, mã, lý do) — không trả lại dữ liệu đã gửi",
+        "operationId": "import_rows_api_imports__job_id__rows_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "ok",
+                    "duplicate",
+                    "failed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Số dòng cuối của trang trước (`next_after`)",
+              "default": 0,
+              "title": "After"
+            },
+            "description": "Số dòng cuối của trang trước (`next_after`)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRowsOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "`not_found` — không có lô, hoặc lô của người khác (kể cả cùng đơn vị) — hai trường hợp như nhau"
+          },
+          "503": {
+            "description": "`database_unavailable`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports": {
+      "get": {
+        "summary": "Các lô nạp của chính người gọi, mới trước",
+        "operationId": "list_imports_api_imports_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportsOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "503": {
+            "description": "`database_unavailable`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/{file_id}": {
       "get": {
         "summary": "Tải tệp xuống, nếu người gọi được xem tệp",
@@ -1479,6 +1836,273 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImportOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "incoming",
+            "title": "Kind",
+            "description": "incoming: văn bản đến"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done"
+            ],
+            "title": "Status",
+            "description": "queued: chờ vòng nền · running: đang xử lý · done: mọi dòng đã xong (đạt, trùng hoặc lỗi)"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Tên tệp dữ liệu đã gửi"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "ndjson",
+              "csv"
+            ],
+            "title": "Format"
+          },
+          "register": {
+            "type": "boolean",
+            "title": "Register",
+            "description": "Vào sổ từng văn bản sau khi tiếp nhận (registerIncoming)"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Số dòng dữ liệu đã nhận (không tính dòng trống, tiêu đề CSV)"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending",
+            "description": "Dòng chưa xử lý"
+          },
+          "ok": {
+            "type": "integer",
+            "title": "Ok",
+            "description": "Dòng đã ghi (và vào sổ khi register=true)"
+          },
+          "duplicate": {
+            "type": "integer",
+            "title": "Duplicate",
+            "description": "Dòng trùng văn bản đã có (cùng số ký hiệu, cơ quan ban hành, ngày ban hành)"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "description": "Dòng lỗi — lý do ở GET /api/imports/{id}/rows?status=failed"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Ghi chú của lô, vd tạm dừng vì lõi bận, tệp nén mất sau khi svc-files khởi động lại"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "filename",
+          "format",
+          "register",
+          "total",
+          "pending",
+          "ok",
+          "duplicate",
+          "failed",
+          "note",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "ImportOut"
+      },
+      "ImportRowOut": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line",
+            "description": "NDJSON: dòng vật lý tính từ 1; CSV: hàng như Excel (tiêu đề là 1)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "duplicate",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Mã lỗi khi failed, vd invalid, bad_json, missing_attachment, infected, archive_lost, register_failed (services/svc-files/README.md)"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Lý do, tiếng Việt"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "Lỗi theo trường như form tiếp nhận: trường → mã (schemas/README.md)"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Văn bản đã tạo (cả khi vào sổ lỗi: register_failed)"
+          },
+          "register_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Register Number",
+            "description": "Số đến khi register=true"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "status",
+          "code",
+          "message",
+          "fields",
+          "document_id",
+          "register_number"
+        ],
+        "title": "ImportRowOut"
+      },
+      "ImportRowsOut": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "next_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next After",
+            "description": "Gửi lại ở tham số `after` để lấy trang sau; null khi đã hết"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "next_after"
+        ],
+        "title": "ImportRowsOut"
+      },
+      "ImportsOut": {
+        "properties": {
+          "imports": {
+            "items": {
+              "$ref": "#/components/schemas/ImportOut"
+            },
+            "type": "array",
+            "title": "Imports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "imports"
+        ],
+        "title": "ImportsOut"
       },
       "ReadField": {
         "properties": {

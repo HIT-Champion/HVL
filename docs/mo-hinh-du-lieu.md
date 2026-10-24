@@ -140,7 +140,11 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 **Chuỗi băm** (cài ở #18 — `db/migrations/`, cách dùng ở `db/README.md`):
 
 - Trigger `core.audit()` gắn vào mọi bảng nghiệp vụ (trừ `office.document_events` và `office.feedback` — góp ý
-  không gắn sổ để lãnh đạo đọc sổ không biết ai góp ý gì, §2.5), ghi các cột đã đổi.
+  không gắn sổ để lãnh đạo đọc sổ không biết ai góp ý gì, §2.5), ghi các cột đã đổi. Hàng đợi của lô nạp
+  (`core.import_jobs`, `core.import_rows`) cũng không gắn: mỗi mẻ đổi `run_after` và từng dòng, gắn trigger thì
+  lô vài trăm dòng làm sổ phình mà không thêm gì — thay vào đó `svc-files` ghi `import.created` lúc tạo lô, trigger
+  `import_jobs_finished` ghi `import.finished` đúng một lần khi lô chuyển sang `done`; mỗi văn bản tạo ra vẫn có
+  dòng sổ của nó.
 - Trigger `before insert` trên `core.audit_log` khóa dòng đầu chuỗi `core.audit_head (last_id, last_hash)`,
   cấp `id = last_id + 1`, đặt `occurred_at`, `prev_hash`, `hash` — người ghi không chọn được các cột này.
   Khóa dòng thay cho `pg_advisory_xact_lock`: ở `READ COMMITTED` giao dịch sau đợi rồi đọc đầu chuỗi mới;
@@ -188,7 +192,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   mô hình sinh và mô hình nhúng, thời gian, mã cảnh báo của câu trả lời `assistant.answered` — migration
   1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý, số ngày đề xuất,
   độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
-  `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó). Lãnh đạo không đọc được văn bản hạn chế
+  `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó; loại lô, định dạng, có vào sổ không, số
+  dòng, số đạt / trùng / lỗi của lô nạp `import.created`, `import.finished` — migration 1792281602800, tên tệp vẫn
+  ẩn). Lãnh đạo không đọc được văn bản hạn chế
   thì sổ cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
@@ -356,6 +362,23 @@ Kênh ngoài (email, webhook; migration 1792281602600): svc-workflow khai ở c�
 — và không có địa chỉ email, URL hay nội dung: người nhận đọc từ `core.users` lúc gửi. Chỉ `service` của đơn vị đọc và
 ghi kết quả; người dùng không đọc (mô tả: `services/svc-workflow/README.md`).
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
+
+**Lô nạp khối lớn** (cụm ⑤, migration 1792281602800; mô tả: `services/svc-files/README.md`, mục Nạp lô văn bản
+đến). Hàng đợi bền trong CSDL như hộp thư đi. `core.import_jobs` một dòng mỗi lô: `kind` (hiện chỉ `incoming` — văn
+bản đến; thêm loại là migration mở rộng check cùng một handler trong `svc-files`), người tạo (`created_by`, sub trong
+token), phòng lúc tạo, `status` `queued` → `running` → `done`, tên và định dạng tệp (`ndjson` | `csv`), băm tệp dữ
+liệu và zip, `options` (`{"register": bool}`), `idempotency_key` (unique theo đơn vị và người tạo: gửi lại cùng khóa
+trả lô cũ), `total`, `run_after` (vòng nền làm lô đến giờ, sớm nhất trước; lỗi tạm thì lùi lại), `ok` / `duplicate` /
+`failed` chụp lúc đóng lô (`import_jobs_closed`: lô `done` thì tổng khớp), `note`. `core.import_rows` một dòng mỗi
+dòng của tệp, khóa `(job_id, line)` — `line` là số dòng người gửi thấy (NDJSON: dòng vật lý; CSV: hàng như Excel);
+`data` chỉ giữ khi `pending`, xong thì xóa; `files` (tên trong zip, tối đa 20); `attempts` 0–20 (khóa lạc quan của
+vòng nền); `claimed_until` (vòng nền giữ dòng tới lúc này: nhận dòng là cập nhật có điều kiện, hai vòng không cùng làm
+một dòng; quá hạn thì nhận lại được); `claim_id` (mã lượt giữ: lưu tiến độ, ghi kết quả đều kèm mã này, vòng đã mất
+dòng không ghi đè được); `result` (id tệp đã lưu khi còn chờ, id văn bản, số đến); `code` chỉ khi
+`failed`, `message`, `fields` (lỗi theo trường). Dòng không thành văn bản thì svc-files gỡ tệp đã lưu cho dòng (khóa
+quản trị, chỉ tệp chưa gắn văn bản của người tạo lô).
+Khóa ngoại `(job_id, tenant_id)` kèm thuê ước, xóa lô thì xóa dòng. Chỉ `service` của đơn vị đọc, ghi;
+không vai trò người dùng nào có quyền — API `/api/imports` (§4.3) kiểm token, chỉ cho người tạo xem lô của mình.
 
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
 create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
@@ -1175,6 +1198,10 @@ Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
+| `POST /api/imports/incoming` | `clerk` | Nạp lô văn bản đến (cụm ⑤): multipart `data` (NDJSON hoặc CSV, cùng trường với `receiveIncoming`, thêm `files`: tên tệp trong zip) + `archive` (zip) tùy chọn, `?register=true` vào sổ từng văn bản, `Idempotency-Key` tùy chọn. Kiểm cả tệp (tệp dữ liệu qua ClamAV), ghi lô + dòng + `import.created` trong một mutation, trả 202. Vòng nền đưa từng dòng qua đúng `ingest()` và Action `receiveIncoming` (tùy chọn `registerIncoming`) với phiên của văn thư tạo lô; lỗi một dòng không hỏng dòng khác. Chi tiết lỗi: README của `svc-files` |
+| `GET /api/imports/{id}` | Người tạo lô | Trạng thái, số dòng đã nhận, còn chờ, đạt, trùng, lỗi; người khác (kể cả cùng đơn vị) → 404 |
+| `GET /api/imports/{id}/rows` | Người tạo lô | Kết quả từng dòng: số dòng, mã, lý do, lỗi theo trường, id văn bản, số đến; không trả lại dữ liệu đã gửi |
+| `GET /api/imports` | Người đăng nhập | Các lô của chính người gọi, mới trước |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, ký số (F4.5, chỉ minh họa — xem dưới), quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}`, `sha256` là băm của bản đã ký. 503 `signing_unavailable` khi két không trả lời (không lưu gì, văn thư bấm lại) |
 | `POST /internal/similar-documents` | Chỉ tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`svc-workflow`), không qua APISIX, không có trong `/openapi.json` | Gợi ý giao việc (F4.3): `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15) → `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` — văn bản đến khác đã giao (`in_progress`, `done`, `archived`) tương tự theo trích yếu, điểm giảm dần, đã hậu kiểm bỏ văn bản hạn chế; dùng lại phần truy xuất của trợ lý hỏi đáp (phạm vi vai trò `service` của thuê ước). Không trả chữ nào (`terms` chỉ là số từ của câu tìm), nhật ký không ghi trích yếu. 404 `not_found`; 409 `not_incoming`, `restricted` (không tìm gì thêm); 503 `assistant_disabled` (`MOC_ASK_ENABLED=false`), `search_unavailable`, `database_unavailable` |
 | `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |

@@ -45,6 +45,7 @@ PREFIX ?= /opt/moc
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
+        demo-nap-lo nap-lo-mau \
         demo-ca-nhan \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung \
@@ -223,6 +224,12 @@ demo-che-pii: $(ENV_FILE) ## Màn che thông tin cá nhân (F4.4): đơn giả l
 do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 15 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
 	  tests/test_pii_corpus.py tests/test_pii_mutation.py
+
+demo-nap-lo: $(ENV_FILE) ## Màn nạp lô văn bản đến (cụm ⑤): 200 dòng + zip qua API, EICAR bị chặn, gửi lại không trùng
+	@python3 scripts/demo.py nap-lo
+
+nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến mẫu, có dòng sai cố ý (không cần Docker)
+	@python3 scripts/nap_lo_mau.py
 
 demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
 	@python3 scripts/demo_ca_nhan.py
