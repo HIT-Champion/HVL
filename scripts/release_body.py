@@ -87,7 +87,7 @@ def main(argv: list[str]) -> int:
         sys.stderr.write(proc.stderr)
         return 1
     repo_url = (f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/"
-                f"{os.environ.get('GITHUB_REPOSITORY', 'HIT-Champion/HVL')}")
+                f"{os.environ.get('GITHUB_REPOSITORY', 'HIT-Champion/Signet')}")
     sys.stdout.buffer.write(body(version, proc.stdout, repo_url).encode())
     return 0
 

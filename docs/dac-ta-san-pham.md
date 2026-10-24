@@ -308,8 +308,9 @@ Chỉ trình bày số đo thật. Chỉ số nào chưa đo được thì nói 
 
 1. **Tên sản phẩm — đã chốt 15/10/2026: Mộc** (theo chữ "đóng mộc" — đóng dấu). Hai tên đã loại:
    "DX-Lab" trùng ứng dụng của HaUI và tên Trạm thực hành số trong chủ đề cuộc thi; "AgentLab" trùng
-   dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL`;
-   tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi trường `MOC_*`.
+   dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL` (đổi thành
+   `Signet` ngày 25/10/2026); tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi
+   trường `MOC_*`.
    **Đổi 23/10/2026: Signet** — nhẫn ấn đóng dấu lên văn bản, giữ ý "đóng dấu" của tên cũ; chỉ đổi tên hiển thị
    (giao diện, tài liệu, chuỗi in ra, header giấy phép "Signet Team"), tên kỹ thuật `moc` giữ nguyên.
 2. **Đơn vị chạy thử**: văn thư khoa nào đồng ý dùng thử; nếu không, dùng phương án dự phòng ở kế hoạch §1.1.

@@ -40,9 +40,9 @@ và quyền Hasura — không sửa mã của lõi (`services/`), ví dụ đầ
 #    (sửa lỗi chính tả, tài liệu nhỏ thì bỏ qua bước này)
 
 # 2. Fork repo trên GitHub, rồi tải bản fork về máy
-git clone https://github.com/<tài-khoản-của-bạn>/HVL.git
-cd HVL
-git remote add upstream https://github.com/HIT-Champion/HVL.git
+git clone https://github.com/<tài-khoản-của-bạn>/Signet.git
+cd Signet
+git remote add upstream https://github.com/HIT-Champion/Signet.git
 
 # 3. Tạo nhánh từ develop mới nhất của repo gốc (nhánh mặc định; main chỉ chứa bản đã phát hành)
 git fetch upstream
@@ -57,7 +57,7 @@ make license-check    # bảo đảm mọi tệp mã có header giấy phép
 make check            # kiểm tra môi trường + cú pháp Compose
 
 # 6. Commit theo quy ước bên dưới, đẩy lên bản fork,
-#    rồi mở pull request vào nhánh develop của HIT-Champion/HVL
+#    rồi mở pull request vào nhánh develop của HIT-Champion/Signet
 git push -u origin feat/<số-issue>-<mô-tả-ngắn>
 ```
 

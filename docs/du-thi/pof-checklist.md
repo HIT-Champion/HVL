@@ -80,14 +80,14 @@ git push origin main --tags
 
 ```bash
 cd /tmp && rm -rf pof-test && mkdir pof-test && cd pof-test
-git clone <URL-repo> && cd HVL
+git clone <URL-repo> && cd Signet
 cp .env.example .env
 make check && make build && make up
 # Hệ thống phải chạy được mà không cần sửa bất kỳ tệp mã nào.
 
 # Chạy ngoài thư mục mã nguồn: cài, xóa hẳn mã nguồn, chạy từ PREFIX
 make down && make install PREFIX=/tmp/pof-test/opt-moc
-cd /tmp/pof-test && rm -rf HVL && cd opt-moc
+cd /tmp/pof-test && rm -rf Signet && cd opt-moc
 docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.py
 ```
 

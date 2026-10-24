@@ -50,7 +50,7 @@ import httpx2
 
 log = logging.getLogger("svc_files")
 
-PRODUCER = "https://github.com/HIT-Champion/HVL/tree/main/services/svc-files"
+PRODUCER = "https://github.com/HIT-Champion/Signet/tree/main/services/svc-files"
 SPEC = "https://openlineage.io/spec"
 RUN_EVENT = f"{SPEC}/2-0-2/OpenLineage.json#/$defs/RunEvent"
 JOB_NAMESPACE = "moc"

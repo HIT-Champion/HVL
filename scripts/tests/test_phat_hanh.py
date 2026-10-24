@@ -230,7 +230,7 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 
     def guard(self, releases: list[dict], fail: str = "") -> subprocess.CompletedProcess[str]:
         (self.dir / "releases.json").write_text(json.dumps(releases), encoding="utf-8")
-        env = {**os.environ, "PATH": f"{self.dir}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "HIT-Champion/HVL",
+        env = {**os.environ, "PATH": f"{self.dir}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "HIT-Champion/Signet",
                "GITHUB_REF_NAME": "v0.2.0", "FAKE_RELEASES": str(self.dir / "releases.json"),
                "FAKE_GH_CALLS": str(self.dir / "calls"), "FAKE_GH_FAIL": fail}
         return subprocess.run(["bash", "-e", "-c", step_script("Chặn phát hành lại")], env=env, capture_output=True,
@@ -238,19 +238,19 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 
     @staticmethod
     def release(tag: str, draft: bool = False) -> dict:
-        return {"tag_name": tag, "draft": draft, "html_url": f"https://github.com/HIT-Champion/HVL/releases/{tag}"}
+        return {"tag_name": tag, "draft": draft, "html_url": f"https://github.com/HIT-Champion/Signet/releases/{tag}"}
 
     def test_new_tag_passes_and_lists_every_page(self) -> None:
         proc = self.guard([self.release("v0.1.0"), self.release("v0.2.0-rc.1", draft=True), self.release("v0.2.00")])
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         calls = (self.dir / "calls").read_text(encoding="utf-8")
         self.assertIn("--paginate", calls)
-        self.assertIn("repos/HIT-Champion/HVL/releases?per_page=100", calls)
+        self.assertIn("repos/HIT-Champion/Signet/releases?per_page=100", calls)
 
     def test_published_release_stops(self) -> None:
         proc = self.guard([self.release("v0.1.0"), self.release("v0.2.0")])
         self.assertEqual(proc.returncode, 1)
-        self.assertIn("::error::v0.2.0 đã có Release (đã đăng https://github.com/HIT-Champion/HVL/releases/v0.2.0)",
+        self.assertIn("::error::v0.2.0 đã có Release (đã đăng https://github.com/HIT-Champion/Signet/releases/v0.2.0)",
                       proc.stdout)
 
     def test_draft_left_by_deleted_tag_stops(self) -> None:
@@ -302,7 +302,7 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 class ReleaseBodyTest(unittest.TestCase):
     """scripts/release_body.py: trang Release ngắn — tóm tắt hiện ra, ghi chép đầy đủ gập lại, không gãy dòng."""
 
-    URL = "https://github.com/HIT-Champion/HVL"
+    URL = "https://github.com/HIT-Champion/Signet"
     NOTES = ("Bản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng,\n"
              "dựng từ mã nguồn bằng make.\n"
              "\n"
@@ -332,7 +332,7 @@ class ReleaseBodyTest(unittest.TestCase):
 
     def test_continuation_lines_join_and_relative_links_point_at_the_tag(self) -> None:
         out = release_body.body("1.1.0", self.NOTES, self.URL)
-        self.assertIn("- Cổng xác thực, xem [docs/api/](https://github.com/HIT-Champion/HVL/blob/v1.1.0/docs/api/"
+        self.assertIn("- Cổng xác thực, xem [docs/api/](https://github.com/HIT-Champion/Signet/blob/v1.1.0/docs/api/"
                       "README.md) và [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/).\n- Sổ đăng ký.\n\n"
                       "### Đã sửa lỗi\n", out)
 
