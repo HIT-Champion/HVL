@@ -346,6 +346,12 @@ jobs:
         if: matrix.phan == 'luong-chinh'
         run: make demo-lien-thong
 
+      # Cụm ⑤: văn thư Khoa Kinh tế nạp 200 văn bản đến một lần (NDJSON + zip) → đúng số đạt / trùng / lỗi theo các dòng
+      # sai cố ý, tệp EICAR trong zip bị chặn và không vào kho, mỗi văn bản một dòng sổ; gửi lại không nhân đôi
+      - name: Nạp lô văn bản đến (make demo-nap-lo)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-nap-lo
+
       # F3.12: thêm đơn vị thứ ba bằng một lệnh (CSDL, Organization, quản trị đơn vị); chạy lại không tạo gì mới, không
       # đặt lại mật khẩu; đối chiếu khớp. Mật khẩu tạm không ra nhật ký CI
       - name: Thêm đơn vị bằng một lệnh (moc tenant create, check)

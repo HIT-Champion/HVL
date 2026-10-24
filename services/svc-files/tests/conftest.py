@@ -1038,6 +1038,8 @@ def settings() -> Settings:
             "MOC_TEXT_INTERVAL_S": "0",
             "MOC_FILES_MAX_MB": "1",
             "MOC_AI_URL": "",       # không dò Ollama trong test (test đọc văn bản đến tự tiêm mô hình giả)
+            # vòng nền nạp lô tắt (không tạo thư mục spool); test nạp lô tự dựng Settings riêng (test_imports_*.py)
+            "MOC_IMPORT_INTERVAL_S": "0",
         }
     )
 

@@ -33,7 +33,9 @@ svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kh
 (F4.1): văn thư gọi /api/files/{id}/read, tác tử đọc tệp vừa tải lên và gợi ý thông tin tiếp nhận — docread/. Hỏi đáp
 trên kho văn bản (F4.2): /api/documents/ask trả câu trích nguyên văn có nguồn từ các văn bản người hỏi được xem, tùy
 chọn câu trả lời do mô hình viết; vòng nền giữ chỉ mục đoạn `chunks` — assist/. Trạng thái hệ thống: /api/status gom
-tình trạng các thành phần cho trang công khai /trang-thai, đã làm sạch và lưu đệm — status.py.
+tình trạng các thành phần cho trang công khai /trang-thai, đã làm sạch và lưu đệm — status.py. Nạp lô văn bản đến:
+văn thư gửi tệp NDJSON/CSV (kèm zip) ở /api/imports/incoming, vòng nền đưa từng dòng qua đúng đường tải lên lẻ
+(ingest) và Action receiveIncoming thay mặt họ — imports/.
 
 Chạy: ``uvicorn svc_files.app:create_app --factory``
 """
@@ -46,6 +48,7 @@ import hashlib
 import io
 import json
 import logging
+import mimetypes
 import os
 import re
 import time
@@ -55,7 +58,7 @@ from collections.abc import Iterator
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
-from typing import Annotated, BinaryIO, Literal
+from typing import Annotated, BinaryIO, Literal, Protocol
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
@@ -82,6 +85,10 @@ from .docread import api as docread_api
 from .docread.reader import Reader
 from .docread.summarize import make_summarizer
 from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
+from .imports import api as imports_api
+from .imports.runner import Importer, IncomingHandler
+from .imports.spool import Spool
+from .imports.store import ImportStore
 from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
@@ -326,7 +333,30 @@ class _Digest:
         return self._h.hexdigest()
 
 
-async def _read_chunks(upload: UploadFile, digest: _Digest, limit: int) -> AsyncIterator[bytes]:
+class Readable(Protocol):
+    """Tệp đọc được hai lượt (quét rồi ghi kho): UploadFile của Starlette, hoặc MemoryFile."""
+
+    file: BinaryIO
+
+    async def read(self, size: int = -1) -> bytes: ...
+    async def seek(self, offset: int) -> None: ...
+
+
+class MemoryFile:
+    """Tệp trong bộ nhớ đọc như UploadFile — tệp lấy ra từ tệp nén của lô nạp đi đúng đường quét, ghi kho của tệp tải
+    lên lẻ (ingest)."""
+
+    def __init__(self, data: bytes) -> None:
+        self.file: BinaryIO = io.BytesIO(data)
+
+    async def read(self, size: int = -1) -> bytes:
+        return self.file.read(size)
+
+    async def seek(self, offset: int) -> None:
+        self.file.seek(offset)
+
+
+async def _read_chunks(upload: Readable, digest: _Digest, limit: int) -> AsyncIterator[bytes]:
     while chunk := await upload.read(CHUNK_SIZE):
         digest.update(chunk)
         if digest.size > limit:
@@ -369,7 +399,12 @@ def _error(status: int, code: str, message: str, **extra: object) -> HTTPExcepti
 
 
 def log_event(event: str, request: Request, *, level: int = logging.INFO, **fields: object) -> None:
-    record = {"event": event, "request_id": request.state.request_id, **fields}
+    log_rid(event, request.state.request_id, level=level, **fields)
+
+
+def log_rid(event: str, rid: str, *, level: int = logging.INFO, **fields: object) -> None:
+    """Như log_event, cho việc không gắn với một yêu cầu HTTP (vòng nền của lô nạp: mã yêu cầu là `<lô>:<dòng>`)."""
+    record = {"event": event, "request_id": rid, **fields}
     log.log(level, json.dumps(record, ensure_ascii=False, default=str))
 
 
@@ -405,6 +440,7 @@ def create_app(
     ai: AiClient | None = None,
     signer: DocumentSigner | None = None,
     status_board: StatusBoard | None = None,
+    import_store: ImportStore | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -460,6 +496,9 @@ def create_app(
     # Trạng thái hệ thống (công khai): dò bằng chính các client trên, thêm APISIX, Keycloak, svc-workflow qua HTTP
     status_board = status_board or default_board(settings, scanner=scanner, store=store, hasura=hasura, meili=meili,
                                                  vault=vault, ai=ai)
+    # Nạp lô văn bản đến: hàng đợi bền trong CSDL, zip giữ tạm trên tmpfs; handler nối vào ingest() ở dưới
+    import_store = import_store or ImportStore(hasura)
+    spool = Spool(settings.import_spool_dir, settings.import_spool_bytes)
 
     async def _probe_signer() -> None:
         try:
@@ -491,8 +530,10 @@ def create_app(
         models = asyncio.create_task(ai.run()) if settings.ask_enabled else None
         # F4.5: dò két một lần để nhật ký khởi động có dòng office.signing.ready / disabled; lỗi để lần phát hành dò lại
         signing = asyncio.create_task(_probe_signer()) if signer is not None else None
+        # nạp lô: dọn spool rồi làm tiếp các lô dở (trạng thái nằm trong CSDL); 0 thì tắt cả API tạo lô
+        imports = asyncio.create_task(importer.run()) if settings.import_interval_s > 0 else None
         yield
-        for task in (sync, anchor, texts, archive, probe, chunks, models, signing):
+        for task in (sync, anchor, texts, archive, probe, chunks, models, signing, imports):
             if task is not None:
                 task.cancel()
         await reader.summarizer.aclose()
@@ -579,14 +620,14 @@ def create_app(
             status_code=200 if ready else 503,
         )
 
-    async def seal_bytes(request: Request, plain: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) -> tuple[bytes, str]:
+    async def seal_bytes(rid: str, plain: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) -> tuple[bytes, str]:
         """Bản mã và khóa đã bọc (F3.7). Khóa rõ chỉ sống trong hàm này; két không sẵn sàng thì không lưu gì."""
         if vault is None:
             raise _error(503, "vault_unavailable", "Chưa cấu hình két khóa, chưa nhận được tệp của văn bản hạn chế")
         try:
             dek, wrapped = await vault.datakey()
         except VaultError as exc:
-            log_event("core.file.vault_failed", request, file_id=file_id, error=str(exc))
+            log_rid("core.file.vault_failed", rid, file_id=file_id, error=str(exc))
             raise _error(503, "vault_unavailable", "Két khóa chưa sẵn sàng, tệp chưa được lưu") from exc
         return await asyncio.to_thread(seal, plain, dek, tenant_id, file_id), wrapped
 
@@ -608,12 +649,136 @@ def create_app(
         finally:
             sealing.release()
 
-    async def discard(request: Request, key: str) -> None:
+    async def discard(rid: str, key: str) -> None:
         """Gỡ đối tượng vừa ghi khi không thêm được dòng CSDL — không để tệp mồ côi trong kho."""
         try:
             await asyncio.to_thread(store.delete, key)
         except StorageError as exc:
-            log_event("core.file.orphaned", request, object_key=key, error=str(exc))
+            log_rid("core.file.orphaned", rid, object_key=key, error=str(exc))
+
+    async def quarantine(rid: str, tenant_id: uuid.UUID, actor_id: str, upload: Readable, *, filename: str,
+                         limit: int) -> _Digest:
+        """Trạm kiểm dịch (F1.6): quét luồng tệp bằng ClamAV, tính SHA-256 và cỡ trong cùng lượt đọc. Nhiễm, hoặc có
+        mật khẩu, nén quá sâu nên không quét được bên trong: ghi file.rejected vào sổ kiểm toán rồi từ chối (422).
+        ClamAV không trả lời: 503. Quá `limit`: 413. Rỗng: 400. Mọi tệp vào đều qua đây — tải lên lẻ, tệp dữ liệu và
+        tệp đính kèm của lô nạp (imports/) — nên không có lối nào vào kho mà chưa quét."""
+        digest = _Digest()
+        try:
+            result = await scanner.scan(_read_chunks(upload, digest, limit))
+        except FileTooLarge:
+            raise _error(413, "too_large", f"Tệp vượt giới hạn {limit // (1024 * 1024)} MB") from None
+        except ScanError as exc:
+            log_rid("core.file.scan_failed", rid, error=str(exc))
+            raise _error(503, "scanner_unavailable", "Trạm quét mã độc chưa sẵn sàng, tệp chưa được lưu") from exc
+
+        if digest.size == 0:
+            raise _error(400, "empty_file", "Tệp rỗng")
+        if not result.clean:
+            details = {
+                "filename": filename,
+                "size_bytes": digest.size,
+                "sha256": digest.hexdigest(),
+                "signature": result.signature,
+            }
+            log_rid("core.file.rejected", rid, tenant_id=tenant_id, actor_id=actor_id, **details)
+            try:
+                await hasura.log_event(
+                    tenant_id=tenant_id,
+                    actor_id=actor_id,
+                    request_id=rid,
+                    action="file.rejected",
+                    entity="core.files",
+                    entity_id=digest.hexdigest(),
+                    details=details,
+                )
+            except HasuraError as exc:
+                # Tệp vẫn bị chặn; chỉ thiếu dòng trong sổ — nhật ký JSON ở trên vẫn còn.
+                log_rid("core.file.audit_failed", rid, error=str(exc))
+            if result.unscannable:
+                raise _error(422, "unscannable", "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không "
+                             "kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại",
+                             signature=result.signature)
+            raise _error(422, "infected", "Tệp chứa mã độc nên đã bị chặn", signature=result.signature)
+        return digest
+
+    async def ingest(rid: str, tenant_id: uuid.UUID, actor_id: str, upload: Readable, *, filename: str, mime: str,
+                     restricted: bool) -> FileOut:
+        """Một tệp vào kho: quét (quarantine) → (văn bản hạn chế: kiểm PDF, mã hóa) → ghi SeaweedFS → thêm dòng
+        core.files của người tải. Lỗi trả HTTPException như POST /api/files; lô nạp đọc cùng mã lỗi cho từng dòng."""
+        digest = await quarantine(rid, tenant_id, actor_id, upload, filename=filename, limit=settings.max_upload_bytes)
+        scanned_at = datetime.now(UTC)
+        file_id = uuid.uuid4()
+        key = object_key(tenant_id, file_id, scanned_at)
+        await upload.seek(0)
+        wrapped: str | None = None
+        body: BinaryIO = upload.file
+        stored_size, stored_sha, stored_mime = digest.size, digest.hexdigest(), mime
+        if restricted:
+            # Văn bản hạn chế (F3.7): bản rõ đọc vào bộ nhớ (Starlette đệm phần lớn tệp ở /tmp — tmpfs trong
+            # compose), kiểm đóng dấu được, mã hóa; kho chỉ nhận bản mã
+            if mime != "application/pdf":
+                raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF (để đóng dấu người xem)")
+            plain = await upload.read()
+            pages = settings.restricted_max_pages
+            try:
+                async with sealing_slot():      # PDF người dùng tải lên: chỉ mở trong tiến trình con có giới hạn
+                    await run_check_pdf(plain, max_pages=pages)
+            except SealError as exc:
+                raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF đọc được, không đặt "
+                             f"mật khẩu, tối đa {pages} trang: {exc}", reason=exc.reason) from exc
+            blob, wrapped = await seal_bytes(rid, plain, tenant_id, file_id)
+            del plain
+            body, stored_size = io.BytesIO(blob), len(blob)
+            stored_sha, stored_mime = hashlib.sha256(blob).hexdigest(), "application/octet-stream"
+        try:
+            await asyncio.to_thread(
+                store.put, key, body, size=stored_size, content_type=stored_mime, sha256_hex=stored_sha
+            )
+        except StorageError as exc:
+            log_rid("core.file.store_failed", rid, object_key=key, error=str(exc))
+            raise _error(503, "storage_unavailable", "Kho lưu tệp chưa sẵn sàng, tệp chưa được lưu") from exc
+
+        try:
+            await hasura.insert_file(
+                tenant_id=tenant_id,
+                actor_id=actor_id,
+                request_id=rid,
+                file_id=file_id,
+                object_key=key,
+                filename=filename,
+                mime_type=mime,
+                size_bytes=digest.size,
+                sha256_hex=digest.hexdigest(),
+                scanned_at=scanned_at,
+                wrapped_dek=wrapped,
+            )
+        except HasuraError as exc:
+            log_rid("core.file.record_failed", rid, object_key=key, code=exc.code, error=str(exc))
+            await discard(rid, key)
+            if exc.code == "constraint-violation":
+                # Thường gặp nhất: tenant_id trong token chưa có trong core.tenants.
+                raise _error(403, "unknown_tenant", "Đơn vị của tài khoản chưa được đăng ký trong hệ thống") from exc
+            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng, tệp chưa được lưu") from exc
+
+        log_rid(
+            "core.file.stored",
+            rid,
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            file_id=file_id,
+            object_key=key,
+            size_bytes=digest.size,
+            encrypted=wrapped is not None,
+        )
+        return FileOut(
+            id=file_id,
+            filename=filename,
+            mime_type=mime,
+            size_bytes=digest.size,
+            sha256=digest.hexdigest(),
+            scanned_at=scanned_at,
+            encrypted=wrapped is not None,
+        )
 
     # Không khai tham số UploadFile: FastAPI sẽ đọc hết thân request TRƯỚC khi kiểm token.
     # Ở đây kiểm token và Content-Length trước, rồi mới đọc multipart.
@@ -655,123 +820,29 @@ def create_app(
             upload = form.get("file")
             if not isinstance(upload, UploadFile):
                 raise _error(400, "missing_file", "Thiếu trường 'file' trong form multipart")
-
-            filename = clean_filename(upload.filename)
-            mime = clean_mime(upload.content_type)
-            digest = _Digest()
-            try:
-                result = await scanner.scan(_read_chunks(upload, digest, limit))
-            except FileTooLarge:
-                raise _error(413, "too_large", f"Tệp vượt giới hạn {limit // (1024 * 1024)} MB") from None
-            except ScanError as exc:
-                log_event("core.file.scan_failed", request, error=str(exc))
-                raise _error(503, "scanner_unavailable", "Trạm quét mã độc chưa sẵn sàng, tệp chưa được lưu") from exc
-            scanned_at = datetime.now(UTC)
-
-            if digest.size == 0:
-                raise _error(400, "empty_file", "Tệp rỗng")
-            if not result.clean:
-                details = {
-                    "filename": filename,
-                    "size_bytes": digest.size,
-                    "sha256": digest.hexdigest(),
-                    "signature": result.signature,
-                }
-                log_event("core.file.rejected", request, tenant_id=principal.tenant_id,
-                          actor_id=principal.user_id, **details)
-                try:
-                    await hasura.log_event(
-                        tenant_id=principal.tenant_id,
-                        actor_id=principal.user_id,
-                        request_id=request.state.request_id,
-                        action="file.rejected",
-                        entity="core.files",
-                        entity_id=digest.hexdigest(),
-                        details=details,
-                    )
-                except HasuraError as exc:
-                    # Tệp vẫn bị chặn; chỉ thiếu dòng trong sổ — nhật ký JSON ở trên vẫn còn.
-                    log_event("core.file.audit_failed", request, error=str(exc))
-                if result.unscannable:
-                    raise _error(422, "unscannable", "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không "
-                                 "kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại",
-                                 signature=result.signature)
-                raise _error(422, "infected", "Tệp chứa mã độc nên đã bị chặn", signature=result.signature)
-
-            file_id = uuid.uuid4()
-            key = object_key(principal.tenant_id, file_id, scanned_at)
-            await upload.seek(0)
-            wrapped: str | None = None
-            body: BinaryIO = upload.file
-            stored_size, stored_sha, stored_mime = digest.size, digest.hexdigest(), mime
-            if restricted:
-                # Văn bản hạn chế (F3.7): bản rõ đọc vào bộ nhớ (Starlette đệm phần lớn tệp ở /tmp — tmpfs trong
-                # compose), kiểm đóng dấu được, mã hóa; kho chỉ nhận bản mã
-                if mime != "application/pdf":
-                    raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF (để đóng dấu người xem)")
-                plain = await upload.read()
-                pages = settings.restricted_max_pages
-                try:
-                    async with sealing_slot():      # PDF người dùng tải lên: chỉ mở trong tiến trình con có giới hạn
-                        await run_check_pdf(plain, max_pages=pages)
-                except SealError as exc:
-                    raise _error(415, "restricted_pdf_only", "Văn bản hạn chế chỉ nhận tệp PDF đọc được, không đặt "
-                                 f"mật khẩu, tối đa {pages} trang: {exc}", reason=exc.reason) from exc
-                blob, wrapped = await seal_bytes(request, plain, principal.tenant_id, file_id)
-                del plain
-                body, stored_size = io.BytesIO(blob), len(blob)
-                stored_sha, stored_mime = hashlib.sha256(blob).hexdigest(), "application/octet-stream"
-            try:
-                await asyncio.to_thread(
-                    store.put, key, body, size=stored_size, content_type=stored_mime, sha256_hex=stored_sha
-                )
-            except StorageError as exc:
-                log_event("core.file.store_failed", request, object_key=key, error=str(exc))
-                raise _error(503, "storage_unavailable", "Kho lưu tệp chưa sẵn sàng, tệp chưa được lưu") from exc
+            return await ingest(request.state.request_id, principal.tenant_id, principal.user_id, upload,
+                                filename=clean_filename(upload.filename), mime=clean_mime(upload.content_type),
+                                restricted=restricted)
         finally:
             await form.close()
 
-        try:
-            await hasura.insert_file(
-                tenant_id=principal.tenant_id,
-                actor_id=principal.user_id,
-                request_id=request.state.request_id,
-                file_id=file_id,
-                object_key=key,
-                filename=filename,
-                mime_type=mime,
-                size_bytes=digest.size,
-                sha256_hex=digest.hexdigest(),
-                scanned_at=scanned_at,
-                wrapped_dek=wrapped,
-            )
-        except HasuraError as exc:
-            log_event("core.file.record_failed", request, object_key=key, code=exc.code, error=str(exc))
-            await discard(request, key)
-            if exc.code == "constraint-violation":
-                # Thường gặp nhất: tenant_id trong token chưa có trong core.tenants.
-                raise _error(403, "unknown_tenant", "Đơn vị của tài khoản chưa được đăng ký trong hệ thống") from exc
-            raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng, tệp chưa được lưu") from exc
+    async def ingest_bytes(rid: str, tenant_id: uuid.UUID, actor_id: str, data: bytes, name: str,
+                           restricted: bool) -> str:
+        """Một tệp lấy ra từ zip của lô nạp đi đúng đường của tải lên lẻ (ingest); trả id tệp đã lưu."""
+        out = await ingest(rid, tenant_id, actor_id, MemoryFile(data), filename=clean_filename(name),
+                           mime=clean_mime(mimetypes.guess_type(name)[0]), restricted=restricted)
+        return str(out.id)
 
-        log_event(
-            "core.file.stored",
-            request,
-            tenant_id=principal.tenant_id,
-            actor_id=principal.user_id,
-            file_id=file_id,
-            object_key=key,
-            size_bytes=digest.size,
-            encrypted=wrapped is not None,
-        )
-        return FileOut(
-            id=file_id,
-            filename=filename,
-            mime_type=mime,
-            size_bytes=digest.size,
-            sha256=digest.hexdigest(),
-            scanned_at=scanned_at,
-            encrypted=wrapped is not None,
-        )
+    # discard: dòng không thành văn bản thì vòng nền gỡ tệp đã lưu cho dòng (dòng core.files rồi đối tượng trong kho)
+    incoming = IncomingHandler(hasura, import_store, ingest_bytes, discard, max_file_bytes=settings.max_upload_bytes,
+                               sealing=vault is not None)
+    importer = Importer(import_store, {incoming.kind: incoming}, spool, interval_s=settings.import_interval_s,
+                        chunk=settings.import_chunk)
+    app.state.importer = importer
+    # Nạp lô văn bản đến: POST /api/imports/{kind}, GET /api/imports… — imports/api.py
+    imports_api.install(app, settings=settings, store=import_store, handlers=importer.handlers, spool=spool,
+                        principal=current_principal, quarantine=quarantine, clean_filename=clean_filename,
+                        max_body=settings.import_data_max_bytes + settings.import_zip_max_bytes + MULTIPART_OVERHEAD)
 
     @app.get(
         "/api/files/{file_id}",
@@ -1032,7 +1103,7 @@ def create_app(
         key = object_key(body.tenant_id, file_id, scanned_at)
         stored, wrapped, stored_mime = pdf, None, "application/pdf"
         if row.get("restricted"):       # văn bản hạn chế (F3.7): bản phát hành cũng lưu mã hóa như tệp tải lên
-            stored, wrapped = await seal_bytes(request, pdf, body.tenant_id, file_id)
+            stored, wrapped = await seal_bytes(rid, pdf, body.tenant_id, file_id)
             stored_mime = "application/octet-stream"
         try:
             await asyncio.to_thread(store.put, key, io.BytesIO(stored), size=len(stored), content_type=stored_mime,
@@ -1046,7 +1117,7 @@ def create_app(
                 size_bytes=len(pdf), sha256_hex=digest, scanned_at=scanned_at, wrapped_dek=wrapped, signature=record,
             )
         except HasuraError as exc:
-            await discard(request, key)
+            await discard(rid, key)
             raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng, chưa lưu bản phát hành") from exc
         log_event("office.document.rendered", request, tenant_id=body.tenant_id, actor_id=body.actor_id,
                   document_id=body.document_id, file_id=file_id, size_bytes=len(pdf), encrypted=wrapped is not None,
@@ -1077,7 +1148,8 @@ def create_app(
             async with copying:
                 copied = await copy_issued_file(body.dispatch_id, actor_id=body.actor_id,
                                                 request_id=request.state.request_id, hasura=hasura, store=store,
-                                                scanner=scanner, log=note, drop=lambda key: discard(request, key))
+                                                scanner=scanner, log=note,
+                                                drop=lambda key: discard(request.state.request_id, key))
         except DispatchError as exc:
             raise _error(exc.status, exc.code, exc.message) from exc
         note("office.dispatch.file_copied" if copied.created else "office.dispatch.file_exists",

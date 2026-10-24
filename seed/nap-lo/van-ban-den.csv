@@ -1,0 +1,201 @@
+type_code,symbol,issuer_name,issued_on,summary,urgency,files
+GM,1/GM-ĐT-ĐH,Phòng Đào tạo,2026-09-12,Giấy mời họp về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,
+HD,2/HD-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-10-14,"Hướng dẫn bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+GM,3/GM-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-07-28,Giấy mời họp về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,tep/0003.pdf
+HD,4/HD-ĐT-ĐH,Phòng Đào tạo,2026-09-24,Hướng dẫn rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,normal,tep/0004.pdf
+TTr,5/TTr-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-10-06,Tờ trình về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,tep/0005.pdf
+QĐ,6/QĐ-TCHC,Phòng Tổ chức – Hành chính,2026-06-03,Quyết định về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,tep/0006.pdf
+CV,7/CTSV,Phòng Công tác sinh viên,2026-08-31,Về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,
+HD,8/HD-ĐT-ĐH,Phòng Đào tạo,2026-03-15,Hướng dẫn đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,tep/0008.pdf
+BC,9/BC-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-10-07,Báo cáo tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,
+HD,10/HD-TTTV,Trung tâm Thông tin – Thư viện,2026-04-03,Hướng dẫn tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,tep/0010.pdf
+KH,11/KH-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-02-18,Kế hoạch cử giảng viên tham gia hội thảo kinh tế số và chuyển đổi xanh,khan,
+QĐ,12/QĐ-TTTV,Trung tâm Thông tin – Thư viện,2026-05-23,"Quyết định về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+CV,13/ĐT-ĐH,Phòng Đào tạo,2026-05-31,"Về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+KH,14/KH-TTTV,Trung tâm Thông tin – Thư viện,2026-05-23,Kế hoạch cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+HD,15/HD-ĐT-ĐH,Phòng Đào tạo,2026-07-30,Hướng dẫn tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,
+TB,16/TB-KHTC,Phòng Kế hoạch – Tài chính,2026-06-02,Thông báo tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,normal,
+KH,17/KH-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-05-19,Kế hoạch báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal
+TTr,18/TTr-TCHC,Phòng Tổ chức – Hành chính,2026-03-13,"Tờ trình về việc tổ chức hội nghị viên chức, người lao động năm 2026",normal,
+BC,19/BC-ĐT-ĐH,Phòng Đào tạo,2026-01-20,Báo cáo lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+KH,20/KH-KHTC,Phòng Kế hoạch – Tài chính,2026-07-07,"Kế hoạch bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+HD,21/HD-ĐT-ĐH,Phòng Đào tạo,2026-05-28,Hướng dẫn báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,tep/0021.pdf
+CV,22/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-07-04,Về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+BC,23/BC-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-05-14,Báo cáo tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,
+KH,24/KH-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-05-19,"Kế hoạch tổ chức hội nghị viên chức, người lao động năm 2026",thuong_khan,tep/0024.pdf
+HD,25/HD-CTSV,Phòng Công tác sinh viên,2026-08-31,Hướng dẫn cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+BC,26/BC-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-09-05,Báo cáo tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,
+CV,27/ĐT-ĐH,Phòng Đào tạo,2026-02-18,Về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+TTr,28/TTr-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-02-18,Tờ trình về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+TTr,29/TTr-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-08-27,Tờ trình về việc rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,khan,
+QĐ,30/QĐ-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-06-07,"Quyết định về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+CV,31/CTSV,Phòng Công tác sinh viên,2026-07-10,Về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,
+BC,32/BC-TTTV,Trung tâm Thông tin – Thư viện,2026-02-22,Báo cáo tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,thuong_khan,
+CV,33/TCHC,Phòng Tổ chức – Hành chính,2026-02-23,Về việc A,normal,
+GM,34/GM-TCHC,Phòng Tổ chức – Hành chính,2026-01-23,"Giấy mời họp về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,tep/0034.pdf
+GM,35/GM-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-10-08,Giấy mời họp về việc đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,thuong_khan,tep/0035.pdf
+GM,36/GM-TTTV,Trung tâm Thông tin – Thư viện,2026-09-17,Giấy mời họp về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0036.pdf
+BC,37/BC-CTSV,Phòng Công tác sinh viên,2026-08-31,Báo cáo lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+QĐ,38/QĐ-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-05-12,Quyết định về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+QĐ,39/QĐ-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-10-16,Quyết định về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,khan,
+KH,40/KH-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-03-15,Kế hoạch xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,
+TTr,41/TTr-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-01-11,Tờ trình về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+HD,42/HD-TCHC,Phòng Tổ chức – Hành chính,2026-07-02,"Hướng dẫn bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",khan,
+CV,43/TTTV,Trung tâm Thông tin – Thư viện,2026-05-04,"Về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+BC,44/BC-TCHC,Phòng Tổ chức – Hành chính,2026-01-12,Báo cáo đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,
+TB,45/TB-TCHC,Phòng Tổ chức – Hành chính,2026-02-19,Thông báo rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,thuong_khan,
+TTr,46/TTr-ĐT-ĐH,Phòng Đào tạo,2026-03-10,Tờ trình về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,thuong_khan,
+KH,47/KH-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-08-30,Kế hoạch lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+GM,48/GM-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-01-05,Giấy mời họp về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,
+GM,49/GM-TTTV,Trung tâm Thông tin – Thư viện,2026-05-29,Giấy mời họp về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+CV,50/TTTV,Trung tâm Thông tin – Thư viện,2026-08-17,Về việc tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,
+TB,51/TB-TTTV,Trung tâm Thông tin – Thư viện,2026-03-22,Thông báo thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,tep/0051.pdf
+BC,52/BC-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-07-29,"Báo cáo kiểm kê tài sản, thiết bị cuối năm tài chính 2026",thuong_khan,
+BC,53/BC-TTTV,Trung tâm Thông tin – Thư viện,2026-10-05,Báo cáo tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,thuong_khan,tep/0053.pdf
+KH,54/KH-TTTV,Trung tâm Thông tin – Thư viện,2026-02-11,"Kế hoạch kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+QĐ,55/QĐ-TTTV,Trung tâm Thông tin – Thư viện,2026-04-09,Quyết định về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,
+CV,56/CTSV,Phòng Công tác sinh viên,2026-04-16,Về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+TB,57/TB-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-10-12,Thông báo thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,tep/0057.pdf
+KH,58/KH-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-02-30,Kế hoạch tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,khan,tep/0058.pdf
+QĐ,59/QĐ-TCHC,Phòng Tổ chức – Hành chính,2026-03-23,"Quyết định về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,tep/0059.pdf
+TTr,60/TTr-ĐT-ĐH,Phòng Đào tạo,2026-09-08,Tờ trình về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0060.pdf
+HD,61/HD-TTTV,Trung tâm Thông tin – Thư viện,2026-09-23,Hướng dẫn xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,
+KH,62/KH-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-01-31,"Kế hoạch bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+CV,63/KHTC,Phòng Kế hoạch – Tài chính,2026-06-06,Về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,tep/0063.pdf
+CV,64/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-07-18,Về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,
+HD,65/HD-TCHC,Phòng Tổ chức – Hành chính,2026-01-05,"Hướng dẫn tổ chức hội nghị viên chức, người lao động năm 2026",normal,tep/0065.pdf
+BC,66/BC-KHTC,Phòng Kế hoạch – Tài chính,2026-05-05,Báo cáo báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+KH,67/KH-CTSV,Phòng Công tác sinh viên,2026-09-02,Kế hoạch báo cáo số liệu tuyển sinh đại học chính quy năm 2026,khan,
+TTr,68/TTr-KHTC,Phòng Kế hoạch – Tài chính,2026-07-20,Tờ trình về việc cử giảng viên tham gia hội thảo kinh tế số và chuyển đổi xanh,thuong_khan,tep/0068.pdf
+QĐ,69/QĐ-KHTC,Phòng Kế hoạch – Tài chính,2026-07-25,Quyết định về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,tep/0069.pdf
+CV,70/ĐT-ĐH,Phòng Đào tạo,2026-09-08,Về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+CV,71/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-04-05,Về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,
+HD,72/HD-TTTV,Trung tâm Thông tin – Thư viện,2026-05-24,Hướng dẫn đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,
+GM,73/GM-TCHC,Phòng Tổ chức – Hành chính,2026-06-02,Giấy mời họp về việc đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,thuong_khan,
+CV,74/TCHC,Phòng Tổ chức – Hành chính,2026-07-02,Về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,thuong_khan,
+TTr,75/TTr-TTTV,Trung tâm Thông tin – Thư viện,2026-03-07,Tờ trình về việc tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,khan,
+XX,76/GM-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-04-03,Giấy mời họp về việc đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,thuong_khan,tep/0076.pdf
+GM,77/GM-KHTC,Phòng Kế hoạch – Tài chính,2026-03-17,Giấy mời họp về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,tep/0077.pdf
+GM,78/GM-CTSV,Phòng Công tác sinh viên,2026-01-12,Giấy mời họp về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,
+HD,79/HD-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-07-26,"Hướng dẫn tổ chức hội nghị viên chức, người lao động năm 2026",normal,
+KH,80/KH-KHTC,Phòng Kế hoạch – Tài chính,2026-07-16,Kế hoạch xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0080.pdf
+CV,81/TTTV,Trung tâm Thông tin – Thư viện,2026-09-04,"Về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+QĐ,82/QĐ-ĐT-ĐH,Phòng Đào tạo,2026-06-09,Quyết định về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,tep/0082.pdf
+KH,83/KH-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-08-21,Kế hoạch đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,khan,
+CV,84/TCHC,Phòng Tổ chức – Hành chính,2026-06-29,"Về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+KH,85/KH-CTSV,Phòng Công tác sinh viên,2026-03-14,Kế hoạch tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,tep/0085.pdf
+BC,86/BC-ĐT-ĐH,Phòng Đào tạo,2026-03-03,Báo cáo thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,
+GM,87/GM-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-03-20,Giấy mời họp về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,khan,
+CV,88/CTD,Công ty Cổ phần Công nghệ Mẫu,2026-10-03,Về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,tep/0088.pdf
+KH,89/KH-TCHC,Phòng Tổ chức – Hành chính,2026-04-22,Kế hoạch xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,tep/0089.pdf
+CV,90/KHTC,Phòng Kế hoạch – Tài chính,2026-04-30,"Về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,tep/0090.pdf
+TTr,91/TTr-KHTC,Phòng Kế hoạch – Tài chính,2026-03-28,Tờ trình về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,tep/khong-co.pdf
+QĐ,92/QĐ-ĐT-ĐH,Phòng Đào tạo,2026-02-16,Quyết định về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,khan,tep/0092.pdf
+CV,93/TCHC,Phòng Tổ chức – Hành chính,2026-08-01,"Về việc tổ chức hội nghị viên chức, người lao động năm 2026",khan,
+CV,94/CTD,Công ty Cổ phần Công nghệ Mẫu,2026-07-13,"Về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+BC,95/BC-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-09-27,Báo cáo đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,
+HD,96/HD-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-04-02,Hướng dẫn xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,tep/0096.pdf
+KH,97/KH-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-05-16,Kế hoạch lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+QĐ,98/QĐ-CTSV,Phòng Công tác sinh viên,2026-08-22,"Quyết định về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,tep/0098.pdf
+QĐ,99/QĐ-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-04-06,"Quyết định về việc tổ chức hội nghị viên chức, người lao động năm 2026",thuong_khan,tep/0099.pdf
+KH,100/KH-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-05-26,Kế hoạch tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,thuong_khan,
+HD,101/HD-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-07-08,Hướng dẫn lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+QĐ,102/QĐ-CTSV,Phòng Công tác sinh viên,2026-07-27,Quyết định về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0102.pdf
+TB,103/TB-ĐT-ĐH,Phòng Đào tạo,2026-04-02,Thông báo rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,normal,tep/0103.pdf
+QĐ,104/QĐ-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-01-21,"Quyết định về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+KH,105/KH-CTSV,Phòng Công tác sinh viên,2026-07-07,Kế hoạch tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,khan,tep/0105.pdf
+TB,106/TB-ĐT-ĐH,Phòng Đào tạo,2026-01-17,Thông báo báo cáo số liệu tuyển sinh đại học chính quy năm 2026,thuong_khan,
+KH,107/KH-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-03-30,Kế hoạch cử giảng viên tham gia hội thảo kinh tế số và chuyển đổi xanh,normal,tep/0107.pdf
+HD,108/HD-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-07-14,Hướng dẫn cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,tep/0108.pdf
+QĐ,109/QĐ-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-10-09,"Quyết định về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+QĐ,110/QĐ-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-10-03,Quyết định về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+KH,111/KH-TTTV,Trung tâm Thông tin – Thư viện,2026-02-26,"Kế hoạch tổ chức hội nghị viên chức, người lao động năm 2026",normal,
+QĐ,112/QĐ-ĐT-ĐH,Phòng Đào tạo,2026-01-14,Quyết định về việc tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,
+KH,113/KH-KHTC,Phòng Kế hoạch – Tài chính,2026-09-02,Kế hoạch xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,
+GM,114/GM-TCHC,Phòng Tổ chức – Hành chính,2026-02-26,Giấy mời họp về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,khan,
+CV,115/KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-08-19,Về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,thuong_khan,tep/0115.pdf
+QĐ,116/QĐ-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-08-27,"Quyết định về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+GM,117/GM-ĐT-ĐH,Phòng Đào tạo,2026-07-05,Giấy mời họp về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+BC,118/BC-CTSV,Phòng Công tác sinh viên,2026-08-16,Báo cáo triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,tep/0118.pdf
+KH,119/KH-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-03-30,Kế hoạch lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+TTr,120/TTr-ĐT-ĐH,Phòng Đào tạo,2026-03-10,Tờ trình về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,khan,tep/eicar.pdf
+BC,121/BC-TTTV,Trung tâm Thông tin – Thư viện,2026-07-18,"Báo cáo bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,
+CV,122/TCHC,Phòng Tổ chức – Hành chính,2026-07-01,"Về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,tep/0122.pdf
+GM,123/GM-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-05-28,Giấy mời họp về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,thuong_khan,
+GM,124/GM-ĐT-ĐH,Phòng Đào tạo,2026-09-22,"Giấy mời họp về việc tổ chức hội nghị viên chức, người lao động năm 2026",normal,
+KH,125/KH-KHTC,Phòng Kế hoạch – Tài chính,2026-03-26,"Kế hoạch kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+GM,126/GM-TCHC,Phòng Tổ chức – Hành chính,2026-03-27,Giấy mời họp về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,thuong_khan,tep/0126.pdf
+BC,127/BC-ĐT-ĐH,Phòng Đào tạo,2026-09-03,Báo cáo báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+TTr,128/TTr-CTSV,Phòng Công tác sinh viên,2026-10-07,Tờ trình về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,
+GM,129/GM-TCHC,Phòng Tổ chức – Hành chính,2026-02-02,Giấy mời họp về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,khan,
+TB,130/TB-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-01-26,Thông báo triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,tep/0130.pdf
+CV,131/KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-01-07,Về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,thuong_khan,tep/0131.pdf
+TTr,132/TTr-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-09-04,Tờ trình về việc tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,
+BC,133/BC-KHTC,Phòng Kế hoạch – Tài chính,2026-10-10,Báo cáo cử giảng viên tham gia hội thảo kinh tế số và chuyển đổi xanh,normal,
+QĐ,134/QĐ-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-08-29,"Quyết định về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,tep/0134.pdf
+BC,135/BC-TTTV,Trung tâm Thông tin – Thư viện,2026-07-09,"Báo cáo tổ chức hội nghị viên chức, người lao động năm 2026",normal,tep/0135.pdf
+BC,136/BC-KHTC,Phòng Kế hoạch – Tài chính,2026-08-21,Báo cáo cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+CV,137/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-08-11,Về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,khan,
+TB,138/TB-TCHC,Phòng Tổ chức – Hành chính,2026-07-18,Thông báo đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,khan,
+CV,139/CTD,Công ty Cổ phần Công nghệ Mẫu,2026-06-03,Về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,
+TB,140/TB-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-02-19,Thông báo cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+CV,141/TCHC,Phòng Tổ chức – Hành chính,2026-06-04,"Về việc tổ chức hội nghị viên chức, người lao động năm 2026",normal,tep/0141.pdf
+GM,142/GM-CTSV,Phòng Công tác sinh viên,2026-01-30,Giấy mời họp về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,
+CV,143/KHTC,Phòng Kế hoạch – Tài chính,2026-10-02,Về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0143.pdf
+CV,144/KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-10-06,Về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,tep/0144.pdf
+TB,145/TB-TTTV,Trung tâm Thông tin – Thư viện,2026-01-27,Thông báo triển khai khảo sát ý kiến người học về hoạt động giảng dạy,khan,tep/0145.pdf
+GM,146/GM-ĐT-ĐH,Phòng Đào tạo,2026-09-26,Giấy mời họp về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+CV,147/KHTC,Phòng Kế hoạch – Tài chính,2026-04-27,Về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,thuong_khan,tep/0147.pdf
+CV,148/KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-07-21,"Về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",khan,
+QĐ,149/QĐ-TCHC,Phòng Tổ chức – Hành chính,2026-08-18,Quyết định về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,
+HD,149/QĐ-TCHC,Phòng Tổ chức – Hành chính,2026-08-18,Hướng dẫn cử giảng viên tham gia hội thảo kinh tế số và chuyển đổi xanh,normal,tep/0150.pdf
+CV,151/CTD,Công ty Cổ phần Công nghệ Mẫu,2026-09-07,Về việc rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,normal,
+TTr,152/TTr-CTSV,Phòng Công tác sinh viên,2026-08-21,Tờ trình về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,tep/0152.pdf
+KH,153/KH-TTTV,Trung tâm Thông tin – Thư viện,2026-09-12,Kế hoạch rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,normal,
+BC,154/BC-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-04-25,Báo cáo lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,
+TB,155/TB-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-09-27,Thông báo triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,
+TTr,156/TTr-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-04-01,"Tờ trình về việc tổ chức hội nghị viên chức, người lao động năm 2026",khan,tep/0156.pdf
+GM,157/GM-KHTC,Phòng Kế hoạch – Tài chính,2026-06-07,Giấy mời họp về việc tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,thuong_khan,
+CV,158/TCHC,Phòng Tổ chức – Hành chính,2026-02-07,Về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,tep/0158.pdf
+TTr,159/TTr-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-10-10,"Tờ trình về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,
+KH,160/KH-ĐT-ĐH,Phòng Đào tạo,2026-01-16,Kế hoạch xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,thuong_khan,
+KH,161/KH-TCHC,Phòng Tổ chức – Hành chính,2026-05-26,Kế hoạch tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,tep/0161.pdf
+CV,162/KHTC,Phòng Kế hoạch – Tài chính,2026-03-10,"Về việc tổ chức hội nghị viên chức, người lao động năm 2026",normal,
+HD,163/HD-ĐT-ĐH,Phòng Đào tạo,2026-01-10,Hướng dẫn xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,thuong_khan,
+TB,164/TB-KHTC,Phòng Kế hoạch – Tài chính,2026-03-08,Thông báo xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,
+TB,165/TB-TTTV,Trung tâm Thông tin – Thư viện,2026-10-19,Thông báo cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+CV,166/TCHC,Phòng Tổ chức – Hành chính,2026-02-18,Về việc lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,tep/0166.pdf
+CV,167/CTSV,Phòng Công tác sinh viên,2026-07-25,Về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,normal,tep/0167.pdf
+HD,168/HD-KHTC,Phòng Kế hoạch – Tài chính,2026-01-05,"Hướng dẫn bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,tep/0168.pdf
+QĐ,169/QĐ-TTTV,Trung tâm Thông tin – Thư viện,2026-06-02,"Quyết định về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,tep/0169.pdf
+QĐ,170/QĐ-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-09-17,Quyết định về việc triển khai khảo sát ý kiến người học về hoạt động giảng dạy,thuong_khan,
+GM,171/GM-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-06-29,Giấy mời họp về việc xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0171.pdf
+TTr,172/TTr-KHTC,Phòng Kế hoạch – Tài chính,2026-06-27,Tờ trình về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,normal,tep/0172.pdf
+GM,173/GM-CTSV,Phòng Công tác sinh viên,2026-01-16,Giấy mời họp về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,
+CV,174/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-04-26,Về việc báo cáo số liệu tuyển sinh đại học chính quy năm 2026,normal,
+CV,175/TCHC,Phòng Tổ chức – Hành chính,2026-07-23,Về việc cử giảng viên tham gia hội thảo kinh tế số và chuyển đổi xanh,normal,
+GM,176/GM-ĐT-ĐH,Phòng Đào tạo,2026-05-01,Giấy mời họp về việc đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,
+QĐ,177/QĐ-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-03-13,Quyết định về việc thanh toán kinh phí giảng dạy vượt giờ học kỳ II,khan,tep/0177.pdf
+CV,178/TCHC,Phòng Tổ chức – Hành chính,2026-06-29,Về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,tep/0178.pdf
+TTr,179/TTr-KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-01-23,"Tờ trình về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",thuong_khan,
+TB,180/TB-ĐT-ĐH,Phòng Đào tạo,2026-08-14,Thông báo lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,tep/0180.pdf
+CV,181/CTD,Công ty Cổ phần Công nghệ Mẫu,2026-07-11,Về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,tep/0181.pdf
+QĐ,182/QĐ-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-02-06,Quyết định về việc tiếp nhận sinh viên thực tập ngành Quản trị kinh doanh,normal,tep/0182.pdf
+HD,183/HD-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-02-11,Hướng dẫn xây dựng kế hoạch giảng dạy học kỳ hè năm học 2026–2027,normal,tep/0183.pdf
+KH,184/KH-ĐT-ĐH,Phòng Đào tạo,2026-06-08,Kế hoạch đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,
+BC,185/BC-ĐT-ĐH,Phòng Đào tạo,2026-03-22,Báo cáo lập dự toán ngân sách năm 2027 của khoa Kinh tế,khan,tep/0185.pdf
+KH,186/KH-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-06-08,"Kế hoạch tổ chức hội nghị viên chức, người lao động năm 2026",khan,
+BC,187/BC-TTTV,Trung tâm Thông tin – Thư viện,2026-05-10,Báo cáo đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,tep/0187.pdf
+TTr,188/TTr-ĐT-ĐH,Phòng Đào tạo,2026-06-29,Tờ trình về việc tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,normal,
+TTr,189/TTr-KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-07-25,"Tờ trình về việc bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",khan,
+HD,190/HD-ĐT-ĐH,Phòng Đào tạo,2026-02-14,Hướng dẫn tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,normal,
+HD,191/HD-KHTC,Phòng Kế hoạch – Tài chính,2026-01-16,"Hướng dẫn tổ chức hội nghị viên chức, người lao động năm 2026",normal,tep/0191.pdf
+CV,192/CTSV,Phòng Công tác sinh viên,2026-09-14,"Về việc kiểm kê tài sản, thiết bị cuối năm tài chính 2026",normal,tep/0192.pdf
+CV,193/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-07-11,Về việc cập nhật hồ sơ minh chứng kiểm định chất lượng chương trình đào tạo,normal,
+CV,194/KHCN,Phòng Khoa học và Hợp tác quốc tế,2026-09-11,Về việc xét cấp học bổng khuyến khích học tập cho sinh viên khoa Kinh tế,normal,tep/0194.pdf
+BC,195/BC-CTD,Công ty Cổ phần Công nghệ Mẫu,2026-03-16,Báo cáo tổ chức sinh hoạt công dân đầu khóa cho sinh viên khóa mới,khan,
+CV,196/KT&ĐBCL,Phòng Khảo thí và Đảm bảo chất lượng,2026-06-07,Về việc tổ chức thi kết thúc học phần học kỳ I năm học 2026–2027,normal,
+TB,197/TB-KHTC,Phòng Kế hoạch – Tài chính,2026-03-28,"Thông báo bổ sung giáo trình, tài liệu tham khảo cho thư viện khoa",normal,tep/0197.pdf
+QĐ,198/QĐ-KHTC,Phòng Kế hoạch – Tài chính,2026-08-13,Quyết định về việc rà soát chương trình đào tạo ngành Kế toán theo chuẩn đầu ra mới,khan,
+BC,199/BC-TCHC,Phòng Tổ chức – Hành chính,2026-03-17,Báo cáo đăng ký đề tài nghiên cứu khoa học cấp trường năm 2027,normal,
+BC,200/BC-CTSV,Phòng Công tác sinh viên,2026-01-28,Báo cáo lập dự toán ngân sách năm 2027 của khoa Kinh tế,normal,

@@ -8,6 +8,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- API nạp lô văn bản đến (cụm ⑤ Tầng 1): `POST /api/imports/incoming` nhận NDJSON hoặc CSV cùng trường với
+  `receiveIncoming`, kèm zip tệp đính kèm tùy chọn. svc-files xử lý nền theo mẻ; mỗi dòng đi đúng đường tiếp nhận lẻ —
+  ClamAV, Action `receiveIncoming` thay mặt văn thư, tùy chọn vào sổ — nên vẫn cách ly đơn vị và có dòng sổ kiểm toán
+  riêng. `GET /api/imports/{id}` báo đã nhận / đạt / trùng / lỗi, `…/rows` báo lỗi từng dòng. Gửi lại cùng tệp không
+  nhân đôi (`Idempotency-Key`, chỉ mục chặn trùng); svc-files khởi động lại thì lô chạy tiếp. Dòng bị từ chối thì tệp
+  đã lưu được gỡ; `restricted` sai kiểu bị chặn trước khi tệp vào kho; trần byte một lô ghi vào kho
+  `MOC_IMPORT_STORE_MAX_MB`; dòng được giữ khi đang làm nên hai tiến trình không làm trùng. Bảng `core.import_jobs`,
+  `core.import_rows` (migration 1792281602800). Lô mẫu 200 dòng `seed/nap-lo/van-ban-den.csv`, `make demo-nap-lo`.
+  Test (đếm tĩnh): svc-files +113, db +18, scripts +12, svc-workflow +2, giao diện +2.
 - Khai giấy phép theo chuẩn REUSE: `REUSE.toml` khai Apache-2.0 cho các tệp không chèn được header (JSON, ảnh, PDF,
   tài liệu, dữ liệu mẫu), `LICENSES/Apache-2.0.txt` là bản sao của `LICENSE`; `reuse lint` 5.0.2 đạt, 482/482 tệp có
   thông tin bản quyền và giấy phép. `.env.example` mang header giấy phép, `make license-check` kiểm cả tệp này
