@@ -24,7 +24,7 @@ const {
 </script>
 
 <template>
-  <div class="pointer-events-none fixed right-4 bottom-4 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-2" aria-live="polite">
+  <TransitionGroup name="sg-notice" tag="div" class="pointer-events-none fixed right-4 bottom-4 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-2" aria-live="polite">
     <component
       :is="n.to ? NuxtLink : 'div'"
       v-for="n in notices" :key="n.id" :to="n.to"
@@ -36,5 +36,5 @@ const {
       <div :class="{ 'font-medium': n.kind === 'info' }">{{ n.text }}</div>
       <div v-if="n.detail" class="mt-0.5 truncate text-stone-500">{{ n.detail }}</div>
     </component>
-  </div>
+  </TransitionGroup>
 </template>
