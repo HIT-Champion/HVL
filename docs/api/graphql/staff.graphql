@@ -709,6 +709,20 @@ type mutation_root {
     "upsert condition"
     on_conflict: office_documents_on_conflict
   ): office_documents
+  "insert data into the table: \"office.feedback\""
+  insert_office_feedback(
+    "the rows to be inserted"
+    objects: [office_feedback_insert_input!]!
+    "upsert condition"
+    on_conflict: office_feedback_on_conflict
+  ): office_feedback_mutation_response
+  "insert a single row into the table: \"office.feedback\""
+  insert_office_feedback_one(
+    "the row to be inserted"
+    object: office_feedback_insert_input!
+    "upsert condition"
+    on_conflict: office_feedback_on_conflict
+  ): office_feedback
   "insert data into the table: \"personal.items\""
   insert_personal_items(
     "the rows to be inserted"
@@ -2643,6 +2657,105 @@ type office_documents_variance_fields {
   register_number: Float
 }
 
+"Góp ý của người dùng Văn phòng điện tử (F4.6): mức hài lòng 1–5, vài dòng, khuôn đường dẫn màn hình; không họ tên, vai trò, IP"
+type office_feedback {
+  comment: String
+  created_at: timestamptz!
+  id: uuid!
+  "Góp ý này của chính người đang xem"
+  mine: Boolean
+  rating: Int!
+  screen: String!
+}
+
+"Boolean expression to filter rows from the table \"office.feedback\". All fields are combined with a logical 'AND'."
+input office_feedback_bool_exp {
+  _and: [office_feedback_bool_exp!]
+  _not: office_feedback_bool_exp
+  _or: [office_feedback_bool_exp!]
+  comment: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  id: uuid_comparison_exp
+  mine: Boolean_comparison_exp
+  rating: Int_comparison_exp
+  screen: String_comparison_exp
+}
+
+"unique or primary key constraints on table \"office.feedback\""
+enum office_feedback_constraint {
+  "unique or primary key constraint on columns \"id\""
+  feedback_pkey
+}
+
+"input type for inserting data into table \"office.feedback\""
+input office_feedback_insert_input {
+  comment: String
+  rating: Int
+  screen: String
+}
+
+"response of any mutation on the table \"office.feedback\""
+type office_feedback_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [office_feedback!]!
+}
+
+"on_conflict condition type for table \"office.feedback\""
+input office_feedback_on_conflict {
+  constraint: office_feedback_constraint!
+  update_columns: [office_feedback_update_column!]! = []
+  where: office_feedback_bool_exp
+}
+
+"Ordering options when selecting data from \"office.feedback\"."
+input office_feedback_order_by {
+  comment: order_by
+  created_at: order_by
+  id: order_by
+  mine: order_by
+  rating: order_by
+  screen: order_by
+}
+
+"select columns of table \"office.feedback\""
+enum office_feedback_select_column {
+  "column name"
+  comment
+  "column name"
+  created_at
+  "column name"
+  id
+  "column name"
+  rating
+  "column name"
+  screen
+}
+
+"Streaming cursor of the table \"office_feedback\""
+input office_feedback_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_feedback_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_feedback_stream_cursor_value_input {
+  comment: String
+  created_at: timestamptz
+  id: uuid
+  rating: Int
+  screen: String
+}
+
+"placeholder for update columns of table \"office.feedback\" (current role has no relevant permissions)"
+enum office_feedback_update_column {
+  "placeholder (do not use)"
+  _PLACEHOLDER
+}
+
 "column ordering options"
 enum order_by {
   "in ascending order, nulls last"
@@ -3017,6 +3130,21 @@ type query_root {
   ): office_documents_aggregate!
   "fetch data from the table: \"office.documents\" using primary key columns"
   office_documents_by_pk(id: uuid!): office_documents
+  "fetch data from the table: \"office.feedback\""
+  office_feedback(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch data from the table: \"office.feedback\" using primary key columns"
+  office_feedback_by_pk(id: uuid!): office_feedback
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"
@@ -3417,6 +3545,30 @@ type subscription_root {
     "filter the rows returned"
     where: office_documents_bool_exp
   ): [office_documents!]!
+  "fetch data from the table: \"office.feedback\""
+  office_feedback(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch data from the table: \"office.feedback\" using primary key columns"
+  office_feedback_by_pk(id: uuid!): office_feedback
+  "fetch data from the table in a streaming manner: \"office.feedback\""
+  office_feedback_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_feedback_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"
