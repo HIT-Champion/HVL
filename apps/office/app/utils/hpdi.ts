@@ -30,7 +30,6 @@ import type { Role } from '~/composables/useAuth'
 
 export const HPDI_KEYS = ['h', 'p', 'd', 'i'] as const
 export type HpdiKey = typeof HPDI_KEYS[number]
-export const HPDI_LEVELS = [1, 2, 3, 4, 5] as const
 export const HPDI_TOP = 5
 export const HPDI_GAP = 1     // chênh từ một mức trở lên mới là lệch nền
 
