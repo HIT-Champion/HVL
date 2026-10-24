@@ -26,20 +26,22 @@ const auth = useAuth();
 const claims = auth.claims;
 const route = useRoute();
 const open = ref(false);
-const collapsed = ref(false);
+const hovering = ref(false);
+const navigationFocused = ref(false);
+const collapsed = computed(() => !mobile.value && !hovering.value && !navigationFocused.value);
+let hoverExit;
+function enterNavigation() { clearTimeout(hoverExit); hovering.value = true; }
+function leaveNavigation() { clearTimeout(hoverExit); hoverExit = setTimeout(() => { hovering.value = false; }, 140); }
+function blurNavigation(event) { navigationFocused.value = event.currentTarget.contains(event.relatedTarget); }
 const calendarDay = ref(today());
 const dateLabel = computed(() => new Intl.DateTimeFormat(locale.value === 'vi' ? 'vi-VN' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(calendarDay.value + 'T12:00:00')));
 let calendarClock;
-function toggleSidebar() {
-  collapsed.value = !collapsed.value;
-  try { localStorage.setItem('signet.sidebar.collapsed', String(collapsed.value)); } catch { /* preference only */ }
-}
 const mobile = ref(false);
 const menuButton = ref(null);
 let media;
 const updateViewport = () => { mobile.value = media.matches; if (!mobile.value) open.value = false; };
-onMounted(() => { try { collapsed.value = localStorage.getItem('signet.sidebar.collapsed') === 'true'; } catch { /* preference only */ } calendarClock = setInterval(() => { calendarDay.value = today(); }, 60000); media = window.matchMedia('(max-width: 900px)'); updateViewport(); media.addEventListener('change', updateViewport); });
-onBeforeUnmount(() => { media?.removeEventListener('change', updateViewport); clearInterval(calendarClock); document.body.style.overflow = ''; });
+onMounted(() => { calendarClock = setInterval(() => { calendarDay.value = today(); }, 60000); media = window.matchMedia('(max-width: 900px), (hover: none)'); updateViewport(); media.addEventListener('change', updateViewport); });
+onBeforeUnmount(() => { media?.removeEventListener('change', updateViewport); clearInterval(calendarClock); clearTimeout(hoverExit); document.body.style.overflow = ''; });
 watch(open, async value => { document.body.style.overflow = value && mobile.value ? 'hidden' : ''; await nextTick(); if (value) document.querySelector('#app-navigation a')?.focus(); else if (mobile.value) menuButton.value?.focus(); });
 const router = useRouter();
 function keyboard(event) {
@@ -163,16 +165,15 @@ async function logout() {
 <template>
   <div class="sg-shell" :class="{ 'is-collapsed': collapsed, 'is-mobile-open': open }">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 btn-primary">{{ t('fe.skip') }}</a>
-    <aside id="app-navigation" class="sg-sidebar" :inert="mobile && !open ? true : undefined" :aria-label="t('fe.navigation')">
+    <aside id="app-navigation" class="sg-sidebar" @pointerenter="enterNavigation" @pointerleave="leaveNavigation" @focusin="navigationFocused = true" @focusout="blurNavigation" :inert="mobile && !open ? true : undefined" :aria-label="t('fe.navigation')">
       <div class="sg-brand-row"><NuxtLink to="/" class="sg-wordmark" :aria-label="t('app.name')"><svg class="sg-brand-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M45 10H26c-9 0-16 7-16 16s7 16 16 16h12" stroke="currentColor" stroke-width="9" stroke-linecap="round"/><path d="M19 54h19c9 0 16-7 16-16s-7-16-16-16H26" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></svg><span class="sg-brand-full">Signet</span></NuxtLink><button class="btn-ghost sg-close-menu" :aria-label="t('shell.closeNav')" @click="open = false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button></div>
       <nav class="sg-nav" :aria-label="t('fe.navigation')"><NuxtLink v-for="item in nav" :key="item.to" :to="item.to" class="sg-nav-link" :class="{ 'is-active': active(item.to) }" :aria-label="item.label" :title="collapsed ? item.label : undefined" :aria-current="active(item.to) ? 'page' : undefined"><svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" /></svg><span class="sg-nav-label">{{ item.label }}</span></NuxtLink></nav>
       <div class="sg-sidebar-bottom">
         <NuxtLink to="/tim-kiem" class="sg-nav-link sg-search-link" :aria-label="t('nav.search')" :title="collapsed ? t('nav.search') : undefined"><svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" /></svg><span class="sg-nav-label">{{ t('nav.search') }}</span></NuxtLink>
-        <button class="sg-sidebar-toggle sg-nav-link" :aria-label="t(collapsed ? 'shell.expand' : 'shell.collapse')" :title="t(collapsed ? 'shell.expand' : 'shell.collapse')" aria-controls="app-navigation" :aria-expanded="!collapsed" @click="toggleSidebar"><svg width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 4h16v16H4zM9 4v16m6-11-3 3 3 3" /></svg><span class="sg-nav-label">{{ t('shell.collapse') }}</span></button>
         <div class="sg-account"><span class="sg-avatar" data-testid="avatar-initial" aria-hidden="true">{{ initialOf(claims?.givenName || '', claims?.name || '') }}</span><div class="sg-account-name sg-nav-label"><strong>{{ claims?.name }}</strong><small>{{ claims?.role ? t('role.' + claims.role) : t('error.noRole') }}</small></div><button class="btn-ghost sg-logout" :aria-label="t('nav.logout')" :title="t('nav.logout')" @click="logout"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 4H4v16h5m6-4l4-4-4-4m-7 4h11" /></svg></button></div>
       </div>
     </aside>
-    <button v-if="open" class="sg-scrim" :aria-label="t('shell.closeNav')" tabindex="-1" @click="open = false" />
+    <Transition name="sg-scrim"><button v-if="open" class="sg-scrim" :aria-label="t('shell.closeNav')" tabindex="-1" @click="open = false" /></Transition>
     <div class="sg-workspace" :inert="mobile && open ? true : undefined">
       <header class="sg-topbar"><div class="sg-topbar-context"><button ref="menuButton" class="btn-secondary sg-mobile-menu" :aria-label="t('fe.menu')" aria-controls="app-navigation" :aria-expanded="open" @click="open = !open"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button><span>{{ tenantName || t('fe.organization') }}</span></div><div class="sg-topbar-tools"><time :datetime="calendarDay">{{ dateLabel }}</time><NotificationBell /><button class="btn-ghost sg-language" :aria-label="t('nav.language')" @click="toggleLocale">{{ locale === 'vi' ? 'EN' : 'VI' }}</button></div></header>
       <main id="main-content" class="moc-sheet"><slot /></main>
