@@ -187,6 +187,18 @@ def test_filters_and_scope_reach_the_retriever(asking):
     assert call["scope"].where and "u-chuyen-vien" in call["scope"].where[0]
 
 
+def test_document_scope_and_the_whole_question_reach_the_retriever(asking, log_records):
+    env = asking(passages=demo())
+    assert ask(env, env.token(), document_id=D88.upper()).status_code == 200
+    call = env.retriever.calls[0]
+    # id chuẩn hóa (chữ thường) trước khi vào bộ lọc; nguyên câu hỏi để chọn tỷ trọng nghĩa (câu tìm đã bỏ ngoặc kép)
+    assert call["filters"].document_id == D88 and call["question"] == QUESTION
+    (done,) = [r for r in log_records if r["event"] == "office.assist.asked"]
+    assert done["scoped"] is True and "ratio" in done
+    assert ask(env, env.token()).status_code == 200
+    assert env.retriever.calls[1]["filters"].document_id is None
+
+
 # --- quyền ---------------------------------------------------------------------------------------------------------
 
 
@@ -428,7 +440,7 @@ def test_newlines_and_invisible_characters_are_normalized_not_rejected(asking):
 
 @pytest.mark.parametrize("body", [
     {"mode": "tom-tat"}, {"year": 1999}, {"type_code": "CV/QĐ"}, {"direction": "ngang"}, {"ask_id": "khong-phai"},
-    {"cau_hoi": "thừa khóa"}, {"question": 42},
+    {"cau_hoi": "thừa khóa"}, {"question": 42}, {"document_id": "khong-phai"},
 ])
 def test_malformed_bodies_are_422(asking, body):
     env = asking(passages=demo())
@@ -601,6 +613,10 @@ def test_end_to_end_with_the_real_chunk_index_and_retriever(scanner, store, veri
         nobody = client.post("/api/documents/ask", json={"question": QUESTION}, headers={
             "Authorization": f"Bearer {ask_token(signing_key, sub='u-tp', role='manager')}"})
         ready = client.get("/readyz").json()["assist"]
+        searched = len(index.searches)
+        # hỏi trong một văn bản: văn bản được đọc, văn bản không được đọc (lọc trước cho qua, hậu kiểm bỏ)
+        mine, other = (client.post("/api/documents/ask", headers={"Authorization": f"Bearer {ask_token(signing_key)}"},
+                                   json={"question": QUESTION, "document_id": doc}) for doc in (d88, hidden))
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "answered" and body["semantic"] is True and body["answer"]["source"] == "extract"
@@ -616,5 +632,9 @@ def test_end_to_end_with_the_real_chunk_index_and_retriever(scanner, store, veri
     assert search["hybrid"]["embedder"] == "emb_qwen3_embedding_0_6b" and len(search["vector"]) == DIMS
     assert fake.calls("/api/embed")[-1]["input"][0].startswith("Instruct: ")
     # quản lý không có phòng: không gọi Meilisearch, không có căn cứ
-    assert nobody.json()["status"] == "no_evidence" and len(index.searches) == 1
+    assert nobody.json()["status"] == "no_evidence" and searched == 1
     assert ready == {"index": True, "semantic": True, "model": True, "embed_pending": 0, "embed_failed": 0}
+    assert mine.json()["status"] == "answered" and [x["document_id"] for x in mine.json()["sources"]] == [d88]
+    assert index.searches[searched]["filter"][-1] == f'document_id = "{d88}"'
+    assert other.json()["status"] == "no_evidence" and other.json()["sources"] == []
+    assert "XANH LAM" not in other.text and "99/MAT" not in other.text

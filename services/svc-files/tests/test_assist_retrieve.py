@@ -30,7 +30,7 @@ from conftest import TENANT_A, FakeChunkIndex
 from svc_files import hasura as hasura_queries
 from svc_files.assist.chunks import eligible
 from svc_files.assist.index import ChunkIndexer
-from svc_files.assist.retrieve import DocHit, Filters, Passage, Retriever
+from svc_files.assist.retrieve import KEYWORD_RATIO, DocHit, Filters, Passage, Retriever, exact_cues, semantic_ratio
 from svc_files.assist.scope import service_scope, user_scope
 from svc_files.hasura import HasuraAuthError, HasuraError
 from svc_files.search import SearchError
@@ -388,6 +388,110 @@ def test_vector_adds_hybrid_search(make_token, hasura, index):
     assert body["rankingScoreThreshold"] == 0.75 and got.semantic is True
     run(retriever(index, hasura, embedder=None).search(scope_of(make_token), q="hoc bong", vector=[0.1]))
     assert "hybrid" not in index.searches[-1]                       # không có embedder: chỉ từ khóa
+
+
+# --- tỷ trọng nghĩa theo câu hỏi -----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("question", "cues"), [
+    ("Quyết định 123/QĐ-ĐHCN quy định gì về học phí?", ["symbol"]),
+    ("thông báo 45/tb-kcntt nói gì", ["symbol"]),                   # chữ thường
+    ("Công văn 88/CTSV xét học bổng thế nào?", ["symbol"]),         # không gạch nối
+    ("Văn bản 2041/2026/CV-CNCT gửi ai?", ["symbol"]),              # có năm
+    ("Văn bản số 152a/TB-VP nói gì?", ["symbol"]),                  # "Số" + số có chữ: mẫu SYMBOL của docread
+    ("Văn bản Số 12 / QĐ - UBND nói gì?", ["symbol"]),               # có khoảng trắng quanh "/"
+    ("Ký hiệu 123/QĐ–ĐHCN là gì?", ["symbol"]),                     # gạch ngang dài
+    ("Hạn nộp hồ sơ 15/11/2026 cho việc gì?", ["date"]),            # "hồ sơ" bỏ dấu là "ho so": không phải "Số"
+    ("Văn bản ngày 5-3-2026 nói gì?", ["date"]),
+    ("Cuộc họp ngày 5.3.2026", ["date"]),
+    ("Văn bản ban hành ngày 5 tháng 3 năm 2026 về việc gì?", ["date"]),
+    ('Văn bản nào có cụm "phương án XANH LAM"?', ["quoted"]),
+    ("Ai phụ trách “trực cơ quan dịp Tết”?", ["quoted"]),
+    ('Quyết định 15/QĐ-ĐHM ngày 05/03/2026 có câu "không quá 3 ngày"?', ["symbol", "date", "quoted"]),
+])
+def test_exact_cues(question, cues):
+    assert exact_cues(question) == cues
+
+
+@pytest.mark.parametrize("question", [
+    "Điều kiện xét học bổng khuyến khích học tập là gì?",
+    "Năm học 2025-2026 có mấy học kỳ?",                             # năm học, không phải ngày
+    "Điểm từ 3,2 trở lên hay 3.2/4?",                                # số, phân số: không có chữ sau "/"
+    "Khoảng 5/10 sinh viên đạt, tốc độ 60km/h",
+    "Nghỉ Tết từ ngày 5 tháng 2?",                                   # thiếu năm
+    'Chỉ có một dấu " lẻ',
+    "Cụm 'trong nháy đơn' không tính",
+    "Số lượng sinh viên đăng ký là bao nhiêu?",                      # "Số" mà không có số ký hiệu
+    "Số 3/4 sinh viên đạt loại giỏi?",                               # "Số" + phân số: không có chữ sau "/"
+])
+def test_no_exact_cues_in_ordinary_questions(question):
+    assert exact_cues(question) == []
+
+
+def test_semantic_ratio_leans_on_keywords_only_for_exact_questions():
+    assert KEYWORD_RATIO == 0.2
+    assert semantic_ratio("Điều kiện xét học bổng là gì?", 0.5) == 0.5          # câu thường: giữ cấu hình
+    assert semantic_ratio("Công văn 88/CTSV nói gì?", 0.5) == 0.2
+    assert semantic_ratio("Công văn 88/CTSV nói gì?", 0.7) == 0.2
+    assert semantic_ratio("Công văn 88/CTSV nói gì?", 0.1) == 0.1               # không bao giờ tăng
+    assert semantic_ratio("Công văn 88/CTSV nói gì?", 0.0) == 0.0
+
+
+def test_hybrid_body_uses_the_ratio_of_the_whole_question(make_token, hasura, index):
+    add(hasura, "Học bổng", sentences("HOCBONG", 2))
+    sync(hasura, index)
+    r = retriever(index, hasura, embedder=EMB, semantic_ratio=0.5)
+    # câu tìm đã bỏ ngoặc kép (vi.keyword_query): xét trên nguyên câu hỏi
+    got = run(r.search(scope_of(make_token), q="phuong an xanh lam", vector=[0.1],
+                       question='Văn bản nào có "phương án xanh lam"?'))
+    assert index.searches[-1]["hybrid"]["semanticRatio"] == 0.2 and got.ratio == 0.2
+    got = run(r.search(scope_of(make_token), q="hoc bong", vector=[0.1], question="Học bổng xét thế nào?"))
+    assert index.searches[-1]["hybrid"]["semanticRatio"] == 0.5 and got.ratio == 0.5
+    got = run(r.search(scope_of(make_token), q="88/CTSV hoc bong", vector=[0.1]))   # không có câu hỏi: xét câu tìm
+    assert index.searches[-1]["hybrid"]["semanticRatio"] == 0.2 and got.ratio == 0.2
+    got = run(r.search(scope_of(make_token), q="88/CTSV", vector=None, question="88/CTSV?"))
+    assert "hybrid" not in index.searches[-1] and got.ratio is None             # chỉ từ khóa: không có tỷ trọng
+    run(r.similar(service_scope(TENANT_A), q="88/CTSV hoc bong", vector=[0.1]))
+    assert index.searches[-1]["hybrid"]["semanticRatio"] == 0.5                 # văn bản tương tự: giữ cấu hình
+
+
+# --- hỏi trong một văn bản -----------------------------------------------------------------------------------
+
+
+def test_document_filter_only_narrows_the_askers_scope(make_token, hasura, index):
+    index.frequency = True
+    mine = add(hasura, "Học bổng của tôi", sentences("HOCBONG", 3), created_by="u-cv")
+    other = add(hasura, "Học bổng khác", sentences("HOCBONG", 3), created_by="u-cv")
+    # văn bản ngoài phạm vi chuyên viên (người khác tạo, không giao cho tôi) mà Hasura giả vẫn cho đọc: chỉ mục không
+    # trả đoạn nào — điều kiện văn bản nối AND sau phạm vi vai trò, không thay nó
+    outside = add(hasura, "Học bổng phòng khác", sentences("HOCBONG", 3), created_by="u-khac")
+    sync(hasura, index)
+    scope = scope_of(make_token, sub="u-cv", role="staff", department_id="dep-dt")
+    r = retriever(index, hasura)
+
+    got = run(r.search(scope, q="hoc bong xet", vector=None, filters=Filters(document_id=mine)))
+    assert {p.document_id for p in got.passages} == {mine} and other
+    assert index.searches[-1]["filter"] == [f'tenant_id = "{TENANT_A}"', *scope.where, f'document_id = "{mine}"']
+    # lượt nới tìm trong cùng bộ lọc
+    assert all(b["filter"] == index.searches[-1]["filter"] for b in index.multi_searches[-1])
+
+    got = run(r.search(scope, q="hoc bong xet", vector=None, filters=Filters(document_id=outside)))
+    assert (got.passages, got.candidates) == ([], 0)
+
+
+def test_document_filter_still_post_checks_with_the_askers_token(make_token, hasura, index):
+    hidden = add(hasura, "Học bổng mật", sentences("HOCBONG", 3), readers={"u-khac"})
+    sealed = add(hasura, "Học bổng sắp hạn chế", sentences("HOCBONG", 3))
+    sync(hasura, index)
+    hasura.documents[sealed]["restricted"] = True                  # chưa đồng bộ lại
+    r = retriever(index, hasura)
+    for doc in (hidden, sealed):
+        # văn thư lọc trước cả đơn vị: Meilisearch trả đoạn, hậu kiểm bằng token người hỏi bỏ đi
+        got = run(r.search(scope_of(make_token), q="hoc bong", vector=None, filters=Filters(document_id=doc)))
+        assert got.passages == [] and got.candidates > 0 and hasura.ask_calls[-1]["by"] == "token"
+    got = run(r.search(scope_of(make_token), q="hoc bong", vector=None,
+                       filters=Filters(document_id='x" OR tenant_id != "y')))
+    assert index.searches[-1]["filter"][-1] == 'document_id = "x\\" OR tenant_id != \\"y"' and got.passages == []
 
 
 # --- tìm lai lỗi: lùi về từ khóa -----------------------------------------------------------------------------

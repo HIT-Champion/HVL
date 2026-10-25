@@ -16,15 +16,18 @@
 
 
 // Hỏi đáp trên kho văn bản (F4.2): câu trả lời tách thành chữ và dấu trích dẫn [n] (không bao giờ thành HTML), nhãn
-// trích dẫn "88/CTSV · tr. 1" theo đúng chữ trong vi.json / en.json, và hai bộ khóa ngôn ngữ khớp nhau.
+// trích dẫn "88/CTSV · tr. 1" theo đúng chữ trong vi.json / en.json, và hai bộ khóa ngôn ngữ khớp nhau. Hỏi trong một
+// văn bản (?van_ban=<id>), nhãn nguồn mở tệp đúng trang (#page=n).
 
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import type { AskResult, AskSource } from '../app/composables/useApi.ts'
 
-const { MASK_RE, MAX_QUESTION, blocks, citeLabel, cleanQuestion, hasMask, needsGenerate, segments, sourceAnchor, tidy } =
-  await import('../app/utils/answer.ts')
+const {
+  ASK_ROLES, MASK_RE, MAX_QUESTION, SCOPE_PARAM, askAbout, blocks, canAskAbout, canView, citeLabel, cleanQuestion,
+  hasMask, inAssistant, needsGenerate, pageUrl, scopeOf, segments, sourceAnchor, tidy,
+} = await import('../app/utils/answer.ts')
 
 type Messages = { [key: string]: string | Messages }
 const load = (lang: string): Messages =>
@@ -256,4 +259,70 @@ test('khóa i18n viết thẳng trong trang Hỏi đáp đều có trong vi.json
     }
   }
   assert.ok(checked > 40, `chỉ thấy ${checked} khóa`)
+})
+
+// --- hỏi trong một văn bản, xem trang được trích -----------------------------------------------------------------
+
+const DOC_ID = '8c1d2e3f-0000-4000-8000-000000000088'
+
+test('nút "Hỏi về văn bản này" mở trang Hỏi đáp với ?van_ban=<id>, trang Hỏi đáp đọc lại đúng id đó', () => {
+  assert.deepEqual(askAbout(DOC_ID), { path: '/hoi-dap', query: { van_ban: DOC_ID } })
+  assert.equal(SCOPE_PARAM, 'van_ban')
+  assert.equal(scopeOf(askAbout(DOC_ID).query), DOC_ID)
+  assert.equal(scopeOf({ van_ban: DOC_ID.toUpperCase() }), DOC_ID)
+  // không phải UUID thì không có phạm vi: không gửi chuỗi lạ lên máy chủ
+  for (const bad of [undefined, null, '', 'abc', [DOC_ID], `${DOC_ID}" OR 1`, ` ${DOC_ID}`]) {
+    assert.equal(scopeOf({ van_ban: bad }), null, String(bad))
+  }
+  assert.equal(scopeOf({ q: 'học bổng' }), null)
+})
+
+test('nút chỉ hiện khi người xem hỏi được và văn bản có trong kho của trợ lý', () => {
+  const doc = (direction: string, status: string, restricted = false) => ({ direction, status, restricted })
+  assert.equal(inAssistant(doc('in', 'received')), true)
+  assert.equal(inAssistant(doc('in', 'cancelled')), false)
+  assert.equal(inAssistant(doc('in', 'received', true)), false)       // hạn chế: không bao giờ vào chỉ mục
+  assert.equal(inAssistant(doc('out', 'draft')), false)               // dự thảo chưa phát hành
+  assert.equal(inAssistant(doc('out', 'issued')), true)
+  assert.equal(inAssistant(doc('out', 'archived')), true)
+  assert.equal(inAssistant(doc('x', 'received')), false)
+  for (const role of ['clerk', 'staff', 'manager', 'director']) {
+    assert.equal(canAskAbout(doc('in', 'received'), role), true, role)
+  }
+  for (const role of ['tenant_admin', 'verifier', '', null, undefined]) {
+    assert.equal(canAskAbout(doc('in', 'received'), role), false, String(role))
+  }
+  assert.equal(canAskAbout(doc('out', 'draft'), 'staff'), false)
+})
+
+test('vai trò hỏi được và văn bản có trong kho của trợ lý khớp svc-files (scope.py, chunks.eligible)', (t) => {
+  const dir = new URL('../../../services/svc-files/src/svc_files/assist/', import.meta.url)
+  if (!existsSync(dir)) {
+    t.skip('không có services/svc-files trong cây mã')
+    return
+  }
+  const scope = readFileSync(new URL('scope.py', dir), 'utf8')
+  const roles = [...scope.matchAll(/^(?:READ_ALL = frozenset\(\{|ROLES = READ_ALL \| \{)([^}]*)\}/gm)]
+    .flatMap((m) => [...m[1]!.matchAll(/"(\w+)"/g)].map((x) => x[1]))
+  assert.deepEqual(roles.sort(), [...ASK_ROLES].sort())
+  const chunks = readFileSync(new URL('chunks.py', dir), 'utf8')
+  const eligible = chunks.match(/^def eligible\(.*\n((?: {4}.*\n)+)/m)?.[1] ?? ''
+  assert.match(eligible, /if doc\.get\("restricted"\):\n\s+return False/)
+  assert.match(eligible, /== "in":\n\s+return doc\.get\("status"\) != "cancelled"/)
+  assert.match(eligible, /== "out":\n\s+return doc\.get\("status"\) in \("issued", "archived"\)/)
+})
+
+test('nhãn nguồn mở tệp đúng trang được trích: #page=n, không có trang thì mở từ đầu', () => {
+  assert.equal(canView(source(1)), true)
+  assert.equal(canView(source(1, { kind: 'meta', file_id: null, file_role: null, page: null })), false)   // trích yếu
+  assert.equal(canView(source(1, { file_id: null })), false)
+  const url = 'blob:https://signet.example/6f1c2a3b'
+  assert.equal(pageUrl(url, 3), `${url}#page=3`)
+  for (const page of [null, undefined, 0, -1, 1.5]) assert.equal(pageUrl(url, page), url, String(page))
+  assert.equal(tVi('assist.viewSource', { label: citeLabel(source(1), tVi, true) }), 'Xem tệp: 88/CTSV, trang 1')
+  assert.equal(tVi('assist.viewPage', { n: 2 }), 'Xem trang 2')
+  assert.equal(tEn('assist.viewSource', { label: citeLabel(source(1), tEn, true) }), 'View file: 88/CTSV, page 1')
+  assert.equal(tVi('assist.scope.chip', { label: '88/CTSV' }), 'Trong 88/CTSV')
+  assert.equal(tVi('doc.askAbout'), 'Hỏi về văn bản này')
+  assert.equal(tEn('doc.askAbout'), 'Ask about this document')
 })
