@@ -41,9 +41,9 @@ Broker gửi mỗi thông báo một lần: ghi CSDL lỗi (503) thì lần vư�
 dựng dự thảo.
 
 Sơ đồ cảm biến (Action ``otSensorMap``, trang /cam-bien): đọc số đo mới nhất của các cảm biến trong tenant của đơn vị
-người gọi, kèm ba cờ chất lượng dữ liệu OT tính ở đây (``sensor_view``) — mất tín hiệu, ngoài dải, trùng
-``observedAt``. Cảm biến khai phòng bằng Property ``room`` (mã phòng trên sơ đồ). Broker không trả lời thì trả trạng
-thái "unavailable", không lỗi: trang báo chưa bật cảm biến.
+người gọi, kèm bốn cờ chất lượng dữ liệu OT tính ở đây (``sensor_view``) — mất tín hiệu, ngoài dải, trùng
+``observedAt``, ``observedAt`` ở tương lai. Cảm biến khai phòng bằng Property ``room`` (mã phòng trên sơ đồ). Broker
+không trả lời thì trả trạng thái "unavailable", không lỗi: trang báo chưa bật cảm biến.
 """
 
 from __future__ import annotations
@@ -98,6 +98,9 @@ RANGE = (-55.0, 125.0)
 HISTORY = 10            # số lần đo gần nhất xét trùng observedAt
 MAX_SENSORS = 100       # một trang của truy vấn thực thể; đơn vị có nhiều cảm biến hơn thì sơ đồ thiếu phần sau
 HISTORY_BUDGET_S = 8.0  # cả lượt đọc lịch sử; quá thì bỏ cờ trùng observedAt lần này (Hasura chờ Action 15 giây)
+# observedAt muộn hơn giờ máy chủ quá chừng này là giờ ở tương lai (cờ future_time, đồng hồ thiết bị chạy nhanh); chừa
+# cho lệch giờ NTP, trễ mạng. Đồng hồ nhanh ít hơn thì cờ mất tín hiệu chậm nhiều nhất chừng ấy
+FUTURE_SLACK = timedelta(minutes=2)
 
 TENANTS = """
 query Tenants { core_tenants(order_by: {code: asc}) { id code } }"""
@@ -275,11 +278,14 @@ def sensor_view(entity: Any, history: list[datetime] | None, now: datetime,
     """Một thực thể cảm biến → một dòng của sơ đồ: số đo mới nhất và cờ chất lượng; None nếu không phải cảm biến.
 
     - ``stale`` (mất tín hiệu): chưa có số đo, hoặc số đo mới nhất cũ hơn ``stale_after`` (theo ``observedAt``; thiết
-      bị không gửi ``observedAt`` thì theo ``modifiedAt`` của broker);
+      bị không gửi ``observedAt``, hoặc gửi giờ ở tương lai, thì theo ``modifiedAt`` — lúc broker nhận số đo);
     - ``out_of_range`` (ngoài dải): giá trị không phải số hữu hạn, hoặc ngoài ``RANGE``;
     - ``duplicate_time`` (trùng ``observedAt``): ``observedAt`` của số đo mới nhất có từ hai lần trở lên trong
       ``history`` (các lần đo gần nhất) — đồng hồ thiết bị đứng hoặc gửi lặp. Có số đo mới đúng giờ thì cờ tự hết.
-      ``history`` None (không đọc được lịch sử) thì không kết luận cờ này.
+      ``history`` None (không đọc được lịch sử) thì không kết luận cờ này;
+    - ``future_time`` (giờ đo ở tương lai): ``observedAt`` của số đo mới nhất muộn hơn ``now`` quá ``FUTURE_SLACK`` —
+      đồng hồ thiết bị chạy nhanh. Giờ đó không dùng để xét mất tín hiệu: theo nó thì số đo cuối luôn có vẻ mới, thiết
+      bị đã mất tín hiệu không bao giờ bị gắn ``stale``.
     """
     if not isinstance(entity, dict) or entity.get("type") != SENSOR_TYPE:
         return None
@@ -289,14 +295,20 @@ def sensor_view(entity: Any, history: list[datetime] | None, now: datetime,
     room = _value(entity, "room")
     attr = _attr(entity, "temperature")
     value = _number(attr.get("value")) if attr else None
-    observed = (_time(attr.get("observedAt")) or _time(attr.get("modifiedAt"))) if attr else None
+    stamp = _time(attr.get("observedAt")) if attr else None      # giờ thiết bị
+    received = _time(attr.get("modifiedAt")) if attr else None   # giờ broker (options=sysAttrs)
+    observed = stamp or received
+    ahead = stamp is not None and stamp - now > FUTURE_SLACK
+    last = received if ahead else observed
     flags = []
-    if observed is None or now - observed > stale_after:
+    if last is None or now - last > stale_after:
         flags.append("stale")
     if attr is not None and (value is None or not RANGE[0] <= value <= RANGE[1]):
         flags.append("out_of_range")
     if observed is not None and history is not None and sum(t == observed for t in history) >= 2:
         flags.append("duplicate_time")
+    if ahead:
+        flags.append("future_time")
     return {
         "id": sensor,
         "room": room if isinstance(room, str) and _ROOM.match(room) else None,

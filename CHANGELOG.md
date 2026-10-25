@@ -93,6 +93,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   (`docker compose up -d --force-recreate --wait keycloak`) để nhận CSS mới. Không đổi dữ liệu, API hay quyền.
   e2e thêm `giao-dien.spec.ts`, test scripts +1.
 
+### Đã sửa đổi
+- Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
+  chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
+  thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi
+  nhầm `v1.1.0`), `ROADMAP.md`, `docs/architecture.md`.
+
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
   Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura
@@ -121,6 +127,18 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thành việc ngoài trên cùng phiên quy trình (#189; thấy trong CI, `make demo-giao-viec`): Flowable khóa lạc quan,
   hủy một giao dịch và trả 500 kèm `FlowableOptimisticLockingException`. `svc-workflow` nay gọi lại tối đa 2 lần
   (sau 0,2 và 0,5 giây) cho hoàn thành việc và việc ngoài, chỉ với đúng lỗi này. Test svc-workflow +7.
+- Sơ đồ cảm biến (`/cam-bien`) không còn bỏ sót cảm biến mất tín hiệu có đồng hồ chạy nhanh (#191): cờ mất tín hiệu
+  xét theo `observedAt` của số đo mới nhất, thiết bị gửi giờ ở tương lai thì số đo cuối luôn có vẻ vừa đo, kể cả khi
+  đã mất tín hiệu thật. Thêm cờ thứ tư `future_time` ("Giờ đo ở tương lai"): `observedAt` muộn hơn giờ máy chủ quá 2
+  phút; khi đó mất tín hiệu xét theo lúc broker nhận số đo (`modifiedAt`). Cờ là một chuỗi nữa trong `flags`, kiểu
+  GraphQL không đổi; phòng chỉ có cờ này vẫn tô theo số đo. `sensor.py` thêm `--clock-ahead` để giả đồng hồ nhanh,
+  bước 7 của `make demo-it-ot` thêm cảm biến phòng xử lý tài liệu. Test svc-workflow +2, office +1.
+- Trợ lý hỏi đáp không còn để lô nhúng nền chen vào lúc mô hình đang trả lời (#192). Trần 30 giây của #184 áp cả cho
+  một câu hỏi mà Ollama viết câu trả lời lâu hơn 30 giây, vì lượt hỏi gia hạn giữ mỗi 2,5 giây và vòng nền không phân
+  biệt gia hạn với câu hỏi mới: trên máy chỉ có CPU, một lô (tới 8 đoạn, khoảng 5 giây) làm câu trả lời chậm thêm. Nay
+  lời gọi mô hình đang chạy (nhúng câu hỏi, viết câu trả lời, nhúng trích yếu cho tác tử gợi ý) giữ vòng nền suốt lời
+  gọi, không có trần; trần 30 giây chỉ còn áp cho 5 giây giữ thêm sau mỗi lời gọi của lượt hỏi. Test svc-files thêm
+  ca lời gọi dài quá 30 giây và ca lượt bị hủy giữa lời gọi.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau

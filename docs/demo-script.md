@@ -122,15 +122,16 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 5. Chuyên viên trình → tổ trưởng phòng có việc duyệt, như mọi văn bản đi.
 6. Thông báo giả: từ mạng thiết bị không tới được svc-workflow; từ mạng nội bộ (container svc-files) với token sai
    → 401.
-7. Sơ đồ cảm biến kho: bốn cảm biến kho khai mã phòng (`--room`) và gửi số đo — kho 1 bình thường; kho 2 gửi
+7. Sơ đồ cảm biến kho: năm cảm biến khai mã phòng (`--room`) và gửi số đo — kho 1 bình thường; kho 2 gửi
    `-127 °C` (ngoài dải); kho 3 đồng hồ đứng (`--frozen-clock`, trùng `observedAt`); phòng đọc gửi số đo cũ hơn
-   `MOC_OT_STALE_MIN` + 20 phút (`--late`, mất tín hiệu). Văn thư gọi Action `otSensorMap`: đúng cờ từng cảm biến,
+   `MOC_OT_STALE_MIN` + 20 phút (`--late`, mất tín hiệu); phòng xử lý đồng hồ nhanh 30 phút (`--clock-ahead`, giờ đo
+   ở tương lai — broker vừa nhận nên không mất tín hiệu). Văn thư gọi Action `otSensorMap`: đúng cờ từng cảm biến,
    phòng máy chủ vượt ngưỡng; văn thư Khoa Kinh tế không thấy cảm biến của Khoa CNTT; quản trị đơn vị không có Action.
 
 Trên giao diện (`chuyenviendt`): chuông thông báo "Cảnh báo nhiệt độ…", mục Văn bản đi có dự thảo, dòng thời gian
 ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dựng dự thảo". Mục "Sơ đồ cảm biến" (`/cam-bien`, văn thư,
 chuyên viên, lãnh đạo): mặt bằng kho, phòng máy chủ đỏ, kho 1 xanh, kho 2 và phòng đọc xám có cờ, kho 3 có cờ
-"Trùng giờ đo"; chú giải ghi luật từng cờ.
+"Trùng giờ đo", phòng xử lý tô theo số đo kèm cờ "Giờ đo ở tương lai"; chú giải ghi luật từng cờ.
 
 **Nếu giám khảo hỏi:**
 

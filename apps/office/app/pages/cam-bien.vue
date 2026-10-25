@@ -19,12 +19,12 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import {
-  FLAG_ORDER, LEVEL_ORDER, LEVEL_TONE, NEAR_BAND, PLAN, SENSOR_REFRESH_MS, doorOf, fmtTemp, knownFlags, placeSensors,
-  sensorLevel, type OtSensor, type OtSensorMap, type RoomView,
+  FLAG_ORDER, FUTURE_SLACK_MIN, LEVEL_ORDER, LEVEL_TONE, NEAR_BAND, PLAN, SENSOR_REFRESH_MS, doorOf, fmtTemp,
+  knownFlags, placeSensors, sensorLevel, type OtSensor, type OtSensorMap, type RoomView,
 } from '~/utils/otMap'
 
 // Sơ đồ cảm biến kho (F3.10): mặt bằng kho lưu trữ, mỗi phòng tô màu theo số đo mới nhất của cảm biến đặt trong phòng
-// so với ngưỡng, kèm ba cờ chất lượng dữ liệu OT do svc-workflow tính. Đọc qua Hasura Action otSensorMap bằng token
+// so với ngưỡng, kèm bốn cờ chất lượng dữ liệu OT do svc-workflow tính. Đọc qua Hasura Action otSensorMap bằng token
 // người xem (APISIX và Hasura kiểm JWT; svc-workflow chỉ đọc tenant NGSI-LD của đơn vị trong phiên) — trình duyệt
 // không gọi thẳng broker. Cùng các vai trò đọc được dự thảo "Báo cáo sự cố". Tự làm mới mỗi 30 giây khi tab đang mở.
 
@@ -88,7 +88,7 @@ const levelHint = (level: string) => t(`sensors.levelHint.${level}`, {
 })
 const flagHint = (flag: string) => t(`sensors.flagHint.${flag}`, {
   n: data.value?.stale_after_min ?? 0, min: fmtTemp(data.value?.range_min ?? null, locale.value),
-  max: fmtTemp(data.value?.range_max ?? null, locale.value),
+  max: fmtTemp(data.value?.range_max ?? null, locale.value), slack: FUTURE_SLACK_MIN,
 })
 const shownValue = (r: RoomView) => r.sensors.length === 1 ? fmtTemp(r.sensors[0]!.value, locale.value)
   : r.sensors.length ? t('sensors.count', { n: r.sensors.length }) : ''

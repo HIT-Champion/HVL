@@ -406,10 +406,19 @@ def test_retriever_similar_keeps_the_semantic_flag_and_similar_documents_wraps_i
 
 def test_with_an_embedding_model_searches_by_meaning(similar_env, hasura):
     fake = FakeOllama()
-    env = similar_env(ai=ollama(fake, chat=None), embedder=EMB)
+    ai = ollama(fake, chat=None)
+    env = similar_env(ai=ai, embedder=EMB)
     c = corpus(hasura)
     env.sync()
     fake.requests.clear()
+    held: list[int] = []
+    embed = ai.embed
+
+    async def watched(*args, **kwargs):
+        held.append(env.indexer.active)
+        return await embed(*args, **kwargs)
+
+    ai.embed = watched
     r = env.post(c.target)
     assert r.status_code == 200 and r.json()["semantic"] is True
     assert r.json()["hits"][0]["document_id"] == c.d88
@@ -419,7 +428,8 @@ def test_with_an_embedding_model_searches_by_meaning(similar_env, hasura):
     (sent,) = env.index.searches
     assert sent["hybrid"]["embedder"] == EMB and len(sent["vector"]) == DIMS and sent["q"] == Q
     assert env.index.multi_searches == []                       # tìm theo nghĩa đã phủ chữ khác: không nới
-    assert env.indexer.holds == [similar.EMBED_TIMEOUT_S]       # vòng nhúng nền nhường mô hình
+    # vòng nhúng nền nhường mô hình suốt lời gọi nhúng; xong thì thôi giữ, không giữ thêm
+    assert held == [1] and env.indexer.holds == [0.0] and env.indexer.active == 0
 
 
 def test_embedding_is_bounded_by_three_seconds_and_a_miss_falls_back_to_keywords(similar_env, hasura):

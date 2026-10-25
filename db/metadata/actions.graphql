@@ -77,7 +77,7 @@ type WorkTask {
 }
 
 # status: ready (broker trả lời) | off (chưa đặt MOC_NGSI_URL) | unavailable (broker không trả lời, vd chưa bật
-# profile iot). flags của từng cảm biến: stale, out_of_range, duplicate_time — luật ở sensor_view
+# profile iot). flags của từng cảm biến: stale, out_of_range, duplicate_time, future_time — luật ở sensor_view
 # (services/svc-workflow/src/svc_workflow/ot.py)
 type OtSensorMap {
   status: String!

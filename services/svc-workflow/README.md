@@ -83,9 +83,11 @@ to drop … ResponseException").
 **Sơ đồ cảm biến** (F3.10, Action `otSensorMap`, trang `/cam-bien` của Văn phòng điện tử): đọc broker ở tenant NGSI-LD
 của đơn vị trong biến phiên — `GET /ngsi-ld/v1/entities?type=TemperatureSensor&options=sysAttrs` (tối đa 100 cảm
 biến) và lịch sử 10 lần đo gần nhất của từng cảm biến (temporal API, tối đa 8 lời gọi một lúc, cả lượt 8 giây) — rồi
-trả số đo mới nhất, mã phòng (Property `room`), ngưỡng và ba cờ chất lượng: `stale` (quá `MOC_OT_STALE_MIN` phút
-không có số đo, theo `observedAt`, thiếu thì `modifiedAt`), `out_of_range` (không phải số hữu hạn hoặc ngoài
-−55…125 °C — dải đo của DS18B20), `duplicate_time` (số đo mới nhất trùng `observedAt` với lần đo khác trong lịch sử).
+trả số đo mới nhất, mã phòng (Property `room`), ngưỡng và bốn cờ chất lượng: `stale` (quá `MOC_OT_STALE_MIN` phút
+không có số đo, theo `observedAt`, thiếu hay ở tương lai thì `modifiedAt` — lúc broker nhận), `out_of_range` (không
+phải số hữu hạn hoặc ngoài −55…125 °C — dải đo của DS18B20), `duplicate_time` (số đo mới nhất trùng `observedAt` với
+lần đo khác trong lịch sử), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút — đồng hồ thiết bị chạy
+nhanh; thiết bị đó mất tín hiệu vẫn bị gắn `stale`).
 Vai trò `clerk`, `staff`, `manager`, `director`. Chưa đặt `MOC_NGSI_URL` thì `status` = `off`; broker không trả lời
 hay trả lỗi thì `unavailable` — vẫn 200, không 5xx. Chỉ đọc, không ghi CSDL.
 

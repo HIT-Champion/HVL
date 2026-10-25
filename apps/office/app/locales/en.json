@@ -1574,12 +1574,14 @@
     "flag": {
       "stale": "Signal lost",
       "out_of_range": "Out of range",
-      "duplicate_time": "Repeated time"
+      "duplicate_time": "Repeated time",
+      "future_time": "Future time"
     },
     "flagHint": {
       "stale": "no new reading for more than {n} minutes",
       "out_of_range": "value is not a number, or outside the sensor's measuring range ({min} to {max})",
-      "duplicate_time": "the latest reading has the same observation time (observedAt) as another reading: stuck device clock or replayed message"
+      "duplicate_time": "the latest reading has the same observation time (observedAt) as another reading: stuck device clock or replayed message",
+      "future_time": "the latest reading's observation time (observedAt) is more than {slack} minutes ahead of the server clock: device clock running fast; signal loss is then judged by when the broker received the reading"
     },
     "flagsNote": "Flags are computed by the server from the sensor's digital twin in the context broker; rooms flagged signal lost or out of range are not coloured by the reading.",
     "table": "Sensors",

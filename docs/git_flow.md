@@ -298,9 +298,9 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
 
 ## 6. Phát hành
 
-Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10 (cả hai đã phát hành) · `v1.1.0` trước 01/11, bản cho vòng trường · `v1.2.0`
-03/12, bản nộp chấm (mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ. Gói phát hành tên `signet-X.Y.Z.tar.gz` từ
-`v1.1.0`; gói của `v0.1.0`, `v1.0.0` giữ tên cũ `moc-X.Y.Z.tar.gz` (không gắn lại thẻ đã đẩy).
+Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10 · `v1.1.0` 25/10 (ba bản đã phát hành) · `v1.2.0` 30/10, bản cho vòng trường ·
+`v1.3.0` 03/12, bản nộp chấm (mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ. Gói phát hành tên `signet-X.Y.Z.tar.gz`
+từ `v1.1.0`; gói của `v0.1.0`, `v1.0.0` giữ tên cũ `moc-X.Y.Z.tar.gz` (không gắn lại thẻ đã đẩy).
 
 Đây là lúc duy nhất `main` nhận thay đổi.
 
@@ -397,9 +397,10 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 
 | Từ | Quy tắc |
 |---|---|
-| **trước 01/11** | Phát hành `v1.1.0`, bản cho vòng trường |
+| **tối 28/10** | Chốt danh sách cho `v1.2.0`: PR chưa gộp thì sang `v1.3.0`. Từ 29/10 chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` tới khi gắn thẻ |
+| **30/10** | Phát hành `v1.2.0`, bản cho vòng trường 01/11 (`v1.1.0` đã phát hành 25/10) |
 | **26/11** | Đóng băng tính năng: chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` |
-| **03/12** | Phát hành `v1.2.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.2.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
+| **03/12** | Phát hành `v1.3.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.3.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
 | **05/12 → 10/12** | Không đẩy `deploy` trừ khi cả đội đồng ý (sự cố chặn demo) |
 | **17:00 06/12** | **Không push bất cứ gì lên repo này** — kể cả nhánh mới. Slide, video làm ở repo riêng |
 

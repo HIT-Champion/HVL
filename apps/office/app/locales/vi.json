@@ -1574,12 +1574,14 @@
     "flag": {
       "stale": "Mất tín hiệu",
       "out_of_range": "Ngoài dải",
-      "duplicate_time": "Trùng giờ đo"
+      "duplicate_time": "Trùng giờ đo",
+      "future_time": "Giờ đo ở tương lai"
     },
     "flagHint": {
       "stale": "quá {n} phút không có số đo mới",
       "out_of_range": "giá trị không phải số, hoặc ngoài dải đo của cảm biến ({min} đến {max})",
-      "duplicate_time": "số đo mới nhất mang cùng thời điểm đo (observedAt) với một lần đo khác: đồng hồ thiết bị đứng hoặc gửi lặp"
+      "duplicate_time": "số đo mới nhất mang cùng thời điểm đo (observedAt) với một lần đo khác: đồng hồ thiết bị đứng hoặc gửi lặp",
+      "future_time": "thời điểm đo (observedAt) của số đo mới nhất muộn hơn giờ máy chủ quá {slack} phút: đồng hồ thiết bị chạy nhanh; khi đó mất tín hiệu tính theo lúc broker nhận số đo"
     },
     "flagsNote": "Cờ do máy chủ tính từ bản sao số của cảm biến trong context broker; phòng có cờ mất tín hiệu hay ngoài dải không tô theo số đo.",
     "table": "Các cảm biến",

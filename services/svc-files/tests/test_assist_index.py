@@ -23,6 +23,7 @@ import asyncio
 import json
 import re
 from collections.abc import Callable
+from contextlib import ExitStack
 
 import pytest
 
@@ -297,8 +298,9 @@ def test_hold_blocks_new_embedding_batches(hasura, index):
 
 
 def test_questions_in_a_row_hold_embedding_for_at_most_max_hold(hasura, index):
-    """#184: người hỏi lại mỗi 3 giây (dưới answer.HOLD_S) giữ vòng nền liền; cứ MAX_HOLD_S giây vòng nền vẫn nhúng
-    một lô rồi lại nhường, thôi hỏi thì nhúng tiếp ngay."""
+    """#184: người hỏi lại mỗi 3 giây, mỗi lượt gọi mô hình 1 giây rồi nhường thêm 5 giây (answer.HOLD_S) như
+    answer._holding: vòng nền bị giữ liền. Trong lời gọi không lô nào chạy (#192); giữa hai lời gọi, cứ MAX_HOLD_S giây
+    vòng nền vẫn nhúng một lô rồi lại nhường; thôi hỏi thì nhúng tiếp khi hết phần nhường thêm của lời gọi cuối."""
     add(hasura, pages=(sentences("A", 3),))
     add(hasura, "Về việc khác", pages=(sentences("B", 3),))
     add(hasura, "Về việc thứ ba", pages=(sentences("C", 3),))
@@ -306,13 +308,68 @@ def test_questions_in_a_row_hold_embedding_for_at_most_max_hold(hasura, index):
     indexer = ChunkIndexer(index, hasura, FakeEmbedder(), batch=1, clock=clock)
     run(indexer.sync_once())
     assert len(index.docs) == 3
-    start, batches = clock.now, []
+    start, during, batches = clock.now, [], []
     while clock.now - start <= 2 * MAX_HOLD_S:
-        indexer.hold(5)                     # một lượt hỏi, như answer._holding
-        if run(indexer.embed_once()):
+        with indexer.holding(5):            # một lượt hỏi gọi mô hình 1 giây
+            during.append(run(indexer.embed_once()))
+            clock.now += 1
+        if run(indexer.embed_once()):       # vòng nền thử ngay khi lời gọi vừa xong
             batches.append(clock.now - start)
-        clock.now += 3
-    assert batches == [MAX_HOLD_S, 2 * MAX_HOLD_S]
+        clock.now += 2
+    assert set(during) == {0}
+    assert batches == [1 + MAX_HOLD_S, 1 + 2 * MAX_HOLD_S]     # chuỗi giữ liền bắt đầu khi lời gọi đầu xong
+    assert indexer.held and run(indexer.embed_once()) == 0     # lời gọi cuối xong 2 giây trước: còn nhường
+    clock.now += 3
+    assert not indexer.held and run(indexer.embed_once()) == 1
+
+
+@pytest.mark.parametrize("after_s", [0.0, 5.0], ids=["similar", "answer"])
+def test_a_model_call_longer_than_max_hold_is_never_interrupted(hasura, index, after_s):
+    """#192: một lời gọi mô hình lâu hơn MAX_HOLD_S (vd viết câu trả lời trên máy chỉ có CPU) giữ vòng nền suốt lời
+    gọi — không lô nhúng nào chen vào, kể cả khi lượt hỏi đã giữ từ trước (nhúng câu hỏi). Xong thì lô chạy ngay,
+    hoặc khi hết phần nhường thêm của lời gọi: phần này không bị trần cắt vì lời gọi đã lâu."""
+    add(hasura, pages=(sentences("A", 3),))
+    clock = Clock()
+    ai = FakeEmbedder()
+    indexer = ChunkIndexer(index, hasura, ai, clock=clock)
+    run(indexer.sync_once())
+    indexer.hold(5)                         # nhúng câu hỏi vừa xong, còn nhường thêm 5 giây
+    start, tried = clock.now, []
+    with indexer.holding(after_s):
+        while clock.now - start <= 3 * MAX_HOLD_S:
+            tried.append(run(indexer.embed_once()))     # vòng nền thử mỗi 3 giây
+            clock.now += 3
+    assert set(tried) == {0} and ai.calls == []
+    if after_s:
+        assert indexer.held and run(indexer.embed_once()) == 0
+        clock.now += after_s
+    assert not indexer.held and run(indexer.embed_once()) == 1
+
+
+def test_a_cancelled_question_stops_holding(hasura, index):
+    """Người hỏi ngắt kết nối: api.py hủy lượt giữa lời gọi mô hình — thôi giữ tuyệt đối, chỉ còn phần nhường thêm."""
+    add(hasura, pages=(sentences("A", 3),))
+    clock = Clock()
+    indexer = ChunkIndexer(index, hasura, FakeEmbedder(), clock=clock)
+    run(indexer.sync_once())
+
+    async def scenario():
+        calling = asyncio.Event()
+
+        async def question():
+            with indexer.holding(5):
+                calling.set()
+                await asyncio.sleep(30)     # lời gọi mô hình
+
+        task = asyncio.create_task(question())
+        await calling.wait()
+        assert indexer.held
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    run(scenario())
+    assert indexer.held and run(indexer.embed_once()) == 0
     clock.now += 5
     assert not indexer.held and run(indexer.embed_once()) == 1
 
@@ -454,16 +511,20 @@ def test_transient_failures_mark_nothing_and_are_not_retried_chunk_by_chunk(hasu
     assert all(c["embed_model"] == MODEL for c in index.docs.values())
 
 
-def test_a_question_stops_the_chunk_by_chunk_retry(hasura, index):
+@pytest.mark.parametrize("calling", [False, True], ids=["hold", "holding"])
+def test_a_question_stops_the_chunk_by_chunk_retry(hasura, index, calling):
     add(hasura, "Văn bản độc", pages=(sentences("DOCHAI", 20), sentences("B", 20)))
     clock = Clock()
     ai = PoisonEmbedder()
     indexer = ChunkIndexer(index, hasura, ai, batch=100, clock=clock)
     run(indexer.sync_once())
-    ai.on_fail = lambda: indexer.hold(30)           # lượt hỏi tới đúng lúc lô vừa lỗi
+    question = ExitStack()
+    # lượt hỏi tới đúng lúc lô vừa lỗi: giữ theo hạn, hoặc lời gọi mô hình của nó đang chạy
+    ai.on_fail = (lambda: question.enter_context(indexer.holding())) if calling else (lambda: indexer.hold(30))
     writes = len(index.writes)
     assert run(indexer.embed_once()) == 0 and len(ai.calls) == 1 and len(index.writes) == writes
     ai.on_fail = None
+    question.close()
     clock.now += 31
     assert run(indexer.embed_once()) == len(index.docs)
 

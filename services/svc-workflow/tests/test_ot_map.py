@@ -49,13 +49,16 @@ def at(minutes_ago: float) -> str:
     return (NOW - timedelta(minutes=minutes_ago)).isoformat().replace("+00:00", "Z")
 
 
-def entity(code: str, value: Any = 22.5, observed: str | None = None, room: Any = None, **extra: Any) -> dict:
+def entity(code: str, value: Any = 22.5, observed: str | None = None, room: Any = None, received: str | None = None,
+           **extra: Any) -> dict:
     e: dict[str, Any] = {"id": f"urn:ngsi-ld:TemperatureSensor:{code}", "type": "TemperatureSensor",
                          "name": {"type": "Property", "value": f"Phòng {code}"},
                          "responsible": {"type": "Property", "value": "chuyenviendt"}}
     if value is not ...:
         e["temperature"] = {"type": "Property", "value": value, "unitCode": "CEL",
                             "observedAt": observed if observed is not None else at(1)}
+        if received is not None:  # lúc broker nhận số đo (modifiedAt, options=sysAttrs)
+            e["temperature"]["modifiedAt"] = received
     if room is not None:
         e["room"] = {"type": "Property", "value": room}
     return {**e, **extra}
@@ -122,10 +125,29 @@ def test_duplicate_observed_at_of_the_latest_reading():
     assert sensor_view(entity("a", observed=latest), None, NOW, STALE)["flags"] == []
 
 
+def test_observed_at_in_the_future_is_flagged_and_stale_goes_by_the_broker():
+    # đồng hồ thiết bị nhanh 30 phút, broker vừa nhận số đo: chỉ cờ giờ ở tương lai; bảng hiện giờ thiết bị gửi
+    view = sensor_view(entity("a", observed=at(-30), received=at(1)), [], NOW, STALE)
+    assert view["flags"] == ["future_time"] and view["observed_at"] == "2026-10-20T03:00:00+00:00"
+    # cùng thiết bị đã mất tín hiệu: mất tín hiệu tính theo lúc broker nhận số đo cuối, không theo giờ thiết bị
+    assert sensor_view(entity("a", observed=at(-30), received=at(10)), [], NOW, STALE)["flags"] == ["future_time"]
+    assert sensor_view(entity("a", observed=at(-30), received=at(10.5)), [], NOW, STALE)["flags"] == \
+        ["stale", "future_time"]
+    # không có giờ broker: không còn mốc nào tin được, như thiếu cả hai mốc
+    assert sensor_view(entity("a", observed=at(-30)), [], NOW, STALE)["flags"] == ["stale", "future_time"]
+    # nhanh trong FUTURE_SLACK (lệch giờ NTP, trễ mạng): không cờ, mất tín hiệu vẫn theo observedAt
+    assert ot.FUTURE_SLACK == timedelta(minutes=2)
+    assert sensor_view(entity("a", observed=at(-2), received=at(30)), [], NOW, STALE)["flags"] == []
+    assert sensor_view(entity("a", observed=at(-2.5), received=at(1)), [], NOW, STALE)["flags"] == ["future_time"]
+
+
 def test_flags_combine_in_fixed_order():
     old = at(40)
     view = sensor_view(entity("a", -127, observed=old), times(old, old), NOW, STALE)
     assert view["flags"] == ["stale", "out_of_range", "duplicate_time"]
+    ahead = at(-40)
+    view = sensor_view(entity("a", -127, observed=ahead, received=old), times(ahead, ahead), NOW, STALE)
+    assert view["flags"] == ["stale", "out_of_range", "duplicate_time", "future_time"]
 
 
 def test_device_text_is_cleaned_and_room_code_checked():
@@ -207,6 +229,7 @@ def broker() -> MapBroker:
         entity("kho-3", 23, observed=latest, room="kho-3"),
         entity("kho-2", -127, room="kho-2"),
         entity("phong-doc", 24, observed=at(30), room="phong-doc"),
+        entity("xu-ly", 22, observed=at(-30), room="xu-ly", received=at(1)),  # đồng hồ thiết bị nhanh 30 phút
         entity("hanh-lang", 21),                      # chưa khai phòng: ngoài sơ đồ
         {"id": "urn:ngsi-ld:Room:kho-1", "type": "Room"},  # không phải cảm biến: bỏ qua
     ]
@@ -228,16 +251,16 @@ def test_map_reads_only_the_callers_tenant_with_flags(bridge, broker, caplog):
     assert (result["range_min"], result["range_max"], result["checked_at"]) == (-55.0, 125.0, NOW.isoformat())
     flags = {s["id"].rsplit(":", 1)[-1]: s["flags"] for s in result["sensors"]}
     assert flags == {"kho-2": ["out_of_range"], "kho-3": ["duplicate_time"], "may-chu": [], "phong-doc": ["stale"],
-                     "hanh-lang": []}
+                     "xu-ly": ["future_time"], "hanh-lang": []}
     # xếp theo phòng, cảm biến chưa khai phòng ở cuối
-    assert [s["room"] for s in result["sensors"]] == ["kho-2", "kho-3", "may-chu", "phong-doc", None]
-    # ba cảm biến broker chưa ghi lịch sử (404): không phải lỗi, không ghi nhật ký
+    assert [s["room"] for s in result["sensors"]] == ["kho-2", "kho-3", "may-chu", "phong-doc", "xu-ly", None]
+    # bốn cảm biến broker chưa ghi lịch sử (404): không phải lỗi, không ghi nhật ký
     assert not any("ot.map_history_missing" in r.message for r in caplog.records)
     assert {r.headers["NGSILD-Tenant"] for r in broker.requests} == {"CNTT"}
     query = dict(broker.requests[0].url.params)
     assert query == {"type": "TemperatureSensor", "limit": "100", "options": "sysAttrs"}
     temporal = [r for r in broker.requests if "/temporal/" in r.url.path]
-    assert len(temporal) == 5 and all(dict(r.url.params) == {"attrs": "temperature", "lastN": "10"} for r in temporal)
+    assert len(temporal) == 6 and all(dict(r.url.params) == {"attrs": "temperature", "lastN": "10"} for r in temporal)
     other = run(bridge.sensor_map(OTHER, now=NOW))
     assert [s["id"] for s in other["sensors"]] == ["urn:ngsi-ld:TemperatureSensor:kho-kt"]
     assert broker.requests[-1].headers["NGSILD-Tenant"] == "KT"
@@ -401,6 +424,14 @@ def test_sensor_can_fake_a_frozen_clock_and_a_late_reading(sensor_module):
                         "--interval", "0", "--late", "30"])
     (_, stamp), = readings(sensor_module.sent)
     assert timedelta(minutes=29) < before - stamp < timedelta(minutes=31)
+
+
+def test_sensor_can_fake_a_clock_running_ahead(sensor_module):
+    before = datetime.now(UTC)
+    sensor_module.main(["--tenant", "CNTT", "--sensor", "xu-ly", "--responsible", "a", "--readings", "22,23",
+                        "--interval", "0", "--clock-ahead", "30"])
+    stamps = [t for _, t in readings(sensor_module.sent)]
+    assert len(stamps) == 2 and all(timedelta(minutes=29) < t - before < timedelta(minutes=31) for t in stamps)
 
 
 def test_existing_sensor_gets_its_room_on_update(sensor_module):
