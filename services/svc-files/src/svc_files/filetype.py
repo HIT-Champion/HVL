@@ -35,6 +35,7 @@ họ của đuôi thì lấy mime của đuôi (hay mime khai). Không rõ: appl
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 
 HEAD = 8192             # số byte đầu đọc để nhận loại
@@ -243,9 +244,18 @@ def detect(head: bytes) -> Kind:
 
 
 def extension(filename: str) -> str:
-    """Đuôi tệp, chữ thường; bỏ dấu chấm, khoảng trắng cuối tên như Windows ("a.exe." mở như "a.exe")."""
-    stem, dot, ext = filename.rstrip(". ").rpartition(".")
-    return ext.lower() if dot and stem else ""
+    """Đuôi tệp, chữ thường; bỏ dấu chấm, khoảng trắng cuối tên như Windows ("a.exe." mở như "a.exe"). Tên chỉ có đuôi
+    (".bat") vẫn có đuôi: Windows mở nó như mọi tệp .bat."""
+    _, dot, ext = filename.rstrip(". ").rpartition(".")
+    return ext.lower() if dot else ""
+
+
+def ascii_name(filename: str) -> str:
+    """Tên ASCII của tệp — ``filename=`` trong Content-Disposition lúc tải về (app.content_disposition), tên mà trình
+    duyệt cũ, ``curl -OJ``, ``wget --content-disposition`` lưu: bỏ dấu, gập chữ toàn độ rộng (NFKD: "x.bát", "x.ｂａｔ"
+    đều thành "x.bat"), đ → d, bỏ ký tự không in được và ``"``, ``\\``."""
+    folded = unicodedata.normalize("NFKD", filename.replace("đ", "d").replace("Đ", "D"))
+    return "".join(ch for ch in folded if ch.isascii() and ch.isprintable() and ch not in '"\\').strip()
 
 
 def check(head: bytes, filename: str, declared: str) -> str:
@@ -254,9 +264,11 @@ def check(head: bytes, filename: str, declared: str) -> str:
     kind, ext = detect(head), extension(filename)
     if kind.family in ("exe", "script"):
         raise Rejected("type_not_allowed", f"Tệp là {kind.label} — không nhận tải lên", kind.mime)
-    if ext in RUNNABLE:
-        raise Rejected("type_not_allowed", f"Không nhận tệp đuôi .{ext}: chương trình, kịch bản chạy được khi mở",
-                       kind.mime)
+    # tải về có thể lưu theo tên ASCII ("x.bát" → "x.bat"): đuôi chạy được ở tên gốc hay tên gập đều chặn
+    for runnable in (ext, extension(ascii_name(filename))):
+        if runnable in RUNNABLE:
+            raise Rejected("type_not_allowed", f"Không nhận tệp đuôi .{runnable}: chương trình, kịch bản chạy được khi "
+                           "mở", kind.mime)
     if ext in EXTENSIONS:                   # tệp tải về mở theo đuôi: đuôi quyết, không xét mime khai
         (mime, families), said = EXTENSIONS[ext], f"đuôi .{ext}"
     elif declared in MIMES:

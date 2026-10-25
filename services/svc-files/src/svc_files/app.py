@@ -402,8 +402,7 @@ def clean_mime(value: str | None) -> str:
 def content_disposition(filename: str, *, inline: bool = False) -> str:
     """Tải về (attachment), kèm tên ASCII cho trình duyệt cũ và tên UTF-8 đầy đủ (RFC 6266). ``inline`` chỉ cho bản PDF
     đã đóng dấu người xem của phòng đọc (F3.8)."""
-    folded = unicodedata.normalize("NFKD", filename.replace("đ", "d").replace("Đ", "D"))
-    fallback = "".join(ch for ch in folded if ch.isascii() and ch.isprintable() and ch not in '"\\').strip()
+    fallback = filetype.ascii_name(filename)       # tải lên đã chặn tên mà bản ASCII có đuôi chạy được
     kind = "inline" if inline else "attachment"
     return f"{kind}; filename=\"{fallback or 'tep'}\"; filename*=UTF-8''{quote(filename, safe='')}"
 

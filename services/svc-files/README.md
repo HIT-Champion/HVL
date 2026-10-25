@@ -120,7 +120,9 @@ quét ClamAV byte gốc, cùng lượt tính SHA-256, cỡ → nhiễm: file.rej
   trình duyệt; còn lại là nhị phân không rõ loại. Đọc văn bản đến (F4.1) dùng cùng bảng.
 - **Chặn luôn** (`415 type_not_allowed`): chương trình (PE `MZ`, ELF, Mach-O, lớp Java), kịch bản `#!`, và đuôi chạy
   được khi người nhận mở (`RUNNABLE`: `.exe`, `.dll`, `.scr`, `.msi`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.hta`,
-  `.lnk`, `.url`, `.reg`, `.jar`, `.sh`, `.apk`, `.php`…) dù nội dung gì. Đuôi tính như Windows: `a.exe.` là `.exe`.
+  `.lnk`, `.url`, `.reg`, `.jar`, `.sh`, `.apk`, `.php`…) dù nội dung gì. Đuôi tính như Windows: `a.exe.` là `.exe`,
+  tên chỉ có đuôi `.bat` là `.bat`. Xét cả tên ASCII mà tải về ghi vào `filename=` (`curl -OJ`, `wget` lưu theo tên
+  đó): `x.bát`, `x.ｂａｔ` gập thành `x.bat` nên cũng chặn (`filetype.ascii_name`).
 - **Phải khớp** (`415 type_mismatch`, kèm `found`): đuôi có trong `EXTENSIONS` thì nội dung phải thuộc họ của đuôi —
   tệp tải về mở theo đuôi, nên đuôi quyết chứ không phải mime khai (Windows có Excel khai `.csv` là
   `application/vnd.ms-excel`). Tên không đuôi hay đuôi lạ: xét mime khai (`application/octet-stream` không nói gì).
@@ -134,7 +136,8 @@ quét ClamAV byte gốc, cùng lượt tính SHA-256, cỡ → nhiễm: file.rej
   CSP `sandbox` như trước.
 - **Ảnh JPEG, PNG bỏ siêu dữ liệu**: EXIF (tọa độ GPS, máy chụp, giờ chụp), XMP, IPTC, chú thích JPEG, chữ PNG (`tEXt`,
   `iTXt`, `zTXt`, `eXIf`). Pillow giải mã rồi mã hóa lại, sau khi xoay theo hướng EXIF (ảnh chụp dọc không nằm ngang).
-  Giữ hồ sơ màu ICC, DPI, màu trong suốt, đủ khung ảnh động APNG (không xoay); JPEG giữ bảng lượng tử, cách lấy mẫu màu
+  Giữ hồ sơ màu ICC, DPI, màu trong suốt, đủ khung ảnh động APNG (không xoay); JPEG nhiều khung (MPO: ảnh chân dung
+  iPhone, máy Nikon, Sony, Samsung) chỉ giữ khung đầu, xoay như ảnh thường; JPEG giữ bảng lượng tử, cách lấy mẫu màu
   của tệp gốc và tối ưu mã Huffman — ảnh trông như cũ, cỡ xấp xỉ cũ. Đo 25/10 trên ảnh mẫu `seed/van-ban-den/`: 4 ảnh
   JPEG đổi dưới 1% điểm ảnh, lệch tối đa 11/255, cỡ lệch dưới 0,1%; ảnh PNG giữ nguyên mọi điểm ảnh, cỡ +4%; mỗi ảnh
   0,1–0,2 giây kể cả dựng tiến trình con (ảnh 99 MP: 0,7–2,4 giây). Byte nối sau ảnh (tệp đa hình ảnh + HTML, zip) rơi

@@ -76,7 +76,10 @@ def clean(data: bytes, fmt: str, max_pixels: int = MAX_PIXELS) -> bytes:
             img.load()
         except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
             raise CleanError("too_many_pixels") from exc
-    animated = getattr(img, "is_animated", False)
+    # APNG giữ mọi khung. JPEG nhiều khung (MPO: ảnh chân dung iPhone, máy Nikon, Sony, Samsung) chỉ lưu khung đầu
+    # — ảnh xem được; khung sau là bản đồ độ sâu, ảnh xem trước. Pillow mở MPO thành is_animated=True mà không ghi lại
+    # được dạng JPEG nhiều khung
+    animated = fmt == "PNG" and getattr(img, "is_animated", False)
     opts: dict[str, Any] = {k: img.info[k] for k in ("icc_profile", "transparency") if k in img.info}
     dpi = img.info.get("dpi")
     if isinstance(dpi, tuple) and len(dpi) == 2 and all(isinstance(v, int | float) and 1 <= v <= 65535 for v in dpi):

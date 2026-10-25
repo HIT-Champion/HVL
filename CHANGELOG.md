@@ -10,13 +10,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
   ClamAV, loại nhận theo byte đầu phải khớp đuôi tệp — tệp `.pdf` thực ra là trang HTML bị chặn `415 type_mismatch`;
-  chương trình, kịch bản (`MZ`, ELF, `#!`, đuôi `.exe`, `.bat`, `.js`…) bị chặn `415 type_not_allowed`; `core.files` lưu
-  mime theo nội dung. Loại đang dùng vẫn nhận (docx, xlsx có hay không mật khẩu, doc, xls cả bản HTML do phần mềm khác
-  xuất, csv Windows khai `application/vnd.ms-excel`, ảnh PNG, WebP mang đuôi .jpg, chữ UTF-16, TCVN3…). Ảnh JPEG, PNG
-  được xoay theo hướng EXIF rồi mã hóa lại trong tiến trình con có giới hạn để bỏ EXIF, vị trí GPS, XMP, chú thích
-  (`sha256`, `size_bytes` là của ảnh đã làm sạch); PDF và loại khác lưu nguyên từng byte. ClamAV vẫn quét byte gốc trước
-  nên EICAR đổi đuôi vẫn là tệp nhiễm, có trong sổ kiểm toán. Giao diện Văn phòng điện tử, Không gian cá nhân báo đúng
-  lỗi mới. Test (đếm tĩnh): svc-files +23, giao diện +1.
+  chương trình, kịch bản (`MZ`, ELF, `#!`, đuôi `.exe`, `.bat`, `.js`…, xét cả tên ASCII lúc tải về: `x.bát` → `x.bat`)
+  bị chặn `415 type_not_allowed`; `core.files` lưu mime theo nội dung. Loại đang dùng vẫn nhận (docx, xlsx có hay không
+  mật khẩu, doc, xls cả bản HTML do phần mềm khác xuất, csv Windows khai `application/vnd.ms-excel`, ảnh PNG, WebP mang
+  đuôi .jpg, chữ UTF-16, TCVN3…). Ảnh JPEG, PNG được xoay theo hướng EXIF rồi mã hóa lại trong tiến trình con có giới
+  hạn để bỏ EXIF, vị trí GPS, XMP, chú thích; JPEG nhiều khung (ảnh chân dung iPhone) giữ khung đầu (`sha256`,
+  `size_bytes` là của ảnh đã làm sạch); PDF và loại khác lưu nguyên từng byte. ClamAV vẫn quét byte gốc trước nên EICAR
+  đổi đuôi vẫn là tệp nhiễm, có trong sổ kiểm toán. Giao diện Văn phòng điện tử, Không gian cá nhân báo đúng lỗi mới.
+  Test (đếm tĩnh): svc-files +25, giao diện +1.
 
 ## [1.1.0] - 2026-10-25
 

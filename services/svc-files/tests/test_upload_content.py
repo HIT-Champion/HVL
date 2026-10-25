@@ -135,6 +135,10 @@ def test_content_that_is_not_its_declared_type_is_415(client, make_token, scanne
     ("cai-dat.bat", b"@echo off\r\ndel /q C:\\*\r\n"),         # chữ thuần, chặn theo đuôi
     ("Hoa don.PDF.js", b"WScript.Echo('x')"),
     ("tai-lieu.exe.", b"van ban"),                  # Windows bỏ dấu chấm cuối tên: mở như .exe
+    ("x.bát", b"@echo off\r\n"),                   # tải về lưu theo tên ASCII "x.bat" (Content-Disposition)
+    ("x.ｂａｔ", b"@echo off\r\n"),                   # chữ toàn độ rộng, NFKD gập thành "x.bat"
+    ("Hóa đơn.ＥＸＥ", b"van ban"),
+    (".bat", b"@echo off\r\n"),                     # tên chỉ có đuôi: Windows vẫn mở như .bat
 ])
 def test_runnable_files_are_not_allowed(client, make_token, store, hasura, name, data):
     r = post(client, make_token(), name, data)
@@ -344,6 +348,27 @@ def test_clean_keeps_every_frame_of_an_animated_png():
     assert got.info["duration"] == 300 and got.convert("RGB").getpixel((0, 0)) == (0, 0, 255)
 
 
+def mpo(exif: bytes, size: tuple[int, int] = (40, 20)) -> bytes:
+    """JPEG nhiều khung (MPO) như ảnh chân dung iPhone, máy Nikon, Sony: khung đầu là ảnh, khung sau ảnh phụ."""
+    first = Image.new("RGB", size, (200, 30, 30))
+    second = Image.new("RGB", size, (30, 30, 200))
+    out = io.BytesIO()
+    first.save(out, "MPO", save_all=True, append_images=[second], exif=exif)
+    return out.getvalue()
+
+
+def test_multi_frame_jpeg_keeps_the_first_frame_upright_without_exif(client, make_token, store, hasura):
+    original = mpo(camera_exif(orientation=6).tobytes())       # chụp dọc: xoay 90° khi hiển thị
+    opened = Image.open(io.BytesIO(original))
+    assert opened.format == "MPO" and getattr(opened, "is_animated", False)
+    r = post(client, make_token(), "chan-dung.jpg", original, "image/jpeg")
+    assert r.status_code == 201, r.text
+    got = Image.open(io.BytesIO(stored(store, hasura, r.json())))
+    assert got.format == "JPEG" and not getattr(got, "is_animated", False)
+    assert got.size == (20, 40) and dict(got.getexif()) == {}
+    assert got.convert("RGB").getpixel((10, 20))[0] > 150          # khung đầu (đỏ), không phải ảnh phụ
+
+
 @pytest.mark.parametrize("mode", ["L", "CMYK"])
 def test_clean_keeps_grey_and_cmyk_jpegs(mode):
     original = image("JPEG", mode=mode, exif=camera_exif())
@@ -394,11 +419,21 @@ def test_detect(head, family, mime):
 
 
 @pytest.mark.parametrize(("name", "ext"), [
-    ("Báo cáo.PDF", "pdf"), ("a.tar.gz", "gz"), ("a.exe.", "exe"), ("a.exe . ", "exe"), (".htaccess", ""),
-    ("tep-khong-ten", ""),
+    ("Báo cáo.PDF", "pdf"), ("a.tar.gz", "gz"), ("a.exe.", "exe"), ("a.exe . ", "exe"), (".htaccess", "htaccess"),
+    (".bat", "bat"), ("tep-khong-ten", ""),
 ])
 def test_extension(name, ext):
     assert filetype.extension(name) == ext
+
+
+@pytest.mark.parametrize(("name", "folded"), [
+    ("Báo cáo đợt 1.pdf", "Bao cao dot 1.pdf"), ("x.bát", "x.bat"), ("x.ｂａｔ", "x.bat"), ('a"b\\c.txt', "abc.txt"),
+])
+def test_ascii_name_is_the_download_fallback_name(name, folded):
+    from svc_files.app import content_disposition
+
+    assert filetype.ascii_name(name) == folded
+    assert content_disposition(name).startswith(f'attachment; filename="{folded}"')
 
 
 def test_every_extension_and_alias_maps_to_a_storable_mime():
