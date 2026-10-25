@@ -126,13 +126,17 @@ mutation DungBaoCaoSuCo($doc: office_documents_insert_input!, $event: office_doc
 SUMMARY = "Báo cáo sự cố nhiệt độ {room} vượt ngưỡng ngày {day}"
 
 BODY = """Hồi {time} ngày {day}, cảm biến nhiệt độ tại {room} (mã {sensor}) đo được {value} °C, vượt ngưỡng cảnh báo {threshold} °C.
-
+{clock}
 1. Diễn biến: (ghi các lần đo, thời điểm phát hiện, thiết bị bị ảnh hưởng.)
 2. Nguyên nhân sơ bộ: (ghi sau khi kiểm tra tại chỗ.)
 3. Biện pháp đã thực hiện: (ghi các việc đã làm để đưa nhiệt độ về mức an toàn.)
 4. Kiến nghị: (ghi đề xuất với lãnh đạo, nếu có.)
 
 Dự thảo do hệ thống dựng từ cảnh báo của cảm biến; người phụ trách kiểm tra, bổ sung các mục trên trước khi trình."""
+
+# {clock} của BODY: rỗng, hoặc đoạn này khi đồng hồ thiết bị chạy nhanh (giờ, ngày trong báo cáo là giờ máy chủ)
+CLOCK_AHEAD = ("\nLưu ý: đồng hồ của cảm biến chạy nhanh (thiết bị ghi giờ đo {time} ngày {day}); giờ, ngày nêu trên là"
+               " lúc hệ thống nhận số đo.\n")
 
 RECIPIENTS = ["Lãnh đạo đơn vị (để báo cáo)", "Lưu: VT"]
 
@@ -206,6 +210,7 @@ class Reading:
     value: float
     responsible: str
     observed_at: datetime
+    device_at: datetime | None = None  # observedAt thiết bị gửi khi đồng hồ thiết bị chạy nhanh (không dùng làm giờ đo)
 
 
 def _clean(text: str) -> str:
@@ -253,7 +258,13 @@ def _room_name(entity: dict[str, Any], sensor: str) -> str:
 
 
 def reading(entity: Any, now: datetime) -> Reading | None:
-    """Một thực thể trong thông báo → lần đo, hoặc None nếu thiếu hay sai dạng (thiết bị không được tin)."""
+    """Một thực thể trong thông báo → lần đo, hoặc None nếu thiếu hay sai dạng (thiết bị không được tin).
+
+    Giờ đo — giờ, ngày của báo cáo và ngày của khóa nhắc — theo ``observedAt`` của thiết bị; thiếu, cũ hơn một ngày,
+    hoặc muộn hơn ``now`` quá ``FUTURE_SLACK`` (đồng hồ thiết bị chạy nhanh, như cờ ``future_time`` của sơ đồ) thì
+    theo ``now``, giờ máy chủ nhận thông báo — broker gửi ngay khi nhận số đo. Không thì thiết bị nhanh 30 phút gửi số
+    đo lúc 23 giờ 50 làm báo cáo ghi ngày hôm sau. Giờ thiết bị chạy nhanh giữ ở ``device_at`` để dự thảo ghi rõ.
+    """
     if not isinstance(entity, dict) or entity.get("type") != SENSOR_TYPE:
         return None
     sensor, value = entity.get("id"), _number(_value(entity, "temperature"))
@@ -262,12 +273,14 @@ def reading(entity: Any, now: datetime) -> Reading | None:
         return None
     if not isinstance(responsible, str) or not _USERNAME.match(responsible):
         return None
-    observed = now
+    observed, ahead = now, None
     attr = entity.get("temperature")
     parsed = _time(attr.get("observedAt")) if isinstance(attr, dict) else None
-    if parsed is not None and abs(parsed - now) < timedelta(days=1):
+    if parsed is not None and parsed - now > FUTURE_SLACK:
+        ahead = parsed
+    elif parsed is not None and now - parsed < timedelta(days=1):
         observed = parsed
-    return Reading(sensor, _room_name(entity, sensor), value, responsible, observed)
+    return Reading(sensor, _room_name(entity, sensor), value, responsible, observed, ahead)
 
 
 # --- sơ đồ cảm biến ------------------------------------------------------------------------------------------
@@ -350,6 +363,11 @@ def draft(r: Reading, threshold: float, user: dict[str, Any], doc_id: str) -> tu
     day = local.strftime("%d/%m/%Y")
     data = {"sensor": r.sensor, "name": r.room, "temperature": r.value, "threshold": threshold,
             "observed_at": r.observed_at.astimezone(UTC).isoformat()}
+    clock = ""
+    if r.device_at is not None:  # giờ thiết bị cả trong sự kiện: thân dự thảo người phụ trách còn sửa được
+        data["device_observed_at"] = r.device_at.astimezone(UTC).isoformat()
+        device = r.device_at.astimezone(VN)
+        clock = CLOCK_AHEAD.format(time=device.strftime("%H giờ %M"), day=device.strftime("%d/%m/%Y"))
     doc = {
         "id": doc_id,
         "direction": "out",
@@ -358,7 +376,7 @@ def draft(r: Reading, threshold: float, user: dict[str, Any], doc_id: str) -> tu
         "urgency": "khan",
         "summary": SUMMARY.format(room=r.room, day=day),
         "body": BODY.format(time=local.strftime("%H giờ %M"), day=day, room=r.room, sensor=r.sensor,
-                            value=_num(r.value), threshold=_num(threshold)),
+                            value=_num(r.value), threshold=_num(threshold), clock=clock),
         "recipients": RECIPIENTS,
         "department_id": user["department_id"],
         "created_by": user["id"],
@@ -564,7 +582,7 @@ class OtBridge:
         return doc_id
 
     async def _notify(self, actor: Actor, user: dict[str, Any], r: Reading, doc_id: str, summary: str) -> None:
-        day = r.observed_at.astimezone(VN).date().isoformat()
+        day = r.observed_at.astimezone(VN).date().isoformat()  # đồng hồ thiết bị chạy nhanh thì ngày theo giờ máy chủ
         try:
             await self.notifier.send(actor, [user["id"]], KIND, f"{KIND}:{doc_id}:{day}", doc_id,
                                      {"name": r.room, "temperature": r.value, "threshold": self.threshold,
