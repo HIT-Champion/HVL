@@ -454,6 +454,7 @@
 }
 .moc-desk-heading h1 { font-size: 28px; font-weight: 700; line-height: 1.25; }
 .moc-desk-heading p { font-size: 14px; line-height: 1.6; color: var(--muted); margin-top: 5px; }
+.moc-desk-heading p + p { margin-top: 0; }
 .moc-inbox-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; min-width: 0; }
 .moc-desk-search {
   display: flex;

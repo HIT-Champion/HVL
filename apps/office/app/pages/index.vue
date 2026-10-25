@@ -123,6 +123,7 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
     <div class="moc-desk-heading">
       <div>
         <h1>{{ t('inbox.title') }}</h1>
+        <p>{{ t('inbox.subtitle') }}</p>
         <p aria-live="polite">
           {{ loading && !tasks.length ? t('fe.loading') : t('desk.pending', { n: tasks.length }) }}
         </p>
