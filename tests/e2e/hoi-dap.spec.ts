@@ -42,7 +42,7 @@ test('hỏi đáp: văn thư thấy câu trích nguyên văn và nguồn; giản
   // 1. Từ Tìm kiếm, "Hỏi trợ lý" mang câu đang tìm sang trang Hỏi đáp: điền sẵn, không tự gửi
   const clerk = await signIn(browser, 'vanthu', { otp: true })
   await clerk.getByRole('link', { name: 'Tìm kiếm', exact: true }).click()
-  await clerk.getByRole('searchbox').fill('học bổng')
+  await clerk.getByRole('searchbox', { name: 'Tìm kiếm văn bản' }).fill('học bổng')
   await clerk.getByRole('link', { name: 'Hỏi trợ lý' }).click()
   await expect(clerk).toHaveURL(/\/hoi-dap\?q=/)
   await expect(clerk.getByRole('heading', { level: 1, name: 'Hỏi đáp văn bản' })).toBeVisible()

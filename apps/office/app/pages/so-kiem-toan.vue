@@ -186,42 +186,61 @@ function anchored(row: Row) {
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
     <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('audit.empty') }}</p>
-    <div v-else class="card overflow-x-auto">
-      <table class="w-full text-sm" data-testid="audit-table">
-        <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500 uppercase">
-          <tr>
-            <th class="px-4 py-3">{{ t('audit.when') }}</th>
-            <th class="px-4 py-3">{{ t('audit.who') }}</th>
-            <th class="px-4 py-3">{{ t('audit.what') }}</th>
-            <th class="px-4 py-3">{{ t('audit.changes') }}</th>
-            <th class="px-4 py-3">{{ t('audit.chain') }}</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-stone-100">
-          <tr v-for="row in rows" :key="row.id" class="align-top">
-            <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDateTime(row.occurred_at) }}</td>
-            <td class="px-4 py-3">{{ who(row) }}</td>
-            <td class="px-4 py-3">
-              <div class="font-medium whitespace-nowrap">{{ action(row) }} · {{ label('audit.entity', row.entity) }}</div>
-              <NuxtLink v-if="canOpen && documentOf(row)" :to="`/van-ban/${documentOf(row)}`" class="text-xs text-brand-700 hover:underline">{{ t('audit.openDocument') }}</NuxtLink>
-            </td>
-            <td class="max-w-md px-4 py-3">
-              <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>
-              <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
-                {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
-              </div>
-            </td>
-            <td class="px-4 py-3 whitespace-nowrap">
-              <div class="font-mono text-xs text-stone-700" :title="row.hash">#{{ row.id }} · {{ row.hash.slice(2, 12) }}…</div>
-              <div class="mt-0.5 text-xs" :class="anchored(row) ? 'text-emerald-700' : 'text-stone-400'">
-                {{ anchored(row) ? t('audit.isAnchored') : t('audit.notYet') }}
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-if="more" class="border-t border-stone-100 p-3 text-center">
-        <button class="btn-secondary" @click="load(true)">{{ t('audit.more') }}</button>
+    <div v-else>
+      <!-- màn hẹp: sổ rộng hơn màn hình, cuộn ngang được cả bằng bàn phím (vùng nhận tiêu điểm). Vùng lấy tên từ
+           câu gợi ý cuộn, không lấy "Sổ kiểm toán" để khỏi trùng tên mục menu -->
+      <p id="audit-scroll-hint" class="moc-scroll-hint">{{ t('fe.scrollTable') }}</p>
+      <div
+        class="moc-table-scroll moc-audit-table card overflow-x-auto" tabindex="0" role="region"
+        aria-labelledby="audit-scroll-hint"
+      >
+        <table class="w-full text-sm" data-testid="audit-table">
+          <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium text-stone-500">
+            <tr>
+              <th class="px-4 py-3">{{ t('audit.when') }}</th>
+              <th class="px-4 py-3">{{ t('audit.who') }}</th>
+              <th class="px-4 py-3">{{ t('audit.what') }}</th>
+              <th class="px-4 py-3">{{ t('audit.changes') }}</th>
+              <th class="px-4 py-3">{{ t('audit.chain') }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-stone-100">
+            <tr v-for="row in rows" :key="row.id" class="align-top">
+              <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDateTime(row.occurred_at) }}</td>
+              <td class="px-4 py-3">{{ who(row) }}</td>
+              <td class="px-4 py-3">
+                <div class="font-medium whitespace-nowrap">
+                  {{ action(row) }} · {{ label('audit.entity', row.entity) }}
+                </div>
+                <NuxtLink
+                  v-if="canOpen && documentOf(row)" :to="`/van-ban/${documentOf(row)}`"
+                  class="text-xs text-brand-700 hover:underline"
+                >
+                  {{ t('audit.openDocument') }}
+                </NuxtLink>
+              </td>
+              <td class="max-w-md px-4 py-3">
+                <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700">
+                  <span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}
+                </div>
+                <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
+                  {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
+                </div>
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="font-mono text-xs text-stone-700" :title="row.hash">
+                  #{{ row.id }} · {{ row.hash.slice(2, 12) }}…
+                </div>
+                <div class="mt-0.5 text-xs" :class="anchored(row) ? 'text-emerald-700' : 'text-stone-400'">
+                  {{ anchored(row) ? t('audit.isAnchored') : t('audit.notYet') }}
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="more" class="border-t border-stone-100 p-3 text-center">
+          <button class="btn-secondary" @click="load(true)">{{ t('audit.more') }}</button>
+        </div>
       </div>
     </div>
   </div>
