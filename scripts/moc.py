@@ -309,6 +309,17 @@ def verify(args: argparse.Namespace) -> int:
                 notes.append(f"không đọc được khóa ký mốc neo trong két: {exc}")
         anchors, signatures, bad_signatures, unchecked = check_signatures(files, keys)
         gaps += unchecked
+        for path, lines in zip(args.anchors, files):
+            if any(a.get("sig") for a in lines):
+                continue
+            if (path.parent / KEY_FILE).is_file():
+                # --publish chỉ ghi anchor-key.pem khi tệp đã có mốc có chữ ký
+                bad_signatures.append(Problem(
+                    "anchor_unsigned_all", lines[-1]["audit_id"] if lines else None,
+                    f"cạnh {path.name} có {KEY_FILE} mà tệp không còn mốc nào có chữ ký — chữ ký đã bị gỡ khỏi"
+                    " mọi dòng (hoặc các dòng đã bị xóa)"))
+            elif args.key:
+                gaps.append(f"{path.name} không có mốc nào có chữ ký: --key chưa kiểm được chữ ký nào")
         with Snapshot() as snap:
             # Liệt kê bucket SAU lúc đọc CSDL: mọi mốc mà bảng tra cứu đã ghi đều phải thấy trong bucket
             bucket: dict[str, Any] | None = None
@@ -405,6 +416,7 @@ def publish(directory: pathlib.Path, line: dict[str, Any]) -> int:
     path = directory / ANCHORS_FILE
     try:
         added = append_line(path, line)
+        signed = any(a.get("sig") for a in read_file_anchors(path))
     except Unavailable as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 2
@@ -415,7 +427,8 @@ def publish(directory: pathlib.Path, line: dict[str, Any]) -> int:
         key = None
         print(f"  không đọc được khóa công khai trong két ({exc}): giữ nguyên {KEY_FILE}", file=sys.stderr)
     pem = directory / KEY_FILE
-    if key and (not pem.exists() or pem.read_text(encoding="utf-8") != key["pem"]):
+    # khóa chỉ đi cùng mốc có chữ ký: audit verify coi anchor-key.pem cạnh một tệp không có dòng ký nào là chữ ký bị gỡ
+    if key and signed and (not pem.exists() or pem.read_text(encoding="utf-8") != key["pem"]):
         # khóa đổi (két dựng lại): ghi đè, lịch sử git vẫn giữ khóa cũ cho các mốc ký trước đó
         pem.write_text(key["pem"], encoding="utf-8")
     if pem.exists():

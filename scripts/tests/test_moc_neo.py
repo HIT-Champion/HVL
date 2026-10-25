@@ -228,6 +228,9 @@ class Ed25519Test(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("✗ dòng 3", out)
             self.assertIn("CHƯA KÝ SAU DÒNG ĐÃ KÝ: 1", out)
+            code, out = run(old)
+            self.assertEqual(code, 2)                   # không dòng nào có chữ ký: chưa kiểm được gì
+            self.assertIn("Không dòng nào có chữ ký", out)
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(anchor_sig.main([str(path)]), 2)
 
@@ -444,6 +447,16 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(git(self.remote, "ls-tree", "--name-only", "main").split(), ["anchors.jsonl"])
 
+    def test_key_file_is_written_only_with_a_signed_line(self) -> None:
+        """Mốc đã ghi chưa ký trước khi két có khóa, đầu chuỗi chưa đổi: không có dòng ký nào nên chưa ghi khóa."""
+        self.publish(FakeTool(now=anchored(signed=False), key=None))
+        code, _, _ = self.publish(FakeTool(now=anchored(new=False)))
+        self.assertEqual(code, 0)
+        self.assertEqual(git(self.remote, "ls-tree", "--name-only", "main").split(), ["anchors.jsonl"])
+        self.assertEqual(self.publish(FakeTool(now=anchored(43, "cd" * 32)))[0], 0)
+        self.assertEqual(git(self.remote, "ls-tree", "--name-only", "main").split(),
+                         ["anchor-key.pem", "anchors.jsonl"])
+
     def test_unsigned_anchor_after_signed_ones_is_never_published(self) -> None:
         self.publish(FakeTool())
         code, _, err = self.publish(FakeTool(now=anchored(43, "cd" * 32, signed=False), key=None))
@@ -562,6 +575,22 @@ class VerifyTest(unittest.TestCase):
         self.assertIn("dòng 2", problem["message"])
         self.assertIsNone(report["rewritten"])
         self.assertEqual(report["anchors"]["anchors.jsonl"], {"checked": 1, "matched": 1})
+
+    def test_key_next_to_a_file_without_any_signed_line_is_an_error(self) -> None:
+        """Gỡ chữ ký khỏi mọi dòng: anchor-key.pem cạnh tệp (chỉ ghi cùng mốc có chữ ký) cho thấy điều đó."""
+        unsigned = {"audit_id": 2, "hash": self.rows[1]["hash"], "anchored_at": "2026-10-25T01:15:03Z",
+                    "system": SYSTEM}
+        key = self.tmp / "khoa.pem"
+        key.write_text(VECTOR_PEM, encoding="utf-8")
+        code, report = self.verify(unsigned, extra=("--key", str(key)))
+        self.assertEqual(code, 2, report)             # --key mà không có dòng ký: chưa đủ bằng chứng, chưa phải lỗi
+        self.assertTrue(report["ok"])
+        self.assertTrue(any("--key chưa kiểm được chữ ký nào" in g for g in report["gaps"]))
+        (self.tmp / "anchor-key.pem").write_text(VECTOR_PEM, encoding="utf-8")
+        code, report = self.verify(unsigned)
+        self.assertEqual(code, 1, report)
+        [problem] = report["problems"]
+        self.assertEqual((problem["kind"], problem["audit_id"]), ("anchor_unsigned_all", 2))
 
     def test_signature_order_is_checked_file_by_file(self) -> None:
         """Tệp mốc mới đã ký kiểm cùng tệp mốc cũ chưa ký: thứ tự tính trong từng tệp, không nối các tệp lại."""

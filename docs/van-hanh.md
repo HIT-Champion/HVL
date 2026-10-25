@@ -233,8 +233,10 @@ dòng vào một tệp để chép ra ngoài bằng cách khác.
 Két đã có khóa thì không mốc nào được ghi ra tệp mà thiếu chữ ký: két không trả lời lúc ký (hoặc lúc hỏi khóa), tệp
 đã có dòng có chữ ký, hay cạnh tệp đã có `anchor-key.pem` thì `--to`/`--publish` không ghi dòng chưa ký, thoát 2, và
 lượt sau ký lại (cùng mốc ra cùng chữ ký). Nhờ vậy người kiểm coi một dòng chưa ký đứng sau dòng đã ký là chữ ký đã bị
-gỡ — lỗi như chữ ký sai. Dòng chưa ký đứng trước mọi dòng đã ký là mốc ghi khi két chưa có khóa; ai gỡ chữ ký của mọi
-dòng từ đầu tệp thì chỉ lịch sử git của kho công khai cho thấy (lệnh `git log -p` ở dưới).
+gỡ — lỗi như chữ ký sai. `--publish` chỉ ghi `anchor-key.pem` khi tệp đã có dòng có chữ ký, nên `anchor-key.pem` nằm
+cạnh một tệp không còn dòng ký nào cũng là lỗi; `anchor_sig.py` không thấy dòng nào có chữ ký thì thoát 2 (chưa kiểm
+được gì). Dòng chưa ký đứng trước mọi dòng đã ký là mốc ghi khi két chưa có khóa: ai gỡ chữ ký của những dòng đầu tệp
+(giữ lại dòng ký sau đó) thì chỉ lịch sử git của kho công khai cho thấy (lệnh `git log -p` ở dưới).
 
 ### Kiểm từ bên ngoài (chỉ cần git, jq, OpenSSL 3)
 

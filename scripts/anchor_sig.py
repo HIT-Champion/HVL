@@ -27,8 +27,8 @@ thông điệp ký); ``moc audit anchor --to/--publish`` chép mốc kèm chữ 
       python3 scripts/anchor_sig.py anchors.jsonl anchor-key.pem
 
   Thoát 0: mọi dòng có chữ ký đều hợp lệ; 1: có dòng chữ ký sai, hoặc dòng chưa ký đứng sau một dòng đã ký; 2: không
-  đọc được tệp, hoặc có dòng ký bằng khóa không có trong tệp khóa. Dòng chưa ký đứng trước mọi dòng đã ký (mốc ghi
-  trước khi két có khóa) chỉ được đếm.
+  đọc được tệp, không dòng nào có chữ ký (chưa kiểm được gì), hoặc có dòng ký bằng khóa không có trong tệp khóa. Dòng
+  chưa ký đứng trước mọi dòng đã ký (mốc ghi trước khi két có khóa) chỉ được đếm.
 
 Chỉ kiểm, không ký: không có khóa riêng nào ở đây, nên mã không cần chạy trong thời gian hằng (khóa công khai, thông
 điệp, chữ ký đều công khai). Kiểm từng dòng một bằng OpenSSL 3 cũng được — docs/van-hanh.md mục "Mốc neo công khai".
@@ -180,7 +180,7 @@ def check_all(anchors: Iterable[dict[str, Any]], keys: dict[str, bytes]) -> list
     """Các dòng của một tệp mốc, theo thứ tự trong tệp → kết quả từng dòng như check(), thêm ``unsigned_late``: dòng
     không có chữ ký đứng sau một dòng có chữ ký. Két có khóa rồi thì ``moc audit anchor`` không ghi mốc chưa ký nữa,
     nên dòng như vậy là chữ ký đã bị gỡ khỏi dòng: lỗi như chữ ký sai. Dòng chưa ký đứng trước mọi dòng có chữ ký là
-    mốc ghi khi két chưa có khóa (gỡ chữ ký của mọi dòng từ đầu tệp thì chỉ lịch sử git của kho công khai cho thấy)."""
+    mốc ghi khi két chưa có khóa (gỡ chữ ký của những dòng đầu tệp thì chỉ lịch sử git của kho công khai cho thấy)."""
     results, signed = [], False
     for anchor in anchors:
         result = check(anchor, keys)
@@ -217,6 +217,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {mark} dòng {n}: mốc #{anchor.get('audit_id')} {str(anchor.get('hash'))[:16]}"
               f" {anchor.get('anchored_at') or ''} — {labels[result]}")
     print(", ".join(f"{labels[k]}: {v}" for k, v in counts.items()))
+    if counts["unsigned"] == len(lines):
+        print("Không dòng nào có chữ ký: chưa kiểm được gì (két chưa có khóa lúc ghi, hoặc chữ ký đã bị gỡ khỏi mọi"
+              " dòng)")
+        return 2
     return 1 if counts["invalid"] or counts["unsigned_late"] else 2 if counts["unknown_key"] else 0
 
 

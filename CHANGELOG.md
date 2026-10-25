@@ -20,7 +20,7 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Python (`scripts/anchor_sig.py`, chạy được độc lập ở máy người ngoài); dòng chữ ký sai, hay dòng chưa ký đứng sau dòng
   đã ký (chữ ký bị gỡ), là lỗi, nên két đã có khóa thì `--to`/`--publish` không ghi mốc chưa ký. Sổ đăng ký in ra có mốc
   neo mới nhất ở chân trang. Dựng kho công khai cấm đẩy ép, khóa triển khai, kiểm bằng OpenSSL 3: `docs/van-hanh.md` mục
-  "Mốc neo công khai"; két cũ nâng cấp tay như mục Két bí mật. Test (đếm tĩnh): svc-files +28, scripts +33,
+  "Mốc neo công khai"; két cũ nâng cấp tay như mục Két bí mật. Test (đếm tĩnh): svc-files +28, scripts +35,
   giao diện +5.
 
 ## [1.1.0] - 2026-10-25
