@@ -331,8 +331,13 @@ def git(cwd: pathlib.Path, *args: str) -> str:
                           env={**os.environ, **GIT_ENV}).stdout.strip()
 
 
-# git của test không đọc cấu hình của máy (ký commit, hook…); người tạo kho trần là "người khác"
-GIT_ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "Người khác",
+# git của test không đọc cấu hình của máy (ký commit, hook…); người tạo kho trần là "người khác".
+# Tắt bảo trì tự động: sau commit/push git chạy `maintenance run --auto`, mặc định tách nền (maintenance.autoDetach);
+# tiến trình nền còn ghi vào objects/ của kho tạm lúc rmtree đang xóa → "Directory not empty: 'objects'" (CI git 2.55).
+# maintenance.auto=false bỏ hẳn bước này; gc.auto=0 thì không đủ ở git 2.54 (bảo trì mặc định không qua git gc).
+# Biến GIT_CONFIG_* không tới receive-pack của kho trần (git bỏ chúng khi đẩy qua đường dẫn cục bộ) → kho trần tự đặt.
+GIT_ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_COUNT": "1",
+           "GIT_CONFIG_KEY_0": "maintenance.auto", "GIT_CONFIG_VALUE_0": "false", "GIT_AUTHOR_NAME": "Người khác",
            "GIT_AUTHOR_EMAIL": "khac@example.invalid", "GIT_COMMITTER_NAME": "Người khác",
            "GIT_COMMITTER_EMAIL": "khac@example.invalid"}
 
@@ -347,6 +352,7 @@ class PublishTest(unittest.TestCase):
         self.addCleanup(env.stop)
         self.remote = self.tmp / "signet-anchors.git"
         git(self.tmp, "init", "--quiet", "--bare", "-b", "main", str(self.remote))
+        git(self.remote, "config", "maintenance.auto", "false")
         self.work = self.tmp / "neo-cong-khai"
         git(self.tmp, "clone", "--quiet", str(self.remote), str(self.work))
         git(self.work, "symbolic-ref", "HEAD", "refs/heads/main")     # git cũ: kho rỗng clone về nhánh master

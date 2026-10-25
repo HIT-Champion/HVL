@@ -58,8 +58,12 @@ class SignedGitopsTest(unittest.TestCase):
         # git không đọc cấu hình của máy chạy test; cấu hình "người dùng" là tệp riêng của test
         self.user_config = self.tmp / "gitconfig"
         self.user_config.write_text("", encoding="utf-8")
-        saved = {k: os.environ.get(k) for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM")}
-        os.environ.update(GIT_CONFIG_GLOBAL=str(self.user_config), GIT_CONFIG_NOSYSTEM="1")
+        # không chạy bảo trì tự động sau commit: nó có thể tách nền và còn ghi vào objects/ lúc dọn thư mục tạm
+        # (xem test_moc_neo.GIT_ENV)
+        env = {"GIT_CONFIG_GLOBAL": str(self.user_config), "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_COUNT": "1",
+               "GIT_CONFIG_KEY_0": "maintenance.auto", "GIT_CONFIG_VALUE_0": "false"}
+        saved = {k: os.environ.get(k) for k in env}
+        os.environ.update(env)
         self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
                                  for k, v in saved.items()])
         for name in ("duoc-phep", "la"):
