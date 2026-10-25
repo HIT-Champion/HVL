@@ -225,21 +225,49 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
 `deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`.
 
-**Nâng cấp tay** (không dùng GitOps):
+**Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
+nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git pull` trong `~/Signet`), rồi từ thư mục đó:
 
 ```bash
-cd /opt/moc && python3 scripts/moc.py backup create     # sao lưu trước
-cd ~/Signet && git pull
-cd /opt/moc && docker compose down
-cd ~/Signet && make install PREFIX=/opt/moc         # giữ .env của bản cài, chỉ đổi MOC_VERSION
-cd /opt/moc && docker compose up -d --wait --wait-timeout 900
-cd /opt/moc && python3 scripts/moc.py realm theme      # một lần: bản cài dựng trước theme đăng nhập Signet
+scripts/nang_cap.sh nang /opt/moc
 ```
 
-Realm Keycloak chỉ nạp từ tệp ở lần khởi động đầu, nên phần realm mới của bản sau không tự vào bản cài cũ (nâng cấp
-bằng GitOps cũng vậy): `realm theme` đặt theme đăng nhập Signet — chỉ khi realm còn dùng theme mặc định, chạy lại không
-đổi gì; báo lỗi nếu container keycloak chưa gắn thư mục theme — còn `realm clients` thêm client của ứng dụng mới
-([`platform/keycloak/README.md`](../platform/keycloak/README.md)).
+Kịch bản:
+
+1. Dựng image bản mới khi trang còn chạy.
+2. Sao lưu bằng chính bản đang chạy, in mã lượt, chép `.env` ra `/opt/moc/.env.truoc-<lượt>`.
+3. Dừng trang, `make install PREFIX=/opt/moc` (giữ `.env` của bản cài, chỉ đổi `MOC_VERSION`), chạy lại. Hasura áp
+   migration mới khi khởi động.
+4. Chạy `moc.py realm clients` và `realm theme`.
+5. Kiểm từng mục rồi báo các mục trượt:
+   - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm;
+   - dịch vụ chạy trước khi nâng vẫn chạy, không cái nào chưa khỏe;
+   - `/api/status` báo đúng phiên bản mới;
+   - realm đủ client và theme;
+   - `moc.py audit verify`;
+   - `smoke.py`. Smoke trượt đúng ở bước hỏi đáp (chữ chưa kịp vào chỉ mục khi máy quá tải) thì chạy lại một lần, có in
+     rõ là lần thử lại.
+
+Nếu dừng giữa chừng sau khi trang đã dừng, hoặc kiểm có mục trượt, kịch bản in lệnh lùi:
+
+```bash
+scripts/nang_cap.sh lui /opt/moc <mã nguồn bản cũ> <lượt>
+```
+
+Lệnh lùi cài lại bản cũ rồi khôi phục đúng lượt sao lưu đó: CSDL, tệp và két về như lúc trước khi nâng, sau đó kiểm lại
+như trên. Gói cũ chưa có tệp `VERSION` (trước 1.2.0) thì đặt `MOC_VERSION=1.1.0` trước lệnh.
+
+`scripts/nang_cap.sh kiem /opt/moc` chỉ chạy phần kiểm. Job CI `.github/workflows/nang-cap.yml` chạy cả ba đường trên
+bản cài của thẻ phát hành trước: nâng lên commit của PR, nâng két cũ (`ket`, [`van-hanh.md`](van-hanh.md) mục Két bí
+mật), lùi về. Job chạy trên PR phát hành và trên PR có đổi migration, két, realm, compose, cài đặt hay sao lưu.
+
+Realm Keycloak chỉ nạp từ tệp ở lần khởi động đầu, nên phần realm mới của bản sau không tự vào bản cài cũ. Nâng cấp
+bằng GitOps cũng vậy. Hai lệnh realm ở bước 4 lo phần này, chạy lại không đổi gì
+([`platform/keycloak/README.md`](../platform/keycloak/README.md)):
+
+- `realm theme` đặt theme đăng nhập Signet, chỉ khi realm còn dùng theme mặc định. Nó báo lỗi nếu container keycloak
+  chưa gắn thư mục theme.
+- `realm clients` thêm client của ứng dụng mới.
 
 Biến `.env` mới của bản mới (CHANGELOG ghi rõ) thêm vào `/opt/moc/.env`. **Không chạy `make reset` hay
 `docker compose down -v` trên máy chủ**: xóa sạch dữ liệu, kể cả két (tệp văn bản hạn chế không mở được nữa).

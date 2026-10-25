@@ -55,6 +55,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   ghi kèm câu giáo trình ở `docs/tu-chan-doan.md` §3. Cảnh báo "rác vào, rác ra" khi `[I]` vượt `[D]` từ 1 mức hoặc
   hình dạng là Ảo giác công nghệ: khuyên tạm dừng mở rộng `[I]`, dẫn tới cờ kiểm chất lượng số liệu ở Phả hệ số liệu.
   Chỉ để định hướng, không phải điểm DTI. Test office +3, e2e thêm bước trong `tu-chan-doan.spec.ts`.
+- Kịch bản nâng cấp bản cài `scripts/nang_cap.sh` và job CI tập nâng cấp `.github/workflows/nang-cap.yml` (#182).
+  `nang` dựng image bản mới khi trang còn chạy, sao lưu bằng bản đang chạy, cài, chạy, đặt client và theme của realm
+  rồi kiểm; `lui` cài lại bản cũ và khôi phục đúng lượt sao lưu đó; `ket` nâng két cũ (khóa `moc-anchor`, PKI,
+  policy), lỗi giữa chừng thì gỡ listener tạm và hủy lượt tạo token dở; `kiem` chạy hết các mục rồi báo mục trượt:
+  dữ liệu không ít đi, dòng sổ cuối còn nguyên băm, dịch vụ khỏe, phiên bản trên `/api/status`, realm, `audit verify`,
+  smoke (thử lại một lần, chỉ khi trượt ở bước hỏi đáp). Job cài thẻ phát hành trước, nạp mẫu, tạo văn bản hạn chế,
+  nâng lên commit của PR, nâng két, lùi về; sau mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR
+  vào `main` và PR đổi migration, két, realm, compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng
+  cấp tay) và `docs/van-hanh.md` (két cũ) dùng kịch bản thay cho các lệnh tay. Test scripts +15.
 
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ

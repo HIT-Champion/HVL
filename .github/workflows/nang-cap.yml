@@ -1,0 +1,215 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Tập nâng cấp đúng như người vận hành làm trên máy chủ (scripts/nang_cap.sh, docs/van-hanh.md mục Nâng cấp): cài
+# thẻ phát hành mới nhất ra một thư mục, nạp mẫu, có văn bản hạn chế; nâng lên commit này; nâng két cũ; lùi về thẻ cũ
+# bằng lượt sao lưu lấy ngay trước khi nâng. Sau mỗi bước kịch bản tự kiểm (dữ liệu còn, dịch vụ khỏe, realm, sổ kiểm
+# toán, smoke) và job mở lại tệp hạn chế tạo từ bản cũ (két giữ khóa moc-files qua nâng cấp, nâng két, khôi phục).
+# Chạy trên PR phát hành vào main, PR vào develop có đổi đường nâng cấp, và chạy tay. Không bắt buộc trong ruleset:
+# đỏ thì người phát hành đọc trước khi gắn thẻ
+name: Nâng cấp
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      tu:
+        description: "Thẻ của bản cũ cài trước khi nâng (để trống: thẻ v* mới nhất)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nang-cap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pham-vi:
+    name: Có đổi đường nâng cấp không
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      chay: ${{ steps.loc.outputs.chay }}
+    steps:
+      # PR vào develop chỉ chạy khi đổi thứ bản cài đã có phải đi qua: migration, metadata, két, realm, compose,
+      # .env mẫu, cài đặt, sao lưu, chính kịch bản và workflow này
+      - name: PR phát hành, chạy tay, hoặc PR đổi đường nâng cấp
+        id: loc
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] || [ "$BASE" = main ]; then
+            echo "chay=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          test -n "$files" || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+          duong='^(db/|platform/openbao/|platform/keycloak/realm/|docker-compose\.yml$|\.env\.example$'
+          duong+='|scripts/(nang_cap\.sh|install\.sh|backup\.py|moc\.py|realm_clients\.py)$'
+          duong+='|\.github/workflows/nang-cap\.yml$)'
+          if doi=$(grep -E "$duong" <<<"$files"); then
+            echo "chay=true" >> "$GITHUB_OUTPUT"
+            echo "Có đổi đường nâng cấp:"; head -20 <<<"$doi"
+          else
+            echo "chay=false" >> "$GITHUB_OUTPUT"
+            echo "PR không đổi đường nâng cấp, không tập"
+          fi
+
+  nang-cap:
+    name: "Nâng từ bản trước, nâng két, lùi về"
+    needs: pham-vi
+    if: needs.pham-vi.outputs.chay == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # cần mọi thẻ để chọn bản cũ và để git describe ra phiên bản của bản mới
+          fetch-depth: 0
+
+      - name: Đăng nhập Docker Hub
+        if: env.DOCKERHUB_TOKEN != '' && vars.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Chọn bản cũ, lấy mã nguồn của nó
+        env:
+          TU: ${{ inputs.tu }}
+        run: |
+          tu=${TU:-$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n 1)}
+          git rev-parse -q --verify "refs/tags/$tu^{commit}" >/dev/null \
+            || { echo "::error::Không có thẻ '$tu'"; exit 1; }
+          git worktree add -q --detach "$RUNNER_TEMP/cu" "$tu"
+          { echo "CU=$RUNNER_TEMP/cu"; echo "MOC=$RUNNER_TEMP/moc"; } >> "$GITHUB_ENV"
+          echo "bản cũ: $tu ($(git rev-parse --short "$tu^{commit}")); bản mới: $(git describe --tags --always)"
+
+      # Hai bộ image của đội (bản cũ, bản mới) cùng image ngoài: dọn bộ công cụ không dùng nếu ổ còn ít
+      - name: Chỗ trống trên ổ
+        run: |
+          df -h /
+          if [ "$(df --output=avail -BG / | tail -n 1 | tr -dc 0-9)" -lt 30 ]; then
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+            df -h /
+          fi
+
+      - name: Sinh cấu hình bản cũ, che các bí mật vừa sinh trong nhật ký
+        working-directory: ${{ runner.temp }}/cu
+        run: |
+          make env
+          grep -oE '^[A-Z0-9_]+=change_me' .env.example | cut -d= -f1 | while read -r k; do
+            v=$(sed -n "s/^$k=//p" .env | tail -n 1)
+            [ -z "$v" ] || echo "::add-mask::$v"
+          done
+
+      - name: Cài bản cũ ra thư mục riêng, chạy, nạp mẫu, tạo văn bản hạn chế
+        working-directory: ${{ runner.temp }}/cu
+        run: |
+          make install PREFIX="$MOC"
+          cd "$MOC"
+          docker compose up -d --wait --wait-timeout 900
+          python3 scripts/seed.py
+          python3 scripts/demo.py han-che
+
+      # Tệp của văn bản hạn chế (mã hóa bằng khóa moc-files của két) mà lãnh đạo khoa mở được lúc còn bản cũ; sau mỗi
+      # bước mở lại đúng các tệp đó. Két mất khóa thì svc-files không giải mã được và trả lỗi
+      - name: Ghi các tệp hạn chế của bản cũ
+        run: |
+          cat > "$RUNNER_TEMP/han_che.py" <<'PY'
+          import pathlib, sys
+          sys.path.insert(0, "scripts")
+          from moc_env import ENV, PUBLIC_URL, HTTPError, Session, compose, request
+
+          LIST = pathlib.Path(sys.argv[2])
+          director = Session("truongkhoa")
+
+          def fails(file_id: str) -> str | None:
+              try:
+                  _, _, body = request("GET", f"{PUBLIC_URL}/api/files/{file_id}", headers=director.auth)
+              except HTTPError as exc:
+                  return f"HTTP {exc.status}"
+              return None if body.startswith(b"%PDF-") else f"không ra PDF: {body[:16]!r}"
+
+          if sys.argv[1] == "ghi":
+              ids = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A",
+                            "-U", ENV.get("POSTGRES_USER", "moc"), "-d", ENV.get("POSTGRES_DB", "moc"),
+                            "-c", "select id from core.files where wrapped_dek is not null order by id")
+              ids = ids.decode().split()
+              mine = [i for i in ids if fails(i) is None]
+              if not mine:
+                  sys.exit(f"không có tệp hạn chế nào lãnh đạo khoa mở được trong {len(ids)} tệp mã hóa")
+              LIST.write_text("\n".join(mine) + "\n")
+              print(f"{len(mine)}/{len(ids)} tệp mã hóa lãnh đạo khoa mở được: {', '.join(mine)}")
+          else:
+              ids = LIST.read_text().split()
+              bad = {i: e for i in ids if (e := fails(i))}
+              if bad:
+                  sys.exit(f"tệp hạn chế tạo từ bản cũ không mở được: {bad}")
+              print(f"{len(ids)} tệp hạn chế tạo từ bản cũ vẫn mở được (giải mã bằng khóa của két)")
+          PY
+          cd "$MOC" && python3 "$RUNNER_TEMP/han_che.py" ghi "$RUNNER_TEMP/han-che.txt"
+
+      - name: Nâng lên commit này (scripts/nang_cap.sh nang)
+        run: |
+          scripts/nang_cap.sh nang "$MOC"
+          luot=$(cd "$MOC" && python3 scripts/moc.py backup list --json | python3 -c '
+          import json, sys
+          print(max(r["run"] for r in json.load(sys.stdin)["runs"] if r["complete"]))')
+          echo "LUOT=$luot" >> "$GITHUB_ENV"
+          cd "$MOC" && python3 "$RUNNER_TEMP/han_che.py" kiem "$RUNNER_TEMP/han-che.txt"
+
+      # Két của bản cũ khởi tạo trước khi có khóa ký mốc neo: nâng tay theo docs/van-hanh.md rồi kiểm lại cả hệ thống
+      - name: Nâng két cũ (scripts/nang_cap.sh ket), kiểm lại
+        run: |
+          scripts/nang_cap.sh ket "$MOC"
+          scripts/nang_cap.sh kiem "$MOC"
+          cd "$MOC" && python3 "$RUNNER_TEMP/han_che.py" kiem "$RUNNER_TEMP/han-che.txt"
+
+      - name: Lùi về bản cũ bằng lượt sao lưu trước khi nâng (scripts/nang_cap.sh lui)
+        run: |
+          scripts/nang_cap.sh lui "$MOC" "$CU" "$LUOT"
+          cd "$MOC" && python3 "$RUNNER_TEMP/han_che.py" kiem "$RUNNER_TEMP/han-che.txt"
+
+      - name: Trạng thái và nhật ký dịch vụ khi lỗi
+        if: failure()
+        run: |
+          mkdir -p ci-logs
+          cd "$MOC" || exit 0
+          docker compose ps -a || true
+          for s in $(docker compose config --services); do
+            docker compose logs --no-color --tail=1000 "$s" > "$GITHUB_WORKSPACE/ci-logs/$s.log" 2>&1 || true
+          done
+          tail -n 30 "$GITHUB_WORKSPACE"/ci-logs/*.log
+
+      - name: Lưu nhật ký khi lỗi
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nang-cap-logs-${{ github.run_attempt }}
+          path: ci-logs/
+          retention-days: 7
+          if-no-files-found: ignore
