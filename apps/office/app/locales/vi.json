@@ -1592,5 +1592,57 @@
     "colFlags": "Cờ",
     "none": "Đơn vị chưa có cảm biến nào gửi số đo.",
     "note": "Sơ đồ mẫu của một tầng kho lưu trữ; cảm biến vào phòng theo mã phòng thiết bị tự khai. Chỉ thấy cảm biến của đơn vị mình."
+  },
+  "fe": {
+    "skip": "Đến nội dung chính",
+    "organization": "Không gian của đơn vị",
+    "navigation": "Điều hướng chính",
+    "verify": "Xác thực văn bản",
+    "localData": "Dữ liệu do đơn vị quản lý",
+    "menu": "Mở điều hướng",
+    "all": "Tất cả",
+    "overdue": "Quá hạn",
+    "urgent": "Văn bản khẩn",
+    "searchTasks": "Tìm trong hộp việc…",
+    "tasks": "{n} công việc",
+    "due": "Hạn giải quyết",
+    "noTasks": "Không có việc phù hợp",
+    "tryFilter": "Thử đổi bộ lọc hoặc tìm bằng từ khác.",
+    "loaded": "{n} văn bản trong danh sách",
+    "filterDocuments": "Lọc trong danh sách đang hiện…",
+    "listHint": "Theo dõi hồ sơ và tiến độ trong phạm vi đơn vị.",
+    "loading": "Đang tải hồ sơ…",
+    "receiveNew": "Tiếp nhận mới",
+    "todayShort": "Hôm nay",
+    "scrollTable": "Cuộn ngang để xem đầy đủ các cột của sổ."
+  },
+  "desk": {
+    "queue": "Cần xử lý",
+    "draft": "Dự thảo chưa cấp số",
+    "clearFilters": "Xóa bộ lọc",
+    "compose": "Soạn mới",
+    "pending": "{n} công việc đang chờ xử lý.",
+    "filter": "Lọc công việc",
+    "noDeadline": "Chưa có hạn",
+    "attention": "Cần chú ý",
+    "remaining": "Các công việc còn lại",
+    "category": "Chiều văn bản",
+    "allDocuments": "Tất cả văn bản"
+  },
+  "shell": {
+    "closeNav": "Đóng điều hướng"
+  },
+  "pageError": {
+    "notFound": "Không tìm thấy trang",
+    "notFoundDetail": "Đường dẫn này không còn tồn tại hoặc đã được thay đổi. Anh/chị có thể trở về hộp việc để tiếp tục.",
+    "title": "Chưa thể mở trang",
+    "detail": "Đã có lỗi khi tải trang. Vui lòng quay lại hộp việc và thử lại.",
+    "home": "Về hộp việc"
+  },
+  "authCallback": {
+    "title": "Đang đăng nhập",
+    "detail": "Signet đang mở không gian làm việc của anh/chị.",
+    "failed": "Chưa thể đăng nhập",
+    "retryDetail": "Phiên đăng nhập có thể đã hết hạn. Vui lòng thử đăng nhập lại."
   }
 }

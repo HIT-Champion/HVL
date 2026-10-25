@@ -55,8 +55,9 @@ const CHECKS = '{ office_report_checks { rule report status expected actual issu
 const IN_STATUSES = ['received', 'registered', 'in_progress', 'done', 'archived', 'cancelled'] as const
 const OPEN = new Set(['received', 'registered', 'in_progress'])
 const MONTHS = 12
-const BRAND = '#0f766e'
-const LATE = '#dc2626'
+// màu biểu đồ theo nhận diện "Liền mạch": olive của hành động chính, đỏ trầm cho quá hạn
+const BRAND = '#555b3f'
+const LATE = '#a02727'
 // giống grid.containLabel của ECharts 5: nhãn trục nằm trong khung
 const GRID = { left: 8, right: 16, top: 16, bottom: 8, outerBoundsMode: 'same', outerBoundsContain: 'axisLabel' }
 
@@ -171,12 +172,24 @@ const departmentHeight = computed(() => Math.max(256, departments.value.length *
 const inHours = computed(() => processingByMonth.value.every((r) => !r.documents || r.total_hours / r.documents < 24))
 
 const tooltip = { trigger: 'axis', axisPointer: { type: 'shadow' } }
+// Thanh ngang: tên trạng thái đọc trọn trên trục dọc, trạng thái đầu quy trình ở trên cùng
 const statusChart = computed(() => ({
   tooltip,
-  grid: GRID,
-  xAxis: { type: 'category', data: byStatus.value.map((r) => t(`status.${r.status}`)), axisLabel: { interval: 0, width: 72, overflow: 'break' } },
-  yAxis: { type: 'value', minInterval: 1 },
-  series: [{ type: 'bar', name: t('board.count'), data: byStatus.value.map((r) => r.documents), itemStyle: { color: BRAND }, label: { show: true, position: 'top' } }],
+  grid: { ...GRID, right: 32 },
+  xAxis: { type: 'value', minInterval: 1 },
+  yAxis: {
+    type: 'category',
+    inverse: true,
+    data: byStatus.value.map((r) => t(`status.${r.status}`)),
+    axisLabel: { interval: 0, width: 105, fontSize: 13, overflow: 'break' },
+  },
+  series: [{
+    type: 'bar',
+    name: t('board.count'),
+    data: byStatus.value.map((r) => r.documents),
+    itemStyle: { color: BRAND },
+    label: { show: true, position: 'right' },
+  }],
 }))
 const departmentChart = computed(() => {
   const rows = [...departments.value].reverse() // nhiều quá hạn nhất ở trên cùng
@@ -195,19 +208,22 @@ const departmentChart = computed(() => {
 const processingChart = computed(() => ({
   tooltip,
   grid: GRID,
-  xAxis: { type: 'category', data: months.value.map(monthLabel) },
+  xAxis: { type: 'category', data: months.value.map(monthLabel), axisLabel: { showMaxLabel: true, hideOverlap: true } },
   yAxis: { type: 'value' },
   series: [{
     type: 'bar',
     name: inHours.value ? t('board.avgHours') : t('board.avgDays'),
-    data: processingByMonth.value.map((r) => (r.documents ? Math.round((r.total_hours / r.documents / (inHours.value ? 1 : 24)) * 100) / 100 : 0)),
+    // tháng không có văn bản xong để trống (null); tháng xử lý rất nhanh vẫn có cột thấp nhất 2px, không thành 0
+    data: processingByMonth.value.map((r) => (r.documents
+      ? Math.round((r.total_hours / r.documents / (inHours.value ? 1 : 24)) * 100) / 100 : null)),
+    barMinHeight: 2,
     itemStyle: { color: BRAND },
   }],
 }))
 const outgoingChart = computed(() => ({
   tooltip,
   grid: GRID,
-  xAxis: { type: 'category', data: months.value.map(monthLabel) },
+  xAxis: { type: 'category', data: months.value.map(monthLabel), axisLabel: { showMaxLabel: true, hideOverlap: true } },
   yAxis: { type: 'value', minInterval: 1 },
   series: [{ type: 'bar', name: t('board.issued'), data: outgoingByMonth.value.map((r) => r.documents), itemStyle: { color: BRAND } }],
 }))
@@ -222,7 +238,7 @@ const outgoingChart = computed(() => ({
     <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
     <p v-if="allowed && !loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <div v-if="allowed && loaded" class="space-y-4">
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="board-kpis">
+      <div class="moc-board-kpis" data-testid="board-kpis">
         <div class="card p-4">
           <div class="text-sm text-stone-500">{{ t('board.open') }}</div>
           <div class="mt-1 text-3xl font-semibold text-stone-900" data-testid="kpi-open">{{ kpis.open }}</div>

@@ -48,6 +48,8 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
     await expect(staff.getByRole('link', { name, exact: true })).toBeVisible()
   }
   await expect(staff.getByRole('link', { name: 'Hộp việc' })).toHaveCount(0)
+  // tên, vai trò nằm ở cuối thanh bên (#116), chỉ hiện khi thanh bên mở: rê chuột vào rồi giữ đó tới khi bấm chuông
+  await staff.locator('#app-navigation').hover()
   await expect(staff.getByText('Officer', { exact: true })).toBeVisible()
   await expect(staff.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await expect(staff.getByRole('button', { name: 'Tiếng Việt', exact: true })).toBeVisible()
