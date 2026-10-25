@@ -240,16 +240,16 @@ class RulesTest(unittest.TestCase):
     def test_every_exclusion_has_reason_and_is_documented(self) -> None:
         readme = read(APISIX / "README.md")
         ids = re.findall(r'"id:(10\d\d\d),', self.directives)
-        self.assertEqual(ids, ["10010", "10011", "10020", "10030", "10031", "10032", "10033", "10040", "10060",
-                               "10061"])
+        self.assertEqual(ids, ["10010", "10011", "10020", "10030", "10031", "10032", "10033", "10040", "10050",
+                               "10060", "10061"])
         removed = re.findall(r"SecRuleRemoveById (\d+)", self.directives)
         self.assertEqual(removed, ["920350"])
         for rule_id in ids + removed:
             self.assertTrue(f"\n| {rule_id} |" in readme, f"platform/apisix/README.md thiếu dòng của luật {rule_id}")
-        # chỉ thị loại trừ (dòng `- >-` của 10010–10040, SecRuleRemoveById) có chú thích lý do ngay trên
+        # chỉ thị loại trừ (dòng `- >-` của 10010–10050, SecRuleRemoveById) có chú thích lý do ngay trên
         lines = self.directives.splitlines()
         for i, line in enumerate(lines):
-            starts = line.strip() == "- >-" and re.search(r'"id:100[1-4]\d,', lines[i + 1])
+            starts = line.strip() == "- >-" and re.search(r'"id:100[1-5]\d,', lines[i + 1])
             if starts or "SecRuleRemoveById" in line:
                 self.assertTrue(lines[i - 1].strip().startswith("#"), f"loại trừ không có chú thích lý do: {line}")
 
@@ -258,13 +258,14 @@ class RulesTest(unittest.TestCase):
         # luật dài xuống dòng sau id (YAML gấp dòng thành dấu cách, Coraza bỏ qua dấu cách giữa các hành động)
         pattern = r'SecRule REQUEST_FILENAME "@(?:beginsWith|rx|streq) [^"]+" "id:(\d+),\s*phase:1,pass,nolog,'
         scoped = re.findall(pattern, self.directives)
-        self.assertEqual(scoped, ["10010", "10011", "10020", "10030", "10031", "10032", "10033", "10040"])
+        self.assertEqual(scoped, ["10010", "10011", "10020", "10030", "10031", "10032", "10033", "10040", "10050"])
         self.assertNotIn("ctl:ruleEngine=Off", self.directives)
         self.assertNotIn("ctl:ruleRemoveByTag", self.directives)
         self.assertNotIn("ctl:ruleRemoveById", self.directives)
         for target in re.findall(r"ctl:ruleRemoveTarget(?:ById|ByTag)=[^;]+;([^,\"\n]+)", self.directives):
             self.assertRegex(target,
-                             r"^(?:ARGS:[a-z_.-]+|FILES|MULTIPART_PART_HEADERS:[a-z]+|REQUEST_COOKIES:[A-Z_]+)$")
+                             r"^(?:ARGS:[a-z_.-]+|FILES|MULTIPART_PART_HEADERS:[a-z]+|REQUEST_COOKIES:[A-Z_]+"
+                             r"|REQUEST_BASENAME)$")
 
     def exclusion(self, rule_id: str) -> str:
         start = self.directives.index(f'"id:{rule_id},')
@@ -363,6 +364,24 @@ class RulesTest(unittest.TestCase):
         self.assertNotIn("FILES_NAMES", rule)                    # tên trường do ứng dụng đặt: vẫn soi
         self.assertEqual(set(re.findall(r"ruleRemoveTargetById=(\d+);", rule)), {"920120", "922130"})
         self.assertEqual(set(re.findall(r"MULTIPART_PART_HEADERS:([a-z]+)", rule)), {"file", "data", "archive"})
+
+    def test_pem_downloads_only_lose_the_extension_rule_on_two_fixed_paths(self) -> None:
+        # Loại trừ 9: đuôi .pem nằm trong tx.restricted_extensions (920440). Chỉ chứng thư CA và khóa ký mốc neo ở cổng
+        # xác thực; .pem khác, .key, đường khác vẫn bị chặn. Đã chạy thử trên Coraza 3.3.3 + CRS 4.14.0 (bộ luật của
+        # coraza-proxy-wasm 0.6.0): có 10050 thì hai đường qua, bỏ 10050 thì 920440 chặn
+        rule = self.exclusion("10050")
+        self.assertEqual(re.findall(r"ctl:([^,\"]+)", rule), ["ruleRemoveTargetById=920440;REQUEST_BASENAME"])
+        path = re.search(r'"@rx (\S+)"', self.directives[self.directives.index('"id:10050,') - 120:]).group(1)
+        for uri, hit in (("/api/verify/ca.pem", True), ("/api/verify/anchor-key.pem", True),
+                         ("/api/verify/other.pem", False), ("/api/verify/ca.pem.bak", False),
+                         ("/api/verify/ca.key", False), ("/api/files/ca.pem", False), ("/x/api/verify/ca.pem", False),
+                         ("/api/verify/caXpem", False)):
+            self.assertEqual(bool(re.search(path, uri)), hit, uri)
+        # svc-files phục vụ đúng hai đường này (khai báo trước /api/verify/{code}), route xac-thuc chỉ cho GET
+        app = read(ROOT / "services" / "svc-files" / "src" / "svc_files" / "app.py")
+        self.assertIn('@app.get("/api/verify/ca.pem"', app)
+        self.assertIn('@app.get("/api/verify/anchor-key.pem"', app)
+        self.assertLess(app.index('"/api/verify/anchor-key.pem"'), app.index('"/api/verify/{code}"'))
 
     def test_argument_limit_rules_block(self) -> None:
         # GHSA-6r3q-mjv7-xr8m: tham số thứ 1000 trở đi không được soi — chặn hẳn

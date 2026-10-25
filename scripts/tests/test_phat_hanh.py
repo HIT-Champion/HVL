@@ -41,6 +41,8 @@ spec = importlib.util.spec_from_file_location("release_body", BODY)
 release_body = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_body)
 WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "release.yml"
+PACKAGE_FILES = ["scripts/kiem_goi.py", "scripts/license-header.sh", "VERSION", ".gitattributes", "LICENSE", "NOTICE",
+                 "LICENSES/Apache-2.0.txt", "LICENSES/LicenseRef-Logos.txt", "REUSE.toml"]
 # repo thử không đọc cấu hình git của máy (khóa ký thẻ, hook…), tên người gắn thẻ cố định; bỏ mọi GIT_* thừa hưởng —
 # chạy từ hook git thì GIT_DIR, GIT_INDEX_FILE trỏ về repo thật và lệnh git của test sẽ ghi vào đó
 GIT_ENV = {
@@ -127,6 +129,10 @@ class NoReReleaseTest(unittest.TestCase):
         (self.repo / "scripts").mkdir(parents=True)
         shutil.copy(RELEASE, self.repo / "scripts" / "release.sh")
         shutil.copy(SCRIPT, self.repo / "scripts" / "release-notes.sh")
+        # release.sh kiểm gói vừa đóng (scripts/kiem_goi.py, test_kiem_goi.py): gói cần đủ tệp giấy phép và VERSION
+        for rel in PACKAGE_FILES:
+            (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(SCRIPT.parent.parent / rel, self.repo / rel)
         (self.repo / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
         (self.repo / ".gitignore").write_text("dist/\n", encoding="utf-8")
         self.git("init", "-q", "-b", "main")
@@ -190,6 +196,10 @@ class NoReReleaseTest(unittest.TestCase):
     def test_other_version_is_not_blocked(self) -> None:
         self.git("tag", "-a", "v0.1.0", "-m", "bản cũ")
         self.git("push", "-q", "origin", "v0.1.0")
+        # bản mới ở commit sau thẻ cũ: hai thẻ gắn cùng giây trên một commit thì VERSION của gói lấy nhầm thẻ cũ
+        (self.repo / "MOI.md").write_text("Thay đổi của 0.2.0\n", encoding="utf-8")
+        self.git("add", "MOI.md")
+        self.git("commit", "-qm", "thay đổi")
         self.assertEqual(self.release("0.2.0").returncode, 0)
 
 

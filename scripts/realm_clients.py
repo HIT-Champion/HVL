@@ -24,6 +24,10 @@ client của ứng dụng đó, đăng nhập báo "Client not found". Lệnh n�
 Chỉ client của ứng dụng trên trình duyệt (công khai, Authorization Code, không luồng mật khẩu, không tài khoản dịch
 vụ): không sửa client đã có (quản trị có thể đã chỉnh trên trang quản trị), không dựng lại client dòng lệnh `moc-cli`
 hay client dịch vụ `svc-workflow` mà quản trị đã cố ý gỡ. Gọi Keycloak qua cổng quản trị nội bộ như `moc tenant`.
+
+Cùng lý do, `moc realm theme` áp `loginTheme` của tệp realm (theme đăng nhập Signet, platform/keycloak/themes/) cho
+realm nạp từ trước khi có theme: chỉ đặt khi realm còn dùng theme mặc định của Keycloak, không đổi theme quản trị đã
+chọn; Keycloak chưa thấy thư mục theme (container dựng từ docker-compose.yml cũ) thì báo, không đặt.
 """
 
 from __future__ import annotations
@@ -108,4 +112,63 @@ def cmd_clients(args: argparse.Namespace) -> int:
         print(json.dumps({**result, "dry_run": args.dry_run}, ensure_ascii=False))
     else:
         print(describe(result, dry_run=args.dry_run))
+    return 0
+
+
+# --- theme đăng nhập: moc realm theme -------------------------------------------------------------------------------
+
+def sync_theme(kc: Any, realm: dict[str, Any], *, dry_run: bool = False) -> dict[str, str]:
+    """{"theme": loginTheme của tệp realm, "current": theme realm đang dùng ("" là mặc định của Keycloak), "action":
+    "present" đã dùng | "set" vừa đặt (sẽ đặt, với dry_run) | "kept" quản trị đã chọn theme khác, giữ nguyên}."""
+    want = realm.get("loginTheme")
+    if not want:
+        raise tenants.TenantError(f"{REALM_FILE.name} không đặt loginTheme — không có gì để áp")
+    if want not in kc.login_themes():
+        # đặt tên theme Keycloak không có thì trang đăng nhập vẫn chạy bằng theme mặc định, chỉ có dòng WARN trong log
+        raise tenants.TenantError(
+            f"Keycloak chưa có theme đăng nhập {want}: container keycloak dựng từ docker-compose.yml cũ chưa gắn "
+            f"platform/keycloak/themes/{want}. Chạy docker compose up -d --wait keycloak trong thư mục cài rồi "
+            "chạy lại lệnh này")
+    rep = kc.realm()
+    current = rep.get("loginTheme") or ""
+    if current == want:
+        return {"theme": want, "current": current, "action": "present"}
+    if current:
+        return {"theme": want, "current": current, "action": "kept"}
+    if not dry_run:
+        kc.update_realm({**rep, "loginTheme": want})
+        if kc.realm().get("loginTheme") != want:
+            raise tenants.TenantError(f"Keycloak không nhận loginTheme {want} cho realm {kc.realm_name}")
+    return {"theme": want, "current": current, "action": "set"}
+
+
+def run_theme(env: dict[str, str], *, dry_run: bool = False, kc: Any = None) -> dict[str, str]:
+    realm = realm_from_text(REALM_FILE.read_text(encoding="utf-8"), env)
+    return sync_theme(kc or tenants.connect(), realm, dry_run=dry_run)
+
+
+def describe_theme(result: dict[str, str], *, dry_run: bool = False) -> str:
+    theme, current = result["theme"], result["current"]
+    if result["action"] == "present":
+        return f"theme đăng nhập: realm đã dùng {theme}"
+    if result["action"] == "kept":
+        return (f"theme đăng nhập: realm đang dùng {current} do quản trị chọn — giữ nguyên; muốn dùng {theme} thì mở "
+                "trang quản trị Keycloak → Realm settings → Themes → Login theme")
+    return f"theme đăng nhập: {'sẽ đặt' if dry_run else 'vừa đặt'} {theme} (trước đó: theme mặc định của Keycloak)"
+
+
+def cmd_theme(args: argparse.Namespace) -> int:
+    import moc_env
+    try:
+        result = run_theme(moc_env.ENV, dry_run=args.dry_run)
+    except tenants.Unavailable as exc:
+        print(f"{exc}. Signet có đang chạy không? (make ps)", file=sys.stderr)
+        return 2
+    except tenants.TenantError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({**result, "dry_run": args.dry_run}, ensure_ascii=False))
+    else:
+        print(describe_theme(result, dry_run=args.dry_run))
     return 0

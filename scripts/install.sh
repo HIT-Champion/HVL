@@ -25,7 +25,8 @@
 #   make uninstall PREFIX=/opt/moc     # gỡ tệp đã cài, giữ .env và dữ liệu
 #
 # Cài lại vào PREFIX đã có là nâng cấp: thay compose, cấu hình, image; giữ .env của PREFIX, chỉ đổi
-# MOC_VERSION. Phiên bản lấy từ `git describe`, đặt tay bằng MOC_VERSION=0.1.0 (vd. khi cài từ gói .tar.gz).
+# MOC_VERSION. Phiên bản lấy từ tệp VERSION của gói .tar.gz (git archive điền), không thì `git describe`; đặt tay
+# bằng MOC_VERSION=0.1.0 (vd. gói cũ chưa có VERSION).
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -33,14 +34,14 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 COMPOSE=(docker compose --profile core --profile app)
 # Danh sách tệp do bản cài quản lý — lần cài sau và lệnh gỡ chỉ xóa đúng những tệp này
 MANIFEST=.moc-install
-# Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py
-# (cả sao lưu, thêm đơn vị, client ứng dụng của realm), màn demo (demo.py, demo_ca_nhan.py), reconciler GitOps
-# (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây profile core, app nên không thấy bind mount
-# của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm ứng
-# dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của manifest)
+# Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py (cả
+# sao lưu, thêm đơn vị, client ứng dụng của realm, kiểm chữ ký mốc neo), màn demo (demo.py, demo_ca_nhan.py), reconciler
+# GitOps (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây profile core, app nên không thấy bind
+# mount của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm
+# ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của manifest)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
-         scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/tenants.py scripts/demo.py scripts/reconcile.py
-         scripts/realm_clients.py scripts/demo_ca_nhan.py
+         scripts/moc.py scripts/audit_chain.py scripts/anchor_sig.py scripts/backup.py scripts/tenants.py
+         scripts/demo.py scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
          seed services/ot-sensor/sensor.py
          platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
          scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json)
@@ -57,9 +58,12 @@ prefix() {
   echo "$p"
 }
 
+# Gói .tar.gz mang sẵn phiên bản ở dòng cuối tệp VERSION (git archive điền thẻ, .gitattributes export-subst); bản clone
+# git giữ nguyên mẫu ở dòng đó nên lấy bằng git describe
 src_version() {
-  local v
-  v="$(git -C "$SRC" -c safe.directory="$SRC" describe --tags --always --dirty 2>/dev/null)" || v=dev
+  local v=""
+  [ ! -f "$SRC/VERSION" ] || v="$(awk '/^v[0-9][0-9A-Za-z.-]*$/ { print; exit }' "$SRC/VERSION")"
+  [ -n "$v" ] || v="$(git -C "$SRC" -c safe.directory="$SRC" describe --tags --always --dirty 2>/dev/null)" || v=dev
   echo "${v#v}"
 }
 

@@ -13,14 +13,44 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mọi lượt, nên chỉ thu hẹp); nhãn nguồn "số ký hiệu · tr. n" mở tệp PDF trong khung xem của trình duyệt đúng trang đó
   (`#page=n`); câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép tìm lai nghiêng về từ khóa (tỷ trọng nghĩa tối đa
   0,2, câu khác giữ `MOC_ASK_SEMANTIC_RATIO`). Test svc-files +29, office +4, e2e thêm bước trong `hoi-dap.spec.ts`.
+- Bản phát hành tự kiểm gói trước khi lên trang Release: `scripts/kiem_goi.py` (`make release` ở máy, bước mới của
+  `release.yml` ngay sau bước đóng gói) giải nén chính `signet-X.Y.Z.tar.gz` vào thư mục tạm và chặn tệp không được
+  phát hành — tệp môi trường thật (chỉ tệp mẫu `*.example`), khóa riêng (theo tên và khối PEM), tài liệu nội bộ
+  `*.local*`, `COMMIT.md`, `publics/`, `node_modules`, `__pycache__`, dữ liệu chạy, tệp lớn hơn 5 MiB; kiểm `LICENSE`,
+  `NOTICE`, header giấy phép và `REUSE.toml` cho từng tệp (`license-header.sh` nay kiểm được thư mục ngoài git, trước
+  đó qua mà không xét tệp nào), `.sha256`, thư mục gốc `signet-X.Y.Z/`. Gói hỏng thì `make release` gỡ thẻ vừa gắn và
+  xóa gói. Tệp `VERSION` do `git archive` điền thẻ (`.gitattributes`, export-subst): cài từ gói không còn phải đặt tay
+  `MOC_VERSION`. Test scripts +27 (`docs/git_flow.md` mục 6).
+- Trang đăng nhập Keycloak mang thương hiệu Signet (theme `signet`, `platform/keycloak/themes/`), chung cho Văn phòng
+  điện tử, P.A.R.A, Bảng tin: kế thừa `keycloak.v2` của Keycloak 26, không viết lại template — chỉ CSS (màu, phông của
+  Văn phòng điện tử, nền, bo góc, cỡ chữ trên điện thoại; chế độ sáng/tối theo máy của theme cha) và logo của Văn
+  phòng điện tử, cũng làm biểu tượng tab. Realm đặt `loginTheme: signet`, compose gắn thư mục chỉ đọc, CSP giữ nguyên.
+  Bản cài cũ (realm không nạp lại): `python3 scripts/moc.py realm theme` sau khi nâng cấp — chỉ đặt khi realm còn dùng
+  theme mặc định, báo lỗi nếu container chưa gắn thư mục theme (`docs/trien-khai.md`, mục Nâng cấp tay). Test scripts
+  +14.
+
+- Mốc neo sổ kiểm toán công khai, người ngoài tự kiểm được (đóng #56): két ký mỗi mốc bằng khóa Ed25519 `moc-anchor`
+  trong transit (két sinh, không cho xuất; chỉ `svc-files` được ký và đọc khóa công khai) trên thông điệp
+  `signet-anchor-v1` gồm số dòng, hash, giờ kho ghi mốc, URL hệ thống; chữ ký tách rời nằm cạnh mốc trong bucket lạnh,
+  mốc cũ không chữ ký vẫn hợp lệ. `GET /api/verify/ca.pem` (#56) và `GET /api/verify/anchor-key.pem` trả chứng thư CA
+  nội bộ và khóa công khai, không cần token, két chưa có thì 404 (WAF gỡ đúng luật đuôi `.pem` trên hai đường này, loại
+  trừ 10050). Trang `/xac-thuc` có liên kết "Tải chứng thư CA (minh họa)" trong khối chữ ký số và khối khóa ký mốc neo,
+  kèm vân tay SHA-256 trình duyệt tự tính. `moc audit anchor --to` ghi kèm chữ ký, vân tay khóa; `--publish THƯ_MỤC`
+  commit vào một bản sao git (tác giả "Signet anchor") rồi đẩy lên nếu có remote, không bao giờ ép; timer mẫu
+  `platform/systemd/moc-anchor-publish.*` chạy mỗi giờ. `moc audit verify --anchors` kiểm chữ ký bằng Ed25519 viết thuần
+  Python (`scripts/anchor_sig.py`, chạy được độc lập ở máy người ngoài); dòng chữ ký sai, hay dòng chưa ký đứng sau dòng
+  đã ký (chữ ký bị gỡ), là lỗi, nên két đã có khóa thì `--to`/`--publish` không ghi mốc chưa ký. Sổ đăng ký in ra có mốc
+  neo mới nhất ở chân trang. Dựng kho công khai cấm đẩy ép, khóa triển khai, kiểm bằng OpenSSL 3: `docs/van-hanh.md` mục
+  "Mốc neo công khai"; két cũ nâng cấp tay như mục Két bí mật. Test (đếm tĩnh): svc-files +28, scripts +35,
+  giao diện +5.
 
 ### Đã sửa lỗi
-- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` base64url của PKCE (RFC 7636,
-  như kịch bản demo hay thư viện OIDC khác) đôi khi trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403); mã `code`
-  gửi kèm là token ngẫu nhiên như ở trang ứng dụng. oidc-client-ts của Văn phòng điện tử, P.A.R.A, Bảng tin sinh
-  verifier hex nên không dính verifier. Luật mới 10011 của `platform/apisix/apisix.yaml`, chỉ trên endpoint token,
-  gỡ đúng ba luật 942100, 933…, 930120 trên hai tham số này như các token khác. Test scripts thêm kiểm luật 10011,
-  smoke thêm ca đổi mã với đúng chuỗi đã bị chặn.
+- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` base64url của PKCE (RFC 7636, như
+  kịch bản demo hay thư viện OIDC khác) khoảng 1/25 000 lượt trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403); mã
+  `code` gửi kèm là token ngẫu nhiên như ở trang ứng dụng. oidc-client-ts của Văn phòng điện tử, P.A.R.A, Bảng tin sinh
+  verifier hex nên không dính verifier. Luật mới 10011 của `platform/apisix/apisix.yaml`, chỉ trên endpoint token, gỡ
+  đúng ba luật 942100, 933…, 930120 trên hai tham số này như các token khác. Test scripts thêm kiểm luật 10011, smoke
+  thêm ca đổi mã với đúng chuỗi đã bị chặn.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
