@@ -113,10 +113,12 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
 
-  # F1.2 — cổng duy nhất mở ra ngoài
+  # F1.2 — cổng duy nhất mở ra ngoài. F3.15: image APISIX ghim digest cộng nguyên bản tệp WAF coraza-proxy-wasm ghim
+  # digest (platform/apisix/Dockerfile), không sửa mã của hai dự án; luật WAF trong apisix.yaml
   apisix:
     <<: *common
-    image: apache/apisix:3.18.0-debian@sha256:84e6b5e787e9f889ebff88161cb9a16599bafcffa236c6b54c7f779a0655940d
+    build: ./platform/apisix
+    image: moc/apisix:${MOC_VERSION:-dev}
     profiles: [core]
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
@@ -127,6 +129,9 @@ services:
       MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
       MOC_RATE_STATUS_PER_MIN: ${MOC_RATE_STATUS_PER_MIN:-30}
       MOC_TRUSTED_PROXY: ${MOC_TRUSTED_PROXY:-127.0.0.1/32}
+      # F3.15: On chặn | DetectionOnly chỉ ghi nhật ký | Off; số worker (mỗi worker nạp một bộ luật WAF)
+      MOC_WAF: ${MOC_WAF:-On}
+      MOC_APISIX_WORKERS: ${MOC_APISIX_WORKERS:-4}
     volumes:
       - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./platform/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro

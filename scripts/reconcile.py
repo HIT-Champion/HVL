@@ -69,6 +69,10 @@ class ReconcileError(Exception):
     pass
 
 
+class ConfigError(ReconcileError):
+    """Lỗi ở .env của bản cài, không phải của commit: sửa .env thì lượt sau áp được, không cần commit mới."""
+
+
 def _run(cmd: list[str], *, cwd: pathlib.Path = ROOT, env: dict[str, str] | None = None,
          timeout: float | None = 600, check: bool = True) -> subprocess.CompletedProcess[str]:
     proc = subprocess.run(cmd, cwd=cwd, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
@@ -256,6 +260,9 @@ def gitops(report: dict[str, Any]) -> None:
     print(f"· áp cấu hình — {reason}", flush=True)
     try:
         apply(git, src, target, state.get("commit"))
+    except ConfigError as exc:
+        # chưa dừng Signet; không ghi "failed": sửa .env thì lượt sau áp được, không cần commit mới
+        raise ReconcileError(f"không áp được commit {target[:12]}: {exc}") from None
     except (ReconcileError, subprocess.TimeoutExpired, OSError) as exc:
         state["failed"] = target
         write_private(state_path, json.dumps(state, indent=2))
@@ -277,6 +284,23 @@ def checkout(git: list[str], src: pathlib.Path, commit: str) -> dict[str, str]:
     return {**os.environ, "MOC_VERSION": version, "MOC_OPS_LOCKED": "1"}
 
 
+def check_gateway_env(src: pathlib.Path, env: dict[str, str]) -> None:
+    """F3.15: MOC_WAF, MOC_APISIX_WORKERS sai thì APISIX thoát ngay lúc khởi động rồi khởi động lại liên tục, mà
+    `up --wait` vẫn báo xong (apisix không có healthcheck). Kiểm trước khi dừng Signet, bằng chính script entrypoint
+    của image — cùng nguồn với `make up` (Makefile, env-ready) — với giá trị compose của commit sắp áp sẽ dùng."""
+    script = src / "platform" / "apisix" / "kiem-moi-truong.sh"
+    if not script.is_file():                            # commit chưa có WAF
+        return
+    resolved = json.loads(_run([*COMPOSE, "config", "--format", "json", "apisix"], cwd=src, env=env).stdout)
+    values = resolved["services"]["apisix"].get("environment") or {}
+    check = {"PATH": env.get("PATH", os.defpath)}
+    check.update({k: str(values[k]) for k in ("MOC_WAF", "MOC_APISIX_WORKERS") if values.get(k) is not None})
+    proc = _run(["sh", str(script), "--chi-kiem"], cwd=src, env=check, check=False)
+    if proc.returncode != 0:
+        detail = " ".join((proc.stderr or proc.stdout).split()) or f"thoát {proc.returncode}"
+        raise ConfigError(f"{detail} — sửa {ROOT / '.env'}, Signet vẫn chạy bản cũ")
+
+
 def install(src: pathlib.Path, env: dict[str, str]) -> None:
     _run(["bash", str(src / "scripts" / "install.sh"), "install", str(ROOT)], cwd=src, env=env, timeout=1800)
     _run([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"], env=env, timeout=900)
@@ -286,6 +310,7 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
     env = checkout(git, src, target)
     if not (src / "scripts" / "install.sh").is_file():
         raise ReconcileError("commit không có scripts/install.sh")
+    check_gateway_env(src, env)
     # dựng image trước khi dừng Signet: lỗi dựng thì hệ thống cũ vẫn chạy; install.sh dựng lại sau đó trúng bộ nhớ đệm
     _run([*COMPOSE, "build"], cwd=src, env=env, timeout=1800)
     _run([*COMPOSE, "down"], timeout=300)
