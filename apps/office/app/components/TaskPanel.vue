@@ -17,163 +17,142 @@
 -->
 
 <script setup>
+
 import { useI18n } from 'vue-i18n';
+
+
+// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong services/svc-workflow/processes/*.bpmn20.xml).
+// Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
+
+
+
+
 const props = defineProps({
-    taskId: {
-        type: String,
-        required: true
-    },
-    formKey: {
-        type: String,
-        required: true
-    },
-    documentId: {
-        type: String,
-        required: true
-    },
-    documentDue: {
-        type: [
-            String,
-            null
-        ],
-        required: true
-    },
-    restricted: {
-        type: Boolean,
-        required: false
-    },
-    users: {
-        type: Array,
-        required: true
-    },
-    departments: {
-        type: Array,
-        required: true
-    },
-    myDepartment: {
-        type: [
-            String,
-            null
-        ],
-        required: true
-    },
-    myId: {
-        type: String,
-        required: true
-    }
+  brief: { type: Object, default: null },
+  taskId: { type: String, required: true },
+  formKey: { type: String, required: true },
+  documentId: { type: String, required: true },
+  documentDue: { type: String, default: null },
+  restricted: { type: Boolean, default: false },
+  users: { type: Array, required: true },
+  departments: { type: Array, required: true },
+  myDepartment: { type: String, default: null },
+  myId: { type: String, required: true },
 });
-const emit = defineEmits([
-    "done"
-]);
+const emit = defineEmits(['done']);
+
 const { t } = useI18n();
 const { gql, preview } = useApi();
 const notice = useNotice();
 const busy = ref(false);
 const tried = ref(false);
+
+// vbden.chiDao
 const direct = reactive({
-    instruction: '',
-    leadKind: 'department',
-    lead_department_id: '',
-    lead_user_id: '',
-    supports: [],
-    due_on: props.documentDue ?? addDays(today(), 7)
+  instruction: '',
+  leadKind: 'department',
+  lead_department_id: '',
+  lead_user_id: '',
+  supports: [],
+  due_on: props.documentDue ?? addDays(today(), 7)
 });
 const fileNote = ref('');
-const assign = reactive({
-    user_id: '',
-    note: ''
-});
+// vbden.phanCong
+const assign = reactive({ user_id: '', note: '' });
+// vbden.xuLy
 const result = ref('');
+const resultField = ref(null);
+// vbdi.duyetPhong, vbdi.duyetDonVi: ý kiến; trả lại thì bắt buộc
 const reviewNote = ref('');
 const returning = ref(false);
+// vbdi.phatHanh: mặc định không công khai trích yếu — phần lớn văn bản đi chỉ lưu hành nội bộ;
+// văn bản hạn chế thì không bao giờ (CSDL và svc-workflow cũng chặn)
 const isPublic = ref(false);
-const handlers = computed(()=>props.users.filter((u)=>u.role === 'staff' || u.role === 'manager'));
-const myPeople = computed(()=>props.users.filter((u)=>u.department_id === props.myDepartment && u.id !== props.myId && (u.role === 'staff' || u.role === 'manager')));
-const deptName = (id)=>props.departments.find((d)=>d.id === id)?.name ?? '';
-const directErrors = computed(()=>{
-    const e = {};
-    if (!direct.instruction.trim()) e.instruction = t('validation.required');
-    if (direct.leadKind === 'department' && !direct.lead_department_id) e.lead = t('validation.required');
-    if (direct.leadKind === 'user' && !direct.lead_user_id) e.lead = t('validation.required');
-    if (direct.due_on && direct.due_on < today()) e.due_on = t('validation.dueBefore');
-    return e;
+
+const handlers = computed(() => props.users.filter((u) => u.role === 'staff' || u.role === 'manager'));
+const myPeople = computed(() => props.users.filter((u) => u.department_id === props.myDepartment && u.id !== props.myId && (u.role === 'staff' || u.role === 'manager')));
+const deptName = (id) => props.departments.find((d) => d.id === id)?.name ?? '';
+
+const directErrors = computed(() => {
+  const e = {};
+  if (!direct.instruction.trim()) e.instruction = t('validation.required');
+  if (direct.leadKind === 'department' && !direct.lead_department_id) e.lead = t('validation.required');
+  if (direct.leadKind === 'user' && !direct.lead_user_id) e.lead = t('validation.required');
+  if (direct.due_on && direct.due_on < today()) e.due_on = t('validation.dueBefore');
+  return e;
 });
+
 async function complete(outcome, data) {
-    busy.value = true;
-    try {
-        await gql('mutation ($t: String!, $o: String!, $d: jsonb) { completeTask(taskId: $t, outcome: $o, data: $d) { task_id } }', {
-            t: props.taskId,
-            o: outcome,
-            d: data
-        });
-        notice.ok(t('form.done'));
-        emit('done');
-    } catch (e) {
-        notice.error(errorText(t, e));
-    } finally{
-        busy.value = false;
-    }
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    await gql(
+      'mutation ($t: String!, $o: String!, $d: jsonb) { completeTask(taskId: $t, outcome: $o, data: $d) { task_id } }',
+      { t: props.taskId, o: outcome, d: data }
+    );
+    notice.ok(t('form.done'));
+    emit('done');
+  } catch (e) {
+    notice.error(errorText(t, e));
+  } finally {
+    busy.value = false;
+  }
 }
-const suggestedLead = computed(()=>direct.leadKind === 'department' ? direct.lead_department_id || null : null);
+
+// Gợi ý giao việc (F4.3): "Dùng gợi ý" chỉ điền form — giao cho phòng được gợi ý (bỏ phòng đó khỏi phòng phối hợp),
+// đặt hạn nếu có hạn gợi ý. Không gửi gì: lãnh đạo sửa nếu muốn rồi tự bấm "Giao xử lý".
+const suggestedLead = computed(() => direct.leadKind === 'department' ? direct.lead_department_id || null : null);
 function takeSuggestion(p) {
-    direct.leadKind = 'department';
-    direct.lead_department_id = p.department_id;
-    direct.supports = direct.supports.filter((d)=>d !== p.department_id);
-    if (p.due_on) direct.due_on = p.due_on;
+  direct.leadKind = 'department';
+  direct.lead_department_id = p.department_id;
+  direct.supports = direct.supports.filter((d) => d !== p.department_id);
+  if (p.due_on) direct.due_on = p.due_on;
 }
+
 function submitDirect() {
-    tried.value = true;
-    if (Object.keys(directErrors.value).length) return;
-    complete('direct', {
-        instruction: direct.instruction.trim(),
-        ...direct.leadKind === 'department' ? {
-            lead_department_id: direct.lead_department_id
-        } : {
-            lead_user_id: direct.lead_user_id
-        },
-        supports: direct.supports.filter((d)=>d !== direct.lead_department_id),
-        due_on: direct.due_on || null
-    });
+  tried.value = true;
+  if (Object.keys(directErrors.value).length) return;
+  complete('direct', {
+    instruction: direct.instruction.trim(),
+    ...(direct.leadKind === 'department' ? { lead_department_id: direct.lead_department_id } : { lead_user_id: direct.lead_user_id }),
+    supports: direct.supports.filter((d) => d !== direct.lead_department_id),
+    due_on: direct.due_on || null
+  });
 }
+
 function submitAssign() {
-    tried.value = true;
-    if (!assign.user_id) return;
-    complete('assign', {
-        user_id: assign.user_id,
-        note: assign.note.trim() || null
-    });
+  tried.value = true;
+  if (!assign.user_id) return;
+  complete('assign', { user_id: assign.user_id, note: assign.note.trim() || null });
 }
+
 function approve() {
-    complete('approve', {
-        note: reviewNote.value.trim() || null
-    });
+  complete('approve', { note: reviewNote.value.trim() || null });
 }
+
 function sendBack() {
-    returning.value = true;
-    if (!reviewNote.value.trim()) return;
-    complete('return', {
-        note: reviewNote.value.trim()
-    });
+  returning.value = true;
+  if (!reviewNote.value.trim()) return;
+  complete('return', { note: reviewNote.value.trim() });
 }
+
 function issue() {
-    if (!confirm(t('form.phatHanh.confirm'))) return;
-    complete('issue', {
-        is_public: isPublic.value && !props.restricted
-    });
+  if (!confirm(t('form.phatHanh.confirm'))) return;
+  complete('issue', { is_public: isPublic.value && !props.restricted });
 }
+
 function submitDone() {
-    tried.value = true;
-    if (!result.value.trim()) return;
-    complete('done', {
-        result_note: result.value.trim()
-    });
+  tried.value = true;
+  if (!result.value.trim()) { resultField.value?.focus(); return; }
+  complete('done', { result_note: result.value.trim() });
 }
 </script>
 
 <template>
-  <section class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
-    <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
+  <section class="card overflow-hidden border-brand-200" :aria-busy="busy">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 bg-brand-50 px-5 py-3">
       <h2 class="text-sm font-semibold text-brand-900">{{ t(`task.${formKey}`) }}</h2>
+      <span v-if="busy" class="text-sm text-stone-600" role="status">{{ t('form.processing') }}</span>
     </div>
 
     <!-- Lãnh đạo đơn vị chỉ đạo -->
@@ -226,7 +205,7 @@ function submitDone() {
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
         <div class="flex items-end gap-2">
-          <input v-model="fileNote" class="input w-56" :placeholder="t('form.chiDao.fileNote')">
+          <input v-model="fileNote" class="input w-56" :aria-label="t('form.chiDao.fileNote')" :placeholder="t('form.chiDao.fileNote')">
           <button type="button" class="btn-secondary" :disabled="busy" @click="complete('file', { note: fileNote.trim() || null })">{{ t('form.chiDao.file') }}</button>
         </div>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.chiDao.direct') }}</button>
@@ -255,10 +234,19 @@ function submitDone() {
 
     <!-- Chuyên viên báo kết quả -->
     <form v-else-if="formKey === 'vbden.xuLy'" class="space-y-4 p-5" novalidate @submit.prevent="submitDone">
+      <div v-if="brief" class="sg-assignment-brief" data-testid="processing-brief">
+        <h3 class="text-sm font-semibold">{{ t('form.xuLy.brief') }}</h3>
+        <p v-for="instruction in brief.instructions" :key="instruction" class="mt-2 whitespace-pre-line text-sm">{{ instruction }}</p>
+        <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <div v-if="brief.assignedBy"><dt class="text-stone-500">{{ t('form.xuLy.assignedBy') }}</dt><dd class="font-medium">{{ users.find(u => u.id === brief.assignedBy)?.full_name || t('app.none') }}</dd></div>
+          <div><dt class="text-stone-500">{{ t('doc.due') }}</dt><dd class="font-medium">{{ brief.dueOn ? fmtDate(brief.dueOn) : t('desk.noDeadline') }}</dd></div>
+        </dl>
+      </div>
       <div>
-        <label class="label" for="result">{{ t('form.xuLy.result') }}</label>
-        <textarea id="result" v-model="result" rows="4" class="input" maxlength="4000" :aria-invalid="tried && !result.trim()" />
-        <p v-if="tried && !result.trim()" class="field-error">{{ t('validation.required') }}</p>
+        <label class="label" for="result">{{ t('form.xuLy.result') }} <span class="font-normal text-stone-500">({{ t('form.xuLy.required') }})</span></label>
+        <textarea id="result" ref="resultField" v-model="result" required aria-required="true" aria-describedby="result-help result-error" rows="4" class="input" maxlength="4000" :aria-invalid="tried && !result.trim()" />
+        <p id="result-help" class="mt-2 text-sm text-stone-500">{{ t('form.xuLy.consequence') }}</p>
+        <p id="result-error" v-show="tried && !result.trim()" class="field-error" role="alert">{{ t('validation.required') }}</p>
       </div>
       <div class="flex justify-end border-t border-stone-100 pt-4">
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.xuLy.done') }}</button>

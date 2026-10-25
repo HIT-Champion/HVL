@@ -17,16 +17,75 @@
 -->
 
 <script setup>
+
 import { useI18n } from 'vue-i18n';
+
+
+
+// Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
+// khung xử lý việc đang chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
+// Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
+// Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Signet có thẻ trạng thái chuyển từng đơn vị;
+// văn bản đến nhận theo đường này có thẻ "Nhận từ …" với mã xác thực của bên gửi và đối chiếu SHA-256 tệp.
+// Nút "Hỏi về văn bản này" (F4.2) mở trang Hỏi đáp chỉ hỏi trong văn bản này — chỉ khi văn bản có trong kho của trợ lý.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const { t } = useI18n();
 const { gql, download, preview } = useApi();
 const notice = useNotice();
 const claims = useAuth().claims;
 const route = useRoute();
+
 const doc = ref(null);
 const users = ref([]);
 const departments = ref([]);
-const units = ref([]);
+const units = ref([]); // đơn vị khác trong hệ thống (liên thông)
 const task = ref(null);
 const loading = ref(true);
 const missing = ref(false);
@@ -34,79 +93,108 @@ const failure = ref('');
 const registering = ref(false);
 const submitting = ref(false);
 const signer = ref('');
-const id = computed(()=>String(route.params.id));
+
+const brief = computed(() => processingBrief(doc.value?.assignments ?? [], claims.value?.userId, doc.value?.due_on));
+const backTarget = computed(() => documentBackTarget(route.query.from, doc.value?.direction));
+const id = computed(() => String(route.params.id));
+
+// Lịch sử (F3.5): các dòng sổ kiểm toán về văn bản — ai sửa gì, lúc nào — cho mọi người đọc được văn bản. Tải khi mở
+// tab; cột nội dung (trích yếu, tên tệp…) chỉ báo là đã đổi, như màn Sổ kiểm toán.
+
+
+
+
+
+
+
+
+
 const side = ref('timeline');
 const history = ref(null);
-const userNames = computed(()=>new Map(users.value.map((u)=>[
-            u.id,
-            u.full_name
-        ])));
-const departmentNames = computed(()=>new Map(departments.value.map((d)=>[
-            d.id,
-            d.name
-        ])));
-const unitNames = computed(()=>new Map(units.value.map((u)=>[
-            u.id,
-            u.name
-        ])));
+const historyLoading = ref(false);
+const historyFailure = ref('');
+const timelineTab = ref(null);
+const historyTab = ref(null);
+function sideKey(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const next = event.key === 'Home' ? 'timeline' : event.key === 'End' ? 'history' : side.value === 'timeline' ? 'history' : 'timeline';
+  if (next === 'history') openHistory(); else side.value = 'timeline';
+  nextTick(() => (next === 'history' ? historyTab.value : timelineTab.value)?.focus());
+}
+const userNames = computed(() => new Map(users.value.map((u) => [u.id, u.full_name])));
+const departmentNames = computed(() => new Map(departments.value.map((d) => [d.id, d.name])));
+const unitNames = computed(() => new Map(units.value.map((u) => [u.id, u.name])));
 const { label, action, who, changes } = useAuditFormat(userNames, departmentNames, unitNames);
+
 async function openHistory() {
-    side.value = 'history';
-    const want = id.value;
-    try {
-        const data = await gql(`
+  side.value = 'history';
+  historyLoading.value = true;
+  historyFailure.value = '';
+  const want = id.value; // đổi sang văn bản khác giữa chừng: bỏ kết quả của văn bản cũ
+  try {
+    const data = await gql(`
       query ($id: uuid!) {
         office_document_history(where: {document_id: {_eq: $id}}, order_by: {id: desc}) {
           id occurred_at actor_id actor_kind action entity overview
         }
-      }`, {
-            id: want
-        });
-        if (want === id.value) history.value = data.office_document_history;
-    } catch (e) {
-        notice.error(errorText(t, e));
-    }
+      }`, { id: want });
+    if (want === id.value) history.value = data.office_document_history;
+  } catch (e) {
+    if (want === id.value) historyFailure.value = errorText(t, e);
+  } finally {
+    if (want === id.value) historyLoading.value = false;
+  }
 }
-const nameOf = (uid)=>users.value.find((u)=>u.id === uid)?.full_name ?? (uid ? uid.slice(0, 8) : '');
-const unitName = (tid)=>unitNames.value.get(tid) ?? tid.slice(0, 8);
+const nameOf = (uid) => users.value.find((u) => u.id === uid)?.full_name ?? (uid ? uid.slice(0, 8) : '');
+const unitName = (tid) => unitNames.value.get(tid) ?? tid.slice(0, 8);
+
 const EVENT_FIELDS = 'id kind actor_id actor_kind note data created_at';
 const DISPATCH_FIELDS = 'id to_tenant_id status attempts last_error delivered_at to_unit { name }';
+
+// Liên thông (F3.12): phát hành xong, svc-workflow chuyển văn bản sang từng đơn vị nhận ngay sau đó (lỗi thì tự thử
+// lại). Bên nhận không báo ngược lại cho bên gửi, nên còn dòng "đang chuyển" thì hỏi lại trạng thái (và dòng thời
+// gian) 5 giây một lần, tối đa 2 phút; quá thế thì tải lại trang để xem
 let dispatchTimer = null;
 let dispatchPolls = 0;
 function followDispatches() {
-    if (dispatchTimer) clearTimeout(dispatchTimer);
-    dispatchTimer = null;
-    if (!doc.value?.dispatches.some((d)=>d.status === 'pending') || dispatchPolls >= 24) return;
-    dispatchTimer = setTimeout(refreshDispatches, 5_000);
+  if (dispatchTimer) clearTimeout(dispatchTimer);
+  dispatchTimer = null;
+  if (!doc.value?.dispatches.some((d) => d.status === 'pending') || dispatchPolls >= 24) return;
+  dispatchTimer = setTimeout(refreshDispatches, 5_000);
 }
 async function refreshDispatches() {
-    dispatchPolls += 1;
-    const want = id.value;
-    try {
-        const data = await gql(`
+  dispatchPolls += 1;
+  const want = id.value;
+  try {
+    const data = await gql(`
       query ($id: uuid!) {
         office_documents_by_pk(id: $id) {
           dispatches(order_by: {created_at: asc}) { ${DISPATCH_FIELDS} }
           events(order_by: {id: asc}) { ${EVENT_FIELDS} }
         }
-      }`, {
-            id: want
-        });
-        const fresh = data.office_documents_by_pk;
-        if (fresh && doc.value && want === id.value) Object.assign(doc.value, fresh);
-    } catch  {}
-    followDispatches();
+      }`, { id: want });
+    const fresh = data.office_documents_by_pk;
+    if (fresh && doc.value && want === id.value) Object.assign(doc.value, fresh);
+  } catch {
+
+    // mạng chập chờn: lần hỏi sau thử lại
+  }followDispatches();
 }
-onBeforeUnmount(()=>{
-    if (dispatchTimer) clearTimeout(dispatchTimer);
-});
+onBeforeUnmount(() => {if (dispatchTimer) clearTimeout(dispatchTimer);});
+
+// Thông báo realtime của văn bản và nút thao tác (phát hành, vào sổ…) có thể cùng gọi load(): lượt cũ về sau không
+// được đè lượt mới — không thì văn bản vừa phát hành hiện lại "Đã duyệt" và thẻ liên thông thôi hỏi lại
 let seq = 0;
 async function load() {
-    const mine = ++seq;
-    loading.value = true;
-    failure.value = '';
-    try {
-        const data = await gql(`
+  const mine = ++seq;
+  loading.value = true;
+  failure.value = '';
+  try {
+    const data = await gql(
+
+
+      `
       query ($id: uuid!) {
         office_documents_by_pk(id: $id) {
           id direction status type_code document_type { name } symbol issuer_name issued_on summary urgency restricted
@@ -125,238 +213,205 @@ async function load() {
         office_departments(order_by: {name: asc}) { id code name }
         office_dispatch_units(order_by: {name: asc}) { id name }
         myTasks { id form_key document_id }
-      }`, {
-            id: id.value
-        });
-        if (mine !== seq) return;
-        doc.value = data.office_documents_by_pk;
-        missing.value = !doc.value;
-        users.value = data.core_users;
-        departments.value = data.office_departments;
-        units.value = data.office_dispatch_units;
-        dispatchPolls = 0;
-        followDispatches();
-        task.value = data.myTasks.find((x)=>x.document_id === id.value && x.form_key !== 'vbdi.chinhSua') ?? null;
-        signer.value = doc.value?.signer_id ?? directors.value[0]?.id ?? '';
-        if (side.value === 'history') void openHistory();
-        viewers.value = null;
-        if (doc.value?.restricted && canManageViewers.value) void loadViewers();
-    } catch (e) {
-        if (mine !== seq) return;
-        if (doc.value) notice.error(errorText(t, e));
-        else failure.value = errorText(t, e);
-    } finally{
-        if (mine === seq) loading.value = false;
-    }
+      }`, { id: id.value });
+    if (mine !== seq) return;
+    doc.value = data.office_documents_by_pk;
+    missing.value = !doc.value;
+    users.value = data.core_users;
+    departments.value = data.office_departments;
+    units.value = data.office_dispatch_units;
+    dispatchPolls = 0;
+    followDispatches();
+    // bước "sửa dự thảo" làm bằng nút Trình lại ở dưới, không hiện khung xử lý riêng
+    task.value = data.myTasks.find((x) => x.document_id === id.value && x.form_key !== 'vbdi.chinhSua') ?? null;
+    signer.value = doc.value?.signer_id ?? directors.value[0]?.id ?? '';
+    // tab Lịch sử đang mở: thao tác vừa xong (vào sổ, trình ký, xử lý) có dòng sổ mới
+    if (side.value === 'history') void openHistory();
+    viewers.value = null;
+    if (doc.value?.restricted && canManageViewers.value) void loadViewers();
+  } catch (e) {
+    if (mine !== seq) return;
+    // lần đầu chưa có gì để hiện: báo lỗi ngay trên trang thay vì để trang trắng
+    if (doc.value) notice.error(errorText(t, e));else
+    failure.value = errorText(t, e);
+  } finally {
+    if (mine === seq) loading.value = false;
+  }
 }
+
+// Văn bản hạn chế (F3.7): văn thư, lãnh đạo đơn vị đang đọc được văn bản thì xem và sửa danh sách người được xem
+// (hàm office.grant_document_access / revoke_document_access kiểm lại vai trò, thuê ước, quyền đọc)
+
 const viewers = ref(null);
 const viewerPick = ref('');
 const viewerBusy = ref(false);
-const canManageViewers = computed(()=>[
-        'clerk',
-        'director'
-    ].includes(claims.value?.role ?? ''));
-const viewerChoices = computed(()=>users.value.filter((u)=>u.role !== 'tenant_admin' && u.id !== doc.value?.created_by && !viewers.value?.some((v)=>v.user_id === u.id)));
+const canManageViewers = computed(() => ['clerk', 'director'].includes(claims.value?.role ?? ''));
+const viewerChoices = computed(() => users.value.filter((u) => u.role !== 'tenant_admin' && u.id !== doc.value?.created_by &&
+!viewers.value?.some((v) => v.user_id === u.id)));
+
 async function loadViewers() {
-    const want = id.value;
-    try {
-        const data = await gql(`
+  const want = id.value;
+  try {
+    const data = await gql(`
       query ($id: uuid!) {
         office_document_acl(where: {document_id: {_eq: $id}}, order_by: {granted_at: asc}) { user_id granted_by granted_at }
-      }`, {
-            id: want
-        });
-        if (want === id.value) viewers.value = data.office_document_acl;
-    } catch (e) {
-        notice.error(errorText(t, e));
-    }
+      }`, { id: want });
+    if (want === id.value) viewers.value = data.office_document_acl;
+  } catch (e) {
+    notice.error(errorText(t, e));
+  }
 }
+
 async function changeViewer(userId, grant) {
-    viewerBusy.value = true;
-    try {
-        const fn = grant ? 'office_grant_document_access' : 'office_revoke_document_access';
-        await gql(`mutation ($d: uuid!, $u: String!) { ${fn}(args: {document_id: $d, user_id: $u}) { user_id } }`, {
-            d: id.value,
-            u: userId
-        });
-        notice.ok(t(grant ? 'doc.viewerGranted' : 'doc.viewerRevoked', {
-            name: nameOf(userId)
-        }));
-        viewerPick.value = '';
-        await loadViewers();
-    } catch (e) {
-        notice.error(errorText(t, e));
-    } finally{
-        viewerBusy.value = false;
-    }
+  viewerBusy.value = true;
+  try {
+    const fn = grant ? 'office_grant_document_access' : 'office_revoke_document_access';
+    await gql(`mutation ($d: uuid!, $u: String!) { ${fn}(args: {document_id: $d, user_id: $u}) { user_id } }`,
+    { d: id.value, u: userId });
+    notice.ok(t(grant ? 'doc.viewerGranted' : 'doc.viewerRevoked', { name: nameOf(userId) }));
+    viewerPick.value = '';
+    await loadViewers();
+  } catch (e) {
+    notice.error(errorText(t, e));
+  } finally {
+    viewerBusy.value = false;
+  }
 }
+
 async function register() {
-    if (!confirm(t('doc.registerConfirm'))) return;
-    registering.value = true;
-    try {
-        const data = await gql('mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }', {
-            id: id.value
-        });
-        notice.ok(t('receive.registered', {
-            n: data.registerIncoming.register_number
-        }));
-        await load();
-    } catch (e) {
-        notice.error(errorText(t, e));
-    } finally{
-        registering.value = false;
-    }
+  if (!confirm(t('doc.registerConfirm'))) return;
+  registering.value = true;
+  try {
+    const data = await gql(
+      'mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }', { id: id.value }
+    );
+    notice.ok(t('receive.registered', { n: data.registerIncoming.register_number }));
+    await load();
+  } catch (e) {
+    notice.error(errorText(t, e));
+  } finally {
+    registering.value = false;
+  }
 }
-const outgoing = computed(()=>doc.value?.direction === 'out');
-const directors = computed(()=>users.value.filter((u)=>u.role === 'director'));
-const canEdit = computed(()=>outgoing.value && claims.value?.role === 'staff' && doc.value?.created_by === claims.value?.userId && [
-        'draft',
-        'returned'
-    ].includes(doc.value?.status ?? ''));
-const lastReturn = computed(()=>[
-        ...doc.value?.events ?? []
-    ].reverse().find((e)=>e.kind === 'office.document.returned')?.note ?? '');
-const issuedFile = computed(()=>doc.value?.files.find((f)=>f.role === 'issued')?.file ?? null);
-const verifyCode = computed(()=>fmtVerifyCode(doc.value?.verify_code));
-const dispatches = computed(()=>doc.value?.dispatches ?? []);
+
+const outgoing = computed(() => doc.value?.direction === 'out');
+const directors = computed(() => users.value.filter((u) => u.role === 'director'));
+// Người soạn sửa, trình được khi dự thảo còn ở bước đầu hoặc bị trả lại
+const canEdit = computed(() => outgoing.value && claims.value?.role === 'staff' && doc.value?.created_by === claims.value?.userId &&
+['draft', 'returned'].includes(doc.value?.status ?? ''));
+const lastReturn = computed(() => [...(doc.value?.events ?? [])].reverse().find((e) => e.kind === 'office.document.returned')?.note ?? '');
+const issuedFile = computed(() => doc.value?.files.find((f) => f.role === 'issued')?.file ?? null);
+const verifyCode = computed(() => fmtVerifyCode(doc.value?.verify_code));
+
+// Văn bản đi gửi trong hệ thống: chưa phát hành thì là danh sách sẽ gửi, phát hành rồi thì trạng thái từng đơn vị
+const dispatches = computed(() => doc.value?.dispatches ?? []);
 const DISPATCH_TONE = {
-    pending: 'bg-amber-100 text-amber-800',
-    delivered: 'bg-emerald-100 text-emerald-800',
-    duplicate: 'bg-sky-100 text-sky-800',
-    failed: 'bg-rose-100 text-rose-800'
+  pending: 'bg-amber-100 text-amber-800',
+  delivered: 'bg-emerald-100 text-emerald-800',
+  duplicate: 'bg-sky-100 text-sky-800',
+  failed: 'bg-rose-100 text-rose-800'
 };
-const sourceMatch = computed(()=>{
-    const main = doc.value?.files.find((f)=>f.role === 'main')?.file;
-    return doc.value?.dispatch_in && doc.value.source_id && main ? sameSha256(main.sha256, doc.value.dispatch_in.source_sha256) : null;
+// Văn bản đến nhận liên thông: tệp chính (bản sao của bản phát hành) phải cùng SHA-256 với bản bên gửi đã phát hành.
+// null: không còn tệp để so (vd đã nộp lưu), hoặc văn bản do văn thư tiếp nhận tay mà lần liên thông chỉ nối vào
+// (trùng — không có source_id): tệp là bản scan của văn thư, khác băm là đương nhiên
+const sourceMatch = computed(() => {
+  const main = doc.value?.files.find((f) => f.role === 'main')?.file;
+  return doc.value?.dispatch_in && doc.value.source_id && main ?
+  sameSha256(main.sha256, doc.value.dispatch_in.source_sha256) : null;
 });
+
 async function submit() {
-    if (!signer.value) return;
-    submitting.value = true;
-    try {
-        await gql('mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }', {
-            d: id.value,
-            s: signer.value
-        });
-        notice.ok(t('doc.submitted'));
-        await load();
-    } catch (e) {
-        notice.error(errorText(t, e));
-    } finally{
-        submitting.value = false;
-    }
+  if (!signer.value) return;
+  submitting.value = true;
+  try {
+    await gql('mutation ($d: uuid!, $s: String!) { submitOutgoing(documentId: $d, signerId: $s) { status } }',
+    { d: id.value, s: signer.value });
+    notice.ok(t('doc.submitted'));
+    await load();
+  } catch (e) {
+    notice.error(errorText(t, e));
+  } finally {
+    submitting.value = false;
+  }
 }
+
 function showPreview() {
-    preview(id.value).catch((e)=>notice.error(errorText(t, e)));
+  preview(id.value).catch((e) => notice.error(errorText(t, e)));
 }
+
 function eventTitle(e) {
-    switch(e.kind){
-        case 'office.document.registered':
-            return t('event.office.document.registered', {
-                n: e.data.register_number
-            });
-        case 'office.document.assigned':
-            return t('event.office.document.assigned', {
-                name: nameOf(e.data.user_id)
-            });
-        case 'office.document.numbered':
-            return t('event.office.document.numbered', {
-                symbol: e.data.symbol
-            });
-        case 'office.task.overdue':
-        case 'office.task.escalated':
-            return t(`event.${e.kind}`, {
-                task: t(`task.${e.data.form_key}`)
-            });
-        case 'office.document.overdue':
-            return t('event.office.document.overdue', {
-                due: fmtDate(e.data.due_on)
-            });
-        case 'ot.alarm':
-            return t('event.ot.alarm', {
-                name: e.data.name,
-                value: fmtNumber(e.data.temperature),
-                threshold: fmtNumber(e.data.threshold)
-            });
-        case 'office.document.dispatched':
-        case 'office.document.dispatch_duplicate':
-            return t(`event.${e.kind}`, {
-                name: e.data.to_name ?? ''
-            });
-        case 'office.document.arrived':
-            return t('event.office.document.arrived', {
-                name: e.data.from_name ?? ''
-            });
-        default:
-            return t(`event.${e.kind}`);
-    }
+  switch (e.kind) {
+    case 'office.document.registered':return t('event.office.document.registered', { n: e.data.register_number });
+    case 'office.document.assigned':return t('event.office.document.assigned', { name: nameOf(e.data.user_id) });
+    case 'office.document.numbered':return t('event.office.document.numbered', { symbol: e.data.symbol });
+    case 'office.task.overdue':
+    case 'office.task.escalated':return t(`event.${e.kind}`, { task: t(`task.${e.data.form_key}`) });
+    case 'office.document.overdue':return t('event.office.document.overdue', { due: fmtDate(e.data.due_on) });
+    case 'ot.alarm':
+      return t('event.ot.alarm', { name: e.data.name, value: fmtNumber(e.data.temperature), threshold: fmtNumber(e.data.threshold) });
+    // liên thông (F3.12): bên gửi ghi tên đơn vị nhận, bên nhận ghi tên đơn vị gửi
+    case 'office.document.dispatched':
+    case 'office.document.dispatch_duplicate':return t(`event.${e.kind}`, { name: e.data.to_name ?? '' });
+    case 'office.document.arrived':return t('event.office.document.arrived', { name: e.data.from_name ?? '' });
+    default:return t(`event.${e.kind}`);
+  }
 }
-const timeline = computed(()=>{
-    if (!doc.value) return [];
-    const first = outgoing.value ? t('event.drafted') : t('event.received');
-    const items = doc.value.source_id ? [] : [
-        {
-            key: 'first',
-            title: first,
-            who: nameOf(doc.value.created_by),
-            at: doc.value.created_at,
-            note: null
-        }
-    ];
-    for (const e of doc.value.events){
-        const title = eventTitle(e);
-        let note = e.note;
-        if (e.kind === 'office.document.arrived' && e.data.verify_code) {
-            note = t('event.sourceCode', {
-                code: fmtVerifyCode(e.data.verify_code)
-            });
-        }
-        if (Array.isArray(e.data.notified) && e.data.notified.length) {
-            note = t('event.notified', {
-                names: e.data.notified.map(nameOf).join(', ')
-            });
-        }
-        if (e.kind === 'office.document.directed') {
-            const lead = e.data.lead_department_id ? departments.value.find((d)=>d.id === e.data.lead_department_id)?.name : nameOf(e.data.lead_user_id);
-            note = [
-                e.note,
-                lead ? `${t('doc.lead')}: ${lead}` : '',
-                e.data.due_on ? `${t('doc.due')}: ${fmtDate(e.data.due_on)}` : ''
-            ].filter(Boolean).join(' · ');
-        }
-        items.push({
-            key: String(e.id),
-            title,
-            who: e.actor_kind === 'service' ? t('event.system') : nameOf(e.actor_id),
-            at: e.created_at,
-            note
-        });
+
+// Dòng thời gian: bước đầu (tiếp nhận / tạo dự thảo) lấy từ chính văn bản, các bước sau từ office.document_events.
+// Văn bản đến nhận liên thông do dịch vụ tạo: bước đầu là sự kiện "nhận liên thông", không thêm bước "tiếp nhận"
+const timeline = computed(() => {
+  if (!doc.value) return [];
+  const first = outgoing.value ? t('event.drafted') : t('event.received');
+  const items = doc.value.source_id ?
+  [] :
+  [{ key: 'first', title: first, who: nameOf(doc.value.created_by), at: doc.value.created_at, note: null }];
+  for (const e of doc.value.events) {
+    const title = eventTitle(e);
+    let note = e.note;
+    if (e.kind === 'office.document.arrived' && e.data.verify_code) {
+      note = t('event.sourceCode', { code: fmtVerifyCode(e.data.verify_code) });
     }
-    return items.reverse();
+    // nhắc hạn do hệ thống gửi: ghi ai đã được báo
+    if (Array.isArray(e.data.notified) && e.data.notified.length) {
+      note = t('event.notified', { names: e.data.notified.map(nameOf).join(', ') });
+    }
+    if (e.kind === 'office.document.directed') {
+      const lead = e.data.lead_department_id ?
+      departments.value.find((d) => d.id === e.data.lead_department_id)?.name :
+      nameOf(e.data.lead_user_id);
+      note = [e.note, lead ? `${t('doc.lead')}: ${lead}` : '', e.data.due_on ? `${t('doc.due')}: ${fmtDate(e.data.due_on)}` : ''].filter(Boolean).join(' · ');
+    }
+    items.push({ key: String(e.id), title, who: e.actor_kind === 'service' ? t('event.system') : nameOf(e.actor_id), at: e.created_at, note });
+  }
+  return items.reverse();
 });
-const assignments = computed(()=>{
-    if (!doc.value) return [];
-    const all = doc.value.assignments;
-    const rank = (role)=>role === 'lead' ? 0 : role === 'support' ? 1 : 2;
-    const roots = all.filter((a)=>!a.parent_id).sort((a, b)=>rank(a.role) - rank(b.role));
-    return roots.flatMap((r)=>[
-            r,
-            ...all.filter((c)=>c.parent_id === r.id)
-        ]);
+
+// Chủ trì trước, người được phân công ngay dưới phòng của họ, rồi phối hợp, để biết
+const assignments = computed(() => {
+  if (!doc.value) return [];
+  const all = doc.value.assignments;
+  const rank = (role) => role === 'lead' ? 0 : role === 'support' ? 1 : 2;
+  const roots = all.filter((a) => !a.parent_id).sort((a, b) => rank(a.role) - rank(b.role));
+  return roots.flatMap((r) => [r, ...all.filter((c) => c.parent_id === r.id)]);
 });
-watch(id, ()=>{
-    history.value = null;
-    load();
+
+watch(id, () => {
+  side.value = 'timeline';
+  historyFailure.value = '';
+  historyLoading.value = false;
+  history.value = null; // lịch sử của văn bản trước: không hiện nhầm trong lúc tải
+  load();
 });
 onMounted(load);
+
+// có người vừa làm một bước với văn bản này (F2.5): tải lại để thấy trạng thái, việc và dòng thời gian mới
 const { lastPush } = useNotifications();
-watch(lastPush, (n)=>{
-    if (n?.document_id === id.value) load();
-});
+watch(lastPush, (n) => {if (n?.document_id === id.value) load();});
 </script>
 
 <template>
   <div>
-    <NuxtLink :to="outgoing ? '/van-ban-di' : '/van-ban-den'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
+    <NuxtLink :to="backTarget" class="sg-document-back mb-4 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-brand-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>{{ t(route.query.from === 'inbox' ? 'fe.backInbox' : 'app.back') }}</NuxtLink>
 
     <p v-if="loading && !doc" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="missing" class="card p-8 text-center text-stone-500">{{ t('doc.notFound') }}</p>
@@ -383,10 +438,15 @@ watch(lastPush, (n)=>{
           <p v-else class="mt-1 text-sm text-stone-500">{{ doc.symbol }} · {{ doc.issuer_name }} · {{ fmtDate(doc.issued_on) }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering" @click="register">
-            {{ t('doc.register') }}
+          <button v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering" :aria-busy="registering" @click="register">
+            {{ registering ? t('doc.registering') : t('doc.register') }}
           </button>
           <NuxtLink v-if="canEdit" :to="`/van-ban-di/soan?id=${doc.id}`" class="btn-secondary">{{ t('doc.edit') }}</NuxtLink>
+          <NuxtLink
+            v-if="canAskAbout(doc, claims?.role)" :to="askAbout(doc.id)" class="btn-secondary" data-testid="ask-about"
+          >
+            {{ t('doc.askAbout') }}
+          </NuxtLink>
           <button v-if="outgoing && !issuedFile" class="btn-secondary" @click="showPreview">{{ t('doc.preview') }}</button>
           <button v-if="issuedFile" class="btn-primary" @click="download(issuedFile.id, issuedFile.filename).catch((e) => notice.error(errorText(t, e)))">
             {{ t('doc.download') }} {{ t('doc.fileRole.issued').toLowerCase() }}
@@ -398,12 +458,12 @@ watch(lastPush, (n)=>{
         <div class="space-y-6 lg:col-span-2">
           <TaskPanel
             v-if="task" :key="task.id" :task-id="task.id" :form-key="task.form_key" :document-due="doc.due_on"
-            :document-id="doc.id" :restricted="doc.restricted" :users="users" :departments="departments"
+            :brief="brief" :document-id="doc.id" :restricted="doc.restricted" :users="users" :departments="departments"
             :my-department="claims?.departmentId ?? null" :my-id="claims?.userId ?? ''" @done="load"
           />
 
           <!-- trình dự thảo: lần đầu, hoặc trình lại sau khi bị trả lại -->
-          <section v-if="canEdit" class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
+          <section v-if="canEdit" class="card overflow-hidden border-brand-200">
             <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
               <h2 class="text-sm font-semibold text-brand-900">{{ t('doc.submitTitle') }}</h2>
             </div>
@@ -432,7 +492,7 @@ watch(lastPush, (n)=>{
               <div class="text-sm text-stone-500">{{ t('doc.verifyCode') }}</div>
               <div class="font-mono text-lg font-semibold tracking-wider text-stone-900" data-testid="verify-code">{{ verifyCode }}</div>
             </div>
-            <a :href="`/xac-thuc/${doc.verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} ↗</a>
+            <a :href="`/xac-thuc/${doc.verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
           </section>
 
           <!-- gửi trong hệ thống (F3.12): chưa phát hành thì là danh sách sẽ gửi, phát hành rồi thì trạng thái từng đơn vị -->
@@ -464,7 +524,7 @@ watch(lastPush, (n)=>{
                 <div class="text-sm text-stone-500">{{ t('doc.dispatch.sourceCode') }}</div>
                 <div class="font-mono text-lg font-semibold tracking-wider text-stone-900" data-testid="source-code">{{ fmtVerifyCode(doc.dispatch_in.source_verify_code) }}</div>
               </div>
-              <a :href="`/xac-thuc/${doc.dispatch_in.source_verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} ↗</a>
+              <a :href="`/xac-thuc/${doc.dispatch_in.source_verify_code}`" target="_blank" rel="noopener" class="btn-secondary">{{ t('doc.verifyOpen') }} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
             </div>
             <p v-if="sourceMatch === true" class="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-800" data-testid="source-hash">
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -515,16 +575,16 @@ watch(lastPush, (n)=>{
             <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.files') }}</h2>
             <p v-if="!doc.files.length" class="text-sm text-stone-500">{{ t('doc.noFiles') }}</p>
             <ul v-else class="divide-y divide-stone-100">
-              <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file.id" class="flex items-center gap-3 py-2 text-sm">
+              <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file.id" class="sg-document-file flex items-center gap-3 py-2 text-sm">
                 <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5" /></svg>
-                <span class="min-w-0 flex-1 truncate">{{ f.file.filename }}</span>
+                <span class="sg-file-name min-w-0 flex-1 break-words">{{ f.file.filename }}</span>
                 <span v-if="f.file.encrypted" class="chip gap-1 bg-stone-800 text-white" :title="t('doc.sealedHint')" data-testid="file-sealed">
                   <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" /></svg>
                   {{ t('doc.sealed') }}
                 </span>
                 <span class="chip bg-stone-100 text-stone-600">{{ t(`doc.fileRole.${f.role}`) }}</span>
                 <span class="text-xs text-stone-500">{{ fmtSize(f.file.size_bytes) }}</span>
-                <button class="btn-ghost text-brand-800" @click="download(f.file.id, f.file.filename).catch((e) => notice.error(errorText(t, e)))">{{ t('doc.download') }}</button>
+                <button class="btn-ghost text-brand-800" :aria-label="t('doc.downloadNamed', { name: f.file.filename })" @click="download(f.file.id, f.file.filename).catch((e) => notice.error(errorText(t, e)))">{{ t('doc.download') }}</button>
               </li>
             </ul>
           </section>
@@ -535,7 +595,7 @@ watch(lastPush, (n)=>{
             <p class="mb-3 text-xs text-stone-500">{{ t('doc.viewersHint') }}</p>
             <p v-if="!viewers.length" class="text-sm text-stone-500">{{ t('doc.viewersEmpty') }}</p>
             <ul v-else class="mb-3 divide-y divide-stone-100">
-              <li v-for="v in viewers" :key="v.user_id" class="flex items-center gap-3 py-2 text-sm">
+              <li v-for="v in viewers" :key="v.user_id" class="sg-document-file flex items-center gap-3 py-2 text-sm">
                 <span class="min-w-0 flex-1">
                   <span class="font-medium">{{ nameOf(v.user_id) }}</span>
                   <span class="block text-xs text-stone-500">{{ t('doc.viewerBy', { by: nameOf(v.granted_by), at: fmtDateTime(v.granted_at) }) }}</span>
@@ -583,23 +643,23 @@ watch(lastPush, (n)=>{
 
         <!-- dòng thời gian -->
         <aside class="card h-fit p-5">
-          <div role="tablist" class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold">
+          <div role="tablist" :aria-label="t('doc.activity')" class="sg-document-tabs mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold" @keydown="sideKey">
             <button
-              role="tab" :aria-selected="side === 'timeline'" class="-mb-px border-b-2 pb-2"
+              id="document-timeline-tab" ref="timelineTab" role="tab" aria-controls="document-timeline" :tabindex="side === 'timeline' ? 0 : -1" :aria-selected="side === 'timeline'" class="-mb-px border-b-2 pb-2"
               :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
               @click="side = 'timeline'"
             >
               {{ t('doc.timeline') }}
             </button>
             <button
-              role="tab" :aria-selected="side === 'history'" class="-mb-px border-b-2 pb-2"
+              id="document-history-tab" ref="historyTab" role="tab" aria-controls="document-history" :tabindex="side === 'history' ? 0 : -1" :aria-selected="side === 'history'" class="-mb-px border-b-2 pb-2"
               :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
               @click="openHistory"
             >
               {{ t('doc.history') }}
             </button>
           </div>
-          <ol v-if="side === 'timeline'" class="relative space-y-5 border-l border-stone-200 pl-5" data-testid="timeline">
+          <ol id="document-timeline" v-show="side === 'timeline'" role="tabpanel" aria-labelledby="document-timeline-tab" tabindex="0" class="relative space-y-5 border-l border-stone-200 pl-5" data-testid="timeline">
             <li v-for="(item, i) in timeline" :key="item.key" class="relative">
               <span class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white" :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'" />
               <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
@@ -607,7 +667,9 @@ watch(lastPush, (n)=>{
               <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
             </li>
           </ol>
-          <div v-else data-testid="history">
+          <div id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab" tabindex="0" :aria-busy="historyLoading" data-testid="history">
+            <p v-if="historyLoading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+            <div v-if="historyFailure" class="text-sm" role="alert">{{ historyFailure }} <button class="btn-secondary mt-2" @click="openHistory">{{ t('app.retry') }}</button></div>
             <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
             <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
             <ol class="space-y-4">
