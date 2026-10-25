@@ -124,7 +124,7 @@
           "items": {"enum": ["office.document.received", "office.document.registered", "office.document.issued"]}
         },
         "webhook": {
-          "description": "Hasura gọi http://app-<tên>:<port><path> trong mạng nội bộ — không có route ra ngoài",
+          "description": "Hasura gọi qua cổng hook nội bộ của APISIX tới http://app-<tên>:<port><path>, không ra ngoài",
           "type": "object",
           "additionalProperties": false,
           "required": ["port", "path"],

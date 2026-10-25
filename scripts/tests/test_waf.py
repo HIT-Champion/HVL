@@ -324,12 +324,17 @@ class RulesTest(unittest.TestCase):
             want = token_ids | ({"932000-932999"} if target == "REQUEST_COOKIES:KC_AUTH_SESSION_HASH" else set())
             self.assertEqual(ids, want, target)
         self.assertNotIn("ARGS:username", realm)
-        # đổi mã lấy token (#162): code và code_verifier, chỉ trên endpoint token, cùng ba luật
+        # đổi mã lấy token (#162): code và code_verifier, chỉ trên endpoint token, cùng ba luật. client_secret: phần
+        # máy chủ của ứng dụng cài bằng manifest (mạng apps) lấy token client credentials qua cổng, bí mật base64url
+        # 32 byte như verifier đã đo
         exchange = self.exclusion("10011")
         self.assertIn('"@streq /realms/${{MOC_REALM}}/protocol/openid-connect/token" "id:10011,', self.directives)
         self.assertEqual(re.findall(r"ctl:([^,\"]+)", exchange),
-                         [f"ruleRemoveTargetById={i};ARGS:{a}" for a in ("code", "code_verifier")
+                         [f"ruleRemoveTargetById={i};ARGS:{a}" for a in ("code", "code_verifier", "client_secret")
                           for i in ("942100", "933000-933999", "930120")])
+        self.assertIn('want["MOC_CLIENT_SECRET"] = secrets.token_urlsafe(32)', read(ROOT / "scripts" / "ung_dung.py"))
+        self.assertRegex(read(ROOT / "apps" / "bang-tin" / "server.py"),
+                         r'"grant_type": "client_credentials", "client_id": [^\n]*\n\s*"client_secret": ')
         # trang ứng dụng nhận lại code, session_state từ Keycloak: cùng ba luật, iss giữ hai luật URL như cũ
         page = self.exclusion("10020")
         self.assertEqual(re.findall(r"ctl:([^,\"]+)", page),

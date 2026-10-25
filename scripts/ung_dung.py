@@ -25,12 +25,16 @@
 Trạng thái mong muốn nằm trong `.moc-apps/` của thư mục chạy (ngoài git): bản ghi từng ứng dụng đã cài
 (`apps/<tên>.json`: manifest đã kiểm, SQL migration, image) và các tệp dựng từ bản ghi + tệp lõi:
   - `apisix.yaml`: `platform/apisix/apisix.yaml` chép nguyên văn, chèn upstream và route của ứng dụng (trước route bắt
-    mọi đường của app-office). Ghi đè TẠI CHỖ: APISIX gắn từng tệp, mỗi giây so mtime và tự nạp lại; tệp mới đổi tên
-    vào chỗ thì container không thấy (inode cũ). Lúc đang ghi APISIX thấy thiếu dấu #END và giữ cấu hình cũ;
-  - `hasura-metadata/`: `db/metadata` chép nguyên văn + bảng, quyền, quan hệ của ứng dụng + event trigger. Image
-    cli-migrations của Hasura áp lại thư mục này mỗi lần khởi động: phần của ứng dụng sống qua khởi động lại;
+    mọi đường của app-office): trang GET/HEAD ở cổng công khai; ứng dụng nghe sự kiện có thêm route hook POST
+    /su-kien/<tên> chỉ khớp ở cổng hook 9081 (không publish), viết lại đúng về đường webhook của ứng dụng. Ghi đè TẠI
+    CHỖ: APISIX gắn từng tệp, mỗi giây so mtime và tự nạp lại; tệp mới đổi tên vào chỗ thì container không thấy (inode
+    cũ). Lúc đang ghi APISIX thấy thiếu dấu #END và giữ cấu hình cũ;
+  - `hasura-metadata/`: `db/metadata` chép nguyên văn + bảng, quyền, quan hệ của ứng dụng + event trigger (webhook
+    http://apisix:9081/su-kien/<tên>: Hasura chỉ ở mạng `moc`, ứng dụng chỉ ở `apps`). Image cli-migrations của Hasura
+    áp lại thư mục này mỗi lần khởi động: phần của ứng dụng sống qua khởi động lại;
   - `docker-compose.apps.yml`: tệp phủ — bind mount của apisix, hasura trỏ sang hai mục trên, bí mật header webhook cho
-    hasura (env_file), service app-<tên> của từng ứng dụng. `COMPOSE_FILE` trong .env thêm tệp này;
+    hasura (env_file), service app-<tên> của từng ứng dụng ở mạng `apps` (chỉ tới được APISIX: token Keycloak, GraphQL
+    đi qua cổng công khai http://apisix:9080 như trình duyệt). `COMPOSE_FILE` trong .env thêm tệp này;
   - `hasura.env`, `<tên>.env` (0600): bí mật sinh lúc cài — không nằm trong manifest, không in ra.
 CSDL ghi trạng thái đã áp: `core.apps`, `core.app_migrations` (migration 1792281603200, có sổ kiểm toán).
 
@@ -39,8 +43,9 @@ Migration của ứng dụng chạy trên một phiên psql mà session user là
 `core`, `office`, `personal`; LOGIN chỉ trong lúc chạy migration). RESET ROLE hay SQL động không leo lên được vai trò
 khác; đối tượng tạo ra vẫn thuộc vai trò đó. Cuối mỗi migration, cùng giao dịch, `moc_app.migration_done()` kiểm các
 đối tượng trong schema (không dựa vào bảng, hàm ngoài schema; hàm của ứng dụng thành SECURITY DEFINER) — vì Hasura đọc,
-ghi bảng ứng dụng bằng superuser `moc`. Vẫn là ứng dụng ĐÃ TIN: container của nó ở mạng nội bộ `moc`. Gỡ ứng dụng không
-xóa dữ liệu (schema, các dòng, vai trò CSDL còn nguyên).
+ghi bảng ứng dụng bằng superuser `moc`. Vẫn là ứng dụng ĐÃ TIN (mã chạy không bị kiểm), nhưng container của nó chỉ ở
+mạng `apps`: tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như trình duyệt. Gỡ ứng dụng không xóa dữ
+liệu (schema, các dòng, vai trò CSDL còn nguyên).
 
 Thoát 0: xong; 1: bị từ chối (manifest sai, xung đột) hoặc một bước lỗi — in rõ bước nào, sửa rồi chạy lại; 2: không gọi
 được Signet (CSDL, Keycloak, Docker).
@@ -81,6 +86,14 @@ CORE_GATEWAY = "platform/apisix/apisix.yaml"
 CORE_METADATA = "db/metadata"
 SCHEMA = "scripts/app-manifest.schema.json"
 FORMAT = 1                                   # định dạng bản ghi .moc-apps/apps/<tên>.json
+# Container ứng dụng chỉ ở mạng `apps` (docker-compose.yml), chỉ tới được APISIX: gọi lõi qua cổng công khai như trình
+# duyệt; Hasura (mạng `moc`) giao sự kiện qua cổng hook 9081 — node_listen trong platform/apisix/config.yaml, không
+# publish (test kiểm cả hai phía)
+APP_NETWORK = "apps"
+GATEWAY_URL = "http://apisix:9080"
+HOOK_PORT = 9081
+HOOK_URL = f"http://apisix:{HOOK_PORT}"
+HOOK_PREFIX = "/su-kien"                      # route hook: POST /su-kien/<tên>, chỉ ở cổng HOOK_PORT
 
 # Danh sách trắng sự kiện của lõi: PHẢI trùng mảng trong core.app_events_publish() (migration 1792281603200; test kiểm)
 EVENT_KINDS = ("office.document.received", "office.document.registered", "office.document.issued")
@@ -100,7 +113,7 @@ RESERVED_PATHS = {
     "/metrics", "/flowable-rest", "/status", "/ca-nhan", "/config", "/favicon",
     "/cam-bien", "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
     "/so-kiem-toan", "/tim-kiem", "/trang-thai", "/tu-chan-doan", "/van-ban", "/van-ban-den", "/van-ban-di",
-    "/xac-thuc", "/ung-dung",
+    "/xac-thuc", "/ung-dung", "/su-kien",
 }
 # Biến môi trường do lõi đặt cho container ứng dụng; manifest không ghi đè được
 PROVIDED_ENV = {"MOC_REALM", "MOC_APP_NAME", "MOC_APP_PATH", "MOC_KEYCLOAK_INTERNAL_URL", "MOC_GRAPHQL_INTERNAL_URL",
@@ -413,7 +426,8 @@ def check_manifest(m: dict[str, Any], base: pathlib.Path, schema: dict[str, Any]
     if test and test[0] not in ("CMD", "CMD-SHELL"):
         errors.append("healthcheck.test: phần tử đầu phải là CMD hoặc CMD-SHELL")
     if "events" in m and m["events"]["webhook"]["port"] == m["port"]:
-        errors.append("events.webhook.port: phải khác port của trang (cổng webhook không có route qua APISIX)")
+        errors.append("events.webhook.port: phải khác port của trang (trang có route ở cổng công khai; webhook chỉ "
+                      "có route ở cổng hook nội bộ của APISIX)")
     if "build" in m["image"]:
         try:
             folder = _inside(base, m["image"]["build"], "image.build")
@@ -465,9 +479,23 @@ def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str,
 
 # ---------------------------------------------------------------------------------------- sinh tệp (hàm thuần)
 
+def hook_id(name: str) -> str:
+    """id upstream, route hook của ứng dụng: không trùng được `app-<tên>` của ứng dụng nào (mọi id đó mở đầu `app-`)."""
+    return f"su-kien-app-{name}"
+
+
+def hook_uri(name: str) -> str:
+    return f"{HOOK_PREFIX}/{name}"
+
+
 def gateway_text(core: str, apps: list[dict[str, Any]]) -> str:
     """Tệp chạy của APISIX: tệp lõi nguyên văn; upstream của ứng dụng chèn ngay sau `upstreams:`, route chèn ngay trước
-    route `app-office` (bắt mọi đường, priority -10). Không ứng dụng nào: trả đúng tệp lõi."""
+    route `app-office` (bắt mọi đường, priority -10). Không ứng dụng nào: trả đúng tệp lõi.
+
+    Ứng dụng nghe sự kiện có thêm route hook: đúng một đường POST /su-kien/<tên>, chỉ khớp khi yêu cầu tới cổng hook
+    (server_port 9081, không publish — cổng công khai 9080 trả 404), viết lại về đúng đường webhook của ứng dụng trên
+    cổng webhook của nó. Không gỡ, không thêm header: X-Moc-Hook-Secret của Hasura tới ứng dụng nguyên vẹn, ứng dụng
+    vẫn tự kiểm."""
     if not apps:
         return core
     lines = core.splitlines(keepends=True)
@@ -488,6 +516,15 @@ def gateway_text(core: str, apps: list[dict[str, Any]]) -> str:
         n = app["name"]
         ups.append(f"  # moc app install: {n} (.moc-apps/apps/{n}.json)\n  - id: app-{n}\n    type: roundrobin\n"
                    f"    nodes:\n      \"app-{n}:{app['port']}\": 1\n")
+        if app.get("events"):
+            ev, h = app["events"], hook_id(n)
+            ups.append(f"  # moc app install: {n} — cổng webhook, chỉ route hook {h} tới\n  - id: {h}\n"
+                       f"    type: roundrobin\n    nodes:\n      \"app-{n}:{ev['port']}\": 1\n")
+            rts.append(f"  # moc app install: {n} — webhook sự kiện: chỉ ở cổng hook {HOOK_PORT} (không publish), "
+                       "đúng một đường, header bí mật đi nguyên tới ứng dụng\n"
+                       f"  - id: {h}\n    uri: {hook_uri(n)}\n    methods: [POST]\n"
+                       f"    vars: [[\"server_port\", \"==\", \"{HOOK_PORT}\"]]\n    upstream_id: {h}\n"
+                       f"    plugins:\n      proxy-rewrite:\n        uri: {json.dumps(ev['path'])}\n\n")
         rts.append(f"  # moc app install: {n} — trang tĩnh, không cần token; dữ liệu đi qua route của lõi ở trên\n"
                    f"  - id: app-{n}\n    uris: [\"{app['path']}\", \"{app['path']}/*\"]\n    methods: [GET, HEAD]\n"
                    f"    upstream_id: app-{n}\n\n")
@@ -501,13 +538,15 @@ def table_file(app: dict[str, Any], table: dict[str, Any]) -> str:
 def event_trigger(app: dict[str, Any]) -> dict[str, Any]:
     """Thân sự kiện chuẩn của Hasura, không request_transform: Hasura v2.51 ghi cả yêu cầu gốc (kèm header bí mật) vào
     nhật ký container khi trigger có transform (đã đo). Mọi loại trong danh sách trắng đều tới; ứng dụng tự bỏ loại
-    không nghe (MOC_APP_EVENT_KINDS). session_variables là null: lõi xóa người làm trước khi ghi core.app_events."""
+    không nghe (MOC_APP_EVENT_KINDS). session_variables là null: lõi xóa người làm trước khi ghi core.app_events.
+    Hasura (mạng `moc`) không tới thẳng được container ứng dụng (mạng `apps`): gọi route hook của APISIX, route đó
+    viết lại về http://app-<tên>:<port><path> của manifest (gateway_text)."""
     ev = app["events"]
     return {
         "name": service_role(app["name"]),
         "definition": {"enable_manual": False, "insert": {"columns": "*"}},
         "retry_conf": ev["retry"],
-        "webhook": f"http://app-{app['name']}:{ev['port']}{ev['path']}",
+        "webhook": f"{HOOK_URL}{hook_uri(app['name'])}",
         "headers": [{"name": HOOK_HEADER, "value_from_env": hook_env(app["name"])}],
     }
 
@@ -564,15 +603,15 @@ def overlay(apps: list[dict[str, Any]]) -> dict[str, Any]:
         n = app["name"]
         svc: dict[str, Any] = {
             "image": app["image"], "pull_policy": "never" if app.get("build") else "missing",
-            "profiles": ["app"], "restart": "unless-stopped", "networks": ["moc"],
+            "profiles": ["app"], "restart": "unless-stopped", "networks": [APP_NETWORK],
             "logging": {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}},
             "read_only": app.get("read_only", True), "tmpfs": ["/tmp"], "cap_drop": ["ALL"],
             "security_opt": ["no-new-privileges:true"],
             "mem_limit": app["memory"], "cpus": 1.0,
             "environment": {**{k: literal(v) for k, v in app["environment"].items()},
                             "MOC_REALM": "${MOC_REALM:-moc}", "MOC_APP_NAME": n,
-                            "MOC_APP_PATH": app["path"], "MOC_KEYCLOAK_INTERNAL_URL": "http://keycloak:8080",
-                            "MOC_GRAPHQL_INTERNAL_URL": "http://hasura:8080/v1/graphql"},
+                            "MOC_APP_PATH": app["path"], "MOC_KEYCLOAK_INTERNAL_URL": GATEWAY_URL,
+                            "MOC_GRAPHQL_INTERNAL_URL": f"{GATEWAY_URL}/v1/graphql"},
             "env_file": [f"{STATE}/{n}.env"],
         }
         if app.get("events"):

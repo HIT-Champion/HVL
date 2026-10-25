@@ -386,17 +386,20 @@ class Migrations(unittest.TestCase):
 
 
 class Gateway(unittest.TestCase):
-    UPSTREAM = re.compile(r"  # moc app install: [^\n]*\n  - id: app-[a-z0-9-]+\n    type: roundrobin\n    nodes:\n"
-                          r"      [^\n]*\n")
+    UPSTREAM = re.compile(r"  # moc app install: [^\n]*\n  - id: (?:su-kien-)?app-[a-z0-9-]+\n    type: roundrobin\n"
+                          r"    nodes:\n      [^\n]*\n")
     ROUTE = re.compile(r"  # moc app install: [^\n]*\n  - id: app-[a-z0-9-]+\n    uris: [^\n]*\n    methods: [^\n]*\n"
                        r"    upstream_id: [^\n]*\n\n")
+    HOOK = re.compile(r"  # moc app install: [^\n]*\n  - id: su-kien-app-[a-z0-9-]+\n    uri: [^\n]*\n"
+                      r"    methods: \[POST\]\n    vars: [^\n]*\n    upstream_id: [^\n]*\n    plugins:\n"
+                      r"      proxy-rewrite:\n        uri: [^\n]*\n\n")
 
     def setUp(self) -> None:
         self.core = (REPO / u.CORE_GATEWAY).read_text(encoding="utf-8")
 
     def strip(self, text: str) -> str:
         """Bỏ đúng các khối đã chèn → phải còn lại tệp lõi, từng byte."""
-        return self.ROUTE.sub("", self.UPSTREAM.sub("", text))
+        return self.HOOK.sub("", self.ROUTE.sub("", self.UPSTREAM.sub("", text)))
 
     def test_no_app_is_byte_identical(self) -> None:
         self.assertEqual(u.gateway_text(self.core, []), self.core)
@@ -412,7 +415,20 @@ class Gateway(unittest.TestCase):
         self.assertGreater(app_route, lines.index("  - id: chan"))
         self.assertEqual(lines[lines.index("upstreams:") + 2], "  - id: app-bang-tin")
         self.assertIn('    uris: ["/bang-tin", "/bang-tin/*"]', lines)
-        self.assertNotIn("8081", text)                              # cổng webhook không có route
+        # cổng webhook chỉ có trong upstream của route hook; route đó chỉ khớp ở cổng hook 9081, đúng một đường
+        self.assertEqual(text.count("8081"), 1)
+        self.assertIn('      "app-bang-tin:8081": 1', lines)
+        hook = text[text.index("  - id: su-kien-app-bang-tin\n    uri:"):]
+        hook = hook[:hook.index("\n\n")]
+        self.assertEqual(hook.splitlines()[1:], [
+            "    uri: /su-kien/bang-tin", "    methods: [POST]", '    vars: [["server_port", "==", "9081"]]',
+            "    upstream_id: su-kien-app-bang-tin", "    plugins:", "      proxy-rewrite:", '        uri: "/su-kien"'])
+
+    def test_app_without_events_has_no_hook(self) -> None:
+        text = u.gateway_text(self.core, [record(events=None)])
+        self.assertEqual(self.strip(text), self.core)
+        self.assertNotIn("su-kien-app-", text)
+        self.assertNotIn("server_port", text)
 
     def test_unknown_core_blocks_survive(self) -> None:
         """Như bản WAF của việc 88: global rule lạ, chuỗi nhiều dòng có chữ giống mốc — vẫn chép nguyên văn."""
@@ -468,7 +484,8 @@ class Metadata(unittest.TestCase):
         self.assertEqual(table, rec["tables"][0])
         events = yaml_nho.loads(tree["databases/default/tables/core_app_events.yaml"].decode())
         trigger = events["event_triggers"][0]
-        self.assertEqual(trigger["webhook"], "http://app-bang-tin:8081/su-kien")
+        # Hasura (mạng moc) tới ứng dụng (mạng apps) chỉ qua route hook của APISIX ở cổng nội bộ 9081
+        self.assertEqual(trigger["webhook"], "http://apisix:9081/su-kien/bang-tin")
         self.assertEqual(trigger["headers"], [{"name": "X-Moc-Hook-Secret", "value_from_env": "MOC_APP_HOOK_BANG_TIN"}])
         self.assertNotIn("value", trigger["headers"][0])                     # bí mật không nằm trong metadata
         includes = yaml_nho.loads(tree["databases/default/tables/tables.yaml"].decode())
@@ -503,7 +520,10 @@ class Compose(unittest.TestCase):
                          ["./.moc-apps/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro"])
         self.assertEqual(data["services"]["hasura"]["volumes"], ["./.moc-apps/hasura-metadata:/hasura-metadata:ro"])
         app = data["services"]["app-bang-tin"]
-        self.assertEqual((app["profiles"], app["networks"], app["pull_policy"]), (["app"], ["moc"], "never"))
+        self.assertEqual((app["profiles"], app["networks"], app["pull_policy"]), (["app"], ["apps"], "never"))
+        env = app["environment"]                                            # lõi chỉ qua cổng công khai
+        self.assertEqual((env["MOC_KEYCLOAK_INTERNAL_URL"], env["MOC_GRAPHQL_INTERNAL_URL"]),
+                         ("http://apisix:9080", "http://apisix:9080/v1/graphql"))
         self.assertTrue(app["read_only"])
         self.assertEqual((app["cap_drop"], app["mem_limit"], app["cpus"]), (["ALL"], "96m", 1.0))
         self.assertEqual(app["security_opt"], ["no-new-privileges:true"])
@@ -526,7 +546,8 @@ class Compose(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:            # compose thật đọc tệp phủ thật, .env có giá trị giả
             root = pathlib.Path(tmp)
             (root / "docker-compose.yml").write_text("services:\n  hasura:\n    image: busybox\n  apisix:\n"
-                                                     "    image: busybox\nnetworks:\n  moc: {}\n", encoding="utf-8")
+                                                     "    image: busybox\nnetworks:\n  moc: {}\n  apps: {}\n",
+                                                     encoding="utf-8")
             (root / (".e" + "nv")).write_text("HASURA_ADMIN_SECRET=GIA-khoa\nPOSTGRES_PASSWORD=GIA-mk\n",
                                              encoding="utf-8")
             (root / ".moc-apps").mkdir()
