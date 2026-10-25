@@ -91,6 +91,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Bản cài (`make install`) thiếu `scripts/nap_lo_mau.py` mà `scripts/demo.py` import ở đầu tệp, nên mọi lệnh `demo.py`
   ở `/opt/moc` dừng với `ModuleNotFoundError` (#174; thấy khi nâng bản online lên 1.1.0). Thêm tệp vào `RUNTIME` của
   `scripts/install.sh`; test mới kiểm mọi script Python được cài có đủ module cục bộ nó import, kể cả import trong hàm.
+- `make install` trên máy chưa từng chạy `make up` dừng ở bước kiểm cuối "thiếu image moc/apisix:dev" (#186):
+  Makefile truyền `MOC_VERSION` rỗng, compose ưu tiên biến môi trường đã đặt (kể cả rỗng) hơn `.env` của bản cài
+  nên bước kiểm tìm thẻ `dev` thay vì thẻ vừa dựng. Bước kiểm nay đặt đúng phiên bản như lúc dựng. Test scripts +3
+  (`install.sh` thật với `docker` giả theo thứ tự ưu tiên của compose).
+- Trợ lý hỏi đáp không còn để văn bản mới chờ véc-tơ mãi khi có người hỏi liên tục (#184; smoke F4.2 trượt trên bản
+  online 1.1.0). Mỗi lượt hỏi giữ vòng nhúng nền 5 giây; người hỏi lại dày hơn thế (smoke hỏi lại mỗi khoảng 3 giây)
+  thì đoạn mới không được nhúng, không tìm được theo nghĩa, dù Ollama nhúng 4 đoạn chỉ mất 5 giây. Nay chuỗi giữ liền
+  quá 30 giây (`MAX_HOLD_S`) thì vòng nền vẫn nhúng một lô rồi lại nhường. Test svc-files thêm ca hỏi lại mỗi 3 giây.
 - Hoàn thành việc không còn lỗi "Đã lưu, nhưng chưa chuyển được bước tiếp" khi worker gợi ý giao việc cùng lúc hoàn
   thành việc ngoài trên cùng phiên quy trình (#189; thấy trong CI, `make demo-giao-viec`): Flowable khóa lạc quan,
   hủy một giao dịch và trả 500 kèm `FlowableOptimisticLockingException`. `svc-workflow` nay gọi lại tối đa 2 lần
