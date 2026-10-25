@@ -130,6 +130,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `make demo-log-tap-trung` thêm Hasura vào chuỗi cùng mã, và kiểm một câu SQL lỗi có giá trị giả cùng một lần đăng
   nhập bằng tên không có: kho có dòng đã che, không có giá trị đó. `make logs-up`, `make logs-down` giờ tạo lại cả
   CSDL, Hasura, Keycloak (gián đoạn vài giây), ghi trong `docs/van-hanh.md`. Test scripts +5.
+- Hướng dẫn cài khi máy không kéo được image từ Docker Hub (#219): mạng chặn hoặc hết lượt tải ẩn danh
+  (`toomanyrequests`). `docs/trien-khai.md` mục 2b chỉ cách bật `registry-mirrors` của Docker sang `mirror.gcr.io` (cần
+  `sudo`, nạp lại bằng `systemctl reload docker`). Bộ dựng mặc định của Docker cũng đọc khóa này nên image nền của
+  Dockerfile cũng qua mirror. Mục 2b kèm lệnh chỉ đọc manifest để kiểm các image ghim có trên mirror, và kể các nguồn
+  khác lần cài đầu vẫn cần (`quay.io`, `ghcr.io`, npm, PyPI, Debian, chữ ký ClamAV). Ngày 26/10 cả 21 image Docker Hub
+  ghim digest đều có trên `mirror.gcr.io`, đủ mọi lớp `linux/amd64`. README hai thứ tiếng thêm một dòng ở Xử lý sự cố.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
