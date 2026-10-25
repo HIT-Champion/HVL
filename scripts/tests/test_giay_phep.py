@@ -295,9 +295,9 @@ class SyftPinTest(unittest.TestCase):
         self.assertIn("SYFT_CHECK_FOR_APP_UPDATE=false", out)
         for excluded in ("node_modules", ".venv", "dist", ".git"):
             self.assertRegex(out, rf"--exclude '\./(\*\*/)?{re.escape(excluded)}/\*\*'")
-        self.assertIn("> dist/moc-1.1.0.cdx.json.tmp", out)
-        self.assertIn("sha256sum moc-1.1.0.cdx.json > moc-1.1.0.cdx.json.sha256", out)
-        self.assertIn("python3 scripts/license_audit.py dist/moc-1.1.0.cdx.json", out)
+        self.assertIn("> dist/signet-1.1.0.cdx.json.tmp", out)
+        self.assertIn("sha256sum signet-1.1.0.cdx.json > signet-1.1.0.cdx.json.sha256", out)
+        self.assertIn("python3 scripts/license_audit.py dist/signet-1.1.0.cdx.json", out)
 
 
 if __name__ == "__main__":

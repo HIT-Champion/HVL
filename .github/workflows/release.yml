@@ -76,13 +76,14 @@ jobs:
           V: ${{ steps.ver.outputs.version }}
         run: |
           mkdir -p dist
-          git archive --format=tar.gz --prefix="moc-$V/" \
-                      -o "dist/moc-$V.tar.gz" "$GITHUB_REF_NAME"
-          ( cd dist && sha256sum "moc-$V.tar.gz" > "moc-$V.tar.gz.sha256" )
+          git archive --format=tar.gz --prefix="signet-$V/" \
+                      -o "dist/signet-$V.tar.gz" "$GITHUB_REF_NAME"
+          ( cd dist && sha256sum "signet-$V.tar.gz" > "signet-$V.tar.gz.sha256" )
 
       # Danh mục thành phần (SBOM CycloneDX, Syft) của đúng cây mã nguồn được gắn thẻ, kèm .sha256: người dùng biết bản
       # phát hành kéo theo những gói npm, Python, action nào, giấy phép gì, và đối chiếu được với cơ sở dữ liệu lỗ hổng
-      # (osv-scanner scan source -L moc-X.Y.Z.cdx.json) mà không cần dựng. Cùng lệnh với job "Giấy phép (PoF #2)" của CI
+      # (osv-scanner scan source -L signet-X.Y.Z.cdx.json) mà không cần dựng. Cùng lệnh với job "Giấy phép (PoF #2)"
+      # của CI
       - name: Sinh SBOM CycloneDX (make sbom)
         env:
           V: ${{ steps.ver.outputs.version }}

@@ -159,10 +159,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `.sha256` (GitHub tự gắn "Source code (zip)" vào mọi bản phát hành mà không gỡ được, PoF #3), phần tóm tắt viết
   ngay dưới tiêu đề phiên bản trong CHANGELOG, rồi toàn bộ ghi chép gập lại. Dòng tiếp nối được nối lại: GitHub hiện
   mỗi dấu xuống dòng của mô tả Release thành một dòng mới. Mục [1.0.0], [0.1.0] thêm phần tóm tắt. Test scripts +6.
-- Lịch phát hành: `v1.0.0` (23/10) là bản cho vòng trường, bản nộp chấm là `v1.1.0` (03/12); sau `v1.1.0`, mỗi bản
-  sửa lỗi gộp vào `develop` đi kèm một bản vá để lúc chấm `develop` và `main` cùng nội dung. `docs/git_flow.md` ghi
-  lệnh thiết lập repo (merge commit, bật secret scanning) và lý do giữ `develop` làm nhánh mặc định; mục 11 ghi đúng
+- Lịch phát hành: `v1.0.0` (23/10); `v1.1.0` trước vòng trường 01/11; bản nộp chấm là `v1.2.0` (03/12); sau `v1.2.0`,
+  mỗi bản sửa lỗi gộp vào `develop` đi kèm một bản vá để lúc chấm `develop` và `main` cùng nội dung. `docs/git_flow.md`
+  ghi lệnh thiết lập repo (merge commit, bật secret scanning) và lý do giữ `develop` làm nhánh mặc định; mục 11 ghi đúng
   mốc chuyển quy trình (sau `v1.0.0`) và việc các lượt chạy cũ đã bị xóa khỏi trang Actions.
+- Gói phát hành đổi tên `moc-X.Y.Z.tar.gz` → `signet-X.Y.Z.tar.gz` (cả SBOM `.cdx.json` và `.sha256`) theo tên sản phẩm;
+  tên mã `moc` trong mã, image, dịch vụ giữ nguyên. Gói của `v0.1.0`, `v1.0.0` giữ tên cũ (không gắn lại thẻ).
 - Tài liệu phục vụ cuộc thi chuyển vào `docs/du-thi/` (phân tích đề, tóm tắt thể lệ, bảng tự chấm PoF, kế hoạch
   phát triển, thư mục `nghien-cuu/`), kèm trang mục lục; `docs/` chỉ còn tài liệu về sản phẩm. Mọi liên kết và chỗ
   nhắc đường dẫn (README, đặc tả, mô hình dữ liệu, README dịch vụ, chú thích BPMN và `flowable.py`) đã sửa theo.
