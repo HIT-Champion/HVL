@@ -15,6 +15,7 @@ chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi 
 | `tests/` | Test kiểm form trên bộ ca thử dùng chung `schemas/*.cases.json` (`npm test`, Node 24) |
 | `app/components/NotificationBell.vue` | Chuông: số chưa đọc, 20 tin mới nhất, đánh dấu đã đọc |
 | `app/components/FeedbackButton.vue` | Nút Góp ý trên thanh trên: mức hài lòng 1–5, vài dòng, tự gắn khuôn đường dẫn màn hình đang dùng (`app/utils/feedback.ts`) |
+| `app/pages/tu-chan-doan.vue`, `app/data/tu-chan-doan.json`, `app/utils/hpdi.ts` | Tự chẩn đoán H-P-D-I cho lãnh đạo (F4.7, `docs/tu-chan-doan.md`): bộ câu kèm JSON Schema (`app/data/tu-chan-doan.schema.json`), cách chấm, bằng chứng đo được từ các view đã có, radar qua `EChart.vue` |
 | `app/locales/` | Tiếng Việt, tiếng Anh |
 | `nginx/` | Cấu hình phục vụ: CSP chặt, `/config.json` đọc realm từ biến môi trường |
 

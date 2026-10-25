@@ -54,3 +54,4 @@
 - "!include office_v_feedback_summary.yaml"
 - "!include core_import_jobs.yaml"
 - "!include core_import_rows.yaml"
+- "!include office_maturity_assessments.yaml"

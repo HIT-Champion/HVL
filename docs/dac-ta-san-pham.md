@@ -208,6 +208,7 @@ Mã F3.6 bỏ trống vì đã lên Must (F2.13).
 | F4.4 | Che CCCD, số điện thoại trong log và ngữ cảnh gửi mô hình |
 | F4.5 | Ký số PDF (PAdES) bằng PKI nội bộ do OpenBao cấp — **chỉ minh họa**, không có giá trị pháp lý như chữ ký số công cộng |
 | F4.6 | Thu góp ý, đo số liệu "sau" theo §8 |
+| F4.7 | **Tự chẩn đoán H-P-D-I** cho lãnh đạo: bộ câu bốn không gian × 5 mức, radar, bước tiếp theo trỏ phân hệ Signet, bằng chứng đo được từ số liệu của chính đơn vị, lưu lịch sử ([`tu-chan-doan.md`](tu-chan-doan.md)) |
 
 ### 4.4. Không làm
 

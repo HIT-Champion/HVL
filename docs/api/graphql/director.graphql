@@ -1145,6 +1145,20 @@ type mutation_root {
     "upsert condition"
     on_conflict: office_feedback_on_conflict
   ): office_feedback
+  "insert data into the table: \"office.maturity_assessments\""
+  insert_office_maturity_assessments(
+    "the rows to be inserted"
+    objects: [office_maturity_assessments_insert_input!]!
+    "upsert condition"
+    on_conflict: office_maturity_assessments_on_conflict
+  ): office_maturity_assessments_mutation_response
+  "insert a single row into the table: \"office.maturity_assessments\""
+  insert_office_maturity_assessments_one(
+    "the row to be inserted"
+    object: office_maturity_assessments_insert_input!
+    "upsert condition"
+    on_conflict: office_maturity_assessments_on_conflict
+  ): office_maturity_assessments
   "insert data into the table: \"personal.items\""
   insert_personal_items(
     "the rows to be inserted"
@@ -1225,6 +1239,21 @@ type mutation_root {
     "updates to execute, in order"
     updates: [personal_items_updates!]!
   ): [personal_items_mutation_response]
+}
+
+scalar numeric
+
+"Boolean expression to compare columns of type \"numeric\". All fields are combined with logical 'AND'."
+input numeric_comparison_exp {
+  _eq: numeric
+  _gt: numeric
+  _gte: numeric
+  _in: [numeric!]
+  _is_null: Boolean
+  _lt: numeric
+  _lte: numeric
+  _neq: numeric
+  _nin: [numeric!]
 }
 
 "columns and relationships of \"office.assignment_suggestions\""
@@ -3190,6 +3219,237 @@ input office_grant_document_access_args {
   user_id: String
 }
 
+"Tự chẩn đoán mức trưởng thành H-P-D-I của đơn vị: câu trả lời theo mã câu, điểm bốn không gian do CSDL tính, ghi chú; mỗi lần lưu một dòng"
+type office_maturity_assessments {
+  answers(
+    "JSON select path"
+    path: String
+  ): jsonb!
+  created_at: timestamptz!
+  d: numeric!
+  framework: String!
+  h: numeric!
+  i: numeric!
+  id: uuid!
+  note: String
+  p: numeric!
+}
+
+"aggregated selection of \"office.maturity_assessments\""
+type office_maturity_assessments_aggregate {
+  aggregate: office_maturity_assessments_aggregate_fields
+  nodes: [office_maturity_assessments!]!
+}
+
+"aggregate fields of \"office.maturity_assessments\""
+type office_maturity_assessments_aggregate_fields {
+  avg: office_maturity_assessments_avg_fields
+  count(columns: [office_maturity_assessments_select_column!], distinct: Boolean): Int!
+  max: office_maturity_assessments_max_fields
+  min: office_maturity_assessments_min_fields
+  stddev: office_maturity_assessments_stddev_fields
+  stddev_pop: office_maturity_assessments_stddev_pop_fields
+  stddev_samp: office_maturity_assessments_stddev_samp_fields
+  sum: office_maturity_assessments_sum_fields
+  var_pop: office_maturity_assessments_var_pop_fields
+  var_samp: office_maturity_assessments_var_samp_fields
+  variance: office_maturity_assessments_variance_fields
+}
+
+"aggregate avg on columns"
+type office_maturity_assessments_avg_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
+"Boolean expression to filter rows from the table \"office.maturity_assessments\". All fields are combined with a logical 'AND'."
+input office_maturity_assessments_bool_exp {
+  _and: [office_maturity_assessments_bool_exp!]
+  _not: office_maturity_assessments_bool_exp
+  _or: [office_maturity_assessments_bool_exp!]
+  answers: jsonb_comparison_exp
+  created_at: timestamptz_comparison_exp
+  d: numeric_comparison_exp
+  framework: String_comparison_exp
+  h: numeric_comparison_exp
+  i: numeric_comparison_exp
+  id: uuid_comparison_exp
+  note: String_comparison_exp
+  p: numeric_comparison_exp
+}
+
+"unique or primary key constraints on table \"office.maturity_assessments\""
+enum office_maturity_assessments_constraint {
+  "unique or primary key constraint on columns \"id\""
+  maturity_assessments_pkey
+}
+
+"input type for inserting data into table \"office.maturity_assessments\""
+input office_maturity_assessments_insert_input {
+  answers: jsonb
+  framework: String
+  note: String
+}
+
+"aggregate max on columns"
+type office_maturity_assessments_max_fields {
+  created_at: timestamptz
+  d: numeric
+  framework: String
+  h: numeric
+  i: numeric
+  id: uuid
+  note: String
+  p: numeric
+}
+
+"aggregate min on columns"
+type office_maturity_assessments_min_fields {
+  created_at: timestamptz
+  d: numeric
+  framework: String
+  h: numeric
+  i: numeric
+  id: uuid
+  note: String
+  p: numeric
+}
+
+"response of any mutation on the table \"office.maturity_assessments\""
+type office_maturity_assessments_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [office_maturity_assessments!]!
+}
+
+"on_conflict condition type for table \"office.maturity_assessments\""
+input office_maturity_assessments_on_conflict {
+  constraint: office_maturity_assessments_constraint!
+  update_columns: [office_maturity_assessments_update_column!]! = []
+  where: office_maturity_assessments_bool_exp
+}
+
+"Ordering options when selecting data from \"office.maturity_assessments\"."
+input office_maturity_assessments_order_by {
+  answers: order_by
+  created_at: order_by
+  d: order_by
+  framework: order_by
+  h: order_by
+  i: order_by
+  id: order_by
+  note: order_by
+  p: order_by
+}
+
+"select columns of table \"office.maturity_assessments\""
+enum office_maturity_assessments_select_column {
+  "column name"
+  answers
+  "column name"
+  created_at
+  "column name"
+  d
+  "column name"
+  framework
+  "column name"
+  h
+  "column name"
+  i
+  "column name"
+  id
+  "column name"
+  note
+  "column name"
+  p
+}
+
+"aggregate stddev on columns"
+type office_maturity_assessments_stddev_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
+"aggregate stddev_pop on columns"
+type office_maturity_assessments_stddev_pop_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
+"aggregate stddev_samp on columns"
+type office_maturity_assessments_stddev_samp_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
+"Streaming cursor of the table \"office_maturity_assessments\""
+input office_maturity_assessments_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_maturity_assessments_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_maturity_assessments_stream_cursor_value_input {
+  answers: jsonb
+  created_at: timestamptz
+  d: numeric
+  framework: String
+  h: numeric
+  i: numeric
+  id: uuid
+  note: String
+  p: numeric
+}
+
+"aggregate sum on columns"
+type office_maturity_assessments_sum_fields {
+  d: numeric
+  h: numeric
+  i: numeric
+  p: numeric
+}
+
+"placeholder for update columns of table \"office.maturity_assessments\" (current role has no relevant permissions)"
+enum office_maturity_assessments_update_column {
+  "placeholder (do not use)"
+  _PLACEHOLDER
+}
+
+"aggregate var_pop on columns"
+type office_maturity_assessments_var_pop_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
+"aggregate var_samp on columns"
+type office_maturity_assessments_var_samp_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
+"aggregate variance on columns"
+type office_maturity_assessments_variance_fields {
+  d: Float
+  h: Float
+  i: Float
+  p: Float
+}
+
 "columns and relationships of \"office.registers\""
 type office_registers {
   direction: String!
@@ -4651,6 +4911,34 @@ type query_root {
   ): office_feedback_aggregate!
   "fetch data from the table: \"office.feedback\" using primary key columns"
   office_feedback_by_pk(id: uuid!): office_feedback
+  "fetch data from the table: \"office.maturity_assessments\""
+  office_maturity_assessments(
+    "distinct select on columns"
+    distinct_on: [office_maturity_assessments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_maturity_assessments_order_by!]
+    "filter the rows returned"
+    where: office_maturity_assessments_bool_exp
+  ): [office_maturity_assessments!]!
+  "fetch aggregated fields from the table: \"office.maturity_assessments\""
+  office_maturity_assessments_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_maturity_assessments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_maturity_assessments_order_by!]
+    "filter the rows returned"
+    where: office_maturity_assessments_bool_exp
+  ): office_maturity_assessments_aggregate!
+  "fetch data from the table: \"office.maturity_assessments\" using primary key columns"
+  office_maturity_assessments_by_pk(id: uuid!): office_maturity_assessments
   "fetch data from the table: \"office.registers\""
   office_registers(
     "distinct select on columns"
@@ -5403,6 +5691,43 @@ type subscription_root {
     "filter the rows returned"
     where: office_feedback_bool_exp
   ): [office_feedback!]!
+  "fetch data from the table: \"office.maturity_assessments\""
+  office_maturity_assessments(
+    "distinct select on columns"
+    distinct_on: [office_maturity_assessments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_maturity_assessments_order_by!]
+    "filter the rows returned"
+    where: office_maturity_assessments_bool_exp
+  ): [office_maturity_assessments!]!
+  "fetch aggregated fields from the table: \"office.maturity_assessments\""
+  office_maturity_assessments_aggregate(
+    "distinct select on columns"
+    distinct_on: [office_maturity_assessments_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_maturity_assessments_order_by!]
+    "filter the rows returned"
+    where: office_maturity_assessments_bool_exp
+  ): office_maturity_assessments_aggregate!
+  "fetch data from the table: \"office.maturity_assessments\" using primary key columns"
+  office_maturity_assessments_by_pk(id: uuid!): office_maturity_assessments
+  "fetch data from the table in a streaming manner: \"office.maturity_assessments\""
+  office_maturity_assessments_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_maturity_assessments_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_maturity_assessments_bool_exp
+  ): [office_maturity_assessments!]!
   "fetch data from the table: \"office.registers\""
   office_registers(
     "distinct select on columns"
