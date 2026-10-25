@@ -76,6 +76,7 @@ test('tài sản: phông, logo, CSS của trang đăng nhập và của ứng d�
   expect(await fontWeights(login)).toEqual(WEIGHTS)
   expect(await brokenImages(login)).toEqual([])
   expect(loginBad).toEqual([])
+  await login.context().close()
 
   // Ứng dụng: lần tải đầu nằm trong signIn, nên nghe rồi tải lại
   const page = await signIn(browser, 'giangvienktpm')
