@@ -123,6 +123,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `make demo-log-tap-trung` thêm Hasura vào chuỗi cùng mã, và kiểm một câu SQL lỗi có giá trị giả cùng một lần đăng
   nhập bằng tên không có: kho có dòng đã che, không có giá trị đó. `make logs-up`, `make logs-down` giờ tạo lại cả
   CSDL, Hasura, Keycloak (gián đoạn vài giây), ghi trong `docs/van-hanh.md`. Test scripts +5.
+- Hướng dẫn cài khi máy không kéo được image từ Docker Hub (#219): mạng chặn hoặc hết lượt tải ẩn danh
+  (`toomanyrequests`). `docs/trien-khai.md` mục 2b chỉ cách bật `registry-mirrors` của Docker sang `mirror.gcr.io` (cần
+  `sudo`, nạp lại bằng `systemctl reload docker`). Bộ dựng mặc định của Docker cũng đọc khóa này nên image nền của
+  Dockerfile cũng qua mirror. Mục 2b kèm lệnh chỉ đọc manifest để kiểm các image ghim có trên mirror, và kể các nguồn
+  khác lần cài đầu vẫn cần (`quay.io`, `ghcr.io`, npm, PyPI, Debian, chữ ký ClamAV). Ngày 26/10 cả 21 image Docker Hub
+  ghim digest đều có trên `mirror.gcr.io`, đủ mọi lớp `linux/amd64`. README hai thứ tiếng thêm một dòng ở Xử lý sự cố.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
@@ -143,6 +149,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   công khai. Test scripts +9.
 
 ### Đã sửa lỗi
+- Log tập trung không còn mất dòng đầu tiên của dịch vụ im lâu khi kết nối tới Vector đã chết (#226). Driver
+  `fluentd` của Docker gửi mà không chờ Vector báo nhận, nên dòng ghi vào kết nối chết mất mà không báo lỗi. Dịch vụ
+  ghi liên tục tự nối lại ở dòng sau; dịch vụ im lâu như PostgreSQL thì mất đúng dòng lỗi. Bước 8 mới của
+  `make demo-log-tap-trung` khởi động lại Vector rồi đòi dòng ERROR đầu tiên của PostgreSQL sau đó tới kho trong 60
+  giây; trước khi sửa, bước này đỏ trên CI. Driver nay đặt `fluentd-request-ack: "true"`: không có `ack` thì nối lại
+  rồi gửi lại dòng đó. Lỗi chập chờn ở bước 3, 5 của màn này trên CI (dòng có trong `docker logs` mà không tới kho, như
+  lần đỏ của develop ở 1fa6236) khớp với lỗi này, nhưng chưa rõ kết nối chết vì đâu. Job CI lỗi nay giữ thêm nhật ký
+  của Vector, Parseable.
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
   Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura
   đóng thì APISIX nhận EOF hoặc RST và trả 502. Upstream `hasura` nay đặt `keepalive_pool` với `idle_timeout: 25`,
@@ -191,6 +205,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Thẻ `<html lang>` không còn về `vi` khi tải lại trang lúc đang dùng tiếng Anh (#205): chữ vẫn tiếng Anh nhưng trình
   đọc màn hình đọc bằng giọng tiếng Việt. Plugin i18n đặt `lang` theo ngôn ngữ đang dùng qua `useHead`, đè lên giá trị
   ghi cứng trong `nuxt.config.ts`; e2e `tieng-anh.spec.ts` kiểm thêm `lang` sau khi tải lại ở cả hai test.
+- Độ tương phản màu của giao diện Liền mạch theo WCAG 2.2 AA (#212): chữ `text-stone-400` (22 chỗ, phần lớn là chữ
+  nhỏ) chỉ đạt 4.07:1 trên nền trang, dưới mức 4.5:1. Token `stone-400` đổi `#777966` → `#6c6d5c`, đạt 4.5:1 trên nền
+  trang, thẻ trắng, `stone-50`, `stone-100`. Test mới `contrast.test.ts` đọc màu thẳng từ `main.css`, kiểm 33 cặp chữ
+  (≥ 4.5:1) và 7 cặp viền ô nhập, viền focus (≥ 3:1). Bỏ dòng đặt `<html lang>` đã thừa trong hai layout, vì plugin
+  i18n đặt từ #206. Test office +3.
+- Viền focus của mục menu trên thanh bên bị cắt khi dùng Tab (#216): `.sg-nav` cắt phần tràn mà viền vẽ lùi ra ngoài
+  3px, nên mục menu mất cạnh trái, phải, mục đầu mất cả cạnh trên. Nay viền vẽ vào trong mục. e2e `giao-dien.spec.ts`
+  thêm một test ở khung 390×844: không cuộn ngang ở hộp việc, văn bản đến, soạn thảo; mở ngăn kéo bằng Enter, Tab đi
+  hết các mục theo thứ tự nhìn thấy với viền focus đủ rồi vòng về mục đầu, Shift+Tab đi ngược; đóng bằng nút và lớp
+  phủ thì focus về nút menu. e2e +1.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô

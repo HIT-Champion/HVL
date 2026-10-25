@@ -56,9 +56,17 @@ applications: the e-Office and the P.A.R.A personal space, a second application 
 changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). A third application, the
 unit news board, exists only once installed with `moc app install`, so the diagram does not show it. Only the APISIX
 gateway is exposed, and every request passes its web application firewall before it reaches the core; the labels on
-its arrows are the real paths. Thick borders mark the team's own code, boxes with a logo are upstream open source used
-as is, and the moving dots follow two real requests. H-P-D-I architecture and technical decisions:
-[`docs/architecture.md`](docs/architecture.md) (Vietnamese).
+its arrows are the real paths. The same holds inside the machine:
+- application containers sit on their own Docker network, `apps` (no Internet access), where APISIX is the only core
+  service;
+- so an application's server side also reaches the core through the gateway, with the same token check, rate limits
+  and WAF as a browser;
+- `make demo-cai-ung-dung` checks that the container reaches APISIX only
+  ([`docs/them-ung-dung.md`](docs/them-ung-dung.md#14-migration-và-mô-hình-tin-cậy) section 1.4, Vietnamese).
+
+Thick borders mark the team's own code, boxes with a logo are upstream open source used as is, and the moving dots
+follow two real requests. H-P-D-I architecture and technical decisions: [`docs/architecture.md`](docs/architecture.md)
+(Vietnamese).
 
 ## Features
 
@@ -306,6 +314,7 @@ GitOps, and scans for secrets and vulnerable dependencies. Reminders can only be
 | Symptom | Cause and fix |
 |---|---|
 | `make check` reports a missing `.env` or `docker compose` | Run `make env` to create `.env`; install the Docker Compose v2 plugin, 2.17 or newer |
+| `make up` stops while pulling or building images: a timeout reaching `docker.io`, or `toomanyrequests` | The network blocks Docker Hub, or the anonymous pull limit is used up. Let Docker pull through the `mirror.gcr.io` mirror (`registry-mirrors`, needs `sudo`) as described in section 2b of [`docs/trien-khai.md`](docs/trien-khai.md#2b-máy-không-kéo-được-image-từ-docker-hub) (Vietnamese) |
 | `make up` takes long, services still `starting` or `unhealthy` | The first run pulls about 5 GB of images and ClamAV loads its virus signatures, which takes a few minutes; `make up` waits up to 10 minutes. Watch with `make ps`, `make logs` |
 | Port 8080 is already used by another program | Set `MOC_HTTP_PORT=8081` and `MOC_PUBLIC_URL=http://localhost:8081` in `.env` before the first `make up`: the Keycloak realm loads this address only once, so if it already ran, `make reset` and start again |
 | Signing in fails when opened by a LAN IP address | Browsers only allow Web Crypto (PKCE sign-in, SHA-256 on the verification page) over `https` or on `localhost`. Use `localhost`, or set up HTTPS following [`docs/trien-khai.md`](docs/trien-khai.md) |

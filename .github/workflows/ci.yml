@@ -562,6 +562,10 @@ jobs:
           for s in $($COMPOSE config --services); do
             $COMPOSE logs --no-color --tail=1000 "$s" > "ci-logs/$s.log" 2>&1 || true
           done
+          # Vector, Parseable (profile logs) không có trong $COMPOSE: lấy theo tên container ở job đã bật log tập trung
+          for c in $(docker ps -a --format '{{.Names}}' | grep -E '^moc-(vector|parseable)-1$'); do
+            docker logs --tail=1000 "$c" > "ci-logs/$c.log" 2>&1 || true
+          done
           tail -n 30 ci-logs/*.log
 
       - name: Lưu nhật ký và vết Playwright khi lỗi
