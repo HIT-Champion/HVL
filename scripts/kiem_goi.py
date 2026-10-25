@@ -48,7 +48,11 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:     # Python 3.10: chưa có tomllib, main() báo rõ thay vì lỗi lúc import
+    tomllib = None  # type: ignore[assignment]
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent
 LICENSE_HEADER = SCRIPTS / "license-header.sh"
@@ -274,7 +278,10 @@ def check(package: pathlib.Path, version: str) -> tuple[list[str], str]:
             if structure:
                 return errors + structure, ""
             with tempfile.TemporaryDirectory(prefix="kiem-goi-") as tmp:
-                tar.extractall(tmp, filter="data")
+                try:
+                    tar.extractall(tmp, filter="data")
+                except TypeError:   # Python chưa có filter= (trước 3.11.4, 3.10.12): mục đã soát ở check_members
+                    tar.extractall(tmp)
                 root = pathlib.Path(tmp) / root_name
                 files = {m.name[len(root_name) + 1:]: m.size for m in members if m.isfile()}
                 found, flagged = check_files(root, files)
@@ -298,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"--version {args.version} khác phiên bản trong tên gói ({m[1]})")
     if not args.package.is_file():
         parser.error(f"không có tệp {args.package}")
+    if tomllib is None:
+        parser.error("cần Python ≥ 3.11 (tomllib, để đọc REUSE.toml của gói)")
 
     errors, summary = check(args.package, m[1])
     if not errors:

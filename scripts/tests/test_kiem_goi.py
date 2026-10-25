@@ -38,6 +38,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 ROOT = SCRIPTS.parent
@@ -367,8 +368,10 @@ class IntegrityTest(PackageRepo):
         out = io.StringIO()
         old = kiem_goi.MAX_FILE
         kiem_goi.MAX_FILE = 1024
+        # gọi trong tiến trình: bỏ GITHUB_ACTIONS (runner đặt sẵn) để lỗi in dạng "  - …" như ở máy
+        env = {k: v for k, v in os.environ.items() if k != "GITHUB_ACTIONS"}
         try:
-            with contextlib.redirect_stdout(out):
+            with contextlib.redirect_stdout(out), mock.patch.dict(os.environ, env, clear=True):
                 code = kiem_goi.main([str(package)])
         finally:
             kiem_goi.MAX_FILE = old
