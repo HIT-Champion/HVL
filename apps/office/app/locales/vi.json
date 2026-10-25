@@ -1311,13 +1311,69 @@
     "inputs": "Đầu vào",
     "outputs": "Đầu ra",
     "quality": "Kiểm chất lượng",
-    "passed": "Đạt",
-    "failedCheck": "Trượt",
     "notChecked": "Không kiểm",
     "reports": "Mọi khung nhìn báo cáo ({n})",
     "reportsHint": "Mọi view office.v_… trong CSDL, kể cả khung nhìn chưa có biểu đồ trên trang Điều hành (vd của trang Số đo).",
     "usedBy": "Biểu đồ dùng",
     "export": "Tải OpenLineage (.jsonl)"
+  },
+  "quality": {
+    "status": {
+      "PASSED": "Đạt",
+      "WARNING": "Cảnh báo",
+      "FAILED": "Trượt",
+      "NONE": "Không kiểm"
+    },
+    "unavailable": "Chưa kiểm được",
+    "flagOf": "Kiểm chất lượng số liệu của {chart}",
+    "title": "Kiểm chất lượng số liệu",
+    "hint": "Bộ luật tính trong CSDL mỗi lần mở trang (view office.report_checks), trên số của đơn vị mình, không tính lại ở trình duyệt. Ngưỡng 0: lệch một văn bản là có cờ. Trang Điều hành hiện cờ nặng nhất cạnh từng biểu đồ.",
+    "view": "Khung nhìn",
+    "rule": "Luật",
+    "result": "Kết quả",
+    "figures": "Số liệu",
+    "rules": {
+      "status_total": {
+        "name": "Tổng theo trạng thái khớp tổng văn bản đến",
+        "what": "Σ các cột của biểu đồ trạng thái cộng văn bản đến hạn chế (dòng riêng) phải bằng số văn bản đến đếm thẳng trên bảng văn bản. Lệch là văn bản biến mất khỏi trang.",
+        "figures": "Trên trang {actual} / trong CSDL {expected} văn bản đến",
+        "detail": "Trạng thái có văn bản mà biểu đồ không vẽ: {detail}"
+      },
+      "department_total": {
+        "name": "Tổng theo phòng khớp số đang xử lý",
+        "what": "Σ văn bản của biểu đồ theo phòng phải bằng cột Đang xử lý của biểu đồ trạng thái. Văn bản chưa rõ phòng chủ trì (giao cho người chưa có trong danh bạ, chưa có việc chủ trì) là Cảnh báo.",
+        "figures": "Theo phòng {actual} / đang xử lý {expected}; {issues} chưa rõ phòng chủ trì"
+      },
+      "processing_coverage": {
+        "name": "Thời gian xử lý tính đủ văn bản đã xong",
+        "what": "Văn bản đã xong mà thiếu mốc xong không vào trung bình (Cảnh báo); tính thừa, hay có tháng tổng giờ âm, là Trượt. Tính trên mọi tháng, không chỉ 12 tháng trên biểu đồ.",
+        "figures": "Tính được {actual} / {expected} văn bản đã xong",
+        "detail": "Tháng có tổng giờ âm: {detail}"
+      },
+      "unique_keys": {
+        "name": "Khóa ghép số không trùng, không rỗng",
+        "what": "Trang ghép số theo tháng, theo phòng: dòng trùng khóa bị bỏ qua, dòng rỗng khóa rơi khỏi biểu đồ mà không báo lỗi.",
+        "figures": "{expected} dòng, {issues} dòng trùng hoặc rỗng khóa"
+      },
+      "no_personal_columns": {
+        "name": "Không có cột thông tin cá nhân",
+        "what": "Theo catalog CSDL: khung nhìn xuất ra cột email, số điện thoại, CCCD/CMND, ngày sinh, địa chỉ, họ tên, tên đăng nhập là Trượt; chỉ đọc cột như vậy (kể cả qua view lồng) là Cảnh báo.",
+        "figures": "{actual} cột cá nhân xuất ra, {issues} cột cá nhân được đọc",
+        "detail": "Cột: {detail}"
+      }
+    },
+    "archive": {
+      "run": "Kiểm chất lượng của lượt này",
+      "source": "Nguyên văn các mục kiểm svc-files đã ghi trong sự kiện OpenLineage (facet dataQualityAssertions), không tính lại.",
+      "table": "{table}: {passed}/{total} mục đạt",
+      "failedItems": "trượt: {items}",
+      "none": "Lượt này không ghi mục kiểm nào trong phả hệ: không có gì bảo chứng số dòng của gói.",
+      "stopped": "Lượt nộp lưu lúc {time} bị dừng vì trượt kiểm chất lượng, hồ sơ chưa vào kho lạnh."
+    },
+    "assertion": {
+      "row_count_equals_source": "số dòng khớp CSDL",
+      "not_null": "cột {column} không rỗng"
+    }
   },
   "hpdi": {
     "title": "Tự chẩn đoán H-P-D-I",
