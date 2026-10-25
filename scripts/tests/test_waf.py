@@ -316,7 +316,8 @@ class RulesTest(unittest.TestCase):
                 removed.setdefault(target, set()).add(ids)
         cookies = {"KC_AUTH_SESSION_HASH", "AUTH_SESSION_ID", "KC_RESTART", "KEYCLOAK_IDENTITY", "KEYCLOAK_SESSION",
                    "KC_STATE_CHECKER"}
-        args = {"session_code", "tab_id", "client_data", "code_challenge", "refresh_token", "id_token_hint"}
+        args = {"session_code", "tab_id", "client_data", "code_challenge", "code_verifier", "code", "refresh_token",
+                "id_token_hint"}
         self.assertEqual(set(removed), {f"REQUEST_COOKIES:{c}" for c in cookies} | {f"ARGS:{a}" for a in args})
         for target, ids in removed.items():
             want = token_ids | ({"932000-932999"} if target == "REQUEST_COOKIES:KC_AUTH_SESSION_HASH" else set())

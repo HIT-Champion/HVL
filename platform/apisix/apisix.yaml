@@ -171,8 +171,9 @@ global_rules:
               # danh sách của client, không tự gọi tới. Token ngẫu nhiên do Keycloak, oidc-client-ts sinh (cookie phiên,
               # mã phiên, JWT, PKCE) tình cờ trùng mẫu: libinjection (942100: "+…" trong ngoặc kép, "8--…"), tên hàm
               # PHP (933…: rtrim, fputs), đuôi tệp (930120: .nsr), lệnh Unix (932…, chỉ cookie base64 có "/", "+") —
-              # khoảng 1/2 500 giá trị mỗi loại bị 403, đăng nhập hỏng ngẫu nhiên (#140). Chỉ gỡ đúng các luật đó trên
-              # đúng tên cookie, tham số token; luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi
+              # khoảng 1/2 500 giá trị mỗi loại bị 403, đăng nhập hỏng ngẫu nhiên (#140). Bước đổi mã lấy token gửi lại
+              # code và code_verifier của PKCE ("71--7iZ…", #162). Chỉ gỡ đúng các luật đó trên đúng tên cookie, tham
+              # số token; luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi
               - >-
                 SecRule REQUEST_FILENAME "@beginsWith /realms/${{MOC_REALM}}/" "id:10010,phase:1,pass,nolog,
                 ctl:ruleRemoveTargetByTag=OWASP_CRS;ARGS:password,
@@ -213,6 +214,12 @@ global_rules:
                 ctl:ruleRemoveTargetById=942100;ARGS:code_challenge,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:code_challenge,
                 ctl:ruleRemoveTargetById=930120;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
                 ctl:ruleRemoveTargetById=942100;ARGS:refresh_token,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:refresh_token,
                 ctl:ruleRemoveTargetById=930120;ARGS:refresh_token,

@@ -14,6 +14,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   (`#page=n`); câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép tìm lai nghiêng về từ khóa (tỷ trọng nghĩa tối đa
   0,2, câu khác giữ `MOC_ASK_SEMANTIC_RATIO`). Test svc-files +29, office +4, e2e thêm bước trong `hoi-dap.spec.ts`.
 
+### Đã sửa lỗi
+- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` của PKCE và mã `code` gửi tới
+  `/realms/…/token` là chuỗi ngẫu nhiên, đôi khi trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403, đăng nhập hỏng
+  ngẫu nhiên như #140). Loại trừ 1 của `platform/apisix/apisix.yaml` gỡ đúng ba luật 942100, 933…, 930120 trên hai tham
+  số này như các token khác. Test scripts cập nhật, smoke thêm ca đổi mã với đúng chuỗi đã bị chặn.
+
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
   ClamAV, loại nhận theo byte đầu phải khớp đuôi tệp — tệp `.pdf` thực ra là trang HTML bị chặn `415 type_mismatch`;

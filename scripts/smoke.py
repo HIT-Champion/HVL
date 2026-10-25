@@ -321,11 +321,18 @@ def check_waf(clerk: Session, director: Session, staff: Session, tag: str) -> No
                                         {"Cookie": f"KC_AUTH_SESSION_HASH={session_hash}"}),
         "code_challenge": ("GET", f"{auth}&code_challenge=81--9_7VdmWtRRK-1GI7T-9HBH_p8K__5U8cZgh30As", None, {}),
         "code trả về trang": ("GET", f"/?code={uuid.uuid4()}.nSRx{tag}.{uuid.uuid4()}", None, {}),
+        # đổi mã lấy token (#162): mã giả nên Keycloak trả 400 invalid_grant; 403 là WAF bắt nhầm code_verifier
+        "code_verifier": ("POST", f"/realms/{REALM}/protocol/openid-connect/token", urllib.parse.urlencode({
+            "grant_type": "authorization_code", "client_id": "app-office", "redirect_uri": f"{PUBLIC_URL}/",
+            "code": f"{uuid.uuid4()}.nSRx{tag}.{uuid.uuid4()}",
+            "code_verifier": "71--7iZrR32djw61IXBqIxhbDSqYkE5zhyVtmcKJs3c"}).encode(),
+            {"Content-Type": "application/x-www-form-urlencoded"}),
     }
     blocked = [label for label, (method, path, data, headers) in tokens.items()
                if waf_call(method, path, data, headers)[0] == 403]
     not blocked or fail(f"WAF chặn nhầm token của Keycloak: {', '.join(blocked)}")
-    ok("token ngẫu nhiên của Keycloak qua WAF: cookie phiên trong ngoặc kép, mã PKCE, code trả về trang ứng dụng")
+    ok("token ngẫu nhiên của Keycloak qua WAF: cookie phiên trong ngoặc kép, mã PKCE, code trả về trang ứng dụng,"
+       " code_verifier khi đổi mã")
     # Tên tệp hành chính có ' ; = (CRS 920120) và ":" (922130) — loại trừ 8: svc-files giữ đúng tên, chỉ bỏ đường dẫn,
     # ký tự điều khiển
     name = f"Tờ trình 'gấp'; đợt 1 = {tag}: bản 2.pdf"
