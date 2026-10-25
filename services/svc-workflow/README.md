@@ -75,10 +75,12 @@ thay subscription; broker chưa chạy thì chỉ ghi nhật ký một lần; m�
 tới thì kiểm token, đọc từng cảm biến vượt ngưỡng (bỏ ký tự điều khiển trong tên phòng), rồi dựng dự thảo văn bản đi
 "Báo cáo sự cố" (một giao dịch GraphQL cùng sự kiện `ot.alarm`) đứng tên chuyên viên khai ở thuộc tính `responsible`
 của cảm biến, và báo người đó. Còn dự thảo chưa trình hoặc bị trả lại của cùng cảm biến thì không dựng thêm, chỉ nhắc
-(khóa thông báo theo dự thảo và ngày). Vòng nền còn giữ một subscription "neo" tạm dừng ở tenant mặc định
-(`urn:ngsi-ld:Subscription:moc-ot-context`): Scorpio 6.0.2 cất ngữ cảnh JSON-LD của subscription trong CSDL của tenant
-nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi thông báo (nhật ký Scorpio: "Mutiny had
-to drop … ResponseException").
+(khóa thông báo theo dự thảo và ngày). Giờ, ngày trong dự thảo và ngày của khóa theo `observedAt` của thiết bị;
+muộn hơn giờ máy chủ quá 2 phút (`FUTURE_SLACK`, đồng hồ thiết bị chạy nhanh) thì theo giờ máy chủ nhận thông báo,
+dự thảo ghi rõ giờ thiết bị gửi, sự kiện giữ giờ đó ở `device_observed_at`. Vòng nền còn giữ một subscription
+"neo" tạm dừng ở tenant mặc định (`urn:ngsi-ld:Subscription:moc-ot-context`): Scorpio 6.0.2 cất ngữ cảnh JSON-LD của
+subscription trong CSDL của tenant nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi
+thông báo (nhật ký Scorpio: "Mutiny had to drop … ResponseException").
 
 **Sơ đồ cảm biến** (F3.10, Action `otSensorMap`, trang `/cam-bien` của Văn phòng điện tử): đọc broker ở tenant NGSI-LD
 của đơn vị trong biến phiên — `GET /ngsi-ld/v1/entities?type=TemperatureSensor&options=sysAttrs` (tối đa 100 cảm
