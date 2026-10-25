@@ -217,6 +217,65 @@ class ManifestRules(unittest.TestCase):
                 "table": {"schema": "core", "name": "files"}, "column": "id"}}}]
         self.check(change, "quan hệ mảng theo khóa ngoại")
 
+    def test_permission_rules_cannot_read_core_data(self) -> None:
+        # Hasura chạy điều kiện trong quyền bằng quyền admin: hai bộ lọc dưới đây (tái hiện trên Hasura v2.51) dò được
+        # văn bản hạn chế của đơn vị khác dù vai trò không có quyền gì trên office.documents
+        eq = {"tenant_id": {"_eq": "X-Hasura-Tenant-Id"}}
+        docs = {"schema": "office", "name": "documents"}
+        exists = {"_exists": {"_table": docs, "_where": {"restricted": {"_eq": True}, "title": {"_like": "Mật%"}}}}
+        guess = {"docs": {"restricted": {"_eq": True}, "title": {"_cgt": ["$", "guess"]}}}
+        manual = {"name": "docs", "using": {"manual_configuration": {"remote_table": docs,
+                                                                    "column_mapping": {"target_tenant": "tenant_id"}}}}
+        own = {"schema": "bang_tin", "name": "nhom"}
+
+        def table(m: dict[str, Any]) -> dict[str, Any]:
+            t = m["metadata"]["tables"][0]
+            t["array_relationships"] = [manual]
+            t["object_relationships"] += [
+                {"name": "nhom", "using": {"manual_configuration": {"remote_table": own,
+                                                                   "column_mapping": {"kind": "kind"}}}},
+                {"name": "goc", "using": {"foreign_key_constraint_on": "document_id"}}]
+            m["metadata"]["tables"].append({"table": own, "object_relationships": [{"name": "van_ban", "using": {
+                "manual_configuration": {"remote_table": docs, "column_mapping": {"document_id": "id"}}}}]})
+            return t
+
+        def user_filter(rule: dict[str, Any]) -> Any:
+            def change(m: dict[str, Any]) -> None:
+                table(m)["select_permissions"][1]["permission"] = {"columns": ["kind"], "filter": {"_and": [eq, rule]}}
+            return change
+
+        for rule, needle in ((exists, "staff filter: không được dùng _exists"),
+                             (guess, "staff filter: qua quan hệ docs"),
+                             ({"_not": {"document": {"restricted": {"_eq": False}}}}, "qua quan hệ document"),
+                             ({"_or": [{"document": {"_and": [{"visible": {"_eq": True}}]}}]}, "quan hệ document"),
+                             ({"goc": {"title": {"_like": "Mật%"}}}, "qua quan hệ goc"),
+                             ({"nhom": {"van_ban": {"title": {"_like": "Mật%"}}}}, "qua quan hệ van_ban"),
+                             ({"nhom": {"_exists": exists["_exists"]}}, "không được dùng _exists"),
+                             ({"docs_aggregate": {"count": {"predicate": {"_gt": 0}, "filter": {
+                                 "title": {"_like": "Mật%"}}}}}, "không được dùng docs_aggregate"),
+                             ({"nhom_aggregate": {"count": {"predicate": {"_gt": 0}, "filter": {
+                                 "van_ban": {"title": {"_like": "Mật%"}}}}}}, "qua quan hệ van_ban")):
+            with self.subTest(rule=rule):
+                self.check(user_filter(rule), needle)
+
+        def service(m: dict[str, Any]) -> None:
+            table(m)["insert_permissions"][0]["permission"]["check"] = exists
+        self.check(service, "app_bang_tin check: không được dùng _exists")
+
+        def insert_guess(m: dict[str, Any]) -> None:
+            table(m)["insert_permissions"].append({"role": "manager", "permission": {
+                "columns": ["kind"], "set": {"tenant_id": "X-Hasura-Tenant-Id"}, "check": guess}})
+        self.check(insert_guess, "manager check: qua quan hệ docs")
+
+        # luật đọc của lõi và điều kiện trên bảng của chính ứng dụng vẫn được
+        visible = {"visible": {"_eq": True}}
+        for rule in ({"docs": visible}, {"goc": visible}, {"nhom": {"kind": {"_eq": "x"}, "van_ban": visible}},
+                     {"kind": {"_ceq": "kind"}}):
+            with self.subTest(ok=rule):
+                m = manifest()
+                user_filter(rule)(m)
+                self.assertEqual(u.check_tables(m), [])
+
     def test_load_reports_every_error_at_once(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bad = pathlib.Path(tmp) / "app.yaml"

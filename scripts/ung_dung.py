@@ -86,6 +86,10 @@ FORMAT = 1                                   # định dạng bản ghi .moc-app
 EVENT_KINDS = ("office.document.received", "office.document.registered", "office.document.issued")
 USER_ROLES = ("clerk", "staff", "manager", "director", "tenant_admin")    # moc_role trong realm
 CORE_SCHEMAS = ("core", "office")             # quan hệ từ bảng ứng dụng chỉ được trỏ về đây (một chiều)
+# Hasura chạy điều kiện trong quyền bằng quyền admin: `_exists` và điều kiện đi qua quan hệ sang lõi đọc được dữ liệu
+# mọi đơn vị (kể cả văn bản hạn chế), quyền của bảng đích không áp. Qua quan hệ sang lõi chỉ nhận đúng luật đọc của lõi
+# (trường `visible` = office.document_visible, chạy theo phiên người gọi)
+CORE_READ_RULE = {"visible": {"_eq": True}}
 RESERVED_SCHEMAS = {"core", "office", "personal", "public", "hdb_catalog", "information_schema", "flowable",
                     "keycloak", "topology", "cron", "graphql", "moc_app"}
 RESERVED_NAMES = {"office", "ca-nhan", "core", "moc", "admin", "api", "svc"}
@@ -279,7 +283,9 @@ def check_tables(m: dict[str, Any]) -> list[str]:
     schema = m["database"]["schema"]
     roles = set(USER_ROLES) | ({service_role(m["name"])} if m.get("service_account") else set())
     seen: set[str] = set()
-    for t in m.get("metadata", {}).get("tables", []):
+    tables = m.get("metadata", {}).get("tables", [])
+    rels = {f"{t['table']['schema']}.{t['table']['name']}": _rel_targets(t) for t in tables}
+    for t in tables:
         ref = f"{t['table']['schema']}.{t['table']['name']}"
         if t["table"]["schema"] != schema:
             errors.append(f"metadata: bảng {ref} không nằm trong schema {schema} của ứng dụng")
@@ -313,8 +319,59 @@ def check_tables(m: dict[str, Any]) -> list[str]:
                     errors.append(f"{where}: vai trò không được dùng (chỉ {allowed}; vai trò app_… cần "
                                   "service_account: true)")
                     continue
+                for key in ("filter", "check"):
+                    errors += _rule_errors(perm.get(key), ref, rels, schema, f"{where} {key}")
                 if role in USER_ROLES:
                     errors += _tenant_errors(kind, perm, where)
+    return errors
+
+
+def _rel_targets(t: dict[str, Any]) -> dict[str, str | None]:
+    """Quan hệ của một bảng → bảng đích `schema.tên`; None khi manifest không nói (khóa ngoại một cột)."""
+    out: dict[str, str | None] = {}
+    for kind in ("object_relationships", "array_relationships"):
+        for rel in t.get(kind, []):
+            using = rel.get("using") or {}
+            target = (using.get("manual_configuration") or {}).get("remote_table")
+            fk = using.get("foreign_key_constraint_on")
+            if target is None and isinstance(fk, dict):
+                target = fk.get("table")
+            out[rel["name"]] = f"{target.get('schema', 'public')}.{target.get('name')}" \
+                if isinstance(target, dict) else None
+    return out
+
+
+def _rule_errors(expr: Any, table: str, rels: dict[str, dict[str, str | None]], schema: str,
+                 where: str) -> list[str]:
+    """Điều kiện trong quyền không đọc được dữ liệu lõi: cấm `_exists`; qua quan hệ không rõ đích hoặc sang lõi chỉ
+    nhận CORE_READ_RULE; qua quan hệ sang bảng của ứng dụng thì kiểm tiếp theo quan hệ của bảng đó."""
+    if isinstance(expr, list):
+        return [e for x in expr for e in _rule_errors(x, table, rels, schema, where)]
+    if not isinstance(expr, dict):
+        return []
+    errors: list[str] = []
+    for key, value in expr.items():
+        if key == "_exists":
+            errors.append(f"{where}: không được dùng _exists (Hasura chạy bằng quyền admin, đọc được bảng của lõi)")
+        elif key in ("_and", "_or", "_not"):
+            errors += _rule_errors(value, table, rels, schema, where)
+        elif key.endswith("_aggregate") and key[:-10] in rels.get(table, {}):
+            # điều kiện tổng hợp `<quan hệ mảng>_aggregate: {count: {predicate, filter}}` cũng chạy bằng quyền admin
+            target = rels[table][key[:-10]]
+            if target is None or target.split(".")[0] != schema:
+                errors.append(f"{where}: không được dùng {key} qua quan hệ sang lõi hoặc không rõ bảng đích")
+            elif isinstance(value, dict):
+                for spec in value.values():
+                    if isinstance(spec, dict):
+                        errors += _rule_errors(spec.get("filter"), target, rels, schema, where)
+        elif key in rels.get(table, {}):
+            target = rels[table][key]
+            if target is not None and target.split(".")[0] == schema:
+                errors += _rule_errors(value, target, rels, schema, where)
+            elif value != CORE_READ_RULE:
+                errors.append(f"{where}: qua quan hệ {key} (sang lõi hoặc khóa ngoại không rõ bảng đích) chỉ nhận "
+                              "visible: {_eq: true} — điều kiện khác chạy bằng quyền admin, đọc được dữ liệu đơn vị "
+                              "khác; lọc theo bảng của ứng dụng thì khai quan hệ bằng manual_configuration")
     return errors
 
 

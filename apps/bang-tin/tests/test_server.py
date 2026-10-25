@@ -21,6 +21,7 @@ gửi lại. Chạy: python3 -m unittest discover -s apps/bang-tin/tests (make t
 
 from __future__ import annotations
 
+import http.client
 import http.server
 import json
 import pathlib
@@ -213,10 +214,22 @@ class Hook(Base):
 
     def test_bad_body_is_400(self) -> None:
         for body in (b"khong-phai-json", [], {"data": EVENT}, {"event_id": "e", "data": EVENT}, hasura(None),
-                     hasura({"id": 1}), hasura(op="UPDATE"), hasura(table={"schema": "office", "name": "documents"})):
+                     hasura({"id": 1}), hasura(op="UPDATE"), hasura(table={"schema": "office", "name": "documents"}),
+                     hasura({**EVENT, "id": None}), hasura({**EVENT, "id": "abc"}), hasura({**EVENT, "id": [1]}),
+                     hasura({**EVENT, "tenant_id": None}), hasura({**EVENT, "kind": ["office.document.issued"]})):
             with self.subTest(body=body):
                 self.assertEqual(self.send(body)[0], 400)
         self.assertEqual(self.send(hasura(), path="/khac")[0], 404)
+        self.assertEqual(self.up.graphql, [])
+
+    def test_negative_content_length_is_400_not_a_hang(self) -> None:
+        conn = http.client.HTTPConnection("127.0.0.1", self.servers[1].server_address[1], timeout=5)
+        self.addCleanup(conn.close)
+        conn.putrequest("POST", "/su-kien")
+        conn.putheader("X-Moc-Hook-Secret", SECRET)
+        conn.putheader("Content-Length", "-1")
+        conn.endheaders()
+        self.assertEqual(conn.getresponse().status, 400)
 
     def test_duplicate_is_success(self) -> None:
         message = 'Uniqueness violation. duplicate key value violates unique constraint "tin_pkey"'

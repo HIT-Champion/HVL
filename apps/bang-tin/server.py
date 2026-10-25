@@ -134,8 +134,10 @@ def row_from(body: Any) -> dict[str, Any] | None:
     if not isinstance(event, dict) or body.get("table") != FEED or event.get("op") != "INSERT":
         raise ValueError("thân không đúng dạng sự kiện Hasura (INSERT trên core.app_events)")
     data = (event.get("data") or {}).get("new") if isinstance(event.get("data"), dict) else None
-    if not isinstance(data, dict) or not COLUMNS <= set(data):
+    if not isinstance(data, dict) or not COLUMNS <= set(data) or any(data[c] is None for c in COLUMNS):
         raise ValueError("event.data.new thiếu cột của core.app_events")
+    if not isinstance(data["kind"], str) or not isinstance(data["id"], int | str):
+        raise ValueError("event.data.new: kind, id sai kiểu")
     if data["kind"] not in KINDS:
         return None
     return {"event_id": int(data["id"]), "tenant_id": str(data["tenant_id"]), "document_id": str(data["document_id"]),
@@ -242,8 +244,8 @@ class Hook(http.server.BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length") or 0)
-            if length > 65536:
-                raise ValueError("thân quá lớn")
+            if not 0 <= length <= 65536:                # âm thì rfile.read(-1) chờ tới khi Hasura cắt kết nối
+                raise ValueError("Content-Length sai hoặc thân quá lớn")
             row = row_from(json.loads(self.rfile.read(length) or b"null"))
         except ValueError as exc:
             log("hook.invalid", error=str(exc))

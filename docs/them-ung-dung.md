@@ -40,7 +40,7 @@ không cần PyYAML trong thư mục cài): không nhận chuỗi nhiều dòng 
 | `image` | `{build: .}` — dựng từ thư mục ứng dụng lúc cài (thẻ `moc/app-<tên>:<phiên bản>-<băm thư mục>`), hoặc `{ref: …@sha256:…}` — image dựng sẵn, bắt buộc ghim digest | Thư mục dựng phải nằm trong thư mục ứng dụng, có `Dockerfile` |
 | `port`, `healthcheck`, `memory`, `read_only`, `environment` | Cổng của trang trong container; healthcheck dạng exec; giới hạn bộ nhớ (mặc định 256m); rootfs chỉ đọc (mặc định); biến môi trường **không bí mật** | Tên biến giống bí mật (`…SECRET`, `…TOKEN`, `…KEY`…) hay biến lõi đặt bị từ chối; giá trị chép nguyên văn (`$` ghi thành `$$`: compose không thay `${…}` bằng biến trong `.env` của lõi) |
 | `database.schema`, `database.migrations` | Schema riêng; thư mục `<số>_<tên>/up.sql`, áp theo thứ tự số | Không phải schema của lõi, của hệ thống; symlink không được trỏ ra ngoài thư mục migration; xem 1.4 |
-| `metadata.tables` | Cùng định dạng tệp bảng của `db/metadata`: bảng, quan hệ, `select`/`insert`/`update_permissions` | Bảng chỉ trong schema của ứng dụng; quan hệ chỉ một chiều về `core`, `office`; vai trò chỉ `clerk`, `staff`, `manager`, `director`, `tenant_admin` (và `app_<tên>` khi có `service_account`); vai trò người dùng phải lọc theo đơn vị: `filter` (đọc, sửa) và `check` (thêm, khi không `set`) có `tenant_id: {_eq: X-Hasura-Tenant-Id}` ở gốc hoặc trong `_and` cấp đầu — nằm trong `_or`, `_not` không tính; hoặc `set: {tenant_id: X-Hasura-Tenant-Id}` khi thêm; bảng phải có ở bước 3 (sau migration); không có `delete_permissions`, `event_triggers` |
+| `metadata.tables` | Cùng định dạng tệp bảng của `db/metadata`: bảng, quan hệ, `select`/`insert`/`update_permissions` | Bảng chỉ trong schema của ứng dụng; quan hệ chỉ một chiều về `core`, `office`; vai trò chỉ `clerk`, `staff`, `manager`, `director`, `tenant_admin` (và `app_<tên>` khi có `service_account`); vai trò người dùng phải lọc theo đơn vị: `filter` (đọc, sửa) và `check` (thêm, khi không `set`) có `tenant_id: {_eq: X-Hasura-Tenant-Id}` ở gốc hoặc trong `_and` cấp đầu — nằm trong `_or`, `_not` không tính; hoặc `set: {tenant_id: X-Hasura-Tenant-Id}` khi thêm; điều kiện trong quyền (mọi vai trò) không có `_exists`, qua quan hệ sang `core`, `office` chỉ nhận `visible: {_eq: true}` (xem 1.9); bảng phải có ở bước 3 (sau migration); không có `delete_permissions`, `event_triggers` |
 | `service_account` | `true`: client bí mật `app-<tên>-svc` cho phần máy chủ (xem 1.5) | — |
 | `events` | `kinds` (danh sách trắng của lõi), `webhook: {port, path}`, `retry` | `webhook.port` khác `port` (cổng webhook không có route ra ngoài) |
 
@@ -141,7 +141,7 @@ lệnh từ chối — viết migration mới. Bảng ứng dụng không gắn 
 |---|---|
 | Vai trò CSDL riêng như trên; ứng dụng không có mật khẩu CSDL nào | Container ở mạng `moc`, tới được mọi dịch vụ nội bộ (PostgreSQL, Hasura, Keycloak, svc-files, OpenBao…) — dịch vụ nào tin "đã ở trong mạng nội bộ" là tin cả ứng dụng |
 | Không có khóa quản trị Hasura: giá trị `environment` chép nguyên văn, không nội suy `${…}` từ `.env` của lõi | Mã trong container không bị kiểm: nó làm được mọi thứ một tiến trình trong mạng nội bộ làm được |
-| Người dùng chỉ đọc bảng ứng dụng theo quyền Hasura khai trong manifest, có lọc đơn vị (1.1) | Đúng sai của quyền đó (ngoài lọc đơn vị) là việc của người viết manifest — lõi không biết một cột nhạy cảm hay không |
+| Người dùng chỉ đọc bảng ứng dụng theo quyền Hasura khai trong manifest, có lọc đơn vị (1.1); điều kiện trong quyền không đọc được dữ liệu lõi (1.9) | Đúng sai của quyền đó (ngoài các điều lõi kiểm) là việc của người viết manifest — lõi không biết một cột nhạy cảm hay không |
 | Phần máy chủ chỉ có vai trò `app_<tên>` (1.5) | `app_<tên>` thêm dòng với `check: {}` thì lõi tin phần máy chủ ghi đúng `tenant_id` |
 
 **Gỡ không xóa dữ liệu**: schema, bảng, các dòng, vai trò CSDL còn nguyên; `core.apps.removed_at` ghi lúc gỡ, đường
@@ -210,8 +210,12 @@ Rủi ro (xem cả bảng ranh giới ở 1.4):
   mạng thì tin cả ứng dụng. Chưa có cách cài ứng dụng không đáng tin.
 - **Quyền thêm của `app_<tên>` có thể là `check: {}`** (như bang-tin): lõi tin phần máy chủ ghi đúng `tenant_id` của
   sự kiện. Phần máy chủ ghi sai đơn vị thì người dùng đơn vị đó thấy dòng sai.
-- **Quyền đọc của người dùng là do manifest khai.** Lõi chỉ kiểm có lọc đơn vị (1.1) và quan hệ một chiều; lọc thêm
-  theo quyền xem văn bản (như `document.visible` của bang-tin) là việc của người viết manifest.
+- **Quyền đọc của người dùng là do manifest khai.** Hasura chạy điều kiện trong quyền bằng quyền admin: `_exists`,
+  `<quan hệ>_aggregate` hay điều kiện đi qua quan hệ sang `office.documents` đọc được văn bản của mọi đơn vị, kể cả
+  văn bản hạn chế — quyền của bảng đích không áp. Nên lõi kiểm cả cây điều kiện của mọi vai trò: có lọc đơn vị (1.1),
+  không `_exists`; qua quan hệ sang `core`, `office`, hay quan hệ khóa ngoại một cột (lõi không biết bảng đích) chỉ
+  nhận đúng `visible: {_eq: true}` — luật đọc văn bản của lõi, chạy theo phiên người xem; qua quan hệ sang bảng của
+  chính ứng dụng thì kiểm tiếp. Ngoài các điều đó, cột nào nhạy cảm, ai đọc dòng nào là việc của người viết manifest.
 - **Mọi ứng dụng nghe sự kiện nhận mọi loại trong danh sách trắng**, không chỉ loại mình khai (Hasura không lọc trigger
   theo giá trị cột): 5 cột đã làm sạch của mọi văn bản không hạn chế trong mọi đơn vị.
 - **Văn bản bật hạn chế sau khi đã phát sự kiện**: dòng đã gửi không thu hồi được (người dùng vẫn không đọc được tin
