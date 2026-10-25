@@ -306,6 +306,7 @@ GitOps, and scans for secrets and vulnerable dependencies. Reminders can only be
 | Symptom | Cause and fix |
 |---|---|
 | `make check` reports a missing `.env` or `docker compose` | Run `make env` to create `.env`; install the Docker Compose v2 plugin, 2.17 or newer |
+| `make up` stops while pulling or building images: a timeout reaching `docker.io`, or `toomanyrequests` | The network blocks Docker Hub, or the anonymous pull limit is used up. Let Docker pull through the `mirror.gcr.io` mirror (`registry-mirrors`, needs `sudo`) as described in section 2b of [`docs/trien-khai.md`](docs/trien-khai.md#2b-máy-không-kéo-được-image-từ-docker-hub) (Vietnamese) |
 | `make up` takes long, services still `starting` or `unhealthy` | The first run pulls about 5 GB of images and ClamAV loads its virus signatures, which takes a few minutes; `make up` waits up to 10 minutes. Watch with `make ps`, `make logs` |
 | Port 8080 is already used by another program | Set `MOC_HTTP_PORT=8081` and `MOC_PUBLIC_URL=http://localhost:8081` in `.env` before the first `make up`: the Keycloak realm loads this address only once, so if it already ran, `make reset` and start again |
 | Signing in fails when opened by a LAN IP address | Browsers only allow Web Crypto (PKCE sign-in, SHA-256 on the verification page) over `https` or on `localhost`. Use `localhost`, or set up HTTPS following [`docs/trien-khai.md`](docs/trien-khai.md) |
