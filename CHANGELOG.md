@@ -23,11 +23,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `MOC_VERSION`. Test scripts +27 (`docs/git_flow.md` mục 6).
 - Trang đăng nhập Keycloak mang thương hiệu Signet (#164, theme `signet`, `platform/keycloak/themes/`), chung cho Văn
   phòng điện tử, P.A.R.A, Bảng tin: kế thừa `keycloak.v2` của Keycloak 26, không viết lại template — chỉ CSS (màu, phông
-  của Văn phòng điện tử, nền, bo góc, cỡ chữ trên điện thoại; chế độ sáng/tối theo máy của theme cha) và logo của Văn
-  phòng điện tử, cũng làm biểu tượng tab. Realm đặt `loginTheme: signet`, compose gắn thư mục chỉ đọc, CSP giữ nguyên.
-  Bản cài cũ (realm không nạp lại): `python3 scripts/moc.py realm theme` sau khi nâng cấp — chỉ đặt khi realm còn dùng
-  theme mặc định, báo lỗi nếu container chưa gắn thư mục theme (`docs/trien-khai.md`, mục Nâng cấp tay). Test scripts
-  +14.
+  của Văn phòng điện tử, nền, bo góc, cỡ chữ trên điện thoại) và logo của Văn phòng điện tử, cũng làm biểu tượng tab.
+  Giao diện Liền mạch (#116) sau đó đổi theme này sang chỉ chế độ sáng, thêm phông tự phục vụ. Realm đặt
+  `loginTheme: signet`, compose gắn thư mục chỉ đọc, CSP giữ nguyên. Bản cài cũ (realm không nạp lại):
+  `python3 scripts/moc.py realm theme` sau khi nâng cấp — chỉ đặt khi realm còn dùng theme mặc định, báo lỗi nếu
+  container chưa gắn thư mục theme (`docs/trien-khai.md`, mục Nâng cấp tay). Test scripts +14.
 - Trang Danh mục ứng dụng (`/ung-dung`, #166) trong Văn phòng điện tử, mục "Ứng dụng" ở thanh bên cho mọi vai trò: các
   ứng dụng chạy trên lõi — hai ứng dụng có sẵn trong lõi (phiên bản lõi từ `/api/status`) và ứng dụng cắm bằng `moc app
   install` — với tên, mô tả, nút Mở, phiên bản, lúc cài; lãnh đạo, quản trị đơn vị thấy thêm băm manifest (SHA-256 tệp
@@ -78,12 +78,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `nang` dựng image bản mới, kéo image dựng sẵn máy chưa có khi trang còn chạy, sao lưu bằng bản đang chạy, cài,
   chạy, đặt client và theme của realm rồi kiểm; `lui` cài lại bản cũ và khôi phục đúng lượt sao lưu đó; `ket` nâng két
   cũ (khóa `moc-anchor`, PKI, policy), lỗi giữa chừng thì gỡ listener tạm, hủy lượt tạo token dở, token root còn nằm
-  lại thì in lệnh thu hồi; `kiem` chạy hết các mục rồi báo mục trượt: dữ liệu không ít đi, dòng sổ cuối còn nguyên
-  băm, dịch vụ khỏe, phiên bản trên `/api/status`, realm, `audit verify`, smoke (thử lại một lần, chỉ khi trượt ở bước
-  hỏi đáp). Job cài thẻ phát hành trước, nạp mẫu, tạo văn bản hạn chế, nâng lên commit của PR, nâng két, lùi về; sau
-  mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
-  compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
-  dùng kịch bản thay cho các lệnh tay. Test scripts +18.
+  lại thì in lệnh thu hồi. Phần kiểm chạy hết các mục rồi báo mục trượt: dịch vụ khỏe, phiên bản trên `/api/status`,
+  realm, `audit verify`, smoke (thử lại một lần, chỉ khi trượt ở bước hỏi đáp); sau `nang` còn kiểm dữ liệu không ít
+  đi, dòng sổ cuối còn nguyên băm, dịch vụ chạy như trước (so với số liệu chụp lúc sao lưu). `lui` kiểm lại sau khi
+  khôi phục; `kiem` chỉ chạy phần kiểm. Job cài thẻ phát hành trước, nạp mẫu, tạo văn bản hạn chế, nâng lên commit
+  của PR, nâng két, lùi về; sau mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và
+  PR đổi migration, két, realm, compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và
+  `docs/van-hanh.md` (két cũ) dùng kịch bản thay cho các lệnh tay. Test scripts +18.
 - Kịch bản e2e chạy giao diện tiếng Anh (F2.9, #200): `tests/e2e/tieng-anh.spec.ts` bấm nút đổi ngôn ngữ ở thanh trên
   rồi kiểm theo vai trò và tên lấy nguyên văn từ `en.json`: menu, hộp việc, chuông thông báo, danh sách văn bản đến
   (tab, cột, trạng thái), soạn dự thảo (form trống bị chặn với lời báo tiếng Anh, lưu được), trang văn bản (trạng thái,
