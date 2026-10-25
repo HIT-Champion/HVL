@@ -34,7 +34,10 @@ const keyboardFocus = ref(false)
 const collapsed = computed(() => !mobile.value && !hovering.value && !keyboardFocus.value)
 const menuButton = ref<HTMLButtonElement | null>(null)
 let hoverExit: ReturnType<typeof setTimeout> | undefined
-function enterNavigation() {
+// Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
+// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung
+function moveInNavigation(event: PointerEvent) {
+  if (!event.movementX && !event.movementY) return
   clearTimeout(hoverExit)
   hovering.value = true
 }
@@ -214,7 +217,7 @@ async function logout() {
     <aside
       id="app-navigation" class="sg-sidebar" :aria-label="t('fe.navigation')"
       :inert="mobile && !open ? true : undefined"
-      @pointerenter="enterNavigation" @pointerleave="leaveNavigation"
+      @pointermove="moveInNavigation" @pointerleave="leaveNavigation"
       @focusin="focusNavigation" @focusout="blurNavigation"
     >
       <div class="sg-brand-row">
