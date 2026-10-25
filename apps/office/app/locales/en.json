@@ -1609,7 +1609,7 @@
     "noTasks": "No matching tasks",
     "tryFilter": "Try another filter or search term.",
     "loaded": "{n} documents in this list",
-    "filterDocuments": "Search number, subject, issuer…",
+    "filterDocuments": "Filter the list shown…",
     "listHint": "Track records and progress within your organization.",
     "loading": "Loading documents…",
     "receiveNew": "Receive a document",
