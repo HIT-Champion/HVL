@@ -44,6 +44,11 @@ test('tự chẩn đoán H-P-D-I: lãnh đạo trả lời, xem radar, lệch n�
   await expect(director.getByTestId('hpdi-score-d')).toHaveText('2')
   await expect(director.getByTestId('hpdi-gaps')).toContainText('[I] Trí tuệ cao hơn [D] Dữ liệu 2 mức')
   await expect(director.getByTestId('hpdi-focus')).toContainText('[D] Dữ liệu')
+  // tỷ trọng theo giáo trình DX-OS 2.4: [P] 15 %, [D] 7,5 %, [I] 22,5 % → Ảo giác công nghệ, cảnh báo GIGO dẫn tới cờ
+  // chất lượng số liệu ở Phả hệ số liệu
+  await expect(director.getByTestId('hpdi-shape-illusion')).toHaveText('Ảo giác công nghệ')
+  await expect(director.getByTestId('hpdi-shares')).toContainText('[H] 55 % · [P] 15 % · [D] 7,5 % · [I] 22,5 %')
+  await expect(director.getByTestId('hpdi-gigo').getByRole('link')).toHaveAttribute('href', '/pha-he#chat-luong')
   const step = director.getByTestId('hpdi-step-d')
   await expect(step).toContainText('Làm trước')
   await shot(director, '41-tu-chan-doan')
@@ -67,6 +72,9 @@ test('tự chẩn đoán H-P-D-I: lãnh đạo trả lời, xem radar, lệch n�
     for (const n of [1, 2, 3]) await manager.getByTestId(`hpdi-q-${space}${n}`).getByRole('radio').first().check()
   }
   // bước của [D] trỏ Điều hành, Số đo — trang của lãnh đạo đơn vị: chỉ hiện tên trang, không có liên kết
+  // toàn mức 1: Mũi giáo phân mảnh, không có cảnh báo GIGO
+  await expect(manager.getByTestId('hpdi-shape-spear')).toBeVisible()
+  await expect(manager.getByTestId('hpdi-gigo')).toHaveCount(0)
   const managerStep = manager.getByTestId('hpdi-step-d')
   await expect(managerStep).toContainText('Điều hành (trang của Lãnh đạo đơn vị)')
   await expect(managerStep.getByRole('link')).toHaveCount(0)

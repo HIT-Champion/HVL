@@ -17,19 +17,21 @@
 // Tự chẩn đoán H-P-D-I (trang /tu-chan-doan, docs/tu-chan-doan.md): bộ câu qua JSON Schema, đủ bốn không gian đúng thứ
 // tự, mỗi câu đúng 5 mức hai thứ tiếng; mọi liên kết "bước tiếp theo" trỏ trang có thật và chỉ dẫn người xem tới trang
 // vai trò của họ mở được (đối chiếu điều kiện của menu); bộ mã câu, phiên bản bộ câu khớp điều CSDL kiểm (đọc thẳng
-// migration 1792281603100); chấm điểm, lệch nền, nên làm trước, bước tiếp theo; bằng chứng đo được không bịa số khi
-// chưa có dữ liệu; trang chỉ cho lãnh đạo, chỉ lãnh đạo đơn vị lưu; đủ khóa i18n.
+// migration 1792281603100); chấm điểm, lệch nền, nên làm trước, bước tiếp theo; tỷ trọng, hình dạng và cảnh báo "rác
+// vào, rác ra" theo giáo trình DX-OS mục 2.4; bằng chứng đo được không bịa số khi chưa có dữ liệu; trang chỉ cho lãnh
+// đạo, chỉ lãnh đạo đơn vị lưu; đủ khóa i18n.
 
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import Ajv2020 from 'ajv/dist/2020.js'
 import type { Role } from '../app/composables/useAuth.ts'
-import type { HpdiEvidenceData, HpdiFramework, HpdiScores } from '../app/utils/hpdi.ts'
+import type { HpdiEvidenceData, HpdiFramework, HpdiScores, HpdiShares } from '../app/utils/hpdi.ts'
 
-const { HPDI_EVIDENCE, HPDI_KEYS, hpdiAccess, hpdiAnswered, hpdiCleanAnswers, hpdiComplete, hpdiEvidence, hpdiFocus,
-  hpdiGaps, hpdiLinkOpen, hpdiNextSteps, hpdiQuestions, hpdiRadarValues, hpdiRowScores, hpdiSample, hpdiSaveInput,
-  hpdiScores, hpdiText } = await import('../app/utils/hpdi.ts')
+const { HPDI_EVIDENCE, HPDI_KEYS, HPDI_QUALITY_LINK, HPDI_SHAPES, hpdiAccess, hpdiAnswered, hpdiCleanAnswers,
+  hpdiComplete, hpdiEvidence, hpdiFocus, hpdiGaps, hpdiGigo, hpdiLinkOpen, hpdiNextSteps, hpdiQuestions,
+  hpdiRadarValues, hpdiRowScores, hpdiSample, hpdiSaveInput, hpdiScores, hpdiShape, hpdiShares,
+  hpdiText } = await import('../app/utils/hpdi.ts')
 const { hasSpace } = await import('../../ca-nhan/public/para.js')
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -64,14 +66,15 @@ function officeRoutes(): Set<string> {
   }))
 }
 
-// Thanh bên (layouts/default.vue): mỗi mục menu là `if (<điều kiện theo role>) items.push({ to: '…'` hoặc không điều
-// kiện. Chạy đúng điều kiện đó với từng vai trò để biết vai trò nào mở được trang nào — trang đích chặn vai trò khác
-// theo cùng điều kiện (Hasura từ chối, trang báo không có quyền, hoặc chuyển hướng như /van-ban-den/tiep-nhan).
+// Thanh bên (layouts/default.vue): mỗi mục menu là `if (<điều kiện theo role>) items.push({ to: '…'` (hoặc khối
+// `if (…) {` chỉ có lệnh push đó, vd /ho-so, /pha-he) hoặc không điều kiện. Chạy đúng điều kiện đó với từng vai trò
+// để biết vai trò nào mở được trang nào — trang đích chặn vai trò khác theo cùng điều kiện (Hasura từ chối, trang báo
+// không có quyền, hoặc chuyển hướng như /van-ban-den/tiep-nhan).
 const ROLES = SCHEMA.$defs.link.properties.roles.items.enum as Role[]
 function menu(): Map<string, (role: Role) => boolean> {
   const out = new Map<string, (role: Role) => boolean>()
   const layout = read('../app/layouts/default.vue')
-  for (const m of layout.matchAll(/^\s*(?:if \((.+?)\) )?items\.push\(\{ to: '([^']+)'/gm)) {
+  for (const m of layout.matchAll(/^\s*(?:if \((.+?)\) \{?\s*)?items\.push\(\{\s*to: '([^']+)'/gm)) {
     out.set(m[2]!, new Function('role', `return Boolean(${m[1] ?? 'true'})`) as (role: Role) => boolean)
   }
   return out
@@ -181,6 +184,66 @@ test('nên làm trước: điểm thấp nhất từ [H] tới trước chỗ l�
   assert.equal(hpdiFocus(scores(5, 5, 4, 5)), 'd')
   assert.equal(hpdiFocus(scores(5, 5, 5, 5)), null)
   assert.equal(hpdiFocus(scores(null, null, null, null)), null)
+})
+
+test('tỷ trọng theo giáo trình 2.4.2: mức 1 → 0 %, mức 5 → 30 %, [H] là phần dư; thiếu [P], [D], [I] thì không', () => {
+  assert.deepEqual(hpdiShares(scores(1, 1, 1, 1)), { h: 100, p: 0, d: 0, i: 0 })
+  // đủ mức 5 ra đúng Kim cương của giáo trình: [H] 10 %, ba trục kia 30 %
+  assert.deepEqual(hpdiShares(scores(5, 5, 5, 5)), { h: 10, p: 30, d: 30, i: 30 })
+  assert.deepEqual(hpdiShares(scores(2, 3, 2, 4)), { h: 55, p: 15, d: 7.5, i: 22.5 })
+  // điểm không gian [H] không vào công thức: [H] của giáo trình là việc còn lại trên vai con người
+  assert.deepEqual(hpdiShares(scores(5, 3, 3, 3)), hpdiShares(scores(1, 3, 3, 3)))
+  assert.deepEqual(hpdiShares(scores(1, 2.67, 1, 1)), { h: 87.5, p: 12.5, d: 0, i: 0 })
+  assert.equal(hpdiShares(scores(3, null, 3, 3)), null)
+  assert.equal(hpdiShares(scores(null, 3, 3, 3))?.h, 55)
+})
+
+test('hình dạng theo giáo trình 2.4.3, luật đầu tiên khớp; ngưỡng đúng chỗ giáo trình ghi số', () => {
+  const shape = (p: number, d: number, i: number) => hpdiShape(hpdiShares(scores(3, p, d, i))!)
+  assert.equal(shape(5, 5, 5), 'diamond')
+  assert.equal(shape(4, 4, 4), 'diamond')
+  assert.equal(shape(1, 1, 4), 'illusion')        // AI khi chưa có móng quy trình
+  assert.equal(shape(2, 3, 1), 'illusion')        // phân tích (BI) đi trước quy trình
+  assert.equal(shape(4, 1, 1), 'kite')
+  assert.equal(shape(1, 1, 1), 'spear')
+  assert.equal(shape(3, 3, 3), 'transitional')
+  assert.equal(shape(4, 3, 1), 'transitional')    // [D] đã nhích khỏi tâm nhưng chưa vượt [P]
+  // ví dụ đối soát của giáo trình: P 10 %, D 0 %, I 0 % → H 90 %, Mức 1
+  assert.equal(hpdiShape({ h: 90, p: 10, d: 0, i: 0 }), 'spear')
+  const at = (p: number, d: number, i: number): HpdiShares => ({ h: 100 - p - d - i, p, d, i })
+  assert.equal(hpdiShape(at(22.5, 22.5, 22.5)), 'diamond')
+  assert.equal(hpdiShape(at(22.4, 22.5, 22.5)), 'transitional')
+  assert.equal(hpdiShape(at(19.9, 20, 0)), 'illusion')
+  assert.equal(hpdiShape(at(20, 20.1, 0)), 'transitional')   // [P] đã tới dải Cánh diều: không còn "suy giảm"
+  assert.equal(hpdiShape(at(9.9, 9.9, 0)), 'spear')           // chưa trục nào "vươn dài" (một phần ba trục)
+  assert.equal(hpdiShape(at(10, 10, 0)), 'spear')             // [D] bằng [P] không phải đi trước [P]; [H] 80 %
+  assert.equal(hpdiShape(at(20, 9.9, 9.9)), 'kite')
+  assert.equal(hpdiShape(at(20, 10, 0)), 'transitional')     // [D] tới một phần ba trục: không còn "triệt tiêu"
+  assert.equal(hpdiShape(at(10, 5, 5)), 'spear')              // [H] 80 %
+  assert.equal(hpdiShape(at(10, 5, 5.1)), 'transitional')
+  assert.deepEqual([...new Set([[5, 5, 5], [1, 1, 4], [4, 1, 1], [1, 1, 1], [3, 3, 3]].map(([p, d, i]) =>
+    shape(p!, d!, i!)))], HPDI_SHAPES)
+})
+
+test('rác vào, rác ra: [I] vượt [D] từ 1 mức, hoặc Ảo giác công nghệ; trỏ tới cờ chất lượng ở Phả hệ số liệu', () => {
+  const gigo = (h: number, p: number, d: number, i: number) => {
+    const sc = scores(h, p, d, i)
+    const shares = hpdiShares(sc)
+    return hpdiGigo(sc, shares ? hpdiShape(shares) : null)
+  }
+  assert.equal(gigo(4, 4, 2, 3), true)            // lệch nền D → I
+  assert.equal(gigo(4, 4, 2.5, 3), false)
+  assert.equal(gigo(3, 1, 3, 2), true)            // Ảo giác: [D] đi trước [P], dù [I] không vượt [D]
+  assert.equal(gigo(3, 4, 1, 1), false)           // Cánh diều: chưa có [I] nào để cảnh báo
+  assert.equal(gigo(3, 3, 3, 3), false)
+  assert.equal(gigo(5, 5, 5, 5), false)
+  assert.equal(hpdiGigo(scores(3, 3, 2, null), null), false)
+  // liên kết: đúng điều kiện vai trò của mục /pha-he trên thanh bên; lãnh đạo phòng chỉ thấy tên trang
+  const nav = menu()
+  assert.deepEqual(HPDI_QUALITY_LINK.roles, ROLES.filter((r) => opens(nav, HPDI_QUALITY_LINK.to, r)))
+  assert.equal(hpdiLinkOpen(HPDI_QUALITY_LINK, 'director'), true)
+  assert.equal(hpdiLinkOpen(HPDI_QUALITY_LINK, 'manager'), false)
+  assert.match(read('../app/pages/tu-chan-doan.vue'), /path: HPDI_QUALITY_LINK\.to, hash: '#chat-luong'/)
 })
 
 test('bước tiếp theo: câu có mức thấp nhất của mỗi không gian, bằng nhau lấy câu đầu, mức 5 thì thôi', () => {
@@ -319,6 +382,12 @@ test('khóa i18n của trang có ở cả vi.json và en.json, kể cả khóa g
   }
   assert.ok(checked > 40, `chỉ thấy ${checked} khóa`)
   assert.match(page, /t\(`hpdi\.evidence\.\$\{e\.id\}\.name`\)/)
+  assert.match(page, /t\(`hpdi\.shape\.\$\{shape\}\.name`\)/)
+  for (const shape of HPDI_SHAPES) {
+    for (const part of ['name', 'text']) {
+      assert.ok(lookup(vi, `hpdi.shape.${shape}.${part}`) && lookup(en, `hpdi.shape.${shape}.${part}`), shape)
+    }
+  }
   for (const id of Object.values(HPDI_EVIDENCE).flat()) {
     for (const part of ['name', 'value']) {
       assert.ok(lookup(vi, `hpdi.evidence.${id}.${part}`) && lookup(en, `hpdi.evidence.${id}.${part}`), `${id}.${part}`)
@@ -339,4 +408,10 @@ test('câu chữ nói rõ là tự đánh giá, không phải bộ chỉ số ch
   const urls = FRAMEWORK.sources.map((s) => s.url)
   assert.ok(urls.some((u) => u.includes('vfossa.vn') && u.includes('761')), 'thiếu bài 761')
   assert.ok(urls.some((u) => u.startsWith('https://opendigitransform.gitbook.io/dx-os/')), 'thiếu giáo trình DX-OS')
+  // CC BY 4.0: ghi công tác giả và giấy phép ở nguồn hiện trên trang, cả câu giải thích tỷ trọng
+  const book = FRAMEWORK.sources.find((x) => x.url.startsWith('https://opendigitransform.gitbook.io/'))!
+  for (const lang of ['vi', 'en'] as const) {
+    assert.match(book.title[lang], /Tạ Tuấn Anh, CC BY 4\.0/)
+    assert.match(lookup(lang === 'vi' ? vi : en, 'hpdi.shapeHint')!, /Tạ Tuấn Anh, CC BY 4\.0/)
+  }
 })
