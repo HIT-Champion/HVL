@@ -28,7 +28,7 @@ import pytest
 
 from conftest import TENANT_A, FakeChunkIndex
 from svc_files.assist.chunks import embed_input
-from svc_files.assist.index import CANARY, EMBEDDER_RETRY_S, ChunkIndexer, changed_at
+from svc_files.assist.index import CANARY, EMBEDDER_RETRY_S, MAX_HOLD_S, ChunkIndexer, changed_at
 from svc_files.assist.meili import embedder_name
 from svc_files.search import SearchError
 from test_assist_chunks import link, sentences, text
@@ -293,6 +293,27 @@ def test_hold_blocks_new_embedding_batches(hasura, index):
     indexer.hold(30)
     assert indexer.held and run(indexer.embed_once()) == 0
     clock.now += 31
+    assert not indexer.held and run(indexer.embed_once()) == 1
+
+
+def test_questions_in_a_row_hold_embedding_for_at_most_max_hold(hasura, index):
+    """#184: người hỏi lại mỗi 3 giây (dưới answer.HOLD_S) giữ vòng nền liền; cứ MAX_HOLD_S giây vòng nền vẫn nhúng
+    một lô rồi lại nhường, thôi hỏi thì nhúng tiếp ngay."""
+    add(hasura, pages=(sentences("A", 3),))
+    add(hasura, "Về việc khác", pages=(sentences("B", 3),))
+    add(hasura, "Về việc thứ ba", pages=(sentences("C", 3),))
+    clock = Clock()
+    indexer = ChunkIndexer(index, hasura, FakeEmbedder(), batch=1, clock=clock)
+    run(indexer.sync_once())
+    assert len(index.docs) == 3
+    start, batches = clock.now, []
+    while clock.now - start <= 2 * MAX_HOLD_S:
+        indexer.hold(5)                     # một lượt hỏi, như answer._holding
+        if run(indexer.embed_once()):
+            batches.append(clock.now - start)
+        clock.now += 3
+    assert batches == [MAX_HOLD_S, 2 * MAX_HOLD_S]
+    clock.now += 5
     assert not indexer.held and run(indexer.embed_once()) == 1
 
 

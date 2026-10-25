@@ -95,6 +95,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Makefile truyền `MOC_VERSION` rỗng, compose ưu tiên biến môi trường đã đặt (kể cả rỗng) hơn `.env` của bản cài
   nên bước kiểm tìm thẻ `dev` thay vì thẻ vừa dựng. Bước kiểm nay đặt đúng phiên bản như lúc dựng. Test scripts +3
   (`install.sh` thật với `docker` giả theo thứ tự ưu tiên của compose).
+- Trợ lý hỏi đáp không còn để văn bản mới chờ véc-tơ mãi khi có người hỏi liên tục (#184; smoke F4.2 trượt trên bản
+  online 1.1.0). Mỗi lượt hỏi giữ vòng nhúng nền 5 giây; người hỏi lại dày hơn thế (smoke hỏi lại mỗi khoảng 3 giây)
+  thì đoạn mới không được nhúng, không tìm được theo nghĩa, dù Ollama nhúng 4 đoạn chỉ mất 5 giây. Nay chuỗi giữ liền
+  quá 30 giây (`MAX_HOLD_S`) thì vòng nền vẫn nhúng một lô rồi lại nhường. Test svc-files thêm ca hỏi lại mỗi 3 giây.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
