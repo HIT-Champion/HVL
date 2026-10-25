@@ -399,6 +399,16 @@ Schema `moc_app` chỉ có hàm `moc_app.migration_done` (security definer): vai
 ứng dụng gọi nó cuối mỗi migration để kiểm đối tượng vừa tạo rồi ghi `core.app_migrations`
 ([`them-ung-dung.md`](them-ung-dung.md) mục 1.4).
 
+**Danh mục ứng dụng** (migration 1792281603400; trang `/ung-dung` của Văn phòng điện tử). View `core.app_catalog` là
+cửa đọc duy nhất của `core.apps` qua GraphQL, đúng 9 cột: `name`, `title`, `description` (= `manifest ->>
+'description'`, gọt khoảng trắng, trống thì `null`), `path`, `version`, `installed_at`, `updated_at`, `removed_at`,
+`manifest_sha256` (SHA-256 các byte của `app.yaml` lúc cài). Không có `manifest` (image, cổng, healthcheck, biến môi
+trường, cổng webhook), `schema_name`. Dữ liệu toàn hệ thống, không cột đơn vị: `clerk`, `staff`, `manager` đọc 7 cột
+đầu của ứng dụng chưa gỡ (`removed_at is null`); `director`, `tenant_admin` đọc cả 9 cột, mọi dòng; không vai trò nào
+ghi, `service` không đọc. Ứng dụng có sẵn trong lõi (Văn phòng điện tử, Không gian cá nhân) không cài bằng manifest
+nên không có ở đây — trang khai chúng trong `apps/office/app/utils/apps.ts` (test đối chiếu tên, đường giữ chỗ, route,
+image).
+
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
 create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
 giới giữa các đơn vị nằm ở nhiều lớp, lớp sau không tin lớp trước:
