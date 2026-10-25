@@ -1386,6 +1386,33 @@
     "gapsNone": "None: no later space is ahead of the one before it.",
     "gap": "{to} is {diff} levels above {from}.",
     "gapsHint": "Following the linear evolution principle H → P → D → I: a later space built on an earlier one that is not solid easily turns into “garbage in, garbage out”.",
+    "shapeTitle": "Shape",
+    "shape": {
+      "diamond": {
+        "name": "Complete diamond",
+        "text": "[P], [D] and [I] all reach near the top and little work is manual: processes stop errors, data is clean, AI runs on a solid base."
+      },
+      "illusion": {
+        "name": "Technology illusion",
+        "text": "[D] or [I] is ahead of [P]: analytics or AI built before the process foundation, so careless data entry turns into wrong results."
+      },
+      "kite": {
+        "name": "Off-centre kite",
+        "text": "[P] is solid but [D] and [I] are almost absent: work follows the process, but there are no figures to steer by (blind execution)."
+      },
+      "spear": {
+        "name": "Fragmented spear",
+        "text": "Most work still rests on people and [P], [D], [I] stay near the centre: the unit depends on a few key staff."
+      },
+      "transitional": {
+        "name": "In transition",
+        "text": "None of the four archetypes in the course book fits; see the foundation gaps and the space to work on first."
+      }
+    },
+    "shares": "Shares estimated as in the course book: [H] {h} % · [P] {p} % · [D] {d} % · [I] {i} %",
+    "shapeHint": "From the DX-OS course book, section 2.4 (Dr Tạ Tuấn Anh, CC BY 4.0): [P], [D] and [I] each take at most 30 %, converted from the score (level 1 is 0 %, level 5 is 30 %); [H] is the work left on people, 100 % minus the other three, not the [H] space score. The book also multiplies by an evidence factor; here it is 1 because every level already describes observable practice. A guide only, not a DTI score.",
+    "gigoTitle": "Garbage in, garbage out",
+    "gigo": "Intelligence and analytics rest on a weak base: [I] is above [D], or [D] and [I] are ahead of [P]. AI and reports that learn from wrong data give wrong results. Pause expanding [I] (agent suggestions, AI questions), standardise [P] and [D] first, and check the data quality flags of the reports:",
     "steps": "Next steps",
     "first": "Do first",
     "stepFrom": "from question {q} ({title}), currently at level {n}",

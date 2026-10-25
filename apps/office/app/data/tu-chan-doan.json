@@ -506,8 +506,8 @@
     },
     {
       "title": {
-        "vi": "Giáo trình \"Xây dựng Hệ điều hành Doanh nghiệp số (DX-OS)\", chương 2: mô hình HPDI, khung DTI, thuật toán ánh xạ và radar, khảo sát nhanh",
-        "en": "Course book \"Building a Digital Enterprise Operating System (DX-OS)\", chapter 2: the HPDI model, the DTI framework, the mapping algorithm and radar, the quick survey"
+        "vi": "Giáo trình \"Xây dựng Hệ điều hành Doanh nghiệp số (DX-OS)\" (TS. Tạ Tuấn Anh, CC BY 4.0), chương 2: mô hình HPDI, khung DTI, khảo sát nhanh; mục 2.4 (thuật toán ánh xạ, radar, bốn nguyên mẫu) là cơ sở của tỷ trọng, hình dạng và cảnh báo rác vào, rác ra",
+        "en": "Course book \"Building a Digital Enterprise Operating System (DX-OS)\" (Dr Tạ Tuấn Anh, CC BY 4.0), chapter 2: the HPDI model, the DTI framework, the quick survey; section 2.4 (mapping algorithm, radar, four archetypes) is the basis of the shares, the shape and the garbage-in, garbage-out warning"
       },
       "url": "https://opendigitransform.gitbook.io/dx-os/phan-i-tu-duy-chien-luoc/chuong-2-mo-hinh-hpdi-va-phuong-phap-danh-gia-nang-luc-so-dti"
     }

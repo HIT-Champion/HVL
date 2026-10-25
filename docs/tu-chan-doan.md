@@ -8,9 +8,9 @@ khung đó ở dạng làm được ngay: lãnh đạo trả lời 12 câu theo 
 đơn vị — để lãnh đạo đối chiếu điều mình tự khai với điều hệ thống thấy. Mức hoàn thiện ở
 [`muc-hoan-thien.md`](muc-hoan-thien.md).
 
-> **Không phải bộ chỉ số chính thức.** Câu hỏi do đội Signet tự viết. Trang không tính điểm DTI, không tính tỷ trọng
-> H% theo giáo trình DX-OS, không quy đổi sang bất kỳ thang nào của cơ quan nhà nước. Bộ câu chưa thử với đơn vị
-> thật nào (mục 6).
+> **Không phải bộ chỉ số chính thức.** Câu hỏi do đội Signet tự viết. Trang không tính điểm DTI, không quy đổi sang
+> bất kỳ thang nào của cơ quan nhà nước. Tỷ trọng H-P-D-I và hình dạng (mục 3) chỉ là ước lượng theo công thức của
+> giáo trình DX-OS, lấy mức tự đánh giá thay cho điểm DTI, để định hướng. Bộ câu chưa thử với đơn vị thật nào (mục 6).
 
 ## 1. Dùng thế nào
 
@@ -34,7 +34,7 @@ hai bộ khác nhau.
 | Nguồn | Lấy gì | Không lấy gì |
 |---|---|---|
 | VFOSSA, [Giới thiệu mô hình DX-OS và chủ đề cuộc thi Phần mềm nguồn mở OLP 2026](https://vfossa.vn/tin-tuc/gioi-thieu-mo-hinh-dx-os-va-chu-de-cuoc-thi-phan-mem-nguon-mo-olp-2026-761.html) (09/06/2026; tóm tắt ở [`du-thi/olp-2026-brief.md`](du-thi/olp-2026-brief.md) §1.2–1.3, §2.3) | Định nghĩa bốn không gian (H: môi trường làm việc số tích hợp — SSO, P.A.R.A, cổng nội bộ; P: luồng việc tự động, Poka-yoke; D: nguồn sự thật duy nhất, dashboard thời gian thực; I: tác tử tự hành); nguyên lý **tiến hóa tuyến tính bắt buộc** và **human-in-the-loop**; nhóm tác nhân lãnh đạo | — |
-| Giáo trình [DX-OS, chương 2](https://opendigitransform.gitbook.io/dx-os/phan-i-tu-duy-chien-luoc/chuong-2-mo-hinh-hpdi-va-phuong-phap-danh-gia-nang-luc-so-dti) (đọc ngày 25/10/2026) | Mục 2.1: năm nấc vai trò của con người (từ "người thực thi" tới "kiến trúc sư") — gợi ý cho câu H3; mục 2.4: vẽ HPDI trên radar bốn trục và nguyên mẫu "ảo giác công nghệ" (trục sau vươn ra khi trục trước chưa vững) — gợi ý cho cảnh báo lệch nền; mục 2.6: hỏi "mất bao lâu để có con số" — gợi ý cho câu D1 | Không chép câu hỏi Mini-DTI (mục 2.6); không tính `X% = DTI_X / max × X_supp × 30%`, `H% = 100 − (P + D + I)` (mục 2.4) vì cần điểm DTI đầy đủ và hệ số thực chứng mà trang không có; không đặt tên mức theo 5 cấp DTI — mục 2.2 nói rõ 5 cấp DTI và 5 nấc HPDI là hai thước đo khác nhau |
+| Giáo trình [DX-OS, chương 2](https://opendigitransform.gitbook.io/dx-os/phan-i-tu-duy-chien-luoc/chuong-2-mo-hinh-hpdi-va-phuong-phap-danh-gia-nang-luc-so-dti) của TS. Tạ Tuấn Anh, giấy phép [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (đọc ngày 25/10/2026) | Mục 2.1: năm nấc vai trò của con người (từ "người thực thi" tới "kiến trúc sư") — gợi ý cho câu H3; mục 2.4.2: công thức tỷ trọng `X% = DTI_X / max × X_supp × 30%`, `H% = 100 − (P + D + I)`; mục 2.4.3: bốn nguyên mẫu trên radar tỷ trọng (Mũi giáo phân mảnh, Cánh diều lệch tâm, Ảo giác công nghệ, Kim cương toàn vẹn) và rủi ro "rác vào, rác ra" của Ảo giác công nghệ — cơ sở của tỷ trọng, hình dạng, cảnh báo GIGO (mục 3); mục 2.6: hỏi "mất bao lâu để có con số" — gợi ý cho câu D1 | Không chép câu hỏi Mini-DTI (mục 2.6); không có điểm DTI đầy đủ và hệ số thực chứng: tỷ trọng dùng mức tự đánh giá thay cho `DTI_X / max` và `X_supp = 1` (mục 3); không đặt tên mức theo 5 cấp DTI — mục 2.2 nói rõ 5 cấp DTI và 5 nấc HPDI là hai thước đo khác nhau; không lấy mã, ngưỡng của bài dự thi nào khác |
 
 Mục 2.2 của giáo trình ghi khung DTI doanh nghiệp kế thừa Quyết định 1567/QĐ-BKHCN; đội chưa đọc văn bản gốc của
 quyết định này và trang không dùng gì từ đó.
@@ -65,8 +65,30 @@ Phép tính ở [`apps/office/app/utils/hpdi.ts`](../apps/office/app/utils/hpdi.
   `roles` khai đúng như menu, lãnh đạo phòng không được dẫn tới Điều hành, Số đo, Sổ đăng ký, Sổ kiểm toán, và không
   ai được dẫn tới trang Tiếp nhận văn bản (trang chuyển vai trò khác văn thư về Văn bản đến).
 
-Ngưỡng 1 mức và quy tắc "nên làm trước" là lựa chọn của đội để diễn đạt nguyên lý của bài 761, không có trong tài liệu
-của Ban tổ chức.
+- **Tỷ trọng** (giáo trình mục 2.4.2): `P% = (mức P − 1) / 4 × 30 %`, `D%`, `I%` như vậy (mức 1 → 0 %, mức 5 →
+  30 %); `H% = 100 % − (P% + D% + I%)` là phần việc còn lại trên vai con người. Giáo trình nhân thêm hệ số thực chứng
+  (phần mềm có liên thông thật không); trang lấy bằng 1 vì mỗi mức của bộ câu đã tả việc quan sát được, không tả phần
+  mềm sở hữu, còn bằng chứng đo được (mục 4) đặt cạnh để đối chiếu chứ không nhân vào. Điểm không gian [H] của bộ câu
+  (không gian làm việc số) không vào công thức: H% của giáo trình là phần dư, không phải mức của không gian [H]. Đủ
+  mức 5 ra đúng Kim cương của giáo trình: [H] 10 %, ba trục kia 30 %.
+- **Hình dạng** (giáo trình mục 2.4.3): xét theo thứ tự, luật đầu tiên khớp. Ngưỡng có số lấy từ giáo trình; chỗ
+  giáo trình chỉ tả bằng lời ("co cụm sát tâm", "triệt tiêu", "vươn dài") thì đội lấy một phần ba trục (10 %).
+
+  | Hình dạng | Luật | Giáo trình tả |
+  |---|---|---|
+  | Kim cương toàn vẹn | [P], [D], [I] đều từ 22,5 % (mức 4) | "[P], [D], [I] mở rộng đối xứng, đạt đỉnh 30 % mỗi trục", [H] 10 % |
+  | Ảo giác công nghệ | [D] hoặc [I] từ 10 %, vượt [P], và [P] dưới 20 % | "Trục [I] hoặc [D] vươn dài … đi kèm sự suy giảm của trục [P]"; rủi ro GIGO |
+  | Cánh diều lệch tâm | [P] từ 20 %, [D] và [I] dưới 10 % | "[P] … (20 % – 30 %). Trục [D] và [I] vẫn ở trạng thái triệt tiêu" |
+  | Mũi giáo phân mảnh | [H] từ 80 % | "[H] (chiếm 80 % – 90 %)" |
+  | Đang chuyển tiếp | không khớp luật nào | giáo trình chỉ tả bốn nguyên mẫu "phổ biến" |
+
+- **Rác vào, rác ra (GIGO)**: [I] cao hơn [D] từ 1 mức (lệch nền D → I), hoặc hình dạng Ảo giác công nghệ. Trang
+  khuyên tạm dừng mở rộng [I] (gợi ý của tác tử, hỏi đáp AI), chuẩn hóa [P], [D] trước, và dẫn tới mục "Kiểm chất
+  lượng số liệu" của trang Phả hệ số liệu (`/pha-he#chat-luong`) — cờ Đạt / Cảnh báo / Trượt của các báo cáo, chỉ lãnh
+  đạo đơn vị xem được; lãnh đạo phòng thấy tên trang và vai trò.
+
+Ngưỡng 1 mức, quy tắc "nên làm trước", cách quy mức sang tỷ trọng, hệ số thực chứng bằng 1 và ngưỡng một phần ba trục
+là lựa chọn của đội để diễn đạt nguyên lý của bài 761 và giáo trình, không có trong tài liệu của Ban tổ chức.
 
 ## 4. Bằng chứng đo được
 
@@ -120,13 +142,15 @@ Migration `1792281603100_maturity_assessments`, metadata `office_maturity_assess
 - Bằng chứng đo được chỉ phủ phần việc văn bản mà Signet quản lý; đơn vị dùng phần mềm khác cho việc khác thì số không
   phản ánh phần đó. Trên bản demo, số tính trên dữ liệu mẫu (vài giây mỗi bước, không phải nhịp làm việc thật).
 - Lãnh đạo phòng không lưu được và không thấy bằng chứng của đơn vị.
+- Tỷ trọng và hình dạng dựng trên mức tự đánh giá, không trên điểm DTI và hệ số thực chứng như giáo trình: hai đơn vị
+  cùng hình dạng chưa chắc cùng thực trạng. Chỉ để gợi chuyện, không dùng để xếp hạng.
 - Mỗi đơn vị lưu tối đa 5 lần mỗi giờ: đủ cho một buổi đánh giá lại, nhưng chạy e2e quá 5 lần trong một giờ trên cùng
   CSDL sẽ đỏ ở bước lưu.
 
 ## 7. Kiểm
 
 ```bash
-cd apps/office && npm test                               # tests/hpdi.test.ts: bộ câu, liên kết, chấm điểm, bằng chứng
+cd apps/office && npm test                               # tests/hpdi.test.ts: bộ câu, liên kết, chấm điểm, hình dạng
 db/tests/stack.sh up && cd db/tests && MOC_IT=1 .venv/bin/python -m pytest test_maturity.py   # quyền, trigger, sổ
 make e2e                                                 # tests/e2e/tu-chan-doan.spec.ts, cần hệ thống đang chạy
 ```
