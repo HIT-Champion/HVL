@@ -319,9 +319,11 @@ gh pr create --base main --head develop --title "chore(release): v1.1.0" --body 
 # 3. Gắn thẻ trên main mới nhất, cây làm việc sạch:
 git switch main && git pull
 make release VERSION=1.1.0       # tạo thẻ v1.1.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
+#    rồi kiểm chính gói vừa đóng (scripts/kiem_goi.py, xem dưới): không đạt thì gỡ thẻ v1.1.0, xóa gói, in từng lỗi —
+#    sửa qua PR như thường rồi chạy lại
 
-# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, rồi tạo Release kèm .tar.gz, SBOM .cdx.json
-#    (make sbom) và .sha256 của cả hai
+# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, đóng gói và kiểm lại gói bằng cùng
+#    scripts/kiem_goi.py, rồi mới tạo Release kèm .tar.gz, SBOM .cdx.json (make sbom) và .sha256 của cả hai
 git push origin v1.1.0
 ```
 
@@ -347,6 +349,19 @@ gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào 
 - `release.yml` dựng trang Release bằng `scripts/release_body.py`: dòng đầu ghi **tệp chính thức là
   `signet-X.Y.Z.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)" mà PoF #3 trừ điểm định dạng không mở), rồi
   phần tóm tắt, toàn bộ ghi chép thay đổi gập lại.
+- **Kiểm gói trước khi phát hành** (`scripts/kiem_goi.py`, `make release` ở máy và bước "Kiểm gói trước khi phát
+  hành" của `release.yml`, ngay sau bước đóng gói): kiểm chính tệp `signet-X.Y.Z.tar.gz`, không phải cây git. Giải nén
+  vào thư mục tạm (mục nào là symlink, đường tuyệt đối, `..` thì dừng trước khi giải nén) rồi chặn: tệp môi trường thật
+  (chỉ phát hành tệp mẫu `*.example`), khóa riêng (`id_rsa`, `*.key`, `*.p12`…, và mọi tệp có khối PEM `PRIVATE KEY`),
+  tài liệu nội bộ `*.local*`, `COMMIT.md`, `publics/`, `node_modules/`, `__pycache__/`, dữ liệu chạy ở gốc
+  (`backups/`, `data/`…), tệp CSDL, tệp lớn hơn 5 MiB (tệp lớn nhất lúc viết 0,44 MB). Giấy phép: có `LICENSE`,
+  `NOTICE`; `scripts/license-header.sh check <thư mục gói>`; mọi tệp có `SPDX-License-Identifier` và bản quyền trong
+  tệp, hoặc được `REUSE.toml` khai. Cuối cùng `.sha256` khớp và ghi đúng tên gói, thư mục gốc là `signet-X.Y.Z/`, tệp
+  `VERSION` của gói ghi `vX.Y.Z`. Tệp phải theo dõi trong git nhưng không được vào gói: thêm dòng
+  `<đường dẫn> export-ignore` vào `.gitattributes`.
+- Phiên bản trong gói: `git archive` điền thẻ vào dòng cuối của `VERSION` (`.gitattributes`: `VERSION export-subst`),
+  `make install` từ gói giải nén đọc dòng đó, không cần đặt tay `MOC_VERSION`; bản clone git vẫn lấy `git describe`.
+  Gói cũ chưa có tệp `VERSION` (đến `v1.1.0`) thì vẫn đặt tay.
 - Không xóa hay gắn lại thẻ đã đẩy — ruleset thẻ `v*` chặn hẳn, `release.yml` và `release.sh` cũng từ
   chối phát hành lại. Phát hành nhầm thì ra bản vá `vX.Y.Z+1`.
 

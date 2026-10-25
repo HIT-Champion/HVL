@@ -80,6 +80,14 @@ jobs:
                       -o "dist/signet-$V.tar.gz" "$GITHUB_REF_NAME"
           ( cd dist && sha256sum "signet-$V.tar.gz" > "signet-$V.tar.gz.sha256" )
 
+      # Kiểm chính gói sẽ đăng, không phải cây git — cùng script với make release ở máy: giải nén vào thư mục tạm, chặn
+      # tệp không được phát hành (tệp môi trường thật, khóa riêng, tài liệu nội bộ *.local*, node_modules…, tệp quá
+      # lớn), kiểm giấy phép từng tệp (header, REUSE.toml), LICENSE, NOTICE, .sha256, thư mục gốc signet-X.Y.Z/, VERSION
+      - name: Kiểm gói trước khi phát hành
+        env:
+          V: ${{ steps.ver.outputs.version }}
+        run: python3 scripts/kiem_goi.py "dist/signet-$V.tar.gz" --version "$V"
+
       # Danh mục thành phần (SBOM CycloneDX, Syft) của đúng cây mã nguồn được gắn thẻ, kèm .sha256: người dùng biết bản
       # phát hành kéo theo những gói npm, Python, action nào, giấy phép gì, và đối chiếu được với cơ sở dữ liệu lỗ hổng
       # (osv-scanner scan source -L signet-X.Y.Z.cdx.json) mà không cần dựng. Cùng lệnh với job "Giấy phép (PoF #2)"

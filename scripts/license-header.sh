@@ -25,12 +25,14 @@
 #
 #   ./scripts/license-header.sh check   # liệt kê tệp thiếu header, thoát 1 nếu có
 #   ./scripts/license-header.sh fix     # tự chèn header vào các tệp thiếu
+#   ./scripts/license-header.sh check <thư mục>   # kiểm thư mục khác, vd. gói .tar.gz đã giải nén
+#                                                 # (scripts/kiem_goi.py)
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT"
+cd "${2:-$REPO_ROOT}"
 
 COPYRIGHT_HOLDER="${MOC_COPYRIGHT_HOLDER:-Signet Team}"
 COPYRIGHT_YEAR="${MOC_COPYRIGHT_YEAR:-2026}"
@@ -79,6 +81,9 @@ comment_style_for() {
       echo "html" ;;
     *.css|*.scss|*.less)
       echo "css" ;;
+    # Tệp phiên bản ở gốc: header dạng #, dòng cuối git archive điền thẻ (scripts/kiem_goi.py kiểm)
+    VERSION)
+      echo "line #" ;;
     *) echo "" ;;
   esac
 }
@@ -96,13 +101,23 @@ is_non_source() {
   return 1
 }
 
-# Liệt kê tệp mã nguồn do dự án viết (Git theo dõi, bỏ qua tài liệu và dữ liệu).
+# Tệp cần xét: trong repo là tệp Git theo dõi. Thư mục không có .git (gói .tar.gz đã giải nén) thì mọi tệp trong đó —
+# git ls-files ở đó không ra tệp nào và lượt kiểm sẽ qua mà không xét gì.
+list_files() {
+  if [ -e .git ]; then
+    git ls-files -z 2>/dev/null | tr '\0' '\n'
+  else
+    find . -type f | sed 's#^\./##' | LC_ALL=C sort
+  fi
+}
+
+# Liệt kê tệp mã nguồn do dự án viết (bỏ qua tài liệu và dữ liệu).
 # Tệp có loại chưa hỗ trợ được ghi vào $UNSUPPORTED để cảnh báo thay vì bỏ qua im lặng.
 UNSUPPORTED="$(mktemp)"
 trap 'rm -f "$UNSUPPORTED"' EXIT
 
 source_files() {
-  git ls-files -z 2>/dev/null | tr '\0' '\n' | while read -r f; do
+  list_files | while read -r f; do
     [ -f "$f" ] || continue
     is_non_source "$f" && continue
     if [ -n "$(comment_style_for "$f")" ]; then
