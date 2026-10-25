@@ -85,6 +85,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
   dùng kịch bản thay cho các lệnh tay. Test scripts +18.
 
+### Đã sửa đổi
+- Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
+  chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
+  thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi
+  nhầm `v1.1.0`), `ROADMAP.md`, `docs/architecture.md`.
+
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
   Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura

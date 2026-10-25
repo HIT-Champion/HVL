@@ -18,11 +18,11 @@
 | **2** — Ứng dụng [P] Văn phòng điện tử | 26/10–08/11 | Văn bản đến: tiếp nhận → kiểm dịch → vào sổ → chỉ đạo → xử lý; văn bản đi: soạn → trình → duyệt → cấp số → phát hành PDF có mã QR. Sổ kiểm toán chuỗi băm; cổng xác thực văn bản công khai. Chạy end-to-end, có test tự động | `v0.2.0` |
 | **3** — 4 nguyên lý + [D]                   | 09–20/11    | Một màn demo cho mỗi nguyên lý (i)–(iv); lưu trữ chống sửa xóa; dashboard điều hành                                                                                                                                                                               | `v0.5.0` |
 | **4** — [I] / **đệm**                | 21–25/11    | Đọc văn bản đến, trợ lý hỏi đáp, tác tử gợi ý giao việc — hoặc dùng làm đệm nếu trễ                                                                                                                                                                     | `v0.9.0` |
-| **5** — Đóng gói, nộp bài                | 26/11–06/12 | Đóng băng tính năng, tự chấm PoF, gửi thư 05/12                                                                                                                                                                                                                        | `v1.1.0` |
+| **5** — Đóng gói, nộp bài                | 26/11–06/12 | Đóng băng tính năng, tự chấm PoF, gửi thư 05/12                                                                                                                                                                                                                        | `v1.3.0` |
 
-Phiên bản thực tế: các phần việc của Phase 1–4 làm xong sau `v0.1.0` được phát hành chung trong `v1.0.0` (23/10) và
-`v1.1.0` (trước vòng trường 01/11); không phát hành riêng `v0.2.0`, `v0.5.0`, `v0.9.0`. Bản nộp chấm của Phase 5 là
-`v1.2.0`.
+Phiên bản thực tế: các phần việc của Phase 1–4 làm xong sau `v0.1.0` được phát hành chung trong `v1.0.0` (23/10),
+`v1.1.0` (25/10) và `v1.2.0` (30/10, bản cho vòng trường 01/11); không phát hành riêng `v0.2.0`, `v0.5.0`, `v0.9.0`.
+Bản nộp chấm của Phase 5 là `v1.3.0`.
 
 ### Ưu tiên (MoSCoW)
 
@@ -352,14 +352,14 @@ Không dùng framework AI: truy xuất, trả lời và tác tử tự viết tr
 
 ---
 
-## Phase 5 — Đóng gói và nộp bài (26/11–06/12) → `v1.2.0`
+## Phase 5 — Đóng gói và nộp bài (26/11–06/12) → `v1.3.0`
 
 | Ngày           | Việc                                                                                                                                                                                                                  |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 26/11           | **Đóng băng tính năng** — từ đây chỉ sửa lỗi                                                                                                                                                         |
 | 26–30/11       | Tự chấm theo `pof-checklist.md` (Backend chủ trì). Nhờ **một người ngoài đội** cài từ README trên máy sạch, cài ra PREFIX ngoài thư mục nguồn và chạy được (PoF #4)                  |
 | 26–30/11       | Rà tài liệu (đã viết dần theo PR): kiến trúc, API, vận hành (sao lưu/phục hồi/nâng cấp), `demo-script.md`, `ROADMAP.md` sau cuộc thi; đối chiếu `DEPENDENCIES.md` với phiên bản đã ghim |
-| 03/12           | Release `v1.2.0`: `.tar.gz` + `.sha256` + CHANGELOG. Dòng đầu ghi chú phát hành (`release.yml` tự ghi) chỉ rõ **tệp chính thức là `.tar.gz`** (GitHub luôn tự gắn "Source code (zip)" và không gỡ được) |
+| 03/12           | Release `v1.3.0`: `.tar.gz` + `.sha256` + CHANGELOG. Dòng đầu ghi chú phát hành (`release.yml` tự ghi) chỉ rõ **tệp chính thức là `.tar.gz`** (GitHub luôn tự gắn "Source code (zip)" và không gỡ được) |
 | **05/12** | **Gửi thư nộp bài**                                                                                                                                                                                          |
 | Từ 17:00 06/12 | **Không push lên nhánh chính** — kho mã được chấm 7–9/12. Slide và video làm ở nhánh hoặc repo khác                                                                                             |
 | 07–09/12       | Slide 15 phút theo 4 phần BTC yêu cầu, mở đầu bằng bài toán (§1) và kết bằng số đo trước/sau; quay video demo dự phòng; tập ít nhất 3 lần; kiểm tra VPS trước giờ thi                      |
