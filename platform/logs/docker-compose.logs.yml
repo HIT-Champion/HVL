@@ -25,6 +25,9 @@ x-fluentd: &fluentd
   options:
     fluentd-address: 127.0.0.1:${MOC_LOGS_FLUENT_PORT:-24224}
     fluentd-async: "true"                 # Vector chưa lên hay chết thì dịch vụ vẫn chạy, dockerd đệm rồi bỏ
+    # Chờ Vector báo nhận từng dòng (#226). Không có thì dòng ghi vào kết nối đã chết (Vector chạy lại, container lên
+    # trước Vector) mất mà không báo lỗi; có thì driver nối lại rồi gửi lại dòng đó
+    fluentd-request-ack: "true"
     fluentd-sub-second-precision: "true"
     tag: "{{.Name}}"
     labels: com.docker.compose.service

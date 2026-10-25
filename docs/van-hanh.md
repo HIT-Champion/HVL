@@ -545,6 +545,15 @@ make logs-down                     # tắt: 8 dịch vụ về json-file, dừng
   bỏ — dịch vụ không bị chặn. Bản cục bộ (`docker logs`) vẫn còn. Đo bằng driver thật (kiểm thử độc lập, 23/10/2026):
   dừng Vector (`docker stop -t 1`) thì mất 13 dòng đang trong lô của Vector; dòng của container chạy lâu ghi lúc
   Vector chết vẫn tới sau khi Vector chạy lại; container ngắn hạn ghi lúc Vector chết thì mất hết (0/100 000 dòng).
+  Số đo này có trước khi bật báo nhận (mục dưới).
+- **Báo nhận từng dòng** (`fluentd-request-ack: "true"`, #226): driver gửi kèm mã `chunk`, Vector trả `ack` ngay khi
+  dòng đã vào pipeline. Vector không bật `acknowledgements` đầu-cuối nên không chờ Parseable lưu. Không có `ack` (kết
+  nối đã chết vì Vector chạy lại hay container lên trước khi Vector nghe cổng) thì driver đóng kết nối, nối lại rồi gửi
+  lại dòng đó. Trước #226, dòng đầu tiên của một dịch vụ im lâu (PostgreSQL, Keycloak) ghi vào kết nối chết thì mất mà
+  không báo lỗi. `make demo-log-tap-trung` (bước 8) kiểm việc này. Hệ quả:
+  - Vector nhận dòng rồi chết trước khi kịp trả `ack` thì dòng đó tới kho hai lần;
+  - mỗi container gửi lần lượt từng dòng và chờ `ack` rồi mới gửi tiếp. Việc chờ nằm trong dockerd: dịch vụ vẫn không
+    bị chặn (`mode: non-blocking`), dòng chưa gửi nằm trong bộ đệm như khi Vector chết.
 - **Lớp che của Vector không thay được F4.4:** chỉ thu dịch vụ đã che; dịch vụ mới muốn thu thì phải che trong chính nó
   trước.
 - `X-Request-Id` do client đặt được (APISIX giữ mã client gửi). `svc-workflow` chỉ nhận mã khớp
