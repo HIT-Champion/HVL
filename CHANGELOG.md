@@ -7,6 +7,23 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 
 ## [Chưa phát hành]
 
+## [1.1.0] - 2026-10-25
+
+Bản cho vòng trường. Lõi Signet có thêm ứng dụng thứ hai và cắm được ứng dụng mới bằng một lệnh; cổng có tường lửa
+ứng dụng web; Văn phòng điện tử có giao diện hồ sơ, phòng đọc và phả hệ của từng biểu đồ báo cáo.
+
+- Ứng dụng trên lõi: Không gian cá nhân P.A.R.A (`/ca-nhan/`); `moc app install` cài ứng dụng từ manifest mà không
+  sửa tệp nào của lõi, ví dụ Bảng tin đơn vị (`apps/bang-tin`) nghe luồng sự kiện đã làm sạch `core.app_events`.
+- Văn phòng điện tử: giao diện hồ sơ công việc, lãnh đạo phòng nộp lưu theo yêu cầu, phòng đọc xem tệp có dấu tên
+  người xem (F3.8; nộp lưu nền đã có từ 1.0.0); phả hệ của từng biểu đồ báo cáo: biểu đồ ← khung nhìn ← bảng (F3.9,
+  F3.11); tự chẩn đoán H-P-D-I cho lãnh đạo (F4.7); góp ý và số đo "sau" (F4.6).
+- Bảo mật: WAF Coraza + OWASP CRS ở APISIX (F3.15), chặn mặc định, mỗi loại trừ có lý do và số đo; giao diện báo rõ
+  khi cổng chặn; nâng pypdf 6.21.2 (ba GHSA) và gỡ pip khỏi image của dịch vụ.
+- Dữ liệu và vận hành: API nạp lô văn bản đến; log tập trung Vector + Parseable (tắt mặc định); thông báo email;
+  trang Trạng thái công khai; SBOM CycloneDX kèm mỗi bản phát hành.
+- Kho mã: cấu hình phần mềm nguồn mở gom vào `platform/`, khai giấy phép REUSE, repo đổi tên `HIT-Champion/Signet`,
+  gói phát hành `signet-X.Y.Z.tar.gz`; CI chia năm phần chạy song song.
+
 ### Đã thêm
 - API nạp lô văn bản đến (cụm ⑤ Tầng 1): `POST /api/imports/incoming` nhận NDJSON hoặc CSV cùng trường với
   `receiveIncoming`, kèm zip tệp đính kèm tùy chọn. svc-files xử lý nền theo mẻ; mỗi dòng đi đúng đường tiếp nhận lẻ —
