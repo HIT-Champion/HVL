@@ -17,25 +17,21 @@
 -->
 
 <script setup>
+
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { init, use } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
+import { RadarChart } from 'echarts/charts';
+import { RadarComponent } from 'echarts/components';
 
 // Biểu đồ Apache ECharts (dashboard điều hành, F3.11). Chỉ nạp phần dùng đến; vẽ SVG để chữ sắc khi in và chụp.
 // Số liệu luôn có bảng đi kèm ở trang gọi: biểu đồ chỉ để nhìn nhanh, aria-label tóm tắt cho trình đọc màn hình.
 use([BarChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
-const props = defineProps({
-  option: {
-    type: Object,
-    required: true
-  },
-  label: {
-    type: String,
-    required: true
-  },
-  height: Number
-});
+// Radar bốn trục của trang Tự chẩn đoán H-P-D-I
+use([RadarChart, RadarComponent]);
+
+const props = defineProps({ option: { type: Object, required: true }, label: { type: String, required: true }, height: { type: Number, default: 256 } });
 const el = ref(null);
 let chart = null;
 let observer = null;
@@ -43,23 +39,17 @@ let observer = null;
 // Cùng phông chữ với trang
 function withFont(option) {
   const fontFamily = el.value ? getComputedStyle(el.value).fontFamily : undefined;
-  return {
-    textStyle: {
-      fontFamily
-    },
-    ...option
-  };
+  return { textStyle: { fontFamily }, ...option };
 }
+
 onMounted(() => {
   if (!el.value) return;
-  chart = init(el.value, undefined, {
-    renderer: 'svg'
-  });
+  chart = init(el.value, undefined, { renderer: 'svg' });
   chart.setOption(withFont(props.option));
   observer = new ResizeObserver(() => chart?.resize());
   observer.observe(el.value);
 });
-watch(() => props.option, option => chart?.setOption(withFont(option), true));
+watch(() => props.option, (option) => chart?.setOption(withFont(option), true));
 onBeforeUnmount(() => {
   observer?.disconnect();
   chart?.dispose();
