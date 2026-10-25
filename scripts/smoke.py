@@ -35,9 +35,11 @@ chế không được gợi ý; mỗi gợi ý một dòng sổ không chứa tr
 khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ kiểm khi MOC_SLA_DURATION ngắn, CI đặt
 PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ có con số tổng), văn thư không đọc được. Văn
 bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người xem, chỉ người có tên trong danh sách được xem (người
-nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả chuỗi
-ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị, đơn vị khác không thấy văn
-bản; văn thư đăng nhập — trên trình duyệt hay qua client moc-cli của kịch bản — phải nhập mã TOTP; giới hạn tốc độ.
+nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, mốc chép ra tệp
+có chữ ký của két, tính lại cả chuỗi ngoài CSDL và kiểm chữ ký (moc audit verify); chứng thư CA, khóa công khai ký mốc
+neo tải được ở cổng xác thực không cần token, vân tay khớp két. Kèm các kiểm tra chặn: tệp EICAR, không token, đường
+quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập — trên trình duyệt hay qua client moc-cli của kịch bản —
+phải nhập mã TOTP; giới hạn tốc độ.
 """
 
 from __future__ import annotations
@@ -55,6 +57,7 @@ import ssl
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -98,6 +101,42 @@ def vault_status() -> dict:
 
 def header(headers: dict[str, str], name: str) -> str | None:
     return next((v for k, v in headers.items() if k.lower() == name.lower()), None)
+
+
+def pem_sha256(pem: str) -> str:
+    """SHA-256 (hex) của DER trong khối PEM đầu tiên — như `openssl x509 -fingerprint -sha256`, `openssl pkey -outform
+    DER | sha256sum`."""
+    lines = pem.strip().splitlines()
+    end = next(i for i, line in enumerate(lines) if line.startswith("-----END "))
+    return hashlib.sha256(base64.b64decode("".join(lines[1:end]))).hexdigest()
+
+
+# Khóa moc-anchor đúng như két trả (transit/keys, 32 byte base64), đọc bằng AppRole của svc-files; két cũ: null
+VAULT_ANCHOR_KEY = (
+    "import asyncio, json, os\n"
+    "from svc_files.config import Settings\n"
+    "from svc_files.openbao import with_secrets\n"
+    "from svc_files.sealed import Vault, VaultError\n"
+    "s = Settings.from_env(with_secrets(os.environ))\n"
+    "v = Vault(s.vault_addr, role_id_file=s.vault_role_id_file, secret_id_file=s.vault_secret_id_file)\n"
+    "try:\n"
+    "    info = asyncio.run(v.transit_key('moc-anchor'))\n"
+    "except VaultError:\n"
+    "    info = None\n"
+    "print(json.dumps(info and {'type': info['type'],"
+    " 'public_key': info['keys'][str(info['latest_version'])]['public_key']}))\n"
+)
+# DER SubjectPublicKeyInfo của Ed25519 = tiền tố cố định + 32 byte khóa (RFC 8410)
+ED25519_SPKI = bytes.fromhex("302a300506032b6570032100")
+
+
+def public_pem(path: str) -> tuple[str | None, dict[str, str], int]:
+    """Tệp PEM công khai ở cổng xác thực, gọi không token → (nội dung hoặc None, tiêu đề, mã HTTP)."""
+    try:
+        status, headers, body = request("GET", f"{PUBLIC_URL}{path}")
+        return body.decode(), headers, status
+    except HTTPError as exc:
+        return None, {}, exc.status
 
 
 class BrowserCookies(http.cookiejar.DefaultCookiePolicy):
@@ -724,6 +763,32 @@ def main() -> None:
         ok("CSDL: chữ ký của bản phát hành ghi khóa moc-ky-so-<đơn vị> (Transit), cùng số sê-ri với cổng xác thực;"
            " trong kho không chữ ký nào gắn với văn bản hạn chế")
 
+    # #56 và mốc neo công khai: chứng thư CA, khóa công khai ký mốc neo tải được ở cổng xác thực không cần token (qua
+    # APISIX, WAF — loại trừ 10050 cho đuôi .pem); vân tay khớp đúng thứ két đang giữ. Két cũ chưa có thì 404
+    print("Tệp công khai ở cổng xác thực (chứng thư CA, khóa ký mốc neo)")
+    ca, headers, status = public_pem("/api/verify/ca.pem")
+    held = vault_ca_pem()
+    if held is None:
+        (ca, status) == (None, 404) or fail(f"két chưa có CA mà /api/verify/ca.pem trả {status}")
+        print("  – két khởi tạo trước F4.5 chưa có CA nội bộ: /api/verify/ca.pem trả 404")
+    else:
+        ca and ca.startswith("-----BEGIN CERTIFICATE-----") and pem_sha256(ca) == pem_sha256(held) \
+            and (header(headers, "Content-Type") or "").startswith("application/x-pem-file") \
+            or fail(f"tải chứng thư CA không cần token: HTTP {status}, chưa đúng CA trong két")
+        ok(f"tải chứng thư CA không cần token; vân tay SHA-256 {pem_sha256(ca)[:16]}… khớp CA trong két")
+    key, headers, status = public_pem("/api/verify/anchor-key.pem")
+    held_key = json.loads(compose("exec", "-T", "svc-files", "python", "-c", VAULT_ANCHOR_KEY).decode().strip())
+    if held_key is None:
+        (key, status) == (None, 404) or fail(f"két chưa có khóa moc-anchor mà /api/verify/anchor-key.pem trả {status}")
+        print("  – két khởi tạo trước khi có chữ ký mốc neo: /api/verify/anchor-key.pem trả 404")
+    else:
+        expected = hashlib.sha256(ED25519_SPKI + base64.b64decode(held_key["public_key"])).hexdigest()
+        held_key["type"] == "ed25519" and key and key.startswith("-----BEGIN PUBLIC KEY-----") \
+            and pem_sha256(key) == expected \
+            and (header(headers, "Content-Type") or "").startswith("application/x-pem-file") \
+            or fail(f"tải khóa ký mốc neo không cần token: HTTP {status}, chưa khớp khóa moc-anchor trong két")
+        ok(f"tải khóa công khai ký mốc neo không cần token; vân tay sha256:{expected[:16]}… khớp khóa trong két")
+
     # F3.12: công văn gửi Khoa Kinh tế trong hệ thống — phát hành xong thì văn thư bên nhận tự có văn bản đến kèm đúng
     # bản phát hành. svc-workflow chép ngay sau lần phát hành; trượt thì vòng đối soát nền làm lại
     print("Liên thông trong hệ thống")
@@ -1145,9 +1210,11 @@ def main() -> None:
 
     print("Sổ kiểm toán (neo hash ra ngoài CSDL)")
     moc = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "audit"]
-    anchored = subprocess.run([*moc, "anchor"], capture_output=True, text=True)
+    # mốc chép ra một tệp ngoài (như kho mốc công khai): có chữ ký của két nếu két có khóa moc-anchor
+    outside = pathlib.Path(tempfile.mkdtemp(prefix="moc-smoke-")) / "anchors.jsonl"
+    anchored = subprocess.run([*moc, "anchor", "--to", str(outside)], capture_output=True, text=True)
     anchored.returncode == 0 or fail(f"moc audit anchor lỗi: {anchored.stderr.strip() or anchored.stdout.strip()}")
-    checked = subprocess.run([*moc, "verify", "--json"], capture_output=True, text=True)
+    checked = subprocess.run([*moc, "verify", "--anchors", str(outside), "--json"], capture_output=True, text=True)
     try:
         report = json.loads(checked.stdout)
     except json.JSONDecodeError:
@@ -1158,6 +1225,16 @@ def main() -> None:
         or fail(f"thiếu mốc neo hoặc văn bản có hash: {report}")
     ok(f"moc audit verify: tính lại {report['rows']} dòng sổ ngoài CSDL, khớp {bucket['matched']} mốc neo trong"
        f" bucket lạnh và hash của {report['documents']} văn bản")
+    signed = report["signatures"].get(outside.name, {})
+    if held_key is None:
+        print("  – két chưa có khóa moc-anchor: mốc chép ra tệp không có chữ ký")
+    else:
+        line = json.loads(outside.read_text(encoding="utf-8").splitlines()[-1])
+        # chỉ xét chữ ký: mốc vừa neo trong 2 giây trước lúc đọc CSDL thì để lần kiểm sau đối chiếu (report.later)
+        line.get("v") == "signet-anchor-v1" and line.get("sig") and signed.get("valid") == 1 \
+            and not signed.get("invalid") or fail(f"mốc chép ra tệp chưa có chữ ký hợp lệ của két: {line} {signed}")
+        ok(f"mốc chép ra tệp có chữ ký Ed25519 của két (khóa {line['key'][:23]}…); moc audit verify kiểm chữ ký"
+           " bằng Python thuần (RFC 8032): hợp lệ")
     try_delete = (
         "import os\n"
         "from svc_files.config import Settings\n"

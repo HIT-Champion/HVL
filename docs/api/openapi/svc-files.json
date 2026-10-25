@@ -993,6 +993,52 @@
         }
       }
     },
+    "/api/verify/ca.pem": {
+      "get": {
+        "summary": "Chứng thư CA nội bộ ký văn bản đi (PEM, chỉ minh họa; không cần đăng nhập)",
+        "operationId": "verify_ca_pem_api_verify_ca_pem_get",
+        "responses": {
+          "200": {
+            "description": "Tệp PEM",
+            "content": {
+              "application/x-pem-file": {}
+            }
+          },
+          "404": {
+            "description": "Két chưa có (két khởi tạo trước khi có tính năng này, hoặc không dùng két)"
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "Két không trả lời"
+          }
+        }
+      }
+    },
+    "/api/verify/anchor-key.pem": {
+      "get": {
+        "summary": "Khóa công khai Ed25519 ký mốc neo sổ kiểm toán (PEM SubjectPublicKeyInfo; không cần đăng nhập)",
+        "operationId": "verify_anchor_key_api_verify_anchor_key_pem_get",
+        "responses": {
+          "200": {
+            "description": "Tệp PEM",
+            "content": {
+              "application/x-pem-file": {}
+            }
+          },
+          "404": {
+            "description": "Két chưa có (két khởi tạo trước khi có tính năng này, hoặc không dùng két)"
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "Két không trả lời"
+          }
+        }
+      }
+    },
     "/api/verify/{code}": {
       "get": {
         "summary": "Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)",
