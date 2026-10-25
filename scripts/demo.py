@@ -101,8 +101,8 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Log tập trung (F3.14, profile logs — chưa bật thì màn tự bật bằng make logs-up và để nguyên): văn thư phát hành
         một công văn với X-Request-Id tự đặt; yêu cầu đi qua APISIX → Hasura → svc-workflow → svc-files; tra
         Parseable theo mã đó ra dòng của cả ba dịch vụ, sổ kiểm toán có dòng cùng mã; không đăng nhập thì không đọc
-        được kho log; không dòng nào có token, cookie, chuỗi truy vấn; docker logs vẫn đọc được. (make
-        demo-log-tap-trung)
+        được kho log; không dòng nào có token, cookie, chuỗi truy vấn; docker logs vẫn đọc được; Vector chạy lại thì
+        dòng đầu tiên của dịch vụ đang im ghi sau đó vẫn tới kho. (make demo-log-tap-trung)
     python3 scripts/demo.py cai-ung-dung
         Cắm ứng dụng thứ ba bằng MỘT lệnh (docs/them-ung-dung.md mục 1): `moc app install apps/bang-tin/app.yaml` —
         kế hoạch --dry-run không đổi gì; cài xong mở /bang-tin/ qua APISIX, đăng nhập một lần (client app-bang-tin,
@@ -3747,6 +3747,48 @@ def log_tap_trung() -> None:
     if without:
         raise DemoFailed(f"docker compose logs của {', '.join(without)} không có mã {rid}")
     ok("docker compose logs apisix, svc-workflow: có dòng mang mã")
+
+    say(8, "Vector chạy lại (cập nhật, sự cố): dòng đầu tiên một dịch vụ đang im ghi sau đó vẫn tới kho")
+    began = time.monotonic()
+    compose("--profile", "logs", "restart", "vector")
+    # Kết nối cũ của driver fluentd tới Vector đã chết. Gọi qua APISIX mỗi 2 giây, cùng một mã: mã có trong kho là
+    # Vector đã nhận lại
+    probe = f"{rid}-v"
+    deadline = time.monotonic() + LOGS_WAIT_S
+    while True:
+        request("GET", f"{PUBLIC_URL}/", headers={"X-Request-Id": probe}, timeout=10)
+        try:
+            back = api.find(probe, 5)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        if back or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    if not back:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Vector chạy lại vẫn chưa gửi dòng nào của apisix mang {probe}")
+    up = time.monotonic() - began
+    # postgres im từ bước 5: dòng ERROR này là lần ghi đầu tiên của nó sau khi Vector chạy lại
+    marker = f"{rid}-sau-khoi-dong-lai"
+    try:
+        psql(f"do $$ begin raise exception '{marker}'; end $$")
+        raise DemoFailed("câu SQL thử không lỗi")
+    except subprocess.CalledProcessError:
+        pass
+    asked = time.monotonic()
+    deadline = asked + LOGS_WAIT_S
+    while True:
+        try:
+            entry = postgres_entry(api.recent("postgres", 10), marker)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        if entry or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    if not entry:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres ghi sau khi Vector chạy"
+                         " lại: driver fluentd gửi vào kết nối đã chết mà không biết")
+    ok(f"Vector nhận lại sau {up:.0f} giây; dòng ERROR đầu tiên của postgres sau đó tới kho sau"
+       f" {time.monotonic() - asked:.0f} giây")
 
     print(f"\n   Giao diện: {api.base_url} — tài khoản {lt.USER}, mật khẩu là MOC_LOGS_PASSWORD trong .env; giữ"
           f" {env.get('MOC_LOGS_RETENTION_DAYS') or '7'} ngày")
