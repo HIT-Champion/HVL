@@ -74,6 +74,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong phiên; chưa bật profile `iot` thì trang báo "Chưa bật cảm biến", không lỗi 5xx. `sensor.py` thêm `--late`,
   `--frozen-clock` để giả lỗi dữ liệu; `make demo-it-ot` thêm bước 7 kiểm cờ, cách ly đơn vị. Test svc-workflow +32,
   office +8.
+- Kịch bản nâng cấp bản cài `scripts/nang_cap.sh` và job CI tập nâng cấp `.github/workflows/nang-cap.yml` (#182).
+  `nang` dựng image bản mới, kéo image dựng sẵn máy chưa có khi trang còn chạy, sao lưu bằng bản đang chạy, cài,
+  chạy, đặt client và theme của realm rồi kiểm; `lui` cài lại bản cũ và khôi phục đúng lượt sao lưu đó; `ket` nâng két
+  cũ (khóa `moc-anchor`, PKI, policy), lỗi giữa chừng thì gỡ listener tạm, hủy lượt tạo token dở, token root còn nằm
+  lại thì in lệnh thu hồi; `kiem` chạy hết các mục rồi báo mục trượt: dữ liệu không ít đi, dòng sổ cuối còn nguyên
+  băm, dịch vụ khỏe, phiên bản trên `/api/status`, realm, `audit verify`, smoke (thử lại một lần, chỉ khi trượt ở bước
+  hỏi đáp). Job cài thẻ phát hành trước, nạp mẫu, tạo văn bản hạn chế, nâng lên commit của PR, nâng két, lùi về; sau
+  mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
+  compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
+  dùng kịch bản thay cho các lệnh tay. Test scripts +18.
 
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
