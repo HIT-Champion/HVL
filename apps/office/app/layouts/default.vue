@@ -169,7 +169,6 @@ function active(to: string) {
 function toggleLocale() {
   locale.value = locale.value === 'vi' ? 'en' : 'vi'
   try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
-  document.documentElement.lang = locale.value
 }
 
 // Chọn xong một trang thì đóng ngăn kéo và thu thanh bên lại, để thanh bên không nằm đè lên nội dung vừa mở
