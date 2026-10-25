@@ -50,3 +50,10 @@ Coverage includes every production page route: inbox, incoming list/intake, outg
 Validation:52 JS/Vue files compile; all3 existing responsive/recovery E2E tests pass on the rebuilt production app, including real Keycloak login and OTP. Live captures have no horizontal document overflow, browser page errors or remaining visible serif UI. Local evidence: `.cache/signet-consistency/routes/measurements.json`, `auth-public.json`, screenshots and contact sheets. Screenshots were inspected; numerical checks alone were not treated as design acceptance.
 
 The authentication theme must be mounted into Keycloak as described in `apps/office/README.md`; app-office rebuilding alone cannot deploy the separate authentication surface. No BE/AI source, root compose, realm policy or credentials were changed.
+
+
+## Sidebar occlusion regression — 24 October 2026
+
+The expanded244px sidebar covered page headings, filters and the first document column because the workspace reserved only76px. Desktop navigation now animates the reserved grid track from76px to244px together with the sidebar mask, so the workspace always starts outside the visible navigation edge. Mobile keeps its deliberate modal drawer and inert background. Pointer clicks no longer count as keyboard focus: leaving navigation after clicking a route now collapses it, while keyboard-visible focus still opens it.
+
+The52-file JS/Vue compilation passed. The local core gateway was stopped, so initial localhost E2E attempts could not connect; final checks ran against the real HTTPS demo. All3 responsive/recovery E2E cases passed there, including the new non-occlusion and pointer-focus regression checks. Dedicated geometry captures cover4 route families at1440/1100/905px and sample the transition frames for overlap. FE image was rebuilt locally, copied directly over SSH, and only app-office was recreated; BE services and data stayed running. The previous FE image and source files were retained on the server for rollback. No GitHub connection was added.

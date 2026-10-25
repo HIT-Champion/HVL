@@ -246,8 +246,8 @@ async function save() {
 </script>
 
 <template>
-  <div class="max-w-3xl">
-    <NuxtLink :to="editId ? `/van-ban/${editId}` : '/van-ban-di'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
+  <div class="mx-auto w-full max-w-3xl">
+    <NuxtLink :to="editId ? `/van-ban/${editId}` : '/van-ban-di'" class="sg-document-back mb-4 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-brand-800"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg>{{ t('app.back') }}</NuxtLink>
     <PageHeader :title="editId ? t('compose.editTitle') : t('compose.title')" :subtitle="t('compose.subtitle')">
       <NuxtLink v-if="editId" to="/van-ban-di/soan" class="btn-secondary" :aria-label="t('nav.compose')">{{ t('desk.compose') }}</NuxtLink>
     </PageHeader>

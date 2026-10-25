@@ -14,83 +14,132 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+
+// Cổng xác thực (F2.13) với khối chữ ký số (F4.5, chỉ minh họa): câu chữ đúng hợp đồng ở cả hai ngôn ngữ, luôn nói rõ
+// không có giá trị pháp lý; chuỗi e2e tìm ("khớp từng byte", "KHÔNG khớp") giữ nguyên; khóa viết thẳng trong trang đều
+// có trong vi.json / en.json; khối chữ ký nằm trong kết quả hợp lệ, văn bản không có chữ ký thì hiện câu thay thế.
+// Liên kết tải chứng thư CA (#56) nằm trong khối chữ ký, sau chú thích minh họa, kèm vân tay SHA-256; khóa công khai ký
+// mốc neo sổ kiểm toán ở cuối trang, ngoài kết quả tra cứu, két chưa có khóa thì ẩn.
+
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readSource as readFileSync } from './source.mjs';
 import { test } from 'node:test';
-const load = (lang)=>JSON.parse(readFileSync(new URL(`../app/locales/${lang}.json`, import.meta.url), 'utf8'));
+
+
+const load = (lang) =>
+JSON.parse(readFileSync(new URL(`../app/locales/${lang}.json`, import.meta.url), 'utf8'));
 const vi = load('vi');
 const en = load('en');
+
 function lookup(messages, key) {
-    let node = messages;
-    for (const part of key.split('.'))node = typeof node === 'object' ? node[part] : undefined;
-    return typeof node === 'string' ? node : undefined;
+  let node = messages;
+  for (const part of key.split('.')) node = typeof node === 'object' ? node[part] : undefined;
+  return typeof node === 'string' ? node : undefined;
 }
-const tVi = (key)=>lookup(vi, key) ?? assert.fail(`thiếu khóa ${key}`);
-const tEn = (key)=>lookup(en, key) ?? assert.fail(`thiếu khóa ${key}`);
+const tVi = (key) => lookup(vi, key) ?? assert.fail(`thiếu khóa ${key}`);
+const tEn = (key) => lookup(en, key) ?? assert.fail(`thiếu khóa ${key}`);
+
 const page = readFileSync(new URL('../app/pages/xac-thuc/[[code]].vue', import.meta.url), 'utf8');
 const template = page.slice(page.indexOf('<template>'));
-const SIGNATURE_KEYS = [
-    'title',
-    'level',
-    'signer',
-    'ca',
-    'serial',
-    'signedAt',
-    'illustrative',
-    'none'
-].map((k)=>`verify.signature.${k}`);
-test('khối chữ ký số: chữ tiếng Việt đúng hợp đồng, có ở cả hai ngôn ngữ', ()=>{
-    for (const messages of [
-        vi,
-        en
-    ])for (const key of SIGNATURE_KEYS)assert.ok(lookup(messages, key), key);
-    assert.equal(tVi('verify.signature.title'), 'Chữ ký số (minh họa)');
-    assert.equal(tVi('verify.signature.level'), 'Chuẩn chữ ký');
-    assert.equal(tVi('verify.signature.signer'), 'Ký bởi');
-    assert.equal(tVi('verify.signature.ca'), 'Chứng thư do');
-    assert.equal(tVi('verify.signature.serial'), 'Số sê-ri chứng thư');
-    assert.equal(tVi('verify.signature.signedAt'), 'Ký lúc (giờ tự ghi trong chữ ký)');
-    assert.equal(tVi('verify.signature.none'), 'Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, ' + 'hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên.');
+
+const SIGNATURE_KEYS = ['title', 'level', 'signer', 'ca', 'serial', 'signedAt', 'illustrative', 'none'].
+map((k) => `verify.signature.${k}`);
+
+test('khối chữ ký số: chữ tiếng Việt đúng hợp đồng, có ở cả hai ngôn ngữ', () => {
+  for (const messages of [vi, en]) for (const key of SIGNATURE_KEYS) assert.ok(lookup(messages, key), key);
+  assert.equal(tVi('verify.signature.title'), 'Chữ ký số (minh họa)');
+  assert.equal(tVi('verify.signature.level'), 'Chuẩn chữ ký');
+  assert.equal(tVi('verify.signature.signer'), 'Ký bởi');
+  assert.equal(tVi('verify.signature.ca'), 'Chứng thư do');
+  assert.equal(tVi('verify.signature.serial'), 'Số sê-ri chứng thư');
+  assert.equal(tVi('verify.signature.signedAt'), 'Ký lúc (giờ tự ghi trong chữ ký)');
+  // không ký vì két cũ chưa có PKI hay ký lỗi lúc phát hành cũng là "không có chữ ký": câu không đoán nguyên nhân
+  assert.equal(tVi('verify.signature.none'), 'Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, ' +
+  'hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên.');
 });
-test('chú thích minh họa nói rõ không có giá trị pháp lý, không trỏ tới link tải CA (đã cắt)', ()=>{
-    const note = tVi('verify.signature.illustrative');
-    assert.match(note, /chỉ để minh họa/);
-    assert.match(note, /không có giá trị pháp lý như chữ ký số công cộng/);
-    assert.match(note, /chưa tin cậy/);
-    assert.doesNotMatch(note, /dưới đây|\.pem/);
-    const noteEn = tEn('verify.signature.illustrative');
-    assert.match(noteEn, /illustration only/);
-    assert.match(noteEn, /no legal standing/);
-    assert.doesNotMatch(noteEn, /below|\.pem/);
-    assert.match(tVi('verify.signature.title'), /minh họa/);
+
+test('chú thích minh họa nói rõ không có giá trị pháp lý, tự đứng được (liên kết tải CA là dòng riêng)', () => {
+  const note = tVi('verify.signature.illustrative');
+  assert.match(note, /chỉ để minh họa/);
+  assert.match(note, /không có giá trị pháp lý như chữ ký số công cộng/);
+  assert.match(note, /chưa tin cậy/);
+  assert.doesNotMatch(note, /dưới đây|\.pem/);
+  const noteEn = tEn('verify.signature.illustrative');
+  assert.match(noteEn, /illustration only/);
+  assert.match(noteEn, /no legal standing/);
+  assert.doesNotMatch(noteEn, /below|\.pem/);
+  // e2e tìm "minh họa" trong khối chữ ký
+  assert.match(tVi('verify.signature.title'), /minh họa/);
 });
-test('chuỗi e2e tìm vẫn nguyên, câu mới không chứa chúng', ()=>{
-    assert.match(tVi('verify.match'), /khớp từng byte/);
-    assert.match(tVi('verify.mismatch'), /KHÔNG khớp/);
-    for (const key of SIGNATURE_KEYS){
-        assert.doesNotMatch(tVi(key), /khớp từng byte|KHÔNG khớp/, key);
-    }
+
+test('chuỗi e2e tìm vẫn nguyên, câu mới không chứa chúng', () => {
+  assert.match(tVi('verify.match'), /khớp từng byte/);
+  assert.match(tVi('verify.mismatch'), /KHÔNG khớp/);
+  for (const key of SIGNATURE_KEYS) {
+    assert.doesNotMatch(tVi(key), /khớp từng byte|KHÔNG khớp/, key);
+  }
 });
-test('khóa i18n viết thẳng trong trang xác thực đều có trong vi.json và en.json', ()=>{
-    let checked = 0;
-    for (const m of page.matchAll(/\bt\('([\w.-]+)'/g)){
-        assert.ok(lookup(vi, m[1]) !== undefined, `vi: thiếu khóa ${m[1]}`);
-        assert.ok(lookup(en, m[1]) !== undefined, `en: thiếu khóa ${m[1]}`);
-        checked++;
-    }
-    assert.ok(checked >= 30, `chỉ thấy ${checked} khóa`);
-    for (const key of SIGNATURE_KEYS)assert.ok(page.includes(`t('${key}')`), `trang chưa dùng ${key}`);
+
+test('khóa i18n viết thẳng trong trang xác thực đều có trong vi.json và en.json', () => {
+  let checked = 0;
+  for (const m of page.matchAll(/\bt\('([\w.-]+)'/g)) {
+    assert.ok(lookup(vi, m[1]) !== undefined, `vi: thiếu khóa ${m[1]}`);
+    assert.ok(lookup(en, m[1]) !== undefined, `en: thiếu khóa ${m[1]}`);
+    checked++;
+  }
+  assert.ok(checked >= 30, `chỉ thấy ${checked} khóa`);
+  for (const key of SIGNATURE_KEYS) assert.ok(page.includes(`t('${key}')`), `trang chưa dùng ${key}`);
 });
-test('trang: khối chữ ký trong kết quả hợp lệ, có thì hiện chi tiết, không có thì hiện câu thay thế', ()=>{
-    const valid = template.slice(template.indexOf('data-testid="verify-valid"'), template.indexOf('</section>'));
-    assert.match(valid, /<div v-if="found\.signature"[^>]*data-testid="verify-signature"/);
-    assert.match(valid, /<p v-else[^>]*data-testid="verify-unsigned"/);
-    assert.ok(valid.indexOf('verify-signature') < valid.indexOf('data-testid="verify-match"'));
-    const block = valid.slice(valid.indexOf('data-testid="verify-signature"'), valid.indexOf('data-testid="verify-unsigned"'));
-    const at = block.indexOf("t('verify.signature.illustrative')");
-    assert.ok(at > 0);
-    assert.doesNotMatch(block.slice(block.lastIndexOf('<p', at), at), /v-if|v-show/);
-    assert.match(block, /fmtDateTime\(found\.signature\.signed_at\)/);
-    assert.match(block, /break-all[^>]*>\{\{ found\.signature\.serial \}\}/);
-    assert.doesNotMatch(page, /v-html/);
+
+test('trang: khối chữ ký trong kết quả hợp lệ, có thì hiện chi tiết, không có thì hiện câu thay thế', () => {
+  assert.match(page, /const found = ref\(null\)/);
+  const valid = template.slice(template.indexOf('data-testid="verify-valid"'), template.indexOf('</section>'));
+  assert.match(valid, /<div v-if="found\.signature"[^>]*data-testid="verify-signature"/);
+  assert.match(valid, /<p v-else[^>]*data-testid="verify-unsigned"/);
+  // khối chữ ký đứng trước kết quả so tệp
+  assert.ok(valid.indexOf('verify-signature') < valid.indexOf('data-testid="verify-match"'));
+  // chú thích minh họa luôn hiện cùng khối chữ ký, không phụ thuộc cờ nào khác
+  const block = valid.slice(valid.indexOf('data-testid="verify-signature"'), valid.indexOf('data-testid="verify-unsigned"'));
+  const at = block.indexOf("t('verify.signature.illustrative')");
+  assert.ok(at > 0);
+  assert.doesNotMatch(block.slice(block.lastIndexOf('<p', at), at), /v-if|v-show/);
+  // giờ ký theo giờ Việt Nam như mọi trang; số sê-ri xuống dòng được
+  assert.match(block, /fmtDateTime\(found\.signature\.signed_at\)/);
+  assert.match(block, /break-all[^>]*>\{\{ found\.signature\.serial \}\}/);
+  assert.doesNotMatch(page, /v-html/);
+});
+
+test('#56: liên kết tải chứng thư CA trong khối chữ ký, sau chú thích minh họa, kèm vân tay SHA-256', () => {
+  assert.equal(tVi('verify.signature.caDownload'), 'Tải chứng thư CA (minh họa)');
+  assert.equal(tVi('verify.signature.caFingerprint'), 'Vân tay SHA-256');
+  assert.match(tEn('verify.signature.caDownload'), /CA certificate \(illustrative\)/);
+  const valid = template.slice(template.indexOf('data-testid="verify-valid"'), template.indexOf('</section>'));
+  const start = valid.indexOf('data-testid="verify-signature"');
+  const block = valid.slice(start, valid.indexOf('data-testid="verify-unsigned"'));
+  const ca = block.slice(block.indexOf('data-testid="verify-ca"'));
+  assert.ok(block.indexOf("t('verify.signature.illustrative')") < block.indexOf('data-testid="verify-ca"'));
+  assert.match(ca, /<a :href="CA_URL" download="signet-ca\.pem"/);
+  assert.match(ca, /v-if="caFingerprint"[^>]*>\{\{ t\('verify\.signature\.caFingerprint'\) \}\}/);
+  assert.match(ca, /\{\{ caFingerprint \}\}/);
+  assert.match(page, /const CA_URL = '\/api\/verify\/ca\.pem'/);
+  // CA chỉ tải khi có văn bản ký số để xem, vân tay trình duyệt tự tính đúng dạng `openssl x509 -fingerprint`
+  assert.match(page, /watch\(\(\) => found\.value\?\.signature,[\s\S]*?publicPem\(CA_URL, 'ca'\)/);
+});
+
+test('khóa công khai ký mốc neo: khối riêng cuối trang, ngoài kết quả tra cứu, két chưa có khóa thì ẩn', () => {
+  for (const key of ['title', 'text', 'download', 'fingerprint']) {
+    assert.ok(lookup(vi, `verify.anchors.${key}`), key);
+    assert.ok(lookup(en, `verify.anchors.${key}`), key);
+  }
+  assert.equal(tVi('verify.anchors.title'), 'Mốc neo sổ kiểm toán');
+  assert.match(tVi('verify.anchors.text'), /OpenSSL/);
+  const section = template.slice(template.indexOf('data-testid="verify-anchor-key"'));
+  assert.ok(template.indexOf('data-testid="verify-anchor-key"') > template.lastIndexOf('id="verify-file"'));
+  assert.match(template, /<section v-if="anchorKey"[^>]*data-testid="verify-anchor-key"/);
+  assert.match(section, /<a :href="ANCHOR_KEY_URL" download="signet-anchor-key\.pem"/);
+  assert.match(section, /v-if="anchorKey\.fingerprint"/);
+  assert.match(page, /const ANCHOR_KEY_URL = '\/api\/verify\/anchor-key\.pem'/);
+  assert.match(page, /anchorKey\.value = await publicPem\(ANCHOR_KEY_URL, 'anchor'\)/);
+  // hai tệp công khai: gọi thẳng, không kèm token (trang không đăng nhập)
+  assert.doesNotMatch(page, /Authorization|useApi|\$fetch/);
 });

@@ -38,6 +38,6 @@ test('giám khảo: hộp việc có sẵn việc mẫu, chữ đại diện là
 
   // việc sửa dự thảo mở ra đúng văn bản đi, có ý kiến trả lại của tổ trưởng
   await redraft.getByRole('link').click()
-  await expect(judge).toHaveURL(/\/van-ban\/[0-9a-f-]{36}$/)
+  await expect(judge).toHaveURL(/\/van-ban\/[0-9a-f-]{36}(?:\?from=inbox)?$/)
   await expect(judge.getByText('Bổ sung ý kiến của Bộ môn Kỹ thuật phần mềm').first()).toBeVisible()
 })

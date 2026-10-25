@@ -71,7 +71,7 @@ test('luồng văn bản đi và cổng xác thực trên giao diện', async ({
   await expect(staff.getByText('Dự thảo bị trả lại: Ghi rõ số học phần đã rà soát.')).toBeVisible()
   await staff.getByRole('link', { name: 'Sửa dự thảo' }).click()
   await expect(staff.getByLabel('Trích yếu nội dung')).toHaveValue(summary)
-  // đang sửa mà bấm Soạn mới (cùng đường dẫn, bỏ ?id=): form trống, không mang dự thảo đang sửa theo
+  // đang sửa mà bấm soạn mới ở thanh bên (cùng đường dẫn, bỏ ?id=): form trống, không mang dự thảo đang sửa theo
   await staff.getByRole('link', { name: 'Soạn văn bản đi' }).click()
   await expect(staff.getByLabel('Trích yếu nội dung')).toHaveValue('')
   await staff.goBack()
@@ -112,16 +112,12 @@ test('luồng văn bản đi và cổng xác thực trên giao diện', async ({
   await outsider.locator('#verify-file').setInputFiles({ name: 'cong-van-nhan-duoc.pdf', mimeType: 'application/pdf', buffer: pdf })
   await expect(outsider.getByTestId('verify-match')).toContainText('khớp từng byte')
   // bản phát hành có chữ ký số PAdES bằng PKI nội bộ trong két (F4.5), cổng nói rõ chỉ minh họa
-  // Mặc định vẫn bắt buộc PAdES. Két local có từ trước F4.5 chưa có PKI thì chạy rõ profile unsigned;
-  // không biến thiếu chữ ký thành pass âm thầm và không nâng cấp két trong một tác vụ frontend.
-  if (process.env.MOC_E2E_EXPECT_SIGNED !== 'false') {
-    const signature = outsider.getByTestId('verify-signature')
-    await expect(signature).toContainText('PAdES')
-    await expect(signature).toContainText('minh họa')
-  } else {
-    await expect(outsider.getByTestId('verify-unsigned')).toContainText('không có chữ ký số')
-    await expect(outsider.getByTestId('verify-signature')).toHaveCount(0)
-  }
+  const signature = outsider.getByTestId('verify-signature')
+  await expect(signature).toContainText('PAdES')
+  await expect(signature).toContainText('minh họa')
+  // #56: tải chứng thư CA nội bộ ngay trong khối chữ ký, không cần đăng nhập
+  await expect(signature.getByRole('link', { name: 'Tải chứng thư CA (minh họa)' }))
+    .toHaveAttribute('href', '/api/verify/ca.pem')
   await shot(outsider, '10-xac-thuc-khop')
   const tampered = Buffer.from(pdf)
   tampered[Math.floor(tampered.length / 2)] ^= 1

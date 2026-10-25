@@ -14,29 +14,38 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+
+// Ngày giờ hiện theo giờ Việt Nam dù máy người dùng đặt múi giờ khác (review: fmtDate/fmtDateTime chưa đặt timeZone).
+
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-process.env.TZ = 'America/Los_Angeles';
+
+process.env.TZ = 'America/Los_Angeles'; // máy ở múi giờ âm, có giờ mùa hè
 const { addDays, fmtDate, fmtDateTime, initialOf } = await import('../app/utils/format.js');
-test('ngày thuần (cột date) không lệch theo múi giờ của máy', ()=>{
-    assert.equal(fmtDate('2026-10-20'), '20/10/2026');
-    assert.equal(fmtDate(null), '—');
+
+test('ngày thuần (cột date) không lệch theo múi giờ của máy', () => {
+  assert.equal(fmtDate('2026-10-20'), '20/10/2026');
+  assert.equal(fmtDate(null), '—');
 });
-test('thời điểm hiện theo giờ Việt Nam', ()=>{
-    assert.equal(fmtDate('2026-10-20T18:30:00Z'), '21/10/2026');
-    assert.match(fmtDateTime('2026-10-20T18:30:00Z'), /^01:30,? 21\/10\/2026$/);
+
+test('thời điểm hiện theo giờ Việt Nam', () => {
+  // 18:30 UTC ngày 20 = 01:30 sáng 21 ở Việt Nam; ở Los Angeles vẫn là ngày 20
+  assert.equal(fmtDate('2026-10-20T18:30:00Z'), '21/10/2026');
+  assert.match(fmtDateTime('2026-10-20T18:30:00Z'), /^01:30,? 21\/10\/2026$/);
 });
-test('cộng ngày qua tháng, qua năm, qua ngày đổi giờ mùa hè của máy', ()=>{
-    assert.equal(addDays('2026-12-30', 3), '2027-01-02');
-    assert.equal(addDays('2026-10-31', 1), '2026-11-01');
-    assert.equal(addDays('2026-11-01', 1), '2026-11-02');
-    assert.equal(addDays('2026-03-01', -1), '2026-02-28');
+
+test('cộng ngày qua tháng, qua năm, qua ngày đổi giờ mùa hè của máy', () => {
+  assert.equal(addDays('2026-12-30', 3), '2027-01-02');
+  assert.equal(addDays('2026-10-31', 1), '2026-11-01');
+  assert.equal(addDays('2026-11-01', 1), '2026-11-02');
+  assert.equal(addDays('2026-03-01', -1), '2026-02-28');
 });
-test('chữ đại diện: chữ đầu của tên, viết hoa; thiếu tên thì lấy từ cuối của họ tên', ()=>{
-    assert.equal(initialOf('Giám khảo', 'Tài khoản Giám khảo'), 'G');
-    assert.equal(initialOf('Thu', 'Trần Thị Thu'), 'T');
-    assert.equal(initialOf('', 'Trần Thị thu'), 'T');
-    assert.equal(initialOf('  đức ', ''), 'Đ');
-    assert.equal(initialOf('', 'vanthu'), 'V');
-    assert.equal(initialOf('', ''), '?');
+
+test('chữ đại diện: chữ đầu của tên, viết hoa; thiếu tên thì lấy từ cuối của họ tên', () => {
+  assert.equal(initialOf('Giám khảo', 'Tài khoản Giám khảo'), 'G');
+  assert.equal(initialOf('Thu', 'Trần Thị Thu'), 'T');
+  assert.equal(initialOf('', 'Trần Thị thu'), 'T');
+  assert.equal(initialOf('  đức ', ''), 'Đ');
+  assert.equal(initialOf('', 'vanthu'), 'V');
+  assert.equal(initialOf('', ''), '?');
 });

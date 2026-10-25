@@ -17,7 +17,13 @@
 import { createHmac } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from '@playwright/test'
+
+// signIn creates role-specific contexts outside Playwright's page fixture.
+// Close them after each scenario so sessions and background timers cannot leak into the next one.
+test.afterEach(async ({ browser }) => {
+  await Promise.all(browser.contexts().map(context => context.close()))
+})
 
 // Dùng chung cho các kịch bản e2e: đăng nhập qua Keycloak (kèm TOTP), chụp màn hình.
 

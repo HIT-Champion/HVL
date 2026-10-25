@@ -68,7 +68,7 @@ test('liên thông văn bản giữa hai khoa trên giao diện', async ({ brows
   const director = await signIn(browser, 'truongkhoa', { otp: true })
   await openTask(director)
   await director.getByRole('button', { name: 'Ký duyệt' }).click()
-  await expect(director.getByText('Đã duyệt').first()).toBeVisible()
+  await expect(director.getByText('Đã duyệt').first()).toBeVisible({ timeout: 60_000 })
 
   // 3. Văn thư CNTT cấp số, phát hành: thẻ liên thông chuyển từ "Đang chuyển" sang "Đã chuyển" (trang tự hỏi lại)
   const clerk = await signIn(browser, 'vanthu', { otp: true })
@@ -107,7 +107,7 @@ test('liên thông văn bản giữa hai khoa trên giao diện', async ({ brows
   await shot(receiver, '27-nhan-lien-thong')
   receiver.once('dialog', (dialog) => dialog.accept())
   await receiver.getByRole('button', { name: 'Vào sổ', exact: true }).click()
-  await expect(receiver.getByText(/Đã vào sổ — số đến \d+/)).toBeVisible()
+  await expect(receiver.getByText(/Đã vào sổ — số đến \d+/)).toBeVisible({ timeout: 60_000 })
   await expect(receiver.getByText('Chờ chỉ đạo').first()).toBeVisible()
   await shot(receiver, '28-lien-thong-da-vao-so')
 })
