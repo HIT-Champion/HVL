@@ -87,6 +87,16 @@ git archive --format=tar.gz \
 echo "==> Sinh tổng kiểm tra SHA-256"
 ( cd "$DIST" && sha256sum "signet-$VERSION.tar.gz" > "signet-$VERSION.tar.gz.sha256" )
 
+# Kiểm chính gói sẽ phát hành, cùng lệnh với release.yml: tệp cấm, giấy phép, .sha256, thư mục gốc, VERSION. Gói hỏng
+# thì gỡ thẻ vừa gắn (chưa đẩy, chưa ai tải) và xóa gói — sửa xong chạy lại được ngay
+echo "==> Kiểm gói trước khi phát hành (scripts/kiem_goi.py)"
+if ! python3 scripts/kiem_goi.py "$DIST/signet-$VERSION.tar.gz" --version "$VERSION"; then
+  git tag -d "$TAG" > /dev/null
+  rm -f "$DIST/signet-$VERSION.tar.gz" "$DIST/signet-$VERSION.tar.gz.sha256"
+  echo "Lỗi: gói không qua kiểm (xem ở trên) — đã gỡ thẻ $TAG ở máy và xóa gói. Sửa rồi chạy lại." >&2
+  exit 1
+fi
+
 echo ""
 echo "Đã tạo bản phát hành $TAG:"
 ls -lh "$DIST/signet-$VERSION.tar.gz"*

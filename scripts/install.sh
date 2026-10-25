@@ -25,7 +25,8 @@
 #   make uninstall PREFIX=/opt/moc     # gỡ tệp đã cài, giữ .env và dữ liệu
 #
 # Cài lại vào PREFIX đã có là nâng cấp: thay compose, cấu hình, image; giữ .env của PREFIX, chỉ đổi
-# MOC_VERSION. Phiên bản lấy từ `git describe`, đặt tay bằng MOC_VERSION=0.1.0 (vd. khi cài từ gói .tar.gz).
+# MOC_VERSION. Phiên bản lấy từ tệp VERSION của gói .tar.gz (git archive điền), không thì `git describe`; đặt tay
+# bằng MOC_VERSION=0.1.0 (vd. gói cũ chưa có VERSION).
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -57,9 +58,12 @@ prefix() {
   echo "$p"
 }
 
+# Gói .tar.gz mang sẵn phiên bản ở dòng cuối tệp VERSION (git archive điền thẻ, .gitattributes export-subst); bản clone
+# git giữ nguyên mẫu ở dòng đó nên lấy bằng git describe
 src_version() {
-  local v
-  v="$(git -C "$SRC" -c safe.directory="$SRC" describe --tags --always --dirty 2>/dev/null)" || v=dev
+  local v=""
+  [ ! -f "$SRC/VERSION" ] || v="$(awk '/^v[0-9][0-9A-Za-z.-]*$/ { print; exit }' "$SRC/VERSION")"
+  [ -n "$v" ] || v="$(git -C "$SRC" -c safe.directory="$SRC" describe --tags --always --dirty 2>/dev/null)" || v=dev
   echo "${v#v}"
 }
 

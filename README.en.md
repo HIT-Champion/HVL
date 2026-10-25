@@ -227,6 +227,8 @@ python3 scripts/seed.py                 # sample data, first time only
 
 - `PREFIX` defaults to `/opt/moc`. The version comes from `git describe`; when installing from a `.tar.gz` package,
   set it by hand: `make install PREFIX=/opt/moc MOC_VERSION=0.1.0`.
+- If the package has a `VERSION` file at its root, the version is already recorded there (`git archive` fills it in
+  when packing) and `make install` reads it, no need to set it by hand.
 - Upgrade: stop the installation and run `make install` again with the same `PREFIX`. Compose, configuration and
   images are replaced; the installation's `.env` is kept, only `MOC_VERSION` changes.
 - Uninstall: `make uninstall PREFIX=/opt/moc` removes exactly the installed files, keeping `.env` and the data.
