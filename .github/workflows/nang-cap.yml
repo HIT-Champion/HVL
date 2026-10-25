@@ -126,13 +126,13 @@ jobs:
             [ -z "$v" ] || echo "::add-mask::$v"
           done
 
+      # Màn demo chạy từ mã nguồn bản cũ (cùng project moc, cùng .env): bản cài 1.1.0 thiếu scripts/nap_lo_mau.py mà
+      # demo.py nạp ngay khi chạy (sửa ở #176)
       - name: Cài bản cũ ra thư mục riêng, chạy, nạp mẫu, tạo văn bản hạn chế
         working-directory: ${{ runner.temp }}/cu
         run: |
           make install PREFIX="$MOC"
-          cd "$MOC"
-          docker compose up -d --wait --wait-timeout 900
-          python3 scripts/seed.py
+          (cd "$MOC" && docker compose up -d --wait --wait-timeout 900 && python3 scripts/seed.py)
           python3 scripts/demo.py han-che
 
       # Tệp của văn bản hạn chế (mã hóa bằng khóa moc-files của két) mà lãnh đạo khoa mở được lúc còn bản cũ; sau mỗi
