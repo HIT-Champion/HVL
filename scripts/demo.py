@@ -3546,9 +3546,11 @@ def nap_lo() -> None:
 
 
 # --- F3.14 · Log tập trung (make demo-log-tap-trung) ------------------------------------------------------------
-# Một yêu cầu phát hành đi qua đủ ba dịch vụ đã che PII mà log tập trung thu: APISIX (dòng truy cập, mã ở cuối dòng),
-# svc-workflow (office.action.done), svc-files (office.document.rendered…)
-LOG_TRACED = ("apisix", "svc-workflow", "svc-files")
+# Dịch vụ log tập trung thu (LOGGED_SERVICES của Makefile, tệp phủ platform/logs/docker-compose.logs.yml)
+LOG_COLLECTED = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres")
+# Một yêu cầu phát hành đi qua: APISIX (dòng truy cập, mã ở cuối dòng), svc-workflow (office.action.done), Hasura
+# (svc-workflow, svc-files gửi mã kèm lời gọi GraphQL: hasura.http-log), svc-files (office.document.rendered…)
+LOG_TRACED = ("apisix", "svc-workflow", "hasura", "svc-files")
 # Không dòng nào trong kho log được có: token (Bearer, JWT), chuỗi truy vấn của ô tìm kiếm hay của lần đăng nhập
 LOG_FORBIDDEN = ("Bearer ey", "eyJ", "?q=", "?code=", "?state=")
 LOGS_WAIT_S = 60.0
@@ -3556,6 +3558,32 @@ LOGS_WAIT_S = 60.0
 
 def traced_services(rows: list[dict[str, Any]]) -> set[str]:
     return {str(r["service"]) for r in rows if r.get("service")}
+
+
+def logged_since(rows: list[dict[str, Any]], since: str) -> list[dict[str, Any]]:
+    """Dòng Parseable nhận từ mốc ``since`` (utc_mark()) trở đi. p_timestamp là giờ UTC, không ghi múi giờ."""
+    start = datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    out = []
+    for row in rows:
+        try:
+            at = datetime.fromisoformat(str(row.get("p_timestamp") or ""))
+        except ValueError:
+            continue
+        if (at if at.tzinfo else at.replace(tzinfo=timezone.utc)) >= start:
+            out.append(row)
+    return out
+
+
+def postgres_entry(rows: list[dict[str, Any]], marker: str) -> list[dict[str, Any]]:
+    """Các dòng PostgreSQL của mục lỗi có ``marker`` trong lời báo: dòng ERROR rồi các dòng cùng tiền tố "%m [%p] "
+    (CONTEXT, STATEMENT…). Không dựa vào thứ tự: các dòng tới Parseable cùng lô có cùng p_timestamp, order by xếp tùy
+    ý. Không có dòng ERROR mang dấu thì []."""
+    rows = [r for r in rows if r.get("service") == "postgres"]
+    for row in rows:
+        found = re.match(r"(.* \[\d+\] )ERROR:  .*" + re.escape(marker), str(row.get("message") or ""))
+        if found:
+            return [row] + [r for r in rows if r is not row and str(r.get("message") or "").startswith(found.group(1))]
+    return []
 
 
 def log_leaks(rows: list[dict[str, Any]], secrets: list[str]) -> list[str]:
@@ -3585,26 +3613,28 @@ def log_tap_trung() -> None:
     import log_tap_trung as lt
     from moc_env import load_env
 
-    print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → svc-files; Vector thu log của"
-          " các dịch vụ đã che thông tin cá nhân (F4.4), che lần hai, gửi Parseable; tra theo mã ra dòng của cả ba")
-    logged = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow")
+    print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → Hasura, svc-files; Vector"
+          " thu log, che lần hai (Hasura, Keycloak, PostgreSQL không tự che: luật riêng), gửi Parseable; tra theo mã ra"
+          " dòng của cả bốn; câu SQL lỗi, lần đăng nhập sai vào kho đã che")
 
-    say(1, "Log tập trung (profile logs): Vector, Parseable chạy; 5 dịch vụ gửi log qua driver fluentd của Docker")
+    say(1, f"Log tập trung (profile logs): Vector, Parseable chạy; {len(LOG_COLLECTED)} dịch vụ gửi log qua driver"
+           " fluentd của Docker")
     turned_on = False
     try:
         request("GET", f"{lt.base_url(ENV)}/api/v1/liveness", timeout=5)
         running = True
     except (HTTPError, OSError):
         running = False
-    drivers = {s: log_driver(s) for s in logged}
+    drivers = {s: log_driver(s) for s in LOG_COLLECTED}
     if not running or any(d != "fluentd" for d in drivers.values()):
         if not (ROOT / "Makefile").is_file():
             raise DemoFailed("log tập trung chưa bật và đây là bản cài (không có Makefile): thêm logs vào"
                              " MOC_EXTRA_PROFILES rồi cài lại (make install) — docs/van-hanh.md mục Log tập trung")
-        print("   chưa bật: make logs-up (tạo lại 5 container, giữ nguyên dữ liệu)")
+        print(f"   chưa bật: make logs-up (tạo lại {len(LOG_COLLECTED)} container, giữ nguyên dữ liệu; CSDL, Hasura,"
+              " Keycloak gián đoạn vài giây)")
         subprocess.run(["make", "--no-print-directory", "logs-up"], cwd=ROOT, check=True)
         turned_on = True
-        drivers = {s: log_driver(s) for s in logged}
+        drivers = {s: log_driver(s) for s in LOG_COLLECTED}
     if any(d != "fluentd" for d in drivers.values()):
         raise DemoFailed(f"dịch vụ chưa gửi log qua fluentd: {drivers}")
     env = load_env()        # make logs-up có thể vừa thêm MOC_LOGS_PASSWORD vào .env
@@ -3651,7 +3681,50 @@ def log_tap_trung() -> None:
         raise DemoFailed(f"core.audit_log không có dòng nào mang request_id {rid} (văn bản {doc_id})")
     ok("psql core.audit_log: " + ", ".join(f"{a} ×{n}" for a, n in audit))
 
-    say(5, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
+    say(5, "PostgreSQL, Keycloak không tự che: một câu SQL lỗi có giá trị giả, một lần đăng nhập bằng tên không có")
+    since = utc_mark()
+    fake = f"Nguyen Van A {uuid.uuid4().hex[:8]}"           # giá trị trong câu lệnh lỗi: kho log không được có
+    try:
+        psql(f"do $$ declare ghi_chu text := '{fake}'; begin raise exception '{rid}: lỗi thử log tập trung'; end $$")
+        raise DemoFailed("câu SQL thử không lỗi")
+    except subprocess.CalledProcessError:
+        pass
+    user = f"{rid}-{uuid.uuid4().hex[:6]}"                  # Keycloak ghi tên gõ vào ở LOGIN_ERROR: kho không được có
+    try:
+        call_json("POST", f"{PUBLIC_URL}/realms/moc/protocol/openid-connect/token",
+                  form={"grant_type": "password", "client_id": "moc-cli", "username": user,
+                        "password": uuid.uuid4().hex, "scope": "openid"})
+        raise DemoFailed(f"Keycloak cho đăng nhập bằng tên không có {user}")
+    except HTTPError as exc:
+        if exc.status not in (400, 401):
+            raise
+    deadline = time.monotonic() + LOGS_WAIT_S
+    while True:
+        try:
+            pg = logged_since(api.recent("postgres", 10), since)
+            kc = logged_since(api.recent("keycloak", 10), since)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        entry = postgres_entry(pg, rid)
+        statement = [r for r in entry if " STATEMENT:  " in str(r.get("message"))]
+        failed = [r for r in kc if "LOGIN_ERROR" in str(r.get("message") or "")]
+        if (statement and failed) or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    cli_lines(lt.table(entry + failed, 70))
+    if not entry:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres mang {rid}")
+    if not statement or not all(str(r.get("message")).endswith(" STATEMENT:  do [REDACTED]") for r in statement):
+        raise DemoFailed("dòng STATEMENT của câu lỗi không có hoặc không bị che")
+    if not failed:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng LOGIN_ERROR của keycloak")
+    for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc)):
+        if any(value in json.dumps(r, ensure_ascii=False) for r in rows_):
+            raise DemoFailed(f"kho log có nguyên văn giá trị {service} phải che")
+    ok(f"postgres: {len(entry)} dòng của mục lỗi (ERROR giữ lời báo, câu lệnh chỉ còn từ đầu); keycloak: LOGIN_ERROR"
+       " không còn tên gõ vào")
+
+    say(6, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
     for who_, auth in (("không đăng nhập", None), ("sai mật khẩu", lt.auth_header(lt.USER, uuid.uuid4().hex))):
         try:
             request("GET", f"{api.base_url}/api/v1/logstream", headers={"Authorization": auth} if auth else None,
@@ -3661,13 +3734,13 @@ def log_tap_trung() -> None:
             if exc.status not in (401, 403):
                 raise
             ok(f"{who_}: HTTP {exc.status}")
-    leaked = log_leaks(rows, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""), env.get("HASURA_ADMIN_SECRET", ""),
-                              env.get("MOC_ACTION_SECRET", "")])
+    leaked = log_leaks(rows + pg + kc, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""),
+                                        env.get("HASURA_ADMIN_SECRET", ""), env.get("MOC_ACTION_SECRET", "")])
     if leaked:
         raise DemoFailed(f"kho log có dấu hiệu cấm: {', '.join(leaked[:6])}")
     ok(f"không dòng nào chứa {', '.join(LOG_FORBIDDEN)}, token phiên của văn thư hay khóa của hệ thống")
 
-    say(6, "docker logs vẫn đọc được (dual logging của Docker): bản cục bộ cũng có mã")
+    say(7, "docker logs vẫn đọc được (dual logging của Docker): bản cục bộ cũng có mã")
     time.sleep(max(0.0, sent + LOG_FLUSH_S - time.monotonic()))
     local = service_logs(mark, "apisix", "svc-workflow")
     without = [s for s, text in local.items() if rid not in text]
@@ -3678,7 +3751,8 @@ def log_tap_trung() -> None:
     print(f"\n   Giao diện: {api.base_url} — tài khoản {lt.USER}, mật khẩu là MOC_LOGS_PASSWORD trong .env; giữ"
           f" {env.get('MOC_LOGS_RETENTION_DAYS') or '7'} ngày")
     if turned_on:
-        print("   Màn này đã bật log tập trung và để nguyên. Tắt: make logs-down (tạo lại 5 container)")
+        print(f"   Màn này đã bật log tập trung và để nguyên. Tắt: make logs-down (tạo lại {len(LOG_COLLECTED)}"
+              " container)")
     else:
         print("   Tắt: bỏ logs khỏi MOC_EXTRA_PROFILES (nếu có) rồi make logs-down")
 
