@@ -25,6 +25,8 @@ import json
 import re
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -108,7 +110,7 @@ class FakeRetriever:
 
 
 class FakeIndexer:
-    """Vòng nền giả: chỉ ghi lại các lần ``hold`` của lượt hỏi."""
+    """Vòng nền giả: chỉ ghi lại các khối ``holding`` của lượt hỏi — số giây giữ thêm của mỗi khối, số khối đang mở."""
 
     def __init__(self, embedder: str | None = None) -> None:
         self.ready = True
@@ -116,10 +118,17 @@ class FakeIndexer:
         self.embedder_ready = True
         self.embed_pending: int | None = None
         self.embed_failed: int | None = None
-        self.holds: list[float] = []
+        self.holds: list[float] = []        # after_s của từng khối holding đã mở
+        self.active = 0                     # khối holding đang mở: lời gọi mô hình đang chạy
 
-    def hold(self, seconds: float) -> None:
-        self.holds.append(seconds)
+    @contextmanager
+    def holding(self, after_s: float = 0.0) -> Iterator[None]:
+        self.holds.append(after_s)
+        self.active += 1
+        try:
+            yield
+        finally:
+            self.active -= 1
 
     async def run(self) -> None:
         return None
