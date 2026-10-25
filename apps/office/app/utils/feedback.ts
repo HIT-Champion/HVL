@@ -52,6 +52,7 @@ const SCREEN_KEYS: Record<string, string> = {
   '/so-do': 'nav.metrics',
   '/gop-y': 'nav.feedback',
   '/tu-chan-doan': 'nav.selfCheck',
+  '/ung-dung': 'apps.nav',
 }
 
 export function screenLabel(t: (key: string) => string, screen: string | null): string {
