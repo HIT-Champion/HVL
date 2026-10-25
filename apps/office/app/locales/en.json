@@ -1311,13 +1311,69 @@
     "inputs": "Inputs",
     "outputs": "Outputs",
     "quality": "Quality check",
-    "passed": "Passed",
-    "failedCheck": "Failed",
     "notChecked": "Not checked",
     "reports": "All report views ({n})",
     "reportsHint": "Every office.v_… view in the database, including views no Overview chart uses yet (e.g. those of the Metrics page).",
     "usedBy": "Used by",
     "export": "Download OpenLineage (.jsonl)"
+  },
+  "quality": {
+    "status": {
+      "PASSED": "Passed",
+      "WARNING": "Warning",
+      "FAILED": "Failed",
+      "NONE": "Not checked"
+    },
+    "unavailable": "Could not check",
+    "flagOf": "Data quality check of {chart}",
+    "title": "Data quality checks",
+    "hint": "Rules computed in the database every time the page opens (view office.report_checks), on your unit's figures, not recomputed in the browser. Threshold 0: one document off raises a flag. The Overview page shows the worst flag next to each chart.",
+    "view": "View",
+    "rule": "Rule",
+    "result": "Result",
+    "figures": "Figures",
+    "rules": {
+      "status_total": {
+        "name": "Status totals match incoming documents",
+        "what": "The status chart's bars plus restricted incoming documents (shown separately) must equal the incoming documents counted directly in the documents table. A gap means documents vanish from the page.",
+        "figures": "On the page {actual} / in the database {expected} incoming documents",
+        "detail": "Statuses with documents the chart does not draw: {detail}"
+      },
+      "department_total": {
+        "name": "Department totals match documents in progress",
+        "what": "The department chart's documents must add up to the In progress bar of the status chart. Documents without a known lead department (assigned to someone not in the directory, no lead task) raise a warning.",
+        "figures": "By department {actual} / in progress {expected}; {issues} without a lead department"
+      },
+      "processing_coverage": {
+        "name": "Processing time covers every finished document",
+        "what": "Finished documents without a finish time are left out of the average (warning); counting more than exist, or a month with negative total hours, fails. All months, not only the 12 on the chart.",
+        "figures": "Timed {actual} / {expected} finished documents",
+        "detail": "Months with negative total hours: {detail}"
+      },
+      "unique_keys": {
+        "name": "Join keys are unique and not empty",
+        "what": "The page matches figures by month and by department: a duplicate key is silently skipped, an empty key drops off the chart.",
+        "figures": "{expected} rows, {issues} with a duplicate or empty key"
+      },
+      "no_personal_columns": {
+        "name": "No personal data columns",
+        "what": "From the database catalog: a view exposing an email, phone, ID card number, birth date, address, full name or username column fails; only reading such a column (also through a nested view) is a warning.",
+        "figures": "{actual} personal columns exposed, {issues} personal columns read",
+        "detail": "Columns: {detail}"
+      }
+    },
+    "archive": {
+      "run": "Quality checks of this run",
+      "source": "The checks svc-files recorded in the OpenLineage events (dataQualityAssertions facet), verbatim, not recomputed.",
+      "table": "{table}: {passed}/{total} checks passed",
+      "failedItems": "failed: {items}",
+      "none": "This run recorded no checks in the lineage: nothing vouches for the package's row counts.",
+      "stopped": "The archiving run at {time} was stopped by a failed quality check; the case file is not in cold storage."
+    },
+    "assertion": {
+      "row_count_equals_source": "row count matches the database",
+      "not_null": "column {column} not empty"
+    }
   },
   "hpdi": {
     "title": "H-P-D-I self-assessment",
