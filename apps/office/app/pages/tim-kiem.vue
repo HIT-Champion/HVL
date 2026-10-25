@@ -17,74 +17,50 @@
 -->
 
 <script setup>
+
 import { useI18n } from 'vue-i18n';
+
+
+// Tìm kiếm (F1.7, F2.7): Meilisearch xếp hạng, Hasura lọc theo quyền — chỉ hiện văn bản người dùng được đọc.
 const { t } = useI18n();
 const { search } = useApi();
 const route = useRoute();
 const router = useRouter();
+
 const q = ref(String(route.query.q ?? ''));
 const direction = ref(String(route.query.direction ?? ''));
+// "Hỏi trợ lý" (F4.2): mang câu đang tìm sang trang Hỏi đáp, điền sẵn, không tự gửi
 const claims = useAuth().claims;
-const canAsk = computed(()=>[
-        'clerk',
-        'staff',
-        'manager',
-        'director'
-    ].includes(claims.value?.role ?? ''));
-const askLink = computed(()=>q.value.trim() ? {
-        path: '/hoi-dap',
-        query: {
-            q: q.value.trim()
-        }
-    } : {
-        path: '/hoi-dap'
-    });
+const canAsk = computed(() => ['clerk', 'staff', 'manager', 'director'].includes(claims.value?.role ?? ''));
+const askLink = computed(() => q.value.trim() ? { path: '/hoi-dap', query: { q: q.value.trim() } } : { path: '/hoi-dap' });
 const hits = ref([]);
 const next = ref(null);
-let shown = {
-    q: ''
-};
+// "Xem thêm" lấy tiếp đúng câu tìm đang hiện kết quả, dù ô tìm đã gõ khác: trang sau gắn với câu tìm (svc-files)
+let shown = { q: '' };
 const loading = ref(false);
 const searched = ref(false);
 const failure = ref('');
+
 async function run(more = false) {
-    if (!more && !q.value.trim()) return;
-    const params = more ? shown : {
-        q: q.value.trim(),
-        direction: direction.value || undefined
-    };
-    loading.value = true;
-    failure.value = '';
-    try {
-        const res = await search({
-            ...params,
-            limit: 20,
-            cursor: more ? next.value ?? undefined : undefined
-        });
-        hits.value = more ? [
-            ...hits.value,
-            ...res.hits
-        ] : res.hits;
-        next.value = res.next_cursor;
-        shown = params;
-        searched.value = true;
-        if (!more) router.replace({
-            query: {
-                q: q.value.trim(),
-                ...direction.value ? {
-                    direction: direction.value
-                } : {}
-            }
-        });
-    } catch (e) {
-        failure.value = errorText(t, e);
-    } finally{
-        loading.value = false;
-    }
+  if (!more && !q.value.trim()) return;
+  const params = more ? shown : { q: q.value.trim(), direction: direction.value || undefined };
+  loading.value = true;
+  failure.value = '';
+  try {
+    const res = await search({ ...params, limit: 20, cursor: more ? next.value ?? undefined : undefined });
+    hits.value = more ? [...hits.value, ...res.hits] : res.hits;
+    next.value = res.next_cursor;
+    shown = params;
+    searched.value = true;
+    if (!more) router.replace({ query: { q: q.value.trim(), ...(direction.value ? { direction: direction.value } : {}) } });
+  } catch (e) {
+    failure.value = errorText(t, e);
+  } finally {
+    loading.value = false;
+  }
 }
-onMounted(()=>{
-    if (q.value) run();
-});
+
+onMounted(() => {if (q.value) run();});
 </script>
 
 <template>
@@ -96,13 +72,13 @@ onMounted(()=>{
       </NuxtLink>
     </PageHeader>
     <form class="card mb-6 flex flex-col gap-3 p-4 sm:flex-row" @submit.prevent="run()">
-      <input v-model="q" type="search" class="input flex-1" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
-      <select v-model="direction" class="input sm:w-44">
+      <input v-model="q" type="search" class="input flex-1" :aria-label="t('search.title')" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
+      <select v-model="direction" class="input sm:w-44" :aria-label="t('search.directionLabel')">
         <option value="">{{ t('search.any') }}</option>
         <option value="in">{{ t('search.direction.in') }}</option>
         <option value="out">{{ t('search.direction.out') }}</option>
       </select>
-      <button class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
+      <button type="submit" class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
     </form>
 
     <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
