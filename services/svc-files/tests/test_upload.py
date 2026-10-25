@@ -185,6 +185,8 @@ def test_openapi_documents_upload_body(client):
         ("..", "tep-khong-ten"),
         (None, "tep-khong-ten"),
         ("x" * 300, "x" * 255),
+        # F3.15: WAF ở cổng cho qua tên có ' " ; = : (tên văn bản hành chính) — svc-files giữ nguyên, tên chỉ là dữ liệu
+        ("Tờ trình 'gấp'; đợt 1 = \"mới\": v2.pdf", "Tờ trình 'gấp'; đợt 1 = \"mới\": v2.pdf"),
     ],
 )
 def test_clean_filename(raw, expected):

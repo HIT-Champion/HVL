@@ -12,7 +12,7 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `clerk` (văn thư) | `vanthu` | 42 | 15 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
 | `staff` (chuyên viên) | `chuyenviendt` | 35 | 30 | [`graphql/staff.graphql`](graphql/staff.graphql) |
 | `manager` (lãnh đạo phòng) | `totruongdt` | 35 | 20 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 62 | 13 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 65 | 15 | [`graphql/director.graphql`](graphql/director.graphql) |
 | `tenant_admin` (quản trị đơn vị) | `quantri` | 27 | 13 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
@@ -65,6 +65,9 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_feedback` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `office_feedback_aggregate` |  |  |  | ✓ | ✓ |
 | `office_feedback_by_pk` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `office_maturity_assessments` |  |  |  | ✓ |  |
+| `office_maturity_assessments_aggregate` |  |  |  | ✓ |  |
+| `office_maturity_assessments_by_pk` |  |  |  | ✓ |  |
 | `office_registers` | ✓ |  |  | ✓ | ✓ |
 | `office_registers_by_pk` | ✓ |  |  | ✓ | ✓ |
 | `office_report_lineage` |  |  |  | ✓ |  |
@@ -103,6 +106,8 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `insert_office_documents_one` |  | ✓ |  |  |  |
 | `insert_office_feedback` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `insert_office_feedback_one` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `insert_office_maturity_assessments` |  |  |  | ✓ |  |
+| `insert_office_maturity_assessments_one` |  |  |  | ✓ |  |
 | `insert_personal_items` | ✓ | ✓ | ✓ | ✓ |  |
 | `insert_personal_items_one` | ✓ | ✓ | ✓ | ✓ |  |
 | `office_grant_document_access` | ✓ |  |  | ✓ |  |

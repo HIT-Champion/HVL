@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:schema:tu-chan-doan",
+  "title": "Bộ câu tự chẩn đoán H-P-D-I (trang /tu-chan-doan)",
+  "description": "Bốn không gian h, p, d, i; mỗi câu 5 mức; chữ vi, en. tests/hpdi.test.ts kiểm thêm thứ tự, trang",
+  "type": "object",
+  "required": ["id", "spaces", "sources"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "Phiên bản bộ câu, lưu cùng mỗi lần tự đánh giá (cột framework, ràng buộc maturity_framework)",
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,40}$"
+    },
+    "spaces": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/space" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "object",
+      "required": ["vi", "en"],
+      "additionalProperties": false,
+      "properties": {
+        "vi": { "type": "string", "minLength": 1, "pattern": "^\\S(.*\\S)?$" },
+        "en": { "type": "string", "minLength": 1, "pattern": "^\\S(.*\\S)?$" }
+      }
+    },
+    "space": {
+      "type": "object",
+      "required": ["key", "name", "summary", "questions"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "enum": ["h", "p", "d", "i"] },
+        "name": { "$ref": "#/$defs/text" },
+        "summary": { "$ref": "#/$defs/text" },
+        "questions": {
+          "description": "Mã câu: chữ của không gian và một chữ số; CSDL kiểm đủ bộ mã câu theo id của bộ câu",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 9,
+          "items": { "$ref": "#/$defs/question" }
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": ["id", "title", "text", "levels", "next", "links"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[hpdi][1-9]$" },
+        "title": { "$ref": "#/$defs/text" },
+        "text": { "$ref": "#/$defs/text" },
+        "levels": {
+          "description": "Mô tả mức 1 đến mức 5, việc quan sát được trong đơn vị",
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "next": { "$ref": "#/$defs/text" },
+        "links": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/link" }
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "required": ["to", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "description": "Vai trò mở được trang, như menu layouts/default.vue; không có: mọi ai mở được trang này",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["clerk", "staff", "manager", "director", "tenant_admin"] }
+        },
+        "to": {
+          "description": "Trang của Văn phòng điện tử (/dieu-hanh…) hoặc ứng dụng khác cùng cổng (/ca-nhan/)",
+          "type": "string",
+          "pattern": "^/([a-z]+(-[a-z]+)*(/[a-z]+(-[a-z]+)*)*/?)?$"
+        },
+        "label": { "$ref": "#/$defs/text" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["title", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/text" },
+        "url": { "type": "string", "pattern": "^https://[^\\s]+$" }
+      }
+    }
+  }
+}
