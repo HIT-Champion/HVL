@@ -33,6 +33,7 @@ import re
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +51,7 @@ from .flowable import FlowableClient, FlowableError
 from .hasura import Actor, HasuraClient, HasuraError
 from .notify import Notifier
 from .openbao import with_secrets
-from .ot import TOKEN_HEADER, OtBridge
+from .ot import MAP_ROLES, TOKEN_HEADER, OtBridge, map_result
 from .schemas import FormSchema, SchemaFileError
 from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
@@ -191,7 +192,8 @@ def create_app(
                         dispatcher=dispatcher)
     deadlines = Deadlines(hasura, flowable, notifier, sla_duration=settings.sla_duration)
     ot = ot or (OtBridge(hasura, notifier, settings.ngsi_url, secret=settings.action_secret,
-                         threshold=settings.ot_threshold, notify_url=settings.ot_notify_url)
+                         threshold=settings.ot_threshold, notify_url=settings.ot_notify_url,
+                         stale_min=settings.ot_stale_min)
                 if settings.ngsi_url else None)
     # F4.3: tác tử gợi ý giao việc nhận việc moc-goi-y của nhánh song song với bước chỉ đạo; không chạy thì nhánh tự
     # hết sau PT10M (timer boGoiY), văn bản vẫn tới lãnh đạo như thường
@@ -313,7 +315,8 @@ def create_app(
         return Response(status_code=204)
 
     @app.post("/actions/{name}",
-              summary="Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",
+              summary="Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, "
+                      "completeTask, otSensorMap",
               openapi_extra=ACTION_DOC)
     async def action(name: str, request: Request) -> JSONResponse:
         given = request.headers.get("x-moc-action-secret", "")
@@ -341,6 +344,10 @@ def create_app(
                 )
             elif name == "myTasks":
                 result = await workflow.my_tasks(actor)
+            elif name == "otSensorMap" and actor.role in MAP_ROLES:
+                # sơ đồ cảm biến (F3.10): chỉ tenant NGSI-LD của đơn vị trong phiên; chưa bật IT/OT thì trạng thái "off"
+                result = (await ot.sensor_map(actor.tenant_id) if ot is not None
+                          else map_result("off", settings.ot_threshold, settings.ot_stale_min, datetime.now(UTC)))
             elif name == "completeTask":
                 result = await workflow.complete_task(
                     actor, str(payload.get("taskId", "")), str(payload.get("outcome", "")), payload.get("data"),

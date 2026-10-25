@@ -66,11 +66,13 @@ class Settings:
     reconcile_interval_s: float
     sla_poll_interval_s: float
     # F3.10 IT/OT: context broker NGSI-LD (Scorpio, profile iot); để trống thì tắt. Ngưỡng nhiệt độ (°C) dựng báo cáo
-    # sự cố; địa chỉ broker gọi lại svc-workflow; chu kỳ kiểm subscription của các đơn vị
+    # sự cố; địa chỉ broker gọi lại svc-workflow; chu kỳ kiểm subscription của các đơn vị; số phút không có số đo thì
+    # sơ đồ cảm biến gắn cờ mất tín hiệu
     ngsi_url: str = ""
     ot_threshold: float = 35.0
     ot_notify_url: str = "http://svc-workflow:8000"
     ot_interval_s: float = 15.0
+    ot_stale_min: int = 10
     # F3.12 liên thông: chu kỳ vòng nền chuyển dòng chờ đến hạn và báo dòng đã chuyển mà chưa báo — ngắn hơn
     # MOC_RECONCILE_INTERVAL_S để lần thử lại (30 giây, 1 phút, 2 phút…) đúng hẹn
     dispatch_interval_s: float = 30.0
@@ -130,6 +132,7 @@ class Settings:
                 ot_threshold=float(env.get("MOC_OT_THRESHOLD", "35")),
                 ot_notify_url=env.get("MOC_OT_NOTIFY_URL", "http://svc-workflow:8000").rstrip("/"),
                 ot_interval_s=float(env.get("MOC_OT_SUBSCRIPTION_INTERVAL_S", "15")),
+                ot_stale_min=int(env.get("MOC_OT_STALE_MIN", "10")),
                 dispatch_interval_s=float(env.get("MOC_DISPATCH_INTERVAL_S", "30")),
                 suggest_enabled=_flag("MOC_SUGGEST_ENABLED", env.get("MOC_SUGGEST_ENABLED", "true")),
                 suggest_poll_interval_s=float(env.get("MOC_SUGGEST_POLL_INTERVAL_S", "2")),
@@ -160,6 +163,8 @@ class Settings:
             raise ConfigError(f"MOC_SLA_DURATION: {exc}") from exc
         if not math.isfinite(self.ot_threshold):
             raise ConfigError("MOC_OT_THRESHOLD phải là một số (°C)")
+        if not 1 <= self.ot_stale_min <= 1440:
+            raise ConfigError("MOC_OT_STALE_MIN phải là số phút nguyên từ 1 đến 1440")
         if not (math.isfinite(self.suggest_poll_interval_s) and self.suggest_poll_interval_s >= 0):
             raise ConfigError("MOC_SUGGEST_POLL_INTERVAL_S phải ≥ 0 (0: không nhận việc gợi ý giao việc)")
         # cả một việc gợi ý ≤ hạn gọi svc-files + 10 giây, phải xong trước khi khóa việc (PT1M) hết
