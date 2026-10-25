@@ -15,10 +15,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   0,2, câu khác giữ `MOC_ASK_SEMANTIC_RATIO`). Test svc-files +29, office +4, e2e thêm bước trong `hoi-dap.spec.ts`.
 
 ### Đã sửa lỗi
-- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` của PKCE và mã `code` gửi tới
-  `/realms/…/token` là chuỗi ngẫu nhiên, đôi khi trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403, đăng nhập hỏng
-  ngẫu nhiên như #140). Loại trừ 1 của `platform/apisix/apisix.yaml` gỡ đúng ba luật 942100, 933…, 930120 trên hai tham
-  số này như các token khác. Test scripts cập nhật, smoke thêm ca đổi mã với đúng chuỗi đã bị chặn.
+- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` base64url của PKCE (RFC 7636,
+  như kịch bản demo hay thư viện OIDC khác) đôi khi trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403); mã `code`
+  gửi kèm là token ngẫu nhiên như ở trang ứng dụng. oidc-client-ts của Văn phòng điện tử, P.A.R.A, Bảng tin sinh
+  verifier hex nên không dính verifier. Luật mới 10011 của `platform/apisix/apisix.yaml`, chỉ trên endpoint token,
+  gỡ đúng ba luật 942100, 933…, 930120 trên hai tham số này như các token khác. Test scripts thêm kiểm luật 10011,
+  smoke thêm ca đổi mã với đúng chuỗi đã bị chặn.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau

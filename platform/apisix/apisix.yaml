@@ -171,9 +171,8 @@ global_rules:
               # danh sách của client, không tự gọi tới. Token ngẫu nhiên do Keycloak, oidc-client-ts sinh (cookie phiên,
               # mã phiên, JWT, PKCE) tình cờ trùng mẫu: libinjection (942100: "+…" trong ngoặc kép, "8--…"), tên hàm
               # PHP (933…: rtrim, fputs), đuôi tệp (930120: .nsr), lệnh Unix (932…, chỉ cookie base64 có "/", "+") —
-              # khoảng 1/2 500 giá trị mỗi loại bị 403, đăng nhập hỏng ngẫu nhiên (#140). Bước đổi mã lấy token gửi lại
-              # code và code_verifier của PKCE ("71--7iZ…", #162). Chỉ gỡ đúng các luật đó trên đúng tên cookie, tham
-              # số token; luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi
+              # khoảng 1/2 500 giá trị mỗi loại bị 403, đăng nhập hỏng ngẫu nhiên (#140). Chỉ gỡ đúng các luật đó trên
+              # đúng tên cookie, tham số token; luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi
               - >-
                 SecRule REQUEST_FILENAME "@beginsWith /realms/${{MOC_REALM}}/" "id:10010,phase:1,pass,nolog,
                 ctl:ruleRemoveTargetByTag=OWASP_CRS;ARGS:password,
@@ -214,18 +213,25 @@ global_rules:
                 ctl:ruleRemoveTargetById=942100;ARGS:code_challenge,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:code_challenge,
                 ctl:ruleRemoveTargetById=930120;ARGS:code_challenge,
-                ctl:ruleRemoveTargetById=942100;ARGS:code_verifier,
-                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_verifier,
-                ctl:ruleRemoveTargetById=930120;ARGS:code_verifier,
-                ctl:ruleRemoveTargetById=942100;ARGS:code,
-                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
-                ctl:ruleRemoveTargetById=930120;ARGS:code,
                 ctl:ruleRemoveTargetById=942100;ARGS:refresh_token,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:refresh_token,
                 ctl:ruleRemoveTargetById=930120;ARGS:refresh_token,
                 ctl:ruleRemoveTargetById=942100;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=930120;ARGS:id_token_hint"
+              # Loại trừ 1b — bước đổi mã lấy token (#162): ứng dụng gửi lại mã code Keycloak vừa trả (cùng
+              # giá trị loại trừ 2 gỡ ở trang ứng dụng) và code_verifier của PKCE. Verifier base64url theo
+              # RFC 7636 (kịch bản demo, thư viện OIDC khác) tình cờ trùng libinjection: "71--7iZ…" → 942100,
+              # 403. Chỉ trên đúng endpoint token, đúng ba luật bắt nhầm token như loại trừ 1
+              - >-
+                SecRule REQUEST_FILENAME "@streq /realms/${{MOC_REALM}}/protocol/openid-connect/token" "id:10011,
+                phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_verifier"
               # Loại trừ 2 — trang Keycloak trả về sau đăng nhập: tham số iss (RFC 9207) là URL của realm; URL công khai
               # là localhost hay IP thì 934110 (SSRF), 931100 (RFI) bắt nhầm. Áp cho mọi redirect URI của ứng dụng: `/`,
               # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`. Mã code, session_state
