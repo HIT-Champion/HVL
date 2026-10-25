@@ -3575,14 +3575,14 @@ def logged_since(rows: list[dict[str, Any]], since: str) -> list[dict[str, Any]]
 
 
 def postgres_entry(rows: list[dict[str, Any]], marker: str) -> list[dict[str, Any]]:
-    """Các dòng PostgreSQL của mục lỗi có ``marker`` trong lời báo (ERROR, rồi CONTEXT, STATEMENT…): cùng [pid] với
-    dòng ERROR, từ dòng đó trở đi. Không có dòng ERROR mang dấu thì []."""
+    """Các dòng PostgreSQL của mục lỗi có ``marker`` trong lời báo: dòng ERROR rồi các dòng cùng tiền tố "%m [%p] "
+    (CONTEXT, STATEMENT…). Không dựa vào thứ tự: các dòng tới Parseable cùng lô có cùng p_timestamp, order by xếp tùy
+    ý. Không có dòng ERROR mang dấu thì []."""
     rows = [r for r in rows if r.get("service") == "postgres"]
-    for i, row in enumerate(rows):
-        found = re.search(r" \[(\d+)\] ERROR:  .*" + re.escape(marker), str(row.get("message") or ""))
+    for row in rows:
+        found = re.match(r"(.* \[\d+\] )ERROR:  .*" + re.escape(marker), str(row.get("message") or ""))
         if found:
-            pid = f" [{found.group(1)}] "
-            return [r for r in rows[i:] if pid in str(r.get("message") or "")]
+            return [row] + [r for r in rows if r is not row and str(r.get("message") or "").startswith(found.group(1))]
     return []
 
 
@@ -3706,14 +3706,15 @@ def log_tap_trung() -> None:
         except lt.ParseableError as exc:
             raise DemoFailed(str(exc)) from exc
         entry = postgres_entry(pg, rid)
+        statement = [r for r in entry if " STATEMENT:  " in str(r.get("message"))]
         failed = [r for r in kc if "LOGIN_ERROR" in str(r.get("message") or "")]
-        if (entry and failed) or time.monotonic() > deadline:
+        if (statement and failed) or time.monotonic() > deadline:
             break
         time.sleep(2)
     cli_lines(lt.table(entry + failed, 70))
     if not entry:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres mang {rid}")
-    if not any(" STATEMENT:  do [REDACTED]" in str(r.get("message")) for r in entry):
+    if not statement or not all(str(r.get("message")).endswith(" STATEMENT:  do [REDACTED]") for r in statement):
         raise DemoFailed("dòng STATEMENT của câu lỗi không có hoặc không bị che")
     if not failed:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng LOGIN_ERROR của keycloak")

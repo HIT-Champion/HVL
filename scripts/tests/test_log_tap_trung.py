@@ -480,16 +480,18 @@ class DemoHelpersTest(unittest.TestCase):
         self.assertEqual(self.demo.logged_since(rows, "2026-10-25T17:18:53Z"), rows[1:4])
 
     def test_postgres_entry(self) -> None:
-        pre = "2026-10-25 17:18:54.694 UTC"
-        rows = [{"service": "postgres", "message": f"{pre} [84] ERROR:  khac"},
+        # dòng cùng lô có cùng p_timestamp: Parseable trả CONTEXT, STATEMENT trước dòng ERROR (lần chạy CI đầu tiên)
+        pre = "2026-10-26 00:49:35.888 +07"
+        rows = [{"service": "postgres", "message": f"{pre} [91] CONTEXT:  PL/pgSQL function inline_code_block"},
+                {"service": "postgres", "message": f"{pre} [84] ERROR:  khac"},
+                {"service": "postgres", "message": f"{pre} [91] STATEMENT:  do [REDACTED]"},
                 {"service": "postgres", "message": f"{pre} [91] ERROR:  demo-log-ab12: lỗi thử"},
                 {"service": "keycloak", "message": f"{pre} [91] ERROR:  không phải postgres"},
                 {"service": "postgres", "message": f"{pre} [84] STATEMENT:  select 1"},
-                {"service": "postgres", "message": f"{pre} [91] CONTEXT:  PL/pgSQL function inline_code_block"},
-                {"service": "postgres", "message": f"{pre} [91] STATEMENT:  do [REDACTED]"}]
-        self.assertEqual(self.demo.postgres_entry(rows, "demo-log-ab12"), [rows[1], rows[4], rows[5]])
+                {"service": "postgres", "message": "2026-10-26 00:52:00.001 +07 [91] STATEMENT:  pid dùng lại"}]
+        self.assertEqual(self.demo.postgres_entry(rows, "demo-log-ab12"), [rows[3], rows[0], rows[2]])
         self.assertEqual(self.demo.postgres_entry(rows, "demo-log-cd34"), [])
-        self.assertEqual(self.demo.postgres_entry(rows[2:], "không phải"), [])
+        self.assertEqual(self.demo.postgres_entry(rows[4:], "không phải"), [])
 
 
 if __name__ == "__main__":
