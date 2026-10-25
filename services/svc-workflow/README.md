@@ -13,6 +13,7 @@ Chủ: issue #15.
 | `submitOutgoing(documentId, signerId)` | `staff` | Người soạn trình dự thảo → khởi chạy `van-ban-di`, hoặc trình lại sau khi bị trả lại. Có đơn vị nhận trong hệ thống (`recipient_tenant_ids`) thì kiểm: có thật, không phải đơn vị mình, văn bản không hạn chế (`400`, `fields.recipient_tenant_ids` = `unknown` / `self` / `restricted`) |
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
 | `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` → liên thông tới đơn vị nhận trong hệ thống |
+| `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Chỉ đọc: số đo mới nhất và cờ chất lượng của các cảm biến NGSI-LD trong đơn vị người gọi (mục IT/OT bên dưới) |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
@@ -78,6 +79,15 @@ của cảm biến, và báo người đó. Còn dự thảo chưa trình hoặc
 (`urn:ngsi-ld:Subscription:moc-ot-context`): Scorpio 6.0.2 cất ngữ cảnh JSON-LD của subscription trong CSDL của tenant
 nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi thông báo (nhật ký Scorpio: "Mutiny had
 to drop … ResponseException").
+
+**Sơ đồ cảm biến** (F3.10, Action `otSensorMap`, trang `/cam-bien` của Văn phòng điện tử): đọc broker ở tenant NGSI-LD
+của đơn vị trong biến phiên — `GET /ngsi-ld/v1/entities?type=TemperatureSensor&options=sysAttrs` (tối đa 100 cảm
+biến) và lịch sử 10 lần đo gần nhất của từng cảm biến (temporal API, tối đa 8 lời gọi một lúc, cả lượt 8 giây) — rồi
+trả số đo mới nhất, mã phòng (Property `room`), ngưỡng và ba cờ chất lượng: `stale` (quá `MOC_OT_STALE_MIN` phút
+không có số đo, theo `observedAt`, thiếu thì `modifiedAt`), `out_of_range` (không phải số hữu hạn hoặc ngoài
+−55…125 °C — dải đo của DS18B20), `duplicate_time` (số đo mới nhất trùng `observedAt` với lần đo khác trong lịch sử).
+Vai trò `clerk`, `staff`, `manager`, `director`. Chưa đặt `MOC_NGSI_URL` thì `status` = `off`; broker không trả lời
+hay trả lỗi thì `unavailable` — vẫn 200, không 5xx. Chỉ đọc, không ghi CSDL.
 
 **Liên thông trong hệ thống** (F3.12, `dispatch.py`): văn bản đi có đơn vị nhận trong hệ thống thì lúc phát hành
 CSDL tạo một dòng `office.dispatches` `pending` cho mỗi đơn vị, cùng giao dịch (trigger — hộp thư đi). Sau khi
@@ -192,6 +202,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_OT_THRESHOLD` | `35` | Ngưỡng nhiệt độ (°C) của subscription |
 | `MOC_OT_NOTIFY_URL` | `http://svc-workflow:8000` | Địa chỉ broker dùng để gọi lại dịch vụ |
 | `MOC_OT_SUBSCRIPTION_INTERVAL_S` | `15` | Chu kỳ kiểm subscription; `0` tắt vòng nền |
+| `MOC_OT_STALE_MIN` | `10` | Sơ đồ cảm biến: quá chừng ấy phút (1–1440) không có số đo thì cảm biến mang cờ `stale` (mất tín hiệu) |
 | `MOC_SUGGEST_ENABLED` | `true` | Tác tử gợi ý giao việc (F4.3). `false`: vẫn nhận việc `moc-goi-y` nhưng hoàn thành ngay, không gọi svc-files, không ghi gì |
 | `MOC_SUGGEST_POLL_INTERVAL_S` | `2` | Chu kỳ nhận việc gợi ý; `0` không chạy vòng nền — nhánh gợi ý tự hết sau `PT10M` |
 | `MOC_SUGGEST_TIMEOUT_S` | `10` | Hạn gọi svc-files (0–40 giây); cả một việc ≤ hạn + 10 giây, dưới khóa việc `PT1M` |

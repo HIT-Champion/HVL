@@ -402,6 +402,8 @@ services:
       # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
       MOC_NGSI_URL: http://scorpio:9090
       MOC_OT_THRESHOLD: ${MOC_OT_THRESHOLD:-35}
+      # sơ đồ cảm biến (trang /cam-bien): quá chừng ấy phút không có số đo thì cảm biến mang cờ mất tín hiệu
+      MOC_OT_STALE_MIN: ${MOC_OT_STALE_MIN:-10}
       # F4.3 — tác tử gợi ý giao việc moc-assigner: nhánh BPMN song song từ lúc vào sổ (topic moc-goi-y), tìm văn bản
       # đến tương tự đã giao qua route nội bộ của svc-files, bỏ phiếu đơn vị chủ trì. Không cần mô hình; svc-files
       # không trả lời thì văn bản vẫn tới lãnh đạo, chỉ không có gợi ý (không phụ thuộc svc-files ở depends_on)

@@ -29,7 +29,8 @@
     "board": "Overview",
     "metrics": "Metrics",
     "feedback": "Feedback",
-    "selfCheck": "Self-assessment"
+    "selfCheck": "Self-assessment",
+    "sensors": "Sensor map"
   },
   "role": {
     "clerk": "Clerk",
@@ -1528,5 +1529,66 @@
         "description": "Each person's own place for files in four folders: Projects, Areas, Resources, Archives."
       }
     }
+  },
+  "sensors": {
+    "title": "Storage sensor map",
+    "subtitle": "Latest temperature of each room in the records storage against the alert threshold, with sensor data quality flags. Refreshes every 30 seconds.",
+    "forbidden": "This page is for clerks, staff, department heads and unit directors.",
+    "off": "Sensors are not enabled",
+    "offHint": {
+      "off": "No NGSI-LD context broker is configured to receive sensor readings (MOC_NGSI_URL of svc-workflow). Contact your system administrator.",
+      "unavailable": "The NGSI-LD context broker (iot profile) is not running or not answering yet, so there are no readings. Administrators enable it with make demo-it-ot or docker compose --profile iot up -d."
+    },
+    "plan": "Storage floor plan",
+    "planLabel": "Floor plan of the records storage, each room coloured by its latest temperature against the threshold",
+    "corridor": "Corridor",
+    "checkedAt": "Read at {time}",
+    "room": {
+      "kho-1": "Stack room 1",
+      "kho-2": "Stack room 2",
+      "kho-3": "Stack room 3",
+      "phong-doc": "Reading room",
+      "xu-ly": "Processing room",
+      "may-chu": "Server room"
+    },
+    "outside": "Not on the plan",
+    "outsideHint": "{n} sensor(s) declare no room code (room attribute) or a code that is not on the plan: listed in the table only.",
+    "count": "{n} sensors",
+    "legend": "Legend",
+    "threshold": "Alert threshold {threshold} (MOC_OT_THRESHOLD). Above it, the system drafts an \"Incident report\" for the staff member responsible for the sensor.",
+    "level": {
+      "over": "Above threshold",
+      "near": "Near threshold",
+      "normal": "Normal",
+      "unknown": "Reading not trusted",
+      "empty": "No sensor"
+    },
+    "levelHint": {
+      "over": "above {threshold}",
+      "near": "above {from}, up to {threshold}; a hint only, no alert is sent",
+      "normal": "{from} or below",
+      "unknown": "no reading yet, signal lost or out of range",
+      "empty": "no sensor in this room"
+    },
+    "flags": "Data quality flags",
+    "flag": {
+      "stale": "Signal lost",
+      "out_of_range": "Out of range",
+      "duplicate_time": "Repeated time"
+    },
+    "flagHint": {
+      "stale": "no new reading for more than {n} minutes",
+      "out_of_range": "value is not a number, or outside the sensor's measuring range ({min} to {max})",
+      "duplicate_time": "the latest reading has the same observation time (observedAt) as another reading: stuck device clock or replayed message"
+    },
+    "flagsNote": "Flags are computed by the server from the sensor's digital twin in the context broker; rooms flagged signal lost or out of range are not coloured by the reading.",
+    "table": "Sensors",
+    "colRoom": "Room",
+    "colSensor": "Sensor",
+    "colValue": "Latest reading",
+    "colAt": "Observed at",
+    "colFlags": "Flags",
+    "none": "Your unit has no sensor sending readings yet.",
+    "note": "Sample floor plan of one storage level; sensors are placed by the room code the device declares. You only see your own unit's sensors."
   }
 }
