@@ -55,8 +55,23 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   ghi kèm câu giáo trình ở `docs/tu-chan-doan.md` §3. Cảnh báo "rác vào, rác ra" khi `[I]` vượt `[D]` từ 1 mức hoặc
   hình dạng là Ảo giác công nghệ: khuyên tạm dừng mở rộng `[I]`, dẫn tới cờ kiểm chất lượng số liệu ở Phả hệ số liệu.
   Chỉ để định hướng, không phải điểm DTI. Test office +3, e2e thêm bước trong `tu-chan-doan.spec.ts`.
+- Cờ chất lượng dữ liệu trên trang Điều hành và Phả hệ số liệu (F3.9, F3.11): khung nhìn `office.report_checks`
+  (migration 1792281603300) tính trong CSDL lúc truy vấn 5 luật trên số của trang Điều hành — tổng theo trạng thái
+  khớp số văn bản đến trong bảng, tổng theo phòng khớp số đang xử lý (văn bản chưa rõ phòng chủ trì là cảnh báo),
+  thời gian xử lý tính đủ văn bản đã xong, khóa ghép số không trùng không rỗng, không khung nhìn `office.v_*` nào xuất
+  (trượt) hay đọc (cảnh báo) cột thông tin cá nhân theo catalog, kể cả qua view lồng — mỗi luật Đạt / Cảnh báo /
+  Trượt kèm số liệu; chỉ lãnh đạo đơn vị đọc, đúng đơn vị mình. Cờ đặt cạnh nút "Nguồn số liệu" của từng biểu đồ
+  (truy vấn riêng, hỏi sau khi biểu đồ đã có số nên không làm chậm biểu đồ). Trang Phả hệ thêm mục Kiểm chất lượng
+  số liệu, cờ từng khung nhìn, cờ của lượt nộp lưu và từng bước theo đúng assertion svc-files đã ghi (không tính
+  lại); lượt bị dừng vì trượt kiểm hiện cờ Trượt kèm mục trượt. Test db +7, office +8; smoke thêm 2 kiểm.
 
 ### Đã sửa lỗi
+- Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
+  Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura
+  đóng thì APISIX nhận EOF hoặc RST và trả 502. Upstream `hasura` nay đặt `keepalive_pool` với `idle_timeout: 25`,
+  chỉ APISIX đóng kết nối rảnh. Dựng lại với Hasura v2.51.0 và APISIX 3.18.0 như repo, gửi yêu cầu lệch −4…+4 ms
+  quanh nhịp quét: trước 21/960 yêu cầu bị 502, sau 0/960. Test `test_giu_ket_noi.py` kiểm quy tắc này cho Hasura
+  và `svc-files`.
 - Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` base64url của PKCE (RFC 7636, như
   kịch bản demo hay thư viện OIDC khác) khoảng 1/25 000 lượt trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403); mã
   `code` gửi kèm là token ngẫu nhiên như ở trang ứng dụng. oidc-client-ts của Văn phòng điện tử, P.A.R.A, Bảng tin sinh

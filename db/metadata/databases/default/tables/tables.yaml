@@ -58,3 +58,4 @@
 - "!include office_maturity_assessments.yaml"
 - "!include office_report_lineage.yaml"
 - "!include core_app_catalog.yaml"
+- "!include office_report_checks.yaml"

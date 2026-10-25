@@ -1214,6 +1214,23 @@ def main() -> None:
         fail("văn thư đọc được phả hệ báo cáo")
     except RuntimeError:
         ok("phả hệ báo cáo chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
+    # Kiểm chất lượng số liệu báo cáo (F3.9, F3.11): luật tính trong CSDL lúc truy vấn, cùng quyền với dashboard.
+    # Trên dữ liệu của luồng chính không luật nào được Trượt; Cảnh báo (vd văn bản chưa rõ phòng chủ trì) thì in ra
+    checks = director.gql("{ office_report_checks { rule report status } }")["office_report_checks"]
+    rules = {r["rule"] for r in checks}
+    failed = sorted(f"{r['rule']} {r['report']}" for r in checks if r["status"] == "FAILED")
+    warned = sorted(f"{r['rule']} {r['report']}" for r in checks if r["status"] == "WARNING")
+    rules == {"status_total", "department_total", "processing_coverage", "unique_keys", "no_personal_columns"} \
+        and {r["report"] for r in checks if r["rule"] != "no_personal_columns"} == board_views \
+        and {r["status"] for r in checks} <= {"PASSED", "WARNING", "FAILED"} and not failed \
+        or fail(f"kiểm chất lượng số liệu chưa đúng: trượt {failed}, luật {sorted(rules)}")
+    ok(f"kiểm chất lượng số liệu: {len(checks)} kết quả của {len(rules)} luật trên khung nhìn báo cáo, không luật nào "
+       "Trượt" + (f"; cảnh báo: {', '.join(warned)}" if warned else ""))
+    try:
+        clerk.gql("{ office_report_checks { rule } }")
+        fail("văn thư đọc được kết quả kiểm chất lượng số liệu")
+    except RuntimeError:
+        ok("kiểm chất lượng số liệu chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
 
     print("Sổ kiểm toán (neo hash ra ngoài CSDL)")
     moc = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "audit"]
