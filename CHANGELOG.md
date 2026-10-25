@@ -94,6 +94,18 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `svc-files` (nhật ký, lời gọi Hasura nên vào `core.audit_log.request_id`, lời gọi `svc-files`), mã sai dạng thì
   thay bằng mã mới; APISIX ghi mã yêu cầu ở cuối dòng log truy cập. Rủi ro (CORS của Parseable, mất log khi Vector dừng)
   và cách tắt: `docs/van-hanh.md`, mục Log tập trung. Test svc-workflow +10, scripts +29, `vector test` 29 ca.
+- Cắm ứng dụng vào lõi bằng một lệnh, không sửa tệp nào của lõi: `python3 scripts/moc.py app install apps/<thư
+  mục>/app.yaml` (`make app-install APP=…`, `--dry-run` in kế hoạch), `app list`, `app remove` (giữ dữ liệu), `app
+  sync`. Manifest theo `scripts/app-manifest.schema.json`; lệnh tạo client Keycloak (PKCE S256, 5 mapper; client dịch vụ
+  khi cần), route APISIX, container, schema + migration chạy bằng vai trò CSDL riêng của ứng dụng (không quyền gì trên
+  lõi; view, `DEFAULT`, trigger đọc lõi hay chạy bằng quyền của Hasura bị từ chối trước khi commit), bảng và quyền
+  Hasura (lọc đơn vị; điều kiện trong quyền không `_exists`, qua quan hệ sang lõi chỉ `visible: {_eq: true}` — Hasura
+  chạy điều kiện bằng quyền admin), Event Trigger — trạng thái trong `.moc-apps/` (ngoài git), tệp chạy dựng từ tệp lõi
+  nguyên văn (APISIX tự nạp lại, metadata sống qua khởi động lại Hasura). Chạy lại không tạo trùng; lỗi báo đúng bước.
+  Lõi phát luồng sự kiện đã làm sạch `core.app_events` (migration 1792281603200: tiếp nhận, vào sổ, phát hành; không văn
+  bản hạn chế) qua Hasura Event Triggers. Ứng dụng thứ ba `apps/bang-tin` — Bảng tin đơn vị; `make demo-cai-ung-dung`;
+  cách làm, ranh giới tin cậy và rủi ro ở `docs/them-ung-dung.md` mục 1. `moc backup` ghi và tạo lại vai trò CSDL của
+  ứng dụng khi khôi phục sang máy mới. Test (đếm tĩnh): scripts +52, db +14, bang-tin +20.
 - Tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7): trang Tự chẩn đoán `/tu-chan-doan` — 12 câu do đội tự
   viết theo bốn không gian Con người, Quy trình, Dữ liệu, Trí tuệ, mỗi câu 5 mức quan sát được (vi/en, có JSON
   Schema), radar ECharts, cảnh báo lệch nền theo nguyên lý tiến hóa tuyến tính H → P → D → I, không gian nên làm

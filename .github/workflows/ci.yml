@@ -406,6 +406,14 @@ jobs:
           python3 scripts/moc.py tenant list
           python3 scripts/moc.py tenant check
 
+      # Ứng dụng thứ ba cắm bằng một lệnh (docs/them-ung-dung.md mục 1): moc app install apps/bang-tin/app.yaml —
+      # client Keycloak, route APISIX, container, migration bằng vai trò CSDL riêng, quyền Hasura, Event Trigger; SSO,
+      # sự kiện tới ứng dụng, cài lại không tạo gì, gỡ giữ dữ liệu, git diff các tệp lõi trống. Lần cài đầu tạo lại
+      # apisix, hasura (≈ 15 giây GraphQL không trả lời) nên đặt sau các bước cần Hasura liên tục
+      - name: Cắm ứng dụng bằng một lệnh (make demo-cai-ung-dung)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-cai-ung-dung
+
       # F3.14: bật profile logs (Vector, Parseable; 5 dịch vụ chuyển sang driver fluentd) → một mã X-Request-Id tự đặt
       # đi qua APISIX → svc-workflow → svc-files, tra Parseable ra đủ dòng của ba dịch vụ, sổ kiểm toán ghi cùng mã, kho
       # log không còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log của các dịch vụ

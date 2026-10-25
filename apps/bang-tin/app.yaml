@@ -1,0 +1,81 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Bảng tin đơn vị — ứng dụng thứ ba, cắm vào lõi bằng MỘT lệnh, không sửa tệp nào ngoài thư mục này:
+#   python3 scripts/moc.py app install apps/bang-tin/app.yaml     (make app-install APP=apps/bang-tin/app.yaml)
+# Cấu trúc tệp: scripts/app-manifest.schema.json; cách làm và giới hạn: docs/them-ung-dung.md mục 1. Không có bí mật
+# ở đây: header webhook và client secret do lệnh sinh lúc cài (.moc-apps/bang-tin.env).
+
+name: bang-tin
+title: Bảng tin đơn vị
+description: Văn bản vừa vào sổ, vừa phát hành trong đơn vị, cập nhật theo sự kiện của lõi
+version: 1.0.0
+path: /bang-tin
+
+# Dựng từ thư mục này lúc cài (Dockerfile: Python thư viện chuẩn trên image ghim digest, không root)
+image: {build: .}
+port: 8080
+healthcheck:
+  test: [CMD, python3, -c, "import urllib.request as u; u.urlopen('http://127.0.0.1:8080/bang-tin/healthz', timeout=3)"]
+  interval: 15s
+  timeout: 5s
+  retries: 3
+memory: 96m
+
+database:
+  schema: bang_tin
+  migrations: migrations
+
+# Phần máy chủ ghi tin vào bảng của mình bằng danh tính riêng: client app-bang-tin-svc, vai trò Hasura app_bang_tin
+service_account: true
+
+metadata:
+  tables:
+    - table: {schema: bang_tin, name: tin}
+      # một chiều về lõi: bảng tin đọc văn bản theo đúng quyền của người đang xem (core_*.yaml, office_*.yaml)
+      object_relationships:
+        - name: document
+          using:
+            manual_configuration:
+              remote_table: {schema: office, name: documents}
+              column_mapping: {document_id: id}
+      select_permissions:
+        - role: clerk
+          permission: &doc_visible
+            columns: [event_id, document_id, kind, occurred_at]
+            filter:
+              _and:
+                - tenant_id: {_eq: X-Hasura-Tenant-Id}
+                - document: {visible: {_eq: true}}
+        - role: staff
+          permission: *doc_visible
+        - role: manager
+          permission: *doc_visible
+        - role: director
+          permission: *doc_visible
+      # chỉ phần máy chủ của ứng dụng thêm dòng; không ai sửa, không ai xóa
+      insert_permissions:
+        - role: app_bang_tin
+          permission:
+            columns: [event_id, tenant_id, document_id, kind, occurred_at]
+            check: {}
+
+# Nghe sự kiện của lõi (danh sách trắng core.app_events). Mọi loại trong danh sách trắng đều tới webhook; loại không
+# có ở đây thì phần máy chủ bỏ qua (lõi đặt MOC_APP_EVENT_KINDS theo danh sách này)
+events:
+  kinds: [office.document.registered, office.document.issued]
+  webhook: {port: 8081, path: /su-kien}
+  retry: {num_retries: 5, interval_sec: 10, timeout_sec: 10}

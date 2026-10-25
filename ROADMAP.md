@@ -48,6 +48,9 @@ trường số khép kín.
 - [x] Cấu trúc thư mục **P.A.R.A**: Không gian cá nhân `apps/ca-nhan` (Dự án, Lĩnh vực, Tài nguyên, Lưu trữ), ứng
       dụng thứ hai cắm vào lõi, không sửa dòng nào trong `services/`
       ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), bước CI `make demo-ca-nhan`)
+- [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng
+      thứ ba Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng
+      được, bước CI `make demo-cai-ung-dung`)
 - [ ] **Một phần** — cổng nội bộ: hai ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; chưa có trang cổng
       dẫn từ ứng dụng này sang ứng dụng kia
 - [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email và webhook
@@ -73,8 +76,9 @@ bộ phận.
 - [ ] **Một phần** — API nạp lô văn bản đến `POST /api/imports/incoming` (cụm ⑤, mức Dùng được; bước CI
       `make demo-nap-lo`): mới có một loại lô, chưa có màn "Nhập lô" trên giao diện
 - [ ] **Một phần** — hướng sự kiện: các bước của văn bản ghi vào `office.document_events`, mọi thay đổi vào sổ kiểm
-      toán `core.audit_log`; chưa có trục sự kiện để ứng dụng khác đăng ký nghe, `db/metadata` chưa khai Hasura Event
-      Trigger nào (cụm ⑥)
+      toán `core.audit_log`; ứng dụng cài bằng `moc app install` nhận luồng `core.app_events` qua Hasura Event
+      Triggers (đến, vào sổ, phát hành; không văn bản hạn chế). Chưa có broker streaming: không phát lại, không bảo
+      đảm thứ tự (cụm ⑥)
 - [ ] Biểu mẫu low-code: form viết trong mã; JSON Schema dùng chung mới có cho form tiếp nhận văn bản đến, khuôn văn
       bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4)
 - [ ] Tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): việc nền hiện là vòng lặp viết trong
@@ -166,9 +170,9 @@ Việc nào chưa xong trước 26/11 thì để sau `v1.1.0`.
 
 1. **Đơn vị chạy thử thật** (F2.11, F4.6): đo cột "trước" của số đo §8, nhận góp ý của người ngoài đội. Mọi số đo hiện
    tính trên dữ liệu mẫu; chưa có đơn vị dùng thật thì chưa biết sản phẩm giải đúng bài toán đến đâu.
-2. **Trục sự kiện** (cụm ⑥, chưa có): bắt đầu bằng Hasura Event Triggers — `DEPENDENCIES.md` đã chọn thay Redpanda —
-   trên các bảng sự kiện sẵn có, chưa thêm broker. Ứng dụng thứ ba cần nghe sự kiện [P] mà không đọc thẳng bảng của
-   Văn phòng điện tử.
+2. **Trục sự kiện** (cụm ⑥, một phần): ứng dụng cài bằng `moc app install` đã nghe được sự kiện [P] qua luồng
+   `core.app_events` và Hasura Event Triggers, không đọc thẳng bảng của Văn phòng điện tử. Còn thiếu: phát lại, thứ
+   tự, thêm loại sự kiện ngoài văn bản; chưa thêm broker.
 3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, chưa có): Kestra đã cân nhắc, chưa đưa vào (`DEPENDENCIES.md`).
    Hiện thêm một việc tự động là phải sửa mã dịch vụ.
 4. **Truy vết, giám sát đủ** (cụm ⑥): tracing phân tán, chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).
