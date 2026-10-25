@@ -231,6 +231,8 @@ python3 scripts/seed.py                 # sample data, first time only
   when packing) and `make install` reads it, no need to set it by hand.
 - Upgrade: stop the installation and run `make install` again with the same `PREFIX`. Compose, configuration and
   images are replaced; the installation's `.env` is kept, only `MOC_VERSION` changes.
+  For a running installation with data, use `scripts/nang_cap.sh nang /opt/moc`: it backs up first, checks
+  afterwards and prints the rollback command ([`docs/trien-khai.md`](docs/trien-khai.md), section Vận hành).
 - Uninstall: `make uninstall PREFIX=/opt/moc` removes exactly the installed files, keeping `.env` and the data.
 
 ## Try it out

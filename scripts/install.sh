@@ -35,13 +35,14 @@ COMPOSE=(docker compose --profile core --profile app)
 # Danh sách tệp do bản cài quản lý — lần cài sau và lệnh gỡ chỉ xóa đúng những tệp này
 MANIFEST=.moc-install
 # Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py (cả
-# sao lưu, thêm đơn vị, client ứng dụng của realm, kiểm chữ ký mốc neo), màn demo (demo.py, demo_ca_nhan.py), reconciler
-# GitOps (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây profile core, app nên không thấy bind
-# mount của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm
-# ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của manifest)
+# sao lưu, thêm đơn vị, client ứng dụng của realm, kiểm chữ ký mốc neo), màn demo (demo.py và lô mẫu nap_lo_mau.py nó
+# import, demo_ca_nhan.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây
+# profile core, app nên không thấy bind mount của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ,
+# lệnh chuẩn bị và tra Parseable), cắm ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của
+# manifest)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
          scripts/moc.py scripts/audit_chain.py scripts/anchor_sig.py scripts/backup.py scripts/tenants.py
-         scripts/demo.py scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
+         scripts/demo.py scripts/nap_lo_mau.py scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
          seed services/ot-sensor/sensor.py
          platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
          scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json)
@@ -220,9 +221,11 @@ do_install() {
   while read -r _ rel; do
     [ -e "$dest/$rel" ] || die "thiếu $dest/$rel"
   done < <(grep '^BIND' <<<"$check")
+  # Thẻ image đúng như lúc chạy từ bản cài (MOC_VERSION trong .env vừa ghi). Đặt lại biến: make install truyền
+  # MOC_VERSION rỗng, mà compose ưu tiên biến môi trường đã đặt — kể cả rỗng — hơn .env, nên sẽ tìm thẻ dev (#186)
   while read -r img; do
     case "$img" in moc/*) docker image inspect "$img" >/dev/null 2>&1 || die "thiếu image $img" ;; esac
-  done < <(cd "$dest" && "${COMPOSE[@]}" config --images)
+  done < <(cd "$dest" && MOC_VERSION="$ver" "${COMPOSE[@]}" config --images)
 
   cat <<EOF
 Đã cài Signet $ver vào $dest. Chạy từ đó:

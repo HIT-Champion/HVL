@@ -69,6 +69,25 @@ input Int_comparison_exp {
   _nin: [Int!]
 }
 
+type OtSensor {
+  flags: [String!]!
+  id: String!
+  name: String!
+  observed_at: timestamptz
+  room: String
+  value: Float
+}
+
+type OtSensorMap {
+  checked_at: timestamptz!
+  range_max: Float!
+  range_min: Float!
+  sensors: [OtSensor!]!
+  stale_after_min: Int!
+  status: String!
+  threshold: Float!
+}
+
 "Boolean expression to compare columns of type \"String\". All fields are combined with logical 'AND'."
 input String_array_comparison_exp {
   "is the array contained in the given array value"
@@ -3590,6 +3609,85 @@ input office_registers_stream_cursor_value_input {
   year: Int
 }
 
+"columns and relationships of \"office.report_checks\""
+type office_report_checks {
+  actual: bigint
+  detail: [String!]
+  expected: bigint
+  issues: bigint
+  report: String
+  rule: String
+  status: String
+  tenant_id: uuid
+}
+
+"Boolean expression to filter rows from the table \"office.report_checks\". All fields are combined with a logical 'AND'."
+input office_report_checks_bool_exp {
+  _and: [office_report_checks_bool_exp!]
+  _not: office_report_checks_bool_exp
+  _or: [office_report_checks_bool_exp!]
+  actual: bigint_comparison_exp
+  detail: String_array_comparison_exp
+  expected: bigint_comparison_exp
+  issues: bigint_comparison_exp
+  report: String_comparison_exp
+  rule: String_comparison_exp
+  status: String_comparison_exp
+  tenant_id: uuid_comparison_exp
+}
+
+"Ordering options when selecting data from \"office.report_checks\"."
+input office_report_checks_order_by {
+  actual: order_by
+  detail: order_by
+  expected: order_by
+  issues: order_by
+  report: order_by
+  rule: order_by
+  status: order_by
+  tenant_id: order_by
+}
+
+"select columns of table \"office.report_checks\""
+enum office_report_checks_select_column {
+  "column name"
+  actual
+  "column name"
+  detail
+  "column name"
+  expected
+  "column name"
+  issues
+  "column name"
+  report
+  "column name"
+  rule
+  "column name"
+  status
+  "column name"
+  tenant_id
+}
+
+"Streaming cursor of the table \"office_report_checks\""
+input office_report_checks_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_report_checks_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_report_checks_stream_cursor_value_input {
+  actual: bigint
+  detail: [String!]
+  expected: bigint
+  issues: bigint
+  report: String
+  rule: String
+  status: String
+  tenant_id: uuid
+}
+
 "columns and relationships of \"office.report_lineage\""
 type office_report_lineage {
   consumer: String
@@ -5113,6 +5211,19 @@ type query_root {
   ): [office_registers!]!
   "fetch data from the table: \"office.registers\" using primary key columns"
   office_registers_by_pk(id: uuid!): office_registers
+  "fetch data from the table: \"office.report_checks\""
+  office_report_checks(
+    "distinct select on columns"
+    distinct_on: [office_report_checks_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_report_checks_order_by!]
+    "filter the rows returned"
+    where: office_report_checks_bool_exp
+  ): [office_report_checks!]!
   "fetch data from the table: \"office.report_lineage\""
   office_report_lineage(
     "distinct select on columns"
@@ -5269,6 +5380,7 @@ type query_root {
     "filter the rows returned"
     where: office_v_time_to_assign_bool_exp
   ): [office_v_time_to_assign!]!
+  otSensorMap: OtSensorMap!
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"
@@ -5946,6 +6058,28 @@ type subscription_root {
     "filter the rows returned"
     where: office_registers_bool_exp
   ): [office_registers!]!
+  "fetch data from the table: \"office.report_checks\""
+  office_report_checks(
+    "distinct select on columns"
+    distinct_on: [office_report_checks_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_report_checks_order_by!]
+    "filter the rows returned"
+    where: office_report_checks_bool_exp
+  ): [office_report_checks!]!
+  "fetch data from the table in a streaming manner: \"office.report_checks\""
+  office_report_checks_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_report_checks_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_report_checks_bool_exp
+  ): [office_report_checks!]!
   "fetch data from the table: \"office.report_lineage\""
   office_report_lineage(
     "distinct select on columns"

@@ -29,7 +29,8 @@
     "board": "Điều hành",
     "metrics": "Số đo",
     "feedback": "Góp ý",
-    "selfCheck": "Tự chẩn đoán"
+    "selfCheck": "Tự chẩn đoán",
+    "sensors": "Sơ đồ cảm biến"
   },
   "role": {
     "clerk": "Văn thư",
@@ -1311,13 +1312,69 @@
     "inputs": "Đầu vào",
     "outputs": "Đầu ra",
     "quality": "Kiểm chất lượng",
-    "passed": "Đạt",
-    "failedCheck": "Trượt",
     "notChecked": "Không kiểm",
     "reports": "Mọi khung nhìn báo cáo ({n})",
     "reportsHint": "Mọi view office.v_… trong CSDL, kể cả khung nhìn chưa có biểu đồ trên trang Điều hành (vd của trang Số đo).",
     "usedBy": "Biểu đồ dùng",
     "export": "Tải OpenLineage (.jsonl)"
+  },
+  "quality": {
+    "status": {
+      "PASSED": "Đạt",
+      "WARNING": "Cảnh báo",
+      "FAILED": "Trượt",
+      "NONE": "Không kiểm"
+    },
+    "unavailable": "Chưa kiểm được",
+    "flagOf": "Kiểm chất lượng số liệu của {chart}",
+    "title": "Kiểm chất lượng số liệu",
+    "hint": "Bộ luật tính trong CSDL mỗi lần mở trang (view office.report_checks), trên số của đơn vị mình, không tính lại ở trình duyệt. Ngưỡng 0: lệch một văn bản là có cờ. Trang Điều hành hiện cờ nặng nhất cạnh từng biểu đồ.",
+    "view": "Khung nhìn",
+    "rule": "Luật",
+    "result": "Kết quả",
+    "figures": "Số liệu",
+    "rules": {
+      "status_total": {
+        "name": "Tổng theo trạng thái khớp tổng văn bản đến",
+        "what": "Σ các cột của biểu đồ trạng thái cộng văn bản đến hạn chế (dòng riêng) phải bằng số văn bản đến đếm thẳng trên bảng văn bản. Lệch là văn bản biến mất khỏi trang.",
+        "figures": "Trên trang {actual} / trong CSDL {expected} văn bản đến",
+        "detail": "Trạng thái có văn bản mà biểu đồ không vẽ: {detail}"
+      },
+      "department_total": {
+        "name": "Tổng theo phòng khớp số đang xử lý",
+        "what": "Σ văn bản của biểu đồ theo phòng phải bằng cột Đang xử lý của biểu đồ trạng thái. Văn bản chưa rõ phòng chủ trì (giao cho người chưa có trong danh bạ, chưa có việc chủ trì) là Cảnh báo.",
+        "figures": "Theo phòng {actual} / đang xử lý {expected}; {issues} chưa rõ phòng chủ trì"
+      },
+      "processing_coverage": {
+        "name": "Thời gian xử lý tính đủ văn bản đã xong",
+        "what": "Văn bản đã xong mà thiếu mốc xong không vào trung bình (Cảnh báo); tính thừa, hay có tháng tổng giờ âm, là Trượt. Tính trên mọi tháng, không chỉ 12 tháng trên biểu đồ.",
+        "figures": "Tính được {actual} / {expected} văn bản đã xong",
+        "detail": "Tháng có tổng giờ âm: {detail}"
+      },
+      "unique_keys": {
+        "name": "Khóa ghép số không trùng, không rỗng",
+        "what": "Trang ghép số theo tháng, theo phòng: dòng trùng khóa bị bỏ qua, dòng rỗng khóa rơi khỏi biểu đồ mà không báo lỗi.",
+        "figures": "{expected} dòng, {issues} dòng trùng hoặc rỗng khóa"
+      },
+      "no_personal_columns": {
+        "name": "Không có cột thông tin cá nhân",
+        "what": "Theo catalog CSDL: khung nhìn xuất ra cột email, số điện thoại, CCCD/CMND, ngày sinh, địa chỉ, họ tên, tên đăng nhập là Trượt; chỉ đọc cột như vậy (kể cả qua view lồng) là Cảnh báo.",
+        "figures": "{actual} cột cá nhân xuất ra, {issues} cột cá nhân được đọc",
+        "detail": "Cột: {detail}"
+      }
+    },
+    "archive": {
+      "run": "Kiểm chất lượng của lượt này",
+      "source": "Nguyên văn các mục kiểm svc-files đã ghi trong sự kiện OpenLineage (facet dataQualityAssertions), không tính lại.",
+      "table": "{table}: {passed}/{total} mục đạt",
+      "failedItems": "trượt: {items}",
+      "none": "Lượt này không ghi mục kiểm nào trong phả hệ: không có gì bảo chứng số dòng của gói.",
+      "stopped": "Lượt nộp lưu lúc {time} bị dừng vì trượt kiểm chất lượng, hồ sơ chưa vào kho lạnh."
+    },
+    "assertion": {
+      "row_count_equals_source": "số dòng khớp CSDL",
+      "not_null": "cột {column} không rỗng"
+    }
   },
   "hpdi": {
     "title": "Tự chẩn đoán H-P-D-I",
@@ -1472,5 +1529,68 @@
         "description": "Chỗ cất tệp của riêng mỗi người trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ."
       }
     }
+  },
+  "sensors": {
+    "title": "Sơ đồ cảm biến kho",
+    "subtitle": "Nhiệt độ mới nhất của từng phòng trong kho lưu trữ so với ngưỡng cảnh báo, kèm cờ chất lượng dữ liệu cảm biến. Trang tự cập nhật 30 giây một lần.",
+    "forbidden": "Trang này dành cho văn thư, chuyên viên, lãnh đạo phòng và lãnh đạo đơn vị.",
+    "off": "Chưa bật cảm biến",
+    "offHint": {
+      "off": "Hệ thống chưa cấu hình context broker NGSI-LD nhận số đo của cảm biến (MOC_NGSI_URL của svc-workflow). Liên hệ người quản trị hệ thống.",
+      "unavailable": "Context broker NGSI-LD (profile iot) chưa chạy hoặc chưa trả lời, nên chưa có số đo nào. Người quản trị bật bằng make demo-it-ot hoặc docker compose --profile iot up -d."
+    },
+    "plan": "Mặt bằng kho lưu trữ",
+    "planLabel": "Sơ đồ mặt bằng kho lưu trữ, mỗi phòng tô màu theo nhiệt độ mới nhất so với ngưỡng",
+    "corridor": "Hành lang",
+    "checkedAt": "Đọc lúc {time}",
+    "room": {
+      "kho-1": "Kho bảo quản 1",
+      "kho-2": "Kho bảo quản 2",
+      "kho-3": "Kho bảo quản 3",
+      "phong-doc": "Phòng đọc",
+      "xu-ly": "Phòng xử lý tài liệu",
+      "may-chu": "Phòng máy chủ"
+    },
+    "outside": "Ngoài sơ đồ",
+    "outsideHint": "{n} cảm biến chưa khai mã phòng (thuộc tính room) hoặc khai mã không có trên sơ đồ: chỉ có trong bảng.",
+    "count": "{n} cảm biến",
+    "legend": "Chú giải",
+    "threshold": "Ngưỡng cảnh báo {threshold} (MOC_OT_THRESHOLD). Vượt ngưỡng thì hệ thống dựng dự thảo \"Báo cáo sự cố\" cho chuyên viên phụ trách cảm biến.",
+    "level": {
+      "over": "Vượt ngưỡng",
+      "near": "Gần ngưỡng",
+      "normal": "Bình thường",
+      "unknown": "Không tin được số đo",
+      "empty": "Chưa có cảm biến"
+    },
+    "levelHint": {
+      "over": "trên {threshold}",
+      "near": "trên {from}, tới {threshold}; chỉ để lưu ý, không gửi cảnh báo",
+      "normal": "từ {from} trở xuống",
+      "unknown": "chưa có số đo, mất tín hiệu hoặc ngoài dải",
+      "empty": "phòng chưa gắn cảm biến nào"
+    },
+    "flags": "Cờ chất lượng dữ liệu",
+    "flag": {
+      "stale": "Mất tín hiệu",
+      "out_of_range": "Ngoài dải",
+      "duplicate_time": "Trùng giờ đo",
+      "future_time": "Giờ đo ở tương lai"
+    },
+    "flagHint": {
+      "stale": "quá {n} phút không có số đo mới",
+      "out_of_range": "giá trị không phải số, hoặc ngoài dải đo của cảm biến ({min} đến {max})",
+      "duplicate_time": "số đo mới nhất mang cùng thời điểm đo (observedAt) với một lần đo khác: đồng hồ thiết bị đứng hoặc gửi lặp",
+      "future_time": "thời điểm đo (observedAt) của số đo mới nhất muộn hơn giờ máy chủ quá {slack} phút: đồng hồ thiết bị chạy nhanh; khi đó mất tín hiệu tính theo lúc broker nhận số đo"
+    },
+    "flagsNote": "Cờ do máy chủ tính từ bản sao số của cảm biến trong context broker; phòng có cờ mất tín hiệu hay ngoài dải không tô theo số đo.",
+    "table": "Các cảm biến",
+    "colRoom": "Phòng",
+    "colSensor": "Cảm biến",
+    "colValue": "Số đo mới nhất",
+    "colAt": "Thời điểm đo",
+    "colFlags": "Cờ",
+    "none": "Đơn vị chưa có cảm biến nào gửi số đo.",
+    "note": "Sơ đồ mẫu của một tầng kho lưu trữ; cảm biến vào phòng theo mã phòng thiết bị tự khai. Chỉ thấy cảm biến của đơn vị mình."
   }
 }

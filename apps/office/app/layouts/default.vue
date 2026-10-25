@@ -52,6 +52,10 @@ const nav = computed(() => {
       icon: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm6 6h6',
     })
   }
+  // Sơ đồ cảm biến kho (F3.10, Action otSensorMap): cùng các vai trò đọc được dự thảo "Báo cáo sự cố" mà cảm biến
+  // vượt ngưỡng dựng ra; quản trị đơn vị không đọc văn bản nên không có
+  if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/cam-bien',
+    label: t('nav.sensors'), icon: 'M3 5h18v14H3zM3 11h7m4 0h7M9 5v6m6-6v6m-3 2v6' })
   items.push({ to: '/tim-kiem', label: t('nav.search'), icon: 'M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z' })
   // Hỏi đáp trên kho văn bản (F4.2): vai trò nghiệp vụ; quản trị đơn vị không đọc văn bản nên không hỏi được
   if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/hoi-dap', label: t('nav.ask'), icon: 'M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z' })

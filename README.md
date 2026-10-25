@@ -223,6 +223,8 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
   tự đọc, không cần đặt tay.
 - Nâng cấp: dừng bản cài, `make install` lại với cùng `PREFIX`. Compose, cấu hình và image được thay; `.env` của bản
   cài được giữ, chỉ đổi `MOC_VERSION`.
+  Bản cài đang chạy có dữ liệu thì dùng `scripts/nang_cap.sh nang /opt/moc`: sao lưu trước, kiểm sau, có lệnh lùi
+  ([`docs/trien-khai.md`](docs/trien-khai.md) mục Vận hành).
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
 
 ## Chạy thử

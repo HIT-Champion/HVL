@@ -139,8 +139,10 @@ async def find(assistant: Assistant, tenant_id: uuid.UUID, document_id: uuid.UUI
     vector: list[float] | None = None
     # Meilisearch chưa có embedder thì tìm lai chắc chắn lỗi: không nhúng (như answer.py)
     if ai.embed_available and indexer.embedder_ready:
-        indexer.hold(EMBED_TIMEOUT_S)      # vòng nhúng nền không mở lô mới trong lúc nhúng trích yếu
-        got = await ai.embed([similar_text(ai.embed_model, subject)], query=False, timeout_s=EMBED_TIMEOUT_S)
+        # vòng nhúng nền không mở lô mới trong lúc nhúng trích yếu; xong thì thôi giữ: phần sau chỉ gọi Meilisearch,
+        # Hasura, và tác tử gợi ý ở svc-workflow không gọi mô hình nào sau đó
+        with indexer.holding():
+            got = await ai.embed([similar_text(ai.embed_model, subject)], query=False, timeout_s=EMBED_TIMEOUT_S)
         vector = (got or [None])[0]
 
     where = ('direction = "in"', f"status IN [{', '.join(json.dumps(s) for s in STATUSES)}]",

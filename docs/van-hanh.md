@@ -110,43 +110,26 @@ Nói rõ giới hạn:
   `/xac-thuc` ẩn khối mốc neo; `moc audit anchor --to`, `--publish` ghi dòng không chữ ký. Mốc cũ không chữ ký vẫn hợp
   lệ khi kiểm. Nâng cấp xong, `svc-files` ký từ lượt neo kế tiếp, không cần khởi động lại: policy mới áp ngay cho token
   đang dùng.
-- Nâng cấp tay một két cũ (một lần; dừng timer reconciler trước như mục GitOps bên dưới):
-  1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` một listener chỉ nghe trong container, bật lại endpoint tạo token root bằng
-     khóa phục hồi (OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không
-     dùng được ở đây), rồi `docker compose restart openbao`:
-     ```hcl
-     listener "tcp" {
-       address                                  = "127.0.0.1:8210"
-       tls_disable                              = true
-       disable_unauthed_generate_root_endpoints = false
-     }
-     ```
-  2. Tạo token root bằng khóa phục hồi, ghi vào `root-token` cạnh khóa phục hồi trong volume `openbao_data`. Khóa phục
-     hồi, mã OTP và token chỉ đi qua tệp tạm (quyền 600) và stdin, không qua tham số dòng lệnh (`ps` nhìn thấy); bước
-     nào không ra giá trị thì dừng, không ghi `root-token` rỗng:
-     ```bash
-     docker compose exec openbao sh -c '
-       set -eu; umask 077
-       A=http://127.0.0.1:8210/v1/sys/generate-root; K=/openbao/file/moc
-       get() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
-       init=$(wget -qO- --post-data "{}" $A/attempt)     # két tự sinh mã OTP một lần
-       otp=$(echo "$init" | get otp); nonce=$(echo "$init" | get nonce)
-       [ -n "$otp" ] && [ -n "$nonce" ] || { echo "không mở được lượt tạo token root (đang có lượt dở?)"; exit 1; }
-       printf "{\"key\":\"%s\",\"nonce\":\"%s\"}" "$(cat $K/recovery-key)" "$nonce" > $K/.generate-root
-       enc=$(wget -qO- --post-file $K/.generate-root $A/update | get encoded_token); rm -f $K/.generate-root
-       [ -n "$enc" ] || { echo "két không nhận khóa phục hồi"; exit 1; }
-       printf "{\"encoded_token\":\"%s\",\"otp\":\"%s\"}" "$enc" "$otp" |
-         bao write -field=token sys/decode-token - > $K/root-token.new
-       [ -s $K/root-token.new ] && mv $K/root-token.new $K/root-token'
-     ```
-     Báo "đang có lượt dở" (lần chạy trước hỏng giữa chừng): hủy lượt đó bằng `docker compose exec -e
-     BAO_ADDR=http://127.0.0.1:8210 openbao bao delete sys/generate-root/attempt` rồi chạy lại. Các bước này chưa diễn
-     tập trên một két thật đã có dữ liệu: sao lưu (`make backup`) trước khi làm.
-  3. Gỡ listener vừa thêm, `docker compose restart openbao`. Thấy token root, `start.sh` chạy lại phần cấu hình — làm
+- Nâng cấp tay một két cũ, một lần: dừng timer reconciler trước như mục GitOps bên dưới, sao lưu (`python3
+  scripts/moc.py backup create`), rồi từ thư mục mã nguồn của bản đang cài chạy `scripts/nang_cap.sh ket /opt/moc`.
+  Két đã có khóa `moc-anchor` (`/api/verify/anchor-key.pem` trả khóa công khai) thì kịch bản không làm gì. Các bước:
+  1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` của bản cài một listener chỉ nghe trong container
+     (`127.0.0.1:8210`, `disable_unauthed_generate_root_endpoints = false`): bật lại endpoint tạo token root bằng khóa
+     phục hồi, OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không dùng
+     được ở đây. Khởi động lại két.
+  2. Trong container, tạo token root bằng khóa phục hồi, ghi vào `root-token` cạnh khóa phục hồi trong volume
+     `openbao_data`. Khóa phục hồi, mã OTP và token chỉ đi qua tệp tạm (quyền 600) và stdin, không qua tham số dòng
+     lệnh (`ps` nhìn thấy); bước nào không ra giá trị thì dừng, không ghi `root-token` rỗng.
+  3. Trả `openbao.hcl` về đúng bản đã cài, khởi động lại két. Thấy token root, `start.sh` chạy lại phần cấu hình — làm
      lại được, không đổi bí mật, khóa `moc-files` hay AppRole; thêm PKI, khóa `moc-anchor` và policy mới của
-     `svc-files` — rồi thu hồi token. Nhật ký két có "đã dựng PKI nội bộ"; `svc-files` bật ký số ở lần dò kế tiếp
-     (hoặc `docker compose restart svc-files`), ký mốc neo từ lượt neo kế tiếp. Kiểm: `curl -s
-     https://<máy chủ>/api/verify/anchor-key.pem` ra một khối `PUBLIC KEY` (svc-files nhớ kết quả đọc khóa 5 phút).
+     `svc-files` — rồi thu hồi token (nhật ký két: "đã cấu hình két; token root đã thu hồi"). Kịch bản khởi động lại
+     `svc-files` (nó nhớ kết quả đọc khóa 5 phút) và chờ `/api/verify/anchor-key.pem` ra một khối `PUBLIC KEY`;
+     `svc-files` ký mốc neo từ lượt neo kế tiếp.
+
+  Lỗi ở bất kỳ bước nào thì kịch bản hủy lượt tạo token root còn dở, trả `openbao.hcl` về như cũ, khởi động lại két;
+  sửa lỗi rồi chạy lại. Két không tự cấu hình xong thì token root vừa tạo còn nằm trong volume: kịch bản in lệnh thu
+  hồi và xóa nó, dùng khi không chạy lại nữa. Job CI `.github/workflows/nang-cap.yml` tập đúng kịch bản này trên két
+  của bản phát hành trước, sau khi nâng bản cài lên: tệp văn bản hạn chế tạo từ bản cũ vẫn mở được, smoke đạt.
 - Cách cuối cùng là dựng lại két (xóa volume `openbao_data` rồi khởi động lại): bí mật nạp lại từ `.env`, có PKI, nhưng
   khóa `moc-files` mới khác nên tệp văn bản hạn chế đã lưu không mở được nữa — **không làm trên máy có dữ liệu thật**.
   Khóa `moc-anchor` cũng mới: mốc đã công bố trước đó vẫn kiểm được bằng khóa cũ còn trong lịch sử kho mốc công khai.
@@ -555,11 +538,28 @@ docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT 
 ```
 
 - Thực thể cảm biến `urn:ngsi-ld:TemperatureSensor:<mã>` có `name` (tên phòng), `responsible` (tên đăng nhập
-  chuyên viên phụ trách) và `temperature` (°C, `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động
-  của đúng đơn vị, có phòng; không thì sự kiện bị bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+  chuyên viên phụ trách), `room` (mã phòng trên sơ đồ kho, tùy chọn: `sensor.py --room kho-1`) và `temperature` (°C,
+  `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động của đúng đơn vị, có phòng; không thì sự kiện bị
+  bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+- **Sơ đồ cảm biến** (`/cam-bien` của Văn phòng điện tử, văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo đơn vị): mặt
+  bằng kho lưu trữ mẫu (SVG, không tải gì ngoài), mỗi phòng tô màu theo số đo mới nhất của cảm biến cùng mã phòng so
+  với `MOC_OT_THRESHOLD`. Đọc qua Hasura Action `otSensorMap`: `svc-workflow` chỉ hỏi broker ở tenant của đơn vị
+  người xem. Bốn cờ chất lượng tính ở `svc-workflow`: **mất tín hiệu** — quá `MOC_OT_STALE_MIN` phút (mặc định 10,
+  1–1440) không có số đo mới; đặt từ 2–3 lần chu kỳ gửi của thiết bị thật; **ngoài dải** — giá trị không phải số
+  hoặc ngoài −55…125 °C (dải đo của cảm biến DS18B20, hằng số trong `ot.py`); **trùng `observedAt`** — số đo mới
+  nhất cùng giờ đo với một lần đo khác trong 10 lần gần nhất (temporal API); **giờ đo ở tương lai** — `observedAt`
+  muộn hơn giờ máy chủ quá 2 phút (`FUTURE_SLACK` trong `ot.py`): đồng hồ thiết bị chạy nhanh. Khi đó mất tín hiệu
+  xét theo lúc broker nhận số đo (`modifiedAt`), không theo giờ thiết bị — không thì thiết bị lệch giờ mà mất tín
+  hiệu không bao giờ bị gắn cờ. Profile `iot` tắt thì trang báo "Chưa bật cảm biến", không lỗi. Giả lỗi để xem cờ:
+  `sensor.py --late 30` (số đo cũ 30 phút), `--frozen-clock` (đồng hồ đứng), `--clock-ahead 30` (đồng hồ nhanh 30
+  phút), `--readings 22,-127`.
 - Broker và CSDL của nó không mở cổng ra máy chủ. Ba mạng nội bộ riêng: thiết bị ↔ broker (`iot-devices`), broker ↔
   `svc-workflow` (`iot`), broker ↔ CSDL của nó (`iot-db`) — thiết bị không gọi được `svc-workflow`. Mỗi lần gọi
   `POST /ot/notify/<tenant>` phải kèm token riêng của đơn vị (HMAC từ khóa Actions của `svc-workflow`), sai thì 401.
+- **Giới hạn của sơ đồ:** mặt bằng mẫu cố định trong `apps/office/app/utils/otMap.ts` (một tầng, 6 phòng), mọi đơn vị
+  dùng chung; dải đo không theo từng cảm biến; broker ghi lịch sử bất đồng bộ nên cờ trùng `observedAt` có thể chậm vài
+  giây; tối đa 100 cảm biến mỗi đơn vị. Cờ chỉ hiện trên sơ đồ: số đo vượt ngưỡng vẫn dựng dự thảo "Báo cáo sự cố" kể
+  cả khi ngoài dải.
 - **Giới hạn:** broker không xác thực — ai vào được mạng thiết bị là ghi được vào tenant của đơn vị bất kỳ, kể cả
   khai người phụ trách là một chuyên viên của đơn vị đó. Triển khai thật phải đặt cổng thiết bị trước broker (IoT
   Agent hoặc PEP proxy của FIWARE) cấp tenant theo khóa của từng thiết bị; bản rút gọn chỉ có cảm biến giả lập.
