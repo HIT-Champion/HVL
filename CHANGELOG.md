@@ -21,6 +21,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   đó qua mà không xét tệp nào), `.sha256`, thư mục gốc `signet-X.Y.Z/`. Gói hỏng thì `make release` gỡ thẻ vừa gắn và
   xóa gói. Tệp `VERSION` do `git archive` điền thẻ (`.gitattributes`, export-subst): cài từ gói không còn phải đặt tay
   `MOC_VERSION`. Test scripts +27 (`docs/git_flow.md` mục 6).
+- Trang đăng nhập Keycloak mang thương hiệu Signet (theme `signet`, `platform/keycloak/themes/`), chung cho Văn phòng
+  điện tử, P.A.R.A, Bảng tin: kế thừa `keycloak.v2` của Keycloak 26, không viết lại template — chỉ CSS (màu, phông của
+  Văn phòng điện tử, nền, bo góc, cỡ chữ trên điện thoại; chế độ sáng/tối theo máy của theme cha) và logo của Văn
+  phòng điện tử, cũng làm biểu tượng tab. Realm đặt `loginTheme: signet`, compose gắn thư mục chỉ đọc, CSP giữ nguyên.
+  Bản cài cũ (realm không nạp lại): `python3 scripts/moc.py realm theme` sau khi nâng cấp — chỉ đặt khi realm còn dùng
+  theme mặc định, báo lỗi nếu container chưa gắn thư mục theme (`docs/trien-khai.md`, mục Nâng cấp tay). Test scripts
+  +14.
 
 - Mốc neo sổ kiểm toán công khai, người ngoài tự kiểm được (đóng #56): két ký mỗi mốc bằng khóa Ed25519 `moc-anchor`
   trong transit (két sinh, không cho xuất; chỉ `svc-files` được ký và đọc khóa công khai) trên thông điệp
