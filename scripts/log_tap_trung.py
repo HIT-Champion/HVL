@@ -41,6 +41,7 @@ USER = "moc"                # trùng P_USERNAME của dịch vụ parseable tron
 MAX_DAYS = 36500            # Parseable nhận tối đa chừng này ngày
 # Mã yêu cầu ghép vào câu SQL: chỉ nhận ký tự an toàn (uuid của APISIX, hex của svc-files/svc-workflow, goi-y:<việc>)
 REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+SERVICE_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")    # tên dịch vụ compose (cột service)
 
 
 class ParseableError(Exception):
@@ -58,10 +59,22 @@ def query_body(request_id: str, minutes: int) -> dict[str, str]:
     """Thân POST /api/v1/query: mọi dòng mang mã này trong ``minutes`` phút gần nhất, cũ trước mới sau."""
     if not valid_request_id(request_id):
         raise ValueError(f"Mã yêu cầu không hợp lệ (chỉ chữ, số, . _ : -; tối đa 128 ký tự): {request_id!r}")
+    return {"query": f"select * from {STREAM} where request_id = '{request_id}' order by p_timestamp",
+            **window(minutes)}
+
+
+def service_body(service: str, minutes: int) -> dict[str, str]:
+    """Thân POST /api/v1/query: mọi dòng của một dịch vụ trong ``minutes`` phút gần nhất, cũ trước mới sau. Cho dòng
+    không mang mã yêu cầu (PostgreSQL, Keycloak)."""
+    if not SERVICE_RE.fullmatch(service):
+        raise ValueError(f"Tên dịch vụ không hợp lệ (chữ thường, số, -): {service!r}")
+    return {"query": f"select * from {STREAM} where service = '{service}' order by p_timestamp", **window(minutes)}
+
+
+def window(minutes: int) -> dict[str, str]:
     if not 1 <= minutes <= MAX_DAYS * 24 * 60:
         raise ValueError(f"Số phút phải từ 1 tới {MAX_DAYS * 24 * 60}")
-    return {"query": f"select * from {STREAM} where request_id = '{request_id}' order by p_timestamp",
-            "startTime": f"{minutes}m", "endTime": "now"}
+    return {"startTime": f"{minutes}m", "endTime": "now"}
 
 
 def retention_days(value: str) -> int:
@@ -160,6 +173,11 @@ class Parseable:
             if exc.status == 400 and "request_id" in exc.body:
                 return []
             raise
+        return rows if isinstance(rows, list) else []
+
+    def recent(self, service: str, minutes: int = 5) -> list[dict[str, Any]]:
+        """Dòng của một dịch vụ trong ``minutes`` phút gần nhất."""
+        rows = self.call("POST", "/api/v1/query", service_body(service, minutes), what="tra log theo dịch vụ")
         return rows if isinstance(rows, list) else []
 
 

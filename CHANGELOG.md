@@ -98,6 +98,21 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trên https://signet.htechcs.com lúc 07:17 mỗi ngày với thẻ phát hành mới nhất, chạy tay được, và chạy trên PR đổi
   nó; từ lúc gắn thẻ mới tới lúc nâng bản online thì job đỏ. `docs/trien-khai.md` mục 6 thêm lệnh này. Test scripts
   +15.
+- Log tập trung thu thêm Hasura, Keycloak, PostgreSQL (F3.14, #202). Ba dịch vụ không tự che thông tin cá nhân nên
+  Vector có luật riêng cho từng dịch vụ trước bước che chung, mỗi luật có ca trong `vector.test.yaml` (29 → 38 ca),
+  bỏ hay nới luật nào cũng có ca đỏ.
+  - Hasura: `event` là `hasura.<loại log>`, `request_id` lấy trong `detail`, nên `make logs-tra` ra cả dòng của Hasura
+    cùng mã với APISIX, `svc-workflow`, `svc-files`. Câu GraphQL, biến (cả nhánh, khóa `jsonb` cũng là dữ liệu) và
+    `generated_sql` bị che, giữ `operationName`.
+  - PostgreSQL: bỏ dòng tiếp của mục nhiều dòng (không có tiền tố giờ `[pid]`, đã thấy mang dữ liệu của dòng vi
+    phạm). Che câu lệnh ở `STATEMENT`/`QUERY` (chỉ giữ từ đầu), giá trị khóa và dòng vi phạm ở `DETAIL`, câu trong
+    nháy và đoạn trích ở `CONTEXT`, tham số `$1 = '…'`, giá trị gõ sai kiểu; dòng dừng giữa giá trị thì che tới hết
+    dòng.
+  - Keycloak: che tên gõ vào (`username`) ở `LOGIN_ERROR`.
+
+  `make demo-log-tap-trung` thêm Hasura vào chuỗi cùng mã, và kiểm một câu SQL lỗi có giá trị giả cùng một lần đăng
+  nhập bằng tên không có: kho có dòng đã che, không có giá trị đó. `make logs-up`, `make logs-down` giờ tạo lại cả
+  CSDL, Hasura, Keycloak (gián đoạn vài giây), ghi trong `docs/van-hanh.md`. Test scripts +5.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp

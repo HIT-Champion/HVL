@@ -107,7 +107,7 @@ jobs:
             echo "profile $p: $(wc -w <<<"$services") dịch vụ"
           done
 
-      # F3.14: profile logs (tắt mặc định) cùng tệp phủ đổi driver log của 5 dịch vụ sang fluentd phân giải được
+      # F3.14: profile logs (tắt mặc định) cùng tệp phủ đổi driver log của 8 dịch vụ sang fluentd phân giải được
       - name: Profile log tập trung phân giải được
         env:
           COMPOSE_FILE: docker-compose.yml:platform/logs/docker-compose.logs.yml
@@ -414,9 +414,10 @@ jobs:
         if: matrix.phan == 'luong-chinh'
         run: make demo-cai-ung-dung
 
-      # F3.14: bật profile logs (Vector, Parseable; 5 dịch vụ chuyển sang driver fluentd) → một mã X-Request-Id tự đặt
-      # đi qua APISIX → svc-workflow → svc-files, tra Parseable ra đủ dòng của ba dịch vụ, sổ kiểm toán ghi cùng mã, kho
-      # log không còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log của các dịch vụ
+      # F3.14: bật profile logs (Vector, Parseable; 8 dịch vụ chuyển sang driver fluentd, tạo lại cả CSDL, Hasura,
+      # Keycloak) → một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files, tra Parseable ra đủ
+      # dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai vào kho đã che; kho log không
+      # còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log của các dịch vụ
       - name: Log tập trung tra theo mã yêu cầu (make logs-up, make demo-log-tap-trung)
         if: matrix.phan == 'luong-chinh'
         run: |

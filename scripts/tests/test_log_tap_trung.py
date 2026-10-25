@@ -15,7 +15,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Log tập trung (F3.14, profile logs): Vector, Parseable chỉ chạy khi bật profile, chỉ nghe 127.0.0.1, không gắn
-docker.sock, mật khẩu rỗng thì Parseable không mở cổng; tệp phủ chỉ đổi driver log của 5 dịch vụ đã che PII; Makefile
+docker.sock, mật khẩu rỗng thì Parseable không mở cổng; tệp phủ chỉ đổi driver log của 8 dịch vụ (5 dịch vụ tự che PII;
+Hasura, Keycloak, PostgreSQL có luật riêng trong Vector); Makefile
 chỉ nạp tệp phủ khi MOC_EXTRA_PROFILES có logs; scripts/log_tap_trung.py không ghép chuỗi lạ vào SQL, không in mật
 khẩu. Kiểm chữ (không có PyYAML, không cần Docker) và một Parseable giả trên 127.0.0.1.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
@@ -48,7 +49,9 @@ from test_duong_ham import service_block  # noqa: E402
 
 LOGS = ROOT / "platform" / "logs"
 OVERRIDE = LOGS / "docker-compose.logs.yml"
-LOGGED = ["apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow"]
+LOGGED = ["apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres"]
+# Không tự che thông tin cá nhân trong nhật ký: Vector có luật riêng, vector.test.yaml có ca
+UNREDACTED = ("hasura", "keycloak", "postgres")
 SECRET_PATHS = ("docker.sock", "/var/lib/docker", "/var/run/docker")
 
 
@@ -108,7 +111,7 @@ class ComposeTest(unittest.TestCase):
             for bad in SECRET_PATHS:
                 self.assertNotIn(bad, text, f"{path.name}: {bad}")
 
-    def test_override_only_switches_the_five_redacted_services_to_fluentd(self) -> None:
+    def test_override_only_switches_the_logged_services_to_fluentd(self) -> None:
         text = OVERRIDE.read_text(encoding="utf-8")
         services = re.findall(r"^  ([a-z-]+): \{logging: \*fluentd\}$", text, re.M)
         self.assertEqual(services, LOGGED)
@@ -124,9 +127,9 @@ class ComposeTest(unittest.TestCase):
         for option in ("env:", "env-regex", "labels-regex"):
             self.assertNotIn(option, anchor)
 
-    def test_unredacted_services_are_not_collected(self) -> None:
+    def test_services_without_rules_are_not_collected(self) -> None:
         text = OVERRIDE.read_text(encoding="utf-8")
-        for name in ("hasura", "keycloak", "postgres", "meilisearch"):
+        for name in ("meilisearch", "openbao", "flowable"):
             self.assertNotRegex(text, rf"^  {name}:", name)
 
     @unittest.skipUnless(shutil.which("git") and (ROOT / ".git").exists(), "cần git và bản checkout")
@@ -164,6 +167,16 @@ class VectorConfigTest(unittest.TestCase):
         self.assertIn("type: remap", block)
         self.assertRegex(block, r"\n    drop_on_error: true\s*\n")
         self.assertNotIn("reroute_dropped", block)
+        # dòng tiếp của PostgreSQL bị abort: drop_on_abort mặc định true, đặt false thì dòng chưa che đi tiếp
+        self.assertIn("abort", block)
+        self.assertNotIn("drop_on_abort", block)
+
+    def test_services_that_do_not_redact_have_their_own_rules_and_cases(self) -> None:
+        block = self.transform("moc")
+        cases = (LOGS / "vector.test.yaml").read_text(encoding="utf-8")
+        for name in UNREDACTED:
+            self.assertIn(f'service == "{name}"', block, name)
+            self.assertIn(f"'\"com.docker.compose.service\"': {name}\n", cases, name)
 
     def test_partial_lines_are_joined_per_container_and_partial_id(self) -> None:
         block = self.transform("ghep")
@@ -271,6 +284,16 @@ class PureFunctionTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             lt.query_body("ok", 0)
 
+    def test_service_body(self) -> None:
+        self.assertEqual(lt.service_body("postgres", 10),
+                         {"query": "select * from moc where service = 'postgres' order by p_timestamp",
+                          "startTime": "10m", "endTime": "now"})
+        for bad in ("", "Postgres", "pg' or '1'='1", "a b", "-x", "a" * 65):
+            with self.assertRaises(ValueError, msg=bad):
+                lt.service_body(bad, 10)
+        with self.assertRaises(ValueError):
+            lt.service_body("keycloak", 0)
+
     def test_retention(self) -> None:
         self.assertEqual(lt.retention_body(7), [{"description": "Giữ log tập trung 7 ngày (MOC_LOGS_RETENTION_DAYS)",
                                                  "action": "delete", "duration": "7d"}])
@@ -370,6 +393,12 @@ class ClientTest(unittest.TestCase):
                 lt.Parseable(url, "dung").find("r-1' or 1=1 --", 15)
         self.assertEqual(st["calls"], [("POST", "/api/v1/query", lt.query_body("r-1", 15))])
 
+    def test_recent_sends_the_service_query(self) -> None:
+        rows = [{"p_timestamp": "2026-10-25T17:18:55.1", "service": "postgres", "message": "m"}]
+        with fake_parseable(rows=rows) as (url, st):
+            self.assertEqual(lt.Parseable(url, "dung").recent("postgres", 10), rows)
+        self.assertEqual(st["calls"], [("POST", "/api/v1/query", lt.service_body("postgres", 10))])
+
     def test_no_rows_with_request_id_yet_is_empty_not_an_error(self) -> None:
         with fake_parseable() as (url, _):
             self.assertEqual(lt.Parseable(url, "dung").find("r-1"), [])
@@ -421,7 +450,8 @@ class DemoHelpersTest(unittest.TestCase):
 
     def test_registered(self) -> None:
         self.assertIs(self.demo.DEMOS["log-tap-trung"], self.demo.log_tap_trung)
-        self.assertEqual(self.demo.LOG_TRACED, ("apisix", "svc-workflow", "svc-files"))
+        self.assertEqual(self.demo.LOG_TRACED, ("apisix", "svc-workflow", "hasura", "svc-files"))
+        self.assertEqual(list(self.demo.LOG_COLLECTED), LOGGED)
 
     def test_complete_task_matches_session_complete(self) -> None:
         # màn gọi tay completeTask để gửi kèm X-Request-Id: phải đúng mutation của Session.complete (moc_env.py)
@@ -441,6 +471,25 @@ class DemoHelpersTest(unittest.TestCase):
         self.assertEqual(found, ["apisix: ?q=", "svc-workflow: Bearer ey", "svc-workflow: eyJ",
                                  "svc-files: giá trị bí mật"])
         self.assertNotIn("tok-cua-van-thu-123", " ".join(found))           # không in giá trị bí mật
+
+
+    def test_logged_since(self) -> None:
+        rows = [{"p_timestamp": "2026-10-25T17:18:52.9"}, {"p_timestamp": "2026-10-25T17:18:53"},
+                {"p_timestamp": "2026-10-25T17:18:54.123456"}, {"p_timestamp": "2026-10-25T17:18:55.1+00:00"},
+                {"p_timestamp": ""}, {}]
+        self.assertEqual(self.demo.logged_since(rows, "2026-10-25T17:18:53Z"), rows[1:4])
+
+    def test_postgres_entry(self) -> None:
+        pre = "2026-10-25 17:18:54.694 UTC"
+        rows = [{"service": "postgres", "message": f"{pre} [84] ERROR:  khac"},
+                {"service": "postgres", "message": f"{pre} [91] ERROR:  demo-log-ab12: lỗi thử"},
+                {"service": "keycloak", "message": f"{pre} [91] ERROR:  không phải postgres"},
+                {"service": "postgres", "message": f"{pre} [84] STATEMENT:  select 1"},
+                {"service": "postgres", "message": f"{pre} [91] CONTEXT:  PL/pgSQL function inline_code_block"},
+                {"service": "postgres", "message": f"{pre} [91] STATEMENT:  do [REDACTED]"}]
+        self.assertEqual(self.demo.postgres_entry(rows, "demo-log-ab12"), [rows[1], rows[4], rows[5]])
+        self.assertEqual(self.demo.postgres_entry(rows, "demo-log-cd34"), [])
+        self.assertEqual(self.demo.postgres_entry(rows[2:], "không phải"), [])
 
 
 if __name__ == "__main__":

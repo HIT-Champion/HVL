@@ -15,9 +15,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Vector (profile logs, F3.14 — docs/van-hanh.md mục Log tập trung): nhận log của apisix, app-office, app-ca-nhan,
-# svc-files, svc-workflow qua driver fluentd của Docker (platform/logs/docker-compose.logs.yml), tách mã yêu cầu,
-# che lần hai thứ không được rời máy, gửi Parseable. Lớp che chính vẫn ở từng dịch vụ (F4.4); ở đây chỉ là lưới an
-# toàn cho dòng lọt qua (dòng lỗi nginx, traceback). Kiểm: vector validate, vector test
+# svc-files, svc-workflow, hasura, keycloak, postgres qua driver fluentd của Docker
+# (platform/logs/docker-compose.logs.yml), tách mã yêu cầu, che lần hai thứ không được rời máy, gửi Parseable. Năm dịch
+# vụ đầu tự che (F4.4), ở đây chỉ là lưới an toàn cho dòng lọt qua (dòng lỗi nginx, traceback). Ba dịch vụ sau không
+# tự che: luật riêng cho từng dịch vụ bên dưới, rồi qua cùng bước che chung. Kiểm: vector validate, vector test
 # (platform/logs/vector.test.yaml).
 secret:
   tep:
@@ -60,19 +61,38 @@ transforms:
       msg = line
       rid = ""
       is_json = false
-      # Dòng JSON của svc-files, svc-workflow: lấy event, request_id. Viết lại dòng từ bản đã giải mã: ký tự thoát
-      # (\u0040 thay @…) không giấu được chữ khỏi bước che, xuống dòng và ký tự điều khiển được thoát lại
+      # Dòng JSON của svc-files, svc-workflow, Hasura: lấy event, request_id. Viết lại dòng từ bản đã giải mã: ký tự
+      # thoát (\u0040 thay @…) không giấu được chữ khỏi bước che, xuống dòng và ký tự điều khiển được thoát lại
       parsed, err = parse_json(line)
       if err == null && is_object(parsed) {
         is_json = true
         ev = string(parsed.event) ?? ""
-        if match(ev, r'^[A-Za-z0-9._:-]{1,128}$') { out.event = ev }
         rid = string(parsed.request_id) ?? ""
+        if service == "hasura" {
+          # Hasura: loại log (http-log, websocket-log…) làm event. Mã yêu cầu (X-Request-Id của APISIX, svc-workflow,
+          # svc-files; không có thì Hasura tự sinh) nằm trong detail, ở websocket-log thì trong detail.event.detail
+          ev = "hasura." + (string(parsed.type) ?? "")
+          rid = string(parsed.detail.request_id) ?? string(parsed.detail.operation.request_id) ?? ""
+          if rid == "" { rid = string(parsed.detail.event.detail.request_id) ?? "" }
+        }
+        if match(ev, r'^[A-Za-z0-9._:-]{1,128}$') { out.event = ev }
         # Khóa bí mật ở mọi tầng (kể cả giá trị là số, null, object lồng): thay cả giá trị trước khi viết lại
         flat = flatten(object!(parsed))
-        for_each(flat) -> |k, _v| {
+        for_each(flat) -> |k, v| {
           if match(k, r'(?i)passw|pwd|secret|token|api[_-]?key|private[_-]?key|credential|session|authoriz|cookie') {
             flat = set!(flat, [k], "[REDACTED]")
+          }
+          # Hasura ghi câu GraphQL và biến (dữ liệu người dùng) khi lỗi và mỗi lần mở subscription. Khóa query (câu
+          # GraphQL, SQL dạng chuỗi) thay giá trị; query.variables và generated_sql (query-log, mặc định tắt, có
+          # prepared_arguments) thay cả nhánh: khóa trong biến jsonb cũng là dữ liệu. Giữ operationName
+          if service == "hasura" {
+            q, qerr = parse_regex(k, r'^(?P<p>(?:[^.]+\.)*?(?:query\.variables|generated_sql))(?:\.|$)')
+            if qerr == null {
+              flat = remove!(flat, [k])
+              flat = set!(flat, [string!(q.p)], "[REDACTED]")
+            } else if match(k, r'(^|\.)query$') && is_string(v) {
+              flat = set!(flat, [k], "[REDACTED]")
+            }
           }
         }
         msg = encode_json(unflatten(flat))
@@ -84,6 +104,37 @@ transforms:
           m, err = parse_regex(line, r'^\S+ - \S+ \[[^\]]*\] .*"(?P<rid>[^"]*)"\s*$')
         }
         if err == null { rid = string(m.rid) ?? "" }
+      }
+      if service == "postgres" {
+        # Mỗi mục log của PostgreSQL bắt đầu bằng tiền tố mặc định "%m [%p] " rồi loại (ERROR:, DETAIL:…). Dòng không
+        # có tiền tố là dòng tiếp của mục nhiều dòng (câu lệnh, dòng vi phạm có xuống dòng) hay lời của script khởi
+        # tạo: không biết thuộc mục nào nên không che đúng được, bỏ
+        p, err = parse_regex(msg, r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ \S+ \[\d+\] (?P<kind>[A-Z0-9]+):')
+        if err != null { abort }
+        kind = string(p.kind) ?? ""
+        # Câu lệnh lỗi (STATEMENT; QUERY là câu bên trong hàm PL/pgSQL) có thể mang giá trị: chỉ giữ từ đầu
+        if kind == "STATEMENT" || kind == "QUERY" {
+          msg = replace(msg, r'^(\S+ \S+ \S+ \[\d+\] [A-Z]+:\s+[A-Za-z]{0,16}).*', "${1} [REDACTED]")
+        }
+        # DETAIL: giá trị khóa Key (cột)=(giá trị), dòng vi phạm Failing row contains (…), Token "…" của JSON sai.
+        # Giá trị có xuống dòng thì dòng dừng giữa giá trị (phần sau là dòng tiếp, đã bỏ): thiếu dấu đóng thì che tới
+        # hết dòng (nhóm c rỗng); cùng cách cho CONTEXT, tham số, giá trị gõ sai kiểu bên dưới
+        if kind == "DETAIL" {
+          msg = replace(msg, r'\)=\((?:.*(?P<c>\))|.*)', ")=([REDACTED]${c}")
+          msg = replace(msg, r'(\bcontains )\((?:.*(?P<c>\))|.*)', "${1}([REDACTED]${c}")
+          msg = replace(msg, r'(\bToken )"(?:.*(?P<c>")|.*)', "${1}\"[REDACTED]${c}")
+        }
+        # CONTEXT: câu trong nháy (SQL statement "…"), đoạn trích sau "line N:" (JSON data, COPY … column c)
+        if kind == "CONTEXT" {
+          msg = replace(msg, r'"(?:.*(?P<c>")|.*)', "\"[REDACTED]${c}")
+          msg = replace(msg, r'(, line \d+(?:, column [^:\n]*)?:\s*).+', "${1}[REDACTED]")
+        }
+        # Tham số câu lệnh ($1 = '…') khi bật log_parameter_max_length_on_error hay log_statement
+        msg = replace(msg, r'(\$\d+ = )\x27(?:(?:[^\x27]|\x27\x27)*(?P<c>\x27)|.*)', "${1}'[REDACTED]${c}")
+      }
+      # Keycloak ghi tên đăng nhập người dùng gõ ở LOGIN_ERROR: gõ nhầm mật khẩu vào ô tên thì lộ. userId vẫn giữ
+      if service == "keycloak" {
+        msg = replace(msg, r'(\busername=)"(?:[^"\\]|\\.)*"', "${1}\"[REDACTED]\"")
       }
       # Chỉ nhận mã đúng dạng, cùng luật với svc-workflow và make logs-tra: mã dài, có dấu cách, PII… bỏ
       if match(rid, r'^[A-Za-z0-9._:-]{1,128}$') { out.request_id = rid }
@@ -136,6 +187,12 @@ transforms:
       msg = replace(msg, r'[␟␝␞]', "")
       # Mật khẩu trong chuỗi kết nối: scheme://người:mật-khẩu@máy
       msg = replace(msg, r'(?i)([a-z][a-z0-9+.-]*://[^:/\s@"\x27]*:)[^@\s/"\x27]+@', "${1}[REDACTED]@")
+      # Giá trị gõ sai kiểu mà PostgreSQL nhắc lại trong lời lỗi (Hasura chuyển nguyên lời này vào log của nó):
+      # invalid input syntax for type uuid: "…", malformed array literal: "…". Dòng chữ và chuỗi JSON (\"…\")
+      msg = replace(msg, r'(\b(?:invalid input (?:syntax|value) for|malformed)[^:"\n]*:\s*)"(?:.*(?P<c>")|.*)',
+                    "${1}\"[REDACTED]${c}")
+      msg = replace(msg, r'(\b(?:invalid input (?:syntax|value) for|malformed)[^:"\n]*:\s*)\\"(?:[^"\\]|\\[^"])*\\"',
+                    "${1}\\\"[REDACTED]\\\"")
       # Chuỗi truy vấn (câu tìm, ?code=…&state=…) của mọi chuỗi có / trước ? (URL tuyệt đối, tương đối, máy:cổng/đường
       # dẫn): trong nháy (giá trị có dấu cách, trường JSON, referrer) hoặc không (dòng request của nginx, uvicorn)
       msg = replace(msg, r'(?P<u>"[^\s"?/]*/[^\s"?]*)\?(?:[^"\\]|\\.)*"', "${u}\"")
