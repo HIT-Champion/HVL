@@ -190,6 +190,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   (profile chia theo tầng, RAM đo được, "cài dưới một giờ" chưa đo).
 
 ### Đã sửa lỗi
+- Cổng thỉnh thoảng trả 502 khi gọi `svc-files` (gặp ở CI của #130): APISIX giữ kết nối rảnh tới dịch vụ phía sau 60
+  giây, uvicorn của `svc-files` đóng sau 5 giây; yêu cầu tới đúng lúc uvicorn đóng thì APISIX nhận EOF hoặc RST, trả
+  502 và không thử lại. `svc-files` nay giữ kết nối 75 giây (`--timeout-keep-alive 75`), chỉ APISIX đóng kết nối rảnh.
+  Dựng lại với APISIX 3.18 và uvicorn 0.54.0 như repo, nghỉ 4,990–5,010 giây giữa hai yêu cầu: trước 31/1 312 yêu cầu
+  bị 502, sau 0/1 312.
 - Tài liệu ghi lệch với mã (#119): `DEPENDENCIES.md` nói Hasura dùng Event Triggers và Redpanda được thay bằng
   Event Triggers, nhưng `db/metadata` không khai trigger nào — nay ghi đúng: sự kiện nằm trong bảng PostgreSQL,
   Centrifugo đẩy tới trình duyệt, trục sự kiện chưa có. `docs/muc-hoan-thien.md` thôi ghi "chưa có bước CI" cho
