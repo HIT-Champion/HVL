@@ -643,7 +643,15 @@
       "serial": "Số sê-ri chứng thư",
       "signedAt": "Ký lúc (giờ tự ghi trong chữ ký)",
       "illustrative": "Chữ ký dùng hạ tầng khóa công khai nội bộ của Signet, chỉ để minh họa — không có giá trị pháp lý như chữ ký số công cộng. Trình đọc PDF sẽ báo chữ ký chưa tin cậy vì CA nội bộ này không nằm trong danh sách tin cậy công cộng.",
-      "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên."
+      "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên.",
+      "caDownload": "Tải chứng thư CA (minh họa)",
+      "caFingerprint": "Vân tay SHA-256"
+    },
+    "anchors": {
+      "title": "Mốc neo sổ kiểm toán",
+      "text": "Hệ thống định kỳ chép mốc của sổ kiểm toán chuỗi băm ra ngoài máy chủ, mỗi mốc có chữ ký của két khóa. Ai cũng tự kiểm được chữ ký đó bằng khóa công khai này (OpenSSL 3), không cần tin máy chủ.",
+      "download": "Tải khóa công khai ký mốc neo",
+      "fingerprint": "Vân tay SHA-256 (trường key trong tệp mốc)"
     },
     "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",

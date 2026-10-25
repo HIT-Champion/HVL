@@ -25,6 +25,10 @@ import { useI18n } from 'vue-i18n'
 // Bản phát hành từ F4.5 có chữ ký số PAdES bằng PKI nội bộ trong két (chỉ minh họa, không có giá trị pháp lý): trang
 // hiện chuẩn, người ký, CA, số sê-ri, giờ ký tự khai — lấy từ CSDL, svc-files đã tự kiểm chữ ký lúc ký; kiểm đầy đủ
 // phần mật mã thì dùng pyHanko trong svc-files. Văn bản cũ hoặc hạn chế không có chữ ký số (signature: null).
+// Khối chữ ký có liên kết tải chứng thư CA (/api/verify/ca.pem) kèm vân tay SHA-256; cuối trang là khóa công khai ký
+// mốc neo sổ kiểm toán (/api/verify/anchor-key.pem) kèm vân tay — người ngoài tự kiểm mốc neo đã công bố bằng OpenSSL.
+// Vân tay do trình duyệt tính trên đúng tệp vừa tải (utils/pemFingerprint.ts); két chưa có CA, chưa có khóa thì 404:
+// không hiện vân tay, khối mốc neo ẩn.
 
 definePageMeta({ layout: 'public' })
 
@@ -62,6 +66,27 @@ const fileName = ref('')
 const checking = ref(false)
 const failure = ref('')
 const dragging = ref(false)
+
+const CA_URL = '/api/verify/ca.pem'
+const ANCHOR_KEY_URL = '/api/verify/anchor-key.pem'
+const caFingerprint = ref<string | null>(null)
+const anchorKey = ref<{ fingerprint: string | null } | null>(null)
+
+// tệp PEM công khai → có hay không, kèm vân tay (null khi trình duyệt không tính được); lỗi mạng coi như chưa có
+async function publicPem(url: string, style: 'ca' | 'anchor'): Promise<{ fingerprint: string | null } | null> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' })
+    return res.ok ? { fingerprint: await pemFingerprint(await res.text(), style) } : null
+  } catch {
+    return null
+  }
+}
+
+// chỉ tải CA khi có văn bản ký số để xem: mỗi lần tải tính vào giới hạn tra cứu theo IP
+watch(() => found.value?.signature, async (signature) => {
+  if (!signature || caFingerprint.value !== null) return
+  caFingerprint.value = (await publicPem(CA_URL, 'ca'))?.fingerprint ?? null
+})
 
 const readableCode = computed(() => (found.value ? `${found.value.verify_code.slice(0, 5)}-${found.value.verify_code.slice(5)}` : ''))
 
@@ -131,7 +156,10 @@ function onDrop(e: DragEvent) {
   onFile(e.dataTransfer?.files?.[0])
 }
 
-onMounted(() => { if (code.value) lookup(code.value) })
+onMounted(async () => {
+  if (code.value) lookup(code.value)
+  anchorKey.value = await publicPem(ANCHOR_KEY_URL, 'anchor')
+})
 </script>
 
 <template>
@@ -188,6 +216,12 @@ onMounted(() => { if (code.value) lookup(code.value) })
           <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('verify.signature.serial') }}</dt><dd class="font-mono text-xs break-all text-stone-700">{{ found.signature.serial }}</dd></div>
         </dl>
         <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">{{ t('verify.signature.illustrative') }}</p>
+        <div class="mt-3 text-xs text-stone-600" data-testid="verify-ca">
+          <a :href="CA_URL" download="signet-ca.pem"
+             class="font-medium text-brand-700 underline underline-offset-2">{{ t('verify.signature.caDownload') }}</a>
+          <span v-if="caFingerprint" class="mt-1 block">{{ t('verify.signature.caFingerprint') }}:
+            <span class="font-mono break-all text-stone-700">{{ caFingerprint }}</span></span>
+        </div>
       </div>
       <p v-else class="mx-5 mb-5 text-xs text-stone-500" data-testid="verify-unsigned">{{ t('verify.signature.none') }}</p>
       <div v-if="match !== null" class="mx-5 mb-5 rounded-md px-4 py-3 text-sm font-medium" data-testid="verify-match"
@@ -214,5 +248,17 @@ onMounted(() => { if (code.value) lookup(code.value) })
       <span class="font-medium text-stone-800">{{ found ? t('verify.compare') : t('verify.file') }}</span>
       <span class="text-xs text-stone-500">{{ t('verify.fileHint') }}</span>
     </label>
+
+    <!-- mốc neo sổ kiểm toán: khóa công khai để người ngoài tự kiểm mốc đã công bố; két chưa có khóa thì ẩn -->
+    <section v-if="anchorKey" class="card p-5 text-sm text-stone-600" data-testid="verify-anchor-key">
+      <h2 class="font-semibold text-stone-900">{{ t('verify.anchors.title') }}</h2>
+      <p class="mt-1 text-xs">{{ t('verify.anchors.text') }}</p>
+      <a :href="ANCHOR_KEY_URL" download="signet-anchor-key.pem"
+         class="mt-2 inline-block text-xs font-medium text-brand-700 underline underline-offset-2">
+        {{ t('verify.anchors.download') }}
+      </a>
+      <p v-if="anchorKey.fingerprint" class="mt-1 text-xs">{{ t('verify.anchors.fingerprint') }}:
+        <span class="font-mono break-all text-stone-700">{{ anchorKey.fingerprint }}</span></p>
+    </section>
   </div>
 </template>

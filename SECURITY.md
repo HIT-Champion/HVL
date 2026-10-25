@@ -74,6 +74,16 @@ Ngoài phạm vi:
 - Bản cài do đơn vị khác tự vận hành: báo cho đơn vị đó; lỗ hổng nằm trong mã thì báo ở đây.
 - Lừa đảo, tấn công vật lý vào máy của thành viên; kết quả quét tự động chưa chỉ ra được tác động.
 
+## Tự kiểm sổ kiểm toán của một bản cài
+
+Bản cài bật mốc neo công khai (`docs/van-hanh.md` mục "Mốc neo công khai") đẩy mốc của sổ kiểm toán chuỗi băm, kèm chữ
+ký Ed25519 của két, lên một kho git công khai cấm đẩy ép. Ai cũng kiểm được mà không cần tài khoản hay tin máy chủ: so
+vân tay `anchor-key.pem` với cuối trang `/xac-thuc` của bản cài, rồi `openssl pkeyutl -verify -pubin -inkey
+anchor-key.pem -rawin -in msg.bin -sigfile sig.bin` cho từng dòng (OpenSSL 3), hoặc `python3 scripts/anchor_sig.py
+anchors.jsonl anchor-key.pem` cho cả tệp. Làm giả được chữ ký mốc neo, làm `moc audit verify` hay
+`scripts/anchor_sig.py` nhận một dòng đã sửa, hoặc ký được bằng khóa `moc-anchor` mà không qua `svc-files` là lỗ hổng
+trong phạm vi.
+
 ## Công bố
 
 - Đừng công bố (issue, bài viết, mạng xã hội, hội thảo) trước khi bản vá được phát hành, hoặc trước ngày hai bên đã

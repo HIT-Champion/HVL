@@ -131,7 +131,9 @@ def to_datetime(value: Any) -> datetime | None:
     try:
         if isinstance(value, int | float) or (isinstance(value, str) and value.replace(".", "", 1).isdigit()):
             return datetime.fromtimestamp(float(value), timezone.utc)
-        at = datetime.fromisoformat(str(value))
+        text = str(value)
+        # mốc có chữ ký ghi giờ UTC dạng ...Z; fromisoformat chỉ nhận "Z" từ Python 3.11
+        at = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
     except (TypeError, ValueError):
         return None
     return at if at.tzinfo else at.astimezone()

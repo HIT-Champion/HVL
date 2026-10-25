@@ -72,8 +72,9 @@ phần bí mật của mình; két ghi sổ mọi lần đăng nhập và đọc
 dùng *static seal*: khởi động lại là tự mở khóa, không cần người nhập khóa. Két cũng giữ khóa `moc-files` (transit)
 bọc khóa của từng tệp văn bản hạn chế: `svc-files` chỉ xin được khóa mới và nhờ két mở khóa đã bọc, không lấy được
 khóa gốc. Từ F4.5 két có thêm PKI nội bộ để ký số văn bản đi (chỉ minh họa): CA gốc `moc-root` trong mount `pki`,
-khóa ký `moc-ky-so-<đơn vị>` trong transit; `svc-files` nhờ két ký từng bản phát hành, không lấy được khóa riêng. Thử:
-`make demo-ket-bi-mat`, `make demo-han-che`, `make demo-ky-so` (`docs/demo-script.md`).
+khóa ký `moc-ky-so-<đơn vị>` trong transit; `svc-files` nhờ két ký từng bản phát hành, không lấy được khóa riêng. Két
+còn giữ khóa Ed25519 `moc-anchor` (transit) ký mốc neo sổ kiểm toán: `svc-files` chỉ ký và đọc khóa công khai (mục Mốc
+neo công khai bên dưới). Thử: `make demo-ket-bi-mat`, `make demo-han-che`, `make demo-ky-so` (`docs/demo-script.md`).
 
 Nói rõ giới hạn:
 
@@ -103,6 +104,12 @@ Nói rõ giới hạn:
   tự tắt ký số (nhật ký `office.signing.disabled`, dò lại mỗi 5 phút): văn bản vẫn phát hành như cũ, chỉ không có chữ
   ký số; mọi thứ khác chạy như trước. Dựng PKI lỗi lúc khởi tạo két mới cũng vậy: `start.sh` ghi "chưa dựng được PKI
   nội bộ", két vẫn lên, và không tự thử lại.
+- **Két khởi tạo trước khi có chữ ký mốc neo không ký mốc** cho tới khi nâng cấp tay như dưới đây: két đó chưa có khóa
+  `moc-anchor`, policy của `svc-files` chưa có quyền ký. `svc-files` vẫn neo vào bucket lạnh như trước, chỉ không có chữ
+  ký (nhật ký `core.audit.anchor_unsigned`, một lần mỗi lần khởi động); `/api/verify/anchor-key.pem` trả 404, trang
+  `/xac-thuc` ẩn khối mốc neo; `moc audit anchor --to`, `--publish` ghi dòng không chữ ký. Mốc cũ không chữ ký vẫn hợp
+  lệ khi kiểm. Nâng cấp xong, `svc-files` ký từ lượt neo kế tiếp, không cần khởi động lại: policy mới áp ngay cho token
+  đang dùng.
 - Nâng cấp tay một két cũ (một lần; dừng timer reconciler trước như mục GitOps bên dưới):
   1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` một listener chỉ nghe trong container, bật lại endpoint tạo token root bằng
      khóa phục hồi (OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không
@@ -136,13 +143,137 @@ Nói rõ giới hạn:
      BAO_ADDR=http://127.0.0.1:8210 openbao bao delete sys/generate-root/attempt` rồi chạy lại. Các bước này chưa diễn
      tập trên một két thật đã có dữ liệu: sao lưu (`make backup`) trước khi làm.
   3. Gỡ listener vừa thêm, `docker compose restart openbao`. Thấy token root, `start.sh` chạy lại phần cấu hình — làm
-     lại được, không đổi bí mật, khóa `moc-files` hay AppRole; thêm PKI và policy mới của `svc-files` — rồi thu hồi
-     token. Nhật ký két có "đã dựng PKI nội bộ"; `svc-files` bật ký số ở lần dò kế tiếp (hoặc `docker compose
-     restart svc-files`).
+     lại được, không đổi bí mật, khóa `moc-files` hay AppRole; thêm PKI, khóa `moc-anchor` và policy mới của
+     `svc-files` — rồi thu hồi token. Nhật ký két có "đã dựng PKI nội bộ"; `svc-files` bật ký số ở lần dò kế tiếp
+     (hoặc `docker compose restart svc-files`), ký mốc neo từ lượt neo kế tiếp. Kiểm: `curl -s
+     https://<máy chủ>/api/verify/anchor-key.pem` ra một khối `PUBLIC KEY` (svc-files nhớ kết quả đọc khóa 5 phút).
 - Cách cuối cùng là dựng lại két (xóa volume `openbao_data` rồi khởi động lại): bí mật nạp lại từ `.env`, có PKI, nhưng
   khóa `moc-files` mới khác nên tệp văn bản hạn chế đã lưu không mở được nữa — **không làm trên máy có dữ liệu thật**.
+  Khóa `moc-anchor` cũng mới: mốc đã công bố trước đó vẫn kiểm được bằng khóa cũ còn trong lịch sử kho mốc công khai.
 - Đổi bí mật trong `.env` rồi `make up`: két được dựng lại và nạp bí mật mới, `svc-files`, `svc-workflow` khởi động
   lại theo (`depends_on … restart: true`, cần Docker Compose 2.17 trở lên).
+
+## Mốc neo công khai
+
+Sổ kiểm toán là một chuỗi băm; `svc-files` neo đầu chuỗi (số dòng cuối, hash của nó) vào bucket lạnh khóa ghi mỗi 10
+phút, và `moc audit verify` chỉ ra dòng bị viết lại khi đối chiếu với các mốc (`docs/mo-hinh-du-lieu.md` §1). Bucket
+đó vẫn nằm trên chính máy chủ. Mốc neo công khai đưa một bản ra ngoài, ai cũng kiểm được mà không phải tin máy chủ:
+
+- Két ký mỗi mốc bằng khóa Ed25519 `moc-anchor` trong transit — két sinh khóa, không cho xuất; policy của `svc-files`
+  chỉ cho ký và đọc khóa công khai. Mốc ghi khi két chưa có khóa (két cũ, mục Két bí mật) vẫn hợp lệ, chỉ không có chữ
+  ký.
+- Mỗi giờ, timer trên máy chủ chép mốc mới nhất kèm chữ ký vào `anchors.jsonl` của một **kho git công khai** do đơn vị
+  giữ, commit và đẩy lên. Nhánh của kho cấm đẩy ép, nên mốc đã công bố không rút lại được, kể cả khi máy chủ bị chiếm.
+- Khóa công khai: `https://<máy chủ>/api/verify/anchor-key.pem` (không cần đăng nhập), bản sao `anchor-key.pem` trong
+  kho mốc; vân tay SHA-256 hiện ở cuối trang `/xac-thuc`.
+
+Thông điệp két ký cho một mốc là năm dòng UTF-8, dòng nào cũng kết thúc bằng một ký tự xuống dòng (`\n`):
+
+```text
+signet-anchor-v1
+<audit_id: số dòng sổ, thập phân>
+<hash: 64 chữ hex thường>
+<anchored_at: lúc kho ghi mốc vào bucket lạnh, giờ UTC, dạng 2026-10-25T01:15:03Z>
+<system: URL công khai của hệ thống, MOC_PUBLIC_URL>
+```
+
+Chữ ký là Ed25519 thuần (RFC 8032, không băm trước). Dòng đầu tách chữ ký này khỏi mọi việc ký khác, `system` gắn mốc
+với đúng một hệ thống (mốc của bản chạy thử không mạo được mốc của bản thật). Mọi trường đều suy ra từ mốc đã khóa
+trong bucket, nên ký lại một mốc ra đúng chữ ký cũ. Mỗi dòng của `anchors.jsonl` chứa đủ các trường để dựng lại thông
+điệp, kèm vân tay khóa (`key`, SHA-256 của DER khóa công khai) và chữ ký (`sig`, base64) — trong tệp là một dòng,
+ở đây ngắt ra cho dễ đọc:
+
+```json
+{"v": "signet-anchor-v1", "audit_id": 42, "hash": "abab…ab", "anchored_at": "2026-10-25T01:15:03Z",
+ "system": "https://signet.example", "key": "sha256:06e3fd8f…", "sig": "6Zd3HmfkSkXW…"}
+```
+
+### Cài đặt (một lần)
+
+1. **Tạo một kho công khai riêng** cho mốc, vd `signet-anchors` trên GitHub, GitLab hay Gitea của đơn vị — không chứa
+   gì khác, không dùng chung với mã nguồn. Bảo vệ nhánh mặc định: **cấm đẩy ép (force push), cấm xóa nhánh**, không
+   bắt buộc review (máy chủ đẩy thẳng). GitHub: Settings → Rules → Rulesets (hoặc Branches) → bật *Block force pushes*,
+   *Restrict deletions* cho nhánh mặc định, không cho ai bỏ qua (kể cả quản trị). GitLab: Settings → Repository →
+   Protected branches, *Allowed to force push* tắt.
+2. **Khóa triển khai** (deploy key) chỉ ghi được vào đúng kho đó, không dùng token cá nhân hay khóa của người nào. Trên
+   máy chủ, bằng người vận hành `moc`:
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C "signet-anchor@$(hostname)" -f ~/.ssh/signet-anchors
+   cat >> ~/.ssh/config <<'CONF'
+   Host signet-anchors
+     HostName github.com
+     User git
+     IdentityFile ~/.ssh/signet-anchors
+     IdentitiesOnly yes
+   CONF
+   ```
+   Thêm `~/.ssh/signet-anchors.pub` vào kho: GitHub Settings → Deploy keys → *Allow write access*; GitLab Settings →
+   Repository → Deploy keys → *Grant write permissions*. Khóa này không đọc hay ghi được kho nào khác.
+3. **Bản sao trên máy chủ**, đúng đường dẫn trong `platform/systemd/moc-anchor-publish.service`:
+   ```bash
+   sudo install -d -o moc -g moc /var/lib/moc
+   sudo -u moc git clone signet-anchors:<tổ chức>/signet-anchors.git /var/lib/moc/neo-cong-khai
+   sudo -u moc python3 /opt/moc/scripts/moc.py audit anchor --publish /var/lib/moc/neo-cong-khai   # thử một lượt
+   ```
+   Lượt đầu commit `anchors.jsonl` và `anchor-key.pem` với tác giả cố định "Signet anchor", thông điệp `Anchor #<số
+   dòng> <16 chữ hex đầu của hash>`, rồi `git push` lên `origin`.
+4. **Timer** (tệp mẫu, như reconciler GitOps):
+   ```bash
+   sudo cp platform/systemd/moc-anchor-publish.service platform/systemd/moc-anchor-publish.timer /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable --now moc-anchor-publish.timer
+   journalctl -u moc-anchor-publish -f
+   ```
+
+`--publish` chỉ thêm commit: không bao giờ `--force`, không amend, không viết lại lịch sử. Đầu chuỗi chưa đổi thì
+không có commit mới. Push lỗi (mất mạng, kho từ chối) thì lệnh thoát 2, commit vẫn nằm ở bản sao và lượt sau đẩy
+tiếp; nhánh trên kho đã đi khác (ai đó đẩy commit khác) thì push bị từ chối và người vận hành phải xem tay — lệnh không
+tự ép. Bản sao chưa có remote thì chỉ commit tại chỗ. Không dùng kho git: `moc audit anchor --to TỆP` chỉ ghi thêm
+dòng vào một tệp để chép ra ngoài bằng cách khác.
+
+### Kiểm từ bên ngoài (chỉ cần git, jq, OpenSSL 3)
+
+```bash
+git clone https://github.com/<tổ chức>/signet-anchors.git && cd signet-anchors
+# khóa đúng của hệ thống: vân tay phải trùng vân tay ở cuối trang https://<máy chủ>/xac-thuc
+openssl pkey -pubin -in anchor-key.pem -outform DER | sha256sum
+# lịch sử chỉ có thêm dòng: lệnh này không in gì (không dòng nào của anchors.jsonl từng bị sửa hay xóa)
+git log -p --format= -- anchors.jsonl | grep '^-[^-]'
+```
+
+Kiểm chữ ký một dòng (ở đây là dòng cuối; dòng khác thì thay `tail -n 1` bằng `sed -n <số dòng>p`):
+
+```bash
+tail -n 1 anchors.jsonl > line.json
+jq -r '.v, .audit_id, .hash, .anchored_at, .system' line.json > msg.bin     # đúng năm dòng đã ký
+jq -r .sig line.json | openssl base64 -d -A > sig.bin
+openssl pkeyutl -verify -pubin -inkey anchor-key.pem -rawin -in msg.bin -sigfile sig.bin
+```
+
+`Signature Verified Successfully`: dòng do két của hệ thống ký và chưa bị sửa chữ nào. Không có jq thì viết tay thông
+điệp từ các trường của dòng: `printf '%s\n' signet-anchor-v1 <audit_id> <hash> <anchored_at> <system> > msg.bin`.
+Kiểm cả tệp một lần: từ mã nguồn Signet, `python3 scripts/anchor_sig.py anchors.jsonl anchor-key.pem` (Python thuần,
+không cài thêm gì, không cần hệ thống đang chạy).
+
+Đơn vị đối chiếu sổ với mốc đã công bố trên máy chủ: `python3 scripts/moc.py audit verify --anchors
+/var/lib/moc/neo-cong-khai/anchors.jsonl` — kiểm chữ ký từng dòng (bằng `anchor-key.pem` cạnh tệp, `--key`, hoặc khóa
+két đang dùng), rồi so từng mốc với chuỗi tính lại: mốc lệch là sổ đã bị viết lại từ khoảng đó; dòng chữ ký sai là lỗi
+(thoát 1) và không được dùng để kết luận.
+
+Nói rõ giới hạn:
+
+- Chữ ký chứng minh dòng do két của hệ thống ký, không chứng minh sổ đúng: người chiếm được `svc-files` ký được mốc
+  mới cho một chuỗi đã viết lại. Cái chặn là các mốc cũ đã công bố không rút được — nhánh cấm đẩy ép, người khác đã
+  clone — nên mốc cũ lệch với sổ mới và `moc audit verify --anchors` chỉ ra.
+- `anchored_at` là giờ của kho đối tượng trên máy chủ; giờ trong commit cũng do máy chủ đặt. Bằng chứng thời gian
+  độc lập là lúc push mà nhà cung cấp git ghi (GitHub: trang Activity của kho) và các bản clone của người khác.
+- Khóa triển khai nằm trên máy chủ: người chiếm máy chủ thêm được commit (kể cả commit sửa dòng cũ) nhưng không xóa
+  được lịch sử; lệnh `git log -p … | grep` ở trên lộ ra ngay.
+- Dựng lại két là có khóa `moc-anchor` mới: `anchor-key.pem` trong kho được ghi đè ở lượt kế tiếp, mốc ký trước đó
+  kiểm bằng khóa cũ trong lịch sử (`git log -p -- anchor-key.pem`); trường `key` của từng dòng cho biết khóa nào.
+- Kho công khai cho người ngoài thấy nhịp hoạt động (số dòng sổ theo giờ) và URL hệ thống, không thấy nội dung nào: hash
+  chỉ là băm.
+- Sổ đăng ký văn bản in ra (`/api/registers/…/pdf`) có mốc neo mới nhất lúc in ở chân trang (`Mốc neo #<số> · <16 chữ
+  hex> · <giờ>`): đối chiếu dòng đó trong kho mốc là biết sổ kiểm toán lúc in chưa bị viết lại về sau.
 
 ## GitOps và tự phục hồi
 

@@ -18,6 +18,8 @@
 // Cổng xác thực (F2.13) với khối chữ ký số (F4.5, chỉ minh họa): câu chữ đúng hợp đồng ở cả hai ngôn ngữ, luôn nói rõ
 // không có giá trị pháp lý; chuỗi e2e tìm ("khớp từng byte", "KHÔNG khớp") giữ nguyên; khóa viết thẳng trong trang đều
 // có trong vi.json / en.json; khối chữ ký nằm trong kết quả hợp lệ, văn bản không có chữ ký thì hiện câu thay thế.
+// Liên kết tải chứng thư CA (#56) nằm trong khối chữ ký, sau chú thích minh họa, kèm vân tay SHA-256; khóa công khai ký
+// mốc neo sổ kiểm toán ở cuối trang, ngoài kết quả tra cứu, két chưa có khóa thì ẩn.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -56,7 +58,7 @@ test('khối chữ ký số: chữ tiếng Việt đúng hợp đồng, có ở 
     + 'hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên.')
 })
 
-test('chú thích minh họa nói rõ không có giá trị pháp lý, không trỏ tới link tải CA (đã cắt)', () => {
+test('chú thích minh họa nói rõ không có giá trị pháp lý, tự đứng được (liên kết tải CA là dòng riêng)', () => {
   const note = tVi('verify.signature.illustrative')
   assert.match(note, /chỉ để minh họa/)
   assert.match(note, /không có giá trị pháp lý như chữ ký số công cộng/)
@@ -105,4 +107,39 @@ test('trang: khối chữ ký trong kết quả hợp lệ, có thì hiện chi 
   assert.match(block, /fmtDateTime\(found\.signature\.signed_at\)/)
   assert.match(block, /break-all[^>]*>\{\{ found\.signature\.serial \}\}/)
   assert.doesNotMatch(page, /v-html/)
+})
+
+test('#56: liên kết tải chứng thư CA trong khối chữ ký, sau chú thích minh họa, kèm vân tay SHA-256', () => {
+  assert.equal(tVi('verify.signature.caDownload'), 'Tải chứng thư CA (minh họa)')
+  assert.equal(tVi('verify.signature.caFingerprint'), 'Vân tay SHA-256')
+  assert.match(tEn('verify.signature.caDownload'), /CA certificate \(illustrative\)/)
+  const valid = template.slice(template.indexOf('data-testid="verify-valid"'), template.indexOf('</section>'))
+  const start = valid.indexOf('data-testid="verify-signature"')
+  const block = valid.slice(start, valid.indexOf('data-testid="verify-unsigned"'))
+  const ca = block.slice(block.indexOf('data-testid="verify-ca"'))
+  assert.ok(block.indexOf("t('verify.signature.illustrative')") < block.indexOf('data-testid="verify-ca"'))
+  assert.match(ca, /<a :href="CA_URL" download="signet-ca\.pem"/)
+  assert.match(ca, /v-if="caFingerprint"[^>]*>\{\{ t\('verify\.signature\.caFingerprint'\) \}\}/)
+  assert.match(ca, /\{\{ caFingerprint \}\}/)
+  assert.match(page, /const CA_URL = '\/api\/verify\/ca\.pem'/)
+  // CA chỉ tải khi có văn bản ký số để xem, vân tay trình duyệt tự tính đúng dạng `openssl x509 -fingerprint`
+  assert.match(page, /watch\(\(\) => found\.value\?\.signature,[\s\S]*?publicPem\(CA_URL, 'ca'\)/)
+})
+
+test('khóa công khai ký mốc neo: khối riêng cuối trang, ngoài kết quả tra cứu, két chưa có khóa thì ẩn', () => {
+  for (const key of ['title', 'text', 'download', 'fingerprint']) {
+    assert.ok(lookup(vi, `verify.anchors.${key}`), key)
+    assert.ok(lookup(en, `verify.anchors.${key}`), key)
+  }
+  assert.equal(tVi('verify.anchors.title'), 'Mốc neo sổ kiểm toán')
+  assert.match(tVi('verify.anchors.text'), /OpenSSL/)
+  const section = template.slice(template.indexOf('data-testid="verify-anchor-key"'))
+  assert.ok(template.indexOf('data-testid="verify-anchor-key"') > template.lastIndexOf('id="verify-file"'))
+  assert.match(template, /<section v-if="anchorKey"[^>]*data-testid="verify-anchor-key"/)
+  assert.match(section, /<a :href="ANCHOR_KEY_URL" download="signet-anchor-key\.pem"/)
+  assert.match(section, /v-if="anchorKey\.fingerprint"/)
+  assert.match(page, /const ANCHOR_KEY_URL = '\/api\/verify\/anchor-key\.pem'/)
+  assert.match(page, /anchorKey\.value = await publicPem\(ANCHOR_KEY_URL, 'anchor'\)/)
+  // hai tệp công khai: gọi thẳng, không kèm token (trang không đăng nhập)
+  assert.doesNotMatch(page, /Authorization|useApi|\$fetch/)
 })

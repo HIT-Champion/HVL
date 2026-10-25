@@ -643,7 +643,15 @@
       "serial": "Certificate serial number",
       "signedAt": "Signed at (time stated in the signature)",
       "illustrative": "The signature uses Signet's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
-      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above."
+      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above.",
+      "caDownload": "Download the CA certificate (illustrative)",
+      "caFingerprint": "SHA-256 fingerprint"
+    },
+    "anchors": {
+      "title": "Audit log anchors",
+      "text": "The system regularly copies anchors of its hash-chained audit log off the server, each signed by the key vault. Anyone can check those signatures with this public key (OpenSSL 3) without trusting the server.",
+      "download": "Download the anchor signing public key",
+      "fingerprint": "SHA-256 fingerprint (the key field in the anchor file)"
     },
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
