@@ -302,7 +302,7 @@ Most documents are in Vietnamese.
 | Group | Documents |
 |---|---|
 | Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
-| Technical | [H-P-D-I architecture](docs/architecture.md) · [Data model and permissions](docs/mo-hinh-du-lieu.md) · [Product specification](docs/dac-ta-san-pham.md) · [Feature maturity with evidence](docs/muc-hoan-thien.md) · [AI evaluation](docs/danh-gia-ai.md) · ["After" metrics of spec §8](docs/so-lieu-sau.md) · [Git workflow](docs/git_flow.md) |
+| Technical | [H-P-D-I architecture](docs/architecture.md) · [Data model and permissions](docs/mo-hinh-du-lieu.md) · [Product specification](docs/dac-ta-san-pham.md) · [Feature maturity with evidence](docs/muc-hoan-thien.md) · [AI evaluation](docs/danh-gia-ai.md) · ["After" metrics of spec §8](docs/so-lieu-sau.md) · [H-P-D-I self-assessment](docs/tu-chan-doan.md) · [Git workflow](docs/git_flow.md) |
 | Contest | [PoF self-assessment](docs/du-thi/pof-checklist.md) · [Likely jury questions](docs/du-thi/hoi-dap-hoi-dong.md) · [Theme, rules, judging criteria](docs/du-thi/olp-2026-brief.md) · [Problem statement analysis](docs/du-thi/olp-2026-de-thi.md) · [Development plan](docs/du-thi/ke-hoach-phat-trien.md) · [Research before the problem statement](docs/du-thi/nghien-cuu/) |
 | Project | [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
 

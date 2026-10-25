@@ -149,7 +149,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       từng dịch vụ, chưa có cảnh báo
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
       định; `X-Request-Id` đi xuyên `svc-workflow`; mới thu 5 dịch vụ, chưa thu Hasura, Keycloak, PostgreSQL
-- [ ] **Đang làm**: khung tự chẩn đoán mức trưởng thành H-P-D-I cho tổ chức
+- [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
+      `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
       văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
 - [ ] **Một phần** — tiếng Anh: giao diện Việt / Anh cùng bộ khóa (F2.9, mức Dùng được) và `README.en.md`; chưa có

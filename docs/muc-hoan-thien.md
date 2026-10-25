@@ -112,6 +112,7 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | F4.4 | Che thông tin cá nhân trong nhật ký và trong chữ gửi mô hình | Hoàn thiện | svc-files `test_pii*.py` 40 (gồm đo trên kho mẫu và 15 đột biến mã); svc-workflow `test_pii_copy.py` 3, `test_pii_logging.py` 2; scripts `test_che_pii.py` 23 | bước CI `make demo-che-pii`; `make do-che-pii` chạy sẵn trong `make test` (job `unit`) | Chưa che họ tên, địa chỉ, số dính chữ (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi trước; nhật ký Hasura, PostgreSQL, Keycloak, Meilisearch không qua bộ che (CHANGELOG [1.0.0], mục Bảo mật) |
 | F4.5 | Ký số PAdES bản phát hành bằng PKI nội bộ trong két — chỉ minh họa | Minh họa | svc-files `test_signing.py` 28; db `test_file_signatures.py` 14; scripts `test_ky_so.py` 22; office `verify.test.ts` (đã tính ở F2.13) | bước CI `make demo-ky-so`; smoke 5 kiểm (bỏ qua khi két chưa có PKI); e2e `van-ban-di.spec.ts` kiểm khối chữ ký ở cổng xác thực | Không có giá trị pháp lý như chữ ký số công cộng; không HSM; ai chiếm được `svc-files` ký được bằng khóa của đơn vị; két dựng trước F4.5 phải nâng cấp tay để ký |
 | F4.6 | Thu góp ý, đo số liệu "sau" theo đặc tả §8 | Dùng được | db `test_feedback.py` 22, `test_success_metrics.py` 8; office `feedback.test.ts` 11, `metrics.test.ts` 10; scripts `test_so_lieu_sau.py` 16 | job `db`; bước CI `make do-so-lieu-sau`; trang Số đo `/so-do` của lãnh đạo đơn vị, nút Góp ý và trang `/gop-y` | Cột "trước" của cả bốn chỉ số chưa đo — chưa có đơn vị chạy thử; số trên bản demo tính trên dữ liệu mẫu (seed đi hết các bước trong vài giây); thời gian tìm lại văn bản cũ là độ trễ hệ thống, không phải thời gian người tìm; số bước chuyển tay chỉ so sánh định tính; chưa có ≥ 5 người ngoài đội góp ý như kế hoạch; góp ý không hiện người gửi nhưng không ẩn danh (giờ gửi chính xác, khuôn màn hình có thể lộ vai trò), không lọc CCCD, số điện thoại trong nội dung (`docs/so-lieu-sau.md`) |
+| F4.7 | Tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo: 12 câu × 5 mức, radar ECharts, lệch nền, không gian nên làm trước, bước tiếp theo trỏ trang Signet có thật mà người xem mở được, bằng chứng đo được từ các view đã có, lưu lịch sử theo đơn vị | Dùng được | office `hpdi.test.ts` 18; db `test_maturity.py` 18 | job `db`; e2e `tu-chan-doan.spec.ts` (chưa chạy lần nào — cần cả hệ thống, chạy ở job `stack` khi mở PR); trang `/tu-chan-doan` của lãnh đạo đơn vị, lãnh đạo phòng | Bộ câu do đội tự viết, chưa thử với đơn vị thật, không phải bộ chỉ số chính thức, không quy đổi sang DTI hay H% của giáo trình DX-OS; một người trả lời cho cả đơn vị; tỷ lệ văn bản đi ký số và các số đo khác của [H] chưa có nguồn lãnh đạo đọc được nên không hiện; lãnh đạo phòng không lưu, không thấy bằng chứng (`docs/tu-chan-doan.md` §6) |
 
 ### 2.5. Ngoài danh sách F — kiểm chất lượng của dự án
 
@@ -126,12 +127,12 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 
 ### 2.6. Tóm tắt
 
-43 tính năng (F1.1–F4.6, không tính F3.6):
+44 tính năng (F1.1–F4.7, không tính F3.6):
 
 | Mức | Số | Tính năng |
 |---|---|---|
 | Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 8 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F3.15, F4.6 |
+| Dùng được | 9 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
 
