@@ -40,8 +40,8 @@ MANIFEST=.moc-install
 # mount của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm
 # ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của manifest)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
-         scripts/moc.py scripts/audit_chain.py scripts/anchor_sig.py scripts/backup.py scripts/tenants.py scripts/demo.py
-         scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
+         scripts/moc.py scripts/audit_chain.py scripts/anchor_sig.py scripts/backup.py scripts/tenants.py
+         scripts/demo.py scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
          seed services/ot-sensor/sensor.py
          platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
          scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json)
