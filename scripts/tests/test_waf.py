@@ -262,7 +262,8 @@ class RulesTest(unittest.TestCase):
         self.assertNotIn("ctl:ruleRemoveByTag", self.directives)
         self.assertNotIn("ctl:ruleRemoveById", self.directives)
         for target in re.findall(r"ctl:ruleRemoveTarget(?:ById|ByTag)=[^;]+;([^,\"\n]+)", self.directives):
-            self.assertRegex(target, r"^(?:ARGS:[a-z_.-]+|FILES|MULTIPART_PART_HEADERS:[a-z]+)$")
+            self.assertRegex(target,
+                             r"^(?:ARGS:[a-z_.-]+|FILES|MULTIPART_PART_HEADERS:[a-z]+|REQUEST_COOKIES:[A-Z_]+)$")
 
     def exclusion(self, rule_id: str) -> str:
         start = self.directives.index(f'"id:{rule_id},')
@@ -301,6 +302,32 @@ class RulesTest(unittest.TestCase):
                 self.assertIn(f"ctl:ruleRemoveTargetById={ids};ARGS:{key},", rule + ",")
         removed = set(re.findall(r"ruleRemoveTargetById=([\d-]+);", rule))
         self.assertEqual(removed, {"932000-932999", "933000-933999", "931100", "931120"})
+
+    def test_keycloak_tokens_only_lose_rules_that_misfire_on_random_strings(self) -> None:
+        # #140: token ngẫu nhiên của Keycloak, oidc-client-ts trùng mẫu libinjection (942100), tên hàm PHP (933…),
+        # đuôi tệp (930120); cookie base64 chuẩn còn trùng lệnh Unix (932…). Chỉ gỡ đúng các luật đó, chỉ trên đúng
+        # tên token — không gỡ theo mẫu tên, không đụng ô người dùng gõ (username, password đã có loại trừ riêng)
+        token_ids = {"942100", "933000-933999", "930120"}
+        realm = self.exclusion("10010")
+        removed: dict[str, set[str]] = {}
+        for ids, target in re.findall(r"ctl:ruleRemoveTargetById=([\d-]+);(REQUEST_COOKIES:[A-Z_]+|ARGS:[a-z_]+)",
+                                      realm):
+            if target.startswith("REQUEST_COOKIES:") or ids in token_ids | {"932000-932999"}:
+                removed.setdefault(target, set()).add(ids)
+        cookies = {"KC_AUTH_SESSION_HASH", "AUTH_SESSION_ID", "KC_RESTART", "KEYCLOAK_IDENTITY", "KEYCLOAK_SESSION",
+                   "KC_STATE_CHECKER"}
+        args = {"session_code", "tab_id", "client_data", "code_challenge", "refresh_token", "id_token_hint"}
+        self.assertEqual(set(removed), {f"REQUEST_COOKIES:{c}" for c in cookies} | {f"ARGS:{a}" for a in args})
+        for target, ids in removed.items():
+            want = token_ids | ({"932000-932999"} if target == "REQUEST_COOKIES:KC_AUTH_SESSION_HASH" else set())
+            self.assertEqual(ids, want, target)
+        self.assertNotIn("ARGS:username", realm)
+        # trang ứng dụng nhận lại code, session_state từ Keycloak: cùng ba luật, iss giữ hai luật URL như cũ
+        page = self.exclusion("10020")
+        self.assertEqual(re.findall(r"ctl:([^,\"]+)", page),
+                         [f"ruleRemoveTargetById={i};ARGS:iss" for i in ("931100", "934110")]
+                         + [f"ruleRemoveTargetById={i};ARGS:{a}" for a in ("code", "session_state")
+                            for i in ("942100", "933000-933999", "930120")])
 
     def test_java_and_node_rules_never_removed_by_tag(self) -> None:
         # Nhãn attack-rce gồm cả 934… (Node.js) và 944… (Java, Log4Shell): gỡ theo nhãn thì mất luôn chúng. Chỉ gỡ

@@ -308,6 +308,19 @@ def check_waf(clerk: Session, director: Session, staff: Session, tag: str) -> No
     except HTTPError as exc:
         fail(f"WAF chặn nhầm GraphQL thật: HTTP {exc.status}")
     ok("GraphQL thật qua WAF: chữ Việt có nháy, gạch, chấm phẩy; toán tử Hasura _is_null")
+    # Token ngẫu nhiên của Keycloak (#140, loại trừ 1, 2): đúng các giá trị đã bị 942100, 930120 bắt nhầm khi chưa có
+    # loại trừ — cookie phiên base64 Keycloak bọc trong ngoặc kép, mã PKCE, code Keycloak trả về trang ứng dụng
+    session_hash = '"+gpgHoziqBr6khlas3c/D+s9GyfOB2QIsM1zj6mR8ET3gRfrxnmZzQ6M91f1rqW/"'
+    auth = f"/realms/{REALM}/protocol/openid-connect/auth?client_id=app-office"
+    tokens = {
+        "cookie KC_AUTH_SESSION_HASH": ("GET", auth, None, {"Cookie": f"KC_AUTH_SESSION_HASH={session_hash}"}),
+        "code_challenge": ("GET", f"{auth}&code_challenge=81--9_7VdmWtRRK-1GI7T-9HBH_p8K__5U8cZgh30As", None, {}),
+        "code trả về trang": ("GET", f"/?code={uuid.uuid4()}.nSRx{tag}.{uuid.uuid4()}", None, {}),
+    }
+    blocked = [label for label, (method, path, data, headers) in tokens.items()
+               if waf_call(method, path, data, headers)[0] == 403]
+    not blocked or fail(f"WAF chặn nhầm token của Keycloak: {', '.join(blocked)}")
+    ok("token ngẫu nhiên của Keycloak qua WAF: cookie phiên trong ngoặc kép, mã PKCE, code trả về trang ứng dụng")
     # Tên tệp hành chính có ' ; = (CRS 920120) và ":" (922130) — loại trừ 8: svc-files giữ đúng tên, chỉ bỏ đường dẫn,
     # ký tự điều khiển
     name = f"Tờ trình 'gấp'; đợt 1 = {tag}: bản 2.pdf"
