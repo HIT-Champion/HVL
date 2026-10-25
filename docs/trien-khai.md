@@ -67,8 +67,8 @@ Máy 8 GB nên thêm 4 GB swap cho lần dựng image đầu tiên:
 Từ đây chạy bằng người dùng `moc` (`sudo -iu moc`).
 
 ```bash
-git clone https://github.com/HIT-Champion/HVL.git ~/HVL
-cd ~/HVL
+git clone https://github.com/HIT-Champion/Signet.git ~/Signet
+cd ~/Signet
 make env          # sinh .env, mọi mật khẩu ngẫu nhiên
 ```
 
@@ -102,7 +102,7 @@ make check
 ## 4. Cài và chạy
 
 ```bash
-cd ~/HVL
+cd ~/Signet
 make install PREFIX=/opt/moc                    # dựng image của đội (lần đầu lâu), chép sang /opt/moc
 cd /opt/moc
 docker compose up -d --wait --wait-timeout 900  # lần đầu ClamAV tải chữ ký, vài phút
@@ -223,23 +223,78 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 **Tự phục hồi và GitOps** (tùy chọn): [`van-hanh.md`](van-hanh.md) mục "GitOps và tự phục hồi" — systemd timer
 `platform/systemd/` chạy `reconcile.py` mỗi 60 giây (đúng `User=moc`, `WorkingDirectory=/opt/moc` như ở đây). Muốn
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
-`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/HVL`.
+`deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`.
 
-**Nâng cấp tay** (không dùng GitOps):
+**Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
+nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git pull` trong `~/Signet`), rồi từ thư mục đó:
 
 ```bash
-cd /opt/moc && python3 scripts/moc.py backup create     # sao lưu trước
-cd ~/HVL && git pull
-cd /opt/moc && docker compose down
-cd ~/HVL && make install PREFIX=/opt/moc         # giữ .env của bản cài, chỉ đổi MOC_VERSION
-cd /opt/moc && docker compose up -d --wait --wait-timeout 900
+scripts/nang_cap.sh nang /opt/moc
 ```
+
+Kịch bản:
+
+1. Dựng image bản mới khi trang còn chạy, kéo trước các image dựng sẵn máy chưa có (của mọi profile bản cài đang bật):
+   lúc dừng trang không phải chờ tải, lỗi mạng thì dừng ở đây khi chưa đổi gì.
+2. Sao lưu bằng chính bản đang chạy, in mã lượt, chép `.env` ra `/opt/moc/.env.truoc-<lượt>` (quyền 600, có bí mật):
+   nâng xong, không cần lùi nữa thì xóa.
+3. Dừng trang, `make install PREFIX=/opt/moc` (giữ `.env` của bản cài, chỉ đổi `MOC_VERSION`), chạy lại. Hasura áp
+   migration mới khi khởi động.
+4. Chạy `moc.py realm clients` và `realm theme`.
+5. Kiểm từng mục rồi báo các mục trượt:
+   - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm;
+   - dịch vụ chạy trước khi nâng vẫn chạy, không cái nào chưa khỏe;
+   - `/api/status` báo đúng phiên bản mới;
+   - realm đủ client và theme;
+   - `moc.py audit verify`;
+   - `smoke.py`. Smoke trượt đúng ở bước hỏi đáp (chữ chưa kịp vào chỉ mục khi máy quá tải) thì chạy lại một lần, có in
+     rõ là lần thử lại.
+
+Nếu dừng giữa chừng sau khi trang đã dừng, hoặc kiểm có mục trượt, kịch bản in lệnh lùi:
+
+```bash
+scripts/nang_cap.sh lui /opt/moc <mã nguồn bản cũ> <lượt>
+```
+
+Lệnh lùi cài lại bản cũ rồi khôi phục đúng lượt sao lưu đó: CSDL, tệp và két về như lúc trước khi nâng, sau đó kiểm lại
+như trên. Gói cũ chưa có tệp `VERSION` (trước 1.2.0) thì đặt `MOC_VERSION=1.1.0` trước lệnh.
+
+`scripts/nang_cap.sh kiem /opt/moc` chỉ chạy phần kiểm. Job CI `.github/workflows/nang-cap.yml` chạy cả ba đường trên
+bản cài của thẻ phát hành trước: nâng lên commit của PR, nâng két cũ (`ket`, [`van-hanh.md`](van-hanh.md) mục Két bí
+mật), lùi về. Job chạy trên PR phát hành và trên PR có đổi migration, két, realm, compose, cài đặt hay sao lưu.
+
+Realm Keycloak chỉ nạp từ tệp ở lần khởi động đầu, nên phần realm mới của bản sau không tự vào bản cài cũ. Nâng cấp
+bằng GitOps cũng vậy. Hai lệnh realm ở bước 4 lo phần này, chạy lại không đổi gì
+([`platform/keycloak/README.md`](../platform/keycloak/README.md)):
+
+- `realm theme` đặt theme đăng nhập Signet, chỉ khi realm còn dùng theme mặc định. Nó báo lỗi nếu container keycloak
+  chưa gắn thư mục theme.
+- `realm clients` thêm client của ứng dụng mới.
 
 Biến `.env` mới của bản mới (CHANGELOG ghi rõ) thêm vào `/opt/moc/.env`. **Không chạy `make reset` hay
 `docker compose down -v` trên máy chủ**: xóa sạch dữ liệu, kể cả két (tệp văn bản hạn chế không mở được nữa).
 
 **Mô hình ngôn ngữ** (tùy chọn, máy 16 GB): `docker compose --profile ai-pull run --rm ollama-pull` (tải trọng số
 khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait ollama`.
+
+**Thông báo qua email, webhook** (tùy chọn; mặc định chỉ có chuông trên web): khai máy chủ thư của đơn vị trong
+`/opt/moc/.env` — `MOC_SMTP_HOST`, `MOC_SMTP_TLS=starttls` (hoặc `ssl`), `MOC_SMTP_USER`, `MOC_SMTP_PASSWORD`,
+`MOC_SMTP_FROM=Signet <signet@moc.example.vn>` — và/hoặc `MOC_NOTIFY_WEBHOOK_URL` của kênh chat chung (incoming webhook
+Mattermost, Slack; ntfy thì thêm `MOC_NOTIFY_WEBHOOK_FORMAT=ntfy`), rồi `docker compose up -d --wait`: két nạp lại mật
+khẩu SMTP và URL webhook, svc-workflow khởi động lại. Người nhận email là địa chỉ trong Keycloak: tài khoản chưa có
+email thì chỉ thấy chuông. Lần gửi xem trong CSDL (chỉ trạng thái, số lần thử, tên lỗi):
+
+```bash
+docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"' _ \
+  "select channel, status, count(*), max(attempts), string_agg(distinct last_error, ', ')
+     from core.notification_deliveries group by 1, 2"
+```
+
+Thử trên máy, không cần máy chủ thư: đặt `MOC_EXTRA_PROFILES=mail`, `MOC_SMTP_HOST=mailpit`, `MOC_SMTP_PORT=1025`,
+`MOC_SMTP_TLS=none`, `MOC_SMTP_FROM=signet@moc.example` rồi `make up` — Mailpit (hộp thư thử, profile `mail`) nhận mọi
+thư mà không chuyển đi đâu, xem ở `http://127.0.0.1:8025` (chỉ mở trên máy; đổi cổng bằng `MOC_MAIL_UI_PORT`). Mailpit
+không thuộc profile `core`, `app`: là công cụ demo, thư nằm trong tệp tạm của container, không có volume (tối đa 500
+thư, mất khi container dừng), không dùng làm máy chủ thư thật.
 
 ## 8. Giới hạn đã biết
 
@@ -258,5 +313,9 @@ khoảng 2 GB, một lần) rồi `docker compose --profile ai up -d --wait olla
   (trang metadata bị chặn ở APISIX), chưa có vai trò CSDL riêng quyền hẹp.
 - **Mọi tài khoản mẫu của `seed.py` dùng chung `MOC_DEMO_PASSWORD`.** Hợp với máy demo; máy có dữ liệu thật thì không
   chạy `seed.py` (bước 3).
+- **Thông báo email, webhook gửi ít nhất một lần**: svc-workflow dừng đúng lúc vừa gửi mà chưa ghi kết quả thì lần sau
+  gửi lại (thư cùng `Message-ID`, hộp thư thường gộp). Webhook là một URL chung cho cả bản cài, mọi đơn vị cùng đổ về
+  một kênh chat; mỗi lần gửi thêm hai dòng sổ kiểm toán. Chưa đo tải gửi thư; một lượt vòng nền gửi tuần tự tối đa 20
+  dòng.
 - **GitOps kiểm chữ ký commit chỉ khi đặt `MOC_GITOPS_ALLOWED_SIGNERS`** (`van-hanh.md` mục GitOps): để trống thì ai đẩy
   được lên nhánh `deploy` là cài được lên máy chủ.

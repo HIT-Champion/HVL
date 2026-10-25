@@ -21,7 +21,8 @@
 # dùng openbao.
 #
 #   Lần đầu   init (static seal: két tự mở) → bằng token root: kv-v2 `moc/`, khóa transit `moc-files` (F3.7),
-#             AppRole và policy cho từng dịch vụ, PKI nội bộ chỉ minh họa (F4.5, setup_pki), token khởi động
+#             khóa Ed25519 `moc-anchor` ký mốc neo sổ kiểm toán, AppRole và policy cho từng dịch vụ, PKI nội bộ
+#             chỉ minh họa (F4.5, setup_pki), token khởi động
 #             `moc-bootstrap` → thu hồi root. Khóa phục hồi và token khởi động nằm trong volume openbao_data (chỉ root
 #             đọc).
 #   Mỗi lần   bằng token khởi động: ghi bí mật của từng dịch vụ (lấy từ biến môi trường của riêng container này) vào
@@ -31,7 +32,8 @@
 # secret_id, nên ai cầm nó làm được mọi việc hai dịch vụ làm được (đọc bí mật của chúng, mở khóa dữ liệu bằng
 # transit): volume openbao_data phải được giữ như chính két. Đổi cấu hình két về sau (thêm khóa, policy) cần quyền
 # quản trị — xem docs/van-hanh.md mục Két bí mật. Vì vậy két khởi tạo trước F4.5 không tự có PKI: ký số tự tắt cho tới khi
-# người quản trị nâng cấp tay hoặc dựng lại két.
+# người quản trị nâng cấp tay hoặc dựng lại két; két khởi tạo trước khi có chữ ký mốc neo cũng không tự có khóa
+# moc-anchor: mốc neo vẫn ghi, chỉ không có chữ ký.
 set -eu
 
 export BAO_ADDR=http://127.0.0.1:8200
@@ -57,14 +59,19 @@ unfinished() {
 }
 
 # Bí mật dịch vụ cần, dạng JSON, đọc từ biến môi trường: TÊN (tên biến trong dịch vụ) hoặc TÊN=BIẾN (tên biến ở đây).
-# Giá trị do `make env` sinh chỉ gồm chữ và số; vẫn thoát \ và " cho chắc.
+# Hậu tố `?` (TÊN?): bí mật tùy chọn — rỗng thì bỏ khỏi két, vd mật khẩu SMTP khi chưa bật email. Giá trị do
+# `make env` sinh chỉ gồm chữ và số; vẫn thoát \ và " cho chắc.
 secrets_json() {
   sep='{'
   for pair in "$@"; do
+    case $pair in *\?) optional=1; pair=${pair%\?} ;; *) optional='' ;; esac
     name=${pair%%=*}
     var=${pair#*=}
     eval "value=\${$var:-}"
-    [ -n "$value" ] || die "thiếu biến môi trường $var"
+    if [ -z "$value" ]; then
+      [ -n "$optional" ] && continue
+      die "thiếu biến môi trường $var"
+    fi
     printf '%s"%s":"%s"' "$sep" "$name" "$(printf %s "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')"
     sep=','
   done
@@ -75,8 +82,9 @@ secrets_of() {
   case $1 in
     svc-files) secrets_json SEAWEEDFS_S3_ACCESS_KEY SEAWEEDFS_S3_SECRET_KEY HASURA_ADMIN_SECRET \
                  MEILISEARCH_API_KEY=MEILI_MASTER_KEY ;;
+    # mật khẩu SMTP, URL webhook (có khóa trong đường dẫn) của thông báo đa kênh: chỉ có khi đã cấu hình
     svc-workflow) secrets_json HASURA_ADMIN_SECRET MOC_ACTION_SECRET FLOWABLE_ADMIN_PASSWORD CENTRIFUGO_API_KEY \
-                    MOC_DIRECTORY_CLIENT_SECRET ;;
+                    MOC_DIRECTORY_CLIENT_SECRET 'MOC_SMTP_PASSWORD?' 'MOC_NOTIFY_WEBHOOK_URL?' ;;
     *) die "không biết dịch vụ $1" ;;
   esac
 }
@@ -92,6 +100,10 @@ policy_of() {
     printf 'path "transit/keys/moc-ky-so-*" { capabilities = ["create", "read", "update"] }\n'
     printf 'path "transit/sign/moc-ky-so-*" { capabilities = ["update"] }\n'
     printf 'path "pki/sign/moc-van-thu" { capabilities = ["update"] }\n'
+    # Mốc neo sổ kiểm toán: ký bằng khóa moc-anchor, đọc khóa công khai của nó (anchors.py, /api/verify/anchor-key.pem).
+    # Đúng hai đường, không glob: không tạo, xoay, cấu hình hay xuất được khóa này; svc-workflow không có
+    printf 'path "transit/keys/moc-anchor" { capabilities = ["read"] }\n'
+    printf 'path "transit/sign/moc-anchor" { capabilities = ["update"] }\n'
   fi
 }
 
@@ -165,6 +177,10 @@ setup() {
   bao write moc/config max_versions=3 >/dev/null
   bao secrets list | has transit/ || bao secrets enable transit >/dev/null
   bao read transit/keys/moc-files >/dev/null 2>&1 || bao write -f transit/keys/moc-files type=aes256-gcm96 >/dev/null
+  # khóa ký mốc neo: két sinh, không cho xuất; có rồi thì giữ nguyên (tạo lại là đổi khóa, mốc đã công bố phải kiểm
+  # bằng khóa cũ còn trong kho mốc công khai)
+  bao read transit/keys/moc-anchor >/dev/null 2>&1 \
+    || bao write transit/keys/moc-anchor type=ed25519 exportable=false allow_plaintext_backup=false >/dev/null
   bao auth list | has approle/ || bao auth enable approle >/dev/null
   for s in $SERVICES; do
     policy_of "$s" | bao policy write "$s" - >/dev/null

@@ -1,0 +1,728 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Test đơn vị của bước tách mã yêu cầu và che (vector test): xem docs/van-hanh.md mục Log tập trung.
+# Số, email, mật khẩu, khóa là giá trị giả lập đúng định dạng (miền example.com), không phải của ai; chuỗi dạng JWT
+# cố ý ngắn hơn luật jwt của gitleaks nhưng vẫn đúng dạng ba phần mà bước che bắt.
+tests:
+  - name: dòng truy cập APISIX giữ mã yêu cầu, bỏ chuỗi truy vấn
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': apisix
+          source: stdout
+          log: >-
+            172.18.0.1 - - [23/Oct/2026:10:00:00 +0700] localhost:8080 "GET /api/search HTTP/1.1" 200 12 0.010
+            "curl/8" 172.18.0.5:8000 200 0.009 "http://svc-files:8000/api/search?q=0912345678" "demo-log-abc123"
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "apisix")
+              assert_eq!(.stream, "stdout")
+              assert_eq!(.request_id, "demo-log-abc123")
+              assert!(!contains(string!(.message), "?q="))
+              assert!(!contains(string!(.message), "0912345678"))
+  - name: dòng lỗi nginx của APISIX, mã yêu cầu ở request_id, bỏ truy vấn và referrer
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': apisix
+          source: stderr
+          log: >-
+            2026/10/23 10:00:00 [error] 49#49: *7 [lua] openid-connect.lua:600: token het han, client: 172.18.0.1,
+            server: _, request: "GET /api/search?q=Nguyen%20Van%20A HTTP/1.1", host: "localhost:8080",
+            referrer: "https://signet.example/tim-kiem?q=0912345678", request_id: "demo-log-err1"
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-err1")
+              m = string!(.message)
+              assert!(!contains(m, "?q="))
+              assert!(!contains(m, "Nguyen"))
+              assert!(!contains(m, "0912345678"))
+  - name: dòng JSON của dịch vụ, che bí mật và PII
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            {"event": "x", "request_id": "r-1", "note": "Authorization: Bearer abcdefghijklmnop",
+            "cookie": "moc_session=abcdefghij", "x-hasura-admin-secret": "khoaquantri1", "email": "a.b@example.com",
+            "tok": "eyJhbGciOiJI.eyJzdWIiOiJ4.c2lnbmF0dXJl"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-files")
+              assert_eq!(.request_id, "r-1")
+              assert_eq!(.event, "x")
+              m = string!(.message)
+              assert!(!contains(m, "abcdefghij"))
+              assert!(!contains(m, "khoaquantri1"))
+              assert!(!contains(m, "a.b@example.com"))
+              assert!(!contains(m, "eyJhbGci"))
+  - name: dòng nginx của app-office không lấy nhầm IP làm mã yêu cầu
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': app-office
+          log: >-
+            172.18.0.9 - - [23/Oct/2026:10:00:00 +0000] "GET /tim-kiem HTTP/1.1" 200 512 "Mozilla/5.0"
+            "203.0.113.7"
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "app-office")
+              assert!(!exists(.request_id))
+  - name: dòng truy cập uvicorn của svc-workflow lọt chuỗi truy vấn thì vẫn bị bỏ
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          source: stdout
+          log: 'INFO:     172.18.0.7:40112 - "GET /healthz?so=0912345678 HTTP/1.1" 200 OK'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-workflow")
+              assert!(!exists(.request_id))
+              m = string!(.message)
+              assert!(contains(m, "GET /healthz HTTP/1.1"))
+              assert!(!contains(m, "so="))
+              assert!(!contains(m, "0912345678"))
+  - name: dòng traceback không phải JSON vẫn qua lưới che, chỉ giữ các trường đã chọn
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          container_id: 0123456789ab
+          '"com.example.khac"': khong-gui
+          source: stderr
+          log: 'ValueError: không gửi được tới nguyenvanb@example.com, CCCD 001205000017, password=hunter2hunter2'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              assert!(contains(m, "[EMAIL]") && contains(m, "[CCCD]") && contains(m, "password=[REDACTED]"))
+              assert!(!contains(m, "nguyenvanb") && !contains(m, "001205000017") && !contains(m, "hunter2"))
+              assert!(!exists(.container_id))
+              assert!(!exists(."com.example.khac"))
+              assert_eq!(.stream, "stderr")
+  - name: khóa có tiền tố, hậu tố (biến môi trường, header), giá trị không nháy dừng ở khóa kế tiếp
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            config: HASURA_ADMIN_SECRET=ENVSECRET123 MOC_ACTION_SECRET=ENVSECRET456 POSTGRES_PASSWORD=ENVPASS789
+            x-api-key: APIKEY12345 user=bob upstream: Bearer abcdefghijklmnop PGPASSWD=PASSWD5678 PWD=PWDVAL5678
+            private-key: PRIVK123456 credential=CRED654321 session=abc␟LOTLOTLOT
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              for_each(["ENVSECRET123", "ENVSECRET456", "ENVPASS789", "APIKEY12345", "abcdefghijklmnop", "PASSWD5678",
+                        "PWDVAL5678", "PRIVK123456", "CRED654321", "LOTLOTLOT"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              assert!(contains(m, "HASURA_ADMIN_SECRET=[REDACTED]") && contains(m, "user=bob"))
+              assert!(!match(m, r'[␟␝␞]'))
+  - name: dòng JSON, khóa bí mật ở mọi tầng và mọi kiểu giá trị, ký tự thoát, URL tương đối
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          log: >-
+            {"event": "office.x", "request_id": "r-8", "access_token": "OPAQUE_ACCESS_1",
+            "refresh_token": "OPAQUE_REFRESH_1", "client_secret": "CLIENTSECRET1", "api_key": "APIKEYAPIKEY",
+            "new_password": "MATKHAUMOI12", "auth": {"session": {"value": "PHIENLONG123"}}, "pin_token": 87654321,
+            "note": "password=XYZ123456", "mail": "a@example.com",
+            "path": "/api/search?q=Nguyen Van A&cccd=001205000017"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.event, "office.x")
+              assert_eq!(.request_id, "r-8")
+              m = string!(.message)
+              for_each(["OPAQUE_ACCESS_1", "OPAQUE_REFRESH_1", "CLIENTSECRET1", "APIKEYAPIKEY", "MATKHAUMOI12",
+                        "PHIENLONG123", "87654321", "XYZ123456", "example.com", "Nguyen", "001205000017"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              assert!(contains(m, "\"path\":\"/api/search\""))
+  - name: dict Python trong traceback và header trong nháy, giá trị có dấu cách
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          source: stderr
+          log: >-
+            KeyError: {'password': 'mat khau co dau cach', 'token': 'TOKENREPR123', 'Set-Cookie':
+            'KEYCLOAK_SESSION=KCS123456; Path=/', 'user': 'bob'} headers={"Cookie": "a=b; KEYCLOAK_IDENTITY=KCID654321",
+            "secret": "nam sau bay"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              for_each(["mat khau", "TOKENREPR123", "KCS123456", "KCID654321", "nam sau bay"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              assert!(contains(m, "'user': 'bob'"))
+              assert!(contains(m, "headers={\"Cookie\": \"[REDACTED]\", \"secret\": \"[REDACTED]\"}"), m)
+  - name: Cookie nhiều cặp không nháy, che tới hết dòng
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: 'request headers: Cookie: theme=dark; KEYCLOAK_IDENTITY=KCID777777; moc_session=PHIENBIMAT123'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              assert_eq!(m, "request headers: Cookie: [REDACTED]")
+  - name: mật khẩu có dấu cách, không nháy và trong nháy; giá trị dừng ở khóa kế tiếp sau dấu phẩy, chấm phẩy
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            login that bai: password=mot hai ba bon "password": "nam sau bay" user=bob token=TOKVAL1,user=alice
+            secret=SECVAL2;mode=fast
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              assert!(!contains(m, "hai ba bon") && !contains(m, "nam sau bay") && contains(m, "user=bob"), m)
+              assert!(!contains(m, "TOKVAL1") && !contains(m, "SECVAL2"), m)
+              assert!(contains(m, "user=alice") && contains(m, "mode=fast"), m)
+  - name: chuỗi kết nối có mật khẩu, URL không nháy có chuỗi truy vấn
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            OperationalError: postgres://moc:DSNPASS12345@postgres:5432/moc; redis://:REDISPASS9@cache:6379;
+            redirect https://signet.example/cb?code=MACODE1&state=TT; next /tim-kiem?q=LeThiB
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              for_each(["DSNPASS12345", "REDISPASS9", "MACODE1", "state=", "LeThiB"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              assert!(contains(m, "postgres://moc:[REDACTED]@postgres:5432/moc"), m)
+  - name: email có dấu hay viết thoát, số điện thoại 0…, +84…, 84…, cố định, CCCD, dính chữ, liền nhau
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            nguyễn.văn.ánh@trường.vn a@example.com b%40example.com c\u0040example.com sđt0912345678 +84912345678
+            84987654321 0812345678
+            cccd001205000017 ĐT 02438691234 0912345678,0987654321 001205000017;001205000018
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              assert!(!match(m, r'\d{9,}'), m)
+              assert!(!contains(m, "@") && !contains(m, "%40") && !contains(m, "u0040") && !contains(m, "trường"), m)
+              assert!(contains(m, "sđt[SĐT]") && contains(m, "cccd[CCCD]"), m)
+  - name: mã yêu cầu, tên sự kiện sai dạng thì không vào cột riêng
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            {"event": "e\nGIA-DONG-MOI", "request_id": "nguyenvana@example.com Bearer abcdefghijklmnop 0912345678"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert!(!exists(.request_id))
+              assert!(!exists(.event))
+              m = string!(.message)
+              assert!(!contains(m, "nguyenvana") && !contains(m, "0912345678") && !contains(m, "\n"), m)
+  - name: mã yêu cầu dài hơn 128 ký tự không vào cột request_id
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: "{\"event\": \"e\", \"request_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}"
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.event, "e")
+              assert!(!exists(.request_id))
+  - name: dòng Docker cắt làm hai bản ghi được ghép lại trước khi che
+    inputs:
+      - insert_at: ghep
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          source: stderr
+          partial_message: "true"
+          partial_id: p-1
+          partial_ordinal: "1"
+          partial_last: "false"
+          log: 'ValueError: khong ket noi duoc, pass'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          source: stderr
+          partial_message: "true"
+          partial_id: p-1
+          partial_ordinal: "2"
+          partial_last: "true"
+          log: 'word=STRADDLESECRET1 tiep theo'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "ValueError: khong ket noi duoc, password=[REDACTED]")
+              assert_eq!(.stream, "stderr")
+  - name: bản ghi thường đi qua bước ghép không đổi
+    inputs:
+      - insert_at: ghep
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': apisix
+          log: '2026/10/23 10:00:00 [warn] 7#7: *1 ket noi cham, request_id: "rid-ghep-1"'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "rid-ghep-1")
+              assert_eq!(.message, "2026/10/23 10:00:00 [warn] 7#7: *1 ket noi cham, request_id: \"rid-ghep-1\"")
+  - name: Authorization không nháy che tới hết dòng (Digest), trong dòng JSON tới hết chuỗi
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: 'x, Authorization: Digest username="u", response="DIGESTRESP1", nonce="n"'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          log: >-
+            {"event": "e.digest", "note": "Proxy-Authorization: Digest username=\"u\", response=\"DIGESTRESP2\"",
+            "request_id": "r-dg"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-files")
+              assert_eq!(.message, "x, Authorization: [REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-workflow")
+              assert_eq!(.message, "{\"event\":\"e.digest\",\"note\":\"Proxy-Authorization: [REDACTED]\"," +
+                                   "\"request_id\":\"r-dg\"}")
+  - name: đối số dòng lệnh có mật khẩu (list Python, mảng JSON, --password X, cả ở đầu dòng)
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            CalledProcessError: Command ['pg_dump', '--password', 'CLIPASS123', '--host', 'db', '--api-key',
+            'KEYKEYKEY1'] returned 1; retry: pg_dump --password CLIPASS789
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          log: '{"event": "e.cli", "args": ["--db-password", "CLIJSON123", "-v"]}'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': app-ca-nhan
+          log: '--password CLISTART1 args=["--client-secret" , "CLISPACE2"]'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-files")
+              assert_eq!(.message, "CalledProcessError: Command ['pg_dump', '--password', '[REDACTED]', " +
+                                   "'--host', 'db', '--api-key', '[REDACTED]'] returned 1; " +
+                                   "retry: pg_dump --password [REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-workflow")
+              assert_eq!(.message, "{\"args\":[\"--db-password\",\"[REDACTED]\",\"-v\"],\"event\":\"e.cli\"}")
+          - type: vrl
+            source: |
+              assert_eq!(.service, "app-ca-nhan")
+              assert_eq!(.message, "--password [REDACTED] args=[\"--client-secret\" , \"[REDACTED]\"]")
+  - name: khóa viết thoát trong dòng không phải JSON được giải mã (chữ số hex là chữ, nhiều mã liền nhau) rồi che
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            ERROR {"pass\u0077ord": "THOATBIMAT1", "to\u006Ben": "THOATBIMAT2", "api_\u006bey": "THOATBIMAT4",
+            "\u0073\u0065cret": "THOATBIMAT5", "mail": "a\u0040example.com", "x": "\\u0041",
+            "y": "\\\u0070assword=THOATBIMAT3"} tail
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "ERROR {\"password\": \"[REDACTED]\", \"token\": \"[REDACTED]\", " +
+                                   "\"api_key\": \"[REDACTED]\", \"secret\": \"[REDACTED]\", " +
+                                   "\"mail\": \"[EMAIL]\", " +
+                                   "\"x\": \"\\\\u0041\", \"y\": \"\\\\password=[REDACTED]\"} tail")
+  - name: số sau từ khóa CMND, CCCD, STK, MST, SĐT, kể cả viết tách nhóm; số không từ khóa giữ nguyên
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            CMND 123456789, CCCD số: 001 205 000 017, căn cước 001205000018, chứng minh nhân dân số 123 456 780,
+            STK 0011004123456, STK 654321, số tài khoản: 1903-6543-2101, MST 0101234567, mã số thuế 0312345678,
+            SĐT: 0912 345 678, điện thoại (+84) 912-345-679, fax 024 3869 1234, phone_number=0912-345-670,
+            tel. 0243.869.1235, tong 123456789 byte, telemetry 2026-10-24 10:00:00, telegram 123456789
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "CMND [CMND], CCCD số: [CCCD], căn cước [CCCD], chứng minh nhân dân số [CMND], " +
+                                   "STK [STK], STK [STK], số tài khoản: [STK], MST [MST], mã số thuế [MST], " +
+                                   "SĐT: [SĐT], " +
+                                   "điện thoại ([SĐT], fax [SĐT], phone_number=[SĐT], tel. [SĐT], " +
+                                   "tong 123456789 byte, telemetry 2026-10-24 10:00:00, telegram 123456789")
+  - name: chuỗi truy vấn của URL không có scheme (máy:cổng/đường dẫn), trong nháy và không nháy
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            upstream svc-files:8000/api/search?q=Nguyen%20Van%20A ok, referer "svc-files:8000/x?q=Tran Thi B" ok,
+            httpx URL('svc-files:8000/y?q=LeVanC'), form "next"=/tim?q=PhamD
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "upstream svc-files:8000/api/search ok, referer \"svc-files:8000/x\" ok, " +
+                                   "httpx URL('svc-files:8000/y'), form \"next\"=/tim")
+  - name: mảnh của hai container và hai luồng một container xen nhau được ghép riêng, không trộn
+    inputs:
+      - insert_at: ghep
+        type: log
+        log_fields: &manh
+          container_id: c-a
+          container_name: /moc-a
+          partial_message: "true"
+          partial_id: p-a
+          partial_ordinal: "1"
+          partial_last: "false"
+          log: 'A1-'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *manh
+          partial_id: p-c
+          log: 'C1-'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *manh
+          container_id: c-b
+          container_name: /moc-b
+          partial_id: p-b
+          log: 'B1-'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *manh
+          partial_ordinal: "2"
+          partial_last: "true"
+          log: 'A2'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *manh
+          container_id: c-b
+          container_name: /moc-b
+          partial_id: p-b
+          partial_ordinal: "2"
+          partial_last: "true"
+          log: 'B2'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *manh
+          partial_id: p-c
+          partial_ordinal: "2"
+          partial_last: "true"
+          log: 'C2'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "A1-A2")
+              assert_eq!(.container, "/moc-a")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "B1-B2")
+              assert_eq!(.container, "/moc-b")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "C1-C2")
+              assert_eq!(.container, "/moc-a")
+  - name: token Bearer/Basic có dấu = đệm ở cuối, đứng riêng, trong cặp header và trong chuỗi JSON
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          log: >-
+            upstream auth Basic dXNlcjpwYXNzd29yZA== ok; retry with Bearer abcdefgh12345678== now;
+            headers=[('authorization', 'Basic dXNlcjpwYXNzd29yZA==')]
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          log: '{"event": "e.basic", "hdr": "Basic dXNlcjpwYXNzd29yZA==", "note": "Bearer abcdefgh12345678=="}'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-files")
+              assert_eq!(.message, "upstream auth Basic [REDACTED] ok; retry with Bearer [REDACTED] now; " +
+                                   "headers=[('authorization', 'Basic [REDACTED]')]")
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-workflow")
+              assert_eq!(.message, "{\"event\":\"e.basic\",\"hdr\":\"Basic [REDACTED]\"," +
+                                   "\"note\":\"Bearer [REDACTED]\"}")
+  - name: giá trị trong nháy không đóng (dòng bị cắt giữa giá trị) che tới hết dòng, trong dòng JSON tới hết chuỗi
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          source: stdout
+          log: 'login fail password="UNTERM1 tiep theo'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-files
+          source: stderr
+          log: "KeyError: {'user': 'bob', 'password': 'UNTERM2"
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': apisix
+          log: 'headers={"Authorization": "Digest username=u, response=UNTERM3'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': svc-workflow
+          log: >-
+            {"event": "e.cut", "error": "KeyError: {'token': 'UNTERM4", "note": "Cookie: 'UNTERM5"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.stream, "stdout")
+              assert_eq!(.message, "login fail password=[REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.stream, "stderr")
+              assert_eq!(.message, "KeyError: {'user': 'bob', 'password': [REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.service, "apisix")
+              assert_eq!(.message, "headers={\"Authorization\": [REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.service, "svc-workflow")
+              assert_eq!(.message, "{\"error\":\"KeyError: {'token': [REDACTED]\",\"event\":\"e.cut\"," +
+                                   "\"note\":\"Cookie: [REDACTED]\"}")
+  - name: hai dòng thường của cùng một container đi riêng, không bị gộp
+    inputs:
+      - insert_at: ghep
+        type: log
+        log_fields:
+          container_id: c-thuong
+          log: 'dong thuong mot'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          container_id: c-thuong
+          log: 'dong thuong hai'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "dong thuong mot")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "dong thuong hai")
+  # Docker không dùng lại mã mảnh; ca này dùng lại để thấy mảnh cuối đóng dòng ngay (vector test không chờ được 10
+  # giây hết hạn: thiếu điều kiện partial_last thì hai dòng bị gộp làm một)
+  - name: mảnh cuối (partial_last) đóng dòng ngay, bản ghi tới sau là dòng khác
+    inputs:
+      - insert_at: ghep
+        type: log
+        log_fields: &cuoi
+          container_id: c-cuoi
+          partial_message: "true"
+          partial_id: p-cuoi
+          partial_ordinal: "1"
+          partial_last: "false"
+          log: 'R1-'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *cuoi
+          partial_ordinal: "2"
+          partial_last: "true"
+          log: 'R2'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *cuoi
+          log: 'S1-'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *cuoi
+          partial_ordinal: "2"
+          partial_last: "true"
+          log: 'S2'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "R1-R2")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "S1-S2")
+  - name: dòng Docker cắt làm ba bản ghi, bí mật vắt qua chỗ cắt thứ hai
+    inputs:
+      - insert_at: ghep
+        type: log
+        log_fields: &ba
+          '"com.docker.compose.service"': svc-files
+          container_id: c-ba
+          partial_message: "true"
+          partial_id: p-ba
+          partial_ordinal: "1"
+          partial_last: "false"
+          log: 'ValueError: ba manh, '
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *ba
+          partial_ordinal: "2"
+          log: 'khong ket noi duoc, pass'
+      - insert_at: ghep
+        type: log
+        log_fields:
+          <<: *ba
+          partial_ordinal: "3"
+          partial_last: "true"
+          log: 'word=STRADDLE3 tiep theo'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "ValueError: ba manh, khong ket noi duoc, password=[REDACTED]")
+  - name: thông điệp dài hơn 16 384 ký tự bị cắt
+    inputs:
+      - insert_at: moc
+        type: vrl
+        source: |
+          s = "0123456789abcdef"
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          s = s + s
+          ."com.docker.compose.service" = "svc-files"
+          .log = s + s
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(strlen(string!(.message)), 16384)
+              assert!(starts_with(string!(.message), "0123456789abcdef0123"))

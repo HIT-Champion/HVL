@@ -18,8 +18,8 @@
 "## [X.Y.Z]" của CHANGELOG; khối mẫu trong chú thích HTML không tính; thiếu mục, hay mục chỉ có tiêu đề nhóm, thì
 lỗi chứ không ra ghi chú rỗng. Không phát hành lại: release.sh dừng trước khi gắn khi thẻ đã có trên origin hay ở máy,
 không hỏi được origin cũng dừng; release.yml dừng khi thẻ đã có Release, kể cả nháp (chạy lệnh của bước với gh giả), và
-báo lỗi khi action không tải lên đủ hai tệp. Trang Release (scripts/release_body.py): dòng chỉ gói .tar.gz chính thức,
-phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
+báo lỗi khi action không tải lên đủ bốn tệp (gói, SBOM, hai .sha256). Trang Release (scripts/release_body.py): dòng chỉ
+gói .tar.gz chính thức và SBOM, phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
@@ -41,12 +41,19 @@ spec = importlib.util.spec_from_file_location("release_body", BODY)
 release_body = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_body)
 WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "release.yml"
+PACKAGE_FILES = ["scripts/kiem_goi.py", "scripts/license-header.sh", "VERSION", ".gitattributes", "LICENSE", "NOTICE",
+                 "LICENSES/Apache-2.0.txt", "LICENSES/LicenseRef-Logos.txt", "REUSE.toml"]
 # repo thử không đọc cấu hình git của máy (khóa ký thẻ, hook…), tên người gắn thẻ cố định; bỏ mọi GIT_* thừa hưởng —
 # chạy từ hook git thì GIT_DIR, GIT_INDEX_FILE trỏ về repo thật và lệnh git của test sẽ ghi vào đó
 GIT_ENV = {
     **{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
     "GIT_CONFIG_GLOBAL": os.devnull,
     "GIT_CONFIG_NOSYSTEM": "1",
+    # không chạy bảo trì tự động sau commit/push: nó có thể tách nền và còn ghi vào objects/ lúc test xóa kho tạm
+    # (CI git 2.55: "Directory not empty: 'objects'", xem test_moc_neo.GIT_ENV)
+    "GIT_CONFIG_COUNT": "1",
+    "GIT_CONFIG_KEY_0": "maintenance.auto",
+    "GIT_CONFIG_VALUE_0": "false",
     "GIT_AUTHOR_NAME": "thu",
     "GIT_AUTHOR_EMAIL": "thu@example.invalid",
     "GIT_COMMITTER_NAME": "thu",
@@ -127,6 +134,10 @@ class NoReReleaseTest(unittest.TestCase):
         (self.repo / "scripts").mkdir(parents=True)
         shutil.copy(RELEASE, self.repo / "scripts" / "release.sh")
         shutil.copy(SCRIPT, self.repo / "scripts" / "release-notes.sh")
+        # release.sh kiểm gói vừa đóng (scripts/kiem_goi.py, test_kiem_goi.py): gói cần đủ tệp giấy phép và VERSION
+        for rel in PACKAGE_FILES:
+            (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(SCRIPT.parent.parent / rel, self.repo / rel)
         (self.repo / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
         (self.repo / ".gitignore").write_text("dist/\n", encoding="utf-8")
         self.git("init", "-q", "-b", "main")
@@ -134,6 +145,8 @@ class NoReReleaseTest(unittest.TestCase):
         self.git("commit", "-qm", "khởi tạo")
         self.origin = root / "origin.git"
         subprocess.run(["git", "init", "-q", "--bare", str(self.origin)], env=GIT_ENV, check=True)
+        # receive-pack của kho trần không nhận biến GIT_CONFIG_* (git bỏ chúng khi đẩy qua đường dẫn cục bộ)
+        subprocess.run(["git", "-C", str(self.origin), "config", "maintenance.auto", "false"], env=GIT_ENV, check=True)
         self.git("remote", "add", "origin", str(self.origin))
         self.git("push", "-q", "origin", "main")
 
@@ -154,8 +167,8 @@ class NoReReleaseTest(unittest.TestCase):
         proc = self.release()
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(self.git("tag", "-l").split(), ["v0.2.0"])
-        self.assertTrue((self.repo / "dist" / "moc-0.2.0.tar.gz").is_file())
-        self.assertTrue((self.repo / "dist" / "moc-0.2.0.tar.gz.sha256").is_file())
+        self.assertTrue((self.repo / "dist" / "signet-0.2.0.tar.gz").is_file())
+        self.assertTrue((self.repo / "dist" / "signet-0.2.0.tar.gz.sha256").is_file())
 
     def test_tag_already_on_origin_stops_before_tagging(self) -> None:
         # thẻ đã đẩy từ máy khác: máy này chưa có, gắn được thẻ cục bộ nhưng đẩy lên sẽ là phát hành lại
@@ -190,6 +203,10 @@ class NoReReleaseTest(unittest.TestCase):
     def test_other_version_is_not_blocked(self) -> None:
         self.git("tag", "-a", "v0.1.0", "-m", "bản cũ")
         self.git("push", "-q", "origin", "v0.1.0")
+        # bản mới ở commit sau thẻ cũ: hai thẻ gắn cùng giây trên một commit thì VERSION của gói lấy nhầm thẻ cũ
+        (self.repo / "MOI.md").write_text("Thay đổi của 0.2.0\n", encoding="utf-8")
+        self.git("add", "MOI.md")
+        self.git("commit", "-qm", "thay đổi")
         self.assertEqual(self.release("0.2.0").returncode, 0)
 
 
@@ -230,7 +247,7 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 
     def guard(self, releases: list[dict], fail: str = "") -> subprocess.CompletedProcess[str]:
         (self.dir / "releases.json").write_text(json.dumps(releases), encoding="utf-8")
-        env = {**os.environ, "PATH": f"{self.dir}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "HIT-Champion/HVL",
+        env = {**os.environ, "PATH": f"{self.dir}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "HIT-Champion/Signet",
                "GITHUB_REF_NAME": "v0.2.0", "FAKE_RELEASES": str(self.dir / "releases.json"),
                "FAKE_GH_CALLS": str(self.dir / "calls"), "FAKE_GH_FAIL": fail}
         return subprocess.run(["bash", "-e", "-c", step_script("Chặn phát hành lại")], env=env, capture_output=True,
@@ -238,19 +255,19 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 
     @staticmethod
     def release(tag: str, draft: bool = False) -> dict:
-        return {"tag_name": tag, "draft": draft, "html_url": f"https://github.com/HIT-Champion/HVL/releases/{tag}"}
+        return {"tag_name": tag, "draft": draft, "html_url": f"https://github.com/HIT-Champion/Signet/releases/{tag}"}
 
     def test_new_tag_passes_and_lists_every_page(self) -> None:
         proc = self.guard([self.release("v0.1.0"), self.release("v0.2.0-rc.1", draft=True), self.release("v0.2.00")])
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         calls = (self.dir / "calls").read_text(encoding="utf-8")
         self.assertIn("--paginate", calls)
-        self.assertIn("repos/HIT-Champion/HVL/releases?per_page=100", calls)
+        self.assertIn("repos/HIT-Champion/Signet/releases?per_page=100", calls)
 
     def test_published_release_stops(self) -> None:
         proc = self.guard([self.release("v0.1.0"), self.release("v0.2.0")])
         self.assertEqual(proc.returncode, 1)
-        self.assertIn("::error::v0.2.0 đã có Release (đã đăng https://github.com/HIT-Champion/HVL/releases/v0.2.0)",
+        self.assertIn("::error::v0.2.0 đã có Release (đã đăng https://github.com/HIT-Champion/Signet/releases/v0.2.0)",
                       proc.stdout)
 
     def test_draft_left_by_deleted_tag_stops(self) -> None:
@@ -275,12 +292,13 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         return subprocess.run(["bash", "-e", "-c", step_script("Kiểm gói đã tải lên")], env=env, capture_output=True,
                               text=True)
 
-    def test_upload_check_needs_both_files(self) -> None:
-        self.assertEqual(self.assets('[{"name": "moc-0.2.0.tar.gz"}, {"name": "moc-0.2.0.tar.gz.sha256"}]')
-                         .returncode, 0)
-        skipped = self.assets('[{"name": "moc-0.2.0.tar.gz.sha256"}]')
+    def test_upload_check_needs_all_four_files(self) -> None:
+        names = ["signet-0.2.0.tar.gz", "signet-0.2.0.tar.gz.sha256", "signet-0.2.0.cdx.json",
+                 "signet-0.2.0.cdx.json.sha256"]
+        self.assertEqual(self.assets(json.dumps([{"name": n} for n in names])).returncode, 0)
+        skipped = self.assets(json.dumps([{"name": n} for n in names[1:]]))
         self.assertEqual(skipped.returncode, 1)
-        self.assertIn("Chỉ tải lên 1/2 tệp", skipped.stdout)
+        self.assertIn("Chỉ tải lên 3/4 tệp", skipped.stdout)
         self.assertEqual(self.assets(None).returncode, 1)
 
     def test_action_does_not_overwrite_assets(self) -> None:
@@ -289,11 +307,20 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         self.assertIn("fail_on_unmatched_files: true", action)
         self.assertIn("ASSETS: ${{ steps.gh_release.outputs.assets }}", action)
 
+    def test_sbom_is_made_from_the_tag_and_attached(self) -> None:
+        # make sbom sinh dist/signet-$V.cdx.json (+ .sha256) trước khi tạo Release; action tải cả hai lên
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertLess(text.index("name: Sinh SBOM CycloneDX (make sbom)"), text.index("softprops/action-gh-release@"))
+        self.assertIn('run: make sbom VERSION="$V"', text)
+        files = text.split("files: |", 1)[1]
+        self.assertIn("dist/*.cdx.json\n", files)
+        self.assertIn("dist/*.cdx.json.sha256\n", files)
+
 
 class ReleaseBodyTest(unittest.TestCase):
     """scripts/release_body.py: trang Release ngắn — tóm tắt hiện ra, ghi chép đầy đủ gập lại, không gãy dòng."""
 
-    URL = "https://github.com/HIT-Champion/HVL"
+    URL = "https://github.com/HIT-Champion/Signet"
     NOTES = ("Bản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng,\n"
              "dựng từ mã nguồn bằng make.\n"
              "\n"
@@ -311,8 +338,9 @@ class ReleaseBodyTest(unittest.TestCase):
     def test_summary_shows_and_changes_fold(self) -> None:
         out = release_body.body("1.1.0", self.NOTES, self.URL)
         head, rest = out.split("<details>", 1)
-        self.assertTrue(head.startswith("**Gói phát hành chính thức: `moc-1.1.0.tar.gz`**"))
-        self.assertIn("`sha256sum -c moc-1.1.0.tar.gz.sha256`", head)
+        self.assertTrue(head.startswith("**Gói phát hành chính thức: `signet-1.1.0.tar.gz`**"))
+        self.assertIn("`sha256sum -c signet-1.1.0.tar.gz.sha256`", head)
+        self.assertIn("(SBOM CycloneDX): `signet-1.1.0.cdx.json`", head)
         self.assertIn('"Source code (zip)"', head)
         self.assertIn("\n\nBản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng, dựng từ mã nguồn bằng "
                       "make.\n\n- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR.\n\n", head)
@@ -322,14 +350,14 @@ class ReleaseBodyTest(unittest.TestCase):
 
     def test_continuation_lines_join_and_relative_links_point_at_the_tag(self) -> None:
         out = release_body.body("1.1.0", self.NOTES, self.URL)
-        self.assertIn("- Cổng xác thực, xem [docs/api/](https://github.com/HIT-Champion/HVL/blob/v1.1.0/docs/api/"
+        self.assertIn("- Cổng xác thực, xem [docs/api/](https://github.com/HIT-Champion/Signet/blob/v1.1.0/docs/api/"
                       "README.md) và [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/).\n- Sổ đăng ký.\n\n"
                       "### Đã sửa lỗi\n", out)
 
     def test_without_summary_only_the_folded_changes(self) -> None:
         out = release_body.body("1.1.1", "### Đã sửa lỗi\n- Lỗi gấp.\n", self.URL)
         first, second = out.split("\n\n", 1)
-        self.assertIn("`moc-1.1.1.tar.gz`", first)
+        self.assertIn("`signet-1.1.1.tar.gz`", first)
         self.assertTrue(second.startswith("<details>\n<summary>Toàn bộ ghi chép thay đổi của 1.1.1 (1 mục)</summary>"))
 
     def test_entry_reads_the_section_and_fails_without_one(self) -> None:
@@ -368,7 +396,7 @@ class WorkflowNotesTest(unittest.TestCase):
         proc = self.step("0.2.0")
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         page = (self.dir / "dist" / "RELEASE_NOTES.md").read_text(encoding="utf-8")
-        self.assertTrue(page.startswith("**Gói phát hành chính thức: `moc-0.2.0.tar.gz`**"))
+        self.assertTrue(page.startswith("**Gói phát hành chính thức: `signet-0.2.0.tar.gz`**"))
         self.assertIn("- Tính năng của 0.2.0.\n", page)
 
     def test_missing_section_stops(self) -> None:

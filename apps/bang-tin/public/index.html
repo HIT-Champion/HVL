@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  Copyright 2026 Signet Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bảng tin đơn vị — Signet</title>
+  <link rel="icon" href="/bang-tin/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/bang-tin/style.css">
+  <script src="/bang-tin/lib/oidc-client-ts.min.js" defer></script>
+  <script src="/bang-tin/app.js" type="module"></script>
+</head>
+<body>
+  <header>
+    <h1>Bảng tin đơn vị</h1>
+    <p class="ai"><span id="nguoi">Đang đăng nhập…</span> <button id="thoat" type="button" hidden>Đăng xuất</button></p>
+  </header>
+  <main>
+    <p class="mo-ta">Văn bản vừa vào sổ, vừa phát hành trong đơn vị. Tin đến theo sự kiện của lõi Signet; chỉ hiện văn
+      bản bạn được xem. <a href="/">Văn phòng điện tử</a></p>
+    <p id="trang-thai" role="status"></p>
+    <ul id="tin"></ul>
+  </main>
+</body>
+</html>

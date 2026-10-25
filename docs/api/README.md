@@ -8,7 +8,7 @@ Có hai loại API:
 - **REST** (`svc-files`) cho tệp, tìm kiếm, bản xem trước văn bản đi và cổng xác thực.
 
 Dù gọi theo cách nào, người gọi cũng phải có token Keycloak, và đơn vị lẫn vai trò luôn lấy từ token. Ngoại lệ
-duy nhất là cổng xác thực văn bản đã phát hành (`/api/verify`), ai cũng gọi được.
+là cổng xác thực văn bản đã phát hành (`/api/verify`) và trạng thái hệ thống (`/api/status`), ai cũng gọi được.
 
 ## Tệp trong thư mục này
 
@@ -32,7 +32,14 @@ make up && make seed && make api-docs
 ```
 
 CI dựng hệ thống từ mã nguồn rồi chạy `scripts/api_docs.py --check`. Lệnh này báo lỗi nếu `docs/api/` lệch với
-hệ thống vừa dựng, nên tài liệu không cũ đi so với mã. Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
+hệ thống vừa dựng, nên tài liệu không cũ đi so với mã. Khi lệch, CI sinh bản mới trên chính hệ thống đó và tải lên
+thành artifact `docs-api-<lần chạy>` của job "Chạy thử: luong-chinh"; không cần dựng ở máy:
+
+```bash
+gh run download <run-id> -n docs-api-1 -D docs/api   # <run-id> lấy ở trang Checks của PR
+```
+
+Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
 đọc OpenAPI 3.1, ví dụ Swagger UI hay Redoc chạy cục bộ. Các tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào
 cũng nạp được.
 
@@ -42,9 +49,11 @@ cũng nạp được.
 |---|---|---|
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
-| `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…` | `svc-files` | Bắt buộc |
-| `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
+| `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…`, `POST /api/imports/incoming`, `GET /api/imports…` | `svc-files` | Bắt buộc |
+| `GET /api/verify/{mã}`, `GET /api/verify?sha256=…`, `GET /api/verify/ca.pem`, `GET /api/verify/anchor-key.pem` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
+| `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
+| `GET /ca-nhan/` và trang tĩnh dưới đó | Không gian cá nhân P.A.R.A (`app-ca-nhan`), ứng dụng thứ hai trên lõi | — |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
 
 Cổng trả `404` cho các đường còn lại:
@@ -70,7 +79,8 @@ Access token sống 5 phút; làm mới bằng refresh token.
   `app-office`.
   - Muốn thêm một ứng dụng Tầng 2: thêm client vào [`platform/keycloak/realm/moc-realm.json`](../../platform/keycloak/realm/moc-realm.json)
     theo mẫu `app-office`. Giữ nguyên `protocolMappers` để token có claim của Hasura; đổi `clientId` và
-    `redirectUris`.
+    `redirectUris`. Bản cài đã chạy thì thêm client vào realm bằng `python3 scripts/moc.py realm clients`. Các bước
+    còn lại và ví dụ đầy đủ (client `app-ca-nhan`): [`docs/them-ung-dung.md`](../them-ung-dung.md).
   - Văn thư, lãnh đạo và quản trị đơn vị phải nhập mã TOTP sau mật khẩu ([`platform/keycloak/README.md`](../../platform/keycloak/README.md)).
 - **Script** dùng client `moc-cli`, luồng mật khẩu kèm mã TOTP (tham số `otp`) — hỏi mã theo đúng quy tắc của
   trình duyệt. Không cần trên server thật thì tắt (`MOC_CLI_CLIENT_ENABLED=false`).
@@ -116,6 +126,7 @@ Action đều gọi lại được sau lỗi mạng mà không cấp số hai l�
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Trình dự thảo văn bản đi cho lãnh đạo phòng duyệt, chọn lãnh đạo đơn vị ký; trình lại sau khi bị trả lại |
 | `myTasks` | `clerk`, `staff`, `manager`, `director` | Hộp việc: việc giao đích danh và việc của nhóm vai trò, khẩn xếp trước |
 | `completeTask(taskId, outcome, data)` | Người được giao việc | Hoàn thành việc; `data` kiểm theo loại việc |
+| `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Sơ đồ cảm biến OT (F3.10, chỉ đọc): số đo mới nhất từng cảm biến của đơn vị người gọi, ngưỡng, cờ `stale`, `out_of_range`, `duplicate_time`, `future_time`; `status` là `off` hay `unavailable` khi chưa bật broker NGSI-LD |
 
 Các loại việc, `outcome` và `data` của từng loại có ở [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §4.2.
 Luồng văn bản đến của văn thư, giống `make smoke`:
@@ -179,8 +190,17 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `POST /api/files/{id}/read` | Văn thư, chỉ tệp chính mình tải lên: tác tử đọc văn bản đến (F4.1) gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu, mỗi trường kèm độ tin cậy; không tạo văn bản. Một lượt đọc một lúc (`503 busy`) |
 | `POST /api/documents/ask` | Văn thư, chuyên viên, lãnh đạo: trợ lý hỏi đáp (F4.2) `{question, mode: extract\|generate}` → câu trả lời, mỗi câu kèm `[n]` trỏ nguồn (số ký hiệu, trang), chỉ từ văn bản người hỏi được đọc; không có căn cứ → `status: no_evidence`. Câu hỏi, câu trả lời không lưu |
 | `GET /api/case-files/{id}/archive` | Hồ sơ đã nộp lưu (F3.8): đọc lại từ gói trên bucket lạnh sau khi khớp băm với CSDL; chỉ văn bản người gọi được đọc |
+| `POST /api/imports/incoming` (multipart, trường `data`, `archive` tùy chọn) | Văn thư: nạp lô văn bản đến — tệp NDJSON hoặc CSV cùng trường với `receiveIncoming` (thêm `files`: tên tệp trong zip `archive`), tối đa 1000 dòng, tổng tệp các dòng trỏ tới (mỗi lần trỏ tính một lần) tối đa 200 MB; `?register=true` vào sổ từng văn bản (tối đa 200 dòng). Trả `202` + `Location` ngay, xử lý nền; mỗi dòng đi đúng đường tiếp nhận lẻ (ClamAV, Action thay mặt văn thư). `Idempotency-Key` gửi lại trả đúng lô cũ (`200`) |
+| `GET /api/imports/{id}` | Người tạo lô: trạng thái `queued`/`running`/`done`, số dòng đã nhận, còn chờ, đạt, trùng, lỗi; lô của người khác → `404` |
+| `GET /api/imports/{id}/rows` | Người tạo lô: kết quả từng dòng (số dòng, mã lỗi, lý do, lỗi theo trường, id văn bản, số đến); `?status=failed`, trang sau `after=<next_after>` |
+| `GET /api/imports` | Các lô của chính người gọi, mới trước |
+| `GET /api/case-files/{id}/archive/files/{file_id}` | Phòng đọc xem tệp (F3.8): chỉ PDF của văn bản người gọi được đọc; so băm với manifest, trả bản có dấu tên người xem (`inline`), mỗi lần xem ghi `case_file.file_viewed` |
+| `POST /api/case-files/{id}/archive` | Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng (F3.8): gói Parquet + tệp + manifest có băm vào bucket lạnh khóa ghi; ghi `case_file.archive_requested` |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
+| `GET /api/verify/ca.pem` | **Không cần token.** Chứng thư CA nội bộ ký văn bản đi (PEM, `application/x-pem-file`, chỉ minh họa); két chưa có PKI thì 404 |
+| `GET /api/verify/anchor-key.pem` | **Không cần token.** Khóa công khai Ed25519 két dùng ký mốc neo sổ kiểm toán (PEM SubjectPublicKeyInfo); két chưa có khóa thì 404. Kiểm mốc đã công bố: `docs/van-hanh.md` mục Mốc neo công khai |
+| `GET /api/status` | **Không cần token.** Tình trạng từng thành phần (`ok`, `degraded`, `down`, `off`) theo tầng, tình trạng chung, phiên bản, thời gian chạy, giờ sao lưu gần nhất, trợ lý AI bật hay tắt; lưu đệm 10 giây, không có địa chỉ nội bộ hay số liệu |
 
 ```bash
 curl -s -OJ "$MOC/api/files/$FILE" -H "Authorization: Bearer $TOKEN"
@@ -189,13 +209,25 @@ curl -s -OJ "$MOC/api/registers/in/2026/pdf" -H "Authorization: Bearer $TOKEN"  
 curl -s "$MOC/api/documents/ask" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"question": "Điều kiện xét học bổng khuyến khích học tập là gì?", "mode": "extract"}'
 
+# nạp lô văn bản đến (token văn thư): 202 + Location, rồi hỏi trạng thái và lỗi từng dòng
+curl -s "$MOC/api/imports/incoming" -H "Authorization: Bearer $TOKEN" -H 'Idempotency-Key: lo-2026-10-23' \
+  -F 'data=@van-ban-den.csv;type=text/csv' -F 'archive=@tep.zip;type=application/zip'
+curl -s "$MOC/api/imports/$LO" -H "Authorization: Bearer $TOKEN"
+curl -s "$MOC/api/imports/$LO/rows?status=failed" -H "Authorization: Bearer $TOKEN"
+
 # cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
 curl -s "$MOC/api/verify/ABCDE-23456"
 curl -s "$MOC/api/verify?sha256=$(sha256sum cong-van-nhan-duoc.pdf | cut -d' ' -f1)"
+curl -s -o signet-ca.pem "$MOC/api/verify/ca.pem" && openssl x509 -in signet-ca.pem -noout -fingerprint -sha256
+curl -s -o anchor-key.pem "$MOC/api/verify/anchor-key.pem"   # khóa ký mốc neo sổ kiểm toán
+
+# trạng thái hệ thống, không đăng nhập
+curl -s "$MOC/api/status"
 ```
 
-Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi đúng hai đường trên; ứng dụng khác
-cũng dùng được để tự kiểm văn bản nhận được.
+Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi hai đường xác thực trên, và tải hai tệp PEM
+để hiện vân tay SHA-256; ứng dụng khác cũng dùng được để tự kiểm văn bản nhận được. Trang `/trang-thai` gọi
+`/api/status` mỗi 30 giây.
 
 Tệp được gắn vào văn bản bằng GraphQL (`file_ids` của `receiveIncoming`, `files` khi chuyên viên tạo dự thảo, hoặc
 `insert_office_document_files_one`), không qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
@@ -238,6 +270,10 @@ kết nối giới hạn theo địa chỉ IP (`MOC_RATE_REALTIME_PER_MIN`). Tin
 thì đọc lại `core_notifications`. Giao diện Signet làm đúng như vậy trong
 [`apps/office/app/composables/useRealtime.ts`](../../apps/office/app/composables/useRealtime.ts).
 
+Bản cài có cấu hình máy chủ thư hoặc webhook thì cùng thông báo đó còn đi qua email, kênh chat (svc-workflow gửi ở
+nền, [README của svc-workflow](../../services/svc-workflow/README.md) mục "Thông báo qua email, webhook"). Ứng dụng
+không phải làm gì thêm; bảng hộp thư đi `core_notification_deliveries` không mở cho vai trò người dùng.
+
 ## 5. Sổ kiểm toán: `core_audit_log` (lãnh đạo, quản trị đơn vị)
 
 Mọi thay đổi dữ liệu nghiệp vụ vào sổ kiểm toán chuỗi băm. Vai trò `director`, `tenant_admin` đọc được dòng sổ
@@ -267,6 +303,7 @@ Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"],
   - GraphQL và tệp: theo token, `MOC_RATE_API_PER_MIN` (mặc định 300/phút).
   - Cổng xác thực: theo địa chỉ IP, `MOC_RATE_VERIFY_PER_MIN` (mặc định 30/phút).
   - Mở kết nối `/realtime`: theo địa chỉ IP, `MOC_RATE_REALTIME_PER_MIN` (mặc định 60/phút).
+  - Trạng thái hệ thống: theo địa chỉ IP, `MOC_RATE_STATUS_PER_MIN` (mặc định 30/phút).
   - Phản hồi có `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (giây).
 - **Thuê ước**: không gửi `tenant_id`; Hasura và `svc-files` lấy từ token. Người của đơn vị này không đọc được
   dữ liệu của đơn vị khác (`make smoke` kiểm).
@@ -277,6 +314,7 @@ Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"],
 |---|---|---|
 | Hasura → `svc-workflow` `POST /actions/{name}` | Tiêu đề `X-Moc-Action-Secret` và biến phiên lấy từ JWT | [`openapi/svc-workflow.json`](openapi/svc-workflow.json) |
 | `svc-files`, `svc-workflow` → Hasura | Khóa quản trị + `X-Hasura-Role: service` + đơn vị, người dùng, request id lấy từ token | [`db/README.md`](../../db/README.md#dịch-vụ-gọi-hasura) |
+| `svc-files` → Hasura Action `receiveIncoming`, `registerIncoming` (nạp lô) | Khóa quản trị + `X-Hasura-Role: clerk` + đơn vị, người, phòng của văn thư tạo lô (lấy từ token đã kiểm lúc tạo lô) — thay mặt văn thư cho từng dòng; dòng không thành văn bản thì gỡ tệp đã lưu cho dòng bằng khóa quản trị không kèm vai trò, `X-Hasura-User-Id: svc-files:import` (chỉ tệp chưa gắn văn bản của người tạo lô) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → `svc-files` `POST /internal/issue` | Token tài khoản dịch vụ `svc-workflow` (client credentials của Keycloak) | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `svc-workflow` → Flowable REST, Keycloak | Tài khoản dịch vụ | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |
 | `svc-workflow` → Flowable `external-job-api` | Tự lấy việc nhắc hạn (topic `moc-sla`) do timer trong BPMN tạo | [`services/svc-workflow/README.md`](../../services/svc-workflow/README.md) |

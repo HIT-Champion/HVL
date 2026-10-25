@@ -78,17 +78,27 @@ mkdir -p "$DIST"
 echo "==> Gắn thẻ phiên bản $TAG"
 git tag -a "$TAG" -m "Signet $VERSION"
 
-echo "==> Sinh gói nguồn $DIST/moc-$VERSION.tar.gz"
+echo "==> Sinh gói nguồn $DIST/signet-$VERSION.tar.gz"
 git archive --format=tar.gz \
-            --prefix="moc-$VERSION/" \
-            -o "$DIST/moc-$VERSION.tar.gz" \
+            --prefix="signet-$VERSION/" \
+            -o "$DIST/signet-$VERSION.tar.gz" \
             "$TAG"
 
 echo "==> Sinh tổng kiểm tra SHA-256"
-( cd "$DIST" && sha256sum "moc-$VERSION.tar.gz" > "moc-$VERSION.tar.gz.sha256" )
+( cd "$DIST" && sha256sum "signet-$VERSION.tar.gz" > "signet-$VERSION.tar.gz.sha256" )
+
+# Kiểm chính gói sẽ phát hành, cùng lệnh với release.yml: tệp cấm, giấy phép, .sha256, thư mục gốc, VERSION. Gói hỏng
+# thì gỡ thẻ vừa gắn (chưa đẩy, chưa ai tải) và xóa gói — sửa xong chạy lại được ngay
+echo "==> Kiểm gói trước khi phát hành (scripts/kiem_goi.py)"
+if ! python3 scripts/kiem_goi.py "$DIST/signet-$VERSION.tar.gz" --version "$VERSION"; then
+  git tag -d "$TAG" > /dev/null
+  rm -f "$DIST/signet-$VERSION.tar.gz" "$DIST/signet-$VERSION.tar.gz.sha256"
+  echo "Lỗi: gói không qua kiểm (xem ở trên) — đã gỡ thẻ $TAG ở máy và xóa gói. Sửa rồi chạy lại." >&2
+  exit 1
+fi
 
 echo ""
 echo "Đã tạo bản phát hành $TAG:"
-ls -lh "$DIST/moc-$VERSION.tar.gz"*
+ls -lh "$DIST/signet-$VERSION.tar.gz"*
 echo ""
-echo "Bước tiếp theo:  git push origin $TAG    # chỉ thẻ này; GitHub Actions tạo Release kèm .tar.gz, .sha256"
+echo "Bước tiếp theo:  git push origin $TAG    # chỉ thẻ này; GitHub Actions tạo Release kèm .tar.gz, SBOM, .sha256"

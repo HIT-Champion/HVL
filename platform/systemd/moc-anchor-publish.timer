@@ -1,0 +1,30 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Gọi moc-anchor-publish.service mỗi giờ (tệp MẪU, xem moc-anchor-publish.service). svc-files tự neo vào bucket lạnh
+# mỗi 10 phút; mỗi giờ một commit công khai là đủ để mọi lần viết lại sổ về sau lộ ra khi đối chiếu, mà kho công khai
+# không phình (khoảng 9 000 dòng một năm). Đầu chuỗi không đổi thì không có commit mới.
+
+[Unit]
+Description=Signet — công bố mốc neo sổ kiểm toán mỗi giờ
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

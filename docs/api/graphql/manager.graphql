@@ -56,6 +56,25 @@ input Int_comparison_exp {
   _nin: [Int!]
 }
 
+type OtSensor {
+  flags: [String!]!
+  id: String!
+  name: String!
+  observed_at: timestamptz
+  room: String
+  value: Float
+}
+
+type OtSensorMap {
+  checked_at: timestamptz!
+  range_max: Float!
+  range_min: Float!
+  sensors: [OtSensor!]!
+  stale_after_min: Int!
+  status: String!
+  threshold: Float!
+}
+
 "Boolean expression to compare columns of type \"String\". All fields are combined with logical 'AND'."
 input String_array_comparison_exp {
   "is the array contained in the given array value"
@@ -145,6 +164,79 @@ input bytea_comparison_exp {
   _lte: bytea
   _neq: bytea
   _nin: [bytea!]
+}
+
+"Danh mục ứng dụng cắm vào lõi bằng manifest: tên, mô tả, đường, phiên bản, lúc cài, lúc gỡ, SHA-256 tệp app.yaml lúc cài; không manifest, cổng, biến môi trường"
+type core_app_catalog {
+  description: String
+  installed_at: timestamptz
+  name: String
+  path: String
+  title: String
+  updated_at: timestamptz
+  version: String
+}
+
+"Boolean expression to filter rows from the table \"core.app_catalog\". All fields are combined with a logical 'AND'."
+input core_app_catalog_bool_exp {
+  _and: [core_app_catalog_bool_exp!]
+  _not: core_app_catalog_bool_exp
+  _or: [core_app_catalog_bool_exp!]
+  description: String_comparison_exp
+  installed_at: timestamptz_comparison_exp
+  name: String_comparison_exp
+  path: String_comparison_exp
+  title: String_comparison_exp
+  updated_at: timestamptz_comparison_exp
+  version: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"core.app_catalog\"."
+input core_app_catalog_order_by {
+  description: order_by
+  installed_at: order_by
+  name: order_by
+  path: order_by
+  title: order_by
+  updated_at: order_by
+  version: order_by
+}
+
+"select columns of table \"core.app_catalog\""
+enum core_app_catalog_select_column {
+  "column name"
+  description
+  "column name"
+  installed_at
+  "column name"
+  name
+  "column name"
+  path
+  "column name"
+  title
+  "column name"
+  updated_at
+  "column name"
+  version
+}
+
+"Streaming cursor of the table \"core_app_catalog\""
+input core_app_catalog_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_app_catalog_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_app_catalog_stream_cursor_value_input {
+  description: String
+  installed_at: timestamptz
+  name: String
+  path: String
+  title: String
+  updated_at: timestamptz
+  version: String
 }
 
 "columns and relationships of \"core.files\""
@@ -668,6 +760,34 @@ type mutation_root {
     "upsert condition"
     on_conflict: office_case_files_on_conflict
   ): office_case_files
+  "insert data into the table: \"office.feedback\""
+  insert_office_feedback(
+    "the rows to be inserted"
+    objects: [office_feedback_insert_input!]!
+    "upsert condition"
+    on_conflict: office_feedback_on_conflict
+  ): office_feedback_mutation_response
+  "insert a single row into the table: \"office.feedback\""
+  insert_office_feedback_one(
+    "the row to be inserted"
+    object: office_feedback_insert_input!
+    "upsert condition"
+    on_conflict: office_feedback_on_conflict
+  ): office_feedback
+  "insert data into the table: \"personal.items\""
+  insert_personal_items(
+    "the rows to be inserted"
+    objects: [personal_items_insert_input!]!
+    "upsert condition"
+    on_conflict: personal_items_on_conflict
+  ): personal_items_mutation_response
+  "insert a single row into the table: \"personal.items\""
+  insert_personal_items_one(
+    "the row to be inserted"
+    object: personal_items_insert_input!
+    "upsert condition"
+    on_conflict: personal_items_on_conflict
+  ): personal_items
   "update data of the table: \"core.notifications\""
   update_core_notifications(
     "sets the columns of the filtered rows to the given values"
@@ -708,6 +828,24 @@ type mutation_root {
     "updates to execute, in order"
     updates: [office_case_files_updates!]!
   ): [office_case_files_mutation_response]
+  "update data of the table: \"personal.items\""
+  update_personal_items(
+    "sets the columns of the filtered rows to the given values"
+    _set: personal_items_set_input
+    "filter the rows which have to be updated"
+    where: personal_items_bool_exp!
+  ): personal_items_mutation_response
+  "update single row of the table: \"personal.items\""
+  update_personal_items_by_pk(
+    "sets the columns of the filtered rows to the given values"
+    _set: personal_items_set_input
+    pk_columns: personal_items_pk_columns_input!
+  ): personal_items
+  "update multiples rows of table: \"personal.items\""
+  update_personal_items_many(
+    "updates to execute, in order"
+    updates: [personal_items_updates!]!
+  ): [personal_items_mutation_response]
 }
 
 "columns and relationships of \"office.assignments\""
@@ -2405,6 +2543,105 @@ type office_documents_variance_fields {
   register_number: Float
 }
 
+"Góp ý của người dùng Văn phòng điện tử (F4.6): mức hài lòng 1–5, vài dòng, khuôn đường dẫn màn hình; không họ tên, vai trò, IP"
+type office_feedback {
+  comment: String
+  created_at: timestamptz!
+  id: uuid!
+  "Góp ý này của chính người đang xem"
+  mine: Boolean
+  rating: Int!
+  screen: String!
+}
+
+"Boolean expression to filter rows from the table \"office.feedback\". All fields are combined with a logical 'AND'."
+input office_feedback_bool_exp {
+  _and: [office_feedback_bool_exp!]
+  _not: office_feedback_bool_exp
+  _or: [office_feedback_bool_exp!]
+  comment: String_comparison_exp
+  created_at: timestamptz_comparison_exp
+  id: uuid_comparison_exp
+  mine: Boolean_comparison_exp
+  rating: Int_comparison_exp
+  screen: String_comparison_exp
+}
+
+"unique or primary key constraints on table \"office.feedback\""
+enum office_feedback_constraint {
+  "unique or primary key constraint on columns \"id\""
+  feedback_pkey
+}
+
+"input type for inserting data into table \"office.feedback\""
+input office_feedback_insert_input {
+  comment: String
+  rating: Int
+  screen: String
+}
+
+"response of any mutation on the table \"office.feedback\""
+type office_feedback_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [office_feedback!]!
+}
+
+"on_conflict condition type for table \"office.feedback\""
+input office_feedback_on_conflict {
+  constraint: office_feedback_constraint!
+  update_columns: [office_feedback_update_column!]! = []
+  where: office_feedback_bool_exp
+}
+
+"Ordering options when selecting data from \"office.feedback\"."
+input office_feedback_order_by {
+  comment: order_by
+  created_at: order_by
+  id: order_by
+  mine: order_by
+  rating: order_by
+  screen: order_by
+}
+
+"select columns of table \"office.feedback\""
+enum office_feedback_select_column {
+  "column name"
+  comment
+  "column name"
+  created_at
+  "column name"
+  id
+  "column name"
+  rating
+  "column name"
+  screen
+}
+
+"Streaming cursor of the table \"office_feedback\""
+input office_feedback_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: office_feedback_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input office_feedback_stream_cursor_value_input {
+  comment: String
+  created_at: timestamptz
+  id: uuid
+  rating: Int
+  screen: String
+}
+
+"placeholder for update columns of table \"office.feedback\" (current role has no relevant permissions)"
+enum office_feedback_update_column {
+  "placeholder (do not use)"
+  _PLACEHOLDER
+}
+
 "column ordering options"
 enum order_by {
   "in ascending order, nulls last"
@@ -2421,7 +2658,129 @@ enum order_by {
   desc_nulls_last
 }
 
+"Không gian cá nhân P.A.R.A: tệp đã qua kiểm dịch của chính người dùng, xếp vào một trong bốn thư mục projects, areas, resources, archives"
+type personal_items {
+  created_at: timestamptz!
+  "An object relationship"
+  file: core_files
+  file_id: uuid!
+  para: String!
+  updated_at: timestamptz!
+}
+
+"Boolean expression to filter rows from the table \"personal.items\". All fields are combined with a logical 'AND'."
+input personal_items_bool_exp {
+  _and: [personal_items_bool_exp!]
+  _not: personal_items_bool_exp
+  _or: [personal_items_bool_exp!]
+  created_at: timestamptz_comparison_exp
+  file: core_files_bool_exp
+  file_id: uuid_comparison_exp
+  para: String_comparison_exp
+  updated_at: timestamptz_comparison_exp
+}
+
+"unique or primary key constraints on table \"personal.items\""
+enum personal_items_constraint {
+  "unique or primary key constraint on columns \"file_id\""
+  items_pkey
+}
+
+"input type for inserting data into table \"personal.items\""
+input personal_items_insert_input {
+  file_id: uuid
+  para: String
+}
+
+"response of any mutation on the table \"personal.items\""
+type personal_items_mutation_response {
+  "number of rows affected by the mutation"
+  affected_rows: Int!
+  "data from the rows affected by the mutation"
+  returning: [personal_items!]!
+}
+
+"on_conflict condition type for table \"personal.items\""
+input personal_items_on_conflict {
+  constraint: personal_items_constraint!
+  update_columns: [personal_items_update_column!]! = []
+  where: personal_items_bool_exp
+}
+
+"Ordering options when selecting data from \"personal.items\"."
+input personal_items_order_by {
+  created_at: order_by
+  file: core_files_order_by
+  file_id: order_by
+  para: order_by
+  updated_at: order_by
+}
+
+"primary key columns input for table: personal.items"
+input personal_items_pk_columns_input {
+  file_id: uuid!
+}
+
+"select columns of table \"personal.items\""
+enum personal_items_select_column {
+  "column name"
+  created_at
+  "column name"
+  file_id
+  "column name"
+  para
+  "column name"
+  updated_at
+}
+
+"input type for updating data in table \"personal.items\""
+input personal_items_set_input {
+  para: String
+}
+
+"Streaming cursor of the table \"personal_items\""
+input personal_items_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: personal_items_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input personal_items_stream_cursor_value_input {
+  created_at: timestamptz
+  file_id: uuid
+  para: String
+  updated_at: timestamptz
+}
+
+"update columns of table \"personal.items\""
+enum personal_items_update_column {
+  "column name"
+  para
+}
+
+input personal_items_updates {
+  "sets the columns of the filtered rows to the given values"
+  _set: personal_items_set_input
+  "filter the rows which have to be updated"
+  where: personal_items_bool_exp!
+}
+
 type query_root {
+  "fetch data from the table: \"core.app_catalog\""
+  core_app_catalog(
+    "distinct select on columns"
+    distinct_on: [core_app_catalog_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_app_catalog_order_by!]
+    "filter the rows returned"
+    where: core_app_catalog_bool_exp
+  ): [core_app_catalog!]!
   "fetch data from the table: \"core.files\""
   core_files(
     "distinct select on columns"
@@ -2670,9 +3029,62 @@ type query_root {
   ): office_documents_aggregate!
   "fetch data from the table: \"office.documents\" using primary key columns"
   office_documents_by_pk(id: uuid!): office_documents
+  "fetch data from the table: \"office.feedback\""
+  office_feedback(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch data from the table: \"office.feedback\" using primary key columns"
+  office_feedback_by_pk(id: uuid!): office_feedback
+  otSensorMap: OtSensorMap!
+  "fetch data from the table: \"personal.items\""
+  personal_items(
+    "distinct select on columns"
+    distinct_on: [personal_items_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [personal_items_order_by!]
+    "filter the rows returned"
+    where: personal_items_bool_exp
+  ): [personal_items!]!
+  "fetch data from the table: \"personal.items\" using primary key columns"
+  personal_items_by_pk(file_id: uuid!): personal_items
 }
 
 type subscription_root {
+  "fetch data from the table: \"core.app_catalog\""
+  core_app_catalog(
+    "distinct select on columns"
+    distinct_on: [core_app_catalog_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_app_catalog_order_by!]
+    "filter the rows returned"
+    where: core_app_catalog_bool_exp
+  ): [core_app_catalog!]!
+  "fetch data from the table in a streaming manner: \"core.app_catalog\""
+  core_app_catalog_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_app_catalog_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_app_catalog_bool_exp
+  ): [core_app_catalog!]!
   "fetch data from the table: \"core.files\""
   core_files(
     "distinct select on columns"
@@ -3055,6 +3467,54 @@ type subscription_root {
     "filter the rows returned"
     where: office_documents_bool_exp
   ): [office_documents!]!
+  "fetch data from the table: \"office.feedback\""
+  office_feedback(
+    "distinct select on columns"
+    distinct_on: [office_feedback_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [office_feedback_order_by!]
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch data from the table: \"office.feedback\" using primary key columns"
+  office_feedback_by_pk(id: uuid!): office_feedback
+  "fetch data from the table in a streaming manner: \"office.feedback\""
+  office_feedback_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [office_feedback_stream_cursor_input]!
+    "filter the rows returned"
+    where: office_feedback_bool_exp
+  ): [office_feedback!]!
+  "fetch data from the table: \"personal.items\""
+  personal_items(
+    "distinct select on columns"
+    distinct_on: [personal_items_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [personal_items_order_by!]
+    "filter the rows returned"
+    where: personal_items_bool_exp
+  ): [personal_items!]!
+  "fetch data from the table: \"personal.items\" using primary key columns"
+  personal_items_by_pk(file_id: uuid!): personal_items
+  "fetch data from the table in a streaming manner: \"personal.items\""
+  personal_items_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [personal_items_stream_cursor_input]!
+    "filter the rows returned"
+    where: personal_items_bool_exp
+  ): [personal_items!]!
 }
 
 scalar timestamptz

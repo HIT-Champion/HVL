@@ -34,13 +34,14 @@ git shortlog -sn                                            # đóng góp có nh
 |---|---|---|---|
 | ☐ | Giấy phép được OSI phê duyệt | `LICENSE` — Apache-2.0 | điều kiện loại trừ |
 | ☐ | Ghi giấy phép trong **từng tệp mã** | Header Apache-2.0 đầu mỗi tệp; tệp không chèn được header (JSON, ảnh, PDF, tài liệu) khai trong `REUSE.toml` | −5 |
-| ☐ | Không xung đột giấy phép giữa các thành phần | `DEPENDENCIES.md`, mục kiểm tra tương thích | −5 |
+| ☐ | Không xung đột giấy phép giữa các thành phần | `DEPENDENCIES.md`, mục kiểm tra tương thích; `make license-audit` kiểm mọi gói kể cả gói gián tiếp trong SBOM, ngoại lệ có lý do ở `.github/license-exceptions.json`; CI chạy trên mọi PR | −5 |
 | ☐ | Có thông báo về **mục đích** của giấy phép | `NOTICE`, mục "Mục đích của giấy phép" | −5 |
 | ☐ | Có **bản sao toàn văn** giấy phép | `LICENSE` (11 KB, toàn văn Apache-2.0) | −5 |
 
 ```bash
 make license-check     # kiểm tra header trong từng tệp mã
 uvx --from reuse==5.0.2 reuse lint   # mọi tệp có thông tin bản quyền, giấy phép (chuẩn REUSE)
+make sbom && make license-audit      # giấy phép của mọi gói npm, Python, action CI (cần Docker, mạng tới PyPI)
 head -3 LICENSE        # xác nhận là toàn văn, không phải link
 ```
 
@@ -79,14 +80,14 @@ git push origin main --tags
 
 ```bash
 cd /tmp && rm -rf pof-test && mkdir pof-test && cd pof-test
-git clone <URL-repo> && cd HVL
+git clone <URL-repo> && cd Signet
 cp .env.example .env
 make check && make build && make up
 # Hệ thống phải chạy được mà không cần sửa bất kỳ tệp mã nào.
 
 # Chạy ngoài thư mục mã nguồn: cài, xóa hẳn mã nguồn, chạy từ PREFIX
 make down && make install PREFIX=/tmp/pof-test/opt-moc
-cd /tmp/pof-test && rm -rf HVL && cd opt-moc
+cd /tmp/pof-test && rm -rf Signet && cd opt-moc
 docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.py
 ```
 
@@ -96,7 +97,7 @@ docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.
 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
-| ☐ | Có tài liệu làm rõ thư viện/gói sử dụng | `DEPENDENCIES.md` | — |
+| ☐ | Có tài liệu làm rõ thư viện/gói sử dụng | `DEPENDENCIES.md`; danh mục đầy đủ từng gói (kể cả gián tiếp) kèm giấy phép: SBOM CycloneDX `signet-X.Y.Z.cdx.json` đính kèm bản phát hành từ sau v1.0.0 (`make sbom`) | — |
 | ☐ | Ưu tiên thư viện sẵn có của hệ thống | Dùng image chính thức, không tự đóng gói lại | −5 |
 | ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` | −5 |
 | ☐ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin | −5 |
@@ -129,8 +130,9 @@ git ls-files | grep -E '(vendor|third_party|node_modules)/' && echo "VI PHẠM" 
 
 - [ ] Clone repo vào máy sạch, chạy đủ chuỗi `clone → cp .env → make up` thành công
 - [ ] Mở repo bằng trình duyệt ẩn danh, xác nhận truy cập được không cần đăng nhập
-- [ ] Trang Releases có ≥ 1 bản phát hành kèm gói `.tar.gz` tự sinh và `.sha256`
-- [ ] `make license-check` sạch trên toàn bộ cây mã nguồn
+- [ ] Trang Releases có ≥ 1 bản phát hành kèm gói `.tar.gz` tự sinh, SBOM `.cdx.json` và `.sha256` của cả hai
+- [ ] `make license-check` sạch trên toàn bộ cây mã nguồn; `make sbom && make license-audit` đạt
+- [ ] `SECURITY.md` có trên trang chủ repo; *Private vulnerability reporting* đã bật (`docs/git_flow.md` mục 10)
 - [ ] `DEPENDENCIES.md` đã điền đủ, không còn dòng *chưa chốt*
 - [ ] `CHANGELOG.md` có mục cho mọi phiên bản đã phát hành
 - [ ] Issues có lịch sử thật: issue đã mở và đã đóng

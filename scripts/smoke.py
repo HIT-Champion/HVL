@@ -35,9 +35,11 @@ chế không được gợi ý; mỗi gợi ý một dòng sổ không chứa tr
 khi chuyên viên trình; để quá hạn thì timer Flowable nhắc rồi báo lãnh đạo (chỉ kiểm khi MOC_SLA_DURATION ngắn, CI đặt
 PT20S). Dashboard điều hành: lãnh đạo khoa đọc số liệu (văn bản hạn chế chỉ có con số tổng), văn thư không đọc được. Văn
 bản hạn chế: tệp nằm trong kho dạng mã hóa, mở ra có dấu tên người xem, chỉ người có tên trong danh sách được xem (người
-nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, tính lại cả chuỗi
-ngoài CSDL (moc audit verify). Kèm các kiểm tra chặn: tệp EICAR, không token, đường quản trị, đơn vị khác không thấy văn
-bản; văn thư đăng nhập — trên trình duyệt hay qua client moc-cli của kịch bản — phải nhập mã TOTP; giới hạn tốc độ.
+nhận việc tự có tên), mỗi lần mở một dòng sổ. Sổ kiểm toán: neo đầu chuỗi ra bucket lạnh khóa ghi, mốc chép ra tệp
+có chữ ký của két, tính lại cả chuỗi ngoài CSDL và kiểm chữ ký (moc audit verify); chứng thư CA, khóa công khai ký mốc
+neo tải được ở cổng xác thực không cần token, vân tay khớp két. Kèm các kiểm tra chặn: tệp EICAR, không token, đường
+quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập — trên trình duyệt hay qua client moc-cli của kịch bản —
+phải nhập mã TOTP; giới hạn tốc độ.
 """
 
 from __future__ import annotations
@@ -55,6 +57,7 @@ import ssl
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -98,6 +101,42 @@ def vault_status() -> dict:
 
 def header(headers: dict[str, str], name: str) -> str | None:
     return next((v for k, v in headers.items() if k.lower() == name.lower()), None)
+
+
+def pem_sha256(pem: str) -> str:
+    """SHA-256 (hex) của DER trong khối PEM đầu tiên — như `openssl x509 -fingerprint -sha256`, `openssl pkey -outform
+    DER | sha256sum`."""
+    lines = pem.strip().splitlines()
+    end = next(i for i, line in enumerate(lines) if line.startswith("-----END "))
+    return hashlib.sha256(base64.b64decode("".join(lines[1:end]))).hexdigest()
+
+
+# Khóa moc-anchor đúng như két trả (transit/keys, 32 byte base64), đọc bằng AppRole của svc-files; két cũ: null
+VAULT_ANCHOR_KEY = (
+    "import asyncio, json, os\n"
+    "from svc_files.config import Settings\n"
+    "from svc_files.openbao import with_secrets\n"
+    "from svc_files.sealed import Vault, VaultError\n"
+    "s = Settings.from_env(with_secrets(os.environ))\n"
+    "v = Vault(s.vault_addr, role_id_file=s.vault_role_id_file, secret_id_file=s.vault_secret_id_file)\n"
+    "try:\n"
+    "    info = asyncio.run(v.transit_key('moc-anchor'))\n"
+    "except VaultError:\n"
+    "    info = None\n"
+    "print(json.dumps(info and {'type': info['type'],"
+    " 'public_key': info['keys'][str(info['latest_version'])]['public_key']}))\n"
+)
+# DER SubjectPublicKeyInfo của Ed25519 = tiền tố cố định + 32 byte khóa (RFC 8410)
+ED25519_SPKI = bytes.fromhex("302a300506032b6570032100")
+
+
+def public_pem(path: str) -> tuple[str | None, dict[str, str], int]:
+    """Tệp PEM công khai ở cổng xác thực, gọi không token → (nội dung hoặc None, tiêu đề, mã HTTP)."""
+    try:
+        status, headers, body = request("GET", f"{PUBLIC_URL}{path}")
+        return body.decode(), headers, status
+    except HTTPError as exc:
+        return None, {}, exc.status
 
 
 class BrowserCookies(http.cookiejar.DefaultCookiePolicy):
@@ -241,6 +280,144 @@ def wait_notification(session: Session, doc_id: str, kind: str, timeout: float) 
         time.sleep(2)
 
 
+def waf_call(method: str, path: str, data: bytes | None = None,
+             headers: dict[str, str] | None = None) -> tuple[int, dict[str, str], bytes]:
+    """Một yêu cầu qua cổng, không ném lỗi theo mã HTTP: (mã, tiêu đề, thân) — cần tiêu đề của cả phản hồi 403."""
+    req = urllib.request.Request(PUBLIC_URL + path, data=data, method=method,
+                                 headers={"User-Agent": USER_AGENT, **(headers or {})})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, dict(exc.headers), exc.read()
+
+
+def check_waf(clerk: Session, director: Session, staff: Session, tag: str) -> None:
+    """F3.15: tường lửa ứng dụng web ở cổng — Coraza + OWASP CRS (platform/apisix/README.md, mục WAF)."""
+    since = (datetime.now(timezone.utc) - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sqli = "1' UNION SELECT password FROM users--"
+    gql = json.dumps({"query": "query ($s: String!) { office_documents(where: {symbol: {_eq: $s}}) { id } }",
+                      "variables": {"s": sqli}}).encode()
+    boundary = uuid.uuid4().hex
+    php = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="shell.php"\r\n'
+           f"Content-Type: application/pdf\r\n\r\n%PDF-1.4\r\n--{boundary}--\r\n").encode()
+    # Không token (trừ tải lên): lọt WAF thì route trả 401 hay 200, không phải 403
+    attacks = {
+        "SQLi ở ô tìm kiếm": ("GET", "/api/search?q=" + urllib.parse.quote(sqli), None, {}),
+        "XSS trong địa chỉ trang": ("GET", "/tim-kiem?q=" + urllib.parse.quote("<script>alert(1)</script>"), None, {}),
+        "đọc tệp hệ thống qua tham số": ("GET", "/api/verify?code=" + urllib.parse.quote("../../../etc/passwd"), None,
+                                         {}),
+        "SQLi trong biến GraphQL": ("POST", "/v1/graphql", gql, {"Content-Type": "application/json"}),
+        "tải lên tệp .php": ("POST", "/api/files", php,
+                             {**clerk.auth, "Content-Type": f"multipart/form-data; boundary={boundary}"}),
+    }
+    first = None
+    for label, (method, path, data, headers) in attacks.items():
+        status, seen, body = waf_call(method, path, data, headers)
+        status == 403 or fail(f"WAF không chặn {label}: HTTP {status}")
+        request_id = header(seen, "X-Request-Id") or fail(f"403 của {label} không có X-Request-Id")
+        text = body.decode(errors="replace").lower()
+        shown = [w for w in ("coraza", "owasp", "secrule", "949110", "anomaly") if w in text]
+        not shown or fail(f"403 của {label} lộ chi tiết của WAF: {shown}")
+        first = first or request_id
+    ok(f"WAF chặn ở cổng (403, có X-Request-Id, không lộ luật): {', '.join(attacks)}")
+    # Dòng chặn của Coraza nằm trong error log của APISIX, cuối dòng là request_id — tra một lần chặn theo mã người
+    # dùng đọc được trên trang lỗi
+    deadline = time.time() + 15
+    while True:
+        logs = compose("logs", "--since", since, "--no-log-prefix", "--no-color", "apisix").decode(errors="replace")
+        if any("Coraza: Access denied" in line and f'request_id: "{first}"' in line for line in logs.splitlines()):
+            break
+        time.time() < deadline or fail(f"nhật ký apisix không có dòng chặn của Coraza mang request_id {first}")
+        time.sleep(1)
+    ok("lần chặn có dòng nhật ký Coraza (luật, điểm) mang đúng X-Request-Id của phản hồi 403")
+    # GHSA-6gcq-wc29-5xf2: Coraza 3.3.3 đọc JSON lồng sâu thì sập worker — global rule chặn trước WAF
+    deep = b'{"query": "{ __typename }", "variables": {"a": ' + b"[" * 100 + b"]" * 100 + b"}}"
+    status, _, body = waf_call("POST", "/v1/graphql", deep, {"Content-Type": "application/json"})
+    status == 400 and b"invalid_json" in body or fail(f"JSON lồng 100 tầng: HTTP {status} {body[:200]!r}")
+    codes = {waf_call("GET", "/")[0] for _ in range(12)}
+    codes == {200} or fail(f"sau JSON lồng sâu, cổng trả {codes}")
+    ok("thân JSON lồng 100 tầng bị chặn trước WAF (400), cổng vẫn trả lời bình thường")
+    # Chữ thật không bị chặn nhầm: dấu nháy, gạch, chấm phẩy trong biến; toán tử _is_null của Hasura trong chữ truy vấn
+    # (trùng tên hàm PHP — loại trừ 3 của apisix.yaml)
+    try:
+        clerk.gql("query ($s: String!) { office_documents(where: {symbol: {_eq: $s}}, limit: 1) { id } }",
+                  {"s": 'Về việc "rà soát" chương trình — năm học 2026-2027; kế hoạch 12/KH-ĐT (lần 2)'})
+        director.gql("{ core_audit_log_aggregate(where: {entity_id: {_is_null: false}}) { aggregate { count } } }")
+    except HTTPError as exc:
+        fail(f"WAF chặn nhầm GraphQL thật: HTTP {exc.status}")
+    ok("GraphQL thật qua WAF: chữ Việt có nháy, gạch, chấm phẩy; toán tử Hasura _is_null")
+    # Token ngẫu nhiên của Keycloak (#140, loại trừ 1, 2): đúng các giá trị đã bị 942100, 930120 bắt nhầm khi chưa có
+    # loại trừ — cookie phiên base64 Keycloak bọc trong ngoặc kép, mã PKCE, code Keycloak trả về trang ứng dụng
+    session_hash = '"+gpgHoziqBr6khlas3c/D+s9GyfOB2QIsM1zj6mR8ET3gRfrxnmZzQ6M91f1rqW/"'
+    # Đủ tham số để Keycloak trả trang đăng nhập: thiếu thì nó chuyển về redirect_uri, urllib đi theo và gửi lại tiêu đề
+    # Cookie tới trang ứng dụng — trình duyệt thì không, cookie của Keycloak chỉ có Path /realms/<realm>/
+    auth = f"/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode({
+        "client_id": "app-office", "redirect_uri": f"{PUBLIC_URL}/", "response_type": "code", "scope": "openid",
+        "code_challenge_method": "S256"})
+    tokens = {
+        "cookie KC_AUTH_SESSION_HASH": ("GET", f"{auth}&code_challenge={'x' * 43}", None,
+                                        {"Cookie": f"KC_AUTH_SESSION_HASH={session_hash}"}),
+        "code_challenge": ("GET", f"{auth}&code_challenge=81--9_7VdmWtRRK-1GI7T-9HBH_p8K__5U8cZgh30As", None, {}),
+        "code trả về trang": ("GET", f"/?code={uuid.uuid4()}.nSRx{tag}.{uuid.uuid4()}", None, {}),
+        # đổi mã lấy token (#162): mã giả nên Keycloak trả 400 invalid_grant; 403 là WAF bắt nhầm code_verifier
+        "code_verifier": ("POST", f"/realms/{REALM}/protocol/openid-connect/token", urllib.parse.urlencode({
+            "grant_type": "authorization_code", "client_id": "app-office", "redirect_uri": f"{PUBLIC_URL}/",
+            "code": f"{uuid.uuid4()}.nSRx{tag}.{uuid.uuid4()}",
+            "code_verifier": "71--7iZrR32djw61IXBqIxhbDSqYkE5zhyVtmcKJs3c"}).encode(),
+            {"Content-Type": "application/x-www-form-urlencoded"}),
+    }
+    blocked = [label for label, (method, path, data, headers) in tokens.items()
+               if waf_call(method, path, data, headers)[0] == 403]
+    not blocked or fail(f"WAF chặn nhầm token của Keycloak: {', '.join(blocked)}")
+    ok("token ngẫu nhiên của Keycloak qua WAF: cookie phiên trong ngoặc kép, mã PKCE, code trả về trang ứng dụng,"
+       " code_verifier khi đổi mã")
+    # Tên tệp hành chính có ' ; = (CRS 920120) và ":" (922130) — loại trừ 8: svc-files giữ đúng tên, chỉ bỏ đường dẫn,
+    # ký tự điều khiển
+    name = f"Tờ trình 'gấp'; đợt 1 = {tag}: bản 2.pdf"
+    try:
+        stored = clerk.upload(name, text_pdf(f"To trinh gap dot 1 {tag}"))
+    except HTTPError as exc:
+        fail(f"WAF chặn nhầm tệp tên {name!r}: HTTP {exc.status}")
+    stored.get("filename") == name or fail(f"svc-files lưu tên tệp khác đi: {stored.get('filename')!r}")
+    ok(f"tải lên tệp tên có ' ; = : qua WAF, svc-files giữ đúng tên ({name})")
+    # Nội dung văn bản đi có đề mục La Mã I./II./III. (CRS 932125 — loại trừ 5), như ô Nội dung của trang soạn
+    content = ("I. MỤC ĐÍCH, YÊU CẦU\nĐánh giá kết quả học tập học kỳ I năm học 2026-2027.\nII. LỊCH THI\nTừ ngày "
+               "04/01/2027 đến ngày 16/01/2027.\nIII. TỔ CHỨC THỰC HIỆN\nPhòng Đào tạo chủ trì; các Khoa phối hợp./.")
+    try:
+        draft = staff.gql(
+            "mutation ($o: office_documents_insert_input!) { insert_office_documents_one(object: $o) { id body } }",
+            {"o": {"type_code": "CV", "recipients": ["Như trên;", "Lưu: VT, P.ĐT."], "body": content,
+                   "summary": f"Về việc tổ chức thi kết thúc học phần (kiểm tra WAF {tag})"}},
+        )["insert_office_documents_one"]
+    except HTTPError as exc:
+        fail(f"WAF chặn nhầm dự thảo có đề mục I./II./III.: HTTP {exc.status}")
+    draft["body"] == content or fail("dự thảo lưu nội dung khác đi")
+    ok("dự thảo có nội dung đề mục I./II./III. qua WAF và được lưu nguyên văn")
+    # Phần đại diện của lượt dò chặn nhầm trên dữ liệu mẫu (README của platform/apisix, mục "Dò chặn nhầm trên dữ liệu
+    # thật"): chữ thật từng bị 403 khi chưa có loại trừ 5, 7 — gửi như trang soạn (sửa dự thảo, $set) và ô Tìm kiếm
+    samples = {
+        "khối ký hai cột (933210)": ("(qua Ban Thanh niên trường học) trước ngày 20 tháng 10 năm 2026./.\n"
+                                     "TM. BAN THƯỜNG VỤ TỈNH ĐOÀN    TM. SỞ GIÁO DỤC VÀ ĐÀO TẠO\nBÍ THƯ    GIÁM ĐỐC\n"
+                                     "(Đã ký)    (Đã ký)\nNguyễn Văn B    Nguyễn Văn A\nNơi nhận:\n"
+                                     "- Thường trực Tỉnh ủy (để b/c);"),
+        "câu \"File …?\" (931120)": "File kế hoạch thi học kỳ I đã gửi chưa?",
+        "đường dẫn http://<IP> (931100)": "http://192.168.1.10:8080/van-ban/12",
+        "dòng \"03 file (…)\" (933160)": "Đính kèm: 03 file (PDF, Word, Excel).",
+    }
+    for label, text in samples.items():
+        try:
+            staff.gql("mutation ($id: uuid!, $set: office_documents_set_input!) { update_office_documents_by_pk("
+                      "pk_columns: {id: $id}, _set: $set) { id } }",
+                      {"id": draft["id"], "set": {"body": text, "summary": text.splitlines()[0]}})
+        except HTTPError as exc:
+            fail(f"WAF chặn nhầm nội dung dự thảo ({label}): HTTP {exc.status}")
+        if "\n" not in text:
+            status, _, _ = waf_call("GET", "/api/search?" + urllib.parse.urlencode({"q": text}), None, clerk.auth)
+            status != 403 or fail(f"WAF chặn nhầm ô Tìm kiếm ({label}): HTTP 403")
+    ok(f"chữ thật từng bị chặn nhầm qua WAF ở nội dung dự thảo và ô Tìm kiếm: {', '.join(samples)}")
+
+
 def main() -> None:
     print(f"Kiểm tra {PUBLIC_URL}")
     tag = uuid.uuid4().hex[:6].upper()
@@ -351,6 +528,13 @@ def main() -> None:
                             headers={**clerk.auth, name: ENV["HASURA_ADMIN_SECRET"]})
         (data or {}).get("errors") or fail(f"{name} đi qua cổng: văn thư đọc được cột diff của sổ kiểm toán")
     ok("khóa quản trị Hasura từ ngoài vào (X-Hasura-Admin-Secret, tên cũ X-Hasura-Access-Key) bị gỡ ở cổng")
+
+    # F3.15: WAF chặn tải tấn công ở cổng; nội dung tệp vẫn do ClamAV ở svc-files soi (EICAR ở mục dưới qua WAF)
+    print("Tường lửa ứng dụng web")
+    if ENV.get("MOC_WAF", "On") == "On":
+        check_waf(clerk, director, staff, tag)
+    else:
+        print(f"  – bỏ qua: MOC_WAF={ENV['MOC_WAF']}, WAF không chặn (platform/apisix/README.md, mục WAF)")
 
     print("Trạm kiểm dịch")
     before = director.gql("{ core_audit_log_aggregate { aggregate { max { id } } } }")
@@ -585,6 +769,32 @@ def main() -> None:
         # lượt sau trên cùng kho (sau khôi phục, từ bản cài) thì có, nên phép đếm toàn kho mới có nghĩa
         ok("CSDL: chữ ký của bản phát hành ghi khóa moc-ky-so-<đơn vị> (Transit), cùng số sê-ri với cổng xác thực;"
            " trong kho không chữ ký nào gắn với văn bản hạn chế")
+
+    # #56 và mốc neo công khai: chứng thư CA, khóa công khai ký mốc neo tải được ở cổng xác thực không cần token (qua
+    # APISIX, WAF — loại trừ 10050 cho đuôi .pem); vân tay khớp đúng thứ két đang giữ. Két cũ chưa có thì 404
+    print("Tệp công khai ở cổng xác thực (chứng thư CA, khóa ký mốc neo)")
+    ca, headers, status = public_pem("/api/verify/ca.pem")
+    held = vault_ca_pem()
+    if held is None:
+        (ca, status) == (None, 404) or fail(f"két chưa có CA mà /api/verify/ca.pem trả {status}")
+        print("  – két khởi tạo trước F4.5 chưa có CA nội bộ: /api/verify/ca.pem trả 404")
+    else:
+        ca and ca.startswith("-----BEGIN CERTIFICATE-----") and pem_sha256(ca) == pem_sha256(held) \
+            and (header(headers, "Content-Type") or "").startswith("application/x-pem-file") \
+            or fail(f"tải chứng thư CA không cần token: HTTP {status}, chưa đúng CA trong két")
+        ok(f"tải chứng thư CA không cần token; vân tay SHA-256 {pem_sha256(ca)[:16]}… khớp CA trong két")
+    key, headers, status = public_pem("/api/verify/anchor-key.pem")
+    held_key = json.loads(compose("exec", "-T", "svc-files", "python", "-c", VAULT_ANCHOR_KEY).decode().strip())
+    if held_key is None:
+        (key, status) == (None, 404) or fail(f"két chưa có khóa moc-anchor mà /api/verify/anchor-key.pem trả {status}")
+        print("  – két khởi tạo trước khi có chữ ký mốc neo: /api/verify/anchor-key.pem trả 404")
+    else:
+        expected = hashlib.sha256(ED25519_SPKI + base64.b64decode(held_key["public_key"])).hexdigest()
+        held_key["type"] == "ed25519" and key and key.startswith("-----BEGIN PUBLIC KEY-----") \
+            and pem_sha256(key) == expected \
+            and (header(headers, "Content-Type") or "").startswith("application/x-pem-file") \
+            or fail(f"tải khóa ký mốc neo không cần token: HTTP {status}, chưa khớp khóa moc-anchor trong két")
+        ok(f"tải khóa công khai ký mốc neo không cần token; vân tay sha256:{expected[:16]}… khớp khóa trong két")
 
     # F3.12: công văn gửi Khoa Kinh tế trong hệ thống — phát hành xong thì văn thư bên nhận tự có văn bản đến kèm đúng
     # bản phát hành. svc-workflow chép ngay sau lần phát hành; trượt thì vòng đối soát nền làm lại
@@ -990,12 +1200,45 @@ def main() -> None:
         fail("văn thư đọc được số liệu dashboard")
     except RuntimeError:
         ok("dashboard chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
+    # Phả hệ báo cáo (F3.9, F3.11): khung nhìn → bảng tính từ catalog PostgreSQL, cùng quyền với dashboard
+    reads = {(r["report"], r["source"]) for r in
+             director.gql("{ office_report_lineage { report source } }")["office_report_lineage"]}
+    board_views = {"office.v_document_counts", "office.v_overdue_by_department", "office.v_processing_time",
+                   "office.v_outgoing_by_month"}
+    board_views <= {r for r, _ in reads} and ("office.v_processing_time", "office.document_events") in reads \
+        or fail(f"phả hệ báo cáo chưa đúng: {sorted(reads)}")
+    ok(f"phả hệ báo cáo: {len({r for r, _ in reads})} khung nhìn office.v_*, {len(reads)} cạnh từ catalog; thời gian"
+       " xử lý ← office.document_events")
+    try:
+        clerk.gql("{ office_report_lineage { report } }")
+        fail("văn thư đọc được phả hệ báo cáo")
+    except RuntimeError:
+        ok("phả hệ báo cáo chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
+    # Kiểm chất lượng số liệu báo cáo (F3.9, F3.11): luật tính trong CSDL lúc truy vấn, cùng quyền với dashboard.
+    # Trên dữ liệu của luồng chính không luật nào được Trượt; Cảnh báo (vd văn bản chưa rõ phòng chủ trì) thì in ra
+    checks = director.gql("{ office_report_checks { rule report status } }")["office_report_checks"]
+    rules = {r["rule"] for r in checks}
+    failed = sorted(f"{r['rule']} {r['report']}" for r in checks if r["status"] == "FAILED")
+    warned = sorted(f"{r['rule']} {r['report']}" for r in checks if r["status"] == "WARNING")
+    rules == {"status_total", "department_total", "processing_coverage", "unique_keys", "no_personal_columns"} \
+        and {r["report"] for r in checks if r["rule"] != "no_personal_columns"} == board_views \
+        and {r["status"] for r in checks} <= {"PASSED", "WARNING", "FAILED"} and not failed \
+        or fail(f"kiểm chất lượng số liệu chưa đúng: trượt {failed}, luật {sorted(rules)}")
+    ok(f"kiểm chất lượng số liệu: {len(checks)} kết quả của {len(rules)} luật trên khung nhìn báo cáo, không luật nào "
+       "Trượt" + (f"; cảnh báo: {', '.join(warned)}" if warned else ""))
+    try:
+        clerk.gql("{ office_report_checks { rule } }")
+        fail("văn thư đọc được kết quả kiểm chất lượng số liệu")
+    except RuntimeError:
+        ok("kiểm chất lượng số liệu chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
 
     print("Sổ kiểm toán (neo hash ra ngoài CSDL)")
     moc = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "audit"]
-    anchored = subprocess.run([*moc, "anchor"], capture_output=True, text=True)
+    # mốc chép ra một tệp ngoài (như kho mốc công khai): có chữ ký của két nếu két có khóa moc-anchor
+    outside = pathlib.Path(tempfile.mkdtemp(prefix="moc-smoke-")) / "anchors.jsonl"
+    anchored = subprocess.run([*moc, "anchor", "--to", str(outside)], capture_output=True, text=True)
     anchored.returncode == 0 or fail(f"moc audit anchor lỗi: {anchored.stderr.strip() or anchored.stdout.strip()}")
-    checked = subprocess.run([*moc, "verify", "--json"], capture_output=True, text=True)
+    checked = subprocess.run([*moc, "verify", "--anchors", str(outside), "--json"], capture_output=True, text=True)
     try:
         report = json.loads(checked.stdout)
     except json.JSONDecodeError:
@@ -1006,6 +1249,16 @@ def main() -> None:
         or fail(f"thiếu mốc neo hoặc văn bản có hash: {report}")
     ok(f"moc audit verify: tính lại {report['rows']} dòng sổ ngoài CSDL, khớp {bucket['matched']} mốc neo trong"
        f" bucket lạnh và hash của {report['documents']} văn bản")
+    signed = report["signatures"].get(outside.name, {})
+    if held_key is None:
+        print("  – két chưa có khóa moc-anchor: mốc chép ra tệp không có chữ ký")
+    else:
+        line = json.loads(outside.read_text(encoding="utf-8").splitlines()[-1])
+        # chỉ xét chữ ký: mốc vừa neo trong 2 giây trước lúc đọc CSDL thì để lần kiểm sau đối chiếu (report.later)
+        line.get("v") == "signet-anchor-v1" and line.get("sig") and signed.get("valid") == 1 \
+            and not signed.get("invalid") or fail(f"mốc chép ra tệp chưa có chữ ký hợp lệ của két: {line} {signed}")
+        ok(f"mốc chép ra tệp có chữ ký Ed25519 của két (khóa {line['key'][:23]}…); moc audit verify kiểm chữ ký"
+           " bằng Python thuần (RFC 8032): hợp lệ")
     try_delete = (
         "import os\n"
         "from svc_files.config import Settings\n"
@@ -1043,9 +1296,20 @@ def main() -> None:
               {"o": {"case_file_id": case_file, "document_id": out_id}})
     staff.gql("""mutation ($id: uuid!) { update_office_case_files(where: {id: {_eq: $id}},
         _set: {status: "closed"}) { affected_rows } }""", {"id": case_file})
-    archived = json.loads(compose("exec", "-T", "svc-files", "python", "-m", "svc_files.archive", "now",
-                                  "--case-file", case_file).decode().strip().splitlines()[-1])
-    "archived" in archived or fail(f"nộp lưu lỗi: {archived}")
+    # nộp lưu qua cổng như nút "Nộp lưu" trên giao diện: chỉ lãnh đạo phòng (chuyên viên lập, đóng — không nộp)
+    archive_url = f"{PUBLIC_URL}/api/case-files/{case_file}/archive"
+    try:
+        call_json("POST", archive_url, headers=staff.auth)
+        fail("chuyên viên nộp lưu được hồ sơ — chỉ lãnh đạo phòng được nộp")
+    except HTTPError as exc:
+        exc.status == 403 and "forbidden" in exc.body \
+            or fail(f"chuyên viên gọi nộp lưu: cần 403 forbidden, nhận {exc.status}: {exc.body[:300]}")
+    ok("nộp lưu theo yêu cầu: chuyên viên gọi bị 403, chỉ lãnh đạo phòng nộp được")
+    try:
+        pkg, _ = call_json("POST", archive_url, headers=manager.auth)
+    except HTTPError as exc:
+        fail(f"lãnh đạo phòng nộp lưu lỗi: {exc.status} {exc.body[:300]}")
+    pkg and pkg.get("archive_sha256") and pkg.get("run_id") or fail(f"nộp lưu trả thiếu trường: {pkg}")
     doc = clerk.gql("""query ($id: uuid!) { office_documents_by_pk(id: $id) { status files { file_id }
         assignments { id } events { id } } }""", {"id": out_id})["office_documents_by_pk"]
     doc["status"] == "archived" and not doc["files"] and not doc["events"] \
@@ -1054,15 +1318,27 @@ def main() -> None:
     found["result"] == "valid" and found["document"]["status"] == "archived" \
         or fail(f"cổng xác thực không còn khớp văn bản đã nộp lưu: {found}")
     room, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/{case_file}/archive", headers=clerk.auth)
-    room["manifest_sha256"] == archived["archived"][0]["archive_sha256"] \
+    room["manifest_sha256"] == pkg["archive_sha256"] \
         and [d["id"] for d in room["documents"]] == [out_id] and room["files"] and room["hidden"] == 0 \
         or fail(f"phòng đọc không đọc lại được gói lưu trữ: {room}")
     ok(f"hồ sơ nộp lưu thành gói Parquet + {len(room['files'])} tệp + manifest trên bucket lạnh khóa ghi; CSDL chỉ"
        " còn bản ghi rút gọn; quét QR vẫn khớp; phòng đọc kiểm băm, DuckDB đọc lại danh sách văn bản")
+    # Phòng đọc xem tệp: bản phát hành đọc từ gói lạnh, so băm với manifest, đóng dấu người xem, vào sổ rồi mới trả
+    viewable = [f for f in room["files"] if f["viewable"]] or fail(f"phòng đọc không có tệp PDF nào để xem: {room}")
+    _, got, stamped = request("GET", f"{PUBLIC_URL}/api/case-files/{case_file}/archive/files/{viewable[0]['file_id']}",
+                              headers=clerk.auth)
+    stamped.startswith(b"%PDF") and hashlib.sha256(stamped).hexdigest() != viewable[0]["sha256"] \
+        and (header(got, "Content-Disposition") or "").startswith("inline;") \
+        and "no-store" in (header(got, "Cache-Control") or "") \
+        or fail(f"phòng đọc trả tệp chưa đúng: {header(got, 'Content-Disposition')} {header(got, 'Cache-Control')}")
+    views = director.gql("""query ($e: String!) { core_audit_log(where: {action: {_eq: "case_file.file_viewed"},
+        entity_id: {_eq: $e}}) { overview } }""", {"e": case_file})["core_audit_log"]
+    views and views[0]["overview"].get("code") == f"HS-SMOKE-{tag}" \
+        or fail(f"lần xem tệp trong phòng đọc chưa vào sổ kiểm toán: {views}")
+    ok("phòng đọc xem tệp: bản PDF có dấu tên người xem (khác byte gốc, inline, cấm lưu đệm), lần xem vào sổ kiểm toán")
 
     # F3.9: lượt nộp lưu vừa rồi có phả hệ OpenLineage — run cha + 4 bước, bảng Parquet đã qua kiểm chất lượng
     print("Phả hệ dữ liệu")
-    pkg = archived["archived"][0]
     runs = director.gql("""query ($r: uuid!) { core_lineage_events(where: {run_id: {_eq: $r},
         event_type: {_eq: "COMPLETE"}}) { run_id outputs } }""", {"r": pkg["run_id"]})["core_lineage_events"]
     runs and runs[0]["outputs"][0].endswith(f"{pkg['archive_key']}manifest-{pkg['archive_sha256']}.json") \

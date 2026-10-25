@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:schema:app-manifest",
+  "title": "Manifest ứng dụng cắm vào lõi Signet",
+  "description": "Manifest apps/<thư mục>/app.yaml của `moc app install` (docs/them-ung-dung.md mục 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "title", "version", "path", "image", "port", "database"],
+  "properties": {
+    "name": {
+      "title": "Tên ngắn",
+      "description": "Chữ thường, số, gạch nối: service, client app-<tên>; trigger, vai trò app_<tên>",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 30
+    },
+    "title": {"title": "Tên hiển thị", "type": "string", "minLength": 1, "maxLength": 100},
+    "description": {"type": "string", "maxLength": 500},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "path": {
+      "title": "Đường của trang trên cổng",
+      "description": "Route APISIX /<đường> và /<đường>/*; client Keycloak chỉ nhận chuyển hướng dưới đường này",
+      "type": "string",
+      "pattern": "^/[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "maxLength": 31
+    },
+    "image": {
+      "title": "Image của container",
+      "description": "build: thư mục dựng (trong thư mục ứng dụng); ref: image dựng sẵn, ghim digest",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["build"],
+          "properties": {"build": {"type": "string", "minLength": 1, "maxLength": 200}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref"],
+          "properties": {"ref": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._/:-]*@sha256:[0-9a-f]{64}$"}}
+        }
+      ]
+    },
+    "port": {"title": "Cổng của trang trong container", "type": "integer", "minimum": 1024, "maximum": 65535},
+    "healthcheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["test"],
+      "properties": {
+        "test": {
+          "description": "Dạng exec của compose: [CMD, chương trình, tham số…]",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 20,
+          "items": {"type": "string", "minLength": 1, "maxLength": 500}
+        },
+        "interval": {"type": "string", "pattern": "^[0-9]+(ms|s|m)$"},
+        "timeout": {"type": "string", "pattern": "^[0-9]+(ms|s|m)$"},
+        "retries": {"type": "integer", "minimum": 1, "maximum": 100},
+        "start_period": {"type": "string", "pattern": "^[0-9]+(ms|s|m)$"}
+      }
+    },
+    "memory": {"description": "Giới hạn bộ nhớ (mặc định 256m)", "type": "string", "pattern": "^[0-9]+[mg]$"},
+    "read_only": {
+      "description": "Rootfs chỉ đọc, chỉ ghi /tmp (mặc định true); false nếu image phải ghi lúc khởi động",
+      "type": "boolean"
+    },
+    "environment": {
+      "description": "Biến môi trường KHÔNG bí mật của container",
+      "type": "object",
+      "maxProperties": 30,
+      "propertyNames": {"pattern": "^[A-Z][A-Z0-9_]{0,63}$"},
+      "additionalProperties": {"type": "string", "maxLength": 1000}
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema"],
+      "properties": {
+        "schema": {
+          "title": "Schema riêng của ứng dụng",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "minLength": 2,
+          "maxLength": 50
+        },
+        "migrations": {
+          "description": "Thư mục migration (tương đối với manifest): <số>_<tên>/up.sql, áp theo thứ tự số",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tables": {
+          "description": "Cùng định dạng tệp bảng của db/metadata/databases/default/tables/",
+          "type": "array",
+          "maxItems": 50,
+          "items": {"$ref": "#/$defs/table"}
+        }
+      }
+    },
+    "service_account": {
+      "description": "true: client bí mật app-<tên>-svc (client credentials), vai trò Hasura app_<tên>",
+      "type": "boolean"
+    },
+    "events": {
+      "title": "Nghe sự kiện của lõi",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kinds", "webhook"],
+      "properties": {
+        "kinds": {
+          "description": "Loại sự kiện muốn nhận dữ liệu, trong danh sách trắng của lõi (core.app_events)",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["office.document.received", "office.document.registered", "office.document.issued"]}
+        },
+        "webhook": {
+          "description": "Hasura gọi http://app-<tên>:<port><path> trong mạng nội bộ — không có route ra ngoài",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["port", "path"],
+          "properties": {
+            "port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+            "path": {"type": "string", "pattern": "^/[A-Za-z0-9/_-]{0,100}$"}
+          }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "num_retries": {"type": "integer", "minimum": 0, "maximum": 20},
+            "interval_sec": {"type": "integer", "minimum": 1, "maximum": 3600},
+            "timeout_sec": {"type": "integer", "minimum": 1, "maximum": 60}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["table"],
+      "properties": {
+        "table": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "name"],
+          "properties": {
+            "schema": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 63}
+          }
+        },
+        "object_relationships": {"type": "array", "items": {"$ref": "#/$defs/relationship"}},
+        "array_relationships": {"type": "array", "items": {"$ref": "#/$defs/relationship"}},
+        "select_permissions": {"type": "array", "items": {"$ref": "#/$defs/permission"}},
+        "insert_permissions": {"type": "array", "items": {"$ref": "#/$defs/permission"}},
+        "update_permissions": {"type": "array", "items": {"$ref": "#/$defs/permission"}}
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "using"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "using": {"type": "object"}
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "permission"],
+      "properties": {
+        "role": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "permission": {"type": "object"}
+      }
+    }
+  }
+}

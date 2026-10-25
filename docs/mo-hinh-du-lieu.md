@@ -12,7 +12,7 @@
 
 - **Hai schema, đúng ranh giới 3 tầng.** `core` là dữ liệu dùng chung của lõi (thuê ước, tệp, sổ kiểm toán)
   — ứng dụng nào cũng dùng. `office` là dữ liệu riêng của ứng dụng Văn phòng điện tử. Ứng dụng khác cắm vào
-  lõi thì có schema riêng của nó, không sửa `core`.
+  lõi thì có schema riêng của nó, không sửa `core` — vd `personal` của Không gian cá nhân (§2.6).
 - **Mọi bảng nghiệp vụ có `tenant_id`**; quyền Hasura luôn lọc theo `X-Hasura-Tenant-Id`.
 - **Keycloak là nguồn sự thật về người dùng.** Bảng nghiệp vụ chỉ lưu `sub` (kiểu `text`); phòng ban của
   người dùng đi trong JWT (`department_id`). `core.users` là **bản sao chỉ đọc** do `svc-workflow` đồng bộ
@@ -41,6 +41,7 @@ create table core.tenants (                 -- cơ quan, đơn vị dùng hệ t
   parent_name text,                          -- cơ quan chủ quản: 'Trường Đại học …'
   place_name  text,                          -- địa danh trước ngày tháng: 'Hà Nội'
   head_title  text,                          -- chức vụ người đứng đầu ở phần ký: 'Trưởng khoa'
+  sample_data boolean not null default false, -- đơn vị mẫu do make seed nạp; số đo F4.6 ghi rõ (§2.5)
   created_at  timestamptz not null default now()
 );
 
@@ -106,6 +107,7 @@ create table core.notifications (           -- thông báo từng người (F2.5
   key          text not null,                -- chống gửi trùng: unique (tenant_id, user_id, key)
   document_id  uuid,
   data         jsonb not null default '{}',  -- form_key, trích yếu, số ký hiệu… lúc gửi; câu chữ dựng ở giao diện
+  channels     text[] not null default '{}', -- kênh ngoài cần gửi: email, webhook (migration 1792281602600)
   created_at   timestamptz not null default now(),
   read_at      timestamptz
 );
@@ -137,7 +139,12 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
 
 **Chuỗi băm** (cài ở #18 — `db/migrations/`, cách dùng ở `db/README.md`):
 
-- Trigger `core.audit()` gắn vào mọi bảng nghiệp vụ (trừ `office.document_events`), ghi các cột đã đổi.
+- Trigger `core.audit()` gắn vào mọi bảng nghiệp vụ (trừ `office.document_events` và `office.feedback` — góp ý
+  không gắn sổ để lãnh đạo đọc sổ không biết ai góp ý gì, §2.5), ghi các cột đã đổi. Hàng đợi của lô nạp
+  (`core.import_jobs`, `core.import_rows`) cũng không gắn: mỗi mẻ đổi `run_after` và từng dòng, gắn trigger thì
+  lô vài trăm dòng làm sổ phình mà không thêm gì — thay vào đó `svc-files` ghi `import.created` lúc tạo lô, trigger
+  `import_jobs_finished` ghi `import.finished` đúng một lần khi lô chuyển sang `done`; mỗi văn bản tạo ra vẫn có
+  dòng sổ của nó.
 - Trigger `before insert` trên `core.audit_log` khóa dòng đầu chuỗi `core.audit_head (last_id, last_hash)`,
   cấp `id = last_id + 1`, đặt `occurred_at`, `prev_hash`, `hash` — người ghi không chọn được các cột này.
   Khóa dòng thay cho `pg_advisory_xact_lock`: ở `READ COMMITTED` giao dịch sau đợi rồi đọc đầu chuỗi mới;
@@ -173,7 +180,10 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   chuỗi tính bằng Python. Ba lớp: chuỗi liền mạch; hash của dòng tại mỗi mốc bằng hash đã neo (viết lại chuỗi
   từ dòng k thì mọi mốc từ k lệch, dòng bị sửa nằm giữa mốc cuối còn khớp và mốc đầu bị lệch); `content_sha256`
   của mọi văn bản bằng giá trị lần cuối ghi vào sổ (đổi hash để một tệp giả "khớp" ở cổng xác thực mà tắt
-  trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ.
+  trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ, kèm chữ ký
+  Ed25519 của két (khóa `moc-anchor`); `--publish` đẩy mốc lên một kho git công khai cấm đẩy ép, người ngoài kiểm chữ
+  ký bằng OpenSSL (`docs/van-hanh.md` mục Mốc neo công khai). Mốc trong tệp có chữ ký sai, hay không có chữ ký mà
+  đứng sau mốc đã ký, thì `audit verify` báo lỗi.
 - **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
@@ -185,7 +195,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   mô hình sinh và mô hình nhúng, thời gian, mã cảnh báo của câu trả lời `assistant.answered` — migration
   1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý, số ngày đề xuất,
   độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
-  `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó). Lãnh đạo không đọc được văn bản hạn chế
+  `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó; loại lô, định dạng, có vào sổ không, số
+  dòng, số đạt / trùng / lỗi của lô nạp `import.created`, `import.finished` — migration 1792281602800, tên tệp vẫn
+  ẩn). Lãnh đạo không đọc được văn bản hạn chế
   thì sổ cũng không lộ trích yếu, nội dung, cả hash của nó (có hash là tra được văn bản ở cổng xác thực). Trường
   `overview` thật ra là `office.audit_overview_seen(r, hasura_session)` (migration 1792281601600, nằm ở `office` vì
   `core` không phụ thuộc `office`): dòng sổ về văn bản hạn chế mà người xem sổ không đọc được (chính văn bản, tệp gắn
@@ -217,7 +229,9 @@ Tệp bị ClamAV chặn **không** có dòng trong `core.files`; `svc-files` gh
 Khôi phục từ bản sao lưu (`moc backup restore`, F3.4) ghi sự kiện `system.restored` của nền tảng (`tenant_id` null,
 `entity` = `backup`, `entity_id` = mã lượt) ngay sau đầu chuỗi vừa khôi phục. Bản sao lưu gồm mọi CSDL (`pg_dump
 -Fc`) và cả volume SeaweedFS (tệp, bucket lạnh với mốc neo); chỉ mục Meilisearch dựng lại từ CSDL khi `svc-files`
-khởi động.
+khởi động. Lượt sao lưu trọn vẹn (`moc backup create`) ghi sự kiện `system.backed_up` cùng dạng, sau lúc dump nên
+không nằm trong chính lượt đó; trang trạng thái hệ thống (`GET /api/status`) lấy giờ sao lưu gần nhất từ dòng này
+hoặc từ `backed_up_at` của `system.restored`.
 
 **Lớp chữ của PDF** (`core.file_texts`, F2.7): `svc-files` đọc ở vòng nền các PDF đã gắn vào văn bản, trong tiến
 trình con có giới hạn, rồi ghi bằng khóa quản trị; vòng đồng bộ tìm kiếm đưa vào trường `content` của
@@ -344,7 +358,56 @@ create table office.assignment_suggestions (   -- một dòng mỗi văn bản �
 và chỉ sửa được `read_at`. Thông báo về văn bản hạn chế (F3.7) không mang nội dung: trigger `notifications_restricted`
 gọt `summary`, `symbol`, `issuer_name`, `note` khỏi `data` và gắn `restricted: true` ở mọi lần ghi, kể cả dịch vụ ghi
 sai; văn bản chuyển sang hạn chế thì thông báo đã gửi về nó cũng bị gọt (`documents_restricted_notifications`). Bảng không gắn sổ kiểm toán: thông báo là bản tin phái sinh từ các bước đã kiểm toán.
+Kênh ngoài (email, webhook; migration 1792281602600): svc-workflow khai ở cột `channels` lúc ghi; trigger
+`notifications_deliveries` tạo trong cùng giao dịch một dòng `core.notification_deliveries` cho mỗi kênh (hộp thư đi:
+`status` `pending` → `sent` | `failed` | `skipped`, `attempts`, `last_error` chỉ tên lỗi và mã, `next_attempt_at`,
+`sent_at`; unique `(notification_id, channel)`). Bảng này gắn sổ kiểm toán — lần gửi ra ngoài hệ thống phải truy được
+— và không có địa chỉ email, URL hay nội dung: người nhận đọc từ `core.users` lúc gửi. Chỉ `service` của đơn vị đọc và
+ghi kết quả; người dùng không đọc (mô tả: `services/svc-workflow/README.md`).
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
+
+**Lô nạp khối lớn** (cụm ⑤, migration 1792281602800; mô tả: `services/svc-files/README.md`, mục Nạp lô văn bản
+đến). Hàng đợi bền trong CSDL như hộp thư đi. `core.import_jobs` một dòng mỗi lô: `kind` (hiện chỉ `incoming` — văn
+bản đến; thêm loại là migration mở rộng check cùng một handler trong `svc-files`), người tạo (`created_by`, sub trong
+token), phòng lúc tạo, `status` `queued` → `running` → `done`, tên và định dạng tệp (`ndjson` | `csv`), băm tệp dữ
+liệu và zip, `options` (`{"register": bool}`), `idempotency_key` (unique theo đơn vị và người tạo: gửi lại cùng khóa
+trả lô cũ), `total`, `run_after` (vòng nền làm lô đến giờ, sớm nhất trước; lỗi tạm thì lùi lại), `ok` / `duplicate` /
+`failed` chụp lúc đóng lô (`import_jobs_closed`: lô `done` thì tổng khớp), `note`. `core.import_rows` một dòng mỗi
+dòng của tệp, khóa `(job_id, line)` — `line` là số dòng người gửi thấy (NDJSON: dòng vật lý; CSV: hàng như Excel);
+`data` chỉ giữ khi `pending`, xong thì xóa; `files` (tên trong zip, tối đa 20); `attempts` 0–20 (khóa lạc quan của
+vòng nền); `claimed_until` (vòng nền giữ dòng tới lúc này: nhận dòng là cập nhật có điều kiện, hai vòng không cùng làm
+một dòng; quá hạn thì nhận lại được); `claim_id` (mã lượt giữ: lưu tiến độ, ghi kết quả đều kèm mã này, vòng đã mất
+dòng không ghi đè được); `result` (id tệp đã lưu khi còn chờ, id văn bản, số đến); `code` chỉ khi
+`failed`, `message`, `fields` (lỗi theo trường). Dòng không thành văn bản thì svc-files gỡ tệp đã lưu cho dòng (khóa
+quản trị, chỉ tệp chưa gắn văn bản của người tạo lô).
+Khóa ngoại `(job_id, tenant_id)` kèm thuê ước, xóa lô thì xóa dòng. Chỉ `service` của đơn vị đọc, ghi;
+không vai trò người dùng nào có quyền — API `/api/imports` (§4.3) kiểm token, chỉ cho người tạo xem lô của mình.
+
+**Ứng dụng cắm bằng manifest** (migration 1792281603200; `moc app install`, [`them-ung-dung.md`](them-ung-dung.md)
+mục 1). `core.apps` một dòng mỗi ứng dụng đã cài: `name` (khóa), `title`, `path` (unique giữa các ứng dụng chưa gỡ),
+`schema_name` (unique; không được là `core`, `office`, `personal`, `public`, `moc_app`), `version`, `manifest` (jsonb,
+như lúc cài, không bí mật),
+`manifest_sha256`, `installed_at`, `updated_at`, `removed_at` (gỡ không xóa dòng, không xóa dữ liệu của ứng dụng).
+`core.app_migrations` khóa `(app, version)`: `name`, `sha256` nội dung — áp rồi thì không áp lại, nội dung đổi thì lệnh
+từ chối. Cả hai gắn `core.audit()`, không vai trò nào đọc qua GraphQL (lệnh đọc bằng `psql`). `core.app_events` là
+luồng sự kiện **đã làm sạch** cho ứng dụng: `id` (= `office.document_events.id`, khóa chống trùng cho người nghe),
+`tenant_id`, `document_id`, `kind`, `occurred_at` — trigger `app_events_publish` (security definer) chép mỗi dòng
+`office.document_events` có `kind` trong danh sách trắng (`office.document.received`, `.registered`, `.issued`) về văn
+bản không hạn chế; không `data`, không người làm (hàm chép đặt `hasura.user` = `null` trong lúc ghi, nên
+`session_variables` của sự kiện Hasura là `null`). Hasura Event Trigger của từng ứng dụng nằm trên bảng này (§5).
+Schema `moc_app` chỉ có hàm `moc_app.migration_done` (security definer): vai trò CSDL `moc_appdb_<schema>` của từng
+ứng dụng gọi nó cuối mỗi migration để kiểm đối tượng vừa tạo rồi ghi `core.app_migrations`
+([`them-ung-dung.md`](them-ung-dung.md) mục 1.4).
+
+**Danh mục ứng dụng** (migration 1792281603400; trang `/ung-dung` của Văn phòng điện tử). View `core.app_catalog` là
+cửa đọc duy nhất của `core.apps` qua GraphQL, đúng 9 cột: `name`, `title`, `description` (= `manifest ->>
+'description'`, gọt khoảng trắng, trống thì `null`), `path`, `version`, `installed_at`, `updated_at`, `removed_at`,
+`manifest_sha256` (SHA-256 các byte của `app.yaml` lúc cài). Không có `manifest` (image, cổng, healthcheck, biến môi
+trường, cổng webhook), `schema_name`. Dữ liệu toàn hệ thống, không cột đơn vị: `clerk`, `staff`, `manager` đọc 7 cột
+đầu của ứng dụng chưa gỡ (`removed_at is null`); `director`, `tenant_admin` đọc cả 9 cột, mọi dòng; không vai trò nào
+ghi, `service` không đọc. Ứng dụng có sẵn trong lõi (Văn phòng điện tử, Không gian cá nhân) không cài bằng manifest
+nên không có ở đây — trang khai chúng trong `apps/office/app/utils/apps.ts` (test đối chiếu tên, đường giữ chỗ, route,
+image).
 
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
 create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
@@ -710,7 +773,10 @@ hồ sơ `closed` từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định 365); một
    đã sang lạnh vào văn bản nào nữa.
 
 Xem lại hồ sơ đã lưu: `GET /api/case-files/{id}/archive` (§4.3) — svc-files tải manifest theo `archive_sha256`, so
-băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Phòng đọc xem tệp có watermark làm cùng F3.7.
+băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Xem tệp: `GET …/archive/files/{file_id}` — chỉ PDF
+của văn bản người gọi đọc được, so băm với manifest, đóng dấu người xem bằng đúng đường của F3.7, ghi
+`case_file.file_viewed` rồi mới trả. Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng:
+`POST /api/case-files/{id}/archive` (cùng các bước trên, ghi `case_file.archive_requested` khi giành được lượt).
 
 **Phả hệ và kiểm chất lượng (F3.9).** Mỗi lượt nộp lưu là một run OpenLineage của job `moc.case_file.archive`, với
 4 run con `files`, `tables`, `manifest`, `commit` (facet `parent`). svc-files ghi từng sự kiện vào:
@@ -796,6 +862,47 @@ aggregate.
 |---|---|---|
 | `office.v_assignment_suggestion_accuracy` | `tenant_id`, `status`, `confidence`, `suggested`, `decided`, `kept_unit`, `due_compared`, `kept_due`, `due_abs_error_days` | Theo kết quả (`suggested`, `none`, `failed`) và độ tin cậy: số gợi ý; số văn bản đã giao chủ trì sau lúc gợi ý; số giữ đúng đơn vị gợi ý; số có cả hạn gợi ý và hạn đã giao; số giữ đúng hạn; tổng số ngày lệch hạn (chia cho `due_compared` ra sai số trung bình) |
 
+**Góp ý và số đo "sau"** (F4.6, migration 1792281602700, 1792281602750; cách đo, cách đọc:
+[`so-lieu-sau.md`](so-lieu-sau.md)). Người đã đăng nhập gửi góp ý: mức hài lòng 1–5, vài dòng, khuôn đường dẫn màn
+hình. Bảng không có họ tên, vai trò, phòng, trình duyệt, IP; không gắn sổ kiểm toán (sổ ghi người thực hiện từng dòng,
+lãnh đạo đọc sổ của đơn vị sẽ biết ai góp ý gì); không vai trò nào sửa, xóa.
+
+```sql
+create table office.feedback (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references core.tenants,
+  user_id     text not null,                 -- sub Keycloak, Hasura đặt từ token; không vai trò nào đọc cột này
+  rating      int  not null,                 -- feedback_rating: 1–5
+  comment     text,                          -- feedback_comment: null hoặc 1–500 ký tự, đã gọt khoảng trắng
+  screen      text not null,                 -- feedback_screen: khuôn đường dẫn, vd '/van-ban/:id', ≤ 80 ký tự
+  created_at  timestamptz not null default now()   -- trigger đặt, người gửi không chọn
+);
+```
+
+- `feedback_screen`: chỉ chữ thường, gạch nối và `:id`, tối đa 6 đoạn, không chuỗi truy vấn — id văn bản hay
+  `?q=<số CCCD>` không lọt vào bảng.
+- Trigger `before insert` `office.feedback_guard()`: gọt khoảng trắng hai đầu của `comment` (chỉ còn khoảng trắng thì
+  null), đặt `created_at = now()`, khóa tư vấn theo (đơn vị, người gửi) rồi đếm: quá 3 góp ý trong 10 phút hay 20 trong
+  24 giờ thì lỗi `check_violation` có câu `feedback_rate: …`. Lỗi raise không có tên ràng buộc đi kèm: Hasura trả mã
+  `permission-error`, câu `Check constraint violation. feedback_rate: …`, nên giao diện tìm tên trong câu. Đếm cả dòng
+  thêm trước đó trong cùng câu lệnh (mutation nhiều dòng) và các lần gửi song song.
+- Hàm `office.feedback_mine(feedback, hasura_session)` → trường `mine`: góp ý này của người đang xem. Người gửi lọc góp
+  ý của mình mà không ai đọc được `user_id`.
+- Quyền: `clerk`, `staff`, `manager`, `director`, `tenant_admin` thêm được (chỉ `rating`, `comment`, `screen`; Hasura
+  đặt `tenant_id`, `user_id` từ token). `clerk`, `staff`, `manager` chỉ đọc góp ý của mình; `director`,
+  `tenant_admin` đọc mọi góp ý của đơn vị (không có `user_id`), có aggregate. `service`, `agent` không có quyền nào.
+
+Ba view số đo "sau" theo đặc tả §8 (migration 1792281602750). Như dashboard: chỉ số đếm và số giờ, văn bản hạn chế,
+văn bản đã hủy không tính, tháng theo giờ Việt Nam. Mỗi view có một dòng mỗi tháng (mỗi màn hình) và một dòng `month`
+(`screen`) null cho tất cả — trung vị, p90 không cộng từ các tháng được nên dòng tổng tính lại (grouping sets). Cột
+`sample` lấy từ `core.tenants.sample_data`.
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.v_time_to_assign` | `tenant_id`, `sample`, `month`, `arrived`, `assigned`, `median_hours`, `p90_hours`, `handled`, `handled_median_hours`, `handled_p90_hours`, `waiting` | (a) Từ lúc văn bản đến (`documents.created_at`) tới lần đầu giao chủ trì gốc (`assignments.assigned_at`), và tới lần đầu văn bản tới tay một người (`handled_*`); `percentile_cont`, giờ âm tính 0; `waiting`: chưa giao, còn chờ vào sổ hay chỉ đạo. Theo tháng văn bản đến. Chỉ `director` đọc |
+| `office.v_overdue_rate` | `tenant_id`, `sample`, `month`, `judged`, `on_time`, `late`, `late_open`, `pending` | (b) Hạn giải quyết so với lúc xong (sự kiện `processed` / `filed` cuối cùng, hay bản giữ lại khi đã nộp lưu); chưa xong mà qua hạn tính là quá hạn (`late_open`), chưa tới hạn chỉ đếm ở `pending`. Theo tháng của hạn. Chỉ `director` đọc |
+| `office.v_feedback_summary` | `tenant_id`, `sample`, `screen`, `feedback`, `rating_total`, `rating_1`…`rating_5`, `with_comment`, `last_at` | Góp ý theo màn hình: số góp ý, tổng điểm (giao diện tự chia ra điểm trung bình), số theo từng mức, số có nội dung, lần gửi gần nhất. Không có nội dung, người gửi. `director`, `tenant_admin` đọc |
+
 **Khung nhìn của cổng xác thực** (`office.issued_documents`, F2.13): một dòng mỗi văn bản đi đã phát hành hoặc đã nộp
 lưu; chỉ vai trò `verifier` đọc, mỗi lần một dòng (§3, §4.3). F4.5 (migration 1792281602200) thêm năm cột chữ ký ở cuối.
 
@@ -806,6 +913,81 @@ lưu; chỉ vai trò `verifier` đọc, mỗi lần một dòng (§3, §4.3). F4
 Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-files` đọc `office.documents` theo `register`
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
 được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
+
+**Phả hệ của báo cáo** (F3.9, F3.11, migration 1792281602900). `office.report_lineage` tính thẳng từ catalog
+PostgreSQL lúc truy vấn khung nhìn báo cáo nào đọc bảng, view nào — không khai tay cạnh nào, tạo, sửa, xóa view là phả
+hệ đổi theo. Báo cáo là mọi view (cả materialized view) trong schema `office` tên bắt đầu `v_` (hiện 9). Cạnh lấy từ
+`pg_depend` của luật `_RETURN`: mọi quan hệ trong truy vấn của view, kể cả truy vấn con, CTE, subquery vô hướng; view
+đọc view thì đi tiếp đệ quy tới tận bảng. Không dùng `information_schema.view_table_usage` (chỉ hiện bảng vai trò hiện
+tại sở hữu). Chỉ có tên và cạnh, giống nhau cho mọi đơn vị: không `tenant_id`, không số dòng (`reltuples` là số của mọi
+đơn vị cộng lại; đếm theo đơn vị trên bảng giao việc, dòng thời gian thì lộ dấu vết văn bản hạn chế), không định nghĩa
+SQL. Hasura cho `director` đọc, `filter: {}` (như dashboard; vai trò khác không thấy).
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.report_lineage` | `report` (view báo cáo gốc), `consumer` (view đọc ở cạnh này), `source`, `source_kind` (`table`, `view`, `materialized_view`, `partitioned_table`, `foreign_table`), `depth` (1: báo cáo đọc trực tiếp) | Trang Phả hệ số liệu (`/pha-he`) của lãnh đạo: biểu đồ → khung nhìn → bảng; bước 5 của `make demo-pha-he`. Tên dạng `schema.tên` |
+
+Biểu đồ nào của trang Điều hành đọc khung nhìn nào thì khai một chỗ ở `apps/office/app/utils/lineage.ts`
+(`BOARD_CHARTS`); `apps/office/tests/lineage.test.ts` đối chiếu khai báo đó với truy vấn và mã thật của
+`pages/dieu-hanh.vue`, `db/tests/test_report_lineage.py` kiểm mọi khung nhìn đã khai có trong phả hệ. Trang Phả hệ nối
+thêm lượt nộp lưu gần nhất từ `core.lineage_events` (§2.4): tên dataset `postgres://postgres:5432` +
+`moc.<schema>.<bảng>` trùng tên catalog, nên bảng nguồn của báo cáo cũng là đầu vào của bước `tables`; bước `commit`
+khai cả `office.archived_document_facts` mà `v_processing_time` đọc. Giới hạn: view gọi một hàm SQL đọc bảng thì
+catalog không ghi cạnh tới bảng đó (hiện không view `v_` nào gọi hàm tự viết — test chặn); phả hệ mức bảng, chưa mức
+cột.
+
+**Kiểm chất lượng số liệu báo cáo** (F3.9, F3.11, migration 1792281603300). `office.report_checks` tính lúc truy vấn
+một bộ luật trên các khung nhìn mà trang Điều hành vẽ; trang Điều hành hiện cờ nặng nhất cạnh từng biểu đồ, trang Phả hệ
+hiện từng luật. Ngưỡng của mọi luật là 0. Luật chọn theo chỗ ràng buộc schema không chặn được:
+
+| Luật | Khung nhìn | PASSED / WARNING / FAILED |
+|---|---|---|
+| `status_total` | `v_document_counts` | Σ 6 cột của biểu đồ trạng thái (đúng `IN_STATUSES` của trang) + văn bản đến hạn chế = số văn bản đến đếm trên `office.documents` / — / lệch (`detail`: trạng thái biểu đồ không vẽ) |
+| `department_total` | `v_overdue_by_department` | Σ "đang xử lý" theo phòng = cột "Đang xử lý" của biểu đồ trạng thái, không văn bản nào ở dòng "chưa rõ phòng" / khớp nhưng có (`issues`) / lệch |
+| `processing_coverage` | `v_processing_time` | văn bản đến đã xong (done, archived; không hạn chế) đều có mốc xong / thiếu mốc (`issues` văn bản không vào trung bình) / tính thừa, hay có tháng tổng giờ âm (`detail`) |
+| `unique_keys` | cả bốn | khóa trang dùng để ghép số (tháng, phòng, bộ chiều của `v_document_counts`) không trùng, không rỗng / — / trùng hoặc rỗng |
+| `no_personal_columns` | mọi `office.v_*` | không cột nào mang tên thông tin cá nhân / view (hay view lồng nó đọc qua) đọc cột như vậy (`pg_depend` mức cột) / xuất ra |
+
+Cột: `tenant_id`, `rule`, `report`, `status`, `expected`, `actual`, `issues`, `detail` (`text[]`). Một dòng
+`core.tenants` nhân lateral với các luật của đúng đơn vị đó (mỗi khung nhìn đọc một lần), nên lọc
+`tenant_id = X-Hasura-Tenant-Id` chỉ tính cho một đơn vị; phần catalog giống nhau cho mọi đơn vị. Hasura cho `director`
+đọc với bộ lọc đó, như dashboard. `status_total` và `unique_keys` hôm nay đúng theo cấu trúc (ràng buộc, GROUP BY): là
+luật chặn hồi quy khi sửa view, `db/tests/test_report_checks.py` giả lập bằng cách thay tạm view. Tên cột cá nhân theo
+mẫu tên (email, phone, cccd, cmnd, birth, address, full_name, username…): cột đặt tên lạ không bắt được; khóa người dùng
+(`user_id`, `created_by`) không tính.
+
+### 2.6. Schema `personal` — Không gian cá nhân P.A.R.A (ứng dụng thứ hai)
+
+Không thuộc Văn phòng điện tử: đây là schema của ứng dụng thứ hai `apps/ca-nhan` (migration
+`1792281602500_personal_space`), đặt ở mục này để không đánh số lại §3–§6. Cách một ứng dụng cắm vào lõi:
+[`them-ung-dung.md`](them-ung-dung.md). Ứng dụng không có bảng tệp riêng: tệp vẫn là dòng `core.files` do `svc-files`
+thêm sau khi ClamAV quét sạch; bảng dưới chỉ ghi tệp nào của ai nằm ở thư mục nào.
+
+| Bảng | Cột | Ràng buộc, ghi chú |
+|---|---|---|
+| `personal.items` | `file_id` (khóa chính), `tenant_id`, `owner_id` (`sub`), `para`, `created_at`, `updated_at` | `para` ∈ `projects`, `areas`, `resources`, `archives` (`items_para`) — Dự án, Lĩnh vực, Tài nguyên, Lưu trữ. Khóa ngoại `(tenant_id, file_id)` → `core.files (tenant_id, id)`, xóa tệp thì mục xóa theo. Trigger `items_guard`: chỉ xếp được tệp có `created_by` là chính chủ, cùng đơn vị, không mã hóa (tệp mã hóa thuộc văn bản hạn chế, đi theo quyền đọc văn bản — F3.7); thêm rồi thì không đổi tệp, chủ, đơn vị; mốc thời gian do CSDL đặt. Sổ kiểm toán: `core.audit('file_id')` |
+
+Quyền: `clerk`, `staff`, `manager`, `director` thêm (chỉ `file_id`, `para`; `tenant_id`, `owner_id` đặt sẵn từ
+token), đọc và chuyển thư mục (chỉ cột `para`) mục của chính mình trong đơn vị mình; không ai xóa (§0). Quan hệ
+`file` đọc `core.files` theo đúng quyền của vai trò ở `core_files.yaml` — người tải lên thấy tệp của mình; không thêm
+quan hệ ngược vào metadata của lõi. `tenant_admin` không đọc `core.files` nên không có không gian cá nhân. `overview`
+của sổ chỉ giữ giá trị `file_id`: lãnh đạo xem sổ thấy ai xếp, chuyển tệp nào, không thấy tên thư mục.
+
+### 2.7. Tự chẩn đoán H-P-D-I
+
+Migration `1792281603100_maturity_assessments`, trang `/tu-chan-doan`, cách dùng và cách chấm:
+[`tu-chan-doan.md`](tu-chan-doan.md). Mỗi lần lãnh đạo đơn vị lưu bài tự chẩn đoán là một dòng; CSDL không giữ nội
+dung câu hỏi (nằm ở `apps/office/app/data/tu-chan-doan.json`), chỉ mã câu và mức — nhưng biết bộ mã câu của từng
+phiên bản để đối chiếu.
+
+| Bảng | Cột | Ràng buộc, ghi chú |
+|---|---|---|
+| `office.maturity_assessments` | `id`, `tenant_id`, `created_by` (`sub`), `framework`, `answers` (jsonb), `h`, `p`, `d`, `i` (numeric(3,2)), `note`, `created_at` | `framework` là phiên bản CSDL biết, hiện chỉ `hpdi-1` (`maturity_framework`); `note` null hoặc 1–300 ký tự (`maturity_note`); bốn điểm trong 1–5 (`maturity_scores`). Trigger `before insert or update` `maturity_assessments_guard`: `answers` là đối tượng có đủ đúng các mã câu của phiên bản (`hpdi-1`: h1–h3, p1–p3, d1–d3, i1–i3), không thừa, mỗi mức số nguyên 1–5 (sai thì lỗi `check_violation` câu `maturity_answers: …`); tính `h`, `p`, `d`, `i` = trung bình mức các câu của không gian, làm tròn 2 chữ số — người gửi không chọn được điểm; gọt khoảng trắng của `note`; khi thêm: đặt `created_at`, chặn lưu dồn — mỗi đơn vị tối đa 5 lần mỗi giờ, 20 lần mỗi 24 giờ (khóa tư vấn theo đơn vị, lỗi `maturity_rate: …`). Sổ kiểm toán: `core.audit()` |
+
+Quyền: chỉ `director` thêm (cột `framework`, `answers`, `note`; `tenant_id`, `created_by` đặt sẵn từ token) và đọc
+dòng của đơn vị mình (mọi cột trừ `tenant_id`, `created_by`; có aggregate). Không vai trò nào sửa, xóa; `manager`,
+`clerk`, `staff`, `tenant_admin`, `service`, `agent` không có bảng này. `overview` của sổ không giữ giá trị cột nào
+của bảng này (`core.audit_overview` không đổi): lãnh đạo đọc sổ thấy ai lưu, lúc nào.
 
 ---
 
@@ -965,6 +1147,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
 | `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, văn bản hạn chế thì người gọi phải đọc được nó (403 `restricted`), kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
+| `otSensorMap` (query) | `clerk`, `staff`, `manager`, `director` — các vai trò đọc được dự thảo "Báo cáo sự cố" | Sơ đồ cảm biến OT (F3.10): đọc context broker NGSI-LD ở tenant của đơn vị trong biến phiên (thực thể `TemperatureSensor`, lịch sử 10 lần đo gần nhất), trả số đo mới nhất, mã phòng (`room`), ngưỡng và cờ chất lượng — `stale` (quá `MOC_OT_STALE_MIN` phút không có số đo), `out_of_range` (không phải số hoặc ngoài −55…125 °C), `duplicate_time` (số đo mới nhất trùng `observedAt` với lần đo khác), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút; khi đó `stale` xét theo lúc broker nhận số đo). Chỉ đọc, không ghi CSDL; chưa bật broker thì `status` = `off` / `unavailable`, không lỗi |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
 cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác
@@ -1104,8 +1287,14 @@ Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
 | `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status, signature}}`; `summary` chỉ có khi `is_public`; `signature` (F4.5, chỉ minh họa) luôn có mặt: `{level, signer, ca, serial, signed_at, illustrative: true}`, hoặc `null` khi bản phát hành không ký |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
+| `GET /api/case-files/{id}/archive/files/{file_id}` | Người xem được hồ sơ, đọc được văn bản gắn tệp | Phòng đọc xem tệp: chỉ PDF; so băm với manifest (lệch → 502, không trả byte), bản có dấu tên người xem, giờ xem (`inline`, `no-store`); ghi `case_file.file_viewed` trước khi trả |
+| `POST /api/case-files/{id}/archive` | `manager`, hồ sơ của phòng mình | Nộp lưu ngay hồ sơ đã đóng: các bước của job nộp lưu; giành được lượt (chung khóa với vòng nền) rồi mới ghi `case_file.archive_requested`; 409 `not_closed`, `already_archived`, `archive_failed`, `archive_conflict`; 503 `busy` |
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
+| `POST /api/imports/incoming` | `clerk` | Nạp lô văn bản đến (cụm ⑤): multipart `data` (NDJSON hoặc CSV, cùng trường với `receiveIncoming`, thêm `files`: tên tệp trong zip) + `archive` (zip) tùy chọn, `?register=true` vào sổ từng văn bản, `Idempotency-Key` tùy chọn. Kiểm cả tệp (tệp dữ liệu qua ClamAV), ghi lô + dòng + `import.created` trong một mutation, trả 202. Vòng nền đưa từng dòng qua đúng `ingest()` và Action `receiveIncoming` (tùy chọn `registerIncoming`) với phiên của văn thư tạo lô; lỗi một dòng không hỏng dòng khác. Chi tiết lỗi: README của `svc-files` |
+| `GET /api/imports/{id}` | Người tạo lô | Trạng thái, số dòng đã nhận, còn chờ, đạt, trùng, lỗi; người khác (kể cả cùng đơn vị) → 404 |
+| `GET /api/imports/{id}/rows` | Người tạo lô | Kết quả từng dòng: số dòng, mã, lý do, lỗi theo trường, id văn bản, số đến; không trả lại dữ liệu đã gửi |
+| `GET /api/imports` | Người đăng nhập | Các lô của chính người gọi, mới trước |
 | `POST /internal/issue` | Chỉ `svc-workflow` (token tài khoản dịch vụ), không qua APISIX | Dựng, ký số (F4.5, chỉ minh họa — xem dưới), quét, lưu bản phát hành; trả `{file_id, sha256, size_bytes}`, `sha256` là băm của bản đã ký. 503 `signing_unavailable` khi két không trả lời (không lưu gì, văn thư bấm lại) |
 | `POST /internal/similar-documents` | Chỉ tài khoản dịch vụ trong `MOC_SERVICE_CLIENTS` (`svc-workflow`), không qua APISIX, không có trong `/openapi.json` | Gợi ý giao việc (F4.3): `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15) → `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` — văn bản đến khác đã giao (`in_progress`, `done`, `archived`) tương tự theo trích yếu, điểm giảm dần, đã hậu kiểm bỏ văn bản hạn chế; dùng lại phần truy xuất của trợ lý hỏi đáp (phạm vi vai trò `service` của thuê ước). Không trả chữ nào (`terms` chỉ là số từ của câu tìm), nhật ký không ghi trích yếu. 404 `not_found`; 409 `not_incoming`, `restricted` (không tìm gì thêm); 503 `assistant_disabled` (`MOC_ASK_ENABLED=false`), `search_unavailable`, `database_unavailable` |
 | `POST /internal/dispatch-file` | Chỉ `svc-workflow` (như trên) | Liên thông (F3.12): `{dispatch_id, actor_id}`. svc-files tự đọc dòng `office.dispatches`, tệp `issued` và văn bản gửi bằng khóa quản trị (bên gọi không chỉ định được tệp), quét ClamAV, lưu bản sao vào `core.files` của đơn vị nhận với id = `dispatches.file_id`. 201 / 200 (đã có) `{file_id, sha256, size_bytes}`; 409 `not_pending`, `not_issued`, `restricted`, `cold`, `integrity` (SHA-256 đọc ra khác `core.files.sha256` hay `content_sha256`); 503 khi kho, ClamAV, CSDL không sẵn sàng |
@@ -1170,6 +1359,12 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 ```
 
 `id` là ULID. `request_id` lấy từ `X-Request-Id` để nối sự kiện với log.
+
+Ứng dụng cắm bằng manifest không nhận khuôn trên: Hasura Event Trigger `app_<tên>` trên `core.app_events` (§1) gọi
+webhook của ứng dụng với thân sự kiện chuẩn của Hasura (không biến đổi): `event.op` = `INSERT`, `event.data.new` =
+`{"id", "tenant_id", "document_id", "kind", "occurred_at"}`, `event.session_variables` = `null`; mọi loại trong danh
+sách trắng, ứng dụng tự bỏ loại không khai (`MOC_APP_EVENT_KINDS`). Header `X-Moc-Hook-Secret`; giao ít nhất một lần,
+chống trùng bằng `event.data.new.id`.
 
 | `type` | Phát khi |
 |---|---|

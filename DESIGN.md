@@ -160,7 +160,7 @@ Warm yellow and olive give the workspace its character; white work surfaces pres
 
 ## Layout
 
-Desktop reserves a fixed 76px icon rail. The 244px sidebar is fixed flush to the left, top and bottom viewport edges, with square outer corners. A clip-path reveals the expanded navigation over the workspace without shifting the reading column. Pointer entry opens immediately; pointer exit waits 140ms before closing to tolerate small accidental exits. Focus within also opens the sidebar. The manual collapse control and stored collapse preference are removed.
+Desktop reserves76px when navigation is collapsed and244px while it is expanded. The 244px sidebar is fixed flush to the left, top and bottom viewport edges, with square outer corners. The sidebar clip-path and workspace grid track animate together over320ms, keeping the heading, toolbar and first table column outside the navigation boundary throughout the reveal. Pointer entry opens immediately; pointer exit waits 140ms before closing to tolerate small accidental exits. Keyboard-visible focus also opens the sidebar; pointer clicks do not pin it open after the pointer leaves. The manual collapse control and stored collapse preference are removed.
 
 The reveal lasts 320ms with cubic-bezier(.16,1,.3,1); labels fade and slide independently. Active and hover backgrounds scale from a 48px icon target into the full navigation row. Icons retain accessible names and collapsed title hints. Permitted destinations remain role-driven; search stays below primary navigation and verification in the footer.
 

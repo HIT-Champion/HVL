@@ -64,6 +64,8 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
    - văn thư tìm theo số ký hiệu → ra văn bản đã nộp lưu;
    - phòng đọc `GET /api/case-files/{id}/archive`: manifest khớp băm trong CSDL, DuckDB đọc `documents.parquet` ra
      đúng các văn bản.
+   - phòng đọc xem tệp `GET /api/case-files/{id}/archive/files/{file_id}`: bản PDF có dấu tên văn thư, giờ xem (khác
+     byte gốc), lần xem vào sổ kiểm toán (`case_file.file_viewed`).
 5. Thử xóa manifest bằng khóa quản trị của kho → bị từ chối (S3 Object Lock, chế độ COMPLIANCE). Dòng
    `case_file.archived` nằm trong sổ kiểm toán chuỗi băm.
 
@@ -72,7 +74,13 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 - *Bất kỳ ai*: mở trang xác thực, nhập mã tra cứu của văn bản vừa nộp lưu → vẫn "Văn bản khớp".
 - *Lãnh đạo khoa*: **Sổ kiểm toán** → tab **Văn bản**, dòng "Nộp lưu hồ sơ" kèm ký hiệu hồ sơ, băm gói, số văn bản,
   số tệp; tên hồ sơ không hiện.
-- Chưa có màn lập hồ sơ: bước 1 đi qua GraphQL với đúng quyền của chuyên viên.
+- *Chuyên viên* (`chuyenviendt`): **Hồ sơ công việc** → **Lập hồ sơ** (ký hiệu, tiêu đề, thời hạn bảo quản) → **Thêm vào
+  hồ sơ** một văn bản đã xong của phòng → **Đóng hồ sơ** (ngày đóng do hệ thống đặt). Không có nút nộp lưu.
+- *Tổ trưởng* (`totruongdt`): mở hồ sơ vừa đóng → **Nộp lưu** → trạng thái "Đã nộp lưu", băm manifest, vị trí gói, khóa
+  ghi tới ngày nào. Lệnh vẫn gọi job nộp lưu (bước 2) để in số byte, thời gian.
+- *Văn thư*: mở hồ sơ đã nộp lưu → **Phòng đọc**: "Manifest khớp băm ghi trong CSDL", văn bản trong gói, bấm
+  **Xem** ở tệp PDF → bản xem hiện ngay trong trang, mọi trang có dòng "PHÒNG ĐỌC — bản xem tài liệu lưu trữ cho …,
+  giờ…" (tên người xem, giờ xem). Lãnh đạo khoa thấy dòng "Xem tệp trong phòng đọc" trong sổ kiểm toán.
 
 **Nếu giám khảo hỏi:**
 
@@ -100,7 +108,7 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
   bị chỉ thấy broker, không gọi được svc-workflow; broker gọi svc-workflow phải kèm token riêng của đơn vị; broker
   và CSDL của nó không mở cổng ra ngoài.
 
-**Lệnh in ra 6 bước** (lần đầu tải image Scorpio và PostGIS, khoảng 380 MB):
+**Lệnh in ra 7 bước** (lần đầu tải image Scorpio và PostGIS, khoảng 380 MB):
 
 1. Bật profile `iot` (Scorpio + PostGIS); svc-workflow tự đăng ký subscription `temperature>35` trong tenant của đơn
    vị, kèm token. In thời gian broker sẵn sàng.
@@ -114,9 +122,16 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 5. Chuyên viên trình → tổ trưởng phòng có việc duyệt, như mọi văn bản đi.
 6. Thông báo giả: từ mạng thiết bị không tới được svc-workflow; từ mạng nội bộ (container svc-files) với token sai
    → 401.
+7. Sơ đồ cảm biến kho: năm cảm biến khai mã phòng (`--room`) và gửi số đo — kho 1 bình thường; kho 2 gửi
+   `-127 °C` (ngoài dải); kho 3 đồng hồ đứng (`--frozen-clock`, trùng `observedAt`); phòng đọc gửi số đo cũ hơn
+   `MOC_OT_STALE_MIN` + 20 phút (`--late`, mất tín hiệu); phòng xử lý đồng hồ nhanh 30 phút (`--clock-ahead`, giờ đo
+   ở tương lai — broker vừa nhận nên không mất tín hiệu). Văn thư gọi Action `otSensorMap`: đúng cờ từng cảm biến,
+   phòng máy chủ vượt ngưỡng; văn thư Khoa Kinh tế không thấy cảm biến của Khoa CNTT; quản trị đơn vị không có Action.
 
 Trên giao diện (`chuyenviendt`): chuông thông báo "Cảnh báo nhiệt độ…", mục Văn bản đi có dự thảo, dòng thời gian
-ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dựng dự thảo".
+ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dựng dự thảo". Mục "Sơ đồ cảm biến" (`/cam-bien`, văn thư,
+chuyên viên, lãnh đạo): mặt bằng kho, phòng máy chủ đỏ, kho 1 xanh, kho 2 và phòng đọc xám có cờ, kho 3 có cờ
+"Trùng giờ đo", phòng xử lý tô theo số đo kèm cờ "Giờ đo ở tương lai"; chú giải ghi luật từng cờ.
 
 **Nếu giám khảo hỏi:**
 
@@ -140,7 +155,7 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 - Chất lượng kiểm tự động, trước khi ghi: bảng Parquet nào cũng được đọc lại, số dòng phải bằng số dòng trong CSDL,
   cột bắt buộc không được rỗng. Trượt thì job dừng trước khi ghi gì sang kho lạnh, sự kiện FAIL nằm lại trong phả hệ.
 
-**Lệnh in ra 4 bước** (chưa có lượt nộp lưu nào thì chạy màn (i) trước):
+**Lệnh in ra 5 bước** (chưa có lượt nộp lưu nào thì chạy màn (i) trước):
 
 1. Lượt nộp lưu gần nhất: run của job `moc.case_file.archive`, START → 4 run con `files`, `tables`, `manifest`,
    `commit` → COMPLETE. Mỗi bước in đầu vào → đầu ra. Lãnh đạo đọc qua Hasura, chỉ thấy đơn vị mình.
@@ -150,15 +165,26 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
    `outputStatistics`); số bước trượt kiểm của đơn vị.
 4. Sự kiện đúng đặc tả OpenLineage 2-0-2 (`schemaURL`, `producer`, tên dataset theo quy ước): đặt
    `MOC_OPENLINEAGE_URL` là gửi được sang Marquez.
+5. Phả hệ báo cáo: bốn khung nhìn của trang Điều hành ← bảng nào, tính từ catalog PostgreSQL lúc hỏi
+   (`office.report_lineage`) — vd `office.v_processing_time` ← `office.archived_document_facts`,
+   `office.document_events`, `office.documents`; lượt nộp lưu mới khai `office.archived_document_facts` ở bước `commit`.
+
+**Trên giao diện** (lãnh đạo, `truongkhoa`): trang Điều hành, nút "Nguồn số liệu" trên biểu đồ "Thời gian xử lý theo
+tháng xong" → trang Phả hệ số liệu lọc đúng biểu đồ đó: đồ thị biểu đồ ← khung nhìn ← bảng ← manifest của lượt nộp lưu
+(nét đứt: bước `commit` ghi lại vào CSDL), bảng nguồn bên dưới. Chọn "Mọi biểu đồ" để thấy cả dải nộp lưu (bảng →
+Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.jsonl)" xuất cùng phả hệ ở dạng chuẩn mở.
 
 **Nếu giám khảo hỏi:**
 
 - *"Marquez đâu?"* Chưa dựng trong compose: thêm một máy chủ Java và CSDL riêng (khoảng 1 GB RAM) cho một job mỗi
   giờ. Sự kiện lưu trong `core.lineage_events` (cột `event` là nguyên văn OpenLineage), cùng sao lưu với CSDL; bật
-  Marquez chỉ cần đặt `MOC_OPENLINEAGE_URL`.
+  Marquez chỉ cần đặt `MOC_OPENLINEAGE_URL`. Đồ thị thì xem ngay ở trang Phả hệ số liệu của Signet (`/pha-he`).
 - *"Kiểm trượt thì sao?"* Thử trong test đơn vị: một văn bản thiếu trích yếu → bước `tables` FAIL, không đối tượng nào
   được ghi sang bucket lạnh (ở đó bị khóa nhiều năm), CSDL không đổi, lượt sau thử lại.
 - *"Ai sửa được phả hệ?"* Không ai: bảng chỉ thêm, trigger chặn sửa và xóa kể cả khi ghi thẳng CSDL.
+- *"Phả hệ báo cáo có phải vẽ tay không?"* Cạnh khung nhìn → bảng đọc từ catalog (`pg_depend`) mỗi lần mở trang: sửa
+  view là đồ thị đổi theo. Chỉ cạnh biểu đồ → khung nhìn khai trong mã giao diện, và có test so với truy vấn thật của
+  trang Điều hành (`apps/office/tests/lineage.test.ts`).
 
 ## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
 
@@ -536,8 +562,10 @@ tự nhúng các đoạn ở vòng nền rồi tìm lai (từ khóa + theo nghĩ
 **Trên giao diện** (`vanthu`, thanh bên → "Hỏi đáp văn bản"; hoặc nút "Hỏi trợ lý" ở Tìm kiếm): gõ "Điều kiện xét
 học bổng khuyến khích học tập là gì?" → khối "Câu trích nguyên văn" có "3,2", nguồn "[1] 88/CTSV · tr. 1 · Phòng
 Công tác sinh viên", nút "Mở văn bản"; bật mô hình thì sau đó có thêm khối "Trả lời của trợ lý" ghi rõ "Do mô hình
-ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Đăng nhập `giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào
-bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: dòng hỏi đáp của tác tử, không có câu hỏi.
+ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Bấm nhãn nguồn "88/CTSV · tr. 1" → tệp PDF mở ngay dưới danh sách
+nguồn, đúng trang 1. "Mở văn bản" → nút "Hỏi về văn bản này" mở lại trang Hỏi đáp chỉ hỏi trong 88/CTSV. Đăng nhập
+`giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán:
+dòng hỏi đáp của tác tử, không có câu hỏi.
 
 **Nếu giám khảo hỏi:**
 

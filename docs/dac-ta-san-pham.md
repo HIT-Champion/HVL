@@ -208,6 +208,7 @@ Mã F3.6 bỏ trống vì đã lên Must (F2.13).
 | F4.4 | Che CCCD, số điện thoại trong log và ngữ cảnh gửi mô hình |
 | F4.5 | Ký số PDF (PAdES) bằng PKI nội bộ do OpenBao cấp — **chỉ minh họa**, không có giá trị pháp lý như chữ ký số công cộng |
 | F4.6 | Thu góp ý, đo số liệu "sau" theo §8 |
+| F4.7 | **Tự chẩn đoán H-P-D-I** cho lãnh đạo: bộ câu bốn không gian × 5 mức, radar, bước tiếp theo trỏ phân hệ Signet, bằng chứng đo được từ số liệu của chính đơn vị, lưu lịch sử ([`tu-chan-doan.md`](tu-chan-doan.md)) |
 
 ### 4.4. Không làm
 
@@ -308,8 +309,9 @@ Chỉ trình bày số đo thật. Chỉ số nào chưa đo được thì nói 
 
 1. **Tên sản phẩm — đã chốt 15/10/2026: Mộc** (theo chữ "đóng mộc" — đóng dấu). Hai tên đã loại:
    "DX-Lab" trùng ứng dụng của HaUI và tên Trạm thực hành số trong chủ đề cuộc thi; "AgentLab" trùng
-   dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL`;
-   tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi trường `MOC_*`.
+   dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL` (đổi thành
+   `Signet` ngày 25/10/2026); tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi
+   trường `MOC_*`.
    **Đổi 23/10/2026: Signet** — nhẫn ấn đóng dấu lên văn bản, giữ ý "đóng dấu" của tên cũ; chỉ đổi tên hiển thị
    (giao diện, tài liệu, chuỗi in ra, header giấy phép "Signet Team"), tên kỹ thuật `moc` giữ nguyên.
 2. **Đơn vị chạy thử**: văn thư khoa nào đồng ý dùng thử; nếu không, dùng phương án dự phòng ở kế hoạch §1.1.

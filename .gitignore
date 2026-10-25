@@ -79,6 +79,8 @@ docker-compose.*.local.yml
 # --- Nhật ký & Tệp tạm -------------------------------------------------------
 *.log
 logs/
+# Cấu hình log tập trung (F3.14) là mã nguồn, không phải nhật ký
+!/platform/logs/
 tmp/
 temp/
 .cache/
@@ -110,3 +112,6 @@ publics/
 # Tài liệu nội bộ của đội — không đưa lên repo công khai (ví dụ TEAM.local.md)
 *.local.md
 /COMMIT.md
+
+# Ứng dụng cài bằng moc app install (scripts/ung_dung.py): trạng thái của từng thư mục chạy, có bí mật
+/.moc-apps/

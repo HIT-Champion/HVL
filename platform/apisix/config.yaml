@@ -26,6 +26,11 @@ apisix:
   enable_ipv6: false
   enable_control: false
   enable_server_tokens: false
+  # Máy chủ trạng thái của APISIX: /status/ready trả 200 khi mọi worker đã nạp route. Chỉ trong mạng nội bộ `moc` (không
+  # có trong ports của docker-compose.yml); svc-files dò rồi gom vào trang trạng thái hệ thống công khai (/api/status)
+  status:
+    ip: 0.0.0.0
+    port: 7085
   # F3.3: container bị xóa rồi dựng lại (tự phục hồi) có IP mới — chỉ tin bản ghi DNS của Docker 5 giây thay vì
   # TTL 600 giây, để cổng tìm thấy dịch vụ mới ngay
   dns_resolver_valid: 5
@@ -39,6 +44,10 @@ apisix:
     - "${{MOC_TRUSTED_PROXY:=127.0.0.1/32}}"
 
 nginx_config:
+  # F3.15: mỗi worker nạp riêng một bộ luật WAF (~80 MB, tới ~230 MB sau khi soi tệp tải lên 24 MB) nên không để "auto"
+  # (một worker mỗi nhân: 16 worker là 1,5 GiB trên máy 16 nhân). 4 worker có WAF vẫn ~470 yêu cầu/giây trên 2 CPU
+  # (platform/apisix/README.md, mục WAF)
+  worker_processes: ${{MOC_APISIX_WORKERS:=4}}
   error_log_level: warn
   # apisix.yaml đọc các biến này lúc chạy, nên phải khai cho tiến trình worker của nginx
   envs:
@@ -48,6 +57,8 @@ nginx_config:
     - MOC_RATE_API_PER_MIN
     - MOC_RATE_VERIFY_PER_MIN
     - MOC_RATE_REALTIME_PER_MIN
+    - MOC_RATE_STATUS_PER_MIN
+    - MOC_WAF
   # F4.4: đường dẫn bỏ chuỗi truy vấn cho access_log_format bên dưới. $request_uri (đường dẫn client gửi) và
   # $upstream_uri (APISIX ghép sẵn ?… vào) đều mang chuỗi truy vấn; log_format không cắt chuỗi được nên dùng map:
   # giữ phần trước dấu ? đầu tiên (nhóm khớp đặt tên moc_dd…)
@@ -73,6 +84,12 @@ nginx_config:
         "~^1:[^:]*:(?<moc_cong_goc>.+)$" $moc_cong_goc;
         default                         $var_x_forwarded_port;
     }
+  # F3.15: plugin wasm của APISIX chỉ đưa thân yêu cầu cho WAF khi biến này khác rỗng (apisix/wasm.lua), mà
+  # coraza-proxy-wasm (viết cho Envoy) không tự đặt. Thiếu dòng này thì Coraza không thấy thân yêu cầu và chạy luật pha
+  # 2 — nơi CRS quyết chặn — sau khi yêu cầu đã tới dịch vụ phía sau. Template đặt snippet sau dòng khởi tạo
+  # `set $wasm_process_req_body ''` của location /
+  http_server_location_configuration_snippet: |
+    set $wasm_process_req_body on;
   http:
     # svc-files tự giới hạn theo MOC_FILES_MAX_MB; ở biên chỉ chặn yêu cầu quá lớn rõ ràng
     client_max_body_size: 64m
@@ -85,8 +102,9 @@ nginx_config:
     # F4.4: không ghi chuỗi truy vấn (ô tìm kiếm ?q=…, mã đăng nhập ?code=…&state=…) và Referer (URL đầy đủ của trang
     # trước). Các trường khác giữ như định dạng mặc định của APISIX 3.18: "$request" thành phương thức, đường dẫn, giao
     # thức; "$upstream_scheme://$upstream_host$upstream_uri" giữ nguyên trừ ?…. APISIX bọc chuỗi này trong '…' khi
-    # dựng nginx.conf: không dùng dấu nháy đơn bên trong
-    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream"'
+    # dựng nginx.conf: không dùng dấu nháy đơn bên trong. "$apisix_request_id" cuối dòng như mặc định: log tập trung
+    # (F3.14) nối dòng của APISIX với svc-files, svc-workflow theo mã yêu cầu
+    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream" "$apisix_request_id"'
 
 # Chỉ bật plugin đang dùng
 plugins:
@@ -97,6 +115,8 @@ plugins:
   - fault-injection
   # F3.13: chỉ số cho Prometheus, bật toàn cục trong apisix.yaml
   - prometheus
+  # F3.15: chặn thân JSON lồng quá sâu trước khi tới WAF (global rule trong apisix.yaml)
+  - serverless-pre-function
 
 plugin_attr:
   prometheus:
@@ -104,3 +124,15 @@ plugin_attr:
     export_addr:
       ip: 0.0.0.0
       port: 9091
+
+# F3.15 — tường lửa ứng dụng web: Coraza + OWASP CRS dạng proxy-wasm (tệp có sẵn trong image,
+# platform/apisix/Dockerfile), bật toàn cục và cấu hình luật trong apisix.yaml. Pha rewrite: global rule chạy rewrite
+# trước plugin của route, nên WAF xét yêu cầu trước openid-connect (kiểm token) và limit-count; ở pha access thì GraphQL
+# không token đã bị 401 trước khi WAF kịp xem. Priority 7999 không trùng plugin nào của APISIX 3.18, thấp hơn
+# request-id (12015) nên phản hồi 403 vẫn có X-Request-Id
+wasm:
+  plugins:
+    - name: coraza-waf
+      priority: 7999
+      file: /usr/local/apisix/wasm/coraza-proxy-wasm.wasm
+      http_request_phase: rewrite

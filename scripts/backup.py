@@ -25,7 +25,9 @@ Mỗi lần sao lưu là một "lượt": vài snapshot restic cùng thẻ `run-
   đây — mất két là mất mọi tệp mã hóa. Két khôi phục mở bằng khóa static seal trong .env đang dùng
   (MOC_OPENBAO_SEAL_KEY): cất một bản .env ở chỗ riêng, KHÔNG để chung với kho sao lưu — thiếu nó thì không khôi
   phục được, có cả hai thì mở được mọi tệp mã hóa;
-- manifest.json, ghi sau cùng. Lượt thiếu manifest là lượt hỏng giữa chừng, không dùng để khôi phục.
+- manifest.json, ghi sau cùng. Lượt thiếu manifest là lượt hỏng giữa chừng, không dùng để khôi phục. Trong đó có
+  tên vai trò CSDL của các ứng dụng cài thêm (`moc_appdb_*`, scripts/ung_dung.py): vai trò thuộc cả máy chủ
+  PostgreSQL, pg_dump một CSDL không chép, nên khôi phục sang máy mới thì tạo lại chúng (NOLOGIN) trước pg_restore.
 
 Từ trước lúc dump CSDL tới lúc chép xong tệp, svc-files (chỗ duy nhất ghi vào SeaweedFS và neo sổ kiểm toán),
 SeaweedFS và két tạm dừng (`docker compose pause`): mốc neo trong bucket với bảng mốc trong CSDL, tệp với dòng trỏ tới tệp
@@ -58,8 +60,9 @@ from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
-from audit_chain import HEAD_SQL, RESTORED_SQL
+from audit_chain import BACKED_UP_SQL, HEAD_SQL, RESTORED_SQL
 from moc_env import ENV, ROOT
+from ung_dung import APP_ROLES_SQL, AppError, recreate_roles_sql
 
 COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
 WRITERS = ("svc-files", "seaweedfs", "openbao")            # tạm dừng suốt lúc sao lưu
@@ -203,6 +206,14 @@ def _psql(script: str, db: str = MAIN_DB, **variables: str) -> str:
     return _call(cmd, "không chạy được lệnh trên CSDL", input=script.encode()).decode().strip()
 
 
+def _actor() -> str:
+    """Người chạy lệnh, ghi vào sổ kiểm toán như os:<tên người dùng của máy chủ>."""
+    try:
+        return f"os:{getpass.getuser()}"
+    except (KeyError, OSError):
+        return "os:?"
+
+
 def _databases() -> list[str]:
     return _psql("select datname from pg_database where not datistemplate and datname <> 'postgres'"
                  " order by datname;").split()
@@ -299,6 +310,7 @@ def create(keep: int | None = None) -> dict[str, Any]:
                             _call([*COMPOSE, "pause", service], f"không tạm dừng được {service}")
                 started = time.monotonic()
                 manifest["audit"] = json.loads(_psql(HEAD_SQL + ";"))
+                manifest["app_roles"] = _psql(APP_ROLES_SQL).split()
                 for db in _databases():
                     # -Z 0: không nén — restic tự nén, và bản dump không nén mới khử trùng lặp được giữa các lượt
                     done, code, err = _pipe(
@@ -336,6 +348,15 @@ def create(keep: int | None = None) -> dict[str, Any]:
         if head["id"]:
             print(f"  ✓ Sổ kiểm toán tới dòng #{head['id']} ({head['hash'][:12]}…)")
         print(f"  · tạm dừng ghi CSDL {_seconds(manifest['db_paused_s'])}, tải tệp {_seconds(manifest['paused_s'])}")
+        # Lượt đã trọn: ghi vào sổ để trang trạng thái hệ thống biết lần sao lưu gần nhất. Ghi không được thì lượt sao
+        # lưu vẫn dùng được, chỉ trang trạng thái chưa thấy lượt này
+        diff = {"run": rid, "audit_id": head["id"], "version": manifest["version"]}
+        try:
+            event = _psql(BACKED_UP_SQL, actor=_actor(), run=rid, diff=json.dumps(diff, ensure_ascii=False))
+            print(f"  ✓ Lần sao lưu ghi vào sổ kiểm toán: dòng #{event}")
+        except BackupError as exc:
+            print(f"  ⚠ Chưa ghi được lần sao lưu vào sổ kiểm toán ({exc}) — trang trạng thái hệ thống chưa thấy lượt"
+                  " này", file=sys.stderr)
         if keep:
             dropped = keep_latest(keep)
             print(f"  · giữ {keep} lượt mới nhất" + (f", đã xóa: {', '.join(dropped)}" if dropped else ""))
@@ -438,6 +459,10 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
             if answer.strip().lower() not in ("y", "yes", "c", "co", "có"):
                 print("Không khôi phục.")
                 return None
+        try:
+            roles = recreate_roles_sql(manifest.get("app_roles", []))   # lượt cũ chưa có khóa này
+        except AppError as exc:
+            raise BackupError(f"manifest của lượt {manifest['run']}: {exc}") from None
         _check_readable(target, manifest)
         print("  ✓ Bản sao lưu đọc được trọn vẹn", flush=True)
         started = time.monotonic()
@@ -446,6 +471,8 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
             _call([*COMPOSE, "down"], "không dừng được Signet")
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "300", "postgres"], "PostgreSQL không lên")
             print("  ✓ Đã dừng Signet, chỉ chạy PostgreSQL", flush=True)
+            if roles:
+                _psql(roles, db="postgres")
             for db, part in manifest["databases"].items():
                 _restore_db(db, part["snapshot"])
                 print(f"  ✓ CSDL {db}", flush=True)
@@ -462,13 +489,9 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
                 _call(restic("restore", f"{manifest['vault']['snapshot']}:{VAULT}", "--target", VAULT, "--delete"),
                       "không khôi phục được két")
                 print("  ✓ Két (volume OpenBao)", flush=True)
-            try:
-                actor = f"os:{getpass.getuser()}"
-            except (KeyError, OSError):
-                actor = "os:?"
             diff = {"run": manifest["run"], "backed_up_at": manifest["created_at"], "audit_id": head["id"],
                     "version": manifest["version"]}
-            event = _psql(RESTORED_SQL, actor=actor, run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
+            event = _psql(RESTORED_SQL, actor=_actor(), run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
             print(f"  ✓ Lần khôi phục ghi vào sổ kiểm toán: dòng #{event}", flush=True)
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"],
                   "Signet chưa chạy lại được — xem: make logs")

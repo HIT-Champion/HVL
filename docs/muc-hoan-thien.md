@@ -24,27 +24,35 @@ xanh hay đỏ thì xem trang Actions, tài liệu này không chép lại.
 Cột "Test tự động" ghi số hàm test **đếm tĩnh** của từng tệp (cách đếm ở mục 1). Một tệp có thể phục vụ nhiều tính
 năng; bảng gán tệp cho tính năng chính của nó, chỗ dùng lại ghi "đã tính ở …". Viết tắt thư mục test: svc-files =
 `services/svc-files/tests/`, svc-workflow = `services/svc-workflow/tests/`, db = `db/tests/`, scripts =
-`scripts/tests/`, office = `apps/office/tests/`, e2e = `tests/e2e/`; mã nguồn `svc_files/…` =
-`services/svc-files/src/svc_files/…`, `svc_workflow/…` = `services/svc-workflow/src/svc_workflow/…`. "smoke" là một
-kiểm của `scripts/smoke.py`.
+`scripts/tests/`, office = `apps/office/tests/`, ca-nhan = `apps/ca-nhan/tests/`, bang-tin = `apps/bang-tin/tests/`,
+e2e = `tests/e2e/`; mã nguồn `svc_files/…` = `services/svc-files/src/svc_files/…`, `svc_workflow/…` =
+`services/svc-workflow/src/svc_workflow/…`. "smoke" là một kiểm của `scripts/smoke.py`.
 
 ## 1. Số test
 
-| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Lần chạy 23/10/2026 (máy phát triển, ngoài CI) | Chạy trong CI |
-|---|---|---|---|---|---|
-| svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 700 hàm | 1 156 đạt, 9 bỏ qua | job `unit` (`make test`) |
-| svc-workflow | `services/svc-workflow/tests/` | như trên | 240 hàm | 414 đạt | job `unit` (`make test`) |
-| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 187 hàm | 187 chạy, đạt, 2 bỏ qua | job `unit` (`make test`) |
-| Giao diện | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 66 lời gọi | 116 đạt | job `unit` (`make test`) |
-| CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 218 hàm | 348 thu thập (`pytest --collect-only`); chưa chạy ở lần đo này — cần PostgreSQL + Hasura | job `db` |
-| Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 14 test trong 13 tệp `*.spec.ts` | chưa chạy ở lần đo này — cần hệ thống đang chạy | job `stack`, bước `make e2e` |
-| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 79 kiểm | chưa chạy ở lần đo này | job `stack`, bước `make smoke` |
+Đếm tĩnh trên `develop` 5ea8fbc; số chạy lấy từ log của lần CI
+[40179833930](https://github.com/HIT-Champion/Signet/actions/runs/40179833930) trên 772d81f (25/10/2026, xanh hết) —
+commit kế tiếp (#144) chỉ sửa chuỗi trong hai tệp test, không thêm, bớt test nào.
 
-**Tổng đếm tĩnh: 1 425 test** (700 + 240 + 187 + 66 + 218 + 14), cộng 79 kiểm của smoke. Số lúc chạy lớn hơn số
-đếm tĩnh vì `pytest.mark.parametrize` và test sinh trong vòng lặp nhân một hàm thành nhiều ca. Không gán cho tính năng
-nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integration/test_live.py` 9 (chỉ chạy khi đặt
-`MOC_IT=1` và khóa JWT thử — CI không đặt, nên 9 test này không chạy ở đâu tự động), office `format.test.ts` 4,
-`paging.test.ts` 4.
+| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Chạy trong CI (lần 40179833930) | Job CI |
+|---|---|---|---|---|---|
+| svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 853 hàm | 1 428 đạt, 9 bỏ qua | `unit` (`make test`) |
+| svc-workflow | `services/svc-workflow/tests/` | như trên | 284 hàm | 486 đạt | `unit` (`make test`) |
+| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 372 hàm | 372 chạy, đạt, 2 bỏ qua | `unit` (`make test`) |
+| Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 149 lời gọi | 199 đạt | `unit` (`make test`) |
+| Không gian cá nhân P.A.R.A | `apps/ca-nhan/tests/` | như trên | 13 lời gọi | 13 đạt | `unit` (`make test`) |
+| Bảng tin đơn vị | `apps/bang-tin/tests/` | như trên; `def test_` cho tệp Python | 5 lời gọi + 15 hàm | 5 + 15 đạt | `unit` (`make test`) |
+| CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 321 hàm | 543 đạt | `db` (`MOC_IT=1`) |
+| Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 23 test trong 19 tệp `*.spec.ts` | 23 đạt | `chay-thu`, phần `e2e`, bước `make e2e` |
+| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 91 kiểm | 91 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
+
+**Tổng đếm tĩnh: 2 035 test** (853 + 284 + 372 + 149 + 13 + 5 + 15 + 321 + 23), cộng 91 kiểm của smoke; **lúc chạy
+trong CI: 3 082 test đạt** (1 428 + 486 + 370 + 199 + 13 + 20 + 543 + 23 — `scripts` tính 370 vì 2 test bỏ qua), cộng
+91 kiểm smoke. Số lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test sinh trong vòng lặp nhân một hàm
+thành nhiều ca. Test của `scripts` chỉ bỏ qua có điều kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư
+mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job
+`unit` không đặt, nên 9 test này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 18
+(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 4, `paging.test.ts` 4.
 
 ## 2. Ma trận tính năng
 
@@ -53,7 +61,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | Mã | Chức năng | Mức | Test tự động | Đầu-cuối trong CI · trình diễn | Hạn chế đã biết |
 |---|---|---|---|---|---|
 | F1.1 | SSO + MFA: Keycloak, vai trò, `tenant_id` và `department_id` trong token | Hoàn thiện | svc-files `test_auth_config.py` 17 (kiểm token Keycloak); scripts `test_dang_nhap.py` 4 | smoke: 5 tài khoản đăng nhập qua cổng, văn thư phải nhập TOTP, luồng mật khẩu của `moc-cli` và `admin-cli` cũng đòi TOTP; e2e: mọi kịch bản đăng nhập qua Keycloak kèm TOTP (`tests/e2e/helpers.ts`) | Realm chỉ nạp ở lần khởi động đầu: sửa `platform/keycloak/realm/moc-realm.json` sau đó phải `make reset` hoặc sửa trong trang quản trị Keycloak. Xác thực hai bước chỉ có TOTP |
-| F1.2 | Cổng API zero-trust: APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, `X-Request-Id` | Hoàn thiện | — (cấu hình khai báo `platform/apisix/apisix.yaml`, kiểm bằng smoke) | smoke: GraphQL không token → 401; đường quản trị Hasura, Keycloak, Flowable bị chặn; khóa quản trị Hasura gửi từ ngoài bị gỡ; đăng nhập quá giới hạn theo IP, GraphQL quá giới hạn theo phiên → 429 | Chưa có WAF (F3.15) |
+| F1.2 | Cổng API zero-trust: APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, `X-Request-Id` | Hoàn thiện | — (cấu hình khai báo `platform/apisix/apisix.yaml`, kiểm bằng smoke) | smoke: GraphQL không token → 401; đường quản trị Hasura, Keycloak, Flowable bị chặn; khóa quản trị Hasura gửi từ ngoài bị gỡ; đăng nhập quá giới hạn theo IP, GraphQL quá giới hạn theo phiên → 429; tải tấn công bị WAF chặn ở cổng → 403 (F3.15) | WAF ở cổng (F3.15) mới ở mức Dùng được: smoke, e2e qua WAF chưa chạy xanh trên CI |
 | F1.3 | Dữ liệu có cấu trúc: PostgreSQL 16 + Hasura v2 CE, GraphQL tự sinh, quyền theo vai trò và đơn vị tới từng dòng, migrations và metadata tự áp | Hoàn thiện | db `test_schema.py` 15, `test_permissions.py` 23 | job `db`; smoke: văn thư Khoa Kinh tế không thấy văn bản Khoa CNTT, không tải được tệp (404); văn thư không ghi thẳng được bảng văn bản | `svc-files`, `svc-workflow` giữ khóa quản trị Hasura (lấy từ két): quyền cấp dòng không giới hạn chính hai dịch vụ này |
 | F1.4 | Quy trình BPMN: Flowable REST 8, Hasura Actions → `svc-workflow`, callback, job đối soát | Hoàn thiện | svc-workflow `test_workflow.py` 32, `test_app.py` 8 | smoke: vào sổ khởi chạy quy trình → chỉ đạo → phân công → báo xong, dòng thời gian đủ 4 bước; e2e `van-ban-den.spec.ts`, `van-ban-di.spec.ts` | Đơn vị gắn vào quy trình bằng biến `tenantId` và nhóm ứng viên `t:<đơn vị>:…`, không dùng tenant của Flowable. Lệch giữa Flowable và CSDL chỉ được sửa ở lượt đối soát kế tiếp (`MOC_RECONCILE_INTERVAL_S`) |
 | F1.5 | Dữ liệu phi cấu trúc: SeaweedFS, tải lên và tải xuống chỉ qua `svc-files` | Hoàn thiện | svc-files `test_upload.py` 18, `test_download.py` 10 | smoke: văn thư tải công văn lên, quét sạch; đơn vị khác tải tệp → 404 | Một bucket chung, đơn vị tách bằng tiền tố `tenant/<id>/` — có chủ ý, lý do ở `docs/mo-hinh-du-lieu.md` |
@@ -78,7 +86,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | F2.9 | Giao diện tiếng Việt / tiếng Anh | Dùng được | office: một test trong `answer.test.ts` kiểm `vi.json`, `en.json` cùng khóa, cùng tham số (770 khóa mỗi bên) | job `unit`; nút đổi ngôn ngữ trong `apps/office/app/layouts/` | Chưa có kịch bản e2e nào chạy tiếng Anh; PDF phát hành và sổ in theo thể thức tiếng Việt |
 | F2.10 | Dữ liệu mẫu `make seed`, tạo qua API như người dùng thật | Hoàn thiện | scripts `test_seed_mau.py` (đã tính ở F2.1) | bước CI "Nạp dữ liệu mẫu (make seed)" trước smoke và e2e; e2e `giam-khao.spec.ts` dựa vào dữ liệu seed | 2 đơn vị, 18 văn bản đến và 7 văn bản đi giả lập (danh sách `CNTT`, `KT`, `OUT_CNTT` trong `scripts/seed_documents.py`); kế hoạch là ~50 văn bản lấy từ công văn đã công bố |
 | F2.11 | Cộng đồng | Một phần | — | `README.en.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, mẫu issue `.github/ISSUE_TEMPLATE/` | Repo chưa ghi đơn vị chạy thử nào; nhãn "good first issue" và bài giới thiệu không kiểm được từ mã nguồn |
-| F2.12 | Sổ kiểm toán chuỗi băm, neo đầu chuỗi ra bucket khóa ghi, `make audit` | Hoàn thiện | db `test_audit.py` 23; svc-files `test_anchors.py` 12 | smoke: `moc audit verify` khớp mốc neo, mốc neo không xóa được (S3 Object Lock); bước CI sao lưu → xóa → khôi phục → `make audit`; e2e `so-kiem-toan.spec.ts` (2 test) | Mốc neo nằm trên cùng máy chủ (bucket lạnh của SeaweedFS); bản ngoài máy chủ phải chạy tay `python3 scripts/moc.py audit anchor --to <tệp>` |
+| F2.12 | Sổ kiểm toán chuỗi băm, neo đầu chuỗi ra bucket khóa ghi, `make audit` | Hoàn thiện | db `test_audit.py` 23; svc-files `test_anchors.py` 38; scripts `test_moc_neo.py` 27 | smoke: `moc audit verify` khớp mốc neo, kiểm chữ ký mốc chép ra tệp, mốc neo không xóa được (S3 Object Lock); bước CI sao lưu → xóa → khôi phục → `make audit`; e2e `so-kiem-toan.spec.ts` (2 test) | Mốc neo nằm trên cùng máy chủ (bucket lạnh của SeaweedFS); bản ngoài máy chủ có chữ ký của két: `moc audit anchor --publish` đẩy lên kho git công khai (timer mẫu `moc-anchor-publish`), nhưng kho công khai, khóa triển khai do đơn vị tự tạo |
 | F2.13 | Cổng xác thực công khai: tra mã hoặc quét QR; thả PDF, trình duyệt tự tính SHA-256 | Hoàn thiện | svc-files `test_outgoing.py` (đã tính ở F2.4); office `verify.test.ts` 5 | smoke: tra mã in cạnh QR ra đúng văn bản, giới hạn theo IP; tệp nguyên vẹn khớp, sửa một byte không khớp; e2e `van-ban-di.spec.ts` (người ngoài, không đăng nhập) | Là trang `/xac-thuc` trong `apps/office` (layout `public`), không phải ứng dụng `apps/verify` riêng như đặc tả §5 |
 
 ### 2.3. Should (Phase 3)
@@ -91,14 +99,14 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | F3.4 | Sao lưu, khôi phục (restic) | Hoàn thiện | db `test_backup.py` 2 | bước CI: hai lượt sao lưu, xóa volume CSDL, tệp và két, khôi phục, smoke, `make audit` | Kho sao lưu nằm trên cùng máy chủ, chép ra ngoài là việc của người vận hành (`docs/trien-khai.md`); lịch sử đo NGSI-LD không vào bản sao lưu |
 | F3.5 | Tab "Lịch sử" trên trang văn bản, đọc từ sổ kiểm toán | Hoàn thiện | db `test_document_history.py` 3 | e2e `van-ban-den.spec.ts` (tab Lịch sử), `giao-viec.spec.ts` | Trường nội dung chỉ báo "đã đổi", không hiện chữ trước và sau |
 | F3.7 | Văn bản hạn chế: mã hóa từng tệp, giải mã trong bộ nhớ, dấu tên người xem | Hoàn thiện | svc-files `test_sealed.py` 33; svc-workflow `test_restricted.py` 16; db `test_restricted.py` 14 | bước CI `make demo-han-che`; smoke 8 kiểm; e2e `han-che.spec.ts` | Chỉ nhận PDF; không dùng cho bí mật nhà nước; ai có quyền Docker trên máy chủ đọc được két (`docs/van-hanh.md`) |
-| F3.8 | (i) Lập hồ sơ, nộp lưu nóng → lạnh: Parquet + tệp + manifest có băm, khóa ghi | Dùng được | svc-files `test_archive.py` 19; db `test_case_files.py` 8 | bước CI `make demo-nong-lanh`; smoke: gói trên bucket lạnh, cổng xác thực vẫn "khớp" | Chưa có giao diện lập hồ sơ, nộp lưu, phòng đọc — chỉ GraphQL và `GET /api/case-files/{id}/archive`; phòng đọc chưa xem được tệp (`services/svc-files/README.md`, mục Trạng thái: "Chưa") |
-| F3.9 | (iii) Phả hệ OpenLineage + kiểm chất lượng bảng Parquet | Dùng được | svc-files `test_archive.py` (6 test phả hệ, đã tính ở F3.8); db `test_lineage.py` 2 | bước CI `make demo-pha-he`; smoke 1 kiểm | Chỉ lượt nộp lưu phát sự kiện phả hệ; chưa dựng Marquez nên không có màn xem đồ thị; dashboard (F3.11) chưa có phả hệ "báo cáo ← bảng" |
-| F3.10 | (ii) IT/OT rút gọn: cảm biến → NGSI-LD (Scorpio) → dự thảo "Báo cáo sự cố" | Minh họa | svc-workflow `test_ot.py` 17 | bước CI `make demo-it-ot` (profile `iot`) | Cảm biến giả lập (`services/ot-sensor/sensor.py`); broker không xác thực thiết bị; broker gửi mỗi thông báo một lần; lịch sử đo không vào bản sao lưu (`docs/van-hanh.md`, mục Hội tụ IT/OT) |
-| F3.11 | [D] Dashboard điều hành (ECharts, bốn view số đếm qua Hasura) | Hoàn thiện | db `test_dashboard.py` 6 | smoke 2 kiểm (số chia khớp văn bản lãnh đạo đọc được, văn thư không đọc được); e2e `dieu-hanh.spec.ts` | Bốn view cố định (`office.v_*`); muốn báo cáo mới phải viết view mới |
+| F3.8 | (i) Lập hồ sơ, nộp lưu nóng → lạnh: Parquet + tệp + manifest có băm, khóa ghi; phòng đọc xem tệp | Hoàn thiện | svc-files `test_archive.py` 19, `test_reading_room.py` 22; db `test_case_files.py` 8; office `caseFiles.test.ts` 10 | bước CI `make demo-nong-lanh` (có xem tệp trong phòng đọc); smoke: nộp lưu qua `POST /api/case-files/{id}/archive` (chuyên viên bị 403), gói trên bucket lạnh, cổng xác thực vẫn "khớp", xem tệp có dấu người xem + dòng sổ kiểm toán; e2e `ho-so.spec.ts` (chuyên viên lập, đóng; tổ trưởng nộp lưu; văn thư xem tệp; hết văn bản thì đỏ, không bỏ qua) | Nộp lưu trên giao diện chạy đồng bộ trong một yêu cầu (cổng chờ 60 giây), chưa đo với hồ sơ lớn; quá 60 giây thì cổng trả 504 trong khi `svc-files` có thể vẫn nộp lưu xong — tải lại trang để xem trạng thái hồ sơ — job nền mỗi giờ vẫn là đường chính cho hồ sơ đóng quá hạn. Phòng đọc chỉ xem được tệp PDF; tệp khác chỉ thấy tên, băm. Bản xem có dấu người xem nhưng người xem vẫn lưu lại được (như F3.7) |
+| F3.9 | (iii) Phả hệ OpenLineage + kiểm chất lượng bảng Parquet; phả hệ báo cáo tổng hợp (biểu đồ ← khung nhìn ← bảng, tính từ catalog PostgreSQL) và trang xem đồ thị; cờ chất lượng số liệu (Đạt / Cảnh báo / Trượt): 5 luật tính trong CSDL trên khung nhìn báo cáo, cờ nộp lưu theo assertion đã ghi | Hoàn thiện | svc-files `test_archive.py` (6 test phả hệ, đã tính ở F3.8); db `test_lineage.py` 2, `test_report_lineage.py` 6; office `lineage.test.ts` 13 (khai báo biểu đồ → khung nhìn khớp truy vấn thật của trang Điều hành, cả hai chiều, dựng và xếp đồ thị, xuất OpenLineage); scripts `test_pha_he.py` 4; db `test_report_checks.py` 7 (từng luật với số biết trước, cảnh báo, giả lập view hỏng, cột cá nhân qua catalog kể cả view lồng, quyền, khớp khai báo của office); office `quality.test.ts` 8 (cờ của biểu đồ, assertion nộp lưu lấy nguyên văn, cờ cạnh đúng từng nút Nguồn số liệu, i18n) | bước CI `make demo-pha-he` (bước 5: phả hệ báo cáo); smoke 5 kiểm (2 của cờ chất lượng: không luật nào Trượt trên dữ liệu luồng chính, văn thư không đọc được); e2e `pha-he.spec.ts` (nút "Nguồn số liệu" → trang Phả hệ; cờ cạnh từng biểu đồ, mục kiểm chất lượng) | Chỉ lượt nộp lưu phát sự kiện phả hệ, trang chỉ vẽ lượt gần nhất; chưa dựng Marquez — tệp OpenLineage xuất ở trang (JobEvent cho khung nhìn, biểu đồ) chưa thử nạp vào Marquez; phả hệ báo cáo mức bảng, chưa mức cột; view gọi hàm SQL đọc bảng thì catalog không ghi cạnh đó (hiện không view `v_` nào làm vậy, test chặn); cạnh biểu đồ → khung nhìn vẫn khai trong mã giao diện; cờ chất lượng: luật cột cá nhân theo tên cột (cột đặt tên lạ không bắt được, khóa người dùng `user_id`, `created_by` không tính), `status_total`, `unique_keys` hôm nay đạt theo cấu trúc (ràng buộc, GROUP BY — luật chặn hồi quy), ngưỡng 0 cố định, không lưu lịch sử cờ, không báo chủ động khi một luật chuyển Trượt; nộp lưu chỉ có cờ của lượt gần nhất và lượt bị dừng gần nhất |
+| F3.10 | (ii) IT/OT rút gọn: cảm biến → NGSI-LD (Scorpio) → dự thảo "Báo cáo sự cố"; sơ đồ cảm biến kho (`/cam-bien`, SVG) với bốn cờ chất lượng dữ liệu OT | Minh họa | svc-workflow `test_ot.py` 17, `test_ot_map.py` 34 (cờ mất tín hiệu, ngoài dải, trùng `observedAt`, `observedAt` ở tương lai; chỉ đọc tenant của người gọi; broker tắt, lỗi → `unavailable` không 5xx; quyền vai trò khớp `actions.yaml`; kết quả khớp kiểu GraphQL; `sensor.py --room`, `--late`, `--frozen-clock`, `--clock-ahead`); office `otMap.test.ts` 9 | bước CI `make demo-it-ot` (profile `iot`; bước 7: năm cảm biến kho ra đúng cờ, đơn vị khác không thấy, quản trị đơn vị không gọi được Action). Bước 7 chưa chạy xanh trên CI | Cảm biến giả lập (`services/ot-sensor/sensor.py`); broker không xác thực thiết bị; broker gửi mỗi thông báo một lần; lịch sử đo không vào bản sao lưu (`docs/van-hanh.md`, mục Hội tụ IT/OT). Sơ đồ mặt bằng mẫu cố định trong mã giao diện, chung cho mọi đơn vị; dải đo −55…125 °C cố định, không theo từng cảm biến; cờ chỉ trên sơ đồ — số đo vượt ngưỡng vẫn dựng dự thảo kể cả khi ngoài dải; tối đa 100 cảm biến mỗi đơn vị |
+| F3.11 | [D] Dashboard điều hành (ECharts, bốn view số đếm qua Hasura) | Hoàn thiện | db `test_dashboard.py` 6; phả hệ và cờ chất lượng từng biểu đồ đã tính ở F3.9 | smoke 2 kiểm (số chia khớp văn bản lãnh đạo đọc được, văn thư không đọc được); e2e `dieu-hanh.spec.ts`, `pha-he.spec.ts` (nguồn số liệu, cờ chất lượng của biểu đồ) | Bốn view cố định (`office.v_*`); muốn báo cáo mới phải viết view mới, và khai biểu đồ mới ở `apps/office/app/utils/lineage.ts` (test đỏ nếu quên); cờ chất lượng là một truy vấn thứ hai đọc lại bốn view, hỏi sau khi biểu đồ có số (không làm chậm biểu đồ, cờ hiện sau): đo trên PostgreSQL 16 thử 2 CPU, đơn vị 2 000 văn bản đến — số liệu 19 ms, cờ 36 ms; 20 000 — số liệu 158–520 ms, cờ 167–313 ms (dao động giữa các lần; phần lớn là `v_processing_time` có sẵn) |
 | F3.12 | Liên thông văn bản giữa các đơn vị; thêm đơn vị bằng một lệnh | Hoàn thiện | svc-files `test_dispatch.py` 12; svc-workflow `test_dispatch.py` 28; db `test_dispatch.py` 16; scripts `test_tenants.py` 31; office `dispatch.test.ts` 4 | bước CI `make demo-lien-thong` và "Thêm đơn vị bằng một lệnh (moc tenant create, check)"; smoke: mỗi đơn vị một Organization, công văn tới đơn vị nhận; e2e `lien-thong.spec.ts` | Chưa gửi lại được dòng liên thông `failed`; danh sách đơn vị nhận hiện cho mọi người dùng; văn bản hạn chế không liên thông (chủ ý) |
 | F3.13 | Giám sát: Prometheus + Grafana | Dùng được | — | smoke 1 kiểm: Prometheus đọc được chỉ số cổng API, Grafana có bảng điều khiển nạp sẵn | Chỉ thu chỉ số của APISIX (`platform/monitoring/prometheus.yml`); chưa có chỉ số từng dịch vụ, chưa có cảnh báo |
-| F3.14 | Log tập trung (Vector, Parseable) | Chưa làm | — | — | Không có trong `docker-compose.yml`; mỗi dịch vụ chỉ có nhật ký container |
-| F3.15 | WAF (Coraza) | Chưa làm | — | — | Không có trong `docker-compose.yml` hay cấu hình APISIX |
+| F3.14 | Log tập trung (Vector, Parseable) | Dùng được | svc-workflow `test_request_id.py` 10; scripts `test_log_tap_trung.py` 29; `platform/logs/vector.test.yaml` 29 ca (`vector test`) | bước CI `make demo-log-tap-trung` | Profile `logs` tắt mặc định; chỉ thu 5 dịch vụ (APISIX, hai ứng dụng web, `svc-files`, `svc-workflow`), không thu Hasura, Keycloak, PostgreSQL, Meilisearch; cổng fluent không xác thực (chỉ 127.0.0.1); Vector dùng tài khoản quản trị Parseable; Parseable chạy root (bỏ mọi capability), luôn mở CORS cho `cdn.parseable.com`; che lần hai không bắt số viết tách nhóm không có từ khóa đứng trước, họ tên; bật, tắt phải tạo lại 5 container; log không vào bản sao lưu (`docs/van-hanh.md`, mục Log tập trung) |
+| F3.15 | WAF ở cổng: Coraza + OWASP CRS (plugin proxy-wasm của APISIX) | Dùng được | scripts `test_waf.py` 23 (cấu hình: image ghim digest và băm, pha rewrite, WAF thấy thân yêu cầu, chặn mặc định, `MOC_WAF` sai bị từ chối ở `make up`, ở reconciler GitOps trước khi dừng Signet và lúc khởi động, loại trừ gỡ theo id có lý do và chỉ trên khóa giao diện còn gửi, token Keycloak chỉ mất đúng các luật bắt nhầm, chặn JSON lồng sâu); svc-files `test_upload.py`, `test_download.py` (tên tệp có `' " ; = :` giữ nguyên, tải về an toàn) | smoke 8 kiểm: SQLi, XSS, duyệt thư mục, SQLi trong biến GraphQL không token, tải lên `.php` → 403 có `X-Request-Id`, không lộ luật; dòng chặn của Coraza mang đúng `request_id`; JSON lồng 100 tầng → 400, cổng vẫn trả lời; chữ thật qua: GraphQL có nháy, gạch, `_is_null`; tải lên tên có `' ; = :`; dự thảo có đề mục I./II./III.; khối ký, "File …?", `http://<IP>`, "03 file (…)" ở nội dung và ô Tìm kiếm; token ngẫu nhiên của Keycloak (cookie phiên, mã PKCE, code). Chưa chạy xanh trên CI | Lên Hoàn thiện khi smoke và e2e qua WAF xanh trên CI. Dò chặn nhầm trên 7 389 yêu cầu dựng từ dữ liệu mẫu: 0 với chữ của dữ liệu mẫu, 28 với câu tự viết đặt vào ô không dành cho chúng (Cơ quan ban hành, Nơi nhận) — gặp chữ thật bị chặn thì người quản trị thêm loại trừ trong `apisix.yaml`. Token ngẫu nhiên của Keycloak, OIDC (#140): trước khi loại trừ khoảng 1/2 500 giá trị mỗi loại bị chặn, sau 0/50 968 trong lượt đo. Coraza 3.3.3 — bản mới nhất có dạng WebAssembly — còn bốn cách lẩn WAF mức medium; hai lỗ mức high có biện pháp ở cổng (`platform/apisix/README.md`, mục WAF). Nội dung tệp không qua WAF (ClamAV soi). Cổng tốn thêm ~0,4–0,8 GB RAM |
 
 F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 
@@ -111,7 +119,8 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | F4.3 | Tác tử gợi ý giao việc: nhánh song song từ lúc vào sổ, lãnh đạo quyết | Hoàn thiện | svc-workflow `test_advisor.py` 31, `test_suggest.py` 17; svc-files `test_assist_similar.py` 26; db `test_assignment_suggestions.py` 17; scripts `test_giao_viec.py` 24; office `assignSuggest.test.ts` 13 | bước CI `make demo-giao-viec`, `make do-giao-viec` (đỏ khi top-1 dưới 60 %); smoke 5 kiểm; e2e `giao-viec.spec.ts` | Top-1 29/29 đo trên lịch sử giả lập chia cụm gọn, chỉ 2 đơn vị — cao hơn thực tế (CHANGELOG [1.0.0]); hạn gợi ý chưa xét ngày lễ (`services/svc-workflow/README.md`) |
 | F4.4 | Che thông tin cá nhân trong nhật ký và trong chữ gửi mô hình | Hoàn thiện | svc-files `test_pii*.py` 40 (gồm đo trên kho mẫu và 15 đột biến mã); svc-workflow `test_pii_copy.py` 3, `test_pii_logging.py` 2; scripts `test_che_pii.py` 23 | bước CI `make demo-che-pii`; `make do-che-pii` chạy sẵn trong `make test` (job `unit`) | Chưa che họ tên, địa chỉ, số dính chữ (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi trước; nhật ký Hasura, PostgreSQL, Keycloak, Meilisearch không qua bộ che (CHANGELOG [1.0.0], mục Bảo mật) |
 | F4.5 | Ký số PAdES bản phát hành bằng PKI nội bộ trong két — chỉ minh họa | Minh họa | svc-files `test_signing.py` 28; db `test_file_signatures.py` 14; scripts `test_ky_so.py` 22; office `verify.test.ts` (đã tính ở F2.13) | bước CI `make demo-ky-so`; smoke 5 kiểm (bỏ qua khi két chưa có PKI); e2e `van-ban-di.spec.ts` kiểm khối chữ ký ở cổng xác thực | Không có giá trị pháp lý như chữ ký số công cộng; không HSM; ai chiếm được `svc-files` ký được bằng khóa của đơn vị; két dựng trước F4.5 phải nâng cấp tay để ký |
-| F4.6 | Thu góp ý, đo số liệu "sau" theo đặc tả §8 | Chưa làm | — | — | Repo chưa có số đo trước / sau nào theo `docs/dac-ta-san-pham.md` §8. Các lệnh `make do-*` đo tác tử AI, không phải số đo này |
+| F4.6 | Thu góp ý, đo số liệu "sau" theo đặc tả §8 | Dùng được | db `test_feedback.py` 22, `test_success_metrics.py` 8; office `feedback.test.ts` 11, `metrics.test.ts` 10; scripts `test_so_lieu_sau.py` 16 | job `db`; bước CI `make do-so-lieu-sau`; trang Số đo `/so-do` của lãnh đạo đơn vị, nút Góp ý và trang `/gop-y` | Cột "trước" của cả bốn chỉ số chưa đo — chưa có đơn vị chạy thử; số trên bản demo tính trên dữ liệu mẫu (seed đi hết các bước trong vài giây); thời gian tìm lại văn bản cũ là độ trễ hệ thống, không phải thời gian người tìm; số bước chuyển tay chỉ so sánh định tính; chưa có ≥ 5 người ngoài đội góp ý như kế hoạch; góp ý không hiện người gửi nhưng không ẩn danh (giờ gửi chính xác, khuôn màn hình có thể lộ vai trò), không lọc CCCD, số điện thoại trong nội dung (`docs/so-lieu-sau.md`) |
+| F4.7 | Tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo: 12 câu × 5 mức, radar ECharts, lệch nền, không gian nên làm trước, tỷ trọng và hình dạng theo giáo trình DX-OS mục 2.4 (bốn nguyên mẫu), cảnh báo "rác vào, rác ra" dẫn tới cờ chất lượng số liệu, bước tiếp theo trỏ trang Signet có thật mà người xem mở được, bằng chứng đo được từ các view đã có, lưu lịch sử theo đơn vị | Dùng được | office `hpdi.test.ts` 21; db `test_maturity.py` 18 | job `db`; e2e `tu-chan-doan.spec.ts` (chưa chạy lần nào — cần cả hệ thống, chạy ở job `stack` khi mở PR); trang `/tu-chan-doan` của lãnh đạo đơn vị, lãnh đạo phòng | Bộ câu do đội tự viết, chưa thử với đơn vị thật, không phải bộ chỉ số chính thức, không quy đổi sang DTI; tỷ trọng H-P-D-I chỉ ước lượng từ mức tự đánh giá, hệ số thực chứng lấy bằng 1; một người trả lời cho cả đơn vị; tỷ lệ văn bản đi ký số và các số đo khác của [H] chưa có nguồn lãnh đạo đọc được nên không hiện; lãnh đạo phòng không lưu, không thấy bằng chứng (`docs/tu-chan-doan.md` §6) |
 
 ### 2.5. Ngoài danh sách F — kiểm chất lượng của dự án
 
@@ -123,18 +132,18 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | Bảo mật chuỗi cung ứng | job `security`: gitleaks trên lịch sử commit, OSV-Scanner trên tệp khóa phụ thuộc |
 | Quy trình pull request | `.github/workflows/pr.yml` "Quy trình nhánh và tiêu đề PR"; scripts `test_quy_trinh.py` 23; ruleset `.github/rulesets/develop.json` đòi đủ 8 kiểm tra (7 job của CI + kiểm quy trình PR) |
 | Phát hành | `.github/workflows/release.yml` "Phát hành gói nguồn"; scripts `test_phat_hanh.py` 25 |
+| Cắm ứng dụng bằng một lệnh (`moc app install`, [`them-ung-dung.md`](them-ung-dung.md) mục 1) — mức Dùng được | Manifest `apps/<thư mục>/app.yaml` theo `scripts/app-manifest.schema.json`; client Keycloak, route APISIX, container, schema + migration bằng vai trò CSDL riêng của ứng dụng (không quyền gì trên lõi; đối tượng đọc lõi hay chạy bằng quyền của Hasura bị từ chối trước khi commit), bảng và quyền Hasura (điều kiện trong quyền không đọc được dữ liệu lõi), Event Trigger — không sửa tệp lõi nào, trạng thái trong `.moc-apps/`; gỡ giữ dữ liệu. Ứng dụng thứ ba `apps/bang-tin` (Bảng tin đơn vị). Trang Danh mục ứng dụng `/ung-dung` của Văn phòng điện tử (mọi vai trò; băm manifest, ứng dụng đã gỡ chỉ lãnh đạo, quản trị đơn vị; khung nhìn hẹp `core.app_catalog`). scripts `test_ung_dung.py` 46, `test_yaml_nho.py` 6; bang-tin `node --test` 5, `unittest` 15; db `test_app_registry.py` 13 (44 ca), `test_app_catalog.py` 6; office `apps.test.ts` 8; e2e `ung-dung.spec.ts`; bước CI `make demo-cai-ung-dung` (job `luong-chinh`; bước 4, 6, 7 kiểm cả danh mục). Một container một trang mỗi ứng dụng, không route API riêng, không Action; cài = tin mã của ứng dụng (container ở mạng nội bộ của lõi); `.moc-apps/` không vào `moc backup`; cài, gỡ chỉ bằng dòng lệnh (trang danh mục chỉ để xem, ghi "Đã cài" — không dò sức khỏe container của ứng dụng) |
 
 ### 2.6. Tóm tắt
 
-43 tính năng (F1.1–F4.6, không tính F3.6):
+44 tính năng (F1.1–F4.7, không tính F3.6):
 
 | Mức | Số | Tính năng |
 |---|---|---|
-| Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 5 | F1.9, F2.9, F3.8, F3.9, F3.13 |
+| Hoàn thiện | 34 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7–F3.9, F3.11, F3.12; F4.1–F4.4 |
+| Dùng được | 7 | F1.9, F2.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
-| Chưa làm | 3 | F3.14, F3.15, F4.6 |
 
 ## 3. Độ phủ 7 cụm dịch vụ Tầng 1
 
@@ -151,7 +160,7 @@ chưa phủ hết năng lực của cụm.
 | ① | Trạm kiểm dịch tệp | ClamAV, `services/svc-files/src/svc_files/clamav.py` | Hoàn thiện | F1.6, F3.1 |
 | ① | Mã hóa | Transit của OpenBao + AES-GCM, `services/svc-files/src/svc_files/sealed.py` | Hoàn thiện | F3.7 |
 | ① | Chữ ký số (PKI, HSM) | PKI nội bộ trong OpenBao + pyHanko, `services/svc-files/src/svc_files/signing.py` | Minh họa | F4.5. Không HSM — đặc tả §4.4 xếp HSM, chữ ký số công cộng vào "Không làm" |
-| ② Đa thuê ước, biên mạng | API Gateway zero-trust | APISIX, `platform/apisix/` | Hoàn thiện | F1.2; chưa có WAF (F3.15) |
+| ② Đa thuê ước, biên mạng | API Gateway zero-trust | APISIX, `platform/apisix/` | Hoàn thiện | F1.2; WAF Coraza + OWASP CRS ở cổng (F3.15, Dùng được) |
 | ② | Rà soát và che PII | `services/svc-files/src/svc_files/pii.py` (bản chép ở `svc-workflow`) | Hoàn thiện | F4.4; các giới hạn ở mục 2.4 |
 | ② | Đa thuê ước cách ly dữ liệu | `tenant_id` + quyền Hasura (`db/metadata/`), Keycloak Organizations, `scripts/tenants.py` | Hoàn thiện | F1.3, F3.12; một realm, một bucket chia theo tiền tố |
 | ② | Dịch thuật, bản địa hóa đa ngôn ngữ | `apps/office/app/locales/` | Một phần | F2.9: bản địa hóa giao diện Việt / Anh; lõi không có dịch vụ dịch thuật nào cho ứng dụng dùng chung |
@@ -161,26 +170,27 @@ chưa phủ hết năng lực của cụm.
 | ③ | Đóng băng số liệu chuỗi thời gian | Lịch sử đo trong Scorpio (NGSI-LD temporal API, đọc ở `make demo-it-ot`); bảng `office.archived_document_facts` | Một phần | Chưa có kho chuỗi thời gian riêng, chưa chụp số liệu theo kỳ; `archived_document_facts` chỉ giữ số liệu dashboard của văn bản đã nộp lưu |
 | ③ | Lớp ngữ nghĩa báo cáo | Bốn view `office.v_*` qua Hasura (`db/migrations/default/1792281601200_dashboard/`) | Một phần | F3.11; không có lớp định nghĩa chỉ số và chiều dùng chung, mỗi báo cáo là một view viết tay |
 | ④ Dữ liệu phi cấu trúc | Lưu trữ đối tượng | SeaweedFS, `services/svc-files/src/svc_files/storage.py` | Hoàn thiện | F1.5 |
-| ④ | Quản lý hồ sơ, văn bản cho quy trình phê duyệt | `apps/office` + `svc-workflow` + Flowable | Hoàn thiện | F2.2–F2.4; riêng lập hồ sơ, nộp lưu (F3.8) mới ở mức Dùng được |
+| ④ | Quản lý hồ sơ, văn bản cho quy trình phê duyệt | `apps/office` + `svc-workflow` + Flowable | Hoàn thiện | F2.2–F2.4, F3.8 (lập hồ sơ, nộp lưu, phòng đọc trên giao diện) |
 | ④ | Chỉ mục toàn văn | Meilisearch, `svc_files/search.py`, `svc_files/texts.py` | Hoàn thiện | F2.7; bản scan không vào chỉ mục nội dung |
 | ④ | Trộn dữ liệu sinh biểu mẫu, báo cáo động | WeasyPrint: `svc_files/render.py` (văn bản đi), `svc_files/registers.py` (sổ đăng ký); dự thảo "Báo cáo sự cố" (`svc_workflow/ot.py`) | Dùng được | Có kiểm trong CI, nhưng khuôn viết trong mã: đổi mẫu phải sửa mã |
 | ⑤ Quy trình, tự động hóa | BPMN quản lý trạng thái luồng phê duyệt | Flowable 8, `services/svc-workflow/processes/*.bpmn20.xml` | Hoàn thiện | F1.4, F2.3, F2.4 |
 | ⑤ | Thực thi kịch bản serverless | — | **Chưa có** | Không có nơi chạy kịch bản do người dùng nạp. Kestra đã cân nhắc nhưng chưa đưa vào (`DEPENDENCIES.md`); việc nền là vòng lặp viết cứng trong `svc-files`, `svc-workflow` |
-| ⑤ | API nạp dữ liệu khối lớn theo lô | — | **Chưa có** | Không có API nhập lô. Hasura sinh `insert_<bảng>` nhận nhiều dòng cho bảng mà vai trò có quyền thêm, nhưng văn bản chỉ vào qua Action, mỗi lần một văn bản; `make seed` cũng gọi từng văn bản |
-| ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`); `svc-files` ghi mã này vào nhật ký và vào `core.audit_log.request_id` ở các dòng nó tự ghi | Một phần | `svc-workflow` chưa mang mã này; không có log tập trung (F3.14), không tracing. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
+| ⑤ | API nạp dữ liệu khối lớn theo lô | `POST /api/imports/incoming` của svc-files (`svc_files/imports/`), bảng `core.import_jobs`, `core.import_rows` | Dùng được | Văn bản đến: tệp NDJSON/CSV + zip tệp đính kèm, xử lý nền theo mẻ; mỗi dòng qua đúng ClamAV và Action `receiveIncoming` thay mặt văn thư, lỗi từng dòng, gửi lại không nhân đôi, chạy tiếp sau khi svc-files khởi động lại. svc-files `test_imports_*.py` 107; db `test_import_jobs.py` 18; bước CI `make demo-nap-lo`. Chưa có màn "Nhập lô" trên giao diện — gọi API; mới có một loại lô (văn bản đến); zip tệp đính kèm mất khi svc-files khởi động lại (dòng còn cần tệp báo `archive_lost`) |
+| ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`) và ghi nó ở cuối dòng log truy cập; `svc-files`, `svc-workflow` ghi mã này vào nhật ký, chuyển tiếp sang Hasura và vào `core.audit_log.request_id`; log tập trung (F3.14, profile `logs`) tra theo mã: `make logs-tra ID=…` | Dùng được | Tắt mặc định; không tracing (không span, không đo thời gian từng chặng); Hasura, Keycloak, PostgreSQL không vào log tập trung. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
 | ⑥ | Kiểm toán bất biến | Sổ kiểm toán chuỗi băm (`db/migrations/default/1792281600100_core_schema/`), neo ra bucket khóa ghi, `scripts/audit_chain.py` | Hoàn thiện | F2.12 |
-| ⑥ | Trục streaming sự kiện | — | **Chưa có** | Không có broker (Kafka hay tương đương). Sự kiện nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`); Centrifugo chỉ đẩy tới trình duyệt. `DEPENDENCIES.md` nêu Hasura Event Triggers thay Redpanda, nhưng `db/metadata` chưa khai event trigger nào |
+| ⑥ | Trục streaming sự kiện | Luồng `core.app_events` (migration `1792281603200`) + Hasura Event Triggers do `moc app install` sinh (`scripts/ung_dung.py`) | Một phần | Lõi chép sự kiện văn bản trong danh sách trắng (đến, vào sổ, phát hành; không văn bản hạn chế, 5 cột) sang `core.app_events`; mỗi ứng dụng khai `events` nhận qua webhook trong mạng nội bộ, header bí mật, Hasura gửi lại khi lỗi (ít nhất một lần). Không phải broker streaming (không Kafka hay tương đương): không đọc lại từ một vị trí, không nhóm người nghe, không bảo đảm thứ tự, chỉ 3 loại sự kiện; sự kiện khác vẫn chỉ nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`), Centrifugo chỉ đẩy tới trình duyệt. Bằng chứng: db `test_app_registry.py` (PostgreSQL, Hasura thật khi `MOC_IT=1`); bước CI `make demo-cai-ung-dung` (job `luong-chinh`) |
 | ⑥ | GitOps | `scripts/reconcile.py`, `platform/systemd/` | Hoàn thiện | F3.3; Compose + reconciler, không Argo CD |
 | ⑥ | Sao lưu, khôi phục thảm họa | restic, `scripts/backup.py` | Hoàn thiện | F3.4; kho sao lưu trên cùng máy chủ, chép ra ngoài bằng tay |
-| ⑦ Truyền thông, giao vận | Định tuyến thông báo đa kênh | — | **Chưa có** | Một kênh: thông báo trong ứng dụng (`core.notifications` + Centrifugo, `svc_workflow/notify.py`). Không email, SMS, Zalo, Telegram, không bộ định tuyến theo kênh |
+| ⑦ Truyền thông, giao vận | Định tuyến thông báo đa kênh | `svc_workflow/channels.py`, hộp thư đi `core.notification_deliveries`; Mailpit (profile `mail`) để thử | Một phần | Chuông trên web (Centrifugo) cộng email (SMTP) và webhook chat (Mattermost, Slack, ntfy), tắt mặc định; trigger tạo dòng chờ gửi trong cùng giao dịch ghi thông báo, lỗi tạm thử lại giãn dần. Chưa SMS, Zalo; webhook một URL cho cả bản cài; chưa cho từng người chọn kênh |
 | ⑦ | WebSocket thời gian thực | Centrifugo, `platform/centrifugo/config.yaml`, route `/realtime` | Hoàn thiện | F2.5 |
 | ⑦ | Hàng đợi bất đồng bộ chống chối bỏ | Hộp thư đi `office.dispatches` (`svc_workflow/dispatch.py`); việc giao ra ngoài của Flowable (topic `moc-goi-y`, `moc-sla`) | Một phần | Liên thông (F3.12) có thử lại lùi dần, so SHA-256, ghi sổ kiểm toán cả hai đơn vị trong cùng giao dịch. Chưa có hàng đợi dùng chung cho ứng dụng khác, chưa có biên nhận ký số |
 
-**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 2, Minh họa 1, Một phần 5, **Chưa có 4**.
+**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 4, Minh họa 1, Một phần 6, **Chưa có 1**.
 
-- Chưa có: kịch bản serverless (⑤), API nạp lô (⑤), trục streaming sự kiện (⑥), định tuyến thông báo đa kênh (⑦).
-- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), log truy
-  vết phân tán (⑥), hàng đợi chống chối bỏ (⑦).
+- Chưa có: kịch bản serverless (⑤).
+- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), trục sự
+  kiện (⑥: Event Triggers giao tới webhook của ứng dụng, chưa phải broker streaming), định tuyến thông báo đa kênh
+  (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
 - Bốn dịch vụ bắt buộc (SSO, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình) đều ở mức Hoàn thiện.
 
 ## 4. Kiểm lại
@@ -192,6 +202,8 @@ for d in services/svc-files/tests services/svc-workflow/tests scripts/tests db/t
   printf '%s %s\n' "$d" "$(grep -rhoE '^\s*(async )?def test_' --include='*.py' "$d" | wc -l)"
 done
 grep -hE '^\s*(test|it)\(' apps/office/tests/*.test.ts | wc -l   # giao diện (node:test)
+grep -hE '^\s*(test|it)\(' apps/ca-nhan/tests/*.test.js apps/bang-tin/tests/*.test.js | wc -l   # hai ứng dụng
+grep -rhoE '^\s*(async )?def test_' apps/bang-tin/tests | wc -l     # Bảng tin, phần Python
 grep -hE '^test\(' tests/e2e/*.spec.ts | wc -l                     # kịch bản Playwright
 grep -cE '^\s*ok\(' scripts/smoke.py                               # kiểm của make smoke
 grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng tệp (đổi thư mục cho phần khác)
@@ -200,18 +212,18 @@ grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng 
 Chạy thật (cần gì cho từng lệnh: README, mục Kiểm thử):
 
 ```bash
-make test                     # svc-files, svc-workflow, scripts, apps/office — như job unit
+make test                     # svc-files, svc-workflow, scripts, apps/office, ca-nhan, bang-tin — như job unit
 db/tests/stack.sh up          # PostgreSQL + Hasura cho db/tests — như job db (lệnh đủ ở db/README.md)
-make up && make seed && make smoke && make e2e   # như job stack
+make up && make seed && make smoke && make e2e   # như job chay-thu (phần luong-chinh, e2e)
 make demo-nong-lanh           # từng màn ở mục 2; make help liệt kê tất cả
 ```
 
 Các ô "Chưa có", "Chưa làm" ở mục 2, mục 3:
 
 ```bash
-git grep -n event_triggers -- db/metadata                                  # rỗng: chưa có Hasura Event Trigger
-git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez|coraza|parseable' -- docker-compose.yml   # rỗng
-git grep -niwE 'smtp|sms' -- services platform docker-compose.yml        # rỗng: thông báo một kênh
+git grep -n event_triggers -- db/metadata scripts/ung_dung.py   # chỉ ung_dung.py: trigger sinh lúc cài ứng dụng
+git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez' -- docker-compose.yml   # rỗng
+git grep -niwE 'sms|zalo' -- services platform docker-compose.yml        # rỗng: chưa có SMS, Zalo
 grep -n job_name platform/monitoring/prometheus.yml                        # chỉ apisix và chính prometheus
 grep -nE '^  [a-z]+:$|^    name:|^      - name:' .github/workflows/ci.yml  # job và bước CI
 ```

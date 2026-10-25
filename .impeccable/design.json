@@ -45,7 +45,7 @@
       {
         "name": "sidebar",
         "value": "320ms cubic-bezier(.16,1,.3,1)",
-        "purpose": "Flush hover/focus reveal over a fixed 76px rail; touch drawer continuity."
+        "purpose": "Flush hover/keyboard reveal with synchronized76-to244px workspace track; touch drawer continuity."
       },
       {
         "name": "task-state",

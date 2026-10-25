@@ -50,7 +50,7 @@
     },
     "/actions/{name}": {
       "post": {
-        "summary": "Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask",
+        "summary": "Chạy một Hasura Action: receiveIncoming, registerIncoming, submitOutgoing, myTasks, completeTask, otSensorMap",
         "operationId": "action_actions__name__post",
         "parameters": [
           {

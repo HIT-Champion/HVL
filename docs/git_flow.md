@@ -123,6 +123,8 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `files` | `svc-files`, SeaweedFS, ClamAV, tìm kiếm | AI |
 | `realtime` | Centrifugo | Backend |
 | `office` | `apps/office` — giao diện web | Frontend |
+| `ca-nhan` | `apps/ca-nhan` — Không gian cá nhân P.A.R.A, ứng dụng thứ hai trên lõi | Frontend |
+| `bang-tin` | `apps/bang-tin` — Bảng tin đơn vị, ứng dụng thứ ba, cắm bằng `moc app install` | Frontend · Backend |
 | `ai` | `svc-ai`: RAG, OCR, tác tử | AI |
 | `data` | Kestra, nóng → lạnh, lineage | AI |
 | `ops` | Compose, reconciler, sao lưu, giám sát, OpenBao | Backend |
@@ -182,7 +184,7 @@ trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự b
 # <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, ≤ 72 ký tự, không chấm cuối>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
-# Phạm vi: gateway auth db workflow files realtime office ai data ops cli scripts e2e ci deps docs release
+# Phạm vi: gateway auth db workflow files realtime office ca-nhan ai data ops cli scripts e2e ci deps docs release
 #
 # Thân (tùy chọn, tiếng Anh): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #
@@ -282,9 +284,10 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
 - Điều kiện: **CI xanh** (8 job: 7 job của workflow CI — Giấy phép, Dựng từ mã nguồn, Tài liệu, Test đơn vị dịch vụ,
   Schema và quyền trên CSDL thật, Chạy thử toàn hệ thống, Quét bí mật và lỗ hổng phụ thuộc — và job "Quy trình nhánh và
   tiêu đề PR" của workflow PR) + **1 duyệt**. Ruleset của repo chặn nút merge tới khi đủ. Job "Chạy thử toàn hệ thống"
-  gom ba phần chạy song song trên ba máy (`Chạy thử: luong-chinh`, `ai-sao-luu`, `cai-dat`; phần nào cũng tự dựng và nạp
-  mẫu), mất khoảng 12 phút; PR chỉ đổi tài liệu (`*.md`, ảnh trong `docs/`, trừ `docs/api/`) không dựng hệ thống, job
-  này đạt ngay. Lỗi thì tải `stack-logs-<phần>` ở trang lượt chạy để xem nhật ký từng dịch vụ và vết Playwright.
+  gom năm phần chạy song song trên năm máy (`Chạy thử: luong-chinh`, `e2e`, `ai`, `sao-luu`, `cai-dat`; phần nào cũng
+  tự dựng và nạp mẫu), mất khoảng 9 phút; PR chỉ đổi tài liệu (`*.md`, ảnh trong `docs/`, trừ `docs/api/`) không dựng
+  hệ thống, job này đạt ngay. Lỗi thì tải `stack-logs-<phần>` ở trang lượt chạy để xem nhật ký từng dịch vụ và vết
+  Playwright.
 - Cách merge vào `develop`: **Squash and merge** — mọi commit nhỏ của nhánh gộp thành một commit sạch.
   Riêng PR gộp ngược sau bản vá nóng (mục 6) dùng **Create a merge commit**.
 - Cách merge vào `main` (PR phát hành, mục 6): **Create a merge commit**, giữ nguyên các commit của
@@ -295,14 +298,15 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
 
 ## 6. Phát hành
 
-Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10, bản cho vòng trường (cả hai đã phát hành) · `v1.1.0` 03/12, bản nộp chấm
-(mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ.
+Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10 (cả hai đã phát hành) · `v1.1.0` trước 01/11, bản cho vòng trường · `v1.2.0`
+03/12, bản nộp chấm (mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ. Gói phát hành tên `signet-X.Y.Z.tar.gz` từ
+`v1.1.0`; gói của `v0.1.0`, `v1.0.0` giữ tên cũ `moc-X.Y.Z.tar.gz` (không gắn lại thẻ đã đẩy).
 
 Đây là lúc duy nhất `main` nhận thay đổi.
 
 ```bash
 # 1. Chốt ghi chép thay đổi trên develop: PR (nhánh chore/<issue>-chot-1-1-0) chuyển các dòng của mục
-#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [1.1.0] - 2026-12-03", viết 3–8 dòng tóm tắt ngay dưới
+#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [1.1.0] - <ngày phát hành>", viết 3–8 dòng tóm tắt ngay dưới
 #    tiêu đề đó (trang Release hiện phần này, phần còn lại gập lại), để lại tiêu đề
 #    "## [Chưa phát hành]" trống (CI đòi có mục này)
 #    tiêu đề PR: chore(release): chốt ghi chép thay đổi v1.1.0  → review → squash merge vào develop
@@ -315,8 +319,11 @@ gh pr create --base main --head develop --title "chore(release): v1.1.0" --body 
 # 3. Gắn thẻ trên main mới nhất, cây làm việc sạch:
 git switch main && git pull
 make release VERSION=1.1.0       # tạo thẻ v1.1.0 + gói .tar.gz + .sha256 trong dist/ để kiểm tra
+#    rồi kiểm chính gói vừa đóng (scripts/kiem_goi.py, xem dưới): không đạt thì gỡ thẻ v1.1.0, xóa gói, in từng lỗi —
+#    sửa qua PR như thường rồi chạy lại
 
-# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, rồi tạo Release kèm .tar.gz, .sha256
+# 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, đóng gói và kiểm lại gói bằng cùng
+#    scripts/kiem_goi.py, rồi mới tạo Release kèm .tar.gz, SBOM .cdx.json (make sbom) và .sha256 của cả hai
 git push origin v1.1.0
 ```
 
@@ -340,8 +347,21 @@ gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào 
 - Phiên bản theo **Semantic Versioning**: số giữa tăng khi có tính năng mới, số cuối cho bản vá nóng, số đầu chỉ
   tăng khi bản cài cũ không nâng cấp tại chỗ được.
 - `release.yml` dựng trang Release bằng `scripts/release_body.py`: dòng đầu ghi **tệp chính thức là
-  `moc-X.Y.Z.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)" mà PoF #3 trừ điểm định dạng không mở), rồi
+  `signet-X.Y.Z.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)" mà PoF #3 trừ điểm định dạng không mở), rồi
   phần tóm tắt, toàn bộ ghi chép thay đổi gập lại.
+- **Kiểm gói trước khi phát hành** (`scripts/kiem_goi.py`, `make release` ở máy và bước "Kiểm gói trước khi phát
+  hành" của `release.yml`, ngay sau bước đóng gói): kiểm chính tệp `signet-X.Y.Z.tar.gz`, không phải cây git. Giải nén
+  vào thư mục tạm (mục nào là symlink, đường tuyệt đối, `..` thì dừng trước khi giải nén) rồi chặn: tệp môi trường thật
+  (chỉ phát hành tệp mẫu `*.example`), khóa riêng (`id_rsa`, `*.key`, `*.p12`…, và mọi tệp có khối PEM `PRIVATE KEY`),
+  tài liệu nội bộ `*.local*`, `COMMIT.md`, `publics/`, `node_modules/`, `__pycache__/`, dữ liệu chạy ở gốc
+  (`backups/`, `data/`…), tệp CSDL, tệp lớn hơn 5 MiB (tệp lớn nhất lúc viết 0,44 MB). Giấy phép: có `LICENSE`,
+  `NOTICE`; `scripts/license-header.sh check <thư mục gói>`; mọi tệp có `SPDX-License-Identifier` và bản quyền trong
+  tệp, hoặc được `REUSE.toml` khai. Cuối cùng `.sha256` khớp và ghi đúng tên gói, thư mục gốc là `signet-X.Y.Z/`, tệp
+  `VERSION` của gói ghi `vX.Y.Z`. Tệp phải theo dõi trong git nhưng không được vào gói: thêm dòng
+  `<đường dẫn> export-ignore` vào `.gitattributes`.
+- Phiên bản trong gói: `git archive` điền thẻ vào dòng cuối của `VERSION` (`.gitattributes`: `VERSION export-subst`),
+  `make install` từ gói giải nén đọc dòng đó, không cần đặt tay `MOC_VERSION`; bản clone git vẫn lấy `git describe`.
+  Gói cũ chưa có tệp `VERSION` (đến `v1.1.0`) thì vẫn đặt tay.
 - Không xóa hay gắn lại thẻ đã đẩy — ruleset thẻ `v*` chặn hẳn, `release.yml` và `release.sh` cũng từ
   chối phát hành lại. Phát hành nhầm thì ra bản vá `vX.Y.Z+1`.
 
@@ -377,8 +397,9 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 
 | Từ | Quy tắc |
 |---|---|
+| **trước 01/11** | Phát hành `v1.1.0`, bản cho vòng trường |
 | **26/11** | Đóng băng tính năng: chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` |
-| **03/12** | Phát hành `v1.1.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.1.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
+| **03/12** | Phát hành `v1.2.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.2.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
 | **05/12 → 10/12** | Không đẩy `deploy` trừ khi cả đội đồng ý (sự cố chặn demo) |
 | **17:00 06/12** | **Không push bất cứ gì lên repo này** — kể cả nhánh mới. Slide, video làm ở repo riêng |
 
@@ -407,7 +428,7 @@ git verify-commit HEAD                            # thấy Good "git" signature 
   mặc định, PR vào nhánh khác không nối, không đóng được issue. Giám khảo clone nhánh mặc định: ruleset giữ
   `develop` luôn xanh CI, và lúc chấm `develop` cùng nội dung với `main` (mục 8).
 - **Ruleset** (Settings → Rules → Rulesets), khai sẵn trong `.github/rulesets/`, tạo bằng
-  `gh api -X POST repos/HIT-Champion/HVL/rulesets --input .github/rulesets/<tệp>.json`:
+  `gh api -X POST repos/HIT-Champion/Signet/rulesets --input .github/rulesets/<tệp>.json`:
   - `develop.json` — nhánh `develop`: bắt buộc PR, 1 duyệt, 8 job CI xanh (mục 5.4); chỉ squash hoặc
     merge commit; cấm force push, cấm xóa;
   - `main.json` — nhánh `main`: như trên nhưng chỉ merge commit; job "Quy trình nhánh và tiêu đề PR"
@@ -420,10 +441,13 @@ git verify-commit HEAD                            # thấy Good "git" signature 
   - nội dung commit mặc định của cả hai lấy tiêu đề + mô tả PR;
   - bật *Automatically delete head branches*;
   - bằng lệnh: `gh repo edit --enable-merge-commit --enable-squash-merge --enable-rebase-merge=false
-    --delete-branch-on-merge`, rồi `gh api -X PATCH repos/HIT-Champion/HVL -f merge_commit_title=PR_TITLE
+    --delete-branch-on-merge`, rồi `gh api -X PATCH repos/HIT-Champion/Signet -f merge_commit_title=PR_TITLE
     -f merge_commit_message=PR_BODY -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY`.
 - **Code security** (Settings → Code security): bật *Secret scanning* và *Push protection* (miễn phí với repo
-  công khai), chặn từ lúc push thay vì đợi job gitleaks của CI.
+  công khai), chặn từ lúc push thay vì đợi job gitleaks của CI; bật *Private vulnerability reporting* để người ngoài
+  báo lỗ hổng riêng tư theo `SECURITY.md` — bằng lệnh:
+  `gh api -X PUT repos/HIT-Champion/Signet/private-vulnerability-reporting`; kiểm:
+  `gh api repos/HIT-Champion/Signet/private-vulnerability-reporting` trả `{"enabled": true}`.
 - **Issues**:
   - bật Issues;
   - tạo nhãn `backend`, `ai`, `frontend`, `bug`, `feature`, `docs`, `good first issue`;

@@ -37,6 +37,7 @@ này bằng bản giả.
 from __future__ import annotations
 
 import argparse
+import copy
 import getpass
 import hashlib
 import json
@@ -299,8 +300,10 @@ select json_build_object('synced', exists(select 1 from core.users u
 
 
 def _tail(text: str) -> str:
+    """Dòng ERROR (cùng DETAIL, HINT) của psql nếu có — CONTEXT nhiều dòng của khối DO đẩy nó ra khỏi mấy dòng cuối."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return " / ".join(lines[-3:])
+    errors = [line for line in lines if re.search(r"\b(ERROR|DETAIL|HINT):", line)]
+    return " / ".join(errors[:3] or lines[-3:])
 
 
 class Database:
@@ -330,6 +333,14 @@ class Database:
         except ValueError:
             raise Unavailable(f"CSDL trả kết quả lạ: {out[:200]}") from None
 
+    def as_user(self, user: str) -> Database:
+        """Cùng CSDL, đăng nhập bằng vai trò khác qua socket Unix trong container (moc app chạy migration của ứng dụng
+        bằng vai trò CSDL riêng của nó: session user là vai trò đó, không phải SET ROLE từ superuser)."""
+        other = copy.copy(self)
+        i = self.base.index("-U")
+        other.base = [*self.base[:i + 1], user, *self.base[i + 2:]]
+        return other
+
 
 def database() -> Database:
     return Database()
@@ -346,14 +357,15 @@ class Keycloak:
     def __init__(self, base_url: str, realm: str, token: str, *, call: Callable[..., tuple[Any, dict[str, str]]],
                  http_error: type[Exception]):
         self.base = f"{base_url.rstrip('/')}/admin/realms/{realm}"
+        self.server = f"{base_url.rstrip('/')}/admin"   # đường của cả máy chủ, ngoài realm (serverinfo)
         self.realm_name = realm
         self._auth = {"Authorization": f"Bearer {token}"}
         self._call = call
         self._http_error = http_error
 
-    def _req(self, method: str, path: str, body: Any = None, *,
-             query: dict[str, Any] | None = None) -> tuple[Any, dict[str, str]]:
-        url = self.base + path + ("?" + urllib.parse.urlencode(query) if query else "")
+    def _req(self, method: str, path: str, body: Any = None, *, query: dict[str, Any] | None = None,
+             server: bool = False) -> tuple[Any, dict[str, str]]:
+        url = (self.server if server else self.base) + path + ("?" + urllib.parse.urlencode(query) if query else "")
         try:
             return self._call(method, url, body, headers=self._auth)
         except self._http_error as exc:
@@ -434,6 +446,31 @@ class Keycloak:
     def reset_password(self, user_id: str, value: str) -> None:
         """Mật khẩu tạm: Keycloak tự thêm yêu cầu đổi mật khẩu ở lần đăng nhập kế tiếp."""
         self._req("PUT", f"/users/{user_id}/reset-password", {"type": "password", "value": value, "temporary": True})
+
+    # client của ứng dụng: realm_clients.py thêm client còn thiếu vào realm đã nạp từ trước
+    def clients(self) -> list[dict[str, Any]]:
+        return self._all("/clients")
+
+    def create_client(self, rep: dict[str, Any]) -> str:
+        return self._created_id(self._req("POST", "/clients", rep)[1])
+
+    # moc app (scripts/ung_dung.py): gỡ client của ứng dụng cài bằng manifest, sửa đường chuyển hướng khi đổi `path`;
+    # id nội bộ, không phải clientId
+    def delete_client(self, client_id: str) -> None:
+        self._req("DELETE", f"/clients/{client_id}")
+
+    def update_client(self, client_id: str, rep: dict[str, Any]) -> None:
+        self._req("PUT", f"/clients/{client_id}", rep)
+
+    # theme đăng nhập: realm_clients.py áp loginTheme của tệp realm cho realm đã nạp từ trước
+    def update_realm(self, rep: dict[str, Any]) -> None:
+        """PUT realm. Gửi nguyên bản vừa đọc đã sửa, như enable_organizations."""
+        self._req("PUT", "", rep)
+
+    def login_themes(self) -> set[str]:
+        """Tên các theme đăng nhập máy chủ Keycloak đang có: dựng sẵn trong image và thư mục /opt/keycloak/themes."""
+        info, _ = self._req("GET", "/serverinfo", server=True)
+        return {t.get("name") for t in ((info or {}).get("themes") or {}).get("login") or []}
 
 
 def admin_token() -> str:

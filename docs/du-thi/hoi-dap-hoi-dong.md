@@ -26,16 +26,24 @@
 ## 1. Open-Core nằm ở đâu, ứng dụng khác dùng lại lõi thế nào?
 
 Tầng 1 là profile `core` của `docker-compose.yml` (Keycloak, APISIX, Hasura + PostgreSQL, Flowable, SeaweedFS,
-Meilisearch, ClamAV, OpenBao, `svc-files`, `svc-workflow`), không có giao diện: chỉ APISIX mở cổng ra ngoài, đường quản
-trị (`/console`, `/v1/metadata`, `/admin`…) trả 404. Ứng dụng nào cũng gọi lõi qua một cổng bằng token Keycloak —
+Meilisearch, ClamAV, OpenBao, `svc-files`, `svc-workflow`), không có giao diện: chỉ APISIX mở cổng ra ngoài, đường
+quản trị (`/console`, `/v1/metadata`, `/admin`…) trả 404. Ứng dụng nào cũng gọi lõi qua một cổng bằng token Keycloak —
 GraphQL cho dữ liệu, REST cho tệp, tìm kiếm, WebSocket cho thông báo; riêng cổng xác thực văn bản không cần token — và
 đơn vị, vai trò luôn lấy từ token. Dữ liệu dùng chung nằm ở schema `core` (đơn vị, tệp, sổ kiểm toán, thông báo); Văn
 phòng điện tử có schema `office` riêng, ứng dụng mới thêm schema của nó và một client Keycloak theo mẫu `app-office`,
-không sửa `core`. Hiện mới có một ứng dụng Tầng 2 (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`); `smoke.py`
-và các màn demo thao tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Phần nghiệp vụ văn phòng phía
-máy chủ (Actions vào sổ, phát hành, dựng PDF văn bản đi) còn nằm chung trong `svc-workflow`, `svc-files`.
+không sửa `core`. Có ba ứng dụng Tầng 2: Văn phòng điện tử (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`),
+Không gian cá nhân P.A.R.A (`app-ca-nhan`, `/ca-nhan/`) và Bảng tin đơn vị (`/bang-tin/`). Ứng dụng thứ hai chỉ thêm
+schema `personal`, client `app-ca-nhan`, một route APISIX và một service compose, không sửa dòng nào trong
+`services/`, và dùng chung phiên đăng nhập, sổ kiểm toán, quét mã độc của lõi. Ứng dụng thứ ba cắm bằng một lệnh:
+`moc app install apps/bang-tin/app.yaml` đọc manifest rồi tạo client Keycloak, route APISIX, container, schema và
+migration chạy bằng vai trò CSDL riêng của ứng dụng (không có quyền gì trên lõi), quyền Hasura và Event Trigger nhận
+sự kiện văn bản của lõi; các tệp lõi không đổi (`git diff` trống), gỡ thì giữ dữ liệu. `smoke.py` và các màn demo thao
+tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Phần nghiệp vụ văn phòng phía máy chủ (Actions vào
+sổ, phát hành, dựng PDF văn bản đi) còn nằm chung trong `svc-workflow`, `svc-files`.
 
 **Bằng chứng:** README mục "Kiến trúc"; [`docs/api/README.md`](../api/README.md) (§1 "Muốn thêm một ứng dụng Tầng 2");
+[`docs/them-ung-dung.md`](../them-ung-dung.md) (§1 `moc app install`, mẫu `apps/bang-tin`; §3–§4 làm tay, mẫu
+`apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`;
 [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `platform/apisix/apisix.yaml`; `make smoke` (chặn đường quản
 trị); CI job `stack`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)".
 
@@ -74,14 +82,19 @@ vị"; CI job `stack`, bước "Thêm đơn vị bằng một lệnh (moc tenant
 
 Đăng nhập một lần qua Keycloak; văn thư, lãnh đạo, tổ trưởng, quản trị đơn vị bắt buộc mã TOTP, cả ở đường lấy token
 cho script. Keycloak chặn dò mật khẩu, APISIX giới hạn lượt đăng nhập theo IP và kiểm JWT ngay ở biên, dịch vụ phía
-sau kiểm lại token. Mọi tệp qua ClamAV trước khi ghi vào kho; ClamAV không trả lời thì từ chối (`503`) chứ không cho
-qua. Văn bản hạn chế: mỗi tệp một khóa AES-256 bọc trong két OpenBao, kho và bản sao lưu chỉ có bản mã, bản rõ chỉ ở
-trong bộ nhớ cho người có tên và mang tên người xem; dịch vụ lấy bí mật từ két bằng AppRole, không qua biến môi trường.
-Mọi thay đổi vào sổ kiểm toán chuỗi băm SHA-256, đầu chuỗi neo định kỳ (mặc định 10 phút) ra bucket khóa ghi:
-`make audit` tính lại cả chuỗi ngoài CSDL và chỉ ra dòng bị sửa, kể cả khi người sửa tắt trigger hay viết lại cả
-chuỗi. Giới hạn đã ghi: các container gọi nhau bằng HTTP trong mạng nội bộ, Hasura nối CSDL bằng siêu người dùng.
+sau kiểm lại token. Trước cả bước kiểm token, mọi yêu cầu qua tường lửa ứng dụng web Coraza + OWASP CRS 4.14
+(paranoia 1) chạy trong APISIX: SQLi, XSS, đọc tệp hệ thống, tải lên tệp `.php` nhận 403 kèm mã yêu cầu để tra nhật
+ký; mỗi loại trừ cho dữ liệu thật có lý do và test riêng. Mọi tệp qua ClamAV trước khi ghi vào kho; ClamAV không trả
+lời thì từ chối (`503`) chứ không cho qua. Văn bản hạn chế: mỗi tệp một khóa AES-256 bọc trong két OpenBao, kho và bản
+sao lưu chỉ có bản mã, bản rõ chỉ ở trong bộ nhớ cho người có tên và mang tên người xem; dịch vụ lấy bí mật từ két
+bằng AppRole, không qua biến môi trường. Mọi thay đổi vào sổ kiểm toán chuỗi băm SHA-256, đầu chuỗi neo định kỳ (mặc
+định 10 phút) ra bucket khóa ghi: `make audit` tính lại cả chuỗi ngoài CSDL và chỉ ra dòng bị sửa, kể cả khi người sửa
+tắt trigger hay viết lại cả chuỗi. Giới hạn đã ghi: các container gọi nhau bằng HTTP trong mạng nội bộ, Hasura nối
+CSDL bằng siêu người dùng; chưa có bản WebAssembly nào mang Coraza đã vá 12 lỗ hổng công bố 02/10/2026 — hai lỗ mức
+high có biện pháp ở cổng, các cách lẩn WAF mức medium thì dịch vụ vẫn tự kiểm đầu vào.
 
-**Bằng chứng:** `platform/keycloak/README.md`; `make demo-kiem-dich`, `make demo-han-che`, `make demo-ket-bi-mat`,
+**Bằng chứng:** `platform/keycloak/README.md`; `platform/apisix/README.md` mục WAF (luật, loại trừ, lỗ hổng của Coraza
+3.3.3); `make smoke` khối "Tường lửa ứng dụng web"; `make demo-kiem-dich`, `make demo-han-che`, `make demo-ket-bi-mat`,
 `make audit`; `db/README.md` (test sổ kiểm toán, gồm các kiểu sửa lén); [`docs/trien-khai.md`](../trien-khai.md) §8;
 CI job `stack` (các bước `make demo-*`), job `security` (gitleaks, OSV-Scanner).
 
@@ -123,10 +136,12 @@ theo từ khóa và trả câu trích, `svc-files` dò lại mô hình mỗi 60 
 đạo vẫn có việc chỉ đạo, chỉ mất gợi ý giao việc. ClamAV ngừng: tải tệp bị từ chối, vì thà chặn còn hơn lưu tệp chưa
 quét; Meilisearch ngừng: trợ lý báo `503 search_unavailable` chứ không trả lời mò. Liên thông giữa hai đơn vị ghi outbox
 trong cùng giao dịch phát hành, vòng nền gửi lại giãn dần từ 30 giây tới 1 giờ; container chết hẳn thì reconciler dựng
-lại trong vòng một phút.
+lại trong vòng một phút. Ai cũng xem được thành phần nào đang chạy, chậm hay ngừng ở trang công khai `/trang-thai` —
+không cần đăng nhập, không lộ địa chỉ hay lỗi nội bộ.
 
 **Bằng chứng:** [`docs/demo-script.md`](../demo-script.md) (các mục "Nếu giám khảo hỏi"); `make demo-giao-viec` (bước
-10: dừng `svc-files` giữa chừng); `make demo-tu-phuc-hoi`; `services/svc-files/README.md` (mã lỗi `503` của trợ lý).
+10: dừng `svc-files` giữa chừng); `make demo-tu-phuc-hoi`; `services/svc-files/README.md` (mã lỗi `503` của trợ lý);
+[`docs/van-hanh.md`](../van-hanh.md) (trang trạng thái, `GET /api/status`).
 
 ## 8. Không có Internet có chạy được không?
 
@@ -143,11 +158,12 @@ mục "Checklist trước giờ trình diễn".
 
 ## 9. Tốn bao nhiêu, máy tối thiểu thế nào?
 
-Không có tiền giấy phép: mọi thành phần là phần mềm nguồn mở, GitHub và Cloudflare gói Free đủ dùng; chi phí là máy
-và điện. Hệ thống mặc định (15 container) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình; máy chủ đề xuất
-4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng chưa đo thật trên máy 8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định
-6 GB RAM, 4 lõi; đặt lại bằng `MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một
-laptop của đội (i5-12500H) qua Cloudflare Tunnel, không cần IP công khai.
+Không có tiền giấy phép: mọi thành phần là phần mềm nguồn mở, GitHub và Cloudflare gói Free đủ dùng; chi phí là máy và
+điện. Hệ thống mặc định (16 container) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình — số đo từ trước khi thêm
+`app-ca-nhan`, một nginx phục vụ trang tĩnh; máy chủ đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng chưa đo thật trên máy
+8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng `MOC_AI_MEM_LIMIT`,
+`MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một laptop của đội (i5-12500H) qua Cloudflare
+Tunnel, không cần IP công khai.
 
 **Bằng chứng:** README mục "Yêu cầu hệ thống"; [`docs/trien-khai.md`](../trien-khai.md) §1, §5b, §8;
 `docker-compose.yml` (dịch vụ `ollama`); `docs/architecture.md` §1.3.
@@ -196,12 +212,14 @@ của nó (loại `agent`).
 ## 13. Còn gì chưa làm?
 
 Chưa có trục streaming sự kiện (Kafka…): sự kiện nằm trong PostgreSQL (dòng thời gian văn bản, outbox liên thông), đủ
-cho một máy. Chưa có thực thi kịch bản serverless (cụm ⑤) và công cụ low-code: form, quy trình viết bằng mã (JSON Schema
-trong `schemas/`, BPMN XML), chưa có trình thiết kế quy trình trên giao diện (bpmn-js bị loại vì giấy phép). Thông báo
-mới có trong ứng dụng và đẩy qua WebSocket (Centrifugo), chưa gửi email, SMS hay Zalo. Một máy, không chịu lỗi nhiều
-nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel, chưa lên VPS thật. Ký số chỉ minh họa bằng CA nội
-bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên kho văn bản giả lập, chưa có đơn vị
-dùng thật.
+cho một máy. Ứng dụng cắm bằng `moc app install` nhận ba loại sự kiện văn bản qua Hasura Event Trigger (luồng
+`core.app_events`): gửi lại khi lỗi, nhưng không đọc lại từ một vị trí, không bảo đảm thứ tự. Chưa có thực thi kịch
+bản serverless (cụm ⑤) và công cụ low-code: form, quy trình viết bằng mã (JSON Schema trong `schemas/`, BPMN XML),
+chưa có trình thiết kế quy trình trên giao diện (bpmn-js bị loại vì giấy phép). Thông báo gửi trong ứng dụng qua
+WebSocket (Centrifugo) và, khi cấu hình, qua email và webhook chat; chưa có SMS, Zalo, chưa cho từng người chọn kênh.
+Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel, chưa lên VPS thật.
+Ký số chỉ minh họa bằng CA nội bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên
+kho văn bản giả lập, chưa có đơn vị dùng thật.
 
 **Bằng chứng:** [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §6 "Không làm — và lý do";
 [`docs/dac-ta-san-pham.md`](../dac-ta-san-pham.md) §4.4; [`docs/trien-khai.md`](../trien-khai.md) §8; các mục "Còn gì
