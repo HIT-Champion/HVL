@@ -25,7 +25,10 @@ sử dụng"*).
   6.21.1 (17/10, vá 5 GHSA của 6.19.0) — cả hai đọc tệp người dùng tải lên (`svc-files`); certifi 2026.10.19 (20/10,
   bỏ gốc emSign có CA trung gian lộ khóa, GHSA-6q48-6c7w-9gw2). 23/10/2026: brotli 1.2.1 và brotlicffi 1.2.1.0 (22/10,
   vá lỗi ghi tràn bộ nhớ trong bộ giải nén, PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) — gói kéo theo của fontTools mà
-  WeasyPrint dùng trong `svc-files`.
+  WeasyPrint dùng trong `svc-files`. 24/10/2026: pypdf 6.21.2 (21/10, vá GHSA-6c7f-9265-g8fw, GHSA-gmh7-3g9r-mjh5,
+  GHSA-jr96-gvgh-j3r4, HIGH: PDF dị dạng làm chạy rất lâu); serialize-javascript 7.1.3 (22/10, GHSA-m5mm-p8h7-m29v)
+  và fast-uri 3.1.9 (19/10, bốn GHSA mức LOW/MODERATE) — gói kéo theo khi dựng `apps/office`, chọn đúng bản vá chứ
+  không lấy bản mới hơn (serialize-javascript 7.1.4 ra 23/10).
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -44,7 +47,7 @@ sử dụng"*).
 | Docker Compose v2 | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | Caddy | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | Python | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
-| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh (chỉ ở bước dựng image) | `node:24.20.0-slim` |
+| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin` (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests` | `node:24.20.0-slim` |
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
 | Git | ≥ 2.30 | GPL-2.0 | Quản lý mã nguồn, sinh gói phát hành | Gói hệ thống |
@@ -53,6 +56,9 @@ sử dụng"*).
 | gitleaks | 8.30.1 | MIT | CI: quét bí mật lộ trong toàn bộ lịch sử commit | `ghcr.io/gitleaks/gitleaks:v8.30.1` |
 | OSV-Scanner | 2.6.0 | Apache-2.0 | CI: đối chiếu tệp khóa phụ thuộc với cơ sở dữ liệu lỗ hổng OSV | `ghcr.io/google/osv-scanner:v2.6.0` |
 | REUSE tool | 5.0.2 | GPL-3.0-or-later | Kiểm mọi tệp đều có thông tin bản quyền và giấy phép theo chuẩn REUSE (`REUSE.toml`); chạy tay, chỉ đọc kho | `uvx --from reuse==5.0.2 reuse lint` |
+| Syft | 1.54.1 | Apache-2.0 | `make sbom`, CI, bản phát hành: SBOM CycloneDX của cây mã nguồn (tệp khóa npm, `requirements*.txt`, action CI), đầu vào của `make license-audit`; chỉ đọc kho, hỏi PyPI giấy phép gói Python | `ghcr.io/anchore/syft:v1.54.1` (image 06/10/2026) |
+| Chromium | bản có `--headless=new` | BSD-3-Clause | Chỉ khi sửa sơ đồ kiến trúc của README: chụp từng khung SVG (`python3 scripts/so_do_kien_truc.py gif`); không thuộc sản phẩm, không chạy trong CI | Gói hệ thống |
+| FFmpeg | ≥ 6.0 | LGPL-2.1-or-later (GPL-2.0-or-later tùy bản dựng) | Chỉ khi sửa sơ đồ kiến trúc: ghép các khung thành GIF với một bảng màu chung; gọi như tiến trình độc lập | Gói hệ thống |
 
 > **Ghi chú tương thích:** Make và Git là *công cụ dựng*, được gọi như tiến trình độc lập và không
 > liên kết vào sản phẩm, nên giấy phép GPL của chúng không lan sang Signet. Cả hai đều là phần
@@ -65,14 +71,14 @@ sử dụng"*).
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
 | Keycloak | 26.7.5 | Apache-2.0 | Định danh tập trung: SSO, MFA, vai trò người dùng | `quay.io/keycloak/keycloak:26.7.5` | 1 |
-| Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian` | 1 |
+| Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian`, dựng thành `moc/apisix` chỉ thêm tệp WAF (`platform/apisix/Dockerfile`, F3.15) | 1 |
 | PostgreSQL | 16 | PostgreSQL License | Cơ sở dữ liệu quan hệ chính (QĐ-002) | `postgres:16-alpine` | 1 |
-| Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions, Event Triggers | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
+| Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions, Event Triggers (luồng `core.app_events` tới webhook của ứng dụng cài bằng `moc app install`; `hasura-cli` có sẵn trong image áp metadata trộn) | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
 | Flowable (REST) | 8.0.0 | Apache-2.0 | Động cơ quy trình BPMN | `flowable/flowable-rest:8.0.0` | 1 |
 | SeaweedFS | 4.48 | Apache-2.0 | Lưu trữ đối tượng chuẩn S3 | `chrislusf/seaweedfs:4.48` | 1 |
 | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc tệp tải lên (dịch vụ độc lập) | `clamav/clamav:1.5.4` | 1 |
 | Meilisearch (Community Edition) | v1.54.3 | MIT | Tìm kiếm toàn văn; chỉ mục đoạn `chunks` của trợ lý hỏi đáp (F4.2): tìm lai từ khóa + véc-tơ trong bản CE, embedder `userProvided` (véc-tơ do `svc-files` tính bằng Ollama, Meilisearch không gọi mô hình nào, không vào mạng `ai`) | `getmeili/meilisearch:v1.54.3` | 1 |
-| nginx (unprivileged) | 1.30.6 | BSD-2-Clause | Phục vụ trang tĩnh của `app-office` sau APISIX | `nginxinc/nginx-unprivileged:1.30.6-alpine` | 1 |
+| nginx (unprivileged) | 1.30.6 | BSD-2-Clause | Phục vụ trang tĩnh của `app-office`, `app-ca-nhan` sau APISIX | `nginxinc/nginx-unprivileged:1.30.6-alpine` | 1 |
 | Centrifugo | v6.9.7 | Apache-2.0 | Đẩy thông báo thời gian thực qua WebSocket | `centrifugo/centrifugo:v6.9.7` | 2 |
 
 **Ghi chú:**
@@ -90,7 +96,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 |---|---|---|---|---|---|
 | Nuxt | 4.5.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | Vue | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
-| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak | npm | 1 |
+| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
@@ -109,7 +115,8 @@ trong trang phát hành (đã tìm trong thư mục trang tĩnh của image `app
 | `node-forge` | BSD-3-Clause OR GPL-2.0 | listhen (máy chủ phát triển của Nuxt) | Gói cho chọn giấy phép, Signet dùng theo BSD-3-Clause. Chỉ chạy lúc phát triển |
 | `type-fest` | MIT OR CC0-1.0 | dot-prop | Chỉ có kiểu TypeScript, Signet dùng theo MIT |
 
-Quét lại: `python3 -c "import json,collections;p=json.load(open('apps/office/package-lock.json'))['packages'];print(collections.Counter(v.get('license') for k,v in p.items() if k))"`.
+Quét lại: `python3 -c "import json,collections;p=json.load(open('apps/office/package-lock.json'))['packages'];print(collections.Counter(v.get('license') for k,v in p.items() if k))"`,
+hoặc kiểm cả gói npm lẫn Python theo chính sách bằng `make sbom && make license-audit` (mục cuối).
 
 **Ghi chú:** BTC gợi ý "Nuxt 3 / Vue 3". Signet dùng **Nuxt 4** (vẫn chạy trên Vue 3) vì đây là dòng
 chính hiện tại; dòng Nuxt 3 chỉ còn nhận bản vá bảo trì. Dùng `vue-i18n` trực tiếp thay cho
@@ -135,7 +142,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | Pillow | 13.0 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
 | Pyphen | 0.18 | GPL-2.0+ / LGPL-2.1+ / MPL-1.1, Signet dùng theo MPL-1.1 | Ngắt từ khi dàn chữ (WeasyPrint kéo theo), dùng nguyên bản không sửa | pip | 2 |
 | segno | 1.6 | BSD-3-Clause | Mã QR in trên văn bản phát hành, dẫn tới cổng xác thực | pip | 2 |
-| pypdf | 6.21.1 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
+| pypdf | 6.21.2 | BSD-3-Clause | Đọc lớp chữ của PDF đính kèm để tìm theo nội dung (`svc-files`, F2.7); F4.1 đọc chữ giữ bố cục (`extraction_mode="layout"`) và lấy ảnh nhúng của trang scan để nhận dạng chữ. Thuần Python, không kéo thêm gói | pip | 2 |
 | pytest | 9.1 | MIT | Test đơn vị và tích hợp (chỉ khi phát triển) | pip | 1 |
 | Typer | 0.27 | MIT | Khung viết lệnh `moc` khi thêm `backup`, `restore`, `doctor`; `moc audit` hiện chỉ dùng thư viện chuẩn | pip | 3 |
 | jsonschema (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
@@ -175,7 +182,14 @@ Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dị
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
 chạy, không sửa), HarfBuzz (MIT) và phông Liberation 2.1 (SIL OFL 1.1) — cùng số đo với Times New Roman mà
 NĐ 30/2020 quy định, có đủ dấu tiếng Việt; từ F4.1 thêm Tesseract cùng dữ liệu tiếng Việt (mục Trí tuệ nhân tạo),
-gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
+gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python. pip của image nền chỉ dùng lúc dựng: cài xong thư
+viện thì gỡ khỏi image, cùng các bản sao thư viện nó mang theo (`pip/_vendor`: certifi, urllib3, msgpack, setuptools
+bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ensurepip/_bundled` của image nền (cùng các bản sao đó, nằm
+trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
+
+Phần máy chủ của Bảng tin (`apps/bang-tin`) dựng từ cùng image `python:3.13.16-slim`, chỉ thư viện chuẩn, không
+cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ thư viện chuẩn (`scripts/yaml_nho.py`): không
+thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
 
 ## Vận hành và bốn nguyên lý thiết kế
 
@@ -189,17 +203,28 @@ gọi bằng dòng lệnh trong tiến trình con, không thêm gói Python.
 | Prometheus | v3.15.0 | Apache-2.0 | Thu chỉ số của cổng API (plugin `prometheus` của APISIX) mỗi 15 giây; không mở cổng ra ngoài (F3.13) | `prom/prometheus:v3.15.0` | 3 |
 | Grafana (OSS) | 13.2.3 | AGPL-3.0 | Hiển thị giám sát: bảng điều khiển nạp từ `platform/monitoring/` (dịch vụ độc lập, chỉ nghe 127.0.0.1, chỉ xem, không tài khoản) (F3.13) | `grafana/grafana:13.2.3` | 3 |
 | cloudflared | 2026.10.0 | Apache-2.0 | Cloudflare Tunnel (F1.9, profile `tunnel`, tùy chọn): máy không có IP công khai ra Internet có HTTPS mà không mở cổng — gọi ra Cloudflare, chuyển yêu cầu vào APISIX qua mạng Docker; token để ngoài repo | `cloudflare/cloudflared:2026.10.0` (image 05/10/2026) | 1 |
+| Mailpit | v1.31.4 | MIT | Hộp thư thử cho thông báo email của `svc-workflow` (profile `mail`, chỉ để demo, kiểm thử): nhận mọi thư qua SMTP trong mạng Docker, không chuyển tiếp ra ngoài, giao diện web chỉ nghe 127.0.0.1; không hỏi bản mới. Cài thật thì gửi qua máy chủ thư của đơn vị | `axllent/mailpit:v1.31.4`, ghim digest (image 03/10/2026) | 4 |
 | restic | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
-| Vector | 0.59.0 | MPL-2.0 | Thu gom log *(Could)* | `timberio/vector:0.59.0-debian` | 3 |
-| Parseable | 3.2 | AGPL-3.0 | Lưu và tra cứu log *(Could)* | `parseable/parseable` (ghim thẻ khi đưa vào) | 3 |
-| Coraza | 3.8 | Apache-2.0 | Tường lửa ứng dụng web tại gateway *(Could)* | Plugin proxy-wasm cho APISIX | 3 |
+| Vector | 0.59.0 | MPL-2.0 | Thu log của 5 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
+| Parseable | 3.2.4 | AGPL-3.0 | Lưu và tra log tập trung (F3.14, profile `logs`): dịch vụ độc lập, chỉ nghe 127.0.0.1, chạy root nhưng bỏ mọi capability, basic auth (mật khẩu rỗng thì không mở cổng), giữ `MOC_LOGS_RETENTION_DAYS` ngày, tắt kiểm bản mới và gửi số liệu sử dụng | `quay.io/parseablehq/parseable:v3.2.4`, ghim digest (image 02/10/2026) | 3 |
+| Coraza + OWASP CRS | Coraza v3.3.3, CRS v4.14.0 (trong coraza-proxy-wasm 0.6.0) | Apache-2.0 | Tường lửa ứng dụng web ở cổng API (F3.15): mọi yêu cầu qua CRS paranoia 1 trước khi kiểm token, tải tấn công → 403; nội dung tệp vẫn do ClamAV soi | `ghcr.io/corazawaf/coraza-proxy-wasm:0.6.0` (phát hành 06/07/2025), ghim digest, kiểm sha256 tệp `.wasm`; APISIX nạp bằng `wasm.plugins` | 3 |
 
 **Ghi chú:**
 
 - Grafana: chỉ dùng `grafana/grafana` (AGPL-3.0). `grafana/grafana-enterprise` là bản độc quyền.
+- Parseable: bản 3.x chỉ phát hành trên Quay (`quay.io/parseablehq/parseable`); `parseable/parseable` trên Docker Hub
+  dừng ở 2.8.0 (29/05/2026).
 - Marquez: bản phát hành gần nhất là 0.51.1 (03/2025), mã nguồn vẫn có commit năm 2026 nhưng nhịp chậm.
   Theo dõi trong Phase 3; nếu gặp lỗi chặn thì chuyển sang chỉ lưu sự kiện OpenLineage vào PostgreSQL. F3.9 đã làm
   theo hướng đó (`core.lineage_events`): tránh thêm máy chủ Java và CSDL riêng (~1 GB RAM) cho một job mỗi giờ.
+- Coraza: coraza-proxy-wasm 0.6.0 là bản phát hành mới nhất và nhánh `main` vẫn dùng Coraza v3.3.3 (20/03/2025), nên
+  không có bản WebAssembly nào mang Coraza đã vá (3.8.1). 3.3.3 có 12 GHSA công bố 02/10/2026: hai mức high áp dụng
+  ở Signet có biện pháp ở cổng (JSON lồng sâu bị chặn trước WAF; quá 1000 tham số thì chặn), các lỗi lẩn WAF mức
+  medium ghi ở [`platform/apisix/README.md`](platform/apisix/README.md), mục WAF. Gói Go biên dịch trong tệp `.wasm`
+  (proxy-wasm-go-sdk, gjson, libinjection-go, go-re2, aho-corasick…) là Apache-2.0, MIT, BSD-3-Clause. SBOM và
+  OSV-Scanner không đọc tệp `.wasm`: lỗ hổng mới của Coraza phải theo dõi tay (GitHub Security Advisories của
+  `corazawaf/coraza`). Khi có bản phát hành mang Coraza ≥ 3.8.1 thì đổi digest và băm trong Dockerfile; hướng thay
+  nếu cần bản vá sớm hơn: coraza-caddy (Coraza 3.8.1) thành một container đứng trước APISIX — so sánh ở README đó.
 
 ## Trí tuệ nhân tạo
 
@@ -241,7 +266,7 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 |---|---|---|
 | HashiCorp Vault | BUSL-1.1 từ v1.15 (08/2023) — không phải OSI | OpenBao |
 | n8n | Sustainable Use License — không phải OSI | Kestra |
-| Redpanda | BSL-1.1 — không phải OSI | Hasura Event Triggers (không cần message broker) |
+| Redpanda | BSL-1.1 — không phải OSI | Chưa thay: sự kiện ghi vào bảng PostgreSQL trong cùng giao dịch (`office.document_events`, `core.lineage_events`, hộp thư đi `core.notification_deliveries`), Centrifugo đẩy tới trình duyệt; trục sự kiện dự kiến dùng Hasura Event Triggers, chưa khai ([`ROADMAP.md`](ROADMAP.md)) |
 | MongoDB | SSPL-1.0 — không phải OSI | PostgreSQL |
 | immudb | BUSL-1.1 từ 12/2023 — không phải OSI | Sổ kiểm toán chuỗi băm trong PostgreSQL |
 | FIWARE Orion / Orion-LD | Bắt buộc MongoDB (SSPL); Orion cổ điển không hỗ trợ NGSI-LD | Scorpio Broker |
@@ -265,8 +290,11 @@ bỏ chuỗi truy vấn bằng khóa cấu hình sẵn có của APISIX 3.18.0 (
 
 Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.0 ở vai trò dịch vụ độc lập):
 
-- ✅ Apache-2.0, MIT, BSD-2/3-Clause, PostgreSQL License, ISC, MPL-2.0, PSF-2.0 (giấy phép dễ dãi được OSI phê
-  duyệt, của chính Python và image `python`; F4.5: aiohappyeyeballs)
+- ✅ Apache-2.0, MIT, MIT-0, BSD-2/3-Clause, 0BSD, ISC, BlueOak-1.0.0, PostgreSQL License, MPL-2.0 (giấy phép dễ dãi
+  được OSI phê duyệt) và PSF-2.0 (giấy phép dễ dãi của chính Python và image `python`; F4.5: aiohappyeyeballs). SPDX
+  đánh dấu OSI phê duyệt cho Python-2.0, bộ giấy phép của Python mở đầu bằng PSF-2.0, chứ không cho riêng PSF-2.0.
+- ✅ MIT-CMU chỉ cho Pillow (ngoại lệ có lý do): một dạng HPND, dễ dãi, chỉ đòi giữ thông báo bản quyền; SPDX đánh dấu
+  OSI phê duyệt cho HPND nhưng chưa cho riêng MIT-CMU.
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
   trong ba giấy phép), Pango (nạp động), phông Liberation.
 - ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
@@ -276,9 +304,31 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
   License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
+- Logo các dự án trong sơ đồ kiến trúc (`docs/anh/logo/`, ảnh `docs/anh/kien-truc-tong-the*.gif`) không phải thành
+  phần phần mềm: là nhãn hiệu của chủ sở hữu, chỉ dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng, không thuộc
+  giấy phép Apache-2.0 của Signet; khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ghi ở
+  `docs/anh/logo/NGUON.md`.
+
+**Kiểm tự động, cả gói gián tiếp.** `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft (tệp khóa npm kể cả gói
+chỉ dùng lúc dựng, `requirements*.txt`, action trong `.github/workflows/`; giấy phép gói Python hỏi PyPI vì
+`requirements.txt` không ghi). `make license-audit` (`scripts/license_audit.py`) xét từng gói theo đúng danh sách trên:
+biểu thức `A OR B` qua khi một nhánh được nhận, `A AND B` phải qua cả hai; copyleft yếu qua nhưng được liệt kê riêng;
+GPL, AGPL, giấy phép khác và giấy phép chưa rõ thì không qua, trừ khi có ngoại lệ ghi lý do trong
+`.github/license-exceptions.json`. Ngoại lệ cho gói ngoài danh sách phải trùng giấy phép SBOM ghi (gói đổi giấy phép thì
+ngoại lệ hết tác dụng); ngoại lệ cho gói SBOM không rõ giấy phép ghi giấy phép đội đã đọc trong gói và phiên bản đã
+đọc. CI (job "Giấy phép (PoF #2)") chạy hai lệnh này trên mọi pull request; từ bản sau 1.0.0, mỗi bản phát hành kèm
+SBOM `signet-X.Y.Z.cdx.json`.
+Syft không đọc `Dockerfile`, `docker-compose.yml`: image thượng nguồn và giấy phép của chúng là các bảng ở trên.
+
+Lần quét 23/10/2026 (Syft 1.54.1): 769 gói khác nhau — npm 690, Python 73, action CI 6 — đều đạt; 22 gói qua nhờ ngoại
+lệ: 4 gói npm dữ liệu và công cụ dựng mang CC-BY-4.0, CC0-1.0 (mục Tầng 2, `mdn-data` có hai bản), Pillow (MIT-CMU), 11
+gói Python mà PyPI chỉ khai giấy phép bằng classifier hay chữ tự do (WeasyPrint và các gói nó kéo theo, segno, DuckDB,
+python-dateutil, colorama — giấy phép đọc từ tệp LICENSE trong wheel) và 6 action CI (giấy phép đọc ở đúng thẻ đã
+ghim). Copyleft yếu: Pyphen (chọn MPL-1.1).
 
 ### Font giao diện Be Vietnam Pro
 
-Các bản Regular/Medium/SemiBold/Bold được lấy từ kho Google Fonts (`ofl/bevietnampro`),
-tác giả Be Vietnam Pro Project Authors, giấy phép OFL-1.1 kèm từng thư mục font.
-Tự phục vụ trong app và theme đăng nhập; không gọi Google Fonts lúc chạy.
+Bốn trọng lượng 400/500/600/700 được tự phục vụ dưới dạng WOFF2 nguyên bản từ API webfont chính thức Google Fonts.
+Giữ đủ các tập Vietnamese, Latin và Latin-ext cùng unicode-range; manifest `sources.json` trong mỗi thư mục font ghi
+URL nguồn, kích thước và SHA-256. Font có giấy phép OFL-1.1 kèm bản quyền Be Vietnam Pro Project Authors.
+Văn phòng, Không gian cá nhân và theme đăng nhập dùng cùng bộ font; không gọi Google Fonts khi ứng dụng chạy.
