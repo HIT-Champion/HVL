@@ -296,6 +296,7 @@ Nhắc hạn chỉ kiểm được khi hạn ngắn: `MOC_SLA_DURATION=PT20S mak
 | Hiện tượng | Nguyên nhân và cách xử lý |
 |---|---|
 | `make check` báo thiếu `.env` hoặc `docker compose` | Chạy `make env` để sinh `.env`; cài plugin Docker Compose v2 từ 2.17 trở lên |
+| `make up` dừng khi kéo hay dựng image: hết thời gian chờ tới `docker.io`, hoặc `toomanyrequests` | Mạng chặn Docker Hub hoặc đã hết lượt tải ẩn danh. Cho Docker kéo qua bản sao `mirror.gcr.io` (khóa `registry-mirrors`, cần `sudo`) theo mục 2b của [`docs/trien-khai.md`](docs/trien-khai.md#2b-máy-không-kéo-được-image-từ-docker-hub) |
 | `make up` chạy lâu, dịch vụ còn `starting` hoặc `unhealthy` | Lần đầu phải tải khoảng 5 GB image và ClamAV nạp chữ ký virus, mất vài phút; `make up` chờ tối đa 10 phút. Theo dõi bằng `make ps`, `make logs` |
 | Cổng 8080 đã có chương trình khác dùng | Đặt `MOC_HTTP_PORT=8081` và `MOC_PUBLIC_URL=http://localhost:8081` trong `.env` trước lần `make up` đầu tiên: realm Keycloak chỉ nạp địa chỉ này một lần, đã chạy rồi thì `make reset` rồi dựng lại |
 | Mở bằng IP trong mạng LAN thì không đăng nhập được | Trình duyệt chỉ cho dùng Web Crypto (đăng nhập PKCE, tính SHA-256 ở trang xác thực) trên `https` hoặc `localhost`. Dùng `localhost`, hoặc lên HTTPS theo [`docs/trien-khai.md`](docs/trien-khai.md) |
