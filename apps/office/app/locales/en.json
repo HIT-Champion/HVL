@@ -535,6 +535,8 @@
     "unscannable": "The file is password-protected or nested too deeply for the malware scanner to check — blocked. Remove the password or unpack it, then upload again.",
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
+    "blocked": "The security gateway blocked this content because some text looks like an attack pattern. Edit the text or file name you sent and try again, or tell your administrator.",
+    "blockedId": "The security gateway blocked this content because some text looks like an attack pattern (ID {id}). Edit the text or file name you sent and try again, or tell your administrator, quoting this ID.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
     "documents_body_length": "The body is longer than 20,000 characters.",
     "invalid": "Some fields are not valid, see the highlighted fields.",

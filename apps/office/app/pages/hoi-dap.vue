@@ -91,10 +91,10 @@ watch(writing, (on) => {
 const elapsed = (turn: Turn) => Math.max(0, Math.floor((now.value - turn.started) / 1000))
 
 // Mã lỗi của svc-files → câu cho người hỏi (mã riêng của chức năng hỏi đáp, không dùng utils/errors.ts); mạng, hết
-// phiên, giới hạn tốc độ của cổng thì như mọi trang
+// phiên, giới hạn tốc độ, chặn của cổng thì như mọi trang
 function askError(e: unknown): string {
   if (e instanceof ApiError && e.code && te(`assist.error.${e.code}`)) return t(`assist.error.${e.code}`)
-  if (e instanceof ApiError && !['network', 'session', 'rate_limited'].includes(e.code ?? '')) {
+  if (e instanceof ApiError && !['network', 'session', 'rate_limited', 'blocked'].includes(e.code ?? '')) {
     return t('assist.error.generic', { msg: e.message })
   }
   return errorText(t, e)
