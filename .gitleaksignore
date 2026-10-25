@@ -1,0 +1,9 @@
+# Copyright 2026 Signet Team
+# SPDX-License-Identifier: Apache-2.0
+#
+# Finding gitleaks đã xem và xác nhận là báo nhầm. Mỗi dòng là fingerprint commit:đường-dẫn:luật:dòng của đúng một
+# finding (bỏ qua đúng chỗ đó, không tắt luật); kèm lý do ở dòng chú thích ngay trên.
+
+# #159: thuộc tính khóa Ed25519 của két giả trong test (`self.anchor_key: Ed25519PrivateKey | None = None`, nhánh
+# #158), không có bí mật nào. CI quét mọi ref nên commit này làm đỏ cả PR khác; không force push nên commit còn mãi.
+d74d742381c28a6104ae5111a657f89a4c198ca6:services/svc-files/tests/conftest.py:generic-api-key:1005
