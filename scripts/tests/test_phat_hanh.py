@@ -145,6 +145,8 @@ class NoReReleaseTest(unittest.TestCase):
         self.git("commit", "-qm", "khởi tạo")
         self.origin = root / "origin.git"
         subprocess.run(["git", "init", "-q", "--bare", str(self.origin)], env=GIT_ENV, check=True)
+        # receive-pack của kho trần không nhận biến GIT_CONFIG_* (git bỏ chúng khi đẩy qua đường dẫn cục bộ)
+        subprocess.run(["git", "-C", str(self.origin), "config", "maintenance.auto", "false"], env=GIT_ENV, check=True)
         self.git("remote", "add", "origin", str(self.origin))
         self.git("push", "-q", "origin", "main")
 
