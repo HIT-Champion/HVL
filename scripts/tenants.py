@@ -357,14 +357,15 @@ class Keycloak:
     def __init__(self, base_url: str, realm: str, token: str, *, call: Callable[..., tuple[Any, dict[str, str]]],
                  http_error: type[Exception]):
         self.base = f"{base_url.rstrip('/')}/admin/realms/{realm}"
+        self.server = f"{base_url.rstrip('/')}/admin"   # đường của cả máy chủ, ngoài realm (serverinfo)
         self.realm_name = realm
         self._auth = {"Authorization": f"Bearer {token}"}
         self._call = call
         self._http_error = http_error
 
-    def _req(self, method: str, path: str, body: Any = None, *,
-             query: dict[str, Any] | None = None) -> tuple[Any, dict[str, str]]:
-        url = self.base + path + ("?" + urllib.parse.urlencode(query) if query else "")
+    def _req(self, method: str, path: str, body: Any = None, *, query: dict[str, Any] | None = None,
+             server: bool = False) -> tuple[Any, dict[str, str]]:
+        url = (self.server if server else self.base) + path + ("?" + urllib.parse.urlencode(query) if query else "")
         try:
             return self._call(method, url, body, headers=self._auth)
         except self._http_error as exc:
@@ -460,6 +461,16 @@ class Keycloak:
 
     def update_client(self, client_id: str, rep: dict[str, Any]) -> None:
         self._req("PUT", f"/clients/{client_id}", rep)
+
+    # theme đăng nhập: realm_clients.py áp loginTheme của tệp realm cho realm đã nạp từ trước
+    def update_realm(self, rep: dict[str, Any]) -> None:
+        """PUT realm. Gửi nguyên bản vừa đọc đã sửa, như enable_organizations."""
+        self._req("PUT", "", rep)
+
+    def login_themes(self) -> set[str]:
+        """Tên các theme đăng nhập máy chủ Keycloak đang có: dựng sẵn trong image và thư mục /opt/keycloak/themes."""
+        info, _ = self._req("GET", "/serverinfo", server=True)
+        return {t.get("name") for t in ((info or {}).get("themes") or {}).get("login") or []}
 
 
 def admin_token() -> str:

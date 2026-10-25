@@ -98,6 +98,8 @@ services:
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
     volumes:
       - ./platform/keycloak/realm:/opt/keycloak/data/import:ro
+      # theme đăng nhập Signet (loginTheme của realm): chỉ CSS, logo, chuỗi; kế thừa keycloak.v2 có sẵn trong image
+      - ./platform/keycloak/themes/signet:/opt/keycloak/themes/signet:ro
     ports:
       # trang quản trị: chỉ trên máy chủ, không qua APISIX
       - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
