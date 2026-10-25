@@ -13,6 +13,7 @@
 | Luồng mật khẩu của `moc-cli` (`moc-cli-direct-grant`) | Mật khẩu rồi mã TOTP (tham số `otp`) theo đúng quy tắc của `moc-browser`: không là đường vòng qua xác thực hai bước. Vai trò bắt buộc mà chưa cài TOTP thì không lấy được token (luồng này không cài được). Kịch bản trong `scripts/` tự tính mã từ `MOC_DEMO_TOTP_SECRET` (`moc_env.user_login`), không gửi lại mã đã dùng. Đây cũng là luồng mật khẩu mặc định của cả realm (`directGrantFlow`): client có sẵn `admin-cli` của realm cũng phải kèm mã, kể cả khi đã tắt `moc-cli` |
 | Mapper | Claim `https://hasura.io/jwt/claims`: `x-hasura-user-id`, `-tenant-id`, `-department-id`, `-default-role`, `-allowed-roles` |
 | User profile | `tenant_id`, `department_id`, `moc_role` (5 vai trò) — chỉ quản trị viên xem và sửa |
+| Giao diện đăng nhập (`loginTheme: signet`) | `themes/signet/login/`, trang chung của Văn phòng điện tử, P.A.R.A, Bảng tin. Kế thừa theme `keycloak.v2` có sẵn trong image Keycloak 26 — giữ nguyên template FreeMarker, PatternFly 5, bản dịch tiếng Việt, chế độ sáng/tối theo máy — chỉ thêm `theme.properties`, `resources/css/signet.css` (màu brand và phông hệ thống của Văn phòng điện tử, nền, bo góc thẻ, cỡ trên điện thoại) và logo `resources/img/signet.svg` (trùng từng byte `apps/office/public/favicon.svg`, cũng là biểu tượng tab). Tên ở đầu trang là `displayName` của realm. Compose gắn thư mục chỉ đọc vào `/opt/keycloak/themes/signet`; CSP giữ mặc định của Keycloak, CSS không tải gì từ ngoài máy chủ |
 | Organizations (`organizationsEnabled`) | Mỗi đơn vị một Organization: alias suy từ mã đơn vị (`CNTT` → `cntt`, `ĐT` → `dt`), thuộc tính `tenant_id` = id trong `core.tenants`; mọi tài khoản có `tenant_id` đó là thành viên (unmanaged) và không thuộc Organization nào khác. Đây là lớp quản lý thành viên và quản trị: gom tài khoản theo đơn vị, chỗ gắn tên miền email hay IdP riêng của đơn vị về sau. **Token vẫn lấy đơn vị từ thuộc tính `tenant_id`** qua mapper ở trên, không đổi: claim `organization` của Keycloak (scope tùy chọn `organization`, client của Signet không xin) là danh sách alias, nằm ngoài namespace `https://hasura.io/jwt/claims` nên Hasura không đọc, và tài khoản thuộc nhiều Organization thì không suy ra được đúng một đơn vị. Tạo bằng `python3 scripts/moc.py tenant create`, kiểm bằng `tenant check`; `make seed` tạo cho hai đơn vị mẫu. Thành viên Organization phải có email (Keycloak từ chối sửa hồ sơ thiếu email) |
 
 Stack dựng trước khi có một ứng dụng (vd `app-ca-nhan`) không có client của ứng dụng đó, vì realm không nạp lại:
@@ -29,6 +30,18 @@ subflow Conditional `moc-cli-otp-bat-buoc`, `moc-cli-otp-tu-chon` sau bước m�
 `moc-realm.json`. Tương tự, stack dựng trước khi realm đặt `directGrantFlow`: mở Authentication, ở luồng
 `moc-cli-direct-grant` chọn Bind flow → Direct grant flow (không thì `admin-cli` lấy được token chỉ bằng mật khẩu).
 
+Stack dựng trước khi có theme đăng nhập vẫn hiện giao diện mặc định của Keycloak, vì realm không nạp lại: cài bản mới
+rồi `docker compose up -d --wait` (container keycloak dựng lại với thư mục theme), sau đó
+`python3 scripts/moc.py realm theme` (`--dry-run` chỉ in việc sẽ làm) đặt `loginTheme` của `moc-realm.json` cho realm
+đang chạy — chỉ khi realm còn dùng theme mặc định, không đổi theme quản trị đã chọn; Keycloak chưa thấy thư mục theme
+thì báo và không đặt. Làm tay: trang quản trị → Realm settings → Themes → Login theme → `signet`.
+
+Sửa tệp trong `themes/` thì dựng lại container: `docker compose up -d --force-recreate --wait keycloak`. Keycloak đọc
+CSS mới ngay nhưng trả kèm `Cache-Control: max-age=2592000` (30 ngày) dưới cùng đường dẫn `/resources/<mã>/…`; mã giữ
+nguyên qua `docker restart`, đổi khi container dựng lại (đo trên Keycloak thử 26.7.5), nên chỉ dựng lại thì trình
+duyệt mới tải bản mới. Nâng cấp (`docker compose down`, `up`) dựng lại sẵn. Nâng Keycloak thì mở lại trang đăng nhập:
+theme cha đổi tên lớp hay biến CSS thì phần phủ mất tác dụng (trang vẫn chạy, về giao diện gốc).
+
 Tài khoản mẫu tạo bằng `make seed` (`seed/users.csv`), không nằm trong realm. Các tài khoản văn thư, lãnh đạo,
 tổ trưởng, trưởng bộ môn, quản trị được cài sẵn TOTP bằng khóa chung `MOC_DEMO_TOTP_SECRET`; `make totp` in mã
-hiện tại và khóa để thêm vào ứng dụng xác thực. Còn làm: giao diện đăng nhập riêng (`platform/keycloak/themes/`).
+hiện tại và khóa để thêm vào ứng dụng xác thực.

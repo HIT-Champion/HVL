@@ -1,6 +1,7 @@
 {
   "realm": "moc",
   "displayName": "Signet",
+  "loginTheme": "signet",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,

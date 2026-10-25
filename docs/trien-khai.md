@@ -233,7 +233,13 @@ cd ~/Signet && git pull
 cd /opt/moc && docker compose down
 cd ~/Signet && make install PREFIX=/opt/moc         # giữ .env của bản cài, chỉ đổi MOC_VERSION
 cd /opt/moc && docker compose up -d --wait --wait-timeout 900
+cd /opt/moc && python3 scripts/moc.py realm theme      # một lần: bản cài dựng trước theme đăng nhập Signet
 ```
+
+Realm Keycloak chỉ nạp từ tệp ở lần khởi động đầu, nên phần realm mới của bản sau không tự vào bản cài cũ (nâng cấp
+bằng GitOps cũng vậy): `realm theme` đặt theme đăng nhập Signet — chỉ khi realm còn dùng theme mặc định, chạy lại không
+đổi gì; báo lỗi nếu container keycloak chưa gắn thư mục theme — còn `realm clients` thêm client của ứng dụng mới
+([`platform/keycloak/README.md`](../platform/keycloak/README.md)).
 
 Biến `.env` mới của bản mới (CHANGELOG ghi rõ) thêm vào `/opt/moc/.env`. **Không chạy `make reset` hay
 `docker compose down -v` trên máy chủ**: xóa sạch dữ liệu, kể cả két (tệp văn bản hạn chế không mở được nữa).
