@@ -115,6 +115,9 @@ test('luồng văn bản đi và cổng xác thực trên giao diện', async ({
   const signature = outsider.getByTestId('verify-signature')
   await expect(signature).toContainText('PAdES')
   await expect(signature).toContainText('minh họa')
+  // #56: tải chứng thư CA nội bộ ngay trong khối chữ ký, không cần đăng nhập
+  await expect(signature.getByRole('link', { name: 'Tải chứng thư CA (minh họa)' }))
+    .toHaveAttribute('href', '/api/verify/ca.pem')
   await shot(outsider, '10-xac-thuc-khop')
   const tampered = Buffer.from(pdf)
   tampered[Math.floor(tampered.length / 2)] ^= 1

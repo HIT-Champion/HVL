@@ -313,6 +313,12 @@ global_rules:
                 ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:file,
                 ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:data,
                 ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:archive"
+              # Loại trừ 9 — tải chứng thư CA nội bộ, khóa công khai ký mốc neo ở cổng xác thực: đuôi .pem nằm trong
+              # tx.restricted_extensions của CRS (920440, đủ 5 điểm là chặn). Chỉ đúng hai đường cố định, chỉ GET (route
+              # xac-thuc); svc-files trả tệp công khai đọc từ két, không mở tệp nào theo tên trong đường dẫn
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/api/verify/(?:ca|anchor-key)\.pem$" "id:10050,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=920440;REQUEST_BASENAME"
               # GHSA-6r3q-mjv7-xr8m: Coraza 3.3.3 lặng lẽ bỏ tham số thứ 1000 trở đi (SecArgumentsLimit), không soi
               # chúng — chặn hẳn yêu cầu chạm giới hạn đó (tham số truy vấn, form urlencoded)
               - >-

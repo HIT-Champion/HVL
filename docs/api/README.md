@@ -50,7 +50,7 @@ cũng nạp được.
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
 | `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…`, `POST /api/imports/incoming`, `GET /api/imports…` | `svc-files` | Bắt buộc |
-| `GET /api/verify/{mã}`, `GET /api/verify?sha256=…` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
+| `GET /api/verify/{mã}`, `GET /api/verify?sha256=…`, `GET /api/verify/ca.pem`, `GET /api/verify/anchor-key.pem` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
 | `GET /ca-nhan/` và trang tĩnh dưới đó | Không gian cá nhân P.A.R.A (`app-ca-nhan`), ứng dụng thứ hai trên lõi | — |
@@ -197,6 +197,8 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `POST /api/case-files/{id}/archive` | Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng (F3.8): gói Parquet + tệp + manifest có băm vào bucket lạnh khóa ghi; ghi `case_file.archive_requested` |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
+| `GET /api/verify/ca.pem` | **Không cần token.** Chứng thư CA nội bộ ký văn bản đi (PEM, `application/x-pem-file`, chỉ minh họa); két chưa có PKI thì 404 |
+| `GET /api/verify/anchor-key.pem` | **Không cần token.** Khóa công khai Ed25519 két dùng ký mốc neo sổ kiểm toán (PEM SubjectPublicKeyInfo); két chưa có khóa thì 404. Kiểm mốc đã công bố: `docs/van-hanh.md` mục Mốc neo công khai |
 | `GET /api/status` | **Không cần token.** Tình trạng từng thành phần (`ok`, `degraded`, `down`, `off`) theo tầng, tình trạng chung, phiên bản, thời gian chạy, giờ sao lưu gần nhất, trợ lý AI bật hay tắt; lưu đệm 10 giây, không có địa chỉ nội bộ hay số liệu |
 
 ```bash
@@ -215,13 +217,16 @@ curl -s "$MOC/api/imports/$LO/rows?status=failed" -H "Authorization: Bearer $TOK
 # cổng xác thực, không đăng nhập: theo mã in cạnh mã QR, hoặc theo băm của tệp nhận được
 curl -s "$MOC/api/verify/ABCDE-23456"
 curl -s "$MOC/api/verify?sha256=$(sha256sum cong-van-nhan-duoc.pdf | cut -d' ' -f1)"
+curl -s -o signet-ca.pem "$MOC/api/verify/ca.pem" && openssl x509 -in signet-ca.pem -noout -fingerprint -sha256
+curl -s -o anchor-key.pem "$MOC/api/verify/anchor-key.pem"   # khóa ký mốc neo sổ kiểm toán
 
 # trạng thái hệ thống, không đăng nhập
 curl -s "$MOC/api/status"
 ```
 
-Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi đúng hai đường xác thực trên; ứng dụng
-khác cũng dùng được để tự kiểm văn bản nhận được. Trang `/trang-thai` gọi `/api/status` mỗi 30 giây.
+Trang `/xac-thuc/<mã>` của giao diện (mã QR trên văn bản trỏ tới đây) gọi hai đường xác thực trên, và tải hai tệp PEM
+để hiện vân tay SHA-256; ứng dụng khác cũng dùng được để tự kiểm văn bản nhận được. Trang `/trang-thai` gọi
+`/api/status` mỗi 30 giây.
 
 Tệp được gắn vào văn bản bằng GraphQL (`file_ids` của `receiveIncoming`, `files` khi chuyên viên tạo dự thảo, hoặc
 `insert_office_document_files_one`), không qua REST. Lỗi của `svc-files` có dạng `{"detail": {"code": "…", "message": "…"}}`.
