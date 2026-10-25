@@ -26,7 +26,11 @@
     "compose": "Draft a document",
     "register": "Registers",
     "audit": "Audit log",
-    "board": "Overview"
+    "board": "Overview",
+    "metrics": "Metrics",
+    "feedback": "Feedback",
+    "selfCheck": "Self-assessment",
+    "sensors": "Sensor map"
   },
   "role": {
     "clerk": "Clerk",
@@ -329,7 +333,11 @@
       "hashMismatch": "SHA-256 does NOT match the sender’s issued copy — report it to the administrator",
       "fromHint": "An outgoing document of another unit on Signet, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
       "manualHint": "The clerk registered this document from paper or email; the sender's in-system dispatch arrived later and was only linked, so the attached file is the one the clerk uploaded. Open the verification page to compare it with the issued copy."
-    }
+    },
+    "askAbout": "Ask about this document",
+    "downloadNamed": "Download {name}",
+    "activity": "Document activity",
+    "registering": "Registering…"
   },
   "form": {
     "chiDao": {
@@ -356,7 +364,11 @@
     "xuLy": {
       "title": "Report result",
       "result": "Result",
-      "done": "Report done"
+      "done": "Report done",
+      "brief": "Your assignment",
+      "assignedBy": "Assigned by",
+      "required": "required",
+      "consequence": "Submitting this report completes your assigned task."
     },
     "pick": "— Choose —",
     "done": "Moved to the next step.",
@@ -375,7 +387,8 @@
       "issue": "Number and issue",
       "confirm": "Assign the next outgoing number and issue this document? Numbers are sequential per year and cannot be taken back.",
       "issued": "Issued."
-    }
+    },
+    "processing": "Submitting…"
   },
   "search": {
     "title": "Search documents",
@@ -390,7 +403,8 @@
     },
     "matchedContent": "Matched in content",
     "matchedContentHint": "The words appear in the document body or in the text of an attached PDF, not in its reference or summary",
-    "askAssistant": "Ask the assistant"
+    "askAssistant": "Ask the assistant",
+    "directionLabel": "Incoming or outgoing"
   },
   "assist": {
     "title": "Ask the documents",
@@ -481,6 +495,23 @@
       "generating": "Writing an answer.",
       "answered": "The assistant has answered.",
       "extractOnly": "No model answer — showing the verbatim quote."
+    },
+    "scope": {
+      "title": "Asking about one document only",
+      "chip": "In {label}",
+      "unnamed": "the selected document",
+      "clear": "Ask across all documents",
+      "missing": "This document was not found, or you are not allowed to view it — the assistant will have nothing to answer from.",
+      "notIndexed": "This document is not in the assistant's collection (restricted, cancelled or not yet issued) — the question will find no evidence."
+    },
+    "viewSource": "View file: {label}",
+    "viewPage": "View page {n}",
+    "viewFile": "View file",
+    "viewer": {
+      "title": "Viewing {label}",
+      "newTab": "Open in a new tab",
+      "close": "Close",
+      "note": "Page numbers count PDF pages (page 1 is the first page of the file) and may differ from the numbers printed on the document."
     }
   },
   "assign": {
@@ -537,7 +568,17 @@
     "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",
     "documents_restricted_sealed": "This document already has files, so its restricted setting cannot change",
     "documents_restricted_local": "Restricted documents cannot be sent to other units within the system.",
-    "documents_recipient_units": "Invalid receiving unit (unknown, or your own unit), or the document was already submitted so its receiving units can no longer change."
+    "documents_recipient_units": "Invalid receiving unit (unknown, or your own unit), or the document was already submitted so its receiving units can no longer change.",
+    "type_mismatch": "The file's content does not match its extension (e.g. a .pdf that is really a web page), so it was blocked. Save it in the right format and upload again.",
+    "type_not_allowed": "Runnable files (programs, scripts such as .exe, .bat, .js) are not accepted.",
+    "image_unreadable": "The image is damaged or too large to strip its hidden data (EXIF, GPS location), so it was not saved. Shrink or re-save the image and upload again.",
+    "blocked": "The security gateway blocked this content because some text looks like an attack pattern. Edit the text or file name you sent and try again, or tell your administrator.",
+    "blockedId": "The security gateway blocked this content because some text looks like an attack pattern (ID {id}). Edit the text or file name you sent and try again, or tell your administrator, quoting this ID.",
+    "feedback_rate": "You have sent a lot of feedback in a short time: at most 3 in 10 minutes and 20 in 24 hours. Try again later.",
+    "feedback_rating": "Choose a satisfaction level from 1 to 5.",
+    "feedback_comment": "Feedback is longer than 500 characters.",
+    "feedback_screen": "Could not attach the current screen to your feedback. Reload the page and send again.",
+    "maturity_rate": "Your organisation has saved the self-check many times in a short time: at most 5 times an hour and 20 in 24 hours. Try again later."
   },
   "validation": {
     "required": "Required",
@@ -632,11 +673,19 @@
       "serial": "Certificate serial number",
       "signedAt": "Signed at (time stated in the signature)",
       "illustrative": "The signature uses Signet's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
-      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above."
+      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above.",
+      "caDownload": "Download the CA certificate (illustrative)",
+      "caFingerprint": "SHA-256 fingerprint"
     },
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
-    "footer": "Signet — open-source e-office. No login required on this page."
+    "footer": "Signet — open-source e-office. No login required on this page.",
+    "anchors": {
+      "title": "Audit log anchors",
+      "text": "The system regularly copies anchors of its hash-chained audit log off the server, each signed by the key vault. Anyone can check those signatures with this public key (OpenSSL 3) without trusting the server.",
+      "download": "Download the anchor signing public key",
+      "fingerprint": "SHA-256 fingerprint (the key field in the anchor file)"
+    }
   },
   "notify": {
     "title": "Notifications",
@@ -702,7 +751,9 @@
       },
       "case_file": {
         "archived": "Case file archived",
-        "read": "Archived case file read"
+        "read": "Archived case file read",
+        "archive_requested": "Case file archiving requested",
+        "file_viewed": "File viewed in the reading room"
       },
       "intake": {
         "suggested": "Read document, suggested intake details"
@@ -712,6 +763,10 @@
       },
       "assignment": {
         "suggested": "Suggested an assignment"
+      },
+      "import": {
+        "created": "Import batch created",
+        "finished": "Import batch finished"
       }
     },
     "entity": {
@@ -725,12 +780,15 @@
         "document_types": "Document type",
         "case_files": "Case file",
         "case_file_documents": "Document in case file",
-        "dispatches": "Inter-unit dispatch"
+        "dispatches": "Inter-unit dispatch",
+        "maturity_assessments": "H-P-D-I self-assessment"
       },
       "core": {
         "files": "Uploaded file",
         "users": "User",
-        "tenants": "Organisation"
+        "tenants": "Organisation",
+        "notification_deliveries": "Notification delivery (email, webhook)",
+        "import_jobs": "Import batch"
       },
       "ai": {
         "questions": "Question to the assistant"
@@ -830,7 +888,14 @@
       "due_days": "Suggested deadline",
       "confidence": "Confidence",
       "evidence": "Evidence documents",
-      "candidates": "Similar documents found"
+      "candidates": "Similar documents found",
+      "kind": "Batch type",
+      "format": "File format",
+      "register": "Registered",
+      "total": "Rows",
+      "ok": "Rows done",
+      "duplicate": "Duplicate rows",
+      "failed": "Failed rows"
     },
     "direction": {
       "in": "Incoming",
@@ -875,6 +940,9 @@
       "extract": "Verbatim quote",
       "model": "Language model",
       "none": "None"
+    },
+    "importKind": {
+      "incoming": "Incoming documents"
     }
   },
   "register": {
@@ -973,32 +1041,34 @@
     "removeFile": "Remove file",
     "receiveNew": "Receive a document",
     "todayShort": "Today",
-    "scrollTable": "Scroll horizontally to read all columns."
+    "scrollTable": "Scroll horizontally to read all columns.",
+    "tools": "Tools",
+    "backInbox": "Back to my tasks"
   },
   "cases": {
     "title": "Case files",
-    "subtitle": "Collect completed documents, close a case and read the archived record.",
-    "create": "Create case file",
-    "code": "Case code",
+    "subtitle": "Gather processed documents into a case file, close it when the work is done, archive it to the write-locked cold store; the reading room shows archived case files (Decree 30/2020, Art. 28–31).",
+    "create": "New case file",
+    "code": "Case file code",
     "year": "Year",
-    "name": "Case title",
-    "retention": "Retention period (years)",
+    "name": "Case file title",
+    "retention": "Retention period",
     "permanentHint": "Leave blank for permanent retention.",
     "invalid": "Check the code, title (5–500 characters), year and retention period (1–100 years).",
-    "created": "Case file created.",
-    "search": "Search case code or title…",
+    "created": "Case file {code} created",
+    "search": "Search by reference or summary",
     "count": "{n} case files in this list",
-    "empty": "No matching case files.",
-    "permanent": "Permanent retention",
+    "empty": "No case files yet.",
+    "permanent": "Permanent",
     "years": "Retain for {n} years",
     "hidden": "Document outside your access",
     "remove": "Remove",
     "removeConfirm": "Remove this document from the case? The document remains in the system.",
-    "noDocuments": "No documents in this case yet.",
-    "add": "Add document",
-    "addHint": "Choose a completed or issued, unrestricted document. Department access is checked when saving.",
-    "close": "Close case",
-    "closeConfirm": "Close case {code}? Documents and case details cannot be edited afterwards.",
+    "noDocuments": "No documents in this case file yet.",
+    "add": "Add documents",
+    "addHint": "Incoming documents already handled and outgoing documents already issued by your department or assigned to you; restricted documents and documents in another case file are not accepted.",
+    "close": "Close case file",
+    "closeConfirm": "Close case file {code}? Documents can no longer be added or removed; the system sets the closing date.",
     "pendingArchive": "Closed on {at}. Archiving follows your organization’s schedule.",
     "read": "Read archived record",
     "verifiedArchive": "Archive hash verified",
@@ -1008,6 +1078,80 @@
       "open": "Open",
       "closed": "Closed",
       "archived": "Archived"
+    },
+    "creating": "Creating…",
+    "tab": {
+      "open": "Open",
+      "closed": "Closed",
+      "archived": "Archived",
+      "all": "All"
+    },
+    "codeHint": "From your unit's file list, e.g. 01.TS",
+    "retentionYears": "{n} years",
+    "department": "Department",
+    "documentCount": "{n} documents",
+    "closedOn": "Closed on",
+    "archivedAt": "Archived on",
+    "notFound": "Case file not found, or you may not view it.",
+    "back": "All case files",
+    "screenDetail": "Case file details",
+    "info": "Case file details",
+    "archiveStatus": "Archive status",
+    "notArchived": "Not archived",
+    "manifestSha": "Package manifest hash",
+    "retainUntil": "Write-locked until",
+    "retainUntilExpected": "{date} (expected, from the closing date)",
+    "archiveKey": "Package location in the cold store",
+    "inCase": "Documents in this case file",
+    "removed": "Document removed from the case file",
+    "addOne": "Add to case file",
+    "added": "Document added to the case file",
+    "noCandidates": "No more documents can be added.",
+    "closedOk": "Case file {code} closed",
+    "closeHint": "Close the case file when the work is finished; it needs at least one document.",
+    "archive": "Archive",
+    "archiving": "Archiving…",
+    "archiveConfirm": "Archive case file {code} to the cold store? The package is write-locked until the end of its retention period and cannot be changed or deleted; the business database keeps only a short record.",
+    "archivedOk": "Case file {code} archived: {documents} documents, {files} files",
+    "archiveHint": "Department heads archive their department's closed case files. Closed case files not archived by hand are archived by the system after the configured delay (365 days by default).",
+    "room": {
+      "title": "Reading room",
+      "subtitle": "View only: the package is read back from the cold store and checked against the database hash first; PDF files carry your name and the time on every page; every opening is recorded in the audit log.",
+      "loading": "Reading the package from the cold store…",
+      "verified": "Manifest matches the hash stored in the database",
+      "hidden": "{n} more documents in the package you may not read.",
+      "noFiles": "No files",
+      "view": "View",
+      "viewing": "Opening…",
+      "notViewable": "Only PDF files can be viewed",
+      "viewer": "Viewing: {name}",
+      "newTab": "Open in a new tab",
+      "stampNote": "This copy carries your name and the viewing time; it is not the original in the cold store.",
+      "closeViewer": "Close viewer"
+    },
+    "validation": {
+      "year": "Year between 2000 and 2999",
+      "code": "Enter the case file code",
+      "title": "Title of 5 to 500 characters",
+      "retention": "Retention of 1 to 100 years"
+    },
+    "error": {
+      "duplicateCode": "Your unit already has a case file with this code this year",
+      "alreadyFiled": "The document already belongs to another case file",
+      "titleLength": "Case file title of 5 to 500 characters",
+      "codeRequired": "Enter the case file code",
+      "forbidden": "Only the department head archives the department's case files",
+      "not_found": "Not found, or you may not view it",
+      "not_closed": "The case file is still open: close it before archiving",
+      "already_archived": "The case file is already archived",
+      "archive_conflict": "The database rejected the archive run because the case file or its documents changed meanwhile; nothing was changed — reload and try again",
+      "not_archived": "The case file is not archived yet",
+      "busy": "The system is busy, try again in a few seconds",
+      "not_viewable": "The reading room only opens PDF files",
+      "unstampable": "The viewer's name could not be stamped on this file, so it was not opened",
+      "archive_mismatch": "The package in the cold store does not match the recorded hash — not opened",
+      "storage_unavailable": "The archive store is not ready, try again later",
+      "database_unavailable": "The database is not ready, try again later"
     }
   },
   "desk": {
@@ -1050,5 +1194,506 @@
     "detail": "Signet is opening your workspace.",
     "failed": "Unable to sign in",
     "retryDetail": "Your sign-in session may have expired. Please sign in again."
+  },
+  "health": {
+    "title": "System status",
+    "subtitle": "Operational state of Signet's components. Refreshes automatically, no sign-in needed.",
+    "overall": {
+      "ok": "All components operational",
+      "degraded": "Some components are having problems",
+      "down": "Service disruption"
+    },
+    "overallHint": {
+      "ok": "Sign-in, document processing, storage and search are all available.",
+      "degraded": "Core features still work; features relying on the affected components may be slow or paused.",
+      "down": "An essential component is not responding; many actions will not go through."
+    },
+    "state": {
+      "ok": "Operational",
+      "degraded": "Partial",
+      "down": "Down",
+      "off": "Off"
+    },
+    "layer": {
+      "nguoi-dung": "Users",
+      "loi": "Core",
+      "quy-trinh": "Process",
+      "du-lieu": "Data",
+      "tri-tue": "Intelligence"
+    },
+    "component": {
+      "cong-api": "API gateway",
+      "dang-nhap": "Single sign-on",
+      "csdl": "Database",
+      "ket-khoa": "Key vault",
+      "quet-ma-doc": "Malware scanning",
+      "quy-trinh": "Workflow",
+      "luu-tru": "File storage",
+      "tim-kiem": "Search",
+      "tro-ly-ai": "AI assistant"
+    },
+    "checkedAt": "Checked at {time}",
+    "autoRefresh": "Refreshes every 30 seconds",
+    "version": "Version",
+    "uptime": "Uptime",
+    "uptimeHint": "Since the file service last started",
+    "backup": "Last backup",
+    "backupNone": "None yet",
+    "backupHint": "Most recent complete backup run recorded by the system",
+    "ai": "AI assistant",
+    "aiOn": "On",
+    "aiOff": "Off",
+    "aiSemantic": "Writes cited answers, semantic search",
+    "aiKeyword": "Writes cited answers, keyword search",
+    "aiOffHint": "No language model enabled: the assistant still searches by keyword and quotes passages verbatim",
+    "aiSemanticOnly": "Answer model not ready: the assistant searches by meaning and quotes passages verbatim",
+    "units": {
+      "day": "d",
+      "hour": "h",
+      "minute": "min",
+      "less": "under 1 min"
+    },
+    "rateLimited": "Status loaded too often in one minute; the page will retry in a few seconds.",
+    "unreachable": "Could not load the status: the API gateway may be down. The page will retry.",
+    "stale": "Showing the result of the previous load.",
+    "note": "This page only shows the overall state — no host names, addresses or business figures. Detailed metrics (API gateway traffic and latency) are on the Grafana dashboard for operators."
+  },
+  "feedback": {
+    "button": "Feedback",
+    "title": "Feedback on the e-Office",
+    "screen": "Screen: {screen}",
+    "screenDocument": "Document details",
+    "allScreens": "All screens",
+    "rating": "Satisfaction",
+    "ratingValue": "Level {n}/5",
+    "low": "Not satisfied",
+    "high": "Very satisfied",
+    "comment": "A few words",
+    "placeholder": "What is inconvenient, what should change…",
+    "privacy": "Do not write names, ID card numbers or phone numbers.",
+    "send": "Send feedback",
+    "sent": "Feedback sent. Thank you!",
+    "mineLink": "Feedback you sent",
+    "pageTitle": "Feedback",
+    "pageSubtitle": "A 1–5 satisfaction level and a few words about the e-Office, sent with the Feedback button in the top bar; the current screen is attached automatically.",
+    "summary": "Unit summary",
+    "sampleNote": "Sample unit (make seed): this feedback comes from people trying the system, not from users at a real unit.",
+    "none": "No feedback yet.",
+    "average": "Average score",
+    "count": "Feedback",
+    "distribution": "By level",
+    "screenColumn": "Screen",
+    "withComment": "With text",
+    "last": "Latest",
+    "recent": "Recent feedback",
+    "anonymous": "The sender is not shown. The time sent is.",
+    "yours": "Yours",
+    "mine": "Your feedback",
+    "mineHint": "Only you see this list. Unit leaders and unit administrators can read the text and the time sent, not who sent it.",
+    "noneMine": "You have not sent any feedback yet."
+  },
+  "metrics": {
+    "title": "Metrics",
+    "subtitle": "Before / after metrics from spec §8, computed from your unit's data when the page opens. Counts and hours only; restricted documents are left out.",
+    "forbidden": "Only unit leaders can view this page.",
+    "sampleNote": "Computed on sample data (make seed): the sample script runs every step within seconds, not at a real working pace.",
+    "table": "The four indicators of spec §8",
+    "indicator": "Indicator",
+    "before": "Before",
+    "after": "After (on the system)",
+    "how": "How it is measured",
+    "notMeasured": "Not measured — no pilot unit yet",
+    "noData": "No data yet",
+    "beforeNote": "The Before column is measured at a pilot unit the old way: asking the clerk, paper logs, a stopwatch, observation. There is no pilot unit yet, so there are no figures, and the page does not fill in estimates. How to measure and read: docs/so-lieu-sau.md.",
+    "month": "Month",
+    "allMonths": "All months",
+    "median": "Median",
+    "unit": {
+      "second": "s",
+      "minute": "min",
+      "hour": "h",
+      "day": "days"
+    },
+    "assign": {
+      "name": "Time from arrival to assignment",
+      "value": "Median {median} · p90 {p90}",
+      "count": "{n} documents assigned · {waiting} still waiting",
+      "how": "From intake (or arrival from another unit) to the first time a leader assigns the lead. Cancelled and restricted documents are left out.",
+      "byMonth": "Time to assignment, by month of arrival",
+      "arrived": "Arrived",
+      "assigned": "Assigned",
+      "handled": "To a handler",
+      "monthHint": "Median and p90 in the All months row are recomputed over every document, not added up from the months. Last column: median time until the document reaches a person who handles it."
+    },
+    "overdue": {
+      "name": "Share of documents handled late",
+      "value": "{pct}% ({late}/{judged} documents)",
+      "count": "Of these, {open} not finished and past the deadline · {pending} not yet due, not counted",
+      "how": "Deadline compared with the time finished, in Vietnam time; a document not finished and past its deadline counts as late. Documents without a deadline are left out.",
+      "byMonth": "Late documents by deadline month",
+      "dueMonth": "Deadline month",
+      "judged": "Known",
+      "late": "Late",
+      "open": "Open, late",
+      "pending": "Not yet due",
+      "monthHint": "Differs from the on-time figure on the Overview page: that page only counts finished documents, by month finished."
+    },
+    "search": {
+      "name": "Time to find an old document again",
+      "value": "Median {median} · slowest {max}",
+      "count": "{n} searches, found {found}/{n}",
+      "how": "Time 5 searches for the reference numbers of the oldest incoming documents: system latency, not including the time a person spends typing and reading.",
+      "run": "Run {n} searches",
+      "running": "Measuring…",
+      "runs": "Searches",
+      "symbol": "Reference number",
+      "latency": "Time",
+      "rank": "Position in results",
+      "notFound": "Not found",
+      "note": "Measured in this browser, one search at a time, so it includes your network round trip; results are not saved. make do-so-lieu-sau measures the same way on the server."
+    },
+    "searchFew": "Only {n} incoming documents have a reference number to search for; {want} are needed.",
+    "handoffs": {
+      "name": "Manual hand-offs (print, sign, carry, reminder messages)",
+      "value": "Qualitative comparison, no figure",
+      "how": "The paper process compared with the process on the system, step by step: docs/so-lieu-sau.md."
+    },
+    "feedback": "User feedback",
+    "feedbackValue": "Average score {avg}/5 over {n} feedback",
+    "feedbackLink": "View feedback"
+  },
+  "lineage": {
+    "nav": "Data lineage",
+    "title": "Data lineage",
+    "subtitle": "Which view each Overview chart reads and which tables each view reads — computed from the database catalog when the page opens, not declared by hand — plus the latest archiving run. Names of tables, views and edges only, no document data.",
+    "source": "Data source",
+    "sourceOf": "Data source: {chart}",
+    "kpis": "Summary cards",
+    "chart": "Chart",
+    "allCharts": "All charts",
+    "graph": "Lineage graph",
+    "graphHint": "Data flows left to right: table → view → chart; table → Parquet → archive package. Dashed: the last archiving step writing back to the database. Hover a node to see its full name.",
+    "kind": {
+      "chart": "Chart",
+      "view": "View",
+      "table": "Table",
+      "job": "Archiving step",
+      "object": "Stored object (S3)"
+    },
+    "edge": {
+      "read": "reads",
+      "archive": "archiving",
+      "commit": "archiving writes to the database"
+    },
+    "sourceKind": {
+      "table": "table",
+      "partitioned_table": "partitioned table",
+      "view": "view",
+      "materialized_view": "materialized view",
+      "foreign_table": "foreign table"
+    },
+    "objects": "{n} objects",
+    "rows": "{n} rows",
+    "readAt": "Catalog read at {time}. Report views are plain views: Overview figures are recomputed on every visit, there is no stale snapshot.",
+    "sources": "Sources of each chart",
+    "view": "View",
+    "readsFrom": "Reads from",
+    "through": "via {view}",
+    "missing": "This view is not in the catalog",
+    "archive": "Latest archiving run",
+    "archiveTotals": "Your unit has {runs} finished archiving runs; {failed} steps failed a quality check.",
+    "archiveNone": "No archiving run of your unit has recorded lineage yet.",
+    "archiveRun": "Run {run}… · finished {time}",
+    "step": "Step",
+    "steps": {
+      "files": "Copy files hot → cold",
+      "tables": "Tables → Parquet + checks",
+      "manifest": "Build package (manifest)",
+      "commit": "Write back to database"
+    },
+    "inputs": "Inputs",
+    "outputs": "Outputs",
+    "quality": "Quality check",
+    "notChecked": "Not checked",
+    "reports": "All report views ({n})",
+    "reportsHint": "Every office.v_… view in the database, including views no Overview chart uses yet (e.g. those of the Metrics page).",
+    "usedBy": "Used by",
+    "export": "Download OpenLineage (.jsonl)"
+  },
+  "quality": {
+    "status": {
+      "PASSED": "Passed",
+      "WARNING": "Warning",
+      "FAILED": "Failed",
+      "NONE": "Not checked"
+    },
+    "unavailable": "Could not check",
+    "flagOf": "Data quality check of {chart}",
+    "title": "Data quality checks",
+    "hint": "Rules computed in the database every time the page opens (view office.report_checks), on your unit's figures, not recomputed in the browser. Threshold 0: one document off raises a flag. The Overview page shows the worst flag next to each chart.",
+    "view": "View",
+    "rule": "Rule",
+    "result": "Result",
+    "figures": "Figures",
+    "rules": {
+      "status_total": {
+        "name": "Status totals match incoming documents",
+        "what": "The status chart's bars plus restricted incoming documents (shown separately) must equal the incoming documents counted directly in the documents table. A gap means documents vanish from the page.",
+        "figures": "On the page {actual} / in the database {expected} incoming documents",
+        "detail": "Statuses with documents the chart does not draw: {detail}"
+      },
+      "department_total": {
+        "name": "Department totals match documents in progress",
+        "what": "The department chart's documents must add up to the In progress bar of the status chart. Documents without a known lead department (assigned to someone not in the directory, no lead task) raise a warning.",
+        "figures": "By department {actual} / in progress {expected}; {issues} without a lead department"
+      },
+      "processing_coverage": {
+        "name": "Processing time covers every finished document",
+        "what": "Finished documents without a finish time are left out of the average (warning); counting more than exist, or a month with negative total hours, fails. All months, not only the 12 on the chart.",
+        "figures": "Timed {actual} / {expected} finished documents",
+        "detail": "Months with negative total hours: {detail}"
+      },
+      "unique_keys": {
+        "name": "Join keys are unique and not empty",
+        "what": "The page matches figures by month and by department: a duplicate key is silently skipped, an empty key drops off the chart.",
+        "figures": "{expected} rows, {issues} with a duplicate or empty key"
+      },
+      "no_personal_columns": {
+        "name": "No personal data columns",
+        "what": "From the database catalog: a view exposing an email, phone, ID card number, birth date, address, full name or username column fails; only reading such a column (also through a nested view) is a warning.",
+        "figures": "{actual} personal columns exposed, {issues} personal columns read",
+        "detail": "Columns: {detail}"
+      }
+    },
+    "archive": {
+      "run": "Quality checks of this run",
+      "source": "The checks svc-files recorded in the OpenLineage events (dataQualityAssertions facet), verbatim, not recomputed.",
+      "table": "{table}: {passed}/{total} checks passed",
+      "failedItems": "failed: {items}",
+      "none": "This run recorded no checks in the lineage: nothing vouches for the package's row counts.",
+      "stopped": "The archiving run at {time} was stopped by a failed quality check; the case file is not in cold storage."
+    },
+    "assertion": {
+      "row_count_equals_source": "row count matches the database",
+      "not_null": "column {column} not empty"
+    }
+  },
+  "hpdi": {
+    "title": "H-P-D-I self-assessment",
+    "subtitle": "Leaders assess the organisation's digital maturity across four spaces: Human, Process, Data, Intelligence.",
+    "forbidden": "Only unit and department leaders can use this page.",
+    "intro": "Each question has 5 levels: pick the one that best describes what actually happens in the organisation today, not what you would like. A space's score is the average of its questions. Next to each space are figures Signet measures from the organisation's own data, for comparison.",
+    "disclaimer": "The questions were written by the Signet team, based on the H-P-D-I definitions in the OLP 2026 theme introduction and the DX-OS course book (sources at the bottom). This is a self-assessment tool, not an official government index, and it does not convert to a DTI score.",
+    "managerNote": "Department leaders can answer and see the result in this browser; only the unit leader saves results and sees the organisation's measured figures.",
+    "progress": "Answered {n}/{total} questions",
+    "fill": "Fill in from the last saved run",
+    "reset": "Start over",
+    "spaceScore": "Score: {score}/5",
+    "level": "Level {n}",
+    "evidenceTitle": "Measured evidence",
+    "evidenceNone": "Signet has no measured figures for this space in the organisation yet.",
+    "evidenceHint": "The organisation's figures when the page was opened, to compare with the answers; they are not used for scoring.",
+    "evidence": {
+      "feedback": {
+        "name": "User satisfaction (in-app feedback)",
+        "value": "{avg}/5 from {n} responses"
+      },
+      "overdueNow": {
+        "name": "Incoming documents now overdue",
+        "value": "{n} documents"
+      },
+      "overdueRate": {
+        "name": "Overdue rate, among documents known to be on time or late",
+        "value": "{pct} % ({late}/{n} documents)"
+      },
+      "timeToAssign": {
+        "name": "Time from arrival to assignment (median)",
+        "value": "{hours} over {n} assigned documents"
+      },
+      "documents": {
+        "name": "Documents in the system, excluding cancelled ones",
+        "value": "{n} (incoming {incoming}, outgoing {outgoing})"
+      },
+      "archivedDocuments": {
+        "name": "Archived documents",
+        "value": "{n} documents"
+      },
+      "caseFiles": {
+        "name": "Case files archived",
+        "value": "{archived}/{n} case files"
+      },
+      "intakeKept": {
+        "name": "Suggested intake fields kept by the clerk",
+        "value": "{pct} % ({kept}/{n} fields)"
+      },
+      "suggestionKept": {
+        "name": "Assignment suggestions that kept the lead department",
+        "value": "{pct} % ({kept}/{n} assigned documents)"
+      }
+    },
+    "result": "Result",
+    "answerAll": "{n} questions still unanswered.",
+    "space": "Space",
+    "now": "This run",
+    "previous": "Saved {date}",
+    "previousShort": "Previous",
+    "focusTitle": "Work on first",
+    "focus": "{space}: the lowest score in the part of the foundation that is not yet solid. Strengthen this space before investing in the later ones.",
+    "focusLast": "{space}: the lowest score; the three foundation spaces before it all score higher. This is where to invest next.",
+    "focusNone": "All four spaces are at level 5: keep the pace and reassess regularly.",
+    "gapsTitle": "Foundation gaps",
+    "gapsNone": "None: no later space is ahead of the one before it.",
+    "gap": "{to} is {diff} levels above {from}.",
+    "gapsHint": "Following the linear evolution principle H → P → D → I: a later space built on an earlier one that is not solid easily turns into “garbage in, garbage out”.",
+    "shapeTitle": "Shape",
+    "shape": {
+      "diamond": {
+        "name": "Complete diamond",
+        "text": "[P], [D] and [I] all reach near the top and little work is manual: processes stop errors, data is clean, AI runs on a solid base."
+      },
+      "illusion": {
+        "name": "Technology illusion",
+        "text": "[D] or [I] is ahead of [P]: analytics or AI built before the process foundation, so careless data entry turns into wrong results."
+      },
+      "kite": {
+        "name": "Off-centre kite",
+        "text": "[P] is solid but [D] and [I] are almost absent: work follows the process, but there are no figures to steer by (blind execution)."
+      },
+      "spear": {
+        "name": "Fragmented spear",
+        "text": "Most work still rests on people and [P], [D], [I] stay near the centre: the unit depends on a few key staff."
+      },
+      "transitional": {
+        "name": "In transition",
+        "text": "None of the four archetypes in the course book fits; see the foundation gaps and the space to work on first."
+      }
+    },
+    "shares": "Shares estimated as in the course book: [H] {h} % · [P] {p} % · [D] {d} % · [I] {i} %",
+    "shapeHint": "From the DX-OS course book, section 2.4 (Dr Tạ Tuấn Anh, CC BY 4.0): [P], [D] and [I] each take at most 30 %, converted from the score (level 1 is 0 %, level 5 is 30 %); [H] is the work left on people, 100 % minus the other three, not the [H] space score. The book also multiplies by an evidence factor; here it is 1 because every level already describes observable practice. A guide only, not a DTI score.",
+    "gigoTitle": "Garbage in, garbage out",
+    "gigo": "Intelligence and analytics rest on a weak base: [I] is above [D], or [D] and [I] are ahead of [P]. AI and reports that learn from wrong data give wrong results. Pause expanding [I] (agent suggestions, AI questions), standardise [P] and [D] first, and check the data quality flags of the reports:",
+    "steps": "Next steps",
+    "first": "Do first",
+    "stepFrom": "from question {q} ({title}), currently at level {n}",
+    "linkFor": "{page} ({roles} only)",
+    "saveTitle": "Save and track progress",
+    "saveHint": "Each save is one row in the organisation's history and one audit log entry; it cannot be edited or deleted. The system recomputes the scores from the answers.",
+    "note": "Note",
+    "notePlaceholder": "Context for this assessment (optional)",
+    "save": "Save result",
+    "saving": "Saving…",
+    "saved": "Self-assessment result saved",
+    "history": "Saved runs",
+    "historyNone": "The organisation has not saved any run yet.",
+    "when": "Saved at",
+    "sources": "References",
+    "sourcesNote": "Question set {id}. Scoring and limitations: docs/tu-chan-doan.md in the source code."
+  },
+  "apps": {
+    "nav": "Applications",
+    "title": "Application catalog",
+    "subtitle": "Applications running on the Signet core, sharing one sign-in",
+    "builtinTitle": "Built into the core",
+    "builtinHint": "Installed with the core, same version as the core.",
+    "installedTitle": "Installed from a manifest",
+    "installedHint": "Added by the system administrator with moc app install, without changing core code.",
+    "removedTitle": "Removed",
+    "removedHint": "moc app remove took down the route, sign-in client and container; the application's data is kept.",
+    "none": {
+      "builtin": "No built-in applications.",
+      "installed": "No application has been installed from a manifest yet.",
+      "removed": "No application has been removed."
+    },
+    "state": {
+      "builtin": "Built into the core",
+      "installed": "Installed",
+      "removed": "Removed"
+    },
+    "version": "Version",
+    "coreVersion": "same as the core",
+    "installedAt": "Installed at",
+    "updatedAt": "Updated at",
+    "removedAt": "Removed at",
+    "manifestHash": "Manifest hash",
+    "hashHint": "The manifest hash is the SHA-256 of app.yaml at install time: compare it with sha256sum apps/<folder>/app.yaml on the server to confirm the installed version is the reviewed one.",
+    "copy": "Copy",
+    "copyHashOf": "Copy the manifest hash of {app}",
+    "copied": "Manifest hash copied",
+    "copyFailed": "The browser does not allow copying — select the hash below by hand",
+    "open": "Open",
+    "builtin": {
+      "office": {
+        "title": "Electronic office",
+        "description": "Incoming and outgoing documents, assignments, case files, search, Q&A, audit log — the first application on the core."
+      },
+      "personal": {
+        "title": "P.A.R.A personal space",
+        "description": "Each person's own place for files in four folders: Projects, Areas, Resources, Archives."
+      }
+    }
+  },
+  "sensors": {
+    "title": "Storage sensor map",
+    "subtitle": "Latest temperature of each room in the records storage against the alert threshold, with sensor data quality flags. Refreshes every 30 seconds.",
+    "forbidden": "This page is for clerks, staff, department heads and unit directors.",
+    "off": "Sensors are not enabled",
+    "offHint": {
+      "off": "Sensors have not been connected to this storage area. Contact your administrator to set up the connection.",
+      "unavailable": "Sensor readings are temporarily unavailable. Try refreshing in a few minutes or contact your administrator if the issue continues."
+    },
+    "plan": "Storage floor plan",
+    "planLabel": "Floor plan of the records storage, each room coloured by its latest temperature against the threshold",
+    "corridor": "Corridor",
+    "checkedAt": "Read at {time}",
+    "room": {
+      "kho-1": "Stack room 1",
+      "kho-2": "Stack room 2",
+      "kho-3": "Stack room 3",
+      "phong-doc": "Reading room",
+      "xu-ly": "Processing room",
+      "may-chu": "Server room"
+    },
+    "outside": "Not on the plan",
+    "outsideHint": "{n} sensor(s) declare no room code (room attribute) or a code that is not on the plan: listed in the table only.",
+    "count": "{n} sensors",
+    "legend": "Legend",
+    "threshold": "Alert threshold {threshold}. Above it, the system drafts an \"Incident report\" for the staff member responsible for the sensor.",
+    "level": {
+      "over": "Above threshold",
+      "near": "Near threshold",
+      "normal": "Normal",
+      "unknown": "Reading not trusted",
+      "empty": "No sensor"
+    },
+    "levelHint": {
+      "over": "above {threshold}",
+      "near": "above {from}, up to {threshold}; a hint only, no alert is sent",
+      "normal": "{from} or below",
+      "unknown": "no reading yet, signal lost or out of range",
+      "empty": "no sensor in this room"
+    },
+    "flags": "Data quality flags",
+    "flag": {
+      "stale": "Signal lost",
+      "out_of_range": "Out of range",
+      "duplicate_time": "Repeated time",
+      "future_time": "Future time"
+    },
+    "flagHint": {
+      "stale": "no new reading for more than {n} minutes",
+      "out_of_range": "value is not a number, or outside the sensor's measuring range ({min} to {max})",
+      "duplicate_time": "the latest reading has the same observation time (observedAt) as another reading: stuck device clock or replayed message",
+      "future_time": "the latest reading's observation time (observedAt) is more than {slack} minutes ahead of the server clock: device clock running fast; signal loss is then judged by when the broker received the reading"
+    },
+    "flagsNote": "Flags are computed by the server from the sensor's digital twin in the context broker; rooms flagged signal lost or out of range are not coloured by the reading.",
+    "table": "Sensors",
+    "colRoom": "Room",
+    "colSensor": "Sensor",
+    "colValue": "Latest reading",
+    "colAt": "Observed at",
+    "colFlags": "Flags",
+    "none": "Your unit has no sensor sending readings yet.",
+    "note": "Sample floor plan of one storage level; sensors are placed by the room code the device declares. You only see your own unit's sensors.",
+    "panHint": "Scroll horizontally to see the full plan. Detailed readings are listed below."
   }
 }
