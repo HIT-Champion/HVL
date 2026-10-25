@@ -81,6 +81,23 @@ actions:
       - role: staff
       - role: manager
       - role: director
+  # Sơ đồ cảm biến OT (F3.10), chỉ đọc: svc-workflow đọc broker NGSI-LD ở tenant của đơn vị trong phiên. Đúng các vai
+  # trò đọc được dự thảo "Báo cáo sự cố" (quản trị đơn vị không đọc văn bản nào)
+  - name: otSensorMap
+    definition:
+      kind: ""
+      handler: '{{MOC_WORKFLOW_URL}}/actions/otSensorMap'
+      forward_client_headers: true
+      headers:
+        - name: X-Moc-Action-Secret
+          value_from_env: MOC_ACTION_SECRET
+      timeout: 15
+      type: query
+    permissions:
+      - role: clerk
+      - role: staff
+      - role: manager
+      - role: director
 custom_types:
   enums: []
   input_objects: []
@@ -120,4 +137,6 @@ custom_types:
           source: default
           remote_table: {schema: office, name: documents}
           field_mapping: {document_id: id}
+    - name: OtSensorMap
+    - name: OtSensor
   scalars: []

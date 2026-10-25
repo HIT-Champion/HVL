@@ -98,7 +98,7 @@ RESERVED_NAMES = {"office", "ca-nhan", "core", "moc", "admin", "api", "svc"}
 RESERVED_PATHS = {
     "/realms", "/resources", "/v1", "/v2", "/v1alpha1", "/api", "/realtime", "/admin", "/console", "/healthz",
     "/metrics", "/flowable-rest", "/status", "/ca-nhan", "/config", "/favicon",
-    "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
+    "/cam-bien", "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
     "/so-kiem-toan", "/tim-kiem", "/trang-thai", "/tu-chan-doan", "/van-ban", "/van-ban-den", "/van-ban-di",
     "/xac-thuc", "/ung-dung",
 }
