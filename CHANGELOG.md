@@ -99,6 +99,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   online 1.1.0). Mỗi lượt hỏi giữ vòng nhúng nền 5 giây; người hỏi lại dày hơn thế (smoke hỏi lại mỗi khoảng 3 giây)
   thì đoạn mới không được nhúng, không tìm được theo nghĩa, dù Ollama nhúng 4 đoạn chỉ mất 5 giây. Nay chuỗi giữ liền
   quá 30 giây (`MAX_HOLD_S`) thì vòng nền vẫn nhúng một lô rồi lại nhường. Test svc-files thêm ca hỏi lại mỗi 3 giây.
+- Trợ lý hỏi đáp không còn để lô nhúng nền chen vào lúc mô hình đang trả lời (#192). Trần 30 giây của #184 áp cả cho
+  một câu hỏi mà Ollama viết câu trả lời lâu hơn 30 giây, vì lượt hỏi gia hạn giữ mỗi 2,5 giây và vòng nền không phân
+  biệt gia hạn với câu hỏi mới: trên máy chỉ có CPU, một lô (tới 8 đoạn, khoảng 5 giây) làm câu trả lời chậm thêm. Nay
+  lời gọi mô hình đang chạy (nhúng câu hỏi, viết câu trả lời, nhúng trích yếu cho tác tử gợi ý) giữ vòng nền suốt lời
+  gọi, không có trần; trần 30 giây chỉ còn áp cho 5 giây giữ thêm sau mỗi lời gọi của lượt hỏi. Test svc-files thêm
+  ca lời gọi dài quá 30 giây và ca lượt bị hủy giữa lời gọi.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
