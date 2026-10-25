@@ -28,7 +28,8 @@ sử từng lần đo và báo svc-workflow khi vượt ngưỡng. Mỗi lần �
 
 Giả lỗi dữ liệu để thấy cờ chất lượng trên trang Sơ đồ cảm biến: ``--late 30`` lùi ``observedAt`` 30 phút (thiết bị
 mất tín hiệu từ nửa giờ trước), ``--frozen-clock`` cho mọi lần đo cùng ``observedAt`` của lần đầu (đồng hồ thiết bị
-đứng), số đo ngoài dải như ``--readings 22,-127`` (-127 °C: mã "mất kết nối" của thư viện DallasTemperature).
+đứng), ``--clock-ahead 30`` đẩy ``observedAt`` tới trước 30 phút (đồng hồ thiết bị chạy nhanh), số đo ngoài dải như
+``--readings 22,-127`` (-127 °C: mã "mất kết nối" của thư viện DallasTemperature).
 """
 
 from __future__ import annotations
@@ -70,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--late", type=float, default=0.0, help="lùi observedAt chừng ấy phút: giả thiết bị mất tín hiệu")
     p.add_argument("--frozen-clock", action="store_true",
                    help="mọi lần đo mang observedAt của lần đầu: giả đồng hồ thiết bị đứng")
+    p.add_argument("--clock-ahead", type=float, default=0.0,
+                   help="đẩy observedAt tới trước chừng ấy phút: giả đồng hồ thiết bị chạy nhanh")
     args = p.parse_args(argv)
     if args.room is not None and not re.fullmatch(r"[a-z0-9-]{1,40}", args.room):
         p.error("--room: 1–40 ký tự a-z, 0-9, dấu gạch ngang")
@@ -93,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     for i, value in enumerate(readings):
         if i:
             time.sleep(args.interval)
-        at = (datetime.now(UTC) - timedelta(minutes=args.late)).isoformat(timespec="seconds").replace("+00:00", "Z")
+        shift = timedelta(minutes=args.clock_ahead - args.late)
+        at = (datetime.now(UTC) + shift).isoformat(timespec="seconds").replace("+00:00", "Z")
         if args.frozen_clock:
             at = first = first or at
         status = call(base, "PATCH", f"/entities/{entity_id}/attrs", args.tenant,

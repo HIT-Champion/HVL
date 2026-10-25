@@ -113,6 +113,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thành việc ngoài trên cùng phiên quy trình (#189; thấy trong CI, `make demo-giao-viec`): Flowable khóa lạc quan,
   hủy một giao dịch và trả 500 kèm `FlowableOptimisticLockingException`. `svc-workflow` nay gọi lại tối đa 2 lần
   (sau 0,2 và 0,5 giây) cho hoàn thành việc và việc ngoài, chỉ với đúng lỗi này. Test svc-workflow +7.
+- Sơ đồ cảm biến (`/cam-bien`) không còn bỏ sót cảm biến mất tín hiệu có đồng hồ chạy nhanh (#191): cờ mất tín hiệu
+  xét theo `observedAt` của số đo mới nhất, thiết bị gửi giờ ở tương lai thì số đo cuối luôn có vẻ vừa đo, kể cả khi
+  đã mất tín hiệu thật. Thêm cờ thứ tư `future_time` ("Giờ đo ở tương lai"): `observedAt` muộn hơn giờ máy chủ quá 2
+  phút; khi đó mất tín hiệu xét theo lúc broker nhận số đo (`modifiedAt`). Cờ là một chuỗi nữa trong `flags`, kiểu
+  GraphQL không đổi; phòng chỉ có cờ này vẫn tô theo số đo. `sensor.py` thêm `--clock-ahead` để giả đồng hồ nhanh,
+  bước 7 của `make demo-it-ot` thêm cảm biến phòng xử lý tài liệu. Test svc-workflow +2, office +1.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau

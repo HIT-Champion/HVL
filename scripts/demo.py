@@ -39,7 +39,7 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         (ii) Hội tụ IT/OT: bật context broker NGSI-LD (profile iot); cảm biến nhiệt độ phòng máy chủ giả lập gửi các
         lần đo, vượt ngưỡng thì svc-workflow dựng dự thảo "Báo cáo sự cố" từ mẫu cho chuyên viên phụ trách; chuyên viên
         trình, dự thảo vào luồng văn bản đi; sơ đồ cảm biến kho (/cam-bien) tô màu từng phòng và gắn cờ chất lượng
-        (mất tín hiệu, ngoài dải, trùng observedAt). (make demo-it-ot)
+        (mất tín hiệu, ngoài dải, trùng observedAt, observedAt ở tương lai). (make demo-it-ot)
     python3 scripts/demo.py lien-thong
         Liên thông văn bản trong hệ thống (F3.12, không thuộc 4 nguyên lý): Khoa CNTT phát hành công văn gửi Khoa
         Kinh tế; bên nhận tự có văn bản đến cùng tệp (cùng SHA-256), cùng mã xác thực; vào sổ, lãnh đạo có việc chỉ
@@ -1008,9 +1008,10 @@ def ot_sensor_map(tenant: str, threshold: float, server_room: float) -> None:
         ("kho-2", "Kho bảo quản 2", [threshold - 13, -127], [], ["out_of_range"]),
         ("kho-3", "Kho bảo quản 3", [threshold - 12, threshold - 11], ["--frozen-clock"], ["duplicate_time"]),
         ("phong-doc", "Phòng đọc", [threshold - 11], ["--late", str(stale_min + 20)], ["stale"]),
+        ("xu-ly", "Phòng xử lý tài liệu", [threshold - 10], ["--clock-ahead", "30"], ["future_time"]),
     ]
-    say(7, "Sơ đồ cảm biến kho: bốn cảm biến kho gửi số đo — bình thường; -127 °C (ngoài dải); đồng hồ đứng (trùng"
-           f" observedAt); số đo cũ {stale_min + 20} phút (mất tín hiệu)")
+    say(7, "Sơ đồ cảm biến kho: năm cảm biến gửi số đo — bình thường; -127 °C (ngoài dải); đồng hồ đứng (trùng"
+           f" observedAt); số đo cũ {stale_min + 20} phút (mất tín hiệu); đồng hồ nhanh 30 phút (giờ đo ở tương lai)")
     for code, name, values, fault, _ in rooms:
         out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", code, "--name", name,
                   "--room", code, "--responsible", OT_STAFF, "--readings", ",".join(f"{v:g}" for v in values),
@@ -1041,7 +1042,8 @@ def ot_sensor_map(tenant: str, threshold: float, server_room: float) -> None:
         raise DemoFailed(f"kho 2 phải hiện số -127 kèm cờ ngoài dải: {got['urn:ngsi-ld:TemperatureSensor:kho-2']}")
     ok(f"văn thư thấy {len(got)} cảm biến: phòng máy chủ {server_room:g} °C vượt ngưỡng {board['threshold']:g} °C (đỏ);"
        " kho 1 bình thường; kho 2 \"ngoài dải\", kho 3 \"trùng giờ đo\", phòng đọc \"mất tín hiệu\" (quá"
-       f" {board['stale_after_min']} phút) — cờ do svc-workflow tính, không tin số của thiết bị")
+       f" {board['stale_after_min']} phút), phòng xử lý \"giờ đo ở tương lai\" (mất tín hiệu xét theo lúc broker nhận)"
+       " — cờ do svc-workflow tính, không tin số của thiết bị")
 
     other = Session("vanthukt").gql(OT_MAP)["otSensorMap"]
     if set(want) & {s["id"] for s in other["sensors"]} or server in {s["id"] for s in other["sensors"]}:

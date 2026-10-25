@@ -544,12 +544,15 @@ docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT 
 - **Sơ đồ cảm biến** (`/cam-bien` của Văn phòng điện tử, văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo đơn vị): mặt
   bằng kho lưu trữ mẫu (SVG, không tải gì ngoài), mỗi phòng tô màu theo số đo mới nhất của cảm biến cùng mã phòng so
   với `MOC_OT_THRESHOLD`. Đọc qua Hasura Action `otSensorMap`: `svc-workflow` chỉ hỏi broker ở tenant của đơn vị
-  người xem. Ba cờ chất lượng tính ở `svc-workflow`: **mất tín hiệu** — quá `MOC_OT_STALE_MIN` phút (mặc định 10,
+  người xem. Bốn cờ chất lượng tính ở `svc-workflow`: **mất tín hiệu** — quá `MOC_OT_STALE_MIN` phút (mặc định 10,
   1–1440) không có số đo mới; đặt từ 2–3 lần chu kỳ gửi của thiết bị thật; **ngoài dải** — giá trị không phải số
   hoặc ngoài −55…125 °C (dải đo của cảm biến DS18B20, hằng số trong `ot.py`); **trùng `observedAt`** — số đo mới
-  nhất cùng giờ đo với một lần đo khác trong 10 lần gần nhất (temporal API). Profile `iot` tắt thì trang báo "Chưa
-  bật cảm biến", không lỗi. Giả lỗi để xem cờ: `sensor.py --late 30` (số đo cũ 30 phút), `--frozen-clock` (đồng hồ
-  đứng), `--readings 22,-127`.
+  nhất cùng giờ đo với một lần đo khác trong 10 lần gần nhất (temporal API); **giờ đo ở tương lai** — `observedAt`
+  muộn hơn giờ máy chủ quá 2 phút (`FUTURE_SLACK` trong `ot.py`): đồng hồ thiết bị chạy nhanh. Khi đó mất tín hiệu
+  xét theo lúc broker nhận số đo (`modifiedAt`), không theo giờ thiết bị — không thì thiết bị lệch giờ mà mất tín
+  hiệu không bao giờ bị gắn cờ. Profile `iot` tắt thì trang báo "Chưa bật cảm biến", không lỗi. Giả lỗi để xem cờ:
+  `sensor.py --late 30` (số đo cũ 30 phút), `--frozen-clock` (đồng hồ đứng), `--clock-ahead 30` (đồng hồ nhanh 30
+  phút), `--readings 22,-127`.
 - Broker và CSDL của nó không mở cổng ra máy chủ. Ba mạng nội bộ riêng: thiết bị ↔ broker (`iot-devices`), broker ↔
   `svc-workflow` (`iot`), broker ↔ CSDL của nó (`iot-db`) — thiết bị không gọi được `svc-workflow`. Mỗi lần gọi
   `POST /ot/notify/<tenant>` phải kèm token riêng của đơn vị (HMAC từ khóa Actions của `svc-workflow`), sai thì 401.
