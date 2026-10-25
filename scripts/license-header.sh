@@ -71,7 +71,7 @@ EOF
 #   ""                — loại tệp chưa hỗ trợ
 comment_style_for() {
   case "$1" in
-    *.sh|*.bash|*.py|*.yml|*.yaml|*.toml|*.cfg|*.conf|*.conf.template|*.ini|*.graphql|*.gql|Makefile|*/Makefile|Dockerfile|*/Dockerfile|*.Dockerfile|*.mk|*.env.example)
+    *.sh|*.bash|*.py|*.yml|*.yaml|*.toml|*.cfg|*.conf|*.conf.template|*.ini|*.graphql|*.gql|Makefile|*/Makefile|Dockerfile|*/Dockerfile|*.Dockerfile|*.mk|*.env.example|*.properties)
       echo "line #" ;;
     *.js|*.mjs|*.cjs|*.ts|*.mts|*.cts|*.jsx|*.tsx|*.go|*.java|*.c|*.h|*.cpp|*.rs|*.kt)
       echo "line //" ;;
