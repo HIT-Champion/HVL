@@ -84,10 +84,10 @@ Ngoài phạm vi:
 
 ## Chuỗi cung ứng phần mềm
 
-- Từ bản sau 1.0.0, mỗi bản phát hành kèm danh mục thành phần SBOM CycloneDX `moc-X.Y.Z.cdx.json` (và `.sha256`), sinh
-  bằng `make sbom`: gói npm, Python, action CI của đúng cây mã nguồn được gắn thẻ, kèm giấy phép. Đối chiếu với cơ sở
-  dữ liệu lỗ hổng không cần dựng hệ thống: `osv-scanner scan source -L moc-X.Y.Z.cdx.json`. Lỗ hổng đội chấp nhận tạm,
-  có lý do và hạn xem lại, nằm trong `apps/office/osv-scanner.toml`.
+- Từ bản sau 1.0.0, mỗi bản phát hành kèm danh mục thành phần SBOM CycloneDX `signet-X.Y.Z.cdx.json` (và `.sha256`),
+  sinh bằng `make sbom`: gói npm, Python, action CI của đúng cây mã nguồn được gắn thẻ, kèm giấy phép. Đối chiếu với cơ
+  sở dữ liệu lỗ hổng không cần dựng hệ thống: `osv-scanner scan source -L signet-X.Y.Z.cdx.json`. Lỗ hổng đội chấp nhận
+  tạm, có lý do và hạn xem lại, nằm trong `apps/office/osv-scanner.toml`.
 - CI chạy trên mọi pull request: quét bí mật trong toàn bộ lịch sử commit (gitleaks), lỗ hổng đã biết trong các tệp
   khóa phụ thuộc (OSV-Scanner), giấy phép của mọi gói kể cả gói gián tiếp (`make license-audit`).
 - Image bên thứ ba và action ghim theo digest, SHA commit; thư viện cài theo băm trong tệp khóa

@@ -298,14 +298,15 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
 
 ## 6. Phát hành
 
-Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10, bản cho vòng trường (cả hai đã phát hành) · `v1.1.0` 03/12, bản nộp chấm
-(mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ.
+Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10 (cả hai đã phát hành) · `v1.1.0` trước 01/11, bản cho vòng trường · `v1.2.0`
+03/12, bản nộp chấm (mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ. Gói phát hành tên `signet-X.Y.Z.tar.gz` từ
+`v1.1.0`; gói của `v0.1.0`, `v1.0.0` giữ tên cũ `moc-X.Y.Z.tar.gz` (không gắn lại thẻ đã đẩy).
 
 Đây là lúc duy nhất `main` nhận thay đổi.
 
 ```bash
 # 1. Chốt ghi chép thay đổi trên develop: PR (nhánh chore/<issue>-chot-1-1-0) chuyển các dòng của mục
-#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [1.1.0] - 2026-12-03", viết 3–8 dòng tóm tắt ngay dưới
+#    "[Chưa phát hành]" trong CHANGELOG.md sang "## [1.1.0] - <ngày phát hành>", viết 3–8 dòng tóm tắt ngay dưới
 #    tiêu đề đó (trang Release hiện phần này, phần còn lại gập lại), để lại tiêu đề
 #    "## [Chưa phát hành]" trống (CI đòi có mục này)
 #    tiêu đề PR: chore(release): chốt ghi chép thay đổi v1.1.0  → review → squash merge vào develop
@@ -344,7 +345,7 @@ gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào 
 - Phiên bản theo **Semantic Versioning**: số giữa tăng khi có tính năng mới, số cuối cho bản vá nóng, số đầu chỉ
   tăng khi bản cài cũ không nâng cấp tại chỗ được.
 - `release.yml` dựng trang Release bằng `scripts/release_body.py`: dòng đầu ghi **tệp chính thức là
-  `moc-X.Y.Z.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)" mà PoF #3 trừ điểm định dạng không mở), rồi
+  `signet-X.Y.Z.tar.gz`** (GitHub luôn tự gắn thêm "Source code (zip)" mà PoF #3 trừ điểm định dạng không mở), rồi
   phần tóm tắt, toàn bộ ghi chép thay đổi gập lại.
 - Không xóa hay gắn lại thẻ đã đẩy — ruleset thẻ `v*` chặn hẳn, `release.yml` và `release.sh` cũng từ
   chối phát hành lại. Phát hành nhầm thì ra bản vá `vX.Y.Z+1`.
@@ -381,8 +382,9 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 
 | Từ | Quy tắc |
 |---|---|
+| **trước 01/11** | Phát hành `v1.1.0`, bản cho vòng trường |
 | **26/11** | Đóng băng tính năng: chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` |
-| **03/12** | Phát hành `v1.1.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.1.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
+| **03/12** | Phát hành `v1.2.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.2.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
 | **05/12 → 10/12** | Không đẩy `deploy` trừ khi cả đội đồng ý (sự cố chặn demo) |
 | **17:00 06/12** | **Không push bất cứ gì lên repo này** — kể cả nhánh mới. Slide, video làm ở repo riêng |
 

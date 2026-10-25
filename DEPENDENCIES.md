@@ -317,7 +317,7 @@ GPL, AGPL, giấy phép khác và giấy phép chưa rõ thì không qua, trừ 
 `.github/license-exceptions.json`. Ngoại lệ cho gói ngoài danh sách phải trùng giấy phép SBOM ghi (gói đổi giấy phép thì
 ngoại lệ hết tác dụng); ngoại lệ cho gói SBOM không rõ giấy phép ghi giấy phép đội đã đọc trong gói và phiên bản đã
 đọc. CI (job "Giấy phép (PoF #2)") chạy hai lệnh này trên mọi pull request; từ bản sau 1.0.0, mỗi bản phát hành kèm
-SBOM `moc-X.Y.Z.cdx.json`.
+SBOM `signet-X.Y.Z.cdx.json`.
 Syft không đọc `Dockerfile`, `docker-compose.yml`: image thượng nguồn và giấy phép của chúng là các bảng ở trên.
 
 Lần quét 23/10/2026 (Syft 1.54.1): 769 gói khác nhau — npm 690, Python 73, action CI 6 — đều đạt; 22 gói qua nhờ ngoại
