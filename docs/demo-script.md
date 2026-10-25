@@ -555,8 +555,10 @@ tự nhúng các đoạn ở vòng nền rồi tìm lai (từ khóa + theo nghĩ
 **Trên giao diện** (`vanthu`, thanh bên → "Hỏi đáp văn bản"; hoặc nút "Hỏi trợ lý" ở Tìm kiếm): gõ "Điều kiện xét
 học bổng khuyến khích học tập là gì?" → khối "Câu trích nguyên văn" có "3,2", nguồn "[1] 88/CTSV · tr. 1 · Phòng
 Công tác sinh viên", nút "Mở văn bản"; bật mô hình thì sau đó có thêm khối "Trả lời của trợ lý" ghi rõ "Do mô hình
-ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Đăng nhập `giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào
-bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: dòng hỏi đáp của tác tử, không có câu hỏi.
+ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Bấm nhãn nguồn "88/CTSV · tr. 1" → tệp PDF mở ngay dưới danh sách
+nguồn, đúng trang 1. "Mở văn bản" → nút "Hỏi về văn bản này" mở lại trang Hỏi đáp chỉ hỏi trong 88/CTSV. Đăng nhập
+`giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán:
+dòng hỏi đáp của tác tử, không có câu hỏi.
 
 **Nếu giám khảo hỏi:**
 

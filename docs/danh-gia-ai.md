@@ -160,7 +160,9 @@ n"; bật `ai` thì thêm câu trả lời ngắn do mô hình viết, có tríc
 [README svc-files](../services/svc-files/README.md#hỏi-đáp-trên-kho-văn-bản-f42).
 
 **Mô hình, công cụ.** Chỉ mục đoạn `chunks` trên Meilisearch (đoạn ≤ 1 200 ký tự, không vượt trang); tìm lai từ khóa +
-véc-tơ khi có Qwen3-Embedding-0.6B (tỷ trọng nghĩa 0,5, ngưỡng điểm 0,75), chỉ từ khóa kèm lượt tìm nới khi không có.
+véc-tơ khi có Qwen3-Embedding-0.6B (tỷ trọng nghĩa 0,5 — 0,2 khi câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép;
+ngưỡng điểm 0,75), chỉ từ khóa kèm lượt tìm nới khi không có. Không câu nào trong 19 câu đánh giá dưới đây có các dấu
+hiệu đó, nên số đo không đổi khi thêm quy tắc này.
 Chế độ `extract` tất định, không cần mô hình; chế độ `generate` dùng Qwen3-1.7B viết câu trả lời từ tối đa 4 đoạn đã
 hậu kiểm. Đường ống tự viết trong `assist/` (không LlamaIndex, QĐ-004).
 

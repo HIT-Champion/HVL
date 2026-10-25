@@ -94,7 +94,7 @@ Object.assign(globalThis, {
   XMLHttpRequest: FakeXhr,
 })
 
-const { ApiError, useApi } = await import('../app/composables/useApi.ts')
+const { ApiError, useApi, viewerType } = await import('../app/composables/useApi.ts')
 const { errorText } = await import('../app/utils/errors.ts')
 const api = useApi()
 
@@ -198,6 +198,21 @@ test('errorText: blocked → câu của cổng kèm mã, hai ngôn ngữ; không
   assert.equal(errorText(tVi as never, new ApiError('HTTP 502', null, 502)), 'HTTP 502')
 })
 
+test('errorText: tệp sai loại, tệp chạy được, ảnh không bỏ được EXIF → câu riêng, hai ngôn ngữ', async () => {
+  const codes = [['type_mismatch', 415], ['type_not_allowed', 415], ['image_unreadable', 422]] as const
+  for (const [code, status] of codes) {
+    reply = jsonReply(status, { detail: { code, message: 'Câu tiếng Việt của máy chủ', found: 'text/html' } })
+    const e = await failure(calls.upload)
+    assert.equal(e.code, code)
+    assert.equal(e.status, status)
+    for (const [t, messages] of [[tVi, vi], [tEn, en]] as const) {
+      const text = errorText(t as never, e)
+      assert.ok(lookup(messages, `error.${code}`), code)
+      assert.equal(text, lookup(messages, `error.${code}`))
+    }
+  }
+})
+
 test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đáp chuyển blocked cho errorText', () => {
   for (const messages of [vi, en]) {
     assert.ok(lookup(messages, 'error.blocked'))
@@ -210,4 +225,14 @@ test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đ
   const passed = page.match(/!\[([^\]]+)\]\.includes\(e\.code/)?.[1] ?? ''
   assert.ok(passed.includes("'blocked'"), passed)
   assert.equal(lookup(vi, 'assist.error.blocked'), undefined)
+})
+
+test('khung xem nguồn của Hỏi đáp: bản scan giữ kiểu ảnh, HTML, SVG hay kiểu lạ đều thành PDF', () => {
+  assert.equal(viewerType('application/pdf'), 'application/pdf')
+  assert.equal(viewerType('image/jpeg'), 'image/jpeg')
+  assert.equal(viewerType('IMAGE/PNG; charset=binary'), 'image/png')
+  // object URL cùng origin với ứng dụng: không bao giờ để byte trả về chạy như trang HTML hay SVG
+  for (const type of ['text/html', 'image/svg+xml', 'application/xhtml+xml', 'image/tiff', '', null]) {
+    assert.equal(viewerType(type), 'application/pdf', String(type))
+  }
 })

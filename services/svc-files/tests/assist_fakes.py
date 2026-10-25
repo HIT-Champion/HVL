@@ -93,8 +93,9 @@ class FakeRetriever:
     fail: Exception | None = None
     hybrid_error: str | None = None
 
-    async def search(self, scope, *, q, vector, limit=5, filters=None) -> Retrieval:
-        self.calls.append({"scope": scope, "q": q, "vector": vector, "limit": limit, "filters": filters})
+    async def search(self, scope, *, q, vector, limit=5, filters=None, question=None) -> Retrieval:
+        self.calls.append({"scope": scope, "q": q, "vector": vector, "limit": limit, "filters": filters,
+                           "question": question})
         if self.fail is not None:
             raise self.fail
         ns = jwt.decode(scope.token, options={"verify_signature": False})[HASURA_CLAIMS] if scope.token else {}

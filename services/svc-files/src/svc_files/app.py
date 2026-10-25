@@ -16,10 +16,11 @@
 
 """API HTTP của svc-files.
 
-Tải lên (F1.5, F1.6): kiểm token → quét ClamAV → sạch mới ghi SeaweedFS → thêm dòng core.files qua
-Hasura. ClamAV không trả lời thì từ chối (503), không bao giờ lưu tệp chưa quét; tệp nhiễm được ghi vào
-sổ kiểm toán. Tải xuống: hỏi Hasura bằng chính token người dùng xem họ có được xem tệp không, rồi mới
-đọc từ SeaweedFS. Tìm kiếm (F1.7): Meilisearch xếp hạng, Hasura lọc theo quyền — chi tiết ở search.py.
+Tải lên (F1.5, F1.6): kiểm token → quét ClamAV → sạch mới nhận loại theo nội dung (filetype.py), bỏ siêu dữ liệu
+ảnh JPEG, PNG (imageclean.py) → ghi SeaweedFS → thêm dòng core.files qua Hasura. ClamAV không trả lời thì từ chối
+(503), không bao giờ lưu tệp chưa quét; tệp nhiễm được ghi vào sổ kiểm toán. Tải xuống: hỏi Hasura bằng chính
+token người dùng xem họ có được xem tệp không, rồi mới đọc từ SeaweedFS. Tìm kiếm (F1.7): Meilisearch xếp hạng,
+Hasura lọc theo quyền — chi tiết ở search.py.
 
 Văn bản đi (F2.4): svc-workflow gọi /internal/issue bằng token tài khoản dịch vụ khi văn thư phát hành —
 dựng PDF có số, mã QR từ dữ liệu trong CSDL, ký số PAdES bằng khóa của đơn vị trong két (F4.5, chỉ minh họa —
@@ -59,7 +60,7 @@ import unicodedata
 import uuid
 from collections.abc import Iterator
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, date, datetime
 from typing import Annotated, BinaryIO, Literal, Protocol
 from urllib.parse import quote
@@ -70,7 +71,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
-from . import __version__, pii
+from . import __version__, filetype, pii
 from .anchors import Anchorer, AnchorSigner, AnchorStore
 from .archive import (Archived, ArchiveError, Archiver, ArchiveStateError, ColdStore, read_archived_file,
                       read_manifest, read_package)
@@ -89,6 +90,7 @@ from .docread import api as docread_api
 from .docread.reader import Reader
 from .docread.summarize import make_summarizer
 from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
+from .imageclean import FORMATS as CLEANED_IMAGES, CleanError, run_clean
 from .imports import api as imports_api
 from .imports.runner import Importer, IncomingHandler
 from .imports.spool import Spool
@@ -106,7 +108,7 @@ from .texts import TextExtractor
 CHUNK_SIZE = 64 * 1024
 # Phần đầu và biên của multipart cộng thêm vào kích thước tệp
 MULTIPART_OVERHEAD = 64 * 1024
-# Văn bản hạn chế (F3.7): chờ lượt kiểm / đóng dấu PDF quá chừng này thì 503 busy
+# Văn bản hạn chế (F3.7): chờ lượt kiểm / đóng dấu PDF (cả lượt bỏ siêu dữ liệu ảnh) quá chừng này thì 503 busy
 SEALING_QUEUE_S = 10.0
 RETRY_AFTER = "10"
 MIME_RE = re.compile(r"^[\w.+-]+/[\w.+-]+$")
@@ -401,8 +403,7 @@ def clean_mime(value: str | None) -> str:
 def content_disposition(filename: str, *, inline: bool = False) -> str:
     """Tải về (attachment), kèm tên ASCII cho trình duyệt cũ và tên UTF-8 đầy đủ (RFC 6266). ``inline`` chỉ cho bản PDF
     đã đóng dấu người xem của phòng đọc (F3.8)."""
-    folded = unicodedata.normalize("NFKD", filename.replace("đ", "d").replace("Đ", "D"))
-    fallback = "".join(ch for ch in folded if ch.isascii() and ch.isprintable() and ch not in '"\\').strip()
+    fallback = filetype.ascii_name(filename)       # tải lên đã chặn tên mà bản ASCII có đuôi chạy được
     kind = "inline" if inline else "attachment"
     return f"{kind}; filename=\"{fallback or 'tep'}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
@@ -659,22 +660,24 @@ def create_app(
         return await asyncio.to_thread(seal, plain, dek, tenant_id, file_id), wrapped
 
     # Kiểm PDF lúc tải lên và giải mã + đóng dấu lúc xem văn bản hạn chế tốn CPU và bộ nhớ (mỗi lượt một tiến trình con
-    # tới MEMORY_MB): chung tối đa hai lượt cùng lúc. Chờ lượt có hạn — đầy thì 503 busy, không treo yêu cầu
+    # tới MEMORY_MB): chung tối đa hai lượt cùng lúc. Bỏ siêu dữ liệu ảnh tải lên cũng vậy, hàng riêng hai lượt. Chờ
+    # lượt có hạn — đầy thì 503 busy, không treo yêu cầu
     sealing = asyncio.Semaphore(2)
+    cleaning = asyncio.Semaphore(2)
 
     @asynccontextmanager
-    async def sealing_slot() -> AsyncIterator[None]:
+    async def slot(lane: asyncio.Semaphore, busy: str) -> AsyncIterator[None]:
         try:
-            await asyncio.wait_for(sealing.acquire(), SEALING_QUEUE_S)
+            await asyncio.wait_for(lane.acquire(), SEALING_QUEUE_S)
         except TimeoutError:
-            raise HTTPException(
-                503, {"code": "busy", "message": "Đang kiểm, đóng dấu tệp văn bản hạn chế khác, thử lại sau ít giây"},
-                {"Retry-After": RETRY_AFTER},
-            ) from None
+            raise HTTPException(503, {"code": "busy", "message": busy}, {"Retry-After": RETRY_AFTER}) from None
         try:
             yield
         finally:
-            sealing.release()
+            lane.release()
+
+    def sealing_slot() -> AbstractAsyncContextManager[None]:
+        return slot(sealing, "Đang kiểm, đóng dấu tệp văn bản hạn chế khác, thử lại sau ít giây")
 
     async def discard(rid: str, key: str) -> None:
         """Gỡ đối tượng vừa ghi khi không thêm được dòng CSDL — không để tệp mồ côi trong kho."""
@@ -728,18 +731,30 @@ def create_app(
             raise _error(422, "infected", "Tệp chứa mã độc nên đã bị chặn", signature=result.signature)
         return digest
 
-    async def ingest(rid: str, tenant_id: uuid.UUID, actor_id: str, upload: Readable, *, filename: str, mime: str,
-                     restricted: bool) -> FileOut:
-        """Một tệp vào kho: quét (quarantine) → (văn bản hạn chế: kiểm PDF, mã hóa) → ghi SeaweedFS → thêm dòng
-        core.files của người tải. Lỗi trả HTTPException như POST /api/files; lô nạp đọc cùng mã lỗi cho từng dòng."""
+    async def ingest(rid: str, tenant_id: uuid.UUID, actor_id: str, upload: Readable, *, filename: str,
+                     declared: str, restricted: bool) -> FileOut:
+        """Một tệp vào kho: quét (quarantine) → nhận loại theo nội dung (filetype.py: sai đuôi, sai kiểu khai, tệp
+        chạy được thì 415) → văn bản hạn chế: kiểm PDF, mã hóa · ảnh JPEG, PNG: bỏ siêu dữ liệu (imageclean.py) → ghi
+        SeaweedFS → thêm dòng core.files của người tải, mime theo nội dung (``declared``: mime trình duyệt khai).
+        ClamAV quét byte gốc trước mọi bước: tệp EICAR đổi đuôi vẫn bị chặn và ghi sổ như tệp nhiễm, không thành 415.
+        Lỗi trả HTTPException như POST /api/files; lô nạp đọc cùng mã lỗi cho từng dòng."""
         digest = await quarantine(rid, tenant_id, actor_id, upload, filename=filename, limit=settings.max_upload_bytes)
         scanned_at = datetime.now(UTC)
+        await upload.seek(0)
+        try:
+            mime = filetype.check(await upload.read(filetype.HEAD), filename, declared)
+        except filetype.Rejected as exc:
+            log_rid("core.file.type_rejected", rid, tenant_id=tenant_id, actor_id=actor_id, code=exc.code,
+                    found=exc.found, extension=filetype.extension(filename), declared=declared)
+            raise _error(415, exc.code, exc.message, found=exc.found) from None
         file_id = uuid.uuid4()
         key = object_key(tenant_id, file_id, scanned_at)
         await upload.seek(0)
         wrapped: str | None = None
         body: BinaryIO = upload.file
-        stored_size, stored_sha, stored_mime = digest.size, digest.hexdigest(), mime
+        # size, sha: của byte người xem nhận (bản rõ) — core.files, cổng xác thực; stored_*: của đối tượng trong kho
+        size, sha = digest.size, digest.hexdigest()
+        stored_size, stored_sha, stored_mime = size, sha, mime
         if restricted:
             # Văn bản hạn chế (F3.7): bản rõ đọc vào bộ nhớ (Starlette đệm phần lớn tệp ở /tmp — tmpfs trong
             # compose), kiểm đóng dấu được, mã hóa; kho chỉ nhận bản mã
@@ -757,6 +772,19 @@ def create_app(
             del plain
             body, stored_size = io.BytesIO(blob), len(blob)
             stored_sha, stored_mime = hashlib.sha256(blob).hexdigest(), "application/octet-stream"
+        elif mime in CLEANED_IMAGES:
+            # Ảnh JPEG, PNG: bỏ EXIF (vị trí GPS), XMP, chú thích — mã hóa lại trong tiến trình con nên byte lưu khác
+            # byte tải lên, băm và cỡ tính lại. Loại khác lưu nguyên từng byte (PDF: cổng xác thực, phòng đọc so băm)
+            raw = await upload.read()
+            try:
+                async with slot(cleaning, "Đang xử lý ảnh tải lên khác, thử lại sau ít giây"):
+                    cleaned = await run_clean(raw, mime)
+            except CleanError as exc:
+                raise _error(422, "image_unreadable", "Không bỏ được siêu dữ liệu (EXIF, vị trí GPS) của ảnh nên "
+                             f"chưa lưu: {exc}", reason=exc.reason) from exc
+            del raw
+            body, size, sha = io.BytesIO(cleaned), len(cleaned), hashlib.sha256(cleaned).hexdigest()
+            stored_size, stored_sha = size, sha
         try:
             await asyncio.to_thread(
                 store.put, key, body, size=stored_size, content_type=stored_mime, sha256_hex=stored_sha
@@ -774,8 +802,8 @@ def create_app(
                 object_key=key,
                 filename=filename,
                 mime_type=mime,
-                size_bytes=digest.size,
-                sha256_hex=digest.hexdigest(),
+                size_bytes=size,
+                sha256_hex=sha,
                 scanned_at=scanned_at,
                 wrapped_dek=wrapped,
             )
@@ -794,15 +822,15 @@ def create_app(
             actor_id=actor_id,
             file_id=file_id,
             object_key=key,
-            size_bytes=digest.size,
+            size_bytes=size,
             encrypted=wrapped is not None,
         )
         return FileOut(
             id=file_id,
             filename=filename,
             mime_type=mime,
-            size_bytes=digest.size,
-            sha256=digest.hexdigest(),
+            size_bytes=size,
+            sha256=sha,
             scanned_at=scanned_at,
             encrypted=wrapped is not None,
         )
@@ -815,17 +843,26 @@ def create_app(
         response_model=FileOut,
         openapi_extra=UPLOAD_BODY,
         summary="Tải tệp lên: quét ClamAV, sạch mới lưu",
+        description="Sau ClamAV: nhận loại theo byte đầu, không tin tên, mime khai; `mime_type` trả về là loại theo "
+                    "nội dung. Ảnh JPEG, PNG được bỏ siêu dữ liệu (EXIF, GPS, XMP, chú thích; xoay theo hướng EXIF "
+                    "trước) nên `sha256`, `size_bytes` là của ảnh đã làm sạch; tệp loại khác lưu nguyên từng byte.",
         responses={
             401: {"description": "Thiếu hoặc sai token"},
             413: {"description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"},
-            415: {"description": "restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa "
-                                 "MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ "
-                                 "(`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 "
-                                 "unscannable)"},
+            415: {"description": "`type_mismatch`: nội dung không khớp đuôi tệp (hay mime khai khi tên không có đuôi), "
+                                 "vd tệp .pdf là HTML · `type_not_allowed`: chương trình, kịch bản chạy được (theo nội "
+                                 "dung hay đuôi .exe, .bat, .js…) — `found` là loại theo nội dung · "
+                                 "`restricted_pdf_only`: restricted=true mà tệp không phải PDF đọc được, không khóa, "
+                                 "tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời "
+                                 "gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước "
+                                 "quét: 422 unscannable)"},
             422: {"description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được "
-                                 "(unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"},
+                                 "(unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán · "
+                                 "`image_unreadable` + `reason` (corrupt, too_many_pixels, timeout, memory): ảnh JPEG, "
+                                 "PNG hỏng hoặc quá lớn nên không bỏ được siêu dữ liệu — không lưu"},
             503: {"description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` "
-                                 "(kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — không lưu"},
+                                 "(kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác hay xử lý ảnh "
+                                 "khác — không lưu"},
         },
     )
     async def upload_file(
@@ -848,7 +885,7 @@ def create_app(
             if not isinstance(upload, UploadFile):
                 raise _error(400, "missing_file", "Thiếu trường 'file' trong form multipart")
             return await ingest(request.state.request_id, principal.tenant_id, principal.user_id, upload,
-                                filename=clean_filename(upload.filename), mime=clean_mime(upload.content_type),
+                                filename=clean_filename(upload.filename), declared=clean_mime(upload.content_type),
                                 restricted=restricted)
         finally:
             await form.close()
@@ -857,7 +894,7 @@ def create_app(
                            restricted: bool) -> str:
         """Một tệp lấy ra từ zip của lô nạp đi đúng đường của tải lên lẻ (ingest); trả id tệp đã lưu."""
         out = await ingest(rid, tenant_id, actor_id, MemoryFile(data), filename=clean_filename(name),
-                           mime=clean_mime(mimetypes.guess_type(name)[0]), restricted=restricted)
+                           declared=clean_mime(mimetypes.guess_type(name)[0]), restricted=restricted)
         return str(out.id)
 
     # discard: dòng không thành văn bản thì vòng nền gỡ tệp đã lưu cho dòng (dòng core.files rồi đối tượng trong kho)

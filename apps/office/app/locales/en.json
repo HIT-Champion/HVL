@@ -287,6 +287,7 @@
     "createdBy": "Drafted by",
     "preview": "Download preview (PDF)",
     "edit": "Edit draft",
+    "askAbout": "Ask about this document",
     "submit": "Submit for signing",
     "resubmit": "Resubmit",
     "submitTitle": "Submit draft",
@@ -436,6 +437,14 @@
     "took": "{s} s",
     "history": "Questions in this session",
     "historyNote": "Questions and answers stay on this page only and are not stored on the server — reloading the page clears them.",
+    "scope": {
+      "title": "Asking about one document only",
+      "chip": "In {label}",
+      "unnamed": "the selected document",
+      "clear": "Ask across all documents",
+      "missing": "This document was not found, or you are not allowed to view it — the assistant will have nothing to answer from.",
+      "notIndexed": "This document is not in the assistant's collection (restricted, cancelled or not yet issued) — the question will find no evidence."
+    },
     "source": {
       "title": "Sources",
       "n": "Source {n}",
@@ -447,6 +456,15 @@
     },
     "openDocument": "Open document",
     "openDocumentFor": "Open document {label}",
+    "viewSource": "View file: {label}",
+    "viewPage": "View page {n}",
+    "viewFile": "View file",
+    "viewer": {
+      "title": "Viewing {label}",
+      "newTab": "Open in a new tab",
+      "close": "Close",
+      "note": "Page numbers count PDF pages (page 1 is the first page of the file) and may differ from the numbers printed on the document."
+    },
     "page": "p. {n}",
     "pageSpoken": "page {n}",
     "summaryOnly": "summary",
@@ -533,6 +551,9 @@
     "documents_summary": "The summary must be 10–500 characters.",
     "infected": "The file contains malware and was blocked.",
     "unscannable": "The file is password-protected or nested too deeply for the malware scanner to check — blocked. Remove the password or unpack it, then upload again.",
+    "type_mismatch": "The file's content does not match its extension (e.g. a .pdf that is really a web page), so it was blocked. Save it in the right format and upload again.",
+    "type_not_allowed": "Runnable files (programs, scripts such as .exe, .bat, .js) are not accepted.",
+    "image_unreadable": "The image is damaged or too large to strip its hidden data (EXIF, GPS location), so it was not saved. Shrink or re-save the image and upload again.",
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
     "blocked": "The security gateway blocked this content because some text looks like an attack pattern. Edit the text or file name you sent and try again, or tell your administrator.",

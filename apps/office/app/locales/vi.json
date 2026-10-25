@@ -287,6 +287,7 @@
     "createdBy": "Người soạn",
     "preview": "Tải bản xem trước (PDF)",
     "edit": "Sửa dự thảo",
+    "askAbout": "Hỏi về văn bản này",
     "submit": "Trình ký",
     "resubmit": "Trình lại",
     "submitTitle": "Trình dự thảo",
@@ -436,6 +437,14 @@
     "took": "{s} giây",
     "history": "Các câu hỏi trong phiên này",
     "historyNote": "Câu hỏi và câu trả lời chỉ giữ trên trang này, không lưu ở máy chủ — tải lại trang là mất.",
+    "scope": {
+      "title": "Chỉ hỏi trong văn bản",
+      "chip": "Trong {label}",
+      "unnamed": "văn bản đã chọn",
+      "clear": "Hỏi trong mọi văn bản",
+      "missing": "Không tìm thấy văn bản này, hoặc bạn không được xem — trợ lý sẽ không có căn cứ để trả lời.",
+      "notIndexed": "Văn bản này không có trong kho của trợ lý (văn bản hạn chế, đã hủy hoặc chưa phát hành) — câu hỏi sẽ không có căn cứ."
+    },
     "source": {
       "title": "Nguồn",
       "n": "Nguồn {n}",
@@ -447,6 +456,15 @@
     },
     "openDocument": "Mở văn bản",
     "openDocumentFor": "Mở văn bản {label}",
+    "viewSource": "Xem tệp: {label}",
+    "viewPage": "Xem trang {n}",
+    "viewFile": "Xem tệp",
+    "viewer": {
+      "title": "Đang xem {label}",
+      "newTab": "Mở trong thẻ mới",
+      "close": "Đóng",
+      "note": "Số trang tính theo tệp PDF (trang 1 là trang đầu của tệp), có thể khác số trang in trên văn bản."
+    },
     "page": "tr. {n}",
     "pageSpoken": "trang {n}",
     "summaryOnly": "trích yếu",
@@ -533,6 +551,9 @@
     "documents_summary": "Trích yếu phải dài 10–500 ký tự.",
     "infected": "Tệp nhiễm mã độc, đã bị chặn.",
     "unscannable": "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại.",
+    "type_mismatch": "Nội dung tệp không khớp đuôi tệp (vd tệp .pdf thực ra là trang web) nên đã bị chặn. Lưu lại đúng định dạng rồi tải lên lại.",
+    "type_not_allowed": "Không nhận tệp chạy được (chương trình, kịch bản như .exe, .bat, .js).",
+    "image_unreadable": "Ảnh hỏng hoặc quá lớn nên không bỏ được thông tin ẩn (EXIF, vị trí GPS) — chưa lưu. Thu nhỏ hoặc lưu lại ảnh rồi tải lên lại.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
     "blocked": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công. Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị.",

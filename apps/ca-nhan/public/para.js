@@ -111,6 +111,11 @@ export function uploadError(status, body) {
         + 'giải nén rồi tải lên lại.'
     case 'too_large':
       return detail.message ? `${detail.message}.` : 'Tệp quá lớn.'
+    case 'type_mismatch':
+    case 'type_not_allowed':
+    case 'image_unreadable':
+      // svc-files nhận loại theo nội dung sau ClamAV, bỏ EXIF của ảnh: câu của máy chủ nói rõ tệp là gì, vì sao chặn
+      return detail.message ? `${detail.message}.` : 'Loại tệp này không được nhận nên chưa lưu.'
     case 'empty_file':
       return 'Tệp rỗng.'
     case 'no_tenant':

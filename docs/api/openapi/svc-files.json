@@ -137,6 +137,7 @@
     "/api/files": {
       "post": {
         "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
+        "description": "Sau ClamAV: nhận loại theo byte đầu, không tin tên, mime khai; `mime_type` trả về là loại theo nội dung. Ảnh JPEG, PNG được bỏ siêu dữ liệu (EXIF, GPS, XMP, chú thích; xoay theo hướng EXIF trước) nên `sha256`, `size_bytes` là của ảnh đã làm sạch; tệp loại khác lưu nguyên từng byte.",
         "operationId": "upload_file_api_files_post",
         "security": [
           {
@@ -175,13 +176,13 @@
             "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
           },
           "415": {
-            "description": "restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
+            "description": "`type_mismatch`: nội dung không khớp đuôi tệp (hay mime khai khi tên không có đuôi), vd tệp .pdf là HTML · `type_not_allowed`: chương trình, kịch bản chạy được (theo nội dung hay đuôi .exe, .bat, .js…) — `found` là loại theo nội dung · `restricted_pdf_only`: restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
           },
           "422": {
-            "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"
+            "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán · `image_unreadable` + `reason` (corrupt, too_many_pixels, timeout, memory): ảnh JPEG, PNG hỏng hoặc quá lớn nên không bỏ được siêu dữ liệu — không lưu"
           },
           "503": {
-            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — không lưu"
+            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác hay xử lý ảnh khác — không lưu"
           }
         },
         "requestBody": {
@@ -1732,6 +1733,19 @@
             ],
             "title": "Type Code",
             "description": "Mã loại văn bản, vd CV"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Chỉ hỏi trong một văn bản (nút \"Hỏi về văn bản này\"). Chỉ thu hẹp phạm vi: văn bản người hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt"
           },
           "ask_id": {
             "anyOf": [

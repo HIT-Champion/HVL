@@ -19,12 +19,14 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
+import { askAbout, canAskAbout } from '~/utils/answer'
 
 // Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
 // khung xử lý việc đang chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
 // Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
 // Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Signet có thẻ trạng thái chuyển từng đơn vị;
 // văn bản đến nhận theo đường này có thẻ "Nhận từ …" với mã xác thực của bên gửi và đối chiếu SHA-256 tệp.
+// Nút "Hỏi về văn bản này" (F4.2) mở trang Hỏi đáp chỉ hỏi trong văn bản này — chỉ khi văn bản có trong kho của trợ lý.
 
 interface Dispatch {
   id: string
@@ -419,6 +421,11 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
             {{ t('doc.register') }}
           </button>
           <NuxtLink v-if="canEdit" :to="`/van-ban-di/soan?id=${doc.id}`" class="btn-secondary">{{ t('doc.edit') }}</NuxtLink>
+          <NuxtLink
+            v-if="canAskAbout(doc, claims?.role)" :to="askAbout(doc.id)" class="btn-secondary" data-testid="ask-about"
+          >
+            {{ t('doc.askAbout') }}
+          </NuxtLink>
           <button v-if="outgoing && !issuedFile" class="btn-secondary" @click="showPreview">{{ t('doc.preview') }}</button>
           <button v-if="issuedFile" class="btn-primary" @click="download(issuedFile.id, issuedFile.filename).catch((e) => notice.error(errorText(t, e)))">
             {{ t('doc.download') }} {{ t('doc.fileRole.issued').toLowerCase() }}

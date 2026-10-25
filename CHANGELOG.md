@@ -8,6 +8,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Trợ lý hỏi đáp (F4.2): nút "Hỏi về văn bản này" ở trang chi tiết mở trang Hỏi đáp chỉ hỏi trong văn bản đó
+  (`document_id` của `POST /api/documents/ask` — một điều kiện lọc nối AND sau phạm vi vai trò, hậu kiểm bằng token như
+  mọi lượt, nên chỉ thu hẹp); nhãn nguồn "số ký hiệu · tr. n" mở tệp PDF trong khung xem của trình duyệt đúng trang đó
+  (`#page=n`); câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép tìm lai nghiêng về từ khóa (tỷ trọng nghĩa tối đa
+  0,2, câu khác giữ `MOC_ASK_SEMANTIC_RATIO`). Test svc-files +29, office +4, e2e thêm bước trong `hoi-dap.spec.ts`.
+
 - Mốc neo sổ kiểm toán công khai, người ngoài tự kiểm được (đóng #56): két ký mỗi mốc bằng khóa Ed25519 `moc-anchor`
   trong transit (két sinh, không cho xuất; chỉ `svc-files` được ký và đọc khóa công khai) trên thông điệp
   `signet-anchor-v1` gồm số dòng, hash, giờ kho ghi mốc, URL hệ thống; chữ ký tách rời nằm cạnh mốc trong bucket lạnh,
@@ -22,6 +28,18 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   neo mới nhất ở chân trang. Dựng kho công khai cấm đẩy ép, khóa triển khai, kiểm bằng OpenSSL 3: `docs/van-hanh.md` mục
   "Mốc neo công khai"; két cũ nâng cấp tay như mục Két bí mật. Test (đếm tĩnh): svc-files +28, scripts +35,
   giao diện +5.
+
+### Bảo mật
+- Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
+  ClamAV, loại nhận theo byte đầu phải khớp đuôi tệp — tệp `.pdf` thực ra là trang HTML bị chặn `415 type_mismatch`;
+  chương trình, kịch bản (`MZ`, ELF, `#!`, đuôi `.exe`, `.bat`, `.js`…, xét cả tên ASCII lúc tải về: `x.bát` → `x.bat`)
+  bị chặn `415 type_not_allowed`; `core.files` lưu mime theo nội dung. Loại đang dùng vẫn nhận (docx, xlsx có hay không
+  mật khẩu, doc, xls cả bản HTML do phần mềm khác xuất, csv Windows khai `application/vnd.ms-excel`, ảnh PNG, WebP mang
+  đuôi .jpg, chữ UTF-16, TCVN3…). Ảnh JPEG, PNG được xoay theo hướng EXIF rồi mã hóa lại trong tiến trình con có giới
+  hạn để bỏ EXIF, vị trí GPS, XMP, chú thích; JPEG nhiều khung (ảnh chân dung iPhone) giữ khung đầu (`sha256`,
+  `size_bytes` là của ảnh đã làm sạch); PDF và loại khác lưu nguyên từng byte. ClamAV vẫn quét byte gốc trước nên EICAR
+  đổi đuôi vẫn là tệp nhiễm, có trong sổ kiểm toán. Giao diện Văn phòng điện tử, Không gian cá nhân báo đúng lỗi mới.
+  Test (đếm tĩnh): svc-files +25, giao diện +1.
 
 ## [1.1.0] - 2026-10-25
 
