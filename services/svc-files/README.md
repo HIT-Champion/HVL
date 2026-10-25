@@ -1,8 +1,9 @@
 # svc-files
 
 Cửa duy nhất để tệp vào và ra khỏi kho đối tượng của Signet. Tệp tải lên được **quét ClamAV trước**,
-sạch mới ghi vào SeaweedFS và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp
-chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
+sạch mới nhận loại theo nội dung (phải khớp đuôi tệp; ảnh JPEG, PNG được bỏ EXIF, vị trí GPS), rồi ghi vào SeaweedFS
+và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp chưa quét. Tải xuống: svc-files
+hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
 Hasura quyết ai được đọc văn bản nào; tìm được cả theo chữ trong tệp PDF đính kèm. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
 trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
@@ -22,6 +23,7 @@ issue #19, #20.
 |---|---|
 | `POST /api/files`: kiểm JWT → quét ClamAV → ghi SeaweedFS → thêm dòng `core.files` | **Xong** |
 | Tệp nhiễm: ghi `file.rejected` vào sổ kiểm toán `core.audit_log` | **Xong** |
+| Sau ClamAV: loại theo byte đầu phải khớp đuôi tệp, chặn chương trình, kịch bản; lưu mime theo nội dung; ảnh JPEG, PNG bỏ EXIF, GPS, XMP (xoay đúng chiều trước) | **Xong** |
 | `GET /api/files/{id}`: kiểm quyền qua Hasura → đọc SeaweedFS | **Xong** |
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
 | Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
@@ -53,6 +55,8 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | Đường dẫn | Kết quả |
 |---|---|
 | `POST /api/files` (multipart, trường `file`) | `201` `{id, object_key, filename, mime_type, size_bytes, sha256, scanned_at, encrypted}` |
+| | `mime_type` theo nội dung, không theo tên hay mime khai; ảnh JPEG, PNG: `sha256`, `size_bytes` của ảnh đã bỏ siêu dữ liệu — mục Kiểm loại tệp, bỏ siêu dữ liệu ảnh |
+| | `415` `type_mismatch` nội dung không khớp đuôi tệp (hay mime khai khi tên không đuôi), `type_not_allowed` chương trình, kịch bản chạy được — kèm `found` (loại theo nội dung) · `422` `image_unreadable` + `reason` (`corrupt`, `too_many_pixels`, `timeout`, `memory`) ảnh không bỏ được siêu dữ liệu · `503` `busy` (+ `Retry-After: 10`) khi đang xử lý hai ảnh khác — **không lưu** |
 | | `?restricted=true` — tệp cho văn bản hạn chế, lưu mã hóa (mục Văn bản hạn chế): `415` `restricted_pdf_only` + `reason` khi không phải PDF đọc được, không mật khẩu, tối đa `MOC_RESTRICTED_MAX_PAGES` trang, hoặc quá nặng để kiểm (`timeout`, `memory`) · `503` `vault_unavailable` khi két chưa sẵn sàng, `busy` (+ `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — **không lưu** |
 | | `401` thiếu hoặc sai token · `403` token không có `tenant_id` |
 | | `413` vượt `MOC_FILES_MAX_MB` · `400` tệp rỗng hoặc thiếu trường `file` |
@@ -91,6 +95,60 @@ có `ETag`: mỗi lần mở là một bản khác).
 Khóa đối tượng: `tenant/<tenant_id>/<yyyy>/<mm>/<id>` — thuê ước lấy từ token, không lấy từ dữ liệu client
 gửi; khóa không trả ra ngoài. Mỗi dòng nhật ký là một đối tượng JSON có `request_id` (lấy từ `X-Request-Id`
 do APISIX gắn); mã này cũng đi vào cột `request_id` của sổ kiểm toán.
+
+### Kiểm loại tệp, bỏ siêu dữ liệu ảnh
+
+`filetype.py`, `imageclean.py`. Trình duyệt khai mime theo đuôi tệp, mà đuôi thì đổi được: svc-files không tin cả
+hai, nhận loại theo byte đầu. Mọi tệp vào kho qua `ingest()` — `POST /api/files` và tệp trong zip của lô nạp — theo
+thứ tự:
+
+```
+quét ClamAV byte gốc, cùng lượt tính SHA-256, cỡ → nhiễm: file.rejected, 422 · ClamAV không trả lời: 503
+  → nhận loại theo 8 KB đầu (filetype.check) → sai: 415 type_mismatch | type_not_allowed
+  → restricted=true: chỉ PDF theo nội dung → kiểm PDF, mã hóa (mục Văn bản hạn chế)
+  → ảnh JPEG, PNG: bỏ siêu dữ liệu trong tiến trình con (imageclean.run_clean) → hỏng, quá lớn: 422 image_unreadable
+  → SHA-256, cỡ của byte sẽ lưu → ghi SeaweedFS → core.files (mime theo nội dung)
+```
+
+- **ClamAV luôn đứng trước**: chỉ tệp sạch mới được nhận loại. Tệp EICAR đặt đuôi `.pdf`, `.jpg`, `.exe` vẫn là tệp
+  nhiễm (`422 infected`, dòng `file.rejected` trong sổ kiểm toán — `make demo-kiem-dich`, `scripts/smoke.py`), không
+  thành `415`.
+- **Chữ ký** (`SIGNATURES`): PDF `%PDF-`, JPEG, PNG, GIF, TIFF, WebP, BMP, hộp `ftyp` (HEIC, AVIF, MP4), vỏ zip
+  `PK\x03\x04` (docx, xlsx, pptx, odt, epub, zip), vỏ OLE `D0 CF 11 E0` (doc, xls, ppt, msg, cả docx đặt mật khẩu),
+  RTF, 7z, RAR, gzip, xz, MP3, Ogg, FLAC, WAV, AVI, Matroska. Không khớp chữ ký nào thì xem có phải chữ (không byte
+  NUL, ký tự điều khiển ≤ 1%; UTF-8, UTF-16, mã cũ TCVN3, VNI đều qua) — HTML, SVG, XML nhận theo thẻ mở đầu như
+  trình duyệt; còn lại là nhị phân không rõ loại. Đọc văn bản đến (F4.1) dùng cùng bảng.
+- **Chặn luôn** (`415 type_not_allowed`): chương trình (PE `MZ`, ELF, Mach-O, lớp Java), kịch bản `#!`, và đuôi chạy
+  được khi người nhận mở (`RUNNABLE`: `.exe`, `.dll`, `.scr`, `.msi`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.hta`,
+  `.lnk`, `.url`, `.reg`, `.jar`, `.sh`, `.apk`, `.php`…) dù nội dung gì. Đuôi tính như Windows: `a.exe.` là `.exe`.
+- **Phải khớp** (`415 type_mismatch`, kèm `found`): đuôi có trong `EXTENSIONS` thì nội dung phải thuộc họ của đuôi —
+  tệp tải về mở theo đuôi, nên đuôi quyết chứ không phải mime khai (Windows có Excel khai `.csv` là
+  `application/vnd.ms-excel`). Tên không đuôi hay đuôi lạ: xét mime khai (`application/octet-stream` không nói gì).
+  Nới cho tệp có thật: đuôi ảnh nhận mọi loại ảnh (ảnh PNG, WebP mang đuôi `.jpg` hay gặp); `.docx`, `.xlsx`, `.pptx`
+  nhận cả vỏ OLE (bản đặt mật khẩu); `.doc`, `.xls` nhận cả zip, RTF và chữ (bảng HTML, XML do phần mềm khác xuất ra
+  đuôi `.xls`); đuôi chữ (`.txt`, `.csv`, `.md`, `.json`, `.xml`, `.html`, `.svg`) nhận mọi nội dung chữ.
+- **Không ràng buộc**: đuôi lạ (`.dwg`, `.mp4`, `.mp3`…) kèm mime khai lạ — nhận như trước, chỉ chặn tệp chạy được.
+- **Mime lưu** (`core.files.mime_type`, `mime_type` trả về): theo nội dung (không rõ: `application/octet-stream`);
+  riêng vỏ zip, OLE và chữ — không tự nói là docx hay xlsx, csv hay md — đúng họ của đuôi thì lấy mime của đuôi (hay
+  mime khai). Ảnh PNG mang đuôi `.jpg` lưu là `image/png`, làm sạch như PNG. Tải về vẫn kèm `attachment`, `nosniff`,
+  CSP `sandbox` như trước.
+- **Ảnh JPEG, PNG bỏ siêu dữ liệu**: EXIF (tọa độ GPS, máy chụp, giờ chụp), XMP, IPTC, chú thích JPEG, chữ PNG (`tEXt`,
+  `iTXt`, `zTXt`, `eXIf`). Pillow giải mã rồi mã hóa lại, sau khi xoay theo hướng EXIF (ảnh chụp dọc không nằm ngang).
+  Giữ hồ sơ màu ICC, DPI, màu trong suốt, đủ khung ảnh động APNG (không xoay); JPEG giữ bảng lượng tử, cách lấy mẫu màu
+  của tệp gốc và tối ưu mã Huffman — ảnh trông như cũ, cỡ xấp xỉ cũ. Đo 25/10 trên ảnh mẫu `seed/van-ban-den/`: 4 ảnh
+  JPEG đổi dưới 1% điểm ảnh, lệch tối đa 11/255, cỡ lệch dưới 0,1%; ảnh PNG giữ nguyên mọi điểm ảnh, cỡ +4%; mỗi ảnh
+  0,1–0,2 giây kể cả dựng tiến trình con (ảnh 99 MP: 0,7–2,4 giây). Byte nối sau ảnh (tệp đa hình ảnh + HTML, zip) rơi
+  mất. Byte lưu khác byte tải lên nên `sha256`, `size_bytes` (phản hồi, `core.files`) là của ảnh đã làm sạch. Loại
+  khác lưu **nguyên từng byte** — PDF giữ nguyên để cổng xác thực, phòng đọc so băm.
+- **Ảnh chỉ giải mã trong tiến trình con**, như OCR: `python -I imageclean.py`, `RLIMIT_AS` 2 GB, hạn 30 giây
+  (`RLIMIT_CPU` = hạn + 5), quá hạn giết cả nhóm; trần 100 triệu điểm ảnh kiểm trước khi giải mã (ảnh bom giải nén).
+  Hai lượt cùng lúc, chờ lượt quá 10 giây thì `503 busy` + `Retry-After: 10`. Không làm được → `422 image_unreadable`
+  kèm `reason` (`corrupt`, `too_many_pixels`, `timeout`, `memory`), không lưu.
+- **Nhật ký** `core.file.type_rejected`: mã, loại tìm thấy, đuôi, mime khai — không ghi tên tệp; không vào sổ kiểm toán
+  (khác tệp nhiễm).
+- **Chưa làm**: ảnh TIFF, HEIC, WebP, GIF, tệp Office, PDF vẫn giữ siêu dữ liệu của chúng; không xét bên trong vỏ zip,
+  OLE (docx đổi đuôi thành xlsx vẫn qua); PDF có byte lạ trước `%PDF-` bị coi là không phải PDF (như đọc văn bản đến,
+  kiểm văn bản hạn chế).
 
 ### Tìm kiếm
 
@@ -166,13 +224,13 @@ có nhãn "Gợi ý". **Tác tử không tạo văn bản**: văn thư đối ch
   tệp đang gắn vào văn bản hạn chế (kể cả tệp rõ có từ trước F3.7), trả `409` trước cả gợi ý đã lưu và trước khi đọc
   byte nào (bản chữ trần hay bản gửi mô hình đều vô hiệu việc hạn chế); CSDL chặn thêm bằng trigger (không lưu gợi ý
   của tệp gắn vào văn bản hạn chế, xóa gợi ý khi văn bản bật hạn chế).
-- **Đọc.** Nhận loại theo byte đầu (PDF `%PDF-`, JPEG, PNG, TIFF), không tin mime khai. PDF: lớp chữ giữ bố cục
-  (`pdflayout.py`, pypdf chế độ `layout`, `MOC_READ_TEXT_PAGES` trang đầu); trang 1 có từ 40 ký tự không trắng thì
-  dùng (`method: text`), không thì OCR ảnh nhúng lớn nhất của từng trang (không rasterize: image không có poppler,
-  pdfium — PDF máy scan là một ảnh mỗi trang); PDF ít chữ mà không có ảnh nhúng nào, hay máy chủ chưa OCR được (thiếu
-  tesseract, thiếu dữ liệu ngôn ngữ), thì dùng lớp chữ ít ỏi đó (`method: text`). Ảnh: OCR (`method: ocr`). OCR
-  (`ocr.py`): Pillow xoay theo EXIF, đổi xám, giãn tương phản, đưa cạnh dài về 2000–3500 px, gửi PNG cho
-  `tesseract stdin stdout -l vie --oem 1 --psm 3 tsv`.
+- **Đọc.** Nhận loại theo byte đầu (PDF `%PDF-`, JPEG, PNG, TIFF — bảng chữ ký chung `filetype.py`), không tin mime
+  khai. PDF: lớp chữ giữ bố cục (`pdflayout.py`, pypdf chế độ `layout`, `MOC_READ_TEXT_PAGES` trang đầu); trang 1 có từ
+  40 ký tự không trắng thì dùng (`method: text`), không thì OCR ảnh nhúng lớn nhất của từng trang (không rasterize:
+  image không có poppler, pdfium — PDF máy scan là một ảnh mỗi trang); PDF ít chữ mà không có ảnh nhúng nào, hay máy chủ
+  chưa OCR được (thiếu tesseract, thiếu dữ liệu ngôn ngữ), thì dùng lớp chữ ít ỏi đó (`method: text`). Ảnh: OCR
+  (`method: ocr`). OCR (`ocr.py`): Pillow xoay theo EXIF, đổi xám, giãn tương phản, đưa cạnh dài về 2000–3500 px, gửi
+  PNG cho `tesseract stdin stdout -l vie --oem 1 --psm 3 tsv`.
 - **Tiến trình con có giới hạn**, như `pdftext.py`: `python -I`, `RLIMIT_AS` (lớp chữ 1 GB, OCR `MOC_OCR_MEMORY_MB`),
   `RLIMIT_CPU`, quá giờ thì giết. Tiến trình OCR mở phiên riêng: quá giờ hoặc yêu cầu bị hủy thì giết **cả nhóm**
   (`os.killpg`), tesseract không chạy mồ côi. Pillow có trần điểm ảnh (`MOC_OCR_MAX_PIXELS`), cả khi pypdf giải mã
@@ -827,11 +885,12 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 
 `sealed.py`. Không dùng cho bí mật nhà nước (Luật Bảo vệ bí mật nhà nước 2018 đòi hệ thống, mật mã được cấp phép).
 
-- **Tải lên** `POST /api/files?restricted=true`: quét ClamAV như mọi tệp, rồi chỉ nhận PDF mở được không cần mật
-  khẩu (cần đọc được để đóng dấu). Két cấp một khóa dữ liệu AES-256 riêng cho tệp (`transit/datakey/plaintext/
-  moc-files`): khóa rõ để mã hóa trong bộ nhớ rồi bỏ, khóa đã bọc (`vault:v1:…`) ghi vào `core.files.wrapped_dek`
-  cùng `encrypted = true`. Kho chỉ nhận bản mã `MOC1` + nonce 12 byte + AES-256-GCM với AAD = id đơn vị ‖ id tệp
-  (chép bản mã sang dòng tệp khác thì không mở được). `sha256`, `size_bytes` của dòng tệp là của bản rõ.
+- **Tải lên** `POST /api/files?restricted=true`: quét ClamAV, nhận loại như mọi tệp, rồi chỉ nhận PDF (theo nội dung) mở
+  được không cần mật khẩu (cần đọc được để đóng dấu). Két cấp một khóa dữ liệu AES-256 riêng cho tệp
+  (`transit/datakey/plaintext/moc-files`): khóa rõ để mã hóa trong bộ nhớ rồi bỏ, khóa đã bọc (`vault:v1:…`) ghi vào
+  `core.files.wrapped_dek` cùng `encrypted = true`. Kho chỉ nhận bản mã `MOC1` + nonce 12 byte + AES-256-GCM với AAD =
+  id đơn vị ‖ id tệp (chép bản mã sang dòng tệp khác thì không mở được). `sha256`, `size_bytes` của dòng tệp là của bản
+  rõ.
 - **Bản phát hành** của văn bản hạn chế (`/internal/issue`) cũng lưu mã hóa như vậy.
 - **Mở tệp** `GET /api/files/{id}`: kiểm quyền như mọi tệp — tệp mã hóa đã gắn vào văn bản thì chỉ theo quyền đọc
   văn bản, kể cả với người tạo dòng tệp (bị gỡ khỏi danh sách xem là hết tải) — két mở khóa đã bọc (`transit/decrypt`), giải mã trong bộ
@@ -906,14 +965,15 @@ POST /api/imports/incoming ─► token → vai trò clerk → bật? → Conten
   → một mutation: core.import_jobs + core.import_rows + sổ import.created → 202 + Location
 vòng nền: lô đến giờ (run_after) → người tạo còn là văn thư đang bật? → mẻ ≤ MOC_IMPORT_CHUNK dòng chờ, mỗi dòng:
   giành dòng (cập nhật có điều kiện: claimed_until + mã lượt giữ claim_id) → tra trùng trước
-  → mỗi tệp trong zip qua ingest() (ClamAV → kho → core.files)
+  → mỗi tệp trong zip qua ingest() (ClamAV → nhận loại, làm sạch ảnh → kho → core.files)
   → Action receiveIncoming thay mặt văn thư → [register=true] registerIncoming → ghi kết quả dòng
   → dòng không thành văn bản: gỡ tệp đã lưu cho dòng (core.files chưa gắn văn bản + đối tượng trong kho)
   → hết dòng chờ: đóng lô (số đếm; trigger ghi import.finished cùng giao dịch, đúng một lần) → xóa zip
 ```
 
-- **Cùng đường với tiếp nhận lẻ.** Tệp đính kèm qua đúng `ingest()` của `POST /api/files`: quét ClamAV, tệp của văn bản
-  hạn chế lưu mã hóa, nhiễm thì ghi `file.rejected` với `request_id` `<lô>:<dòng>`. Dữ liệu qua đúng Action
+- **Cùng đường với tiếp nhận lẻ.** Tệp đính kèm qua đúng `ingest()` của `POST /api/files`: quét ClamAV, nhận loại theo
+  nội dung (sai đuôi: dòng `type_mismatch`), ảnh bỏ siêu dữ liệu, tệp của văn bản hạn chế lưu mã hóa, nhiễm thì ghi
+  `file.rejected` với `request_id` `<lô>:<dòng>`. Dữ liệu qua đúng Action
   `receiveIncoming` — kiểm schema `van-ban-den.json`, tra danh mục loại, tệp phải do chính người gửi tải lên, chặn
   trùng, ghi văn bản và dòng sổ kiểm toán chuỗi băm của nó — với phiên của văn thư tạo lô: vai trò `clerk`, đơn vị,
   người, phòng lấy từ token đã kiểm lúc tạo lô. `register=true` thì gọi tiếp `registerIncoming` (cấp số đến, khởi chạy

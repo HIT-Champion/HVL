@@ -34,6 +34,10 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'blocked') return e.requestId ? t('error.blockedId', { id: e.requestId }) : t('error.blocked')
     if (e.code === 'infected') return t('error.infected')
     if (e.code === 'unscannable') return t('error.unscannable')    // có mật khẩu, nén quá sâu: ClamAV không quét hết
+    // svc-files nhận loại theo nội dung sau ClamAV: sai đuôi, tệp chạy được (415); ảnh không bỏ được EXIF, GPS (422)
+    if (e.code === 'type_mismatch' || e.code === 'type_not_allowed' || e.code === 'image_unreadable') {
+      return t(`error.${e.code}`)
+    }
     // submitOutgoing kiểm đơn vị nhận (restricted / self / unknown) ở trang văn bản, nơi không có ô nào để đánh dấu
     if (e.code === 'invalid' && e.fields?.recipient_tenant_ids) {
       return t(e.fields.recipient_tenant_ids === 'restricted' ? 'error.documents_restricted_local' : 'error.documents_recipient_units')
