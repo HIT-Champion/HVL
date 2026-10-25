@@ -81,7 +81,7 @@ version_of() {
   echo "${MOC_VERSION:-${v#v}}"
 }
 
-installed_version() { sed -n 's/^Signet //p' "$DEST/VERSION" | head -n 1; }
+installed_version() { awk '/^Signet / { print $2; exit }' "$DEST/VERSION"; }
 
 in_dest() { (cd "$DEST" && "$@"); }
 
@@ -213,7 +213,9 @@ report() {
 }
 
 anchor_key() {
-  curl -fsS --max-time 30 "$(public_url)/api/verify/anchor-key.pem" 2>/dev/null | grep -q 'BEGIN PUBLIC KEY'
+  local pem
+  pem=$(curl -fsS --max-time 30 "$(public_url)/api/verify/anchor-key.pem" 2>/dev/null) || return 1
+  [[ $pem == *"BEGIN PUBLIC KEY"* ]]
 }
 
 do_nang() {
@@ -367,13 +369,14 @@ do_ket() {
   in_dest docker compose exec -T openbao sh -c "$GEN_ROOT"
 
   step "Gỡ listener tạm; két thấy token root thì cấu hình lại rồi thu hồi token"
-  local since
+  local since logs
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   restore_hcl
   trap - EXIT
-  in_dest docker compose logs --since "$since" openbao 2>/dev/null | grep 'moc-openbao:' || true
-  in_dest docker compose logs --since "$since" openbao 2>/dev/null | grep -q 'token root đã thu hồi' \
-    || die "két chưa báo cấu hình xong (docker compose logs openbao)"
+  # đọc hết nhật ký rồi mới tìm: `logs | grep -q` dưới pipefail hỏng khi grep thoát sớm (docker nhận SIGPIPE)
+  logs=$(in_dest docker compose logs --since "$since" openbao 2>/dev/null) || true
+  grep 'moc-openbao:' <<<"$logs" || true
+  grep -q 'token root đã thu hồi' <<<"$logs" || die "két chưa báo cấu hình xong (docker compose logs openbao)"
   # shellcheck disable=SC2016
   in_dest docker compose exec -T openbao sh -c 'test ! -e /openbao/file/moc/root-token' \
     || die "tệp root-token vẫn còn trong két"
