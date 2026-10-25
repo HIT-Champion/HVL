@@ -104,6 +104,11 @@ export async function signIn(browser: Browser, username: string, { otp = false }
   return page
 }
 
+// Trong lúc chụp toàn trang, Chrome đổi cỡ khung nhìn tạm thời: media query màn hẹp (max-width: 900px), (hover: none)
+// báo đổi rồi đổi lại, thanh bên nhảy sang độ rộng 256px của ngăn kéo rồi chạy chuyển động thu về 76px, nên ảnh có
+// thanh bên mở dở đè lên nội dung (#218). Chụp với chuyển động tắt
+const STILL = '*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; }'
+
 export async function shot(page: Page, name: string) {
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
+  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true, animations: 'disabled', style: STILL })
 }

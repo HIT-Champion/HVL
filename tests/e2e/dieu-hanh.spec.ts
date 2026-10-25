@@ -39,6 +39,9 @@ test('dashboard điều hành: chỉ lãnh đạo đơn vị xem, số liệu kh
   // mỗi phòng của đơn vị một dòng, kể cả phòng chưa có việc
   await expect(director.getByTestId('board-departments').locator('tbody tr').first()).toBeVisible()
   await expect(director.getByTestId('board-outgoing').locator('svg').first()).toBeVisible()
+  // ảnh này dùng trong README: đợi các thông báo realtime (tự tắt sau 8 giây) tắt hết để không che bảng; chỉ để ảnh
+  // gọn, hết giờ vẫn chụp chứ không làm test đỏ
+  await director.getByTestId('realtime-notice').first().waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {})
   await shot(director, '18-dieu-hanh')
 
   const clerk = await signIn(browser, 'vanthu', { otp: true })
