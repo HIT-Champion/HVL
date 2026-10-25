@@ -84,6 +84,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
   compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
   dùng kịch bản thay cho các lệnh tay. Test scripts +18.
+- Kịch bản e2e chạy giao diện tiếng Anh (F2.9): `tests/e2e/tieng-anh.spec.ts` bấm nút đổi ngôn ngữ ở thanh trên rồi
+  kiểm theo vai trò và tên lấy nguyên văn từ `en.json`: menu, hộp việc, chuông thông báo, danh sách văn bản đến (tab,
+  cột, trạng thái), soạn dự thảo (form trống bị chặn với lời báo tiếng Anh, lưu được), trang văn bản (trạng thái, dòng
+  thời gian, tab Lịch sử), danh sách văn bản đi; tải lại trang vẫn giữ tiếng Anh, bấm "Tiếng Việt" thì về lại. Kịch
+  bản thứ hai: người ngoài dùng trình duyệt tiếng Anh vẫn mở ra tiếng Việt, đổi ngôn ngữ ở trang trạng thái hệ thống
+  và cổng xác thực không cần đăng nhập. e2e +2.
 - Kiểm bản online qua HTTPS mỗi ngày (F1.9, #197): `scripts/kiem_ban_online.py` (chỉ thư viện chuẩn) kiểm một địa
   chỉ công khai từ bên ngoài, chạy hết các mục rồi báo mục trượt: chứng chỉ hợp lệ, TLS từ 1.2, còn ít nhất 14 ngày;
   `http://` chuyển sang `https://`; `/api/status` ok hay degraded (thành phần không ok in thành cảnh báo) và đúng
