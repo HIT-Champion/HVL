@@ -311,9 +311,14 @@ def check_waf(clerk: Session, director: Session, staff: Session, tag: str) -> No
     # Token ngẫu nhiên của Keycloak (#140, loại trừ 1, 2): đúng các giá trị đã bị 942100, 930120 bắt nhầm khi chưa có
     # loại trừ — cookie phiên base64 Keycloak bọc trong ngoặc kép, mã PKCE, code Keycloak trả về trang ứng dụng
     session_hash = '"+gpgHoziqBr6khlas3c/D+s9GyfOB2QIsM1zj6mR8ET3gRfrxnmZzQ6M91f1rqW/"'
-    auth = f"/realms/{REALM}/protocol/openid-connect/auth?client_id=app-office"
+    # Đủ tham số để Keycloak trả trang đăng nhập: thiếu thì nó chuyển về redirect_uri, urllib đi theo và gửi lại tiêu đề
+    # Cookie tới trang ứng dụng — trình duyệt thì không, cookie của Keycloak chỉ có Path /realms/<realm>/
+    auth = f"/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode({
+        "client_id": "app-office", "redirect_uri": f"{PUBLIC_URL}/", "response_type": "code", "scope": "openid",
+        "code_challenge_method": "S256"})
     tokens = {
-        "cookie KC_AUTH_SESSION_HASH": ("GET", auth, None, {"Cookie": f"KC_AUTH_SESSION_HASH={session_hash}"}),
+        "cookie KC_AUTH_SESSION_HASH": ("GET", f"{auth}&code_challenge={'x' * 43}", None,
+                                        {"Cookie": f"KC_AUTH_SESSION_HASH={session_hash}"}),
         "code_challenge": ("GET", f"{auth}&code_challenge=81--9_7VdmWtRRK-1GI7T-9HBH_p8K__5U8cZgh30As", None, {}),
         "code trả về trang": ("GET", f"/?code={uuid.uuid4()}.nSRx{tag}.{uuid.uuid4()}", None, {}),
     }
