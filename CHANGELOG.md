@@ -90,8 +90,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `--version`; `issuer`, `authorization_endpoint`, `token_endpoint` của Keycloak nằm dưới `https://<máy>/realms/moc`
   (proxy chuyển đúng header); trang chủ còn CSP và `nosniff`. Job `.github/workflows/ban-online.yml` chạy kịch bản
   trên https://signet.htechcs.com lúc 07:17 mỗi ngày với thẻ phát hành mới nhất, chạy tay được, và chạy trên PR đổi
-  nó; lịch và nút chạy tay có từ bản phát hành chứa tệp (GitHub chỉ đọc nhánh mặc định). `docs/trien-khai.md` mục 6
-  thêm lệnh này. Test scripts +15.
+  nó; từ lúc gắn thẻ mới tới lúc nâng bản online thì job đỏ. `docs/trien-khai.md` mục 6 thêm lệnh này. Test scripts
+  +15.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp

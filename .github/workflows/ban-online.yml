@@ -16,8 +16,8 @@
 
 # Kiểm bản chạy công khai qua HTTPS từ bên ngoài (F1.9, #197): chứng chỉ, HTTP chuyển sang HTTPS, /api/status chạy đúng
 # thẻ phát hành mới nhất, Keycloak sau proxy, header bảo mật (scripts/kiem_ban_online.py).
-# GitHub chỉ chạy lịch và nút chạy tay của tệp trên nhánh mặc định (main): hai đường đó có từ bản phát hành chứa tệp
-# này. Trước đó, và mỗi khi sửa, job chạy trên PR đổi chính nó hay kịch bản.
+# GitHub chạy lịch và nút chạy tay theo tệp trên nhánh mặc định (develop); PR đổi chính tệp này hay kịch bản thì chạy
+# job trên PR đó. Từ lúc gắn thẻ mới tới lúc nâng bản online, job đỏ vì bản online còn chạy bản cũ — đúng ý.
 name: Bản online
 
 on:
