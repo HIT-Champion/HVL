@@ -18,8 +18,8 @@
 >    chọn có bản ghi QĐ-001…QĐ-013 (§5).
 > 4. **Lõi đang ôm gì.** Phần máy chủ của Văn phòng điện tử chạy chung tiến trình với `svc-files`, `svc-workflow`. Thứ
 >    tách cứng hiện chỉ có cổng và khóa ngoại CSDL; còn lại là chỗ dính đã liệt kê (§4).
-> 5. **Yếu nhất ở đâu.** Lõi còn ôm nghiệp vụ; một máy, một PostgreSQL; chưa có trục sự kiện, chưa có WAF; chưa chạy thử
->    trên máy 8 GB thật (§6).
+> 5. **Yếu nhất ở đâu.** Lõi còn ôm nghiệp vụ; một máy, một PostgreSQL; chưa có trục sự kiện; chưa chạy thử trên máy
+>    8 GB thật (§6).
 
 | Mục | Trả lời câu hỏi |
 |---|---|
@@ -119,7 +119,7 @@ flowchart LR
     U1["Trình duyệt<br/>văn thư, lãnh đạo, chuyên viên, quản trị"]
     U2["Người nhận văn bản<br/>quét QR, không đăng nhập"]
   end
-  GW{{"APISIX 3.18 — cổng duy nhất mở ra ngoài<br/>kiểm JWT · giới hạn tốc độ · X-Request-Id<br/>đường quản trị: 404"}}
+  GW{{"APISIX 3.18 — cổng duy nhất mở ra ngoài<br/>WAF · kiểm JWT · giới hạn tốc độ<br/>X-Request-Id · quản trị: 404"}}
   subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app)"]
     OFF["app-office<br/>Văn phòng điện tử · Nuxt 4"]
     CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
@@ -226,6 +226,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
 | Apache APISIX | 3.18.0 | Cổng duy nhất: danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, gắn `X-Request-Id`, xuất chỉ số cho Prometheus | ② | `platform/apisix/` | F1.2 Hoàn thiện |
+| Coraza + OWASP CRS | Coraza 3.3.3, CRS 4.14.0 (coraza-proxy-wasm 0.6.0) | Tường lửa ứng dụng web trong APISIX (plugin proxy-wasm, global rule): soi mọi yêu cầu trước khi kiểm token, chặn mặc định (QĐ-013) | ② | `platform/apisix/` | F3.15 Dùng được |
 | `svc-files` *(mã của đội)* | Python 3.13, FastAPI 0.143 | Cửa duy nhất của tệp, tìm kiếm, dựng PDF, cổng xác thực, trạng thái hệ thống, tác tử đọc văn bản đến và trợ lý hỏi đáp. Phân loại từng module: §4.3 | ① ④ | `services/svc-files/` | nhiều mã F — xem từng thành phần ở các bảng dưới |
 | `svc-workflow` *(mã của đội)* | Python 3.13, FastAPI 0.143 | 5 Hasura Actions, nối Flowable, nhắc hạn, liên thông, thông báo đa kênh, đồng bộ danh bạ Keycloak → `core.users`, tác tử gợi ý giao việc. Phân loại: §4.3 | ⑤ ⑦ | `services/svc-workflow/` | F1.4 Hoàn thiện |
 | ClamAV | 1.5.4 | Quét mọi tệp trước khi ghi (giao thức INSTREAM qua TCP); không trả lời thì từ chối, không lưu | ① | `svc_files/clamav.py` | F1.6, F3.1 Hoàn thiện |
@@ -308,7 +309,6 @@ Khi PR #121 được gộp, có thêm F4.7 — tự chẩn đoán mức trưởn
 | [I] Cổng giám sát tác tử | **Chưa có** màn riêng | Dòng của tác tử trong sổ kiểm toán; số đo từng tác tử ở [`danh-gia-ai.md`](danh-gia-ai.md) | `ROADMAP.md` giai đoạn 4 |
 | Tracing phân tán (⑥) | **Chưa có** | `X-Request-Id` từ APISIX đi qua hai dịch vụ tới `core.audit_log.request_id` | `muc-hoan-thien.md` §3 |
 | Dịch thuật trong lõi (②) | Một phần | Chỉ bản địa hóa giao diện tiếng Việt, tiếng Anh | `muc-hoan-thien.md` §3 |
-| Tường lửa ứng dụng web (②) | **Chưa có** | Chờ PR, đang sửa chặn nhầm (QĐ-013) | `muc-hoan-thien.md`, F3.15 |
 | SMS, Zalo (⑦) | **Chưa có** | Email, webhook | `muc-hoan-thien.md` §3 |
 
 Ứng viên đã cân nhắc nhưng không dùng — vì giấy phép không thuộc danh sách OSI, của chính nó hay của phụ thuộc bắt
@@ -601,7 +601,7 @@ phần Văn phòng — tách về đường đi của mã và dữ liệu, chưa
 Mỗi lựa chọn công cụ được ghi lại theo mẫu: *bối cảnh → phương án đã cân nhắc → quyết định → hệ quả*.
 
 QĐ-001…QĐ-007 giữ nguyên văn lúc ghi. QĐ-008…QĐ-012 ghi lại những quyết định đã làm, có trong mã, mà trước đây chưa có
-bản ghi; QĐ-013 chờ PR. Câu nào của QĐ cũ đã lệch với hiện trạng thì ghi ở bảng dưới, không sửa vào QĐ.
+bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch với hiện trạng thì ghi ở bảng dưới, không sửa vào QĐ.
 
 | QĐ | Câu lúc ghi | Hiện trạng |
 |---|---|---|
@@ -920,27 +920,28 @@ bản ghi; QĐ-013 chờ PR. Câu nào của QĐ cũ đã lệch với hiện tr
   Ứng dụng thứ hai vẫn cắm được mà không sửa `services/` (§4.6). Hướng tách, tiêu chí, cái giá: §4.7 — việc sau
   `v1.1.0`.
 
-### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX — chờ PR
+### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX
 
-> **Trạng thái:** chờ PR, đang sửa chặn nhầm — bản đang làm (`ROADMAP.md`, giai đoạn 1) còn chặn nhầm yêu cầu thật nên
-> chưa mở pull request; trên `develop` hiện chưa có WAF (F3.15 Chưa làm). Nội dung và số đo dưới đây theo bản đang làm;
-> gộp khác đi thì sửa QĐ này trong cùng pull request.
+> **Trạng thái:** gộp ở #130, F3.15 mức Dùng được cho tới khi smoke và e2e qua WAF xanh đủ lâu trên CI và chạy trên
+> bản online. Số đo dưới đây đo trên máy thử lúc làm.
 
 - **Bối cảnh:** nguyên lý (iv) và F3.15 — chặn tải tấn công trong yêu cầu ngay ở biên; cụm ② "API Gateway zero-trust"
   còn ghi "chưa có WAF".
 - **Phương án:** (A) coraza-proxy-wasm nạp vào APISIX; (B) coraza-caddy thành container đứng trước APISIX; (C) Go plugin
   runner của APISIX cộng Coraza; (D) chaitin-waf, không phải Coraza.
-- **Quyết định (dự kiến):** (A). Image `moc/apisix` là image APISIX đang ghim cộng đúng một tệp `.wasm` của
+- **Quyết định:** (A). Image `moc/apisix` là image APISIX đang ghim cộng đúng một tệp `.wasm` của
   coraza-proxy-wasm 0.6.0 (Coraza 3.3.3, OWASP CRS 4.14.0), kiểm băm khi dựng; bật ở global rule nên áp cho mọi yêu
   cầu; chặn mặc định (403); công tắc `MOC_WAF`.
 - **Lý do:** không thêm container, không đổi cổng mở ra ngoài hay đích của Cloudflare Tunnel, không phải tin
   `X-Forwarded-For` qua hai tầng proxy; chỉ thêm cấu hình, không sửa mã APISIX hay Coraza.
-- **Hệ quả (theo số đo của bản đang làm):** Coraza 3.3.3 còn lỗ hổng đã công bố — hai lỗ mức high có biện pháp chặn ở
+- **Hệ quả (số đo trên máy thử):** Coraza 3.3.3 còn lỗ hổng đã công bố — hai lỗ mức high có biện pháp chặn ở
   cổng, bốn cách lẩn WAF mức medium ghi là hạn chế; OSV-Scanner không đọc được tệp `.wasm` nên phải theo dõi tay. Trên
   máy thử 2 CPU: APISIX tốn thêm khoảng 0,4–0,8 GB RAM (82 MiB lên 451 MiB lúc rảnh, tới 931 MiB sau khi nhận tệp
   24 MB); yêu cầu nhỏ chậm thêm khoảng 2–3 ms (p50), tải lên tệp 1 MB thêm khoảng 6 ms, tệp 24 MB thêm khoảng 44 ms;
   thông lượng GraphQL 8 luồng giảm từ 3 834 xuống 470 yêu cầu/giây. Mỗi worker giữ một bộ luật riêng nên số worker của
   APISIX đổi từ `auto` thành 4 (`MOC_APISIX_WORKERS`). WAF không soi nội dung tệp tải lên — việc đó vẫn của ClamAV.
+  Loại trừ CRS gỡ theo id, chỉ trên đúng đường và khóa, mỗi cái có lý do (`platform/apisix/README.md`); dò trên
+  7 389 yêu cầu dựng từ chữ của dữ liệu mẫu, gửi như giao diện gửi: không chữ mẫu nào bị chặn nhầm.
 
 ## 6. Chỗ còn yếu
 
@@ -957,8 +958,8 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   vai trò CSDL quyền hẹp ([`trien-khai.md`](trien-khai.md) §8). Mốc neo sổ kiểm toán ra bucket khóa ghi là để chặn đúng
   đường siêu người dùng viết lại sổ (`svc_files/anchors.py`).
 - **Mạng**: TLS chỉ ở đoạn trình duyệt ↔ proxy, trong mạng Docker các dịch vụ gọi nhau bằng HTTP;
-  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy ([`trien-khai.md`](trien-khai.md) §8). Chưa có WAF
-  (F3.15, QĐ-013).
+  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy ([`trien-khai.md`](trien-khai.md) §8). WAF (F3.15,
+  QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
 - **Quan sát**: chỉ có chỉ số của APISIX, chưa có tracing phân tán, chưa có cảnh báo; log tập trung tắt mặc định
   (F3.13, F3.14).
 - **Két bí mật**: `.env` vẫn là nguồn bí mật; chưa có quy trình xoay khóa transit, xoay bí mật

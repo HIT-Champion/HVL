@@ -42,7 +42,8 @@ trường số khép kín.
 - [x] Định danh tập trung: Keycloak, SSO, TOTP bắt buộc với vai trò quan trọng, `tenant_id` và `department_id` trong
       token (F1.1, F2.1)
 - [x] Một điểm vào: cổng API APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ (F1.2)
-- [ ] **Đang làm**: tường lửa ứng dụng web Coraza ở APISIX (F3.15, nguyên lý iv)
+- [x] Tường lửa ứng dụng web ở cổng: Coraza + OWASP CRS trong APISIX, chặn mặc định, loại trừ có lý do (F3.15,
+      nguyên lý iv; mức Dùng được cho tới khi smoke qua WAF xanh trên CI)
 - [x] Lưu trữ tệp nội bộ: SeaweedFS, tệp chỉ vào và ra qua `svc-files`, ClamAV quét trước khi ghi (F1.5, F1.6)
 - [x] Cấu trúc thư mục **P.A.R.A**: Không gian cá nhân `apps/ca-nhan` (Dự án, Lĩnh vực, Tài nguyên, Lưu trữ), ứng
       dụng thứ hai cắm vào lõi, không sửa dòng nào trong `services/`

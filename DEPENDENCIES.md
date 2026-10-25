@@ -71,7 +71,7 @@ sử dụng"*).
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
 | Keycloak | 26.7.5 | Apache-2.0 | Định danh tập trung: SSO, MFA, vai trò người dùng | `quay.io/keycloak/keycloak:26.7.5` | 1 |
-| Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian` | 1 |
+| Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian`, dựng thành `moc/apisix` chỉ thêm tệp WAF (`platform/apisix/Dockerfile`, F3.15) | 1 |
 | PostgreSQL | 16 | PostgreSQL License | Cơ sở dữ liệu quan hệ chính (QĐ-002) | `postgres:16-alpine` | 1 |
 | Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
 | Flowable (REST) | 8.0.0 | Apache-2.0 | Động cơ quy trình BPMN | `flowable/flowable-rest:8.0.0` | 1 |
@@ -203,7 +203,7 @@ trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 | restic | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
 | Vector | 0.59.0 | MPL-2.0 | Thu log của 5 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
 | Parseable | 3.2.4 | AGPL-3.0 | Lưu và tra log tập trung (F3.14, profile `logs`): dịch vụ độc lập, chỉ nghe 127.0.0.1, chạy root nhưng bỏ mọi capability, basic auth (mật khẩu rỗng thì không mở cổng), giữ `MOC_LOGS_RETENTION_DAYS` ngày, tắt kiểm bản mới và gửi số liệu sử dụng | `quay.io/parseablehq/parseable:v3.2.4`, ghim digest (image 02/10/2026) | 3 |
-| Coraza | 3.8 | Apache-2.0 | Tường lửa ứng dụng web tại gateway *(Could)* | Plugin proxy-wasm cho APISIX | 3 |
+| Coraza + OWASP CRS | Coraza v3.3.3, CRS v4.14.0 (trong coraza-proxy-wasm 0.6.0) | Apache-2.0 | Tường lửa ứng dụng web ở cổng API (F3.15): mọi yêu cầu qua CRS paranoia 1 trước khi kiểm token, tải tấn công → 403; nội dung tệp vẫn do ClamAV soi | `ghcr.io/corazawaf/coraza-proxy-wasm:0.6.0` (phát hành 06/07/2025), ghim digest, kiểm sha256 tệp `.wasm`; APISIX nạp bằng `wasm.plugins` | 3 |
 
 **Ghi chú:**
 
@@ -213,6 +213,14 @@ trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 - Marquez: bản phát hành gần nhất là 0.51.1 (03/2025), mã nguồn vẫn có commit năm 2026 nhưng nhịp chậm.
   Theo dõi trong Phase 3; nếu gặp lỗi chặn thì chuyển sang chỉ lưu sự kiện OpenLineage vào PostgreSQL. F3.9 đã làm
   theo hướng đó (`core.lineage_events`): tránh thêm máy chủ Java và CSDL riêng (~1 GB RAM) cho một job mỗi giờ.
+- Coraza: coraza-proxy-wasm 0.6.0 là bản phát hành mới nhất và nhánh `main` vẫn dùng Coraza v3.3.3 (20/03/2025), nên
+  không có bản WebAssembly nào mang Coraza đã vá (3.8.1). 3.3.3 có 12 GHSA công bố 02/10/2026: hai mức high áp dụng
+  ở Signet có biện pháp ở cổng (JSON lồng sâu bị chặn trước WAF; quá 1000 tham số thì chặn), các lỗi lẩn WAF mức
+  medium ghi ở [`platform/apisix/README.md`](platform/apisix/README.md), mục WAF. Gói Go biên dịch trong tệp `.wasm`
+  (proxy-wasm-go-sdk, gjson, libinjection-go, go-re2, aho-corasick…) là Apache-2.0, MIT, BSD-3-Clause. SBOM và
+  OSV-Scanner không đọc tệp `.wasm`: lỗ hổng mới của Coraza phải theo dõi tay (GitHub Security Advisories của
+  `corazawaf/coraza`). Khi có bản phát hành mang Coraza ≥ 3.8.1 thì đổi digest và băm trong Dockerfile; hướng thay
+  nếu cần bản vá sớm hơn: coraza-caddy (Coraza 3.8.1) thành một container đứng trước APISIX — so sánh ở README đó.
 
 ## Trí tuệ nhân tạo
 

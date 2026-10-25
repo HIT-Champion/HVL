@@ -17,6 +17,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `MOC_IMPORT_STORE_MAX_MB`; dòng được giữ khi đang làm nên hai tiến trình không làm trùng. Bảng `core.import_jobs`,
   `core.import_rows` (migration 1792281602800). Lô mẫu 200 dòng `seed/nap-lo/van-ban-den.csv`, `make demo-nap-lo`.
   Test (đếm tĩnh): svc-files +113, db +18, scripts +12, svc-workflow +2, giao diện +2.
+- Tường lửa ứng dụng web ở cổng APISIX (F3.15): Coraza v3.3.3 + OWASP CRS v4.14.0 (coraza-proxy-wasm 0.6.0, ghim digest
+  và băm) chặn tải tấn công (SQLi, XSS, duyệt thư mục, chèn lệnh, Log4Shell, tải lên `.php`…) trên mọi đường trước khi
+  kiểm token → 403 có `X-Request-Id`, dòng chặn trong nhật ký mang cùng mã. Mặc định chặn, `MOC_WAF=On | DetectionOnly |
+  Off`; giá trị sai bị `make up` và reconciler GitOps (trước khi dừng Signet) từ chối, và image dừng ngay lúc khởi động
+  với dòng lỗi rõ thay vì cổng trả 503. Loại trừ CRS gỡ theo id, có lý do, chỉ trên đúng khóa: Keycloak, chữ truy vấn
+  GraphQL, truy cập bằng IP; chữ tự do trong biến GraphQL (nội dung, trích yếu, ý kiến, ghi chú, góp ý), câu hỏi trợ lý,
+  ô Tìm kiếm; tên tệp tải lên có `' " ; = :`. Dò trên 7 389 yêu cầu dựng từ toàn bộ chữ của dữ liệu mẫu: không chữ mẫu
+  nào bị chặn nhầm (trước đó 4/21 PDF mẫu). JSON lồng sâu bị chặn trước WAF (GHSA-6gcq-wc29-5xf2). Nội dung tệp vẫn do
+  ClamAV soi. APISIX dựng thành image `moc/apisix`, 4 worker (`MOC_APISIX_WORKERS`); smoke thêm 7 kiểm, có tên tệp và
+  nội dung hành chính thật phải qua (`platform/apisix/README.md`, mục WAF).
 - Khai giấy phép theo chuẩn REUSE: `REUSE.toml` khai Apache-2.0 cho các tệp không chèn được header (JSON, ảnh, PDF,
   tài liệu, dữ liệu mẫu), `LICENSES/Apache-2.0.txt` là bản sao của `LICENSE`; `reuse lint` 5.0.2 đạt, 482/482 tệp có
   thông tin bản quyền và giấy phép. `.env.example` mang header giấy phép, `make license-check` kiểm cả tệp này
