@@ -127,3 +127,83 @@ test('giao diện: thanh bên mở khi rê chuột hoặc dùng bàn phím, khô
   await page.keyboard.press('Escape')
   await expect(menu).toBeFocused()
 })
+
+test('giao diện: màn hẹp 390×844 bằng bàn phím: không cuộn ngang, ngăn kéo giữ focus, viền focus đủ', async ({
+  browser,
+}) => {
+  test.skip(!PASSWORD, 'Cần dữ liệu mẫu và MOC_DEMO_PASSWORD')
+  const page = await signIn(browser, 'chuyenviendt')
+  await page.setViewportSize({ width: 390, height: 844 })
+  const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+  const menu = page.getByRole('button', { name: 'Mở điều hướng', exact: true })
+  const drawer = page.locator('#app-navigation')
+
+  // hộp việc, văn bản đến, soạn thảo: đợi dữ liệu hiện rồi mới đo, vì thẻ việc, dòng bảng mới làm trang rộng ra
+  await expect(page.locator('[data-testid="inbox"], .moc-empty').first()).toBeVisible()
+  expect(await fits(), 'hộp việc cuộn ngang ở 390px').toBe(true)
+  await menu.click()
+  await drawer.getByRole('link', { name: 'Văn bản đến', exact: true }).click()
+  await expect(page.locator('tbody tr').first()).toBeVisible()
+  expect(await fits(), 'văn bản đến cuộn ngang ở 390px').toBe(true)
+  await menu.click()
+  await drawer.getByRole('link', { name: 'Soạn văn bản đi', exact: true }).click()
+  await expect(page.getByLabel('Loại văn bản', { exact: true })).toBeVisible()
+  expect(await fits(), 'soạn thảo cuộn ngang ở 390px').toBe(true)
+
+  // mở ngăn kéo bằng phím: focus vào mục đầu
+  await menu.focus()
+  await page.keyboard.press('Enter')
+  await expect(drawer.locator('a').first()).toBeFocused()
+  await expect.poll(async () => (await drawer.boundingBox())!.x).toBe(0)
+
+  // Tab đi qua mọi mục theo thứ tự nhìn thấy (trên xuống, cùng hàng thì trái sang phải), mục nào cũng có viền focus
+  // 2px nằm trọn trong vùng không bị cắt, rồi quay về mục đầu chứ không lọt ra trang phía sau
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement as HTMLElement
+    const s = getComputedStyle(el)
+    const r = el.getBoundingClientRect()
+    // viền nằm từ cạnh + offset tới cạnh + offset + độ dày: phần tràn ra ngoài phần tử (offset 3px → 5px, -3px → 0)
+    const grow = Math.max(0, parseFloat(s.outlineOffset) + parseFloat(s.outlineWidth))
+    const clip = (el.closest('.sg-nav') ?? el.closest('#app-navigation'))?.getBoundingClientRect()
+    return {
+      name: el.getAttribute('aria-label') ?? el.textContent?.trim() ?? '',
+      top: r.top,
+      bottom: r.bottom,
+      left: r.left,
+      ring: s.outlineStyle === 'solid' && parseFloat(s.outlineWidth) >= 2,
+      inside: !!clip && r.left - grow >= clip.left && r.right + grow <= clip.right
+        && r.top - grow >= clip.top && r.bottom + grow <= clip.bottom,
+    }
+  })
+  const count = await drawer.evaluate((nav) => [...nav.querySelectorAll<HTMLElement>('a, button')]
+    .filter((el) => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden').length)
+  expect(count).toBeGreaterThan(5)
+  const first = await focused()
+  let previous = first
+  for (let i = 0; i < count; i++) {
+    const now = i ? await focused() : first
+    expect(now.ring, `${now.name}: không có viền focus 2px`).toBe(true)
+    expect(now.inside, `${now.name}: viền focus bị cắt`).toBe(true)
+    if (i) {
+      const sameRow = now.top < previous.bottom && now.bottom > previous.top
+      expect(sameRow ? now.left > previous.left : now.top > previous.top,
+             `${previous.name} → ${now.name}: sai thứ tự nhìn thấy`).toBe(true)
+    }
+    previous = now
+    await page.keyboard.press('Tab')
+  }
+  expect((await focused()).name, 'Tab sau mục cuối phải về mục đầu').toBe(first.name)
+  await page.keyboard.press('Shift+Tab')
+  expect((await focused()).name, 'Shift+Tab ở mục đầu phải về mục cuối').toBe(previous.name)
+
+  // đóng bằng nút trong ngăn kéo, rồi bằng lớp phủ: ngăn kéo ẩn, focus về nút menu
+  await drawer.getByRole('button', { name: 'Đóng điều hướng', exact: true }).click()
+  await expect(drawer).toHaveCSS('visibility', 'hidden')
+  await expect(menu).toBeFocused()
+  await menu.click()
+  await expect(drawer).toHaveCSS('visibility', 'visible')
+  await page.mouse.click(370, 420)
+  await expect(drawer).toHaveCSS('visibility', 'hidden')
+  await expect(menu).toBeFocused()
+  expect(await fits()).toBe(true)
+})
