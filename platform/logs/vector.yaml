@@ -82,15 +82,17 @@ transforms:
           if match(k, r'(?i)passw|pwd|secret|token|api[_-]?key|private[_-]?key|credential|session|authoriz|cookie') {
             flat = set!(flat, [k], "[REDACTED]")
           }
-          # Hasura ghi câu GraphQL và biến (dữ liệu người dùng) khi lỗi và mỗi lần mở subscription. Khóa query (câu
-          # GraphQL, SQL dạng chuỗi) thay giá trị; query.variables và generated_sql (query-log, mặc định tắt, có
-          # prepared_arguments) thay cả nhánh: khóa trong biến jsonb cũng là dữ liệu. Giữ operationName
+          # Hasura ghi câu GraphQL và biến (dữ liệu người dùng) mỗi lần mở subscription. Khóa query, raw_query (câu
+          # GraphQL, SQL, thân yêu cầu dạng chuỗi) thay giá trị; query.variables, generated_sql (query-log, mặc định
+          # tắt, có prepared_arguments) và internal của lỗi (tham số, câu SQL, DETAIL của PostgreSQL) thay cả nhánh:
+          # khóa trong biến jsonb cũng là dữ liệu. Bản 2.51 không ghi internal, raw_query vào http-log (đã thử cả
+          # DEV_MODE true): luật để phòng bản khác. Giữ operationName
           if service == "hasura" {
-            q, qerr = parse_regex(k, r'^(?P<p>(?:[^.]+\.)*?(?:query\.variables|generated_sql))(?:\.|$)')
+            q, qerr = parse_regex(k, r'^(?P<p>(?:[^.]+\.)*?(?:query\.variables|generated_sql|internal))(?:\.|$)')
             if qerr == null {
               flat = remove!(flat, [k])
               flat = set!(flat, [string!(q.p)], "[REDACTED]")
-            } else if match(k, r'(^|\.)query$') && is_string(v) {
+            } else if match(k, r'(^|\.)(?:raw_)?query$') && is_string(v) {
               flat = set!(flat, [k], "[REDACTED]")
             }
           }

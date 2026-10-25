@@ -373,9 +373,12 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
   - **Hasura** (dòng JSON): `event` là `hasura.<loại log>` (`hasura.http-log`, `hasura.websocket-log`…);
     `request_id` lấy trong `detail` (`detail.request_id`, `detail.operation.request_id`, ở `websocket-log` là
     `detail.event.detail.request_id`). Đó là `X-Request-Id` mà APISIX, `svc-workflow`, `svc-files` gửi kèm lời gọi
-    GraphQL, nên `make logs-tra` ra cả dòng của Hasura. Câu GraphQL (khóa `query` là chuỗi), cả nhánh
-    `query.variables` (khóa trong biến `jsonb` cũng là dữ liệu) và `generated_sql` (của `query-log`, mặc định tắt) thay
-    bằng `[REDACTED]`. Hasura ghi chúng khi lỗi và mỗi lần mở subscription. `operationName` giữ lại.
+    GraphQL, nên `make logs-tra` ra cả dòng của Hasura. Khóa `query`, `raw_query` là chuỗi (câu GraphQL, thân yêu
+    cầu) và cả nhánh `query.variables` (khóa trong biến `jsonb` cũng là dữ liệu), `generated_sql` (của `query-log`, mặc
+    định tắt), `internal` của lỗi (tham số, câu SQL, `DETAIL` của PostgreSQL) thay bằng `[REDACTED]`; `operationName`
+    giữ lại. Hasura 2.51 ghi câu và biến mỗi lần mở subscription. Dòng `http-log` lỗi của nó chỉ có `code`, `error`,
+    `path`, kể cả với vai trò admin và `DEV_MODE=true` (đã thử 26/10/2026). Luật `raw_query`, `internal` để phòng
+    bản khác.
   - **PostgreSQL**: mỗi mục log bắt đầu bằng tiền tố mặc định `%m [%p] ` rồi loại (`ERROR:`, `DETAIL:`…). Dòng
     không có tiền tố bị bỏ: đó là dòng tiếp của mục nhiều dòng (câu lệnh hay dòng vi phạm có xuống dòng) hay lời
     của script khởi tạo, không biết thuộc mục nào nên không che đúng được. Các phần bị che:
@@ -391,7 +394,7 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
   - **Keycloak**: `username="…"` ở sự kiện `LOGIN_ERROR` (tên người dùng gõ vào: gõ nhầm mật khẩu vào ô tên thì
     lộ). `userId`, `clientId`, `error` giữ lại. `sessionId`, chuỗi truy vấn của `redirect_uri` đã bị bước che chung che.
 - **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
-  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (38 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
+  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (39 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
   - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;
   - giá trị của khóa có chữ `password`, `passwd`, `pwd`, `secret`, `token`, `api key`, `private key`, `credential`,
     `session`, kể cả có tiền tố, hậu tố (`HASURA_ADMIN_SECRET=`, `POSTGRES_PASSWORD=`, `access_token`,

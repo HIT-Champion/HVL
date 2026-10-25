@@ -99,11 +99,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   nó; từ lúc gắn thẻ mới tới lúc nâng bản online thì job đỏ. `docs/trien-khai.md` mục 6 thêm lệnh này. Test scripts
   +15.
 - Log tập trung thu thêm Hasura, Keycloak, PostgreSQL (F3.14, #202). Ba dịch vụ không tự che thông tin cá nhân nên
-  Vector có luật riêng cho từng dịch vụ trước bước che chung, mỗi luật có ca trong `vector.test.yaml` (29 → 38 ca),
+  Vector có luật riêng cho từng dịch vụ trước bước che chung, mỗi luật có ca trong `vector.test.yaml` (29 → 39 ca),
   bỏ hay nới luật nào cũng có ca đỏ.
   - Hasura: `event` là `hasura.<loại log>`, `request_id` lấy trong `detail`, nên `make logs-tra` ra cả dòng của Hasura
-    cùng mã với APISIX, `svc-workflow`, `svc-files`. Câu GraphQL, biến (cả nhánh, khóa `jsonb` cũng là dữ liệu) và
-    `generated_sql` bị che, giữ `operationName`.
+    cùng mã với APISIX, `svc-workflow`, `svc-files`. Câu GraphQL, thân yêu cầu (`raw_query`), biến (cả nhánh, khóa
+    `jsonb` cũng là dữ liệu), `generated_sql` và `internal` của lỗi bị che, giữ `operationName`. Có ca lấy nguyên
+    dòng lỗi thật của Hasura 2.51.
   - PostgreSQL: bỏ dòng tiếp của mục nhiều dòng (không có tiền tố giờ `[pid]`, đã thấy mang dữ liệu của dòng vi
     phạm). Che câu lệnh ở `STATEMENT`/`QUERY` (chỉ giữ từ đầu), giá trị khóa và dòng vi phạm ở `DETAIL`, câu trong
     nháy và đoạn trích ở `CONTEXT`, tham số `$1 = '…'`, giá trị gõ sai kiểu; dòng dừng giữa giá trị thì che tới hết

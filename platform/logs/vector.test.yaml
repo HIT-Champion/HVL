@@ -792,6 +792,57 @@ tests:
               assert_eq!(.request_id, "demo-log-hs5")
               o = object!(parse_json!(string!(.message)).detail.operation)
               assert_eq!(o.error.error, "malformed array literal: \"[REDACTED]\"")
+  - name: dòng lỗi thật của Hasura 2.51 (vai trò user, giá trị gõ sai kiểu); internal, raw_query nếu có thì che cả
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"http_info": {"content_encoding": null, "http_version": "HTTP/1.1", "ip": "172.31.0.1",
+            "method": "POST", "status": 200, "url": "/v1/graphql"},
+            "operation": {"error": {"code": "data-exception",
+            "error": "invalid input syntax for type integer: \"Le Van C\"", "path": "$"}, "query": {"type": null},
+            "query_execution_time": 0.000861992, "request_id": "demo-log-hsx", "request_mode": "error",
+            "request_read_time": 1.13e-06, "response_size": 98, "uncompressed_response_size": 98,
+            "user_vars": {"x-hasura-role": "user", "x-hasura-user-id": "u-1"}}, "request_id": "demo-log-hsx"},
+            "level": "error", "span_id": "87721971ef7690bd", "timestamp": "2026-10-25T17:41:44.190+0000",
+            "trace_id": "f5ec55df4731896b9043c86a7a287e39", "type": "http-log"}
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"operation": {"error": {"code": "constraint-violation", "error": "Uniqueness violation.",
+            "internal": {"arguments": ["(Oid 25,Just (\"Tran Thi B\",Binary))"], "error": {"description":
+            "Key (email)=(tran.b@example.com) already exists.", "exec_status": "FatalError", "hint": null,
+            "message": "duplicate key value", "status_code": "23505"}, "prepared": true,
+            "statement": "INSERT INTO nguoi (ten) VALUES ('Le Van C')"}, "path": "$"},
+            "raw_query": "{\"query\": \"query { nguoi { ten } }\", \"variables\": {\"x\": \"Pham Thi D\"",
+            "request_id": "demo-log-hs6"}}, "level": "error", "type": "http-log"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hsx")
+              assert_eq!(.event, "hasura.http-log")
+              m = string!(.message)
+              assert!(!contains(m, "Le Van C"), m)
+              e = object!(parse_json!(m).detail.operation.error)
+              assert_eq!(e.error, "invalid input syntax for type integer: \"[REDACTED]\"")
+              assert_eq!(e.code, "data-exception")
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hs6")
+              m = string!(.message)
+              for_each(["Tran", "tran.b", "Le Van", "Pham", "23505"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              o = object!(parse_json!(m).detail.operation)
+              assert_eq!(o.error.internal, "[REDACTED]")
+              assert_eq!(o.raw_query, "[REDACTED]")
+              assert_eq!(o.error.code, "constraint-violation")
   - name: websocket-log của Hasura khi mở subscription, mã yêu cầu trong detail.event.detail
     inputs:
       - insert_at: moc
