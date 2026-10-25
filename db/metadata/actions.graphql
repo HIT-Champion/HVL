@@ -42,6 +42,11 @@ type Query {
   myTasks: [WorkTask!]!
 }
 
+type Query {
+  "Sơ đồ cảm biến OT của đơn vị người gọi: số đo mới nhất từng cảm biến, ngưỡng, cờ chất lượng dữ liệu (F3.10)"
+  otSensorMap: OtSensorMap!
+}
+
 type ReceiveIncomingOutput {
   document_id: uuid!
 }
@@ -69,4 +74,26 @@ type WorkTask {
   created_at: timestamptz!
   due_on: date
   urgency: String!
+}
+
+# status: ready (broker trả lời) | off (chưa đặt MOC_NGSI_URL) | unavailable (broker không trả lời, vd chưa bật
+# profile iot). flags của từng cảm biến: stale, out_of_range, duplicate_time — luật ở sensor_view
+# (services/svc-workflow/src/svc_workflow/ot.py)
+type OtSensorMap {
+  status: String!
+  threshold: Float!
+  stale_after_min: Int!
+  range_min: Float!
+  range_max: Float!
+  checked_at: timestamptz!
+  sensors: [OtSensor!]!
+}
+
+type OtSensor {
+  id: String!
+  room: String
+  name: String!
+  value: Float
+  observed_at: timestamptz
+  flags: [String!]!
 }

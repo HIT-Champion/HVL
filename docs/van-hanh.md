@@ -555,11 +555,25 @@ docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT 
 ```
 
 - Thực thể cảm biến `urn:ngsi-ld:TemperatureSensor:<mã>` có `name` (tên phòng), `responsible` (tên đăng nhập
-  chuyên viên phụ trách) và `temperature` (°C, `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động
-  của đúng đơn vị, có phòng; không thì sự kiện bị bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+  chuyên viên phụ trách), `room` (mã phòng trên sơ đồ kho, tùy chọn: `sensor.py --room kho-1`) và `temperature` (°C,
+  `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động của đúng đơn vị, có phòng; không thì sự kiện bị
+  bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+- **Sơ đồ cảm biến** (`/cam-bien` của Văn phòng điện tử, văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo đơn vị): mặt
+  bằng kho lưu trữ mẫu (SVG, không tải gì ngoài), mỗi phòng tô màu theo số đo mới nhất của cảm biến cùng mã phòng so
+  với `MOC_OT_THRESHOLD`. Đọc qua Hasura Action `otSensorMap`: `svc-workflow` chỉ hỏi broker ở tenant của đơn vị
+  người xem. Ba cờ chất lượng tính ở `svc-workflow`: **mất tín hiệu** — quá `MOC_OT_STALE_MIN` phút (mặc định 10,
+  1–1440) không có số đo mới; đặt từ 2–3 lần chu kỳ gửi của thiết bị thật; **ngoài dải** — giá trị không phải số
+  hoặc ngoài −55…125 °C (dải đo của cảm biến DS18B20, hằng số trong `ot.py`); **trùng `observedAt`** — số đo mới
+  nhất cùng giờ đo với một lần đo khác trong 10 lần gần nhất (temporal API). Profile `iot` tắt thì trang báo "Chưa
+  bật cảm biến", không lỗi. Giả lỗi để xem cờ: `sensor.py --late 30` (số đo cũ 30 phút), `--frozen-clock` (đồng hồ
+  đứng), `--readings 22,-127`.
 - Broker và CSDL của nó không mở cổng ra máy chủ. Ba mạng nội bộ riêng: thiết bị ↔ broker (`iot-devices`), broker ↔
   `svc-workflow` (`iot`), broker ↔ CSDL của nó (`iot-db`) — thiết bị không gọi được `svc-workflow`. Mỗi lần gọi
   `POST /ot/notify/<tenant>` phải kèm token riêng của đơn vị (HMAC từ khóa Actions của `svc-workflow`), sai thì 401.
+- **Giới hạn của sơ đồ:** mặt bằng mẫu cố định trong `apps/office/app/utils/otMap.ts` (một tầng, 6 phòng), mọi đơn vị
+  dùng chung; dải đo không theo từng cảm biến; broker ghi lịch sử bất đồng bộ nên cờ trùng `observedAt` có thể chậm vài
+  giây; tối đa 100 cảm biến mỗi đơn vị. Cờ chỉ hiện trên sơ đồ: số đo vượt ngưỡng vẫn dựng dự thảo "Báo cáo sự cố" kể
+  cả khi ngoài dải.
 - **Giới hạn:** broker không xác thực — ai vào được mạng thiết bị là ghi được vào tenant của đơn vị bất kỳ, kể cả
   khai người phụ trách là một chuyên viên của đơn vị đó. Triển khai thật phải đặt cổng thiết bị trước broker (IoT
   Agent hoặc PEP proxy của FIWARE) cấp tenant theo khóa của từng thiết bị; bản rút gọn chỉ có cảm biến giả lập.

@@ -126,6 +126,7 @@ Action đều gọi lại được sau lỗi mạng mà không cấp số hai l�
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Trình dự thảo văn bản đi cho lãnh đạo phòng duyệt, chọn lãnh đạo đơn vị ký; trình lại sau khi bị trả lại |
 | `myTasks` | `clerk`, `staff`, `manager`, `director` | Hộp việc: việc giao đích danh và việc của nhóm vai trò, khẩn xếp trước |
 | `completeTask(taskId, outcome, data)` | Người được giao việc | Hoàn thành việc; `data` kiểm theo loại việc |
+| `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Sơ đồ cảm biến OT (F3.10, chỉ đọc): số đo mới nhất từng cảm biến của đơn vị người gọi, ngưỡng, cờ `stale`, `out_of_range`, `duplicate_time`; `status` là `off` hay `unavailable` khi chưa bật broker NGSI-LD |
 
 Các loại việc, `outcome` và `data` của từng loại có ở [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §4.2.
 Luồng văn bản đến của văn thư, giống `make smoke`:
