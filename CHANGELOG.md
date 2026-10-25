@@ -209,6 +209,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trang, thẻ trắng, `stone-50`, `stone-100`. Test mới `contrast.test.ts` đọc màu thẳng từ `main.css`, kiểm 33 cặp chữ
   (≥ 4.5:1) và 7 cặp viền ô nhập, viền focus (≥ 3:1). Bỏ dòng đặt `<html lang>` đã thừa trong hai layout, vì plugin
   i18n đặt từ #206. Test office +3.
+- Viền focus của mục menu trên thanh bên bị cắt khi dùng Tab (#216): `.sg-nav` cắt phần tràn mà viền vẽ lùi ra ngoài
+  3px, nên mục menu mất cạnh trái, phải, mục đầu mất cả cạnh trên. Nay viền vẽ vào trong mục. e2e `giao-dien.spec.ts`
+  thêm một test ở khung 390×844: không cuộn ngang ở hộp việc, văn bản đến, soạn thảo; mở ngăn kéo bằng Enter, Tab đi
+  hết các mục theo thứ tự nhìn thấy với viền focus đủ rồi vòng về mục đầu, Shift+Tab đi ngược; đóng bằng nút và lớp
+  phủ thì focus về nút menu. e2e +1.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
