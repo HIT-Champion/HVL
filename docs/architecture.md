@@ -120,7 +120,7 @@ flowchart LR
     U2["Người nhận văn bản<br/>quét QR, không đăng nhập"]
   end
   GW{{"APISIX 3.18 — cổng duy nhất mở ra ngoài<br/>WAF · kiểm JWT · giới hạn tốc độ<br/>X-Request-Id · quản trị: 404"}}
-  subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app)"]
+  subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app; mạng apps: chỉ tới APISIX)"]
     OFF["app-office<br/>Văn phòng điện tử · Nuxt 4"]
     CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
   end
@@ -194,9 +194,13 @@ flowchart LR
   sau khi Hasura xác nhận người hỏi được xem.
 - **Mạng con khép kín.** SeaweedFS chỉ ở mạng `storage`, OpenBao ở `secrets`, Ollama ở `ai` — mạng `internal` của
   Docker, chỉ `svc-files` (và `svc-workflow` với `secrets`) nối vào, nên không thành phần nào khác chạm được tệp, két
-  hay mô hình qua mạng. Ngoại lệ có chủ ý: container `restic` (profile `backup`, không mạng) gắn thẳng volume của
-  SeaweedFS và OpenBao để sao lưu (`docker-compose.yml`, `scripts/backup.py`). Flowable không gọi ra ngoài: việc tự động
-  là việc giao ra ngoài (external worker) do `svc-workflow` kéo về (QĐ-009).
+  hay mô hình qua mạng. Container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app install`) chỉ ở
+  mạng `apps` (`internal`), nơi chỉ có APISIX: ứng dụng tới lõi duy nhất qua cổng, kể cả phần máy chủ của ứng dụng
+  (token client credentials, GraphQL đi qua đúng các route của trình duyệt, cùng kiểm token, giới hạn tốc độ, WAF).
+  Hasura giao sự kiện tới ứng dụng qua cổng hook 9081 của APISIX — không publish, route hook chỉ khớp ở cổng đó
+  ([`them-ung-dung.md`](them-ung-dung.md) 1.3). Ngoại lệ có chủ ý: container `restic` (profile `backup`, không
+  mạng) gắn thẳng volume của SeaweedFS và OpenBao để sao lưu (`docker-compose.yml`, `scripts/backup.py`). Flowable không
+  gọi ra ngoài: việc tự động là việc giao ra ngoài (external worker) do `svc-workflow` kéo về (QĐ-009).
 
 ## 3. Bản đồ công cụ
 
@@ -326,12 +330,13 @@ liên thông, nộp lưu hồ sơ, đọc văn bản đến, gợi ý giao việ
 và `svc-workflow`. Nhiều cơ chế dùng chung (tải tệp, tìm kiếm, trợ lý, thông báo, nạp lô) còn viết cứng bảng, vai trò
 hay câu chữ của Văn phòng.
 
-Thứ đã tách cứng chỉ có hai: **cổng** — ứng dụng chỉ là client gọi lõi qua APISIX; **khóa ngoại CSDL** — mỗi ứng dụng
-có schema riêng (`office`, `personal`), `core` không đặt khóa ngoại nào sang `office`. Phần còn lại của CSDL vẫn dính:
-một hàm của `core` đọc `office`, ba cột in văn bản đi trong `core.tenants`, hàm `core.audit_overview` viết cứng loại
-dòng sổ của Văn phòng, hai tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4).
-Ở mức mã thì chưa tách. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`, nhưng
-nó mang theo các chỗ dính đó (§4.6). Tách là việc sau `v1.3.0` (§4.7).
+Thứ đã tách cứng chỉ có hai: **cổng** — ứng dụng chỉ là client gọi lõi qua APISIX, và mạng buộc điều đó: container
+ứng dụng chỉ ở mạng `apps`, nơi chỉ có APISIX (§2); **khóa ngoại CSDL** — mỗi ứng dụng có schema riêng (`office`,
+`personal`), `core` không đặt khóa ngoại nào sang `office`. Phần còn lại của CSDL vẫn dính: một hàm của `core` đọc
+`office`, ba cột in văn bản đi trong `core.tenants`, hàm `core.audit_overview` viết cứng loại dòng sổ của Văn phòng,
+hai tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4). Ở mức mã thì chưa
+tách. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`, nhưng nó mang theo
+các chỗ dính đó (§4.6). Tách là việc sau `v1.3.0` (§4.7).
 
 ### 4.2. Sơ đồ
 
@@ -557,8 +562,9 @@ phần Văn phòng — tách về đường đi của mã và dữ liệu, chưa
 Ứng dụng thứ ba, Bảng tin đơn vị (`apps/bang-tin`), đi xa hơn một bước: cài bằng `moc app install` từ manifest, không
 sửa tệp nào của lõi — client Keycloak, route APISIX, metadata Hasura nằm trong `.moc-apps/` ngoài git. Migration chạy
 bằng vai trò CSDL riêng không có quyền trên `core`, `office`, `personal`; ứng dụng biết văn bản vừa vào sổ qua luồng
-`core.app_events` chứ không đọc bảng của Văn phòng. Kiểm trên hệ thống chạy: `make demo-cai-ung-dung`, có trong CI
-([`them-ung-dung.md`](them-ung-dung.md) mục 1).
+`core.app_events` chứ không đọc bảng của Văn phòng. Container của nó chỉ ở mạng `apps`: nhận sự kiện qua cổng hook
+của APISIX, lấy token, ghi GraphQL qua cổng công khai như trình duyệt. Kiểm trên hệ thống chạy:
+`make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](them-ung-dung.md) mục 1).
 
 ### 4.7. Hướng tách
 
@@ -967,7 +973,9 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   vai trò CSDL quyền hẹp ([`trien-khai.md`](trien-khai.md) §8). Mốc neo sổ kiểm toán ra bucket khóa ghi là để chặn đúng
   đường siêu người dùng viết lại sổ (`svc_files/anchors.py`).
 - **Mạng**: TLS chỉ ở đoạn trình duyệt ↔ proxy, trong mạng Docker các dịch vụ gọi nhau bằng HTTP;
-  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy ([`trien-khai.md`](trien-khai.md) §8). WAF (F3.15,
+  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy, kể cả container ứng dụng ở mạng `apps`
+  ([`trien-khai.md`](trien-khai.md) §8). Ứng dụng chỉ tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
+  tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
 - **Quan sát**: chỉ có chỉ số của APISIX, chưa có tracing phân tán, chưa có cảnh báo; log tập trung tắt mặc định
   (F3.13, F3.14).
