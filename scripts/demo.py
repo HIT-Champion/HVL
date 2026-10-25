@@ -21,7 +21,7 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py nong-lanh
         (i) Vòng đời dữ liệu nóng → lạnh: chuyên viên lập hồ sơ, đóng; svc-files nộp lưu thành gói Parquet + tệp +
         manifest có băm trên bucket lạnh khóa ghi, gỡ chi tiết khỏi CSDL nghiệp vụ; văn bản vẫn tìm thấy, quét QR vẫn
-        khớp, phòng đọc đọc lại gói bằng DuckDB. (make demo-nong-lanh)
+        khớp, phòng đọc đọc lại gói bằng DuckDB, xem tệp PDF có dấu tên người xem. (make demo-nong-lanh)
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
@@ -102,6 +102,13 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Parseable theo mã đó ra dòng của cả ba dịch vụ, sổ kiểm toán có dòng cùng mã; không đăng nhập thì không đọc
         được kho log; không dòng nào có token, cookie, chuỗi truy vấn; docker logs vẫn đọc được. (make
         demo-log-tap-trung)
+    python3 scripts/demo.py cai-ung-dung
+        Cắm ứng dụng thứ ba bằng MỘT lệnh (docs/them-ung-dung.md mục 1): `moc app install apps/bang-tin/app.yaml` —
+        kế hoạch --dry-run không đổi gì; cài xong mở /bang-tin/ qua APISIX, đăng nhập một lần (client app-bang-tin,
+        PKCE S256, không hỏi lại mật khẩu), GraphQL trên bảng của ứng dụng; văn thư vào sổ văn bản đến → ứng dụng nhận
+        sự kiện qua Event Trigger, văn bản hạn chế thì không; cài lại không tạo gì mới; gỡ thì route, client, trigger,
+        container mất, dữ liệu còn; git status trước và sau giống hệt: không tệp nào của lõi đổi. (make
+        demo-cai-ung-dung)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -652,6 +659,23 @@ def nong_lanh() -> None:
         raise DemoFailed(f"phòng đọc trả {room}")
     ok(f"phòng đọc: manifest khớp băm trong CSDL; DuckDB đọc documents.parquet ra {len(room['documents'])} văn bản: "
        + ", ".join(d["symbol"] or "?" for d in room["documents"]))
+    # phòng đọc xem tệp: đọc từ gói lạnh, so băm với manifest, đóng dấu tên người xem, ghi sổ rồi mới trả
+    viewable = [f for f in room["files"] if f["viewable"]]
+    if viewable:
+        _, got, stamped = request("GET", f"{PUBLIC_URL}/api/case-files/{cf['id']}/archive/files/"
+                                  f"{viewable[0]['file_id']}", headers=clerk.auth)
+        disposition = next((v for k, v in got.items() if k.lower() == "content-disposition"), "")
+        if not stamped.startswith(b"%PDF") or not disposition.startswith("inline;") \
+                or hashlib.sha256(stamped).hexdigest() == viewable[0]["sha256"]:
+            raise DemoFailed(f"phòng đọc trả tệp chưa đúng: {disposition}")
+        seen = psql("select count(*) from core.audit_log where action = 'case_file.file_viewed'"
+                    f" and entity_id = '{cf['id']}'")
+        if seen != "1":
+            raise DemoFailed(f"lần xem tệp trong phòng đọc chưa vào sổ kiểm toán ({seen} dòng)")
+        ok(f"phòng đọc xem {viewable[0]['filename']}: bản PDF có dấu tên văn thư và giờ xem (khác byte gốc, chỉ xem);"
+           " lần xem vào sổ kiểm toán (case_file.file_viewed)")
+    else:
+        ok("phòng đọc: các tệp trong gói không phải PDF — chỉ hiện băm, cỡ, không mở")
 
     say(5, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
     try_delete = (
@@ -3561,12 +3585,218 @@ def log_tap_trung() -> None:
     else:
         print("   Tắt: bỏ logs khỏi MOC_EXTRA_PROFILES (nếu có) rồi make logs-down")
 
+# ------------------------------------------------------------------------------------------- cắm ứng dụng bằng manifest
+
+APP_MANIFEST = "apps/bang-tin/app.yaml"
+APP_NAME, APP_PATH = "bang-tin", "/bang-tin/"
+APP_CALLBACK = f"{PUBLIC_URL}/bang-tin/dang-nhap"
+
+
+def app_query() -> str:
+    """Đúng câu GraphQL trang Bảng tin gửi (apps/bang-tin/public/tin.js)."""
+    js = (ROOT / "apps" / "bang-tin" / "public" / "tin.js").read_text(encoding="utf-8")
+    found = re.search(r"export const QUERY_TIN = `([^`]*)`", js)
+    if not found:
+        raise DemoFailed("apps/bang-tin/public/tin.js không còn QUERY_TIN")
+    return found.group(1)
+
+
+def moc_app(*args: str) -> str:
+    """`moc app …` đúng như người vận hành gõ; lỗi thì in đúng thông báo của lệnh (bước nào)."""
+    code, out, err = moc("app", *args)
+    if code != 0:
+        raise DemoFailed(f"moc app {' '.join(args)} thoát {code}: {(err or out).strip()[-600:]}")
+    return out
+
+
+def git_state() -> str | None:
+    """Tệp nào của cây mã nguồn đang khác commit (kể cả tệp mới không bị .gitignore); không phải bản git → None."""
+    r = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=all"], capture_output=True,
+                       text=True)
+    return r.stdout if r.returncode == 0 else None
+
+
+def state_digest() -> str:
+    """Băm mọi tệp trong .moc-apps/ (không in nội dung: có bí mật)."""
+    base = ROOT / ".moc-apps"
+    h = hashlib.sha256()
+    for path in sorted(p for p in base.rglob("*") if p.is_file()) if base.is_dir() else []:
+        h.update(str(path.relative_to(base)).encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
+    return h.hexdigest()
+
+
+def app_container() -> list[str]:
+    """Container của service app-bang-tin trong project compose của thư mục này (tên project tùy nơi cài); gỡ rồi thì
+    tệp phủ không còn service đó, compose báo lỗi — coi như không có container."""
+    import ung_dung
+    proc = subprocess.run([*ung_dung.COMPOSE, "ps", "-q", f"app-{APP_NAME}"], cwd=ROOT,
+                          env=ung_dung.System(ROOT).env(), capture_output=True, text=True)
+    return proc.stdout.split() if proc.returncode == 0 else []
+
+
+def app_clients() -> list[str]:
+    import tenants
+    return sorted(c["clientId"] for c in tenants.connect().clients()
+                  if c.get("clientId") in (f"app-{APP_NAME}", f"app-{APP_NAME}-svc"))
+
+
+def app_metadata() -> tuple[bool, bool]:
+    """(bảng bang_tin.tin còn được track, trigger app_bang_tin còn) theo metadata Hasura đang chạy."""
+    import ung_dung
+    md = ung_dung.System(ROOT).metadata({"type": "export_metadata", "version": 2, "args": {}})["metadata"]
+    tables = [t for src in md.get("sources", []) for t in src.get("tables", [])]
+    tracked = any(t["table"] == {"schema": "bang_tin", "name": "tin"} for t in tables)
+    trigger = any(e["name"] == "app_bang_tin" for t in tables for e in t.get("event_triggers", []))
+    return tracked, trigger
+
+
+def sso_fragment(browser: Any, client_id: str, redirect_uri: str) -> tuple[str, str]:
+    """Như oidc-client-ts của trang (apps/bang-tin/public/auth.js): code + PKCE S256, response_mode=fragment — mã cấp
+    quyền nằm sau dấu #, không tới máy chủ nào. Phiên SSO phải đủ: Keycloak hỏi mật khẩu là lỗi."""
+    import urllib.parse
+
+    verifier = base64.urlsafe_b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = uuid.uuid4().hex
+    query = urllib.parse.urlencode({"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code",
+                                    "response_mode": "fragment", "scope": "openid profile", "state": state,
+                                    "code_challenge": challenge, "code_challenge_method": "S256"})
+    resp = browser.opener.open(f"{PUBLIC_URL}/realms/{ENV.get('MOC_REALM', 'moc')}/protocol/openid-connect/auth?"
+                               f"{query}", timeout=30)
+    url = urllib.parse.urlsplit(resp.geturl())
+    params = urllib.parse.parse_qs(url.fragment)
+    if url.path != urllib.parse.urlsplit(redirect_uri).path or "code" not in params:
+        raise DemoFailed(f"{client_id}: Keycloak không chuyển về {redirect_uri}#code=… (dừng ở {url.path}) — SSO "
+                         "hỏng hoặc client chưa có")
+    if params.get("state") != [state]:
+        raise DemoFailed(f"{client_id}: state trả về không khớp")
+    return params["code"][0], verifier
+
+
+def cai_ung_dung() -> None:
+    from demo_ca_nhan import OWNER, Browser, as_session, claims_of, exchange
+
+    print("Cắm ứng dụng thứ ba bằng một lệnh — Bảng tin đơn vị (apps/bang-tin): không sửa tệp nào của lõi")
+    listed = json.loads(moc_app("list", "--json"))["apps"]
+    if any(a["name"] == APP_NAME and (a["installed"] or a["removing"]) for a in listed):
+        moc_app("remove", APP_NAME)
+        print("   (gỡ bản cài từ lần chạy trước, dữ liệu giữ)")
+    git_before = git_state()
+    query = app_query()
+
+    say(1, f"moc app install {APP_MANIFEST} --dry-run — kế hoạch từng bước, chưa đổi gì")
+    before = state_digest()
+    out = moc_app("install", APP_MANIFEST, "--dry-run")
+    print("\n".join(f"   {ln}" for ln in out.strip().splitlines()))
+    if "8/8 Hasura" not in out or state_digest() != before or app_container():
+        raise DemoFailed("--dry-run phải in đủ 8 bước và không đổi .moc-apps/, không tạo container")
+    ok("8 bước, .moc-apps/ không đổi, chưa có container")
+
+    say(2, f"moc app install {APP_MANIFEST} — một lệnh, không sửa tệp nào của lõi")
+    started = time.monotonic()
+    out = moc_app("install", APP_MANIFEST)
+    print("\n".join(f"   {ln}" for ln in out.strip().splitlines()))
+    tracked, trigger = app_metadata()
+    if not (app_container() and tracked and trigger and app_clients() == [f"app-{APP_NAME}", f"app-{APP_NAME}-svc"]):
+        raise DemoFailed(f"sau khi cài: container {app_container()}, bảng {tracked}, trigger {trigger}, client "
+                         f"{app_clients()}")
+    ok(f"xong sau {time.monotonic() - started:.0f} giây: container app-{APP_NAME}, client app-{APP_NAME} + "
+       f"app-{APP_NAME}-svc, bảng bang_tin.tin, trigger app_bang_tin")
+
+    say(3, f"Mở {PUBLIC_URL}{APP_PATH} — route APISIX của ứng dụng (thêm vào tệp chạy, tệp lõi không đổi)")
+    status, headers, body = request("GET", f"{PUBLIC_URL}{APP_PATH}")
+    csp = next((v for k, v in headers.items() if k.lower() == "content-security-policy"), "")
+    if status != 200 or "Bảng tin đơn vị" not in body.decode() or "script-src 'self'" not in csp:
+        raise DemoFailed(f"{APP_PATH} trả {status}, CSP {csp!r}")
+    config = json.loads(request("GET", f"{PUBLIC_URL}{APP_PATH}config.json")[2])
+    if config != {"realm": ENV.get("MOC_REALM", "moc"), "clientId": f"app-{APP_NAME}"}:
+        raise DemoFailed(f"config.json: {config}")
+    ok(f"200, {len(body)} byte, CSP script-src 'self'; config.json: client app-{APP_NAME}")
+
+    say(4, f"{OWNER} đăng nhập Văn phòng điện tử rồi mở Bảng tin: client riêng, PKCE S256, không hỏi lại mật khẩu")
+    browser = Browser()
+    code, verifier, _ = browser.authorize("app-office", f"{PUBLIC_URL}/", OWNER)
+    exchange("app-office", f"{PUBLIC_URL}/", code, verifier)
+    code, verifier = sso_fragment(browser, f"app-{APP_NAME}", APP_CALLBACK)
+    token = exchange(f"app-{APP_NAME}", APP_CALLBACK, code, verifier)["access_token"]
+    claims = claims_of(token)
+    hasura = claims.get("https://hasura.io/jwt/claims", {})
+    if claims.get("azp") != f"app-{APP_NAME}" or not hasura.get("x-hasura-tenant-id"):
+        raise DemoFailed(f"token của app-{APP_NAME} thiếu claim Hasura: azp {claims.get('azp')}")
+    reader = as_session(OWNER, token)
+    reader.gql(query)
+    ok(f"token azp app-{APP_NAME}, vai trò {hasura.get('x-hasura-default-role')}, đơn vị của người dùng; câu GraphQL "
+       "của trang chạy được trên bang_tin.tin")
+
+    say(5, "Văn thư vào sổ một văn bản đến thường và một văn bản hạn chế → lõi phát sự kiện, ứng dụng nhận qua webhook")
+    tag = uuid.uuid4().hex[:6].upper()
+    d = {"type_code": "CV", "issuer_name": "UBND tỉnh Hưng Yên", "summary": f"Về việc thử bảng tin đơn vị ({tag})"}
+    sent = time.monotonic()
+    normal = receive_bare(d, f"{tag}/BT-VP")
+    secret = receive_bare({**d, "summary": f"Văn bản hạn chế thử bảng tin ({tag})"}, f"{tag}/BT-HC", restricted=True)
+    director = gv("truongkhoa")
+    seen: list[dict[str, Any]] = []
+    while time.monotonic() - sent < 60 and not seen:
+        seen = [t for t in director.gql(query)["bang_tin_tin"] if t["document_id"] == normal]
+        time.sleep(0 if seen else 1)
+    if not seen or seen[0]["kind"] != "office.document.registered" or not seen[0].get("document"):
+        raise DemoFailed(f"sau 60 giây lãnh đạo khoa chưa thấy tin của văn bản {tag}/BT-VP: {seen}")
+    ok(f"lãnh đạo khoa thấy tin \"{seen[0]['document']['symbol']} — Văn bản đến đã vào sổ\" sau "
+       f"{time.monotonic() - sent:.1f} giây (Event Trigger → app-{APP_NAME}:8081 → GraphQL bằng danh tính dịch vụ)")
+    leaked = psql(f"select (select count(*) from core.app_events where document_id = '{secret}') + "
+                  f"(select count(*) from bang_tin.tin where document_id = '{secret}')")
+    if leaked != "0":
+        raise DemoFailed(f"văn bản hạn chế lọt vào luồng sự kiện của ứng dụng ({leaked} dòng)")
+    ok("văn bản hạn chế: không có trong core.app_events, ứng dụng không biết nó tồn tại")
+    if any(t["document_id"] == normal for t in reader.gql(query)["bang_tin_tin"]):
+        raise DemoFailed(f"{OWNER} thấy tin của văn bản chưa được giao cho mình")
+    ok(f"{OWNER} (chưa được giao văn bản đó) không thấy tin: Bảng tin theo đúng quyền xem văn bản của lõi")
+
+    say(6, f"Chạy lại moc app install {APP_MANIFEST}: không tạo gì mới")
+    container, digest = app_container(), state_digest()
+    migrations = psql(f"select count(*) from core.app_migrations where app = '{APP_NAME}'")
+    out = moc_app("install", APP_MANIFEST)
+    if (app_container() != container or state_digest() != digest
+            or psql(f"select count(*) from core.app_migrations where app = '{APP_NAME}'") != migrations
+            or "client đã có" not in out or "không có migration mới" not in out):
+        raise DemoFailed("cài lại phải giữ nguyên container, .moc-apps/, migration, client:\n" + out)
+    ok("cùng container, .moc-apps/ không đổi một byte, không migration mới, client đã có")
+
+    say(7, f"moc app remove {APP_NAME}: route, client, trigger, container mất; dữ liệu còn")
+    rows = psql(f"select count(*) from bang_tin.tin where document_id = '{normal}'")
+    print("\n".join(f"   {ln}" for ln in moc_app("remove", APP_NAME).strip().splitlines()))
+    _, _, body = request("GET", f"{PUBLIC_URL}{APP_PATH}")
+    tracked, trigger = app_metadata()
+    problems = [what for what, bad in (("route", "Bảng tin đơn vị" in body.decode(errors="replace")),
+                                        ("container", bool(app_container())), ("client", bool(app_clients())),
+                                        ("trigger", trigger), ("bảng còn track", tracked)) if bad]
+    if problems:
+        raise DemoFailed(f"sau khi gỡ còn: {', '.join(problems)}")
+    if psql(f"select count(*) from bang_tin.tin where document_id = '{normal}'") != rows or rows == "0":
+        raise DemoFailed("gỡ ứng dụng không được xóa dữ liệu")
+    if (ROOT / ".moc-apps" / "apisix.yaml").read_bytes() != (ROOT / "platform" / "apisix" / "apisix.yaml").read_bytes():
+        raise DemoFailed(".moc-apps/apisix.yaml phải giống hệt tệp lõi khi không còn ứng dụng")
+    ok(f"/bang-tin/ không còn là Bảng tin; không container, client, trigger; bang_tin.tin còn {rows} dòng của "
+       "văn bản thử; tệp chạy APISIX giống hệt tệp lõi")
+
+    say(8, "Tệp của lõi không đổi: git status trước và sau giống hệt (trạng thái ứng dụng ở .moc-apps/, ngoài git)")
+    git_after = git_state()
+    if git_before is None:
+        ok("không phải thư mục git (bản cài) — bỏ qua so sánh")
+        return
+    if git_after != git_before:
+        raise DemoFailed("cây mã nguồn đổi trong lúc cài/gỡ:\n" + git_after)
+    stat = subprocess.run(["git", "-C", str(ROOT), "diff", "--stat"], capture_output=True, text=True).stdout.strip()
+    print(f"   git diff --stat: {stat or '(trống)'}")
+    ok("không tệp nào được theo dõi trong git đổi; không tệp mới ngoài .gitignore")
+
 
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
-         "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung}
+         "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung,
+         "cai-ung-dung": cai_ung_dung}
 
 
 def main(argv: list[str] | None = None) -> int:

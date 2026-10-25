@@ -37,6 +37,7 @@ này bằng bản giả.
 from __future__ import annotations
 
 import argparse
+import copy
 import getpass
 import hashlib
 import json
@@ -299,8 +300,10 @@ select json_build_object('synced', exists(select 1 from core.users u
 
 
 def _tail(text: str) -> str:
+    """Dòng ERROR (cùng DETAIL, HINT) của psql nếu có — CONTEXT nhiều dòng của khối DO đẩy nó ra khỏi mấy dòng cuối."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return " / ".join(lines[-3:])
+    errors = [line for line in lines if re.search(r"\b(ERROR|DETAIL|HINT):", line)]
+    return " / ".join(errors[:3] or lines[-3:])
 
 
 class Database:
@@ -329,6 +332,14 @@ class Database:
             return json.loads(out) if out else None
         except ValueError:
             raise Unavailable(f"CSDL trả kết quả lạ: {out[:200]}") from None
+
+    def as_user(self, user: str) -> Database:
+        """Cùng CSDL, đăng nhập bằng vai trò khác qua socket Unix trong container (moc app chạy migration của ứng dụng
+        bằng vai trò CSDL riêng của nó: session user là vai trò đó, không phải SET ROLE từ superuser)."""
+        other = copy.copy(self)
+        i = self.base.index("-U")
+        other.base = [*self.base[:i + 1], user, *self.base[i + 2:]]
+        return other
 
 
 def database() -> Database:
@@ -441,6 +452,14 @@ class Keycloak:
 
     def create_client(self, rep: dict[str, Any]) -> str:
         return self._created_id(self._req("POST", "/clients", rep)[1])
+
+    # moc app (scripts/ung_dung.py): gỡ client của ứng dụng cài bằng manifest, sửa đường chuyển hướng khi đổi `path`;
+    # id nội bộ, không phải clientId
+    def delete_client(self, client_id: str) -> None:
+        self._req("DELETE", f"/clients/{client_id}")
+
+    def update_client(self, client_id: str, rep: dict[str, Any]) -> None:
+        self._req("PUT", f"/clients/{client_id}", rep)
 
 
 def admin_token() -> str:

@@ -91,7 +91,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | F3.4 | Sao lưu, khôi phục (restic) | Hoàn thiện | db `test_backup.py` 2 | bước CI: hai lượt sao lưu, xóa volume CSDL, tệp và két, khôi phục, smoke, `make audit` | Kho sao lưu nằm trên cùng máy chủ, chép ra ngoài là việc của người vận hành (`docs/trien-khai.md`); lịch sử đo NGSI-LD không vào bản sao lưu |
 | F3.5 | Tab "Lịch sử" trên trang văn bản, đọc từ sổ kiểm toán | Hoàn thiện | db `test_document_history.py` 3 | e2e `van-ban-den.spec.ts` (tab Lịch sử), `giao-viec.spec.ts` | Trường nội dung chỉ báo "đã đổi", không hiện chữ trước và sau |
 | F3.7 | Văn bản hạn chế: mã hóa từng tệp, giải mã trong bộ nhớ, dấu tên người xem | Hoàn thiện | svc-files `test_sealed.py` 33; svc-workflow `test_restricted.py` 16; db `test_restricted.py` 14 | bước CI `make demo-han-che`; smoke 8 kiểm; e2e `han-che.spec.ts` | Chỉ nhận PDF; không dùng cho bí mật nhà nước; ai có quyền Docker trên máy chủ đọc được két (`docs/van-hanh.md`) |
-| F3.8 | (i) Lập hồ sơ, nộp lưu nóng → lạnh: Parquet + tệp + manifest có băm, khóa ghi | Dùng được | svc-files `test_archive.py` 19; db `test_case_files.py` 8 | bước CI `make demo-nong-lanh`; smoke: gói trên bucket lạnh, cổng xác thực vẫn "khớp" | Chưa có giao diện lập hồ sơ, nộp lưu, phòng đọc — chỉ GraphQL và `GET /api/case-files/{id}/archive`; phòng đọc chưa xem được tệp (`services/svc-files/README.md`, mục Trạng thái: "Chưa") |
+| F3.8 | (i) Lập hồ sơ, nộp lưu nóng → lạnh: Parquet + tệp + manifest có băm, khóa ghi; phòng đọc xem tệp | Hoàn thiện | svc-files `test_archive.py` 19, `test_reading_room.py` 22; db `test_case_files.py` 8; office `caseFiles.test.ts` 10 | bước CI `make demo-nong-lanh` (có xem tệp trong phòng đọc); smoke: nộp lưu qua `POST /api/case-files/{id}/archive` (chuyên viên bị 403), gói trên bucket lạnh, cổng xác thực vẫn "khớp", xem tệp có dấu người xem + dòng sổ kiểm toán; e2e `ho-so.spec.ts` (chuyên viên lập, đóng; tổ trưởng nộp lưu; văn thư xem tệp; hết văn bản thì đỏ, không bỏ qua) | Nộp lưu trên giao diện chạy đồng bộ trong một yêu cầu (cổng chờ 60 giây), chưa đo với hồ sơ lớn — job nền mỗi giờ vẫn là đường chính cho hồ sơ đóng quá hạn. Phòng đọc chỉ xem được tệp PDF; tệp khác chỉ thấy tên, băm. Bản xem có dấu người xem nhưng người xem vẫn lưu lại được (như F3.7) |
 | F3.9 | (iii) Phả hệ OpenLineage + kiểm chất lượng bảng Parquet | Dùng được | svc-files `test_archive.py` (6 test phả hệ, đã tính ở F3.8); db `test_lineage.py` 2 | bước CI `make demo-pha-he`; smoke 1 kiểm | Chỉ lượt nộp lưu phát sự kiện phả hệ; chưa dựng Marquez nên không có màn xem đồ thị; dashboard (F3.11) chưa có phả hệ "báo cáo ← bảng" |
 | F3.10 | (ii) IT/OT rút gọn: cảm biến → NGSI-LD (Scorpio) → dự thảo "Báo cáo sự cố" | Minh họa | svc-workflow `test_ot.py` 17 | bước CI `make demo-it-ot` (profile `iot`) | Cảm biến giả lập (`services/ot-sensor/sensor.py`); broker không xác thực thiết bị; broker gửi mỗi thông báo một lần; lịch sử đo không vào bản sao lưu (`docs/van-hanh.md`, mục Hội tụ IT/OT) |
 | F3.11 | [D] Dashboard điều hành (ECharts, bốn view số đếm qua Hasura) | Hoàn thiện | db `test_dashboard.py` 6 | smoke 2 kiểm (số chia khớp văn bản lãnh đạo đọc được, văn thư không đọc được); e2e `dieu-hanh.spec.ts` | Bốn view cố định (`office.v_*`); muốn báo cáo mới phải viết view mới |
@@ -124,6 +124,7 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | Bảo mật chuỗi cung ứng | job `security`: gitleaks trên lịch sử commit, OSV-Scanner trên tệp khóa phụ thuộc |
 | Quy trình pull request | `.github/workflows/pr.yml` "Quy trình nhánh và tiêu đề PR"; scripts `test_quy_trinh.py` 23; ruleset `.github/rulesets/develop.json` đòi đủ 8 kiểm tra (7 job của CI + kiểm quy trình PR) |
 | Phát hành | `.github/workflows/release.yml` "Phát hành gói nguồn"; scripts `test_phat_hanh.py` 25 |
+| Cắm ứng dụng bằng một lệnh (`moc app install`, [`them-ung-dung.md`](them-ung-dung.md) mục 1) — mức Dùng được | Manifest `apps/<thư mục>/app.yaml` theo `scripts/app-manifest.schema.json`; client Keycloak, route APISIX, container, schema + migration bằng vai trò CSDL riêng của ứng dụng (không quyền gì trên lõi; đối tượng đọc lõi hay chạy bằng quyền của Hasura bị từ chối trước khi commit), bảng và quyền Hasura (điều kiện trong quyền không đọc được dữ liệu lõi), Event Trigger — không sửa tệp lõi nào, trạng thái trong `.moc-apps/`; gỡ giữ dữ liệu. Ứng dụng thứ ba `apps/bang-tin` (Bảng tin đơn vị). scripts `test_ung_dung.py` 46, `test_yaml_nho.py` 6; bang-tin `node --test` 5, `unittest` 15; db `test_app_registry.py` 13 (44 ca); bước CI `make demo-cai-ung-dung` (job `luong-chinh`). Một container một trang mỗi ứng dụng, không route API riêng, không Action; cài = tin mã của ứng dụng (container ở mạng nội bộ của lõi); `.moc-apps/` không vào `moc backup`; chỉ dòng lệnh |
 
 ### 2.6. Tóm tắt
 
@@ -131,8 +132,8 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 
 | Mức | Số | Tính năng |
 |---|---|---|
-| Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 9 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
+| Hoàn thiện | 33 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.8, F3.11, F3.12; F4.1–F4.4 |
+| Dùng được | 8 | F1.9, F2.9, F3.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
 
@@ -161,7 +162,7 @@ chưa phủ hết năng lực của cụm.
 | ③ | Đóng băng số liệu chuỗi thời gian | Lịch sử đo trong Scorpio (NGSI-LD temporal API, đọc ở `make demo-it-ot`); bảng `office.archived_document_facts` | Một phần | Chưa có kho chuỗi thời gian riêng, chưa chụp số liệu theo kỳ; `archived_document_facts` chỉ giữ số liệu dashboard của văn bản đã nộp lưu |
 | ③ | Lớp ngữ nghĩa báo cáo | Bốn view `office.v_*` qua Hasura (`db/migrations/default/1792281601200_dashboard/`) | Một phần | F3.11; không có lớp định nghĩa chỉ số và chiều dùng chung, mỗi báo cáo là một view viết tay |
 | ④ Dữ liệu phi cấu trúc | Lưu trữ đối tượng | SeaweedFS, `services/svc-files/src/svc_files/storage.py` | Hoàn thiện | F1.5 |
-| ④ | Quản lý hồ sơ, văn bản cho quy trình phê duyệt | `apps/office` + `svc-workflow` + Flowable | Hoàn thiện | F2.2–F2.4; riêng lập hồ sơ, nộp lưu (F3.8) mới ở mức Dùng được |
+| ④ | Quản lý hồ sơ, văn bản cho quy trình phê duyệt | `apps/office` + `svc-workflow` + Flowable | Hoàn thiện | F2.2–F2.4, F3.8 (lập hồ sơ, nộp lưu, phòng đọc trên giao diện) |
 | ④ | Chỉ mục toàn văn | Meilisearch, `svc_files/search.py`, `svc_files/texts.py` | Hoàn thiện | F2.7; bản scan không vào chỉ mục nội dung |
 | ④ | Trộn dữ liệu sinh biểu mẫu, báo cáo động | WeasyPrint: `svc_files/render.py` (văn bản đi), `svc_files/registers.py` (sổ đăng ký); dự thảo "Báo cáo sự cố" (`svc_workflow/ot.py`) | Dùng được | Có kiểm trong CI, nhưng khuôn viết trong mã: đổi mẫu phải sửa mã |
 | ⑤ Quy trình, tự động hóa | BPMN quản lý trạng thái luồng phê duyệt | Flowable 8, `services/svc-workflow/processes/*.bpmn20.xml` | Hoàn thiện | F1.4, F2.3, F2.4 |
@@ -169,18 +170,19 @@ chưa phủ hết năng lực của cụm.
 | ⑤ | API nạp dữ liệu khối lớn theo lô | `POST /api/imports/incoming` của svc-files (`svc_files/imports/`), bảng `core.import_jobs`, `core.import_rows` | Dùng được | Văn bản đến: tệp NDJSON/CSV + zip tệp đính kèm, xử lý nền theo mẻ; mỗi dòng qua đúng ClamAV và Action `receiveIncoming` thay mặt văn thư, lỗi từng dòng, gửi lại không nhân đôi, chạy tiếp sau khi svc-files khởi động lại. svc-files `test_imports_*.py` 107; db `test_import_jobs.py` 18; bước CI `make demo-nap-lo`. Chưa có màn "Nhập lô" trên giao diện — gọi API; mới có một loại lô (văn bản đến); zip tệp đính kèm mất khi svc-files khởi động lại (dòng còn cần tệp báo `archive_lost`) |
 | ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`) và ghi nó ở cuối dòng log truy cập; `svc-files`, `svc-workflow` ghi mã này vào nhật ký, chuyển tiếp sang Hasura và vào `core.audit_log.request_id`; log tập trung (F3.14, profile `logs`) tra theo mã: `make logs-tra ID=…` | Dùng được | Tắt mặc định; không tracing (không span, không đo thời gian từng chặng); Hasura, Keycloak, PostgreSQL không vào log tập trung. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
 | ⑥ | Kiểm toán bất biến | Sổ kiểm toán chuỗi băm (`db/migrations/default/1792281600100_core_schema/`), neo ra bucket khóa ghi, `scripts/audit_chain.py` | Hoàn thiện | F2.12 |
-| ⑥ | Trục streaming sự kiện | — | **Chưa có** | Không có broker (Kafka hay tương đương). Sự kiện nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`); Centrifugo chỉ đẩy tới trình duyệt. chưa dùng Hasura Event Triggers — `db/metadata` không khai trigger nào (hướng dự kiến ở `ROADMAP.md`) |
+| ⑥ | Trục streaming sự kiện | Luồng `core.app_events` (migration `1792281603200`) + Hasura Event Triggers do `moc app install` sinh (`scripts/ung_dung.py`) | Một phần | Lõi chép sự kiện văn bản trong danh sách trắng (đến, vào sổ, phát hành; không văn bản hạn chế, 5 cột) sang `core.app_events`; mỗi ứng dụng khai `events` nhận qua webhook trong mạng nội bộ, header bí mật, Hasura gửi lại khi lỗi (ít nhất một lần). Không phải broker streaming (không Kafka hay tương đương): không đọc lại từ một vị trí, không nhóm người nghe, không bảo đảm thứ tự, chỉ 3 loại sự kiện; sự kiện khác vẫn chỉ nằm trong bảng (`office.document_events`, `core.lineage_events`, `core.notifications`), Centrifugo chỉ đẩy tới trình duyệt. Bằng chứng: db `test_app_registry.py` (PostgreSQL, Hasura thật khi `MOC_IT=1`); `make demo-cai-ung-dung` chưa chạy trong CI |
 | ⑥ | GitOps | `scripts/reconcile.py`, `platform/systemd/` | Hoàn thiện | F3.3; Compose + reconciler, không Argo CD |
 | ⑥ | Sao lưu, khôi phục thảm họa | restic, `scripts/backup.py` | Hoàn thiện | F3.4; kho sao lưu trên cùng máy chủ, chép ra ngoài bằng tay |
 | ⑦ Truyền thông, giao vận | Định tuyến thông báo đa kênh | `svc_workflow/channels.py`, hộp thư đi `core.notification_deliveries`; Mailpit (profile `mail`) để thử | Một phần | Chuông trên web (Centrifugo) cộng email (SMTP) và webhook chat (Mattermost, Slack, ntfy), tắt mặc định; trigger tạo dòng chờ gửi trong cùng giao dịch ghi thông báo, lỗi tạm thử lại giãn dần. Chưa SMS, Zalo; webhook một URL cho cả bản cài; chưa cho từng người chọn kênh |
 | ⑦ | WebSocket thời gian thực | Centrifugo, `platform/centrifugo/config.yaml`, route `/realtime` | Hoàn thiện | F2.5 |
 | ⑦ | Hàng đợi bất đồng bộ chống chối bỏ | Hộp thư đi `office.dispatches` (`svc_workflow/dispatch.py`); việc giao ra ngoài của Flowable (topic `moc-goi-y`, `moc-sla`) | Một phần | Liên thông (F3.12) có thử lại lùi dần, so SHA-256, ghi sổ kiểm toán cả hai đơn vị trong cùng giao dịch. Chưa có hàng đợi dùng chung cho ứng dụng khác, chưa có biên nhận ký số |
 
-**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 4, Minh họa 1, Một phần 5, **Chưa có 2**.
+**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 4, Minh họa 1, Một phần 6, **Chưa có 1**.
 
-- Chưa có: kịch bản serverless (⑤), trục streaming sự kiện (⑥).
-- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), định tuyến
-  thông báo đa kênh (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
+- Chưa có: kịch bản serverless (⑤).
+- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), trục sự
+  kiện (⑥: Event Triggers giao tới webhook của ứng dụng, chưa phải broker streaming), định tuyến thông báo đa kênh
+  (⑦: email, webhook; chưa SMS, Zalo), hàng đợi chống chối bỏ (⑦).
 - Bốn dịch vụ bắt buộc (SSO, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình) đều ở mức Hoàn thiện.
 
 ## 4. Kiểm lại
@@ -209,7 +211,7 @@ make demo-nong-lanh           # từng màn ở mục 2; make help liệt kê t�
 Các ô "Chưa có", "Chưa làm" ở mục 2, mục 3:
 
 ```bash
-git grep -n event_triggers -- db/metadata                                  # rỗng: chưa có Hasura Event Trigger
+git grep -n event_triggers -- db/metadata scripts/ung_dung.py   # chỉ ung_dung.py: trigger sinh lúc cài ứng dụng
 git grep -niE 'kafka|nats|rabbitmq|kestra|openfaas|marquez' -- docker-compose.yml   # rỗng
 git grep -niwE 'sms|zalo' -- services platform docker-compose.yml        # rỗng: chưa có SMS, Zalo
 grep -n job_name platform/monitoring/prometheus.yml                        # chỉ apisix và chính prometheus

@@ -34,6 +34,7 @@ import pytest
 # Câu ghi lần khôi phục mà `moc backup restore` dùng (scripts/audit_chain.py, chỉ dùng thư viện chuẩn)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "scripts"))
 from audit_chain import HEAD_SQL, RESTORED_SQL  # noqa: E402
+from ung_dung import ROLE_SQL, AppError, recreate_roles_sql  # noqa: E402
 
 PG = os.environ.get("MOC_IT_PG_CONTAINER", "moc-db-it-postgres")   # container của db/tests/stack.sh
 COPY = "moc_restore_it"
@@ -93,3 +94,37 @@ def test_restore_event_continues_chain(restored):
                    "action": "system.restored", "entity": "backup", "entity_id": diff["run"], "diff": diff}
     assert head(COPY)["id"] == event
     assert problems(COPY) == restored["problems"]
+
+
+def pg_restore(db: str, dump: bytes) -> subprocess.CompletedProcess:
+    return subprocess.run(["docker", "exec", "-i", PG, "pg_restore", "-U", "moc", "--exit-on-error", "-d", db],
+                          input=dump, capture_output=True)
+
+
+def test_restore_on_new_server_recreates_app_roles_first():
+    """Vai trò moc_appdb_* thuộc cả máy chủ, pg_dump một CSDL không chép: máy mới chưa có thì pg_restore
+    --exit-on-error dừng ở ALTER … OWNER TO. `moc backup restore` tạo lại chúng theo manifest trước khi khôi phục."""
+    role, src, dst = "moc_appdb_thu_khoi_phuc", "moc_bk_src_it", "moc_bk_dst_it"
+    psql("postgres", f"drop database if exists {src} with (force); drop database if exists {dst} with (force);"
+                     f"drop role if exists {role}; create database {src}; create database {dst};")
+    try:
+        psql(src, "create schema moc_app; create function moc_app.migration_done(text, bigint, text, text)"
+                  " returns json language sql as $$ select '{}'::json $$;"
+                  + ROLE_SQL.format(role=role, schema="thu_khoi_phuc").replace("begin;", "").replace("commit;", "")
+                  + f"set role {role}; create table thu_khoi_phuc.ghi (i int); reset role;")
+        dump = subprocess.run(["docker", "exec", PG, "pg_dump", "-U", "moc", "-Fc", "-d", src],
+                              capture_output=True, check=True).stdout
+        psql("postgres", f"drop database {src} with (force); drop role {role};")   # như máy mới: chưa có vai trò
+        failed = pg_restore(dst, dump)
+        assert failed.returncode != 0 and f'role "{role}" does not exist' in failed.stderr.decode()
+        psql("postgres", recreate_roles_sql([role]) + f"drop database {dst} with (force); create database {dst};")
+        restored = pg_restore(dst, dump)
+        assert restored.returncode == 0, restored.stderr.decode()
+        assert psql(dst, "select tableowner from pg_tables where schemaname = 'thu_khoi_phuc'") == role
+        assert psql("postgres", f"select rolcanlogin, rolsuper, rolinherit, rolbypassrls, rolconnlimit"
+                                f" from pg_roles where rolname = '{role}'") == "f|f|f|f|2"
+        with pytest.raises(AppError):
+            recreate_roles_sql(['moc_appdb_x"; drop role moc; --'])
+    finally:
+        psql("postgres", f"drop database if exists {src} with (force); drop database if exists {dst} with (force);"
+                         f"drop role if exists {role};")

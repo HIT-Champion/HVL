@@ -27,8 +27,10 @@ signing.py; văn bản hạn chế không ký), quét, lưu như mọi tệp. Ng
 ở /api/documents/{id}/preview. Cổng xác thực (F2.13): /api/verify trả thông tin công khai của đúng một văn
 bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập. Sổ đăng ký văn bản đến / đi (F2.8):
 văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} và in ra PDF để ký nhận, đóng sổ — registers.py.
-Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh — archive.py; phòng đọc
-/api/case-files/{id}/archive đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL. Liên thông trong hệ thống (F3.12):
+Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh — archive.py; lãnh đạo phòng nộp lưu ngay bằng
+POST /api/case-files/{id}/archive; phòng đọc GET cùng đường đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL, và
+…/archive/files/{file_id} cho xem một tệp: so băm với manifest, đóng dấu người xem như F3.7, ghi sổ rồi mới trả.
+Liên thông trong hệ thống (F3.12):
 svc-workflow gọi /internal/dispatch-file để chép bản phát hành sang kho của đơn vị nhận — dispatch.py. Đọc văn bản đến
 (F4.1): văn thư gọi /api/files/{id}/read, tác tử đọc tệp vừa tải lên và gợi ý thông tin tiếp nhận — docread/. Hỏi đáp
 trên kho văn bản (F4.2): /api/documents/ask trả câu trích nguyên văn có nguồn từ các văn bản người hỏi được xem, tùy
@@ -69,7 +71,8 @@ from starlette.datastructures import UploadFile
 
 from . import __version__, pii
 from .anchors import Anchorer, AnchorStore
-from .archive import ArchiveError, Archiver, ColdStore, read_package
+from .archive import (Archived, ArchiveError, Archiver, ArchiveStateError, ColdStore, read_archived_file,
+                      read_manifest, read_package)
 from .assist import api as assist_api
 from .assist import similar
 from .assist.ai import AiClient, make_ai
@@ -96,7 +99,7 @@ from .sealed import SealError, Vault, VaultError, run_check_pdf, run_watermark, 
 from .search import Cursor, Indexer, MeiliClient, SearchError, SearchQuery, search_documents
 from .signing import DocumentSigner, SigningError, SigningOff, SigningUnavailable, preload as preload_signing
 from .status import StatusBoard, default_board
-from .storage import ObjectStore, StorageError, object_key, s3_client
+from .storage import ObjectMissing, ObjectStore, StorageError, object_key, s3_client
 from .texts import TextExtractor
 
 CHUNK_SIZE = 64 * 1024
@@ -287,10 +290,13 @@ class ArchivedDocumentOut(BaseModel):
 
 
 class ArchivedFileOut(BaseModel):
+    file_id: uuid.UUID = Field(description="Mở trong phòng đọc: GET /api/case-files/{id}/archive/files/{file_id}")
     filename: str
     mime_type: str
     sha256: str
     bytes: int
+    document_ids: list[uuid.UUID] = Field(description="Văn bản người gọi đọc được có gắn tệp này")
+    viewable: bool = Field(description="Xem được trong phòng đọc (PDF, đóng dấu người xem); tệp khác chỉ hiện băm, cỡ")
 
 
 class ArchiveOut(BaseModel):
@@ -306,6 +312,19 @@ class ArchiveOut(BaseModel):
         description="Văn bản người gọi đọc được (cùng quy tắc như trước khi nộp lưu), đọc từ bảng Parquet trong gói (DuckDB)")
     files: list[ArchivedFileOut] = Field(description="Tệp của các văn bản trên")
     hidden: int = Field(description="Số văn bản trong gói người gọi không được đọc — chỉ biết có, không biết là gì")
+
+
+class ArchiveRunOut(BaseModel):
+    """Kết quả nộp lưu theo yêu cầu: gói đã nằm trong bucket lạnh, đọc lại khớp băm, CSDL đã chuyển `archived`."""
+
+    case_file_id: uuid.UUID
+    code: str
+    archive_key: str = Field(description="Tiền tố của gói trong bucket lạnh (khóa ghi S3 Object Lock)")
+    archive_sha256: str = Field(description="Băm manifest của gói — cũng là case_files.archive_sha256")
+    documents: int
+    files: int
+    bytes: int = Field(description="Tổng số byte tệp và bảng Parquet đã ghi vào gói")
+    run_id: str = Field(description="Run OpenLineage của lượt nộp lưu (core.lineage_events, F3.9)")
 
 
 class SearchOut(BaseModel):
@@ -378,11 +397,13 @@ def clean_mime(value: str | None) -> str:
     return mime if MIME_RE.match(mime) else "application/octet-stream"
 
 
-def content_disposition(filename: str) -> str:
-    """Luôn tải về (attachment), kèm tên ASCII cho trình duyệt cũ và tên UTF-8 đầy đủ (RFC 6266)."""
+def content_disposition(filename: str, *, inline: bool = False) -> str:
+    """Tải về (attachment), kèm tên ASCII cho trình duyệt cũ và tên UTF-8 đầy đủ (RFC 6266). ``inline`` chỉ cho bản PDF
+    đã đóng dấu người xem của phòng đọc (F3.8)."""
     folded = unicodedata.normalize("NFKD", filename.replace("đ", "d").replace("Đ", "D"))
     fallback = "".join(ch for ch in folded if ch.isascii() and ch.isprintable() and ch not in '"\\').strip()
-    return f"attachment; filename=\"{fallback or 'tep'}\"; filename*=UTF-8''{quote(filename, safe='')}"
+    kind = "inline" if inline else "attachment"
+    return f"{kind}; filename=\"{fallback or 'tep'}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 
 # Tệp người dùng tải lên có thể là HTML hay SVG chứa script: không bao giờ để trình duyệt hiển thị nó
@@ -441,6 +462,8 @@ def create_app(
     signer: DocumentSigner | None = None,
     status_board: StatusBoard | None = None,
     import_store: ImportStore | None = None,
+    cold: ColdStore | None = None,
+    archiver: Archiver | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -464,12 +487,12 @@ def create_app(
         ),
         interval_s=settings.anchor_interval_s,
     )
-    cold = ColdStore(
+    cold = cold or ColdStore(
         s3_client(settings.s3_endpoint, settings.s3_access_key, settings.s3_secret_key, settings.s3_region),
         settings.cold_bucket,
     )
-    archiver = Archiver(hasura, store, cold, after_days=settings.archive_after_days,
-                        interval_s=settings.archive_interval_s, lineage_url=settings.openlineage_url)
+    archiver = archiver or Archiver(hasura, store, cold, after_days=settings.archive_after_days,
+                                    interval_s=settings.archive_interval_s, lineage_url=settings.openlineage_url)
     if vault is None and settings.vault_addr:
         vault = Vault(settings.vault_addr, role_id_file=settings.vault_role_id_file,
                       secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
@@ -1338,17 +1361,12 @@ def create_app(
 
     # --- phòng đọc hồ sơ đã nộp lưu (F3.8) ----------------------------------------------------------------
 
-    archive_responses = {
-        404: {"description": "Không có hồ sơ, hoặc người gọi không được xem"},
-        409: {"description": "Hồ sơ chưa nộp lưu"},
-        502: {"description": "Gói trong bucket lạnh không khớp băm ghi trong CSDL"},
-        503: {"description": "Chưa đọc được CSDL hoặc bucket lạnh"},
-    }
+    def _broken(exc: Exception) -> str:
+        """Câu lỗi 502 của gói hỏng: lệch băm (ArchiveError) hay thiếu đối tượng — thử lại không khỏi."""
+        return "Gói lưu trữ thiếu một phần trong bucket lạnh" if isinstance(exc, ObjectMissing) else str(exc)
 
-    @app.get("/api/case-files/{case_file_id}/archive", response_model=ArchiveOut, responses=archive_responses,
-             summary="Phòng đọc: đọc lại gói lưu trữ của hồ sơ đã nộp lưu từ bucket lạnh, kiểm băm")
-    async def case_file_archive(case_file_id: uuid.UUID, request: Request,
-                                principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
+    async def _archived_case_file(principal: Principal, case_file_id: uuid.UUID) -> dict:
+        """Hồ sơ đã nộp lưu mà người gọi xem được (token → Hasura quyết): 404 / 409 / 503 như nhau ở mọi đường đọc."""
         try:
             row = await hasura.visible_case_file(principal.token, case_file_id)
         except HasuraAuthError as exc:
@@ -1359,10 +1377,27 @@ def create_app(
             raise _error(404, "not_found", "Không có hồ sơ này")
         if row["status"] != "archived":
             raise _error(409, "not_archived", "Hồ sơ chưa nộp lưu")
+        return row
+
+    archive_responses = {
+        404: {"description": "Không có hồ sơ, hoặc người gọi không được xem"},
+        409: {"description": "Hồ sơ chưa nộp lưu"},
+        502: {"description": "`archive_mismatch`: gói trong bucket lạnh không khớp băm ghi trong CSDL, hoặc thiếu "
+                             "một phần của gói"},
+        503: {"description": "Chưa đọc được CSDL hoặc bucket lạnh"},
+    }
+
+    @app.get("/api/case-files/{case_file_id}/archive", response_model=ArchiveOut, responses=archive_responses,
+             summary="Phòng đọc: đọc lại gói lưu trữ của hồ sơ đã nộp lưu từ bucket lạnh, kiểm băm")
+    async def case_file_archive(case_file_id: uuid.UUID, request: Request,
+                                principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
+        row = await _archived_case_file(principal, case_file_id)
         try:
             pkg = await asyncio.to_thread(read_package, cold, row["archive_key"], row["archive_sha256"])
-        except ArchiveError as exc:
-            raise _error(502, "archive_mismatch", str(exc)) from exc
+        except (ArchiveError, ObjectMissing) as exc:
+            log_event("case_file.archive_mismatch", request, level=logging.WARNING, case_file_id=case_file_id,
+                      error=str(exc))
+            raise _error(502, "archive_mismatch", _broken(exc)) from exc
         except StorageError as exc:
             raise _error(503, "storage_unavailable", "Chưa đọc được bucket lạnh, thử lại sau") from exc
         # Đọc hồ sơ lưu trữ là việc đáng ghi lại: ai đọc hồ sơ nào
@@ -1381,16 +1416,219 @@ def create_app(
         except HasuraError as exc:
             raise _error(503, "database_unavailable", "Chưa đọc được CSDL, thử lại sau") from exc
         documents = [d for d in pkg["documents"] if d["id"] in readable]
+        files = []
+        for f in manifest["files"]:
+            linked = [link["document_id"] for link in f["documents"] if link["document_id"] in readable]
+            if linked:
+                files.append(ArchivedFileOut(
+                    file_id=f["file_id"], filename=f["filename"], mime_type=f["mime_type"], sha256=f["sha256"],
+                    bytes=f["bytes"], document_ids=linked, viewable=f["mime_type"] == "application/pdf"))
         out = ArchiveOut(
             case_file_id=case_file_id, code=row["code"], title=row["title"], closed_on=row["closed_on"],
             archived_at=row["archived_at"], archive_key=row["archive_key"], manifest_sha256=pkg["manifest_sha256"],
             retain_until=manifest["retain_until"],
             documents=[ArchivedDocumentOut(**d) for d in documents],
-            files=[ArchivedFileOut(filename=f["filename"], mime_type=f["mime_type"], sha256=f["sha256"],
-                                   bytes=f["bytes"]) for f in manifest["files"]
-                   if any(link["document_id"] in readable for link in f["documents"])],
+            files=files,
             hidden=len(pkg["documents"]) - len(documents),
         )
         return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
+
+    archived_file_responses = {
+        200: {"content": {"application/pdf": {}},
+              "description": "Bản PDF có dấu tên người xem và giờ xem trên mọi trang, `Content-Disposition: inline`"},
+        401: {"description": "Thiếu hoặc sai token"},
+        404: {"description": "Không có hồ sơ, tệp không thuộc gói, hoặc người gọi không đọc được văn bản nào gắn tệp "
+                             "này — các trường hợp trả như nhau"},
+        409: {"description": "Hồ sơ chưa nộp lưu"},
+        415: {"description": "`not_viewable`: tệp không phải PDF — phòng đọc chỉ mở bản PDF đóng dấu được"},
+        422: {"description": "`unstampable` + `reason`: PDF không đóng dấu được (quá MOC_RESTRICTED_MAX_PAGES "
+                             "trang, quá nặng, hỏng) — không trả tệp"},
+        502: {"description": "`archive_mismatch`: manifest không khớp băm trong CSDL, tệp không khớp băm trong "
+                             "manifest, hoặc gói thiếu manifest hay tệp — không trả tệp"},
+        503: {"description": "CSDL, bucket lạnh hoặc sổ kiểm toán chưa sẵn sàng; `busy` (kèm `Retry-After: 10`) khi "
+                             "đang đóng dấu tệp khác"},
+    }
+
+    @app.get(
+        "/api/case-files/{case_file_id}/archive/files/{file_id}",
+        response_class=Response,
+        responses=archived_file_responses,
+        summary="Phòng đọc: xem một tệp trong gói lưu trữ (chỉ xem, PDF có dấu tên người xem)",
+        description="Cùng quy tắc quyền như `GET /api/case-files/{id}/archive`: hồ sơ người gọi xem được, tệp gắn "
+                    "với văn bản người gọi đọc được. Tệp đọc từ bucket lạnh, so băm với manifest (manifest đã so với "
+                    "CSDL), đóng dấu tên người xem và giờ xem lên mọi trang, ghi `case_file.file_viewed` vào sổ "
+                    "kiểm toán — ghi không được thì không trả tệp. Không ghi gì vào bucket lạnh.",
+    )
+    async def view_archived_file(case_file_id: uuid.UUID, file_id: uuid.UUID, request: Request,
+                                 principal: Annotated[Principal, Depends(current_principal)]) -> Response:
+        row = await _archived_case_file(principal, case_file_id)
+        try:
+            manifest = await asyncio.to_thread(read_manifest, cold, row["archive_key"], row["archive_sha256"])
+        except (ArchiveError, ObjectMissing) as exc:
+            log_event("case_file.archive_mismatch", request, level=logging.WARNING, case_file_id=case_file_id,
+                      error=str(exc))
+            raise _error(502, "archive_mismatch", _broken(exc)) from exc
+        except StorageError as exc:
+            raise _error(503, "storage_unavailable", "Chưa đọc được bucket lạnh, thử lại sau") from exc
+        entry = next((f for f in manifest["files"] if f["file_id"] == str(file_id)), None)
+        if entry is None:
+            raise _error(404, "not_found", "Không có tệp này trong hồ sơ, hoặc bạn không có quyền xem")
+        # Tệp xem được khi người gọi đọc được ít nhất một văn bản gắn nó — như danh sách `files` của GET …/archive
+        try:
+            readable = await hasura.visible_documents(principal.token, [d["document_id"] for d in entry["documents"]])
+        except HasuraAuthError as exc:
+            raise _error(401, "invalid_token", "Token không hợp lệ") from exc
+        except HasuraError as exc:
+            raise _error(503, "database_unavailable", "Chưa đọc được CSDL, thử lại sau") from exc
+        if not readable:
+            raise _error(404, "not_found", "Không có tệp này trong hồ sơ, hoặc bạn không có quyền xem")
+        if entry["mime_type"] != "application/pdf":
+            raise _error(415, "not_viewable", "Phòng đọc chỉ mở được tệp PDF (đóng dấu tên người xem được)")
+        who = principal.display_name or principal.user_id
+        # Byte của tệp chỉ nằm trong RAM: đọc kho lạnh, đóng dấu đều trong giới hạn số lượt cùng lúc như F3.7
+        async with sealing_slot():
+            try:
+                data = await asyncio.to_thread(read_archived_file, cold, row["archive_key"], entry)
+            except (ArchiveError, ObjectMissing) as exc:
+                log_event("case_file.archive_mismatch", request, level=logging.WARNING, case_file_id=case_file_id,
+                          file_id=file_id, error=str(exc))
+                raise _error(502, "archive_mismatch", _broken(exc)) from exc
+            except StorageError as exc:
+                raise _error(503, "storage_unavailable", "Chưa đọc được bucket lạnh, thử lại sau") from exc
+            at = datetime.now(UTC)
+            try:
+                out = await run_watermark(data, who, at, max_pages=settings.restricted_max_pages, kind="archive")
+            except SealError as exc:
+                log_event("case_file.stamp_failed", request, tenant_id=principal.tenant_id, file_id=file_id,
+                          reason=exc.reason)
+                raise _error(422, "unstampable", f"Không đóng dấu được tên người xem lên tệp nên chưa mở: {exc}",
+                             reason=exc.reason) from exc
+            del data
+        # Mỗi lần xem đều vào sổ kiểm toán; không ghi được sổ thì không trả tệp
+        try:
+            await hasura.log_event(
+                tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=request.state.request_id,
+                action="case_file.file_viewed", entity="office.case_files", entity_id=str(case_file_id),
+                details={"code": row["code"], "archive_sha256": row["archive_sha256"], "file_id": str(file_id),
+                         "sha256": entry["sha256"], "watermark": who, "at": at.isoformat(timespec="seconds")},
+            )
+        except HasuraError as exc:
+            log_event("case_file.audit_failed", request, case_file_id=case_file_id, error=str(exc))
+            raise _error(503, "database_unavailable", "Chưa ghi được sổ kiểm toán nên chưa mở tệp") from exc
+        log_event("case_file.file_viewed", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
+                  case_file_id=case_file_id, file_id=file_id, size_bytes=len(out))
+        return Response(out, media_type="application/pdf", headers={
+            **DOWNLOAD_HEADERS, **NO_STORE, "Content-Disposition": content_disposition(entry["filename"], inline=True),
+        })
+
+    # Nộp lưu theo yêu cầu (F3.8): lãnh đạo phòng nộp lưu hồ sơ đã đóng của phòng mình ngay, không đợi vòng nền
+    # (MOC_ARCHIVE_AFTER_DAYS). Đội chọn: chuyên viên lập, đóng; lãnh đạo phòng (`manager`) nộp — hai người, người nộp
+    # là người phụ trách phòng có hồ sơ (căn cứ điều khoản chưa đối chiếu văn bản gốc, xem PLAN/NOTES việc 90). Một
+    # lượt mỗi lúc trong tiến trình: dùng chung khóa với vòng nền (Archiver.lock); hàm SQL làm trọng tài cho mọi lượt
+    archive_lock = archiver.lock
+
+    archive_run_responses = {
+        401: {"description": "Thiếu hoặc sai token"},
+        403: {"description": "`forbidden`: chỉ lãnh đạo phòng (`manager`) nộp lưu hồ sơ của phòng mình"},
+        404: {"description": "Không có hồ sơ, hoặc hồ sơ không thuộc phòng của người gọi"},
+        409: {"description": "`not_closed` hồ sơ còn mở · `already_archived` đã nộp lưu (kể cả lượt khác vừa xong) · "
+                             "`archive_failed` + `message`: không nộp lưu được (văn bản không còn ở trạng thái nộp lưu "
+                             "được, đang gửi liên thông, tệp trong kho nóng không khớp băm…) · `archive_conflict`: "
+                             "CSDL từ chối vì hồ sơ hay văn bản đổi trong lúc nộp lưu — CSDL không đổi gì"},
+        503: {"description": "CSDL, kho đối tượng hoặc sổ kiểm toán chưa sẵn sàng; `busy` (kèm `Retry-After: 10`) khi "
+                             "đang có lượt nộp lưu khác trong tiến trình (nút bấm hay vòng nền) — chưa ghi sổ"},
+    }
+
+    async def _closed_case_file(principal: Principal, case_file_id: uuid.UUID) -> dict:
+        """Hồ sơ đã đóng mà người gọi (manager) xem được, không thì lỗi đúng nghĩa: 404, 409 already_archived, 409
+        not_closed, 401, 503."""
+        try:
+            row = await hasura.visible_case_file(principal.token, case_file_id)
+        except HasuraAuthError as exc:
+            raise _error(401, "invalid_token", "Token không hợp lệ") from exc
+        except HasuraError as exc:
+            raise _error(503, "database_unavailable", "Chưa đọc được CSDL, thử lại sau") from exc
+        if row is None:
+            raise _error(404, "not_found", "Không có hồ sơ này")
+        if row["status"] == "archived":
+            raise _error(409, "already_archived", "Hồ sơ đã nộp lưu")
+        if row["status"] != "closed":
+            raise _error(409, "not_closed", "Hồ sơ còn mở: đóng hồ sơ trước khi nộp lưu")
+        return row
+
+    @app.post("/api/case-files/{case_file_id}/archive", response_model=ArchiveRunOut, responses=archive_run_responses,
+              summary="Nộp lưu ngay hồ sơ đã đóng (lãnh đạo phòng): gói Parquet + tệp + manifest vào bucket lạnh",
+              description="Cùng các bước như vòng nộp lưu nền: kiểm băm tệp nóng, ghi gói khóa ghi, đọc lại so băm, "
+                          "hàm SQL `office.archive_case_file` một giao dịch. Giành được lượt rồi mới kiểm lại hồ sơ và "
+                          "ghi `case_file.archive_requested` vào sổ kiểm toán, sau đó mới làm; CSDL ghi "
+                          "`case_file.archived` khi xong.")
+    async def archive_case_file(case_file_id: uuid.UUID, request: Request,
+                                principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
+        # vai trò Hasura áp cho token: manager thì Hasura chỉ trả hồ sơ của phòng mình
+        if principal.role != "manager":
+            raise _error(403, "forbidden", "Chỉ lãnh đạo phòng nộp lưu hồ sơ của phòng mình")
+        await _closed_case_file(principal, case_file_id)      # trả lời ngay, không chờ lượt
+        try:
+            await asyncio.wait_for(archive_lock.acquire(), SEALING_QUEUE_S)
+        except TimeoutError:
+            raise HTTPException(503, {"code": "busy", "message": "Đang nộp lưu hồ sơ khác, thử lại sau ít giây"},
+                                {"Retry-After": RETRY_AFTER}) from None
+        try:
+            # trong lúc chờ lượt, lượt khác có thể đã nộp lưu xong hồ sơ này
+            row = await _closed_case_file(principal, case_file_id)
+            try:
+                await hasura.log_event(
+                    tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=request.state.request_id,
+                    action="case_file.archive_requested", entity="office.case_files", entity_id=str(case_file_id),
+                    details={"code": row["code"]},
+                )
+            except HasuraError as exc:
+                raise _error(503, "database_unavailable", "Chưa ghi được sổ kiểm toán, thử lại sau") from exc
+            done = await _run_archive(principal, case_file_id, request)
+        finally:
+            archive_lock.release()
+        log_event("case_file.archived", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
+                  case_file_id=case_file_id, archive_sha256=done.archive_sha256, documents=done.documents,
+                  files=done.files)
+        out = ArchiveRunOut(case_file_id=case_file_id, code=done.code, archive_key=done.archive_key,
+                            archive_sha256=done.archive_sha256, documents=done.documents, files=done.files,
+                            bytes=done.bytes, run_id=done.run_id)
+        return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
+
+    async def _run_archive(principal: Principal, case_file_id: uuid.UUID, request: Request) -> Archived:
+        """Một lượt nộp lưu (đã giữ khóa), lỗi đổi ra mã đúng nghĩa."""
+        def failed(exc: Exception) -> None:
+            log_event("case_file.archive_failed", request, level=logging.WARNING, case_file_id=case_file_id,
+                      error=str(exc))
+
+        try:
+            return await archiver.archive(str(case_file_id))
+        except ArchiveStateError as exc:     # lệnh tay ở tiến trình khác vừa đổi trạng thái hồ sơ
+            failed(exc)
+            if exc.status == "archived":
+                raise _error(409, "already_archived", "Hồ sơ đã nộp lưu") from exc
+            raise _error(409, "not_closed", f"Chưa nộp lưu được: {exc}") from exc
+        except ArchiveError as exc:
+            failed(exc)
+            raise _error(409, "archive_failed", f"Chưa nộp lưu được: {exc}") from exc
+        except StorageError as exc:
+            failed(exc)
+            raise _error(503, "storage_unavailable", "Kho đối tượng chưa sẵn sàng, chưa nộp lưu — thử lại sau") from exc
+        except HasuraError as exc:
+            failed(exc)
+            # CSDL trả lời khác "đã nộp lưu": đọc lại hồ sơ để biết. Đã archived → lượt khác (hoặc chính lượt này, mất
+            # câu trả lời) đã xong. Vẫn closed mà Hasura có trả lời (có mã lỗi) → hàm SQL từ chối, giao dịch đã quay
+            # lui: xung đột, 409. Không đọc lại được hay mất kết nối → chưa biết, 503
+            try:
+                now = await hasura.visible_case_file(principal.token, case_file_id)
+            except HasuraError:
+                now = None
+            if now is not None and now["status"] == "archived":
+                raise _error(409, "already_archived", "Hồ sơ đã nộp lưu") from exc
+            if now is not None and exc.code is not None:
+                raise _error(409, "archive_conflict", "CSDL từ chối lượt nộp lưu vì hồ sơ hoặc văn bản đổi trong lúc "
+                             "nộp lưu, chưa đổi gì — tải lại hồ sơ rồi thử lại") from exc
+            raise _error(503, "database_unavailable",
+                         "CSDL chưa xác nhận lượt nộp lưu — tải lại hồ sơ để xem trạng thái, thử lại sau") from exc
 
     return app
