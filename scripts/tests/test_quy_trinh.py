@@ -44,6 +44,11 @@ GIT_ENV = {
     **{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
     "GIT_CONFIG_GLOBAL": os.devnull,
     "GIT_CONFIG_NOSYSTEM": "1",
+    # không chạy bảo trì tự động sau commit/push: nó có thể tách nền và còn ghi vào objects/ lúc test xóa kho tạm
+    # (CI git 2.55: "Directory not empty: 'objects'", xem test_moc_neo.GIT_ENV)
+    "GIT_CONFIG_COUNT": "1",
+    "GIT_CONFIG_KEY_0": "maintenance.auto",
+    "GIT_CONFIG_VALUE_0": "false",
     "GIT_AUTHOR_NAME": "thu",
     "GIT_AUTHOR_EMAIL": "thu@example.invalid",
     "GIT_COMMITTER_NAME": "thu",
