@@ -1,0 +1,515 @@
+{
+  "id": "hpdi-1",
+  "spaces": [
+    {
+      "key": "h",
+      "name": { "vi": "Con người", "en": "Human" },
+      "summary": {
+        "vi": "Mọi người làm việc trong một môi trường số khép kín: một danh tính, một nơi lưu tài liệu, thông tin đúng ngay từ khâu đầu vào thay vì dựa vào trí nhớ và thói quen.",
+        "en": "People work in one closed digital workplace: one identity, one place for documents, information right at the point of entry instead of relying on memory and habit."
+      },
+      "questions": [
+        {
+          "id": "h1",
+          "title": { "vi": "Danh tính và đăng nhập", "en": "Identity and sign-in" },
+          "text": {
+            "vi": "Nhân sự đăng nhập vào các phần mềm công việc như thế nào?",
+            "en": "How do staff sign in to the software they use for work?"
+          },
+          "levels": [
+            {
+              "vi": "Mỗi phần mềm một tài khoản riêng; có tài khoản dùng chung, mật khẩu ghi ra giấy.",
+              "en": "A separate account for each application; some accounts are shared, passwords are written down."
+            },
+            {
+              "vi": "Mỗi người có tài khoản công việc riêng nhưng mỗi phần mềm vẫn đăng nhập riêng; không ai nắm hết ai đang có quyền gì.",
+              "en": "Everyone has a personal work account, but each application still has its own sign-in; nobody has a full view of who can do what."
+            },
+            {
+              "vi": "Phần lớn phần mềm nghiệp vụ đăng nhập một lần (SSO) bằng cùng một tài khoản; vẫn còn vài hệ thống đăng nhập riêng.",
+              "en": "Most business applications use single sign-on (SSO) with the same account; a few systems still have their own sign-in."
+            },
+            {
+              "vi": "Mọi phần mềm công việc dùng chung một danh tính; vai trò, phòng ban lấy từ một danh bạ; người nghỉ việc bị khóa một lần ở một nơi.",
+              "en": "Every work application uses one identity; roles and departments come from one directory; a leaver is disabled once, in one place."
+            },
+            {
+              "vi": "Như mức 4, thêm xác thực hai bước cho các vai trò nhạy cảm và rà soát quyền định kỳ có ghi lại kết quả.",
+              "en": "As level 4, plus two-step verification for sensitive roles and periodic access reviews whose results are recorded."
+            }
+          ],
+          "next": {
+            "vi": "Đưa mọi phần mềm công việc về một lần đăng nhập (Signet dùng Keycloak cho cả Văn phòng điện tử và Không gian cá nhân), bật xác thực hai bước cho văn thư, lãnh đạo; dùng sổ kiểm toán để rà ai đã làm gì.",
+            "en": "Bring every work application under one sign-in (Signet uses Keycloak for both the Office and the Personal space), turn on two-step verification for clerks and leaders; use the audit log to review who did what."
+          },
+          "links": [
+            { "to": "/ca-nhan/", "label": { "vi": "Không gian cá nhân (cùng một lần đăng nhập)", "en": "Personal space (same sign-in)" } },
+            { "to": "/so-kiem-toan", "roles": ["director", "tenant_admin"], "label": { "vi": "Sổ kiểm toán", "en": "Audit log" } }
+          ]
+        },
+        {
+          "id": "h2",
+          "title": { "vi": "Nơi lưu tài liệu công việc", "en": "Where work documents live" },
+          "text": {
+            "vi": "Tài liệu công việc được lưu và tìm lại như thế nào?",
+            "en": "How are work documents stored and found again?"
+          },
+          "levels": [
+            {
+              "vi": "Nằm trên máy cá nhân, USB, nhóm chat; muốn tìm phải hỏi người đang giữ.",
+              "en": "On personal computers, USB sticks and chat groups; to find one you ask whoever has it."
+            },
+            {
+              "vi": "Có thư mục dùng chung nhưng mỗi người đặt tên, xếp theo ý mình; tìm lại mất nhiều thời gian.",
+              "en": "There are shared folders, but everyone names and files things their own way; finding things takes a long time."
+            },
+            {
+              "vi": "Có quy ước thư mục và cách đặt tên chung (ví dụ P.A.R.A: dự án, lĩnh vực, tài nguyên, lưu trữ) và phần lớn mọi người làm theo.",
+              "en": "There is a shared folder and naming convention (for example P.A.R.A: projects, areas, resources, archives) and most people follow it."
+            },
+            {
+              "vi": "Tệp đưa vào kho chung đều qua kiểm tra (quét mã độc, đúng loại tệp) và tìm được theo nội dung trong vài giây.",
+              "en": "Every file put into the shared store is checked (malware scan, allowed file type) and can be found by its content within seconds."
+            },
+            {
+              "vi": "Như mức 4, tài liệu gắn với hồ sơ công việc; hồ sơ đã xong được nộp lưu theo thời hạn bảo quản và vẫn tra cứu được.",
+              "en": "As level 4, documents belong to case files; closed case files are archived by retention period and can still be looked up."
+            }
+          ],
+          "next": {
+            "vi": "Thống nhất một quy ước lưu tài liệu cá nhân theo P.A.R.A, đưa tài liệu công việc vào kho chung có quét mã độc và tìm theo nội dung.",
+            "en": "Agree on one P.A.R.A convention for personal documents, and keep work documents in the shared store with malware scanning and full-text search."
+          },
+          "links": [
+            { "to": "/ca-nhan/", "label": { "vi": "Không gian cá nhân P.A.R.A", "en": "P.A.R.A personal space" } },
+            { "to": "/tim-kiem", "label": { "vi": "Tìm kiếm", "en": "Search" } }
+          ]
+        },
+        {
+          "id": "h3",
+          "title": { "vi": "Vai trò của con người trong luồng việc", "en": "The role of people in the workflow" },
+          "text": {
+            "vi": "Phần lớn thời gian làm việc của nhân sự dành cho việc gì?",
+            "en": "What do staff spend most of their working time on?"
+          },
+          "levels": [
+            {
+              "vi": "Làm mọi bước bằng tay: chép số liệu giữa các tệp, nhớ quy trình trong đầu, gọi điện nhắc nhau.",
+              "en": "Doing every step by hand: copying figures between files, keeping the procedure in their heads, phoning each other as reminders."
+            },
+            {
+              "vi": "Đã có phần mềm nhưng phải làm hai lần: nhập vào phần mềm rồi nhắn tin, gọi điện để nhắc người làm bước sau.",
+              "en": "There is software, but work is done twice: entered in the software, then a message or call to remind whoever does the next step."
+            },
+            {
+              "vi": "Làm việc theo quy trình trên hệ thống; chủ yếu kiểm tra, duyệt và gỡ các trường hợp ngoại lệ.",
+              "en": "Working inside the procedure in the system; mostly checking, approving and untangling exceptions."
+            },
+            {
+              "vi": "Ít phải nhập liệu; phần lớn thời gian dành để xem số liệu, tìm nguyên nhân và ra quyết định.",
+              "en": "Little data entry; most of the time goes to reading figures, finding causes and making decisions."
+            },
+            {
+              "vi": "Thiết kế và giám sát luồng việc, rào chắn để máy chạy; con người chỉ duyệt ngoại lệ và việc rủi ro cao.",
+              "en": "Designing and supervising the workflows and guardrails the machines run; people only approve exceptions and high-risk actions."
+            }
+          ],
+          "next": {
+            "vi": "Đưa việc nhắc và chuyển việc vào hệ thống (hộp việc, thông báo) để không ai phải nhắn tay; dùng thời gian tiết kiệm được để đọc số liệu điều hành.",
+            "en": "Move reminders and hand-offs into the system (task inbox, notifications) so nobody has to chase by message; spend the time saved on the management figures."
+          },
+          "links": [
+            { "to": "/", "label": { "vi": "Hộp việc", "en": "Task inbox" } },
+            { "to": "/dieu-hanh", "roles": ["director"], "label": { "vi": "Điều hành", "en": "Dashboard" } }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "p",
+      "name": { "vi": "Quy trình", "en": "Process" },
+      "summary": {
+        "vi": "Việc chuyển giữa các bộ phận theo luồng trên hệ thống, không cần nhắn tay; rào chắn (Poka-yoke) chặn thao tác sai ngay tại chỗ nhập.",
+        "en": "Work moves between departments along workflows in the system, without manual chasing; guardrails (poka-yoke) block wrong input right where it is entered."
+      },
+      "questions": [
+        {
+          "id": "p1",
+          "title": { "vi": "Chuyển việc giữa các bộ phận", "en": "Hand-offs between departments" },
+          "text": {
+            "vi": "Một văn bản, một việc đi qua các bộ phận như thế nào?",
+            "en": "How does a document or a task travel between departments?"
+          },
+          "levels": [
+            {
+              "vi": "Chuyển bằng giấy hoặc truyền miệng; không biết việc đang nằm ở ai.",
+              "en": "On paper or by word of mouth; nobody knows who has the task now."
+            },
+            {
+              "vi": "Chuyển qua email, nhóm chat; người gửi tự nhắc; chỉ người trong cuộc biết việc đã tới đâu.",
+              "en": "By email or chat groups; the sender chases it; only those involved know how far it has got."
+            },
+            {
+              "vi": "Có phần mềm theo dõi các bước (vào sổ, giao, xử lý) nhưng vẫn có bước làm bên ngoài rồi nhập lại.",
+              "en": "Software tracks the steps (register, assign, handle), but some steps are still done outside and typed in again."
+            },
+            {
+              "vi": "Mọi bước bàn giao chạy trên hệ thống; người nhận được thông báo ngay; mỗi bước có dấu thời gian.",
+              "en": "Every hand-off runs in the system; the recipient is notified at once; every step is time-stamped."
+            },
+            {
+              "vi": "Như mức 4, quy trình được mô tả bằng mô hình (ví dụ BPMN) nên đổi được mà không viết lại phần mềm; hệ thống tự chuyển, tự nhắc khi gần hạn.",
+              "en": "As level 4, the procedure is described as a model (for example BPMN), so it can change without rewriting software; the system routes work and reminds before deadlines."
+            }
+          ],
+          "next": {
+            "vi": "Chạy trọn luồng văn bản đến (vào sổ, chỉ đạo, xử lý) và văn bản đi (soạn, duyệt, ký, phát hành) trên hệ thống, bỏ bước chuyển giấy.",
+            "en": "Run the whole incoming flow (register, direct, handle) and outgoing flow (draft, review, sign, issue) in the system and drop the paper hand-offs."
+          },
+          "links": [
+            { "to": "/van-ban-den", "label": { "vi": "Văn bản đến", "en": "Incoming documents" } },
+            { "to": "/van-ban-di", "label": { "vi": "Văn bản đi", "en": "Outgoing documents" } }
+          ]
+        },
+        {
+          "id": "p2",
+          "title": { "vi": "Rào chắn chống nhập sai (Poka-yoke)", "en": "Guardrails against wrong input (poka-yoke)" },
+          "text": {
+            "vi": "Khi nhân viên nhập thiếu hoặc sai thông tin, chuyện gì xảy ra?",
+            "en": "What happens when someone enters missing or wrong information?"
+          },
+          "levels": [
+            {
+              "vi": "Không có kiểm tra nào; sai sót chỉ lộ ra khi văn bản đã gửi đi.",
+              "en": "There are no checks; mistakes only show up after the document has gone out."
+            },
+            {
+              "vi": "Có mẫu biểu nhưng điền tùy ý; hệ thống chỉ nhắc, vẫn cho lưu.",
+              "en": "There are forms, but they can be filled in any way; the system only warns and still saves."
+            },
+            {
+              "vi": "Biểu mẫu bắt buộc các trường chính và kiểm định dạng (số ký hiệu, ngày) nhưng vẫn có đường lưu vòng qua (sửa thẳng tệp, nhập thẳng cơ sở dữ liệu).",
+              "en": "Forms require the key fields and check formats (reference number, dates), but there are still ways around them (editing files directly, writing straight to the database)."
+            },
+            {
+              "vi": "Cùng một bộ quy tắc được kiểm ở biểu mẫu, ở máy chủ và ở cơ sở dữ liệu; không đường nào lưu được dữ liệu sai.",
+              "en": "One set of rules is checked in the form, on the server and in the database; no path can save invalid data."
+            },
+            {
+              "vi": "Như mức 4, thêm chặn trùng, chặn làm sai thứ tự bước; ngoại lệ phải được người có thẩm quyền duyệt và ghi sổ.",
+              "en": "As level 4, plus blocking duplicates and out-of-order steps; exceptions need approval by someone with authority and are logged."
+            }
+          ],
+          "next": {
+            "vi": "Áp một bộ quy tắc chung (JSON Schema) cho biểu mẫu tiếp nhận ở cả ba lớp: giao diện, máy chủ, cơ sở dữ liệu; chặn vào sổ trùng.",
+            "en": "Apply one shared rule set (JSON Schema) to the intake form at all three layers: interface, server, database; block duplicate registration."
+          },
+          "links": [
+            { "to": "/van-ban-den/tiep-nhan", "roles": ["clerk"], "label": { "vi": "Tiếp nhận văn bản", "en": "Receive a document" } }
+          ]
+        },
+        {
+          "id": "p3",
+          "title": { "vi": "Hạn xử lý", "en": "Deadlines" },
+          "text": {
+            "vi": "Hạn giải quyết công việc được theo dõi như thế nào?",
+            "en": "How are deadlines for handling work tracked?"
+          },
+          "levels": [
+            {
+              "vi": "Hạn ghi trên giấy hoặc nhớ miệng; trễ hạn chỉ biết khi bị hỏi đến.",
+              "en": "Deadlines are on paper or remembered; lateness is only noticed when someone asks."
+            },
+            {
+              "vi": "Có sổ hoặc bảng tính theo dõi hạn, một người cập nhật bằng tay.",
+              "en": "A register or spreadsheet tracks deadlines, updated by hand by one person."
+            },
+            {
+              "vi": "Hạn gắn với từng việc trên hệ thống; người xử lý thấy hạn của mình.",
+              "en": "Each task in the system carries its deadline; the person handling it can see it."
+            },
+            {
+              "vi": "Hệ thống tự nhắc trước hạn và báo việc quá hạn cho người giao; lãnh đạo xem được việc quá hạn theo phòng.",
+              "en": "The system reminds before the deadline and reports overdue work to whoever assigned it; leaders see overdue work by department."
+            },
+            {
+              "vi": "Tỷ lệ đúng hạn được đo hằng tháng và dùng để điều chỉnh phân công, quy trình.",
+              "en": "The on-time rate is measured every month and used to adjust assignments and procedures."
+            }
+          ],
+          "next": {
+            "vi": "Giao việc kèm hạn trên hệ thống; mỗi tuần xem văn bản quá hạn theo phòng và tỷ lệ quá hạn theo tháng.",
+            "en": "Assign work with a deadline in the system; review overdue documents by department and the monthly overdue rate every week."
+          },
+          "links": [
+            { "to": "/dieu-hanh", "roles": ["director"], "label": { "vi": "Điều hành", "en": "Dashboard" } },
+            { "to": "/so-do", "roles": ["director"], "label": { "vi": "Số đo", "en": "Metrics" } }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "d",
+      "name": { "vi": "Dữ liệu", "en": "Data" },
+      "summary": {
+        "vi": "Dữ liệu sinh ra từ quy trình được gom về một nguồn sự thật; lãnh đạo xem số liệu tại thời điểm cần thay vì chờ báo cáo tổng hợp tay.",
+        "en": "Data produced by the processes is brought into one source of truth; leaders see figures when they need them instead of waiting for hand-made reports."
+      },
+      "questions": [
+        {
+          "id": "d1",
+          "title": { "vi": "Thời gian có số liệu", "en": "Time to get the figures" },
+          "text": {
+            "vi": "Muốn biết ngay lúc này đơn vị còn bao nhiêu việc tồn, bao nhiêu việc quá hạn thì mất bao lâu?",
+            "en": "How long does it take to know, right now, how much work is pending and how much is overdue?"
+          },
+          "levels": [
+            {
+              "vi": "Vài ngày: phải yêu cầu người tổng hợp từ sổ sách, giấy tờ.",
+              "en": "Days: someone has to compile it from registers and paper."
+            },
+            {
+              "vi": "Vài giờ: có người xuất tệp từ phần mềm rồi cộng lại bằng bảng tính.",
+              "en": "Hours: someone exports files from the software and adds them up in a spreadsheet."
+            },
+            {
+              "vi": "Có báo cáo tự động nhưng là số của hôm qua hoặc cuối kỳ.",
+              "en": "There are automatic reports, but the figures are from yesterday or the end of the period."
+            },
+            {
+              "vi": "Mở bảng điều hành là có số, tính từ chính dữ liệu vận hành tại thời điểm xem.",
+              "en": "Opening the dashboard shows the figures, computed from live operational data at that moment."
+            },
+            {
+              "vi": "Như mức 4, số liệu được dùng trong họp giao ban để ra quyết định; mỗi thay đổi lớn đều có số đo trước và sau.",
+              "en": "As level 4, the figures are used to decide in management meetings; every major change has before-and-after measurements."
+            }
+          ],
+          "next": {
+            "vi": "Dùng bảng điều hành trong họp giao ban thay cho báo cáo tổng hợp tay; theo dõi số đo trước, sau khi đổi quy trình.",
+            "en": "Use the dashboard in management meetings instead of hand-made reports; track before-and-after metrics when a procedure changes."
+          },
+          "links": [
+            { "to": "/dieu-hanh", "roles": ["director"], "label": { "vi": "Điều hành", "en": "Dashboard" } },
+            { "to": "/so-do", "roles": ["director"], "label": { "vi": "Số đo", "en": "Metrics" } }
+          ]
+        },
+        {
+          "id": "d2",
+          "title": { "vi": "Một nguồn sự thật", "en": "One source of truth" },
+          "text": {
+            "vi": "Cùng một văn bản, một số liệu đang có bao nhiêu bản ở bao nhiêu nơi?",
+            "en": "How many copies of the same document or figure exist, in how many places?"
+          },
+          "levels": [
+            {
+              "vi": "Nhiều bản ở nhiều nơi, không biết bản nào đúng.",
+              "en": "Many copies in many places; nobody knows which one is right."
+            },
+            {
+              "vi": "Có phần mềm chính nhưng các bộ phận vẫn giữ bảng tính riêng, số liệu lệch nhau.",
+              "en": "There is a main system, but departments keep their own spreadsheets and the figures disagree."
+            },
+            {
+              "vi": "Dữ liệu chính nằm trong một hệ thống; danh mục (loại văn bản, phòng ban) dùng chung.",
+              "en": "The core data lives in one system; reference lists (document types, departments) are shared."
+            },
+            {
+              "vi": "Dữ liệu có cấu trúc, có mã định danh duy nhất; mọi thay đổi có lịch sử ai sửa, khi nào.",
+              "en": "Data is structured with unique identifiers; every change has a history of who changed it and when."
+            },
+            {
+              "vi": "Như mức 4, lịch sử thay đổi không sửa được và kiểm chứng được từ bên ngoài; dữ liệu chia sẻ ra ngoài theo định dạng mở.",
+              "en": "As level 4, the change history cannot be altered and can be verified from outside; data shared externally uses open formats."
+            }
+          ],
+          "next": {
+            "vi": "Ghi mọi văn bản vào sổ đăng ký trên hệ thống, bỏ bảng tính riêng của từng bộ phận; dùng sổ kiểm toán chuỗi băm để biết ai đổi gì.",
+            "en": "Record every document in the system registers and drop the departments' own spreadsheets; use the hash-chained audit log to see who changed what."
+          },
+          "links": [
+            { "to": "/so-dang-ky", "roles": ["clerk", "director"], "label": { "vi": "Sổ đăng ký", "en": "Registers" } },
+            { "to": "/so-kiem-toan", "roles": ["director", "tenant_admin"], "label": { "vi": "Sổ kiểm toán", "en": "Audit log" } }
+          ]
+        },
+        {
+          "id": "d3",
+          "title": { "vi": "Lưu trữ và nộp lưu", "en": "Records and archiving" },
+          "text": {
+            "vi": "Hồ sơ công việc đã xong được lưu giữ như thế nào?",
+            "en": "How are finished case files kept?"
+          },
+          "levels": [
+            {
+              "vi": "Hồ sơ giấy để trong kho, không có danh mục.",
+              "en": "Paper files in a storeroom, with no index."
+            },
+            {
+              "vi": "Có danh mục hồ sơ trên bảng tính; bản điện tử nằm rải rác.",
+              "en": "There is a spreadsheet index of files; electronic copies are scattered."
+            },
+            {
+              "vi": "Hồ sơ điện tử được lập theo năm, theo phòng và có thời hạn bảo quản.",
+              "en": "Electronic case files are organised by year and department and have a retention period."
+            },
+            {
+              "vi": "Hồ sơ đã xong được nộp lưu điện tử, có mã băm để kiểm toàn vẹn, và tra cứu lại được.",
+              "en": "Finished case files are archived electronically with a hash to check integrity, and can be looked up again."
+            },
+            {
+              "vi": "Như mức 4, sao lưu định kỳ có thử khôi phục; dữ liệu lưu lâu dài ở định dạng mở.",
+              "en": "As level 4, with regular backups that are test-restored; long-term data is kept in open formats."
+            }
+          ],
+          "next": {
+            "vi": "Lập hồ sơ công việc theo phòng, nộp lưu hồ sơ đã đóng; theo dõi số văn bản đã lưu trữ trên bảng điều hành và lần nộp lưu trong sổ kiểm toán.",
+            "en": "Keep case files by department and archive the closed ones; follow archived documents on the dashboard and archiving events in the audit log."
+          },
+          "links": [
+            { "to": "/dieu-hanh", "roles": ["director"], "label": { "vi": "Điều hành", "en": "Dashboard" } },
+            { "to": "/so-kiem-toan", "roles": ["director", "tenant_admin"], "label": { "vi": "Sổ kiểm toán", "en": "Audit log" } }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "i",
+      "name": { "vi": "Trí tuệ", "en": "Intelligence" },
+      "summary": {
+        "vi": "AI đọc dữ liệu từ [D], nhận sự kiện từ [P] để gợi ý hoặc tự làm việc đã cấu hình sẵn; con người vẫn duyệt các việc rủi ro cao.",
+        "en": "AI reads data from [D] and events from [P] to suggest or carry out pre-configured actions; people still approve high-risk actions."
+      },
+      "questions": [
+        {
+          "id": "i1",
+          "title": { "vi": "AI hỗ trợ nhập văn bản đến", "en": "AI help with incoming documents" },
+          "text": {
+            "vi": "Khi văn bản đến, việc đọc và nhập thông tin (số ký hiệu, ngày, cơ quan ban hành, trích yếu) làm như thế nào?",
+            "en": "When a document arrives, how are its details (reference number, date, issuer, summary) read and entered?"
+          },
+          "levels": [
+            {
+              "vi": "Nhập tay toàn bộ, không có công cụ nào hỗ trợ.",
+              "en": "Everything is typed by hand, with no tool to help."
+            },
+            {
+              "vi": "Từng người tự dán nội dung vào công cụ AI bên ngoài, không có quy định; dữ liệu có thể ra khỏi đơn vị.",
+              "en": "Individuals paste content into outside AI tools with no policy; data may leave the organisation."
+            },
+            {
+              "vi": "Hệ thống tự đọc văn bản (kể cả bản scan) và điền sẵn; người kiểm, sửa trước khi lưu; dữ liệu không rời đơn vị.",
+              "en": "The system reads the document (scans included) and pre-fills the form; a person checks and corrects it before saving; data stays in-house."
+            },
+            {
+              "vi": "Như mức 3, đơn vị đo được tỷ lệ gợi ý được giữ nguyên theo từng trường và dùng số đó để biết tin AI tới đâu.",
+              "en": "As level 3, the organisation measures how often each suggested field is kept and uses that figure to decide how far to trust it."
+            },
+            {
+              "vi": "Tác tử tự làm các bước rủi ro thấp theo quy tắc đã duyệt; mỗi hành động mang danh tính riêng của tác tử trong sổ kiểm toán; việc rủi ro cao chờ người duyệt.",
+              "en": "Agents carry out low-risk steps under approved rules; every action carries the agent's own identity in the audit log; high-risk actions wait for a person."
+            }
+          ],
+          "next": {
+            "vi": "Bật đọc văn bản đến tự động cho văn thư (không gửi dữ liệu ra ngoài), theo dõi tỷ lệ trường được giữ nguyên trước khi mở rộng.",
+            "en": "Turn on automatic reading of incoming documents for clerks (no data sent outside), and watch the share of fields kept before widening its use."
+          },
+          "links": [
+            { "to": "/van-ban-den/tiep-nhan", "roles": ["clerk"], "label": { "vi": "Tiếp nhận văn bản", "en": "Receive a document" } }
+          ]
+        },
+        {
+          "id": "i2",
+          "title": { "vi": "Hỏi đáp trên tri thức của đơn vị", "en": "Questions over the organisation's knowledge" },
+          "text": {
+            "vi": "Khi cần biết một quy định hay một văn bản cũ nói gì, nhân sự làm thế nào?",
+            "en": "When staff need to know what a rule or an old document says, what do they do?"
+          },
+          "levels": [
+            {
+              "vi": "Hỏi người làm lâu năm; tri thức nằm trong đầu vài người.",
+              "en": "Ask a long-serving colleague; the knowledge lives in a few people's heads."
+            },
+            {
+              "vi": "Tìm theo tên tệp, từ khóa trong thư mục chung.",
+              "en": "Search by file name or keyword in shared folders."
+            },
+            {
+              "vi": "Tìm toàn văn trong kho văn bản của đơn vị, kể cả nội dung tệp PDF.",
+              "en": "Full-text search across the organisation's documents, including the content of PDF files."
+            },
+            {
+              "vi": "Hỏi bằng câu tự nhiên; câu trả lời trích nguyên văn kèm nguồn (số ký hiệu, trang) và chỉ dùng văn bản người hỏi được xem.",
+              "en": "Ask in plain language; answers quote the source verbatim with its reference and page, and only use documents the asker may read."
+            },
+            {
+              "vi": "Như mức 4, chất lượng câu trả lời được đo định kỳ và góp ý của người dùng được dùng để cải thiện.",
+              "en": "As level 4, answer quality is measured regularly and user feedback is used to improve it."
+            }
+          ],
+          "next": {
+            "vi": "Dùng hỏi đáp có trích nguồn thay cho hỏi miệng; thu góp ý của người dùng về câu trả lời.",
+            "en": "Use source-quoting Q&A instead of asking around; collect user feedback on the answers."
+          },
+          "links": [
+            { "to": "/hoi-dap", "label": { "vi": "Hỏi đáp", "en": "Ask" } },
+            { "to": "/tim-kiem", "label": { "vi": "Tìm kiếm", "en": "Search" } },
+            { "to": "/gop-y", "label": { "vi": "Góp ý", "en": "Feedback" } }
+          ]
+        },
+        {
+          "id": "i3",
+          "title": { "vi": "Gợi ý quyết định, con người giữ quyền duyệt", "en": "Decision suggestions with a human in the loop" },
+          "text": {
+            "vi": "Các quyết định lặp lại (giao cho phòng nào, hạn bao lâu) được đưa ra như thế nào?",
+            "en": "How are recurring decisions (which department, what deadline) made?"
+          },
+          "levels": [
+            {
+              "vi": "Hoàn toàn dựa vào trí nhớ và kinh nghiệm của lãnh đạo.",
+              "en": "Entirely from the leader's memory and experience."
+            },
+            {
+              "vi": "Có danh sách, quy tắc tham khảo do người soạn và tra bằng tay.",
+              "en": "There are reference lists or rules, written and looked up by hand."
+            },
+            {
+              "vi": "Hệ thống gợi ý (phòng chủ trì, hạn) kèm căn cứ; lãnh đạo chấp nhận hoặc đổi.",
+              "en": "The system suggests (lead department, deadline) with its reasons; the leader accepts or changes it."
+            },
+            {
+              "vi": "Như mức 3, đơn vị đo được lãnh đạo giữ hay đổi gợi ý bao nhiêu lần và xem lại khi tỷ lệ giữ thấp.",
+              "en": "As level 3, the organisation measures how often leaders keep or change the suggestions and reviews them when few are kept."
+            },
+            {
+              "vi": "Việc rủi ro thấp được tự thực hiện theo ngưỡng đã duyệt, việc rủi ro cao bắt buộc người duyệt; ngưỡng và kết quả được rà soát định kỳ.",
+              "en": "Low-risk actions run automatically under approved thresholds, high-risk ones always need a person; thresholds and outcomes are reviewed regularly."
+            }
+          ],
+          "next": {
+            "vi": "Dùng gợi ý giao việc kèm căn cứ ở bước chỉ đạo văn bản đến; theo dõi tỷ lệ giữ gợi ý trước khi dựa vào nó nhiều hơn.",
+            "en": "Use assignment suggestions with their reasons when directing incoming documents; track how many are kept before relying on them more."
+          },
+          "links": [
+            { "to": "/van-ban-den", "label": { "vi": "Văn bản đến (bước chỉ đạo)", "en": "Incoming documents (directing step)" } }
+          ]
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "title": {
+        "vi": "VFOSSA — Giới thiệu mô hình DX-OS và chủ đề cuộc thi Phần mềm nguồn mở OLP 2026 (bài 761, 09/06/2026): định nghĩa bốn không gian H-P-D-I, nguyên lý tiến hóa tuyến tính và human-in-the-loop",
+        "en": "VFOSSA — Introduction to the DX-OS model and the OLP 2026 open-source software contest theme (post 761, 9 June 2026): the four H-P-D-I spaces, mandatory linear evolution, human-in-the-loop"
+      },
+      "url": "https://vfossa.vn/tin-tuc/gioi-thieu-mo-hinh-dx-os-va-chu-de-cuoc-thi-phan-mem-nguon-mo-olp-2026-761.html"
+    },
+    {
+      "title": {
+        "vi": "Giáo trình \"Xây dựng Hệ điều hành Doanh nghiệp số (DX-OS)\" (TS. Tạ Tuấn Anh, CC BY 4.0), chương 2: mô hình HPDI, khung DTI, khảo sát nhanh; mục 2.4 (thuật toán ánh xạ, radar, bốn nguyên mẫu) là cơ sở của tỷ trọng, hình dạng và cảnh báo rác vào, rác ra",
+        "en": "Course book \"Building a Digital Enterprise Operating System (DX-OS)\" (Dr Tạ Tuấn Anh, CC BY 4.0), chapter 2: the HPDI model, the DTI framework, the quick survey; section 2.4 (mapping algorithm, radar, four archetypes) is the basis of the shares, the shape and the garbage-in, garbage-out warning"
+      },
+      "url": "https://opendigitransform.gitbook.io/dx-os/phan-i-tu-duy-chien-luoc/chuong-2-mo-hinh-hpdi-va-phuong-phap-danh-gia-nang-luc-so-dti"
+    }
+  ]
+}
