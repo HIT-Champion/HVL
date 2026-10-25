@@ -84,6 +84,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
   compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
   dùng kịch bản thay cho các lệnh tay. Test scripts +18.
+- Giao diện Liền mạch cho Văn phòng điện tử (#116): logo, biểu tượng tab và phông Be Vietnam Pro tự phục vụ (OFL-1.1,
+  khai trong `REUSE.toml`, `NOTICE`); nền xám lục, nút olive, nút và ô nhập cao 44px; thanh bên vàng bơ thu về dải
+  biểu tượng, mở khi rê chuột hoặc dùng bàn phím, nằm đè không đẩy nội dung, thành ngăn kéo trên màn hẹp; hộp việc tách
+  nhóm "Cần chú ý" (khẩn, quá hạn), tìm và lọc trên danh sách đã tải; trang tiếp nhận, soạn thảo báo lỗi tải kèm nút
+  Thử lại; trang lỗi chung; chuyển trang, chuông, thông báo có chuyển động ngắn, tắt theo `prefers-reduced-motion`.
+  Trang đăng nhập (theme `signet`) theo cùng nhận diện, chỉ chế độ sáng; bản đang chạy dựng lại container keycloak
+  (`docker compose up -d --force-recreate --wait keycloak`) để nhận CSS mới. Không đổi dữ liệu, API hay quyền.
+  e2e thêm `giao-dien.spec.ts`, test scripts +1.
 
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
