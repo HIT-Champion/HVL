@@ -709,6 +709,18 @@ LINEAGE_OF = """query ($run: uuid!) { core_lineage_events(order_by: {id: asc},
   where: {_or: [{run_id: {_eq: $run}}, {parent_run_id: {_eq: $run}}]}) {
   run_id parent_run_id job event_type inputs outputs quality_ok event } }"""
 QUALITY_FAILED = """query { core_lineage_events_aggregate(where: {quality_ok: {_eq: false}}) { aggregate { count } } }"""
+# Phả hệ báo cáo (F3.9, F3.11): office.report_lineage tính từ catalog PostgreSQL (migration 1792281602900)
+REPORT_LINEAGE = "{ office_report_lineage { report consumer source source_kind depth } }"
+BOARD_VIEWS = ("office.v_document_counts", "office.v_overdue_by_department", "office.v_processing_time",
+               "office.v_outgoing_by_month")
+
+
+def report_sources(rows: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Cạnh catalog → mỗi khung nhìn báo cáo đọc những gì, gần trước xa sau; đọc qua view lồng thì ghi "qua <view>"."""
+    out: dict[str, list[str]] = {}
+    for r in sorted(rows, key=lambda r: (r["report"], r["depth"], r["consumer"], r["source"])):
+        out.setdefault(r["report"], []).append(r["source"] + (f" (qua {r['consumer']})" if r["depth"] > 1 else ""))
+    return out
 
 
 def short(name: str) -> str:
@@ -796,6 +808,23 @@ def pha_he() -> None:
     first = events[0]["event"]
     ok(f"{first['schemaURL']} · producer {first['producer'].rsplit('/', 2)[-1]} · namespace job"
        f" '{first['job']['namespace']}'; tên dataset theo quy ước postgres://host:port/db.schema.bảng, s3://bucket/key")
+
+    say(5, "Phả hệ báo cáo: biểu đồ trang Điều hành ← khung nhìn ← bảng, tính từ catalog PostgreSQL lúc hỏi")
+    sources = report_sources(director.gql(REPORT_LINEAGE)["office_report_lineage"])
+    missing = [v for v in BOARD_VIEWS if v not in sources]
+    if missing:
+        raise DemoFailed(f"khung nhìn của trang Điều hành không có trong office.report_lineage: {missing}")
+    for view in BOARD_VIEWS:
+        print(f"       · {view} ← {', '.join(sources[view])}")
+    if not {"office.document_events", "office.archived_document_facts"} <= set(sources["office.v_processing_time"]):
+        raise DemoFailed(f"thời gian xử lý không dẫn về dòng thời gian: {sources['office.v_processing_time']}")
+    ok(f"{len(sources)} khung nhìn báo cáo office.v_*, {sum(map(len, sources.values()))} cạnh — không khai tay: sửa"
+       " view là phả hệ đổi theo; lãnh đạo xem đồ thị ở /pha-he (nút \"Nguồn số liệu\" trên từng biểu đồ của"
+       " /dieu-hanh)")
+    commit = next(e for e in steps if e["job"].endswith(".commit"))
+    if any(o.endswith("moc.office.archived_document_facts") for o in commit["outputs"]):
+        ok("thời gian xử lý ← office.archived_document_facts ← bước commit của lượt nộp lưu ở bước 1: văn bản đã nộp"
+           " lưu vẫn được đếm")
 
 
 OT_SENSOR = "phong-may-chu"

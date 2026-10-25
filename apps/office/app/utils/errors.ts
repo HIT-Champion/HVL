@@ -30,6 +30,8 @@ export function errorText(t: Composer['t'], e: unknown): string {
   if (e instanceof ApiError) {
     if (e.code === 'network') return t('error.network')
     if (e.code === 'session') return t('error.session')
+    // tường lửa ở cổng chặn (F3.15): kèm X-Request-Id để người quản trị tra nhật ký chặn
+    if (e.code === 'blocked') return e.requestId ? t('error.blockedId', { id: e.requestId }) : t('error.blocked')
     if (e.code === 'infected') return t('error.infected')
     if (e.code === 'unscannable') return t('error.unscannable')    // có mật khẩu, nén quá sâu: ClamAV không quét hết
     // submitOutgoing kiểm đơn vị nhận (restricted / self / unknown) ở trang văn bản, nơi không có ô nào để đánh dấu

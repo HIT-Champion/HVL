@@ -148,7 +148,7 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
 - Chất lượng kiểm tự động, trước khi ghi: bảng Parquet nào cũng được đọc lại, số dòng phải bằng số dòng trong CSDL,
   cột bắt buộc không được rỗng. Trượt thì job dừng trước khi ghi gì sang kho lạnh, sự kiện FAIL nằm lại trong phả hệ.
 
-**Lệnh in ra 4 bước** (chưa có lượt nộp lưu nào thì chạy màn (i) trước):
+**Lệnh in ra 5 bước** (chưa có lượt nộp lưu nào thì chạy màn (i) trước):
 
 1. Lượt nộp lưu gần nhất: run của job `moc.case_file.archive`, START → 4 run con `files`, `tables`, `manifest`,
    `commit` → COMPLETE. Mỗi bước in đầu vào → đầu ra. Lãnh đạo đọc qua Hasura, chỉ thấy đơn vị mình.
@@ -158,15 +158,26 @@ ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dự
    `outputStatistics`); số bước trượt kiểm của đơn vị.
 4. Sự kiện đúng đặc tả OpenLineage 2-0-2 (`schemaURL`, `producer`, tên dataset theo quy ước): đặt
    `MOC_OPENLINEAGE_URL` là gửi được sang Marquez.
+5. Phả hệ báo cáo: bốn khung nhìn của trang Điều hành ← bảng nào, tính từ catalog PostgreSQL lúc hỏi
+   (`office.report_lineage`) — vd `office.v_processing_time` ← `office.archived_document_facts`,
+   `office.document_events`, `office.documents`; lượt nộp lưu mới khai `office.archived_document_facts` ở bước `commit`.
+
+**Trên giao diện** (lãnh đạo, `truongkhoa`): trang Điều hành, nút "Nguồn số liệu" trên biểu đồ "Thời gian xử lý theo
+tháng xong" → trang Phả hệ số liệu lọc đúng biểu đồ đó: đồ thị biểu đồ ← khung nhìn ← bảng ← manifest của lượt nộp lưu
+(nét đứt: bước `commit` ghi lại vào CSDL), bảng nguồn bên dưới. Chọn "Mọi biểu đồ" để thấy cả dải nộp lưu (bảng →
+Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.jsonl)" xuất cùng phả hệ ở dạng chuẩn mở.
 
 **Nếu giám khảo hỏi:**
 
 - *"Marquez đâu?"* Chưa dựng trong compose: thêm một máy chủ Java và CSDL riêng (khoảng 1 GB RAM) cho một job mỗi
   giờ. Sự kiện lưu trong `core.lineage_events` (cột `event` là nguyên văn OpenLineage), cùng sao lưu với CSDL; bật
-  Marquez chỉ cần đặt `MOC_OPENLINEAGE_URL`.
+  Marquez chỉ cần đặt `MOC_OPENLINEAGE_URL`. Đồ thị thì xem ngay ở trang Phả hệ số liệu của Signet (`/pha-he`).
 - *"Kiểm trượt thì sao?"* Thử trong test đơn vị: một văn bản thiếu trích yếu → bước `tables` FAIL, không đối tượng nào
   được ghi sang bucket lạnh (ở đó bị khóa nhiều năm), CSDL không đổi, lượt sau thử lại.
 - *"Ai sửa được phả hệ?"* Không ai: bảng chỉ thêm, trigger chặn sửa và xóa kể cả khi ghi thẳng CSDL.
+- *"Phả hệ báo cáo có phải vẽ tay không?"* Cạnh khung nhìn → bảng đọc từ catalog (`pg_depend`) mỗi lần mở trang: sửa
+  view là đồ thị đổi theo. Chỉ cạnh biểu đồ → khung nhìn khai trong mã giao diện, và có test so với truy vấn thật của
+  trang Điều hành (`apps/office/tests/lineage.test.ts`).
 
 ## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
 

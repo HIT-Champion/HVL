@@ -47,6 +47,7 @@ const SCREEN_KEYS: Record<string, string> = {
   '/tim-kiem': 'nav.search',
   '/hoi-dap': 'nav.ask',
   '/dieu-hanh': 'nav.board',
+  '/pha-he': 'lineage.nav',
   '/so-kiem-toan': 'nav.audit',
   '/so-do': 'nav.metrics',
   '/gop-y': 'nav.feedback',
