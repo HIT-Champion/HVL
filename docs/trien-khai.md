@@ -308,8 +308,9 @@ Kịch bản:
    migration mới khi khởi động.
 4. Chạy `moc.py realm clients` và `realm theme`.
 5. Kiểm từng mục rồi báo các mục trượt:
-   - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm;
-   - dịch vụ chạy trước khi nâng vẫn chạy, không cái nào chưa khỏe;
+   - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm (so với số liệu chụp ở
+     bước 2, nên chỉ `nang` kiểm được);
+   - dịch vụ chạy trước khi nâng vẫn chạy (chỉ `nang`), không cái nào chưa khỏe;
    - `/api/status` báo đúng phiên bản mới;
    - realm đủ client và theme;
    - `moc.py audit verify`;
@@ -323,7 +324,8 @@ scripts/nang_cap.sh lui /opt/moc <mã nguồn bản cũ> <lượt>
 ```
 
 Lệnh lùi cài lại bản cũ rồi khôi phục đúng lượt sao lưu đó: CSDL, tệp và két về như lúc trước khi nâng, sau đó kiểm lại
-như trên. Gói cũ chưa có tệp `VERSION` (trước 1.2.0) thì đặt `MOC_VERSION=1.1.0` trước lệnh.
+như trên, trừ hai mục chỉ `nang` kiểm được. Gói cũ chưa có tệp `VERSION` (trước 1.2.0) thì đặt `MOC_VERSION=1.1.0`
+trước lệnh.
 
 `scripts/nang_cap.sh kiem /opt/moc` chỉ chạy phần kiểm. Job CI `.github/workflows/nang-cap.yml` chạy cả ba đường trên
 bản cài của thẻ phát hành trước: nâng lên commit của PR, nâng két cũ (`ket`, [`van-hanh.md`](van-hanh.md) mục Két bí
