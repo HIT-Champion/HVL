@@ -96,18 +96,27 @@ onMounted(() => load())
 // văn bản liên thông từ đơn vị khác vừa tới (văn thư được báo): hiện ngay trong danh sách
 const { lastPush } = useNotifications()
 watch(lastPush, (n) => { if (n?.kind === 'document.incoming') load() })
+
+// Lọc nhanh trên các dòng đã tải, không gọi lại máy chủ; so khớp không dấu ("dao tao" ra "Đào tạo")
+const query = ref('')
+const normalize = (value: string) =>
+  value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd')
+const filteredRows = computed(() => {
+  const needle = normalize(query.value)
+  return rows.value.filter((row) => normalize([row.symbol, row.summary, row.issuer_name].join(' ')).includes(needle))
+})
 </script>
 
 <template>
   <div>
-    <PageHeader :title="t('incoming.title')">
+    <PageHeader :title="t('incoming.title')" :subtitle="t('fe.listHint')">
       <NuxtLink v-if="claims?.role === 'clerk'" to="/van-ban-den/tiep-nhan" class="btn-primary">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M12 5v14m-7-7h14" /></svg>
         {{ t('incoming.receive') }}
       </NuxtLink>
     </PageHeader>
 
-    <div class="mb-4 flex gap-1 border-b border-stone-200" role="tablist">
+    <div class="moc-tabs" role="tablist">
       <button
         v-for="(_, key) in tabs" :key="key" role="tab" :aria-selected="tab === key"
         class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
@@ -118,12 +127,24 @@ watch(lastPush, (n) => { if (n?.kind === 'document.incoming') load() })
       </button>
     </div>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading && !rows.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('incoming.empty') }}</p>
-    <div v-else class="card overflow-x-auto">
+    <div class="moc-toolbar">
+      <input
+        v-model="query" type="search" class="input" :aria-label="t('fe.filterDocuments')"
+        :placeholder="t('fe.filterDocuments')"
+      >
+      <span class="moc-count" aria-live="polite">{{ t('fe.loaded', { n: filteredRows.length }) }}</span>
+    </div>
+    <div v-if="failure" class="moc-state" role="alert">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
+    </div>
+    <div v-else-if="loading && !rows.length" aria-busy="true" :aria-label="t('fe.loading')">
+      <div v-for="n in 5" :key="n" class="moc-skeleton" />
+    </div>
+    <p v-else-if="!filteredRows.length" class="card p-12 text-center text-stone-500">{{ t('incoming.empty') }}</p>
+    <div v-else class="moc-doc-table moc-incoming-table overflow-x-auto">
       <table class="w-full text-sm">
-        <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500 uppercase">
+        <thead class="border-b border-stone-200 text-left text-xs font-medium text-stone-500">
           <tr>
             <th class="px-4 py-3">{{ t('incoming.number') }}</th>
             <th class="px-4 py-3">{{ t('incoming.symbol') }}</th>
@@ -133,8 +154,13 @@ watch(lastPush, (n) => { if (n?.kind === 'document.incoming') load() })
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-100">
-          <tr v-for="row in rows" :key="row.id" class="cursor-pointer hover:bg-brand-50/40" @click="router.push(`/van-ban/${row.id}`)">
-            <td class="px-4 py-3 font-semibold text-stone-700 tabular-nums">{{ row.register_number ?? '—' }}</td>
+          <tr
+            v-for="row in filteredRows" :key="row.id" class="cursor-pointer hover:bg-brand-50/40"
+            @click="router.push(`/van-ban/${row.id}`)"
+          >
+            <td :data-label="t('incoming.number')" class="px-4 py-3 font-semibold text-stone-700 tabular-nums">
+              {{ row.register_number ?? '—' }}
+            </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="font-medium">{{ row.symbol }}</div>
               <div class="text-xs text-stone-500">{{ fmtDate(row.issued_on) }}</div>
@@ -144,12 +170,16 @@ watch(lastPush, (n) => { if (n?.kind === 'document.incoming') load() })
               <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
                 {{ row.issuer_name }}
                 <UrgencyChip :urgency="row.urgency" quiet />
+                <span
+                  v-if="row.source_id" data-testid="dispatched-chip" class="chip bg-brand-50 text-brand-800"
+                >{{ t('incoming.dispatched') }}</span>
                 <span v-if="row.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
-                <span v-if="row.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">{{ t('incoming.dispatched') }}</span>
               </div>
             </td>
             <td class="px-4 py-3"><StatusChip :status="row.status" /></td>
-            <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDate(row.due_on) }}</td>
+            <td :data-label="t('incoming.due')" class="px-4 py-3 whitespace-nowrap text-stone-600">
+              {{ fmtDate(row.due_on) }}
+            </td>
           </tr>
         </tbody>
       </table>

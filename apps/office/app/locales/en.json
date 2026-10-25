@@ -1592,5 +1592,57 @@
     "colFlags": "Flags",
     "none": "Your unit has no sensor sending readings yet.",
     "note": "Sample floor plan of one storage level; sensors are placed by the room code the device declares. You only see your own unit's sensors."
+  },
+  "fe": {
+    "skip": "Skip to main content",
+    "organization": "Organization workspace",
+    "navigation": "Main navigation",
+    "verify": "Verify a document",
+    "localData": "Your organization owns its data",
+    "menu": "Open navigation",
+    "all": "All",
+    "overdue": "Overdue",
+    "urgent": "Urgent",
+    "searchTasks": "Search your tasks…",
+    "tasks": "{n} tasks",
+    "due": "Due date",
+    "noTasks": "No matching tasks",
+    "tryFilter": "Try another filter or search term.",
+    "loaded": "{n} documents in this list",
+    "filterDocuments": "Filter the list shown…",
+    "listHint": "Track records and progress within your organization.",
+    "loading": "Loading documents…",
+    "receiveNew": "Receive a document",
+    "todayShort": "Today",
+    "scrollTable": "Scroll horizontally to read all columns."
+  },
+  "desk": {
+    "queue": "To process",
+    "draft": "Unnumbered draft",
+    "clearFilters": "Clear filters",
+    "compose": "New document",
+    "pending": "{n} tasks awaiting action.",
+    "filter": "Filter tasks",
+    "noDeadline": "No deadline",
+    "attention": "Needs attention",
+    "remaining": "Other tasks",
+    "category": "Direction",
+    "allDocuments": "All documents"
+  },
+  "shell": {
+    "closeNav": "Close navigation"
+  },
+  "pageError": {
+    "notFound": "Page not found",
+    "notFoundDetail": "This link no longer exists or has changed. Return to your tasks to continue.",
+    "title": "Unable to open this page",
+    "detail": "Something went wrong while loading this page. Return to your tasks and try again.",
+    "home": "Back to my tasks"
+  },
+  "authCallback": {
+    "title": "Signing in",
+    "detail": "Signet is opening your workspace.",
+    "failed": "Unable to sign in",
+    "retryDetail": "Your sign-in session may have expired. Please sign in again."
   }
 }

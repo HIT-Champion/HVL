@@ -98,6 +98,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trên https://signet.htechcs.com lúc 07:17 mỗi ngày với thẻ phát hành mới nhất, chạy tay được, và chạy trên PR đổi
   nó; từ lúc gắn thẻ mới tới lúc nâng bản online thì job đỏ. `docs/trien-khai.md` mục 6 thêm lệnh này. Test scripts
   +15.
+- Giao diện Liền mạch cho Văn phòng điện tử (#116): logo, biểu tượng tab và phông Be Vietnam Pro tự phục vụ (OFL-1.1,
+  khai trong `REUSE.toml`, `NOTICE`); nền xám lục, nút olive, nút và ô nhập cao 44px; thanh bên vàng bơ thu về dải
+  biểu tượng, mở khi rê chuột hoặc dùng bàn phím, nằm đè không đẩy nội dung, thành ngăn kéo trên màn hẹp; hộp việc tách
+  nhóm "Cần chú ý" (khẩn, quá hạn), tìm và lọc trên danh sách đã tải; trang tiếp nhận, soạn thảo báo lỗi tải kèm nút
+  Thử lại; trang lỗi chung; chuyển trang, chuông, thông báo có chuyển động ngắn, tắt theo `prefers-reduced-motion`.
+  Trang đăng nhập (theme `signet`) theo cùng nhận diện, chỉ chế độ sáng; `nang_cap.sh` tự dựng lại Keycloak, bản
+  sửa tay chạy `docker compose up -d --force-recreate --wait keycloak` để nhận CSS mới. Không đổi dữ liệu, API hay
+  quyền. e2e thêm `giao-dien.spec.ts`; `tieng-anh.spec.ts` rê chuột mở thanh bên trước khi kiểm vai trò (tên, vai
+  trò nằm ở cuối thanh bên); test scripts +1.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
@@ -163,6 +172,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   giờ máy chủ quá 2 phút (`FUTURE_SLACK`, như cờ `future_time` ở trên) thì giờ, ngày của báo cáo và khóa nhắc theo
   lúc máy chủ nhận thông báo; dự thảo thêm một dòng ghi rõ đồng hồ cảm biến chạy nhanh kèm giờ thiết bị gửi, sự kiện
   `ot.alarm` giữ giờ đó ở `device_observed_at`. Đồng hồ đúng giữ nguyên như trước. Test svc-workflow +3.
+- Thẻ `<html lang>` không còn về `vi` khi tải lại trang lúc đang dùng tiếng Anh (#205): chữ vẫn tiếng Anh nhưng trình
+  đọc màn hình đọc bằng giọng tiếng Việt. Plugin i18n đặt `lang` theo ngôn ngữ đang dùng qua `useHead`, đè lên giá trị
+  ghi cứng trong `nuxt.config.ts`; e2e `tieng-anh.spec.ts` kiểm thêm `lang` sau khi tải lại ở cả hai test.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau

@@ -101,6 +101,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
 | Apache ECharts | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
+| Be Vietnam Pro | 1.002 | OFL-1.1 | Phông giao diện của nhận diện Liền mạch (#116), đủ dấu tiếng Việt. Bốn độ đậm 400, 500, 600, 700 lấy nguyên bản từ kho Google Fonts (`ofl/bevietnampro`), không sửa, kèm `OFL.txt`; trình duyệt tải từ chính máy chủ, không gọi Google Fonts | Tệp trong kho: `apps/office/public/fonts/be-vietnam-pro/`, bản trùng từng byte cho trang đăng nhập ở `platform/keycloak/themes/signet/login/resources/fonts/` | 3 |
 
 Thư viện gián tiếp (khoảng 700 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
 giấy phép MIT, ISC, Apache-2.0, BSD-2/3-Clause, BlueOak-1.0.0, MPL-2.0 hoặc 0BSD, đều được OSI phê duyệt. Quét
@@ -296,7 +297,8 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
 - ✅ MIT-CMU chỉ cho Pillow (ngoại lệ có lý do): một dạng HPND, dễ dãi, chỉ đòi giữ thông báo bản quyền; SPDX đánh dấu
   OSI phê duyệt cho HPND nhưng chưa cho riêng MIT-CMU.
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
-  trong ba giấy phép), Pango (nạp động), phông Liberation.
+  trong ba giấy phép), Pango (nạp động), phông Liberation, phông giao diện Be Vietnam Pro (kèm `OFL.txt`, khai trong
+  `REUSE.toml`, toàn văn ở `LICENSES/OFL-1.1.txt`).
 - ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
   `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
   theo BSD-3-Clause, `type-fest` theo MIT.

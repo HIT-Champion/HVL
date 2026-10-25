@@ -48,6 +48,8 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
     await expect(staff.getByRole('link', { name, exact: true })).toBeVisible()
   }
   await expect(staff.getByRole('link', { name: 'Hộp việc' })).toHaveCount(0)
+  // tên, vai trò nằm ở cuối thanh bên (#116), chỉ hiện khi thanh bên mở: rê chuột vào rồi giữ đó tới khi bấm chuông
+  await staff.locator('#app-navigation').hover()
   await expect(staff.getByText('Officer', { exact: true })).toBeVisible()
   await expect(staff.getByRole('button', { name: 'Sign out' })).toBeVisible()
   await expect(staff.getByRole('button', { name: 'Tiếng Việt', exact: true })).toBeVisible()
@@ -123,9 +125,10 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
   await expect(row.getByText('Draft', { exact: true })).toBeVisible()
   await expect(row.getByText('Urgent', { exact: true })).toBeVisible()
 
-  // 6. Tải lại trang: ứng dụng đọc lại moc.locale, vẫn tiếng Anh
+  // 6. Tải lại trang: ứng dụng đọc lại moc.locale, vẫn tiếng Anh, cả thẻ <html lang> (#205)
   await staff.reload()
   await expect(staff.getByRole('heading', { level: 1, name: 'Outgoing documents' })).toBeVisible()
+  await expect(html).toHaveAttribute('lang', 'en')
   await expect(staff.getByRole('tab', { name: 'Drafts', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(row.getByText('Draft', { exact: true })).toBeVisible()
   await expect(staff.getByRole('link', { name: 'My tasks', exact: true })).toBeVisible()
@@ -155,11 +158,12 @@ test('trang công khai đổi sang tiếng Anh không cần đăng nhập', asyn
   await expect(outsider.getByTestId('status-component-dang-nhap')).toContainText('Single sign-on')
   await expect(outsider.getByTestId('status-overall')).toContainText('Checked at')
 
-  // chân trang sang cổng xác thực văn bản; tải lại vẫn tiếng Anh
+  // chân trang sang cổng xác thực văn bản; tải lại vẫn tiếng Anh, cả thẻ <html lang>
   await outsider.getByRole('link', { name: 'Verify a document', exact: true }).click()
   await expect(outsider.getByRole('heading', { level: 1, name: 'Verify a document' })).toBeVisible()
   await outsider.reload()
   await expect(outsider.getByRole('heading', { level: 1, name: 'Verify a document' })).toBeVisible()
+  await expect(outsider.locator('html')).toHaveAttribute('lang', 'en')
   expect(await savedLocale(outsider)).toBe('en')
 
   await outsider.getByRole('button', { name: 'Tiếng Việt', exact: true }).click()

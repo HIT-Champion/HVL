@@ -132,11 +132,22 @@ async function print() {
         </div>
       </div>
 
-      <div v-if="data.entries.length" class="card overflow-x-auto">
+      <!-- màn hẹp: sổ rộng hơn màn hình, cuộn ngang được cả bằng bàn phím (vùng nhận tiêu điểm). Vùng lấy tên từ
+           câu gợi ý cuộn, không lấy "Sổ đăng ký văn bản" để khỏi trùng tên mục menu -->
+      <p v-if="data.entries.length" id="register-scroll-hint" class="moc-scroll-hint">{{ t('fe.scrollTable') }}</p>
+      <div
+        v-if="data.entries.length" class="moc-table-scroll moc-register-table card overflow-x-auto" tabindex="0"
+        role="region" aria-labelledby="register-scroll-hint"
+      >
         <table class="w-full text-sm" data-testid="register-table">
           <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500">
             <tr>
-              <th v-for="i in shown" :key="i" class="px-3 py-3">{{ data.columns[i] }}</th>
+              <th
+                v-for="i in shown" :key="i" class="px-3 py-3"
+                :class="{ 'text-right': data.direction === 'in' && i === 1 }"
+              >
+                {{ data.columns[i] }}
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-100">
@@ -147,7 +158,10 @@ async function print() {
             >
               <td
                 v-for="i in shown" :key="i" class="px-3 py-2"
-                :class="{ 'font-semibold tabular-nums': data.direction === 'in' && i === 1, 'whitespace-nowrap': isDate(entry.cells[i]) }"
+                :class="{
+                  'font-semibold tabular-nums text-right': data.direction === 'in' && i === 1,
+                  'whitespace-nowrap': isDate(entry.cells[i]),
+                }"
               >
                 {{ entry.cells[i] }}
               </td>

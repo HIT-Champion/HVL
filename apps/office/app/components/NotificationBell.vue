@@ -53,7 +53,7 @@ async function readAll() {
 </script>
 
 <template>
-  <div ref="root" class="relative">
+  <div ref="root" class="relative" @keydown.esc.stop="open = false">
     <button
       class="btn-ghost relative" :aria-label="t('notify.title')" :aria-expanded="open" data-testid="notification-bell"
       @click="open = !open"
@@ -71,6 +71,7 @@ async function readAll() {
       />
     </button>
 
+    <Transition name="sg-popover">
     <div
       v-if="open"
       class="absolute right-0 z-50 mt-2 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-stone-200 bg-white shadow-xl"
@@ -102,5 +103,6 @@ async function readAll() {
       </ul>
       <p v-else class="px-4 py-10 text-center text-sm text-stone-500">{{ t('notify.empty') }}</p>
     </div>
+    </Transition>
   </div>
 </template>
