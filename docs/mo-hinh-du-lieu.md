@@ -1389,7 +1389,7 @@ chống trùng bằng `event.data.new.id`.
 | `core.intake.suggested` | Tác tử đọc xong một tệp văn bản đến, có gợi ý (F4.1). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `core.assistant.answered` | Trợ lý hỏi đáp trả lời một câu hỏi (F4.2). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `core.assignment.suggested` | Tác tử gợi ý giao việc xong một văn bản đến, có gợi ý hay không (F4.3). Ở sổ kiểm toán và tab Lịch sử của văn bản, khuôn bên dưới |
-| `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
+| `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo (`observed_at`; đồng hồ thiết bị chạy nhanh quá 2 phút thì là giờ máy chủ nhận, giờ thiết bị gửi ở `device_observed_at`) |
 
 Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
 đến; không bao giờ mang `task_id` — chỉ mục `document_events_task_once` là chỉ mục duy nhất cho cả bảng.

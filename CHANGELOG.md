@@ -139,6 +139,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   lời gọi mô hình đang chạy (nhúng câu hỏi, viết câu trả lời, nhúng trích yếu cho tác tử gợi ý) giữ vòng nền suốt lời
   gọi, không có trần; trần 30 giây chỉ còn áp cho 5 giây giữ thêm sau mỗi lời gọi của lượt hỏi. Test svc-files thêm
   ca lời gọi dài quá 30 giây và ca lượt bị hủy giữa lời gọi.
+- Dự thảo "Báo cáo sự cố" không còn ghi sang ngày hôm sau khi cảm biến có đồng hồ chạy nhanh (#195): đường cảnh báo
+  vượt ngưỡng tin `observedAt` của thiết bị nếu lệch dưới một ngày, nên thiết bị nhanh 30 phút gửi số đo lúc 23 giờ 50
+  thì báo cáo ghi ngày hôm sau, khóa nhắc "mỗi ngày một lần" cũng tính sang ngày hôm sau. Nay `observedAt` muộn hơn
+  giờ máy chủ quá 2 phút (`FUTURE_SLACK`, như cờ `future_time` ở trên) thì giờ, ngày của báo cáo và khóa nhắc theo
+  lúc máy chủ nhận thông báo; dự thảo thêm một dòng ghi rõ đồng hồ cảm biến chạy nhanh kèm giờ thiết bị gửi, sự kiện
+  `ot.alarm` giữ giờ đó ở `device_observed_at`. Đồng hồ đúng giữ nguyên như trước. Test svc-workflow +3.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
