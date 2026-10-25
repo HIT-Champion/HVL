@@ -162,7 +162,8 @@ test('giao diện: màn hẹp 390×844 bằng bàn phím: không cuộn ngang, n
     const el = document.activeElement as HTMLElement
     const s = getComputedStyle(el)
     const r = el.getBoundingClientRect()
-    const grow = Math.max(0, parseFloat(s.outlineOffset)) + parseFloat(s.outlineWidth)
+    // viền nằm từ cạnh + offset tới cạnh + offset + độ dày: phần tràn ra ngoài phần tử (offset 3px → 5px, -3px → 0)
+    const grow = Math.max(0, parseFloat(s.outlineOffset) + parseFloat(s.outlineWidth))
     const clip = (el.closest('.sg-nav') ?? el.closest('#app-navigation'))?.getBoundingClientRect()
     return {
       name: el.getAttribute('aria-label') ?? el.textContent?.trim() ?? '',
