@@ -91,6 +91,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Bản cài (`make install`) thiếu `scripts/nap_lo_mau.py` mà `scripts/demo.py` import ở đầu tệp, nên mọi lệnh `demo.py`
   ở `/opt/moc` dừng với `ModuleNotFoundError` (#174; thấy khi nâng bản online lên 1.1.0). Thêm tệp vào `RUNTIME` của
   `scripts/install.sh`; test mới kiểm mọi script Python được cài có đủ module cục bộ nó import, kể cả import trong hàm.
+- `make install` trên máy chưa từng chạy `make up` dừng ở bước kiểm cuối "thiếu image moc/apisix:dev" (#186):
+  Makefile truyền `MOC_VERSION` rỗng, compose ưu tiên biến môi trường đã đặt (kể cả rỗng) hơn `.env` của bản cài
+  nên bước kiểm tìm thẻ `dev` thay vì thẻ vừa dựng. Bước kiểm nay đặt đúng phiên bản như lúc dựng. Test scripts +3
+  (`install.sh` thật với `docker` giả theo thứ tự ưu tiên của compose).
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
