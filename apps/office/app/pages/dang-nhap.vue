@@ -41,6 +41,7 @@ onMounted(async () => {
         <h1 id="callback-title" class="text-2xl font-bold">{{ $t(failed ? 'authCallback.failed' : 'authCallback.title') }}</h1>
         <p class="mt-3 text-sm leading-relaxed text-stone-600">{{ $t(failed ? 'authCallback.retryDetail' : 'authCallback.detail') }}</p>
         <button v-if="failed" class="btn-primary mt-6 w-full" @click="auth.login('/')">{{ $t('app.retry') }}</button>
+        <NuxtLink to="/trang-thai" v-if="failed" class="mt-4 block text-center text-sm text-brand-700 underline">{{ $t('health.title') }}</NuxtLink>
       </div>
     </section>
   </main>

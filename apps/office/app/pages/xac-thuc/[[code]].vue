@@ -17,13 +17,48 @@
 -->
 
 <script setup>
+
 import { useI18n } from 'vue-i18n';
-definePageMeta({
-    layout: 'public'
-});
+
+// Cổng xác thực văn bản (F2.13), công khai. Tra bằng mã in cạnh mã QR (quét QR là mở thẳng trang này), hoặc
+// thả tệp PDF: trình duyệt tự tính SHA-256 (Web Crypto) và chỉ gửi mã băm đi tra — tệp không rời khỏi máy.
+// Có mã rồi thì thả tệp để so: khớp từng byte với bản đã phát hành mới báo "khớp".
+// Bản phát hành từ F4.5 có chữ ký số PAdES bằng PKI nội bộ trong két (chỉ minh họa, không có giá trị pháp lý): trang
+// hiện chuẩn, người ký, CA, số sê-ri, giờ ký tự khai — lấy từ CSDL, svc-files đã tự kiểm chữ ký lúc ký; kiểm đầy đủ
+// phần mật mã thì dùng pyHanko trong svc-files. Văn bản cũ hoặc hạn chế không có chữ ký số (signature: null).
+// Khối chữ ký có liên kết tải chứng thư CA (/api/verify/ca.pem) kèm vân tay SHA-256; cuối trang là khóa công khai ký
+// mốc neo sổ kiểm toán (/api/verify/anchor-key.pem) kèm vân tay — người ngoài tự kiểm mốc neo đã công bố bằng OpenSSL.
+// Vân tay do trình duyệt tính trên đúng tệp vừa tải (utils/pemFingerprint.ts); két chưa có CA, chưa có khóa thì 404:
+// không hiện vân tay, khối mốc neo ẩn.
+
+definePageMeta({ layout: 'public' });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
+
 const code = ref(String(route.params.code ?? ''));
 const result = ref(null);
 const found = ref(null);
@@ -32,72 +67,99 @@ const fileName = ref('');
 const checking = ref(false);
 const failure = ref('');
 const dragging = ref(false);
-const readableCode = computed(()=>found.value ? `${found.value.verify_code.slice(0, 5)}-${found.value.verify_code.slice(5)}` : '');
+
+const CA_URL = '/api/verify/ca.pem';
+const ANCHOR_KEY_URL = '/api/verify/anchor-key.pem';
+const caFingerprint = ref(null);
+const anchorKey = ref(null);
+
+// tệp PEM công khai → có hay không, kèm vân tay (null khi trình duyệt không tính được); lỗi mạng coi như chưa có
+async function publicPem(url, style) {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    return res.ok ? { fingerprint: await pemFingerprint(await res.text(), style) } : null;
+  } catch {
+    return null;
+  }
+}
+
+// chỉ tải CA khi có văn bản ký số để xem: mỗi lần tải tính vào giới hạn tra cứu theo IP
+watch(() => found.value?.signature, async (signature) => {
+  if (!signature || caFingerprint.value !== null) return;
+  caFingerprint.value = (await publicPem(CA_URL, 'ca'))?.fingerprint ?? null;
+});
+
+const readableCode = computed(() => found.value ? `${found.value.verify_code.slice(0, 5)}-${found.value.verify_code.slice(5)}` : '');
+
 async function call(url) {
-    const res = await fetch(url, {
-        cache: 'no-store'
-    });
-    if (res.status === 429) throw new Error(t('verify.rateLimited'));
-    if (!res.ok) throw new Error(t('error.generic', {
-        msg: `HTTP ${res.status}`
-    }));
-    return res.json();
+  const res = await fetch(url, { cache: 'no-store' });
+  if (res.status === 429) throw new Error(t('verify.rateLimited'));
+  if (!res.ok) throw new Error(t('error.generic', { msg: `HTTP ${res.status}` }));
+  return res.json();
 }
+
 async function run(job) {
-    checking.value = true;
-    failure.value = '';
-    try {
-        await job();
-    } catch (e) {
-        failure.value = e instanceof Error ? e.message : String(e);
-    } finally{
-        checking.value = false;
-    }
+  checking.value = true;
+  failure.value = '';
+  try {
+    await job();
+  } catch (e) {
+    failure.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    checking.value = false;
+  }
 }
+
 function lookup(value) {
-    return run(async ()=>{
-        const body = await call(`/api/verify/${encodeURIComponent(value)}`);
-        result.value = body.result;
-        found.value = body.document;
-        match.value = null;
-        fileName.value = '';
-    });
+  return run(async () => {
+    const body = await call(`/api/verify/${encodeURIComponent(value)}`);
+    result.value = body.result;
+    found.value = body.document;
+    match.value = null;
+    fileName.value = '';
+  });
 }
+
 function submitCode() {
-    const value = code.value.trim();
-    if (!value) return;
-    router.replace(`/xac-thuc/${encodeURIComponent(value)}`);
-    lookup(value);
+  const value = code.value.trim();
+  if (!value) return;
+  router.replace(`/xac-thuc/${encodeURIComponent(value)}`);
+  lookup(value);
 }
+
 async function digest(file) {
-    const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
-    return Array.from(new Uint8Array(hash), (b)=>b.toString(16).padStart(2, '0')).join('');
+  const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
 function onFile(file) {
-    if (!file) return;
-    if (!window.crypto?.subtle) {
-        failure.value = t('verify.noCrypto');
-        return;
+  if (!file) return;
+  if (!window.crypto?.subtle) {
+    failure.value = t('verify.noCrypto');
+    return;
+  }
+  run(async () => {
+    const hash = await digest(file);
+    fileName.value = file.name;
+    if (found.value) {
+      match.value = hash === found.value.sha256;
+      return;
     }
-    run(async ()=>{
-        const hash = await digest(file);
-        fileName.value = file.name;
-        if (found.value) {
-            match.value = hash === found.value.sha256;
-            return;
-        }
-        const body = await call(`/api/verify?sha256=${hash}`);
-        result.value = body.result;
-        found.value = body.document;
-        match.value = body.result === 'valid' ? true : null;
-    });
+    const body = await call(`/api/verify?sha256=${hash}`);
+    result.value = body.result;
+    found.value = body.document;
+    match.value = body.result === 'valid' ? true : null;
+  });
 }
+
 function onDrop(e) {
-    dragging.value = false;
-    onFile(e.dataTransfer?.files?.[0]);
+  dragging.value = false;
+  onFile(e.dataTransfer?.files?.[0]);
 }
-onMounted(()=>{
-    if (code.value) lookup(code.value);
+
+onMounted(async () => {
+  if (code.value) lookup(code.value);
+  anchorKey.value = await publicPem(ANCHOR_KEY_URL, 'anchor');
 });
 </script>
 
@@ -155,6 +217,12 @@ onMounted(()=>{
           <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('verify.signature.serial') }}</dt><dd class="font-mono text-xs break-all text-stone-700">{{ found.signature.serial }}</dd></div>
         </dl>
         <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">{{ t('verify.signature.illustrative') }}</p>
+        <div class="mt-3 text-xs text-stone-600" data-testid="verify-ca">
+          <a :href="CA_URL" download="signet-ca.pem"
+             class="font-medium text-brand-700 underline underline-offset-2">{{ t('verify.signature.caDownload') }}</a>
+          <span v-if="caFingerprint" class="mt-1 block">{{ t('verify.signature.caFingerprint') }}:
+            <span class="font-mono break-all text-stone-700">{{ caFingerprint }}</span></span>
+        </div>
       </div>
       <p v-else class="mx-5 mb-5 text-xs text-stone-500" data-testid="verify-unsigned">{{ t('verify.signature.none') }}</p>
       <div v-if="match !== null" class="mx-5 mb-5 rounded-md px-4 py-3 text-sm font-medium" data-testid="verify-match"
@@ -176,10 +244,22 @@ onMounted(()=>{
       @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
     >
       <input id="verify-file" type="file" accept="application/pdf,.pdf" class="sr-only"
-             @change="onFile(($event.target ).files?.[0])">
+             @change="onFile(($event.target).files?.[0])">
       <svg class="h-8 w-8 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
       <span class="font-medium text-stone-800">{{ found ? t('verify.compare') : t('verify.file') }}</span>
       <span class="text-xs text-stone-500">{{ t('verify.fileHint') }}</span>
     </label>
+
+    <!-- mốc neo sổ kiểm toán: khóa công khai để người ngoài tự kiểm mốc đã công bố; két chưa có khóa thì ẩn -->
+    <section v-if="anchorKey" class="card p-5 text-sm text-stone-600" data-testid="verify-anchor-key">
+      <h2 class="font-semibold text-stone-900">{{ t('verify.anchors.title') }}</h2>
+      <p class="mt-1 text-xs">{{ t('verify.anchors.text') }}</p>
+      <a :href="ANCHOR_KEY_URL" download="signet-anchor-key.pem"
+         class="mt-2 inline-block text-xs font-medium text-brand-700 underline underline-offset-2">
+        {{ t('verify.anchors.download') }}
+      </a>
+      <p v-if="anchorKey.fingerprint" class="mt-1 text-xs">{{ t('verify.anchors.fingerprint') }}:
+        <span class="font-mono break-all text-stone-700">{{ anchorKey.fingerprint }}</span></p>
+    </section>
   </div>
 </template>

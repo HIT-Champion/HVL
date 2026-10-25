@@ -19,6 +19,7 @@ export default defineNuxtRouteMiddleware(async to => {
   if (import.meta.dev && to.name === 'fe-preview') return;
   if (to.path.replace(/\/$/, '') === '/dang-nhap') return;
   if (to.path === '/xac-thuc' || to.path.startsWith('/xac-thuc/')) return;
+  if (to.path.replace(/\/$/, '') === '/trang-thai') return;
   const auth = useAuth();
   if (auth.user.value && !auth.user.value.expired) return;
   const restored = await auth.restore();
