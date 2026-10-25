@@ -64,6 +64,8 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
    - văn thư tìm theo số ký hiệu → ra văn bản đã nộp lưu;
    - phòng đọc `GET /api/case-files/{id}/archive`: manifest khớp băm trong CSDL, DuckDB đọc `documents.parquet` ra
      đúng các văn bản.
+   - phòng đọc xem tệp `GET /api/case-files/{id}/archive/files/{file_id}`: bản PDF có dấu tên văn thư, giờ xem (khác
+     byte gốc), lần xem vào sổ kiểm toán (`case_file.file_viewed`).
 5. Thử xóa manifest bằng khóa quản trị của kho → bị từ chối (S3 Object Lock, chế độ COMPLIANCE). Dòng
    `case_file.archived` nằm trong sổ kiểm toán chuỗi băm.
 
@@ -72,7 +74,13 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 - *Bất kỳ ai*: mở trang xác thực, nhập mã tra cứu của văn bản vừa nộp lưu → vẫn "Văn bản khớp".
 - *Lãnh đạo khoa*: **Sổ kiểm toán** → tab **Văn bản**, dòng "Nộp lưu hồ sơ" kèm ký hiệu hồ sơ, băm gói, số văn bản,
   số tệp; tên hồ sơ không hiện.
-- Chưa có màn lập hồ sơ: bước 1 đi qua GraphQL với đúng quyền của chuyên viên.
+- *Chuyên viên* (`chuyenviendt`): **Hồ sơ công việc** → **Lập hồ sơ** (ký hiệu, tiêu đề, thời hạn bảo quản) → **Thêm vào
+  hồ sơ** một văn bản đã xong của phòng → **Đóng hồ sơ** (ngày đóng do hệ thống đặt). Không có nút nộp lưu.
+- *Tổ trưởng* (`totruongdt`): mở hồ sơ vừa đóng → **Nộp lưu** → trạng thái "Đã nộp lưu", băm manifest, vị trí gói, khóa
+  ghi tới ngày nào. Lệnh vẫn gọi job nộp lưu (bước 2) để in số byte, thời gian.
+- *Văn thư*: mở hồ sơ đã nộp lưu → **Phòng đọc**: "Manifest khớp băm ghi trong CSDL", văn bản trong gói, bấm
+  **Xem** ở tệp PDF → bản xem hiện ngay trong trang, mọi trang có dòng "PHÒNG ĐỌC — bản xem tài liệu lưu trữ cho …,
+  giờ…" (tên người xem, giờ xem). Lãnh đạo khoa thấy dòng "Xem tệp trong phòng đọc" trong sổ kiểm toán.
 
 **Nếu giám khảo hỏi:**
 

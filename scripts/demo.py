@@ -21,7 +21,7 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py nong-lanh
         (i) Vòng đời dữ liệu nóng → lạnh: chuyên viên lập hồ sơ, đóng; svc-files nộp lưu thành gói Parquet + tệp +
         manifest có băm trên bucket lạnh khóa ghi, gỡ chi tiết khỏi CSDL nghiệp vụ; văn bản vẫn tìm thấy, quét QR vẫn
-        khớp, phòng đọc đọc lại gói bằng DuckDB. (make demo-nong-lanh)
+        khớp, phòng đọc đọc lại gói bằng DuckDB, xem tệp PDF có dấu tên người xem. (make demo-nong-lanh)
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
@@ -652,6 +652,23 @@ def nong_lanh() -> None:
         raise DemoFailed(f"phòng đọc trả {room}")
     ok(f"phòng đọc: manifest khớp băm trong CSDL; DuckDB đọc documents.parquet ra {len(room['documents'])} văn bản: "
        + ", ".join(d["symbol"] or "?" for d in room["documents"]))
+    # phòng đọc xem tệp: đọc từ gói lạnh, so băm với manifest, đóng dấu tên người xem, ghi sổ rồi mới trả
+    viewable = [f for f in room["files"] if f["viewable"]]
+    if viewable:
+        _, got, stamped = request("GET", f"{PUBLIC_URL}/api/case-files/{cf['id']}/archive/files/"
+                                  f"{viewable[0]['file_id']}", headers=clerk.auth)
+        disposition = next((v for k, v in got.items() if k.lower() == "content-disposition"), "")
+        if not stamped.startswith(b"%PDF") or not disposition.startswith("inline;") \
+                or hashlib.sha256(stamped).hexdigest() == viewable[0]["sha256"]:
+            raise DemoFailed(f"phòng đọc trả tệp chưa đúng: {disposition}")
+        seen = psql("select count(*) from core.audit_log where action = 'case_file.file_viewed'"
+                    f" and entity_id = '{cf['id']}'")
+        if seen != "1":
+            raise DemoFailed(f"lần xem tệp trong phòng đọc chưa vào sổ kiểm toán ({seen} dòng)")
+        ok(f"phòng đọc xem {viewable[0]['filename']}: bản PDF có dấu tên văn thư và giờ xem (khác byte gốc, chỉ xem);"
+           " lần xem vào sổ kiểm toán (case_file.file_viewed)")
+    else:
+        ok("phòng đọc: các tệp trong gói không phải PDF — chỉ hiện băm, cỡ, không mở")
 
     say(5, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
     try_delete = (

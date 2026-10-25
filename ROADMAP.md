@@ -94,9 +94,9 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
 - [x] Dashboard điều hành: ECharts trong `apps/office`, bốn view số đếm qua Hasura, đúng quyền đơn vị (F3.11). Không
       dùng Metabase: bản nguồn mở không đăng nhập bằng Keycloak được và đọc thẳng CSDL, bỏ qua quyền đơn vị
       (`docs/du-thi/ke-hoach-phat-trien.md` §6)
-- [ ] **Một phần** — vòng đời nóng → lạnh (F3.8, mức Dùng được): hồ sơ đã đóng nộp lưu thành Parquet + tệp + manifest
-      có băm trên bucket khóa ghi (`make demo-nong-lanh`); chưa có giao diện lập hồ sơ, nộp lưu, phòng đọc
-- [ ] **Đang làm**: giao diện lập hồ sơ, nộp lưu và phòng đọc xem tệp (F3.8, nguyên lý i)
+- [x] Vòng đời nóng → lạnh (F3.8): hồ sơ đã đóng nộp lưu thành Parquet + tệp + manifest có băm trên bucket khóa ghi
+      (`make demo-nong-lanh`); trên giao diện: trang Hồ sơ công việc, lãnh đạo phòng nộp lưu, phòng đọc xem tệp PDF
+      có dấu tên người xem
 - [ ] **Một phần** — phả hệ dữ liệu (F3.9, mức Dùng được): OpenLineage cho lượt nộp lưu, kiểm số dòng và cột bắt buộc
       trước khi ghi Parquet (`make demo-pha-he`); chưa có phả hệ "báo cáo ← bảng", chưa có màn xem đồ thị
 - [ ] **Đang làm**: phả hệ cho báo cáo của dashboard và màn xem đồ thị phả hệ (F3.9, F3.11, nguyên lý iii)

@@ -103,6 +103,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   và tính điểm, cách ly theo đơn vị, tối đa 5 lần lưu mỗi giờ, không sửa, xóa, gắn sổ kiểm toán) để xem tiến bộ; lãnh
   đạo phòng làm được nhưng không lưu. Không phải bộ chỉ số chính thức, không quy đổi DTI. Nguồn, cách chấm, giới hạn:
   [`docs/tu-chan-doan.md`](docs/tu-chan-doan.md). Test office +18, db +18.
+- Giao diện hồ sơ công việc và phòng đọc xem tệp (F3.8, màn (i)): trang **Hồ sơ công việc** của Văn phòng điện tử —
+  chuyên viên, lãnh đạo phòng lập hồ sơ (ký hiệu, tiêu đề, thời hạn bảo quản), thêm văn bản đã xong của phòng, đóng hồ
+  sơ; văn thư, lãnh đạo đơn vị xem cả đơn vị; lãnh đạo phòng bấm **Nộp lưu** (`POST /api/case-files/{id}/archive`; đội
+  chọn lãnh đạo phòng làm người nộp, người thứ hai sau người lập; chung một lượt với vòng nộp lưu nền, ghi sổ kiểm
+  toán khi giành được lượt, lỗi trả mã đúng nghĩa). Phòng đọc trên trang hồ sơ đã nộp lưu: manifest khớp băm, văn bản
+  trong gói, nút **Xem** tệp PDF (`GET /api/case-files/{id}/archive/files/{file_id}`) — kiểm băm tệp với manifest,
+  đóng dấu "PHÒNG ĐỌC" kèm tên người xem, giờ xem, ghi `case_file.file_viewed` vào sổ kiểm toán rồi mới trả, chỉ xem
+  trong trang (`inline`, `no-store`); gói lạnh không đổi. Test svc-files +22, office +10, e2e `ho-so.spec.ts`; `make
+  smoke` nộp lưu qua endpoint mới (chuyên viên gọi bị 403) và xem tệp; `make demo-nong-lanh` kiểm thêm bước xem tệp.
 
 ### Đã sửa đổi
 - README (cả bản tiếng Anh) viết lại thành 12 mục, cài đặt lên khoảng giữa trang thay vì dòng 221: Giới thiệu, Kiến

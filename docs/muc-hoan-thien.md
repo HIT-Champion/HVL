@@ -91,7 +91,7 @@ nào: svc-files `test_hasura.py` 16 (máy khách Hasura dùng chung), `integrati
 | F3.4 | Sao lưu, khôi phục (restic) | Hoàn thiện | db `test_backup.py` 2 | bước CI: hai lượt sao lưu, xóa volume CSDL, tệp và két, khôi phục, smoke, `make audit` | Kho sao lưu nằm trên cùng máy chủ, chép ra ngoài là việc của người vận hành (`docs/trien-khai.md`); lịch sử đo NGSI-LD không vào bản sao lưu |
 | F3.5 | Tab "Lịch sử" trên trang văn bản, đọc từ sổ kiểm toán | Hoàn thiện | db `test_document_history.py` 3 | e2e `van-ban-den.spec.ts` (tab Lịch sử), `giao-viec.spec.ts` | Trường nội dung chỉ báo "đã đổi", không hiện chữ trước và sau |
 | F3.7 | Văn bản hạn chế: mã hóa từng tệp, giải mã trong bộ nhớ, dấu tên người xem | Hoàn thiện | svc-files `test_sealed.py` 33; svc-workflow `test_restricted.py` 16; db `test_restricted.py` 14 | bước CI `make demo-han-che`; smoke 8 kiểm; e2e `han-che.spec.ts` | Chỉ nhận PDF; không dùng cho bí mật nhà nước; ai có quyền Docker trên máy chủ đọc được két (`docs/van-hanh.md`) |
-| F3.8 | (i) Lập hồ sơ, nộp lưu nóng → lạnh: Parquet + tệp + manifest có băm, khóa ghi | Dùng được | svc-files `test_archive.py` 19; db `test_case_files.py` 8 | bước CI `make demo-nong-lanh`; smoke: gói trên bucket lạnh, cổng xác thực vẫn "khớp" | Chưa có giao diện lập hồ sơ, nộp lưu, phòng đọc — chỉ GraphQL và `GET /api/case-files/{id}/archive`; phòng đọc chưa xem được tệp (`services/svc-files/README.md`, mục Trạng thái: "Chưa") |
+| F3.8 | (i) Lập hồ sơ, nộp lưu nóng → lạnh: Parquet + tệp + manifest có băm, khóa ghi; phòng đọc xem tệp | Hoàn thiện | svc-files `test_archive.py` 19, `test_reading_room.py` 22; db `test_case_files.py` 8; office `caseFiles.test.ts` 10 | bước CI `make demo-nong-lanh` (có xem tệp trong phòng đọc); smoke: nộp lưu qua `POST /api/case-files/{id}/archive` (chuyên viên bị 403), gói trên bucket lạnh, cổng xác thực vẫn "khớp", xem tệp có dấu người xem + dòng sổ kiểm toán; e2e `ho-so.spec.ts` (chuyên viên lập, đóng; tổ trưởng nộp lưu; văn thư xem tệp; hết văn bản thì đỏ, không bỏ qua) | Nộp lưu trên giao diện chạy đồng bộ trong một yêu cầu (cổng chờ 60 giây), chưa đo với hồ sơ lớn — job nền mỗi giờ vẫn là đường chính cho hồ sơ đóng quá hạn. Phòng đọc chỉ xem được tệp PDF; tệp khác chỉ thấy tên, băm. Bản xem có dấu người xem nhưng người xem vẫn lưu lại được (như F3.7) |
 | F3.9 | (iii) Phả hệ OpenLineage + kiểm chất lượng bảng Parquet | Dùng được | svc-files `test_archive.py` (6 test phả hệ, đã tính ở F3.8); db `test_lineage.py` 2 | bước CI `make demo-pha-he`; smoke 1 kiểm | Chỉ lượt nộp lưu phát sự kiện phả hệ; chưa dựng Marquez nên không có màn xem đồ thị; dashboard (F3.11) chưa có phả hệ "báo cáo ← bảng" |
 | F3.10 | (ii) IT/OT rút gọn: cảm biến → NGSI-LD (Scorpio) → dự thảo "Báo cáo sự cố" | Minh họa | svc-workflow `test_ot.py` 17 | bước CI `make demo-it-ot` (profile `iot`) | Cảm biến giả lập (`services/ot-sensor/sensor.py`); broker không xác thực thiết bị; broker gửi mỗi thông báo một lần; lịch sử đo không vào bản sao lưu (`docs/van-hanh.md`, mục Hội tụ IT/OT) |
 | F3.11 | [D] Dashboard điều hành (ECharts, bốn view số đếm qua Hasura) | Hoàn thiện | db `test_dashboard.py` 6 | smoke 2 kiểm (số chia khớp văn bản lãnh đạo đọc được, văn thư không đọc được); e2e `dieu-hanh.spec.ts` | Bốn view cố định (`office.v_*`); muốn báo cáo mới phải viết view mới |
@@ -131,8 +131,8 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 
 | Mức | Số | Tính năng |
 |---|---|---|
-| Hoàn thiện | 32 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 9 | F1.9, F2.9, F3.8, F3.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
+| Hoàn thiện | 33 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7, F3.8, F3.11, F3.12; F4.1–F4.4 |
+| Dùng được | 8 | F1.9, F2.9, F3.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
 
@@ -161,7 +161,7 @@ chưa phủ hết năng lực của cụm.
 | ③ | Đóng băng số liệu chuỗi thời gian | Lịch sử đo trong Scorpio (NGSI-LD temporal API, đọc ở `make demo-it-ot`); bảng `office.archived_document_facts` | Một phần | Chưa có kho chuỗi thời gian riêng, chưa chụp số liệu theo kỳ; `archived_document_facts` chỉ giữ số liệu dashboard của văn bản đã nộp lưu |
 | ③ | Lớp ngữ nghĩa báo cáo | Bốn view `office.v_*` qua Hasura (`db/migrations/default/1792281601200_dashboard/`) | Một phần | F3.11; không có lớp định nghĩa chỉ số và chiều dùng chung, mỗi báo cáo là một view viết tay |
 | ④ Dữ liệu phi cấu trúc | Lưu trữ đối tượng | SeaweedFS, `services/svc-files/src/svc_files/storage.py` | Hoàn thiện | F1.5 |
-| ④ | Quản lý hồ sơ, văn bản cho quy trình phê duyệt | `apps/office` + `svc-workflow` + Flowable | Hoàn thiện | F2.2–F2.4; riêng lập hồ sơ, nộp lưu (F3.8) mới ở mức Dùng được |
+| ④ | Quản lý hồ sơ, văn bản cho quy trình phê duyệt | `apps/office` + `svc-workflow` + Flowable | Hoàn thiện | F2.2–F2.4, F3.8 (lập hồ sơ, nộp lưu, phòng đọc trên giao diện) |
 | ④ | Chỉ mục toàn văn | Meilisearch, `svc_files/search.py`, `svc_files/texts.py` | Hoàn thiện | F2.7; bản scan không vào chỉ mục nội dung |
 | ④ | Trộn dữ liệu sinh biểu mẫu, báo cáo động | WeasyPrint: `svc_files/render.py` (văn bản đi), `svc_files/registers.py` (sổ đăng ký); dự thảo "Báo cáo sự cố" (`svc_workflow/ot.py`) | Dùng được | Có kiểm trong CI, nhưng khuôn viết trong mã: đổi mẫu phải sửa mã |
 | ⑤ Quy trình, tự động hóa | BPMN quản lý trạng thái luồng phê duyệt | Flowable 8, `services/svc-workflow/processes/*.bpmn20.xml` | Hoàn thiện | F1.4, F2.3, F2.4 |

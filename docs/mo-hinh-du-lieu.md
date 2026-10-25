@@ -744,7 +744,10 @@ hồ sơ `closed` từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định 365); một
    đã sang lạnh vào văn bản nào nữa.
 
 Xem lại hồ sơ đã lưu: `GET /api/case-files/{id}/archive` (§4.3) — svc-files tải manifest theo `archive_sha256`, so
-băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Phòng đọc xem tệp có watermark làm cùng F3.7.
+băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Xem tệp: `GET …/archive/files/{file_id}` — chỉ PDF
+của văn bản người gọi đọc được, so băm với manifest, đóng dấu người xem bằng đúng đường của F3.7, ghi
+`case_file.file_viewed` rồi mới trả. Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng:
+`POST /api/case-files/{id}/archive` (cùng các bước trên, ghi `case_file.archive_requested` khi giành được lượt).
 
 **Phả hệ và kiểm chất lượng (F3.9).** Mỗi lượt nộp lưu là một run OpenLineage của job `moc.case_file.archive`, với
 4 run con `files`, `tables`, `manifest`, `commit` (facet `parent`). svc-files ghi từng sự kiện vào:
@@ -1212,6 +1215,8 @@ Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
 | `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status, signature}}`; `summary` chỉ có khi `is_public`; `signature` (F4.5, chỉ minh họa) luôn có mặt: `{level, signer, ca, serial, signed_at, illustrative: true}`, hoặc `null` khi bản phát hành không ký |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
+| `GET /api/case-files/{id}/archive/files/{file_id}` | Người xem được hồ sơ, đọc được văn bản gắn tệp | Phòng đọc xem tệp: chỉ PDF; so băm với manifest (lệch → 502, không trả byte), bản có dấu tên người xem, giờ xem (`inline`, `no-store`); ghi `case_file.file_viewed` trước khi trả |
+| `POST /api/case-files/{id}/archive` | `manager`, hồ sơ của phòng mình | Nộp lưu ngay hồ sơ đã đóng: các bước của job nộp lưu; giành được lượt (chung khóa với vòng nền) rồi mới ghi `case_file.archive_requested`; 409 `not_closed`, `already_archived`, `archive_failed`, `archive_conflict`; 503 `busy` |
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
 | `POST /api/imports/incoming` | `clerk` | Nạp lô văn bản đến (cụm ⑤): multipart `data` (NDJSON hoặc CSV, cùng trường với `receiveIncoming`, thêm `files`: tên tệp trong zip) + `archive` (zip) tùy chọn, `?register=true` vào sổ từng văn bản, `Idempotency-Key` tùy chọn. Kiểm cả tệp (tệp dữ liệu qua ClamAV), ghi lô + dòng + `import.created` trong một mutation, trả 202. Vòng nền đưa từng dòng qua đúng `ingest()` và Action `receiveIncoming` (tùy chọn `registerIncoming`) với phiên của văn thư tạo lô; lỗi một dòng không hỏng dòng khác. Chi tiết lỗi: README của `svc-files` |

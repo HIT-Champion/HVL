@@ -1163,9 +1163,20 @@ def main() -> None:
               {"o": {"case_file_id": case_file, "document_id": out_id}})
     staff.gql("""mutation ($id: uuid!) { update_office_case_files(where: {id: {_eq: $id}},
         _set: {status: "closed"}) { affected_rows } }""", {"id": case_file})
-    archived = json.loads(compose("exec", "-T", "svc-files", "python", "-m", "svc_files.archive", "now",
-                                  "--case-file", case_file).decode().strip().splitlines()[-1])
-    "archived" in archived or fail(f"nộp lưu lỗi: {archived}")
+    # nộp lưu qua cổng như nút "Nộp lưu" trên giao diện: chỉ lãnh đạo phòng (chuyên viên lập, đóng — không nộp)
+    archive_url = f"{PUBLIC_URL}/api/case-files/{case_file}/archive"
+    try:
+        call_json("POST", archive_url, headers=staff.auth)
+        fail("chuyên viên nộp lưu được hồ sơ — chỉ lãnh đạo phòng được nộp")
+    except HTTPError as exc:
+        exc.status == 403 and "forbidden" in exc.body \
+            or fail(f"chuyên viên gọi nộp lưu: cần 403 forbidden, nhận {exc.status}: {exc.body[:300]}")
+    ok("nộp lưu theo yêu cầu: chuyên viên gọi bị 403, chỉ lãnh đạo phòng nộp được")
+    try:
+        pkg, _ = call_json("POST", archive_url, headers=manager.auth)
+    except HTTPError as exc:
+        fail(f"lãnh đạo phòng nộp lưu lỗi: {exc.status} {exc.body[:300]}")
+    pkg and pkg.get("archive_sha256") and pkg.get("run_id") or fail(f"nộp lưu trả thiếu trường: {pkg}")
     doc = clerk.gql("""query ($id: uuid!) { office_documents_by_pk(id: $id) { status files { file_id }
         assignments { id } events { id } } }""", {"id": out_id})["office_documents_by_pk"]
     doc["status"] == "archived" and not doc["files"] and not doc["events"] \
@@ -1174,15 +1185,27 @@ def main() -> None:
     found["result"] == "valid" and found["document"]["status"] == "archived" \
         or fail(f"cổng xác thực không còn khớp văn bản đã nộp lưu: {found}")
     room, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/{case_file}/archive", headers=clerk.auth)
-    room["manifest_sha256"] == archived["archived"][0]["archive_sha256"] \
+    room["manifest_sha256"] == pkg["archive_sha256"] \
         and [d["id"] for d in room["documents"]] == [out_id] and room["files"] and room["hidden"] == 0 \
         or fail(f"phòng đọc không đọc lại được gói lưu trữ: {room}")
     ok(f"hồ sơ nộp lưu thành gói Parquet + {len(room['files'])} tệp + manifest trên bucket lạnh khóa ghi; CSDL chỉ"
        " còn bản ghi rút gọn; quét QR vẫn khớp; phòng đọc kiểm băm, DuckDB đọc lại danh sách văn bản")
+    # Phòng đọc xem tệp: bản phát hành đọc từ gói lạnh, so băm với manifest, đóng dấu người xem, vào sổ rồi mới trả
+    viewable = [f for f in room["files"] if f["viewable"]] or fail(f"phòng đọc không có tệp PDF nào để xem: {room}")
+    _, got, stamped = request("GET", f"{PUBLIC_URL}/api/case-files/{case_file}/archive/files/{viewable[0]['file_id']}",
+                              headers=clerk.auth)
+    stamped.startswith(b"%PDF") and hashlib.sha256(stamped).hexdigest() != viewable[0]["sha256"] \
+        and (header(got, "Content-Disposition") or "").startswith("inline;") \
+        and "no-store" in (header(got, "Cache-Control") or "") \
+        or fail(f"phòng đọc trả tệp chưa đúng: {header(got, 'Content-Disposition')} {header(got, 'Cache-Control')}")
+    views = director.gql("""query ($e: String!) { core_audit_log(where: {action: {_eq: "case_file.file_viewed"},
+        entity_id: {_eq: $e}}) { overview } }""", {"e": case_file})["core_audit_log"]
+    views and views[0]["overview"].get("code") == f"HS-SMOKE-{tag}" \
+        or fail(f"lần xem tệp trong phòng đọc chưa vào sổ kiểm toán: {views}")
+    ok("phòng đọc xem tệp: bản PDF có dấu tên người xem (khác byte gốc, inline, cấm lưu đệm), lần xem vào sổ kiểm toán")
 
     # F3.9: lượt nộp lưu vừa rồi có phả hệ OpenLineage — run cha + 4 bước, bảng Parquet đã qua kiểm chất lượng
     print("Phả hệ dữ liệu")
-    pkg = archived["archived"][0]
     runs = director.gql("""query ($r: uuid!) { core_lineage_events(where: {run_id: {_eq: $r},
         event_type: {_eq: "COMPLETE"}}) { run_id outputs } }""", {"r": pkg["run_id"]})["core_lineage_events"]
     runs and runs[0]["outputs"][0].endswith(f"{pkg['archive_key']}manifest-{pkg['archive_sha256']}.json") \
