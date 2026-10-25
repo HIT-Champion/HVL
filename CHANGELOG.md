@@ -84,6 +84,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
   compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
   dùng kịch bản thay cho các lệnh tay. Test scripts +18.
+- Kiểm bản online qua HTTPS mỗi ngày (F1.9, #197): `scripts/kiem_ban_online.py` (chỉ thư viện chuẩn) kiểm một địa
+  chỉ công khai từ bên ngoài, chạy hết các mục rồi báo mục trượt: chứng chỉ hợp lệ, TLS từ 1.2, còn ít nhất 14 ngày;
+  `http://` chuyển sang `https://`; `/api/status` ok hay degraded (thành phần không ok in thành cảnh báo) và đúng
+  `--version`; `issuer`, `authorization_endpoint`, `token_endpoint` của Keycloak nằm dưới `https://<máy>/realms/moc`
+  (proxy chuyển đúng header); trang chủ còn CSP và `nosniff`. Job `.github/workflows/ban-online.yml` chạy kịch bản
+  trên https://signet.htechcs.com lúc 07:17 mỗi ngày với thẻ phát hành mới nhất, chạy tay được, và chạy trên PR đổi
+  nó; lịch và nút chạy tay có từ bản phát hành chứa tệp (GitHub chỉ đọc nhánh mặc định). `docs/trien-khai.md` mục 6
+  thêm lệnh này. Test scripts +15.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
