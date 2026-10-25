@@ -50,9 +50,15 @@ Tầng 1 là lõi không giao diện: định danh, cổng API, dữ liệu, quy
 điện tử và Không gian cá nhân P.A.R.A, ứng dụng thứ hai cắm vào cùng lõi mà không sửa dòng mã nào của lõi
 ([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Ứng dụng thứ ba, Bảng tin đơn vị, chỉ có khi cắm bằng lệnh
 `moc app install` nên không vẽ trong sơ đồ. Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó
-trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Viền đậm là mã của đội, hộp có logo là phần mềm nguồn mở dùng
-nguyên bản, chấm sáng đi theo hai yêu cầu thật. Kiến trúc H-P-D-I và các quyết định kỹ thuật:
-[`docs/architecture.md`](docs/architecture.md).
+trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Bên trong máy cũng vậy:
+- container ứng dụng ở mạng Docker riêng `apps` (không ra Internet), nơi dịch vụ lõi duy nhất là APISIX;
+- vì thế phần máy chủ của ứng dụng cũng gọi lõi qua cổng, qua cùng bước kiểm token, giới hạn tốc độ, WAF như trình
+  duyệt;
+- `make demo-cai-ung-dung` kiểm container chỉ tới được APISIX
+  ([`docs/them-ung-dung.md`](docs/them-ung-dung.md#14-migration-và-mô-hình-tin-cậy) mục 1.4).
+
+Viền đậm là mã của đội, hộp có logo là phần mềm nguồn mở dùng nguyên bản, chấm sáng đi theo hai yêu cầu thật. Kiến trúc
+H-P-D-I và các quyết định kỹ thuật: [`docs/architecture.md`](docs/architecture.md).
 
 ## Tính năng
 
