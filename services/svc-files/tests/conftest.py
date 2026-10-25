@@ -995,14 +995,14 @@ class FakeOllama:
 
 class FakeVault:
     """Két giả: khóa dữ liệu ngẫu nhiên, "bọc" bằng cách ghi nhớ trong từ điển; đếm số lần mở khóa. ca_pem: CA nội bộ
-    (None: két chưa có PKI); anchor_key: khóa Ed25519 ``moc-anchor`` trong transit (None: két chưa có khóa)."""
+    (None: két chưa có PKI); anchor_private: khóa Ed25519 ``moc-anchor`` trong transit (None: két chưa có khóa)."""
 
     def __init__(self) -> None:
         self.keys: dict[str, bytes] = {}
         self.down = False
         self.unwrapped: list[str] = []
         self.ca_pem: str | None = None
-        self.anchor_key: Ed25519PrivateKey | None = None
+        self.anchor_private: Ed25519PrivateKey | None = None
         self.key_reads = 0
 
     async def datakey(self) -> tuple[bytes, str]:
@@ -1033,16 +1033,16 @@ class FakeVault:
         if self.down:
             raise VaultError("két tắt")
         self.key_reads += 1
-        if name != "moc-anchor" or self.anchor_key is None:
+        if name != "moc-anchor" or self.anchor_private is None:
             return None
-        raw = self.anchor_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        raw = self.anchor_private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         return {"name": name, "type": "ed25519", "exportable": False, "latest_version": 1,
                 "keys": {"1": {"name": "ed25519", "public_key": base64.b64encode(raw).decode()}}}
 
     async def transit_sign_ed25519(self, name: str, data: bytes, *, version: int) -> bytes:
-        if self.down or self.anchor_key is None:
+        if self.down or self.anchor_private is None:
             raise VaultError("két tắt")
-        return self.anchor_key.sign(data)
+        return self.anchor_private.sign(data)
 
     async def aclose(self) -> None:
         pass

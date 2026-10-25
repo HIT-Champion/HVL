@@ -182,7 +182,8 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   của mọi văn bản bằng giá trị lần cuối ghi vào sổ (đổi hash để một tệp giả "khớp" ở cổng xác thực mà tắt
   trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ, kèm chữ ký
   Ed25519 của két (khóa `moc-anchor`); `--publish` đẩy mốc lên một kho git công khai cấm đẩy ép, người ngoài kiểm chữ
-  ký bằng OpenSSL (`docs/van-hanh.md` mục Mốc neo công khai). Mốc trong tệp có chữ ký sai thì `audit verify` báo lỗi.
+  ký bằng OpenSSL (`docs/van-hanh.md` mục Mốc neo công khai). Mốc trong tệp có chữ ký sai, hay không có chữ ký mà
+  đứng sau mốc đã ký, thì `audit verify` báo lỗi.
 - **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration

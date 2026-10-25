@@ -230,6 +230,12 @@ tiếp; nhánh trên kho đã đi khác (ai đó đẩy commit khác) thì push 
 tự ép. Bản sao chưa có remote thì chỉ commit tại chỗ. Không dùng kho git: `moc audit anchor --to TỆP` chỉ ghi thêm
 dòng vào một tệp để chép ra ngoài bằng cách khác.
 
+Két đã có khóa thì không mốc nào được ghi ra tệp mà thiếu chữ ký: két không trả lời lúc ký (hoặc lúc hỏi khóa), tệp
+đã có dòng có chữ ký, hay cạnh tệp đã có `anchor-key.pem` thì `--to`/`--publish` không ghi dòng chưa ký, thoát 2, và
+lượt sau ký lại (cùng mốc ra cùng chữ ký). Nhờ vậy người kiểm coi một dòng chưa ký đứng sau dòng đã ký là chữ ký đã bị
+gỡ — lỗi như chữ ký sai. Dòng chưa ký đứng trước mọi dòng đã ký là mốc ghi khi két chưa có khóa; ai gỡ chữ ký của mọi
+dòng từ đầu tệp thì chỉ lịch sử git của kho công khai cho thấy (lệnh `git log -p` ở dưới).
+
 ### Kiểm từ bên ngoài (chỉ cần git, jq, OpenSSL 3)
 
 ```bash
@@ -256,8 +262,8 @@ không cài thêm gì, không cần hệ thống đang chạy).
 
 Đơn vị đối chiếu sổ với mốc đã công bố trên máy chủ: `python3 scripts/moc.py audit verify --anchors
 /var/lib/moc/neo-cong-khai/anchors.jsonl` — kiểm chữ ký từng dòng (bằng `anchor-key.pem` cạnh tệp, `--key`, hoặc khóa
-két đang dùng), rồi so từng mốc với chuỗi tính lại: mốc lệch là sổ đã bị viết lại từ khoảng đó; dòng chữ ký sai là lỗi
-(thoát 1) và không được dùng để kết luận.
+két đang dùng), rồi so từng mốc với chuỗi tính lại: mốc lệch là sổ đã bị viết lại từ khoảng đó; dòng chữ ký sai, hay
+dòng chưa ký sau dòng đã ký, là lỗi (thoát 1) và không được dùng để kết luận.
 
 Nói rõ giới hạn:
 

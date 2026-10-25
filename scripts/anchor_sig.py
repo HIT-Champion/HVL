@@ -26,8 +26,9 @@ thông điệp ký); ``moc audit anchor --to/--publish`` chép mốc kèm chữ 
 
       python3 scripts/anchor_sig.py anchors.jsonl anchor-key.pem
 
-  Thoát 0: mọi dòng có chữ ký đều hợp lệ; 1: có dòng chữ ký sai; 2: không đọc được tệp, hoặc có dòng ký bằng khóa
-  không có trong tệp khóa. Dòng chưa ký (mốc ghi trước khi két có khóa) chỉ được đếm.
+  Thoát 0: mọi dòng có chữ ký đều hợp lệ; 1: có dòng chữ ký sai, hoặc dòng chưa ký đứng sau một dòng đã ký; 2: không
+  đọc được tệp, hoặc có dòng ký bằng khóa không có trong tệp khóa. Dòng chưa ký đứng trước mọi dòng đã ký (mốc ghi
+  trước khi két có khóa) chỉ được đếm.
 
 Chỉ kiểm, không ký: không có khóa riêng nào ở đây, nên mã không cần chạy trong thời gian hằng (khóa công khai, thông
 điệp, chữ ký đều công khai). Kiểm từng dòng một bằng OpenSSL 3 cũng được — docs/van-hanh.md mục "Mốc neo công khai".
@@ -175,6 +176,19 @@ def check(anchor: dict[str, Any], keys: dict[str, bytes]) -> str:
     return "valid" if ed25519_verify(raw, text, sig) else "invalid"
 
 
+def check_all(anchors: Iterable[dict[str, Any]], keys: dict[str, bytes]) -> list[str]:
+    """Các dòng của một tệp mốc, theo thứ tự trong tệp → kết quả từng dòng như check(), thêm ``unsigned_late``: dòng
+    không có chữ ký đứng sau một dòng có chữ ký. Két có khóa rồi thì ``moc audit anchor`` không ghi mốc chưa ký nữa,
+    nên dòng như vậy là chữ ký đã bị gỡ khỏi dòng: lỗi như chữ ký sai. Dòng chưa ký đứng trước mọi dòng có chữ ký là
+    mốc ghi khi két chưa có khóa (gỡ chữ ký của mọi dòng từ đầu tệp thì chỉ lịch sử git của kho công khai cho thấy)."""
+    results, signed = [], False
+    for anchor in anchors:
+        result = check(anchor, keys)
+        results.append("unsigned_late" if result == "unsigned" and signed else result)
+        signed = signed or result != "unsigned"
+    return results
+
+
 def _lines(path: pathlib.Path) -> Iterable[tuple[int, dict[str, Any]]]:
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if line.strip() and not line.lstrip().startswith("#"):
@@ -195,16 +209,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"✗ {exc}", file=sys.stderr)
         return 2
     labels = {"valid": "chữ ký hợp lệ", "invalid": "CHỮ KÝ SAI", "unsigned": "chưa ký",
-              "unknown_key": "ký bằng khóa không có trong tệp khóa"}
+              "unsigned_late": "CHƯA KÝ SAU DÒNG ĐÃ KÝ", "unknown_key": "ký bằng khóa không có trong tệp khóa"}
     counts = dict.fromkeys(labels, 0)
-    for n, anchor in lines:
-        result = check(anchor, keys)
+    for (n, anchor), result in zip(lines, check_all((anchor for _, anchor in lines), keys)):
         counts[result] += 1
-        print(f"  {'✓' if result == 'valid' else '✗' if result == 'invalid' else '·'} dòng {n}: mốc"
-              f" #{anchor.get('audit_id')} {str(anchor.get('hash'))[:16]} {anchor.get('anchored_at') or ''}"
-              f" — {labels[result]}")
+        mark = "✓" if result == "valid" else "✗" if result in ("invalid", "unsigned_late") else "·"
+        print(f"  {mark} dòng {n}: mốc #{anchor.get('audit_id')} {str(anchor.get('hash'))[:16]}"
+              f" {anchor.get('anchored_at') or ''} — {labels[result]}")
     print(", ".join(f"{labels[k]}: {v}" for k, v in counts.items()))
-    return 1 if counts["invalid"] else 2 if counts["unknown_key"] else 0
+    return 1 if counts["invalid"] or counts["unsigned_late"] else 2 if counts["unknown_key"] else 0
 
 
 if __name__ == "__main__":

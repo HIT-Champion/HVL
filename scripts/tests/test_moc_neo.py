@@ -191,6 +191,18 @@ class Ed25519Test(unittest.TestCase):
         self.assertEqual(anchor_sig.check({**line, "key": "sha256:" + "0" * 64}, keys), "unknown_key")
         self.assertEqual(anchor_sig.check({"audit_id": 42, "hash": "ab" * 32}, keys), "unsigned")
 
+    def test_unsigned_line_after_a_signed_one_is_a_removed_signature(self) -> None:
+        """Gỡ "key", "sig" khỏi một dòng đã ký thì dòng vẫn đúng dạng mốc cũ: chỉ thứ tự trong tệp lộ ra điều đó."""
+        keys = anchor_sig.public_keys(VECTOR_PEM)
+        old, good = {"audit_id": 7, "hash": "cd" * 32}, signed_line(42, "ab" * 32)
+        stripped = {k: v for k, v in signed_line(43, "ef" * 32).items() if k not in ("key", "sig")}
+        self.assertEqual(anchor_sig.check(stripped, keys), "unsigned")
+        self.assertEqual(anchor_sig.check_all([old, good, stripped, old], keys),
+                         ["unsigned", "valid", "unsigned_late", "unsigned_late"])
+        # dòng ký sai vẫn là dòng có chữ ký: dòng chưa ký sau nó cũng bị bắt
+        bad = {**good, "hash": "ee" * 32}
+        self.assertEqual(anchor_sig.check_all([old, bad, stripped], keys), ["unsigned", "invalid", "unsigned_late"])
+
     def test_command_line_for_outsiders(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path, key = pathlib.Path(tmp) / "anchors.jsonl", pathlib.Path(tmp) / "anchor-key.pem"
@@ -212,6 +224,10 @@ class Ed25519Test(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("✗ dòng 2", out)
             self.assertEqual(run(signed_line(42, "ab" * 32, seed=b"\x02" * 32))[0], 2)
+            code, out = run(old, good, {"audit_id": 43, "hash": "ef" * 32, "anchored_at": "2026-10-25T02:15:03Z"})
+            self.assertEqual(code, 1)
+            self.assertIn("✗ dòng 3", out)
+            self.assertIn("CHƯA KÝ SAU DÒNG ĐÃ KÝ: 1", out)
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(anchor_sig.main([str(path)]), 2)
 
@@ -231,7 +247,7 @@ def anchored(audit_id: int = 42, hash_hex: str = "ab" * 32, *, signed: bool = Tr
 class FakeTool:
     """`anchors_tool` giả: now, key, list; ghi lại lệnh đã gọi."""
 
-    def __init__(self, now: dict | None = None, key: str | None = VECTOR_PEM,
+    def __init__(self, now: dict | None = None, key: str | Exception | None = VECTOR_PEM,
                  bucket: list[dict] | None = None) -> None:
         self.now, self.key, self.bucket = now or anchored(), key, bucket or []
         self.calls: list[str] = []
@@ -241,6 +257,8 @@ class FakeTool:
         if command == "now":
             return self.now
         if command == "key":
+            if isinstance(self.key, Exception):
+                raise self.key
             return {"key": {"version": 1, "fingerprint": "", "pem": self.key} if self.key else None}
         return {"bucket": "moc-cold", "locked": True, "anchors": self.bucket}
 
@@ -271,13 +289,38 @@ class AnchorToTest(unittest.TestCase):
 
     def test_old_vault_writes_an_unsigned_line_with_the_bucket_time(self) -> None:
         self.path.write_text('{"audit_id": 7, "hash": "' + "cd" * 32 + '"}', encoding="utf-8")   # thiếu \n cuối
-        with mock.patch.object(moc, "anchors_tool", FakeTool(now=anchored(signed=False))):
+        with mock.patch.object(moc, "anchors_tool", FakeTool(now=anchored(signed=False), key=None)):
             code, out, _ = run_moc("audit", "anchor", "--to", str(self.path))
         self.assertEqual(code, 0)
         self.assertIn("không có chữ ký", out)
         old, line = [json.loads(x) for x in self.path.read_text(encoding="utf-8").splitlines()]
         self.assertEqual(line, {"audit_id": 42, "hash": "ab" * 32, "anchored_at": "2026-10-25T01:15:03Z",
                                 "system": SYSTEM})
+
+    def test_no_unsigned_line_once_the_vault_has_a_key(self) -> None:
+        """Két có khóa mà không ký được (két không trả lời lúc ký): không ghi dòng chưa ký, thoát 2 để lượt sau ghi."""
+        unsigned = anchored(43, "cd" * 32, signed=False)
+        cases = {
+            "két có khóa": (FakeTool(now=unsigned), None),
+            "không hỏi được két": (FakeTool(now=unsigned, key=moc.Unavailable("két không trả lời")), None),
+            "tệp đã có mốc có chữ ký": (FakeTool(now=unsigned, key=None), signed_line(42, "ab" * 32)),
+        }
+        for reason, (tool, first) in cases.items():
+            with self.subTest(reason):
+                self.path.write_text(json.dumps(first) + "\n" if first else "", encoding="utf-8")
+                before = self.path.read_text(encoding="utf-8")
+                with mock.patch.object(moc, "anchors_tool", tool):
+                    code, _, err = run_moc("audit", "anchor", "--to", str(self.path))
+                self.assertEqual(code, 2)
+                self.assertIn("Không ghi mốc chưa ký", err)
+                self.assertEqual(self.path.read_text(encoding="utf-8"), before)
+        (self.tmp / "anchor-key.pem").write_text(VECTOR_PEM, encoding="utf-8")
+        self.path.unlink()
+        with mock.patch.object(moc, "anchors_tool", FakeTool(now=unsigned, key=None)):
+            code, _, err = run_moc("audit", "anchor", "--to", str(self.path))
+        self.assertEqual(code, 2)
+        self.assertIn("đã có khóa ký mốc", err)
+        self.assertFalse(self.path.exists())
 
 
 def git(cwd: pathlib.Path, *args: str) -> str:
@@ -401,6 +444,14 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(git(self.remote, "ls-tree", "--name-only", "main").split(), ["anchors.jsonl"])
 
+    def test_unsigned_anchor_after_signed_ones_is_never_published(self) -> None:
+        self.publish(FakeTool())
+        code, _, err = self.publish(FakeTool(now=anchored(43, "cd" * 32, signed=False), key=None))
+        self.assertEqual(code, 2)
+        self.assertIn("Không ghi mốc chưa ký", err)
+        self.assertEqual(git(self.remote, "rev-list", "--count", "main"), "1")
+        self.assertEqual(git(self.work, "status", "--porcelain"), "")
+
 
 # --- moc audit verify --anchors ------------------------------------------------------------------------------------
 
@@ -462,7 +513,7 @@ class VerifyTest(unittest.TestCase):
         code, report = self.verify(signed_line(2, self.rows[1]["hash"]))
         self.assertEqual(code, 0, report)
         self.assertEqual(report["signatures"]["anchors.jsonl"],
-                         {"valid": 1, "invalid": 0, "unsigned": 0, "unknown_key": 0})
+                         {"valid": 1, "invalid": 0, "unsigned": 0, "unsigned_late": 0, "unknown_key": 0})
         self.assertEqual(report["anchors"]["anchors.jsonl"], {"checked": 1, "matched": 1})
 
     def test_good_signature_with_the_vault_key_or_key_option(self) -> None:
@@ -498,6 +549,32 @@ class VerifyTest(unittest.TestCase):
         self.assertEqual(code, 0, report)
         self.assertEqual(report["anchors"]["anchors.jsonl"], {"checked": 1, "matched": 1})
         self.assertTrue(any("không có chữ ký" in n for n in report["notes"]))
+
+    def test_unsigned_line_after_a_signed_one_is_an_error_and_is_not_used(self) -> None:
+        """Gỡ chữ ký khỏi một dòng để sửa giá trị mà không bị bắt chữ ký sai: lỗi (thoát 1), dòng không được dùng."""
+        (self.tmp / "anchor-key.pem").write_text(VECTOR_PEM, encoding="utf-8")
+        stripped = {"audit_id": 2, "hash": "ee" * 32, "anchored_at": "2026-10-25T01:15:03Z", "system": SYSTEM}
+        code, report = self.verify(signed_line(1, self.rows[0]["hash"]), stripped)
+        self.assertEqual(code, 1, report)
+        self.assertEqual(report["signatures"]["anchors.jsonl"]["unsigned_late"], 1)
+        [problem] = report["problems"]
+        self.assertEqual((problem["kind"], problem["audit_id"]), ("anchor_unsigned_late", 2))
+        self.assertIn("dòng 2", problem["message"])
+        self.assertIsNone(report["rewritten"])
+        self.assertEqual(report["anchors"]["anchors.jsonl"], {"checked": 1, "matched": 1})
+
+    def test_signature_order_is_checked_file_by_file(self) -> None:
+        """Tệp mốc mới đã ký kiểm cùng tệp mốc cũ chưa ký: thứ tự tính trong từng tệp, không nối các tệp lại."""
+        (self.tmp / "anchor-key.pem").write_text(VECTOR_PEM, encoding="utf-8")
+        old_dir = self.tmp / "cu"
+        old_dir.mkdir()
+        (old_dir / "anchors.jsonl").write_text(json.dumps({"audit_id": 2, "hash": self.rows[1]["hash"]}) + "\n",
+                                               encoding="utf-8")
+        code, report = self.verify(signed_line(1, self.rows[0]["hash"]),
+                                   extra=("--anchors", str(old_dir / "anchors.jsonl")))
+        self.assertEqual(code, 0, report)
+        self.assertEqual(report["signatures"]["anchors.jsonl"],
+                         {"valid": 1, "invalid": 0, "unsigned": 1, "unsigned_late": 0, "unknown_key": 0})
 
     def test_signed_line_that_no_longer_matches_the_chain_still_points_at_the_rewrite(self) -> None:
         """Chữ ký đúng mà hash lệch sổ: két đã ký mốc này, sổ bị viết lại sau đó — lỗi của sổ, không của chữ ký."""

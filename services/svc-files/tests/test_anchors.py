@@ -481,7 +481,7 @@ def test_no_anchor_key_in_an_older_vault_is_404(client, vault):
 
 
 def test_anchor_key_is_public_pem_with_the_fingerprint_written_in_anchor_lines(client, vault):
-    vault.anchor_key = Ed25519PrivateKey.from_private_bytes(SEED)
+    vault.anchor_private = Ed25519PrivateKey.from_private_bytes(SEED)
     r = client.get("/api/verify/anchor-key.pem")
     assert r.status_code == 200 and r.text == VECTOR_PEM
     assert r.headers["content-type"] == "application/x-pem-file"
