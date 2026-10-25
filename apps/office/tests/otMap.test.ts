@@ -20,12 +20,12 @@
 // broker, không tải gì ngoài), mục thanh bên đúng các vai trò có quyền Action trong db/metadata/actions.yaml.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 const {
-  FLAG_ORDER, LEVEL_ORDER, LEVEL_TONE, NEAR_BAND, PLAN, doorOf, fmtTemp, knownFlags, placeSensors, roomLevel,
-  sensorLevel,
+  FLAG_ORDER, FUTURE_SLACK_MIN, LEVEL_ORDER, LEVEL_TONE, NEAR_BAND, PLAN, doorOf, fmtTemp, knownFlags, placeSensors,
+  roomLevel, sensorLevel,
 } = await import('../app/utils/otMap.ts')
 const { corridor: PLAN_CORRIDOR, outline: PLAN_OUTLINE, rooms: PLAN_ROOMS, view: PLAN_VIEW } = PLAN
 
@@ -54,8 +54,10 @@ test('mức của một cảm biến: vượt là lớn hơn ngưỡng (như q c
   // mất tín hiệu, ngoài dải: số không tin được, không tô theo số dù số vượt ngưỡng
   assert.equal(at(41, ['stale']), 'unknown')
   assert.equal(at(-127, ['out_of_range']), 'unknown')
-  // trùng giờ đo: vẫn tô theo số, chỉ thêm dấu cờ
+  // trùng giờ đo, giờ đo ở tương lai: vẫn tô theo số, chỉ thêm dấu cờ
   assert.equal(at(41, ['duplicate_time']), 'over')
+  assert.equal(at(41, ['future_time']), 'over')
+  assert.equal(at(41, ['stale', 'future_time']), 'unknown')
   assert.equal(at(20, ['cờ-mới-chưa-biết']), 'normal')
   assert.equal(sensorLevel({ value: 30, flags: [] }, 37.5), 'normal')
   assert.equal(sensorLevel({ value: 36, flags: [] }, 37.5), 'near')
@@ -91,8 +93,9 @@ test('gắn cảm biến vào phòng theo mã; mã lạ hay không có mã thì 
   assert.equal(room('may-chu').level, 'over')
   assert.equal(room('kho-3').level, 'empty')
   assert.deepEqual(placed.outside.map((s) => s.name), ['hanh-lang', 'tang-2'])
-  assert.deepEqual(knownFlags(['duplicate_time', 'x', 'stale', 'stale']), ['stale', 'duplicate_time'])
-  assert.deepEqual(FLAG_ORDER, ['stale', 'out_of_range', 'duplicate_time'])
+  assert.deepEqual(knownFlags(['future_time', 'duplicate_time', 'x', 'stale', 'stale']),
+    ['stale', 'duplicate_time', 'future_time'])
+  assert.deepEqual(FLAG_ORDER, ['stale', 'out_of_range', 'duplicate_time', 'future_time'])
 })
 
 test('sơ đồ mẫu: phòng trong khung nhà, không chồng nhau, không đè hành lang; cửa nằm trên cạnh giáp hành lang', () => {
@@ -144,9 +147,22 @@ test('đủ chữ hai thứ tiếng cho mọi phòng, mức, cờ, trạng thái
   // chữ dùng tham số đúng tên trang truyền vào
   assert.match(lookup(vi, 'sensors.flagHint.stale')!, /\{n\}/)
   assert.match(lookup(en, 'sensors.flagHint.out_of_range')!, /\{min\}.*\{max\}/)
+  for (const messages of [vi, en]) assert.match(lookup(messages, 'sensors.flagHint.future_time')!, /\{slack\}/)
   for (const messages of [vi, en]) {
     for (const key of keys) assert.doesNotMatch(lookup(messages, key)!, /[|@$]/, `${key}: ký tự đặc biệt của vue-i18n`)
   }
+})
+
+test('ngưỡng giờ đo ở tương lai trong chú giải đúng FUTURE_SLACK của svc-workflow (ot.py)', (t) => {
+  const file = new URL('../../../services/svc-workflow/src/svc_workflow/ot.py', import.meta.url)
+  if (!existsSync(file)) {
+    t.skip('không có services/svc-workflow trong cây mã')
+    return
+  }
+  const m = readFileSync(file, 'utf8').match(/^FUTURE_SLACK = timedelta\(minutes=(\d+)\)$/m)
+  assert.ok(m, 'không thấy FUTURE_SLACK trong ot.py')
+  assert.equal(FUTURE_SLACK_MIN, Number(m[1]))
+  assert.match(read('../app/pages/cam-bien.vue'), /slack: FUTURE_SLACK_MIN/)
 })
 
 test('trang chỉ đọc qua Action otSensorMap, không gọi broker, không tải gì ngoài; báo rõ khi chưa bật cảm biến', () => {

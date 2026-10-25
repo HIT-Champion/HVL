@@ -22,12 +22,15 @@
 export const SENSOR_REFRESH_MS = 30_000
 // Dải "gần ngưỡng" chỉ để nhìn trên sơ đồ, không gửi cảnh báo: cảnh báo (dự thảo "Báo cáo sự cố") chỉ khi vượt ngưỡng
 export const NEAR_BAND = 2
+// Giờ đo muộn hơn giờ máy chủ quá chừng này phút là ở tương lai (cờ future_time): đúng FUTURE_SLACK của svc-workflow
+// (ot.py), chỉ để ghi trong chú giải
+export const FUTURE_SLACK_MIN = 2
 
-export type SensorFlag = 'stale' | 'out_of_range' | 'duplicate_time'
+export type SensorFlag = 'stale' | 'out_of_range' | 'duplicate_time' | 'future_time'
 export type MapStatus = 'ready' | 'off' | 'unavailable'
 export type Level = 'over' | 'near' | 'normal' | 'unknown' | 'empty'
 
-export const FLAG_ORDER: SensorFlag[] = ['stale', 'out_of_range', 'duplicate_time']
+export const FLAG_ORDER: SensorFlag[] = ['stale', 'out_of_range', 'duplicate_time', 'future_time']
 export const LEVEL_ORDER: Level[] = ['over', 'near', 'normal', 'unknown', 'empty']
 
 export interface OtSensor {
@@ -104,7 +107,8 @@ export function knownFlags(flags: Iterable<string>): SensorFlag[] {
 }
 
 // Mức của một cảm biến: không có số, mất tín hiệu hay ngoài dải thì không tin được số đo; vượt ngưỡng theo đúng luật
-// của subscription (temperature > ngưỡng); trùng giờ đo vẫn tô theo số, chỉ thêm dấu cờ
+// của subscription (temperature > ngưỡng); trùng giờ đo, giờ đo ở tương lai vẫn tô theo số, chỉ thêm dấu cờ (số đo
+// mới tới broker, chỉ giờ của thiết bị sai; thiết bị đó mất tín hiệu thì có thêm cờ mất tín hiệu)
 export function sensorLevel(sensor: Pick<OtSensor, 'value' | 'flags'>, threshold: number): Level {
   if (sensor.value === null || sensor.flags.includes('stale') || sensor.flags.includes('out_of_range')) return 'unknown'
   if (sensor.value > threshold) return 'over'
