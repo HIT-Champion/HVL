@@ -214,6 +214,8 @@ class MakefileTest(unittest.TestCase):
             (d / "bin").mkdir()
             shutil.copy(ROOT / "Makefile", d)
             shutil.copy(ROOT / "scripts" / "gen-env.sh", d / "scripts")
+            (d / "platform" / "apisix").mkdir(parents=True)  # make up kiểm MOC_WAF bằng script này (F3.15)
+            shutil.copy(ROOT / "platform" / "apisix" / "kiem-moi-truong.sh", d / "platform" / "apisix")
             (d / "scripts" / "log_tap_trung.py").write_text(
                 "import sys\nopen('init.log', 'a').write(' '.join(sys.argv[1:]) + '\\n')\n", encoding="utf-8")
             docker = d / "bin" / "docker"
@@ -241,7 +243,9 @@ class MakefileTest(unittest.TestCase):
     def test_make_up_without_logs_profile_is_unchanged(self) -> None:
         env, docker, init = self.run_up("MOC_PUBLIC_URL=https://x\nMOC_EXTRA_PROFILES=\n")
         self.assertNotIn("MOC_LOGS_PASSWORD", env)
-        self.assertEqual(docker, "compose --profile core --profile app up -d --build --wait --wait-timeout 600\n")
+        # bỏ lệnh chỉ đọc `config` mà env-ready gọi để kiểm MOC_WAF (F3.15)
+        ups = [line for line in docker.splitlines() if " config " not in line]
+        self.assertEqual(ups, ["compose --profile core --profile app up -d --build --wait --wait-timeout 600"])
         self.assertEqual(init, "")
 
     def test_logged_services_match_the_override(self) -> None:

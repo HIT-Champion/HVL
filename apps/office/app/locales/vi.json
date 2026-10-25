@@ -28,7 +28,8 @@
     "audit": "Sổ kiểm toán",
     "board": "Điều hành",
     "metrics": "Số đo",
-    "feedback": "Góp ý"
+    "feedback": "Góp ý",
+    "selfCheck": "Tự chẩn đoán"
   },
   "role": {
     "clerk": "Văn thư",
@@ -544,7 +545,8 @@
     "feedback_rate": "Bạn đã gửi nhiều góp ý trong thời gian ngắn: tối đa 3 góp ý mỗi 10 phút, 20 góp ý mỗi 24 giờ. Thử lại sau.",
     "feedback_rating": "Chọn mức hài lòng từ 1 đến 5.",
     "feedback_comment": "Nội dung góp ý dài quá 500 ký tự.",
-    "feedback_screen": "Không gắn được màn hình đang dùng vào góp ý. Tải lại trang rồi gửi lại."
+    "feedback_screen": "Không gắn được màn hình đang dùng vào góp ý. Tải lại trang rồi gửi lại.",
+    "maturity_rate": "Đơn vị đã lưu tự chẩn đoán nhiều lần trong thời gian ngắn: tối đa 5 lần mỗi giờ, 20 lần mỗi 24 giờ. Thử lại sau."
   },
   "validation": {
     "required": "Không được để trống",
@@ -800,7 +802,8 @@
         "document_types": "Loại văn bản",
         "case_files": "Hồ sơ",
         "case_file_documents": "Văn bản trong hồ sơ",
-        "dispatches": "Liên thông văn bản"
+        "dispatches": "Liên thông văn bản",
+        "maturity_assessments": "Tự chẩn đoán H-P-D-I"
       },
       "core": {
         "files": "Tệp tải lên",
@@ -1224,5 +1227,89 @@
     "feedback": "Góp ý của người dùng",
     "feedbackValue": "Điểm trung bình {avg}/5 trên {n} góp ý",
     "feedbackLink": "Xem góp ý"
+  },
+  "hpdi": {
+    "title": "Tự chẩn đoán H-P-D-I",
+    "subtitle": "Lãnh đạo tự đánh giá mức trưởng thành số của đơn vị theo bốn không gian: Con người, Quy trình, Dữ liệu, Trí tuệ.",
+    "forbidden": "Chỉ lãnh đạo đơn vị và lãnh đạo phòng dùng được trang này.",
+    "intro": "Mỗi câu có 5 mức: chọn mức mô tả đúng nhất điều đang thực sự diễn ra ở đơn vị, không phải điều mong muốn. Điểm của mỗi không gian là trung bình các câu của nó. Cạnh mỗi không gian là số liệu Signet đo được từ chính dữ liệu của đơn vị để đối chiếu.",
+    "disclaimer": "Câu hỏi do đội Signet tự viết, dựa trên định nghĩa H-P-D-I của bài giới thiệu chủ đề OLP 2026 và giáo trình DX-OS (nguồn ở cuối trang). Đây là công cụ tự đánh giá, không phải bộ chỉ số chính thức của cơ quan nhà nước, không quy đổi sang điểm DTI.",
+    "managerNote": "Lãnh đạo phòng trả lời và xem kết quả trên trình duyệt này; chỉ lãnh đạo đơn vị lưu kết quả và xem số liệu đo được của đơn vị.",
+    "progress": "Đã trả lời {n}/{total} câu",
+    "fill": "Điền theo lần lưu gần nhất",
+    "reset": "Làm lại",
+    "spaceScore": "Điểm: {score}/5",
+    "level": "Mức {n}",
+    "evidenceTitle": "Bằng chứng đo được",
+    "evidenceNone": "Đơn vị chưa có số liệu nào Signet đo được cho không gian này.",
+    "evidenceHint": "Số của đơn vị lúc mở trang, chỉ để đối chiếu với câu trả lời, không dùng để chấm điểm.",
+    "evidence": {
+      "feedback": {
+        "name": "Điểm hài lòng của người dùng (góp ý trong ứng dụng)",
+        "value": "{avg}/5 trên {n} góp ý"
+      },
+      "overdueNow": {
+        "name": "Văn bản đến đang quá hạn",
+        "value": "{n} văn bản"
+      },
+      "overdueRate": {
+        "name": "Tỷ lệ quá hạn, trong số văn bản đã rõ đúng hay trễ hạn",
+        "value": "{pct} % ({late}/{n} văn bản)"
+      },
+      "timeToAssign": {
+        "name": "Thời gian từ khi văn bản đến tới khi được giao xử lý (trung vị)",
+        "value": "{hours} trên {n} văn bản đã giao"
+      },
+      "documents": {
+        "name": "Văn bản trên hệ thống, không tính văn bản đã hủy",
+        "value": "{n} (đến {incoming}, đi {outgoing})"
+      },
+      "archivedDocuments": {
+        "name": "Văn bản đã lưu trữ (nộp lưu)",
+        "value": "{n} văn bản"
+      },
+      "caseFiles": {
+        "name": "Hồ sơ đã nộp lưu",
+        "value": "{archived}/{n} hồ sơ"
+      },
+      "intakeKept": {
+        "name": "Trường gợi ý đọc văn bản đến được văn thư giữ nguyên",
+        "value": "{pct} % ({kept}/{n} trường)"
+      },
+      "suggestionKept": {
+        "name": "Gợi ý giao việc giữ đúng phòng chủ trì",
+        "value": "{pct} % ({kept}/{n} văn bản đã giao)"
+      }
+    },
+    "result": "Kết quả",
+    "answerAll": "Còn {n} câu chưa trả lời.",
+    "space": "Không gian",
+    "now": "Lần này",
+    "previous": "Lần lưu {date}",
+    "previousShort": "Lần trước",
+    "focusTitle": "Nên làm trước",
+    "focus": "{space}: điểm thấp nhất trong phần nền chưa vững. Làm vững không gian này trước khi đầu tư cho các không gian sau.",
+    "focusLast": "{space}: điểm thấp nhất, ba không gian nền phía trước đều cao hơn. Đây là chỗ nên đầu tư tiếp.",
+    "focusNone": "Cả bốn không gian đều ở mức 5: giữ nhịp và đo lại định kỳ.",
+    "gapsTitle": "Lệch nền",
+    "gapsNone": "Không có: không gian sau không vượt không gian trước.",
+    "gap": "{to} cao hơn {from} {diff} mức.",
+    "gapsHint": "Theo nguyên lý tiến hóa tuyến tính H → P → D → I: không gian sau dựng trên không gian trước chưa vững dễ thành “rác vào, rác ra”.",
+    "steps": "Bước tiếp theo",
+    "first": "Làm trước",
+    "stepFrom": "từ câu {q} ({title}), đang ở mức {n}",
+    "linkFor": "{page} (trang của {roles})",
+    "saveTitle": "Lưu và theo dõi tiến bộ",
+    "saveHint": "Mỗi lần lưu là một dòng trong lịch sử của đơn vị và một dòng sổ kiểm toán; không sửa, không xóa được. Điểm do hệ thống tính lại từ các câu trả lời.",
+    "note": "Ghi chú",
+    "notePlaceholder": "Bối cảnh của lần đánh giá này (không bắt buộc)",
+    "save": "Lưu kết quả",
+    "saving": "Đang lưu…",
+    "saved": "Đã lưu kết quả tự chẩn đoán",
+    "history": "Các lần đã lưu",
+    "historyNone": "Đơn vị chưa lưu lần nào.",
+    "when": "Lúc lưu",
+    "sources": "Nguồn tham khảo",
+    "sourcesNote": "Bộ câu {id}. Cách chấm và giới hạn: docs/tu-chan-doan.md trong mã nguồn."
   }
 }

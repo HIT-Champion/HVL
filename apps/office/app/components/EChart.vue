@@ -21,10 +21,14 @@ import { BarChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { init, use, type EChartsCoreOption, type EChartsType } from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
+import { RadarChart } from 'echarts/charts'
+import { RadarComponent } from 'echarts/components'
 
 // Biểu đồ Apache ECharts (dashboard điều hành, F3.11). Chỉ nạp phần dùng đến; vẽ SVG để chữ sắc khi in và chụp.
 // Số liệu luôn có bảng đi kèm ở trang gọi: biểu đồ chỉ để nhìn nhanh, aria-label tóm tắt cho trình đọc màn hình.
 use([BarChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer])
+// Radar bốn trục của trang Tự chẩn đoán H-P-D-I
+use([RadarChart, RadarComponent])
 
 const props = defineProps<{ option: EChartsCoreOption; label: string; height?: number }>()
 const el = ref<HTMLDivElement | null>(null)

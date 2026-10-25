@@ -21,9 +21,10 @@ import { ApiError } from '~/composables/useApi'
 // ràng buộc check) nên dịch được thành câu tiếng Việt cụ thể; svc-workflow đã trả câu tiếng Việt sẵn.
 // documents_recipient_units gồm cả documents_recipient_units_out, _other và lỗi của trigger cùng tiền tố (F3.12).
 // feedback_*: góp ý (F4.6) — feedback_rate là lỗi chặn gửi dồn của trigger, tên đứng đầu câu lỗi.
+// maturity_rate: tự chẩn đoán H-P-D-I (F4.7) — chặn lưu dồn theo đơn vị, như feedback_rate.
 const CONSTRAINTS = ['documents_in_dedup', 'documents_due_after_registered', 'documents_body_length',
   'document_files_sealed', 'documents_restricted_sealed', 'documents_restricted_local', 'documents_recipient_units',
-  'feedback_rate', 'feedback_rating', 'feedback_comment', 'feedback_screen']
+  'feedback_rate', 'feedback_rating', 'feedback_comment', 'feedback_screen', 'maturity_rate']
 
 export function errorText(t: Composer['t'], e: unknown): string {
   if (e instanceof ApiError) {

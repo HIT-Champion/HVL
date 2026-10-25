@@ -118,6 +118,8 @@ def test_lookup_uses_token_tenant_not_request_data(client, make_token, hasura):
         ('a"b\\c.pdf', 'filename="abc.pdf"', "filename*=UTF-8''a%22b%5Cc.pdf"),
         ("Đơn.docx", 'filename="Don.docx"', "filename*=UTF-8''%C4%90%C6%A1n.docx"),
         ("文件.pdf", 'filename=".pdf"', "filename*=UTF-8''%E6%96%87%E4%BB%B6.pdf"),
+        # tên có ; = ' (WAF cho qua, F3.15): phần UTF-8 mã hóa hết, không tách được tiêu đề
+        ("a;b=c'd.pdf", "filename=\"a;b=c'd.pdf\"", "filename*=UTF-8''a%3Bb%3Dc%27d.pdf"),
     ],
 )
 def test_content_disposition(name, ascii_part, utf8_part):

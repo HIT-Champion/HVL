@@ -28,7 +28,8 @@
     "audit": "Audit log",
     "board": "Overview",
     "metrics": "Metrics",
-    "feedback": "Feedback"
+    "feedback": "Feedback",
+    "selfCheck": "Self-assessment"
   },
   "role": {
     "clerk": "Clerk",
@@ -544,7 +545,8 @@
     "feedback_rate": "You have sent a lot of feedback in a short time: at most 3 in 10 minutes and 20 in 24 hours. Try again later.",
     "feedback_rating": "Choose a satisfaction level from 1 to 5.",
     "feedback_comment": "Feedback is longer than 500 characters.",
-    "feedback_screen": "Could not attach the current screen to your feedback. Reload the page and send again."
+    "feedback_screen": "Could not attach the current screen to your feedback. Reload the page and send again.",
+    "maturity_rate": "Your organisation has saved the self-check many times in a short time: at most 5 times an hour and 20 in 24 hours. Try again later."
   },
   "validation": {
     "required": "Required",
@@ -800,7 +802,8 @@
         "document_types": "Document type",
         "case_files": "Case file",
         "case_file_documents": "Document in case file",
-        "dispatches": "Inter-unit dispatch"
+        "dispatches": "Inter-unit dispatch",
+        "maturity_assessments": "H-P-D-I self-assessment"
       },
       "core": {
         "files": "Uploaded file",
@@ -1224,5 +1227,89 @@
     "feedback": "User feedback",
     "feedbackValue": "Average score {avg}/5 over {n} feedback",
     "feedbackLink": "View feedback"
+  },
+  "hpdi": {
+    "title": "H-P-D-I self-assessment",
+    "subtitle": "Leaders assess the organisation's digital maturity across four spaces: Human, Process, Data, Intelligence.",
+    "forbidden": "Only unit and department leaders can use this page.",
+    "intro": "Each question has 5 levels: pick the one that best describes what actually happens in the organisation today, not what you would like. A space's score is the average of its questions. Next to each space are figures Signet measures from the organisation's own data, for comparison.",
+    "disclaimer": "The questions were written by the Signet team, based on the H-P-D-I definitions in the OLP 2026 theme introduction and the DX-OS course book (sources at the bottom). This is a self-assessment tool, not an official government index, and it does not convert to a DTI score.",
+    "managerNote": "Department leaders can answer and see the result in this browser; only the unit leader saves results and sees the organisation's measured figures.",
+    "progress": "Answered {n}/{total} questions",
+    "fill": "Fill in from the last saved run",
+    "reset": "Start over",
+    "spaceScore": "Score: {score}/5",
+    "level": "Level {n}",
+    "evidenceTitle": "Measured evidence",
+    "evidenceNone": "Signet has no measured figures for this space in the organisation yet.",
+    "evidenceHint": "The organisation's figures when the page was opened, to compare with the answers; they are not used for scoring.",
+    "evidence": {
+      "feedback": {
+        "name": "User satisfaction (in-app feedback)",
+        "value": "{avg}/5 from {n} responses"
+      },
+      "overdueNow": {
+        "name": "Incoming documents now overdue",
+        "value": "{n} documents"
+      },
+      "overdueRate": {
+        "name": "Overdue rate, among documents known to be on time or late",
+        "value": "{pct} % ({late}/{n} documents)"
+      },
+      "timeToAssign": {
+        "name": "Time from arrival to assignment (median)",
+        "value": "{hours} over {n} assigned documents"
+      },
+      "documents": {
+        "name": "Documents in the system, excluding cancelled ones",
+        "value": "{n} (incoming {incoming}, outgoing {outgoing})"
+      },
+      "archivedDocuments": {
+        "name": "Archived documents",
+        "value": "{n} documents"
+      },
+      "caseFiles": {
+        "name": "Case files archived",
+        "value": "{archived}/{n} case files"
+      },
+      "intakeKept": {
+        "name": "Suggested intake fields kept by the clerk",
+        "value": "{pct} % ({kept}/{n} fields)"
+      },
+      "suggestionKept": {
+        "name": "Assignment suggestions that kept the lead department",
+        "value": "{pct} % ({kept}/{n} assigned documents)"
+      }
+    },
+    "result": "Result",
+    "answerAll": "{n} questions still unanswered.",
+    "space": "Space",
+    "now": "This run",
+    "previous": "Saved {date}",
+    "previousShort": "Previous",
+    "focusTitle": "Work on first",
+    "focus": "{space}: the lowest score in the part of the foundation that is not yet solid. Strengthen this space before investing in the later ones.",
+    "focusLast": "{space}: the lowest score; the three foundation spaces before it all score higher. This is where to invest next.",
+    "focusNone": "All four spaces are at level 5: keep the pace and reassess regularly.",
+    "gapsTitle": "Foundation gaps",
+    "gapsNone": "None: no later space is ahead of the one before it.",
+    "gap": "{to} is {diff} levels above {from}.",
+    "gapsHint": "Following the linear evolution principle H → P → D → I: a later space built on an earlier one that is not solid easily turns into “garbage in, garbage out”.",
+    "steps": "Next steps",
+    "first": "Do first",
+    "stepFrom": "from question {q} ({title}), currently at level {n}",
+    "linkFor": "{page} ({roles} only)",
+    "saveTitle": "Save and track progress",
+    "saveHint": "Each save is one row in the organisation's history and one audit log entry; it cannot be edited or deleted. The system recomputes the scores from the answers.",
+    "note": "Note",
+    "notePlaceholder": "Context for this assessment (optional)",
+    "save": "Save result",
+    "saving": "Saving…",
+    "saved": "Self-assessment result saved",
+    "history": "Saved runs",
+    "historyNone": "The organisation has not saved any run yet.",
+    "when": "Saved at",
+    "sources": "References",
+    "sourcesNote": "Question set {id}. Scoring and limitations: docs/tu-chan-doan.md in the source code."
   }
 }

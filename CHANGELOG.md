@@ -17,6 +17,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `MOC_IMPORT_STORE_MAX_MB`; dòng được giữ khi đang làm nên hai tiến trình không làm trùng. Bảng `core.import_jobs`,
   `core.import_rows` (migration 1792281602800). Lô mẫu 200 dòng `seed/nap-lo/van-ban-den.csv`, `make demo-nap-lo`.
   Test (đếm tĩnh): svc-files +113, db +18, scripts +12, svc-workflow +2, giao diện +2.
+- Tường lửa ứng dụng web ở cổng APISIX (F3.15): Coraza v3.3.3 + OWASP CRS v4.14.0 (coraza-proxy-wasm 0.6.0, ghim digest
+  và băm) chặn tải tấn công (SQLi, XSS, duyệt thư mục, chèn lệnh, Log4Shell, tải lên `.php`…) trên mọi đường trước khi
+  kiểm token → 403 có `X-Request-Id`, dòng chặn trong nhật ký mang cùng mã. Mặc định chặn, `MOC_WAF=On | DetectionOnly |
+  Off`; giá trị sai bị `make up` và reconciler GitOps (trước khi dừng Signet) từ chối, và image dừng ngay lúc khởi động
+  với dòng lỗi rõ thay vì cổng trả 503. Loại trừ CRS gỡ theo id, có lý do, chỉ trên đúng khóa: Keycloak, chữ truy vấn
+  GraphQL, truy cập bằng IP; chữ tự do trong biến GraphQL (nội dung, trích yếu, ý kiến, ghi chú, góp ý), câu hỏi trợ lý,
+  ô Tìm kiếm; tên tệp tải lên có `' " ; = :`. Dò trên 7 389 yêu cầu dựng từ toàn bộ chữ của dữ liệu mẫu: không chữ mẫu
+  nào bị chặn nhầm (trước đó 4/21 PDF mẫu). JSON lồng sâu bị chặn trước WAF (GHSA-6gcq-wc29-5xf2). Nội dung tệp vẫn do
+  ClamAV soi. APISIX dựng thành image `moc/apisix`, 4 worker (`MOC_APISIX_WORKERS`); smoke thêm 7 kiểm, có tên tệp và
+  nội dung hành chính thật phải qua (`platform/apisix/README.md`, mục WAF).
 - Khai giấy phép theo chuẩn REUSE: `REUSE.toml` khai Apache-2.0 cho các tệp không chèn được header (JSON, ảnh, PDF,
   tài liệu, dữ liệu mẫu), `LICENSES/Apache-2.0.txt` là bản sao của `LICENSE`; `reuse lint` 5.0.2 đạt, 482/482 tệp có
   thông tin bản quyền và giấy phép. `.env.example` mang header giấy phép, `make license-check` kiểm cả tệp này
@@ -84,6 +94,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `svc-files` (nhật ký, lời gọi Hasura nên vào `core.audit_log.request_id`, lời gọi `svc-files`), mã sai dạng thì
   thay bằng mã mới; APISIX ghi mã yêu cầu ở cuối dòng log truy cập. Rủi ro (CORS của Parseable, mất log khi Vector dừng)
   và cách tắt: `docs/van-hanh.md`, mục Log tập trung. Test svc-workflow +10, scripts +29, `vector test` 29 ca.
+- Tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7): trang Tự chẩn đoán `/tu-chan-doan` — 12 câu do đội tự
+  viết theo bốn không gian Con người, Quy trình, Dữ liệu, Trí tuệ, mỗi câu 5 mức quan sát được (vi/en, có JSON
+  Schema), radar ECharts, cảnh báo lệch nền theo nguyên lý tiến hóa tuyến tính H → P → D → I, không gian nên làm
+  trước, bước tiếp theo trỏ đúng trang Signet mà vai trò người xem mở được. Cạnh mỗi không gian là bằng chứng đo được
+  của chính đơn vị lấy từ các view đã có (dashboard, số đo F4.6, độ chính xác tác tử F4.1/F4.3, hồ sơ nộp lưu), chỉ số
+  chưa có dữ liệu thì không hiện. Lãnh đạo đơn vị lưu kết quả vào `office.maturity_assessments` (CSDL kiểm đủ bộ câu
+  và tính điểm, cách ly theo đơn vị, tối đa 5 lần lưu mỗi giờ, không sửa, xóa, gắn sổ kiểm toán) để xem tiến bộ; lãnh
+  đạo phòng làm được nhưng không lưu. Không phải bộ chỉ số chính thức, không quy đổi DTI. Nguồn, cách chấm, giới hạn:
+  [`docs/tu-chan-doan.md`](docs/tu-chan-doan.md). Test office +18, db +18.
 - Giao diện hồ sơ công việc và phòng đọc xem tệp (F3.8, màn (i)): trang **Hồ sơ công việc** của Văn phòng điện tử —
   chuyên viên, lãnh đạo phòng lập hồ sơ (ký hiệu, tiêu đề, thời hạn bảo quản), thêm văn bản đã xong của phòng, đóng hồ
   sơ; văn thư, lãnh đạo đơn vị xem cả đơn vị; lãnh đạo phòng bấm **Nộp lưu** (`POST /api/case-files/{id}/archive`; đội
@@ -141,8 +160,21 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   kèm thành phần và mã F hay tệp làm bằng chứng (`docs/muc-hoan-thien.md`), mục làm dở ghi rõ phần còn thiếu, việc
   đang làm ghi số PR nếu có. Thêm mục "Sau vòng trường": việc còn thiếu thật xếp theo ưu tiên, kèm lý do, không gắn
   ngày.
+- `docs/architecture.md` viết lại theo hệ thống đang chạy: sơ đồ tổng thể vẽ lại bằng Mermaid với đường dẫn thật của
+  APISIX; bản đồ công cụ thay bảng "đang khảo sát" bằng thành phần, phiên bản ghim, cụm Tầng 1, vị trí trong repo và mức
+  theo `docs/muc-hoan-thien.md`, khe cắm chưa có ghi thẳng "chưa có". Mục mới "Ranh giới lõi và ứng dụng" xếp từng
+  module của `svc-files`, `svc-workflow` và từng phần CSDL vào lõi, phần máy chủ của Văn phòng điện tử hay phần dùng
+  chung mang dáng nghiệp vụ, kèm chỗ dính, lý do đang gộp và hướng tách sau `v1.1.0`. Thêm QĐ-008…QĐ-012 cho quyết định
+  đã có trong mã (sự kiện trong bảng thay broker, Flowable, SeaweedFS, ứng dụng là trang tĩnh, Văn phòng chung tiến
+  trình với lõi), QĐ-013 (WAF, chờ PR), hộp "Đọc trong 10 phút" và mục "Chỗ còn yếu"; §1.2, §1.3 sửa câu đã lệch
+  (profile chia theo tầng, RAM đo được, "cài dưới một giờ" chưa đo).
 
 ### Đã sửa lỗi
+- Tài liệu ghi lệch với mã (#119): `DEPENDENCIES.md` nói Hasura dùng Event Triggers và Redpanda được thay bằng
+  Event Triggers, nhưng `db/metadata` không khai trigger nào — nay ghi đúng: sự kiện nằm trong bảng PostgreSQL,
+  Centrifugo đẩy tới trình duyệt, trục sự kiện chưa có. `docs/muc-hoan-thien.md` thôi ghi "chưa có bước CI" cho
+  `make demo-log-tap-trung`, `make do-so-lieu-sau`, `make demo-nap-lo` (đã chạy trong CI từ #111); `ROADMAP.md`
+  ghi log tập trung là Một phần thay vì Đang làm.
 - `DEPENDENCIES.md` liệt kê PDF.js (`pdfjs-dist`) dù giao diện không dùng: tệp được lấy bằng fetch rồi lưu về máy.
   Bỏ dòng đó, sửa chú thích cùng ý trong `svc-files`. Câu "gói npm gián tiếp không có giấy phép ngoài danh sách OSI"
   cũng sai: có thêm bảng năm gói ngoại lệ, đều chỉ dùng lúc dựng, lúc phát triển, không nằm trong trang phát hành —

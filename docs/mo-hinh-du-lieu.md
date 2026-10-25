@@ -902,6 +902,22 @@ token), đọc và chuyển thư mục (chỉ cột `para`) mục của chính m
 quan hệ ngược vào metadata của lõi. `tenant_admin` không đọc `core.files` nên không có không gian cá nhân. `overview`
 của sổ chỉ giữ giá trị `file_id`: lãnh đạo xem sổ thấy ai xếp, chuyển tệp nào, không thấy tên thư mục.
 
+### 2.7. Tự chẩn đoán H-P-D-I
+
+Migration `1792281603100_maturity_assessments`, trang `/tu-chan-doan`, cách dùng và cách chấm:
+[`tu-chan-doan.md`](tu-chan-doan.md). Mỗi lần lãnh đạo đơn vị lưu bài tự chẩn đoán là một dòng; CSDL không giữ nội
+dung câu hỏi (nằm ở `apps/office/app/data/tu-chan-doan.json`), chỉ mã câu và mức — nhưng biết bộ mã câu của từng
+phiên bản để đối chiếu.
+
+| Bảng | Cột | Ràng buộc, ghi chú |
+|---|---|---|
+| `office.maturity_assessments` | `id`, `tenant_id`, `created_by` (`sub`), `framework`, `answers` (jsonb), `h`, `p`, `d`, `i` (numeric(3,2)), `note`, `created_at` | `framework` là phiên bản CSDL biết, hiện chỉ `hpdi-1` (`maturity_framework`); `note` null hoặc 1–300 ký tự (`maturity_note`); bốn điểm trong 1–5 (`maturity_scores`). Trigger `before insert or update` `maturity_assessments_guard`: `answers` là đối tượng có đủ đúng các mã câu của phiên bản (`hpdi-1`: h1–h3, p1–p3, d1–d3, i1–i3), không thừa, mỗi mức số nguyên 1–5 (sai thì lỗi `check_violation` câu `maturity_answers: …`); tính `h`, `p`, `d`, `i` = trung bình mức các câu của không gian, làm tròn 2 chữ số — người gửi không chọn được điểm; gọt khoảng trắng của `note`; khi thêm: đặt `created_at`, chặn lưu dồn — mỗi đơn vị tối đa 5 lần mỗi giờ, 20 lần mỗi 24 giờ (khóa tư vấn theo đơn vị, lỗi `maturity_rate: …`). Sổ kiểm toán: `core.audit()` |
+
+Quyền: chỉ `director` thêm (cột `framework`, `answers`, `note`; `tenant_id`, `created_by` đặt sẵn từ token) và đọc
+dòng của đơn vị mình (mọi cột trừ `tenant_id`, `created_by`; có aggregate). Không vai trò nào sửa, xóa; `manager`,
+`clerk`, `staff`, `tenant_admin`, `service`, `agent` không có bảng này. `overview` của sổ không giữ giá trị cột nào
+của bảng này (`core.audit_overview` không đổi): lãnh đạo đọc sổ thấy ai lưu, lúc nào.
+
 ---
 
 ## 3. Quyền (Hasura)
