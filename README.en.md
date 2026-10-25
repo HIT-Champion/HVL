@@ -14,7 +14,7 @@ Built for the **Vietnam Student Olympiad in Informatics 2026 — Open Source Sof
 DX-OS Open-Core. Most project documentation is written in Vietnamese; this page is a translation of
 [README.md](README.md).
 
-**Try it:** <https://signet.htechcs.com> (release v1.0.0, see [Try it out](#try-it-out)) · or install it on your own
+**Try it:** <https://signet.htechcs.com> (release v1.1.0, see [Try it out](#try-it-out)) · or install it on your own
 machine with four commands from [Building from source](#building-from-source).
 
 **Quick links:** [Introduction](#introduction) · [Architecture](#architecture) · [Features](#features) ·
@@ -237,9 +237,9 @@ python3 scripts/seed.py                 # sample data, first time only
 
 ## Try it out
 
-**Online:** <https://signet.htechcs.com> runs release v1.0.0 on the team's machine, reaching the Internet through
+**Online:** <https://signet.htechcs.com> runs release v1.1.0 on the team's machine, reaching the Internet through
 Cloudflare Tunnel. Trial accounts are sent with the contest submission; the repository does not publish passwords.
-Features newer than v1.0.0 (the "Chưa phát hành" — unreleased — section of [`CHANGELOG.md`](CHANGELOG.md)) are
+Features newer than v1.1.0 (the "Chưa phát hành" — unreleased — section of [`CHANGELOG.md`](CHANGELOG.md)) are
 available when you install from source.
 
 **Your own installation:** the shared password of the sample accounts is the value of `MOC_DEMO_PASSWORD` in `.env`.
