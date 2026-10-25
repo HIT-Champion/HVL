@@ -94,7 +94,7 @@ Object.assign(globalThis, {
   XMLHttpRequest: FakeXhr,
 })
 
-const { ApiError, useApi } = await import('../app/composables/useApi.ts')
+const { ApiError, useApi, viewerType } = await import('../app/composables/useApi.ts')
 const { errorText } = await import('../app/utils/errors.ts')
 const api = useApi()
 
@@ -225,4 +225,14 @@ test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đ
   const passed = page.match(/!\[([^\]]+)\]\.includes\(e\.code/)?.[1] ?? ''
   assert.ok(passed.includes("'blocked'"), passed)
   assert.equal(lookup(vi, 'assist.error.blocked'), undefined)
+})
+
+test('khung xem nguồn của Hỏi đáp: bản scan giữ kiểu ảnh, HTML, SVG hay kiểu lạ đều thành PDF', () => {
+  assert.equal(viewerType('application/pdf'), 'application/pdf')
+  assert.equal(viewerType('image/jpeg'), 'image/jpeg')
+  assert.equal(viewerType('IMAGE/PNG; charset=binary'), 'image/png')
+  // object URL cùng origin với ứng dụng: không bao giờ để byte trả về chạy như trang HTML hay SVG
+  for (const type of ['text/html', 'image/svg+xml', 'application/xhtml+xml', 'image/tiff', '', null]) {
+    assert.equal(viewerType(type), 'application/pdf', String(type))
+  }
 })

@@ -1688,6 +1688,19 @@
             "title": "Type Code",
             "description": "Mã loại văn bản, vd CV"
           },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Chỉ hỏi trong một văn bản (nút \"Hỏi về văn bản này\"). Chỉ thu hẹp phạm vi: văn bản người hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt"
+          },
           "ask_id": {
             "anyOf": [
               {
