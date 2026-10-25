@@ -62,6 +62,60 @@ Máy 8 GB nên thêm 4 GB swap cho lần dựng image đầu tiên:
 `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile` (thêm
 `/swapfile none swap sw 0 0` vào `/etc/fstab` để giữ sau khi khởi động lại).
 
+## 2b. Máy không kéo được image từ Docker Hub
+
+Phần lớn image của Signet lấy từ Docker Hub (`docker.io`): 17 image trong `docker-compose.yml` và 4 image nền mà các
+Dockerfile của đội dựng lên (`node`, `python`, `nginxinc/nginx-unprivileged`, `apache/apisix`). Mạng chặn Docker Hub,
+hay đã hết lượt tải ẩn danh của Docker Hub (lỗi `toomanyrequests`), thì `make up`, `make install` và
+`scripts/nang_cap.sh` dừng ở bước kéo hoặc dựng image. Cách xử lý: cho Docker kéo các image này qua `mirror.gcr.io`, bản
+sao Docker Hub của Google.
+
+Tạo hoặc sửa `/etc/docker/daemon.json` (cần `sudo`; người cài tự làm, Signet không sửa cấu hình Docker của máy) cho có
+khóa `registry-mirrors`. Tệp đã có nội dung thì chỉ thêm khóa này, giữ JSON hợp lệ:
+
+```json
+{
+  "registry-mirrors": ["https://mirror.gcr.io"]
+}
+```
+
+```bash
+sudo systemctl reload docker                             # nạp lại cấu hình, container đang chạy không bị dừng
+docker info --format '{{json .RegistryConfig.Mirrors}}'  # phải có "https://mirror.gcr.io/"
+```
+
+Docker chỉ dùng mirror cho image của Docker Hub: thử mirror trước, mirror không có thì quay về Docker Hub. Bộ dựng mặc
+định của Docker Engine (BuildKit chạy trong dockerd) cũng đọc `registry-mirrors`, nên `make up` dựng image của đội vẫn
+kéo image nền qua mirror. Đã đổi sang builder `docker-container` (`docker buildx create --use …`) thì builder đó không
+đọc `daemon.json`: khai mirror trong `buildkitd.toml` của nó
+([Configure BuildKit](https://docs.docker.com/build/buildkit/configure/#registry-mirror)). Mọi image đều ghim theo
+digest (`@sha256:…`), Docker kiểm nội dung tải về theo digest, nên mirror không tráo được image.
+
+Ngày 26/10/2026 đã kiểm: cả 21 image ghim đều có trên `mirror.gcr.io`, đủ mọi lớp của bản `linux/amd64`. `mirror.gcr.io`
+chỉ giữ các image được kéo nhiều, nên khi cài một phiên bản khác hãy kiểm lại bằng lệnh dưới. Lệnh chỉ đọc manifest,
+không kéo image; chạy trong thư mục mã nguồn (bản clone hay gói phát hành đã giải nén), nơi `make up`, `make install`
+dựng image:
+
+```bash
+grep -hoE '(image:|FROM) +[a-z][^ ]*@sha256:[0-9a-f]{64}' docker-compose.yml */*/Dockerfile \
+  | awk '{print $2}' | sort -u | grep -vE '^(quay|ghcr)\.io/' | while read -r ref; do
+    repo=${ref%%[:@]*}; [[ $repo == */* ]] || repo=library/$repo
+    docker buildx imagetools inspect "mirror.gcr.io/$repo@${ref#*@}" >/dev/null 2>&1 && echo "có    $ref" ||
+      echo "THIẾU $ref"
+  done
+```
+
+Có dòng `THIẾU` thì mirror chưa giữ image đó: dùng một mirror Docker Hub khác mà máy cài vào được (của trường, của
+công ty), hoặc mở Docker Hub cho lần cài ấy.
+
+Ngoài Docker Hub, lần cài đầu còn tải từ các nguồn sau, mirror trên không thay được:
+
+- `quay.io` (Keycloak, Parseable) và `ghcr.io` (coraza-proxy-wasm, lớp WAF dựng vào image APISIX);
+- lúc dựng image của đội: gói npm (`registry.npmjs.org`), gói Python (`pypi.org`, `files.pythonhosted.org`), gói Debian
+  của svc-files (`deb.debian.org`);
+- lúc chạy: ClamAV tải chữ ký virus (`database.clamav.net`). Khi bật profile `ai-pull`, mô hình ngôn ngữ tải từ thư
+  viện Ollama (`registry.ollama.ai`).
+
 ## 3. Lấy mã nguồn và cấu hình
 
 Từ đây chạy bằng người dùng `moc` (`sudo -iu moc`).
