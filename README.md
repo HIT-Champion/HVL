@@ -48,9 +48,11 @@ chức tự cài, tự làm chủ. Ứng dụng mới chỉ cần cắm vào lõ
 
 Tầng 1 là lõi không giao diện: định danh, cổng API, dữ liệu, quy trình và lớp tin cậy. Tầng 2 là ứng dụng: Văn phòng
 điện tử và Không gian cá nhân P.A.R.A, ứng dụng thứ hai cắm vào cùng lõi mà không sửa dòng mã nào của lõi
-([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Chỉ cổng APISIX mở ra ngoài; nhãn trên mũi tên là đường dẫn thật.
-Viền đậm là mã của đội, hộp có logo là phần mềm nguồn mở dùng nguyên bản, chấm sáng đi theo hai yêu cầu thật. Kiến
-trúc H-P-D-I và các quyết định kỹ thuật: [`docs/architecture.md`](docs/architecture.md).
+([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Ứng dụng thứ ba, Bảng tin đơn vị, chỉ có khi cắm bằng lệnh
+`moc app install` nên không vẽ trong sơ đồ. Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó
+trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Viền đậm là mã của đội, hộp có logo là phần mềm nguồn mở dùng
+nguyên bản, chấm sáng đi theo hai yêu cầu thật. Kiến trúc H-P-D-I và các quyết định kỹ thuật:
+[`docs/architecture.md`](docs/architecture.md).
 
 ## Tính năng
 
@@ -80,6 +82,16 @@ Ngoài ra: sổ đăng ký văn bản đến, đi đúng mẫu NĐ 30; nhiều �
 
 Tệp của mỗi người xếp trong bốn thư mục Dự án · Lĩnh vực · Tài nguyên · Lưu trữ; client Keycloak riêng, gọi lõi qua
 cổng như mọi ứng dụng, không sửa dòng mã nào của lõi (`make demo-ca-nhan`).
+
+### Cắm thêm ứng dụng bằng một lệnh
+
+`python3 scripts/moc.py app install apps/bang-tin/app.yaml` đọc manifest của ứng dụng rồi tạo client Keycloak, route
+APISIX, container, schema và migration chạy bằng vai trò CSDL riêng của ứng dụng (không có quyền gì trên lõi), bảng và
+quyền Hasura, và đăng ký nhận sự kiện văn bản của lõi; không sửa tệp nào của lõi. Chạy lại không tạo gì trùng;
+`moc app remove` gỡ ứng dụng nhưng giữ dữ liệu. Ứng dụng mẫu là Bảng tin đơn vị (`apps/bang-tin`, `/bang-tin/`): văn
+bản vừa vào sổ, vừa phát hành hiện lên theo sự kiện của lõi, mỗi người chỉ thấy tin của văn bản mình được xem
+(`make demo-cai-ung-dung`). Cách làm, mô hình tin cậy và giới hạn: [`docs/them-ung-dung.md`](docs/them-ung-dung.md)
+mục 1.
 
 ### Trợ lý AI chạy tại chỗ
 
@@ -122,8 +134,8 @@ nhiêu lần cũng được — kịch bản trình bày ở [`docs/demo-script.
 
 Các màn nghiệp vụ, cùng cách chạy: `make demo-lien-thong` (liên thông hai đơn vị), `make demo-nap-lo` (nạp lô văn bản
 đến), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (trợ lý AI),
-`make demo-ky-so` (ký số, minh họa), `make demo-ca-nhan` (ứng dụng thứ hai trên cùng lõi), `make demo-log-tap-trung`
-(log tập trung).
+`make demo-ky-so` (ký số, minh họa), `make demo-ca-nhan` (ứng dụng thứ hai trên cùng lõi), `make demo-cai-ung-dung`
+(cắm ứng dụng thứ ba bằng một lệnh), `make demo-log-tap-trung` (log tập trung).
 
 ## Công nghệ và giấy phép
 
@@ -133,6 +145,7 @@ Danh mục đầy đủ, cả thư viện và lý do chọn: [`DEPENDENCIES.md`]
 | Không gian | Thành phần | Phiên bản | Giấy phép | Vai trò trong Signet |
 |---|---|---|---|---|
 | Cổng | Apache APISIX | 3.18.0 | Apache-2.0 | Cổng duy nhất mở ra ngoài: kiểm JWT ở biên, danh sách trắng đường dẫn, giới hạn tốc độ |
+| Cổng | Coraza, OWASP CRS (coraza-proxy-wasm) | 3.3.3, 4.14.0 (0.6.0) | Apache-2.0 | Tường lửa ứng dụng web chạy trong APISIX: soi mọi yêu cầu trước khi kiểm token, tải tấn công nhận 403 |
 | [H] | Keycloak | 26.7.5 | Apache-2.0 | Đăng nhập một lần, TOTP; vai trò, đơn vị, phòng đưa vào token |
 | [P] | Flowable | 8.0.0 | Apache-2.0 | Quy trình BPMN văn bản đến, văn bản đi |
 | [P] | Centrifugo | 6.9.7 | Apache-2.0 | Thông báo tức thời qua WebSocket, kênh riêng từng người |
@@ -162,7 +175,7 @@ tiếp, được kiểm tự động bằng `make license-audit`.
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 và `docker buildx` |
 | GNU Make | 4.0 | điều phối lệnh |
 | Python | 3.10 | chỉ thư viện chuẩn, không cài thêm gì: dữ liệu mẫu, smoke, demo, sao lưu, cài đặt và các lệnh vận hành |
-| RAM | 8 GB | cả hệ thống (profile mặc định, 15 container) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB); bật mô hình AI cần thêm tới 6 GB |
+| RAM | 8 GB | cả hệ thống (profile mặc định, 16 container) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB), đo từ trước khi thêm `app-ca-nhan` (một nginx phục vụ trang tĩnh); bật mô hình AI cần thêm tới 6 GB |
 | Đĩa trống | 10 GB | image khoảng 5 GB; mô hình AI thêm khoảng 2 GB |
 
 Toàn bộ công cụ dùng để dựng Signet đều là phần mềm nguồn mở. Không cần bất kỳ công cụ nguồn đóng hay tự chế nào.
@@ -238,6 +251,7 @@ và một dự thảo phúc đáp bị tổ trưởng trả lại chờ sửa.
 |---|---|---|
 | <http://localhost:8080> | Văn phòng điện tử | Có |
 | <http://localhost:8080/ca-nhan/> | Không gian cá nhân P.A.R.A | Có |
+| <http://localhost:8080/bang-tin/> | Bảng tin đơn vị, sau khi cắm bằng `make app-install APP=apps/bang-tin/app.yaml` | Có |
 | <http://localhost:8080/xac-thuc> | Cổng xác thực văn bản: nhập mã hoặc thả tệp PDF; mã của văn bản mẫu ở trang chi tiết văn bản (Văn bản đi, tab Đã phát hành) | Không |
 | <http://localhost:8080/trang-thai> | Trạng thái hệ thống | Không |
 | <http://127.0.0.1:8180/admin> | Quản trị Keycloak, chỉ mở trên máy chủ (tài khoản `KEYCLOAK_ADMIN_*`) | Có |
@@ -256,12 +270,14 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 | [Giám sát](docs/van-hanh.md#giám-sát) cổng API bằng Prometheus + Grafana | đường hầm SSH tới cổng 3300 |
 | [Log tập trung](docs/van-hanh.md#log-tập-trung): Vector + Parseable, tra theo mã yêu cầu `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
 | [Hội tụ IT/OT](docs/van-hanh.md#hội-tụ-itot): broker NGSI-LD, cảm biến | `make demo-it-ot` |
+| [Cắm ứng dụng](docs/them-ung-dung.md#1-một-lệnh-moc-app-install) bằng manifest, không sửa lõi; gỡ giữ dữ liệu | `python3 scripts/moc.py app install …`, `app list`, `app remove` |
+| [Tường lửa ứng dụng web](platform/apisix/README.md#tường-lửa-ứng-dụng-web--waf-f315): chặn, chỉ ghi nhật ký hay tắt; đọc dòng chặn theo `X-Request-Id` | `MOC_WAF=On` · `DetectionOnly` · `Off` |
 | [Kiểm sổ kiểm toán](db/README.md) ngoài CSDL | `make audit` |
 
 | Lệnh | Kiểm gì | Cần |
 |---|---|---|
-| `make test` | Test đơn vị của `svc-files`, `svc-workflow`, lệnh vận hành; kiểm form theo `schemas/` trên cùng bộ ca thử với máy chủ và CSDL | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
-| `make smoke` | Đi trọn luồng văn bản đến, văn bản đi qua cổng APISIX; cổng xác thực, thông báo WebSocket, sổ kiểm toán; chặn dữ liệu sai, EICAR, đường quản trị; cách ly đơn vị; giới hạn tốc độ; két bí mật; reconciler; nộp lưu; giám sát | Hệ thống đang chạy + `make seed` |
+| `make test` | Test đơn vị của `svc-files`, `svc-workflow`, lệnh vận hành; kiểm form theo `schemas/` trên cùng bộ ca thử với máy chủ và CSDL; test của Không gian cá nhân và Bảng tin | Python + [uv](https://github.com/astral-sh/uv); Node 24 và `npm ci` trong `apps/office` |
+| `make smoke` | Đi trọn luồng văn bản đến, văn bản đi qua cổng APISIX; cổng xác thực, thông báo WebSocket, sổ kiểm toán; chặn dữ liệu sai, EICAR, đường quản trị; cách ly đơn vị; giới hạn tốc độ; két bí mật; reconciler; nộp lưu; giám sát; WAF chặn tải tấn công mà không chặn nhầm dữ liệu thật | Hệ thống đang chạy + `make seed` |
 | `make e2e` | Trình duyệt thật (Playwright, trong container): form sai bị chặn trước khi gửi, thả tệp vào trang xác thực, hai người dùng cùng lúc nhận thông báo, sổ kiểm toán, dashboard, ký số | Như trên |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii`, `do-so-lieu-sau` | Đo các tác tử AI trên bộ mẫu có đáp án (đúng / sai / trống từng trường, recall@3, độ phủ); số đo "sau" theo đặc tả §8 | Hệ thống đang chạy (`do-che-pii` không cần) |
 | `db/tests/` | Schema, quyền theo vai trò và đơn vị, ràng buộc, sổ kiểm toán (kể cả các kiểu sửa lén) trên PostgreSQL + Hasura thật | xem [`db/README.md`](db/README.md) |
@@ -280,6 +296,7 @@ Nhắc hạn chỉ kiểm được khi hạn ngắn: `MOC_SLA_DURATION=PT20S mak
 | Cổng 8080 đã có chương trình khác dùng | Đặt `MOC_HTTP_PORT=8081` và `MOC_PUBLIC_URL=http://localhost:8081` trong `.env` trước lần `make up` đầu tiên: realm Keycloak chỉ nạp địa chỉ này một lần, đã chạy rồi thì `make reset` rồi dựng lại |
 | Mở bằng IP trong mạng LAN thì không đăng nhập được | Trình duyệt chỉ cho dùng Web Crypto (đăng nhập PKCE, tính SHA-256 ở trang xác thực) trên `https` hoặc `localhost`. Dùng `localhost`, hoặc lên HTTPS theo [`docs/trien-khai.md`](docs/trien-khai.md) |
 | Mã TOTP bị từ chối | Đồng hồ điện thoại lệch (mã đổi mỗi 30 giây): bật giờ tự động, hoặc lấy mã theo đồng hồ máy chủ bằng `make totp`. Sai 10 lần thì Keycloak tạm khóa tài khoản |
+| Báo "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công" (HTTP 403) | WAF ở cổng APISIX thấy chữ giống tải tấn công. Sửa chữ hoặc tên tệp rồi gửi lại. Nếu là dữ liệu thật bị chặn nhầm thì lấy mã yêu cầu (`X-Request-Id`) của lần chặn, tìm bằng `docker compose logs apisix \| grep <mã>` và thêm loại trừ theo [`platform/apisix/README.md`](platform/apisix/README.md#đọc-nhật-ký-chặn); tạm thời có thể đặt `MOC_WAF=DetectionOnly` (chỉ ghi nhật ký) rồi `docker compose up -d apisix` |
 | Máy chậm hoặc hết RAM sau khi bật AI | Mô hình cần thêm tới 6 GB RAM. Tắt bằng `docker compose --profile ai stop ollama`; các tác tử tự về chế độ không cần mô hình |
 
 Chưa gỡ được thì [mở issue theo mẫu báo lỗi](https://github.com/HIT-Champion/Signet/issues/new?template=bug_report.yml),
@@ -300,7 +317,8 @@ Mã đội tự viết nằm ở `apps/`, `services/` và `db/`. `platform/` ch�
 nguyên bản (image chính thức, không sửa mã thượng nguồn).
 
 ```
-apps/                Văn phòng điện tử (office/, Nuxt 4) · Không gian cá nhân P.A.R.A (ca-nhan/)
+apps/                Văn phòng điện tử (office/, Nuxt 4) · Không gian cá nhân P.A.R.A (ca-nhan/) · Bảng tin đơn vị
+                     (bang-tin/, cắm bằng moc app install)
 services/            svc-workflow/: Hasura Actions, quy trình BPMN, thông báo, nhắc hạn, gợi ý giao việc
                      svc-files/: tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực, các tác tử AI
                      ot-sensor/: cảm biến nhiệt độ giả lập (profile iot)

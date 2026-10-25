@@ -53,10 +53,12 @@ trust out of the box, without building them itself:
 
 Tier 1 is the headless core: identity, API gateway, data, workflow and the trust layer. Tier 2 holds the
 applications: the e-Office and the P.A.R.A personal space, a second application plugged into the same core without
-changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). Only the APISIX gateway is
-exposed; the labels on its arrows are the real paths. Thick borders mark the team's own code, boxes with a logo are
-upstream open source used as is, and the moving dots follow two real requests. H-P-D-I architecture and technical
-decisions: [`docs/architecture.md`](docs/architecture.md) (Vietnamese).
+changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). A third application, the
+unit news board, exists only once installed with `moc app install`, so the diagram does not show it. Only the APISIX
+gateway is exposed, and every request passes its web application firewall before it reaches the core; the labels on
+its arrows are the real paths. Thick borders mark the team's own code, boxes with a logo are upstream open source used
+as is, and the moving dots follow two real requests. H-P-D-I architecture and technical decisions:
+[`docs/architecture.md`](docs/architecture.md) (Vietnamese).
 
 ## Features
 
@@ -87,6 +89,16 @@ only their own unit's data; Vietnamese and English interface. Scope and roles:
 
 Each person's files in four folders — Projects · Areas · Resources · Archives; its own Keycloak client, calling the
 core through the gateway like any application, without changing a line of core code (`make demo-ca-nhan`).
+
+### Plugging in an application with one command
+
+`python3 scripts/moc.py app install apps/bang-tin/app.yaml` reads the application's manifest and creates its Keycloak
+client, APISIX route, container, schema and migrations run under the application's own database role (with no rights
+on the core), Hasura tables and permissions, and a subscription to the core's document events. No core file changes.
+Running it again creates nothing twice; `moc app remove` uninstalls the application and keeps its data. The sample
+application is the unit news board (`apps/bang-tin`, `/bang-tin/`): documents just registered or issued appear as the
+core's events arrive, and each person only sees items for documents they may read (`make demo-cai-ung-dung`). How it
+works, the trust model and limits: [`docs/them-ung-dung.md`](docs/them-ung-dung.md) section 1 (Vietnamese).
 
 ### Local AI assistants
 
@@ -130,7 +142,8 @@ repeatable any number of times — the presentation script is [`docs/demo-script
 Business demos, run the same way: `make demo-lien-thong` (exchange between two units), `make demo-nap-lo` (batch import
 of incoming documents), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (AI
 assistants), `make demo-ky-so` (digital signature, illustrative), `make demo-ca-nhan` (a second application on the same
-core), `make demo-log-tap-trung` (centralised logs).
+core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-log-tap-trung`
+(centralised logs).
 
 ## Technology and licenses
 
@@ -140,6 +153,7 @@ modified. The full list, libraries and reasons for each choice included: [`DEPEN
 | Space | Component | Version | License | Role in Signet |
 |---|---|---|---|---|
 | Gateway | Apache APISIX | 3.18.0 | Apache-2.0 | The only exposed entry point: JWT check at the edge, path allow-list, rate limits |
+| Gateway | Coraza, OWASP CRS (coraza-proxy-wasm) | 3.3.3, 4.14.0 (0.6.0) | Apache-2.0 | Web application firewall inside APISIX: inspects every request before the token check, attack payloads get 403 |
 | [H] | Keycloak | 26.7.5 | Apache-2.0 | Single sign-on, TOTP; roles, unit and department go into the token |
 | [P] | Flowable | 8.0.0 | Apache-2.0 | BPMN workflows for incoming and outgoing documents |
 | [P] | Centrifugo | 6.9.7 | Apache-2.0 | Instant notifications over WebSocket, one channel per person |
@@ -169,7 +183,7 @@ package, transitive ones included, is checked automatically with `make license-a
 | Docker Engine | 24.0 | with the `docker compose` v2 plugin 2.17+ and `docker buildx` |
 | GNU Make | 4.0 | runs the commands |
 | Python | 3.10 | standard library only, nothing to install: sample data, smoke tests, demos, backup, install and operations commands |
-| RAM | 8 GB | the whole system (default profiles, 15 containers) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB); the AI model needs up to 6 GB more |
+| RAM | 8 GB | the whole system (default profiles, 16 containers) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages) was added; the AI model needs up to 6 GB more |
 | Free disk | 10 GB | images about 5 GB; AI models about 2 GB more |
 
 Every tool used to build Signet is open-source software. No closed-source or home-made tool is needed.
@@ -246,6 +260,7 @@ handle and a reply draft the team head sent back for changes.
 |---|---|---|
 | <http://localhost:8080> | e-Office | Yes |
 | <http://localhost:8080/ca-nhan/> | P.A.R.A personal space | Yes |
+| <http://localhost:8080/bang-tin/> | Unit news board, once installed with `make app-install APP=apps/bang-tin/app.yaml` | Yes |
 | <http://localhost:8080/xac-thuc> | Document verification portal: enter a code or drop a PDF; codes of the issued sample documents are on each document's detail page (Outgoing documents, Issued tab) | No |
 | <http://localhost:8080/trang-thai> | System status | No |
 | <http://127.0.0.1:8180/admin> | Keycloak admin console, only on the server itself (`KEYCLOAK_ADMIN_*` account) | Yes |
@@ -264,12 +279,14 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.m
 | [Monitoring](docs/van-hanh.md#giám-sát) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
 | [Centralised logs](docs/van-hanh.md#log-tập-trung): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
 | [IT/OT convergence](docs/van-hanh.md#hội-tụ-itot): NGSI-LD broker, sensors | `make demo-it-ot` |
+| [Plugging in an application](docs/them-ung-dung.md#1-một-lệnh-moc-app-install) from a manifest, no core changes; removal keeps data | `python3 scripts/moc.py app install …`, `app list`, `app remove` |
+| [Web application firewall](platform/apisix/README.md#tường-lửa-ứng-dụng-web--waf-f315): block, log only or off; find a block by `X-Request-Id` | `MOC_WAF=On` · `DetectionOnly` · `Off` |
 | [Checking the audit log](db/README.md) outside the database | `make audit` |
 
 | Command | What it checks | Needs |
 |---|---|---|
-| `make test` | Unit tests of `svc-files`, `svc-workflow` and the operations commands; form validation against `schemas/` with the same test cases as the server and database | Python + [uv](https://github.com/astral-sh/uv); Node 24 and `npm ci` in `apps/office` |
-| `make smoke` | The full incoming and outgoing document flows through APISIX; verification portal, WebSocket notifications, audit log; blocking bad data, EICAR, admin paths; unit isolation; rate limits; secrets vault; reconciler; archiving; monitoring | A running system + `make seed` |
+| `make test` | Unit tests of `svc-files`, `svc-workflow` and the operations commands; form validation against `schemas/` with the same test cases as the server and database; tests of the personal space and the news board | Python + [uv](https://github.com/astral-sh/uv); Node 24 and `npm ci` in `apps/office` |
+| `make smoke` | The full incoming and outgoing document flows through APISIX; verification portal, WebSocket notifications, audit log; blocking bad data, EICAR, admin paths; unit isolation; rate limits; secrets vault; reconciler; archiving; monitoring; the WAF blocks attack payloads without blocking real data | A running system + `make seed` |
 | `make e2e` | A real browser (Playwright, in a container): bad forms blocked before sending, dropping a file on the verification page, two users notified at the same time, audit log, dashboard, digital signature | Same as above |
 | `make do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec`, `do-che-pii`, `do-so-lieu-sau` | Measure the AI agents on labelled samples (right / wrong / empty per field, recall@3, coverage); the "after" metrics of spec §8 | A running system (`do-che-pii` does not need one) |
 | `db/tests/` | Schema, permissions by role and unit, constraints, audit log (including tampering attempts) on real PostgreSQL + Hasura | see [`db/README.md`](db/README.md) |
@@ -289,6 +306,7 @@ GitOps, and scans for secrets and vulnerable dependencies. Reminders can only be
 | Port 8080 is already used by another program | Set `MOC_HTTP_PORT=8081` and `MOC_PUBLIC_URL=http://localhost:8081` in `.env` before the first `make up`: the Keycloak realm loads this address only once, so if it already ran, `make reset` and start again |
 | Signing in fails when opened by a LAN IP address | Browsers only allow Web Crypto (PKCE sign-in, SHA-256 on the verification page) over `https` or on `localhost`. Use `localhost`, or set up HTTPS following [`docs/trien-khai.md`](docs/trien-khai.md) |
 | The TOTP code is rejected | The phone's clock is off (codes change every 30 seconds): turn on automatic time, or get the code from the server's clock with `make totp`. After 10 wrong attempts Keycloak temporarily locks the account |
+| "The security gateway blocked this content because some text looks like an attack pattern" (HTTP 403) | The WAF in the APISIX gateway saw text that looks like an attack payload. Edit the text or file name and send again. If real data was blocked by mistake, take the request id (`X-Request-Id`) of the block, find it with `docker compose logs apisix \| grep <id>` and add an exclusion as described in [`platform/apisix/README.md`](platform/apisix/README.md#đọc-nhật-ký-chặn) (Vietnamese); meanwhile you can set `MOC_WAF=DetectionOnly` (log only) and run `docker compose up -d apisix` |
 | The machine slows down or runs out of RAM after turning on AI | The model needs up to 6 GB more RAM. Turn it off with `docker compose --profile ai stop ollama`; the agents fall back to working without a model |
 
 Still stuck?
@@ -312,7 +330,8 @@ The team's own code lives in `apps/`, `services/` and `db/`. `platform/` only ho
 software the core uses unmodified (official images, no changes to upstream code).
 
 ```
-apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nhan/)
+apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nhan/) · unit news board
+                     (bang-tin/, plugged in with moc app install)
 services/            svc-workflow/: Hasura Actions, BPMN workflows, notifications, reminders, assignment suggestions
                      svc-files/: files, quarantine, search, PDF rendering, signing, verification portal, AI agents
                      ot-sensor/: simulated temperature sensor (profile iot)
