@@ -298,7 +298,7 @@ SYFT_IMAGE ?= ghcr.io/anchore/syft:v1.54.1@sha256:3eb5379ba7b409c3f4069b68611052
 SBOM_VERSION = $(or $(VERSION),$(shell git describe --tags --always 2>/dev/null | sed 's/^v//'),dev)
 SBOM = dist/signet-$(SBOM_VERSION).cdx.json
 
-sbom: ## Danh mục thành phần SBOM CycloneDX của cây mã nguồn (Syft): dist/moc-<phiên bản>.cdx.json kèm .sha256 — dùng: make sbom [VERSION=1.1.0]; cần Docker, mạng tới PyPI
+sbom: ## Danh mục thành phần SBOM CycloneDX của cây mã nguồn (Syft): dist/signet-<phiên bản>.cdx.json kèm .sha256 — dùng: make sbom [VERSION=1.1.0]; cần Docker, mạng tới PyPI
 	@mkdir -p dist
 	@docker run --rm -e SYFT_CHECK_FOR_APP_UPDATE=false -e SYFT_JAVASCRIPT_INCLUDE_DEV_DEPENDENCIES=true \
 	  -v "$(CURDIR):/src:ro" $(SYFT_IMAGE) scan dir:/src --enrich python --source-name moc \
