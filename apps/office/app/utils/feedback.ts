@@ -42,6 +42,8 @@ const SCREEN_KEYS: Record<string, string> = {
   '/van-ban-di/soan': 'nav.compose',
   '/van-ban/:id': 'feedback.screenDocument',
   '/so-dang-ky': 'nav.register',
+  '/ho-so': 'cases.title',
+  '/ho-so/:id': 'cases.screenDetail',
   '/tim-kiem': 'nav.search',
   '/hoi-dap': 'nav.ask',
   '/dieu-hanh': 'nav.board',

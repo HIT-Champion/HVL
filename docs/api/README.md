@@ -193,6 +193,8 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `GET /api/imports/{id}` | Người tạo lô: trạng thái `queued`/`running`/`done`, số dòng đã nhận, còn chờ, đạt, trùng, lỗi; lô của người khác → `404` |
 | `GET /api/imports/{id}/rows` | Người tạo lô: kết quả từng dòng (số dòng, mã lỗi, lý do, lỗi theo trường, id văn bản, số đến); `?status=failed`, trang sau `after=<next_after>` |
 | `GET /api/imports` | Các lô của chính người gọi, mới trước |
+| `GET /api/case-files/{id}/archive/files/{file_id}` | Phòng đọc xem tệp (F3.8): chỉ PDF của văn bản người gọi được đọc; so băm với manifest, trả bản có dấu tên người xem (`inline`), mỗi lần xem ghi `case_file.file_viewed` |
+| `POST /api/case-files/{id}/archive` | Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng (F3.8): gói Parquet + tệp + manifest có băm vào bucket lạnh khóa ghi; ghi `case_file.archive_requested` |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
 | `GET /api/status` | **Không cần token.** Tình trạng từng thành phần (`ok`, `degraded`, `down`, `off`) theo tầng, tình trạng chung, phiên bản, thời gian chạy, giờ sao lưu gần nhất, trợ lý AI bật hay tắt; lưu đệm 10 giây, không có địa chỉ nội bộ hay số liệu |

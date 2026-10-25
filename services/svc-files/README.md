@@ -41,7 +41,8 @@ issue #19, #20.
 | `/internal/dispatch-file`: chép bản phát hành sang kho của đơn vị nhận trong hệ thống (kiểm băm, quét, id định trước) | **Xong** (F3.12) |
 | `GET /api/status`: trạng thái vận hành từng thành phần theo tầng cho trang công khai `/trang-thai`, lưu đệm 10 giây, không lộ địa chỉ nội bộ | **Xong** |
 | `POST /api/imports/incoming`: nạp lô văn bản đến (NDJSON/CSV + zip tệp đính kèm), xử lý nền theo mẻ, mỗi dòng đi đúng đường tiếp nhận lẻ, báo lỗi từng dòng | **Xong** (cụm ⑤) |
-| Phòng đọc xem tệp đã nộp lưu (chỉ xem, watermark) | Chưa |
+| Phòng đọc xem tệp đã nộp lưu: chỉ PDF, so băm với manifest, đóng dấu người xem như F3.7, ghi sổ trước khi trả (`GET /api/case-files/{id}/archive/files/{file_id}`) | **Xong** (F3.8) |
+| `POST /api/case-files/{id}/archive`: lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng (cùng các bước như vòng nền) | **Xong** (F3.8) |
 
 ## API
 
@@ -68,7 +69,9 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456`. `document.signature`: chữ ký số của bản phát hành `{level, signer, ca, serial, signed_at, illustrative: true}`, `null` với văn bản cũ, văn bản hạn chế (F4.5) |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
 | `GET /api/status` | **Không cần token.** `200` `{status, checked_at, version, uptime_s, last_backup_at, ai: {enabled, model, semantic}, layers, components: [{id, layer, label, software, status}]}`, `Cache-Control: no-store`; trạng thái `ok` · `degraded` · `down` (thành phần) và `off` (tắt theo cấu hình). Mọi người gọi trong 10 giây nhận cùng một kết quả · `429` quá `MOC_RATE_STATUS_PER_MIN` lần một phút mỗi IP (APISIX) — mục Trạng thái hệ thống |
-| `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
+| `GET /api/case-files/{id}/archive` | Người xem được hồ sơ (phòng mình với `staff`, `manager`; cả đơn vị với `clerk`, `director`). `200` `{case_file_id, code, title, closed_on, archived_at, archive_key, manifest_sha256, retain_until, documents, files, hidden}` — văn bản người gọi đọc được, đọc từ bảng Parquet trong gói; `files[]` `{file_id, filename, mime_type, sha256, bytes, document_ids, viewable}` — tệp gắn với các văn bản đó, `viewable` khi là PDF; `hidden` là số văn bản còn lại · `404` không có hoặc không được xem · `409` `not_archived` · `502` `archive_mismatch` gói không khớp băm trong CSDL hoặc thiếu một phần · `401` · `503`. Ghi `case_file.read` vào sổ kiểm toán trước khi trả |
+| `GET /api/case-files/{id}/archive/files/{file_id}` | Phòng đọc xem một tệp, cùng quy tắc quyền như trên: hồ sơ xem được, tệp gắn với văn bản người gọi đọc được. `200` `application/pdf` — bản có dấu tên người xem và giờ xem trên mọi trang (như F3.7, chữ "PHÒNG ĐỌC"), `Content-Disposition: inline`, `Cache-Control: no-store`, CSP sandbox · `404` không có, tệp không thuộc gói hoặc không được xem (trả như nhau) · `409` `not_archived` · `415` `not_viewable` không phải PDF · `422` `unstampable` + `reason` (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng) · `502` `archive_mismatch` manifest không khớp CSDL, tệp không khớp manifest, hoặc gói thiếu manifest hay tệp — không trả byte nào · `401` · `503` (cả `busy` + `Retry-After: 10`). Ghi `case_file.file_viewed` vào sổ kiểm toán trước khi trả; ghi không được thì `503`, không trả tệp. Không ghi gì vào bucket lạnh |
+| `POST /api/case-files/{id}/archive` | Chỉ `manager` (vai trò Hasura áp cho token), chỉ hồ sơ của phòng mình. `200` `{case_file_id, code, archive_key, archive_sha256, documents, files, bytes, run_id}` · `403` `forbidden` vai trò khác · `404` không có hoặc hồ sơ phòng khác · `409` `not_closed`, `already_archived` (kể cả lượt khác vừa xong), `archive_failed` + `message` (văn bản không còn nộp lưu được, đang gửi liên thông, tệp nóng không khớp băm… — chưa đổi gì), `archive_conflict` (hàm SQL từ chối vì dữ liệu đổi giữa chừng — chưa đổi gì) · `503` kho, CSDL, sổ kiểm toán chưa sẵn sàng; `busy` (+ `Retry-After: 10`) khi tiến trình đang có lượt nộp lưu khác (nút bấm hay vòng nền) — chưa ghi sổ. Giành được lượt rồi mới ghi `case_file.archive_requested`; các bước như vòng nền (mục Nộp lưu hồ sơ) |
 | `POST /api/imports/incoming` (multipart, trường `data`, `archive` tùy chọn) | Chỉ `clerk`. Query `format=ndjson\|csv` (thiếu thì đoán theo đuôi tệp, Content-Type), `register=true\|false` (mặc định `false`); header `Idempotency-Key` tùy chọn. `202` `ImportOut` + `Location: /api/imports/{id}` · `200` gửi lại cùng khóa, cùng nội dung: lô cũ · `400` `missing_file`, `unknown_format`, `bad_encoding`, `bad_header`, `bad_format`, `empty`, `bad_archive`, `bad_idempotency_key` · `403` `forbidden`, `unknown_tenant` · `409` `idempotency_conflict` · `413` `too_large`, `too_many_rows` · `422` `infected`, `unscannable` chính tệp dữ liệu (ghi `file.rejected`, không có lô) · `429` `too_many_imports` (+ `Retry-After: 60`) · `503` `imports_disabled`, `busy` (+ `Retry-After: 60`), `scanner_unavailable`, `database_unavailable` — mục Nạp lô văn bản đến |
 | `GET /api/imports/{id}` | Chỉ người tạo lô. `200` `ImportOut` `{id, kind, status: queued\|running\|done, filename, format, register, total, pending, ok, duplicate, failed, note, created_at, started_at, finished_at}`, `Cache-Control: no-store` · `404` `not_found` không có lô hoặc lô của người khác (kể cả cùng đơn vị) · `401` · `503` |
 | `GET /api/imports/{id}/rows` | Như trên. `status=pending\|ok\|duplicate\|failed`, `after` (số dòng cuối của trang trước), `limit` 1–500 (100). `200` `{rows: [{line, status, code, message, fields, document_id, register_number}], next_after}` — không trả lại dữ liệu đã gửi |
@@ -781,6 +784,29 @@ cổng xác thực vẫn trả `valid` theo mã tra cứu và băm (trạng thá
 chỉ mục tìm kiếm; tệp không tải được qua `/api/files/{id}` nữa, chỉ đọc từ gói; tệp đã nộp lưu không gắn lại được vào
 dự thảo. Phòng đọc chỉ trả những văn bản trong gói mà người gọi đọc được, kèm số văn bản bị ẩn (`hidden`).
 
+**Nộp lưu theo yêu cầu.** Lãnh đạo phòng (`manager`) nộp lưu ngay hồ sơ đã đóng của phòng mình bằng `POST
+/api/case-files/{id}/archive` (nút "Nộp lưu" trên màn Hồ sơ công việc của `apps/office`), không đợi
+`MOC_ARCHIVE_AFTER_DAYS`. Ai được nộp là lựa chọn của đội: chuyên viên lập và đóng, lãnh đạo phòng — người phụ trách
+phòng có hồ sơ — nộp, để việc đưa vào kho khóa ghi (không sửa, không xóa được) qua tay người thứ hai; điều khoản Nghị
+định 30/2020 về trách nhiệm nộp lưu chưa được đối chiếu với văn bản gốc. Kiểm vai trò ở svc-files, phòng ở Hasura
+(token của người gọi chỉ thấy hồ sơ của phòng mình). Lượt nộp lưu dùng chung một khóa với vòng nền trong tiến trình
+(`Archiver.lock`): chờ quá 10 giây thì `503 busy` kèm `Retry-After`, chưa ghi sổ. Giành được lượt thì kiểm lại hồ sơ
+(lượt khác vừa xong → `409 already_archived`), ghi `case_file.archive_requested`, rồi gọi đúng `Archiver.archive` như
+vòng nền — mọi bước kiểm băm, khóa ghi, hàm SQL giữ nguyên, dòng `case_file.archived` vẫn do hàm SQL ghi. Lệnh tay
+`python -m svc_files.archive now` chạy tiến trình riêng, không dùng khóa này: khi đó hàm SQL chỉ nhận một lượt, lượt
+kia nhận `409 already_archived` hoặc `409 archive_conflict` (CSDL từ chối, không đổi gì). Nộp lưu chạy trong yêu cầu:
+hồ sơ rất lớn có thể quá 60 giây của APISIX dù svc-files vẫn làm xong — chưa đo; tải lại hồ sơ để biết trạng thái.
+
+**Phòng đọc xem tệp (chỉ xem).** `GET /api/case-files/{id}/archive/files/{file_id}`: hồ sơ người gọi xem được và đã
+nộp lưu; manifest tải theo băm trong CSDL, so băm; tệp phải có trong gói và gắn với văn bản người gọi đọc được (cùng
+quy tắc với danh sách `files`); chỉ PDF. Tệp đọc từ bucket lạnh vào RAM, so băm với manifest (lệch → `502
+archive_mismatch`, không trả byte nào), đóng dấu tên người xem và giờ xem lên mọi trang bằng đúng tiến trình con có
+giới hạn của F3.7 (`sealed.run_watermark`, chữ "PHÒNG ĐỌC — bản xem tài liệu lưu trữ…", chung hàng đợi hai lượt, trần
+`MOC_RESTRICTED_MAX_PAGES` trang), ghi `case_file.file_viewed` (ký hiệu hồ sơ, băm gói, id và băm tệp, tên in trên
+dấu) rồi mới trả `inline` — chỉ bản đã đóng dấu, không bao giờ byte gốc. Không ghi, không thêm phiên bản nào vào bucket
+lạnh. Gói lạnh không có tệp mã hóa: nộp lưu từ chối văn bản hạn chế (F3.7). Người xem vẫn lưu được bản xem từ trình xem
+PDF của trình duyệt — bản đó mang tên họ và giờ xem.
+
 **Phả hệ và kiểm chất lượng (F3.9, `svc_files.lineage`).** Mỗi lượt là một run OpenLineage 2-0-2 của job
 `moc.case_file.archive` (START, rồi COMPLETE hoặc FAIL) với 4 run con: `files` (bucket nóng → `files/<sha256>`),
 `tables` (bảng `moc.office.*` → Parquet), `manifest` (Parquet + tệp → manifest), `commit` (manifest → các bảng CSDL).
@@ -1026,6 +1052,8 @@ thống chạy thật; chưa có job dọn định kỳ tệp mà lần gỡ b�
 | Đọc đầu chuỗi sổ kiểm toán, ghi mốc neo | Khóa quản trị, không kèm vai trò — việc nội bộ, không nhận tham số từ người dùng |
 | Đọc hồ sơ, văn bản, tệp để nộp lưu; gọi hàm `office_archive_case_file` | Khóa quản trị, không kèm vai trò, `X-Hasura-User-Id: svc-files:archive` — việc nội bộ; id hồ sơ lấy từ CSDL hoặc lệnh chạy tay. Hàm không cấp quyền cho vai trò nào |
 | Phòng đọc: tìm hồ sơ, lọc văn bản người gọi đọc được | Token của người dùng; ghi `case_file.read` như ghi `register.printed` |
+| Phòng đọc xem tệp: hồ sơ, văn bản gắn tệp người gọi đọc được; ghi `case_file.file_viewed` | Token của người dùng; ghi sổ như trên |
+| Nộp lưu theo yêu cầu: hồ sơ người gọi (`manager`) xem được — Hasura chỉ trả hồ sơ của phòng mình; ghi `case_file.archive_requested` | Token của người dùng; ghi sổ như trên; rồi các bước nộp lưu bằng khóa quản trị như vòng nền |
 | Liên thông: đọc dòng outbox, văn bản nguồn, bản phát hành; bản sao đã có chưa | Khóa quản trị, không kèm vai trò — id dòng do svc-workflow gửi, mọi thứ khác đọc từ CSDL |
 | Liên thông: thêm dòng `core.files` của bản sao | Khóa quản trị + `X-Hasura-Role: service` + thuê ước **nhận** (đọc từ dòng outbox), người thực hiện `svc-workflow` |
 | Đọc văn bản đến: tệp có xem được, có do người gọi tải lên | Token của người dùng (`created_by` trong `core_files_by_pk`) |

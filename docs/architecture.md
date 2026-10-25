@@ -18,8 +18,8 @@
 >    chọn có bản ghi QĐ-001…QĐ-013 (§5).
 > 4. **Lõi đang ôm gì.** Phần máy chủ của Văn phòng điện tử chạy chung tiến trình với `svc-files`, `svc-workflow`. Thứ
 >    tách cứng hiện chỉ có cổng và khóa ngoại CSDL; còn lại là chỗ dính đã liệt kê (§4).
-> 5. **Yếu nhất ở đâu.** Lõi còn ôm nghiệp vụ; một máy, một PostgreSQL; chưa có trục sự kiện; chưa chạy thử trên máy
->    8 GB thật (§6).
+> 5. **Yếu nhất ở đâu.** Lõi còn ôm nghiệp vụ; một máy, một PostgreSQL; trục sự kiện mới một phần (Event Triggers tới
+>    ứng dụng, chưa phải broker); chưa chạy thử trên máy 8 GB thật (§6).
 
 | Mục | Trả lời câu hỏi |
 |---|---|
@@ -263,7 +263,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | SeaweedFS | 4.48 | Kho tệp S3: bucket nóng `moc-files`; bucket lạnh `moc-cold` có Object Lock cho mốc neo sổ kiểm toán và gói nộp lưu (QĐ-010) | ④ | `svc_files/storage.py`, `svc_files/anchors.py`, `svc_files/archive.py` | F1.5 Hoàn thiện |
 | Meilisearch CE | v1.54.3 | Tìm toàn văn văn bản, cả chữ trong PDF; chỉ mục đoạn `chunks` của trợ lý hỏi đáp (tìm lai từ khóa và véc-tơ). Chỉ trả id, Hasura quyết ai đọc được | ④ | `svc_files/search.py`, `svc_files/texts.py`, `svc_files/assist/meili.py` | F1.7, F2.7 Hoàn thiện |
 | DuckDB | 1.5.6, thư viện trong `svc-files` | Ghi bảng của hồ sơ nộp lưu thành Parquet; phòng đọc đọc lại | ③ ④ | `svc_files/archive.py` | F3.8 Dùng được; PR #124 (giao diện hồ sơ, phòng đọc) nâng lên Hoàn thiện khi được gộp |
-| Phả hệ dữ liệu *(mã của đội)* | OpenLineage 2-0-2, thư viện chuẩn | Sự kiện cho từng bước nộp lưu, lưu ở `core.lineage_events`; Marquez chưa đưa vào | — | `svc_files/lineage.py` | F3.9 Dùng được; PR #126 (phả hệ báo cáo, trang xem đồ thị) nâng lên Hoàn thiện khi được gộp |
+| Phả hệ dữ liệu *(mã của đội)* | OpenLineage 2-0-2, thư viện chuẩn | Sự kiện cho từng bước nộp lưu, lưu ở `core.lineage_events`; phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL (`office.report_lineage`), trang `/pha-he` vẽ đồ thị; Marquez chưa đưa vào | — | `svc_files/lineage.py`, migration `1792281602900_report_lineage` | F3.9 Hoàn thiện |
 | Dashboard điều hành | Apache ECharts 6.1.0 | Trang `/dieu-hanh` của `app-office` đọc bốn view `office.v_*` qua Hasura, đúng quyền đơn vị | ③ | `apps/office/app/pages/dieu-hanh.vue`, migration `1792281601200_dashboard` | F3.11 Hoàn thiện |
 | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | Bản sao số của cảm biến theo NGSI-LD; vượt ngưỡng thì báo `svc-workflow` (profile `iot`) | ③ | `svc_workflow/ot.py`, `services/ot-sensor/` | F3.10 Minh họa |
 
@@ -301,7 +301,7 @@ Khi PR #121 được gộp, có thêm F4.7 — tự chẩn đoán mức trưởn
 | [H] Cổng nội bộ | Một phần | Hai ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; chưa có trang dẫn qua lại | `ROADMAP.md` giai đoạn 1 |
 | [P] Biểu mẫu low-code | **Chưa có** | Form viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py` | `ROADMAP.md` giai đoạn 2 |
 | [P] Tự động hóa, kịch bản serverless (⑤) | **Chưa có** | Vòng nền viết cứng trong `svc-files`, `svc-workflow`; Kestra đã cân nhắc, chưa đưa vào | `muc-hoan-thien.md` §3; `DEPENDENCIES.md` |
-| [P] Trục streaming sự kiện (⑥) | **Chưa có** | Bảng sự kiện và hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3 |
+| [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
 | [D] Thu thập, làm sạch, đồng bộ sang kho phân tích | **Chưa có** | Chặn dữ liệu bẩn ngay ở điểm nhập (Poka-yoke ba lớp); dashboard đọc thẳng view trên CSDL nghiệp vụ | `ROADMAP.md` giai đoạn 3 |
 | [D] BI riêng | **Chưa có** (chủ ý) | Trang `/dieu-hanh` (ECharts) đọc view `office.v_*` qua Hasura. Metabase bị loại: bản nguồn mở không đăng nhập bằng Keycloak được, đọc thẳng CSDL bỏ qua quyền đơn vị | `DEPENDENCIES.md` |
 | [D] Lớp ngữ nghĩa báo cáo, số liệu chuỗi thời gian (③) | Một phần | Mỗi báo cáo một view viết tay; `office.archived_document_facts` giữ số liệu của văn bản đã nộp lưu | `muc-hoan-thien.md` §3 |
@@ -553,6 +553,12 @@ dụng này, `git diff --stat` trên `services/`, `apps/office/`, các migration
 `actions.*` đều không in dòng nào ([`them-ung-dung.md`](them-ung-dung.md) §4). Kiểm trên hệ thống chạy: `make
 demo-ca-nhan`, có trong CI. Giới hạn của bằng chứng này: tải lên của P.A.R.A vẫn chạy trong tiến trình `svc-files` có
 phần Văn phòng — tách về đường đi của mã và dữ liệu, chưa tách về tiến trình.
+
+Ứng dụng thứ ba, Bảng tin đơn vị (`apps/bang-tin`), đi xa hơn một bước: cài bằng `moc app install` từ manifest, không
+sửa tệp nào của lõi — client Keycloak, route APISIX, metadata Hasura nằm trong `.moc-apps/` ngoài git. Migration chạy
+bằng vai trò CSDL riêng không có quyền trên `core`, `office`, `personal`; ứng dụng biết văn bản vừa vào sổ qua luồng
+`core.app_events` chứ không đọc bảng của Văn phòng. Kiểm trên hệ thống chạy: `make demo-cai-ung-dung`, có trong CI
+([`them-ung-dung.md`](them-ung-dung.md) mục 1).
 
 ### 4.7. Hướng tách
 
@@ -830,6 +836,8 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   `1792281602600_notification_deliveries`, `1792281602800_import_jobs`, `1792281601400_lineage`;
   `svc_workflow/dispatch.py`, `svc_workflow/channels.py`, `svc_files/imports/runner.py`;
   `git grep -n event_triggers -- db/metadata` không in gì.
+  Cập nhật sau #132: ứng dụng cài bằng `moc app install` nghe luồng `core.app_events` qua Hasura Event Triggers do
+  lệnh cài sinh (không nằm trong `db/metadata`), nên cụm ⑥ lên Một phần; bảng sự kiện, hộp thư đi vẫn như trên.
 
 ### QĐ-009: Flowable REST cho BPMN; Flowable giữ bước, PostgreSQL giữ dữ liệu, chỉ `svc-workflow` ghi trạng thái
 
@@ -949,8 +957,9 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
 
 - **Lõi còn ôm phần máy chủ của Văn phòng điện tử**: tách cứng ở cổng và khóa ngoại CSDL; hàm, cột, metadata, vai trò
   của `core` còn dính `office`; chưa tách ở mã (§4, QĐ-012).
-- **Thiếu hai năng lực Tầng 1**: trục streaming sự kiện (⑥) và nơi chạy kịch bản serverless (⑤); việc nền là vòng lặp
-  viết cứng trong hai dịch vụ ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, QĐ-008).
+- **Thiếu một năng lực Tầng 1**: nơi chạy kịch bản serverless (⑤); việc nền là vòng lặp viết cứng trong hai dịch vụ.
+  Trục sự kiện (⑥) mới một phần: Event Triggers giao `core.app_events` tới ứng dụng, chưa phải broker
+  ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, QĐ-008).
 - **Một máy, một PostgreSQL**: điểm lỗi đơn (QĐ-002), không tự mở rộng, không chịu lỗi nhiều nút (QĐ-003); sổ kiểm toán
   là một chuỗi băm, mọi giao dịch ghi sổ xếp hàng ở dòng `core.audit_head`; chưa đo tải
   ([`du-thi/hoi-dap-hoi-dong.md`](du-thi/hoi-dap-hoi-dong.md) §3).

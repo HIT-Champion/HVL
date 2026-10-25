@@ -380,6 +380,22 @@ quản trị, chỉ tệp chưa gắn văn bản của người tạo lô).
 Khóa ngoại `(job_id, tenant_id)` kèm thuê ước, xóa lô thì xóa dòng. Chỉ `service` của đơn vị đọc, ghi;
 không vai trò người dùng nào có quyền — API `/api/imports` (§4.3) kiểm token, chỉ cho người tạo xem lô của mình.
 
+**Ứng dụng cắm bằng manifest** (migration 1792281603200; `moc app install`, [`them-ung-dung.md`](them-ung-dung.md)
+mục 1). `core.apps` một dòng mỗi ứng dụng đã cài: `name` (khóa), `title`, `path` (unique giữa các ứng dụng chưa gỡ),
+`schema_name` (unique; không được là `core`, `office`, `personal`, `public`, `moc_app`), `version`, `manifest` (jsonb,
+như lúc cài, không bí mật),
+`manifest_sha256`, `installed_at`, `updated_at`, `removed_at` (gỡ không xóa dòng, không xóa dữ liệu của ứng dụng).
+`core.app_migrations` khóa `(app, version)`: `name`, `sha256` nội dung — áp rồi thì không áp lại, nội dung đổi thì lệnh
+từ chối. Cả hai gắn `core.audit()`, không vai trò nào đọc qua GraphQL (lệnh đọc bằng `psql`). `core.app_events` là
+luồng sự kiện **đã làm sạch** cho ứng dụng: `id` (= `office.document_events.id`, khóa chống trùng cho người nghe),
+`tenant_id`, `document_id`, `kind`, `occurred_at` — trigger `app_events_publish` (security definer) chép mỗi dòng
+`office.document_events` có `kind` trong danh sách trắng (`office.document.received`, `.registered`, `.issued`) về văn
+bản không hạn chế; không `data`, không người làm (hàm chép đặt `hasura.user` = `null` trong lúc ghi, nên
+`session_variables` của sự kiện Hasura là `null`). Hasura Event Trigger của từng ứng dụng nằm trên bảng này (§5).
+Schema `moc_app` chỉ có hàm `moc_app.migration_done` (security definer): vai trò CSDL `moc_appdb_<schema>` của từng
+ứng dụng gọi nó cuối mỗi migration để kiểm đối tượng vừa tạo rồi ghi `core.app_migrations`
+([`them-ung-dung.md`](them-ung-dung.md) mục 1.4).
+
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
 create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
 giới giữa các đơn vị nằm ở nhiều lớp, lớp sau không tin lớp trước:
@@ -744,7 +760,10 @@ hồ sơ `closed` từ `MOC_ARCHIVE_AFTER_DAYS` ngày (mặc định 365); một
    đã sang lạnh vào văn bản nào nữa.
 
 Xem lại hồ sơ đã lưu: `GET /api/case-files/{id}/archive` (§4.3) — svc-files tải manifest theo `archive_sha256`, so
-băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Phòng đọc xem tệp có watermark làm cùng F3.7.
+băm, DuckDB đọc bảng văn bản, chỉ trả văn bản người gọi đọc được. Xem tệp: `GET …/archive/files/{file_id}` — chỉ PDF
+của văn bản người gọi đọc được, so băm với manifest, đóng dấu người xem bằng đúng đường của F3.7, ghi
+`case_file.file_viewed` rồi mới trả. Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng:
+`POST /api/case-files/{id}/archive` (cùng các bước trên, ghi `case_file.archive_requested` khi giành được lượt).
 
 **Phả hệ và kiểm chất lượng (F3.9).** Mỗi lượt nộp lưu là một run OpenLineage của job `moc.case_file.archive`, với
 4 run con `files`, `tables`, `manifest`, `commit` (facet `parent`). svc-files ghi từng sự kiện vào:
@@ -1234,6 +1253,8 @@ Thuật toán, ngưỡng, số đo: README của `svc-workflow`.
 | `GET /api/verify/{code}` | Ẩn danh | `{result, document: {symbol, issued_on, type_name, issuer_name, parent_name, summary?, sha256, verify_code, status, signature}}`; `summary` chỉ có khi `is_public`; `signature` (F4.5, chỉ minh họa) luôn có mặt: `{level, signer, ca, serial, signed_at, illustrative: true}`, hoặc `null` khi bản phát hành không ký |
 | `GET /api/verify?sha256=…` | Ẩn danh | Như trên, tra theo băm do trình duyệt tự tính |
 | `GET /api/case-files/{id}/archive` | Người xem được hồ sơ | Phòng đọc hồ sơ đã nộp lưu: đọc lại gói từ bucket lạnh, so băm với CSDL, văn bản người gọi đọc được từ Parquet (số còn lại trong `hidden`); ghi `case_file.read` vào sổ kiểm toán |
+| `GET /api/case-files/{id}/archive/files/{file_id}` | Người xem được hồ sơ, đọc được văn bản gắn tệp | Phòng đọc xem tệp: chỉ PDF; so băm với manifest (lệch → 502, không trả byte), bản có dấu tên người xem, giờ xem (`inline`, `no-store`); ghi `case_file.file_viewed` trước khi trả |
+| `POST /api/case-files/{id}/archive` | `manager`, hồ sơ của phòng mình | Nộp lưu ngay hồ sơ đã đóng: các bước của job nộp lưu; giành được lượt (chung khóa với vòng nền) rồi mới ghi `case_file.archive_requested`; 409 `not_closed`, `already_archived`, `archive_failed`, `archive_conflict`; 503 `busy` |
 | `POST /api/files/{id}/read` | `clerk`, tệp do chính mình tải lên | Đọc văn bản đến (F4.1): gợi ý số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn, trích yếu kèm độ tin cậy; `?force=true` đọc lại. Tệp mã hóa → 409 `restricted`, không đọc byte. Lưu gợi ý và ghi sổ `intake.suggested` trong một giao dịch bằng vai trò `agent` (§3); không ghi được sổ thì không trả gợi ý (503). Chi tiết lỗi: README của `svc-files` |
 | `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director` | Trợ lý hỏi đáp (F4.2): `{question, mode: extract\|generate, direction?, year?, type_code?, ask_id?}` → câu trích nguyên văn (luôn có, không cần mô hình) hoặc câu trả lời do mô hình viết, mỗi ý có `[n]`; `sources` (số ký hiệu, trang, đoạn trích) chỉ gồm văn bản người hỏi đọc được, lọc trước trong chỉ mục và hậu kiểm bằng token người hỏi (§3). `no_evidence` giống hệt dù văn bản không tồn tại hay bị cấm. Mỗi lượt một dòng sổ `assistant.answered` bằng vai trò `agent`, không ghi được sổ thì không trả lời (503). Đi qua route `/api/documents/*` sẵn có của APISIX. Chi tiết lỗi: README của `svc-files` |
 | `POST /api/imports/incoming` | `clerk` | Nạp lô văn bản đến (cụm ⑤): multipart `data` (NDJSON hoặc CSV, cùng trường với `receiveIncoming`, thêm `files`: tên tệp trong zip) + `archive` (zip) tùy chọn, `?register=true` vào sổ từng văn bản, `Idempotency-Key` tùy chọn. Kiểm cả tệp (tệp dữ liệu qua ClamAV), ghi lô + dòng + `import.created` trong một mutation, trả 202. Vòng nền đưa từng dòng qua đúng `ingest()` và Action `receiveIncoming` (tùy chọn `registerIncoming`) với phiên của văn thư tạo lô; lỗi một dòng không hỏng dòng khác. Chi tiết lỗi: README của `svc-files` |
@@ -1304,6 +1325,12 @@ cùng loại (cột `kind`), người làm (`actor_id`, `actor_kind`) và `data`
 ```
 
 `id` là ULID. `request_id` lấy từ `X-Request-Id` để nối sự kiện với log.
+
+Ứng dụng cắm bằng manifest không nhận khuôn trên: Hasura Event Trigger `app_<tên>` trên `core.app_events` (§1) gọi
+webhook của ứng dụng với thân sự kiện chuẩn của Hasura (không biến đổi): `event.op` = `INSERT`, `event.data.new` =
+`{"id", "tenant_id", "document_id", "kind", "occurred_at"}`, `event.session_variables` = `null`; mọi loại trong danh
+sách trắng, ứng dụng tự bỏ loại không khai (`MOC_APP_EVENT_KINDS`). Header `X-Moc-Hook-Secret`; giao ít nhất một lần,
+chống trùng bằng `event.data.new.id`.
 
 | `type` | Phát khi |
 |---|---|
