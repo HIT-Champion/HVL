@@ -30,30 +30,29 @@ e2e = `tests/e2e/`; mã nguồn `svc_files/…` = `services/svc-files/src/svc_fi
 
 ## 1. Số test
 
-Đếm tĩnh trên `develop` f54b6f3; số chạy lấy từ log của lần CI
-[40177874695](https://github.com/HIT-Champion/Signet/actions/runs/40177874695) trên đúng commit đó (25/10/2026, xanh
-hết).
+Đếm tĩnh trên `develop` 5ea8fbc; số chạy lấy từ log của lần CI
+[40179833930](https://github.com/HIT-Champion/Signet/actions/runs/40179833930) trên 772d81f (25/10/2026, xanh hết) —
+commit kế tiếp (#144) chỉ sửa chuỗi trong hai tệp test, không thêm, bớt test nào.
 
-| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Chạy trong CI (lần 40177874695) | Job CI |
+| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Chạy trong CI (lần 40179833930) | Job CI |
 |---|---|---|---|---|---|
 | svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 853 hàm | 1 428 đạt, 9 bỏ qua | `unit` (`make test`) |
 | svc-workflow | `services/svc-workflow/tests/` | như trên | 284 hàm | 486 đạt | `unit` (`make test`) |
-| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 371 hàm | 371 chạy, đạt, 2 bỏ qua | `unit` (`make test`) |
+| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 372 hàm | 372 chạy, đạt, 2 bỏ qua | `unit` (`make test`) |
 | Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 149 lời gọi | 199 đạt | `unit` (`make test`) |
 | Không gian cá nhân P.A.R.A | `apps/ca-nhan/tests/` | như trên | 13 lời gọi | 13 đạt | `unit` (`make test`) |
 | Bảng tin đơn vị | `apps/bang-tin/tests/` | như trên; `def test_` cho tệp Python | 5 lời gọi + 15 hàm | 5 + 15 đạt | `unit` (`make test`) |
 | CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 321 hàm | 543 đạt | `db` (`MOC_IT=1`) |
 | Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 23 test trong 19 tệp `*.spec.ts` | 23 đạt | `chay-thu`, phần `e2e`, bước `make e2e` |
-| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 90 kiểm | 90 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
+| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 91 kiểm | 91 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
 
-**Tổng đếm tĩnh: 2 034 test** (853 + 284 + 371 + 149 + 13 + 5 + 15 + 321 + 23), cộng 90 kiểm của smoke; **lúc chạy
-trong CI: 3 081 test đạt** (1 428 + 486 + 369 + 199 + 13 + 20 + 543 + 23 — `scripts` tính 369 vì 2 test bỏ qua), cộng
-90 kiểm smoke. Số lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test sinh trong vòng lặp nhân một hàm
+**Tổng đếm tĩnh: 2 035 test** (853 + 284 + 372 + 149 + 13 + 5 + 15 + 321 + 23), cộng 91 kiểm của smoke; **lúc chạy
+trong CI: 3 082 test đạt** (1 428 + 486 + 370 + 199 + 13 + 20 + 543 + 23 — `scripts` tính 370 vì 2 test bỏ qua), cộng
+91 kiểm smoke. Số lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test sinh trong vòng lặp nhân một hàm
 thành nhiều ca. Test của `scripts` chỉ bỏ qua có điều kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư
-mục). 9 test bỏ qua của
-svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job `unit` không đặt, nên 9 test
-này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 18 (máy khách Hasura dùng
-chung), `integration/test_live.py` 9, office `format.test.ts` 4, `paging.test.ts` 4.
+mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job
+`unit` không đặt, nên 9 test này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 18
+(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 4, `paging.test.ts` 4.
 
 ## 2. Ma trận tính năng
 
@@ -203,6 +202,8 @@ for d in services/svc-files/tests services/svc-workflow/tests scripts/tests db/t
   printf '%s %s\n' "$d" "$(grep -rhoE '^\s*(async )?def test_' --include='*.py' "$d" | wc -l)"
 done
 grep -hE '^\s*(test|it)\(' apps/office/tests/*.test.ts | wc -l   # giao diện (node:test)
+grep -hE '^\s*(test|it)\(' apps/ca-nhan/tests/*.test.js apps/bang-tin/tests/*.test.js | wc -l   # hai ứng dụng
+grep -rhoE '^\s*(async )?def test_' apps/bang-tin/tests | wc -l     # Bảng tin, phần Python
 grep -hE '^test\(' tests/e2e/*.spec.ts | wc -l                     # kịch bản Playwright
 grep -cE '^\s*ok\(' scripts/smoke.py                               # kiểm của make smoke
 grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng tệp (đổi thư mục cho phần khác)
@@ -211,9 +212,9 @@ grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng 
 Chạy thật (cần gì cho từng lệnh: README, mục Kiểm thử):
 
 ```bash
-make test                     # svc-files, svc-workflow, scripts, apps/office — như job unit
+make test                     # svc-files, svc-workflow, scripts, apps/office, ca-nhan, bang-tin — như job unit
 db/tests/stack.sh up          # PostgreSQL + Hasura cho db/tests — như job db (lệnh đủ ở db/README.md)
-make up && make seed && make smoke && make e2e   # như job stack
+make up && make seed && make smoke && make e2e   # như job chay-thu (phần luong-chinh, e2e)
 make demo-nong-lanh           # từng màn ở mục 2; make help liệt kê tất cả
 ```
 
