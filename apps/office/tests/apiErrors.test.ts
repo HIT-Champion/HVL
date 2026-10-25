@@ -198,6 +198,21 @@ test('errorText: blocked → câu của cổng kèm mã, hai ngôn ngữ; không
   assert.equal(errorText(tVi as never, new ApiError('HTTP 502', null, 502)), 'HTTP 502')
 })
 
+test('errorText: tệp sai loại, tệp chạy được, ảnh không bỏ được EXIF → câu riêng, hai ngôn ngữ', async () => {
+  const codes = [['type_mismatch', 415], ['type_not_allowed', 415], ['image_unreadable', 422]] as const
+  for (const [code, status] of codes) {
+    reply = jsonReply(status, { detail: { code, message: 'Câu tiếng Việt của máy chủ', found: 'text/html' } })
+    const e = await failure(calls.upload)
+    assert.equal(e.code, code)
+    assert.equal(e.status, status)
+    for (const [t, messages] of [[tVi, vi], [tEn, en]] as const) {
+      const text = errorText(t as never, e)
+      assert.ok(lookup(messages, `error.${code}`), code)
+      assert.equal(text, lookup(messages, `error.${code}`))
+    }
+  }
+})
+
 test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đáp chuyển blocked cho errorText', () => {
   for (const messages of [vi, en]) {
     assert.ok(lookup(messages, 'error.blocked'))

@@ -174,6 +174,17 @@ def test_infected_attachment_fails_only_its_row(lab, clerk, store):
     assert (drop["line"], len(drop["dropped"])) == (1, 1) and len(store.deleted) == 1
 
 
+def test_attachment_that_is_not_its_type_fails_only_its_row(lab, clerk, store):
+    # tệp trong zip đi đúng ingest(): sau ClamAV nhận loại theo nội dung — trang HTML đặt đuôi .pdf bị chặn
+    job_id = create(lab, clerk, doc(1, files=["gia.pdf"]), doc(2, files=["that.pdf"]),
+                    archive=zip_bytes({"gia.pdf": b"<html><body>Dang nhap</body></html>", "that.pdf": PDF_A}))
+    lab.drain()
+    got = lines(lab, job_id)
+    assert (got[1]["status"], got[1]["code"]) == ("failed", "type_mismatch") and "gia.pdf" in got[1]["message"]
+    assert got[2]["status"] == "ok" and files_named(lab, "gia.pdf") == []
+    assert lab.hasura.events == []          # không phải tệp nhiễm: không có dòng file.rejected
+
+
 def test_encrypted_entry_is_unscannable(lab, clerk):
     job_id = create(lab, clerk, doc(1, files=["khoa.pdf"]), archive=zip_bytes({"khoa.pdf": PDF_A},
                                                                              encrypted={"khoa.pdf"}))
@@ -185,7 +196,7 @@ def test_encrypted_entry_is_unscannable(lab, clerk):
 def test_restricted_rows_store_sealed_pdfs(lab, clerk, store):
     secret = text_pdf("NOI DUNG HAN CHE")
     job_id = create(lab, clerk, doc(1, restricted=True, files=["mat.pdf"]), doc(2, restricted=True, files=["mat.docx"]),
-                    archive=zip_bytes({"mat.pdf": secret, "mat.docx": b"PK docx"}))
+                    archive=zip_bytes({"mat.pdf": secret, "mat.docx": b"PK\x03\x04 docx"}))
     lab.drain()
     got = lines(lab, job_id)
     assert got[1]["status"] == "ok"

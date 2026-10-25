@@ -54,6 +54,7 @@ from zoneinfo import ZoneInfo
 
 from ..auth import Principal
 from ..config import Settings
+from ..filetype import HEAD, detect
 from ..hasura import HasuraAuthError, HasuraError, Location, StoredFile
 from ..storage import ObjectMissing, StorageError
 from . import layout, rules
@@ -87,14 +88,8 @@ RETRY_AFTER = "10"
 RESTRICTED = "Văn bản hạn chế không đọc tự động — nhập tay"
 NOT_FOUND = "Không có tệp này, hoặc không phải tệp bạn vừa tải lên"
 
-# byte đầu → loại tệp (không tin mime khai lúc tải lên)
-MAGIC = (
-    (b"%PDF-", "pdf"),
-    (b"\xff\xd8\xff", "image"),          # JPEG
-    (b"\x89PNG", "image"),               # PNG (89 50 4E 47)
-    (b"II*\x00", "image"),               # TIFF little-endian
-    (b"MM\x00*", "image"),               # TIFF big-endian
-)
+# họ nội dung theo byte đầu (filetype.py, cùng bảng chữ ký với lúc tải lên — không tin mime khai) → cách đọc
+READABLE = {"pdf": "pdf", "jpeg": "image", "png": "image", "tiff": "image"}
 
 UNREADABLE = {
     "password": "Tệp PDF đặt mật khẩu nên không đọc được — nhập tay",
@@ -158,10 +153,7 @@ Lines = Callable[[Sequence[str]], list[layout.Line]]
 
 
 def sniff(data: bytes) -> str | None:
-    for magic, kind in MAGIC:
-        if data.startswith(magic):
-            return kind
-    return None
+    return READABLE.get(detect(data[:HEAD]).family)
 
 
 def clean_fields(raw: dict[str, Any]) -> dict[str, dict[str, str]]:
