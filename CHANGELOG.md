@@ -143,6 +143,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   giờ máy chủ quá 2 phút (`FUTURE_SLACK`, như cờ `future_time` ở trên) thì giờ, ngày của báo cáo và khóa nhắc theo
   lúc máy chủ nhận thông báo; dự thảo thêm một dòng ghi rõ đồng hồ cảm biến chạy nhanh kèm giờ thiết bị gửi, sự kiện
   `ot.alarm` giữ giờ đó ở `device_observed_at`. Đồng hồ đúng giữ nguyên như trước. Test svc-workflow +3.
+- Thẻ `<html lang>` không còn về `vi` khi tải lại trang lúc đang dùng tiếng Anh (#205): chữ vẫn tiếng Anh nhưng trình
+  đọc màn hình đọc bằng giọng tiếng Việt. Plugin i18n đặt `lang` theo ngôn ngữ đang dùng qua `useHead`, đè lên giá trị
+  ghi cứng trong `nuxt.config.ts`; e2e `tieng-anh.spec.ts` kiểm thêm `lang` sau khi tải lại ở cả hai test.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau

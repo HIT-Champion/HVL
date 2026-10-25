@@ -34,4 +34,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     messages: { vi, en },
   })
   nuxtApp.vueApp.use(i18n)
+  // <html lang> theo ngôn ngữ đang dùng, kể cả ngay sau khi tải lại trang (#205): mục này đè lên `lang: 'vi'` ghi cứng
+  // trong nuxt.config.ts và đổi theo mỗi lần bấm nút đổi ngôn ngữ
+  useHead({ htmlAttrs: { lang: computed(() => i18n.global.locale.value) } })
 })
