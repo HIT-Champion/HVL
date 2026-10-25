@@ -97,7 +97,7 @@ docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.
 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
-| ☐ | Có tài liệu làm rõ thư viện/gói sử dụng | `DEPENDENCIES.md`; danh mục đầy đủ từng gói (kể cả gián tiếp) kèm giấy phép: SBOM CycloneDX `moc-X.Y.Z.cdx.json` đính kèm bản phát hành từ sau v1.0.0 (`make sbom`) | — |
+| ☐ | Có tài liệu làm rõ thư viện/gói sử dụng | `DEPENDENCIES.md`; danh mục đầy đủ từng gói (kể cả gián tiếp) kèm giấy phép: SBOM CycloneDX `signet-X.Y.Z.cdx.json` đính kèm bản phát hành từ sau v1.0.0 (`make sbom`) | — |
 | ☐ | Ưu tiên thư viện sẵn có của hệ thống | Dùng image chính thức, không tự đóng gói lại | −5 |
 | ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` | −5 |
 | ☐ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin | −5 |

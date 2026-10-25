@@ -331,7 +331,7 @@ có schema riêng (`office`, `personal`), `core` không đặt khóa ngoại nà
 một hàm của `core` đọc `office`, ba cột in văn bản đi trong `core.tenants`, hàm `core.audit_overview` viết cứng loại
 dòng sổ của Văn phòng, hai tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4).
 Ở mức mã thì chưa tách. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`, nhưng
-nó mang theo các chỗ dính đó (§4.6). Tách là việc sau `v1.1.0` (§4.7).
+nó mang theo các chỗ dính đó (§4.6). Tách là việc sau `v1.2.0` (§4.7).
 
 ### 4.2. Sơ đồ
 
@@ -562,7 +562,7 @@ bằng vai trò CSDL riêng không có quyền trên `core`, `office`, `personal
 
 ### 4.7. Hướng tách
 
-Đây là việc sau `v1.1.0`, chưa xếp ngày.
+Đây là việc sau `v1.2.0`, chưa xếp ngày.
 
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
@@ -926,7 +926,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   giữa hai phần là gọi hàm. Đổi lại: chưa tắt hay thay được Văn phòng mà không sửa mã lõi; tìm kiếm, chữ PDF, trợ lý chỉ
   phủ văn bản của Văn phòng; triển khai lại phần Văn phòng là khởi động lại cả dịch vụ lõi; còn những chỗ dính ở §4.4.
   Ứng dụng thứ hai vẫn cắm được mà không sửa `services/` (§4.6). Hướng tách, tiêu chí, cái giá: §4.7 — việc sau
-  `v1.1.0`.
+  `v1.2.0`.
 
 ### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX
 

@@ -30,7 +30,7 @@ requirements.txt, workflow) theo chính sách của DEPENDENCIES.md, mục "Ki�
     trong gói, bắt buộc kèm `phien_ban` — nâng bản thì đọc lại.
   Ngoại lệ không còn gói nào cần tới thì chỉ cảnh báo.
 
-  python3 scripts/license_audit.py dist/moc-1.1.0.cdx.json [--ngoai-le .github/license-exceptions.json]
+  python3 scripts/license_audit.py dist/signet-1.1.0.cdx.json [--ngoai-le .github/license-exceptions.json]
 
 Thoát 0 khi đạt, 1 khi có gói không đạt, 2 khi SBOM hay tệp ngoại lệ sai định dạng. Chỉ dùng thư viện chuẩn.
 """
@@ -374,7 +374,7 @@ def report(packages: list[Package], waivers: list[Waiver], waivers_path: str, so
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Kiểm giấy phép mọi gói trong SBOM CycloneDX (make sbom).")
-    parser.add_argument("sbom", type=pathlib.Path, help="tệp SBOM CycloneDX JSON, vd. dist/moc-1.1.0.cdx.json")
+    parser.add_argument("sbom", type=pathlib.Path, help="tệp SBOM CycloneDX JSON, vd. dist/signet-1.1.0.cdx.json")
     parser.add_argument("--ngoai-le", type=pathlib.Path, default=WAIVERS, help="tệp ngoại lệ có lý do")
     args = parser.parse_args(argv)
     try:

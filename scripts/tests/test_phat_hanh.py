@@ -154,8 +154,8 @@ class NoReReleaseTest(unittest.TestCase):
         proc = self.release()
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(self.git("tag", "-l").split(), ["v0.2.0"])
-        self.assertTrue((self.repo / "dist" / "moc-0.2.0.tar.gz").is_file())
-        self.assertTrue((self.repo / "dist" / "moc-0.2.0.tar.gz.sha256").is_file())
+        self.assertTrue((self.repo / "dist" / "signet-0.2.0.tar.gz").is_file())
+        self.assertTrue((self.repo / "dist" / "signet-0.2.0.tar.gz.sha256").is_file())
 
     def test_tag_already_on_origin_stops_before_tagging(self) -> None:
         # thẻ đã đẩy từ máy khác: máy này chưa có, gắn được thẻ cục bộ nhưng đẩy lên sẽ là phát hành lại
@@ -276,7 +276,8 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
                               text=True)
 
     def test_upload_check_needs_all_four_files(self) -> None:
-        names = ["moc-0.2.0.tar.gz", "moc-0.2.0.tar.gz.sha256", "moc-0.2.0.cdx.json", "moc-0.2.0.cdx.json.sha256"]
+        names = ["signet-0.2.0.tar.gz", "signet-0.2.0.tar.gz.sha256", "signet-0.2.0.cdx.json",
+                 "signet-0.2.0.cdx.json.sha256"]
         self.assertEqual(self.assets(json.dumps([{"name": n} for n in names])).returncode, 0)
         skipped = self.assets(json.dumps([{"name": n} for n in names[1:]]))
         self.assertEqual(skipped.returncode, 1)
@@ -290,7 +291,7 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         self.assertIn("ASSETS: ${{ steps.gh_release.outputs.assets }}", action)
 
     def test_sbom_is_made_from_the_tag_and_attached(self) -> None:
-        # make sbom sinh dist/moc-$V.cdx.json (+ .sha256) trước khi tạo Release; action tải cả hai lên
+        # make sbom sinh dist/signet-$V.cdx.json (+ .sha256) trước khi tạo Release; action tải cả hai lên
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertLess(text.index("name: Sinh SBOM CycloneDX (make sbom)"), text.index("softprops/action-gh-release@"))
         self.assertIn('run: make sbom VERSION="$V"', text)
@@ -320,9 +321,9 @@ class ReleaseBodyTest(unittest.TestCase):
     def test_summary_shows_and_changes_fold(self) -> None:
         out = release_body.body("1.1.0", self.NOTES, self.URL)
         head, rest = out.split("<details>", 1)
-        self.assertTrue(head.startswith("**Gói phát hành chính thức: `moc-1.1.0.tar.gz`**"))
-        self.assertIn("`sha256sum -c moc-1.1.0.tar.gz.sha256`", head)
-        self.assertIn("(SBOM CycloneDX): `moc-1.1.0.cdx.json`", head)
+        self.assertTrue(head.startswith("**Gói phát hành chính thức: `signet-1.1.0.tar.gz`**"))
+        self.assertIn("`sha256sum -c signet-1.1.0.tar.gz.sha256`", head)
+        self.assertIn("(SBOM CycloneDX): `signet-1.1.0.cdx.json`", head)
         self.assertIn('"Source code (zip)"', head)
         self.assertIn("\n\nBản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng, dựng từ mã nguồn bằng "
                       "make.\n\n- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR.\n\n", head)
@@ -339,7 +340,7 @@ class ReleaseBodyTest(unittest.TestCase):
     def test_without_summary_only_the_folded_changes(self) -> None:
         out = release_body.body("1.1.1", "### Đã sửa lỗi\n- Lỗi gấp.\n", self.URL)
         first, second = out.split("\n\n", 1)
-        self.assertIn("`moc-1.1.1.tar.gz`", first)
+        self.assertIn("`signet-1.1.1.tar.gz`", first)
         self.assertTrue(second.startswith("<details>\n<summary>Toàn bộ ghi chép thay đổi của 1.1.1 (1 mục)</summary>"))
 
     def test_entry_reads_the_section_and_fails_without_one(self) -> None:
@@ -378,7 +379,7 @@ class WorkflowNotesTest(unittest.TestCase):
         proc = self.step("0.2.0")
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         page = (self.dir / "dist" / "RELEASE_NOTES.md").read_text(encoding="utf-8")
-        self.assertTrue(page.startswith("**Gói phát hành chính thức: `moc-0.2.0.tar.gz`**"))
+        self.assertTrue(page.startswith("**Gói phát hành chính thức: `signet-0.2.0.tar.gz`**"))
         self.assertIn("- Tính năng của 0.2.0.\n", page)
 
     def test_missing_section_stops(self) -> None:

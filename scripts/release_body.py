@@ -19,7 +19,7 @@ ngay dưới tiêu đề "## [X.Y.Z]" của CHANGELOG.md (nếu có), rồi toà
 ngắn, ai cần thì bấm mở.
 
 - GitHub tự gắn "Source code (zip)" vào mọi Release và không gỡ được, mà PoF #3 trừ điểm định dạng không mở: dòng đầu
-  chỉ rõ gói của đội là moc-X.Y.Z.tar.gz, kèm tên tệp SBOM CycloneDX moc-X.Y.Z.cdx.json (make sbom).
+  chỉ rõ gói của đội là signet-X.Y.Z.tar.gz, kèm tên tệp SBOM CycloneDX signet-X.Y.Z.cdx.json (make sbom).
 - Mô tả Release hiện mỗi dấu xuống dòng thành một dòng mới: dòng tiếp nối của một đoạn hay một gạch đầu dòng
   (CHANGELOG ngắt dòng ở 120 ký tự) được nối lại. Liên kết tương đối trỏ về tệp ở thẻ vX.Y.Z.
 - Mục lấy bằng scripts/release-notes.sh: thiếu mục, hay mục không có dòng thay đổi nào, thì lỗi như release.sh.
@@ -61,9 +61,9 @@ def body(version: str, notes: str, repo_url: str) -> str:
     lines = notes.splitlines()
     first = next((i for i, line in enumerate(lines) if line.startswith("### ")), len(lines))
     summary, changes = "\n".join(lines[:first]).strip(), "\n".join(lines[first:]).strip()
-    parts = [f'**Gói phát hành chính thức: `moc-{version}.tar.gz`** (định dạng mở), kiểm bằng '
-             f'`sha256sum -c moc-{version}.tar.gz.sha256`; danh mục thành phần kèm giấy phép (SBOM CycloneDX): '
-             f'`moc-{version}.cdx.json`. "Source code (zip)" và "Source code (tar.gz)" do GitHub tự gắn vào mọi bản '
+    parts = [f'**Gói phát hành chính thức: `signet-{version}.tar.gz`** (định dạng mở), kiểm bằng '
+             f'`sha256sum -c signet-{version}.tar.gz.sha256`; danh mục thành phần kèm giấy phép (SBOM CycloneDX): '
+             f'`signet-{version}.cdx.json`. "Source code (zip)" và "Source code (tar.gz)" do GitHub tự gắn vào mọi bản '
              'phát hành, không phải gói của đội.']
     if summary:
         parts.append(unwrap(summary))
