@@ -141,6 +141,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thì kiểm lại sau lần nâng cấp này (`docker compose down` tạo lại mạng, có thể đổi dải — `docs/trien-khai.md` mục
   8). `make demo-cai-ung-dung` kiểm từ trong container `app-bang-tin` chỉ tới được APISIX, route hook không có ở cổng
   công khai. Test scripts +9.
+- Ảnh giao diện trong README chụp lại theo giao diện Liền mạch (#218): `docs/anh/doc-van-ban-goi-y.png`,
+  `dieu-hanh.png`, `xac-thuc.png` lấy từ ảnh e2e `29-doc-van-ban-goi-y`, `18-dieu-hanh`, `10-xac-thuc-khop` của CI.
+  Job "Chạy thử: e2e" nay tải ảnh màn hình lên artifact `e2e-anh-<lần chạy>` ở mọi lần chạy, cả khi xanh, để lần
+  sau thay ảnh không phải dựng cả hệ thống ở máy.
 
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
