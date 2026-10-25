@@ -192,7 +192,18 @@ curl -sI https://moc.example.vn/admin/ | head -1                      # phải b
 curl -s https://moc.example.vn/realms/moc/.well-known/openid-configuration \
   | grep -oE '"(issuer|token_endpoint)":"[^"]*"'
 docker compose logs --tail 3 apisix                                   # cột đầu: IP của người vừa gọi
+python3 scripts/kiem_ban_online.py https://moc.example.vn             # chạy được từ máy bất kỳ có Python
 ```
+
+`kiem_ban_online.py` kiểm từ bên ngoài, như trình duyệt của người dùng thấy, rồi báo mọi mục trượt:
+- chứng chỉ hợp lệ, còn ít nhất 14 ngày;
+- `http://` chuyển sang `https://`;
+- `/api/status` ok (thêm `--version 1.2.0` để đòi đúng bản);
+- `issuer`, `token_endpoint` như dưới đây;
+- header CSP, `nosniff` còn qua proxy.
+
+Job `.github/workflows/ban-online.yml` chạy kịch bản này mỗi sáng trên bản online của đội, với phiên bản là thẻ phát
+hành mới nhất. Địa chỉ đổi bằng biến `MOC_ONLINE_URL` của repo.
 
 - `issuer` và `token_endpoint` đều phải bắt đầu bằng `https://moc.example.vn/realms/moc`. `issuer` sai (`http://…`,
   `localhost`) là `MOC_PUBLIC_URL` sai; chỉ `token_endpoint` sai (`http://…` hay có `:9080`) là `MOC_TRUSTED_PROXY`

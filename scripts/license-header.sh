@@ -94,7 +94,7 @@ comment_style_for() {
 is_non_source() {
   case "$1" in
     *.md|*.txt|LICENSE|NOTICE|*.json|*.lock|*.csv|*.tsv|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.svg|\
-    *.woff|*.woff2|*.ttf|*.otf|*.gitkeep|*.gitignore|*.gitattributes|*.dockerignore|*.editorconfig|\
+    *.woff|*.woff2|*.ttf|*.otf|*.gitkeep|*.gitignore|*.gitattributes|*.mailmap|*.dockerignore|*.editorconfig|\
     *.nvmrc|*.python-version)
       return 0 ;;
   esac

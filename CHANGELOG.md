@@ -90,6 +90,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thời gian, tab Lịch sử), danh sách văn bản đi; tải lại trang vẫn giữ tiếng Anh, bấm "Tiếng Việt" thì về lại. Kịch
   bản thứ hai: người ngoài dùng trình duyệt tiếng Anh vẫn mở ra tiếng Việt, đổi ngôn ngữ ở trang trạng thái hệ thống
   và cổng xác thực không cần đăng nhập. e2e +2.
+- Kiểm bản online qua HTTPS mỗi ngày (F1.9, #197): `scripts/kiem_ban_online.py` (chỉ thư viện chuẩn) kiểm một địa
+  chỉ công khai từ bên ngoài, chạy hết các mục rồi báo mục trượt: chứng chỉ hợp lệ, TLS từ 1.2, còn ít nhất 14 ngày;
+  `http://` chuyển sang `https://`; `/api/status` ok hay degraded (thành phần không ok in thành cảnh báo) và đúng
+  `--version`; `issuer`, `authorization_endpoint`, `token_endpoint` của Keycloak nằm dưới `https://<máy>/realms/moc`
+  (proxy chuyển đúng header); trang chủ còn CSP và `nosniff`. Job `.github/workflows/ban-online.yml` chạy kịch bản
+  trên https://signet.htechcs.com lúc 07:17 mỗi ngày với thẻ phát hành mới nhất, chạy tay được, và chạy trên PR đổi
+  nó; từ lúc gắn thẻ mới tới lúc nâng bản online thì job đỏ. `docs/trien-khai.md` mục 6 thêm lệnh này. Test scripts
+  +15.
 - Giao diện Liền mạch cho Văn phòng điện tử (#116): logo, biểu tượng tab và phông Be Vietnam Pro tự phục vụ (OFL-1.1,
   khai trong `REUSE.toml`, `NOTICE`); nền xám lục, nút olive, nút và ô nhập cao 44px; thanh bên vàng bơ thu về dải
   biểu tượng, mở khi rê chuột hoặc dùng bàn phím, nằm đè không đẩy nội dung, thành ngăn kéo trên màn hẹp; hộp việc tách
@@ -152,6 +160,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   giờ máy chủ quá 2 phút (`FUTURE_SLACK`, như cờ `future_time` ở trên) thì giờ, ngày của báo cáo và khóa nhắc theo
   lúc máy chủ nhận thông báo; dự thảo thêm một dòng ghi rõ đồng hồ cảm biến chạy nhanh kèm giờ thiết bị gửi, sự kiện
   `ot.alarm` giữ giờ đó ở `device_observed_at`. Đồng hồ đúng giữ nguyên như trước. Test svc-workflow +3.
+- Thẻ `<html lang>` không còn về `vi` khi tải lại trang lúc đang dùng tiếng Anh (#205): chữ vẫn tiếng Anh nhưng trình
+  đọc màn hình đọc bằng giọng tiếng Việt. Plugin i18n đặt `lang` theo ngôn ngữ đang dùng qua `useHead`, đè lên giá trị
+  ghi cứng trong `nuxt.config.ts`; e2e `tieng-anh.spec.ts` kiểm thêm `lang` sau khi tải lại ở cả hai test.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
