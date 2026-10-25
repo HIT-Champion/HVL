@@ -58,6 +58,17 @@ precedence = "closest"
 SPDX-FileCopyrightText = "Chủ sở hữu từng dự án, xem docs/anh/logo/NGUON.md"
 SPDX-License-Identifier = "LicenseRef-Logos"
 
+# Phông giao diện Be Vietnam Pro (#116): tệp nguyên bản của dự án Be Vietnam Pro, giấy phép SIL OFL-1.1 (kèm OFL.txt
+# trong từng thư mục phông, toàn văn ở LICENSES/OFL-1.1.txt). Khai sau khối đầu nên ghi đè "**.txt" cho OFL.txt.
+[[annotations]]
+path = [
+  "apps/office/public/fonts/be-vietnam-pro/**",
+  "platform/keycloak/themes/signet/login/resources/fonts/be-vietnam-pro/**",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = "2021 The Be Vietnam Pro Project Authors"
+SPDX-License-Identifier = "OFL-1.1"
+
 # Ảnh sơ đồ kiến trúc: đội vẽ (scripts/so_do_kien_truc.py), bên trong có các logo ở trên
 [[annotations]]
 path = ["docs/anh/kien-truc-tong-the.gif", "docs/anh/kien-truc-tong-the.en.gif"]

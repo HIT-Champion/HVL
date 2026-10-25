@@ -140,14 +140,27 @@ const draft = useFormDraft<Kept>(
   },
 )
 
-onMounted(async () => {
+// Tải danh mục loại văn bản; lỗi thì báo ngay trên trang kèm nút Thử lại (gọi lại hàm này). Bản dở chỉ khôi phục
+// một lần: bấm Thử lại không đè lên phần văn thư đã nhập sau đó
+const initialFailure = ref('')
+let restored = false
+async function loadInitial() {
+  initialFailure.value = ''
   if (claims.value?.role !== 'clerk') return router.replace('/van-ban-den')
-  if (draft.resume()) notice.info(t('compose.restored'))
-  const data = await gql<{ office_document_types: { code: string; name: string }[] }>(
-    '{ office_document_types(order_by: {name: asc}) { code name } }',
-  )
-  types.value = data.office_document_types
-})
+  if (!restored) {
+    restored = true
+    if (draft.resume()) notice.info(t('compose.restored'))
+  }
+  try {
+    const data = await gql<{ office_document_types: { code: string; name: string }[] }>(
+      '{ office_document_types(order_by: {name: asc}) { code name } }',
+    )
+    types.value = data.office_document_types
+  } catch (e) {
+    initialFailure.value = errorText(t, e)
+  }
+}
+onMounted(loadInitial)
 
 const uploading = computed(() => files.value.some((f) => f.state === 'uploading'))
 const cleanFiles = computed(() => files.value.filter((f) => f.state === 'clean'))
@@ -442,6 +455,11 @@ async function save(register: boolean) {
   <div>
     <PageHeader :title="t('receive.title')" :subtitle="t('receive.subtitle')" />
 
+    <!-- không tải được danh mục loại văn bản: báo ngay trên trang, thử lại tại chỗ -->
+    <div v-if="initialFailure" class="moc-state mb-6" role="alert">
+      <span>{{ initialFailure }}</span>
+      <button type="button" class="btn-secondary" @click="loadInitial">{{ t('app.retry') }}</button>
+    </div>
     <!-- trình đọc màn hình: đang đọc, đọc xong (điền mấy ô), lỗi -->
     <p class="sr-only" aria-live="polite" data-testid="read-live">{{ announce }}</p>
 

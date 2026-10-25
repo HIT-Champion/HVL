@@ -98,6 +98,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trên https://signet.htechcs.com lúc 07:17 mỗi ngày với thẻ phát hành mới nhất, chạy tay được, và chạy trên PR đổi
   nó; từ lúc gắn thẻ mới tới lúc nâng bản online thì job đỏ. `docs/trien-khai.md` mục 6 thêm lệnh này. Test scripts
   +15.
+- Giao diện Liền mạch cho Văn phòng điện tử (#116): logo, biểu tượng tab và phông Be Vietnam Pro tự phục vụ (OFL-1.1,
+  khai trong `REUSE.toml`, `NOTICE`); nền xám lục, nút olive, nút và ô nhập cao 44px; thanh bên vàng bơ thu về dải
+  biểu tượng, mở khi rê chuột hoặc dùng bàn phím, nằm đè không đẩy nội dung, thành ngăn kéo trên màn hẹp; hộp việc tách
+  nhóm "Cần chú ý" (khẩn, quá hạn), tìm và lọc trên danh sách đã tải; trang tiếp nhận, soạn thảo báo lỗi tải kèm nút
+  Thử lại; trang lỗi chung; chuyển trang, chuông, thông báo có chuyển động ngắn, tắt theo `prefers-reduced-motion`.
+  Trang đăng nhập (theme `signet`) theo cùng nhận diện, chỉ chế độ sáng; `nang_cap.sh` tự dựng lại Keycloak, bản
+  sửa tay chạy `docker compose up -d --force-recreate --wait keycloak` để nhận CSS mới. Không đổi dữ liệu, API hay
+  quyền. e2e thêm `giao-dien.spec.ts`; `tieng-anh.spec.ts` rê chuột mở thanh bên trước khi kiểm vai trò (tên, vai
+  trò nằm ở cuối thanh bên); test scripts +1.
 - Log tập trung thu thêm Hasura, Keycloak, PostgreSQL (F3.14, #202). Ba dịch vụ không tự che thông tin cá nhân nên
   Vector có luật riêng cho từng dịch vụ trước bước che chung, mỗi luật có ca trong `vector.test.yaml` (29 → 39 ca),
   bỏ hay nới luật nào cũng có ca đỏ.

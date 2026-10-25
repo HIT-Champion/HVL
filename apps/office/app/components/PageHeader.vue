@@ -21,11 +21,11 @@ defineProps<{ title: string; subtitle?: string }>()
 </script>
 
 <template>
-  <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+  <div class="moc-page-header">
     <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-stone-900">{{ title }}</h1>
-      <p v-if="subtitle" class="mt-1 text-sm text-stone-500">{{ subtitle }}</p>
+      <h1>{{ title }}</h1>
+      <p v-if="subtitle">{{ subtitle }}</p>
     </div>
-    <div class="flex items-center gap-2"><slot /></div>
+    <div v-if="$slots.default" class="flex flex-wrap items-center gap-2"><slot /></div>
   </div>
 </template>
