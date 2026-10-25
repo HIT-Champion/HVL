@@ -1386,6 +1386,33 @@
     "gapsNone": "Không có: không gian sau không vượt không gian trước.",
     "gap": "{to} cao hơn {from} {diff} mức.",
     "gapsHint": "Theo nguyên lý tiến hóa tuyến tính H → P → D → I: không gian sau dựng trên không gian trước chưa vững dễ thành “rác vào, rác ra”.",
+    "shapeTitle": "Hình dạng",
+    "shape": {
+      "diamond": {
+        "name": "Kim cương toàn vẹn",
+        "text": "[P], [D], [I] cùng vươn gần đỉnh, việc thủ công còn ít: quy trình chặn sai lệch, dữ liệu sạch, AI chạy trên nền vững."
+      },
+      "illusion": {
+        "name": "Ảo giác công nghệ",
+        "text": "[D] hoặc [I] đi trước [P]: công cụ phân tích, AI dựng khi chưa có móng quy trình, dữ liệu nhập đối phó nên kết quả ra cũng sai."
+      },
+      "kite": {
+        "name": "Cánh diều lệch tâm",
+        "text": "[P] đã vững nhưng [D], [I] gần như chưa có: làm đúng quy trình mà chưa có số liệu để điều hành (vận hành mù)."
+      },
+      "spear": {
+        "name": "Mũi giáo phân mảnh",
+        "text": "Phần lớn việc vẫn trên vai con người, [P], [D], [I] còn sát tâm: đơn vị phụ thuộc vào vài người chủ chốt."
+      },
+      "transitional": {
+        "name": "Đang chuyển tiếp",
+        "text": "Chưa khớp nguyên mẫu nào trong bốn nguyên mẫu giáo trình tả; xem lệch nền và không gian nên làm trước."
+      }
+    },
+    "shares": "Tỷ trọng ước theo giáo trình: [H] {h} % · [P] {p} % · [D] {d} % · [I] {i} %",
+    "shapeHint": "Theo giáo trình DX-OS mục 2.4 (TS. Tạ Tuấn Anh, CC BY 4.0): [P], [D], [I] mỗi trục tối đa 30 %, quy từ điểm (mức 1 là 0 %, mức 5 là 30 %); [H] là phần việc còn lại trên vai con người, bằng 100 % trừ ba trục kia, không phải điểm không gian [H]. Giáo trình nhân thêm hệ số thực chứng; ở đây lấy bằng 1 vì mỗi mức đã tả việc quan sát được. Chỉ để định hướng, không phải điểm DTI.",
+    "gigoTitle": "Rác vào, rác ra",
+    "gigo": "Trí tuệ, phân tích đang dựng trên nền chưa vững: [I] cao hơn [D], hoặc [D], [I] đi trước [P]. AI và báo cáo học từ dữ liệu nhập sai sẽ cho kết quả sai. Nên tạm dừng mở rộng [I] (gợi ý của tác tử, hỏi đáp AI), chuẩn hóa [P], [D] trước, và xem cờ kiểm chất lượng số liệu của các báo cáo:",
     "steps": "Bước tiếp theo",
     "first": "Làm trước",
     "stepFrom": "từ câu {q} ({title}), đang ở mức {n}",
