@@ -60,7 +60,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `403` `unknown_tenant` — thuê ước trong token chưa có trong `core.tenants` |
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
 | `POST /api/files/{id}/read` | Chỉ `clerk`, chỉ tệp chính mình tải lên. `?force=true` đọc lại. `200` `{file_id, status, method, pages, fields, warnings, summary_source, model, duration_ms, cached, read_at}` · `401` · `403` `forbidden` · `404` `not_found` (cả tệp người khác) · `409` `restricted` tệp mã hóa hoặc tệp đang gắn vào văn bản hạn chế (trước gợi ý đã lưu, trước khi đọc byte) · `413` `too_large` · `415` `unsupported` · `422` `unreadable` + `reason` · `503` `busy` (+ `Retry-After: 10`), `reader_disabled`, `ocr_unavailable`, `storage_unavailable`, `database_unavailable` — mục Đọc văn bản đến |
-| `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director`. Thân `{question, mode: extract\|generate, direction, year, type_code, ask_id}`. `200` `{ask_id, status, answer, extract, sources, semantic, ai_available, warnings, duration_ms}`, `Cache-Control: no-store` · `400` `invalid_question` · `401` · `403` `forbidden` · `422` thân sai · `503` `assistant_disabled`, `busy` (+ `Retry-After: 10`), `search_unavailable`, `database_unavailable` — mục Hỏi đáp trên kho văn bản |
+| `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director`. Thân `{question, mode: extract\|generate, direction, year, type_code, document_id, ask_id}`. `200` `{ask_id, status, answer, extract, sources, semantic, ai_available, warnings, duration_ms}`, `Cache-Control: no-store` · `400` `invalid_question` · `401` · `403` `forbidden` · `422` thân sai · `503` `assistant_disabled`, `busy` (+ `Retry-After: 10`), `search_unavailable`, `database_unavailable` — mục Hỏi đáp trên kho văn bản |
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `422` `unstampable` + `reason` không đóng dấu được (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng), `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng, `busy` (+ `Retry-After: 10`) |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
@@ -314,7 +314,8 @@ liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
 1. **Lọc trước** trong Meilisearch: thuê ước lấy từ token (luôn đứng đầu), rồi điều kiện theo vai trò viết đúng như
    `office.document_visible` — văn thư, lãnh đạo: cả đơn vị; trưởng phòng: văn bản của phòng mình hoặc có giao việc
    cho phòng mình (token không có phòng thì không tìm gì); chuyên viên: mình tạo, được giao cho mình, hoặc văn bản đi
-   của phòng mình. Lớp này chỉ quyết **độ phủ**.
+   của phòng mình. Lớp này chỉ quyết **độ phủ**. Hỏi trong một văn bản (`document_id`, nút "Hỏi về văn bản này" ở
+   trang chi tiết) thêm điều kiện `document_id = …` nối AND sau các điều kiện trên — chỉ thu hẹp, không thay chúng.
 2. **Hậu kiểm** bằng Hasura với **token người hỏi** (như tìm kiếm F2.7), bỏ cả văn bản đang `restricted`. Lớp này quyết
    **an toàn**: chỉ mục chậm vài giây sau khi bật hạn chế hay hủy giao việc cũng không lộ đoạn nào. svc-files không
    viết lại quy tắc quyền. Số ký hiệu, trích yếu, trạng thái trả về lấy từ Hasura (bản mới nhất), không từ chỉ mục.
@@ -331,6 +332,14 @@ gần đủ câu hỏi, dù lượt chính đã đủ đoạn. Kết quả của
 tính cho đoạn có nguyên văn từ đó (bỏ dấu như Meilisearch) — đoạn có đủ câu hỏi không bị chấm thấp vì đứng sau trong
 kết quả của từ phổ biến. Lượt nới lỗi thì giữ kết quả lượt chính. Nhật ký `office.assist.asked` ghi số đoạn nhờ tìm nới
 (`relaxed`). Khi tìm theo nghĩa, phần nghĩa đã phủ câu hỏi dùng chữ khác nên không nới.
+
+**Tỷ trọng nghĩa theo câu hỏi** (`retrieve.semantic_ratio`). Câu hỏi có số ký hiệu (`123/QĐ-ĐHCN`, `88/CTSV`, "Số
+152a/TB-VP" — mẫu `SYMBOL` của bộ đọc văn bản đến và token số ký hiệu của `vi.py`), ngày (`15/11/2026`, "ngày 5 tháng
+3 năm 2026") hay cụm trong ngoặc kép thì tìm lai dùng `min(MOC_ASK_SEMANTIC_RATIO, 0,2)`; câu khác giữ tỷ trọng cấu
+hình. Meilisearch xếp chung hai danh sách theo điểm nhân trọng số: đoạn khớp từ khóa (điểm `s_k`) đứng trước đoạn chỉ
+gần nghĩa (độ tương đồng `s_v`) khi `(1 − r)·s_k > r·s_v`. Với 0,5 phải có `s_k > s_v` — văn bản cùng chủ đề khác số ký
+hiệu dễ đẩy văn bản có đúng số ký hiệu xuống; với 0,2 mọi đoạn khớp từ khóa có điểm > 0,25 đứng trước. Không về 0 để
+đoạn gần nghĩa vẫn lấp chỗ khi người hỏi gõ khác chữ trong văn bản. Nhật ký ghi tỷ trọng đã dùng (`ratio`).
 
 Không đoạn nào qua được hai lớp → `no_evidence`, **không gọi mô hình**; trả lời y hệt nhau dù văn bản không tồn tại hay
 người hỏi không được đọc.
@@ -367,10 +376,11 @@ người hỏi không được đọc.
   trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
   hai dòng sổ cùng một thực thể.
 - **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
-  cited, semantic, model, warnings, duration_ms}, `office.assist.ask_failed` {code}, `office.assist.model_rejected`
-  {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` / `ai_unavailable` (khi đổi trạng thái),
-  `office.assist.embed_dims_mismatch` {dims, expected} (mức error), `office.assist.indexed` / `embedded` /
-  `embed_skipped` {ids} / `index_failed` {error, stage, reason}, `config.warning` {message} lúc khởi động.
+  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms}, `office.assist.ask_failed`
+  {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` /
+  `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch` {dims, expected} (mức error),
+  `office.assist.indexed` / `embedded` / `embed_skipped` {ids} / `index_failed` {error, stage, reason},
+  `config.warning` {message} lúc khởi động.
 
 | Kết quả | Ý nghĩa |
 |---|---|
@@ -1134,7 +1144,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ASK_SYNC_INTERVAL_S` | `5` | Chu kỳ đồng bộ + nhúng chỉ mục đoạn; `0` chỉ hợp lệ khi `MOC_ASK_ENABLED=false` (bật trợ lý mà không có vòng nền thì chỉ mục đoạn không bao giờ có: svc-files từ chối khởi động) |
 | `MOC_ASK_TOP_K` · `MOC_ASK_CANDIDATES` · `MOC_ASK_PER_DOC` | `5` · `24` · `2` | Số nguồn trả về · số đoạn lấy từ Meilisearch mỗi lượt · số đoạn tối đa mỗi văn bản |
 | `MOC_ASK_MIN_SCORE` · `MOC_ASK_MIN_SCORE_SEMANTIC` | `0` · `0.75` | Ngưỡng `_rankingScore` khi tìm từ khóa · tìm lai (0–1). Từ khóa để 0: chiến lược `frequency` đã buộc đoạn chứa từ hiếm nhất của câu hỏi, điểm `words` thấp cả với nguồn đúng. Tìm lai 0,75: trên kho mẫu nguồn đúng đứng đầu ≥ 0,88, câu không có đáp án ≤ 0,70 |
-| `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1) |
+| `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1); câu hỏi có số ký hiệu, ngày, cụm trong ngoặc kép dùng tối đa 0,2 |
 | `MOC_ASK_DEADLINE_S` | `50` | Hạn tổng một lượt hỏi, tối đa 55 (dưới 60 giây của APISIX) |
 | `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
 | `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |

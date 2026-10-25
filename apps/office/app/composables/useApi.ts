@@ -158,6 +158,7 @@ export interface AskBody {
   direction?: 'in' | 'out'
   year?: number
   type_code?: string
+  document_id?: string       // chỉ hỏi trong văn bản này ("Hỏi về văn bản này") — vẫn trong phạm vi được xem
   ask_id?: string            // gửi lại ở lượt generate để hai dòng sổ kiểm toán cùng một câu hỏi
 }
 
@@ -448,6 +449,14 @@ export function useApi() {
     return URL.createObjectURL(new Blob([await res.arrayBuffer()], { type: 'application/pdf' }))
   }
 
+  /** Xem tệp của một nguồn trợ lý trích (F4.2) trong khung xem của trang Hỏi đáp: tải bằng token (svc-files kiểm quyền
+   *  đọc như nút Tải về), trả object URL kiểu PDF như viewArchivedFile — gọi URL.revokeObjectURL khi đóng. */
+  async function viewFile(fileId: string): Promise<string> {
+    const res = await authFetch(`/api/files/${encodeURIComponent(fileId)}`)
+    if (!res.ok) throw await serviceError(res)
+    return URL.createObjectURL(new Blob([await res.arrayBuffer()], { type: 'application/pdf' }))
+  }
+
   return { gql, upload, download, preview, register, printRegister, search, readFile, ask, archiveCaseFile, readingRoom,
-    viewArchivedFile }
+    viewArchivedFile, viewFile }
 }

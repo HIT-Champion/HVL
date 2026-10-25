@@ -24,7 +24,9 @@ Theo đúng thứ tự, mỗi bước chặn được thì chặn trước khi t
 3. ``generate``: chờ lượt (``MOC_ASK_CONCURRENCY``, tối đa ``MOC_ASK_QUEUE_S``, quá thì 503 busy).
 4. Có mô hình nhúng thì nhúng câu hỏi (≤ 5 giây; lỗi → chỉ tìm theo từ khóa).
 5. Truy xuất: Meilisearch lọc trước theo vai trò, Hasura hậu kiểm **bằng token người hỏi** (retrieve.py). Tìm lai lỗi
-   thì retrieve.py đã tìm lại chỉ bằng từ khóa: cảnh báo ``embed_unavailable``.
+   thì retrieve.py đã tìm lại chỉ bằng từ khóa: cảnh báo ``embed_unavailable``. Có ``document_id`` ("Hỏi về văn bản
+   này") thì thêm một điều kiện lọc, chỉ thu hẹp; câu hỏi có số ký hiệu, ngày, cụm trong ngoặc kép thì tìm lai nghiêng
+   về từ khóa (``retrieve.semantic_ratio``).
 6. Câu trích nguyên văn (extract.py) — luôn chạy, tất định.
 7. ``generate`` + có đoạn + mô hình sẵn sàng + còn ≥ 5 giây → mô hình viết câu trả lời từ đúng các đoạn đã hậu kiểm;
    máy chủ kiểm và tự gán trích dẫn [n] theo bằng chứng (grounding.py). Không đạt thì vẫn 200 với câu trích và cảnh báo.
@@ -96,6 +98,7 @@ class AskBody(Protocol):
     direction: str | None
     year: int | None
     type_code: str | None
+    document_id: uuid.UUID | None   # chỉ hỏi trong văn bản này — vẫn trong phạm vi người hỏi được xem
     ask_id: uuid.UUID | None
 
 
@@ -199,8 +202,9 @@ class Assistant:
 
         try:
             found = await self.retriever.search(
-                scope, q=vi.keyword_query(question), vector=vector, limit=s.ask_top_k,
-                filters=Filters(direction=body.direction, year=body.year, type_code=body.type_code))
+                scope, q=vi.keyword_query(question), vector=vector, limit=s.ask_top_k, question=question,
+                filters=Filters(direction=body.direction, year=body.year, type_code=body.type_code,
+                                document_id=None if body.document_id is None else str(body.document_id)))
         except HasuraAuthError as exc:
             raise AskError(401, "invalid_token", "Token không hợp lệ hoặc đã hết hạn",
                            headers={"WWW-Authenticate": "Bearer"}) from exc
@@ -259,8 +263,8 @@ class Assistant:
         _log("office.assist.asked", request_id, tenant_id=principal.tenant_id, actor_id=principal.user_id,
              mode=body.mode, status=status, q_length=len(question), terms=len(vi.terms(question)),
              candidates=found.candidates, relaxed=found.relaxed, hits=len(passages), cited=len(cited),
-             semantic=found.semantic, model=model, warnings=",".join(warnings), masked=masked,
-             duration_ms=duration_ms)
+             semantic=found.semantic, ratio=found.ratio, scoped=body.document_id is not None, model=model,
+             warnings=",".join(warnings), masked=masked, duration_ms=duration_ms)
         cited_set = set(cited)
         return {
             "ask_id": ask_id, "status": status, "answer": answer_out, "extract": extract_out,

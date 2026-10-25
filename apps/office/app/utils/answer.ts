@@ -16,7 +16,8 @@
 
 // Hỏi đáp trên kho văn bản (F4.2): phần thuần của trang Hỏi đáp. Câu trả lời (câu trích nguyên văn hoặc do mô hình
 // viết) là chữ thuần có dấu [n] trỏ tới nguồn thứ n — tách thành đoạn chữ và dấu trích dẫn để giao diện dựng bằng nút
-// chữ, không bao giờ dựng HTML từ chữ của văn bản hay của mô hình. Nhãn trích dẫn "88/CTSV · tr. 1".
+// chữ, không bao giờ dựng HTML từ chữ của văn bản hay của mô hình. Nhãn trích dẫn "88/CTSV · tr. 1", mở được tệp đúng
+// trang đó; hỏi trong một văn bản bằng ?van_ban=<id>.
 // Tệp này không dùng gì của Nuxt để Node chạy test được (tests/answer.test.ts).
 
 import type { AskAnswer, AskResult, AskSource } from '../composables/useApi'
@@ -120,4 +121,53 @@ export function tidy(res: AskResult): AskResult {
     : []
   const warnings = Array.isArray(res.warnings) ? [...new Set(res.warnings.filter((w) => typeof w === 'string'))] : []
   return { ...res, sources, warnings, answer: res.answer ?? null, extract: res.extract ?? null }
+}
+
+// --- hỏi trong một văn bản, xem trang được trích ---------------------------------------------------------------------
+
+// Vai trò hỏi được (svc-files trả 403 forbidden với vai trò khác)
+export const ASK_ROLES: readonly string[] = ['clerk', 'staff', 'manager', 'director']
+
+// Tham số của trang Hỏi đáp: ?van_ban=<id> — chỉ hỏi trong văn bản đó (nút "Hỏi về văn bản này" ở trang chi tiết)
+export const SCOPE_PARAM = 'van_ban'
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Đường tới trang Hỏi đáp chỉ hỏi trong một văn bản. */
+export function askAbout(documentId: string): { path: string; query: Record<string, string> } {
+  return { path: '/hoi-dap', query: { [SCOPE_PARAM]: documentId } }
+}
+
+/** Id văn bản phạm vi trong query của trang Hỏi đáp: chỉ nhận UUID (đưa về chữ thường), còn lại null — không gửi chuỗi
+ *  lạ lên máy chủ (svc-files trả 422). */
+export function scopeOf(query: Record<string, unknown>): string | null {
+  const value = query[SCOPE_PARAM]
+  return typeof value === 'string' && UUID_RE.test(value) ? value.toLowerCase() : null
+}
+
+/** Văn bản có trong kho của trợ lý không — đúng như chunks.eligible của svc-files: không hạn chế; văn bản đến chưa
+ *  hủy; văn bản đi đã phát hành hoặc đã nộp lưu. */
+export function inAssistant(doc: { restricted: boolean; direction: string; status: string }): boolean {
+  if (doc.restricted) return false
+  if (doc.direction === 'in') return doc.status !== 'cancelled'
+  if (doc.direction === 'out') return doc.status === 'issued' || doc.status === 'archived'
+  return false
+}
+
+/** Hiện nút "Hỏi về văn bản này" không: người xem hỏi được và văn bản có trong kho của trợ lý. Chỉ là giao diện —
+ *  svc-files vẫn lọc theo vai trò và hậu kiểm bằng token người hỏi như mọi lượt. */
+export function canAskAbout(doc: { restricted: boolean; direction: string; status: string },
+  role: string | null | undefined): boolean {
+  return ASK_ROLES.includes(role ?? '') && inAssistant(doc)
+}
+
+/** Nguồn có tệp để mở không: đoạn chữ của một tệp. Đoạn "trích yếu" (meta: bản scan chưa có chữ, tệp lỗi, văn bản chưa
+ *  có tệp) không có tệp, không có trang. */
+export function canView(source: Pick<AskSource, 'kind' | 'file_id'>): boolean {
+  return source.kind === 'page' && !!source.file_id
+}
+
+/** Địa chỉ mở tệp PDF đúng trang: thêm #page=n (tham số mở PDF, RFC 8118 — trình xem PDF có sẵn của trình duyệt hiểu);
+ *  không có số trang (chữ chưa có ranh giới trang) thì mở từ đầu. */
+export function pageUrl(url: string, page: number | null | undefined): string {
+  return typeof page === 'number' && Number.isInteger(page) && page > 0 ? `${url}#page=${page}` : url
 }
