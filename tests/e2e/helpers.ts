@@ -104,6 +104,16 @@ export async function signIn(browser: Browser, username: string, { otp = false }
   return page
 }
 
+// Chụp ngay sau khi bấm một mục ở thanh bên (chuột còn nằm trên đó) thì ảnh có lúc ra thanh bên mở dở đè lên nội
+// dung (#218). Đưa chuột ra góc dưới phải, đợi thanh bên thu hẳn (màn rộng) rồi mới chụp
 export async function shot(page: Page, name: string) {
+  const { width, height } = page.viewportSize()!
+  await page.mouse.move(width - 1, height - 1)
+  const shell = page.locator('.sg-shell')
+  if (width > 900 && await shell.count()) {
+    await expect(shell).toHaveClass(/is-collapsed/)
+    await expect.poll(() => page.locator('#app-navigation').evaluate((nav) => nav.getAnimations({ subtree: true })
+      .length)).toBe(0)
+  }
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
 }
