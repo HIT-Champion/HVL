@@ -56,9 +56,17 @@ applications: the e-Office and the P.A.R.A personal space, a second application 
 changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). A third application, the
 unit news board, exists only once installed with `moc app install`, so the diagram does not show it. Only the APISIX
 gateway is exposed, and every request passes its web application firewall before it reaches the core; the labels on
-its arrows are the real paths. Thick borders mark the team's own code, boxes with a logo are upstream open source used
-as is, and the moving dots follow two real requests. H-P-D-I architecture and technical decisions:
-[`docs/architecture.md`](docs/architecture.md) (Vietnamese).
+its arrows are the real paths. The same holds inside the machine:
+- application containers sit on their own Docker network, `apps` (no Internet access), where APISIX is the only core
+  service;
+- so an application's server side also reaches the core through the gateway, with the same token check, rate limits
+  and WAF as a browser;
+- `make demo-cai-ung-dung` checks that the container reaches APISIX only
+  ([`docs/them-ung-dung.md`](docs/them-ung-dung.md#14-migration-và-mô-hình-tin-cậy) section 1.4, Vietnamese).
+
+Thick borders mark the team's own code, boxes with a logo are upstream open source used as is, and the moving dots
+follow two real requests. H-P-D-I architecture and technical decisions: [`docs/architecture.md`](docs/architecture.md)
+(Vietnamese).
 
 ## Features
 
