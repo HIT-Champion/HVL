@@ -104,16 +104,11 @@ export async function signIn(browser: Browser, username: string, { otp = false }
   return page
 }
 
-// Chụp ngay sau khi bấm một mục ở thanh bên (chuột còn nằm trên đó) thì ảnh có lúc ra thanh bên mở dở đè lên nội
-// dung (#218). Đưa chuột ra góc dưới phải, đợi thanh bên thu hẳn (màn rộng) rồi mới chụp
+// Trong lúc chụp toàn trang, Chrome đổi cỡ khung nhìn tạm thời: media query màn hẹp (max-width: 900px), (hover: none)
+// báo đổi rồi đổi lại, thanh bên nhảy sang độ rộng 256px của ngăn kéo rồi chạy chuyển động thu về 76px, nên ảnh có
+// thanh bên mở dở đè lên nội dung (#218). Chụp với chuyển động tắt
+const STILL = '*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; }'
+
 export async function shot(page: Page, name: string) {
-  const { width, height } = page.viewportSize()!
-  await page.mouse.move(width - 1, height - 1)
-  const shell = page.locator('.sg-shell')
-  if (width > 900 && await shell.count()) {
-    await expect(shell).toHaveClass(/is-collapsed/)
-    await expect.poll(() => page.locator('#app-navigation').evaluate((nav) => nav.getAnimations({ subtree: true })
-      .length)).toBe(0)
-  }
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
+  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true, animations: 'disabled', style: STILL })
 }
