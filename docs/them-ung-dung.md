@@ -73,7 +73,8 @@ Mọi thứ của ứng dụng nằm trong `.moc-apps/` của thư mục chạy 
 
 - `apisix.yaml`: [`platform/apisix/apisix.yaml`](../platform/apisix/apisix.yaml) chép **nguyên văn** (kể cả
   `global_rules`, plugin, khối lõi thêm sau này — vd tường lửa WAF), chèn upstream ngay sau `upstreams:` và route
-  `GET`/`HEAD` ngay **trước** route bắt mọi đường `app-office`. Không còn ứng dụng nào thì tệp giống hệt tệp lõi.
+  `GET`/`HEAD` ngay **trước** route bắt mọi đường `app-office`. Ứng dụng khai `events` có thêm route hook
+  `POST /su-kien/<tên>` chỉ ở cổng hook 9081 (1.3). Không còn ứng dụng nào thì tệp giống hệt tệp lõi.
   APISIX gắn từng tệp và mỗi giây so `mtime`: lệnh ghi đè **tại chỗ** (cùng inode) và APISIX tự nạp lại không khởi
   động lại; lúc đang ghi tệp thiếu dấu `#END` nên APISIX giữ cấu hình cũ.
 - `hasura-metadata/`: `db/metadata` chép nguyên văn, thêm một tệp mỗi bảng của ứng dụng (một dòng `!include` cuối
@@ -81,7 +82,8 @@ Mọi thứ của ứng dụng nằm trong `.moc-apps/` của thư mục chạy 
   mục này mỗi lần khởi động, nên phần của ứng dụng sống qua khởi động lại (thêm qua Metadata API thì mất).
 - `docker-compose.apps.yml`: tệp phủ — bind mount của `apisix`, `hasura` trỏ sang hai mục trên (compose gộp
   `volumes` theo đường trong container), `env_file` bí mật header cho `hasura`, service `app-<tên>` (profile `app`,
-  mạng `moc`, không mở cổng, rootfs chỉ đọc, `cap_drop: ALL`, `no-new-privileges`, giới hạn bộ nhớ và 1 CPU).
+  chỉ mạng `apps` — tới được APISIX, không tới được dịch vụ lõi nào khác —, không mở cổng, rootfs chỉ đọc,
+  `cap_drop: ALL`, `no-new-privileges`, giới hạn bộ nhớ và 1 CPU).
   `make up`, reconciler và mọi lệnh `docker compose` nhận tệp này qua `COMPOSE_FILE` trong `.env`.
 - `apps/<tên>.json`: bản ghi đã kiểm (manifest, SQL migration, image) — trạng thái mong muốn.
 
@@ -96,9 +98,13 @@ dòng cho mỗi `office.document_events` thuộc **danh sách trắng** — `off
 `tenant_id`, `document_id`, `kind`, `occurred_at`: không ghi chú, không số ký hiệu, không người làm.
 
 Mỗi ứng dụng khai `events` có một Hasura Event Trigger `app_<tên>` trên bảng đó: Hasura gọi
-`http://app-<tên>:<port><path>` trong mạng nội bộ (cổng này không có route qua APISIX), kèm header
-`X-Moc-Hook-Secret` lấy từ biến môi trường của Hasura (`value_from_env`, giá trị trong `.moc-apps/hasura.env`, không
-nằm trong metadata). Thân là **thân sự kiện chuẩn** của Hasura, không biến đổi:
+`http://apisix:9081/su-kien/<tên>`, kèm header `X-Moc-Hook-Secret` lấy từ biến môi trường của Hasura
+(`value_from_env`, giá trị trong `.moc-apps/hasura.env`, không nằm trong metadata). Hasura chỉ ở mạng `moc`, container
+ứng dụng chỉ ở `apps`, nên không tới thẳng nhau: 9081 là cổng hook của APISIX — có trong `node_listen`, không publish
+ra máy chủ; route hook có `vars: [["server_port", "==", "9081"]]` nên cổng công khai 9080 không khớp (404), đúng một
+đường `POST`, `proxy-rewrite` về đúng `http://app-<tên>:<port><path>` của manifest. APISIX không gỡ, không thêm header:
+ứng dụng vẫn tự kiểm `X-Moc-Hook-Secret`. Như mọi yêu cầu qua cổng, thân sự kiện đi qua WAF (5 cột, không chữ tự
+do). Thân là **thân sự kiện chuẩn** của Hasura, không biến đổi:
 `{id, created_at, trigger: {name}, table: {schema: core, name: app_events}, event: {op: INSERT, data: {old: null,
 new: {5 cột}}, session_variables: null}, delivery_info}`. `session_variables` là `null` vì hàm chép của lõi xóa người
 làm (`hasura.user`) trong lúc ghi `core.app_events`. Mọi loại trong danh sách trắng đều tới mọi ứng dụng nghe sự kiện;
@@ -115,8 +121,9 @@ container.
 ### 1.4. Migration và mô hình tin cậy
 
 **Cài một ứng dụng nghĩa là quản trị viên tin mã của ứng dụng đó**, như cài một gói phần mềm: container của ứng dụng
-chạy mã của nó trong mạng `moc` của lõi. Các kiểm dưới đây thu hẹp những gì SQL và manifest của ứng dụng làm được với
-CSDL và Hasura; chúng không biến một ứng dụng không đáng tin thành an toàn.
+chạy mã của nó trên máy của lõi, mã không bị kiểm. Mạng thì đã tách: container chỉ ở mạng `apps`, tới lõi duy nhất qua
+APISIX. Các kiểm dưới đây thu hẹp những gì SQL và manifest của ứng dụng làm được với CSDL và Hasura; chúng không biến
+một ứng dụng không đáng tin thành an toàn.
 
 **Vai trò CSDL riêng.** Mỗi ứng dụng có một vai trò PostgreSQL `moc_appdb_<schema>`: không superuser, không
 `CREATEDB`, `CREATEROLE`, `BYPASSRLS`, `REPLICATION`, không là thành viên vai trò nào, không mật khẩu, `NOLOGIN` trừ lúc
@@ -149,8 +156,9 @@ lệnh từ chối — viết migration mới. Bảng ứng dụng không gắn 
 
 | Đã có | Chưa có |
 |---|---|
-| Vai trò CSDL riêng như trên; ứng dụng không có mật khẩu CSDL nào | Container ở mạng `moc`, tới được mọi dịch vụ nội bộ (PostgreSQL, Hasura, Keycloak, svc-files, OpenBao…) — dịch vụ nào tin "đã ở trong mạng nội bộ" là tin cả ứng dụng |
-| Không có khóa quản trị Hasura: giá trị `environment` chép nguyên văn, không nội suy `${…}` từ `.env` của lõi | Mã trong container không bị kiểm: nó làm được mọi thứ một tiến trình trong mạng nội bộ làm được |
+| Vai trò CSDL riêng như trên; ứng dụng không có mật khẩu CSDL nào | Các ứng dụng chung một mạng `apps`: tới được nhau, tới cổng hook 9081 (webhook của ứng dụng khác vẫn đòi bí mật header của nó), cổng trạng thái 7085 và chỉ số 9091 của APISIX — không có chính sách mạng riêng cho từng ứng dụng |
+| Container chỉ ở mạng `apps` (`internal`, không ra Internet), nơi chỉ có APISIX của lõi: không tới được PostgreSQL, Hasura, Keycloak, svc-files hay dịch vụ lõi nào khác; mọi lời gọi vào lõi qua cổng — kiểm token, giới hạn tốc độ, WAF như trình duyệt (`scripts/tests/test_mang_ung_dung.py`, bước 5 của `make demo-cai-ung-dung`) | Trong cổng, ứng dụng là một client như trình duyệt: gọi được mọi route công khai mà token của nó cho phép |
+| Không có khóa quản trị Hasura: giá trị `environment` chép nguyên văn, không nội suy `${…}` từ `.env` của lõi | Mã trong container không bị kiểm: nó làm được mọi thứ một tiến trình ở mạng `apps` làm được |
 | Người dùng chỉ đọc bảng ứng dụng theo quyền Hasura khai trong manifest, có lọc đơn vị (1.1); điều kiện trong quyền không đọc được dữ liệu lõi (1.9) | Đúng sai của quyền đó (ngoài các điều lõi kiểm) là việc của người viết manifest — lõi không biết một cột nhạy cảm hay không |
 | Phần máy chủ chỉ có vai trò `app_<tên>` (1.5) | `app_<tên>` thêm dòng với `check: {}` thì lõi tin phần máy chủ ghi đúng `tenant_id` |
 
@@ -163,7 +171,10 @@ của ứng dụng được trả lại. Cài lại thì dữ liệu cũ hiện 
 luồng mật khẩu), token sống 5 phút, mang claim Hasura cố định: vai trò `app_<tên>` (gạch nối thành gạch dưới), không
 đơn vị, người làm `app:<tên>` (sổ kiểm toán ghi tên này). Vai trò `app_<tên>` chỉ có quyền ứng dụng khai cho nó trên
 bảng của chính nó — không đọc văn bản, không đọc gì của lõi. Container nhận `MOC_CLIENT_ID`, `MOC_CLIENT_SECRET`,
-`MOC_HOOK_SECRET`, `MOC_KEYCLOAK_INTERNAL_URL`, `MOC_GRAPHQL_INTERNAL_URL` qua `env_file`. Mất tệp bí mật thì lần
+`MOC_HOOK_SECRET` qua `env_file`; `MOC_KEYCLOAK_INTERNAL_URL`, `MOC_GRAPHQL_INTERNAL_URL` là `http://apisix:9080`,
+`http://apisix:9080/v1/graphql` — container chỉ tới được APISIX, nên lấy token ở route `dang-nhap` (giới hạn
+`MOC_RATE_LOGIN_PER_MIN` theo IP của container, chung cho mọi lần lấy token của ứng dụng đó) và gọi GraphQL ở route
+`graphql` (kiểm token ở biên, `MOC_RATE_API_PER_MIN` mỗi token), cùng WAF như trình duyệt. Mất tệp bí mật thì lần
 cài sau sinh bí mật mới và dựng lại client dịch vụ.
 
 ### 1.6. Vị trí trong GitOps
@@ -191,35 +202,43 @@ quyền đọc `bang_tin.tin` lọc theo `document.visible`, đúng quy tắc `o
 | Quyền | clerk, staff, manager, director đọc 4 cột, lọc đơn vị và `document.visible`; quan hệ `document` một chiều về `office.documents`; chỉ `app_bang_tin` thêm dòng; không ai sửa, xóa |
 
 ```
-office.document_events ──trigger──► core.app_events ──Event Trigger──► app-bang-tin:8081/su-kien
- (lõi ghi khi vào sổ, phát hành)    (danh sách trắng,     (header bí mật,      │ token client credentials
-                                     không hạn chế)        thử lại)            ▼ app-bang-tin-svc → app_bang_tin
-trình duyệt ── /bang-tin/ ──► APISIX ──► app-bang-tin:8080          Hasura ── insert_bang_tin_tin ── bang_tin.tin
+office.document_events ──trigger──► core.app_events ──Event Trigger──► APISIX :9081 /su-kien/bang-tin
+ (lõi ghi khi vào sổ, phát hành)    (danh sách trắng,     (header bí mật,      │ (cổng hook, không publish)
+                                     không hạn chế)        thử lại)            ▼
+                                                                   app-bang-tin:8081/su-kien  (mạng apps)
+                                                                               │ token client credentials qua
+                                                                               ▼ APISIX :9080 (app-bang-tin-svc)
+trình duyệt ── /bang-tin/ ──► APISIX ──► app-bang-tin:8080       APISIX :9080 /v1/graphql ──► Hasura ── bang_tin.tin
             ── /v1/graphql (token người dùng) ──► Hasura ── bang_tin_tin { document { symbol summary } }
 ```
 
 Kiểm: `apps/bang-tin/tests` (`node --test` 5, `unittest` 15, trong `make test`); `scripts/tests/test_ung_dung.py`
-46, `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13 hàm (44 ca, PostgreSQL và Hasura thật khi `MOC_IT=1`, job
-CI `db` có đặt); `make demo-cai-ung-dung` trên hệ thống đang chạy (bước CI của job `luong-chinh`).
+47, `test_mang_ung_dung.py` 8 (mạng `apps`, cổng hook), `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13
+hàm (44 ca, PostgreSQL và Hasura thật khi `MOC_IT=1`, job CI `db` có đặt); `make demo-cai-ung-dung` trên hệ thống đang
+chạy (bước CI của job `luong-chinh`).
 
 ### 1.8. Bằng chứng: lõi không đổi
 
 `make demo-cai-ung-dung` (cần `make seed`): `--dry-run` không đổi gì; cài; mở `/bang-tin/` qua APISIX; đăng nhập Văn
 phòng điện tử rồi vào Bảng tin không hỏi lại mật khẩu; câu GraphQL của trang chạy trên bảng của ứng dụng; Danh mục ứng
 dụng của chuyên viên có Bảng tin, chuyên viên không đọc được băm manifest; văn thư vào sổ một văn bản đến thường và một
-văn bản hạn chế → lãnh đạo khoa thấy tin của văn bản thường, văn bản hạn chế không có trong luồng sự kiện; cài lại không
-tạo gì mới (cùng container, `.moc-apps/` không đổi một byte; băm manifest lãnh đạo khoa thấy = `sha256sum
-apps/bang-tin/app.yaml`, lúc cài, lúc cập nhật không đổi); gỡ → route, client, trigger, container mất, dữ liệu còn, tệp
-chạy APISIX giống hệt tệp lõi, Danh mục ứng dụng: chuyên viên không còn thấy Bảng tin, lãnh đạo khoa thấy "Đã gỡ"; cuối
-cùng `git status` trước và sau giống hệt và `git diff --stat` trống.
+văn bản hạn chế → lãnh đạo khoa thấy tin của văn bản thường, văn bản hạn chế không có trong luồng sự kiện; từ trong
+container `app-bang-tin` chỉ mở được kết nối tới `apisix:9080` (Keycloak, Hasura, PostgreSQL, svc-files: không),
+`POST /su-kien/bang-tin` ở cổng công khai trả 404; cài lại không tạo gì mới (cùng container, `.moc-apps/` không đổi
+một byte; băm manifest lãnh đạo khoa thấy = `sha256sum apps/bang-tin/app.yaml`, lúc cài, lúc cập nhật không đổi); gỡ →
+route, client, trigger, container mất, dữ liệu còn, tệp chạy APISIX giống hệt tệp lõi, Danh mục ứng dụng: chuyên viên
+không còn thấy Bảng tin, lãnh đạo khoa thấy "Đã gỡ"; cuối cùng `git status` trước và sau giống hệt và
+`git diff --stat` trống.
 
 ### 1.9. Giới hạn và rủi ro
 
 Rủi ro (xem cả bảng ranh giới ở 1.4):
 
-- **Tin mã của ứng dụng.** Container ở mạng `moc`, tới được PostgreSQL, Hasura, Keycloak, svc-files, OpenBao và mọi
-  dịch vụ nội bộ khác; không có chính sách mạng riêng cho ứng dụng. Dịch vụ nào tin yêu cầu chỉ vì nó đến từ trong
-  mạng thì tin cả ứng dụng. Chưa có cách cài ứng dụng không đáng tin.
+- **Tin mã của ứng dụng.** Mã trong container không bị kiểm. Container chỉ ở mạng `apps` nên chỉ tới được APISIX:
+  mọi lời gọi vào lõi qua cùng kiểm token, giới hạn tốc độ, WAF như trình duyệt; dịch vụ lõi tin "đã ở trong mạng
+  nội bộ" (mạng `moc`) không thấy ứng dụng. Các ứng dụng vẫn chung một mạng `apps` (tới được nhau, tới cổng hook 9081
+  — webhook của ứng dụng khác đòi bí mật header của nó), không có chính sách mạng riêng từng ứng dụng. Chưa có cách
+  cài ứng dụng không đáng tin.
 - **Quyền thêm của `app_<tên>` có thể là `check: {}`** (như bang-tin): lõi tin phần máy chủ ghi đúng `tenant_id` của
   sự kiện. Phần máy chủ ghi sai đơn vị thì người dùng đơn vị đó thấy dòng sai.
 - **Quyền đọc của người dùng là do manifest khai.** Hasura chạy điều kiện trong quyền bằng quyền admin: `_exists`,
@@ -280,7 +299,7 @@ metadata vào `db/`. Cách một lệnh ở mục 1 làm đúng các việc này
 |---|---|---|
 | 1 | `platform/keycloak/realm/moc-realm.json` | Chép client `app-office`, đổi `clientId`, `name`, `baseUrl`; `redirectUris` và `post.logout.redirect.uris` chỉ dưới đường của ứng dụng (`${MOC_PUBLIC_URL}/<đường>/*`). Giữ `publicClient`, `pkce.code.challenge.method: S256`, không bật luồng mật khẩu, tài khoản dịch vụ; giữ nguyên `protocolMappers` |
 | 2 | `platform/apisix/apisix.yaml` | Một `upstream` tới `<service>:8080`, một route `uris: ["/<đường>", "/<đường>/*"]`, `methods: [GET, HEAD]`, đặt **trước** route bắt mọi đường của `app-office`. Trang tĩnh không cần token; API của ứng dụng đi qua các route có sẵn (`/v1/graphql`, `/api/files`), đã kiểm token |
-| 3 | `docker-compose.yml` | Service `<<: *common`, `build: ./apps/<thư mục>` **trên một dòng** (`make install` thay dòng đó bằng `pull_policy: never`), `image: moc/<service>:${MOC_VERSION:-dev}`, `profiles: [app]`. Reconciler và `make up` tự nhận service mới |
+| 3 | `docker-compose.yml` | Service `<<: *common`, `build: ./apps/<thư mục>` **trên một dòng** (`make install` thay dòng đó bằng `pull_policy: never`), `image: moc/<service>:${MOC_VERSION:-dev}`, `profiles: [app]`, `networks: [apps]` (ghi đè mạng `moc` của `x-common`: container chỉ tới được APISIX; `test_mang_ung_dung.py` liệt kê đúng các service ở mạng này, thêm service mới vào đó). Reconciler và `make up` tự nhận service mới |
 | 4 | `apps/<thư mục>/` | Image ghim theo digest, chạy không quyền root, có `HEALTHCHECK`; CSP chặn mã nội tuyến; nhật ký truy cập không ghi chuỗi truy vấn (khối `log_format moc_khong_truy_van`, [`platform/apisix/README.md`](../platform/apisix/README.md)) |
 | 5 | `db/migrations/default/<phiên bản>_<tên>/` | `create schema <tên>`; mọi bảng có `tenant_id`; khóa ngoại kèm thuê ước tới bảng của `core`; ràng buộc trong CSDL; trigger `core.audit('<cột khóa>')`. Không sửa gì trong `core`, `office` ([`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md) §0) |
 | 6 | `db/metadata/databases/default/tables/<schema>_<bảng>.yaml`, một dòng `!include` trong `tables.yaml` | Quyền theo vai trò: `set` thuê ước, chủ từ phiên; `filter` theo `X-Hasura-Tenant-Id` và `X-Hasura-User-Id`; chỉ cấp cột cần sửa; không cấp `delete`. Quan hệ chỉ một chiều, từ bảng của ứng dụng về `core` — không thêm quan hệ vào metadata của lõi |

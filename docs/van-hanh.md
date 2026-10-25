@@ -316,10 +316,11 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
 
 ## Giám sát
 
-APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 chỉ trong mạng nội bộ). Prometheus thu
-mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra ngoài. Grafana hiện bảng điều khiển
-**Signet — cổng API** nạp sẵn: yêu cầu mỗi giây theo route, mã trạng thái (429 = vượt giới hạn tốc độ), tỉ lệ lỗi 5xx,
-độ trễ p95, băng thông, kết nối đang mở.
+APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 không publish: chỉ container ở mạng
+`moc`, `apps` tới được — container ứng dụng đọc được số đếm theo route, không có token hay dữ liệu nghiệp vụ).
+Prometheus thu mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra ngoài. Grafana hiện
+bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi giây theo route, mã trạng thái (429 = vượt giới hạn tốc
+độ), tỉ lệ lỗi 5xx, độ trễ p95, băng thông, kết nối đang mở.
 
 - Grafana chỉ nghe `127.0.0.1:MOC_GRAFANA_PORT` (mặc định 3300) trên máy chủ — xem từ máy khác qua đường hầm SSH:
   `ssh -L 3300:127.0.0.1:3300 máy-chủ` rồi mở `http://localhost:3300`.

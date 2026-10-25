@@ -3819,6 +3819,28 @@ def app_container() -> list[str]:
     return proc.stdout.split() if proc.returncode == 0 else []
 
 
+# Chạy trong container ứng dụng: in các host:cổng mở được kết nối TCP (tên không phân giải được cũng là không tới được)
+NET_PROBE = """import socket, sys
+for target in sys.argv[1:]:
+    host, port = target.rsplit(":", 1)
+    try:
+        socket.create_connection((host, int(port)), timeout=3).close()
+    except OSError:
+        continue
+    print(target)
+"""
+
+
+def app_reach(*targets: str) -> list[str]:
+    """host:cổng mà container app-bang-tin tới được (mạng apps: chỉ APISIX)."""
+    import ung_dung
+    proc = subprocess.run([*ung_dung.COMPOSE, "exec", "-T", f"app-{APP_NAME}", "python3", "-c", NET_PROBE, *targets],
+                          cwd=ROOT, env=ung_dung.System(ROOT).env(), capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise DemoFailed(f"không chạy được thử mạng trong app-{APP_NAME}: {proc.stderr.strip()[-300:]}")
+    return proc.stdout.split()
+
+
 def app_clients() -> list[str]:
     import tenants
     return sorted(c["clientId"] for c in tenants.connect().clients()
@@ -3942,7 +3964,8 @@ def cai_ung_dung() -> None:
     if not seen or seen[0]["kind"] != "office.document.registered" or not seen[0].get("document"):
         raise DemoFailed(f"sau 60 giây lãnh đạo khoa chưa thấy tin của văn bản {tag}/BT-VP: {seen}")
     ok(f"lãnh đạo khoa thấy tin \"{seen[0]['document']['symbol']} — Văn bản đến đã vào sổ\" sau "
-       f"{time.monotonic() - sent:.1f} giây (Event Trigger → app-{APP_NAME}:8081 → GraphQL bằng danh tính dịch vụ)")
+       f"{time.monotonic() - sent:.1f} giây (Event Trigger → APISIX cổng hook 9081 → app-{APP_NAME}:8081 → token, "
+       "GraphQL qua APISIX bằng danh tính dịch vụ)")
     leaked = psql(f"select (select count(*) from core.app_events where document_id = '{secret}') + "
                   f"(select count(*) from bang_tin.tin where document_id = '{secret}')")
     if leaked != "0":
@@ -3951,6 +3974,19 @@ def cai_ung_dung() -> None:
     if any(t["document_id"] == normal for t in reader.gql(query)["bang_tin_tin"]):
         raise DemoFailed(f"{OWNER} thấy tin của văn bản chưa được giao cho mình")
     ok(f"{OWNER} (chưa được giao văn bản đó) không thấy tin: Bảng tin theo đúng quyền xem văn bản của lõi")
+    reach = app_reach("apisix:9080", "keycloak:8080", "hasura:8080", "postgres:5432", "svc-files:8000")
+    if reach != ["apisix:9080"]:
+        raise DemoFailed(f"container app-{APP_NAME} (mạng apps) phải chỉ tới được apisix:9080, đang tới được: {reach}")
+    try:
+        request("POST", f"{PUBLIC_URL}/su-kien/{APP_NAME}", data=b"{}", headers={"Content-Type": "application/json"})
+        public_hook = 200
+    except HTTPError as exc:
+        public_hook = exc.status
+    if public_hook != 404:
+        raise DemoFailed(f"POST /su-kien/{APP_NAME} ở cổng công khai phải 404 (route hook chỉ ở cổng 9081): "
+                         f"{public_hook}")
+    ok(f"app-{APP_NAME} chỉ tới được APISIX (Keycloak, Hasura, PostgreSQL, svc-files: không); route hook chỉ ở cổng "
+       "nội bộ 9081, cổng công khai trả 404")
 
     say(6, f"Chạy lại moc app install {APP_MANIFEST}: không tạo gì mới")
     container, digest = app_container(), state_digest()

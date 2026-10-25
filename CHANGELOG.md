@@ -129,6 +129,18 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
   thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi
   nhầm `v1.1.0`), `ROADMAP.md`, `docs/architecture.md`.
+- Ứng dụng cách ly mạng khỏi lõi: container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app
+  install`) nay chỉ ở mạng `apps` (`internal`, không ra Internet), nơi chỉ có APISIX — trước đây chung mạng `moc` với
+  lõi, tới thẳng được PostgreSQL, Hasura, Keycloak, `svc-files`. Phần máy chủ của ứng dụng (Bảng tin) lấy token client
+  credentials và gọi GraphQL qua `http://apisix:9080` như trình duyệt, cùng kiểm token, giới hạn tốc độ, WAF. Hasura
+  giao sự kiện qua cổng hook 9081 của APISIX: có trong `node_listen`, không publish; route `POST /su-kien/<tên>` chỉ
+  khớp ở cổng đó, viết lại về đúng webhook của manifest, header bí mật đi nguyên tới ứng dụng. WAF thêm
+  `client_secret` vào loại trừ 10011 (chỉ endpoint token, ba luật bắt nhầm token ngẫu nhiên): bí mật base64url do
+  `moc app install` sinh cùng loại chuỗi với verifier của #162. Bản cài đã có Bảng tin: `make install` hay `python3
+  scripts/moc.py app sync` dựng lại tệp phủ, route, metadata; ai đã thu hẹp `MOC_TRUSTED_PROXY` theo dải mạng `moc`
+  thì kiểm lại sau lần nâng cấp này (`docker compose down` tạo lại mạng, có thể đổi dải — `docs/trien-khai.md` mục
+  8). `make demo-cai-ung-dung` kiểm từ trong container `app-bang-tin` chỉ tới được APISIX, route hook không có ở cổng
+  công khai. Test scripts +9.
 
 ### Đã sửa lỗi
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ

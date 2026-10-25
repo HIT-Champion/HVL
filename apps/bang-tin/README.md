@@ -16,7 +16,7 @@ tin cậy và giới hạn: [`docs/them-ung-dung.md`](../../docs/them-ung-dung.m
 |---|---|
 | `app.yaml` | Manifest (`scripts/app-manifest.schema.json`): đường `/bang-tin`, image dựng từ thư mục này, schema `bang_tin`, quyền Hasura, danh tính dịch vụ, sự kiện nghe |
 | `migrations/0001_tin/up.sql` | Bảng `bang_tin.tin`, chạy bằng vai trò CSDL riêng `moc_appdb_bang_tin` (chỉ làm chủ schema `bang_tin`) |
-| `server.py` | Python thư viện chuẩn, không root: trang tĩnh ở `:8080` (CSP `script-src 'self'`, nhật ký không ghi chuỗi truy vấn); webhook `POST /su-kien` ở `:8081` (chỉ trong mạng nội bộ, kiểm header bí mật, trùng là đã ghi, lỗi → 503 để Hasura gửi lại) |
+| `server.py` | Python thư viện chuẩn, không root: trang tĩnh ở `:8080` (CSP `script-src 'self'`, nhật ký không ghi chuỗi truy vấn); webhook `POST /su-kien` ở `:8081` (Hasura gọi qua cổng hook nội bộ 9081 của APISIX, không publish; kiểm header bí mật, trùng là đã ghi, lỗi → 503 để Hasura gửi lại). Container chỉ ở mạng `apps`: token client credentials, GraphQL cũng đi qua APISIX (`http://apisix:9080`) |
 | `public/` | Trang duy nhất; `auth.js` đăng nhập Authorization Code + PKCE (oidc-client-ts, `response_mode=fragment`), `tin.js` câu GraphQL và phần không đụng trình duyệt, `app.js` vẽ danh sách bằng `textContent` |
 | `Dockerfile` | `node:24.20.0-slim` lấy bản cho trình duyệt của oidc-client-ts; `python:3.13.16-slim` ghim digest, user 10001 |
 | `tests/` | `node --test tests/*.test.js` (câu GraphQL ↔ quyền trong `app.yaml` và của lõi, nhãn ↔ sự kiện nghe); `python3 -m unittest discover -s tests` (máy chủ thật trên cổng ngẫu nhiên, Keycloak và Hasura giả) |
