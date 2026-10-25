@@ -357,7 +357,7 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
 Profile `logs` (tắt mặc định) gom log của các dịch vụ về một chỗ để tra theo **mã yêu cầu**. APISIX gắn mã
 `X-Request-Id` cho mọi yêu cầu (giữ mã client tự gửi, trả lại ở header của phản hồi) và ghi ở cuối dòng truy cập;
 Hasura chuyển mã sang `svc-workflow`; `svc-workflow` ghi mã trong nhật ký, gửi tiếp sang Hasura và `svc-files`. Cùng
-một mã nằm ở dòng log của APISIX, `svc-workflow`, `svc-files` và ở cột `request_id` của sổ kiểm toán
+một mã nằm ở dòng log của APISIX, `svc-workflow`, Hasura, `svc-files` và ở cột `request_id` của sổ kiểm toán
 `core.audit_log`.
 
 Đường đi: driver log `fluentd` của Docker → **Vector** 0.59 (cổng `127.0.0.1:24224` trên máy chủ, tách mã yêu cầu, che
@@ -366,11 +366,36 @@ Driver đặt trong tệp compose phủ [`platform/logs/docker-compose.logs.yml`
 chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docker`. `docker logs`, `make logs` vẫn đọc được như cũ
 (Docker giữ bản cục bộ 10 MB × 3 cho driver ngoài).
 
-- **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ đã che thông tin cá nhân
-  trong nhật ký (F4.4). **Không thu** Hasura, Keycloak, PostgreSQL, Meilisearch, OpenBao…: nhật ký của chúng chưa
-  che, đưa vào kho log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ tự che thông tin cá nhân
+  trong nhật ký (F4.4) — cùng `hasura`, `keycloak`, `postgres`: ba dịch vụ này không tự che, Vector che bằng luật
+  riêng (dưới đây) trước bước che chung. **Không thu** Meilisearch, OpenBao, Flowable…: chưa có luật riêng, đưa vào kho
+  log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Luật riêng** cho ba dịch vụ không tự che, mỗi luật có ca trong `vector.test.yaml`:
+  - **Hasura** (dòng JSON): `event` là `hasura.<loại log>` (`hasura.http-log`, `hasura.websocket-log`…);
+    `request_id` lấy trong `detail` (`detail.request_id`, `detail.operation.request_id`, ở `websocket-log` là
+    `detail.event.detail.request_id`). Đó là `X-Request-Id` mà APISIX, `svc-workflow`, `svc-files` gửi kèm lời gọi
+    GraphQL, nên `make logs-tra` ra cả dòng của Hasura. Khóa `query`, `raw_query` là chuỗi (câu GraphQL, thân yêu
+    cầu) và cả nhánh `query.variables` (khóa trong biến `jsonb` cũng là dữ liệu), `generated_sql` (của `query-log`, mặc
+    định tắt), `internal` của lỗi (tham số, câu SQL, `DETAIL` của PostgreSQL) thay bằng `[REDACTED]`; `operationName`
+    giữ lại. Hasura 2.51 ghi câu và biến mỗi lần mở subscription. Dòng `http-log` lỗi của nó chỉ có `code`, `error`,
+    `path`, kể cả với vai trò admin và `DEV_MODE=true` (đã thử 26/10/2026). Luật `raw_query`, `internal` để phòng
+    bản khác.
+  - **PostgreSQL**: mỗi mục log bắt đầu bằng tiền tố mặc định `%m [%p] ` rồi loại (`ERROR:`, `DETAIL:`…). Dòng
+    không có tiền tố bị bỏ: đó là dòng tiếp của mục nhiều dòng (câu lệnh hay dòng vi phạm có xuống dòng) hay lời
+    của script khởi tạo, không biết thuộc mục nào nên không che đúng được. Các phần bị che:
+    - `STATEMENT:`, `QUERY:` chỉ giữ từ đầu (`STATEMENT:  insert [REDACTED]`);
+    - `DETAIL:` che giá trị khóa (`Key (email)=([REDACTED]) already exists.`), dòng vi phạm (`Failing row contains
+      ([REDACTED]).`), `Token "…"` của JSON sai;
+    - `CONTEXT:` che câu trong nháy (`SQL statement "…"`) và đoạn trích sau `line N:` (`JSON data`, `COPY`);
+    - tham số `$1 = '…'`, giá trị gõ sai kiểu (`invalid input syntax for type uuid: "…"`, `malformed array
+      literal: "…"`; luật này cũng chạy cho lời lỗi Hasura chuyển nguyên).
+
+    Dòng dừng giữa giá trị (giá trị có xuống dòng) thì che tới hết dòng. Lời báo `ERROR:` giữ nguyên: lời của các
+    hàm trong `db/migrations` chỉ có mã, trạng thái, số hồ sơ. Đổi `log_line_prefix` thì mọi dòng bị bỏ.
+  - **Keycloak**: `username="…"` ở sự kiện `LOGIN_ERROR` (tên người dùng gõ vào: gõ nhầm mật khẩu vào ô tên thì
+    lộ). `userId`, `clientId`, `error` giữ lại. `sessionId`, chuỗi truy vấn của `redirect_uri` đã bị bước che chung che.
 - **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
-  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (29 ca; bỏ một luật nào thì có ca đỏ):
+  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (39 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
   - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;
   - giá trị của khóa có chữ `password`, `passwd`, `pwd`, `secret`, `token`, `api key`, `private key`, `credential`,
     `session`, kể cả có tiền tố, hậu tố (`HASURA_ADMIN_SECRET=`, `POSTGRES_PASSWORD=`, `access_token`,
@@ -427,7 +452,12 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
     (`msg="tim svc-files:8000/a?q=Do Thi I"`);
   - số sau từ khóa tách nhóm bằng dấu cách không ngắt (U+00A0); từ khóa gõ dạng Unicode tổ hợp (NFD);
   - ký tự nhiều byte nằm đúng chỗ Docker cắt thành `�`; dòng quá 64 mảnh (khoảng 1 MiB) hoặc mảnh cuối tới sau 10
-    giây thì che từng phần (bí mật vắt qua chỗ chia lọt).
+    giây thì che từng phần (bí mật vắt qua chỗ chia lọt);
+  - PostgreSQL: lời báo `ERROR:` của hàm tự viết (`raise exception '… %', giá_trị`), token sau `syntax error at or
+    near "…"`, `HINT:`, `DETAIL:` khác các dạng ở trên;
+  - Hasura: lời lỗi khác hai dạng giá trị gõ sai kiểu ở trên; `user_vars` (vai trò, mã người dùng, mã đơn vị),
+    `http_info.ip`, đường dẫn URL giữ nguyên;
+  - Keycloak: trường khác `username` của sự kiện (`ipAddress`, đường dẫn của `redirect_uri`), dòng traceback Java.
 
   **Che thừa** (không lọt, chỉ mất chữ): khóa vô hại có chữ `token`, `session`, `pwd` (`max_tokens`,
   `session_timeout=3600`, `PWD=/app`); số, kể cả ngày giờ, nằm trong 20 ký tự sau từ khóa (`tài khoản a lúc
@@ -438,21 +468,22 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
   `--sort-key name` cũng bị che); từ dài từ 8 ký tự đứng sau chữ `basic`, `bearer` (`basic authentication`); dấu `,`
   `;` ngay sau giá trị bị che (`token=X,user=a` thành `token=[REDACTED]user=a`).
 - **Cột** của luồng `moc`: `service`, `container`, `stream` (stdout/stderr), `timestamp`, `event`, `request_id` (dòng
-  JSON của `svc-files`, `svc-workflow`; dòng của APISIX; chỉ mã đúng dạng `[A-Za-z0-9._:-]{1,128}`, như `event`),
+  JSON của `svc-files`, `svc-workflow`, Hasura; dòng của APISIX; chỉ mã đúng dạng `[A-Za-z0-9._:-]{1,128}`, như
+  `event`; dòng PostgreSQL, Keycloak không có, tra theo `service`),
   `message`; Parseable thêm `p_timestamp` (giờ nhận, UTC), `p_src_ip` (IP của Vector trong mạng `logs`),
   `p_user_agent` (của Vector).
 
 ```bash
-make logs-up                       # bật: Vector, Parseable; tạo lại 5 container; đặt giữ log; tới lần make up sau
+make logs-up                       # bật: Vector, Parseable; tạo lại 8 container; đặt giữ log; tới lần make up sau
 make logs-tra ID=<mã>              # dòng của mọi dịch vụ mang mã, 60 phút gần nhất (PHUT=… để đổi)
-make demo-log-tap-trung            # màn demo: một mã đi qua APISIX → svc-workflow → svc-files
-make logs-down                     # tắt: 5 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
+make demo-log-tap-trung            # màn demo: một mã qua APISIX → svc-workflow → Hasura, svc-files; SQL lỗi…
+make logs-down                     # tắt: 8 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
 ```
 
 - **Bật lâu dài:** thêm `logs` vào `MOC_EXTRA_PROFILES` trong `.env` (vd `MOC_EXTRA_PROFILES=tunnel,logs`) rồi chạy
   `make up` (hoặc `make logs-up`); từ đó `make up`, `make down`, `make ps`… tự nạp tệp phủ và profile, và mỗi lần
   `make up` thêm mật khẩu vào `.env` cũ nếu thiếu, tạo luồng, đặt lại thời gian giữ log (kể cả sau khi xóa volume
-  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 5 dịch vụ về
+  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 8 dịch vụ về
   `json-file` (Vector, Parseable vẫn chạy nhưng không nhận gì).
 - **Mật khẩu:** `MOC_LOGS_PASSWORD` do `make env` sinh; `.env` sinh trước F3.14 thiếu dòng này thì `make logs-up` (và
   `make up` khi `logs` có trong `MOC_EXTRA_PROFILES`) tự thêm một chuỗi ngẫu nhiên đúng như `make env` (không in ra).
@@ -488,8 +519,11 @@ make logs-down                     # tắt: 5 dịch vụ về json-file, dừng
 
 **Rủi ro, hạn chế người vận hành cần biết:**
 
-- **Bật hay tắt phải tạo lại 5 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`): vài
-  giây gián đoạn; đổi driver log chỉ có hiệu lực khi tạo lại container.
+- **Bật hay tắt phải tạo lại 8 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
+  `hasura`, `keycloak`, `postgres`): đổi driver log chỉ có hiệu lực khi tạo lại container. `make logs-up`,
+  `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi động lại cả CSDL,
+  Hasura, Keycloak: vài giây không đăng nhập, không ghi được; dịch vụ khác giữ kết nối tới CSDL (Flowable) phải tự
+  nối lại. Nên bật, tắt ngoài giờ làm việc.
 - **Cổng fluent `127.0.0.1:24224` không cần đăng nhập** (driver `fluentd` của Docker không có xác thực): tiến trình
   nào trên máy chủ cũng gửi được dòng giả vào kho log (dòng giả vẫn qua bước che). Máy chủ dùng chung nhiều người thì
   đây là hạn chế thật.

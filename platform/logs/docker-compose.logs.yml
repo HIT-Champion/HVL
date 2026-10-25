@@ -16,7 +16,7 @@
 
 # Tệp phủ của log tập trung (F3.14, docs/van-hanh.md mục Log tập trung). Chỉ nạp khi bật:
 #   COMPOSE_FILE=docker-compose.yml:platform/logs/docker-compose.logs.yml
-# (Makefile tự đặt khi MOC_EXTRA_PROFILES có logs; make logs-up đặt cho riêng lệnh đó). Không nạp thì 5 dịch vụ dưới
+# (Makefile tự đặt khi MOC_EXTRA_PROFILES có logs; make logs-up đặt cho riêng lệnh đó). Không nạp thì 8 dịch vụ dưới
 # giữ json-file như cũ. Đổi driver thì compose thay hẳn options của x-common: khai lại dung lượng bộ đệm cục bộ để
 # docker logs vẫn đọc được như trước (dual logging của Docker ≥ 20.10).
 # KHÔNG thêm env, env-regex, labels-regex: driver sẽ gửi biến môi trường (có bí mật) của container theo từng dòng log.
@@ -33,11 +33,15 @@ x-fluentd: &fluentd
     cache-max-size: 10m
     cache-max-file: "3"
 
-# Chỉ các dịch vụ đã che thông tin cá nhân trong nhật ký (F4.4). Hasura, Keycloak, PostgreSQL, Meilisearch chưa che:
-# không thu
+# Năm dịch vụ đầu tự che thông tin cá nhân trong nhật ký (F4.4). Hasura, Keycloak, PostgreSQL không tự che: Vector che
+# bằng luật riêng cho từng dịch vụ (platform/logs/vector.yaml), có ca trong vector.test.yaml. Meilisearch chưa có luật:
+# không thu. Đổi driver là tạo lại container: make logs-up, logs-down làm CSDL, Hasura, Keycloak gián đoạn vài giây
 services:
   apisix: {logging: *fluentd}
   app-office: {logging: *fluentd}
   app-ca-nhan: {logging: *fluentd}
   svc-files: {logging: *fluentd}
   svc-workflow: {logging: *fluentd}
+  hasura: {logging: *fluentd}
+  keycloak: {logging: *fluentd}
+  postgres: {logging: *fluentd}

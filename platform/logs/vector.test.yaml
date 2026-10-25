@@ -726,3 +726,407 @@ tests:
             source: |
               assert_eq!(strlen(string!(.message)), 16384)
               assert!(starts_with(string!(.message), "0123456789abcdef0123"))
+  - name: http-log của Hasura, mã yêu cầu trong detail, loại log làm event, giữ vai trò phiên
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          source: stdout
+          log: >-
+            {"detail": {"http_info": {"content_encoding": null, "http_version": "HTTP/1.1", "ip": "172.18.0.9",
+            "method": "POST", "status": 200, "url": "/v1/graphql"}, "operation": {"query": {"type": null},
+            "query_execution_time": 0.004, "request_id": "demo-log-hs1", "request_mode": "single",
+            "response_size": 120, "user_vars": {"x-hasura-role": "user", "x-hasura-tenant-id": "t-1",
+            "x-hasura-user-id": "u-1"}}, "request_id": "demo-log-hs1"}, "level": "info",
+            "timestamp": "2026-10-25T16:50:01.123+0000", "type": "http-log"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "hasura")
+              assert_eq!(.request_id, "demo-log-hs1")
+              assert_eq!(.event, "hasura.http-log")
+              d = object!(parse_json!(string!(.message)).detail)
+              assert_eq!(d.operation.user_vars."x-hasura-role", "user")
+              assert_eq!(d.http_info.url, "/v1/graphql")
+              assert_eq!(d.operation.query, {"type": null})
+  - name: http-log lỗi của Hasura che câu GraphQL, biến (cả khóa jsonb) và giá trị gõ sai kiểu, giữ operationName
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"http_info": {"method": "POST", "status": 200, "url": "/v1/graphql"}, "operation": {"error":
+            {"code": "data-exception", "error": "invalid input syntax for type uuid: \"Nguyen Van A\"", "path": "$"},
+            "query": {"operationName": "TimNguoi", "query":
+            "query TimNguoi($e: String!) { users(where: {ho_ten: {_eq: \"Tran Thi B\"}}) { id } }",
+            "variables": {"e": "Le Van C", "ghi_chu": {"Pham Thi D": "Hoang Van E"}}},
+            "request_id": "demo-log-hs2"}}, "level": "error", "type": "http-log"}
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"operation": {"error": {"code": "data-exception", "error":
+            "malformed array literal: \"{Ly Van M\"", "path": "$"}, "request_id": "demo-log-hs5"}},
+            "level": "error", "type": "http-log"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hs2")
+              m = string!(.message)
+              for_each(["Nguyen", "Tran", "Le Van", "Pham", "Hoang"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              o = object!(parse_json!(m).detail.operation)
+              assert_eq!(o.query, {"operationName": "TimNguoi", "query": "[REDACTED]", "variables": "[REDACTED]"})
+              assert_eq!(o.error.error, "invalid input syntax for type uuid: \"[REDACTED]\"")
+              assert_eq!(o.error.code, "data-exception")
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hs5")
+              o = object!(parse_json!(string!(.message)).detail.operation)
+              assert_eq!(o.error.error, "malformed array literal: \"[REDACTED]\"")
+  - name: dòng lỗi thật của Hasura 2.51 (vai trò user, giá trị gõ sai kiểu); internal, raw_query nếu có thì che cả
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"http_info": {"content_encoding": null, "http_version": "HTTP/1.1", "ip": "172.31.0.1",
+            "method": "POST", "status": 200, "url": "/v1/graphql"},
+            "operation": {"error": {"code": "data-exception",
+            "error": "invalid input syntax for type integer: \"Le Van C\"", "path": "$"}, "query": {"type": null},
+            "query_execution_time": 0.000861992, "request_id": "demo-log-hsx", "request_mode": "error",
+            "request_read_time": 1.13e-06, "response_size": 98, "uncompressed_response_size": 98,
+            "user_vars": {"x-hasura-role": "user", "x-hasura-user-id": "u-1"}}, "request_id": "demo-log-hsx"},
+            "level": "error", "span_id": "87721971ef7690bd", "timestamp": "2026-10-25T17:41:44.190+0000",
+            "trace_id": "f5ec55df4731896b9043c86a7a287e39", "type": "http-log"}
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"operation": {"error": {"code": "constraint-violation", "error": "Uniqueness violation.",
+            "internal": {"arguments": ["(Oid 25,Just (\"Tran Thi B\",Binary))"], "error": {"description":
+            "Key (email)=(tran.b@example.com) already exists.", "exec_status": "FatalError", "hint": null,
+            "message": "duplicate key value", "status_code": "23505"}, "prepared": true,
+            "statement": "INSERT INTO nguoi (ten) VALUES ('Le Van C')"}, "path": "$"},
+            "raw_query": "{\"query\": \"query { nguoi { ten } }\", \"variables\": {\"x\": \"Pham Thi D\"",
+            "request_id": "demo-log-hs6"}}, "level": "error", "type": "http-log"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hsx")
+              assert_eq!(.event, "hasura.http-log")
+              m = string!(.message)
+              assert!(!contains(m, "Le Van C"), m)
+              e = object!(parse_json!(m).detail.operation.error)
+              assert_eq!(e.error, "invalid input syntax for type integer: \"[REDACTED]\"")
+              assert_eq!(e.code, "data-exception")
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hs6")
+              m = string!(.message)
+              for_each(["Tran", "tran.b", "Le Van", "Pham", "23505"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              o = object!(parse_json!(m).detail.operation)
+              assert_eq!(o.error.internal, "[REDACTED]")
+              assert_eq!(o.raw_query, "[REDACTED]")
+              assert_eq!(o.error.code, "constraint-violation")
+  - name: websocket-log của Hasura khi mở subscription, mã yêu cầu trong detail.event.detail
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"connection_info": {"jwt_expiry": null, "msg": null, "websocket_id": "w-1"}, "event":
+            {"detail": {"operation_id": "1", "operation_name": "TheoDoi", "operation_type": {"type": "started"},
+            "query": {"operationName": "TheoDoi", "query":
+            "subscription TheoDoi($n: String) { tasks(where: {note: {_eq: \"Vu Thi F\"}}) { id } }",
+            "variables": {"n": "Ngo Van K"}},
+            "request_id": "demo-log-hs3"}, "type": "operation"}, "user_vars": {"x-hasura-role": "user"}},
+            "level": "info", "type": "websocket-log"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hs3")
+              assert_eq!(.event, "hasura.websocket-log")
+              m = string!(.message)
+              assert!(!contains(m, "Vu Thi F"), m)
+              assert!(!contains(m, "Ngo Van K"), m)
+              e = object!(parse_json!(m).detail.event.detail)
+              assert_eq!(e.query, {"operationName": "TheoDoi", "query": "[REDACTED]", "variables": "[REDACTED]"})
+              assert_eq!(e.operation_name, "TheoDoi")
+  - name: query-log của Hasura (nếu bật) che câu dạng chuỗi và generated_sql; startup che chuỗi kết nối, jwt_secret
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"kind": "database", "request_id": "demo-log-hs4", "query": "query { users { ho_ten } }",
+            "generated_sql": {"users": {"prepared_arguments": ["Dang Van G"], "query": "SELECT ..."}}},
+            "level": "info", "type": "query-log"}
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': hasura
+          log: >-
+            {"detail": {"info": {"database_url": "postgres://moc:DSNPASS12345@postgres:5432/moc", "source": "default",
+            "jwt_secret": {"type": "RS256", "key": "KHOAJWT123"}}, "kind": "server_configuration"}, "level": "info",
+            "type": "startup"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.request_id, "demo-log-hs4")
+              d = object!(parse_json!(string!(.message)).detail)
+              assert_eq!(d.query, "[REDACTED]")
+              assert_eq!(d.generated_sql, "[REDACTED]")
+              assert!(!contains(string!(.message), "Dang Van G"))
+          - type: vrl
+            source: |
+              assert_eq!(.event, "hasura.startup")
+              assert!(!exists(.request_id))
+              m = string!(.message)
+              assert!(!contains(m, "DSNPASS12345"), m)
+              assert!(!contains(m, "KHOAJWT123"), m)
+              assert!(contains(m, "postgres://moc:[REDACTED]@postgres:5432/moc"), m)
+  - name: PostgreSQL giữ dòng LOG, ERROR; che dòng vi phạm ở DETAIL, câu lệnh ở STATEMENT chỉ giữ từ đầu
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          source: stderr
+          log: '2026-10-25 16:50:01.123 UTC [1] LOG:  database system is ready to accept connections'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: >-
+            2026-10-25 16:50:01.123 UTC [77] ERROR:  new row for relation "documents" violates check constraint
+            "documents_symbol_check"
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: >-
+            2026-10-25 16:50:01.123 UTC [77] DETAIL:  Failing row contains (5f0c, in, received, CV, 12/ĐHCN-ĐT,
+            Nguyen Van A (chuyen vien), 2026-10-25).
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: >-
+            2026-10-25 16:50:01.123 UTC [77] STATEMENT:  insert into office.documents (direction, summary)
+            values ('in', 'Gui ong Tran Van B')
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "postgres")
+              assert_eq!(.stream, "stderr")
+              p = "2026-10-25 16:50:01.123 UTC [1] "
+              assert_eq!(.message, p + "LOG:  database system is ready to accept connections")
+          - type: vrl
+            source: |
+              assert!(ends_with(string!(.message),
+                " ERROR:  new row for relation \"documents\" violates check constraint \"documents_symbol_check\""))
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:01.123 UTC [77] DETAIL:  Failing row contains ([REDACTED]).")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:01.123 UTC [77] STATEMENT:  insert [REDACTED]")
+  - name: PostgreSQL che giá trị khóa, giá trị gõ sai kiểu, Token JSON, CONTEXT, QUERY, tham số câu lệnh
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: >-
+            2026-10-25 16:50:02.000 UTC [78] DETAIL:  Key (so_ky_hieu, lower(nguoi_ky))=(12/ĐHCN, Nguyen Van A)
+            already exists.
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 16:50:02.000 UTC [79] ERROR:  invalid input syntax for type uuid: "Tran Thi B"'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 16:50:02.000 UTC [79] CONTEXT:  JSON data, line 1: {"ho_ten": "Le Van C'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: >-
+            2026-10-25 16:50:02.000 UTC [80] CONTEXT:  SQL statement "insert into personal.items (title)
+            values ('Pham Thi D')"
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 16:50:02.000 UTC [81] DETAIL:  Token "Hoang" is invalid.'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 16:50:02.000 UTC [82] ERROR:  malformed array literal: "{Vu Thi F"'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 16:50:02.000 UTC [83] CONTEXT:  unnamed portal parameter $1 = ''Dang Van G'''
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: "2026-10-25 16:50:02.000 UTC [84] QUERY:  select id from core.users where ho_ten = 'Bui Van H'"
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              p = "2026-10-25 16:50:02.000 UTC [78] "
+              assert_eq!(.message, p + "DETAIL:  Key (so_ky_hieu, lower(nguoi_ky))=([REDACTED]) already exists.")
+          - type: vrl
+            source: |
+              p = "2026-10-25 16:50:02.000 UTC [79] "
+              assert_eq!(.message, p + "ERROR:  invalid input syntax for type uuid: \"[REDACTED]\"")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:02.000 UTC [79] CONTEXT:  JSON data, line 1: [REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:02.000 UTC [80] CONTEXT:  SQL statement \"[REDACTED]\"")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:02.000 UTC [81] DETAIL:  Token \"[REDACTED]\" is invalid.")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:02.000 UTC [82] ERROR:  malformed array literal: \"[REDACTED]\"")
+          - type: vrl
+            source: |
+              p = "2026-10-25 16:50:02.000 UTC [83] "
+              assert_eq!(.message, p + "CONTEXT:  unnamed portal parameter $1 = '[REDACTED]'")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 16:50:02.000 UTC [84] QUERY:  select [REDACTED]")
+  - name: giá trị PostgreSQL có xuống dòng làm dòng dừng giữa giá trị (thiếu dấu đóng) thì che tới hết dòng
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 17:18:54.808 UTC [91] DETAIL:  Failing row contains (1, Tran'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 17:18:54.808 UTC [92] DETAIL:  Key (ten)=(Le Van'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 17:18:54.808 UTC [93] CONTEXT:  SQL statement "insert into t values (''Pham'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 17:18:54.808 UTC [94] ERROR:  invalid input syntax for type integer: "Hoang'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 17:18:54.808 UTC [95] DETAIL:  Token "Vu Thi'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 17:18:54.808 UTC [96] CONTEXT:  unnamed portal parameter $1 = ''Dang'
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 17:18:54.808 UTC [91] DETAIL:  Failing row contains ([REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 17:18:54.808 UTC [92] DETAIL:  Key (ten)=([REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 17:18:54.808 UTC [93] CONTEXT:  SQL statement \"[REDACTED]")
+          - type: vrl
+            source: |
+              p = "2026-10-25 17:18:54.808 UTC [94] "
+              assert_eq!(.message, p + "ERROR:  invalid input syntax for type integer: \"[REDACTED]")
+          - type: vrl
+            source: |
+              assert_eq!(.message, "2026-10-25 17:18:54.808 UTC [95] DETAIL:  Token \"[REDACTED]")
+          - type: vrl
+            source: |
+              p = "2026-10-25 17:18:54.808 UTC [96] "
+              assert_eq!(.message, p + "CONTEXT:  unnamed portal parameter $1 = '[REDACTED]")
+  - name: PostgreSQL bỏ dòng tiếp của mục nhiều dòng, dòng của script khởi tạo, dòng có tiền tố mà không có loại
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: "\t, 2026-10-25, Ve viec cua ong Nguyen Van A, normal, f, null"
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: 'PostgreSQL Database directory appears to contain a database; Skipping initialization'
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': postgres
+          log: '2026-10-25 16:50:03.000 UTC [85] thieu loai Tran Thi B'
+    no_outputs_from:
+      - moc
+  - name: sự kiện đăng nhập lỗi của Keycloak che tên gõ vào, phiên, chuỗi truy vấn; giữ userId, clientId, lỗi
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': keycloak
+          log: >-
+            2026-10-25 16:50:01,123 WARN  [org.keycloak.events] (executor-thread-3) type="LOGIN_ERROR",
+            realmId="9b1f", realmName="moc", clientId="app-office", userId="2f6c", sessionId="phien-123",
+            ipAddress="172.18.0.9", error="invalid_user_credentials", auth_method="openid-connect",
+            redirect_uri="https://signet.example/callback?state=TT9", code_id="c-1", username="Mk go nham 123"
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "keycloak")
+              m = string!(.message)
+              for_each(["Mk go nham", "phien-123", "state=TT9"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              assert!(contains(m, "username=\"[REDACTED]\""), m)
+              assert!(contains(m, "userId=\"2f6c\""), m)
+              assert!(contains(m, "clientId=\"app-office\""), m)
+              assert!(contains(m, "error=\"invalid_user_credentials\""), m)
+              assert!(contains(m, "redirect_uri=\"https://signet.example/callback\""), m)
