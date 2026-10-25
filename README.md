@@ -219,6 +219,8 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 
 - `PREFIX` mặc định là `/opt/moc`. Phiên bản lấy từ `git describe`; cài từ gói `.tar.gz` thì đặt tay:
   `make install PREFIX=/opt/moc MOC_VERSION=0.1.0`.
+- Gói có tệp `VERSION` ở thư mục gốc thì phiên bản đã ghi sẵn trong đó (`git archive` điền khi đóng gói), `make install`
+  tự đọc, không cần đặt tay.
 - Nâng cấp: dừng bản cài, `make install` lại với cùng `PREFIX`. Compose, cấu hình và image được thay; `.env` của bản
   cài được giữ, chỉ đổi `MOC_VERSION`.
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
