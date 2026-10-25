@@ -165,8 +165,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
 ## Sau vòng trường
 
 Việc còn thiếu thật theo `docs/muc-hoan-thien.md`, xếp theo ưu tiên, kèm lý do. Không gắn ngày: kế hoạch chỉ có hai
-mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.2.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
-Việc nào chưa xong trước 26/11 thì để sau `v1.2.0`.
+mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.3.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
+Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
 
 1. **Đơn vị chạy thử thật** (F2.11, F4.6): đo cột "trước" của số đo §8, nhận góp ý của người ngoài đội. Mọi số đo hiện
    tính trên dữ liệu mẫu; chưa có đơn vị dùng thật thì chưa biết sản phẩm giải đúng bài toán đến đâu.
