@@ -26,7 +26,8 @@ Văn bản đi (F2.4): svc-workflow gọi /internal/issue bằng token tài kho�
 dựng PDF có số, mã QR từ dữ liệu trong CSDL, ký số PAdES bằng khóa của đơn vị trong két (F4.5, chỉ minh họa —
 signing.py; văn bản hạn chế không ký), quét, lưu như mọi tệp. Người được đọc dự thảo xem trước bản PDF
 ở /api/documents/{id}/preview. Cổng xác thực (F2.13): /api/verify trả thông tin công khai của đúng một văn
-bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập. Sổ đăng ký văn bản đến / đi (F2.8):
+bản đã phát hành theo mã tra cứu hoặc băm SHA-256, không cần đăng nhập; /api/verify/ca.pem, /api/verify/anchor-key.pem
+trả chứng thư CA nội bộ và khóa công khai ký mốc neo sổ kiểm toán (anchors.py). Sổ đăng ký văn bản đến / đi (F2.8):
 văn thư, lãnh đạo xem sổ một năm ở /api/registers/{in|out}/{năm} và in ra PDF để ký nhận, đóng sổ — registers.py.
 Nộp lưu (F3.8): vòng nền chuyển hồ sơ đã đóng sang bucket lạnh — archive.py; lãnh đạo phòng nộp lưu ngay bằng
 POST /api/case-files/{id}/archive; phòng đọc GET cùng đường đọc lại gói (DuckDB đọc Parquet), kiểm băm với CSDL, và
@@ -71,7 +72,7 @@ from pydantic import BaseModel, Field
 from starlette.datastructures import UploadFile
 
 from . import __version__, filetype, pii
-from .anchors import Anchorer, AnchorStore
+from .anchors import Anchorer, AnchorSigner, AnchorStore
 from .archive import (Archived, ArchiveError, Archiver, ArchiveStateError, ColdStore, read_archived_file,
                       read_manifest, read_package)
 from .assist import api as assist_api
@@ -501,6 +502,9 @@ def create_app(
         signer = signer or DocumentSigner(vault)
     if not settings.sign_enabled:
         signer = None
+    # Mốc neo sổ kiểm toán ký bằng khóa moc-anchor của két (anchors.py); không có két thì neo không chữ ký
+    anchor_signer = AnchorSigner(vault, settings.public_url) if vault is not None else None
+    anchorer.signer = anchor_signer
     reader = reader or Reader(settings, hasura, store, summarizer=make_summarizer(
         settings.ai_url, settings.ai_model, max_chars=settings.ai_max_chars))
     # Hỏi đáp trên kho văn bản (F4.2): chỉ mục đoạn riêng trên cùng Meilisearch, mô hình nhúng / sinh tùy chọn
@@ -1282,7 +1286,8 @@ def create_app(
             ) from exc
         except HasuraError as exc:
             raise _error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
-        return build_register(data, visible, direction=direction, year=year, printed_at=datetime.now(UTC))
+        return build_register(data, visible, direction=direction, year=year, printed_at=datetime.now(UTC),
+                              anchor=anchorer.latest)
 
     async def _register(direction: str, year: int, request: Request, principal: Principal) -> Register:
         if not REGISTER_ROLES & set(principal.roles):
@@ -1367,6 +1372,54 @@ def create_app(
         429: {"description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"},
         503: {"description": "CSDL không sẵn sàng"},
     }
+
+    # Chứng thư CA nội bộ (F4.5) và khóa công khai ký mốc neo sổ kiểm toán: tệp công khai đọc từ két, để người ngoài
+    # tự kiểm chữ ký số văn bản và mốc neo đã chép ra ngoài (docs/van-hanh.md mục Mốc neo công khai). Khai báo trước
+    # /api/verify/{code}: route nào khớp trước thì được chọn. Két chưa có PKI, chưa có khóa (két khởi tạo trước khi có
+    # chúng) thì 404; két không trả lời thì 503
+    pem_responses: dict[int | str, dict[str, object]] = {
+        200: {"content": {"application/x-pem-file": {}}, "description": "Tệp PEM"},
+        404: {"description": "Két chưa có (két khởi tạo trước khi có tính năng này, hoặc không dùng két)"},
+        429: {"description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"},
+        503: {"description": "Két không trả lời"},
+    }
+
+    def _pem(text: str, filename: str) -> Response:
+        return Response(text, media_type="application/x-pem-file", headers={
+            "X-Content-Type-Options": "nosniff", "Cache-Control": "public, max-age=300",
+            "Content-Disposition": content_disposition(filename)})
+
+    @app.get("/api/verify/ca.pem", response_class=Response, responses=pem_responses,
+             summary="Chứng thư CA nội bộ ký văn bản đi (PEM, chỉ minh họa; không cần đăng nhập)")
+    async def verify_ca_pem(request: Request) -> Response:
+        missing = _error(404, "no_ca", "Két chưa có CA nội bộ: văn bản phát hành không có chữ ký số")
+        if vault is None:
+            raise missing
+        try:
+            pem = (await vault.pki_ca_pem()).strip()
+        except VaultError as exc:
+            if exc.status in (204, 403, 404):   # mount pki chưa có, hoặc chưa có CA
+                raise missing from exc
+            log_event("core.verify.ca_failed", request, level=logging.WARNING, error=str(exc))
+            raise _error(503, "vault_unavailable", "Chưa đọc được két, thử lại sau") from exc
+        if not pem.startswith("-----BEGIN CERTIFICATE-----"):
+            raise missing
+        return _pem(pem + "\n", "signet-ca.pem")
+
+    @app.get("/api/verify/anchor-key.pem", response_class=Response, responses=pem_responses,
+             summary="Khóa công khai Ed25519 ký mốc neo sổ kiểm toán (PEM SubjectPublicKeyInfo; không cần đăng nhập)")
+    async def verify_anchor_key(request: Request) -> Response:
+        missing = _error(404, "no_anchor_key", "Két chưa có khóa ký mốc neo: mốc neo không có chữ ký")
+        if anchor_signer is None:
+            raise missing
+        try:
+            key = await anchor_signer.public_key()
+        except VaultError as exc:
+            log_event("core.verify.anchor_key_failed", request, level=logging.WARNING, error=str(exc))
+            raise _error(503, "vault_unavailable", "Chưa đọc được két, thử lại sau") from exc
+        if key is None:
+            raise missing
+        return _pem(key.pem, "signet-anchor-key.pem")
 
     @app.get("/api/verify/{code}", response_model=VerifyOut, responses=verify_responses,
              summary="Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)")
