@@ -162,6 +162,66 @@ export function hpdiRadarValues(scores: HpdiScores): number[] {
   return HPDI_KEYS.map((k) => scores[k] ?? 0)
 }
 
+// --- Hình dạng H-P-D-I và cảnh báo GIGO -----------------------------------------------------------------------------
+// Theo giáo trình "Xây dựng Hệ điều hành Doanh nghiệp số (DX-OS)" của TS. Tạ Tuấn Anh (CC BY 4.0), mục 2.4 "Phương
+// pháp luận: Thuật toán Ánh xạ và Dashboard HPDI" (đường dẫn trong nguồn của bộ câu, app/data/tu-chan-doan.json; đọc
+// ngày 25/10/2026). Đội tự viết lại từ lời giáo trình; không lấy mã hay ngưỡng của dự án nào khác.
+// - 2.4.2: P% = (điểm đạt / điểm tối đa) × hệ số thực chứng × 30 %, D%, I% như vậy; H% = 100 % − (P% + D% + I%), phần
+//   việc còn lại trên vai con người. Ở đây "điểm đạt / tối đa" là (mức − 1) / 4 (mức 1 → 0 %, mức 5 → 30 %); hệ số
+//   thực chứng lấy bằng 1 vì mỗi mức của bộ câu đã tả việc quan sát được, không tả phần mềm sở hữu — bằng chứng đo
+//   được đặt cạnh để đối chiếu, không nhân vào. Điểm không gian [H] của bộ câu (không gian làm việc số) không vào
+//   công thức: H% của giáo trình là phần dư, không phải mức của không gian [H].
+// - 2.4.3: bốn nguyên mẫu trên radar tỷ trọng. Ngưỡng dưới lấy từ số giáo trình ghi; chỗ giáo trình chỉ tả bằng lời
+//   ("co cụm sát tâm", "triệt tiêu", "vươn dài") thì lấy một phần ba trục (10 %), ghi rõ ở từng luật.
+export const HPDI_SHARE_MAX = 30
+export interface HpdiShares { h: number; p: number; d: number; i: number }
+export type HpdiShape = 'diamond' | 'illusion' | 'kite' | 'spear' | 'transitional'
+export const HPDI_SHAPES: HpdiShape[] = ['diamond', 'illusion', 'kite', 'spear', 'transitional']
+
+const round1 = (x: number) => Math.round(x * 10) / 10
+
+// Tỷ trọng % theo 2.4.2; thiếu điểm [P], [D] hay [I] thì không tính
+export function hpdiShares(scores: HpdiScores): HpdiShares | null {
+  const { p, d, i } = scores
+  if (p === null || d === null || i === null) return null
+  const share = (s: number) => round1(((s - 1) / (HPDI_TOP - 1)) * HPDI_SHARE_MAX)
+  const out = { p: share(p), d: share(d), i: share(i) }
+  return { h: round1(100 - out.p - out.d - out.i), ...out }
+}
+
+// Xét theo thứ tự, luật đầu tiên khớp là hình dạng:
+// 1. Kim cương toàn vẹn — "[P], [D], [I] mở rộng đối xứng, đạt đỉnh 30 % mỗi trục", [H] về 10 %: cả ba từ 22,5 %
+//    (ba phần tư trục, mức 4) trở lên.
+// 2. Ảo giác công nghệ — "trục [I] hoặc [D] vươn dài … đi kèm sự suy giảm của trục [P]", hậu quả GIGO: [D] hoặc [I]
+//    từ 10 % trở lên, vượt [P], và [P] chưa tới 20 % (dải [P] của Cánh diều).
+// 3. Cánh diều lệch tâm — "[P] vươn dài … (20 % – 30 %). Trục [D] và [I] vẫn ở trạng thái triệt tiêu": [P] từ 20 %,
+//    [D] và [I] dưới 10 %.
+// 4. Mũi giáo phân mảnh — "[H] (chiếm 80 % – 90 %)": H% từ 80 % trở lên.
+// 5. Không khớp nguyên mẫu nào: đang chuyển tiếp (giáo trình chỉ tả bốn nguyên mẫu "phổ biến").
+export function hpdiShape(s: HpdiShares): HpdiShape {
+  const third = HPDI_SHARE_MAX / 3
+  if (s.p >= 22.5 && s.d >= 22.5 && s.i >= 22.5) return 'diamond'
+  if (Math.max(s.d, s.i) >= third && Math.max(s.d, s.i) > s.p && s.p < 20) return 'illusion'
+  if (s.p >= 20 && s.d < third && s.i < third) return 'kite'
+  if (s.h >= 80) return 'spear'
+  return 'transitional'
+}
+
+// Rác vào, rác ra: [I] dựng trên [D] chưa vững (lệch nền D → I) hoặc hình dạng Ảo giác công nghệ. Trang khuyên tạm
+// dừng mở rộng [I], chuẩn hóa [P], [D] trước, và trỏ tới cờ kiểm chất lượng số liệu của các báo cáo (Phả hệ số liệu)
+export function hpdiGigo(scores: HpdiScores, shape: HpdiShape | null): boolean {
+  if (shape === 'illusion') return true
+  return hpdiGaps(scores).some((g) => g.from === 'd' && g.to === 'i')
+}
+
+// Nơi xem cờ chất lượng: mục "Kiểm chất lượng số liệu" của trang Phả hệ số liệu — cùng điều kiện vai trò với mục
+// /pha-he của thanh bên (test đối chiếu)
+export const HPDI_QUALITY_LINK: HpdiLink = {
+  to: '/pha-he',
+  roles: ['director'],
+  label: { vi: 'Phả hệ số liệu — kiểm chất lượng số liệu', en: 'Data lineage — data quality checks' },
+}
+
 // --- Lịch sử (bảng office.maturity_assessments) ---------------------------------------------------------------------
 
 export interface HpdiAssessmentRow {

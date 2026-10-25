@@ -21,6 +21,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   đó qua mà không xét tệp nào), `.sha256`, thư mục gốc `signet-X.Y.Z/`. Gói hỏng thì `make release` gỡ thẻ vừa gắn và
   xóa gói. Tệp `VERSION` do `git archive` điền thẻ (`.gitattributes`, export-subst): cài từ gói không còn phải đặt tay
   `MOC_VERSION`. Test scripts +27 (`docs/git_flow.md` mục 6).
+- Tự chẩn đoán H-P-D-I (`/tu-chan-doan`) thêm hình dạng theo giáo trình DX-OS mục 2.4 (TS. Tạ Tuấn Anh, CC BY 4.0):
+  tỷ trọng `[P]`, `[D]`, `[I]` tối đa 30 % quy từ mức tự đánh giá, `[H]` là phần dư; xếp vào một trong bốn nguyên mẫu
+  (Mũi giáo phân mảnh, Cánh diều lệch tâm, Ảo giác công nghệ, Kim cương toàn vẹn) hoặc "đang chuyển tiếp", ngưỡng
+  ghi kèm câu giáo trình ở `docs/tu-chan-doan.md` §3. Cảnh báo "rác vào, rác ra" khi `[I]` vượt `[D]` từ 1 mức hoặc
+  hình dạng là Ảo giác công nghệ: khuyên tạm dừng mở rộng `[I]`, dẫn tới cờ kiểm chất lượng số liệu ở Phả hệ số liệu.
+  Chỉ để định hướng, không phải điểm DTI. Test office +3, e2e thêm bước trong `tu-chan-doan.spec.ts`.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
