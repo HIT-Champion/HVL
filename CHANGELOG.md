@@ -149,6 +149,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   công khai. Test scripts +9.
 
 ### Đã sửa lỗi
+- Log tập trung không còn mất dòng đầu tiên của dịch vụ im lâu khi kết nối tới Vector đã chết (#226). Driver
+  `fluentd` của Docker gửi mà không chờ Vector báo nhận, nên dòng ghi vào kết nối chết mất mà không báo lỗi. Dịch vụ
+  ghi liên tục tự nối lại ở dòng sau; dịch vụ im lâu như PostgreSQL thì mất đúng dòng lỗi. Bước 8 mới của
+  `make demo-log-tap-trung` khởi động lại Vector rồi đòi dòng ERROR đầu tiên của PostgreSQL sau đó tới kho trong 60
+  giây; trước khi sửa, bước này đỏ trên CI. Driver nay đặt `fluentd-request-ack: "true"`: không có `ack` thì nối lại
+  rồi gửi lại dòng đó. Lỗi chập chờn ở bước 3, 5 của màn này trên CI (dòng có trong `docker logs` mà không tới kho, như
+  lần đỏ của develop ở 1fa6236) khớp với lỗi này, nhưng chưa rõ kết nối chết vì đâu. Job CI lỗi nay giữ thêm nhật ký
+  của Vector, Parseable.
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
   Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura
   đóng thì APISIX nhận EOF hoặc RST và trả 502. Upstream `hasura` nay đặt `keepalive_pool` với `idle_timeout: 25`,

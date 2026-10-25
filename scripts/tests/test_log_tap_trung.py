@@ -121,6 +121,7 @@ class ComposeTest(unittest.TestCase):
         self.assertIn("driver: fluentd", anchor)
         self.assertIn("fluentd-address: 127.0.0.1:${MOC_LOGS_FLUENT_PORT:-24224}", anchor)
         self.assertIn('fluentd-async: "true"', anchor)
+        self.assertIn('fluentd-request-ack: "true"', anchor)        # không ack thì mất dòng ở kết nối chết (#226)
         self.assertIn("labels: com.docker.compose.service", anchor)
         self.assertIn("cache-max-size: 10m", anchor)                 # docker logs vẫn đọc được như trước
         # driver gửi kèm biến môi trường (có bí mật) của container nếu khai các tùy chọn này
