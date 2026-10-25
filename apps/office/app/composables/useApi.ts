@@ -411,8 +411,10 @@ export function useApi() {
 
   // --- hồ sơ, nộp lưu, phòng đọc (F3.8) ---------------------------------------------------------------------------
 
-  /** Lỗi của svc-files ({detail: {code, message, reason}}) thành ApiError. */
+  /** Lỗi của svc-files ({detail: {code, message, reason}}) thành ApiError; cổng chặn thì blocked. */
   async function serviceError(res: Response): Promise<ApiError> {
+    const blocked = gatewayBlock(res.status, res.headers)
+    if (blocked) return blocked
     const body = await res.json().catch(() => ({}))
     const raw = body.detail
     const detail = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw : {}

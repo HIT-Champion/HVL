@@ -108,6 +108,11 @@ const calls: Record<string, () => Promise<unknown>> = {
   search: () => api.search({ q: '${jndi:ldap://x/a}' }),
   readFile: () => api.readFile('00000000-0000-0000-0000-000000000001'),
   ask: () => api.ask({ question: "x' UNION SELECT password FROM users --" }),
+  // hồ sơ, nộp lưu, phòng đọc (F3.8): đọc thân lỗi qua serviceError
+  archiveCaseFile: () => api.archiveCaseFile('00000000-0000-0000-0000-000000000002'),
+  readingRoom: () => api.readingRoom('00000000-0000-0000-0000-000000000002'),
+  viewArchivedFile: () => api.viewArchivedFile('00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000001'),
 }
 
 async function failure(call: () => Promise<unknown>): Promise<InstanceType<typeof ApiError>> {
@@ -146,7 +151,8 @@ test('403 JSON của Hasura, svc-files giữ mã cũ, không thành blocked', as
   assert.equal(gqlError.message, 'field "x" not found')
 
   reply = jsonReply(403, { detail: { code: 'forbidden', message: 'Không có quyền với tệp này' } })
-  for (const name of ['upload', 'preview', 'register', 'search', 'readFile', 'ask']) {
+  for (const name of ['upload', 'preview', 'register', 'search', 'readFile', 'ask', 'archiveCaseFile', 'readingRoom',
+    'viewArchivedFile']) {
     const e = await failure(calls[name])
     assert.equal(e.code, 'forbidden', name)
     assert.equal(e.message, 'Không có quyền với tệp này', name)
