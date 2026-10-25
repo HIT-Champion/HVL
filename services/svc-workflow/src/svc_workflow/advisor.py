@@ -223,7 +223,7 @@ class Advisor:
 
         started = self._clock()
         try:
-            similar = await asyncio.wait_for(self.files.similar(tenant, doc_id, limit=LIMIT),
+            similar = await asyncio.wait_for(self.files.similar(tenant, doc_id, limit=LIMIT, request_id=request_id),
                                              self.settings.suggest_timeout_s)
         except TimeoutError:
             row = failed_row(doc_id, job.process_instance_id, "timeout", duration_ms=self._ms(started))

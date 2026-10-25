@@ -130,15 +130,26 @@ def test_plain_upload_is_unchanged(client, make_token, store):
 
 # PDF phải nhập mật khẩu mới mở: ClamAV thật (AlertEncrypted) chặn trước bước này — 422 unscannable, xem
 # test_upload và test tích hợp. Trạm quét giả ở đây không báo, nên check_pdf vẫn là lớp chặn sau (415)
-@pytest.mark.parametrize(("data", "mime"), [
-    (b"van ban thuong", "text/plain"),
-    (SECRET, "image/png"),
-    (b"%PDF-1.7 hong", "application/pdf"),
+@pytest.mark.parametrize(("data", "name"), [
+    (b"van ban thuong", "Công văn mật.txt"),
+    (b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "Công văn mật.png"),
+    (b"%PDF-1.7 hong", "Công văn mật.pdf"),
 ])
-def test_restricted_upload_takes_readable_pdf_only(client, make_token, hasura, store, data, mime):
-    r = upload(client, make_token(), data, mime=mime)
+def test_restricted_upload_takes_readable_pdf_only(client, make_token, hasura, store, data, name):
+    r = upload(client, make_token(), data, name=name)
     assert r.status_code == 415 and r.json()["detail"]["code"] == "restricted_pdf_only"
     assert not store.objects and not hasura.files
+
+
+def test_restricted_upload_goes_by_content_not_declared_mime(client, make_token, hasura, store):
+    # loại theo byte đầu (filetype.py): PDF thật mà trình duyệt khai image/png vẫn nhận, lưu là application/pdf; tệp
+    # chữ đặt đuôi .pdf bị chặn ở bước nhận loại, trước bước kiểm PDF của văn bản hạn chế
+    r = upload(client, make_token(), SECRET, mime="image/png")
+    assert r.status_code == 201, r.text
+    assert r.json()["mime_type"] == "application/pdf" and r.json()["encrypted"] is True
+    r = upload(client, make_token(), b"van ban thuong", mime="application/pdf")
+    assert r.status_code == 415 and r.json()["detail"]["code"] == "type_mismatch"
+    assert len(store.objects) == len(hasura.files) == 1
 
 
 def test_restricted_upload_is_still_scanned(client, make_token, store):

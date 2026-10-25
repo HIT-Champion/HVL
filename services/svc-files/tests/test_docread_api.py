@@ -56,6 +56,7 @@ ENV = {
     "MOC_OIDC_ISSUER": ISSUER, "MOC_OIDC_JWKS_URL": "http://unused/jwks", "SEAWEEDFS_S3_ACCESS_KEY": "test",
     "SEAWEEDFS_S3_SECRET_KEY": "test", "HASURA_ADMIN_SECRET": "test", "MEILISEARCH_API_KEY": "test",
     "MOC_SEARCH_SYNC_INTERVAL_S": "0", "MOC_AUDIT_ANCHOR_INTERVAL_S": "0", "MOC_TEXT_INTERVAL_S": "0",
+    "MOC_IMPORT_INTERVAL_S": "0",     # vòng nền nạp lô tắt (không tạo thư mục spool)
     "MOC_ARCHIVE_INTERVAL_S": "0", "MOC_FILES_MAX_MB": "1", "MOC_AI_URL": "",
     "MOC_ASK_ENABLED": "false",     # không chạy vòng chỉ mục đoạn F4.2 (nó gọi Meilisearch thật)
 }
@@ -360,10 +361,15 @@ def test_too_large_is_413_without_reading(reading, make_token, hasura, store):
     assert store.reads == []
 
 
-def test_declared_pdf_that_is_a_zip_is_415(reading, make_token, hasura):
+def test_zip_is_415_and_a_zip_named_pdf_never_gets_in(reading, make_token, hasura):
     client = reading()
     token = make_token()
-    file_id = upload(client, token, b"PK\x03\x04" + b"\x00" * 200, name="cong-van.pdf")
+    data = b"PK\x03\x04" + b"\x00" * 200
+    # tải lên đã nhận loại theo nội dung (filetype.py): zip đặt đuôi .pdf không vào kho
+    r = client.post("/api/files", headers=auth(token), files={"file": ("cong-van.pdf", data, "application/pdf")})
+    assert r.status_code == 415 and r.json()["detail"]["code"] == "type_mismatch"
+    # đọc vẫn nhận loại theo byte đầu (tệp lưu trước khi có bước trên): zip không đọc được
+    file_id = upload(client, token, data, name="cong-van.zip")
     r = read(client, token, file_id)
     assert r.status_code == 415 and r.json()["detail"]["code"] == "unsupported"
     assert hasura.agent_events == []

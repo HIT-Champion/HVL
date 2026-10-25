@@ -338,6 +338,10 @@ def test_lineage_one_run_per_step_linked_to_the_archive_run():
     assert ev[3]["outputs"] == [f"{prefix}manifest-{done.archive_sha256}.json"]
     assert set(ev[3]["inputs"]) == set(tables["outputs"]) | set(ev[1]["outputs"])
     assert ev[4]["inputs"] == ev[3]["outputs"] and ev[-1]["outputs"] == ev[3]["outputs"]
+    # bước commit khai đúng các bảng hàm SQL ghi, kể cả số liệu giữ lại mà báo cáo thời gian xử lý đọc
+    assert {o.rsplit(".", 1)[1] for o in ev[4]["outputs"]} == {"case_files", "documents", "document_events",
+                                                                 "document_files", "archived_document_facts", "files",
+                                                                 "audit_log"}
     # kiểm chất lượng: số dòng khớp CSDL, cột bắt buộc không null — nằm trong facet của từng bảng
     assert tables["quality_ok"] is True and ev[1]["quality_ok"] is None and ev[3]["quality_ok"] is None
     assert done.run_id == parent

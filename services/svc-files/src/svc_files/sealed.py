@@ -33,6 +33,9 @@ PDF do người dùng tải lên: như pdftext.py, ocr.py, svc-files không mở
 sealed.py``, không cần gói svc_files) có RLIMIT_AS, RLIMIT_CPU, hạn thời gian; quá hạn thì giết cả nhóm. Bản rõ, bản có
 dấu chỉ đi qua ống stdin/stdout, không xuống đĩa; tiến trình con không ghi nhật ký (stderr bỏ đi). Trần số trang
 (``MOC_RESTRICTED_MAX_PAGES``) chặn tệp hàng vạn trang tí hon làm mỗi lần xem tốn hàng phút.
+
+Phòng đọc hồ sơ đã nộp lưu (F3.8, ``GET /api/case-files/{id}/archive/files/{file_id}``) đóng dấu tệp trong gói lạnh
+bằng đúng đường này, chỉ khác chữ trên lớp dấu (``kind="archive"``, STAMP_LINES).
 """
 
 from __future__ import annotations
@@ -120,7 +123,8 @@ class Vault:
     hết hạn); đọc lại role_id/secret_id mỗi lần đăng nhập vì két cấp secret_id mới mỗi lần khởi động.
 
     Ký số (F4.5, signing.py): khóa ký từng đơn vị trong transit (tạo, xin CSR, gắn chứng thư, ký), chứng thư từ PKI
-    nội bộ của két. Không có hàm xuất khóa: policy của svc-files cũng không cho."""
+    nội bộ của két. Mốc neo sổ kiểm toán (anchors.py): ký bằng khóa Ed25519 ``moc-anchor`` do két tạo sẵn. Không có hàm
+    xuất khóa: policy của svc-files cũng không cho."""
 
     def __init__(self, addr: str, *, role_id_file: str, secret_id_file: str, key: str = "moc-files",
                  timeout_s: float = 5.0, transport: httpx2.AsyncBaseTransport | None = None) -> None:
@@ -133,6 +137,14 @@ class Vault:
 
     async def aclose(self) -> None:
         await self._http.aclose()
+
+    async def ping(self) -> bool:
+        """Két đã khởi tạo và đã mở khóa (``/v1/sys/health``, không cần token) — trang trạng thái hệ thống."""
+        try:
+            r = await self._http.get("/v1/sys/health", params={"standbyok": "true"})
+        except httpx2.HTTPError:
+            return False
+        return r.status_code == 200
 
     async def _login(self) -> str:
         try:
@@ -234,13 +246,25 @@ class Vault:
         """Chữ ký RSA PKCS#1 v1.5 trên SHA-256(data) bằng đúng phiên bản khóa; két ghi sổ từng lần ký."""
         out = await self._request("POST", f"/v1/transit/sign/{name}/sha2-256", {
             "input": base64.b64encode(data).decode(), "signature_algorithm": "pkcs1v15", "key_version": version})
-        prefix, _, sig = str(out.get("signature") or "").rpartition(":")
-        if prefix != f"vault:v{version}":
-            raise VaultError(f"két ký bằng phiên bản khóa khác ({prefix or 'không rõ'})", status=200)
-        try:
-            return base64.b64decode(sig, validate=True)
-        except ValueError:
-            raise VaultError("két trả chữ ký không đúng dạng", status=200) from None
+        return _signature(out, version)
+
+    async def transit_sign_ed25519(self, name: str, data: bytes, *, version: int) -> bytes:
+        """Chữ ký Ed25519 thuần (RFC 8032, két không băm trước) trên data bằng đúng phiên bản khóa — mốc neo sổ kiểm
+        toán (anchors.py); két ghi sổ từng lần ký."""
+        out = await self._request("POST", f"/v1/transit/sign/{name}", {
+            "input": base64.b64encode(data).decode(), "key_version": version})
+        return _signature(out, version)
+
+
+def _signature(out: dict[str, Any], version: int) -> bytes:
+    """``vault:v<phiên bản>:<base64>`` két trả → chữ ký; ký bằng phiên bản khác thì VaultError."""
+    prefix, _, sig = str(out.get("signature") or "").rpartition(":")
+    if prefix != f"vault:v{version}":
+        raise VaultError(f"két ký bằng phiên bản khóa khác ({prefix or 'không rõ'})", status=200)
+    try:
+        return base64.b64decode(sig, validate=True)
+    except ValueError:
+        raise VaultError("két trả chữ ký không đúng dạng", status=200) from None
 
 
 # --- PDF: kiểm lúc tải lên, đóng dấu người xem lúc đọc -----------------------------------------------------------
@@ -287,24 +311,39 @@ html, body {{ margin: 0; font-family: "Liberation Sans", sans-serif; }}
 .top {{ top: 4mm; }} .bottom {{ bottom: 4mm; }}
 </style></head><body>
 <div class="big">{who}<br>{when}</div>
-<div class="line top">VĂN BẢN HẠN CHẾ — bản giải mã cho {who}, {when}</div>
-<div class="line bottom">Không sao chép, chuyển tiếp. Không dùng cho bí mật nhà nước. Mỗi lần xem đều ghi vào sổ kiểm toán.</div>
+<div class="line top">{top}</div>
+<div class="line bottom">{bottom}</div>
 </body></html>"""
 
+# Chữ của lớp dấu theo loại bản xem: văn bản hạn chế (F3.7) và tệp trong phòng đọc hồ sơ đã nộp lưu (F3.8). Dòng trên
+# có {who}, {when} (tên đã thoát HTML); dòng dưới cố định
+STAMP_LINES = {
+    "restricted": ("VĂN BẢN HẠN CHẾ — bản giải mã cho {who}, {when}",
+                   "Không sao chép, chuyển tiếp. Không dùng cho bí mật nhà nước. "
+                   "Mỗi lần xem đều ghi vào sổ kiểm toán."),
+    "archive": ("PHÒNG ĐỌC — bản xem tài liệu lưu trữ cho {who}, {when}",
+                "Chỉ để xem, không thay bản lưu trữ. Không sao chép, chuyển tiếp. "
+                "Mỗi lần xem đều ghi vào sổ kiểm toán."),
+}
 
-def watermark(pdf: bytes, who: str, at: datetime, max_pages: int | None = None) -> bytes:
+
+def watermark(pdf: bytes, who: str, at: datetime, max_pages: int | None = None, kind: str = "restricted") -> bytes:
     """Đóng dấu tên người xem, giờ xem lên mọi trang của bản PDF đã giải mã (trong bộ nhớ). Quá ``max_pages`` trang
-    (tệp tải lên trước khi có trần, hoặc trần vừa hạ) thì dừng trước khi chép trang nào."""
-    from weasyprint import HTML  # nạp chậm: chỉ đường xem văn bản hạn chế cần
+    (tệp tải lên trước khi có trần, hoặc trần vừa hạ) thì dừng trước khi chép trang nào. ``kind``: một khóa của
+    STAMP_LINES — chữ của lớp dấu."""
+    from weasyprint import HTML  # nạp chậm: chỉ đường xem văn bản hạn chế, phòng đọc cần
 
     when = at.astimezone(VN).strftime("%H:%M %d/%m/%Y")
+    top, bottom = STAMP_LINES[kind]
+    who_html = html.escape(who)
     stamps: dict[tuple[float, float], PageObject] = {}
 
     def stamp(w: float, h: float) -> PageObject:  # lớp dấu đúng cỡ trang (trang ngang không bị méo chữ)
         if (w, h) not in stamps:
             if len(stamps) >= MAX_STAMPS:
                 return next(iter(stamps.values()))
-            page = HTML(string=OVERLAY.format(who=html.escape(who), when=when, w=w, h=h)).write_pdf()
+            page = HTML(string=OVERLAY.format(who=who_html, when=when, w=w, h=h, bottom=bottom,
+                                              top=top.format(who=who_html, when=when))).write_pdf()
             stamps[(w, h)] = PdfReader(io.BytesIO(page)).pages[0]
         return stamps[(w, h)]
 
@@ -335,8 +374,9 @@ def watermark(pdf: bytes, who: str, at: datetime, max_pages: int | None = None) 
 
 def _main(argv: list[str]) -> int:
     """``python -I sealed.py check <max_pages> <memory_mb> <cpu_s>`` hoặc ``… stamp <max_pages> <memory_mb> <cpu_s>
-    <tên người xem, JSON> <giờ xem, ISO>``; PDF qua stdin. Ra stdout: một dòng JSON (``status`` ok kèm ``pages`` với
-    check · failed kèm ``reason``), stamp ok thì sau dòng đó là bản có dấu."""
+    <tên người xem, JSON> <giờ xem, ISO> [loại dấu]``; PDF qua stdin. Ra stdout: một dòng JSON (``status`` ok kèm
+    ``pages`` với check · failed kèm ``reason``), stamp ok thì sau dòng đó là bản có dấu. Loại dấu: khóa của
+    STAMP_LINES, thiếu thì ``restricted``."""
     import resource
 
     op = argv[1]
@@ -354,7 +394,8 @@ def _main(argv: list[str]) -> int:
         if op == "check":
             head: dict[str, Any] = {"status": "ok", "pages": check_pdf(data, max_pages)}
         else:
-            body = watermark(data, json.loads(argv[5]), datetime.fromisoformat(argv[6]), max_pages)
+            body = watermark(data, json.loads(argv[5]), datetime.fromisoformat(argv[6]), max_pages,
+                             argv[7] if len(argv) > 7 else "restricted")
             head = {"status": "ok"}
     except SealError as exc:
         head = {"status": "failed", "reason": exc.reason}
@@ -433,10 +474,13 @@ async def run_check_pdf(data: bytes, *, max_pages: int, timeout_s: float = CHECK
 
 
 async def run_watermark(pdf: bytes, who: str, at: datetime, *, max_pages: int, timeout_s: float = STAMP_TIMEOUT_S,
-                        memory_mb: int = MEMORY_MB) -> bytes:
+                        memory_mb: int = MEMORY_MB, kind: str = "restricted") -> bytes:
     """watermark trong tiến trình con có giới hạn; bản rõ vào qua stdin, bản có dấu ra qua stdout. Không đóng dấu
-    được: SealError mang ``reason``."""
-    _, out = await _isolated("stamp", pdf, [json.dumps(who), at.isoformat()], max_pages=max_pages,
+    được: SealError mang ``reason``. ``kind``: chữ của lớp dấu (STAMP_LINES) — phòng đọc hồ sơ nộp lưu dùng
+    ``archive``."""
+    if kind not in STAMP_LINES:
+        raise ValueError(f"không có loại dấu {kind}")
+    _, out = await _isolated("stamp", pdf, [json.dumps(who), at.isoformat(), kind], max_pages=max_pages,
                              timeout_s=timeout_s, memory_mb=memory_mb)
     if not out.startswith(b"%PDF-"):
         raise _failed("corrupt", max_pages)

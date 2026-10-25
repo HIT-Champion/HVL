@@ -130,6 +130,38 @@ def test_other_failures_raise_hasura_error(reply):
     assert not isinstance(exc.value, HasuraAuthError)
 
 
+def test_action_errors_keep_their_field_errors():
+    rec = Recorder((200, {"errors": [{"message": "Dữ liệu văn bản đến chưa hợp lệ", "extensions": {
+        "code": "invalid", "fields": {"summary": "minLength", "issued_on": "format"}}}]}))
+    with pytest.raises(HasuraError) as exc:
+        run(client(rec).as_role("service", TENANT, "u", "r", "query { x }", {}))
+    assert exc.value.code == "invalid" and exc.value.fields == {"summary": "minLength", "issued_on": "format"}
+    rec = Recorder((200, {"errors": [{"message": "x", "extensions": {"code": "invalid", "fields": ["summary"]}}]}))
+    with pytest.raises(HasuraError) as exc:
+        run(client(rec).as_role("service", TENANT, "u", "r", "query { x }", {}))
+    assert exc.value.fields is None         # không phải object trường → mã: bỏ
+
+
+def test_act_as_plays_the_user_with_admin_secret_and_a_longer_timeout():
+    rec = Recorder((200, {"data": {"receiveIncoming": {"document_id": str(FILE)}}}))
+    out = run(client(rec).act_as(role="clerk", tenant_id=TENANT, user_id="u-van-thu", department_id="phong-1",
+                                 request_id="lo-1:7", query="mutation { receiveIncoming }", variables={"d": {"a": 1}}))
+    assert out == {"receiveIncoming": {"document_id": str(FILE)}}
+    headers, body = rec.last
+    assert headers["x-hasura-admin-secret"] == "bi-mat" and headers["x-hasura-role"] == "clerk"
+    assert headers["x-hasura-tenant-id"] == str(TENANT) and headers["x-hasura-user-id"] == "u-van-thu"
+    assert headers["x-hasura-department-id"] == "phong-1"
+    assert headers["x-hasura-request-id"] == "lo-1:7" and headers["x-request-id"] == "lo-1:7"
+    assert body["variables"] == {"d": {"a": 1}}
+    # dài hơn hạn 30 giây Hasura chờ Action (actions.yaml), dài hơn HASURA_TIMEOUT_S của các câu khác
+    assert rec.requests[-1].extensions["timeout"] == {"connect": 35.0, "read": 35.0, "write": 35.0, "pool": 35.0}
+    run(client(rec).act_as(role="clerk", tenant_id=TENANT, user_id="u", department_id=None, request_id="r",
+                           query="q", variables={}, timeout_s=5))
+    headers, _ = rec.last
+    assert "x-hasura-department-id" not in headers
+    assert rec.requests[-1].extensions["timeout"]["read"] == 5
+
+
 def test_log_event_sends_details_as_jsonb():
     rec = Recorder((200, {"data": {"insert_core_audit_log": {"affected_rows": 1}}}))
     run(client(rec).log_event(tenant_id=TENANT, actor_id="u-1", request_id="r-1", action="file.rejected",

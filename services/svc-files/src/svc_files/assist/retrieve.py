@@ -26,6 +26,13 @@
 Tìm lai (từ khóa + nghĩa) lỗi — embedder chưa có trong Meilisearch lúc khởi động hay khi đổi mô hình — thì tìm lại
 một lần chỉ bằng từ khóa (``Retrieval.hybrid_error``), không trả lỗi cho người hỏi.
 
+**Tỷ trọng nghĩa theo câu hỏi** (``semantic_ratio``): câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép là người hỏi
+cần đúng chữ đó — tìm lai dùng ``min(MOC_ASK_SEMANTIC_RATIO, KEYWORD_RATIO)``, câu khác giữ tỷ trọng cấu hình. Vì sao
+0,2: xem ``KEYWORD_RATIO``.
+
+**Hỏi trong một văn bản** (``Filters.document_id``, nút "Hỏi về văn bản này"): thêm điều kiện ``document_id = …`` sau
+điều kiện thuê ước và phạm vi vai trò — các điều kiện nối bằng AND nên chỉ thu hẹp; hậu kiểm vẫn như mọi lượt.
+
 **Tìm nới** (mỗi lần tìm theo từ khóa, không tìm theo nghĩa): chiến lược ``frequency`` của Meilisearch bỏ dần từ
 phổ biến nhưng luôn giữ từ hiếm nhất của câu hỏi — câu "Điều kiện xét học bổng …" mà vài văn bản về xét tốt nghiệp có
 chữ "điều kiện" thì lượt chính chỉ ra các văn bản đó, văn bản trả lời (không có chữ "điều kiện") không bao giờ ra. Lượt
@@ -49,17 +56,62 @@ from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeVar
 
-from ..docread.rules import fold
+from ..docread.rules import DASHES, DATE, SYMBOL, fold
 from ..search import SearchError, _quoted
 from .chunks import eligible
 from .scope import NOTHING, Scope
+from .vi import TOKEN_RE
 
 FIELDS = ["id", "document_id", "kind", "file_id", "file_role", "page", "seq", "text"]
 MORE_ROUNDS = 2            # thiếu đoạn mà Meilisearch còn kết quả: lấy thêm tối đa từng này lượt
 RELAX_MIN = 0.5            # tìm nới: đoạn phải có từ chiếm ≥ tỷ lệ này trọng số của câu hỏi
 WORD = re.compile(r"\w+")
 
+# Tỷ trọng nghĩa tối đa khi câu hỏi cần đúng chữ. Meilisearch xếp chung hai danh sách theo điểm nhân trọng số: đoạn
+# khớp từ khóa (điểm s_k, trọng số 1 − r) đứng trước đoạn chỉ gần nghĩa (độ tương đồng s_v, trọng số r) khi
+# (1 − r)·s_k > r·s_v. Với r = 0,5 phải có s_k > s_v, mà văn bản cùng chủ đề khác số ký hiệu thường có s_v ≥ 0,8 nên
+# đẩy văn bản có đúng số ký hiệu xuống; với r = 0,2 chỉ cần s_k > s_v / 4: mọi đoạn khớp từ khóa có điểm > 0,25 đứng
+# trước cả đoạn gần nghĩa nhất (s_v = 1). Không về 0: người hỏi gõ khác chữ trong văn bản (5/3/2026 và 05/03/2026)
+# thì đoạn gần nghĩa vẫn lấp chỗ sau các đoạn khớp từ khóa.
+KEYWORD_RATIO = 0.2
+# Ngày viết bằng số, có hay không có chữ "ngày" đứng trước: 15/11/2026, 5-3-2026, 5.3.2026. Ngày viết bằng chữ ("ngày
+# 5 tháng 3 năm 2026") dùng docread.rules.DATE
+NUM_DATE = re.compile(r"(?<![\w/.-])[0-9]{1,2}[/.-][0-9]{1,2}[/.-](?:19|20)[0-9]{2}(?![\w/.-])")
+QUOTED = re.compile(r'["“][^"“”]*\w[^"“”]*["”]')     # cụm trong ngoặc kép thẳng hoặc cong, có ít nhất một chữ
+SYMBOL_TAIL = re.compile(r"/\s*[^\W\d_]")              # số ký hiệu có phần chữ sau "/" (88/CTSV); 15/11 thì không
+
 T = TypeVar("T")
+
+
+def exact_cues(question: str) -> list[str]:
+    """Dấu hiệu câu hỏi cần khớp đúng chữ, theo thứ tự ``symbol``, ``date``, ``quoted`` — chỉ tên dấu hiệu, không có
+    chữ của câu hỏi.
+
+    - ``symbol``: mẫu "Số 123/QĐ-…" của bộ đọc văn bản đến (``docread.rules.SYMBOL``, cả "Số 152a/TB-VP", "Số 12 /
+      QĐ") trên chữ bỏ dấu; hoặc token số ký hiệu của ``vi.TOKEN_RE`` ("123/QĐ-ĐHCN", "45/TB-KCNTT", "88/CTSV"). Cả
+      hai phải có chữ sau "/" (``SYMBOL_TAIL``): bỏ dấu thì "hồ sơ 15/11/2026" cũng có "so 15/11". Không dùng mẫu trần
+      ``docread.rules.BARE``: nó đòi gạch nối và chữ hoa để khỏi nhầm trong thân văn bản, còn người hỏi hay gõ chữ
+      thường, và có số ký hiệu không gạch nối (88/CTSV).
+    - ``date``: ``NUM_DATE`` (15/11/2026) hoặc ``docread.rules.DATE`` ("ngày 5 tháng 3 năm 2026").
+    - ``quoted``: cụm trong ngoặc kép ("…" hoặc “…”).
+    """
+    folded = DASHES.sub("-", fold(question))
+    cues = []
+    if (any(any(ch.isdigit() for ch in m.group("num")) and SYMBOL_TAIL.search(m.group("sym"))
+            for m in SYMBOL.finditer(folded))
+            or any(SYMBOL_TAIL.search(token) for token in TOKEN_RE.findall(question))):
+        cues.append("symbol")
+    if NUM_DATE.search(folded) or DATE.search(folded):
+        cues.append("date")
+    if QUOTED.search(question):
+        cues.append("quoted")
+    return cues
+
+
+def semantic_ratio(question: str, base: float) -> float:
+    """Tỷ trọng tìm theo nghĩa cho một câu hỏi: ``base`` (``MOC_ASK_SEMANTIC_RATIO``), trừ khi câu hỏi có dấu hiệu cần
+    khớp đúng chữ (``exact_cues``) — khi đó ``min(base, KEYWORD_RATIO)``: không bao giờ tăng tỷ trọng đã cấu hình."""
+    return min(base, KEYWORD_RATIO) if exact_cues(question) else base
 
 
 @dataclass(frozen=True)
@@ -67,6 +119,7 @@ class Filters:
     direction: str | None = None
     year: int | None = None
     type_code: str | None = None
+    document_id: str | None = None      # chỉ đoạn của một văn bản ("Hỏi về văn bản này"): chỉ thu hẹp phạm vi
 
 
 @dataclass(frozen=True)
@@ -90,6 +143,7 @@ class Retrieval:
     semantic: bool          # lượt này có tìm theo nghĩa
     hybrid_error: str | None = None     # tìm lai lỗi nên đã tìm lại chỉ bằng từ khóa — chỉ ghi nhật ký
     relaxed: int = 0        # số đoạn có được nhờ tìm nới — chỉ ghi nhật ký
+    ratio: float | None = None          # tỷ trọng nghĩa đã dùng; None khi chỉ tìm từ khóa — chỉ ghi nhật ký
 
 
 @dataclass(frozen=True)
@@ -126,6 +180,8 @@ def filter_parts(filters: Filters) -> list[str]:
         parts.append(f"year = {int(filters.year)}")
     if filters.type_code is not None:
         parts.append(f"type_code = {_quoted(filters.type_code)}")
+    if filters.document_id is not None:
+        parts.append(f"document_id = {_quoted(filters.document_id)}")
     return parts
 
 
@@ -152,7 +208,8 @@ class Retriever:
         self.min_score_semantic = min_score_semantic
         self.semantic_ratio = semantic_ratio
 
-    def _body(self, scope: Scope, q: str, vector: list[float] | None, where: list[str]) -> tuple[dict[str, Any], bool]:
+    def _body(self, scope: Scope, q: str, vector: list[float] | None, where: list[str],
+              ratio: float | None = None) -> tuple[dict[str, Any], bool]:
         semantic = vector is not None and bool(self.embedder)
         body: dict[str, Any] = {
             "q": q,
@@ -164,7 +221,8 @@ class Retriever:
             "rankingScoreThreshold": self.min_score_semantic if semantic else self.min_score,
         }
         if semantic:
-            body["hybrid"] = {"embedder": self.embedder, "semanticRatio": self.semantic_ratio}
+            body["hybrid"] = {"embedder": self.embedder,
+                              "semanticRatio": self.semantic_ratio if ratio is None else ratio}
             body["vector"] = vector
         return body, semantic
 
@@ -192,10 +250,12 @@ class Retriever:
                 return
 
     async def _hybrid_or_keywords(self, scope: Scope, q: str, vector: list[float] | None, where: list[str],
-                                  collect: Callable[[dict[str, Any]], Awaitable[T]]) -> tuple[T, bool, str | None]:
+                                  collect: Callable[[dict[str, Any]], Awaitable[T]], ratio: float | None = None
+                                  ) -> tuple[T, bool, str | None]:
         """``collect(thân tìm)`` → (kết quả, có tìm theo nghĩa, lỗi tìm lai). Tìm lai lỗi thì tìm lại một lần chỉ bằng
-        từ khóa; Meilisearch tắt hẳn thì lần đó cũng lỗi và SearchError đi lên."""
-        body, semantic = self._body(scope, q, vector, where)
+        từ khóa; Meilisearch tắt hẳn thì lần đó cũng lỗi và SearchError đi lên. ``ratio``: tỷ trọng nghĩa của lượt
+        này, None thì theo cấu hình."""
+        body, semantic = self._body(scope, q, vector, where, ratio)
         if not semantic:
             return await collect(body), False, None
         try:
@@ -205,12 +265,16 @@ class Retriever:
             return await collect(body), False, str(exc)
 
     async def search(self, scope: Scope, *, q: str, vector: list[float] | None, limit: int = 5,
-                     filters: Filters = Filters()) -> Retrieval:  # noqa: B008 — dataclass bất biến
+                     filters: Filters = Filters(),  # noqa: B008 — dataclass bất biến
+                     question: str | None = None) -> Retrieval:
+        """``q``: câu tìm (``vi.keyword_query``); ``question``: nguyên câu hỏi đã chuẩn hóa, để chọn tỷ trọng nghĩa
+        (``semantic_ratio`` — ``keyword_query`` đã bỏ ngoặc kép); không có thì xét trên ``q``."""
         if scope.where == NOTHING or limit <= 0:
             return Retrieval([], 0, False)
+        ratio = semantic_ratio(q if question is None else question, self.semantic_ratio)
         (passages, candidates, relaxed), semantic, error = await self._hybrid_or_keywords(
-            scope, q, vector, filter_parts(filters), lambda body: self._passages(scope, body, limit))
-        return Retrieval(passages, candidates, semantic, error, relaxed)
+            scope, q, vector, filter_parts(filters), lambda body: self._passages(scope, body, limit), ratio)
+        return Retrieval(passages, candidates, semantic, error, relaxed, ratio if semantic else None)
 
     async def _passages(self, scope: Scope, body: dict[str, Any], limit: int) -> tuple[list[Passage], int, int]:
         """(đoạn đã hậu kiểm theo thứ tự xếp hạng, số đoạn Meilisearch đã trả, số đoạn nhờ tìm nới)."""

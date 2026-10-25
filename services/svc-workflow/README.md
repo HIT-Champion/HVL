@@ -13,6 +13,7 @@ Chủ: issue #15.
 | `submitOutgoing(documentId, signerId)` | `staff` | Người soạn trình dự thảo → khởi chạy `van-ban-di`, hoặc trình lại sau khi bị trả lại. Có đơn vị nhận trong hệ thống (`recipient_tenant_ids`) thì kiểm: có thật, không phải đơn vị mình, văn bản không hạn chế (`400`, `fields.recipient_tenant_ids` = `unknown` / `self` / `restricted`) |
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
 | `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` → liên thông tới đơn vị nhận trong hệ thống |
+| `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Chỉ đọc: số đo mới nhất và cờ chất lượng của các cảm biến NGSI-LD trong đơn vị người gọi (mục IT/OT bên dưới) |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
@@ -33,6 +34,35 @@ trang là thấy bước mới.
 sau khi bước đã ghi xong; lỗi ghi hay lỗi đẩy chỉ ghi nhật ký, không làm hỏng bước nghiệp vụ. Mỗi người nhận
 một lần cho mỗi khóa (gọi lại Action không gửi trùng).
 
+**Thông báo qua email, webhook** (`channels.py`, chỉ khi đặt `MOC_SMTP_HOST` hoặc `MOC_NOTIFY_WEBHOOK_URL`; mặc định
+tắt, mọi thứ như trên): lúc ghi thông báo, `Router.route` khai kênh ngoài ở cột `channels` của từng dòng
+`core.notifications` — email cho mỗi người nhận, webhook một tin cho cả sự kiện (gắn vào dòng của người nhận đầu tiên).
+Trigger CSDL tạo một dòng `core.notification_deliveries` `pending` cho mỗi kênh trong cùng giao dịch (hộp thư đi như
+liên thông): thông báo đã lưu thì không mất thư khi dịch vụ dừng; gọi lại cùng khóa không thêm dòng. Vòng nền
+`Router.serve` chạy ngay khi có thông báo mới và mỗi `MOC_NOTIFY_INTERVAL_S` giây, mỗi lượt tối đa 20 dòng đến hạn của
+mọi đơn vị:
+
+- email: `smtplib` của thư viện chuẩn, chạy ở luồng riêng, STARTTLS hoặc SSL theo `MOC_SMTP_TLS`; địa chỉ, họ tên đọc
+  từ danh bạ (`core.users`, đồng bộ từ Keycloak) lúc gửi. Tiêu đề `[Signet] <như chuông>`, thân có số ký hiệu, trích
+  yếu, ý kiến và liên kết `<MOC_PUBLIC_URL>/van-ban/<id>`; `Message-ID` cố định theo dòng, `Auto-Submitted:
+  auto-generated`;
+- webhook: `POST` JSON `{"text": …}` (incoming webhook của Mattermost, Slack) hoặc, với
+  `MOC_NOTIFY_WEBHOOK_FORMAT=ntfy`, thân là chữ thuần, tiêu đề và liên kết ở tham số `title`, `click`. Webhook là kênh
+  chung nên tin không có tên người ("Người được giao"), không có ý kiến; thông báo của văn bản hạn chế không lên webhook
+  (xét lúc ghi và lúc gửi, vì CSDL gọt thông báo khi văn bản chuyển sang hạn chế).
+
+Câu chữ lấy như chuông (`apps/office/app/locales/vi.json`, `task.*`, `notify.*`; `tests/test_channels.py` đối chiếu
+hai bên). Kết quả mỗi dòng: `sent`; lỗi tạm (không nối được, hết giờ, SMTP 4xx, HTTP 408, 429, 5xx) thì thử lại sau
+30 s·2^lần, tối đa 5 lần rồi `failed`; bị từ chối hẳn (SMTP 5xx với người nhận hay nội dung, HTTP 4xx khác, chuyển
+hướng) thì `failed` ngay; `skipped` khi người nhận chưa có email, đã khóa, kênh đã tắt sau lúc xếp hàng, hoặc văn bản
+hạn chế trên webhook. Gửi ít nhất một lần, không phải đúng một lần: dừng giữa lúc gửi và lúc ghi kết quả thì lượt sau
+gửi lại (cùng `Message-ID`). Ghi kết quả có khóa lạc quan (còn `pending`, đúng số lần thử), giả định một tiến trình
+như các vòng nền khác. Hộp thư đi không lưu địa chỉ, URL hay nội dung; `last_error` và nhật ký
+(`core.notification.delivered`, `delivery_failed`, `delivery_skipped`) chỉ có id dòng, kênh, loại, số lần thử, tên lớp
+lỗi kèm mã SMTP/HTTP — không chép thông điệp lỗi của smtplib, httpx2 vì chúng mang địa chỉ người nhận, URL webhook.
+Mỗi lần xếp hàng và mỗi kết quả vào sổ kiểm toán chuỗi băm (đã gửi cho ai, qua kênh nào, lúc nào, thử mấy lần). Thử
+trên máy không cần máy chủ thư: profile `mail` (Mailpit) — xem [docs/trien-khai.md](../../docs/trien-khai.md) mục 7.
+
 **Nhắc hạn** (`sla.py`): mỗi việc trong BPMN có timer `R2/${slaDuration}`; timer bắn thì Flowable tạo việc giao
 ra ngoài (external worker, topic `moc-sla`), dịch vụ lấy về mỗi `MOC_SLA_POLL_INTERVAL_S` giây: quá một thời
 hạn thì nhắc người phải làm, quá hai thì báo thêm lãnh đạo của họ.
@@ -49,6 +79,17 @@ của cảm biến, và báo người đó. Còn dự thảo chưa trình hoặc
 (`urn:ngsi-ld:Subscription:moc-ot-context`): Scorpio 6.0.2 cất ngữ cảnh JSON-LD của subscription trong CSDL của tenant
 nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi thông báo (nhật ký Scorpio: "Mutiny had
 to drop … ResponseException").
+
+**Sơ đồ cảm biến** (F3.10, Action `otSensorMap`, trang `/cam-bien` của Văn phòng điện tử): đọc broker ở tenant NGSI-LD
+của đơn vị trong biến phiên — `GET /ngsi-ld/v1/entities?type=TemperatureSensor&options=sysAttrs` (tối đa 100 cảm
+biến) và lịch sử 10 lần đo gần nhất của từng cảm biến (temporal API, tối đa 8 lời gọi một lúc, cả lượt 8 giây) — rồi
+trả số đo mới nhất, mã phòng (Property `room`), ngưỡng và bốn cờ chất lượng: `stale` (quá `MOC_OT_STALE_MIN` phút
+không có số đo, theo `observedAt`, thiếu hay ở tương lai thì `modifiedAt` — lúc broker nhận), `out_of_range` (không
+phải số hữu hạn hoặc ngoài −55…125 °C — dải đo của DS18B20), `duplicate_time` (số đo mới nhất trùng `observedAt` với
+lần đo khác trong lịch sử), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút — đồng hồ thiết bị chạy
+nhanh; thiết bị đó mất tín hiệu vẫn bị gắn `stale`).
+Vai trò `clerk`, `staff`, `manager`, `director`. Chưa đặt `MOC_NGSI_URL` thì `status` = `off`; broker không trả lời
+hay trả lỗi thì `unavailable` — vẫn 200, không 5xx. Chỉ đọc, không ghi CSDL.
 
 **Liên thông trong hệ thống** (F3.12, `dispatch.py`): văn bản đi có đơn vị nhận trong hệ thống thì lúc phát hành
 CSDL tạo một dòng `office.dispatches` `pending` cho mỗi đơn vị, cùng giao dịch (trigger — hộp thư đi). Sau khi
@@ -136,7 +177,8 @@ svc-workflow python -m svc_workflow.pii count < tệp`. Loại, nhãn, giới h�
 
 Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi
 trường: khi có `MOC_OPENBAO_ADDR`, lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc
-chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Két chưa sẵn sàng thì
+chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Mật khẩu SMTP và
+URL webhook (thường chứa khóa) cũng đi qua két, là bí mật tùy chọn: rỗng thì két không có. Két chưa sẵn sàng thì
 thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
 
 | Biến | Mặc định | Ghi chú |
@@ -162,18 +204,35 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_OT_THRESHOLD` | `35` | Ngưỡng nhiệt độ (°C) của subscription |
 | `MOC_OT_NOTIFY_URL` | `http://svc-workflow:8000` | Địa chỉ broker dùng để gọi lại dịch vụ |
 | `MOC_OT_SUBSCRIPTION_INTERVAL_S` | `15` | Chu kỳ kiểm subscription; `0` tắt vòng nền |
+| `MOC_OT_STALE_MIN` | `10` | Sơ đồ cảm biến: quá chừng ấy phút (1–1440) không có số đo thì cảm biến mang cờ `stale` (mất tín hiệu) |
 | `MOC_SUGGEST_ENABLED` | `true` | Tác tử gợi ý giao việc (F4.3). `false`: vẫn nhận việc `moc-goi-y` nhưng hoàn thành ngay, không gọi svc-files, không ghi gì |
 | `MOC_SUGGEST_POLL_INTERVAL_S` | `2` | Chu kỳ nhận việc gợi ý; `0` không chạy vòng nền — nhánh gợi ý tự hết sau `PT10M` |
 | `MOC_SUGGEST_TIMEOUT_S` | `10` | Hạn gọi svc-files (0–40 giây); cả một việc ≤ hạn + 10 giây, dưới khóa việc `PT1M` |
 | `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
 | `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
+| `MOC_SMTP_HOST` | trống | Máy chủ thư; trống thì tắt kênh email |
+| `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa, chỉ cho relay nội bộ như Mailpit, không bao giờ đăng nhập — xem dưới bảng) |
+| `MOC_SMTP_PORT` | theo `MOC_SMTP_TLS` | `587` (starttls), `465` (ssl), `25` (none) |
+| `MOC_SMTP_USER`, `MOC_SMTP_PASSWORD` | trống | Đăng nhập SMTP khi có `MOC_SMTP_USER`, chỉ qua `starttls` hoặc `ssl`; mật khẩu lấy từ két |
+| `MOC_SMTP_FROM` | trống | Người gửi, vd `Signet <signet@ten-mien>`; bắt buộc (có `@`) khi đặt `MOC_SMTP_HOST` |
+| `MOC_NOTIFY_WEBHOOK_URL` | trống | URL `http`/`https` nhận tin; lấy từ két; trống thì tắt kênh webhook |
+| `MOC_NOTIFY_WEBHOOK_FORMAT` | `json` | `json` (`{"text": …}`: Mattermost, Slack) hoặc `ntfy` |
+| `MOC_NOTIFY_EMAIL_KINDS`, `MOC_NOTIFY_WEBHOOK_KINDS` | trống (mọi loại) | Chỉ gửi các loại này, cách nhau bằng dấu phẩy, vd `task.overdue,task.escalated`; loại lạ thì dịch vụ dừng khi khởi động |
+| `MOC_NOTIFY_INTERVAL_S` | `5` | Chu kỳ vòng nền gửi thông báo ngoài; `0` tắt (dòng chờ nằm nguyên tới khi bật lại) |
+| `MOC_PUBLIC_URL` | trống | Địa chỉ trang web cho liên kết trong thư, tin webhook; trống thì không kèm liên kết |
+
+`MOC_SMTP_TLS=none` mà có `MOC_SMTP_USER`: svc-workflow không nối máy chủ thư để mật khẩu không đi qua kết nối rõ.
+Dịch vụ vẫn chạy, lúc khởi động ghi một dòng `config.warning`; mỗi thư báo lỗi với lý do trong `last_error` và được
+thử lại 4 lần (sau 30, 60, 120, 240 giây) rồi thành `failed`. Cấu hình chỉ đọc lúc khởi động: sửa `.env` (chuyển
+sang `starttls`/`ssl`, hoặc bỏ `MOC_SMTP_USER` nếu relay không cần đăng nhập) rồi khởi động lại svc-workflow trong
+khoảng 7,5 phút đó thì thư đang chờ vẫn đi; quá thời gian đó thư không gửi lại.
 
 ## Phát triển
 
 ```bash
 cd services/svc-workflow
 uv venv && uv pip install -r requirements-dev.txt
-.venv/bin/python -m pytest          # 396 test đơn vị với Flowable, Hasura, svc-files, Centrifugo giả lập
+.venv/bin/python -m pytest          # 461 test đơn vị với Flowable, Hasura, svc-files, Centrifugo, SMTP, webhook giả lập
 ```
 
 Luồng thật đi qua cả hệ thống: `make up && make seed && make smoke` ở thư mục gốc. Đổi phụ thuộc: sửa

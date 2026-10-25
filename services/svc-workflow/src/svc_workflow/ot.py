@@ -39,6 +39,11 @@ hoạt động của đơn vị thì bỏ qua (ghi nhật ký) — thiết bị 
 
 Broker gửi mỗi thông báo một lần: ghi CSDL lỗi (503) thì lần vượt ngưỡng đó mất, lần đo kế tiếp còn trên ngưỡng sẽ
 dựng dự thảo.
+
+Sơ đồ cảm biến (Action ``otSensorMap``, trang /cam-bien): đọc số đo mới nhất của các cảm biến trong tenant của đơn vị
+người gọi, kèm bốn cờ chất lượng dữ liệu OT tính ở đây (``sensor_view``) — mất tín hiệu, ngoài dải, trùng
+``observedAt``, ``observedAt`` ở tương lai. Cảm biến khai phòng bằng Property ``room`` (mã phòng trên sơ đồ). Broker
+không trả lời thì trả trạng thái "unavailable", không lỗi: trang báo chưa bật cảm biến.
 """
 
 from __future__ import annotations
@@ -82,6 +87,20 @@ VN = timezone(timedelta(hours=7))
 _USERNAME = re.compile(r"^[A-Za-z0-9._@-]{1,100}$")
 _SENSOR = re.compile(r"^urn:ngsi-ld:[A-Za-z0-9:._-]{1,200}$")
 _TENANT = re.compile(r"^[A-Za-z0-9]{1,20}$")
+_ROOM = re.compile(r"^[a-z0-9-]{1,40}$")
+
+# Sơ đồ cảm biến. Vai trò đọc được: đúng các vai trò mà office.document_visible có thể cho đọc dự thảo "Báo cáo sự
+# cố" (văn bản đi); quản trị đơn vị không đọc văn bản nào nên không có sơ đồ
+MAP_ROLES = frozenset({"clerk", "staff", "manager", "director"})
+# Dải đo của cảm biến giả lập: dải của cảm biến số DS18B20 (−55 °C đến +125 °C, bảng thông số của Analog Devices).
+# Số ngoài dải — kể cả dưới 0 K, phi vật lý — là số đo không tin được, không phải nhiệt độ của phòng
+RANGE = (-55.0, 125.0)
+HISTORY = 10            # số lần đo gần nhất xét trùng observedAt
+MAX_SENSORS = 100       # một trang của truy vấn thực thể; đơn vị có nhiều cảm biến hơn thì sơ đồ thiếu phần sau
+HISTORY_BUDGET_S = 8.0  # cả lượt đọc lịch sử; quá thì bỏ cờ trùng observedAt lần này (Hasura chờ Action 15 giây)
+# observedAt muộn hơn giờ máy chủ quá chừng này là giờ ở tương lai (cờ future_time, đồng hồ thiết bị chạy nhanh); chừa
+# cho lệch giờ NTP, trễ mạng. Đồng hồ nhanh ít hơn thì cờ mất tín hiệu chậm nhiều nhất chừng ấy
+FUTURE_SLACK = timedelta(minutes=2)
 
 TENANTS = """
 query Tenants { core_tenants(order_by: {code: asc}) { id code } }"""
@@ -194,44 +213,131 @@ def _clean(text: str) -> str:
     return "".join(ch for ch in text if unicodedata.category(ch)[0] != "C").strip()
 
 
-def _value(entity: dict[str, Any], name: str) -> Any:
+def _attr(entity: dict[str, Any], name: str) -> dict[str, Any] | None:
     attr = entity.get(name)
     if isinstance(attr, list):  # nhiều instance (datasetId): lấy cái đầu
         attr = attr[0] if attr else None
-    return attr.get("value") if isinstance(attr, dict) else None
+    return attr if isinstance(attr, dict) else None
 
 
-def reading(entity: Any, now: datetime) -> Reading | None:
-    """Một thực thể trong thông báo → lần đo, hoặc None nếu thiếu hay sai dạng (thiết bị không được tin)."""
-    if not isinstance(entity, dict) or entity.get("type") != SENSOR_TYPE:
-        return None
-    sensor, value = entity.get("id"), _value(entity, "temperature")
-    responsible, room = _value(entity, "responsible"), _value(entity, "name")
-    if not isinstance(sensor, str) or not _SENSOR.match(sensor):
-        return None
+def _value(entity: dict[str, Any], name: str) -> Any:
+    attr = _attr(entity, name)
+    return attr.get("value") if attr else None
+
+
+def _number(value: Any) -> float | None:
+    """Số hữu hạn, hoặc None (chuỗi "41", true, NaN, số nguyên quá lớn — thiết bị không được tin)."""
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     try:
         value = float(value)
     except OverflowError:  # số nguyên quá lớn
         return None
-    if not math.isfinite(value):
+    return value if math.isfinite(value) else None
+
+
+def _time(stamp: Any) -> datetime | None:
+    """Mốc thời gian ISO 8601 có múi giờ, hoặc None."""
+    if not isinstance(stamp, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _room_name(entity: dict[str, Any], sensor: str) -> str:
+    name = _value(entity, "name")
+    return (_clean(name)[:120] if isinstance(name, str) else "") or sensor.rsplit(":", 1)[-1]
+
+
+def reading(entity: Any, now: datetime) -> Reading | None:
+    """Một thực thể trong thông báo → lần đo, hoặc None nếu thiếu hay sai dạng (thiết bị không được tin)."""
+    if not isinstance(entity, dict) or entity.get("type") != SENSOR_TYPE:
+        return None
+    sensor, value = entity.get("id"), _number(_value(entity, "temperature"))
+    responsible = _value(entity, "responsible")
+    if not isinstance(sensor, str) or not _SENSOR.match(sensor) or value is None:
         return None
     if not isinstance(responsible, str) or not _USERNAME.match(responsible):
         return None
-    room = _clean(room)[:120] if isinstance(room, str) else ""
-    room = room or sensor.rsplit(":", 1)[-1]
     observed = now
     attr = entity.get("temperature")
-    stamp = attr.get("observedAt") if isinstance(attr, dict) else None
-    if isinstance(stamp, str):
-        try:
-            parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-            if parsed.tzinfo is not None and abs(parsed - now) < timedelta(days=1):
-                observed = parsed
-        except ValueError:
-            pass
-    return Reading(sensor, room, value, responsible, observed)
+    parsed = _time(attr.get("observedAt")) if isinstance(attr, dict) else None
+    if parsed is not None and abs(parsed - now) < timedelta(days=1):
+        observed = parsed
+    return Reading(sensor, _room_name(entity, sensor), value, responsible, observed)
+
+
+# --- sơ đồ cảm biến ------------------------------------------------------------------------------------------
+
+
+def sensor_view(entity: Any, history: list[datetime] | None, now: datetime,
+                stale_after: timedelta) -> dict[str, Any] | None:
+    """Một thực thể cảm biến → một dòng của sơ đồ: số đo mới nhất và cờ chất lượng; None nếu không phải cảm biến.
+
+    - ``stale`` (mất tín hiệu): chưa có số đo, hoặc số đo mới nhất cũ hơn ``stale_after`` (theo ``observedAt``; thiết
+      bị không gửi ``observedAt``, hoặc gửi giờ ở tương lai, thì theo ``modifiedAt`` — lúc broker nhận số đo);
+    - ``out_of_range`` (ngoài dải): giá trị không phải số hữu hạn, hoặc ngoài ``RANGE``;
+    - ``duplicate_time`` (trùng ``observedAt``): ``observedAt`` của số đo mới nhất có từ hai lần trở lên trong
+      ``history`` (các lần đo gần nhất) — đồng hồ thiết bị đứng hoặc gửi lặp. Có số đo mới đúng giờ thì cờ tự hết.
+      ``history`` None (không đọc được lịch sử) thì không kết luận cờ này;
+    - ``future_time`` (giờ đo ở tương lai): ``observedAt`` của số đo mới nhất muộn hơn ``now`` quá ``FUTURE_SLACK`` —
+      đồng hồ thiết bị chạy nhanh. Giờ đó không dùng để xét mất tín hiệu: theo nó thì số đo cuối luôn có vẻ mới, thiết
+      bị đã mất tín hiệu không bao giờ bị gắn ``stale``.
+    """
+    if not isinstance(entity, dict) or entity.get("type") != SENSOR_TYPE:
+        return None
+    sensor = entity.get("id")
+    if not isinstance(sensor, str) or not _SENSOR.match(sensor):
+        return None
+    room = _value(entity, "room")
+    attr = _attr(entity, "temperature")
+    value = _number(attr.get("value")) if attr else None
+    stamp = _time(attr.get("observedAt")) if attr else None      # giờ thiết bị
+    received = _time(attr.get("modifiedAt")) if attr else None   # giờ broker (options=sysAttrs)
+    observed = stamp or received
+    ahead = stamp is not None and stamp - now > FUTURE_SLACK
+    last = received if ahead else observed
+    flags = []
+    if last is None or now - last > stale_after:
+        flags.append("stale")
+    if attr is not None and (value is None or not RANGE[0] <= value <= RANGE[1]):
+        flags.append("out_of_range")
+    if observed is not None and history is not None and sum(t == observed for t in history) >= 2:
+        flags.append("duplicate_time")
+    if ahead:
+        flags.append("future_time")
+    return {
+        "id": sensor,
+        "room": room if isinstance(room, str) and _ROOM.match(room) else None,
+        "name": _room_name(entity, sensor),
+        "value": value,
+        "observed_at": observed.astimezone(UTC).isoformat() if observed else None,
+        "flags": flags,
+    }
+
+
+def history_times(body: Any) -> list[datetime] | None:
+    """Thân trả về của temporal API cho một thực thể → các ``observedAt`` của ``temperature``; None nếu sai dạng.
+
+    Thuộc tính một instance có thể về dạng đối tượng thay vì mảng (JSON-LD rút gọn)."""
+    if not isinstance(body, dict):
+        return None
+    attr = body.get("temperature")
+    instances = attr if isinstance(attr, list) else [attr] if isinstance(attr, dict) else []
+    return [t for t in (_time(i.get("observedAt")) for i in instances if isinstance(i, dict)) if t is not None]
+
+
+def map_result(status: str, threshold: float, stale_min: int, now: datetime,
+               sensors: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Kết quả của Action otSensorMap — đúng kiểu ``OtSensorMap`` khai trong db/metadata/actions.graphql.
+
+    ``status``: ``ready`` (broker trả lời), ``off`` (chưa đặt MOC_NGSI_URL), ``unavailable`` (broker không trả lời:
+    chưa bật profile iot, đang khởi động)."""
+    return {"status": status, "threshold": threshold, "stale_after_min": stale_min, "range_min": RANGE[0],
+            "range_max": RANGE[1], "checked_at": now.astimezone(UTC).isoformat(), "sensors": sensors or []}
 
 
 def _num(x: float) -> str:
@@ -263,15 +369,17 @@ def draft(r: Reading, threshold: float, user: dict[str, Any], doc_id: str) -> tu
 class OtBridge:
     def __init__(self, hasura: HasuraClient, notifier: Notifier, ngsi_url: str, *, secret: str,
                  threshold: float = 35.0, notify_url: str = "http://svc-workflow:8000", timeout_s: float = 5.0,
-                 transport: httpx2.AsyncBaseTransport | None = None) -> None:
+                 stale_min: int = 10, transport: httpx2.AsyncBaseTransport | None = None) -> None:
         self.hasura = hasura
         self.notifier = notifier
         self.secret = secret
         self.threshold = threshold
+        self.stale_min = stale_min
         self.notify_url = notify_url.rstrip("/")
         self._http = httpx2.AsyncClient(base_url=ngsi_url.rstrip("/"), timeout=timeout_s, transport=transport)
         self._lock = asyncio.Lock()  # một thông báo một lúc: hai lần vượt ngưỡng sát nhau không dựng hai dự thảo
         self._reachable: bool | None = None
+        self._map_ok: bool | None = None  # lần đọc sơ đồ trước có tới được broker không (chỉ ghi nhật ký khi đổi)
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -345,6 +453,69 @@ class OtBridge:
         log.info(json.dumps({"event": "ot.subscription_created", "tenant": tenant, "q": want["q"]},
                             ensure_ascii=False))
         return 1
+
+    # --- sơ đồ cảm biến (Action otSensorMap) ----------------------------------------------------------------
+
+    async def sensor_map(self, tenant_id: uuid.UUID, now: datetime | None = None) -> dict[str, Any]:
+        """Số đo mới nhất và cờ chất lượng của mọi cảm biến trong tenant NGSI-LD của một đơn vị.
+
+        Chỉ đọc tenant của ``tenant_id`` (đơn vị trong biến phiên của người gọi). Broker không trả lời, trả lỗi hay
+        trả lạ → ``unavailable``; tenant chưa có thực thể nào (Scorpio trả 404 TenantNotFound) → không có cảm biến.
+        Lịch sử của từng cảm biến (để xét trùng ``observedAt``) đọc song song, tối đa 8 lời gọi một lúc, cả lượt trong
+        ``HISTORY_BUDGET_S`` giây; broker chưa ghi lịch sử (404) thì coi như chưa có lần đo nào trong lịch sử, lỗi khác
+        thì cảm biến đó không có kết luận về cờ trùng.
+        """
+        now = now or datetime.now(UTC)
+        tenants = (await self.hasura.as_system(TENANTS))["core_tenants"]
+        code = next((t["code"] for t in tenants if t["id"] == str(tenant_id)), None)
+        if code is None:
+            return map_result("ready", self.threshold, self.stale_min, now)
+        tenant = ngsi_tenant(code)
+        headers = {"NGSILD-Tenant": tenant, "Accept": "application/json"}
+        try:
+            r = await self._http.get("/ngsi-ld/v1/entities", headers=headers, params={
+                "type": SENSOR_TYPE, "limit": MAX_SENSORS, "options": "sysAttrs"})
+            entities = [] if r.status_code == 404 else r.json() if r.status_code == 200 else None
+            error = "" if isinstance(entities, list) else f"HTTP {r.status_code}"
+        except (httpx2.HTTPError, ValueError) as exc:
+            entities, error = None, f"{type(exc).__name__}: {str(exc)[:200]}"
+        if not isinstance(entities, list):
+            # trang tự làm mới 30 giây một lần: profile iot tắt lâu dài thì không ghi một dòng mỗi lần đọc
+            if self._map_ok is not False:
+                log.warning(json.dumps({"event": "ot.map_unavailable", "tenant": tenant, "error": error},
+                                       ensure_ascii=False))
+            self._map_ok = False
+            return map_result("unavailable", self.threshold, self.stale_min, now)
+        self._map_ok = True
+
+        ids = [e["id"] for e in entities if isinstance(e, dict) and isinstance(e.get("id"), str)
+               and _SENSOR.match(e["id"]) and e.get("temperature") is not None]
+        gate = asyncio.Semaphore(8)
+
+        async def history(sensor: str) -> list[datetime] | None:
+            async with gate:
+                try:
+                    h = await self._http.get(f"/ngsi-ld/v1/temporal/entities/{sensor}", headers=headers,
+                                             params={"attrs": "temperature", "lastN": HISTORY})
+                    if h.status_code == 404:  # broker chưa ghi lịch sử nào của cảm biến (ghi bất đồng bộ)
+                        return []
+                    return history_times(h.json()) if h.status_code == 200 else None
+                except (httpx2.HTTPError, ValueError):
+                    return None
+
+        try:
+            found = await asyncio.wait_for(asyncio.gather(*(history(s) for s in ids)), HISTORY_BUDGET_S)
+        except TimeoutError:
+            found = [None] * len(ids)
+        histories = dict(zip(ids, found, strict=True))
+        missing = sum(h is None for h in found)
+        if missing:
+            log.warning(json.dumps({"event": "ot.map_history_missing", "tenant": tenant, "sensors": missing}))
+        stale_after = timedelta(minutes=self.stale_min)
+        rows = [v for v in (sensor_view(e, histories.get(e.get("id")) if isinstance(e, dict) else None, now,
+                                        stale_after) for e in entities) if v is not None]
+        rows.sort(key=lambda v: (v["room"] is None, v["room"] or "", v["id"]))
+        return map_result("ready", self.threshold, self.stale_min, now, rows)
 
     # --- thông báo từ broker -----------------------------------------------------------------------------
 

@@ -82,7 +82,7 @@ log = logging.getLogger("svc_workflow")
 
 
 class WorkflowError(Exception):
-    """Lỗi trả về cho người dùng qua Hasura: mã máy đọc + câu tiếng Việt."""
+    """Lỗi trả về cho bên gọi (Hasura, context broker): mã máy đọc + câu tiếng Việt."""
 
     def __init__(self, code: str, message: str, status: int = 400, fields: dict[str, str] | None = None) -> None:
         super().__init__(message)
@@ -366,7 +366,7 @@ class Workflow:
             except (FlowableError, HasuraError) as exc:
                 # Số đến đã cấp và đã ghi; job đối soát sẽ khởi chạy quy trình sau
                 log.warning(json.dumps({"event": "office.process.start_failed", "document_id": doc["id"],
-                                        "error": str(exc)}, ensure_ascii=False))
+                                        "error": str(exc), "request_id": actor.request_id}, ensure_ascii=False))
             else:
                 await self._share(actor, pid, doc["id"])
                 await self._announce(actor, pid, doc["id"])
@@ -398,7 +398,7 @@ class Workflow:
         except HasuraError as exc:
             if started:  # quy trình đã chạy mà chưa chắc đã gắn: để lại dấu cho người vận hành đối chiếu
                 log.warning(json.dumps({"event": "office.process.unlinked", "document_id": doc_id, "process_id": pid,
-                                        "error": str(exc)}, ensure_ascii=False))
+                                        "error": str(exc), "request_id": actor.request_id}, ensure_ascii=False))
             raise
         winner = (found or {}).get("process_id")
         if started and winner != pid:
@@ -406,7 +406,8 @@ class Workflow:
                 await self.flowable.delete_process(pid, "trùng: văn bản đã gắn quy trình khác")
             except FlowableError as exc:
                 log.warning(json.dumps({"event": "office.process.duplicate_left", "document_id": doc_id,
-                                        "process_id": pid, "error": str(exc)}, ensure_ascii=False))
+                                        "process_id": pid, "error": str(exc), "request_id": actor.request_id},
+                                       ensure_ascii=False))
         if not winner:
             raise WorkflowError("document_not_found", "Không tìm thấy văn bản", 404)
         return winner
@@ -564,13 +565,14 @@ class Workflow:
 
     # --- thông báo ------------------------------------------------------------------------------------
 
-    async def _quietly(self, what: str, doc_id: str, job: Callable[[], Awaitable[None]]) -> None:
+    async def _quietly(self, what: str, doc_id: str, job: Callable[[], Awaitable[None]], request_id: str) -> None:
         """Thông báo không bao giờ làm hỏng bước nghiệp vụ đã ghi xong: lỗi chỉ ghi nhật ký."""
         try:
             await job()
         except Exception as exc:  # noqa: BLE001 — bước đã ghi và đã chuyển trong Flowable, không được báo lỗi
             log.warning(json.dumps({"event": "core.notification.failed", "step": what, "document_id": doc_id,
-                                    "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
+                                    "error": f"{type(exc).__name__}: {exc}", "request_id": request_id},
+                                   ensure_ascii=False))
 
     async def brief(self, actor: Actor, doc_id: str) -> dict[str, Any] | None:
         """Trích yếu, số ký hiệu, độ khẩn ghi kèm thông báo; văn bản hạn chế chỉ có nhãn."""
@@ -597,7 +599,8 @@ class Workflow:
                     {"document_id": doc_id, "user_id": u, "granted_by": actor.user_id} for u in sorted(users)]})
         except (HasuraError, FlowableError) as exc:
             log.warning(json.dumps({"event": "office.acl.share_failed", "document_id": doc_id,
-                                    "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False))
+                                    "error": f"{type(exc).__name__}: {exc}", "request_id": actor.request_id},
+                                   ensure_ascii=False))
 
     async def _announce(self, actor: Actor, process_id: str | None, doc_id: str, *, note: str | None = None) -> None:
         """Báo cho người phải làm từng việc đang mở của quy trình — trừ chính người vừa làm bước trước."""
@@ -616,7 +619,7 @@ class Workflow:
                 data = {"form_key": task.form_key, "task_id": task.id, **brief, **({"note": note} if note else {})}
                 await notifier.send(actor, users, "task.assigned", f"task:{task.id}:assigned", doc_id, data)
 
-        await self._quietly("announce", doc_id, job)
+        await self._quietly("announce", doc_id, job, actor.request_id)
 
     async def _tell(self, actor: Actor, users: set[str], kind: str, doc_id: str, **data: Any) -> None:
         """Một thông báo về văn bản (không gắn việc) cho những người cụ thể, mỗi người một lần."""
@@ -699,7 +702,8 @@ class Workflow:
                     again = await self._plan(actor, task, doc_id, outcome, form)
             else:
                 log.warning(json.dumps({"event": "office.task.retry_other_outcome", "task_id": task_id,
-                                        "saved": saved.get("outcome"), "asked": outcome}, ensure_ascii=False))
+                                        "saved": saved.get("outcome"), "asked": outcome,
+                                        "request_id": actor.request_id}, ensure_ascii=False))
             return await self._finish(actor, task, doc_id, saved, note=again.note if again else None,
                                       after=again.after if again else None)
         plan = await self._plan(actor, task, doc_id, outcome, form)
@@ -735,7 +739,7 @@ class Workflow:
                     flow = found or plan.flow
         except (HasuraError, WorkflowError) as exc:
             if claimed:
-                await self._unclaim(task_id)
+                await self._unclaim(task_id, actor.request_id)
             if isinstance(exc, WorkflowError):
                 raise
             raise _db_error(exc) from exc
@@ -755,7 +759,7 @@ class Workflow:
         await self._share(actor, task.process_instance_id, doc_id)
         await self._announce(actor, task.process_instance_id, doc_id, note=note)
         if after is not None:
-            await self._quietly("after", doc_id, after)
+            await self._quietly("after", doc_id, after, actor.request_id)
         return {"task_id": task.id, "document_id": doc_id}
 
     async def _saved_flow(self, actor: Actor, doc_id: str, task_id: str) -> dict[str, Any] | None:
@@ -794,11 +798,12 @@ class Workflow:
             raise WorkflowError("restricted", "Văn bản hạn chế: bạn chưa có tên trong danh sách được xem — nhờ văn "
                                               "thư hoặc lãnh đạo đơn vị cấp quyền", 403)
 
-    async def _unclaim(self, task_id: str) -> None:
+    async def _unclaim(self, task_id: str, request_id: str) -> None:
         try:
             await self.flowable.claim(task_id, None)
         except FlowableError:
-            log.warning(json.dumps({"event": "office.task.unclaim_failed", "task_id": task_id}))
+            log.warning(json.dumps({"event": "office.task.unclaim_failed", "task_id": task_id,
+                                    "request_id": request_id}))
 
     async def _document(self, actor: Actor, doc_id: str) -> dict[str, Any]:
         doc = (await self.hasura.as_service(actor, DOCUMENT, {"id": doc_id}))["office_documents_by_pk"]
@@ -970,7 +975,7 @@ class Workflow:
                 pdf = await files.issue(actor, doc_id)
             except FilesError as exc:
                 log.warning(json.dumps({"event": "office.document.render_failed", "document_id": doc_id,
-                                        "error": str(exc)}, ensure_ascii=False))
+                                        "error": str(exc), "request_id": actor.request_id}, ensure_ascii=False))
                 raise WorkflowError("files_unavailable", "Chưa dựng được bản phát hành, thử lại sau", 503) from exc
             event = self._event(actor, doc_id, "office.document.issued", task.id, None, symbol=numbered["symbol"],
                                 verify_code=numbered["verify_code"], sha256=pdf["sha256"], is_public=form.is_public)
@@ -982,7 +987,7 @@ class Workflow:
 
         async def after() -> None:
             await self._quietly("after", doc_id, lambda: self._tell(
-                actor, {doc["created_by"], doc["signer_id"]} - {None}, "document.issued", doc_id))
+                actor, {doc["created_by"], doc["signer_id"]} - {None}, "document.issued", doc_id), actor.request_id)
             if doc.get("recipient_tenant_ids") and self.dispatcher is not None:
                 await self.dispatcher.dispatch_document(doc_id)   # tự giới hạn thời gian, không ném lỗi
 
