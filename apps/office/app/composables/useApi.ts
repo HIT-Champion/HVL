@@ -36,6 +36,15 @@ function gatewayBlock(status: number, headers: { get(name: string): string | nul
   return new ApiError('blocked', 'blocked', 403, null, null, headers.get('X-Request-Id'))
 }
 
+// Kiểu của object URL trong khung xem tệp nguồn (F4.2): object URL cùng origin với ứng dụng, nên chỉ ảnh raster giữ
+// kiểu svc-files trả (bản scan có đoạn kind=page); mọi thứ khác — kể cả HTML, SVG — ép application/pdf như phòng đọc
+const VIEWER_IMAGES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+export function viewerType(contentType: string | null): string {
+  const type = (contentType ?? '').split(';')[0]!.trim().toLowerCase()
+  return VIEWER_IMAGES.has(type) ? type : 'application/pdf'
+}
+
 export interface UploadedFile {
   id: string
   filename: string
@@ -450,11 +459,13 @@ export function useApi() {
   }
 
   /** Xem tệp của một nguồn trợ lý trích (F4.2) trong khung xem của trang Hỏi đáp: tải bằng token (svc-files kiểm quyền
-   *  đọc như nút Tải về), trả object URL kiểu PDF như viewArchivedFile — gọi URL.revokeObjectURL khi đóng. */
+   *  đọc như nút Tải về), trả object URL kiểu PDF như viewArchivedFile — riêng bản scan JPEG, PNG… giữ kiểu ảnh
+   *  (viewerType) — gọi URL.revokeObjectURL khi đóng. */
   async function viewFile(fileId: string): Promise<string> {
     const res = await authFetch(`/api/files/${encodeURIComponent(fileId)}`)
     if (!res.ok) throw await serviceError(res)
-    return URL.createObjectURL(new Blob([await res.arrayBuffer()], { type: 'application/pdf' }))
+    const type = viewerType(res.headers.get('Content-Type'))
+    return URL.createObjectURL(new Blob([await res.arrayBuffer()], { type }))
   }
 
   return { gql, upload, download, preview, register, printRegister, search, readFile, ask, archiveCaseFile, readingRoom,
