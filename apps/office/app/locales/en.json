@@ -1429,5 +1429,48 @@
     "when": "Saved at",
     "sources": "References",
     "sourcesNote": "Question set {id}. Scoring and limitations: docs/tu-chan-doan.md in the source code."
+  },
+  "apps": {
+    "nav": "Applications",
+    "title": "Application catalog",
+    "subtitle": "Applications running on the Signet core, sharing one sign-in",
+    "builtinTitle": "Built into the core",
+    "builtinHint": "Installed with the core, same version as the core.",
+    "installedTitle": "Installed from a manifest",
+    "installedHint": "Added by the system administrator with moc app install, without changing core code.",
+    "removedTitle": "Removed",
+    "removedHint": "moc app remove took down the route, sign-in client and container; the application's data is kept.",
+    "none": {
+      "builtin": "No built-in applications.",
+      "installed": "No application has been installed from a manifest yet.",
+      "removed": "No application has been removed."
+    },
+    "state": {
+      "builtin": "Built into the core",
+      "installed": "Installed",
+      "removed": "Removed"
+    },
+    "version": "Version",
+    "coreVersion": "same as the core",
+    "installedAt": "Installed at",
+    "updatedAt": "Updated at",
+    "removedAt": "Removed at",
+    "manifestHash": "Manifest hash",
+    "hashHint": "The manifest hash is the SHA-256 of app.yaml at install time: compare it with sha256sum apps/<folder>/app.yaml on the server to confirm the installed version is the reviewed one.",
+    "copy": "Copy",
+    "copyHashOf": "Copy the manifest hash of {app}",
+    "copied": "Manifest hash copied",
+    "copyFailed": "The browser does not allow copying — select the hash below by hand",
+    "open": "Open",
+    "builtin": {
+      "office": {
+        "title": "Electronic office",
+        "description": "Incoming and outgoing documents, assignments, case files, search, Q&A, audit log — the first application on the core."
+      },
+      "personal": {
+        "title": "P.A.R.A personal space",
+        "description": "Each person's own place for files in four folders: Projects, Areas, Resources, Archives."
+      }
+    }
   }
 }

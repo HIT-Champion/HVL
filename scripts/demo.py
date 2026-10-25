@@ -3630,6 +3630,20 @@ def app_query() -> str:
     return found.group(1)
 
 
+def catalog_queries() -> tuple[str, str]:
+    """Đúng hai câu GraphQL trang Danh mục ứng dụng (/ung-dung) gửi (apps/office/app/utils/apps.ts): mọi vai trò;
+    lãnh đạo, quản trị đơn vị (thêm băm manifest, ứng dụng đã gỡ)."""
+    ts = (ROOT / "apps" / "office" / "app" / "utils" / "apps.ts").read_text(encoding="utf-8")
+    found = [re.search(rf"export const {name} = `([^`]*)`", ts) for name in ("APPS_QUERY", "APPS_QUERY_LEADER")]
+    if not (found[0] and found[1]):
+        raise DemoFailed("apps/office/app/utils/apps.ts không còn APPS_QUERY, APPS_QUERY_LEADER")
+    return found[0].group(1), found[1].group(1)
+
+
+def catalog_row(session: Session, query: str) -> dict[str, Any] | None:
+    return next((a for a in session.gql(query)["core_app_catalog"] if a["name"] == APP_NAME), None)
+
+
 def moc_app(*args: str) -> str:
     """`moc app …` đúng như người vận hành gõ; lỗi thì in đúng thông báo của lệnh (bước nào)."""
     code, out, err = moc("app", *args)
@@ -3756,6 +3770,21 @@ def cai_ung_dung() -> None:
     reader.gql(query)
     ok(f"token azp app-{APP_NAME}, vai trò {hasura.get('x-hasura-default-role')}, đơn vị của người dùng; câu GraphQL "
        "của trang chạy được trên bang_tin.tin")
+    # Trang Danh mục ứng dụng của Văn phòng điện tử (core.app_catalog): chuyên viên thấy ứng dụng vừa cài để mở, không
+    # đọc được băm manifest, ứng dụng đã gỡ
+    catalog_q, catalog_leader_q = catalog_queries()
+    version = re.search(r"^version: (\S+)$", (ROOT / APP_MANIFEST).read_text(encoding="utf-8"), re.M)
+    entry = catalog_row(gv(OWNER), catalog_q)
+    if not entry or entry["path"] != APP_PATH.rstrip("/") or entry["version"] != (version and version.group(1)):
+        raise DemoFailed(f"Danh mục ứng dụng của {OWNER} không có {APP_NAME} đúng đường, phiên bản: {entry}")
+    try:
+        gv(OWNER).gql(catalog_leader_q)
+    except RuntimeError:     # Hasura: field 'manifest_sha256' not found — vai trò không được đọc cột
+        pass
+    else:
+        raise DemoFailed(f"{OWNER} (chuyên viên) đọc được băm manifest, ứng dụng đã gỡ trong Danh mục ứng dụng")
+    ok(f"Danh mục ứng dụng (/ung-dung) của {OWNER}: \"{entry['title']}\" {entry['version']} ở {entry['path']}/; "
+       "băm manifest, ứng dụng đã gỡ: chỉ lãnh đạo, quản trị đơn vị")
 
     say(5, "Văn thư vào sổ một văn bản đến thường và một văn bản hạn chế → lõi phát sự kiện, ứng dụng nhận qua webhook")
     tag = uuid.uuid4().hex[:6].upper()
@@ -3784,12 +3813,19 @@ def cai_ung_dung() -> None:
     say(6, f"Chạy lại moc app install {APP_MANIFEST}: không tạo gì mới")
     container, digest = app_container(), state_digest()
     migrations = psql(f"select count(*) from core.app_migrations where app = '{APP_NAME}'")
+    entry = catalog_row(gv("truongkhoa"), catalog_leader_q)
     out = moc_app("install", APP_MANIFEST)
     if (app_container() != container or state_digest() != digest
             or psql(f"select count(*) from core.app_migrations where app = '{APP_NAME}'") != migrations
             or "client đã có" not in out or "không có migration mới" not in out):
         raise DemoFailed("cài lại phải giữ nguyên container, .moc-apps/, migration, client:\n" + out)
     ok("cùng container, .moc-apps/ không đổi một byte, không migration mới, client đã có")
+    sha = hashlib.sha256((ROOT / APP_MANIFEST).read_bytes()).hexdigest()
+    if not entry or entry["manifest_sha256"] != sha or catalog_row(gv("truongkhoa"), catalog_leader_q) != entry:
+        raise DemoFailed(f"Danh mục ứng dụng của lãnh đạo: băm manifest phải là SHA-256 của {APP_MANIFEST} ({sha}), "
+                         f"cài lại không đổi dòng nào: {entry}")
+    ok(f"Danh mục ứng dụng của lãnh đạo khoa: băm manifest {sha[:12]}… = sha256sum {APP_MANIFEST}; cài lại không đổi "
+       "lúc cài, lúc cập nhật")
 
     say(7, f"moc app remove {APP_NAME}: route, client, trigger, container mất; dữ liệu còn")
     rows = psql(f"select count(*) from bang_tin.tin where document_id = '{normal}'")
@@ -3807,6 +3843,10 @@ def cai_ung_dung() -> None:
         raise DemoFailed(".moc-apps/apisix.yaml phải giống hệt tệp lõi khi không còn ứng dụng")
     ok(f"/bang-tin/ không còn là Bảng tin; không container, client, trigger; bang_tin.tin còn {rows} dòng của "
        "văn bản thử; tệp chạy APISIX giống hệt tệp lõi")
+    gone, entry = catalog_row(gv(OWNER), catalog_q), catalog_row(gv("truongkhoa"), catalog_leader_q)
+    if gone or not entry or not entry["removed_at"]:
+        raise DemoFailed(f"Danh mục ứng dụng sau khi gỡ: {OWNER} vẫn thấy {gone}; lãnh đạo thấy {entry}")
+    ok(f"Danh mục ứng dụng: {OWNER} không còn thấy {APP_NAME}; lãnh đạo khoa thấy \"Đã gỡ\" lúc {entry['removed_at']}")
 
     say(8, "Tệp của lõi không đổi: git status trước và sau giống hệt (trạng thái ứng dụng ở .moc-apps/, ngoài git)")
     git_after = git_state()

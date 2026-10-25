@@ -100,7 +100,7 @@ RESERVED_PATHS = {
     "/metrics", "/flowable-rest", "/status", "/ca-nhan", "/config", "/favicon",
     "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
     "/so-kiem-toan", "/tim-kiem", "/trang-thai", "/tu-chan-doan", "/van-ban", "/van-ban-den", "/van-ban-di",
-    "/xac-thuc",
+    "/xac-thuc", "/ung-dung",
 }
 # Biến môi trường do lõi đặt cho container ứng dụng; manifest không ghi đè được
 PROVIDED_ENV = {"MOC_REALM", "MOC_APP_NAME", "MOC_APP_PATH", "MOC_KEYCLOAK_INTERNAL_URL", "MOC_GRAPHQL_INTERNAL_URL",
