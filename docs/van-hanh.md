@@ -548,9 +548,9 @@ make logs-down                     # tắt: 8 dịch vụ về json-file, dừng
   Số đo này có trước khi bật báo nhận (mục dưới).
 - **Báo nhận từng dòng** (`fluentd-request-ack: "true"`, #226): driver gửi kèm mã `chunk`, Vector trả `ack` ngay khi
   dòng đã vào pipeline. Vector không bật `acknowledgements` đầu-cuối nên không chờ Parseable lưu. Không có `ack` (kết
-  nối đã chết vì Vector chạy lại hay container lên trước khi Vector nghe cổng) thì driver đóng kết nối, nối lại rồi gửi
-  lại dòng đó. Trước #226, dòng đầu tiên của một dịch vụ im lâu (PostgreSQL, Keycloak) ghi vào kết nối chết thì mất mà
-  không báo lỗi. `make demo-log-tap-trung` (bước 8) kiểm việc này. Hệ quả:
+  nối đã chết, ví dụ sau khi Vector chạy lại) thì driver đóng kết nối, nối lại rồi gửi lại dòng đó. Trước #226,
+  dòng đầu tiên của một dịch vụ im lâu (PostgreSQL, Keycloak) ghi vào kết nối chết thì mất mà không báo lỗi.
+  `make demo-log-tap-trung` (bước 8) kiểm việc này. Hệ quả:
   - Vector nhận dòng rồi chết trước khi kịp trả `ack` thì dòng đó tới kho hai lần;
   - mỗi container gửi lần lượt từng dòng và chờ `ack` rồi mới gửi tiếp. Việc chờ nằm trong dockerd: dịch vụ vẫn không
     bị chặn (`mode: non-blocking`), dòng chưa gửi nằm trong bộ đệm như khi Vector chết.
