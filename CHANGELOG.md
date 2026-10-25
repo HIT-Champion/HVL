@@ -82,6 +82,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   chỉ APISIX đóng kết nối rảnh. Dựng lại với Hasura v2.51.0 và APISIX 3.18.0 như repo, gửi yêu cầu lệch −4…+4 ms
   quanh nhịp quét: trước 21/960 yêu cầu bị 502, sau 0/960. Test `test_giu_ket_noi.py` kiểm quy tắc này cho Hasura
   và `svc-files`.
+- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` base64url của PKCE (RFC 7636, như
+  kịch bản demo hay thư viện OIDC khác) khoảng 1/25 000 lượt trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403); mã
+  `code` gửi kèm là token ngẫu nhiên như ở trang ứng dụng. oidc-client-ts của Văn phòng điện tử, P.A.R.A, Bảng tin sinh
+  verifier hex nên không dính verifier. Luật mới 10011 của `platform/apisix/apisix.yaml`, chỉ trên endpoint token, gỡ
+  đúng ba luật 942100, 933…, 930120 trên hai tham số này như các token khác. Test scripts thêm kiểm luật 10011, smoke
+  thêm ca đổi mã với đúng chuỗi đã bị chặn.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau

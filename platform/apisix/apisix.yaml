@@ -223,6 +223,19 @@ global_rules:
                 ctl:ruleRemoveTargetById=942100;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=930120;ARGS:id_token_hint"
+              # Loại trừ 1b — bước đổi mã lấy token (#162): ứng dụng gửi lại mã code Keycloak vừa trả (cùng
+              # giá trị loại trừ 2 gỡ ở trang ứng dụng) và code_verifier của PKCE. Verifier base64url theo
+              # RFC 7636 (kịch bản demo, thư viện OIDC khác) tình cờ trùng libinjection: "71--7iZ…" → 942100,
+              # 403. Chỉ trên đúng endpoint token, đúng ba luật bắt nhầm token như loại trừ 1
+              - >-
+                SecRule REQUEST_FILENAME "@streq /realms/${{MOC_REALM}}/protocol/openid-connect/token" "id:10011,
+                phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_verifier"
               # Loại trừ 2 — trang Keycloak trả về sau đăng nhập: tham số iss (RFC 9207) là URL của realm; URL công khai
               # là localhost hay IP thì 934110 (SSRF), 931100 (RFI) bắt nhầm. Áp cho mọi redirect URI của ứng dụng: `/`,
               # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`. Mã code, session_state
