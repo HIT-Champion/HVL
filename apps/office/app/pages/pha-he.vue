@@ -24,12 +24,18 @@ import {
   ARCHIVE_JOB, BOARD_CHARTS, chartNode, datasetNode, isBoardChart, lineageGraph, lineageLayout, lineageUpstream,
   toOpenLineage, type BoardChart, type CatalogEdge, type LineageEvent, type LineageNode, type NodeKind,
 } from '~/utils/lineage'
+import {
+  assertionsByTable, checkMessages, checksFor, runCheck, stepCheck, worstCheck, type Assertion, type ReportCheck,
+} from '~/utils/quality'
 
 // Phả hệ số liệu (F3.9, F3.11), cho lãnh đạo đơn vị — cùng quyền với trang Điều hành. Biểu đồ nào lấy số từ khung
 // nhìn nào: khai ở app/utils/lineage.ts. Khung nhìn đọc bảng nào: office.report_lineage tính từ catalog PostgreSQL lúc
 // truy vấn (migration 1792281602900) — chỉ có tên và cạnh, giống nhau cho mọi đơn vị. Lượt nộp lưu gần nhất: sự kiện
 // OpenLineage trong core.lineage_events, Hasura lọc theo đơn vị trong token. Không có số dòng của bảng nguồn (lý do ở
 // migration); số dòng của bảng Parquet lấy từ facet outputStatistics của chính sự kiện.
+// Cờ kiểm chất lượng (Đạt / Cảnh báo / Trượt): số liệu báo cáo theo bộ luật tính trong CSDL (office.report_checks,
+// migration 1792281603300), cùng quyền; nộp lưu theo assertion svc-files đã ghi trong sự kiện (facet
+// dataQualityAssertions), lấy nguyên văn — kể cả lượt bị dừng vì trượt kiểm, vốn không có run COMPLETE nào.
 
 // Đồ thị ECharts loại graph chỉ trang này dùng: đăng ký ở đây (use() của ECharts là đăng ký toàn cục, chạy trước khi
 // EChart.vue vẽ) để trang Điều hành không phải tải thêm phần này
@@ -42,6 +48,9 @@ const QUERY = `{
   archived: core_lineage_events_aggregate(where: {job: {_eq: "${ARCHIVE_JOB}"}, event_type: {_eq: "COMPLETE"}}) {
     aggregate { count } }
   failed: core_lineage_events_aggregate(where: {quality_ok: {_eq: false}}) { aggregate { count } }
+  stopped: core_lineage_events(where: {quality_ok: {_eq: false}}, order_by: {id: desc}, limit: 1) {
+    run_id parent_run_id job event_type event_time inputs outputs quality_ok event }
+  office_report_checks { rule report status expected actual issues detail }
 }`
 const RUN = `query ($run: uuid!) {
   core_lineage_events(where: {_or: [{run_id: {_eq: $run}}, {parent_run_id: {_eq: $run}}]}, order_by: {id: asc}) {
@@ -64,7 +73,7 @@ const STYLE: Record<NodeKind, { fill: string; text: string }> = {
 }
 const STEPS = ['files', 'tables', 'manifest', 'commit'] as const
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { gql } = useApi()
 const claims = useAuth().claims
 const route = useRoute()
@@ -72,6 +81,8 @@ const router = useRouter()
 
 const catalog = ref<CatalogEdge[]>([])
 const events = ref<LineageEvent[]>([])
+const checks = ref<ReportCheck[]>([])
+const stopped = ref<LineageEvent | null>(null)
 const archivedRuns = ref(0)
 const failedChecks = ref(0)
 const readAt = ref('')
@@ -89,14 +100,20 @@ async function load() {
       runs: { run_id: string }[]
       archived: { aggregate: { count: number } }
       failed: { aggregate: { count: number } }
+      stopped: LineageEvent[]
+      office_report_checks: ReportCheck[]
     }>(QUERY)
     const run = data.runs[0]?.run_id
     events.value = run ? (await gql<{ core_lineage_events: LineageEvent[] }>(RUN, { run })).core_lineage_events : []
     catalog.value = data.office_report_lineage
     archivedRuns.value = data.archived.aggregate.count
     failedChecks.value = data.failed.aggregate.count
+    stopped.value = data.stopped[0] ?? null
+    checks.value = data.office_report_checks
     readAt.value = new Date().toISOString()
     loaded.value = true
+    // cờ trên trang Điều hành mở thẳng tới mục kiểm chất lượng (#chat-luong): mục chỉ có sau khi tải xong
+    if (route.hash === '#chat-luong') nextTick(() => document.getElementById('chat-luong')?.scrollIntoView())
   } catch (e) {
     failure.value = errorText(t, e)
   } finally {
@@ -164,7 +181,9 @@ const graphOption = computed(() => {
         itemStyle: { color: STYLE[n.kind].fill },
         label: { color: STYLE[n.kind].text },
         tip: `${escape(t(`lineage.kind.${n.kind}`))}<br><b>${escape(nodeText(n))}</b>`
-          + (n.kind === 'object' ? `<br>${escape(n.id)}` : ''),
+          + (n.kind === 'object' ? `<br>${escape(n.id)}` : '')
+          + (n.kind === 'view' && viewFlag(n.id) ? `<br>${escape(t('lineage.quality'))}: `
+            + escape(t(`quality.status.${viewFlag(n.id)}`)) : ''),
       })),
       links: graph.value.edges.map((e) => ({
         source: e.source,
@@ -202,11 +221,39 @@ const reports = computed(() => [...new Set(catalog.value.map((e) => e.report))].
   charts: BOARD_CHARTS.filter((c) => c.views.includes(report)),
 })))
 
+// Kiểm chất lượng số liệu của các khung nhìn mà (các) biểu đồ đang xem dùng; cờ của một khung nhìn là cờ nặng nhất
+const checkRows = computed(() => checksFor(checks.value, [...new Set(charts.value.flatMap((c) => c.views))]))
+function viewFlag(view: string) {
+  return worstCheck(checksFor(checks.value, [view]).map((c) => c.status))
+}
+function checkText(c: ReportCheck) {
+  return checkMessages(c).map(([key, params]) => t(key, params)).join(' · ')
+}
+function viewDetail(view: string) {
+  return checksFor(checks.value, [view])
+    .map((c) => `${t(`quality.status.${c.status}`)} — ${t(`quality.rules.${c.rule}.name`)}: ${checkText(c)}`)
+    .join('\n')
+}
+
 const run = computed(() => events.value.find((e) => e.job === ARCHIVE_JOB && e.event_type === 'COMPLETE') ?? null)
 const steps = computed(() => STEPS.map((name) => events.value.find((e) => e.job === `${ARCHIVE_JOB}.${name}`))
   .filter((e): e is LineageEvent => !!e))
-function quality(e: LineageEvent) {
-  return e.quality_ok === null ? 'lineage.notChecked' : e.quality_ok ? 'lineage.passed' : 'lineage.failedCheck'
+// Kiểm của lượt nộp lưu gần nhất: assertion nguyên văn của các bước. Lượt bị dừng vì trượt kiểm (không có run COMPLETE)
+// mới hơn lượt đó thì hiện riêng, cờ Trượt kèm các mục trượt
+const runQuality = computed(() => runCheck(events.value))
+const stoppedRun = computed(() => (stopped.value && (!run.value
+  || Date.parse(stopped.value.event_time) > Date.parse(run.value.event_time)) ? stopped.value : null))
+const stoppedQuality = computed(() => (stoppedRun.value ? runCheck([stoppedRun.value]) : null))
+function assertionText(a: Assertion) {
+  return te(`quality.assertion.${a.assertion}`) ? t(`quality.assertion.${a.assertion}`, { column: a.column ?? '' })
+    : [a.assertion, a.column].filter(Boolean).join(' ')
+}
+// Một dòng mỗi bảng của gói: số mục đạt / tổng, rồi các mục trượt
+function tableText(g: ReturnType<typeof assertionsByTable>[number]) {
+  return t('quality.archive.table', { table: g.dataset, passed: g.total - g.failed.length, total: g.total })
+}
+function failedText(g: ReturnType<typeof assertionsByTable>[number]) {
+  return t('quality.archive.failedItems', { items: g.failed.map(assertionText).join(', ') })
 }
 function stepName(e: LineageEvent) {
   return t(`lineage.steps.${e.job.slice(ARCHIVE_JOB.length + 1)}`)
@@ -280,6 +327,7 @@ function exportOpenLineage() {
                 <th class="py-1 font-medium">{{ t('lineage.chart') }}</th>
                 <th class="py-1 font-medium">{{ t('lineage.view') }}</th>
                 <th class="py-1 font-medium">{{ t('lineage.readsFrom') }}</th>
+                <th class="py-1 text-right font-medium">{{ t('lineage.quality') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-100">
@@ -301,6 +349,40 @@ function exportOpenLineage() {
                     </li>
                   </ul>
                 </td>
+                <td class="py-1.5 pl-3 text-right">
+                  <QualityFlag :status="viewFlag(r.view)" :detail="viewDetail(r.view)" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="chat-luong" class="card scroll-mt-4 p-4" data-testid="lineage-checks">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="font-medium text-stone-900">{{ t('quality.title') }}</h2>
+          <QualityFlag :status="worstCheck(checkRows.map((c) => c.status))" />
+        </div>
+        <p class="mt-1 text-xs text-stone-500">{{ t('quality.hint') }}</p>
+        <div class="mt-2 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-left text-xs text-stone-500">
+              <tr>
+                <th class="py-1 font-medium">{{ t('quality.view') }}</th>
+                <th class="py-1 font-medium">{{ t('quality.rule') }}</th>
+                <th class="py-1 font-medium">{{ t('quality.result') }}</th>
+                <th class="py-1 font-medium">{{ t('quality.figures') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100">
+              <tr v-for="c in checkRows" :key="`${c.rule}/${c.report}`" class="align-top" :data-rule="c.rule">
+                <td class="py-1.5 pr-3 font-mono text-xs text-stone-900">{{ c.report }}</td>
+                <td class="py-1.5 pr-3">
+                  <div class="text-stone-800">{{ t(`quality.rules.${c.rule}.name`) }}</div>
+                  <div class="text-xs text-stone-500">{{ t(`quality.rules.${c.rule}.what`) }}</div>
+                </td>
+                <td class="py-1.5 pr-3"><QualityFlag :status="c.status" /></td>
+                <td class="py-1.5 text-xs text-stone-700">{{ checkText(c) }}</td>
               </tr>
             </tbody>
           </table>
@@ -312,11 +394,42 @@ function exportOpenLineage() {
         <p class="mt-1 text-xs text-stone-500" data-testid="lineage-archive-totals">
           {{ t('lineage.archiveTotals', { runs: archivedRuns, failed: failedChecks }) }}
         </p>
+        <div
+          v-if="stoppedRun && stoppedQuality" class="mt-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm"
+          data-testid="lineage-archive-stopped"
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            <QualityFlag :status="stoppedQuality.status" />
+            <span class="text-red-800">
+              {{ t('quality.archive.stopped', { time: fmtDateTime(stoppedRun.event_time) }) }}
+            </span>
+          </div>
+          <ul class="mt-1 space-y-0.5 text-xs text-stone-700">
+            <li v-for="g in assertionsByTable(stoppedQuality.assertions)" :key="g.dataset">
+              {{ tableText(g) }}<span v-if="g.failed.length" class="text-red-700"> · {{ failedText(g) }}</span>
+            </li>
+          </ul>
+        </div>
         <p v-if="!run" class="py-6 text-center text-sm text-stone-500">{{ t('lineage.archiveNone') }}</p>
         <template v-else>
           <p class="mt-2 text-sm text-stone-700">
             {{ t('lineage.archiveRun', { run: run.run_id.slice(0, 8), time: fmtDateTime(run.event_time) }) }}
           </p>
+          <div class="mt-2 rounded-md border border-stone-200 p-3" data-testid="lineage-archive-quality">
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <span class="text-stone-700">{{ t('quality.archive.run') }}</span>
+              <QualityFlag :status="runQuality.status" />
+            </div>
+            <p v-if="!runQuality.assertions.length" class="mt-1 text-xs text-amber-900">
+              {{ t('quality.archive.none') }}
+            </p>
+            <ul v-else class="mt-1 space-y-0.5 text-xs text-stone-700">
+              <li v-for="g in assertionsByTable(runQuality.assertions)" :key="g.dataset">
+                {{ tableText(g) }}<span v-if="g.failed.length" class="text-red-700"> · {{ failedText(g) }}</span>
+              </li>
+            </ul>
+            <p class="mt-1 text-xs text-stone-500">{{ t('quality.archive.source') }}</p>
+          </div>
           <div class="mt-2 overflow-x-auto">
             <table class="w-full text-sm">
               <thead class="text-left text-xs text-stone-500">
@@ -336,11 +449,8 @@ function exportOpenLineage() {
                   <td class="py-1.5 pr-3 font-mono text-xs text-stone-700">
                     <div v-for="d in datasets(e.outputs)" :key="d">{{ d }}</div>
                   </td>
-                  <td
-                    class="py-1.5 text-right text-xs"
-                    :class="e.quality_ok === false ? 'text-red-700' : 'text-stone-500'"
-                  >
-                    {{ t(quality(e)) }}
+                  <td class="py-1.5 text-right">
+                    <QualityFlag :status="stepCheck(e)" :empty="t('lineage.notChecked')" />
                   </td>
                 </tr>
               </tbody>
@@ -359,6 +469,7 @@ function exportOpenLineage() {
                 <th class="py-1 font-medium">{{ t('lineage.view') }}</th>
                 <th class="py-1 font-medium">{{ t('lineage.readsFrom') }}</th>
                 <th class="py-1 font-medium">{{ t('lineage.usedBy') }}</th>
+                <th class="py-1 text-right font-medium">{{ t('lineage.quality') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-100">
@@ -373,6 +484,9 @@ function exportOpenLineage() {
                     >{{ t(c.label) }}</NuxtLink>
                   </template>
                   <span v-else class="text-stone-400">{{ t('app.none') }}</span>
+                </td>
+                <td class="py-1.5 pl-3 text-right">
+                  <QualityFlag :status="viewFlag(r.report)" :detail="viewDetail(r.report)" />
                 </td>
               </tr>
             </tbody>
