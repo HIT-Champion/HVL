@@ -188,9 +188,9 @@ trình duyệt ── /bang-tin/ ──► APISIX ──► app-bang-tin:8080   
             ── /v1/graphql (token người dùng) ──► Hasura ── bang_tin_tin { document { symbol summary } }
 ```
 
-Kiểm: `apps/bang-tin/tests` (`node --test` 5, `unittest` 14, trong `make test`); `scripts/tests/test_ung_dung.py`
-45, `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13 hàm (44 ca, PostgreSQL và Hasura thật khi `MOC_IT=1`);
-`make demo-cai-ung-dung` trên hệ thống đang chạy (chưa chạy trong CI).
+Kiểm: `apps/bang-tin/tests` (`node --test` 5, `unittest` 15, trong `make test`); `scripts/tests/test_ung_dung.py`
+46, `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13 hàm (44 ca, PostgreSQL và Hasura thật khi `MOC_IT=1`, job
+CI `db` có đặt); `make demo-cai-ung-dung` trên hệ thống đang chạy (bước CI của job `luong-chinh`).
 
 ### 1.8. Bằng chứng: lõi không đổi
 
@@ -242,7 +242,8 @@ Giới hạn:
   giây, Hasura khoảng 15 giây.
 - Chưa có giao diện quản trị: chỉ dòng lệnh. Không gian cá nhân (`apps/ca-nhan`) chưa chuyển sang manifest: vẫn là
   một phần của lõi, cắm theo cách làm tay (mục 3).
-- Màn `make demo-cai-ung-dung` và bộ thử tích hợp (Keycloak, Hasura, APISIX thật) chưa chạy trong CI.
+- Với Keycloak, Hasura, APISIX thật, lệnh chỉ được kiểm bằng màn `make demo-cai-ung-dung` (bước CI của job
+  `luong-chinh`); test trong `scripts/tests` không gọi dịch vụ thật.
 
 ## 2. Ứng dụng nhận gì từ lõi
 
