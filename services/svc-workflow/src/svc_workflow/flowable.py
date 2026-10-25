@@ -19,22 +19,36 @@
 Flowable là chủ trạng thái quy trình: đang ở bước nào, ai phải làm. Dữ liệu nghiệp vụ nằm ở PostgreSQL
 (docs/du-thi/ke-hoach-phat-trien.md §2.1). Flowable không biết người dùng Keycloak; việc được giao cho nhóm
 ứng viên dạng ``t:<tenant>:director`` hoặc ``t:<tenant>:d:<phòng>:manager``, hoặc đích danh theo ``sub``.
+
+Hoàn thành việc (``complete``) và việc giao ra ngoài (``complete_job``) có thể đụng một giao dịch khác trên cùng phiên
+quy trình, ví dụ worker gợi ý giao việc: Flowable khóa lạc quan, rollback một bên và REST trả 500 "Unhandled
+exception" kèm ``FlowableOptimisticLockingException``. Chỉ lỗi đó được gọi lại, sau ``RETRY_DELAYS_S`` (#189).
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
+import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx2
 
+log = logging.getLogger("svc_workflow")
+
+# thông điệp của FlowableOptimisticLockingException (DbSqlSession), REST đặt vào trường "exception" của body lỗi 500
+CONCURRENT = "was updated by another transaction concurrently"
+RETRY_DELAYS_S = (0.2, 0.5)    # gọi lại sau chừng này giây; giao dịch bị hủy đã rollback hết nên gọi lại an toàn
+
 
 class FlowableError(Exception):
-    def __init__(self, message: str, status: int | None = None) -> None:
+    def __init__(self, message: str, status: int | None = None, *, concurrent: bool = False) -> None:
         super().__init__(message)
         self.status = status
+        self.concurrent = concurrent    # bị hủy vì giao dịch khác cùng sửa phiên quy trình (khóa lạc quan)
 
 
 @dataclass(frozen=True)
@@ -106,7 +120,8 @@ class FlowableClient:
         except httpx2.HTTPError as exc:
             raise FlowableError(f"Không gọi được Flowable: {exc}") from exc
         if r.status_code >= 400:
-            raise FlowableError(f"Flowable trả {r.status_code}: {r.text[:300]}", r.status_code)
+            raise FlowableError(f"Flowable trả {r.status_code}: {r.text[:300]}", r.status_code,
+                                concurrent=r.status_code == 500 and CONCURRENT in r.text)
         return r.json() if r.content else None
 
     async def ping(self) -> bool:
@@ -208,9 +223,23 @@ class FlowableClient:
         """Nhận việc cho user_id; None trả việc về nhóm. Người khác đã nhận thì Flowable trả 409."""
         await self._request("POST", f"/runtime/tasks/{task_id}", json={"action": "claim", "assignee": user_id})
 
+    async def _post_again_if_concurrent(self, path: str, body: dict[str, Any]) -> Any:
+        """POST làm phiên quy trình đi tiếp; bị hủy vì khóa lạc quan thì gọi lại theo ``RETRY_DELAYS_S``. Lỗi khác,
+        kể cả 5xx khác, đi thẳng lên."""
+        delays = list(RETRY_DELAYS_S)
+        while True:
+            try:
+                return await self._request("POST", path, json=body)
+            except FlowableError as exc:
+                if not exc.concurrent or not delays:
+                    raise
+                delay = delays.pop(0)
+                log.info(json.dumps({"event": "office.flowable.retry_concurrent", "path": path, "after_s": delay}))
+            await asyncio.sleep(delay)
+
     async def complete(self, task_id: str, variables: dict[str, Any]) -> None:
-        await self._request(
-            "POST", f"/runtime/tasks/{task_id}", json={"action": "complete", "variables": _variables(variables)},
+        await self._post_again_if_concurrent(
+            f"/runtime/tasks/{task_id}", {"action": "complete", "variables": _variables(variables)},
         )
 
     # --- việc giao ra ngoài (external worker) ----------------------------------------------------------
@@ -232,7 +261,7 @@ class FlowableClient:
         ]
 
     async def complete_job(self, job_id: str, worker_id: str) -> None:
-        await self._request("POST", f"{self._jobs}/{job_id}/complete", json={"workerId": worker_id})
+        await self._post_again_if_concurrent(f"{self._jobs}/{job_id}/complete", {"workerId": worker_id})
 
     async def fail_job(self, job_id: str, worker_id: str, message: str, retry_after: str = "PT1M") -> None:
         """Báo lỗi: Flowable bớt một lần thử và giao lại sau retry_after; hết lượt thử thì vào hàng việc chết."""

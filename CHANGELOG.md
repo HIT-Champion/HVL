@@ -82,6 +82,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   chỉ APISIX đóng kết nối rảnh. Dựng lại với Hasura v2.51.0 và APISIX 3.18.0 như repo, gửi yêu cầu lệch −4…+4 ms
   quanh nhịp quét: trước 21/960 yêu cầu bị 502, sau 0/960. Test `test_giu_ket_noi.py` kiểm quy tắc này cho Hasura
   và `svc-files`.
+- Hoàn thành việc không còn lỗi "Đã lưu, nhưng chưa chuyển được bước tiếp" khi worker gợi ý giao việc cùng lúc hoàn
+  thành việc ngoài trên cùng phiên quy trình (#189; thấy trong CI, `make demo-giao-viec`): Flowable khóa lạc quan,
+  hủy một giao dịch và trả 500 kèm `FlowableOptimisticLockingException`. `svc-workflow` nay gọi lại tối đa 2 lần
+  (sau 0,2 và 0,5 giây) cho hoàn thành việc và việc ngoài, chỉ với đúng lỗi này. Test svc-workflow +7.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
