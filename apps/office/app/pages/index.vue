@@ -26,9 +26,9 @@ const {
 } = useApi();
 const tasks = ref([]);
 const claims = useAuth().claims;
-const query = ref('');
-const filter = ref('all');
-const category = ref('all');
+const query = useState('inbox-query', () => '');
+const filter = useState('inbox-filter', () => 'all');
+const category = useState('inbox-category', () => 'all');
 const day = ref(today());
 
 let clock;
