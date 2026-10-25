@@ -221,9 +221,11 @@ do_install() {
   while read -r _ rel; do
     [ -e "$dest/$rel" ] || die "thiếu $dest/$rel"
   done < <(grep '^BIND' <<<"$check")
+  # Thẻ image đúng như lúc chạy từ bản cài (MOC_VERSION trong .env vừa ghi). Đặt lại biến: make install truyền
+  # MOC_VERSION rỗng, mà compose ưu tiên biến môi trường đã đặt — kể cả rỗng — hơn .env, nên sẽ tìm thẻ dev (#186)
   while read -r img; do
     case "$img" in moc/*) docker image inspect "$img" >/dev/null 2>&1 || die "thiếu image $img" ;; esac
-  done < <(cd "$dest" && "${COMPOSE[@]}" config --images)
+  done < <(cd "$dest" && MOC_VERSION="$ver" "${COMPOSE[@]}" config --images)
 
   cat <<EOF
 Đã cài Signet $ver vào $dest. Chạy từ đó:
