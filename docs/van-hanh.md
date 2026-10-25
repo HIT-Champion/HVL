@@ -528,8 +528,10 @@ của mỗi đơn vị (`NGSILD-Tenant` = mã đơn vị; mã có dấu thì `t`
 `temperature>MOC_OT_THRESHOLD`. Cảm biến vượt ngưỡng thì broker gọi `svc-workflow`, và dịch vụ dựng dự thảo văn bản
 đi "Báo cáo sự cố" (loại Báo cáo, độ khẩn "Khẩn") từ mẫu cho chuyên viên phụ trách cảm biến, ghi sự kiện `ot.alarm`
 vào dòng thời gian và báo người đó ngay. Còn dự thảo chưa trình (hoặc bị trả lại) của cùng cảm biến thì không dựng
-thêm, chỉ nhắc người phụ trách, mỗi ngày nhiều nhất một lần. Dự thảo đi tiếp theo luồng văn bản đi như mọi văn bản
-khác.
+thêm, chỉ nhắc người phụ trách, mỗi ngày nhiều nhất một lần. Giờ, ngày của báo cáo và của lượt nhắc theo giờ đo thiết
+bị gửi (`observedAt`); giờ đó muộn hơn giờ máy chủ quá 2 phút (đồng hồ thiết bị chạy nhanh, như cờ **giờ đo ở tương
+lai** bên dưới) thì theo lúc máy chủ nhận số đo, và dự thảo ghi rõ giờ thiết bị — không thì thiết bị nhanh 30 phút
+gửi số đo lúc 23 giờ 50 làm báo cáo ghi ngày hôm sau. Dự thảo đi tiếp theo luồng văn bản đi như mọi văn bản khác.
 
 ```bash
 make demo-it-ot                       # bật profile iot, cảm biến giả lập 24 → 41 °C, dự thảo, trình
