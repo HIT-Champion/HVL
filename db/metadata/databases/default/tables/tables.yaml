@@ -56,3 +56,4 @@
 - "!include core_import_jobs.yaml"
 - "!include core_import_rows.yaml"
 - "!include office_maturity_assessments.yaml"
+- "!include office_report_lineage.yaml"

@@ -901,6 +901,28 @@ Sổ đăng ký văn bản đến / đi (F2.8) không cần view riêng: `svc-fi
 (chiều, năm) bằng vai trò `service` để sổ liền số kể cả văn bản hạn chế, rồi che nội dung dòng nào người in không
 được đọc (hỏi lại Hasura bằng token của họ) — §4.3.
 
+**Phả hệ của báo cáo** (F3.9, F3.11, migration 1792281602900). `office.report_lineage` tính thẳng từ catalog
+PostgreSQL lúc truy vấn khung nhìn báo cáo nào đọc bảng, view nào — không khai tay cạnh nào, tạo, sửa, xóa view là phả
+hệ đổi theo. Báo cáo là mọi view (cả materialized view) trong schema `office` tên bắt đầu `v_` (hiện 9). Cạnh lấy từ
+`pg_depend` của luật `_RETURN`: mọi quan hệ trong truy vấn của view, kể cả truy vấn con, CTE, subquery vô hướng; view
+đọc view thì đi tiếp đệ quy tới tận bảng. Không dùng `information_schema.view_table_usage` (chỉ hiện bảng vai trò hiện
+tại sở hữu). Chỉ có tên và cạnh, giống nhau cho mọi đơn vị: không `tenant_id`, không số dòng (`reltuples` là số của mọi
+đơn vị cộng lại; đếm theo đơn vị trên bảng giao việc, dòng thời gian thì lộ dấu vết văn bản hạn chế), không định nghĩa
+SQL. Hasura cho `director` đọc, `filter: {}` (như dashboard; vai trò khác không thấy).
+
+| View | Cột | Dùng cho |
+|---|---|---|
+| `office.report_lineage` | `report` (view báo cáo gốc), `consumer` (view đọc ở cạnh này), `source`, `source_kind` (`table`, `view`, `materialized_view`, `partitioned_table`, `foreign_table`), `depth` (1: báo cáo đọc trực tiếp) | Trang Phả hệ số liệu (`/pha-he`) của lãnh đạo: biểu đồ → khung nhìn → bảng; bước 5 của `make demo-pha-he`. Tên dạng `schema.tên` |
+
+Biểu đồ nào của trang Điều hành đọc khung nhìn nào thì khai một chỗ ở `apps/office/app/utils/lineage.ts`
+(`BOARD_CHARTS`); `apps/office/tests/lineage.test.ts` đối chiếu khai báo đó với truy vấn và mã thật của
+`pages/dieu-hanh.vue`, `db/tests/test_report_lineage.py` kiểm mọi khung nhìn đã khai có trong phả hệ. Trang Phả hệ nối
+thêm lượt nộp lưu gần nhất từ `core.lineage_events` (§2.4): tên dataset `postgres://postgres:5432` +
+`moc.<schema>.<bảng>` trùng tên catalog, nên bảng nguồn của báo cáo cũng là đầu vào của bước `tables`; bước `commit`
+khai cả `office.archived_document_facts` mà `v_processing_time` đọc. Giới hạn: view gọi một hàm SQL đọc bảng thì
+catalog không ghi cạnh tới bảng đó (hiện không view `v_` nào gọi hàm tự viết — test chặn); phả hệ mức bảng, chưa mức
+cột.
+
 ### 2.6. Schema `personal` — Không gian cá nhân P.A.R.A (ứng dụng thứ hai)
 
 Không thuộc Văn phòng điện tử: đây là schema của ứng dụng thứ hai `apps/ca-nhan` (migration

@@ -58,6 +58,11 @@ const nav = computed(() => {
   if (role === 'director') items.push({ to: '/dieu-hanh', label: t('nav.board'), icon: 'M3 3v18h18M8 17v-4m4 4V8m4 9v-6' })
   // Số đo "sau" theo đặc tả §8 (F4.6): khung nhìn số đo chỉ cho lãnh đạo đơn vị đọc, như dashboard điều hành
   if (role === 'director') items.push({ to: '/so-do', label: t('nav.metrics'), icon: 'M12 9v4l2.5 2.5M9 3h6M12 21a8 8 0 110-16 8 8 0 010 16z' })
+  // Phả hệ số liệu (F3.9): biểu đồ của trang Điều hành ← khung nhìn ← bảng, lượt nộp lưu; cùng quyền với dashboard
+  if (role === 'director') {
+    items.push({ to: '/pha-he', label: t('lineage.nav'),
+                 icon: 'M4 9h5v6H4zM15 3h5v6h-5zM15 15h5v6h-5zM9 12h3m0-6v12m0-12h3m-3 12h3' })
+  }
   // Tự chẩn đoán H-P-D-I: lãnh đạo đơn vị trả lời, lưu, xem bằng chứng đo được; lãnh đạo phòng trả lời, không lưu
   if (role === 'director' || role === 'manager') items.push({ to: '/tu-chan-doan', label: t('nav.selfCheck'), icon: 'M12 3l8.5 6.2-3.2 10H6.7L3.5 9.2 12 3zm0 5l4 2.9-1.5 4.6h-5L8 10.9 12 8z' })
   if (role === 'director' || role === 'tenant_admin') items.push({ to: '/so-kiem-toan', label: t('nav.audit'), icon: 'M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4' })

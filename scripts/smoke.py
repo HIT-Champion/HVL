@@ -1110,6 +1110,20 @@ def main() -> None:
         fail("văn thư đọc được số liệu dashboard")
     except RuntimeError:
         ok("dashboard chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
+    # Phả hệ báo cáo (F3.9, F3.11): khung nhìn → bảng tính từ catalog PostgreSQL, cùng quyền với dashboard
+    reads = {(r["report"], r["source"]) for r in
+             director.gql("{ office_report_lineage { report source } }")["office_report_lineage"]}
+    board_views = {"office.v_document_counts", "office.v_overdue_by_department", "office.v_processing_time",
+                   "office.v_outgoing_by_month"}
+    board_views <= {r for r, _ in reads} and ("office.v_processing_time", "office.document_events") in reads \
+        or fail(f"phả hệ báo cáo chưa đúng: {sorted(reads)}")
+    ok(f"phả hệ báo cáo: {len({r for r, _ in reads})} khung nhìn office.v_*, {len(reads)} cạnh từ catalog; thời gian"
+       " xử lý ← office.document_events")
+    try:
+        clerk.gql("{ office_report_lineage { report } }")
+        fail("văn thư đọc được phả hệ báo cáo")
+    except RuntimeError:
+        ok("phả hệ báo cáo chỉ cho lãnh đạo đơn vị: văn thư không đọc được")
 
     print("Sổ kiểm toán (neo hash ra ngoài CSDL)")
     moc = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "moc.py"), "audit"]

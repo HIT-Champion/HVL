@@ -98,8 +98,9 @@ RESERVED_NAMES = {"office", "ca-nhan", "core", "moc", "admin", "api", "svc"}
 RESERVED_PATHS = {
     "/realms", "/resources", "/v1", "/v2", "/v1alpha1", "/api", "/realtime", "/admin", "/console", "/healthz",
     "/metrics", "/flowable-rest", "/status", "/ca-nhan", "/config", "/favicon",
-    "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/so-dang-ky", "/so-do", "/so-kiem-toan",
-    "/tim-kiem", "/trang-thai", "/tu-chan-doan", "/van-ban", "/van-ban-den", "/van-ban-di", "/xac-thuc",
+    "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
+    "/so-kiem-toan", "/tim-kiem", "/trang-thai", "/tu-chan-doan", "/van-ban", "/van-ban-den", "/van-ban-di",
+    "/xac-thuc",
 }
 # Biến môi trường do lõi đặt cho container ứng dụng; manifest không ghi đè được
 PROVIDED_ENV = {"MOC_REALM", "MOC_APP_NAME", "MOC_APP_PATH", "MOC_KEYCLOAK_INTERNAL_URL", "MOC_GRAPHQL_INTERNAL_URL",
