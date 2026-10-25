@@ -27,6 +27,16 @@ nhiêu lần cũng được: bước nào đã khớp thì bỏ qua, không tạ
 lệnh báo đúng bước (`✗ bước 5/8 (Keycloak): …`) và cách chạy lại; chạy lại chỉ làm phần còn thiếu. Thoát 0: xong;
 1: manifest sai, xung đột hay một bước lỗi; 2: không gọi được CSDL, Keycloak, Docker.
 
+Người dùng thấy ứng dụng đã cài ở trang **Danh mục ứng dụng** của Văn phòng điện tử (`/ung-dung`, mục "Ứng dụng" ở
+thanh bên, mọi vai trò): tên, mô tả (`description` của manifest), nút Mở tới `/<đường>/`, phiên bản, lúc cài, cùng hai
+ứng dụng có sẵn trong lõi (Văn phòng điện tử, Không gian cá nhân — phiên bản lõi lấy từ `/api/status`). Lãnh đạo, quản
+trị đơn vị thấy thêm **băm manifest** (SHA-256 các byte của `app.yaml` lúc cài — so với `sha256sum
+apps/<thư mục>/app.yaml` để biết bản đang cài đúng bản đã duyệt; nút chép đủ 64 ký tự) và ứng dụng **đã gỡ**. Trang
+đọc khung nhìn `core.app_catalog` (migration `1792281603400`): 9 cột của `core.apps`, không có manifest (image, cổng,
+healthcheck, biến môi trường, cổng webhook), không schema; `core.apps` vẫn không vào GraphQL; không vai trò nào ghi.
+Trạng thái ghi "Đã cài", không ghi "đang chạy": CSDL không biết container của ứng dụng có khỏe không. Kiểm: office
+`apps.test.ts`, db `test_app_catalog.py`, `make demo-cai-ung-dung` (bước 4, 6, 7), e2e `ung-dung.spec.ts`.
+
 ### 1.1. Manifest
 
 Cấu trúc đầy đủ: [`scripts/app-manifest.schema.json`](../scripts/app-manifest.schema.json) (JSON Schema 2020-12). Lệnh
@@ -195,11 +205,13 @@ CI `db` có đặt); `make demo-cai-ung-dung` trên hệ thống đang chạy (b
 ### 1.8. Bằng chứng: lõi không đổi
 
 `make demo-cai-ung-dung` (cần `make seed`): `--dry-run` không đổi gì; cài; mở `/bang-tin/` qua APISIX; đăng nhập Văn
-phòng điện tử rồi vào Bảng tin không hỏi lại mật khẩu; câu GraphQL của trang chạy trên bảng của ứng dụng; văn thư vào
-sổ một văn bản đến thường và một văn bản hạn chế → lãnh đạo khoa thấy tin của văn bản thường, văn bản hạn chế không
-có trong luồng sự kiện; cài lại không tạo gì mới (cùng container, `.moc-apps/` không đổi một byte); gỡ → route,
-client, trigger, container mất, dữ liệu còn, tệp chạy APISIX giống hệt tệp lõi; cuối cùng `git status` trước và sau
-giống hệt và `git diff --stat` trống.
+phòng điện tử rồi vào Bảng tin không hỏi lại mật khẩu; câu GraphQL của trang chạy trên bảng của ứng dụng; Danh mục ứng
+dụng của chuyên viên có Bảng tin, chuyên viên không đọc được băm manifest; văn thư vào sổ một văn bản đến thường và một
+văn bản hạn chế → lãnh đạo khoa thấy tin của văn bản thường, văn bản hạn chế không có trong luồng sự kiện; cài lại không
+tạo gì mới (cùng container, `.moc-apps/` không đổi một byte; băm manifest lãnh đạo khoa thấy = `sha256sum
+apps/bang-tin/app.yaml`, lúc cài, lúc cập nhật không đổi); gỡ → route, client, trigger, container mất, dữ liệu còn, tệp
+chạy APISIX giống hệt tệp lõi, Danh mục ứng dụng: chuyên viên không còn thấy Bảng tin, lãnh đạo khoa thấy "Đã gỡ"; cuối
+cùng `git status` trước và sau giống hệt và `git diff --stat` trống.
 
 ### 1.9. Giới hạn và rủi ro
 
@@ -240,7 +252,8 @@ Giới hạn:
   chúng trước khi khôi phục sang máy mới.
 - Bước 7 tạo lại `apisix`, `hasura` ở lần cài đầu (bind mount mới) và khi bí mật header đổi: cổng gián đoạn vài
   giây, Hasura khoảng 15 giây.
-- Chưa có giao diện quản trị: chỉ dòng lệnh. Không gian cá nhân (`apps/ca-nhan`) chưa chuyển sang manifest: vẫn là
+- Chưa có giao diện quản trị: cài, gỡ chỉ bằng dòng lệnh; trang Danh mục ứng dụng (`/ung-dung`) chỉ để xem, không
+  dò sức khỏe container của ứng dụng. Không gian cá nhân (`apps/ca-nhan`) chưa chuyển sang manifest: vẫn là
   một phần của lõi, cắm theo cách làm tay (mục 3).
 - Với Keycloak, Hasura, APISIX thật, lệnh chỉ được kiểm bằng màn `make demo-cai-ung-dung` (bước CI của job
   `luong-chinh`); test trong `scripts/tests` không gọi dịch vụ thật.

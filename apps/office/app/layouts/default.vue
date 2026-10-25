@@ -66,6 +66,11 @@ const nav = computed(() => {
   // Tự chẩn đoán H-P-D-I: lãnh đạo đơn vị trả lời, lưu, xem bằng chứng đo được; lãnh đạo phòng trả lời, không lưu
   if (role === 'director' || role === 'manager') items.push({ to: '/tu-chan-doan', label: t('nav.selfCheck'), icon: 'M12 3l8.5 6.2-3.2 10H6.7L3.5 9.2 12 3zm0 5l4 2.9-1.5 4.6h-5L8 10.9 12 8z' })
   if (role === 'director' || role === 'tenant_admin') items.push({ to: '/so-kiem-toan', label: t('nav.audit'), icon: 'M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4' })
+  // Danh mục ứng dụng trên lõi: mọi vai trò xem để mở; lãnh đạo, quản trị đơn vị thấy thêm băm manifest, ứng dụng đã gỡ
+  if (role) {
+    items.push({ to: '/ung-dung', label: t('apps.nav'),
+                 icon: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z' })
+  }
   // Góp ý (F4.6): mọi vai trò gửi được; trang xem lại góp ý của mình, lãnh đạo, quản trị đơn vị xem thêm tổng hợp
   if (role) items.push({ to: '/gop-y', label: t('nav.feedback'), icon: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9L12 3z' })
   return items
