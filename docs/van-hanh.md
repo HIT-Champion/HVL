@@ -127,8 +127,9 @@ Nói rõ giới hạn:
      `svc-files` ký mốc neo từ lượt neo kế tiếp.
 
   Lỗi ở bất kỳ bước nào thì kịch bản hủy lượt tạo token root còn dở, trả `openbao.hcl` về như cũ, khởi động lại két;
-  sửa lỗi rồi chạy lại. Job CI `.github/workflows/nang-cap.yml` tập đúng kịch bản này trên két của bản phát hành
-  trước, sau khi nâng bản cài lên: tệp văn bản hạn chế tạo từ bản cũ vẫn mở được, smoke đạt.
+  sửa lỗi rồi chạy lại. Két không tự cấu hình xong thì token root vừa tạo còn nằm trong volume: kịch bản in lệnh thu
+  hồi và xóa nó, dùng khi không chạy lại nữa. Job CI `.github/workflows/nang-cap.yml` tập đúng kịch bản này trên két
+  của bản phát hành trước, sau khi nâng bản cài lên: tệp văn bản hạn chế tạo từ bản cũ vẫn mở được, smoke đạt.
 - Cách cuối cùng là dựng lại két (xóa volume `openbao_data` rồi khởi động lại): bí mật nạp lại từ `.env`, có PKI, nhưng
   khóa `moc-files` mới khác nên tệp văn bản hạn chế đã lưu không mở được nữa — **không làm trên máy có dữ liệu thật**.
   Khóa `moc-anchor` cũng mới: mốc đã công bố trước đó vẫn kiểm được bằng khóa cũ còn trong lịch sử kho mốc công khai.

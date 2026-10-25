@@ -127,6 +127,20 @@ data_kept() {
 
 services() { in_dest docker compose ps --services --status running | sort; }
 
+# Image dựng sẵn bản mới cần (postgres, hasura, … và image của profile thêm đang bật như tunnel, iot) mà máy chưa có:
+# kéo trước khi dừng trang để lúc dừng không phải chờ tải, lỗi mạng thì dừng ở đây khi chưa đổi gì. Danh sách theo
+# profile và .env của bản cài như lúc docker compose up ở đó; bỏ moc/* (vừa dựng, hoặc ot-sensor dùng lại image đó)
+pull_missing() {
+  local profiles images img
+  profiles=$(sed -n 's/^COMPOSE_PROFILES=//p' "$DEST/.env" | tail -n 1)
+  images=$(cd "$SRC" && MOC_VERSION="$1" COMPOSE_PROFILES="${profiles:-core,app}" COMPOSE_FILE=docker-compose.yml \
+    docker compose --env-file "$DEST/.env" config --images)
+  while read -r img; do
+    case "$img" in "" | moc/*) continue ;; esac
+    docker image inspect "$img" >/dev/null 2>&1 || docker pull -q "$img"
+  done <<<"$images"
+}
+
 # Dịch vụ chạy trước khi nâng vẫn chạy (bản mới thêm dịch vụ thì chỉ in ra)
 same_services() {
   local now missing added
@@ -228,9 +242,10 @@ do_nang() {
   preflight
   step "Nâng $DEST: Signet $old → $new (mã nguồn $SRC)"
 
-  step "Dựng image $new khi trang còn chạy"
+  step "Dựng image $new, kéo image dựng sẵn máy chưa có, khi trang còn chạy"
   [ -f "$SRC/.env" ] || (cd "$SRC" && make env)
   (cd "$SRC" && MOC_VERSION="$new" docker compose --profile core --profile app build)
+  pull_missing "$new"
 
   step "Sao lưu bằng bản đang chạy ($old)"
   before=$(fingerprint)
@@ -263,6 +278,7 @@ print(max(r["run"] for r in json.load(sys.stdin)["runs"] if r["complete"]))')
   anchor_key || echo "Két khởi tạo trước khi có khóa ký mốc neo: mốc neo chưa có chữ ký. Nâng két (dừng timer" \
     "reconciler trước): $0 ket $DEST"
   report
+  echo "$DEST/.env.truoc-$run là bản sao .env cũ, có bí mật: không cần lùi nữa thì xóa."
 }
 
 do_lui() {
@@ -326,6 +342,12 @@ printf "{\"encoded_token\":\"%s\",\"otp\":\"%s\"}" "$enc" "$otp" |
   bao write -field=token sys/decode-token - > $K/root-token.new
 [ -s $K/root-token.new ] && mv $K/root-token.new $K/root-token'
 
+# Két không tự cấu hình xong thì token root vừa tạo nằm lại trong volume. Lệnh thu hồi và xóa, chạy trong thư mục bản
+# cài; cùng thứ tự với start.sh: xóa tệp trước rồi mới thu hồi (dừng giữa hai bước thì chỉ còn token không ai cầm)
+ROOT_TOKEN=/openbao/file/moc/root-token
+DROP_ROOT="docker compose exec openbao sh -c 't=\$(cat $ROOT_TOKEN) && rm $ROOT_TOKEN"
+DROP_ROOT+=" && BAO_TOKEN=\$t bao token revoke -self'"
+
 HCL=""
 HCL_SAVED=""
 
@@ -376,10 +398,10 @@ do_ket() {
   # đọc hết nhật ký rồi mới tìm: `logs | grep -q` dưới pipefail hỏng khi grep thoát sớm (docker nhận SIGPIPE)
   logs=$(in_dest docker compose logs --since "$since" openbao 2>/dev/null) || true
   grep 'moc-openbao:' <<<"$logs" || true
-  grep -q 'token root đã thu hồi' <<<"$logs" || die "két chưa báo cấu hình xong (docker compose logs openbao)"
-  # shellcheck disable=SC2016
-  in_dest docker compose exec -T openbao sh -c 'test ! -e /openbao/file/moc/root-token' \
-    || die "tệp root-token vẫn còn trong két"
+  grep -q 'token root đã thu hồi' <<<"$logs" || die "két chưa báo cấu hình xong (docker compose logs openbao)." \
+    "Token root vừa tạo còn trong két: sửa lỗi rồi chạy lại ket; dừng hẳn thì thu hồi và xóa, trong $DEST: $DROP_ROOT"
+  in_dest docker compose exec -T openbao sh -c "test ! -e $ROOT_TOKEN" \
+    || die "tệp root-token vẫn còn trong két; thu hồi và xóa, trong $DEST: $DROP_ROOT"
 
   step "svc-files đọc lại khóa ký mốc neo"
   in_dest docker compose restart svc-files

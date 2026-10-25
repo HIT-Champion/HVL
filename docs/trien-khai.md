@@ -234,8 +234,10 @@ scripts/nang_cap.sh nang /opt/moc
 
 Kịch bản:
 
-1. Dựng image bản mới khi trang còn chạy.
-2. Sao lưu bằng chính bản đang chạy, in mã lượt, chép `.env` ra `/opt/moc/.env.truoc-<lượt>`.
+1. Dựng image bản mới khi trang còn chạy, kéo trước các image dựng sẵn máy chưa có (của mọi profile bản cài đang bật):
+   lúc dừng trang không phải chờ tải, lỗi mạng thì dừng ở đây khi chưa đổi gì.
+2. Sao lưu bằng chính bản đang chạy, in mã lượt, chép `.env` ra `/opt/moc/.env.truoc-<lượt>` (quyền 600, có bí mật):
+   nâng xong, không cần lùi nữa thì xóa.
 3. Dừng trang, `make install PREFIX=/opt/moc` (giữ `.env` của bản cài, chỉ đổi `MOC_VERSION`), chạy lại. Hasura áp
    migration mới khi khởi động.
 4. Chạy `moc.py realm clients` và `realm theme`.

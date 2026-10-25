@@ -17,7 +17,9 @@
 """Kịch bản nâng cấp (scripts/nang_cap.sh) ở những phần chạy được không cần Docker: từ chối trước khi đụng vào bản
 cài (không phải bản cài, mã nguồn cũ không rõ phiên bản, lượt sao lưu không có, thiếu RAM, reconciler đang chạy —
 docker không được gọi lần nào); phần kiểm chạy hết các mục và chỉ thử lại smoke một lần khi trượt đúng ở bước hỏi
-đáp. Lệnh docker, curl, free, systemctl là bản giả ghi lại lời gọi; đường nâng, nâng két, lùi thật chạy ở
+đáp; nang kéo image dựng sẵn còn thiếu trước khi dừng trang; ket lỗi sau khi tạo token root thì trả openbao.hcl về
+như cũ và chỉ cách thu hồi token. Lệnh docker, curl, free, systemctl là bản giả ghi lại lời gọi; đường nâng, nâng
+két, lùi thật chạy ở
 .github/workflows/nang-cap.yml. Workflow chỉ gọi lệnh con có thật, bộ lọc tệp của nó bắt đúng đường nâng cấp.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
@@ -41,6 +43,16 @@ FAKES = {
         case "$*" in
           "ps -q --filter "*) echo c0ffee ;;
           "compose ps --format "*) echo "postgres healthy"; echo "apisix " ;;
+          "compose ps --services "*) echo apisix; echo postgres ;;
+          "compose exec -T postgres "*)
+            case "$(cat)" in *"where id ="*) echo abcd ;; *) echo "3 5 7 12:abcd" ;; esac ;;
+          "compose --env-file "*" config --images")
+            printf '%s\\n' postgres:16-alpine moc/apisix:1.3.0 moc/svc-workflow:1.3.0
+            case ",$COMPOSE_PROFILES," in *,tunnel,*) echo cloudflare/cloudflared:2026.10.0 ;; esac ;;
+          "image inspect "*) case " ${FAKE_HAVE:-} " in *" $3 "*) ;; *) exit 1 ;; esac ;;
+          "pull "*) [ "${FAKE_PULL:-ok}" = ok ] ;;
+          "compose logs "*) echo "${FAKE_VAULT_LOG:-}" ;;
+          "compose exec -T openbao sh -c test "*) [ "${FAKE_ROOT_LEFT:-no}" = no ] ;;
         esac
     """,
     "curl": """
@@ -70,10 +82,14 @@ args = sys.argv[1:]
 if args[:2] == ["backup", "list"]:
     print(json.dumps({"runs": [{"run": "20261025-191948", "complete": True},
                                {"run": "20261025-180000", "complete": False}]}))
+elif args in (["backup", "create"], ["backup", "check"]):
+    print("đã sao lưu")
 elif args[:3] == ["realm", "clients", "--dry-run"]:
     print(json.dumps({"present": ["app-office"], "created": [], "dry_run": True}))
+elif args in (["realm", "clients"], ["realm", "theme"]):
+    print("realm: đã đặt")  # nang gọi lệnh của bản mới
 elif args[:2] == ["realm", "theme"]:
-    sys.exit(2)  # bản cũ chưa có lệnh này
+    sys.exit(2)  # --help, --dry-run: như bản cũ chưa có lệnh này
 elif args[:2] == ["audit", "verify"]:
     print("sổ kiểm toán khớp")
 else:
@@ -117,6 +133,9 @@ class Sandbox:
         (self.dest / "scripts" / "moc.py").write_text(MOC_PY)
         (self.dest / "scripts" / "smoke.py").write_text(SMOKE_PY)
         (self.dest / "scripts" / "moc_env.py").write_text('PUBLIC_URL = "http://moc.invalid"\n')
+        (self.dest / ".env").write_text("MOC_VERSION=1.2.0\nCOMPOSE_PROFILES=core,app,tunnel\n")
+        (self.dest / "platform" / "openbao").mkdir(parents=True)
+        (self.dest / "platform" / "openbao" / "openbao.hcl").write_text('listener "tcp" {}\n')
         self.old = tmp / "signet-1.1.0"
         (self.old / "scripts").mkdir(parents=True)
         (self.old / "scripts" / "install.sh").write_text("#!/bin/sh\n")
@@ -239,6 +258,59 @@ class ChecksTest(unittest.TestCase):
         self.assertIn("apisix unhealthy", proc.stdout)
         self.assertIn("sổ kiểm toán khớp", proc.stdout)
         self.assertEqual(self.smoke_runs(), 1)
+
+
+class UpgradeTest(unittest.TestCase):
+    """nang: image dựng sẵn máy chưa có được kéo khi trang còn chạy; kéo lỗi thì chưa sao lưu, chưa dừng trang."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.box = Sandbox(pathlib.Path(tmp.name))
+
+    def nang(self, **env: str) -> subprocess.CompletedProcess:
+        return self.box.run("nang", str(self.box.dest), MOC_VERSION="1.3.0", FAKE_STATUS_VERSION="1.3.0",
+                            FAKE_HAVE="postgres:16-alpine", **env)
+
+    def test_missing_images_are_pulled_before_the_site_stops(self) -> None:
+        proc = self.nang()
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("Mọi mục kiểm đều đạt.", proc.stdout)
+        docker = self.box.calls("docker")
+        # profile tunnel của bản cài thêm cloudflared; postgres máy đã có, moc/* vừa dựng (ot-sensor dùng lại)
+        pulls = [c for c in docker if c.startswith("docker pull")]
+        self.assertEqual(pulls, ["docker pull -q cloudflare/cloudflared:2026.10.0"])
+        self.assertLess(docker.index(pulls[0]), docker.index("docker compose down"))
+        kept = self.box.dest / ".env.truoc-20261025-191948"
+        self.assertEqual(kept.stat().st_mode & 0o777, 0o600)
+        self.assertIn(f"{kept} là bản sao .env cũ, có bí mật", proc.stdout)
+
+    def test_failed_pull_stops_before_backup_and_downtime(self) -> None:
+        proc = self.nang(FAKE_PULL="fail")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("Chưa dừng trang, chưa đổi gì", proc.stderr)
+        self.assertNotIn("docker compose down", self.box.calls("docker"))
+        self.assertEqual(list(self.box.dest.glob(".env.truoc-*")), [])
+
+
+class VaultTest(unittest.TestCase):
+    """ket lỗi sau khi tạo token root: openbao.hcl về như cũ, câu báo chỉ cách thu hồi và xóa token còn trong két."""
+
+    def test_token_left_in_the_vault_is_explained(self) -> None:
+        done = "moc-openbao: đã cấu hình két; token root đã thu hồi"
+        cases = {"két chưa báo cấu hình xong": {},
+                 "tệp root-token vẫn còn trong két": {"FAKE_VAULT_LOG": done, "FAKE_ROOT_LEFT": "yes"}}
+        for message, env in cases.items():
+            with self.subTest(message), tempfile.TemporaryDirectory() as tmp:
+                box = Sandbox(pathlib.Path(tmp))
+                hcl = box.dest / "platform" / "openbao" / "openbao.hcl"
+                before = hcl.read_text()
+                proc = box.run("ket", str(box.dest), **env)
+                self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+                self.assertIn(message, proc.stderr)
+                self.assertIn("rm /openbao/file/moc/root-token && BAO_TOKEN=$t bao token revoke -self", proc.stderr)
+                self.assertEqual(hcl.read_text(), before)
+                self.assertIn("docker compose restart openbao", box.calls("docker"))
 
 
 class WorkflowTest(unittest.TestCase):
