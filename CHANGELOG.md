@@ -8,28 +8,28 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
-- Trợ lý hỏi đáp (F4.2): nút "Hỏi về văn bản này" ở trang chi tiết mở trang Hỏi đáp chỉ hỏi trong văn bản đó
+- Trợ lý hỏi đáp (F4.2, #151): nút "Hỏi về văn bản này" ở trang chi tiết mở trang Hỏi đáp chỉ hỏi trong văn bản đó
   (`document_id` của `POST /api/documents/ask` — một điều kiện lọc nối AND sau phạm vi vai trò, hậu kiểm bằng token như
   mọi lượt, nên chỉ thu hẹp); nhãn nguồn "số ký hiệu · tr. n" mở tệp PDF trong khung xem của trình duyệt đúng trang đó
   (`#page=n`); câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép tìm lai nghiêng về từ khóa (tỷ trọng nghĩa tối đa
-  0,2, câu khác giữ `MOC_ASK_SEMANTIC_RATIO`). Test svc-files +29, office +4, e2e thêm bước trong `hoi-dap.spec.ts`.
-- Bản phát hành tự kiểm gói trước khi lên trang Release: `scripts/kiem_goi.py` (`make release` ở máy, bước mới của
-  `release.yml` ngay sau bước đóng gói) giải nén chính `signet-X.Y.Z.tar.gz` vào thư mục tạm và chặn tệp không được
+  0,2, câu khác giữ `MOC_ASK_SEMANTIC_RATIO`). Test svc-files +29, office +5, e2e thêm bước trong `hoi-dap.spec.ts`.
+- Bản phát hành tự kiểm gói trước khi lên trang Release (#153): `scripts/kiem_goi.py` (`make release` ở máy, bước mới
+  của `release.yml` ngay sau bước đóng gói) giải nén chính `signet-X.Y.Z.tar.gz` vào thư mục tạm và chặn tệp không được
   phát hành — tệp môi trường thật (chỉ tệp mẫu `*.example`), khóa riêng (theo tên và khối PEM), tài liệu nội bộ
   `*.local*`, `COMMIT.md`, `publics/`, `node_modules`, `__pycache__`, dữ liệu chạy, tệp lớn hơn 5 MiB; kiểm `LICENSE`,
   `NOTICE`, header giấy phép và `REUSE.toml` cho từng tệp (`license-header.sh` nay kiểm được thư mục ngoài git, trước
   đó qua mà không xét tệp nào), `.sha256`, thư mục gốc `signet-X.Y.Z/`. Gói hỏng thì `make release` gỡ thẻ vừa gắn và
   xóa gói. Tệp `VERSION` do `git archive` điền thẻ (`.gitattributes`, export-subst): cài từ gói không còn phải đặt tay
   `MOC_VERSION`. Test scripts +27 (`docs/git_flow.md` mục 6).
-- Trang đăng nhập Keycloak mang thương hiệu Signet (theme `signet`, `platform/keycloak/themes/`), chung cho Văn phòng
-  điện tử, P.A.R.A, Bảng tin: kế thừa `keycloak.v2` của Keycloak 26, không viết lại template — chỉ CSS (màu, phông của
-  Văn phòng điện tử, nền, bo góc, cỡ chữ trên điện thoại; chế độ sáng/tối theo máy của theme cha) và logo của Văn
+- Trang đăng nhập Keycloak mang thương hiệu Signet (#164, theme `signet`, `platform/keycloak/themes/`), chung cho Văn
+  phòng điện tử, P.A.R.A, Bảng tin: kế thừa `keycloak.v2` của Keycloak 26, không viết lại template — chỉ CSS (màu, phông
+  của Văn phòng điện tử, nền, bo góc, cỡ chữ trên điện thoại; chế độ sáng/tối theo máy của theme cha) và logo của Văn
   phòng điện tử, cũng làm biểu tượng tab. Realm đặt `loginTheme: signet`, compose gắn thư mục chỉ đọc, CSP giữ nguyên.
   Bản cài cũ (realm không nạp lại): `python3 scripts/moc.py realm theme` sau khi nâng cấp — chỉ đặt khi realm còn dùng
   theme mặc định, báo lỗi nếu container chưa gắn thư mục theme (`docs/trien-khai.md`, mục Nâng cấp tay). Test scripts
   +14.
-- Trang Danh mục ứng dụng (`/ung-dung`) trong Văn phòng điện tử, mục "Ứng dụng" ở thanh bên cho mọi vai trò: các ứng
-  dụng chạy trên lõi — hai ứng dụng có sẵn trong lõi (phiên bản lõi từ `/api/status`) và ứng dụng cắm bằng `moc app
+- Trang Danh mục ứng dụng (`/ung-dung`, #166) trong Văn phòng điện tử, mục "Ứng dụng" ở thanh bên cho mọi vai trò: các
+  ứng dụng chạy trên lõi — hai ứng dụng có sẵn trong lõi (phiên bản lõi từ `/api/status`) và ứng dụng cắm bằng `moc app
   install` — với tên, mô tả, nút Mở, phiên bản, lúc cài; lãnh đạo, quản trị đơn vị thấy thêm băm manifest (SHA-256 tệp
   `app.yaml` lúc cài, rút gọn, có nút chép) và ứng dụng đã gỡ. Đọc khung nhìn hẹp `core.app_catalog` (migration
   1792281603400): không có manifest (image, cổng, biến môi trường), không schema; `core.apps` vẫn không vào GraphQL,
@@ -49,13 +49,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   neo mới nhất ở chân trang. Dựng kho công khai cấm đẩy ép, khóa triển khai, kiểm bằng OpenSSL 3: `docs/van-hanh.md` mục
   "Mốc neo công khai"; két cũ nâng cấp tay như mục Két bí mật. Test (đếm tĩnh): svc-files +28, scripts +35,
   giao diện +5.
-- Tự chẩn đoán H-P-D-I (`/tu-chan-doan`) thêm hình dạng theo giáo trình DX-OS mục 2.4 (TS. Tạ Tuấn Anh, CC BY 4.0):
-  tỷ trọng `[P]`, `[D]`, `[I]` tối đa 30 % quy từ mức tự đánh giá, `[H]` là phần dư; xếp vào một trong bốn nguyên mẫu
-  (Mũi giáo phân mảnh, Cánh diều lệch tâm, Ảo giác công nghệ, Kim cương toàn vẹn) hoặc "đang chuyển tiếp", ngưỡng
+- Tự chẩn đoán H-P-D-I (`/tu-chan-doan`, #168) thêm hình dạng theo giáo trình DX-OS mục 2.4 (TS. Tạ Tuấn Anh, CC BY
+  4.0): tỷ trọng `[P]`, `[D]`, `[I]` tối đa 30 % quy từ mức tự đánh giá, `[H]` là phần dư; xếp vào một trong bốn nguyên
+  mẫu (Mũi giáo phân mảnh, Cánh diều lệch tâm, Ảo giác công nghệ, Kim cương toàn vẹn) hoặc "đang chuyển tiếp", ngưỡng
   ghi kèm câu giáo trình ở `docs/tu-chan-doan.md` §3. Cảnh báo "rác vào, rác ra" khi `[I]` vượt `[D]` từ 1 mức hoặc
   hình dạng là Ảo giác công nghệ: khuyên tạm dừng mở rộng `[I]`, dẫn tới cờ kiểm chất lượng số liệu ở Phả hệ số liệu.
   Chỉ để định hướng, không phải điểm DTI. Test office +3, e2e thêm bước trong `tu-chan-doan.spec.ts`.
-- Cờ chất lượng dữ liệu trên trang Điều hành và Phả hệ số liệu (F3.9, F3.11): khung nhìn `office.report_checks`
+- Cờ chất lượng dữ liệu trên trang Điều hành và Phả hệ số liệu (F3.9, F3.11, #170): khung nhìn `office.report_checks`
   (migration 1792281603300) tính trong CSDL lúc truy vấn 5 luật trên số của trang Điều hành — tổng theo trạng thái
   khớp số văn bản đến trong bảng, tổng theo phòng khớp số đang xử lý (văn bản chưa rõ phòng chủ trì là cảnh báo),
   thời gian xử lý tính đủ văn bản đã xong, khóa ghép số không trùng không rỗng, không khung nhìn `office.v_*` nào xuất
@@ -64,8 +64,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   (truy vấn riêng, hỏi sau khi biểu đồ đã có số nên không làm chậm biểu đồ). Trang Phả hệ thêm mục Kiểm chất lượng
   số liệu, cờ từng khung nhìn, cờ của lượt nộp lưu và từng bước theo đúng assertion svc-files đã ghi (không tính
   lại); lượt bị dừng vì trượt kiểm hiện cờ Trượt kèm mục trượt. Test db +7, office +8; smoke thêm 2 kiểm.
-- Sơ đồ cảm biến kho (F3.10): trang `/cam-bien` của Văn phòng điện tử vẽ mặt bằng kho lưu trữ bằng SVG (không tile,
-  không thư viện bản đồ, CSP giữ nguyên), mỗi phòng tô màu theo số đo mới nhất của cảm biến khai cùng mã phòng
+- Sơ đồ cảm biến kho (F3.10, #181): trang `/cam-bien` của Văn phòng điện tử vẽ mặt bằng kho lưu trữ bằng SVG (không
+  tile, không thư viện bản đồ, CSP giữ nguyên), mỗi phòng tô màu theo số đo mới nhất của cảm biến khai cùng mã phòng
   (Property NGSI-LD `room`, `sensor.py --room`) so với `MOC_OT_THRESHOLD`, kèm ba cờ chất lượng dữ liệu OT tính ở
   `svc-workflow`: mất tín hiệu (quá `MOC_OT_STALE_MIN` phút, mặc định 10, không có số đo mới), ngoài dải (không phải
   số hoặc ngoài −55…125 °C), trùng `observedAt` (số đo mới nhất cùng giờ đo với một lần đo khác trong 10 lần gần
@@ -84,12 +84,19 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
   compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
   dùng kịch bản thay cho các lệnh tay. Test scripts +18.
-- Kịch bản e2e chạy giao diện tiếng Anh (F2.9): `tests/e2e/tieng-anh.spec.ts` bấm nút đổi ngôn ngữ ở thanh trên rồi
-  kiểm theo vai trò và tên lấy nguyên văn từ `en.json`: menu, hộp việc, chuông thông báo, danh sách văn bản đến (tab,
-  cột, trạng thái), soạn dự thảo (form trống bị chặn với lời báo tiếng Anh, lưu được), trang văn bản (trạng thái, dòng
-  thời gian, tab Lịch sử), danh sách văn bản đi; tải lại trang vẫn giữ tiếng Anh, bấm "Tiếng Việt" thì về lại. Kịch
+- Kịch bản e2e chạy giao diện tiếng Anh (F2.9, #200): `tests/e2e/tieng-anh.spec.ts` bấm nút đổi ngôn ngữ ở thanh trên
+  rồi kiểm theo vai trò và tên lấy nguyên văn từ `en.json`: menu, hộp việc, chuông thông báo, danh sách văn bản đến
+  (tab, cột, trạng thái), soạn dự thảo (form trống bị chặn với lời báo tiếng Anh, lưu được), trang văn bản (trạng thái,
+  dòng thời gian, tab Lịch sử), danh sách văn bản đi; tải lại trang vẫn giữ tiếng Anh, bấm "Tiếng Việt" thì về lại. Kịch
   bản thứ hai: người ngoài dùng trình duyệt tiếng Anh vẫn mở ra tiếng Việt, đổi ngôn ngữ ở trang trạng thái hệ thống
   và cổng xác thực không cần đăng nhập. e2e +2.
+- Kịch bản e2e kiểm tài sản tĩnh của giao diện Liền mạch (#214). `tests/e2e/tai-san.spec.ts` mở trang đăng nhập
+  (theme `signet`) rồi hộp việc, và đòi các điều sau:
+  - phông Be Vietnam Pro tải được đủ bốn độ đậm;
+  - ảnh giải mã được;
+  - không tài nguyên tĩnh nào trả lỗi, console không có lỗi CSP;
+  - `favicon.svg` và logo trả đúng SVG.
+  nginx trả `index.html` (200) cho tệp không có, nên chỉ nhìn mã trạng thái thì không thấy tệp thiếu. e2e +1.
 - Kiểm bản online qua HTTPS mỗi ngày (F1.9, #197): `scripts/kiem_ban_online.py` (chỉ thư viện chuẩn) kiểm một địa
   chỉ công khai từ bên ngoài, chạy hết các mục rồi báo mục trượt: chứng chỉ hợp lệ, TLS từ 1.2, còn ít nhất 14 ngày;
   `http://` chuyển sang `https://`; `/api/status` ok hay degraded (thành phần không ok in thành cảnh báo) và đúng
@@ -135,7 +142,7 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
   thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi
   nhầm `v1.1.0`), `ROADMAP.md`, `docs/architecture.md`.
-- Ứng dụng cách ly mạng khỏi lõi: container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app
+- Ứng dụng cách ly mạng khỏi lõi (#207): container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app
   install`) nay chỉ ở mạng `apps` (`internal`, không ra Internet), nơi chỉ có APISIX — trước đây chung mạng `moc` với
   lõi, tới thẳng được PostgreSQL, Hasura, Keycloak, `svc-files`. Phần máy chủ của ứng dụng (Bảng tin) lấy token client
   credentials và gọi GraphQL qua `http://apisix:9080` như trình duyệt, cùng kiểm token, giới hạn tốc độ, WAF. Hasura
@@ -223,16 +230,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   phủ thì focus về nút menu. e2e +1.
 
 ### Bảo mật
-- Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
-  ClamAV, loại nhận theo byte đầu phải khớp đuôi tệp — tệp `.pdf` thực ra là trang HTML bị chặn `415 type_mismatch`;
-  chương trình, kịch bản (`MZ`, ELF, `#!`, đuôi `.exe`, `.bat`, `.js`…, xét cả tên ASCII lúc tải về: `x.bát` → `x.bat`)
-  bị chặn `415 type_not_allowed`; `core.files` lưu mime theo nội dung. Loại đang dùng vẫn nhận (docx, xlsx có hay không
-  mật khẩu, doc, xls cả bản HTML do phần mềm khác xuất, csv Windows khai `application/vnd.ms-excel`, ảnh PNG, WebP mang
-  đuôi .jpg, chữ UTF-16, TCVN3…). Ảnh JPEG, PNG được xoay theo hướng EXIF rồi mã hóa lại trong tiến trình con có giới
-  hạn để bỏ EXIF, vị trí GPS, XMP, chú thích; JPEG nhiều khung (ảnh chân dung iPhone) giữ khung đầu (`sha256`,
-  `size_bytes` là của ảnh đã làm sạch); PDF và loại khác lưu nguyên từng byte. ClamAV vẫn quét byte gốc trước nên EICAR
-  đổi đuôi vẫn là tệp nhiễm, có trong sổ kiểm toán. Giao diện Văn phòng điện tử, Không gian cá nhân báo đúng lỗi mới.
-  Test (đếm tĩnh): svc-files +25, giao diện +1.
+- Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô
+  nạp): sau ClamAV, loại nhận theo byte đầu phải khớp đuôi tệp — tệp `.pdf` thực ra là trang HTML bị chặn `415
+  type_mismatch`; chương trình, kịch bản (`MZ`, ELF, `#!`, đuôi `.exe`, `.bat`, `.js`…, xét cả tên ASCII lúc tải về:
+  `x.bát` → `x.bat`) bị chặn `415 type_not_allowed`; `core.files` lưu mime theo nội dung. Loại đang dùng vẫn nhận (docx,
+  xlsx có hay không mật khẩu, doc, xls cả bản HTML do phần mềm khác xuất, csv Windows khai `application/vnd.ms-excel`,
+  ảnh PNG, WebP mang đuôi .jpg, chữ UTF-16, TCVN3…). Ảnh JPEG, PNG được xoay theo hướng EXIF rồi mã hóa lại trong tiến
+  trình con có giới hạn để bỏ EXIF, vị trí GPS, XMP, chú thích; JPEG nhiều khung (ảnh chân dung iPhone) giữ khung đầu
+  (`sha256`, `size_bytes` là của ảnh đã làm sạch); PDF và loại khác lưu nguyên từng byte. ClamAV vẫn quét byte gốc trước
+  nên EICAR đổi đuôi vẫn là tệp nhiễm, có trong sổ kiểm toán. Giao diện Văn phòng điện tử, Không gian cá nhân báo đúng
+  lỗi mới. Test (đếm tĩnh): svc-files +25, giao diện +1.
 
 ## [1.1.0] - 2026-10-25
 
