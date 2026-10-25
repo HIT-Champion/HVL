@@ -235,6 +235,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   nghĩa ở trang Hỏi đáp. 403 JSON của Hasura, svc-files giữ như cũ. E2e `waf.spec.ts`: tên tệp có `' ; =`, dự thảo có
   đề mục I./II./III. và đường dẫn theo IP, ô Tìm kiếm "File …?" đi qua WAF; ô Nơi nhận chỉ là `http://<IP>/…` bị chặn
   và hiện đúng mã. Test office +6.
+- Đăng nhập thỉnh thoảng bị WAF chặn 403 (gặp ở CI của develop 6710703): token ngẫu nhiên do Keycloak,
+  oidc-client-ts sinh tình cờ trùng mẫu của OWASP CRS — libinjection (942100) với cookie `KC_AUTH_SESSION_HASH`
+  mà Keycloak bọc trong ngoặc kép (`"+…"`) hay chuỗi `8--…`, tên hàm PHP (933150: `rtrim`, `fputs`), đuôi tệp
+  (930120: `.nsr`), lệnh Unix (932250). Loại trừ 10010, 10020 nay gỡ đúng các luật đó trên đúng 6 cookie và 8 tham
+  số token của Keycloak, OIDC; luật SQLi khác, XSS, Java, Node.js vẫn soi. Đo với APISIX + Coraza như repo, 21 loại
+  token × 2 500 giá trị ngẫu nhiên đúng dạng: trước 7/50 951 bị chặn, sau 0/50 968; 16 giá trị đã bị chặn (có giá
+  trị trong log CI) nay đều qua. Test scripts +1, smoke +1 kiểm.
 
 ### Bảo mật
 - Image `svc-files`, `svc-workflow` (cả `ot-sensor`, dùng chung image) gỡ pip ngay sau khi cài thư viện: pip 26.2.1
