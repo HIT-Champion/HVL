@@ -1394,5 +1394,48 @@
     "when": "Lúc lưu",
     "sources": "Nguồn tham khảo",
     "sourcesNote": "Bộ câu {id}. Cách chấm và giới hạn: docs/tu-chan-doan.md trong mã nguồn."
+  },
+  "apps": {
+    "nav": "Ứng dụng",
+    "title": "Danh mục ứng dụng",
+    "subtitle": "Các ứng dụng chạy trên lõi Signet, dùng chung một lần đăng nhập",
+    "builtinTitle": "Có sẵn trong lõi",
+    "builtinHint": "Cài cùng lõi, cùng phiên bản với lõi.",
+    "installedTitle": "Cài bằng manifest",
+    "installedHint": "Quản trị hệ thống cắm thêm bằng lệnh moc app install, không sửa mã của lõi.",
+    "removedTitle": "Đã gỡ",
+    "removedHint": "Lệnh moc app remove đã gỡ đường dẫn, đăng nhập và container; dữ liệu của ứng dụng vẫn giữ.",
+    "none": {
+      "builtin": "Không có ứng dụng có sẵn.",
+      "installed": "Chưa có ứng dụng nào cài bằng manifest.",
+      "removed": "Chưa gỡ ứng dụng nào."
+    },
+    "state": {
+      "builtin": "Có sẵn trong lõi",
+      "installed": "Đã cài",
+      "removed": "Đã gỡ"
+    },
+    "version": "Phiên bản",
+    "coreVersion": "theo bản lõi",
+    "installedAt": "Cài lúc",
+    "updatedAt": "Cập nhật lúc",
+    "removedAt": "Gỡ lúc",
+    "manifestHash": "Băm manifest",
+    "hashHint": "Băm manifest là SHA-256 của tệp app.yaml lúc cài: so với kết quả sha256sum apps/<thư mục>/app.yaml trên máy chủ để biết bản đang cài đúng bản đã duyệt.",
+    "copy": "Chép",
+    "copyHashOf": "Chép băm manifest của {app}",
+    "copied": "Đã chép băm manifest",
+    "copyFailed": "Trình duyệt không cho chép — chọn tay chuỗi băm dưới đây",
+    "open": "Mở",
+    "builtin": {
+      "office": {
+        "title": "Văn phòng điện tử",
+        "description": "Văn bản đến, văn bản đi, giao việc, hồ sơ công việc, tìm kiếm, hỏi đáp, sổ kiểm toán — ứng dụng đầu tiên trên lõi."
+      },
+      "personal": {
+        "title": "Không gian cá nhân P.A.R.A",
+        "description": "Chỗ cất tệp của riêng mỗi người trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ."
+      }
+    }
   }
 }

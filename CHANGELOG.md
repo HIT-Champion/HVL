@@ -28,6 +28,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Bản cài cũ (realm không nạp lại): `python3 scripts/moc.py realm theme` sau khi nâng cấp — chỉ đặt khi realm còn dùng
   theme mặc định, báo lỗi nếu container chưa gắn thư mục theme (`docs/trien-khai.md`, mục Nâng cấp tay). Test scripts
   +14.
+- Trang Danh mục ứng dụng (`/ung-dung`) trong Văn phòng điện tử, mục "Ứng dụng" ở thanh bên cho mọi vai trò: các ứng
+  dụng chạy trên lõi — hai ứng dụng có sẵn trong lõi (phiên bản lõi từ `/api/status`) và ứng dụng cắm bằng `moc app
+  install` — với tên, mô tả, nút Mở, phiên bản, lúc cài; lãnh đạo, quản trị đơn vị thấy thêm băm manifest (SHA-256 tệp
+  `app.yaml` lúc cài, rút gọn, có nút chép) và ứng dụng đã gỡ. Đọc khung nhìn hẹp `core.app_catalog` (migration
+  1792281603400): không có manifest (image, cổng, biến môi trường), không schema; `core.apps` vẫn không vào GraphQL,
+  không vai trò nào ghi. `/ung-dung` thành đường giữ chỗ của `moc app`; `make demo-cai-ung-dung` kiểm danh mục sau khi
+  cài, cài lại, gỡ. Test office +8, db +6, e2e +1.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
