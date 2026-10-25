@@ -31,8 +31,6 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   vite: { plugins: [tailwindcss(), formsPlugin(schemas)] },
   app: {
-    // chuyển trang: mờ dần và trượt nhẹ (lớp sg-page-* trong main.css), tắt khi người dùng chọn giảm chuyển động
-    pageTransition: { name: 'sg-page', mode: 'out-in' },
     head: {
       title: 'Signet — Văn phòng điện tử',
       htmlAttrs: { lang: 'vi' },

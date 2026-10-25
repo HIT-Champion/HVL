@@ -566,10 +566,11 @@
 .sg-task-move { transition: transform 280ms var(--sg-ease); }
 .sg-task-enter-from { opacity: 0; transform: translateY(10px); }
 .sg-task-leave-to { opacity: 0; transform: translateY(-4px); }
-.sg-page-enter-active { transition: opacity 180ms ease, transform 260ms var(--sg-ease); }
-.sg-page-leave-active { transition: opacity 100ms ease, transform 120ms ease; }
-.sg-page-enter-from { opacity: 0; transform: translateY(8px); }
-.sg-page-leave-to { opacity: 0; transform: translateY(-3px); }
+/* Chuyển trang: trang mới hiện dần, trượt lên 8px. Không dùng <Transition> của trang: trang cũ gỡ ngay, không lúc nào
+   có hai trang trên màn hình (trình đọc màn hình, e2e chỉ thấy trang đang mở). Chỉ giữ hiệu ứng lúc đầu (backwards),
+   xong là hết transform, không thành khung chứa cho phần tử position: fixed trong trang. */
+@keyframes sg-page-in { from { opacity: 0; transform: translateY(8px); } }
+.moc-sheet > *, .moc-public > main > * { animation: sg-page-in 260ms var(--sg-ease) backwards; }
 .sg-popover-enter-active {
   transform-origin: top right;
   transition: opacity 160ms ease, transform 240ms var(--sg-ease);
@@ -718,7 +719,7 @@
     scroll-behavior: auto !important;
     transition-duration: 0s !important;
   }
-  .sg-task-enter-from, .sg-task-leave-to, .sg-page-enter-from, .sg-page-leave-to,
+  .sg-task-enter-from, .sg-task-leave-to,
   .sg-popover-enter-from, .sg-popover-leave-to, .sg-notice-enter-from, .sg-notice-leave-to { transform: none; }
   .sg-nav-label, .sg-brand-full { transform: none !important; }
   .sg-nav-link:hover svg, .sg-task-link:hover .sg-task-action svg, .sg-task-link:focus-visible .sg-task-action svg,

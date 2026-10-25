@@ -131,6 +131,7 @@ const nav = computed(() => {
   // vượt ngưỡng dựng ra; quản trị đơn vị không đọc văn bản nên không có
   if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/cam-bien',
     label: t('nav.sensors'), icon: 'M3 5h18v14H3zM3 11h7m4 0h7M9 5v6m6-6v6m-3 2v6' })
+  items.push({ to: '/tim-kiem', label: t('nav.search'), icon: 'M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z' })
   // Hỏi đáp trên kho văn bản (F4.2): vai trò nghiệp vụ; quản trị đơn vị không đọc văn bản nên không hỏi được
   if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/hoi-dap', label: t('nav.ask'), icon: 'M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z' })
   if (role === 'director') items.push({ to: '/dieu-hanh', label: t('nav.board'), icon: 'M3 3v18h18M8 17v-4m4 4V8m4 9v-6' })
@@ -252,18 +253,6 @@ async function logout() {
         </NuxtLink>
       </nav>
       <div class="sg-sidebar-bottom">
-        <NuxtLink
-          to="/tim-kiem" class="sg-nav-link" :class="{ 'is-active': active('/tim-kiem') }" :aria-label="t('nav.search')"
-          :title="collapsed ? t('nav.search') : undefined" :aria-current="active('/tim-kiem') ? 'page' : undefined"
-        >
-          <svg
-            width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
-            aria-hidden="true"
-          >
-            <path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
-          </svg>
-          <span class="sg-nav-label">{{ t('nav.search') }}</span>
-        </NuxtLink>
         <div class="sg-account">
           <span class="sg-avatar" data-testid="avatar-initial" aria-hidden="true">
             {{ initialOf(claims?.givenName ?? '', claims?.name ?? '') }}
