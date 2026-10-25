@@ -105,7 +105,7 @@ jobs:
           git rev-parse -q --verify "refs/tags/$tu^{commit}" >/dev/null \
             || { echo "::error::Không có thẻ '$tu'"; exit 1; }
           git worktree add -q --detach "$RUNNER_TEMP/cu" "$tu"
-          { echo "CU=$RUNNER_TEMP/cu"; echo "MOC=$RUNNER_TEMP/moc"; } >> "$GITHUB_ENV"
+          { echo "TU=$tu"; echo "CU=$RUNNER_TEMP/cu"; echo "MOC=$RUNNER_TEMP/moc"; } >> "$GITHUB_ENV"
           echo "bản cũ: $tu ($(git rev-parse --short "$tu^{commit}")); bản mới: $(git describe --tags --always)"
 
       # Hai bộ image của đội (bản cũ, bản mới) cùng image ngoài: dọn bộ công cụ không dùng nếu ổ còn ít
@@ -126,12 +126,13 @@ jobs:
             [ -z "$v" ] || echo "::add-mask::$v"
           done
 
-      # Màn demo chạy từ mã nguồn bản cũ (cùng project moc, cùng .env): bản cài 1.1.0 thiếu scripts/nap_lo_mau.py mà
-      # demo.py nạp ngay khi chạy (sửa ở #176)
+      # MOC_VERSION đặt tay như người vận hành cài bản 1.1.0: make install truyền MOC_VERSION rỗng, install.sh của bản
+      # đó dựng image thẻ 1.1.0 nhưng lúc kiểm lại tìm thẻ dev. Màn demo chạy từ mã nguồn bản cũ (cùng project moc,
+      # cùng .env): bản cài 1.1.0 thiếu scripts/nap_lo_mau.py mà demo.py nạp ngay khi chạy (sửa ở #176)
       - name: Cài bản cũ ra thư mục riêng, chạy, nạp mẫu, tạo văn bản hạn chế
         working-directory: ${{ runner.temp }}/cu
         run: |
-          make install PREFIX="$MOC"
+          MOC_VERSION="${TU#v}" make install PREFIX="$MOC"
           (cd "$MOC" && docker compose up -d --wait --wait-timeout 900 && python3 scripts/seed.py)
           python3 scripts/demo.py han-che
 
