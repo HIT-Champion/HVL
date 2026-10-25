@@ -27,6 +27,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import pathlib
 import re
 import ssl
@@ -96,6 +97,11 @@ class FakeSite:
 class CheckTest(unittest.TestCase):
     def setUp(self) -> None:
         self.site = FakeSite()
+        # Trên GitHub Actions lỗi in thành ::error::; các ca dưới kiểm cách in ở máy, trừ ca chú thích tự đặt lại biến
+        env = mock.patch.dict("os.environ")
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop("GITHUB_ACTIONS", None)
 
     def run_check(self, *args: str, url: str = BASE) -> tuple[int, str]:
         out = io.StringIO()
@@ -193,12 +199,18 @@ class CheckTest(unittest.TestCase):
         self.assertIn("  - /api/status: chạy bản 1.1.0", out)
         self.assertEqual(out.count("✓ "), 2, out)     # Keycloak, header vẫn được kiểm
 
-    def test_errors_become_annotations_on_github(self) -> None:
+    def test_errors_and_warnings_become_annotations_on_github(self) -> None:
         self.site.status["version"] = "1.1.0"
         with mock.patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}):
             code, out = self.run_check("--version", "1.2.0")
-        self.assertEqual(code, 1)
-        self.assertIn(f"::error::{BASE}: /api/status: chạy bản 1.1.0", out)
+            self.assertEqual(code, 1)
+            self.assertIn(f"::error::{BASE}: /api/status: chạy bản 1.1.0", out)
+            self.assertNotIn("  - ", out)
+            self.site.status.update(status="degraded", version="1.2.0")
+            self.site.status["components"][0]["status"] = "degraded"
+            code, out = self.run_check("--version", "1.2.0")
+        self.assertEqual(code, 0, out)
+        self.assertIn(f"::warning::{BASE}: /api/status: thành phần không ok: CSDL: degraded", out)
 
     def test_only_a_bare_https_origin_is_accepted(self) -> None:
         for url in ("http://signet.example", "https://signet.example/app", "signet.example", "https://"):
