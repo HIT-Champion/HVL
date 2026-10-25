@@ -53,4 +53,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
 
-CMD ["uvicorn", "svc_files.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# APISIX giữ kết nối rảnh tới dịch vụ phía sau 60 giây (mặc định của APISIX 3.18), uvicorn mặc định đóng sau 5 giây:
+# yêu cầu tới đúng lúc uvicorn đóng thì cổng trả 502, không thử lại ("upstream prematurely closed connection" hay
+# "Connection reset by peer" trong log APISIX). Giữ kết nối lâu hơn cổng (75 > 60) để chỉ APISIX đóng kết nối rảnh
+CMD ["uvicorn", "svc_files.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", \
+     "--timeout-keep-alive", "75"]
