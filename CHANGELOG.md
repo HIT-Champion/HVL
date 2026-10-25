@@ -90,6 +90,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   dòng thời gian, tab Lịch sử), danh sách văn bản đi; tải lại trang vẫn giữ tiếng Anh, bấm "Tiếng Việt" thì về lại. Kịch
   bản thứ hai: người ngoài dùng trình duyệt tiếng Anh vẫn mở ra tiếng Việt, đổi ngôn ngữ ở trang trạng thái hệ thống
   và cổng xác thực không cần đăng nhập. e2e +2.
+- Kịch bản e2e kiểm tài sản tĩnh của giao diện Liền mạch (#214). `tests/e2e/tai-san.spec.ts` mở trang đăng nhập
+  (theme `signet`) rồi hộp việc, và đòi các điều sau:
+  - phông Be Vietnam Pro tải được đủ bốn độ đậm;
+  - ảnh giải mã được;
+  - không tài nguyên tĩnh nào trả lỗi, console không có lỗi CSP;
+  - `favicon.svg` và logo trả đúng SVG.
+  nginx trả `index.html` (200) cho tệp không có, nên chỉ nhìn mã trạng thái thì không thấy tệp thiếu. e2e +1.
 - Kiểm bản online qua HTTPS mỗi ngày (F1.9, #197): `scripts/kiem_ban_online.py` (chỉ thư viện chuẩn) kiểm một địa
   chỉ công khai từ bên ngoài, chạy hết các mục rồi báo mục trượt: chứng chỉ hợp lệ, TLS từ 1.2, còn ít nhất 14 ngày;
   `http://` chuyển sang `https://`; `/api/status` ok hay degraded (thành phần không ok in thành cảnh báo) và đúng
