@@ -30,7 +30,6 @@ const width = computed(() => (route.meta.wide ? 'max-w-6xl' : 'max-w-3xl'))
 function toggleLocale() {
   locale.value = locale.value === 'vi' ? 'en' : 'vi'
   try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
-  document.documentElement.lang = locale.value
 }
 </script>
 
