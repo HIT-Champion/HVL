@@ -535,6 +535,8 @@
     "unscannable": "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
+    "blocked": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công. Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị.",
+    "blockedId": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công (mã {id}). Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị kèm mã trên.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
     "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
     "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
