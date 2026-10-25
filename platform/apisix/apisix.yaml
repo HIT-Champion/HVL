@@ -168,7 +168,11 @@ global_rules:
                 SecAction "id:900110,phase:1,pass,nolog,setvar:tx.inbound_anomaly_score_threshold=5,
                 setvar:tx.outbound_anomaly_score_threshold=4"
               # Loại trừ 1 — Keycloak: mật khẩu là chuỗi tùy ý (Keycloak chỉ băm); redirect URI được Keycloak so đúng
-              # danh sách của client, không tự gọi tới
+              # danh sách của client, không tự gọi tới. Token ngẫu nhiên do Keycloak, oidc-client-ts sinh (cookie phiên,
+              # mã phiên, JWT, PKCE) tình cờ trùng mẫu: libinjection (942100: "+…" trong ngoặc kép, "8--…"), tên hàm
+              # PHP (933…: rtrim, fputs), đuôi tệp (930120: .nsr), lệnh Unix (932…, chỉ cookie base64 có "/", "+") —
+              # khoảng 1/2 500 giá trị mỗi loại bị 403, đăng nhập hỏng ngẫu nhiên (#140). Chỉ gỡ đúng các luật đó trên
+              # đúng tên cookie, tham số token; luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi
               - >-
                 SecRule REQUEST_FILENAME "@beginsWith /realms/${{MOC_REALM}}/" "id:10010,phase:1,pass,nolog,
                 ctl:ruleRemoveTargetByTag=OWASP_CRS;ARGS:password,
@@ -177,14 +181,58 @@ global_rules:
                 ctl:ruleRemoveTargetById=931100;ARGS:redirect_uri,
                 ctl:ruleRemoveTargetById=934110;ARGS:redirect_uri,
                 ctl:ruleRemoveTargetById=931100;ARGS:post_logout_redirect_uri,
-                ctl:ruleRemoveTargetById=934110;ARGS:post_logout_redirect_uri"
+                ctl:ruleRemoveTargetById=934110;ARGS:post_logout_redirect_uri,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=932000-932999;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:AUTH_SESSION_ID,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:AUTH_SESSION_ID,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:AUTH_SESSION_ID,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KC_RESTART,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KC_RESTART,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KC_RESTART,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KEYCLOAK_IDENTITY,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KEYCLOAK_IDENTITY,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KEYCLOAK_IDENTITY,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KEYCLOAK_SESSION,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KEYCLOAK_SESSION,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KEYCLOAK_SESSION,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KC_STATE_CHECKER,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KC_STATE_CHECKER,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KC_STATE_CHECKER,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_code,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_code,
+                ctl:ruleRemoveTargetById=942100;ARGS:tab_id,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:tab_id,
+                ctl:ruleRemoveTargetById=930120;ARGS:tab_id,
+                ctl:ruleRemoveTargetById=942100;ARGS:client_data,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:client_data,
+                ctl:ruleRemoveTargetById=930120;ARGS:client_data,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=942100;ARGS:refresh_token,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:refresh_token,
+                ctl:ruleRemoveTargetById=930120;ARGS:refresh_token,
+                ctl:ruleRemoveTargetById=942100;ARGS:id_token_hint,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:id_token_hint,
+                ctl:ruleRemoveTargetById=930120;ARGS:id_token_hint"
               # Loại trừ 2 — trang Keycloak trả về sau đăng nhập: tham số iss (RFC 9207) là URL của realm; URL công khai
               # là localhost hay IP thì 934110 (SSRF), 931100 (RFI) bắt nhầm. Áp cho mọi redirect URI của ứng dụng: `/`,
-              # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`
+              # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`. Mã code, session_state
+              # Keycloak gửi kèm là token ngẫu nhiên: gỡ đúng ba luật bắt nhầm token như loại trừ 1 (#140)
               - >-
                 SecRule REQUEST_FILENAME "@rx ^/(?:[a-z0-9-]+/)?(?:dang-nhap)?$" "id:10020,phase:1,pass,nolog,
                 ctl:ruleRemoveTargetById=931100;ARGS:iss,
-                ctl:ruleRemoveTargetById=934110;ARGS:iss"
+                ctl:ruleRemoveTargetById=934110;ARGS:iss,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_state,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_state,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_state"
               # Loại trừ 3 — chữ truy vấn GraphQL (không phải biến): tên cột, toán tử của Hasura trùng lệnh Unix (932…),
               # hàm PHP (933…), toán tử MongoDB (942290); Hasura phân tích theo ngữ pháp GraphQL rồi sinh SQL tham số
               # hóa. Chỉ gỡ đúng hai dải id đó: luật Java/Log4Shell (944…), Node.js (934…) cùng nhãn attack-rce vẫn soi
