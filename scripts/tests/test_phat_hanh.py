@@ -18,20 +18,28 @@
 "## [X.Y.Z]" của CHANGELOG; khối mẫu trong chú thích HTML không tính; thiếu mục, hay mục chỉ có tiêu đề nhóm, thì
 lỗi chứ không ra ghi chú rỗng. Không phát hành lại: release.sh dừng trước khi gắn khi thẻ đã có trên origin hay ở máy,
 không hỏi được origin cũng dừng; release.yml dừng khi thẻ đã có Release, kể cả nháp (chạy lệnh của bước với gh giả), và
-báo lỗi khi action không tải lên đủ hai tệp. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
+báo lỗi khi action không tải lên đủ bốn tệp (gói, SBOM, hai .sha256). Trang Release (scripts/release_body.py): dòng chỉ
+gói .tar.gz chính thức và SBOM, phần tóm tắt đầu mục, toàn bộ ghi chép gập trong <details>, dòng tiếp nối nối lại.
+Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "release-notes.sh"
 RELEASE = SCRIPT.parent / "release.sh"
+BODY = SCRIPT.parent / "release_body.py"
+spec = importlib.util.spec_from_file_location("release_body", BODY)
+release_body = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(release_body)
 WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "release.yml"
 # repo thử không đọc cấu hình git của máy (khóa ký thẻ, hook…), tên người gắn thẻ cố định; bỏ mọi GIT_* thừa hưởng —
 # chạy từ hook git thì GIT_DIR, GIT_INDEX_FILE trỏ về repo thật và lệnh git của test sẽ ghi vào đó
@@ -146,8 +154,8 @@ class NoReReleaseTest(unittest.TestCase):
         proc = self.release()
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(self.git("tag", "-l").split(), ["v0.2.0"])
-        self.assertTrue((self.repo / "dist" / "moc-0.2.0.tar.gz").is_file())
-        self.assertTrue((self.repo / "dist" / "moc-0.2.0.tar.gz.sha256").is_file())
+        self.assertTrue((self.repo / "dist" / "signet-0.2.0.tar.gz").is_file())
+        self.assertTrue((self.repo / "dist" / "signet-0.2.0.tar.gz.sha256").is_file())
 
     def test_tag_already_on_origin_stops_before_tagging(self) -> None:
         # thẻ đã đẩy từ máy khác: máy này chưa có, gắn được thẻ cục bộ nhưng đẩy lên sẽ là phát hành lại
@@ -222,7 +230,7 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 
     def guard(self, releases: list[dict], fail: str = "") -> subprocess.CompletedProcess[str]:
         (self.dir / "releases.json").write_text(json.dumps(releases), encoding="utf-8")
-        env = {**os.environ, "PATH": f"{self.dir}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "HIT-Champion/HVL",
+        env = {**os.environ, "PATH": f"{self.dir}:{os.environ['PATH']}", "GITHUB_REPOSITORY": "HIT-Champion/Signet",
                "GITHUB_REF_NAME": "v0.2.0", "FAKE_RELEASES": str(self.dir / "releases.json"),
                "FAKE_GH_CALLS": str(self.dir / "calls"), "FAKE_GH_FAIL": fail}
         return subprocess.run(["bash", "-e", "-c", step_script("Chặn phát hành lại")], env=env, capture_output=True,
@@ -230,19 +238,19 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
 
     @staticmethod
     def release(tag: str, draft: bool = False) -> dict:
-        return {"tag_name": tag, "draft": draft, "html_url": f"https://github.com/HIT-Champion/HVL/releases/{tag}"}
+        return {"tag_name": tag, "draft": draft, "html_url": f"https://github.com/HIT-Champion/Signet/releases/{tag}"}
 
     def test_new_tag_passes_and_lists_every_page(self) -> None:
         proc = self.guard([self.release("v0.1.0"), self.release("v0.2.0-rc.1", draft=True), self.release("v0.2.00")])
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         calls = (self.dir / "calls").read_text(encoding="utf-8")
         self.assertIn("--paginate", calls)
-        self.assertIn("repos/HIT-Champion/HVL/releases?per_page=100", calls)
+        self.assertIn("repos/HIT-Champion/Signet/releases?per_page=100", calls)
 
     def test_published_release_stops(self) -> None:
         proc = self.guard([self.release("v0.1.0"), self.release("v0.2.0")])
         self.assertEqual(proc.returncode, 1)
-        self.assertIn("::error::v0.2.0 đã có Release (đã đăng https://github.com/HIT-Champion/HVL/releases/v0.2.0)",
+        self.assertIn("::error::v0.2.0 đã có Release (đã đăng https://github.com/HIT-Champion/Signet/releases/v0.2.0)",
                       proc.stdout)
 
     def test_draft_left_by_deleted_tag_stops(self) -> None:
@@ -267,12 +275,13 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         return subprocess.run(["bash", "-e", "-c", step_script("Kiểm gói đã tải lên")], env=env, capture_output=True,
                               text=True)
 
-    def test_upload_check_needs_both_files(self) -> None:
-        self.assertEqual(self.assets('[{"name": "moc-0.2.0.tar.gz"}, {"name": "moc-0.2.0.tar.gz.sha256"}]')
-                         .returncode, 0)
-        skipped = self.assets('[{"name": "moc-0.2.0.tar.gz.sha256"}]')
+    def test_upload_check_needs_all_four_files(self) -> None:
+        names = ["signet-0.2.0.tar.gz", "signet-0.2.0.tar.gz.sha256", "signet-0.2.0.cdx.json",
+                 "signet-0.2.0.cdx.json.sha256"]
+        self.assertEqual(self.assets(json.dumps([{"name": n} for n in names])).returncode, 0)
+        skipped = self.assets(json.dumps([{"name": n} for n in names[1:]]))
         self.assertEqual(skipped.returncode, 1)
-        self.assertIn("Chỉ tải lên 1/2 tệp", skipped.stdout)
+        self.assertIn("Chỉ tải lên 3/4 tệp", skipped.stdout)
         self.assertEqual(self.assets(None).returncode, 1)
 
     def test_action_does_not_overwrite_assets(self) -> None:
@@ -281,6 +290,102 @@ class WorkflowNoReReleaseTest(unittest.TestCase):
         self.assertIn("fail_on_unmatched_files: true", action)
         self.assertIn("ASSETS: ${{ steps.gh_release.outputs.assets }}", action)
 
+    def test_sbom_is_made_from_the_tag_and_attached(self) -> None:
+        # make sbom sinh dist/signet-$V.cdx.json (+ .sha256) trước khi tạo Release; action tải cả hai lên
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertLess(text.index("name: Sinh SBOM CycloneDX (make sbom)"), text.index("softprops/action-gh-release@"))
+        self.assertIn('run: make sbom VERSION="$V"', text)
+        files = text.split("files: |", 1)[1]
+        self.assertIn("dist/*.cdx.json\n", files)
+        self.assertIn("dist/*.cdx.json.sha256\n", files)
+
+
+class ReleaseBodyTest(unittest.TestCase):
+    """scripts/release_body.py: trang Release ngắn — tóm tắt hiện ra, ghi chép đầy đủ gập lại, không gãy dòng."""
+
+    URL = "https://github.com/HIT-Champion/Signet"
+    NOTES = ("Bản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng,\n"
+             "dựng từ mã nguồn bằng make.\n"
+             "\n"
+             "- Văn bản đi: soạn, duyệt, ký,\n"
+             "  cấp số, phát hành PDF có mã QR.\n"
+             "\n"
+             "### Đã thêm\n"
+             "- Cổng xác thực, xem [docs/api/](docs/api/README.md) và\n"
+             "  [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/).\n"
+             "- Sổ đăng ký.\n"
+             "\n"
+             "### Đã sửa lỗi\n"
+             "- Lỗi gấp.\n")
+
+    def test_summary_shows_and_changes_fold(self) -> None:
+        out = release_body.body("1.1.0", self.NOTES, self.URL)
+        head, rest = out.split("<details>", 1)
+        self.assertTrue(head.startswith("**Gói phát hành chính thức: `signet-1.1.0.tar.gz`**"))
+        self.assertIn("`sha256sum -c signet-1.1.0.tar.gz.sha256`", head)
+        self.assertIn("(SBOM CycloneDX): `signet-1.1.0.cdx.json`", head)
+        self.assertIn('"Source code (zip)"', head)
+        self.assertIn("\n\nBản cho vòng trường: văn bản đến và văn bản đi chạy đủ luồng, dựng từ mã nguồn bằng "
+                      "make.\n\n- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR.\n\n", head)
+        self.assertNotIn("### Đã thêm", head)
+        self.assertIn("<summary>Toàn bộ ghi chép thay đổi của 1.1.0 (3 mục)</summary>\n\n### Đã thêm\n", rest)
+        self.assertTrue(rest.endswith("- Lỗi gấp.\n\n</details>\n"))
+
+    def test_continuation_lines_join_and_relative_links_point_at_the_tag(self) -> None:
+        out = release_body.body("1.1.0", self.NOTES, self.URL)
+        self.assertIn("- Cổng xác thực, xem [docs/api/](https://github.com/HIT-Champion/Signet/blob/v1.1.0/docs/api/"
+                      "README.md) và [Keep a Changelog](https://keepachangelog.com/vi/1.1.0/).\n- Sổ đăng ký.\n\n"
+                      "### Đã sửa lỗi\n", out)
+
+    def test_without_summary_only_the_folded_changes(self) -> None:
+        out = release_body.body("1.1.1", "### Đã sửa lỗi\n- Lỗi gấp.\n", self.URL)
+        first, second = out.split("\n\n", 1)
+        self.assertIn("`signet-1.1.1.tar.gz`", first)
+        self.assertTrue(second.startswith("<details>\n<summary>Toàn bộ ghi chép thay đổi của 1.1.1 (1 mục)</summary>"))
+
+    def test_entry_reads_the_section_and_fails_without_one(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "CHANGELOG.md"
+            path.write_text(CHANGELOG, encoding="utf-8")
+            ok = subprocess.run([sys.executable, str(BODY), "0.2.0", str(path)], capture_output=True, text=True)
+            missing = subprocess.run([sys.executable, str(BODY), "0.3.0", str(path)], capture_output=True, text=True)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertIn("(2 mục)</summary>\n\n### Đã thêm\n- Tính năng của 0.2.0.\n\n### Đã sửa lỗi\n", ok.stdout)
+        self.assertNotIn("Khung dự án", ok.stdout)
+        self.assertEqual(missing.returncode, 1)
+        self.assertIn("chưa có mục '## [0.3.0]'", missing.stderr)
+        self.assertEqual(missing.stdout, "")
+
+
+class WorkflowNotesTest(unittest.TestCase):
+    """release.yml, bước "Trích ghi chú phát hành từ CHANGELOG": chạy thật lệnh của bước — trang Release dựng bằng
+    release_body.py; thiếu mục thì dừng."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = pathlib.Path(tmp.name)
+        (self.dir / "scripts").mkdir()
+        shutil.copy(SCRIPT, self.dir / "scripts" / "release-notes.sh")
+        shutil.copy(BODY, self.dir / "scripts" / "release_body.py")
+        (self.dir / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
+        (self.dir / "dist").mkdir()
+
+    def step(self, version: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["bash", "-e", "-c", step_script("Trích ghi chú phát hành từ CHANGELOG")], cwd=self.dir,
+                              env={**os.environ, "V": version}, capture_output=True, text=True)
+
+    def test_page_starts_with_the_official_package(self) -> None:
+        proc = self.step("0.2.0")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        page = (self.dir / "dist" / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+        self.assertTrue(page.startswith("**Gói phát hành chính thức: `signet-0.2.0.tar.gz`**"))
+        self.assertIn("- Tính năng của 0.2.0.\n", page)
+
+    def test_missing_section_stops(self) -> None:
+        proc = self.step("0.3.0")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("::error::CHANGELOG.md chưa có mục [0.3.0]", proc.stdout)
 
 if __name__ == "__main__":
     unittest.main()

@@ -476,6 +476,7 @@ def _env(settings: Settings) -> dict[str, str]:
             "SEAWEEDFS_S3_ACCESS_KEY": "test", "SEAWEEDFS_S3_SECRET_KEY": "test", "HASURA_ADMIN_SECRET": "test",
             "MEILISEARCH_API_KEY": "test", "MOC_SEARCH_SYNC_INTERVAL_S": "0", "MOC_ASK_ENABLED": "false",
             "MOC_ASK_SYNC_INTERVAL_S": "0", "MOC_AUDIT_ANCHOR_INTERVAL_S": "0", "MOC_TEXT_INTERVAL_S": "0",
+            "MOC_IMPORT_INTERVAL_S": "0",     # vòng nền nạp lô tắt (không tạo thư mục spool)
             "MOC_AI_URL": ""}
 
 

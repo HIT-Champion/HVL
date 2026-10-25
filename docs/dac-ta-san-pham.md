@@ -2,8 +2,8 @@
 
 > Lập ngày 15/10/2026. Thay hướng "luồng phê duyệt đề xuất mua sắm / tạm ứng / nghỉ phép" của kế hoạch
 > ngày 05/10.
-> Liên quan: phân tích đề [`olp-2026-de-thi.md`](olp-2026-de-thi.md) · kế hoạch theo phase
-> [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) · mô hình dữ liệu [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
+> Liên quan: phân tích đề [`olp-2026-de-thi.md`](du-thi/olp-2026-de-thi.md) · kế hoạch theo phase
+> [`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md) · mô hình dữ liệu [`mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md).
 > Mã chức năng (F2.x, F3.x, F4.x) dùng chung với kế hoạch. Hai tài liệu lệch nhau về **lịch** thì kế
 > hoạch đúng; lệch về **phạm vi sản phẩm** thì tài liệu này đúng.
 
@@ -62,7 +62,7 @@ coi là thiếu R7, và theo ghi chú ở tiêu chí PoF #2 ("giải quyết đ�
 ### 1.2. Các đội khác đang làm gì
 
 Kho mã OLP 2026 công khai trên GitHub, tra ngày 15/10/2026 (cùng 2 kho tra ngày 09/09 ở
-[`nghien-cuu/nghien-cuu-chu-de-2026.md`](nghien-cuu/nghien-cuu-chu-de-2026.md) §5.5):
+[`nghien-cuu/nghien-cuu-chu-de-2026.md`](du-thi/nghien-cuu/nghien-cuu-chu-de-2026.md) §5.5):
 
 | Kho | Ứng dụng | Ghi chú |
 |---|---|---|
@@ -208,6 +208,7 @@ Mã F3.6 bỏ trống vì đã lên Must (F2.13).
 | F4.4 | Che CCCD, số điện thoại trong log và ngữ cảnh gửi mô hình |
 | F4.5 | Ký số PDF (PAdES) bằng PKI nội bộ do OpenBao cấp — **chỉ minh họa**, không có giá trị pháp lý như chữ ký số công cộng |
 | F4.6 | Thu góp ý, đo số liệu "sau" theo §8 |
+| F4.7 | **Tự chẩn đoán H-P-D-I** cho lãnh đạo: bộ câu bốn không gian × 5 mức, radar, bước tiếp theo trỏ phân hệ Signet, bằng chứng đo được từ số liệu của chính đơn vị, lưu lịch sử ([`tu-chan-doan.md`](tu-chan-doan.md)) |
 
 ### 4.4. Không làm
 
@@ -308,8 +309,9 @@ Chỉ trình bày số đo thật. Chỉ số nào chưa đo được thì nói 
 
 1. **Tên sản phẩm — đã chốt 15/10/2026: Mộc** (theo chữ "đóng mộc" — đóng dấu). Hai tên đã loại:
    "DX-Lab" trùng ứng dụng của HaUI và tên Trạm thực hành số trong chủ đề cuộc thi; "AgentLab" trùng
-   dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL`;
-   tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi trường `MOC_*`.
+   dự án nguồn mở ServiceNow/AgentLab và gợi một sản phẩm về tác tử AI. Tên repo giữ nguyên `HVL` (đổi thành
+   `Signet` ngày 25/10/2026); tên kỹ thuật (Compose project, CSDL mặc định, gói phát hành) là `moc`, biến môi
+   trường `MOC_*`.
    **Đổi 23/10/2026: Signet** — nhẫn ấn đóng dấu lên văn bản, giữ ý "đóng dấu" của tên cũ; chỉ đổi tên hiển thị
    (giao diện, tài liệu, chuỗi in ra, header giấy phép "Signet Team"), tên kỹ thuật `moc` giữ nguyên.
 2. **Đơn vị chạy thử**: văn thư khoa nào đồng ý dùng thử; nếu không, dùng phương án dự phòng ở kế hoạch §1.1.
@@ -318,7 +320,7 @@ Chỉ trình bày số đo thật. Chỉ số nào chưa đo được thì nói 
    trường hoặc bằng dữ liệu mẫu.
 3. **Mẫu văn bản đi làm trước**: đề xuất công văn và thông báo.
 4. Hỏi BTC: trang đăng nhập do Keycloak phát ra có bị coi là giao diện của Tầng 1 không
-   ([`olp-2026-de-thi.md`](olp-2026-de-thi.md) §8).
+   ([`olp-2026-de-thi.md`](du-thi/olp-2026-de-thi.md) §8).
 
 ---
 

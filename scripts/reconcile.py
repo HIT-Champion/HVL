@@ -17,7 +17,7 @@
 
 """Reconciler GitOps và tự phục hồi (F3.3) — một lượt mỗi lần gọi, chỉ dùng thư viện chuẩn.
 
-Chạy trên máy chủ bằng systemd timer mỗi 60 giây (`ops/systemd/`), không gắn socket Docker vào container nào.
+Chạy trên máy chủ bằng systemd timer mỗi 60 giây (`platform/systemd/`), không gắn socket Docker vào container nào.
 Mỗi lượt đưa hệ thống đang chạy về đúng trạng thái khai trong git:
 
   1. GitOps (khi đặt MOC_GITOPS_DIR — một bản sao git riêng của reconciler, chỉ dùng khi chạy từ bản cài):
@@ -26,6 +26,8 @@ Mỗi lượt đưa hệ thống đang chạy về đúng trạng thái khai tro
      Cài hỏng giữa chừng thì cài lại commit cũ. Commit áp lỗi thì không thử lại mỗi phút: đợi commit kế tiếp.
   2. Tự phục hồi: container unhealthy → khởi động lại; dịch vụ khai trong compose mà thiếu container hoặc đã dừng →
      `docker compose up -d` đúng các dịch vụ đó.
+  Giữa hai bước: ứng dụng cài bằng `moc app install` (nếu có) — dựng lại tệp chạy khi lõi đổi; không tự cài, gỡ ứng
+  dụng nào (apps()).
 
 Bỏ qua lượt khi đang sao lưu, khôi phục, cài đặt (cùng một khóa với `moc backup` và `install.sh`), khi lần khôi phục
 trước dừng giữa chừng (dữ liệu dở dang, không chạy lại Signet trên đó) hay có dịch vụ đang tạm dừng có chủ ý. Dịch vụ
@@ -58,12 +60,17 @@ COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
 MANIFEST = ".moc-install"           # danh sách tệp do make install quản lý (scripts/install.sh)
 STATE = "moc-reconcile.json"        # trong thư mục .git của bản sao: commit đã áp, băm tệp lúc cài
 RESTORING = ".moc-restoring"        # scripts/backup.py đặt trước khi dừng Signet để khôi phục, xóa khi xong
+APPS = ".moc-apps/apps"             # bản ghi ứng dụng cài bằng moc app install (scripts/ung_dung.py)
 # Dịch vụ `moc backup create` tạm dừng (cùng danh sách WRITERS, DB_WRITERS trong scripts/backup.py)
 BACKUP_PAUSES = {"svc-files", "seaweedfs", "openbao", "hasura", "svc-workflow", "flowable", "keycloak"}
 
 
 class ReconcileError(Exception):
     pass
+
+
+class ConfigError(ReconcileError):
+    """Lỗi ở .env của bản cài, không phải của commit: sửa .env thì lượt sau áp được, không cần commit mới."""
 
 
 def _run(cmd: list[str], *, cwd: pathlib.Path = ROOT, env: dict[str, str] | None = None,
@@ -253,6 +260,9 @@ def gitops(report: dict[str, Any]) -> None:
     print(f"· áp cấu hình — {reason}", flush=True)
     try:
         apply(git, src, target, state.get("commit"))
+    except ConfigError as exc:
+        # chưa dừng Signet; không ghi "failed": sửa .env thì lượt sau áp được, không cần commit mới
+        raise ReconcileError(f"không áp được commit {target[:12]}: {exc}") from None
     except (ReconcileError, subprocess.TimeoutExpired, OSError) as exc:
         state["failed"] = target
         write_private(state_path, json.dumps(state, indent=2))
@@ -274,6 +284,23 @@ def checkout(git: list[str], src: pathlib.Path, commit: str) -> dict[str, str]:
     return {**os.environ, "MOC_VERSION": version, "MOC_OPS_LOCKED": "1"}
 
 
+def check_gateway_env(src: pathlib.Path, env: dict[str, str]) -> None:
+    """F3.15: MOC_WAF, MOC_APISIX_WORKERS sai thì APISIX thoát ngay lúc khởi động rồi khởi động lại liên tục, mà
+    `up --wait` vẫn báo xong (apisix không có healthcheck). Kiểm trước khi dừng Signet, bằng chính script entrypoint
+    của image — cùng nguồn với `make up` (Makefile, env-ready) — với giá trị compose của commit sắp áp sẽ dùng."""
+    script = src / "platform" / "apisix" / "kiem-moi-truong.sh"
+    if not script.is_file():                            # commit chưa có WAF
+        return
+    resolved = json.loads(_run([*COMPOSE, "config", "--format", "json", "apisix"], cwd=src, env=env).stdout)
+    values = resolved["services"]["apisix"].get("environment") or {}
+    check = {"PATH": env.get("PATH", os.defpath)}
+    check.update({k: str(values[k]) for k in ("MOC_WAF", "MOC_APISIX_WORKERS") if values.get(k) is not None})
+    proc = _run(["sh", str(script), "--chi-kiem"], cwd=src, env=check, check=False)
+    if proc.returncode != 0:
+        detail = " ".join((proc.stderr or proc.stdout).split()) or f"thoát {proc.returncode}"
+        raise ConfigError(f"{detail} — sửa {ROOT / '.env'}, Signet vẫn chạy bản cũ")
+
+
 def install(src: pathlib.Path, env: dict[str, str]) -> None:
     _run(["bash", str(src / "scripts" / "install.sh"), "install", str(ROOT)], cwd=src, env=env, timeout=1800)
     _run([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"], env=env, timeout=900)
@@ -283,6 +310,7 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
     env = checkout(git, src, target)
     if not (src / "scripts" / "install.sh").is_file():
         raise ReconcileError("commit không có scripts/install.sh")
+    check_gateway_env(src, env)
     # dựng image trước khi dừng Signet: lỗi dựng thì hệ thống cũ vẫn chạy; install.sh dựng lại sau đó trúng bộ nhớ đệm
     _run([*COMPOSE, "build"], cwd=src, env=env, timeout=1800)
     _run([*COMPOSE, "down"], timeout=300)
@@ -297,6 +325,26 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
         except (ReconcileError, subprocess.TimeoutExpired, OSError) as again:
             raise ReconcileError(f"{exc}; cài lại commit cũ {previous[:12]} cũng lỗi: {again}") from None
         raise ReconcileError(f"{exc} — đã cài lại commit cũ {previous[:12]}") from None
+
+
+# ----------------------------------------------------------------------------------------------- ứng dụng cài thêm
+
+def apps(report: dict[str, Any]) -> None:
+    """Ứng dụng cài bằng `moc app install` (scripts/ung_dung.py): trạng thái vận hành ngoài git, như đơn vị hay tài
+    khoản. Reconciler KHÔNG cài, gỡ hay kéo mã ứng dụng nào; chỉ dựng lại tệp chạy (APISIX, metadata Hasura trộn, tệp
+    phủ compose) khi lõi vừa đổi hoặc tệp bị sửa, rồi áp lại phần còn thiếu. Container ứng dụng mất thì heal() dựng lại
+    như mọi dịch vụ khác (tệp phủ nằm trong COMPOSE_FILE của .env)."""
+    if not (ROOT / APPS).is_dir():
+        return
+    moc = [sys.executable, str(ROOT / "scripts" / "moc.py"), "app", "sync", "--json"]
+    env = {**os.environ, "MOC_OPS_LOCKED": "1"}     # đang giữ khóa của thư mục này
+    out = _run([*moc, "--files"], env=env, timeout=120).stdout.strip().splitlines()
+    changed = json.loads(out[-1]).get("changed", []) if out else []
+    if not changed:
+        return
+    report["actions"].append(f"dựng lại {len(changed)} tệp của ứng dụng cài thêm (lõi đổi hoặc tệp bị sửa)")
+    out = _run(moc, env=env, timeout=900).stdout.strip().splitlines()
+    report["actions"] += [f"ứng dụng: {a}" for a in (json.loads(out[-1]).get("actions", []) if out else [])]
 
 
 # -----------------------------------------------------------------------------------------------
@@ -319,6 +367,10 @@ def reconcile(*, heal_only: bool = False, wait_s: float = 0) -> dict[str, Any]:
             except (ReconcileError, subprocess.TimeoutExpired, OSError, ValueError) as exc:
                 # lỗi GitOps (mạng, repo, tệp trạng thái) không được chặn phần tự phục hồi
                 report["problems"].append(f"GitOps: {exc}")
+        try:
+            apps(report)
+        except (ReconcileError, subprocess.TimeoutExpired, OSError, ValueError) as exc:
+            report["problems"].append(f"ứng dụng cài thêm: {exc}")
         heal(report)
     return report
 

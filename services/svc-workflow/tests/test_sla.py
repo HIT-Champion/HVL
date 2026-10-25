@@ -34,7 +34,7 @@ from svc_workflow.sla import Deadlines, parse_duration
 DIRECTOR_GROUP = f"t:{TENANT}:director"
 MANAGER_GROUP = f"t:{TENANT}:d:{DEPT_DT}:manager"
 CREATED = datetime(2026, 10, 19, 9, 0, tzinfo=UTC)
-PROCESSES = pathlib.Path(__file__).resolve().parents[3] / "processes"
+PROCESSES = pathlib.Path(__file__).resolve().parents[1] / "processes"
 BPMN = "{http://www.omg.org/spec/BPMN/20100524/MODEL}"
 FLOWABLE = "{http://flowable.org/bpmn}"
 
@@ -98,18 +98,34 @@ def test_second_deadline_also_tells_the_leader(deadlines, hasura, flowable):
     assert len(events(hasura, "office.task.overdue")) == 1 and len(events(hasura, "office.task.escalated")) == 1
 
 
-def test_timeline_entry_is_written_on_retry_after_a_failed_write(deadlines, hasura, flowable):
+def test_reminder_is_sent_on_retry_after_a_failed_write(deadlines, hasura, flowable):
     flowable.add_task("t1", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT, process="p1",
                       created=CREATED.isoformat())
     hasura.fail_writes = "Không gọi được Hasura"
     with pytest.raises(HasuraError):
         run(deadlines.handle(job(doc=OUT), now=at(1.1)))
-    assert hasura.sent() == {"task.overdue": {"u-manager-dt"}}    # đã gửi, chưa ghi dòng thời gian
+    assert hasura.sent() == {}                                     # chưa ghi được dòng thời gian thì chưa gửi
     hasura.fail_writes = None
     run(deadlines.handle(job(doc=OUT), now=at(1.2)))               # Flowable giao lại việc
     run(deadlines.handle(job(doc=OUT), now=at(1.3)))
     (event,) = events(hasura, "office.task.overdue")
     assert event["data"]["notified"] == ["u-manager-dt"] and len(hasura.notifications) == 1
+
+
+def test_timeline_entry_is_written_before_the_reminder_is_sent(deadlines, hasura, flowable, notifier, monkeypatch):
+    # người bấm thông báo mở văn bản ra phải thấy ngay dòng nhắc (smoke từng đọc trúng lúc chưa ghi)
+    flowable.add_task("t1", "vbdi.duyetPhong", groups=[MANAGER_GROUP], doc=OUT, process="p1",
+                      created=CREATED.isoformat())
+    seen = []
+    send = notifier.send
+
+    async def spy(actor, users, kind, *args):
+        seen.append((kind, len(events(hasura, f"office.{kind}"))))
+        return await send(actor, users, kind, *args)
+
+    monkeypatch.setattr(notifier, "send", spy)
+    run(deadlines.handle(job(doc=OUT), now=at(2.05)))
+    assert seen == [("task.overdue", 1), ("task.escalated", 1)]
 
 
 def test_staff_task_escalates_to_their_department_manager(deadlines, hasura, flowable):

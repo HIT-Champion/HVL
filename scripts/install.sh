@@ -34,11 +34,16 @@ COMPOSE=(docker compose --profile core --profile app)
 # Danh sách tệp do bản cài quản lý — lần cài sau và lệnh gỡ chỉ xóa đúng những tệp này
 MANIFEST=.moc-install
 # Ngoài các bind mount (đọc tự động từ compose): script nạp dữ liệu mẫu, kiểm tra nhanh, mã TOTP mẫu, lệnh moc.py
-# (cả sao lưu, thêm đơn vị), màn demo (demo.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot
-# (compose chỉ đọc ở đây profile core, app nên không thấy bind mount của nó)
+# (cả sao lưu, thêm đơn vị, client ứng dụng của realm), màn demo (demo.py, demo_ca_nhan.py), reconciler GitOps
+# (reconcile.py), cảm biến giả lập của profile iot (compose chỉ đọc ở đây profile core, app nên không thấy bind mount
+# của nó), log tập trung của profile logs (cấu hình Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm ứng
+# dụng bằng manifest (moc app: ung_dung.py, bộ đọc YAML, JSON Schema của manifest)
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
          scripts/moc.py scripts/audit_chain.py scripts/backup.py scripts/tenants.py scripts/demo.py scripts/reconcile.py
-         seed ot/sensor.py)
+         scripts/realm_clients.py scripts/demo_ca_nhan.py
+         seed services/ot-sensor/sensor.py
+         platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
+         scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -62,6 +67,8 @@ src_version() {
 #   BUILD <dịch vụ>        dịch vụ còn phải dựng từ mã nguồn
 #   BIND <đường dẫn>       bind mount, tương đối với thư mục đó
 #   OUTSIDE <đường dẫn>    bind mount trỏ ra ngoài thư mục đó
+# Bỏ qua .moc-apps/: tệp chạy của ứng dụng cài bằng moc app (tệp phủ trong COMPOSE_FILE) là trạng thái của từng thư mục
+# chạy, không phải cấu hình lõi để chép
 inspect_compose() {
   (cd "$1" && "${COMPOSE[@]}" config --format json) | python3 -c '
 import json, os, sys
@@ -72,6 +79,8 @@ for name, svc in json.load(sys.stdin)["services"].items():
     for vol in svc.get("volumes", []):
         if vol.get("type") == "bind":
             rel = os.path.relpath(os.path.realpath(vol["source"]), root)
+            if rel == ".moc-apps" or rel.startswith(".moc-apps/"):
+                continue
             print("OUTSIDE" if rel == ".." or rel.startswith("../") else "BIND", rel)
 ' "$1"
 }
@@ -91,12 +100,16 @@ running_from() {
 }
 
 # Xóa các tệp lần cài trước đã chép (theo MANIFEST); không đụng .env. keep: giữ chính tệp MANIFEST
+# Thư mục cha còn rỗng thì bỏ luôn: bản cài theo bố cục cũ (auth/, gateway/… trước khi dời vào platform/) không để
+# lại thư mục trống
 remove_managed() {
-  local dest=$1 keep=${2:-} rel
+  local dest=$1 keep=${2:-} rel dir
   [ -f "$dest/$MANIFEST" ] || return 0
   while IFS= read -r rel; do
     case "$rel" in "" | . | .env | /* | .. | ../* | */../* | */..) die "đường dẫn lạ trong $dest/$MANIFEST: '$rel'" ;; esac
     rm -rf -- "${dest:?}/$rel"
+    dir=$(dirname -- "$rel")
+    while [ "$dir" != . ] && rmdir -- "$dest/$dir" 2>/dev/null; do dir=$(dirname -- "$dir"); done
   done < "$dest/$MANIFEST"
   [ -n "$keep" ] || rm -f -- "$dest/$MANIFEST"
 }
@@ -123,7 +136,8 @@ do_install() {
   [ -d "$dest" ] || mkdir -p "$dest"
   lock_dest "$dest"
   # .env và kho sao lưu (backups/) được giữ lại khi gỡ: cài lại vào đó vẫn được
-  if [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vxE '\.env|backups|\.moc-install\.tmp' || true)" ]; then
+  local leftover='\.env|backups|\.moc-install\.tmp|\.moc-apps'
+  if [ ! -f "$dest/$MANIFEST" ] && [ -n "$(ls -A "$dest" | grep -vxE "$leftover" || true)" ]; then
     die "$dest đã có tệp nhưng không phải bản cài Signet — chọn thư mục trống hoặc chưa có"
   fi
   # Thay thư mục cấu hình dưới container đang chạy thì container còn giữ thư mục cũ đã xóa
@@ -180,6 +194,20 @@ do_install() {
   # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài
   extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
   set_env "$dest/.env" COMPOSE_PROFILES "core,app${extra:+,$extra}"
+  # Log tập trung (F3.14, profile logs): tệp phủ đổi driver log của 5 dịch vụ. docker compose đọc COMPOSE_FILE trong
+  # .env của bản cài (reconciler, lệnh gõ tay); bỏ logs thì trả về chỉ docker-compose.yml
+  if [[ ",$extra," == *,logs,* ]]; then
+    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml:platform/logs/docker-compose.logs.yml
+  elif grep -q '^COMPOSE_FILE=' "$dest/.env"; then
+    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml
+  fi
+  # Ứng dụng cài bằng moc app (docs/them-ung-dung.md): dựng lại tệp chạy từ lõi vừa chép và bản ghi trong .moc-apps/ của
+  # bản cài (không cần CSDL), thêm lại tệp phủ vào COMPOSE_FILE. Đang giữ khóa của bản cài: MOC_OPS_LOCKED
+  if [ -d "$dest/.moc-apps/apps" ]; then
+    echo "==> Dựng lại tệp chạy của ứng dụng cài thêm (.moc-apps)"
+    (cd "$dest" && MOC_OPS_LOCKED=1 python3 scripts/moc.py app sync --files) \
+      || die "không dựng lại được tệp của ứng dụng cài thêm — xem lỗi ở trên"
+  fi
 
   echo "==> Kiểm tra bản cài không cần thư mục mã nguồn"
   check="$(inspect_compose "$dest")" || die "compose trong $dest không hợp lệ"
@@ -200,7 +228,7 @@ do_install() {
   python3 scripts/moc.py audit verify   # kiểm sổ kiểm toán
   python3 scripts/demo.py kiem-dich     # màn demo kiểm dịch (docs/demo-script.md)
   python3 scripts/moc.py backup create  # sao lưu CSDL và tệp vào MOC_BACKUP_DIR (mặc định $dest/backups)
-  python3 scripts/reconcile.py         # một lượt GitOps + tự phục hồi (timer mẫu: ops/systemd/)
+  python3 scripts/reconcile.py         # một lượt GitOps + tự phục hồi (timer mẫu: platform/systemd/)
 Bản cài dùng chung tên project và dữ liệu "moc" với bản chạy trong thư mục mã nguồn: dừng bản đó trước (make down).
 EOF
 }
@@ -215,7 +243,8 @@ do_uninstall() {
   fi
   remove_managed "$dest"
   find "$dest" -mindepth 1 -type d -empty -delete
-  echo "Đã gỡ Signet khỏi $dest. Giữ lại $dest/.env (mật khẩu), kho sao lưu (nếu có) và dữ liệu trong các volume Docker của project moc."
+  echo "Đã gỡ Signet khỏi $dest. Giữ lại $dest/.env (mật khẩu), kho sao lưu (nếu có), ứng dụng cài thêm" \
+    "(.moc-apps, nếu có) và dữ liệu trong các volume Docker của project moc."
   echo "Xóa cả dữ liệu: docker volume rm \$(docker volume ls -q --filter label=com.docker.compose.project=moc)"
 }
 

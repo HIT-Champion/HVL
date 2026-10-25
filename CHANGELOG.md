@@ -7,7 +7,288 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 
 ## [Chưa phát hành]
 
+## [1.1.0] - 2026-10-25
+
+Bản cho vòng trường. Lõi Signet có thêm ứng dụng thứ hai và cắm được ứng dụng mới bằng một lệnh; cổng có tường lửa
+ứng dụng web; Văn phòng điện tử có giao diện hồ sơ, phòng đọc và phả hệ của từng biểu đồ báo cáo.
+
+- Ứng dụng trên lõi: Không gian cá nhân P.A.R.A (`/ca-nhan/`); `moc app install` cài ứng dụng từ manifest mà không
+  sửa tệp nào của lõi, ví dụ Bảng tin đơn vị (`apps/bang-tin`) nghe luồng sự kiện đã làm sạch `core.app_events`.
+- Văn phòng điện tử: giao diện hồ sơ công việc, lãnh đạo phòng nộp lưu theo yêu cầu, phòng đọc xem tệp có dấu tên
+  người xem (F3.8; nộp lưu nền đã có từ 1.0.0); phả hệ của từng biểu đồ báo cáo: biểu đồ ← khung nhìn ← bảng (F3.9,
+  F3.11); tự chẩn đoán H-P-D-I cho lãnh đạo (F4.7); góp ý và số đo "sau" (F4.6).
+- Bảo mật: WAF Coraza + OWASP CRS ở APISIX (F3.15), chặn mặc định, mỗi loại trừ có lý do và số đo; giao diện báo rõ
+  khi cổng chặn; nâng pypdf 6.21.2 (ba GHSA) và gỡ pip khỏi image của dịch vụ.
+- Dữ liệu và vận hành: API nạp lô văn bản đến; log tập trung Vector + Parseable (tắt mặc định); thông báo email;
+  trang Trạng thái công khai; SBOM CycloneDX kèm mỗi bản phát hành.
+- Kho mã: cấu hình phần mềm nguồn mở gom vào `platform/`, khai giấy phép REUSE, repo đổi tên `HIT-Champion/Signet`,
+  gói phát hành `signet-X.Y.Z.tar.gz`; CI chia năm phần chạy song song.
+
+### Đã thêm
+- API nạp lô văn bản đến (cụm ⑤ Tầng 1): `POST /api/imports/incoming` nhận NDJSON hoặc CSV cùng trường với
+  `receiveIncoming`, kèm zip tệp đính kèm tùy chọn. svc-files xử lý nền theo mẻ; mỗi dòng đi đúng đường tiếp nhận lẻ —
+  ClamAV, Action `receiveIncoming` thay mặt văn thư, tùy chọn vào sổ — nên vẫn cách ly đơn vị và có dòng sổ kiểm toán
+  riêng. `GET /api/imports/{id}` báo đã nhận / đạt / trùng / lỗi, `…/rows` báo lỗi từng dòng. Gửi lại cùng tệp không
+  nhân đôi (`Idempotency-Key`, chỉ mục chặn trùng); svc-files khởi động lại thì lô chạy tiếp. Dòng bị từ chối thì tệp
+  đã lưu được gỡ; `restricted` sai kiểu bị chặn trước khi tệp vào kho; trần byte một lô ghi vào kho
+  `MOC_IMPORT_STORE_MAX_MB`; dòng được giữ khi đang làm nên hai tiến trình không làm trùng. Bảng `core.import_jobs`,
+  `core.import_rows` (migration 1792281602800). Lô mẫu 200 dòng `seed/nap-lo/van-ban-den.csv`, `make demo-nap-lo`.
+  Test (đếm tĩnh): svc-files +113, db +18, scripts +12, svc-workflow +2, giao diện +2.
+- Tường lửa ứng dụng web ở cổng APISIX (F3.15): Coraza v3.3.3 + OWASP CRS v4.14.0 (coraza-proxy-wasm 0.6.0, ghim digest
+  và băm) chặn tải tấn công (SQLi, XSS, duyệt thư mục, chèn lệnh, Log4Shell, tải lên `.php`…) trên mọi đường trước khi
+  kiểm token → 403 có `X-Request-Id`, dòng chặn trong nhật ký mang cùng mã. Mặc định chặn, `MOC_WAF=On | DetectionOnly |
+  Off`; giá trị sai bị `make up` và reconciler GitOps (trước khi dừng Signet) từ chối, và image dừng ngay lúc khởi động
+  với dòng lỗi rõ thay vì cổng trả 503. Loại trừ CRS gỡ theo id, có lý do, chỉ trên đúng khóa: Keycloak, chữ truy vấn
+  GraphQL, truy cập bằng IP; chữ tự do trong biến GraphQL (nội dung, trích yếu, ý kiến, ghi chú, góp ý), câu hỏi trợ lý,
+  ô Tìm kiếm; tên tệp tải lên có `' " ; = :`. Dò trên 7 389 yêu cầu dựng từ toàn bộ chữ của dữ liệu mẫu: không chữ mẫu
+  nào bị chặn nhầm (trước đó 4/21 PDF mẫu). JSON lồng sâu bị chặn trước WAF (GHSA-6gcq-wc29-5xf2). Nội dung tệp vẫn do
+  ClamAV soi. APISIX dựng thành image `moc/apisix`, 4 worker (`MOC_APISIX_WORKERS`); smoke thêm 7 kiểm, có tên tệp và
+  nội dung hành chính thật phải qua (`platform/apisix/README.md`, mục WAF).
+- Khai giấy phép theo chuẩn REUSE: `REUSE.toml` khai Apache-2.0 cho các tệp không chèn được header (JSON, ảnh, PDF,
+  tài liệu, dữ liệu mẫu), `LICENSES/Apache-2.0.txt` là bản sao của `LICENSE`; `reuse lint` 5.0.2 đạt, 482/482 tệp có
+  thông tin bản quyền và giấy phép. `.env.example` mang header giấy phép, `make license-check` kiểm cả tệp này
+  (PoF #2).
+- README (cả bản tiếng Anh) có mục "Cấu trúc thư mục": mỗi thư mục chứa gì, mã đội tự viết nằm đâu, các tác tử AI
+  (F4.1–F4.4) ở tệp nào, test của từng phần ở đâu.
+- Tài liệu đánh giá AI [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md): với đọc văn bản đến, trợ lý hỏi đáp, gợi ý giao
+  việc và bộ che thông tin cá nhân (F4.1–F4.4) — mục đích, mô hình và công cụ kèm phiên bản, giấy phép (trỏ
+  `DEPENDENCIES.md`), dữ liệu đo và cách làm nhãn, lệnh đo lại, số đo kèm ngày, máy và nguồn, phần chưa đo, giới hạn,
+  cơ chế an toàn kèm tệp mã. Thêm lần đo trợ lý hỏi đáp trên bản online (23/10/2026, Qwen3-1.7B và
+  Qwen3-Embedding-0.6B trên CPU): recall@3 16/16, 0 nguồn bị cấm, câu trả lời của mô hình qua kiểm 16/16, p50 8,9
+  giây. Bảng Tài liệu của README (cả bản tiếng Anh) có thêm dòng này.
+- Hồ sơ chất vấn: `docs/du-thi/hoi-dap-hoi-dong.md` gồm 13 câu hội đồng dễ hỏi (lên 100.000 người dùng, nguồn mở và
+  khóa nhà cung cấp, lõi dùng lại cho ứng dụng khác, bảo mật, AI bịa và dữ liệu ra ngoài, sao lưu và tự phục hồi, chạy
+  không Internet, chi phí, giấy phép, việc chưa làm), mỗi câu trả lời kèm đường dẫn, lệnh `make`, bước CI làm bằng
+  chứng. `docs/demo-script.md` thêm mục "Phương án dự phòng" (mất mạng, hỏng laptop, AI chậm, TOTP không qua, bước demo
+  lỗi; máy dự phòng chạy tại chỗ không cần Internet, video) và checklist T-1 ngày, T-1 giờ, T-5 phút.
+- Bảng mức hoàn thiện [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): 43 tính năng F1.1–F4.6, mỗi tính năng một
+  mức (Hoàn thiện 32, Dùng được 5, Minh họa 2, Một phần 1, Chưa làm 3; định nghĩa ở đầu tệp) kèm bằng chứng — tệp test
+  và số hàm test đếm tĩnh (tổng 1 425, cách đếm ghi rõ), bước CI, màn demo hay kịch bản e2e — và hạn chế đã biết. Độ
+  phủ 29 năng lực của 7 cụm dịch vụ Tầng 1 theo đề: 17 hoàn thiện, 3 chưa có (kịch bản serverless, API nạp lô, trục
+  streaming sự kiện). Lệnh đếm lại, kiểm lại ở cuối tệp.
+- Thông báo đa kênh: ngoài chuông trên web, `svc-workflow` gửi thêm email (SMTP, STARTTLS/SSL) tới địa chỉ trong
+  danh bạ và tin tóm tắt lên webhook (Mattermost, Slack, ntfy) khi đặt `MOC_SMTP_HOST`, `MOC_NOTIFY_WEBHOOK_URL` —
+  mặc định tắt. Hộp thư đi `core.notification_deliveries` tạo cùng giao dịch với thông báo, gửi ở nền, thử lại tối
+  đa 5 lần có giãn cách, mỗi lần ghi sổ kiểm toán; webhook không có tên người, không có văn bản hạn chế; nhật ký không
+  có địa chỉ email, URL. Mailpit (profile `mail`) làm hộp thư thử cho demo. Test svc-workflow +41, scripts +8.
+- Chuỗi cung ứng: `make sbom` sinh SBOM CycloneDX của cây mã nguồn bằng Syft 1.54.1 (image ghim digest), bản phát hành
+  đính kèm `moc-X.Y.Z.cdx.json` cùng `.sha256`; `make license-audit` (`scripts/license_audit.py`, chỉ thư viện chuẩn)
+  kiểm giấy phép của mọi gói kể cả gói gián tiếp theo chính sách của `DEPENDENCIES.md`, gói chưa rõ hay ngoài chính
+  sách cần ngoại lệ có lý do trong `.github/license-exceptions.json`. Job CI "Giấy phép (PoF #2)" chạy cả hai: 769 gói
+  (npm 690, Python 73, action 6) đều đạt, 22 gói qua nhờ ngoại lệ. `SECURITY.md`: phiên bản được hỗ trợ, báo lỗ hổng
+  riêng tư qua GitHub, thời gian phản hồi, phạm vi kể cả bản chạy thử trực tuyến. Test scripts +22.
+- Trang công khai **Trạng thái hệ thống** `/trang-thai` (không cần đăng nhập, tự làm mới mỗi 30 giây): tình trạng chung
+  và từng thành phần theo tầng người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo, phiên bản, thời gian chạy, giờ
+  sao lưu gần nhất, trợ lý AI bật hay tắt kèm tên mô hình; có đường tới từ trang đăng nhập lỗi, chân trang cổng xác
+  thực, thanh bên. `GET /api/status` của `svc-files` gom ở phía máy chủ (lưu đệm 10 giây cho mọi người, mỗi lần dò tối
+  đa 3 giây), chỉ trả nhãn cố định, không tên máy, địa chỉ hay số liệu; APISIX giới hạn 30 lần/phút mỗi IP
+  (`MOC_RATE_STATUS_PER_MIN`). `moc backup create` ghi dòng `system.backed_up` vào sổ kiểm toán. Test svc-files +36,
+  office +9, e2e +1.
+- Ứng dụng thứ hai trên lõi, Không gian cá nhân P.A.R.A (`/ca-nhan/`, `apps/ca-nhan`): mỗi người cất tệp của mình
+  trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ — tải lên qua `svc-files` (ClamAV), chuyển, tải về; client
+  Keycloak riêng `app-ca-nhan`, cùng phiên SSO với Văn phòng điện tử; schema riêng `personal` có quyền đến từng dòng,
+  mỗi lần xếp, chuyển vào sổ kiểm toán của lõi. Không sửa dòng nào trong `services/`; cách thêm một ứng dụng:
+  `docs/them-ung-dung.md`. Bản cài cũ thêm client bằng `moc realm clients` (`make seed` cũng gọi); `make demo-ca-nhan`.
+- Góp ý và số đo "sau" theo đặc tả §8 (F4.6): nút Góp ý trên thanh trên của Văn phòng điện tử — mức hài lòng 1–5,
+  vài dòng, màn hình đang dùng tự gắn dạng khuôn đường dẫn (không id, không chuỗi truy vấn); bảng `office.feedback`
+  cách ly theo đơn vị, người gửi chỉ thấy góp ý của mình, lãnh đạo và quản trị đơn vị xem danh sách (không có người
+  gửi) và tổng hợp theo màn hình ở trang Góp ý; CSDL chặn gửi dồn (3 góp ý mỗi 10 phút, 20 mỗi 24 giờ); góp ý không
+  gắn sổ kiểm toán. Trang Số đo cho lãnh đạo đơn vị và `make do-so-lieu-sau`: thời gian từ văn bản đến tới khi giao
+  xử lý (trung vị, p90), tỷ lệ xử lý quá hạn, 5 lần tìm lại văn bản cũ qua API (độ trễ hệ thống), số bước chuyển tay
+  so sánh định tính; cột "trước" ghi chưa đo, số trên đơn vị mẫu (`core.tenants.sample_data`) ghi rõ là dữ liệu mẫu.
+  Cách đo: [`docs/so-lieu-sau.md`](docs/so-lieu-sau.md). Test db +30, office +21, scripts +16.
+- Log tập trung (F3.14, profile `logs`, tắt mặc định): tệp compose phủ `platform/logs/docker-compose.logs.yml` đổi
+  driver log của APISIX, app-office, app-ca-nhan, `svc-files`, `svc-workflow` sang fluentd, gửi Vector 0.59.0 rồi
+  Parseable v3.2.4 (chỉ nghe 127.0.0.1, bỏ mọi capability, mật khẩu do `make env`, `make up` hay `make logs-up` sinh,
+  mật khẩu rỗng thì không mở cổng, giữ `MOC_LOGS_RETENTION_DAYS` ngày). Vector ghép dòng Docker cắt ở 16 KiB rồi che
+  lần hai: token Bearer/Basic (cả có `=` đệm), JWT; giá trị của khóa mật khẩu, bí mật, token, khóa API, phiên (cả có
+  tiền tố, hậu tố, dict Python, mật khẩu có dấu cách, nháy không đóng, khóa ở mọi tầng của dòng JSON, khóa viết
+  thoát) và của cờ dòng lệnh như `--password`; Authorization (không nháy thì tới hết dòng, cả Digest), Cookie nhiều
+  cặp; mật khẩu trong chuỗi kết nối; chuỗi truy vấn của URL; email (cả có dấu), số điện thoại (cả +84), CCCD;
+  CMND, số tài khoản, mã số thuế khi có từ khóa đứng trước; số viết tách nhóm không có từ khóa, họ tên vẫn lọt
+  (danh sách ở `docs/van-hanh.md`). Không gắn `docker.sock`, `docker logs` vẫn đọc được; `make logs-up`,
+  `make logs-tra ID=…`, `make logs-down`, `make demo-log-tap-trung`. `svc-workflow` mang `X-Request-Id` như
+  `svc-files` (nhật ký, lời gọi Hasura nên vào `core.audit_log.request_id`, lời gọi `svc-files`), mã sai dạng thì
+  thay bằng mã mới; APISIX ghi mã yêu cầu ở cuối dòng log truy cập. Rủi ro (CORS của Parseable, mất log khi Vector dừng)
+  và cách tắt: `docs/van-hanh.md`, mục Log tập trung. Test svc-workflow +10, scripts +29, `vector test` 29 ca.
+- Cắm ứng dụng vào lõi bằng một lệnh, không sửa tệp nào của lõi: `python3 scripts/moc.py app install apps/<thư
+  mục>/app.yaml` (`make app-install APP=…`, `--dry-run` in kế hoạch), `app list`, `app remove` (giữ dữ liệu), `app
+  sync`. Manifest theo `scripts/app-manifest.schema.json`; lệnh tạo client Keycloak (PKCE S256, 5 mapper; client dịch vụ
+  khi cần), route APISIX, container, schema + migration chạy bằng vai trò CSDL riêng của ứng dụng (không quyền gì trên
+  lõi; view, `DEFAULT`, trigger đọc lõi hay chạy bằng quyền của Hasura bị từ chối trước khi commit), bảng và quyền
+  Hasura (lọc đơn vị; điều kiện trong quyền không `_exists`, qua quan hệ sang lõi chỉ `visible: {_eq: true}` — Hasura
+  chạy điều kiện bằng quyền admin), Event Trigger — trạng thái trong `.moc-apps/` (ngoài git), tệp chạy dựng từ tệp lõi
+  nguyên văn (APISIX tự nạp lại, metadata sống qua khởi động lại Hasura). Chạy lại không tạo trùng; lỗi báo đúng bước.
+  Lõi phát luồng sự kiện đã làm sạch `core.app_events` (migration 1792281603200: tiếp nhận, vào sổ, phát hành; không văn
+  bản hạn chế) qua Hasura Event Triggers. Ứng dụng thứ ba `apps/bang-tin` — Bảng tin đơn vị; `make demo-cai-ung-dung`;
+  cách làm, ranh giới tin cậy và rủi ro ở `docs/them-ung-dung.md` mục 1. `moc backup` ghi và tạo lại vai trò CSDL của
+  ứng dụng khi khôi phục sang máy mới. Test (đếm tĩnh): scripts +52, db +14, bang-tin +20.
+- Tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7): trang Tự chẩn đoán `/tu-chan-doan` — 12 câu do đội tự
+  viết theo bốn không gian Con người, Quy trình, Dữ liệu, Trí tuệ, mỗi câu 5 mức quan sát được (vi/en, có JSON
+  Schema), radar ECharts, cảnh báo lệch nền theo nguyên lý tiến hóa tuyến tính H → P → D → I, không gian nên làm
+  trước, bước tiếp theo trỏ đúng trang Signet mà vai trò người xem mở được. Cạnh mỗi không gian là bằng chứng đo được
+  của chính đơn vị lấy từ các view đã có (dashboard, số đo F4.6, độ chính xác tác tử F4.1/F4.3, hồ sơ nộp lưu), chỉ số
+  chưa có dữ liệu thì không hiện. Lãnh đạo đơn vị lưu kết quả vào `office.maturity_assessments` (CSDL kiểm đủ bộ câu
+  và tính điểm, cách ly theo đơn vị, tối đa 5 lần lưu mỗi giờ, không sửa, xóa, gắn sổ kiểm toán) để xem tiến bộ; lãnh
+  đạo phòng làm được nhưng không lưu. Không phải bộ chỉ số chính thức, không quy đổi DTI. Nguồn, cách chấm, giới hạn:
+  [`docs/tu-chan-doan.md`](docs/tu-chan-doan.md). Test office +18, db +18.
+- Giao diện hồ sơ công việc và phòng đọc xem tệp (F3.8, màn (i)): trang **Hồ sơ công việc** của Văn phòng điện tử —
+  chuyên viên, lãnh đạo phòng lập hồ sơ (ký hiệu, tiêu đề, thời hạn bảo quản), thêm văn bản đã xong của phòng, đóng hồ
+  sơ; văn thư, lãnh đạo đơn vị xem cả đơn vị; lãnh đạo phòng bấm **Nộp lưu** (`POST /api/case-files/{id}/archive`; đội
+  chọn lãnh đạo phòng làm người nộp, người thứ hai sau người lập; chung một lượt với vòng nộp lưu nền, ghi sổ kiểm
+  toán khi giành được lượt, lỗi trả mã đúng nghĩa). Phòng đọc trên trang hồ sơ đã nộp lưu: manifest khớp băm, văn bản
+  trong gói, nút **Xem** tệp PDF (`GET /api/case-files/{id}/archive/files/{file_id}`) — kiểm băm tệp với manifest,
+  đóng dấu "PHÒNG ĐỌC" kèm tên người xem, giờ xem, ghi `case_file.file_viewed` vào sổ kiểm toán rồi mới trả, chỉ xem
+  trong trang (`inline`, `no-store`); gói lạnh không đổi. Test svc-files +22, office +10, e2e `ho-so.spec.ts`; `make
+  smoke` nộp lưu qua endpoint mới (chuyên viên gọi bị 403) và xem tệp; `make demo-nong-lanh` kiểm thêm bước xem tệp.
+- Phả hệ trên báo cáo tổng hợp (F3.9, F3.11): khung nhìn `office.report_lineage` tính từ catalog PostgreSQL lúc truy
+  vấn khung nhìn báo cáo `office.v_*` nào đọc bảng, view nào (đệ quy qua view lồng, không khai tay — sửa view là phả
+  hệ đổi theo), chỉ có tên và cạnh, lãnh đạo đơn vị đọc như dashboard. Trang Phả hệ số liệu (`/pha-he`) và nút "Nguồn
+  số liệu" trên từng biểu đồ của trang Điều hành: đồ thị ECharts biểu đồ → khung nhìn → bảng, nối với lượt nộp lưu gần
+  nhất (bảng → Parquet → gói lưu trữ, số dòng đã kiểm), bảng nguồn đi kèm, tải phả hệ dạng OpenLineage (JSON Lines);
+  biểu đồ nào đọc khung nhìn nào khai một chỗ, có test đối chiếu với truy vấn thật của trang. Bước `commit` của nộp
+  lưu khai thêm `office.archived_document_facts`; `make demo-pha-he` thêm bước in phả hệ báo cáo, smoke thêm 2 kiểm.
+  Test db +6, office +13, scripts +4, e2e +1.
+
+### Đã sửa đổi
+- README (cả bản tiếng Anh) viết lại thành 12 mục, cài đặt lên khoảng giữa trang thay vì dòng 221: Giới thiệu, Kiến
+  trúc, Tính năng, Bằng chứng 4 nguyên lý, Công nghệ và giấy phép (phiên bản, giấy phép, vai trò từng thành phần),
+  Cài đặt từ mã nguồn, Chạy thử (bản online signet.htechcs.com, tài khoản, địa chỉ), Vận hành và kiểm thử, Xử lý sự
+  cố, Tài liệu, Đóng góp và liên hệ (nhóm phát triển), Giấy phép. Sơ đồ ASCII thay bằng sơ đồ kiến trúc động (GIF,
+  tiếng Việt và tiếng Anh): luồng yêu cầu chạy trái sang phải, màu theo H-P-D-I, viền đậm là mã của đội, logo trên
+  các phần mềm nguồn mở dùng nguyên bản; sinh lại bằng `python3 scripts/so_do_kien_truc.py gif` (Chromium và
+  FFmpeg, chỉ khi sửa sơ đồ). Logo khai riêng trong `REUSE.toml` (`LicenseRef-Logos`), nguồn ở
+  `docs/anh/logo/NGUON.md` (#108).
+- Repo đổi tên `HIT-Champion/HVL` → `HIT-Champion/Signet` (#112): đường dẫn trong hướng dẫn đóng góp, chính sách
+  bảo mật, mẫu issue, tài liệu triển khai, vận hành, quy trình nhánh, `scripts/release_body.py` và producer của sự
+  kiện OpenLineage; lệnh `cd HVL` sau khi clone thành `cd Signet`. GitHub vẫn chuyển hướng đường dẫn cũ.
+- CI nhanh hơn: job "Chạy thử toàn hệ thống (PoF #4)" chia ba phần chạy song song trên ba máy (luồng chính, e2e và
+  các màn lõi; màn AI, nộp lưu, ký số, sao lưu và khôi phục; cài đặt và GitOps), phần nào cũng tự dựng và nạp
+  mẫu — khoảng 27 phút còn khoảng 12 phút, vẫn chạy đủ mọi bước. PR chỉ đổi tài liệu (`*.md`, ảnh trong `docs/`,
+  trừ `docs/api/`) không dựng hệ thống. Tên job ruleset yêu cầu giữ nguyên.
+- CI nhanh hơn nữa (#110): job "Chạy thử toàn hệ thống (PoF #4)" chia năm phần (`luong-chinh`, `e2e`, `ai`,
+  `sao-luu`, `cai-dat`); smoke chạy lại sau khôi phục và cuối GitOps không chờ timer nhắc hạn lần nữa (đã kiểm ở
+  `luong-chinh`), smoke ngay sau `make install` thay bằng kiểm nhanh vì GitOps chạy smoke đủ trên cùng bản cài; job
+  "Dựng từ mã nguồn" đỏ khi một bước gọi tên phần không có trong ma trận hay một phần không có bước nào; Python in
+  ngay từng dòng để mốc thời gian trong nhật ký đúng. `make demo-tu-phuc-hoi` thử lại tải tệp tối đa 30 giây khi cổng
+  còn trả 502/503 ngay sau khi svc-files được dựng lại (APISIX hỏi lại DNS mỗi 5 giây), in số giây đã chờ.
+- Trang Release ngắn lại (`scripts/release_body.py`): dòng chỉ gói chính thức `moc-X.Y.Z.tar.gz` kèm lệnh kiểm
+  `.sha256` (GitHub tự gắn "Source code (zip)" vào mọi bản phát hành mà không gỡ được, PoF #3), phần tóm tắt viết
+  ngay dưới tiêu đề phiên bản trong CHANGELOG, rồi toàn bộ ghi chép gập lại. Dòng tiếp nối được nối lại: GitHub hiện
+  mỗi dấu xuống dòng của mô tả Release thành một dòng mới. Mục [1.0.0], [0.1.0] thêm phần tóm tắt. Test scripts +6.
+- Lịch phát hành: `v1.0.0` (23/10); `v1.1.0` trước vòng trường 01/11; bản nộp chấm là `v1.2.0` (03/12); sau `v1.2.0`,
+  mỗi bản sửa lỗi gộp vào `develop` đi kèm một bản vá để lúc chấm `develop` và `main` cùng nội dung. `docs/git_flow.md`
+  ghi lệnh thiết lập repo (merge commit, bật secret scanning) và lý do giữ `develop` làm nhánh mặc định; mục 11 ghi đúng
+  mốc chuyển quy trình (sau `v1.0.0`) và việc các lượt chạy cũ đã bị xóa khỏi trang Actions.
+- Gói phát hành đổi tên `moc-X.Y.Z.tar.gz` → `signet-X.Y.Z.tar.gz` (cả SBOM `.cdx.json` và `.sha256`) theo tên sản phẩm;
+  tên mã `moc` trong mã, image, dịch vụ giữ nguyên. Gói của `v0.1.0`, `v1.0.0` giữ tên cũ (không gắn lại thẻ).
+- Tài liệu phục vụ cuộc thi chuyển vào `docs/du-thi/` (phân tích đề, tóm tắt thể lệ, bảng tự chấm PoF, kế hoạch
+  phát triển, thư mục `nghien-cuu/`), kèm trang mục lục; `docs/` chỉ còn tài liệu về sản phẩm. Mọi liên kết và chỗ
+  nhắc đường dẫn (README, đặc tả, mô hình dữ liệu, README dịch vụ, chú thích BPMN và `flowable.py`) đã sửa theo.
+- Cấu hình của phần mềm nguồn mở dùng nguyên bản gom vào `platform/`: `auth/` → `platform/keycloak/`, `gateway/` →
+  `platform/apisix/`, `realtime/` → `platform/centrifugo/`, `openbao/`, `monitoring/` → `platform/openbao/`,
+  `platform/monitoring/`, `ops/systemd/` → `platform/systemd/`, kèm trang `platform/README.md`. BPMN vào thư mục của
+  dịch vụ nạp nó (`services/svc-workflow/processes/`), cảm biến giả lập vào `services/ot-sensor/`. Gốc repo từ 15 còn 10
+  thư mục. Compose, `install.sh`, test, tài liệu đổi đường dẫn theo; đường dẫn trong container không đổi. Cài lại vào
+  bản cài theo bố cục cũ thì `make install` xóa các tệp cũ (theo MANIFEST) và cả thư mục cha đã rỗng.
+- CI: bước "Tài liệu API trong docs/api/ khớp mã" lệch thì sinh lại `docs/api/` trên chính hệ thống vừa dựng và tải
+  lên thành artifact `docs-api-<lần chạy>` (giữ 7 ngày); người sửa PR chép về rồi commit, không phải dựng cả hệ thống
+  ở máy. `docs/api/README.md` có lệnh `gh run download`.
+- `ROADMAP.md` viết lại theo hiện trạng: trước đây gần như mọi mục còn `[ ]` và viết theo lúc chọn công cụ ("Chốt
+  nền tảng …"). Nay giữ khung giai đoạn 0, bốn không gian H-P-D-I, giai đoạn 5 và Ngoài phạm vi; mục đã xong ghi `[x]`
+  kèm thành phần và mã F hay tệp làm bằng chứng (`docs/muc-hoan-thien.md`), mục làm dở ghi rõ phần còn thiếu, việc
+  đang làm ghi số PR nếu có. Thêm mục "Sau vòng trường": việc còn thiếu thật xếp theo ưu tiên, kèm lý do, không gắn
+  ngày.
+- `docs/architecture.md` viết lại theo hệ thống đang chạy: sơ đồ tổng thể vẽ lại bằng Mermaid với đường dẫn thật của
+  APISIX; bản đồ công cụ thay bảng "đang khảo sát" bằng thành phần, phiên bản ghim, cụm Tầng 1, vị trí trong repo và mức
+  theo `docs/muc-hoan-thien.md`, khe cắm chưa có ghi thẳng "chưa có". Mục mới "Ranh giới lõi và ứng dụng" xếp từng
+  module của `svc-files`, `svc-workflow` và từng phần CSDL vào lõi, phần máy chủ của Văn phòng điện tử hay phần dùng
+  chung mang dáng nghiệp vụ, kèm chỗ dính, lý do đang gộp và hướng tách sau `v1.1.0`. Thêm QĐ-008…QĐ-012 cho quyết định
+  đã có trong mã (sự kiện trong bảng thay broker, Flowable, SeaweedFS, ứng dụng là trang tĩnh, Văn phòng chung tiến
+  trình với lõi), QĐ-013 (WAF, chờ PR), hộp "Đọc trong 10 phút" và mục "Chỗ còn yếu"; §1.2, §1.3 sửa câu đã lệch
+  (profile chia theo tầng, RAM đo được, "cài dưới một giờ" chưa đo).
+
+### Đã sửa lỗi
+- Cổng thỉnh thoảng trả 502 khi gọi `svc-files` (gặp ở CI của #130): APISIX giữ kết nối rảnh tới dịch vụ phía sau 60
+  giây, uvicorn của `svc-files` đóng sau 5 giây; yêu cầu tới đúng lúc uvicorn đóng thì APISIX nhận EOF hoặc RST, trả
+  502 và không thử lại. `svc-files` nay giữ kết nối 75 giây (`--timeout-keep-alive 75`), chỉ APISIX đóng kết nối rảnh.
+  Dựng lại với APISIX 3.18 và uvicorn 0.54.0 như repo, nghỉ 4,990–5,010 giây giữa hai yêu cầu: trước 31/1 312 yêu cầu
+  bị 502, sau 0/1 312.
+- Tài liệu ghi lệch với mã (#119): `DEPENDENCIES.md` nói Hasura dùng Event Triggers và Redpanda được thay bằng
+  Event Triggers, nhưng `db/metadata` không khai trigger nào — nay ghi đúng: sự kiện nằm trong bảng PostgreSQL,
+  Centrifugo đẩy tới trình duyệt, trục sự kiện chưa có. `docs/muc-hoan-thien.md` thôi ghi "chưa có bước CI" cho
+  `make demo-log-tap-trung`, `make do-so-lieu-sau`, `make demo-nap-lo` (đã chạy trong CI từ #111); `ROADMAP.md`
+  ghi log tập trung là Một phần thay vì Đang làm.
+- `DEPENDENCIES.md` liệt kê PDF.js (`pdfjs-dist`) dù giao diện không dùng: tệp được lấy bằng fetch rồi lưu về máy.
+  Bỏ dòng đó, sửa chú thích cùng ý trong `svc-files`. Câu "gói npm gián tiếp không có giấy phép ngoài danh sách OSI"
+  cũng sai: có thêm bảng năm gói ngoại lệ, đều chỉ dùng lúc dựng, lúc phát triển, không nằm trong trang phát hành —
+  `caniuse-lite` (CC-BY-4.0), `mdn-data`, `@speed-highlight/core` (CC0-1.0), `node-forge` (chọn BSD-3-Clause),
+  `type-fest` (chọn MIT).
+- Tên 4 job CI có dấu `#` (`Giấy phép (PoF #2)`…) bị YAML hiểu phần từ ` #` là chú thích: trang Actions hiện
+  `Giấy phép (PoF`, và ruleset đòi đúng tên có `#` thì không PR nào gộp được. Tên đặt trong ngoặc kép; test mới kiểm
+  mọi job ruleset đòi đều có thật. Test scripts +2.
+- Nhắc hạn, báo lãnh đạo (F2.3): dòng nhắc được ghi vào dòng thời gian văn bản trước khi gửi thông báo. Trước
+  đây gửi trước rồi mới ghi, người bấm thông báo mở văn bản ngay có thể chưa thấy dòng nhắc; `make smoke` thỉnh
+  thoảng đỏ vì đọc trúng khoảng đó. Test svc-workflow +1.
+- Văn bản hạn chế quá nặng để đóng dấu có lúc bị báo "không đọc được PDF" thay vì "PDF quá nặng, vượt giới hạn bộ
+  nhớ": tiến trình con nạp WeasyPrint sau khi đặt trần bộ nhớ, dlopen thư viện pango hỏng lại báo "cannot open
+  shared object file" (OSError); mã C của WeasyPrint hết bộ nhớ thì chết bằng SIGTRAP hay SIGSEGV tùy bản dựng, bị
+  coi là tệp hỏng. Bản sửa ở 1.0.0 chỉ cứu test (trần ≤ 64 MB thì coi là hết bộ nhớ): trần 96–160 MB vẫn báo sai.
+  Nay WeasyPrint nạp trước khi đặt trần, mọi việc sau đó nằm trong `try`, hết bộ nhớ cả lúc ghi kết quả thì thoát
+  bằng mã riêng; tiến trình con chết vì tín hiệu (trừ SIGXCPU) là hết bộ nhớ — tệp chỉ đi qua pypdf, mã C chỉ vẽ lớp
+  dấu; bỏ đoán theo lời báo lỗi, chỉ tin MemoryError và ENOMEM. Test svc-files +13.
+- brotli 1.2.0 → 1.2.1, brotlicffi 1.2.0.2 → 1.2.1.0 (`svc-files`, gói kéo theo của fontTools mà WeasyPrint dùng):
+  vá lỗi ghi tràn bộ nhớ trong bộ giải nén Brotli (PYSEC-2026-4322, PYSEC-2026-4323, CRITICAL) mà OSV-Scanner trong CI
+  báo từ 23/10. Bản vá phát hành 22/10: ngoại lệ quy tắc hai tuần, ghi ở `DEPENDENCIES.md`.
+- Sửa các lỗi SonarQube tìm thấy ở lần quét đầu (23/10/2026). `POST /ot/notify/{tenant}` của `svc-workflow` khai trả
+  204 mà có 5 nhánh `return` thân lỗi (5 BLOCKER `python:S8400`): lỗi nay ném `WorkflowError` cho một bộ xử lý chung;
+  mã HTTP, thân lỗi và OpenAPI không đổi. `MOC_SMTP_TLS=none` đi cùng `MOC_SMTP_USER` từng đăng nhập máy chủ thư qua
+  kết nối không mã hóa, mật khẩu đi dạng rõ: nay không đăng nhập, thư email báo lỗi gửi, lúc khởi động ghi một dòng
+  `config.warning` (không chặn khởi động). Ô tìm kiếm, ô chọn văn bản đến hay đi và ô lý do lưu có tên cho trình đọc
+  màn hình, nút Tìm ghi `type="submit"`, kiểm form không còn `reduce()` thiếu giá trị đầu. Ký tự điều khiển hai chiều
+  trong mã `svc-files` viết bằng mã thoát. Test mới chạy lại các luật này mà không cần SonarQube: route khai 204 không
+  `return` thân, ký tự hai chiều ở `services/`, `apps/`, `scripts/`, nhãn ô nhập và `type` của nút trong form ở mọi
+  tệp `.vue`. Các cảnh báo còn lại là báo nhầm, không chèn `NOSONAR`. Test svc-workflow +5, office +3, scripts +2.
+- Cổng WAF chặn (F3.15) thì Văn phòng điện tử báo "Cổng an ninh chặn nội dung này… (mã <X-Request-Id>)", thay cho "Có
+  lỗi xảy ra: Unexpected token '<'…" (đọc trang 403 HTML của cổng như JSON), "HTTP 403" hay câu "không có quyền" sai
+  nghĩa ở trang Hỏi đáp. 403 JSON của Hasura, svc-files giữ như cũ. E2e `waf.spec.ts`: tên tệp có `' ; =`, dự thảo có
+  đề mục I./II./III. và đường dẫn theo IP, ô Tìm kiếm "File …?" đi qua WAF; ô Nơi nhận chỉ là `http://<IP>/…` bị chặn
+  và hiện đúng mã. Test office +6.
+- Đăng nhập thỉnh thoảng bị WAF chặn 403 (gặp ở CI của develop 6710703): token ngẫu nhiên do Keycloak,
+  oidc-client-ts sinh tình cờ trùng mẫu của OWASP CRS — libinjection (942100) với cookie `KC_AUTH_SESSION_HASH`
+  mà Keycloak bọc trong ngoặc kép (`"+…"`) hay chuỗi `8--…`, tên hàm PHP (933150: `rtrim`, `fputs`), đuôi tệp
+  (930120: `.nsr`), lệnh Unix (932250). Loại trừ 10010, 10020 nay gỡ đúng các luật đó trên đúng 6 cookie và 8 tham
+  số token của Keycloak, OIDC; luật SQLi khác, XSS, Java, Node.js vẫn soi. Đo với APISIX + Coraza như repo, 21 loại
+  token × 2 500 giá trị ngẫu nhiên đúng dạng: trước 7/50 951 bị chặn, sau 0/50 968; 16 giá trị đã bị chặn (có giá
+  trị trong log CI) nay đều qua. Test scripts +1, smoke +1 kiểm.
+
+### Bảo mật
+- Image `svc-files`, `svc-workflow` (cả `ot-sensor`, dùng chung image) gỡ pip ngay sau khi cài thư viện: pip 26.2.1
+  của image nền `python:3.13.16-slim` mang theo bản sao cũ của certifi 2026.6.17 (GHSA-6q48-6c7w-9gw2, CRITICAL: gốc
+  emSign có CA trung gian lộ khóa), urllib3 2.7.0 (CVE-2026-97687, CVE-2026-97689), msgpack 1.1.2
+  (GHSA-6v7p-g79w-8964), setuptools 70.3.0 (CVE-2025-47273). Gói của dịch vụ đã ở bản vá, lúc chạy không dùng pip;
+  không thêm, không nâng gói nào. Trivy 0.75.0 quét lại image dựng mới (23/10/2026): lỗ hổng HIGH/CRITICAL có bản sửa
+  của mỗi image từ 5 (1 CRITICAL, 4 HIGH) còn 0, phần Python không còn lỗ hổng nào; HIGH/CRITICAL còn lại đều là gói
+  Debian chưa có bản sửa.
+- Nâng pypdf 6.21.1 → 6.21.2 trong `svc-files` (GHSA-6c7f-9265-g8fw, GHSA-gmh7-3g9r-mjh5, GHSA-jr96-gvgh-j3r4,
+  HIGH: PDF tải lên dị dạng làm bước đọc chữ chạy rất lâu); gói kéo theo của `apps/office`: serialize-javascript
+  7.1.2 → 7.1.3 (GHSA-m5mm-p8h7-m29v), fast-uri 3.1.8 → 3.1.9 (chỉ lúc dựng, bốn GHSA). Ngoại lệ vá bảo mật ghi ở
+  `DEPENDENCIES.md`.
+
 ## [1.0.0] - 2026-10-23
+
+Bản cho vòng trường. Văn phòng điện tử chạy đủ luồng văn bản đến và văn bản đi theo NĐ 30/2020 trên lõi dùng chung
+(Keycloak, APISIX, Hasura, Flowable), dựng từ mã nguồn bằng `make`.
+
+- Văn bản đến: kiểm dịch ClamAV, poka-yoke ba lớp, vào sổ, chỉ đạo, xử lý, nhắc hạn, thông báo realtime.
+- Văn bản đi: soạn, duyệt, ký, cấp số, phát hành PDF có mã QR; sổ đăng ký đến / đi in được; liên thông giữa các
+  đơn vị.
+- Tin cậy: sổ kiểm toán chuỗi băm neo ra kho không xóa được, cổng xác thực văn bản công khai, văn bản hạn chế mã
+  hóa, ký số PAdES (chỉ minh họa).
+- AI: đọc văn bản đến, trợ lý hỏi đáp có trích nguồn, gợi ý giao việc; che thông tin cá nhân trước khi gửi mô hình.
+- Vận hành: cài ra ngoài thư mục mã nguồn, sao lưu và khôi phục một lệnh, GitOps tự phục hồi, két bí mật OpenBao,
+  giám sát, Cloudflare Tunnel.
+- CI dựng toàn hệ thống trên mọi thay đổi rồi chạy `make seed` → `make smoke` → `make e2e` cùng các màn demo.
 
 ### Đã thêm
 - Hộp việc của `giamkhao` không còn trống sau `make seed`: có công văn khẩn 152/ĐT-ĐH chờ xử lý và dự thảo phúc đáp
@@ -596,6 +877,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `${{ }}` vào lệnh shell — tên thẻ chứa `$( )` không chạy được lệnh trong job có quyền ghi kho.
 
 ## [0.1.0] - 2026-10-18
+
+Bộ khung dự án: giấy phép Apache-2.0, dựng từ mã nguồn bằng Make và Docker Compose, cấu hình qua `.env`, CI kiểm
+header giấy phép, gói phát hành `.tar.gz`, mẫu báo lỗi và PR, tài liệu.
 
 ### Đã thêm
 - Khung dự án nguồn mở: giấy phép Apache-2.0 (toàn văn + thông báo mục đích + header từng tệp).

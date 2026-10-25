@@ -46,6 +46,17 @@
         Các đơn vị kèm số phòng, người dùng, văn bản, Organization; đối chiếu đơn vị, Organization, thành viên và
         danh bạ core.users. check thoát 1 nếu lệch.
 
+    python3 scripts/moc.py realm clients [--dry-run] [--json]
+        Thêm vào realm đang chạy client của ứng dụng trên trình duyệt có trong moc-realm.json mà realm chưa có (realm
+        chỉ nạp từ tệp ở lần khởi động đầu; vd bản cài cũ chưa có app-ca-nhan). Không sửa client đã có. make seed
+        cũng gọi. Thoát 0: xong; 1: bị từ chối; 2: không gọi được Keycloak. (chi tiết trong scripts/realm_clients.py)
+
+    python3 scripts/moc.py app install apps/<thư mục>/app.yaml [--dry-run] | list [--json] | remove TÊN [--dry-run]
+                           | sync [--files] [--json]
+        Cắm ứng dụng vào lõi bằng manifest, không sửa tệp lõi nào: client Keycloak, route APISIX, container, schema và
+        migration riêng, bảng và quyền Hasura, event trigger nghe sự kiện của lõi. Chạy lại được; lỗi giữa chừng thì
+        báo bước nào. Gỡ giữ nguyên dữ liệu. (make app-install APP=…; chi tiết trong scripts/ung_dung.py)
+
 Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`, gọi Keycloak qua cổng
 quản trị nội bộ (127.0.0.1): không mở thêm cổng nào, không cần mật khẩu ngoài .env.
 """
@@ -63,7 +74,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import backup
+import realm_clients
 import tenants
+import ung_dung
 from audit_chain import ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Report, check, local_time, to_datetime
 from moc_env import ENV, ROOT
 
@@ -358,6 +371,15 @@ def main(argv: list[str] | None = None) -> int:
     tk.add_argument("codes", nargs="*", metavar="MÃ", help="chỉ kiểm các đơn vị này (mặc định: tất cả)")
     tk.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     tk.set_defaults(run=tenants.cmd_check)
+
+    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md)").add_subparsers(
+        dest="cmd", required=True)
+    rc = rm.add_parser("clients", help="thêm client ứng dụng trên trình duyệt còn thiếu so với moc-realm.json")
+    rc.add_argument("--dry-run", action="store_true", help="chỉ in client sẽ thêm, không thay đổi gì")
+    rc.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    rc.set_defaults(run=realm_clients.cmd_clients)
+
+    ung_dung.add_parser(groups)
     args = parser.parse_args(argv)
     return args.run(args)
 

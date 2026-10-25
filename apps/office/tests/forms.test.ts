@@ -25,7 +25,7 @@ import { after, test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { formsSource } from '../scripts/forms.mjs'
 import { formErrors } from '../app/utils/forms.ts'
-import type { JsonSchema, Validate } from '../app/utils/forms.ts'
+import type { JsonSchema, SchemaError, Validate } from '../app/utils/forms.ts'
 
 interface Case { name: string, set?: Record<string, unknown>, unset?: string[], error?: Record<string, string> }
 
@@ -86,4 +86,26 @@ test('mã kiểm chạy được dưới CSP không có unsafe-eval: không new 
 test('một tệp schema thành một hàm kiểm, ca thử không bị coi là schema', () => {
   assert.equal(typeof forms.vanBanDen, 'function')
   assert.deepEqual(Object.keys(forms.schemas), ['vanBanDen'])
+})
+
+test('một trường sai nhiều điều: giữ điều đứng trước trong PRIORITY, cùng hạng thì điều gặp trước', () => {
+  const failing = (...errors: SchemaError[]): Validate => Object.assign(() => false, { errors })
+  const at = (keyword: string, field: string): SchemaError => ({ keyword, instancePath: `/${field}`, params: {} })
+  const plain: JsonSchema = { properties: { so_ky_hieu: {}, trich_yeu: {} } }
+  // từ khóa lạ cùng xếp sau mọi từ khóa đã biết: giữ cái gặp trước
+  const mixed = failing(at('maxLength', 'so_ky_hieu'), at('pattern', 'so_ky_hieu'), at('x-la', 'trich_yeu'),
+    at('x-khac', 'trich_yeu'))
+  assert.deepEqual(formErrors(mixed, plain, {}, TODAY), { so_ky_hieu: 'pattern', trich_yeu: 'x-la' })
+  // x-moc-nfc gom sau lỗi của schema: đứng trước uniqueItems thì thay, đứng sau maxLength thì không
+  const nfc: JsonSchema = { 'x-moc-nfc': true, properties: { ten: {} } }
+  const decomposed = { ten: 'Hoà'.normalize('NFD') }
+  assert.deepEqual(formErrors(failing(at('uniqueItems', 'ten')), nfc, decomposed, TODAY), { ten: 'x-moc-nfc' })
+  assert.deepEqual(formErrors(failing(at('maxLength', 'ten')), nfc, decomposed, TODAY), { ten: 'maxLength' })
+  // x-moc-date chỉ báo cho trường chưa có lỗi
+  const dated: JsonSchema = {
+    properties: { ngay: { 'x-moc-date': 'not-after-today' }, han: { 'x-moc-date': 'not-before-today' } },
+  }
+  assert.deepEqual(formErrors(failing(at('format', 'ngay')), dated, { ngay: '2999-01-01', han: '2000-01-01' }, TODAY),
+    { ngay: 'format', han: 'x-moc-date' })
+  assert.deepEqual(formErrors(Object.assign(() => true, { errors: null }), plain, {}, TODAY), {})
 })

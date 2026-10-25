@@ -17,7 +17,7 @@
 """Gọi Flowable REST (chỉ trong mạng nội bộ, tài khoản rest-admin).
 
 Flowable là chủ trạng thái quy trình: đang ở bước nào, ai phải làm. Dữ liệu nghiệp vụ nằm ở PostgreSQL
-(docs/ke-hoach-phat-trien.md §2.1). Flowable không biết người dùng Keycloak; việc được giao cho nhóm
+(docs/du-thi/ke-hoach-phat-trien.md §2.1). Flowable không biết người dùng Keycloak; việc được giao cho nhóm
 ứng viên dạng ``t:<tenant>:director`` hoặc ``t:<tenant>:d:<phòng>:manager``, hoặc đích danh theo ``sub``.
 """
 

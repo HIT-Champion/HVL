@@ -28,6 +28,21 @@ ENV_FILE := .env
 # COMPOSE_PROFILES trong bản cài (make install)
 EXTRA_PROFILES := $(shell sed -n 's/^MOC_EXTRA_PROFILES=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr ',' ' ')
 COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXTRA_PROFILES),--profile $(p)))
+# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 5 dịch vụ sang
+# fluentd → Vector. Chỉ nạp khi bật; tắt thì docker compose chỉ đọc docker-compose.yml như cũ. export: lệnh con
+# (demo.py, moc.py… gọi docker compose) cũng nạp tệp phủ
+# Ứng dụng cài bằng manifest (moc app install, docs/them-ung-dung.md): tệp phủ compose sinh trong .moc-apps/. Có thì
+# đi cùng mọi COMPOSE_FILE mà Makefile tự đặt (log tập trung); không đặt thì compose đọc COMPOSE_FILE trong .env
+APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
+APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
+BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
+LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
+LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow
+# Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
+LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
+ifneq ($(LOGS_ON),)
+export COMPOSE_FILE := $(LOGS_COMPOSE_FILE)
+endif
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
@@ -35,8 +50,12 @@ PREFIX ?= /opt/moc
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
+        demo-nap-lo nap-lo-mau \
+        demo-ca-nhan \
+        do-so-lieu-sau \
+        logs-env logs-up logs-down logs-tra demo-log-tap-trung \
         reconcile \
-        backup restore install uninstall license-check license-fix lint release clean
+        backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
 help: ## Hiển thị danh sách lệnh
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -59,6 +78,13 @@ env-ready: $(ENV_FILE)
 	@! grep -qE '^[A-Z0-9_]+=change_me' $(ENV_FILE) || { echo "$(ENV_FILE) còn giá trị mẫu change_me:" \
 	  $$(grep -oE '^[A-Z0-9_]+=change_me' $(ENV_FILE) | cut -d= -f1) \
 	  "— đổi thành chuỗi ngẫu nhiên, hoặc xóa $(ENV_FILE) rồi make env" >&2; exit 1; }
+	@# F3.15: MOC_WAF, MOC_APISIX_WORKERS sai thì APISIX dừng ngay lúc khởi động — kiểm trước bằng chính script
+	@# entrypoint của image (cùng nguồn với reconciler GitOps), với giá trị compose sẽ dùng: shell rồi .env, mặc định
+	@json=$$($(COMPOSE) config --format json apisix 2>/dev/null) || exit 0; \
+	  get() { printf '%s\n' "$$json" | sed -n "s/^ *\"$$1\": \"\(.*\)\",*\$$/\1/p"; }; \
+	  w=$$(get MOC_WAF); n=$$(get MOC_APISIX_WORKERS); \
+	  if [ -n "$$w" ]; then export MOC_WAF="$$w"; fi; if [ -n "$$n" ]; then export MOC_APISIX_WORKERS="$$n"; fi; \
+	  sh platform/apisix/kiem-moi-truong.sh --chi-kiem
 
 check: ## Kiểm tra tiền điều kiện của môi trường
 	@command -v docker >/dev/null || { echo "Thiếu Docker Engine >= 24.0"; exit 1; }
@@ -71,8 +97,11 @@ check: ## Kiểm tra tiền điều kiện của môi trường
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: env-ready ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync --files)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
+	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
+	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync)
 	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
 up-ai: $(ENV_FILE) ## Bật mô hình ngôn ngữ cục bộ (Ollama, profile ai): tác tử đọc văn bản viết trích yếu, trợ lý hỏi đáp tìm theo nghĩa và viết câu trả lời — cần make ai-model trước
@@ -82,16 +111,42 @@ ai-model: $(ENV_FILE) ## Tải mô hình sinh MOC_AI_MODEL (mặc định qwen3:
 	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Signet trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull down -v
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
 logs: ## Theo dõi nhật ký của mọi dịch vụ
 	@$(COMPOSE) logs -f --tail=100
+
+logs-env: $(ENV_FILE)
+	@# .env sinh trước F3.14 thiếu mật khẩu: sinh đúng như make env (scripts/gen-env.sh), không in giá trị
+	@grep -q '^MOC_LOGS_PASSWORD=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Log tập trung (F3.14), make up / make logs-up thêm\nMOC_LOGS_PASSWORD=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) && echo "Đã thêm MOC_LOGS_PASSWORD (ngẫu nhiên) vào $(ENV_FILE)."; }
+	@sed -n 's/^MOC_LOGS_PASSWORD=//p' $(ENV_FILE) | tail -n 1 | grep -q . || { echo "MOC_LOGS_PASSWORD trong" \
+	  "$(ENV_FILE) rỗng: Parseable không khởi động với mật khẩu rỗng — đặt một chuỗi ngẫu nhiên" >&2; exit 1; }
+
+logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; apisix, app-office, app-ca-nhan, svc-files, svc-workflow gửi log qua driver fluentd (tạo lại 5 container). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
+	@COMPOSE_FILE=$(LOGS_COMPOSE_FILE) $(COMPOSE) --profile logs up -d --wait vector parseable $(LOGGED_SERVICES)
+	@python3 scripts/log_tap_trung.py init
+	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 5 dịch vụ về json-file" \
+	  "(Vector, Parseable vẫn chạy mà không nhận gì) — bật lâu dài thì thêm logs vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
+
+logs-down: env-ready ## Tắt log tập trung: 5 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
+	@! echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || { echo "Bỏ logs khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
+	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
+	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
+	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) --profile logs rm -sf vector parseable
+
+logs-tra: $(ENV_FILE) ## Tra log tập trung theo mã yêu cầu (header X-Request-Id, câu "đã ghi nhật ký với mã …"): make logs-tra ID=<mã> [PHUT=60]
+	@python3 scripts/log_tap_trung.py tra "$(ID)" --phut "$(or $(PHUT),60)"
+
+demo-log-tap-trung: $(ENV_FILE) ## Màn log tập trung (F3.14): một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → svc-files; Parseable trả dòng của cả ba cùng mã, sổ kiểm toán cùng mã; không lộ token; docker logs vẫn đọc được
+	@python3 scripts/demo.py log-tap-trung
 
 ps: ## Liệt kê trạng thái các dịch vụ
 	@$(COMPOSE) ps
@@ -118,6 +173,9 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@cd services/svc-workflow && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q
 	@python3 -m unittest discover -s scripts/tests
 	@cd apps/office && npm test
+	@cd apps/ca-nhan && npm test
+	@cd apps/bang-tin && node --test tests/*.test.js
+	@python3 -m unittest discover -s apps/bang-tin/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
@@ -170,6 +228,9 @@ demo-giao-viec: $(ENV_FILE) ## Màn gợi ý giao việc (F4.3): văn bản mớ
 do-giao-viec: $(ENV_FILE) ## Đo tác tử gợi ý giao việc leave-one-out trên lịch sử seed/giao-viec: top-1/2/3, độ phủ, sai số hạn, thời gian (thoát 1 khi căn cứ là văn bản hạn chế hoặc top-1 dưới ngưỡng)
 	@python3 scripts/demo.py do-giao-viec
 
+do-so-lieu-sau: $(ENV_FILE) ## Số đo "sau" của đặc tả §8 (F4.6) trên hệ thống đang chạy: thời gian từ văn bản đến tới khi giao xử lý (trung vị, p90), tỷ lệ quá hạn, 5 lần tìm lại văn bản cũ qua API (độ trễ hệ thống); in bảng, ghi out/so-lieu-sau.json (thoát 1 khi không đo được)
+	@python3 scripts/demo.py do-so-lieu-sau
+
 demo-ky-so: $(ENV_FILE) ## Màn ký số (F4.5, chỉ minh họa): văn bản đi ký PAdES bằng khóa của đơn vị trong két, CA nội bộ; cổng xác thực báo người ký; pyHanko phát hiện sửa sau khi ký, lật một bit; văn bản hạn chế không ký (docs/demo-script.md)
 	@python3 scripts/demo.py ky-so
 
@@ -180,7 +241,32 @@ do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số ch�
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
 	  tests/test_pii_corpus.py tests/test_pii_mutation.py
 
-reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem ops/systemd/)
+demo-nap-lo: $(ENV_FILE) ## Màn nạp lô văn bản đến (cụm ⑤): 200 dòng + zip qua API, EICAR bị chặn, gửi lại không trùng
+	@python3 scripts/demo.py nap-lo
+
+nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến mẫu, có dòng sai cố ý (không cần Docker)
+	@python3 scripts/nap_lo_mau.py
+
+demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
+	@python3 scripts/demo_ca_nhan.py
+
+.PHONY: app-install app-list app-remove demo-cai-ung-dung
+
+app-install: env-ready ## Cắm ứng dụng bằng manifest, không sửa lõi: make app-install APP=apps/bang-tin/app.yaml [DRY=1]
+	@test -n "$(APP)" || { echo "Thiếu tham số: make app-install APP=apps/<thư mục>/app.yaml" >&2; exit 1; }
+	@python3 scripts/moc.py app install "$(APP)" $(if $(DRY),--dry-run)
+
+app-list: $(ENV_FILE) ## Ứng dụng đã cài bằng manifest: đường, image, migration đã áp, sự kiện nghe
+	@python3 scripts/moc.py app list
+
+app-remove: env-ready ## Gỡ ứng dụng cài bằng manifest, GIỮ dữ liệu: make app-remove APP=bang-tin [DRY=1]
+	@test -n "$(APP)" || { echo "Thiếu tham số: make app-remove APP=<tên>" >&2; exit 1; }
+	@python3 scripts/moc.py app remove "$(APP)" $(if $(DRY),--dry-run)
+
+demo-cai-ung-dung: $(ENV_FILE) ## Cắm Bảng tin bằng một lệnh: cài, SSO, sự kiện, cài lại, gỡ giữ dữ liệu; lõi không đổi
+	@python3 scripts/demo.py cai-ung-dung
+
+reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py
 
 backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (MOC_BACKUP_DIR, mặc định ./backups)
@@ -203,6 +289,28 @@ license-check: ## Kiểm tra header giấy phép trong từng tệp mã (tiêu c
 
 license-fix: ## Tự chèn header giấy phép vào các tệp còn thiếu
 	@./scripts/license-header.sh fix
+
+# Syft (Anchore) đọc tệp khóa npm (kể cả gói chỉ dùng lúc dựng), requirements*.txt và action trong .github/workflows/;
+# requirements.txt không ghi giấy phép nên --enrich python hỏi PyPI giấy phép của từng gói Python (cần mạng). Không đọc
+# Dockerfile, docker-compose.yml: image thượng nguồn và giấy phép của chúng ghi ở DEPENDENCIES.md. CI ghi đè bằng biến
+# môi trường cùng tên trong .github/workflows/ci.yml — đổi phiên bản thì đổi cả hai (test scripts kiểm hai chỗ trùng)
+SYFT_IMAGE ?= ghcr.io/anchore/syft:v1.54.1@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa
+SBOM_VERSION = $(or $(VERSION),$(shell git describe --tags --always 2>/dev/null | sed 's/^v//'),dev)
+SBOM = dist/signet-$(SBOM_VERSION).cdx.json
+
+sbom: ## Danh mục thành phần SBOM CycloneDX của cây mã nguồn (Syft): dist/signet-<phiên bản>.cdx.json kèm .sha256 — dùng: make sbom [VERSION=1.1.0]; cần Docker, mạng tới PyPI
+	@mkdir -p dist
+	@docker run --rm -e SYFT_CHECK_FOR_APP_UPDATE=false -e SYFT_JAVASCRIPT_INCLUDE_DEV_DEPENDENCIES=true \
+	  -v "$(CURDIR):/src:ro" $(SYFT_IMAGE) scan dir:/src --enrich python --source-name moc \
+	  --source-version "$(SBOM_VERSION)" --exclude './**/node_modules/**' --exclude './**/.venv/**' \
+	  --exclude './dist/**' --exclude './.git/**' -o cyclonedx-json > $(SBOM).tmp || { rm -f $(SBOM).tmp; exit 1; }
+	@mv $(SBOM).tmp $(SBOM)
+	@cd dist && sha256sum $(notdir $(SBOM)) > $(notdir $(SBOM)).sha256
+	@echo "Đã tạo $(SBOM) và $(notdir $(SBOM)).sha256. Kiểm giấy phép: make license-audit"
+
+license-audit: ## Kiểm giấy phép mọi gói (kể cả gián tiếp) trong SBOM của make sbom theo DEPENDENCIES.md; ngoại lệ có lý do ở .github/license-exceptions.json
+	@test -f $(SBOM) || { echo "Chưa có $(SBOM) — chạy make sbom trước (cùng VERSION nếu có)." >&2; exit 1; }
+	@python3 scripts/license_audit.py $(SBOM)
 
 lint: license-check ## Chạy toàn bộ kiểm tra tĩnh
 	@$(COMPOSE) config -q && echo "Docker Compose hợp lệ."

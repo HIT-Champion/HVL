@@ -17,5 +17,9 @@
 blank_issues_enabled: true
 contact_links:
   - name: Câu hỏi sử dụng
-    url: https://github.com/HIT-Champion/HVL/discussions/categories/q-a
+    url: https://github.com/HIT-Champion/Signet/discussions/categories/q-a
     about: Đặt câu hỏi về cách cài đặt và vận hành Signet
+  # Lỗ hổng bảo mật không đi qua issue công khai: trang này hiện SECURITY.md, cùng nút báo riêng tư khi đã bật
+  - name: Báo lỗ hổng bảo mật
+    url: https://github.com/HIT-Champion/Signet/security/policy
+    about: Đừng mở issue công khai — báo riêng tư theo SECURITY.md

@@ -29,7 +29,9 @@ import hmac
 import json
 import logging
 import os
-from collections.abc import AsyncIterator
+import re
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -39,6 +41,7 @@ from fastapi.responses import JSONResponse, Response
 
 from . import __version__, pii
 from .advisor import Advisor
+from .channels import Router
 from .config import ConfigError, Settings
 from .directory import Directory
 from .dispatch import Dispatcher
@@ -53,6 +56,8 @@ from .sla import Deadlines
 from .workflow import Workflow, WorkflowError
 
 log = logging.getLogger("svc_workflow")
+# Mã yêu cầu nhận từ X-Request-Id: cùng luật với bước tách mã của Vector và make logs-tra (log tập trung F3.14)
+REQUEST_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 
 
 def _setup_logging() -> None:
@@ -174,7 +179,9 @@ def create_app(
                                        settings.directory_client_secret, hasura)
     files = files or FilesClient(settings.files_url, ServiceToken(
         settings.keycloak_url, settings.realm, settings.directory_client_id, settings.directory_client_secret))
-    notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key)
+    # kênh ngoài (email, webhook): None khi chưa cấu hình — chỉ có chuông trên web như trước
+    router = Router.from_settings(hasura, settings) if notifier is None else getattr(notifier, "router", None)
+    notifier = notifier or Notifier(hasura, settings.centrifugo_url, settings.centrifugo_api_key, router=router)
     try:
         intake = FormSchema.load(Path(settings.schemas_dir) / "van-ban-den.json")
     except SchemaFileError as exc:
@@ -192,6 +199,8 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        for warning in settings.warnings():     # cấu hình chạy được nhưng có phần không dùng được (vd kênh email)
+            log.warning(json.dumps({"event": "config.warning", "message": warning}, ensure_ascii=False))
         tasks = [asyncio.create_task(_deploy_processes(flowable, settings.processes_dir))]
         if settings.directory_sync_interval_s > 0:
             tasks.append(asyncio.create_task(directory.run(settings.directory_sync_interval_s)))
@@ -211,6 +220,8 @@ def create_app(
                 _every(settings.suggest_poll_interval_s, "office.assign.jobs_handled", advisor.run_jobs)))
         if ot is not None and settings.ot_interval_s > 0:
             tasks.append(asyncio.create_task(_every(settings.ot_interval_s, "ot.subscriptions_ensured", ot.ensure_all)))
+        if router is not None and settings.notify_interval_s > 0:
+            tasks.append(asyncio.create_task(router.serve(settings.notify_interval_s)))
         try:
             yield
         finally:
@@ -221,6 +232,8 @@ def create_app(
             if ot is not None:
                 await ot.aclose()
             await notifier.aclose()
+            if router is not None:
+                await router.aclose()
             await files.aclose()
             await flowable.aclose()
             await hasura.aclose()
@@ -232,12 +245,33 @@ def create_app(
                     "ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def request_id(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        # APISIX gắn X-Request-Id (giữ mã client tự gửi), Hasura chuyển tiếp sang Action (forward_client_headers); gọi
+        # thẳng (khi phát triển) thì tự sinh. Mã sai dạng (dài, dấu cách, ký tự điều khiển…) cũng thay bằng mã mới: mọi
+        # mã trong nhật ký, sổ kiểm toán đều tra được. Trả lại ở header để người gọi tra nhật ký, log tập trung (F3.14)
+        rid = request.headers.get("x-request-id", "")
+        if not REQUEST_ID.fullmatch(rid):
+            rid = uuid.uuid4().hex
+        request.state.request_id = rid
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = rid
+        return response
+
     app.state.workflow = workflow
     app.state.dispatcher = dispatcher
     app.state.deadlines = deadlines
     app.state.advisor = advisor
     app.state.directory = directory
     app.state.ot = ot
+    app.state.router = router
+
+    @app.exception_handler(WorkflowError)
+    async def refused(request: Request, exc: WorkflowError) -> JSONResponse:
+        # Lỗi nghiệp vụ ném ra khỏi route (vd /ot/notify, khai trả 204) → thân lỗi định dạng Action như _error().
+        # /actions/{name} tự bắt WorkflowError trước để ghi nhật ký kèm người gọi, nên không đi qua đây.
+        return _error(exc.status, exc.code, exc.message, exc.fields)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
@@ -257,24 +291,25 @@ def create_app(
                          404: {"description": "Chưa cấu hình MOC_NGSI_URL"},
                          503: {"description": "Chưa ghi được CSDL, broker sẽ báo lỗi gửi"}})
     async def ot_notify(tenant: str, request: Request) -> Response:
+        # Khai trả 204 nên chỉ có một return (204 không thân); lỗi ném WorkflowError cho bộ xử lý chung ở trên
         if ot is None:
-            return _error(404, "not_found", "Chưa bật IT/OT (MOC_NGSI_URL)")
+            raise WorkflowError("not_found", "Chưa bật IT/OT (MOC_NGSI_URL)", 404)
         if not ot.check(tenant, request.headers.get(TOKEN_HEADER, "")):
-            return _error(401, "unauthorized", "Sai token của đơn vị")
+            raise WorkflowError("unauthorized", "Sai token của đơn vị", 401)
         try:
             body = await request.json()
             if not isinstance(body, dict):
                 raise ValueError("không phải đối tượng JSON")
-        except ValueError:
-            return _error(400, "bad_request", "Thông báo không phải Notification NGSI-LD")
+        except ValueError as exc:
+            raise WorkflowError("bad_request", "Thông báo không phải Notification NGSI-LD") from exc
         try:
             await ot.handle(tenant, body)
-        except ValueError:
-            return _error(400, "bad_request", "Thông báo không có danh sách thực thể")
+        except ValueError as exc:
+            raise WorkflowError("bad_request", "Thông báo không có danh sách thực thể") from exc
         except HasuraError as exc:
             log.warning(json.dumps({"event": "ot.alarm_failed", "tenant": tenant, "error": str(exc)},
                                    ensure_ascii=False))
-            return _error(503, "unavailable", "Chưa ghi được dự thảo, thử lại sau")
+            raise WorkflowError("unavailable", "Chưa ghi được dự thảo, thử lại sau", 503) from exc
         return Response(status_code=204)
 
     @app.post("/actions/{name}",
@@ -290,7 +325,7 @@ def create_app(
             payload = body.get("input") or {}
             if (body.get("action") or {}).get("name") != name:
                 return _error(400, "bad_request", "Tên Action không khớp đường dẫn")
-            actor = Actor.from_session(session, request.headers.get("x-request-id", ""))
+            actor = Actor.from_session(session, request.state.request_id)
         except (ValueError, KeyError, TypeError):
             return _error(400, "bad_request", "Yêu cầu không đúng định dạng Action")
 

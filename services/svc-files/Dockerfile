@@ -37,9 +37,12 @@ RUN apt-get update \
       tesseract-ocr tesseract-ocr-vie \
  && rm -rf /var/lib/apt/lists/*
 
-# Thư viện cài từ PyPI theo tệp khóa có băm; không chép thư viện vào repo (PoF #5).
+# Thư viện cài từ PyPI theo tệp khóa có băm; không chép thư viện vào repo (PoF #5). Cài xong thì gỡ pip: lúc chạy
+# không dùng, mà pip của image nền mang theo bản sao cũ của certifi, urllib3, msgpack, setuptools (pip/_vendor) có lỗ
+# hổng đã có bản sửa (1 CRITICAL, 4 HIGH khi quét image 23/10/2026)
 COPY requirements.txt ./
-RUN pip install --require-hashes -r requirements.txt
+RUN pip install --require-hashes -r requirements.txt \
+ && python -m pip uninstall -y pip
 
 COPY src/ ./src/
 
@@ -50,4 +53,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
 
-CMD ["uvicorn", "svc_files.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# APISIX giữ kết nối rảnh tới dịch vụ phía sau 60 giây (mặc định của APISIX 3.18), uvicorn mặc định đóng sau 5 giây:
+# yêu cầu tới đúng lúc uvicorn đóng thì cổng trả 502, không thử lại ("upstream prematurely closed connection" hay
+# "Connection reset by peer" trong log APISIX). Giữ kết nối lâu hơn cổng (75 > 60) để chỉ APISIX đóng kết nối rảnh
+CMD ["uvicorn", "svc_files.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", \
+     "--timeout-keep-alive", "75"]

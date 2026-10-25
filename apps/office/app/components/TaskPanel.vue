@@ -20,7 +20,7 @@
 import { useI18n } from 'vue-i18n'
 import type { SuggestApply } from '~/utils/assignSuggest'
 
-// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong processes/*.bpmn20.xml).
+// Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong services/svc-workflow/processes/*.bpmn20.xml).
 // Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
 
 export interface PanelUser { id: string; full_name: string; role: string; department_id: string | null }
@@ -200,7 +200,7 @@ function submitDone() {
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
         <div class="flex items-end gap-2">
-          <input v-model="fileNote" class="input w-56" :placeholder="t('form.chiDao.fileNote')">
+          <input v-model="fileNote" class="input w-56" :aria-label="t('form.chiDao.fileNote')" :placeholder="t('form.chiDao.fileNote')">
           <button type="button" class="btn-secondary" :disabled="busy" @click="complete('file', { note: fileNote.trim() || null })">{{ t('form.chiDao.file') }}</button>
         </div>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.chiDao.direct') }}</button>

@@ -1,0 +1,17 @@
+{
+  "name": "moc-app-bang-tin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Signet — Bảng tin đơn vị (ứng dụng thứ ba, cắm vào lõi bằng moc app install)",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "oidc-client-ts": "3.5.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

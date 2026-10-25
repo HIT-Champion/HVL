@@ -20,13 +20,18 @@ import { ApiError } from '~/composables/useApi'
 // Lỗi từ máy chủ → câu cho người dùng. Hasura trả tên ràng buộc trong CSDL (db/README.md: đặt tên cho
 // ràng buộc check) nên dịch được thành câu tiếng Việt cụ thể; svc-workflow đã trả câu tiếng Việt sẵn.
 // documents_recipient_units gồm cả documents_recipient_units_out, _other và lỗi của trigger cùng tiền tố (F3.12).
+// feedback_*: góp ý (F4.6) — feedback_rate là lỗi chặn gửi dồn của trigger, tên đứng đầu câu lỗi.
+// maturity_rate: tự chẩn đoán H-P-D-I (F4.7) — chặn lưu dồn theo đơn vị, như feedback_rate.
 const CONSTRAINTS = ['documents_in_dedup', 'documents_due_after_registered', 'documents_body_length',
-  'document_files_sealed', 'documents_restricted_sealed', 'documents_restricted_local', 'documents_recipient_units']
+  'document_files_sealed', 'documents_restricted_sealed', 'documents_restricted_local', 'documents_recipient_units',
+  'feedback_rate', 'feedback_rating', 'feedback_comment', 'feedback_screen', 'maturity_rate']
 
 export function errorText(t: Composer['t'], e: unknown): string {
   if (e instanceof ApiError) {
     if (e.code === 'network') return t('error.network')
     if (e.code === 'session') return t('error.session')
+    // tường lửa ở cổng chặn (F3.15): kèm X-Request-Id để người quản trị tra nhật ký chặn
+    if (e.code === 'blocked') return e.requestId ? t('error.blockedId', { id: e.requestId }) : t('error.blocked')
     if (e.code === 'infected') return t('error.infected')
     if (e.code === 'unscannable') return t('error.unscannable')    // có mật khẩu, nén quá sâu: ClamAV không quét hết
     // submitOutgoing kiểm đơn vị nhận (restricted / self / unknown) ở trang văn bản, nơi không có ô nào để đánh dấu

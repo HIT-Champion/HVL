@@ -45,11 +45,29 @@ const nav = computed(() => {
   if (role && role !== 'tenant_admin') items.push({ to: '/van-ban-di', label: t('nav.outgoing'), icon: 'M4 12l16-8-6 16-2-7-8-1z' })
   if (role === 'staff') items.push({ to: '/van-ban-di/soan', label: t('nav.compose'), icon: 'M4 20h4l10.5-10.5a2.1 2.1 0 00-3-3L5 17v3zM13.5 7.5l3 3' })
   if (role === 'clerk' || role === 'director') items.push({ to: '/so-dang-ky', label: t('nav.register'), icon: 'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zm0 16a2 2 0 012-2h13v2H6a2 2 0 01-2 0zM8 7h7M8 11h7' })
+  // Hồ sơ công việc, nộp lưu, phòng đọc (F3.8): chuyên viên, lãnh đạo phòng lập; văn thư, lãnh đạo đơn vị xem
+  if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') {
+    items.push({
+      to: '/ho-so', label: t('cases.title'),
+      icon: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm6 6h6',
+    })
+  }
   items.push({ to: '/tim-kiem', label: t('nav.search'), icon: 'M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z' })
   // Hỏi đáp trên kho văn bản (F4.2): vai trò nghiệp vụ; quản trị đơn vị không đọc văn bản nên không hỏi được
   if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/hoi-dap', label: t('nav.ask'), icon: 'M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z' })
   if (role === 'director') items.push({ to: '/dieu-hanh', label: t('nav.board'), icon: 'M3 3v18h18M8 17v-4m4 4V8m4 9v-6' })
+  // Số đo "sau" theo đặc tả §8 (F4.6): khung nhìn số đo chỉ cho lãnh đạo đơn vị đọc, như dashboard điều hành
+  if (role === 'director') items.push({ to: '/so-do', label: t('nav.metrics'), icon: 'M12 9v4l2.5 2.5M9 3h6M12 21a8 8 0 110-16 8 8 0 010 16z' })
+  // Phả hệ số liệu (F3.9): biểu đồ của trang Điều hành ← khung nhìn ← bảng, lượt nộp lưu; cùng quyền với dashboard
+  if (role === 'director') {
+    items.push({ to: '/pha-he', label: t('lineage.nav'),
+                 icon: 'M4 9h5v6H4zM15 3h5v6h-5zM15 15h5v6h-5zM9 12h3m0-6v12m0-12h3m-3 12h3' })
+  }
+  // Tự chẩn đoán H-P-D-I: lãnh đạo đơn vị trả lời, lưu, xem bằng chứng đo được; lãnh đạo phòng trả lời, không lưu
+  if (role === 'director' || role === 'manager') items.push({ to: '/tu-chan-doan', label: t('nav.selfCheck'), icon: 'M12 3l8.5 6.2-3.2 10H6.7L3.5 9.2 12 3zm0 5l4 2.9-1.5 4.6h-5L8 10.9 12 8z' })
   if (role === 'director' || role === 'tenant_admin') items.push({ to: '/so-kiem-toan', label: t('nav.audit'), icon: 'M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4' })
+  // Góp ý (F4.6): mọi vai trò gửi được; trang xem lại góp ý của mình, lãnh đạo, quản trị đơn vị xem thêm tổng hợp
+  if (role) items.push({ to: '/gop-y', label: t('nav.feedback'), icon: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9L12 3z' })
   return items
 })
 
@@ -121,6 +139,9 @@ async function logout() {
       </nav>
       <div class="absolute inset-x-0 bottom-0 border-t border-stone-200 p-4 text-xs text-stone-500">
         {{ tenantName }}
+        <NuxtLink to="/trang-thai" class="mt-1 block text-stone-400 hover:text-brand-700 hover:underline">
+          {{ t('health.title') }}
+        </NuxtLink>
       </div>
     </aside>
     <div v-if="open" class="fixed inset-0 z-30 bg-black/30 md:hidden" @click="open = false" />
@@ -133,6 +154,7 @@ async function logout() {
         </button>
         <div class="flex-1" />
         <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>
+        <FeedbackButton v-if="claims?.role" />
         <NotificationBell v-if="claims?.role && claims.role !== 'tenant_admin'" />
         <div v-if="claims" class="hidden text-right sm:block">
           <div class="text-sm font-medium text-stone-900">{{ claims.name }}</div>

@@ -26,7 +26,10 @@
     "compose": "Soạn văn bản đi",
     "register": "Sổ đăng ký",
     "audit": "Sổ kiểm toán",
-    "board": "Điều hành"
+    "board": "Điều hành",
+    "metrics": "Số đo",
+    "feedback": "Góp ý",
+    "selfCheck": "Tự chẩn đoán"
   },
   "role": {
     "clerk": "Văn thư",
@@ -384,6 +387,7 @@
     "empty": "Không có văn bản nào khớp.",
     "more": "Xem thêm",
     "any": "Tất cả",
+    "directionLabel": "Văn bản đến hay đi",
     "direction": {
       "in": "Văn bản đến",
       "out": "Văn bản đi"
@@ -531,13 +535,20 @@
     "unscannable": "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
+    "blocked": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công. Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị.",
+    "blockedId": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công (mã {id}). Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị kèm mã trên.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
     "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
     "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
     "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",
     "documents_restricted_sealed": "Văn bản đã có tệp nên không đổi được chế độ hạn chế",
     "documents_restricted_local": "Văn bản hạn chế không gửi liên thông trong hệ thống.",
-    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ (không có, hoặc là chính đơn vị mình), hoặc văn bản đã trình nên không đổi được đơn vị nhận."
+    "documents_recipient_units": "Đơn vị nhận trong hệ thống không hợp lệ (không có, hoặc là chính đơn vị mình), hoặc văn bản đã trình nên không đổi được đơn vị nhận.",
+    "feedback_rate": "Bạn đã gửi nhiều góp ý trong thời gian ngắn: tối đa 3 góp ý mỗi 10 phút, 20 góp ý mỗi 24 giờ. Thử lại sau.",
+    "feedback_rating": "Chọn mức hài lòng từ 1 đến 5.",
+    "feedback_comment": "Nội dung góp ý dài quá 500 ký tự.",
+    "feedback_screen": "Không gắn được màn hình đang dùng vào góp ý. Tải lại trang rồi gửi lại.",
+    "maturity_rate": "Đơn vị đã lưu tự chẩn đoán nhiều lần trong thời gian ngắn: tối đa 5 lần mỗi giờ, 20 lần mỗi 24 giờ. Thử lại sau."
   },
   "validation": {
     "required": "Không được để trống",
@@ -638,6 +649,69 @@
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
     "footer": "Signet — văn phòng điện tử nguồn mở. Trang này không cần đăng nhập."
   },
+  "health": {
+    "title": "Trạng thái hệ thống",
+    "subtitle": "Tình trạng vận hành các thành phần của Signet. Trang tự cập nhật, không cần đăng nhập.",
+    "overall": {
+      "ok": "Mọi thành phần hoạt động bình thường",
+      "degraded": "Một số thành phần đang gặp sự cố",
+      "down": "Hệ thống đang gián đoạn"
+    },
+    "overallHint": {
+      "ok": "Đăng nhập, xử lý văn bản, lưu trữ và tìm kiếm đều sẵn sàng.",
+      "degraded": "Chức năng chính vẫn dùng được; chức năng dựa vào thành phần bị ảnh hưởng có thể chậm hoặc tạm dừng.",
+      "down": "Một thành phần thiết yếu không trả lời, nhiều thao tác sẽ chưa thực hiện được."
+    },
+    "state": {
+      "ok": "Hoạt động",
+      "degraded": "Một phần",
+      "down": "Gián đoạn",
+      "off": "Tắt"
+    },
+    "layer": {
+      "nguoi-dung": "Người dùng",
+      "loi": "Lõi",
+      "quy-trinh": "Quy trình",
+      "du-lieu": "Dữ liệu",
+      "tri-tue": "Trí tuệ nhân tạo"
+    },
+    "component": {
+      "cong-api": "Cổng API",
+      "dang-nhap": "Đăng nhập một lần",
+      "csdl": "CSDL",
+      "ket-khoa": "Két khóa",
+      "quet-ma-doc": "Quét mã độc",
+      "quy-trinh": "Quy trình",
+      "luu-tru": "Lưu trữ tệp",
+      "tim-kiem": "Tìm kiếm",
+      "tro-ly-ai": "Trợ lý AI"
+    },
+    "checkedAt": "Kiểm lúc {time}",
+    "autoRefresh": "Tự cập nhật mỗi 30 giây",
+    "version": "Phiên bản",
+    "uptime": "Chạy liên tục",
+    "uptimeHint": "Từ lần khởi động gần nhất của dịch vụ tệp",
+    "backup": "Sao lưu gần nhất",
+    "backupNone": "Chưa có",
+    "backupHint": "Lượt sao lưu trọn vẹn gần nhất mà hệ thống ghi nhận",
+    "ai": "Trợ lý AI",
+    "aiOn": "Bật",
+    "aiOff": "Tắt",
+    "aiSemantic": "Viết câu trả lời có trích dẫn, tìm theo nghĩa",
+    "aiKeyword": "Viết câu trả lời có trích dẫn, tìm theo từ khóa",
+    "aiOffHint": "Chưa bật mô hình ngôn ngữ: trợ lý vẫn tìm theo từ khóa và trả câu trích nguyên văn",
+    "aiSemanticOnly": "Mô hình viết câu trả lời chưa sẵn sàng: trợ lý tìm theo nghĩa và trả câu trích nguyên văn",
+    "units": {
+      "day": "ngày",
+      "hour": "giờ",
+      "minute": "phút",
+      "less": "dưới 1 phút"
+    },
+    "rateLimited": "Tải trạng thái quá nhiều lần trong một phút, trang sẽ tự thử lại sau ít giây.",
+    "unreachable": "Không tải được trạng thái: có thể cổng API đang gián đoạn. Trang sẽ tự thử lại.",
+    "stale": "Đang hiện kết quả của lần tải trước.",
+    "note": "Trang chỉ cho biết tình trạng chung, không có tên máy, địa chỉ hay số liệu nghiệp vụ. Chỉ số chi tiết (lưu lượng, độ trễ của cổng API) xem ở bảng Grafana dành cho người vận hành."
+  },
   "notify": {
     "title": "Thông báo",
     "empty": "Chưa có thông báo nào",
@@ -701,7 +775,9 @@
       },
       "case_file": {
         "archived": "Nộp lưu hồ sơ",
-        "read": "Đọc hồ sơ lưu trữ"
+        "read": "Đọc hồ sơ lưu trữ",
+        "archive_requested": "Yêu cầu nộp lưu hồ sơ",
+        "file_viewed": "Xem tệp trong phòng đọc"
       },
       "intake": {
         "suggested": "Đọc văn bản, gợi ý thông tin tiếp nhận"
@@ -711,6 +787,10 @@
       },
       "assignment": {
         "suggested": "Gợi ý giao việc"
+      },
+      "import": {
+        "created": "Tạo lô nạp văn bản",
+        "finished": "Xong lô nạp văn bản"
       }
     },
     "entity": {
@@ -724,12 +804,15 @@
         "document_types": "Loại văn bản",
         "case_files": "Hồ sơ",
         "case_file_documents": "Văn bản trong hồ sơ",
-        "dispatches": "Liên thông văn bản"
+        "dispatches": "Liên thông văn bản",
+        "maturity_assessments": "Tự chẩn đoán H-P-D-I"
       },
       "core": {
         "files": "Tệp tải lên",
         "users": "Người dùng",
-        "tenants": "Đơn vị"
+        "tenants": "Đơn vị",
+        "notification_deliveries": "Gửi thông báo qua email, webhook",
+        "import_jobs": "Lô nạp văn bản"
       },
       "ai": {
         "questions": "Câu hỏi cho trợ lý"
@@ -829,7 +912,14 @@
       "due_days": "Hạn đề xuất",
       "confidence": "Độ tin cậy",
       "evidence": "Số văn bản căn cứ",
-      "candidates": "Số văn bản tương tự"
+      "candidates": "Số văn bản tương tự",
+      "kind": "Loại lô",
+      "format": "Định dạng tệp",
+      "register": "Vào sổ",
+      "total": "Số dòng",
+      "ok": "Dòng đạt",
+      "duplicate": "Dòng trùng",
+      "failed": "Dòng lỗi"
     },
     "direction": {
       "in": "Đến",
@@ -874,6 +964,9 @@
       "extract": "Câu trích nguyên văn",
       "model": "Mô hình ngôn ngữ",
       "none": "Không có"
+    },
+    "importKind": {
+      "incoming": "Văn bản đến"
     }
   },
   "register": {
@@ -892,6 +985,106 @@
     "gaps": "Sổ thiếu dòng của số: {numbers}. Báo quản trị hệ thống trước khi in.",
     "how": "Bấm vào một dòng để mở văn bản. Cột Ký nhận, Số lượng bản để trống, ghi tay trên bản in. Mỗi lần in được ghi vào sổ kiểm toán.",
     "masked": "{n} dòng là văn bản hạn chế bạn không được đọc: chỉ có số, ngày, số ký hiệu."
+  },
+  "cases": {
+    "title": "Hồ sơ công việc",
+    "subtitle": "Tập hợp văn bản đã xử lý vào hồ sơ, đóng khi xong việc, nộp lưu vào kho lạnh khóa ghi; phòng đọc xem hồ sơ đã nộp lưu (NĐ 30/2020, Điều 28–31).",
+    "create": "Lập hồ sơ",
+    "creating": "Đang lập…",
+    "created": "Đã lập hồ sơ {code}",
+    "tab": {
+      "open": "Đang lập",
+      "closed": "Đã đóng",
+      "archived": "Đã nộp lưu",
+      "all": "Tất cả"
+    },
+    "status": {
+      "open": "Đang lập",
+      "closed": "Đã đóng",
+      "archived": "Đã nộp lưu"
+    },
+    "empty": "Chưa có hồ sơ nào.",
+    "code": "Ký hiệu hồ sơ",
+    "codeHint": "Theo danh mục hồ sơ của đơn vị, vd 01.TS",
+    "name": "Tiêu đề hồ sơ",
+    "year": "Năm",
+    "retention": "Thời hạn bảo quản",
+    "retentionYears": "{n} năm",
+    "permanent": "Vĩnh viễn",
+    "department": "Phòng",
+    "documentCount": "{n} văn bản",
+    "closedOn": "Ngày đóng",
+    "archivedAt": "Ngày nộp lưu",
+    "notFound": "Không tìm thấy hồ sơ, hoặc bạn không có quyền xem.",
+    "back": "Danh sách hồ sơ",
+    "screenDetail": "Chi tiết hồ sơ",
+    "info": "Thông tin hồ sơ",
+    "archiveStatus": "Trạng thái nộp lưu",
+    "notArchived": "Chưa nộp lưu",
+    "manifestSha": "Băm manifest của gói",
+    "retainUntil": "Khóa ghi tới",
+    "retainUntilExpected": "{date} (dự kiến, tính từ ngày đóng)",
+    "archiveKey": "Vị trí gói trong kho lạnh",
+    "inCase": "Văn bản trong hồ sơ",
+    "noDocuments": "Hồ sơ chưa có văn bản nào.",
+    "remove": "Bỏ khỏi hồ sơ",
+    "removeConfirm": "Bỏ văn bản này khỏi hồ sơ? Văn bản vẫn được giữ trong hệ thống.",
+    "removed": "Đã bỏ văn bản khỏi hồ sơ",
+    "add": "Thêm văn bản",
+    "addHint": "Văn bản đến đã xử lý xong, văn bản đi đã phát hành của phòng mình hoặc giao cho mình; không nhận văn bản hạn chế, văn bản đã thuộc hồ sơ khác.",
+    "addOne": "Thêm vào hồ sơ",
+    "added": "Đã thêm văn bản vào hồ sơ",
+    "noCandidates": "Không còn văn bản nào đưa vào được.",
+    "search": "Tìm theo số ký hiệu, trích yếu",
+    "hidden": "Văn bản ngoài quyền xem",
+    "close": "Đóng hồ sơ",
+    "closeConfirm": "Đóng hồ sơ {code}? Sau khi đóng không thêm, gỡ văn bản được nữa; ngày đóng do hệ thống đặt.",
+    "closedOk": "Đã đóng hồ sơ {code}",
+    "closeHint": "Đóng hồ sơ khi công việc kết thúc; hồ sơ phải có ít nhất một văn bản.",
+    "archive": "Nộp lưu",
+    "archiving": "Đang nộp lưu…",
+    "archiveConfirm": "Nộp lưu hồ sơ {code} vào kho lạnh? Gói lưu trữ khóa ghi tới hết thời hạn bảo quản, không sửa, không xóa được; CSDL nghiệp vụ chỉ còn bản ghi rút gọn.",
+    "archivedOk": "Đã nộp lưu hồ sơ {code}: {documents} văn bản, {files} tệp",
+    "archiveHint": "Lãnh đạo phòng nộp lưu hồ sơ đã đóng của phòng. Hồ sơ đã đóng chưa nộp lưu được hệ thống tự nộp lưu sau thời hạn cấu hình (mặc định 365 ngày).",
+    "room": {
+      "title": "Phòng đọc",
+      "subtitle": "Chỉ xem: gói đọc lại từ kho lạnh, so băm với CSDL trước khi hiện; tệp PDF có dấu tên bạn và giờ xem trên mọi trang; mỗi lần mở ghi vào sổ kiểm toán.",
+      "loading": "Đang đọc gói từ kho lạnh…",
+      "verified": "Manifest khớp băm ghi trong CSDL",
+      "hidden": "Còn {n} văn bản trong gói bạn không có quyền đọc.",
+      "noFiles": "Không có tệp",
+      "view": "Xem",
+      "viewing": "Đang mở…",
+      "notViewable": "Chỉ xem được tệp PDF",
+      "viewer": "Bản xem: {name}",
+      "newTab": "Mở trong thẻ mới",
+      "stampNote": "Bản xem có dấu tên bạn và giờ xem, không phải bản gốc trong kho lạnh.",
+      "closeViewer": "Đóng bản xem"
+    },
+    "validation": {
+      "year": "Năm từ 2000 đến 2999",
+      "code": "Nhập ký hiệu hồ sơ",
+      "title": "Tiêu đề từ 5 đến 500 ký tự",
+      "retention": "Thời hạn từ 1 đến 100 năm"
+    },
+    "error": {
+      "duplicateCode": "Đơn vị đã có hồ sơ cùng ký hiệu trong năm này",
+      "alreadyFiled": "Văn bản đã thuộc một hồ sơ khác",
+      "titleLength": "Tiêu đề hồ sơ từ 5 đến 500 ký tự",
+      "codeRequired": "Nhập ký hiệu hồ sơ",
+      "forbidden": "Chỉ lãnh đạo phòng nộp lưu hồ sơ của phòng mình",
+      "not_found": "Không tìm thấy, hoặc bạn không có quyền xem",
+      "not_closed": "Hồ sơ còn mở: đóng hồ sơ trước khi nộp lưu",
+      "already_archived": "Hồ sơ đã nộp lưu",
+      "archive_conflict": "CSDL từ chối lượt nộp lưu vì hồ sơ hoặc văn bản đổi trong lúc nộp lưu, chưa đổi gì — tải lại hồ sơ rồi thử lại",
+      "not_archived": "Hồ sơ chưa nộp lưu",
+      "busy": "Hệ thống đang bận, thử lại sau ít giây",
+      "not_viewable": "Phòng đọc chỉ mở được tệp PDF",
+      "unstampable": "Không đóng dấu được tên người xem lên tệp này nên chưa mở",
+      "archive_mismatch": "Gói trong kho lạnh không khớp băm đã ghi — không mở",
+      "storage_unavailable": "Kho lưu trữ chưa sẵn sàng, thử lại sau",
+      "database_unavailable": "CSDL chưa sẵn sàng, thử lại sau"
+    }
   },
   "board": {
     "title": "Điều hành",
@@ -932,5 +1125,253 @@
     "average": "Trung bình",
     "status": "Trạng thái",
     "underHour": "dưới 1 giờ"
+  },
+  "feedback": {
+    "button": "Góp ý",
+    "title": "Góp ý về Văn phòng điện tử",
+    "screen": "Màn hình: {screen}",
+    "screenDocument": "Chi tiết văn bản",
+    "allScreens": "Mọi màn hình",
+    "rating": "Mức hài lòng",
+    "ratingValue": "Mức {n}/5",
+    "low": "Chưa hài lòng",
+    "high": "Rất hài lòng",
+    "comment": "Vài dòng góp ý",
+    "placeholder": "Điều gì chưa tiện, nên sửa gì…",
+    "privacy": "Đừng ghi họ tên, số CCCD, số điện thoại.",
+    "send": "Gửi góp ý",
+    "sent": "Đã gửi góp ý. Cảm ơn bạn!",
+    "mineLink": "Góp ý đã gửi",
+    "pageTitle": "Góp ý",
+    "pageSubtitle": "Mức hài lòng 1–5 và vài dòng về Văn phòng điện tử, gửi bằng nút Góp ý trên thanh trên; màn hình đang dùng tự gắn kèm.",
+    "summary": "Tổng hợp của đơn vị",
+    "sampleNote": "Đơn vị mẫu (make seed): góp ý ở đây là của người dùng thử hệ thống, không phải người dùng ở đơn vị thật.",
+    "none": "Chưa có góp ý nào.",
+    "average": "Điểm trung bình",
+    "count": "Số góp ý",
+    "distribution": "Theo mức",
+    "screenColumn": "Màn hình",
+    "withComment": "Có nội dung",
+    "last": "Gần nhất",
+    "recent": "Góp ý gần đây",
+    "anonymous": "Không hiện người gửi. Giờ gửi vẫn hiện.",
+    "yours": "Của bạn",
+    "mine": "Góp ý của bạn",
+    "mineHint": "Chỉ bạn thấy danh sách này. Lãnh đạo, quản trị đơn vị đọc được nội dung và giờ gửi, không thấy người gửi.",
+    "noneMine": "Bạn chưa gửi góp ý nào."
+  },
+  "metrics": {
+    "title": "Số đo",
+    "subtitle": "Số đo trước / sau theo đặc tả §8, tính từ dữ liệu của đơn vị lúc mở trang. Chỉ có số đếm và số giờ; văn bản hạn chế không tính.",
+    "forbidden": "Chỉ lãnh đạo đơn vị xem được trang này.",
+    "sampleNote": "Số tính trên dữ liệu mẫu (make seed): kịch bản mẫu đi hết các bước trong vài giây, không phải nhịp làm việc thật.",
+    "table": "Bốn chỉ số của đặc tả §8",
+    "indicator": "Chỉ số",
+    "before": "Trước",
+    "after": "Sau (trên hệ thống)",
+    "how": "Cách đo",
+    "notMeasured": "Chưa đo — chưa có đơn vị chạy thử",
+    "noData": "Chưa có dữ liệu",
+    "beforeNote": "Cột Trước đo ở đơn vị chạy thử theo cách làm cũ: hỏi văn thư, sổ tay, bấm giờ, quan sát. Chưa có đơn vị chạy thử nên chưa có số nào, trang không điền số ước đoán. Cách đo và cách đọc: docs/so-lieu-sau.md.",
+    "month": "Tháng",
+    "allMonths": "Mọi tháng",
+    "median": "Trung vị",
+    "unit": {
+      "second": "giây",
+      "minute": "phút",
+      "hour": "giờ",
+      "day": "ngày"
+    },
+    "assign": {
+      "name": "Thời gian từ khi văn bản đến tới khi được giao xử lý",
+      "value": "Trung vị {median} · p90 {p90}",
+      "count": "{n} văn bản đã giao · {waiting} văn bản còn chờ",
+      "how": "Từ lúc tiếp nhận (hoặc liên thông tới) đến lần đầu lãnh đạo giao chủ trì. Văn bản đã hủy, văn bản hạn chế không tính.",
+      "byMonth": "Thời gian tới khi giao xử lý, theo tháng văn bản đến",
+      "arrived": "Đến",
+      "assigned": "Đã giao",
+      "handled": "Tới người xử lý",
+      "monthHint": "Trung vị, p90 của dòng Mọi tháng tính lại trên toàn bộ văn bản, không cộng từ các tháng. Cột cuối: trung vị thời gian tới khi văn bản tới tay một người xử lý."
+    },
+    "overdue": {
+      "name": "Tỷ lệ văn bản xử lý quá hạn",
+      "value": "{pct}% ({late}/{judged} văn bản)",
+      "count": "Trong đó {open} văn bản chưa xong đã qua hạn · {pending} văn bản chưa tới hạn chưa tính",
+      "how": "Hạn giải quyết so với lúc xong, theo giờ Việt Nam; văn bản chưa xong mà đã qua hạn tính là quá hạn. Văn bản không có hạn không tính.",
+      "byMonth": "Quá hạn theo tháng của hạn giải quyết",
+      "dueMonth": "Tháng của hạn",
+      "judged": "Đã rõ",
+      "late": "Quá hạn",
+      "open": "Chưa xong, quá hạn",
+      "pending": "Chưa tới hạn",
+      "monthHint": "Khác số đúng hạn của trang Điều hành: trang đó chỉ đếm văn bản đã xong, theo tháng xong."
+    },
+    "search": {
+      "name": "Thời gian tìm lại một văn bản cũ",
+      "value": "Trung vị {median} · chậm nhất {max}",
+      "count": "{n} lần tìm, thấy {found}/{n}",
+      "how": "Bấm giờ 5 lần tìm số ký hiệu của các văn bản đến cũ nhất: độ trễ hệ thống, không gồm thời gian người gõ và đọc.",
+      "run": "Đo {n} lần tìm",
+      "running": "Đang đo…",
+      "runs": "Các lần tìm",
+      "symbol": "Số, ký hiệu",
+      "latency": "Thời gian",
+      "rank": "Vị trí trong kết quả",
+      "notFound": "Không thấy",
+      "note": "Đo ngay trên trình duyệt này, lần lượt từng lần, nên có cả thời gian đi về qua mạng của bạn; kết quả không lưu lại. Lệnh make do-so-lieu-sau đo cùng cách trên máy chủ."
+    },
+    "searchFew": "Chỉ có {n} văn bản đến có số ký hiệu để tìm, cần {want}.",
+    "handoffs": {
+      "name": "Số bước chuyển tay (in, ký, mang đi, nhắn tin nhắc)",
+      "value": "So sánh định tính, không có số",
+      "how": "So quy trình giấy với quy trình trên hệ thống, từng bước: docs/so-lieu-sau.md."
+    },
+    "feedback": "Góp ý của người dùng",
+    "feedbackValue": "Điểm trung bình {avg}/5 trên {n} góp ý",
+    "feedbackLink": "Xem góp ý"
+  },
+  "lineage": {
+    "nav": "Phả hệ số liệu",
+    "title": "Phả hệ số liệu",
+    "subtitle": "Biểu đồ nào của trang Điều hành lấy số từ khung nhìn nào, khung nhìn đọc bảng nào — tính từ catalog CSDL lúc mở trang, không khai tay — cùng lượt nộp lưu gần nhất. Chỉ có tên bảng, khung nhìn và cạnh, không có dữ liệu văn bản.",
+    "source": "Nguồn số liệu",
+    "sourceOf": "Nguồn số liệu: {chart}",
+    "kpis": "Thẻ số liệu đầu trang",
+    "chart": "Biểu đồ",
+    "allCharts": "Mọi biểu đồ",
+    "graph": "Đồ thị phả hệ",
+    "graphHint": "Dữ liệu chảy từ trái sang phải: bảng → khung nhìn → biểu đồ; bảng → Parquet → gói lưu trữ. Nét đứt: bước cuối của nộp lưu ghi lại vào CSDL. Rê chuột lên một nút để xem tên đầy đủ.",
+    "kind": {
+      "chart": "Biểu đồ",
+      "view": "Khung nhìn",
+      "table": "Bảng",
+      "job": "Bước nộp lưu",
+      "object": "Đối tượng lưu trữ (S3)"
+    },
+    "edge": {
+      "read": "đọc",
+      "archive": "nộp lưu",
+      "commit": "nộp lưu ghi vào CSDL"
+    },
+    "sourceKind": {
+      "table": "bảng",
+      "partitioned_table": "bảng phân vùng",
+      "view": "khung nhìn",
+      "materialized_view": "khung nhìn vật lý hóa",
+      "foreign_table": "bảng ngoài"
+    },
+    "objects": "{n} đối tượng",
+    "rows": "{n} dòng",
+    "readAt": "Đọc catalog lúc {time}. Khung nhìn báo cáo là view thường: số trên trang Điều hành tính lại mỗi lần mở, không có bản chụp cũ.",
+    "sources": "Nguồn của từng biểu đồ",
+    "view": "Khung nhìn",
+    "readsFrom": "Đọc từ",
+    "through": "qua {view}",
+    "missing": "Không thấy khung nhìn này trong catalog",
+    "archive": "Lượt nộp lưu gần nhất",
+    "archiveTotals": "Đơn vị có {runs} lượt nộp lưu đã xong; {failed} bước trượt kiểm chất lượng.",
+    "archiveNone": "Chưa có lượt nộp lưu nào của đơn vị ghi phả hệ.",
+    "archiveRun": "Run {run}… · xong lúc {time}",
+    "step": "Bước",
+    "steps": {
+      "files": "Chép tệp nóng → lạnh",
+      "tables": "Bảng → Parquet + kiểm",
+      "manifest": "Lập gói (manifest)",
+      "commit": "Ghi lại vào CSDL"
+    },
+    "inputs": "Đầu vào",
+    "outputs": "Đầu ra",
+    "quality": "Kiểm chất lượng",
+    "passed": "Đạt",
+    "failedCheck": "Trượt",
+    "notChecked": "Không kiểm",
+    "reports": "Mọi khung nhìn báo cáo ({n})",
+    "reportsHint": "Mọi view office.v_… trong CSDL, kể cả khung nhìn chưa có biểu đồ trên trang Điều hành (vd của trang Số đo).",
+    "usedBy": "Biểu đồ dùng",
+    "export": "Tải OpenLineage (.jsonl)"
+  },
+  "hpdi": {
+    "title": "Tự chẩn đoán H-P-D-I",
+    "subtitle": "Lãnh đạo tự đánh giá mức trưởng thành số của đơn vị theo bốn không gian: Con người, Quy trình, Dữ liệu, Trí tuệ.",
+    "forbidden": "Chỉ lãnh đạo đơn vị và lãnh đạo phòng dùng được trang này.",
+    "intro": "Mỗi câu có 5 mức: chọn mức mô tả đúng nhất điều đang thực sự diễn ra ở đơn vị, không phải điều mong muốn. Điểm của mỗi không gian là trung bình các câu của nó. Cạnh mỗi không gian là số liệu Signet đo được từ chính dữ liệu của đơn vị để đối chiếu.",
+    "disclaimer": "Câu hỏi do đội Signet tự viết, dựa trên định nghĩa H-P-D-I của bài giới thiệu chủ đề OLP 2026 và giáo trình DX-OS (nguồn ở cuối trang). Đây là công cụ tự đánh giá, không phải bộ chỉ số chính thức của cơ quan nhà nước, không quy đổi sang điểm DTI.",
+    "managerNote": "Lãnh đạo phòng trả lời và xem kết quả trên trình duyệt này; chỉ lãnh đạo đơn vị lưu kết quả và xem số liệu đo được của đơn vị.",
+    "progress": "Đã trả lời {n}/{total} câu",
+    "fill": "Điền theo lần lưu gần nhất",
+    "reset": "Làm lại",
+    "spaceScore": "Điểm: {score}/5",
+    "level": "Mức {n}",
+    "evidenceTitle": "Bằng chứng đo được",
+    "evidenceNone": "Đơn vị chưa có số liệu nào Signet đo được cho không gian này.",
+    "evidenceHint": "Số của đơn vị lúc mở trang, chỉ để đối chiếu với câu trả lời, không dùng để chấm điểm.",
+    "evidence": {
+      "feedback": {
+        "name": "Điểm hài lòng của người dùng (góp ý trong ứng dụng)",
+        "value": "{avg}/5 trên {n} góp ý"
+      },
+      "overdueNow": {
+        "name": "Văn bản đến đang quá hạn",
+        "value": "{n} văn bản"
+      },
+      "overdueRate": {
+        "name": "Tỷ lệ quá hạn, trong số văn bản đã rõ đúng hay trễ hạn",
+        "value": "{pct} % ({late}/{n} văn bản)"
+      },
+      "timeToAssign": {
+        "name": "Thời gian từ khi văn bản đến tới khi được giao xử lý (trung vị)",
+        "value": "{hours} trên {n} văn bản đã giao"
+      },
+      "documents": {
+        "name": "Văn bản trên hệ thống, không tính văn bản đã hủy",
+        "value": "{n} (đến {incoming}, đi {outgoing})"
+      },
+      "archivedDocuments": {
+        "name": "Văn bản đã lưu trữ (nộp lưu)",
+        "value": "{n} văn bản"
+      },
+      "caseFiles": {
+        "name": "Hồ sơ đã nộp lưu",
+        "value": "{archived}/{n} hồ sơ"
+      },
+      "intakeKept": {
+        "name": "Trường gợi ý đọc văn bản đến được văn thư giữ nguyên",
+        "value": "{pct} % ({kept}/{n} trường)"
+      },
+      "suggestionKept": {
+        "name": "Gợi ý giao việc giữ đúng phòng chủ trì",
+        "value": "{pct} % ({kept}/{n} văn bản đã giao)"
+      }
+    },
+    "result": "Kết quả",
+    "answerAll": "Còn {n} câu chưa trả lời.",
+    "space": "Không gian",
+    "now": "Lần này",
+    "previous": "Lần lưu {date}",
+    "previousShort": "Lần trước",
+    "focusTitle": "Nên làm trước",
+    "focus": "{space}: điểm thấp nhất trong phần nền chưa vững. Làm vững không gian này trước khi đầu tư cho các không gian sau.",
+    "focusLast": "{space}: điểm thấp nhất, ba không gian nền phía trước đều cao hơn. Đây là chỗ nên đầu tư tiếp.",
+    "focusNone": "Cả bốn không gian đều ở mức 5: giữ nhịp và đo lại định kỳ.",
+    "gapsTitle": "Lệch nền",
+    "gapsNone": "Không có: không gian sau không vượt không gian trước.",
+    "gap": "{to} cao hơn {from} {diff} mức.",
+    "gapsHint": "Theo nguyên lý tiến hóa tuyến tính H → P → D → I: không gian sau dựng trên không gian trước chưa vững dễ thành “rác vào, rác ra”.",
+    "steps": "Bước tiếp theo",
+    "first": "Làm trước",
+    "stepFrom": "từ câu {q} ({title}), đang ở mức {n}",
+    "linkFor": "{page} (trang của {roles})",
+    "saveTitle": "Lưu và theo dõi tiến bộ",
+    "saveHint": "Mỗi lần lưu là một dòng trong lịch sử của đơn vị và một dòng sổ kiểm toán; không sửa, không xóa được. Điểm do hệ thống tính lại từ các câu trả lời.",
+    "note": "Ghi chú",
+    "notePlaceholder": "Bối cảnh của lần đánh giá này (không bắt buộc)",
+    "save": "Lưu kết quả",
+    "saving": "Đang lưu…",
+    "saved": "Đã lưu kết quả tự chẩn đoán",
+    "history": "Các lần đã lưu",
+    "historyNone": "Đơn vị chưa lưu lần nào.",
+    "when": "Lúc lưu",
+    "sources": "Nguồn tham khảo",
+    "sourcesNote": "Bộ câu {id}. Cách chấm và giới hạn: docs/tu-chan-doan.md trong mã nguồn."
   }
 }

@@ -52,6 +52,17 @@ mutation InsertSignedFile($o: core_files_insert_input!, $s: core_file_signatures
   insert_core_file_signatures(objects: [$s]) { affected_rows }
 }"""
 
+# Lần sao lưu gần nhất (trang trạng thái hệ thống): dòng sổ của nền tảng do `moc backup create` ghi sau mỗi lượt trọn
+# vẹn; CSDL vừa khôi phục không có dòng của chính lượt đó (ghi sau lúc dump) nên lấy thêm giờ sao lưu ghi trong dòng
+# system.restored. Lọc tenant_id null, xếp theo occurred_at: đi theo chỉ mục audit_log_tenant_time, không quét cả sổ
+LAST_BACKUP = """
+query LastBackup {
+  backed_up: core_audit_log(where: {tenant_id: {_is_null: true}, action: {_eq: "system.backed_up"}},
+                            order_by: {occurred_at: desc}, limit: 1) { occurred_at }
+  restored: core_audit_log(where: {tenant_id: {_is_null: true}, action: {_eq: "system.restored"}},
+                           order_by: {occurred_at: desc}, limit: 1) { backed_up_at: diff(path: "$.backed_up_at") }
+}"""
+
 LOG_EVENT = """
 mutation LogEvent($o: core_audit_log_insert_input!) {
   insert_core_audit_log(objects: [$o]) { affected_rows }
@@ -252,16 +263,23 @@ query DispatchedFile($id: uuid!) {
   core_files_by_pk(id: $id) { id tenant_id object_key size_bytes sha256 }
 }"""
 
+# Lời gọi Action thay mặt văn thư (act_as): Hasura chờ Action tối đa 30 giây (db/metadata/actions.yaml)
+ACT_AS_TIMEOUT_S = 35.0
+
 # Hasura từ chối chính token/phiên của người gọi
 AUTH_CODES = {"invalid-jwt", "invalid-headers", "access-denied", "jwt-missing-role-claims"}
 
 
 class HasuraError(Exception):
-    """Hasura không trả lời, hoặc trả lỗi không mong đợi."""
+    """Hasura không trả lời, hoặc trả lỗi không mong đợi.
 
-    def __init__(self, message: str, code: str | None = None) -> None:
+    fields: lỗi theo trường mà Action trả trong ``extensions.fields`` (svc-workflow, schemas/README.md) — lô nạp
+    (imports/runner.py) ghi lại cho từng dòng."""
+
+    def __init__(self, message: str, code: str | None = None, fields: dict[str, str] | None = None) -> None:
         super().__init__(message)
         self.code = code
+        self.fields = fields
 
 
 class HasuraAuthError(HasuraError):
@@ -316,9 +334,12 @@ class HasuraClient:
             return False
         return r.status_code == 200
 
-    async def _call(self, query: str, variables: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
+    async def _call(self, query: str, variables: dict[str, Any], headers: dict[str, str], *,
+                    timeout_s: float | None = None) -> dict[str, Any]:
+        extra: dict[str, Any] = {} if timeout_s is None else {"timeout": timeout_s}
         try:
-            r = await self._http.post("/v1/graphql", json={"query": query, "variables": variables}, headers=headers)
+            r = await self._http.post("/v1/graphql", json={"query": query, "variables": variables}, headers=headers,
+                                      **extra)
         except httpx2.HTTPError as exc:
             raise HasuraError(f"Không gọi được Hasura: {exc}") from exc
         if r.status_code != 200:
@@ -327,9 +348,11 @@ class HasuraClient:
         errors = body.get("errors")
         if errors:
             first = errors[0]
-            code = (first.get("extensions") or {}).get("code")
+            extensions = first.get("extensions") or {}
+            code = extensions.get("code")
+            fields = extensions.get("fields")
             cls = HasuraAuthError if code in AUTH_CODES else HasuraError
-            raise cls(str(first.get("message")), code)
+            raise cls(str(first.get("message")), code, fields if isinstance(fields, dict) else None)
         return body["data"]
 
     def _as_service(self, tenant_id: uuid.UUID, actor_id: str, request_id: str) -> dict[str, str]:
@@ -351,6 +374,28 @@ class HasuraClient:
             "X-Hasura-User-Id": user_id,
             "X-Hasura-Request-Id": request_id,
         })
+
+    async def act_as(self, *, role: str, tenant_id: uuid.UUID, user_id: str, department_id: str | None,
+                     request_id: str, query: str, variables: dict[str, Any],
+                     timeout_s: float = ACT_AS_TIMEOUT_S) -> dict[str, Any]:
+        """Thay mặt một người dùng đã kiểm token lúc tạo lô nạp (imports/runner.py): khóa quản trị kèm đúng phiên của
+        họ — vai trò, thuê ước, phòng, người làm. Hasura áp quyền của vai trò như với token của họ, kể cả quyền gọi
+        Action, rồi chuyển phiên đó sang svc-workflow. X-Request-Id gửi kèm để nối nhật ký; svc-workflow có nhận được
+        hay không tùy Hasura (forward_client_headers), chưa kiểm trên hệ thống chạy thật.
+
+        timeout_s: riêng cho lời gọi này, dài hơn hạn 30 giây Hasura chờ Action (db/metadata/actions.yaml) — hết giờ ở
+        đây trước Hasura thì Action vẫn chạy mà không ai nhận kết quả (vòng nền vẫn nhận về được, xem runner.py)."""
+        headers = {
+            "X-Hasura-Admin-Secret": self._secret,
+            "X-Hasura-Role": role,
+            "X-Hasura-Tenant-Id": str(tenant_id),
+            "X-Hasura-User-Id": user_id,
+            "X-Hasura-Request-Id": request_id,
+            "X-Request-Id": request_id,
+        }
+        if department_id:
+            headers["X-Hasura-Department-Id"] = department_id
+        return await self._call(query, variables, headers, timeout_s=timeout_s)
 
     async def insert_file(
         self,
@@ -615,6 +660,21 @@ class HasuraClient:
         data = await self._call(AUDIT_HEAD, {}, {"X-Hasura-Admin-Secret": self._secret})
         head = data["core_audit_head"][0]
         return int(head["last_id"]), _hex(head["last_hash"])
+
+    async def last_backup(self) -> datetime | None:
+        """Giờ của lượt sao lưu gần nhất mà CSDL biết; chưa sao lưu lần nào thì None."""
+        data = await self._call(LAST_BACKUP, {}, {"X-Hasura-Admin-Secret": self._secret})
+        found = [row.get("occurred_at") for row in data.get("backed_up") or []]
+        found += [row.get("backed_up_at") for row in data.get("restored") or []]
+        times = []
+        for value in found:
+            try:
+                at = datetime.fromisoformat(str(value))
+            except ValueError:
+                continue
+            if at.tzinfo is not None:
+                times.append(at)
+        return max(times, default=None)
 
     async def record_anchor(self, audit_id: int, hash_hex: str, location: str) -> None:
         await self._call(RECORD_ANCHOR, {"o": {"audit_id": audit_id, "hash": _bytea(hash_hex), "location": location}},

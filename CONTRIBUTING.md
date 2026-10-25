@@ -29,6 +29,10 @@ Trước khi viết dòng mã đầu tiên, hãy nắm ba ràng buộc không đ
 3. **Không nhảy cóc trục.** Tính năng thuộc trục [I] chỉ được nhận nếu dữ liệu nó tiêu thụ đã do
    [D] chuẩn hóa và sự kiện nó lắng nghe đã do [P] sinh ra.
 
+Muốn thêm một **ứng dụng mới** (Tầng 2) trên lõi, làm theo
+[`docs/them-ung-dung.md`](docs/them-ung-dung.md): client Keycloak, route APISIX, service compose, schema riêng
+và quyền Hasura — không sửa mã của lõi (`services/`), ví dụ đầy đủ là Không gian cá nhân `apps/ca-nhan/`.
+
 ## Quy trình đóng góp
 
 ```bash
@@ -36,9 +40,9 @@ Trước khi viết dòng mã đầu tiên, hãy nắm ba ràng buộc không đ
 #    (sửa lỗi chính tả, tài liệu nhỏ thì bỏ qua bước này)
 
 # 2. Fork repo trên GitHub, rồi tải bản fork về máy
-git clone https://github.com/<tài-khoản-của-bạn>/HVL.git
-cd HVL
-git remote add upstream https://github.com/HIT-Champion/HVL.git
+git clone https://github.com/<tài-khoản-của-bạn>/Signet.git
+cd Signet
+git remote add upstream https://github.com/HIT-Champion/Signet.git
 
 # 3. Tạo nhánh từ develop mới nhất của repo gốc (nhánh mặc định; main chỉ chứa bản đã phát hành)
 git fetch upstream
@@ -53,7 +57,7 @@ make license-check    # bảo đảm mọi tệp mã có header giấy phép
 make check            # kiểm tra môi trường + cú pháp Compose
 
 # 6. Commit theo quy ước bên dưới, đẩy lên bản fork,
-#    rồi mở pull request vào nhánh develop của HIT-Champion/HVL
+#    rồi mở pull request vào nhánh develop của HIT-Champion/Signet
 git push -u origin feat/<số-issue>-<mô-tả-ngắn>
 ```
 
@@ -63,20 +67,21 @@ nhánh thẳng trên repo, không cần fork — xem [`docs/git_flow.md`](docs/g
 
 ## Quy ước commit
 
-Theo [Conventional Commits](https://www.conventionalcommits.org/), mô tả viết tiếng Việt có dấu:
+Theo [Conventional Commits](https://www.conventionalcommits.org/). Commit, tiêu đề và mô tả PR viết **tiếng Anh**
+(từ 23/10/2026, commit cũ giữ tiếng Việt — xem [`docs/git_flow.md`](docs/git_flow.md) mục 3.1):
 
 ```
 <loại>(<phạm vi>): <mô tả ngắn, ≤ 72 ký tự>
 
-feat(workflow): thêm bước giám đốc duyệt khi số tiền vượt ngưỡng
-fix(files): chặn tệp khi ClamAV không phản hồi thay vì cho qua
-docs(readme): bổ sung phát biểu bài toán và bảng chức năng
-ci: ghim phiên bản action checkout
+feat(workflow): add a director approval step above the amount threshold
+fix(files): block files when ClamAV times out instead of storing them
+docs(readme): add the problem statement and the feature table
+ci: pin the checkout action version
 ```
 
 - **Loại**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.
 - **Phạm vi** theo thành phần: `gateway`, `auth`, `db`, `workflow`, `files`, `realtime`, `office`,
-  `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
+  `ca-nhan`, `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
 - Chân commit ghi `Closes #<số-issue>` để tự đóng issue khi gộp vào `develop`.
 - CI kiểm tiêu đề pull request theo đúng quy ước này, vì khi squash nó thành dòng đầu của commit.
 
@@ -96,10 +101,15 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
 - Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng.
 - Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md`
   kèm giấy phép và kiểm tra tính tương thích với Apache-2.0.
+- Thêm hay nâng gói npm, Python thì chạy `make sbom && make license-audit` (cần Docker và mạng): CI kiểm giấy phép của
+  mọi gói, kể cả gói gián tiếp. Gói ngoài chính sách hay chưa rõ giấy phép cần ngoại lệ ghi lý do trong
+  `.github/license-exceptions.json`.
 
 ## Báo lỗi
 
-Mở issue theo mẫu có sẵn tại `.github/ISSUE_TEMPLATE/`. Một báo lỗi hữu ích cần có: bước tái
+**Lỗ hổng bảo mật thì không mở issue**: báo riêng tư theo [`SECURITY.md`](SECURITY.md).
+
+Lỗi khác: mở issue theo mẫu có sẵn tại `.github/ISSUE_TEMPLATE/`. Một báo lỗi hữu ích cần có: bước tái
 hiện, kết quả mong đợi, kết quả thực tế, phiên bản Signet (`git describe --tags`), và nhật ký
 liên quan (`make logs`).
 

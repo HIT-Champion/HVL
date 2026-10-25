@@ -17,7 +17,7 @@
 """Nhật ký qua bộ che PII (F4.4): create_app gắn bộ lọc vào logger của dịch vụ và của uvicorn; dòng chặn tệp nhiễm
 ghi tên đã che, còn sổ kiểm toán giữ tên gốc; dòng truy cập bỏ chuỗi truy vấn.
 
-Kèm kiểm tĩnh định dạng nhật ký truy cập của APISIX (gateway/config.yaml) và nginx của app-office: không còn chuỗi
+Kèm kiểm tĩnh định dạng nhật ký truy cập của APISIX (platform/apisix/config.yaml) và nginx của app-office: không còn chuỗi
 truy vấn và Referer, các trường khác giữ như mặc định. Không chạy được APISIX/nginx ở đây, nên regex của map được
 thử bằng re của Python; cú pháp thật do người tích hợp kiểm trên stack (apisix test, nginx -t).
 
@@ -50,13 +50,13 @@ EMAIL = "nguyenvanb@example.com"        # giả lập (miền dành cho ví dụ
 LOGGERS = ("svc_files", "uvicorn", "uvicorn.error", "uvicorn.access")
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-GATEWAY = ROOT / "gateway" / "config.yaml"
+GATEWAY = ROOT / "platform" / "apisix" / "config.yaml"
 NGINX = ROOT / "apps" / "office" / "nginx" / "default.conf.template"
 # Định dạng trước F4.4: mặc định của APISIX 3.18 (nginx_config.http.access_log_format) và log_format "main" của image
 # nginx-unprivileged 1.30.6. F4.4 chỉ đổi phần mang chuỗi truy vấn, bỏ Referer; các trường khác giữ nguyên.
 APISIX_DEFAULT = ('$remote_addr - $remote_user [$time_local] $http_host "$request" $status $body_bytes_sent '
                   '$request_time "$http_referer" "$http_user_agent" $upstream_addr $upstream_status '
-                  '$upstream_response_time "$upstream_scheme://$upstream_host$upstream_uri"')
+                  '$upstream_response_time "$upstream_scheme://$upstream_host$upstream_uri" "$apisix_request_id"')
 NGINX_MAIN = ('$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" '
               '"$http_user_agent" "$http_x_forwarded_for"')
 # Biến nginx mang chuỗi truy vấn (đã mã hóa phần trăm: regex che không thấy) hoặc Referer
@@ -179,7 +179,7 @@ def strips_query(text: str, target: str, source: str) -> None:
         assert m is not None and m.group(group) == uri.split("?", 1)[0], uri
 
 
-@pytest.mark.skipif(not GATEWAY.is_file(), reason="không có gateway/ (chạy trong image)")
+@pytest.mark.skipif(not GATEWAY.is_file(), reason="không có platform/apisix/ (chạy trong image)")
 def test_apisix_access_log_has_no_query_string_or_referer():
     lines = GATEWAY.read_text(encoding="utf-8").splitlines()
 

@@ -1,0 +1,475 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Cổng duy nhất của Signet (F1.2). Danh sách trắng: đường dẫn nào không có ở đây thì về giao diện,
+# và các đường dẫn quản trị của thành phần lõi bị chặn tường minh (route "chan").
+#
+#   /realms/<realm>/*, /resources/*  → Keycloak (đăng nhập)          — không cần token
+#   /v1/graphql                      → Hasura                       — cần token
+#   /api/files/*, /api/search, /api/documents/*, /api/registers/*, /api/case-files/* → svc-files — cần token
+#   /api/imports, /api/imports/*     → svc-files (nạp lô văn bản đến)  — cần token
+#   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
+#   /api/status                      → svc-files (trạng thái hệ thống) — không cần token
+#   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
+#   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
+#   /*                               → app-office (giao diện tĩnh)   — không cần token
+#
+# Kiểm token ở biên bằng JWKS của Keycloak (zero-trust: Hasura và svc-files vẫn kiểm lại).
+#
+# Giới hạn tốc độ (số yêu cầu mỗi phút đặt trong .env), vượt thì trả 429:
+#   - đường nhận mật khẩu và cấp token: theo địa chỉ IP (MOC_RATE_LOGIN_PER_MIN) — chặn dò mật khẩu hàng
+#     loạt; Keycloak còn tự khóa từng tài khoản sau 10 lần sai (bruteForceProtected trong realm)
+#   - GraphQL và tệp: theo phiên đăng nhập (MOC_RATE_API_PER_MIN) — không theo IP, để cả văn phòng dùng
+#     chung một IP không bị chặn lây vì một người; mở phiên mới lại phải qua giới hạn đăng nhập
+#   - cổng xác thực văn bản, không cần đăng nhập: theo địa chỉ IP (MOC_RATE_VERIFY_PER_MIN) — không dò được
+#     mã tra cứu hàng loạt
+#   - mở kết nối thông báo realtime: theo địa chỉ IP (MOC_RATE_REALTIME_PER_MIN) — chỉ đếm lần mở WebSocket,
+#     tin đẩy trên kết nối đã mở không bị đếm
+#   - trạng thái hệ thống, không cần đăng nhập: theo địa chỉ IP (MOC_RATE_STATUS_PER_MIN) — svc-files còn lưu đệm kết
+#     quả 10 giây cho mọi người gọi, gọi dồn không thành lời gọi vào các thành phần lõi
+#
+# Tường lửa ứng dụng web (F3.15, global rule bên dưới): mọi yêu cầu, kể cả đường không có route, qua Coraza + OWASP CRS
+# v4.14 (paranoia 1, chặn khi điểm bất thường ≥ 5) TRƯỚC khi kiểm token và giới hạn tốc độ. Tải tấn công trong đường
+# dẫn, tham số, tiêu đề, cookie, thân form/JSON và các trường thường của multipart → 403; nội dung tệp tải lên không do
+# WAF soi mà do ClamAV ở svc-files. MOC_WAF: On (mặc định, chặn) | DetectionOnly (chỉ ghi nhật ký) | Off. Luật, loại trừ
+# và lý do, cách đọc nhật ký chặn: platform/apisix/README.md, mục WAF
+
+upstreams:
+  - id: keycloak
+    type: roundrobin
+    pass_host: pass
+    nodes:
+      "keycloak:8080": 1
+  - id: hasura
+    type: roundrobin
+    # mặc định 60 giây; completeTask (phát hành) được Hasura chờ tới 90 giây (db/metadata/actions.yaml)
+    timeout: {connect: 6, send: 100, read: 100}
+    nodes:
+      "hasura:8080": 1
+  - id: svc-files
+    type: roundrobin
+    nodes:
+      "svc-files:8000": 1
+  - id: app-office
+    type: roundrobin
+    nodes:
+      "app-office:8080": 1
+  # Không gian cá nhân P.A.R.A (apps/ca-nhan): ứng dụng thứ hai, gọi lõi qua đúng các route ở dưới như app-office
+  - id: app-ca-nhan
+    type: roundrobin
+    nodes:
+      "app-ca-nhan:8080": 1
+  - id: centrifugo
+    type: roundrobin
+    nodes:
+      "centrifugo:8000": 1
+
+plugin_configs:
+  - id: can-token
+    plugins:
+      openid-connect:
+        # Chỉ kiểm chữ ký, hạn và iss của token Bearer; client_secret không dùng ở chế độ này
+        client_id: app-office
+        client_secret: khong-dung
+        discovery: http://keycloak:8080/realms/${{MOC_REALM}}/.well-known/openid-configuration
+        bearer_only: true
+        use_jwks: true
+        realm: ${{MOC_REALM}}
+        set_access_token_header: false
+        set_id_token_header: false
+        set_userinfo_header: false
+      # Đếm theo token sau khi openid-connect đã kiểm (token giả bị trả 401 trước, không tạo bộ đếm)
+      limit-count:
+        count: ${{MOC_RATE_API_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: http_authorization
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều yêu cầu trong một phút, thử lại sau ít giây."
+
+  # F1.9: cổng ngoài cho Keycloak sau proxy không gửi X-Forwarded-Port (map moc_cong_chuyen_tiep, config.yaml)
+  - id: cong-keycloak
+    plugins:
+      proxy-rewrite:
+        headers:
+          set:
+            X-Forwarded-Port: $moc_cong_chuyen_tiep
+
+global_rules:
+  - id: 1
+    plugins:
+      request-id:
+        header_name: X-Request-Id
+        include_in_response: true
+        algorithm: uuid
+      # F3.13: đếm yêu cầu, mã trạng thái, độ trễ của mọi route; nhãn route là id trong tệp này (graphql, svc-files, …)
+      prometheus: {}
+      # F3.15: Coraza 3.3.3 trong coraza-proxy-wasm đọc JSON bằng đệ quy không giới hạn (GHSA-6gcq-wc29-5xf2): thân
+      # JSON lồng ~80 tầng (vài trăm byte, không cần token) làm tràn ngăn xếp WebAssembly và worker đó trả 503 cho mọi
+      # yêu cầu sau. Chặn trước WAF (priority 10000 > 7999): thân JSON — đúng các Content-Type làm Coraza bật bộ đọc
+      # JSON, xét mọi giá trị của tiêu đề — không hợp lệ hoặc lồng quá 32 tầng thì trả 400. JSON thật của Signet sâu
+      # khoảng 8 tầng (biến lọc GraphQL); cjson kiểm độ sâu khi đọc, không đệ quy quá giới hạn
+      serverless-pre-function:
+        phase: rewrite
+        functions:
+          - |
+            local core = require("apisix.core")
+            local cjson = require("cjson.safe").new()
+            cjson.decode_max_depth(32)
+            return function(conf, ctx)
+              local types = ngx.req.get_headers(0)["content-type"]
+              if type(types) ~= "table" then types = {types} end
+              for _, t in ipairs(types) do
+                t = t:lower()
+                if t:find("^application/json") or t:find("^application/[a-z0-9.%-]+%+json") then
+                  local body = core.request.get_body()
+                  if body and cjson.decode(body) == nil then
+                    core.log.warn("WAF: thân JSON không hợp lệ hoặc lồng quá 32 tầng, chặn 400")
+                    return 400, {error = "invalid_json"}
+                  end
+                  return
+                end
+              end
+            end
+      # F3.15: tường lửa ứng dụng web — Coraza v3.3.3 + OWASP CRS v4.14.0 (coraza-proxy-wasm 0.6.0, wasm.plugins trong
+      # config.yaml). Mỗi dòng dưới là một chỉ thị SecLang; loại trừ nào cũng có lý do ở platform/apisix/README.md
+      coraza-waf:
+        conf:
+          default_directives: moc
+          directives_map:
+            moc:
+              - Include @recommended-conf
+              # On: chặn | DetectionOnly: chỉ ghi nhật ký (dò chặn nhầm) | Off: tắt luật
+              - SecRuleEngine ${{MOC_WAF:=On}}
+              # Soi thân tới đúng client_max_body_size (64 MiB, config.yaml): mặc định của recommended-conf là 128 KB
+              # kèm Reject, mọi tệp tải lên lớn hơn sẽ bị 413. WebAssembly không ghi được tệp tạm nên giữ cả trong RAM
+              - SecRequestBodyLimit 67108864
+              - SecRequestBodyInMemoryLimit 67108864
+              # Không soi thân phản hồi: phía sau là dịch vụ của Signet, soi thì WAF phải đệm cả phản hồi (tệp tải về)
+              - SecResponseBodyAccess Off
+              - Include @crs-setup-conf
+              # Paranoia 1, ngưỡng điểm bất thường mặc định của CRS (vào 5, ra 4); id do CRS dành cho hai thiết lập này
+              - SecAction "id:900000,phase:1,pass,nolog,setvar:tx.blocking_paranoia_level=1"
+              - >-
+                SecAction "id:900110,phase:1,pass,nolog,setvar:tx.inbound_anomaly_score_threshold=5,
+                setvar:tx.outbound_anomaly_score_threshold=4"
+              # Loại trừ 1 — Keycloak: mật khẩu là chuỗi tùy ý (Keycloak chỉ băm); redirect URI được Keycloak so đúng
+              # danh sách của client, không tự gọi tới. Token ngẫu nhiên do Keycloak, oidc-client-ts sinh (cookie phiên,
+              # mã phiên, JWT, PKCE) tình cờ trùng mẫu: libinjection (942100: "+…" trong ngoặc kép, "8--…"), tên hàm
+              # PHP (933…: rtrim, fputs), đuôi tệp (930120: .nsr), lệnh Unix (932…, chỉ cookie base64 có "/", "+") —
+              # khoảng 1/2 500 giá trị mỗi loại bị 403, đăng nhập hỏng ngẫu nhiên (#140). Chỉ gỡ đúng các luật đó trên
+              # đúng tên cookie, tham số token; luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi
+              - >-
+                SecRule REQUEST_FILENAME "@beginsWith /realms/${{MOC_REALM}}/" "id:10010,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetByTag=OWASP_CRS;ARGS:password,
+                ctl:ruleRemoveTargetByTag=OWASP_CRS;ARGS:password-new,
+                ctl:ruleRemoveTargetByTag=OWASP_CRS;ARGS:password-confirm,
+                ctl:ruleRemoveTargetById=931100;ARGS:redirect_uri,
+                ctl:ruleRemoveTargetById=934110;ARGS:redirect_uri,
+                ctl:ruleRemoveTargetById=931100;ARGS:post_logout_redirect_uri,
+                ctl:ruleRemoveTargetById=934110;ARGS:post_logout_redirect_uri,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=932000-932999;REQUEST_COOKIES:KC_AUTH_SESSION_HASH,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:AUTH_SESSION_ID,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:AUTH_SESSION_ID,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:AUTH_SESSION_ID,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KC_RESTART,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KC_RESTART,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KC_RESTART,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KEYCLOAK_IDENTITY,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KEYCLOAK_IDENTITY,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KEYCLOAK_IDENTITY,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KEYCLOAK_SESSION,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KEYCLOAK_SESSION,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KEYCLOAK_SESSION,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:KC_STATE_CHECKER,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:KC_STATE_CHECKER,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:KC_STATE_CHECKER,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_code,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_code,
+                ctl:ruleRemoveTargetById=942100;ARGS:tab_id,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:tab_id,
+                ctl:ruleRemoveTargetById=930120;ARGS:tab_id,
+                ctl:ruleRemoveTargetById=942100;ARGS:client_data,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:client_data,
+                ctl:ruleRemoveTargetById=930120;ARGS:client_data,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_challenge,
+                ctl:ruleRemoveTargetById=942100;ARGS:refresh_token,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:refresh_token,
+                ctl:ruleRemoveTargetById=930120;ARGS:refresh_token,
+                ctl:ruleRemoveTargetById=942100;ARGS:id_token_hint,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:id_token_hint,
+                ctl:ruleRemoveTargetById=930120;ARGS:id_token_hint"
+              # Loại trừ 2 — trang Keycloak trả về sau đăng nhập: tham số iss (RFC 9207) là URL của realm; URL công khai
+              # là localhost hay IP thì 934110 (SSRF), 931100 (RFI) bắt nhầm. Áp cho mọi redirect URI của ứng dụng: `/`,
+              # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`. Mã code, session_state
+              # Keycloak gửi kèm là token ngẫu nhiên: gỡ đúng ba luật bắt nhầm token như loại trừ 1 (#140)
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/(?:[a-z0-9-]+/)?(?:dang-nhap)?$" "id:10020,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=931100;ARGS:iss,
+                ctl:ruleRemoveTargetById=934110;ARGS:iss,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_state,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_state,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_state"
+              # Loại trừ 3 — chữ truy vấn GraphQL (không phải biến): tên cột, toán tử của Hasura trùng lệnh Unix (932…),
+              # hàm PHP (933…), toán tử MongoDB (942290); Hasura phân tích theo ngữ pháp GraphQL rồi sinh SQL tham số
+              # hóa. Chỉ gỡ đúng hai dải id đó: luật Java/Log4Shell (944…), Node.js (934…) cùng nhãn attack-rce vẫn soi
+              - >-
+                SecRule REQUEST_FILENAME "@streq /v1/graphql" "id:10030,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.query,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.query,
+                ctl:ruleRemoveTargetById=942290;ARGS:json.query"
+              # Loại trừ 5 — chữ tự do người dùng gõ, gửi trong biến GraphQL: Nội dung, Trích yếu của văn bản đi (soạn,
+              # sửa), Trích yếu văn bản đến, ý kiến chỉ đạo, ghi chú, kết quả xử lý, góp ý. Văn bản hành chính có đề mục
+              # La Mã I./II./III. trùng lệnh PowerShell (932125), khối chữ ký gộp liền trùng PHP (933210), dòng mở đầu
+              # bằng URL nội bộ http://<IP> trùng RFI (931100), câu mở đầu bằng "File"/"http"/"ftp" và kết thúc bằng "?"
+              # ("File đính kèm ở đâu?") trùng RFI (931120). Chữ chỉ được lưu và hiện ra (svc-files escape khi dựng
+              # PDF), không chạy, không include, không tải URL. Gỡ đúng dải id 932…, 933… và hai luật 931100, 931120
+              # trên đúng khóa biến của giao diện — khóa khác vẫn soi đủ; SQLi, XSS, duyệt thư mục, Log4Shell (944…),
+              # Node.js (934…) trong các khóa này vẫn bị chặn
+              - >-
+                SecRule REQUEST_FILENAME "@streq /v1/graphql" "id:10031,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.o.body,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.o.summary,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.set.body,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.set.summary,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.d.summary,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.d.instruction,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.d.note,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.d.result_note,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.variables.c,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.o.body,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.o.summary,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.set.body,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.set.summary,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.d.summary,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.d.instruction,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.d.note,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.d.result_note,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.variables.c,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.o.body,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.o.summary,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.set.body,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.set.summary,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.d.summary,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.d.instruction,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.d.note,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.d.result_note,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.variables.c,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.o.body,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.o.summary,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.set.body,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.set.summary,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.d.summary,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.d.instruction,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.d.note,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.d.result_note,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.variables.c"
+              # Loại trừ 6 — câu hỏi trợ lý (hoi-dap.vue): người dùng dán đoạn văn bản vào hỏi, như loại trừ 5
+              - >-
+                SecRule REQUEST_FILENAME "@streq /api/documents/ask" "id:10032,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:json.question,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:json.question,
+                ctl:ruleRemoveTargetById=931100;ARGS:json.question,
+                ctl:ruleRemoveTargetById=931120;ARGS:json.question"
+              # Loại trừ 7 — ô Tìm kiếm (/api/search?q=, trang /tim-kiem?q=): người dùng dán đường dẫn văn bản khi
+              # Signet mở bằng IP (http://192.168.1.10:8080/van-ban/…, 931100), gõ câu hỏi "File kế hoạch thi?"
+              # (931120) hay dán dòng "Đính kèm: 03 file (PDF, Word)" (933160, gọi hàm PHP file()). q chỉ được đưa
+              # cho Meilisearch hay đọc ở trình duyệt, không tải, không chạy; các luật khác vẫn soi q
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/(?:api/search|tim-kiem)$" "id:10033,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=931100;ARGS:q,
+                ctl:ruleRemoveTargetById=931120;ARGS:q,
+                ctl:ruleRemoveTargetById=933160;ARGS:q"
+              # Loại trừ 8 — tên tệp tải lên (POST /api/files, nạp lô /api/imports/<loại>): tên văn bản hành chính hay
+              # có ' " ; = (920120) và ":" (922130, Linux cho đặt). Tên chỉ là dữ liệu: svc-files bỏ đường dẫn, ký tự
+              # điều khiển, khóa kho theo id chứ không theo tên, Content-Disposition khi tải về mã hóa tên (RFC 6266).
+              # Gỡ trên tên tệp (FILES) và tiêu đề của đúng các phần tệp; tên trường (FILES_NAMES) vẫn soi
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/api/(?:files|imports/[a-z_-]+)$" "id:10040,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=920120;FILES,
+                ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:file,
+                ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:data,
+                ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:archive"
+              # GHSA-6r3q-mjv7-xr8m: Coraza 3.3.3 lặng lẽ bỏ tham số thứ 1000 trở đi (SecArgumentsLimit), không soi
+              # chúng — chặn hẳn yêu cầu chạm giới hạn đó (tham số truy vấn, form urlencoded)
+              - >-
+                SecRule &ARGS_GET "@ge 1000" "id:10060,phase:1,deny,status:403,log,
+                msg:'Quá nhiều tham số truy vấn (GHSA-6r3q-mjv7-xr8m)'"
+              - >-
+                SecRule &ARGS_POST "@ge 1000" "id:10061,phase:2,deny,status:403,log,
+                msg:'Quá nhiều tham số form (GHSA-6r3q-mjv7-xr8m)',chain"
+              - SecRule REQBODY_PROCESSOR "@streq URLENCODED"
+              - Include @owasp_crs/*.conf
+              # Loại trừ 4 — Host là địa chỉ IP: Signet được mở bằng IP trong mạng nội bộ; dưới APISIX coraza-proxy-wasm
+              # thêm Host lần nữa nên luật cộng điểm hai lần (6 ≥ 5) và chặn mọi yêu cầu vào bằng IP
+              - SecRuleRemoveById 920350
+
+routes:
+  - id: keycloak
+    uris: ["/realms/${{MOC_REALM}}", "/realms/${{MOC_REALM}}/*", "/resources/*"]
+    upstream_id: keycloak
+    plugin_config_id: cong-keycloak
+
+  # Đường cụ thể hơn route keycloak nên được chọn trước: biểu mẫu đăng nhập, quên mật khẩu, cấp và làm mới token
+  - id: dang-nhap
+    uris: ["/realms/${{MOC_REALM}}/protocol/openid-connect/token", "/realms/${{MOC_REALM}}/login-actions/*"]
+    upstream_id: keycloak
+    plugin_config_id: cong-keycloak
+    plugins:
+      limit-count:
+        group: dang-nhap
+        count: ${{MOC_RATE_LOGIN_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều lần đăng nhập từ địa chỉ này, thử lại sau một phút."
+
+  # Mọi POST khác vào realm (…/token/, …/token;x, …) cũng tới Keycloak: không cho viết khác đường để né giới hạn trên.
+  # Cùng group nên chung một bộ đếm với route dang-nhap (cấu hình phải giống hệt); priority để thắng route keycloak
+  - id: dang-nhap-post
+    uri: /realms/${{MOC_REALM}}/*
+    methods: [POST]
+    priority: 10
+    upstream_id: keycloak
+    plugin_config_id: cong-keycloak
+    plugins:
+      limit-count:
+        group: dang-nhap
+        count: ${{MOC_RATE_LOGIN_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Quá nhiều lần đăng nhập từ địa chỉ này, thử lại sau một phút."
+
+  - id: graphql
+    uri: /v1/graphql
+    methods: [POST]
+    upstream_id: hasura
+    plugin_config_id: can-token
+    plugins:
+      proxy-rewrite:
+        headers:
+          # khóa quản trị Hasura không bao giờ được đi từ ngoài vào; tên cũ X-Hasura-Access-Key thì Hasura 2.51
+          # đã không nhận, gỡ để phòng xa
+          remove: [X-Hasura-Admin-Secret, X-Hasura-Access-Key]
+
+  - id: svc-files
+    uris: ["/api/files", "/api/files/*", "/api/search", "/api/documents/*", "/api/registers/*", "/api/case-files/*",
+           "/api/imports", "/api/imports/*"]
+    methods: [GET, POST]
+    upstream_id: svc-files
+    plugin_config_id: can-token
+
+  # Cổng xác thực văn bản đã phát hành (F2.13): ai cũng gọi được, không cần token — chỉ đọc, mỗi lần đúng một
+  # văn bản theo mã tra cứu hoặc băm, không liệt kê được
+  - id: xac-thuc
+    uris: ["/api/verify", "/api/verify/*"]
+    methods: [GET]
+    upstream_id: svc-files
+    plugins:
+      limit-count:
+        count: ${{MOC_RATE_VERIFY_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Tra cứu quá nhiều trong một phút, thử lại sau ít giây."
+
+  # Trạng thái hệ thống (trang /trang-thai): ai cũng gọi được, không cần token — chỉ đọc; svc-files gom tình trạng các
+  # thành phần, trả chữ cố định đã làm sạch (không tên máy, địa chỉ, số liệu nghiệp vụ), lưu đệm 10 giây
+  - id: trang-thai
+    uri: /api/status
+    methods: [GET]
+    upstream_id: svc-files
+    plugins:
+      limit-count:
+        count: ${{MOC_RATE_STATUS_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Xem trạng thái quá nhiều lần trong một phút, thử lại sau ít giây."
+
+  # Thông báo realtime (F2.5): WebSocket tới Centrifugo. Trình duyệt không gắn được header Authorization vào
+  # WebSocket, nên token Keycloak đi trong lệnh connect đầu tiên và Centrifugo tự kiểm (JWKS, iss); chỉ cổng
+  # WebSocket của Centrifugo được nối ra, HTTP API của nó ở cổng nội bộ khác
+  - id: realtime
+    uri: /realtime
+    methods: [GET]
+    upstream_id: centrifugo
+    enable_websocket: true
+    plugins:
+      proxy-rewrite:
+        uri: /connection/websocket
+      limit-count:
+        count: ${{MOC_RATE_REALTIME_PER_MIN}}
+        time_window: 60
+        key_type: var
+        key: remote_addr
+        policy: local
+        rejected_code: 429
+        rejected_msg: "Mở kết nối thông báo quá nhiều lần trong một phút, thử lại sau ít giây."
+
+  # Giao diện quản trị và API nội bộ của các thành phần lõi: không bao giờ qua cổng
+  - id: chan
+    uris:
+      - /admin
+      - /admin/*
+      - /realms/*
+      - /console
+      - /console/*
+      - /v1/*
+      - /v2/*
+      - /v1alpha1/*
+      - /healthz
+      - /metrics
+      - /api/*
+      - /flowable-rest/*
+    plugins:
+      fault-injection:
+        abort:
+          http_status: 404
+          body: "{\"error\":\"not_found\"}"
+
+  # Trang tĩnh của ứng dụng thứ hai (docs/them-ung-dung.md). Thêm một ứng dụng chỉ cần một upstream và một route như
+  # thế này: dữ liệu, tệp, đăng nhập vẫn đi qua các route của lõi ở trên, cùng kiểm token, giới hạn tốc độ
+  - id: app-ca-nhan
+    uris: ["/ca-nhan", "/ca-nhan/*"]
+    methods: [GET, HEAD]
+    upstream_id: app-ca-nhan
+
+  - id: app-office
+    uri: /*
+    priority: -10
+    methods: [GET, HEAD]
+    upstream_id: app-office
+#END

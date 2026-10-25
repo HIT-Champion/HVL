@@ -78,17 +78,17 @@ mkdir -p "$DIST"
 echo "==> Gắn thẻ phiên bản $TAG"
 git tag -a "$TAG" -m "Signet $VERSION"
 
-echo "==> Sinh gói nguồn $DIST/moc-$VERSION.tar.gz"
+echo "==> Sinh gói nguồn $DIST/signet-$VERSION.tar.gz"
 git archive --format=tar.gz \
-            --prefix="moc-$VERSION/" \
-            -o "$DIST/moc-$VERSION.tar.gz" \
+            --prefix="signet-$VERSION/" \
+            -o "$DIST/signet-$VERSION.tar.gz" \
             "$TAG"
 
 echo "==> Sinh tổng kiểm tra SHA-256"
-( cd "$DIST" && sha256sum "moc-$VERSION.tar.gz" > "moc-$VERSION.tar.gz.sha256" )
+( cd "$DIST" && sha256sum "signet-$VERSION.tar.gz" > "signet-$VERSION.tar.gz.sha256" )
 
 echo ""
 echo "Đã tạo bản phát hành $TAG:"
-ls -lh "$DIST/moc-$VERSION.tar.gz"*
+ls -lh "$DIST/signet-$VERSION.tar.gz"*
 echo ""
-echo "Bước tiếp theo:  git push origin $TAG    # chỉ thẻ này; GitHub Actions tạo Release kèm .tar.gz, .sha256"
+echo "Bước tiếp theo:  git push origin $TAG    # chỉ thẻ này; GitHub Actions tạo Release kèm .tar.gz, SBOM, .sha256"

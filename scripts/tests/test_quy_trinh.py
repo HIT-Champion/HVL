@@ -21,15 +21,20 @@ của bước trong một repo thử). Chạy: python3 -m unittest discover -s s
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
-WORKFLOW = SCRIPTS.parent / ".github" / "workflows" / "release.yml"
+WORKFLOWS = SCRIPTS.parent / ".github" / "workflows"
+WORKFLOW = WORKFLOWS / "release.yml"
+RULESETS = SCRIPTS.parent / ".github" / "rulesets"
+JOB_NAME = re.compile(r"^    name: (.+)$")      # khóa name của một job: thụt 4 dấu cách dưới jobs:
 spec = importlib.util.spec_from_file_location("check_pr", SCRIPTS / "check_pr.py")
 check_pr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check_pr)
@@ -234,6 +239,44 @@ class TagOnMainTest(unittest.TestCase):
         proc = self.step("v0.3.0")
         self.assertEqual(proc.returncode, 1)
         self.assertIn("::error::Thẻ v0.3.0 không nằm trên main", proc.stdout)
+
+
+def job_names() -> set[str]:
+    """Tên các job như GitHub hiện (và báo cho ruleset), đọc theo luật YAML: tên không đặt trong ngoặc kép thì từ " #"
+    trở đi là chú thích — `name: Giấy phép (PoF #2)` thành "Giấy phép (PoF"."""
+    names = set()
+    for workflow in WORKFLOWS.glob("*.yml"):
+        for line in workflow.read_text(encoding="utf-8").splitlines():
+            if m := JOB_NAME.match(line):
+                value = m[1]
+                if value[0] in "\"'":
+                    value = value[1:value.index(value[0], 1)]
+                else:
+                    value = value.split(" #", 1)[0].rstrip()
+                names.add(value)
+    return names
+
+
+class RulesetChecksTest(unittest.TestCase):
+    """Ruleset của develop, main đòi đúng tên job có thật: đòi một tên không job nào báo thì không PR nào gộp được."""
+
+    def test_no_job_name_is_cut_at_a_hash(self) -> None:
+        names = job_names()
+        self.assertIn("Quy trình nhánh và tiêu đề PR", names)
+        self.assertIn("Giấy phép (PoF #2)", names)
+        self.assertNotIn("Giấy phép (PoF", names)
+
+    def test_required_checks_are_real_job_names(self) -> None:
+        names = job_names()
+        for f in ("develop.json", "main.json"):
+            ruleset = json.loads((RULESETS / f).read_text(encoding="utf-8"))
+            (rule,) = [r for r in ruleset["rules"] if r["type"] == "required_status_checks"]
+            checks = rule["parameters"]["required_status_checks"]
+            self.assertEqual(len(checks), 8)
+            for check in checks:
+                with self.subTest(ruleset=f, check=check["context"]):
+                    self.assertIn(check["context"], names)
+                    self.assertEqual(check["integration_id"], 15368)      # GitHub Actions
 
 
 if __name__ == "__main__":

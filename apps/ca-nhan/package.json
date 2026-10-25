@@ -1,0 +1,17 @@
+{
+  "name": "moc-app-ca-nhan",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Signet — Không gian cá nhân P.A.R.A (ứng dụng thứ hai trên lõi, Tầng 2)",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "oidc-client-ts": "3.5.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

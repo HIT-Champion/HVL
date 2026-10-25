@@ -59,7 +59,7 @@ if TYPE_CHECKING:
     from asn1crypto import x509
 
 KEY_PREFIX = "moc-ky-so-"       # khóa transit của từng đơn vị: moc-ky-so-<id đơn vị>
-ROLE = "moc-van-thu"            # role PKI cấp chứng thư ký văn bản (openbao/start.sh)
+ROLE = "moc-van-thu"            # role PKI cấp chứng thư ký văn bản (platform/openbao/start.sh)
 FIELD = "MocKySo"               # ô ký ẩn
 LEVEL = "PAdES-B-B"
 RETRY_OFF_S = 300.0             # két thiếu PKI / từ chối: phát hành không ký, chừng ấy giây sau mới dò lại

@@ -184,6 +184,11 @@ class FakeHasura:
                                "object_key": object_key, "signature": signature, **row}
 
     fail_events: bool = False         # ghi sổ kiểm toán lỗi (Hasura vẫn đọc được)
+    backup_at: datetime | None = None   # lượt sao lưu gần nhất CSDL biết (trang trạng thái hệ thống)
+
+    async def last_backup(self) -> datetime | None:
+        self._check()
+        return self.backup_at
 
     async def log_event(self, **event) -> None:
         self._check()
@@ -1007,6 +1012,9 @@ class FakeVault:
         self.unwrapped.append(wrapped)
         return self.keys[wrapped]
 
+    async def ping(self) -> bool:
+        return not self.down
+
     async def aclose(self) -> None:
         pass
 
@@ -1030,6 +1038,8 @@ def settings() -> Settings:
             "MOC_TEXT_INTERVAL_S": "0",
             "MOC_FILES_MAX_MB": "1",
             "MOC_AI_URL": "",       # không dò Ollama trong test (test đọc văn bản đến tự tiêm mô hình giả)
+            # vòng nền nạp lô tắt (không tạo thư mục spool); test nạp lô tự dựng Settings riêng (test_imports_*.py)
+            "MOC_IMPORT_INTERVAL_S": "0",
         }
     )
 

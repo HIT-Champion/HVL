@@ -22,8 +22,10 @@
 # dựng từ thư mục trong repo. Không chép, không sửa mã của dự án khác (PoF #5).
 #
 #   profile core — Tầng 1, lõi headless: chỉ APISIX mở cổng ra ngoài
-#   profile app  — Tầng 2, ứng dụng Văn phòng điện tử
+#   profile app  — Tầng 2, ứng dụng Văn phòng điện tử và Không gian cá nhân P.A.R.A
 #   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
+#   profile mail   — Mailpit, hộp thư thử cho thông báo email (chỉ để demo, MOC_EXTRA_PROFILES=mail)
+#   profile logs   — log tập trung Vector + Parseable (tắt mặc định; make logs-up; docs/van-hanh.md mục Log tập trung)
 #
 #   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
@@ -69,7 +71,7 @@ services:
       timeout: 5s
       retries: 30
 
-  # F1.1 — SSO. Realm nạp từ auth/realm/ ở lần đầu (bỏ qua nếu realm đã có).
+  # F1.1 — SSO. Realm nạp từ platform/keycloak/realm/ ở lần đầu (bỏ qua nếu realm đã có).
   keycloak:
     <<: *common
     image: quay.io/keycloak/keycloak:26.7.5@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
@@ -90,12 +92,12 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50
-      # giá trị thay vào auth/realm/moc-realm.json khi nạp
+      # giá trị thay vào platform/keycloak/realm/moc-realm.json khi nạp
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
       MOC_CLI_CLIENT_ENABLED: ${MOC_CLI_CLIENT_ENABLED:-false}
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
     volumes:
-      - ./auth/realm:/opt/keycloak/data/import:ro
+      - ./platform/keycloak/realm:/opt/keycloak/data/import:ro
     ports:
       # trang quản trị: chỉ trên máy chủ, không qua APISIX
       - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
@@ -111,10 +113,12 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
 
-  # F1.2 — cổng duy nhất mở ra ngoài
+  # F1.2 — cổng duy nhất mở ra ngoài. F3.15: image APISIX ghim digest cộng nguyên bản tệp WAF coraza-proxy-wasm ghim
+  # digest (platform/apisix/Dockerfile), không sửa mã của hai dự án; luật WAF trong apisix.yaml
   apisix:
     <<: *common
-    image: apache/apisix:3.18.0-debian@sha256:84e6b5e787e9f889ebff88161cb9a16599bafcffa236c6b54c7f779a0655940d
+    build: ./platform/apisix
+    image: moc/apisix:${MOC_VERSION:-dev}
     profiles: [core]
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
@@ -123,10 +127,14 @@ services:
       MOC_RATE_API_PER_MIN: ${MOC_RATE_API_PER_MIN:-300}
       MOC_RATE_VERIFY_PER_MIN: ${MOC_RATE_VERIFY_PER_MIN:-30}
       MOC_RATE_REALTIME_PER_MIN: ${MOC_RATE_REALTIME_PER_MIN:-60}
+      MOC_RATE_STATUS_PER_MIN: ${MOC_RATE_STATUS_PER_MIN:-30}
       MOC_TRUSTED_PROXY: ${MOC_TRUSTED_PROXY:-127.0.0.1/32}
+      # F3.15: On chặn | DetectionOnly chỉ ghi nhật ký | Off; số worker (mỗi worker nạp một bộ luật WAF)
+      MOC_WAF: ${MOC_WAF:-On}
+      MOC_APISIX_WORKERS: ${MOC_APISIX_WORKERS:-4}
     volumes:
-      - ./gateway/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ./gateway/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+      - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./platform/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
     ports:
       - ${MOC_HTTP_PORT:-8080}:9080
     depends_on:
@@ -271,7 +279,7 @@ services:
     volumes:
       - meili_data:/meili_data
 
-  # F3.2 — két bí mật (openbao/start.sh): svc-files, svc-workflow lấy bí mật qua AppRole lúc khởi động thay vì nhận
+  # F3.2 — két bí mật (platform/openbao/start.sh): svc-files, svc-workflow lấy bí mật qua AppRole lúc khởi động thay vì nhận
   # qua biến môi trường; khóa transit moc-files cho F3.7; F4.5 — PKI nội bộ (CA moc-root, chỉ minh họa) cấp chứng thư
   # cho khóa ký transit moc-ky-so-<đơn vị>. Static seal: khởi động lại là tự mở khóa. Không mở cổng ra ngoài. Chạy
   # bằng root chỉ để ghi tệp đăng nhập cho từng dịch vụ; máy chủ chạy bằng người dùng openbao.
@@ -295,8 +303,11 @@ services:
       FLOWABLE_ADMIN_PASSWORD: ${FLOWABLE_ADMIN_PASSWORD:?}
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:?}
       MOC_DIRECTORY_CLIENT_SECRET: ${MOC_DIRECTORY_CLIENT_SECRET:?}
+      # tùy chọn (thông báo đa kênh của svc-workflow): rỗng thì không nạp
+      MOC_SMTP_PASSWORD: ${MOC_SMTP_PASSWORD:-}
+      MOC_NOTIFY_WEBHOOK_URL: ${MOC_NOTIFY_WEBHOOK_URL:-}
     volumes:
-      - ./openbao:/moc:ro
+      - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
       - openbao_svc_files:/run/moc/svc-files
       - openbao_svc_workflow:/run/moc/svc-workflow
@@ -354,6 +365,12 @@ services:
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
       MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
+      # Trang trạng thái hệ thống (/api/status, công khai): phiên bản đang chạy; svc-files còn dò APISIX (cổng trạng
+      # thái 7085 nội bộ), JWKS của Keycloak, /readyz của svc-workflow
+      MOC_VERSION: ${MOC_VERSION:-dev}
+      # Nạp lô văn bản đến (/api/imports): trần byte một lô được ghi vào kho — tổng cỡ đã giải nén các mục zip mà các
+      # dòng trỏ tới, mỗi lần trỏ tính một lần. Các trần khác của lô: mặc định (services/svc-files/README.md)
+      MOC_IMPORT_STORE_MAX_MB: ${MOC_IMPORT_STORE_MAX_MB:-200}
     volumes:
       - openbao_svc_files:/run/openbao:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
@@ -393,16 +410,47 @@ services:
       MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
+      # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP) và webhook (Mattermost, Slack, ntfy) qua hộp thư đi
+      # core.notification_deliveries. MOC_SMTP_HOST và MOC_NOTIFY_WEBHOOK_URL đều rỗng (mặc định) thì tắt hẳn. Mật
+      # khẩu SMTP và URL webhook lấy từ két; liên kết trong thư: <MOC_PUBLIC_URL>/van-ban/<id>
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_SMTP_HOST: ${MOC_SMTP_HOST:-}
+      MOC_SMTP_PORT: ${MOC_SMTP_PORT:-}
+      MOC_SMTP_TLS: ${MOC_SMTP_TLS:-starttls}
+      MOC_SMTP_USER: ${MOC_SMTP_USER:-}
+      MOC_SMTP_FROM: ${MOC_SMTP_FROM:-}
+      MOC_NOTIFY_WEBHOOK_FORMAT: ${MOC_NOTIFY_WEBHOOK_FORMAT:-json}
+      MOC_NOTIFY_EMAIL_KINDS: ${MOC_NOTIFY_EMAIL_KINDS:-}
+      MOC_NOTIFY_WEBHOOK_KINDS: ${MOC_NOTIFY_WEBHOOK_KINDS:-}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
-      - ./processes:/app/processes:ro
+      - ./services/svc-workflow/processes:/app/processes:ro
       - openbao_svc_workflow:/run/openbao:ro
     depends_on:
       # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
       openbao: {condition: service_healthy, restart: true}
       hasura: {condition: service_healthy}
       flowable: {condition: service_healthy}
-    # Không phụ thuộc centrifugo: thiếu nó thì thông báo vẫn lưu, chỉ không đẩy tức thời
+    # Không phụ thuộc centrifugo: thiếu nó thì thông báo vẫn lưu, chỉ không đẩy tức thời. Không phụ thuộc mailpit:
+    # máy chủ thư chưa lên thì thư nằm chờ ở hộp thư đi, vòng nền thử lại
+
+  # Hộp thư thử cho thông báo email (profile mail, chỉ để demo và kiểm thử): nhận mọi thư svc-workflow gửi tới
+  # mailpit:1025, không chuyển tiếp ra ngoài, xem trên giao diện web chỉ mở ở 127.0.0.1. Không thuộc core, app: cài
+  # thật thì svc-workflow gửi qua máy chủ thư của đơn vị (docs/trien-khai.md mục 7); thư nằm trong tệp tạm, không có
+  # volume, mất khi container dừng; tối đa 500 thư
+  mailpit:
+    <<: *common
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    profiles: [mail]
+    environment:
+      TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
+      MP_MAX_MESSAGES: "500"
+      # không gọi GitHub hỏi bản mới, không tra DNS ngược địa chỉ người gửi
+      MP_DISABLE_VERSION_CHECK: "true"
+      MP_SMTP_DISABLE_RDNS: "true"
+    ports:
+      - "127.0.0.1:${MOC_MAIL_UI_PORT:-8025}:8025"
+    mem_limit: 128m
 
   # F2.5 — đẩy thông báo tới trình duyệt qua WebSocket (/realtime ở APISIX); tự kiểm token Keycloak
   centrifugo:
@@ -418,7 +466,7 @@ services:
       # chỉ trang của chính Signet được mở WebSocket (chặn trang lạ dùng phiên của người dùng)
       CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${MOC_PUBLIC_URL:?}
     volumes:
-      - ./realtime:/centrifugo:ro
+      - ./platform/centrifugo:/centrifugo:ro
     mem_limit: 256m
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/health || exit 1"]
@@ -441,7 +489,7 @@ services:
       - --storage.tsdb.retention.time=${MOC_METRICS_RETENTION:-15d}
     mem_limit: 512m
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./platform/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]
@@ -474,9 +522,9 @@ services:
     mem_limit: 512m
     # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ
     volumes:
-      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./platform/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./platform/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./platform/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     ports:
       - 127.0.0.1:${MOC_GRAFANA_PORT:-3300}:3000
     healthcheck:
@@ -486,6 +534,65 @@ services:
       retries: 18
     depends_on:
       prometheus: {condition: service_healthy}
+
+  # ---- Log tập trung (F3.14), profile logs — tắt mặc định (docs/van-hanh.md mục Log tập trung) ---------------------
+  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của apisix, app-office, app-ca-nhan, svc-files,
+  # svc-workflow (5 dịch vụ đã che thông tin cá nhân, F4.4) sang fluentd: dockerd gửi dòng log vào Vector qua cổng
+  # 127.0.0.1. Không gắn docker.sock, không đọc /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ
+  # nào khác của Signet. Không dùng x-common (mạng moc); log của chính chúng ghi json-file, không gửi vào mình.
+  vector:
+    image: timberio/vector:0.59.0-distroless-static@sha256:2138c72ef15477d3a60126da851407a198ec61d2ff4cd600a4e69db5f6a29ff7
+    profiles: [logs]
+    restart: unless-stopped
+    command: ["--config", "/etc/vector/vector.yaml"]
+    # Không read_only: compose chép secret nguồn environment vào container trước khi chạy, Docker từ chối chép vào
+    # rootfs chỉ đọc ("container rootfs is marked read-only")
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # chưa đo dưới tải; lúc nghỉ ≈ 18 MiB
+    networks: [logs]
+    ports:
+      - 127.0.0.1:${MOC_LOGS_FLUENT_PORT:-24224}:24224    # dockerd trên máy chủ gửi vào đây; không xác thực
+    # Vector ≥ 0.57 không thay ${…} trong tệp cấu hình: mật khẩu Parseable đi qua compose secret (/run/secrets)
+    secrets: [moc_logs_password]
+    volumes:
+      - ./platform/logs/vector.yaml:/etc/vector/vector.yaml:ro
+    depends_on:
+      parseable: {condition: service_started}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  # Parseable (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản. API và giao diện chỉ nghe 127.0.0.1, tài khoản moc
+  # (basic auth), giữ log MOC_LOGS_RETENTION_DAYS ngày (scripts/log_tap_trung.py init đặt). Image distroless, không
+  # có shell nên không có healthcheck (make logs-up chờ /api/v1/readiness). Chạy bằng root nhưng bỏ mọi capability:
+  # uid khác 0 không tạo được thư mục trên volume mới (Parseable dừng: "Permission denied")
+  parseable:
+    image: quay.io/parseablehq/parseable:v3.2.4@sha256:fccd5124553cda66c2e01d01d98bd4077cee819842717d2e884e2dc6aa8025d1
+    profiles: [logs]
+    restart: unless-stopped
+    command: ["/usr/bin/parseable", "local-store"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m                       # chưa đo dưới tải; lúc nghỉ ≈ 45 MiB
+    networks: [logs]
+    ports:
+      - 127.0.0.1:${MOC_LOGS_PORT:-8400}:8000
+    environment:
+      P_USERNAME: moc
+      P_PASSWORD: ${MOC_LOGS_PASSWORD:-}
+      # Mật khẩu rỗng thì Parseable nhận đăng nhập rỗng: để P_ADDR rỗng, Parseable từ chối khởi động
+      P_ADDR: ${MOC_LOGS_PASSWORD:+0.0.0.0:8000}
+      P_STAGING_DIR: /parseable/data/staging
+      P_FS_DIR: /parseable/data/store
+      P_CHECK_UPDATE: "false"               # mặc định gọi download.parseable.io
+      P_SEND_ANONYMOUS_USAGE_DATA: "false"  # mặc định gửi số liệu sử dụng cho analytics.parseable.io
+    volumes:
+      - parseable_data:/parseable/data
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
 
   # F3.10 — hội tụ IT/OT (màn ii), profile iot (tùy chọn: `make demo-it-ot` tự bật). Context broker NGSI-LD giữ bản
   # sao số của cảm biến; mỗi đơn vị một tenant NGSI-LD. Không mở cổng nào ra máy chủ. Ba mạng riêng: thiết bị ↔ broker
@@ -546,7 +653,7 @@ services:
     environment:
       MOC_NGSI_URL: http://scorpio:9090
     volumes:
-      - ./ot/sensor.py:/ot/sensor.py:ro
+      - ./services/ot-sensor/sensor.py:/ot/sensor.py:ro
 
   # F4.1 — mô hình ngôn ngữ cục bộ cho tác tử đọc văn bản đến, profile ai (tùy chọn: make up-ai). Ollama (MIT) chạy
   # Qwen3 (Apache-2.0) trên CPU; chỉ viết trích yếu khi quy tắc không ra trích yếu tin cậy — số, ngày, cơ quan luôn
@@ -637,8 +744,22 @@ services:
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
 
+  # Không gian cá nhân P.A.R.A ([H]): ứng dụng thứ hai trên lõi (docs/them-ung-dung.md). Trang tĩnh ở /ca-nhan/, client
+  # Keycloak riêng app-ca-nhan; tệp, dữ liệu đi qua đúng các route của lõi như app-office. Không dịch vụ nào của lõi
+  # phải đổi để có ứng dụng này
+  app-ca-nhan:
+    <<: *common
+    build: ./apps/ca-nhan
+    image: moc/app-ca-nhan:${MOC_VERSION:-dev}
+    profiles: [app]
+    environment:
+      MOC_REALM: ${MOC_REALM:-moc}
+
 networks:
   moc:
+    driver: bridge
+  # F3.14 (profile logs): chỉ vector, parseable. Không internal: phải mở cổng 127.0.0.1 (mạng internal không mở được)
+  logs:
     driver: bridge
   # chỉ seaweedfs và svc-files; không ra Internet
   storage:
@@ -670,6 +791,8 @@ volumes:
   postgres_data:
   seaweedfs_data:
   prometheus_data:
+  # log tập trung (F3.14, profile logs); không sao lưu, giữ MOC_LOGS_RETENTION_DAYS ngày
+  parseable_data:
   scorpio_data:
   clamav_data:
   meili_data:
@@ -679,3 +802,8 @@ volumes:
   openbao_svc_workflow:
   # trọng số mô hình ngôn ngữ (F4.1, profile ai); không sao lưu: tải lại được bằng make ai-model
   ollama_models:
+
+secrets:
+  # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ
+  moc_logs_password:
+    environment: MOC_LOGS_PASSWORD

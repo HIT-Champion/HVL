@@ -1,0 +1,138 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# APISIX chạy standalone: route đọc từ apisix.yaml, không cần etcd, không có Admin API.
+# Giá trị ${{TÊN}} lấy từ biến môi trường của container (docker-compose.yml).
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
+
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  enable_control: false
+  enable_server_tokens: false
+  # Máy chủ trạng thái của APISIX: /status/ready trả 200 khi mọi worker đã nạp route. Chỉ trong mạng nội bộ `moc` (không
+  # có trong ports của docker-compose.yml); svc-files dò rồi gom vào trang trạng thái hệ thống công khai (/api/status)
+  status:
+    ip: 0.0.0.0
+    port: 7085
+  # F3.3: container bị xóa rồi dựng lại (tự phục hồi) có IP mới — chỉ tin bản ghi DNS của Docker 5 giây thay vì
+  # TTL 600 giây, để cổng tìm thấy dịch vụ mới ngay
+  dns_resolver_valid: 5
+  ssl:
+    enable: false
+  # F1.9: trên máy chủ, proxy TLS (Caddy, docs/trien-khai.md) đứng trước APISIX. APISIX 3.18 ghi đè X-Forwarded-Proto,
+  # -Host, -Port bằng giá trị nó thấy (http, cổng 9080) trừ khi yêu cầu tới từ địa chỉ tin cậy — không thì Keycloak
+  # tưởng người dùng ở http, trả token_endpoint http://… và trình duyệt chặn lần đăng nhập. Mặc định 127.0.0.1/32: không
+  # ai tới APISIX từ loopback của chính container, nghĩa là không tin ai (máy dev, CI)
+  trusted_addresses:
+    - "${{MOC_TRUSTED_PROXY:=127.0.0.1/32}}"
+
+nginx_config:
+  # F3.15: mỗi worker nạp riêng một bộ luật WAF (~80 MB, tới ~230 MB sau khi soi tệp tải lên 24 MB) nên không để "auto"
+  # (một worker mỗi nhân: 16 worker là 1,5 GiB trên máy 16 nhân). 4 worker có WAF vẫn ~470 yêu cầu/giây trên 2 CPU
+  # (platform/apisix/README.md, mục WAF)
+  worker_processes: ${{MOC_APISIX_WORKERS:=4}}
+  error_log_level: warn
+  # apisix.yaml đọc các biến này lúc chạy, nên phải khai cho tiến trình worker của nginx
+  envs:
+    - MOC_REALM
+    - MOC_FILES_MAX_MB
+    - MOC_RATE_LOGIN_PER_MIN
+    - MOC_RATE_API_PER_MIN
+    - MOC_RATE_VERIFY_PER_MIN
+    - MOC_RATE_REALTIME_PER_MIN
+    - MOC_RATE_STATUS_PER_MIN
+    - MOC_WAF
+  # F4.4: đường dẫn bỏ chuỗi truy vấn cho access_log_format bên dưới. $request_uri (đường dẫn client gửi) và
+  # $upstream_uri (APISIX ghép sẵn ?… vào) đều mang chuỗi truy vấn; log_format không cắt chuỗi được nên dùng map:
+  # giữ phần trước dấu ? đầu tiên (nhóm khớp đặt tên moc_dd…)
+  http_configuration_snippet: |
+    map $request_uri $moc_duong_dan {
+        "~^(?<moc_dd>[^?]*)" $moc_dd;
+    }
+    map $upstream_uri $moc_duong_dan_upstream {
+        "~^(?<moc_dd_upstream>[^?]*)" $moc_dd_upstream;
+    }
+    # F1.9: proxy tin cậy nói https mà không gửi X-Forwarded-Port (Cloudflare Tunnel không gửi) thì cổng ngoài là 443,
+    # không phải cổng 9080 APISIX điền theo mặc định — không thì Keycloak trả địa chỉ token https://<tên miền>:9080/….
+    # Tin cậy xét theo địa chỉ kết nối, cùng dải trusted_addresses ở trên; $original_x_forwarded_* là giá trị client
+    # gửi (APISIX chép trước khi làm sạch — không dùng $http_x_forwarded_*, APISIX giữ chúng ở giá trị thô). Mọi ca
+    # khác trả đúng giá trị APISIX tự đặt: cổng proxy tin cậy gửi, hoặc cổng của Host/listener. Route Keycloak gửi
+    # đi qua plugin_config cong-keycloak (apisix.yaml)
+    geo $realip_remote_addr $moc_proxy_tin_cay {
+        default 0;
+        ${{MOC_TRUSTED_PROXY:=127.0.0.1/32}} 1;
+    }
+    map "$moc_proxy_tin_cay:$original_x_forwarded_proto:$original_x_forwarded_port" $moc_cong_chuyen_tiep {
+        "1:https:"                      443;
+        "~^1:[^:]*:(?<moc_cong_goc>.+)$" $moc_cong_goc;
+        default                         $var_x_forwarded_port;
+    }
+  # F3.15: plugin wasm của APISIX chỉ đưa thân yêu cầu cho WAF khi biến này khác rỗng (apisix/wasm.lua), mà
+  # coraza-proxy-wasm (viết cho Envoy) không tự đặt. Thiếu dòng này thì Coraza không thấy thân yêu cầu và chạy luật pha
+  # 2 — nơi CRS quyết chặn — sau khi yêu cầu đã tới dịch vụ phía sau. Template đặt snippet sau dòng khởi tạo
+  # `set $wasm_process_req_body ''` của location /
+  http_server_location_configuration_snippet: |
+    set $wasm_process_req_body on;
+  http:
+    # svc-files tự giới hạn theo MOC_FILES_MAX_MB; ở biên chỉ chặn yêu cầu quá lớn rõ ràng
+    client_max_body_size: 64m
+    # Giới hạn đăng nhập, cổng xác thực đếm theo IP nguồn. Sau proxy TLS mọi yêu cầu mang IP của proxy: lấy IP người
+    # dùng từ X-Forwarded-For, chỉ khi yêu cầu tới từ MOC_TRUSTED_PROXY (như trusted_addresses ở trên)
+    real_ip_header: X-Forwarded-For
+    real_ip_recursive: "on"
+    real_ip_from:
+      - "${{MOC_TRUSTED_PROXY:=127.0.0.1/32}}"
+    # F4.4: không ghi chuỗi truy vấn (ô tìm kiếm ?q=…, mã đăng nhập ?code=…&state=…) và Referer (URL đầy đủ của trang
+    # trước). Các trường khác giữ như định dạng mặc định của APISIX 3.18: "$request" thành phương thức, đường dẫn, giao
+    # thức; "$upstream_scheme://$upstream_host$upstream_uri" giữ nguyên trừ ?…. APISIX bọc chuỗi này trong '…' khi
+    # dựng nginx.conf: không dùng dấu nháy đơn bên trong. "$apisix_request_id" cuối dòng như mặc định: log tập trung
+    # (F3.14) nối dòng của APISIX với svc-files, svc-workflow theo mã yêu cầu
+    access_log_format: '$remote_addr - $remote_user [$time_local] $http_host "$request_method $moc_duong_dan $server_protocol" $status $body_bytes_sent $request_time "$http_user_agent" $upstream_addr $upstream_status $upstream_response_time "$upstream_scheme://$upstream_host$moc_duong_dan_upstream" "$apisix_request_id"'
+
+# Chỉ bật plugin đang dùng
+plugins:
+  - request-id
+  - openid-connect
+  - proxy-rewrite
+  - limit-count
+  - fault-injection
+  # F3.13: chỉ số cho Prometheus, bật toàn cục trong apisix.yaml
+  - prometheus
+  # F3.15: chặn thân JSON lồng quá sâu trước khi tới WAF (global rule trong apisix.yaml)
+  - serverless-pre-function
+
+plugin_attr:
+  prometheus:
+    # Cổng xuất chỉ số riêng, chỉ trong mạng nội bộ `moc` (không có trong ports của docker-compose.yml)
+    export_addr:
+      ip: 0.0.0.0
+      port: 9091
+
+# F3.15 — tường lửa ứng dụng web: Coraza + OWASP CRS dạng proxy-wasm (tệp có sẵn trong image,
+# platform/apisix/Dockerfile), bật toàn cục và cấu hình luật trong apisix.yaml. Pha rewrite: global rule chạy rewrite
+# trước plugin của route, nên WAF xét yêu cầu trước openid-connect (kiểm token) và limit-count; ở pha access thì GraphQL
+# không token đã bị 401 trước khi WAF kịp xem. Priority 7999 không trùng plugin nào của APISIX 3.18, thấp hơn
+# request-id (12015) nên phản hồi 403 vẫn có X-Request-Id
+wasm:
+  plugins:
+    - name: coraza-waf
+      priority: 7999
+      file: /usr/local/apisix/wasm/coraza-proxy-wasm.wasm
+      http_request_phase: rewrite
