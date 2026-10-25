@@ -75,8 +75,8 @@ class Actor:
 
 def _traced(headers: dict[str, str], request_id: str) -> dict[str, str]:
     """Mã yêu cầu đi cùng lời gọi: ``X-Hasura-Request-Id`` thành biến phiên, trigger sổ kiểm toán ghi vào
-    ``core.audit_log.request_id``; ``X-Request-Id`` để nhật ký của Hasura (``docker logs``, không vào log tập trung)
-    mang cùng mã.
+    ``core.audit_log.request_id``; ``X-Request-Id`` để nhật ký của Hasura (``docker logs``, cột ``request_id`` của log
+    tập trung) mang cùng mã.
     Mã rỗng (việc nền không có yêu cầu gốc) thì không gửi gì."""
     if request_id:
         headers["X-Hasura-Request-Id"] = request_id
