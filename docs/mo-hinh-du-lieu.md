@@ -936,6 +936,26 @@ khai cả `office.archived_document_facts` mà `v_processing_time` đọc. Giớ
 catalog không ghi cạnh tới bảng đó (hiện không view `v_` nào gọi hàm tự viết — test chặn); phả hệ mức bảng, chưa mức
 cột.
 
+**Kiểm chất lượng số liệu báo cáo** (F3.9, F3.11, migration 1792281603300). `office.report_checks` tính lúc truy vấn
+một bộ luật trên các khung nhìn mà trang Điều hành vẽ; trang Điều hành hiện cờ nặng nhất cạnh từng biểu đồ, trang Phả hệ
+hiện từng luật. Ngưỡng của mọi luật là 0. Luật chọn theo chỗ ràng buộc schema không chặn được:
+
+| Luật | Khung nhìn | PASSED / WARNING / FAILED |
+|---|---|---|
+| `status_total` | `v_document_counts` | Σ 6 cột của biểu đồ trạng thái (đúng `IN_STATUSES` của trang) + văn bản đến hạn chế = số văn bản đến đếm trên `office.documents` / — / lệch (`detail`: trạng thái biểu đồ không vẽ) |
+| `department_total` | `v_overdue_by_department` | Σ "đang xử lý" theo phòng = cột "Đang xử lý" của biểu đồ trạng thái, không văn bản nào ở dòng "chưa rõ phòng" / khớp nhưng có (`issues`) / lệch |
+| `processing_coverage` | `v_processing_time` | văn bản đến đã xong (done, archived; không hạn chế) đều có mốc xong / thiếu mốc (`issues` văn bản không vào trung bình) / tính thừa, hay có tháng tổng giờ âm (`detail`) |
+| `unique_keys` | cả bốn | khóa trang dùng để ghép số (tháng, phòng, bộ chiều của `v_document_counts`) không trùng, không rỗng / — / trùng hoặc rỗng |
+| `no_personal_columns` | mọi `office.v_*` | không cột nào mang tên thông tin cá nhân / view (hay view lồng nó đọc qua) đọc cột như vậy (`pg_depend` mức cột) / xuất ra |
+
+Cột: `tenant_id`, `rule`, `report`, `status`, `expected`, `actual`, `issues`, `detail` (`text[]`). Một dòng
+`core.tenants` nhân lateral với các luật của đúng đơn vị đó (mỗi khung nhìn đọc một lần), nên lọc
+`tenant_id = X-Hasura-Tenant-Id` chỉ tính cho một đơn vị; phần catalog giống nhau cho mọi đơn vị. Hasura cho `director`
+đọc với bộ lọc đó, như dashboard. `status_total` và `unique_keys` hôm nay đúng theo cấu trúc (ràng buộc, GROUP BY): là
+luật chặn hồi quy khi sửa view, `db/tests/test_report_checks.py` giả lập bằng cách thay tạm view. Tên cột cá nhân theo
+mẫu tên (email, phone, cccd, cmnd, birth, address, full_name, username…): cột đặt tên lạ không bắt được; khóa người dùng
+(`user_id`, `created_by`) không tính.
+
 ### 2.6. Schema `personal` — Không gian cá nhân P.A.R.A (ứng dụng thứ hai)
 
 Không thuộc Văn phòng điện tử: đây là schema của ứng dụng thứ hai `apps/ca-nhan` (migration
@@ -1127,6 +1147,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
 | `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, văn bản hạn chế thì người gọi phải đọc được nó (403 `restricted`), kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
+| `otSensorMap` (query) | `clerk`, `staff`, `manager`, `director` — các vai trò đọc được dự thảo "Báo cáo sự cố" | Sơ đồ cảm biến OT (F3.10): đọc context broker NGSI-LD ở tenant của đơn vị trong biến phiên (thực thể `TemperatureSensor`, lịch sử 10 lần đo gần nhất), trả số đo mới nhất, mã phòng (`room`), ngưỡng và cờ chất lượng — `stale` (quá `MOC_OT_STALE_MIN` phút không có số đo), `out_of_range` (không phải số hoặc ngoài −55…125 °C), `duplicate_time` (số đo mới nhất trùng `observedAt` với lần đo khác), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút; khi đó `stale` xét theo lúc broker nhận số đo). Chỉ đọc, không ghi CSDL; chưa bật broker thì `status` = `off` / `unavailable`, không lỗi |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
 cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác

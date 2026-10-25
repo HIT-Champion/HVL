@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 import uuid
 from types import SimpleNamespace
 
@@ -309,21 +308,31 @@ def test_model_is_skipped_when_the_deadline_is_near(asking):
     assert fake.calls("/api/chat") == []
 
 
-def test_background_embedding_is_held_only_while_ollama_is_called(asking, monkeypatch):
+def test_background_embedding_is_held_only_while_ollama_is_called(asking):
     async def slow(request):
         await asyncio.sleep(0.5)
         return good_answer()
 
-    env = asking(passages=demo(), ai=ollama(FakeOllama(reply=slow)))
-    assert ask(env, env.token()).status_code == 200            # câu trích: chỉ nhúng câu hỏi, giữ ngắn
-    assert env.indexer.holds == [answer_module.HOLD_S] and answer_module.HOLD_S <= 5
+    ai = ollama(FakeOllama(reply=slow))
+    env = asking(passages=demo(), ai=ai)
+    seen: list[tuple[str, int]] = []        # (bước, số khối giữ đang mở lúc bắt đầu bước)
+
+    def watch(step, call):
+        async def watched(*args, **kwargs):
+            seen.append((step, env.indexer.active))
+            return await call(*args, **kwargs)
+        return watched
+
+    ai.embed, ai.chat = watch("embed", ai.embed), watch("chat", ai.chat)
+    env.retriever.search = watch("search", env.retriever.search)
+    assert ask(env, env.token()).status_code == 200            # câu trích: chỉ nhúng câu hỏi
+    assert seen == [("embed", 1), ("search", 0)] and env.indexer.holds == [answer_module.HOLD_S]
+    seen.clear()
     env.indexer.holds.clear()
-    monkeypatch.setattr(answer_module, "HOLD_S", 0.1)       # gia hạn mỗi 0,05 giây
     assert ask(env, env.token(), mode="generate").json()["answer"]["source"] == "model"
-    during = len(env.indexer.holds)
-    assert during >= 4 and set(env.indexer.holds) == {0.1}     # gia hạn suốt 0,5 giây sinh
-    time.sleep(0.3)
-    assert len(env.indexer.holds) == during                    # gọi xong thì thôi giữ
+    # giữ suốt từng lời gọi Ollama (cả 0,5 giây sinh), không giữ lúc truy xuất; mỗi lời gọi xong nhường thêm HOLD_S
+    assert seen == [("embed", 1), ("search", 0), ("chat", 1)] and env.indexer.active == 0
+    assert env.indexer.holds == [answer_module.HOLD_S] * 2 and answer_module.HOLD_S <= 5
 
 
 def test_busy_is_503_with_retry_after_only_for_generate(asking):
@@ -367,13 +376,13 @@ def _post(app, token: str, body: dict, gone: asyncio.Event):
 
 
 def test_disconnect_cancels_the_model_call_frees_the_slot_and_writes_no_audit_row(
-        scanner, store, verifier, meili, vault, signing_key, log_records, monkeypatch):
-    monkeypatch.setattr(answer_module, "HOLD_S", 0.02)
-
+        scanner, store, verifier, meili, vault, signing_key, log_records):
     async def scenario():
         started, cancelled = asyncio.Event(), asyncio.Event()
+        held: list[int] = []
 
         async def endless(request):
+            held.append(indexer.active)
             started.set()
             try:
                 await asyncio.sleep(30)
@@ -400,6 +409,7 @@ def test_disconnect_cancels_the_model_call_frees_the_slot_and_writes_no_audit_ro
         gone.set()
         await asyncio.wait_for(call, 5)
         assert cancelled.is_set() and not assistant.slots.locked()
+        assert held == [1] and indexer.active == 0              # giữ vòng nền suốt lời gọi; bị hủy thì thôi giữ
         assert sent[0]["status"] == 499 and hasura.agent_events == []
 
         # lượt kế tiếp không phải chờ hàng 20 giây
@@ -408,9 +418,7 @@ def test_disconnect_cancels_the_model_call_frees_the_slot_and_writes_no_audit_ro
         await asyncio.wait_for(call, 5)
         assert sent[0]["status"] == 200
         assert [e["diff"]["answer_source"] for e in hasura.agent_events] == ["model"]
-        holds = len(indexer.holds)
-        await asyncio.sleep(0.1)
-        assert len(indexer.holds) == holds                      # lượt bị hủy không để lại vòng gia hạn hold
+        assert indexer.active == 0                              # không lượt nào để lại khối giữ đang mở
         await ai.aclose()
 
     asyncio.run(scenario())

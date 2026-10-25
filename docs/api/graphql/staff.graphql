@@ -56,6 +56,25 @@ input Int_comparison_exp {
   _nin: [Int!]
 }
 
+type OtSensor {
+  flags: [String!]!
+  id: String!
+  name: String!
+  observed_at: timestamptz
+  room: String
+  value: Float
+}
+
+type OtSensorMap {
+  checked_at: timestamptz!
+  range_max: Float!
+  range_min: Float!
+  sensors: [OtSensor!]!
+  stale_after_min: Int!
+  status: String!
+  threshold: Float!
+}
+
 "Boolean expression to compare columns of type \"String\". All fields are combined with logical 'AND'."
 input String_array_comparison_exp {
   "is the array contained in the given array value"
@@ -3231,6 +3250,7 @@ type query_root {
   ): [office_feedback!]!
   "fetch data from the table: \"office.feedback\" using primary key columns"
   office_feedback_by_pk(id: uuid!): office_feedback
+  otSensorMap: OtSensorMap!
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"

@@ -38,7 +38,8 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py it-ot
         (ii) Hội tụ IT/OT: bật context broker NGSI-LD (profile iot); cảm biến nhiệt độ phòng máy chủ giả lập gửi các
         lần đo, vượt ngưỡng thì svc-workflow dựng dự thảo "Báo cáo sự cố" từ mẫu cho chuyên viên phụ trách; chuyên viên
-        trình, dự thảo vào luồng văn bản đi. (make demo-it-ot)
+        trình, dự thảo vào luồng văn bản đi; sơ đồ cảm biến kho (/cam-bien) tô màu từng phòng và gắn cờ chất lượng
+        (mất tín hiệu, ngoài dải, trùng observedAt, observedAt ở tương lai). (make demo-it-ot)
     python3 scripts/demo.py lien-thong
         Liên thông văn bản trong hệ thống (F3.12, không thuộc 4 nguyên lý): Khoa CNTT phát hành công văn gửi Khoa
         Kinh tế; bên nhận tự có văn bản đến cùng tệp (cùng SHA-256), cùng mã xác thực; vào sổ, lãnh đạo có việc chỉ
@@ -829,6 +830,7 @@ def pha_he() -> None:
 
 OT_SENSOR = "phong-may-chu"
 OT_ROOM = "Phòng máy chủ tầng 3"
+OT_PLAN_ROOM = "may-chu"  # mã phòng trên sơ đồ cảm biến kho (apps/office/app/utils/otMap.ts)
 OT_STAFF = "chuyenviendt"
 OT_SUBSCRIPTION = "urn:ngsi-ld:Subscription:moc-ot-alarm"
 
@@ -846,6 +848,9 @@ COMPLETE_TASK = ("mutation ($t: String!, $o: String!, $d: jsonb) { completeTask(
                  " task_id } }")
 
 # Gửi một thông báo giả (token sai) tới svc-workflow, in mã HTTP nhận được hoặc "không tới được"
+# Sơ đồ cảm biến kho (Action otSensorMap, trang /cam-bien)
+OT_MAP = "{ otSensorMap { status threshold stale_after_min sensors { id room value observed_at flags } } }"
+
 OT_PROBE = """
 import sys, urllib.error, urllib.request
 req = urllib.request.Request(sys.argv[1], data=b'{"data": []}', method="POST",
@@ -931,7 +936,8 @@ def it_ot() -> None:
     readings = [threshold - 11, threshold - 6, threshold - 2, threshold + 2, threshold + 6]
     say(2, f"Cảm biến {OT_ROOM} gửi các lần đo: {' → '.join(f'{r:g}' for r in readings)} °C (ngưỡng {threshold:g} °C)")
     out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", OT_SENSOR, "--name", OT_ROOM,
-              "--responsible", OT_STAFF, "--readings", ",".join(f"{r:g}" for r in readings), "--interval", "1")
+              "--room", OT_PLAN_ROOM, "--responsible", OT_STAFF, "--readings", ",".join(f"{r:g}" for r in readings),
+              "--interval", "1")
     sent = [json.loads(line) for line in out.decode().splitlines() if line.startswith("{")]
     if len(sent) != len(readings) or any(r.get("status") != 204 for r in sent):
         raise DemoFailed(f"cảm biến chưa gửi đủ: {sent}")
@@ -989,6 +995,68 @@ def it_ot() -> None:
                          f" token sai phải 401 (nhận {from_inside})")
     ok("mạng thiết bị chỉ thấy broker, không tới được svc-workflow; thông báo giả từ mạng nội bộ (svc-files) với token"
        " sai bị từ chối (401) — token mỗi đơn vị suy từ khóa của svc-workflow, chỉ broker giữ")
+
+    ot_sensor_map(tenant, threshold, readings[-1])
+
+
+def ot_sensor_map(tenant: str, threshold: float, server_room: float) -> None:
+    """Bước 7 của màn it-ot: sơ đồ cảm biến kho, cờ chất lượng tính ở svc-workflow, đọc qua Action có kiểm quyền."""
+    stale_min = int(ENV.get("MOC_OT_STALE_MIN") or 10)
+    # mã cảm biến = mã phòng, tên phòng, số đo (dưới ngưỡng: không dựng dự thảo), cách giả lỗi của sensor.py, cờ chờ
+    rooms = [
+        ("kho-1", "Kho bảo quản 1", [threshold - 14, threshold - 13], [], []),
+        ("kho-2", "Kho bảo quản 2", [threshold - 13, -127], [], ["out_of_range"]),
+        ("kho-3", "Kho bảo quản 3", [threshold - 12, threshold - 11], ["--frozen-clock"], ["duplicate_time"]),
+        ("phong-doc", "Phòng đọc", [threshold - 11], ["--late", str(stale_min + 20)], ["stale"]),
+        ("xu-ly", "Phòng xử lý tài liệu", [threshold - 10], ["--clock-ahead", "30"], ["future_time"]),
+    ]
+    say(7, "Sơ đồ cảm biến kho: năm cảm biến gửi số đo — bình thường; -127 °C (ngoài dải); đồng hồ đứng (trùng"
+           f" observedAt); số đo cũ {stale_min + 20} phút (mất tín hiệu); đồng hồ nhanh 30 phút (giờ đo ở tương lai)")
+    for code, name, values, fault, _ in rooms:
+        out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", code, "--name", name,
+                  "--room", code, "--responsible", OT_STAFF, "--readings", ",".join(f"{v:g}" for v in values),
+                  "--interval", "1", *fault)
+        sent = [json.loads(line) for line in out.decode().splitlines() if line.startswith("{")]
+        if len(sent) != len(values) or any(r.get("status") != 204 for r in sent):
+            raise DemoFailed(f"cảm biến {code} chưa gửi đủ: {sent}")
+    want = {f"urn:ngsi-ld:TemperatureSensor:{code}": flags for code, _, _, _, flags in rooms}
+    server = f"urn:ngsi-ld:TemperatureSensor:{OT_SENSOR}"
+    clerk = Session("vanthu")
+    # lịch sử đo (để xét trùng observedAt) broker ghi bất đồng bộ, sau vài chục giây: chờ tới khi đủ cờ
+    deadline = time.monotonic() + 60
+    while True:
+        board = clerk.gql(OT_MAP)["otSensorMap"]
+        got = {s["id"]: s for s in board["sensors"]}
+        seen = {sid: got.get(sid, {}).get("flags") for sid in want}
+        wrong = {sid: flags for sid, flags in seen.items() if flags != want[sid]}
+        if board["status"] == "ready" and not wrong and server in got:
+            break
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau 60 giây sơ đồ vẫn chưa đúng cờ (trạng thái {board['status']}): {wrong}")
+        time.sleep(1)
+    room = got[server]
+    if room["room"] != OT_PLAN_ROOM or room["value"] != server_room or {"out_of_range", "duplicate_time"} & set(
+            room["flags"]):
+        raise DemoFailed(f"phòng máy chủ trên sơ đồ chưa đúng: {room}")
+    if got["urn:ngsi-ld:TemperatureSensor:kho-2"]["value"] != -127:
+        raise DemoFailed(f"kho 2 phải hiện số -127 kèm cờ ngoài dải: {got['urn:ngsi-ld:TemperatureSensor:kho-2']}")
+    ok(f"văn thư thấy {len(got)} cảm biến: phòng máy chủ {server_room:g} °C vượt ngưỡng {board['threshold']:g} °C (đỏ);"
+       " kho 1 bình thường; kho 2 \"ngoài dải\", kho 3 \"trùng giờ đo\", phòng đọc \"mất tín hiệu\" (quá"
+       f" {board['stale_after_min']} phút), phòng xử lý \"giờ đo ở tương lai\" (mất tín hiệu xét theo lúc broker nhận)"
+       " — cờ do svc-workflow tính, không tin số của thiết bị")
+
+    other = Session("vanthukt").gql(OT_MAP)["otSensorMap"]
+    if set(want) & {s["id"] for s in other["sensors"]} or server in {s["id"] for s in other["sensors"]}:
+        raise DemoFailed(f"văn thư Khoa Kinh tế thấy cảm biến của Khoa CNTT: {other['sensors']}")
+    try:
+        Session("quantri").gql(OT_MAP)
+    except RuntimeError as exc:
+        refused = str(exc)
+    else:
+        raise DemoFailed("quản trị đơn vị gọi được otSensorMap: Action phải chỉ cho các vai trò đọc được văn bản")
+    ok(f"văn thư Khoa Kinh tế chỉ thấy cảm biến của đơn vị mình ({len(other['sensors'])}); quản trị đơn vị không có"
+       f" Action này ({refused[:80]}) — trình duyệt không gọi thẳng broker, đọc qua APISIX → Hasura → svc-workflow")
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/cam-bien")
 
 
 DISPATCH_UNITS = "{ office_dispatch_units(order_by: {name: asc}) { id code name } }"

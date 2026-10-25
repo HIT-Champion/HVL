@@ -57,6 +57,10 @@ upstreams:
     type: roundrobin
     # mặc định 60 giây; completeTask (phát hành) được Hasura chờ tới 90 giây (db/metadata/actions.yaml)
     timeout: {connect: 6, send: 100, read: 100}
+    # Hasura (Warp) quét kết nối mỗi 30 giây, đóng kết nối rảnh sau 30–60 giây; APISIX mặc định giữ 60 giây nên yêu
+    # cầu gửi đúng lúc Hasura đóng bị 502 ("upstream prematurely closed connection"). Giữ 25 giây (< 30) để chỉ APISIX
+    # đóng kết nối rảnh; size, requests là mặc định của APISIX
+    keepalive_pool: {size: 320, idle_timeout: 25, requests: 1000}
     nodes:
       "hasura:8080": 1
   - id: svc-files
@@ -219,6 +223,19 @@ global_rules:
                 ctl:ruleRemoveTargetById=942100;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=930120;ARGS:id_token_hint"
+              # Loại trừ 1b — bước đổi mã lấy token (#162): ứng dụng gửi lại mã code Keycloak vừa trả (cùng
+              # giá trị loại trừ 2 gỡ ở trang ứng dụng) và code_verifier của PKCE. Verifier base64url theo
+              # RFC 7636 (kịch bản demo, thư viện OIDC khác) tình cờ trùng libinjection: "71--7iZ…" → 942100,
+              # 403. Chỉ trên đúng endpoint token, đúng ba luật bắt nhầm token như loại trừ 1
+              - >-
+                SecRule REQUEST_FILENAME "@streq /realms/${{MOC_REALM}}/protocol/openid-connect/token" "id:10011,
+                phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_verifier"
               # Loại trừ 2 — trang Keycloak trả về sau đăng nhập: tham số iss (RFC 9207) là URL của realm; URL công khai
               # là localhost hay IP thì 934110 (SSRF), 931100 (RFI) bắt nhầm. Áp cho mọi redirect URI của ứng dụng: `/`,
               # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`. Mã code, session_state

@@ -21,10 +21,15 @@ Chạy trong mạng iot của Signet (dịch vụ ``ot-sensor``, profile iot), c
     docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT --responsible chuyenviendt \\
         --name "Phòng máy chủ tầng 3" --readings 24,29,33,37,41
 
-Thực thể ``urn:ngsi-ld:TemperatureSensor:<mã>`` được tạo nếu chưa có (tên phòng, người phụ trách), rồi mỗi lần đo
-cập nhật ``temperature`` (°C, ``observedAt`` = giờ gửi). Broker tự ghi lịch sử từng lần đo và báo svc-workflow khi
-vượt ngưỡng. Mỗi lần đo in một dòng JSON. Gửi JSON thường không kèm ``@context`` như thiết bị đơn giản: broker hiểu
-theo ngữ cảnh lõi NGSI-LD.
+Thực thể ``urn:ngsi-ld:TemperatureSensor:<mã>`` được tạo nếu chưa có (tên phòng, người phụ trách, mã phòng trên sơ
+đồ kho nếu có ``--room``), rồi mỗi lần đo cập nhật ``temperature`` (°C, ``observedAt`` = giờ gửi). Broker tự ghi lịch
+sử từng lần đo và báo svc-workflow khi vượt ngưỡng. Mỗi lần đo in một dòng JSON. Gửi JSON thường không kèm
+``@context`` như thiết bị đơn giản: broker hiểu theo ngữ cảnh lõi NGSI-LD.
+
+Giả lỗi dữ liệu để thấy cờ chất lượng trên trang Sơ đồ cảm biến: ``--late 30`` lùi ``observedAt`` 30 phút (thiết bị
+mất tín hiệu từ nửa giờ trước), ``--frozen-clock`` cho mọi lần đo cùng ``observedAt`` của lần đầu (đồng hồ thiết bị
+đứng), ``--clock-ahead 30`` đẩy ``observedAt`` tới trước 30 phút (đồng hồ thiết bị chạy nhanh), số đo ngoài dải như
+``--readings 22,-127`` (-127 °C: mã "mất kết nối" của thư viện DallasTemperature).
 """
 
 from __future__ import annotations
@@ -32,11 +37,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 def call(base: str, method: str, path: str, tenant: str, body: dict | None = None) -> int:
     data = json.dumps(body).encode() if body is not None else None
@@ -61,7 +67,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--responsible", required=True, help="tên đăng nhập của chuyên viên phụ trách")
     p.add_argument("--readings", required=True, help="các lần đo, °C, cách nhau bằng dấu phẩy: 24,29,33,37,41")
     p.add_argument("--interval", type=float, default=2.0, help="giây giữa hai lần đo")
+    p.add_argument("--room", help="mã phòng trên sơ đồ kho (trang Sơ đồ cảm biến), vd kho-1, may-chu")
+    p.add_argument("--late", type=float, default=0.0, help="lùi observedAt chừng ấy phút: giả thiết bị mất tín hiệu")
+    p.add_argument("--frozen-clock", action="store_true",
+                   help="mọi lần đo mang observedAt của lần đầu: giả đồng hồ thiết bị đứng")
+    p.add_argument("--clock-ahead", type=float, default=0.0,
+                   help="đẩy observedAt tới trước chừng ấy phút: giả đồng hồ thiết bị chạy nhanh")
     args = p.parse_args(argv)
+    if args.room is not None and not re.fullmatch(r"[a-z0-9-]{1,40}", args.room):
+        p.error("--room: 1–40 ký tự a-z, 0-9, dấu gạch ngang")
     base = os.environ.get("MOC_NGSI_URL", "http://scorpio:9090").rstrip("/") + "/ngsi-ld/v1"
     entity_id = f"urn:ngsi-ld:TemperatureSensor:{args.sensor}"
     try:
@@ -69,19 +83,23 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError:
         p.error("--readings: các số cách nhau bằng dấu phẩy")
 
-    entity = {"id": entity_id, "type": "TemperatureSensor", "name": prop(args.name),
-              "responsible": prop(args.responsible)}
-    status = call(base, "POST", "/entities", args.tenant, entity)
-    if status == 409:  # đã có: cập nhật tên phòng, người phụ trách
-        status = call(base, "PATCH", f"/entities/{entity_id}/attrs", args.tenant,
-                      {"name": prop(args.name), "responsible": prop(args.responsible)})
+    about = {"name": prop(args.name), "responsible": prop(args.responsible)}
+    if args.room is not None:
+        about["room"] = prop(args.room)
+    status = call(base, "POST", "/entities", args.tenant, {"id": entity_id, "type": "TemperatureSensor", **about})
+    if status == 409:  # đã có: cập nhật tên phòng, người phụ trách, mã phòng
+        status = call(base, "PATCH", f"/entities/{entity_id}/attrs", args.tenant, about)
     if status not in (201, 204):
         print(json.dumps({"error": f"broker trả HTTP {status} khi tạo cảm biến"}, ensure_ascii=False))
         return 1
+    first = ""
     for i, value in enumerate(readings):
         if i:
             time.sleep(args.interval)
-        at = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+        shift = timedelta(minutes=args.clock_ahead - args.late)
+        at = (datetime.now(UTC) + shift).isoformat(timespec="seconds").replace("+00:00", "Z")
+        if args.frozen_clock:
+            at = first = first or at
         status = call(base, "PATCH", f"/entities/{entity_id}/attrs", args.tenant,
                       {"temperature": prop(value, unitCode="CEL", observedAt=at)})
         print(json.dumps({"sensor": entity_id, "temperature": value, "observedAt": at, "status": status}), flush=True)

@@ -358,7 +358,9 @@ liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
   đoạn. Mọi tác vụ Meilisearch của một lượt phải xong thì con trỏ mới tiến; một tác vụ lỗi thì lượt sau đọc lại.
 - **Tìm theo nghĩa** (tùy chọn): embedder `userProvided` đặt tên theo mô hình (`emb_qwen3_embedding_0_6b`); svc-files
   tự gọi Ollama `/api/embed` theo lô `MOC_AI_EMBED_BATCH` đoạn ở vòng nền, và không mở lô mới trong lúc một lượt hỏi
-  đang gọi Ollama (nhúng câu hỏi, viết câu trả lời). Meilisearch không vào mạng `ai`. Chưa có véc-tơ thì đoạn vẫn tìm được bằng từ khóa; không có mô hình (CI) thì
+  đang gọi Ollama (nhúng câu hỏi, viết câu trả lời), lời gọi lâu bao nhiêu cũng vậy, và 5 giây sau mỗi lời gọi. Phần 5
+  giây sau đó nối liền quá 30 giây (người hỏi liên tục) thì vòng nền vẫn nhúng một lô lúc không có lời gọi nào rồi lại
+  nhường. Meilisearch không vào mạng `ai`. Chưa có véc-tơ thì đoạn vẫn tìm được bằng từ khóa; không có mô hình (CI) thì
   chỉ tìm từ khóa. Đổi `MOC_AI_EMBED_MODEL` là bỏ embedder cũ và nhúng lại từ đầu. Câu hỏi đưa đi nhúng mang tiền tố
   chỉ dẫn mà Qwen3-Embedding cần (`Instruct: …\nQuery: …`); đoạn văn bản thì không.
 - **Khi nhúng lỗi.** Cấu hình tìm từ khóa và cấu hình embedder áp thành hai tác vụ: embedder bị Meilisearch từ chối thì

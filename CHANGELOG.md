@@ -55,6 +55,76 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   ghi kèm câu giáo trình ở `docs/tu-chan-doan.md` §3. Cảnh báo "rác vào, rác ra" khi `[I]` vượt `[D]` từ 1 mức hoặc
   hình dạng là Ảo giác công nghệ: khuyên tạm dừng mở rộng `[I]`, dẫn tới cờ kiểm chất lượng số liệu ở Phả hệ số liệu.
   Chỉ để định hướng, không phải điểm DTI. Test office +3, e2e thêm bước trong `tu-chan-doan.spec.ts`.
+- Cờ chất lượng dữ liệu trên trang Điều hành và Phả hệ số liệu (F3.9, F3.11): khung nhìn `office.report_checks`
+  (migration 1792281603300) tính trong CSDL lúc truy vấn 5 luật trên số của trang Điều hành — tổng theo trạng thái
+  khớp số văn bản đến trong bảng, tổng theo phòng khớp số đang xử lý (văn bản chưa rõ phòng chủ trì là cảnh báo),
+  thời gian xử lý tính đủ văn bản đã xong, khóa ghép số không trùng không rỗng, không khung nhìn `office.v_*` nào xuất
+  (trượt) hay đọc (cảnh báo) cột thông tin cá nhân theo catalog, kể cả qua view lồng — mỗi luật Đạt / Cảnh báo /
+  Trượt kèm số liệu; chỉ lãnh đạo đơn vị đọc, đúng đơn vị mình. Cờ đặt cạnh nút "Nguồn số liệu" của từng biểu đồ
+  (truy vấn riêng, hỏi sau khi biểu đồ đã có số nên không làm chậm biểu đồ). Trang Phả hệ thêm mục Kiểm chất lượng
+  số liệu, cờ từng khung nhìn, cờ của lượt nộp lưu và từng bước theo đúng assertion svc-files đã ghi (không tính
+  lại); lượt bị dừng vì trượt kiểm hiện cờ Trượt kèm mục trượt. Test db +7, office +8; smoke thêm 2 kiểm.
+- Sơ đồ cảm biến kho (F3.10): trang `/cam-bien` của Văn phòng điện tử vẽ mặt bằng kho lưu trữ bằng SVG (không tile,
+  không thư viện bản đồ, CSP giữ nguyên), mỗi phòng tô màu theo số đo mới nhất của cảm biến khai cùng mã phòng
+  (Property NGSI-LD `room`, `sensor.py --room`) so với `MOC_OT_THRESHOLD`, kèm ba cờ chất lượng dữ liệu OT tính ở
+  `svc-workflow`: mất tín hiệu (quá `MOC_OT_STALE_MIN` phút, mặc định 10, không có số đo mới), ngoài dải (không phải
+  số hoặc ngoài −55…125 °C), trùng `observedAt` (số đo mới nhất cùng giờ đo với một lần đo khác trong 10 lần gần
+  nhất). Trình duyệt không gọi broker: Hasura Action chỉ đọc `otSensorMap` cho văn thư, chuyên viên, lãnh đạo phòng,
+  lãnh đạo đơn vị (các vai trò đọc được dự thảo "Báo cáo sự cố"), `svc-workflow` chỉ hỏi tenant NGSI-LD của đơn vị
+  trong phiên; chưa bật profile `iot` thì trang báo "Chưa bật cảm biến", không lỗi 5xx. `sensor.py` thêm `--late`,
+  `--frozen-clock` để giả lỗi dữ liệu; `make demo-it-ot` thêm bước 7 kiểm cờ, cách ly đơn vị. Test svc-workflow +32,
+  office +8.
+- Kịch bản nâng cấp bản cài `scripts/nang_cap.sh` và job CI tập nâng cấp `.github/workflows/nang-cap.yml` (#182).
+  `nang` dựng image bản mới, kéo image dựng sẵn máy chưa có khi trang còn chạy, sao lưu bằng bản đang chạy, cài,
+  chạy, đặt client và theme của realm rồi kiểm; `lui` cài lại bản cũ và khôi phục đúng lượt sao lưu đó; `ket` nâng két
+  cũ (khóa `moc-anchor`, PKI, policy), lỗi giữa chừng thì gỡ listener tạm, hủy lượt tạo token dở, token root còn nằm
+  lại thì in lệnh thu hồi; `kiem` chạy hết các mục rồi báo mục trượt: dữ liệu không ít đi, dòng sổ cuối còn nguyên
+  băm, dịch vụ khỏe, phiên bản trên `/api/status`, realm, `audit verify`, smoke (thử lại một lần, chỉ khi trượt ở bước
+  hỏi đáp). Job cài thẻ phát hành trước, nạp mẫu, tạo văn bản hạn chế, nâng lên commit của PR, nâng két, lùi về; sau
+  mỗi bước tệp hạn chế tạo từ bản cũ phải mở lại được. Job chạy trên PR vào `main` và PR đổi migration, két, realm,
+  compose, cài đặt hay sao lưu; không bắt buộc. `docs/trien-khai.md` (Nâng cấp tay) và `docs/van-hanh.md` (két cũ)
+  dùng kịch bản thay cho các lệnh tay. Test scripts +18.
+
+### Đã sửa lỗi
+- Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
+  Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura
+  đóng thì APISIX nhận EOF hoặc RST và trả 502. Upstream `hasura` nay đặt `keepalive_pool` với `idle_timeout: 25`,
+  chỉ APISIX đóng kết nối rảnh. Dựng lại với Hasura v2.51.0 và APISIX 3.18.0 như repo, gửi yêu cầu lệch −4…+4 ms
+  quanh nhịp quét: trước 21/960 yêu cầu bị 502, sau 0/960. Test `test_giu_ket_noi.py` kiểm quy tắc này cho Hasura
+  và `svc-files`.
+- Cổng không còn chặn nhầm bước đổi mã lấy token khi bật WAF (#162): `code_verifier` base64url của PKCE (RFC 7636, như
+  kịch bản demo hay thư viện OIDC khác) khoảng 1/25 000 lượt trùng mẫu libinjection (`71--7iZ…` → CRS 942100, 403); mã
+  `code` gửi kèm là token ngẫu nhiên như ở trang ứng dụng. oidc-client-ts của Văn phòng điện tử, P.A.R.A, Bảng tin sinh
+  verifier hex nên không dính verifier. Luật mới 10011 của `platform/apisix/apisix.yaml`, chỉ trên endpoint token, gỡ
+  đúng ba luật 942100, 933…, 930120 trên hai tham số này như các token khác. Test scripts thêm kiểm luật 10011, smoke
+  thêm ca đổi mã với đúng chuỗi đã bị chặn.
+- Bản cài (`make install`) thiếu `scripts/nap_lo_mau.py` mà `scripts/demo.py` import ở đầu tệp, nên mọi lệnh `demo.py`
+  ở `/opt/moc` dừng với `ModuleNotFoundError` (#174; thấy khi nâng bản online lên 1.1.0). Thêm tệp vào `RUNTIME` của
+  `scripts/install.sh`; test mới kiểm mọi script Python được cài có đủ module cục bộ nó import, kể cả import trong hàm.
+- `make install` trên máy chưa từng chạy `make up` dừng ở bước kiểm cuối "thiếu image moc/apisix:dev" (#186):
+  Makefile truyền `MOC_VERSION` rỗng, compose ưu tiên biến môi trường đã đặt (kể cả rỗng) hơn `.env` của bản cài
+  nên bước kiểm tìm thẻ `dev` thay vì thẻ vừa dựng. Bước kiểm nay đặt đúng phiên bản như lúc dựng. Test scripts +3
+  (`install.sh` thật với `docker` giả theo thứ tự ưu tiên của compose).
+- Trợ lý hỏi đáp không còn để văn bản mới chờ véc-tơ mãi khi có người hỏi liên tục (#184; smoke F4.2 trượt trên bản
+  online 1.1.0). Mỗi lượt hỏi giữ vòng nhúng nền 5 giây; người hỏi lại dày hơn thế (smoke hỏi lại mỗi khoảng 3 giây)
+  thì đoạn mới không được nhúng, không tìm được theo nghĩa, dù Ollama nhúng 4 đoạn chỉ mất 5 giây. Nay chuỗi giữ liền
+  quá 30 giây (`MAX_HOLD_S`) thì vòng nền vẫn nhúng một lô rồi lại nhường. Test svc-files thêm ca hỏi lại mỗi 3 giây.
+- Hoàn thành việc không còn lỗi "Đã lưu, nhưng chưa chuyển được bước tiếp" khi worker gợi ý giao việc cùng lúc hoàn
+  thành việc ngoài trên cùng phiên quy trình (#189; thấy trong CI, `make demo-giao-viec`): Flowable khóa lạc quan,
+  hủy một giao dịch và trả 500 kèm `FlowableOptimisticLockingException`. `svc-workflow` nay gọi lại tối đa 2 lần
+  (sau 0,2 và 0,5 giây) cho hoàn thành việc và việc ngoài, chỉ với đúng lỗi này. Test svc-workflow +7.
+- Sơ đồ cảm biến (`/cam-bien`) không còn bỏ sót cảm biến mất tín hiệu có đồng hồ chạy nhanh (#191): cờ mất tín hiệu
+  xét theo `observedAt` của số đo mới nhất, thiết bị gửi giờ ở tương lai thì số đo cuối luôn có vẻ vừa đo, kể cả khi
+  đã mất tín hiệu thật. Thêm cờ thứ tư `future_time` ("Giờ đo ở tương lai"): `observedAt` muộn hơn giờ máy chủ quá 2
+  phút; khi đó mất tín hiệu xét theo lúc broker nhận số đo (`modifiedAt`). Cờ là một chuỗi nữa trong `flags`, kiểu
+  GraphQL không đổi; phòng chỉ có cờ này vẫn tô theo số đo. `sensor.py` thêm `--clock-ahead` để giả đồng hồ nhanh,
+  bước 7 của `make demo-it-ot` thêm cảm biến phòng xử lý tài liệu. Test svc-workflow +2, office +1.
+- Trợ lý hỏi đáp không còn để lô nhúng nền chen vào lúc mô hình đang trả lời (#192). Trần 30 giây của #184 áp cả cho
+  một câu hỏi mà Ollama viết câu trả lời lâu hơn 30 giây, vì lượt hỏi gia hạn giữ mỗi 2,5 giây và vòng nền không phân
+  biệt gia hạn với câu hỏi mới: trên máy chỉ có CPU, một lô (tới 8 đoạn, khoảng 5 giây) làm câu trả lời chậm thêm. Nay
+  lời gọi mô hình đang chạy (nhúng câu hỏi, viết câu trả lời, nhúng trích yếu cho tác tử gợi ý) giữ vòng nền suốt lời
+  gọi, không có trần; trần 30 giây chỉ còn áp cho 5 giây giữ thêm sau mỗi lời gọi của lượt hỏi. Test svc-files thêm
+  ca lời gọi dài quá 30 giây và ca lượt bị hủy giữa lời gọi.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
