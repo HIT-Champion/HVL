@@ -18,14 +18,35 @@
 // scripts/forms.mjs). Lỗi quy về {trường: mã} giống hệt svc-workflow (lớp 2, schemas.py), nên hai bên chạy chung
 // bộ ca thử schemas/*.cases.json (tests/forms.test.ts). Tệp này không dùng gì của Nuxt để Node chạy test được.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Một trường sai nhiều điều thì báo điều đứng trước — cùng thứ tự với svc-workflow
-const PRIORITY = ['type', 'required', 'additionalProperties', 'enum', 'format', 'pattern', 'minLength', 'maxLength', 'not', 'x-moc-nfc', 'uniqueItems', 'maxItems', 'x-moc-date'];
+const PRIORITY = ['type', 'required', 'additionalProperties', 'enum', 'format', 'pattern', 'minLength', 'maxLength',
+'not', 'x-moc-nfc', 'uniqueItems', 'maxItems', 'x-moc-date'];
+
 function fieldOf(e) {
   if (e.keyword === 'required') return String(e.params.missingProperty);
   if (e.keyword === 'additionalProperties') return String(e.params.additionalProperty);
   const top = e.instancePath.split('/')[1];
   return top === undefined ? '' : top.replaceAll('~1', '/').replaceAll('~0', '~');
 }
+
 function rank(code) {
   const i = PRIORITY.indexOf(code);
   return i < 0 ? PRIORITY.length : i;
@@ -38,8 +59,13 @@ function rank(code) {
  */
 export function formErrors(validate, schema, data, today) {
   // Map chứ không phải {}: tên trường do người gửi đặt, có thể là "constructor", "toString"…
+  // Một trường sai nhiều điều thì giữ ngay lúc gom điều đứng trước trong PRIORITY, cùng hạng thì điều gặp trước — như
+  // min(codes, key=rank) của svc-workflow; không cần mảng mã rồi reduce() (mảng rỗng thì reduce() ném lỗi)
   const found = new Map();
-  const add = (name, code) => found.set(name, [...(found.get(name) ?? []), code]);
+  const add = (name, code) => {
+    const kept = found.get(name);
+    if (kept === undefined || rank(code) < rank(kept)) found.set(name, code);
+  };
   if (!validate(data)) {
     for (const e of validate.errors ?? []) add(fieldOf(e), e.keyword);
   }
@@ -55,17 +81,13 @@ export function formErrors(validate, schema, data, today) {
       const value = data[name];
       if (!rule || found.has(name) || typeof value !== 'string') continue;
       if (rule === 'not-after-today' && value > today || rule === 'not-before-today' && value < today) {
-        found.set(name, ['x-moc-date']);
+        found.set(name, 'x-moc-date');
       }
     }
   }
   const errors = {};
-  for (const [name, codes] of found) {
-    Object.defineProperty(errors, name, {
-      value: codes.reduce((best, c) => rank(c) < rank(best) ? c : best),
-      enumerable: true,
-      writable: true
-    });
+  for (const [name, code] of found) {
+    Object.defineProperty(errors, name, { value: code, enumerable: true, writable: true });
   }
   return errors;
 }
