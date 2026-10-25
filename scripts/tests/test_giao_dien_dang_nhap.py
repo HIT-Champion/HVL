@@ -15,9 +15,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Theme đăng nhập Signet (platform/keycloak/themes/signet) và lệnh `moc realm theme`: realm dùng đúng thư mục theme,
-theme chỉ có CSS, ảnh, properties (không viết lại template FreeMarker của keycloak.v2), CSS không tải gì từ ngoài, logo
-trùng logo của Văn phòng điện tử, compose gắn thư mục chỉ đọc; lệnh chỉ đặt theme khi realm còn dùng mặc định. Keycloak
-giả, không cần Docker, không đọc .env. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
+theme chỉ có CSS, ảnh, phông kèm giấy phép, properties (không viết lại template FreeMarker của keycloak.v2), CSS không
+tải gì từ ngoài, logo và phông trùng của Văn phòng điện tử, compose gắn thư mục chỉ đọc; lệnh chỉ đặt theme khi realm
+còn dùng mặc định. Keycloak giả, không cần Docker, không đọc .env.
+Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
@@ -117,13 +118,26 @@ class ThemeFilesTest(unittest.TestCase):
         for rel in styles[1:] + props["favicons"].split():
             self.assertTrue((LOGIN / "resources" / rel).is_file(), rel)
 
-    def test_only_css_images_and_properties(self) -> None:
-        # không .ftl (template), không .js: chỉ đổi giao diện, luồng đăng nhập và mã của Keycloak giữ nguyên
+    def test_only_css_images_fonts_and_properties(self) -> None:
+        # không .ftl (template), không .js: chỉ đổi giao diện, luồng đăng nhập và mã của Keycloak giữ nguyên. Phông .ttf
+        # đi kèm OFL.txt (giấy phép SIL OFL-1.1 buộc phát hành phông cùng giấy phép)
         files = [p for p in THEME.rglob("*") if p.is_file()]
         self.assertTrue(files)
         for path in files:
-            self.assertIn(path.suffix, {".css", ".svg", ".png", ".properties"}, path)
+            if path.suffix == ".txt":
+                self.assertEqual(path.name, "OFL.txt", path)
+            else:
+                self.assertIn(path.suffix, {".css", ".svg", ".png", ".ttf", ".properties"}, path)
         self.assertEqual({p.name for p in THEME.iterdir()}, {"login"})   # chỉ theme đăng nhập
+
+    def test_fonts_are_the_office_fonts_with_licence(self) -> None:
+        office = ROOT / "apps" / "office" / "public" / "fonts"
+        fonts = sorted(LOGIN.rglob("*.ttf"))
+        self.assertTrue(fonts)
+        for font in fonts:
+            self.assertTrue((font.parent / "OFL.txt").is_file(), font)
+            same = office / font.relative_to(LOGIN / "resources" / "fonts")
+            self.assertEqual(font.read_bytes(), same.read_bytes(), font)
 
     def test_css_loads_nothing_from_outside(self) -> None:
         for css in LOGIN.rglob("*.css"):
