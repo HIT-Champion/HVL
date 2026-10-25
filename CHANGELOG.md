@@ -175,6 +175,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Thẻ `<html lang>` không còn về `vi` khi tải lại trang lúc đang dùng tiếng Anh (#205): chữ vẫn tiếng Anh nhưng trình
   đọc màn hình đọc bằng giọng tiếng Việt. Plugin i18n đặt `lang` theo ngôn ngữ đang dùng qua `useHead`, đè lên giá trị
   ghi cứng trong `nuxt.config.ts`; e2e `tieng-anh.spec.ts` kiểm thêm `lang` sau khi tải lại ở cả hai test.
+- Viền focus của mục menu trên thanh bên bị cắt khi dùng Tab (#216): `.sg-nav` cắt phần tràn mà viền vẽ lùi ra ngoài
+  3px, nên mục menu mất cạnh trái, phải, mục đầu mất cả cạnh trên. Nay viền vẽ vào trong mục. e2e `giao-dien.spec.ts`
+  thêm một test ở khung 390×844: không cuộn ngang ở hộp việc, văn bản đến, soạn thảo; mở ngăn kéo bằng Enter, Tab đi
+  hết các mục theo thứ tự nhìn thấy với viền focus đủ rồi vòng về mục đầu, Shift+Tab đi ngược; đóng bằng nút và lớp
+  phủ thì focus về nút menu. e2e +1.
 
 ### Bảo mật
 - Tải lên kiểm nội dung, không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô nạp): sau
