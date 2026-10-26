@@ -47,7 +47,7 @@ sử dụng"*).
 | Docker Compose v2 | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | Caddy | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | Python | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
-| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin` và phông của theme đăng nhập (chỉ ở bước dựng image); image `moc/keycloak-fonts` (#305) dựng trên image này, chạy một lần mỗi lần `up` để chép phông vào volume (chỉ `sh` và lệnh chép, không chạy Node); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests` | `node:24.20.0-slim` |
+| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep` và phông của theme đăng nhập (chỉ ở bước dựng image); image `moc/keycloak-fonts` (#305) dựng trên image này, chạy một lần mỗi lần `up` để chép phông vào volume (chỉ `sh` và lệnh chép, không chạy Node); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests`, `apps/nghi-phep/tests` | `node:24.20.0-slim` |
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | axe-core, @axe-core/playwright | 4.13.0 | MPL-2.0 | Kiểm trợ năng tự động theo WCAG 2.0, 2.1 mức A, AA trong e2e (`tests/e2e/tro-nang.spec.ts`, #246); chỉ dùng trong test, dùng nguyên bản, không vào gói phát hành | npm, `tests/e2e/package-lock.json` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
@@ -97,7 +97,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 |---|---|---|---|---|---|
 | Nuxt | 4.5.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | Vue | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
-| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
+| oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
@@ -138,7 +138,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | httpx2 (+ httpcore2, truststore) | 2.13 | BSD-3-Clause (truststore: MIT) | Gọi Hasura, Flowable, Keycloak, Meilisearch | pip | 1 |
 | python-multipart | 0.0.32 | Apache-2.0 | Đọc tệp tải lên (`svc-files`) | pip | 1 |
 | boto3 | 1.43 | Apache-2.0 | Gọi SeaweedFS qua giao thức S3 (`svc-files`) | pip | 1 |
-| PyJWT (+ cryptography) | 2.15 · 50.0 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files`; mã hóa con trỏ trang tìm kiếm | pip | 1 |
+| PyJWT (+ cryptography) | 2.15 · 50.0 | MIT (cryptography: Apache-2.0 / BSD) | Kiểm JWT Keycloak trong `svc-files` và ở API quy trình cho ứng dụng của `svc-workflow` (`/api/workflow`); mã hóa con trỏ trang tìm kiếm | pip | 1 |
 | WeasyPrint (+ pydyf, tinycss2, cssselect2, tinyhtml5, webencodings) | 70.0 | BSD-3-Clause (tinyhtml5: MIT) | Dựng PDF văn bản đi đúng thể thức NĐ 30 từ khuôn HTML (`svc-files`) | pip | 2 |
 | fontTools (+ Brotli, zopfli) | 4.66 | MIT (zopfli: Apache-2.0) | Nhúng và nén phông vào PDF (WeasyPrint kéo theo) | pip | 2 |
 | Pillow | 13.0 | MIT-CMU (HPND) | Xử lý ảnh khi dựng PDF (WeasyPrint kéo theo). Từ F4.1 khai trực tiếp: chuẩn bị ảnh chụp, ảnh trang scan trước khi nhận dạng chữ (xoay theo EXIF, đổi xám, tăng tương phản, có trần điểm ảnh), chạy trong tiến trình con có giới hạn | pip | 2 |
@@ -189,9 +189,9 @@ viện thì gỡ khỏi image, cùng các bản sao thư viện nó mang theo (`
 bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ensurepip/_bundled` của image nền (cùng các bản sao đó, nằm
 trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 
-Phần máy chủ của Bảng tin (`apps/bang-tin`) dựng từ cùng image `python:3.13.16-slim`, chỉ thư viện chuẩn, không
-cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ thư viện chuẩn (`scripts/yaml_nho.py`): không
-thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
+Phần máy chủ của Bảng tin (`apps/bang-tin`) và máy chủ trang của Đơn nghỉ phép (`apps/nghi-phep`) dựng từ cùng image
+`python:3.13.16-slim`, chỉ thư viện chuẩn, không cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ
+thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
 
 ## Vận hành và bốn nguyên lý thiết kế
 

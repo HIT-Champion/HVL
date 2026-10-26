@@ -42,6 +42,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from . import __version__, pii
+from .apps.api import AppWorkflow
 from .channels import Router
 from .config import Settings
 from .directory import Directory
@@ -99,6 +100,8 @@ def create_app(
     office = (Office.build(settings, hasura, flowable, notifier, files=files, ot=ot)
               if settings.office_enabled else None)
     parts: list[Part] = [office] if office is not None else []
+    # quy trình của ứng dụng cắm bằng manifest (#301, /api/workflow qua APISIX): luôn bật, không theo cờ Văn phòng
+    parts.append(AppWorkflow.build(settings, flowable))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -131,8 +134,9 @@ def create_app(
     app = FastAPI(
         title="Signet svc-workflow",
         version=__version__,
-        description="Hasura Actions của Văn phòng điện tử. API nội bộ: chỉ Hasura gọi, không qua cổng APISIX; "
-                    "ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
+        description="Hasura Actions của Văn phòng điện tử: API nội bộ, chỉ Hasura gọi, không qua cổng APISIX; ứng "
+                    "dụng gọi các Action này bằng GraphQL. Riêng /api/workflow/{app}/… (quy trình của ứng dụng cắm "
+                    "bằng manifest) đi qua cổng, cần token của client app-<tên> (docs/api/README.md).",
         lifespan=lifespan,
     )
 

@@ -72,6 +72,9 @@ if TYPE_CHECKING:
 
 PROCESS_IN = "van-ban-den"
 PROCESS_OUT = "van-ban-di"
+# Quy trình của Văn phòng: hộp việc /viec và completeTask chỉ nhận việc của hai quy trình này — việc của ứng dụng cắm
+# bằng manifest (apps/, khóa <tên app>.<tên>) chạy cùng Flowable nhưng đi qua /api/workflow, không lọt vào đây
+OFFICE_PROCESSES = (PROCESS_IN, PROCESS_OUT)
 BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 URGENCY_RANK = {"hoa_toc": 3, "thuong_khan": 2, "khan": 1, "normal": 0}
 SYSTEM_ACTOR = "svc-workflow"
@@ -639,7 +642,8 @@ class Workflow:
             tasks = await self.flowable.tasks_for(actor.user_id, actor.groups)
         except FlowableError as exc:
             raise WorkflowError("workflow_unavailable", "Chưa lấy được hộp việc, thử lại sau", 503) from exc
-        mine = [t for t in tasks if t.variables.get("tenantId") == str(actor.tenant_id)]
+        mine = [t for t in tasks
+                if t.process_key in OFFICE_PROCESSES and t.variables.get("tenantId") == str(actor.tenant_id)]
         mine.sort(key=lambda t: t.created_at)
         mine.sort(key=lambda t: URGENCY_RANK.get(t.variables.get("urgency") or "normal", 0), reverse=True)
         return [
@@ -667,7 +671,8 @@ class Workflow:
             task = await self.flowable.task(task_id)
         except FlowableError as exc:
             raise WorkflowError("workflow_unavailable", "Chưa gọi được động cơ quy trình, thử lại sau", 503) from exc
-        if task is None or task.variables.get("tenantId") != str(actor.tenant_id):
+        if (task is None or task.process_key not in OFFICE_PROCESSES
+                or task.variables.get("tenantId") != str(actor.tenant_id)):
             raise WorkflowError("task_not_found", "Việc không còn — có thể đã có người xử lý", 404)
         await self._check_owner(actor, task)
         await self._check_visible(actor, task.variables.get("documentId") or "")

@@ -25,7 +25,7 @@ import httpx2
 import pytest
 
 from svc_workflow import flowable
-from svc_workflow.flowable import FlowableClient, FlowableError
+from svc_workflow.flowable import FlowableClient, FlowableError, Task
 
 BASE = "http://flowable:8080/flowable-rest/service"
 # body lỗi 500 của BaseExceptionHandlerAdvice khi gặp FlowableOptimisticLockingException (run 40197127090 của CI)
@@ -97,3 +97,13 @@ def test_retries_stop_after_the_last_delay():
 def test_other_errors_are_not_retried(status, body):
     got, seen = calls([(status, body), (204, None)], lambda c: c.complete("t-1", {}))
     assert isinstance(got, FlowableError) and got.status == status and not got.concurrent and len(seen) == 1
+
+
+def test_task_process_key_is_empty_when_flowable_dropped_the_key():
+    def task(definition_id: str) -> Task:
+        return Task("t-1", "Duyệt", "nghi-phep.duyet", None, "p-1", "2026-10-26T00:00:00Z",
+                    process_definition_id=definition_id)
+    assert task("nghi-phep.don:3:8a0c6a52-0000-4000-8000-000000000001").process_key == "nghi-phep.don"
+    # id quá 64 ký tự: Flowable chỉ để uuid — không đoán khóa, không khớp quy trình nào
+    assert task("8a0c6a52-0000-4000-8000-000000000001").process_key == ""
+    assert task("").process_key == ""

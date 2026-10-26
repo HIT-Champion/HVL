@@ -47,7 +47,7 @@ ROLES = {
 }
 SERVICES = {
     "svc-files": "qua cổng APISIX ở /api/files, /api/search",
-    "svc-workflow": "nội bộ, không qua cổng: Hasura gọi để chạy Actions, context broker NGSI-LD gọi /ot/notify",
+    "svc-workflow": "Hasura gọi chạy Actions, context broker NGSI-LD gọi /ot/notify (nội bộ); /api/workflow qua cổng",
 }
 BUILTIN_SCALARS = {"String", "Int", "Float", "Boolean", "ID"}
 

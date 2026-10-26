@@ -44,7 +44,8 @@ sổ, phát hành, dựng PDF văn bản đi) còn nằm chung trong `svc-workfl
 
 **Bằng chứng:** README mục "Kiến trúc"; [`docs/api/README.md`](../api/README.md) (§1 "Muốn thêm một ứng dụng Tầng 2");
 [`docs/them-ung-dung.md`](../them-ung-dung.md) (§1 `moc app install`, mẫu `apps/bang-tin`; §3–§4 làm tay, mẫu
-`apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`;
+`apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`, `make demo-quy-trinh` (ứng dụng mang quy trình
+riêng, `apps/nghi-phep`);
 [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `platform/apisix/apisix.yaml`; `make smoke` (chặn đường quản
 trị); CI job `chay-thu`, phần `luong-chinh`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)".
 

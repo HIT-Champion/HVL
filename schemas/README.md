@@ -77,7 +77,8 @@ bộ test chạy cùng các ca đó:
 Ứng dụng cài thêm khai form bằng một tệp JSON Schema trong gói của mình (`apps/<ứng dụng>/forms/*.json`), không
 viết mã giao diện. Trang gọi `mountForm()` của `apps/nghi-phep/public/schema-form.js` (JS thuần, không thư viện):
 module dựng ô, nhãn, gợi ý, câu báo lỗi tiếng Việt/tiếng Anh, kiểm bằng đúng tệp đó trước khi gửi. svc-workflow kiểm
-lại khi nhận qua API của ứng dụng; phần này đến cùng #301. Bộ kiểm của module đi từng từ khóa vì CSP không cho
+lại khi nhận qua API của ứng dụng (`/api/workflow/…`, #301; luật form lúc cài: `docs/them-ung-dung.md` mục 1.10).
+Bộ kiểm của module đi từng từ khóa vì CSP không cho
 `unsafe-eval`; nó hiểu các từ khóa ở trên cùng `const`, `minimum`, `maximum`, `minItems`, `allOf`. Từ khóa khác, giá
 trị từ khóa sai dạng, `$ref` vòng hay gợi ý hiển thị sai (thiếu trường trong `x-moc-order`, `x-moc-range` không phải
 hai trường ngày) thì báo lỗi ngay lúc nạp.
@@ -92,7 +93,9 @@ Gợi ý hiển thị, bên kiểm bỏ qua; chữ là chuỗi hoặc `{vi, en}`
 
 Thêm một từ khóa kiểm riêng: **`x-moc-range`** ở gốc, vd `[["tuNgay", "denNgay"]]` — hai trường `format: date`,
 trường sau không được trước trường trước. Mã `x-moc-range` gắn vào trường sau, chỉ xét khi cả hai trường đã hợp lệ,
-đứng cuối thứ tự ưu tiên. Hiện chỉ trình duyệt kiểm; `FormSchema` của svc-workflow thêm cùng #301.
+đứng cuối thứ tự ưu tiên. Phía máy chủ, `svc_workflow/apps/forms.py` (`AppForm`) kiểm bằng `FormSchema` rồi mới
+xét `x-moc-range`, cùng luật đó; từ khóa không thêm vào `schemas.py` nên form của Văn phòng điện tử không đổi. Lúc
+cài, svc-workflow từ chối form có `x-moc-range` không phải cặp hai trường `format: date` khác nhau.
 
 | Tệp | Form |
 |---|---|
@@ -101,5 +104,6 @@ trường sau không được trước trường trước. Mã `x-moc-range` g�
 
 Mỗi form có tệp ca thử `*.cases.json` cùng cách viết với `van-ban-den.cases.json`.
 `apps/nghi-phep/tests/schema-form.test.js` (`make test`) chạy cả ca của `schemas/` lẫn ca của form ứng dụng: trên ca
-của `schemas/`, bộ kiểm trên trình duyệt cho đúng mã như Ajv và svc-workflow. Ca của form ứng dụng có thêm test phía
-máy chủ khi #301 cho svc-workflow đọc `apps/*/forms/*.cases.json`.
+của `schemas/`, bộ kiểm trên trình duyệt cho đúng mã như Ajv và svc-workflow. Phía máy chủ,
+`services/svc-workflow/tests/test_app_forms.py` chạy mọi ca của `apps/*/forms/*.cases.json` qua đúng bộ kiểm của API
+(`AppForm`: `FormSchema` + `x-moc-range`) và kiểm form cạnh tệp ca thử qua được luật lúc cài.

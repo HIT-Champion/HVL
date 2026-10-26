@@ -36,6 +36,7 @@ import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 import httpx2
 
@@ -74,6 +75,16 @@ class Task:
     process_instance_id: str
     created_at: str
     variables: dict[str, Any] = field(default_factory=dict)
+    # "<khóa>:<phiên bản>:<id>": khóa cho biết việc thuộc quy trình Văn phòng hay của một ứng dụng (apps/)
+    process_definition_id: str = ""
+    due_at: str | None = None
+
+    @property
+    def process_key(self) -> str:
+        """Khóa quy trình; rỗng khi id không mang khóa (Flowable bỏ khóa khi id quá 64 ký tự, xem apps/bpmn.MAX_KEY):
+        không khớp quy trình nào, việc không lộ sang ứng dụng khác."""
+        key, sep, _ = self.process_definition_id.partition(":")
+        return key if sep else ""
 
 
 def _variables(values: dict[str, Any]) -> list[dict[str, Any]]:
@@ -98,6 +109,8 @@ def _task(row: dict[str, Any]) -> Task:
         process_instance_id=row["processInstanceId"],
         created_at=row["createTime"],
         variables={v["name"]: v.get("value") for v in row.get("variables") or []},
+        process_definition_id=row.get("processDefinitionId") or "",
+        due_at=row.get("dueDate"),
     )
 
 
@@ -272,3 +285,68 @@ class FlowableClient:
         await self._request("POST", f"{self._jobs}/{job_id}/fail", json={
             "workerId": worker_id, "errorMessage": message[:255], "retryTimeout": retry_after,
         })
+
+    # --- quy trình của ứng dụng (apps/, #301) -----------------------------------------------------------
+
+    async def deployments(self, name_like: str, *, size: int = 1) -> list[dict[str, Any]]:
+        """Deployment có tên khớp mẫu LIKE, mới nhất trước."""
+        data = await self._request("GET", "/repository/deployments", params={
+            "nameLike": name_like, "sort": "deployTime", "order": "desc", "size": size,
+        })
+        return data["data"]
+
+    async def deploy_zip(self, name: str, filename: str, content: bytes) -> dict[str, Any]:
+        """Một deployment gồm mọi tệp trong zip (BPMN thành định nghĩa quy trình, tệp khác thành tài nguyên)."""
+        return await self._request("POST", "/repository/deployments", params={"deploymentName": name},
+                                   files={"file": (filename, content, "application/zip")})
+
+    async def resource(self, deployment_id: str, name: str) -> bytes | None:
+        """Nội dung một tài nguyên của deployment; None nếu không có."""
+        path = f"/repository/deployments/{quote(deployment_id, safe='')}/resourcedata/{quote(name, safe='')}"
+        try:
+            r = await self._http.get(path)
+        except httpx2.HTTPError as exc:
+            raise FlowableError(f"Không gọi được Flowable: {exc}") from exc
+        if r.status_code == 404:
+            return None
+        if r.status_code >= 400:
+            raise FlowableError(f"Flowable trả {r.status_code}: {r.text[:300]}", r.status_code)
+        return r.content
+
+    async def definitions(self, **params: Any) -> list[dict[str, Any]]:
+        """Định nghĩa quy trình theo bộ lọc của REST (key, keyLike, deploymentId, suspended…)."""
+        data = await self._request("GET", "/repository/process-definitions", params={**params, "size": 1000})
+        return data["data"]
+
+    async def definition(self, definition_id: str) -> dict[str, Any] | None:
+        try:
+            return await self._request("GET", f"/repository/process-definitions/{quote(definition_id, safe='')}")
+        except FlowableError as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    async def set_definition_state(self, definition_id: str, action: str) -> None:
+        """action: suspend | activate, kèm các phiên đang chạy của định nghĩa đó."""
+        await self._request("PUT", f"/repository/process-definitions/{quote(definition_id, safe='')}",
+                            json={"action": action, "includeProcessInstances": True})
+
+    async def start_definition(self, definition_id: str, variables: list[dict[str, Any]]) -> str:
+        """Bắt đầu đúng phiên bản định nghĩa đã chọn; biến đã ghi kiểu (REST variable)."""
+        data = await self._request("POST", "/runtime/process-instances",
+                                   json={"processDefinitionId": definition_id, "variables": variables})
+        return data["id"]
+
+    async def query_tasks(self, query: dict[str, Any]) -> list[Task]:
+        data = await self._request("POST", "/query/tasks", json={**query, "includeProcessVariables": True, "size": 500})
+        return [_task(row) for row in data["data"]]
+
+    async def historic_processes(self, query: dict[str, Any]) -> list[dict[str, Any]]:
+        data = await self._request("POST", "/query/historic-process-instances",
+                                   json={**query, "includeProcessVariables": True, "size": 500})
+        return data["data"]
+
+    async def complete_typed(self, task_id: str, variables: list[dict[str, Any]]) -> None:
+        """Như complete() nhưng biến đã ghi kiểu (REST variable): số, đúng/sai của form ứng dụng giữ nguyên kiểu."""
+        await self._post_again_if_concurrent(f"/runtime/tasks/{task_id}", {"action": "complete",
+                                                                           "variables": variables})

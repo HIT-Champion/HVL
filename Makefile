@@ -177,6 +177,7 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@cd apps/bang-tin && node --test tests/*.test.js
 	@python3 -m unittest discover -s apps/bang-tin/tests
 	@cd apps/nghi-phep && node --test tests/*.test.js
+	@python3 -m unittest discover -s apps/nghi-phep/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
@@ -254,7 +255,7 @@ demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-du
 demo-tat-van-phong: $(ENV_FILE) ## Tắt phần Văn phòng điện tử (MOC_OFFICE_ENABLED=false) trong svc-files, svc-workflow: route, Action của Văn phòng không còn; phần lõi của make smoke và make demo-ca-nhan vẫn đạt; xong thì bật lại (#302)
 	@python3 scripts/demo_tat_van_phong.py
 
-.PHONY: app-install app-list app-remove demo-cai-ung-dung
+.PHONY: app-install app-list app-remove demo-cai-ung-dung demo-quy-trinh
 
 app-install: env-ready ## Cắm ứng dụng bằng manifest, không sửa lõi: make app-install APP=apps/bang-tin/app.yaml [DRY=1]
 	@test -n "$(APP)" || { echo "Thiếu tham số: make app-install APP=apps/<thư mục>/app.yaml" >&2; exit 1; }
@@ -269,6 +270,9 @@ app-remove: env-ready ## Gỡ ứng dụng cài bằng manifest, GIỮ dữ li�
 
 demo-cai-ung-dung: $(ENV_FILE) ## Cắm Bảng tin bằng một lệnh: cài, SSO, sự kiện, cài lại, gỡ giữ dữ liệu; lõi không đổi
 	@python3 scripts/demo.py cai-ung-dung
+
+demo-quy-trinh: $(ENV_FILE) ## Quy trình ứng dụng qua lõi (Đơn nghỉ phép): BPMN độc bị từ chối, 422, duyệt theo phòng
+	@python3 scripts/demo.py quy-trinh
 
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py

@@ -8,6 +8,26 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Quy trình là dịch vụ của lõi (#301). Manifest của `moc app install` có thêm mục `workflow`: tệp BPMN và form JSON
+  Schema của ứng dụng. svc-workflow kiểm gói ngay ở bước 1, trước khi đổi gì: BPMN theo danh sách trắng (chỉ sự kiện bắt
+  đầu, kết thúc, `userTask`, cổng rẽ nhánh, luồng; không `scriptTask`, `serviceTask`, listener, biểu thức ngoài điều
+  kiện so chuỗi và nhóm ứng viên `t:${tenantId}:…`; không `DOCTYPE`, `ENTITY`; process id tối đa 22 ký tự để Flowable
+  giữ khóa trong id định nghĩa), form 2020-12 với `additionalProperties: false`, `pattern` không quay lui bùng nổ
+  (ReDoS: không lặp lồng, số bước quay lui ước lượng tối đa 10^7, cần `maxLength` khi số bước tăng theo độ dài chuỗi;
+  chuỗi dài quá `maxLength` không chạy `pattern`). Bước mới "quy trình" sau Keycloak triển khai thành một deployment
+  trên Flowable của lõi, tên theo băm nội dung: cài lại không đổi gì không thêm phiên bản. `moc app remove` tạm dừng các
+  định nghĩa quy trình đó, lịch sử đơn giữ nguyên trong Flowable. Trang của ứng dụng gọi API chung
+  `/api/workflow/<tên>/…` (route APISIX mới, chỉ nhận token của client `app-<tên>`): lấy form, bắt đầu quy trình, xem
+  đơn của mình, xem và hoàn thành việc của mình; dữ liệu sai form trả `422` từng trường, kể cả từ khóa mới
+  `x-moc-range`; đơn vị, phòng, người gửi lấy từ token. Hộp việc Văn phòng điện tử chỉ còn nhận việc của quy trình văn
+  bản đến, đi. Thư viện mới của svc-workflow: PyJWT (kèm `cryptography`), như svc-files. Chi tiết:
+  `docs/them-ung-dung.md` mục 1.10, `docs/api/README.md` §8.
+- Ứng dụng mẫu Đơn nghỉ phép `apps/nghi-phep` (#301), cắm vào lõi bằng `moc app install` như Bảng tin. Ứng dụng không
+  có máy chủ nghiệp vụ, không có bảng: quy trình BPMN và hai form JSON Schema khai ở mục `workflow` của manifest, chạy
+  trên động cơ quy trình của lõi qua API chung `/api/workflow/nghi-phep/…`. Nhân viên gửi đơn, trưởng phòng của chính
+  phòng người gửi duyệt hoặc từ chối, người gửi theo dõi kết quả. `make demo-quy-trinh` (bước CI mới ở phần
+  `luong-chinh`) kiểm cả luồng: BPMN có `scriptTask` bị từ chối lúc cài, dữ liệu sai trả `422` đúng ô, phòng khác
+  không thấy việc, token của client khác bị từ chối, cài lại không đổi gì, gỡ giữ lịch sử đơn.
 - Phân tích trên dữ liệu đã nộp lưu (F3.8, nguyên lý (i), #304). Trang Điều hành có thêm phần "Văn bản đã nộp lưu
   (kho lạnh)": số hồ sơ, văn bản đến, đi theo năm ban hành, theo loại văn bản, theo phòng lập hồ sơ. svc-files có
   `GET /api/case-files/archive-stats`: manifest của từng gói so băm với CSDL, bảng văn bản so băm với manifest, rồi

@@ -153,7 +153,8 @@ repeatable any number of times — the presentation script is [`docs/demo-script
 Business demos, run the same way: `make demo-lien-thong` (exchange between two units), `make demo-nap-lo` (batch import
 of incoming documents), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (AI
 assistants), `make demo-ky-so` (digital signature, illustrative), `make demo-ca-nhan` (a second application on the same
-core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-tat-van-phong`
+core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-quy-trinh` (a fourth
+application that brings its own process and runs it on the core's workflow engine), `make demo-tat-van-phong`
 (turning off the e-Office part, the core keeps running), `make demo-log-tap-trung` (centralised logs).
 
 ## Technology and licenses
