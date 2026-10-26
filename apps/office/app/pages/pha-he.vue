@@ -480,10 +480,11 @@ function exportOpenLineage() {
                 <td class="py-1.5 pr-3 font-mono text-xs text-stone-900">{{ r.report }}</td>
                 <td class="py-1.5 pr-3 font-mono text-xs text-stone-700">{{ [...r.views, ...r.tables].join(', ') }}</td>
                 <td class="py-1.5 text-stone-600">
+                  <!-- vùng bấm ≥ 24×24px (WCAG 2.2, 2.5.8; #250): liên kết đứng sát nhau, không ở trong câu -->
                   <template v-if="r.charts.length">
                     <NuxtLink
                       v-for="c in r.charts" :key="c.id" :to="{ query: { 'bieu-do': c.id } }"
-                      class="mr-2 inline-block text-brand-700 hover:underline"
+                      class="mr-2 inline-flex min-h-6 min-w-6 items-center text-brand-700 hover:underline"
                     >{{ t(c.label) }}</NuxtLink>
                   </template>
                   <span v-else class="text-stone-400">{{ t('app.none') }}</span>

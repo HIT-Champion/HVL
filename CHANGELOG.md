@@ -187,7 +187,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   báo lỗi tương phản lúc có lúc không.
   Từ #250 spec quét thêm Bảng tin (`/bang-tin/`, tài khoản `giamkhao`) và các tiêu chí mới của WCAG 2.2 mức AA (tag
   `wcag22aa`, như cỡ vùng bấm 2.5.8). Phần e2e của CI cài Bảng tin (`make app-install`) trước `make seed` để văn bản
-  mẫu thành tin; chạy `make e2e` ở máy chưa cài thì phần Bảng tin được bỏ qua, có ghi chú trong báo cáo.
+  mẫu thành tin; chạy `make e2e` ở máy chưa cài thì phần Bảng tin được bỏ qua, có ghi chú trong báo cáo. Lần quét
+  đầu theo 2.2 chỉ thấy một lỗi, đã sửa: liên kết tới biểu đồ trong bảng khung nhìn ở trang Phả hệ đứng sát nhau mà
+  nhỏ hơn 24px (cỡ vùng bấm, 2.5.8); nay mỗi liên kết cao, rộng ít nhất 24px. Danh sách cho phép vẫn trống.
 - Kiểm song ngữ cho cả Văn phòng điện tử và hướng dẫn dịch (#267): `apps/office/tests/i18n.test.ts` quét mọi tệp
   `app/` — khóa `t('…')` phải là câu có trong `vi.json`, phần viết thẳng của khóa ghép phải có thật, template và script
   không được viết cứng chữ tiếng Việt (trừ trường `vi:` của dữ liệu song ngữ). Trước đây chỉ vài tệp được kiểm; lần
