@@ -8,7 +8,8 @@ phục vụ ở `/ca-nhan/` sau APISIX; mọi dữ liệu lấy qua cổng cùng
 
 | Tệp | Nội dung |
 |---|---|
-| `public/index.html`, `style.css` | Trang duy nhất; màu của Signet, phông hệ thống |
+| `public/index.html`, `style.css` | Trang duy nhất; màu Liền mạch như Văn phòng điện tử, trên điện thoại bảng thành thẻ |
+| `public/fonts/be-vietnam-pro/` | Phông Be Vietnam Pro tự phục vụ (OFL-1.1, kèm `OFL.txt`), trùng từng byte với bản của Văn phòng; không gọi Google Fonts |
 | `public/app.js` | Vẽ thư mục, danh sách, tải lên → xếp vào thư mục đang mở, chuyển, tải về; chữ gán bằng `textContent` |
 | `public/auth.js` | Đăng nhập Authorization Code + PKCE bằng oidc-client-ts (bản cho trình duyệt, `lib/`), cùng phiên SSO với Văn phòng điện tử; token trong `sessionStorage` |
 | `public/api.js` | Gọi GraphQL, `POST /api/files` (có tiến độ), `GET /api/files/{id}`; lỗi thành câu tiếng Việt |

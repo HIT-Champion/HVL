@@ -101,7 +101,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
 | Apache ECharts | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
-| Be Vietnam Pro | 1.002 | OFL-1.1 | Phông giao diện của nhận diện Liền mạch (#116), đủ dấu tiếng Việt. Bốn độ đậm 400, 500, 600, 700 lấy nguyên bản từ kho Google Fonts (`ofl/bevietnampro`), không sửa, kèm `OFL.txt`; trình duyệt tải từ chính máy chủ, không gọi Google Fonts | Tệp trong kho: `apps/office/public/fonts/be-vietnam-pro/`, bản trùng từng byte cho trang đăng nhập ở `platform/keycloak/themes/signet/login/resources/fonts/` | 3 |
+| Be Vietnam Pro | 1.002 | OFL-1.1 | Phông giao diện của nhận diện Liền mạch (#116), đủ dấu tiếng Việt. Bốn độ đậm 400, 500, 600, 700 lấy nguyên bản từ kho Google Fonts (`ofl/bevietnampro`), không sửa, kèm `OFL.txt`; trình duyệt tải từ chính máy chủ, không gọi Google Fonts | Tệp trong kho: `apps/office/public/fonts/be-vietnam-pro/`, bản trùng từng byte cho Không gian cá nhân ở `apps/ca-nhan/public/fonts/be-vietnam-pro/` và cho trang đăng nhập ở `platform/keycloak/themes/signet/login/resources/fonts/` | 3 |
 
 Thư viện gián tiếp (khoảng 700 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
 giấy phép MIT, ISC, Apache-2.0, BSD-2/3-Clause, BlueOak-1.0.0, MPL-2.0 hoặc 0BSD, đều được OSI phê duyệt. Quét

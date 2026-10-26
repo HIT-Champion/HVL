@@ -35,5 +35,6 @@ Ngoại lệ duy nhất là phông chữ giao diện, tự phục vụ để kh�
 Be Vietnam Pro, Copyright 2021 The Be Vietnam Pro Project Authors
 (https://github.com/bettergui/BeVietnamPro), phát hành theo SIL Open Font License
 1.1 (LICENSES/OFL-1.1.txt). Bốn tệp phông nguyên bản, không sửa, đi kèm OFL.txt tại
-apps/office/public/fonts/be-vietnam-pro/ và
+apps/office/public/fonts/be-vietnam-pro/,
+apps/ca-nhan/public/fonts/be-vietnam-pro/ và
 platform/keycloak/themes/signet/login/resources/fonts/be-vietnam-pro/.

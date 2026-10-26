@@ -63,6 +63,7 @@ SPDX-License-Identifier = "LicenseRef-Logos"
 [[annotations]]
 path = [
   "apps/office/public/fonts/be-vietnam-pro/**",
+  "apps/ca-nhan/public/fonts/be-vietnam-pro/**",
   "platform/keycloak/themes/signet/login/resources/fonts/be-vietnam-pro/**",
 ]
 precedence = "closest"
