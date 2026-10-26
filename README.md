@@ -77,7 +77,7 @@ xử lý → trả lời → phát hành → lưu trữ** theo Nghị định 30
 | Đơn vị gửi văn bản cho nhau qua email | Liên thông trên cùng bản cài: bên nhận có ngay văn bản đến, tệp trùng từng byte, kèm mã xác thực | [P] |
 | Văn bản nhạy cảm bị lộ | Mã hóa từng tệp, chỉ giải mã trong bộ nhớ cho người có tên; bản mở đóng tên người xem lên mọi trang | [P] |
 | Lãnh đạo không biết việc nghẽn ở đâu | Dashboard điều hành từ số liệu thật | [D] |
-| Tìm lại văn bản cũ mất thời gian | Tìm toàn văn, cả chữ trong tệp PDF đính kèm; trợ lý hỏi đáp trả lời kèm số ký hiệu và trang | [I] |
+| Tìm lại văn bản cũ mất thời gian | Tìm toàn văn, cả chữ trong tệp PDF đính kèm và bản scan (nhận dạng chữ); trợ lý hỏi đáp trả lời kèm số ký hiệu và trang | [I] |
 
 Ngoài ra: sổ đăng ký văn bản đến, đi đúng mẫu NĐ 30; nhiều đơn vị trên một bản cài, mỗi người chỉ thấy dữ liệu của
 đơn vị mình; giao diện tiếng Việt và tiếng Anh. Phạm vi và vai trò:

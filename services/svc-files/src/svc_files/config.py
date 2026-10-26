@@ -108,6 +108,9 @@ class Settings:
     ai_summary: str = "fallback"        # fallback: chỉ khi quy tắc không ra trích yếu tin cậy cao · always
     agent_id: str = "moc-doc-reader"    # danh tính tác tử trong sổ kiểm toán (X-Hasura-User-Id của vai trò agent)
     tesseract_bin: str = "tesseract"
+    # #253 — vòng đọc chữ (F2.7) gặp PDF không có lớp chữ (bản scan) thì OCR từng này trang đầu, mỗi lần một tệp, hạn
+    # MOC_OCR_TIMEOUT_S cho mỗi trang; 0: tắt, bản scan giữ trạng thái `empty`
+    text_ocr_pages: int = 3
     # F4.2 — trợ lý hỏi đáp trên kho văn bản (assist/): chỉ mục đoạn Meilisearch, câu trích, mô hình tùy chọn
     ask_enabled: bool = True
     ask_index: str = "chunks"           # chỉ mục đoạn, khác MOC_SEARCH_INDEX
@@ -220,6 +223,7 @@ class Settings:
                 ai_summary=env.get("MOC_AI_SUMMARY", "fallback").strip().lower(),
                 agent_id=env.get("MOC_AGENT_ID", "moc-doc-reader").strip(),
                 tesseract_bin=env.get("MOC_TESSERACT_BIN", "tesseract").strip(),
+                text_ocr_pages=int(env.get("MOC_TEXT_OCR_PAGES", "3")),
                 ask_enabled=_flag("MOC_ASK_ENABLED", env.get("MOC_ASK_ENABLED", "true")),
                 ask_index=env.get("MOC_ASK_INDEX", "chunks").strip(),
                 ask_sync_interval_s=float(env.get("MOC_ASK_SYNC_INTERVAL_S", "5")),
@@ -262,6 +266,8 @@ class Settings:
     def __post_init__(self) -> None:
         if self.text_interval_s < 0:
             raise ConfigError("MOC_TEXT_INTERVAL_S phải ≥ 0 (0: tắt vòng đọc chữ của PDF)")
+        if not 0 <= self.text_ocr_pages <= 200:
+            raise ConfigError("MOC_TEXT_OCR_PAGES phải trong 0–200 (0: không OCR bản scan)")
         if self.anchor_interval_s < 0:
             raise ConfigError("MOC_AUDIT_ANCHOR_INTERVAL_S phải ≥ 0 (0: tắt vòng neo)")
         if self.anchor_retention_days < 1:

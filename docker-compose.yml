@@ -355,6 +355,8 @@ services:
       MOC_READ_ENABLED: ${MOC_READ_ENABLED:-true}
       MOC_READ_CONCURRENCY: ${MOC_READ_CONCURRENCY:-1}
       MOC_OCR_TIMEOUT_S: ${MOC_OCR_TIMEOUT_S:-40}
+      # #253 — bản scan gắn vào văn bản: OCR từng này trang đầu ở vòng đọc chữ để tìm theo nội dung; 0: tắt
+      MOC_TEXT_OCR_PAGES: ${MOC_TEXT_OCR_PAGES:-3}
       MOC_AI_URL: ${MOC_AI_URL-http://ollama:11434}
       MOC_AI_MODEL: ${MOC_AI_MODEL:-qwen3:1.7b}
       MOC_AI_TIMEOUT_S: ${MOC_AI_TIMEOUT_S:-20}

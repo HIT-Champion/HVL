@@ -65,9 +65,9 @@ import urllib.request
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from moc_env import (EICAR, ENV, INCREMENTAL_EDIT, PUBLIC_URL, REALM, USER_AGENT, HTTPError, Session, byte_range_end,
-                     call_json, compose, flip_in_signed_stream, request, signature_cli, text_pages, text_pdf,
-                     user_login, vault_ca_pem)
+from moc_env import (EICAR, ENV, INCREMENTAL_EDIT, PUBLIC_URL, REALM, ROOT, USER_AGENT, HTTPError, Session,
+                     byte_range_end, call_json, compose, flip_in_signed_stream, request, signature_cli, text_pages,
+                     text_pdf, user_login, vault_ca_pem)
 
 DEPT_DT = "5cc372aa-304d-4574-896c-4f3e781a2ce7"
 DEPT_KTPM = "7ee31261-b14c-4c42-8e1b-9a7e99935412"
@@ -577,6 +577,18 @@ def main() -> None:
     doc_id = doc["document_id"]
     doc["document"] == {"status": "received", "files": [{"role": "main"}]} or fail(f"văn bản mới chưa đúng: {doc}")
     ok("văn thư nhập văn bản đến kèm tệp (Action receiveIncoming)")
+    # #253: hai bản scan mẫu (PDF chỉ có ảnh) vào sổ ngay để vòng nền OCR trong lúc các bước sau chạy — kiểm ở mục Tìm
+    # theo nội dung. Bản của văn bản hạn chế tải lên TRƯỚC, như secret_pdf
+    samples = ROOT / "seed" / "van-ban-den"
+    sealed_scan = clerk.upload(f"han-che-scan-{tag}.pdf", (samples / "13-thong-bao-ban-scan.pdf").read_bytes(),
+                               restricted=True)
+    scan = clerk.upload(f"quyet-dinh-scan-{tag}.pdf", (samples / "22-quyet-dinh-scan-3-trang.pdf").read_bytes())
+    clerk.gql(receive, {"d": {**incoming, "symbol": f"125/ĐHCN-TC{tag}", "restricted": True, "urgency": "normal",
+                              "summary": f"Về việc lịch đăng ký học phần (kiểm tra {tag})",
+                              "file_ids": [sealed_scan["id"]]}})
+    scan_id = clerk.gql(receive, {"d": {**incoming, "symbol": f"126/ĐHCN-KH{tag}", "urgency": "normal",
+                                        "summary": f"Về việc danh mục nhiệm vụ cấp tỉnh (kiểm tra {tag})",
+                                        "file_ids": [scan["id"]]}})["receiveIncoming"]["document_id"]
 
     print("Poka-yoke: dữ liệu văn bản đến sai bị chặn ở svc-workflow và CSDL, không chỉ ở form")
     direct, _ = call_json("POST", f"{PUBLIC_URL}/v1/graphql", headers=clerk.auth, body={
@@ -851,6 +863,23 @@ def main() -> None:
                    f"select count(*) from core.file_texts where file_id = '{secret_pdf['id']}'").decode().strip()
     hidden == [] and read == "0" or fail(f"tệp của văn bản hạn chế bị đọc chữ hoặc tìm được: {hidden}, {read}")
     ok("văn bản hạn chế: tệp không bị đọc chữ, không tìm được theo nội dung (kể cả người tạo)")
+    # #253: bản scan không có lớp chữ — vòng nền OCR 3 trang đầu (MOC_TEXT_OCR_PAGES). "SKHCN", "KGVX" chỉ có trong
+    # ảnh (số tờ trình, nơi lưu), không có trong trích yếu hay số ký hiệu
+    started, hits = time.time(), []
+    while scan_id not in [h["id"] for h in hits if h["matched_content"]] and time.time() - started < 240:
+        hits = call_json("GET", f"{PUBLIC_URL}/api/search?" + urllib.parse.urlencode({"q": "SKHCN KGVX"}),
+                         headers=director.auth)[0]["hits"]
+        scan_id in [h["id"] for h in hits if h["matched_content"]] or time.sleep(3)
+    scan_id in [h["id"] for h in hits if h["matched_content"]] \
+        or fail(f"sau {time.time() - started:.0f} giây không tìm được bản scan theo chữ trong ảnh: {hits}")
+    row = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                  "-d", ENV.get("POSTGRES_DB", "moc"), "-c",
+                  "select status, note, cardinality(page_starts), (select count(*) from core.file_texts where"
+                  f" file_id = '{sealed_scan['id']}') from core.file_texts where file_id = '{scan['id']}'")
+    row.decode().strip() == "ok|ocr 3/3|3|0" \
+        or fail(f"chữ OCR của bản scan 3 trang hay bản scan của văn bản hạn chế chưa đúng: {row.decode().strip()}")
+    ok(f"bản scan 3 trang: OCR ở vòng nền, tìm theo chữ chỉ có trong ảnh ra đúng văn bản"
+       f" (sau {time.time() - started:.0f} giây), chữ giữ ranh giới 3 trang; bản scan của văn bản hạn chế không bị đọc")
 
     # F4.2: trợ lý moc-assistant trả lời bằng câu trích nguyên văn kèm số ký hiệu và trang, chỉ trong văn bản người hỏi
     # được xem. Vòng nền svc-files đọc chữ từng trang rồi đưa đoạn vào chỉ mục chunks (MOC_ASK_SYNC_INTERVAL_S); CI

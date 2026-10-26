@@ -205,6 +205,15 @@ def test_pending_texts_include_issued_files():
     assert '{document_files: {role: {_in: ["main", "attachment", "issued"]}}}' in body["query"]
 
 
+def test_pending_texts_never_include_files_of_restricted_documents():
+    # hàng đợi duy nhất của vòng đọc chữ, kể cả OCR bản scan (#253): tệp mã hóa, tệp của văn bản hạn chế không vào
+    rec = Recorder((200, {"data": {"core_files": []}}))
+    run(client(rec).pending_texts(5))
+    query = " ".join(rec.last[1]["query"].split())
+    assert "{encrypted: {_eq: false}}" in query
+    assert "{_not: {document_files: {document: {restricted: {_eq: true}}}}}" in query
+
+
 def test_save_text_sends_page_starts_as_a_json_array():
     rec = Recorder((200, {"data": {"insert_core_file_texts_one": {"file_id": str(FILE)}}}))
     run(client(rec).save_text(file_id=str(FILE), tenant_id=str(TENANT), status="ok", pages=2, content="ab\ncd",

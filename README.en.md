@@ -86,7 +86,7 @@ Decree 30/2020/NĐ-CP on clerical work:
 | Units send documents to each other by email | In-system exchange on the same installation: the recipient gets an incoming document at once, byte-identical file, with a verification code | [P] |
 | Sensitive documents leak | Per-file encryption, decrypted only in memory for named readers; every opened page is stamped with the viewer's name | [P] |
 | Managers cannot see where work is stuck | An executive dashboard built on real data | [D] |
-| Finding old documents takes time | Full-text search, including text inside attached PDFs; a Q&A assistant answers with document number and page | [I] |
+| Finding old documents takes time | Full-text search, including text inside attached PDFs and scans (OCR); a Q&A assistant answers with document number and page | [I] |
 
 Also: incoming and outgoing registers in the Decree 30 format; several units on one installation, each person seeing
 only their own unit's data; Vietnamese and English interface. Scope and roles:

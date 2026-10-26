@@ -22,6 +22,11 @@ Vòng đồng bộ tìm kiếm (search.py) thấy chữ mới ghi thì đẩy l�
 
 F4.2: ghi kèm ``page_starts`` (vị trí đầu từng trang trong nội dung) để trợ lý hỏi đáp cắt đoạn theo trang
 (assist/index.py); hàng đợi có thêm bản phát hành văn bản đi (role ``issued``).
+
+#253: PDF không có lớp chữ (bản scan) thì nhận dạng chữ bằng Tesseract (``docread/ocr.run_ocr``: tiến trình con có
+giới hạn bộ nhớ, CPU, điểm ảnh) vài trang đầu, rồi ghi ``ok`` như lớp chữ, ``note`` = "ocr <số trang đã đọc>/<số
+trang>". Vòng nền đọc lần lượt từng tệp nên mỗi lúc chỉ một tệp OCR. Không ra chữ (không có ảnh, ảnh trắng, quá giờ…)
+thì giữ ``empty`` kèm lý do: bản scan mờ không phải tệp hỏng, và tệp đã có dòng kết quả thì không bị đọc lại.
 """
 
 from __future__ import annotations
@@ -29,16 +34,35 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Iterator
+import time
+from collections.abc import Awaitable, Callable, Iterator
 from typing import Any, Protocol
 
+from .docread.layout import tsv_lines
+from .docread.ocr import OcrResult
 from .hasura import HasuraError
-from .pdftext import PdfText, extract_pdf
+from .pdftext import MAX_CHARS, PdfText, clean, extract_pdf, join_pages
 from .storage import ObjectMissing, StorageError
 
 log = logging.getLogger("svc_files")
 
 MAX_TRIES = 5      # số lượt liền kho không đọc được một tệp (mà tệp vẫn có) trước khi ghi "failed"
+
+Ocr = Callable[[bytes], Awaitable[OcrResult]]
+
+
+def from_ocr(got: OcrResult, pages: int | None) -> PdfText:
+    """Kết quả OCR của một PDF không có lớp chữ → dòng core.file_texts. ``pages``: số trang pypdf đếm được."""
+    if got.status != "ok":
+        return PdfText("empty", pages, "", f"ocr {got.note or 'failed'}")
+    # mỗi trang một TSV (trang không có ảnh: chuỗi rỗng, vẫn giữ chỗ) → các dòng trên → dưới, trái → phải
+    full, starts = join_pages([clean("\n".join(line.text for line in tsv_lines([tsv]))) for tsv in got.tsv])
+    content = full[:MAX_CHARS].rstrip()
+    total = pages if pages is not None else got.pages
+    read = f"ocr {len(got.tsv)}/{total if total is not None else '?'}"
+    if not content:
+        return PdfText("empty", pages, "", f"{read} blank")
+    return PdfText("ok", pages, content, read, [s for s in starts if s <= len(content)])
 
 
 class _Hasura(Protocol):
@@ -53,13 +77,14 @@ class _Store(Protocol):
 
 class TextExtractor:
     def __init__(self, hasura: _Hasura, store: _Store, *, interval_s: float = 10.0, max_bytes: int,
-                 batch: int = 5, timeout_s: float | None = None) -> None:
+                 batch: int = 5, timeout_s: float | None = None, ocr: Ocr | None = None) -> None:
         self.hasura = hasura
         self.store = store
         self.interval_s = interval_s
         self.max_bytes = max_bytes
         self.batch = batch
         self.timeout_s = timeout_s
+        self.ocr = ocr                       # None: bản scan giữ `empty` (MOC_TEXT_OCR_PAGES=0)
         self._tries: dict[str, int] = {}     # id tệp → số lượt kho không đọc được (lỗi có thể tự hết)
 
     def _read(self, key: str) -> bytes:
@@ -70,8 +95,19 @@ class TextExtractor:
             return PdfText("failed", None, "", "too large")
         data = await asyncio.to_thread(self._read, row["object_key"])
         if self.timeout_s is None:
-            return await extract_pdf(data)
-        return await extract_pdf(data, timeout_s=self.timeout_s)
+            text = await extract_pdf(data)
+        else:
+            text = await extract_pdf(data, timeout_s=self.timeout_s)
+        if text.status != "empty" or self.ocr is None:
+            return text
+        started = time.monotonic()
+        got = await self.ocr(data)
+        text = from_ocr(got, text.pages)
+        # chỉ số đếm được, không ghi chữ nhận dạng: nhật ký đi ra kho log tập trung
+        log.info(json.dumps({"event": "core.file.text_ocr", "file_id": row["id"], "status": text.status,
+                             "pages_read": len(got.tsv), "chars": len(text.content), "note": text.note,
+                             "seconds": round(time.monotonic() - started, 1)}))
+        return text
 
     async def run_once(self) -> int:
         """Đọc một lượt tối đa `batch` tệp; trả về số tệp đã ghi kết quả.
