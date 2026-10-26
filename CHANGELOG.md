@@ -8,6 +8,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Cảnh báo cho giám sát cổng API (F3.13, #255). Prometheus tính 5 luật trên chỉ số APISIX đang thu
+  (`platform/monitoring/canh-bao.yml`): cổng mất chỉ số; dịch vụ sau cổng không trả lời (502, 504 theo route liên tục
+  3 phút — 503 có chủ ý của svc-files không tính); hơn 5% yêu cầu lỗi 5xx trong 5 phút, có sàn 0,1 yêu cầu/giây;
+  p95 trên 3 giây trong 10 phút ở các route tương tác (không tính svc-files, realtime); Prometheus tính luật lỗi.
+  Bảng điều khiển Grafana thêm hàng "Cảnh báo đang bật". Chưa có Alertmanager: cảnh báo chỉ xem được trong Grafana
+  và Prometheus, chưa gửi ra ngoài; F3.13 vẫn ở mức Dùng được. Mỗi luật có ca bật và ca không bật
+  (`promtool test rules`, 6 ca), chạy trong job build của CI bằng đúng image Prometheus đã ghim; smoke kiểm Prometheus
+  nạp và tính được cả 5 luật.
 - Tìm được bản scan theo nội dung (#253). PDF không có lớp chữ (bản scan, công văn chụp) gắn vào văn bản giờ được
   vòng đọc chữ của svc-files nhận dạng chữ bằng Tesseract, qua đúng đường OCR có giới hạn bộ nhớ, CPU, điểm ảnh của
   tác tử đọc văn bản đến. Mỗi tệp OCR `MOC_TEXT_OCR_PAGES` trang đầu (mặc định 3; 0: tắt), lần lượt từng tệp, hạn

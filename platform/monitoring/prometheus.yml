@@ -19,6 +19,10 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Luật cảnh báo (#255): chỉ hiện ở /alerts của Prometheus và bảng điều khiển Grafana, chưa gửi ra ngoài
+rule_files:
+  - canh-bao.yml
+
 scrape_configs:
   # Cổng API: plugin prometheus của APISIX xuất chỉ số ở cổng 9091 (platform/apisix/config.yaml, không mở ra ngoài)
   - job_name: apisix

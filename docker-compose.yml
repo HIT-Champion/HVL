@@ -487,9 +487,10 @@ services:
     depends_on:
       keycloak: {condition: service_healthy}
 
-  # F3.13 — giám sát gọn: Prometheus thu chỉ số của cổng API (plugin prometheus của APISIX, cổng 9091 nội bộ),
-  # Grafana hiện bảng điều khiển nạp sẵn. Prometheus không mở cổng; Grafana chỉ nghe 127.0.0.1 trên máy chủ, không có
-  # tài khoản quản trị, chỉ xem ẩn danh (bảng điều khiển sửa trong repo, không sửa trên giao diện).
+  # F3.13 — giám sát gọn: Prometheus thu chỉ số của cổng API (plugin prometheus của APISIX, cổng 9091 nội bộ) và
+  # tính luật cảnh báo (canh-bao.yml, #255), Grafana hiện bảng điều khiển nạp sẵn. Prometheus không mở cổng; Grafana
+  # chỉ nghe 127.0.0.1 trên máy chủ, không có tài khoản quản trị, chỉ xem ẩn danh (bảng điều khiển sửa trong repo,
+  # không sửa trên giao diện).
   prometheus:
     <<: *common
     image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
@@ -501,6 +502,7 @@ services:
     mem_limit: 512m
     volumes:
       - ./platform/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./platform/monitoring/canh-bao.yml:/etc/prometheus/canh-bao.yml:ro
       - prometheus_data:/prometheus
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/ready"]

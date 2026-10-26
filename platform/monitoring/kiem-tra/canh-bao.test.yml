@@ -1,0 +1,152 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Test đơn vị của luật cảnh báo (#255) với chuỗi số giả, mỗi mẫu cách 15 giây như lần thu thật:
+#   promtool test rules platform/monitoring/kiem-tra/canh-bao.test.yml
+# CI chạy promtool trong đúng image prom/prometheus của docker-compose.yml (bước "Giám sát" của job build).
+# exp_alerts chỉ so cảnh báo đang bật (firing); cảnh báo còn chờ hết `for` thì coi như chưa có.
+rule_files:
+  - ../canh-bao.yml
+
+evaluation_interval: 15s
+
+tests:
+  # cổng ngừng trả chỉ số từ phút 2: tới phút 4 mới quá 2 phút
+  - interval: 15s
+    input_series:
+      - series: 'up{job="apisix", instance="apisix:9091"}'
+        values: "1x8 0x20"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: GatewayMetricsDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: GatewayMetricsDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: apisix, instance: "apisix:9091"}
+            exp_annotations:
+              summary: Prometheus không thu được chỉ số của cổng API — APISIX có thể đã dừng
+
+  # svc-files trả 502 liên tục: bật sau 3 phút. graphql chỉ có 503 (mã có chủ ý), app-office một 504 lẻ: không bật
+  - interval: 15s
+    input_series:
+      - series: 'apisix_http_status{code="502", route="svc-files"}'
+        values: "0+1x40"
+      - series: 'apisix_http_status{code="503", route="graphql"}'
+        values: "0+1x40"
+      - series: 'apisix_http_status{code="504", route="app-office"}'
+        values: "0 1x40"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: UpstreamUnreachable
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: UpstreamUnreachable
+        exp_alerts:
+          - exp_labels: {severity: critical, route: svc-files}
+            exp_annotations:
+              summary: "Route svc-files: dịch vụ sau cổng không trả lời (502/504 liên tục)"
+
+  # 4 yêu cầu/giây, 9% lỗi 500: bật sau 5 phút
+  - interval: 15s
+    input_series:
+      - series: 'apisix_http_status{code="200", route="graphql"}'
+        values: "0+60x40"
+      - series: 'apisix_http_status{code="500", route="graphql"}'
+        values: "0+6x40"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: High5xxRatio
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: High5xxRatio
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Hơn 5% yêu cầu qua cổng API lỗi 5xx trong 5 phút
+      - eval_time: 7m
+        alertname: UpstreamUnreachable
+        exp_alerts: []
+
+  # trang vắng: 50% lỗi nhưng chỉ 2 yêu cầu mỗi phút, dưới sàn 0,1 yêu cầu/giây — không bật
+  - interval: 15s
+    input_series:
+      - series: 'apisix_http_status{code="200", route="graphql"}'
+        values: "0+0.25x40"
+      - series: 'apisix_http_status{code="503", route="svc-files"}'
+        values: "0+0.25x40"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: High5xxRatio
+        exp_alerts: []
+
+  # graphql: mọi yêu cầu 2–5 giây (p95 ≈ 4,85 giây) → bật sau 10 phút. svc-files chậm như vậy (theo thiết kế),
+  # app-office dưới 1 giây: không bật
+  - interval: 15s
+    input_series:
+      - series: 'apisix_http_latency_bucket{type="request", route="graphql", le="1000"}'
+        values: "0x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="graphql", le="2000"}'
+        values: "0x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="graphql", le="5000"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="graphql", le="+Inf"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="svc-files", le="1000"}'
+        values: "0x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="svc-files", le="2000"}'
+        values: "0x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="svc-files", le="5000"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="svc-files", le="+Inf"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="app-office", le="1000"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="app-office", le="2000"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="app-office", le="5000"}'
+        values: "0+10x80"
+      - series: 'apisix_http_latency_bucket{type="request", route="app-office", le="+Inf"}'
+        values: "0+10x80"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: SlowRoute
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: SlowRoute
+        exp_alerts:
+          - exp_labels: {severity: warning, route: graphql}
+            exp_annotations:
+              summary: "Route graphql: p95 thời gian trả lời trên 3 giây trong 10 phút"
+
+  # một lần tính luật lỗi ở phút 1: bật ngay (không có `for`), hết sau 10 phút
+  - interval: 15s
+    input_series:
+      - series: 'prometheus_rule_evaluation_failures_total{rule_group="/etc/prometheus/canh-bao.yml;cong-api"}'
+        values: "0x4 1x60"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: AlertRulesFailing
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: AlertRulesFailing
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Prometheus tính luật cảnh báo bị lỗi — cảnh báo có thể không bật khi cần
+      - eval_time: 14m
+        alertname: AlertRulesFailing
+        exp_alerts: []

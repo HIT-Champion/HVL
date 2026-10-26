@@ -174,7 +174,7 @@ modified. The full list, libraries and reasons for each choice included: [`DEPEN
 | Trust | ClamAV | 1.5.4 | GPL-2.0 | Malware scanning before storage |
 | Trust | OpenBao | 2.7.1 | MPL-2.0 | Secrets vault, encryption keys for restricted documents, internal CA and signing keys |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | NGSI-LD digital twins of sensors (profile `iot`) |
-| Operations | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | API gateway monitoring, internal network only |
+| Operations | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | API gateway monitoring and alerts, internal network only |
 | Operations | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Centralised logs with personal data masked, optional (profile `logs`) |
 | Operations | restic | 0.19.1 | BSD-2-Clause | Encrypted backup of databases, files and the vault |
 

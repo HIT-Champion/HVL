@@ -1408,16 +1408,19 @@ def main() -> None:
     ping(clerk)
     ok("phiên khác vẫn gọi được, không bị chặn lây")
 
-    # F3.13: Prometheus thu được chỉ số của cổng API (lưu lượng của chính lượt smoke này), Grafana có bảng điều khiển
+    # F3.13: Prometheus thu được chỉ số của cổng API (lưu lượng của chính lượt smoke này), Grafana có bảng điều khiển,
+    # luật cảnh báo đã nạp (#255)
     print("Giám sát")
 
-    def prometheus(expr: str) -> list:
+    def prometheus_api(path: str) -> dict:
         try:
-            raw = compose("exec", "-T", "prometheus", "wget", "-q", "-O", "-",
-                          f"http://localhost:9090/api/v1/query?query={urllib.parse.quote(expr)}")
-            return json.loads(raw)["data"]["result"]
+            raw = compose("exec", "-T", "prometheus", "wget", "-q", "-O", "-", f"http://localhost:9090/api/v1/{path}")
+            return json.loads(raw)["data"]
         except (subprocess.CalledProcessError, ValueError, KeyError):  # chưa sẵn sàng: thử lại ở vòng sau
-            return []
+            return {}
+
+    def prometheus(expr: str) -> list:
+        return prometheus_api(f"query?query={urllib.parse.quote(expr)}").get("result", [])
 
     for _ in range(10):  # lần thu chỉ số kế tiếp cách tối đa 15 giây
         up, total = prometheus('up{job="apisix"}'), prometheus("sum(apisix_http_status)")
@@ -1437,6 +1440,20 @@ def main() -> None:
     [d["title"] for d in dashboards] == ["Signet — cổng API"] or fail(f"Grafana thiếu bảng điều khiển: {dashboards}")
     ok(f"Prometheus đọc chỉ số cổng API ({float(total[0]['value'][1]):.0f} yêu cầu, {len(routes)} route); Grafana"
        " có bảng điều khiển cho người xem ẩn danh")
+    # mọi luật tính được: health "unknown" tới lần tính đầu (15 giây một lần), "err" khi biểu thức lỗi lúc chạy.
+    # Cảnh báo đang bật chỉ in ra, không làm smoke đỏ: ca bật, ca không bật nằm ở promtool test rules (bước CI build)
+    for _ in range(6):
+        groups = prometheus_api("rules").get("groups", [])
+        rules = [r for g in groups for r in g["rules"]]
+        if {g["name"] for g in groups} == {"cong-api", "prometheus"} and all(r["health"] == "ok" for r in rules):
+            break
+        time.sleep(5)
+    else:
+        fail(f"Prometheus chưa nạp hoặc chưa tính được luật cảnh báo: nhóm {sorted(g['name'] for g in groups)},"
+             f" luật {[(r['name'], r['health'], r.get('lastError')) for r in rules]}")
+    firing = sorted(r["name"] for r in rules if r.get("state") == "firing")
+    ok(f"Prometheus nạp và tính được {len(rules)} luật cảnh báo (nhóm cong-api, prometheus); đang bật:"
+       f" {', '.join(firing) or 'không'}")
 
     # Để cuối: thời gian các phần trên đã chạy cũng tính vào thời hạn đang chờ
     print("Nhắc hạn (timer Flowable)")
