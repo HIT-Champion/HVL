@@ -206,7 +206,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   phát hành, cài đặt, thư viện, tài liệu, kiến trúc, mức hoàn thiện, vận hành, trình diễn) kèm phần CI kiểm, và các
   giới hạn đã biết có issue theo dõi (#301–#306). README, README.en trỏ tới trang này ngay đầu. Bảng tự kiểm
   `docs/du-thi/pof-checklist.md` đánh dấu 23 trên 24 yêu cầu, kiểm ngày 26/10/2026 trên `develop` 62bff8d; ô "không
-  phát hành kèm gói" để trống vì ba bản phông Be Vietnam Pro trong repo (#305).
+  phát hành kèm gói" để trống vì ba bản phông Be Vietnam Pro trong repo, rồi đánh dấu khi #305 đã bỏ các tệp đó
+  (kiểm lại trên 399d8af), đủ 24 trên 24.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
