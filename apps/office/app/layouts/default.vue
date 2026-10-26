@@ -34,14 +34,25 @@ const keyboardFocus = ref(false)
 const collapsed = computed(() => !mobile.value && !hovering.value && !keyboardFocus.value)
 const menuButton = ref<HTMLButtonElement | null>(null)
 let hoverExit: ReturnType<typeof setTimeout> | undefined
+let hoverEnter: ReturnType<typeof setTimeout> | undefined
+function cancelHoverEnter() {
+  clearTimeout(hoverEnter)
+  hoverEnter = undefined
+}
 // Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
-// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung
+// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung.
+// Chờ 120ms rồi mới mở: con trỏ chỉ lướt qua dải biểu tượng trên đường sang nội dung thì thanh bên không bật ra che chữ
 function moveInNavigation(event: PointerEvent) {
   if (!event.movementX && !event.movementY) return
   clearTimeout(hoverExit)
-  hovering.value = true
+  if (hovering.value || hoverEnter) return
+  hoverEnter = setTimeout(() => {
+    hoverEnter = undefined
+    hovering.value = true
+  }, 120)
 }
 function leaveNavigation() {
+  cancelHoverEnter()
   clearTimeout(hoverExit)
   hoverExit = setTimeout(() => { hovering.value = false }, 140)
 }
@@ -100,6 +111,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', keyboard)
   clearInterval(calendarClock)
   clearTimeout(hoverExit)
+  cancelHoverEnter()
   document.body.style.overflow = ''
 })
 
@@ -191,6 +203,7 @@ function toggleLocale() {
 // Chọn xong một trang thì đóng ngăn kéo và thu thanh bên lại, để thanh bên không nằm đè lên nội dung vừa mở
 watch(() => route.fullPath, () => {
   open.value = false
+  cancelHoverEnter()
   hovering.value = false
 })
 

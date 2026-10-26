@@ -70,7 +70,7 @@ onMounted(() => { if (q.value) run() })
         {{ t('search.askAssistant') }}
       </NuxtLink>
     </PageHeader>
-    <form class="card mb-6 flex flex-col gap-3 p-4 sm:flex-row" @submit.prevent="run()">
+    <form class="mb-6 flex max-w-4xl flex-col gap-2 sm:flex-row" @submit.prevent="run()">
       <input v-model="q" type="search" class="input flex-1" :aria-label="t('search.title')" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
       <select v-model="direction" class="input sm:w-44" :aria-label="t('search.directionLabel')">
         <option value="">{{ t('search.any') }}</option>
@@ -80,19 +80,34 @@ onMounted(() => { if (q.value) run() })
       <button type="submit" class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
     </form>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="searched && !hits.length" class="card p-12 text-center text-stone-500">{{ t('search.empty') }}</p>
-    <ul v-else class="space-y-3">
-      <li v-for="h in hits" :key="h.id">
-        <NuxtLink :to="`/van-ban/${h.id}`" class="card block p-4 transition hover:border-brand-600 hover:shadow-md">
-          <div class="mb-1 flex flex-wrap items-center gap-2">
-            <StatusChip :status="h.status" />
-            <UrgencyChip :urgency="h.urgency" quiet />
-            <span class="text-xs text-stone-500">{{ t(`search.direction.${h.direction}`) }}<span v-if="h.register_number"> · {{ t('incoming.number') }} {{ h.register_number }}</span></span>
-            <span v-if="h.matched_content" class="chip bg-amber-50 text-amber-800" :title="t('search.matchedContentHint')">{{ t('search.matchedContent') }}</span>
+    <p v-if="failure" class="moc-state text-red-700" role="alert">{{ failure }}</p>
+    <div v-else-if="searched && !hits.length" class="moc-empty"><h2>{{ t('search.empty') }}</h2></div>
+    <!-- kết quả là danh sách hai dòng như hộp việc: trích yếu trước, số ký hiệu, nơi ban hành sau; trạng thái ở
+      cột phải -->
+    <ul v-else class="sg-task-list max-w-5xl">
+      <li v-for="h in hits" :key="h.id" class="sg-task-item">
+        <NuxtLink :to="`/van-ban/${h.id}`" class="sg-result">
+          <div class="sg-task-identity">
+            <h3>
+              <UrgencyChip :urgency="h.urgency" quiet />
+              <span>{{ h.summary }}</span>
+            </h3>
+            <p class="sg-task-meta">
+              <strong>{{ h.symbol }}</strong>
+              <span v-if="h.issuer_name">{{ h.issuer_name }}</span>
+              <span>{{ fmtDate(h.issued_on) }}</span>
+              <span>
+                {{ t(`search.direction.${h.direction}`) }}<template v-if="h.register_number">
+                  {{ t('incoming.number').toLowerCase() }} {{ h.register_number }}</template>
+              </span>
+            </p>
           </div>
-          <div class="font-medium text-stone-900">{{ h.summary }}</div>
-          <div class="mt-0.5 text-sm text-stone-500">{{ h.symbol }} · {{ h.issuer_name }} · {{ fmtDate(h.issued_on) }}</div>
+          <div class="sg-result-side">
+            <StatusChip :status="h.status" />
+            <span
+              v-if="h.matched_content" class="chip bg-amber-50 text-amber-900" :title="t('search.matchedContentHint')"
+            >{{ t('search.matchedContent') }}</span>
+          </div>
         </NuxtLink>
       </li>
     </ul>

@@ -173,7 +173,9 @@ const filteredRows = computed(() => {
                 <span
                   v-if="row.source_id" data-testid="dispatched-chip" class="chip bg-brand-50 text-brand-800"
                 >{{ t('incoming.dispatched') }}</span>
-                <span v-if="row.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
+                <span v-if="row.restricted" class="chip border border-stone-400 bg-white text-stone-800">
+                  {{ t('doc.restricted') }}
+                </span>
               </div>
             </td>
             <td class="px-4 py-3"><StatusChip :status="row.status" /></td>

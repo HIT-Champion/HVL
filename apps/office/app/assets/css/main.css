@@ -311,8 +311,9 @@
   transition: width 260ms var(--sg-ease), box-shadow 220ms var(--sg-ease);
 }
 .sg-shell.is-collapsed .sg-sidebar { width: 76px; }
-/* mở ra là nổi lên trên tờ giấy: bóng mềm cho biết thanh bên đang nằm đè */
-.sg-shell:not(.is-collapsed) .sg-sidebar { box-shadow: 10px 0 24px #23221f14; }
+/* mở ra là nổi lên trên tờ giấy: mép 1px và bóng cho thấy thanh bên đang nằm đè, chữ bên dưới không bị cắt ngang
+   giữa chừng mà không rõ vì sao */
+.sg-shell:not(.is-collapsed) .sg-sidebar { box-shadow: 1px 0 0 #d8d2c5, 14px 0 32px #23221f24; }
 .sg-brand-row {
   display: flex;
   align-items: center;
@@ -480,7 +481,8 @@
 .sg-topbar time { text-transform: capitalize; margin-right: 10px; }
 .sg-language { padding-inline: 8px; }
 .sg-mobile-menu, .sg-scrim { display: none; }
-/* tờ giấy: một bậc sáng so với khung, viền 1px, không bóng; nội dung bám một mép trái, rộng tối đa 1280px */
+/* tờ giấy: một bậc sáng so với khung, viền 1px, không bóng; nội dung bám một mép trái, rộng tối đa 1280px. 12px
+   lề trong của main (trừ vào lề tờ giấy) là chỗ cho nền rê chuột của các dòng việc tràn ra hai bên, vẫn trong main */
 .sg-paper {
   flex: 1;
   display: flex;
@@ -489,14 +491,15 @@
   background: #fff;
   border: 1px solid var(--edge);
   border-radius: 16px;
-  padding: 32px 40px 18px;
+  padding: 32px 28px 18px;
 }
-.moc-sheet { min-width: 0; flex: 1; width: 100%; max-width: 1280px; padding: 0 0 40px; }
+.moc-sheet { min-width: 0; flex: 1; width: 100%; max-width: 1304px; padding: 0 12px 40px; }
 .moc-shell-footer {
   display: flex;
   align-items: center;
   gap: 16px;
   max-width: 1280px;
+  margin-inline: 12px;
   border-top: 1px solid var(--edge);
   padding-top: 14px;
   color: var(--muted);
@@ -615,6 +618,20 @@
   color: #284868;
   transform: translateX(3px);
 }
+/* kết quả tìm kiếm: cùng dòng hai tầng của hộp việc, trạng thái và nhãn "khớp trong nội dung" ở cột phải */
+.sg-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 24px;
+  align-items: center;
+  padding: 14px 12px;
+  margin-inline: -12px;
+  border-radius: 8px;
+  transition: background-color 140ms;
+}
+.sg-result:hover { background: #f8f6f1; }
+.sg-result:focus-visible { outline-offset: -2px; }
+.sg-result-side { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 /* khung báo kết quả: phần việc được giao tách khỏi ô kết quả bằng một đường kẻ */
 .sg-assignment-brief { padding-bottom: 16px; border-bottom: 1px solid var(--edge); }
 /* độ khẩn in như con dấu son trên công văn giấy: Khẩn viền mảnh, Thượng khẩn viền đậm, Hỏa tốc nền son chữ trắng */
@@ -635,6 +652,30 @@
 }
 .sg-stamp.is-strong { border-width: 2px; font-weight: 700; }
 .sg-stamp.is-fire { background: #b42419; color: #fff; font-weight: 700; }
+/* khung việc của người đang xem trên trang văn bản (chỉ đạo, phân công, báo kết quả, duyệt, phát hành, trình): viền
+   mực nhạt, tiêu đề là bước phải làm, không có dải nền */
+.sg-action-panel { border-color: #bccbdd; }
+.sg-action-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 18px 20px 0;
+}
+.sg-action-head h2 { font-size: 16px; font-weight: 600; color: #152a40; }
+/* thông tin văn bản ở cột phải: nhãn xám bên trái, giá trị bên phải, hàng cách nhau một vạch nhạt */
+.sg-facts { font-size: 14px; line-height: 1.45; }
+.sg-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-top: 1px solid #f0ede6;
+}
+.sg-facts > div:first-child { border-top: 0; padding-top: 0; }
+.sg-facts dt { color: var(--muted); flex-shrink: 0; }
+.sg-facts dd { min-width: 0; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
 
 /* Chuyển động chỉ diễn tả điều hướng, đổi trạng thái và phản hồi trực tiếp; không hiệu ứng khi cuộn */
 .sg-task-enter-active { transition: opacity 220ms ease, transform 280ms var(--sg-ease); }
@@ -661,7 +702,7 @@
 .sg-scrim-enter-from, .sg-scrim-leave-to { opacity: 0; }
 
 @media (max-width: 1200px) {
-  .sg-paper { padding: 28px 28px 18px; }
+  .sg-paper { padding: 28px 16px 18px; }
   .sg-topbar time { display: none; }
   .sg-task-link { grid-template-columns: minmax(0, 1fr) 116px 18px; gap: 16px; }
 }
@@ -703,7 +744,7 @@
   .sg-topbar { gap: 10px; padding: 6px 12px; }
   .sg-topbar-tools { gap: 2px; }
   .sg-workspace { padding: 0; }
-  .sg-paper { border-width: 1px 0 0; border-radius: 16px 16px 0 0; padding: 28px 24px 18px; }
+  .sg-paper { border-width: 1px 0 0; border-radius: 16px 16px 0 0; padding: 28px 12px 18px; }
   .moc-scroll-hint { display: block; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
   .moc-table-scroll th:first-child, .moc-table-scroll td:first-child { position: sticky; left: 0; background: #fff; }
   .moc-table-scroll th:first-child { z-index: 2; }
@@ -712,7 +753,7 @@
 
 /* Điện thoại: bảng văn bản thành thẻ xếp dọc, ô nhập chữ 16px để trình duyệt không phóng to khi chạm */
 @media (max-width: 640px) {
-  .sg-paper { padding: 24px 16px 16px; }
+  .sg-paper { padding: 24px 4px 16px; }
   .sg-topbar { font-size: 13px; padding-inline: 8px; }
   .sg-topbar-context { gap: 10px; }
   .sg-topbar-tools { gap: 0; }
@@ -727,12 +768,16 @@
   .moc-inbox-filter { width: 0; flex: 1; min-width: 0; min-height: 44px; }
   .moc-inbox-refresh { min-width: 44px; min-height: 44px; }
   .moc-inbox-tabs { margin: 12px 0 20px; }
+  /* tab không vừa một dòng thì xuống dòng, không cuộn ngang giấu mất tab cuối */
+  .moc-tabs { flex-wrap: wrap; column-gap: 20px; overflow: visible; }
   /* điện thoại: hạn xuống dòng 3, mũi tên giữ cột phải */
   .sg-task-link { grid-template-columns: minmax(0, 1fr) 18px; gap: 6px 12px; padding: 14px 12px; }
   .sg-task-identity { grid-column: 1; }
   .sg-task-identity h3 { font-size: 15px; gap: 8px; }
   .sg-task-deadline { grid-column: 1; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
   .sg-task-arrow { grid-column: 2; grid-row: 1 / 3; }
+  .sg-result { grid-template-columns: minmax(0, 1fr); }
+  .sg-result-side { justify-content: flex-start; }
   .moc-shell-footer { font-size: 12px; gap: 8px; }
   .moc-shell-footer > span:last-child { width: 100%; }
   .moc-footer-verify { margin-left: auto; }

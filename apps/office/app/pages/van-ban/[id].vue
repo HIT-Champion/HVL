@@ -434,11 +434,13 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           <div class="mb-2 flex flex-wrap items-center gap-2">
             <StatusChip :status="doc.status" />
             <UrgencyChip :urgency="doc.urgency" quiet />
-            <span v-if="doc.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
+            <span v-if="doc.restricted" class="chip border border-stone-400 bg-white text-stone-800">
+              {{ t('doc.restricted') }}
+            </span>
             <span v-if="doc.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">{{ t('incoming.dispatched') }}</span>
             <span class="text-sm text-stone-500">{{ doc.document_type?.name }}</span>
           </div>
-          <h1 class="text-xl font-semibold text-stone-900">{{ doc.summary }}</h1>
+          <h1 class="text-[22px] leading-snug font-semibold text-stone-900">{{ doc.summary }}</h1>
           <p v-if="outgoing" class="mt-1 text-sm text-stone-500">
             {{ doc.symbol ?? t('doc.draft') }} · {{ doc.department?.name }}<span v-if="doc.issued_on"> · {{ fmtDate(doc.issued_on) }}</span>
           </p>
@@ -473,9 +475,9 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           />
 
           <!-- trình dự thảo: lần đầu, hoặc trình lại sau khi bị trả lại -->
-          <section v-if="canEdit" class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
-            <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
-              <h2 class="text-sm font-semibold text-brand-900">{{ t('doc.submitTitle') }}</h2>
+          <section v-if="canEdit" class="card sg-action-panel">
+            <div class="sg-action-head">
+              <h2>{{ t('doc.submitTitle') }}</h2>
             </div>
             <form class="space-y-4 p-5" @submit.prevent="submit">
               <p v-if="doc.status === 'returned' && lastReturn" class="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">
@@ -569,18 +571,6 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               </div>
             </dl>
           </section>
-          <section v-else class="card p-5">
-            <h2 class="mb-4 text-sm font-semibold text-stone-800">{{ t('doc.info') }}</h2>
-            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div><dt class="text-stone-500">{{ t('doc.symbol') }}</dt><dd class="font-medium">{{ doc.symbol ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.issuedOn') }}</dt><dd class="font-medium">{{ fmtDate(doc.issued_on) }}</dd></div>
-              <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('doc.issuer') }}</dt><dd class="font-medium">{{ doc.issuer_name ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.number') }}</dt><dd class="font-medium tabular-nums">{{ doc.register_number ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.registered') }}</dt><dd class="font-medium">{{ fmtDateTime(doc.registered_at) }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.due') }}</dt><dd class="font-medium">{{ fmtDate(doc.due_on) }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.urgency') }}</dt><dd class="font-medium">{{ t(`urgency.${doc.urgency}`) }}</dd></div>
-            </dl>
-          </section>
 
           <!-- tệp -->
           <section class="card p-5">
@@ -588,9 +578,20 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
             <p v-if="!doc.files.length" class="text-sm text-stone-500">{{ t('doc.noFiles') }}</p>
             <ul v-else class="divide-y divide-stone-100">
               <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id" class="flex items-center gap-3 py-2 text-sm">
-                <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5" /></svg>
+                <svg
+                  class="h-5 w-5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path
+                    stroke-linecap="round" stroke-linejoin="round"
+                    d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5"
+                  />
+                </svg>
                 <span class="min-w-0 flex-1 break-words">{{ f.file!.filename }}</span>
-                <span v-if="f.file!.encrypted" class="chip gap-1 bg-stone-800 text-white" :title="t('doc.sealedHint')" data-testid="file-sealed">
+                <span
+                  v-if="f.file!.encrypted" class="chip gap-1 border border-stone-400 bg-white text-stone-800"
+                  :title="t('doc.sealedHint')" data-testid="file-sealed"
+                >
                   <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" /></svg>
                   {{ t('doc.sealed') }}
                 </span>
@@ -658,76 +659,98 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           </section>
         </div>
 
-        <!-- dòng thời gian -->
-        <aside class="card h-fit p-5">
-          <div
-            role="tablist" :aria-label="t('doc.activity')"
-            class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold" @keydown="sideKey"
-          >
-            <button
-              id="document-timeline-tab" ref="timelineTab" role="tab" aria-controls="document-timeline"
-              :tabindex="side === 'timeline' ? 0 : -1" :aria-selected="side === 'timeline'"
-              class="-mb-px border-b-2 pb-2"
-              :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
-              @click="side = 'timeline'"
+        <!-- cột phải: thông tin văn bản đến dạng nhãn - giá trị, rồi dòng thời gian; đọc lướt mà không rời khung
+          việc -->
+        <aside class="h-fit space-y-6">
+          <section v-if="!outgoing" class="card p-5">
+            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.info') }}</h2>
+            <dl class="sg-facts">
+              <div><dt>{{ t('doc.number') }}</dt><dd class="tabular-nums">{{ doc.register_number ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.symbol') }}</dt><dd>{{ doc.symbol ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.issuedOn') }}</dt><dd>{{ fmtDate(doc.issued_on) }}</dd></div>
+              <div><dt>{{ t('doc.issuer') }}</dt><dd>{{ doc.issuer_name ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.registered') }}</dt><dd>{{ fmtDateTime(doc.registered_at) }}</dd></div>
+              <div><dt>{{ t('doc.due') }}</dt><dd>{{ fmtDate(doc.due_on) }}</dd></div>
+              <div><dt>{{ t('doc.urgency') }}</dt><dd>{{ t(`urgency.${doc.urgency}`) }}</dd></div>
+            </dl>
+          </section>
+          <!-- dòng thời gian -->
+          <div class="card p-5">
+            <div
+              role="tablist" :aria-label="t('doc.activity')"
+              class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold" @keydown="sideKey"
             >
-              {{ t('doc.timeline') }}
-            </button>
-            <button
-              id="document-history-tab" ref="historyTab" role="tab" aria-controls="document-history"
-              :tabindex="side === 'history' ? 0 : -1" :aria-selected="side === 'history'"
-              class="-mb-px border-b-2 pb-2"
-              :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
-              @click="openHistory"
-            >
-              {{ t('doc.history') }}
-            </button>
-          </div>
-          <!-- tabpanel bọc ngoài danh sách: role trên chính <ol> thay mất vai trò list, các <li> mồ côi (axe, #246) -->
-          <div
-            id="document-timeline" v-show="side === 'timeline'" role="tabpanel" aria-labelledby="document-timeline-tab"
-            tabindex="0" data-testid="timeline"
-          >
-            <ol class="relative space-y-5 border-l border-stone-200 pl-5">
-              <li v-for="(item, i) in timeline" :key="item.key" class="relative">
-                <span
-                  class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white"
-                  :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'"
-                />
-                <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
-                <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
-                <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
-              </li>
-            </ol>
-          </div>
-          <div
-            id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab"
-            tabindex="0" :aria-busy="historyLoading" data-testid="history"
-          >
-            <p v-if="historyLoading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-            <div v-if="historyFailure" class="text-sm" role="alert">
-              {{ historyFailure }}
-              <button class="btn-secondary mt-2" @click="openHistory">{{ t('app.retry') }}</button>
+              <button
+                id="document-timeline-tab" ref="timelineTab" role="tab" aria-controls="document-timeline"
+                :tabindex="side === 'timeline' ? 0 : -1" :aria-selected="side === 'timeline'"
+                class="-mb-px border-b-2 pb-2"
+                :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
+                @click="side = 'timeline'"
+              >
+                {{ t('doc.timeline') }}
+              </button>
+              <button
+                id="document-history-tab" ref="historyTab" role="tab" aria-controls="document-history"
+                :tabindex="side === 'history' ? 0 : -1" :aria-selected="side === 'history'"
+                class="-mb-px border-b-2 pb-2"
+                :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
+                @click="openHistory"
+              >
+                {{ t('doc.history') }}
+              </button>
             </div>
-            <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
-            <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
-            <ol class="space-y-4">
-              <li v-for="row in history ?? []" :key="row.id" class="text-sm">
-                <div class="font-medium text-stone-900">{{ action(row) }} · {{ label('audit.entity', row.entity) }}</div>
-                <div class="text-xs text-stone-500">{{ who(row) }} · {{ fmtDateTime(row.occurred_at) }}</div>
-                <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>
-                <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
-                  {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
-                </div>
-              </li>
-            </ol>
+            <!-- tabpanel bọc ngoài danh sách: role trên chính <ol> thay mất vai trò list, các <li> mồ côi
+              (axe, #246) -->
+            <div
+              id="document-timeline" v-show="side === 'timeline'" role="tabpanel"
+              aria-labelledby="document-timeline-tab"
+              tabindex="0" data-testid="timeline"
+            >
+              <ol class="relative space-y-5 border-l border-stone-200 pl-5">
+                <li v-for="(item, i) in timeline" :key="item.key" class="relative">
+                  <span
+                    class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white"
+                    :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'"
+                  />
+                  <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
+                  <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
+                  <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
+                </li>
+              </ol>
+            </div>
+            <div
+              id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab"
+              tabindex="0" :aria-busy="historyLoading" data-testid="history"
+            >
+              <p v-if="historyLoading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+              <div v-if="historyFailure" class="text-sm" role="alert">
+                {{ historyFailure }}
+                <button class="btn-secondary mt-2" @click="openHistory">{{ t('app.retry') }}</button>
+              </div>
+              <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
+              <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
+              <ol class="space-y-4">
+                <li v-for="row in history ?? []" :key="row.id" class="text-sm">
+                  <div class="font-medium text-stone-900">
+                    {{ action(row) }} · {{ label('audit.entity', row.entity) }}
+                  </div>
+                  <div class="text-xs text-stone-500">{{ who(row) }} · {{ fmtDateTime(row.occurred_at) }}</div>
+                  <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700">
+                    <span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}
+                  </div>
+                  <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
+                    {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <NuxtLink
+              v-if="claims?.role === 'director'" :to="{ path: '/so-kiem-toan', query: { van_ban: doc.id } }"
+              class="mt-5 inline-block text-xs font-medium text-brand-700 hover:underline"
+            >
+              {{ t('audit.openAudit') }}
+            </NuxtLink>
           </div>
-          <NuxtLink
-            v-if="claims?.role === 'director'" :to="{ path: '/so-kiem-toan', query: { van_ban: doc.id } }"
-            class="mt-5 inline-block text-xs font-medium text-brand-700 hover:underline"
-          >
-            {{ t('audit.openAudit') }}
-          </NuxtLink>
         </aside>
       </div>
     </div>

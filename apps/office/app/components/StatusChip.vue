@@ -22,13 +22,13 @@ const tone: Record<string, string> = {
   received: 'bg-amber-100 text-amber-800',
   registered: 'bg-stone-100 text-stone-700',
   in_progress: 'bg-brand-100 text-brand-800',
-  done: 'bg-brand-100 text-brand-900',
+  done: 'bg-emerald-50 text-emerald-900',
   cancelled: 'bg-stone-200 text-stone-600',
   draft: 'bg-stone-100 text-stone-700',
   in_review: 'bg-stone-100 text-stone-700',
   returned: 'bg-rose-100 text-rose-800',
   approved: 'bg-brand-100 text-brand-800',
-  issued: 'bg-brand-100 text-brand-900',
+  issued: 'bg-emerald-50 text-emerald-900',
 }
 </script>
 
