@@ -668,7 +668,8 @@ khối này.
   không cần nút "gợi ý sai". Không đủ văn bản tương tự, hay phiếu chia đều, thì không gợi ý.
 - *"Căn cứ có làm lộ văn bản hạn chế?"* Ba lớp: không vào chỉ mục; svc-files hậu kiểm; trigger CSDL. Giao diện còn
   hậu kiểm danh sách căn cứ bằng token người xem trước khi hiện.
-- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn chưa xét ngày lễ; chỉ
+- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn tránh ngày lễ dương
+  lịch cố định, còn Tết Âm lịch và ngày nghỉ bù phải do người vận hành thêm vào `MOC_HOLIDAYS` mỗi năm; chỉ
   dựa vào trích yếu (đầu nội dung công văn toàn khuôn mẫu "Căn cứ…", "Kính gửi…"); dữ liệu mẫu nhỏ, hai đơn vị hợp lệ.
 
 ## Ngoài 4 nguyên lý: ký số văn bản đi (minh họa) — `make demo-ky-so`

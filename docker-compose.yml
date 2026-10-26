@@ -419,6 +419,8 @@ services:
       MOC_SUGGEST_TIMEOUT_S: ${MOC_SUGGEST_TIMEOUT_S:-10}
       MOC_SUGGEST_MIN_SCORE: ${MOC_SUGGEST_MIN_SCORE:-0.3}
       MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
+      # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (cú pháp ở .env.example); để trống thì như mặc định
+      MOC_HOLIDAYS: ${MOC_HOLIDAYS:-01-01,04-30,05-01,09-02}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
       # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP) và webhook (Mattermost, Slack, ntfy) qua hộp thư đi

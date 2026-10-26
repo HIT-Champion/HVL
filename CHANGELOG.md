@@ -8,6 +8,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Hạn gợi ý giao việc tránh ngày lễ (F4.3, #280). Trước đây hạn chỉ dời khỏi thứ Bảy, Chủ nhật. Biến mới `MOC_HOLIDAYS`
+  của svc-workflow nhận ba dạng, cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
+  `YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định là các ngày lễ dương lịch cố định ở Điều 112 Bộ luật Lao
+  động 2019 (1/1, 30/4, 1/5, 2/9). Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc khánh và ngày nghỉ bù đổi theo
+  năm, nên người vận hành thêm theo lịch nghỉ Chính phủ công bố. Giá trị sai thì svc-workflow dừng lúc khởi động. Chỉ
+  gợi ý mới dùng lịch này; gợi ý đã lưu giữ nguyên hạn. Thời hạn từng bước của quy trình (F2.3) vẫn đếm theo đồng hồ.
+  Bản cài cũ không cần sửa `.env`: không đặt biến thì dùng mặc định.
 - Prometheus đọc bảng trạng thái thành phần (F3.13, #274). svc-files có thêm `GET /metrics`: mỗi thành phần của trang
   `/trang-thai` một dòng `moc_component_up` (1 khi chạy, 0 khi gián đoạn), cùng lần dò và lưu đệm với `/api/status`.
   Đường này chỉ gọi được trong mạng nội bộ, qua cổng API thì 404. Prometheus thu 15 giây một lần, và nhóm luật mới

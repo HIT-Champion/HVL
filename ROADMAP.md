@@ -186,9 +186,10 @@ Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
 7. **Khuôn văn bản, biểu mẫu sửa được không cần sửa mã** ([P] low-code): trước hết cho quản trị đơn vị tự sửa mẫu văn
    bản đi (F2.4). Thiết kế quy trình bằng giao diện cần một công cụ thay `bpmn-js`, vốn bị loại vì giấy phép
    (`docs/du-thi/ke-hoach-phat-trien.md` §6).
-8. **Hạn chế đã ghi của tính năng đã có**: gửi lại liên thông lỗi (F3.12), hạn xử lý không tính ngày nghỉ, ngày lễ
-   (F2.3, F4.3), chữ OCR vào chỉ mục tìm kiếm (F2.7), két bí mật có TLS và xoay khóa (F3.2), tự chép kho sao lưu ra
-   ngoài máy chủ (F3.4).
+8. **Hạn chế đã ghi của tính năng đã có**: gửi lại liên thông lỗi (F3.12), thời hạn từng bước của quy trình không
+   trừ ngày nghỉ, ngày lễ (F2.3), lịch ngày lễ âm lịch tự có thay vì người vận hành thêm mỗi năm (F4.3), chữ OCR của cả
+   bản scan chứ không chỉ 3 trang đầu (F2.7), két bí mật có TLS và xoay khóa (F3.2), tự chép kho sao lưu ra ngoài máy
+   chủ (F3.4).
 9. **Dịch thuật trong lõi** (cụm ②): dịch vụ dịch chạy tại chỗ cho mọi ứng dụng. Xếp sau vì người dùng hiện là cơ
    quan trong nước và giao diện đã có tiếng Anh.
 10. **WebGIS** (đề nêu ở [D] của Tầng 2): nghiệp vụ văn thư hiện chưa cần bản đồ; làm khi có ứng dụng cần.
