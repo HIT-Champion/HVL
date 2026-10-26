@@ -22,6 +22,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+import time
 import unicodedata
 from datetime import date, timedelta
 from pathlib import Path
@@ -30,7 +31,7 @@ from typing import Any
 import pytest
 
 from app_fakes import DON, DUYET, form_bytes
-from svc_workflow.apps.forms import AppForm, bad_value, check_form
+from svc_workflow.apps.forms import DRAFT, AppForm, bad_value, check_form, pattern_problem
 
 ROOT = Path(__file__).resolve().parents[3]          # gốc repo: CI chạy pytest trong bản checkout đầy đủ
 CASE_FILES = sorted(ROOT.glob("apps/*/forms/*.cases.json"))
@@ -188,12 +189,24 @@ def test_sample_forms_pass():
     (with_prop("soNgay", {"type": "khong-co-kieu-nay"}), "chỉ nhận giá trị đơn"),
     (with_prop("ma", {"type": "string", "pattern": "^(a+)+$"}), "lặp lồng trong một phần lặp"),
     (with_prop("ma", {"type": "string", "pattern": "^(a|aa)+$"}), "lựa chọn (|) trong một phần lặp"),
-    (with_prop("ma", {"type": "string", "pattern": "^a*a*$"}), "phần lặp dài"),
+    (with_prop("ma", {"type": "string", "pattern": "^a*a*$"}), "cần maxLength"),
+    (with_prop("ma", {"type": "string", "maxLength": 1000, "pattern": "a*a*a*$"}), "bước quay lui"),
     (with_prop("ma", {"type": "string", "pattern": "^(a)\\1$"}), "tham chiếu ngược"),
     (with_prop("ma", {"type": "string", "pattern": "(" * 2}), "không phải biểu thức chính quy hợp lệ"),
     (with_prop("ma", {"type": "string", "pattern": "a" * 513}), "dài quá 512"),
     (with_prop("ma", {"type": "string", "not": {"pattern": "^(\\w+\\s?)*$"}}), "ReDoS"),
-    (changed(patternProperties={"^(x+)+$": {"type": "string"}}), "ReDoS"),
+    (changed(patternProperties={"^x$": {"type": "string"}}), "không dùng patternProperties"),
+    # thời gian kiểm tăng theo độ dài chuỗi mà không có maxLength chặn, ở mọi chỗ có schema con
+    (with_prop("ma", {"type": "string", "pattern": "^\\S.*$"}), "cần maxLength"),
+    (with_prop("ma", {"type": "string", "pattern": "[0-9]{9,11}"}), "cần maxLength"),
+    (with_prop("ma", {"type": "string", "maxLength": 20, "allOf": [{"pattern": "a+$"}]}), "cần maxLength"),
+    (changed(propertyNames={"pattern": "^[a-z]+$"}), "cần maxLength"),
+    (changed(**{"$defs": {"ma": {"type": "string", "pattern": "^a+"}}}), "cần maxLength"),
+    # tốn quá MAX_STEPS bước
+    (with_prop("ma", {"type": "string", "maxLength": 30000, "pattern": "a+$"}), "bước quay lui với chuỗi 30000"),
+    (with_prop("ma", {"type": "string", "pattern": "^" + "a{0,30}" * 5 + "$"}), "bước quay lui"),
+    (with_prop("ma", {"type": "string", "maxLength": 256, "pattern": "a{0,30}" * 4 + "$"}), "bước quay lui"),
+    (with_prop("ma", {"type": "string", "pattern": "^" + "a{0,30}" * 4 + "(a|aa)" * 4 + "$"}), "bước quay lui"),
 ], ids=lambda v: v if isinstance(v, str) else "")
 def test_form_rules_at_deploy(schema, needle):
     errors = problems(schema)
@@ -201,15 +214,47 @@ def test_form_rules_at_deploy(schema, needle):
     assert all(e.startswith("workflow.forms.nghi-phep.don (forms/don.json): ") for e in errors)
 
 
-@pytest.mark.parametrize("pattern", ["^20[0-9]{2}-", "^[A-Z]{2,5}$", "^[0-9]{1,3}(,[0-9]{3})*$", "^(a|b)+$",
-                                     "^[^<>]{0,200}$", "^\\S.*$"])
-def test_ordinary_patterns_pass(pattern):
+@pytest.mark.parametrize("pattern", ["^20[0-9]{2}-", "^(19|20)[0-9]{2}-", "^[A-Z]{2,5}$", "^[^<>]{0,200}$",
+                                     "^[0-9a-f]{64}-[0-9a-f]{40}$", "[\\u0000-\\u001f]",
+                                     "^[^@\\s]{1,64}@[^@\\s]{1,63}\\.[a-z]{2,10}$", "^" + "a{0,30}" * 4 + "$"])
+def test_patterns_whose_cost_does_not_grow_with_the_string_need_no_max_length(pattern):
     assert problems(with_prop("ma", {"type": "string", "pattern": pattern})) == []
+
+
+@pytest.mark.parametrize("pattern", ["^[0-9]{1,3}(,[0-9]{3})*$", "^(a|b)+$", "^\\S.*$", "^\\S(.*\\S)?$",
+                                     "[0-9]{9,11}", "a+$", "a+a{0,30}$"])
+def test_patterns_with_max_length_pass(pattern):
+    assert problems(with_prop("ma", {"type": "string", "maxLength": 200, "pattern": pattern})) == []
+
+
+def test_step_estimate_follows_re():
+    # cùng bốn phần {0,30}: neo ^ thì 9,2·10^5 bước, nhận; không neo với chuỗi 96 ký tự thì re.search thử lại ở mọi vị
+    # trí, ước lượng 8,9·10^7 bước, từ chối — và re chạy chậm hơn hẳn thật
+    anchored, loose = "^" + "a{0,30}" * 4 + "$", "a{0,30}" * 4 + "$"
+    assert pattern_problem(anchored) is None
+    assert "8,9·10^7 bước quay lui với chuỗi 96 ký tự" in (pattern_problem(loose, 96) or "")
+
+    def took(pattern: str) -> float:
+        started = time.perf_counter()
+        re.search(pattern, "a" * 96 + "!")
+        return time.perf_counter() - started
+
+    assert took(loose) > 10 * took(anchored)
+
+
+def test_string_longer_than_max_length_never_reaches_the_pattern():
+    # mẫu này đứng hàng giờ với vài chục ký tự; bị chặn lúc triển khai, ở đây dựng AppForm thẳng để chắc re không chạy
+    form = AppForm({"$schema": DRAFT, "type": "object", "additionalProperties": False,
+                    "properties": {"ma": {"type": "string", "maxLength": 10, "pattern": "^(a+)+$"}}})
+    started = time.perf_counter()
+    assert form.errors({"ma": "a" * 100_000 + "!"}) == {"ma": "maxLength"}
+    assert time.perf_counter() - started < 0.05
+    assert form.errors({"ma": "a" * 8 + "!"}) == {"ma": "pattern"}
+    assert form.errors({"ma": "a" * 10}) == {}
 
 
 def test_redos_pattern_would_stall_re_and_is_refused_before_deploy():
     # mẫu bị từ chối thật sự quay lui bùng nổ với re: mỗi ký tự thêm vào gấp đôi thời gian (đo với chuỗi ngắn)
-    import time
     slow = re.compile("^(a+)+$")
     took = []
     for n in (14, 20):

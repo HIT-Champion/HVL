@@ -33,6 +33,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 from jsonschema.exceptions import SchemaError
+from jsonschema.protocols import Validator
 
 VN = timezone(timedelta(hours=7))  # giờ Việt Nam, không đổi theo mùa
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
@@ -74,13 +75,15 @@ class SchemaFileError(Exception):
 class FormSchema:
     """Một tệp schema đã nạp. errors() trả {} khi dữ liệu hợp lệ."""
 
-    def __init__(self, schema: dict[str, Any]) -> None:
+    def __init__(self, schema: dict[str, Any], *, validator: type[Validator] = Draft202012Validator) -> None:
+        """``validator``: lớp kiểm của jsonschema, mặc định Draft 2020-12; form của ứng dụng truyền bản riêng
+        (apps/forms.py)."""
         try:
             Draft202012Validator.check_schema(schema)
         except SchemaError as exc:
             raise SchemaFileError(f"Schema không hợp lệ: {exc.message}") from exc
         self.schema = schema
-        self._validator = Draft202012Validator(schema, format_checker=FORMATS)
+        self._validator = validator(schema, format_checker=FORMATS)
         self._properties: dict[str, Any] = schema.get("properties", {})
         # Hai từ khóa riêng, JSON Schema không diễn đạt được: x-moc-date so ngày với hôm nay (giờ Việt Nam);
         # x-moc-nfc ở gốc — mọi chuỗi phải ở dạng dựng sẵn (NFC), để "Hưng Yên" gõ và "Hưng Yên" chép từ PDF dạng

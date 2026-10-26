@@ -25,8 +25,9 @@ Không thêm vào ``schemas.py`` để form của Văn phòng điện tử (Ajv 
 Lúc triển khai, form phải: là JSON Schema 2020-12 hợp lệ; ``type: object``, ``additionalProperties: false`` (mọi biến
 ghi vào quy trình đều được khai); tên trường dạng camelCase, không trùng biến hệ thống; giá trị là một giá trị đơn
 (biến Flowable); ``$ref`` chỉ trỏ trong chính tệp (không tải gì từ ngoài); ``format`` chỉ ``date``, ``uuid`` — hai
-định dạng cả trình duyệt lẫn máy chủ cùng kiểm; ``pattern`` (cả khóa của ``patternProperties``) không dễ quay lui bùng
-nổ (``pattern_problem``).
+định dạng cả trình duyệt lẫn máy chủ cùng kiểm; không có ``patternProperties``; ``pattern`` không dễ quay lui bùng nổ,
+có ``maxLength`` cạnh nó khi thời gian kiểm tăng theo độ dài chuỗi (``pattern_problem``). Lúc kiểm dữ liệu, chuỗi dài
+quá ``maxLength`` không chạy ``pattern`` (``AppValidator``).
 """
 
 from __future__ import annotations
@@ -34,10 +35,13 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Iterator
 from datetime import date
 from re import _constants as sre
 from re import _parser as sre_parse
 from typing import Any
+
+from jsonschema import Draft202012Validator, validators
 
 from ..schemas import FormSchema, SchemaFileError
 
@@ -53,11 +57,14 @@ LONG = (-(2**63), 2**63 - 1)    # biến kiểu long của Flowable
 
 # ``pattern`` chạy bằng ``re`` (quay lui) ngay trong vòng sự kiện của svc-workflow lúc kiểm dữ liệu gửi lên, và ``re``
 # giữ GIL: một mẫu quay lui bùng nổ (ReDoS, vd ``^(a+)+$``) với vài chục ký tự làm đứng cả dịch vụ, kể cả Action của
-# Văn phòng điện tử. Lúc triển khai chỉ nhận mẫu không lặp lồng trong lặp (trừ lặp đúng n lần như ``(,[0-9]{3})*``),
-# không có lựa chọn ``|`` hay tham chiếu ngược trong phần lặp, nhiều nhất một phần lặp dài (không chặn trên hoặc trên
-# ``LONG_REPEAT`` lần). Đủ cho mẫu thường gặp: ``^20[0-9]{2}-``, lớp ký tự cấm, ``^[A-Z]{2,5}$``
+# Văn phòng điện tử. Lúc triển khai không nhận mẫu tốn thời gian mũ: lặp lồng trong lặp (trừ lặp đúng n lần như
+# ``(,[0-9]{3})*``), lựa chọn ``|`` hay tham chiếu ngược trong phần lặp. Phần lặp nối nhau vẫn tốn thời gian đa thức
+# (``^a{0,30}…a{0,30}$``), và jsonschema kiểm bằng re.search: mẫu không neo ``^`` thử lại ở mọi vị trí, ``a+$`` đã tốn
+# bình phương độ dài chuỗi. Nên ước lượng số bước quay lui = tích (high - low + 1) của các phần lặp không cố định, số
+# nhánh của mỗi ``|``, nhân L cho mỗi phần lặp không chặn trên và thêm L nếu không neo ``^``, với L = ``maxLength`` cạnh
+# ``pattern`` (bắt buộc khi số bước tăng theo L), rồi chặn trên MAX_STEPS. Đo với re: 10^7 bước khoảng 30 ms
 MAX_PATTERN = 512
-LONG_REPEAT = 32
+MAX_STEPS = 10**7
 REPEATS = (sre.MAX_REPEAT, sre.MIN_REPEAT, sre.POSSESSIVE_REPEAT)
 
 
@@ -77,11 +84,24 @@ def bad_value(value: Any) -> bool:
     return False
 
 
+def _pattern_within_length(validator: Any, pattern: str, instance: Any, schema: dict[str, Any]) -> Iterator[Any]:
+    """``pattern`` của jsonschema, trừ chuỗi dài hơn ``maxLength`` cạnh nó: không chạy mẫu (``maxLength`` đã báo lỗi),
+    để L mà ``pattern_problem`` dùng ước lượng cũng là chặn trên của chuỗi thật sự đưa vào re."""
+    limit = schema.get("maxLength")
+    if isinstance(instance, str) and isinstance(limit, int) and len(instance) > limit:
+        return
+    yield from Draft202012Validator.VALIDATORS["pattern"](validator, pattern, instance, schema)
+
+
+AppValidator = validators.extend(Draft202012Validator, {"pattern": _pattern_within_length})
+
+
 class AppForm:
     """Một form đã kiểm. errors() trả {} khi dữ liệu hợp lệ."""
 
     def __init__(self, schema: dict[str, Any]) -> None:
-        self._schema = FormSchema(schema)           # SchemaFileError nếu không phải JSON Schema 2020-12 hợp lệ
+        # SchemaFileError nếu không phải JSON Schema 2020-12 hợp lệ
+        self._schema = FormSchema(schema, validator=AppValidator)
         self.schema = schema
         self.fields: tuple[str, ...] = tuple(schema.get("properties") or {})
         self.required: frozenset[str] = frozenset(schema.get("required") or ())
@@ -107,56 +127,86 @@ class AppForm:
         return {name: data[name] for name in self.fields if data.get(name) is not None}
 
 
-def _risky(items: Any, in_repeat: bool, long: list[int]) -> str | None:
+def _risky(items: Any, in_repeat: bool, repeats: list[tuple[int, int]], branches: list[int]) -> str | None:
     """Chỗ dễ quay lui bùng nổ đầu tiên trong mẫu đã phân tích (``re._parser``), không có thì None. ``in_repeat``: đang
-    ở trong một phần lặp nhiều hơn một lần; ``long`` đếm phần lặp dài."""
+    ở trong một phần lặp nhiều hơn một lần; ``repeats`` gom (low, high) của các phần lặp không cố định, ``branches`` số
+    nhánh của mỗi ``|``."""
     for op, av in items:
         found = None
         if op in REPEATS:
             low, high, sub = av
             if in_repeat and low != high:
                 return "lặp lồng trong một phần lặp"
-            if high > LONG_REPEAT:
-                long.append(high)
-            found = _risky(sub, in_repeat or high > 1, long)
+            if low != high:
+                repeats.append((low, high))
+            found = _risky(sub, in_repeat or high > 1, repeats, branches)
         elif op == sre.BRANCH:
             if in_repeat:
                 return "lựa chọn (|) trong một phần lặp"
-            found = next((r for alt in av[1] if (r := _risky(alt, in_repeat, long))), None)
+            branches.append(len(av[1]))
+            found = next((r for alt in av[1] if (r := _risky(alt, in_repeat, repeats, branches))), None)
         elif op in (sre.GROUPREF, sre.GROUPREF_EXISTS):
             return "tham chiếu ngược tới nhóm"
         elif op == sre.SUBPATTERN:
-            found = _risky(av[3], in_repeat, long)
+            found = _risky(av[3], in_repeat, repeats, branches)
         elif op in (sre.ASSERT, sre.ASSERT_NOT):
-            found = _risky(av[1], in_repeat, long)
+            found = _risky(av[1], in_repeat, repeats, branches)
         elif op == sre.ATOMIC_GROUP:
-            found = _risky(av, in_repeat, long)
+            found = _risky(av, in_repeat, repeats, branches)
         if found:
             return found
     return None
 
 
-def pattern_problem(pattern: str) -> str | None:
-    """Vì sao không nhận ``pattern`` này lúc triển khai (tiếng Việt), nhận được thì None."""
+def _anchored(parsed: Any) -> bool:
+    """Mẫu mở đầu bằng ``^`` (không cờ m) hoặc ``\\A``: re.search chỉ thử ở đầu chuỗi."""
+    if not len(parsed) or parsed[0][0] != sre.AT:
+        return False
+    at = parsed[0][1]
+    return at == sre.AT_BEGINNING_STRING or (at == sre.AT_BEGINNING and not parsed.state.flags & re.MULTILINE)
+
+
+def _power(n: int) -> str:
+    """12345678 → '1,2·10^7'."""
+    e = len(str(n)) - 1
+    return f"{n / 10**e:.1f}".replace(".", ",") + f"·10^{e}"
+
+
+def pattern_problem(pattern: str, max_length: int | None = None) -> str | None:
+    """Vì sao không nhận ``pattern`` này lúc triển khai (tiếng Việt), nhận được thì None. ``max_length``: ``maxLength``
+    cạnh ``pattern`` trong schema, None nếu không khai."""
     if len(pattern) > MAX_PATTERN:
         return f"dài quá {MAX_PATTERN} ký tự"
     try:
         parsed = sre_parse.parse(pattern)
     except (re.error, RecursionError, OverflowError) as exc:
         return f"không phải biểu thức chính quy hợp lệ ({exc})"
-    long: list[int] = []
-    found = _risky(parsed, False, long)
+    repeats: list[tuple[int, int]] = []
+    branches: list[int] = []
+    found = _risky(parsed, False, repeats, branches)
     if found:
         return found
-    if len(long) > 1:
-        return f"có {len(long)} phần lặp dài (không chặn trên hoặc trên {LONG_REPEAT} lần), chỉ nhận một"
+    if not repeats and not branches:
+        return None             # không có chỗ nào để quay lui: re quét chuỗi một lượt
+    steps = math.prod(high - low + 1 for low, high in repeats if high != sre.MAXREPEAT) * math.prod(branches)
+    grows = sum(high == sre.MAXREPEAT for _, high in repeats) + (0 if _anchored(parsed) else 1)
+    if grows:
+        if max_length is None:
+            return ("thời gian kiểm tăng theo độ dài chuỗi (không neo ^ hoặc có phần lặp không chặn trên): cần "
+                    "maxLength ngay cạnh pattern")
+        steps *= max_length**grows
+    if steps > MAX_STEPS:
+        return (f"ước tính {_power(steps)} bước quay lui" + (f" với chuỗi {max_length} ký tự" if grows else "")
+                + f", tối đa {_power(MAX_STEPS)}: bớt phần lặp không cố định hay nhánh |, neo ^"
+                + (", giảm maxLength" if grows else ""))
     return None
 
 
-def _check_pattern(pattern: Any, where: str, errors: list[str]) -> None:
+def _check_pattern(pattern: Any, where: str, errors: list[str], max_length: Any = None) -> None:
     if not isinstance(pattern, str):
         return
-    problem = pattern_problem(pattern)
+    bound = max_length if isinstance(max_length, int) and not isinstance(max_length, bool) else None
+    problem = pattern_problem(pattern, bound)
     if problem:
         shown = pattern if len(pattern) <= 60 else pattern[:60] + "…"
         errors.append(f"{where}: pattern {shown!r}: {problem} — máy chủ kiểm bằng re (quay lui), mẫu như vậy có thể "
@@ -175,10 +225,10 @@ def _walk(node: Any, where: str, errors: list[str], schema: bool = True) -> None
             elif key == "format" and isinstance(value, str) and value not in FORMATS:
                 errors.append(f"{where}: format {value!r} chưa hỗ trợ (chỉ {', '.join(sorted(FORMATS))})")
             elif key == "pattern" and schema:
-                _check_pattern(value, where, errors)
-            elif key == "patternProperties" and schema and isinstance(value, dict):
-                for pattern in value:
-                    _check_pattern(pattern, where, errors)
+                _check_pattern(value, where, errors, node.get("maxLength"))
+            elif key == "patternProperties" and schema:
+                errors.append(f"{where}: không dùng patternProperties — khóa của đối tượng không có maxLength chặn độ "
+                              "dài cho pattern; khai từng trường trong properties")
             _walk(value, where, errors, schema and not key.startswith("x-moc"))
     elif isinstance(node, list):
         for value in node:
