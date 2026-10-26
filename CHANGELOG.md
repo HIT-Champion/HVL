@@ -254,8 +254,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `svc-workflow` sang lớp `Office` (`svc_workflow/office/api.py`) theo khuôn `Part` mới (`parts.py`). Biến mới
   `MOC_OFFICE_ENABLED` (mặc định `true`, hành vi như cũ); `false` thì hai dịch vụ vẫn lên với phần lõi, không gắn route
   hay chạy vòng nền nào của Văn phòng. `make demo-tat-van-phong` (có trong CI) dựng lại hai dịch vụ với cờ tắt, kiểm
-  phần lõi của `make smoke` (`smoke.py --chi-loi`) và `make demo-ca-nhan` vẫn đạt, rồi dựng lại như cũ. OpenAPI sinh ra
-  không đổi. Test svc-files +48 (`test_office_flag.py`), svc-workflow +3 (`test_office_toggle.py`).
+  phần lõi của `make smoke` (`smoke.py --chi-loi`) và `make demo-ca-nhan` vẫn đạt, rồi dựng lại như cũ. Hai dịch vụ đang
+  chạy mà được dựng từ thư mục khác (bản cài cùng project compose `moc` khi quên `COMPOSE_PROJECT_NAME`) thì màn demo
+  dừng ngay, không đụng gì (#328). OpenAPI sinh ra không đổi. Test svc-files +48 (`test_office_flag.py`), svc-workflow
+  +3 (`test_office_toggle.py`), scripts +3 (`test_demo_tat_van_phong.py`).
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
   chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
   thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi
