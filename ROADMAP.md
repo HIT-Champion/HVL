@@ -43,7 +43,7 @@ trường số khép kín.
       token (F1.1, F2.1)
 - [x] Một điểm vào: cổng API APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ (F1.2)
 - [x] Tường lửa ứng dụng web ở cổng: Coraza + OWASP CRS trong APISIX, chặn mặc định, loại trừ có lý do (F3.15,
-      nguyên lý iv; mức Dùng được: chữ thật ở vài ô nhập liệu còn cần người quản trị thêm loại trừ)
+      nguyên lý iv; mức Dùng được: chữ lạ ở ô chữ ngắn có thể bị chặn nhầm, người quản trị phải thêm loại trừ)
 - [x] Lưu trữ tệp nội bộ: SeaweedFS, tệp chỉ vào và ra qua `svc-files`, ClamAV quét trước khi ghi (F1.5, F1.6)
 - [x] Cấu trúc thư mục **P.A.R.A**: Không gian cá nhân `apps/ca-nhan` (Dự án, Lĩnh vực, Tài nguyên, Lưu trữ), ứng
       dụng thứ hai cắm vào lõi, không sửa dòng nào trong `services/`
