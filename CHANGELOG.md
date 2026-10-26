@@ -241,6 +241,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Thanh bên mở lại ngay sau khi bấm một mục (#297). Bấm chuột vào một mục thì thanh bên thu lại, nhưng con trỏ còn
+  nằm trong dải biểu tượng nên nhích 1px là thanh bên bật ra che trang vừa mở; bấm mục của chính trang đang mở thì
+  không thu. Giờ bấm chuột vào mục nào cũng thu thanh bên (kể cả khi thanh bên đang mở theo focus bàn phím) và đóng
+  ngăn kéo trên màn hẹp; rê chuột chỉ mở lại khi con trỏ đã rời thanh bên rồi vào lại. Chọn bằng bàn phím vẫn giữ
+  thanh bên mở theo focus.
 - CI không còn đỏ với PR không đổi tệp nào (#295). Hai job đọc danh sách tệp của PR ("Phạm vi thay đổi" và "Có đổi
   đường nâng cấp không") coi danh sách rỗng là lỗi API, nên PR chỉ ghi lịch sử một nhánh (#294) và PR gộp ngược `main`
   → `develop` sau phát hành (cây hai nhánh trùng nhau) không bao giờ qua được job bắt buộc "Chạy thử toàn hệ thống".

@@ -92,10 +92,46 @@ test('giao diện: thanh bên mở khi rê chuột hoặc dùng bàn phím, khô
   await expect(shell).toHaveClass(/is-collapsed/)
 
   // bấm một mục: sang trang mới và thu lại dù chuột còn trên thanh bên, focus do chuột không giữ thanh bên mở
-  await page.getByRole('link', { name: 'Văn bản đến', exact: true }).click()
+  const incoming = page.getByRole('link', { name: 'Văn bản đến', exact: true })
+  await incoming.click()
   await expect(page).toHaveURL(/\/van-ban-den$/)
   await expect(shell).toHaveClass(/is-collapsed/)
+  // con trỏ còn nằm trên biểu tượng vừa bấm: nhích 1px không làm thanh bên mở lại (chờ 400ms để chắc); ra hẳn khỏi
+  // thanh bên rồi vào lại thì mở như thường (#297)
+  const box = (await incoming.boundingBox())!
+  const [pointerX, pointerY] = [box.x + 24, box.y + box.height / 2]
+  await page.mouse.move(pointerX + 1, pointerY)
+  await page.waitForTimeout(400)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  // bấm mục của chính trang đang mở (route không đổi): vẫn thu lại, nhích chuột cũng không mở lại
+  await page.mouse.move(800, 300)
+  await page.mouse.move(pointerX, pointerY)
+  await expect(shell).not.toHaveClass(/is-collapsed/)
+  await page.mouse.click(pointerX, pointerY)
+  await expect(page).toHaveURL(/\/van-ban-den$/)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.mouse.move(pointerX + 1, pointerY)
+  await page.waitForTimeout(400)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.mouse.move(800, 300)
+  await page.mouse.move(pointerX, pointerY)
+  await expect(shell).not.toHaveClass(/is-collapsed/)
+  await page.mouse.move(800, 300)
+  await expect(shell).toHaveClass(/is-collapsed/)
   // bàn phím: Tab sang mục kế tiếp thì mở, focus rời thanh bên thì thu
+  await page.keyboard.press('Tab')
+  await expect(shell).not.toHaveClass(/is-collapsed/)
+  // đổi từ bàn phím sang chuột: thanh bên đang mở theo focus, bấm chuột đúng mục đang focus (không có focusin mới) vẫn
+  // thu, nhích chuột không mở lại; Tab tiếp thì mở theo bàn phím như thường
+  const focused = page.locator('#app-navigation a:focus')
+  const fbox = (await focused.boundingBox())!
+  const href = (await focused.getAttribute('href'))!
+  await page.mouse.click(fbox.x + 24, fbox.y + fbox.height / 2)
+  await expect(page).toHaveURL(new RegExp(`${href}$`))
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.mouse.move(fbox.x + 25, fbox.y + fbox.height / 2)
+  await page.waitForTimeout(400)
+  await expect(shell).toHaveClass(/is-collapsed/)
   await page.keyboard.press('Tab')
   await expect(shell).not.toHaveClass(/is-collapsed/)
   await page.getByTestId('notification-bell').focus()
