@@ -403,9 +403,10 @@ giá trị của nghiệp vụ văn thư — thì phần mã đó phải làm g�
 
 Xếp theo mã thật trên `9147e0f`: import nội gói, route, tên bảng, hằng số. Route xếp theo hàm xử lý của nó; mô-đun có
 hai phần rõ rệt thì xếp từng phần; `__init__.py` chỉ có chú thích, không xếp. "Dính" là chỗ phải gỡ khi tách (§4.4).
-Sau `9147e0f` có thêm bốn route công khai của Văn phòng (`/api/verify/ca.pem`, `/api/verify/anchor-key.pem` của #158;
-nộp lưu và xem tệp phòng đọc của #124), Action `otSensorMap` của IT/OT (#183) và `imageclean.py` (#150); §4.4 và §4.7
-đếm theo mã hiện tại.
+Sau `9147e0f` có thêm bốn route công khai: `/api/verify/ca.pem` của #158, nộp lưu và xem tệp phòng đọc của #124 là của
+Văn phòng; `/api/verify/anchor-key.pem` của #158 là của lõi (khóa công khai ký mốc neo sổ kiểm toán, cùng nhóm với
+`anchors.py`). Thêm nữa có Action `otSensorMap` của IT/OT (#183) và `imageclean.py` (#150); §4.4 và §4.7 đếm theo mã
+hiện tại.
 
 | Nhóm | `svc-files` | `svc-workflow` | Route công khai của `svc-files` (16) | CSDL |
 |---|---|---|---|---|
@@ -505,7 +506,7 @@ Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git g
 
 - **Mã.** Mọi route của `svc-files` gắn vào app trong `create_app` (`svc_files/app.py`): 16 route khai thẳng (chưa kể
   `/healthz`, `/readyz`), 7 route qua hàm `install()` của `docread/api.py`, `assist/api.py`, `imports/api.py`,
-  `assist/similar.py`. Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 1 lõi, 8 dáng nghiệp vụ, 11 Văn
+  `assist/similar.py`. Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 2 lõi, 8 dáng nghiệp vụ, 10 Văn
   phòng — cộng 3 route nội bộ đều của Văn phòng. Mô-đun dáng nghiệp vụ gọi vào gói `docread/` của Văn phòng: `sealed.py`
   → `docread.ocr._kill_group`; `assist/vi.py` → `docread.rules.fold`, `docread.summarize.INVISIBLE_RE`;
   `assist/retrieve.py` → `docread.rules.fold`, `DASHES`, `DATE`, `SYMBOL`. Đường tải lên chung cũng vậy: `imageclean.py`
@@ -594,9 +595,9 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
 1. Gỡ chỗ dính trong mã: đưa `_kill_group`, `_killed`, `fold` (cùng `DASHES`, `DATE`, `SYMBOL`), `INVISIBLE_RE` và
    ba mô-đun lõi của `docread/` sang chỗ chung;
    tách câu GraphQL của Văn phòng khỏi hai tệp `hasura.py`.
-2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 12 route Văn phòng đang khai thẳng
-   trong `app.py` (xem trước, hai route sổ, bốn route xác thực, ba route nộp lưu, `/internal/issue`,
-   `/internal/dispatch-file`)
+2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 11 route Văn phòng đang khai thẳng
+   trong `app.py` (xem trước, hai route sổ, ba route xác thực, ba route nộp lưu, `/internal/issue`,
+   `/internal/dispatch-file`; `/api/verify/anchor-key.pem` là của lõi, ở lại)
    sang `APIRouter` riêng (vd gói `svc_files/office/`; Actions của `svc-workflow` cũng vậy); `create_app` chỉ
    `include_router` và chạy tác vụ nền của Văn phòng khi phần đó được bật.
 3. Dọn CSDL: dời `core.file_texts_skip_restricted` và trigger `core.app_events_publish` sang schema `office`; cột in văn
