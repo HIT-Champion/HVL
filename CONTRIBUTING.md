@@ -148,6 +148,7 @@ Trong Không gian cá nhân và Bảng tin (JavaScript thuần, mỗi ứng dụ
   tử) hoặc `data-i18n-<thuộc tính>="khoa"` (vd `data-i18n-aria-label`); `localize()` gán lại theo ngôn ngữ đã chọn.
 - Kiểm bằng `node --test tests/*.test.js` trong thư mục ứng dụng: `tests/i18n.test.js` bắt chữ tiếng Việt viết cứng
   trong `public/*.js`, chữ tĩnh của `index.html` không có khóa hay lệch bảng, khóa thiếu ở một trong hai bảng.
+  e2e `tests/e2e/tieng-anh.spec.ts` mở cả hai ứng dụng bằng tiếng Anh.
 
 Tài liệu tiếng Anh: `README.en.md`. Bản tiếng Anh của hướng dẫn vận hành đang chờ người đóng góp (issue #59).
 
