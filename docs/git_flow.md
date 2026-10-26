@@ -47,7 +47,7 @@ hành (chuyển mục CHANGELOG) làm bằng một PR vào `develop`, rồi PR t
 |---|---|---|---|
 | `develop` | **Nhánh mặc định**: mã mới nhất, **luôn chạy được** | Không ai push trực tiếp | Squash merge từ PR |
 | `main` | Chỉ các bản đã phát hành; mỗi commit gộp trên `main` mang một thẻ | Không ai push trực tiếp | Merge commit từ PR phát hành (mục 6) |
-| `deploy` | Đúng phiên bản đang chạy trên server; reconciler kéo nhánh này | Backend | Theo thẻ phát hành (mục 7) |
+| `deploy` | Cho máy chủ bật reconciler GitOps: đúng phiên bản máy đó chạy. Chưa tạo, vì bản online của đội nâng bằng gói (mục 7) | Backend | Theo thẻ phát hành (mục 7) |
 | `<loại>/<issue>-<mô-tả>` | Nhánh làm việc tách từ `develop`, sống **≤ 3 ngày** | Người làm issue | Commit, push thoải mái |
 | `hotfix/X.Y.Z` | Sửa gấp một lỗi của bản đã phát hành, tách từ `main` | Người sửa | PR vào `main`, rồi gộp ngược vào `develop` |
 | Thẻ `vX.Y.Z` | Bản phát hành, gắn trên `main` | Backend | `make release` (mục 6); không sửa, không xóa được |
@@ -325,6 +325,12 @@ make release VERSION=1.1.0       # tạo thẻ v1.1.0 + gói .tar.gz + .sha256 t
 # 4. Đẩy thẻ — GitHub Actions kiểm thẻ nằm trên main, chưa có Release, đóng gói và kiểm lại gói bằng cùng
 #    scripts/kiem_goi.py, rồi mới tạo Release kèm .tar.gz, SBOM .cdx.json (make sbom) và .sha256 của cả hai
 git push origin v1.1.0
+
+# 5. Gộp ngược main vào develop để thẻ nằm trong lịch sử develop. Không làm thì bản clone develop (nhánh mặc định)
+#    có `git describe` ra thẻ cũ (v0.1.0-…), và scripts/install.sh lấy chuỗi đó làm phiên bản khi cài từ bản clone.
+#    main chỉ thêm commit gộp phát hành, cây giống hệt develop lúc phát hành, nên không xung đột
+gh pr create --base develop --head main --title "chore(release): merge v1.1.0 back into develop" --body "Refs #N"
+#    → review → Create a merge commit (không squash: squash không đưa thẻ vào lịch sử develop)
 ```
 
 **Bản vá nóng** — lỗi của bản đã phát hành cần sửa ngay, không chờ phase sau:
@@ -369,7 +375,12 @@ gh pr create --base develop --title "chore(release): gộp ngược v1.1.1 vào 
 
 ## 7. Đưa lên server (nhánh `deploy`)
 
-Reconciler trên server kéo nhánh `deploy` mỗi 60 giây. Chỉ Backend (@Vanvuong2005827) đẩy nhánh này.
+Có hai cách. Bản online của đội (signet.htechcs.com) dùng cách thứ nhất: tải gói của thẻ trên trang Release rồi chạy
+`scripts/nang_cap.sh nang` (`trien-khai.md` mục 7). Cách này sao lưu trước, kiểm sau khi nâng và lùi về được. Máy đó
+không bật reconciler nên repo chưa có nhánh `deploy`.
+
+Cách thứ hai dành cho máy chủ bật reconciler GitOps (`van-hanh.md` mục GitOps): reconciler kéo nhánh `deploy` mỗi 60
+giây. Chỉ Backend (@Vanvuong2005827) đẩy nhánh này.
 
 ```bash
 git fetch origin
