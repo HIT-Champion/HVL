@@ -19,12 +19,12 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { PASSWORD, TOTP_SECRET, signIn } from './helpers'
 
-// Trợ năng tự động (#246): axe-core quét cả trang theo WCAG 2.0, 2.1 mức A, AA. Mỗi vai trò đăng nhập một lần rồi
-// quét nhiều trang (tài khoản có TOTP phải chờ khoảng mã mới). Lỗi chưa sửa nằm trong ALLOW, mỗi dòng có rule, trang,
-// lý do và issue; danh sách chỉ ngắn đi: dòng nào không còn khớp lỗi nào ở trang đã quét thì test đỏ. Kết quả từng
-// trang ở test-results/axe/ (CI giữ lại khi test hỏng).
+// Trợ năng tự động (#246): axe-core quét cả trang theo WCAG 2.0, 2.1 mức A, AA và tiêu chí mới của 2.2 mức AA (#250,
+// như cỡ vùng bấm 2.5.8). Mỗi vai trò đăng nhập một lần rồi quét nhiều trang (tài khoản có TOTP phải chờ khoảng mã
+// mới). Lỗi chưa sửa nằm trong ALLOW, mỗi dòng có rule, trang, lý do và issue; danh sách chỉ ngắn đi: dòng nào không
+// còn khớp lỗi nào ở trang đã quét thì test đỏ. Kết quả từng trang ở test-results/axe/ (CI giữ lại khi test hỏng).
 
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
+const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
 interface Allowed { rule: string, page: string, reason: string, issue: number }
 const ALLOW: Allowed[] = []
@@ -94,6 +94,9 @@ test('trợ năng: các trang của giám khảo (chuyên viên)', async ({ brow
   left.push(...await scan(judge, '/van-ban/[id]'))
   left.push(...await scanAll(judge, ['/van-ban-den', '/van-ban-di', '/van-ban-di/soan', '/ho-so', '/cam-bien',
     '/tim-kiem', '/hoi-dap', '/ung-dung', '/gop-y', '/ca-nhan/']))
+  // Bảng tin (#250): h1 có sẵn trong HTML tĩnh, nên chờ đăng nhập SSO xong và danh sách tin (hay câu trạng thái) hiện
+  await judge.goto('/bang-tin/')
+  left.push(...await scan(judge, '/bang-tin/', judge.locator('#tin li, #trang-thai:not(:empty)').first()))
   expect(left).toEqual([])
 })
 

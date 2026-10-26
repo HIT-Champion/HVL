@@ -177,6 +177,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thẻ `<ol>` nên mất vai trò danh sách, trình đọc màn hình không đọc được số mục; nay tabpanel bọc ngoài danh sách.
   Spec quét khi đã bật giảm chuyển động (#263): quét lúc trang còn hiệu ứng vào thì axe đo chữ nhạt hơn màu thật và
   báo lỗi tương phản lúc có lúc không.
+  Từ #250 spec quét thêm Bảng tin (`/bang-tin/`, tài khoản `giamkhao`) và các tiêu chí mới của WCAG 2.2 mức AA (tag
+  `wcag22aa`, như cỡ vùng bấm 2.5.8).
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
