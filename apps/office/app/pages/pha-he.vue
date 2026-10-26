@@ -302,7 +302,7 @@ function exportOpenLineage() {
           </div>
           <div>
             <label for="lineage-chart" class="label">{{ t('lineage.chart') }}</label>
-            <select id="lineage-chart" v-model="focus" class="input w-auto" data-testid="lineage-chart">
+            <select id="lineage-chart" v-model="focus" class="input w-auto max-w-full" data-testid="lineage-chart">
               <option value="">{{ t('lineage.allCharts') }}</option>
               <option v-for="c in BOARD_CHARTS" :key="c.id" :value="c.id">{{ t(c.label) }}</option>
             </select>

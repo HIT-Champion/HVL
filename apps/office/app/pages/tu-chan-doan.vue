@@ -305,7 +305,7 @@ async function save() {
         <p v-if="!complete" class="py-8 text-center text-sm text-stone-500">
           {{ t('hpdi.answerAll', { n: total - answered }) }}
         </p>
-        <div v-else class="mt-2 grid gap-4 lg:grid-cols-2">
+        <div v-else class="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
             <EChart :option="radar" :height="320" :label="radarLabel" />
             <table class="mt-2 w-full text-sm" data-testid="hpdi-scores">

@@ -45,7 +45,7 @@ const label = computed(() => (props.status ? t(`quality.status.${props.status}`)
 </script>
 
 <template>
-  <span class="chip gap-1" :class="tone[level]" :title="detail || undefined" :data-status="level">
+  <span class="chip relative gap-1" :class="tone[level]" :title="detail || undefined" :data-status="level">
     <svg
       v-if="level !== 'NONE'" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"
       stroke-width="2.5" aria-hidden="true"

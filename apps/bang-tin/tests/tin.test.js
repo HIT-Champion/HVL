@@ -22,7 +22,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { LOAI, QUERY_TIN, dong, gio, tenNguoi } from '../public/tin.js'
+import { LOAI, QUERY_TIN, VAI_TRO_XEM, dong, gio, tenNguoi, vaiTro } from '../public/tin.js'
 
 const APP = new URL('../', import.meta.url)
 const ROOT = new URL('../../../', import.meta.url)
@@ -69,6 +69,17 @@ test('tên trong token có dấu tiếng Việt, token hỏng thì rỗng', () =
   const part = Buffer.from(JSON.stringify({ name: 'Nguyễn Thị Hà', preferred_username: 'ha' })).toString('base64url')
   assert.equal(tenNguoi(`h.${part}.s`), 'Nguyễn Thị Hà')
   assert.equal(tenNguoi('khong-phai-token'), '')
+})
+
+test('vai trò đọc được bảng tin khớp select_permissions của app.yaml; vai trò lấy từ token', () => {
+  const manifest = read(APP, 'app.yaml')
+  const select = manifest.slice(manifest.indexOf('select_permissions:'), manifest.indexOf('insert_permissions:'))
+  assert.deepEqual([...select.matchAll(/role: (\w+)/g)].map((m) => m[1]).sort(), [...VAI_TRO_XEM].sort())
+  assert.ok(!VAI_TRO_XEM.includes('tenant_admin'))
+  const claims = { 'https://hasura.io/jwt/claims': { 'x-hasura-default-role': 'tenant_admin' } }
+  assert.equal(vaiTro(`h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`), 'tenant_admin')
+  assert.equal(vaiTro('khong-phai-token'), null)
+  assert.match(read(APP, 'public/app.js'), /if \(!VAI_TRO_XEM\.includes\(vaiTro\(user\.access_token\)\)\) \{/)
 })
 
 test('trang không có script nội tuyến, đăng nhập dùng client và đường của ứng dụng', () => {

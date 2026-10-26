@@ -15,16 +15,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Mọi trang cần đăng nhập, trừ trang nhận kết quả đăng nhập từ Keycloak, cổng xác thực văn bản và trạng thái hệ thống
-// (công khai).
+// (công khai). Quản trị đơn vị mở trang văn bản thì về sổ kiểm toán (utils/adminRoutes.ts).
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path.replace(/\/$/, '') === '/dang-nhap') return
   if (to.path === '/xac-thuc' || to.path.startsWith('/xac-thuc/')) return
   if (to.path.replace(/\/$/, '') === '/trang-thai') return
   const auth = useAuth()
-  if (auth.user.value && !auth.user.value.expired) return
-  const restored = await auth.restore()
-  if (!restored) {
-    await auth.login(to.fullPath)
-    return abortNavigation()
+  if (!auth.user.value || auth.user.value.expired) {
+    const restored = await auth.restore()
+    if (!restored) {
+      await auth.login(to.fullPath)
+      return abortNavigation()
+    }
+  }
+  if (auth.claims.value?.role === 'tenant_admin' && closedToTenantAdmin(to.path)) {
+    return navigateTo('/so-kiem-toan', { replace: true })
   }
 })
