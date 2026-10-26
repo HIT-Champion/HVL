@@ -21,7 +21,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 process.env.TZ = 'America/Los_Angeles'   // máy ở múi giờ âm, có giờ mùa hè
-const { addDays, fmtDate, fmtDateTime, initialOf } = await import('../app/utils/format.ts')
+const { addDays, daysBetween, dueState, fmtDate, fmtDateTime, fmtMonth, fmtWeekday, initialOf, weekStart } =
+  await import('../app/utils/format.ts')
 
 test('ngày thuần (cột date) không lệch theo múi giờ của máy', () => {
   assert.equal(fmtDate('2026-10-20'), '20/10/2026')
@@ -48,4 +49,27 @@ test('chữ đại diện: chữ đầu của tên, viết hoa; thiếu tên th�
   assert.equal(initialOf('  đức ', ''), 'Đ')
   assert.equal(initialOf('', 'vanthu'), 'V')
   assert.equal(initialOf('', ''), '?')
+})
+
+test('lịch hạn: tuần bắt đầu từ Thứ Hai, đếm ngày qua tháng, hạn so với hôm nay', () => {
+  assert.equal(weekStart('2026-10-26'), '2026-10-26')
+  assert.equal(weekStart('2026-11-01'), '2026-10-26')
+  assert.equal(weekStart('2026-10-31'), '2026-10-26')
+  assert.equal(daysBetween('2026-10-26', '2026-11-03'), 8)
+  assert.equal(daysBetween('2026-10-26', '2026-10-24'), -2)
+  assert.deepEqual(dueState('2026-10-24', '2026-10-26'), { tone: 'over', n: 2 })
+  assert.deepEqual(dueState('2026-10-26', '2026-10-26'), { tone: 'today', n: 0 })
+  assert.deepEqual(dueState('2026-10-28', '2026-10-26'), { tone: 'soon', n: 2 })
+  assert.deepEqual(dueState('2026-10-31', '2026-10-26'), { tone: 'ok', n: 5 })
+})
+
+test('lịch hạn: tên thứ, tháng theo ngôn ngữ, không lệch theo múi giờ của máy', () => {
+  assert.equal(fmtWeekday('2026-10-31', 'vi'), 'Thứ Bảy')
+  assert.equal(fmtWeekday('2026-10-31', 'vi', 'short'), 'T7')
+  assert.equal(fmtWeekday('2026-11-01', 'vi', 'short'), 'CN')
+  assert.equal(fmtWeekday('2026-10-31', 'en'), 'Saturday')
+  assert.equal(fmtWeekday('2026-10-31', 'en', 'short'), 'Sat')
+  assert.equal(fmtMonth('2026-10-31', 'vi', '2026'), 'tháng 10')
+  assert.equal(fmtMonth('2027-01-04', 'vi', '2026'), 'tháng 1 năm 2027')
+  assert.equal(fmtMonth('2026-10-31', 'en', '2026'), 'October')
 })

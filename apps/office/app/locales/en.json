@@ -113,7 +113,6 @@
   },
   "inbox": {
     "title": "My tasks",
-    "subtitle": "Tasks waiting for you — urgent first",
     "empty": "Nothing is waiting for you.",
     "received": "Received",
     "due": "Due",
@@ -1628,17 +1627,30 @@
     "scrollTable": "Scroll horizontally to read all columns."
   },
   "desk": {
-    "queue": "To process",
     "draft": "Unnumbered draft",
     "clearFilters": "Clear filters",
     "compose": "New document",
-    "pending": "{n} tasks awaiting action.",
     "filter": "Filter tasks",
     "noDeadline": "No deadline",
-    "attention": "Needs attention",
-    "remaining": "Other tasks",
     "category": "Direction",
-    "allDocuments": "All documents"
+    "allDocuments": "All documents",
+    "finding": "{n} task waiting. Nearest due {date}, {left}. | {n} tasks waiting. Nearest due {date}, {left}.",
+    "findingNoDue": "{n} task waiting, no due date yet. | {n} tasks waiting, none with a due date yet.",
+    "received": "received {date}",
+    "dueOver": "{n} day overdue | {n} days overdue",
+    "dueToday": "due today",
+    "dueLeft": "{n} day left | {n} days left",
+    "calendar": "Due dates",
+    "later": "Later",
+    "hideCalendar": "Hide calendar",
+    "showCalendar": "Show calendar",
+    "dayTasks": "{date}: {n} task | {date}: {n} tasks",
+    "dayNone": "{date}: no tasks",
+    "showingDay": "Showing tasks due {date}.",
+    "showingOverdue": "Showing overdue tasks.",
+    "showingLater": "Showing tasks due after {date}.",
+    "showingNoDue": "Showing tasks with no due date.",
+    "showAll": "Show all {n} task | Show all {n} tasks"
   },
   "shell": {
     "closeNav": "Close navigation"

@@ -43,7 +43,8 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
   await staff.getByRole('button', { name: 'English', exact: true }).click()
   await expect(html).toHaveAttribute('lang', 'en')
   await expect(staff.getByRole('heading', { level: 1, name: 'My tasks' })).toBeVisible()
-  await expect(staff.getByText('Tasks waiting for you — urgent first')).toBeVisible()
+  // câu mở đầu hộp việc (#291): số việc và hạn gần nhất, hoặc câu báo hộp trống
+  await expect(staff.getByText(/^\d+ tasks? waiting|^Nothing is waiting for you/)).toBeVisible()
   for (const name of ['My tasks', 'Incoming documents', 'Outgoing', 'Draft a document', 'Search', 'Ask']) {
     await expect(staff.getByRole('link', { name, exact: true })).toBeVisible()
   }

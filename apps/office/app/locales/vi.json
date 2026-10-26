@@ -113,7 +113,6 @@
   },
   "inbox": {
     "title": "Hộp việc",
-    "subtitle": "Việc đang chờ bạn — văn bản khẩn xếp trước",
     "empty": "Không còn việc nào chờ bạn.",
     "received": "Nhận lúc",
     "due": "Hạn",
@@ -1628,17 +1627,30 @@
     "scrollTable": "Cuộn ngang để xem đầy đủ các cột của sổ."
   },
   "desk": {
-    "queue": "Cần xử lý",
     "draft": "Dự thảo chưa cấp số",
     "clearFilters": "Xóa bộ lọc",
     "compose": "Soạn mới",
-    "pending": "{n} công việc đang chờ xử lý.",
     "filter": "Lọc công việc",
     "noDeadline": "Chưa có hạn",
-    "attention": "Cần chú ý",
-    "remaining": "Các công việc còn lại",
     "category": "Chiều văn bản",
-    "allDocuments": "Tất cả văn bản"
+    "allDocuments": "Tất cả văn bản",
+    "finding": "{n} việc chờ bạn. Hạn gần nhất {date}, {left}.",
+    "findingNoDue": "{n} việc chờ bạn, chưa việc nào có hạn.",
+    "received": "nhận {date}",
+    "dueOver": "quá hạn {n} ngày",
+    "dueToday": "hết hạn hôm nay",
+    "dueLeft": "còn {n} ngày",
+    "calendar": "Lịch hạn",
+    "later": "Sau đó",
+    "hideCalendar": "Thu gọn lịch",
+    "showCalendar": "Mở lịch",
+    "dayTasks": "{date}: {n} việc",
+    "dayNone": "{date}: không có việc",
+    "showingDay": "Đang xem việc hạn {date}.",
+    "showingOverdue": "Đang xem việc quá hạn.",
+    "showingLater": "Đang xem việc hạn sau {date}.",
+    "showingNoDue": "Đang xem việc chưa có hạn.",
+    "showAll": "Xem tất cả {n} việc"
   },
   "shell": {
     "closeNav": "Đóng điều hướng"
