@@ -67,7 +67,8 @@ async function brokenImages(page: Page): Promise<string[]> {
 test('tài sản: phông, logo, CSS của trang đăng nhập và của ứng dụng tải được', async ({ browser }) => {
   test.skip(!PASSWORD, 'Cần dữ liệu mẫu và MOC_DEMO_PASSWORD')
 
-  // Trang đăng nhập (theme signet): phông và logo nằm trong resources của theme, CSS gọi ../fonts/…, ../img/…
+  // Trang đăng nhập (theme signet): logo nằm trong resources của theme (CSS gọi ../img/…), phông do keycloak-fonts
+  // chép từ gói npm vào volume gắn ở resources/fonts/be-vietnam-pro (#305)
   const login = await (await browser.newContext()).newPage()
   const loginBad = watch(login)
   await login.goto('/')

@@ -47,7 +47,7 @@ sử dụng"*).
 | Docker Compose v2 | ≥ 2.20 | Apache-2.0 | Điều phối đa dịch vụ | Plugin của Docker |
 | Caddy | ≥ 2.6 | Apache-2.0 | Proxy TLS trên máy chủ: HTTPS, chứng thư Let's Encrypt tự gia hạn ([`docs/trien-khai.md`](docs/trien-khai.md)); không nằm trong Compose | Gói hệ thống của máy chủ (`apt install caddy`) |
 | Python | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
-| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin` (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests` | `node:24.20.0-slim` |
+| Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin` và phông của theme đăng nhập (image `keycloak-fonts`, #305) (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests` | `node:24.20.0-slim` |
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
 | axe-core, @axe-core/playwright | 4.13.0 | MPL-2.0 | Kiểm trợ năng tự động theo WCAG 2.0, 2.1 mức A, AA trong e2e (`tests/e2e/tro-nang.spec.ts`, #246); chỉ dùng trong test, dùng nguyên bản, không vào gói phát hành | npm, `tests/e2e/package-lock.json` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
@@ -71,7 +71,7 @@ sử dụng"*).
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| Keycloak | 26.7.5 | Apache-2.0 | Định danh tập trung: SSO, MFA, vai trò người dùng | `quay.io/keycloak/keycloak:26.7.5` | 1 |
+| Keycloak | 26.7.5 | Apache-2.0 | Định danh tập trung: SSO, MFA, vai trò người dùng | `quay.io/keycloak/keycloak:26.7.5`, nguyên bản; theme đăng nhập `signet` gắn từ repo, phông của theme do dịch vụ chạy một lần `keycloak-fonts` (`platform/keycloak/fonts/`, #305) chép từ gói npm vào volume | 1 |
 | Apache APISIX | 3.18.0 | Apache-2.0 | Cổng API: cửa duy nhất ra Internet, kiểm JWT tại biên, giới hạn tốc độ | `apache/apisix:3.18.0-debian`, dựng thành `moc/apisix` chỉ thêm tệp WAF (`platform/apisix/Dockerfile`, F3.15) | 1 |
 | PostgreSQL | 16 | PostgreSQL License | Cơ sở dữ liệu quan hệ chính (QĐ-002) | `postgres:16-alpine` | 1 |
 | Hasura GraphQL Engine (CE) | v2.51.0 | Apache-2.0 | Tự sinh API GraphQL, phân quyền cấp dòng, Actions, Event Triggers (luồng `core.app_events` tới webhook của ứng dụng cài bằng `moc app install`; `hasura-cli` có sẵn trong image áp metadata trộn) | `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` | 1 |
@@ -102,7 +102,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 | Tailwind CSS (+ `@tailwindcss/vite`) | 4.3.3 | MIT | Định dạng giao diện | npm | 1 |
 | Ajv | 8.20.0 | MIT | Biên dịch JSON Schema dùng chung (`schemas/`) thành mã kiểm form lúc dựng; chỉ dùng lúc dựng, không vào bundle | npm | 2 |
 | Apache ECharts | 6.1.0 | Apache-2.0 | Biểu đồ dashboard điều hành (F3.11), chỉ nạp biểu đồ cột, vẽ SVG. Kéo theo zrender 6.1.0 (BSD-3-Clause) và tslib 2.3.0 (0BSD), cùng nằm trong bundle | npm | 3 |
-| Be Vietnam Pro | 1.002 | OFL-1.1 | Phông giao diện của nhận diện Liền mạch (#116), đủ dấu tiếng Việt. Bốn độ đậm 400, 500, 600, 700 lấy nguyên bản từ kho Google Fonts (`ofl/bevietnampro`), không sửa, kèm `OFL.txt`; trình duyệt tải từ chính máy chủ, không gọi Google Fonts | Tệp trong kho: `apps/office/public/fonts/be-vietnam-pro/`, bản trùng từng byte cho Không gian cá nhân ở `apps/ca-nhan/public/fonts/be-vietnam-pro/` và cho trang đăng nhập ở `platform/keycloak/themes/signet/login/resources/fonts/` | 3 |
+| Be Vietnam Pro (`@fontsource/be-vietnam-pro`) | 5.3.0 (phông 1.002) | OFL-1.1 | Phông giao diện của nhận diện Liền mạch (#116), đủ dấu tiếng Việt. Bốn độ đậm 400, 500, 600, 700, kiểu thường; gói chia mỗi độ đậm theo bộ ký tự latin, latin-ext, vietnamese (tệp woff2, woff, CSS có `unicode-range`), dùng nguyên như gói phát hành, kèm giấy phép của gói (`OFL.txt`); trình duyệt tải từ chính máy chủ, không gọi Google Fonts. Repo không chứa tệp phông nào (#305) | npm, ghim trong `package-lock.json` của `apps/office` (Vite đưa vào `/_nuxt/`), `apps/ca-nhan` và `platform/keycloak/fonts` (image `keycloak-fonts` chép vào volume `keycloak_fonts`, Keycloak gắn vào `themes/signet/login/resources/fonts/be-vietnam-pro/`) | 3 |
 
 Thư viện gián tiếp (khoảng 700 gói, đều chỉ dùng lúc dựng; trang phát hành chỉ còn tệp JS/CSS tĩnh) mang
 giấy phép MIT, ISC, Apache-2.0, BSD-2/3-Clause, BlueOak-1.0.0, MPL-2.0 hoặc 0BSD, đều được OSI phê duyệt. Quét
@@ -298,8 +298,8 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
 - ✅ MIT-CMU chỉ cho Pillow (ngoại lệ có lý do): một dạng HPND, dễ dãi, chỉ đòi giữ thông báo bản quyền; SPDX đánh dấu
   OSI phê duyệt cho HPND nhưng chưa cho riêng MIT-CMU.
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
-  trong ba giấy phép), Pango (nạp động), phông Liberation, phông giao diện Be Vietnam Pro (kèm `OFL.txt`, khai trong
-  `REUSE.toml`, toàn văn ở `LICENSES/OFL-1.1.txt`).
+  trong ba giấy phép), Pango (nạp động), phông Liberation, phông giao diện Be Vietnam Pro (gói npm
+  `@fontsource/be-vietnam-pro`, không nằm trong repo; mỗi bản dựng kèm `OFL.txt` lấy từ gói).
 - ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
   `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
   theo BSD-3-Clause, `type-fest` theo MIT.
