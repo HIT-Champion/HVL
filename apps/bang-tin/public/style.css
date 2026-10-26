@@ -16,22 +16,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* Bảng tin đơn vị: một cột, phông hệ thống, màu của Signet (như apps/ca-nhan) */
-:root { --chu: #1f2937; --nhat: #6b7280; --nen: #f8fafc; --the: #ffffff; --vien: #e5e7eb; --chinh: #115e59; }
+/* Bảng tin đơn vị: một cột, màu "Lịch hạn" của Signet (như apps/office và apps/ca-nhan): trang trắng, chữ mực lục
+   đậm; đầu trang lục bảo sâu là khối tối duy nhất, lục bảo nhấn cho liên kết và loại tin. Phông hệ thống: Be Vietnam
+   Pro chỉ dùng khi máy đã cài sẵn, trang không tải tệp phông. */
+:root { --chu: #10201b; --nhat: #4d5f56; --nen: #ffffff; --the: #ffffff; --vien: #d6e1dc; --chinh: #0b6b53;
+  --dam: #0b5a47; --dam-re: #0f6a54; --vien-dam: #86c2a9; }
 * { box-sizing: border-box; }
-body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--chu);
-  background: var(--nen); }
+body { margin: 0; font: 16px/1.5 "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  color: var(--chu); background: var(--nen); }
+::selection { background: #b7dccb; color: var(--chu); }
+a { color: var(--chinh); text-underline-offset: 3px; }
+/* viền focus lục bảo trên nền trắng; trên đầu trang thì trắng vì viền lục bảo chìm vào nền */
+:focus-visible { outline: 2px solid var(--chinh); outline-offset: 3px; }
+header :focus-visible { outline-color: #fff; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1.25rem;
-  background: var(--chinh); color: #fff; flex-wrap: wrap; }
-header h1 { margin: 0; font-size: 1.25rem; }
+  background: var(--dam); color: #fff; flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
 .ai { margin: 0; font-size: 0.9rem; }
-button { font: inherit; border: 1px solid #fff; background: transparent; color: #fff; border-radius: 6px;
-  padding: 0.15rem 0.6rem; cursor: pointer; }
+/* nút cao tối thiểu 44px, bo 8px như Văn phòng; nút duy nhất là Đăng xuất trên đầu trang */
+button { font: inherit; font-weight: 500; min-height: 44px; border: 1px solid var(--vien-dam); background: transparent;
+  color: #fff; border-radius: 8px; padding: 0.5rem 0.875rem; cursor: pointer; transition: background-color 160ms; }
+button:hover { background: var(--dam-re); }
 main { max-width: 52rem; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
 .mo-ta, #trang-thai { color: var(--nhat); }
 #tin { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
 #tin li { background: var(--the); border: 1px solid var(--vien); border-radius: 8px; padding: 0.7rem 0.9rem; }
 .loai { display: inline-block; font-size: 0.8rem; font-weight: 600; color: var(--chinh); margin-right: 0.5rem; }
-.gio { font-size: 0.8rem; color: var(--nhat); }
+.gio { font-size: 0.8rem; color: var(--nhat); font-variant-numeric: tabular-nums; }
 .so { font-weight: 600; margin: 0.15rem 0 0; }
 .trich-yeu { margin: 0.1rem 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+}
