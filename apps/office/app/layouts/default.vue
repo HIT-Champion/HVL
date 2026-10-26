@@ -34,14 +34,28 @@ const keyboardFocus = ref(false)
 const collapsed = computed(() => !mobile.value && !hovering.value && !keyboardFocus.value)
 const menuButton = ref<HTMLButtonElement | null>(null)
 let hoverExit: ReturnType<typeof setTimeout> | undefined
+// Bấm chuột vào một mục, kể cả mục của trang đang mở (route không đổi nên watch(route) ở dưới không chạy): thu thanh
+// bên, đóng ngăn kéo, rồi không cho rê chuột mở lại tới khi con trỏ rời hẳn thanh bên và vào lại. Không thì con trỏ còn
+// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Enter bằng bàn phím (event.detail = 0) vẫn giữ
+// thanh bên mở theo focus như cũ
+let pointerPicked = false
+function pickInNavigation(event: MouseEvent) {
+  if (!(event.target as HTMLElement).closest('a[href]')) return
+  open.value = false
+  if (!event.detail) return
+  pointerPicked = true
+  hovering.value = false
+}
 // Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
 // đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung
 function moveInNavigation(event: PointerEvent) {
   if (!event.movementX && !event.movementY) return
   clearTimeout(hoverExit)
+  if (pointerPicked) return
   hovering.value = true
 }
 function leaveNavigation() {
+  pointerPicked = false
   clearTimeout(hoverExit)
   hoverExit = setTimeout(() => { hovering.value = false }, 140)
 }
@@ -216,7 +230,7 @@ async function logout() {
     <aside
       id="app-navigation" class="sg-sidebar" :aria-label="t('fe.navigation')"
       :inert="mobile && !open ? true : undefined"
-      @pointermove="moveInNavigation" @pointerleave="leaveNavigation"
+      @pointermove="moveInNavigation" @pointerleave="leaveNavigation" @click="pickInNavigation"
       @focusin="focusNavigation" @focusout="blurNavigation"
     >
       <div class="sg-brand-row">

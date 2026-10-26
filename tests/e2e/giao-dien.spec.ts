@@ -92,8 +92,31 @@ test('giao diện: thanh bên mở khi rê chuột hoặc dùng bàn phím, khô
   await expect(shell).toHaveClass(/is-collapsed/)
 
   // bấm một mục: sang trang mới và thu lại dù chuột còn trên thanh bên, focus do chuột không giữ thanh bên mở
-  await page.getByRole('link', { name: 'Văn bản đến', exact: true }).click()
+  const incoming = page.getByRole('link', { name: 'Văn bản đến', exact: true })
+  await incoming.click()
   await expect(page).toHaveURL(/\/van-ban-den$/)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  // con trỏ còn nằm trên biểu tượng vừa bấm: nhích 1px không làm thanh bên mở lại (chờ 400ms để chắc); ra hẳn khỏi
+  // thanh bên rồi vào lại thì mở như thường (#297)
+  const box = (await incoming.boundingBox())!
+  const [x, y] = [box.x + 24, box.y + box.height / 2]
+  await page.mouse.move(x + 1, y)
+  await page.waitForTimeout(400)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  // bấm mục của chính trang đang mở (route không đổi): vẫn thu lại, nhích chuột cũng không mở lại
+  await page.mouse.move(800, 300)
+  await page.mouse.move(x, y)
+  await expect(shell).not.toHaveClass(/is-collapsed/)
+  await page.mouse.click(x, y)
+  await expect(page).toHaveURL(/\/van-ban-den$/)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.mouse.move(x + 1, y)
+  await page.waitForTimeout(400)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.mouse.move(800, 300)
+  await page.mouse.move(x, y)
+  await expect(shell).not.toHaveClass(/is-collapsed/)
+  await page.mouse.move(800, 300)
   await expect(shell).toHaveClass(/is-collapsed/)
   // bàn phím: Tab sang mục kế tiếp thì mở, focus rời thanh bên thì thu
   await page.keyboard.press('Tab')
