@@ -365,6 +365,124 @@
           "legendFormat": "{{type}}"
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Cảnh báo đang bật",
+      "description": "Luật trong platform/monitoring/canh-bao.yml (#255); chưa gửi ra ngoài",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moc-prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "moc-prometheus"
+          },
+          "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Cảnh báo đang bật và đang chờ",
+      "description": "pending: điều kiện đã đúng nhưng chưa đủ thời gian `for` của luật; firing: đang bật",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "moc-prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 20
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "indexByName": {
+              "alertname": 0,
+              "alertstate": 1,
+              "severity": 2,
+              "route": 3
+            },
+            "renameByName": {
+              "alertname": "Cảnh báo",
+              "alertstate": "Trạng thái",
+              "severity": "Mức",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "moc-prometheus"
+          },
+          "expr": "ALERTS",
+          "format": "table",
+          "instant": true
+        }
+      ]
     }
   ],
   "templating": {

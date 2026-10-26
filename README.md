@@ -164,7 +164,7 @@ Danh mục đầy đủ, cả thư viện và lý do chọn: [`DEPENDENCIES.md`]
 | Tin cậy | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc trước khi lưu |
 | Tin cậy | OpenBao | 2.7.1 | MPL-2.0 | Két bí mật, khóa mã hóa văn bản hạn chế, CA nội bộ và khóa ký |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | Bản sao số của cảm biến theo NGSI-LD (profile `iot`) |
-| Vận hành | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát cổng API, chỉ trong mạng nội bộ |
+| Vận hành | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát, cảnh báo cổng API, chỉ trong mạng nội bộ |
 | Vận hành | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Log tập trung đã che thông tin cá nhân, tùy chọn (profile `logs`) |
 | Vận hành | restic | 0.19.1 | BSD-2-Clause | Sao lưu mã hóa CSDL, tệp, két |
 

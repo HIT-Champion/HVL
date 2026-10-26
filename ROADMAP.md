@@ -151,7 +151,7 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
 - [x] Trang công khai Trạng thái hệ thống `/trang-thai`: tình trạng từng thành phần, phiên bản, giờ sao lưu gần nhất
       (`docs/van-hanh.md`, mục Trang trạng thái hệ thống)
 - [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana mới thu chỉ số của APISIX, chưa có chỉ số
-      từng dịch vụ, chưa có cảnh báo
+      từng dịch vụ; có luật cảnh báo (#255) nhưng chỉ xem trong Grafana, Prometheus, chưa gửi ra ngoài
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
       định; `X-Request-Id` đi xuyên `svc-workflow`; thu 8 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202)
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,

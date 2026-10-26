@@ -330,6 +330,32 @@ bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi g
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
 
+### Cảnh báo
+
+Prometheus tính 5 luật trong `platform/monitoring/canh-bao.yml` mỗi 15 giây, trên chỉ số APISIX đang thu (#255).
+Nhãn `route` là id route trong `platform/apisix/apisix.yaml`.
+
+| Cảnh báo | Mức | Bật khi |
+|---|---|---|
+| `GatewayMetricsDown` | critical | Prometheus không thu được chỉ số của APISIX quá 2 phút: cổng có thể đã dừng |
+| `UpstreamUnreachable` | critical | Một route trả 502 hoặc 504 liên tục 3 phút: APISIX tự sinh hai mã này khi dịch vụ sau cổng chết hay quá giờ |
+| `High5xxRatio` | warning | Hơn 5% yêu cầu lỗi 5xx trong 5 phút, khi có hơn 0,1 yêu cầu/giây |
+| `SlowRoute` | warning | p95 thời gian trả lời trên 3 giây trong 10 phút, ở route graphql, app-office, app-ca-nhan, keycloak, dang-nhap, dang-nhap-post |
+| `AlertRulesFailing` | warning | Prometheus tính luật bị lỗi trong 10 phút qua |
+
+- Xem ở hàng "Cảnh báo đang bật" cuối bảng điều khiển Grafana. `pending` là điều kiện đã đúng nhưng chưa đủ thời
+  gian của luật. Trên máy chủ, trong thư mục cài:
+  `docker compose exec -T prometheus wget -q -O - http://localhost:9090/api/v1/alerts`.
+- Chưa có Alertmanager: cảnh báo không gửi email hay chat, người vận hành phải mở Grafana để thấy.
+- 503 không tính là "không trả lời". svc-files trả 503 có chủ ý (`busy`, `scanner_unavailable`… kèm `Retry-After`),
+  nên 503 chỉ tính vào tỉ lệ 5xx. Độ trễ của svc-files không xét: tải lên, đọc văn bản đến, hỏi đáp vốn chậm theo
+  thiết kế.
+- svc-workflow không có cảnh báo riêng. Nó không có route riêng mà nằm sau Hasura Actions; lỗi của nó về trình duyệt
+  là GraphQL 200 có `errors`.
+- Cảnh báo dựa trên lưu lượng thật: không ai gọi tới thì không thấy dịch vụ chết.
+- Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
+  `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
+
 ## Trang trạng thái hệ thống
 
 `<MOC_PUBLIC_URL>/trang-thai` là trang công khai, không cần đăng nhập: người dùng tự xem Signet có đang chạy bình

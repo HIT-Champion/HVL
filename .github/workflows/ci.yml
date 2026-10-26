@@ -123,6 +123,15 @@ jobs:
           docker run --rm --network none "${m[@]}" "$image" validate --deny-warnings /etc/vector/vector.yaml
           docker run --rm --network none "${m[@]}" "$image" test /etc/vector/vector.yaml /etc/vector/vector.test.yaml
 
+      # F3.13 (#255): cấu hình Prometheus nạp được luật cảnh báo, mỗi luật có ca bật và ca không bật trong
+      # platform/monitoring/kiem-tra/canh-bao.test.yml. promtool có sẵn trong image ghim digest ở docker-compose.yml
+      - name: Giám sát — cấu hình Prometheus và luật cảnh báo (promtool check config, test rules)
+        run: |
+          image=$(sed -n '/^  prometheus:$/,/^    image:/s/^    image: //p' docker-compose.yml)
+          m=(--entrypoint promtool -v "$PWD/platform/monitoring:/etc/prometheus:ro")
+          docker run --rm --network none "${m[@]}" "$image" check config /etc/prometheus/prometheus.yml
+          docker run --rm --network none "${m[@]}" "$image" test rules /etc/prometheus/kiem-tra/canh-bao.test.yml
+
       - name: Script khả thi và đúng cú pháp
         run: |
           for f in scripts/*.sh db/tests/stack.sh; do
