@@ -229,6 +229,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Tài liệu không còn ghi Prometheus chỉ thu chỉ số của APISIX (#282). Từ #274, Prometheus thu thêm trạng thái từng thành
+  phần qua `GET /metrics` của svc-files. Sửa bảng công cụ và mục hạn chế của `docs/architecture.md`, dòng Prometheus
+  của `DEPENDENCIES.md`, bảng thành phần của `README.md`, `README.en.md` và `platform/README.md`.
 - `docs/danh-gia-ai.md` có số đo của CI và bỏ hai câu cũ về bản scan (#276). Mục "Giới hạn" của F4.1 ghi bản scan chưa
   được OCR cho tìm kiếm, F4.2 ghi bản scan chỉ có đoạn "trích yếu". Từ #253, bản scan vào tìm kiếm và đoạn hỏi đáp
   bằng chữ OCR của 3 trang đầu. Tài liệu chép thêm số của ba lần chạy xanh trên `develop` ngày 26/10, phần `ai` của

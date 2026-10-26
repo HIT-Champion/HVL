@@ -285,7 +285,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
-| Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Thu chỉ số của APISIX mỗi 15 giây, tính luật cảnh báo; Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
+| Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
 | Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 8 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
 | Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, kiểm chữ ký commit nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
@@ -988,8 +988,9 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   ([`trien-khai.md`](trien-khai.md) §8). Ứng dụng chỉ tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
   tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
-- **Quan sát**: chỉ có chỉ số của APISIX, chưa có tracing phân tán; cảnh báo chỉ hiện trong Grafana, Prometheus,
-  chưa gửi ra ngoài; log tập trung tắt mặc định (F3.13, F3.14).
+- **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ, chưa có
+  tracing phân tán; cảnh báo chỉ hiện trong Grafana, Prometheus, chưa gửi ra ngoài; log tập trung tắt mặc định (F3.13,
+  F3.14).
 - **Két bí mật**: `.env` vẫn là nguồn bí mật; chưa có quy trình xoay khóa transit, xoay bí mật
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, cụm ①).
 - **Số đo còn thiếu**: chạy trên máy 8 GB và "cài dưới một giờ" chưa đo (§1.3); cột "trước" của số đo thành công chưa

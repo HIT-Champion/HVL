@@ -11,6 +11,6 @@ vào container ở chế độ chỉ đọc; `make install` chép chúng vào b�
 | [`apisix/`](apisix/) | Apache APISIX | `/usr/local/apisix/conf/` | Route danh sách trắng, kiểm JWT, giới hạn tốc độ, nhật ký |
 | [`centrifugo/`](centrifugo/) | Centrifugo | `/centrifugo` | Kênh thông báo riêng từng người, kiểm token Keycloak |
 | [`openbao/`](openbao/) | OpenBao | `/moc` | Cấu hình máy chủ; `start.sh` khởi tạo, mở khóa két, cấp AppRole, dựng PKI |
-| [`monitoring/`](monitoring/) | Prometheus, Grafana | `/etc/prometheus/`, `/etc/grafana/` | Thu chỉ số cổng API, nguồn dữ liệu, bảng điều khiển |
+| [`monitoring/`](monitoring/) | Prometheus, Grafana | `/etc/prometheus/`, `/etc/grafana/` | Thu chỉ số cổng API và trạng thái thành phần, luật cảnh báo, nguồn dữ liệu, bảng điều khiển |
 | [`logs/`](logs/) | Vector (profile `logs`) | `/etc/vector/` | Nhận log của 8 dịch vụ qua driver fluentd, tách mã yêu cầu, che lần hai, gửi Parseable; test của bước che; tệp compose phủ đổi driver log ([`docs/van-hanh.md`](../docs/van-hanh.md#log-tập-trung)) |
 | [`systemd/`](systemd/) | systemd (trên máy chủ) | không gắn — chép vào `/etc/systemd/system/` | Hẹn giờ chạy `scripts/reconcile.py` mỗi 60 giây |
