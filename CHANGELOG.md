@@ -13,7 +13,7 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   đầu, kết thúc, `userTask`, cổng rẽ nhánh, luồng; không `scriptTask`, `serviceTask`, listener, biểu thức ngoài điều
   kiện so chuỗi và nhóm ứng viên `t:${tenantId}:…`; không `DOCTYPE`, `ENTITY`; process id tối đa 22 ký tự để Flowable
   giữ khóa trong id định nghĩa), form 2020-12 với `additionalProperties: false` (tên trường không trùng `execution`,
-  `task`, `authenticatedUserId`, `variableContainer` mà Flowable dành sẵn trong biểu thức — #330), `pattern` không quay
+  `task`, `authenticatedUserId`, `currentTenantId` mà Flowable dành sẵn trong biểu thức — #330), `pattern` không quay
   lui bùng nổ (ReDoS: không lặp lồng, số bước quay lui ước lượng tối đa 10^7, cần `maxLength` khi số bước tăng theo độ
   dài chuỗi; chuỗi dài quá `maxLength` không chạy `pattern`; kiểm một lần gửi tối đa 3·10^7 bước (mỗi schema con 3000
   bước cộng `pattern` ở đó, mỗi chỗ `$ref` tính một lần), `$id`, `$anchor` chỉ ở gốc form, không nhận `propertyNames`,

@@ -50,8 +50,9 @@ from ..schemas import FormSchema, SchemaFileError
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
 # biến hệ thống svc-workflow đặt lúc bắt đầu quy trình, lấy từ token; form không khai được, client không ghi đè được
 RESERVED = ("tenantId", "departmentId", "initiator")
-# Flowable giải các tên này trong biểu thức của BPMN (điều kiện rẽ nhánh) thành đối tượng của động cơ trước khi tìm biến
-ENGINE_NAMES = ("execution", "task", "authenticatedUserId", "variableContainer")
+# Flowable 8 giải các tên này trong biểu thức của BPMN (điều kiện rẽ nhánh) thành giá trị của động cơ trước khi tìm biến
+# (VariableContainerELResolver, ProcessVariableScopeELResolver; task: khi biểu thức chạy trên một việc)
+ENGINE_NAMES = ("execution", "task", "authenticatedUserId", "currentTenantId")
 VARIABLE = re.compile(r"[a-z][A-Za-z0-9]{0,63}", re.ASCII)
 SCALAR_TYPES = {"string", "integer", "number", "boolean", "null"}
 FORMATS = {"date", "uuid"}
