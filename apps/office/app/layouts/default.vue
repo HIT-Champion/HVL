@@ -39,19 +39,33 @@ function cancelHoverEnter() {
   clearTimeout(hoverEnter)
   hoverEnter = undefined
 }
+// Bấm chuột vào một mục, kể cả mục của trang đang mở (route không đổi nên watch(route) ở dưới không chạy): thu thanh
+// bên, đóng ngăn kéo, rồi không cho rê chuột mở lại tới khi con trỏ rời hẳn thanh bên và vào lại. Không thì con trỏ còn
+// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Enter bằng bàn phím (event.detail = 0) vẫn giữ
+// thanh bên mở theo focus như cũ
+let pointerPicked = false
+function pickInNavigation(event: MouseEvent) {
+  if (!(event.target as HTMLElement).closest('a[href]')) return
+  open.value = false
+  if (!event.detail) return
+  pointerPicked = true
+  cancelHoverEnter()
+  hovering.value = false
+}
 // Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
 // đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung.
 // Chờ 120ms rồi mới mở: con trỏ chỉ lướt qua dải biểu tượng trên đường sang nội dung thì thanh bên không bật ra che chữ
 function moveInNavigation(event: PointerEvent) {
   if (!event.movementX && !event.movementY) return
   clearTimeout(hoverExit)
-  if (hovering.value || hoverEnter) return
+  if (pointerPicked || hovering.value || hoverEnter) return
   hoverEnter = setTimeout(() => {
     hoverEnter = undefined
     hovering.value = true
   }, 120)
 }
 function leaveNavigation() {
+  pointerPicked = false
   cancelHoverEnter()
   clearTimeout(hoverExit)
   hoverExit = setTimeout(() => { hovering.value = false }, 140)
@@ -246,7 +260,7 @@ async function logout() {
     <aside
       id="app-navigation" class="sg-sidebar" :aria-label="t('fe.navigation')"
       :inert="mobile && !open ? true : undefined"
-      @pointermove="moveInNavigation" @pointerleave="leaveNavigation"
+      @pointermove="moveInNavigation" @pointerleave="leaveNavigation" @click="pickInNavigation"
       @focusin="focusNavigation" @focusout="blurNavigation"
     >
       <div class="sg-brand-row">
