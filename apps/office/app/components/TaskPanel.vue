@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { SuggestApply } from '~/utils/assignSuggest'
+import type { ProcessingBrief } from '~/utils/taskContext'
 
 // Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong services/svc-workflow/processes/*.bpmn20.xml).
 // Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
@@ -36,6 +37,8 @@ const props = defineProps<{
   departments: PanelDepartment[]
   myDepartment: string | null
   myId: string
+  // phần việc được giao cho người xem (vbden.xuLy), trang văn bản tính từ các lượt giao
+  brief?: ProcessingBrief | null
 }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -59,6 +62,7 @@ const fileNote = ref('')
 const assign = reactive({ user_id: '', note: '' })
 // vbden.xuLy
 const result = ref('')
+const resultField = ref<HTMLTextAreaElement | null>(null)
 // vbdi.duyetPhong, vbdi.duyetDonVi: ý kiến; trả lại thì bắt buộc
 const reviewNote = ref('')
 const returning = ref(false)
@@ -80,6 +84,8 @@ const directErrors = computed(() => {
 })
 
 async function complete(outcome: string, data: Record<string, unknown>) {
+  // bấm hai lần lúc đang gửi: lượt sau không gửi lại completeTask
+  if (busy.value) return
   busy.value = true
   try {
     await gql(
@@ -139,15 +145,19 @@ function issue() {
 
 function submitDone() {
   tried.value = true
-  if (!result.value.trim()) return
+  if (!result.value.trim()) {
+    resultField.value?.focus()
+    return
+  }
   complete('done', { result_note: result.value.trim() })
 }
 </script>
 
 <template>
-  <section class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
-    <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
+  <section class="card overflow-hidden border-brand-200 ring-2 ring-brand-100" :aria-busy="busy">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 bg-brand-50 px-5 py-3">
       <h2 class="text-sm font-semibold text-brand-900">{{ t(`task.${formKey}`) }}</h2>
+      <span v-if="busy" class="text-sm text-stone-600" role="status">{{ t('form.processing') }}</span>
     </div>
 
     <!-- Lãnh đạo đơn vị chỉ đạo -->
@@ -229,10 +239,33 @@ function submitDone() {
 
     <!-- Chuyên viên báo kết quả -->
     <form v-else-if="formKey === 'vbden.xuLy'" class="space-y-4 p-5" novalidate @submit.prevent="submitDone">
+      <!-- chỉ đạo, người giao, hạn của phần việc này: không phải cuộn xuống dòng xử lý để đọc lại -->
+      <div v-if="brief" class="sg-assignment-brief" data-testid="processing-brief">
+        <h3 class="text-sm font-semibold">{{ t('form.xuLy.brief') }}</h3>
+        <p v-for="line in brief.instructions" :key="line" class="mt-2 whitespace-pre-line text-sm">{{ line }}</p>
+        <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <div v-if="brief.assignedBy">
+            <dt class="text-stone-500">{{ t('form.xuLy.assignedBy') }}</dt>
+            <dd class="font-medium">{{ users.find((u) => u.id === brief?.assignedBy)?.full_name || t('app.none') }}</dd>
+          </div>
+          <div>
+            <dt class="text-stone-500">{{ t('doc.due') }}</dt>
+            <dd class="font-medium">{{ brief.dueOn ? fmtDate(brief.dueOn) : t('desk.noDeadline') }}</dd>
+          </div>
+        </dl>
+      </div>
       <div>
-        <label class="label" for="result">{{ t('form.xuLy.result') }}</label>
-        <textarea id="result" v-model="result" rows="4" class="input" maxlength="4000" :aria-invalid="tried && !result.trim()" />
-        <p v-if="tried && !result.trim()" class="field-error">{{ t('validation.required') }}</p>
+        <label class="label" for="result">
+          {{ t('form.xuLy.result') }} <span class="font-normal text-stone-500">({{ t('form.xuLy.required') }})</span>
+        </label>
+        <textarea
+          id="result" ref="resultField" v-model="result" rows="4" class="input" maxlength="4000" required
+          aria-required="true" aria-describedby="result-help result-error" :aria-invalid="tried && !result.trim()"
+        />
+        <p id="result-help" class="mt-2 text-sm text-stone-500">{{ t('form.xuLy.consequence') }}</p>
+        <p id="result-error" v-show="tried && !result.trim()" class="field-error" role="alert">
+          {{ t('validation.required') }}
+        </p>
       </div>
       <div class="flex justify-end border-t border-stone-100 pt-4">
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.xuLy.done') }}</button>

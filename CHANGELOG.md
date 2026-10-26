@@ -137,6 +137,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Dockerfile cũng qua mirror. Mục 2b kèm lệnh chỉ đọc manifest để kiểm các image ghim có trên mirror, và kể các nguồn
   khác lần cài đầu vẫn cần (`quay.io`, `ghcr.io`, npm, PyPI, Debian, chữ ký ClamAV). Ngày 26/10 cả 21 image Docker Hub
   ghim digest đều có trên `mirror.gcr.io`, đủ mọi lớp `linux/amd64`. README hai thứ tiếng thêm một dòng ở Xử lý sự cố.
+- Ngữ cảnh việc trên trang văn bản (#235, phần còn thiếu của nhánh `fe-integration`): mở văn bản từ hộp việc thì nút
+  quay lại thành "Về hộp việc" và ô tìm, bộ lọc của hộp việc vẫn giữ; tham số `?from=` chỉ nhận đúng `inbox`, không bao
+  giờ thành đường dẫn đích. Chuyên viên báo kết quả thấy ngay khung "Yêu cầu được giao" (chỉ đạo của phòng và của người
+  giao, người giao, hạn); ô kết quả ghi rõ bắt buộc, gửi thiếu thì đưa tiêu điểm về ô. Khung xử lý báo "Đang chuyển
+  bước…" và không gửi lại khi bấm hai lần. Hai tab Dòng thời gian / Lịch sử dùng được bằng phím mũi tên, Home, End; lỗi
+  tải lịch sử hiện ngay trong tab kèm nút thử lại. Nút tải từng tệp đọc kèm tên tệp, tên tệp dài xuống dòng thay vì bị
+  cắt; nút Vào sổ báo "Đang vào sổ…"; Esc đóng khung Góp ý. Test giao diện +5.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp

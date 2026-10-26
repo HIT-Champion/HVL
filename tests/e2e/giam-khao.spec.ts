@@ -36,8 +36,10 @@ test('giám khảo: hộp việc có sẵn việc mẫu, chữ đại diện là
   await expect(judge.getByTestId('avatar-initial')).toHaveText('G')
   await shot(judge, '30-giam-khao')
 
-  // việc sửa dự thảo mở ra đúng văn bản đi, có ý kiến trả lại của tổ trưởng
+  // việc sửa dự thảo mở ra đúng văn bản đi, có ý kiến trả lại của tổ trưởng; nút quay lại về hộp việc
   await redraft.getByRole('link').click()
-  await expect(judge).toHaveURL(/\/van-ban\/[0-9a-f-]{36}$/)
+  await expect(judge).toHaveURL(/\/van-ban\/[0-9a-f-]{36}\?from=inbox$/)
   await expect(judge.getByText('Bổ sung ý kiến của Bộ môn Kỹ thuật phần mềm').first()).toBeVisible()
+  await judge.getByRole('link', { name: 'Về hộp việc' }).click()
+  await expect(judge.getByTestId('inbox')).toBeVisible()
 })

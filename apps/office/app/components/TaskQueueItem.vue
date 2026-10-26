@@ -36,7 +36,7 @@ const { t } = useI18n()
 
 <template>
   <li class="sg-task-item" :class="{ 'is-highlight': highlight }">
-    <NuxtLink :to="`/van-ban/${task.document_id}`" class="sg-task-link">
+    <NuxtLink :to="{ path: `/van-ban/${task.document_id}`, query: { from: 'inbox' } }" class="sg-task-link">
       <div class="sg-task-identity">
         <div v-if="highlight" class="sg-task-alert">
           <UrgencyChip v-if="task.urgency && task.urgency !== 'normal'" :urgency="task.urgency" quiet />

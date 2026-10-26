@@ -534,6 +534,8 @@
 .sg-task-deadline { font-size: 14px; color: var(--muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
 .sg-task-deadline strong { display: block; font-weight: 500; color: #30342a; }
 .sg-task-deadline.is-overdue, .sg-task-deadline.is-overdue strong { color: #a02727; }
+/* khung báo kết quả: phần việc được giao tách khỏi ô kết quả bằng một đường kẻ */
+.sg-assignment-brief { padding-bottom: 16px; border-bottom: 1px solid var(--edge); }
 .sg-task-action {
   display: flex;
   align-items: center;
