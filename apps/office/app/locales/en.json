@@ -1177,7 +1177,7 @@
     "high": "Very satisfied",
     "comment": "A few words",
     "placeholder": "What is inconvenient, what should change…",
-    "privacy": "Do not write names, ID card numbers or phone numbers.",
+    "privacy": "Do not write names, ID card numbers or phone numbers. Long numbers and emails are masked if you do.",
     "send": "Send feedback",
     "sent": "Feedback sent. Thank you!",
     "mineLink": "Feedback you sent",

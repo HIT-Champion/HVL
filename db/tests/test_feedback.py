@@ -19,7 +19,8 @@
 CSDL đặt. Văn thư, chuyên viên, lãnh đạo phòng chỉ thấy góp ý của mình; lãnh đạo, quản trị đơn vị đọc cả đơn vị nhưng
 không biết ai gửi; đơn vị khác không thấy. Màn hình không chứa id, chuỗi truy vấn. Chặn gửi dồn ở CSDL (3 góp ý mỗi 10
 phút, 20 mỗi 24 giờ, cả khi gửi nhiều dòng trong một mutation hay nhiều yêu cầu song song); câu lỗi chứa tên
-feedback_rate để giao diện dịch được. Không ai sửa, xóa; không vào sổ kiểm toán; vai trò service, agent không gửi được.
+feedback_rate để giao diện dịch được. Nội dung che email, dãy số dài trước khi lưu (#265, migration 1792281603600).
+Không ai sửa, xóa; không vào sổ kiểm toán; vai trò service, agent không gửi được.
 Khung nhìn tổng hợp office.v_feedback_summary (migration 1792281602750) theo màn hình, có dòng mọi màn hình và cờ đơn vị
 mẫu.
 
@@ -130,6 +131,63 @@ def test_comment_whitespace_trimmed_including_newlines(world: World) -> None:
     user = person(world)
     assert send(user, 3, "\n \t\r\n")["comment"] is None         # chỉ có xuống dòng, tab: như để trống
     assert send(user, 3, " \n Dòng một\nDòng hai\t\n")["comment"] == "Dòng một\nDòng hai"
+
+
+# #265 (migration 1792281603600): email, dãy số liền từ 9 chữ số, dãy tách nhóm từ 9 chữ số bắt đầu bằng 0 hoặc +84
+# thành [đã che] trước khi lưu — luật theo mẫu, không phân loại như svc_files/pii.py
+MASKED = [
+    ("Gọi em 0912345678 nhé", "Gọi em [đã che] nhé"),
+    ("SĐT: 0912 345 678.", "SĐT: [đã che]."),
+    ("sđt 0912.345.678, cảm ơn", "sđt [đã che], cảm ơn"),
+    ("Tel: 0912-345-678; CCCD: 079 203 004 567", "Tel: [đã che]; CCCD: [đã che]"),
+    ("+84 912 345 678", "[đã che]"),
+    ("(+84) 912 345 678", "[đã che]"),
+    ("+84912345678", "[đã che]"),
+    ("CCCD 001090012345", "CCCD [đã che]"),
+    ("CMND 123456789", "CMND [đã che]"),
+    ("STK 0011004123456789", "STK [đã che]"),
+    ("lần 2 0912345678", "lần 2 [đã che]"),
+    ("0912345678 và 0987654321", "[đã che] và [đã che]"),
+    ("Nhờ hỏi a.b-c@truong.edu.vn giúp", "Nhờ hỏi [đã che] giúp"),
+]
+KEPT = [
+    "Ngày 26.10.2026 lúc 8:30",
+    "Công văn 152/ĐT-ĐH",
+    "Kinh phí 100.000.000 đồng",                     # tách bằng dấu chấm, không bắt đầu bằng 0: số tiền
+    "Dự toán 10.000.000.000 đồng",                   # không che phần sau của số
+    "Trang 12 13 14 15 16, năm 2024 2025 2026",
+    "Mã 12345678 tám số",
+    "Mã lỗi 123e4567-e89b-12d3-a456-426614174000",   # mã X-Request-Id chép từ câu báo lỗi
+    "SĐT0912345678",                                 # số dính chữ (như #58 ở svc-files)
+]
+
+
+@pytest.mark.parametrize(("comment", "stored"), MASKED + [(k, k) for k in KEPT])
+def test_mask_pii_rules(comment: str, stored: str) -> None:
+    assert sql(f"select office.mask_pii($c${comment}$c$)") == [[stored]]
+
+
+def test_phone_id_and_email_are_masked_before_storing(world: World) -> None:
+    user = person(world)
+    row = send(user, 2, "  Em gọi 0912 345 678 và gửi a.b@truong.edu.vn mà chưa ai trả lời  ")
+    assert row["comment"] == "Em gọi [đã che] và gửi [đã che] mà chưa ai trả lời"
+    assert sql(f"select comment from office.feedback where id = '{row['id']}'") == [[row["comment"]]]
+    user.gql(SEND_MANY, {"o": [{"rating": 3, "screen": "/", "comment": "CCCD 001090012345"},
+                               {"rating": 4, "screen": "/", "comment": "Kinh phí 100.000.000 đồng"}]})
+    stored = {f["comment"] for f in user.gql(LIST)["office_feedback"]}
+    assert {"CCCD [đã che]", "Kinh phí 100.000.000 đồng"} <= stored
+    assert not any("0912" in c or "001090012345" in c for c in stored)
+
+
+def test_masking_keeps_the_500_limit(world: World) -> None:
+    # 490 chữ + dấu cách + số 9 chữ số: 500 ký tự, nhãn 8 ký tự ngắn hơn số nên vẫn lưu được
+    assert send(person(world), 3, "x" * 490 + " 123456789")["comment"] == "x" * 490 + " [đã che]"
+    # email 6 ký tự làm câu 500 ký tự dài ra 2: cắt lại ở 500, không báo lỗi khó hiểu
+    row = send(person(world), 3, "x" * 493 + " a@b.vn")
+    assert len(row["comment"]) == 500 and row["comment"].startswith("x" * 493 + " [đã ch")
+    # nhập quá 500 ký tự vẫn bị từ chối như trước, kể cả khi che xong thì ngắn lại
+    with pytest.raises(GraphQLError, match="feedback_comment"):
+        send(person(world), 3, "x" * 491 + " 0912345678")
 
 
 @pytest.mark.parametrize("screen", ["/", "/van-ban-den/tiep-nhan", "/van-ban/:id", "/so-do", "/gop-y"])
