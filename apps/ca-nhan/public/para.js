@@ -15,16 +15,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Phần thuần của Không gian cá nhân: thư mục P.A.R.A, câu GraphQL, định dạng, câu báo lỗi. Không đụng DOM hay mạng
-// nên chạy được dưới `node --test` (tests/para.test.js).
+// nên chạy được dưới `node --test` (tests/para.test.js). Chữ lấy từ bảng dịch (i18n.js) theo ngôn ngữ đang dùng.
+
+import { locale, t } from './i18n.js'
 
 /** Bốn thư mục P.A.R.A (Projects, Areas, Resources, Archives — phương pháp của Tiago Forte). `key` khớp ràng buộc
- *  items_para của bảng personal.items (db/migrations/default/1792281602500_personal_space); test so hai bên. */
-export const FOLDERS = Object.freeze([
-  { key: 'projects', name: 'Dự án', hint: 'Việc đang làm, có đích và có hạn: hồ sơ một đề tài, kế hoạch một sự kiện.' },
-  { key: 'areas', name: 'Lĩnh vực', hint: 'Phần việc giữ lâu dài, không có ngày xong: giảng dạy, công tác đoàn thể.' },
-  { key: 'resources', name: 'Tài nguyên', hint: 'Tài liệu tham khảo, chủ đề quan tâm, mở ra khi cần.' },
-  { key: 'archives', name: 'Lưu trữ', hint: 'Đã xong hoặc tạm gác: chuyển từ ba thư mục trên sang đây.' },
-])
+ *  items_para của bảng personal.items (db/migrations/default/1792281602500_personal_space); test so hai bên. Tên và
+ *  lời gợi ý ở bảng dịch, khóa folder.<key>.name và folder.<key>.hint. */
+export const FOLDERS = Object.freeze(['projects', 'areas', 'resources', 'archives']
+  .map((key) => Object.freeze({ key })))
 
 export const DEFAULT_FOLDER = 'projects'
 
@@ -33,7 +32,11 @@ export function isFolder(key) {
 }
 
 export function folderName(key) {
-  return FOLDERS.find((f) => f.key === key)?.name ?? key
+  return isFolder(key) ? t(`folder.${key}.name`) : key
+}
+
+export function folderHint(key) {
+  return isFolder(key) ? t(`folder.${key}.hint`) : ''
 }
 
 /** Thư mục đang mở theo phần # của địa chỉ (#archives); sai hoặc trống thì thư mục mặc định. */
@@ -76,7 +79,7 @@ export function itemsIn(items, key) {
 
 const UNITS = ['B', 'KB', 'MB', 'GB']
 
-/** Dung lượng kiểu Việt Nam: dấu phẩy thập phân, một chữ số lẻ từ KB trở lên. */
+/** Dung lượng, một chữ số lẻ từ KB trở lên: dấu phẩy thập phân khi dùng tiếng Việt, dấu chấm khi dùng tiếng Anh. */
 export function formatSize(bytes) {
   let n = Number(bytes)
   if (!Number.isFinite(n) || n < 0) return '—'
@@ -85,7 +88,7 @@ export function formatSize(bytes) {
     n /= 1024
     unit += 1
   }
-  const text = unit === 0 ? String(n) : n.toFixed(1).replace(/\.0$/, '').replace('.', ',')
+  const text = unit === 0 ? String(n) : n.toFixed(1).replace(/\.0$/, '').replace('.', locale() === 'vi' ? ',' : '.')
   return `${text} ${UNITS[unit]}`
 }
 
@@ -103,44 +106,45 @@ export function formatTime(iso, timeZone = 'Asia/Ho_Chi_Minh') {
  *  svc-files ({detail: {code, message, signature}}), có thể rỗng khi cổng trả lỗi. */
 export function uploadError(status, body) {
   const detail = body && typeof body.detail === 'object' && body.detail !== null ? body.detail : {}
+  // svc-files nhận loại theo nội dung sau ClamAV, bỏ EXIF của ảnh: câu của máy chủ nói rõ tệp là gì, vì sao chặn. Câu
+  // đó viết tiếng Việt, nên khi dùng tiếng Anh lấy câu chung của bảng dịch
+  const server = locale() === 'vi' && detail.message ? `${detail.message}.` : null
   switch (detail.code) {
     case 'infected':
-      return `Tệp chứa mã độc nên trạm quét đã chặn, không lưu${detail.signature ? ` (mẫu ${detail.signature})` : ''}.`
+      return detail.signature ? t('upload.infectedSignature', { signature: detail.signature }) : t('upload.infected')
     case 'unscannable':
-      return 'Tệp có mật khẩu hoặc nén nhiều lớp nên trạm quét không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc '
-        + 'giải nén rồi tải lên lại.'
+      return t('upload.unscannable')
     case 'too_large':
-      return detail.message ? `${detail.message}.` : 'Tệp quá lớn.'
+      return server ?? t('upload.tooLarge')
     case 'type_mismatch':
     case 'type_not_allowed':
     case 'image_unreadable':
-      // svc-files nhận loại theo nội dung sau ClamAV, bỏ EXIF của ảnh: câu của máy chủ nói rõ tệp là gì, vì sao chặn
-      return detail.message ? `${detail.message}.` : 'Loại tệp này không được nhận nên chưa lưu.'
+      return server ?? t('upload.typeRejected')
     case 'empty_file':
-      return 'Tệp rỗng.'
+      return t('upload.empty')
     case 'no_tenant':
     case 'unknown_tenant':
-      return 'Tài khoản chưa được gắn đơn vị nên chưa lưu được tệp. Báo quản trị đơn vị.'
+      return t('upload.noTenant')
     default:
   }
-  if (status === 0) return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
-  if (status === 413) return 'Tệp quá lớn.'
-  if (status === 429) return 'Thao tác quá nhanh, thử lại sau ít giây.'
-  if (status === 503) return 'Kho tệp hoặc trạm quét mã độc chưa sẵn sàng, tệp chưa được lưu. Thử lại sau.'
-  return `Tải lên không được (mã ${status}).`
+  if (status === 0) return t('error.network')
+  if (status === 413) return t('upload.tooLarge')
+  if (status === 429) return t('error.rateLimited')
+  if (status === 503) return t('upload.unavailable')
+  return t('upload.failed', { status })
 }
 
 /** Câu báo khi Hasura trả lỗi. code: extensions.code của lỗi đầu tiên. */
 export function graphqlError(code, message = '') {
-  if (code === 'validation-failed') return 'Vai trò của tài khoản này không có không gian cá nhân.'
+  if (code === 'validation-failed') return t('error.noSpaceRole')
   if (code === 'constraint-violation' || code === 'permission-error') {
-    if (/items_guard/.test(message)) return 'Chỉ xếp được tệp chính bạn tải lên.'
-    if (/items_para/.test(message)) return 'Thư mục không hợp lệ.'
-    if (/items_pkey|Uniqueness/i.test(message)) return 'Tệp này đã nằm trong không gian của bạn.'
+    if (/items_guard/.test(message)) return t('error.notOwner')
+    if (/items_para/.test(message)) return t('error.badFolder')
+    if (/items_pkey|Uniqueness/i.test(message)) return t('error.duplicate')
   }
-  if (code === 'rate_limited') return 'Thao tác quá nhanh, thử lại sau ít giây.'
-  if (code === 'network') return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
-  return message ? `Máy chủ báo lỗi: ${message}` : 'Máy chủ báo lỗi.'
+  if (code === 'rate_limited') return t('error.rateLimited')
+  if (code === 'network') return t('error.network')
+  return message ? t('error.serverMessage', { message }) : t('error.server')
 }
 
 const HASURA = 'https://hasura.io/jwt/claims'
