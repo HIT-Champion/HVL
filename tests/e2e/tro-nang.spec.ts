@@ -34,6 +34,10 @@ const used = new Set<Allowed>()
 
 // quét một trang đã mở; trả về các lỗi ngoài ALLOW, mỗi lỗi một dòng: trang, rule, mức, số chỗ, 3 chỗ đầu
 async function scan(page: Page, name: string, ready?: Locator): Promise<string[]> {
+  // axe đo màu đúng lúc quét: trang còn chạy hiệu ứng vào (sg-page-in, opacity từ 0) thì chữ nhạt hơn màu thật và
+  // lỗi tương phản lúc có lúc không (#263). Bật giảm chuyển động như người dùng chọn trong hệ điều hành: CSS bỏ mọi
+  // animation, trang ở ngay trạng thái cuối
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(ready ?? page.getByRole('heading', { level: 1 }).first()).toBeVisible()
   await expect(page.getByText('Đang tải…')).toHaveCount(0)
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {})
