@@ -39,7 +39,12 @@ COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
 SCRIPTS = pathlib.Path(__file__).resolve().parent
 # Tra băm không khớp văn bản nào: Văn phòng bật thì 200 kèm kết quả, tắt thì route không có (404)
 VERIFY = f"{PUBLIC_URL}/api/verify?sha256={'0' * 64}"
+# Route lõi của svc-files, gắn bất kể cờ; svc-workflow không có route này (404)
+STATUS = f"{PUBLIC_URL}/api/status"
 MY_TASKS = "{ myTasks { id } }"
+# APISIX tin bản ghi DNS của Docker 5 giây, mỗi worker một bản (dns_resolver_valid, platform/apisix/config.yaml)
+DNS_VALID_S = 5
+GATEWAY_WAIT_S = 30
 
 
 class DemoFailed(Exception):
@@ -63,7 +68,27 @@ def recreate(office: bool | None) -> float:
     # --no-deps: chỉ dựng lại hai dịch vụ này, không đụng các dịch vụ chúng phụ thuộc (đang chạy sẵn)
     subprocess.run([*COMPOSE, "up", "-d", "--no-deps", "--wait", "--wait-timeout", "300", *SERVICES], cwd=ROOT,
                    env=env, check=True, capture_output=True)
+    gateway_reaches_files()
     return time.monotonic() - started
+
+
+def gateway_reaches_files() -> None:
+    """Chờ cổng gửi tới đúng container mới. Dựng lại hai dịch vụ cùng lúc thì chúng có thể đổi IP cho nhau, và --wait
+    trả về ngay khi healthy: trong 5 giây sau đó APISIX có thể còn gửi route của svc-files tới IP cũ, nay là
+    svc-workflow, nhận 404 như thể route không được gắn. Đợi bản ghi cũ hết hạn, rồi /api/status phải trả lời ba lần
+    liền qua cổng."""
+    time.sleep(DNS_VALID_S + 1)
+    deadline = time.monotonic() + GATEWAY_WAIT_S
+    streak = 0
+    while streak < 3:
+        try:
+            call_json("GET", STATUS)
+            streak += 1
+        except HTTPError as exc:
+            if time.monotonic() > deadline:
+                fail(f"sau {GATEWAY_WAIT_S} giây cổng vẫn chưa tới svc-files mới: GET /api/status → {exc.status}")
+            streak = 0
+            time.sleep(1)
 
 
 def office_flag(service: str) -> str:
@@ -112,7 +137,7 @@ def run() -> None:
         took = recreate(False)
         flags = {s: office_flag(s) for s in SERVICES}
         all(v == "false" for v in flags.values()) or fail(f"biến chưa vào container: {flags}")
-        ok(f"hai dịch vụ lên lại, healthy sau {took:.0f} giây")
+        ok(f"hai dịch vụ lên lại, healthy và cổng đã tới container mới sau {took:.0f} giây")
 
         say(3, "Phần của Văn phòng không còn")
         not verify_answers() or fail("tắt Văn phòng mà /api/verify vẫn trả lời")
@@ -120,7 +145,7 @@ def run() -> None:
         errors = my_tasks_errors(clerk)
         errors or fail("tắt Văn phòng mà Action myTasks vẫn chạy")
         ok(f"Hasura Action myTasks báo lỗi: svc-workflow không còn route Actions ({errors[0].get('message', '')})")
-        status, _ = call_json("GET", f"{PUBLIC_URL}/api/status")
+        status, _ = call_json("GET", STATUS)
         status["status"] in ("ok", "degraded") or fail(f"/api/status: {status}")
         ok(f"/api/status vẫn trả lời ({status['status']})")
 
@@ -132,7 +157,7 @@ def run() -> None:
     finally:
         say(6, "Dựng lại hai dịch vụ theo cấu hình thường")
         took = recreate(None)
-        ok(f"lên lại sau {took:.0f} giây")
+        ok(f"lên lại, cổng đã tới container mới sau {took:.0f} giây")
 
     verify_answers() or fail("dựng lại theo cấu hình thường mà cổng xác thực vẫn không trả lời")
     clerk = Session("vanthu")   # token lúc đầu có thể đã hết hạn sau hai kịch bản trên
