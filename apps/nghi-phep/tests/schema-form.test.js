@@ -14,9 +14,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Form dựng từ schema (public/schema-form.js), phần không cần trình duyệt. Bộ kiểm phải cho đúng mã lỗi mà mọi bên
-// khác cho trên cùng ca thử: schemas/*.cases.json (Ajv của Văn phòng, svc-workflow, CSDL cũng chạy) và
-// forms/*.cases.json (svc-workflow chạy qua API của ứng dụng). Kèm kiểm tệp form: đủ nhãn hai thứ tiếng, thứ tự ô đủ.
+// Form dựng từ schema (public/schema-form.js), phần không cần trình duyệt. Bộ kiểm phải cho đúng mã lỗi trên mọi ca
+// thử: schemas/*.cases.json (Ajv của Văn phòng, svc-workflow, CSDL cũng chạy) và forms/*.cases.json của ứng dụng.
+// Phía máy chủ của forms/*.cases.json đến cùng #301 (x-moc-range trong FormSchema, test Python đọc
+// apps/*/forms/*.cases.json); trước đó gọi thẳng API vẫn nhận đến ngày trước từ ngày. Kèm kiểm tệp form: đủ nhãn
+// hai thứ tiếng, thứ tự ô đủ.
 
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -160,6 +162,8 @@ test('câu báo lỗi hai thứ tiếng, theo mã và theo ô', () => {
     // minLength 1 nghĩa là không được để trống, không phải "cần ít nhất 1 ký tự"
     assert.equal(say('lyDo', 'minLength'), say('lyDo', 'required'))
     assert.notEqual(say('tuNgay', 'format'), say('lyDo', 'format'))
+    // mã chỉ máy chủ biết: câu chung "chưa hợp lệ", không nói sai thành "sai định dạng"
+    assert.equal(say('lyDo', 'duplicate'), vi ? 'Giá trị chưa hợp lệ' : 'Invalid value')
   }
 })
 
@@ -210,6 +214,29 @@ test('schema dùng điều không hỗ trợ thì báo ngay lúc nạp', () => {
   assert.throws(() => checkSchema({ $ref: 'https://x.test/s.json' }), /\$ref/)
   assert.throws(() => checkSchema({ type: 'string', pattern: '(' }))
   assert.doesNotThrow(() => checkSchema({ type: 'string', title: 'x', 'x-moc-ui': { widget: 'textarea' } }))
+  // $ref chỉ tới $defs có thật, không tới prototype; $ref vòng bị từ chối thay vì đệ quy mãi lúc gửi
+  assert.throws(() => checkSchema({ $defs: {}, $ref: '#/$defs/constructor' }), /\$ref/)
+  assert.throws(() => checkSchema({ $defs: {}, $ref: '#/$defs/__proto__' }), /\$ref/)
+  assert.throws(() => checkSchema({ $defs: { a: { $ref: '#/$defs/b' }, b: { allOf: [{ $ref: '#/$defs/a' }] } },
+    $ref: '#/$defs/a' }), /vòng/)
+  // giá trị từ khóa sai dạng
+  for (const bad of [{ required: 'ab' }, { enum: 'x' }, { minLength: -1 }, { maxItems: 1.5 }, { properties: [] },
+    { items: 'x' }, { allOf: [] }, { uniqueItems: 'yes' }, { minimum: '1' }]) {
+    assert.throws(() => checkSchema(bad), /sai dạng/, JSON.stringify(bad))
+  }
+})
+
+test('gợi ý hiển thị sai thì báo lúc nạp', () => {
+  const props = { a: { type: 'string', format: 'date' }, b: { type: 'string', format: 'date' }, c: { type: 'string' } }
+  const base = { type: 'object', properties: props }
+  assert.doesNotThrow(() => checkSchema({ ...base, 'x-moc-order': ['c', 'a', 'b'], 'x-moc-range': [['a', 'b']] }))
+  assert.throws(() => checkSchema({ ...base, 'x-moc-order': ['a', 'b'] }), /x-moc-order/)
+  assert.throws(() => checkSchema({ ...base, 'x-moc-order': ['a', 'b', 'c', 'd'] }), /x-moc-order/)
+  assert.throws(() => checkSchema({ ...base, 'x-moc-range': [['a', 'c']] }), /x-moc-range/)
+  assert.throws(() => checkSchema({ ...base, 'x-moc-range': [['a', 'z']] }), /x-moc-range/)
+  assert.throws(() => checkSchema({ ...base, 'x-moc-range': ['a', 'b'] }), /x-moc-range/)
+  const slider = { type: 'object', properties: { a: { 'x-moc-ui': { widget: 'slider' } } } }
+  assert.throws(() => checkSchema(slider), /widget/)
 })
 
 test('hôm nay theo giờ Việt Nam', () => {

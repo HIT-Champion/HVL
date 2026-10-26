@@ -18,19 +18,16 @@
 // giao diện. JS thuần, không thư viện, không bundler. Trang gọi mountForm(); phần còn lại không đụng trình duyệt nên
 // test bằng node --test (tests/schema-form.test.js).
 //
-// Trình duyệt kiểm bằng đúng tệp schema mà svc-workflow kiểm lại khi nhận dữ liệu. Lỗi quy về {trường: mã} giống hệt
-// máy chủ (services/svc-workflow/src/svc_workflow/schemas.py) và form của Văn phòng, nên các bên chạy chung ca thử
-// *.cases.json. Bộ kiểm đi từng từ khóa, không sinh mã (CSP không cho 'unsafe-eval'), và chỉ hiểu tập từ khóa ghi ở
-// schemas/README.md: schema dùng điều khác thì báo ngay lúc nạp, không lặng lẽ bỏ qua.
+// Trình duyệt kiểm bằng đúng tệp schema mà svc-workflow kiểm lại khi nhận dữ liệu qua API của ứng dụng (#301). Lỗi
+// quy về {trường: mã} giống hệt máy chủ (services/svc-workflow/src/svc_workflow/schemas.py) và form của Văn phòng,
+// nên các bên chạy chung ca thử *.cases.json. Bộ kiểm đi từng từ khóa, không sinh mã (CSP không cho 'unsafe-eval'),
+// và chỉ hiểu tập từ khóa ghi ở schemas/README.md: schema dùng điều khác thì báo ngay lúc nạp, không lặng lẽ bỏ qua.
 //
 // Gợi ý hiển thị nằm trong schema: x-moc-title, x-moc-order ở gốc; x-moc-ui ở từng trường (widget, label, note, help,
 // rows, options, errors). Chữ là chuỗi hoặc {vi, en}. Mọi chữ gán bằng textContent, không bao giờ innerHTML.
 
 // từ khóa chỉ để chú thích, không kiểm gì; x-moc-* do formErrors() hay phần vẽ form đọc
 const NOTES = new Set(['$schema', '$id', '$defs', '$comment', 'title', 'description', 'default', 'examples'])
-const RULES = new Set(['$ref', 'type', 'enum', 'const', 'required', 'properties', 'additionalProperties', 'items',
-  'minItems', 'maxItems', 'uniqueItems', 'minLength', 'maxLength', 'pattern', 'format', 'minimum', 'maximum', 'not',
-  'allOf'])
 const TYPES = new Set(['string', 'number', 'integer', 'boolean', 'null', 'array', 'object'])
 
 // Một trường sai nhiều điều thì báo điều đứng trước — cùng thứ tự với svc-workflow và Văn phòng
@@ -49,6 +46,32 @@ const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 const FORMATS = { date: isDate, uuid: (s) => UUID.test(s) }
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+// Từ khóa có tác dụng kiểm mà bộ này hiểu, kèm dạng giá trị hợp lệ: "required": "ab" hay "enum": "x" bị từ chối lúc
+// nạp, không để bộ kiểm hiểu sai
+const isCount = (v) => Number.isInteger(v) && v >= 0
+const isSchema = (v) => typeof v === 'boolean' || isObject(v)
+const SHAPES = {
+  $ref: (v) => typeof v === 'string',
+  type: (v) => (Array.isArray(v) ? v.length > 0 && v.every((t) => TYPES.has(t)) : TYPES.has(v)),
+  enum: (v) => Array.isArray(v) && v.length > 0,
+  const: () => true,
+  required: (v) => Array.isArray(v) && v.every((n) => typeof n === 'string'),
+  properties: (v) => isObject(v),
+  additionalProperties: isSchema,
+  items: isSchema,
+  not: isSchema,
+  allOf: (v) => Array.isArray(v) && v.length > 0,
+  minItems: isCount,
+  maxItems: isCount,
+  uniqueItems: (v) => typeof v === 'boolean',
+  minLength: isCount,
+  maxLength: isCount,
+  pattern: (v) => typeof v === 'string',
+  format: (v) => typeof v === 'string' && Object.hasOwn(FORMATS, v),
+  minimum: Number.isFinite,
+  maximum: Number.isFinite,
+}
 // độ dài theo ký tự (code point) như Python len()
 const length = (s) => [...s].length
 
@@ -82,21 +105,24 @@ class Checker {
   constructor(root) {
     this.#root = root
     this.#inspect(root, '#')
+    this.#acyclic(root, [])
+    this.#hints(root)
   }
 
-  // Duyệt cả schema lúc nạp: từ khóa lạ, kiểu lạ, định dạng lạ, $ref ra ngoài, pattern hỏng đều ném lỗi ngay
+  // Duyệt cả schema lúc nạp: từ khóa lạ, giá trị từ khóa sai dạng, kiểu lạ, định dạng lạ, $ref ra ngoài, pattern hỏng
+  // đều ném lỗi ngay
   #inspect(node, at) {
     if (typeof node === 'boolean') return
     if (!isObject(node)) throw new Error(`Schema ${at}: phải là đối tượng`)
     for (const [key, value] of Object.entries(node)) {
+      if (key === '$defs' && !isObject(value)) throw new Error(`Schema ${at}: $defs phải là đối tượng`)
       if (NOTES.has(key) || key.startsWith('x-moc-')) continue
-      if (!RULES.has(key)) throw new Error(`Schema ${at}: không hỗ trợ từ khóa ${key}`)
-      if (key === 'type' && !(Array.isArray(value) ? value : [value]).every((t) => TYPES.has(t))) {
-        throw new Error(`Schema ${at}: kiểu ${JSON.stringify(value)} không có`)
-      }
-      if (key === 'format' && !Object.hasOwn(FORMATS, value)) {
+      if (!Object.hasOwn(SHAPES, key)) throw new Error(`Schema ${at}: không hỗ trợ từ khóa ${key}`)
+      if (key === 'type' && !SHAPES.type(value)) throw new Error(`Schema ${at}: kiểu ${JSON.stringify(value)} không có`)
+      if (key === 'format' && !SHAPES.format(value)) {
         throw new Error(`Schema ${at}: định dạng ${String(value)} không hỗ trợ (chỉ date, uuid)`)
       }
+      if (!SHAPES[key](value)) throw new Error(`Schema ${at}: ${key} sai dạng (${JSON.stringify(value)})`)
       if (key === 'pattern') this.#regex(value)
       if (key === '$ref') this.#resolve(value)
     }
@@ -120,9 +146,50 @@ class Checker {
 
   #resolve(ref) {
     const m = typeof ref === 'string' ? /^#\/\$defs\/([^/]+)$/.exec(ref) : null
-    const target = m ? this.#root.$defs?.[m[1]] : undefined
+    const defs = this.#root.$defs
+    // Object.hasOwn: "#/$defs/constructor", "#/$defs/__proto__" không được trỏ vào prototype
+    const target = m && isObject(defs) && Object.hasOwn(defs, m[1]) ? defs[m[1]] : undefined
     if (target === undefined) throw new Error(`Schema: $ref ${String(ref)} không trỏ tới #/$defs/… có sẵn`)
     return target
+  }
+
+  // $ref vòng (A → B → A, kể cả qua properties, items, allOf, not) thì từ chối: bộ kiểm có thể đệ quy mãi trên cùng
+  // một dữ liệu. Form không cần schema đệ quy
+  #acyclic(node, refs) {
+    if (!isObject(node)) return
+    if (node.$ref !== undefined) {
+      if (refs.includes(node.$ref)) throw new Error(`Schema: $ref vòng ${[...refs, node.$ref].join(' → ')}`)
+      this.#acyclic(this.#resolve(node.$ref), [...refs, node.$ref])
+    }
+    for (const sub of Object.values(node.properties ?? {})) this.#acyclic(sub, refs)
+    for (const key of ['items', 'not', 'additionalProperties']) this.#acyclic(node[key], refs)
+    for (const sub of node.allOf ?? []) this.#acyclic(sub, refs)
+  }
+
+  // Gợi ý hiển thị sai thì form thiếu ô, vẽ sai ô hay so sai cặp ngày mà không ai biết, nên cũng báo lúc nạp
+  #hints(root) {
+    const props = root.properties ?? {}
+    const names = Object.keys(props)
+    const order = root['x-moc-order']
+    if (order !== undefined && !(Array.isArray(order) && order.length === names.length
+      && names.every((n) => order.includes(n)))) {
+      throw new Error('Schema: x-moc-order phải liệt kê đủ và đúng các trường trong properties')
+    }
+    const ranges = root['x-moc-range']
+    if (ranges !== undefined && !Array.isArray(ranges)) throw new Error('Schema: x-moc-range phải là mảng các cặp')
+    for (const pair of ranges ?? []) {
+      const dates = Array.isArray(pair) && pair.length === 2
+        && pair.every((n) => typeof n === 'string' && Object.hasOwn(props, n) && props[n].format === 'date')
+      if (!dates) throw new Error(`Schema: x-moc-range ${JSON.stringify(pair)} phải là cặp hai trường format date`)
+    }
+    for (const [name, prop] of Object.entries(props)) {
+      const ui = prop['x-moc-ui']
+      if (ui === undefined) continue
+      if (!isObject(ui)) throw new Error(`Schema: x-moc-ui của ${name} phải là đối tượng`)
+      if (ui.widget !== undefined && !WIDGETS.has(ui.widget)) {
+        throw new Error(`Schema: x-moc-ui.widget của ${name} không có (${String(ui.widget)})`)
+      }
+    }
   }
 
   /** Lỗi dạng {keyword, instancePath, params} như Ajv, đẩy vào out. */
@@ -205,9 +272,10 @@ export function todayVN(now = new Date()) {
 }
 
 /**
- * Lỗi của dữ liệu theo schema, {} khi hợp lệ. Ngoài từ khóa JSON Schema còn ba từ khóa riêng, kiểm như svc-workflow:
- * x-moc-nfc ở gốc (mọi chuỗi ở dạng dựng sẵn NFC), x-moc-date ở trường (so với hôm nay), x-moc-range ở gốc
- * ([[a, b], …]: b không được nhỏ hơn a; bỏ qua khi a hoặc b đã sai điều khác; mã gắn vào b).
+ * Lỗi của dữ liệu theo schema, {} khi hợp lệ. Ngoài từ khóa JSON Schema còn ba từ khóa riêng: x-moc-nfc ở gốc (mọi
+ * chuỗi ở dạng dựng sẵn NFC) và x-moc-date ở trường (so với hôm nay), kiểm như svc-workflow; x-moc-range ở gốc
+ * ([[a, b], …], hai trường ngày: b không được trước a; bỏ qua khi a hoặc b đã sai điều khác; mã gắn vào b),
+ * svc-workflow thêm cùng #301.
  */
 export function formErrors(schema, data, today = todayVN()) {
   // Map chứ không phải {}: tên trường do người gửi đặt, có thể là "constructor", "__proto__"…
@@ -353,6 +421,7 @@ const TEXT = {
     const: 'Không đúng giá trị yêu cầu',
     type: 'Sai kiểu dữ liệu',
     additionalProperties: 'Trường không có trong mẫu',
+    invalid: 'Giá trị chưa hợp lệ',
   },
   en: {
     optional: 'optional',
@@ -382,6 +451,7 @@ const TEXT = {
     const: 'Not the required value',
     type: 'Wrong data type',
     additionalProperties: 'Field not in the form',
+    invalid: 'Invalid value',
   },
 }
 const word = (lang, key, params = {}) =>
@@ -414,7 +484,8 @@ export function message(f, code, lang = 'vi', list = [], schema = {}) {
     case 'x-moc-nfc': case 'not': case 'enum': case 'const': case 'type': case 'uniqueItems':
     case 'additionalProperties':
       return word(lang, code)
-    default: return word(lang, 'format')
+    // mã chỉ máy chủ biết (vd duplicate) mà schema không đặt câu riêng trong x-moc-ui.errors
+    default: return word(lang, 'invalid')
   }
 }
 
@@ -439,7 +510,7 @@ export function summary(schema, data, lang = 'vi') {
  * của nó xong. Trả về setErrors(lỗi {trường: mã}, vd từ 422 của máy chủ), values() (dữ liệu đã dọn) và reset().
  */
 export function mountForm(container, schema, options = {}) {
-  const { values: start = {}, onSubmit, submitLabel, idPrefix = 'sf-' } = options
+  const { values: given = {}, onSubmit, submitLabel, idPrefix = 'sf-' } = options
   const lang = String(options.lang ?? 'vi').toLowerCase().startsWith('en') ? 'en' : 'vi'
   checkSchema(schema)
   const list = fields(schema, lang, idPrefix)
@@ -448,11 +519,22 @@ export function mountForm(container, schema, options = {}) {
   const ranges = schema['x-moc-range'] ?? []
   const today = todayVN()
 
+  // Trường ẩn (x-moc-ui.hidden) không có ô: giá trị lấy từ values hay default của schema, gửi đi nguyên như vậy. Bắt
+  // buộc mà không có giá trị thì người dùng không bao giờ gửi được form, nên báo ngay lúc dựng
+  const start = (f) => (Object.hasOwn(given, f.name) ? given[f.name] : f.prop.default)
+  const hidden = list.filter((f) => f.hidden)
+  for (const f of hidden) {
+    if (f.required && start(f) === undefined) {
+      throw new Error(`Schema: trường ẩn ${f.name} bắt buộc mà không có giá trị`)
+    }
+  }
+
   const form = make('form', { className: 'sf', noValidate: true })
   const title = formTitle(schema, lang)
   if (title) form.setAttribute('aria-label', title)
-  // lỗi của trường không có trên form (máy chủ báo trường lạ, cả đơn sai kiểu): báo ở đầu form
-  const top = make('div', { className: 'sf-error sf-top', id: `${idPrefix}loi`, hidden: true })
+  // lỗi của trường không có ô (trường ẩn, trường lạ máy chủ báo, cả đơn sai kiểu): báo ở đầu form. Dấu ":" trong id để
+  // không trùng id của ô nào (id ô là idPrefix + tên trường, lỗi của ô thêm "-error")
+  const top = make('div', { className: 'sf-error sf-top', id: `${idPrefix}:errors`, hidden: true })
   top.setAttribute('role', 'alert')
   form.append(top)
 
@@ -475,8 +557,9 @@ export function mountForm(container, schema, options = {}) {
       caption.append(' ', make('span', { className: 'sf-note', textContent: `(${mark})` }))
     }
     const help = f.help ? make('p', { className: 'sf-help', id: `${f.id}-help`, textContent: f.help }) : null
+    // Câu lỗi của từng ô không là role=alert (nhiều ô sai sẽ đọc dồn một lượt): ô sai đầu tiên nhận tiêu điểm và đọc
+    // câu lỗi qua aria-describedby, các ô sau đọc khi người dùng tới
     const error = make('p', { className: 'sf-error', id: `${f.id}-error`, hidden: true })
-    error.setAttribute('role', 'alert')
     let inputs, get, set
 
     if (group) {
@@ -500,7 +583,7 @@ export function mountForm(container, schema, options = {}) {
         x.checked = radio ? same(f.options[i].value, v) : [v].flat().some((y) => same(y, f.options[i].value))
       })
     } else if (f.widget === 'checkbox') {
-      const input = make('input', { type: 'checkbox', id: f.id, name: f.name })
+      const input = make('input', { type: 'checkbox', id: f.id, name: f.id })
       caption.prepend(input, ' ')
       inputs = [input]
       wrap.append(caption)
@@ -533,18 +616,21 @@ export function mountForm(container, schema, options = {}) {
         get = () => input.value
         set = (v) => { input.value = v === undefined || v === null ? '' : String(v) }
       }
-      Object.assign(input, { id: f.id, name: f.name, required: f.required })
+      // name là id chứ không là tên trường: ô tên "append", "submit"… sẽ che phương thức cùng tên của form
+      Object.assign(input, { id: f.id, name: f.id, required: f.required })
       inputs = [input]
       wrap.append(caption, input)
     }
     if (help) wrap.append(help)
     wrap.append(error)
     form.append(wrap)
-    const target = group ? wrap : inputs[0]
+    // gợi ý và câu lỗi gắn vào từng ô (cả từng nút chọn), trình đọc màn hình đọc chắc hơn gắn vào fieldset
     const describe = (bad) => {
       const ids = [help?.id, bad ? error.id : ''].filter(Boolean).join(' ')
-      if (ids) target.setAttribute('aria-describedby', ids)
-      else target.removeAttribute('aria-describedby')
+      for (const x of inputs) {
+        if (ids) x.setAttribute('aria-describedby', ids)
+        else x.removeAttribute('aria-describedby')
+      }
     }
     describe(false)
     return {
@@ -565,7 +651,10 @@ export function mountForm(container, schema, options = {}) {
     from.inputs[0].addEventListener('input', () => { to.inputs[0].min = from.get() })
   }
 
-  const read = () => Object.fromEntries([...controls].map(([name, c]) => [name, c.get()]))
+  const read = () => Object.fromEntries([
+    ...hidden.map((f) => [f.name, start(f)]),
+    ...[...controls].map(([name, c]) => [name, c.get()]),
+  ])
   const current = () => clean(list, read())
 
   function setErrors(errors = {}) {
@@ -600,10 +689,7 @@ export function mountForm(container, schema, options = {}) {
   }
 
   function reset() {
-    for (const c of controls.values()) {
-      const v = Object.hasOwn(start, c.f.name) ? start[c.f.name] : c.f.prop.default
-      c.set(v)
-    }
+    for (const c of controls.values()) c.set(start(c.f))
     for (const [a, b] of ranges) {
       const from = controls.get(a), to = controls.get(b)
       if (from?.f.widget === 'date' && to?.f.widget === 'date') to.inputs[0].min = from.get()
@@ -619,13 +705,15 @@ export function mountForm(container, schema, options = {}) {
     const errors = formErrors(schema, data, todayVN())
     setErrors(errors)
     if (Object.keys(errors).length || !onSubmit) return
+    // aria-disabled chứ không disabled: nút disabled làm rơi tiêu điểm về đầu trang; bấm lại lúc đang gửi đã bị busy
+    // chặn
     busy = true
-    submit.disabled = true
+    submit.setAttribute('aria-disabled', 'true')
     try {
       await onSubmit(data)
     } finally {
       busy = false
-      submit.disabled = false
+      submit.removeAttribute('aria-disabled')
     }
   })
 
