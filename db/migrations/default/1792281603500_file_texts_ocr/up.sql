@@ -1,0 +1,22 @@
+-- Copyright 2026 Signet Team
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+--
+-- SPDX-License-Identifier: Apache-2.0
+
+-- #253: vòng đọc chữ của svc-files nhận dạng chữ (OCR) bản scan — PDF không có lớp chữ, trước đây ghi `empty` rồi
+-- thôi. Dữ liệu dẫn xuất: xóa các dòng `empty` để vòng nền đọc lại, lần này có OCR (như migration 1792281602000 xóa
+-- dòng `ok` để đọc lại có ranh giới trang). Mỗi tệp đọc lại một lần, lần lượt từng tệp. Bảng không gắn sổ kiểm toán
+-- nên lệnh xóa không ghi sổ. Tệp của văn bản hạn chế không có dòng nào ở đây (trigger file_texts_skip_restricted) và
+-- không vào hàng đợi đọc chữ.
+delete from core.file_texts where status = 'empty';

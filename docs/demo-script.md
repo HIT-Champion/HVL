@@ -585,9 +585,8 @@ dòng hỏi đáp của tác tử, không có câu hỏi.
   Internet lúc chạy và không biết quyền của Signet — phần lọc, trích dẫn, kiểm đầu ra vẫn phải tự viết.
 - *"Lưu câu hỏi ở đâu?"* Không lưu: không bảng hội thoại, sổ chỉ có siêu dữ liệu; trang Hỏi đáp chỉ giữ trong bộ
   nhớ trình duyệt.
-- *"Còn gì chưa làm?"* Bản scan chưa OCR nền nên chỉ hỏi được theo trích yếu (nguồn ghi "trích yếu", không bịa
-  trang); mỗi câu hỏi độc lập, chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản
-  giả, sạch hơn văn bản thật.
+- *"Còn gì chưa làm?"* Bản scan chỉ có chữ OCR của 3 trang đầu, có thể sai chữ, sai dấu (#253); mỗi câu hỏi độc lập,
+  chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản giả, sạch hơn văn bản thật.
 
 ## Ngoài 4 nguyên lý: gợi ý giao việc — `make demo-giao-viec`
 

@@ -62,6 +62,7 @@ from collections.abc import Iterator
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, date, datetime
+from functools import partial
 from typing import Annotated, BinaryIO, Literal, Protocol
 from urllib.parse import quote
 
@@ -87,6 +88,7 @@ from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .dispatch import DispatchError, copy_issued_file
 from .docread import api as docread_api
+from .docread.ocr import run_ocr
 from .docread.reader import Reader
 from .docread.summarize import make_summarizer
 from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
@@ -478,8 +480,13 @@ def create_app(
     meili = meili or MeiliClient(settings.meili_url, settings.meili_api_key, settings.search_index)
     cursors = Cursor(settings.hasura_admin_secret)   # khóa dẫn xuất (HKDF) từ một bí mật sẵn có của svc-files
     indexer = Indexer(hasura, meili, interval_s=settings.search_sync_interval_s or 5.0)
+    # #253: bản scan (PDF không có lớp chữ) OCR ở vòng nền, hạn MOC_OCR_TIMEOUT_S cho mỗi trang
+    scan_ocr = partial(run_ocr, kind="pdf", binary=settings.tesseract_bin, lang=settings.ocr_lang,
+                       max_pages=settings.text_ocr_pages, max_pixels=settings.ocr_max_pixels,
+                       timeout_s=settings.ocr_timeout_s * settings.text_ocr_pages,
+                       memory_mb=settings.ocr_memory_mb) if settings.text_ocr_pages else None
     extractor = TextExtractor(hasura, store, interval_s=settings.text_interval_s or 10.0,
-                              max_bytes=settings.max_upload_bytes)
+                              max_bytes=settings.max_upload_bytes, ocr=scan_ocr)
     anchorer = Anchorer(
         hasura,
         anchor_store or AnchorStore(

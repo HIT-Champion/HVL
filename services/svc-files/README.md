@@ -193,9 +193,19 @@ tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số k
   còn tồn (vd tệp tải lên trước khi có F2.7) thì đọc tiếp ngay. Chữ từng trang nối bằng xuống dòng, vị trí đầu mỗi
   trang lưu ở `page_starts` (F4.2: trích dẫn có số trang). Kết quả ghi vào
   `core.file_texts` (khóa quản trị; không vai trò người dùng nào đọc được bảng này), mỗi tệp một lần: `ok`, `empty`
-  (không có lớp chữ — bản scan, để dành OCR F4.1), `failed` kèm lý do (`encrypted`, `timeout`, `memory`,
+  (không có lớp chữ và OCR không ra chữ, xem dưới), `failed` kèm lý do (`encrypted`, `timeout`, `memory`,
   `too large`, `missing` — kho không có đối tượng, `unreadable` — kho lỗi 5 lượt liền, `not saved` — CSDL không
   nhận kết quả, `bad output`, lỗi của pypdf).
+- **Bản scan được nhận dạng chữ (#253).** PDF không có lớp chữ thì vòng nền OCR `MOC_TEXT_OCR_PAGES` trang đầu (mặc
+  định 3) bằng đúng đường OCR của tác tử đọc văn bản đến: ảnh nhúng lớn nhất mỗi trang, tiến trình con có giới hạn
+  bộ nhớ, CPU, điểm ảnh (mục Đọc văn bản đến), hạn `MOC_OCR_TIMEOUT_S` cho mỗi trang. Đọc lần lượt từng tệp, nên mỗi
+  lúc vòng nền chỉ OCR một tệp. Ra chữ thì ghi `ok` như lớp chữ, kèm `page_starts` đúng từng trang (trang không có
+  ảnh giữ chỗ), `note` = `ocr <số trang đã đọc>/<số trang>`: tìm theo nội dung và trợ lý hỏi đáp dùng được chữ này.
+  Không ra chữ thì giữ `empty`, `note` = `ocr <lý do>` (`no_text` — không có ảnh, `timeout`, `memory`,
+  `too_many_pixels`, `no_tesseract`…) hoặc `ocr <n>/<số trang> blank` (ảnh không có chữ nào): bản scan mờ không phải
+  tệp hỏng, và không bị đọc lại. Nhật ký `core.file.text_ocr` ghi số trang đã đọc, số ký tự, thời gian, không ghi
+  chữ. Chữ OCR có thể sai chữ, sai dấu; các trang sau `MOC_TEXT_OCR_PAGES` trang đầu không vào chỉ mục. Migration
+  `1792281603500_file_texts_ocr` xóa các dòng `empty` cũ để bản scan đã có được đọc lại một lần sau khi nâng cấp.
 - **Một tệp lỗi không chặn hàng đợi.** Hàng đợi chung mọi thuê ước, tệp cũ nhất trước: tệp nào cũng phải đi tới
   một dòng kết quả, nếu không thì tệp đó đứng đầu mãi. Số trang tệp tự khai (`/Count`, pypdf trả nguyên với tệp mã
   hóa) không được tin — lấy số trang thật sau khi duyệt cây trang; kết quả của tiến trình con được kiểm đúng ràng
@@ -331,8 +341,8 @@ Mô hình chỉ chạy khi quy tắc chưa ra trích yếu chắc chắn: trên 
 xám), các tệp khác giữ thời gian như khi không bật mô hình. Từ bản này chữ OCR không trường nào `high` nên mọi ảnh, bản
 scan đều qua mô hình khi bật `ai` (thêm khoảng 3,5–6 giây).
 
-Chưa làm: OCR bản scan cho tìm kiếm toàn văn (F2.7 chỉ đọc lớp chữ); so sánh PaddleOCR / VietOCR; dữ liệu
-`tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ volume nếu cần chính xác hơn).
+Chưa làm: so sánh PaddleOCR / VietOCR; dữ liệu `tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ
+volume nếu cần chính xác hơn). OCR bản scan cho tìm kiếm toàn văn đã có ở vòng đọc chữ (#253, mục Tìm kiếm).
 
 ### Hỏi đáp trên kho văn bản (F4.2)
 
@@ -344,12 +354,13 @@ câu hỏi độc lập, không lưu hội thoại.
 **Chỉ mục đoạn** (`chunks.py`, `index.py`, `meili.py`). Chỉ mục Meilisearch riêng `MOC_ASK_INDEX` (`chunks`), một tài
 liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
 
-- **Nguồn**: chữ PDF của F2.7 (`core.file_texts`, có `page_starts`), không đọc lại tệp. Văn bản đến: bản chính và tài
-  liệu kèm theo (đánh trang riêng từng tệp), mọi trạng thái trừ `cancelled`. Văn bản đi: chỉ khi `issued`, `archived`,
-  nguồn là bản phát hành — dự thảo chưa có giá trị, đổi liên tục. **Văn bản hạn chế không bao giờ có đoạn nào.**
+- **Nguồn**: chữ PDF của F2.7 (`core.file_texts`, có `page_starts`; bản scan là chữ OCR, #253), không đọc lại tệp.
+  Văn bản đến: bản chính và tài liệu kèm theo (đánh trang riêng từng tệp), mọi trạng thái trừ `cancelled`. Văn bản
+  đi: chỉ khi `issued`, `archived`, nguồn là bản phát hành — dự thảo chưa có giá trị, đổi liên tục. **Văn bản hạn chế
+  không bao giờ có đoạn nào.**
 - **Cắt đoạn** theo từng trang, ≤ 1 200 ký tự, cắt ở ranh giới câu rồi khoảng trắng, đoạn sau mở đầu bằng câu cuối của
-  đoạn trước; không đoạn nào vượt trang. Bản scan, tệp lỗi, văn bản chưa có tệp: một đoạn "trích yếu" (loại, số ký
-  hiệu, ngày, cơ quan ban hành, trích yếu) — trích dẫn ghi "trích yếu", không bịa số trang.
+  đoạn trước; không đoạn nào vượt trang. Bản scan OCR không ra chữ, tệp lỗi, văn bản chưa có tệp: một đoạn "trích
+  yếu" (loại, số ký hiệu, ngày, cơ quan ban hành, trích yếu) — trích dẫn ghi "trích yếu", không bịa số trang.
 - **Mỗi đoạn mang thuộc tính quyền** chép từ văn bản: thuê ước, chiều, phòng, người tạo, phòng và người được giao
   (giao việc chưa hủy).
 - **Vòng nền** mỗi `MOC_ASK_SYNC_INTERVAL_S` giây, như chỉ mục F2.7 (con trỏ thời gian lùi 60 giây, lật trang theo id).
@@ -484,8 +495,9 @@ Chưa làm, giới hạn đã biết:
   bản trong cùng lệnh).
 - Hủy một giao việc không đổi `updated_at` hay `assigned_at`, nên thuộc tính quyền của đoạn còn cũ tới lần văn bản đổi
   sau. Việc này chỉ làm giảm độ phủ; hậu kiểm vẫn giữ an toàn.
-- Meilisearch chỉ xét 10 từ đầu của câu tìm; câu hỏi gõ không dấu bỏ được ít từ dừng hơn. Bản scan chỉ có đoạn "trích
-  yếu" (chưa OCR nền). Tách câu dựa trên lớp chữ PDF, có thể lệch với PDF dàn trang lạ.
+- Meilisearch chỉ xét 10 từ đầu của câu tìm; câu hỏi gõ không dấu bỏ được ít từ dừng hơn. Bản scan chỉ có chữ OCR
+  của `MOC_TEXT_OCR_PAGES` trang đầu, có thể sai chữ, sai dấu (#253). Tách câu dựa trên lớp chữ PDF, có thể lệch với
+  PDF dàn trang lạ.
 - Ngưỡng và hằng số kiểm (`RELAX_MIN`, độ phủ 60 %, ngưỡng câu trích) chỉnh trên kho mẫu nhỏ; cần đo lại trên kho
   thật. Kiểm theo từ không bắt được câu sai mà dùng đúng chữ của nguồn (vd "loại Xuất sắc" khi nguồn có cả "Xuất sắc"
   lẫn "Tốt"); câu có từ đệm không có trong nguồn ("… như sau:") có thể bị loại oan — người dùng vẫn có câu trích.
@@ -1178,6 +1190,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_SEARCH_INDEX` | `documents` | Tự tạo và áp cấu hình khi khởi động |
 | `MOC_SEARCH_SYNC_INTERVAL_S` | `5` | `0` tắt vòng đồng bộ nền |
 | `MOC_TEXT_INTERVAL_S` | `10` | Chu kỳ đọc chữ của PDF mới gắn vào văn bản; `0` tắt vòng đọc |
+| `MOC_TEXT_OCR_PAGES` | `3` | Bản scan (PDF không có lớp chữ): số trang đầu OCR ở vòng đọc chữ, hạn `MOC_OCR_TIMEOUT_S` mỗi trang; `0` tắt (#253) |
 | `MOC_PUBLIC_URL` | phần trước `/realms/` của `MOC_OIDC_ISSUER` | In vào mã QR của bản phát hành |
 | `MOC_SERVICE_CLIENTS` | `svc-workflow` | Client Keycloak được gọi `/internal/*`, cách nhau dấu phẩy |
 | `MOC_COLD_BUCKET` | `moc-cold` | Bucket lạnh có khóa ghi, tự tạo; phải khác `MOC_FILES_BUCKET` |

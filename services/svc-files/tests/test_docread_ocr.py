@@ -126,6 +126,19 @@ def test_only_the_first_pages_are_recognized(tmp_path):
     assert got.pages == 3 and got.tsv == (SAMPLE_TSV, SAMPLE_TSV)
 
 
+def test_a_page_without_images_keeps_its_place(tmp_path):
+    # #253: TSV thứ n là của trang n — trang không có ảnh cho chuỗi rỗng chứ không bị bỏ qua
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import DictionaryObject, NameObject
+
+    writer = PdfWriter(clone_from=PdfReader(io.BytesIO(pdf_of(*(Image.new("L", (1240, 1754), 255) for _ in range(3))))))
+    writer.pages[1][NameObject("/Resources")] = DictionaryObject()
+    out = io.BytesIO()
+    writer.write(out)
+    got = ocr(out.getvalue(), "pdf", fake_tesseract(tmp_path), max_pages=3)
+    assert got == OcrResult("ok", 3, (SAMPLE_TSV, "", SAMPLE_TSV))
+
+
 def test_pdf_without_images_has_nothing_to_read(tmp_path):
     binary = fake_tesseract(tmp_path)
     assert ocr(text_pdf(pages=2), "pdf", binary) == OcrResult("failed", 2, (), "no_text")

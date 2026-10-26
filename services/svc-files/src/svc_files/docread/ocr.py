@@ -151,7 +151,8 @@ def _xobject(page: Any, key: Any) -> Any:
 
 
 def pdf_images(data: bytes, max_pages: int, max_pixels: int) -> tuple[int | None, Iterator[Any]]:
-    """(số trang, ảnh nhúng lớn nhất của từng trang trong ``max_pages`` trang đầu — giải mã lần lượt)."""
+    """(số trang, ảnh nhúng lớn nhất của từng trang trong ``max_pages`` trang đầu — giải mã lần lượt). Trang không có
+    ảnh nào cho ``None`` để TSV các trang sau vẫn đúng số trang (#253: trợ lý trích "tr. n" từ chữ OCR)."""
     from pypdf import PasswordType, PdfReader
 
     reader = PdfReader(io.BytesIO(data), strict=False)
@@ -180,6 +181,7 @@ def pdf_images(data: bytes, max_pages: int, max_pixels: int) -> tuple[int | None
                 if w * h > size:
                     best, size = key, w * h
             if best is None:
+                yield None
                 continue
             obj = _xobject(page, best)
             # kiểm kích thước khai trong PDF TRƯỚC khi giải mã: pypdf giải nén cả ảnh vào bộ nhớ
@@ -226,10 +228,12 @@ def recognize(data: bytes, kind: str, *, binary: str, lang: str, max_pages: int,
             pages, images = pdf_images(data, max_pages, max_pixels)
         else:
             pages, images = 1, iter([open_image(data, max_pixels)])
-        tsv = [tesseract(prepare(img), binary=binary, lang=lang, timeout_s=timeout_s) for img in images]
+        # trang không có ảnh: TSV rỗng, giữ chỗ của trang
+        tsv = ["" if img is None else tesseract(prepare(img), binary=binary, lang=lang, timeout_s=timeout_s)
+               for img in images]
     except _Fail as exc:
         return OcrResult("failed", exc.pages, (), exc.note)
-    if not tsv:
+    if not any(tsv):
         return OcrResult("failed", pages, (), "no_text")
     return OcrResult("ok", pages, tuple(tsv))
 
