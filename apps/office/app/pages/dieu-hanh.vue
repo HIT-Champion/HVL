@@ -55,9 +55,9 @@ const CHECKS = '{ office_report_checks { rule report status expected actual issu
 const IN_STATUSES = ['received', 'registered', 'in_progress', 'done', 'archived', 'cancelled'] as const
 const OPEN = new Set(['received', 'registered', 'in_progress'])
 const MONTHS = 12
-// màu biểu đồ theo nhận diện "Liền mạch": olive của hành động chính, đỏ trầm cho quá hạn
-const BRAND = '#555b3f'
-const LATE = '#a02727'
+// màu biểu đồ theo nhận diện "bìa hồ sơ và tờ giấy": mực xanh của hành động chính, đỏ son cho quá hạn
+const BRAND = '#284868'
+const LATE = '#b42419'
 // giống grid.containLabel của ECharts 5: nhãn trục nằm trong khung
 const GRID = { left: 8, right: 16, top: 16, bottom: 8, outerBoundsMode: 'same', outerBoundsContain: 'axisLabel' }
 

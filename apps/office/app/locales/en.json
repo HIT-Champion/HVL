@@ -1642,7 +1642,12 @@
     "allDocuments": "All documents"
   },
   "shell": {
-    "closeNav": "Close navigation"
+    "closeNav": "Close navigation",
+    "groupWork": "Work",
+    "groupDocuments": "Documents",
+    "groupLookup": "Look up",
+    "groupManage": "Management",
+    "groupMore": "More"
   },
   "pageError": {
     "notFound": "Page not found",

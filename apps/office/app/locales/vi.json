@@ -1642,7 +1642,12 @@
     "allDocuments": "Tất cả văn bản"
   },
   "shell": {
-    "closeNav": "Đóng điều hướng"
+    "closeNav": "Đóng điều hướng",
+    "groupWork": "Công việc",
+    "groupDocuments": "Văn bản",
+    "groupLookup": "Tra cứu",
+    "groupManage": "Điều hành",
+    "groupMore": "Khác"
   },
   "pageError": {
     "notFound": "Không tìm thấy trang",

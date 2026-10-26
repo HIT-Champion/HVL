@@ -158,6 +158,23 @@ const nav = computed(() => {
   return items
 })
 
+// Thanh bên chia nhóm theo việc người dùng đang làm: việc của mình, sổ văn bản, tra cứu, điều hành, còn lại. Thứ tự
+// trong nhóm giữ như danh sách trên; nhóm không có mục nào cho vai trò này thì không hiện
+const GROUPS = {
+  groupWork: ['/', '/van-ban-den/tiep-nhan', '/van-ban-di/soan', '/ho-so'],
+  groupDocuments: ['/van-ban-den', '/van-ban-di', '/so-dang-ky', '/cam-bien'],
+  groupLookup: ['/tim-kiem', '/hoi-dap'],
+  groupManage: ['/dieu-hanh', '/so-do', '/pha-he', '/tu-chan-doan', '/so-kiem-toan'],
+} as const
+const navGroups = computed(() => {
+  const known = Object.values(GROUPS).flat() as string[]
+  const sections = Object.entries(GROUPS).map(([key, paths]) => ({
+    key, items: nav.value.filter((item) => (paths as readonly string[]).includes(item.to)),
+  }))
+  sections.push({ key: 'groupMore', items: nav.value.filter((item) => !known.includes(item.to)) })
+  return sections.filter((section) => section.items.length)
+})
+
 // Mục đang mở: đúng đường dẫn, hoặc trang con của nó (/ho-so/… thuộc Hồ sơ công việc) trừ khi trang con đã có mục
 // riêng (/van-ban-den/tiep-nhan)
 function active(to: string) {
@@ -240,19 +257,26 @@ async function logout() {
         </button>
       </div>
       <nav class="sg-nav" :aria-label="t('fe.navigation')">
-        <NuxtLink
-          v-for="item in nav" :key="item.to" :to="item.to" class="sg-nav-link" :class="{ 'is-active': active(item.to) }"
-          :aria-label="item.label" :title="collapsed ? item.label : undefined"
-          :aria-current="active(item.to) ? 'page' : undefined"
+        <div
+          v-for="section in navGroups" :key="section.key" class="sg-nav-section" role="group"
+          :aria-label="t(`shell.${section.key}`)"
         >
-          <svg
-            width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
-            aria-hidden="true"
+          <span class="sg-nav-group" aria-hidden="true">{{ t(`shell.${section.key}`) }}</span>
+          <NuxtLink
+            v-for="item in section.items" :key="item.to" :to="item.to" class="sg-nav-link"
+            :class="{ 'is-active': active(item.to) }"
+            :aria-label="item.label" :title="collapsed ? item.label : undefined"
+            :aria-current="active(item.to) ? 'page' : undefined"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-          </svg>
-          <span class="sg-nav-label">{{ item.label }}</span>
-        </NuxtLink>
+            <svg
+              width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+            </svg>
+            <span class="sg-nav-label">{{ item.label }}</span>
+          </NuxtLink>
+        </div>
       </nav>
       <div class="sg-sidebar-bottom">
         <div class="sg-account">
@@ -303,15 +327,18 @@ async function logout() {
           </button>
         </div>
       </header>
-      <main id="main-content" class="moc-sheet">
-        <slot />
-      </main>
-      <footer class="moc-shell-footer">
-        <span>Signet <span aria-hidden="true">/</span> {{ t('app.tagline') }}</span>
-        <NuxtLink to="/xac-thuc" class="moc-footer-verify">{{ t('fe.verify') }}</NuxtLink>
-        <NuxtLink to="/trang-thai">{{ t('health.title') }}</NuxtLink>
-        <span>{{ t('fe.localData') }}</span>
-      </footer>
+      <!-- tờ giấy: nội dung trang và chân trang nằm trên nền trắng, khung kraft bao quanh -->
+      <div class="sg-paper">
+        <main id="main-content" class="moc-sheet">
+          <slot />
+        </main>
+        <footer class="moc-shell-footer">
+          <span>Signet <span aria-hidden="true">/</span> {{ t('app.tagline') }}</span>
+          <NuxtLink to="/xac-thuc" class="moc-footer-verify">{{ t('fe.verify') }}</NuxtLink>
+          <NuxtLink to="/trang-thai">{{ t('health.title') }}</NuxtLink>
+          <span>{{ t('fe.localData') }}</span>
+        </footer>
+      </div>
     </div>
   </div>
 </template>
