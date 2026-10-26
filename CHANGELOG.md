@@ -11,9 +11,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Quy trình là dịch vụ của lõi (#301). Manifest của `moc app install` có thêm mục `workflow`: tệp BPMN và form JSON
   Schema của ứng dụng. svc-workflow kiểm gói ngay ở bước 1, trước khi đổi gì: BPMN theo danh sách trắng (chỉ sự kiện
   bắt đầu, kết thúc, `userTask`, cổng rẽ nhánh, luồng; không `scriptTask`, `serviceTask`, listener, biểu thức ngoài
-  điều kiện so chuỗi và nhóm ứng viên `t:${tenantId}:…`; không `DOCTYPE`, `ENTITY`), form 2020-12 với
-  `additionalProperties: false`. Bước mới "quy trình" sau Keycloak triển khai thành một deployment trên Flowable của
-  lõi, tên theo băm nội dung: cài lại không đổi gì không thêm phiên bản. `moc app remove` tạm dừng các định nghĩa quy
+  điều kiện so chuỗi và nhóm ứng viên `t:${tenantId}:…`; không `DOCTYPE`, `ENTITY`; process id tối đa 22 ký tự để
+  Flowable giữ khóa trong id định nghĩa), form 2020-12 với `additionalProperties: false`, `pattern` không quay lui bùng
+  nổ (ReDoS). Bước mới "quy trình" sau Keycloak triển khai thành một deployment trên Flowable của lõi, tên theo băm nội
+  dung: cài lại không đổi gì không thêm phiên bản. `moc app remove` tạm dừng các định nghĩa quy
   trình đó, lịch sử đơn giữ nguyên trong Flowable. Trang của ứng dụng gọi API chung `/api/workflow/<tên>/…` (route
   APISIX mới, chỉ nhận token của client `app-<tên>`): lấy form, bắt đầu quy trình, xem đơn của mình, xem và hoàn thành
   việc của mình; dữ liệu sai form trả `422` từng trường, kể cả từ khóa mới `x-moc-range`; đơn vị, phòng, người gửi lấy

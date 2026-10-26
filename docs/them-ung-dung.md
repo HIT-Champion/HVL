@@ -339,13 +339,20 @@ chỉ nhận đúng những gì một quy trình duyệt cần; mọi thứ khá
 | Tệp | UTF-8, tối đa 512 KB | `<!DOCTYPE`, `<!ENTITY` (thực thể ngoài đọc được tệp của máy chủ, thực thể lồng làm nổ bộ nhớ), chỉ thị xử lý `<?…?>` |
 
 Process id (= `processKey`) phải dạng `<tên>.<khóa>`: ứng dụng không chạm được quy trình Văn phòng điện tử hay của ứng
-dụng khác. Gói còn bị từ chối khi hai tệp cùng process id, khi có tệp không khai.
+dụng khác. Process id tối đa 22 ký tự: Flowable đặt id định nghĩa `<khóa>:<phiên bản>:<uuid>`, chuỗi đó quá 64 ký tự
+thì id chỉ còn uuid, lõi không còn biết việc thuộc ứng dụng nào (22 ký tự vừa tới phiên bản 9999). Gói còn bị từ chối
+khi hai tệp cùng process id, khi có tệp không khai.
 
 **Kiểm form** (`svc_workflow/apps/forms.py`). Lúc cài, form phải là JSON Schema 2020-12 hợp lệ, `type: object`,
 `additionalProperties: false` (mọi biến ghi vào quy trình đều được khai); tên trường dạng camelCase (là tên biến
 Flowable), không trùng biến hệ thống `tenantId`, `departmentId`, `initiator`; mỗi trường một giá trị đơn (chuỗi, số,
 đúng/sai — biến Flowable không chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp;
-`x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB. Lúc nhận dữ liệu, lõi kiểm bằng đúng
+`x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB. `pattern` (cả khóa của `patternProperties`) chạy
+bằng `re` của Python, quay lui, ngay trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ (ReDoS, vd `^(a+)+$`)
+với vài chục ký tự làm đứng cả dịch vụ, kể cả Action của Văn phòng điện tử. Nên lúc cài chỉ nhận mẫu không lặp lồng
+trong lặp (trừ lặp đúng n lần như `(,[0-9]{3})*`), không có `|` hay tham chiếu ngược (`\1`) trong phần lặp, nhiều nhất
+một phần lặp dài (không chặn trên hoặc trên 32 lần), tối đa 512 ký tự; `^20[0-9]{2}-`, lớp ký tự cấm,
+`^[A-Z]{2,5}$` đều qua. Lúc nhận dữ liệu, lõi kiểm bằng đúng
 `schemas.FormSchema` của form tiếp nhận văn bản đến (mã lỗi như [`schemas/README.md`](../schemas/README.md)) cộng
 `x-moc-range` (trường sau trước trường trước → mã `x-moc-range` ở trường sau; kiểm sau cùng, bỏ qua khi một trong hai
 trường đã có lỗi). Chỉ trường đã khai, có mặt và khác `null` được ghi thành biến, giữ kiểu (chuỗi, long, double,
