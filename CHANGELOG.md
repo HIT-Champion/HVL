@@ -252,6 +252,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   hiện tại; trigger `core.app_events_publish` vào danh sách chỗ dính CSDL; ba ứng dụng ở Tầng 2; Bảng tin đọc
   `office.documents` qua quan hệ GraphQL; đã có trang `/ung-dung` (sửa cả `ROADMAP.md`); số mục dẫn sang
   `them-ung-dung.md`.
+- `docs/architecture.md` xếp `/api/verify/anchor-key.pem` vào lõi (#233): route trả khóa công khai ký mốc neo sổ kiểm
+  toán, cùng nhóm với `anchors.py`, không phải của Văn phòng. Route công khai của `svc-files` thành 2 lõi, 8 dáng nghiệp
+  vụ, 10 Văn phòng; bước tách router ở §4.7 còn 11 route Văn phòng.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô
