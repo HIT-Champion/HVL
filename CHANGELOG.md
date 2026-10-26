@@ -241,6 +241,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- CI không còn đỏ với PR không đổi tệp nào (#295). Hai job đọc danh sách tệp của PR ("Phạm vi thay đổi" và "Có đổi
+  đường nâng cấp không") coi danh sách rỗng là lỗi API, nên PR chỉ ghi lịch sử một nhánh (#294) và PR gộp ngược `main`
+  → `develop` sau phát hành (cây hai nhánh trùng nhau) không bao giờ qua được job bắt buộc "Chạy thử toàn hệ thống".
+  Giờ danh sách rỗng chỉ hợp lệ khi chính sự kiện PR báo 0 tệp; khi đó không dựng hệ thống, không tập nâng cấp. Gọi
+  API lỗi vẫn làm job đỏ như cũ.
 - e2e không còn đỏ chập chờn khi ClamAV nạp lại chữ ký (#287). Volume chữ ký của CI luôn mới tạo. freshclam tải bản
   daily mới đúng lúc clamd đang nạp bản có sẵn trong image, nên 600 giây sau clamd tự nạp lại, và với
   `ConcurrentDatabaseReload no` thì suốt lúc nạp không quét gì: tệp tải lên lúc đó treo quá 15 giây.

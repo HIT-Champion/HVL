@@ -237,7 +237,8 @@ jobs:
         run: docker logs --tail 200 moc-db-it-hasura || true
 
   # PR chỉ đổi tài liệu (*.md, ảnh trong docs/; trừ docs/api/ do máy sinh, CI so với hệ thống thật) thì không dựng
-  # cả hệ thống. Push lên develop, main luôn chạy đủ
+  # cả hệ thống; PR không đổi tệp nào (commit gộp chỉ ghi lịch sử, PR gộp ngược sau phát hành) cũng vậy. Push lên
+  # develop, main luôn chạy đủ
   thay-doi:
     name: Phạm vi thay đổi
     runs-on: ubuntu-24.04
@@ -253,10 +254,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          SO_TEP: ${{ github.event.pull_request.changed_files }}
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then echo "ma=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # gh api lỗi thì bước dừng ở đây (bash -e). Danh sách rỗng chỉ hợp lệ khi chính sự kiện báo 0 tệp
           files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
-          test -n "$files" || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+          if [ -z "$files" ]; then
+            test "$SO_TEP" = 0 || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+            echo "ma=false" >> "$GITHUB_OUTPUT"; echo "PR không đổi tệp nào, không dựng hệ thống"; exit 0
+          fi
           ma=$(grep -vE '\.md$|^docs/.*\.(png|jpe?g|svg|gif|webp)$' <<<"$files"; grep -E '^docs/api/' <<<"$files") || true
           if [ -n "$ma" ]; then
             echo "ma=true" >> "$GITHUB_OUTPUT"
