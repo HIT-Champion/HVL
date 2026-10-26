@@ -21,7 +21,8 @@ dịch vụ với MOC_OFFICE_ENABLED=false rồi kiểm: route và Hasura Action
 (smoke.py --chi-loi) và ứng dụng thứ hai (make demo-ca-nhan) vẫn đạt. Xong thì dựng lại hai dịch vụ theo cấu hình
 thường (.env, mặc định bật), kể cả khi có bước sai, và kiểm Văn phòng trả lời lại.
 
-Cần make seed trước. Thoát 0: đạt; 1: có bước sai hoặc không gọi được Signet.
+Cần make seed trước, trên stack dựng từ chính thư mục này: hai dịch vụ đang chạy mà được dựng từ thư mục khác (bản cài
+cùng project compose) thì dừng ngay, không đụng gì (#328). Thoát 0: đạt; 1: có bước sai hoặc không gọi được Signet.
 """
 
 from __future__ import annotations
@@ -45,6 +46,8 @@ MY_TASKS = "{ myTasks { id } }"
 # APISIX tin bản ghi DNS của Docker 5 giây, mỗi worker một bản (dns_resolver_valid, platform/apisix/config.yaml)
 DNS_VALID_S = 5
 GATEWAY_WAIT_S = 30
+# Docker Compose gắn nhãn này vào mọi container nó dựng: thư mục của docker-compose.yml lúc dựng
+WORKING_DIR = '{{index .Config.Labels "com.docker.compose.project.working_dir"}}'
 
 
 class DemoFailed(Exception):
@@ -57,6 +60,19 @@ def say(n: int, text: str) -> None:
 
 def ok(text: str) -> None:
     print(f"   ✓ {text}")
+
+
+def started_elsewhere() -> str | None:
+    """Thư mục đã dựng svc-files, svc-workflow đang chạy, nếu khác thư mục mã nguồn này. docker-compose.yml đặt
+    ``name: moc``, nên không đặt COMPOSE_PROJECT_NAME thì bản sao nào cũng cùng project với bản cài (make install
+    PREFIX=/opt/moc): dựng lại từ đây là thay container của bản cài bằng cấu hình ở đây."""
+    ids = subprocess.run([*COMPOSE, "ps", "-q", *SERVICES], cwd=ROOT, capture_output=True, text=True,
+                         check=True).stdout.split()
+    if not ids:
+        return None
+    dirs = subprocess.run(["docker", "inspect", "-f", WORKING_DIR, *ids], capture_output=True, text=True,
+                          check=True).stdout.split("\n")
+    return next((d for d in dirs if d and pathlib.Path(d).resolve() != ROOT.resolve()), None)
 
 
 def recreate(office: bool | None) -> float:
@@ -125,6 +141,10 @@ def fail(message: str) -> None:
 
 def run() -> None:
     print("Tắt phần Văn phòng điện tử trong svc-files, svc-workflow — lõi vẫn chạy")
+    elsewhere = started_elsewhere()
+    if elsewhere:
+        fail(f"{', '.join(SERVICES)} đang chạy được dựng từ {elsewhere}, không phải từ thư mục này: màn demo sẽ thay "
+             "chúng bằng cấu hình ở đây. Chạy trên project riêng (COMPOSE_PROJECT_NAME=moc-thu) hay từ đúng thư mục đó")
     clerk = Session("vanthu")
 
     say(1, "Lúc đầu Văn phòng đang bật")
