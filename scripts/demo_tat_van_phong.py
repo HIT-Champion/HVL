@@ -60,8 +60,9 @@ def recreate(office: bool | None) -> float:
     if office is not None:
         env["MOC_OFFICE_ENABLED"] = "true" if office else "false"
     started = time.monotonic()
-    subprocess.run([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "300", *SERVICES], cwd=ROOT, env=env,
-                   check=True, capture_output=True)
+    # --no-deps: chỉ dựng lại hai dịch vụ này, không đụng các dịch vụ chúng phụ thuộc (đang chạy sẵn)
+    subprocess.run([*COMPOSE, "up", "-d", "--no-deps", "--wait", "--wait-timeout", "300", *SERVICES], cwd=ROOT,
+                   env=env, check=True, capture_output=True)
     return time.monotonic() - started
 
 
