@@ -487,6 +487,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   hiện câu ấy thay vì chữ "HTTP 502" trơn. Test đơn vị +1.
 
 ### Bảo mật
+- Giao diện Văn phòng điện tử nâng Nuxt 4.5.2 → 4.6.2 (#321), đóng bốn cảnh báo Dependabot của Nuxt: GHSA-vjh5-4x84-xrqp
+  (route rules phía máy chủ bỏ qua đường dẫn khác hoa thường), GHSA-xfq5-w38q-pc2x (server islands),
+  GHSA-jjm6-p2m9-9w4x (URL `javascript:` trong `NuxtLink` khi tắt `pages`). Signet không dính cả ba: app-office là
+  trang tĩnh qua nginx, bật `pages`, không dùng server islands. Gói phụ đổi theo Nuxt chỉ lấy bản phát hành trước
+  23/10. `apps/office/osv-scanner.toml` bỏ hai mục đã vá và mục braces GHSA-vfj7-8cjw-p6xm (OSV đã rút); giữ
+  GHSA-vjh5-4x84-xrqp vì bản ghi OSV còn khoảng 3.x chưa vá nên vẫn khớp 4.6.2, và node-forge (chỉ `nuxt dev` dùng,
+  chưa có bản vá).
 - Góp ý trong ứng dụng che số và email trước khi lưu (#265): lãnh đạo, quản trị đơn vị đọc được nội dung góp ý, nên
   số điện thoại, CCCD, CMND, số tài khoản, email lỡ ghi vào sẽ bị thay bằng `[đã che]` — hàm `office.mask_pii` gọi
   trong trigger `feedback_guard`, áp cho mọi đường ghi; migration che luôn góp ý đã gửi. Luật theo mẫu: dãy số liền từ

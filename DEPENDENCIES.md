@@ -95,7 +95,7 @@ Thư viện được cài qua `npm` với `package-lock.json`; phiên bản dư�
 
 | Thành phần | Phiên bản | Giấy phép | Vai trò | Cách nạp | Phase |
 |---|---|---|---|---|---|
-| Nuxt | 4.5.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
+| Nuxt | 4.6.2 | MIT | Khung ứng dụng web (chế độ SPA, dựng thành trang tĩnh) | npm | 1 |
 | Vue | 3.5 | MIT | Thư viện giao diện (qua Nuxt) | npm | 1 |
 | oidc-client-ts | 3.5.0 | Apache-2.0 | Đăng nhập OIDC (Authorization Code + PKCE) với Keycloak; `app-ca-nhan`, `app-bang-tin`, `app-nghi-phep` dùng bản dựng sẵn cho trình duyệt của cùng gói (`dist/browser/oidc-client-ts.min.js`, đã gồm jwt-decode 4.0.0, MIT) — không thêm gói nào | npm | 1 |
 | vue-i18n | 11.4.13 | MIT | Song ngữ Việt / Anh | npm | 1 |
