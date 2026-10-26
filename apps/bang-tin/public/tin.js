@@ -49,14 +49,29 @@ export function dong(tin) {
   }
 }
 
-/** Tên người dùng trong access token (claim name, không thì preferred_username) — chỉ để chào, không để phân quyền. */
-export function tenNguoi(token) {
+function claims(token) {
   try {
     const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const claims = JSON.parse(decodeURIComponent(Array.from(atob(part), (c) =>
+    return JSON.parse(decodeURIComponent(Array.from(atob(part), (c) =>
       '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')))
-    return claims.name || claims.preferred_username || ''
   } catch {
-    return ''
+    return null
   }
 }
+
+/** Tên người dùng trong access token (claim name, không thì preferred_username) — chỉ để chào, không để phân quyền. */
+export function tenNguoi(token) {
+  const c = claims(token)
+  return c?.name || c?.preferred_username || ''
+}
+
+/** Vai trò trong access token, chỉ để vẽ trang; quyền thật do Hasura xét theo app.yaml. */
+export function vaiTro(token) {
+  return claims(token)?.['https://hasura.io/jwt/claims']?.['x-hasura-default-role'] ?? null
+}
+
+/**
+ * Vai trò đọc được bảng tin: đúng các vai trò có select_permissions trong app.yaml (quản trị đơn vị không đọc văn
+ * bản).
+ */
+export const VAI_TRO_XEM = ['clerk', 'staff', 'manager', 'director']

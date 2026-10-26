@@ -159,7 +159,16 @@
 }
 
 /* Khối dựng trang: đầu trang, thẻ lọc, thanh công cụ, trạng thái rỗng, đang tải, phân trang, bảng văn bản */
-.moc-page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+.moc-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 26px;
+}
+/* chữ tiêu đề co lại tới 18rem; hẹp hơn nữa thì các nút xuống dòng dưới, không bị đẩy ra ngoài trang */
+.moc-page-header > div:first-child { flex: 1 1 18rem; min-width: 0; }
 .moc-page-header p { margin-top: 7px; font-size: 14px; color: var(--muted); }
 .moc-tabs { display: flex; gap: 24px; overflow-x: auto; border-bottom: 1px solid var(--edge); }
 .moc-tabs button {

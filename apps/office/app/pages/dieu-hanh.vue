@@ -273,7 +273,7 @@ const outgoingChart = computed(() => ({
         </div>
       </div>
 
-      <div class="grid gap-4 xl:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <section class="card p-4" data-testid="board-status">
           <div class="flex items-start justify-between gap-3">
             <h2 class="font-medium text-stone-900">{{ t('board.byStatus') }}</h2>

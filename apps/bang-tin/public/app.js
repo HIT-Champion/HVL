@@ -18,7 +18,7 @@
 // theo đơn vị và theo văn bản người xem được đọc), vẽ danh sách, hỏi lại mỗi 15 giây.
 
 import { signIn, signOut } from './auth.js'
-import { QUERY_TIN, dong, tenNguoi } from './tin.js'
+import { QUERY_TIN, VAI_TRO_XEM, dong, tenNguoi, vaiTro } from './tin.js'
 
 const el = (id) => document.getElementById(id)
 
@@ -54,6 +54,12 @@ async function main() {
   el('nguoi').textContent = tenNguoi(user.access_token) || 'Đã đăng nhập'
   el('thoat').hidden = false
   el('thoat').addEventListener('click', () => signOut())
+  // quản trị đơn vị không đọc văn bản nên không có bảng tin: báo bằng câu đọc được, không hỏi để nhận lỗi GraphQL
+  if (!VAI_TRO_XEM.includes(vaiTro(user.access_token))) {
+    el('trang-thai').textContent = 'Tài khoản quản trị đơn vị không xem được bảng tin: bảng tin chỉ hiện văn bản người '
+      + 'xem được đọc. Đăng nhập bằng tài khoản nghiệp vụ.'
+    return
+  }
   const refresh = async () => {
     try {
       const current = await signIn()

@@ -265,6 +265,20 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Số dịch vụ log tập trung thu: `DEPENDENCIES.md`, `ROADMAP.md`, `platform/README.md` và chú thích trong
   `docker-compose.yml`, `scripts/install.sh` vẫn ghi 5 dịch vụ, chưa thu Hasura, Keycloak, PostgreSQL; từ #202 tệp phủ
   `platform/logs/docker-compose.logs.yml` thu 8 dịch vụ. Sửa thành 8.
+- Giao diện trên màn hẹp và với quản trị đơn vị (#230):
+  - tiêu đề trang (`PageHeader`) xuống dòng khi chật, các nút không bị đẩy ra ngoài khung (Hồ sơ công việc, Cảm biến
+    ở 768px);
+  - lưới ở trang Điều hành, Số đo, Tự chẩn đoán và trang văn bản có cột co theo màn hình: biểu đồ vẽ ở khổ rộng tự
+    co lại khi thu cửa sổ xuống 390px, trang không còn cuộn ngang;
+  - cờ chất lượng (`QualityFlag`) giữ phần chữ cho trình đọc màn hình trong chính cờ: ở trang Phả hệ, phần chữ ấy
+    từng thoát khỏi bảng cuộn ngang làm cả trang rộng ra ở 390px. Bộ chọn biểu đồ của Phả hệ không rộng quá khung;
+  - quản trị đơn vị gõ thẳng địa chỉ trang văn bản, hồ sơ, sổ đăng ký (cả trang con) thì về sổ kiểm toán trước khi
+    trang gửi câu hỏi, thay vì báo lỗi (GraphQL "not found" ở trang văn bản). Quyền Hasura, svc-files không đổi;
+  - Bảng tin báo bằng câu đọc được rằng tài khoản quản trị đơn vị không xem được bảng tin, thay vì hỏi rồi hiện lỗi
+    GraphQL.
+
+  e2e mới `tests/e2e/man-hep.spec.ts`: trang thu từ 1440 xuống 768, 390 không cuộn ngang (đo cả `#main-content`),
+  nút ở tiêu đề nằm trong khung, quản trị đơn vị bị đưa về sổ kiểm toán mà không gửi câu hỏi văn bản nào.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô
