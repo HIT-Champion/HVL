@@ -36,8 +36,46 @@ test('giám khảo: hộp việc có sẵn việc mẫu, chữ đại diện là
   await expect(judge.getByTestId('avatar-initial')).toHaveText('G')
   await shot(judge, '30-giam-khao')
 
-  // việc sửa dự thảo mở ra đúng văn bản đi, có ý kiến trả lại của tổ trưởng
+  // việc sửa dự thảo mở ra đúng văn bản đi, có ý kiến trả lại của tổ trưởng; nút quay lại về hộp việc
   await redraft.getByRole('link').click()
-  await expect(judge).toHaveURL(/\/van-ban\/[0-9a-f-]{36}$/)
+  await expect(judge).toHaveURL(/\/van-ban\/[0-9a-f-]{36}\?from=inbox$/)
   await expect(judge.getByText('Bổ sung ý kiến của Bộ môn Kỹ thuật phần mềm').first()).toBeVisible()
+  await judge.getByRole('link', { name: 'Về hộp việc' }).click()
+  await expect(judge.getByTestId('inbox')).toBeVisible()
+
+  // ngữ cảnh việc (#235): khung báo kết quả có chỉ đạo của phòng và ghi chú phân công; gửi trống thì tiêu điểm về ô
+  // kết quả, không gửi gì
+  const search = judge.getByRole('searchbox', { name: 'Tìm trong hộp việc…' })
+  await search.fill('152')
+  await handle.getByRole('link').click()
+  const brief = judge.getByTestId('processing-brief')
+  await expect(brief).toContainText('Giao Tổ Đào tạo chủ trì thực hiện, báo cáo đúng hạn.')
+  await expect(brief).toContainText('Đề nghị xử lý và báo cáo kết quả.')
+  await expect(brief).toContainText('Hạn giải quyết')
+  await judge.getByRole('button', { name: 'Báo cáo xong', exact: true }).click()
+  const result = judge.getByLabel('Kết quả xử lý')
+  await expect(result).toBeFocused()
+  await expect(result).toHaveAttribute('aria-invalid', 'true')
+  await shot(judge, '30-giam-khao-yeu-cau')
+
+  // tab Dòng thời gian / Lịch sử bằng bàn phím; Esc đóng khung Góp ý và trả tiêu điểm về nút
+  const timelineTab = judge.getByRole('tab', { name: 'Dòng thời gian', exact: true })
+  const historyTab = judge.getByRole('tab', { name: 'Lịch sử', exact: true })
+  await timelineTab.focus()
+  await judge.keyboard.press('ArrowRight')
+  await expect(historyTab).toBeFocused()
+  await expect(historyTab).toHaveAttribute('aria-selected', 'true')
+  await expect(judge.getByRole('tabpanel', { name: 'Lịch sử' })).toBeVisible()
+  await judge.keyboard.press('Home')
+  await expect(timelineTab).toBeFocused()
+  await expect(judge.getByRole('tabpanel', { name: 'Dòng thời gian' })).toBeVisible()
+  await judge.getByTestId('feedback-open').click()
+  await expect(judge.getByTestId('feedback-form')).toBeVisible()
+  await judge.keyboard.press('Escape')
+  await expect(judge.getByTestId('feedback-form')).toHaveCount(0)
+  await expect(judge.getByTestId('feedback-open')).toBeFocused()
+
+  // quay lại hộp việc: ô tìm còn nguyên
+  await judge.getByRole('link', { name: 'Về hộp việc' }).click()
+  await expect(search).toHaveValue('152')
 })

@@ -32,6 +32,7 @@ const comment = ref('')
 const sending = ref(false)
 const failure = ref('')
 const root = ref<HTMLElement | null>(null)
+const toggle = ref<HTMLButtonElement | null>(null)
 const screen = computed(() => feedbackScreen(route.path))
 
 const SEND = `mutation ($r: Int!, $c: String, $s: String!) {
@@ -44,6 +45,12 @@ function outside(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', outside))
 onBeforeUnmount(() => document.removeEventListener('click', outside))
 watch(() => route.fullPath, () => { open.value = false })
+// Esc đóng khung đang mở và trả tiêu điểm về nút Góp ý, không để tiêu điểm lạc khi khung biến mất
+function escape() {
+  if (!open.value) return
+  open.value = false
+  toggle.value?.focus()
+}
 
 async function send() {
   if (!rating.value || sending.value) return
@@ -64,8 +71,11 @@ async function send() {
 </script>
 
 <template>
-  <div ref="root" class="relative">
-    <button class="btn-ghost text-xs" :aria-expanded="open" data-testid="feedback-open" @click="open = !open">
+  <div ref="root" class="relative" @keydown.esc.stop="escape">
+    <button
+      ref="toggle" type="button" class="btn-ghost text-xs" :aria-expanded="open" data-testid="feedback-open"
+      @click="open = !open"
+    >
       {{ t('feedback.button') }}
     </button>
     <form

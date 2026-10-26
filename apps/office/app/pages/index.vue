@@ -39,10 +39,10 @@ const tasks = ref<InboxTask[]>([])
 const loading = ref(true)
 const failure = ref('')
 
-// Lọc, tìm trên các việc đã tải, không gọi lại máy chủ
-const query = ref('')
-const filter = ref<Filter>('all')
-const category = ref<Category>('all')
+// Lọc, tìm trên các việc đã tải, không gọi lại máy chủ. Giữ qua lúc mở một văn bản rồi bấm "Về hộp việc"
+const query = useState<string>('inbox-query', () => '')
+const filter = useState<Filter>('inbox-filter', () => 'all')
+const category = useState<Category>('inbox-category', () => 'all')
 const filters: Record<Filter, string> = {
   all: 'fe.all',
   today: 'fe.todayShort',
