@@ -99,22 +99,22 @@ test('giao diện: thanh bên mở khi rê chuột hoặc dùng bàn phím, khô
   // con trỏ còn nằm trên biểu tượng vừa bấm: nhích 1px không làm thanh bên mở lại (chờ quá nhịp mở để chắc); ra hẳn
   // khỏi thanh bên rồi vào lại thì mở như thường
   const box = (await incoming.boundingBox())!
-  const [x, y] = [box.x + 24, box.y + box.height / 2]
-  await page.mouse.move(x + 1, y)
+  const [pointerX, pointerY] = [box.x + 24, box.y + box.height / 2]
+  await page.mouse.move(pointerX + 1, pointerY)
   await page.waitForTimeout(400)
   await expect(shell).toHaveClass(/is-collapsed/)
   // bấm mục của chính trang đang mở (route không đổi): vẫn thu lại, nhích chuột cũng không mở lại
   await page.mouse.move(800, 300)
-  await page.mouse.move(x, y)
+  await page.mouse.move(pointerX, pointerY)
   await expect(shell).not.toHaveClass(/is-collapsed/)
-  await page.mouse.click(x, y)
+  await page.mouse.click(pointerX, pointerY)
   await expect(page).toHaveURL(/\/van-ban-den$/)
   await expect(shell).toHaveClass(/is-collapsed/)
-  await page.mouse.move(x + 1, y)
+  await page.mouse.move(pointerX + 1, pointerY)
   await page.waitForTimeout(400)
   await expect(shell).toHaveClass(/is-collapsed/)
   await page.mouse.move(800, 300)
-  await page.mouse.move(x, y)
+  await page.mouse.move(pointerX, pointerY)
   await expect(shell).not.toHaveClass(/is-collapsed/)
   await page.mouse.move(800, 300)
   await expect(shell).toHaveClass(/is-collapsed/)
