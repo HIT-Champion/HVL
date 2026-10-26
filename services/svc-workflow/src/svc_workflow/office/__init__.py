@@ -16,6 +16,7 @@
 
 """Phần Văn phòng điện tử của svc-workflow (ứng dụng đầu tiên trên lõi, docs/architecture.md §4.3).
 
+- ``api``: route (Actions, ``/ot/notify``) và việc nền của Văn phòng, gắn vào app theo khuôn ``parts.Part``.
 - ``queries``: câu GraphQL trên schema ``office``.
 
 Các mô-đun nghiệp vụ của Văn phòng (``workflow``, ``forms``, ``sla``, ``dispatch``, ``advisor``, ``suggest``, ``ot``,
