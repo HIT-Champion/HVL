@@ -31,7 +31,8 @@ thống kê.
 
 ## Khung
 
-- Thanh bên 76px (biểu tượng) mở thành 248px khi rê chuột hoặc focus bàn phím, nằm đè lên trang, không đẩy nội dung.
+- Thanh bên 76px (biểu tượng) mở thành 248px khi rê chuột hoặc focus bàn phím; nội dung dịch sang theo cùng nhịp,
+  không bị che. Chỉ thu lại khi con trỏ rời thanh bên: bấm mục menu hay đổi trang không thu.
   Hành vi giữ đúng #297/#298 (`tests/e2e/giao-dien.spec.ts`): bấm chọn thì thu, nhích chuột không mở lại, Esc thu;
   ≤ 900px hoặc màn cảm ứng thành ngăn kéo. Không ghim mở.
 - Thanh trên trải hết chiều ngang: đơn vị › trang đang mở, ngày, góp ý, chuông, ngôn ngữ. Trang ngoài menu đặt tên

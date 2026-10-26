@@ -24,9 +24,10 @@ const auth = useAuth()
 const claims = auth.claims
 const route = useRoute()
 
-// Thanh bên: trên máy tính thu về một dải biểu tượng, mở ra khi rê chuột vào hoặc khi focus bằng bàn phím (focus do
-// bấm chuột không tính, không thì bấm một mục xong thanh bên cứ mở đè lên nội dung). Màn hẹp hay màn cảm ứng: ngăn
-// kéo mở bằng nút menu, Esc đóng, Tab chỉ đi vòng trong ngăn kéo.
+// Thanh bên: trên máy tính thu về một dải biểu tượng, mở ra khi rê chuột vào hoặc khi focus bằng bàn phím. Mở hay thu,
+// nội dung đều dịch theo (main.css), không bị che. Chỉ con trỏ rời thanh bên mới thu lại: bấm một mục, kể cả mục của
+// trang đang mở, hay đổi trang đều không thu. Màn hẹp hay màn cảm ứng: ngăn kéo mở bằng nút menu, Esc đóng, Tab chỉ đi
+// vòng trong ngăn kéo.
 const open = ref(false)
 const mobile = ref(false)
 const hovering = ref(false)
@@ -34,30 +35,22 @@ const keyboardFocus = ref(false)
 const collapsed = computed(() => !mobile.value && !hovering.value && !keyboardFocus.value)
 const menuButton = ref<HTMLButtonElement | null>(null)
 let hoverExit: ReturnType<typeof setTimeout> | undefined
-// Bấm chuột vào một mục, kể cả mục của trang đang mở (route không đổi nên watch(route) ở dưới không chạy): thu thanh
-// bên, đóng ngăn kéo, rồi không cho rê chuột mở lại tới khi con trỏ rời hẳn thanh bên và vào lại. Không thì con trỏ còn
-// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Bấm chuột cũng xóa focus bàn phím: Tab tới một
-// mục rồi bấm chuột đúng mục đó thì không có focusin mới, thanh bên cứ mở theo focus cũ. Enter bằng bàn phím
-// (event.detail = 0) vẫn giữ thanh bên mở theo focus như cũ
-let pointerPicked = false
+// Bấm một mục: đóng ngăn kéo. Bấm bằng chuột còn xóa focus bàn phím: Tab tới một mục rồi bấm chuột đúng mục đó thì
+// không có focusin mới, thanh bên sẽ mở mãi theo focus cũ dù con trỏ đã rời đi. Enter bằng bàn phím (event.detail = 0)
+// vẫn giữ thanh bên mở theo focus
 function pickInNavigation(event: MouseEvent) {
   if (!(event.target as HTMLElement).closest('a[href]')) return
   open.value = false
-  if (!event.detail) return
-  pointerPicked = true
-  keyboardFocus.value = false
-  hovering.value = false
+  if (event.detail) keyboardFocus.value = false
 }
 // Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
-// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung
+// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở
 function moveInNavigation(event: PointerEvent) {
   if (!event.movementX && !event.movementY) return
   clearTimeout(hoverExit)
-  if (pointerPicked) return
   hovering.value = true
 }
 function leaveNavigation() {
-  pointerPicked = false
   clearTimeout(hoverExit)
   hoverExit = setTimeout(() => { hovering.value = false }, 140)
 }
@@ -192,11 +185,8 @@ function toggleLocale() {
   try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
 }
 
-// Chọn xong một trang thì đóng ngăn kéo và thu thanh bên lại, để thanh bên không nằm đè lên nội dung vừa mở
-watch(() => route.fullPath, () => {
-  open.value = false
-  hovering.value = false
-})
+// Chọn xong một trang thì đóng ngăn kéo; thanh bên trên máy tính giữ nguyên, chỉ thu khi con trỏ rời đi
+watch(() => route.fullPath, () => { open.value = false })
 watch(() => route.path, () => { crumb.value = '' })
 
 // Thông báo (F2.5): một kết nối realtime cho cả phiên làm việc; mỗi lần (nối lại) kết nối thì tải lại danh sách,

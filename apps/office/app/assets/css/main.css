@@ -516,10 +516,17 @@
   .moc-case-table td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; text-align: left; font-size: 13px; }
 }
 
-/* Khung ứng dụng: thanh bên lục bảo thu về 76px (chỉ còn biểu tượng), mở ra khi rê chuột tới mép trái hoặc khi focus
-   bằng bàn phím; nội dung bên phải không bị đẩy (thanh bên cố định, nằm đè). Thu gọn bằng chiều rộng chứ không cắt
-   bằng clip-path: phần bị cắt không nhận chuột, mà giữa mỗi mục menu lại nằm ngoài dải 76px. */
-.sg-shell { display: grid; grid-template-columns: 76px minmax(0, 1fr); min-height: 100dvh; }
+/* Khung ứng dụng: thanh bên lục bảo thu về 76px (chỉ còn biểu tượng), mở ra 248px khi rê chuột tới mép trái hoặc khi
+   focus bằng bàn phím. Cột đầu của lưới đổi theo cùng nhịp nên nội dung dịch sang theo thanh bên, không bị che. Thu
+   gọn bằng chiều rộng chứ không cắt bằng clip-path: phần bị cắt không nhận chuột, mà giữa mỗi mục menu lại nằm ngoài
+   dải 76px. */
+.sg-shell {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100dvh;
+  transition: grid-template-columns 320ms var(--sg-ease);
+}
+.sg-shell.is-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
 .sg-sidebar {
   position: fixed;
   left: 0;
@@ -536,10 +543,9 @@
   min-height: 0;
   overflow: hidden;
   z-index: 40;
-  transition: width 320ms var(--sg-ease), box-shadow 280ms var(--sg-ease);
+  transition: width 320ms var(--sg-ease);
 }
 .sg-shell.is-collapsed .sg-sidebar { width: 76px; }
-.sg-shell:not(.is-collapsed) .sg-sidebar { box-shadow: 16px 0 40px #10201b33; }
 /* viền focus trắng trên nền lục bảo: viền lục bảo chung của trang chìm vào thanh bên */
 .sg-sidebar :focus-visible { outline-color: #ffffff; }
 .sg-brand-row {
