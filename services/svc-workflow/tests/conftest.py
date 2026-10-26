@@ -79,9 +79,12 @@ class FakeFlowable:
 
     def add_task(self, task_id: str, form_key: str, *, assignee: str | None = None, groups: list[str] | None = None,
                  tenant: uuid.UUID = TENANT, urgency: str = "normal", created: str = "2026-10-18T09:00:00Z",
-                 doc: str = DOC, process: str | None = None) -> None:
+                 doc: str = DOC, process: str | None = None, key: str | None = None) -> None:
+        # khóa quy trình trong processDefinitionId như Flowable thật: hộp việc Văn phòng chỉ nhận van-ban-den, -di
+        key = key or ("van-ban-di" if form_key.startswith("vbdi.") else "van-ban-den")
         self.tasks[task_id] = Task(task_id, form_key, form_key, assignee, process or f"p-{task_id}", created,
-                                   {"tenantId": str(tenant), "documentId": doc, "urgency": urgency})
+                                   {"tenantId": str(tenant), "documentId": doc, "urgency": urgency},
+                                   process_definition_id=f"{key}:1:{key}-def")
         self.groups[task_id] = groups or []
 
     def then(self, after: str, task_id: str, form_key: str, **kwargs: Any) -> None:

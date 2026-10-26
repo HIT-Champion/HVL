@@ -50,6 +50,11 @@ OFFICE_LOOPS = {"office.process.reconciled", "office.document.overdue_notified",
 ROUTES = [("/openapi.json", {"GET", "HEAD"}), ("/docs", {"GET", "HEAD"}), ("/docs/oauth2-redirect", {"GET", "HEAD"}),
           ("/redoc", {"GET", "HEAD"}), ("/healthz", {"GET"}), ("/readyz", {"GET"}),
           ("/ot/notify/{tenant}", {"POST"}), ("/actions/{name}", {"POST"})]
+# quy trình của ứng dụng (#301, apps/api.py): luôn gắn, sau phần Văn phòng, bật hay tắt cờ đều có
+APP_ROUTES = [("/api/workflow/{app}/forms/{form_key}", {"GET"}),
+              ("/api/workflow/{app}/processes/{process_key}", {"POST"}), ("/api/workflow/{app}/processes", {"GET"}),
+              ("/api/workflow/{app}/tasks", {"GET"}), ("/api/workflow/{app}/tasks/{task_id}", {"POST"})]
+APP_PATHS = [path for path, _ in APP_ROUTES]
 
 
 class Started:
@@ -147,8 +152,8 @@ def test_office_flag_is_on_by_default_and_reads_like_other_flags():
 
 def test_office_on_keeps_routes_and_background_jobs(hasura, flowable, files, started, deployed):
     app = make_app(ENV, hasura, flowable, files, started)
-    assert routes(app) == ROUTES
-    assert list(app.openapi()["paths"]) == ["/ot/notify/{tenant}", "/actions/{name}"]
+    assert routes(app) == ROUTES + APP_ROUTES
+    assert list(app.openapi()["paths"]) == ["/ot/notify/{tenant}", "/actions/{name}", *APP_PATHS]
     office = app.state.office
     assert isinstance(office, Office) and app.state.workflow is office.workflow and app.state.ot is office.ot
     with TestClient(app) as c:
@@ -160,8 +165,8 @@ def test_office_on_keeps_routes_and_background_jobs(hasura, flowable, files, sta
 
 def test_office_off_still_starts_with_the_shared_part_only(hasura, flowable, files, started, deployed):
     app = make_app(OFF, hasura, flowable, files, started)
-    assert routes(app) == ROUTES[:6]
-    assert app.openapi()["paths"] == {}
+    assert routes(app) == ROUTES[:6] + APP_ROUTES
+    assert list(app.openapi()["paths"]) == APP_PATHS
     assert app.state.office is None and not hasattr(app.state, "workflow")
     with TestClient(app) as c:
         wait_until(lambda: set(started.names) >= COMMON_JOBS)
