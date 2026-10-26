@@ -1510,9 +1510,9 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
                              {"MOC_CLIENT_SECRET": "…"}, new_secret="MOC_CLIENT_SECRET" in made, dry_run=dry_run)
 
     def undo() -> str:
-        """Bước Hasura lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài dở đầu tiên rồi áp
-        metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng; quy trình về bản của lần cài trước
-        (chưa có thì tạm dừng). CSDL, client giữ (chạy lại dùng tiếp)."""
+        """Bước Hasura lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài dở đầu tiên
+        rồi áp metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng; quy trình về bản của lần cài
+        trước (chưa có thì tạm dừng). CSDL, client giữ (chạy lại dùng tiếp)."""
         try:
             if before_bytes is None:
                 system.compose("rm", "--stop", "--force", f"app-{rec['name']}", timeout=180)
