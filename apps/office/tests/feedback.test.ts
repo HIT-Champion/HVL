@@ -184,6 +184,9 @@ test('câu chữ không hứa ẩn danh, nhắc không ghi thông tin cá nhân'
   }
   assert.match(lookup(vi, 'feedback.anonymous')!, /^Không hiện người gửi/)
   assert.match(lookup(vi, 'feedback.privacy')!, /họ tên.*CCCD.*số điện thoại/)
+  // CSDL che dãy số dài và email (#265): câu nhắc nói đúng phạm vi đó, không hứa che họ tên
+  assert.match(lookup(vi, 'feedback.privacy')!, /dãy số dài và email được tự che/)
+  assert.match(lookup(en, 'feedback.privacy')!, /Long numbers and emails are masked/)
   assert.match(read('../app/components/FeedbackButton.vue'), /t\('feedback\.privacy'\)/)
   // form góp ý không có ô nào khác ngoài mức và nội dung: màn hình tự gắn, không hỏi tên, email, số điện thoại
   const button = read('../app/components/FeedbackButton.vue')

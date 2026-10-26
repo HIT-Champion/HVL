@@ -100,6 +100,11 @@ Nút **Góp ý** trên thanh trên của Văn phòng điện tử, mọi vai tr�
 - **Thu gì:** mức 1–5, nội dung, khuôn đường dẫn màn hình (`/van-ban/:id`, không phải id thật, không chuỗi truy vấn —
   ràng buộc `feedback_screen`), giờ gửi do CSDL đặt. `user_id` chỉ để người gửi lọc góp ý của mình (trường `mine`) và
   chặn gửi dồn; không vai trò nào đọc được cột này.
+- **Che số, email trong nội dung (#265):** trước khi lưu, CSDL thay email, dãy số liền từ 9 chữ số (CMND, số điện
+  thoại, CCCD, số tài khoản) và dãy chia nhóm bằng dấu cách, chấm, gạch từ 9 chữ số bắt đầu bằng 0 hoặc +84 (số điện
+  thoại, CCCD viết tách) bằng `[đã che]` — hàm `office.mask_pii` trong trigger `feedback_guard`, áp cho mọi đường
+  ghi; góp ý gửi trước bản này cũng đã được che. Số gốc không lưu ở đâu. Ngày, số hiệu văn bản, số tiền "100.000.000",
+  mã lỗi (UUID) giữ nguyên.
 - **Không thu:** họ tên, vai trò, phòng, trình duyệt, địa chỉ IP — không có cột nào cho các thứ này, nhưng khuôn màn
   hình có thể gián tiếp cho biết vai trò (xem hạn chế dưới).
 - **Ai thấy gì:** văn thư, chuyên viên, lãnh đạo phòng chỉ thấy góp ý của mình. Lãnh đạo đơn vị, quản trị đơn vị thấy
@@ -118,7 +123,10 @@ Hạn chế đã biết:
   đơn vị. Đơn vị chỉ có một văn thư thì góp ý gửi từ màn tiếp nhận, cộng giờ gửi, cho lãnh đạo biết ngay ai gửi. Làm
   tròn giờ trên trang Góp ý cũng không che được: lãnh đạo, quản trị đơn vị đọc `created_at` chính xác qua GraphQL.
   Người gửi muốn kín hơn thì gửi từ màn chung (hộp việc, tìm kiếm).
-- Hệ thống không lọc số CCCD, số điện thoại trong nội dung; form chỉ nhắc "Đừng ghi họ tên, số CCCD, số điện thoại".
+- Che theo mẫu, không phân loại như bộ che của svc-files (F4.4): không che họ tên, địa chỉ, số dính chữ (`SĐT0912…`), số
+  viết tách nhóm không bắt đầu bằng 0 hay +84; dãy số liền từ 9 chữ số không phải thông tin cá nhân (mã số dài) cũng bị
+  che, số tiền viết tách bằng dấu cách từ 100 tỉ ("100 000 000 000") bị che phần sau. Form vẫn nhắc "Đừng ghi họ tên, số
+  CCCD, số điện thoại", thêm "Lỡ ghi thì dãy số dài và email được tự che".
 - Kế hoạch phát triển đặt mục tiêu ≥ 5 người ngoài đội dùng thử và để lại góp ý; đến nay chưa có.
 
 ## 6. Cách chạy

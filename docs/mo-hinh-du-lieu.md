@@ -882,10 +882,15 @@ create table office.feedback (
 - `feedback_screen`: chỉ chữ thường, gạch nối và `:id`, tối đa 6 đoạn, không chuỗi truy vấn — id văn bản hay
   `?q=<số CCCD>` không lọt vào bảng.
 - Trigger `before insert` `office.feedback_guard()`: gọt khoảng trắng hai đầu của `comment` (chỉ còn khoảng trắng thì
-  null), đặt `created_at = now()`, khóa tư vấn theo (đơn vị, người gửi) rồi đếm: quá 3 góp ý trong 10 phút hay 20 trong
-  24 giờ thì lỗi `check_violation` có câu `feedback_rate: …`. Lỗi raise không có tên ràng buộc đi kèm: Hasura trả mã
-  `permission-error`, câu `Check constraint violation. feedback_rate: …`, nên giao diện tìm tên trong câu. Đếm cả dòng
-  thêm trước đó trong cùng câu lệnh (mutation nhiều dòng) và các lần gửi song song.
+  null), che bằng `office.mask_pii` khi nội dung trong 500 ký tự (cắt lại ở 500 nếu email ngắn làm câu dài ra; quá 500
+  thì để nguyên cho `feedback_comment` từ chối), đặt `created_at = now()`, khóa tư vấn theo (đơn vị, người gửi) rồi đếm:
+  quá 3 góp ý trong 10 phút hay 20 trong 24 giờ thì lỗi `check_violation` có câu `feedback_rate: …`. Lỗi raise không có
+  tên ràng buộc đi kèm: Hasura trả mã `permission-error`, câu `Check constraint violation. feedback_rate: …`, nên giao
+  diện tìm tên trong câu. Đếm cả dòng thêm trước đó trong cùng câu lệnh (mutation nhiều dòng) và các lần gửi song song.
+- Hàm `office.mask_pii(text)` (immutable, strict; migration 1792281603600, #265): thay email, dãy số liền từ 9 chữ số
+  và dãy chia nhóm bằng dấu cách, chấm, gạch từ 9 chữ số bắt đầu bằng 0, +84 hay (+84) bằng `[đã che]`. Không che số
+  dính chữ, nhóm số trong mã UUID, phần sau của "chữ số + dấu chấm" (số tiền "10.000.000.000" giữ nguyên). Migration
+  che luôn các góp ý đã có; số gốc không lưu ở đâu nên `down.sql` không mở lại được.
 - Hàm `office.feedback_mine(feedback, hasura_session)` → trường `mine`: góp ý này của người đang xem. Người gửi lọc góp
   ý của mình mà không ai đọc được `user_id`.
 - Quyền: `clerk`, `staff`, `manager`, `director`, `tenant_admin` thêm được (chỉ `rating`, `comment`, `screen`; Hasura
