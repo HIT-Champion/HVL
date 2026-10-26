@@ -123,6 +123,8 @@ const pickedText = computed(() => {
   return t('desk.showingDay', { date: `${fmtWeekday(picked.value, locale.value)} ${fmtDate(picked.value)}` })
 })
 
+const filtersOpen = ref(false)
+const activeFilters = computed(() => Number(category.value !== 'all') + Number(filter.value !== 'all'))
 const filtered = computed(() => !!query.value || filter.value !== 'all' || category.value !== 'all' || !!picked.value)
 function clearFilters() {
   query.value = ''
@@ -195,14 +197,29 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
         </svg>
         <input v-model="query" type="search" :placeholder="t('fe.searchTasks')" :aria-label="t('fe.searchTasks')">
       </div>
-      <select v-model="category" class="input moc-inbox-filter" :aria-label="t('desk.category')">
-        <option value="all">{{ t('desk.allDocuments') }}</option>
-        <option value="incoming">{{ t('nav.incoming') }}</option>
-        <option value="outgoing">{{ t('nav.outgoing') }}</option>
-      </select>
-      <select v-model="filter" class="input moc-inbox-filter" :aria-label="t('desk.filter')">
-        <option v-for="(label, key) in filters" :key="key" :value="key">{{ t(label) }}</option>
-      </select>
+      <!-- điện thoại: hai ô lọc gập sau nút Lọc (số trên nút là số ô đang lọc), màn rộng luôn hiện -->
+      <button
+        type="button" class="btn-secondary moc-filter-toggle" :aria-expanded="filtersOpen" aria-controls="inbox-filters"
+        @click="filtersOpen = !filtersOpen"
+      >
+        <svg
+          width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path d="M4 6h16M7 12h10M10 18h4" />
+        </svg>
+        {{ t('desk.filters') }}<b v-if="activeFilters" class="moc-filter-count">{{ activeFilters }}</b>
+      </button>
+      <div id="inbox-filters" class="moc-inbox-filters" :class="{ 'is-open': filtersOpen }">
+        <select v-model="category" class="input moc-inbox-filter" :aria-label="t('desk.category')">
+          <option value="all">{{ t('desk.allDocuments') }}</option>
+          <option value="incoming">{{ t('nav.incoming') }}</option>
+          <option value="outgoing">{{ t('nav.outgoing') }}</option>
+        </select>
+        <select v-model="filter" class="input moc-inbox-filter" :aria-label="t('desk.filter')">
+          <option v-for="(label, key) in filters" :key="key" :value="key">{{ t(label) }}</option>
+        </select>
+      </div>
       <button class="btn-secondary moc-inbox-refresh" :disabled="loading" :aria-label="t('app.refresh')" @click="load">
         <svg
           width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"

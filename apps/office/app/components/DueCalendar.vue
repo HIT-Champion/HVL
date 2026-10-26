@@ -64,15 +64,23 @@ function pick(key: string) {
 const KEY = 'moc.inbox.calendar'
 const open = ref(true)
 const strip = ref<HTMLElement>()
-// màn hẹp dải ngày cuộn ngang: cuộn sẵn để hôm nay đứng thứ hai từ trái
+// dải ngày cuộn ngang khi không đủ chỗ (trên điện thoại cả dải cuộn, ô Quá hạn bám mép trái): cuộn sẵn để hôm nay
+// đứng thứ hai sau ô Quá hạn
 async function reveal() {
   await nextTick()
   const today = strip.value?.querySelector<HTMLElement>('.is-today')
-  if (strip.value && today) strip.value.scrollLeft = Math.max(0, today.offsetLeft - today.offsetWidth)
+  const box = [strip.value, strip.value?.parentElement].find((el) => el && el.scrollWidth > el.clientWidth)
+  if (!today || !box) return
+  const edge = box === strip.value ? 0 : box.querySelector('.sg-calendar-edge')?.getBoundingClientRect().width ?? 0
+  const at = today.getBoundingClientRect().left - box.getBoundingClientRect().left
+  box.scrollLeft += at - edge - today.offsetWidth
 }
+// chưa chọn lần nào thì màn rộng mở lịch, điện thoại thu lại để việc đầu tiên lên gần đầu màn hình
 onMounted(() => {
-  try { open.value = localStorage.getItem(KEY) !== 'closed' } catch { /* trình duyệt chặn lưu: để mở */ }
-  reveal()
+  let saved: string | null = null
+  try { saved = localStorage.getItem(KEY) } catch { /* trình duyệt chặn lưu: theo mặc định */ }
+  open.value = saved ? saved !== 'closed' : !matchMedia('(max-width: 640px)').matches
+  if (open.value) reveal()
 })
 function toggle() {
   open.value = !open.value

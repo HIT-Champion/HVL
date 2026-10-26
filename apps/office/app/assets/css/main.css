@@ -513,6 +513,8 @@
 .moc-desk-search:focus-within { outline: 2px solid #0b6b53; outline-offset: 2px; }
 .moc-inbox-filter { width: 170px; min-height: 44px; }
 .moc-inbox-refresh { width: 44px; height: 44px; padding: 0; }
+.moc-inbox-filters { display: contents; }
+.moc-filter-toggle { display: none; }
 /* lịch hai tuần: ô Quá hạn, 14 ngày (hôm nay có gạch trên), ô Sau đó; ô đang chọn tô lục bảo */
 .sg-calendar { margin-bottom: 28px; }
 .sg-calendar-head { display: flex; align-items: center; gap: 12px; min-height: 36px; margin-bottom: 8px; }
@@ -638,7 +640,7 @@
 .sg-task-item + .sg-task-item { border-top: 1px solid var(--rule); }
 .sg-task-link {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) auto 20px;
+  grid-template-columns: minmax(0, 1fr) auto 20px;
   gap: 16px;
   align-items: center;
   min-height: 80px;
@@ -650,10 +652,17 @@
 }
 .sg-task-link:hover { background: #f5f9f7; }
 .sg-task-link:focus-visible { outline-offset: -4px; border-radius: 10px; }
-.sg-task-mark { align-self: start; padding-top: 2px; }
 .sg-task-identity { display: grid; gap: 4px; min-width: 0; }
 .sg-task-title { font-size: 16px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
-.sg-task-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.sg-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
 .sg-task-meta strong { font-weight: 600; color: #36463f; }
 .sg-task-step {
   padding: 4px 10px;
@@ -703,7 +712,7 @@
   .sg-calendar-edge { flex-basis: 84px; }
   .sg-due-group { grid-template-columns: 112px minmax(0, 1fr); gap: 20px; }
   .sg-due-num { font-size: 38px; line-height: 40px; }
-  .sg-task-link { grid-template-columns: 84px minmax(0, 1fr) auto 18px; gap: 14px; padding: 14px 18px; }
+  .sg-task-link { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 14px; padding: 14px 18px; }
 }
 
 /* Màn hẹp hoặc màn cảm ứng (không rê chuột được): thanh bên thành ngăn kéo, mở bằng nút menu, có lớp phủ phía sau */
@@ -755,36 +764,48 @@
   .sg-crumb b, .sg-crumb svg { display: none; }
   .sg-topbar-tools { gap: 0; }
   .sg-language { padding-inline: 7px; }
-  .moc-desk-heading { align-items: flex-start; gap: 10px; margin-bottom: 23px; }
-  .moc-desk-heading p { font-size: 14px; }
-  .moc-desk-heading > .btn-primary { font-size: 13px; padding-inline: 12px; }
-  .moc-inbox-toolbar { gap: 8px; margin-bottom: 22px; }
-  .moc-desk-search { flex-basis: 100%; }
+  /* tiêu đề: nút tạo mới đứng cạnh chữ Hộp việc, câu mở đầu trải hết chiều ngang bên dưới */
+  .moc-desk-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 12px;
+    margin-bottom: 18px;
+  }
+  .moc-desk-heading > div { display: contents; }
+  .moc-desk-heading p { grid-column: 1 / -1; grid-row: 2; margin-top: 0; font-size: 14px; }
+  .moc-desk-heading > .btn-primary, .moc-desk-heading > .btn-secondary { font-size: 13px; padding-inline: 12px; }
+  /* công cụ: ô tìm, nút Lọc, nút tải lại trên một hàng; hai ô lọc mở ra hàng dưới khi bấm Lọc */
+  .moc-inbox-toolbar { flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .moc-desk-search { flex: 1 1 0; min-width: 0; }
+  .moc-filter-toggle { display: inline-flex; gap: 6px; padding-inline: 12px; }
+  .moc-filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding-inline: 5px;
+    border-radius: 999px;
+    background: #0b6b53;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .moc-inbox-filters { display: none; order: 1; flex: 1 1 100%; flex-wrap: wrap; gap: 8px; }
+  .moc-inbox-filters.is-open { display: flex; }
   .moc-inbox-filter { width: 0; flex: 1; min-width: 0; padding-inline: 9px; }
   .moc-inbox-filter:first-of-type { flex: 1.4; }
   .moc-inbox-refresh { min-width: 44px; }
-  /* lịch: các ô Quá hạn, Sau đó thành một hàng trên, dải ngày cuộn ngang bên dưới; ngày hạn đứng trên khối việc */
-  .sg-calendar { margin-bottom: 24px; }
+  /* lịch: một hàng cuộn ngang, ô Quá hạn bám mép trái, ô không có việc ẩn đi; ngày hạn đứng trên khối việc */
+  .sg-calendar { margin-bottom: 18px; }
   .sg-calendar-range { display: none; }
-  .sg-calendar-strip { flex-wrap: wrap; }
-  .sg-calendar-edge {
-    flex: 1 1 0;
-    display: flex;
-    justify-content: center;
-    align-items: baseline;
-    gap: 8px;
-    min-height: 44px;
-    padding: 8px;
-  }
-  .sg-calendar-edge:first-child { border-right: 0; }
+  .sg-calendar-strip { overflow-x: auto; scrollbar-width: none; }
+  .sg-calendar-edge { flex: 0 0 68px; padding: 8px 4px; font-size: 12px; text-align: center; }
+  .sg-calendar-edge:disabled { display: none; }
+  .sg-calendar-edge:first-child { position: sticky; left: 0; z-index: 1; }
   .sg-calendar-edge b { font-size: 18px; line-height: 24px; }
-  .sg-calendar-days {
-    order: 1;
-    flex-basis: 100%;
-    grid-template-columns: repeat(14, 46px);
-    border-top: 1px solid var(--edge);
-  }
-  .sg-day { min-height: 72px; }
+  .sg-calendar-days { flex: none; overflow: visible; grid-template-columns: repeat(14, 46px); }
+  .sg-day { min-height: 66px; padding-top: 8px; }
   .sg-picked { margin-top: -8px; }
   .sg-agenda { gap: 24px; }
   .sg-due-group { grid-template-columns: minmax(0, 1fr); gap: 10px; }
@@ -796,10 +817,8 @@
   .is-none .sg-due-text { padding-top: 0; }
   .sg-task-link { grid-template-columns: minmax(0, 1fr) 18px; gap: 8px 12px; padding: 16px; min-height: 0; }
   .sg-task-link > :not(.sg-task-go) { grid-column: 1; }
-  .sg-task-mark { padding-top: 0; }
-  .sg-task-mark:empty { display: none; }
   .sg-task-step { justify-self: start; white-space: normal; }
-  .sg-task-go { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+  .sg-task-go { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
   .moc-page-header { gap: 16px; flex-wrap: wrap; }
   .moc-page-header h1, .moc-desk-heading h1 { font-size: 24px; }
   .moc-toolbar .input { max-width: none; }

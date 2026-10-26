@@ -38,12 +38,10 @@ const { t } = useI18n()
 <template>
   <li class="sg-task-item">
     <NuxtLink :to="{ path: `/van-ban/${task.document_id}`, query: { from: 'inbox' } }" class="sg-task-link">
-      <span class="sg-task-mark">
-        <UrgencyChip v-if="task.urgency && task.urgency !== 'normal'" :urgency="task.urgency" quiet />
-      </span>
       <span class="sg-task-identity">
         <span class="sg-task-title">{{ task.document?.summary || task.name }}</span>
         <span class="sg-task-meta">
+          <UrgencyChip v-if="task.urgency && task.urgency !== 'normal'" :urgency="task.urgency" quiet />
           <strong>{{ task.document?.symbol || t('desk.draft') }}</strong>
           <span v-if="task.document?.issuer_name">{{ task.document.issuer_name }}</span>
           <span>{{ t('desk.received', { date: fmtDate(task.created_at).slice(0, 5) }) }}</span>
