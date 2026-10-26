@@ -275,10 +275,11 @@ container: không gắn socket Docker vào container nào). Mỗi lượt:
 - **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
   thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Thử: `make demo-tu-phuc-hoi` (`docs/demo-script.md`).
 - **GitOps** (khi đặt `MOC_GITOPS_DIR` trong `.env` của bản cài): kéo nhánh `MOC_GITOPS_BRANCH` (mặc định `deploy`)
-  về một bản sao git riêng của reconciler (bản sao có thay đổi chưa commit thì reconciler từ chối, không xóa việc của
-  ai). Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm lúc cài), thì dựng image của commit đó, dừng Signet, cài lại
-  đúng commit vào thư mục cài rồi chạy lại. Cài hỏng giữa chừng thì cài lại commit đang chạy trước đó. Commit áp lỗi
-  thì không thử lại mỗi phút mà đợi commit kế tiếp.
+  về một bản sao git riêng của reconciler. Lần chạy đầu mà bản sao có thay đổi chưa commit thì reconciler từ chối,
+  không xóa việc của ai; từ khi đã áp một commit, mỗi lần áp đều `checkout -f` và `clean -fd` bản sao, nên đừng sửa
+  tay trong đó. Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm lúc cài), thì dựng image của commit đó, dừng
+  Signet, cài lại đúng commit vào thư mục cài rồi chạy lại. Cài hỏng giữa chừng thì cài lại commit đang chạy trước đó.
+  Commit áp lỗi thì không thử lại mỗi phút mà đợi commit kế tiếp.
 
 ```bash
 # trên máy chủ, đã make install PREFIX=/opt/moc; người vận hành moc thuộc nhóm docker
@@ -342,13 +343,16 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
 - **Đọc thế nào:** Cổng API, Đăng nhập một lần, CSDL, Quét mã độc, Quy trình, Lưu trữ tệp gián đoạn thì tình trạng
   chung là *Hệ thống đang gián đoạn*. Két khóa, Tìm kiếm, Trợ lý AI gián đoạn, hoặc thành phần nào chỉ chạy một phần,
   thì *Một số thành phần đang gặp sự cố*: văn bản hạn chế và ký số (két), tìm kiếm, hỏi đáp tạm không dùng được, còn
-  lại vẫn chạy. Trợ lý AI *Tắt* (chưa bật profile `ai`, hoặc tắt hỏi đáp) là cấu hình, không phải sự cố.
+  lại vẫn chạy. Trợ lý AI *Tắt* khi chưa bật profile `ai`, tắt hỏi đáp, hoặc Ollama không trả lời: trang không phân
+  biệt được ba trường hợp này, nên *Tắt* mà profile `ai` đang bật thì xem `docker compose logs ollama`. Trợ lý vẫn tìm
+  theo từ khóa.
 - **Không lộ gì:** chỉ có nhãn cố định và trạng thái; không tên máy, địa chỉ IP, URL nội bộ, phiên bản từng thành phần,
   số người dùng hay số văn bản, thông báo lỗi. Lý do cụ thể nằm trong nhật ký của `svc-files` (sự kiện
   `core.status.changed`, ghi khi một thành phần đổi trạng thái): `docker compose logs svc-files | grep status.changed`.
-- **Không thành đường tấn công:** `svc-files` lưu đệm kết quả 10 giây cho mọi người (`MOC_STATUS_CACHE_S`), mỗi lần
-  dò một thành phần tối đa 3 giây (`MOC_STATUS_TIMEOUT_S`); APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` (mặc định 30)
-  lần một phút mỗi địa chỉ IP, vượt thì `429`.
+- **Không thành đường tấn công:** `svc-files` lưu đệm kết quả 10 giây cho mọi người, mỗi lần dò một thành phần tối đa
+  3 giây (mặc định của `MOC_STATUS_CACHE_S`, `MOC_STATUS_TIMEOUT_S` trong `svc-files`; compose không truyền hai biến
+  này, đặt trong `.env` không có tác dụng); APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` (mặc định 30) lần một phút mỗi
+  địa chỉ IP, vượt thì `429`.
 - Trang chỉ trả lời "đang chạy hay không" ngay lúc này; diễn biến theo thời gian, độ trễ, tỉ lệ lỗi xem ở Grafana (mục
   Giám sát). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
 

@@ -238,7 +238,8 @@ python3 scripts/seed.py                 # sample data, first time only
 - If the package has a `VERSION` file at its root, the version is already recorded there (`git archive` fills it in
   when packing) and `make install` reads it, no need to set it by hand.
 - Upgrade: stop the installation and run `make install` again with the same `PREFIX`. Compose, configuration and
-  images are replaced; the installation's `.env` is kept, only `MOC_VERSION` changes.
+  images are replaced; the installation's `.env` is kept, except `MOC_VERSION`,
+  `COMPOSE_PROFILES` and `COMPOSE_FILE`, which `make install` sets again each time.
   For a running installation with data, use `scripts/nang_cap.sh nang /opt/moc`: it backs up first, checks
   afterwards and prints the rollback command ([`docs/trien-khai.md`](docs/trien-khai.md), section Vận hành).
 - Uninstall: `make uninstall PREFIX=/opt/moc` removes exactly the installed files, keeping `.env` and the data.
@@ -347,7 +348,7 @@ apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nh
                      (bang-tin/, plugged in with moc app install)
 services/            svc-workflow/: Hasura Actions, BPMN workflows, notifications, reminders, assignment suggestions
                      svc-files/: files, quarantine, search, PDF rendering, signing, verification portal, AI agents
-                     ot-sensor/: simulated temperature sensor (profile iot)
+                     ot-sensor/: simulated temperature sensor (profile iot-sim)
 db/                  PostgreSQL schema, Hasura permissions by role and unit, hash-chained audit log; tests/
 schemas/             Form JSON Schemas, shared by the interface, the services and the database
 platform/            Configuration for Keycloak, APISIX, Centrifugo, OpenBao, monitoring, centralised logs, systemd

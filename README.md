@@ -228,7 +228,7 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 - Gói có tệp `VERSION` ở thư mục gốc thì phiên bản đã ghi sẵn trong đó (`git archive` điền khi đóng gói), `make install`
   tự đọc, không cần đặt tay.
 - Nâng cấp: dừng bản cài, `make install` lại với cùng `PREFIX`. Compose, cấu hình và image được thay; `.env` của bản
-  cài được giữ, chỉ đổi `MOC_VERSION`.
+  cài được giữ, trừ `MOC_VERSION`, `COMPOSE_PROFILES` và `COMPOSE_FILE` do `make install` đặt lại mỗi lần.
   Bản cài đang chạy có dữ liệu thì dùng `scripts/nang_cap.sh nang /opt/moc`: sao lưu trước, kiểm sau, có lệnh lùi
   ([`docs/trien-khai.md`](docs/trien-khai.md) mục Vận hành).
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
@@ -332,7 +332,7 @@ apps/                Văn phòng điện tử (office/, Nuxt 4) · Không gian c
                      (bang-tin/, cắm bằng moc app install)
 services/            svc-workflow/: Hasura Actions, quy trình BPMN, thông báo, nhắc hạn, gợi ý giao việc
                      svc-files/: tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực, các tác tử AI
-                     ot-sensor/: cảm biến nhiệt độ giả lập (profile iot)
+                     ot-sensor/: cảm biến nhiệt độ giả lập (profile iot-sim)
 db/                  Lược đồ PostgreSQL, quyền Hasura theo vai trò và đơn vị, sổ kiểm toán chuỗi băm; tests/
 schemas/             JSON Schema của form, dùng chung cho giao diện, dịch vụ và CSDL
 platform/            Cấu hình Keycloak, APISIX, Centrifugo, OpenBao, giám sát, log tập trung, systemd

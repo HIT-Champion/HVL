@@ -51,8 +51,9 @@ trường số khép kín.
 - [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng
       thứ ba Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng
       được, bước CI `make demo-cai-ung-dung`)
-- [ ] **Một phần** — cổng nội bộ: hai ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; chưa có trang cổng
-      dẫn từ ứng dụng này sang ứng dụng kia
+- [ ] **Một phần** — cổng nội bộ: các ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; trang Ứng dụng
+      (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng
+      riêng
 - [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email và webhook
       Mattermost, Slack, ntfy, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
 - [ ] Hệ quản trị tri thức (wiki)
