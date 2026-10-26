@@ -48,7 +48,7 @@ def rendered(monkeypatch):
         seen.append(letter)
         return b"%PDF-1.7 fake " + (letter.symbol or "du-thao").encode()
 
-    monkeypatch.setattr("svc_files.app.render_pdf", fake)
+    monkeypatch.setattr("svc_files.office.api.render_pdf", fake)
     return seen
 
 

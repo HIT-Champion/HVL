@@ -42,6 +42,7 @@ from svc_files.auth import HASURA_CLAIMS
 from svc_files.hasura import HasuraError
 from svc_files.lineage import INSERT as LINEAGE
 from svc_files.lineage import Lineage
+from svc_files.office import api as office_api
 from test_archive import NOW, TENANT, FakeHot, FakeS3, case_file, sha
 from test_archive import FakeHasura as AdminHasura
 from test_reading_room import RoomHasura
@@ -398,6 +399,21 @@ def test_director_sees_the_counts_of_the_cold_packages(board, token):
     assert body["unreadable"] == [] and body["bucket"] == "moc-cold" and body["computed_at"]
     # chỉ số đếm: không trích yếu, số ký hiệu, tên tệp nào trong câu trả lời
     assert "Văn bản thử" not in r.text and "UBND" not in r.text and "công văn.pdf" not in r.text
+
+
+def test_without_injected_parts_the_stats_read_the_office_cold_bucket(settings, scanner, store, verifier, meili,
+                                                                       vault, token, monkeypatch):
+    # create_app không dựng kho lạnh: phần Văn phòng (office/api.py) dựng, số liệu phải đọc đúng kho đó
+    c = make_cold()
+    c.hasura = StatsHasura(admin_hasura=c.admin)
+    two_case_files(c)
+    monkeypatch.setattr(office_api, "s3_client", lambda *args: c.s3)
+    app = create_app(dataclasses.replace(settings, archive_interval_s=0, cold_bucket="moc-cold"), scanner=scanner,
+                     store=store, verifier=verifier, hasura=c.hasura, meili=meili, vault=vault)
+    with TestClient(app) as client:
+        r = client.get(URL, headers=token("director", department=None))
+    assert r.status_code == 200, r.text
+    assert (r.json()["case_files"], r.json()["documents"], r.json()["bucket"]) == (2, 5, "moc-cold")
 
 
 @pytest.mark.parametrize("role", ["clerk", "manager", "staff", "tenant_admin"])

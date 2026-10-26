@@ -23,7 +23,7 @@ Vòng đồng bộ tìm kiếm (search.py) thấy chữ mới ghi thì đẩy l�
 F4.2: ghi kèm ``page_starts`` (vị trí đầu từng trang trong nội dung) để trợ lý hỏi đáp cắt đoạn theo trang
 (assist/index.py); hàng đợi có thêm bản phát hành văn bản đi (role ``issued``).
 
-#253: PDF không có lớp chữ (bản scan) thì nhận dạng chữ bằng Tesseract (``docread/ocr.run_ocr``: tiến trình con có
+#253: PDF không có lớp chữ (bản scan) thì nhận dạng chữ bằng Tesseract (``ocr.run_ocr``: tiến trình con có
 giới hạn bộ nhớ, CPU, điểm ảnh) vài trang đầu, rồi ghi ``ok`` như lớp chữ, ``note`` = "ocr <số trang đã đọc>/<số
 trang>". Vòng nền đọc lần lượt từng tệp nên mỗi lúc chỉ một tệp OCR. Không ra chữ vì tệp (không có ảnh, ảnh trắng…)
 thì giữ ``empty`` kèm lý do: bản scan mờ không phải tệp hỏng, và tệp đã có dòng kết quả thì không bị đọc lại. Hỏng vì

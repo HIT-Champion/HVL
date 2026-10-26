@@ -285,7 +285,7 @@ def rendered(monkeypatch):
         seen.append(letter)
         return one_page_pdf()
 
-    monkeypatch.setattr("svc_files.app.render_pdf", fake)
+    monkeypatch.setattr("svc_files.office.api.render_pdf", fake)
     return seen
 
 

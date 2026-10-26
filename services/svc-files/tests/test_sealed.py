@@ -390,7 +390,7 @@ def test_busy_sealing_slots_answer_503_with_retry_after(client, make_token, stor
 # --- phát hành văn bản đi hạn chế ------------------------------------------------------------------------------------
 
 def test_issued_pdf_of_a_restricted_letter_is_sealed(client, hasura, store, make_token, monkeypatch):
-    monkeypatch.setattr("svc_files.app.render_pdf", lambda letter: SECRET)
+    monkeypatch.setattr("svc_files.office.api.render_pdf", lambda letter: SECRET)
     doc = hasura.add_letter(TENANT_A, restricted=True)
     r = client.post("/internal/issue", headers=auth(make_token(azp="svc-workflow", tenant=None)),
                     json={"tenant_id": str(TENANT_A), "document_id": doc, "actor_id": "u-van-thu"})
