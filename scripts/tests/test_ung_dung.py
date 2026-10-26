@@ -666,6 +666,7 @@ def fake_system(root: pathlib.Path) -> Any:
             self.images: set[str] = set()
             self.applied = 0
             self.broken_once = False                 # lần áp metadata kế tiếp báo không nhất quán
+            self.gateway: list[str] = []             # mã cổng trả cho các lần hỏi tới (hết thì 200)
 
         def run(self, cmd: list[str], *, input: str | None = None, timeout: float = 900) -> str:
             self.calls.append(cmd)
@@ -682,6 +683,10 @@ def fake_system(root: pathlib.Path) -> Any:
         def apply_metadata(self) -> str:
             self.applied += 1
             return "Metadata applied"
+
+        def gateway_code(self, realm: str) -> str:
+            self.calls.append(["cổng", realm])
+            return self.gateway.pop(0) if self.gateway else "200"
 
         def metadata(self, body: dict[str, Any]) -> Any:
             if body["type"] == "get_inconsistent_metadata":
@@ -733,7 +738,8 @@ class Flow(unittest.TestCase):
         self.assertFalse([c for c in self.system.calls if c[:2] in (["docker", "build"], ["docker", "compose"])])
         plan = "\n".join(self.lines)
         for needle in ("2/8 image: sẽ dựng", "3/8 CSDL: sẽ ghi core.apps; sẽ áp 1 migration: 1_tin",
-                       "5/8 Keycloak: sẽ thêm app-bang-tin, thêm app-bang-tin-svc", "8/8 Hasura: sẽ áp"):
+                       "5/8 Keycloak: sẽ thêm app-bang-tin, thêm app-bang-tin-svc",
+                       "; sẽ khởi động lại apisix vì tệp route đổi", "8/8 Hasura: sẽ áp"):
             self.assertIn(needle, plan)
 
     def test_install_then_again_creates_nothing_new(self) -> None:
@@ -773,6 +779,40 @@ class Flow(unittest.TestCase):
         self.assertIn("không có migration mới", "\n".join(self.lines))
         self.assertIn("đã khớp", "\n".join(self.lines))
 
+    def test_gateway_restarts_only_when_routes_change(self) -> None:
+        # #299: tệp route đổi thì khởi động lại apisix sau compose up rồi chờ cổng, không để APISIX tự nạp lại
+        self.env.write_text(self.env.read_text(encoding="utf-8") + "MOC_REALM=hvl\n", encoding="utf-8")
+        restart = [*u.COMPOSE, "restart", "apisix"]
+
+        def steps() -> list[str]:
+            return [c[-1] if c[0] == "cổng" else c[len(u.COMPOSE)] for c in self.system.calls
+                    if c[0] == "cổng" or c[len(u.COMPOSE):len(u.COMPOSE) + 1] in (["up"], ["restart"], ["rm"])]
+
+        self.system.gateway = ["000", "503"]                      # đang khởi động, WAF chưa sẵn sàng
+        with unittest.mock.patch.object(u.time, "sleep") as sleep:
+            self.install()
+        self.assertEqual(steps(), ["up", "restart", "hvl", "hvl", "hvl"])
+        self.assertEqual(sleep.call_count, 2)
+        self.assertIn("đã khởi động lại apisix (tệp route đổi), cổng trả lời sau", "\n".join(self.lines))
+
+        self.system.calls.clear()
+        self.install()                                            # không đổi gì: không khởi động lại
+        self.assertEqual(steps(), ["up"])
+        self.assertNotIn(restart, self.system.calls)
+
+        self.system.calls.clear()
+        u.remove("bang-tin", state=self.state, system=self.system, out=self.lines.append)
+        self.assertEqual(steps(), ["rm", "up", "restart", "hvl"])
+
+    def test_gateway_not_answering_fails_with_hint(self) -> None:
+        self.system.gateway = ["502"]
+        with self.assertRaisesRegex(u.AppError, r"cổng vẫn chưa trả 200 \(mã 502\) — xem docker compose logs apisix, "
+                                                r"sửa xong thì docker compose restart apisix"):
+            with unittest.mock.patch.object(u.time, "monotonic", side_effect=[0, 0, 91]), \
+                    unittest.mock.patch.object(u.time, "sleep"):
+                u.restart_apisix(self.system)
+        self.assertEqual(self.system.calls, [[*u.COMPOSE, "restart", "apisix"], ["cổng", "moc"]])
+
     def test_failure_names_the_step_and_rerun_completes(self) -> None:
         self.system.kc.fail = True
         with self.assertRaises(u.StepFailed) as ctx:
@@ -797,6 +837,7 @@ class Flow(unittest.TestCase):
         self.assertEqual((self.tmp / u.GATEWAY).read_bytes(), (self.tmp / u.CORE_GATEWAY).read_bytes())
         self.assertIn([*u.COMPOSE, "rm", "--stop", "--force", "app-bang-tin"], self.system.calls)
         self.assertEqual(self.system.applied, 2)                    # áp hỏng, rồi áp lại bản trước
+        self.assertEqual(self.system.calls.count([*u.COMPOSE, "restart", "apisix"]), 2)   # cài, rồi trả tệp route về
         self.assertNotEqual(self.snapshot(), before)                 # .moc-apps có (tệp phủ trống ứng dụng, bí mật)
         self.lines.clear()
         self.install()                                               # sửa xong chạy lại: hoàn tất
