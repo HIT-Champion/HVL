@@ -300,7 +300,7 @@ function exportOpenLineage() {
             <h2 id="lineage-graph-title" class="font-medium text-stone-900">{{ t('lineage.graph') }}</h2>
             <p class="mt-1 text-xs text-stone-500">{{ t('lineage.graphHint') }}</p>
           </div>
-          <div>
+          <div class="min-w-0 max-w-full">
             <label for="lineage-chart" class="label">{{ t('lineage.chart') }}</label>
             <select id="lineage-chart" v-model="focus" class="input w-auto max-w-full" data-testid="lineage-chart">
               <option value="">{{ t('lineage.allCharts') }}</option>
