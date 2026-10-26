@@ -320,8 +320,8 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
 Mọi tệp tải lên đều qua ClamAV trước khi lưu. Container `clamav` tự tải chữ ký mới (freshclam, mỗi ngày một lần),
 người vận hành không phải làm gì. Có một hạn chế (#287): mỗi lần clamd nạp lại chữ ký, nó ngừng quét tới khi nạp xong.
 Đã đo: khoảng 10 giây trên máy CI, 8 giây bằng một container thử trên máy chạy bản online; máy bận hay yếu có thể
-tới khoảng 1 phút. Lý do là compose đặt `ConcurrentDatabaseReload no` để đỡ RAM (#288 đo lại lựa chọn này). Clamd nạp lại
-vào hai lúc:
+tới khoảng 1 phút. Lý do là compose đặt `ConcurrentDatabaseReload no` để đỡ RAM (#288 đo lại lựa chọn này).
+Clamd nạp lại vào hai lúc:
 
 - mỗi ngày một lần, ngay sau khi freshclam tải bản chữ ký mới;
 - khoảng 10 phút sau khi ClamAV khởi động (`make up`, nâng cấp, khởi động lại máy), nếu đúng lúc khởi động freshclam
