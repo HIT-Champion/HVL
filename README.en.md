@@ -17,6 +17,8 @@ DX-OS Open-Core. Most project documentation is written in Vietnamese; this page 
 **Try it:** <https://signet.htechcs.com> (release v1.1.0, see [Try it out](#try-it-out)) · or install it on your own
 machine with four commands from [Building from source](#building-from-source).
 
+**Five-minute tour and documentation map (in Vietnamese):** [`docs/README.md`](docs/README.md).
+
 **Quick links:** [Introduction](#introduction) · [Architecture](#architecture) · [Features](#features) ·
 [Four principles](#evidence-for-the-four-design-principles) · [Technology](#technology-and-licenses) ·
 [Install](#building-from-source) · [Try it out](#try-it-out) · [Operations](#operations-and-testing) ·
