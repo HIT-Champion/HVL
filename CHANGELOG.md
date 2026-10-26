@@ -246,9 +246,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `ConcurrentDatabaseReload no` thì suốt lúc nạp không quét gì: tệp tải lên lúc đó treo quá 15 giây.
   - CI giờ cho clamd nạp ngay bản freshclam vừa tải, sau `make up` và trước mọi bước tải lên.
   - 7 chỗ chờ trạm quét trong e2e chờ tới 60 giây (`SCAN_TIMEOUT`), bằng `CLAMAV_TIMEOUT_S`.
-  - Máy chủ thật vẫn gặp mỗi ngày một lần: tải lên chờ khoảng 1 phút, có thể ra `503 scanner_unavailable`.
-    `docs/van-hanh.md` (mục "Quét mã độc (ClamAV)") ghi dấu hiệu, cách xử lý và cách nhận ra trong nhật ký.
-    Đo RAM để bật nạp song song: #288.
+  - Máy chủ thật vẫn gặp mỗi ngày một lần: tải lên chờ tới khi clamd nạp xong (đo được 8–10 giây, máy bận có thể tới
+    khoảng 1 phút), quá 60 giây thì `503 scanner_unavailable`. `docs/van-hanh.md` (mục "Quét mã độc (ClamAV)") ghi
+    dấu hiệu, cách xử lý, cách nhận ra trong nhật ký, và lệnh `freshclam --log=…` để tải chữ ký mới ngay (phải có
+    `--log` vì freshclam chạy nền giữ khóa tệp nhật ký). Đo RAM để bật nạp song song: #288.
 - Bảng mức hoàn thiện ghi đúng số hàm test của từng tệp (#285). 16 trong 102 chỗ ghi sai, có chỗ sai ngay từ lúc viết:
   `test_anchors.py` ghi 38 hàm, tệp có 28; `test_ot_map.py` ghi 34, có 24; các tệp `test_assist_*.py` ghi 188, có
   198. Test mới `scripts/tests/test_muc_hoan_thien.py` đếm tĩnh như mục 1 của tài liệu (cả mẫu `*` và "(trừ …)") và
