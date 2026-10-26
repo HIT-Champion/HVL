@@ -162,7 +162,7 @@ class Page(Base):
     def test_no_file_outside_public(self) -> None:
         index = call(self.page + "/bang-tin/")[2]
         for path in ("/bang-tin/../server.py", "/bang-tin/%2e%2e/server.py", "/bang-tin/..%2fserver.py",
-                     "/bang-tin/%2e%2e%2fapp.yaml"):
+                     "/bang-tin/%2e%2e%2fapp.yaml", "/bang-tin/%00", "/bang-tin/app.js%00.txt"):
             with self.subTest(path=path):
                 status, _, body = call(self.page + path)
                 self.assertEqual(status, 200)
