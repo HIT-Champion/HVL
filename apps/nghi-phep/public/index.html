@@ -1,0 +1,86 @@
+<!doctype html>
+<!--
+  Copyright 2026 Signet Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đơn nghỉ phép — Signet</title>
+  <meta name="description" content="Signet — gửi đơn nghỉ phép, trưởng phòng duyệt trên quy trình của lõi">
+  <link rel="icon" href="/nghi-phep/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/nghi-phep/style.css">
+  <!-- thư viện trước, mã của trang sau: cả hai chạy theo thứ tự sau khi đọc xong trang -->
+  <script src="/nghi-phep/lib/oidc-client-ts.min.js" defer></script>
+  <script src="/nghi-phep/app.js" type="module"></script>
+</head>
+<body>
+  <a class="bo-qua" href="#noi-dung">Bỏ qua, tới nội dung chính</a>
+  <header class="top">
+    <a class="brand" href="/nghi-phep/">
+      <img src="/nghi-phep/favicon.svg" alt="" width="28" height="28">
+      <span><strong>Đơn nghỉ phép</strong><small>Signet · quy trình trên lõi</small></span>
+    </a>
+    <nav class="top-nav" aria-label="Ứng dụng">
+      <a href="/">Văn phòng điện tử</a>
+      <span id="nguoi" class="who">Đang đăng nhập…</span>
+      <button id="thoat" type="button" class="btn ghost" hidden>Đăng xuất</button>
+    </nav>
+  </header>
+
+  <main id="noi-dung" tabindex="-1">
+    <p id="tin" class="status" role="status">Đang nạp mẫu đơn…</p>
+    <div id="loi" class="loi" role="alert" hidden></div>
+
+    <div id="ung-dung" hidden>
+      <nav class="tabs" aria-label="Các phần của ứng dụng">
+        <button type="button" class="tab" data-phan="gui-don" aria-controls="gui-don">Gửi đơn</button>
+        <button type="button" class="tab" data-phan="don-cua-toi" aria-controls="don-cua-toi">
+          Đơn của tôi <span id="dem-don" class="dem"></span>
+        </button>
+        <button type="button" class="tab" data-phan="viec-can-duyet" aria-controls="viec-can-duyet" hidden>
+          Việc cần duyệt <span id="dem-viec" class="dem"></span>
+        </button>
+      </nav>
+
+      <section id="gui-don" class="phan" aria-labelledby="tieu-de-gui-don">
+        <h1 id="tieu-de-gui-don" tabindex="-1">Gửi đơn nghỉ phép</h1>
+        <p class="hint">Trưởng phòng của phòng bạn nhận đơn và duyệt. Kết quả hiện ở phần "Đơn của tôi".</p>
+        <div id="form-don" class="khung-form"></div>
+      </section>
+
+      <section id="don-cua-toi" class="phan" aria-labelledby="tieu-de-don-cua-toi" hidden>
+        <h1 id="tieu-de-don-cua-toi" tabindex="-1">Đơn của tôi</h1>
+        <p id="khong-co-don" class="empty" hidden>Bạn chưa gửi đơn nào.</p>
+        <ul id="danh-sach-don" class="danh-sach"></ul>
+      </section>
+
+      <section id="viec-can-duyet" class="phan" aria-labelledby="tieu-de-viec-can-duyet" hidden>
+        <h1 id="tieu-de-viec-can-duyet" tabindex="-1">Việc cần duyệt</h1>
+        <p class="hint">Đơn của nhân viên trong phòng bạn đang chờ quyết định. Người gửi đọc được ghi chú.</p>
+        <p id="khong-co-viec" class="empty" hidden>Không còn đơn nào chờ duyệt.</p>
+        <ul id="danh-sach-viec" class="danh-sach"></ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    Ứng dụng này không có máy chủ nghiệp vụ: đơn, việc duyệt, ai được thấy việc nào đều do động cơ quy trình của lõi
+    Signet giữ và kiểm. Mẫu đơn là tệp JSON Schema, quy trình là tệp BPMN nằm trong thư mục của ứng dụng.
+  </footer>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "moc-app-nghi-phep",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Signet — Đơn nghỉ phép (ứng dụng thứ tư, quy trình chạy trên lõi, cắm bằng moc app install)",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "oidc-client-ts": "3.5.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
