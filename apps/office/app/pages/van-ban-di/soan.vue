@@ -228,21 +228,26 @@ async function save() {
 
 <template>
   <div class="max-w-3xl">
-    <NuxtLink :to="editId ? `/van-ban/${editId}` : '/van-ban-di'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
+    <NuxtLink :to="editId ? `/van-ban/${editId}` : '/van-ban-di'" class="moc-back">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      {{ t('app.back') }}
+    </NuxtLink>
     <PageHeader :title="editId ? t('compose.editTitle') : t('compose.title')" :subtitle="t('compose.subtitle')">
       <!-- đang sửa dự thảo: soạn văn bản mới ngay từ đầu trang. Không đặt tên truy cập trùng mục "Soạn văn bản đi" ở
            thanh bên (e2e bấm mục đó theo tên) -->
       <NuxtLink v-if="editId" to="/van-ban-di/soan" class="btn-secondary">{{ t('desk.compose') }}</NuxtLink>
     </PageHeader>
 
-    <p v-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-if="loading" class="moc-loading">{{ t('app.loading') }}</p>
     <div v-else-if="initialFailure" class="moc-state" role="alert">
       <span>{{ initialFailure }}</span>
       <button type="button" class="btn-secondary" @click="loadInitial">{{ t('app.retry') }}</button>
     </div>
-    <p v-else-if="locked" class="card p-8 text-center text-stone-500">{{ t('compose.notEditable') }}</p>
+    <p v-else-if="locked" class="moc-empty">{{ t('compose.notEditable') }}</p>
 
-    <form v-else class="card space-y-5 p-6" novalidate @submit.prevent="save">
+    <form v-else class="moc-block space-y-5" novalidate @submit.prevent="save">
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label class="label" for="type">{{ t('compose.type') }}</label>
@@ -266,7 +271,7 @@ async function save() {
           :aria-describedby="tried && errors.summary ? 'summary-error' : undefined"
         >
         <p v-if="tried && errors.summary" id="summary-error" class="field-error">{{ errors.summary }}</p>
-        <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.summaryHint') }}</p>
+        <p v-else class="mt-1 text-[13px] text-stone-500">{{ t('compose.summaryHint') }}</p>
       </div>
 
       <div>
@@ -277,7 +282,7 @@ async function save() {
           :aria-describedby="tried && errors.body ? 'body-error' : undefined"
         />
         <p v-if="tried && errors.body" id="body-error" class="field-error">{{ errors.body }}</p>
-        <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.bodyHint') }}</p>
+        <p v-else class="mt-1 text-[13px] text-stone-500">{{ t('compose.bodyHint') }}</p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
@@ -289,7 +294,7 @@ async function save() {
             :aria-describedby="tried && errors.recipients ? 'recipients-error' : undefined"
           />
           <p v-if="tried && errors.recipients" id="recipients-error" class="field-error">{{ errors.recipients }}</p>
-          <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.recipientsHint') }}</p>
+          <p v-else class="mt-1 text-[13px] text-stone-500">{{ t('compose.recipientsHint') }}</p>
         </div>
         <div>
           <label class="label" for="reply">{{ t('compose.replyTo') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></label>
@@ -315,7 +320,9 @@ async function save() {
             </span>
           </label>
         </div>
-        <p class="mt-1 text-xs text-stone-500">{{ restricted ? t('compose.unitsRestricted') : t('compose.unitsHint') }}</p>
+        <p class="mt-1 text-[13px] text-stone-500">
+          {{ restricted ? t('compose.unitsRestricted') : t('compose.unitsHint') }}
+        </p>
       </fieldset>
 
       <div>
@@ -333,7 +340,7 @@ async function save() {
           <input type="file" class="sr-only" multiple :accept="restricted ? 'application/pdf' : undefined" @change="addFiles(($event.target as HTMLInputElement).files)">
           + {{ t('compose.attachments') }}
         </label>
-        <p class="mt-1 text-xs text-stone-500">{{ t('compose.attachmentsHint') }}</p>
+        <p class="mt-1 text-[13px] text-stone-500">{{ t('compose.attachmentsHint') }}</p>
       </div>
 
       <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">

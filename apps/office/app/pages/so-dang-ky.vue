@@ -105,27 +105,44 @@ async function print() {
       </button>
     </PageHeader>
 
-    <div class="mb-4 flex gap-1 border-b border-stone-200" role="tablist">
+    <div class="moc-tabs" role="tablist">
       <button
         v-for="(_, key) in books" :key="key" role="tab" :aria-selected="book === key"
-        class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
-        :class="book === key ? 'border-brand-700 text-brand-800' : 'border-transparent text-stone-500 hover:text-stone-800'"
         @click="pick({ so: key })"
       >
         {{ t(`register.book.${key}`) }}
       </button>
     </div>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <div v-if="failure" class="moc-state">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
+    </div>
+    <p v-else-if="loading" class="moc-loading">{{ t('app.loading') }}</p>
     <template v-else-if="data">
-      <div class="card mb-4 flex flex-wrap items-start gap-3 p-4 text-sm" data-testid="register-check">
-        <svg class="mt-0.5 h-5 w-5 shrink-0" :class="data.missing.length ? 'text-red-600' : 'text-emerald-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" :d="data.missing.length ? 'M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z' : 'M5 13l4 4L19 7'" /></svg>
+      <!-- kiểm sổ liền số: dòng kết luận trước, cách kiểm bên dưới -->
+      <div class="moc-block mb-5 flex items-start gap-3 text-sm" data-testid="register-check">
+        <svg
+          class="mt-0.5 h-5 w-5 shrink-0" :class="data.missing.length ? 'text-red-700' : 'text-brand-700'"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"
+        >
+          <path
+            v-if="data.missing.length" stroke-linecap="round" stroke-linejoin="round"
+            d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"
+          />
+          <path v-else stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
         <div class="min-w-0 flex-1">
-          <p v-if="!data.last_number" class="font-medium text-stone-800">{{ t('register.none', { year: data.year }) }}</p>
-          <p v-else-if="data.missing.length" class="font-medium text-red-700">{{ t('register.gaps', { numbers: data.missing.join(', ') }) }}</p>
-          <p v-else class="font-medium text-stone-800">{{ t('register.continuous', { last: String(data.last_number).padStart(2, '0') }) }}</p>
-          <p class="mt-0.5 text-stone-500">
+          <p v-if="!data.last_number" class="font-semibold text-stone-900">
+            {{ t('register.none', { year: data.year }) }}
+          </p>
+          <p v-else-if="data.missing.length" class="font-semibold text-red-700 wrap-anywhere">
+            {{ t('register.gaps', { numbers: data.missing.join(', ') }) }}
+          </p>
+          <p v-else class="font-semibold text-stone-900">
+            {{ t('register.continuous', { last: String(data.last_number).padStart(2, '0') }) }}
+          </p>
+          <p class="mt-1 text-stone-600">
             {{ t('register.how') }}
             <template v-if="masked"> {{ t('register.masked', { n: masked }) }}</template>
           </p>
@@ -136,28 +153,25 @@ async function print() {
            câu gợi ý cuộn, không lấy "Sổ đăng ký văn bản" để khỏi trùng tên mục menu -->
       <p v-if="data.entries.length" id="register-scroll-hint" class="moc-scroll-hint">{{ t('fe.scrollTable') }}</p>
       <div
-        v-if="data.entries.length" class="moc-table-scroll moc-register-table card overflow-x-auto" tabindex="0"
+        v-if="data.entries.length" class="moc-table-scroll moc-register-table moc-table-frame" tabindex="0"
         role="region" aria-labelledby="register-scroll-hint"
       >
-        <table class="w-full text-sm" data-testid="register-table">
-          <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500">
+        <table class="moc-table" data-testid="register-table">
+          <thead>
             <tr>
-              <th
-                v-for="i in shown" :key="i" class="px-3 py-3"
-                :class="{ 'text-right': data.direction === 'in' && i === 1 }"
-              >
+              <th v-for="i in shown" :key="i" :class="{ 'text-right': data.direction === 'in' && i === 1 }">
                 {{ data.columns[i] }}
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-stone-100">
+          <tbody>
             <tr
-              v-for="entry in data.entries" :key="entry.number" class="align-top"
-              :class="entry.document_id ? 'cursor-pointer hover:bg-brand-50/40' : 'text-stone-500 italic'"
+              v-for="entry in data.entries" :key="entry.number"
+              :class="entry.document_id ? 'cursor-pointer' : 'text-stone-500 italic'"
               @click="entry.document_id && router.push(`/van-ban/${entry.document_id}`)"
             >
               <td
-                v-for="i in shown" :key="i" class="px-3 py-2"
+                v-for="i in shown" :key="i"
                 :class="{
                   'font-semibold tabular-nums text-right': data.direction === 'in' && i === 1,
                   'whitespace-nowrap': isDate(entry.cells[i]),

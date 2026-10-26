@@ -252,15 +252,18 @@ const lockedUntil = computed(() => {
 
 <template>
   <div>
-    <NuxtLink to="/ho-so" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">
-      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <NuxtLink to="/ho-so" class="moc-back">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
       </svg>
       {{ t('cases.back') }}
     </NuxtLink>
 
-    <p v-if="loading && !cf" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <p v-else-if="failure" class="card p-4 text-sm text-red-700" data-testid="case-file-error">{{ failure }}</p>
+    <p v-if="loading && !cf" class="moc-loading">{{ t('app.loading') }}</p>
+    <div v-else-if="failure" class="moc-state" data-testid="case-file-error">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
+    </div>
     <template v-else-if="cf">
       <PageHeader :title="cf.title" :subtitle="`${cf.code} · ${cf.year} · ${cf.department?.name ?? ''}`">
         <span class="chip" :class="STATUS_TONE[cf.status]" data-testid="case-file-status">
@@ -280,183 +283,192 @@ const lockedUntil = computed(() => {
         </button>
       </PageHeader>
 
-      <section class="card mb-6 p-5" data-testid="case-file-info">
-        <h2 class="mb-3 text-sm font-semibold text-stone-900">{{ t('cases.info') }}</h2>
-        <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <dt class="text-stone-500">{{ t('cases.department') }}</dt>
-            <dd>{{ cf.department?.name ?? '—' }}</dd>
-          </div>
-          <div><dt class="text-stone-500">{{ t('cases.retention') }}</dt><dd>{{ retention }}</dd></div>
-          <div><dt class="text-stone-500">{{ t('cases.closedOn') }}</dt><dd>{{ fmtDate(cf.closed_on) }}</dd></div>
-          <div>
-            <dt class="text-stone-500">{{ t('cases.archiveStatus') }}</dt>
-            <dd v-if="cf.archived_at">{{ t('cases.status.archived') }} · {{ fmtDateTime(cf.archived_at) }}</dd>
-            <dd v-else>{{ t('cases.notArchived') }}</dd>
-          </div>
-          <div>
-            <dt class="text-stone-500">{{ t('cases.retainUntil') }}</dt>
-            <dd data-testid="case-file-retain">{{ lockedUntil }}</dd>
-          </div>
-          <div v-if="cf.archive_key" class="sm:col-span-2 lg:col-span-1">
-            <dt class="text-stone-500">{{ t('cases.archiveKey') }}</dt>
-            <dd class="font-mono text-xs break-all">{{ cf.archive_key }}</dd>
-          </div>
-          <div v-if="sha" class="sm:col-span-2 lg:col-span-3">
-            <dt class="text-stone-500">{{ t('cases.manifestSha') }}</dt>
-            <dd class="font-mono text-xs break-all" data-testid="case-file-sha">{{ sha }}</dd>
-          </div>
-        </dl>
-        <p v-if="editable" class="mt-4 text-xs text-stone-500">{{ t('cases.closeHint') }}</p>
-        <p v-if="cf.status === 'closed'" class="mt-4 text-xs text-stone-500">{{ t('cases.archiveHint') }}</p>
-      </section>
-
-      <section class="card mb-6 overflow-x-auto" data-testid="case-file-documents">
-        <h2 class="border-b border-stone-200 px-5 py-3 text-sm font-semibold text-stone-900">
-          {{ t('cases.inCase') }}
-        </h2>
-        <p v-if="!cf.case_file_documents.length" class="p-5 text-sm text-stone-500">{{ t('cases.noDocuments') }}</p>
-        <table v-else class="w-full text-sm">
-          <thead
-            class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500
-              uppercase"
-          >
-            <tr>
-              <th class="px-4 py-3">{{ t('outgoing.symbol') }}</th>
-              <th class="px-4 py-3">{{ t('outgoing.summary') }}</th>
-              <th class="px-4 py-3">{{ t('outgoing.status') }}</th>
-              <th class="px-4 py-3">{{ t('outgoing.issuedOn') }}</th>
-              <th v-if="editable" class="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-stone-100">
-            <tr v-for="link in cf.case_file_documents" :key="link.document_id">
-              <template v-if="link.document">
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <div class="font-medium">{{ link.document.symbol ?? '—' }}</div>
-                  <div class="text-xs text-stone-500">
-                    {{ t(`search.direction.${link.document.direction}`) }} · {{ link.document.type_code }}
-                  </div>
-                </td>
-                <td class="max-w-md px-4 py-3">
-                  <NuxtLink
-                    :to="`/van-ban/${link.document.id}`" class="line-clamp-2 text-stone-900 hover:text-brand-800"
-                  >
-                    {{ link.document.summary }}
-                  </NuxtLink>
-                </td>
-                <td class="px-4 py-3"><StatusChip :status="link.document.status" /></td>
-                <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDate(link.document.issued_on) }}</td>
-              </template>
-              <td v-else colspan="4" class="px-4 py-3 text-stone-500 italic">{{ t('cases.hidden') }}</td>
-              <td v-if="editable" class="px-4 py-3 text-right">
-                <button class="btn-ghost text-red-700" :disabled="!!busy" @click="removeDocument(link.document_id)">
-                  {{ t('cases.remove') }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section v-if="editable" class="card mb-6 p-5" data-testid="case-file-add">
-        <h2 class="text-sm font-semibold text-stone-900">{{ t('cases.add') }}</h2>
-        <p class="mt-1 text-xs text-stone-500">{{ t('cases.addHint') }}</p>
-        <form class="mt-3 flex gap-2" @submit.prevent="loadCandidates">
-          <input v-model="query" class="input" :aria-label="t('cases.search')" :placeholder="t('cases.search')">
-          <button type="submit" class="btn-secondary">{{ t('search.button') }}</button>
-        </form>
-        <p v-if="candidatesLoading && !candidates.length" class="mt-3 text-sm text-stone-500">{{ t('app.loading') }}</p>
-        <p v-else-if="!candidates.length" class="mt-3 text-sm text-stone-500" data-testid="case-file-no-candidates">
-          {{ t('cases.noCandidates') }}
-        </p>
-        <ul v-else class="mt-3 divide-y divide-stone-100">
-          <li v-for="doc in candidates" :key="doc.id" class="flex items-center gap-3 py-2 text-sm">
-            <div class="min-w-0 flex-1">
-              <div class="font-medium">
-                {{ doc.symbol ?? '—' }}
-                <span class="text-xs font-normal text-stone-500">
-                  · {{ t(`search.direction.${doc.direction}`) }} · {{ fmtDate(doc.issued_on) }}
-                </span>
-              </div>
-              <div class="truncate text-stone-600">{{ doc.summary }}</div>
+      <div class="moc-stack">
+        <section class="moc-block" data-testid="case-file-info">
+          <h2 class="moc-block-title mb-3">{{ t('cases.info') }}</h2>
+          <dl class="moc-facts">
+            <div>
+              <dt>{{ t('cases.department') }}</dt>
+              <dd>{{ cf.department?.name ?? '—' }}</dd>
             </div>
-            <button class="btn-secondary" :disabled="!!busy" @click="addDocument(doc)">
-              {{ busy === `add:${doc.id}` ? t('app.loading') : t('cases.addOne') }}
-            </button>
-          </li>
-        </ul>
-      </section>
+            <div><dt>{{ t('cases.retention') }}</dt><dd>{{ retention }}</dd></div>
+            <div><dt>{{ t('cases.closedOn') }}</dt><dd class="tabular-nums">{{ fmtDate(cf.closed_on) }}</dd></div>
+            <div>
+              <dt>{{ t('cases.archiveStatus') }}</dt>
+              <dd v-if="cf.archived_at">{{ t('cases.status.archived') }} · {{ fmtDateTime(cf.archived_at) }}</dd>
+              <dd v-else>{{ t('cases.notArchived') }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('cases.retainUntil') }}</dt>
+              <dd data-testid="case-file-retain">{{ lockedUntil }}</dd>
+            </div>
+            <div v-if="cf.archive_key" class="is-wide">
+              <dt>{{ t('cases.archiveKey') }}</dt>
+              <dd class="font-mono text-xs break-all">{{ cf.archive_key }}</dd>
+            </div>
+            <div v-if="sha" class="is-wide">
+              <dt>{{ t('cases.manifestSha') }}</dt>
+              <dd class="font-mono text-xs break-all" data-testid="case-file-sha">{{ sha }}</dd>
+            </div>
+          </dl>
+          <p v-if="editable" class="moc-foot">{{ t('cases.closeHint') }}</p>
+          <p v-if="cf.status === 'closed'" class="moc-foot">{{ t('cases.archiveHint') }}</p>
+        </section>
 
-      <section v-if="cf.status === 'archived'" class="card p-5" data-testid="reading-room">
-        <h2 class="text-sm font-semibold text-stone-900">{{ t('cases.room.title') }}</h2>
-        <p class="mt-1 text-xs text-stone-500">{{ t('cases.room.subtitle') }}</p>
-        <p v-if="roomLoading" class="mt-3 text-sm text-stone-500">{{ t('cases.room.loading') }}</p>
-        <div v-else-if="roomError" class="mt-3 flex items-center gap-3 text-sm text-red-700">
-          {{ roomError }}
-          <button class="btn-secondary" @click="loadRoom">{{ t('app.retry') }}</button>
-        </div>
-        <template v-else-if="room">
-          <p class="mt-3 flex items-start gap-2 text-sm text-emerald-800" data-testid="reading-room-verified">
-            <svg
-              class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>
-              {{ t('cases.room.verified') }} —
-              <span class="font-mono text-xs break-all">{{ room.manifest_sha256 }}</span>
-            </span>
+        <section class="moc-block" data-testid="case-file-documents">
+          <h2 class="moc-block-title mb-1">{{ t('cases.inCase') }}</h2>
+          <p v-if="!cf.case_file_documents.length" class="moc-empty">{{ t('cases.noDocuments') }}</p>
+          <div v-else class="moc-scroll">
+            <table class="moc-table">
+              <thead>
+                <tr>
+                  <th>{{ t('outgoing.symbol') }}</th>
+                  <th>{{ t('outgoing.summary') }}</th>
+                  <th>{{ t('outgoing.status') }}</th>
+                  <th>{{ t('outgoing.issuedOn') }}</th>
+                  <th v-if="editable"><span class="sr-only">{{ t('cases.remove') }}</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="link in cf.case_file_documents" :key="link.document_id">
+                  <template v-if="link.document">
+                    <td class="whitespace-nowrap">
+                      <div class="font-medium">{{ link.document.symbol ?? '—' }}</div>
+                      <div class="text-[13px] text-stone-500">
+                        {{ t(`search.direction.${link.document.direction}`) }} · {{ link.document.type_code }}
+                      </div>
+                    </td>
+                    <td class="min-w-60">
+                      <NuxtLink
+                        :to="`/van-ban/${link.document.id}`"
+                        class="moc-doc-title"
+                      >
+                        {{ link.document.summary }}
+                      </NuxtLink>
+                    </td>
+                    <td><StatusChip :status="link.document.status" /></td>
+                    <td class="whitespace-nowrap text-stone-600">{{ fmtDate(link.document.issued_on) }}</td>
+                  </template>
+                  <td v-else colspan="4" class="text-stone-500 italic">{{ t('cases.hidden') }}</td>
+                  <td v-if="editable" class="text-right">
+                    <button
+                      class="btn-ghost min-h-9 text-red-700 hover:bg-red-50" :disabled="!!busy"
+                      @click="removeDocument(link.document_id)"
+                    >
+                      {{ t('cases.remove') }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-if="editable" class="moc-block" data-testid="case-file-add">
+          <h2 class="moc-block-title">{{ t('cases.add') }}</h2>
+          <p class="moc-block-hint">{{ t('cases.addHint') }}</p>
+          <form class="mt-4 flex gap-2" @submit.prevent="loadCandidates">
+            <input v-model="query" class="input" :aria-label="t('cases.search')" :placeholder="t('cases.search')">
+            <button type="submit" class="btn-secondary">{{ t('search.button') }}</button>
+          </form>
+          <p v-if="candidatesLoading && !candidates.length" class="moc-loading mt-3">{{ t('app.loading') }}</p>
+          <p v-else-if="!candidates.length" class="moc-empty" data-testid="case-file-no-candidates">
+            {{ t('cases.noCandidates') }}
           </p>
-          <ul class="mt-4 divide-y divide-stone-100">
-            <li v-for="doc in room.documents" :key="doc.id" class="py-3 text-sm">
-              <div class="font-medium">
-                {{ doc.symbol ?? '—' }}
-                <span class="text-xs font-normal text-stone-500">
-                  · {{ t(`search.direction.${doc.direction}`) }} · {{ fmtDate(doc.issued_on) }}
-                </span>
+          <ul v-else class="moc-rows mt-4">
+            <li v-for="doc in candidates" :key="doc.id" class="flex items-center gap-3 text-sm">
+              <div class="min-w-0 flex-1">
+                <div class="font-medium">
+                  {{ doc.symbol ?? '—' }}
+                  <span class="text-[13px] font-normal text-stone-500">
+                    · {{ t(`search.direction.${doc.direction}`) }} · {{ fmtDate(doc.issued_on) }}
+                  </span>
+                </div>
+                <div class="truncate text-stone-600">{{ doc.summary }}</div>
               </div>
-              <div class="text-stone-700">{{ doc.summary }}</div>
-              <p v-if="!filesOf.get(doc.id)?.length" class="mt-1 text-xs text-stone-500">
-                {{ t('cases.room.noFiles') }}
-              </p>
-              <ul v-else class="mt-2 space-y-1">
-                <li
-                  v-for="file in filesOf.get(doc.id)" :key="file.file_id"
-                  class="flex flex-wrap items-center gap-2 text-xs text-stone-600"
-                >
-                  <span class="font-medium text-stone-800">{{ file.filename }}</span>
-                  <span>{{ fmtSize(file.bytes) }}</span>
-                  <span class="font-mono" :title="file.sha256">{{ file.sha256.slice(0, 16) }}…</span>
-                  <button
-                    v-if="file.viewable" class="btn-ghost px-2 py-1 text-brand-800" :disabled="!!viewing"
-                    :data-testid="`view-${file.file_id}`" @click="view(file)"
-                  >
-                    {{ viewing === file.file_id ? t('cases.room.viewing') : t('cases.room.view') }}
-                  </button>
-                  <span v-else class="text-stone-400">{{ t('cases.room.notViewable') }}</span>
-                </li>
-              </ul>
+              <button class="btn-secondary" :disabled="!!busy" @click="addDocument(doc)">
+                {{ busy === `add:${doc.id}` ? t('app.loading') : t('cases.addOne') }}
+              </button>
             </li>
           </ul>
-          <p v-if="room.hidden" class="mt-3 text-xs text-stone-500">{{ t('cases.room.hidden', { n: room.hidden }) }}</p>
+        </section>
 
-          <div v-if="viewerUrl" class="mt-5 rounded-lg border border-stone-200" data-testid="reading-room-viewer">
-            <div class="flex flex-wrap items-center gap-3 border-b border-stone-200 px-4 py-2 text-sm">
-              <span class="min-w-0 flex-1 truncate font-medium">
-                {{ t('cases.room.viewer', { name: viewerName }) }}
-              </span>
-              <a :href="viewerUrl" target="_blank" rel="noopener" class="text-brand-800 hover:underline">
-                {{ t('cases.room.newTab') }}
-              </a>
-              <button class="btn-ghost" @click="closeViewer">{{ t('cases.room.closeViewer') }}</button>
-            </div>
-            <iframe :src="viewerUrl" :title="t('cases.room.viewer', { name: viewerName })" class="h-[75vh] w-full" />
-            <p class="border-t border-stone-200 px-4 py-2 text-xs text-stone-500">{{ t('cases.room.stampNote') }}</p>
+        <section v-if="cf.status === 'archived'" class="moc-block" data-testid="reading-room">
+          <h2 class="moc-block-title">{{ t('cases.room.title') }}</h2>
+          <p class="moc-block-hint">{{ t('cases.room.subtitle') }}</p>
+          <p v-if="roomLoading" class="moc-loading mt-3">{{ t('cases.room.loading') }}</p>
+          <div v-else-if="roomError" class="moc-state mt-3">
+            <span>{{ roomError }}</span>
+            <button class="btn-secondary" @click="loadRoom">{{ t('app.retry') }}</button>
           </div>
-        </template>
-      </section>
+          <template v-else-if="room">
+            <p
+              class="mt-4 flex items-start gap-2 rounded-lg bg-brand-50 px-3.5 py-3 text-sm text-brand-900"
+              data-testid="reading-room-verified"
+            >
+              <svg
+                class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="2.5" aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span class="min-w-0">
+                {{ t('cases.room.verified') }} —
+                <span class="font-mono text-xs break-all">{{ room.manifest_sha256 }}</span>
+              </span>
+            </p>
+            <ul class="moc-rows mt-4">
+              <li v-for="doc in room.documents" :key="doc.id" class="text-sm">
+                <div class="font-medium">
+                  {{ doc.symbol ?? '—' }}
+                  <span class="text-[13px] font-normal text-stone-500">
+                    · {{ t(`search.direction.${doc.direction}`) }} · {{ fmtDate(doc.issued_on) }}
+                  </span>
+                </div>
+                <div class="text-stone-700 wrap-anywhere">{{ doc.summary }}</div>
+                <p v-if="!filesOf.get(doc.id)?.length" class="mt-1 text-[13px] text-stone-500">
+                  {{ t('cases.room.noFiles') }}
+                </p>
+                <ul v-else class="mt-2 space-y-1">
+                  <li
+                    v-for="file in filesOf.get(doc.id)" :key="file.file_id"
+                    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-stone-600"
+                  >
+                    <span class="min-w-0 font-medium text-stone-800 wrap-anywhere">{{ file.filename }}</span>
+                    <span class="tabular-nums">{{ fmtSize(file.bytes) }}</span>
+                    <span class="font-mono text-xs" :title="file.sha256">{{ file.sha256.slice(0, 16) }}…</span>
+                    <button
+                      v-if="file.viewable" class="btn-ghost min-h-9 px-2 py-1 text-brand-800" :disabled="!!viewing"
+                      :data-testid="`view-${file.file_id}`" @click="view(file)"
+                    >
+                      {{ viewing === file.file_id ? t('cases.room.viewing') : t('cases.room.view') }}
+                    </button>
+                    <span v-else class="text-stone-500">{{ t('cases.room.notViewable') }}</span>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+            <p v-if="room.hidden" class="moc-foot">{{ t('cases.room.hidden', { n: room.hidden }) }}</p>
+
+            <div
+              v-if="viewerUrl" class="mt-5 overflow-hidden rounded-lg border border-stone-200"
+              data-testid="reading-room-viewer"
+            >
+              <div class="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm">
+                <span class="min-w-0 flex-1 truncate font-medium">
+                  {{ t('cases.room.viewer', { name: viewerName }) }}
+                </span>
+                <a :href="viewerUrl" target="_blank" rel="noopener" class="text-brand-800 hover:underline">
+                  {{ t('cases.room.newTab') }}
+                </a>
+                <button class="btn-ghost" @click="closeViewer">{{ t('cases.room.closeViewer') }}</button>
+              </div>
+              <iframe :src="viewerUrl" :title="t('cases.room.viewer', { name: viewerName })" class="h-[75vh] w-full" />
+              <p class="border-t border-stone-200 px-4 py-2 text-xs text-stone-500">{{ t('cases.room.stampNote') }}</p>
+            </div>
+          </template>
+        </section>
+      </div>
     </template>
   </div>
 </template>

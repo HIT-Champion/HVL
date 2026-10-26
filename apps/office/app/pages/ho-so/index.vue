@@ -140,7 +140,7 @@ async function create() {
     </PageHeader>
 
     <form
-      v-if="creating" class="card mb-6 grid gap-4 p-5 sm:grid-cols-2" data-testid="case-file-form" novalidate
+      v-if="creating" class="moc-block mb-6 grid gap-4 sm:grid-cols-2" data-testid="case-file-form" novalidate
       @submit.prevent="create"
     >
       <div>
@@ -182,66 +182,62 @@ async function create() {
       </div>
     </form>
 
-    <div class="mb-4 flex gap-1 border-b border-stone-200" role="tablist">
+    <div class="moc-tabs" role="tablist">
       <button
         v-for="(_, key) in tabs" :key="key" role="tab" :aria-selected="tab === key"
-        class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
-        :class="tab === key
-          ? 'border-brand-700 text-brand-800' : 'border-transparent text-stone-500 hover:text-stone-800'"
         @click="router.replace({ query: { tab: key } })"
       >
         {{ t(`cases.tab.${key}`) }}
       </button>
     </div>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading && !rows.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('cases.empty') }}</p>
-    <div v-else class="card overflow-x-auto">
+    <div v-if="failure" class="moc-state" role="alert">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
+    </div>
+    <div v-else-if="loading && !rows.length" role="status" aria-busy="true" :aria-label="t('app.loading')">
+      <div v-for="n in 5" :key="n" class="moc-skeleton" />
+    </div>
+    <p v-else-if="!rows.length" class="moc-empty">{{ t('cases.empty') }}</p>
+    <div v-else class="moc-doc-table moc-case-table overflow-x-auto">
       <table class="w-full text-sm" data-testid="case-file-table">
-        <thead
-          class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500
-            uppercase"
-        >
+        <thead>
           <tr>
-            <th class="px-4 py-3">{{ t('cases.code') }}</th>
-            <th class="px-4 py-3">{{ t('cases.name') }}</th>
-            <th class="px-4 py-3">{{ t('cases.archiveStatus') }}</th>
-            <th class="px-4 py-3">{{ t('cases.retention') }}</th>
+            <th class="px-4">{{ t('cases.code') }}</th>
+            <th class="px-4">{{ t('cases.name') }}</th>
+            <th class="px-4">{{ t('cases.archiveStatus') }}</th>
+            <th class="px-4">{{ t('cases.retention') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-stone-100">
-          <tr
-            v-for="row in rows" :key="row.id" class="cursor-pointer hover:bg-brand-50/40"
-            @click="router.push(`/ho-so/${row.id}`)"
-          >
-            <td class="px-4 py-3 whitespace-nowrap">
-              <div class="font-medium">{{ row.code }}</div>
-              <div class="text-xs text-stone-500">{{ row.year }}</div>
+        <tbody>
+          <tr v-for="row in rows" :key="row.id" class="cursor-pointer" @click="router.push(`/ho-so/${row.id}`)">
+            <td class="px-4 whitespace-nowrap">
+              <div class="font-medium tabular-nums">{{ row.code }}</div>
+              <div class="mt-0.5 text-[13px] text-stone-500 tabular-nums">{{ row.year }}</div>
             </td>
-            <td class="max-w-md px-4 py-3">
-              <NuxtLink :to="`/ho-so/${row.id}`" class="line-clamp-2 text-stone-900 hover:text-brand-800" @click.stop>
+            <td class="max-w-xl px-4">
+              <NuxtLink :to="`/ho-so/${row.id}`" class="moc-doc-title" @click.stop>
                 {{ row.title }}
               </NuxtLink>
-              <div class="mt-0.5 text-xs text-stone-500">
+              <div class="moc-doc-meta">
                 {{ row.department?.name }} · {{ t('cases.documentCount', { n: row.case_file_documents.length }) }}
               </div>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 whitespace-nowrap">
               <span class="chip" :class="STATUS_TONE[row.status]">
                 {{ t(`cases.status.${row.status}`) }}
               </span>
-              <div class="mt-0.5 text-xs text-stone-500">
+              <div class="mt-0.5 text-[13px] text-stone-500 tabular-nums">
                 {{ row.archived_at ? fmtDate(row.archived_at) : row.closed_on ? fmtDate(row.closed_on) : '' }}
               </div>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-stone-600">
+            <td :data-label="t('cases.retention')" class="px-4 whitespace-nowrap text-stone-600">
               {{ row.retention_years ? t('cases.retentionYears', { n: row.retention_years }) : t('cases.permanent') }}
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="more" class="border-t border-stone-100 p-3 text-center">
+      <div v-if="more" class="moc-more">
         <button class="btn-secondary" :disabled="loading" data-testid="list-more" @click="load(true)">
           {{ t('app.more') }}
         </button>

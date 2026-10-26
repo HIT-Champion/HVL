@@ -106,6 +106,9 @@ test('chữ đạt 4.5:1 trên nền nó nằm', () => {
     ['mục menu khi rê chuột', decl('.sg-nav-link', 'color'), decl('.sg-nav-link:hover::before', 'background')],
     ['mục menu đang mở', decl('.sg-nav-link.is-active', 'color'), decl('.sg-nav-link.is-active::before', 'background')],
     ['vai trò dưới tên trên thanh bên', decl('.sg-account-name small', 'color'), sidebar],
+    ['báo lỗi chung (.moc-state)', decl('.moc-state', 'color'), decl('.moc-state', 'background')],
+    ['ghi chú cảnh báo (.moc-note)', decl('.moc-note', 'color'), decl('.moc-note', 'background')],
+    ['ghi chú thường (.moc-aside) trên nền giấy', token('muted'), token('paper')],
   ]
   for (const [what, fg, bg] of pairs) {
     const r = ratio(fg, bg)

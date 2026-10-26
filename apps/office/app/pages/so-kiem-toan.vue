@@ -157,88 +157,104 @@ function anchored(row: Row) {
   <div>
     <PageHeader :title="t('audit.title')" :subtitle="t('audit.subtitle')" />
 
-    <div class="card mb-4 flex flex-wrap items-start gap-3 p-4 text-sm" data-testid="audit-anchor">
-      <svg class="mt-0.5 h-5 w-5 shrink-0" :class="anchor ? 'text-emerald-600' : 'text-stone-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4" /></svg>
+    <div class="moc-block mb-5 flex items-start gap-3 text-sm" data-testid="audit-anchor">
+      <svg
+        class="mt-0.5 h-5 w-5 shrink-0" :class="anchor ? 'text-brand-700' : 'text-stone-400'" fill="none"
+        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round" stroke-linejoin="round"
+          d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4"
+        />
+      </svg>
       <div class="min-w-0 flex-1">
-        <p v-if="anchor" class="font-medium text-stone-800">{{ t('audit.anchored', { id: anchor.audit_id, at: fmtDateTime(anchor.anchored_at) }) }}</p>
-        <p v-else class="font-medium text-stone-800">{{ t('audit.notAnchored') }}</p>
-        <p class="mt-0.5 text-stone-500">{{ t('audit.how') }}</p>
+        <p v-if="anchor" class="font-semibold text-stone-900 wrap-anywhere">
+          {{ t('audit.anchored', { id: anchor.audit_id, at: fmtDateTime(anchor.anchored_at) }) }}
+        </p>
+        <p v-else class="font-semibold text-stone-900">{{ t('audit.notAnchored') }}</p>
+        <p class="mt-1 text-stone-600">{{ t('audit.how') }}</p>
       </div>
     </div>
 
-    <div class="mb-4 flex flex-wrap items-center gap-2">
-      <div class="flex flex-wrap gap-1 border-b border-stone-200" role="tablist">
-        <button
-          v-for="(_, key) in groups" :key="key" role="tab" :aria-selected="group === key"
-          class="-mb-px border-b-2 px-3 py-2 text-sm font-medium"
-          :class="group === key ? 'border-brand-700 text-brand-800' : 'border-transparent text-stone-500 hover:text-stone-800'"
-          @click="router.replace({ query: { ...route.query, loai: key } })"
-        >
-          {{ t(`audit.group.${key}`) }}
-        </button>
-      </div>
-      <span v-if="doc" class="chip bg-brand-50 text-brand-800">
+    <div class="moc-tabs" role="tablist">
+      <button
+        v-for="(_, key) in groups" :key="key" role="tab" :aria-selected="group === key"
+        @click="router.replace({ query: { ...route.query, loai: key } })"
+      >
+        {{ t(`audit.group.${key}`) }}
+      </button>
+    </div>
+    <p v-if="doc" class="-mt-2 mb-4">
+      <span class="chip gap-1 bg-brand-50 py-0 pr-0 text-brand-800">
         {{ t('audit.forDocument') }}
-        <button class="ml-1 font-bold" :aria-label="t('audit.clear')" @click="router.replace({ query: { ...route.query, van_ban: undefined } })">×</button>
+        <button
+          class="min-h-7 min-w-7 rounded-md font-bold hover:bg-brand-100" :aria-label="t('audit.clear')"
+          @click="router.replace({ query: { ...route.query, van_ban: undefined } })"
+        >×</button>
       </span>
-    </div>
+    </p>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('audit.empty') }}</p>
+    <div v-if="failure" class="moc-state">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
+    </div>
+    <p v-else-if="loading" class="moc-loading">{{ t('app.loading') }}</p>
+    <p v-else-if="!rows.length" class="moc-empty">{{ t('audit.empty') }}</p>
     <div v-else>
       <!-- màn hẹp: sổ rộng hơn màn hình, cuộn ngang được cả bằng bàn phím (vùng nhận tiêu điểm). Vùng lấy tên từ
            câu gợi ý cuộn, không lấy "Sổ kiểm toán" để khỏi trùng tên mục menu -->
       <p id="audit-scroll-hint" class="moc-scroll-hint">{{ t('fe.scrollTable') }}</p>
       <div
-        class="moc-table-scroll moc-audit-table card overflow-x-auto" tabindex="0" role="region"
+        class="moc-table-scroll moc-audit-table moc-table-frame" tabindex="0" role="region"
         aria-labelledby="audit-scroll-hint"
       >
-        <table class="w-full text-sm" data-testid="audit-table">
-          <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium text-stone-500">
+        <table class="moc-table" data-testid="audit-table">
+          <thead>
             <tr>
-              <th class="px-4 py-3">{{ t('audit.when') }}</th>
-              <th class="px-4 py-3">{{ t('audit.who') }}</th>
-              <th class="px-4 py-3">{{ t('audit.what') }}</th>
-              <th class="px-4 py-3">{{ t('audit.changes') }}</th>
-              <th class="px-4 py-3">{{ t('audit.chain') }}</th>
+              <th>{{ t('audit.when') }}</th>
+              <th>{{ t('audit.who') }}</th>
+              <th>{{ t('audit.what') }}</th>
+              <th>{{ t('audit.changes') }}</th>
+              <th>{{ t('audit.chain') }}</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-stone-100">
-            <tr v-for="row in rows" :key="row.id" class="align-top">
-              <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDateTime(row.occurred_at) }}</td>
-              <td class="px-4 py-3">{{ who(row) }}</td>
-              <td class="px-4 py-3">
+          <tbody>
+            <tr v-for="row in rows" :key="row.id">
+              <td class="whitespace-nowrap text-stone-600">{{ fmtDateTime(row.occurred_at) }}</td>
+              <td>{{ who(row) }}</td>
+              <td>
                 <div class="font-medium whitespace-nowrap">
                   {{ action(row) }} · {{ label('audit.entity', row.entity) }}
                 </div>
                 <NuxtLink
                   v-if="canOpen && documentOf(row)" :to="`/van-ban/${documentOf(row)}`"
-                  class="text-xs text-brand-700 hover:underline"
+                  class="text-[13px] text-brand-700 hover:underline"
                 >
                   {{ t('audit.openDocument') }}
                 </NuxtLink>
               </td>
-              <td class="max-w-md px-4 py-3">
+              <td class="max-w-md">
                 <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700">
                   <span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}
                 </div>
-                <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
+                <div
+                  v-if="changes(row).hidden.length" class="text-[13px] text-stone-500" :title="t('audit.hiddenHint')"
+                >
                   {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
                 </div>
               </td>
-              <td class="px-4 py-3 whitespace-nowrap">
+              <td class="whitespace-nowrap">
                 <div class="font-mono text-xs text-stone-700" :title="row.hash">
                   #{{ row.id }} · {{ row.hash.slice(2, 12) }}…
                 </div>
-                <div class="mt-0.5 text-xs" :class="anchored(row) ? 'text-emerald-700' : 'text-stone-400'">
+                <div class="mt-0.5 text-[13px]" :class="anchored(row) ? 'text-brand-700' : 'text-stone-500'">
                   {{ anchored(row) ? t('audit.isAnchored') : t('audit.notYet') }}
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="more" class="border-t border-stone-100 p-3 text-center">
+        <div v-if="more" class="moc-more border-t border-stone-100 pb-4">
           <button class="btn-secondary" @click="load(true)">{{ t('audit.more') }}</button>
         </div>
       </div>
