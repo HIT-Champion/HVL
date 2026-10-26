@@ -7,8 +7,8 @@ từ trang chủ kho mã nguồn.
 **Cách dùng:** mỗi tiêu chí ghi rõ *bằng chứng trong repo* và *lệnh tự kiểm tra*. Đánh dấu ✅ chỉ
 khi đã chạy lệnh kiểm tra và thấy kết quả sạch.
 
-**Lần kiểm gần nhất:** 26/10/2026, trên `develop` 62bff8d. Ô ✅ đã kiểm bằng lệnh, CI hay trang GitHub ghi ở cột
-Bằng chứng; CI của commit đó xanh cả 14 job:
+**Lần kiểm gần nhất:** 26/10/2026, trên `develop` 62bff8d; riêng ô "Không phát hành kèm gói" kiểm lại trên
+399d8af. Ô ✅ đã kiểm bằng lệnh, CI hay trang GitHub ghi ở cột Bằng chứng; CI của 62bff8d xanh cả 14 job:
 <https://github.com/HIT-Champion/Signet/actions/runs/40315747559>. Ô ☐ chưa đạt, ghi lý do và issue. Số commit, PR,
 issue là số lúc kiểm. Mục "Rà soát cuối cùng" làm lại trên bản phát hành cuối, trước 17:00 06/12/2026.
 
@@ -104,7 +104,7 @@ docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.
 |---|---|---|---|
 | ✅ | Có tài liệu làm rõ thư viện/gói sử dụng | `DEPENDENCIES.md`; danh mục đầy đủ từng gói (kể cả gián tiếp) kèm giấy phép: SBOM CycloneDX `signet-X.Y.Z.cdx.json` đính kèm bản phát hành từ sau v1.0.0 (`make sbom`); v1.1.0 có `signet-1.1.0.cdx.json` | — |
 | ✅ | Ưu tiên thư viện sẵn có của hệ thống | Dùng image chính thức, không tự đóng gói lại: image thượng nguồn trong `docker-compose.yml` ghim phiên bản và digest. Image đội tự dựng là mã của đội (dịch vụ, ứng dụng) và APISIX: image `apache/apisix` chính thức thêm tệp `plugin.wasm` chép từ image chính thức của coraza-proxy-wasm 0.6.0, kiểm SHA-256 | −5 |
-| ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` (CI job "Giấy phép" kiểm). Chưa đánh dấu lúc kiểm 26/10 trên 62bff8d: phông Be Vietnam Pro (OFL-1.1) có 3 bản TTF trong repo. #305 bỏ các tệp này, lấy từ gói npm `@fontsource/be-vietnam-pro` lúc dựng; kiểm lại sau khi gộp | −5 |
+| ✅ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` (CI job "Giấy phép" kiểm). Lúc kiểm 26/10 trên 62bff8d ô này để trống vì phông Be Vietnam Pro (OFL-1.1) có 3 bản TTF trong repo; #305 (PR #314) bỏ các tệp đó, lấy từ gói npm `@fontsource/be-vietnam-pro` lúc dựng. Kiểm lại 26/10 trên `develop` 399d8af: `git ls-tree -r` không còn tệp `.ttf`, `.otf`, `.woff`, `.woff2` nào, không có `vendor/`, `node_modules/`, `third_party/` | −5 |
 | ✅ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin. Repo không có tệp `.patch`, Dockerfile không vá mã thượng nguồn; tùy biến bằng route APISIX, metadata Hasura, realm và theme Keycloak | −5 |
 
 > ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Signet. Nguyên tắc
