@@ -252,6 +252,10 @@
     }
   },
   "doc": {
+    "yourTask": "Việc của bạn",
+    "runFrom": "Vào sổ",
+    "runDue": "Hạn",
+    "runLabel": "Từ ngày vào sổ {from} tới hạn {to}",
     "info": "Thông tin văn bản",
     "files": "Tệp đính kèm",
     "noFiles": "Chưa có tệp.",

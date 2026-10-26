@@ -40,6 +40,11 @@ export function today(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date())
 }
 
+// Ngày (YYYY-MM-DD) theo giờ Việt Nam của một thời điểm, như lúc vào sổ
+export function dayOf(value: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date(value))
+}
+
 // Cộng ngày trên lịch (YYYY-MM-DD), tính theo UTC để không vướng giờ mùa hè của máy người dùng
 export function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`)

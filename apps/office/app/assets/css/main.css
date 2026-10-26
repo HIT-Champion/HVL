@@ -678,6 +678,163 @@
 /* khung báo kết quả: phần việc được giao tách khỏi ô kết quả bằng một đường kẻ */
 .sg-assignment-brief { padding-bottom: 16px; border-bottom: 1px solid var(--edge); }
 
+/* Trang văn bản "Lịch hạn": dải đầu trang (ô hạn như tờ lịch, trích yếu, đoạn đường vào sổ → hạn, nút thao tác), rồi
+   hai cột: việc của người dùng và nội dung bên trái, thông tin văn bản và dòng thời gian bên phải */
+.sg-doc { max-width: 1368px; }
+.sg-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 140ms;
+}
+.sg-back:hover { color: #0b6b53; }
+.sg-doc-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: start;
+  padding-bottom: 28px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--edge);
+}
+.sg-doc-band.has-due { grid-template-columns: 148px minmax(0, 1fr) auto; }
+.sg-due-card {
+  display: grid;
+  justify-items: center;
+  padding: 12px 10px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--paper);
+  text-align: center;
+}
+.sg-due-card-label { font-size: 12px; line-height: 16px; color: var(--muted); }
+.sg-due-card-num {
+  font-size: 48px;
+  line-height: 52px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: #0a5a46;
+  font-variant-numeric: tabular-nums;
+}
+.sg-due-card-day { font-size: 14px; line-height: 20px; font-weight: 600; }
+.sg-due-card-month { font-size: 13px; line-height: 18px; color: var(--muted); }
+.sg-due-card-left {
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e6f2ec;
+  color: #0a5a46;
+  font-size: 13px;
+  font-weight: 600;
+  text-wrap: balance;
+}
+.sg-due-card.is-soon .sg-due-card-num, .sg-due-card.is-today .sg-due-card-num { color: #7a4800; }
+.sg-due-card.is-soon .sg-due-card-left, .sg-due-card.is-today .sg-due-card-left { background: #fdf8ea; color: #7a4800; }
+.sg-due-card.is-over .sg-due-card-num { color: #9f2019; }
+.sg-due-card.is-over .sg-due-card-left { background: #fdf1ef; color: #9f2019; }
+.sg-due-card.is-done .sg-due-card-num { color: var(--text); }
+.sg-doc-head { display: grid; gap: 10px; min-width: 0; }
+.sg-doc-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sg-doc-kind { font-size: 13px; color: var(--muted); }
+.sg-doc-title {
+  max-width: 860px;
+  font-size: 26px;
+  line-height: 34px;
+  font-weight: 600;
+  letter-spacing: -.012em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.sg-doc-meta { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sg-doc-tools { display: grid; gap: 8px; justify-items: stretch; }
+/* đoạn đường vào sổ → hạn: ngày đã qua tô nhạt, hôm nay viền lục bảo, ngày hạn tô đặc */
+.sg-run { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.sg-run-day {
+  display: grid;
+  justify-items: center;
+  width: 52px;
+  padding: 6px 0 7px;
+  border-radius: 10px;
+  background: var(--paper);
+}
+.sg-run-tag { font-size: 11px; line-height: 14px; color: var(--muted); white-space: nowrap; }
+.sg-run-num { font-size: 16px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sg-run-day.is-past { background: #e6f2ec; }
+.sg-run-day.is-past .sg-run-num { color: var(--muted); }
+.sg-run-day.is-today { background: #fff; box-shadow: inset 0 0 0 2px #0b6b53; }
+.sg-run-day.is-today .sg-run-tag { color: #0a5a46; font-weight: 600; }
+.sg-run-day.is-due { background: #0b6b53; box-shadow: none; }
+.sg-run-day.is-due .sg-run-tag, .sg-run-day.is-due .sg-run-num { color: #fff; }
+.sg-doc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 32px; align-items: start; }
+.sg-doc-main, .sg-doc-side { display: grid; gap: 24px; min-width: 0; }
+.sg-block-title { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text); }
+/* khung việc của người dùng: phần nổi nhất trang, đầu khung ghi "Việc của bạn" và tên bước */
+.sg-work { background: #fff; border: 1px solid #b7dccb; border-radius: 16px; overflow: hidden; }
+.sg-work-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid #dcefe6;
+  background: #eef7f3;
+}
+.sg-work-kicker { font-size: 12px; line-height: 16px; font-weight: 600; color: #0a5a46; }
+.sg-work-head h2 { font-size: 20px; line-height: 28px; font-weight: 600; }
+/* thông tin văn bản: nhãn trái, giá trị phải; giá trị dài nằm dưới nhãn */
+.sg-facts { display: grid; font-size: 14px; }
+.sg-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.sg-facts > div:last-child { border-bottom: 0; }
+.sg-facts dt { flex-shrink: 0; color: var(--muted); }
+.sg-facts dd { min-width: 0; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.sg-facts > .is-wide { display: grid; gap: 2px; }
+.sg-facts > .is-wide dd { text-align: left; }
+@media (max-width: 1279px) {
+  .sg-doc-band { grid-template-columns: minmax(0, 1fr); }
+  .sg-doc-band.has-due { grid-template-columns: 132px minmax(0, 1fr); }
+  .sg-doc-tools { grid-column: -2 / -1; display: flex; flex-wrap: wrap; }
+  .sg-doc-grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; }
+}
+@media (max-width: 1080px) {
+  .sg-doc-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* điện thoại: ô hạn nằm ngang (số lớn bên trái), đoạn đường cuộn ngang trong khung, hai cột thành một */
+@media (max-width: 640px) {
+  .sg-doc-band, .sg-doc-band.has-due { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-bottom: 20px; }
+  .sg-doc-band { margin-bottom: 20px; }
+  .sg-due-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'num label' 'num day' 'num month' 'left left';
+    justify-items: start;
+    column-gap: 14px;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  .sg-due-card-num { grid-area: num; align-self: center; font-size: 44px; line-height: 48px; }
+  .sg-due-card-label { grid-area: label; }
+  .sg-due-card-day { grid-area: day; }
+  .sg-due-card-month { grid-area: month; }
+  .sg-due-card-left { grid-area: left; margin-top: 6px; }
+  .sg-doc-title { font-size: 21px; line-height: 28px; }
+  .sg-run { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .sg-run-day { flex: 0 0 48px; }
+  .sg-doc-tools { grid-column: auto; }
+  .sg-work-head { padding: 12px 16px; }
+  .sg-work-head h2 { font-size: 18px; line-height: 26px; }
+}
+
 /* Chuyển động chỉ diễn tả điều hướng, đổi trạng thái và phản hồi trực tiếp; không hiệu ứng khi cuộn */
 .sg-task-enter-active { transition: opacity 220ms ease, transform 280ms var(--sg-ease); }
 .sg-task-leave-active { transition: opacity 110ms ease, transform 140ms ease; }

@@ -252,6 +252,10 @@
     }
   },
   "doc": {
+    "yourTask": "Your task",
+    "runFrom": "Logged",
+    "runDue": "Due",
+    "runLabel": "From registration on {from} to the due date {to}",
     "info": "Document details",
     "files": "Files",
     "noFiles": "No files.",
