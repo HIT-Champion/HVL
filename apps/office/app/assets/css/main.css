@@ -1241,7 +1241,7 @@
    Bo góc: khung soạn và bóng câu hỏi 16px, khối phụ 12px, nút và ô chọn 8px */
 .moc-sheet:has(> .sg-ask) { padding-bottom: 0; }
 .sg-ask { display: flex; flex-direction: column; min-height: calc(100dvh - 96px); }
-.sg-ask > * { width: 100%; max-width: 760px; margin-inline: auto; }
+.sg-ask > :not(.sr-only) { width: 100%; max-width: 760px; margin-inline: auto; }
 .sg-ask-head { padding-bottom: 16px; }
 .sg-ask-head h1 { font-size: 20px; line-height: 28px; }
 

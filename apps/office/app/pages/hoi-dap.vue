@@ -679,7 +679,7 @@ onBeforeUnmount(() => {
                   <!-- khung xem tệp, mở đúng trang được trích -->
                   <div
                     v-if="viewer && viewer.turn === turn.key" :id="`xem-${turn.key}`" tabindex="-1"
-                    class="mt-4 overflow-hidden rounded-xl border border-stone-200 focus:outline-2
+                    class="mt-4 scroll-mb-44 overflow-hidden rounded-xl border border-stone-200 focus:outline-2
                       focus:outline-brand-600"
                     data-testid="ask-viewer"
                   >
