@@ -125,8 +125,13 @@ function dungTheViec(task, forms) {
   if (task.dueAt) li.append(make('p', { className: 'gio', textContent: `Hạn duyệt: ${ngayGio(task.dueAt)}` }))
   const khung = make('div', { className: 'khung-form' })
   li.append(khung)
-  const schema = forms.byKey[task.formKey] || forms.duyet
-  const form = veForm(khung, schema, {
+  // formKey lạ (quy trình đổi mà trang chưa tải lại): không đoán mẫu nào, báo trên thẻ
+  if (!Object.hasOwn(forms.byKey, task.formKey)) {
+    khung.append(make('p', { className: 'loi', textContent: `Trang chưa có mẫu "${task.formKey}" cho việc này. `
+      + 'Tải lại trang để lấy mẫu mới.' }))
+    return li
+  }
+  const form = veForm(khung, forms.byKey[task.formKey], {
     idPrefix: `viec-${++soThe}-`,
     submitLabel: 'Gửi quyết định',
     onSubmit: async (data) => {
@@ -220,6 +225,7 @@ async function main() {
   try {
     const [don, duyet] = await Promise.all([napForm(FORM_DON), napForm(FORM_DUYET)])
     forms = { don, duyet, byKey: { [FORM_DON]: don, [FORM_DUYET]: duyet } }
+    veFormDon(forms)       // mountForm ném lỗi khi schema không dùng được: báo như không nạp được mẫu
   } catch (err) {
     el('tin').textContent = ''
     baoLoi(`Không nạp được mẫu đơn từ Signet: ${err.message}`)
@@ -230,10 +236,12 @@ async function main() {
   for (const p of PHAN) {
     document.querySelector(`[data-phan="${p}"]`).addEventListener('click', () => moPhan(p))
   }
-  veFormDon(forms)
   moPhan('gui-don', { focus: false })
-  const lamMoi = () => Promise.all([taiDon(forms), taiViec(forms)])
+  // một lượt tải lại mỗi lúc: lượt trước chậm quá LAM_MOI_MS thì lượt sau dùng chung, không chồng kết quả cũ lên mới
+  let dangTai = null
+  const lamMoi = () => (dangTai ??= Promise.all([taiDon(forms), taiViec(forms)])
     .catch((err) => baoLoi(`Không tải lại được danh sách: ${err.message}`))
+    .finally(() => { dangTai = null }))
   await lamMoi()
   setInterval(lamMoi, LAM_MOI_MS)
 }

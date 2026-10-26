@@ -97,8 +97,12 @@ class Page(http.server.BaseHTTPRequestHandler):
             cfg = {"realm": self.server.realm, "clientId": CLIENT_ID}       # type: ignore[attr-defined]
             self._send(200, json.dumps(cfg).encode(), "application/json", "no-store")
             return
-        target = (PUBLIC / rel).resolve() if rel else PUBLIC / "index.html"
-        if PUBLIC not in target.parents or not target.is_file():
+        try:
+            target = (PUBLIC / rel).resolve() if rel else PUBLIC / "index.html"
+            found = PUBLIC in target.parents and target.is_file()
+        except (ValueError, OSError):               # vd %00 (byte rỗng) trong đường dẫn: không có tệp nào như vậy
+            found = False
+        if not found:
             target = PUBLIC / "index.html"          # ứng dụng một trang: /nghi-phep/dang-nhap… trả trang chính
         ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml"):

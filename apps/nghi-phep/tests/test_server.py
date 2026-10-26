@@ -97,7 +97,7 @@ class Page(unittest.TestCase):
         index = call(self.base + "/nghi-phep/")[2]
         for path in ("/nghi-phep/../server.py", "/nghi-phep/%2e%2e/server.py", "/nghi-phep/..%2fapp.yaml",
                      "/nghi-phep/%2e%2e%2fworkflow/don-nghi-phep.bpmn20.xml", "/nghi-phep/..%2fforms/don.json",
-                     "/nghi-phep/%2e%2e%2fpackage.json"):
+                     "/nghi-phep/%2e%2e%2fpackage.json", "/nghi-phep/%00", "/nghi-phep/app.js%00.txt"):
             with self.subTest(path=path):
                 status, _, body = call(self.base + path)
                 self.assertEqual((status, body), (200, index))
