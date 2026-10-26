@@ -229,6 +229,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thêm một test ở khung 390×844: không cuộn ngang ở hộp việc, văn bản đến, soạn thảo; mở ngăn kéo bằng Enter, Tab đi
   hết các mục theo thứ tự nhìn thấy với viền focus đủ rồi vòng về mục đầu, Shift+Tab đi ngược; đóng bằng nút và lớp
   phủ thì focus về nút menu. e2e +1.
+- Tài liệu người chấm đọc trước khớp lại với mã (#233). Hướng dẫn cài: Compose tối thiểu là 2.17 (`docs/trien-khai.md`
+  ghi 2.20); `kiem_ban_online.py` chạy từ thư mục mã nguồn vì `make install` không chép nó; nâng cấp bằng `make install`
+  còn đặt lại `COMPOSE_PROFILES`, `COMPOSE_FILE`; `ot-sensor` thuộc profile `iot-sim`. `CONTRIBUTING.md`: sinh `.env`
+  bằng `make env` (`make check` từ chối `change_me`), thêm phạm vi `bang-tin`, 72 ký tự tính cả dòng tiêu đề, `main`
+  nhận cả `hotfix/X.Y.Z`. `docs/van-hanh.md`: reconciler chỉ từ chối bản sao có thay đổi chưa commit ở lần chạy đầu; Trợ
+  lý AI *Tắt* cũng có thể là Ollama không trả lời; compose không truyền hai biến lưu đệm, thời hạn dò của trang trạng
+  thái. `docs/architecture.md`: 6 Hasura Actions (thêm `otSensorMap`); #124, #121 đã gộp; số route `svc-files` theo mã
+  hiện tại; trigger `core.app_events_publish` vào danh sách chỗ dính CSDL; ba ứng dụng ở Tầng 2; Bảng tin đọc
+  `office.documents` qua quan hệ GraphQL; đã có trang `/ung-dung` (sửa cả `ROADMAP.md`); số mục dẫn sang
+  `them-ung-dung.md`.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô

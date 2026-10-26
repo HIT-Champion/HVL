@@ -48,8 +48,8 @@ git remote add upstream https://github.com/HIT-Champion/Signet.git
 git fetch upstream
 git switch -c feat/<số-issue>-<mô-tả-ngắn> upstream/develop   # hoặc fix/, docs/, refactor/, test/
 
-# 4. Cấu hình môi trường
-cp .env.example .env
+# 4. Cấu hình môi trường: sinh .env từ .env.example, mọi change_me thay bằng chuỗi ngẫu nhiên
+make env
 
 # 5. Sửa mã, rồi kiểm tra trước khi commit
 make license-fix      # tự chèn header giấy phép vào tệp mã mới
@@ -62,8 +62,9 @@ git push -u origin feat/<số-issue>-<mô-tả-ngắn>
 ```
 
 Pull request cần **CI xanh** và được **một người duy trì duyệt**, sau đó được gộp vào `develop` bằng
-*Squash and merge*. `main` chỉ nhận bản phát hành do người duy trì gộp từ `develop`. Thành viên đội tạo
-nhánh thẳng trên repo, không cần fork — xem [`docs/git_flow.md`](docs/git_flow.md).
+*Squash and merge*. `main` chỉ nhận bản phát hành do người duy trì gộp từ `develop`, hay từ `hotfix/X.Y.Z` khi
+sửa gấp bản đã phát hành. Thành viên đội tạo nhánh thẳng trên repo, không cần fork — xem
+[`docs/git_flow.md`](docs/git_flow.md).
 
 ## Quy ước commit
 
@@ -71,7 +72,7 @@ Theo [Conventional Commits](https://www.conventionalcommits.org/). Commit, tiêu
 (từ 23/10/2026, commit cũ giữ tiếng Việt — xem [`docs/git_flow.md`](docs/git_flow.md) mục 3.1):
 
 ```
-<loại>(<phạm vi>): <mô tả ngắn, ≤ 72 ký tự>
+<loại>(<phạm vi>): <mô tả ngắn; cả dòng ≤ 72 ký tự>
 
 feat(workflow): add a director approval step above the amount threshold
 fix(files): block files when ClamAV times out instead of storing them
@@ -81,7 +82,7 @@ ci: pin the checkout action version
 
 - **Loại**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.
 - **Phạm vi** theo thành phần: `gateway`, `auth`, `db`, `workflow`, `files`, `realtime`, `office`,
-  `ca-nhan`, `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
+  `ca-nhan`, `bang-tin`, `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
 - Chân commit ghi `Closes #<số-issue>` để tự đóng issue khi gộp vào `develop`.
 - CI kiểm tiêu đề pull request theo đúng quy ước này, vì khi squash nó thành dòng đầu của commit.
 

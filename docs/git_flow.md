@@ -181,10 +181,11 @@ Lưu khối dưới đây thành tệp `~/.gitmessage-moc`, rồi chạy
 trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự bị bỏ.
 
 ```
-# <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, ≤ 72 ký tự, không chấm cuối>
+# <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, không chấm cuối; cả dòng ≤ 72 ký tự>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
-# Phạm vi: gateway auth db workflow files realtime office ca-nhan ai data ops cli scripts e2e ci deps docs release
+# Phạm vi: gateway auth db workflow files realtime office ca-nhan bang-tin ai data ops cli scripts e2e ci deps docs
+#          release
 #
 # Thân (tùy chọn, tiếng Anh): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #

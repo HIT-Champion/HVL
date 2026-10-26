@@ -44,7 +44,7 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
   | sudo tee /etc/apt/sources.list.d/docker.list
 sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-docker --version && docker compose version     # cần Docker ≥ 24.0, compose ≥ 2.20
+docker --version && docker compose version     # cần Docker ≥ 24.0, compose ≥ 2.17
 
 # Người vận hành moc: chạy Signet, sao lưu, reconciler. Nhóm docker có quyền ngang root trên máy — chỉ người vận hành
 sudo adduser --disabled-password --gecos "" moc
@@ -246,10 +246,14 @@ curl -sI https://moc.example.vn/admin/ | head -1                      # phải b
 curl -s https://moc.example.vn/realms/moc/.well-known/openid-configuration \
   | grep -oE '"(issuer|token_endpoint)":"[^"]*"'
 docker compose logs --tail 3 apisix                                   # cột đầu: IP của người vừa gọi
-python3 scripts/kiem_ban_online.py https://moc.example.vn             # chạy được từ máy bất kỳ có Python
 ```
 
-`kiem_ban_online.py` kiểm từ bên ngoài, như trình duyệt của người dùng thấy, rồi báo mọi mục trượt:
+```bash
+python3 scripts/kiem_ban_online.py https://moc.example.vn   # từ thư mục mã nguồn, máy nào có Python cũng được
+```
+
+`make install` không chép `kiem_ban_online.py` vào `/opt/moc`. Kịch bản kiểm từ bên ngoài, như trình duyệt của người
+dùng thấy, rồi báo mọi mục trượt:
 - chứng chỉ hợp lệ, còn ít nhất 14 ngày;
 - `http://` chuyển sang `https://`;
 - `/api/status` ok (thêm `--version 1.2.0` để đòi đúng bản);
@@ -304,8 +308,9 @@ Kịch bản:
    lúc dừng trang không phải chờ tải, lỗi mạng thì dừng ở đây khi chưa đổi gì.
 2. Sao lưu bằng chính bản đang chạy, in mã lượt, chép `.env` ra `/opt/moc/.env.truoc-<lượt>` (quyền 600, có bí mật):
    nâng xong, không cần lùi nữa thì xóa.
-3. Dừng trang, `make install PREFIX=/opt/moc` (giữ `.env` của bản cài, chỉ đổi `MOC_VERSION`), chạy lại. Hasura áp
-   migration mới khi khởi động.
+3. Dừng trang, `make install PREFIX=/opt/moc`, chạy lại. Hasura áp migration mới khi khởi động. `.env` của bản cài được
+   giữ, trừ `MOC_VERSION` và hai biến `make install` đặt lại mỗi lần: `COMPOSE_PROFILES` (`core,app` cộng
+   `MOC_EXTRA_PROFILES`) và `COMPOSE_FILE` (theo profile `logs` và ứng dụng đã cài), nên sửa tay hai biến này sẽ mất.
 4. Chạy `moc.py realm clients` và `realm theme`.
 5. Kiểm từng mục rồi báo các mục trượt:
    - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm (so với số liệu chụp ở
