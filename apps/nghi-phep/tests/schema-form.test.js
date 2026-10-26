@@ -1,0 +1,218 @@
+// Copyright 2026 Signet Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+// Form dựng từ schema (public/schema-form.js), phần không cần trình duyệt. Bộ kiểm phải cho đúng mã lỗi mà mọi bên
+// khác cho trên cùng ca thử: schemas/*.cases.json (Ajv của Văn phòng, svc-workflow, CSDL cũng chạy) và
+// forms/*.cases.json (svc-workflow chạy qua API của ứng dụng). Kèm kiểm tệp form: đủ nhãn hai thứ tiếng, thứ tự ô đủ.
+
+import assert from 'node:assert/strict'
+import { readFileSync, readdirSync } from 'node:fs'
+import { test } from 'node:test'
+
+import {
+  PRIORITY, checkSchema, clean, fields, formErrors, formTitle, message, summary, todayVN,
+} from '../public/schema-form.js'
+
+const SHARED = new URL('../../../schemas/', import.meta.url)
+const FORMS = new URL('../forms/', import.meta.url)
+const TODAY = '2026-10-19'
+const json = (base, name) => JSON.parse(readFileSync(new URL(name, base), 'utf8'))
+
+// Giá trị trong ca thử: 'today', 'today±N' theo TODAY; {$repeat, times}; {$nfd} (dạng tổ hợp, như chép từ PDF)
+function value(v) {
+  if (v !== null && typeof v === 'object' && '$repeat' in v) return v.$repeat.repeat(v.times)
+  if (v !== null && typeof v === 'object' && '$nfd' in v) return v.$nfd.normalize('NFD')
+  const m = typeof v === 'string' ? /^today([+-]\d+)?$/.exec(v) : null
+  if (!m) return v
+  const [y, mo, d] = TODAY.split('-').map(Number)
+  return new Date(Date.UTC(y, mo - 1, d + Number(m[1] ?? 0))).toISOString().slice(0, 10)
+}
+
+const suites = [
+  ...readdirSync(SHARED).filter((f) => f.endsWith('.cases.json')).map((f) => [SHARED, f]),
+  ...readdirSync(FORMS).filter((f) => f.endsWith('.cases.json')).map((f) => [FORMS, f]),
+]
+for (const [base, file] of suites) {
+  const schema = json(base, file.replace('.cases.json', '.json'))
+  const cases = json(base, file)
+  for (const c of [...cases.valid, ...cases.invalid]) {
+    test(`${file}: ${c.name}`, () => {
+      const data = Object.fromEntries(Object.entries(cases.base).map(([k, v]) => [k, value(v)]))
+      for (const [k, v] of Object.entries(c.set ?? {})) data[k] = value(v)
+      for (const k of c.unset ?? []) delete data[k]
+      assert.deepEqual(formErrors(schema, data, TODAY), c.error ?? {})
+    })
+  }
+}
+
+test('có ca thử cho cả schemas/ lẫn mọi form của ứng dụng', () => {
+  assert.ok(suites.some(([base]) => base === SHARED))
+  const forms = readdirSync(FORMS).filter((f) => f.endsWith('.json') && !f.endsWith('.cases.json'))
+  assert.ok(forms.length >= 2)
+  for (const f of forms) assert.ok(suites.some(([, c]) => c === f.replace('.json', '.cases.json')), `${f} thiếu ca thử`)
+})
+
+test('thứ tự ưu tiên mã lỗi giữ nguyên thứ tự của svc-workflow, thêm x-moc-range ở cuối', () => {
+  const server = readFileSync(new URL('../../../services/svc-workflow/src/svc_workflow/schemas.py', import.meta.url),
+    'utf8')
+  const tuple = server.match(/PRIORITY = \(([^)]*)\)/)[1]
+  const codes = [...tuple.matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  assert.deepEqual(PRIORITY.slice(0, codes.length), codes)
+  assert.deepEqual(PRIORITY.slice(codes.length).filter((c) => c !== 'x-moc-range'), [])
+})
+
+test('mỗi tệp form: nạp được, x-moc-order đủ trường, nhãn và lựa chọn có đủ tiếng Việt và tiếng Anh', () => {
+  for (const file of readdirSync(FORMS).filter((f) => f.endsWith('.json') && !f.endsWith('.cases.json'))) {
+    const schema = json(FORMS, file)
+    assert.doesNotThrow(() => checkSchema(schema), file)
+    assert.deepEqual([...schema['x-moc-order']].sort(), Object.keys(schema.properties).sort(), file)
+    assert.ok(schema['x-moc-title']?.vi && schema['x-moc-title']?.en, `${file}: x-moc-title`)
+    for (const [a, b] of schema['x-moc-range'] ?? []) {
+      assert.ok(schema.properties[a] && schema.properties[b], `${file}: x-moc-range ${a}, ${b}`)
+    }
+    for (const lang of ['vi', 'en']) {
+      for (const f of fields(schema, lang)) {
+        const ui = f.prop['x-moc-ui'] ?? {}
+        assert.ok(ui.label?.[lang], `${file}: ${f.name} thiếu nhãn ${lang}`)
+        for (const o of f.options) assert.ok(ui.options?.[o.value]?.[lang], `${file}: ${f.name}.${o.value} ${lang}`)
+        if (ui.help) assert.ok(ui.help[lang], `${file}: ${f.name} thiếu gợi ý ${lang}`)
+      }
+    }
+  }
+})
+
+test('đơn xin nghỉ: ô theo thứ tự, kiểu ô suy từ schema, nhãn theo ngôn ngữ', () => {
+  const don = json(FORMS, 'don.json')
+  const vi = fields(don, 'vi')
+  assert.deepEqual(vi.map((f) => [f.name, f.widget, f.required]), [
+    ['loai', 'select', true], ['tuNgay', 'date', true], ['denNgay', 'date', true], ['lyDo', 'textarea', false],
+  ])
+  assert.equal(vi[0].id, 'sf-loai')
+  assert.equal(fields(don, 'vi', 'don-')[0].id, 'don-loai')
+  assert.deepEqual(vi[0].options.map((o) => o.label), ['Phép năm', 'Nghỉ ốm', 'Việc riêng', 'Nghỉ không lương'])
+  assert.equal(fields(don, 'en')[0].options[1].label, 'Sick leave')
+  assert.equal(formTitle(don, 'en'), 'Leave request')
+  assert.equal(fields(json(FORMS, 'duyet.json'), 'vi')[0].widget, 'radio')
+})
+
+test('kiểu ô khi schema không ghi widget', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      a: { type: 'array', items: { enum: ['x', 'y'] } },
+      b: { type: 'boolean' },
+      c: { type: 'integer', minimum: 1 },
+      d: { type: 'string', maxLength: 201 },
+      e: { type: 'string', maxLength: 50 },
+      f: { type: ['string', 'null'], format: 'date' },
+    },
+  }
+  assert.deepEqual(fields(schema).map((f) => f.widget),
+    ['checkboxes', 'checkbox', 'number', 'textarea', 'text', 'date'])
+  assert.deepEqual(fields(schema)[0].options.map((o) => o.value), ['x', 'y'])
+  assert.equal(fields(schema)[5].nullable, true)
+})
+
+test('dọn dữ liệu trước khi kiểm: NFC, ký tự ẩn, khoảng trắng; ô trống thì bỏ', () => {
+  const don = fields(json(FORMS, 'don.json'))
+  const nfd = 'Nghỉ ốm'.normalize('NFD')
+  assert.deepEqual(clean(don, { loai: 'om', tuNgay: '2026-10-27', denNgay: '2026-10-27', lyDo: `  ${nfd}\u200b\r\n` }),
+    { loai: 'om', tuNgay: '2026-10-27', denNgay: '2026-10-27', lyDo: 'Nghỉ ốm' })
+  assert.deepEqual(clean(don, { loai: undefined, tuNgay: '', denNgay: ' ', lyDo: '   ' }), {})
+  assert.deepEqual(clean(don, { lyDo: 'dòng một\r\ndòng hai' }), { lyDo: 'dòng một\ndòng hai' })
+  const n = fields({ type: 'object', properties: { so: { type: 'integer' }, ghi: { type: ['string', 'null'] } } })
+  assert.deepEqual(clean(n, { so: ' 3 ', ghi: '' }), { so: 3, ghi: null })
+  assert.deepEqual(clean(n, { so: 'ba' }), { so: 'ba', ghi: null })
+})
+
+test('dữ liệu người dùng gõ, sau khi dọn, qua được chính schema đó', () => {
+  const don = json(FORMS, 'don.json')
+  const data = clean(fields(don), { loai: 'om', tuNgay: '2026-10-27', denNgay: '2026-10-28', lyDo: ' Sốt\u00ad ' })
+  assert.deepEqual(formErrors(don, data, TODAY), {})
+})
+
+test('câu báo lỗi hai thứ tiếng, theo mã và theo ô', () => {
+  const don = json(FORMS, 'don.json')
+  for (const lang of ['vi', 'en']) {
+    const list = fields(don, lang)
+    const at = (name) => list.find((f) => f.name === name)
+    const say = (name, code) => message(at(name), code, lang, list, don)
+    for (const code of [...PRIORITY, 'minimum', 'maximum', 'minItems', 'const', 'không-biết']) {
+      assert.ok(say('lyDo', code).length > 0, `${lang} ${code}`)
+    }
+    const vi = lang === 'vi'
+    assert.equal(say('denNgay', 'x-moc-range'), vi ? 'Không được trước «Từ ngày»' : 'Cannot be before "From"')
+    assert.equal(say('tuNgay', 'pattern'), vi ? 'Năm phải từ 2000 đến 2099' : 'The year must be between 2000 and 2099')
+    assert.equal(say('lyDo', 'maxLength'), lang === 'vi' ? 'Tối đa 500 ký tự' : 'At most 500 characters')
+    // minLength 1 nghĩa là không được để trống, không phải "cần ít nhất 1 ký tự"
+    assert.equal(say('lyDo', 'minLength'), say('lyDo', 'required'))
+    assert.notEqual(say('tuNgay', 'format'), say('lyDo', 'format'))
+  }
+})
+
+test('tóm tắt một đơn cho người duyệt: nhãn, tên lựa chọn, ngày dd/mm/yyyy, ô trống là —', () => {
+  const don = json(FORMS, 'don.json')
+  assert.deepEqual(summary(don, { loai: 'om', tuNgay: '2026-10-27', denNgay: '2026-10-28' }), [
+    { name: 'loai', label: 'Loại nghỉ', value: 'Nghỉ ốm' },
+    { name: 'tuNgay', label: 'Từ ngày', value: '27/10/2026' },
+    { name: 'denNgay', label: 'Đến ngày', value: '28/10/2026' },
+    { name: 'lyDo', label: 'Lý do', value: '—' },
+  ])
+  assert.equal(summary(don, { loai: 'mot-loai-moi' }, 'en')[0].value, 'mot-loai-moi')
+  assert.equal(summary(json(FORMS, 'duyet.json'), { quyetDinh: 'tu-choi' }, 'en')[0].value, 'Decline')
+})
+
+test('kiểu, danh mục, số, mảng, đối tượng lồng: cùng mã lỗi như Ajv và svc-workflow', () => {
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['so_ngay', 'loai'],
+    properties: {
+      so_ngay: { type: 'integer', minimum: 1, maximum: 30 },
+      loai: { enum: ['phep', 'om'] },
+      ghi_chu: { type: ['string', 'null'], maxLength: 5 },
+      nguoi: { type: 'array', items: { type: 'string', format: 'uuid' }, uniqueItems: true, minItems: 1 },
+    },
+  }
+  const errs = (data) => formErrors(schema, data, TODAY)
+  assert.deepEqual(errs({ so_ngay: 2, loai: 'phep' }), {})
+  assert.deepEqual(errs({ so_ngay: 2.5, loai: 'phep' }), { so_ngay: 'type' })
+  assert.deepEqual(errs({ so_ngay: 0, loai: 'x' }), { so_ngay: 'minimum', loai: 'enum' })
+  assert.deepEqual(errs({ so_ngay: 31, loai: 'om', ghi_chu: 'dài quá' }), { so_ngay: 'maximum', ghi_chu: 'maxLength' })
+  assert.deepEqual(errs({ loai: 'om', la: 1 }), { so_ngay: 'required', la: 'additionalProperties' })
+  const id = '0b7c6f1e-3a52-4f0e-9a51-2d4f3c6e8a10'
+  assert.deepEqual(errs({ so_ngay: 1, loai: 'om', nguoi: [id, id] }), { nguoi: 'uniqueItems' })
+  assert.deepEqual(errs({ so_ngay: 1, loai: 'om', nguoi: ['x'] }), { nguoi: 'format' })
+  assert.deepEqual(errs({ so_ngay: 1, loai: 'om', nguoi: [] }), { nguoi: 'minItems' })
+  assert.deepEqual(errs({ so_ngay: 1, loai: 'om', ghi_chu: null }), {})
+  assert.deepEqual(errs('x'), { '': 'type' })
+  // tên trường lạ như "constructor" không đụng vào prototype
+  assert.deepEqual(errs({ so_ngay: 1, loai: 'om', constructor: 1 }), { constructor: 'additionalProperties' })
+})
+
+test('schema dùng điều không hỗ trợ thì báo ngay lúc nạp', () => {
+  assert.throws(() => checkSchema({ type: 'object', properties: { a: { oneOf: [] } } }), /oneOf/)
+  assert.throws(() => checkSchema({ type: 'string', format: 'email' }), /email/)
+  assert.throws(() => checkSchema({ type: 'text' }), /kiểu/)
+  assert.throws(() => checkSchema({ $ref: 'https://x.test/s.json' }), /\$ref/)
+  assert.throws(() => checkSchema({ type: 'string', pattern: '(' }))
+  assert.doesNotThrow(() => checkSchema({ type: 'string', title: 'x', 'x-moc-ui': { widget: 'textarea' } }))
+})
+
+test('hôm nay theo giờ Việt Nam', () => {
+  assert.equal(todayVN(new Date('2026-10-26T16:59:59Z')), '2026-10-26')
+  assert.equal(todayVN(new Date('2026-10-26T17:00:00Z')), '2026-10-27')
+})

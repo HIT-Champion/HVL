@@ -1,0 +1,23 @@
+{
+  "$comment": "Ca thử dùng chung cho forms/duyet.json: trình duyệt (tests/schema-form.test.js) và svc-workflow.",
+  "base": {
+    "quyetDinh": "dong-y",
+    "ghiChu": "Nhớ bàn giao việc đang làm trước khi nghỉ"
+  },
+  "valid": [
+    {"name": "đồng ý kèm ghi chú"},
+    {"name": "chỉ quyết định", "unset": ["ghiChu"]},
+    {"name": "từ chối, ghi chú nhiều dòng",
+     "set": {"quyetDinh": "tu-choi", "ghiChu": "Tuần này đủ người nghỉ.\nĐổi sang tuần sau."}}
+  ],
+  "invalid": [
+    {"name": "thiếu quyết định", "unset": ["quyetDinh"], "error": {"quyetDinh": "required"}},
+    {"name": "quyết định viết khác mã", "set": {"quyetDinh": "Đồng ý"}, "error": {"quyetDinh": "enum"}},
+    {"name": "quyết định là true", "set": {"quyetDinh": true}, "error": {"quyetDinh": "enum"}},
+    {"name": "ghi chú rỗng", "set": {"ghiChu": ""}, "error": {"ghiChu": "minLength"}},
+    {"name": "ghi chú 501 ký tự", "set": {"ghiChu": {"$repeat": "a", "times": 501}}, "error": {"ghiChu": "maxLength"}},
+    {"name": "ghi chú xuống dòng ở cuối", "set": {"ghiChu": "Đồng ý\n"}, "error": {"ghiChu": "not"}},
+    {"name": "ghi chú là null", "set": {"ghiChu": null}, "error": {"ghiChu": "type"}},
+    {"name": "trường không có trong mẫu", "set": {"nguoiDuyet": "x"}, "error": {"nguoiDuyet": "additionalProperties"}}
+  ]
+}
