@@ -84,6 +84,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `POST /internal/similar-documents` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15; thừa trường → `422`). `200` `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` · `404` `not_found` · `409` `not_incoming`, `restricted` · `503` `assistant_disabled`, `search_unavailable`, `database_unavailable` (mục Văn bản tương tự cho tác tử gợi ý giao việc) |
 | `GET /healthz` | Tiến trình còn sống |
+| `GET /metrics` | Bảng trạng thái (mục Trạng thái hệ thống) ở dạng chữ của Prometheus, chỉ trong mạng nội bộ: cổng API trả `404` |
 | `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"`; `ai`: mô hình trích yếu (F4.1) đang sẵn sàng không; `assist: {index, semantic, model, embed_pending, embed_failed}` (F4.2): chỉ mục đoạn đã đồng bộ xong một lượt; tìm theo nghĩa được (mô hình nhúng sẵn sàng, đúng số chiều, embedder đã áp trong Meilisearch); mô hình viết câu trả lời sẵn sàng; số đoạn còn chờ nhúng và số đoạn làm mô hình nhúng lỗi (null khi không nhúng hoặc chưa đếm) — cả hai không ảnh hưởng `status` |
 
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
@@ -974,6 +975,12 @@ người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ v
   ai gọi trong lúc đó chờ chung lượt ấy. Mỗi lần dò có hạn `MOC_STATUS_TIMEOUT_S` giây, quá hạn là `down`; lần dò cũ
   còn treo thì lượt sau chờ tiếp chính lần đó, không mở lần mới. APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` lần một
   phút mỗi IP. Bao nhiêu người gọi trong 10 giây cũng chỉ là một lượt dò mỗi thành phần (test: 50 lượt gọi cùng lúc).
+- **Cho Prometheus (#274):** `GET /metrics` trả cùng kết quả gom, cùng lưu đệm, ở dạng chữ của Prometheus:
+  `moc_component_up{component="<mã>",critical="true|false"}` bằng 1 khi thành phần `ok` hay `degraded`, 0 khi
+  `down`; thành phần `off` không có dòng. `critical` là `"true"` với thành phần làm cả hệ thống `down` (cột cuối bảng
+  trên). Prometheus thu 15 giây một lần, nên thành phần chết vẫn bật cảnh báo khi không ai gọi tới
+  (`docs/van-hanh.md`, mục Cảnh báo). Không có URL hay tên máy trong nhãn. Route `chan` của APISIX trả 404 cho
+  `/metrics`, nên chỉ gọi được trong mạng nội bộ.
 - **Sao lưu gần nhất:** dòng `system.backed_up` mới nhất trong sổ kiểm toán (`moc backup create` ghi sau mỗi lượt sao
   lưu), hoặc giờ của lượt vừa khôi phục (`system.restored`), lấy cái mới hơn; chưa có thì `null`.
 - **Tên mô hình** bỏ phần trước dấu `/` cuối (registry có thể là tên máy nội bộ), chỉ nhận `[0-9A-Za-z._:-]`; phiên

@@ -8,6 +8,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Prometheus đọc bảng trạng thái thành phần (F3.13, #274). svc-files có thêm `GET /metrics`: mỗi thành phần của trang
+  `/trang-thai` một dòng `moc_component_up` (1 khi chạy, 0 khi gián đoạn), cùng lần dò và lưu đệm với `/api/status`.
+  Đường này chỉ gọi được trong mạng nội bộ, qua cổng API thì 404. Prometheus thu 15 giây một lần, và nhóm luật mới
+  `thanh-phan` báo `ComponentDown` (thành phần bắt buộc gián đoạn 2 phút), `OptionalComponentDown` (két khóa, tìm
+  kiếm gián đoạn 5 phút) và `StatusMetricsDown` (không đọc được svc-files 2 phút). Trước đây cảnh báo chỉ dựa trên
+  lưu lượng qua cổng: không ai gọi tới thì không thấy dịch vụ chết, và svc-workflow (nằm sau Hasura Actions) không có
+  cảnh báo riêng; giờ nó được thấy qua thành phần `quy-trinh`. Smoke so các thành phần trong Prometheus với
+  `/api/status`, chờ tới lượt thu đầu tiên. Chưa có Alertmanager nên F3.13 vẫn ở mức Dùng được.
 - CI chạy thử thêm phần `https` (F1.9, #261), song song với năm phần cũ. Phần này dựng hệ thống sau một proxy TLS
   theo `docs/trien-khai.md`: `.env` như bước 3 (`MOC_PUBLIC_URL=https://signet.test`, APISIX chỉ nghe
   `127.0.0.1:8080`, `MOC_TRUSTED_PROXY`), nginx với chứng thư do một CA tự ký cấp, đặt `X-Forwarded-*` như Caddyfile

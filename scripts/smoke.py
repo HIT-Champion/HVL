@@ -1409,7 +1409,7 @@ def main() -> None:
     ok("phiên khác vẫn gọi được, không bị chặn lây")
 
     # F3.13: Prometheus thu được chỉ số của cổng API (lưu lượng của chính lượt smoke này), Grafana có bảng điều khiển,
-    # luật cảnh báo đã nạp (#255)
+    # luật cảnh báo đã nạp (#255), bảng trạng thái của svc-files khớp /api/status (#274)
     print("Giám sát")
 
     def prometheus_api(path: str) -> dict:
@@ -1445,15 +1445,39 @@ def main() -> None:
     for _ in range(6):
         groups = prometheus_api("rules").get("groups", [])
         rules = [r for g in groups for r in g["rules"]]
-        if {g["name"] for g in groups} == {"cong-api", "prometheus"} and all(r["health"] == "ok" for r in rules):
+        if {g["name"] for g in groups} == {"cong-api", "thanh-phan", "prometheus"} \
+                and all(r["health"] == "ok" for r in rules):
             break
         time.sleep(5)
     else:
         fail(f"Prometheus chưa nạp hoặc chưa tính được luật cảnh báo: nhóm {sorted(g['name'] for g in groups)},"
              f" luật {[(r['name'], r['health'], r.get('lastError')) for r in rules]}")
     firing = sorted(r["name"] for r in rules if r.get("state") == "firing")
-    ok(f"Prometheus nạp và tính được {len(rules)} luật cảnh báo (nhóm cong-api, prometheus); đang bật:"
+    ok(f"Prometheus nạp và tính được {len(rules)} luật cảnh báo (nhóm cong-api, thanh-phan, prometheus); đang bật:"
        f" {', '.join(firing) or 'không'}")
+    # Prometheus thu /metrics của svc-files 15 giây một lần: mỗi thành phần khác `off` của /api/status có đúng một dòng
+    # moc_component_up = 1. So với /api/status chứ không với một số cố định: smoke cũng chạy trên bản đang nâng cấp
+    # (scripts/nang_cap.sh), cấu hình có thể khác. Ngay sau make up Prometheus có thể chưa thu lượt nào: chờ tới 60 giây
+    for _ in range(12):
+        board = call_json("GET", f"{PUBLIC_URL}/api/status")[0]
+        expected = sorted(c["id"] for c in board["components"] if c["status"] != "off")
+        series = prometheus('moc_component_up{job="svc-files"}')
+        if sorted(s["metric"].get("component", "") for s in series) == expected \
+                and all(s["value"][1] == "1" for s in series):
+            break
+        time.sleep(5)
+    else:
+        fail(f"Prometheus chưa thấy đủ thành phần đang chạy: /api/status {expected}, moc_component_up"
+             f" {sorted((s['metric'].get('component'), s['value'][1]) for s in series)}")
+    # /metrics chỉ trong mạng nội bộ: route `chan` của APISIX trả 404, không rơi xuống route trang của Văn phòng
+    for path in ("/metrics", "/api/metrics"):
+        try:
+            request("GET", PUBLIC_URL + path)
+            fail(f"{path} không bị chặn ở cổng")
+        except HTTPError as exc:
+            exc.status == 404 and "moc_component_up" not in exc.body or fail(f"{path} qua cổng trả {exc.status}")
+    ok(f"Prometheus đọc bảng trạng thái của svc-files: {len(series)} thành phần đang chạy, khớp /api/status;"
+       " /metrics, /api/metrics qua cổng → 404")
 
     # Để cuối: thời gian các phần trên đã chạy cũng tính vào thời hạn đang chờ
     print("Nhắc hạn (timer Flowable)")

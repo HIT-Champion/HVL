@@ -33,7 +33,7 @@ from fastapi.testclient import TestClient
 from svc_files.app import create_app
 from svc_files.config import ConfigError, Settings
 from svc_files.hasura import HasuraClient, HasuraError
-from svc_files.status import Component, StatusBoard, default_board, public_model, public_version
+from svc_files.status import Component, StatusBoard, default_board, public_model, public_version, render_metrics
 
 BACKUP_AT = datetime(2026, 10, 23, 1, 30, tzinfo=UTC)
 JWKS = {"keys": [{"kid": "k1", "kty": "RSA", "alg": "RS256", "use": "sig", "n": "AQAB", "e": "AQAB"}]}
@@ -373,6 +373,59 @@ def test_openapi_documents_public_status(parts, verifier):
     with status_client(status_settings(), parts, verifier) as c:
         op = c.get("/openapi.json").json()["paths"]["/api/status"]["get"]
     assert "security" not in op and "429" in op["responses"]
+
+
+# --- GET /metrics cho Prometheus (#274) ----------------------------------------------------------------------------
+
+METRIC = re.compile(r'^moc_component_up\{component="([a-z-]+)",critical="(true|false)"\} ([01])$')
+
+
+def component_up(text: str) -> dict[str, tuple[str, str]]:
+    """Mỗi dòng số liệu của /metrics → {thành phần: (critical, giá trị)}; dòng lạ thì test đỏ."""
+    rows = [line for line in text.splitlines() if not line.startswith("#")]
+    assert all(METRIC.match(line) for line in rows), rows
+    found = {m[1]: (m[2], m[3]) for m in map(METRIC.match, rows)}
+    assert len(found) == len(rows)                                  # mỗi thành phần đúng một dòng
+    return found
+
+
+def test_metrics_lists_every_component_not_off(parts, verifier):
+    with status_client(status_settings(), parts, verifier) as c:
+        r = c.get("/metrics")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    assert r.headers["content-type"] == "text/plain; version=0.0.4; charset=utf-8"
+    assert "# TYPE moc_component_up gauge" in r.text.splitlines()
+    up = component_up(r.text)
+    assert list(up) == [x for x in EXPECTED if x != "tro-ly-ai"]   # trợ lý AI tắt theo cấu hình: không có dòng
+    assert {k: v for k, (_, v) in up.items()} == dict.fromkeys(up, "1")
+    assert {k for k, (crit, _) in up.items() if crit == "false"} == {"ket-khoa", "tim-kiem"}
+    assert leaks(r.text) == []
+
+
+def test_metrics_zero_only_when_down(parts, verifier):
+    parts["net"].gateway = 503                                      # suy giảm vẫn là trả lời được
+    parts["meili"].down = True
+    parts["scanner"].down = True
+    with status_client(status_settings(), parts, verifier) as c:
+        up = component_up(c.get("/metrics").text)
+    assert {k for k, (_, v) in up.items() if v == "0"} == {"tim-kiem", "quet-ma-doc"}
+    assert up["cong-api"] == ("true", "1") and up["tim-kiem"] == ("false", "0")
+
+
+def test_metrics_share_the_status_cache_and_stay_out_of_openapi(parts, verifier):
+    with status_client(status_settings(), parts, verifier) as c:
+        c.get("/api/status")
+        c.get("/metrics")
+        c.get("/metrics")
+        assert c.app.state.status_board.rounds == 1
+        assert "/metrics" not in c.get("/openapi.json").json()["paths"]
+
+
+def test_metrics_escape_label_values():
+    report = {"components": [{"id": 'a"b\\c\nd', "status": "degraded"}, {"id": "x", "status": "off"}]}
+    # thoát \ " và xuống dòng theo định dạng chữ của Prometheus; không khai critical thì coi là bắt buộc
+    expected = 'moc_component_up{component="a\\"b\\\\c\\nd",critical="true"} 1'
+    assert render_metrics(report, {}).splitlines()[2:] == [expected]
 
 
 @pytest.mark.parametrize(("env", "message"), [
