@@ -36,14 +36,16 @@ const menuButton = ref<HTMLButtonElement | null>(null)
 let hoverExit: ReturnType<typeof setTimeout> | undefined
 // Bấm chuột vào một mục, kể cả mục của trang đang mở (route không đổi nên watch(route) ở dưới không chạy): thu thanh
 // bên, đóng ngăn kéo, rồi không cho rê chuột mở lại tới khi con trỏ rời hẳn thanh bên và vào lại. Không thì con trỏ còn
-// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Enter bằng bàn phím (event.detail = 0) vẫn giữ
-// thanh bên mở theo focus như cũ
+// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Bấm chuột cũng xóa focus bàn phím: Tab tới một
+// mục rồi bấm chuột đúng mục đó thì không có focusin mới, thanh bên cứ mở theo focus cũ. Enter bằng bàn phím
+// (event.detail = 0) vẫn giữ thanh bên mở theo focus như cũ
 let pointerPicked = false
 function pickInNavigation(event: MouseEvent) {
   if (!(event.target as HTMLElement).closest('a[href]')) return
   open.value = false
   if (!event.detail) return
   pointerPicked = true
+  keyboardFocus.value = false
   hovering.value = false
 }
 // Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ

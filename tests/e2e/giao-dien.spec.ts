@@ -121,6 +121,19 @@ test('giao diện: thanh bên mở khi rê chuột hoặc dùng bàn phím, khô
   // bàn phím: Tab sang mục kế tiếp thì mở, focus rời thanh bên thì thu
   await page.keyboard.press('Tab')
   await expect(shell).not.toHaveClass(/is-collapsed/)
+  // đổi từ bàn phím sang chuột: thanh bên đang mở theo focus, bấm chuột đúng mục đang focus (không có focusin mới) vẫn
+  // thu, nhích chuột không mở lại; Tab tiếp thì mở theo bàn phím như thường
+  const focused = page.locator('#app-navigation a:focus')
+  const fbox = (await focused.boundingBox())!
+  const href = (await focused.getAttribute('href'))!
+  await page.mouse.click(fbox.x + 24, fbox.y + fbox.height / 2)
+  await expect(page).toHaveURL(new RegExp(`${href}$`))
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.mouse.move(fbox.x + 25, fbox.y + fbox.height / 2)
+  await page.waitForTimeout(400)
+  await expect(shell).toHaveClass(/is-collapsed/)
+  await page.keyboard.press('Tab')
+  await expect(shell).not.toHaveClass(/is-collapsed/)
   await page.getByTestId('notification-bell').focus()
   await expect(shell).toHaveClass(/is-collapsed/)
 
