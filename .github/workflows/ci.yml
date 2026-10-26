@@ -385,9 +385,11 @@ jobs:
       - name: ClamAV dùng bản chữ ký freshclam vừa tải
         run: |
           daily() {   # "ClamAV 1.5.4/28165/…": clamdscan hỏi clamd đang dùng bản nào, clamscan đọc tệp trên đĩa
-            timeout 120 $COMPOSE exec -T clamav "$1" --version 2>/dev/null | sed -n 's#^ClamAV [^/]*/\([0-9]*\)/.*#\1#p'
+            $COMPOSE exec -T clamav timeout 90 "$1" --version 2>/dev/null | sed -n 's#^ClamAV [^/]*/\([0-9]*\)/.*#\1#p'
           }
-          for i in $(seq 1 40); do
+          # $SECONDS đếm từ đầu bước: không bắt đầu vòng mới sau 4 phút. Vòng đang dở có thể kéo thêm, vì mỗi lần hỏi
+          # chờ tối đa 90 giây (clamd đang nạp thì trả lời khi nạp xong); câu cảnh báo in số giây thật
+          while [ "$SECONDS" -lt 240 ]; do
             # chỉ so khi freshclam đã xong lượt đầu (tải bản mới, báo đã mới nhất, hay lỗi): sớm hơn thì có thể so trước
             # khi nó ghi tệp
             if $COMPOSE logs clamav | grep -qE 'daily\.c[lv]d (updated|database is up-to-date)|update process failed'
@@ -396,11 +398,14 @@ jobs:
               echo "daily trên đĩa: ${disk:-?}, clamd đang dùng: ${loaded:-?}"
               if [ -n "$disk" ] && [ "$disk" = "$loaded" ]; then exit 0; fi
               # clamd chưa trả lời thì chưa gửi RELOAD; đang nạp thì clamdscan --version chờ tới khi nạp xong
-              if [ -n "$loaded" ] && [ -z "${sent:-}" ]; then $COMPOSE exec -T clamav clamdscan --reload; sent=1; fi
+              if [ -n "$loaded" ] && [ -z "${sent:-}" ]; then
+                $COMPOSE exec -T clamav timeout 60 clamdscan --reload || true
+                sent=1
+              fi
             fi
             sleep 5
           done
-          echo "::warning::clamd chưa dùng bản daily trên đĩa sau hơn 3 phút; tải lên có thể treo khi clamd tự nạp lại"
+          echo "::warning::clamd chưa dùng bản daily trên đĩa sau $SECONDS giây: tải lên có thể treo lúc clamd nạp lại"
 
       # Phần e2e quét trợ năng cả Bảng tin (#250, tests/e2e/tro-nang.spec.ts), là ứng dụng cắm bằng manifest. Cài trước
       # make seed: tin của Bảng tin chỉ sinh từ sự kiện mới (Event Trigger không đọc lại dòng cũ), nên văn bản mẫu vào
