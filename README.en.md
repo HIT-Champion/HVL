@@ -89,7 +89,7 @@ Decree 30/2020/NĐ-CP on clerical work:
 | Finding old documents takes time | Full-text search, including text inside attached PDFs and scans (OCR); a Q&A assistant answers with document number and page | [I] |
 
 Also: incoming and outgoing registers in the Decree 30 format; several units on one installation, each person seeing
-only their own unit's data; Vietnamese and English interface. Scope and roles:
+only their own unit's data; the e-Office interface in Vietnamese and English. Scope and roles:
 [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md); maturity of each feature with its evidence:
 [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md) (both in Vietnamese).
 
@@ -126,7 +126,8 @@ each agent (Vietnamese): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 ### Screenshots
 
 Taken automatically during the e2e run (`make e2e`), with fictional sample data. The interface is in Vietnamese by
-default; every page also has an English version.
+default; every e-Office page also has an English version (the P.A.R.A personal space and Bảng tin are in
+Vietnamese only).
 
 | The clerk uploads an incoming letter, the agent pre-fills the fields | Managers see where work is stuck | Recipients verify a document without signing in |
 |---|---|---|
