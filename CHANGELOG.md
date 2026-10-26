@@ -363,6 +363,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Khung xử lý việc trên điện thoại (#251): ở 390px, khung **Cho ý kiến chỉ đạo** cắt mất nút **Lưu, không xử lý**
   (khung ẩn phần lố nên trang không cuộn ngang). Ô ghi chú và nút xuống dòng khi chật; các hàng nút khác của khung
   cũng xuống dòng. `man-hep.spec.ts` thêm kiểm ô, nút trong khung việc của ba vai không bị cắt ở 390px.
+- Văn phòng điện tử khi máy chủ trả lỗi không kèm lý do (#278): câu hỏi GraphQL nhận JSON không có `data` (cổng hay
+  proxy trả 404 kèm `{}`) làm trang hiện lỗi JavaScript "Cannot read properties of undefined". Nay báo "Máy chủ chưa
+  trả lời được (HTTP 404)…" kèm lời khuyên thử lại, hai ngôn ngữ; lỗi `HTTP <mã>` khác (trang 502 của cổng) cũng
+  hiện câu ấy thay vì chữ "HTTP 502" trơn. Test đơn vị +1.
 
 ### Bảo mật
 - Góp ý trong ứng dụng che số và email trước khi lưu (#265): lãnh đạo, quản trị đơn vị đọc được nội dung góp ý, nên

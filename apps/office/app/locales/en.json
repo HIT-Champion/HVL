@@ -565,6 +565,7 @@
     "image_unreadable": "The image is damaged or too large to strip its hidden data (EXIF, GPS location), so it was not saved. Shrink or re-save the image and upload again.",
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
+    "http": "The server could not answer (HTTP {status}). Try again in a few minutes, or report this code.",
     "blocked": "The security gateway blocked this content because some text looks like an attack pattern. Edit the text or file name you sent and try again, or tell your administrator.",
     "blockedId": "The security gateway blocked this content because some text looks like an attack pattern (ID {id}). Edit the text or file name you sent and try again, or tell your administrator, quoting this ID.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
