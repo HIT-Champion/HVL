@@ -79,94 +79,100 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-stone-900">{{ t('health.title') }}</h1>
-        <p class="mt-1 text-sm text-stone-500">{{ t('health.subtitle') }}</p>
-      </div>
+  <div>
+    <PageHeader :title="t('health.title')" :subtitle="t('health.subtitle')">
       <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
-    </div>
+    </PageHeader>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700" role="alert" data-testid="status-failure">
-      {{ failure }}<span v-if="data" class="block text-xs text-stone-500">{{ t('health.stale') }}</span>
+    <p v-if="failure" class="moc-state mb-6" role="alert" data-testid="status-failure">
+      <span>{{ failure }}<span v-if="data" class="block text-[13px]">{{ t('health.stale') }}</span></span>
     </p>
-    <p v-if="!data && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-if="!data && !failure" class="moc-loading">{{ t('app.loading') }}</p>
 
-    <template v-if="data">
-      <!-- tình trạng chung -->
-      <section class="card flex flex-wrap items-center gap-4 border p-5" :class="OVERALL_TONE[data.status]"
-               role="status" aria-live="polite" data-testid="status-overall" :data-status="data.status">
-        <svg class="h-8 w-8 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <div v-if="data" class="moc-stack">
+      <!-- tình trạng chung: màu theo tình trạng, chữ đậm trên nền nhạt -->
+      <section
+        class="flex flex-wrap items-center gap-4 rounded-xl border px-6 py-5" :class="OVERALL_TONE[data.status]"
+        role="status" aria-live="polite" data-testid="status-overall" :data-status="data.status"
+      >
+        <svg
+          class="h-8 w-8 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+        >
           <path v-if="data.status === 'ok'" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           <path v-else d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
         </svg>
         <div class="min-w-48 flex-1">
-          <div class="text-lg font-semibold">{{ t(`health.overall.${data.status}`) }}</div>
-          <p class="text-sm opacity-90">{{ t(`health.overallHint.${data.status}`) }}</p>
+          <div class="text-lg leading-7 font-semibold">{{ t(`health.overall.${data.status}`) }}</div>
+          <p class="mt-0.5 text-sm">{{ t(`health.overallHint.${data.status}`) }}</p>
         </div>
-        <div class="text-right text-xs opacity-80">
+        <div class="text-[13px] tabular-nums sm:text-right">
           <div>{{ t('health.checkedAt', { time: fmtClock(data.checked_at) }) }}</div>
           <div>{{ t('health.autoRefresh') }}</div>
         </div>
       </section>
 
-      <!-- vận hành -->
-      <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="card p-4">
-          <dt class="text-sm text-stone-500">{{ t('health.version') }}</dt>
-          <dd class="mt-1 font-mono text-lg font-semibold text-stone-900" data-testid="status-version">
-            {{ data.version }}
-          </dd>
-        </div>
-        <div class="card p-4">
-          <dt class="text-sm text-stone-500">{{ t('health.uptime') }}</dt>
-          <dd class="mt-1 text-lg font-semibold text-stone-900" data-testid="status-uptime">{{ uptime }}</dd>
-          <dd class="mt-1 text-xs text-stone-500">{{ t('health.uptimeHint') }}</dd>
-        </div>
-        <div class="card p-4">
-          <dt class="text-sm text-stone-500">{{ t('health.backup') }}</dt>
-          <dd class="mt-1 text-lg font-semibold text-stone-900" data-testid="status-backup">
-            {{ data.last_backup_at ? fmtDateTime(data.last_backup_at) : t('health.backupNone') }}
-          </dd>
-          <dd class="mt-1 text-xs text-stone-500">{{ t('health.backupHint') }}</dd>
-        </div>
-        <div class="card p-4">
-          <dt class="text-sm text-stone-500">{{ t('health.ai') }}</dt>
-          <dd class="mt-1 text-lg font-semibold text-stone-900" data-testid="status-ai">
-            {{ data.ai.enabled ? t('health.aiOn') : t('health.aiOff') }}
-            <span v-if="data.ai.enabled && data.ai.model" class="font-mono text-sm font-normal text-stone-600">
-              · {{ data.ai.model }}
-            </span>
-          </dd>
-          <dd class="mt-1 text-xs text-stone-500">
-            <template v-if="data.ai.enabled">
-              {{ data.ai.semantic ? t('health.aiSemantic') : t('health.aiKeyword') }}
-            </template>
-            <template v-else>{{ data.ai.semantic ? t('health.aiSemanticOnly') : t('health.aiOffHint') }}</template>
-          </dd>
-        </div>
-      </dl>
+      <!-- vận hành: một khối, bốn mục; dd thứ hai là chú thích -->
+      <section class="moc-block">
+        <dl class="moc-facts">
+          <div>
+            <dt>{{ t('health.version') }}</dt>
+            <dd class="font-mono text-base" data-testid="status-version">{{ data.version }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('health.uptime') }}</dt>
+            <dd class="text-base tabular-nums" data-testid="status-uptime">{{ uptime }}</dd>
+            <dd>{{ t('health.uptimeHint') }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('health.backup') }}</dt>
+            <dd class="text-base tabular-nums" data-testid="status-backup">
+              {{ data.last_backup_at ? fmtDateTime(data.last_backup_at) : t('health.backupNone') }}
+            </dd>
+            <dd>{{ t('health.backupHint') }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('health.ai') }}</dt>
+            <dd class="text-base" data-testid="status-ai">
+              {{ data.ai.enabled ? t('health.aiOn') : t('health.aiOff') }}
+              <span v-if="data.ai.enabled && data.ai.model" class="font-mono text-sm text-stone-600">
+                · {{ data.ai.model }}
+              </span>
+            </dd>
+            <dd>
+              <template v-if="data.ai.enabled">
+                {{ data.ai.semantic ? t('health.aiSemantic') : t('health.aiKeyword') }}
+              </template>
+              <template v-else>{{ data.ai.semantic ? t('health.aiSemanticOnly') : t('health.aiOffHint') }}</template>
+            </dd>
+          </div>
+        </dl>
+      </section>
 
-      <!-- thành phần theo tầng -->
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5" data-testid="status-layers">
-        <section v-for="(g, i) in groups" :key="g.id" class="card p-4" :data-testid="`status-layer-${g.id}`">
-          <h2 class="flex items-center gap-2 text-sm font-semibold text-stone-900">
+      <!-- thành phần theo tầng: mỗi tầng một hàng, tên tầng bên trái, thành phần bên phải -->
+      <div class="moc-block !py-1" data-testid="status-layers">
+        <section
+          v-for="(g, i) in groups" :key="g.id" :data-testid="`status-layer-${g.id}`"
+          class="grid gap-3 border-t border-stone-100 py-5 first:border-t-0 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6"
+        >
+          <h2 class="moc-block-title flex items-center gap-2.5">
             <span
-              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs text-brand-800">
-              {{ i + 1 }}
-            </span>
+              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[13px]
+                text-brand-800 tabular-nums"
+            >{{ i + 1 }}</span>
             {{ layerLabel(g) }}
           </h2>
-          <ul class="mt-3 space-y-3">
-            <li v-for="c in g.components" :key="c.id" class="flex items-start gap-2"
-                :data-testid="`status-component-${c.id}`" :data-status="c.status">
-              <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" :class="STATE_TONE[c.status].dot"
-                    aria-hidden="true" />
+          <ul class="grid gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+            <li
+              v-for="c in g.components" :key="c.id" class="flex min-w-0 items-start gap-2.5"
+              :data-testid="`status-component-${c.id}`" :data-status="c.status"
+            >
+              <span
+                class="mt-[7px] h-2.5 w-2.5 shrink-0 rounded-full" :class="STATE_TONE[c.status].dot" aria-hidden="true"
+              />
               <div class="min-w-0 flex-1">
                 <div class="text-sm font-medium text-stone-900">{{ componentLabel(c) }}</div>
-                <div class="truncate text-xs text-stone-500">{{ c.software }}</div>
+                <div class="truncate text-[13px] text-stone-500">{{ c.software }}</div>
               </div>
               <span class="chip" :class="STATE_TONE[c.status].chip">{{ t(`health.state.${c.status}`) }}</span>
             </li>
@@ -174,7 +180,7 @@ onBeforeUnmount(() => {
         </section>
       </div>
 
-      <p class="text-xs text-stone-500">{{ t('health.note') }}</p>
-    </template>
+      <p class="text-[13px] text-stone-500">{{ t('health.note') }}</p>
+    </div>
   </div>
 </template>

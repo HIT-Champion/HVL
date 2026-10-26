@@ -290,15 +290,15 @@ function exportOpenLineage() {
         <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
       </template>
     </PageHeader>
-    <p v-if="!allowed" class="card p-12 text-center text-stone-500">{{ t('board.forbidden') }}</p>
-    <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-if="allowed && !loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <div v-if="allowed && loaded" class="space-y-4">
-      <section class="card p-4" data-testid="lineage-graph">
+    <p v-if="!allowed" class="moc-empty">{{ t('board.forbidden') }}</p>
+    <p v-else-if="failure" class="moc-state mb-6">{{ failure }}</p>
+    <p v-if="allowed && !loaded && !failure" class="moc-loading">{{ t('app.loading') }}</p>
+    <div v-if="allowed && loaded" class="moc-stack">
+      <section class="moc-block" data-testid="lineage-graph">
         <div class="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 id="lineage-graph-title" class="font-medium text-stone-900">{{ t('lineage.graph') }}</h2>
-            <p class="mt-1 text-xs text-stone-500">{{ t('lineage.graphHint') }}</p>
+          <div class="min-w-0 flex-1 basis-64">
+            <h2 id="lineage-graph-title" class="moc-block-title">{{ t('lineage.graph') }}</h2>
+            <p class="moc-block-hint">{{ t('lineage.graphHint') }}</p>
           </div>
           <div class="min-w-0 max-w-full">
             <label for="lineage-chart" class="label">{{ t('lineage.chart') }}</label>
@@ -309,33 +309,33 @@ function exportOpenLineage() {
           </div>
         </div>
         <!-- các vùng cuộn ngang nhận tiêu điểm (tên lấy từ tiêu đề mục): trên màn hẹp cuộn được bằng phím mũi tên -->
-        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-graph-title">
+        <div class="moc-scroll mt-3" tabindex="0" role="region" aria-labelledby="lineage-graph-title">
           <div :style="{ minWidth: `${graphWidth}px` }">
             <EChart :option="graphOption" :height="graphHeight" :label="graphLabel" />
           </div>
         </div>
-        <p class="mt-2 text-xs text-stone-500" data-testid="lineage-read-at">
+        <p class="moc-foot" data-testid="lineage-read-at">
           {{ t('lineage.readAt', { time: fmtDateTime(readAt) }) }}
         </p>
       </section>
 
-      <section class="card p-4" data-testid="lineage-sources">
-        <h2 id="lineage-sources-title" class="font-medium text-stone-900">{{ t('lineage.sources') }}</h2>
-        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-sources-title">
-          <table class="w-full min-w-[680px] text-sm">
-            <thead class="text-left text-xs text-stone-500">
+      <section class="moc-block" data-testid="lineage-sources">
+        <h2 id="lineage-sources-title" class="moc-block-title">{{ t('lineage.sources') }}</h2>
+        <div class="moc-scroll mt-3" tabindex="0" role="region" aria-labelledby="lineage-sources-title">
+          <table class="moc-table min-w-[680px]">
+            <thead>
               <tr>
-                <th class="py-1 font-medium">{{ t('lineage.chart') }}</th>
-                <th class="py-1 font-medium">{{ t('lineage.view') }}</th>
-                <th class="py-1 font-medium">{{ t('lineage.readsFrom') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('lineage.quality') }}</th>
+                <th>{{ t('lineage.chart') }}</th>
+                <th>{{ t('lineage.view') }}</th>
+                <th>{{ t('lineage.readsFrom') }}</th>
+                <th class="text-right">{{ t('lineage.quality') }}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
-              <tr v-for="r in sourceRows" :key="`${r.chart.id}/${r.view}`" class="align-top">
-                <td class="py-1.5 pr-3 text-stone-600">{{ t(r.chart.label) }}</td>
-                <td class="py-1.5 pr-3 font-mono text-xs text-stone-900">{{ r.view }}</td>
-                <td class="py-1.5">
+            <tbody>
+              <tr v-for="r in sourceRows" :key="`${r.chart.id}/${r.view}`">
+                <td class="text-stone-600">{{ t(r.chart.label) }}</td>
+                <td class="font-mono text-xs text-stone-900">{{ r.view }}</td>
+                <td>
                   <p v-if="!r.sources.length" class="text-xs text-red-700">{{ t('lineage.missing') }}</p>
                   <ul v-else class="space-y-0.5">
                     <li
@@ -350,7 +350,7 @@ function exportOpenLineage() {
                     </li>
                   </ul>
                 </td>
-                <td class="py-1.5 pl-3 text-right">
+                <td class="text-right">
                   <QualityFlag :status="viewFlag(r.view)" :detail="viewDetail(r.view)" />
                 </td>
               </tr>
@@ -359,44 +359,44 @@ function exportOpenLineage() {
         </div>
       </section>
 
-      <section id="chat-luong" class="card scroll-mt-4 p-4" data-testid="lineage-checks">
+      <section id="chat-luong" class="moc-block scroll-mt-4" data-testid="lineage-checks">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="lineage-checks-title" class="font-medium text-stone-900">{{ t('quality.title') }}</h2>
+          <h2 id="lineage-checks-title" class="moc-block-title">{{ t('quality.title') }}</h2>
           <QualityFlag :status="worstCheck(checkRows.map((c) => c.status))" />
         </div>
-        <p class="mt-1 text-xs text-stone-500">{{ t('quality.hint') }}</p>
-        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-checks-title">
-          <table class="w-full min-w-[680px] text-sm">
-            <thead class="text-left text-xs text-stone-500">
+        <p class="moc-block-hint">{{ t('quality.hint') }}</p>
+        <div class="moc-scroll mt-3" tabindex="0" role="region" aria-labelledby="lineage-checks-title">
+          <table class="moc-table min-w-[680px]">
+            <thead>
               <tr>
-                <th class="py-1 font-medium">{{ t('quality.view') }}</th>
-                <th class="py-1 font-medium">{{ t('quality.rule') }}</th>
-                <th class="py-1 font-medium">{{ t('quality.result') }}</th>
-                <th class="py-1 font-medium">{{ t('quality.figures') }}</th>
+                <th>{{ t('quality.view') }}</th>
+                <th>{{ t('quality.rule') }}</th>
+                <th>{{ t('quality.result') }}</th>
+                <th>{{ t('quality.figures') }}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
-              <tr v-for="c in checkRows" :key="`${c.rule}/${c.report}`" class="align-top" :data-rule="c.rule">
-                <td class="py-1.5 pr-3 font-mono text-xs text-stone-900">{{ c.report }}</td>
-                <td class="py-1.5 pr-3">
+            <tbody>
+              <tr v-for="c in checkRows" :key="`${c.rule}/${c.report}`" :data-rule="c.rule">
+                <td class="font-mono text-xs text-stone-900">{{ c.report }}</td>
+                <td>
                   <div class="text-stone-800">{{ t(`quality.rules.${c.rule}.name`) }}</div>
                   <div class="text-xs text-stone-500">{{ t(`quality.rules.${c.rule}.what`) }}</div>
                 </td>
-                <td class="py-1.5 pr-3"><QualityFlag :status="c.status" /></td>
-                <td class="py-1.5 text-xs text-stone-700">{{ checkText(c) }}</td>
+                <td><QualityFlag :status="c.status" /></td>
+                <td class="text-[13px] text-stone-700">{{ checkText(c) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section class="card p-4" data-testid="lineage-archive">
-        <h2 id="lineage-archive-title" class="font-medium text-stone-900">{{ t('lineage.archive') }}</h2>
-        <p class="mt-1 text-xs text-stone-500" data-testid="lineage-archive-totals">
+      <section class="moc-block" data-testid="lineage-archive">
+        <h2 id="lineage-archive-title" class="moc-block-title">{{ t('lineage.archive') }}</h2>
+        <p class="moc-block-hint" data-testid="lineage-archive-totals">
           {{ t('lineage.archiveTotals', { runs: archivedRuns, failed: failedChecks }) }}
         </p>
         <div
-          v-if="stoppedRun && stoppedQuality" class="mt-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm"
+          v-if="stoppedRun && stoppedQuality" class="mt-3 rounded-lg bg-red-50 p-3.5 text-sm"
           data-testid="lineage-archive-stopped"
         >
           <div class="flex flex-wrap items-center gap-2">
@@ -405,52 +405,52 @@ function exportOpenLineage() {
               {{ t('quality.archive.stopped', { time: fmtDateTime(stoppedRun.event_time) }) }}
             </span>
           </div>
-          <ul class="mt-1 space-y-0.5 text-xs text-stone-700">
-            <li v-for="g in assertionsByTable(stoppedQuality.assertions)" :key="g.dataset">
+          <ul class="mt-1.5 space-y-0.5 text-[13px] text-stone-700">
+            <li v-for="g in assertionsByTable(stoppedQuality.assertions)" :key="g.dataset" class="wrap-anywhere">
               {{ tableText(g) }}<span v-if="g.failed.length" class="text-red-700"> · {{ failedText(g) }}</span>
             </li>
           </ul>
         </div>
-        <p v-if="!run" class="py-6 text-center text-sm text-stone-500">{{ t('lineage.archiveNone') }}</p>
+        <p v-if="!run" class="moc-empty">{{ t('lineage.archiveNone') }}</p>
         <template v-else>
-          <p class="mt-2 text-sm text-stone-700">
+          <p class="mt-3 text-sm text-stone-700">
             {{ t('lineage.archiveRun', { run: run.run_id.slice(0, 8), time: fmtDateTime(run.event_time) }) }}
           </p>
-          <div class="mt-2 rounded-md border border-stone-200 p-3" data-testid="lineage-archive-quality">
+          <div class="mt-3 rounded-lg bg-stone-50 p-3.5" data-testid="lineage-archive-quality">
             <div class="flex flex-wrap items-center gap-2 text-sm">
               <span class="text-stone-700">{{ t('quality.archive.run') }}</span>
               <QualityFlag :status="runQuality.status" />
             </div>
-            <p v-if="!runQuality.assertions.length" class="mt-1 text-xs text-amber-900">
+            <p v-if="!runQuality.assertions.length" class="mt-1.5 text-[13px] text-amber-900">
               {{ t('quality.archive.none') }}
             </p>
-            <ul v-else class="mt-1 space-y-0.5 text-xs text-stone-700">
-              <li v-for="g in assertionsByTable(runQuality.assertions)" :key="g.dataset">
+            <ul v-else class="mt-1.5 space-y-0.5 text-[13px] text-stone-700">
+              <li v-for="g in assertionsByTable(runQuality.assertions)" :key="g.dataset" class="wrap-anywhere">
                 {{ tableText(g) }}<span v-if="g.failed.length" class="text-red-700"> · {{ failedText(g) }}</span>
               </li>
             </ul>
-            <p class="mt-1 text-xs text-stone-500">{{ t('quality.archive.source') }}</p>
+            <p class="mt-1.5 text-[13px] text-stone-600">{{ t('quality.archive.source') }}</p>
           </div>
-          <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-archive-title">
-            <table class="w-full min-w-[680px] text-sm">
-              <thead class="text-left text-xs text-stone-500">
+          <div class="moc-scroll mt-3" tabindex="0" role="region" aria-labelledby="lineage-archive-title">
+            <table class="moc-table min-w-[680px]">
+              <thead>
                 <tr>
-                  <th class="py-1 font-medium">{{ t('lineage.step') }}</th>
-                  <th class="py-1 font-medium">{{ t('lineage.inputs') }}</th>
-                  <th class="py-1 font-medium">{{ t('lineage.outputs') }}</th>
-                  <th class="py-1 text-right font-medium">{{ t('lineage.quality') }}</th>
+                  <th>{{ t('lineage.step') }}</th>
+                  <th>{{ t('lineage.inputs') }}</th>
+                  <th>{{ t('lineage.outputs') }}</th>
+                  <th class="text-right">{{ t('lineage.quality') }}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-stone-100">
-                <tr v-for="e in steps" :key="e.run_id" class="align-top">
-                  <td class="py-1.5 pr-3 text-stone-600">{{ stepName(e) }}</td>
-                  <td class="py-1.5 pr-3 font-mono text-xs text-stone-700">
+              <tbody>
+                <tr v-for="e in steps" :key="e.run_id">
+                  <td class="text-stone-600">{{ stepName(e) }}</td>
+                  <td class="font-mono text-xs text-stone-700">
                     <div v-for="d in datasets(e.inputs)" :key="d">{{ d }}</div>
                   </td>
-                  <td class="py-1.5 pr-3 font-mono text-xs text-stone-700">
+                  <td class="font-mono text-xs text-stone-700">
                     <div v-for="d in datasets(e.outputs)" :key="d">{{ d }}</div>
                   </td>
-                  <td class="py-1.5 text-right">
+                  <td class="text-right">
                     <QualityFlag :status="stepCheck(e)" :empty="t('lineage.notChecked')" />
                   </td>
                 </tr>
@@ -460,26 +460,26 @@ function exportOpenLineage() {
         </template>
       </section>
 
-      <section class="card p-4" data-testid="lineage-reports">
-        <h2 id="lineage-reports-title" class="font-medium text-stone-900">
+      <section class="moc-block" data-testid="lineage-reports">
+        <h2 id="lineage-reports-title" class="moc-block-title">
           {{ t('lineage.reports', { n: reports.length }) }}
         </h2>
-        <p class="mt-1 text-xs text-stone-500">{{ t('lineage.reportsHint') }}</p>
-        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-reports-title">
-          <table class="w-full min-w-[680px] text-sm">
-            <thead class="text-left text-xs text-stone-500">
+        <p class="moc-block-hint">{{ t('lineage.reportsHint') }}</p>
+        <div class="moc-scroll mt-3" tabindex="0" role="region" aria-labelledby="lineage-reports-title">
+          <table class="moc-table min-w-[680px]">
+            <thead>
               <tr>
-                <th class="py-1 font-medium">{{ t('lineage.view') }}</th>
-                <th class="py-1 font-medium">{{ t('lineage.readsFrom') }}</th>
-                <th class="py-1 font-medium">{{ t('lineage.usedBy') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('lineage.quality') }}</th>
+                <th>{{ t('lineage.view') }}</th>
+                <th>{{ t('lineage.readsFrom') }}</th>
+                <th>{{ t('lineage.usedBy') }}</th>
+                <th class="text-right">{{ t('lineage.quality') }}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
-              <tr v-for="r in reports" :key="r.report" class="align-top">
-                <td class="py-1.5 pr-3 font-mono text-xs text-stone-900">{{ r.report }}</td>
-                <td class="py-1.5 pr-3 font-mono text-xs text-stone-700">{{ [...r.views, ...r.tables].join(', ') }}</td>
-                <td class="py-1.5 text-stone-600">
+            <tbody>
+              <tr v-for="r in reports" :key="r.report">
+                <td class="font-mono text-xs text-stone-900">{{ r.report }}</td>
+                <td class="font-mono text-xs text-stone-700">{{ [...r.views, ...r.tables].join(', ') }}</td>
+                <td class="text-stone-600">
                   <!-- vùng bấm ≥ 24×24px (WCAG 2.2, 2.5.8; #250): liên kết đứng sát nhau, không ở trong câu -->
                   <template v-if="r.charts.length">
                     <NuxtLink
@@ -489,7 +489,7 @@ function exportOpenLineage() {
                   </template>
                   <span v-else class="text-stone-400">{{ t('app.none') }}</span>
                 </td>
-                <td class="py-1.5 pl-3 text-right">
+                <td class="text-right">
                   <QualityFlag :status="viewFlag(r.report)" :detail="viewDetail(r.report)" />
                 </td>
               </tr>
