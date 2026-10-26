@@ -43,37 +43,9 @@
   --color-amber-300: #bfa46b;
   --color-amber-800: #76551e;
   --color-amber-900: #664717;
-  /* Be Vietnam Pro tự phục vụ (public/fonts, OFL-1.1), đủ dấu tiếng Việt; không tải phông từ bên ngoài */
+  /* Be Vietnam Pro tự phục vụ (gói npm @fontsource/be-vietnam-pro, OFL-1.1, nạp trong nuxt.config.ts), đủ dấu tiếng
+     Việt; không tải phông từ bên ngoài */
   --font-sans: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
-}
-
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/fonts/be-vietnam-pro/BeVietnamPro-Regular.ttf) format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/fonts/be-vietnam-pro/BeVietnamPro-Medium.ttf) format("truetype");
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/fonts/be-vietnam-pro/BeVietnamPro-SemiBold.ttf) format("truetype");
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/fonts/be-vietnam-pro/BeVietnamPro-Bold.ttf) format("truetype");
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
 }
 
 @layer base {

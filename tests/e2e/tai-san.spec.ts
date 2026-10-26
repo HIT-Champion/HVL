@@ -45,11 +45,21 @@ function watch(page: Page): string[] {
 async function fontWeights(page: Page): Promise<number[]> {
   return page.evaluate(async (weights) => {
     await document.fonts.ready
+    // unicode-range của một @font-face có phủ ký tự này không ("U+1EA0-1EF9", "U+4??", không khai là cả bảng mã)
+    const covers = (face: FontFace, cp: number) => face.unicodeRange.split(',').some((part) => {
+      const m = /U\+([0-9a-f?]+)(?:-([0-9a-f]+))?/i.exec(part.trim())
+      if (!m) return false
+      const lo = parseInt(m[1].replaceAll('?', '0'), 16)
+      const hi = parseInt(m[2] ?? m[1].replaceAll('?', 'f'), 16)
+      return cp >= lo && cp <= hi
+    })
     const ok: number[] = []
     for (const w of weights) {
       const font = `${w} 16px "Be Vietnam Pro"`
-      const faces = await document.fonts.load(font).catch(() => [])
-      if (faces.length > 0 && faces.every((f) => f.status === 'loaded') && document.fonts.check(font)) ok.push(w)
+      // không kèm chữ thì chỉ nạp bộ latin: kèm "ữ" để bộ vietnamese cũng phải có và tải được
+      const faces = await document.fonts.load(font, 'Đăng nhập ữ').catch(() => [])
+      const loaded = faces.length > 0 && faces.every((f) => f.status === 'loaded')
+      if (loaded && faces.some((f) => covers(f, 0x1eef)) && document.fonts.check(font)) ok.push(w)
     }
     return ok
   }, WEIGHTS)
@@ -67,7 +77,8 @@ async function brokenImages(page: Page): Promise<string[]> {
 test('tài sản: phông, logo, CSS của trang đăng nhập và của ứng dụng tải được', async ({ browser }) => {
   test.skip(!PASSWORD, 'Cần dữ liệu mẫu và MOC_DEMO_PASSWORD')
 
-  // Trang đăng nhập (theme signet): phông và logo nằm trong resources của theme, CSS gọi ../fonts/…, ../img/…
+  // Trang đăng nhập (theme signet): logo nằm trong resources của theme (CSS gọi ../img/…), phông do keycloak-fonts
+  // chép từ gói npm vào volume gắn ở resources/fonts/be-vietnam-pro (#305)
   const login = await (await browser.newContext()).newPage()
   const loginBad = watch(login)
   await login.goto('/')

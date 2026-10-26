@@ -69,12 +69,13 @@ chạy, chuỗi đó đi như sau: danh tính Keycloak [H] đi trong token tới
 văn bản, giao việc và sự kiện đó qua Hasura, đúng quyền người xem; tác tử [I] có danh tính riêng (vai trò Hasura
 `agent`), việc của nó vào sổ kiểm toán, và nó chỉ gợi ý — người quyết.
 
-Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (14 dịch vụ), `app` là Tầng 2
-(`app-office`, `app-ca-nhan`); `make up` bật cả hai. Phần tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio,
-PostGIS), `logs` (Vector, Parseable), `mail` (Mailpit), `tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng
-khi gọi `make ai-model`, `make demo-it-ot`, `make backup` hay `make restore`. Kế hoạch dời việc đổi profile sang
-Phase 1, dự kiến `core / app / ops / ai` ([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0);
-hiện là `core`, `app` cộng các phần tùy chọn ở trên, không có profile `ops`.
+Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (15 dịch vụ, trong đó
+`keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`); `make up` bật cả hai. Phần
+tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `mail` (Mailpit),
+`tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`, `make demo-it-ot`, `make
+backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến `core / app / ops / ai`
+([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`,
+`app` cộng các phần tùy chọn ở trên, không có profile `ops`.
 
 ### 1.3. Ràng buộc tài nguyên
 
@@ -97,9 +98,10 @@ của ba câu, đúng mức đã kiểm:
 | 2. Cài dưới một giờ | **Chưa đo** với người ngoài đội trên máy sạch | `ROADMAP.md`, giai đoạn 5 |
 | 3. Không dịch vụ trả phí bắt buộc | Đạt | [`trien-khai.md`](trien-khai.md) §5, §5b |
 
-- **Câu 1.** `make up` bật profile `core` và `app` (16 dịch vụ). README ghi khoảng 3,2 GB (đo từ trước khi thêm
-  `app-ca-nhan`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa. Bật mô hình ngôn ngữ
-  (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`) cần máy 16 GB.
+- **Câu 1.** `make up` bật profile `core` và `app` (17 dịch vụ, 16 chạy liên tục). README ghi khoảng 3,2 GB (đo
+  từ trước khi thêm `app-ca-nhan`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa.
+  Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
+  cần máy 16 GB.
 - **Câu 2.** Cài từ mã nguồn bằng `make env`, `make up`, `make seed`; `make install PREFIX=…` cài ra ngoài thư mục mã
   nguồn (F1.8).
 - **Câu 3.** Mô hình chạy tại chỗ; Cloudflare Tunnel chỉ là một cách lên mạng (profile `tunnel`, tắt mặc định), máy có
@@ -642,7 +644,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 | QĐ-001 | "mọi tệp mã phải mang header Apache-2.0 (CI cưỡng chế)" | Vẫn đúng với tệp mã; tệp không chèn được header (JSON, ảnh, Markdown…) khai giấy phép trong `REUSE.toml` |
 | QĐ-002 | "dùng chung cho mọi thành phần, tách bằng schema hoặc database riêng" | Đúng, trừ Scorpio: broker bắt buộc phần mở rộng `postgis` nên có CSDL PostGIS riêng (profile `iot`) |
 | QĐ-002 | "tài liệu vận hành ở giai đoạn 5 phải có quy trình sao lưu và phục hồi rõ ràng" | Đã có: `make backup`, `make restore` (restic, F3.4), [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục" |
-| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` chạy 16 dịch vụ (14 của `core`, 2 của `app`); profile chia theo tầng và phần tùy chọn (§1.2) |
+| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 17 dịch vụ (15 của `core`, 2 của `app`), 16 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
