@@ -8,6 +8,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- CI chạy thử thêm phần `https` (F1.9, #261), song song với năm phần cũ. Phần này dựng hệ thống sau một proxy TLS
+  theo `docs/trien-khai.md`: `.env` như bước 3 (`MOC_PUBLIC_URL=https://signet.test`, APISIX chỉ nghe
+  `127.0.0.1:8080`, `MOC_TRUSTED_PROXY`), nginx với chứng thư do một CA tự ký cấp, đặt `X-Forwarded-*` như Caddyfile
+  ở bước 5. Nạp mẫu đi qua proxy, rồi kiểm như bước 6: `kiem_ban_online.py` (chứng chỉ, HTTP sang HTTPS, Keycloak
+  sau proxy, header bảo mật), smoke trọn qua `https://` kể cả thông báo qua `wss://`, nhật ký APISIX ghi IP của
+  máy gọi. Trước đây đường này chỉ được diễn tập tay một lần. F1.9 vẫn ở mức Dùng được cho tới khi phần này xanh
+  hai lần liên tiếp trên develop.
 - Cảnh báo cho giám sát cổng API (F3.13, #255). Prometheus tính 5 luật trên chỉ số APISIX đang thu
   (`platform/monitoring/canh-bao.yml`): cổng mất chỉ số; dịch vụ sau cổng không trả lời (502, 504 theo route liên tục
   3 phút — 503 có chủ ý của svc-files không tính); hơn 5% yêu cầu lỗi 5xx trong 5 phút, có sàn 0,1 yêu cầu/giây;
