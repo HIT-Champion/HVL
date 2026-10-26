@@ -107,3 +107,49 @@ def test_task_process_key_is_empty_when_flowable_dropped_the_key():
     # id quá 64 ký tự: Flowable chỉ để uuid — không đoán khóa, không khớp quy trình nào
     assert task("8a0c6a52-0000-4000-8000-000000000001").process_key == ""
     assert task("").process_key == ""
+
+
+def raw_paths(call) -> list[bytes]:
+    """Đường gọi tới Flowable, đúng như gửi đi (chưa giải mã); Flowable giả trả 404 cho mọi yêu cầu."""
+    seen: list[bytes] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request.url.raw_path)
+        return httpx2.Response(404, json={"message": "Not found"})
+
+    async def go():
+        client = FlowableClient(BASE, "rest-admin", "x", transport=httpx2.MockTransport(handler))
+        try:
+            await call(client)
+        except FlowableError:
+            pass
+        finally:
+            await client.aclose()
+
+    asyncio.run(go())
+    return seen
+
+
+@pytest.mark.parametrize("given, sent", [
+    ("../t-2?x=1#y", b"..%2Ft-2%3Fx%3D1%23y"),
+    ("..", b"%2E%2E"),
+    ("nghi-phep.don:3:8a0c6a52", b"nghi-phep.don%3A3%3A8a0c6a52"),
+])
+@pytest.mark.parametrize("call, path", [
+    (lambda c, i: c.task(i), b"/runtime/tasks/"),
+    (lambda c, i: c.candidate_groups(i), b"/runtime/tasks/"),
+    (lambda c, i: c.claim(i, "u-1"), b"/runtime/tasks/"),
+    (lambda c, i: c.complete(i, {}), b"/runtime/tasks/"),
+    (lambda c, i: c.complete_typed(i, []), b"/runtime/tasks/"),
+    (lambda c, i: c.delete_process(i, "thừa"), b"/runtime/process-instances/"),
+    (lambda c, i: c.set_variables(i, {}), b"/runtime/process-instances/"),
+    (lambda c, i: c.definition(i), b"/repository/process-definitions/"),
+    (lambda c, i: c.set_definition_state(i, "suspend"), b"/repository/process-definitions/"),
+    (lambda c, i: c.resource(i, "forms/don.json"), b"/repository/deployments/"),
+])
+def test_ids_stay_one_path_segment(given, sent, call, path):
+    # id lấy từ yêu cầu gửi lên: "/", "?", "#", ".." không đổi được đường gọi tới Flowable
+    seen = raw_paths(lambda client: call(client, given))
+    assert len(seen) == 1
+    assert seen[0].startswith(b"/flowable-rest/service" + path + sent)
+    assert seen[0].removeprefix(b"/flowable-rest/service" + path + sent)[:1] in (b"", b"/", b"?")   # ? của client

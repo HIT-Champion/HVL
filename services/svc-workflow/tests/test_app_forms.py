@@ -169,6 +169,8 @@ def test_sample_forms_pass():
     (changed(properties={}), "cần properties"),
     (with_prop("tenantId", {"type": "string"}), "trùng biến hệ thống"),
     (with_prop("initiator", {"type": "string"}), "trùng biến hệ thống"),
+    (with_prop("execution", {"type": "string"}), "trùng tên Flowable dành sẵn"),
+    (with_prop("task", {"type": "string"}), "trùng tên Flowable dành sẵn"),
     (with_prop("ly_do", {"type": "string"}), "camelCase"),
     (with_prop("LyDo", {"type": "string"}), "camelCase"),
     (with_prop("tep", {"type": "array", "items": {"type": "string"}}), "chỉ nhận giá trị đơn"),
