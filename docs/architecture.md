@@ -334,9 +334,11 @@ Thứ đã tách cứng chỉ có hai: **cổng** — ứng dụng chỉ là cli
 dụng chỉ ở mạng `apps`, nơi chỉ có APISIX (§2); **khóa ngoại CSDL** — mỗi ứng dụng có schema riêng (`office`,
 `personal`), `core` không đặt khóa ngoại nào sang `office`. Phần còn lại của CSDL vẫn dính: hai hàm của `core` đọc
 `office`, ba cột in văn bản đi trong `core.tenants`, hàm `core.audit_overview` viết cứng loại dòng sổ của Văn phòng, hai
-tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4). Ở mức mã thì chưa tách. Như
-vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`, nhưng nó mang theo các chỗ dính đó
-(§4.6). Tách là việc sau `v1.3.0` (§4.7).
+tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4). Ở mức mã, bước 1–2 của
+§4.7 đã làm ở #302: phần Văn phòng của hai dịch vụ nằm trong gói `office/`, chỉ gắn route và chạy vòng nền khi
+`MOC_OFFICE_ENABLED` bật; tắt thì hai dịch vụ vẫn lên và phần lõi vẫn chạy (`make demo-tat-van-phong`, có trong CI). Vẫn
+chung tiến trình, chung image. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`,
+nhưng nó mang theo các chỗ dính ở CSDL, metadata và vai trò (§4.6). Các bước còn lại là việc sau `v1.3.0` (§4.7).
 
 ### 4.2. Sơ đồ
 
@@ -448,14 +450,15 @@ hiện tại.
 | `signing.py` | Dáng nghiệp vụ | Ký PAdES bằng khóa của đơn vị trong két; sự kiện nhật ký `office.signing.*`; chỉ `/internal/issue` gọi |
 | `lineage.py` | Dáng nghiệp vụ | Dựng sự kiện OpenLineage, ghi `core.lineage_events`; tên job `moc.case_file.archive` và cột các bảng Parquet của Văn phòng viết trong mã |
 | `render.py`, route `POST /internal/issue`, `GET /api/documents/{document_id}/preview` | Văn phòng | PDF văn bản đi theo thể thức NĐ 30/2020 (WeasyPrint), mã QR, mã tra cứu |
-| route `GET /api/verify`, `GET /api/verify/{code}` (trong `app.py`) | Văn phòng | Chỉ đọc `office.issued_documents`; mã tra cứu do `/internal/issue` và `office_number_outgoing` sinh. README gọi đây là con dấu "kiểm chứng được từ bên ngoài" của lõi, nhưng gỡ Văn phòng thì route không còn gì để trả |
+| route `GET /api/verify`, `GET /api/verify/{code}` (router `verify` của `office/api.py`) | Văn phòng | Chỉ đọc `office.issued_documents`; mã tra cứu do `/internal/issue` và `office_number_outgoing` sinh. README gọi đây là con dấu "kiểm chứng được từ bên ngoài" của lõi, nhưng gỡ Văn phòng thì route không còn gì để trả |
 | `registers.py`, route `/api/registers/*` | Văn phòng | Sổ đăng ký văn bản đến, đi theo Phụ lục IV NĐ 30/2020; `office.registers`, `office.documents` |
 | `dispatch.py`, route `POST /internal/dispatch-file` | Văn phòng | Chép bản phát hành sang kho của đơn vị nhận; `office.dispatches`, hàm `office.deliver_dispatch` |
 | `archive.py`, route `GET /api/case-files/{case_file_id}/archive` | Văn phòng | Nộp lưu hồ sơ (`office.case_files`, hàm `office.archive_case_file`), Parquet bằng DuckDB. Sau `9147e0f`, #124 thêm `POST /api/case-files/{case_file_id}/archive` và route xem tệp trong phòng đọc |
 | `docread/api.py` (route `POST /api/files/{file_id}/read`), `docread/reader.py`, `docread/rules.py`, `docread/summarize.py`, `docread/store.py` | Văn phòng | Tác tử đọc văn bản đến theo bố cục NĐ 30/2020, viết trích yếu, ghi `office.intake_suggestions`. `rules.fold` (bỏ dấu tiếng Việt) là hàm chung nằm trong mô-đun này |
 | `IncomingHandler` và hai mutation `receiveIncoming`, `registerIncoming` trong `imports/runner.py` | Văn phòng | Mỗi dòng của lô văn bản đến đi đúng đường tiếp nhận lẻ rồi vào sổ |
 | `assist/similar.py`, route `POST /internal/similar-documents` | Văn phòng | Chỉ phục vụ tác tử gợi ý giao việc của `svc-workflow` (F4.3) |
-| `app.py`, `config.py` | Trộn | `create_app` dựng mọi thành phần, gắn cả 19 route (12 khai thẳng, 7 qua `install()` của bốn mô-đun), chạy 9 tác vụ nền; `Settings` chứa biến của cả ba nhóm |
+| `office/api.py` | Văn phòng | Lớp `Office` dựng tác tử đọc văn bản đến, bucket lạnh, vòng nộp lưu; `routers()` trả ba `APIRouter` (`documents`, `verify`, `case_files`) với 11 route Văn phòng trước khai thẳng trong `app.py` (#302) |
+| `app.py`, `config.py` | Trộn | `create_app` dựng thành phần lõi, khai thẳng 5 route lõi và dáng nghiệp vụ (tải lên, tải về, tìm kiếm, `/api/status`, `anchor-key.pem`), gắn trợ lý qua `install()`. Phần Văn phòng (`office/api.py`, đọc văn bản đến, `similar`, nạp lô) chỉ dựng, gắn route, chạy vòng nền khi `MOC_OFFICE_ENABLED` bật (#302); vẫn import cả khi tắt. `Settings` chứa biến của cả ba nhóm |
 
 `svc-workflow` (`services/svc-workflow/src/svc_workflow/`):
 
@@ -476,7 +479,9 @@ hiện tại.
 | `ot.py`, route `POST /ot/notify/{tenant}` | Văn phòng | Cảm biến vượt ngưỡng → dự thảo văn bản đi "Báo cáo sự cố" trong `office.documents` |
 | `files.py` | Văn phòng | Gọi `/internal/issue`, `/internal/dispatch-file`, `/internal/similar-documents` của `svc-files` |
 | `processes/*.bpmn20.xml` | Văn phòng | Hai quy trình `van-ban-den`, `van-ban-di` |
-| `app.py`, `config.py` | Trộn | Route `/actions/{name}` chỉ nhận 5 Action của Văn phòng; 8 vòng định kỳ của cả hai nhóm cộng một lần triển khai BPMN. Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
+| `office/api.py` | Văn phòng | Lớp `Office` theo khuôn `Part`: gắn `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN văn bản, sáu vòng định kỳ của Văn phòng (#302) |
+| `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
+| `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ), chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
 CSDL và metadata Hasura:
 
@@ -504,13 +509,16 @@ CSDL và metadata Hasura:
 
 Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git grep`:
 
-- **Mã.** Mọi route của `svc-files` gắn vào app trong `create_app` (`svc_files/app.py`): 16 route khai thẳng (chưa kể
-  `/healthz`, `/readyz`), 7 route qua hàm `install()` của `docread/api.py`, `assist/api.py`, `imports/api.py`,
-  `assist/similar.py`. Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 2 lõi, 8 dáng nghiệp vụ, 10 Văn
-  phòng — cộng 3 route nội bộ đều của Văn phòng. Đã gỡ ở #302 (bước 1 của §4.7): mô-đun dáng nghiệp vụ không còn gọi
-  vào gói `docread/` của Văn phòng — `kill_group`, `killed` nằm ở `ocr.py`; `fold`, `DASHES`, `DATE`, `SYMBOL`,
-  `INVISIBLE_RE` ở `vntext.py`; ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` ra gói gốc. Câu GraphQL chỉ Văn
-  phòng dùng sang `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`.
+- **Mã.** Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 2 lõi, 8 dáng nghiệp vụ, 10 Văn phòng — cộng
+  3 route nội bộ đều của Văn phòng. Đã gỡ ở #302. Bước 1 của §4.7: mô-đun dáng nghiệp vụ không còn gọi vào gói
+  `docread/` của Văn phòng — `kill_group`, `killed` nằm ở `ocr.py`; `fold`, `DASHES`, `DATE`, `SYMBOL`, `INVISIBLE_RE` ở
+  `vntext.py`; ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` ra gói gốc. Câu GraphQL chỉ Văn phòng dùng sang
+  `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`. Bước 2: 11 route Văn phòng của `svc-files` sang ba
+  `APIRouter` trong `svc_files/office/api.py`; Actions, `/ot/notify/{tenant}`, BPMN và vòng định kỳ của Văn phòng trong
+  `svc-workflow` sang lớp `Office` (`svc_workflow/office/api.py`, khuôn `parts.py`); cả hai chỉ gắn khi
+  `MOC_OFFICE_ENABLED` bật. Còn lại: `app.py` của hai dịch vụ vẫn import gói Văn phòng (cùng WeasyPrint, pyHanko…) cả
+  khi tắt; khi tắt, `svc-files` vẫn dò két cho ký số lúc khởi động và `/readyz` báo `"ai": false` (cờ này lấy từ tác
+  tử đọc văn bản đến).
 - **Phạm vi.** Tìm kiếm, đọc chữ PDF, chỉ mục đoạn của trợ lý chọn dữ liệu từ `office.documents`,
   `office.document_files`: tệp của ứng dụng khác (vd trong `personal`) không tìm được, trợ lý không đọc tới.
 - **Tệp và quyền xem tệp.** Route `/api/files` có nhánh `restricted` của văn bản hạn chế. Bộ lọc quyền của `core.files`
@@ -527,7 +535,9 @@ Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git g
 - **Metadata Hasura.** `core_files.yaml`, `core_audit_log.yaml` trỏ sang `office` — ngược với quy tắc đặt cho ứng dụng
   mới: "không thêm quan hệ vào metadata của lõi" ([`them-ung-dung.md`](them-ung-dung.md) §3, bước 6).
 - **Vận hành.** Dựng PDF, OCR (tiến trình con), nộp lưu chạy chung container với tải tệp lên của mọi ứng dụng; triển
-  khai lại phần Văn phòng là khởi động lại cả `svc-files` hay `svc-workflow`.
+  khai lại phần Văn phòng là khởi động lại cả `svc-files` hay `svc-workflow`. `MOC_OFFICE_ENABLED=false` để kiểm lõi
+  đứng được một mình, không phải cách vận hành: giao diện Văn phòng vẫn được phục vụ nhưng route của nó trả
+  404, Action Hasura của nó báo lỗi.
 
 ### 4.5. Vì sao đang gộp
 
@@ -575,18 +585,19 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
 
 ### 4.7. Hướng tách
 
-Đây là việc sau `v1.3.0`, chưa xếp ngày.
+Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa xếp ngày.
 
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
 1. Gói lõi không import gói nào của Văn phòng (`git grep` các dòng `from .docread`, `from .render`… trong mô-đun lõi
-   không in gì).
+   không in gì). **Đạt ở #302**, trừ chỗ ráp: `app.py` của hai dịch vụ (nhóm "Trộn" ở §4.3) còn import `office`.
 2. Không còn hàm, cột, quan hệ metadata nào của `core` trỏ sang `office`; quyền xem `core.files` không phụ thuộc bảng
    nào của `office`.
 3. Vai trò của một ứng dụng là của ứng dụng đó: ứng dụng mới khai vai trò riêng mà không sửa `core.users.role` hay
    `directory.py`.
 4. Tắt phần Văn phòng bằng cấu hình thì `svc-files`, `svc-workflow` vẫn lên; phần lõi của `make smoke` và
-   `make demo-ca-nhan` vẫn xanh.
+   `make demo-ca-nhan` vẫn xanh. **Đạt ở #302**: `MOC_OFFICE_ENABLED=false`, kiểm bằng `make demo-tat-van-phong` trong
+   CI.
 5. Ứng dụng thứ ba có tìm kiếm và thông báo cho dữ liệu của mình mà không đọc bảng `office`.
 
 **Bước**, mỗi bước một pull request, luồng chính (smoke, e2e) giữ xanh:
@@ -598,7 +609,8 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
    trong `app.py` (xem trước, hai route sổ, ba route xác thực, ba route nộp lưu, `/internal/issue`,
    `/internal/dispatch-file`; `/api/verify/anchor-key.pem` là của lõi, ở lại)
    sang `APIRouter` riêng (vd gói `svc_files/office/`; Actions của `svc-workflow` cũng vậy); `create_app` chỉ
-   `include_router` và chạy tác vụ nền của Văn phòng khi phần đó được bật.
+   `include_router` và chạy tác vụ nền của Văn phòng khi phần đó được bật. **Đã làm ở #302**, cờ
+   `MOC_OFFICE_ENABLED` (mặc định bật); OpenAPI sinh ra của hai dịch vụ không đổi.
 3. Dọn CSDL: dời `core.file_texts_skip_restricted` và trigger `core.app_events_publish` sang schema `office`; cột in văn
    bản đi của `core.tenants` sang một bảng của `office`; danh sách trắng của `core.audit_overview` thành dữ liệu mỗi ứng
    dụng tự thêm dòng; nhánh `office.document_files` trong bộ lọc quyền của `core.files` và năm vai trò cố định của

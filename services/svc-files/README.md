@@ -1189,6 +1189,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_FILES_TRANSIT_KEY` | `moc-files` | Khóa transit trong két bọc khóa của tệp văn bản hạn chế (F3.7); không đặt `MOC_OPENBAO_ADDR` thì không nhận, không mở tệp mã hóa (`503`) |
 | `MOC_RESTRICTED_MAX_PAGES` | `500` | Trần số trang PDF của văn bản hạn chế (≥ 1): quá thì không nhận (`415`), không đóng dấu (`422`) |
 | `MOC_SIGN_ENABLED` | `true` | Ký số PAdES bản phát hành (F4.5, chỉ minh họa); `false`: phát hành không ký, không gọi transit hay PKI. Chỉ có tác dụng khi có `MOC_OPENBAO_ADDR` |
+| `MOC_OFFICE_ENABLED` | `true` | Phần Văn phòng điện tử (#302, `office/api.py`): văn bản đi, sổ đăng ký, cổng xác thực (trừ `anchor-key.pem`), liên thông, nộp lưu, phòng đọc, đọc văn bản đến, `/internal/similar-documents`, nạp lô `/api/imports*`, vòng nộp lưu và vòng dò mô hình đọc văn bản. `false`: dịch vụ vẫn lên với phần lõi — tải lên, tải xuống, tìm kiếm, hỏi đáp, trạng thái, mốc neo; route của Văn phòng trả 404, lô nạp dở nằm nguyên trong CSDL, bật lại thì làm tiếp. Để kiểm lõi đứng được một mình (`make demo-tat-van-phong`), không dùng khi vận hành thật |
 | `CLAMAV_HOST`, `CLAMAV_PORT` | `clamav`, `3310` | |
 | `CLAMAV_TIMEOUT_S` | `60` | |
 | `HASURA_URL` | `http://hasura:8080` | Gọi trong mạng nội bộ, không qua APISIX |
