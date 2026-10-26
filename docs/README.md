@@ -10,14 +10,15 @@ Không cần cài gì:
 1. **Hệ thống là gì (1 phút):** [`README.md`](../README.md), mục Giới thiệu và sơ đồ ở mục Kiến trúc.
 2. **Trạng thái (30 giây):** <https://signet.htechcs.com/trang-thai>, không cần đăng nhập: từng thành phần của lõi
    đang chạy hay gián đoạn.
-3. **Dùng thử (2 phút):** <https://signet.htechcs.com>, đăng nhập bằng tài khoản dùng thử ở
-   [`README.md`](../README.md#chạy-thử), mục Chạy thử. Tài khoản chuyên viên mà mục đó gợi ý để thử nhanh không cần
-   xác thực hai bước; hộp việc có sẵn một công văn khẩn chờ xử lý và một dự thảo bị trả lại chờ sửa.
+3. **Dùng thử (2 phút):** <https://signet.htechcs.com>. Mật khẩu tài khoản dùng thử gửi kèm hồ sơ dự thi, không có
+   trong repo; danh sách tài khoản ở [`README.md`](../README.md#chạy-thử), mục Chạy thử. Tài khoản chuyên viên mà mục
+   đó gợi ý để thử nhanh không cần xác thực hai bước; lúc nạp dữ liệu mẫu, hộp việc của tài khoản này có một công văn
+   khẩn chờ xử lý và một dự thảo bị trả lại chờ sửa.
 4. **Xác thực văn bản (1 phút):** <https://signet.htechcs.com/xac-thuc>, không cần đăng nhập: tra mã in cạnh mã QR
    hoặc thả tệp PDF đã phát hành; tệp bị sửa thì báo không khớp.
 5. **Kiểm tự động (30 giây):** trang [Actions](https://github.com/HIT-Champion/Signet/actions/workflows/ci.yml).
-   Mỗi pull request dựng toàn hệ thống từ mã nguồn rồi chạy smoke, e2e trên trình duyệt thật, các màn demo và cài ra
-   ngoài thư mục mã nguồn.
+   Mỗi pull request đổi mã dựng toàn hệ thống từ mã nguồn rồi chạy smoke, e2e trên trình duyệt thật, các màn demo và
+   cài ra ngoài thư mục mã nguồn; pull request chỉ đổi tài liệu thì bỏ qua phần này.
 
 Tự cài thì dùng bốn lệnh ở [`README.md`](../README.md#cài-đặt-từ-mã-nguồn-building-from-source), mục Cài đặt từ mã
 nguồn. Sau đó mỗi nguyên lý thiết kế có một màn demo chạy bằng một lệnh, dưới một phút: README, mục Bằng chứng 4 nguyên
@@ -34,8 +35,8 @@ lý; kịch bản ở [`demo-script.md`](demo-script.md).
 | Thư viện, gói phụ thuộc | [`DEPENDENCIES.md`](../DEPENDENCIES.md): từng thành phần kèm giấy phép. Image thượng nguồn ghim phiên bản và digest trong `docker-compose.yml`, tùy biến bằng cấu hình; không commit `vendor/`, `node_modules/` | CI job "Giấy phép", bước "Không bundle mã nguồn dự án khác"; `make license-audit` |
 | Tài liệu, giao tiếp | README ([tiếng Anh](../README.en.md)), [`CONTRIBUTING.md`](../CONTRIBUTING.md), [`SECURITY.md`](../SECURITY.md) (báo lỗ hổng riêng tư đã bật), [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md), [`ROADMAP.md`](../ROADMAP.md), tài liệu API [`api/`](api/README.md) | CI job "Tài liệu" |
 | Ý tưởng, kiến trúc | [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §1–2: vì sao chọn hướng này, bài toán. [`architecture.md`](architecture.md): mô hình H-P-D-I, §4 ranh giới lõi và ứng dụng, §5 bản ghi quyết định kiến trúc | — |
-| Đã làm tới đâu | [`muc-hoan-thien.md`](muc-hoan-thien.md): mức của từng tính năng (Hoàn thiện, Dùng được, Minh họa…), tệp test, bước CI, lệnh demo, hạn chế; [`danh-gia-ai.md`](danh-gia-ai.md); [`so-lieu-sau.md`](so-lieu-sau.md) | `make test` đối số test ghi trong `muc-hoan-thien.md` với mã thật |
-| Dễ dùng | Văn phòng điện tử có tiếng Việt và tiếng Anh, dùng được trên điện thoại, đạt tương phản và quét trợ năng theo WCAG 2.2 AA; ảnh ở README, mục Ảnh chụp màn hình | CI job `chay-thu`, phần `e2e` (quét bằng axe-core) |
+| Đã làm tới đâu | [`muc-hoan-thien.md`](muc-hoan-thien.md): mức của từng tính năng (Hoàn thiện, Dùng được, Minh họa…), tệp test, bước CI, lệnh demo, hạn chế; [`danh-gia-ai.md`](danh-gia-ai.md); [`so-lieu-sau.md`](so-lieu-sau.md) | `make test` đối chiếu số test ghi trong `muc-hoan-thien.md` với mã thật |
+| Dễ dùng | Văn phòng điện tử có tiếng Việt và tiếng Anh, dùng được trên điện thoại. Kiểm tự động theo WCAG 2.2 AA: tương phản màu chữ đọc từ token CSS, quét trợ năng bằng axe-core trên 23 trang, không lỗi nào được miễn. Ảnh ở README, mục Ảnh chụp màn hình | `apps/office/tests/contrast.test.ts`; CI job `chay-thu`, phần `e2e` (axe-core) |
 | Vận hành lâu dài | [`van-hanh.md`](van-hanh.md): thêm đơn vị, sao lưu và khôi phục, két bí mật, mốc neo công khai, GitOps và tự phục hồi, giám sát, log tập trung; [`them-ung-dung.md`](them-ung-dung.md): cắm ứng dụng mới bằng một lệnh; [`tu-chan-doan.md`](tu-chan-doan.md) | CI job `chay-thu`, phần `sao-luu` |
 | Trình diễn | [`demo-script.md`](demo-script.md): từng màn, phương án dự phòng, việc trước giờ trình diễn; [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §7: kịch bản 5 phút | Mọi màn `make demo-*` chạy lại trong CI job `chay-thu`, trừ `demo-kiem-dich` (đã có trong `make smoke`) |
 

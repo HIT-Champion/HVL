@@ -21,7 +21,7 @@ issue là số lúc kiểm. Mục "Rà soát cuối cùng" làm lại trên bả
 | ✅ | Kho mã nguồn công khai trên Internet | <https://github.com/HIT-Champion/Signet>, `gh repo view` báo `PUBLIC` | — |
 | ✅ | Có web viewer duyệt mã trực tiếp trên trình duyệt | GitHub: duyệt mã, lịch sử, blame trên trình duyệt | −3 |
 | ✅ | Truy cập mở, không cần đăng nhập | Trang repo, Releases, Issues và `LICENSE` trả 200 khi tải không đăng nhập, không cookie | −3 |
-| ✅ | **Repo được sử dụng thực tế** | 334 commit trên `develop` của 3 tác giả (`git shortlog -sn`, gộp tên theo `.mailmap`); 118 PR đã gộp, PR nào cũng có lượt duyệt; 137 issue, 117 đã đóng | **−5** |
+| ✅ | **Repo được sử dụng thực tế** | Đề trừ điểm khi "có repo nhưng thực tế không dùng". Đã kiểm: 118 PR đã gộp, PR nào cũng có lượt duyệt; 137 issue, 117 đã đóng; 334 commit trên `develop` của 3 tác giả (`git shortlog -sn`, gộp tên theo `.mailmap`) | **−5** |
 
 > ⚠️ Mức trừ −5 nặng nhất của tiêu chí này là *"có hệ thống quản lý mã nguồn nhưng trên thực tế
 > không được sử dụng"*. Đây là lý do phải commit đều **từ tháng 9**, không dồn toàn bộ vào tháng 12.
