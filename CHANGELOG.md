@@ -191,6 +191,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   rồi gửi lại dòng đó. Lỗi chập chờn ở bước 3, 5 của màn này trên CI (dòng có trong `docker logs` mà không tới kho, như
   lần đỏ của develop ở 1fa6236) khớp với lỗi này, nhưng chưa rõ kết nối chết vì đâu. Job CI lỗi nay giữ thêm nhật ký
   của Vector, Parseable.
+- Clone repo trên Windows không còn ra CRLF (#244). Git for Windows mặc định `core.autocrlf=true`, nên script `.sh`
+  hỏng ở `#!/bin/sh\r` khi chạy trong container Linux (`kiem-moi-truong.sh` của APISIX) và 8 test đơn vị Văn phòng đọc
+  nguồn bằng regex hỏng (#230). `.gitattributes` nay đặt `* text=auto eol=lf` và khai `binary` cho phông, ảnh, PDF;
+  test mới giả lập checkout trên Windows. Bản clone có từ trước: xem CONTRIBUTING.
 - Cổng thỉnh thoảng trả 502 cho `/v1/graphql` (#173), cùng loại với lỗi của `svc-files` ở 1.1.0: Hasura (máy chủ
   Warp) quét kết nối mỗi 30 giây và đóng kết nối rảnh sau 30–60 giây, APISIX giữ 60 giây; yêu cầu tới đúng lúc Hasura
   đóng thì APISIX nhận EOF hoặc RST và trả 502. Upstream `hasura` nay đặt `keepalive_pool` với `idle_timeout: 25`,

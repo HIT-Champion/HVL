@@ -18,3 +18,21 @@
 # - export-subst: điền thẻ phát hành vào VERSION.
 # - Thêm "<đường dẫn> export-ignore" để loại một tệp đang theo dõi khỏi gói; scripts/kiem_goi.py kiểm lại gói thật.
 VERSION export-subst
+
+# Xuống dòng (#244): mọi tệp chữ checkout ra LF, kể cả khi core.autocrlf=true (mặc định của Git for Windows). Script .sh
+# chạy trong container Linux hỏng ở "#!/bin/sh\r"; test đọc nguồn bằng regex viết cho LF. Git tự nhận tệp nhị phân,
+# các dòng binary dưới đây giữ cho phông, ảnh, PDF không bao giờ bị đổi byte dù không có byte NUL ở đầu tệp.
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.gz binary
+*.zip binary
