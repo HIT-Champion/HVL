@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test, type Page } from '@playwright/test'
-import { PASSWORD, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
 
 // Kịch bản demo (docs/dac-ta-san-pham.md §7, màn 1–2) trên giao diện thật: form sai bị chặn, văn thư tiếp nhận và
 // vào sổ → lãnh đạo khoa chỉ đạo → tổ trưởng phân công → chuyên viên báo xong → tìm lại được bằng chữ không dấu,
@@ -43,7 +43,7 @@ test('luồng văn bản đến trên giao diện', async ({ browser }) => {
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
   const pdf = textPdf('De nghi Khoa ra soat chuong trinh dao tao', `Phu luc kem theo: bang doi chieu chuan dau ra ${tag}`)
   await clerk.locator('input[type=file]').setInputFiles({ name: `cong-van-${tag}.pdf`, mimeType: 'application/pdf', buffer: pdf })
-  await expect(clerk.getByText('Đã quét — sạch')).toBeVisible()
+  await expect(clerk.getByText('Đã quét — sạch')).toBeVisible({ timeout: SCAN_TIMEOUT })
 
   // Poka-yoke lớp 1 (F2.2): form sai bị chặn ngay trên trình duyệt theo schemas/van-ban-den.json, chưa gửi gì đi
   const sent: string[] = []

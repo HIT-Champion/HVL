@@ -1317,6 +1317,17 @@ brotli 1.2.1, brotlicffi 1.2.1.0).
   SeaweedFS chỉ nằm trong mạng nội bộ; bản triển khai phải nạp tệp danh tính S3 (`-s3.config`).
 - **ClamAV**: giữ volume `/var/lib/clamav`; image `clamav/clamav:1.5.4` đã kèm sẵn chữ ký nên quét được ngay
   sau khi clamd nạp xong (đo trên máy dev: khoảng 1 phút, 3,6 triệu chữ ký).
+- **ClamAV nạp lại chữ ký thì ngừng quét** (#287). Compose đặt `ConcurrentDatabaseReload no`, nên trong lúc clamd
+  nạp lại, không tệp nào được quét. Clamd nạp lại vào hai lúc:
+  - mỗi ngày một lần, khi freshclam tải bản daily mới (image chạy freshclam `--checks=1`) rồi báo clamd;
+  - khoảng 10 phút sau khi khởi động (`SelfCheck 600`), nếu freshclam tải bản mới lúc clamd còn đang nạp bản cũ.
+    Lúc đó clamd chưa nhận báo được: nhật ký có "Clamd was NOT notified".
+
+  Trong lúc nạp, `POST /api/files` (và mọi đường quét tệp) chờ clamd. Quá `CLAMAV_TIMEOUT_S` thì trả
+  `503 scanner_unavailable`, tệp chưa được lưu. Dấu hiệu và cách xử lý cho người vận hành: `docs/van-hanh.md`, mục
+  "Quét mã độc (ClamAV)". CI cho clamd nạp ngay bản freshclam vừa tải, trước mọi bước tải lên:
+  job `chay-thu`, bước "ClamAV dùng bản chữ ký freshclam vừa tải". Bật nạp song song (clamd vẫn quét bằng bộ chữ ký
+  cũ, RAM đỉnh gần gấp đôi) chờ số đo: #288.
 - **Meilisearch**: `MEILI_ENV=production`, `MEILI_MASTER_KEY` (≥ 16 byte, từ `.env`), `MEILI_NO_ANALYTICS=true`,
   volume `/meili_data`. Mất volume cũng không sao: svc-files khởi động lại là đồng bộ lại toàn bộ.
 - **svc-files** cần `HASURA_URL`, `HASURA_ADMIN_SECRET`, `MOC_OIDC_ISSUER`, `MOC_OIDC_JWKS_URL` giống Hasura,

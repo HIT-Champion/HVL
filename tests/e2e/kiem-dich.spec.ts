@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from '@playwright/test'
-import { PASSWORD, TOTP_SECRET, shot, signIn } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, TOTP_SECRET, shot, signIn } from './helpers'
 
 // Kiểm dịch tại cửa ngõ (F3.1, màn (iv) trong docs/demo-script.md) trên giao diện: văn thư tải tệp nhiễm thì bị
 // chặn ngay, không lưu; lãnh đạo khoa thấy lần chặn trong sổ kiểm toán, kèm mẫu mã độc, không kèm tên tệp.
@@ -29,7 +29,8 @@ test('kiểm dịch: tệp nhiễm bị chặn khi tải lên, lần chặn nằ
   const clerk = await signIn(browser, 'vanthu', { otp: true })
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
   await clerk.locator('input[type=file]').setInputFiles({ name: 'hoa-don.pdf', mimeType: 'application/pdf', buffer: EICAR })
-  await expect(clerk.getByText(/Tệp nhiễm mã độc \(Eicar-Test-Signature\) — đã bị chặn, không lưu/)).toBeVisible()
+  await expect(clerk.getByText(/Tệp nhiễm mã độc \(Eicar-Test-Signature\) — đã bị chặn, không lưu/))
+    .toBeVisible({ timeout: SCAN_TIMEOUT })
   await shot(clerk, '16-kiem-dich-chan-tep')
 
   const director = await signIn(browser, 'truongkhoa', { otp: true })
