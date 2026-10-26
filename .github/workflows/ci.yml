@@ -364,7 +364,8 @@ jobs:
           }
           NGINX
           img=$(sed -n 's#^FROM \(nginxinc/nginx-unprivileged:[^ ]*\).*#\1#p' apps/office/Dockerfile)
-          for _ in 1 2 3; do docker pull -q "$img" && break; sleep 15; done   # Docker Hub đôi khi trả 502
+          # Docker Hub đôi khi trả 502: thử 3 lần, lần thứ ba vẫn lỗi thì dừng bước tại đây
+          for i in 1 2 3; do docker pull -q "$img" && break; test "$i" -lt 3; sleep 15; done
           # nginx-unprivileged chạy uid 101; --network host dùng chung mạng của runner để tới 127.0.0.1:8080 như Caddy
           # trên máy chủ, nên phải cho tiến trình thường mở cổng 80, 443 của runner
           sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
@@ -650,8 +651,13 @@ jobs:
           MOC_SLA_DURATION=PT24H python3 scripts/smoke.py
           ua="moc-ci-https-$GITHUB_RUN_ID"
           curl -fsS --cacert "$RUNNER_TEMP/https/ca.pem" -A "$ua" -o /dev/null https://signet.test/api/status
-          sleep 1
-          line=$($COMPOSE logs --no-color --no-log-prefix --tail 300 apisix | grep -F "\"$ua\"" | tail -1)
+          # APISIX ghi nhật ký truy cập có đệm (buffer=16384 flush=3 trong mẫu nginx của nó): chờ dòng ra tới 15 giây
+          line=
+          for _ in $(seq 1 15); do
+            line=$($COMPOSE logs --no-color --no-log-prefix --tail 1000 apisix | grep -F "\"$ua\"" | tail -1)
+            [ -n "$line" ] && break
+            sleep 1
+          done
           echo "nhật ký APISIX: ${line%% *} …"
           test "${line%% *}" = 127.0.0.1
 
