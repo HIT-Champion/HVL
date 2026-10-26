@@ -12,5 +12,5 @@ vào container ở chế độ chỉ đọc; `make install` chép chúng vào b�
 | [`centrifugo/`](centrifugo/) | Centrifugo | `/centrifugo` | Kênh thông báo riêng từng người, kiểm token Keycloak |
 | [`openbao/`](openbao/) | OpenBao | `/moc` | Cấu hình máy chủ; `start.sh` khởi tạo, mở khóa két, cấp AppRole, dựng PKI |
 | [`monitoring/`](monitoring/) | Prometheus, Grafana | `/etc/prometheus/`, `/etc/grafana/` | Thu chỉ số cổng API, nguồn dữ liệu, bảng điều khiển |
-| [`logs/`](logs/) | Vector (profile `logs`) | `/etc/vector/` | Nhận log của 5 dịch vụ qua driver fluentd, tách mã yêu cầu, che lần hai, gửi Parseable; test của bước che; tệp compose phủ đổi driver log ([`docs/van-hanh.md`](../docs/van-hanh.md#log-tập-trung)) |
+| [`logs/`](logs/) | Vector (profile `logs`) | `/etc/vector/` | Nhận log của 8 dịch vụ qua driver fluentd, tách mã yêu cầu, che lần hai, gửi Parseable; test của bước che; tệp compose phủ đổi driver log ([`docs/van-hanh.md`](../docs/van-hanh.md#log-tập-trung)) |
 | [`systemd/`](systemd/) | systemd (trên máy chủ) | không gắn — chép vào `/etc/systemd/system/` | Hẹn giờ chạy `scripts/reconcile.py` mỗi 60 giây |

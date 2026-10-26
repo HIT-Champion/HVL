@@ -1549,6 +1549,7 @@
     },
     "plan": "Storage floor plan",
     "planLabel": "Floor plan of the records storage, each room coloured by its latest temperature against the threshold",
+    "panHint": "Scroll horizontally to see the full plan. Detailed readings are listed below.",
     "corridor": "Corridor",
     "checkedAt": "Read at {time}",
     "room": {

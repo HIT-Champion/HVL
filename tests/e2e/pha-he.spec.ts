@@ -58,6 +58,13 @@ test('phả hệ số liệu: biểu đồ ← khung nhìn ← bảng, chỉ lã
   expect((await download).suggestedFilename()).toBe('pha-he-openlineage.jsonl')
   await shot(director, '18b-pha-he')
 
+  // điện thoại (#235): bảng nguồn rộng hơn màn, cuộn ngang bằng phím trong vùng cuộn mang tên của mục
+  await director.setViewportSize({ width: 390, height: 900 })
+  const sourcesScroll = director.getByRole('region', { name: 'Nguồn của từng biểu đồ' })
+  await sourcesScroll.focus()
+  await director.keyboard.press('ArrowRight')
+  await expect.poll(() => sourcesScroll.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+
   const clerk = await signIn(browser, 'vanthu', { otp: true })
   await expect(clerk.getByRole('link', { name: 'Sổ đăng ký' })).toBeVisible()
   await expect(clerk.getByRole('link', { name: 'Phả hệ số liệu' })).toHaveCount(0)
