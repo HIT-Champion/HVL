@@ -79,3 +79,20 @@ test('trang Điều hành chỉ thêm một dòng gọi thành phần, chỉ cho
   const api = readFileSync(new URL('../app/composables/useApi.ts', import.meta.url), 'utf8')
   assert.match(api, /authFetch\('\/api\/case-files\/archive-stats'\)/)
 })
+
+test('en: "1 package", "2 packages" — câu có số gói chia số ít, số nhiều, thành phần truyền số; vi một dạng', () => {
+  const locale = (lang: string) =>
+    JSON.parse(readFileSync(new URL(`../app/locales/${lang}.json`, import.meta.url), 'utf8')).archiveBoard
+  const en = locale('en')
+  const vi = locale('vi')
+  for (const key of ['source', 'unreadable']) {
+    const forms = en[key].split(' | ')
+    assert.equal(forms.length, 2, key)
+    assert.match(forms[0], /\{n\} package\b(?!s)/)
+    assert.match(forms[1], /\{n\} packages\b/)
+    assert.equal(vi[key].includes(' | '), false)
+  }
+  const component = readFileSync(new URL('../app/components/ArchiveBoard.vue', import.meta.url), 'utf8')
+  assert.match(component, /t\('archiveBoard\.source', \{[^}]*\}, stats\.case_files\)/)
+  assert.match(component, /t\('archiveBoard\.unreadable', \{[^}]*\},\s*stats\.unreadable\.length\)/)
+})

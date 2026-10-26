@@ -49,7 +49,8 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
   thấy, quét mã QR vẫn "khớp", phòng đọc vẫn đọc lại được gói.
 - Kho lạnh có khóa ghi: trong thời hạn bảo quản không ai xóa được gói, kể cả quản trị kho.
 - Dữ liệu lạnh vẫn phân tích được (#304): trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB đọc thẳng các gói Parquet
-  trong bucket lạnh, không đọc CSDL nghiệp vụ; quyền như các biểu đồ nóng (chỉ lãnh đạo đơn vị, số của đơn vị mình).
+  trong bucket lạnh. Số đếm không lấy từ CSDL nghiệp vụ: CSDL (qua Hasura) chỉ cho danh sách gói và băm manifest. Quyền
+  như các biểu đồ nóng (chỉ lãnh đạo đơn vị, số của đơn vị mình).
 
 **Lệnh in ra 6 bước:**
 
@@ -71,7 +72,10 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 5. Phân tích trên dữ liệu lạnh: lãnh đạo đơn vị gọi `GET /api/case-files/archive-stats` (API của phần "Văn bản đã nộp
    lưu" trên trang Điều hành) trước bước 2 và sau bước 4. Số hồ sơ tăng 1, số văn bản tăng đúng số văn bản của hồ sơ,
    theo năm ban hành và chiều đến / đi tăng đúng như các văn bản đó; chuyên viên gọi cùng API → 403. Phả hệ có run
-   `moc.archive.stats` với đầu vào là bảng `documents-….parquet` của gói vừa nộp lưu.
+   `moc.archive.stats` với đầu vào là bảng `documents-….parquet` của gói vừa nộp lưu. Bước này giả định trong lúc
+   lệnh chạy không ai khác nộp lưu hồ sơ của cùng đơn vị: trong CI không sao (vòng nền chỉ nộp lưu hồ sơ đóng quá
+   `MOC_ARCHIVE_AFTER_DAYS` ngày); chạy trên hệ thống đang có người dùng thì một lượt nộp lưu chen giữa làm số đếm
+   lệch và bước 5 báo lỗi.
 6. Thử xóa manifest bằng khóa quản trị của kho → bị từ chối (S3 Object Lock, chế độ COMPLIANCE). Dòng
    `case_file.archived` nằm trong sổ kiểm toán chuỗi băm.
 
@@ -99,7 +103,7 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 - *"Đã chuyển sang kho lạnh thì còn phân tích được không?"* Được: svc-files tải manifest theo băm trong CSDL,
   kiểm băm bảng văn bản của từng gói, rồi DuckDB đọc mọi bảng một lượt (`read_parquet` trên danh sách tệp) và đếm
   theo năm, loại, phòng (`svc_files/archive_stats.py`). Gói không đổi nên kết quả lưu đệm tới khi có hồ sơ mới nộp
-  lưu. Gói lệch băm thì không đếm mà báo tên hồ sơ trên trang. Đọc lại mọi gói mỗi khi có hồ sơ mới: chưa đo với
+  lưu. Gói lệch băm thì không đếm mà báo ký hiệu hồ sơ trên trang. Đọc lại mọi gói mỗi khi có hồ sơ mới: chưa đo với
   hàng nghìn gói.
 - *"Sao không dùng Kestra?"* Một job mỗi giờ không đáng thêm một máy chủ Java khoảng 1 GB RAM. Job là vòng nền trong
   svc-files, như vòng neo sổ kiểm toán. DuckDB nhúng trong svc-files, không chạy máy chủ riêng.

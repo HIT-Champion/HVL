@@ -113,7 +113,7 @@ const yearSummary = computed(() => years.value.filter((r) => r.incoming || r.out
         <h2 id="board-archive-title" class="font-medium text-stone-900">{{ t('archiveBoard.title') }}</h2>
         <p class="mt-1 text-xs text-stone-500" data-testid="archive-source">
           {{ stats && !empty
-            ? t('archiveBoard.source', { n: stats.case_files, bucket: stats.bucket, at: computedAt })
+            ? t('archiveBoard.source', { n: stats.case_files, bucket: stats.bucket, at: computedAt }, stats.case_files)
             : t('archiveBoard.sourceShort') }}
         </p>
       </div>
@@ -129,7 +129,8 @@ const yearSummary = computed(() => years.value.filter((r) => r.incoming || r.out
     </p>
     <template v-else>
       <p v-if="stats.unreadable.length" class="mt-3 text-sm text-red-700" data-testid="archive-unreadable">
-        {{ t('archiveBoard.unreadable', { n: stats.unreadable.length, codes: unreadableCodes }) }}
+        {{ t('archiveBoard.unreadable', { n: stats.unreadable.length, codes: unreadableCodes },
+             stats.unreadable.length) }}
       </p>
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div v-for="k in kpis" :key="k.id">
