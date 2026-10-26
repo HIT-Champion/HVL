@@ -19,18 +19,22 @@
 from __future__ import annotations
 
 import dataclasses
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from svc_workflow.suggest import (
+    LEGAL_HOLIDAYS,
     MAX_DAYS,
+    NO_HOLIDAYS,
     TOP_K,
     Evidence,
     Hit,
+    Holidays,
     Past,
     lead_unit,
     next_workday,
+    parse_holidays,
     past_days,
     suggest,
     vn_date,
@@ -46,12 +50,13 @@ def doc(n: int) -> str:
 
 
 def run(pairs: list[tuple[float, str | None, int | None]], *, units: set[str] = UNITS, min_score: float = 0.3,
-        registered_on: date = MONDAY, doc_due: date | None = None, today: date = MONDAY):
+        registered_on: date = MONDAY, doc_due: date | None = None, today: date = MONDAY,
+        holidays: Holidays = NO_HOLIDAYS):
     """pairs: (điểm, đơn vị chủ trì lúc trước, số ngày) theo thứ tự svc-files trả."""
     hits = [Hit(doc(i), score) for i, (score, _, _) in enumerate(pairs)]
     history = {doc(i): Past(doc(i), unit, days) for i, (_, unit, days) in enumerate(pairs)}
     return suggest(hits, history, units, min_score=min_score, registered_on=registered_on, doc_due=doc_due,
-                   today=today)
+                   today=today, holidays=holidays)
 
 
 def test_three_agreeing_letters_give_high_confidence_and_a_typical_due_date():
@@ -161,6 +166,60 @@ def test_due_written_on_the_letter_wins_over_habit():
 ])
 def test_next_workday(d, expected):
     assert next_workday(d) == expected
+
+
+LEGAL = parse_holidays(LEGAL_HOLIDAYS)
+# khoảng ví dụ cho Tết Đinh Mùi (mùng 1 là 06/02/2027), không phải lịch nghỉ Chính phủ công bố
+TET = parse_holidays(f"{LEGAL_HOLIDAYS},2027-02-05..2027-02-12")
+
+
+@pytest.mark.parametrize(("d", "holidays", "expected"), [
+    (date(2026, 9, 2), LEGAL, date(2026, 9, 3)),         # Quốc khánh thứ Tư → thứ Năm
+    (date(2026, 4, 30), LEGAL, date(2026, 5, 4)),        # 30/4 thứ Năm, 1/5 thứ Sáu, rồi cuối tuần → thứ Hai
+    (date(2027, 1, 1), LEGAL, date(2027, 1, 4)),         # lễ thứ Sáu ngay trước cuối tuần; lặp hằng năm
+    (date(2027, 2, 8), TET, date(2027, 2, 15)),          # giữa khoảng Tết, hết khoảng là thứ Bảy, Chủ nhật
+    (date(2027, 2, 4), TET, date(2027, 2, 4)),           # ngày trước khoảng vẫn là ngày làm việc
+    (date(2026, 9, 2), NO_HOLIDAYS, date(2026, 9, 2)),
+])
+def test_next_workday_skips_holidays(d, holidays, expected):
+    assert next_workday(d, holidays) == expected
+
+
+def test_next_workday_gives_up_after_a_year():
+    every_day = Holidays(yearly=frozenset((d.month, d.day) for d in (date(2028, 1, 1) + timedelta(days=i)
+                                                                       for i in range(366))))
+    assert next_workday(date(2026, 10, 26), every_day) == date(2026, 10, 26) + timedelta(days=366)
+
+
+def test_suggested_due_date_moves_off_a_holiday():
+    # vào sổ thứ Hai 24/8/2026, thói quen 9 ngày → 2/9 là Quốc khánh → thứ Năm 3/9; số ngày vẫn là 9
+    s = run([(0.9, DT, 9), (0.8, DT, 9), (0.7, DT, 9)], registered_on=date(2026, 8, 24), today=date(2026, 8, 24),
+            holidays=LEGAL)
+    assert (s.due_days, s.due_on) == (9, date(2026, 9, 3))
+    s = run([(0.9, DT, 9), (0.8, DT, 9), (0.7, DT, 9)], registered_on=date(2026, 8, 24), today=date(2026, 8, 24))
+    assert (s.due_days, s.due_on) == (9, date(2026, 9, 2))
+
+
+def test_holidays_syntax():
+    assert LEGAL == Holidays(yearly=frozenset({(1, 1), (4, 30), (5, 1), (9, 2)}))
+    h = parse_holidays(" 02-29 ,2027-04-16  2026-12-31..2027-01-02,")
+    assert h.yearly == {(2, 29)}
+    assert h.dates == {date(2027, 4, 16), date(2026, 12, 31), date(2027, 1, 1), date(2027, 1, 2)}
+    assert date(2028, 2, 29) in h and date(2027, 4, 16) in h and date(2028, 4, 16) not in h
+    assert parse_holidays("") == parse_holidays(" , ") == NO_HOLIDAYS
+    assert len(parse_holidays("2027-02-05..2027-03-07").dates) == 31     # dài nhất: 31 ngày
+
+
+@pytest.mark.parametrize("text", [
+    "30/04", "4-30", "04-30-", "13-01", "02-30", "٠٤-٣٠",            # ngày lặp hằng năm
+    "2027-2-8", "20270208", "2027-W06-1", "2027-02-30", "2027-02-08T00:00",
+    "2027-02-13..2027-02-05",                                          # khoảng ngược
+    "2027-02-05..2027-03-08",                                          # 32 ngày: gần như chắc gõ nhầm
+    "2027-02-05..", "..2027-02-05", "2027-02-05...2027-02-08", "04-30..05-01",
+])
+def test_bad_holidays_are_rejected(text):
+    with pytest.raises(ValueError):
+        parse_holidays(text)
 
 
 def test_dates_are_counted_in_vietnam_time():

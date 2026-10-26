@@ -247,7 +247,7 @@ class Advisor:
         registered_on = vn_date(doc["registered_at"]) if doc.get("registered_at") else today
         doc_due = date.fromisoformat(doc["due_on"]) if doc.get("due_on") else None
         s = suggest(hits, history, units, min_score=self.settings.suggest_min_score, registered_on=registered_on,
-                    doc_due=doc_due, today=today)
+                    doc_due=doc_due, today=today, holidays=self.settings.holidays)
         row = suggestion_row(doc_id, job.process_instance_id, s, semantic=bool(similar.get("semantic")),
                              duration_ms=self._ms(started))
         return await self._save(tenant, request_id, row)
@@ -344,7 +344,7 @@ class Advisor:
             at = registered.get(doc_id)
             registered_on = vn_date(at) if at else self._today()
             s = suggest(hits, history, units, min_score=self.settings.suggest_min_score,
-                        registered_on=registered_on, doc_due=None, today=registered_on)
+                        registered_on=registered_on, doc_due=None, today=registered_on, holidays=self.settings.holidays)
             row.update(status=s.status, reason=s.reason, department_id=s.department_id, ranking=list(s.ranking),
                        confidence=s.confidence, due_days=s.due_days, evidence=[e.document_id for e in s.evidence],
                        semantic=bool(similar.get("semantic")), duration_ms=self._ms(started))

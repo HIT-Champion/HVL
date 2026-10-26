@@ -19,7 +19,8 @@
 Đầu vào là các văn bản đến tương tự (svc-files tìm theo trích yếu, điểm ``_rankingScore`` 0..1) và đơn vị chủ trì
 lúc trước của chúng. Mỗi văn bản đủ điểm là một căn cứ, bỏ phiếu cho đơn vị đã chủ trì nó với trọng số bằng điểm
 (kNN có trọng số). Chỉ đơn vị có lãnh đạo phòng đang bật mới được gợi ý — đúng điều kiện chỉ đạo không báo
-``no_manager``. Độ tin cậy theo số căn cứ ủng hộ và tỉ phần phiếu; hạn theo trung vị số ngày các căn cứ ủng hộ đã có.
+``no_manager``. Độ tin cậy theo số căn cứ ủng hộ và tỉ phần phiếu; hạn theo trung vị số ngày các căn cứ ủng hộ đã có,
+dời sang ngày làm việc nếu rơi vào thứ Bảy, Chủ nhật hay ngày lễ (``MOC_HOLIDAYS``).
 
 Không cần mô hình: giải thích được ("vì 3 văn bản tương tự đã giao Tổ Đào tạo"), tốt dần khi có thêm dữ liệu.
 Căn cứ chỉ mang id, điểm, đơn vị, số ngày — không có chữ của văn bản nào.
@@ -102,9 +103,74 @@ def past_days(registered_at: str, due_on: str | None) -> int | None:
     return days if 1 <= days <= MAX_DAYS else None
 
 
-def next_workday(d: date) -> date:
-    """Thứ Bảy, Chủ nhật → thứ Hai. Chưa xét ngày lễ (chưa có lịch nghỉ)."""
-    return d + timedelta(days=7 - d.weekday()) if d.weekday() >= 5 else d
+@dataclass(frozen=True)
+class Holidays:
+    """Ngày nghỉ ngoài thứ Bảy, Chủ nhật (``MOC_HOLIDAYS``): (tháng, ngày) lặp hằng năm và các ngày của một năm."""
+
+    yearly: frozenset[tuple[int, int]] = frozenset()
+    dates: frozenset[date] = frozenset()
+
+    def __contains__(self, d: object) -> bool:
+        return isinstance(d, date) and ((d.month, d.day) in self.yearly or d in self.dates)
+
+
+NO_HOLIDAYS = Holidays()
+# Ngày lễ dương lịch cố định của Điều 112 Bộ luật Lao động 2019. Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc
+# khánh và ngày nghỉ bù đổi theo năm: người vận hành thêm vào MOC_HOLIDAYS theo lịch nghỉ Chính phủ công bố
+LEGAL_HOLIDAYS = "01-01,04-30,05-01,09-02"
+MAX_RANGE_DAYS = 31  # một khoảng dài hơn gần như chắc là gõ nhầm năm, tháng
+
+
+def parse_holidays(text: str) -> Holidays:
+    """``04-30`` lặp hằng năm; ``2027-02-08`` một ngày; ``2027-02-05..2027-02-13`` cả khoảng, tính cả hai đầu.
+
+    Các mục cách nhau bằng dấu phẩy hay khoảng trắng; chuỗi rỗng là không có ngày lễ. Sai dạng thì ``ValueError``.
+    """
+    yearly: set[tuple[int, int]] = set()
+    dates: set[date] = set()
+    for item in text.replace(",", " ").split():
+        start, sep, end = item.partition("..")
+        if sep:
+            first, last = _day(start, item), _day(end, item)
+            if not 0 <= (last - first).days < MAX_RANGE_DAYS:
+                raise ValueError(f"{item!r}: khoảng phải từ ngày sớm tới ngày muộn, dài tối đa {MAX_RANGE_DAYS} ngày")
+            dates.update(first + timedelta(days=i) for i in range((last - first).days + 1))
+        elif item.count("-") == 1:
+            month, day = _numbers(item, (2, 2), item)
+            _date(2000, month, day, item)  # năm nhuận: 02-29 hợp lệ
+            yearly.add((month, day))
+        else:
+            dates.add(_day(item, item))
+    return Holidays(frozenset(yearly), frozenset(dates))
+
+
+def _numbers(text: str, sizes: tuple[int, ...], item: str) -> list[int]:
+    # chỉ nhận đúng số chữ số từng phần: date.fromisoformat còn nhận 20270208, 2027-W06-1…
+    chunks = text.split("-")
+    if tuple(map(len, chunks)) != sizes or not all(c.isascii() and c.isdigit() for c in chunks):
+        raise ValueError(f"{item!r}: cần MM-DD, YYYY-MM-DD hoặc YYYY-MM-DD..YYYY-MM-DD")
+    return [int(c) for c in chunks]
+
+
+def _date(year: int, month: int, day: int, item: str) -> date:
+    try:
+        return date(year, month, day)
+    except ValueError:
+        raise ValueError(f"{item!r}: không có ngày này") from None
+
+
+def _day(text: str, item: str) -> date:
+    year, month, day = _numbers(text, (4, 2, 2), item)
+    return _date(year, month, day, item)
+
+
+def next_workday(d: date, holidays: Holidays = NO_HOLIDAYS) -> date:
+    """Ngày làm việc đầu tiên từ ``d``: bỏ qua thứ Bảy, Chủ nhật và ngày lễ trong ``holidays``."""
+    for _ in range(366):  # cấu hình cho nghỉ cả năm cũng không làm vòng lặp treo
+        if d.weekday() < 5 and d not in holidays:
+            break
+        d += timedelta(days=1)
+    return d
 
 
 def lead_unit(lead: dict | None, user_departments: dict[str, str]) -> str | None:
@@ -126,11 +192,13 @@ def _none(reason: str, candidates: int, ranking: tuple[str, ...] = ()) -> Sugges
 
 
 def suggest(hits: list[Hit], history: dict[str, Past], units: set[str], *, min_score: float,
-            registered_on: date, doc_due: date | None, today: date) -> Suggestion:
+            registered_on: date, doc_due: date | None, today: date,
+            holidays: Holidays = NO_HOLIDAYS) -> Suggestion:
     """Bỏ phiếu đơn vị chủ trì và hạn cho văn bản vào sổ ngày ``registered_on``.
 
     hits: văn bản tương tự (đã loại chính nó, đã loại văn bản hạn chế); history: id → lần giao chủ trì đầu tiên;
-    units: đơn vị có lãnh đạo phòng đang bật; doc_due: hạn ghi trên văn bản — có thì không gợi ý hạn.
+    units: đơn vị có lãnh đạo phòng đang bật; doc_due: hạn ghi trên văn bản — có thì không gợi ý hạn; holidays: ngày
+    lễ hạn gợi ý phải tránh.
     """
     candidates = len(hits)
     # điểm 0 không nói gì về độ giống; mỗi văn bản một phiếu (giữ điểm cao nhất nếu bị trả trùng)
@@ -168,6 +236,7 @@ def suggest(hits: list[Hit], history: dict[str, Past], units: set[str], *, min_s
     days = [e.days for e in backing if e.days is not None]
     if doc_due is None and days:
         due_days = statistics.median_low(days)
-        # hạn rơi vào cuối tuần thì sang thứ Hai; vào sổ đã lâu thì hạn sớm nhất là ngày mai (vẫn là ngày làm việc)
-        due_on = next_workday(max(registered_on + timedelta(days=due_days), today + timedelta(days=1)))
+        # hạn rơi vào thứ Bảy, Chủ nhật, ngày lễ thì sang ngày làm việc kế tiếp; vào sổ đã lâu thì hạn sớm nhất là ngày
+        # mai (vẫn là ngày làm việc)
+        due_on = next_workday(max(registered_on + timedelta(days=due_days), today + timedelta(days=1)), holidays)
     return Suggestion("suggested", None, winner, confidence, share, due_days, due_on, evidence, ranking, candidates)
