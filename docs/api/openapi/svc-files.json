@@ -1332,10 +1332,75 @@
           }
         }
       }
+    },
+    "/api/case-files/archive-stats": {
+      "get": {
+        "summary": "Trang Điều hành: số liệu văn bản đã nộp lưu — DuckDB đọc các gói Parquet trong bucket lạnh",
+        "description": "Quyền như trang Điều hành: chỉ lãnh đạo đơn vị, số liệu của đơn vị trong token (Hasura trả các hồ sơ đã nộp lưu người gọi xem được). Mỗi gói: manifest so băm với CSDL, bảng văn bản so băm với manifest, rồi DuckDB đếm trên mọi bảng một lượt. Chỉ số đếm; lưu đệm tới khi có hồ sơ mới nộp lưu (có gói không đọc được thì 60 giây). Mỗi tập manifest mới là một run OpenLineage `moc.archive.stats` (đầu vào: các bảng Parquet đã đọc).",
+        "operationId": "case_file_archive_stats_api_case_files_archive_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveStatsOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "`forbidden`: chỉ lãnh đạo đơn vị (`director`), như trang Điều hành"
+          },
+          "503": {
+            "description": "Chưa đọc được CSDL hoặc bucket lạnh"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "ArchiveDepartmentOut": {
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id",
+            "description": "Phòng lập hồ sơ, theo manifest của gói"
+          },
+          "case_files": {
+            "type": "integer",
+            "title": "Case Files"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_id",
+          "case_files",
+          "documents"
+        ],
+        "title": "ArchiveDepartmentOut"
+      },
       "ArchiveOut": {
         "properties": {
           "case_file_id": {
@@ -1475,6 +1540,137 @@
         ],
         "title": "ArchiveRunOut",
         "description": "Kết quả nộp lưu theo yêu cầu: gói đã nằm trong bucket lạnh, đọc lại khớp băm, CSDL đã chuyển `archived`."
+      },
+      "ArchiveStatsOut": {
+        "properties": {
+          "case_files": {
+            "type": "integer",
+            "title": "Case Files",
+            "description": "Số hồ sơ đã nộp lưu có gói đọc được, khớp băm"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "incoming": {
+            "type": "integer",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "type": "integer",
+            "title": "Outgoing"
+          },
+          "by_year": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveYearOut"
+            },
+            "type": "array",
+            "title": "By Year"
+          },
+          "by_type": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveTypeOut"
+            },
+            "type": "array",
+            "title": "By Type"
+          },
+          "by_department": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveDepartmentOut"
+            },
+            "type": "array",
+            "title": "By Department"
+          },
+          "unreadable": {
+            "items": {
+              "$ref": "#/components/schemas/UnreadablePackageOut"
+            },
+            "type": "array",
+            "title": "Unreadable",
+            "description": "Hồ sơ có gói không đọc được (lệch băm, thiếu đối tượng, sai dạng): không vào số liệu, bình thường rỗng. Chỉ `case_file_id` và ký hiệu (`code`); lý do ghi vào nhật ký (`case_file.archive_stats_skipped`)"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket",
+            "description": "Bucket lạnh (khóa ghi S3 Object Lock) chứa các gói"
+          },
+          "computed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Computed At",
+            "description": "Lúc DuckDB tính; tính lại khi có hồ sơ mới nộp lưu"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_files",
+          "documents",
+          "incoming",
+          "outgoing",
+          "by_year",
+          "by_type",
+          "by_department",
+          "unreadable",
+          "bucket",
+          "computed_at"
+        ],
+        "title": "ArchiveStatsOut",
+        "description": "Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bảng Parquet trong bucket lạnh (#304). Chỉ số đếm."
+      },
+      "ArchiveTypeOut": {
+        "properties": {
+          "type_code": {
+            "type": "string",
+            "title": "Type Code",
+            "description": "Mã loại văn bản (office.document_types)"
+          },
+          "incoming": {
+            "type": "integer",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "type": "integer",
+            "title": "Outgoing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type_code",
+          "incoming",
+          "outgoing"
+        ],
+        "title": "ArchiveTypeOut"
+      },
+      "ArchiveYearOut": {
+        "properties": {
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year",
+            "description": "Năm ban hành của văn bản (thiếu thì năm của hồ sơ)"
+          },
+          "incoming": {
+            "type": "integer",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "type": "integer",
+            "title": "Outgoing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "incoming",
+          "outgoing"
+        ],
+        "title": "ArchiveYearOut"
       },
       "ArchivedDocumentOut": {
         "properties": {
@@ -2953,6 +3149,25 @@
         ],
         "title": "StatusOut",
         "description": "Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thái, không tên máy, địa chỉ hay số liệu nghiệp vụ."
+      },
+      "UnreadablePackageOut": {
+        "properties": {
+          "case_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case File Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_file_id",
+          "code"
+        ],
+        "title": "UnreadablePackageOut"
       },
       "ValidationError": {
         "properties": {

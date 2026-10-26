@@ -8,6 +8,18 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Phân tích trên dữ liệu đã nộp lưu (F3.8, nguyên lý (i), #304). Trang Điều hành có thêm phần "Văn bản đã nộp lưu
+  (kho lạnh)": số hồ sơ, văn bản đến, đi theo năm ban hành, theo loại văn bản, theo phòng lập hồ sơ. svc-files có
+  `GET /api/case-files/archive-stats`: manifest của từng gói so băm với CSDL, bảng văn bản so băm với manifest, rồi
+  DuckDB đọc mọi bảng Parquet trong bucket lạnh một lượt và đếm; chỉ có số đếm. Quyền như trang Điều hành: chỉ lãnh
+  đạo đơn vị, chỉ hồ sơ của đơn vị trong token. Gói lệch băm, thiếu một phần hay sai dạng (manifest khác định dạng, bảng
+  văn bản thiếu cột) không được đếm mà báo ký hiệu hồ sơ trên trang, lý do ghi vào nhật ký; chưa có hồ sơ nào nộp lưu
+  thì báo rõ, không phải lỗi; CSDL hay kho lạnh lỗi thì báo lỗi, không hiện như kho trống. Kết quả lưu đệm tới khi có hồ
+  sơ mới nộp lưu (có gói không đọc được thì 60 giây); mỗi tập manifest mới là một run OpenLineage `moc.archive.stats`
+  với đầu vào là các bảng Parquet đã đọc. DuckDB chạy có trần: `MOC_ARCHIVE_STATS_THREADS` (mặc định 2 luồng),
+  `MOC_ARCHIVE_STATS_MEMORY_MB` (mặc định 256 MB). `make demo-nong-lanh` thêm bước 5: đọc lại kho lạnh sau khi nộp lưu,
+  số đếm phải tăng đúng số văn bản của hồ sơ vừa nộp, chuyên viên bị 403, phả hệ có bảng vừa ghi. Trước đây dữ liệu đã
+  sang lạnh chỉ xem được từng hồ sơ trong phòng đọc.
 - Hạn gợi ý giao việc tránh ngày lễ (F4.3, #280). Trước đây hạn chỉ dời khỏi thứ Bảy, Chủ nhật. Biến mới `MOC_HOLIDAYS`
   của svc-workflow nhận ba dạng, cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
   `YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định là các ngày lễ dương lịch cố định ở Điều 112 Bộ luật Lao
