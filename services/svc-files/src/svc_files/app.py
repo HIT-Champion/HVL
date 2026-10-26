@@ -76,6 +76,7 @@ from . import __version__, filetype, pii
 from .anchors import Anchorer, AnchorSigner, AnchorStore
 from .archive import (Archived, ArchiveError, Archiver, ArchiveStateError, ColdStore, read_archived_file,
                       read_manifest, read_package)
+from .archive_stats import ArchiveStats
 from .assist import api as assist_api
 from .assist import similar
 from .assist.ai import AiClient, make_ai
@@ -96,6 +97,7 @@ from .imports import api as imports_api
 from .imports.runner import Importer, IncomingHandler
 from .imports.spool import Spool
 from .imports.store import ImportStore
+from .lineage import Lineage
 from .ocr import run_ocr
 from .office.hasura import OfficeHasura
 from .openbao import with_secrets
@@ -333,6 +335,47 @@ class ArchiveRunOut(BaseModel):
     run_id: str = Field(description="Run OpenLineage của lượt nộp lưu (core.lineage_events, F3.9)")
 
 
+class ArchiveYearOut(BaseModel):
+    year: int | None = Field(description="Năm ban hành của văn bản (thiếu thì năm của hồ sơ)")
+    incoming: int
+    outgoing: int
+
+
+class ArchiveTypeOut(BaseModel):
+    type_code: str = Field(description="Mã loại văn bản (office.document_types)")
+    incoming: int
+    outgoing: int
+
+
+class ArchiveDepartmentOut(BaseModel):
+    department_id: uuid.UUID | None = Field(description="Phòng lập hồ sơ, theo manifest của gói")
+    case_files: int
+    documents: int
+
+
+class UnreadablePackageOut(BaseModel):
+    case_file_id: uuid.UUID
+    code: str
+
+
+class ArchiveStatsOut(BaseModel):
+    """Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bảng Parquet trong bucket lạnh (#304). Chỉ số đếm."""
+
+    case_files: int = Field(description="Số hồ sơ đã nộp lưu có gói đọc được, khớp băm")
+    documents: int
+    incoming: int
+    outgoing: int
+    by_year: list[ArchiveYearOut]
+    by_type: list[ArchiveTypeOut]
+    by_department: list[ArchiveDepartmentOut]
+    unreadable: list[UnreadablePackageOut] = Field(
+        description="Hồ sơ có gói không đọc được (lệch băm, thiếu đối tượng, sai dạng): không vào số liệu, bình thường "
+                    "rỗng. Chỉ `case_file_id` và ký hiệu (`code`); lý do ghi vào nhật ký "
+                    "(`case_file.archive_stats_skipped`)")
+    bucket: str = Field(description="Bucket lạnh (khóa ghi S3 Object Lock) chứa các gói")
+    computed_at: datetime = Field(description="Lúc DuckDB tính; tính lại khi có hồ sơ mới nộp lưu")
+
+
 class SearchOut(BaseModel):
     hits: list[SearchHit]
     # Không có tổng số kết quả, vị trí trang sau cũng mã hóa — xem search.Cursor.
@@ -469,6 +512,7 @@ def create_app(
     import_store: ImportStore | None = None,
     cold: ColdStore | None = None,
     archiver: Archiver | None = None,
+    archive_stats: ArchiveStats | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -504,6 +548,11 @@ def create_app(
     )
     archiver = archiver or Archiver(hasura, store, cold, after_days=settings.archive_after_days,
                                     interval_s=settings.archive_interval_s, lineage_url=settings.openlineage_url)
+    # Số liệu đã nộp lưu cho trang Điều hành (#304); phả hệ ghi như lượt nộp lưu (khóa quản trị, không nhận gì từ
+    # người dùng ngoài đơn vị trong token)
+    archive_stats = archive_stats or ArchiveStats(cold, Lineage(
+        lambda query, variables: hasura.admin(query, variables, {"X-Hasura-User-Id": "svc-files:archive-stats"}),
+        settings.openlineage_url), threads=settings.archive_stats_threads, memory_mb=settings.archive_stats_memory_mb)
     if vault is None and settings.vault_addr:
         vault = Vault(settings.vault_addr, role_id_file=settings.vault_role_id_file,
                       secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
@@ -1626,6 +1675,44 @@ def create_app(
         return Response(out, media_type="application/pdf", headers={
             **DOWNLOAD_HEADERS, **NO_STORE, "Content-Disposition": content_disposition(entry["filename"], inline=True),
         })
+
+    # --- phân tích dữ liệu đã nộp lưu cho trang Điều hành (#304) --------------------------------------------------
+
+    @app.get("/api/case-files/archive-stats", response_model=ArchiveStatsOut,
+             responses={
+                 401: {"description": "Thiếu hoặc sai token"},
+                 403: {"description": "`forbidden`: chỉ lãnh đạo đơn vị (`director`), như trang Điều hành"},
+                 503: {"description": "Chưa đọc được CSDL hoặc bucket lạnh"},
+             },
+             summary="Trang Điều hành: số liệu văn bản đã nộp lưu — DuckDB đọc các gói Parquet trong bucket lạnh",
+             description="Quyền như trang Điều hành: chỉ lãnh đạo đơn vị, số liệu của đơn vị trong token (Hasura trả "
+                         "các hồ sơ đã nộp lưu người gọi xem được). Mỗi gói: manifest so băm với CSDL, bảng văn bản so "
+                         "băm với manifest, rồi DuckDB đếm trên mọi bảng một lượt. Chỉ số đếm; lưu đệm tới khi có hồ "
+                         "sơ mới nộp lưu (có gói không đọc được thì 60 giây). Mỗi tập manifest mới là một run "
+                         "OpenLineage `moc.archive.stats` (đầu vào: các bảng Parquet đã đọc).")
+    async def case_file_archive_stats(request: Request,
+                                      principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
+        if principal.role != "director":
+            raise _error(403, "forbidden", "Chỉ lãnh đạo đơn vị xem số liệu đã nộp lưu")
+        try:
+            packages = await hasura.archived_case_files(principal.token)
+        except HasuraAuthError as exc:
+            raise _error(401, "invalid_token", "Token không hợp lệ") from exc
+        except HasuraError as exc:
+            raise _error(503, "database_unavailable", "Chưa đọc được CSDL, thử lại sau") from exc
+        try:
+            stats = await archive_stats.get(principal.tenant_id, packages)
+        except StorageError as exc:
+            raise _error(503, "storage_unavailable", "Chưa đọc được bucket lạnh, thử lại sau") from exc
+        if stats.unreadable:
+            log_event("case_file.archive_mismatch", request, level=logging.WARNING, tenant_id=principal.tenant_id,
+                      unreadable=[u["case_file_id"] for u in stats.unreadable])
+        out = ArchiveStatsOut(
+            case_files=stats.case_files, documents=stats.documents, incoming=stats.incoming, outgoing=stats.outgoing,
+            by_year=stats.by_year, by_type=stats.by_type, by_department=stats.by_department,
+            unreadable=stats.unreadable, bucket=cold.bucket, computed_at=stats.computed_at,
+        )
+        return JSONResponse(out.model_dump(mode="json"), headers=NO_STORE)
 
     # Nộp lưu theo yêu cầu (F3.8): lãnh đạo phòng nộp lưu hồ sơ đã đóng của phòng mình ngay, không đợi vòng nền
     # (MOC_ARCHIVE_AFTER_DAYS). Đội chọn: chuyên viên lập, đóng; lãnh đạo phòng (`manager`) nộp — hai người, người nộp

@@ -132,7 +132,7 @@ nhiêu lần cũng được — kịch bản trình bày ở [`docs/demo-script.
 
 | Nguyên lý | Màn demo | Lệnh |
 |---|---|---|
-| (i) Vòng đời và tốc độ dữ liệu | Hồ sơ đã đóng nộp lưu thành gói Parquet + tệp + manifest có băm trên kho lạnh khóa ghi; vẫn tìm thấy, quét mã QR vẫn "khớp"; trên giao diện: lập hồ sơ, lãnh đạo phòng nộp lưu, phòng đọc xem tệp có dấu tên người xem | `make demo-nong-lanh` |
+| (i) Vòng đời và tốc độ dữ liệu | Hồ sơ đã đóng nộp lưu thành gói Parquet + tệp + manifest có băm trên kho lạnh khóa ghi; vẫn tìm thấy, quét mã QR vẫn "khớp"; trên giao diện: lập hồ sơ, lãnh đạo phòng nộp lưu, phòng đọc xem tệp có dấu tên người xem; trang Điều hành có số liệu văn bản đã nộp lưu do DuckDB đếm thẳng trên gói Parquet trong kho lạnh | `make demo-nong-lanh` |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ → NGSI-LD (Scorpio) → vượt ngưỡng thì dựng dự thảo "Báo cáo sự cố" vào luồng văn bản đi | `make demo-it-ot` |
 | (iii) Quản trị dữ liệu | Phả hệ OpenLineage: gói lưu trữ truy ngược về bảng nghiệp vụ và tệp gốc; kiểm số dòng, cột bắt buộc trước khi ghi; mỗi biểu đồ ở trang Điều hành truy về khung nhìn và bảng nguồn (tính từ catalog PostgreSQL), xem đồ thị ở trang Phả hệ số liệu (`/pha-he`) | `make demo-pha-he` |
 | (iv) Zero-Trust | Kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán | `make demo-kiem-dich` |

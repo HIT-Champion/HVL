@@ -101,7 +101,7 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
       (`docs/du-thi/ke-hoach-phat-trien.md` §6)
 - [x] Vòng đời nóng → lạnh (F3.8): hồ sơ đã đóng nộp lưu thành Parquet + tệp + manifest có băm trên bucket khóa ghi
       (`make demo-nong-lanh`); trên giao diện: trang Hồ sơ công việc, lãnh đạo phòng nộp lưu, phòng đọc xem tệp PDF
-      có dấu tên người xem
+      có dấu tên người xem; trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB trên gói Parquet (#304)
 - [x] Phả hệ dữ liệu (F3.9): OpenLineage cho lượt nộp lưu, kiểm số dòng và cột bắt buộc trước khi ghi Parquet
       (`make demo-pha-he`); phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL, trang Phả hệ số liệu
       (`/pha-he`) vẽ đồ thị, mỗi biểu đồ ở trang Điều hành có nút Nguồn số liệu

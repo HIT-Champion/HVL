@@ -17,6 +17,8 @@
 // Gọi lõi Signet qua APISIX cùng tên miền: GraphQL (Hasura) cho dữ liệu và thao tác nghiệp vụ, REST của
 // svc-files cho tệp và tìm kiếm. Mọi yêu cầu mang access token của người dùng.
 
+import type { ArchiveStats } from '~/utils/archiveStats'
+
 export class ApiError extends Error {
   // fields: trường sai → mã lỗi do svc-workflow trả (cùng mã với app/utils/forms.ts); reason: lý do chi tiết của
   // một số mã (vd đọc văn bản unreadable → password, corrupt, timeout…); requestId: X-Request-Id của phản hồi (mã
@@ -451,6 +453,14 @@ export function useApi() {
     return await res.json() as ArchivePackage
   }
 
+  /** Số liệu văn bản đã nộp lưu cho trang Điều hành (#304, chỉ lãnh đạo đơn vị): svc-files cho DuckDB đếm trên các
+   *  gói Parquet trong bucket lạnh. Lỗi: ApiError với mã của svc-files (forbidden, storage_unavailable…). */
+  async function archiveStats(): Promise<ArchiveStats> {
+    const res = await authFetch('/api/case-files/archive-stats')
+    if (!res.ok) throw await serviceError(res)
+    return await res.json() as ArchiveStats
+  }
+
   /** Phòng đọc xem một tệp PDF trong gói: bản có dấu tên người xem, giờ xem (mỗi lần mở ghi case_file.file_viewed).
    *  Trả object URL để hiện trong khung xem — gọi URL.revokeObjectURL khi đóng. */
   async function viewArchivedFile(caseFileId: string, fileId: string): Promise<string> {
@@ -472,5 +482,5 @@ export function useApi() {
   }
 
   return { gql, upload, download, preview, register, printRegister, search, readFile, ask, archiveCaseFile, readingRoom,
-    viewArchivedFile, viewFile }
+    viewArchivedFile, viewFile, archiveStats }
 }

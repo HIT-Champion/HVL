@@ -905,6 +905,25 @@ lỗi trong phả hệ chỉ có tên lớp lỗi (không tên tệp, số ký h
 và, nếu đặt `MOC_OPENLINEAGE_URL`, gửi thêm tới máy chủ nhận OpenLineage (Marquez). Ghi phả hệ lỗi chỉ thành cảnh báo,
 không chặn nộp lưu. Không có tên hồ sơ, trích yếu trong sự kiện — chỉ key đối tượng, tên bảng, số dòng.
 
+**Phân tích trên dữ liệu lạnh (#304, `archive_stats.py`).** `GET /api/case-files/archive-stats` cho phần "Văn bản đã
+nộp lưu (kho lạnh)" của trang Điều hành: số hồ sơ, số văn bản đến, đi, theo năm ban hành (văn bản không có ngày ban
+hành tính theo năm của hồ sơ), theo loại văn bản, theo phòng lập hồ sơ. Quyền như trang Điều hành: chỉ lãnh đạo đơn vị
+(vai trò mặc định `director`, vai trò khác `403 forbidden`), danh sách hồ sơ đã nộp lưu lấy từ Hasura bằng token của
+người gọi nên chỉ có hồ sơ của đơn vị mình. Mỗi gói: manifest tải theo băm trong CSDL, so băm (như phòng đọc), phải là
+manifest định dạng `moc-archive/1` của đúng hồ sơ, đúng đơn vị, gói nằm đúng `cold/<đơn vị>/case/<hồ sơ>/`; bảng
+`documents-<sha256>.parquet` so băm với manifest, rồi DuckDB đọc thử riêng bảng đó (đủ cột, ép được về kiểu của lược
+đồ). Sau cùng DuckDB đọc mọi bảng văn bản một lượt (`read_parquet` trên danh sách tệp) và đếm, mỗi lượt tối đa
+`MOC_ARCHIVE_STATS_THREADS` luồng và `MOC_ARCHIVE_STATS_MEMORY_MB` MB RAM. Gói lệch băm, thiếu đối tượng, manifest khác
+định dạng hay sai dạng, bảng văn bản thiếu cột thì không đếm: câu trả lời chỉ ghi hồ sơ đó trong `unreadable`
+(`case_file_id` và `code` — ký hiệu hồ sơ); lý do chỉ vào nhật ký, sự kiện `case_file.archive_stats_skipped` cho từng
+gói, rồi `case_file.archive_mismatch` liệt kê các hồ sơ. Chỉ có số đếm: không trích yếu, số ký hiệu hay tên người. Chưa
+có hồ sơ nào nộp lưu thì trả số 0, không đọc bucket. Gói không đổi nên kết quả lưu đệm theo đơn vị tới khi tập manifest
+đổi (có hồ sơ mới nộp lưu); kết quả có gói không đọc được chỉ lưu đệm 60 giây. Mỗi đơn vị một lượt tính mỗi lúc, đơn vị
+này tính lâu không bắt đơn vị khác đợi. Mỗi tập manifest mới là một run OpenLineage `moc.archive.stats` (đầu vào: các
+bảng Parquet đã đọc) trong `core.lineage_events`. CSDL không trả lời (kể cả metadata Hasura hỏng, `validation-failed`) →
+`503 database_unavailable`, bucket lạnh không trả lời → `503 storage_unavailable`. Mỗi khi có hồ sơ mới nộp lưu thì đọc
+lại mọi gói của đơn vị: chưa đo với hàng nghìn gói.
+
 Chưa làm: dọn bản nóng khi giao dịch đã chạy mà svc-files không nhận được trả lời (hồ sơ đã `archived`, tệp đã
 `cold`, bản nóng còn thừa — không mất gì).
 
@@ -1207,6 +1226,8 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_AUDIT_ANCHOR_RETENTION_DAYS` | `3650` | Hạn giữ mỗi mốc; trong hạn không ai xóa được |
 | `MOC_ARCHIVE_INTERVAL_S` | `3600` | Chu kỳ tìm hồ sơ đến hạn nộp lưu; `0` tắt vòng nộp lưu |
 | `MOC_ARCHIVE_AFTER_DAYS` | `365` | Hồ sơ đóng từ chừng ấy ngày trở lên thì nộp lưu |
+| `MOC_ARCHIVE_STATS_THREADS` | `2` | Số luồng DuckDB mỗi lượt đếm kho lạnh cho trang Điều hành (#304) |
+| `MOC_ARCHIVE_STATS_MEMORY_MB` | `256` | Trần RAM của DuckDB mỗi lượt đếm kho lạnh; quá trần thì tràn ra thư mục tạm |
 | `MOC_OPENLINEAGE_URL` | (rỗng) | Gửi thêm sự kiện phả hệ tới máy chủ OpenLineage, vd `http://marquez:5000/api/v1/lineage`; rỗng thì chỉ ghi `core.lineage_events` |
 | `MOC_READ_ENABLED` | `true` | Đọc văn bản đến (F4.1); `false`: `503 reader_disabled` |
 | `MOC_READ_MAX_MB` | = `MOC_FILES_MAX_MB` | Tệp lớn hơn thì không đọc (`413`) |

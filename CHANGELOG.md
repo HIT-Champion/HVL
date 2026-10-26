@@ -8,6 +8,18 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Phân tích trên dữ liệu đã nộp lưu (F3.8, nguyên lý (i), #304). Trang Điều hành có thêm phần "Văn bản đã nộp lưu
+  (kho lạnh)": số hồ sơ, văn bản đến, đi theo năm ban hành, theo loại văn bản, theo phòng lập hồ sơ. svc-files có
+  `GET /api/case-files/archive-stats`: manifest của từng gói so băm với CSDL, bảng văn bản so băm với manifest, rồi
+  DuckDB đọc mọi bảng Parquet trong bucket lạnh một lượt và đếm; chỉ có số đếm. Quyền như trang Điều hành: chỉ lãnh
+  đạo đơn vị, chỉ hồ sơ của đơn vị trong token. Gói lệch băm, thiếu một phần hay sai dạng (manifest khác định dạng, bảng
+  văn bản thiếu cột) không được đếm mà báo ký hiệu hồ sơ trên trang, lý do ghi vào nhật ký; chưa có hồ sơ nào nộp lưu
+  thì báo rõ, không phải lỗi; CSDL hay kho lạnh lỗi thì báo lỗi, không hiện như kho trống. Kết quả lưu đệm tới khi có hồ
+  sơ mới nộp lưu (có gói không đọc được thì 60 giây); mỗi tập manifest mới là một run OpenLineage `moc.archive.stats`
+  với đầu vào là các bảng Parquet đã đọc. DuckDB chạy có trần: `MOC_ARCHIVE_STATS_THREADS` (mặc định 2 luồng),
+  `MOC_ARCHIVE_STATS_MEMORY_MB` (mặc định 256 MB). `make demo-nong-lanh` thêm bước 5: đọc lại kho lạnh sau khi nộp lưu,
+  số đếm phải tăng đúng số văn bản của hồ sơ vừa nộp, chuyên viên bị 403, phả hệ có bảng vừa ghi. Trước đây dữ liệu đã
+  sang lạnh chỉ xem được từng hồ sơ trong phòng đọc.
 - Hạn gợi ý giao việc tránh ngày lễ (F4.3, #280). Trước đây hạn chỉ dời khỏi thứ Bảy, Chủ nhật. Biến mới `MOC_HOLIDAYS`
   của svc-workflow nhận ba dạng, cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
   `YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định là các ngày lễ dương lịch cố định ở Điều 112 Bộ luật Lao
@@ -206,7 +218,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   phát hành, cài đặt, thư viện, tài liệu, kiến trúc, mức hoàn thiện, vận hành, trình diễn) kèm phần CI kiểm, và các
   giới hạn đã biết có issue theo dõi (#301–#306). README, README.en trỏ tới trang này ngay đầu. Bảng tự kiểm
   `docs/du-thi/pof-checklist.md` đánh dấu 23 trên 24 yêu cầu, kiểm ngày 26/10/2026 trên `develop` 62bff8d; ô "không
-  phát hành kèm gói" để trống vì ba bản phông Be Vietnam Pro trong repo (#305).
+  phát hành kèm gói" để trống vì ba bản phông Be Vietnam Pro trong repo, rồi đánh dấu khi #305 đã bỏ các tệp đó
+  (kiểm lại trên 399d8af), đủ 24 trên 24.
 
 ### Đã sửa đổi
 - Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của
@@ -252,8 +265,26 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - `docs/du-thi/hoi-dap-hoi-dong.md` thêm câu 14: lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak.
   Trả lời: lõi không có màn hình nghiệp vụ; bàn điều khiển của người vận hành chỉ nghe `127.0.0.1`, cổng chặn đường
   quản trị; trang đăng nhập là của dịch vụ danh tính theo OIDC.
+- Phông Be Vietnam Pro lấy từ gói npm `@fontsource/be-vietnam-pro` 5.3.0 (OFL-1.1) lúc dựng thay vì commit trong repo
+  (#305, PoF #5): xóa 12 tệp TTF (ba bản trùng từng byte ở Văn phòng điện tử, Không gian cá nhân, theme đăng nhập) cùng
+  `OFL.txt`, `LICENSES/OFL-1.1.txt` và khối phông trong `REUSE.toml`; `git ls-files` không còn tệp phông nào. Cùng bốn
+  độ đậm 400, 500, 600, 700, cùng bản phông 1.002, nay là woff2 chia theo bộ ký tự latin, latin-ext, vietnamese
+  (`unicode-range`), vẫn tự phục vụ, không gọi Google Fonts. Văn phòng điện tử nạp CSS của gói trong `nuxt.config.ts`
+  (Vite đưa tệp phông vào `/_nuxt/`); Không gian cá nhân chép phông vào image ở `/ca-nhan/fonts/be-vietnam-pro/`.
+  Theme đăng nhập: Keycloak vẫn chạy image chính thức, không phụ thuộc ứng dụng nào; dịch vụ mới `keycloak-fonts`
+  (image của đội, `platform/keycloak/fonts/`) chạy một lần trước `keycloak`, không mạng, chạy user `node` chứ không
+  root, chép phông vào volume `keycloak_fonts` gắn đè lên thư mục giữ chỗ `resources/fonts/be-vietnam-pro/` của theme.
+  Reconciler không chạy lại dịch vụ chạy một lần đã xong (thoát 0); thoát lỗi thì chạy lại và ghi vào `problems`. Bản
+  cài cũ nâng bằng `scripts/nang_cap.sh` như thường: image mới dựng ở bước 1, volume tạo ở lần chạy đầu. Mỗi bản dựng
+  kèm `OFL.txt` của gói; cập nhật `NOTICE`, `DEPENDENCIES.md`. e2e kiểm cả bộ phông vietnamese tải được. Test scripts
+  +12 (`test_phong_chu.py`).
 
 ### Đã sửa lỗi
+- Hoàn thành việc thỉnh thoảng báo lỗi khi hai giao dịch của Flowable khóa vòng nhau trên cùng phiên quy trình (#316;
+  thấy trong CI, `make demo-giao-viec`: trưởng khoa hoàn thành việc trong lúc vòng nhắc hạn đang xử lý việc ngoài).
+  PostgreSQL hủy một bên ("deadlock detected"), Flowable REST trả 500 và người dùng nhận `workflow_unavailable`, phải
+  bấm lại. Giờ svc-workflow gọi lại như với khóa lạc quan (#189): tối đa hai lần, sau 0,2 và 0,5 giây; giao dịch bị
+  hủy đã rollback hết nên gọi lại an toàn.
 - Thanh bên mở lại ngay sau khi bấm một mục (#297). Bấm chuột vào một mục thì thanh bên thu lại, nhưng con trỏ còn
   nằm trong dải biểu tượng nên nhích 1px là thanh bên bật ra che trang vừa mở; bấm mục của chính trang đang mở thì
   không thu. Giờ bấm chuột vào mục nào cũng thu thanh bên (kể cả khi thanh bên đang mở theo focus bàn phím) và đóng

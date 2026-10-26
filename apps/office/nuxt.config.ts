@@ -28,7 +28,16 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: false },
   telemetry: false,
-  css: ['~/assets/css/main.css'],
+  // Phông Be Vietnam Pro (#305): CSS của gói npm @fontsource/be-vietnam-pro, bốn độ đậm giao diện dùng. Mỗi độ đậm ba
+  // @font-face chia theo unicode-range (latin, latin-ext, vietnamese); Vite chép tệp woff2, woff vào /_nuxt/ — tự phục
+  // vụ, không gọi Google Fonts
+  css: [
+    '@fontsource/be-vietnam-pro/400.css',
+    '@fontsource/be-vietnam-pro/500.css',
+    '@fontsource/be-vietnam-pro/600.css',
+    '@fontsource/be-vietnam-pro/700.css',
+    '~/assets/css/main.css',
+  ],
   vite: { plugins: [tailwindcss(), formsPlugin(schemas)] },
   app: {
     head: {
