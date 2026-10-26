@@ -589,7 +589,7 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
 
 ### 4.7. Hướng tách
 
-Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa xếp ngày.
+Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa xếp ngày (#324).
 
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
