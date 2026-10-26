@@ -23,6 +23,8 @@
 | 12 | [H-P-D-I ở đâu, khác gì phần mềm quản lý văn bản sẵn có?](#12-h-p-d-i-ở-đâu-khác-gì-phần-mềm-quản-lý-văn-bản-sẵn-có) | Tiêu chí 7, 9 |
 | 13 | [Còn gì chưa làm?](#13-còn-gì-chưa-làm) | Tiêu chí 8, 11 |
 | 14 | [Lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak?](#14-lõi-không-giao-diện-mà-sao-có-grafana-trang-quản-trị-keycloak) | Tiêu chí 7, cụm ① ⑥ |
+| 15 | [Ứng dụng thứ ba muốn có luồng duyệt riêng thì làm thế nào?](#15-ứng-dụng-thứ-ba-muốn-có-luồng-duyệt-riêng-thì-làm-thế-nào) | R1–R7, tiêu chí 7 |
+| 16 | [Vì sao cài ứng dụng bằng dòng lệnh, không có nút trên giao diện?](#16-vì-sao-cài-ứng-dụng-bằng-dòng-lệnh-không-có-nút-trên-giao-diện) | Tiêu chí 9, nguyên lý (iv) |
 
 ## 1. Open-Core nằm ở đâu, ứng dụng khác dùng lại lõi thế nào?
 
@@ -39,15 +41,20 @@ schema `personal`, client `app-ca-nhan`, một route APISIX và một service co
 `moc app install apps/bang-tin/app.yaml` đọc manifest rồi tạo client Keycloak, route APISIX, container, schema và
 migration chạy bằng vai trò CSDL riêng của ứng dụng (không có quyền gì trên lõi), quyền Hasura và Event Trigger nhận
 sự kiện văn bản của lõi; các tệp lõi không đổi (`git diff` trống), gỡ thì giữ dữ liệu. `smoke.py` và các màn demo thao
-tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Phần nghiệp vụ văn phòng phía máy chủ (Actions vào
-sổ, phát hành, dựng PDF văn bản đi) còn nằm chung trong `svc-workflow`, `svc-files`.
+tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Ứng dụng còn mang được quy trình duyệt của riêng nó
+lên động cơ quy trình của lõi (câu 15). Phần nghiệp vụ văn phòng phía máy chủ (Actions vào sổ, phát hành, dựng PDF văn
+bản đi) còn chạy chung tiến trình với lõi trong `svc-workflow`, `svc-files`, nhưng đã tách thành router riêng sau cờ
+`MOC_OFFICE_ENABLED`: tắt cờ thì hai dịch vụ vẫn lên, phần lõi của `make smoke` và `make demo-ca-nhan` vẫn đạt. Tách
+hẳn thành dịch vụ riêng là bước 3–5 của `docs/architecture.md` §4.7, chưa làm (#324).
 
 **Bằng chứng:** README mục "Kiến trúc"; [`docs/api/README.md`](../api/README.md) (§1 "Muốn thêm một ứng dụng Tầng 2");
 [`docs/them-ung-dung.md`](../them-ung-dung.md) (§1 `moc app install`, mẫu `apps/bang-tin`; §3–§4 làm tay, mẫu
 `apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`, `make demo-quy-trinh` (ứng dụng mang quy trình
-riêng, `apps/nghi-phep`);
+riêng, `apps/nghi-phep`), `make demo-tat-van-phong`;
+[`docs/architecture.md`](../architecture.md) §4.7 (tiêu chí xong 4 đạt ở #302);
 [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `platform/apisix/apisix.yaml`; `make smoke` (chặn đường quản
-trị); CI job `chay-thu`, phần `luong-chinh`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)".
+trị); CI job `chay-thu`, phần `luong-chinh`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)" và bước "Tắt
+Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)".
 
 ## 2. Vì sao nguồn mở, có thoát được một nhà cung cấp không?
 
@@ -202,7 +209,8 @@ tiêu chí 3, 4; [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §4.1.
 
 Một công văn đi trọn [H] → [P] → [D] → [I]: danh tính SSO, đơn vị và phòng trong token ([H]); luồng BPMN vào sổ, chỉ
 đạo, xử lý, phát hành, chặn nhập sai ở form, máy chủ và CSDL theo một JSON Schema ([P]); dashboard điều hành, sổ đăng
-ký, nộp lưu sang kho lạnh có phả hệ ([D]); tác tử đọc văn bản đến, hỏi đáp, gợi ý giao việc dùng chính dữ liệu đó
+ký, nộp lưu sang kho lạnh có phả hệ, rồi đếm lại văn bản đã nộp lưu theo năm, loại, phòng ngay trên các gói Parquet
+bằng DuckDB ở trang Điều hành ([D]); tác tử đọc văn bản đến, hỏi đáp, gợi ý giao việc dùng chính dữ liệu đó
 ([I]). Đội không đua tính năng với sản phẩm thương mại: khác ở chỗ tổ chức tự cài, tự giữ dữ liệu, mã nguồn mở; người
 nhận ngoài hệ thống tự kiểm văn bản bằng mã QR, SHA-256 ở cổng xác thực công khai; lớp tin cậy (danh tính, kiểm dịch,
 sổ kiểm toán, kiểm chứng từ bên ngoài) nằm ở lõi để ứng dụng khác dùng lại. AI chỉ gợi ý, người quyết định: câu trả
@@ -218,8 +226,11 @@ của nó (loại `agent`).
 Chưa có trục streaming sự kiện (Kafka…): sự kiện nằm trong PostgreSQL (dòng thời gian văn bản, outbox liên thông), đủ
 cho một máy. Ứng dụng cắm bằng `moc app install` nhận ba loại sự kiện văn bản qua Hasura Event Trigger (luồng
 `core.app_events`): gửi lại khi lỗi, nhưng không đọc lại từ một vị trí, không bảo đảm thứ tự. Chưa có thực thi kịch
-bản serverless (cụm ⑤) và công cụ low-code: form, quy trình viết bằng mã (JSON Schema trong `schemas/`, BPMN XML),
-chưa có trình thiết kế quy trình trên giao diện (bpmn-js bị loại vì giấy phép). Thông báo gửi trong ứng dụng qua
+bản serverless (cụm ⑤). Low-code mới ở mức khai báo: ứng dụng cắm thêm khai form bằng JSON Schema và trang dựng form từ
+chính tệp đó, không viết mã giao diện (`apps/nghi-phep/public/schema-form.js`), khai quy trình bằng BPMN XML; form
+của Văn phòng điện tử vẫn viết trong mã (#303), chưa có trình thiết kế quy trình hay form trên giao diện (bpmn-js bị
+loại vì giấy phép). Quy trình của ứng dụng cắm thêm mới là quy trình duyệt: chưa có timer, bước tự động, gọi API ra
+ngoài; form chưa có tệp đính kèm (#325). Thông báo gửi trong ứng dụng qua
 WebSocket (Centrifugo) và, khi cấu hình, qua email và webhook chat; chưa có SMS, Zalo, chưa cho từng người chọn kênh.
 Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel, chưa lên VPS thật.
 Ký số chỉ minh họa bằng CA nội bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên
@@ -251,3 +262,41 @@ còn lại đi theo phần mềm nguồn mở dùng nguyên bản, và không c�
 `platform/apisix/apisix.yaml` (route `keycloak` chỉ mở realm `${MOC_REALM}`, route `chan`);
 [`docs/architecture.md`](../architecture.md) §2 và QĐ-009; README, bảng địa chỉ ở mục "Chạy thử";
 [`docs/van-hanh.md`](../van-hanh.md) mục "Giám sát".
+
+## 15. Ứng dụng thứ ba muốn có luồng duyệt riêng thì làm thế nào?
+
+Khai mục `workflow` trong manifest: các tệp BPMN và form JSON Schema của nó. `moc app install` gửi gói cho
+`svc-workflow` kiểm trước mọi thay đổi, rồi triển khai lên chính Flowable của lõi thành một deployment đặt tên theo băm
+nội dung. BPMN chỉ được dùng phần tử của một quy trình duyệt (danh sách trắng: không `scriptTask`, `serviceTask`,
+listener hay biểu thức tùy ý, vì chúng chạy bằng quyền của động cơ); khóa quy trình mang tiền tố `<tên>.` nên không chạm
+được quy trình Văn phòng hay của ứng dụng khác. Form kiểm cả ở trình duyệt lẫn ở lõi, có trần chi phí cho `pattern` để
+một form không làm đứng dịch vụ. Trang của ứng dụng gọi API chung `/api/workflow/<tên>/…` qua APISIX: lấy form, gửi
+đơn, xem đơn của mình, xem và hoàn thành việc. API chỉ nhận token của client `app-<tên>` (claim `azp`); đơn vị, phòng,
+người gửi lấy từ token, việc giao theo nhóm `t:<đơn vị>:<vai trò>` hay theo phòng. Không ứng dụng nào gọi thẳng
+Flowable: cổng chặn `/flowable-rest/*`. Ứng dụng mẫu Đơn nghỉ phép (`apps/nghi-phep`) không có máy chủ nghiệp vụ, không
+có bảng, cắm bằng `moc app install` như Bảng tin. Giới hạn: mới là quy trình duyệt, như câu 13 (#325).
+
+**Bằng chứng:** [`docs/them-ung-dung.md`](../them-ung-dung.md) mục 1.10 (kiểm BPMN, kiểm form, bảng API) và mục 7;
+`apps/nghi-phep/app.yaml`; `services/svc-workflow/src/svc_workflow/apps/` (`bpmn.py`, `forms.py`, `api.py`);
+`make demo-quy-trinh` (BPMN độc bị từ chối, dữ liệu sai form trả `422`, việc duyệt tới đúng phòng); CI job
+`chay-thu`, phần `luong-chinh`, bước "Quy trình của ứng dụng qua lõi (make demo-quy-trinh)".
+
+## 16. Vì sao cài ứng dụng bằng dòng lệnh, không có nút trên giao diện?
+
+Cài một ứng dụng là việc của người vận hành máy chủ, không phải của người dùng. Lệnh cần dựng image và chạy container
+qua Docker, tạo client trong Keycloak bằng quyền quản trị, tạo vai trò và schema trong PostgreSQL, ghi route APISIX và
+metadata Hasura: 8 bước, 9 khi ứng dụng có quy trình. Một nút trên web nghĩa là một dịch vụ mở ra mạng phải giữ các
+quyền đó, và lỗ hổng ở dịch vụ đó sẽ thành quyền điều khiển Docker trên máy chủ. Vì vậy đội để việc cài ở dòng lệnh
+trên máy chủ, như cách cài chính Signet, và làm cho lệnh dễ dùng:
+- `--dry-run` in kế hoạch từng bước trước khi đổi gì;
+- chạy lại chỉ làm phần còn thiếu; lỗi giữa chừng báo đúng bước;
+- bước Hasura lỗi thì trả tệp chạy về như trước; quy trình mới không chạy khi các bước sau nó lỗi;
+- gỡ thì giữ dữ liệu.
+
+Người dùng thấy ứng dụng đã cài ở trang Danh mục ứng dụng của Văn phòng điện tử (`/ung-dung`): tên, mô tả, nút Mở,
+phiên bản. Lãnh đạo, quản trị đơn vị thấy thêm băm manifest để so với bản đã duyệt. Chưa có giao diện quản trị để cài,
+gỡ.
+
+**Bằng chứng:** [`docs/them-ung-dung.md`](../them-ung-dung.md) mục 1 (lệnh, trang Danh mục ứng dụng), 1.2 (từng bước
+ghi vào đâu), 1.9 (giới hạn); `scripts/ung_dung.py`; `make demo-cai-ung-dung` (cài, cài lại, gỡ giữ dữ liệu); e2e
+`ung-dung.spec.ts`.
