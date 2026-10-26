@@ -49,6 +49,7 @@ sử dụng"*).
 | Python | ≥ 3.10 | PSF-2.0 | Chạy `make seed`, `make smoke` (chỉ thư viện chuẩn) | Gói hệ thống |
 | Node.js | 24.20.0 | MIT | Dựng giao diện thành trang tĩnh, cài gói npm của `app-ca-nhan`, `app-bang-tin` (chỉ ở bước dựng image); chạy test `apps/ca-nhan/tests`, `apps/bang-tin/tests` | `node:24.20.0-slim` |
 | Playwright | 1.63.0 | Apache-2.0 | Kiểm thử trên trình duyệt thật — `make e2e`, `tests/e2e/` | `mcr.microsoft.com/playwright:v1.63.0-noble` |
+| axe-core, @axe-core/playwright | 4.13.0 | MPL-2.0 | Kiểm trợ năng tự động theo WCAG 2.0, 2.1 mức A, AA trong e2e (`tests/e2e/tro-nang.spec.ts`, #246); chỉ dùng trong test, dùng nguyên bản, không vào gói phát hành | npm, `tests/e2e/package-lock.json` |
 | GNU Make | ≥ 4.0 | GPL-3.0+ | Điều phối lệnh (công cụ dựng, không liên kết vào sản phẩm) | Gói hệ thống |
 | Git | ≥ 2.30 | GPL-2.0 | Quản lý mã nguồn, sinh gói phát hành | Gói hệ thống |
 | uv | 0.12.19 | Apache-2.0 / MIT | Cài thư viện test theo băm và chạy `make test`, test `db/tests/` | Tệp chạy độc lập |

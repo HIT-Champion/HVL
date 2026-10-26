@@ -144,6 +144,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   bước…" và không gửi lại khi bấm hai lần. Hai tab Dòng thời gian / Lịch sử dùng được bằng phím mũi tên, Home, End; lỗi
   tải lịch sử hiện ngay trong tab kèm nút thử lại. Nút tải từng tệp đọc kèm tên tệp, tên tệp dài xuống dòng thay vì bị
   cắt; nút Vào sổ báo "Đang vào sổ…"; Esc đóng khung Góp ý. Test giao diện +5.
+- Kiểm trợ năng tự động trong e2e (#246): `tests/e2e/tro-nang.spec.ts` dùng axe-core quét cả trang theo WCAG 2.0, 2.1
+  mức A, AA: trang đăng nhập, xác thực văn bản, trạng thái hệ thống; các trang của tài khoản `giamkhao` (hộp việc, văn
+  bản, hồ sơ, tìm kiếm, hỏi đáp, ứng dụng, góp ý, Không gian cá nhân); các trang của lãnh đạo đơn vị và văn thư. Lỗi
+  chưa sửa phải nằm trong danh sách cho phép của spec, mỗi dòng có rule, trang, lý do và issue; danh sách chỉ ngắn đi.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
