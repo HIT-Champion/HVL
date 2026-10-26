@@ -14,15 +14,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   kiện so chuỗi và nhóm ứng viên `t:${tenantId}:…`; không `DOCTYPE`, `ENTITY`; process id tối đa 22 ký tự để Flowable
   giữ khóa trong id định nghĩa), form 2020-12 với `additionalProperties: false`, `pattern` không quay lui bùng nổ
   (ReDoS: không lặp lồng, số bước quay lui ước lượng tối đa 10^7, cần `maxLength` khi số bước tăng theo độ dài chuỗi;
-  chuỗi dài quá `maxLength` không chạy `pattern`; các `pattern` của một form cộng lại tối đa 3·10^7 bước (mỗi chỗ `$ref`
-  tính một lần), không nhận `propertyNames`, giá trị mảng, đối tượng báo `type` mà không chạy schema, thân yêu cầu tối
-  đa 64 KB, lớn hơn trả `413` — #323). Bước mới "quy trình" sau Keycloak triển khai thành một deployment trên Flowable
-  của lõi, tên theo băm nội dung: cài lại không đổi gì không thêm phiên bản. `moc app remove` tạm dừng các định nghĩa
-  quy trình đó, lịch sử đơn giữ nguyên trong Flowable. Trang của ứng dụng gọi API chung `/api/workflow/<tên>/…` (route
-  APISIX mới, chỉ nhận token của client `app-<tên>`): lấy form, bắt đầu quy trình, xem đơn của mình, xem và hoàn thành
-  việc của mình; dữ liệu sai form trả `422` từng trường, kể cả từ khóa mới `x-moc-range`; đơn vị, phòng, người gửi lấy
-  từ token. Hộp việc Văn phòng điện tử chỉ còn nhận việc của quy trình văn bản đến, đi. Thư viện mới của svc-workflow:
-  PyJWT (kèm `cryptography`), như svc-files. Chi tiết: `docs/them-ung-dung.md` mục 1.10, `docs/api/README.md` §8.
+  chuỗi dài quá `maxLength` không chạy `pattern`; kiểm một lần gửi tối đa 3·10^7 bước (mỗi schema con 3000 bước cộng
+  `pattern` ở đó, mỗi chỗ `$ref` tính một lần), `$id`, `$anchor` chỉ ở gốc form, không nhận `propertyNames`, giá trị
+  mảng, đối tượng báo `type` mà không chạy schema, thân yêu cầu tối đa 64 KB, lớn hơn trả `413` — #323). Bước mới "quy
+  trình" sau Keycloak triển khai thành một deployment trên Flowable của lõi, tên theo băm nội dung: cài lại không đổi gì
+  không thêm phiên bản. `moc app remove` tạm dừng các định nghĩa quy trình đó, lịch sử đơn giữ nguyên trong Flowable.
+  Trang của ứng dụng gọi API chung `/api/workflow/<tên>/…` (route APISIX mới, chỉ nhận token của client `app-<tên>`):
+  lấy form, bắt đầu quy trình, xem đơn của mình, xem và hoàn thành việc của mình; dữ liệu sai form trả `422` từng
+  trường, kể cả từ khóa mới `x-moc-range`; đơn vị, phòng, người gửi lấy từ token. Hộp việc Văn phòng điện tử chỉ còn
+  nhận việc của quy trình văn bản đến, đi. Thư viện mới của svc-workflow: PyJWT (kèm `cryptography`), như svc-files. Chi
+  tiết: `docs/them-ung-dung.md` mục 1.10, `docs/api/README.md` §8.
 - Ứng dụng mẫu Đơn nghỉ phép `apps/nghi-phep` (#301), cắm vào lõi bằng `moc app install` như Bảng tin. Ứng dụng không
   có máy chủ nghiệp vụ, không có bảng: quy trình BPMN và hai form JSON Schema khai ở mục `workflow` của manifest, chạy
   trên động cơ quy trình của lõi qua API chung `/api/workflow/nghi-phep/…`. Nhân viên gửi đơn, trưởng phòng của chính
