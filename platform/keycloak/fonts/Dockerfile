@@ -36,4 +36,8 @@ RUN set -eu; p=node_modules/@fontsource/be-vietnam-pro; mkdir -p /fonts/files; c
 FROM node:24.20.0-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
 COPY --from=build /fonts /fonts
 COPY copy-fonts.sh /copy-fonts.sh
+# Chạy user node, không root: volume keycloak_fonts tạo mới lấy chủ của thư mục gắn trong image ở lần gắn đầu, nên
+# /theme-fonts thuộc node thì volume thuộc node
+RUN mkdir /theme-fonts && chown node:node /theme-fonts
+USER node
 ENTRYPOINT ["sh", "/copy-fonts.sh"]

@@ -167,6 +167,11 @@ def heal(report: dict[str, Any]) -> None:
     done = {s for s in once if s in actual and actual[s].get("State") == "exited" and actual[s].get("ExitCode") == 0}
     stopped = [s for s in wanted if s in actual and s not in done
                and actual[s].get("State") in ("exited", "created", "dead")]
+    # chạy lại thì có thể qua (lỗi thoáng qua), nhưng lượt nào cũng thoát lỗi thì chỉ nằm trong actions, không ai thấy
+    for s in sorted(once & set(stopped)):
+        if actual[s].get("State") == "exited" and actual[s].get("ExitCode") != 0:
+            report["problems"].append(f"{s} chạy một lần mà thoát lỗi ({actual[s].get('Status', '')}) — xem nhật ký: "
+                                      f"docker compose logs {s}")
     looping = [s for s in wanted if s in actual and actual[s].get("State") == "restarting"]
     unhealthy = [s for s in wanted if s in actual and actual[s].get("State") == "running"
                  and actual[s].get("Health") == "unhealthy"]

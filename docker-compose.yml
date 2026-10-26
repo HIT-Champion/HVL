@@ -74,8 +74,8 @@ services:
   # Phông Be Vietnam Pro của theme đăng nhập (#305): image của đội (platform/keycloak/fonts) lấy phông từ gói npm
   # @fontsource/be-vietnam-pro lúc dựng, repo không chứa tệp phông nào (PoF #5); Keycloak vẫn chạy image chính thức.
   # Chạy một lần trước keycloak: chép phông vào volume keycloak_fonts rồi thoát 0, keycloak gắn volume đó vào thư mục
-  # phông của theme. Không mạng, không capability nào; chạy root chỉ để ghi vào volume (thư mục gốc của volume mới
-  # thuộc root). Không dùng x-common: restart "no", không mạng
+  # phông của theme. Không mạng, không capability nào, chạy user node của image (volume mới lấy chủ của thư mục
+  # /theme-fonts trong image). Không dùng x-common: restart "no", không mạng
   keycloak-fonts:
     build: ./platform/keycloak/fonts
     image: moc/keycloak-fonts:${MOC_VERSION:-dev}

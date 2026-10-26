@@ -23,6 +23,11 @@ set -eu
 SRC=/fonts
 DST=/theme-fonts
 
+# volume tạo từ trước khi image chạy user node thì thư mục gốc của nó thuộc root
+if [ ! -w "$DST" ]; then
+  echo "keycloak-fonts: không ghi được vào $DST; xóa volume keycloak_fonts rồi chạy lại để tạo volume mới" >&2
+  exit 1
+fi
 cd "$SRC"
 for f in $(find . -type f); do
   mkdir -p "$DST/${f%/*}"

@@ -138,6 +138,10 @@ class KeycloakFontVolumeTest(unittest.TestCase):
         self.assertIn('ENTRYPOINT ["sh", "/copy-fonts.sh"]\n', dockerfile)
         self.assertIn("\nSRC=/fonts\nDST=/theme-fonts\n", script)
         self.assertEqual(dockerfile.count("FROM node:24.20.0-slim@sha256:"), 2)   # không thêm image thượng nguồn
+        # không chạy root: thư mục gắn volume thuộc node trước khi đổi user
+        last = dockerfile[dockerfile.rindex("FROM "):]
+        self.assertLess(last.index("chown node:node /theme-fonts"), last.index("\nUSER node\n"))
+        self.assertLess(last.index("\nUSER node\n"), last.index("ENTRYPOINT"))
 
     @unittest.skipUnless(shutil.which("sh"), "cần sh")
     def test_copy_replaces_old_version(self) -> None:
@@ -157,6 +161,23 @@ class KeycloakFontVolumeTest(unittest.TestCase):
             self.assertEqual(got, ["be-vietnam-pro.css", "files/a-400-normal.woff2"])
             self.assertEqual((dst / "be-vietnam-pro.css").read_text(encoding="utf-8"), "moi")
             self.assertIn("2 tệp phông", proc.stdout)
+
+    @unittest.skipUnless(shutil.which("sh") and os.geteuid() != 0, "cần sh, không chạy root")
+    def test_copy_stops_with_hint_when_volume_not_writable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            src, dst = pathlib.Path(tmp, "fonts"), pathlib.Path(tmp, "theme-fonts")
+            src.mkdir()
+            (src / "be-vietnam-pro.css").write_text("moi", encoding="utf-8")
+            dst.mkdir(mode=0o555)                     # như volume tạo lúc image còn chạy root
+            script = read(FONTS_IMAGE / "copy-fonts.sh").replace("\nSRC=/fonts\nDST=/theme-fonts\n",
+                                                                  f"\nSRC={src}\nDST={dst}\n")
+            try:
+                proc = subprocess.run(["sh", "-c", script], capture_output=True, text=True, check=False)
+            finally:
+                dst.chmod(0o755)
+            self.assertEqual(proc.returncode, 1)
+            self.assertIn("xóa volume keycloak_fonts", proc.stderr)
+            self.assertEqual(list(dst.iterdir()), [])
 
 
 def compose_stub(services: dict[str, Any], containers: list[dict[str, Any]], calls: list[list[str]]):
@@ -194,6 +215,9 @@ class ReconcileOneShotTest(unittest.TestCase):
         self.assertEqual(len(ups), 1)
         self.assertEqual(ups[0][-1], "keycloak-fonts")
         self.assertIn("chạy lại keycloak-fonts (đã dừng: Exited (1) 1 minute ago)", report["actions"])
+        # lượt nào cũng thoát lỗi thì người vận hành phải thấy, không chỉ nằm trong actions
+        self.assertEqual(len(report["problems"]), 1)
+        self.assertIn("keycloak-fonts chạy một lần mà thoát lỗi (Exited (1) 1 minute ago)", report["problems"][0])
 
     def test_stopped_long_running_service_still_restarted(self) -> None:
         services = {"centrifugo": {}}

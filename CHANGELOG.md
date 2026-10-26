@@ -254,11 +254,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   (`unicode-range`), vẫn tự phục vụ, không gọi Google Fonts. Văn phòng điện tử nạp CSS của gói trong `nuxt.config.ts`
   (Vite đưa tệp phông vào `/_nuxt/`); Không gian cá nhân chép phông vào image ở `/ca-nhan/fonts/be-vietnam-pro/`.
   Theme đăng nhập: Keycloak vẫn chạy image chính thức, không phụ thuộc ứng dụng nào; dịch vụ mới `keycloak-fonts`
-  (image của đội, `platform/keycloak/fonts/`) chạy một lần trước `keycloak`, không mạng, chép phông vào volume
-  `keycloak_fonts` gắn đè lên thư mục giữ chỗ `resources/fonts/be-vietnam-pro/` của theme. Reconciler không chạy lại
-  dịch vụ chạy một lần đã xong (thoát 0). Bản cài cũ nâng bằng `scripts/nang_cap.sh` như thường: image mới dựng ở bước
-  1, volume tạo ở lần chạy đầu. Mỗi bản dựng kèm `OFL.txt` của gói; cập nhật `NOTICE`, `DEPENDENCIES.md`. Test scripts
-  +11 (`test_phong_chu.py`).
+  (image của đội, `platform/keycloak/fonts/`) chạy một lần trước `keycloak`, không mạng, chạy user `node` chứ không
+  root, chép phông vào volume `keycloak_fonts` gắn đè lên thư mục giữ chỗ `resources/fonts/be-vietnam-pro/` của theme.
+  Reconciler không chạy lại dịch vụ chạy một lần đã xong (thoát 0); thoát lỗi thì chạy lại và ghi vào `problems`. Bản
+  cài cũ nâng bằng `scripts/nang_cap.sh` như thường: image mới dựng ở bước 1, volume tạo ở lần chạy đầu. Mỗi bản dựng
+  kèm `OFL.txt` của gói; cập nhật `NOTICE`, `DEPENDENCIES.md`. e2e kiểm cả bộ phông vietnamese tải được. Test scripts
+  +12 (`test_phong_chu.py`).
 
 ### Đã sửa lỗi
 - Thanh bên mở lại ngay sau khi bấm một mục (#297). Bấm chuột vào một mục thì thanh bên thu lại, nhưng con trỏ còn
