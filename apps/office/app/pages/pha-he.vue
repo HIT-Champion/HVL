@@ -65,9 +65,9 @@ const BOX = { width: 176, height: 26 }
 const COL = 216
 const ROW = 40
 const STYLE: Record<NodeKind, { fill: string; text: string }> = {
-  chart: { fill: '#0f766e', text: '#ffffff' },
+  chart: { fill: '#0b6b53', text: '#ffffff' },
   view: { fill: '#1d4ed8', text: '#ffffff' },
-  table: { fill: '#e7e5e4', text: '#292524' },
+  table: { fill: '#dde7e2', text: '#10201b' },
   job: { fill: '#6d28d9', text: '#ffffff' },
   object: { fill: '#fde68a', text: '#78350f' },
 }
@@ -195,7 +195,7 @@ const graphOption = computed(() => {
       symbol: 'rect',
       symbolSize: [BOX.width, BOX.height],
       label: { show: true, position: 'inside', fontSize: 11, width: BOX.width - 12, overflow: 'truncate' },
-      lineStyle: { color: '#a8a29e', width: 1.5, opacity: 0.9 },
+      lineStyle: { color: '#a7b8b0', width: 1.5, opacity: 0.9 },
       emphasis: { focus: 'adjacency' },
     }],
   }

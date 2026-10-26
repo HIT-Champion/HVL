@@ -44,8 +44,8 @@ const HISTORY = `{ office_maturity_assessments(order_by: {created_at: desc}, lim
 const SAVE = `mutation ($o: office_maturity_assessments_insert_input!) {
   insert_office_maturity_assessments_one(object: $o) { ${COLUMNS} } }`
 const NOTE_MAX = 300
-const BRAND = '#0f766e'
-const PREVIOUS = '#a8a29e'
+const BRAND = '#0b6b53'
+const PREVIOUS = '#a7b8b0'
 
 const { t, locale } = useI18n()
 const { gql } = useApi()
