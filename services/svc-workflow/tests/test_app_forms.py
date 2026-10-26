@@ -186,11 +186,44 @@ def test_sample_forms_pass():
     (changed(**{"x-moc-range": [["tuNgay", "denNgay", "lyDo"]]}), "x-moc-range"),
     (changed(**{"x-moc-range": "tuNgay"}), "x-moc-range"),
     (with_prop("soNgay", {"type": "khong-co-kieu-nay"}), "chỉ nhận giá trị đơn"),
+    (with_prop("ma", {"type": "string", "pattern": "^(a+)+$"}), "lặp lồng trong một phần lặp"),
+    (with_prop("ma", {"type": "string", "pattern": "^(a|aa)+$"}), "lựa chọn (|) trong một phần lặp"),
+    (with_prop("ma", {"type": "string", "pattern": "^a*a*$"}), "phần lặp dài"),
+    (with_prop("ma", {"type": "string", "pattern": "^(a)\\1$"}), "tham chiếu ngược"),
+    (with_prop("ma", {"type": "string", "pattern": "(" * 2}), "không phải biểu thức chính quy hợp lệ"),
+    (with_prop("ma", {"type": "string", "pattern": "a" * 513}), "dài quá 512"),
+    (with_prop("ma", {"type": "string", "not": {"pattern": "^(\\w+\\s?)*$"}}), "ReDoS"),
+    (changed(patternProperties={"^(x+)+$": {"type": "string"}}), "ReDoS"),
 ], ids=lambda v: v if isinstance(v, str) else "")
 def test_form_rules_at_deploy(schema, needle):
     errors = problems(schema)
     assert any(needle in e for e in errors), errors
     assert all(e.startswith("workflow.forms.nghi-phep.don (forms/don.json): ") for e in errors)
+
+
+@pytest.mark.parametrize("pattern", ["^20[0-9]{2}-", "^[A-Z]{2,5}$", "^[0-9]{1,3}(,[0-9]{3})*$", "^(a|b)+$",
+                                     "^[^<>]{0,200}$", "^\\S.*$"])
+def test_ordinary_patterns_pass(pattern):
+    assert problems(with_prop("ma", {"type": "string", "pattern": pattern})) == []
+
+
+def test_redos_pattern_would_stall_re_and_is_refused_before_deploy():
+    # mẫu bị từ chối thật sự quay lui bùng nổ với re: mỗi ký tự thêm vào gấp đôi thời gian (đo với chuỗi ngắn)
+    import time
+    slow = re.compile("^(a+)+$")
+    took = []
+    for n in (14, 20):
+        started = time.perf_counter()
+        slow.match("a" * n + "!")
+        took.append(time.perf_counter() - started)
+    assert took[1] > 4 * took[0]
+    assert any("ReDoS" in e for e in problems(with_prop("ma", {"type": "string", "pattern": "^(a+)+$"})))
+
+
+def test_ui_text_named_pattern_is_not_a_pattern():
+    # x-moc-ui.errors.pattern là câu báo lỗi cho giao diện, không phải mẫu
+    prop = {"type": "string", "x-moc-ui": {"errors": {"pattern": "(((("}}}
+    assert problems(with_prop("ma", prop)) == []
 
 
 def test_invalid_json_schema_is_reported():
