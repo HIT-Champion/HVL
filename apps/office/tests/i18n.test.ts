@@ -22,6 +22,8 @@
 //   * khóa ghép t(`a.b.${x}`): phần viết thẳng "a.b." phải mở đầu ít nhất một khóa của vi.json;
 //   * phần <template> không có chữ tiếng Việt có dấu, trừ trong chú thích HTML;
 //   * chuỗi tiếng Việt trong mã chỉ được là trường `vi:` của dữ liệu song ngữ { vi, en } (vd app/utils/hpdi.ts).
+// Không kiểm ở đây: khóa truyền qua biến (`t(n.label)` của pha-he.vue — nhãn lấy từ app/utils/lineage.ts, test riêng ở
+// lineage.test.ts) và lời gọi qua đối tượng (`i18n.global.t(…)`, hiện không có).
 // Hướng dẫn dịch cho người đóng góp: CONTRIBUTING.md, mục "Dịch giao diện".
 
 import assert from 'node:assert/strict'
@@ -38,8 +40,8 @@ const sources = readdirSync(APP, { recursive: true, encoding: 'utf8' })
 
 // chữ cái tiếng Việt có dấu: đủ để nhận ra một câu tiếng Việt (câu viết không dấu thì không bắt được)
 const VIET = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/iu
-// t('khóa' …) và $t("khóa" …); không bắt te(, rt(, hay .t( của đối tượng khác
-const LITERAL = /(?<![\w$.])\$?t\(\s*(['"])([\w.-]+)\1/g
+// t('khóa' …), $t("khóa" …) và t(`khóa`) không có ${}; không bắt te(, rt(, hay .t( của đối tượng khác
+const LITERAL = /(?<![\w$.])\$?t\(\s*(['"`])([\w.-]+)\1/g
 const DYNAMIC = /(?<![\w$.])\$?t\(\s*`([^`$]*)\$\{/g
 
 const keys: string[] = []
@@ -105,12 +107,17 @@ test('template không có chữ tiếng Việt viết cứng, mọi câu đi qua
 })
 
 interface Str { at: number, value: string }
+const REGEX_AFTER = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw',
+  'yield', 'await'])
 
 // Các chuỗi '…', "…" và phần chữ của `…` trong mã, kể cả chuỗi nằm trong ${…} lồng nhau; bỏ qua chú thích // và
 // /* */, biểu thức chính quy /…/. Comment trong repo viết tiếng Việt và chuỗi có thể chứa "//" (URL), nên phải tách
 // theo token chứ không xóa comment trên văn bản thô.
 function strings(code: string): Str[] {
   const out: Str[] = []
+  // "/" ngay sau từ khóa (return /…/, typeof /…/) mở regex, sau tên biến hay số là phép chia
+  const afterKeyword = (i: number, prev: string) =>
+    /[\w$]/.test(prev) && REGEX_AFTER.has(/[\w$]+$/.exec(code.slice(Math.max(0, i - 20), i).trimEnd())?.[0] ?? '')
   // quét mã từ i tới khi gặp "}" đóng ${…} (depth về 0) hoặc hết; trả vị trí dừng
   function scan(i: number, closing: boolean): number {
     let prev = ''                                       // ký tự có nghĩa gần nhất: "/" là phép chia hay mở regex
@@ -123,7 +130,7 @@ function strings(code: string): Str[] {
       } else if (c === '/' && code[i + 1] === '*') {
         const end = code.indexOf('*/', i + 2)
         i = end < 0 ? code.length : end + 1
-      } else if (c === '/' && (prev === '' || '(,=:[!&|?{};+-*%<>~^'.includes(prev))) {
+      } else if (c === '/' && (prev === '' || '(,=:[!&|?{};+-*%<>~^'.includes(prev) || afterKeyword(i, prev))) {
         let inClass = false
         for (i++; i < code.length && (code[i] !== '/' || inClass); i++) {
           if (code[i] === '\\') i++
