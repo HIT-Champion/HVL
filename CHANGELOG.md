@@ -8,6 +8,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Prometheus đọc bảng trạng thái thành phần (F3.13, #274). svc-files có thêm `GET /metrics`: mỗi thành phần của trang
+  `/trang-thai` một dòng `moc_component_up` (1 khi chạy, 0 khi gián đoạn), cùng lần dò và lưu đệm với `/api/status`.
+  Đường này chỉ gọi được trong mạng nội bộ, qua cổng API thì 404. Prometheus thu 15 giây một lần, và nhóm luật mới
+  `thanh-phan` báo `ComponentDown` (thành phần bắt buộc gián đoạn 2 phút), `OptionalComponentDown` (két khóa, tìm
+  kiếm gián đoạn 5 phút) và `StatusMetricsDown` (không đọc được svc-files 2 phút). Trước đây cảnh báo chỉ dựa trên
+  lưu lượng qua cổng: không ai gọi tới thì không thấy dịch vụ chết, và svc-workflow (nằm sau Hasura Actions) không có
+  cảnh báo riêng; giờ nó được thấy qua thành phần `quy-trinh`. Smoke so các thành phần trong Prometheus với
+  `/api/status`, chờ tới lượt thu đầu tiên. Chưa có Alertmanager nên F3.13 vẫn ở mức Dùng được.
 - CI chạy thử thêm phần `https` (F1.9, #261), song song với năm phần cũ. Phần này dựng hệ thống sau một proxy TLS
   theo `docs/trien-khai.md`: `.env` như bước 3 (`MOC_PUBLIC_URL=https://signet.test`, APISIX chỉ nghe
   `127.0.0.1:8080`, `MOC_TRUSTED_PROXY`), nginx với chứng thư do một CA tự ký cấp, đặt `X-Forwarded-*` như Caddyfile
@@ -180,6 +188,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Từ #250 spec quét thêm Bảng tin (`/bang-tin/`, tài khoản `giamkhao`) và các tiêu chí mới của WCAG 2.2 mức AA (tag
   `wcag22aa`, như cỡ vùng bấm 2.5.8). Phần e2e của CI cài Bảng tin (`make app-install`) trước `make seed` để văn bản
   mẫu thành tin; chạy `make e2e` ở máy chưa cài thì phần Bảng tin được bỏ qua, có ghi chú trong báo cáo.
+- Kiểm song ngữ cho cả Văn phòng điện tử và hướng dẫn dịch (#267): `apps/office/tests/i18n.test.ts` quét mọi tệp
+  `app/` — khóa `t('…')` phải là câu có trong `vi.json`, phần viết thẳng của khóa ghép phải có thật, template và script
+  không được viết cứng chữ tiếng Việt (trừ trường `vi:` của dữ liệu song ngữ). Trước đây chỉ vài tệp được kiểm; lần
+  quét đầu không thấy lỗi nào. `CONTRIBUTING.md` có mục "Dịch giao diện". README, README.en, ROADMAP và F2.9 ghi
+  rõ Không gian cá nhân, Bảng tin chỉ có tiếng Việt. Test giao diện +4.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
@@ -219,6 +232,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Tài liệu trỏ bằng chứng vào đúng job CI (#271). Từ khi phần chạy thử tách thành sáu phần của job `chay-thu`, job
+  `stack` chỉ còn bước gom kết quả, nhưng `docs/du-thi/hoi-dap-hoi-dong.md` vẫn ghi "CI job `stack`, bước …" ở sáu
+  chỗ. Giờ mỗi chỗ ghi job `chay-thu` và phần chạy bước đó. Cũng sửa "job `luong-chinh`" ở `docs/muc-hoan-thien.md`,
+  `docs/them-ung-dung.md`, và chỗ tên job ở `docs/so-lieu-sau.md`, `docs/demo-script.md`. F4.7 bỏ câu "e2e chưa chạy
+  lần nào": `tu-chan-doan.spec.ts` chạy và đạt ở phần `e2e`; mức vẫn là Dùng được. Test mới `test_tai_lieu_ci.py`
+  đọc mọi tệp `.md` (trừ CHANGELOG, ghi chép nghiên cứu) và báo khi tài liệu nêu job, phần hay bước không có trong
+  `.github/workflows/`, hoặc nêu bước dưới job, phần không chạy bước đó.
 - Bảng mức hoàn thiện ghi đúng việc CI đã chạy (#258). F3.15: smoke (8 kiểm) và e2e chạy qua WAF trên mọi pull
   request, vì `.env.example` đặt `MOC_WAF=On`. Câu "chưa chạy xanh trên CI" đã cũ. F3.15 vẫn ở mức Dùng được, với
   điều kiện thật còn lại: chữ nghiệp vụ ở ô Cơ quan ban hành, Nơi nhận không còn cần người quản trị thêm loại trừ

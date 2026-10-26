@@ -151,16 +151,18 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       dựng lại container bị xóa (F3.3)
 - [x] Trang công khai Trạng thái hệ thống `/trang-thai`: tình trạng từng thành phần, phiên bản, giờ sao lưu gần nhất
       (`docs/van-hanh.md`, mục Trang trạng thái hệ thống)
-- [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana mới thu chỉ số của APISIX, chưa có chỉ số
-      từng dịch vụ; có luật cảnh báo (#255) nhưng chỉ xem trong Grafana, Prometheus, chưa gửi ra ngoài
+- [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana thu chỉ số của APISIX và trạng thái từng
+      thành phần (#274), chưa có chỉ số bên trong từng dịch vụ; có luật cảnh báo (#255, #274) nhưng chỉ xem trong
+      Grafana, Prometheus, chưa gửi ra ngoài
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
       định; `X-Request-Id` đi xuyên `svc-workflow`; thu 8 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202)
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
       văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
-- [ ] **Một phần** — tiếng Anh: giao diện Việt / Anh cùng bộ khóa (F2.9, mức Dùng được) và `README.en.md`; chưa có
-      hướng dẫn dịch cho người đóng góp, tài liệu vận hành chưa có bản tiếng Anh (issue #59)
+- [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được),
+      `README.en.md`, hướng dẫn dịch cho người đóng góp (`CONTRIBUTING.md`, mục "Dịch giao diện"); Không gian cá nhân,
+      Bảng tin chỉ có tiếng Việt; tài liệu vận hành chưa có bản tiếng Anh (issue #59)
 - [ ] **Một phần** — cộng đồng và số đo thực tế: `CONTRIBUTING.md`, mẫu issue (F2.11, mức Một phần); thu góp ý và
       trang Số đo theo đặc tả §8 (F4.6, mức Dùng được). Chưa có đơn vị chạy thử nên cột "trước" của số đo còn trống
 

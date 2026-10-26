@@ -8,7 +8,7 @@ phần góp ý trong ứng dụng thu gì. Mã chức năng theo đặc tả §4
 
 **Kết quả: chưa đo.** Repo chưa có lần chạy `make do-so-lieu-sau` nào trên hệ thống thật, cũng chưa có đơn vị chạy
 thử. Tài liệu không ghi số nào; khi có lần đo, ghi kèm ngày, máy, đơn vị và tệp `out/so-lieu-sau.json`. CI chạy lệnh
-này trên dữ liệu mẫu (phần `ai` của job "Chạy thử toàn hệ thống", sau màn giao việc) chỉ để kiểm lệnh chạy
+này trên dữ liệu mẫu (phần `ai` của job `chay-thu`, sau màn giao việc) chỉ để kiểm lệnh chạy
 được và tìm ra văn bản; số đó không phải số đo.
 
 ## 1. Đọc số ở đâu

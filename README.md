@@ -80,7 +80,7 @@ xử lý → trả lời → phát hành → lưu trữ** theo Nghị định 30
 | Tìm lại văn bản cũ mất thời gian | Tìm toàn văn, cả chữ trong tệp PDF đính kèm và bản scan (nhận dạng chữ); trợ lý hỏi đáp trả lời kèm số ký hiệu và trang | [I] |
 
 Ngoài ra: sổ đăng ký văn bản đến, đi đúng mẫu NĐ 30; nhiều đơn vị trên một bản cài, mỗi người chỉ thấy dữ liệu của
-đơn vị mình; giao diện tiếng Việt và tiếng Anh. Phạm vi và vai trò:
+đơn vị mình; Văn phòng điện tử có giao diện tiếng Việt và tiếng Anh. Phạm vi và vai trò:
 [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md); mức hoàn thiện từng tính năng kèm bằng chứng:
 [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md).
 
@@ -116,8 +116,8 @@ từng tác tử: [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 
 ### Ảnh chụp màn hình
 
-Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt, trang nào cũng có bản
-tiếng Anh.
+Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt; trang nào của Văn
+phòng điện tử cũng có bản tiếng Anh (Không gian cá nhân, Bảng tin chỉ có tiếng Việt).
 
 | Văn thư tải công văn lên, tác tử điền sẵn các ô | Lãnh đạo xem việc nghẽn ở đâu | Người nhận tự kiểm văn bản, không cần đăng nhập |
 |---|---|---|

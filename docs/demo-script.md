@@ -915,8 +915,8 @@ trong thư mục mã nguồn. Kịch bản 5 phút ở [`dac-ta-san-pham.md`](da
 - Lệnh dừng ở bước sai, in tên bước, thoát 1. Chạy lại ngay được: mỗi màn chạy lại bao nhiêu lần cũng được.
 - Dịch vụ chết hay `unhealthy`: `make ps` (bản cài: `docker compose ps`), rồi một lượt tự phục hồi
   `python3 scripts/reconcile.py --heal-only`; xem lỗi bằng `docker compose logs --tail 50 <dịch vụ>`.
-- Vẫn lỗi: bỏ màn đó, mở lượt CI xanh của đúng commit đang chạy — job "Chạy thử toàn hệ thống (PoF #4)" có từng bước
-  `make demo-*` kèm nhật ký — rồi đi tiếp; còn giờ thì quay lại.
+- Vẫn lỗi: bỏ màn đó, mở lượt CI xanh của đúng commit đang chạy — các job "Chạy thử: luong-chinh", "Chạy thử: ai",
+  "Chạy thử: sao-luu" có từng bước `make demo-*` kèm nhật ký — rồi đi tiếp; còn giờ thì quay lại.
 - Dữ liệu demo hỏng tới mức không dùng được: khôi phục lượt sao lưu lấy hôm trước,
   `python3 scripts/moc.py backup restore <lượt>` (hỏi lại trước khi thay dữ liệu; Signet dừng trong lúc khôi phục). Chỉ
   làm khi còn thời gian, không thì sang máy dự phòng.

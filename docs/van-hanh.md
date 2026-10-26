@@ -319,7 +319,10 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
 
 APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 không publish: chỉ container ở mạng
 `moc`, `apps` tới được — container ứng dụng đọc được số đếm theo route, không có token hay dữ liệu nghiệp vụ).
-Prometheus thu mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra ngoài. Grafana hiện
+Prometheus còn thu bảng trạng thái của `svc-files` (`GET /metrics`, #274): mỗi thành phần của trang `/trang-thai` một
+dòng `moc_component_up`, cùng lần dò và lưu đệm 10 giây với `/api/status`; `/metrics` chỉ gọi được trong mạng `moc`,
+qua cổng API thì 404. Prometheus thu mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra
+ngoài. Grafana hiện
 bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi giây theo route, mã trạng thái (429 = vượt giới hạn tốc
 độ), tỉ lệ lỗi 5xx, độ trễ p95, băng thông, kết nối đang mở.
 
@@ -329,11 +332,16 @@ bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi g
   `platform/monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
+- Prometheus chỉ đọc `platform/monitoring/prometheus.yml` và `canh-bao.yml` lúc khởi động. Sửa tay trên máy đang chạy
+  thì khởi động lại nó: `docker compose restart prometheus` trong thư mục cài. Lúc nâng cấp, `scripts/nang_cap.sh` đã
+  dừng rồi chạy lại cả hệ thống nên bản mới tự nạp tệp mới.
 
 ### Cảnh báo
 
-Prometheus tính 5 luật trong `platform/monitoring/canh-bao.yml` mỗi 15 giây, trên chỉ số APISIX đang thu (#255).
-Nhãn `route` là id route trong `platform/apisix/apisix.yaml`.
+Prometheus tính 8 luật trong `platform/monitoring/canh-bao.yml` mỗi 15 giây: nhóm `cong-api` trên chỉ số APISIX
+(#255), nhóm `thanh-phan` trên bảng trạng thái của svc-files (#274). Nhãn `route` là id route trong
+`platform/apisix/apisix.yaml`; nhãn `component` là mã thành phần ở `services/svc-files/README.md`, mục Trạng thái hệ
+thống.
 
 | Cảnh báo | Mức | Bật khi |
 |---|---|---|
@@ -341,6 +349,9 @@ Nhãn `route` là id route trong `platform/apisix/apisix.yaml`.
 | `UpstreamUnreachable` | critical | Một route trả 502 hoặc 504 liên tục 3 phút: APISIX tự sinh hai mã này khi dịch vụ sau cổng chết hay quá giờ |
 | `High5xxRatio` | warning | Hơn 5% yêu cầu lỗi 5xx trong 5 phút, khi có hơn 0,1 yêu cầu/giây |
 | `SlowRoute` | warning | p95 thời gian trả lời trên 3 giây trong 10 phút, ở route graphql, app-office, app-ca-nhan, keycloak, dang-nhap, dang-nhap-post |
+| `ComponentDown` | critical | Một thành phần bắt buộc (`cong-api`, `dang-nhap`, `csdl`, `quet-ma-doc`, `quy-trinh`, `luu-tru`) gián đoạn quá 2 phút: trang `/trang-thai` báo cả Signet gián đoạn |
+| `OptionalComponentDown` | warning | Két khóa (`ket-khoa`) hay tìm kiếm (`tim-kiem`) gián đoạn quá 5 phút |
+| `StatusMetricsDown` | critical | Prometheus không đọc được `/metrics` của svc-files quá 2 phút: svc-files có thể đã dừng. Khi đó các dòng `moc_component_up` mất chứ không về 0, nên `ComponentDown` không bật |
 | `AlertRulesFailing` | warning | Prometheus tính luật bị lỗi trong 10 phút qua |
 
 - Xem ở hàng "Cảnh báo đang bật" cuối bảng điều khiển Grafana. `pending` là điều kiện đã đúng nhưng chưa đủ thời
@@ -350,9 +361,13 @@ Nhãn `route` là id route trong `platform/apisix/apisix.yaml`.
 - 503 không tính là "không trả lời". svc-files trả 503 có chủ ý (`busy`, `scanner_unavailable`… kèm `Retry-After`),
   nên 503 chỉ tính vào tỉ lệ 5xx. Độ trễ của svc-files không xét: tải lên, đọc văn bản đến, hỏi đáp vốn chậm theo
   thiết kế.
-- svc-workflow không có cảnh báo riêng. Nó không có route riêng mà nằm sau Hasura Actions; lỗi của nó về trình duyệt
-  là GraphQL 200 có `errors`.
-- Cảnh báo dựa trên lưu lượng thật: không ai gọi tới thì không thấy dịch vụ chết.
+- svc-workflow không có route riêng mà nằm sau Hasura Actions; lỗi của nó về trình duyệt là GraphQL 200 có `errors`,
+  nên nhóm `cong-api` không thấy. Nhóm `thanh-phan` thấy qua thành phần `quy-trinh`: bảng trạng thái gọi `/readyz` của
+  svc-workflow, trong đó có kiểm Flowable.
+- Nhóm `cong-api` dựa trên lưu lượng thật: không ai gọi tới thì nhóm này không thấy dịch vụ chết. Nhóm `thanh-phan`
+  thì không cần lưu lượng: Prometheus thu bảng trạng thái 15 giây một lần.
+- Trợ lý AI không có cảnh báo: Ollama không trả lời thì bảng trạng thái báo `off` như khi chưa bật (không phân biệt
+  được), và thành phần `off` không có dòng `moc_component_up`.
 - Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
   `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
 

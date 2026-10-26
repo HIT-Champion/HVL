@@ -14,10 +14,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# F3.13 — luật cảnh báo (#255), tính trên chỉ số APISIX mà Prometheus đang thu. Nhãn `route` là id route trong
-# platform/apisix/apisix.yaml. Chưa có Alertmanager: cảnh báo chỉ hiện ở Prometheus (/alerts) và bảng điều khiển
-# Grafana, không gửi ra ngoài. Test: platform/monitoring/kiem-tra/canh-bao.test.yml (promtool test rules, bước CI
-# "Giám sát"). Cảnh báo dựa trên lưu lượng thật: không ai gọi tới thì không thấy dịch vụ chết.
+# F3.13 — luật cảnh báo (#255, #274). Chưa có Alertmanager: cảnh báo chỉ hiện ở Prometheus (/alerts) và bảng điều
+# khiển Grafana, không gửi ra ngoài. Test: platform/monitoring/kiem-tra/canh-bao.test.yml (promtool test rules, bước
+# CI "Giám sát").
+#   * cong-api: chỉ số của APISIX, nhãn `route` là id route trong platform/apisix/apisix.yaml. Dựa trên lưu lượng thật:
+#     không ai gọi tới thì nhóm này không thấy dịch vụ chết;
+#   * thanh-phan: bảng trạng thái của svc-files (GET /metrics, cùng lần dò của trang /trang-thai), Prometheus thu 15
+#     giây một lần nên không cần ai gọi tới. Nhãn `component` là mã thành phần (status.py), `critical` là "true" khi
+#     thành phần gián đoạn làm cả Signet gián đoạn.
 groups:
   - name: cong-api
     rules:
@@ -64,6 +68,33 @@ groups:
           severity: warning
         annotations:
           summary: "Route {{ $labels.route }}: p95 thời gian trả lời trên 3 giây trong 10 phút"
+
+  - name: thanh-phan
+    rules:
+      - alert: ComponentDown
+        expr: moc_component_up{critical="true"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Thành phần {{ $labels.component }} gián đoạn — cả Signet ngừng phục vụ"
+
+      - alert: OptionalComponentDown
+        expr: moc_component_up{critical="false"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Thành phần {{ $labels.component }} gián đoạn — Signet vẫn chạy nhưng thiếu phần việc này"
+
+      # svc-files dừng thì các dòng moc_component_up cũng mất (không về 0): chỉ luật này bật
+      - alert: StatusMetricsDown
+        expr: up{job="svc-files"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus không đọc được bảng trạng thái của svc-files — svc-files có thể đã dừng
 
   - name: prometheus
     rules:

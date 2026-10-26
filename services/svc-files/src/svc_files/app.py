@@ -655,6 +655,13 @@ def create_app(
             status_code=200 if ready else 503,
         )
 
+    # Bảng trạng thái cho Prometheus (F3.13, #274), cùng lưu đệm với /api/status. Chỉ trong mạng nội bộ: route `chan`
+    # của APISIX trả 404 cho /metrics
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        return Response(await status_board.metrics(), media_type="text/plain; version=0.0.4; charset=utf-8",
+                        headers=NO_STORE)
+
     async def seal_bytes(rid: str, plain: bytes, tenant_id: uuid.UUID, file_id: uuid.UUID) -> tuple[bytes, str]:
         """Bản mã và khóa đã bọc (F3.7). Khóa rõ chỉ sống trong hàm này; két không sẵn sàng thì không lưu gì."""
         if vault is None:

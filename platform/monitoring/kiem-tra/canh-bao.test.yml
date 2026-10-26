@@ -132,6 +132,59 @@ tests:
             exp_annotations:
               summary: "Route graphql: p95 thời gian trả lời trên 3 giây trong 10 phút"
 
+  # ClamAV (bắt buộc) gián đoạn từ phút 2: bật sau 2 phút. Meilisearch (không bắt buộc) gián đoạn từ đầu: chỉ bật
+  # OptionalComponentDown, sau 5 phút. CSDL vẫn chạy
+  - interval: 15s
+    input_series:
+      - series: 'moc_component_up{job="svc-files", instance="svc-files:8000", component="quet-ma-doc", critical="true"}'
+        values: "1x8 0x40"
+      - series: 'moc_component_up{job="svc-files", instance="svc-files:8000", component="tim-kiem", critical="false"}'
+        values: "0x48"
+      - series: 'moc_component_up{job="svc-files", instance="svc-files:8000", component="csdl", critical="true"}'
+        values: "1x48"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ComponentDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: ComponentDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: svc-files, instance: "svc-files:8000", component: quet-ma-doc,
+                         critical: "true"}
+            exp_annotations:
+              summary: "Thành phần quet-ma-doc gián đoạn — cả Signet ngừng phục vụ"
+      - eval_time: 4m
+        alertname: OptionalComponentDown
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OptionalComponentDown
+        exp_alerts:
+          - exp_labels: {severity: warning, job: svc-files, instance: "svc-files:8000", component: tim-kiem,
+                         critical: "false"}
+            exp_annotations:
+              summary: "Thành phần tim-kiem gián đoạn — Signet vẫn chạy nhưng thiếu phần việc này"
+
+  # svc-files dừng từ phút 2: Prometheus không thu được (up = 0), các dòng moc_component_up mất chứ không về 0
+  - interval: 15s
+    input_series:
+      - series: 'up{job="svc-files", instance="svc-files:8000"}'
+        values: "1x8 0x20"
+      - series: 'moc_component_up{job="svc-files", instance="svc-files:8000", component="csdl", critical="true"}'
+        values: "1x8 _x20"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: StatusMetricsDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: StatusMetricsDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: svc-files, instance: "svc-files:8000"}
+            exp_annotations:
+              summary: Prometheus không đọc được bảng trạng thái của svc-files — svc-files có thể đã dừng
+      - eval_time: 5m
+        alertname: ComponentDown
+        exp_alerts: []
+
   # một lần tính luật lỗi ở phút 1: bật ngay (không có `for`), hết sau 10 phút
   - interval: 15s
     input_series:

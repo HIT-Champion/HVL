@@ -30,6 +30,10 @@ còn giới hạn số lần gọi theo địa chỉ IP (``MOC_RATE_STATUS_PER_M
 Thành phần theo thứ tự người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo. Thành phần ``critical`` gián đoạn thì
 cả hệ thống ``down``; thành phần khác gián đoạn hoặc suy giảm thì ``degraded``; ``off`` (tắt theo cấu hình, vd chưa bật
 mô hình ngôn ngữ) không tính.
+
+Cùng kết quả gom ra dạng chữ của Prometheus ở ``GET /metrics`` (#274): Prometheus thu 15 giây một lần, nên thành
+phần chết vẫn bật cảnh báo khi không ai gọi tới (``platform/monitoring/canh-bao.yml``, nhóm ``thanh-phan``). Đường này
+chỉ gọi được trong mạng nội bộ: route ``chan`` của APISIX trả 404 cho ``/metrics``.
 """
 
 from __future__ import annotations
@@ -140,6 +144,10 @@ class StatusBoard:
         assert self._cached is not None
         return {**self._cached, "uptime_s": int(self._clock() - self._started)}
 
+    async def metrics(self) -> str:
+        """Kết quả gom (cùng lưu đệm với ``report``) ở dạng chữ của Prometheus."""
+        return render_metrics(await self.report(), {c.id: c.critical for c in self.components})
+
     def _changed(self, key: str, state: str, reason: str | None = None) -> None:
         if self._last.get(key) == state:
             return
@@ -206,6 +214,23 @@ class StatusBoard:
             "components": [{"id": c.id, "layer": c.layer, "label": c.label, "software": c.software, "status": s}
                            for c, s in rows],
         }
+
+
+def _label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def render_metrics(report: dict[str, Any], critical: dict[str, bool]) -> str:
+    """``moc_component_up{component, critical}``: 1 khi thành phần ok hoặc suy giảm, 0 khi gián đoạn; thành phần tắt
+    theo cấu hình (``off``) không có dòng. Nhãn chỉ có mã thành phần như trang công khai, không URL hay tên máy."""
+    out = ["# HELP moc_component_up Thành phần trả lời được: 1 khi ok hoặc suy giảm, 0 khi gián đoạn.",
+           "# TYPE moc_component_up gauge"]
+    for c in report["components"]:
+        if c["status"] != "off":
+            flag = "true" if critical.get(c["id"], True) else "false"
+            labels = f'component="{_label(c["id"])}",critical="{flag}"'
+            out.append(f"moc_component_up{{{labels}}} {int(c['status'] != 'down')}")
+    return "\n".join(out) + "\n"
 
 
 # --- các lần dò của bản chạy thật -------------------------------------------------------------------------------
