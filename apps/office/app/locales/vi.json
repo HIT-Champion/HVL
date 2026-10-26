@@ -1549,6 +1549,7 @@
     },
     "plan": "Mặt bằng kho lưu trữ",
     "planLabel": "Sơ đồ mặt bằng kho lưu trữ, mỗi phòng tô màu theo nhiệt độ mới nhất so với ngưỡng",
+    "panHint": "Cuộn ngang để xem đủ sơ đồ. Bảng số đo chi tiết ở bên dưới.",
     "corridor": "Hành lang",
     "checkedAt": "Đọc lúc {time}",
     "room": {

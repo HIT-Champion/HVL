@@ -174,6 +174,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `NOTICE`, `DEPENDENCIES.md`. Nút, mục thư mục, ô chọn thư mục cao tối thiểu 44px; ô chọn tệp có viền tiêu điểm ở nhãn
   "Tải tệp lên"; trên điện thoại (≤640px) bảng tệp thành thẻ, nhãn cột lấy từ `data-label`; tắt chuyển động khi hệ điều
   hành yêu cầu giảm chuyển động. e2e kiểm phông tải được và không cuộn ngang ở khổ 768, 390px.
+- Sơ đồ cảm biến và Phả hệ số liệu dùng được trên điện thoại (#235, phần cuối của nhánh `fe-integration`): sơ đồ kho giữ
+  bề rộng tối thiểu 540px để chữ trong phòng còn đọc được, cuộn ngang trong một vùng có tên, nhận tiêu điểm và cuộn bằng
+  phím mũi tên, kèm một dòng gợi ý trên màn hẹp; bảng số đo cũng vậy. Phòng có nhiều cờ chỉ ghi cờ đầu và số cờ còn lại
+  ("Mất tín hiệu +1") cho vừa ô phòng, đủ các cờ vẫn ở chú thích di chuột và bảng số đo. Ký tự ⚠ đổi sang biểu tượng
+  SVG: Be Vietnam Pro không có ký tự này nên trình duyệt lấy phông khác, có máy hiện thành emoji màu. Trang Phả hệ: năm
+  vùng cuộn ngang (đồ thị và bốn bảng) nhận tiêu điểm, mang tên của mục; các bảng giữ bề rộng tối thiểu 680px và cuộn
+  trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
 - Log tập trung không còn mất dòng đầu tiên của dịch vụ im lâu khi kết nối tới Vector đã chết (#226). Driver
