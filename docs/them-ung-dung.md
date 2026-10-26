@@ -312,16 +312,21 @@ docker compose exec -T svc-workflow python -m svc_workflow.apps.deploy remove <t
 
 Lệnh lấy thông tin đăng nhập Flowable đúng như lúc dịch vụ khởi động (`Settings.from_env(with_secrets(…))`: mật khẩu
 `rest-admin` trong két OpenBao, đọc bằng AppRole của `svc-workflow`), không qua dòng lệnh hay biến môi trường của người
-chạy. Gói hợp lệ thành **một** deployment tên `app/<tên>@<12 ký tự đầu SHA-256 nội dung>`, tài nguyên đặt tên theo
-khóa: `<processKey>.bpmn20.xml`, `<formKey>.json` và mục lục `moc-app.json`. Deployment mới nhất của ứng dụng đã cùng
-tên thì không triển khai lại — cài lại không đổi gì không thêm phiên bản định nghĩa quy trình nào. Gói khác thì thành
-phiên bản mới: đơn bắt đầu sau đó theo bản mới; đơn đang chạy đi tiếp theo BPMN cũ, việc của nó kiểm theo form của
-chính deployment cũ. Bước Hasura lỗi thì hoàn tác cả quy trình: cài lại gói của lần cài trước, chưa có thì tạm dừng.
+chạy. Gói hợp lệ thành **một** deployment tên `app/<tên>@<12 ký tự đầu SHA-256 nội dung>`, tài nguyên đặt tên theo khóa:
+`<processKey>.bpmn20.xml`, `<formKey>.json` và mục lục `moc-app.json`. Deployment mới nhất của ứng dụng đã cùng tên thì
+không triển khai lại — cài lại không đổi gì không thêm phiên bản định nghĩa quy trình nào. Gói khác thì thành phiên bản
+mới: đơn bắt đầu sau đó theo bản mới; đơn đang chạy đi tiếp theo BPMN cũ, việc của nó kiểm theo form của chính
+deployment cũ. Bước nào sau bước quy trình lỗi (tệp chạy, container, Hasura) thì quy trình về như trước lần cài này: cài
+lại gói của lần cài trước, chưa có thì tạm dừng — không để BPMN, form mới chạy khi trang, route còn bản cũ hay chưa có
+(#332). Tệp chạy, container giữ như lúc lỗi, chạy lại thì làm tiếp; riêng bước Hasura trả cả tệp chạy về. Lần cài dở đầu
+tiên ghi bản ghi trước nó vào `.moc-apps/truoc-khi-cai/<tên>.json`: lỗi thêm lần nữa vẫn hoàn tác về đó, không về bản
+ghi lần dở để lại; cài xong, hoàn tác xong hay gỡ thì xóa tệp này.
 
-`moc app remove` (và manifest bỏ mục `workflow`) **tạm dừng** (suspend) mọi định nghĩa quy trình có khóa `<tên>.…`
-cùng các phiên đang chạy — không xóa deployment: lịch sử đơn (`act_hi_*`), biến, đơn đang dở còn nguyên trong Flowable,
-như schema CSDL của ứng dụng gỡ không bị xóa. API coi ứng dụng là đã gỡ (`404 app_not_installed`) khi không định nghĩa
-nào của deployment mới nhất còn chạy. Cài lại thì bật lại, đơn đang dở làm tiếp.
+`moc app remove` (và manifest bỏ mục `workflow`) **tạm dừng** (suspend) mọi định nghĩa quy trình có khóa `<tên>.…` cùng
+các phiên đang chạy — không xóa deployment: lịch sử đơn (`act_hi_*`), biến, đơn đang dở còn nguyên trong Flowable, như
+schema CSDL của ứng dụng gỡ không bị xóa. API coi ứng dụng là đã gỡ (`404 app_not_installed`) khi không định nghĩa nào
+của deployment mới nhất còn chạy. Cài lại thì bật lại, đơn đang dở làm tiếp. Khi gỡ, bước quy trình chạy trước bước xóa
+client Keycloak: lỗi thì client còn nguyên, chạy lại `moc app remove` gỡ tiếp (#332).
 
 **Kiểm BPMN theo danh sách trắng** (`svc_workflow/apps/bpmn.py`). BPMN của ứng dụng chạy trong cùng động cơ với quy
 trình Văn phòng điện tử và bằng quyền của động cơ: `scriptTask` chạy mã, `serviceTask` gọi lớp Java hay bean, listener

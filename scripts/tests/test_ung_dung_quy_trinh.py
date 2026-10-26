@@ -239,6 +239,77 @@ class WorkflowFlow(unittest.TestCase):
         self.assertEqual(self.wf.calls[4][2], first)                        # …rồi cài lại bản trước
         self.assertEqual(self.wf.current, first)
 
+    def test_container_failure_suspends_a_first_deployment(self) -> None:
+        # bước sau "quy trình" lỗi: không để BPMN, form mới chạy khi chưa có trang, route
+        with unittest.mock.patch.object(base.u, "up_services", side_effect=base.u.AppError("compose up thoát 1")):
+            with self.assertRaises(base.u.StepFailed) as ctx:
+                self.install()
+        self.assertIn("bước 8/9 (container): compose up thoát 1; quy trình vừa triển khai đã tạm dừng",
+                      str(ctx.exception))
+        self.assertEqual(self.wf.actions(), ["check", "install", "remove"])
+        self.install()                                                      # chạy lại: bật lại, làm tiếp
+        self.assertFalse(self.wf.suspended)
+
+    def test_files_failure_puts_the_previous_bundle_back(self) -> None:
+        self.install()
+        first = self.wf.current
+        (self.app / "forms" / "duyet.json").write_text('{"type": "object", "title": "mới"}\n', encoding="utf-8")
+        with unittest.mock.patch.object(self.state, "write", side_effect=base.u.AppError("không ghi được")):
+            with self.assertRaises(base.u.StepFailed) as ctx:
+                self.install()
+        self.assertIn("bước 7/9 (tệp chạy): không ghi được; quy trình về bản của lần cài trước", str(ctx.exception))
+        self.assertEqual(self.wf.current, first)
+
+    def container_fails(self) -> str:
+        with unittest.mock.patch.object(base.u, "up_services", side_effect=base.u.AppError("compose up thoát 1")):
+            with self.assertRaises(base.u.StepFailed) as ctx:
+                self.install()
+        return str(ctx.exception)
+
+    def record_bytes(self) -> bytes:
+        return (self.tmp / base.u.STATE / "apps" / "bang-tin.json").read_bytes()
+
+    def test_container_failing_twice_still_suspends_a_first_deployment(self) -> None:
+        # lần lỗi đầu đã ghi bản ghi mới: lần sau vẫn hoàn tác về lúc chưa cài, không về bản ghi lần lỗi để lại
+        for _ in range(2):
+            self.assertIn("; quy trình vừa triển khai đã tạm dừng", self.container_fails())
+            self.assertTrue(self.wf.suspended)
+        self.assertEqual(self.wf.actions(), ["check", "install", "remove"] * 2)
+        self.assertTrue(self.state.before_path("bang-tin").exists())
+        self.install()
+        self.assertFalse(self.wf.suspended)
+        self.assertFalse(self.state.before_path("bang-tin").exists())         # cài xong: hết đích hoàn tác
+
+    def test_upgrade_failing_twice_still_goes_back_to_the_previous_bundle(self) -> None:
+        self.install()
+        first = self.wf.current
+        (self.app / "forms" / "duyet.json").write_text('{"type": "object", "title": "mới"}\n', encoding="utf-8")
+        for _ in range(2):
+            self.assertIn("; quy trình về bản của lần cài trước", self.container_fails())
+            self.assertEqual(self.wf.current, first)
+
+    def test_hasura_undo_after_a_container_failure_restores_the_record_before_both(self) -> None:
+        self.install()
+        first, record = self.wf.current, self.record_bytes()
+        (self.app / "forms" / "duyet.json").write_text('{"type": "object", "title": "mới"}\n', encoding="utf-8")
+        self.container_fails()
+        self.assertNotEqual(self.record_bytes(), record)                    # lần dở để lại bản ghi mới
+        self.system.broken_once = True
+        with self.assertRaises(base.u.StepFailed) as ctx:
+            self.install()
+        self.assertIn("bước 9/9 (Hasura)", str(ctx.exception))
+        self.assertEqual(self.record_bytes(), record)
+        self.assertEqual(self.wf.current, first)
+        self.assertFalse(self.state.before_path("bang-tin").exists())
+
+    def test_failure_before_the_workflow_step_leaves_flowable_alone(self) -> None:
+        with unittest.mock.patch.object(base.u, "step_keycloak", side_effect=base.u.AppError("Keycloak 500")):
+            with self.assertRaises(base.u.StepFailed) as ctx:
+                self.install()
+        self.assertIn("bước 5/9 (Keycloak): Keycloak 500", str(ctx.exception))
+        self.assertNotIn("quy trình", str(ctx.exception))
+        self.assertEqual(self.wf.actions(), ["check"])
+
     def test_dropping_workflow_from_the_manifest_suspends_it(self) -> None:
         self.install()
         self.manifest.write_text(self.manifest.read_text(encoding="utf-8").replace(WORKFLOW, ""), encoding="utf-8")
@@ -258,18 +329,37 @@ class WorkflowFlow(unittest.TestCase):
         base.u.remove("bang-tin", state=self.state, system=self.system, out=self.lines.append)
         self.assertEqual(self.wf.actions()[-1], "remove")
         self.assertTrue(self.wf.suspended)
-        self.assertIn("5/6 quy trình: đã tạm dừng 1 định nghĩa quy trình; lịch sử, đơn đang dở giữ nguyên",
+        self.assertIn("4/6 quy trình: đã tạm dừng 1 định nghĩa quy trình; lịch sử, đơn đang dở giữ nguyên",
                       self.text())
         self.lines.clear()
         self.install()                                                      # cài lại cùng bản: bật lại
         self.assertRegex(self.text(), r"đã triển khai, giữ nguyên \(1 quy trình, 2 form\); bật lại 1 định nghĩa")
+
+    def test_remove_keeps_the_client_until_the_workflow_is_suspended(self) -> None:
+        self.install()
+        self.wf.down = True
+        with self.assertRaises(base.u.StepFailed) as ctx:
+            base.u.remove("bang-tin", state=self.state, system=self.system, out=self.lines.append)
+        self.assertIn("bước 4/6 (quy trình)", str(ctx.exception))
+        clients = [c["clientId"] for c in self.system.kc.clients()]
+        self.assertIn("app-bang-tin", clients)                             # chưa xóa: chạy lại gỡ tiếp
+        self.wf.down = False
+        base.u.remove("bang-tin", state=self.state, system=self.system, out=self.lines.append)
+        self.assertTrue(self.wf.suspended)
+        self.assertNotIn("app-bang-tin", [c["clientId"] for c in self.system.kc.clients()])
+
+    def test_remove_after_a_failed_install_drops_the_undo_target(self) -> None:
+        self.container_fails()
+        self.assertTrue(self.state.before_path("bang-tin").exists())
+        base.u.remove("bang-tin", state=self.state, system=self.system, out=self.lines.append)
+        self.assertFalse(self.state.before_path("bang-tin").exists())
 
     def test_remove_dry_run_does_not_call_svc_workflow(self) -> None:
         self.install()
         calls = len(self.wf.calls)
         base.u.remove("bang-tin", state=self.state, system=self.system, dry_run=True, out=self.lines.append)
         self.assertEqual(len(self.wf.calls), calls)
-        self.assertIn("5/6 quy trình: sẽ tạm dừng mọi định nghĩa quy trình", self.text())
+        self.assertIn("4/6 quy trình: sẽ tạm dừng mọi định nghĩa quy trình", self.text())
 
     def test_sync_redeploys_from_the_record(self) -> None:
         self.install()

@@ -776,8 +776,13 @@ class State:
         _write_atomic(self.dir / "apps" / f"{rec['name']}.json",
                       (json.dumps(rec, ensure_ascii=False, indent=2) + "\n").encode())
 
+    def before_path(self, name: str) -> pathlib.Path:
+        """Bản ghi trước lần cài dở (rỗng: chưa có bản ghi), đích hoàn tác của các lần cài sau đó: có từ lúc một lần cài
+        ghi bản ghi mới tới khi một lần cài xong, hoàn tác xong hay gỡ."""
+        return self.dir / "truoc-khi-cai" / f"{name}.json"
+
     def drop(self, name: str) -> None:
-        for path in (self.dir / "apps" / f"{name}.json", self.dir / f"{name}.env"):
+        for path in (self.dir / "apps" / f"{name}.json", self.dir / f"{name}.env", self.before_path(name)):
             with contextlib.suppress(FileNotFoundError):
                 path.unlink()
 
@@ -1449,10 +1454,15 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
     old = state.records().get(rec["name"])
     old_json = state.dir / "apps" / f"{rec['name']}.json"
     old_bytes = old_json.read_bytes() if old_json.exists() else None
+    # Lần cài trước hỏng sau khi đã ghi bản ghi (tệp chạy, container): hoàn tác về bản ghi trước lần cài dở đó, không
+    # phải bản ghi nó để lại
+    before_json = state.before_path(rec["name"])
+    before_bytes = (before_json.read_bytes() or None) if before_json.exists() else old_bytes
+    before = json.loads(before_bytes) if before_bytes else None
     out(f"{'Kế hoạch cài' if dry_run else 'Cài'} {rec['name']} {rec['version']} — {rec['title']} ở {rec['path']}/"
         f"{' (đã cài, chạy lại: chỉ làm phần còn thiếu)' if old and not old.get('removing') else ''}")
     # bước quy trình: manifest khai workflow, hoặc bản cài trước có mà bản này bỏ (tạm dừng quy trình cũ)
-    had_workflow = bool(old and old.get("workflow") and not old.get("removing"))
+    had_workflow = bool(before and before.get("workflow") and not before.get("removing"))
     with_workflow = bool(rec.get("workflow")) or had_workflow
     total = 9 if with_workflow else 8
     wf = rec.get("workflow")
@@ -1485,6 +1495,8 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
 
     def files_step() -> str:
         if not dry_run:
+            if not before_json.exists():
+                _write_atomic(before_json, old_bytes or b"")
             state.save(rec)
             changed = state.write()
         else:
@@ -1498,15 +1510,16 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
                              {"MOC_CLIENT_SECRET": "…"}, new_secret="MOC_CLIENT_SECRET" in made, dry_run=dry_run)
 
     def undo() -> str:
-        """Bước Hasura lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài này rồi áp lại
-        metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng; quy trình về bản của lần cài trước
-        (chưa có thì tạm dừng). CSDL, client giữ (chạy lại dùng tiếp)."""
+        """Bước Hasura lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài dở đầu tiên
+        rồi áp metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng; quy trình về bản của lần cài
+        trước (chưa có thì tạm dừng). CSDL, client giữ (chạy lại dùng tiếp)."""
         try:
-            if old_bytes is None:
+            if before_bytes is None:
                 system.compose("rm", "--stop", "--force", f"app-{rec['name']}", timeout=180)
                 old_json.unlink(missing_ok=True)
             else:
-                _write_atomic(old_json, old_bytes)
+                _write_atomic(old_json, before_bytes)
+            before_json.unlink(missing_ok=True)
             if GATEWAY in state.write():
                 restart_apisix(system)
             system.apply_metadata()
@@ -1521,7 +1534,7 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
             return ""
         try:
             if had_workflow:
-                workflow_cli(system, "install", rec["name"], workflow_bundle(old))
+                workflow_cli(system, "install", rec["name"], workflow_bundle(before))
                 return "; quy trình về bản của lần cài trước"
             workflow_cli(system, "remove", rec["name"])
             return "; quy trình vừa triển khai đã tạm dừng"
@@ -1533,6 +1546,20 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         if not dry_run:
             deployed.append(True)
         return result
+
+    def or_workflow_back(step: Callable[[], str]) -> Callable[[], str]:
+        """Bước sau "quy trình" lỗi thì quy trình về bản của lần cài trước (chưa có thì tạm dừng): không để BPMN, form
+        mới chạy khi trang, route còn bản cũ hay chưa có. Tệp chạy, container giữ như lúc lỗi (chạy lại làm tiếp); bước
+        Hasura trả cả tệp chạy (undo)."""
+        def run() -> str:
+            try:
+                return step()
+            except (AppError, Unavailable) as exc:
+                back = workflow_back()
+                if not back:
+                    raise
+                raise AppError(f"{exc}{back}") from exc
+        return run
 
     def container_step() -> str:
         up = up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)
@@ -1555,12 +1582,14 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         ("bí mật", secrets_step),
         ("Keycloak", keycloak_step),
         *([("quy trình", workflow_step)] if with_workflow else []),
-        ("tệp chạy", files_step),
-        ("container", container_step),
+        ("tệp chạy", or_workflow_back(files_step)),
+        ("container", or_workflow_back(container_step)),
         ("Hasura", hasura_step),
     ]
     with ops_lock(state.root):
         run_steps(steps, out, first=2, dry_run=dry_run)
+        if not dry_run:
+            before_json.unlink(missing_ok=True)
     return {"name": rec["name"], "dry_run": dry_run, "image": rec["image"], "secrets_created": made}
 
 
@@ -1663,8 +1692,10 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
         state.write()
         return f"core.apps.removed_at đã ghi; schema {rec['schema']} và dữ liệu giữ nguyên"
 
+    # quy trình tạm dừng trước khi xóa client: bước quy trình lỗi thì Keycloak chưa đổi gì, chạy lại gỡ tiếp — không có
+    # lúc client đã xóa mà định nghĩa quy trình vẫn nhận đơn từ token còn hạn
     steps = [("container", container_step), ("tệp chạy", files_step), ("Hasura", hasura_step),
-             ("Keycloak", keycloak_step), *([("quy trình", workflow_step)] if rec.get("workflow") else []),
+             *([("quy trình", workflow_step)] if rec.get("workflow") else []), ("Keycloak", keycloak_step),
              ("CSDL", db_step)]
     with ops_lock(state.root):
         run_steps(steps, out, dry_run=dry_run)

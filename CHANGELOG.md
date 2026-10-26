@@ -19,12 +19,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   bước cộng `pattern` ở đó, mỗi chỗ `$ref` tính một lần), `$id`, `$anchor` chỉ ở gốc form, không nhận `propertyNames`,
   giá trị mảng, đối tượng báo `type` mà không chạy schema, thân yêu cầu tối đa 64 KB, lớn hơn trả `413` — #323). Bước
   mới "quy trình" sau Keycloak triển khai thành một deployment trên Flowable của lõi, tên theo băm nội dung: cài lại
-  không đổi gì không thêm phiên bản. `moc app remove` tạm dừng các định nghĩa quy trình đó, lịch sử đơn giữ nguyên trong
-  Flowable. Trang của ứng dụng gọi API chung `/api/workflow/<tên>/…` (route APISIX mới, chỉ nhận token của client
-  `app-<tên>`): lấy form, bắt đầu quy trình, xem đơn của mình, xem và hoàn thành việc của mình; dữ liệu sai form trả
-  `422` từng trường, kể cả từ khóa mới `x-moc-range`; đơn vị, phòng, người gửi lấy từ token. Hộp việc Văn phòng điện tử
-  chỉ còn nhận việc của quy trình văn bản đến, đi. Thư viện mới của svc-workflow: PyJWT (kèm `cryptography`), như
-  svc-files. Chi tiết: `docs/them-ung-dung.md` mục 1.10, `docs/api/README.md` §8.
+  không đổi gì không thêm phiên bản; bước tệp chạy, container hay Hasura lỗi sau đó thì quy trình về bản của lần cài
+  trước, chưa có thì tạm dừng (#332). `moc app remove` tạm dừng các định nghĩa quy trình đó trước khi xóa client
+  Keycloak (#332), lịch sử đơn giữ nguyên trong Flowable. Trang của ứng dụng gọi API chung `/api/workflow/<tên>/…`
+  (route APISIX mới, chỉ nhận token của client `app-<tên>`): lấy form, bắt đầu quy trình, xem đơn của mình, xem và hoàn
+  thành việc của mình; dữ liệu sai form trả `422` từng trường, kể cả từ khóa mới `x-moc-range`; đơn vị, phòng, người gửi
+  lấy từ token. Hộp việc Văn phòng điện tử chỉ còn nhận việc của quy trình văn bản đến, đi. Thư viện mới của
+  svc-workflow: PyJWT (kèm `cryptography`), như svc-files. Chi tiết: `docs/them-ung-dung.md` mục 1.10,
+  `docs/api/README.md` §8.
 - Ứng dụng mẫu Đơn nghỉ phép `apps/nghi-phep` (#301), cắm vào lõi bằng `moc app install` như Bảng tin. Ứng dụng không
   có máy chủ nghiệp vụ, không có bảng: quy trình BPMN và hai form JSON Schema khai ở mục `workflow` của manifest, chạy
   trên động cơ quy trình của lõi qua API chung `/api/workflow/nghi-phep/…`. Nhân viên gửi đơn, trưởng phòng của chính
