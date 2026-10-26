@@ -14,10 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Quản trị đơn vị không đọc văn bản: Hasura không cho vai trò này đọc office.documents, hồ sơ công việc, sổ đăng ký
-// văn bản, nên menu không có các mục ấy. Gõ thẳng địa chỉ (hay mở lại một đường dẫn cũ) thì trang gửi câu hỏi rồi báo
-// lỗi GraphQL "not found". Middleware auth.global đưa họ về sổ kiểm toán trước khi trang nào chạy. Tệp này không dùng
-// gì của Nuxt để Node chạy test được (tests/adminRoutes.test.ts).
+// Quản trị đơn vị không đọc văn bản: Hasura không cho vai trò này đọc office.documents, hồ sơ công việc; sổ đăng ký chỉ
+// văn thư, lãnh đạo xem (svc-files). Menu vì vậy không có các mục ấy. Gõ thẳng địa chỉ (hay mở lại một đường dẫn cũ)
+// thì trang gửi câu hỏi rồi báo lỗi, như GraphQL "not found". Middleware auth.global đưa họ về sổ kiểm toán trước khi
+// trang nào chạy. Tệp này không dùng gì của Nuxt để Node chạy test được (tests/adminRoutes.test.ts).
 
 const DOCUMENT_AREAS = ['/van-ban-den', '/van-ban-di', '/van-ban', '/ho-so', '/so-dang-ky']
 

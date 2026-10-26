@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Quản trị đơn vị gõ thẳng địa chỉ trang văn bản (#230): về sổ kiểm toán trước khi trang gửi câu hỏi; các vùng chặn
-// khớp với quyền Hasura và menu.
+// khớp với quyền Hasura (sổ đăng ký do svc-files chặn, không kiểm ở đây) và menu.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'

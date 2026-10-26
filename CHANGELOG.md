@@ -263,7 +263,7 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   - cờ chất lượng (`QualityFlag`) giữ phần chữ cho trình đọc màn hình trong chính cờ: ở trang Phả hệ, phần chữ ấy
     từng thoát khỏi bảng cuộn ngang làm cả trang rộng ra ở 390px. Bộ chọn biểu đồ của Phả hệ không rộng quá khung;
   - quản trị đơn vị gõ thẳng địa chỉ trang văn bản, hồ sơ, sổ đăng ký (cả trang con) thì về sổ kiểm toán trước khi
-    trang gửi câu hỏi, thay vì báo lỗi GraphQL "not found". Quyền Hasura không đổi;
+    trang gửi câu hỏi, thay vì báo lỗi (GraphQL "not found" ở trang văn bản). Quyền Hasura, svc-files không đổi;
   - Bảng tin báo bằng câu đọc được rằng tài khoản quản trị đơn vị không xem được bảng tin, thay vì hỏi rồi hiện lỗi
     GraphQL.
 
