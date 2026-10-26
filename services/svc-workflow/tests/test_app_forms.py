@@ -200,7 +200,7 @@ def test_sample_forms_pass():
     (with_prop("ma", {"type": "string", "pattern": "^\\S.*$"}), "cần maxLength"),
     (with_prop("ma", {"type": "string", "pattern": "[0-9]{9,11}"}), "cần maxLength"),
     (with_prop("ma", {"type": "string", "maxLength": 20, "allOf": [{"pattern": "a+$"}]}), "cần maxLength"),
-    (changed(propertyNames={"pattern": "^[a-z]+$"}), "cần maxLength"),
+    (changed(propertyNames={"maxLength": 20, "pattern": "^[a-z]+$"}), "không dùng propertyNames"),
     (changed(**{"$defs": {"ma": {"type": "string", "pattern": "^a+"}}}), "cần maxLength"),
     # tốn quá MAX_STEPS bước
     (with_prop("ma", {"type": "string", "maxLength": 30000, "pattern": "a+$"}), "bước quay lui với chuỗi 30000"),
@@ -225,6 +225,18 @@ def test_patterns_whose_cost_does_not_grow_with_the_string_need_no_max_length(pa
                                      "[0-9]{9,11}", "a+$", "a+a{0,30}$"])
 def test_patterns_with_max_length_pass(pattern):
     assert problems(with_prop("ma", {"type": "string", "maxLength": 200, "pattern": pattern})) == []
+
+
+def test_patterns_of_one_form_share_one_step_budget():
+    # mỗi mẫu 9,2·10^5 bước, dưới trần riêng; 33 trường như thế cộng lại quá 3·10^7 thì cả form không nhận
+    near = {"type": "string", "pattern": "^" + "a{0,30}" * 4 + "$"}
+    schema = copy.deepcopy(DON)
+    for i in range(32):
+        schema["properties"][f"ma{i}"] = near
+    assert problems(schema) == []
+    schema["properties"]["ma32"] = near
+    errors = problems(schema)
+    assert len(errors) == 1 and "cộng lại ước tính 3,0·10^7 bước" in errors[0], errors
 
 
 def test_step_estimate_follows_re():

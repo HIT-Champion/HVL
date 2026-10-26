@@ -355,6 +355,7 @@ Dữ liệu sai form: `422 {"errors": {"<trường>": "<mã>"}}` — mã như [`
 | Mã HTTP | `code` | Khi nào |
 |---|---|---|
 | `400` | `bad_request` | Thân không phải JSON `{"data": {…}}` |
+| `413` | `too_large` | Thân lớn quá 64 KB (#323): dữ liệu một form chỉ là vài trường đơn |
 | `401` | `missing_token`, `invalid_token` | Thiếu token; sai chữ ký, `iss`, hết hạn |
 | `403` | `wrong_client`, `no_tenant` | Token không phải của `app-{app}`; tài khoản chưa gán đơn vị |
 | `404` | `app_not_found`, `app_not_installed`, `form_not_found`, `process_not_found`, `task_not_found` | Tên ứng dụng sai; chưa cài hoặc đã gỡ (`moc app remove` tạm dừng quy trình, lịch sử còn trong Flowable); form, quy trình không có; việc không còn hoặc không thuộc ứng dụng, đơn vị, người gọi |
