@@ -241,6 +241,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- `moc app install`, `remove`, `sync` khởi động lại APISIX khi tệp route đổi, không để APISIX tự nạp lại (#299).
+  Khi nạp lại nóng, bộ lọc WAF coraza-proxy-wasm 0.6.0 đọc lại bộ luật CRS trong máy ảo WebAssembly cũ của worker và
+  có lần hỏng bộ nhớ: yêu cầu đầu tiên sau khi gỡ ứng dụng nhận 503, rồi worker chết (SIGSEGV), yêu cầu đang chạy
+  mất kết nối; màn demo "Cắm ứng dụng thứ ba bằng một lệnh" đỏ ở bước gỡ. Giờ lệnh khởi động lại `apisix` rồi chờ cổng
+  trả 200 qua route có WAF (tối đa 90 giây) mới báo xong. Cổng gián đoạn vài giây mỗi lần route đổi; không đổi gì thì
+  không khởi động lại. Chưa có bản coraza-proxy-wasm nào mới hơn 0.6.0.
 - CI không còn đỏ với PR không đổi tệp nào (#295). Hai job đọc danh sách tệp của PR ("Phạm vi thay đổi" và "Có đổi
   đường nâng cấp không") coi danh sách rỗng là lỗi API, nên PR chỉ ghi lịch sử một nhánh (#294) và PR gộp ngược `main`
   → `develop` sau phát hành (cây hai nhánh trùng nhau) không bao giờ qua được job bắt buộc "Chạy thử toàn hệ thống".

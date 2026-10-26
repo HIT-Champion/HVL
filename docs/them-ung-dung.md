@@ -66,7 +66,7 @@ Không có bí mật nào trong manifest: header webhook và client secret do l�
 | 4 | Bí mật còn thiếu: header webhook, client secret (giữ cái đã có) | `.moc-apps/<tên>.env` (0600) |
 | 5 | Keycloak: client công khai `app-<tên>` chép từ `app-office` (PKCE S256, 5 mapper, chuyển hướng và đăng xuất chỉ dưới `/<đường>/*` — đổi `path` thì sửa theo); client dịch vụ `app-<tên>-svc` | Keycloak qua cổng quản trị nội bộ (như `moc tenant`) |
 | 6 | Tệp chạy dựng từ tệp lõi + bản ghi các ứng dụng đã cài | `.moc-apps/` (dưới đây), `COMPOSE_FILE` trong `.env` |
-| 7 | `docker compose up -d --no-deps apisix hasura app-<tên>`: compose chỉ tạo lại dịch vụ có cấu hình đổi | Docker |
+| 7 | `docker compose up -d --no-deps apisix hasura app-<tên>`: compose chỉ tạo lại dịch vụ có cấu hình đổi; tệp route `.moc-apps/apisix.yaml` vừa đổi thì khởi động lại `apisix` và chờ cổng trả lời (#299) | Docker |
 | 8 | Hasura: `hasura-cli metadata apply` thư mục metadata trộn trong container, kiểm bảng được track, trigger có mặt, không có gì không nhất quán; lỗi thì trả tệp chạy và metadata về như trước lần cài này | Metadata Hasura |
 
 Mọi thứ của ứng dụng nằm trong `.moc-apps/` của thư mục chạy (`.gitignore` bỏ qua), tệp của lõi không đổi một byte:
@@ -75,8 +75,11 @@ Mọi thứ của ứng dụng nằm trong `.moc-apps/` của thư mục chạy 
   `global_rules`, plugin, khối lõi thêm sau này — vd tường lửa WAF), chèn upstream ngay sau `upstreams:` và route
   `GET`/`HEAD` ngay **trước** route bắt mọi đường `app-office`. Ứng dụng khai `events` có thêm route hook
   `POST /su-kien/<tên>` chỉ ở cổng hook 9081 (1.3). Không còn ứng dụng nào thì tệp giống hệt tệp lõi.
-  APISIX gắn từng tệp và mỗi giây so `mtime`: lệnh ghi đè **tại chỗ** (cùng inode) và APISIX tự nạp lại không khởi
-  động lại; lúc đang ghi tệp thiếu dấu `#END` nên APISIX giữ cấu hình cũ.
+  APISIX gắn từng tệp và mỗi giây so `mtime`: lệnh ghi đè **tại chỗ** (cùng inode); lúc đang ghi tệp thiếu dấu
+  `#END` nên APISIX giữ cấu hình cũ. APISIX có tự nạp lại tệp mới, nhưng lệnh không dựa vào đó: tệp này đổi thì sau
+  bước 7 lệnh khởi động lại `apisix` và chờ cổng trả 200 (tối đa 90 giây), vì nạp lại nóng có lúc làm hỏng bộ nhớ
+  của WAF (#299, [`platform/apisix/README.md`](../platform/apisix/README.md) mục WAF, "Hạn chế"). Trong vài giây đó
+  cổng không trả lời, mọi trang của Signet cũng vậy; chạy lại lệnh mà không đổi gì thì không khởi động lại.
 - `hasura-metadata/`: `db/metadata` chép nguyên văn, thêm một tệp mỗi bảng của ứng dụng (một dòng `!include` cuối
   `tables.yaml`) và khóa `event_triggers` cuối `core_app_events.yaml`. Image `cli-migrations` của Hasura áp lại thư
   mục này mỗi lần khởi động, nên phần của ứng dụng sống qua khởi động lại (thêm qua Metadata API thì mất).

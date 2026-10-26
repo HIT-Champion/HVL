@@ -28,7 +28,8 @@ Trạng thái mong muốn nằm trong `.moc-apps/` của thư mục chạy (ngo�
     mọi đường của app-office): trang GET/HEAD ở cổng công khai; ứng dụng nghe sự kiện có thêm route hook POST
     /su-kien/<tên> chỉ khớp ở cổng hook 9081 (không publish), viết lại đúng về đường webhook của ứng dụng. Ghi đè TẠI
     CHỖ: APISIX gắn từng tệp, mỗi giây so mtime và tự nạp lại; tệp mới đổi tên vào chỗ thì container không thấy (inode
-    cũ). Lúc đang ghi APISIX thấy thiếu dấu #END và giữ cấu hình cũ;
+    cũ). Lúc đang ghi APISIX thấy thiếu dấu #END và giữ cấu hình cũ. Ghi xong thì khởi động lại apisix và chờ cổng
+    trả lời (restart_apisix, #299: nạp lại nóng làm hỏng bộ nhớ của WAF);
   - `hasura-metadata/`: `db/metadata` chép nguyên văn + bảng, quyền, quan hệ của ứng dụng + event trigger (webhook
     http://apisix:9081/su-kien/<tên>: Hasura chỉ ở mạng `moc`, ứng dụng chỉ ở `apps`). Image cli-migrations của Hasura
     áp lại thư mục này mỗi lần khởi động: phần của ứng dụng sống qua khởi động lại;
@@ -826,6 +827,10 @@ APPLY_METADATA = (
     " > config.yaml; hasura-cli metadata apply --skip-update-check 2>&1")
 CALL_METADATA = ('curl -sS -H "X-Hasura-Admin-Secret: $HASURA_GRAPHQL_ADMIN_SECRET" -H "Content-Type: application/json"'
                  " --data-binary @- http://127.0.0.1:8080/v1/metadata")
+# Cổng đã trả lời chưa (restart_apisix): trang cấu hình OIDC của realm $1 qua route keycloak — có WAF, không giới hạn
+# lượt. Gọi từ container hasura vì image APISIX không có curl; chưa kết nối được thì curl in 000
+PROBE_GATEWAY = ('curl -s -o /dev/null -w "%{http_code}" --max-time 10'
+                 ' "http://apisix:9080/realms/$1/.well-known/openid-configuration" || true')
 
 
 def _tail(text: str, n: int = 4) -> str:
@@ -913,6 +918,9 @@ class System:
 
     def apply_metadata(self) -> str:
         return self.exec("hasura", "sh", "-c", APPLY_METADATA, timeout=180)
+
+    def gateway_code(self, realm: str) -> str:
+        return self.exec("hasura", "sh", "-c", PROBE_GATEWAY, "sh", realm, timeout=30).strip()
 
 
 # ---------------------------------------------------------------------------------------- CSDL
@@ -1284,6 +1292,24 @@ def up_services(system: System, names: list[str], *, dry_run: bool) -> str:
     return "đang chạy: " + ", ".join(names)
 
 
+def restart_apisix(system: System, *, wait_s: float = 90) -> str:
+    """Lệnh nào vừa ghi tệp route của APISIX (GATEWAY) thì gọi hàm này sau up_services: khởi động lại apisix rồi chờ
+    cổng trả 200 (#299). APISIX tự nạp lại tệp khi mtime đổi, nhưng mỗi lần nạp lại bộ lọc WAF coraza-proxy-wasm 0.6.0
+    dựng ngữ cảnh mới, đọc lại CRS trong máy ảo WebAssembly cũ của worker và có lúc hỏng bộ nhớ (wasm trap trong
+    proxy_on_configure → 503, rồi worker chết vì SIGSEGV). Khởi động lại thì mỗi worker có máy ảo mới và chỉ dựng ngữ
+    cảnh một lần, như lúc make up. Cổng gián đoạn vài giây."""
+    realm = compose_env_values(system.root).get("MOC_REALM") or "moc"
+    system.compose("restart", "apisix", timeout=180)
+    started, code = time.monotonic(), ""
+    while time.monotonic() - started < wait_s:
+        code = system.gateway_code(realm)
+        if code == "200":
+            return f"đã khởi động lại apisix (tệp route đổi), cổng trả lời sau {time.monotonic() - started:.0f} giây"
+        time.sleep(1)
+    raise AppError(f"đã khởi động lại apisix nhưng sau {wait_s:.0f} giây cổng vẫn chưa trả 200 (mã {code or '?'})"
+                   " — xem docker compose logs apisix")
+
+
 # ---------------------------------------------------------------------------------------- các lệnh
 
 def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bool = False,
@@ -1305,6 +1331,7 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         f"{', nghe ' + ', '.join(rec['events']['kinds']) if rec.get('events') else ''})")
     env = compose_env_values(state.root)
     made: list[str] = []
+    wrote: list[str] = []
 
     def secrets_step() -> str:
         made.extend(state.ensure_secrets(rec, dry_run=dry_run))
@@ -1316,6 +1343,7 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
             changed = state.write()
         else:
             changed = sorted(set(_preview(state, rec)))
+        wrote.extend(changed)
         return (f"{'sẽ đổi' if dry_run else 'đã ghi'} {len(changed)} tệp: " + ", ".join(_short(changed))) \
             if changed else "đã khớp"
 
@@ -1333,13 +1361,20 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
                 old_json.unlink(missing_ok=True)
             else:
                 _write_atomic(old_json, old_bytes)
-            state.write()
+            if GATEWAY in state.write():
+                restart_apisix(system)
             system.apply_metadata()
             bad = system.metadata({"type": "get_inconsistent_metadata", "args": {}}).get("inconsistent_objects")
             return ("đã trả tệp chạy và metadata Hasura về như trước lần cài này"
                     + (f", còn {len(bad)} chỗ không nhất quán" if bad else ", nhất quán"))
         except (AppError, Unavailable) as exc:
             return f"không trả về được ({exc}) — gỡ: python3 scripts/moc.py app remove {rec['name']}"
+
+    def container_step() -> str:
+        up = up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)
+        if GATEWAY not in wrote:
+            return up
+        return f"{up}; " + ("sẽ khởi động lại apisix vì tệp route đổi" if dry_run else restart_apisix(system))
 
     def hasura_step() -> str:
         if dry_run:
@@ -1356,7 +1391,7 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         ("bí mật", secrets_step),
         ("Keycloak", keycloak_step),
         ("tệp chạy", files_step),
-        ("container", lambda: up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)),
+        ("container", container_step),
         ("Hasura", hasura_step),
     ]
     with ops_lock(state.root):
@@ -1420,6 +1455,7 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
             raise AppError(f"không có ứng dụng {name} trong {STATE}/apps/ (moc app list để xem)")
         return _remove_half_install(name, row, system=system, state=state, dry_run=dry_run, out=out)
     out(f"{'Kế hoạch gỡ' if dry_run else 'Gỡ'} {name} — dữ liệu, schema {rec['schema']} giữ nguyên (không xóa)")
+    wrote: list[str] = []
 
     def container_step() -> str:
         if rec.get("removing"):              # lần gỡ trước đã qua bước này; tệp phủ không còn service để gọi tên
@@ -1434,14 +1470,16 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
             return f"sẽ bỏ route {rec['path']}, bảng và trigger khỏi tệp chạy"
         state.save({**rec, "removing": True})
         changed = state.write()
+        wrote.extend(changed)
         return f"đã ghi {len(changed)} tệp: " + ", ".join(_short(changed)) if changed else "đã khớp"
 
     def hasura_step() -> str:
         if dry_run:
             return "sẽ áp metadata không còn bảng, trigger của ứng dụng"
         up_services(system, ["apisix", "hasura"], dry_run=False)
+        restarted = restart_apisix(system) if GATEWAY in wrote else ""
         system.apply_metadata()
-        return hasura_check(system, state.active(), gone=[rec])
+        return hasura_check(system, state.active(), gone=[rec]) + (f"; {restarted}" if restarted else "")
 
     def keycloak_step() -> str:
         return _remove_keycloak(system, name, dry_run=dry_run)
@@ -1481,6 +1519,8 @@ def sync(*, state: State, system: System, files_only: bool = False, out: Callabl
                 system, rec, env, state.secrets(rec["name"]), new_secret="MOC_CLIENT_SECRET" in made[rec["name"]],
                 dry_run=False))
         up_services(system, ["apisix", "hasura", *(f"app-{a['name']}" for a in apps)], dry_run=False)
+        if GATEWAY in result["changed"]:
+            result["actions"].append(restart_apisix(system))
         system.apply_metadata()
         result["actions"].append(hasura_check(system, apps))
     for line in result["actions"]:

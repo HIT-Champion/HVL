@@ -361,3 +361,9 @@ trong bộ nhớ: mỗi worker tới ~230 MB sau khi soi tệp 24 MB.
   đi tiếp: thêm chữ trước đường dẫn ("Xem tại http://…"), bỏ dấu `?` cuối; người quản trị tra `X-Request-Id` (mục "Đọc
   nhật ký chặn") rồi thêm loại trừ nếu đó là chữ thật hay gặp.
 - Cổng tốn thêm ~0,4–0,8 GB RAM (số đo trên).
+- Không để APISIX tự nạp lại `apisix.yaml` khi đang chạy (#299). APISIX so `mtime` mỗi giây và nạp lại, khi đó
+  coraza-proxy-wasm dựng ngữ cảnh mới và đọc lại CRS trong máy ảo WebAssembly cũ của từng worker. Có lần bộ nhớ hỏng:
+  `wasm trap: out of bounds memory access` trong `proxy_on_configure` → 503, rồi
+  `worker process … exited on signal 11`, yêu cầu đang chạy trên worker đó mất kết nối. `moc app` ghi tệp route xong
+  thì tự khởi động lại `apisix` và chờ cổng trả lời ([`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.2).
+  Sửa tay tệp route trên máy đang chạy cũng vậy: `docker compose restart apisix`. Cổng gián đoạn vài giây.
