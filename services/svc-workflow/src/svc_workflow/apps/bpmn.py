@@ -55,6 +55,10 @@ XSI = "http://www.w3.org/2001/XMLSchema-instance"
 PREFIX = {BPMN: "", BPMNDI: "bpmndi:", DC: "dc:", DI: "di:", FLOWABLE: "flowable:", XSI: "xsi:",
           "http://activiti.org/bpmn": "activiti:"}
 MAX_BPMN_BYTES = 512 * 1024
+# Flowable đặt id định nghĩa quy trình "<khóa>:<phiên bản>:<uuid 36 ký tự>"; chuỗi đó quá 64 ký tự thì id chỉ còn uuid,
+# mất khóa — lõi không còn biết việc, đơn thuộc ứng dụng nào (Task.process_key), đơn vào mà không ai thấy. 22 ký tự
+# vừa tới phiên bản 9999: 22 + 1 + 4 + 1 + 36 = 64
+MAX_KEY = 22
 
 NAME = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*", re.ASCII)              # như name của manifest
 ELEMENT_ID = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]{0,63}", re.ASCII)
@@ -366,6 +370,9 @@ def check(app: str, where: str, raw: bytes, forms: set[str], fields: set[str]) -
     key = proc.attrs.get("id", "")
     if not c.key.fullmatch(key):
         c.err(proc, f"id {key!r} phải dạng {app}.<tên> (chữ thường, số, gạch nối) — id là processKey")
+    elif len(key) > MAX_KEY:
+        c.err(proc, f"id {key!r} dài {len(key)} ký tự, tối đa {MAX_KEY}: Flowable bỏ khóa khỏi id định nghĩa khi "
+                    "<khóa>:<phiên bản>:<uuid> quá 64 ký tự, lõi không còn biết việc thuộc ứng dụng nào")
     nodes = [n for n in proc.children if n.ns == BPMN and n.tag in _Checker.FLOW_NODES]
     starts = [n for n in nodes if n.tag == "startEvent"]
     if len(starts) != 1:

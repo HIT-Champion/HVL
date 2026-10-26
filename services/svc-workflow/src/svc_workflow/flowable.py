@@ -77,7 +77,10 @@ class Task:
 
     @property
     def process_key(self) -> str:
-        return self.process_definition_id.split(":", 1)[0]
+        """Khóa quy trình; rỗng khi id không mang khóa (Flowable bỏ khóa khi id quá 64 ký tự, xem apps/bpmn.MAX_KEY):
+        không khớp quy trình nào, việc không lộ sang ứng dụng khác."""
+        key, sep, _ = self.process_definition_id.partition(":")
+        return key if sep else ""
 
 
 def _variables(values: dict[str, Any]) -> list[dict[str, Any]]:

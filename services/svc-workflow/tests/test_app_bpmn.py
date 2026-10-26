@@ -213,6 +213,15 @@ def test_one_process_per_file():
     assert any("cần đúng một <process>" in e for e in errors_of(xml))
 
 
+def test_process_key_must_fit_in_flowable_definition_id():
+    # "<khóa>:<phiên bản>:<uuid>" quá 64 ký tự thì Flowable bỏ khóa: khóa tối đa 22 ký tự (tới phiên bản 9999)
+    fits = "nghi-phep.don-dai-1234"
+    assert len(fits) == 22 and len(f"{fits}:9999:{'0' * 36}") == 64
+    assert errors_of(swap('<process id="nghi-phep.don"', f'<process id="{fits}"')) == []
+    errors = errors_of(swap('<process id="nghi-phep.don"', f'<process id="{fits}5"'))
+    assert len(errors) == 1 and "dài 23 ký tự, tối đa 22" in errors[0]
+
+
 def test_app_name_is_checked():
     assert check("Nghi_Phep", WHERE, BPMN.encode(), FORMS, FIELDS)[1] == ["tên ứng dụng 'Nghi_Phep' không hợp lệ"]
 
