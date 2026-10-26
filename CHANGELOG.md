@@ -229,6 +229,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- `docs/danh-gia-ai.md` có số đo của CI và bỏ hai câu cũ về bản scan (#276). Mục "Giới hạn" của F4.1 ghi bản scan chưa
+  được OCR cho tìm kiếm, F4.2 ghi bản scan chỉ có đoạn "trích yếu". Từ #253, bản scan vào tìm kiếm và đoạn hỏi đáp
+  bằng chữ OCR của 3 trang đầu. Tài liệu chép thêm số của ba lần chạy xanh trên `develop` ngày 26/10, phần `ai` của
+  job `chay-thu`, không bật mô hình ngôn ngữ, kèm run id và SHA, vì nhật ký CI bị xóa sau 90 ngày. F4.1, F4.2 trùng
+  các lần đo trước trừ độ trễ. F4.3 có sai số hạn 0,9 ngày (lần 22/10: 1,3 ngày), chưa rõ nguyên nhân.
 - Tài liệu trỏ bằng chứng vào đúng job CI (#271). Từ khi phần chạy thử tách thành sáu phần của job `chay-thu`, job
   `stack` chỉ còn bước gom kết quả, nhưng `docs/du-thi/hoi-dap-hoi-dong.md` vẫn ghi "CI job `stack`, bước …" ở sáu
   chỗ. Giờ mỗi chỗ ghi job `chay-thu` và phần chạy bước đó. Cũng sửa "job `luong-chinh`" ở `docs/muc-hoan-thien.md`,
