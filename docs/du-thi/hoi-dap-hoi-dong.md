@@ -22,6 +22,7 @@
 | 11 | [Người khác dựng lại từ mã nguồn được không?](#11-người-khác-dựng-lại-từ-mã-nguồn-được-không) | PoF #4, tiêu chí 10 |
 | 12 | [H-P-D-I ở đâu, khác gì phần mềm quản lý văn bản sẵn có?](#12-h-p-d-i-ở-đâu-khác-gì-phần-mềm-quản-lý-văn-bản-sẵn-có) | Tiêu chí 7, 9 |
 | 13 | [Còn gì chưa làm?](#13-còn-gì-chưa-làm) | Tiêu chí 8, 11 |
+| 14 | [Lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak?](#14-lõi-không-giao-diện-mà-sao-có-grafana-trang-quản-trị-keycloak) | Tiêu chí 7, cụm ① ⑥ |
 
 ## 1. Open-Core nằm ở đâu, ứng dụng khác dùng lại lõi thế nào?
 
@@ -226,3 +227,26 @@ kho văn bản giả lập, chưa có đơn vị dùng thật.
 **Bằng chứng:** [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §6 "Không làm — và lý do";
 [`docs/dac-ta-san-pham.md`](../dac-ta-san-pham.md) §4.4; [`docs/trien-khai.md`](../trien-khai.md) §8; các mục "Còn gì
 chưa làm?" trong [`docs/demo-script.md`](../demo-script.md).
+
+## 14. Lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak?
+
+"Không giao diện" nghĩa là lõi không có màn hình nghiệp vụ: mọi màn hình người dùng thấy thuộc tầng ứng dụng (Văn
+phòng điện tử, Không gian cá nhân, Bảng tin), kể cả hai trang công khai `/trang-thai` và `/xac-thuc` — chúng là trang
+của `apps/office`, lấy dữ liệu từ lõi qua cổng như mọi trang khác. Ứng dụng chỉ gọi lõi bằng API sau APISIX. Giao diện
+còn lại đi theo phần mềm nguồn mở dùng nguyên bản, và không cái nào là màn hình nghiệp vụ:
+
+- Bàn điều khiển cho người vận hành máy chủ: trang quản trị Keycloak, Grafana, và khi bật profile thì Parseable (log),
+  Mailpit (hộp thư thử). Cả bốn chỉ nghe `127.0.0.1`, từ xa phải qua đường hầm SSH. Cổng công khai duy nhất là
+  APISIX, và route `chan` của cổng chặn `/admin`, `/console`, `/realms/*` (trừ realm của Signet), `/flowable-rest/*`
+  cùng các API nội bộ. Không ứng dụng nào gọi tới các bàn này.
+- Trang đăng nhập của Keycloak (theme `signet`): theo OIDC, người dùng nhập mật khẩu và mã TOTP ở trang của dịch vụ
+  danh tính chứ không ở ứng dụng. Nhờ vậy không ứng dụng nào thấy mật khẩu, và ba ứng dụng dùng chung một lần đăng
+  nhập. Theme chỉ thêm CSS, logo và câu chữ tiếng Việt, tiếng Anh, không thay mẫu trang; cổng chỉ mở đường đăng
+  nhập của realm Signet.
+- Không có giao diện: Hasura tắt console (`HASURA_GRAPHQL_ENABLE_CONSOLE: "false"`); Flowable dùng bản REST, không có
+  giao diện (QĐ-009).
+
+**Bằng chứng:** `docker-compose.yml` (cổng của Keycloak, Grafana, Parseable, Mailpit gắn `127.0.0.1`);
+`platform/apisix/apisix.yaml` (route `keycloak` chỉ mở realm `${MOC_REALM}`, route `chan`);
+[`docs/architecture.md`](../architecture.md) §2 và QĐ-009; README, bảng địa chỉ ở mục "Chạy thử";
+[`docs/van-hanh.md`](../van-hanh.md) mục "Giám sát".
