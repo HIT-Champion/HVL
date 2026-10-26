@@ -111,9 +111,12 @@ function takeSuggestion(p: SuggestApply) {
   if (p.due_on) direct.due_on = p.due_on
 }
 
-function submitDirect() {
+async function submitDirect() {
   tried.value = true
-  if (Object.keys(directErrors.value).length) return
+  if (Object.keys(directErrors.value).length) {
+    await focusInvalidField()
+    return
+  }
   complete('direct', {
     instruction: direct.instruction.trim(),
     ...(direct.leadKind === 'department' ? { lead_department_id: direct.lead_department_id } : { lead_user_id: direct.lead_user_id }),
@@ -122,9 +125,12 @@ function submitDirect() {
   })
 }
 
-function submitAssign() {
+async function submitAssign() {
   tried.value = true
-  if (!assign.user_id) return
+  if (!assign.user_id) {
+    await focusInvalidField()
+    return
+  }
   complete('assign', { user_id: assign.user_id, note: assign.note.trim() || null })
 }
 
@@ -132,9 +138,12 @@ function approve() {
   complete('approve', { note: reviewNote.value.trim() || null })
 }
 
-function sendBack() {
+async function sendBack() {
   returning.value = true
-  if (!reviewNote.value.trim()) return
+  if (!reviewNote.value.trim()) {
+    await focusInvalidField()
+    return
+  }
   complete('return', { note: reviewNote.value.trim() })
 }
 
@@ -170,8 +179,11 @@ function submitDone() {
       <div>
         <label class="label" for="instruction">{{ t('form.chiDao.instruction') }}</label>
         <textarea id="instruction" v-model="direct.instruction" rows="3" class="input" maxlength="2000"
-                  :aria-invalid="tried && !!directErrors.instruction" />
-        <p v-if="tried && directErrors.instruction" class="field-error">{{ directErrors.instruction }}</p>
+                  required :aria-invalid="tried && !!directErrors.instruction"
+                  :aria-describedby="tried && directErrors.instruction ? 'instruction-error' : undefined" />
+        <p v-if="tried && directErrors.instruction" id="instruction-error" class="field-error">
+          {{ directErrors.instruction }}
+        </p>
       </div>
       <fieldset>
         <legend class="label">{{ t('form.chiDao.leadKind') }}</legend>
@@ -182,19 +194,27 @@ function submitDone() {
       </fieldset>
       <div v-if="direct.leadKind === 'department'">
         <label class="label" for="lead_dept">{{ t('form.chiDao.department') }}</label>
-        <select id="lead_dept" v-model="direct.lead_department_id" class="input" :aria-invalid="tried && !!directErrors.lead">
+        <select
+          id="lead_dept" v-model="direct.lead_department_id" class="input" required
+          :aria-invalid="tried && !!directErrors.lead"
+          :aria-describedby="tried && directErrors.lead ? 'lead-error' : undefined"
+        >
           <option value="">{{ t('form.pick') }}</option>
           <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
         </select>
       </div>
       <div v-else>
         <label class="label" for="lead_user">{{ t('form.chiDao.user') }}</label>
-        <select id="lead_user" v-model="direct.lead_user_id" class="input" :aria-invalid="tried && !!directErrors.lead">
+        <select
+          id="lead_user" v-model="direct.lead_user_id" class="input" required
+          :aria-invalid="tried && !!directErrors.lead"
+          :aria-describedby="tried && directErrors.lead ? 'lead-error' : undefined"
+        >
           <option value="">{{ t('form.pick') }}</option>
           <option v-for="u in handlers" :key="u.id" :value="u.id">{{ u.full_name }} — {{ deptName(u.department_id) }}</option>
         </select>
       </div>
-      <p v-if="tried && directErrors.lead" class="field-error">{{ directErrors.lead }}</p>
+      <p v-if="tried && directErrors.lead" id="lead-error" class="field-error">{{ directErrors.lead }}</p>
       <fieldset>
         <legend class="label">{{ t('form.chiDao.supports') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></legend>
         <div class="grid gap-1.5 sm:grid-cols-2">
@@ -205,8 +225,12 @@ function submitDone() {
       </fieldset>
       <div class="max-w-xs">
         <label class="label" for="due">{{ t('form.chiDao.due') }}</label>
-        <input id="due" v-model="direct.due_on" type="date" class="input" :min="today()" :aria-invalid="tried && !!directErrors.due_on">
-        <p v-if="tried && directErrors.due_on" class="field-error">{{ directErrors.due_on }}</p>
+        <input
+          id="due" v-model="direct.due_on" type="date" class="input" :min="today()"
+          :aria-invalid="tried && !!directErrors.due_on"
+          :aria-describedby="tried && directErrors.due_on ? 'due-error' : undefined"
+        >
+        <p v-if="tried && directErrors.due_on" id="due-error" class="field-error">{{ directErrors.due_on }}</p>
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
         <div class="flex items-end gap-2">
@@ -221,11 +245,12 @@ function submitDone() {
     <form v-else-if="formKey === 'vbden.phanCong'" class="space-y-4 p-5" novalidate @submit.prevent="submitAssign">
       <div>
         <label class="label" for="assignee">{{ t('form.phanCong.user') }}</label>
-        <select id="assignee" v-model="assign.user_id" class="input" :aria-invalid="tried && !assign.user_id">
+        <select id="assignee" v-model="assign.user_id" class="input" required :aria-invalid="tried && !assign.user_id"
+          :aria-describedby="tried && !assign.user_id ? 'assignee-error' : undefined">
           <option value="">{{ t('form.pick') }}</option>
           <option v-for="u in myPeople" :key="u.id" :value="u.id">{{ u.full_name }}</option>
         </select>
-        <p v-if="tried && !assign.user_id" class="field-error">{{ t('validation.required') }}</p>
+        <p v-if="tried && !assign.user_id" id="assignee-error" class="field-error">{{ t('validation.required') }}</p>
       </div>
       <div>
         <label class="label" for="note">{{ t('form.phanCong.note') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></label>
@@ -280,8 +305,11 @@ function submitDone() {
       <div>
         <label class="label" for="review-note">{{ t('form.duyet.note') }}</label>
         <textarea id="review-note" v-model="reviewNote" rows="3" class="input" maxlength="2000"
-                  :placeholder="t('form.duyet.returnNote')" :aria-invalid="returning && !reviewNote.trim()" />
-        <p v-if="returning && !reviewNote.trim()" class="field-error">{{ t('form.duyet.returnNote') }}</p>
+                  :placeholder="t('form.duyet.returnNote')" :aria-invalid="returning && !reviewNote.trim()"
+                  :aria-describedby="returning && !reviewNote.trim() ? 'review-note-error' : undefined" />
+        <p v-if="returning && !reviewNote.trim()" id="review-note-error" class="field-error">
+          {{ t('form.duyet.returnNote') }}
+        </p>
       </div>
       <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" :disabled="busy" @click="sendBack">{{ t('form.duyet.return') }}</button>

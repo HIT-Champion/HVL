@@ -283,6 +283,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 
   e2e mới `tests/e2e/man-hep.spec.ts`: trang thu từ 1440 xuống 768, 390 không cuộn ngang (đo cả `#main-content`),
   nút ở tiêu đề nằm trong khung, quản trị đơn vị bị đưa về sổ kiểm toán mà không gửi câu hỏi văn bản nào.
+- Phần còn lại của #230: form, hộp Góp ý trên điện thoại, Bảng tin (#248):
+  - bấm lưu khi còn ô sai (soạn dự thảo, lập hồ sơ, tiếp nhận văn bản đến, chỉ đạo, phân công, báo cáo kết quả, trả
+    lại) thì tiêu điểm vào ô sai đầu tiên thay vì ở lại nút lưu, và ô trỏ tới câu báo lỗi (`aria-describedby`) để
+    trình đọc màn hình đọc được; ô chọn tệp khi tiếp nhận có viền khi dùng bàn phím;
+  - hộp Góp ý trên điện thoại (dưới 640px) nằm trọn trong màn hình, trước đây lệch trái 29px ở 390px; Esc vẫn đóng
+    hộp và giữ chữ đang soạn;
+  - Bảng tin kiểm lại vai trò ở mỗi lần làm mới, xóa tin cũ nếu tài khoản không còn quyền xem, và đổi lỗi
+    `validation-failed` của máy chủ thành câu hướng dẫn thay vì in nguyên lỗi GraphQL.
+
+  e2e mới `tests/e2e/loi-form.spec.ts`: hộp Góp ý ở 390px, tiêu điểm và mô tả lỗi ở các form trên.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô

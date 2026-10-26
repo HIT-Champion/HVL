@@ -106,7 +106,10 @@ const errorOf = (e: unknown) => caseFileErrorText(t, e, (x) => errorText(t, x))
 
 async function create() {
   errors.value = validateCaseFile(form)
-  if (Object.keys(errors.value).length) return
+  if (Object.keys(errors.value).length) {
+    await focusInvalidField()
+    return
+  }
   saving.value = true
   try {
     const data = await gql<{ insert_office_case_files_one: { id: string, code: string } }>(`
@@ -144,22 +147,23 @@ async function create() {
         <label class="label" for="cf-code">{{ t('cases.code') }}</label>
         <input
           id="cf-code" v-model="form.code" class="input" :placeholder="t('cases.codeHint')" maxlength="50"
-          :aria-invalid="!!errors.code"
+          required :aria-invalid="!!errors.code" :aria-describedby="errors.code ? 'cf-code-error' : undefined"
         >
-        <p v-if="errors.code" class="field-error">{{ t(`cases.validation.${errors.code}`) }}</p>
+        <p v-if="errors.code" id="cf-code-error" class="field-error">{{ t(`cases.validation.${errors.code}`) }}</p>
       </div>
       <div>
         <label class="label" for="cf-year">{{ t('cases.year') }}</label>
         <input
           id="cf-year" v-model="form.year" type="number" min="2000" max="2999" class="input"
-          :aria-invalid="!!errors.year"
+          required :aria-invalid="!!errors.year" :aria-describedby="errors.year ? 'cf-year-error' : undefined"
         >
-        <p v-if="errors.year" class="field-error">{{ t(`cases.validation.${errors.year}`) }}</p>
+        <p v-if="errors.year" id="cf-year-error" class="field-error">{{ t(`cases.validation.${errors.year}`) }}</p>
       </div>
       <div class="sm:col-span-2">
         <label class="label" for="cf-title">{{ t('cases.name') }}</label>
-        <input id="cf-title" v-model="form.title" class="input" maxlength="500" :aria-invalid="!!errors.title">
-        <p v-if="errors.title" class="field-error">{{ t(`cases.validation.${errors.title}`) }}</p>
+        <input id="cf-title" v-model="form.title" class="input" maxlength="500" required
+          :aria-invalid="!!errors.title" :aria-describedby="errors.title ? 'cf-title-error' : undefined">
+        <p v-if="errors.title" id="cf-title-error" class="field-error">{{ t(`cases.validation.${errors.title}`) }}</p>
       </div>
       <div>
         <label class="label" for="cf-retention">{{ t('cases.retention') }}</label>
