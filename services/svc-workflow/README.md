@@ -19,6 +19,12 @@ Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hi
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
 xuất bằng `make api-docs`.
 
+**Quy trình của ứng dụng (#301)**: gói `svc_workflow/apps/` (luôn bật, không phụ thuộc `MOC_OFFICE_ENABLED`) mở năm
+đường `/api/workflow/{app}/…` qua APISIX cho ứng dụng cắm bằng manifest — token phải của client `app-{app}` — và lệnh
+`python -m svc_workflow.apps.deploy check|install|remove <tên>` mà `moc app install | remove` gọi trong container:
+kiểm BPMN theo danh sách trắng, form, rồi triển khai thành một deployment trên cùng Flowable. Chi tiết:
+[`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.10, [`docs/api/README.md`](../../docs/api/README.md) §8.
+
 **Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
 chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:
 chỉ mục duy nhất `document_events_task_once` (một việc một sự kiện — lỗi này thì đọc lại sự kiện đã ghi, hoàn

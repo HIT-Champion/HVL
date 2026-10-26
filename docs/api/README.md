@@ -17,7 +17,7 @@ là cổng xác thực văn bản đã phát hành (`/api/verify`) và trạng t
 | [`graphql/<vai trò>.graphql`](graphql/) | Schema GraphQL mà từng vai trò thấy: `clerk`, `staff`, `manager`, `director`, `tenant_admin` |
 | [`thao-tac-theo-vai-tro.md`](thao-tac-theo-vai-tro.md) | Bảng vai trò × truy vấn, thao tác ghi |
 | [`openapi/svc-files.json`](openapi/svc-files.json) | OpenAPI 3.1 của API tệp và tìm kiếm |
-| [`openapi/svc-workflow.json`](openapi/svc-workflow.json) | OpenAPI 3.1 của API nội bộ chạy Hasura Actions, chỉ Hasura gọi |
+| [`openapi/svc-workflow.json`](openapi/svc-workflow.json) | OpenAPI 3.1 của `svc-workflow`: API nội bộ chạy Hasura Actions (chỉ Hasura gọi) và API quy trình của ứng dụng `/api/workflow/…` (§8) |
 
 Trừ tệp README này, mọi tệp trên **sinh tự động** từ hệ thống đang chạy:
 
@@ -50,6 +50,7 @@ cũng nạp được.
 | `/realms/moc/…` | Keycloak: đăng nhập, cấp và làm mới token, JWKS | — |
 | `POST /v1/graphql` | Hasura | Bắt buộc |
 | `POST /api/files`, `GET /api/files/{id}`, `POST /api/files/{id}/read`, `GET /api/search`, `GET /api/documents/{id}/preview`, `POST /api/documents/ask`, `GET /api/registers/…`, `GET /api/case-files/…`, `POST /api/imports/incoming`, `GET /api/imports…` | `svc-files` | Bắt buộc |
+| `GET`, `POST /api/workflow/{app}/…` | `svc-workflow`: quy trình của ứng dụng cắm bằng manifest (§8) | Bắt buộc, của client `app-{app}` |
 | `GET /api/verify/{mã}`, `GET /api/verify?sha256=…`, `GET /api/verify/ca.pem`, `GET /api/verify/anchor-key.pem` | `svc-files`: cổng xác thực | Không; giới hạn theo IP |
 | `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
@@ -63,8 +64,8 @@ Cổng trả `404` cho các đường còn lại:
 - WebSocket tới Hasura, nên chưa dùng được `subscription` của GraphQL; thông báo đẩy đi qua `/realtime` (§4).
   Danh sách đầy đủ ở [`platform/apisix/apisix.yaml`](../../platform/apisix/apisix.yaml).
 
-Token thiếu, sai chữ ký hoặc hết hạn bị cổng trả `401` trước khi tới Hasura hay `svc-files`. Hai dịch vụ này
-vẫn kiểm lại token (zero-trust).
+Token thiếu, sai chữ ký hoặc hết hạn bị cổng trả `401` trước khi tới Hasura, `svc-files` hay `svc-workflow`. Ba
+dịch vụ này vẫn kiểm lại token (zero-trust).
 
 ## 1. Lấy token
 
@@ -321,3 +322,40 @@ Ví dụ `overview` của lần phát hành: `{"status": ["approved", "issued"],
 | `svc-workflow` → Centrifugo `POST /api/batch` (cổng nội bộ 9000) | Tiêu đề `X-API-Key` (`CENTRIFUGO_API_KEY`) | [`platform/centrifugo/config.yaml`](../../platform/centrifugo/config.yaml) |
 | `svc-files` → SeaweedFS, bucket lạnh `moc-cold` | S3, bucket bật Object Lock; ghi mốc neo sổ kiểm toán kèm hạn giữ COMPLIANCE | [`services/svc-files/README.md`](../../services/svc-files/README.md) |
 | `scripts/moc.py` trên máy chủ → PostgreSQL, `svc-files` | `docker compose exec` (không mở thêm cổng) | [`db/README.md`](../../db/README.md#sổ-kiểm-toán-chuỗi-băm) |
+
+## 8. Quy trình của ứng dụng: `/api/workflow/{app}/…`
+
+Ứng dụng cắm bằng `moc app install` khai quy trình BPMN và form JSON Schema ở mục `workflow` của manifest; lõi kiểm,
+triển khai lên Flowable của `svc-workflow` và mở năm đường dưới đây cho trang của ứng dụng
+([`docs/them-ung-dung.md`](../them-ung-dung.md) mục 1.10). Token phải do client công khai `app-{app}` của chính ứng
+dụng cấp (`azp`): token của Văn phòng điện tử, của `moc-cli` hay của ứng dụng khác bị trả `403`. Đơn vị, phòng, vai trò,
+người dùng lấy từ claim của token, không lấy từ dữ liệu gửi lên.
+
+| Yêu cầu | Trả |
+|---|---|
+| `GET /api/workflow/{app}/forms/{formKey}` | `200`: JSON Schema của form, đúng tệp manifest khai |
+| `POST /api/workflow/{app}/processes/{processKey}` `{"data": {…}}` | `201 {"id"}`: kiểm theo form của sự kiện bắt đầu rồi bắt đầu quy trình; lõi tự đặt biến `tenantId`, `departmentId`, `initiator` |
+| `GET /api/workflow/{app}/processes` | `200 [{id, processKey, startedAt, endedAt, data}]`: đơn người gọi đã gửi, mới nhất trước; `endedAt` là `null` khi chưa xong; `data` gồm dữ liệu đơn và các bước đã xong |
+| `GET /api/workflow/{app}/tasks` | `200 [{id, name, formKey, processKey, processId, createdAt, dueAt, data}]`: việc giao cho người gọi hoặc nhóm của người gọi, cùng đơn vị, cũ nhất trước; `data` là dữ liệu đã ghi vào quy trình |
+| `POST /api/workflow/{app}/tasks/{taskId}` `{"data": {…}}` | `204`: kiểm theo form của việc, nhận việc rồi hoàn thành |
+
+```bash
+# TOKEN: token của client app-nghi-phep (trang của ứng dụng đăng nhập bằng Authorization Code + PKCE)
+curl -s "$MOC/api/workflow/nghi-phep/forms/nghi-phep.don" -H "Authorization: Bearer $TOKEN"
+curl -s "$MOC/api/workflow/nghi-phep/processes/nghi-phep.don" -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"data": {"loai": "phep-nam", "tuNgay": "2026-11-02", "denNgay": "2026-11-04"}}'
+```
+
+Dữ liệu sai form: `422 {"errors": {"<trường>": "<mã>"}}` — mã như [`schemas/README.md`](../../schemas/README.md)
+(`required`, `enum`, `format`, `maxLength`, `additionalProperties`…) cộng `x-moc-range` (trường "đến" trước trường
+"từ"); gửi tên biến hệ thống cũng là `additionalProperties`. Lỗi khác có dạng `{"detail": {"code", "message"}}`:
+
+| Mã HTTP | `code` | Khi nào |
+|---|---|---|
+| `400` | `bad_request` | Thân không phải JSON `{"data": {…}}` |
+| `401` | `missing_token`, `invalid_token` | Thiếu token; sai chữ ký, `iss`, hết hạn |
+| `403` | `wrong_client`, `no_tenant` | Token không phải của `app-{app}`; tài khoản chưa gán đơn vị |
+| `404` | `app_not_found`, `app_not_installed`, `form_not_found`, `process_not_found`, `task_not_found` | Tên ứng dụng sai; chưa cài hoặc đã gỡ (`moc app remove` tạm dừng quy trình, lịch sử còn trong Flowable); form, quy trình không có; việc không còn hoặc không thuộc ứng dụng, đơn vị, người gọi |
+| `409` | `task_taken` | Việc vừa có người khác nhận |
+| `503` | `workflow_unavailable`, `jwks_unavailable`, `not_configured` | Chưa gọi được Flowable, Keycloak; dịch vụ chưa cấu hình kiểm token |
