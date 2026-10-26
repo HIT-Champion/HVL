@@ -535,15 +535,10 @@ class HasuraClient:
         return {**row, "archive_sha256": _hex(row["archive_sha256"]) if row["archive_sha256"] else None} if row else None
 
     async def archived_case_files(self, token: str) -> list[dict[str, Any]]:
-        """Hồ sơ đã nộp lưu người giữ token xem được (vị trí gói, băm manifest); vai trò không đọc hồ sơ thì rỗng."""
-        try:
-            data = await self._call(ARCHIVED_CASE_FILES, {}, {"Authorization": f"Bearer {token}"})
-        except HasuraAuthError:
-            raise
-        except HasuraError as exc:
-            if exc.code == "validation-failed":
-                return []
-            raise
+        """Hồ sơ đã nộp lưu người giữ token xem được (vị trí gói, băm manifest). Route chỉ gọi cho lãnh đạo đơn vị, vai
+        trò đọc được hồ sơ: ``validation-failed`` ở đây là metadata Hasura hỏng, đi ra như mọi ``HasuraError`` (503),
+        không thành "chưa có hồ sơ nào nộp lưu"."""
+        data = await self._call(ARCHIVED_CASE_FILES, {}, {"Authorization": f"Bearer {token}"})
         return [{**row, "archive_sha256": _hex(row["archive_sha256"])} for row in data["office_case_files"]
                 if row["archive_key"] and row["archive_sha256"]]
 

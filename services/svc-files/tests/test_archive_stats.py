@@ -24,7 +24,11 @@ import dataclasses
 import json
 import time
 import uuid
+from collections.abc import Callable
+from datetime import timedelta
+from typing import Any
 
+import duckdb
 import jwt
 import pytest
 from botocore.exceptions import ClientError
@@ -33,8 +37,9 @@ from fastapi.testclient import TestClient
 from conftest import ISSUER
 from svc_files.app import create_app
 from svc_files.archive import CASE_FILE, Archiver, ColdStore, manifest_key
-from svc_files.archive_stats import JOB, ArchiveStats
+from svc_files.archive_stats import JOB, UNREADABLE_TTL, ArchiveStats
 from svc_files.auth import HASURA_CLAIMS
+from svc_files.hasura import HasuraError
 from svc_files.lineage import INSERT as LINEAGE
 from svc_files.lineage import Lineage
 from test_archive import NOW, TENANT, FakeHot, FakeS3, case_file, sha
@@ -148,6 +153,29 @@ def two_case_files(c: Cold) -> None:
     add(c, 2, [("in", "CV", "2026-02-01"), ("in", "TB", "2026-05-01")], department=KTPM)
 
 
+def forge(c: Cold, row: dict, change: Callable[[dict], Any], *, documents: bytes | None = None) -> None:
+    """Gói ``row`` có manifest khác (``change`` sửa bản gốc) và CSDL trỏ tới băm mới: manifest vẫn khớp băm trong CSDL.
+    ``documents``: thay bảng văn bản, băm mới ghi vào manifest."""
+    manifest = json.loads(c.s3.objects[manifest_key(row["archive_key"], row["archive_sha256"])])
+    if documents is not None:
+        path = f"documents-{sha(documents)}.parquet"
+        c.s3.versions[f"{row['archive_key']}{path}"] = [(documents, {})]
+        manifest["tables"]["documents"].update(path=path, sha256=sha(documents))
+    data = json.dumps(change(manifest)).encode()
+    row["archive_sha256"] = sha(data)
+    c.s3.versions[manifest_key(row["archive_key"], row["archive_sha256"])] = [(data, {})]
+
+
+def parquet(tmp_path, select: str) -> bytes:
+    out = tmp_path / "t.parquet"
+    con = duckdb.connect()
+    try:
+        con.execute(f"copy ({select}) to '{out}' (format parquet)")
+    finally:
+        con.close()
+    return out.read_bytes()
+
+
 # --- truy vấn DuckDB trên gói lạnh ------------------------------------------------------------------------------------
 
 def test_counts_match_the_archived_packages_by_year_type_and_department():
@@ -221,6 +249,109 @@ def test_cached_until_a_new_package_arrives_and_each_new_set_is_one_lineage_run(
     again = stats_of(c, engine)
     assert (again.case_files, again.documents) == (2, 3) and len(events) == 2
     assert len(events[1]["inputs"]) == 2 and events[1]["run_id"] != event["run_id"]
+
+
+@pytest.mark.parametrize("field, value", [("id", case_id(9)), ("tenant_id", OTHER_TENANT)])
+def test_manifest_naming_another_case_file_or_unit_is_unreadable_even_with_a_matching_hash(field, value):
+    c = make_cold()
+    forged, _ = (add(c, n, [("in", "CV", "2026-02-01")]) for n in (1, 2))
+    forge(c, forged, lambda m: {**m, "case_file": {**m["case_file"], field: value}})
+    c.gets.clear()
+    s = stats_of(c)
+    assert (s.case_files, s.documents, [u["code"] for u in s.unreadable]) == (1, 1, ["HS-01"])
+    # manifest không phải của hồ sơ này: không tải bảng văn bản của gói
+    assert [k for k in c.gets if k.startswith(forged["archive_key"])] == [
+        manifest_key(forged["archive_key"], forged["archive_sha256"])]
+
+
+SHAPES = {
+    "format": lambda m: {**m, "format": "moc-archive/2"},
+    "not-an-object": lambda m: [m],
+    "no-tables": lambda m: {k: v for k, v in m.items() if k != "tables"},
+    "case-file-list": lambda m: {**m, "case_file": [m["case_file"]]},
+    "year-text": lambda m: {**m, "case_file": {**m["case_file"], "year": "năm 2026"}},
+    "department-not-uuid": lambda m: {**m, "case_file": {**m["case_file"], "department_id": "phong-dao-tao"}},
+}
+
+
+@pytest.mark.parametrize("change", SHAPES.values(), ids=SHAPES.keys())
+def test_manifest_of_another_format_or_shape_is_unreadable_not_a_failed_page(change):
+    c = make_cold()
+    bad, _ = (add(c, n, [("in", "CV", "2026-02-01")]) for n in (1, 2))
+    forge(c, bad, change)
+    s = stats_of(c)
+    assert (s.case_files, s.documents, [u["code"] for u in s.unreadable]) == (1, 1, ["HS-01"])
+
+
+TABLES = {
+    "missing-column": "select 'in' as direction, date '2026-02-01' as issued_on, uuid() as case_file_id, uuid() as id",
+    "date-as-number": "select 'in' as direction, 'CV' as type_code, 20260201 as issued_on, uuid() as case_file_id,"
+                      " uuid() as id",
+}
+
+
+@pytest.mark.parametrize("table", TABLES)
+def test_documents_table_missing_a_column_or_of_another_type_is_unreadable(tmp_path, log_records, table):
+    c = make_cold()
+    bad, good = (add(c, n, [("in", "CV", "2026-02-01")]) for n in (1, 2))
+    forge(c, bad, lambda m: m, documents=parquet(tmp_path, TABLES[table]))
+    s = stats_of(c)
+    assert (s.case_files, s.documents, [u["code"] for u in s.unreadable]) == (1, 1, ["HS-01"])
+    assert [k.split("/case/")[1].split("/")[0] for k in s.inputs] == [good["id"]]
+    # lý do chỉ vào nhật ký, không vào câu trả lời
+    [skipped] = [r for r in log_records if r["event"] == "case_file.archive_stats_skipped"]
+    assert skipped["case_file_id"] == bad["id"]
+    assert skipped["error"].startswith(("BinderException", "ConversionException"))
+
+
+def test_result_with_an_unreadable_package_is_cached_only_briefly():
+    c = make_cold()
+    add(c, 1, [("in", "CV", "2026-02-01")])
+    gone = add(c, 2, [("in", "CV", "2026-02-01")])
+    key = manifest_key(gone["archive_key"], gone["archive_sha256"])
+    saved = c.s3.versions.pop(key)
+    now = [NOW]
+    engine = ArchiveStats(c.cold, clock=lambda: now[0])
+    first = stats_of(c, engine)
+    assert [u["code"] for u in first.unreadable] == ["HS-02"]
+    reads = len(c.gets)
+    now[0] += UNREADABLE_TTL - timedelta(seconds=1)
+    assert stats_of(c, engine) is first and len(c.gets) == reads     # mở lại trang ngay: không tải lại mọi gói
+    c.s3.versions[key] = saved                                       # gói được sửa
+    now[0] += timedelta(seconds=2)
+    again = stats_of(c, engine)
+    assert (again.case_files, again.documents, again.unreadable) == (2, 2, []) and len(c.gets) > reads
+    now[0] += timedelta(days=30)
+    assert stats_of(c, engine) is again                              # không còn gói hỏng: lưu đệm tới gói mới
+
+
+def test_one_unit_computing_does_not_make_another_unit_wait():
+    engine = ArchiveStats(make_cold().cold)
+
+    async def scenario():
+        async with engine.lock(TENANT):          # đơn vị này đang có một lượt tính
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(engine.get(uuid.UUID(TENANT), []), 0.2)
+            return await asyncio.wait_for(engine.get(uuid.UUID(OTHER_TENANT), []), 5)
+    assert asyncio.run(scenario()).case_files == 0
+
+
+def test_duckdb_runs_under_the_configured_thread_and_memory_caps(monkeypatch):
+    c = make_cold()
+    add(c, 1, [("in", "CV", "2026-02-01")])
+    connect, seen = duckdb.connect, []
+
+    def spy(*args, **kwargs):
+        con = connect(*args, **kwargs)
+        seen.append(con.execute("select current_setting('threads'), current_setting('memory_limit')").fetchone())
+        return con
+    monkeypatch.setattr(duckdb, "connect", spy)
+    assert stats_of(c, ArchiveStats(c.cold, threads=1, memory_mb=300)).documents == 1
+    ref = connect(config={"memory_limit": "300MB"})
+    try:
+        assert seen == [(1, ref.execute("select current_setting('memory_limit')").fetchone()[0])]
+    finally:
+        ref.close()
 
 
 # --- route của trang Điều hành ----------------------------------------------------------------------------------------
@@ -305,6 +436,13 @@ def test_database_or_cold_bucket_down_is_503(board, token):
     r = client.get(URL, headers=token("director", department=None))
     assert (r.status_code, r.json()["detail"]["code"]) == (503, "database_unavailable")
     c.hasura.down = False
+
+    async def broken(token: str) -> list[dict]:     # metadata Hasura hỏng: lỗi CSDL, không phải "chưa có hồ sơ nào"
+        raise HasuraError("field 'office_case_files' not found in type: 'query_root'", "validation-failed")
+    c.hasura.archived_case_files = broken
+    r = client.get(URL, headers=token("director", department=None))
+    assert (r.status_code, r.json()["detail"]["code"]) == (503, "database_unavailable")
+    del c.hasura.archived_case_files
 
     def down(*, Bucket, Key):  # noqa: N803
         raise ClientError({"Error": {"Code": "ServiceUnavailable"}}, "GetObject")

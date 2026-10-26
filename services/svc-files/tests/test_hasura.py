@@ -275,8 +275,11 @@ def test_archived_case_files_ask_with_the_user_token_and_return_hex_hashes():
     assert headers["authorization"] == "Bearer token-lanh-dao" and "x-hasura-admin-secret" not in headers
     assert '{status: {_eq: "archived"}}' in body["query"]
     assert got == [{"id": "c-1", "code": "HS-01", "archive_key": key, "archive_sha256": "ef" * 32}]
+    # lãnh đạo đơn vị đọc được hồ sơ: validation-failed là metadata hỏng, ra như lỗi CSDL (503), không thành kho trống
     rec = Recorder((200, {"errors": [{"message": "field not found", "extensions": {"code": "validation-failed"}}]}))
-    assert run(client(rec).archived_case_files("t")) == []
+    with pytest.raises(HasuraError) as exc:
+        run(client(rec).archived_case_files("t"))
+    assert exc.value.code == "validation-failed" and not isinstance(exc.value, HasuraAuthError)
     rec = Recorder((200, {"errors": [{"message": "JWTExpired", "extensions": {"code": "invalid-jwt"}}]}))
     with pytest.raises(HasuraAuthError):
         run(client(rec).archived_case_files("t"))

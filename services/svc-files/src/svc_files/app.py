@@ -368,7 +368,9 @@ class ArchiveStatsOut(BaseModel):
     by_type: list[ArchiveTypeOut]
     by_department: list[ArchiveDepartmentOut]
     unreadable: list[UnreadablePackageOut] = Field(
-        description="Hồ sơ có gói không đọc được (lệch băm, thiếu đối tượng): không vào số liệu, bình thường rỗng")
+        description="Hồ sơ có gói không đọc được (lệch băm, thiếu đối tượng, sai dạng): không vào số liệu, bình thường "
+                    "rỗng. Chỉ `case_file_id` và ký hiệu (`code`); lý do ghi vào nhật ký "
+                    "(`case_file.archive_stats_skipped`)")
     bucket: str = Field(description="Bucket lạnh (khóa ghi S3 Object Lock) chứa các gói")
     computed_at: datetime = Field(description="Lúc DuckDB tính; tính lại khi có hồ sơ mới nộp lưu")
 
@@ -548,7 +550,7 @@ def create_app(
     # người dùng ngoài đơn vị trong token)
     archive_stats = archive_stats or ArchiveStats(cold, Lineage(
         lambda query, variables: hasura.admin(query, variables, {"X-Hasura-User-Id": "svc-files:archive-stats"}),
-        settings.openlineage_url))
+        settings.openlineage_url), threads=settings.archive_stats_threads, memory_mb=settings.archive_stats_memory_mb)
     if vault is None and settings.vault_addr:
         vault = Vault(settings.vault_addr, role_id_file=settings.vault_role_id_file,
                       secret_id_file=settings.vault_secret_id_file, key=settings.transit_key)
@@ -1684,7 +1686,8 @@ def create_app(
              description="Quyền như trang Điều hành: chỉ lãnh đạo đơn vị, số liệu của đơn vị trong token (Hasura trả "
                          "các hồ sơ đã nộp lưu người gọi xem được). Mỗi gói: manifest so băm với CSDL, bảng văn bản so "
                          "băm với manifest, rồi DuckDB đếm trên mọi bảng một lượt. Chỉ số đếm; lưu đệm tới khi có hồ "
-                         "sơ mới nộp lưu, mỗi lần tính lại ghi một run OpenLineage `moc.archive.stats`.")
+                         "sơ mới nộp lưu (có gói không đọc được thì 60 giây). Mỗi tập manifest mới là một run "
+                         "OpenLineage `moc.archive.stats` (đầu vào: các bảng Parquet đã đọc).")
     async def case_file_archive_stats(request: Request,
                                       principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
         if principal.role != "director":
