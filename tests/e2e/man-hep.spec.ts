@@ -18,8 +18,9 @@ import { expect, test, type Page } from '@playwright/test'
 import { PASSWORD, TOTP_SECRET, signIn } from './helpers'
 
 // Màn hẹp và quyền trên giao diện (#230): mở trang ở 1440px, thu xuống 768 rồi 390 (như người dùng thu cửa sổ,
-// biểu đồ vẽ ở khổ rộng phải tự co lại) mà trang không cuộn ngang; nút ở tiêu đề trang nằm trong khung; quản trị
-// đơn vị gõ thẳng địa chỉ trang văn bản thì về sổ kiểm toán, không gửi câu hỏi văn bản nào.
+// biểu đồ vẽ ở khổ rộng phải tự co lại) mà trang không cuộn ngang; nút ở tiêu đề trang nằm trong khung; ô, nút trong
+// khung xử lý việc không bị cắt (#251); quản trị đơn vị gõ thẳng địa chỉ trang văn bản thì về sổ kiểm toán, không gửi
+// câu hỏi văn bản nào.
 
 // Trang hay vùng nội dung rộng hơn khung thì trả về mô tả (các phần tử sâu nhất lố ra ngoài, không kể phần nằm trong
 // vùng cuộn ngang riêng), không thì chuỗi rỗng. Đo cả #main-content để overflow ẩn ở đó không che được lỗi
@@ -51,6 +52,22 @@ function headerSpill() {
     const r = el.getBoundingClientRect()
     return r.right > box.right + 1 || r.left < box.left - 1 || el.scrollWidth > el.clientWidth + 1
   }).map((el) => el.textContent?.trim()).join(', ')
+}
+
+// Ô, nút trong vùng lố khỏi màn hình hay khỏi một tổ tiên có overflow ẩn: phần lố bị cắt mà trang không cuộn ngang
+// nên overflow() không thấy. Trả về nhãn của chúng
+function clipped(area: Element) {
+  return [...area.querySelectorAll<HTMLElement>('input, button, select, textarea')].filter((el) => {
+    const r = el.getBoundingClientRect()
+    if (!r.width || !r.height) return false
+    if (r.right > innerWidth + 1 || r.left < -1) return true
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      if (!['hidden', 'clip'].includes(getComputedStyle(p).overflowX)) continue
+      const box = p.getBoundingClientRect()
+      if (r.right > box.right + 1 || r.left < box.left - 1) return true
+    }
+    return false
+  }).map((el) => el.getAttribute('aria-label') || el.textContent?.trim() || el.id || el.tagName.toLowerCase())
 }
 
 async function shrink(page: Page, where: string, { header = false } = {}) {
@@ -116,3 +133,19 @@ test('quản trị đơn vị gõ địa chỉ trang văn bản: về sổ kiể
   }
   expect(asked).toEqual([])
 })
+
+for (const task of [
+  { user: 'chuyenviendt', name: 'Xử lý văn bản' },
+  { user: 'truongkhoa', name: 'Cho ý kiến chỉ đạo' },
+  { user: 'totruongdt', name: 'Phân công xử lý' },
+]) {
+  test(`màn hẹp: ô, nút trong khung ${task.name} (${task.user}) không bị cắt ở 390px`, async ({ browser }) => {
+    test.skip(!PASSWORD || !TOTP_SECRET, 'Cần dữ liệu mẫu, MOC_DEMO_PASSWORD và MOC_DEMO_TOTP_SECRET')
+    const page = await signIn(browser, task.user, { otp: task.user !== 'chuyenviendt' })
+    await page.locator('.sg-task-link').filter({ hasText: task.name }).first().click()
+    const form = page.getByTestId('task-panel').locator('form')
+    await expect(form).toBeVisible()
+    await page.setViewportSize({ width: 390, height: 900 })
+    await expect.poll(() => form.evaluate(clipped), { message: `${task.name}: ô, nút bị cắt ở 390px` }).toEqual([])
+  })
+}
