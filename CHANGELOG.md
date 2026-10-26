@@ -177,6 +177,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   thẻ `<ol>` nên mất vai trò danh sách, trình đọc màn hình không đọc được số mục; nay tabpanel bọc ngoài danh sách.
   Spec quét khi đã bật giảm chuyển động (#263): quét lúc trang còn hiệu ứng vào thì axe đo chữ nhạt hơn màu thật và
   báo lỗi tương phản lúc có lúc không.
+- Kiểm song ngữ cho cả Văn phòng điện tử và hướng dẫn dịch (#267): `apps/office/tests/i18n.test.ts` quét mọi tệp
+  `app/` — khóa `t('…')` phải là câu có trong `vi.json`, phần viết thẳng của khóa ghép phải có thật, template và script
+  không được viết cứng chữ tiếng Việt (trừ trường `vi:` của dữ liệu song ngữ). Trước đây chỉ vài tệp được kiểm; lần
+  quét đầu không thấy lỗi nào. `CONTRIBUTING.md` có mục "Dịch giao diện". README, README.en, ROADMAP và F2.9 ghi
+  rõ Không gian cá nhân, Bảng tin chỉ có tiếng Việt. Test giao diện +4.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp

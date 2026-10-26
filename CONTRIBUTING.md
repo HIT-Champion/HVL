@@ -109,6 +109,39 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
   mọi gói, kể cả gói gián tiếp. Gói ngoài chính sách hay chưa rõ giấy phép cần ngoại lệ ghi lý do trong
   `.github/license-exceptions.json`.
 
+## Dịch giao diện
+
+Phần song ngữ Việt / Anh hiện có:
+
+- **Văn phòng điện tử** (`apps/office`): mọi câu trên giao diện. Ngôn ngữ chọn bằng nút trên thanh trên; trang công
+  khai cũng có nút này.
+- **Trang đăng nhập**: theme Keycloak `signet`, câu nằm ở `platform/keycloak/themes/signet/login/messages/`
+  (`messages_vi.properties`, `messages_en.properties`).
+
+Không gian cá nhân (`apps/ca-nhan`) và Bảng tin (`apps/bang-tin`) chỉ có tiếng Việt. PDF phát hành và sổ in theo thể
+thức văn bản tiếng Việt.
+
+Trong Văn phòng điện tử:
+
+- Câu nằm trong `apps/office/app/locales/vi.json` và `en.json`. Hai tệp cùng cây khóa, cùng tham số `{x}`. Thêm câu
+  mới thì thêm khóa ở **cả hai** tệp và gọi `t('nhom.khoa')` trong template hoặc script. Không viết chữ thẳng trong
+  template, kể cả `placeholder`, `title`, `aria-label`.
+- Dữ liệu song ngữ viết trong mã, như bộ câu tự chẩn đoán (`app/utils/hpdi.ts`), dùng dạng `{ vi: '…', en: '…' }`.
+- Kiểm bằng `cd apps/office && npm test` (Node 24, `node --test`):
+  - `tests/answer.test.ts`: hai tệp cùng khóa, cùng tham số;
+  - `tests/i18n.test.ts`: mọi khóa `t('…')` có thật; phần viết thẳng của khóa ghép `` t(`a.${x}`) `` có trong
+    `vi.json`; template và script không có chữ tiếng Việt viết cứng, trừ trường `vi:`.
+
+  Ngoài ra, e2e `tests/e2e/tieng-anh.spec.ts` chạy luồng chính bằng tiếng Anh.
+- Thêm ngôn ngữ thứ ba hiện phải sửa mã:
+  - `app/plugins/i18n.ts`: danh sách bản dịch; ngôn ngữ đã chọn lưu ở `localStorage`, khóa `moc.locale`;
+  - nút đổi ngôn ngữ ở `app/layouts/default.vue` và `app/layouts/public.vue`, hiện là công tắc giữa hai ngôn ngữ;
+  - các chỗ chọn định dạng số, ngày theo `locale.value === 'vi'`;
+  - hàm `hpdiText` của `app/utils/hpdi.ts`;
+  - test so cặp `vi` và `en` ở `tests/answer.test.ts`.
+
+Tài liệu tiếng Anh: `README.en.md`. Bản tiếng Anh của hướng dẫn vận hành đang chờ người đóng góp (issue #59).
+
 ## Báo lỗi
 
 **Lỗ hổng bảo mật thì không mở issue**: báo riêng tư theo [`SECURITY.md`](SECURITY.md).
