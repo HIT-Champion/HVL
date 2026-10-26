@@ -128,8 +128,8 @@ each agent (Vietnamese): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 ### Screenshots
 
 Taken automatically during the e2e run (`make e2e`), with fictional sample data. The interface is in Vietnamese by
-default; every e-Office page also has an English version (the P.A.R.A personal space and Bảng tin are in
-Vietnamese only).
+default; every page of the e-Office, the P.A.R.A personal space and the unit news board also has an English
+version.
 
 | The clerk uploads an incoming letter, the agent pre-fills the fields | Managers see where work is stuck | Recipients verify a document without signing in |
 |---|---|---|

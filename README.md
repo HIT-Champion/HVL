@@ -119,7 +119,7 @@ từng tác tử: [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 ### Ảnh chụp màn hình
 
 Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt; trang nào của Văn
-phòng điện tử cũng có bản tiếng Anh (Không gian cá nhân, Bảng tin chỉ có tiếng Việt).
+phòng điện tử, Không gian cá nhân và Bảng tin cũng có bản tiếng Anh.
 
 | Văn thư tải công văn lên, tác tử điền sẵn các ô | Lãnh đạo xem việc nghẽn ở đâu | Người nhận tự kiểm văn bản, không cần đăng nhập |
 |---|---|---|

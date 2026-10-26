@@ -245,6 +245,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `docs/du-thi/pof-checklist.md` đánh dấu 23 trên 24 yêu cầu, kiểm ngày 26/10/2026 trên `develop` 62bff8d; ô "không
   phát hành kèm gói" để trống vì ba bản phông Be Vietnam Pro trong repo, rồi đánh dấu khi #305 đã bỏ các tệp đó
   (kiểm lại trên 399d8af), đủ 24 trên 24.
+- Giao diện tiếng Anh cho Không gian cá nhân và Bảng tin (#306). Mỗi ứng dụng có bảng dịch vi/en `public/i18n.js` và
+  nút "English" / "Tiếng Việt" ở thanh trên. Ngôn ngữ chọn lưu chung khóa `moc.locale` với Văn phòng điện tử, nên đổi
+  ở một ứng dụng thì ứng dụng kia mở ra cũng theo; thẻ `<html lang>` theo ngôn ngữ đang dùng. Mặc định vẫn tiếng
+  Việt. Câu báo lỗi của svc-files viết tiếng Việt, nên khi dùng tiếng Anh trang hiện câu chung của bảng dịch.
+  `tests/i18n.test.js` của mỗi ứng dụng kiểm như #267: không còn chữ tiếng Việt viết cứng trong `public/*.js`, chữ
+  tĩnh của `index.html` khớp bảng dịch, `vi` và `en` cùng khóa, cùng tham số. Test giao diện +14.
 
 ### Đã sửa đổi
 - Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của

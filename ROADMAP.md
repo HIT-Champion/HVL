@@ -160,9 +160,9 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
       văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
-- [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được),
-      `README.en.md`, hướng dẫn dịch cho người đóng góp (`CONTRIBUTING.md`, mục "Dịch giao diện"); Không gian cá nhân,
-      Bảng tin chỉ có tiếng Việt; tài liệu vận hành chưa có bản tiếng Anh (issue #59)
+- [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được), Không
+      gian cá nhân và Bảng tin cũng có bản tiếng Anh (#306), `README.en.md`, hướng dẫn dịch cho người đóng góp
+      (`CONTRIBUTING.md`, mục "Dịch giao diện"); tài liệu vận hành chưa có bản tiếng Anh (issue #59)
 - [ ] **Một phần** — cộng đồng và số đo thực tế: `CONTRIBUTING.md`, mẫu issue (F2.11, mức Một phần); thu góp ý và
       trang Số đo theo đặc tả §8 (F4.6, mức Dùng được). Chưa có đơn vị chạy thử nên cột "trước" của số đo còn trống
 
