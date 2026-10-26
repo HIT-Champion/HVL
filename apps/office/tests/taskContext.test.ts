@@ -66,10 +66,13 @@ test('chỉ đạo trùng, dòng trống bỏ; không có hạn riêng thì lấ
   assert.deepEqual(processingBrief(list, 'staff')!.instructions, ['Rà soát dự thảo kèm theo'])
 })
 
-test('không đăng nhập, không được giao hay việc đã xong thì không có tóm tắt', () => {
+test('không đăng nhập, không được giao, việc đã xong hay đã huỷ thì không có tóm tắt', () => {
   assert.equal(processingBrief(base(), undefined), null)
   assert.equal(processingBrief(base(), 'not-assigned'), null)
   assert.equal(processingBrief(base().filter((a) => a.id !== 'own'), 'staff'), null)
+  const cancelled = base().filter((a) => a.id !== 'old')
+  cancelled[1]!.status = 'cancelled'
+  assert.equal(processingBrief(cancelled, 'staff'), null)
 })
 
 test('hộp việc mở văn bản kèm ?from=inbox, giữ ô tìm và bộ lọc khi quay lại; trang dùng đích và tóm tắt', () => {

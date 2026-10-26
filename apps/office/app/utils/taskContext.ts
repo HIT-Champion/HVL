@@ -44,15 +44,16 @@ export function documentBackTarget(from: unknown, direction: string | null | und
 }
 
 /**
- * Phần việc của người xem: lượt giao chưa xong gần nhất cho chính họ, chỉ đạo của lượt cha (giao phòng) rồi của lượt
- * đó, bỏ dòng trống và dòng trùng; hạn lấy của lượt đó, không có thì của lượt cha, rồi của văn bản. Chỉ dùng các lượt
- * giao Hasura đã trả theo quyền của người xem; không phải người được giao thì không có tóm tắt.
+ * Phần việc của người xem: lượt giao còn mở (status 'open'; 'done' và 'cancelled' thì bỏ) gần nhất cho chính họ, chỉ
+ * đạo của lượt cha (giao phòng) rồi của lượt đó, bỏ dòng trống và dòng trùng; hạn lấy của lượt đó, không có thì của
+ * lượt cha, rồi của văn bản. Chỉ dùng các lượt giao Hasura đã trả theo quyền của người xem; không phải người được giao
+ * thì không có tóm tắt.
  */
 export function processingBrief(
   assignments: readonly BriefAssignment[], userId: string | null | undefined, documentDue: string | null = null,
 ): ProcessingBrief | null {
   if (!userId) return null
-  const mine = assignments.filter((a) => a.user_id === userId && a.status !== 'done').at(-1)
+  const mine = assignments.filter((a) => a.user_id === userId && a.status === 'open').at(-1)
   if (!mine) return null
   const parent = mine.parent_id ? assignments.find((a) => a.id === mine.parent_id) : undefined
   const texts = [parent?.instruction, mine.instruction].map((x) => x?.trim() ?? '').filter(Boolean)
