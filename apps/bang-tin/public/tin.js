@@ -14,7 +14,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Phần không đụng trình duyệt (test bằng node --test): câu GraphQL, nhãn loại tin, giờ, dựng dòng hiển thị.
+// Phần không đụng trình duyệt (test bằng node --test): câu GraphQL, nhãn loại tin, giờ, dựng dòng hiển thị. Chữ lấy
+// từ bảng dịch (i18n.js) theo ngôn ngữ đang dùng.
+
+import { t } from './i18n.js'
 
 /** Đúng câu trang gửi lên /v1/graphql (tests/ kiểm câu này theo quyền trong app.yaml). */
 export const QUERY_TIN = `query BangTin {
@@ -24,12 +27,13 @@ export const QUERY_TIN = `query BangTin {
   }
 }`
 
-export const LOAI = {
-  'office.document.registered': 'Văn bản đến đã vào sổ',
-  'office.document.issued': 'Văn bản đi đã phát hành',
-}
+/** Loại tin ứng dụng nghe (events.kinds của app.yaml) → khóa nhãn trong bảng dịch. */
+export const LOAI = Object.freeze({
+  'office.document.registered': 'kind.registered',
+  'office.document.issued': 'kind.issued',
+})
 
-/** Giờ Việt Nam, dạng 25/10/2026 14:05 */
+/** Giờ Việt Nam, dạng 25/10/2026 14:05 (cả khi dùng tiếng Anh: văn bản theo giờ của đơn vị) */
 export function gio(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
@@ -42,9 +46,9 @@ export function gio(iso) {
 /** Một tin → các chữ hiển thị (trang gán bằng textContent, không bao giờ innerHTML). */
 export function dong(tin) {
   return {
-    loai: LOAI[tin.kind] || tin.kind,
+    loai: Object.hasOwn(LOAI, tin.kind) ? t(LOAI[tin.kind]) : tin.kind,
     gio: gio(tin.occurred_at),
-    so: tin.document?.symbol || '(chưa có số)',
+    so: tin.document?.symbol || t('news.noSymbol'),
     trichYeu: tin.document?.summary || '',
   }
 }
@@ -83,7 +87,7 @@ export const VAI_TRO_XEM = ['clerk', 'staff', 'manager', 'director']
  */
 export function loiTaiTin(body, status) {
   if (body?.errors?.some((e) => e.extensions?.code === 'validation-failed')) {
-    return 'Tài khoản này không đọc được bảng tin. Kiểm tra vai trò của tài khoản hoặc hỏi quản trị đơn vị.'
+    return t('error.noAccess')
   }
   return body?.errors?.[0]?.message || `HTTP ${status}`
 }

@@ -20,7 +20,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bảng tin đơn vị — Signet</title>
+  <!-- chữ tĩnh để sẵn bằng tiếng Việt (ngôn ngữ mặc định); app.js gán lại theo ngôn ngữ đã chọn: data-i18n là chữ của
+       phần tử, data-i18n-<thuộc tính> là thuộc tính, khóa ở i18n.js (tests/i18n.test.js kiểm chữ ở đây khớp bảng) -->
+  <title data-i18n="page.title">Bảng tin đơn vị — Signet</title>
   <link rel="icon" href="/bang-tin/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/bang-tin/style.css">
   <script src="/bang-tin/lib/oidc-client-ts.min.js" defer></script>
@@ -28,12 +30,18 @@
 </head>
 <body>
   <header>
-    <h1>Bảng tin đơn vị</h1>
-    <p class="ai"><span id="nguoi">Đang đăng nhập…</span> <button id="thoat" type="button" hidden>Đăng xuất</button></p>
+    <h1 data-i18n="page.heading">Bảng tin đơn vị</h1>
+    <p class="ai">
+      <span id="nguoi" data-i18n="status.signingIn">Đang đăng nhập…</span>
+      <!-- tên ngôn ngữ kia viết bằng chính tiếng đó; lang của nút đổi theo (lang.other) -->
+      <button id="doi-ngon-ngu" type="button" lang="en" data-i18n="lang.switch"
+              data-i18n-lang="lang.other">English</button>
+      <button id="thoat" type="button" data-i18n="nav.logout" hidden>Đăng xuất</button>
+    </p>
   </header>
   <main>
-    <p class="mo-ta">Văn bản vừa vào sổ, vừa phát hành trong đơn vị. Tin đến theo sự kiện của lõi Signet; chỉ hiện văn
-      bản bạn được xem. <a href="/">Văn phòng điện tử</a></p>
+    <p class="mo-ta"><span data-i18n="page.intro">Văn bản vừa vào sổ, vừa phát hành trong đơn vị. Tin đến theo sự kiện
+      của lõi Signet; chỉ hiện văn bản bạn được xem.</span> <a href="/" data-i18n="nav.office">Văn phòng điện tử</a></p>
     <p id="trang-thai" role="status"></p>
     <ul id="tin"></ul>
   </main>

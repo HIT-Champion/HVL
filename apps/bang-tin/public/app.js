@@ -15,12 +15,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Bảng tin: đăng nhập, hỏi bảng bang_tin.tin của ứng dụng qua cổng (/v1/graphql, APISIX kiểm token, Hasura xét quyền
-// theo đơn vị và theo văn bản người xem được đọc), vẽ danh sách, hỏi lại mỗi 15 giây.
+// theo đơn vị và theo văn bản người xem được đọc), vẽ danh sách, hỏi lại mỗi 15 giây. Chữ lấy từ bảng dịch vi/en
+// (i18n.js); phần đang hiện giữ lại để đổi ngôn ngữ thì vẽ lại ngay, không chờ lần hỏi sau.
 
 import { signIn, signOut } from './auth.js'
+import { locale, localize, saveLocale, savedLocale, setLocale, t } from './i18n.js'
 import { QUERY_TIN, VAI_TRO_XEM, dong, loiTaiTin, tenNguoi, vaiTro } from './tin.js'
 
 const el = (id) => document.getElementById(id)
+// tên người (hay câu chờ) và câu trạng thái là hàm trả câu theo ngôn ngữ đang dùng; rows: tin đang hiện
+const view = { nguoi: () => t('status.signingIn'), trangThai: () => '', rows: [] }
+
+function trangThai(text) {
+  view.trangThai = text
+  el('trang-thai').textContent = text()
+}
 
 async function load(token) {
   const res = await fetch('/v1/graphql', {
@@ -33,9 +42,9 @@ async function load(token) {
   return body.data.bang_tin_tin
 }
 
-function draw(rows) {
-  const list = el('tin')
-  list.replaceChildren(...rows.map((tin) => {
+function list(rows) {
+  view.rows = rows
+  el('tin').replaceChildren(...rows.map((tin) => {
     const d = dong(tin)
     const li = document.createElement('li')
     const loai = Object.assign(document.createElement('span'), { className: 'loai', textContent: d.loai })
@@ -45,22 +54,38 @@ function draw(rows) {
     li.append(loai, gio, so, ty)
     return li
   }))
-  el('trang-thai').textContent = rows.length ? '' : 'Chưa có tin nào.'
+}
+
+function draw(rows) {
+  list(rows)
+  trangThai(() => (rows.length ? '' : t('status.empty')))
+}
+
+/** Nút đổi ngôn ngữ: lưu lựa chọn (chung với Văn phòng điện tử), gán lại phần tĩnh rồi vẽ lại phần đang hiện. */
+function switchLocale() {
+  saveLocale(setLocale(locale() === 'vi' ? 'en' : 'vi'))
+  localize(document)
+  el('nguoi').textContent = view.nguoi()
+  list(view.rows)
+  el('trang-thai').textContent = view.trangThai()
 }
 
 async function main() {
+  setLocale(savedLocale())
+  localize(document)
+  el('doi-ngon-ngu').addEventListener('click', switchLocale)
   const user = await signIn()
   if (!user) return
-  el('nguoi').textContent = tenNguoi(user.access_token) || 'Đã đăng nhập'
+  view.nguoi = () => tenNguoi(user.access_token) || t('status.signedIn')
+  el('nguoi').textContent = view.nguoi()
   el('thoat').hidden = false
   el('thoat').addEventListener('click', () => signOut())
   // quản trị đơn vị không đọc văn bản nên không có bảng tin: báo bằng câu đọc được, không hỏi để nhận lỗi GraphQL.
   // Kiểm cả ở mỗi lần làm mới: token gia hạn có thể mang vai trò khác, khi đó xóa tin đang hiện
   const khongXem = (token) => {
     if (VAI_TRO_XEM.includes(vaiTro(token))) return false
-    el('tin').replaceChildren()
-    el('trang-thai').textContent = 'Tài khoản quản trị đơn vị không xem được bảng tin: bảng tin chỉ hiện văn bản người '
-      + 'xem được đọc. Đăng nhập bằng tài khoản nghiệp vụ.'
+    list([])
+    trangThai(() => t('status.adminNoBoard'))
     return true
   }
   if (khongXem(user.access_token)) return
@@ -69,7 +94,8 @@ async function main() {
       const current = await signIn()
       if (current && !khongXem(current.access_token)) draw(await load(current.access_token))
     } catch (err) {
-      el('trang-thai').textContent = `Không tải được bảng tin: ${err.message}`
+      // câu lỗi dựng lúc nhận phản hồi (loiTaiTin), theo ngôn ngữ lúc đó; lần hỏi sau viết lại
+      trangThai(() => t('status.loadFailed', { error: err.message }))
     }
   }
   await refresh()
