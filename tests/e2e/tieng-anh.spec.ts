@@ -100,7 +100,8 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
 
   // trang văn bản vừa lưu: trạng thái, độ khẩn, các mục, nút trình ký, dòng thời gian, lịch sử đều tiếng Anh
   await expect(staff.getByRole('heading', { level: 1, name: summary })).toBeVisible()
-  await expect(staff.getByText('Draft', { exact: true })).toBeVisible()
+  // chip trạng thái trong trang; thanh trên cũng ghi "Draft" (dự thảo chưa có số) nên chỉ tìm trong nội dung chính
+  await expect(staff.locator('#main-content').getByText('Draft', { exact: true })).toBeVisible()
   await expect(staff.getByText('Urgent', { exact: true }).first()).toBeVisible()
   for (const name of ['Submit draft', 'Body', 'Document details', 'Files']) {
     await expect(staff.getByRole('heading', { level: 2, name, exact: true })).toBeVisible()
