@@ -318,7 +318,9 @@ không triển khai lại — cài lại không đổi gì không thêm phiên b
 mới: đơn bắt đầu sau đó theo bản mới; đơn đang chạy đi tiếp theo BPMN cũ, việc của nó kiểm theo form của chính
 deployment cũ. Bước nào sau bước quy trình lỗi (tệp chạy, container, Hasura) thì quy trình về như trước lần cài này: cài
 lại gói của lần cài trước, chưa có thì tạm dừng — không để BPMN, form mới chạy khi trang, route còn bản cũ hay chưa có
-(#332). Tệp chạy, container giữ như lúc lỗi, chạy lại thì làm tiếp; riêng bước Hasura trả cả tệp chạy về.
+(#332). Tệp chạy, container giữ như lúc lỗi, chạy lại thì làm tiếp; riêng bước Hasura trả cả tệp chạy về. Lần cài dở đầu
+tiên ghi bản ghi trước nó vào `.moc-apps/truoc-khi-cai/<tên>.json`: lỗi thêm lần nữa vẫn hoàn tác về đó, không về bản
+ghi lần dở để lại; cài xong, hoàn tác xong hay gỡ thì xóa tệp này.
 
 `moc app remove` (và manifest bỏ mục `workflow`) **tạm dừng** (suspend) mọi định nghĩa quy trình có khóa `<tên>.…` cùng
 các phiên đang chạy — không xóa deployment: lịch sử đơn (`act_hi_*`), biến, đơn đang dở còn nguyên trong Flowable, như
