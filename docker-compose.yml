@@ -488,9 +488,9 @@ services:
       keycloak: {condition: service_healthy}
 
   # F3.13 — giám sát gọn: Prometheus thu chỉ số của cổng API (plugin prometheus của APISIX, cổng 9091 nội bộ) và
-  # tính luật cảnh báo (canh-bao.yml, #255), Grafana hiện bảng điều khiển nạp sẵn. Prometheus không mở cổng; Grafana
-  # chỉ nghe 127.0.0.1 trên máy chủ, không có tài khoản quản trị, chỉ xem ẩn danh (bảng điều khiển sửa trong repo,
-  # không sửa trên giao diện).
+  # trạng thái từng thành phần (GET /metrics của svc-files, #274), tính luật cảnh báo (canh-bao.yml, #255), Grafana
+  # hiện bảng điều khiển nạp sẵn. Prometheus không mở cổng; Grafana chỉ nghe 127.0.0.1 trên máy chủ, không có tài
+  # khoản quản trị, chỉ xem ẩn danh (bảng điều khiển sửa trong repo, không sửa trên giao diện).
   prometheus:
     <<: *common
     image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
