@@ -568,6 +568,7 @@
     "blocked": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công. Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị.",
     "blockedId": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công (mã {id}). Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị kèm mã trên.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
+    "noAccess": "Vai trò của tài khoản này không được xem hay làm việc này. Hãy mở các mục có trong menu của bạn.",
     "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
     "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
     "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",

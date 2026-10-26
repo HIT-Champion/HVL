@@ -568,6 +568,7 @@
     "blocked": "The security gateway blocked this content because some text looks like an attack pattern. Edit the text or file name you sent and try again, or tell your administrator.",
     "blockedId": "The security gateway blocked this content because some text looks like an attack pattern (ID {id}). Edit the text or file name you sent and try again, or tell your administrator, quoting this ID.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
+    "noAccess": "Your account's role may not view or do this. Open the items listed in your menu.",
     "documents_body_length": "The body is longer than 20,000 characters.",
     "invalid": "Some fields are not valid, see the highlighted fields.",
     "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",

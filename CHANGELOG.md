@@ -183,6 +183,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Vai trò không được đọc hay ghi dữ liệu mà trang hỏi (#242), như quản trị đơn vị gõ thẳng địa chỉ trang Điều hành,
+  Phả hệ: trang báo "Vai trò của tài khoản này không được xem hay làm việc này", ở cả hai ngôn ngữ, thay cho câu
+  GraphQL tiếng Anh của Hasura (`field '…' not found in type: 'query_root'`, `check constraint of an insert permission
+  has failed`). Lỗi ràng buộc, lỗi trigger của CSDL và lỗi kiểm khác của Hasura giữ câu cũ.
 - Log tập trung không còn mất dòng đầu tiên của dịch vụ im lâu khi kết nối tới Vector đã chết (#226). Driver
   `fluentd` của Docker gửi mà không chờ Vector báo nhận, nên dòng ghi vào kết nối chết mất mà không báo lỗi. Dịch vụ
   ghi liên tục tự nối lại ở dòng sau; dịch vụ im lâu như PostgreSQL thì mất đúng dòng lỗi. Bước 8 mới của
