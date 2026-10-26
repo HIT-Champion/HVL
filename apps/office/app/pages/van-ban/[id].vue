@@ -441,6 +441,10 @@ onMounted(load)
 // có người vừa làm một bước với văn bản này (F2.5): tải lại để thấy trạng thái, việc và dòng thời gian mới
 const { lastPush } = useNotifications()
 watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
+
+// thanh trên: đơn vị › số ký hiệu văn bản đang đọc (chưa có số thì "Dự thảo" hay "Văn bản đến"), không lặp trích yếu
+const crumb = useState<string>('sg-crumb', () => '')
+watch([doc, locale], ([d]) => { if (d) crumb.value = d.symbol || t(outgoing.value ? 'doc.draft' : 'nav.incoming') })
 </script>
 
 <template>
