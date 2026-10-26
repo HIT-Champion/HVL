@@ -68,7 +68,7 @@ mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ ch
 | F1.6 | Trạm kiểm dịch: ClamAV quét trước khi ghi | Hoàn thiện | svc-files `test_clamav.py` 8 | smoke: EICAR → 422, không lưu, lần chặn vào sổ kiểm toán; e2e `kiem-dich.spec.ts`; `make demo-kiem-dich` | ClamAV chiếm khoảng 0,8 GB RAM (README, mục Yêu cầu hệ thống) |
 | F1.7 | Tìm kiếm toàn văn: Meilisearch qua `/api/search`, lọc đơn vị ở máy chủ | Hoàn thiện | svc-files `test_search.py` 34 | e2e `van-ban-den.spec.ts`: tìm lại bằng chữ không dấu | Xem F2.7 |
 | F1.8 | Cài ra ngoài thư mục mã nguồn: `make install PREFIX=…` | Hoàn thiện | — (không có test đơn vị cho `scripts/install.sh`) | bước CI "Cài ra ngoài thư mục mã nguồn và chạy từ đó (make install)": cài sang thư mục tạm, dựng lại từ đó, chạy smoke | — |
-| F1.9 | Lên mạng: HTTPS sau proxy (`MOC_TRUSTED_PROXY`), Cloudflare Tunnel tùy chọn | Dùng được | scripts `test_duong_ham.py` 7 (kiểm chữ cấu hình tunnel, route Keycloak sau proxy), `test_kiem_ban_online.py` 15 (site giả) | Job `.github/workflows/ban-online.yml` kiểm bản online https://signet.htechcs.com hằng ngày (`scripts/kiem_ban_online.py`: chứng chỉ, HTTP sang HTTPS, `/api/status` đúng thẻ phát hành mới nhất, URL của Keycloak sau proxy, header bảo mật); diễn tập tay 22/10/2026 trên máy phát triển (CHANGELOG [1.0.0]); phần CI `https` trên mọi pull request (#261): `.env` như `docs/trien-khai.md` bước 3, proxy TLS nginx với chứng thư tự ký như bước 5, rồi `kiem_ban_online.py`, smoke trọn qua `https://`, nhật ký APISIX ghi IP của máy gọi; hướng dẫn `docs/trien-khai.md` | Máy chạy bản online tắt, hoặc từ lúc gắn thẻ mới tới lúc nâng bản online, thì job đỏ. CI dùng nginx với chứng thư tự ký thay Caddy và Let's Encrypt, không kiểm Cloudflare Tunnel. Lên Hoàn thiện khi phần `https` xanh ít nhất 2 lần liên tiếp trên develop |
+| F1.9 | Lên mạng: HTTPS sau proxy (`MOC_TRUSTED_PROXY`), Cloudflare Tunnel tùy chọn | Hoàn thiện | scripts `test_duong_ham.py` 7 (kiểm chữ cấu hình tunnel, route Keycloak sau proxy), `test_kiem_ban_online.py` 15 (site giả) | Job `.github/workflows/ban-online.yml` kiểm bản online https://signet.htechcs.com hằng ngày (`scripts/kiem_ban_online.py`: chứng chỉ, HTTP sang HTTPS, `/api/status` đúng thẻ phát hành mới nhất, URL của Keycloak sau proxy, header bảo mật); diễn tập tay 22/10/2026 trên máy phát triển (CHANGELOG [1.0.0]); phần CI `https` trên mọi pull request (#261): `.env` như `docs/trien-khai.md` bước 3, proxy TLS nginx với chứng thư tự ký như bước 5, rồi `kiem_ban_online.py`, smoke trọn qua `https://`, nhật ký APISIX ghi IP của máy gọi; hướng dẫn `docs/trien-khai.md` | Máy chạy bản online tắt, hoặc từ lúc gắn thẻ mới tới lúc nâng bản online, thì job đỏ. CI dùng nginx với chứng thư tự ký thay Caddy và Let's Encrypt, không kiểm Cloudflare Tunnel |
 | F1.10 | Tài liệu API xuất tự động (`docs/api/`) | Hoàn thiện | — | bước CI "Tài liệu API trong docs/api/ khớp mã (make api-docs)": `scripts/api_docs.py --check` so tài liệu với hệ thống vừa dựng | — |
 
 ### 2.2. Văn phòng điện tử — Must (Phase 2)
@@ -140,8 +140,8 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 
 | Mức | Số | Tính năng |
 |---|---|---|
-| Hoàn thiện | 34 | F1.1–F1.8, F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7–F3.9, F3.11, F3.12; F4.1–F4.4 |
-| Dùng được | 7 | F1.9, F2.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
+| Hoàn thiện | 35 | F1.1–F1.10; F2.1–F2.8, F2.10, F2.12, F2.13; F3.1–F3.5, F3.7–F3.9, F3.11, F3.12; F4.1–F4.4 |
+| Dùng được | 6 | F2.9, F3.13, F3.14, F3.15, F4.6, F4.7 |
 | Minh họa | 2 | F3.10, F4.5 |
 | Một phần | 1 | F2.11 |
 

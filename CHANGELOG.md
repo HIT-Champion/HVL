@@ -13,8 +13,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `127.0.0.1:8080`, `MOC_TRUSTED_PROXY`), nginx với chứng thư do một CA tự ký cấp, đặt `X-Forwarded-*` như Caddyfile
   ở bước 5. Nạp mẫu đi qua proxy, rồi kiểm như bước 6: `kiem_ban_online.py` (chứng chỉ, HTTP sang HTTPS, Keycloak
   sau proxy, header bảo mật), smoke trọn qua `https://` kể cả thông báo qua `wss://`, nhật ký APISIX ghi IP của
-  máy gọi. Trước đây đường này chỉ được diễn tập tay một lần. F1.9 vẫn ở mức Dùng được cho tới khi phần này xanh
-  hai lần liên tiếp trên develop.
+  máy gọi. Trước đây đường này chỉ được diễn tập tay một lần. Sau hai lần xanh liên tiếp trên develop, F1.9 lên mức
+  Hoàn thiện (#269); Cloudflare Tunnel vẫn chưa kiểm trong CI.
 - Cảnh báo cho giám sát cổng API (F3.13, #255). Prometheus tính 5 luật trên chỉ số APISIX đang thu
   (`platform/monitoring/canh-bao.yml`): cổng mất chỉ số; dịch vụ sau cổng không trả lời (502, 504 theo route liên tục
   3 phút — 503 có chủ ý của svc-files không tính); hơn 5% yêu cầu lỗi 5xx trong 5 phút, có sàn 0,1 yêu cầu/giây;
