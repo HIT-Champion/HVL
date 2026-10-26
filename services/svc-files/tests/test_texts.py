@@ -32,7 +32,7 @@ from conftest import SAMPLE_TSV, TENANT_A, fake_tesseract, pages_pdf, text_pdf
 from svc_files.docread.ocr import OcrResult, run_ocr
 from svc_files.hasura import HasuraError
 from svc_files.pdftext import MAX_CHARS, _starts_ok
-from svc_files.texts import MAX_TRIES, TextExtractor, from_ocr
+from svc_files.texts import MAX_TRIES, OCR_RETRY, TextExtractor, from_ocr
 
 
 def pending(hasura, store, data: bytes, *, size: int | None = None) -> str:
@@ -214,9 +214,8 @@ def test_scans_are_recognized_one_at_a_time(hasura, store):
 
 
 @pytest.mark.parametrize(("result", "note"), [
-    (OcrResult("failed", 2, (), "timeout"), "ocr timeout"),
     (OcrResult("failed", 2, (), "no_text"), "ocr no_text"),
-    (OcrResult("failed", None, (), "no_tesseract"), "ocr no_tesseract"),
+    (OcrResult("failed", 2, (), "too_many_pixels"), "ocr too_many_pixels"),
     (OcrResult("ok", 2, (SAMPLE_TSV.split("\n", 2)[0], "")), "ocr 2/2 blank"),      # chỉ dòng tiêu đề: không có từ
 ])
 def test_a_scan_without_recognized_text_stays_empty_with_the_reason(hasura, store, result, note):
@@ -227,6 +226,33 @@ def test_a_scan_without_recognized_text_stays_empty_with_the_reason(hasura, stor
     assert hasura.texts[scan] == {"tenant_id": str(TENANT_A), "status": "empty", "pages": 2, "content": "",
                                   "note": note, "page_starts": None}
     assert asyncio.run(worker.run_once()) == 0 and len(ocr.calls) == 1      # không đọc lại, không vào vòng MAX_TRIES
+
+
+@pytest.mark.parametrize("note", sorted(OCR_RETRY))
+def test_ocr_failing_on_the_machine_is_retried_but_not_forever(hasura, store, note):
+    # máy bận quá giờ, thiếu RAM, thiếu tesseract: không phải lỗi của bản scan, lượt sau OCR lại như lỗi kho
+    scan = pending(hasura, store, text_pdf(pages=2))
+    after = pending(hasura, store, text_pdf("Tep sau van doc"))
+    ocr = FakeOcr(OcrResult("failed", None, (), note))
+    worker = extractor(hasura, store, ocr=ocr)
+    assert asyncio.run(worker.run_once()) == 1                       # bản scan chờ không chặn tệp sau
+    assert scan not in hasura.texts and hasura.texts[after]["status"] == "ok"
+    for _ in range(MAX_TRIES - 2):
+        assert asyncio.run(worker.run_once()) == 0 and scan not in hasura.texts
+    assert asyncio.run(worker.run_once()) == 1 and len(ocr.calls) == MAX_TRIES
+    assert hasura.texts[scan] == {"tenant_id": str(TENANT_A), "status": "empty", "pages": 2, "content": "",
+                                  "note": f"ocr {note}", "page_starts": None}
+    assert asyncio.run(worker.run_once()) == 0 and len(ocr.calls) == MAX_TRIES
+
+
+def test_a_scan_is_recognized_once_the_machine_is_free_again(hasura, store):
+    scan = pending(hasura, store, text_pdf(pages=1))
+    ocr = FakeOcr(OcrResult("failed", 1, (), "timeout"))
+    worker = extractor(hasura, store, ocr=ocr)
+    assert asyncio.run(worker.run_once()) == 0 and scan not in hasura.texts
+    ocr.result = OcrResult("ok", 1, (NOTICE,))
+    assert asyncio.run(worker.run_once()) == 1
+    assert (hasura.texts[scan]["status"], hasura.texts[scan]["note"]) == ("ok", "ocr 1/1")
 
 
 def test_without_ocr_a_scan_stays_empty_as_before(hasura, store):

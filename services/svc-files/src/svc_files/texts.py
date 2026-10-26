@@ -25,8 +25,9 @@ F4.2: ghi kèm ``page_starts`` (vị trí đầu từng trang trong nội dung) 
 
 #253: PDF không có lớp chữ (bản scan) thì nhận dạng chữ bằng Tesseract (``docread/ocr.run_ocr``: tiến trình con có
 giới hạn bộ nhớ, CPU, điểm ảnh) vài trang đầu, rồi ghi ``ok`` như lớp chữ, ``note`` = "ocr <số trang đã đọc>/<số
-trang>". Vòng nền đọc lần lượt từng tệp nên mỗi lúc chỉ một tệp OCR. Không ra chữ (không có ảnh, ảnh trắng, quá giờ…)
-thì giữ ``empty`` kèm lý do: bản scan mờ không phải tệp hỏng, và tệp đã có dòng kết quả thì không bị đọc lại.
+trang>". Vòng nền đọc lần lượt từng tệp nên mỗi lúc chỉ một tệp OCR. Không ra chữ vì tệp (không có ảnh, ảnh trắng…)
+thì giữ ``empty`` kèm lý do: bản scan mờ không phải tệp hỏng, và tệp đã có dòng kết quả thì không bị đọc lại. Hỏng vì
+máy (quá giờ, thiếu bộ nhớ, thiếu tesseract — ``OCR_RETRY``) thì thử lại tới MAX_TRIES lượt rồi mới ghi ``empty``.
 """
 
 from __future__ import annotations
@@ -46,9 +47,20 @@ from .storage import ObjectMissing, StorageError
 
 log = logging.getLogger("svc_files")
 
-MAX_TRIES = 5      # số lượt liền kho không đọc được một tệp (mà tệp vẫn có) trước khi ghi "failed"
+MAX_TRIES = 5      # số lượt liền một tệp gặp lỗi có thể tự hết (kho, OCR phía máy) trước khi ghi kết quả cuối
+# OCR hỏng vì máy (bận quá giờ, thiếu RAM — SIGKILL của bộ diệt OOM —, thiếu tesseract hay gói ngôn ngữ): thử lại như
+# lỗi kho. Lý do còn lại là của tệp (không có ảnh, ảnh trắng, quá nhiều điểm ảnh, mật khẩu, hỏng): ghi `empty` ngay.
+OCR_RETRY = {"timeout", "memory", "no_tesseract", "engine_failed"}
 
 Ocr = Callable[[bytes], Awaitable[OcrResult]]
+
+
+class OcrRetry(Exception):
+    """OCR hỏng vì máy: tệp ở lại hàng đợi; hết MAX_TRIES lượt thì ghi ``text`` (``empty`` kèm lý do)."""
+
+    def __init__(self, text: PdfText) -> None:
+        super().__init__(text.note)
+        self.text = text
 
 
 def from_ocr(got: OcrResult, pages: int | None) -> PdfText:
@@ -107,6 +119,8 @@ class TextExtractor:
         log.info(json.dumps({"event": "core.file.text_ocr", "file_id": row["id"], "status": text.status,
                              "pages_read": len(got.tsv), "chars": len(text.content), "note": text.note,
                              "seconds": round(time.monotonic() - started, 1)}))
+        if got.status != "ok" and got.note in OCR_RETRY:
+            raise OcrRetry(text)
         return text
 
     async def run_once(self) -> int:
@@ -121,14 +135,15 @@ class TextExtractor:
                 text = await self._extract(row)
             except ObjectMissing:
                 text = PdfText("failed", None, "", "missing")
-            except StorageError as exc:
-                # kho chưa lên hoặc đứt kết nối: lượt sau thử lại; lỗi mãi ở một tệp thì thôi, ghi "failed"
+            except (StorageError, OcrRetry) as exc:
+                # kho chưa lên, đứt kết nối, OCR quá giờ lúc máy bận: lượt sau thử lại; lỗi mãi ở một tệp thì thôi,
+                # ghi "failed" (kho) hay `empty` kèm lý do (OCR)
                 tries = self._tries[row["id"]] = self._tries.get(row["id"], 0) + 1
                 log.warning(json.dumps({"event": "core.file.text_unread", "file_id": row["id"], "tries": tries,
                                         "error": str(exc)}, ensure_ascii=False))
                 if tries < MAX_TRIES:
                     continue
-                text = PdfText("failed", None, "", "unreadable")
+                text = exc.text if isinstance(exc, OcrRetry) else PdfText("failed", None, "", "unreadable")
             self._tries.pop(row["id"], None)
             await self._save(row, text)
             log.info(json.dumps({"event": "core.file.text_extracted", "file_id": row["id"], "status": text.status,

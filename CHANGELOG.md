@@ -11,12 +11,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Tìm được bản scan theo nội dung (#253). PDF không có lớp chữ (bản scan, công văn chụp) gắn vào văn bản giờ được
   vòng đọc chữ của svc-files nhận dạng chữ bằng Tesseract, qua đúng đường OCR có giới hạn bộ nhớ, CPU, điểm ảnh của
   tác tử đọc văn bản đến. Mỗi tệp OCR `MOC_TEXT_OCR_PAGES` trang đầu (mặc định 3; 0: tắt), lần lượt từng tệp, hạn
-  `MOC_OCR_TIMEOUT_S` mỗi trang. Chữ vào chỉ mục tìm kiếm, và trợ lý hỏi đáp trích được kèm số trang; trước đây bản
-  scan chỉ tìm được theo số ký hiệu, trích yếu, cơ quan. Không ra chữ (không có ảnh, ảnh trắng, quá giờ) thì giữ
-  `empty` kèm lý do và không đọc lại. Tệp của văn bản hạn chế vẫn không bao giờ được đọc. Trang không có ảnh nay giữ
-  chỗ trong kết quả OCR, nên số trang của các trang sau không lệch. Migration `1792281603500` đưa các bản scan đã có
-  vào đọc lại một lần sau khi nâng cấp; trong lúc đó vòng nền dùng một lõi CPU. Smoke tìm ra bản scan 3 trang theo chữ
-  chỉ có trong ảnh. Test svc-files +13.
+  chung cho cả tệp là số trang đó × `MOC_OCR_TIMEOUT_S`. Chữ vào chỉ mục tìm kiếm, và trợ lý hỏi đáp trích được kèm
+  số trang; trước đây bản scan chỉ tìm được theo số ký hiệu, trích yếu, cơ quan. Không ra chữ vì tệp (không có ảnh,
+  ảnh trắng, quá nhiều điểm ảnh) thì giữ `empty` kèm lý do và không đọc lại; hỏng vì máy (quá giờ lúc máy bận, thiếu
+  bộ nhớ, thiếu tesseract) thì thử lại tới 5 lượt rồi mới ghi `empty`. Tệp của văn bản hạn chế vẫn không bao giờ được
+  đọc. Trang không có ảnh nay giữ chỗ trong kết quả OCR, nên số trang của các trang sau không lệch. Migration
+  `1792281603500` đưa các bản scan đã có vào đọc lại một lần sau khi nâng cấp; trong lúc đó vòng nền dùng một lõi
+  CPU. Smoke tìm ra bản scan 3 trang theo chữ chỉ có trong ảnh. Test svc-files +17.
 - Trợ lý hỏi đáp (F4.2, #151): nút "Hỏi về văn bản này" ở trang chi tiết mở trang Hỏi đáp chỉ hỏi trong văn bản đó
   (`document_id` của `POST /api/documents/ask` — một điều kiện lọc nối AND sau phạm vi vai trò, hậu kiểm bằng token như
   mọi lượt, nên chỉ thu hẹp); nhãn nguồn "số ký hiệu · tr. n" mở tệp PDF trong khung xem của trình duyệt đúng trang đó
