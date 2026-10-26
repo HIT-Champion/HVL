@@ -299,6 +299,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - `docs/du-thi/hoi-dap-hoi-dong.md` thêm câu 14: lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak.
   Trả lời: lõi không có màn hình nghiệp vụ; bàn điều khiển của người vận hành chỉ nghe `127.0.0.1`, cổng chặn đường
   quản trị; trang đăng nhập là của dịch vụ danh tính theo OIDC.
+- `docs/du-thi/hoi-dap-hoi-dong.md` theo phần đã làm cho vòng trường: câu 1 thêm cờ `MOC_OFFICE_ENABLED` (#302), câu
+  12 thêm phần DuckDB đếm văn bản đã nộp lưu (#304), câu 13 viết lại phần low-code (form dựng từ JSON Schema, #303) và
+  giới hạn của quy trình ứng dụng (#325); thêm câu 15 (ứng dụng mang luồng duyệt riêng, #301) và câu 16 (vì sao cài
+  ứng dụng bằng dòng lệnh).
 - Phông Be Vietnam Pro lấy từ gói npm `@fontsource/be-vietnam-pro` 5.3.0 (OFL-1.1) lúc dựng thay vì commit trong repo
   (#305, PoF #5): xóa 12 tệp TTF (ba bản trùng từng byte ở Văn phòng điện tử, Không gian cá nhân, theme đăng nhập) cùng
   `OFL.txt`, `LICENSES/OFL-1.1.txt` và khối phông trong `REUSE.toml`; `git ls-files` không còn tệp phông nào. Cùng bốn
