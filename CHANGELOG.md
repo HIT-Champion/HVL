@@ -244,6 +244,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   SVG: Be Vietnam Pro không có ký tự này nên trình duyệt lấy phông khác, có máy hiện thành emoji màu. Trang Phả hệ: năm
   vùng cuộn ngang (đồ thị và bốn bảng) nhận tiêu điểm, mang tên của mục; các bảng giữ bề rộng tối thiểu 680px và cuộn
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
+- `docs/du-thi/hoi-dap-hoi-dong.md` thêm câu 14: lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak.
+  Trả lời: lõi không có màn hình nghiệp vụ; bàn điều khiển của người vận hành chỉ nghe `127.0.0.1`, cổng chặn đường
+  quản trị; trang đăng nhập là của dịch vụ danh tính theo OIDC.
 
 ### Đã sửa lỗi
 - Thanh bên mở lại ngay sau khi bấm một mục (#297). Bấm chuột vào một mục thì thanh bên thu lại, nhưng con trỏ còn
