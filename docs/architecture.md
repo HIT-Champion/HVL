@@ -946,8 +946,9 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 
 ### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX
 
-> **Trạng thái:** gộp ở #130, F3.15 mức Dùng được cho tới khi smoke và e2e qua WAF xanh đủ lâu trên CI và chạy trên
-> bản online. Số đo dưới đây đo trên máy thử lúc làm.
+> **Trạng thái:** gộp ở #130; smoke và e2e chạy qua WAF trên mọi pull request. F3.15 mức Dùng được cho tới khi chữ
+> nghiệp vụ ở các ô nhập liệu không còn cần người quản trị thêm loại trừ ([`muc-hoan-thien.md`](muc-hoan-thien.md)).
+> Số đo dưới đây đo trên máy thử lúc làm.
 
 - **Bối cảnh:** nguyên lý (iv) và F3.15 — chặn tải tấn công trong yêu cầu ngay ở biên; cụm ② "API Gateway zero-trust"
   còn ghi "chưa có WAF".
