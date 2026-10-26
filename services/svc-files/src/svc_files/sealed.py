@@ -429,7 +429,7 @@ async def _isolated(op: str, data: bytes, extra: list[str], *, max_pages: int, t
     """Chạy tệp này thành tiến trình con có giới hạn → (dòng JSON đầu, phần còn lại của stdout). Tệp không đọc được,
     quá nặng (hết giờ, hết CPU, hết bộ nhớ, tiến trình con sập), kết quả sai dạng: SealError mang ``reason``."""
     # nhập ở đây, không ở đầu tệp: tiến trình con chạy tệp này như script, không có gói svc_files
-    from .docread.ocr import _kill_group
+    from .ocr import kill_group
 
     timeout_s = max(timeout_s, 0.001)
     proc = await asyncio.create_subprocess_exec(
@@ -440,12 +440,12 @@ async def _isolated(op: str, data: bytes, extra: list[str], *, max_pages: int, t
     try:
         out, _ = await asyncio.wait_for(proc.communicate(data), timeout_s)
     except TimeoutError:
-        _kill_group(proc)
+        kill_group(proc)
         await proc.wait()
         raise _failed("timeout", max_pages) from None
     finally:
         # hết giờ, yêu cầu bị hủy, hay xong bình thường: không để tiến trình con chạy tiếp
-        _kill_group(proc)
+        kill_group(proc)
     rc = proc.returncode
     if rc != 0:
         raise _failed(_exit_reason(rc), max_pages)

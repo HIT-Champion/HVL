@@ -29,8 +29,8 @@ import pytest
 from PIL import Image
 
 from conftest import SAMPLE_TSV, TENANT_A, fake_tesseract, pages_pdf, text_pdf
-from svc_files.docread.ocr import OcrResult, run_ocr
 from svc_files.hasura import HasuraError
+from svc_files.ocr import OcrResult, run_ocr
 from svc_files.pdftext import MAX_CHARS, _starts_ok
 from svc_files.texts import MAX_TRIES, OCR_RETRY, TextExtractor, from_ocr
 

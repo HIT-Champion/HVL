@@ -31,7 +31,7 @@ WORKDIR /app
 # Dựng PDF văn bản đi bằng WeasyPrint: Pango dàn chữ, HarfBuzz nhúng phông vào PDF. Phông Liberation Serif
 # (SIL OFL 1.1) có cùng số đo với Times New Roman mà NĐ 30/2020 quy định, đủ dấu tiếng Việt.
 # Đọc văn bản đến (F4.1): Tesseract OCR (Apache-2.0) và dữ liệu tiếng Việt của gói Debian, gọi qua dòng lệnh
-# trong tiến trình con có giới hạn (src/svc_files/docread/ocr.py).
+# trong tiến trình con có giới hạn (src/svc_files/ocr.py).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-liberation \
       tesseract-ocr tesseract-ocr-vie \

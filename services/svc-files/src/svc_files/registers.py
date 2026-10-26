@@ -185,7 +185,8 @@ def _outgoing(doc: dict[str, Any], hidden: bool) -> tuple[str, ...]:
 
 def build_register(data: dict[str, Any], visible: set[str], *, direction: str, year: int,
                    printed_at: datetime, anchor: Mark | None = None) -> Register:
-    """Sổ từ dữ liệu hasura.REGISTER; visible: id các văn bản người in được đọc (Hasura trả theo token của họ)."""
+    """Sổ từ dữ liệu REGISTER (office/hasura.py); visible: id các văn bản người in được đọc (Hasura trả theo token
+    của họ)."""
     tenant = data.get("core_tenants_by_pk") or {}
     users = {u["id"]: u["full_name"] for u in data.get("core_users") or []}
     registers = data.get("office_registers") or []

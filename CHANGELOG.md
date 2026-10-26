@@ -222,6 +222,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   (kiểm lại trên 399d8af), đủ 24 trên 24.
 
 ### Đã sửa đổi
+- Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của
+  `svc-files` không còn import gói `docread/` của Văn phòng: `kill_group`, `killed` và ba mô-đun `ocr.py`, `layout.py`,
+  `pdflayout.py` ra gói gốc, `fold`, `INVISIBLE_RE` sang `vntext.py`. Câu GraphQL chỉ Văn phòng dùng sang
+  `svc_files/office/hasura.py` và `svc_workflow/office/queries.py`; hai tệp `hasura.py` còn máy khách chung và câu của
+  lõi. Chỉ dời mã, hành vi không đổi.
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
   chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
   thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi

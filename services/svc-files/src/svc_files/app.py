@@ -89,7 +89,6 @@ from .clamav import ClamAVClient, ScanError
 from .config import Settings
 from .dispatch import DispatchError, copy_issued_file
 from .docread import api as docread_api
-from .docread.ocr import run_ocr
 from .docread.reader import Reader
 from .docread.summarize import make_summarizer
 from .hasura import HasuraAuthError, HasuraClient, HasuraError, Location, StoredFile
@@ -99,6 +98,8 @@ from .imports.runner import Importer, IncomingHandler
 from .imports.spool import Spool
 from .imports.store import ImportStore
 from .lineage import Lineage
+from .ocr import run_ocr
+from .office.hasura import OfficeHasura
 from .openbao import with_secrets
 from .registers import Register, build_register, render_register_pdf
 from .render import letter_from, render_pdf
@@ -520,7 +521,8 @@ def create_app(
         settings.s3_endpoint, settings.s3_access_key, settings.s3_secret_key, settings.s3_region, settings.bucket
     )
     verifier = verifier or TokenVerifier(settings.oidc_issuer, settings.oidc_jwks_url, settings.oidc_audience)
-    hasura = hasura or HasuraClient(settings.hasura_url, settings.hasura_admin_secret, timeout_s=settings.hasura_timeout_s)
+    hasura = hasura or OfficeHasura(settings.hasura_url, settings.hasura_admin_secret,
+                                    timeout_s=settings.hasura_timeout_s)
     meili = meili or MeiliClient(settings.meili_url, settings.meili_api_key, settings.search_index)
     cursors = Cursor(settings.hasura_admin_secret)   # khóa dẫn xuất (HKDF) từ một bí mật sẵn có của svc-files
     indexer = Indexer(hasura, meili, interval_s=settings.search_sync_interval_s or 5.0)
