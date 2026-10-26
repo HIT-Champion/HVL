@@ -201,6 +201,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_DIRECTORY_CLIENT_SECRET` | **bắt buộc** | Client `svc-workflow` trong realm (quyền `view-users`) |
 | `HASURA_URL`, `FLOWABLE_URL`, `MOC_KEYCLOAK_URL` | `http://hasura:8080`, `http://flowable:8080/flowable-rest/service`, `http://keycloak:8080` | Mạng nội bộ |
 | `MOC_REALM` | `moc` | |
+| `MOC_OFFICE_ENABLED` | `true` | Phần Văn phòng điện tử (#302, `office/api.py`): route `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN trong `MOC_PROCESSES_DIR`, sáu vòng nền của Văn phòng. `false`: dịch vụ vẫn lên với phần chung — đồng bộ danh bạ, thông báo và kênh ngoài, `/healthz`, `/readyz`; route của Văn phòng trả 404, không đọc `MOC_SCHEMAS_DIR`. Để kiểm lõi đứng được một mình (`make demo-tat-van-phong`), không dùng khi vận hành thật |
 | `MOC_PROCESSES_DIR` | `/app/processes` | Compose gắn `processes/` vào đây |
 | `MOC_SCHEMAS_DIR` | `/app/schemas` | JSON Schema dùng chung với giao diện, dựng sẵn vào image từ `schemas/` ở gốc repo (`docker build --build-context schemas=schemas services/svc-workflow`). Thiếu hoặc hỏng tệp thì dịch vụ dừng khi khởi động |
 | `MOC_SLA_DURATION` | `PT24H` | Thời hạn mỗi bước (ISO 8601: ngày, giờ, phút, giây — `P1D`, `PT24H`, `PT1M`). Sai dạng thì dịch vụ dừng khi khởi động. Gắn vào quy trình lúc khởi chạy: đổi giá trị không đổi hạn của văn bản đang xử lý |
