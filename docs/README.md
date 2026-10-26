@@ -53,7 +53,6 @@ kiến trúc ở [`architecture.md`](architecture.md) §6.
   ([`architecture.md`](architecture.md) §4.4, hướng tách §4.7; #302).
 - Chưa có biểu mẫu low-code: form của Văn phòng viết trong mã, JSON Schema ở `schemas/` chỉ dùng để kiểm dữ liệu
   (#303).
-- Phông Be Vietnam Pro (OFL-1.1) có ba bản giống nhau trong repo (#305).
 - Không gian cá nhân và Bảng tin mới có tiếng Việt (#306).
 
 Các việc còn mở khác: [Issues](https://github.com/HIT-Champion/Signet/issues).

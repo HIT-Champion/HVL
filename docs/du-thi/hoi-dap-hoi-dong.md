@@ -239,10 +239,10 @@ còn lại đi theo phần mềm nguồn mở dùng nguyên bản, và không c�
   Mailpit (hộp thư thử). Cả bốn chỉ nghe `127.0.0.1`, từ xa phải qua đường hầm SSH. Cổng công khai duy nhất là
   APISIX, và route `chan` của cổng chặn `/admin`, `/console`, `/realms/*` (trừ realm của Signet), `/flowable-rest/*`
   cùng các API nội bộ. Không ứng dụng nào gọi tới các bàn này.
-- Trang đăng nhập của Keycloak (theme `signet`): theo OIDC, người dùng nhập mật khẩu và mã TOTP ở trang của dịch vụ
-  danh tính chứ không ở ứng dụng. Nhờ vậy không ứng dụng nào thấy mật khẩu, và ba ứng dụng dùng chung một lần đăng
-  nhập. Theme chỉ thêm CSS, logo và câu chữ tiếng Việt, tiếng Anh, không thay mẫu trang; cổng chỉ mở đường đăng
-  nhập của realm Signet.
+- Trang đăng nhập của Keycloak (theme `signet`): theo OIDC, người dùng nhập mật khẩu, và mã TOTP với vai trò bắt buộc
+  (văn thư, lãnh đạo, tổ trưởng, quản trị đơn vị), ở trang của dịch vụ danh tính chứ không ở ứng dụng. Nhờ vậy không
+  ứng dụng nào thấy mật khẩu, và ba ứng dụng dùng chung một lần đăng nhập. Theme chỉ thêm CSS, logo và câu chữ tiếng
+  Việt, tiếng Anh, không thay mẫu trang; cổng chỉ mở đường đăng nhập của realm Signet.
 - Không có giao diện: Hasura tắt console (`HASURA_GRAPHQL_ENABLE_CONSOLE: "false"`); Flowable dùng bản REST, không có
   giao diện (QĐ-009).
 

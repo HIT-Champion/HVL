@@ -1,0 +1,43 @@
+{
+  "$comment": "Ca thử dùng chung cho don.json: trình duyệt (tests/schema-form.test.js) và svc-workflow.",
+  "base": {
+    "loai": "phep-nam",
+    "tuNgay": "today+3",
+    "denNgay": "today+5",
+    "lyDo": "Về quê dự đám cưới em gái"
+  },
+  "valid": [
+    {"name": "đủ các trường"},
+    {"name": "chỉ các trường bắt buộc", "unset": ["lyDo"]},
+    {"name": "nghỉ một ngày: đến ngày trùng từ ngày", "set": {"tuNgay": "today+3", "denNgay": "today+3"}},
+    {"name": "nghỉ ốm đã qua", "set": {"loai": "om", "tuNgay": "today-2", "denNgay": "today-1"}},
+    {"name": "nghỉ không lương qua năm mới",
+     "set": {"loai": "khong-luong", "tuNgay": "2026-12-30", "denNgay": "2027-01-02"}},
+    {"name": "việc riêng, lý do nhiều dòng", "set": {"loai": "viec-rieng", "lyDo": "Đưa con đi khám\nchiều về làm"}},
+    {"name": "lý do đúng 500 ký tự có dấu", "set": {"lyDo": {"$repeat": "ệ", "times": 500}}}
+  ],
+  "invalid": [
+    {"name": "thiếu loại nghỉ", "unset": ["loai"], "error": {"loai": "required"}},
+    {"name": "loại nghỉ không có trong danh sách", "set": {"loai": "nghi-mat"}, "error": {"loai": "enum"}},
+    {"name": "thiếu từ ngày", "unset": ["tuNgay"], "error": {"tuNgay": "required"}},
+    {"name": "ngày không có thật", "set": {"tuNgay": "2026-02-30"}, "error": {"tuNgay": "format"}},
+    {"name": "ngày viết kiểu dd/mm/yyyy", "set": {"denNgay": "27/10/2026"}, "error": {"denNgay": "format"}},
+    {"name": "năm gõ nhầm", "set": {"tuNgay": "0026-10-27", "denNgay": "0026-10-28"},
+     "error": {"tuNgay": "pattern", "denNgay": "pattern"}},
+    {"name": "ngày là số", "set": {"tuNgay": 20261027}, "error": {"tuNgay": "type"}},
+    {"name": "đến ngày trước từ ngày", "set": {"tuNgay": "today+5", "denNgay": "today+3"},
+     "error": {"denNgay": "x-moc-range"}},
+    {"name": "đến ngày không có thật thì chỉ báo định dạng", "set": {"denNgay": "2026-02-30"},
+     "error": {"denNgay": "format"}},
+    {"name": "từ ngày sai thì không so khoảng", "set": {"tuNgay": "2099-13-01", "denNgay": "today"},
+     "error": {"tuNgay": "format"}},
+    {"name": "lý do rỗng", "set": {"lyDo": ""}, "error": {"lyDo": "minLength"}},
+    {"name": "lý do 501 ký tự", "set": {"lyDo": {"$repeat": "ệ", "times": 501}}, "error": {"lyDo": "maxLength"}},
+    {"name": "lý do có khoảng trắng ở đầu", "set": {"lyDo": " Ốm"}, "error": {"lyDo": "not"}},
+    {"name": "lý do có ký tự rộng 0", "set": {"lyDo": "Ốm\u200b"}, "error": {"lyDo": "not"}},
+    {"name": "lý do có điều khiển hướng chữ", "set": {"lyDo": "Ốm \u202e"}, "error": {"lyDo": "not"}},
+    {"name": "lý do dạng tổ hợp NFD", "set": {"lyDo": {"$nfd": "Nghỉ ốm"}}, "error": {"lyDo": "x-moc-nfc"}},
+    {"name": "lý do là số", "set": {"lyDo": 5}, "error": {"lyDo": "type"}},
+    {"name": "trường không có trong mẫu", "set": {"soNgay": 3}, "error": {"soNgay": "additionalProperties"}}
+  ]
+}

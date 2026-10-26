@@ -15,9 +15,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Theme đăng nhập Signet (platform/keycloak/themes/signet) và lệnh `moc realm theme`: realm dùng đúng thư mục theme,
-theme chỉ có CSS, ảnh, phông kèm giấy phép, properties (không viết lại template FreeMarker của keycloak.v2), CSS không
-tải gì từ ngoài, logo và phông trùng của Văn phòng điện tử, compose gắn thư mục chỉ đọc; lệnh chỉ đặt theme khi realm
-còn dùng mặc định. Keycloak giả, không cần Docker, không đọc .env.
+theme chỉ có CSS, ảnh, properties (không viết lại template FreeMarker của keycloak.v2), không có tệp phông (phông lấy
+từ gói npm, gắn vào lúc chạy — test_phong_chu.py), CSS không tải gì từ ngoài, logo trùng của Văn phòng điện tử, compose
+gắn thư mục chỉ đọc; lệnh chỉ đặt theme khi realm còn dùng mặc định. Keycloak giả, không cần Docker, không đọc .env.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
@@ -39,6 +39,9 @@ SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 ROOT = SCRIPTS.parent
 THEME = ROOT / "platform" / "keycloak" / "themes" / "signet"
 LOGIN = THEME / "login"
+# điểm gắn volume keycloak_fonts (#305): chỉ có README.md giữ chỗ trong repo
+FONTS = LOGIN / "resources" / "fonts" / "be-vietnam-pro"
+FONTS_IMAGE = ROOT / "platform" / "keycloak" / "fonts" / "Dockerfile"
 SERVER = "http://127.0.0.1:8180/admin"
 BASE = f"{SERVER}/realms/moc"
 ENV = {"MOC_PUBLIC_URL": "https://signet.example"}
@@ -116,28 +119,28 @@ class ThemeFilesTest(unittest.TestCase):
         self.assertEqual(styles[0], "css/styles.css")
         self.assertFalse((LOGIN / "resources" / styles[0]).exists())
         for rel in styles[1:] + props["favicons"].split():
+            if rel.startswith("fonts/be-vietnam-pro/"):
+                # phông của gói npm: image keycloak-fonts dựng tệp này ở /fonts, chép vào volume gắn ở FONTS (#305)
+                image = FONTS_IMAGE.read_text(encoding="utf-8")
+                self.assertIn(f"/fonts/{rel.removeprefix('fonts/be-vietnam-pro/')}", image)
+                continue
             self.assertTrue((LOGIN / "resources" / rel).is_file(), rel)
+        self.assertIn("fonts/be-vietnam-pro/be-vietnam-pro.css", styles[1:-1])   # sau CSS cha, trước signet.css
 
-    def test_only_css_images_fonts_and_properties(self) -> None:
-        # không .ftl (template), không .js: chỉ đổi giao diện, luồng đăng nhập và mã của Keycloak giữ nguyên. Phông .ttf
-        # đi kèm OFL.txt (giấy phép SIL OFL-1.1 buộc phát hành phông cùng giấy phép)
+    def test_only_css_images_and_properties(self) -> None:
+        # không .ftl (template), không .js: chỉ đổi giao diện, luồng đăng nhập và mã của Keycloak giữ nguyên. Không có
+        # tệp phông (#305): thư mục phông chỉ có README.md giữ chỗ cho điểm gắn volume
         files = [p for p in THEME.rglob("*") if p.is_file()]
         self.assertTrue(files)
         for path in files:
-            if path.suffix == ".txt":
-                self.assertEqual(path.name, "OFL.txt", path)
-            else:
-                self.assertIn(path.suffix, {".css", ".svg", ".png", ".ttf", ".properties"}, path)
+            if path != FONTS / "README.md":
+                self.assertIn(path.suffix, {".css", ".svg", ".png", ".properties"}, path)
         self.assertEqual({p.name for p in THEME.iterdir()}, {"login"})   # chỉ theme đăng nhập
 
-    def test_fonts_are_the_office_fonts_with_licence(self) -> None:
-        office = ROOT / "apps" / "office" / "public" / "fonts"
-        fonts = sorted(LOGIN.rglob("*.ttf"))
-        self.assertTrue(fonts)
-        for font in fonts:
-            self.assertTrue((font.parent / "OFL.txt").is_file(), font)
-            same = office / font.relative_to(LOGIN / "resources" / "fonts")
-            self.assertEqual(font.read_bytes(), same.read_bytes(), font)
+    def test_font_folder_is_only_a_mount_point(self) -> None:
+        # thư mục theme gắn chỉ đọc: điểm gắn của volume keycloak_fonts phải có sẵn, nên giữ README.md trong repo
+        self.assertEqual([p.name for p in FONTS.iterdir()], ["README.md"])
+        self.assertIn("keycloak-fonts", (FONTS / "README.md").read_text(encoding="utf-8"))
 
     def test_css_loads_nothing_from_outside(self) -> None:
         for css in LOGIN.rglob("*.css"):

@@ -71,3 +71,35 @@ bộ test chạy cùng các ca đó:
 4. Schema được dựng vào cả image `app-office` (thành mã kiểm form) lẫn `svc-workflow` (compose đưa vào bằng
    `additional_contexts`), nên `make up` dựng lại cả hai — hai lớp luôn cùng một bản. Ở thư mục cài
    (`make install`) không sửa schema tại chỗ: sửa trong mã nguồn rồi cài lại.
+
+## Form dựng từ schema (#303)
+
+Ứng dụng cài thêm khai form bằng một tệp JSON Schema trong gói của mình (`apps/<ứng dụng>/forms/*.json`), không
+viết mã giao diện. Trang gọi `mountForm()` của `apps/nghi-phep/public/schema-form.js` (JS thuần, không thư viện):
+module dựng ô, nhãn, gợi ý, câu báo lỗi tiếng Việt/tiếng Anh, kiểm bằng đúng tệp đó trước khi gửi. svc-workflow kiểm
+lại khi nhận qua API của ứng dụng; phần này đến cùng #301. Bộ kiểm của module đi từng từ khóa vì CSP không cho
+`unsafe-eval`; nó hiểu các từ khóa ở trên cùng `const`, `minimum`, `maximum`, `minItems`, `allOf`. Từ khóa khác, giá
+trị từ khóa sai dạng, `$ref` vòng hay gợi ý hiển thị sai (thiếu trường trong `x-moc-order`, `x-moc-range` không phải
+hai trường ngày) thì báo lỗi ngay lúc nạp.
+
+Gợi ý hiển thị, bên kiểm bỏ qua; chữ là chuỗi hoặc `{vi, en}`:
+
+- `x-moc-title` (gốc): tên form.
+- `x-moc-order` (gốc): thứ tự ô; không có thì theo `properties`.
+- `x-moc-ui` (từng trường): `widget` — `text`, `textarea`, `date`, `number`, `select`, `radio`, `checkbox`,
+  `checkboxes`, không ghi thì suy từ kiểu; `label`, `help`, `note`, `rows`; `options` — nhãn cho từng giá trị của
+  `enum`; `errors` — câu báo riêng theo mã; `hidden`.
+
+Thêm một từ khóa kiểm riêng: **`x-moc-range`** ở gốc, vd `[["tuNgay", "denNgay"]]` — hai trường `format: date`,
+trường sau không được trước trường trước. Mã `x-moc-range` gắn vào trường sau, chỉ xét khi cả hai trường đã hợp lệ,
+đứng cuối thứ tự ưu tiên. Hiện chỉ trình duyệt kiểm; `FormSchema` của svc-workflow thêm cùng #301.
+
+| Tệp | Form |
+|---|---|
+| `apps/nghi-phep/forms/don.json` | Đơn xin nghỉ (formKey `nghi-phep.don`) |
+| `apps/nghi-phep/forms/duyet.json` | Duyệt đơn xin nghỉ (formKey `nghi-phep.duyet`) |
+
+Mỗi form có tệp ca thử `*.cases.json` cùng cách viết với `van-ban-den.cases.json`.
+`apps/nghi-phep/tests/schema-form.test.js` (`make test`) chạy cả ca của `schemas/` lẫn ca của form ứng dụng: trên ca
+của `schemas/`, bộ kiểm trên trình duyệt cho đúng mã như Ajv và svc-workflow. Ca của form ứng dụng có thêm test phía
+máy chủ khi #301 cho svc-workflow đọc `apps/*/forms/*.cases.json`.
