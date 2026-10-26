@@ -47,12 +47,15 @@ Bảng tự kiểm theo các yêu cầu PoF, có ngày và commit đã kiểm: [
 Mỗi giới hạn có issue theo dõi. Hạn chế của từng tính năng ở [`muc-hoan-thien.md`](muc-hoan-thien.md), chỗ còn yếu của
 kiến trúc ở [`architecture.md`](architecture.md) §6.
 
-- Quy trình (Flowable) mới phục vụ Văn phòng điện tử: `svc-workflow` chỉ nhận các Action viết sẵn của Văn phòng,
-  manifest ứng dụng chưa khai được quy trình (#301).
-- Phần máy chủ của Văn phòng còn chạy chung tiến trình với phần lõi trong `svc-files`, `svc-workflow`
-  ([`architecture.md`](architecture.md) §4.4, hướng tách §4.7; #302).
-- Chưa có biểu mẫu low-code: form của Văn phòng viết trong mã, JSON Schema ở `schemas/` chỉ dùng để kiểm dữ liệu
-  (#303).
+- Quy trình của ứng dụng cắm thêm ([`them-ung-dung.md`](them-ung-dung.md) mục 1.10) mới là quy trình duyệt: chưa có
+  timer, nhắc hạn, bước tự động, gọi API ra ngoài; form chưa có tệp đính kèm (#325).
+- Các ứng dụng chung một tên miền sau APISIX nên tách nhau ở token (`azp`), chưa ở trình duyệt: mã của một ứng dụng
+  đã cài đọc được token mà ứng dụng khác lưu trong `sessionStorage` của cùng thẻ. Chỉ người vận hành cài được ứng dụng
+  (#325).
+- Văn phòng điện tử tắt được bằng `MOC_OFFICE_ENABLED` nhưng vẫn chạy chung tiến trình, image và CSDL với phần lõi
+  trong `svc-files`, `svc-workflow` ([`architecture.md`](architecture.md) §4.4, bước 3–5 của §4.7; #324).
+- Form dựng từ JSON Schema mới dùng cho ứng dụng cắm thêm; form của Văn phòng vẫn viết trong mã, JSON Schema ở
+  `schemas/` chỉ dùng để kiểm dữ liệu (#303).
 - Không gian cá nhân và Bảng tin mới có tiếng Việt (#306).
 
 Các việc còn mở khác: [Issues](https://github.com/HIT-Champion/Signet/issues).
