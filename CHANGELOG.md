@@ -241,6 +241,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Bảng mức hoàn thiện ghi đúng số hàm test của từng tệp (#285). 14 trong 98 chỗ ghi sai, có chỗ sai ngay từ lúc viết:
+  `test_anchors.py` ghi 38 hàm, tệp có 28; `test_ot_map.py` ghi 34, có 24; `test_sla.py` ghi 14, có 15. Test mới
+  `scripts/tests/test_muc_hoan_thien.py` đếm tĩnh như mục 1 của tài liệu và báo dòng, số ghi, số thật khi bảng lệch.
+  Thêm hay bớt hàm test thì sửa bảng trong cùng pull request. Tổng ở mục 1 vẫn đếm lại khi chốt bản phát hành.
 - Tài liệu không còn ghi Prometheus chỉ thu chỉ số của APISIX (#282). Từ #274, Prometheus thu thêm trạng thái từng thành
   phần qua `GET /metrics` của svc-files. Sửa bảng công cụ và mục hạn chế của `docs/architecture.md`, dòng Prometheus
   của `DEPENDENCIES.md`, bảng thành phần của `README.md`, `README.en.md` và `platform/README.md`, chú thích của service
