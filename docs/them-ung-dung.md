@@ -215,7 +215,7 @@ trình duyệt ── /bang-tin/ ──► APISIX ──► app-bang-tin:8080   
 Kiểm: `apps/bang-tin/tests` (`node --test` 5, `unittest` 15, trong `make test`); `scripts/tests/test_ung_dung.py`
 47, `test_mang_ung_dung.py` 8 (mạng `apps`, cổng hook), `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13
 hàm (44 ca, PostgreSQL và Hasura thật khi `MOC_IT=1`, job CI `db` có đặt); `make demo-cai-ung-dung` trên hệ thống đang
-chạy (bước CI của job `luong-chinh`).
+chạy (bước CI ở phần `luong-chinh` của job `chay-thu`).
 
 ### 1.8. Bằng chứng: lõi không đổi
 
@@ -274,8 +274,8 @@ Giới hạn:
 - Chưa có giao diện quản trị: cài, gỡ chỉ bằng dòng lệnh; trang Danh mục ứng dụng (`/ung-dung`) chỉ để xem, không
   dò sức khỏe container của ứng dụng. Không gian cá nhân (`apps/ca-nhan`) chưa chuyển sang manifest: vẫn là
   một phần của lõi, cắm theo cách làm tay (mục 3).
-- Với Keycloak, Hasura, APISIX thật, lệnh chỉ được kiểm bằng màn `make demo-cai-ung-dung` (bước CI của job
-  `luong-chinh`); test trong `scripts/tests` không gọi dịch vụ thật.
+- Với Keycloak, Hasura, APISIX thật, lệnh chỉ được kiểm bằng màn `make demo-cai-ung-dung` (bước CI ở phần
+  `luong-chinh` của job `chay-thu`); test trong `scripts/tests` không gọi dịch vụ thật.
 
 ## 2. Ứng dụng nhận gì từ lõi
 

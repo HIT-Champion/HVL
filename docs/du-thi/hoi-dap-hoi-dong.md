@@ -45,7 +45,7 @@ sổ, phát hành, dựng PDF văn bản đi) còn nằm chung trong `svc-workfl
 [`docs/them-ung-dung.md`](../them-ung-dung.md) (§1 `moc app install`, mẫu `apps/bang-tin`; §3–§4 làm tay, mẫu
 `apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`;
 [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `platform/apisix/apisix.yaml`; `make smoke` (chặn đường quản
-trị); CI job `stack`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)".
+trị); CI job `chay-thu`, phần `luong-chinh`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)".
 
 ## 2. Vì sao nguồn mở, có thoát được một nhà cung cấp không?
 
@@ -76,7 +76,7 @@ lưu, neo sổ, nhắc hạn, nhúng) chưa thử chạy nhiều bản song song
 
 **Bằng chứng:** `docs/architecture.md` QĐ-002, QĐ-003; `db/migrations/default/1792281600100_core_schema/up.sql` (khóa
 `core.audit_head`); `platform/apisix/apisix.yaml` (`limit-count`); [`docs/van-hanh.md`](../van-hanh.md) mục "Thêm đơn
-vị"; CI job `stack`, bước "Thêm đơn vị bằng một lệnh (moc tenant create, check)".
+vị"; CI job `chay-thu`, phần `luong-chinh`, bước "Thêm đơn vị bằng một lệnh (moc tenant create, check)".
 
 ## 4. Bảo mật: đăng nhập, tệp độc, văn bản nhạy cảm, nhật ký
 
@@ -96,7 +96,8 @@ high có biện pháp ở cổng, các cách lẩn WAF mức medium thì dịch 
 **Bằng chứng:** `platform/keycloak/README.md`; `platform/apisix/README.md` mục WAF (luật, loại trừ, lỗ hổng của Coraza
 3.3.3); `make smoke` khối "Tường lửa ứng dụng web"; `make demo-kiem-dich`, `make demo-han-che`, `make demo-ket-bi-mat`,
 `make audit`; `db/README.md` (test sổ kiểm toán, gồm các kiểu sửa lén); [`docs/trien-khai.md`](../trien-khai.md) §8;
-CI job `stack` (các bước `make demo-*`), job `security` (gitleaks, OSV-Scanner).
+CI job `chay-thu`: phần `luong-chinh` (`make smoke`, bước `make demo-han-che`, `make demo-ket-bi-mat`), phần `e2e`
+(`kiem-dich.spec.ts`), phần `sao-luu` (`make audit` sau khi khôi phục); job `security` (gitleaks, OSV-Scanner).
 
 ## 5. AI có bịa không, dữ liệu có ra khỏi máy không?
 
@@ -112,7 +113,8 @@ gắn [n] cho từng câu theo đoạn nguồn, câu không có căn cứ thì n
 
 **Bằng chứng:** `make demo-hoi-dap`, `make do-hoi-dap` (thoát 1 khi có nguồn bị cấm), `make demo-che-pii`,
 `make do-che-pii`; `services/svc-files/README.md` (bảng số đo); `docs/architecture.md` QĐ-004, QĐ-006;
-`docker-compose.yml` (dịch vụ `ollama`, mạng `ai`); CI job `stack`, bước "Đo chất lượng hỏi đáp (make do-hoi-dap)".
+`docker-compose.yml` (dịch vụ `ollama`, mạng `ai`); CI job `chay-thu`, phần `ai`, bước "Đo chất lượng hỏi đáp
+(make do-hoi-dap)".
 
 ## 6. Hỏng máy, mất dữ liệu thì sao?
 
@@ -125,9 +127,9 @@ mở khóa nên khởi động lại không cần người. Giới hạn: một 
 phải chép ra máy khác, `.env` (khóa kho, khóa két) cất riêng; chưa đo thời gian khôi phục trên dữ liệu lớn.
 
 **Bằng chứng:** [`docs/van-hanh.md`](../van-hanh.md) mục "Sao lưu và khôi phục", "GitOps và tự phục hồi";
-[`docs/trien-khai.md`](../trien-khai.md) §7 (sao lưu hằng đêm); `make demo-tu-phuc-hoi`; CI job `stack`, bước "Sao
-lưu, xóa dữ liệu, khôi phục rồi kiểm lại (make backup, make restore)" và "GitOps — reconciler áp commit mới, sửa lệch
-cấu hình (scripts/reconcile.py)".
+[`docs/trien-khai.md`](../trien-khai.md) §7 (sao lưu hằng đêm); `make demo-tu-phuc-hoi`; CI job `chay-thu`, phần
+`sao-luu`, bước "Sao lưu, xóa dữ liệu, khôi phục rồi kiểm lại (make backup, make restore)" và phần `cai-dat`, bước
+"GitOps — reconciler áp commit mới, sửa lệch cấu hình (scripts/reconcile.py)".
 
 ## 7. Một thành phần ngừng thì hệ thống ra sao?
 
@@ -190,9 +192,9 @@ request, rồi smoke, e2e trên trình duyệt thật và 12 màn demo. `make in
 CI smoke lại từ bản cài. Bản phát hành là gói `.tar.gz` kèm `.sha256` (`make release`). Chưa có người ngoài đội tự cài
 từ README trên máy sạch: việc này còn trong kế hoạch.
 
-**Bằng chứng:** README mục "Cài đặt từ mã nguồn"; CI job `build` ("Dựng từ mã nguồn (PoF #4)"), job `stack`, bước
-"Cài ra ngoài thư mục mã nguồn và chạy từ đó (make install)"; [`pof-checklist.md`](pof-checklist.md) tiêu chí 3, 4;
-[`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §4.1.
+**Bằng chứng:** README mục "Cài đặt từ mã nguồn"; CI job `build` ("Dựng từ mã nguồn (PoF #4)"), job `chay-thu`, phần
+`cai-dat`, bước "Cài ra ngoài thư mục mã nguồn và chạy từ đó (make install)"; [`pof-checklist.md`](pof-checklist.md)
+tiêu chí 3, 4; [`ke-hoach-phat-trien.md`](ke-hoach-phat-trien.md) §4.1.
 
 ## 12. H-P-D-I ở đâu, khác gì phần mềm quản lý văn bản sẵn có?
 
