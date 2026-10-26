@@ -287,10 +287,11 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
   tiêu đề PR" của workflow PR) + **1 duyệt**. Ruleset của repo chặn nút merge tới khi đủ. Job "Chạy thử toàn hệ thống"
   gom sáu phần chạy song song trên sáu máy (`Chạy thử: luong-chinh`, `e2e`, `ai`, `sao-luu`, `cai-dat`, `https`;
   phần nào cũng tự dựng và nạp mẫu), mất khoảng 11 phút; PR chỉ đổi tài liệu (`*.md`, ảnh trong `docs/`, trừ
-  `docs/api/`) không dựng hệ thống, job này đạt ngay. Lỗi thì tải `stack-logs-<phần>` ở trang lượt chạy để xem nhật
-  ký từng dịch vụ và vết Playwright.
+  `docs/api/`) hay không đổi tệp nào không dựng hệ thống, job này đạt ngay. Lỗi thì tải `stack-logs-<phần>` ở trang
+  lượt chạy để xem nhật ký từng dịch vụ và vết Playwright.
 - Cách merge vào `develop`: **Squash and merge** — mọi commit nhỏ của nhánh gộp thành một commit sạch.
-  Riêng PR gộp ngược sau bản vá nóng (mục 6) dùng **Create a merge commit**.
+  Riêng PR gộp ngược (mục 6) và PR chỉ ghi lịch sử một nhánh vào `develop` (commit gộp `git merge -s ours`, không
+  đổi tệp nào, như #294) dùng **Create a merge commit**: squash bỏ mất đúng phần lịch sử cần giữ.
 - Cách merge vào `main` (PR phát hành, mục 6): **Create a merge commit**, giữ nguyên các commit của
   `develop`.
 - Người mở PR tự merge sau khi được duyệt; nhánh làm việc tự xóa sau khi gộp.

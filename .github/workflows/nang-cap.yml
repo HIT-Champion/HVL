@@ -58,12 +58,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           BASE: ${{ github.base_ref }}
+          SO_TEP: ${{ github.event.pull_request.changed_files }}
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ] || [ "$BASE" = main ]; then
             echo "chay=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
+          # gh api lỗi thì bước dừng ở đây (bash -e). PR không đổi tệp nào (commit gộp chỉ ghi lịch sử, PR gộp ngược
+          # sau phát hành) không có gì để tập; danh sách rỗng chỉ hợp lệ khi chính sự kiện báo 0 tệp
           files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
-          test -n "$files" || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+          if [ -z "$files" ]; then
+            test "$SO_TEP" = 0 || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+            echo "chay=false" >> "$GITHUB_OUTPUT"; echo "PR không đổi tệp nào, không tập"; exit 0
+          fi
           duong='^(db/|platform/openbao/|platform/keycloak/realm/|docker-compose\.yml$|\.env\.example$'
           duong+='|scripts/(nang_cap\.sh|install\.sh|backup\.py|moc\.py|realm_clients\.py)$'
           duong+='|\.github/workflows/nang-cap\.yml$)'
