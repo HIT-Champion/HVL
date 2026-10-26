@@ -81,6 +81,8 @@ function average(row: FeedbackSummaryRow | null) {
     <p v-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
     <p v-if="!loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
 
+    <!-- chữ góp ý, đường dẫn màn hình là chữ người dùng gõ: chuỗi dài không dấu cách phải xuống dòng (wrap-anywhere),
+         không đẩy trang cuộn ngang -->
     <div v-if="loaded" class="space-y-4">
       <template v-if="leader">
         <p v-if="sample" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="feedback-sample">
@@ -122,7 +124,9 @@ function average(row: FeedbackSummaryRow | null) {
               </thead>
               <tbody class="divide-y divide-stone-100">
                 <tr v-for="r in split.screens" :key="r.screen ?? ''">
-                  <td class="py-1 text-stone-700">{{ screenLabel(t, r.screen) }} <span class="text-xs text-stone-400">{{ r.screen }}</span></td>
+                  <td class="py-1 text-stone-700 wrap-anywhere">
+                    {{ screenLabel(t, r.screen) }} <span class="text-xs text-stone-400">{{ r.screen }}</span>
+                  </td>
                   <td class="py-1 text-right tabular-nums">{{ r.feedback }}</td>
                   <td class="py-1 text-right font-medium tabular-nums">{{ average(r) }}</td>
                   <td class="py-1 text-right tabular-nums">{{ r.with_comment }}</td>
@@ -141,11 +145,11 @@ function average(row: FeedbackSummaryRow | null) {
             <li v-for="f in recent" :key="f.id" class="py-2 text-sm">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="chip bg-brand-50 text-brand-800">{{ t('feedback.ratingValue', { n: f.rating }) }}</span>
-                <span class="text-stone-600">{{ screenLabel(t, f.screen) }}</span>
+                <span class="min-w-0 text-stone-600 wrap-anywhere">{{ screenLabel(t, f.screen) }}</span>
                 <span v-if="f.mine" class="chip bg-stone-100 text-stone-600">{{ t('feedback.yours') }}</span>
                 <span class="ml-auto text-xs text-stone-400">{{ fmtDateTime(f.created_at) }}</span>
               </div>
-              <p v-if="f.comment" class="mt-1 whitespace-pre-line text-stone-700">{{ f.comment }}</p>
+              <p v-if="f.comment" class="mt-1 whitespace-pre-line text-stone-700 wrap-anywhere">{{ f.comment }}</p>
             </li>
           </ul>
         </section>
@@ -159,10 +163,10 @@ function average(row: FeedbackSummaryRow | null) {
           <li v-for="f in mine" :key="f.id" class="py-2 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <span class="chip bg-brand-50 text-brand-800">{{ t('feedback.ratingValue', { n: f.rating }) }}</span>
-              <span class="text-stone-600">{{ screenLabel(t, f.screen) }}</span>
+              <span class="min-w-0 text-stone-600 wrap-anywhere">{{ screenLabel(t, f.screen) }}</span>
               <span class="ml-auto text-xs text-stone-400">{{ fmtDateTime(f.created_at) }}</span>
             </div>
-            <p v-if="f.comment" class="mt-1 whitespace-pre-line text-stone-700">{{ f.comment }}</p>
+            <p v-if="f.comment" class="mt-1 whitespace-pre-line text-stone-700 wrap-anywhere">{{ f.comment }}</p>
           </li>
         </ul>
       </section>
