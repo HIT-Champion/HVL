@@ -122,163 +122,204 @@ const feedbackAverage = computed(() => averageRating(feedbackTotal.value))
     <PageHeader :title="t('metrics.title')" :subtitle="t('metrics.subtitle')">
       <button v-if="allowed" class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
     </PageHeader>
-    <p v-if="!allowed" class="card p-12 text-center text-stone-500">{{ t('metrics.forbidden') }}</p>
-    <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-if="allowed && !loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-if="!allowed" class="moc-empty">{{ t('metrics.forbidden') }}</p>
+    <p v-else-if="failure" class="moc-state mb-6">{{ failure }}</p>
+    <p v-if="allowed && !loaded && !failure" class="moc-loading">{{ t('app.loading') }}</p>
 
-    <div v-if="allowed && loaded" class="space-y-4">
-      <p v-if="sample" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="metrics-sample">
+    <!-- bảng rộng cuộn ngang trong khối (vùng nhận tiêu điểm để cuộn bằng phím), trang không cuộn ngang -->
+    <div v-if="allowed && loaded" class="moc-stack">
+      <p v-if="sample" class="moc-note" data-testid="metrics-sample">
         {{ t('metrics.sampleNote') }}
       </p>
 
-      <section class="card overflow-x-auto p-4" data-testid="metrics-table">
-        <h2 class="font-medium text-stone-900">{{ t('metrics.table') }}</h2>
-        <table class="mt-2 w-full min-w-[40rem] text-sm">
-          <thead class="text-left text-xs text-stone-500">
-            <tr>
-              <th class="py-1 pr-3 font-medium">{{ t('metrics.indicator') }}</th>
-              <th class="py-1 pr-3 font-medium">{{ t('metrics.before') }}</th>
-              <th class="py-1 pr-3 font-medium">{{ t('metrics.after') }}</th>
-              <th class="py-1 font-medium">{{ t('metrics.how') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-stone-100 align-top">
-            <tr data-testid="metrics-assign">
-              <td class="py-2 pr-3 font-medium text-stone-800">{{ t('metrics.assign.name') }}</td>
-              <td class="py-2 pr-3 text-stone-500">{{ t('metrics.notMeasured') }}</td>
-              <td class="py-2 pr-3">
-                <template v-if="assignTotal && assignTotal.assigned">
-                  <div class="font-medium tabular-nums">{{ t('metrics.assign.value', { median: duration(assignTotal.median_hours), p90: duration(assignTotal.p90_hours) }) }}</div>
-                  <div class="text-xs text-stone-500">{{ t('metrics.assign.count', { n: assignTotal.assigned, waiting: assignTotal.waiting }) }}</div>
-                </template>
-                <span v-else class="text-stone-500">{{ t('metrics.noData') }}</span>
-              </td>
-              <td class="py-2 text-xs text-stone-500">{{ t('metrics.assign.how') }}</td>
-            </tr>
-            <tr data-testid="metrics-overdue">
-              <td class="py-2 pr-3 font-medium text-stone-800">{{ t('metrics.overdue.name') }}</td>
-              <td class="py-2 pr-3 text-stone-500">{{ t('metrics.notMeasured') }}</td>
-              <td class="py-2 pr-3">
-                <template v-if="overdueTotal && lateTotal !== null">
-                  <div class="font-medium tabular-nums">{{ t('metrics.overdue.value', { pct: number.format(lateTotal), late: overdueTotal.late, judged: overdueTotal.judged }) }}</div>
-                  <div class="text-xs text-stone-500">{{ t('metrics.overdue.count', { open: overdueTotal.late_open, pending: overdueTotal.pending }) }}</div>
-                </template>
-                <span v-else class="text-stone-500">{{ t('metrics.noData') }}</span>
-              </td>
-              <td class="py-2 text-xs text-stone-500">{{ t('metrics.overdue.how') }}</td>
-            </tr>
-            <tr data-testid="metrics-search">
-              <td class="py-2 pr-3 font-medium text-stone-800">{{ t('metrics.search.name') }}</td>
-              <td class="py-2 pr-3 text-stone-500">{{ t('metrics.notMeasured') }}</td>
-              <td class="py-2 pr-3">
-                <template v-if="runs.length">
-                  <div class="font-medium tabular-nums">{{ t('metrics.search.value', { median: fmtMs(searched.median_ms, (n) => number.format(n)), max: fmtMs(searched.max_ms, (n) => number.format(n)) }) }}</div>
-                  <div class="text-xs text-stone-500">{{ t('metrics.search.count', { n: searched.runs, found: searched.found }) }}</div>
-                </template>
-                <button class="btn-secondary mt-1" :disabled="measuring" data-testid="metrics-search-run" @click="measureSearch">
-                  {{ measuring ? t('metrics.search.running') : t('metrics.search.run', { n: SEARCH_RUNS }) }}
-                </button>
-                <p v-if="searchFailure" class="mt-1 text-xs text-red-700">{{ searchFailure }}</p>
-              </td>
-              <td class="py-2 text-xs text-stone-500">{{ t('metrics.search.how') }}</td>
-            </tr>
-            <tr data-testid="metrics-handoffs">
-              <td class="py-2 pr-3 font-medium text-stone-800">{{ t('metrics.handoffs.name') }}</td>
-              <td class="py-2 pr-3 text-stone-500">{{ t('metrics.notMeasured') }}</td>
-              <td class="py-2 pr-3 text-stone-700">{{ t('metrics.handoffs.value') }}</td>
-              <td class="py-2 text-xs text-stone-500">{{ t('metrics.handoffs.how') }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="mt-3 text-xs text-stone-500">{{ t('metrics.beforeNote') }}</p>
+      <section class="moc-block" data-testid="metrics-table">
+        <h2 id="metrics-table-title" class="moc-block-title mb-2">{{ t('metrics.table') }}</h2>
+        <div class="moc-scroll" tabindex="0" role="region" aria-labelledby="metrics-table-title">
+          <table class="moc-table min-w-[40rem]">
+            <thead>
+              <tr>
+                <th>{{ t('metrics.indicator') }}</th>
+                <th>{{ t('metrics.before') }}</th>
+                <th>{{ t('metrics.after') }}</th>
+                <th>{{ t('metrics.how') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-testid="metrics-assign">
+                <td class="font-medium text-stone-900">{{ t('metrics.assign.name') }}</td>
+                <td class="text-stone-500">{{ t('metrics.notMeasured') }}</td>
+                <td>
+                  <template v-if="assignTotal && assignTotal.assigned">
+                    <div class="font-medium">
+                      {{ t('metrics.assign.value', {
+                        median: duration(assignTotal.median_hours), p90: duration(assignTotal.p90_hours) }) }}
+                    </div>
+                    <div class="text-[13px] text-stone-500">
+                      {{ t('metrics.assign.count', { n: assignTotal.assigned, waiting: assignTotal.waiting }) }}
+                    </div>
+                  </template>
+                  <span v-else class="text-stone-500">{{ t('metrics.noData') }}</span>
+                </td>
+                <td class="text-[13px] text-stone-600">{{ t('metrics.assign.how') }}</td>
+              </tr>
+              <tr data-testid="metrics-overdue">
+                <td class="font-medium text-stone-900">{{ t('metrics.overdue.name') }}</td>
+                <td class="text-stone-500">{{ t('metrics.notMeasured') }}</td>
+                <td>
+                  <template v-if="overdueTotal && lateTotal !== null">
+                    <div class="font-medium">
+                      {{ t('metrics.overdue.value', {
+                        pct: number.format(lateTotal), late: overdueTotal.late, judged: overdueTotal.judged }) }}
+                    </div>
+                    <div class="text-[13px] text-stone-500">
+                      {{ t('metrics.overdue.count', { open: overdueTotal.late_open, pending: overdueTotal.pending }) }}
+                    </div>
+                  </template>
+                  <span v-else class="text-stone-500">{{ t('metrics.noData') }}</span>
+                </td>
+                <td class="text-[13px] text-stone-600">{{ t('metrics.overdue.how') }}</td>
+              </tr>
+              <tr data-testid="metrics-search">
+                <td class="font-medium text-stone-900">{{ t('metrics.search.name') }}</td>
+                <td class="text-stone-500">{{ t('metrics.notMeasured') }}</td>
+                <td>
+                  <template v-if="runs.length">
+                    <div class="font-medium">
+                      {{ t('metrics.search.value', {
+                        median: fmtMs(searched.median_ms, (n) => number.format(n)),
+                        max: fmtMs(searched.max_ms, (n) => number.format(n)) }) }}
+                    </div>
+                    <div class="text-[13px] text-stone-500">
+                      {{ t('metrics.search.count', { n: searched.runs, found: searched.found }) }}
+                    </div>
+                  </template>
+                  <button
+                    class="btn-secondary mt-1.5" :disabled="measuring" data-testid="metrics-search-run"
+                    @click="measureSearch"
+                  >
+                    {{ measuring ? t('metrics.search.running') : t('metrics.search.run', { n: SEARCH_RUNS }) }}
+                  </button>
+                  <p v-if="searchFailure" class="mt-1 text-[13px] text-red-700">{{ searchFailure }}</p>
+                </td>
+                <td class="text-[13px] text-stone-600">{{ t('metrics.search.how') }}</td>
+              </tr>
+              <tr data-testid="metrics-handoffs">
+                <td class="font-medium text-stone-900">{{ t('metrics.handoffs.name') }}</td>
+                <td class="text-stone-500">{{ t('metrics.notMeasured') }}</td>
+                <td class="text-stone-700">{{ t('metrics.handoffs.value') }}</td>
+                <td class="text-[13px] text-stone-600">{{ t('metrics.handoffs.how') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="moc-foot">{{ t('metrics.beforeNote') }}</p>
       </section>
 
-      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <section class="card overflow-x-auto p-4" data-testid="metrics-assign-months">
-          <h2 class="font-medium text-stone-900">{{ t('metrics.assign.byMonth') }}</h2>
-          <p v-if="!monthRows(assign).length" class="py-8 text-center text-sm text-stone-500">{{ t('metrics.noData') }}</p>
-          <table v-else class="mt-2 w-full text-sm">
-            <thead class="text-left text-xs text-stone-500">
-              <tr>
-                <th class="py-1 font-medium">{{ t('metrics.month') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.assign.arrived') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.assign.assigned') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.median') }}</th>
-                <th class="py-1 text-right font-medium">p90</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.assign.handled') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-stone-100">
-              <tr v-for="r in [...monthRows(assign), ...(assignTotal ? [assignTotal] : [])]" :key="r.month ?? 'all'" :class="r.month ? '' : 'font-medium'">
-                <td class="py-1 text-stone-600">{{ monthLabel(r.month) }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.arrived }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.assigned }}</td>
-                <td class="py-1 text-right tabular-nums">{{ duration(r.median_hours) }}</td>
-                <td class="py-1 text-right tabular-nums">{{ duration(r.p90_hours) }}</td>
-                <td class="py-1 text-right tabular-nums">{{ duration(r.handled_median_hours) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="mt-2 text-xs text-stone-500">{{ t('metrics.assign.monthHint') }}</p>
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <section class="moc-block" data-testid="metrics-assign-months">
+          <h2 id="metrics-assign-title" class="moc-block-title mb-2">{{ t('metrics.assign.byMonth') }}</h2>
+          <p v-if="!monthRows(assign).length" class="moc-empty">{{ t('metrics.noData') }}</p>
+          <div v-else class="moc-scroll" tabindex="0" role="region" aria-labelledby="metrics-assign-title">
+            <table class="moc-table min-w-[30rem]">
+              <thead>
+                <tr>
+                  <th>{{ t('metrics.month') }}</th>
+                  <th class="text-right">{{ t('metrics.assign.arrived') }}</th>
+                  <th class="text-right">{{ t('metrics.assign.assigned') }}</th>
+                  <th class="text-right">{{ t('metrics.median') }}</th>
+                  <th class="text-right">p90</th>
+                  <th class="text-right">{{ t('metrics.assign.handled') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="r in [...monthRows(assign), ...(assignTotal ? [assignTotal] : [])]" :key="r.month ?? 'all'"
+                  :class="{ 'is-total': !r.month }"
+                >
+                  <td class="text-stone-700">{{ monthLabel(r.month) }}</td>
+                  <td class="text-right">{{ r.arrived }}</td>
+                  <td class="text-right">{{ r.assigned }}</td>
+                  <td class="text-right">{{ duration(r.median_hours) }}</td>
+                  <td class="text-right">{{ duration(r.p90_hours) }}</td>
+                  <td class="text-right">{{ duration(r.handled_median_hours) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="moc-foot">{{ t('metrics.assign.monthHint') }}</p>
         </section>
 
-        <section class="card overflow-x-auto p-4" data-testid="metrics-overdue-months">
-          <h2 class="font-medium text-stone-900">{{ t('metrics.overdue.byMonth') }}</h2>
-          <p v-if="!monthRows(overdue).length" class="py-8 text-center text-sm text-stone-500">{{ t('metrics.noData') }}</p>
-          <table v-else class="mt-2 w-full text-sm">
-            <thead class="text-left text-xs text-stone-500">
-              <tr>
-                <th class="py-1 font-medium">{{ t('metrics.overdue.dueMonth') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.overdue.judged') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.overdue.late') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.overdue.open') }}</th>
-                <th class="py-1 text-right font-medium">{{ t('metrics.overdue.pending') }}</th>
-                <th class="py-1 text-right font-medium">%</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-stone-100">
-              <tr v-for="r in [...monthRows(overdue), ...(overdueTotal ? [overdueTotal] : [])]" :key="r.month ?? 'all'" :class="r.month ? '' : 'font-medium'">
-                <td class="py-1 text-stone-600">{{ monthLabel(r.month) }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.judged }}</td>
-                <td class="py-1 text-right tabular-nums" :class="r.late ? 'text-red-700' : ''">{{ r.late }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.late_open }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.pending }}</td>
-                <td class="py-1 text-right tabular-nums">{{ overduePct(r) === null ? '—' : number.format(overduePct(r)!) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="mt-2 text-xs text-stone-500">{{ t('metrics.overdue.monthHint') }}</p>
+        <section class="moc-block" data-testid="metrics-overdue-months">
+          <h2 id="metrics-overdue-title" class="moc-block-title mb-2">{{ t('metrics.overdue.byMonth') }}</h2>
+          <p v-if="!monthRows(overdue).length" class="moc-empty">{{ t('metrics.noData') }}</p>
+          <div v-else class="moc-scroll" tabindex="0" role="region" aria-labelledby="metrics-overdue-title">
+            <table class="moc-table min-w-[30rem]">
+              <thead>
+                <tr>
+                  <th>{{ t('metrics.overdue.dueMonth') }}</th>
+                  <th class="text-right">{{ t('metrics.overdue.judged') }}</th>
+                  <th class="text-right">{{ t('metrics.overdue.late') }}</th>
+                  <th class="text-right">{{ t('metrics.overdue.open') }}</th>
+                  <th class="text-right">{{ t('metrics.overdue.pending') }}</th>
+                  <th class="text-right">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="r in [...monthRows(overdue), ...(overdueTotal ? [overdueTotal] : [])]" :key="r.month ?? 'all'"
+                  :class="{ 'is-total': !r.month }"
+                >
+                  <td class="text-stone-700">{{ monthLabel(r.month) }}</td>
+                  <td class="text-right">{{ r.judged }}</td>
+                  <td class="text-right" :class="r.late ? 'text-red-700' : ''">{{ r.late }}</td>
+                  <td class="text-right">{{ r.late_open }}</td>
+                  <td class="text-right">{{ r.pending }}</td>
+                  <td class="text-right">{{ overduePct(r) === null ? '—' : number.format(overduePct(r)!) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="moc-foot">{{ t('metrics.overdue.monthHint') }}</p>
         </section>
       </div>
 
-      <section v-if="runs.length" class="card overflow-x-auto p-4" data-testid="metrics-search-runs">
-        <h2 class="font-medium text-stone-900">{{ t('metrics.search.runs') }}</h2>
-        <table class="mt-2 w-full text-sm">
-          <thead class="text-left text-xs text-stone-500">
+      <section v-if="runs.length" class="moc-block" data-testid="metrics-search-runs">
+        <h2 class="moc-block-title mb-2">{{ t('metrics.search.runs') }}</h2>
+        <table class="moc-table">
+          <thead>
             <tr>
-              <th class="py-1 font-medium">{{ t('metrics.search.symbol') }}</th>
-              <th class="py-1 text-right font-medium">{{ t('metrics.search.latency') }}</th>
-              <th class="py-1 text-right font-medium">{{ t('metrics.search.rank') }}</th>
+              <th>{{ t('metrics.search.symbol') }}</th>
+              <th class="text-right">{{ t('metrics.search.latency') }}</th>
+              <th class="text-right">{{ t('metrics.search.rank') }}</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-stone-100">
+          <tbody>
             <tr v-for="r in runs" :key="r.id">
-              <td class="py-1"><NuxtLink :to="`/van-ban/${r.id}`" class="text-brand-700 hover:underline">{{ r.symbol }}</NuxtLink></td>
-              <td class="py-1 text-right tabular-nums">{{ fmtMs(r.ms, (n) => number.format(n)) }}</td>
-              <td class="py-1 text-right tabular-nums" :class="r.rank === null ? 'text-red-700' : ''">{{ r.rank ?? t('metrics.search.notFound') }}</td>
+              <td class="wrap-anywhere">
+                <NuxtLink :to="`/van-ban/${r.id}`" class="text-brand-700 hover:underline">{{ r.symbol }}</NuxtLink>
+              </td>
+              <td class="text-right">{{ fmtMs(r.ms, (n) => number.format(n)) }}</td>
+              <td class="text-right" :class="r.rank === null ? 'text-red-700' : ''">
+                {{ r.rank ?? t('metrics.search.notFound') }}
+              </td>
             </tr>
           </tbody>
         </table>
-        <p class="mt-2 text-xs text-stone-500">{{ t('metrics.search.note') }}</p>
+        <p class="moc-foot">{{ t('metrics.search.note') }}</p>
       </section>
 
-      <section class="card p-4" data-testid="metrics-feedback">
-        <h2 class="font-medium text-stone-900">{{ t('metrics.feedback') }}</h2>
+      <section class="moc-block" data-testid="metrics-feedback">
+        <h2 class="moc-block-title">{{ t('metrics.feedback') }}</h2>
         <p v-if="!feedbackTotal" class="mt-1 text-sm text-stone-500">{{ t('feedback.none') }}</p>
         <p v-else class="mt-1 text-sm text-stone-700">
-          {{ t('metrics.feedbackValue', { avg: feedbackAverage === null ? '—' : number.format(feedbackAverage), n: feedbackTotal.feedback }) }}
+          {{ t('metrics.feedbackValue', {
+            avg: feedbackAverage === null ? '—' : number.format(feedbackAverage), n: feedbackTotal.feedback }) }}
         </p>
-        <NuxtLink to="/gop-y" class="mt-2 inline-block text-sm text-brand-700 hover:underline">{{ t('metrics.feedbackLink') }}</NuxtLink>
+        <NuxtLink
+          to="/gop-y" class="mt-2 inline-flex min-h-6 items-center text-sm font-medium text-brand-700 hover:underline"
+        >
+          {{ t('metrics.feedbackLink') }}
+        </NuxtLink>
       </section>
     </div>
   </div>

@@ -117,8 +117,6 @@ const filteredRows = computed(() => {
     <div class="moc-tabs" role="tablist">
       <button
         v-for="(_, key) in tabs" :key="key" role="tab" :aria-selected="tab === key"
-        class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
-        :class="tab === key ? 'border-brand-700 text-brand-800' : 'border-transparent text-stone-500 hover:text-stone-800'"
         @click="router.replace({ query: { tab: key } })"
       >
         {{ t(`outgoing.tab.${key}`) }}
@@ -136,46 +134,48 @@ const filteredRows = computed(() => {
       <span>{{ failure }}</span>
       <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
     </div>
-    <div v-else-if="loading && !rows.length" aria-busy="true" :aria-label="t('fe.loading')">
+    <div v-else-if="loading && !rows.length" role="status" aria-busy="true" :aria-label="t('fe.loading')">
       <div v-for="n in 5" :key="n" class="moc-skeleton" />
     </div>
-    <p v-else-if="!filteredRows.length" class="card p-12 text-center text-stone-500">{{ t('outgoing.empty') }}</p>
+    <p v-else-if="!filteredRows.length" class="moc-empty">{{ t('outgoing.empty') }}</p>
     <div v-else class="moc-doc-table moc-outgoing-table overflow-x-auto">
       <table class="w-full text-sm">
-        <thead class="border-b border-stone-200 text-left text-xs font-medium text-stone-500">
+        <thead>
           <tr>
-            <th class="px-4 py-3">{{ t('outgoing.symbol') }}</th>
-            <th class="px-4 py-3">{{ t('outgoing.summary') }}</th>
-            <th class="px-4 py-3">{{ t('outgoing.status') }}</th>
-            <th class="px-4 py-3">{{ t('outgoing.issuedOn') }}</th>
+            <th class="px-4">{{ t('outgoing.symbol') }}</th>
+            <th class="px-4">{{ t('outgoing.summary') }}</th>
+            <th class="px-4">{{ t('outgoing.status') }}</th>
+            <th class="px-4">{{ t('outgoing.issuedOn') }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-stone-100">
+        <tbody>
           <tr
-            v-for="row in filteredRows" :key="row.id" class="cursor-pointer hover:bg-brand-50/40"
+            v-for="row in filteredRows" :key="row.id" class="cursor-pointer"
             @click="router.push(`/van-ban/${row.id}`)"
           >
-            <td class="px-4 py-3 whitespace-nowrap">
-              <div v-if="row.symbol" class="font-medium">{{ row.symbol }}</div>
+            <td class="px-4 whitespace-nowrap">
+              <div v-if="row.symbol" class="font-medium tabular-nums">{{ row.symbol }}</div>
               <div v-else class="text-stone-500">{{ t('outgoing.unnumbered') }}</div>
-              <div class="text-xs text-stone-500">{{ row.type_code }}</div>
+              <div class="mt-0.5 text-[13px] text-stone-500">{{ row.type_code }}</div>
             </td>
-            <td class="max-w-md px-4 py-3">
-              <NuxtLink :to="`/van-ban/${row.id}`" class="line-clamp-2 text-stone-900 hover:text-brand-800" @click.stop>{{ row.summary }}</NuxtLink>
-              <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
+            <td class="max-w-xl px-4">
+              <NuxtLink :to="`/van-ban/${row.id}`" class="moc-doc-title" @click.stop>{{ row.summary }}</NuxtLink>
+              <div class="moc-doc-meta">
                 {{ row.department?.name }}<span v-if="row.creator"> · {{ row.creator.full_name }}</span>
                 <UrgencyChip :urgency="row.urgency" quiet />
               </div>
             </td>
-            <td class="px-4 py-3"><StatusChip :status="row.status" /></td>
-            <td :data-label="t('outgoing.issuedOn')" class="px-4 py-3 whitespace-nowrap text-stone-600">
+            <td class="px-4"><StatusChip :status="row.status" /></td>
+            <td :data-label="t('outgoing.issuedOn')" class="px-4 whitespace-nowrap text-stone-600 tabular-nums">
               {{ fmtDate(row.issued_on) }}
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-if="more" class="border-t border-stone-100 p-3 text-center">
-        <button class="btn-secondary" :disabled="loading" data-testid="list-more" @click="load(true)">{{ t('app.more') }}</button>
+      <div v-if="more" class="moc-more">
+        <button class="btn-secondary" :disabled="loading" data-testid="list-more" @click="load(true)">
+          {{ t('app.more') }}
+        </button>
       </div>
     </div>
   </div>

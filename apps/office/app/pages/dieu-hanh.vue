@@ -234,139 +234,171 @@ const outgoingChart = computed(() => ({
     <PageHeader :title="t('board.title')" :subtitle="t('board.subtitle')">
       <button v-if="allowed" class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
     </PageHeader>
-    <p v-if="!allowed" class="card p-12 text-center text-stone-500">{{ t('board.forbidden') }}</p>
-    <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-if="allowed && !loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <div v-if="allowed && loaded" class="space-y-4">
-      <div class="moc-board-kpis" data-testid="board-kpis">
-        <div class="card p-4">
-          <div class="text-sm text-stone-500">{{ t('board.open') }}</div>
-          <div class="mt-1 text-3xl font-semibold text-stone-900" data-testid="kpi-open">{{ kpis.open }}</div>
-          <div class="mt-1 text-xs text-stone-500">{{ t('board.openHint') }}</div>
+    <p v-if="!allowed" class="moc-empty">{{ t('board.forbidden') }}</p>
+    <p v-else-if="failure" class="moc-state mb-6">{{ failure }}</p>
+    <p v-if="allowed && !loaded && !failure" class="moc-loading">{{ t('app.loading') }}</p>
+    <div v-if="allowed && loaded" class="moc-stack">
+      <!-- bốn con số chính đứng thành một hàng, không thành thẻ; các bảng bên dưới là số liệu chi tiết -->
+      <div>
+        <div class="moc-board-kpis" data-testid="board-kpis">
+          <div class="card p-4">
+            <div class="text-sm text-stone-600">{{ t('board.open') }}</div>
+            <div class="mt-1 text-stone-900" data-testid="kpi-open">{{ kpis.open }}</div>
+            <div class="mt-1 text-xs text-stone-500">{{ t('board.openHint') }}</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-sm text-stone-600">{{ t('board.overdue') }}</div>
+            <div class="mt-1" :class="kpis.overdue ? 'text-red-700' : 'text-stone-900'" data-testid="kpi-overdue">
+              {{ kpis.overdue }}
+            </div>
+            <div class="mt-1 text-xs text-stone-500">{{ t('board.overdueHint') }}</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-sm text-stone-600">{{ t('board.urgent') }}</div>
+            <div class="mt-1 text-stone-900" data-testid="kpi-urgent">{{ kpis.urgent }}</div>
+            <div class="mt-1 text-xs text-stone-500">{{ t('board.urgentHint') }}</div>
+          </div>
+          <div class="card p-4">
+            <div class="text-sm text-stone-600">{{ t('board.avgTime') }}</div>
+            <div class="mt-1 text-stone-900" data-testid="kpi-time">
+              {{ kpis.hours === null ? '—' : duration(kpis.hours) }}
+            </div>
+            <div class="mt-1 text-xs text-stone-500">
+              {{ kpis.hours === null ? t('board.noneDone') : t('board.avgHint', { done: kpis.done }) }}
+              <template v-if="kpis.onTimePct !== null"> · {{ t('board.onTimePct', { pct: kpis.onTimePct }) }}</template>
+            </div>
+          </div>
         </div>
-        <div class="card p-4">
-          <div class="text-sm text-stone-500">{{ t('board.overdue') }}</div>
-          <div class="mt-1 text-3xl font-semibold" :class="kpis.overdue ? 'text-red-700' : 'text-stone-900'" data-testid="kpi-overdue">{{ kpis.overdue }}</div>
-          <div class="mt-1 text-xs text-stone-500">{{ t('board.overdueHint') }}</div>
-        </div>
-        <div class="card p-4">
-          <div class="text-sm text-stone-500">{{ t('board.urgent') }}</div>
-          <div class="mt-1 text-3xl font-semibold text-stone-900" data-testid="kpi-urgent">{{ kpis.urgent }}</div>
-          <div class="mt-1 text-xs text-stone-500">{{ t('board.urgentHint') }}</div>
-        </div>
-        <div class="card p-4">
-          <div class="text-sm text-stone-500">{{ t('board.avgTime') }}</div>
-          <div class="mt-1 text-3xl font-semibold text-stone-900" data-testid="kpi-time">{{ kpis.hours === null ? '—' : duration(kpis.hours) }}</div>
-          <div class="mt-1 text-xs text-stone-500">
-            {{ kpis.hours === null ? t('board.noneDone') : t('board.avgHint', { done: kpis.done }) }}
-            <template v-if="kpis.onTimePct !== null"> · {{ t('board.onTimePct', { pct: kpis.onTimePct }) }}</template>
+        <div class="mt-3 flex flex-wrap items-start justify-between gap-2">
+          <p v-if="restricted" class="text-[13px] text-stone-500" data-testid="board-restricted">
+            {{ t('board.restricted', { n: restricted }) }}
+          </p>
+          <div class="ml-auto flex items-center gap-2">
+            <ChartChecks chart="kpis" :checks="checks" :failed="checksFailed" />
+            <SourceLink chart="kpis" />
           </div>
         </div>
       </div>
-      <div class="flex flex-wrap items-start justify-between gap-2">
-        <p v-if="restricted" class="text-xs text-stone-500" data-testid="board-restricted">
-          {{ t('board.restricted', { n: restricted }) }}
-        </p>
-        <div class="ml-auto flex items-center gap-2">
-          <ChartChecks chart="kpis" :checks="checks" :failed="checksFailed" />
-          <SourceLink chart="kpis" />
-        </div>
-      </div>
 
-      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <section class="card p-4" data-testid="board-status">
-          <div class="flex items-start justify-between gap-3">
-            <h2 class="font-medium text-stone-900">{{ t('board.byStatus') }}</h2>
-            <div class="flex shrink-0 items-center gap-2">
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <section class="moc-block" data-testid="board-status">
+          <div class="moc-block-head">
+            <h2 class="moc-block-title">{{ t('board.byStatus') }}</h2>
+            <div class="moc-block-tools">
               <ChartChecks chart="status" :checks="checks" :failed="checksFailed" />
               <SourceLink chart="status" />
             </div>
           </div>
-          <EChart :option="statusChart" :label="byStatus.map((r) => `${t(`status.${r.status}`)}: ${r.documents}`).join(', ')" />
-          <table class="mt-2 w-full text-sm">
-            <thead class="text-left text-xs text-stone-500">
-              <tr><th class="py-1 font-medium">{{ t('board.status') }}</th><th class="py-1 text-right font-medium">{{ t('board.count') }}</th></tr>
+          <EChart
+            :option="statusChart"
+            :label="byStatus.map((r) => `${t(`status.${r.status}`)}: ${r.documents}`).join(', ')"
+          />
+          <table class="moc-table mt-3">
+            <thead>
+              <tr><th>{{ t('board.status') }}</th><th class="text-right">{{ t('board.count') }}</th></tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
+            <tbody>
               <tr v-for="r in byStatus" :key="r.status">
-                <td class="py-1 text-stone-600">{{ t(`status.${r.status}`) }}</td>
-                <td class="py-1 text-right font-medium tabular-nums">{{ r.documents }}</td>
+                <td class="text-stone-700">{{ t(`status.${r.status}`) }}</td>
+                <td class="text-right font-medium">{{ r.documents }}</td>
               </tr>
             </tbody>
           </table>
         </section>
 
-        <section class="card p-4" data-testid="board-departments">
-          <div class="flex items-start justify-between gap-3">
-            <h2 class="font-medium text-stone-900">{{ t('board.byDepartment') }}</h2>
-            <div class="flex shrink-0 items-center gap-2">
+        <section class="moc-block" data-testid="board-departments">
+          <div class="moc-block-head">
+            <h2 class="moc-block-title">{{ t('board.byDepartment') }}</h2>
+            <div class="moc-block-tools">
               <ChartChecks chart="departments" :checks="checks" :failed="checksFailed" />
               <SourceLink chart="departments" />
             </div>
           </div>
-          <p v-if="!departments.length" class="py-12 text-center text-sm text-stone-500">{{ t('board.empty') }}</p>
+          <p v-if="!departments.length" class="moc-empty">{{ t('board.empty') }}</p>
           <template v-else>
-            <EChart :option="departmentChart" :height="departmentHeight" :label="departments.map((r) => `${departmentName(r)}: ${r.in_progress}, ${t('board.late')} ${r.overdue}`).join('; ')" />
-            <table class="mt-2 w-full text-sm">
-              <thead class="text-left text-xs text-stone-500">
-                <tr><th class="py-1 font-medium">{{ t('board.department') }}</th><th class="py-1 text-right font-medium">{{ t('board.inProgress') }}</th><th class="py-1 text-right font-medium">{{ t('board.late') }}</th></tr>
+            <EChart
+              :option="departmentChart" :height="departmentHeight"
+              :label="departments.map((r) => `${departmentName(r)}: ${r.in_progress}, ${t('board.late')} ${r.overdue}`)
+                .join('; ')"
+            />
+            <table class="moc-table mt-3">
+              <thead>
+                <tr>
+                  <th>{{ t('board.department') }}</th>
+                  <th class="text-right">{{ t('board.inProgress') }}</th>
+                  <th class="text-right">{{ t('board.late') }}</th>
+                </tr>
               </thead>
-              <tbody class="divide-y divide-stone-100">
+              <tbody>
                 <tr v-for="r in departments" :key="r.department_id ?? 'none'">
-                  <td class="py-1 text-stone-600">{{ departmentName(r) }}</td>
-                  <td class="py-1 text-right tabular-nums">{{ r.in_progress }}</td>
-                  <td class="py-1 text-right font-medium tabular-nums" :class="r.overdue ? 'text-red-700' : ''">{{ r.overdue }}</td>
+                  <td class="text-stone-700 wrap-anywhere">{{ departmentName(r) }}</td>
+                  <td class="text-right">{{ r.in_progress }}</td>
+                  <td class="text-right font-medium" :class="r.overdue ? 'text-red-700' : ''">{{ r.overdue }}</td>
                 </tr>
               </tbody>
             </table>
           </template>
         </section>
 
-        <section class="card p-4" data-testid="board-processing">
-          <div class="flex items-start justify-between gap-3">
-            <h2 class="font-medium text-stone-900">
+        <section class="moc-block" data-testid="board-processing">
+          <div class="moc-block-head">
+            <h2 class="moc-block-title">
               {{ t('board.processing') }}
               <span class="text-sm font-normal text-stone-500"
                 >({{ inHours ? t('board.unitHours') : t('board.unitDays') }})</span>
             </h2>
-            <div class="flex shrink-0 items-center gap-2">
+            <div class="moc-block-tools">
               <ChartChecks chart="processing" :checks="checks" :failed="checksFailed" />
               <SourceLink chart="processing" />
             </div>
           </div>
-          <EChart :option="processingChart" :label="processingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${duration(r.total_hours / r.documents)}`).join(', ') || t('board.noneDone')" />
-          <table class="mt-2 w-full text-sm">
-            <thead class="text-left text-xs text-stone-500">
-              <tr><th class="py-1 font-medium">{{ t('board.month') }}</th><th class="py-1 text-right font-medium">{{ t('board.finished') }}</th><th class="py-1 text-right font-medium">{{ t('board.onTime') }}</th><th class="py-1 text-right font-medium">{{ t('board.average') }}</th></tr>
+          <EChart
+            :option="processingChart"
+            :label="processingByMonth.filter((r) => r.documents)
+              .map((r) => `${monthLabel(r.month)}: ${duration(r.total_hours / r.documents)}`).join(', ')
+              || t('board.noneDone')"
+          />
+          <table class="moc-table mt-3">
+            <thead>
+              <tr>
+                <th>{{ t('board.month') }}</th>
+                <th class="text-right">{{ t('board.finished') }}</th>
+                <th class="text-right">{{ t('board.onTime') }}</th>
+                <th class="text-right">{{ t('board.average') }}</th>
+              </tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
+            <tbody>
               <tr v-for="r in processingByMonth.filter((p) => p.documents)" :key="r.month">
-                <td class="py-1 text-stone-600">{{ monthLabel(r.month) }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.documents }}</td>
-                <td class="py-1 text-right tabular-nums">{{ r.with_due ? `${r.on_time}/${r.with_due}` : '—' }}</td>
-                <td class="py-1 text-right font-medium tabular-nums">{{ duration(r.total_hours / r.documents) }}</td>
+                <td class="text-stone-700">{{ monthLabel(r.month) }}</td>
+                <td class="text-right">{{ r.documents }}</td>
+                <td class="text-right">{{ r.with_due ? `${r.on_time}/${r.with_due}` : '—' }}</td>
+                <td class="text-right font-medium">{{ duration(r.total_hours / r.documents) }}</td>
               </tr>
             </tbody>
           </table>
         </section>
 
-        <section class="card p-4" data-testid="board-outgoing">
-          <div class="flex items-start justify-between gap-3">
-            <h2 class="font-medium text-stone-900">{{ t('board.outgoing') }}</h2>
-            <div class="flex shrink-0 items-center gap-2">
+        <section class="moc-block" data-testid="board-outgoing">
+          <div class="moc-block-head">
+            <h2 class="moc-block-title">{{ t('board.outgoing') }}</h2>
+            <div class="moc-block-tools">
               <ChartChecks chart="outgoing" :checks="checks" :failed="checksFailed" />
               <SourceLink chart="outgoing" />
             </div>
           </div>
-          <EChart :option="outgoingChart" :label="outgoingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${r.documents}`).join(', ') || t('board.empty')" />
-          <table class="mt-2 w-full text-sm">
-            <thead class="text-left text-xs text-stone-500">
-              <tr><th class="py-1 font-medium">{{ t('board.month') }}</th><th class="py-1 text-right font-medium">{{ t('board.issued') }}</th></tr>
+          <EChart
+            :option="outgoingChart"
+            :label="outgoingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${r.documents}`)
+              .join(', ') || t('board.empty')"
+          />
+          <table class="moc-table mt-3">
+            <thead>
+              <tr><th>{{ t('board.month') }}</th><th class="text-right">{{ t('board.issued') }}</th></tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
+            <tbody>
               <tr v-for="r in outgoingByMonth.filter((o) => o.documents)" :key="r.month">
-                <td class="py-1 text-stone-600">{{ monthLabel(r.month) }}</td>
-                <td class="py-1 text-right font-medium tabular-nums">{{ r.documents }}</td>
+                <td class="text-stone-700">{{ monthLabel(r.month) }}</td>
+                <td class="text-right font-medium">{{ r.documents }}</td>
               </tr>
             </tbody>
           </table>

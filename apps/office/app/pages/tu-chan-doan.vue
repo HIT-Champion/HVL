@@ -231,15 +231,15 @@ async function save() {
         {{ t('app.refresh') }}
       </button>
     </PageHeader>
-    <p v-if="!allowed" class="card p-12 text-center text-stone-500">{{ t('hpdi.forbidden') }}</p>
+    <p v-if="!allowed" class="moc-empty">{{ t('hpdi.forbidden') }}</p>
 
-    <div v-else class="space-y-4">
-      <section class="card space-y-2 p-4 text-sm text-stone-600" data-testid="hpdi-intro">
-        <p>{{ t('hpdi.intro') }}</p>
-        <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">{{ t('hpdi.disclaimer') }}</p>
-        <p v-if="!leader" class="text-stone-500" data-testid="hpdi-manager-note">{{ t('hpdi.managerNote') }}</p>
+    <div v-else class="moc-stack">
+      <section class="moc-block space-y-3 text-sm text-stone-700" data-testid="hpdi-intro">
+        <p class="max-w-[75ch] leading-relaxed">{{ t('hpdi.intro') }}</p>
+        <p class="moc-note">{{ t('hpdi.disclaimer') }}</p>
+        <p v-if="!leader" class="text-stone-600" data-testid="hpdi-manager-note">{{ t('hpdi.managerNote') }}</p>
         <div class="flex flex-wrap items-center gap-2 pt-1">
-          <span class="font-medium text-stone-900" data-testid="hpdi-progress">
+          <span class="mr-2 font-semibold text-stone-900 tabular-nums" data-testid="hpdi-progress">
             {{ t('hpdi.progress', { n: answered, total }) }}
           </span>
           <button v-if="leader && history.length" type="button" class="btn-secondary" data-testid="hpdi-fill"
@@ -250,31 +250,30 @@ async function save() {
         </div>
       </section>
 
-      <p v-if="leader && failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-      <p v-if="leader && sample" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
-        data-testid="hpdi-sample">
+      <p v-if="leader && failure" class="moc-state">{{ failure }}</p>
+      <p v-if="leader && sample" class="moc-note" data-testid="hpdi-sample">
         {{ t('metrics.sampleNote') }}
       </p>
 
-      <section v-for="s in FRAMEWORK.spaces" :key="s.key" class="card p-4" :data-testid="`hpdi-space-${s.key}`">
+      <section v-for="s in FRAMEWORK.spaces" :key="s.key" class="moc-block" :data-testid="`hpdi-space-${s.key}`">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 class="font-medium text-stone-900">{{ spaceName(s.key) }}</h2>
-          <span class="text-sm text-stone-500 tabular-nums">
+          <h2 class="moc-block-title">{{ spaceName(s.key) }}</h2>
+          <span class="text-sm text-stone-600 tabular-nums">
             {{ t('hpdi.spaceScore', { score: score(scores[s.key]) }) }}
           </span>
         </div>
-        <p class="mt-1 text-sm text-stone-600">{{ text(s.summary) }}</p>
-        <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <p class="mt-1 max-w-[75ch] text-sm text-stone-600">{{ text(s.summary) }}</p>
+        <div class="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
           <div class="space-y-5">
             <fieldset v-for="q in s.questions" :key="q.id" class="space-y-1.5" :data-testid="`hpdi-q-${q.id}`">
-              <legend class="mb-1 text-sm font-medium text-stone-900">
+              <legend class="mb-1.5 text-sm font-semibold text-stone-900">
                 {{ q.id.toUpperCase() }}. {{ text(q.title) }}
                 <span class="block font-normal text-stone-600">{{ text(q.text) }}</span>
               </legend>
               <label
                 v-for="(level, n) in q.levels" :key="n"
-                class="flex cursor-pointer gap-3 rounded-md border px-3 py-2 text-sm"
-                :class="answers[q.id] === n + 1 ? 'border-brand-600 bg-brand-50' : 'border-stone-200 hover:bg-stone-50'"
+                class="flex cursor-pointer gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors"
+                :class="answers[q.id] === n + 1 ? 'border-brand-700 bg-brand-50' : 'border-stone-200 hover:bg-stone-50'"
               >
                 <input v-model="answers[q.id]" type="radio" :name="q.id" :value="n + 1" class="mt-0.5 accent-brand-700">
                 <span>
@@ -284,9 +283,8 @@ async function save() {
               </label>
             </fieldset>
           </div>
-          <aside v-if="leader" class="self-start rounded-lg bg-stone-50 p-3 text-sm"
-            :data-testid="`hpdi-evidence-${s.key}`">
-            <h3 class="text-xs font-medium tracking-wide text-stone-500 uppercase">{{ t('hpdi.evidenceTitle') }}</h3>
+          <aside v-if="leader" class="moc-aside self-start" :data-testid="`hpdi-evidence-${s.key}`">
+            <h3 class="moc-subtitle">{{ t('hpdi.evidenceTitle') }}</h3>
             <p v-if="!loaded" class="mt-2 text-stone-500">{{ loading ? t('app.loading') : '—' }}</p>
             <dl v-else-if="evidenceBySpace[s.key].length" class="mt-2 space-y-2">
               <div v-for="e in evidenceBySpace[s.key]" :key="e.id" :data-testid="`hpdi-ev-${e.id}`">
@@ -295,43 +293,43 @@ async function save() {
               </div>
             </dl>
             <p v-else class="mt-2 text-stone-500">{{ t('hpdi.evidenceNone') }}</p>
-            <p class="mt-3 text-xs text-stone-500">{{ t('hpdi.evidenceHint') }}</p>
+            <p class="mt-3 text-[13px] text-stone-600">{{ t('hpdi.evidenceHint') }}</p>
           </aside>
         </div>
       </section>
 
-      <section class="card p-4" data-testid="hpdi-result">
-        <h2 class="font-medium text-stone-900">{{ t('hpdi.result') }}</h2>
-        <p v-if="!complete" class="py-8 text-center text-sm text-stone-500">
+      <section class="moc-block" data-testid="hpdi-result">
+        <h2 class="moc-block-title">{{ t('hpdi.result') }}</h2>
+        <p v-if="!complete" class="moc-empty">
           {{ t('hpdi.answerAll', { n: total - answered }) }}
         </p>
-        <div v-else class="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div v-else class="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>
             <EChart :option="radar" :height="320" :label="radarLabel" />
-            <table class="mt-2 w-full text-sm" data-testid="hpdi-scores">
-              <thead class="text-left text-xs text-stone-500">
+            <table class="moc-table mt-3" data-testid="hpdi-scores">
+              <thead>
                 <tr>
-                  <th class="py-1 font-medium">{{ t('hpdi.space') }}</th>
-                  <th class="py-1 text-right font-medium">{{ t('hpdi.now') }}</th>
-                  <th v-if="previousScores" class="py-1 text-right font-medium">{{ t('hpdi.previousShort') }}</th>
+                  <th>{{ t('hpdi.space') }}</th>
+                  <th class="text-right">{{ t('hpdi.now') }}</th>
+                  <th v-if="previousScores" class="text-right">{{ t('hpdi.previousShort') }}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-stone-100">
+              <tbody>
                 <tr v-for="k in HPDI_KEYS" :key="k">
-                  <td class="py-1 text-stone-600">{{ spaceName(k) }}</td>
-                  <td class="py-1 text-right font-medium tabular-nums" :data-testid="`hpdi-score-${k}`">
+                  <td class="text-stone-700">{{ spaceName(k) }}</td>
+                  <td class="text-right font-medium" :data-testid="`hpdi-score-${k}`">
                     {{ score(scores[k]) }}
                   </td>
-                  <td v-if="previousScores" class="py-1 text-right text-stone-500 tabular-nums">
+                  <td v-if="previousScores" class="text-right text-stone-500">
                     {{ score(previousScores[k]) }}
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="space-y-4 text-sm">
+          <div class="space-y-5 text-sm">
             <div data-testid="hpdi-focus">
-              <h3 class="font-medium text-stone-900">{{ t('hpdi.focusTitle') }}</h3>
+              <h3 class="moc-subtitle">{{ t('hpdi.focusTitle') }}</h3>
               <!-- [I] là không gian cuối: không còn "không gian sau" để nói tới -->
               <p v-if="focus === 'i'" class="mt-1 text-stone-700">
                 {{ t('hpdi.focusLast', { space: spaceName(focus) }) }}
@@ -340,17 +338,17 @@ async function save() {
               <p v-else class="mt-1 text-stone-700">{{ t('hpdi.focusNone') }}</p>
             </div>
             <div data-testid="hpdi-gaps">
-              <h3 class="font-medium text-stone-900">{{ t('hpdi.gapsTitle') }}</h3>
+              <h3 class="moc-subtitle">{{ t('hpdi.gapsTitle') }}</h3>
               <p v-if="!gaps.length" class="mt-1 text-stone-700">{{ t('hpdi.gapsNone') }}</p>
               <ul v-else class="mt-1 space-y-1">
                 <li v-for="g in gaps" :key="g.to" class="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
                   {{ t('hpdi.gap', { to: spaceName(g.to), from: spaceName(g.from), diff: number.format(g.diff) }) }}
                 </li>
               </ul>
-              <p class="mt-1 text-xs text-stone-500">{{ t('hpdi.gapsHint') }}</p>
+              <p class="mt-1 text-[13px] text-stone-500">{{ t('hpdi.gapsHint') }}</p>
             </div>
             <div v-if="shape && shares" data-testid="hpdi-shape">
-              <h3 class="font-medium text-stone-900">{{ t('hpdi.shapeTitle') }}</h3>
+              <h3 class="moc-subtitle">{{ t('hpdi.shapeTitle') }}</h3>
               <p class="mt-1 text-stone-700">
                 <span class="font-medium" :data-testid="`hpdi-shape-${shape}`">
                   {{ t(`hpdi.shape.${shape}.name`) }}</span>: {{ t(`hpdi.shape.${shape}.text`) }}
@@ -359,10 +357,10 @@ async function save() {
                 {{ t('hpdi.shares', { h: number.format(shares.h), p: number.format(shares.p),
                                       d: number.format(shares.d), i: number.format(shares.i) }) }}
               </p>
-              <p class="mt-1 text-xs text-stone-500">{{ t('hpdi.shapeHint') }}</p>
+              <p class="mt-1 text-[13px] text-stone-500">{{ t('hpdi.shapeHint') }}</p>
             </div>
-            <div v-if="gigo" class="rounded-md bg-red-50 px-3 py-2 text-red-900" data-testid="hpdi-gigo">
-              <h3 class="font-medium">{{ t('hpdi.gigoTitle') }}</h3>
+            <div v-if="gigo" class="rounded-lg bg-red-50 px-3.5 py-3 text-red-900" data-testid="hpdi-gigo">
+              <h3 class="font-semibold">{{ t('hpdi.gigoTitle') }}</h3>
               <p class="mt-1">{{ t('hpdi.gigo') }}</p>
               <p class="mt-1">
                 <span v-if="!hpdiLinkOpen(HPDI_QUALITY_LINK, role)" data-testid="hpdi-gigo-other">
@@ -379,10 +377,10 @@ async function save() {
         </div>
       </section>
 
-      <section v-if="steps.length" class="card p-4" data-testid="hpdi-steps">
-        <h2 class="font-medium text-stone-900">{{ t('hpdi.steps') }}</h2>
-        <ul class="mt-2 divide-y divide-stone-100">
-          <li v-for="st in steps" :key="st.space" class="py-3 text-sm" :data-testid="`hpdi-step-${st.space}`">
+      <section v-if="steps.length" class="moc-block" data-testid="hpdi-steps">
+        <h2 class="moc-block-title mb-3">{{ t('hpdi.steps') }}</h2>
+        <ul class="moc-rows">
+          <li v-for="st in steps" :key="st.space" class="text-sm" :data-testid="`hpdi-step-${st.space}`">
             <div class="flex flex-wrap items-center gap-2">
               <span class="chip bg-brand-50 text-brand-800">{{ spaceName(st.space) }}</span>
               <span v-if="st.space === focus" class="chip bg-amber-100 text-amber-900">{{ t('hpdi.first') }}</span>
@@ -408,48 +406,50 @@ async function save() {
         </ul>
       </section>
 
-      <section v-if="leader" class="card p-4" data-testid="hpdi-save">
-        <h2 class="font-medium text-stone-900">{{ t('hpdi.saveTitle') }}</h2>
-        <p class="mt-1 text-sm text-stone-500">{{ t('hpdi.saveHint') }}</p>
+      <section v-if="leader" class="moc-block" data-testid="hpdi-save">
+        <h2 class="moc-block-title">{{ t('hpdi.saveTitle') }}</h2>
+        <p class="moc-block-hint">{{ t('hpdi.saveHint') }}</p>
         <form class="mt-3 space-y-2" @submit.prevent="save">
           <label class="label" for="hpdi-note">{{ t('hpdi.note') }}</label>
           <textarea id="hpdi-note" v-model="note" class="input" rows="2" :maxlength="NOTE_MAX"
             :placeholder="t('hpdi.notePlaceholder')" />
-          <p v-if="saveFailure" class="text-sm text-red-700">{{ saveFailure }}</p>
+          <p v-if="saveFailure" class="moc-state">{{ saveFailure }}</p>
           <button type="submit" class="btn-primary" :disabled="!complete || saving" data-testid="hpdi-save-button">
             {{ saving ? t('hpdi.saving') : t('hpdi.save') }}
           </button>
-          <span v-if="!complete" class="ml-2 text-xs text-stone-500">
+          <span v-if="!complete" class="ml-2 text-[13px] text-stone-500">
             {{ t('hpdi.answerAll', { n: total - answered }) }}
           </span>
         </form>
 
-        <h3 class="mt-6 font-medium text-stone-900">{{ t('hpdi.history') }}</h3>
-        <p v-if="!history.length" class="py-6 text-center text-sm text-stone-500">{{ t('hpdi.historyNone') }}</p>
-        <div v-else class="overflow-x-auto">
-          <table class="mt-2 w-full min-w-[32rem] text-sm" data-testid="hpdi-history">
-            <thead class="text-left text-xs text-stone-500">
+        <h3 id="hpdi-history-title" class="moc-subtitle mt-7 border-t border-stone-100 pt-5">
+          {{ t('hpdi.history') }}
+        </h3>
+        <p v-if="!history.length" class="moc-empty">{{ t('hpdi.historyNone') }}</p>
+        <div v-else class="moc-scroll" tabindex="0" role="region" aria-labelledby="hpdi-history-title">
+          <table class="moc-table mt-2 min-w-[32rem]" data-testid="hpdi-history">
+            <thead>
               <tr>
-                <th class="py-1 font-medium">{{ t('hpdi.when') }}</th>
-                <th v-for="k in HPDI_KEYS" :key="k" class="py-1 text-right font-medium">[{{ k.toUpperCase() }}]</th>
-                <th class="py-1 pl-3 font-medium">{{ t('hpdi.note') }}</th>
+                <th>{{ t('hpdi.when') }}</th>
+                <th v-for="k in HPDI_KEYS" :key="k" class="text-right">[{{ k.toUpperCase() }}]</th>
+                <th>{{ t('hpdi.note') }}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-stone-100">
+            <tbody>
               <tr v-for="r in history" :key="r.id">
-                <td class="py-1 whitespace-nowrap text-stone-600">{{ fmtDateTime(r.created_at) }}</td>
-                <td v-for="k in HPDI_KEYS" :key="k" class="py-1 text-right font-medium tabular-nums">
+                <td class="whitespace-nowrap text-stone-600">{{ fmtDateTime(r.created_at) }}</td>
+                <td v-for="k in HPDI_KEYS" :key="k" class="text-right font-medium">
                   {{ score(hpdiRowScores(r)[k]) }}
                 </td>
-                <td class="py-1 pl-3 text-stone-600">{{ r.note ?? '' }}</td>
+                <td class="text-stone-600 wrap-anywhere">{{ r.note ?? '' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section class="card p-4 text-sm" data-testid="hpdi-sources">
-        <h2 class="font-medium text-stone-900">{{ t('hpdi.sources') }}</h2>
+      <section class="moc-block text-sm" data-testid="hpdi-sources">
+        <h2 class="moc-block-title">{{ t('hpdi.sources') }}</h2>
         <ul class="mt-2 list-disc space-y-1 pl-5 text-stone-600">
           <li v-for="src in FRAMEWORK.sources" :key="src.url">
             <a :href="src.url" class="text-brand-700 hover:underline" target="_blank" rel="noopener noreferrer">
@@ -457,7 +457,7 @@ async function save() {
             </a>
           </li>
         </ul>
-        <p class="mt-2 text-xs text-stone-500">{{ t('hpdi.sourcesNote', { id: FRAMEWORK.id }) }}</p>
+        <p class="moc-foot">{{ t('hpdi.sourcesNote', { id: FRAMEWORK.id }) }}</p>
       </section>
     </div>
   </div>

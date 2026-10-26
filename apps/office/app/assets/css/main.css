@@ -177,30 +177,62 @@
   @apply mt-1 text-xs text-red-700;
 }
 @utility chip {
-  @apply inline-flex shrink-0 items-center rounded px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  @apply inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap;
 }
 
-/* Khối dựng trang: đầu trang, thẻ lọc, thanh công cụ, trạng thái rỗng, đang tải, phân trang, bảng văn bản */
+/* Khối dựng trang dùng chung cho các trang ngoài hộp việc và trang văn bản: đầu trang, thẻ lọc, thanh công cụ, khối nội
+   dung, bảng, danh sách, trạng thái (đang tải, rỗng, lỗi, ghi chú), bảng văn bản. Trang trắng, khối viền --edge;
+   --paper chỉ là nền phụ (ghi chú, ô thông tin phụ), không tô cả khối. Không lồng khối có viền trong khối có viền. */
 .moc-page-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px 24px;
   margin-bottom: 26px;
 }
-/* chữ tiêu đề co lại tới 18rem; hẹp hơn nữa thì các nút xuống dòng dưới, không bị đẩy ra ngoài trang */
+/* chữ tiêu đề co lại tới 18rem; hẹp hơn nữa thì các nút xuống dòng dưới, không bị đẩy ra ngoài trang. Tiêu đề hồ sơ,
+   mã dài không dấu cách vẫn xuống dòng */
 .moc-page-header > div:first-child { flex: 1 1 18rem; min-width: 0; }
-.moc-page-header p { margin-top: 7px; font-size: 14px; color: var(--muted); }
-.moc-tabs { display: flex; gap: 24px; overflow-x: auto; border-bottom: 1px solid var(--edge); }
+.moc-page-header h1 { overflow-wrap: anywhere; }
+.moc-page-header p { margin-top: 6px; max-width: 75ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
+/* liên kết quay lại trang trước, đặt trên tiêu đề trang */
+.moc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  transition: color 160ms;
+}
+.moc-back:hover { color: #0b6b53; }
+/* thẻ lọc: gạch dưới lục bảo cho thẻ đang chọn; đường kẻ nền vẽ bằng bóng trong để gạch của thẻ đè lên được mà vùng
+   cuộn ngang không cắt mất */
+.moc-tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  box-shadow: inset 0 -1px 0 var(--edge);
+  scrollbar-width: none;
+}
 .moc-tabs button {
-  padding: 12px 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 0;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
   color: var(--muted);
   font-size: 14px;
+  font-weight: 500;
+  transition: color 160ms, border-color 160ms;
 }
+.moc-tabs button:hover { color: var(--text); }
 .moc-tabs button[aria-selected=true] { color: #10201b; border-color: #0b6b53; font-weight: 600; }
+.moc-tabs button:focus-visible { outline-offset: -2px; }
 .moc-tabs span { margin-left: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .moc-toolbar {
   display: flex;
@@ -210,28 +242,158 @@
   gap: 12px;
   margin: 20px 0;
 }
-.moc-toolbar .input { min-height: 36px; max-width: 340px; }
-.moc-count { font-size: 14px; color: var(--muted); }
-.moc-empty {
-  padding: 42px 20px;
-  text-align: center;
-  color: var(--muted);
+.moc-toolbar .input { min-height: 40px; max-width: 340px; }
+.moc-count { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Khối nội dung: nền trắng, viền --edge, bo 12px; các khối xếp dọc cách 24px. Xếp bằng flex chứ không bằng grid: ô
+   lưới tự giãn theo bảng rộng bên trong (min-content) làm trang cuộn ngang trên điện thoại */
+.moc-stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.moc-block {
+  min-width: 0;
+  padding: 20px 24px;
   background: #fff;
   border: 1px solid var(--edge);
   border-radius: 12px;
 }
-.moc-empty h2 { font-size: 16px; font-weight: 500; color: var(--text); }
-.moc-empty p { margin-top: 8px; }
-.moc-state {
-  padding: 16px;
+.moc-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+.moc-block-head > :first-child { flex: 1 1 14rem; min-width: 0; }
+.moc-block-title { font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
+.moc-block-hint { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.moc-block-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-shrink: 0; }
+.moc-subtitle { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text); }
+/* chú thích cuối khối: chữ nhỏ màu phụ */
+.moc-foot { margin-top: 12px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+/* Bảng số liệu: đầu bảng chữ 13px màu phụ, hàng ngăn bằng đường kẻ mảnh, chữ số đều (tabular). Bảng trong khối sát
+   lề khối; bảng trong khung riêng (.moc-table-frame, sổ rộng cuộn ngang) chừa 16px hai bên. Canh phải do từng ô đặt */
+.moc-table { width: 100%; font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.moc-table th {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--muted);
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--edge);
+}
+.moc-table td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid var(--rule); }
+.moc-table tbody tr:last-child td { border-bottom: 0; }
+.moc-table :is(th, td):first-child { padding-left: 0; }
+.moc-table :is(th, td):last-child { padding-right: 0; }
+.moc-table tr.is-total td { font-weight: 600; border-top: 1px solid var(--edge); }
+.moc-table-frame {
+  min-width: 0;
+  overflow-x: auto;
   background: #fff;
   border: 1px solid var(--edge);
   border-radius: 12px;
-  color: var(--muted);
+}
+.moc-table-frame .moc-table th { padding-top: 12px; padding-bottom: 10px; }
+.moc-table-frame .moc-table :is(th, td):first-child { padding-left: 16px; }
+.moc-table-frame .moc-table :is(th, td):last-child { padding-right: 16px; }
+.moc-table-frame .moc-table tbody tr.cursor-pointer:hover { background: var(--paper); }
+/* vùng cuộn ngang riêng cho bảng, sơ đồ rộng trong một khối */
+.moc-scroll { min-width: 0; max-width: 100%; overflow-x: auto; }
+
+/* Danh sách: khung viền, mỗi mục ngăn bằng đường kẻ; mục là liên kết thì cả dòng bấm được. Danh sách trong một khối
+   (.moc-rows) chỉ có đường kẻ, không khung */
+.moc-list { background: #fff; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.moc-list > li + li { border-top: 1px solid var(--rule); }
+.moc-list-link { display: block; padding: 16px 20px; color: var(--text); transition: background-color 140ms; }
+.moc-list-link:hover { background: var(--paper); }
+.moc-list-link:focus-visible { outline-offset: -3px; border-radius: 10px; }
+.moc-rows > li { min-width: 0; padding: 12px 0; }
+.moc-rows > li + li { border-top: 1px solid var(--rule); }
+.moc-rows > li:first-child { padding-top: 0; }
+.moc-rows > li:last-child { padding-bottom: 0; }
+/* cặp tên – giá trị (thông tin hồ sơ, văn bản tra được, phiên bản): tên 13px màu phụ, giá trị 14px đậm vừa */
+.moc-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px 24px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.moc-facts > div { min-width: 0; }
+.moc-facts .is-wide { grid-column: 1 / -1; }
+.moc-facts dt { font-size: 13px; color: var(--muted); }
+.moc-facts dd { margin-top: 2px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+/* dd thứ hai trong một mục là chú thích cho giá trị: chữ nhỏ, màu phụ */
+.moc-facts dd + dd { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+/* Trạng thái dùng chung, mọi trang một kiểu: đang tải (vòng quay nhỏ + chữ; danh sách dùng hàng khung xương),
+   rỗng (khung nét đứt; trong khối đã có viền thì không vẽ thêm khung), lỗi (nền đỏ nhạt, nút Thử lại), ghi chú cảnh
+   báo (hổ phách: dữ liệu mẫu, lưu ý) và ghi chú thường (nền giấy) */
+@keyframes sg-spin { to { transform: rotate(360deg); } }
+.moc-loading {
   display: flex;
   align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.moc-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 2px solid #dde7e2;
+  border-top-color: #0b6b53;
+  border-radius: 999px;
+  animation: sg-spin 900ms linear infinite;
+}
+.moc-empty {
+  padding: 40px 20px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px dashed #a7b8b0;
+  border-radius: 12px;
+}
+.moc-empty h2 { font-size: 16px; font-weight: 600; color: var(--text); }
+.moc-empty p { margin-top: 6px; }
+.moc-block .moc-empty, .moc-table-frame .moc-empty { padding: 28px 12px; background: transparent; border: 0; }
+.moc-state {
+  display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #9f2019;
+  background: #fdf1ef;
+  border: 1px solid #f4c5bf;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.moc-state > :first-child { flex: 1 1 16rem; min-width: 0; }
+.moc-state .btn-secondary { min-height: 36px; }
+.moc-note {
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #5f3800;
+  background: #fdf8ea;
+  border: 1px solid #f3dc9f;
+  border-radius: 10px;
+}
+.moc-aside {
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  background: var(--paper);
+  border-radius: 10px;
 }
 .moc-skeleton { height: 72px; border-bottom: 1px solid var(--edge); padding: 16px 12px; }
 .moc-skeleton::before, .moc-skeleton::after {
@@ -243,6 +405,8 @@
   width: 65%;
 }
 .moc-skeleton::after { margin-top: 12px; width: 40%; height: 8px; }
+/* "Xem thêm" dưới danh sách */
+.moc-more { display: flex; justify-content: center; padding-top: 16px; }
 .moc-pagination {
   display: flex;
   align-items: center;
@@ -252,13 +416,39 @@
   color: var(--muted);
   font-size: 14px;
 }
+
+/* Bảng văn bản (văn bản đến, đi, hồ sơ): không khung, hàng cao, trích yếu là dòng chính; điện thoại thành thẻ xếp dọc
+   (luật chung cuối tệp; vị trí ô của bảng hồ sơ ở khối @media cuối mục này) */
 .moc-doc-table { border-radius: 0; border: 0; background: transparent; }
-.moc-doc-table td { padding-top: 19px; padding-bottom: 19px; }
-.moc-doc-table thead th { font-weight: 500; font-size: 14px; }
+.moc-doc-table td { padding-top: 18px; padding-bottom: 18px; vertical-align: top; }
+.moc-doc-table thead th { padding-top: 10px; padding-bottom: 10px; font-weight: 500; font-size: 13px; }
+.moc-doc-table thead tr { border-bottom: 1px solid var(--edge); }
+.moc-doc-table tbody tr { transition: background-color 140ms; }
 .moc-doc-table tbody tr:hover { background: #f5f9f7; }
 .moc-doc-table th:first-child, .moc-doc-table td:first-child { padding-left: 0; }
 .moc-doc-table th:last-child, .moc-doc-table td:last-child { padding-right: 0; text-align: right; }
 .moc-doc-table tbody tr { border-bottom: 1px solid var(--rule); }
+.moc-doc-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.moc-doc-title:hover { color: #0b6b53; text-decoration: underline; }
+.moc-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
 .moc-incoming-table th:first-child, .moc-incoming-table td:first-child { text-align: right; padding-right: 20px; }
 .moc-board-kpis {
   display: grid;
@@ -268,24 +458,33 @@
   border-bottom: 1px solid var(--edge);
 }
 .moc-board-kpis > .card { border: 0; border-radius: 0; padding: 0; background: transparent; }
-.moc-board-kpis [data-testid^="kpi-"] { font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.moc-board-kpis [data-testid^="kpi-"] {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
 .moc-board-kpis .text-xs, .moc-public .text-xs { font-size: 13px; }
 .moc-public-wordmark {
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--font-sans);
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -.04em;
   line-height: 1;
 }
 .moc-public-title { font-size: 28px; font-weight: 500; }
+/* liên kết chân trang công khai: vùng bấm cao 24px, rê chuột thì lục bảo, gạch dưới */
+.moc-public-link { display: inline-flex; align-items: center; min-height: 24px; }
+.moc-public-link:hover { color: #0b6b53; text-decoration: underline; }
 .moc-scroll-hint { display: none; }
 .moc-table-scroll { max-width: 100%; }
 .moc-register-table table, .moc-audit-table table { min-width: 1050px; }
 .moc-audit-table td:nth-child(2) { min-width: 140px; }
-.moc-audit-table td:nth-child(4) { min-width: 280px; }
+.moc-audit-table td:nth-child(4) { min-width: 280px; overflow-wrap: anywhere; }
 /* hàng chọn hồ sơ: nút trái-phải đầy chiều ngang, hàng đang chọn tô bạc hà */
 .moc-task {
   display: block;
@@ -301,6 +500,21 @@
 .moc-task > span { font-size: 13px; }
 .moc-task h2 { font-size: 16px; line-height: 1.5; font-weight: 600; margin-top: 6px; }
 .moc-task p { font-size: 13px; line-height: 1.5; color: var(--muted); margin-top: 7px; }
+
+/* Màn hẹp của các khối trên: khối, khung rỗng mỏng lề hơn; bảng hồ sơ thành thẻ như bảng văn bản đến, đi */
+@media (max-width: 640px) {
+  .moc-page-header p { font-size: 14px; }
+  .moc-stack { gap: 20px; }
+  .moc-block { padding: 16px; }
+  .moc-block-head { margin-bottom: 12px; }
+  .moc-empty { padding: 32px 16px; }
+  .moc-tabs { gap: 20px; }
+  .moc-list-link { padding: 14px 16px; }
+  .moc-case-table td:nth-child(2) { grid-column: 1 / -1; grid-row: 1; }
+  .moc-case-table td:nth-child(1) { grid-column: 1; grid-row: 2; }
+  .moc-case-table td:nth-child(3) { grid-column: 2; grid-row: 2; text-align: right; }
+  .moc-case-table td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; text-align: left; font-size: 13px; }
+}
 
 /* Khung ứng dụng: thanh bên lục bảo thu về 76px (chỉ còn biểu tượng), mở ra khi rê chuột tới mép trái hoặc khi focus
    bằng bàn phím; nội dung bên phải không bị đẩy (thanh bên cố định, nằm đè). Thu gọn bằng chiều rộng chứ không cắt

@@ -139,6 +139,7 @@
   "receive": {
     "title": "Receive an incoming document",
     "subtitle": "Upload the electronic copy, enter the document details, then register.",
+    "details": "Document details",
     "file": "Document file",
     "drop": "Drop a PDF or image here, or click to choose",
     "scanning": "Uploading and scanning for malware…",

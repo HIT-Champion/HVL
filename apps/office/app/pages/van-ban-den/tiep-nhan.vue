@@ -471,10 +471,10 @@ async function save(register: boolean) {
     <!-- trình đọc màn hình: đang đọc, đọc xong (điền mấy ô), lỗi -->
     <p class="sr-only" aria-live="polite" data-testid="read-live">{{ announce }}</p>
 
-    <form class="grid gap-6 lg:grid-cols-5" novalidate @submit.prevent="save(true)">
+    <form class="grid grid-cols-1 items-start gap-6 lg:grid-cols-5" novalidate @submit.prevent="save(true)">
       <!-- tệp -->
-      <section class="card p-5 lg:col-span-2">
-        <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('receive.file') }}</h2>
+      <section class="moc-block lg:col-span-2">
+        <h2 class="moc-block-title mb-3">{{ t('receive.file') }}</h2>
         <label
           class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2
                  border-dashed px-4 py-10 text-center text-sm transition focus-within:outline focus-within:outline-2
@@ -492,11 +492,15 @@ async function save(register: boolean) {
         </label>
 
         <ul class="mt-4 space-y-2">
-          <li v-for="f in files" :key="f.key" class="rounded-md border border-stone-200 p-3 text-sm">
+          <li v-for="f in files" :key="f.key" class="rounded-lg bg-stone-50 p-3 text-sm">
             <div class="flex items-center gap-2">
               <span class="min-w-0 flex-1 truncate font-medium">{{ f.name }}</span>
               <span class="text-xs text-stone-500">{{ fmtSize(f.size) }}</span>
-              <button type="button" class="text-stone-400 hover:text-red-600" :aria-label="t('app.cancel')" @click="removeFile(f.key)">✕</button>
+              <button
+                type="button" :aria-label="t('app.cancel')" @click="removeFile(f.key)"
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-stone-500
+                  hover:bg-stone-100 hover:text-red-700"
+              >✕</button>
             </div>
             <div v-if="f.state === 'uploading'" class="mt-2">
               <div class="h-1.5 overflow-hidden rounded bg-stone-200"><div class="h-full bg-brand-600 transition-all" :style="{ width: f.progress + '%' }" /></div>
@@ -548,7 +552,8 @@ async function save(register: boolean) {
       </section>
 
       <!-- thông tin văn bản -->
-      <section class="card space-y-4 p-5 lg:col-span-3">
+      <section class="moc-block space-y-4 lg:col-span-3">
+        <h2 class="moc-block-title">{{ t('receive.details') }}</h2>
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <div class="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
@@ -651,11 +656,14 @@ async function save(register: boolean) {
           </label>
         </div>
 
-        <p v-if="duplicate" class="rounded-md bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200" role="alert">
+        <p v-if="duplicate" class="moc-note" role="alert">
           {{ t('receive.duplicate', { symbol: duplicate.symbol, issuer: duplicate.issuer_name, date: fmtDate(duplicate.issued_on) }) }}
         </p>
 
-        <p v-if="hasSuggestions" class="flex items-start gap-2 rounded-md bg-sky-50 p-3 text-sm text-sky-900 ring-1 ring-sky-200" data-testid="suggest-note">
+        <p
+          v-if="hasSuggestions" class="flex items-start gap-2 rounded-lg bg-brand-50 p-3 text-sm text-brand-900"
+          data-testid="suggest-note"
+        >
           <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8h.01M11 12h1v4h1m-1 5a9 9 0 110-18 9 9 0 010 18z" /></svg>
           <span>{{ t('receive.read.confirmNote') }}</span>
         </p>

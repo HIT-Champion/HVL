@@ -139,6 +139,7 @@
   "receive": {
     "title": "Tiếp nhận văn bản đến",
     "subtitle": "Tải bản điện tử lên, nhập thông tin trên văn bản rồi vào sổ.",
+    "details": "Thông tin trên văn bản",
     "file": "Tệp văn bản",
     "drop": "Kéo thả tệp PDF hoặc ảnh vào đây, hoặc bấm để chọn",
     "scanning": "Đang tải lên và quét virus…",

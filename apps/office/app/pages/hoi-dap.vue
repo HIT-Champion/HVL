@@ -351,12 +351,12 @@ onBeforeUnmount(() => {
     <!-- trình đọc màn hình: đang tìm, tìm thấy mấy đoạn, đã trả lời, không tìm thấy, lỗi -->
     <p class="sr-only" aria-live="polite" data-testid="ask-live">{{ announce }}</p>
 
-    <p v-if="!allowed" class="card p-4 text-sm text-stone-700">{{ t('assist.error.forbidden') }}</p>
-    <form v-else class="card mb-6 space-y-3 p-4" @submit.prevent="submit">
+    <p v-if="!allowed" class="moc-empty">{{ t('assist.error.forbidden') }}</p>
+    <form v-else class="moc-block mb-8 space-y-3" @submit.prevent="submit">
       <!-- hỏi trong một văn bản: văn bản nào, bỏ phạm vi được -->
       <div
         v-if="scopeId" data-testid="ask-scope"
-        class="flex flex-wrap items-start gap-3 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm"
+        class="flex flex-wrap items-start gap-3 rounded-lg bg-brand-50 p-3.5 text-sm"
       >
         <div class="min-w-0 flex-1">
           <p class="font-medium text-brand-900">{{ t('assist.scope.title') }}</p>
@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
         :placeholder="t('assist.placeholder')" aria-describedby="ask-keys" @keydown="onKey"
       />
       <div class="flex flex-wrap items-end gap-3">
-        <p id="ask-keys" class="min-w-48 flex-1 text-xs text-stone-500">
+        <p id="ask-keys" class="min-w-48 flex-1 text-[13px] text-stone-500">
           {{ t('assist.keysHint') }} · <span class="tabular-nums">{{ t('assist.count', { n: text.length, max: MAX_QUESTION }) }}</span>
         </p>
         <!-- chiều, năm: không cần khi đã hỏi trong một văn bản -->
@@ -410,17 +410,17 @@ onBeforeUnmount(() => {
     </form>
 
     <section v-if="turns.length" :aria-label="t('assist.history')">
-      <p class="mb-3 text-xs text-stone-500">{{ t('assist.historyNote') }}</p>
-      <div class="space-y-4">
+      <p class="mb-3 text-[13px] text-stone-500">{{ t('assist.historyNote') }}</p>
+      <div class="moc-stack">
         <article
-          v-for="turn in turns" :key="turn.key" class="card p-5"
+          v-for="turn in turns" :key="turn.key" class="moc-block"
           :aria-labelledby="`hoi-${turn.key}`"
           :aria-busy="turn.phase === 'searching' || turn.gen === 'running' || turn.gen === 'waiting'"
           :data-state="stateOf(turn)" :data-gen="turn.gen" data-testid="ask-turn"
         >
           <!-- câu hỏi, phạm vi, cách tìm -->
           <div class="flex flex-wrap items-start gap-x-3 gap-y-2">
-            <h2 :id="`hoi-${turn.key}`" class="min-w-0 flex-1 font-medium break-words text-stone-900">{{ turn.question }}</h2>
+            <h2 :id="`hoi-${turn.key}`" class="moc-block-title min-w-0 flex-1 wrap-anywhere">{{ turn.question }}</h2>
             <div class="flex flex-wrap items-center gap-1.5">
               <span
                 v-if="turn.document" class="chip bg-brand-50 text-brand-800 ring-1 ring-brand-200"
@@ -432,20 +432,20 @@ onBeforeUnmount(() => {
               <span v-if="turn.year" class="chip bg-stone-100 text-stone-700">{{ t('assist.yearValue', { year: turn.year }) }}</span>
               <template v-if="turn.result">
                 <span class="chip bg-stone-100 text-stone-700" data-testid="ask-mode">{{ turn.result.semantic ? t('assist.semantic') : t('assist.keyword') }}</span>
-                <span class="text-xs text-stone-500 tabular-nums">{{ took(turn.result) }}</span>
+                <span class="text-[13px] text-stone-500 tabular-nums">{{ took(turn.result) }}</span>
               </template>
             </div>
           </div>
 
           <!-- đang tìm -->
-          <div v-if="turn.phase === 'searching'" class="mt-3 flex items-center gap-2 text-sm text-stone-700">
+          <div v-if="turn.phase === 'searching'" class="mt-4 flex items-center gap-2 text-sm text-stone-700">
             <svg class="h-4 w-4 text-brand-700 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
             {{ t('assist.searching') }}
           </div>
 
           <!-- lỗi tìm -->
-          <div v-else-if="turn.phase === 'error'" class="mt-3 flex flex-wrap items-center gap-3 text-sm" data-testid="ask-error">
-            <span class="font-medium text-red-700">
+          <div v-else-if="turn.phase === 'error'" class="moc-state mt-4" data-testid="ask-error">
+            <span class="font-medium">
               <svg
                 class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="1.6" aria-hidden="true"
@@ -458,20 +458,23 @@ onBeforeUnmount(() => {
 
           <template v-else-if="turn.result">
             <!-- không có căn cứ: câu giống hệt nhau dù văn bản không tồn tại hay người hỏi không được xem -->
-            <div v-if="turn.result.status === 'no_evidence'" class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700" data-testid="ask-none">
+            <div
+              v-if="turn.result.status === 'no_evidence'" class="mt-4 rounded-lg bg-stone-50 p-4 text-sm text-stone-700"
+              data-testid="ask-none"
+            >
               <p>{{ t('assist.noEvidence') }}</p>
               <NuxtLink :to="{ path: '/tim-kiem', query: { q: turn.question.slice(0, 200) } }" class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2">{{ t('assist.openSearch') }}</NuxtLink>
             </div>
 
             <template v-else>
-              <p v-if="turn.result.status === 'passages_only'" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="ask-passages">
+              <p v-if="turn.result.status === 'passages_only'" class="moc-note mt-4" data-testid="ask-passages">
                 {{ t('assist.passagesOnly') }}
               </p>
 
               <!-- câu trả lời do mô hình viết (đã qua kiểm trích dẫn) -->
-              <section v-if="blocks(turn.result).model" class="mt-3 rounded-lg border border-sky-200 bg-sky-50/60 p-4" data-testid="ask-model">
+              <section v-if="blocks(turn.result).model" class="mt-4 rounded-lg bg-stone-50 p-4" data-testid="ask-model">
                 <div class="mb-2 flex flex-wrap items-center gap-2">
-                  <h3 class="text-sm font-semibold text-stone-800">{{ t('assist.modelTitle') }}</h3>
+                  <h3 class="moc-subtitle">{{ t('assist.modelTitle') }}</h3>
                   <span class="chip gap-1 bg-white text-sky-900 ring-1 ring-sky-300">
                     <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4L12 3z" /></svg>
                     {{ t('assist.modelNote') }}
@@ -479,12 +482,15 @@ onBeforeUnmount(() => {
                 </div>
                 <AnswerText :text="blocks(turn.result).model!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
                 <!-- F4.4: chữ gửi mô hình đã che, mô hình viết nhãn [SĐT-1] thay cho số -->
-                <p v-if="hasMask(blocks(turn.result).model!.text)" class="mt-2 text-xs text-sky-900" data-testid="ask-masked">
+                <p
+                  v-if="hasMask(blocks(turn.result).model!.text)" class="mt-2 text-[13px] text-stone-600"
+                  data-testid="ask-masked"
+                >
                   {{ t('assist.maskedNote') }}
                 </p>
                 <button
                   v-if="blocks(turn.result).extract" type="button"
-                  class="mt-3 text-xs font-medium text-brand-700 underline underline-offset-2"
+                  class="mt-3 min-h-6 text-[13px] font-medium text-brand-700 underline underline-offset-2"
                   :aria-expanded="turn.showExtract" :aria-controls="`trich-${turn.key}`"
                   @click="turn.showExtract = !turn.showExtract"
                 >
@@ -495,21 +501,28 @@ onBeforeUnmount(() => {
               <!-- câu trích nguyên văn từ văn bản -->
               <section
                 v-if="blocks(turn.result).extract && (!blocks(turn.result).model || turn.showExtract)"
-                :id="`trich-${turn.key}`" class="mt-3 rounded-lg border border-stone-200 bg-stone-50 p-4" data-testid="ask-extract"
+                :id="`trich-${turn.key}`" class="mt-4 rounded-lg bg-stone-50 p-4" data-testid="ask-extract"
               >
-                <h3 class="mb-2 text-sm font-semibold text-stone-800">{{ t('assist.extractTitle') }}</h3>
+                <h3 class="moc-subtitle mb-2">{{ t('assist.extractTitle') }}</h3>
                 <AnswerText :text="blocks(turn.result).extract!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
               </section>
 
               <!-- đang viết câu trả lời -->
-              <div v-if="turn.gen === 'waiting' || turn.gen === 'running'" class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed border-sky-300 p-3 text-sm text-stone-700" data-testid="ask-generating">
+              <div
+                v-if="turn.gen === 'waiting' || turn.gen === 'running'" data-testid="ask-generating"
+                class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed
+                  border-stone-300 p-3 text-sm text-stone-700"
+              >
                 <svg class="h-4 w-4 text-brand-700 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                 <span class="font-medium">{{ turn.gen === 'waiting' ? t('assist.waiting') : t('assist.generating') }}</span>
                 <span v-if="turn.gen === 'running'" class="text-stone-500 tabular-nums">{{ t('assist.elapsed', { s: elapsed(turn) }) }}</span>
                 <button type="button" class="btn-secondary ml-auto !px-2.5 !py-1 !text-xs" @click="stop(turn.key)">{{ t('assist.stop') }}</button>
-                <span class="basis-full text-xs text-stone-500">{{ t('assist.generatingHint') }}</span>
+                <span class="basis-full text-[13px] text-stone-500">{{ t('assist.generatingHint') }}</span>
               </div>
-              <div v-else-if="turn.gen === 'stopped' || turn.gen === 'failed'" class="mt-3 flex flex-wrap items-center gap-3 text-sm text-amber-900" data-testid="ask-generate-note">
+              <div
+                v-else-if="turn.gen === 'stopped' || turn.gen === 'failed'" data-testid="ask-generate-note"
+                class="mt-4 flex flex-wrap items-center gap-3 text-sm text-amber-900"
+              >
                 <span>
                   <svg
                     class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
@@ -522,7 +535,10 @@ onBeforeUnmount(() => {
                 <button v-if="needsGenerate(turn.result)" type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" @click="queueGenerate(turn.key)">{{ t('assist.retryGenerate') }}</button>
               </div>
 
-              <ul v-if="warningTexts(turn.result).length" class="mt-3 space-y-1 text-xs text-amber-900" data-testid="ask-warnings">
+              <ul
+                v-if="warningTexts(turn.result).length" class="mt-3 space-y-1 text-[13px] text-amber-900"
+                data-testid="ask-warnings"
+              >
                 <li v-for="w in warningTexts(turn.result)" :key="w">
                   <svg
                     class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
@@ -534,12 +550,12 @@ onBeforeUnmount(() => {
               </ul>
 
               <!-- nguồn -->
-              <div v-if="turn.result.sources.length" class="mt-4">
-                <h3 class="mb-2 text-sm font-semibold text-stone-800">{{ t('assist.source.title') }}</h3>
-                <ol class="space-y-2" data-testid="ask-sources">
+              <div v-if="turn.result.sources.length" class="mt-5 border-t border-stone-100 pt-4">
+                <h3 class="moc-subtitle mb-3">{{ t('assist.source.title') }}</h3>
+                <ol class="moc-rows" data-testid="ask-sources">
                   <li
                     v-for="s in turn.result.sources" :id="sourceAnchor(turn.result.ask_id, s.n)" :key="s.n" tabindex="-1"
-                    class="scroll-mt-20 rounded-lg border border-stone-200 p-3 focus:outline-2 focus:outline-brand-600"
+                    class="scroll-mt-20 rounded-sm focus:outline-2 focus:outline-offset-4 focus:outline-brand-600"
                   >
                     <div class="flex flex-wrap items-center gap-2">
                       <span class="font-mono text-xs font-semibold text-brand-800" aria-hidden="true">[{{ s.n }}]</span>
@@ -560,16 +576,17 @@ onBeforeUnmount(() => {
                       <span v-if="s.cited" class="chip bg-brand-50 text-brand-800 ring-1 ring-brand-200">{{ t('assist.source.cited') }}</span>
                       <StatusChip :status="s.status" />
                     </div>
-                    <p class="mt-1 text-sm text-stone-800">{{ s.summary }}</p>
-                    <p class="mt-0.5 text-xs text-stone-500">{{ metaLine(s) }}</p>
+                    <p class="mt-1 text-sm text-stone-800 wrap-anywhere">{{ s.summary }}</p>
+                    <p class="mt-0.5 text-[13px] text-stone-500">{{ metaLine(s) }}</p>
                     <p
                       v-if="s.excerpt" :id="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
-                      class="mt-2 border-l border-stone-200 pl-3 text-sm break-words whitespace-pre-line text-stone-600"
+                      class="mt-2 border-l border-stone-200 pl-3 text-sm whitespace-pre-line text-stone-600
+                        wrap-anywhere"
                       :class="{ 'line-clamp-3': s.excerpt.length > LONG_EXCERPT && !turn.opened.includes(s.n) }"
                     >
                       <span class="sr-only">{{ t('assist.source.excerpt') }}: </span>{{ s.excerpt }}
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-4 text-xs">
+                    <div class="mt-2 flex flex-wrap items-center gap-4 text-[13px]">
                       <button
                         v-if="s.excerpt.length > LONG_EXCERPT" type="button" class="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-900"
                         :aria-expanded="turn.opened.includes(s.n)" :aria-controls="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
@@ -590,10 +607,13 @@ onBeforeUnmount(() => {
                 <!-- khung xem tệp, mở đúng trang được trích -->
                 <div
                   v-if="viewer && viewer.turn === turn.key" :id="`xem-${turn.key}`" tabindex="-1"
-                  class="mt-4 rounded-lg border border-stone-200 focus:outline-2 focus:outline-brand-600"
+                  class="mt-4 overflow-hidden rounded-lg border border-stone-200 focus:outline-2
+                    focus:outline-brand-600"
                   data-testid="ask-viewer"
                 >
-                  <div class="flex flex-wrap items-center gap-3 border-b border-stone-200 px-4 py-2 text-sm">
+                  <div
+                    class="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm"
+                  >
                     <span class="min-w-0 flex-1 truncate font-medium">
                       {{ t('assist.viewer.title', { label: viewer.label }) }}
                     </span>
