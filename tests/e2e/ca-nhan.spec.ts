@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { PASSWORD, shot, signIn, textPdf } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, shot, signIn, textPdf } from './helpers'
 
 // Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A ở /ca-nhan/, client Keycloak riêng
 // app-ca-nhan. Đã đăng nhập Văn phòng điện tử thì vào thẳng, không nhập lại mật khẩu (SSO); tải tệp lên thư mục Dự án
@@ -37,7 +37,8 @@ test('không gian cá nhân: SSO từ Văn phòng điện tử, tải lên, chuy
   const name = `de-cuong-${tag}.pdf`
   const content = textPdf('De cuong hoc phan', `Ma thu ${tag}`)
   await page.locator('#file').setInputFiles({ name, mimeType: 'application/pdf', buffer: content })
-  await expect(page.getByText(`Đã tải ${name} lên, trạm quét báo sạch, đã xếp vào Dự án.`)).toBeVisible()
+  await expect(page.getByText(`Đã tải ${name} lên, trạm quét báo sạch, đã xếp vào Dự án.`))
+    .toBeVisible({ timeout: SCAN_TIMEOUT })
   await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible()
 
   await page.getByRole('combobox', { name: `Chuyển ${name} sang thư mục` }).selectOption('archives')

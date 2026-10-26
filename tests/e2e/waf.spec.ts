@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test, type Page } from '@playwright/test'
-import { PASSWORD, shot, signIn, textPdf } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, shot, signIn, textPdf } from './helpers'
 
 // Tường lửa ứng dụng web ở cổng (F3.15, platform/apisix/README.md, mục WAF) trên trình duyệt thật: chữ thật mà OWASP
 // CRS từng chặn nhầm — tên tệp có ' ; =, nội dung có đề mục La Mã và đường dẫn theo IP, câu tìm "File …?" — đi qua
@@ -54,7 +54,8 @@ test("tải lên tệp tên có ' ; = qua cổng, trang văn bản hiện đúng
   // loại trừ 10040: chỉ tên tệp trên đường tải lên; ClamAV vẫn quét nội dung
   await staff.locator('input[type=file]').setInputFiles({ name: FILE_NAME, mimeType: 'application/pdf',
     buffer: textPdf(`To trinh gap dot 1 ${tag}`) })
-  await expect(staff.getByRole('listitem').filter({ hasText: FILE_NAME }).getByText('Đã quét — sạch')).toBeVisible()
+  await expect(staff.getByRole('listitem').filter({ hasText: FILE_NAME }).getByText('Đã quét — sạch'))
+    .toBeVisible({ timeout: SCAN_TIMEOUT })
   await staff.getByRole('button', { name: 'Lưu dự thảo' }).click()
   await expect(staff.getByRole('heading', { level: 1, name: summary })).toBeVisible()
   const files = staff.locator('section').filter({ has: staff.getByRole('heading', { name: 'Tệp đính kèm' }) })

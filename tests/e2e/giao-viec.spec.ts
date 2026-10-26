@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from '@playwright/test'
-import { PASSWORD, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
 
 // Gợi ý giao việc (F4.3) trên giao diện: văn thư vào sổ công văn xét cấp học bổng → lãnh đạo khoa mở việc "Cho ý
 // kiến chỉ đạo", trong 30 giây thấy khối "Gợi ý giao việc": Tổ Đào tạo chủ trì, căn cứ có 88/CTSV (công văn seed đã
@@ -37,7 +37,7 @@ test('gợi ý giao việc: lãnh đạo thấy đơn vị chủ trì và căn c
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
   const pdf = textPdf('Kinh gui Lanh dao Khoa', `Ma ho so ${tag}`)
   await clerk.locator('input[type=file]').setInputFiles({ name: `hoc-bong-${tag}.pdf`, mimeType: 'application/pdf', buffer: pdf })
-  await expect(clerk.getByText('Đã quét — sạch')).toBeVisible()
+  await expect(clerk.getByText('Đã quét — sạch')).toBeVisible({ timeout: SCAN_TIMEOUT })
   await clerk.getByLabel('Số, ký hiệu').fill(`52/CTSV-${tag}`)
   await clerk.getByLabel('Ngày ban hành').fill(new Date().toISOString().slice(0, 10))
   await clerk.getByLabel('Cơ quan ban hành').fill('Phòng Công tác sinh viên')

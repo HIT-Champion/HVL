@@ -24,6 +24,10 @@ import { expect, type Browser, type Page } from '@playwright/test'
 export const PASSWORD = process.env.MOC_DEMO_PASSWORD ?? ''
 export const TOTP_SECRET = process.env.MOC_DEMO_TOTP_SECRET ?? ''
 const SHOTS = process.env.MOC_E2E_SCREENSHOTS ?? 'test-results/screens'
+// Hạn chờ trạm quét sau khi tải lên, bằng CLAMAV_TIMEOUT_S của svc-files (quá hạn đó svc-files trả 503). clamd nạp
+// lại chữ ký sau mỗi lần freshclam tải bản mới, và trong lúc nạp không quét tệp nào (ConcurrentDatabaseReload no):
+// một tệp tải lên đúng lúc đó chờ tới khi nạp xong, lâu hơn nhiều so với hạn 15 giây mặc định của expect (#287)
+export const SCAN_TIMEOUT = 60_000
 
 // Tệp PDF một trang có lớp chữ (Helvetica, chỉ ASCII) để tải lên: ClamAV quét như tệp thật, svc-files đọc được chữ
 // để tìm theo nội dung (F2.7)

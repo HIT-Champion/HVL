@@ -17,7 +17,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { PASSWORD, TOTP_SECRET, shot, signIn } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, TOTP_SECRET, shot, signIn } from './helpers'
 
 // Đọc văn bản đến (F4.1) trên giao diện: văn thư tải công văn mẫu 01 (PDF có lớp chữ) → ClamAV quét sạch → tác tử
 // moc-doc-reader tự đọc, không cần bấm → ô Số ký hiệu, Ngày ban hành, Cơ quan ban hành điền sẵn đúng nhãn của mẫu,
@@ -54,7 +54,7 @@ test('đọc văn bản đến: tác tử điền sẵn, văn thư sửa rồi v
   await clerk.getByRole('link', { name: 'Tiếp nhận văn bản' }).click()
   await clerk.locator('input[type=file]').setInputFiles(join(SAMPLES, SAMPLE))
   const row = clerk.getByRole('listitem').filter({ hasText: SAMPLE })
-  await expect(row.getByText('Đã quét — sạch')).toBeVisible()
+  await expect(row.getByText('Đã quét — sạch')).toBeVisible({ timeout: SCAN_TIMEOUT })
   await expect(row.getByText(/Đã đọc bằng lớp chữ PDF — điền sẵn \d+ ô/)).toBeVisible({ timeout: 60_000 })
 
   const symbol = clerk.getByLabel('Số, ký hiệu')

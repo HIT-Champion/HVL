@@ -241,6 +241,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- e2e không còn đỏ chập chờn khi ClamAV nạp lại chữ ký (#287). Volume chữ ký của CI luôn mới tạo. freshclam tải bản
+  daily mới đúng lúc clamd đang nạp bản có sẵn trong image, nên 600 giây sau clamd tự nạp lại, và với
+  `ConcurrentDatabaseReload no` thì suốt lúc nạp không quét gì: tệp tải lên lúc đó treo quá 15 giây.
+  - CI giờ cho clamd nạp ngay bản freshclam vừa tải, sau `make up` và trước mọi bước tải lên.
+  - 7 chỗ chờ trạm quét trong e2e chờ tới 60 giây (`SCAN_TIMEOUT`), bằng `CLAMAV_TIMEOUT_S`.
+  - Máy chủ thật vẫn gặp mỗi ngày một lần: tải lên chờ khoảng 1 phút, có thể ra `503 scanner_unavailable`.
+    `docs/van-hanh.md` (mục "Quét mã độc (ClamAV)") ghi dấu hiệu, cách xử lý và cách nhận ra trong nhật ký.
+    Đo RAM để bật nạp song song: #288.
 - Bảng mức hoàn thiện ghi đúng số hàm test của từng tệp (#285). 16 trong 102 chỗ ghi sai, có chỗ sai ngay từ lúc viết:
   `test_anchors.py` ghi 38 hàm, tệp có 28; `test_ot_map.py` ghi 34, có 24; các tệp `test_assist_*.py` ghi 188, có
   198. Test mới `scripts/tests/test_muc_hoan_thien.py` đếm tĩnh như mục 1 của tài liệu (cả mẫu `*` và "(trừ …)") và

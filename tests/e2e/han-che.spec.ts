@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from '@playwright/test'
-import { PASSWORD, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, TOTP_SECRET, shot, signIn, textPdf } from './helpers'
 
 // Văn bản hạn chế (F3.7) trên giao diện: văn thư tiếp nhận ở chế độ hạn chế (chỉ PDF, tệp mã hóa trước khi lưu) →
 // màn văn bản có khóa ở tệp và danh sách người được xem, lãnh đạo khoa nhận việc đã tự có tên; văn thư gỡ rồi cấp
@@ -44,7 +44,7 @@ test('văn bản hạn chế trên giao diện', async ({ browser }) => {
     name: `nang-luong-${tag}.pdf`, mimeType: 'application/pdf',
     buffer: textPdf('Danh sach nang luong truoc han nam 2026', `Ma thu ${tag}`),
   })
-  await expect(clerk.getByText('Đã quét — sạch, đã mã hóa')).toBeVisible()
+  await expect(clerk.getByText('Đã quét — sạch, đã mã hóa')).toBeVisible({ timeout: SCAN_TIMEOUT })
   await expect(clerk.getByTestId('restricted')).toBeDisabled()
   await clerk.getByLabel('Số, ký hiệu').fill(`89/ĐHCN-TCCB${tag}`)
   await clerk.getByLabel('Ngày ban hành').fill(new Date().toISOString().slice(0, 10))
