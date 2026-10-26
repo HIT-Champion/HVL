@@ -112,9 +112,9 @@ def test_deploy_zip_is_one_multipart_upload():
 
 
 def test_resource_is_read_raw_and_missing_is_none():
-    got, seen = calls([(200, b'{"a": 1}')], lambda c: c.resource("d/1", "nghi-phep.don.json"))
+    got, seen = calls([(200, b'{"a": 1}')], lambda c: c.resource("d-1", "nghi-phep.don.json"))
     assert got == b'{"a": 1}'
-    assert seen[0].url.raw_path.decode().endswith("/repository/deployments/d%2F1/resourcedata/nghi-phep.don.json")
+    assert seen[0].url.raw_path.decode().endswith("/repository/deployments/d-1/resourcedata/nghi-phep.don.json")
     assert calls([(404, None)], lambda c: c.resource("d-1", "x"))[0] is None
     assert isinstance(calls([(500, None)], lambda c: c.resource("d-1", "x"))[0], FlowableError)
 

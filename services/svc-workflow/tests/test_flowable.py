@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import httpx2
 import pytest
@@ -109,8 +110,8 @@ def test_task_process_key_is_empty_when_flowable_dropped_the_key():
     assert task("").process_key == ""
 
 
-def raw_paths(call) -> list[bytes]:
-    """Đường gọi tới Flowable, đúng như gửi đi (chưa giải mã); Flowable giả trả 404 cho mọi yêu cầu."""
+def raw_paths(call) -> tuple[Any, list[bytes]]:
+    """Như ``calls`` nhưng ghi đường gọi đúng như gửi đi (chưa giải mã); Flowable giả trả 404 cho mọi yêu cầu."""
     seen: list[bytes] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -120,22 +121,16 @@ def raw_paths(call) -> list[bytes]:
     async def go():
         client = FlowableClient(BASE, "rest-admin", "x", transport=httpx2.MockTransport(handler))
         try:
-            await call(client)
-        except FlowableError:
-            pass
+            return await call(client)
+        except FlowableError as exc:
+            return exc
         finally:
             await client.aclose()
 
-    asyncio.run(go())
-    return seen
+    return asyncio.run(go()), seen
 
 
-@pytest.mark.parametrize("given, sent", [
-    ("../t-2?x=1#y", b"..%2Ft-2%3Fx%3D1%23y"),
-    ("..", b"%2E%2E"),
-    ("nghi-phep.don:3:8a0c6a52", b"nghi-phep.don%3A3%3A8a0c6a52"),
-])
-@pytest.mark.parametrize("call, path", [
+PATH_ID_CALLS = [
     (lambda c, i: c.task(i), b"/runtime/tasks/"),
     (lambda c, i: c.candidate_groups(i), b"/runtime/tasks/"),
     (lambda c, i: c.claim(i, "u-1"), b"/runtime/tasks/"),
@@ -146,10 +141,27 @@ def raw_paths(call) -> list[bytes]:
     (lambda c, i: c.definition(i), b"/repository/process-definitions/"),
     (lambda c, i: c.set_definition_state(i, "suspend"), b"/repository/process-definitions/"),
     (lambda c, i: c.resource(i, "forms/don.json"), b"/repository/deployments/"),
-])
-def test_ids_stay_one_path_segment(given, sent, call, path):
-    # id lấy từ yêu cầu gửi lên: "/", "?", "#", ".." không đổi được đường gọi tới Flowable
-    seen = raw_paths(lambda client: call(client, given))
+]
+
+
+@pytest.mark.parametrize("call, path", PATH_ID_CALLS)
+def test_ids_are_sent_as_one_path_segment(call, path):
+    result, seen = raw_paths(lambda client: call(client, "nghi-phep.don:3:8a0c6a52-0000-4000-8000-000000000001"))
     assert len(seen) == 1
-    assert seen[0].startswith(b"/flowable-rest/service" + path + sent)
-    assert seen[0].removeprefix(b"/flowable-rest/service" + path + sent)[:1] in (b"", b"/", b"?")   # ? của client
+    assert seen[0].startswith(b"/flowable-rest/service" + path + b"nghi-phep.don%3A3%3A8a0c6a52-0000-4000-8000-")
+
+
+@pytest.mark.parametrize("given", ["../t-2?x=1#y", "a/b", "..", ".", "", "t%2F1", "x" * 65])
+@pytest.mark.parametrize("call, path", PATH_ID_CALLS)
+def test_ids_flowable_cannot_have_are_not_sent(given, call, path):
+    # id lấy từ yêu cầu gửi lên: Flowable không có id nào như thế. Gửi đi thì firewall của Spring trả 400 cho "%2F",
+    # "%2E" (ra 503 thay vì "không có việc"), "" thành danh sách việc — báo 404 như Flowable, không gửi đi
+    result, seen = raw_paths(lambda client: call(client, given))
+    assert seen == []
+    assert result is None or (isinstance(result, FlowableError) and result.status == 404)
+
+
+def test_task_with_an_id_flowable_cannot_have_is_none():
+    # task() là chỗ đầu tiên id từ yêu cầu gửi lên đi qua (apps/api.py, workflow.py): None → "không có việc"
+    for given in ("..", "", "a/b", "t-1#x"):
+        assert raw_paths(lambda client: client.task(given)) == (None, [])

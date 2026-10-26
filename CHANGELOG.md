@@ -310,10 +310,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   +12 (`test_phong_chu.py`).
 
 ### Đã sửa lỗi
-- Id việc, phiên quy trình ghép vào đường dẫn REST của Flowable giờ được mã hóa thành đúng một đoạn (#330). Id có thể
-  đến từ yêu cầu gửi lên (Action `completeTask` của Văn phòng điện tử, `/api/workflow/<ứng dụng>/tasks/{id}`): `/`, `?`,
-  `#` hay `..` trong id từng làm yêu cầu tới Flowable sai hình. Không lộ dữ liệu: mọi lần gọi vẫn rơi vào đúng việc đã
-  kiểm quyền.
+- Id việc, phiên quy trình ghép vào đường dẫn REST của Flowable (#330). Id có thể đến từ yêu cầu gửi lên (Action
+  `completeTask` của Văn phòng điện tử, `/api/workflow/<ứng dụng>/tasks/{id}`): `/`, `?`, `#` hay `..` trong id từng làm
+  yêu cầu tới Flowable sai hình, id rỗng thành danh sách việc. Giờ id phải có dạng id của Flowable (chữ, số, `.`, `:`,
+  `-`, `_`, tối đa 64 ký tự, không chỉ có dấu chấm), không thì svc-workflow báo không có việc mà không gửi đi. Không lộ
+  dữ liệu: trước đây mọi lần gọi vẫn rơi vào đúng việc đã kiểm quyền.
 - Hoàn thành việc thỉnh thoảng báo lỗi khi hai giao dịch của Flowable khóa vòng nhau trên cùng phiên quy trình (#316;
   thấy trong CI, `make demo-giao-viec`: trưởng khoa hoàn thành việc trong lúc vòng nhắc hạn đang xử lý việc ngoài).
   PostgreSQL hủy một bên ("deadlock detected"), Flowable REST trả 500 và người dùng nhận `workflow_unavailable`, phải

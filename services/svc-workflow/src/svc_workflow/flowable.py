@@ -34,6 +34,7 @@ import hashlib
 import json
 import logging
 import pathlib
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote
@@ -49,11 +50,18 @@ DEADLOCK = "deadlock detected"
 RETRY_DELAYS_S = (0.2, 0.5)    # gọi lại sau chừng này giây; giao dịch bị hủy đã rollback hết nên gọi lại an toàn
 
 
+# id của Flowable (cột ID_ varchar(64)): uuid, số, hay id định nghĩa quy trình khóa:phiên bản:uuid (khóa có dấu chấm)
+FLOWABLE_ID = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+
+
 def _path_id(value: str) -> str:
-    """Một id thành đúng một đoạn đường dẫn REST. Id có thể đến từ yêu cầu gửi lên (Action completeTask,
-    /api/workflow/…/tasks/{id}): mã hóa cả "/", "?", "#", và đoạn chỉ có dấu chấm, vì httpx gộp ".." với đoạn trước."""
-    quoted = quote(value, safe="")
-    return quoted if quoted.strip(".") else quoted.replace(".", "%2E")
+    """Một id thành đúng một đoạn đường dẫn REST (":" mã hóa thành %3A). Id có thể đến từ yêu cầu gửi lên (Action
+    completeTask, /api/workflow/…/tasks/{id}); id Flowable không thể có thì báo 404 như Flowable mà không gửi đi:
+    "%2F", "%2E" bị firewall của Spring trước Flowable REST trả 400, "" thành danh sách việc, httpx gộp ".." với đoạn
+    trước, "?" và "#" cắt đường dẫn."""
+    if not FLOWABLE_ID.fullmatch(value) or not value.strip("."):
+        raise FlowableError(f"Flowable không có id {value[:80]!r}", 404)
+    return quote(value, safe="")
 
 
 class FlowableError(Exception):
