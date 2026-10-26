@@ -104,7 +104,7 @@ docker compose up -d --wait && python3 scripts/seed.py && python3 scripts/smoke.
 |---|---|---|---|
 | ✅ | Có tài liệu làm rõ thư viện/gói sử dụng | `DEPENDENCIES.md`; danh mục đầy đủ từng gói (kể cả gián tiếp) kèm giấy phép: SBOM CycloneDX `signet-X.Y.Z.cdx.json` đính kèm bản phát hành từ sau v1.0.0 (`make sbom`); v1.1.0 có `signet-1.1.0.cdx.json` | — |
 | ✅ | Ưu tiên thư viện sẵn có của hệ thống | Dùng image chính thức, không tự đóng gói lại: image thượng nguồn trong `docker-compose.yml` ghim phiên bản và digest. Image đội tự dựng là mã của đội (dịch vụ, ứng dụng) và APISIX: image `apache/apisix` chính thức thêm tệp `plugin.wasm` chép từ image chính thức của coraza-proxy-wasm 0.6.0, kiểm SHA-256 | −5 |
-| ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` (CI job "Giấy phép" kiểm). Chưa đánh dấu: phông Be Vietnam Pro (OFL-1.1) có 3 bản TTF trong repo, đã khai ở `NOTICE` và `REUSE.toml`; #305 chuyển sang lấy từ gói npm lúc dựng | −5 |
+| ☐ | **Không** phát hành kèm gói của dự án phụ thuộc | Không commit `vendor/`, `node_modules/`, `third_party/` (CI job "Giấy phép" kiểm). Chưa đánh dấu lúc kiểm 26/10 trên 62bff8d: phông Be Vietnam Pro (OFL-1.1) có 3 bản TTF trong repo. #305 bỏ các tệp này, lấy từ gói npm `@fontsource/be-vietnam-pro` lúc dựng; kiểm lại sau khi gộp | −5 |
 | ✅ | **Không** chỉnh sửa mã nguồn gói đính kèm | Không fork-sửa upstream; tùy biến ở lớp config/plugin. Repo không có tệp `.patch`, Dockerfile không vá mã thượng nguồn; tùy biến bằng route APISIX, metadata Hasura, realm và theme Keycloak | −5 |
 
 > ⚠️ Đây là tiêu chí **xung khắc nhất** với bản chất "lắp ghép open-core" của Signet. Nguyên tắc

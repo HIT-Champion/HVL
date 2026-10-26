@@ -71,6 +71,26 @@ services:
       timeout: 5s
       retries: 30
 
+  # Phông Be Vietnam Pro của theme đăng nhập (#305): image của đội (platform/keycloak/fonts) lấy phông từ gói npm
+  # @fontsource/be-vietnam-pro lúc dựng, repo không chứa tệp phông nào (PoF #5); Keycloak vẫn chạy image chính thức.
+  # Chạy một lần trước keycloak: chép phông vào volume keycloak_fonts rồi thoát 0, keycloak gắn volume đó vào thư mục
+  # phông của theme. Không mạng, không capability nào, chạy user node của image (volume mới lấy chủ của thư mục
+  # /theme-fonts trong image). Không dùng x-common: restart "no", không mạng
+  keycloak-fonts:
+    build: ./platform/keycloak/fonts
+    image: moc/keycloak-fonts:${MOC_VERSION:-dev}
+    profiles: [core]
+    restart: "no"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - keycloak_fonts:/theme-fonts
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
   # F1.1 — SSO. Realm nạp từ platform/keycloak/realm/ ở lần đầu (bỏ qua nếu realm đã có).
   keycloak:
     <<: *common
@@ -100,6 +120,9 @@ services:
       - ./platform/keycloak/realm:/opt/keycloak/data/import:ro
       # theme đăng nhập Signet (loginTheme của realm): chỉ CSS, logo, chuỗi; kế thừa keycloak.v2 có sẵn trong image
       - ./platform/keycloak/themes/signet:/opt/keycloak/themes/signet:ro
+      # phông của theme do keycloak-fonts chép vào volume (#305), gắn đè lên thư mục giữ chỗ có sẵn trong theme: điểm
+      # gắn phải có trước vì thư mục theme gắn chỉ đọc
+      - keycloak_fonts:/opt/keycloak/themes/signet/login/resources/fonts/be-vietnam-pro:ro
     ports:
       # trang quản trị: chỉ trên máy chủ, không qua APISIX
       - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
@@ -114,6 +137,8 @@ services:
       start_period: 30s
     depends_on:
       postgres: {condition: service_healthy}
+      # phông đã nằm trong volume trước khi trang đăng nhập phục vụ; `up --wait` coi dịch vụ này xong là đạt
+      keycloak-fonts: {condition: service_completed_successfully}
 
   # F1.2 — cổng duy nhất mở ra ngoài. F3.15: image APISIX ghim digest cộng nguyên bản tệp WAF coraza-proxy-wasm ghim
   # digest (platform/apisix/Dockerfile), không sửa mã của hai dự án; luật WAF trong apisix.yaml
@@ -826,6 +851,8 @@ volumes:
   openbao_svc_workflow:
   # trọng số mô hình ngôn ngữ (F4.1, profile ai); không sao lưu: tải lại được bằng make ai-model
   ollama_models:
+  # phông của theme đăng nhập (#305): keycloak-fonts chép lại mỗi lần docker compose up; không sao lưu
+  keycloak_fonts:
 
 secrets:
   # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ
