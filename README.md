@@ -15,6 +15,8 @@ DX-OS Open-Core.
 **Dùng thử:** <https://signet.htechcs.com> (bản v1.1.0, xem [Chạy thử](#chạy-thử)) · tự cài trên máy mình bằng bốn
 lệnh ở [Cài đặt từ mã nguồn](#cài-đặt-từ-mã-nguồn-building-from-source).
 
+**Xem nhanh 5 phút, tìm tài liệu theo từng phần:** [`docs/README.md`](docs/README.md).
+
 **Đọc nhanh:** [Giới thiệu](#giới-thiệu) · [Kiến trúc](#kiến-trúc) · [Tính năng](#tính-năng) ·
 [4 nguyên lý](#bằng-chứng-4-nguyên-lý) · [Công nghệ](#công-nghệ-và-giấy-phép) ·
 [Cài đặt](#cài-đặt-từ-mã-nguồn-building-from-source) · [Chạy thử](#chạy-thử) · [Vận hành](#vận-hành-và-kiểm-thử) ·

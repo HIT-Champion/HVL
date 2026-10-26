@@ -202,6 +202,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   không được viết cứng chữ tiếng Việt (trừ trường `vi:` của dữ liệu song ngữ). Trước đây chỉ vài tệp được kiểm; lần
   quét đầu không thấy lỗi nào. `CONTRIBUTING.md` có mục "Dịch giao diện". README, README.en, ROADMAP và F2.9 ghi
   rõ Không gian cá nhân, Bảng tin chỉ có tiếng Việt. Test giao diện +4.
+- Trang `docs/README.md` (#307): xem nhanh hệ thống trong 5 phút, bảng tìm từng phần ở đâu (mã nguồn, giấy phép, bản
+  phát hành, cài đặt, thư viện, tài liệu, kiến trúc, mức hoàn thiện, vận hành, trình diễn) kèm phần CI kiểm, và các
+  giới hạn đã biết có issue theo dõi (#301–#306). README, README.en trỏ tới trang này ngay đầu. Bảng tự kiểm
+  `docs/du-thi/pof-checklist.md` đánh dấu 23 trên 24 yêu cầu, kiểm ngày 26/10/2026 trên `develop` 62bff8d; ô "không
+  phát hành kèm gói" để trống vì ba bản phông Be Vietnam Pro trong repo (#305).
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
