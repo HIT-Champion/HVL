@@ -50,6 +50,9 @@ from ..schemas import FormSchema, SchemaFileError
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
 # biến hệ thống svc-workflow đặt lúc bắt đầu quy trình, lấy từ token; form không khai được, client không ghi đè được
 RESERVED = ("tenantId", "departmentId", "initiator")
+# Flowable 8 giải các tên này trong biểu thức của BPMN (điều kiện rẽ nhánh) thành giá trị của động cơ trước khi tìm biến
+# (VariableContainerELResolver, ProcessVariableScopeELResolver; task: khi biểu thức chạy trên một việc)
+ENGINE_NAMES = ("execution", "task", "authenticatedUserId", "currentTenantId")
 VARIABLE = re.compile(r"[a-z][A-Za-z0-9]{0,63}", re.ASCII)
 SCALAR_TYPES = {"string", "integer", "number", "boolean", "null"}
 FORMATS = {"date", "uuid"}
@@ -351,6 +354,9 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
     for name, prop in props.items():
         if name in RESERVED:
             errors.append(f"{where}: trường {name} trùng biến hệ thống ({', '.join(RESERVED)}) — lõi tự đặt từ token")
+        elif name in ENGINE_NAMES:
+            errors.append(f"{where}: trường {name} trùng tên Flowable dành sẵn trong biểu thức "
+                          f"({', '.join(ENGINE_NAMES)}) — điều kiện của BPMN không đọc được giá trị gửi lên")
         elif not VARIABLE.fullmatch(name):
             errors.append(f"{where}: tên trường {name!r} phải dạng camelCase (chữ thường đầu, chỉ chữ và số, "
                           "≤ 64 ký tự) — là tên biến Flowable")

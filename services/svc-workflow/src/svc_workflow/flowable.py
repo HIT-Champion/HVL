@@ -34,6 +34,7 @@ import hashlib
 import json
 import logging
 import pathlib
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote
@@ -47,6 +48,20 @@ CONCURRENT = "was updated by another transaction concurrently"
 # thông điệp PostgreSQL khi hủy một bên của deadlock (40P01); MyBatis đặt nó vào PersistenceException mà REST trả lại
 DEADLOCK = "deadlock detected"
 RETRY_DELAYS_S = (0.2, 0.5)    # gọi lại sau chừng này giây; giao dịch bị hủy đã rollback hết nên gọi lại an toàn
+
+
+# id của Flowable (cột ID_ varchar(64)): uuid, số, hay id định nghĩa quy trình khóa:phiên bản:uuid (khóa có dấu chấm)
+FLOWABLE_ID = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+
+
+def _path_id(value: str) -> str:
+    """Một id thành đúng một đoạn đường dẫn REST (":" mã hóa thành %3A). Id có thể đến từ yêu cầu gửi lên (Action
+    completeTask, /api/workflow/…/tasks/{id}); id Flowable không thể có thì báo 404 như Flowable mà không gửi đi:
+    "%2F", "%2E" bị firewall của Spring trước Flowable REST trả 400, "" thành danh sách việc, httpx gộp ".." với đoạn
+    trước, "?" và "#" cắt đường dẫn."""
+    if not FLOWABLE_ID.fullmatch(value) or not value.strip("."):
+        raise FlowableError(f"Flowable không có id {value[:80]!r}", 404)
+    return quote(value, safe="")
 
 
 class FlowableError(Exception):
@@ -190,12 +205,14 @@ class FlowableClient:
 
     async def delete_process(self, process_id: str, reason: str) -> None:
         """Hủy phiên vừa khởi chạy thừa (lần gọi khác đã gắn phiên của nó vào văn bản): chưa ai làm gì trong đó."""
-        await self._request("DELETE", f"/runtime/process-instances/{process_id}", params={"deleteReason": reason})
+        await self._request("DELETE", f"/runtime/process-instances/{_path_id(process_id)}",
+                            params={"deleteReason": reason})
 
     async def set_variables(self, process_id: str, variables: dict[str, Any]) -> None:
         """Ghi biến của phiên quy trình: PUT tạo biến chưa có, ghi đè biến đã có (POST thì 409 khi đã có). Chỉ tác dụng
         với việc tạo sau đó — việc đang mở giữ người được giao lúc tạo."""
-        await self._request("PUT", f"/runtime/process-instances/{process_id}/variables", json=_variables(variables))
+        await self._request("PUT", f"/runtime/process-instances/{_path_id(process_id)}/variables",
+                            json=_variables(variables))
 
     # --- việc ---------------------------------------------------------------------------------------
 
@@ -215,12 +232,13 @@ class FlowableClient:
 
     async def task(self, task_id: str) -> Task | None:
         try:
-            row = await self._request("GET", f"/runtime/tasks/{task_id}")
+            row = await self._request("GET", f"/runtime/tasks/{_path_id(task_id)}")
         except FlowableError as exc:
             if exc.status == 404:
                 return None
             raise
-        variables = await self._request("GET", f"/runtime/process-instances/{row['processInstanceId']}/variables")
+        variables = await self._request(
+            "GET", f"/runtime/process-instances/{_path_id(row['processInstanceId'])}/variables")
         row["variables"] = variables
         return _task(row)
 
@@ -233,12 +251,13 @@ class FlowableClient:
         return [_task(row) for row in data["data"]]
 
     async def candidate_groups(self, task_id: str) -> list[str]:
-        links = await self._request("GET", f"/runtime/tasks/{task_id}/identitylinks")
+        links = await self._request("GET", f"/runtime/tasks/{_path_id(task_id)}/identitylinks")
         return [link["group"] for link in links if link.get("group") and link.get("type") == "candidate"]
 
     async def claim(self, task_id: str, user_id: str | None) -> None:
         """Nhận việc cho user_id; None trả việc về nhóm. Người khác đã nhận thì Flowable trả 409."""
-        await self._request("POST", f"/runtime/tasks/{task_id}", json={"action": "claim", "assignee": user_id})
+        await self._request("POST", f"/runtime/tasks/{_path_id(task_id)}",
+                            json={"action": "claim", "assignee": user_id})
 
     async def _post_again_if_concurrent(self, path: str, body: dict[str, Any]) -> Any:
         """POST làm phiên quy trình đi tiếp; bị hủy vì khóa lạc quan thì gọi lại theo ``RETRY_DELAYS_S``. Lỗi khác,
@@ -256,7 +275,7 @@ class FlowableClient:
 
     async def complete(self, task_id: str, variables: dict[str, Any]) -> None:
         await self._post_again_if_concurrent(
-            f"/runtime/tasks/{task_id}", {"action": "complete", "variables": _variables(variables)},
+            f"/runtime/tasks/{_path_id(task_id)}", {"action": "complete", "variables": _variables(variables)},
         )
 
     # --- việc giao ra ngoài (external worker) ----------------------------------------------------------
@@ -302,7 +321,7 @@ class FlowableClient:
 
     async def resource(self, deployment_id: str, name: str) -> bytes | None:
         """Nội dung một tài nguyên của deployment; None nếu không có."""
-        path = f"/repository/deployments/{quote(deployment_id, safe='')}/resourcedata/{quote(name, safe='')}"
+        path = f"/repository/deployments/{_path_id(deployment_id)}/resourcedata/{quote(name, safe='')}"
         try:
             r = await self._http.get(path)
         except httpx2.HTTPError as exc:
@@ -320,7 +339,7 @@ class FlowableClient:
 
     async def definition(self, definition_id: str) -> dict[str, Any] | None:
         try:
-            return await self._request("GET", f"/repository/process-definitions/{quote(definition_id, safe='')}")
+            return await self._request("GET", f"/repository/process-definitions/{_path_id(definition_id)}")
         except FlowableError as exc:
             if exc.status == 404:
                 return None
@@ -328,7 +347,7 @@ class FlowableClient:
 
     async def set_definition_state(self, definition_id: str, action: str) -> None:
         """action: suspend | activate, kèm các phiên đang chạy của định nghĩa đó."""
-        await self._request("PUT", f"/repository/process-definitions/{quote(definition_id, safe='')}",
+        await self._request("PUT", f"/repository/process-definitions/{_path_id(definition_id)}",
                             json={"action": action, "includeProcessInstances": True})
 
     async def start_definition(self, definition_id: str, variables: list[dict[str, Any]]) -> str:
@@ -348,5 +367,5 @@ class FlowableClient:
 
     async def complete_typed(self, task_id: str, variables: list[dict[str, Any]]) -> None:
         """Như complete() nhưng biến đã ghi kiểu (REST variable): số, đúng/sai của form ứng dụng giữ nguyên kiểu."""
-        await self._post_again_if_concurrent(f"/runtime/tasks/{task_id}", {"action": "complete",
-                                                                           "variables": variables})
+        await self._post_again_if_concurrent(f"/runtime/tasks/{_path_id(task_id)}",
+                                             {"action": "complete", "variables": variables})
