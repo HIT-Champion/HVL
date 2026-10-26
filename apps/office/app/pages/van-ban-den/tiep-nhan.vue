@@ -398,7 +398,8 @@ const notes = computed(() => Object.fromEntries(READ_KEYS.map((key) => {
 })) as Record<ReadFieldKey, { warnings: string[]; offer: string }>)
 
 // Ô nhập trỏ tới nhãn gợi ý, gợi ý chưa điền để trình đọc màn hình đọc kèm
-const describedBy = (key: ReadFieldKey) => [suggested.value[key] && `${key}-suggest`, notes.value[key].offer && `${key}-offer`]
+const describedBy = (key: ReadFieldKey) => [show(key) && `${key}-error`,
+  suggested.value[key] && `${key}-suggest`, notes.value[key].offer && `${key}-offer`]
   .filter(Boolean).join(' ') || undefined
 
 // Chặn trùng: cùng cơ quan ban hành, số ký hiệu, ngày ban hành (NĐ 30) — báo ngay khi rời ô, chưa cho lưu. Chỉ tra
@@ -417,7 +418,11 @@ async function checkDuplicate() {
 
 async function save(register: boolean) {
   tried.value = true
-  if (Object.keys(clientErrors.value).length || uploading.value) return
+  if (Object.keys(clientErrors.value).length) {
+    await focusInvalidField()
+    return
+  }
+  if (uploading.value) return
   saving.value = true
   let id: string
   try {
@@ -427,7 +432,10 @@ async function save(register: boolean) {
     id = data.receiveIncoming.document_id
     draft.clear()
   } catch (e) {
-    if (e instanceof ApiError && e.fields) serverErrors.value = e.fields
+    if (e instanceof ApiError && e.fields) {
+      serverErrors.value = e.fields
+      await focusInvalidField()
+    }
     notice.error(errorText(t, e))
     saving.value = false
     return
@@ -468,13 +476,19 @@ async function save(register: boolean) {
       <section class="card p-5 lg:col-span-2">
         <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('receive.file') }}</h2>
         <label
-          class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-10 text-center text-sm transition"
+          class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2
+                 border-dashed px-4 py-10 text-center text-sm transition focus-within:outline focus-within:outline-2
+                 focus-within:outline-offset-2 focus-within:outline-brand-700"
           :class="dragging ? 'border-brand-600 bg-brand-50' : 'border-stone-300 hover:border-brand-500 hover:bg-stone-50'"
           @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
         >
           <svg class="h-8 w-8 text-brand-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
           <span class="text-stone-600">{{ form.restricted ? t('receive.dropRestricted') : t('receive.drop') }}</span>
-          <input type="file" class="sr-only" multiple :accept="form.restricted ? 'application/pdf' : 'application/pdf,image/*'" @change="addFiles(($event.target as HTMLInputElement).files)">
+          <input id="incoming-files" type="file" class="sr-only" multiple :aria-invalid="!!show('file_ids')"
+            :aria-describedby="show('file_ids') ? 'file_ids-error' : undefined"
+            :accept="form.restricted ? 'application/pdf' : 'application/pdf,image/*'"
+            @change="addFiles(($event.target as HTMLInputElement).files)"
+          >
         </label>
 
         <ul class="mt-4 space-y-2">
@@ -530,7 +544,7 @@ async function save(register: boolean) {
             <div v-else class="mt-1 text-xs font-medium text-red-600">{{ f.message }}</div>
           </li>
         </ul>
-        <p v-if="show('file_ids')" class="field-error">{{ show('file_ids') }}</p>
+        <p v-if="show('file_ids')" id="file_ids-error" class="field-error">{{ show('file_ids') }}</p>
       </section>
 
       <!-- thông tin văn bản -->
@@ -544,7 +558,7 @@ async function save(register: boolean) {
             <select id="type" v-model="form.type_code" class="input" :aria-invalid="!!show('type_code')" :aria-describedby="describedBy('type_code')" @change="touch('type_code')">
               <option v-for="ty in types" :key="ty.code" :value="ty.code">{{ ty.name }}</option>
             </select>
-            <p v-if="show('type_code')" class="field-error">{{ show('type_code') }}</p>
+            <p v-if="show('type_code')" id="type_code-error" class="field-error">{{ show('type_code') }}</p>
             <p v-for="w in notes.type_code.warnings" :key="w" class="mt-1 text-xs text-amber-800">{{ w }}</p>
             <p v-if="notes.type_code.offer" id="type_code-offer" class="mt-1 text-xs text-stone-600">
               {{ t('receive.read.offer', { value: notes.type_code.offer }) }}
@@ -570,7 +584,7 @@ async function save(register: boolean) {
               <SuggestTag id="symbol-suggest" data-testid="suggest-symbol" :suggestion="suggested.symbol" :value="form.symbol" />
             </div>
             <input id="symbol" v-model="form.symbol" class="input" :placeholder="t('receive.symbolHint')" :aria-invalid="!!show('symbol')" :aria-describedby="describedBy('symbol')" @input="touch('symbol')" @compositionstart="touch('symbol')" @blur="checkDuplicate">
-            <p v-if="show('symbol')" class="field-error">{{ show('symbol') }}</p>
+            <p v-if="show('symbol')" id="symbol-error" class="field-error">{{ show('symbol') }}</p>
             <p v-for="w in notes.symbol.warnings" :key="w" class="mt-1 text-xs text-amber-800">{{ w }}</p>
             <p v-if="notes.symbol.offer" id="symbol-offer" class="mt-1 text-xs text-stone-600">
               {{ t('receive.read.offer', { value: notes.symbol.offer }) }}
@@ -583,7 +597,7 @@ async function save(register: boolean) {
               <SuggestTag id="issued_on-suggest" data-testid="suggest-issued_on" :suggestion="suggested.issued_on" :value="form.issued_on" :display="shown('issued_on', suggested.issued_on?.value ?? '')" />
             </div>
             <input id="issued_on" v-model="form.issued_on" type="date" class="input" :max="today()" :aria-invalid="!!show('issued_on')" :aria-describedby="describedBy('issued_on')" @input="touch('issued_on')" @keydown="touchDate" @change="touch('issued_on'); checkDuplicate()">
-            <p v-if="show('issued_on')" class="field-error">{{ show('issued_on') }}</p>
+            <p v-if="show('issued_on')" id="issued_on-error" class="field-error">{{ show('issued_on') }}</p>
             <p v-for="w in notes.issued_on.warnings" :key="w" class="mt-1 text-xs text-amber-800">{{ w }}</p>
             <p v-if="notes.issued_on.offer" id="issued_on-offer" class="mt-1 text-xs text-stone-600">
               {{ t('receive.read.offer', { value: notes.issued_on.offer }) }}
@@ -597,7 +611,7 @@ async function save(register: boolean) {
             <SuggestTag id="issuer_name-suggest" data-testid="suggest-issuer_name" :suggestion="suggested.issuer_name" :value="form.issuer_name" />
           </div>
           <input id="issuer" v-model="form.issuer_name" class="input" :aria-invalid="!!show('issuer_name')" :aria-describedby="describedBy('issuer_name')" @input="touch('issuer_name')" @compositionstart="touch('issuer_name')" @blur="checkDuplicate">
-          <p v-if="show('issuer_name')" class="field-error">{{ show('issuer_name') }}</p>
+          <p v-if="show('issuer_name')" id="issuer_name-error" class="field-error">{{ show('issuer_name') }}</p>
           <p v-if="notes.issuer_name.offer" id="issuer_name-offer" class="mt-1 text-xs text-stone-600">
             {{ t('receive.read.offer', { value: notes.issuer_name.offer }) }}
             <button type="button" class="ml-1 font-medium text-brand-700 underline underline-offset-2" :aria-label="t('receive.read.useFor', { value: notes.issuer_name.offer })" @click="takeOffer('issuer_name')">{{ t('receive.read.use') }}</button>
@@ -610,7 +624,7 @@ async function save(register: boolean) {
           </div>
           <textarea id="summary" v-model="form.summary" rows="3" class="input" :aria-invalid="!!show('summary')" :aria-describedby="describedBy('summary')" @input="touch('summary')" @compositionstart="touch('summary')" />
           <div class="mt-1 flex justify-between text-xs">
-            <span class="field-error !mt-0">{{ show('summary') }}</span>
+            <span id="summary-error" class="field-error !mt-0">{{ show('summary') }}</span>
             <span class="text-stone-400 tabular-nums">{{ summaryLength }}/{{ maxLength('summary') }}</span>
           </div>
           <p v-if="notes.summary.offer" id="summary-offer" class="mt-1 text-xs text-stone-600">
@@ -621,8 +635,12 @@ async function save(register: boolean) {
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <label class="label" for="due_on">{{ t('receive.dueOn') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></label>
-            <input id="due_on" v-model="form.due_on" type="date" class="input" :min="today()" :aria-invalid="!!show('due_on')">
-            <p v-if="show('due_on')" class="field-error">{{ show('due_on') }}</p>
+            <input
+              id="due_on" v-model="form.due_on" type="date" class="input" :min="today()"
+              :aria-invalid="!!show('due_on')"
+              :aria-describedby="show('due_on') ? 'due_on-error' : undefined"
+            >
+            <p v-if="show('due_on')" id="due_on-error" class="field-error">{{ show('due_on') }}</p>
           </div>
           <label class="flex items-start gap-3 rounded-md border border-stone-200 p-3 text-sm" :class="{ 'opacity-60': files.length }">
             <input v-model="form.restricted" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700" :disabled="files.length > 0" data-testid="restricted">

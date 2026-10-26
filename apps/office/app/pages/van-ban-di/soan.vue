@@ -177,7 +177,11 @@ function removeAttachment(a: Attachment) {
 
 async function save() {
   tried.value = true
-  if (Object.keys(errors.value).length || uploading.value) return
+  if (Object.keys(errors.value).length) {
+    await focusInvalidField()
+    return
+  }
+  if (uploading.value) return
   saving.value = true
   const fields = {
     type_code: form.type_code, summary: form.summary.trim(), body: form.body.trim(), recipients: recipientList.value,
@@ -256,8 +260,12 @@ async function save() {
 
       <div>
         <label class="label" for="summary">{{ t('compose.summary') }}</label>
-        <input id="summary" v-model="form.summary" class="input" maxlength="500" :aria-invalid="tried && !!errors.summary">
-        <p v-if="tried && errors.summary" class="field-error">{{ errors.summary }}</p>
+        <input
+          id="summary" v-model="form.summary" class="input" maxlength="500" required
+          :aria-invalid="tried && !!errors.summary"
+          :aria-describedby="tried && errors.summary ? 'summary-error' : undefined"
+        >
+        <p v-if="tried && errors.summary" id="summary-error" class="field-error">{{ errors.summary }}</p>
         <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.summaryHint') }}</p>
       </div>
 
@@ -265,17 +273,22 @@ async function save() {
         <label class="label" for="body">{{ t('compose.body') }}</label>
         <textarea
           id="body" v-model="form.body" rows="12" class="input font-sans leading-relaxed"
-          :aria-invalid="tried && !!errors.body"
+          required :aria-invalid="tried && !!errors.body"
+          :aria-describedby="tried && errors.body ? 'body-error' : undefined"
         />
-        <p v-if="tried && errors.body" class="field-error">{{ errors.body }}</p>
+        <p v-if="tried && errors.body" id="body-error" class="field-error">{{ errors.body }}</p>
         <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.bodyHint') }}</p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label class="label" for="recipients">{{ t('compose.recipients') }}</label>
-          <textarea id="recipients" v-model="form.recipients" rows="3" class="input" :aria-invalid="tried && !!errors.recipients" />
-          <p v-if="tried && errors.recipients" class="field-error">{{ errors.recipients }}</p>
+          <textarea
+            id="recipients" v-model="form.recipients" rows="3" class="input" required
+            :aria-invalid="tried && !!errors.recipients"
+            :aria-describedby="tried && errors.recipients ? 'recipients-error' : undefined"
+          />
+          <p v-if="tried && errors.recipients" id="recipients-error" class="field-error">{{ errors.recipients }}</p>
           <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.recipientsHint') }}</p>
         </div>
         <div>

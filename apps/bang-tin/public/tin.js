@@ -52,8 +52,9 @@ export function dong(tin) {
 function claims(token) {
   try {
     const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(decodeURIComponent(Array.from(atob(part), (c) =>
-      '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')))
+    const c = JSON.parse(decodeURIComponent(Array.from(atob(part), (ch) =>
+      '%' + ch.charCodeAt(0).toString(16).padStart(2, '0')).join('')))
+    return c && typeof c === 'object' && !Array.isArray(c) ? c : null
   } catch {
     return null
   }
@@ -75,3 +76,14 @@ export function vaiTro(token) {
  * bản).
  */
 export const VAI_TRO_XEM = ['clerk', 'staff', 'manager', 'director']
+
+/**
+ * Câu báo khi không tải được tin. Hasura trả validation-failed khi vai trò không thấy bảng (vd token vừa đổi vai trò):
+ * báo bằng câu đọc được, không đưa tên bảng, query_root của GraphQL ra trang.
+ */
+export function loiTaiTin(body, status) {
+  if (body?.errors?.some((e) => e.extensions?.code === 'validation-failed')) {
+    return 'Tài khoản này không đọc được bảng tin. Kiểm tra vai trò của tài khoản hoặc hỏi quản trị đơn vị.'
+  }
+  return body?.errors?.[0]?.message || `HTTP ${status}`
+}

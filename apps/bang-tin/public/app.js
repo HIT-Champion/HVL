@@ -18,7 +18,7 @@
 // theo đơn vị và theo văn bản người xem được đọc), vẽ danh sách, hỏi lại mỗi 15 giây.
 
 import { signIn, signOut } from './auth.js'
-import { QUERY_TIN, VAI_TRO_XEM, dong, tenNguoi, vaiTro } from './tin.js'
+import { QUERY_TIN, VAI_TRO_XEM, dong, loiTaiTin, tenNguoi, vaiTro } from './tin.js'
 
 const el = (id) => document.getElementById(id)
 
@@ -29,7 +29,7 @@ async function load(token) {
     body: JSON.stringify({ query: QUERY_TIN }),
   })
   const body = await res.json()
-  if (!res.ok || body.errors) throw new Error(body.errors?.[0]?.message || `HTTP ${res.status}`)
+  if (!res.ok || body.errors) throw new Error(loiTaiTin(body, res.status))
   return body.data.bang_tin_tin
 }
 
@@ -54,16 +54,20 @@ async function main() {
   el('nguoi').textContent = tenNguoi(user.access_token) || 'Đã đăng nhập'
   el('thoat').hidden = false
   el('thoat').addEventListener('click', () => signOut())
-  // quản trị đơn vị không đọc văn bản nên không có bảng tin: báo bằng câu đọc được, không hỏi để nhận lỗi GraphQL
-  if (!VAI_TRO_XEM.includes(vaiTro(user.access_token))) {
+  // quản trị đơn vị không đọc văn bản nên không có bảng tin: báo bằng câu đọc được, không hỏi để nhận lỗi GraphQL.
+  // Kiểm cả ở mỗi lần làm mới: token gia hạn có thể mang vai trò khác, khi đó xóa tin đang hiện
+  const khongXem = (token) => {
+    if (VAI_TRO_XEM.includes(vaiTro(token))) return false
+    el('tin').replaceChildren()
     el('trang-thai').textContent = 'Tài khoản quản trị đơn vị không xem được bảng tin: bảng tin chỉ hiện văn bản người '
       + 'xem được đọc. Đăng nhập bằng tài khoản nghiệp vụ.'
-    return
+    return true
   }
+  if (khongXem(user.access_token)) return
   const refresh = async () => {
     try {
       const current = await signIn()
-      if (current) draw(await load(current.access_token))
+      if (current && !khongXem(current.access_token)) draw(await load(current.access_token))
     } catch (err) {
       el('trang-thai').textContent = `Không tải được bảng tin: ${err.message}`
     }
