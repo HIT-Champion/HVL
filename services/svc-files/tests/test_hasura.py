@@ -263,3 +263,20 @@ def test_ask_documents_service_runs_as_service_of_the_tenant_and_skips_restricte
     headers, body = rec.last
     assert headers["x-hasura-role"] == "service" and headers["x-hasura-tenant-id"] == str(TENANT)
     assert "{restricted: {_eq: false}}" in body["query"]
+
+
+def test_archived_case_files_ask_with_the_user_token_and_return_hex_hashes():
+    key = f"cold/{TENANT}/case/c-1/"
+    rec = Recorder((200, {"data": {"office_case_files": [
+        {"id": "c-1", "code": "HS-01", "archive_key": key, "archive_sha256": "\\x" + "ef" * 32},
+        {"id": "c-2", "code": "HS-02", "archive_key": None, "archive_sha256": None}]}}))
+    got = run(client(rec).archived_case_files("token-lanh-dao"))
+    headers, body = rec.last
+    assert headers["authorization"] == "Bearer token-lanh-dao" and "x-hasura-admin-secret" not in headers
+    assert '{status: {_eq: "archived"}}' in body["query"]
+    assert got == [{"id": "c-1", "code": "HS-01", "archive_key": key, "archive_sha256": "ef" * 32}]
+    rec = Recorder((200, {"errors": [{"message": "field not found", "extensions": {"code": "validation-failed"}}]}))
+    assert run(client(rec).archived_case_files("t")) == []
+    rec = Recorder((200, {"errors": [{"message": "JWTExpired", "extensions": {"code": "invalid-jwt"}}]}))
+    with pytest.raises(HasuraAuthError):
+        run(client(rec).archived_case_files("t"))

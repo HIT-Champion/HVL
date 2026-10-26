@@ -905,6 +905,20 @@ lỗi trong phả hệ chỉ có tên lớp lỗi (không tên tệp, số ký h
 và, nếu đặt `MOC_OPENLINEAGE_URL`, gửi thêm tới máy chủ nhận OpenLineage (Marquez). Ghi phả hệ lỗi chỉ thành cảnh báo,
 không chặn nộp lưu. Không có tên hồ sơ, trích yếu trong sự kiện — chỉ key đối tượng, tên bảng, số dòng.
 
+**Phân tích trên dữ liệu lạnh (#304, `archive_stats.py`).** `GET /api/case-files/archive-stats` cho phần "Văn bản đã
+nộp lưu (kho lạnh)" của trang Điều hành: số hồ sơ, số văn bản đến, đi, theo năm ban hành (văn bản không có ngày ban
+hành tính theo năm của hồ sơ), theo loại văn bản, theo phòng lập hồ sơ. Quyền như trang Điều hành: chỉ lãnh đạo đơn vị
+(vai trò mặc định `director`, vai trò khác `403 forbidden`), danh sách hồ sơ đã nộp lưu lấy từ Hasura bằng token của
+người gọi nên chỉ có hồ sơ của đơn vị mình. Mỗi gói: manifest tải theo băm trong CSDL, so băm (như phòng đọc), phải là
+manifest của đúng hồ sơ, đúng đơn vị, gói nằm đúng `cold/<đơn vị>/case/<hồ sơ>/`; bảng `documents-<sha256>.parquet` so
+băm với manifest. Rồi DuckDB đọc mọi bảng văn bản một lượt (`read_parquet` trên danh sách tệp) và đếm. Gói lệch băm,
+thiếu đối tượng thì không đếm, trả trong `unreadable` (ký hiệu hồ sơ, lý do) và ghi `case_file.archive_mismatch` vào
+nhật ký. Chỉ có số đếm: không trích yếu, số ký hiệu hay tên người. Chưa có hồ sơ nào nộp lưu thì trả số 0, không đọc
+bucket. Gói không đổi nên kết quả lưu đệm theo đơn vị tới khi tập manifest đổi (có hồ sơ mới nộp lưu); kết quả có gói
+không đọc được thì không lưu đệm. Mỗi tập manifest mới là một run OpenLineage `moc.archive.stats` (đầu vào: các bảng
+Parquet đã đọc) trong `core.lineage_events`. CSDL không trả lời → `503 database_unavailable`, bucket lạnh không trả lời
+→ `503 storage_unavailable`. Mỗi khi có hồ sơ mới nộp lưu thì đọc lại mọi gói của đơn vị: chưa đo với hàng nghìn gói.
+
 Chưa làm: dọn bản nóng khi giao dịch đã chạy mà svc-files không nhận được trả lời (hồ sơ đã `archived`, tệp đã
 `cold`, bản nóng còn thừa — không mất gì).
 

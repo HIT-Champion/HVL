@@ -80,6 +80,14 @@ query VisibleCaseFile($id: uuid!) {
   office_case_files_by_pk(id: $id) { id code title year status closed_on archived_at archive_key archive_sha256 }
 }"""
 
+# Phân tích dữ liệu đã nộp lưu (#304): mọi hồ sơ đã nộp lưu người giữ token xem được — Hasura lọc theo vai trò, đơn vị
+ARCHIVED_CASE_FILES = """
+query ArchivedCaseFiles {
+  office_case_files(where: {status: {_eq: "archived"}}, order_by: {archived_at: asc}) {
+    id code archive_key archive_sha256
+  }
+}"""
+
 # Kèm: tệp có đang gắn vào văn bản hạn chế nào không. Tệp rõ của văn bản hạn chế có từ trước F3.7 (hoặc văn bản
 # được đánh dấu hạn chế sau khi gắn tệp) vẫn không mã hóa — người đọc tự động (F4.1) phải chặn theo văn bản.
 FILE_LOCATION = """
@@ -525,6 +533,19 @@ class HasuraClient:
             raise
         row = data.get("office_case_files_by_pk")
         return {**row, "archive_sha256": _hex(row["archive_sha256"]) if row["archive_sha256"] else None} if row else None
+
+    async def archived_case_files(self, token: str) -> list[dict[str, Any]]:
+        """Hồ sơ đã nộp lưu người giữ token xem được (vị trí gói, băm manifest); vai trò không đọc hồ sơ thì rỗng."""
+        try:
+            data = await self._call(ARCHIVED_CASE_FILES, {}, {"Authorization": f"Bearer {token}"})
+        except HasuraAuthError:
+            raise
+        except HasuraError as exc:
+            if exc.code == "validation-failed":
+                return []
+            raise
+        return [{**row, "archive_sha256": _hex(row["archive_sha256"])} for row in data["office_case_files"]
+                if row["archive_key"] and row["archive_sha256"]]
 
     async def changed_documents(self, since: datetime, limit: int, after: str) -> list[dict[str, Any]]:
         """Văn bản sửa (hoặc có tệp vừa được đọc chữ) từ `since` của mọi thuê ước, để đồng bộ chỉ mục tìm kiếm.
