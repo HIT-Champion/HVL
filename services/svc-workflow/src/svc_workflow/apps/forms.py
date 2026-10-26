@@ -41,6 +41,7 @@ from datetime import date
 from re import _constants as sre
 from re import _parser as sre_parse
 from typing import Any
+from urllib.parse import unquote
 
 from jsonschema import Draft202012Validator, validators
 
@@ -69,6 +70,13 @@ MAX_STEPS = 10**7
 # Mọi pattern của một form chạy trong cùng một lần gửi: cộng lại cũng có trần, khoảng 100 ms
 MAX_FORM_STEPS = 3 * 10**7
 REPEATS = (sre.MAX_REPEAT, sre.MIN_REPEAT, sre.POSSESSIVE_REPEAT)
+# Chỗ có schema con trong JSON Schema 2020-12, để cộng chi phí pattern theo đúng đường jsonschema đi; $defs chỉ tính
+# qua $ref (mỗi chỗ trỏ tới một lần)
+SUBSCHEMA = ("not", "if", "then", "else", "items", "contains", "additionalProperties", "propertyNames",
+             "unevaluatedItems", "unevaluatedProperties")
+SUBSCHEMA_LISTS = ("allOf", "anyOf", "oneOf", "prefixItems")
+SUBSCHEMA_MAPS = ("properties", "patternProperties", "dependentSchemas")
+MAX_REF_DEPTH = 16
 
 
 def _scalar(value: Any) -> bool:
@@ -111,9 +119,14 @@ class AppForm:
         self._ranges = [(pair[0], pair[1]) for pair in schema.get("x-moc-range") or ()]
 
     def errors(self, data: Any, today: date | None = None) -> dict[str, str]:
-        found = self._schema.errors(data, today)
+        # Giá trị lồng (mảng, đối tượng) không bao giờ ghi được thành biến: báo ``type`` ngay, không đưa vào schema, để
+        # items, properties… không chạy pattern một lần cho mỗi phần tử — trần chi phí lúc cài tính cho giá trị đơn
         if not isinstance(data, dict):
-            return found
+            return {"": "type"}
+        nested = {name: "type" for name, value in data.items() if isinstance(value, (dict, list))}
+        if nested:
+            return nested
+        found = self._schema.errors(data, today)
         for name, value in data.items():
             if name not in found and bad_value(value):
                 found[name] = "type"
@@ -211,21 +224,23 @@ def pattern_cost(pattern: str, max_length: int | None = None) -> tuple[str | Non
     return None, steps
 
 
-def _check_pattern(pattern: Any, where: str, errors: list[str], steps: list[int], max_length: Any = None) -> None:
+def _bound(max_length: Any) -> int | None:
+    return max_length if isinstance(max_length, int) and not isinstance(max_length, bool) else None
+
+
+def _check_pattern(pattern: Any, where: str, errors: list[str], max_length: Any = None) -> None:
     if not isinstance(pattern, str):
         return
-    bound = max_length if isinstance(max_length, int) and not isinstance(max_length, bool) else None
-    problem, cost = pattern_cost(pattern, bound)
-    steps.append(cost)
+    problem = pattern_problem(pattern, _bound(max_length))
     if problem:
         shown = pattern if len(pattern) <= 60 else pattern[:60] + "…"
         errors.append(f"{where}: pattern {shown!r}: {problem} — máy chủ kiểm bằng re (quay lui), mẫu như vậy có thể "
                       "làm đứng dịch vụ (ReDoS)")
 
 
-def _walk(node: Any, where: str, errors: list[str], steps: list[int], schema: bool = True) -> None:
-    """``steps`` gom số bước ước lượng của từng pattern. ``schema``: đang ở trong schema; dưới ``x-moc-*`` (câu chữ cho
-    giao diện) khóa ``pattern`` là tên lỗi, không phải mẫu."""
+def _walk(node: Any, where: str, errors: list[str], schema: bool = True) -> None:
+    """``schema``: đang ở trong schema; dưới ``x-moc-*`` (câu chữ cho giao diện) khóa ``pattern`` là tên lỗi, không phải
+    mẫu."""
     if isinstance(node, dict):
         for key, value in node.items():
             if key == "$ref" and isinstance(value, str) and not value.startswith("#"):
@@ -235,14 +250,58 @@ def _walk(node: Any, where: str, errors: list[str], steps: list[int], schema: bo
             elif key == "format" and isinstance(value, str) and value not in FORMATS:
                 errors.append(f"{where}: format {value!r} chưa hỗ trợ (chỉ {', '.join(sorted(FORMATS))})")
             elif key == "pattern" and schema:
-                _check_pattern(value, where, errors, steps, node.get("maxLength"))
+                _check_pattern(value, where, errors, node.get("maxLength"))
             elif key in ("patternProperties", "propertyNames") and schema:
                 errors.append(f"{where}: không dùng {key} — mẫu chạy trên mọi khóa gửi lên, kể cả khóa thừa; khai từng "
                               "trường trong properties")
-            _walk(value, where, errors, steps, schema and not key.startswith("x-moc"))
+            _walk(value, where, errors, schema and not key.startswith("x-moc"))
     elif isinstance(node, list):
         for value in node:
-            _walk(value, where, errors, steps, schema)
+            _walk(value, where, errors, schema)
+
+
+class RefProblem(Exception):
+    pass
+
+
+def _resolve(root: dict[str, Any], ref: str) -> Any:
+    """``#/…`` (JSON Pointer) trong chính form → schema đích; trỏ không tới đâu thì RefProblem."""
+    if ref != "#" and not ref.startswith("#/"):
+        raise RefProblem(f"$ref {ref!r}: chỉ nhận JSON Pointer trong chính form (#/…)")
+    node: Any = root
+    for part in ref[2:].split("/") if ref != "#" else ():
+        part = unquote(part).replace("~1", "/").replace("~0", "~")
+        if isinstance(node, dict) and part in node:
+            node = node[part]
+        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        else:
+            raise RefProblem(f"$ref {ref!r} không trỏ tới schema nào trong form")
+    return node
+
+
+def form_steps(node: Any, root: dict[str, Any], refs: tuple[str, ...] = ()) -> int:
+    """Số bước quay lui ước lượng của mọi pattern jsonschema chạy khi kiểm một lần gửi (giá trị đơn): pattern của chính
+    schema, của các schema con, của đích mỗi ``$ref`` (trỏ bao nhiêu chỗ tính bấy nhiêu lần). $ref vòng → RefProblem."""
+    if not isinstance(node, dict):
+        return 0
+    total = 0
+    if isinstance(node.get("pattern"), str):
+        total += pattern_cost(node["pattern"], _bound(node.get("maxLength")))[1]
+    ref = node.get("$ref")
+    if isinstance(ref, str) and ref.startswith("#"):           # trỏ ra ngoài tệp: _walk đã báo
+        if ref in refs or len(refs) >= MAX_REF_DEPTH:
+            raise RefProblem(f"$ref {ref!r} trỏ vòng hoặc lồng quá {MAX_REF_DEPTH} tầng")
+        total += form_steps(_resolve(root, ref), root, (*refs, ref))
+    for key in SUBSCHEMA:
+        total += form_steps(node.get(key), root, refs)
+    for key in SUBSCHEMA_LISTS:
+        for sub in node.get(key) if isinstance(node.get(key), list) else ():
+            total += form_steps(sub, root, refs)
+    for key in SUBSCHEMA_MAPS:
+        for sub in node[key].values() if isinstance(node.get(key), dict) else ():
+            total += form_steps(sub, root, refs)
+    return total
 
 
 def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
@@ -291,11 +350,15 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
             and all(isinstance(props.get(f), dict) and props[f].get("format") == "date" for f in p) for p in ranges):
         errors.append(f"{where}: x-moc-range phải là danh sách cặp [trường trước, trường sau], hai trường đã khai "
                       "trong properties với format: date (như bộ kiểm form trên trình duyệt)")
-    steps: list[int] = []
-    _walk(schema, where, errors, steps)
-    if sum(steps) > MAX_FORM_STEPS:
-        errors.append(f"{where}: các pattern của form cộng lại ước tính {_power(sum(steps))} bước quay lui mỗi lần "
-                      f"gửi, tối đa {_power(MAX_FORM_STEPS)}")
+    _walk(schema, where, errors)
+    try:
+        steps = form_steps(schema, schema)
+    except RefProblem as exc:
+        errors.append(f"{where}: {exc}")
+    else:
+        if steps > MAX_FORM_STEPS:
+            errors.append(f"{where}: các pattern của form cộng lại ước tính {_power(steps)} bước quay lui mỗi lần "
+                          f"gửi (mỗi chỗ $ref tính một lần), tối đa {_power(MAX_FORM_STEPS)}")
     if errors:
         return None, errors
     try:

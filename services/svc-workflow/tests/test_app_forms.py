@@ -239,6 +239,44 @@ def test_patterns_of_one_form_share_one_step_budget():
     assert len(errors) == 1 and "cộng lại ước tính 3,0·10^7 bước" in errors[0], errors
 
 
+def test_each_ref_counts_where_it_is_used():
+    # cùng mẫu viết một lần ở $defs, bốn trường trỏ tới: jsonschema chạy bốn lần, nên tính bốn lần (4 × 9·10^6)
+    text = {"type": "string", "maxLength": 3000, "pattern": "a+$"}
+    direct = copy.deepcopy(DON)
+    by_ref = copy.deepcopy(DON)
+    by_ref.setdefault("$defs", {})["dai"] = text
+    for i in range(4):
+        direct["properties"][f"ma{i}"] = text
+        by_ref["properties"][f"ma{i}"] = {"$ref": "#/$defs/dai"}
+    for schema in (direct, by_ref):
+        errors = problems(schema)
+        assert len(errors) == 1 and "cộng lại ước tính 3,6·10^7 bước" in errors[0], errors
+    del by_ref["properties"]["ma3"]
+    assert problems(by_ref) == []
+
+
+@pytest.mark.parametrize("ref, needle", [
+    ("#/$defs/khongCo", "không trỏ tới schema nào"),
+    ("#ten", "chỉ nhận JSON Pointer"),
+    ("#/$defs/vong", "trỏ vòng"),
+])
+def test_refs_must_resolve_without_a_loop(ref, needle):
+    schema = with_prop("ma", {"$ref": ref})
+    schema.setdefault("$defs", {})["vong"] = {"$ref": "#/$defs/vong"}
+    assert any(needle in e for e in problems(schema)), problems(schema)
+
+
+def test_nested_values_never_reach_the_schema():
+    # mảng, đối tượng không ghi được thành biến: báo type ngay, items… không chạy pattern trên từng phần tử
+    form = AppForm({"$schema": DRAFT, "type": "object", "additionalProperties": False,
+                    "properties": {"ma": {"items": {"pattern": "^(a+)+$"}}, "ten": {"type": "string"}}})
+    started = time.perf_counter()
+    assert form.errors({"ma": ["a" * 40 + "!"] * 100, "ten": 1}) == {"ma": "type"}
+    assert form.errors(["a" * 40 + "!"]) == {"": "type"}
+    assert time.perf_counter() - started < 0.05
+    assert form.errors({"ma": "x", "ten": 1}) == {"ten": "type"}
+
+
 def test_step_estimate_follows_re():
     # cùng bốn phần {0,30}: neo ^ thì 9,2·10^5 bước, nhận; không neo với chuỗi 96 ký tự thì re.search thử lại ở mọi vị
     # trí, ước lượng 8,9·10^7 bước, từ chối — và re chạy chậm hơn hẳn thật

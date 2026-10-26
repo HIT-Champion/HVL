@@ -275,7 +275,7 @@ def test_body_without_content_length_is_counted_while_read(client, fl):
     assert r.status_code == 413 and r.json()["detail"]["code"] == "too_large"
 
 
-@pytest.mark.parametrize("body", [b"khong-phai-json", b"[1, 2]"])
+@pytest.mark.parametrize("body", [b"khong-phai-json", b"[1, 2]", b"[" * 50000])
 def test_body_must_be_a_json_object(client, body):
     r = client.post(f"{API}/processes/{APP}.don", content=body, headers={**STAFF, "Content-Type": "application/json"})
     assert r.status_code == 400 and r.json()["detail"]["code"] == "bad_request"

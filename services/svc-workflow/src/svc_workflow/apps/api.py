@@ -346,7 +346,7 @@ class AppWorkflow:
                     raise too_large
             try:
                 body = json.loads(raw)
-            except ValueError as exc:
+            except (ValueError, RecursionError) as exc:     # RecursionError: mảng lồng hàng vạn tầng
                 raise _fail(400, "bad_request", 'Thân yêu cầu phải là JSON {"data": {…}}') from exc
             if not isinstance(body, dict):
                 raise _fail(400, "bad_request", 'Thân yêu cầu phải là JSON {"data": {…}}')
