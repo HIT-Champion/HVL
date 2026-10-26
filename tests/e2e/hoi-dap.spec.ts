@@ -27,11 +27,11 @@ import { PASSWORD, TOTP_SECRET, shot, signIn } from './helpers'
 const QUESTION = 'Điều kiện xét học bổng khuyến khích học tập là gì?'
 const DONE = /^(answered|passages_only|no_evidence|error)$/
 
-// Hỏi một câu và chờ xong pha tìm; thẻ mới nhất nằm trên cùng
+// Hỏi một câu và chờ xong pha tìm; như một cuộc trò chuyện, lượt mới nhất nằm cuối
 async function ask(page: Page, question: string): Promise<Locator> {
   await page.getByLabel('Câu hỏi', { exact: true }).fill(question)
   await page.getByRole('button', { name: 'Hỏi', exact: true }).click()
-  const turn = page.getByTestId('ask-turn').first()
+  const turn = page.getByTestId('ask-turn').last()
   await expect(turn).toHaveAttribute('data-state', DONE, { timeout: 30_000 })
   return turn
 }
@@ -51,7 +51,7 @@ test('hỏi đáp: văn thư thấy câu trích nguyên văn và nguồn; giản
   await expect(clerk.getByTestId('ask-turn')).toHaveCount(0)
 
   // 2. Hỏi: câu trích có "3,2", nguồn 88/CTSV. Chỉ mục đoạn đồng bộ vài giây sau make seed: hỏi lại tới 60 giây
-  let turn = clerk.getByTestId('ask-turn').first()
+  let turn = clerk.getByTestId('ask-turn').last()
   await expect(async () => {
     turn = await ask(clerk, QUESTION)
     await expect(turn.getByTestId('ask-extract')).toContainText('3,2', { timeout: 1_000 })

@@ -31,6 +31,8 @@ import {
 // với cùng ask_id — mô hình viết câu trả lời có trích dẫn [n] trong 15–40 giây, bấm Dừng hoặc Esc thì thôi, câu trích
 // vẫn còn đó. Mỗi câu hỏi độc lập; danh sách chỉ giữ trong bộ nhớ trang (tối đa 10), không lưu ở đâu cả.
 // Mở từ nút "Hỏi về văn bản này" (?van_ban=<id>) thì chỉ hỏi trong văn bản đó; nhãn nguồn mở tệp đúng trang được trích.
+// Bố cục như một cuộc trò chuyện: một cột giữa vùng làm việc, câu hỏi cũ ở trên, mới ở dưới, khung soạn câu hỏi dính
+// đáy màn hình (main.css, mục "Hỏi đáp").
 
 interface Turn {
   key: number
@@ -46,11 +48,10 @@ interface Turn {
   genError: string
   started: number
   showExtract: boolean     // đã có câu trả lời của mô hình: người dùng mở thêm khối câu trích nguyên văn
-  opened: number[]         // nguồn đang mở đủ đoạn trích
+  opened: number[]         // nguồn đang mở phần chi tiết (trích yếu đủ, đoạn trích, loại, nơi ban hành)
 }
 
 const MAX_TURNS = 10
-const LONG_EXCERPT = 240
 
 const { t, te } = useI18n()
 const { ask, gql, viewFile } = useApi()
@@ -105,6 +106,16 @@ watch(scopeId, loadScope, { immediate: true })
 
 function clearScope() {
   router.replace({ query: { ...route.query, [SCOPE_PARAM]: undefined } })
+}
+
+// Gợi ý ở trang trống: câu hỏi lấy từ bộ câu hỏi thử của trợ lý (seed/hoi-dap/cau-hoi.json), không gọi thêm API.
+// Bấm chỉ điền vào ô câu hỏi, không tự gửi (như khi mở từ trang Tìm kiếm)
+const SUGGESTIONS = ['assist.suggest.credits', 'assist.suggest.examDeadline', 'assist.suggest.language']
+const field = ref<HTMLTextAreaElement | null>(null)
+
+function suggest(key: string) {
+  text.value = t(key)
+  nextTick(() => field.value?.focus())
 }
 
 const turns = ref<Turn[]>([])
@@ -177,14 +188,40 @@ function submit() {
     document: scoped ? { id: scoped, label: scopeLabel.value } : null, phase: 'searching', result: null,
     error: '', gen: 'idle', genError: '', started: 0, showExtract: false, opened: [],
   }
-  // mới nhất trên cùng; quá 10 thì bỏ câu cũ nhất (đang viết thì dừng, đang xem tệp thì đóng)
-  const all = [turn, ...turns.value]
-  for (const old of all.slice(MAX_TURNS)) controllers.get(old.key)?.abort()
-  turns.value = all.slice(0, MAX_TURNS)
+  // mới nhất ở cuối, như một cuộc trò chuyện; quá 10 thì bỏ câu cũ nhất ở đầu (đang viết thì dừng, đang xem tệp thì
+  // đóng)
+  const all = [...turns.value, turn]
+  for (const old of all.slice(0, -MAX_TURNS)) controllers.get(old.key)?.abort()
+  turns.value = all.slice(-MAX_TURNS)
   if (viewer.value && !turns.value.some((x) => x.key === viewer.value?.turn)) closeViewer()
   text.value = ''
+  pin = true
   search(turn.key)
 }
+
+// Cuộn theo lượt mới nhất. Vừa gửi câu hỏi thì luôn đưa lượt đó vào tầm nhìn; kết quả về sau (tìm xong, soạn xong) chỉ
+// cuộn khi người dùng đang ở cuối trang, không kéo người đang đọc lượt cũ đi chỗ khác. Không bao giờ cuộn quá đầu lượt
+// (câu trả lời dài thì đọc từ câu hỏi xuống); khung soạn câu hỏi dính đáy nên phần nhìn thấy kết thúc ở mép trên của nó
+const dock = ref<HTMLElement | null>(null)
+let pin = false
+const atBottom = () => document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) < 64
+
+function follow() {
+  const last = turns.value.at(-1)
+  const el = last ? document.querySelector<HTMLElement>(`[data-turn="${last.key}"]`) : null
+  if (!el) return
+  const box = el.getBoundingClientRect()
+  const by = Math.min(box.bottom - (window.innerHeight - (dock.value?.offsetHeight ?? 0)), box.top - 24)
+  if (by <= 0) return
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  window.scrollBy({ top: by, behavior: reduce ? 'auto' : 'smooth' })
+}
+// flush 'pre': đo "đang ở cuối trang" trước khi trang vẽ lại với nội dung mới
+watch(() => turns.value.map((x) => `${x.key}:${x.phase}:${x.gen}`).join(), () => {
+  if (!pin && !atBottom()) return
+  pin = false
+  nextTick(follow)
+}, { flush: 'pre' })
 
 async function search(key: number) {
   const turn = find(key)
@@ -283,8 +320,13 @@ function onEscape(e: KeyboardEvent) {
   for (const turn of turns.value) if (turn.gen === 'waiting' || turn.gen === 'running') stop(turn.key)
 }
 
-function toggleExcerpt(turn: Turn, n: number) {
+// Mỗi nguồn là một dòng gọn; "Chi tiết" mở trích yếu đủ, loại, nơi ban hành và đoạn trích. Bấm dấu [n] trong câu trả
+// lời đưa tiêu điểm vào nguồn đó (AnswerText) và mở luôn phần chi tiết
+function toggleSource(turn: Turn, n: number) {
   turn.opened = turn.opened.includes(n) ? turn.opened.filter((x) => x !== n) : [...turn.opened, n]
+}
+function openSource(turn: Turn, n: number) {
+  if (!turn.opened.includes(n)) turn.opened = [...turn.opened, n]
 }
 
 // Xem trang được trích: tải tệp bằng token (như phòng đọc hồ sơ, F3.8) thành object URL kiểu PDF, hiện trong khung xem
@@ -345,299 +387,398 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>
-    <PageHeader :title="t('assist.title')" :subtitle="t('assist.intro')" />
+  <div class="sg-ask" :class="{ 'is-empty': !turns.length }">
+    <header class="sg-ask-head">
+      <h1>{{ t('assist.title') }}</h1>
+    </header>
 
     <!-- trình đọc màn hình: đang tìm, tìm thấy mấy đoạn, đã trả lời, không tìm thấy, lỗi -->
     <p class="sr-only" aria-live="polite" data-testid="ask-live">{{ announce }}</p>
 
     <p v-if="!allowed" class="moc-empty">{{ t('assist.error.forbidden') }}</p>
-    <form v-else class="moc-block mb-8 space-y-3" @submit.prevent="submit">
-      <!-- hỏi trong một văn bản: văn bản nào, bỏ phạm vi được -->
-      <div
-        v-if="scopeId" data-testid="ask-scope"
-        class="flex flex-wrap items-start gap-3 rounded-lg bg-brand-50 p-3.5 text-sm"
-      >
-        <div class="min-w-0 flex-1">
-          <p class="font-medium text-brand-900">{{ t('assist.scope.title') }}</p>
-          <p v-if="scopeState === 'loading'" class="text-stone-600">{{ t('app.loading') }}</p>
-          <template v-else-if="scopeDoc">
-            <p class="break-words text-stone-800">
-              <NuxtLink
-                :to="`/van-ban/${scopeId}`"
-                class="font-semibold text-brand-800 underline underline-offset-2 hover:text-brand-900"
-              >{{ scopeLabel }}</NuxtLink>
-              — {{ scopeDoc.summary }}
-            </p>
-            <p v-if="!inAssistant(scopeDoc)" class="mt-1 text-amber-900">{{ t('assist.scope.notIndexed') }}</p>
-          </template>
-          <p v-else-if="scopeState === 'missing'" class="text-amber-900">{{ t('assist.scope.missing') }}</p>
-          <p v-else class="text-stone-700">{{ scopeLabel }}</p>
+    <template v-else>
+      <!-- trang trống: lời giới thiệu ngắn ở giữa vùng còn lại, vài câu hỏi mẫu bấm để điền -->
+      <section v-if="!turns.length" class="sg-ask-empty" aria-labelledby="ask-empty-title">
+        <h2 id="ask-empty-title">{{ t('assist.emptyTitle') }}</h2>
+        <p>{{ t('assist.intro') }}</p>
+        <div v-if="!scopeId" class="sg-ask-suggest">
+          <h3>{{ t('assist.suggestTitle') }}</h3>
+          <ul>
+            <li v-for="key in SUGGESTIONS" :key="key">
+              <button type="button" data-testid="ask-suggestion" @click="suggest(key)">{{ t(key) }}</button>
+            </li>
+          </ul>
         </div>
-        <button type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" @click="clearScope">
-          {{ t('assist.scope.clear') }}
-        </button>
-      </div>
-      <label class="label" for="ask-question">{{ t('assist.label') }}</label>
-      <textarea
-        id="ask-question" v-model="text" rows="3" :maxlength="MAX_QUESTION" class="input resize-y" autofocus
-        :placeholder="t('assist.placeholder')" aria-describedby="ask-keys" @keydown="onKey"
-      />
-      <div class="flex flex-wrap items-end gap-3">
-        <p id="ask-keys" class="min-w-48 flex-1 text-[13px] text-stone-500">
-          {{ t('assist.keysHint') }} · <span class="tabular-nums">{{ t('assist.count', { n: text.length, max: MAX_QUESTION }) }}</span>
-        </p>
-        <!-- chiều, năm: không cần khi đã hỏi trong một văn bản -->
-        <template v-if="!scopeId">
-          <div>
-            <label class="label" for="ask-direction">{{ t('assist.direction.label') }}</label>
-            <select id="ask-direction" v-model="direction" class="input sm:w-40">
-              <option value="">{{ t('assist.any') }}</option>
-              <option value="in">{{ t('assist.direction.in') }}</option>
-              <option value="out">{{ t('assist.direction.out') }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="label" for="ask-year">{{ t('assist.year') }}</label>
-            <select id="ask-year" v-model="year" class="input sm:w-32">
-              <option :value="null">{{ t('assist.anyYear') }}</option>
-              <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-            </select>
-          </div>
-        </template>
-        <button type="submit" class="btn-primary" :disabled="!ready">{{ t('assist.ask') }}</button>
-      </div>
-    </form>
+      </section>
 
-    <section v-if="turns.length" :aria-label="t('assist.history')">
-      <p class="mb-3 text-[13px] text-stone-500">{{ t('assist.historyNote') }}</p>
-      <div class="moc-stack">
+      <!-- cuộc trò chuyện: câu hỏi cũ ở trên, mới ở dưới -->
+      <section v-else class="sg-ask-thread" :aria-label="t('assist.history')">
+        <p class="sg-ask-session">{{ t('assist.historyNote') }}</p>
         <article
-          v-for="turn in turns" :key="turn.key" class="moc-block"
+          v-for="turn in turns" :key="turn.key" class="sg-turn" :data-turn="turn.key"
           :aria-labelledby="`hoi-${turn.key}`"
           :aria-busy="turn.phase === 'searching' || turn.gen === 'running' || turn.gen === 'waiting'"
           :data-state="stateOf(turn)" :data-gen="turn.gen" data-testid="ask-turn"
         >
-          <!-- câu hỏi, phạm vi, cách tìm -->
-          <div class="flex flex-wrap items-start gap-x-3 gap-y-2">
-            <h2 :id="`hoi-${turn.key}`" class="moc-block-title min-w-0 flex-1 wrap-anywhere">{{ turn.question }}</h2>
-            <div class="flex flex-wrap items-center gap-1.5">
+          <!-- câu hỏi của người dùng, phạm vi đã chọn lúc hỏi -->
+          <div class="sg-turn-q">
+            <h2 :id="`hoi-${turn.key}`" class="sg-turn-bubble">{{ turn.question }}</h2>
+            <div v-if="turn.document || turn.direction || turn.year" class="sg-turn-tags">
               <span
                 v-if="turn.document" class="chip bg-brand-50 text-brand-800 ring-1 ring-brand-200"
                 data-testid="ask-scope-chip"
               >
                 {{ t('assist.scope.chip', { label: turn.document.label }) }}
               </span>
-              <span v-if="turn.direction" class="chip bg-stone-100 text-stone-700">{{ t(`assist.direction.${turn.direction}`) }}</span>
-              <span v-if="turn.year" class="chip bg-stone-100 text-stone-700">{{ t('assist.yearValue', { year: turn.year }) }}</span>
+              <span v-if="turn.direction" class="chip bg-stone-100 text-stone-700">
+                {{ t(`assist.direction.${turn.direction}`) }}
+              </span>
+              <span v-if="turn.year" class="chip bg-stone-100 text-stone-700">
+                {{ t('assist.yearValue', { year: turn.year }) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- câu trả lời: chữ thường trên nền trang, không đóng khung -->
+          <div class="sg-turn-a">
+            <p class="sg-turn-by">
+              <b>{{ t('assist.answerBy') }}</b>
               <template v-if="turn.result">
-                <span class="chip bg-stone-100 text-stone-700" data-testid="ask-mode">{{ turn.result.semantic ? t('assist.semantic') : t('assist.keyword') }}</span>
-                <span class="text-[13px] text-stone-500 tabular-nums">{{ took(turn.result) }}</span>
-              </template>
-            </div>
-          </div>
-
-          <!-- đang tìm -->
-          <div v-if="turn.phase === 'searching'" class="mt-4 flex items-center gap-2 text-sm text-stone-700">
-            <svg class="h-4 w-4 text-brand-700 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
-            {{ t('assist.searching') }}
-          </div>
-
-          <!-- lỗi tìm -->
-          <div v-else-if="turn.phase === 'error'" class="moc-state mt-4" data-testid="ask-error">
-            <span class="font-medium">
-              <svg
-                class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="1.6" aria-hidden="true"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" />
-              </svg>{{ turn.error }}
-            </span>
-            <button type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" :disabled="searching" @click="search(turn.key)">{{ t('app.retry') }}</button>
-          </div>
-
-          <template v-else-if="turn.result">
-            <!-- không có căn cứ: câu giống hệt nhau dù văn bản không tồn tại hay người hỏi không được xem -->
-            <div
-              v-if="turn.result.status === 'no_evidence'" class="mt-4 rounded-lg bg-stone-50 p-4 text-sm text-stone-700"
-              data-testid="ask-none"
-            >
-              <p>{{ t('assist.noEvidence') }}</p>
-              <NuxtLink :to="{ path: '/tim-kiem', query: { q: turn.question.slice(0, 200) } }" class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2">{{ t('assist.openSearch') }}</NuxtLink>
-            </div>
-
-            <template v-else>
-              <p v-if="turn.result.status === 'passages_only'" class="moc-note mt-4" data-testid="ask-passages">
-                {{ t('assist.passagesOnly') }}
-              </p>
-
-              <!-- câu trả lời do mô hình viết (đã qua kiểm trích dẫn) -->
-              <section v-if="blocks(turn.result).model" class="mt-4 rounded-lg bg-stone-50 p-4" data-testid="ask-model">
-                <div class="mb-2 flex flex-wrap items-center gap-2">
-                  <h3 class="moc-subtitle">{{ t('assist.modelTitle') }}</h3>
-                  <span class="chip gap-1 bg-white text-sky-900 ring-1 ring-sky-300">
-                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4L12 3z" /></svg>
-                    {{ t('assist.modelNote') }}
-                  </span>
-                </div>
-                <AnswerText :text="blocks(turn.result).model!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
-                <!-- F4.4: chữ gửi mô hình đã che, mô hình viết nhãn [SĐT-1] thay cho số -->
-                <p
-                  v-if="hasMask(blocks(turn.result).model!.text)" class="mt-2 text-[13px] text-stone-600"
-                  data-testid="ask-masked"
-                >
-                  {{ t('assist.maskedNote') }}
-                </p>
-                <button
-                  v-if="blocks(turn.result).extract" type="button"
-                  class="mt-3 min-h-6 text-[13px] font-medium text-brand-700 underline underline-offset-2"
-                  :aria-expanded="turn.showExtract" :aria-controls="`trich-${turn.key}`"
-                  @click="turn.showExtract = !turn.showExtract"
-                >
-                  {{ turn.showExtract ? t('assist.hideExtract') : t('assist.showExtract') }}
-                </button>
-              </section>
-
-              <!-- câu trích nguyên văn từ văn bản -->
-              <section
-                v-if="blocks(turn.result).extract && (!blocks(turn.result).model || turn.showExtract)"
-                :id="`trich-${turn.key}`" class="mt-4 rounded-lg bg-stone-50 p-4" data-testid="ask-extract"
-              >
-                <h3 class="moc-subtitle mb-2">{{ t('assist.extractTitle') }}</h3>
-                <AnswerText :text="blocks(turn.result).extract!.text" :sources="turn.result.sources" :ask="turn.result.ask_id" />
-              </section>
-
-              <!-- đang viết câu trả lời -->
-              <div
-                v-if="turn.gen === 'waiting' || turn.gen === 'running'" data-testid="ask-generating"
-                class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed
-                  border-stone-300 p-3 text-sm text-stone-700"
-              >
-                <svg class="h-4 w-4 text-brand-700 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
-                <span class="font-medium">{{ turn.gen === 'waiting' ? t('assist.waiting') : t('assist.generating') }}</span>
-                <span v-if="turn.gen === 'running'" class="text-stone-500 tabular-nums">{{ t('assist.elapsed', { s: elapsed(turn) }) }}</span>
-                <button type="button" class="btn-secondary ml-auto !px-2.5 !py-1 !text-xs" @click="stop(turn.key)">{{ t('assist.stop') }}</button>
-                <span class="basis-full text-[13px] text-stone-500">{{ t('assist.generatingHint') }}</span>
-              </div>
-              <div
-                v-else-if="turn.gen === 'stopped' || turn.gen === 'failed'" data-testid="ask-generate-note"
-                class="mt-4 flex flex-wrap items-center gap-3 text-sm text-amber-900"
-              >
-                <span>
-                  <svg
-                    class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="1.6" aria-hidden="true"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" />
-                  </svg>{{ turn.gen === 'stopped'
-                    ? t('assist.stopped') : t('assist.generateFailed', { reason: turn.genError }) }}
+                <span class="chip bg-stone-100 text-stone-700" data-testid="ask-mode">
+                  {{ turn.result.semantic ? t('assist.semantic') : t('assist.keyword') }}
                 </span>
-                <button v-if="needsGenerate(turn.result)" type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" @click="queueGenerate(turn.key)">{{ t('assist.retryGenerate') }}</button>
-              </div>
+                <span class="tabular-nums">{{ took(turn.result) }}</span>
+              </template>
+            </p>
 
-              <ul
-                v-if="warningTexts(turn.result).length" class="mt-3 space-y-1 text-[13px] text-amber-900"
-                data-testid="ask-warnings"
-              >
-                <li v-for="w in warningTexts(turn.result)" :key="w">
-                  <svg
-                    class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="1.6" aria-hidden="true"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" />
-                  </svg>{{ w }}
-                </li>
-              </ul>
-
-              <!-- nguồn -->
-              <div v-if="turn.result.sources.length" class="mt-5 border-t border-stone-100 pt-4">
-                <h3 class="moc-subtitle mb-3">{{ t('assist.source.title') }}</h3>
-                <ol class="moc-rows" data-testid="ask-sources">
-                  <li
-                    v-for="s in turn.result.sources" :id="sourceAnchor(turn.result.ask_id, s.n)" :key="s.n" tabindex="-1"
-                    class="scroll-mt-20 rounded-sm focus:outline-2 focus:outline-offset-4 focus:outline-brand-600"
-                  >
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="font-mono text-xs font-semibold text-brand-800" aria-hidden="true">[{{ s.n }}]</span>
-                      <span class="sr-only">{{ t('assist.source.n', { n: s.n }) }}</span>
-                      <!-- nhãn trích dẫn: mở tệp đúng trang được trích -->
-                      <button
-                        v-if="canView(s)" type="button" data-testid="ask-view"
-                        class="text-left text-sm font-semibold text-brand-800 underline decoration-brand-300
-                          underline-offset-2 hover:decoration-brand-700 disabled:opacity-60"
-                        :aria-label="t('assist.viewSource', { label: citeLabel(s, t, true) })"
-                        :title="s.page ? t('assist.viewPage', { n: s.page }) : t('assist.viewFile')"
-                        :disabled="opening !== ''" :aria-busy="opening === viewKey(turn, s)"
-                        @click="viewSource(turn, s)"
-                      >
-                        {{ citeLabel(s, t) }}
-                      </button>
-                      <span v-else class="text-sm font-semibold text-stone-900">{{ citeLabel(s, t) }}</span>
-                      <span v-if="s.cited" class="chip bg-brand-50 text-brand-800 ring-1 ring-brand-200">{{ t('assist.source.cited') }}</span>
-                      <StatusChip :status="s.status" />
-                    </div>
-                    <p class="mt-1 text-sm text-stone-800 wrap-anywhere">{{ s.summary }}</p>
-                    <p class="mt-0.5 text-[13px] text-stone-500">{{ metaLine(s) }}</p>
-                    <p
-                      v-if="s.excerpt" :id="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
-                      class="mt-2 border-l border-stone-200 pl-3 text-sm whitespace-pre-line text-stone-600
-                        wrap-anywhere"
-                      :class="{ 'line-clamp-3': s.excerpt.length > LONG_EXCERPT && !turn.opened.includes(s.n) }"
-                    >
-                      <span class="sr-only">{{ t('assist.source.excerpt') }}: </span>{{ s.excerpt }}
-                    </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-4 text-[13px]">
-                      <button
-                        v-if="s.excerpt.length > LONG_EXCERPT" type="button" class="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-900"
-                        :aria-expanded="turn.opened.includes(s.n)" :aria-controls="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
-                        @click="toggleExcerpt(turn, s.n)"
-                      >
-                        {{ turn.opened.includes(s.n) ? t('assist.source.less') : t('assist.source.more') }}
-                      </button>
-                      <NuxtLink
-                        :to="`/van-ban/${s.document_id}`" class="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
-                        :aria-label="t('assist.openDocumentFor', { label: citeLabel(s, t, true) })"
-                      >
-                        {{ t('assist.openDocument') }}
-                      </NuxtLink>
-                    </div>
-                  </li>
-                </ol>
-
-                <!-- khung xem tệp, mở đúng trang được trích -->
-                <div
-                  v-if="viewer && viewer.turn === turn.key" :id="`xem-${turn.key}`" tabindex="-1"
-                  class="mt-4 overflow-hidden rounded-lg border border-stone-200 focus:outline-2
-                    focus:outline-brand-600"
-                  data-testid="ask-viewer"
+            <!-- đang tìm: chỗ của câu trả lời giữ sẵn bằng vài vạch xám -->
+            <div v-if="turn.phase === 'searching'" class="sg-turn-wait">
+              <p>
+                <svg
+                  class="h-4 w-4 text-brand-700 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none"
+                  aria-hidden="true"
                 >
-                  <div
-                    class="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm"
-                  >
-                    <span class="min-w-0 flex-1 truncate font-medium">
-                      {{ t('assist.viewer.title', { label: viewer.label }) }}
-                    </span>
-                    <a
-                      :href="pageUrl(viewer.url, viewer.page)" target="_blank" rel="noopener"
-                      class="text-brand-800 hover:underline"
-                    >
-                      {{ t('assist.viewer.newTab') }}
-                    </a>
-                    <button type="button" class="btn-ghost" @click="closeViewer">{{ t('assist.viewer.close') }}</button>
-                  </div>
-                  <iframe
-                    :key="pageUrl(viewer.url, viewer.page)" :src="pageUrl(viewer.url, viewer.page)"
-                    :title="t('assist.viewer.title', { label: viewer.label })" class="h-[75vh] w-full"
-                  />
-                  <p class="border-t border-stone-200 px-4 py-2 text-xs text-stone-500">
-                    {{ t('assist.viewer.note') }}
-                  </p>
-                </div>
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                {{ t('assist.searching') }}
+              </p>
+              <div class="sg-turn-skeleton" aria-hidden="true"><span /><span /><span /></div>
+            </div>
+
+            <!-- lỗi tìm -->
+            <div v-else-if="turn.phase === 'error'" class="moc-state" data-testid="ask-error">
+              <span class="font-medium">
+                <svg
+                  class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.6" aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" />
+                </svg>{{ turn.error }}
+              </span>
+              <button
+                type="button" class="btn-secondary !px-2.5 !py-1 !text-xs" :disabled="searching"
+                @click="search(turn.key)"
+              >
+                {{ t('app.retry') }}
+              </button>
+            </div>
+
+            <template v-else-if="turn.result">
+              <!-- không có căn cứ: câu giống hệt nhau dù văn bản không tồn tại hay người hỏi không được xem -->
+              <div v-if="turn.result.status === 'no_evidence'" class="sg-turn-none" data-testid="ask-none">
+                <p>{{ t('assist.noEvidence') }}</p>
+                <NuxtLink
+                  :to="{ path: '/tim-kiem', query: { q: turn.question.slice(0, 200) } }"
+                  class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2"
+                >
+                  {{ t('assist.openSearch') }}
+                </NuxtLink>
               </div>
+
+              <template v-else>
+                <p v-if="turn.result.status === 'passages_only'" class="moc-note" data-testid="ask-passages">
+                  {{ t('assist.passagesOnly') }}
+                </p>
+
+                <!-- câu trả lời do mô hình viết (đã qua kiểm trích dẫn) -->
+                <section v-if="blocks(turn.result).model" class="sg-answer" data-testid="ask-model">
+                  <h3 class="sr-only">{{ t('assist.modelTitle') }}</h3>
+                  <AnswerText
+                    :text="blocks(turn.result).model!.text" :sources="turn.result.sources" :ask="turn.result.ask_id"
+                  />
+                  <p class="sg-answer-note">
+                    <svg
+                      class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      stroke-width="2" aria-hidden="true"
+                    >
+                      <path
+                        stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4L12 3z"
+                      />
+                    </svg>
+                    {{ t('assist.modelNote') }}
+                  </p>
+                  <!-- F4.4: chữ gửi mô hình đã che, mô hình viết nhãn [SĐT-1] thay cho số -->
+                  <p v-if="hasMask(blocks(turn.result).model!.text)" class="sg-answer-note" data-testid="ask-masked">
+                    {{ t('assist.maskedNote') }}
+                  </p>
+                  <button
+                    v-if="blocks(turn.result).extract" type="button"
+                    class="mt-2 min-h-6 text-[13px] font-medium text-brand-700 underline underline-offset-2"
+                    :aria-expanded="turn.showExtract" :aria-controls="`trich-${turn.key}`"
+                    @click="turn.showExtract = !turn.showExtract"
+                  >
+                    {{ turn.showExtract ? t('assist.hideExtract') : t('assist.showExtract') }}
+                  </button>
+                </section>
+
+                <!-- câu trích nguyên văn: là câu trả lời khi không có mô hình, là khối phụ khi có -->
+                <section
+                  v-if="blocks(turn.result).extract && (!blocks(turn.result).model || turn.showExtract)"
+                  :id="`trich-${turn.key}`" class="sg-answer" :class="{ 'is-quote': blocks(turn.result).model }"
+                  data-testid="ask-extract"
+                >
+                  <h3 class="sg-answer-label">{{ t('assist.extractTitle') }}</h3>
+                  <AnswerText
+                    :text="blocks(turn.result).extract!.text" :sources="turn.result.sources"
+                    :ask="turn.result.ask_id"
+                  />
+                </section>
+
+                <!-- đang viết câu trả lời -->
+                <div
+                  v-if="turn.gen === 'waiting' || turn.gen === 'running'" data-testid="ask-generating"
+                  class="sg-turn-writing"
+                >
+                  <svg
+                    class="h-4 w-4 text-brand-700 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  <span class="font-medium">
+                    {{ turn.gen === 'waiting' ? t('assist.waiting') : t('assist.generating') }}
+                  </span>
+                  <span v-if="turn.gen === 'running'" class="text-stone-500 tabular-nums">
+                    {{ t('assist.elapsed', { s: elapsed(turn) }) }}
+                  </span>
+                  <button type="button" class="btn-secondary ml-auto !px-2.5 !py-1 !text-xs" @click="stop(turn.key)">
+                    {{ t('assist.stop') }}
+                  </button>
+                  <span class="basis-full text-[13px] text-stone-500">{{ t('assist.generatingHint') }}</span>
+                </div>
+                <div
+                  v-else-if="turn.gen === 'stopped' || turn.gen === 'failed'" data-testid="ask-generate-note"
+                  class="mt-4 flex flex-wrap items-center gap-3 text-sm text-amber-900"
+                >
+                  <span>
+                    <svg
+                      class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="1.6" aria-hidden="true"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" />
+                    </svg>{{ turn.gen === 'stopped'
+                      ? t('assist.stopped') : t('assist.generateFailed', { reason: turn.genError }) }}
+                  </span>
+                  <button
+                    v-if="needsGenerate(turn.result)" type="button" class="btn-secondary !px-2.5 !py-1 !text-xs"
+                    @click="queueGenerate(turn.key)"
+                  >
+                    {{ t('assist.retryGenerate') }}
+                  </button>
+                </div>
+
+                <ul
+                  v-if="warningTexts(turn.result).length" class="mt-3 space-y-1 text-[13px] text-amber-900"
+                  data-testid="ask-warnings"
+                >
+                  <li v-for="w in warningTexts(turn.result)" :key="w">
+                    <svg
+                      class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="1.6" aria-hidden="true"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 10 18H2L12 3Zm0 6v4m0 4h.01" />
+                    </svg>{{ w }}
+                  </li>
+                </ul>
+
+                <!-- nguồn: mỗi nguồn một dòng gọn, "Chi tiết" mở đoạn trích -->
+                <section
+                  v-if="turn.result.sources.length" class="sg-sources" :aria-labelledby="`nguon-${turn.key}`"
+                >
+                  <h3 :id="`nguon-${turn.key}`" class="sg-sources-title">
+                    {{ t('assist.source.title') }} <span class="tabular-nums">({{ turn.result.sources.length }})</span>
+                  </h3>
+                  <ol data-testid="ask-sources">
+                    <li
+                      v-for="s in turn.result.sources" :id="sourceAnchor(turn.result.ask_id, s.n)" :key="s.n"
+                      tabindex="-1" class="sg-source" :class="{ 'is-open': turn.opened.includes(s.n) }"
+                      @focus="openSource(turn, s.n)"
+                    >
+                      <div class="sg-source-row">
+                        <span class="sg-source-n" aria-hidden="true">[{{ s.n }}]</span>
+                        <span class="sr-only">{{ t('assist.source.n', { n: s.n }) }}</span>
+                        <!-- nhãn trích dẫn: mở tệp đúng trang được trích -->
+                        <button
+                          v-if="canView(s)" type="button" data-testid="ask-view" class="sg-source-label"
+                          :aria-label="t('assist.viewSource', { label: citeLabel(s, t, true) })"
+                          :title="s.page ? t('assist.viewPage', { n: s.page }) : t('assist.viewFile')"
+                          :disabled="opening !== ''" :aria-busy="opening === viewKey(turn, s)"
+                          @click="viewSource(turn, s)"
+                        >
+                          {{ citeLabel(s, t) }}
+                        </button>
+                        <span v-else class="sg-source-label is-plain">{{ citeLabel(s, t) }}</span>
+                        <span v-if="s.cited" class="chip bg-brand-50 text-brand-800 ring-1 ring-brand-200">
+                          {{ t('assist.source.cited') }}
+                        </span>
+                        <span class="sg-source-tools">
+                          <NuxtLink
+                            :to="`/van-ban/${s.document_id}`"
+                            :aria-label="t('assist.openDocumentFor', { label: citeLabel(s, t, true) })"
+                          >
+                            {{ t('assist.openDocument') }}
+                          </NuxtLink>
+                          <button
+                            type="button" :aria-expanded="turn.opened.includes(s.n)"
+                            :aria-controls="`${sourceAnchor(turn.result.ask_id, s.n)}-chi-tiet`"
+                            @click="toggleSource(turn, s.n)"
+                          >
+                            {{ t('assist.source.details') }}
+                            <span class="sr-only">{{ t('assist.source.n', { n: s.n }) }}</span>
+                            <svg
+                              class="sg-source-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                              stroke-width="1.8" aria-hidden="true"
+                            >
+                              <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                          </button>
+                        </span>
+                      </div>
+                      <p class="sg-source-summary">{{ s.summary }}</p>
+                      <div
+                        v-show="turn.opened.includes(s.n)" :id="`${sourceAnchor(turn.result.ask_id, s.n)}-chi-tiet`"
+                        class="sg-source-detail"
+                      >
+                        <p class="sg-source-meta">
+                          <span>{{ metaLine(s) }}</span>
+                          <StatusChip :status="s.status" />
+                        </p>
+                        <p
+                          v-if="s.excerpt" :id="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
+                          class="sg-source-excerpt"
+                        >
+                          <span class="sr-only">{{ t('assist.source.excerpt') }}: </span>{{ s.excerpt }}
+                        </p>
+                      </div>
+                    </li>
+                  </ol>
+
+                  <!-- khung xem tệp, mở đúng trang được trích -->
+                  <div
+                    v-if="viewer && viewer.turn === turn.key" :id="`xem-${turn.key}`" tabindex="-1"
+                    class="mt-4 overflow-hidden rounded-xl border border-stone-200 focus:outline-2
+                      focus:outline-brand-600"
+                    data-testid="ask-viewer"
+                  >
+                    <div
+                      class="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm"
+                    >
+                      <span class="min-w-0 flex-1 truncate font-medium">
+                        {{ t('assist.viewer.title', { label: viewer.label }) }}
+                      </span>
+                      <a
+                        :href="pageUrl(viewer.url, viewer.page)" target="_blank" rel="noopener"
+                        class="text-brand-800 hover:underline"
+                      >
+                        {{ t('assist.viewer.newTab') }}
+                      </a>
+                      <button type="button" class="btn-ghost" @click="closeViewer">
+                        {{ t('assist.viewer.close') }}
+                      </button>
+                    </div>
+                    <iframe
+                      :key="pageUrl(viewer.url, viewer.page)" :src="pageUrl(viewer.url, viewer.page)"
+                      :title="t('assist.viewer.title', { label: viewer.label })" class="h-[75vh] w-full"
+                    />
+                    <p class="border-t border-stone-200 px-4 py-2 text-xs text-stone-500">
+                      {{ t('assist.viewer.note') }}
+                    </p>
+                  </div>
+                </section>
+              </template>
             </template>
-          </template>
+          </div>
         </article>
-      </div>
-    </section>
+      </section>
+
+      <!-- khung soạn câu hỏi: dính đáy màn hình, chiếm chỗ của nó nên không che câu trả lời cuối -->
+      <form ref="dock" class="sg-ask-dock" @submit.prevent="submit">
+        <div class="sg-composer">
+          <!-- hỏi trong một văn bản: văn bản nào, bỏ phạm vi được -->
+          <div v-if="scopeId" data-testid="ask-scope" class="sg-composer-scope">
+            <div class="min-w-0 flex-1">
+              <p class="font-medium text-brand-900">{{ t('assist.scope.title') }}</p>
+              <p v-if="scopeState === 'loading'" class="text-stone-600">{{ t('app.loading') }}</p>
+              <template v-else-if="scopeDoc">
+                <p class="sg-composer-doc">
+                  <NuxtLink
+                    :to="`/van-ban/${scopeId}`"
+                    class="font-semibold text-brand-800 underline underline-offset-2 hover:text-brand-900"
+                  >{{ scopeLabel }}</NuxtLink>
+                  <span>{{ scopeDoc.summary }}</span>
+                </p>
+                <p v-if="!inAssistant(scopeDoc)" class="mt-1 text-amber-900">{{ t('assist.scope.notIndexed') }}</p>
+              </template>
+              <p v-else-if="scopeState === 'missing'" class="text-amber-900">{{ t('assist.scope.missing') }}</p>
+              <p v-else class="text-stone-700">{{ scopeLabel }}</p>
+            </div>
+            <button type="button" class="btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs" @click="clearScope">
+              {{ t('assist.scope.clear') }}
+            </button>
+          </div>
+          <label class="sr-only" for="ask-question">{{ t('assist.label') }}</label>
+          <textarea
+            id="ask-question" ref="field" v-model="text" rows="2" :maxlength="MAX_QUESTION" class="sg-composer-input"
+            autofocus :placeholder="t('assist.placeholder')" aria-describedby="ask-keys" @keydown="onKey"
+          />
+          <div class="sg-composer-bar">
+            <!-- chiều, năm: không cần khi đã hỏi trong một văn bản -->
+            <template v-if="!scopeId">
+              <span class="sg-composer-filter">
+                <label for="ask-direction">{{ t('assist.direction.label') }}</label>
+                <select id="ask-direction" v-model="direction">
+                  <option value="">{{ t('assist.any') }}</option>
+                  <option value="in">{{ t('assist.direction.in') }}</option>
+                  <option value="out">{{ t('assist.direction.out') }}</option>
+                </select>
+              </span>
+              <span class="sg-composer-filter">
+                <label for="ask-year">{{ t('assist.year') }}</label>
+                <select id="ask-year" v-model="year">
+                  <option :value="null">{{ t('assist.anyYear') }}</option>
+                  <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                </select>
+              </span>
+            </template>
+            <button type="submit" class="btn-primary sg-composer-send" :disabled="!ready">
+              <svg
+                class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m-6 6 6-6 6 6" />
+              </svg>
+              {{ t('assist.ask') }}
+            </button>
+          </div>
+        </div>
+        <p id="ask-keys" class="sg-composer-hint">
+          {{ t('assist.keysHint') }} ·
+          <span class="tabular-nums">{{ t('assist.count', { n: text.length, max: MAX_QUESTION }) }}</span>
+        </p>
+      </form>
+    </template>
   </div>
 </template>

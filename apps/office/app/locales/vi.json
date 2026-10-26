@@ -413,11 +413,19 @@
   "assist": {
     "title": "Hỏi đáp văn bản",
     "intro": "Trợ lý chỉ tìm trong các văn bản bạn được xem; văn bản hạn chế không bao giờ được đưa vào. Mỗi ý có số ký hiệu và trang để bạn đối chiếu.",
+    "emptyTitle": "Bạn cần tìm gì trong văn bản?",
+    "suggestTitle": "Thử hỏi",
+    "suggest": {
+      "credits": "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?",
+      "examDeadline": "Hạn nộp đề thi và đáp án là ngày nào?",
+      "language": "Chuẩn đầu ra ngoại ngữ xét tốt nghiệp cần chứng chỉ gì?"
+    },
     "label": "Câu hỏi",
     "placeholder": "Ví dụ: Điều kiện xét học bổng khuyến khích học tập là gì?",
     "keysHint": "Enter để hỏi, Shift+Enter để xuống dòng",
     "count": "{n}/{max} ký tự",
     "ask": "Hỏi",
+    "answerBy": "Trợ lý",
     "any": "Tất cả",
     "direction": {
       "label": "Văn bản",
@@ -463,6 +471,7 @@
       "n": "Nguồn {n}",
       "cite": "Nguồn {n}: {label}",
       "cited": "Được trích",
+      "details": "Chi tiết",
       "excerpt": "Đoạn trích",
       "more": "Xem đủ đoạn trích",
       "less": "Thu gọn đoạn trích"

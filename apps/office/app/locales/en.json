@@ -413,11 +413,19 @@
   "assist": {
     "title": "Ask the documents",
     "intro": "The assistant only searches documents you are allowed to see; restricted documents are never included. Every point cites a reference number and page so you can check it.",
+    "emptyTitle": "What do you need from the documents?",
+    "suggestTitle": "Try asking",
+    "suggest": {
+      "credits": "What is the minimum number of credits to be considered for a scholarship?",
+      "examDeadline": "When are exam papers and answer keys due?",
+      "language": "Which language certificate is required to graduate?"
+    },
     "label": "Question",
     "placeholder": "For example: What are the requirements for a merit scholarship?",
     "keysHint": "Enter to ask, Shift+Enter for a new line",
     "count": "{n}/{max} characters",
     "ask": "Ask",
+    "answerBy": "Assistant",
     "any": "All",
     "direction": {
       "label": "Documents",
@@ -463,6 +471,7 @@
       "n": "Source {n}",
       "cite": "Source {n}: {label}",
       "cited": "Cited",
+      "details": "Details",
       "excerpt": "Passage",
       "more": "Show the full passage",
       "less": "Collapse the passage"
