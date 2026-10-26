@@ -255,6 +255,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - `docs/architecture.md` xếp `/api/verify/anchor-key.pem` vào lõi (#233): route trả khóa công khai ký mốc neo sổ kiểm
   toán, cùng nhóm với `anchors.py`, không phải của Văn phòng. Route công khai của `svc-files` thành 2 lõi, 8 dáng nghiệp
   vụ, 10 Văn phòng; bước tách router ở §4.7 còn 11 route Văn phòng.
+- Số dịch vụ log tập trung thu: `DEPENDENCIES.md`, `ROADMAP.md`, `platform/README.md` và chú thích trong
+  `docker-compose.yml`, `scripts/install.sh` vẫn ghi 5 dịch vụ, chưa thu Hasura, Keycloak, PostgreSQL; từ #202 tệp phủ
+  `platform/logs/docker-compose.logs.yml` thu 8 dịch vụ. Sửa thành 8.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô

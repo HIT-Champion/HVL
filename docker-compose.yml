@@ -545,10 +545,11 @@ services:
       prometheus: {condition: service_healthy}
 
   # ---- Log tập trung (F3.14), profile logs — tắt mặc định (docs/van-hanh.md mục Log tập trung) ---------------------
-  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của apisix, app-office, app-ca-nhan, svc-files,
-  # svc-workflow (5 dịch vụ đã che thông tin cá nhân, F4.4) sang fluentd: dockerd gửi dòng log vào Vector qua cổng
-  # 127.0.0.1. Không gắn docker.sock, không đọc /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ
-  # nào khác của Signet. Không dùng x-common (mạng moc); log của chính chúng ghi json-file, không gửi vào mình.
+  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của 8 dịch vụ sang fluentd: apisix, app-office,
+  # app-ca-nhan, svc-files, svc-workflow tự che thông tin cá nhân (F4.4); hasura, keycloak, postgres do Vector che bằng
+  # luật riêng (#202). dockerd gửi dòng log vào Vector qua cổng 127.0.0.1. Không gắn docker.sock, không đọc
+  # /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ nào khác của Signet. Không dùng x-common (mạng
+  # moc); log của chính chúng ghi json-file, không gửi vào mình.
   vector:
     image: timberio/vector:0.59.0-distroless-static@sha256:2138c72ef15477d3a60126da851407a198ec61d2ff4cd600a4e69db5f6a29ff7
     profiles: [logs]
