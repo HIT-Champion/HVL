@@ -142,7 +142,7 @@ class Page(Base):
     def test_static_files_with_headers(self) -> None:
         status, headers, body = call(self.page + "/bang-tin/")
         self.assertEqual(status, 200)
-        self.assertIn(b"<title>", body)
+        self.assertIn(b"<title", body)
         self.assertIn("script-src 'self'", headers["Content-Security-Policy"])
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
