@@ -46,13 +46,13 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'duplicate') return t('error.documents_in_dedup')
     if (e.status === 413) return t('error.too_large')
     if (e.status === 429) return t('error.rate_limited')
-    // Hasura từ chối vai trò (#242): bảng, cột, action ngoài quyền của vai trò thì báo "field … not found in type",
-    // điều kiện quyền khi ghi không thỏa thì permission-error; câu tiếng Anh của GraphQL không đến người dùng
-    if (e.code === 'permission-error' || (e.code === 'validation-failed' && e.message.includes(' not found in type'))) {
-      return t('error.noAccess')
-    }
     for (const name of CONSTRAINTS) if (e.message.includes(name)) return t(`error.${name}`)
     if (e.message.includes('summary')) return t('error.documents_summary')
+    // Hasura từ chối vai trò (#242): bảng, cột, action ngoài quyền của vai trò thì báo "field … not found in type";
+    // điều kiện quyền khi ghi không thỏa thì "check constraint of an insert/update permission has failed". Chỉ bắt
+    // đúng hai câu ấy: permission-error còn mang mọi check_violation của CSDL, kể cả câu tiếng Việt của trigger
+    if ((e.code === 'validation-failed' && e.message.includes(' not found in type'))
+      || (e.code === 'permission-error' && e.message.includes(' permission has failed'))) return t('error.noAccess')
     return e.message
   }
   return t('error.generic', { msg: e instanceof Error ? e.message : String(e) })
