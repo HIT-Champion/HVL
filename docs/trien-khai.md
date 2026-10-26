@@ -19,7 +19,9 @@ Internet ──443/80──▶ Caddy (máy chủ) ──▶ 127.0.0.1:8080 APISI
 install` ra thư mục riêng, chạy từ đó), một proxy TLS ở cổng 443 đặt các tiêu đề như Caddyfile ở bước 5 (nginx với
 chứng thư tự ký, thay cho Caddy và Let's Encrypt), rồi qua `https://`: các mục kiểm ở bước 6, smoke, 13 kịch bản e2e
 trên trình duyệt, màn kiểm dịch, ký số, che thông tin cá nhân, kiểm sổ kiểm toán. Chưa diễn tập: bước 2 (máy diễn tập
-đã có Docker), Caddy, Let's Encrypt thật — xem mục 8.
+đã có Docker), Caddy, Let's Encrypt thật — xem mục 8. Phần `https` của CI (#261) chạy lại trên mọi pull request:
+`.env` như bước 3, proxy như bước 5 (nginx với chứng thư tự ký thay Caddy), rồi smoke và `kiem_ban_online.py` của
+bước 6.
 
 ## 1. Chuẩn bị
 

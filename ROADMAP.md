@@ -144,7 +144,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
 - [ ] Chứng minh "dưới một giờ": chưa đo với người ngoài đội trên máy sạch (việc của Phase 5 trong
       `docs/du-thi/ke-hoach-phat-trien.md`); `make check` chưa kiểm RAM và phiên bản Docker
 - [ ] **Một phần** — lên mạng (F1.9, mức Dùng được): HTTPS sau Caddy hoặc Cloudflare Tunnel theo
-      [`docs/trien-khai.md`](docs/trien-khai.md); HTTPS mới kiểm bằng tay, chưa có bước CI
+      [`docs/trien-khai.md`](docs/trien-khai.md); phần CI `https` (#261) chạy smoke qua proxy TLS nginx với chứng
+      thư tự ký trên mọi pull request
 - [x] Tài liệu vận hành: sao lưu, khôi phục, két bí mật, GitOps, giám sát ([`docs/van-hanh.md`](docs/van-hanh.md));
       triển khai, nâng cấp (`docs/trien-khai.md`). Sao lưu → xóa → khôi phục chạy trong CI (F3.4); reconciler GitOps
       dựng lại container bị xóa (F3.3)
