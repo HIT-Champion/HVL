@@ -277,7 +277,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|---|---|---|---|
 | Ollama | 0.35.1 | Chạy mô hình tại chỗ (profile `ai`, tắt mặc định, giới hạn 6 GB RAM); mạng `ai` không ra Internet, chỉ `svc-files` nối vào | — | dịch vụ `ollama` trong `docker-compose.yml` | phần tùy chọn của F4.1, F4.2 |
 | Qwen3-1.7B, Qwen3-Embedding-0.6B | `qwen3:1.7b`, `qwen3-embedding:0.6b` | Viết trích yếu và câu trả lời có trích dẫn; nhúng đoạn và câu hỏi | — | `svc_files/docread/summarize.py`, `svc_files/assist/ai.py` | F4.1, F4.2 |
-| Tesseract OCR | 5.5.0, gói Debian trong image `svc-files` | Nhận dạng chữ bản scan, ảnh chụp, chạy trong tiến trình con có giới hạn | — | `svc_files/docread/ocr.py` | F4.1 Hoàn thiện |
+| Tesseract OCR | 5.5.0, gói Debian trong image `svc-files` | Nhận dạng chữ bản scan, ảnh chụp, chạy trong tiến trình con có giới hạn | — | `svc_files/ocr.py` | F4.1 Hoàn thiện |
 | Truy xuất và trả lời có nguồn *(mã của đội)* | — | RAG tự viết: Meilisearch làm kho véc-tơ, quyền ở hai lớp, câu trích nguyên văn, kiểm trích dẫn (QĐ-004) | — | `svc_files/assist/` | F4.2 Hoàn thiện |
 | Tác tử `moc-doc-reader`, `moc-assistant`, `moc-assigner` *(mã của đội)* | — | Chỉ gợi ý, người quyết; danh tính riêng (vai trò Hasura `agent`), mỗi việc vào sổ kiểm toán (QĐ-005) | — | `svc_files/docread/`, `svc_files/assist/`, `svc_workflow/advisor.py` | F4.1, F4.2, F4.3 Hoàn thiện |
 
@@ -435,15 +435,15 @@ hiện tại.
 | `pii.py` | Lõi | Bộ che, chỉ thư viện chuẩn |
 | `pdftext.py` | Lõi | Đọc lớp chữ PDF trong tiến trình con; không gọi CSDL |
 | `assist/store.py` | Lõi | Ghi một dòng `core.audit_log` cho mỗi lượt hỏi, bằng vai trò `agent` |
-| `docread/ocr.py`, `docread/layout.py`, `docread/pdflayout.py` | Lõi | Tesseract trong tiến trình con có giới hạn, dựng bố cục trang; không bảng, không câu chữ nghiệp vụ. Dính: nằm trong gói `docread/` của Văn phòng |
+| `ocr.py`, `layout.py`, `pdflayout.py` | Lõi | Tesseract trong tiến trình con có giới hạn, dựng bố cục trang; không bảng, không câu chữ nghiệp vụ. Trước #302 nằm trong gói `docread/` của Văn phòng |
 | `imports/parse.py`, `imports/spool.py`, khung của `imports/runner.py` (`Importer`, `Handler`) | Lõi | Đọc NDJSON, CSV; giữ zip tạm; chạy mẻ có giữ dòng và thử lại. Loại lô do nơi gọi truyền vào (`handlers`) |
 | route `POST /api/files`, `GET /api/files/{file_id}` (trong `app.py`) | Dáng nghiệp vụ | Tải lên qua ClamAV, tải về khi Hasura cho xem — đúng hai đường ứng dụng thứ hai dùng. Viết cứng của Văn phòng: nhánh `restricted` ("Văn bản hạn chế chỉ nhận tệp PDF…", đóng dấu người xem qua `sealed.py`). Dính: quyền tải về đi qua bộ lọc của `core_files.yaml`, có nhánh sang `office.document_files` |
-| `sealed.py` | Dáng nghiệp vụ | Mã hóa từng tệp bằng khóa transit, đóng dấu tên người xem là cơ chế chung; lớp dấu in sẵn câu của văn bản hạn chế ("VĂN BẢN HẠN CHẾ — bản giải mã cho …"). Dính: gọi `docread.ocr._kill_group` |
-| `hasura.py` | Dáng nghiệp vụ | Máy khách chung (token người dùng, vai trò `service`, `agent`) nhưng chứa câu GraphQL của Văn phòng: `LETTER`, `REGISTER`, `VERIFY`, `DISPATCH_SOURCE`, `VISIBLE_CASE_FILE`, `CHANGED_DOCUMENTS`… |
+| `sealed.py` | Dáng nghiệp vụ | Mã hóa từng tệp bằng khóa transit, đóng dấu tên người xem là cơ chế chung; lớp dấu in sẵn câu của văn bản hạn chế ("VĂN BẢN HẠN CHẾ — bản giải mã cho …"). Trước #302 gọi `docread.ocr._kill_group`, nay `ocr.kill_group` |
+| `hasura.py` | Dáng nghiệp vụ | Máy khách chung (token người dùng, vai trò `service`, `agent`); câu của tìm kiếm (`CHANGED_DOCUMENTS`) còn đọc `office.documents`. Câu chỉ Văn phòng dùng (`LETTER`, `REGISTER`, `VERIFY`, `DISPATCH_SOURCE`, `VISIBLE_CASE_FILE`…) đã sang `office/hasura.py` (#302) |
 | `search.py`, route `GET /api/search` | Dáng nghiệp vụ | Meilisearch xếp hạng, Hasura lọc quyền; chỉ mục và trường lọc là của `office.documents` |
 | `texts.py` | Dáng nghiệp vụ | Đọc chữ PDF ở vòng nền; tệp chọn bằng `PENDING_TEXTS` theo `office.document_files`, bỏ tệp của văn bản hạn chế |
 | `assist/ai.py`, `assist/meili.py`, `assist/grounding.py`, `assist/extract.py` | Dáng nghiệp vụ | Gọi mô hình, kho véc-tơ trên Meilisearch, khung lời dặn, trích câu. Viết cứng: sự kiện `office.assist.*` và tiền tố truy vấn "Vietnamese administrative documents" (`ai`), trường lọc `direction`, `type_code` (`meili`), lời dặn "trợ lý tra cứu văn bản hành chính" (`grounding`), loại văn bản (`extract`) |
-| `assist/chunks.py`, `assist/index.py`, `assist/scope.py`, `assist/answer.py`, `assist/retrieve.py`, `assist/vi.py`, `assist/api.py` (route `POST /api/documents/ask`) | Dáng nghiệp vụ | Cắt đoạn, đồng bộ chỉ mục, lọc trước theo quyền, trả lời có trích dẫn; điều kiện "văn bản đủ điều kiện" và bộ lọc theo vai trò viết lại đúng `office.document_visible`. Dính: `vi.py` import `docread.rules.fold`, `docread.summarize.INVISIBLE_RE`; `retrieve.py` import `docread.rules.fold` |
+| `assist/chunks.py`, `assist/index.py`, `assist/scope.py`, `assist/answer.py`, `assist/retrieve.py`, `assist/vi.py`, `assist/api.py` (route `POST /api/documents/ask`) | Dáng nghiệp vụ | Cắt đoạn, đồng bộ chỉ mục, lọc trước theo quyền, trả lời có trích dẫn; điều kiện "văn bản đủ điều kiện" và bộ lọc theo vai trò viết lại đúng `office.document_visible`. Trước #302 `vi.py`, `retrieve.py` import `fold`, `INVISIBLE_RE` từ `docread/`, nay từ `vntext.py` |
 | `imports/api.py` (route `/api/imports`, `/api/imports/*`), `imports/store.py` | Dáng nghiệp vụ | API lô, bảng `core.import_jobs`, `core.import_rows` dùng chung; viết cứng `Kind = Literal["incoming"]` và câu dò trùng trên `office_documents` |
 | `signing.py` | Dáng nghiệp vụ | Ký PAdES bằng khóa của đơn vị trong két; sự kiện nhật ký `office.signing.*`; chỉ `/internal/issue` gọi |
 | `lineage.py` | Dáng nghiệp vụ | Dựng sự kiện OpenLineage, ghi `core.lineage_events`; tên job `moc.case_file.archive` và cột các bảng Parquet của Văn phòng viết trong mã |
@@ -465,7 +465,7 @@ hiện tại.
 | `openbao.py`, `pii.py` | Lõi | Bản chép của tệp cùng tên trong `svc-files` |
 | `directory.py` | Dáng nghiệp vụ | Đồng bộ người dùng Keycloak → `core.users` là cơ chế chung; viết cứng `ROLES = {"clerk", "staff", "manager", "director", "tenant_admin"}` |
 | `notify.py` | Dáng nghiệp vụ | Ghi `core.notifications`, đẩy qua Centrifugo; nhận `document_id`, người nhận và người được báo tiếp chọn theo vai trò văn thư (`staff` → `manager` → `director`) |
-| `hasura.py` | Dáng nghiệp vụ | Máy khách vai trò `service`, nhưng gần như mọi câu là của Văn phòng (`office_register_incoming`, `office_number_outgoing`, `office_dispatches`…) |
+| `hasura.py` | Dáng nghiệp vụ | Máy khách vai trò `service`, `Actor` (biến phiên, cả nhóm ứng viên của BPMN văn bản), hai câu của danh bạ. 23 câu của Văn phòng (`office_register_incoming`, `office_number_outgoing`, `office_dispatches`…) đã sang `office/queries.py` (#302) |
 | `channels.py` | Dáng nghiệp vụ | Kênh email, webhook dùng chung; loại thông báo và câu chữ là của Văn phòng (`document.issued`, `task.overdue`…) |
 | `schemas.py` | Dáng nghiệp vụ | Bộ kiểm JSON Schema chung; schema hiện có là form văn bản đến `schemas/van-ban-den.json` |
 | `workflow.py`, route `POST /actions/{name}` | Văn phòng | Nghiệp vụ của 5 Actions: tiếp nhận, vào sổ, trình văn bản đi, hộp việc, hoàn thành việc; đối soát với Flowable |
@@ -507,11 +507,10 @@ Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git g
 - **Mã.** Mọi route của `svc-files` gắn vào app trong `create_app` (`svc_files/app.py`): 16 route khai thẳng (chưa kể
   `/healthz`, `/readyz`), 7 route qua hàm `install()` của `docread/api.py`, `assist/api.py`, `imports/api.py`,
   `assist/similar.py`. Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 2 lõi, 8 dáng nghiệp vụ, 10 Văn
-  phòng — cộng 3 route nội bộ đều của Văn phòng. Mô-đun dáng nghiệp vụ gọi vào gói `docread/` của Văn phòng: `sealed.py`
-  → `docread.ocr._kill_group`; `assist/vi.py` → `docread.rules.fold`, `docread.summarize.INVISIBLE_RE`;
-  `assist/retrieve.py` → `docread.rules.fold`, `DASHES`, `DATE`, `SYMBOL`. Đường tải lên chung cũng vậy: `imageclean.py`
-  → `docread.ocr._kill_group`, `_killed`. Ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` cũng nằm trong gói đó. Hai
-  tệp `hasura.py` để câu GraphQL của hai phần chung một chỗ.
+  phòng — cộng 3 route nội bộ đều của Văn phòng. Đã gỡ ở #302 (bước 1 của §4.7): mô-đun dáng nghiệp vụ không còn gọi
+  vào gói `docread/` của Văn phòng — `kill_group`, `killed` nằm ở `ocr.py`; `fold`, `DASHES`, `DATE`, `SYMBOL`,
+  `INVISIBLE_RE` ở `vntext.py`; ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` ra gói gốc. Câu GraphQL chỉ Văn
+  phòng dùng sang `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`.
 - **Phạm vi.** Tìm kiếm, đọc chữ PDF, chỉ mục đoạn của trợ lý chọn dữ liệu từ `office.documents`,
   `office.document_files`: tệp của ứng dụng khác (vd trong `personal`) không tìm được, trợ lý không đọc tới.
 - **Tệp và quyền xem tệp.** Route `/api/files` có nhánh `restricted` của văn bản hạn chế. Bộ lọc quyền của `core.files`
@@ -594,7 +593,7 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
 
 1. Gỡ chỗ dính trong mã: đưa `_kill_group`, `_killed`, `fold` (cùng `DASHES`, `DATE`, `SYMBOL`), `INVISIBLE_RE` và
    ba mô-đun lõi của `docread/` sang chỗ chung;
-   tách câu GraphQL của Văn phòng khỏi hai tệp `hasura.py`.
+   tách câu GraphQL của Văn phòng khỏi hai tệp `hasura.py`. **Đã làm ở #302.**
 2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 11 route Văn phòng đang khai thẳng
    trong `app.py` (xem trước, hai route sổ, ba route xác thực, ba route nộp lưu, `/internal/issue`,
    `/internal/dispatch-file`; `/api/verify/anchor-key.pem` là của lõi, ở lại)

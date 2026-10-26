@@ -83,7 +83,7 @@ cậy. Văn thư đối chiếu bản gốc, sửa, rồi tự lưu. Chi tiết:
 [README svc-files](../services/svc-files/README.md#đọc-văn-bản-đến-f41).
 
 **Mô hình, công cụ.** pypdf đọc lớp chữ giữ bố cục; ảnh và PDF scan qua Tesseract (`-l vie --oem 1 --psm 3`). Quy tắc
-tự viết theo thể thức NĐ 30 (`docread/rules.py`, `docread/layout.py`) quyết **mọi** trường. Qwen3-1.7B chỉ viết trích
+tự viết theo thể thức NĐ 30 (`docread/rules.py`, `layout.py`) quyết **mọi** trường. Qwen3-1.7B chỉ viết trích
 yếu, chỉ khi quy tắc không ra trích yếu tin cậy cao (`MOC_AI_SUMMARY=fallback`, mặc định).
 
 **Dữ liệu đánh giá.** `seed/van-ban-den/`: 22 văn bản hư cấu (cơ quan có chữ "Mẫu", người ký "Nguyễn Văn A", chân trang
@@ -155,7 +155,7 @@ chữ OCR của `MOC_TEXT_OCR_PAGES` trang đầu (mặc định 3), có thể s
   yếu theo quy tắc (`docread/summarize.py`; test `tests/test_docread_summarize.py`).
 - *Tiến trình con có giới hạn:* đọc PDF, OCR chạy trong tiến trình con `python -I` có `RLIMIT_AS`, `RLIMIT_CPU`, quá
   giờ thì bị giết (OCR giết cả nhóm, tesseract không chạy mồ côi); Pillow có trần điểm ảnh; tesseract không thấy bí mật
-  của dịch vụ (`docread/ocr.py`, `docread/pdflayout.py`).
+  của dịch vụ (`ocr.py`, `pdflayout.py` của `svc-files`).
 - *Danh tính, sổ kiểm toán:* mỗi lần đọc một dòng `intake.suggested` bằng vai trò Hasura `agent`, danh tính
   `moc-doc-reader` ép từ preset; dòng sổ chỉ có siêu dữ liệu (cách đọc, số trang, tên trường tìm thấy, mô hình, thời
   gian), không chữ của văn bản; không ghi được sổ thì không trả gợi ý (`docread/store.py`, `docread/reader.py`).
