@@ -183,7 +183,7 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
         v-for="(label, key) in filters" :key="key" role="tab" :aria-selected="filter === key"
         :class="{ 'is-alert': key === 'overdue' && counts.overdue > 0 }" @click="filter = key"
       >
-        {{ t(label) }}<span>{{ counts[key] }}</span>
+        {{ t(label) }} <span>{{ counts[key] }}</span>
       </button>
     </div>
 

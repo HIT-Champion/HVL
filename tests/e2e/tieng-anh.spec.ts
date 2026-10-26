@@ -43,7 +43,11 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
   await staff.getByRole('button', { name: 'English', exact: true }).click()
   await expect(html).toHaveAttribute('lang', 'en')
   await expect(staff.getByRole('heading', { level: 1, name: 'My tasks' })).toBeVisible()
-  await expect(staff.getByText('Tasks waiting for you — urgent first')).toBeVisible()
+  // đầu hộp việc (#291): dòng đếm việc và bốn tab lọc kèm số việc cũng sang tiếng Anh
+  await expect(staff.getByText(/^\d+ tasks awaiting action\.$/)).toBeVisible()
+  for (const tab of ['All', 'Today', 'Overdue', 'Urgent']) {
+    await expect(staff.getByRole('tab', { name: new RegExp(`^${tab} \\d+$`) })).toBeVisible()
+  }
   for (const name of ['My tasks', 'Incoming documents', 'Outgoing', 'Draft a document', 'Search', 'Ask']) {
     await expect(staff.getByRole('link', { name, exact: true })).toBeVisible()
   }

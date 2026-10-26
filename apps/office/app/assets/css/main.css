@@ -185,7 +185,8 @@
   font-size: 14px;
 }
 .moc-tabs button[aria-selected=true] { color: #1d1c1a; border-color: #284868; font-weight: 600; }
-.moc-tabs span { margin-left: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* số đếm cách tên tab bằng một dấu cách thật (trình đọc màn hình đọc "Tất cả 3", không dính "Tất cả3") */
+.moc-tabs span { margin-left: 2px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .moc-toolbar {
   display: flex;
   align-items: center;
