@@ -289,7 +289,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 8 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
 | Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, kiểm chữ ký commit nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
-| cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Dùng được |
+| cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Hoàn thiện (tunnel chưa kiểm trong CI) |
 
 F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (Dùng được): bảng
 `office.maturity_assessments` và một trang của Văn phòng điện tử; không thêm thành phần nào, không sửa `services/`.
