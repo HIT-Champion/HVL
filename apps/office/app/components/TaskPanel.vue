@@ -163,7 +163,9 @@ function submitDone() {
 </script>
 
 <template>
-  <section class="card overflow-hidden border-brand-200 ring-2 ring-brand-100" :aria-busy="busy">
+  <section
+    class="card overflow-hidden border-brand-200 ring-2 ring-brand-100" :aria-busy="busy" data-testid="task-panel"
+  >
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 bg-brand-50 px-5 py-3">
       <h2 class="text-sm font-semibold text-brand-900">{{ t(`task.${formKey}`) }}</h2>
       <span v-if="busy" class="text-sm text-stone-600" role="status">{{ t('form.processing') }}</span>
@@ -233,8 +235,11 @@ function submitDone() {
         <p v-if="tried && directErrors.due_on" id="due-error" class="field-error">{{ directErrors.due_on }}</p>
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
-        <div class="flex items-end gap-2">
-          <input v-model="fileNote" class="input w-56" :aria-label="t('form.chiDao.fileNote')" :placeholder="t('form.chiDao.fileNote')">
+        <div class="flex min-w-0 flex-wrap items-end gap-2">
+          <input
+            v-model="fileNote" class="input w-full sm:w-56" :aria-label="t('form.chiDao.fileNote')"
+            :placeholder="t('form.chiDao.fileNote')"
+          >
           <button type="button" class="btn-secondary" :disabled="busy" @click="complete('file', { note: fileNote.trim() || null })">{{ t('form.chiDao.file') }}</button>
         </div>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.chiDao.direct') }}</button>
@@ -256,7 +261,7 @@ function submitDone() {
         <label class="label" for="note">{{ t('form.phanCong.note') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></label>
         <textarea id="note" v-model="assign.note" rows="2" class="input" maxlength="2000" />
       </div>
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" :disabled="busy" @click="complete('self', { note: assign.note.trim() || null })">{{ t('form.phanCong.self') }}</button>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.phanCong.assign') }}</button>
       </div>
@@ -311,7 +316,7 @@ function submitDone() {
           {{ t('form.duyet.returnNote') }}
         </p>
       </div>
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" :disabled="busy" @click="sendBack">{{ t('form.duyet.return') }}</button>
         <button type="submit" class="btn-primary" :disabled="busy">
           {{ formKey === 'vbdi.duyetDonVi' ? t('form.duyet.sign') : t('form.duyet.approve') }}
@@ -326,7 +331,7 @@ function submitDone() {
         <input v-model="isPublic" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700">
         <span>{{ t('form.phatHanh.public') }}<span class="block text-xs text-stone-500">{{ t('form.phatHanh.publicHint') }}</span></span>
       </label>
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" @click="preview(documentId).catch((e) => notice.error(errorText(t, e)))">
           {{ t('form.duyet.preview') }}
         </button>

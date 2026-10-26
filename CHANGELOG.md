@@ -297,6 +297,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
     `validation-failed` của máy chủ thành câu hướng dẫn thay vì in nguyên lỗi GraphQL.
 
   e2e mới `tests/e2e/loi-form.spec.ts`: hộp Góp ý ở 390px, tiêu điểm và mô tả lỗi ở các form trên.
+- Khung xử lý việc trên điện thoại (#251): ở 390px, khung **Cho ý kiến chỉ đạo** cắt mất nút **Lưu, không xử lý**
+  (khung ẩn phần lố nên trang không cuộn ngang). Ô ghi chú và nút xuống dòng khi chật; các hàng nút khác của khung
+  cũng xuống dòng. `man-hep.spec.ts` thêm kiểm ô, nút trong khung việc của ba vai không bị cắt ở 390px.
 
 ### Bảo mật
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô
