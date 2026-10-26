@@ -683,17 +683,23 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
               {{ t('doc.history') }}
             </button>
           </div>
-          <ol
+          <!-- tabpanel bọc ngoài danh sách: role trên chính <ol> thay mất vai trò list, các <li> mồ côi (axe, #246) -->
+          <div
             id="document-timeline" v-show="side === 'timeline'" role="tabpanel" aria-labelledby="document-timeline-tab"
-            tabindex="0" class="relative space-y-5 border-l border-stone-200 pl-5" data-testid="timeline"
+            tabindex="0" data-testid="timeline"
           >
-            <li v-for="(item, i) in timeline" :key="item.key" class="relative">
-              <span class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white" :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'" />
-              <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
-              <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
-              <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
-            </li>
-          </ol>
+            <ol class="relative space-y-5 border-l border-stone-200 pl-5">
+              <li v-for="(item, i) in timeline" :key="item.key" class="relative">
+                <span
+                  class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white"
+                  :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'"
+                />
+                <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
+                <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
+                <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
+              </li>
+            </ol>
+          </div>
           <div
             id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab"
             tabindex="0" :aria-busy="historyLoading" data-testid="history"

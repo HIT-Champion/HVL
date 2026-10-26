@@ -148,6 +148,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   mức A, AA: trang đăng nhập, xác thực văn bản, trạng thái hệ thống; các trang của tài khoản `giamkhao` (hộp việc, văn
   bản, hồ sơ, tìm kiếm, hỏi đáp, ứng dụng, góp ý, Không gian cá nhân); các trang của lãnh đạo đơn vị và văn thư. Lỗi
   chưa sửa phải nằm trong danh sách cho phép của spec, mỗi dòng có rule, trang, lý do và issue; danh sách chỉ ngắn đi.
+  Lần quét đầu trên 22 trang chỉ thấy một lỗi, đã sửa: dòng thời gian ở trang văn bản mang `role="tabpanel"` trên chính
+  thẻ `<ol>` nên mất vai trò danh sách, trình đọc màn hình không đọc được số mục; nay tabpanel bọc ngoài danh sách.
 
 ### Đã sửa đổi
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
