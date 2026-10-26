@@ -806,7 +806,8 @@ class Flow(unittest.TestCase):
 
     def test_gateway_not_answering_fails_with_hint(self) -> None:
         self.system.gateway = ["502"]
-        with self.assertRaisesRegex(u.AppError, r"cổng vẫn chưa trả 200 \(mã 502\) — xem docker compose logs apisix"):
+        with self.assertRaisesRegex(u.AppError, r"cổng vẫn chưa trả 200 \(mã 502\) — xem docker compose logs apisix, "
+                                                r"sửa xong thì docker compose restart apisix"):
             with unittest.mock.patch.object(u.time, "monotonic", side_effect=[0, 0, 91]), \
                     unittest.mock.patch.object(u.time, "sleep"):
                 u.restart_apisix(self.system)

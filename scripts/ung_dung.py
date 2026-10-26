@@ -1307,7 +1307,8 @@ def restart_apisix(system: System, *, wait_s: float = 90) -> str:
             return f"đã khởi động lại apisix (tệp route đổi), cổng trả lời sau {time.monotonic() - started:.0f} giây"
         time.sleep(1)
     raise AppError(f"đã khởi động lại apisix nhưng sau {wait_s:.0f} giây cổng vẫn chưa trả 200 (mã {code or '?'})"
-                   " — xem docker compose logs apisix")
+                   " — xem docker compose logs apisix, sửa xong thì docker compose restart apisix (chạy lại lệnh"
+                   " không khởi động lại nữa vì tệp route đã khớp)")
 
 
 # ---------------------------------------------------------------------------------------- các lệnh
