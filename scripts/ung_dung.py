@@ -1534,6 +1534,20 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
             deployed.append(True)
         return result
 
+    def or_workflow_back(step: Callable[[], str]) -> Callable[[], str]:
+        """Bước sau "quy trình" lỗi thì quy trình về bản của lần cài trước (chưa có thì tạm dừng): không để BPMN, form
+        mới chạy khi trang, route còn bản cũ hay chưa có. Tệp chạy, container giữ như lúc lỗi (chạy lại làm tiếp); bước
+        Hasura trả cả tệp chạy (undo)."""
+        def run() -> str:
+            try:
+                return step()
+            except (AppError, Unavailable) as exc:
+                back = workflow_back()
+                if not back:
+                    raise
+                raise AppError(f"{exc}{back}") from exc
+        return run
+
     def container_step() -> str:
         up = up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)
         if GATEWAY not in wrote:
@@ -1555,8 +1569,8 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         ("bí mật", secrets_step),
         ("Keycloak", keycloak_step),
         *([("quy trình", workflow_step)] if with_workflow else []),
-        ("tệp chạy", files_step),
-        ("container", container_step),
+        ("tệp chạy", or_workflow_back(files_step)),
+        ("container", or_workflow_back(container_step)),
         ("Hasura", hasura_step),
     ]
     with ops_lock(state.root):
@@ -1663,8 +1677,10 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
         state.write()
         return f"core.apps.removed_at đã ghi; schema {rec['schema']} và dữ liệu giữ nguyên"
 
+    # quy trình tạm dừng trước khi xóa client: bước quy trình lỗi thì Keycloak chưa đổi gì, chạy lại gỡ tiếp — không có
+    # lúc client đã xóa mà định nghĩa quy trình vẫn nhận đơn từ token còn hạn
     steps = [("container", container_step), ("tệp chạy", files_step), ("Hasura", hasura_step),
-             ("Keycloak", keycloak_step), *([("quy trình", workflow_step)] if rec.get("workflow") else []),
+             *([("quy trình", workflow_step)] if rec.get("workflow") else []), ("Keycloak", keycloak_step),
              ("CSDL", db_step)]
     with ops_lock(state.root):
         run_steps(steps, out, dry_run=dry_run)
