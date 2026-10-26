@@ -198,13 +198,15 @@ tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số k
   nhận kết quả, `bad output`, lỗi của pypdf).
 - **Bản scan được nhận dạng chữ (#253).** PDF không có lớp chữ thì vòng nền OCR `MOC_TEXT_OCR_PAGES` trang đầu (mặc
   định 3) bằng đúng đường OCR của tác tử đọc văn bản đến: ảnh nhúng lớn nhất mỗi trang, tiến trình con có giới hạn
-  bộ nhớ, CPU, điểm ảnh (mục Đọc văn bản đến), hạn `MOC_OCR_TIMEOUT_S` cho mỗi trang. Đọc lần lượt từng tệp, nên mỗi
-  lúc vòng nền chỉ OCR một tệp. Ra chữ thì ghi `ok` như lớp chữ, kèm `page_starts` đúng từng trang (trang không có
-  ảnh giữ chỗ), `note` = `ocr <số trang đã đọc>/<số trang>`: tìm theo nội dung và trợ lý hỏi đáp dùng được chữ này.
-  Không ra chữ thì giữ `empty`, `note` = `ocr <lý do>` (`no_text` — không có ảnh, `timeout`, `memory`,
-  `too_many_pixels`, `no_tesseract`…) hoặc `ocr <n>/<số trang> blank` (ảnh không có chữ nào): bản scan mờ không phải
-  tệp hỏng, và không bị đọc lại. Nhật ký `core.file.text_ocr` ghi số trang đã đọc, số ký tự, thời gian, không ghi
-  chữ. Chữ OCR có thể sai chữ, sai dấu; các trang sau `MOC_TEXT_OCR_PAGES` trang đầu không vào chỉ mục. Migration
+  bộ nhớ, CPU, điểm ảnh (mục Đọc văn bản đến), hạn chung cho cả tệp là số trang đó × `MOC_OCR_TIMEOUT_S`. Đọc lần
+  lượt từng tệp, nên mỗi lúc vòng nền chỉ OCR một tệp. Ra chữ thì ghi `ok` như lớp chữ, kèm `page_starts` đúng từng
+  trang (trang không có ảnh giữ chỗ), `note` = `ocr <số trang đã đọc>/<số trang>`: tìm theo nội dung và trợ lý hỏi
+  đáp dùng được chữ này. Không ra chữ vì tệp thì giữ `empty`, `note` = `ocr <lý do>` (`no_text` — không có ảnh,
+  `too_many_pixels`, `corrupt`) hoặc `ocr <n>/<số trang> blank` (ảnh không có chữ nào): bản scan mờ không phải tệp
+  hỏng, và không bị đọc lại. Hỏng vì máy (`timeout` lúc máy bận, `memory`, `no_tesseract`, `engine_failed` — thiếu
+  gói ngôn ngữ) thì tệp ở lại hàng đợi, lượt sau OCR lại như lỗi kho; 5 lượt liền vẫn hỏng thì ghi `empty`, `note` =
+  `ocr <lý do>`. Nhật ký `core.file.text_ocr` ghi số trang đã đọc, số ký tự, thời gian, không ghi chữ. Chữ OCR có
+  thể sai chữ, sai dấu; các trang sau `MOC_TEXT_OCR_PAGES` trang đầu không vào chỉ mục. Migration
   `1792281603500_file_texts_ocr` xóa các dòng `empty` cũ để bản scan đã có được đọc lại một lần sau khi nâng cấp.
 - **Một tệp lỗi không chặn hàng đợi.** Hàng đợi chung mọi thuê ước, tệp cũ nhất trước: tệp nào cũng phải đi tới
   một dòng kết quả, nếu không thì tệp đó đứng đầu mãi. Số trang tệp tự khai (`/Count`, pypdf trả nguyên với tệp mã
@@ -1190,7 +1192,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_SEARCH_INDEX` | `documents` | Tự tạo và áp cấu hình khi khởi động |
 | `MOC_SEARCH_SYNC_INTERVAL_S` | `5` | `0` tắt vòng đồng bộ nền |
 | `MOC_TEXT_INTERVAL_S` | `10` | Chu kỳ đọc chữ của PDF mới gắn vào văn bản; `0` tắt vòng đọc |
-| `MOC_TEXT_OCR_PAGES` | `3` | Bản scan (PDF không có lớp chữ): số trang đầu OCR ở vòng đọc chữ, hạn `MOC_OCR_TIMEOUT_S` mỗi trang; `0` tắt (#253) |
+| `MOC_TEXT_OCR_PAGES` | `3` | Bản scan (PDF không có lớp chữ): số trang đầu OCR ở vòng đọc chữ, hạn cả tệp = số trang × `MOC_OCR_TIMEOUT_S`; `0` tắt (#253) |
 | `MOC_PUBLIC_URL` | phần trước `/realms/` của `MOC_OIDC_ISSUER` | In vào mã QR của bản phát hành |
 | `MOC_SERVICE_CLIENTS` | `svc-workflow` | Client Keycloak được gọi `/internal/*`, cách nhau dấu phẩy |
 | `MOC_COLD_BUCKET` | `moc-cold` | Bucket lạnh có khóa ghi, tự tạo; phải khác `MOC_FILES_BUCKET` |
