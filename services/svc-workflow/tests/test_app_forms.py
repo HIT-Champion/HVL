@@ -200,7 +200,7 @@ def test_sample_forms_pass():
     (with_prop("ma", {"type": "string", "pattern": "^\\S.*$"}), "cần maxLength"),
     (with_prop("ma", {"type": "string", "pattern": "[0-9]{9,11}"}), "cần maxLength"),
     (with_prop("ma", {"type": "string", "maxLength": 20, "allOf": [{"pattern": "a+$"}]}), "cần maxLength"),
-    (changed(propertyNames={"pattern": "^[a-z]+$"}), "cần maxLength"),
+    (changed(propertyNames={"maxLength": 20, "pattern": "^[a-z]+$"}), "không dùng propertyNames"),
     (changed(**{"$defs": {"ma": {"type": "string", "pattern": "^a+"}}}), "cần maxLength"),
     # tốn quá MAX_STEPS bước
     (with_prop("ma", {"type": "string", "maxLength": 30000, "pattern": "a+$"}), "bước quay lui với chuỗi 30000"),
@@ -225,6 +225,96 @@ def test_patterns_whose_cost_does_not_grow_with_the_string_need_no_max_length(pa
                                      "[0-9]{9,11}", "a+$", "a+a{0,30}$"])
 def test_patterns_with_max_length_pass(pattern):
     assert problems(with_prop("ma", {"type": "string", "maxLength": 200, "pattern": pattern})) == []
+
+
+def test_patterns_of_one_form_share_one_step_budget():
+    # mỗi mẫu 9,2·10^5 bước, dưới trần riêng; 33 trường như thế cộng lại quá 3·10^7 thì cả form không nhận
+    near = {"type": "string", "pattern": "^" + "a{0,30}" * 4 + "$"}
+    schema = copy.deepcopy(DON)
+    for i in range(32):
+        schema["properties"][f"ma{i}"] = near
+    assert problems(schema) == []
+    schema["properties"]["ma32"] = near
+    errors = problems(schema)
+    assert len(errors) == 1 and "kiểm một lần gửi ước tính 3,1·10^7 bước" in errors[0], errors
+
+
+def test_each_ref_counts_where_it_is_used():
+    # cùng mẫu viết một lần ở $defs, bốn trường trỏ tới: jsonschema chạy bốn lần, nên tính bốn lần (4 × 9·10^6)
+    text = {"type": "string", "maxLength": 3000, "pattern": "a+$"}
+    direct = copy.deepcopy(DON)
+    by_ref = copy.deepcopy(DON)
+    by_ref.setdefault("$defs", {})["dai"] = text
+    for i in range(4):
+        direct["properties"][f"ma{i}"] = text
+        by_ref["properties"][f"ma{i}"] = {"$ref": "#/$defs/dai"}
+    for schema in (direct, by_ref):
+        errors = problems(schema)
+        assert len(errors) == 1 and "kiểm một lần gửi ước tính 3,6·10^7 bước" in errors[0], errors
+    del by_ref["properties"]["ma3"]
+    assert problems(by_ref) == []
+
+
+@pytest.mark.parametrize("ref, needle", [
+    ("#/$defs/khongCo", "không trỏ tới schema nào"),
+    ("#ten", "chỉ nhận JSON Pointer"),
+    ("#/$defs/vong", "trỏ vòng"),
+])
+def test_refs_must_resolve_without_a_loop(ref, needle):
+    schema = with_prop("ma", {"$ref": ref})
+    schema.setdefault("$defs", {})["vong"] = {"$ref": "#/$defs/vong"}
+    assert any(needle in e for e in problems(schema)), problems(schema)
+
+
+def dag(depth: int, fan: int = 10) -> dict[str, Any]:
+    """Mỗi tầng allOf ``fan`` $ref tới tầng sau: không pattern nào, jsonschema vẫn đi qua fan^depth schema."""
+    defs: dict[str, Any] = {f"t{depth}": {"type": "string"}}
+    for d in range(depth - 1, -1, -1):
+        defs[f"t{d}"] = {"allOf": [{"$ref": f"#/$defs/t{d + 1}"}] * fan}
+    schema = with_prop("ma", {"$ref": "#/$defs/t0"})
+    schema.setdefault("$defs", {}).update(defs)
+    return schema
+
+
+def test_nested_refs_count_every_schema_they_reach():
+    # sâu 3 × 10: cỡ 2·10^3 schema mỗi lần gửi, nhận; sâu 4 × 10: 2·10^4 schema (~140 ms), không nhận; sâu 7 × 10
+    # (cả chục giây mỗi lần gửi) cũng bị từ chối ngay, vì lúc cài mỗi đích $ref chỉ tính một lần
+    assert problems(dag(3)) == []
+    assert any("kiểm một lần gửi ước tính 6,7·10^7 bước" in e for e in problems(dag(4))), problems(dag(4))
+    started = time.perf_counter()
+    assert any("kiểm một lần gửi ước tính" in e for e in problems(dag(7))), problems(dag(7))
+    assert time.perf_counter() - started < 1
+
+
+def test_ref_depth_is_counted_through_shared_targets():
+    # t0 → t1 → … → t16: tính t8 trước từ chỗ nông (9 tầng), trỏ lại qua t0 thì sâu 17 tầng — vẫn bị chặn
+    chain = {f"t{i}": {"$ref": f"#/$defs/t{i + 1}"} for i in range(16)}
+    chain["t16"] = {"type": "string"}
+    schema = with_prop("ma", {"$ref": "#/$defs/t8"})
+    schema["properties"]["maCu"] = {"$ref": "#/$defs/t0"}
+    schema.setdefault("$defs", {}).update(chain)
+    assert any("lồng quá 16 tầng" in e for e in problems(schema)), problems(schema)
+    del schema["properties"]["maCu"]
+    assert problems(schema) == []
+
+
+@pytest.mark.parametrize("key", ["$id", "$anchor", "$dynamicAnchor"])
+def test_ids_and_anchors_only_at_the_root(key):
+    # $id dưới gốc đổi chỗ "#/…" trỏ tới: lúc cài tính theo gốc tệp, jsonschema lại giải theo $id gần nhất
+    schema = with_prop("ma", {key: "https://signet.local/khac" if key == "$id" else "khac", "type": "string"})
+    assert any(f"{key} chỉ khai ở gốc form" in e for e in problems(schema)), problems(schema)
+    assert all(key not in e for e in problems(with_prop("ma", {"type": "string"})))
+
+
+def test_nested_values_never_reach_the_schema():
+    # mảng, đối tượng không ghi được thành biến: báo type ngay, items… không chạy pattern trên từng phần tử
+    form = AppForm({"$schema": DRAFT, "type": "object", "additionalProperties": False,
+                    "properties": {"ma": {"items": {"pattern": "^(a+)+$"}}, "ten": {"type": "string"}}})
+    started = time.perf_counter()
+    assert form.errors({"ma": ["a" * 40 + "!"] * 100, "ten": 1}) == {"ma": "type"}
+    assert form.errors(["a" * 40 + "!"]) == {"": "type"}
+    assert time.perf_counter() - started < 0.05
+    assert form.errors({"ma": "x", "ten": 1}) == {"ten": "type"}
 
 
 def test_step_estimate_follows_re():

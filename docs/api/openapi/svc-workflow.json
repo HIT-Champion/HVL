@@ -549,6 +549,9 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "Thân yêu cầu lớn quá 64 KB"
           }
         },
         "requestBody": {
@@ -771,6 +774,9 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "Thân yêu cầu lớn quá 64 KB"
           }
         },
         "requestBody": {

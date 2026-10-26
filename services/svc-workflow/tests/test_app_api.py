@@ -35,7 +35,7 @@ from fastapi.testclient import TestClient
 from app_fakes import APP, BPMN, DON, DUYET, AppFlowable, bundle_zip, form_bytes
 from conftest import DEPT_DT, DEPT_KTPM, OTHER, TENANT
 from svc_workflow.apps import deploy
-from svc_workflow.apps.api import AppWorkflow, rest_variables
+from svc_workflow.apps.api import MAX_BODY, AppWorkflow, rest_variables
 from svc_workflow.apps.auth import HASURA_CLAIMS, AppUser, AuthError, TokenVerifier, default_role
 from svc_workflow.apps.bundle import check_bundle
 from svc_workflow.config import Settings
@@ -260,7 +260,22 @@ def test_invalid_data_is_422_per_field_and_nothing_starts(client, fl, data, erro
     assert fl.started == []
 
 
-@pytest.mark.parametrize("body", [b"khong-phai-json", b"[1, 2]"])
+def test_body_over_the_cap_is_413_and_nothing_starts(client, fl):
+    big = {"data": {"loai": "phep-nam", "lyDo": "x" * MAX_BODY}}
+    r = client.post(f"{API}/processes/{APP}.don", json=big, headers=STAFF)
+    assert r.status_code == 413 and r.json()["detail"]["code"] == "too_large"
+    assert fl.started == []
+
+
+def test_body_without_content_length_is_counted_while_read(client, fl):
+    # thân gửi từng khúc (chunked), không có Content-Length: vẫn dừng khi vượt trần
+    chunks = (b"x" * 8192 for _ in range(MAX_BODY // 8192 + 2))
+    r = client.post(f"{API}/tasks/{uuid.uuid4()}", content=chunks,
+                    headers={**STAFF, "Content-Type": "application/json"})
+    assert r.status_code == 413 and r.json()["detail"]["code"] == "too_large"
+
+
+@pytest.mark.parametrize("body", [b"khong-phai-json", b"[1, 2]", b"[" * 50000])
 def test_body_must_be_a_json_object(client, body):
     r = client.post(f"{API}/processes/{APP}.don", content=body, headers={**STAFF, "Content-Type": "application/json"})
     assert r.status_code == 400 and r.json()["detail"]["code"] == "bad_request"

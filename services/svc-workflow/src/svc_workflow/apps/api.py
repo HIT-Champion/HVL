@@ -58,6 +58,9 @@ from .forms import RESERVED, AppForm
 
 log = logging.getLogger("svc_workflow")
 CACHE_LIMIT = 500           # mục lục, form, định nghĩa → deployment: bất biến, chỉ cần trần bộ nhớ
+# Dữ liệu một form chỉ là vài trường đơn. Đọc quá thì dừng: không giữ cả thân (APISIX cho tới 64 MiB) trong bộ nhớ,
+# không đưa chuỗi cỡ đó vào pattern của form (apps/forms.py)
+MAX_BODY = 64 * 1024
 
 DATA_BODY: dict[str, Any] = {"requestBody": {"required": True, "content": {"application/json": {"schema": {
     "type": "object", "required": ["data"],
@@ -67,6 +70,7 @@ ERRORS_422 = {"description": "Dữ liệu chưa đúng form: {\"errors\": {trư�
               "content": {"application/json": {"schema": {
                   "type": "object", "required": ["errors"],
                   "properties": {"errors": {"type": "object", "additionalProperties": {"type": "string"}}}}}}}
+TOO_LARGE = {413: {"description": f"Thân yêu cầu lớn quá {MAX_BODY // 1024} KB"}}
 COMMON = {401: {"description": "Thiếu hoặc sai token"},
           403: {"description": "Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị"},
           404: {"description": "Ứng dụng chưa cài hoặc đã gỡ"},
@@ -331,9 +335,18 @@ class AppWorkflow:
         User = Annotated[AppUser, Depends(caller)]
 
         async def body_data(request: Request) -> Any:
+            too_large = _fail(413, "too_large", f"Thân yêu cầu lớn quá {MAX_BODY // 1024} KB")
+            length = request.headers.get("content-length", "")
+            if length.isdigit() and int(length) > MAX_BODY:
+                raise too_large
+            raw = bytearray()
+            async for chunk in request.stream():         # không có Content-Length (chunked): đếm khi đọc
+                raw += chunk
+                if len(raw) > MAX_BODY:
+                    raise too_large
             try:
-                body = await request.json()
-            except ValueError as exc:
+                body = json.loads(raw)
+            except (ValueError, RecursionError) as exc:     # RecursionError: mảng lồng hàng vạn tầng
                 raise _fail(400, "bad_request", 'Thân yêu cầu phải là JSON {"data": {…}}') from exc
             if not isinstance(body, dict):
                 raise _fail(400, "bad_request", 'Thân yêu cầu phải là JSON {"data": {…}}')
@@ -355,7 +368,7 @@ class AppWorkflow:
 
         @app.post("/api/workflow/{app}/processes/{process_key}", status_code=201, tags=tags, openapi_extra=DATA_BODY,
                   responses={**COMMON, 404: {"description": "Ứng dụng chưa cài, đã gỡ hoặc không có quy trình này"},
-                             422: ERRORS_422},
+                             422: ERRORS_422, **TOO_LARGE},
                   summary="Bắt đầu quy trình với dữ liệu form bắt đầu")
         async def start_process(app: str, process_key: str, user: User, request: Request) -> dict[str, str]:
             data = await body_data(request)
@@ -391,7 +404,7 @@ class AppWorkflow:
         @app.post("/api/workflow/{app}/tasks/{task_id}", status_code=204, tags=tags, openapi_extra=DATA_BODY,
                   responses={**COMMON,
                              404: {"description": "Ứng dụng đã gỡ; việc không còn hoặc không thuộc người này"},
-                             409: {"description": "Việc vừa có người khác nhận"}, 422: ERRORS_422},
+                             409: {"description": "Việc vừa có người khác nhận"}, 422: ERRORS_422, **TOO_LARGE},
                   summary="Hoàn thành một việc với dữ liệu form của việc")
         async def complete_task(app: str, task_id: str, user: User, request: Request) -> Response:
             # Khai trả 204 nên chỉ có một return (204 không thân); lỗi ném ra cho FastAPI, invalid() ở trên

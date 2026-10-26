@@ -346,22 +346,27 @@ khi hai tệp cùng process id, khi có tệp không khai.
 **Kiểm form** (`svc_workflow/apps/forms.py`). Lúc cài, form phải là JSON Schema 2020-12 hợp lệ, `type: object`,
 `additionalProperties: false` (mọi biến ghi vào quy trình đều được khai); tên trường dạng camelCase (là tên biến
 Flowable), không trùng biến hệ thống `tenantId`, `departmentId`, `initiator`; mỗi trường một giá trị đơn (chuỗi, số,
-đúng/sai — biến Flowable không chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp;
-`x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB; không dùng `patternProperties`. `pattern` chạy bằng
+đúng/sai — biến Flowable không chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng
+JSON Pointer (`#/…`), tới đúng một schema, không vòng, lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai
+ở gốc form (dưới gốc chúng đổi chỗ `#/…` trỏ tới); `x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB;
+không dùng `patternProperties`, `propertyNames` (mẫu chạy trên mọi khóa gửi lên, kể cả khóa thừa). `pattern` chạy bằng
 `re` của Python, quay lui, ngay trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ (ReDoS, vd `^(a+)+$`) với vài
 chục ký tự làm đứng cả dịch vụ, kể cả Action của Văn phòng điện tử. Nên lúc cài không nhận mẫu lặp lồng trong lặp (trừ
 lặp đúng n lần như `(,[0-9]{3})*`), có `|` hay tham chiếu ngược (`\1`) trong phần lặp, dài quá 512 ký tự. Phần lặp nối
 nhau vẫn tốn thời gian đa thức, và jsonschema kiểm bằng `re.search`: mẫu không neo `^` thử lại ở mọi vị trí, `a+$` đã
 tốn bình phương độ dài chuỗi. Lõi ước lượng số bước quay lui: tích (cận trên − cận dưới + 1) của các phần lặp không cố
 định và số nhánh của mỗi `|`, nhân độ dài chuỗi L cho mỗi phần lặp không chặn trên (`+`, `*`, `{n,}`) và thêm L nếu
-không neo `^`; quá 10^7 bước (khoảng 30 ms) thì không nhận. Khi số bước tăng theo L, `pattern` phải có `maxLength` ngay
-cạnh (cùng một schema) làm L; lúc nhận dữ liệu, chuỗi dài quá `maxLength` đó không chạy `pattern` (chỉ báo `maxLength`).
-Mẫu không có chỗ quay lui (lớp ký tự cấm, `^20[0-9]{2}-`) hay neo `^` với phần lặp có chặn (`^[A-Z]{2,5}$`,
-`^[^@\s]{1,64}@[^@\s]{1,63}\.[a-z]{2,10}$`) không cần `maxLength`; `^\S.*$` cần. Lúc nhận dữ liệu, lõi kiểm bằng đúng
-`schemas.FormSchema` của form tiếp nhận văn bản đến (mã lỗi như [`schemas/README.md`](../schemas/README.md)) cộng
-`x-moc-range` (trường sau trước trường trước → mã `x-moc-range` ở trường sau; kiểm sau cùng, bỏ qua khi một trong hai
-trường đã có lỗi). Chỉ trường đã khai, có mặt và khác `null` được ghi thành biến, giữ kiểu (chuỗi, long, double,
-boolean).
+không neo `^`; quá 10^7 bước (khoảng 30 ms) thì không nhận, cả form có trần 3·10^7 bước cho một lần gửi: mỗi schema con
+jsonschema đi qua tính 3000 bước (khoảng 7 µs) cộng số bước của `pattern` ở đó, đích ở `$defs` tính một lần cho mỗi chỗ
+`$ref` trỏ tới — nên cả `$ref` lồng nhau không có `pattern` nào (`allOf` mười `$ref` tới tầng sau, bốn tầng) cũng không
+nhận (#323). Khi số bước tăng theo L, `pattern` phải có `maxLength` ngay cạnh (cùng một schema) làm L; lúc nhận dữ liệu,
+chuỗi dài quá `maxLength` đó không chạy `pattern` (chỉ báo `maxLength`). Mẫu không có chỗ quay lui (lớp ký tự cấm,
+`^20[0-9]{2}-`) hay neo `^` với phần lặp có chặn (`^[A-Z]{2,5}$`, `^[^@\s]{1,64}@[^@\s]{1,63}\.[a-z]{2,10}$`) không cần
+`maxLength`; `^\S.*$` cần. Lúc nhận dữ liệu, giá trị mảng hay đối tượng báo `type` ngay mà không chạy schema (không ghi
+được thành biến); còn lại lõi kiểm bằng đúng `schemas.FormSchema` của form tiếp nhận văn bản đến (mã lỗi như
+[`schemas/README.md`](../schemas/README.md)) cộng `x-moc-range` (trường sau trước trường trước → mã `x-moc-range` ở
+trường sau; kiểm sau cùng, bỏ qua khi một trong hai trường đã có lỗi). Chỉ trường đã khai, có mặt và khác `null` được
+ghi thành biến, giữ kiểu (chuỗi, long, double, boolean).
 
 **API** (route APISIX `svc-workflow`: `/api/workflow/*`, `GET`/`POST`, cùng kiểm token, giới hạn tốc độ như
 `/api/files`; bảng đủ ở [`docs/api/README.md`](api/README.md)):
@@ -374,13 +379,13 @@ boolean).
 | `GET /api/workflow/<tên>/tasks` | Việc của ứng dụng giao cho người này (`assignee`) hoặc cho một nhóm của người này, cùng đơn vị, cũ nhất trước: `[{id, name, formKey, processKey, processId, createdAt, dueAt, data}]` |
 | `POST /api/workflow/<tên>/tasks/<taskId>` `{"data": {…}}` | `204`: kiểm theo form của việc, nhận việc rồi hoàn thành |
 
-Lỗi kiểm dữ liệu: `422 {"errors": {trường: mã}}` (gửi tên biến hệ thống → `additionalProperties`). Lỗi khác dạng
-`{"detail": {"code", "message"}}` như `svc-files`: `401` thiếu, sai, hết hạn token; `403` token không phải của client
-`app-<tên>` (`azp` — token của Văn phòng điện tử, `moc-cli` hay của ứng dụng khác không dùng được) hoặc tài khoản chưa
-gán đơn vị; `404` ứng dụng chưa cài hoặc đã gỡ, form, quy trình, việc không có hoặc không thuộc ứng dụng, đơn vị, người
-này (không nói việc của người khác có tồn tại); `409` việc vừa có người khác nhận; `503` chưa gọi được Flowable hoặc
-Keycloak. APISIX kiểm chữ ký, hạn của token ở biên; `svc-workflow` kiểm lại theo JWKS của realm (`iss` là URL công khai
-của realm như `x-oidc` trong `docker-compose.yml`), thêm `azp`.
+Thân yêu cầu tối đa 64 KB, lớn hơn → `413 too_large` (#323). Lỗi kiểm dữ liệu: `422 {"errors": {trường: mã}}` (gửi tên
+biến hệ thống → `additionalProperties`). Lỗi khác dạng `{"detail": {"code", "message"}}` như `svc-files`: `401` thiếu,
+sai, hết hạn token; `403` token không phải của client `app-<tên>` (`azp` — token của Văn phòng điện tử, `moc-cli` hay
+của ứng dụng khác không dùng được) hoặc tài khoản chưa gán đơn vị; `404` ứng dụng chưa cài hoặc đã gỡ, form, quy trình,
+việc không có hoặc không thuộc ứng dụng, đơn vị, người này (không nói việc của người khác có tồn tại); `409` việc vừa có
+người khác nhận; `503` chưa gọi được Flowable hoặc Keycloak. APISIX kiểm chữ ký, hạn của token ở biên; `svc-workflow`
+kiểm lại theo JWKS của realm (`iss` là URL công khai của realm như `x-oidc` trong `docker-compose.yml`), thêm `azp`.
 
 Nhóm của người dùng lấy từ claim của token: `t:<đơn vị>:<vai trò>` và, khi có phòng, `t:<đơn vị>:d:<phòng>:<vai trò>`
 — bao trùm nhóm Văn phòng điện tử dùng. Hộp việc Văn phòng điện tử chỉ nhận việc của quy trình `van-ban-den`,
