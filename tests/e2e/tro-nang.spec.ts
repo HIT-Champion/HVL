@@ -67,6 +67,25 @@ async function scanAll(page: Page, paths: string[]): Promise<string[]> {
   return left
 }
 
+// Bảng tin (#250) là ứng dụng cắm bằng manifest: phần e2e của CI cài nó trước make seed (ci.yml) nên ở đó phải có;
+// máy chưa cài thì /bang-tin/ ra trang của Văn phòng, bỏ phần này và ghi chú vào báo cáo, không im lặng. h1 có sẵn
+// trong HTML tĩnh, nên chờ đăng nhập SSO xong và danh sách tin hay câu trạng thái hiện; câu trạng thái mà là lỗi tải
+// thì không quét (giamkhao phải thấy tin của văn bản mẫu)
+async function scanBoard(page: Page): Promise<string[]> {
+  const installed = (await (await page.request.get('/bang-tin/')).text()).includes('id="tin"')
+  if (!installed) {
+    expect(process.env.CI, 'CI phải cài Bảng tin trước make e2e (ci.yml, bước make app-install)').toBeFalsy()
+    test.info().annotations.push({ type: 'bỏ qua /bang-tin/',
+      description: 'chưa cài Bảng tin: make app-install APP=apps/bang-tin/app.yaml' })
+    return []
+  }
+  await page.goto('/bang-tin/')
+  await expect(page.locator('#tin li, #trang-thai:not(:empty)').first()).toBeVisible()
+  const status = await page.locator('#trang-thai').textContent()
+  await expect(page.locator('#tin li').first(), `Bảng tin không có tin: ${status}`).toBeVisible({ timeout: 1_000 })
+  return scan(page, '/bang-tin/', page.locator('#tin li').first())
+}
+
 test.afterAll(() => {
   const stale = ALLOW.filter((a) => scanned.has(a.page) && !used.has(a))
     .map((a) => `${a.page}: ${a.rule} (#${a.issue}) không còn lỗi, bỏ khỏi ALLOW`)
@@ -94,9 +113,7 @@ test('trợ năng: các trang của giám khảo (chuyên viên)', async ({ brow
   left.push(...await scan(judge, '/van-ban/[id]'))
   left.push(...await scanAll(judge, ['/van-ban-den', '/van-ban-di', '/van-ban-di/soan', '/ho-so', '/cam-bien',
     '/tim-kiem', '/hoi-dap', '/ung-dung', '/gop-y', '/ca-nhan/']))
-  // Bảng tin (#250): h1 có sẵn trong HTML tĩnh, nên chờ đăng nhập SSO xong và danh sách tin (hay câu trạng thái) hiện
-  await judge.goto('/bang-tin/')
-  left.push(...await scan(judge, '/bang-tin/', judge.locator('#tin li, #trang-thai:not(:empty)').first()))
+  left.push(...await scanBoard(judge))
   expect(left).toEqual([])
 })
 

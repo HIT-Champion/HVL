@@ -378,6 +378,13 @@ jobs:
       - name: Dựng image và khởi động lõi + ứng dụng (make up)
         run: make up
 
+      # Phần e2e quét trợ năng cả Bảng tin (#250, tests/e2e/tro-nang.spec.ts), là ứng dụng cắm bằng manifest. Cài trước
+      # make seed: tin của Bảng tin chỉ sinh từ sự kiện mới (Event Trigger không đọc lại dòng cũ), nên văn bản mẫu vào
+      # sổ, phát hành sau khi cài mới thành tin. Lần cài đầu tạo lại apisix, hasura; lệnh chờ chúng healthy mới trả về
+      - name: Cài Bảng tin cho phần quét trợ năng (make app-install)
+        if: matrix.phan == 'e2e'
+        run: make app-install APP=apps/bang-tin/app.yaml
+
       - name: Nạp dữ liệu mẫu (make seed)
         run: make seed
 

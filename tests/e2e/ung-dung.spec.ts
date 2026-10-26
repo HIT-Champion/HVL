@@ -19,9 +19,9 @@ import { PASSWORD, TOTP_SECRET, shot, signIn } from './helpers'
 
 // Danh mục ứng dụng (/ung-dung): mục "Ứng dụng" ở thanh bên đưa lãnh đạo đơn vị tới trang; hai ứng dụng có sẵn trong
 // lõi (Văn phòng điện tử, Không gian cá nhân) mang phiên bản lõi mà /api/status trả, nút Mở tới /ca-nhan/ chạy được;
-// phần "Cài bằng manifest", "Đã gỡ" và câu hướng dẫn đối chiếu băm có mặt (job e2e không cài ứng dụng nào: chỉ kiểm
-// phần có mặt — cài, gỡ thật kiểm ở make demo-cai-ung-dung). Chuyên viên thấy ứng dụng có sẵn, không thấy phần đã gỡ,
-// băm.
+// phần "Cài bằng manifest", "Đã gỡ" và câu hướng dẫn đối chiếu băm có mặt (job e2e chỉ cài sẵn Bảng tin cho phần quét
+// trợ năng, #250: ở đây chỉ kiểm phần có mặt — cài, gỡ thật kiểm ở make demo-cai-ung-dung). Chuyên viên thấy ứng dụng
+// có sẵn, không thấy phần đã gỡ, băm.
 
 test('danh mục ứng dụng: ứng dụng có sẵn mở được, phần kỹ thuật chỉ cho lãnh đạo, quản trị', async ({ browser }) => {
   test.skip(!PASSWORD || !TOTP_SECRET, 'đặt MOC_DEMO_PASSWORD, MOC_DEMO_TOTP_SECRET (make e2e tự đọc từ .env)')
