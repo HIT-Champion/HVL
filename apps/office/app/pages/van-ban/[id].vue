@@ -421,8 +421,12 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
     </NuxtLink>
 
     <p v-if="loading && !doc" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <p v-else-if="missing" class="card p-8 text-center text-stone-500">{{ t('doc.notFound') }}</p>
-    <div v-else-if="failure" class="card flex flex-col items-center gap-3 p-8 text-center text-sm text-red-700" data-testid="doc-failure">
+    <!-- không có hoặc không được xem: cùng một câu (không lộ văn bản có tồn tại), kèm lối đi tiếp -->
+    <div v-else-if="missing" class="moc-empty max-w-2xl">
+      <h1>{{ t('doc.notFound') }}</h1>
+      <NuxtLink to="/tim-kiem" class="btn-secondary mt-4">{{ t('search.title') }}</NuxtLink>
+    </div>
+    <div v-else-if="failure" class="moc-state max-w-2xl text-sm text-red-700" data-testid="doc-failure">
       {{ failure }}
       <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.retry') }}</button>
     </div>
@@ -468,6 +472,49 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-2">
+          <!-- tệp: đặt trước khung việc, đọc văn bản rồi mới làm; dòng gọn trên tờ giấy, không bọc thẻ -->
+          <section>
+            <h2 class="mb-2 text-sm font-semibold text-stone-800">{{ t('doc.files') }}</h2>
+            <p v-if="!doc.files.length" class="text-sm text-stone-500">{{ t('doc.noFiles') }}</p>
+            <ul v-else class="divide-y divide-stone-200 border-y border-stone-200">
+              <li
+                v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id"
+                class="flex items-center gap-3 py-2 text-sm"
+              >
+                <svg
+                  class="h-5 w-5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  stroke-width="1.6"
+                >
+                  <path
+                    stroke-linecap="round" stroke-linejoin="round"
+                    d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5"
+                  />
+                </svg>
+                <span class="min-w-0 flex-1 break-words">{{ f.file!.filename }}</span>
+                <span
+                  v-if="f.file!.encrypted" class="chip gap-1 border border-stone-400 bg-white text-stone-800"
+                  :title="t('doc.sealedHint')" data-testid="file-sealed"
+                >
+                  <svg
+                    class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" />
+                  </svg>
+                  {{ t('doc.sealed') }}
+                </span>
+                <span class="chip bg-stone-100 text-stone-600">{{ t(`doc.fileRole.${f.role}`) }}</span>
+                <span class="text-xs text-stone-500">{{ fmtSize(f.file!.size_bytes) }}</span>
+                <button
+                  class="btn-ghost text-brand-800" :aria-label="t('doc.downloadNamed', { name: f.file!.filename })"
+                  @click="download(f.file!.id, f.file!.filename).catch((e) => notice.error(errorText(t, e)))"
+                >
+                  {{ t('doc.download') }}
+                </button>
+              </li>
+            </ul>
+          </section>
+
           <TaskPanel
             v-if="task" :key="task.id" :task-id="task.id" :form-key="task.form_key" :document-due="doc.due_on"
             :document-id="doc.id" :restricted="doc.restricted" :users="users" :departments="departments"
@@ -570,41 +617,6 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
                 <dd><NuxtLink :to="`/van-ban/${doc.reply_to.id}`" class="font-medium text-brand-800 hover:underline">{{ doc.reply_to.symbol }} — {{ doc.reply_to.summary }}</NuxtLink></dd>
               </div>
             </dl>
-          </section>
-
-          <!-- tệp -->
-          <section class="card p-5">
-            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.files') }}</h2>
-            <p v-if="!doc.files.length" class="text-sm text-stone-500">{{ t('doc.noFiles') }}</p>
-            <ul v-else class="divide-y divide-stone-100">
-              <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id" class="flex items-center gap-3 py-2 text-sm">
-                <svg
-                  class="h-5 w-5 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                  stroke-width="1.6"
-                >
-                  <path
-                    stroke-linecap="round" stroke-linejoin="round"
-                    d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5"
-                  />
-                </svg>
-                <span class="min-w-0 flex-1 break-words">{{ f.file!.filename }}</span>
-                <span
-                  v-if="f.file!.encrypted" class="chip gap-1 border border-stone-400 bg-white text-stone-800"
-                  :title="t('doc.sealedHint')" data-testid="file-sealed"
-                >
-                  <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" /></svg>
-                  {{ t('doc.sealed') }}
-                </span>
-                <span class="chip bg-stone-100 text-stone-600">{{ t(`doc.fileRole.${f.role}`) }}</span>
-                <span class="text-xs text-stone-500">{{ fmtSize(f.file!.size_bytes) }}</span>
-                <button
-                  class="btn-ghost text-brand-800" :aria-label="t('doc.downloadNamed', { name: f.file!.filename })"
-                  @click="download(f.file!.id, f.file!.filename).catch((e) => notice.error(errorText(t, e)))"
-                >
-                  {{ t('doc.download') }}
-                </button>
-              </li>
-            </ul>
           </section>
 
           <!-- người được xem văn bản hạn chế (F3.7) -->

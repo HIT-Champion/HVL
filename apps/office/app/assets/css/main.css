@@ -205,7 +205,7 @@
   border: 1px dashed #d8d2c5;
   border-radius: 8px;
 }
-.moc-empty h2 { font-size: 16px; font-weight: 600; color: var(--text); }
+.moc-empty h1, .moc-empty h2 { font-size: 16px; font-weight: 600; color: var(--text); }
 .moc-empty p { margin-top: 6px; }
 .moc-state {
   padding: 14px 16px;
@@ -261,10 +261,12 @@
   gap: 8px;
   font-family: var(--font-sans);
   font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -.04em;
+  font-weight: 600;
+  letter-spacing: -.03em;
   line-height: 1;
 }
+/* trang lỗi, trang chờ đăng nhập: một tờ giấy giữa nền kraft, như thẻ của trang đăng nhập (theme Keycloak signet) */
+.moc-public-card { background: #fff; border: 1px solid var(--edge); border-radius: 16px; padding: 28px; }
 .moc-public-title { font-size: 28px; font-weight: 500; }
 .moc-scroll-hint { display: none; }
 .moc-table-scroll { max-width: 100%; }
@@ -337,7 +339,8 @@
   white-space: nowrap;
 }
 /* logo chữ S Liền mạch in màu son, như dấu đóng trên công văn */
-.sg-brand-mark { width: 32px; height: 32px; flex-shrink: 0; color: #b42419; }
+/* logo giữ màu olive của bản chính thức (public/brand); đỏ son chỉ dành cho độ khẩn, quá hạn và lỗi */
+.sg-brand-mark { width: 32px; height: 32px; flex-shrink: 0; color: #35432d; }
 .sg-close-menu { display: none; }
 .sg-nav {
   display: flex;
@@ -768,8 +771,12 @@
   .moc-inbox-filter { width: 0; flex: 1; min-width: 0; min-height: 44px; }
   .moc-inbox-refresh { min-width: 44px; min-height: 44px; }
   .moc-inbox-tabs { margin: 12px 0 20px; }
-  /* tab không vừa một dòng thì xuống dòng, không cuộn ngang giấu mất tab cuối */
+  /* tab không vừa một dòng thì xuống dòng, không cuộn ngang giấu mất tab cuối. Bốn tab hộp việc xếp lưới 2×2 đều
+     nhịp (không 3 + 1 lẻ loi); mỗi ô có gạch chân riêng, ô đang chọn gạch 2px màu mực */
   .moc-tabs { flex-wrap: wrap; column-gap: 20px; overflow: visible; }
+  .moc-inbox-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; border: 0; }
+  .moc-inbox-tabs button { padding: 9px 0; text-align: left; border-bottom: 1px solid var(--edge); }
+  .moc-inbox-tabs button[aria-selected=true] { box-shadow: inset 0 -1px 0 #284868; }
   /* điện thoại: hạn xuống dòng 3, mũi tên giữ cột phải */
   .sg-task-link { grid-template-columns: minmax(0, 1fr) 18px; gap: 6px 12px; padding: 14px 12px; }
   .sg-task-identity { grid-column: 1; }

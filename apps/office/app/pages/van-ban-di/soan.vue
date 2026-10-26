@@ -240,9 +240,10 @@ async function save() {
       <span>{{ initialFailure }}</span>
       <button type="button" class="btn-secondary" @click="loadInitial">{{ t('app.retry') }}</button>
     </div>
-    <p v-else-if="locked" class="card p-8 text-center text-stone-500">{{ t('compose.notEditable') }}</p>
+    <p v-else-if="locked" class="moc-empty">{{ t('compose.notEditable') }}</p>
 
-    <form v-else class="card space-y-5 p-6" novalidate @submit.prevent="save">
+    <!-- form nằm thẳng trên tờ giấy, không bọc thêm thẻ; nút lưu tách bằng đường kẻ -->
+    <form v-else class="space-y-5" novalidate @submit.prevent="save">
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label class="label" for="type">{{ t('compose.type') }}</label>
@@ -336,7 +337,7 @@ async function save() {
         <p class="mt-1 text-xs text-stone-500">{{ t('compose.attachmentsHint') }}</p>
       </div>
 
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex justify-end gap-2 border-t border-stone-200 pt-5">
         <button type="submit" class="btn-primary" :disabled="saving || uploading">{{ t('compose.save') }}</button>
       </div>
     </form>

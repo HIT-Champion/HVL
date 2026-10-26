@@ -78,17 +78,21 @@ function average(row: FeedbackSummaryRow | null) {
     <PageHeader :title="t('feedback.pageTitle')" :subtitle="t('feedback.pageSubtitle')">
       <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
     </PageHeader>
-    <p v-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
+    <p v-if="failure" class="moc-state mb-4 max-w-4xl text-sm text-red-700">{{ failure }}</p>
     <p v-if="!loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
 
-    <div v-if="loaded" class="space-y-4">
+    <!-- các khối nằm thẳng trên tờ giấy, ngăn bằng tiêu đề và đường kẻ, không thẻ lồng -->
+    <div v-if="loaded" class="max-w-4xl space-y-10">
       <template v-if="leader">
-        <p v-if="sample" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="feedback-sample">
+        <p
+          v-if="sample" class="border-l-2 border-amber-300 pl-3 text-sm text-amber-900"
+          data-testid="feedback-sample"
+        >
           {{ t('feedback.sampleNote') }}
         </p>
-        <section class="card p-4" data-testid="feedback-summary">
-          <h2 class="font-medium text-stone-900">{{ t('feedback.summary') }}</h2>
-          <p v-if="!split.total" class="py-8 text-center text-sm text-stone-500">{{ t('feedback.none') }}</p>
+        <section data-testid="feedback-summary">
+          <h2 class="text-base font-semibold text-stone-900">{{ t('feedback.summary') }}</h2>
+          <p v-if="!split.total" class="moc-empty mt-3 text-sm">{{ t('feedback.none') }}</p>
           <template v-else>
             <div class="mt-2 flex flex-wrap gap-6">
               <div>
@@ -120,7 +124,7 @@ function average(row: FeedbackSummaryRow | null) {
                   <th class="py-1 text-right font-medium">{{ t('feedback.last') }}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-stone-100">
+              <tbody class="divide-y divide-stone-200 border-y border-stone-200">
                 <tr v-for="r in split.screens" :key="r.screen ?? ''">
                   <td class="py-1 text-stone-700">{{ screenLabel(t, r.screen) }} <span class="text-xs text-stone-400">{{ r.screen }}</span></td>
                   <td class="py-1 text-right tabular-nums">{{ r.feedback }}</td>
@@ -133,12 +137,12 @@ function average(row: FeedbackSummaryRow | null) {
           </template>
         </section>
 
-        <section class="card p-4" data-testid="feedback-recent">
-          <h2 class="font-medium text-stone-900">{{ t('feedback.recent') }}</h2>
+        <section data-testid="feedback-recent">
+          <h2 class="text-base font-semibold text-stone-900">{{ t('feedback.recent') }}</h2>
           <p class="mt-1 text-xs text-stone-500">{{ t('feedback.anonymous') }}</p>
-          <p v-if="!recent.length" class="py-8 text-center text-sm text-stone-500">{{ t('feedback.none') }}</p>
-          <ul v-else class="mt-2 divide-y divide-stone-100">
-            <li v-for="f in recent" :key="f.id" class="py-2 text-sm">
+          <p v-if="!recent.length" class="moc-empty mt-3 text-sm">{{ t('feedback.none') }}</p>
+          <ul v-else class="mt-3 divide-y divide-stone-200 border-y border-stone-200">
+            <li v-for="f in recent" :key="f.id" class="py-3 text-sm">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="chip bg-brand-50 text-brand-800">{{ t('feedback.ratingValue', { n: f.rating }) }}</span>
                 <span class="text-stone-600">{{ screenLabel(t, f.screen) }}</span>
@@ -151,12 +155,12 @@ function average(row: FeedbackSummaryRow | null) {
         </section>
       </template>
 
-      <section class="card p-4" data-testid="feedback-mine">
-        <h2 class="font-medium text-stone-900">{{ t('feedback.mine') }}</h2>
+      <section data-testid="feedback-mine">
+        <h2 class="text-base font-semibold text-stone-900">{{ t('feedback.mine') }}</h2>
         <p class="mt-1 text-xs text-stone-500">{{ t('feedback.mineHint') }}</p>
-        <p v-if="!mine.length" class="py-8 text-center text-sm text-stone-500">{{ t('feedback.noneMine') }}</p>
-        <ul v-else class="mt-2 divide-y divide-stone-100">
-          <li v-for="f in mine" :key="f.id" class="py-2 text-sm">
+        <p v-if="!mine.length" class="moc-empty mt-3 text-sm">{{ t('feedback.noneMine') }}</p>
+        <ul v-else class="mt-3 divide-y divide-stone-200 border-y border-stone-200">
+          <li v-for="f in mine" :key="f.id" class="py-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <span class="chip bg-brand-50 text-brand-800">{{ t('feedback.ratingValue', { n: f.rating }) }}</span>
               <span class="text-stone-600">{{ screenLabel(t, f.screen) }}</span>

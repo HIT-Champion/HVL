@@ -472,8 +472,8 @@ async function save(register: boolean) {
     <p class="sr-only" aria-live="polite" data-testid="read-live">{{ announce }}</p>
 
     <form class="grid gap-6 lg:grid-cols-5" novalidate @submit.prevent="save(true)">
-      <!-- tệp -->
-      <section class="card p-5 lg:col-span-2">
+      <!-- tệp: khay nền giấy nhạt bên trái, các ô thông tin nằm thẳng trên tờ giấy bên phải -->
+      <section class="h-fit rounded-lg bg-stone-50 p-5 lg:col-span-2">
         <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('receive.file') }}</h2>
         <label
           class="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2
@@ -548,7 +548,7 @@ async function save(register: boolean) {
       </section>
 
       <!-- thông tin văn bản -->
-      <section class="card space-y-4 p-5 lg:col-span-3">
+      <section class="space-y-4 lg:col-span-3">
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             <div class="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">

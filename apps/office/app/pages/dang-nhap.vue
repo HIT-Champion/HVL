@@ -37,11 +37,11 @@ onMounted(async () => {
   <main class="flex min-h-screen items-center justify-center px-5 py-10">
     <section class="w-full max-w-md" aria-labelledby="callback-title">
       <div class="moc-public-wordmark mb-7 justify-center">
-        <img src="/brand/signet-symbol.svg" alt="" class="h-9 w-9">
+        <img src="/brand/signet-symbol.svg" alt="" class="h-8 w-8">
         <span>{{ $t('app.name') }}</span>
       </div>
-      <div class="card p-7 sm:p-8" aria-live="polite">
-        <h1 id="callback-title" class="text-2xl font-bold">
+      <div class="moc-public-card" aria-live="polite">
+        <h1 id="callback-title" class="text-2xl font-semibold">
           {{ $t(failed ? 'authCallback.failed' : 'authCallback.title') }}
         </h1>
         <p class="mt-3 text-sm leading-relaxed text-stone-600">
