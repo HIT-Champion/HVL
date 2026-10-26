@@ -39,9 +39,9 @@ import time
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Any, Protocol
 
-from .docread.layout import tsv_lines
-from .docread.ocr import OcrResult
 from .hasura import HasuraError
+from .layout import tsv_lines
+from .ocr import OcrResult
 from .pdftext import MAX_CHARS, PdfText, clean, extract_pdf, join_pages
 from .storage import ObjectMissing, StorageError
 

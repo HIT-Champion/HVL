@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Dòng chữ có vị trí trên trang (F4.1) — đầu vào chung của quy tắc trích xuất (``rules.py``).
+"""Dòng chữ có vị trí trên trang (F4.1) — đầu vào chung của quy tắc trích xuất (``docread/rules.py``).
 
 Văn bản hành chính theo thể thức NĐ 30/2020 có phần đầu hai cột: trái là cơ quan ban hành, số ký hiệu, trích yếu
 công văn; phải là quốc hiệu, tiêu ngữ, địa danh và ngày. Quy tắc cần biết dòng nằm cột nào, cao thấp ra sao, nên hai

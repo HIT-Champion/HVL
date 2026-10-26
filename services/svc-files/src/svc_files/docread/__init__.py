@@ -16,9 +16,10 @@
 
 """Đọc văn bản đến (F4.1): tác tử ``moc-doc-reader`` đọc tệp văn thư vừa tải lên, gợi ý thông tin tiếp nhận.
 
-- ``layout``: chữ của trang (lớp chữ PDF theo bố cục, hoặc TSV của Tesseract) → các dòng có vị trí trên trang.
 - ``rules``: quy tắc thuần Python, không I/O: dòng → số ký hiệu, ngày ban hành, cơ quan ban hành, loại, độ khẩn,
   trích yếu, mỗi trường kèm độ tin cậy. Mô hình ngôn ngữ (nếu bật) chỉ viết trích yếu, không quyết trường nào khác.
 
-Gói này không nhập gì lúc khởi tạo: ``pdflayout.py``, ``ocr.py`` chạy thành tiến trình con bằng ``python -I``.
+Phần không riêng của Văn phòng nằm ngoài gói, cấp ``svc_files``: ``layout.py`` (chữ của trang → các dòng có vị trí),
+``pdflayout.py``, ``ocr.py`` (lớp chữ PDF theo bố cục, Tesseract — chạy thành tiến trình con bằng ``python -I``),
+``vntext.py`` (bỏ dấu, mẫu số ký hiệu, ngày). Gói này không nhập gì lúc khởi tạo.
 """

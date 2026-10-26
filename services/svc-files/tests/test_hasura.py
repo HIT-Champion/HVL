@@ -25,6 +25,7 @@ import httpx2
 import pytest
 
 from svc_files.hasura import HasuraAuthError, HasuraClient, HasuraError
+from svc_files.office.hasura import OfficeHasura
 
 TENANT = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000a")
 FILE = uuid.UUID("3c4d0000-0000-4000-8000-000000000001")
@@ -182,7 +183,8 @@ def test_dispatch_source_reads_with_admin_secret_and_returns_hex_hashes():
                                          "mime_type": "application/pdf", "size_bytes": 10, "sha256": "\\x" + "ab" * 32,
                                          "encrypted": False, "storage_tier": "hot"}}]},
     }}}))
-    row = run(client(rec).dispatch_source(uuid.uuid4()))
+    office = OfficeHasura("http://hasura:8080", "bi-mat", transport=httpx2.MockTransport(rec))
+    row = run(office.dispatch_source(uuid.uuid4()))
     headers, _ = rec.last
     assert headers["x-hasura-admin-secret"] == "bi-mat" and "x-hasura-role" not in headers
     assert row["source_sha256"] == row["document"]["content_sha256"] == row["document"]["issued"][0]["sha256"] \

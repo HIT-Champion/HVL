@@ -398,7 +398,7 @@ def test_vector_adds_hybrid_search(make_token, hasura, index):
     ("thông báo 45/tb-kcntt nói gì", ["symbol"]),                   # chữ thường
     ("Công văn 88/CTSV xét học bổng thế nào?", ["symbol"]),         # không gạch nối
     ("Văn bản 2041/2026/CV-CNCT gửi ai?", ["symbol"]),              # có năm
-    ("Văn bản số 152a/TB-VP nói gì?", ["symbol"]),                  # "Số" + số có chữ: mẫu SYMBOL của docread
+    ("Văn bản số 152a/TB-VP nói gì?", ["symbol"]),                  # "Số" + số có chữ: mẫu SYMBOL của vntext
     ("Văn bản Số 12 / QĐ - UBND nói gì?", ["symbol"]),               # có khoảng trắng quanh "/"
     ("Ký hiệu 123/QĐ–ĐHCN là gì?", ["symbol"]),                     # gạch ngang dài
     ("Hạn nộp hồ sơ 15/11/2026 cho việc gì?", ["date"]),            # "hồ sơ" bỏ dấu là "ho so": không phải "Số"

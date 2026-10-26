@@ -57,9 +57,10 @@ from ..config import Settings
 from ..filetype import HEAD, detect
 from ..hasura import HasuraAuthError, HasuraError, Location, StoredFile
 from ..storage import ObjectMissing, StorageError
-from . import layout, rules
-from .ocr import SERVER_NOTES, run_ocr
-from .pdflayout import extract_layout
+from .. import layout
+from ..ocr import SERVER_NOTES, run_ocr
+from ..pdflayout import extract_layout
+from . import rules
 from .store import SuggestionStore
 from .summarize import Summarizer
 

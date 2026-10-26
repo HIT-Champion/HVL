@@ -56,8 +56,8 @@ from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeVar
 
-from ..docread.rules import DASHES, DATE, SYMBOL, fold
 from ..search import SearchError, _quoted
+from ..vntext import DASHES, DATE, SYMBOL, fold
 from .chunks import eligible
 from .scope import NOTHING, Scope
 from .vi import TOKEN_RE
@@ -75,7 +75,7 @@ WORD = re.compile(r"\w+")
 # thì đoạn gần nghĩa vẫn lấp chỗ sau các đoạn khớp từ khóa.
 KEYWORD_RATIO = 0.2
 # Ngày viết bằng số, có hay không có chữ "ngày" đứng trước: 15/11/2026, 5-3-2026, 5.3.2026. Ngày viết bằng chữ ("ngày
-# 5 tháng 3 năm 2026") dùng docread.rules.DATE
+# 5 tháng 3 năm 2026") dùng vntext.DATE
 NUM_DATE = re.compile(r"(?<![\w/.-])[0-9]{1,2}[/.-][0-9]{1,2}[/.-](?:19|20)[0-9]{2}(?![\w/.-])")
 QUOTED = re.compile(r'["“][^"“”]*\w[^"“”]*["”]')     # cụm trong ngoặc kép thẳng hoặc cong, có ít nhất một chữ
 SYMBOL_TAIL = re.compile(r"/\s*[^\W\d_]")              # số ký hiệu có phần chữ sau "/" (88/CTSV); 15/11 thì không
@@ -87,12 +87,12 @@ def exact_cues(question: str) -> list[str]:
     """Dấu hiệu câu hỏi cần khớp đúng chữ, theo thứ tự ``symbol``, ``date``, ``quoted`` — chỉ tên dấu hiệu, không có
     chữ của câu hỏi.
 
-    - ``symbol``: mẫu "Số 123/QĐ-…" của bộ đọc văn bản đến (``docread.rules.SYMBOL``, cả "Số 152a/TB-VP", "Số 12 /
+    - ``symbol``: mẫu "Số 123/QĐ-…" của bộ đọc văn bản đến (``vntext.SYMBOL``, cả "Số 152a/TB-VP", "Số 12 /
       QĐ") trên chữ bỏ dấu; hoặc token số ký hiệu của ``vi.TOKEN_RE`` ("123/QĐ-ĐHCN", "45/TB-KCNTT", "88/CTSV"). Cả
       hai phải có chữ sau "/" (``SYMBOL_TAIL``): bỏ dấu thì "hồ sơ 15/11/2026" cũng có "so 15/11". Không dùng mẫu trần
       ``docread.rules.BARE``: nó đòi gạch nối và chữ hoa để khỏi nhầm trong thân văn bản, còn người hỏi hay gõ chữ
       thường, và có số ký hiệu không gạch nối (88/CTSV).
-    - ``date``: ``NUM_DATE`` (15/11/2026) hoặc ``docread.rules.DATE`` ("ngày 5 tháng 3 năm 2026").
+    - ``date``: ``NUM_DATE`` (15/11/2026) hoặc ``vntext.DATE`` ("ngày 5 tháng 3 năm 2026").
     - ``quoted``: cụm trong ngoặc kép ("…" hoặc “…”).
     """
     folded = DASHES.sub("-", fold(question))
