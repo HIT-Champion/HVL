@@ -46,6 +46,8 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'duplicate') return t('error.documents_in_dedup')
     if (e.status === 413) return t('error.too_large')
     if (e.status === 429) return t('error.rate_limited')
+    // máy chủ, cổng trả lỗi mà không kèm lý do (trang lỗi 502, JSON không có data, #278): câu đọc được giữ mã HTTP
+    if (/^HTTP \d{3}$/.test(e.message)) return t('error.http', { status: e.status })
     for (const name of CONSTRAINTS) if (e.message.includes(name)) return t(`error.${name}`)
     if (e.message.includes('summary')) return t('error.documents_summary')
     // Hasura từ chối vai trò (#242): bảng, cột, action ngoài quyền của vai trò thì báo "field … not found in type";

@@ -258,12 +258,15 @@ export function useApi() {
     })
     const blocked = gatewayBlock(res.status, res.headers)
     if (blocked) throw blocked
-    // thân không phải JSON (cổng trả trang lỗi 502, 504…): báo mã HTTP, không để lỗi đọc JSON lọt ra giao diện
+    // thân không phải JSON (cổng trả trang lỗi 502, 504…) hay JSON không có data (cổng, proxy trả 404 kèm {}, #278):
+    // báo mã HTTP, không để lỗi đọc JSON hay data rỗng lọt ra trang thành lỗi JavaScript
     const body = await res.json().catch(() => null)
-    if (!body) throw new ApiError(`HTTP ${res.status}`, null, res.status)
-    if (body.errors?.length) {
+    if (body?.errors?.length) {
       const e = body.errors[0]
       throw new ApiError(e.message, e.extensions?.code ?? null, res.status, e.extensions?.fields ?? null)
+    }
+    if (!res.ok || !body?.data || typeof body.data !== 'object') {
+      throw new ApiError(`HTTP ${res.status}`, null, res.status)
     }
     return body.data as T
   }

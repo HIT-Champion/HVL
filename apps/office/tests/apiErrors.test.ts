@@ -176,6 +176,25 @@ test('gql: trang lỗi không phải JSON ở mã khác (502 của cổng) → A
   assert.deepEqual(await calls.gql(), { insert_office_documents_one: { id: 'abc' } })
 })
 
+test('gql: JSON không có data (cổng trả 404 kèm {}) → ApiError HTTP 404, không trả undefined (#278)', async () => {
+  for (const [status, body] of [[404, {}], [500, { message: 'oops' }], [200, {}], [200, { data: null }]] as const) {
+    reply = jsonReply(status, body)
+    const e = await failure(calls.gql)
+    assert.equal(e.message, `HTTP ${status}`, JSON.stringify(body))
+    assert.equal(e.status, status)
+  }
+  reply = jsonReply(404, {})
+  const e = await failure(calls.gql)
+  assert.equal(errorText(tVi as never, e),
+    'Máy chủ chưa trả lời được (HTTP 404). Thử lại sau ít phút; còn lỗi thì báo quản trị kèm mã này.')
+  assert.match(errorText(tEn as never, e), /^The server could not answer \(HTTP 404\)\. /)
+  assert.doesNotMatch(errorText(tVi as never, e), /Cannot read|undefined|Có lỗi xảy ra/)
+
+  // lỗi GraphQL kèm mã HTTP không thành công vẫn báo câu của Hasura như trước
+  reply = jsonReply(400, { errors: [{ message: 'field "x" not found', extensions: { code: 'validation-failed' } }] })
+  assert.equal((await failure(calls.gql)).code, 'validation-failed')
+})
+
 test('errorText: blocked → câu của cổng kèm mã, hai ngôn ngữ; không còn "Unexpected token"', async () => {
   reply = blockedReply()
   const e = await failure(calls.gql)
@@ -195,7 +214,8 @@ test('errorText: blocked → câu của cổng kèm mã, hai ngôn ngữ; không
   // lỗi khác giữ câu cũ
   const limited = new ApiError('rate_limited', 'rate_limited', 429)
   assert.equal(errorText(tVi as never, limited), lookup(vi, 'error.rate_limited'))
-  assert.equal(errorText(tVi as never, new ApiError('HTTP 502', null, 502)), 'HTTP 502')
+  assert.equal(errorText(tVi as never, new ApiError('HTTP 502', null, 502)),
+    'Máy chủ chưa trả lời được (HTTP 502). Thử lại sau ít phút; còn lỗi thì báo quản trị kèm mã này.')
 })
 
 test('errorText: tệp sai loại, tệp chạy được, ảnh không bỏ được EXIF → câu riêng, hai ngôn ngữ', async () => {
