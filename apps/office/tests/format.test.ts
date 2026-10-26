@@ -21,7 +21,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 process.env.TZ = 'America/Los_Angeles'   // máy ở múi giờ âm, có giờ mùa hè
-const { addDays, fmtDate, fmtDateTime, initialOf } = await import('../app/utils/format.ts')
+const { addDays, daysUntil, fmtDate, fmtDateTime, initialOf } = await import('../app/utils/format.ts')
 
 test('ngày thuần (cột date) không lệch theo múi giờ của máy', () => {
   assert.equal(fmtDate('2026-10-20'), '20/10/2026')
@@ -39,6 +39,14 @@ test('cộng ngày qua tháng, qua năm, qua ngày đổi giờ mùa hè của m
   assert.equal(addDays('2026-10-31', 1), '2026-11-01')
   assert.equal(addDays('2026-11-01', 1), '2026-11-02')
   assert.equal(addDays('2026-03-01', -1), '2026-02-28')
+})
+
+test('số ngày tới hạn: hôm nay là 0, quá hạn là số âm, qua tháng và qua năm vẫn đúng', () => {
+  assert.equal(daysUntil('2026-10-26', '2026-10-26'), 0)
+  assert.equal(daysUntil('2026-10-31', '2026-10-26'), 5)
+  assert.equal(daysUntil('2026-10-24', '2026-10-26'), -2)
+  assert.equal(daysUntil('2027-01-02', '2026-12-30'), 3)
+  assert.equal(daysUntil('2026-03-01', '2026-02-28'), 1)
 })
 
 test('chữ đại diện: chữ đầu của tên, viết hoa; thiếu tên thì lấy từ cuối của họ tên', () => {

@@ -507,125 +507,134 @@
 .moc-footer-verify { margin-left: auto; color: #284868; }
 .moc-footer-verify:hover, .moc-shell-footer a:hover { text-decoration: underline; }
 
-/* Hộp việc: việc khẩn hoặc quá hạn tách lên nhóm "Cần chú ý", mỗi việc là một liên kết tới văn bản */
-.moc-desk { max-width: 1080px; margin-inline: auto; }
+/* Hộp việc: đọc lướt, mở, làm. Mọi việc là một dòng hai tầng: dòng 1 dấu độ khẩn và trích yếu, dòng 2 số ký hiệu,
+   nơi gửi và bước phải làm (màu mực); cột hạn thẳng hàng bên phải. Việc khẩn hoặc quá hạn tách lên nhóm "Cần chú ý"
+   ở trên, cùng một kiểu dòng; danh sách không quá 1120px để mắt không phải chạy từ trích yếu sang hạn. */
+.moc-desk { max-width: 1120px; }
 .moc-desk-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
-.moc-desk-heading h1 { font-size: 28px; font-weight: 700; line-height: 1.25; }
-.moc-desk-heading p { font-size: 14px; line-height: 1.6; color: var(--muted); margin-top: 5px; }
-.moc-desk-heading p + p { margin-top: 0; }
-.moc-inbox-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; min-width: 0; }
+.moc-desk-heading h1 { font-size: 24px; font-weight: 600; line-height: 1.3; }
+.moc-desk-heading p { font-size: 14px; line-height: 1.5; color: var(--muted); margin-top: 4px; }
+.moc-inbox-toolbar { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .moc-desk-search {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid #898a79;
+  border: 1px solid #857f71;
   border-radius: 8px;
   background: #fff;
-  padding: 0 13px;
+  padding: 0 12px;
   flex: 1;
   min-width: 120px;
-  color: #666a59;
+  max-width: 560px;
+  color: #67635a;
   transition: border-color 180ms, box-shadow 180ms, background-color 180ms;
 }
 .moc-desk-search svg { flex-shrink: 0; }
 .moc-desk-search input {
   width: 100%;
   min-width: 0;
-  height: 44px;
+  height: 40px;
   font-size: 14px;
   outline: none;
   background: transparent;
 }
-.moc-desk-search:focus-within { outline: 2px solid #666d4c; outline-offset: 2px; }
-.moc-inbox-filter { width: 160px; min-height: 46px; }
-.moc-inbox-refresh { width: 44px; height: 46px; padding: 0; }
-.sg-task-groups { display: flex; flex-direction: column; gap: 24px; }
+.moc-desk-search:focus-within { border-color: #284868; outline: 2px solid #39597c; outline-offset: 2px; }
+.moc-inbox-filter { width: 176px; min-height: 42px; }
+.moc-inbox-refresh { width: 42px; min-height: 42px; padding: 0; }
+.moc-inbox-tabs { margin: 16px 0 24px; }
+.moc-tabs button.is-alert span { color: #9f1f16; font-weight: 600; }
+.sg-task-groups { display: flex; flex-direction: column; gap: 28px; }
 .sg-section-heading {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
 }
-.sg-section-heading h2 { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
+.sg-section-heading h2 { font-size: 15px; font-weight: 600; }
 .sg-section-heading > span { font-size: 13px; color: var(--muted); white-space: nowrap; }
-.sg-attention { background: #fffdf6; border: 1px solid #cbb57a; border-radius: 12px; padding: 20px 24px 0; }
-.sg-attention .sg-section-heading { margin-bottom: 16px; }
-.sg-attention ul { position: relative; }
-.sg-task-list {
-  background: #fff;
-  border: 1px solid var(--edge);
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-}
-.sg-task-item + .sg-task-item { border-top: 1px solid var(--edge); }
-.sg-attention .sg-task-item + .sg-task-item { border-color: #dfd3b7; }
+.sg-task-list { border-top: 1px solid var(--edge); position: relative; }
+.sg-task-item { border-bottom: 1px solid var(--edge); }
 .sg-task-link {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 116px 20px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 132px 18px;
+  gap: 24px;
   align-items: center;
-  padding: 20px 24px;
+  padding: 14px 12px;
+  margin-inline: -12px;
+  border-radius: 8px;
   text-decoration: none;
   transition: background-color 140ms;
   position: relative;
 }
-.sg-task-link:hover { background: #f7f8f1; }
-.sg-task-link:focus-visible { outline-offset: -4px; border-radius: 8px; }
+.sg-task-link:hover { background: #f8f6f1; }
+.sg-task-link:focus-visible { outline-offset: -2px; }
 .sg-task-identity { min-width: 0; }
-.sg-task-identity h3 { font-size: 17px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; max-width: 64ch; }
+.sg-task-identity h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  max-width: 72ch;
+}
+.sg-task-identity h3 > .sg-stamp { position: relative; top: -1px; }
 .sg-task-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
+  gap: 2px 8px;
   font-size: 14px;
   color: var(--muted);
   line-height: 1.5;
-  margin-top: 8px;
+  margin-top: 4px;
 }
-.sg-task-meta strong { font-weight: 500; color: #4d543d; }
-.sg-task-work { font-size: 14px; color: #555b3f; margin-top: 8px; line-height: 1.5; }
-.sg-task-deadline { font-size: 14px; color: var(--muted); line-height: 1.6; font-variant-numeric: tabular-nums; }
-.sg-task-deadline strong { display: block; font-weight: 500; color: #30342a; }
-.sg-task-deadline.is-overdue, .sg-task-deadline.is-overdue strong { color: #a02727; }
+.sg-task-meta > * + *::before { content: "·"; margin-right: 8px; color: #b0aa9b; }
+.sg-task-meta strong { font-weight: 500; color: #2f2d29; font-variant-numeric: tabular-nums; }
+.sg-task-step { color: #284868; font-weight: 500; }
+.sg-task-deadline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sg-task-deadline strong { font-size: 14px; font-weight: 500; color: #1d1c1a; }
+.sg-task-deadline.is-overdue, .sg-task-deadline.is-overdue strong { color: #9f1f16; }
+.sg-task-arrow { color: #b0aa9b; transition: transform 240ms var(--sg-ease), color 160ms; }
+.sg-task-link:hover .sg-task-arrow, .sg-task-link:focus-visible .sg-task-arrow {
+  color: #284868;
+  transform: translateX(3px);
+}
 /* khung báo kết quả: phần việc được giao tách khỏi ô kết quả bằng một đường kẻ */
 .sg-assignment-brief { padding-bottom: 16px; border-bottom: 1px solid var(--edge); }
-.sg-task-action {
-  display: flex;
+/* độ khẩn in như con dấu son trên công văn giấy: Khẩn viền mảnh, Thượng khẩn viền đậm, Hỏa tốc nền son chữ trắng */
+.sg-stamp {
+  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  color: #555b3f;
-  font-size: 14px;
-  font-weight: 500;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1.5px solid #b42419;
+  border-radius: 4px;
+  background: #fff;
+  color: #9f1f16;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
 }
-.sg-task-action svg { flex-shrink: 0; transition: transform 240ms var(--sg-ease); }
-.sg-task-link:hover .sg-task-action svg, .sg-task-link:focus-visible .sg-task-action svg { transform: translateX(4px); }
-.sg-task-item.is-highlight .sg-task-link {
-  padding: 0 0 16px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0 14px;
-  background: transparent;
-}
-.is-highlight .sg-task-identity { grid-column: 1 / -1; padding-bottom: 16px; }
-.is-highlight .sg-task-identity h3 { font-size: 19px; line-height: 1.5; margin-top: 8px; font-weight: 600; }
-.is-highlight .sg-task-meta { margin-top: 12px; }
-.sg-task-alert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.sg-task-alert .chip { font-size: 12px; }
-.is-highlight .sg-task-deadline, .is-highlight .sg-task-action {
-  padding-top: 12px;
-  border-top: 1px solid #dfd3b7;
-  align-self: stretch;
-}
-.is-highlight .sg-task-deadline { display: flex; align-items: center; gap: 5px; }
-.is-highlight .sg-task-action { align-items: center; }
+.sg-stamp.is-strong { border-width: 2px; font-weight: 700; }
+.sg-stamp.is-fire { background: #b42419; color: #fff; font-weight: 700; }
 
 /* Chuyển động chỉ diễn tả điều hướng, đổi trạng thái và phản hồi trực tiếp; không hiệu ứng khi cuộn */
 .sg-task-enter-active { transition: opacity 220ms ease, transform 280ms var(--sg-ease); }
@@ -654,12 +663,7 @@
 @media (max-width: 1200px) {
   .sg-paper { padding: 28px 28px 18px; }
   .sg-topbar time { display: none; }
-  .sg-task-link { grid-template-columns: minmax(0, 1fr) 100px 18px; gap: 12px; padding: 18px; }
-  .moc-inbox-toolbar { flex-wrap: wrap; }
-  .moc-desk-search { flex-basis: 220px; }
-  .moc-inbox-filter { width: 148px; }
-  .sg-attention { padding: 20px 20px 0; }
-  .is-highlight .sg-task-identity h3 { font-size: 18px; }
+  .sg-task-link { grid-template-columns: minmax(0, 1fr) 116px 18px; gap: 16px; }
 }
 
 /* Màn hẹp hoặc màn cảm ứng (không rê chuột được): thanh bên thành ngăn kéo, mở bằng nút menu, có lớp phủ phía sau */
@@ -713,31 +717,22 @@
   .sg-topbar-context { gap: 10px; }
   .sg-topbar-tools { gap: 0; }
   .sg-language { padding-inline: 7px; }
-  .moc-desk-heading { align-items: flex-start; gap: 10px; margin-bottom: 23px; }
-  .moc-desk-heading h1 { font-size: 27px; }
+  .moc-desk-heading { align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+  .moc-desk-heading h1 { font-size: 22px; }
   .moc-desk-heading p { font-size: 13px; }
   .moc-desk-heading > .btn-primary { font-size: 13px; padding-inline: 12px; }
-  .moc-inbox-toolbar { gap: 8px; margin-bottom: 22px; }
-  .moc-desk-search { flex-basis: 100%; }
-  .moc-inbox-filter { width: 0; flex: 1; min-width: 0; padding-inline: 9px; }
-  .moc-inbox-filter:first-of-type { flex: 1.4; }
-  .moc-inbox-refresh { min-width: 44px; }
-  .sg-attention { padding: 17px 16px 0; }
-  .sg-section-heading { gap: 8px; }
-  .sg-section-heading h2 { font-size: 16px; }
-  .is-highlight .sg-task-identity h3 { font-size: 18px; }
-  .is-highlight .sg-task-identity { padding-bottom: 20px; }
-  .sg-task-item.is-highlight .sg-task-link { gap: 0 8px; }
-  .is-highlight .sg-task-action { font-size: 13px; text-align: right; max-width: 175px; }
-  .is-highlight .sg-task-deadline { align-items: flex-start; flex-wrap: wrap; align-content: center; gap: 0 4px; }
-  .sg-task-link { grid-template-columns: minmax(0, 1fr) 18px; gap: 6px 12px; padding: 17px 16px; }
+  .moc-inbox-toolbar { flex-wrap: wrap; }
+  .moc-desk-search { flex-basis: 100%; max-width: none; }
+  .moc-desk-search input { height: 42px; }
+  .moc-inbox-filter { width: 0; flex: 1; min-width: 0; min-height: 44px; }
+  .moc-inbox-refresh { min-width: 44px; min-height: 44px; }
+  .moc-inbox-tabs { margin: 12px 0 20px; }
+  /* điện thoại: hạn xuống dòng 3, mũi tên giữ cột phải */
+  .sg-task-link { grid-template-columns: minmax(0, 1fr) 18px; gap: 6px 12px; padding: 14px 12px; }
   .sg-task-identity { grid-column: 1; }
-  .sg-task-identity h3 { font-size: 16px; }
-  .sg-task-meta { gap: 4px 10px; }
-  .sg-task-deadline { grid-column: 1; display: flex; gap: 5px; margin-top: 6px; }
-  .sg-task-deadline strong { display: inline; }
-  .sg-task-action { grid-column: 2; grid-row: 1 / 3; }
-  .is-highlight .sg-task-action { grid-row: auto; }
+  .sg-task-identity h3 { font-size: 15px; gap: 8px; }
+  .sg-task-deadline { grid-column: 1; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+  .sg-task-arrow { grid-column: 2; grid-row: 1 / 3; }
   .moc-shell-footer { font-size: 12px; gap: 8px; }
   .moc-shell-footer > span:last-child { width: 100%; }
   .moc-footer-verify { margin-left: auto; }
@@ -776,10 +771,6 @@
   input, select, textarea { font-size: 16px !important; }
 }
 
-@media (max-width: 380px) {
-  .moc-inbox-filter:first-of-type { flex-basis: 100%; width: 100%; }
-}
-
 /* Người dùng chọn giảm chuyển động: bỏ hiệu ứng, thời lượng chuyển, cuộn mượt, dịch chuyển khi rê hay nhấn; trạng thái
    vẫn đổi như thường */
 @media (prefers-reduced-motion: reduce) {
@@ -791,6 +782,6 @@
   .sg-task-enter-from, .sg-task-leave-to,
   .sg-popover-enter-from, .sg-popover-leave-to, .sg-notice-enter-from, .sg-notice-leave-to { transform: none; }
   .sg-nav-label, .sg-brand-full { transform: none !important; }
-  .sg-nav-link:hover svg, .sg-task-link:hover .sg-task-action svg, .sg-task-link:focus-visible .sg-task-action svg,
+  .sg-nav-link:hover svg, .sg-task-link:hover .sg-task-arrow, .sg-task-link:focus-visible .sg-task-arrow,
   .btn-primary:active, .btn-secondary:active, .btn-ghost:active { transform: none !important; }
 }

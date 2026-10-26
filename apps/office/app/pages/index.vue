@@ -63,18 +63,28 @@ const urgent = (task: InboxTask) => !!task.urgency && task.urgency !== 'normal'
 const normalize = (value: string) =>
   value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd')
 
-const visible = computed(() => {
+// số việc của từng thẻ lọc, trong phạm vi chiều văn bản và từ khóa đang tìm: đổi tìm kiếm thì số đổi theo
+const scoped = computed(() => {
   const needle = normalize(query.value)
   return tasks.value.filter((task) => {
     if (category.value === 'incoming' && !task.form_key.startsWith('vbden.')) return false
     if (category.value === 'outgoing' && !task.form_key.startsWith('vbdi.')) return false
-    if (filter.value === 'overdue' && !overdue(task)) return false
-    if (filter.value === 'today' && !dueToday(task)) return false
-    if (filter.value === 'urgent' && !urgent(task)) return false
     const doc = task.document
     return normalize([doc?.summary, doc?.symbol, doc?.issuer_name].join(' ')).includes(needle)
   })
 })
+const counts = computed<Record<Filter, number>>(() => ({
+  all: scoped.value.length,
+  today: scoped.value.filter(dueToday).length,
+  overdue: scoped.value.filter(overdue).length,
+  urgent: scoped.value.filter(urgent).length,
+}))
+const visible = computed(() => scoped.value.filter((task) => {
+  if (filter.value === 'overdue') return overdue(task)
+  if (filter.value === 'today') return dueToday(task)
+  if (filter.value === 'urgent') return urgent(task)
+  return true
+}))
 // việc khẩn hoặc quá hạn tách lên nhóm "Cần chú ý"
 const attention = (task: InboxTask) => urgent(task) || overdue(task)
 const attentionTasks = computed(() => visible.value.filter(attention))
@@ -123,7 +133,6 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
     <div class="moc-desk-heading">
       <div>
         <h1>{{ t('inbox.title') }}</h1>
-        <p>{{ t('inbox.subtitle') }}</p>
         <p aria-live="polite">
           {{ loading && !tasks.length ? t('fe.loading') : t('desk.pending', { n: tasks.length }) }}
         </p>
@@ -158,9 +167,6 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
         <option value="incoming">{{ t('nav.incoming') }}</option>
         <option value="outgoing">{{ t('nav.outgoing') }}</option>
       </select>
-      <select v-model="filter" class="input moc-inbox-filter" :aria-label="t('desk.filter')">
-        <option v-for="(label, key) in filters" :key="key" :value="key">{{ t(label) }}</option>
-      </select>
       <button class="btn-secondary moc-inbox-refresh" :disabled="loading" :aria-label="t('app.refresh')" @click="load">
         <svg
           width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
@@ -168,6 +174,16 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
         >
           <path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0112-1l2 3M4 15l2 3a7 7 0 0012-1" />
         </svg>
+      </button>
+    </div>
+
+    <!-- thẻ lọc kèm số việc: một lần bấm thấy ngay việc hôm nay, quá hạn, khẩn -->
+    <div class="moc-tabs moc-inbox-tabs" role="tablist" :aria-label="t('desk.filter')">
+      <button
+        v-for="(label, key) in filters" :key="key" role="tab" :aria-selected="filter === key"
+        :class="{ 'is-alert': key === 'overdue' && counts.overdue > 0 }" @click="filter = key"
+      >
+        {{ t(label) }}<span>{{ counts[key] }}</span>
       </button>
     </div>
 
@@ -186,20 +202,12 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
     <div v-else-if="visible.length" :aria-busy="loading" class="sg-task-groups" data-testid="inbox">
       <section v-if="attentionTasks.length" class="sg-attention" :aria-label="t('desk.attention')">
         <div class="sg-section-heading">
-          <h2>
-            <svg
-              width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-              aria-hidden="true"
-            >
-              <path d="m12 3 10 18H2L12 3zm0 6v5m0 3v1" />
-            </svg>
-            {{ t('desk.attention') }}
-          </h2>
+          <h2>{{ t('desk.attention') }}</h2>
           <span>{{ t('fe.tasks', { n: attentionTasks.length }) }}</span>
         </div>
-        <TransitionGroup name="sg-task" tag="ul">
+        <TransitionGroup name="sg-task" tag="ul" class="sg-task-list">
           <TaskQueueItem
-            v-for="task in attentionTasks" :key="task.id" :task="task" :overdue="overdue(task)" highlight
+            v-for="task in attentionTasks" :key="task.id" :task="task" :day="day" :overdue="overdue(task)"
           />
         </TransitionGroup>
       </section>
@@ -209,7 +217,9 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
           <span>{{ t('fe.tasks', { n: otherTasks.length }) }}</span>
         </div>
         <TransitionGroup name="sg-task" tag="ul" class="sg-task-list">
-          <TaskQueueItem v-for="task in otherTasks" :key="task.id" :task="task" :overdue="overdue(task)" />
+          <TaskQueueItem
+            v-for="task in otherTasks" :key="task.id" :task="task" :day="day" :overdue="overdue(task)"
+          />
         </TransitionGroup>
       </section>
     </div>

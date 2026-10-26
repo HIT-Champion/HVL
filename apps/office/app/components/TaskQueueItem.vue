@@ -19,8 +19,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-// Một việc trong hộp việc: cả dòng là một liên kết tới văn bản. Việc khẩn hoặc quá hạn (highlight) nằm trong nhóm
-// "Cần chú ý": hiện chip độ khẩn / quá hạn ở trên, bước xử lý đưa sang cạnh mũi tên.
+// Một việc trong hộp việc: cả dòng là một liên kết tới văn bản. Dòng 1: dấu độ khẩn và trích yếu; dòng 2: số ký hiệu,
+// nơi gửi và bước phải làm. Cột phải: hạn và còn bao nhiêu ngày (quá hạn thì đỏ son), thẳng hàng giữa các dòng.
 interface QueueTask {
   name: string
   form_key: string
@@ -30,38 +30,44 @@ interface QueueTask {
   document: { symbol: string | null; summary: string; issuer_name: string | null } | null
 }
 
-defineProps<{ task: QueueTask; highlight?: boolean; overdue?: boolean }>()
+const props = defineProps<{ task: QueueTask; day: string; overdue?: boolean }>()
 const { t } = useI18n()
+
+const left = computed(() => props.task.due_on ? daysUntil(props.task.due_on, props.day) : null)
+const dueNote = computed(() => {
+  const n = left.value
+  if (n === null) return t('desk.noDeadline')
+  if (n < 0) return t('desk.overdueBy', { n: -n }, -n)
+  if (n === 0) return t('desk.dueToday')
+  return t('desk.dueIn', { n }, n)
+})
 </script>
 
 <template>
-  <li class="sg-task-item" :class="{ 'is-highlight': highlight }">
+  <li class="sg-task-item" :class="{ 'is-overdue': overdue }">
     <NuxtLink :to="{ path: `/van-ban/${task.document_id}`, query: { from: 'inbox' } }" class="sg-task-link">
       <div class="sg-task-identity">
-        <div v-if="highlight" class="sg-task-alert">
+        <h3>
           <UrgencyChip v-if="task.urgency && task.urgency !== 'normal'" :urgency="task.urgency" quiet />
-          <span v-if="overdue" class="chip bg-red-100 text-red-800">{{ t('fe.overdue') }}</span>
-        </div>
-        <h3>{{ task.document?.summary || task.name }}</h3>
-        <div class="sg-task-meta">
+          <span>{{ task.document?.summary || task.name }}</span>
+        </h3>
+        <p class="sg-task-meta">
           <strong>{{ task.document?.symbol || t('desk.draft') }}</strong>
           <span v-if="task.document?.issuer_name">{{ task.document.issuer_name }}</span>
-        </div>
-        <p v-if="!highlight" class="sg-task-work">{{ t(`task.${task.form_key}`) }}</p>
+          <span class="sg-task-step">{{ t(`task.${task.form_key}`) }}</span>
+        </p>
       </div>
-      <div class="sg-task-deadline" :class="{ 'is-overdue': overdue }">
-        <span>{{ t('fe.due') }}</span>
-        <strong>{{ task.due_on ? fmtDate(task.due_on) : t('desk.noDeadline') }}</strong>
-      </div>
-      <span class="sg-task-action">
-        <span v-if="highlight">{{ t(`task.${task.form_key}`) }}</span>
-        <svg
-          width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-          aria-hidden="true"
-        >
-          <path d="M5 12h14m-5-5l5 5-5 5" />
-        </svg>
-      </span>
+      <p class="sg-task-deadline" :class="{ 'is-overdue': overdue }">
+        <span class="sr-only">{{ t('fe.due') }}</span>
+        <strong>{{ task.due_on ? fmtDate(task.due_on) : '—' }}</strong>
+        <span>{{ dueNote }}</span>
+      </p>
+      <svg
+        class="sg-task-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.6" aria-hidden="true"
+      >
+        <path d="M5 12h14m-5-5l5 5-5 5" />
+      </svg>
     </NuxtLink>
   </li>
 </template>

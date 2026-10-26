@@ -56,7 +56,7 @@ trong CI: 3 082 test đạt** (1 428 + 486 + 370 + 199 + 13 + 20 + 543 + 23 — 
 thành nhiều ca. Test của `scripts` chỉ bỏ qua có điều kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư
 mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job
 `unit` không đặt, nên 9 test này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 18
-(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 4, `paging.test.ts` 4.
+(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 5, `paging.test.ts` 4.
 
 ## 2. Ma trận tính năng
 

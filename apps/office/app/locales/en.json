@@ -113,7 +113,6 @@
   },
   "inbox": {
     "title": "My tasks",
-    "subtitle": "Tasks waiting for you — urgent first",
     "empty": "Nothing is waiting for you.",
     "received": "Received",
     "due": "Due",
@@ -1639,7 +1638,10 @@
     "attention": "Needs attention",
     "remaining": "Other tasks",
     "category": "Direction",
-    "allDocuments": "All documents"
+    "allDocuments": "All documents",
+    "dueIn": "{n} day left | {n} days left",
+    "dueToday": "Due today",
+    "overdueBy": "{n} day overdue | {n} days overdue"
   },
   "shell": {
     "closeNav": "Close navigation",

@@ -18,15 +18,19 @@
 
 <script setup lang="ts">
 const props = defineProps<{ urgency: string; quiet?: boolean }>()
+// độ khẩn in như con dấu son trên công văn giấy (main.css .sg-stamp): Khẩn viền mảnh, Thượng khẩn viền đậm, Hỏa tốc nền
+// son; độ khẩn thường là chip xám
 const tone: Record<string, string> = {
-  khan: 'bg-amber-100 text-amber-900 ring-1 ring-amber-300',
-  thuong_khan: 'bg-orange-100 text-orange-900 ring-1 ring-orange-300',
-  hoa_toc: 'bg-red-100 text-red-800 ring-1 ring-red-300',
+  khan: 'sg-stamp',
+  thuong_khan: 'sg-stamp is-strong',
+  hoa_toc: 'sg-stamp is-fire',
 }
 </script>
 
 <template>
-  <span v-if="props.urgency !== 'normal' || !props.quiet" class="chip" :class="tone[props.urgency] ?? 'bg-stone-100 text-stone-600'">
+  <span
+    v-if="props.urgency !== 'normal' || !props.quiet" :class="tone[props.urgency] ?? 'chip bg-stone-100 text-stone-600'"
+  >
     {{ $t(`urgency.${props.urgency}`) }}
   </span>
 </template>

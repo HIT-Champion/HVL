@@ -47,6 +47,11 @@ export function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+// Số ngày từ hôm nay tới hạn (YYYY-MM-DD): 0 là hạn hôm nay, âm là đã quá hạn bấy nhiêu ngày
+export function daysUntil(due: string, day: string): number {
+  return Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)
+}
+
 // Số đo (nhiệt độ cảm biến…) theo kiểu Việt Nam: 41,5
 export function fmtNumber(value: unknown): string {
   const n = Number(value)

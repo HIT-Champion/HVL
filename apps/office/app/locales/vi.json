@@ -113,7 +113,6 @@
   },
   "inbox": {
     "title": "Hộp việc",
-    "subtitle": "Việc đang chờ bạn — văn bản khẩn xếp trước",
     "empty": "Không còn việc nào chờ bạn.",
     "received": "Nhận lúc",
     "due": "Hạn",
@@ -1639,7 +1638,10 @@
     "attention": "Cần chú ý",
     "remaining": "Các công việc còn lại",
     "category": "Chiều văn bản",
-    "allDocuments": "Tất cả văn bản"
+    "allDocuments": "Tất cả văn bản",
+    "dueIn": "Còn {n} ngày",
+    "dueToday": "Đến hạn hôm nay",
+    "overdueBy": "Quá hạn {n} ngày"
   },
   "shell": {
     "closeNav": "Đóng điều hướng",
