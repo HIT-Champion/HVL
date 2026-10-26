@@ -21,12 +21,14 @@
     lần thì áp cho các tệp sau nó trong cùng ô;
   * mỗi "`tệp` N" sau một thư mục là tệp có thật, có đúng N hàm test: Python `def test_` (cả async), giao diện
     (`.ts`, `.js`) `test(` hay `it(` đầu dòng, e2e `test(` sát lề;
+  * "`test_x_*.py` N" là tổng mọi tệp khớp mẫu, trừ các tệp nêu trong "(trừ `…`)" ngay sau số;
   * số chỉ một phần tệp viết "`tệp` (N hàm về …)": không phải "`tệp` N" nên không bị kiểm.
 Tổng ở §1 và số chạy trong CI đếm lại khi chốt bản phát hành, không kiểm ở đây.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
+import fnmatch
 import pathlib
 import re
 import unittest
@@ -46,27 +48,32 @@ DIRS = {
 }
 # thư mục rồi khoảng trắng ("office: …" cũng được): không bắt `db` trong "job `db`" vì sau nó là dấu `
 TOKEN = re.compile(r"(?<![\w`-])(" + "|".join(map(re.escape, DIRS)) + r"):?\s"
-                   r"|`([\w./-]+\.(?:py|ts|js))`(?:\s+(\d+)\b)?")
+                   r"|`([\w./*-]+\.(?:py|ts|js))`"
+                   r"(?:\s+(\d+)\b(?:\s*\(trừ ((?:`[\w./-]+`(?:,\s*)?)+)\))?)?")
+NAME = re.compile(r"`([^`]+)`")
 CELL = re.compile(r"(?<!\\)\|")                       # "\|" trong ô (lệnh grep) không tách ô
 PY = re.compile(r"^\s*(?:async\s+)?def test_", re.M)
 UI = re.compile(r"^\s*(?:test|it)\(", re.M)
 E2E = re.compile(r"^test\(", re.M)
 
 
-def count(path: pathlib.Path) -> int | None:
-    """Số hàm test của một tệp theo cách đếm ở §1; None nếu không có tệp."""
-    if not path.is_file():
-        return None
+def count(path: pathlib.Path) -> int:
+    """Số hàm test của một tệp theo cách đếm ở §1."""
     text = path.read_text(encoding="utf-8")
     if path.suffix == ".py":
         return len(PY.findall(text))
     return len((E2E if path.name.endswith(".spec.ts") else UI).findall(text))
 
 
-def problems(text: str, counter: Callable[[str], int | None]) -> tuple[list[tuple[int, str]], int]:
+def files(pattern: str) -> dict[str, int]:
+    """Tệp khớp ``pattern`` (từ gốc repo, có thể có ``*``) → số hàm test; rỗng nếu không có tệp nào."""
+    return {p.relative_to(ROOT).as_posix(): count(p) for p in sorted(ROOT.glob(pattern)) if p.is_file()}
+
+
+def problems(text: str, lookup: Callable[[str], dict[str, int]]) -> tuple[list[tuple[int, str]], int]:
     """Chỗ ghi sai trong các bảng của tài liệu: ([(số dòng, lời báo)], số cặp "`tệp` N" đã kiểm).
 
-    counter: đường dẫn từ gốc repo → số hàm test, None nếu không có tệp."""
+    lookup: như ``files`` — đường dẫn từ gốc repo, có thể có ``*`` → {tệp khớp: số hàm test}."""
     found, checked = [], 0
     for no, line in enumerate(text.split("\n"), 1):
         if not line.startswith("|"):
@@ -77,16 +84,21 @@ def problems(text: str, counter: Callable[[str], int | None]) -> tuple[list[tupl
                 if m.group(1):
                     folder = m.group(1)
                     continue
-                name, written = m.group(2), m.group(3)
+                name, written, skip = m.group(2), m.group(3), NAME.findall(m.group(4) or "")
                 if written is None or folder is None:
                     continue
                 checked += 1
-                path = f"{DIRS[folder]}/{name}"
-                real = counter(path)
-                if real is None:
-                    found.append((no, f"{folder} `{name}`: không có tệp {path}"))
+                where, path = f"{folder} `{name}`", f"{DIRS[folder]}/{name}"
+                matched = lookup(path)
+                stray = [s for s in skip if f"{DIRS[folder]}/{s}" not in matched]
+                real = sum(n for p, n in matched.items() if p.rsplit("/", 1)[-1] not in skip)
+                if not matched:
+                    found.append((no, f"{where}: không có tệp {path}"))
+                elif stray:
+                    found.append((no, f"{where}: trừ `{stray[0]}` nhưng mẫu không khớp tệp đó"))
                 elif real != int(written):
-                    found.append((no, f"{folder} `{name}`: bảng ghi {written}, tệp có {real} hàm test"))
+                    what = f"{len(matched) - len(skip)} tệp khớp có" if "*" in name else "tệp có"
+                    found.append((no, f"{where}: bảng ghi {written}, {what} {real} hàm test"))
     return found, checked
 
 
@@ -107,17 +119,24 @@ class CountTest(unittest.TestCase):
             (folder / "a.test.js").write_text((folder / "a.test.ts").read_text())   # ca-nhan, bang-tin
             self.assertEqual(count(folder / "a.test.js"), 3)
             self.assertEqual(count(folder / "a.spec.ts"), 1)
-            self.assertIsNone(count(folder / "test_khong_co.py"))
+
+    def test_files_globs_from_the_repo_root(self) -> None:
+        self.assertEqual(list(files("scripts/tests/test_muc_hoan_*.py")), ["scripts/tests/test_muc_hoan_thien.py"])
+        self.assertEqual(list(files("scripts/tests/test_muc_hoan_thien.py")), ["scripts/tests/test_muc_hoan_thien.py"])
+        self.assertEqual(files("scripts/tests/test_khong_co*.py"), {})
 
 
 class ProblemsTest(unittest.TestCase):
     """problems() trên bảng viết tay với số đếm giả: bắt đúng chỗ sai, bỏ qua chỗ không phải "`tệp` N"."""
 
     FILES = {"services/svc-files/tests/test_a.py": 4, "services/svc-files/tests/test_b.py": 2,
+             "services/svc-files/tests/test_assist_api.py": 5, "services/svc-files/tests/test_assist_rank.py": 3,
+             "services/svc-files/tests/test_assist_similar.py": 2,
              "db/tests/test_c.py": 7, "apps/office/tests/d.test.ts": 3, "tests/e2e/e.spec.ts": 1}
 
     def check(self, text: str) -> tuple[list[str], int]:
-        found, checked = problems(text, self.FILES.get)
+        found, checked = problems(text, lambda pattern: {p: n for p, n in self.FILES.items()
+                                                         if fnmatch.fnmatchcase(p, pattern)})
         return [f"{no}: {msg}" for no, msg in found], checked
 
     def test_correct_counts_pass(self) -> None:
@@ -142,15 +161,32 @@ class ProblemsTest(unittest.TestCase):
         row = r"| office | `grep -hE '^\s*(test\|it)\('` | office `d.test.ts` 5 |"
         self.assertEqual(self.check(row), (["1: office `d.test.ts`: bảng ghi 5, tệp có 3 hàm test"], 1))
 
+    def test_glob_sums_every_matching_file(self) -> None:
+        self.assertEqual(self.check("| F4 | svc-files `test_assist_*.py` 10; db `test_c.py` 7 |"), ([], 2))
+        self.assertEqual(self.check("| F4 | svc-files `test_assist_*.py` 8 | db `test_x_*.py` 1 |"),
+                         (["1: svc-files `test_assist_*.py`: bảng ghi 8, 3 tệp khớp có 10 hàm test",
+                           "1: db `test_x_*.py`: không có tệp db/tests/test_x_*.py"], 2))
+
+    def test_glob_except_leaves_out_the_named_files(self) -> None:
+        row = "| F4 | svc-files `test_assist_*.py` {} (trừ `test_assist_similar.py`{}); db `test_c.py` 7 |"
+        self.assertEqual(self.check(row.format(8, "")), ([], 2))
+        self.assertEqual(self.check(row.format(10, "")),
+                         (["1: svc-files `test_assist_*.py`: bảng ghi 10, 2 tệp khớp có 8 hàm test"], 2))
+        self.assertEqual(self.check(row.format(5, ", `test_assist_rank.py`")), ([], 2))
+        # tên gõ sai trong "(trừ …)" không được lặng lẽ cộng cả tệp lẽ ra phải trừ
+        self.assertEqual(self.check(row.format(8, ", `test_assist_ranks.py`")),
+                         (["1: svc-files `test_assist_*.py`: trừ `test_assist_ranks.py` nhưng mẫu không khớp tệp đó"],
+                          2))
+
 
 class DocTest(unittest.TestCase):
     maxDiff = None                                    # in đủ mọi dòng sai, không cắt
 
     def test_matrix_counts_match_the_test_files(self) -> None:
-        found, checked = problems(DOC.read_text(encoding="utf-8"), lambda rel: count(ROOT / rel))
+        found, checked = problems(DOC.read_text(encoding="utf-8"), files)
         self.assertEqual([f"docs/muc-hoan-thien.md:{no}: {msg}" for no, msg in found], [],
                          "thêm, bớt hàm test thì sửa số trong bảng ở cùng pull request")
-        # cận dưới: bộ đọc bảng hỏng thì đỏ thay vì qua mà không kiểm gì (26/10: 97 cặp)
+        # cận dưới: bộ đọc bảng hỏng thì đỏ thay vì qua mà không kiểm gì (26/10: 103 cặp)
         self.assertGreaterEqual(checked, 90, f"chỉ đọc được {checked} cặp `tệp` N")
 
 
