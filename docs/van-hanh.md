@@ -273,7 +273,9 @@ systemd timer gọi nó mỗi 60 giây (tệp mẫu [`platform/systemd/`](../pla
 container: không gắn socket Docker vào container nào). Mỗi lượt:
 
 - **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
-  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Thử: `make demo-tu-phuc-hoi` (`docs/demo-script.md`).
+  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Dịch vụ chạy một lần `keycloak-fonts` (chép phông của
+  theme đăng nhập vào volume, #305) đã xong, thoát 0, không tính là đã dừng. Thử: `make demo-tu-phuc-hoi`
+  (`docs/demo-script.md`).
 - **GitOps** (khi đặt `MOC_GITOPS_DIR` trong `.env` của bản cài): kéo nhánh `MOC_GITOPS_BRANCH` (mặc định `deploy`)
   về một bản sao git riêng của reconciler. Lần chạy đầu mà bản sao có thay đổi chưa commit thì reconciler từ chối,
   không xóa việc của ai; từ khi đã áp một commit, mỗi lần áp đều `checkout -f` và `clean -fd` bản sao, nên đừng sửa

@@ -57,12 +57,13 @@ PUBLIC_API = [
     ("/api/status", ["GET"]),
     ("/api/case-files/{case_file_id}/archive", ["GET", "POST"]),
     ("/api/case-files/{case_file_id}/archive/files/{file_id}", ["GET"]),
+    ("/api/case-files/archive-stats", ["GET"]),
 ]
 # Văn phòng tắt: chỉ còn các đường dẫn của lõi, giữ thứ tự cũ
 CORE_API = ["/api/documents/ask", "/api/files", "/api/files/{file_id}", "/api/search", "/api/verify/anchor-key.pem",
             "/api/status"]
 
-# 11 route khai trong office/api.py, rồi các route Văn phòng gắn qua install(): đọc văn bản đến, gợi ý giao việc, nạp lô
+# 12 route khai trong office/api.py, rồi các route Văn phòng gắn qua install(): đọc văn bản đến, gợi ý giao việc, nạp lô
 OFFICE_ROUTES = [
     ("POST", "/internal/issue"),
     ("POST", "/internal/dispatch-file"),
@@ -75,6 +76,7 @@ OFFICE_ROUTES = [
     ("GET", f"/api/case-files/{CASE}/archive"),
     ("GET", f"/api/case-files/{CASE}/archive/files/{FILE}"),
     ("POST", f"/api/case-files/{CASE}/archive"),
+    ("GET", "/api/case-files/archive-stats"),
     ("POST", f"/api/files/{FILE}/read"),
     ("POST", "/internal/similar-documents"),
     ("POST", "/api/imports/incoming"),

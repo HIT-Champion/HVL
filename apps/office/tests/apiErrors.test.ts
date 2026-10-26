@@ -113,6 +113,8 @@ const calls: Record<string, () => Promise<unknown>> = {
   readingRoom: () => api.readingRoom('00000000-0000-0000-0000-000000000002'),
   viewArchivedFile: () => api.viewArchivedFile('00000000-0000-0000-0000-000000000002',
     '00000000-0000-0000-0000-000000000001'),
+  // số liệu đã nộp lưu trên trang Điều hành (#304)
+  archiveStats: () => api.archiveStats(),
 }
 
 async function failure(call: () => Promise<unknown>): Promise<InstanceType<typeof ApiError>> {
@@ -152,7 +154,7 @@ test('403 JSON của Hasura, svc-files giữ mã cũ, không thành blocked', as
 
   reply = jsonReply(403, { detail: { code: 'forbidden', message: 'Không có quyền với tệp này' } })
   for (const name of ['upload', 'preview', 'register', 'search', 'readFile', 'ask', 'archiveCaseFile', 'readingRoom',
-    'viewArchivedFile']) {
+    'viewArchivedFile', 'archiveStats']) {
     const e = await failure(calls[name])
     assert.equal(e.code, 'forbidden', name)
     assert.equal(e.message, 'Không có quyền với tệp này', name)
