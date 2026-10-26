@@ -19,6 +19,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   việc của mình; dữ liệu sai form trả `422` từng trường, kể cả từ khóa mới `x-moc-range`; đơn vị, phòng, người gửi lấy
   từ token. Hộp việc Văn phòng điện tử chỉ còn nhận việc của quy trình văn bản đến, đi. Thư viện mới của svc-workflow:
   PyJWT (kèm `cryptography`), như svc-files. Chi tiết: `docs/them-ung-dung.md` mục 1.10, `docs/api/README.md` §8.
+- Ứng dụng mẫu Đơn nghỉ phép `apps/nghi-phep` (#301), cắm vào lõi bằng `moc app install` như Bảng tin. Ứng dụng không
+  có máy chủ nghiệp vụ, không có bảng: quy trình BPMN và hai form JSON Schema khai ở mục `workflow` của manifest, chạy
+  trên động cơ quy trình của lõi qua API chung `/api/workflow/nghi-phep/…`. Nhân viên gửi đơn, trưởng phòng của chính
+  phòng người gửi duyệt hoặc từ chối, người gửi theo dõi kết quả. `make demo-quy-trinh` (bước CI mới ở phần
+  `luong-chinh`) kiểm cả luồng: BPMN có `scriptTask` bị từ chối lúc cài, dữ liệu sai trả `422` đúng ô, phòng khác
+  không thấy việc, token của client khác bị từ chối, cài lại không đổi gì, gỡ giữ lịch sử đơn.
 - Hạn gợi ý giao việc tránh ngày lễ (F4.3, #280). Trước đây hạn chỉ dời khỏi thứ Bảy, Chủ nhật. Biến mới `MOC_HOLIDAYS`
   của svc-workflow nhận ba dạng, cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
   `YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định là các ngày lễ dương lịch cố định ở Điều 112 Bộ luật Lao

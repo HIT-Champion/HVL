@@ -143,8 +143,9 @@ nhiêu lần cũng được — kịch bản trình bày ở [`docs/demo-script.
 Các màn nghiệp vụ, cùng cách chạy: `make demo-lien-thong` (liên thông hai đơn vị), `make demo-nap-lo` (nạp lô văn bản
 đến), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (trợ lý AI),
 `make demo-ky-so` (ký số, minh họa), `make demo-ca-nhan` (ứng dụng thứ hai trên cùng lõi), `make demo-cai-ung-dung`
-(cắm ứng dụng thứ ba bằng một lệnh), `make demo-tat-van-phong` (tắt phần Văn phòng điện tử, lõi vẫn chạy),
-`make demo-log-tap-trung` (log tập trung).
+(cắm ứng dụng thứ ba bằng một lệnh), `make demo-quy-trinh` (ứng dụng thứ tư mang quy trình riêng, chạy trên động cơ
+quy trình của lõi), `make demo-tat-van-phong` (tắt phần Văn phòng điện tử, lõi vẫn chạy), `make demo-log-tap-trung`
+(log tập trung).
 
 ## Công nghệ và giấy phép
 

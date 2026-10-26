@@ -29,8 +29,9 @@ trong "(trừ `…`)" ngay sau số. Số chỉ một phần tệp viết "`tệ
 Một tệp có thể phục vụ nhiều tính năng; bảng gán tệp cho tính năng chính của nó, chỗ dùng lại ghi "đã tính ở …". Viết
 tắt thư mục test: svc-files = `services/svc-files/tests/`, svc-workflow = `services/svc-workflow/tests/`, db =
 `db/tests/`, scripts = `scripts/tests/`, office = `apps/office/tests/`, ca-nhan = `apps/ca-nhan/tests/`, bang-tin =
-`apps/bang-tin/tests/`, e2e = `tests/e2e/`; mã nguồn `svc_files/…` = `services/svc-files/src/svc_files/…`,
-`svc_workflow/…` = `services/svc-workflow/src/svc_workflow/…`. "smoke" là một kiểm của `scripts/smoke.py`.
+`apps/bang-tin/tests/`, nghi-phep = `apps/nghi-phep/tests/`, e2e = `tests/e2e/`; mã nguồn `svc_files/…` =
+`services/svc-files/src/svc_files/…`, `svc_workflow/…` = `services/svc-workflow/src/svc_workflow/…`. "smoke" là một
+kiểm của `scripts/smoke.py`.
 
 ## 1. Số test
 
@@ -46,6 +47,7 @@ commit kế tiếp (#144) chỉ sửa chuỗi trong hai tệp test, không thêm
 | Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 149 lời gọi | 199 đạt | `unit` (`make test`) |
 | Không gian cá nhân P.A.R.A | `apps/ca-nhan/tests/` | như trên | 13 lời gọi | 13 đạt | `unit` (`make test`) |
 | Bảng tin đơn vị | `apps/bang-tin/tests/` | như trên; `def test_` cho tệp Python | 5 lời gọi + 15 hàm | 5 + 15 đạt | `unit` (`make test`) |
+| Đơn nghỉ phép (#301) | `apps/nghi-phep/tests/` | như trên | 24 lời gọi + 12 hàm | thêm sau lần CI này, chưa đo | `unit` (`make test`) |
 | CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 321 hàm | 543 đạt | `db` (`MOC_IT=1`) |
 | Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 23 test trong 19 tệp `*.spec.ts` | 23 đạt | `chay-thu`, phần `e2e`, bước `make e2e` |
 | Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 91 kiểm | 91 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
@@ -57,6 +59,7 @@ thành nhiều ca. Test của `scripts` chỉ bỏ qua có điều kiện (`skip
 mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job
 `unit` không đặt, nên 9 test này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 18
 (máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 4, `paging.test.ts` 4.
+Dòng Đơn nghỉ phép (#301) thêm sau lần đếm và lần CI trên: hai tổng chưa tính nó, cột CI để trống tới lần chốt sau.
 
 ## 2. Ma trận tính năng
 
@@ -139,6 +142,7 @@ F3.6 bỏ trống: cổng xác thực đã lên Must thành F2.13.
 | Quy trình của ứng dụng là dịch vụ của lõi (#301, mục `workflow` của manifest, [`them-ung-dung.md`](them-ung-dung.md) mục 1.10) — chưa xếp mức: chờ lần CI đầu chạy trên Flowable thật | Kiểm BPMN theo danh sách trắng, form JSON Schema, triển khai một deployment theo băm nội dung, gỡ = tạm dừng; API `/api/workflow/<ứng dụng>/…` chỉ nhận token của client `app-<ứng dụng>`. svc-workflow `test_app_*.py` 86 (`api` 33, `deploy` 22, `bpmn` 12, `forms` 11 — chạy mọi ca của `apps/*/forms/*.cases.json`, `core` 8 — hộp việc Văn phòng không lẫn việc ứng dụng); scripts `test_ung_dung_quy_trinh.py` 17. Trên hệ thống thật: bước CI của `make demo-quy-trinh` (ứng dụng mẫu Đơn nghỉ phép). Chỉ quy trình duyệt: không timer, bước tự động, quy trình con; điều kiện chỉ so chuỗi; gỡ không xóa lịch sử khỏi Flowable |
 | Cắm ứng dụng bằng một lệnh (`moc app install`, [`them-ung-dung.md`](them-ung-dung.md) mục 1) — mức Dùng được | Manifest `apps/<thư mục>/app.yaml` theo `scripts/app-manifest.schema.json`; client Keycloak, route APISIX, container, schema + migration bằng vai trò CSDL riêng của ứng dụng (không quyền gì trên lõi; đối tượng đọc lõi hay chạy bằng quyền của Hasura bị từ chối trước khi commit), bảng và quyền Hasura (điều kiện trong quyền không đọc được dữ liệu lõi), Event Trigger — không sửa tệp lõi nào, trạng thái trong `.moc-apps/`; gỡ giữ dữ liệu. Ứng dụng thứ ba `apps/bang-tin` (Bảng tin đơn vị). Trang Danh mục ứng dụng `/ung-dung` của Văn phòng điện tử (mọi vai trò; băm manifest, ứng dụng đã gỡ chỉ lãnh đạo, quản trị đơn vị; khung nhìn hẹp `core.app_catalog`). scripts `test_ung_dung.py` 49, `test_mang_ung_dung.py` 8, `test_yaml_nho.py` 6; bang-tin `node --test` 5, `unittest` 15; db `test_app_registry.py` 13 (44 ca), `test_app_catalog.py` 6; office `apps.test.ts` 8; e2e `ung-dung.spec.ts`; bước CI `make demo-cai-ung-dung` (`chay-thu`, phần `luong-chinh`; bước 4, 6, 7 kiểm cả danh mục). Một container một trang mỗi ứng dụng, không route API riêng, không Action; cài = tin mã của ứng dụng (mã không bị kiểm; container chỉ ở mạng `apps`, tới lõi duy nhất qua APISIX, các ứng dụng tới được nhau); `.moc-apps/` không vào `moc backup`; cài, gỡ chỉ bằng dòng lệnh (trang danh mục chỉ để xem, ghi "Đã cài" — không dò sức khỏe container của ứng dụng) |
 | Tách lõi khỏi Văn phòng điện tử ([`architecture.md`](architecture.md) §4.7, bước 1–2, #302) — mức Dùng được | `MOC_OFFICE_ENABLED=false` (mặc định bật): `svc-files`, `svc-workflow` vẫn lên, không gắn route, Action, BPMN, vòng nền nào của Văn phòng; svc-files `test_office_flag.py` 10, svc-workflow `test_office_toggle.py` 3. Trên hệ thống chạy: `make demo-tat-van-phong`, bước CI "Tắt Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)" — dựng lại hai dịch vụ với cờ tắt, kiểm `/api/verify` 404 và Action `myTasks` lỗi, `smoke.py --chi-loi` và `make demo-ca-nhan` đạt, rồi dựng lại như cũ. Chưa làm: bước 3–5 (CSDL, vai trò, gói riêng) |
+| Ứng dụng mẫu có quy trình riêng: Đơn nghỉ phép (`apps/nghi-phep`, #301, [`them-ung-dung.md`](them-ung-dung.md) mục 7) — chưa xếp mức: chờ lần CI đầu chạy bước của nó | BPMN (chỉ sự kiện, việc người làm, cổng rẽ) và hai form JSON Schema khai trong manifest, chạy trên động cơ quy trình của lõi qua API chung; container chỉ phục vụ trang tĩnh. nghi-phep `schema-form.test.js` 14, `don.test.js` 10, `test_server.py` 6, `test_bpmn.py` 6; scripts `test_nghi_phep.py` 8 (phần thuần của kịch bản); job `chay-thu`, phần `luong-chinh`, bước "Quy trình của ứng dụng qua lõi (make demo-quy-trinh)". Cần phần lõi của #301 (mục `workflow` của manifest, API `/api/workflow/<ứng dụng>/…`); việc duyệt không có tên người gửi; một bước duyệt, không hủy đơn đã gửi |
 
 ### 2.6. Tóm tắt
 
@@ -210,6 +214,8 @@ done
 grep -hE '^\s*(test|it)\(' apps/office/tests/*.test.ts | wc -l   # giao diện (node:test)
 grep -hE '^\s*(test|it)\(' apps/ca-nhan/tests/*.test.js apps/bang-tin/tests/*.test.js | wc -l   # hai ứng dụng
 grep -rhoE '^\s*(async )?def test_' apps/bang-tin/tests | wc -l     # Bảng tin, phần Python
+grep -hE '^\s*(test|it)\(' apps/nghi-phep/tests/*.test.js | wc -l   # Đơn nghỉ phép (#301)
+grep -rhoE '^\s*(async )?def test_' apps/nghi-phep/tests | wc -l   # Đơn nghỉ phép, phần Python
 grep -hE '^test\(' tests/e2e/*.spec.ts | wc -l                     # kịch bản Playwright
 grep -cE '^\s*ok\(' scripts/smoke.py                               # kiểm của make smoke
 grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng tệp (đổi thư mục cho phần khác)
@@ -218,7 +224,7 @@ grep -cE '^\s*(async )?def test_' services/svc-files/tests/test_*.py   # từng 
 Chạy thật (cần gì cho từng lệnh: README, mục Kiểm thử):
 
 ```bash
-make test                     # svc-files, svc-workflow, scripts, apps/office, ca-nhan, bang-tin — như job unit
+make test                     # hai dịch vụ, scripts, apps/office, ca-nhan, bang-tin, nghi-phep — như job unit
 db/tests/stack.sh up          # PostgreSQL + Hasura cho db/tests — như job db (lệnh đủ ở db/README.md)
 make up && make seed && make smoke && make e2e   # như job chay-thu (phần luong-chinh, e2e)
 make demo-nong-lanh           # từng màn ở mục 2; make help liệt kê tất cả

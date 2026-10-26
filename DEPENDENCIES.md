@@ -190,8 +190,8 @@ bản cũ có lỗ hổng đã có bản sửa). Còn lại wheel pip trong `ens
 trong tệp nén): không cài, không nạp lúc chạy, Trivy không tính.
 
 Phần máy chủ của Bảng tin (`apps/bang-tin`) và máy chủ trang của Đơn nghỉ phép (`apps/nghi-phep`) dựng từ cùng image
-`python:3.13.16-slim`, chỉ thư viện chuẩn, không cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ thư viện chuẩn (`scripts/yaml_nho.py`): không
-thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
+`python:3.13.16-slim`, chỉ thư viện chuẩn, không cài gói nào. `moc app` đọc manifest bằng bộ đọc YAML tự viết, chỉ
+thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục cài; test so kết quả với PyYAML khi máy có sẵn.
 
 ## Vận hành và bốn nguyên lý thiết kế
 

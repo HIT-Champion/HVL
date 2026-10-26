@@ -504,3 +504,48 @@ mới, một tệp metadata mới, một dòng `!include`), công cụ vận hà
 - Đường dưới `/ca-nhan/` không có tệp thì trả trang chính (ứng dụng một trang).
 - Đặt `MOC_OIDC_AUDIENCE` cho `svc-files` thì client mới cũng phải có mapper audience tương ứng.
 - Giao diện chỉ tiếng Việt.
+
+## 7. Ứng dụng mẫu có quy trình riêng: Đơn nghỉ phép
+
+`apps/nghi-phep` (#301) là ứng dụng thứ tư, dựng để cho thấy một ứng dụng mang quy trình nghiệp vụ của riêng nó mà
+không có máy chủ nghiệp vụ, không có bảng nào: nhân viên gửi đơn nghỉ phép, trưởng phòng **của chính phòng người gửi**
+duyệt hoặc từ chối kèm ghi chú, người gửi theo dõi kết quả. Mục này chỉ tả ứng dụng; cách lõi nhận mục `workflow` của
+manifest, kiểm BPMN và mở API chung là phần lõi của #301 trong tài liệu này. Ứng dụng chỉ chạy khi lõi đã có phần đó.
+
+| Phần | Ở nghi-phep |
+|---|---|
+| Manifest | [`apps/nghi-phep/app.yaml`](../apps/nghi-phep/app.yaml): `/nghi-phep`, cổng 8080, 64 MiB; `database` chỉ vì manifest bắt buộc (schema trống `nghi_phep`, không migration); `workflow`: một quy trình, hai form |
+| Quy trình | [`workflow/don-nghi-phep.bpmn20.xml`](../apps/nghi-phep/workflow/don-nghi-phep.bpmn20.xml), id `nghi-phep.don`: gửi đơn → "Trưởng phòng duyệt" (nhóm `t:${tenantId}:d:${departmentId}:manager`, như bước duyệt cấp phòng của văn bản đi) → cổng rẽ theo `quyetDinh` → "Đã duyệt" / "Bị từ chối". Chỉ sự kiện, việc người làm, cổng rẽ; có sơ đồ BPMN DI |
+| Form | `forms/don.json` (loại nghỉ, từ ngày, đến ngày, lý do) và `forms/duyet.json` (quyết định, ghi chú): JSON Schema, kiểm ở trình duyệt bằng `public/schema-form.js` và ở lõi khi nhận |
+| Image | Python thư viện chuẩn trên `python:3.13.16-slim` ghim digest (như Bảng tin), không root (10001), chỉ trang tĩnh; bản dựng cho trình duyệt của `oidc-client-ts` lấy từ npm lúc dựng |
+| Trang | Đăng nhập Authorization Code + PKCE (client `app-nghi-phep`, `response_mode=fragment`). Ba phần: Gửi đơn; Đơn của tôi (trạng thái, nội dung, quyết định); Việc cần duyệt (chỉ hiện khi có việc, tự làm mới mỗi 30 giây). Lỗi `422` của lõi hiện dưới đúng ô |
+
+Trang gọi `/api/workflow/nghi-phep/…` bằng token của người dùng: lấy form, gửi đơn, xem đơn của mình, xem và làm việc
+duyệt của mình. Ai thấy việc nào, dữ liệu có hợp form không, đơn lưu ở đâu là việc của lõi; trang không quyết định
+điều gì trong số đó. Chi tiết trang, bảng API: [`apps/nghi-phep/README.md`](../apps/nghi-phep/README.md).
+
+Kiểm không cần hệ thống chạy (trong `make test`): `apps/nghi-phep/tests` — `node --test` (form dựng từ schema; đường
+API, đọc câu trả lời, trạng thái đơn; khóa trong app.yaml, BPMN, form khớp nhau; tỉ lệ tương phản màu) và `unittest`
+(máy chủ trang trên cổng ngẫu nhiên; BPMN chỉ dùng phần tử được phép, mọi nút tới được kết thúc);
+`scripts/tests/test_nghi_phep.py` cho phần thuần của kịch bản dưới đây.
+
+Kiểm trên hệ thống đang chạy: `make demo-quy-trinh` (cần `make seed`), bước CI "Quy trình của ứng dụng qua lõi (make
+demo-quy-trinh)" ở phần `luong-chinh` của job `chay-thu`, ngay sau bước của Bảng tin. Kịch bản dùng ba tài khoản mẫu
+cùng đơn vị Khoa CNTT: chuyên viên `giangvienktpm` và trưởng bộ môn `truongbmktpm` cùng Bộ môn KTPM, tổ trưởng
+`totruongdt` ở phòng Đào tạo — để cùng một quy trình cho thấy việc duyệt tới đúng phòng và không tới phòng khác:
+
+1. Bản sao của ứng dụng với BPMN có thêm một `scriptTask` bị từ chối lúc cài, không đổi gì trên hệ thống.
+2. Cài; trang `/nghi-phep/` qua APISIX có CSP, `config.json` mang client `app-nghi-phep`.
+3. Chuyên viên đăng nhập Văn phòng điện tử rồi vào ứng dụng không hỏi lại mật khẩu; form lõi trả về khớp
+   `forms/*.json`.
+4. Đơn sai (đến ngày trước từ ngày, loại nghỉ ngoài danh sách) → `422` đúng mã ở đúng ô; đơn đúng → `201`, nằm ở
+   "Đơn của tôi" với trạng thái chờ duyệt.
+5. Trưởng bộ môn cùng phòng thấy việc duyệt; tổ trưởng phòng khác và chính người gửi không thấy, không làm được.
+6. Token của `app-office`, `moc-cli` bị từ chối (`403`); hộp việc của Văn phòng điện tử không lẫn việc nghỉ phép.
+7. Quyết định ngoài danh sách → `422`; "Đồng ý" → `204`, quy trình kết thúc với `quyetDinh = dong-y`.
+8. Cài lại không đổi gì (cùng container, cùng trạng thái trong `.moc-apps/`, không thêm phiên bản quy trình).
+9. Gỡ: trang, container, client mất; API của ứng dụng thôi trả `200`; lịch sử đơn còn trong động cơ quy trình.
+10. `git status` trước và sau giống hệt.
+
+Giới hạn của ứng dụng mẫu: việc duyệt chỉ có nội dung đơn, không có tên người gửi (API chung không trả); giao diện
+chỉ tiếng Việt; một bước duyệt, không ủy quyền, không hủy đơn đã gửi.

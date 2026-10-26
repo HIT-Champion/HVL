@@ -110,6 +110,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         sự kiện qua Event Trigger, văn bản hạn chế thì không; cài lại không tạo gì mới; gỡ thì route, client, trigger,
         container mất, dữ liệu còn; git status trước và sau giống hệt: không tệp nào của lõi đổi. (make
         demo-cai-ung-dung)
+    python3 scripts/demo.py quy-trinh
+        Quy trình của ứng dụng chạy trên lõi (#301, docs/them-ung-dung.md mục Đơn nghỉ phép): cài apps/nghi-phep —
+        BPMN, form của ứng dụng lên động cơ quy trình của lõi; bản có scriptTask bị từ chối trước khi đổi gì; nhân viên
+        gửi đơn qua API chung bằng token app-nghi-phep (dữ liệu sai → 422 đúng mã từng trường); chỉ trưởng phòng cùng
+        phòng thấy và duyệt được; token của client khác → 403; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép;
+        duyệt → đơn kết thúc với quyết định đồng ý; cài lại không đổi gì; gỡ giữ lịch sử đơn. (make demo-quy-trinh)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -120,6 +126,7 @@ import argparse
 import base64
 import hashlib
 import json
+import pathlib
 import re
 import subprocess
 import sys
@@ -3852,11 +3859,11 @@ def state_digest() -> str:
     return h.hexdigest()
 
 
-def app_container() -> list[str]:
-    """Container của service app-bang-tin trong project compose của thư mục này (tên project tùy nơi cài); gỡ rồi thì
+def app_container(name: str = APP_NAME) -> list[str]:
+    """Container của service app-<tên> trong project compose của thư mục này (tên project tùy nơi cài); gỡ rồi thì
     tệp phủ không còn service đó, compose báo lỗi — coi như không có container."""
     import ung_dung
-    proc = subprocess.run([*ung_dung.COMPOSE, "ps", "-q", f"app-{APP_NAME}"], cwd=ROOT,
+    proc = subprocess.run([*ung_dung.COMPOSE, "ps", "-q", f"app-{name}"], cwd=ROOT,
                           env=ung_dung.System(ROOT).env(), capture_output=True, text=True)
     return proc.stdout.split() if proc.returncode == 0 else []
 
@@ -3883,10 +3890,10 @@ def app_reach(*targets: str) -> list[str]:
     return proc.stdout.split()
 
 
-def app_clients() -> list[str]:
+def app_clients(name: str = APP_NAME) -> list[str]:
     import tenants
     return sorted(c["clientId"] for c in tenants.connect().clients()
-                  if c.get("clientId") in (f"app-{APP_NAME}", f"app-{APP_NAME}-svc"))
+                  if c.get("clientId") in (f"app-{name}", f"app-{name}-svc"))
 
 
 def app_metadata() -> tuple[bool, bool]:
@@ -4080,12 +4087,321 @@ def cai_ung_dung() -> None:
     ok("không tệp nào được theo dõi trong git đổi; không tệp mới ngoài .gitignore")
 
 
+# ------------------------------------------------------------------------------- quy trình của ứng dụng qua lõi (#301)
+
+QT_MANIFEST = "apps/nghi-phep/app.yaml"
+QT_NAME, QT_PATH = "nghi-phep", "/nghi-phep/"
+QT_CLIENT = f"app-{QT_NAME}"
+QT_CALLBACK = f"{PUBLIC_URL}/nghi-phep/dang-nhap"
+QT_API = f"{PUBLIC_URL}/api/workflow/nghi-phep"
+QT_PROCESS, QT_FORM_DON, QT_FORM_DUYET = "nghi-phep.don", "nghi-phep.don", "nghi-phep.duyet"
+# seed/users.csv, Khoa CNTT: giảng viên và trưởng Bộ môn KTPM cùng phòng; tổ trưởng Đào tạo là trưởng phòng khác của
+# cùng đơn vị (scripts/tests/test_nghi_phep.py kiểm theo tệp seed)
+QT_STAFF, QT_MANAGER, QT_OTHER = "giangvienktpm", "truongbmktpm", "totruongdt"
+# Dữ liệu sai và mã lỗi lõi phải trả, trùng ca thử dùng chung apps/nghi-phep/forms/*.cases.json (test kiểm)
+QT_BAD_RANGE = {"denNgay": "x-moc-range"}
+QT_WRONG_TYPE, QT_BAD_TYPE = "nghi-mat", {"loai": "enum"}
+QT_WRONG_DECISION, QT_BAD_DECISION = "Đồng ý", {"quyetDinh": "enum"}
+
+
+def leave_request(today: Any, tag: str) -> dict[str, str]:
+    """Đơn hợp lệ theo forms/don.json: phép năm từ một tuần sau, ba ngày; lý do ở dạng NFC như form dọn."""
+    start = today + timedelta(days=7)
+    return {"loai": "phep-nam", "tuNgay": start.isoformat(), "denNgay": (start + timedelta(days=2)).isoformat(),
+            "lyDo": unicodedata.normalize("NFC", f"Về quê dự đám cưới em gái ({tag})")}
+
+
+def bad_range(req: dict[str, str]) -> dict[str, str]:
+    """Cùng đơn, đến ngày trước từ ngày: lõi phải trả 422 {"denNgay": "x-moc-range"}."""
+    return {**req, "tuNgay": req["denNgay"], "denNgay": req["tuNgay"]}
+
+
+def poison_bpmn(xml: str) -> str:
+    """BPMN của ứng dụng chèn thêm một scriptTask chạy lệnh trên máy chủ ngay sau lúc gửi đơn — lõi phải từ chối khi
+    cài, trước khi đổi gì."""
+    flow = 'sourceRef="guiDon" targetRef="duyet"/>'
+    if xml.count(flow) != 1:
+        raise ValueError("BPMN của nghi-phep không còn luồng guiDon → duyet")
+    script = ('sourceRef="guiDon" targetRef="chayMa"/>\n'
+              '    <scriptTask id="chayMa" name="Chạy lệnh trên máy chủ" scriptFormat="groovy">'
+              '<script>"id".execute()</script></scriptTask>\n'
+              '    <sequenceFlow id="f0" sourceRef="chayMa" targetRef="duyet"/>')
+    return xml.replace(flow, script)
+
+
+def poison_copy(target: pathlib.Path) -> pathlib.Path:
+    """Chép apps/nghi-phep sang thư mục tạm (ngoài cây mã nguồn), thay BPMN bằng bản độc → đường tới app.yaml."""
+    import shutil
+    src = ROOT / "apps" / QT_NAME
+    shutil.copytree(src, target, ignore=shutil.ignore_patterns("node_modules", "tests"))
+    bpmn = target / "workflow" / "don-nghi-phep.bpmn20.xml"
+    bpmn.write_text(poison_bpmn(bpmn.read_text(encoding="utf-8")), encoding="utf-8")
+    return target / "app.yaml"
+
+
+def qt_call(token: str, method: str, path: str, data: Any = None) -> tuple[int, Any]:
+    """API quy trình chung của lõi, gọi như trang (apps/nghi-phep/public/don.js) → (mã HTTP, thân JSON hoặc None)."""
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    body = None
+    if data is not None:
+        body = json.dumps({"data": data}, ensure_ascii=False).encode()
+        headers["Content-Type"] = "application/json"
+    try:
+        status, _, raw = request(method, f"{QT_API}{path}", data=body, headers=headers)
+    except HTTPError as exc:
+        status, raw = exc.status, exc.body.encode()
+    try:
+        return status, json.loads(raw) if raw else None
+    except ValueError:
+        return status, None
+
+
+def qt_ok(token: str, method: str, path: str, data: Any = None, *, want: int = 200) -> Any:
+    status, body = qt_call(token, method, path, data)
+    if status != want:
+        raise DemoFailed(f"{method} /api/workflow/{QT_NAME}{path} trả {status} (cần {want}): {json.dumps(body)[:300]}")
+    return body
+
+
+def qt_list(token: str, path: str) -> list[dict[str, Any]]:
+    """GET một danh sách của API chung (/processes, /tasks): phải là mảng các đối tượng."""
+    body = qt_ok(token, "GET", path)
+    if not isinstance(body, list) or not all(isinstance(x, dict) for x in body):
+        raise DemoFailed(f"GET /api/workflow/{QT_NAME}{path} phải trả một mảng: {json.dumps(body)[:300]}")
+    return body
+
+
+def qt_login(username: str, browser: Any = None) -> str:
+    """Đăng nhập như trang (apps/nghi-phep/public/auth.js): code + PKCE S256, response_mode=fragment, client
+    app-nghi-phep. Phiên SSO có sẵn thì Keycloak chuyển thẳng về; chưa có thì gõ mật khẩu, rồi mã TOTP nếu Keycloak hỏi
+    (trưởng phòng — mã tính từ MOC_DEMO_TOTP_SECRET như make seed cài) → access token."""
+    import html
+    import urllib.parse
+
+    from demo_ca_nhan import Browser, exchange
+    from moc_env import _otp_counter, totp_at
+
+    browser = browser or Browser()
+    verifier = base64.urlsafe_b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = uuid.uuid4().hex
+    query = urllib.parse.urlencode({"client_id": QT_CLIENT, "redirect_uri": QT_CALLBACK, "response_type": "code",
+                                    "response_mode": "fragment", "scope": "openid profile", "state": state,
+                                    "code_challenge": challenge, "code_challenge_method": "S256"})
+    resp = browser.opener.open(f"{PUBLIC_URL}/realms/{ENV.get('MOC_REALM', 'moc')}/protocol/openid-connect/auth?"
+                               f"{query}", timeout=30)
+    otp_sent = 0
+    for _ in range(6):
+        url = urllib.parse.urlsplit(resp.geturl())
+        if url.path == urllib.parse.urlsplit(QT_CALLBACK).path:
+            break
+        page = resp.read().decode(errors="replace")
+        form = re.search(r'<form[^>]*\saction="([^"]+)"', page)
+        if form is None:
+            raise DemoFailed(f"{username}: Keycloak không chuyển về {QT_CALLBACK}, cũng không hỏi đăng nhập "
+                             f"({url.path})")
+        if 'name="otp"' in page:
+            if not ENV.get("MOC_DEMO_TOTP_SECRET") or otp_sent >= 3:
+                raise DemoFailed(f"{username}: Keycloak không nhận mã TOTP (MOC_DEMO_TOTP_SECRET khác khóa make seed "
+                                 "đã cài?)")
+            if otp_sent:
+                time.sleep(1.5)        # hai lần sai sát nhau thì Keycloak coi là dò mật khẩu
+            fields = {"otp": totp_at(ENV["MOC_DEMO_TOTP_SECRET"], _otp_counter(username))}
+            otp_sent += 1
+        elif 'name="password"' in page:
+            fields = {"username": username, "password": ENV["MOC_DEMO_PASSWORD"]}
+        else:
+            raise DemoFailed(f"{username}: trang Keycloak lạ ở {url.path} (cần đổi mật khẩu, cài TOTP?)")
+        resp = browser.opener.open(urllib.parse.urljoin(resp.geturl(), html.unescape(form.group(1))), timeout=30,
+                                   data=urllib.parse.urlencode(fields).encode())
+    params = urllib.parse.parse_qs(urllib.parse.urlsplit(resp.geturl()).fragment)
+    if "code" not in params or params.get("state") != [state]:
+        raise DemoFailed(f"{username}: {QT_CLIENT} không nhận được mã cấp quyền đúng state sau khi đăng nhập")
+    return exchange(QT_CLIENT, QT_CALLBACK, params["code"][0], verifier)["access_token"]
+
+
+def task_of(tasks: Any, process_id: str) -> dict[str, Any] | None:
+    """Việc của một đơn trong danh sách /tasks."""
+    return next((t for t in tasks or [] if t.get("processId") == process_id), None)
+
+
+def flowable_sql(query: str) -> str:
+    """Một câu trên CSDL của Flowable (docker-compose.yml: jdbc:postgresql://postgres:5432/flowable)."""
+    out = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                  "-d", "flowable", "-c", query)
+    return out.decode().strip()
+
+
+def qt_versions() -> int:
+    """Số phiên bản định nghĩa quy trình nghi-phep.don lõi đã triển khai lên Flowable."""
+    return int(flowable_sql(f"select count(*) from act_re_procdef where key_ = '{QT_PROCESS}'") or 0)
+
+
+def qt_history() -> int:
+    """Số đơn (phiên quy trình, cả đã kết thúc) của nghi-phep.don trong lịch sử Flowable."""
+    return int(flowable_sql(f"select count(*) from act_hi_procinst where proc_def_id_ like '{QT_PROCESS}:%'") or 0)
+
+
+def quy_trinh() -> None:
+    import tempfile
+
+    from demo_ca_nhan import Browser, claims_of, exchange
+
+    print("Quy trình của ứng dụng chạy trên lõi — Đơn nghỉ phép (apps/nghi-phep): ứng dụng mang BPMN và form, lõi "
+          "triển khai, kiểm form, giao việc theo phòng; không sửa tệp nào của lõi")
+    listed = json.loads(moc_app("list", "--json"))["apps"]
+    if any(a["name"] == QT_NAME and (a["installed"] or a["removing"]) for a in listed):
+        moc_app("remove", QT_NAME)
+        print("   (gỡ bản cài từ lần chạy trước)")
+    git_before = git_state()
+    tag = uuid.uuid4().hex[:6].upper()
+
+    say(1, "Cài một bản có BPMN độc (scriptTask chạy lệnh trên máy chủ): lõi từ chối, không đổi gì")
+    digest, versions = state_digest(), qt_versions()
+    with tempfile.TemporaryDirectory(prefix="moc-nghi-phep-doc-") as tmp:
+        code, out, err = moc("app", "install", str(poison_copy(pathlib.Path(tmp) / QT_NAME)))
+    said = (err or out).strip()
+    if code != 1 or "scriptTask" not in said:
+        raise DemoFailed(f"BPMN có scriptTask phải bị từ chối (thoát 1, lời báo nêu scriptTask): thoát {code}\n{said}")
+    if state_digest() != digest or app_container(QT_NAME) or app_clients(QT_NAME) or qt_versions() != versions:
+        raise DemoFailed("bị từ chối nhưng đã đổi .moc-apps/, tạo container, client hoặc triển khai quy trình")
+    print("\n".join(f"   {ln}" for ln in said.splitlines()[-4:]))
+    ok("thoát 1, lời báo nêu scriptTask; .moc-apps/ không đổi, không container, client, không quy trình mới")
+
+    say(2, f"moc app install {QT_MANIFEST} — một lệnh: trang, client, BPMN và form lên động cơ quy trình của lõi")
+    started = time.monotonic()
+    out = moc_app("install", QT_MANIFEST)
+    print("\n".join(f"   {ln}" for ln in out.strip().splitlines()))
+    if not app_container(QT_NAME) or app_clients(QT_NAME) != [QT_CLIENT] or qt_versions() < 1:
+        raise DemoFailed(f"sau khi cài: container {app_container(QT_NAME)}, client {app_clients(QT_NAME)}, quy trình "
+                         f"{QT_PROCESS} trên Flowable: {qt_versions()} phiên bản")
+    status, headers, body = request("GET", f"{PUBLIC_URL}{QT_PATH}")
+    csp = next((v for k, v in headers.items() if k.lower() == "content-security-policy"), "")
+    config = json.loads(request("GET", f"{PUBLIC_URL}{QT_PATH}config.json")[2])
+    if status != 200 or "Đơn nghỉ phép" not in body.decode() or "script-src 'self'" not in csp \
+            or config.get("clientId") != QT_CLIENT:
+        raise DemoFailed(f"{QT_PATH} trả {status}, CSP {csp!r}, config {config}")
+    ok(f"xong sau {time.monotonic() - started:.0f} giây: container app-{QT_NAME}, client {QT_CLIENT} (không client "
+       f"dịch vụ), {QT_PROCESS} trên Flowable; {QT_PATH} 200, CSP script-src 'self'")
+
+    say(3, f"{QT_STAFF} đăng nhập Văn phòng điện tử rồi mở Đơn nghỉ phép (SSO, PKCE) — form lấy từ lõi")
+    browser = Browser()
+    code, verifier, _ = browser.authorize("app-office", f"{PUBLIC_URL}/", QT_STAFF)
+    office_token = exchange("app-office", f"{PUBLIC_URL}/", code, verifier)["access_token"]
+    staff = qt_login(QT_STAFF, browser)
+    if claims_of(staff).get("azp") != QT_CLIENT:
+        raise DemoFailed(f"token của trang Đơn nghỉ phép có azp {claims_of(staff).get('azp')}")
+    for key, name in ((QT_FORM_DON, "don"), (QT_FORM_DUYET, "duyet")):
+        served = qt_ok(staff, "GET", f"/forms/{key}")
+        mine = json.loads((ROOT / "apps" / QT_NAME / "forms" / f"{name}.json").read_text(encoding="utf-8"))
+        if not isinstance(served, dict) or served.get("properties") != mine["properties"]:
+            raise DemoFailed(f"GET /forms/{key} không trả đúng forms/{name}.json của ứng dụng")
+    ok(f"token azp {QT_CLIENT}, không hỏi lại mật khẩu; GET /forms/{QT_FORM_DON}, /forms/{QT_FORM_DUYET} trả đúng "
+       "JSON Schema trong forms/ của ứng dụng")
+
+    say(4, "Nhân viên gửi đơn: dữ liệu sai → 422 đúng mã từng trường; dữ liệu đúng → quy trình chạy")
+    today = datetime.now(timezone(timedelta(hours=7))).date()
+    req = leave_request(today, tag)
+    for wrong, want, what in ((bad_range(req), QT_BAD_RANGE, "đến ngày trước từ ngày"),
+                              ({**req, "loai": QT_WRONG_TYPE}, QT_BAD_TYPE, "loại nghỉ không có trong danh sách")):
+        status, body = qt_call(staff, "POST", f"/processes/{QT_PROCESS}", wrong)
+        if status != 422 or (body or {}).get("errors") != want:
+            raise DemoFailed(f"{what}: cần 422 {{\"errors\": {json.dumps(want)}}}, nhận {status} {body}")
+        ok(f"{what}: 422 {json.dumps(want)}")
+    pid = (qt_ok(staff, "POST", f"/processes/{QT_PROCESS}", req, want=201) or {}).get("id")
+    mine = next((p for p in qt_list(staff, "/processes") if p.get("id") == pid), None) if pid else None
+    if not mine or mine.get("endedAt") or mine.get("processKey") != QT_PROCESS:
+        raise DemoFailed(f"đơn vừa gửi ({pid}) phải có trong \"Đơn của tôi\", đang chờ duyệt: {mine}")
+    ok(f"201, đơn {pid}: {req['tuNgay']} → {req['denNgay']}, \"Đơn của tôi\" ghi đang chờ duyệt")
+
+    say(5, f"Ai thấy việc: trưởng phòng cùng phòng ({QT_MANAGER}) thấy; phòng khác ({QT_OTHER}), người gửi không")
+    manager = qt_login(QT_MANAGER)
+    task = None
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline and task is None:
+        task = task_of(qt_list(manager, "/tasks"), pid)
+        time.sleep(0 if task else 1)
+    if not task or task.get("formKey") != QT_FORM_DUYET or (task.get("data") or {}).get("tuNgay") != req["tuNgay"]:
+        raise DemoFailed(f"{QT_MANAGER} không thấy việc duyệt đơn {pid} (formKey {QT_FORM_DUYET}, kèm dữ liệu đơn)")
+    ok(f"{QT_MANAGER}: việc \"{task.get('name')}\" ({QT_FORM_DUYET}) kèm dữ liệu đơn")
+    other = qt_login(QT_OTHER)
+    for who_, token in ((QT_OTHER, other), (QT_STAFF, staff)):
+        if task_of(qt_list(token, "/tasks"), pid):
+            raise DemoFailed(f"{who_} thấy việc duyệt đơn của {QT_STAFF}")
+        status, _ = qt_call(token, "POST", f"/tasks/{task['id']}", {"quyetDinh": "dong-y"})
+        if status not in (403, 404):
+            raise DemoFailed(f"{who_} duyệt được đơn của {QT_STAFF}: {status}")
+    ok(f"{QT_OTHER} (phòng khác), {QT_STAFF} (người gửi) không thấy việc; tự duyệt → 403/404")
+
+    say(6, "Ranh giới: token của client khác bị cổng từ chối; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép")
+    office_mgr = who(QT_MANAGER)
+    for client, token in (("app-office", office_token), ("moc-cli", office_mgr.token)):
+        status, _ = qt_call(token, "GET", "/processes")
+        if status != 403:
+            raise DemoFailed(f"token azp {client} gọi /api/workflow/{QT_NAME}/processes phải 403, nhận {status}")
+    inbox = office_mgr.gql("{ myTasks { id form_key } }")["myTasks"]
+    leaked = [t for t in inbox if t["id"] == task["id"] or str(t["form_key"]).startswith(f"{QT_NAME}.")]
+    if leaked:
+        raise DemoFailed(f"hộp việc Văn phòng điện tử của {QT_MANAGER} có việc của ứng dụng: {leaked}")
+    ok(f"azp app-office, moc-cli → 403; myTasks của {QT_MANAGER} ({len(inbox)} việc) không có việc nghỉ phép")
+
+    say(7, f"{QT_MANAGER} duyệt: dữ liệu sai → 422; đồng ý → đơn của {QT_STAFF} kết thúc với quyết định đồng ý")
+    status, body = qt_call(manager, "POST", f"/tasks/{task['id']}", {"quyetDinh": QT_WRONG_DECISION})
+    if status != 422 or (body or {}).get("errors") != QT_BAD_DECISION:
+        raise DemoFailed(f"quyết định viết khác mã: cần 422 {json.dumps(QT_BAD_DECISION)}, nhận {status} {body}")
+    note = unicodedata.normalize("NFC", f"Nhớ bàn giao việc đang làm ({tag})")
+    qt_ok(manager, "POST", f"/tasks/{task['id']}", {"quyetDinh": "dong-y", "ghiChu": note}, want=204)
+    done = None
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline and not done:
+        done = next((p for p in qt_list(staff, "/processes") if p.get("id") == pid and p.get("endedAt")), None)
+        time.sleep(0 if done else 1)
+    if not done or (done.get("data") or {}).get("quyetDinh") != "dong-y":
+        raise DemoFailed(f"đơn {pid} phải kết thúc với quyetDinh dong-y: {done}")
+    if task_of(qt_list(manager, "/tasks"), pid):
+        raise DemoFailed(f"việc duyệt đơn {pid} vẫn còn trong danh sách của {QT_MANAGER}")
+    ok(f"422 {json.dumps(QT_BAD_DECISION)}; rồi 204 — \"Đơn của tôi\": kết thúc lúc {done['endedAt']}, quyết định "
+       "dong-y; việc không còn")
+
+    say(8, f"Chạy lại moc app install {QT_MANIFEST}: không đổi gì")
+    container, digest, versions = app_container(QT_NAME), state_digest(), qt_versions()
+    out = moc_app("install", QT_MANIFEST)
+    if app_container(QT_NAME) != container or state_digest() != digest or qt_versions() != versions \
+            or "client đã có" not in out:
+        raise DemoFailed("cài lại phải giữ nguyên container, .moc-apps/, client và số phiên bản quy trình:\n" + out)
+    ok(f"cùng container, .moc-apps/ không đổi một byte, client đã có, {QT_PROCESS} vẫn {versions} phiên bản")
+
+    say(9, f"moc app remove {QT_NAME}: trang, client, container mất; lịch sử đơn còn")
+    history = qt_history()
+    print("\n".join(f"   {ln}" for ln in moc_app("remove", QT_NAME).strip().splitlines()))
+    _, _, body = request("GET", f"{PUBLIC_URL}{QT_PATH}")
+    status, _ = qt_call(staff, "GET", "/processes")
+    problems = [what for what, bad in (("trang", "Đơn nghỉ phép" in body.decode(errors="replace")),
+                                        ("container", bool(app_container(QT_NAME))),
+                                        ("client", bool(app_clients(QT_NAME))), ("API", status == 200)) if bad]
+    if problems:
+        raise DemoFailed(f"sau khi gỡ còn: {', '.join(problems)}")
+    if qt_history() != history or history < 1:
+        raise DemoFailed(f"gỡ ứng dụng không được xóa lịch sử đơn ({history} → {qt_history()})")
+    ok(f"{QT_PATH} không còn là Đơn nghỉ phép, API trả {status}; không container, client; lịch sử Flowable còn "
+       f"{history} đơn")
+
+    say(10, "Tệp của lõi không đổi: git status trước và sau giống hệt")
+    git_after = git_state()
+    if git_before is None:
+        ok("không phải thư mục git (bản cài) — bỏ qua so sánh")
+        return
+    if git_after != git_before:
+        raise DemoFailed("cây mã nguồn đổi trong lúc cài/gỡ:\n" + git_after)
+    ok("không tệp nào được theo dõi trong git đổi; không tệp mới ngoài .gitignore")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
          "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung,
-         "cai-ung-dung": cai_ung_dung}
+         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh}
 
 
 def main(argv: list[str] | None = None) -> int:

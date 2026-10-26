@@ -542,6 +542,14 @@ jobs:
         if: matrix.phan == 'luong-chinh'
         run: make demo-cai-ung-dung
 
+      # #301: ứng dụng thứ tư apps/nghi-phep mang BPMN và form (mục workflow của manifest), lõi kiểm rồi triển khai lên
+      # Flowable: bản có scriptTask bị từ chối trước khi đổi gì; nhân viên gửi đơn qua /api/workflow/nghi-phep bằng
+      # token app-nghi-phep, dữ liệu sai → 422 đúng mã; chỉ trưởng phòng cùng phòng thấy và duyệt; token client khác
+      # → 403; hộp việc Văn phòng không lẫn; cài lại không đổi gì; gỡ giữ lịch sử. Cài cũng tạo lại apisix, hasura
+      - name: Quy trình của ứng dụng qua lõi (make demo-quy-trinh)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-quy-trinh
+
       # F3.14: bật profile logs (Vector, Parseable; 8 dịch vụ chuyển sang driver fluentd, tạo lại cả CSDL, Hasura,
       # Keycloak) → một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files, tra Parseable ra đủ
       # dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai vào kho đã che; kho log không
