@@ -118,46 +118,59 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
 
     <div v-if="allowed && data && ready" class="space-y-4">
       <div class="grid gap-4 lg:grid-cols-3">
-        <section class="card p-4 lg:col-span-2" data-testid="sensor-plan">
+        <section class="card min-w-0 p-4 lg:col-span-2" data-testid="sensor-plan">
           <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-            <h2 class="font-medium text-stone-900">{{ t('sensors.plan') }}</h2>
+            <h2 id="sensor-plan-title" class="font-medium text-stone-900">{{ t('sensors.plan') }}</h2>
             <span class="text-xs text-stone-500">
               {{ t('sensors.checkedAt', { time: fmtDateTime(data.checked_at) }) }}
             </span>
           </div>
-          <svg :viewBox="`0 0 ${PLAN.view.width} ${PLAN.view.height}`" class="h-auto w-full" role="img"
-               :aria-label="t('sensors.planLabel')">
-            <defs>
-              <pattern id="sensor-hatch" width="8" height="8" patternUnits="userSpaceOnUse"
-                       patternTransform="rotate(45)">
-                <line x1="0" y1="0" x2="0" y2="8" class="stroke-stone-400" stroke-width="2" />
-              </pattern>
-            </defs>
-            <rect :x="PLAN.outline.x" :y="PLAN.outline.y" :width="PLAN.outline.w" :height="PLAN.outline.h" rx="6"
-                  class="fill-stone-50 stroke-stone-500" stroke-width="3" />
-            <rect :x="PLAN.corridor.x" :y="PLAN.corridor.y" :width="PLAN.corridor.w" :height="PLAN.corridor.h"
-                  class="fill-stone-100" />
-            <text :x="PLAN.corridor.x + PLAN.corridor.w / 2" :y="PLAN.corridor.y + PLAN.corridor.h / 2 + 5"
-                  text-anchor="middle" class="fill-stone-400 text-sm">{{ t('sensors.corridor') }}</text>
-            <g v-for="r in placed.rooms" :key="r.room.code" :data-testid="`sensor-room-${r.room.code}`"
-               :data-level="r.level" :data-flags="r.flags.join(' ')">
-              <title>{{ roomTitle(r) }}</title>
-              <rect :x="r.room.x" :y="r.room.y" :width="r.room.w" :height="r.room.h" rx="3"
-                    :class="[LEVEL_TONE[r.level].fill, LEVEL_TONE[r.level].stroke]" stroke-width="2" />
-              <rect v-if="r.level === 'unknown'" :x="r.room.x" :y="r.room.y" :width="r.room.w" :height="r.room.h"
-                    rx="3" fill="url(#sensor-hatch)" opacity="0.35" />
-              <line v-bind="doorOf(r.room)" class="stroke-stone-50" stroke-width="5" />
-              <text :x="r.room.x + 12" :y="r.room.y + 24" class="fill-stone-700 text-sm font-medium">
-                {{ roomLabel(r.room.code) }}
-              </text>
-              <text :x="r.room.x + r.room.w / 2" :y="r.room.y + r.room.h / 2 + 10" text-anchor="middle"
-                    class="fill-stone-900 text-3xl font-semibold">{{ shownValue(r) }}</text>
-              <text v-if="r.flags.length" :x="r.room.x + 12" :y="r.room.y + r.room.h - 14"
-                    class="fill-red-700 text-xs font-medium">
-                ⚠ {{ r.flags.map((f) => t(`sensors.flag.${f}`)).join(', ') }}
-              </text>
-            </g>
-          </svg>
+          <!-- dưới 540px chữ trên sơ đồ quá nhỏ: giữ bề rộng đó, vùng cuộn ngang nhận tiêu điểm để cuộn bằng phím -->
+          <p class="mb-2 text-xs text-stone-500 sm:hidden">{{ t('sensors.panHint') }}</p>
+          <div
+            class="overflow-x-auto" tabindex="0" role="region" aria-labelledby="sensor-plan-title"
+            data-testid="sensor-plan-scroll"
+          >
+            <svg :viewBox="`0 0 ${PLAN.view.width} ${PLAN.view.height}`" class="h-auto w-full min-w-[540px]" role="img"
+                 :aria-label="t('sensors.planLabel')">
+              <defs>
+                <pattern id="sensor-hatch" width="8" height="8" patternUnits="userSpaceOnUse"
+                         patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="8" class="stroke-stone-400" stroke-width="2" />
+                </pattern>
+              </defs>
+              <rect :x="PLAN.outline.x" :y="PLAN.outline.y" :width="PLAN.outline.w" :height="PLAN.outline.h" rx="6"
+                    class="fill-stone-50 stroke-stone-500" stroke-width="3" />
+              <rect :x="PLAN.corridor.x" :y="PLAN.corridor.y" :width="PLAN.corridor.w" :height="PLAN.corridor.h"
+                    class="fill-stone-100" />
+              <text :x="PLAN.corridor.x + PLAN.corridor.w / 2" :y="PLAN.corridor.y + PLAN.corridor.h / 2 + 5"
+                    text-anchor="middle" class="fill-stone-400 text-sm">{{ t('sensors.corridor') }}</text>
+              <g v-for="r in placed.rooms" :key="r.room.code" :data-testid="`sensor-room-${r.room.code}`"
+                 :data-level="r.level" :data-flags="r.flags.join(' ')">
+                <title>{{ roomTitle(r) }}</title>
+                <rect :x="r.room.x" :y="r.room.y" :width="r.room.w" :height="r.room.h" rx="3"
+                      :class="[LEVEL_TONE[r.level].fill, LEVEL_TONE[r.level].stroke]" stroke-width="2" />
+                <rect v-if="r.level === 'unknown'" :x="r.room.x" :y="r.room.y" :width="r.room.w" :height="r.room.h"
+                      rx="3" fill="url(#sensor-hatch)" opacity="0.35" />
+                <line v-bind="doorOf(r.room)" class="stroke-stone-50" stroke-width="5" />
+                <text :x="r.room.x + 12" :y="r.room.y + 24" class="fill-stone-700 text-sm font-medium">
+                  {{ roomLabel(r.room.code) }}
+                </text>
+                <text :x="r.room.x + r.room.w / 2" :y="r.room.y + r.room.h / 2 + 10" text-anchor="middle"
+                      class="fill-stone-900 text-3xl font-semibold">{{ shownValue(r) }}</text>
+                <!-- cờ đầu tiên và số cờ còn lại: đủ chỗ trong ô phòng; đủ các cờ ở chú thích di chuột và bảng dưới -->
+                <g v-if="r.flags.length" :transform="`translate(${r.room.x + 12}, ${r.room.y + r.room.h - 26})`"
+                   fill="none" class="text-red-700" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                  <path d="M7 1 1 13h12L7 1Z" /><path d="M7 5v3m0 2v.5" />
+                </g>
+                <text v-if="r.flags.length" :x="r.room.x + 30" :y="r.room.y + r.room.h - 14"
+                      class="fill-red-700 text-xs font-medium">
+                  {{ t(`sensors.flag.${r.flags[0]}`) }}
+                  <tspan v-if="r.flags.length > 1">+{{ r.flags.length - 1 }}</tspan>
+                </text>
+              </g>
+            </svg>
+          </div>
         </section>
 
         <aside class="card space-y-4 p-4 text-sm" data-testid="sensor-legend">
@@ -179,7 +192,14 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
             <h2 class="font-medium text-stone-900">{{ t('sensors.flags') }}</h2>
             <ul class="mt-2 space-y-1.5">
               <li v-for="flag in FLAG_ORDER" :key="flag" :data-testid="`sensor-flag-${flag}`">
-                <span class="font-medium text-red-700">⚠ {{ t(`sensors.flag.${flag}`) }}</span>
+                <span class="font-medium text-red-700">
+                  <svg
+                    class="mr-1 inline-block h-4 w-4 align-text-bottom" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="1.6" aria-hidden="true"
+                  >
+                    <path d="M12 3 2 21h20L12 3Z" /><path d="M12 9v5m0 3v.5" />
+                  </svg>{{ t(`sensors.flag.${flag}`) }}
+                </span>
                 <span class="text-stone-500"> — {{ flagHint(flag) }}</span>
               </li>
             </ul>
@@ -188,8 +208,10 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
         </aside>
       </div>
 
-      <section class="card overflow-x-auto p-4" data-testid="sensor-table">
-        <h2 class="font-medium text-stone-900">{{ t('sensors.table') }}</h2>
+      <section
+        class="card overflow-x-auto p-4" tabindex="0" aria-labelledby="sensor-table-title" data-testid="sensor-table"
+      >
+        <h2 id="sensor-table-title" class="font-medium text-stone-900">{{ t('sensors.table') }}</h2>
         <p v-if="!sensors.length" class="mt-2 text-sm text-stone-500">{{ t('sensors.none') }}</p>
         <table v-else class="mt-2 w-full min-w-[40rem] text-sm">
           <thead class="text-left text-xs text-stone-500">

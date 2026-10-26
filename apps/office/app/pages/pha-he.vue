@@ -297,7 +297,7 @@ function exportOpenLineage() {
       <section class="card p-4" data-testid="lineage-graph">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 class="font-medium text-stone-900">{{ t('lineage.graph') }}</h2>
+            <h2 id="lineage-graph-title" class="font-medium text-stone-900">{{ t('lineage.graph') }}</h2>
             <p class="mt-1 text-xs text-stone-500">{{ t('lineage.graphHint') }}</p>
           </div>
           <div>
@@ -308,7 +308,8 @@ function exportOpenLineage() {
             </select>
           </div>
         </div>
-        <div class="mt-2 overflow-x-auto">
+        <!-- các vùng cuộn ngang nhận tiêu điểm (tên lấy từ tiêu đề mục): trên màn hẹp cuộn được bằng phím mũi tên -->
+        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-graph-title">
           <div :style="{ minWidth: `${graphWidth}px` }">
             <EChart :option="graphOption" :height="graphHeight" :label="graphLabel" />
           </div>
@@ -319,9 +320,9 @@ function exportOpenLineage() {
       </section>
 
       <section class="card p-4" data-testid="lineage-sources">
-        <h2 class="font-medium text-stone-900">{{ t('lineage.sources') }}</h2>
-        <div class="mt-2 overflow-x-auto">
-          <table class="w-full text-sm">
+        <h2 id="lineage-sources-title" class="font-medium text-stone-900">{{ t('lineage.sources') }}</h2>
+        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-sources-title">
+          <table class="w-full min-w-[680px] text-sm">
             <thead class="text-left text-xs text-stone-500">
               <tr>
                 <th class="py-1 font-medium">{{ t('lineage.chart') }}</th>
@@ -360,12 +361,12 @@ function exportOpenLineage() {
 
       <section id="chat-luong" class="card scroll-mt-4 p-4" data-testid="lineage-checks">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="font-medium text-stone-900">{{ t('quality.title') }}</h2>
+          <h2 id="lineage-checks-title" class="font-medium text-stone-900">{{ t('quality.title') }}</h2>
           <QualityFlag :status="worstCheck(checkRows.map((c) => c.status))" />
         </div>
         <p class="mt-1 text-xs text-stone-500">{{ t('quality.hint') }}</p>
-        <div class="mt-2 overflow-x-auto">
-          <table class="w-full text-sm">
+        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-checks-title">
+          <table class="w-full min-w-[680px] text-sm">
             <thead class="text-left text-xs text-stone-500">
               <tr>
                 <th class="py-1 font-medium">{{ t('quality.view') }}</th>
@@ -390,7 +391,7 @@ function exportOpenLineage() {
       </section>
 
       <section class="card p-4" data-testid="lineage-archive">
-        <h2 class="font-medium text-stone-900">{{ t('lineage.archive') }}</h2>
+        <h2 id="lineage-archive-title" class="font-medium text-stone-900">{{ t('lineage.archive') }}</h2>
         <p class="mt-1 text-xs text-stone-500" data-testid="lineage-archive-totals">
           {{ t('lineage.archiveTotals', { runs: archivedRuns, failed: failedChecks }) }}
         </p>
@@ -430,8 +431,8 @@ function exportOpenLineage() {
             </ul>
             <p class="mt-1 text-xs text-stone-500">{{ t('quality.archive.source') }}</p>
           </div>
-          <div class="mt-2 overflow-x-auto">
-            <table class="w-full text-sm">
+          <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-archive-title">
+            <table class="w-full min-w-[680px] text-sm">
               <thead class="text-left text-xs text-stone-500">
                 <tr>
                   <th class="py-1 font-medium">{{ t('lineage.step') }}</th>
@@ -460,10 +461,12 @@ function exportOpenLineage() {
       </section>
 
       <section class="card p-4" data-testid="lineage-reports">
-        <h2 class="font-medium text-stone-900">{{ t('lineage.reports', { n: reports.length }) }}</h2>
+        <h2 id="lineage-reports-title" class="font-medium text-stone-900">
+          {{ t('lineage.reports', { n: reports.length }) }}
+        </h2>
         <p class="mt-1 text-xs text-stone-500">{{ t('lineage.reportsHint') }}</p>
-        <div class="mt-2 overflow-x-auto">
-          <table class="w-full text-sm">
+        <div class="mt-2 overflow-x-auto" tabindex="0" role="region" aria-labelledby="lineage-reports-title">
+          <table class="w-full min-w-[680px] text-sm">
             <thead class="text-left text-xs text-stone-500">
               <tr>
                 <th class="py-1 font-medium">{{ t('lineage.view') }}</th>
