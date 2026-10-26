@@ -292,7 +292,7 @@ def create_app(
     scanner: ClamAVClient | None = None,
     store: ObjectStore | None = None,
     verifier: TokenVerifier | None = None,
-    hasura: HasuraClient | None = None,
+    hasura: HasuraClient | None = None,     # Văn phòng bật thì phải là OfficeHasura (hoặc bản giả có đủ hàm)
     meili: MeiliClient | None = None,
     anchor_store: AnchorStore | None = None,
     vault: Vault | None = None,

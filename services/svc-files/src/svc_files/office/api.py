@@ -68,6 +68,7 @@ from ..signing import SigningError, SigningOff, SigningUnavailable
 from ..storage import ObjectMissing, StorageError, object_key, s3_client
 from ..web import (CHUNK_SIZE, DOWNLOAD_HEADERS, NO_STORE, PEM_RESPONSES, RETRY_AFTER, SEALING_QUEUE_S,
                    content_disposition, error, log_event, pem_response)
+from .hasura import OfficeHasura
 
 class IssueIn(BaseModel):
     tenant_id: uuid.UUID
@@ -207,7 +208,7 @@ class Office:
 
     ``reader``, ``cold``, ``archiver``: test tự tiêm bản giả; không truyền thì dựng theo ``settings``."""
 
-    def __init__(self, settings: Settings, hasura: Any, store: Any, *, reader: Reader | None = None,
+    def __init__(self, settings: Settings, hasura: OfficeHasura, store: Any, *, reader: Reader | None = None,
                  cold: ColdStore | None = None, archiver: Archiver | None = None) -> None:
         self.settings = settings
         self.hasura = hasura
