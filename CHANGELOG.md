@@ -263,6 +263,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   +12 (`test_phong_chu.py`).
 
 ### Đã sửa lỗi
+- Hoàn thành việc thỉnh thoảng báo lỗi khi hai giao dịch của Flowable khóa vòng nhau trên cùng phiên quy trình (#316;
+  thấy trong CI, `make demo-giao-viec`: trưởng khoa hoàn thành việc trong lúc vòng nhắc hạn đang xử lý việc ngoài).
+  PostgreSQL hủy một bên ("deadlock detected"), Flowable REST trả 500 và người dùng nhận `workflow_unavailable`, phải
+  bấm lại. Giờ svc-workflow gọi lại như với khóa lạc quan (#189): tối đa hai lần, sau 0,2 và 0,5 giây; giao dịch bị
+  hủy đã rollback hết nên gọi lại an toàn.
 - Thanh bên mở lại ngay sau khi bấm một mục (#297). Bấm chuột vào một mục thì thanh bên thu lại, nhưng con trỏ còn
   nằm trong dải biểu tượng nên nhích 1px là thanh bên bật ra che trang vừa mở; bấm mục của chính trang đang mở thì
   không thu. Giờ bấm chuột vào mục nào cũng thu thanh bên (kể cả khi thanh bên đang mở theo focus bàn phím) và đóng
