@@ -552,6 +552,12 @@ jobs:
           make logs-up
           make demo-log-tap-trung
 
+      # #302: tắt phần Văn phòng điện tử trong svc-files, svc-workflow thì lõi vẫn lên, phần lõi của smoke và
+      # demo-ca-nhan vẫn đạt; xong bật lại. Đặt cuối phần luong-chinh vì màn này dựng lại hai dịch vụ
+      - name: Tắt Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-tat-van-phong
+
       # F4.1: văn thư tải công văn PDF có chữ → tác tử moc-doc-reader gợi ý số ký hiệu, ngày, cơ quan, loại, trích yếu;
       # ảnh chụp → nhận dạng chữ (Tesseract); văn thư sửa một ô rồi vào sổ; sổ kiểm toán có dòng của tác tử, không mang
       # nội dung; tệp văn bản hạn chế bị từ chối, không có gợi ý nào được lưu. Không bật profile ai: trích yếu theo quy tắc

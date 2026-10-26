@@ -374,6 +374,9 @@ services:
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
       MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
+      # #302 — phần Văn phòng điện tử chạy chung tiến trình với lõi. false: chỉ chạy phần lõi, không gắn route,
+      # Action, vòng nền của Văn phòng (docs/architecture.md §4.7); dùng để kiểm lõi đứng được một mình
+      MOC_OFFICE_ENABLED: ${MOC_OFFICE_ENABLED:-true}
       # Trang trạng thái hệ thống (/api/status, công khai): phiên bản đang chạy; svc-files còn dò APISIX (cổng trạng
       # thái 7085 nội bộ), JWKS của Keycloak, /readyz của svc-workflow
       MOC_VERSION: ${MOC_VERSION:-dev}
@@ -405,6 +408,9 @@ services:
       # F3.2 — khóa Hasura, khóa Actions, mật khẩu Flowable, khóa Centrifugo, client secret lấy từ két (AppRole)
       MOC_OPENBAO_ADDR: http://openbao:8200
       MOC_OPENBAO_SECRET_PATH: moc/data/svc-workflow
+      # #302 — phần Văn phòng điện tử chạy chung tiến trình với lõi. false: chỉ chạy phần lõi, không gắn route,
+      # Action, vòng nền của Văn phòng (docs/architecture.md §4.7); dùng để kiểm lõi đứng được một mình
+      MOC_OFFICE_ENABLED: ${MOC_OFFICE_ENABLED:-true}
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
       # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
       MOC_NGSI_URL: http://scorpio:9090

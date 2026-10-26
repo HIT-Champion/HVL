@@ -51,7 +51,7 @@ PREFIX ?= /opt/moc
         demo-ky-so \
         demo-che-pii do-che-pii \
         demo-nap-lo nap-lo-mau \
-        demo-ca-nhan \
+        demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung \
         reconcile \
@@ -250,6 +250,9 @@ nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến m�
 
 demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
 	@python3 scripts/demo_ca_nhan.py
+
+demo-tat-van-phong: $(ENV_FILE) ## Tắt phần Văn phòng điện tử (MOC_OFFICE_ENABLED=false) trong svc-files, svc-workflow: route, Action của Văn phòng không còn; phần lõi của make smoke và make demo-ca-nhan vẫn đạt; xong thì bật lại (#302)
+	@python3 scripts/demo_tat_van_phong.py
 
 .PHONY: app-install app-list app-remove demo-cai-ung-dung
 
