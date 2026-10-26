@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Signet svc-workflow",
-    "description": "Hasura Actions của Văn phòng điện tử. API nội bộ: chỉ Hasura gọi, không qua cổng APISIX; ứng dụng gọi các Action này bằng GraphQL (docs/api/README.md).",
+    "description": "Hasura Actions của Văn phòng điện tử: API nội bộ, chỉ Hasura gọi, không qua cổng APISIX; ứng dụng gọi các Action này bằng GraphQL. Riêng /api/workflow/{app}/… (quy trình của ứng dụng cắm bằng manifest) đi qua cổng, cần token của client app-<tên> (docs/api/README.md).",
     "version": "0.1.0"
   },
   "paths": {
@@ -399,6 +399,400 @@
           }
         }
       }
+    },
+    "/api/workflow/{app}/forms/{form_key}": {
+      "get": {
+        "tags": [
+          "Quy trình của ứng dụng"
+        ],
+        "summary": "JSON Schema của một form, đúng tệp manifest khai",
+        "operationId": "get_form_api_workflow__app__forms__form_key__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "App"
+            }
+          },
+          {
+            "name": "form_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Form Api Workflow  App  Forms  Form Key  Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị"
+          },
+          "404": {
+            "description": "Ứng dụng chưa cài, đã gỡ hoặc không có form này"
+          },
+          "503": {
+            "description": "Chưa gọi được Flowable hoặc Keycloak, thử lại sau"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflow/{app}/processes/{process_key}": {
+      "post": {
+        "tags": [
+          "Quy trình của ứng dụng"
+        ],
+        "summary": "Bắt đầu quy trình với dữ liệu form bắt đầu",
+        "operationId": "start_process_api_workflow__app__processes__process_key__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "App"
+            }
+          },
+          {
+            "name": "process_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Process Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Start Process Api Workflow  App  Processes  Process Key  Post"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị"
+          },
+          "404": {
+            "description": "Ứng dụng chưa cài, đã gỡ hoặc không có quy trình này"
+          },
+          "503": {
+            "description": "Chưa gọi được Flowable hoặc Keycloak, thử lại sau"
+          },
+          "422": {
+            "description": "Dữ liệu chưa đúng form: {\"errors\": {trường: mã}} (schemas/README.md, x-moc-range)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "errors"
+                  ],
+                  "properties": {
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "data"
+                ],
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "description": "Dữ liệu form: tên trường là tên biến của quy trình"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflow/{app}/processes": {
+      "get": {
+        "tags": [
+          "Quy trình của ứng dụng"
+        ],
+        "summary": "Đơn người này đã gửi qua ứng dụng, mới nhất trước",
+        "operationId": "list_processes_api_workflow__app__processes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "App"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Processes Api Workflow  App  Processes Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị"
+          },
+          "404": {
+            "description": "Ứng dụng chưa cài hoặc đã gỡ"
+          },
+          "503": {
+            "description": "Chưa gọi được Flowable hoặc Keycloak, thử lại sau"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflow/{app}/tasks": {
+      "get": {
+        "tags": [
+          "Quy trình của ứng dụng"
+        ],
+        "summary": "Việc của ứng dụng giao cho người này hoặc nhóm của người này, cũ nhất trước",
+        "operationId": "list_tasks_api_workflow__app__tasks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "App"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Tasks Api Workflow  App  Tasks Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị"
+          },
+          "404": {
+            "description": "Ứng dụng chưa cài hoặc đã gỡ"
+          },
+          "503": {
+            "description": "Chưa gọi được Flowable hoặc Keycloak, thử lại sau"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workflow/{app}/tasks/{task_id}": {
+      "post": {
+        "tags": [
+          "Quy trình của ứng dụng"
+        ],
+        "summary": "Hoàn thành một việc với dữ liệu form của việc",
+        "operationId": "complete_task_api_workflow__app__tasks__task_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "App"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị"
+          },
+          "404": {
+            "description": "Ứng dụng đã gỡ; việc không còn hoặc không thuộc người này"
+          },
+          "503": {
+            "description": "Chưa gọi được Flowable hoặc Keycloak, thử lại sau"
+          },
+          "409": {
+            "description": "Việc vừa có người khác nhận"
+          },
+          "422": {
+            "description": "Dữ liệu chưa đúng form: {\"errors\": {trường: mã}} (schemas/README.md, x-moc-range)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "errors"
+                  ],
+                  "properties": {
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "data"
+                ],
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "description": "Dữ liệu form: tên trường là tên biến của quy trình"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -455,6 +849,12 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }
