@@ -221,6 +221,13 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Tài liệu trỏ bằng chứng vào đúng job CI (#271). Từ khi phần chạy thử tách thành sáu phần của job `chay-thu`, job
+  `stack` chỉ còn bước gom kết quả, nhưng `docs/du-thi/hoi-dap-hoi-dong.md` vẫn ghi "CI job `stack`, bước …" ở sáu
+  chỗ. Giờ mỗi chỗ ghi job `chay-thu` và phần chạy bước đó. Cũng sửa "job `luong-chinh`" ở `docs/muc-hoan-thien.md`,
+  `docs/them-ung-dung.md`, và chỗ tên job ở `docs/so-lieu-sau.md`, `docs/demo-script.md`. F4.7 bỏ câu "e2e chưa chạy
+  lần nào": `tu-chan-doan.spec.ts` chạy và đạt ở phần `e2e`; mức vẫn là Dùng được. Test mới `test_tai_lieu_ci.py`
+  đọc mọi tệp `.md` (trừ CHANGELOG, ghi chép nghiên cứu) và báo khi tài liệu nêu job, phần hay bước không có trong
+  `.github/workflows/`, hoặc nêu bước dưới job, phần không chạy bước đó.
 - Bảng mức hoàn thiện ghi đúng việc CI đã chạy (#258). F3.15: smoke (8 kiểm) và e2e chạy qua WAF trên mọi pull
   request, vì `.env.example` đặt `MOC_WAF=On`. Câu "chưa chạy xanh trên CI" đã cũ. F3.15 vẫn ở mức Dùng được, với
   điều kiện thật còn lại: chữ nghiệp vụ ở ô Cơ quan ban hành, Nơi nhận không còn cần người quản trị thêm loại trừ
