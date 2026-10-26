@@ -53,7 +53,6 @@ kiến trúc ở [`architecture.md`](architecture.md) §6.
   ([`architecture.md`](architecture.md) §4.4, hướng tách §4.7; #302).
 - Chưa có biểu mẫu low-code: form của Văn phòng viết trong mã, JSON Schema ở `schemas/` chỉ dùng để kiểm dữ liệu
   (#303).
-- Hồ sơ đã nộp lưu (Parquet trên kho lạnh) tìm và xác thực được, nhưng chưa phân tích được trên trang Điều hành (#304).
 - Phông Be Vietnam Pro (OFL-1.1) có ba bản giống nhau trong repo (#305).
 - Không gian cá nhân và Bảng tin mới có tiếng Việt (#306).
 
