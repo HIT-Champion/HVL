@@ -213,6 +213,33 @@ test('errorText: tệp sai loại, tệp chạy được, ảnh không bỏ đư
   }
 })
 
+test('errorText: Hasura từ chối vai trò (đọc, ghi ngoài quyền) → câu noAccess, hai ngôn ngữ (#242)', async () => {
+  // dạng lỗi của Hasura v2.51: bảng, khung nhìn, cột, action không có trong quyền của vai trò; điều kiện quyền khi ghi
+  const denied = [
+    { message: "field 'office_v_document_counts' not found in type: 'query_root'",
+      extensions: { path: '$.selectionSet.office_v_document_counts', code: 'validation-failed' } },
+    { message: "field 'otSensorMap' not found in type: 'query_root'",
+      extensions: { path: '$.selectionSet.otSensorMap', code: 'validation-failed' } },
+    { message: "field 'body' not found in type: 'office_documents'",
+      extensions: { path: '$.selectionSet.office_documents_by_pk.selectionSet.body', code: 'validation-failed' } },
+    { message: 'check constraint of an insert permission has failed',
+      extensions: { path: '$.selectionSet.insert_office_documents_one.args.object', code: 'permission-error' } },
+  ]
+  for (const error of denied) {
+    reply = jsonReply(200, { errors: [error] })
+    const e = await failure(calls.gql)
+    for (const [t, messages] of [[tVi, vi], [tEn, en]] as const) {
+      assert.equal(errorText(t as never, e), lookup(messages, 'error.noAccess'), error.message)
+    }
+  }
+
+  // lỗi kiểm khác của Hasura (câu hỏi sai kiểu biến) giữ câu cũ
+  const typo = "variable 'o' is declared as 'office_documents_insert_input!', but used where 'String' is expected"
+  reply = jsonReply(200, { errors: [{ message: typo, extensions: { code: 'validation-failed' } }] })
+  assert.equal(errorText(tVi as never, await failure(calls.gql)), typo)
+  for (const messages of [vi, en]) assert.doesNotMatch(lookup(messages, 'error.noAccess') ?? '', /\{|not found/)
+})
+
 test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đáp chuyển blocked cho errorText', () => {
   for (const messages of [vi, en]) {
     assert.ok(lookup(messages, 'error.blocked'))

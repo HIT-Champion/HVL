@@ -46,6 +46,11 @@ export function errorText(t: Composer['t'], e: unknown): string {
     if (e.code === 'duplicate') return t('error.documents_in_dedup')
     if (e.status === 413) return t('error.too_large')
     if (e.status === 429) return t('error.rate_limited')
+    // Hasura từ chối vai trò (#242): bảng, cột, action ngoài quyền của vai trò thì báo "field … not found in type",
+    // điều kiện quyền khi ghi không thỏa thì permission-error; câu tiếng Anh của GraphQL không đến người dùng
+    if (e.code === 'permission-error' || (e.code === 'validation-failed' && e.message.includes(' not found in type'))) {
+      return t('error.noAccess')
+    }
     for (const name of CONSTRAINTS) if (e.message.includes(name)) return t(`error.${name}`)
     if (e.message.includes('summary')) return t('error.documents_summary')
     return e.message
