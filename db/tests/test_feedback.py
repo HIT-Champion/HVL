@@ -147,6 +147,9 @@ MASKED = [
     ("CMND 123456789", "CMND [đã che]"),
     ("STK 0011004123456789", "STK [đã che]"),
     ("lần 2 0912345678", "lần 2 [đã che]"),
+    ("Hôm 26/10/2026 0912345678 em gọi", "Hôm 26/10/2026 [đã che] em gọi"),   # sau một dãy bị loại
+    ("Phòng 302 0912 345 678", "Phòng 302 [đã che]"),
+    ("SĐT (0912345678) nhé", "SĐT ([đã che]) nhé"),
     ("0912345678 và 0987654321", "[đã che] và [đã che]"),
     ("Nhờ hỏi a.b-c@truong.edu.vn giúp", "Nhờ hỏi [đã che] giúp"),
 ]
@@ -154,6 +157,7 @@ KEPT = [
     "Ngày 26.10.2026 lúc 8:30",
     "Công văn 152/ĐT-ĐH",
     "Kinh phí 100.000.000 đồng",                     # tách bằng dấu chấm, không bắt đầu bằng 0: số tiền
+    "Kinh phí 150.000.000, 200.000.000 đồng",
     "Dự toán 10.000.000.000 đồng",                   # không che phần sau của số
     "Trang 12 13 14 15 16, năm 2024 2025 2026",
     "Mã 12345678 tám số",

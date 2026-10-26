@@ -24,15 +24,16 @@
 --   * dãy chia nhóm bằng dấu cách, chấm, gạch, từ 9 chữ số, bắt đầu bằng 0 hoặc +84, (+84): số điện thoại, CCCD (mã
 --     tỉnh 001–096) viết tách nhóm. Số tiền "100.000.000", năm "2024 2025 2026" không bắt đầu bằng 0 nên giữ.
 -- Không che: số dính chữ ("SĐT0912…", "ĐT-0912…"), nhóm số trong mã UUID (mã X-Request-Id người dùng chép từ câu báo
--- lỗi), dãy bắt đầu ngay sau "chữ số + dấu chấm" (phần sau của "10.000.000.000"). Nhãn `[đã che]` 8 ký tự, ngắn hơn
--- mọi dãy số bị che; chỉ email rất ngắn (a@b.vn) làm câu dài ra — trigger cắt lại ở 500 ký tự.
+-- lỗi), dãy bắt đầu ngay sau "chữ số + dấu chấm" (phần sau của "10.000.000.000"). Số tiền viết tách bằng dấu cách từ
+-- 100 tỉ ("100 000 000 000") bị che phần sau. Nhãn `[đã che]` 8 ký tự, ngắn hơn mọi dãy số bị che; chỉ email rất ngắn
+-- (a@b.vn) làm câu dài ra — trigger cắt lại ở 500 ký tự.
 -- strict: null vào thì null ra (regexp_instr(null) là null, vòng lặp sẽ không dừng).
 create function office.mask_pii(t text) returns text
 language plpgsql immutable strict set search_path = pg_catalog, pg_temp
 as $$
 declare
   num constant text :=
-    '(?<![[:alnum:]_(])(?<![[:alnum:]_]-)(?<!\d\.)(?:\(?\+\d{2}\)?|\d{3,})(?:[ .-]?\d{2,})*(?![[:alnum:]_])';
+    '(?<![[:alnum:]_])(?<![[:alnum:]_]-)(?<!\d\.)(?:\(?\+\d{2}\)?|\d{3,})(?:[ .-]?\d{2,})*(?![[:alnum:]_])';
   pos int := 1;
   at  int;
   run text;
@@ -47,7 +48,9 @@ begin
       t := overlay(t placing '[đã che]' from at for char_length(run));
       pos := at + char_length('[đã che]');
     else
-      pos := at + char_length(run);
+      -- dãy bị loại: chỉ bước qua nhóm đầu, các nhóm sau xét lại — số điện thoại đứng sau năm, số phòng
+      -- ("26/10/2026 0912345678", "Phòng 302 0912 345 678") vẫn được che
+      pos := at + char_length(substring(run from '^\(?\+?\d+\)?'));
     end if;
   end loop;
   return t;

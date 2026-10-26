@@ -330,7 +330,7 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   số điện thoại, CCCD, CMND, số tài khoản, email lỡ ghi vào sẽ bị thay bằng `[đã che]` — hàm `office.mask_pii` gọi
   trong trigger `feedback_guard`, áp cho mọi đường ghi; migration che luôn góp ý đã gửi. Luật theo mẫu: dãy số liền từ
   9 chữ số, dãy chia nhóm từ 9 chữ số bắt đầu bằng 0 hoặc +84, email; số tiền "100.000.000", ngày, số hiệu văn bản,
-  mã lỗi giữ nguyên. Câu nhắc trên form thêm "Lỡ ghi thì dãy số dài và email được tự che". Test: db +3 (21 ca luật).
+  mã lỗi giữ nguyên. Câu nhắc trên form thêm "Lỡ ghi thì dãy số dài và email được tự che". Test: db +3 (25 ca luật).
 - Tải lên kiểm nội dung (#149), không tin tên tệp hay mime trình duyệt khai (`POST /api/files`, tệp trong zip của lô
   nạp): sau ClamAV, loại nhận theo byte đầu phải khớp đuôi tệp — tệp `.pdf` thực ra là trang HTML bị chặn `415
   type_mismatch`; chương trình, kịch bản (`MZ`, ELF, `#!`, đuôi `.exe`, `.bat`, `.js`…, xét cả tên ASCII lúc tải về:

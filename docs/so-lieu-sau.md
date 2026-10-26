@@ -123,10 +123,10 @@ Hạn chế đã biết:
   đơn vị. Đơn vị chỉ có một văn thư thì góp ý gửi từ màn tiếp nhận, cộng giờ gửi, cho lãnh đạo biết ngay ai gửi. Làm
   tròn giờ trên trang Góp ý cũng không che được: lãnh đạo, quản trị đơn vị đọc `created_at` chính xác qua GraphQL.
   Người gửi muốn kín hơn thì gửi từ màn chung (hộp việc, tìm kiếm).
-- Che theo mẫu, không phân loại như bộ che của svc-files (F4.4): không che họ tên, địa chỉ, số dính chữ (`SĐT0912…`),
-  số viết tách nhóm không bắt đầu bằng 0 hay +84; dãy số liền từ 9 chữ số không phải thông tin cá nhân (mã số dài)
-  cũng bị che. Form vẫn nhắc "Đừng ghi họ tên, số CCCD, số điện thoại", thêm "Lỡ ghi thì dãy số dài và email được tự
-  che".
+- Che theo mẫu, không phân loại như bộ che của svc-files (F4.4): không che họ tên, địa chỉ, số dính chữ (`SĐT0912…`), số
+  viết tách nhóm không bắt đầu bằng 0 hay +84; dãy số liền từ 9 chữ số không phải thông tin cá nhân (mã số dài) cũng bị
+  che, số tiền viết tách bằng dấu cách từ 100 tỉ ("100 000 000 000") bị che phần sau. Form vẫn nhắc "Đừng ghi họ tên, số
+  CCCD, số điện thoại", thêm "Lỡ ghi thì dãy số dài và email được tự che".
 - Kế hoạch phát triển đặt mục tiêu ≥ 5 người ngoài đội dùng thử và để lại góp ý; đến nay chưa có.
 
 ## 6. Cách chạy
