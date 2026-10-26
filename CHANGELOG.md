@@ -204,6 +204,16 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   rõ Không gian cá nhân, Bảng tin chỉ có tiếng Việt. Test giao diện +4.
 
 ### Đã sửa đổi
+- Giao diện Văn phòng điện tử làm mới theo hướng "bìa hồ sơ và tờ giấy" (#291, bản thử, thuộc v1.3.0). Thanh bên
+  và thanh trên dùng chung nền kraft nhạt; nội dung nằm trên một tờ giấy trắng viền 1px, bo 16px. Nút chính màu mực
+  xanh, đỏ son chỉ dành cho độ khẩn, quá hạn và lỗi; logo giữ màu olive chính thức. Thanh bên chia nhóm (Công việc,
+  Văn bản, Tra cứu, Điều hành, Khác), vẫn nằm đè không đẩy nội dung, rê chuột dừng 120ms mới mở. Hộp việc thành danh
+  sách dòng hai tầng có cột hạn (ngày, còn hoặc quá mấy ngày) và tab lọc kèm số đếm; độ khẩn in như con dấu. Trang
+  văn bản đưa tệp lên trước khung việc, thông tin văn bản đến sang cột phải; tìm kiếm, hỏi đáp, góp ý, form soạn và
+  tiếp nhận nằm thẳng trên tờ giấy, không thẻ lồng; trang không có văn bản có lối sang tìm kiếm. Trang đăng nhập
+  (theme `signet`) theo cùng bảng màu, chỉ đổi CSS: `nang_cap.sh` tự dựng lại Keycloak, bản sửa tay chạy
+  `docker compose up -d --force-recreate --wait keycloak`. Không đổi API, dữ liệu hay quyền. `apps/office/PRODUCT.md`
+  và `DESIGN.md` ghi người dùng, yêu cầu, quyết định thiết kế và phần chưa phủ. Test office +1 (`daysUntil`).
 - Lịch phiên bản (#179): `v1.2.0` ngày 30/10 là bản cho vòng trường 01/11, gồm các tính năng làm sau `v1.1.0`; bản nộp
   chấm 03/12 đổi thành `v1.3.0`, bản vá sau đó là `v1.3.x`. Tối 28/10 chốt danh sách, từ 29/10 chỉ sửa lỗi tới khi gắn
   thẻ. Sửa `docs/git_flow.md` (mục 6, mục 8), `docs/du-thi/ke-hoach-phat-trien.md` (hàng Phase 5 trong bảng trước ghi
