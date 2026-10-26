@@ -236,7 +236,7 @@ def printed(monkeypatch):
         seen.append(reg)
         return b"%PDF-1.7 fake register"
 
-    monkeypatch.setattr("svc_files.app.render_register_pdf", fake)
+    monkeypatch.setattr("svc_files.office.api.render_register_pdf", fake)
     return seen
 
 

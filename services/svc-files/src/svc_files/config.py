@@ -86,6 +86,10 @@ class Settings:
     # vài trang, kèm phụ lục hiếm quá vài trăm; 25 MB bản scan ~ 50–250 trang. Đo 22/10: đóng dấu 500 trang ~3 giây,
     # 2000 trang ~13 giây trong tiến trình con — 500 đủ rộng mà mỗi lần xem vẫn nhanh
     restricted_max_pages: int = 500
+    # Văn phòng điện tử (docs/architecture.md §4.3): route văn bản đi, sổ đăng ký, cổng xác thực, liên thông, nộp lưu,
+    # phòng đọc, đọc văn bản đến, gợi ý giao việc, nạp lô văn bản đến; vòng nền nộp lưu, dò mô hình trích yếu, nạp lô.
+    # false: không gắn route nào của Văn phòng (404), không chạy vòng nền của nó; lõi vẫn chạy
+    office_enabled: bool = True
     # F4.5 — ký số PAdES bản phát hành bằng khóa transit của đơn vị, chứng thư từ CA nội bộ trong két (chỉ minh họa);
     # chỉ có tác dụng khi có két. false: phát hành không ký, không gọi transit hay PKI
     sign_enabled: bool = True
@@ -203,6 +207,7 @@ class Settings:
                 vault_secret_id_file=env.get("MOC_OPENBAO_SECRET_ID_FILE", "/run/openbao/secret_id"),
                 transit_key=env.get("MOC_FILES_TRANSIT_KEY", "moc-files"),
                 restricted_max_pages=int(env.get("MOC_RESTRICTED_MAX_PAGES", "500")),
+                office_enabled=_flag("MOC_OFFICE_ENABLED", env.get("MOC_OFFICE_ENABLED", "true")),
                 sign_enabled=_flag("MOC_SIGN_ENABLED", env.get("MOC_SIGN_ENABLED", "true")),
                 read_enabled=_flag("MOC_READ_ENABLED", env.get("MOC_READ_ENABLED", "true")),
                 read_max_bytes=int(env.get("MOC_READ_MAX_MB") or env.get("MOC_FILES_MAX_MB", "25")) * 1024 * 1024,
