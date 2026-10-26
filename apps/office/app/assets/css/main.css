@@ -694,7 +694,17 @@
 .sg-topbar time::first-letter { text-transform: uppercase; }
 .sg-language { padding-inline: 8px; font-weight: 600; }
 .sg-mobile-menu, .sg-scrim { display: none; }
-.moc-sheet { min-width: 0; flex: 1; width: 100%; max-width: 1448px; padding: 32px 40px 56px; }
+/* Căn theo phần làm việc bên phải thanh bên, ở cả hai độ rộng của thanh bên. Các trang có khung hẹp (như soạn
+   văn bản) giữ nguyên độ rộng nhưng cả tiêu đề lẫn biểu mẫu cùng nằm giữa; bảng rộng vẫn dùng hết khung trang. */
+.moc-sheet {
+  min-width: 0;
+  flex: 1;
+  width: 100%;
+  max-width: 1448px;
+  margin-inline: auto;
+  padding: 32px 40px 56px;
+}
+.moc-sheet > :not(.sr-only) { margin-inline: auto; }
 
 /* Hộp việc "Lịch hạn": câu mở đầu, công cụ lọc, lịch hai tuần, rồi việc nhóm theo ngày đến hạn (số ngày lớn như tờ
    lịch). Mỗi việc là một liên kết tới văn bản */
