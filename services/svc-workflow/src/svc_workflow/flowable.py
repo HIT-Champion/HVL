@@ -22,7 +22,9 @@ Flowable là chủ trạng thái quy trình: đang ở bước nào, ai phải l
 
 Hoàn thành việc (``complete``) và việc giao ra ngoài (``complete_job``) có thể đụng một giao dịch khác trên cùng phiên
 quy trình, ví dụ worker gợi ý giao việc: Flowable khóa lạc quan, rollback một bên và REST trả 500 "Unhandled
-exception" kèm ``FlowableOptimisticLockingException``. Chỉ lỗi đó được gọi lại, sau ``RETRY_DELAYS_S`` (#189).
+exception" kèm ``FlowableOptimisticLockingException``. Hai giao dịch cũng có thể khóa vòng nhau trên
+``ACT_RU_EXECUTION``, ví dụ vòng nhắc hạn hoàn thành việc ngoài đúng lúc người dùng hoàn thành việc: PostgreSQL hủy
+một bên, REST trả 500 kèm "deadlock detected" (#316). Chỉ hai lỗi đó được gọi lại, sau ``RETRY_DELAYS_S`` (#189).
 """
 
 from __future__ import annotations
@@ -42,6 +44,8 @@ log = logging.getLogger("svc_workflow")
 
 # thông điệp của FlowableOptimisticLockingException (DbSqlSession), REST đặt vào trường "exception" của body lỗi 500
 CONCURRENT = "was updated by another transaction concurrently"
+# thông điệp PostgreSQL khi hủy một bên của deadlock (40P01); MyBatis đặt nó vào PersistenceException mà REST trả lại
+DEADLOCK = "deadlock detected"
 RETRY_DELAYS_S = (0.2, 0.5)    # gọi lại sau chừng này giây; giao dịch bị hủy đã rollback hết nên gọi lại an toàn
 
 
@@ -49,7 +53,7 @@ class FlowableError(Exception):
     def __init__(self, message: str, status: int | None = None, *, concurrent: bool = False) -> None:
         super().__init__(message)
         self.status = status
-        self.concurrent = concurrent    # bị hủy vì giao dịch khác cùng sửa phiên quy trình (khóa lạc quan)
+        self.concurrent = concurrent    # bị hủy vì giao dịch khác cùng sửa phiên quy trình (khóa lạc quan, deadlock)
 
 
 @dataclass(frozen=True)
@@ -134,7 +138,7 @@ class FlowableClient:
             raise FlowableError(f"Không gọi được Flowable: {exc}") from exc
         if r.status_code >= 400:
             raise FlowableError(f"Flowable trả {r.status_code}: {r.text[:300]}", r.status_code,
-                                concurrent=r.status_code == 500 and CONCURRENT in r.text)
+                                concurrent=r.status_code == 500 and (CONCURRENT in r.text or DEADLOCK in r.text))
         return r.json() if r.content else None
 
     async def ping(self) -> bool:

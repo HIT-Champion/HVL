@@ -305,6 +305,7 @@ def create_app(
     import_store: ImportStore | None = None,
     cold: office_api.ColdStore | None = None,
     archiver: office_api.Archiver | None = None,
+    archive_stats: office_api.ArchiveStats | None = None,
 ) -> FastAPI:
     _setup_logging()
     settings = settings or Settings.from_env(with_secrets(os.environ))
@@ -347,7 +348,8 @@ def create_app(
     anchorer.signer = anchor_signer
     # Văn phòng điện tử (docs/architecture.md §4.3): tác tử đọc văn bản đến, bucket lạnh, vòng nộp lưu — office/api.py.
     # MOC_OFFICE_ENABLED=false: không dựng, không gắn route nào của Văn phòng, không chạy vòng nền của nó
-    office = (office_api.Office(settings, hasura, store, reader=reader, cold=cold, archiver=archiver)
+    office = (office_api.Office(settings, hasura, store, reader=reader, cold=cold, archiver=archiver,
+                                archive_stats=archive_stats)
               if settings.office_enabled else None)
     # Hỏi đáp trên kho văn bản (F4.2): chỉ mục đoạn riêng trên cùng Meilisearch, mô hình nhúng / sinh tùy chọn
     ai = ai or make_ai(settings)

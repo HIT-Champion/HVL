@@ -197,6 +197,7 @@ Mô tả đầy đủ (tham số, kiểu trả về, mã lỗi) nằm trong [`op
 | `GET /api/imports` | Các lô của chính người gọi, mới trước |
 | `GET /api/case-files/{id}/archive/files/{file_id}` | Phòng đọc xem tệp (F3.8): chỉ PDF của văn bản người gọi được đọc; so băm với manifest, trả bản có dấu tên người xem (`inline`), mỗi lần xem ghi `case_file.file_viewed` |
 | `POST /api/case-files/{id}/archive` | Lãnh đạo phòng nộp lưu ngay hồ sơ đã đóng của phòng (F3.8): gói Parquet + tệp + manifest có băm vào bucket lạnh khóa ghi; ghi `case_file.archive_requested` |
+| `GET /api/case-files/archive-stats` | Số liệu văn bản đã nộp lưu cho trang Điều hành (#304): DuckDB đếm trên các bảng Parquet trong bucket lạnh sau khi so băm từng gói; chỉ lãnh đạo đơn vị, chỉ hồ sơ của đơn vị mình; chỉ có số đếm |
 | `GET /api/verify/{mã}` | **Không cần token.** Văn bản đã phát hành có mã tra cứu này: số ký hiệu, ngày, cơ quan ban hành, SHA-256; trích yếu chỉ khi công khai |
 | `GET /api/verify?sha256=…` | **Không cần token.** Như trên, tra theo SHA-256 của tệp PDF (trình duyệt tự tính, tệp không tải lên) |
 | `GET /api/verify/ca.pem` | **Không cần token.** Chứng thư CA nội bộ ký văn bản đi (PEM, `application/x-pem-file`, chỉ minh họa); két chưa có PKI thì 404 |

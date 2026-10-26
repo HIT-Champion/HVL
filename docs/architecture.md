@@ -268,7 +268,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Hasura GraphQL Engine CE | v2.51.0 | GraphQL tự sinh, quyền theo vai trò và đơn vị tới từng dòng; khóa quản trị không bao giờ đi từ ngoài vào | ③ | `db/metadata/` | F1.3 Hoàn thiện |
 | SeaweedFS | 4.48 | Kho tệp S3: bucket nóng `moc-files`; bucket lạnh `moc-cold` có Object Lock cho mốc neo sổ kiểm toán và gói nộp lưu (QĐ-010) | ④ | `svc_files/storage.py`, `svc_files/anchors.py`, `svc_files/archive.py` | F1.5 Hoàn thiện |
 | Meilisearch CE | v1.54.3 | Tìm toàn văn văn bản, cả chữ trong PDF; chỉ mục đoạn `chunks` của trợ lý hỏi đáp (tìm lai từ khóa và véc-tơ). Chỉ trả id, Hasura quyết ai đọc được | ④ | `svc_files/search.py`, `svc_files/texts.py`, `svc_files/assist/meili.py` | F1.7, F2.7 Hoàn thiện |
-| DuckDB | 1.5.6, thư viện trong `svc-files` | Ghi bảng của hồ sơ nộp lưu thành Parquet; phòng đọc đọc lại | ③ ④ | `svc_files/archive.py` | F3.8 Hoàn thiện (giao diện hồ sơ, phòng đọc: #124) |
+| DuckDB | 1.5.6, thư viện trong `svc-files` | Ghi bảng của hồ sơ nộp lưu thành Parquet; phòng đọc đọc lại; trang Điều hành đếm văn bản đã nộp lưu trên các gói (#304) | ③ ④ | `svc_files/archive.py`, `svc_files/archive_stats.py` | F3.8 Hoàn thiện (giao diện hồ sơ, phòng đọc: #124) |
 | Phả hệ dữ liệu *(mã của đội)* | OpenLineage 2-0-2, thư viện chuẩn | Sự kiện cho từng bước nộp lưu, lưu ở `core.lineage_events`; phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL (`office.report_lineage`), trang `/pha-he` vẽ đồ thị; Marquez chưa đưa vào | — | `svc_files/lineage.py`, migration `1792281602900_report_lineage` | F3.9 Hoàn thiện |
 | Dashboard điều hành | Apache ECharts 6.1.0 | Trang `/dieu-hanh` của `app-office` đọc bốn view `office.v_*` qua Hasura, đúng quyền đơn vị | ③ | `apps/office/app/pages/dieu-hanh.vue`, migration `1792281601200_dashboard` | F3.11 Hoàn thiện |
 | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | Bản sao số của cảm biến theo NGSI-LD; vượt ngưỡng thì báo `svc-workflow` (profile `iot`) | ③ | `svc_workflow/ot.py`, `services/ot-sensor/` | F3.10 Minh họa |
@@ -456,10 +456,11 @@ hiện tại.
 | `registers.py`, route `/api/registers/*` | Văn phòng | Sổ đăng ký văn bản đến, đi theo Phụ lục IV NĐ 30/2020; `office.registers`, `office.documents` |
 | `dispatch.py`, route `POST /internal/dispatch-file` | Văn phòng | Chép bản phát hành sang kho của đơn vị nhận; `office.dispatches`, hàm `office.deliver_dispatch` |
 | `archive.py`, route `GET /api/case-files/{case_file_id}/archive` | Văn phòng | Nộp lưu hồ sơ (`office.case_files`, hàm `office.archive_case_file`), Parquet bằng DuckDB. Sau `9147e0f`, #124 thêm `POST /api/case-files/{case_file_id}/archive` và route xem tệp trong phòng đọc |
+| `archive_stats.py` | Văn phòng | Số liệu văn bản đã nộp lưu cho trang Điều hành (#304, route `GET /api/case-files/archive-stats` trong `office/api.py`): DuckDB đếm trên các bảng Parquet trong bucket lạnh, chỉ lãnh đạo đơn vị; phả hệ job `moc.archive.stats` |
 | `docread/api.py` (route `POST /api/files/{file_id}/read`), `docread/reader.py`, `docread/rules.py`, `docread/summarize.py`, `docread/store.py` | Văn phòng | Tác tử đọc văn bản đến theo bố cục NĐ 30/2020, viết trích yếu, ghi `office.intake_suggestions`. `rules.fold` (bỏ dấu tiếng Việt) là hàm chung nằm trong mô-đun này |
 | `IncomingHandler` và hai mutation `receiveIncoming`, `registerIncoming` trong `imports/runner.py` | Văn phòng | Mỗi dòng của lô văn bản đến đi đúng đường tiếp nhận lẻ rồi vào sổ |
 | `assist/similar.py`, route `POST /internal/similar-documents` | Văn phòng | Chỉ phục vụ tác tử gợi ý giao việc của `svc-workflow` (F4.3) |
-| `office/api.py` | Văn phòng | Lớp `Office` dựng tác tử đọc văn bản đến, bucket lạnh, vòng nộp lưu; `routers()` trả ba `APIRouter` (`documents`, `verify`, `case_files`) với 11 route Văn phòng trước khai thẳng trong `app.py` (#302) |
+| `office/api.py` | Văn phòng | Lớp `Office` dựng tác tử đọc văn bản đến, bucket lạnh, vòng nộp lưu, `ArchiveStats`; `routers()` trả ba `APIRouter` (`documents`, `verify`, `case_files`) với 12 route Văn phòng trước khai thẳng trong `app.py` (#302) |
 | `app.py`, `config.py` | Trộn | `create_app` dựng thành phần lõi, khai thẳng 5 route lõi và dáng nghiệp vụ (tải lên, tải về, tìm kiếm, `/api/status`, `anchor-key.pem`), gắn trợ lý qua `install()`. Phần Văn phòng (`office/api.py`, đọc văn bản đến, `similar`, nạp lô) chỉ dựng, gắn route, chạy vòng nền khi `MOC_OFFICE_ENABLED` bật (#302); vẫn import cả khi tắt. `Settings` chứa biến của cả ba nhóm |
 
 `svc-workflow` (`services/svc-workflow/src/svc_workflow/`):
@@ -516,7 +517,7 @@ Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git g
   3 route nội bộ đều của Văn phòng. Đã gỡ ở #302. Bước 1 của §4.7: mô-đun dáng nghiệp vụ không còn gọi vào gói
   `docread/` của Văn phòng — `kill_group`, `killed` nằm ở `ocr.py`; `fold`, `DASHES`, `DATE`, `SYMBOL`, `INVISIBLE_RE` ở
   `vntext.py`; ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` ra gói gốc. Câu GraphQL chỉ Văn phòng dùng sang
-  `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`. Bước 2: 11 route Văn phòng của `svc-files` sang ba
+  `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`. Bước 2: 12 route Văn phòng của `svc-files` sang ba
   `APIRouter` trong `svc_files/office/api.py`; Actions, `/ot/notify/{tenant}`, BPMN và vòng định kỳ của Văn phòng trong
   `svc-workflow` sang lớp `Office` (`svc_workflow/office/api.py`, khuôn `parts.py`); cả hai chỉ gắn khi
   `MOC_OFFICE_ENABLED` bật. Còn lại: `app.py` của hai dịch vụ vẫn import gói Văn phòng (cùng WeasyPrint, pyHanko…) cả
@@ -608,8 +609,8 @@ Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa x
 1. Gỡ chỗ dính trong mã: đưa `_kill_group`, `_killed`, `fold` (cùng `DASHES`, `DATE`, `SYMBOL`), `INVISIBLE_RE` và
    ba mô-đun lõi của `docread/` sang chỗ chung;
    tách câu GraphQL của Văn phòng khỏi hai tệp `hasura.py`. **Đã làm ở #302.**
-2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 11 route Văn phòng đang khai thẳng
-   trong `app.py` (xem trước, hai route sổ, ba route xác thực, ba route nộp lưu, `/internal/issue`,
+2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 12 route Văn phòng đang khai thẳng
+   trong `app.py` (xem trước, hai route sổ, ba route xác thực, bốn route nộp lưu, `/internal/issue`,
    `/internal/dispatch-file`; `/api/verify/anchor-key.pem` là của lõi, ở lại)
    sang `APIRouter` riêng (vd gói `svc_files/office/`; Actions của `svc-workflow` cũng vậy); `create_app` chỉ
    `include_router` và chạy tác vụ nền của Văn phòng khi phần đó được bật. **Đã làm ở #302**, cờ

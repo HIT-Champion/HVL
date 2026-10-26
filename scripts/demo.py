@@ -21,7 +21,9 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py nong-lanh
         (i) Vòng đời dữ liệu nóng → lạnh: chuyên viên lập hồ sơ, đóng; svc-files nộp lưu thành gói Parquet + tệp +
         manifest có băm trên bucket lạnh khóa ghi, gỡ chi tiết khỏi CSDL nghiệp vụ; văn bản vẫn tìm thấy, quét QR vẫn
-        khớp, phòng đọc đọc lại gói bằng DuckDB, xem tệp PDF có dấu tên người xem. (make demo-nong-lanh)
+        khớp, phòng đọc đọc lại gói bằng DuckDB, xem tệp PDF có dấu tên người xem; số liệu đã nộp lưu của trang Điều
+        hành (DuckDB đếm trên các gói Parquet) tăng đúng bằng hồ sơ vừa nộp lưu, phả hệ ghi lượt đọc. (make
+        demo-nong-lanh)
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
@@ -584,6 +586,62 @@ def oltp_detail(ids: list[str]) -> dict[str, int]:
     return {"liên kết tệp": files, "dòng thời gian": events, "giao việc": assignments}
 
 
+ARCHIVE_STATS_RUN = """query { core_lineage_events(where: {job: {_eq: "moc.archive.stats"}}, order_by: {id: desc},
+  limit: 1) { inputs } }"""
+
+
+def archive_stats(session: Session) -> dict[str, Any]:
+    """Số liệu đã nộp lưu của trang Điều hành (#304): DuckDB đếm trên các gói Parquet trong bucket lạnh."""
+    stats, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/archive-stats", headers=session.auth)
+    return stats
+
+
+def year_counts(stats: dict[str, Any]) -> Counter:
+    counts: Counter = Counter()
+    for r in stats["by_year"]:
+        counts[(r["year"], "in")] += r["incoming"]
+        counts[(r["year"], "out")] += r["outgoing"]
+    return counts
+
+
+def check_archive_stats(director: Session, staff: Session, before: dict[str, Any], docs: dict[str, dict[str, Any]],
+                        done: dict[str, Any]) -> None:
+    """Màn nóng → lạnh, bước 5: số liệu lạnh tăng đúng bằng hồ sơ vừa nộp lưu (tổng, theo năm ban hành và chiều), chỉ
+    lãnh đạo đơn vị đọc được, phả hệ ghi lượt DuckDB đọc các gói."""
+    started = time.monotonic()
+    after = archive_stats(director)
+    elapsed = time.monotonic() - started
+    grown = year_counts(after)
+    grown.subtract(year_counts(before))
+    changed = {k: v for k, v in grown.items() if v}
+    expected = dict(Counter((d["year"], d["direction"]) for d in docs.values()))
+    if after["case_files"] - before["case_files"] != 1 or after["documents"] - before["documents"] != len(docs) \
+            or changed != expected:
+        raise DemoFailed(f"số liệu lạnh chưa khớp hồ sơ vừa nộp lưu: trước {before['case_files']} hồ sơ,"
+                         f" {before['documents']} văn bản; sau {after['case_files']}, {after['documents']};"
+                         f" theo năm tăng {changed}, cần {expected}")
+    if any(u["case_file_id"] == done["case_file_id"] for u in after["unreadable"]):
+        raise DemoFailed("gói vừa nộp lưu không đọc lại được để phân tích")
+    ok(f"lãnh đạo đơn vị: {after['case_files']} hồ sơ, {after['documents']} văn bản đã nộp lưu (đến"
+       f" {after['incoming']}, đi {after['outgoing']}) — thêm 1 hồ sơ, {len(docs)} văn bản so với trước bước 2;"
+       f" {elapsed:.1f} giây")
+    ok("theo năm ban hành: " + "; ".join(f"{r['year'] or '?'}: đến {r['incoming']}, đi {r['outgoing']}"
+                                         for r in after["by_year"]))
+    try:
+        archive_stats(staff)
+    except HTTPError as exc:
+        if exc.status != 403:
+            raise DemoFailed(f"chuyên viên gọi số liệu đã nộp lưu trả {exc.status}") from exc
+    else:
+        raise DemoFailed("chuyên viên đọc được số liệu đã nộp lưu của cả đơn vị")
+    ok("chuyên viên gọi cùng API → 403: như trang Điều hành, chỉ lãnh đạo đơn vị")
+    runs = director.gql(ARCHIVE_STATS_RUN)["core_lineage_events"]
+    table = f"s3://{after['bucket']}/{done['archive_key']}documents-"
+    if not runs or not any(name.startswith(table) for name in runs[0]["inputs"]):
+        raise DemoFailed("phả hệ chưa ghi lượt DuckDB đọc gói vừa nộp lưu (job moc.archive.stats)")
+    ok(f"phả hệ: run moc.archive.stats đọc {len(runs[0]['inputs'])} bảng Parquet, có bảng văn bản của gói vừa nộp lưu")
+
+
 def nong_lanh() -> None:
     print("Màn (i) · Vòng đời dữ liệu: nóng → lạnh — hồ sơ đã đóng được nộp lưu thành gói Parquet + tệp + manifest có"
           " băm trên bucket lạnh khóa ghi; CSDL nghiệp vụ chỉ giữ bản ghi rút gọn")
@@ -602,10 +660,17 @@ def nong_lanh() -> None:
     ids = by_user[username][:3]
     staff = Session(username)
     docs = {}
-    for row in psql("select id, direction, coalesce(symbol, ''), coalesce(verify_code, ''), summary from"
+    for row in psql("select id, direction, coalesce(symbol, ''), coalesce(verify_code, ''),"
+                    " coalesce(extract(year from issued_on)::int::text, ''), summary from"
                     f" office.documents where id in ({', '.join(repr(i) for i in ids)})").splitlines():
-        i, direction, symbol, code, summary = row.split("|", 4)
-        docs[i] = {"direction": direction, "symbol": symbol, "verify_code": code, "summary": summary}
+        i, direction, symbol, code, year, summary = row.split("|", 5)
+        docs[i] = {"direction": direction, "symbol": symbol, "verify_code": code, "summary": summary,
+                   "year": int(year) if year else datetime.now().year}   # thiếu ngày ban hành: năm của hồ sơ
+    # số liệu đã nộp lưu trước khi nộp lưu hồ sơ này (bước 5 so lại): lãnh đạo đơn vị của người lập hồ sơ
+    director = Session(psql("select d.username from core.users d join core.users s on s.tenant_id = d.tenant_id"
+                            f" where s.username = '{username}' and d.role = 'director' and d.enabled"
+                            " order by d.username limit 1"))
+    cold_before = archive_stats(director)
     cf = staff.gql(CREATE_CASE_FILE, {"o": {"year": datetime.now().year, "code": f"HS-{tag}",
                                             "title": f"Hồ sơ thử nộp lưu {tag}", "retention_years": 10}})
     cf = cf["insert_office_case_files_one"]
@@ -685,7 +750,10 @@ def nong_lanh() -> None:
     else:
         ok("phòng đọc: các tệp trong gói không phải PDF — chỉ hiện băm, cỡ, không mở")
 
-    say(5, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
+    say(5, "Phân tích trên dữ liệu lạnh: trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB trên các gói Parquet")
+    check_archive_stats(director, staff, cold_before, docs, done)
+
+    say(6, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
     try_delete = (
         "import os, sys\n"
         "from svc_files.config import Settings\n"

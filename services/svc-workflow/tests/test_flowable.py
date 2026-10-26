@@ -32,6 +32,12 @@ BASE = "http://flowable:8080/flowable-rest/service"
 CONCURRENT = {"message": "Internal server error",
               "exception": "Execution[ id '8dd073b9' ] - definition 'van-ban-den:1:2906c0a0' - activity 'hanChiDao' "
                            "- parent '8dd073b1' was updated by another transaction concurrently"}
+# dạng thông điệp PersistenceException của MyBatis khi PostgreSQL hủy một bên của deadlock; deadlock này thấy ở
+# run 40337213084 của CI (#316)
+DEADLOCK = {"message": "Internal server error",
+            "exception": "\n### Error updating database.  Cause: org.postgresql.util.PSQLException: ERROR: deadlock "
+                         "detected\n  Detail: Process 84 waits for ShareLock on transaction 2812; blocked by process "
+                         "85.\n### SQL: delete from ACT_RU_EXECUTION where ID_ = ? and REV_ = ?"}
 OTHER_500 = {"message": "Internal server error", "exception": "Cannot invoke \"Object.toString()\" because x is null"}
 
 
@@ -71,12 +77,23 @@ def test_complete_job_is_retried_after_optimistic_locking():
     assert got is None and seen == ["/flowable-rest/external-job-api/acquire/jobs/j-1/complete"] * 3
 
 
+def test_complete_is_retried_after_a_deadlock():
+    got, seen = calls([(500, DEADLOCK), (204, None)], lambda c: c.complete("t-1", {"outcome": "assign"}))
+    assert got is None and seen == ["/flowable-rest/service/runtime/tasks/t-1"] * 2
+
+
+def test_complete_job_is_retried_after_a_deadlock():
+    got, seen = calls([(500, DEADLOCK), (204, None)], lambda c: c.complete_job("j-1", "w"))
+    assert got is None and seen == ["/flowable-rest/external-job-api/acquire/jobs/j-1/complete"] * 2
+
+
 def test_retries_stop_after_the_last_delay():
     got, seen = calls([(500, CONCURRENT)] * 3, lambda c: c.complete("t-1", {}))
     assert isinstance(got, FlowableError) and got.status == 500 and got.concurrent and len(seen) == 3
 
 
-@pytest.mark.parametrize("status, body", [(500, OTHER_500), (409, CONCURRENT), (404, None), (503, None)])
+@pytest.mark.parametrize("status, body", [(500, OTHER_500), (409, CONCURRENT), (409, DEADLOCK), (404, None),
+                                          (503, None)])
 def test_other_errors_are_not_retried(status, body):
     got, seen = calls([(status, body), (204, None)], lambda c: c.complete("t-1", {}))
     assert isinstance(got, FlowableError) and got.status == status and not got.concurrent and len(seen) == 1
