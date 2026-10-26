@@ -168,6 +168,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   sau thay ảnh không phải dựng cả hệ thống ở máy. `shot()` của e2e nay chụp với chuyển động tắt: lúc chụp toàn trang
   media query màn hẹp đổi rồi đổi lại, thanh bên từng ra mở dở đè lên nội dung. Ảnh dashboard đợi thông báo nổi tắt
   hết rồi mới chụp.
+- Không gian cá nhân theo giao diện Liền mạch (#235, phần còn thiếu của nhánh `fe-integration`): màu olive, thanh trên
+  và biểu tượng tab vàng bơ như thanh bên của Văn phòng điện tử thay cho màu teal cũ; phông Be Vietnam Pro tự phục vụ ở
+  `apps/ca-nhan/public/fonts/be-vietnam-pro/`, bản trùng từng byte với bản của Văn phòng, khai thêm trong `REUSE.toml`,
+  `NOTICE`, `DEPENDENCIES.md`. Nút, mục thư mục, ô chọn thư mục cao tối thiểu 44px; ô chọn tệp có viền tiêu điểm ở nhãn
+  "Tải tệp lên"; trên điện thoại (≤640px) bảng tệp thành thẻ, nhãn cột lấy từ `data-label`; tắt chuyển động khi hệ điều
+  hành yêu cầu giảm chuyển động. e2e kiểm phông tải được và không cuộn ngang ở khổ 768, 390px.
 
 ### Đã sửa lỗi
 - Log tập trung không còn mất dòng đầu tiên của dịch vụ im lâu khi kết nối tới Vector đã chết (#226). Driver

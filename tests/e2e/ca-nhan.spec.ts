@@ -54,4 +54,18 @@ test('không gian cá nhân: SSO từ Văn phòng điện tử, tải lên, chuy
   expect(download.suggestedFilename()).toBe(name)
   expect(readFileSync(await download.path()).equals(content)).toBe(true)
   await shot(page, '35-ca-nhan-luu-tru')
+
+  // phông Be Vietnam Pro tự phục vụ ở /ca-nhan/fonts/ tải được dưới CSP của ứng dụng (#235)
+  const faces = await page.evaluate(async () =>
+    (await document.fonts.load('600 16px "Be Vietnam Pro"', 'Không gian')).map((f) => f.status))
+  expect(faces).toEqual(['loaded'])
+
+  // máy tính bảng, điện thoại: không cuộn ngang; trên điện thoại dòng tệp thành thẻ, ô chuyển thư mục vẫn dùng được
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  for (const width of [768, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(overflow).toBeLessThanOrEqual(0)
+    await expect(page.getByRole('combobox', { name: `Chuyển ${name} sang thư mục` })).toBeVisible()
+    await shot(page, `35-ca-nhan-${width}`)
+  }
 })

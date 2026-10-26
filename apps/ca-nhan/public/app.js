@@ -69,8 +69,9 @@ function row(item) {
     ...FOLDERS.filter((f) => f.key !== item.para).map((f) => el('option', { value: f.key, text: f.name })))
   return el('tr', {},
     el('td', { class: 'name', text: name }),
-    el('td', { class: 'num', text: formatSize(item.file?.size_bytes) }),
-    el('td', { text: formatTime(item.file?.scanned_at) }),
+    // data-label: nhãn cột khi bảng thành thẻ trên điện thoại (style.css), cùng chữ với đầu bảng trong index.html
+    el('td', { class: 'num', 'data-label': 'Dung lượng', text: formatSize(item.file?.size_bytes) }),
+    el('td', { 'data-label': 'Quét sạch lúc', text: formatTime(item.file?.scanned_at) }),
     el('td', { class: 'actions' },
       el('button', { type: 'button', class: 'btn secondary', 'aria-label': `Tải về ${name}`, text: 'Tải về',
                      onclick: () => download(item) }),
