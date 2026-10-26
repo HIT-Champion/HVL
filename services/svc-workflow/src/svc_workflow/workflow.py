@@ -47,7 +47,9 @@ from pydantic import ValidationError
 from .files import FilesClient, FilesError
 from .flowable import FlowableClient, FlowableError, Task
 from .forms import FORMS, ChiDao, Note, PhanCong, PhatHanh, XuLy
-from .hasura import (
+from .hasura import Actor, HasuraClient, HasuraError
+from .notify import Notifier, People, brief_of, load_people, task_people
+from .office.queries import (
     BRIEF,
     CLAIM_PROCESS,
     DISPATCH_UNITS,
@@ -62,11 +64,7 @@ from .hasura import (
     UNLINKED,
     USER,
     VISIBLE,
-    Actor,
-    HasuraClient,
-    HasuraError,
 )
-from .notify import Notifier, People, brief_of, load_people, task_people
 from .schemas import FormSchema
 
 if TYPE_CHECKING:
