@@ -198,6 +198,11 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   trong vùng của mình. e2e mới `cam-bien.spec.ts` dùng số đo giả cho Action `otSensorMap`, không cần broker.
 
 ### Đã sửa lỗi
+- Bảng mức hoàn thiện ghi đúng việc CI đã chạy (#258). F3.15: smoke (8 kiểm) và e2e chạy qua WAF trên mọi pull
+  request, vì `.env.example` đặt `MOC_WAF=On`. Câu "chưa chạy xanh trên CI" đã cũ. F3.15 vẫn ở mức Dùng được, với
+  điều kiện thật còn lại: chữ nghiệp vụ ở ô Cơ quan ban hành, Nơi nhận không còn cần người quản trị thêm loại trừ
+  trong `apisix.yaml`. F3.10: bước 7 của `make demo-it-ot` (sơ đồ cảm biến kho) đã xanh trên CI. Sửa theo trong
+  `ROADMAP.md`, `docs/architecture.md` (QĐ-013).
 - Vai trò không được đọc hay ghi dữ liệu mà trang hỏi (#242), như quản trị đơn vị gõ thẳng địa chỉ trang Điều hành,
   Phả hệ: trang báo "Vai trò của tài khoản này không được xem hay làm việc này", ở cả hai ngôn ngữ, thay cho câu
   GraphQL tiếng Anh của Hasura (`field '…' not found in type: 'query_root'`, `check constraint of an insert permission
