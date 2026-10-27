@@ -42,7 +42,7 @@ test('bốn thư mục P.A.R.A khớp ràng buộc items_para của personal.ite
   assert.ok(m, 'không thấy ràng buộc items_para')
   const keys = [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1])
   assert.deepEqual(FOLDERS.map((f) => f.key), keys)
-  assert.equal(new Set(FOLDERS.map((f) => f.name)).size, 4)
+  assert.equal(new Set(FOLDERS.map((f) => folderName(f.key))).size, 4)
   assert.ok(isFolder(DEFAULT_FOLDER))
 })
 
@@ -137,6 +137,11 @@ test('câu báo khi tải lên không được: mã của svc-files, mã HTTP c�
   assert.equal(uploadError(413, { detail: { code: 'too_large', message: 'Tệp vượt giới hạn 25 MB' } }),
     'Tệp vượt giới hạn 25 MB.')
   assert.equal(uploadError(413, null), 'Tệp quá lớn.')
+  assert.equal(uploadError(415, { detail: { code: 'type_mismatch', message: 'Nội dung tệp là trang HTML, không khớp '
+    + 'đuôi .pdf' } }), 'Nội dung tệp là trang HTML, không khớp đuôi .pdf.')
+  assert.equal(uploadError(415, { detail: { code: 'type_not_allowed' } }), 'Loại tệp này không được nhận nên chưa lưu.')
+  assert.match(uploadError(422, { detail: { code: 'image_unreadable', message: 'Không bỏ được siêu dữ liệu' } }),
+    /siêu dữ liệu\.$/)
   assert.match(uploadError(403, { detail: { code: 'no_tenant' } }), /chưa được gắn đơn vị/)
   assert.match(uploadError(0, null), /Không kết nối/)
   assert.match(uploadError(429, {}), /quá nhanh/)

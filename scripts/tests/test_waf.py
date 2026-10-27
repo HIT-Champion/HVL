@@ -240,30 +240,32 @@ class RulesTest(unittest.TestCase):
     def test_every_exclusion_has_reason_and_is_documented(self) -> None:
         readme = read(APISIX / "README.md")
         ids = re.findall(r'"id:(10\d\d\d),', self.directives)
-        self.assertEqual(ids, ["10010", "10020", "10030", "10031", "10032", "10033", "10040", "10060",
-                               "10061"])
+        self.assertEqual(ids, ["10010", "10011", "10020", "10030", "10031", "10032", "10033", "10040", "10050",
+                               "10060", "10061"])
         removed = re.findall(r"SecRuleRemoveById (\d+)", self.directives)
         self.assertEqual(removed, ["920350"])
         for rule_id in ids + removed:
             self.assertTrue(f"\n| {rule_id} |" in readme, f"platform/apisix/README.md thiếu dòng của luật {rule_id}")
-        # chỉ thị loại trừ (dòng `- >-` của 10010–10040, SecRuleRemoveById) có chú thích lý do ngay trên
+        # chỉ thị loại trừ (dòng `- >-` của 10010–10050, SecRuleRemoveById) có chú thích lý do ngay trên
         lines = self.directives.splitlines()
         for i, line in enumerate(lines):
-            starts = line.strip() == "- >-" and re.search(r'"id:100[1-4]\d,', lines[i + 1])
+            starts = line.strip() == "- >-" and re.search(r'"id:100[1-5]\d,', lines[i + 1])
             if starts or "SecRuleRemoveById" in line:
                 self.assertTrue(lines[i - 1].strip().startswith("#"), f"loại trừ không có chú thích lý do: {line}")
 
     def test_exclusions_scoped_to_path_and_target(self) -> None:
         # loại trừ trên đường cụ thể, gỡ luật trên đúng tham số — không tắt cả nhóm luật cho mọi đầu vào
-        scoped = re.findall(r'SecRule REQUEST_FILENAME "@(?:beginsWith|rx|streq) [^"]+" "id:(\d+),phase:1,pass,nolog,',
-                            self.directives)
-        self.assertEqual(scoped, ["10010", "10020", "10030", "10031", "10032", "10033", "10040"])
+        # luật dài xuống dòng sau id (YAML gấp dòng thành dấu cách, Coraza bỏ qua dấu cách giữa các hành động)
+        pattern = r'SecRule REQUEST_FILENAME "@(?:beginsWith|rx|streq) [^"]+" "id:(\d+),\s*phase:1,pass,nolog,'
+        scoped = re.findall(pattern, self.directives)
+        self.assertEqual(scoped, ["10010", "10011", "10020", "10030", "10031", "10032", "10033", "10040", "10050"])
         self.assertNotIn("ctl:ruleEngine=Off", self.directives)
         self.assertNotIn("ctl:ruleRemoveByTag", self.directives)
         self.assertNotIn("ctl:ruleRemoveById", self.directives)
         for target in re.findall(r"ctl:ruleRemoveTarget(?:ById|ByTag)=[^;]+;([^,\"\n]+)", self.directives):
             self.assertRegex(target,
-                             r"^(?:ARGS:[a-z_.-]+|FILES|MULTIPART_PART_HEADERS:[a-z]+|REQUEST_COOKIES:[A-Z_]+)$")
+                             r"^(?:ARGS:[a-z_.-]+|FILES|MULTIPART_PART_HEADERS:[a-z]+|REQUEST_COOKIES:[A-Z_]+"
+                             r"|REQUEST_BASENAME)$")
 
     def exclusion(self, rule_id: str) -> str:
         start = self.directives.index(f'"id:{rule_id},')
@@ -322,6 +324,17 @@ class RulesTest(unittest.TestCase):
             want = token_ids | ({"932000-932999"} if target == "REQUEST_COOKIES:KC_AUTH_SESSION_HASH" else set())
             self.assertEqual(ids, want, target)
         self.assertNotIn("ARGS:username", realm)
+        # đổi mã lấy token (#162): code và code_verifier, chỉ trên endpoint token, cùng ba luật. client_secret: phần
+        # máy chủ của ứng dụng cài bằng manifest (mạng apps) lấy token client credentials qua cổng, bí mật base64url
+        # 32 byte như verifier đã đo
+        exchange = self.exclusion("10011")
+        self.assertIn('"@streq /realms/${{MOC_REALM}}/protocol/openid-connect/token" "id:10011,', self.directives)
+        self.assertEqual(re.findall(r"ctl:([^,\"]+)", exchange),
+                         [f"ruleRemoveTargetById={i};ARGS:{a}" for a in ("code", "code_verifier", "client_secret")
+                          for i in ("942100", "933000-933999", "930120")])
+        self.assertIn('want["MOC_CLIENT_SECRET"] = secrets.token_urlsafe(32)', read(ROOT / "scripts" / "ung_dung.py"))
+        self.assertRegex(read(ROOT / "apps" / "bang-tin" / "server.py"),
+                         r'"grant_type": "client_credentials", "client_id": [^\n]*\n\s*"client_secret": ')
         # trang ứng dụng nhận lại code, session_state từ Keycloak: cùng ba luật, iss giữ hai luật URL như cũ
         page = self.exclusion("10020")
         self.assertEqual(re.findall(r"ctl:([^,\"]+)", page),
@@ -356,6 +369,29 @@ class RulesTest(unittest.TestCase):
         self.assertNotIn("FILES_NAMES", rule)                    # tên trường do ứng dụng đặt: vẫn soi
         self.assertEqual(set(re.findall(r"ruleRemoveTargetById=(\d+);", rule)), {"920120", "922130"})
         self.assertEqual(set(re.findall(r"MULTIPART_PART_HEADERS:([a-z]+)", rule)), {"file", "data", "archive"})
+
+    def test_pem_downloads_only_lose_the_extension_rule_on_two_fixed_paths(self) -> None:
+        # Loại trừ 9: đuôi .pem nằm trong tx.restricted_extensions (920440). Chỉ chứng thư CA và khóa ký mốc neo ở cổng
+        # xác thực; .pem khác, .key, đường khác vẫn bị chặn. Đã chạy thử trên Coraza 3.3.3 + CRS 4.14.0 (bộ luật của
+        # coraza-proxy-wasm 0.6.0): có 10050 thì hai đường qua, bỏ 10050 thì 920440 chặn
+        rule = self.exclusion("10050")
+        self.assertEqual(re.findall(r"ctl:([^,\"]+)", rule), ["ruleRemoveTargetById=920440;REQUEST_BASENAME"])
+        path = re.search(r'"@rx (\S+)"', self.directives[self.directives.index('"id:10050,') - 120:]).group(1)
+        for uri, hit in (("/api/verify/ca.pem", True), ("/api/verify/anchor-key.pem", True),
+                         ("/api/verify/other.pem", False), ("/api/verify/ca.pem.bak", False),
+                         ("/api/verify/ca.key", False), ("/api/files/ca.pem", False), ("/x/api/verify/ca.pem", False),
+                         ("/api/verify/caXpem", False)):
+            self.assertEqual(bool(re.search(path, uri)), hit, uri)
+        # svc-files phục vụ đúng hai đường này (gắn trước /api/verify/{code}), route xac-thuc chỉ cho GET. ca.pem nằm ở
+        # router documents của Văn phòng, anchor-key.pem ở lõi; router verify (có /api/verify/{code}) gắn sau cả hai
+        src = ROOT / "services" / "svc-files" / "src" / "svc_files"
+        app, office = read(src / "app.py"), read(src / "office" / "api.py")
+        self.assertIn('@documents.get("/api/verify/ca.pem"', office)
+        self.assertIn('@verify.get("/api/verify/{code}"', office)
+        self.assertIn('@app.get("/api/verify/anchor-key.pem"', app)
+        verify_mounted = app.index("app.include_router(routes.verify)")
+        self.assertLess(app.index("app.include_router(routes.documents)"), verify_mounted)
+        self.assertLess(app.index('"/api/verify/anchor-key.pem"'), verify_mounted)
 
     def test_argument_limit_rules_block(self) -> None:
         # GHSA-6r3q-mjv7-xr8m: tham số thứ 1000 trở đi không được soi — chặn hẳn

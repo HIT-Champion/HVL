@@ -18,10 +18,13 @@
 
   :8080  trang tĩnh dưới /bang-tin/ (route APISIX app-bang-tin, chỉ GET/HEAD), /bang-tin/config.json, /bang-tin/healthz.
          CSP script-src 'self'; nhật ký truy cập không ghi chuỗi truy vấn (như app-office, F4.4).
-  :8081  POST /su-kien — webhook của Hasura Event Trigger app_bang_tin trên core.app_events. Không có route qua APISIX:
-         chỉ container trong mạng nội bộ gọi tới. Kiểm header X-Moc-Hook-Secret (so khớp thời gian hằng), ghi một dòng
-         bang_tin.tin bằng danh tính dịch vụ riêng (client credentials của app-bang-tin-svc → vai trò Hasura
-         app_bang_tin, chỉ được thêm dòng vào bảng này). Trùng event_id → coi như đã ghi. Lỗi → 503: Hasura tự gửi lại.
+  :8081  POST /su-kien — webhook của Hasura Event Trigger app_bang_tin trên core.app_events. Không có route ở cổng công
+         khai: Hasura gọi cổng hook nội bộ của APISIX (apisix:9081/su-kien/bang-tin, không publish), APISIX chuyển tới
+         đây. Container chỉ ở mạng `apps`, chỉ tới được APISIX: token và GraphQL dưới đây cũng đi qua cổng
+         (MOC_KEYCLOAK_INTERNAL_URL, MOC_GRAPHQL_INTERNAL_URL lõi đặt là http://apisix:9080…). Kiểm header
+         X-Moc-Hook-Secret (so khớp thời gian hằng), ghi một dòng bang_tin.tin bằng danh tính dịch vụ riêng (client
+         credentials của app-bang-tin-svc → vai trò Hasura app_bang_tin, chỉ được thêm dòng vào bảng này). Trùng
+         event_id → coi như đã ghi. Lỗi → 503: Hasura tự gửi lại.
 
 Biến môi trường (moc app install đặt; bí mật từ .moc-apps/bang-tin.env, không nằm trong manifest): MOC_HOOK_SECRET,
 MOC_CLIENT_ID, MOC_CLIENT_SECRET, MOC_REALM, MOC_KEYCLOAK_INTERNAL_URL, MOC_GRAPHQL_INTERNAL_URL (MOC_APP_EVENT_KINDS
@@ -208,8 +211,12 @@ class Page(http.server.BaseHTTPRequestHandler):
             cfg = {"realm": self.server.settings.realm, "clientId": "app-bang-tin"}       # type: ignore[attr-defined]
             self._send(200, json.dumps(cfg).encode(), "application/json", "no-store")
             return
-        target = (PUBLIC / rel).resolve() if rel else PUBLIC / "index.html"
-        if PUBLIC not in target.parents or not target.is_file():
+        try:
+            target = (PUBLIC / rel).resolve() if rel else PUBLIC / "index.html"
+            found = PUBLIC in target.parents and target.is_file()
+        except (ValueError, OSError):               # vd %00 (byte rỗng) trong đường dẫn: không có tệp nào như vậy
+            found = False
+        if not found:
             target = PUBLIC / "index.html"          # ứng dụng một trang: /bang-tin/dang-nhap… trả trang chính
         ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript", "image/svg+xml"):

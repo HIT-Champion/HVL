@@ -18,12 +18,12 @@ Trước buổi trình diễn làm theo [checklist](#checklist-trước-giờ-tr
 
 | Nguyên lý | Màn | Lệnh | Tình trạng |
 | --- | --- | --- | --- |
-| (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm và xác thực được | `make demo-nong-lanh` | Có (F3.8) |
+| (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm, xác thực và phân tích được (DuckDB trên gói Parquet) | `make demo-nong-lanh` | Có (F3.8) |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | `make demo-it-ot` | Có (F3.10) |
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | `make demo-pha-he` | Có (F3.9) |
-| (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
+| (iv) Zero-Trust + GitOps | Kiểm dịch trước khi lưu | `make demo-kiem-dich` | Có (F3.1) |
 | (iv) Zero-Trust + GitOps | Văn bản hạn chế: tệp mã hóa trong kho, chỉ người có tên mở được, bản mở có dấu tên | `make demo-han-che` | Có (F3.7) |
-| (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
+| (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ của đội không nhận bí mật qua biến môi trường, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
 Ngoài các màn nguyên lý còn năm màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
@@ -48,8 +48,11 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 - Chuyển đi mà không mất gì: gói có manifest băm từng phần, đọc lại so băm xong mới gỡ khỏi CSDL. Văn bản vẫn tìm
   thấy, quét mã QR vẫn "khớp", phòng đọc vẫn đọc lại được gói.
 - Kho lạnh có khóa ghi: trong thời hạn bảo quản không ai xóa được gói, kể cả quản trị kho.
+- Dữ liệu lạnh vẫn phân tích được (#304): trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB đọc thẳng các gói Parquet
+  trong bucket lạnh. Số đếm không lấy từ CSDL nghiệp vụ: CSDL (qua Hasura) chỉ cho danh sách gói và băm manifest. Quyền
+  như các biểu đồ nóng (chỉ lãnh đạo đơn vị, số của đơn vị mình).
 
-**Lệnh in ra 5 bước:**
+**Lệnh in ra 6 bước:**
 
 1. Chuyên viên (hoặc tổ trưởng) lập hồ sơ `HS-…`, đưa vào tối đa ba văn bản đã xong mà mình đọc được, thuộc phòng
    mình (ưu tiên văn bản đi đã phát hành, có mã QR), đóng hồ sơ — ngày đóng do CSDL đặt. In số dòng liên kết tệp,
@@ -66,7 +69,14 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
      đúng các văn bản.
    - phòng đọc xem tệp `GET /api/case-files/{id}/archive/files/{file_id}`: bản PDF có dấu tên văn thư, giờ xem (khác
      byte gốc), lần xem vào sổ kiểm toán (`case_file.file_viewed`).
-5. Thử xóa manifest bằng khóa quản trị của kho → bị từ chối (S3 Object Lock, chế độ COMPLIANCE). Dòng
+5. Phân tích trên dữ liệu lạnh: lãnh đạo đơn vị gọi `GET /api/case-files/archive-stats` (API của phần "Văn bản đã nộp
+   lưu" trên trang Điều hành) trước bước 2 và sau bước 4. Số hồ sơ tăng 1, số văn bản tăng đúng số văn bản của hồ sơ,
+   theo năm ban hành và chiều đến / đi tăng đúng như các văn bản đó; chuyên viên gọi cùng API → 403. Phả hệ có run
+   `moc.archive.stats` với đầu vào là bảng `documents-….parquet` của gói vừa nộp lưu. Bước này giả định trong lúc
+   lệnh chạy không ai khác nộp lưu hồ sơ của cùng đơn vị: trong CI không sao (vòng nền chỉ nộp lưu hồ sơ đóng quá
+   `MOC_ARCHIVE_AFTER_DAYS` ngày); chạy trên hệ thống đang có người dùng thì một lượt nộp lưu chen giữa làm số đếm
+   lệch và bước 5 báo lỗi.
+6. Thử xóa manifest bằng khóa quản trị của kho → bị từ chối (S3 Object Lock, chế độ COMPLIANCE). Dòng
    `case_file.archived` nằm trong sổ kiểm toán chuỗi băm.
 
 **Trên giao diện:**
@@ -74,6 +84,9 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 - *Bất kỳ ai*: mở trang xác thực, nhập mã tra cứu của văn bản vừa nộp lưu → vẫn "Văn bản khớp".
 - *Lãnh đạo khoa*: **Sổ kiểm toán** → tab **Văn bản**, dòng "Nộp lưu hồ sơ" kèm ký hiệu hồ sơ, băm gói, số văn bản,
   số tệp; tên hồ sơ không hiện.
+- *Lãnh đạo khoa*: **Điều hành** → phần **Văn bản đã nộp lưu (kho lạnh)** cuối trang: số hồ sơ, văn bản đến, văn bản
+  đi đã nộp lưu; biểu đồ theo năm ban hành; bảng theo loại văn bản, theo phòng lập hồ sơ; dòng nguồn ghi số gói, tên
+  bucket lạnh, giờ DuckDB tính. Chưa có hồ sơ nào nộp lưu thì phần này báo trống, không báo lỗi.
 - *Chuyên viên* (`chuyenviendt`): **Hồ sơ công việc** → **Lập hồ sơ** (ký hiệu, tiêu đề, thời hạn bảo quản) → **Thêm vào
   hồ sơ** một văn bản đã xong của phòng → **Đóng hồ sơ** (ngày đóng do hệ thống đặt). Không có nút nộp lưu.
 - *Tổ trưởng* (`totruongdt`): mở hồ sơ vừa đóng → **Nộp lưu** → trạng thái "Đã nộp lưu", băm manifest, vị trí gói, khóa
@@ -87,6 +100,11 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 - *"Lạnh là ở đâu?"* Bucket `moc-cold` của SeaweedFS, có khóa ghi, chung với mốc neo sổ kiểm toán. Triển khai thật
   thì trỏ `MOC_COLD_BUCKET` sang ổ rẻ hơn hoặc kho S3 khác. Parquet là định dạng cột mở: công cụ nào cũng đọc được,
   không cần Signet.
+- *"Đã chuyển sang kho lạnh thì còn phân tích được không?"* Được: svc-files tải manifest theo băm trong CSDL,
+  kiểm băm bảng văn bản của từng gói, rồi DuckDB đọc mọi bảng một lượt (`read_parquet` trên danh sách tệp) và đếm
+  theo năm, loại, phòng (`svc_files/archive_stats.py`). Gói không đổi nên kết quả lưu đệm tới khi có hồ sơ mới nộp
+  lưu. Gói lệch băm thì không đếm mà báo ký hiệu hồ sơ trên trang. Đọc lại mọi gói mỗi khi có hồ sơ mới: chưa đo với
+  hàng nghìn gói.
 - *"Sao không dùng Kestra?"* Một job mỗi giờ không đáng thêm một máy chủ Java khoảng 1 GB RAM. Job là vòng nền trong
   svc-files, như vòng neo sổ kiểm toán. DuckDB nhúng trong svc-files, không chạy máy chủ riêng.
 - *"Hỏng giữa chừng thì sao?"* Thứ tự là kiểm băm tệp nóng → ghi gói → đọc lại so băm → một giao dịch CSDL → xóa
@@ -108,7 +126,7 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
   bị chỉ thấy broker, không gọi được svc-workflow; broker gọi svc-workflow phải kèm token riêng của đơn vị; broker
   và CSDL của nó không mở cổng ra ngoài.
 
-**Lệnh in ra 6 bước** (lần đầu tải image Scorpio và PostGIS, khoảng 380 MB):
+**Lệnh in ra 7 bước** (lần đầu tải image Scorpio và PostGIS, khoảng 380 MB):
 
 1. Bật profile `iot` (Scorpio + PostGIS); svc-workflow tự đăng ký subscription `temperature>35` trong tenant của đơn
    vị, kèm token. In thời gian broker sẵn sàng.
@@ -122,9 +140,16 @@ gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng ch�
 5. Chuyên viên trình → tổ trưởng phòng có việc duyệt, như mọi văn bản đi.
 6. Thông báo giả: từ mạng thiết bị không tới được svc-workflow; từ mạng nội bộ (container svc-files) với token sai
    → 401.
+7. Sơ đồ cảm biến kho: năm cảm biến khai mã phòng (`--room`) và gửi số đo — kho 1 bình thường; kho 2 gửi
+   `-127 °C` (ngoài dải); kho 3 đồng hồ đứng (`--frozen-clock`, trùng `observedAt`); phòng đọc gửi số đo cũ hơn
+   `MOC_OT_STALE_MIN` + 20 phút (`--late`, mất tín hiệu); phòng xử lý đồng hồ nhanh 30 phút (`--clock-ahead`, giờ đo
+   ở tương lai — broker vừa nhận nên không mất tín hiệu). Văn thư gọi Action `otSensorMap`: đúng cờ từng cảm biến,
+   phòng máy chủ vượt ngưỡng; văn thư Khoa Kinh tế không thấy cảm biến của Khoa CNTT; quản trị đơn vị không có Action.
 
 Trên giao diện (`chuyenviendt`): chuông thông báo "Cảnh báo nhiệt độ…", mục Văn bản đi có dự thảo, dòng thời gian
-ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dựng dự thảo".
+ghi "Cảm biến … đo 41 °C, vượt ngưỡng 35 °C — hệ thống dựng dự thảo". Mục "Sơ đồ cảm biến" (`/cam-bien`, văn thư,
+chuyên viên, lãnh đạo): mặt bằng kho, phòng máy chủ đỏ, kho 1 xanh, kho 2 và phòng đọc xám có cờ, kho 3 có cờ
+"Trùng giờ đo", phòng xử lý tô theo số đo kèm cờ "Giờ đo ở tương lai"; chú giải ghi luật từng cờ.
 
 **Nếu giám khảo hỏi:**
 
@@ -179,12 +204,13 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
   view là đồ thị đổi theo. Chỉ cạnh biểu đồ → khung nhìn khai trong mã giao diện, và có test so với truy vấn thật của
   trang Điều hành (`apps/office/tests/lineage.test.ts`).
 
-## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
+## (iv) Kiểm dịch trước khi lưu — `make demo-kiem-dich`
 
 **Điều muốn chứng minh:**
 
 - Không tệp nào chạm kho mà chưa qua ClamAV.
-- Tệp nhiễm bị chặn ngay ở cửa ngõ, không được lưu. Thứ duy nhất còn lại là dòng sổ kiểm toán ghi lần chặn.
+- Tệp nhiễm bị từ chối ngay khi `svc-files` nhận, trước khi ghi vào kho, và không được lưu ở đâu. Thứ duy nhất còn
+  lại là dòng sổ kiểm toán ghi lần chặn.
 - Sổ kiểm toán là chuỗi băm, neo ra ngoài CSDL: ai sửa hay xóa dòng đó, kể cả quản trị, đều bị phát hiện.
 
 **Lệnh in ra 5 bước:**
@@ -208,7 +234,10 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
 
 - *"Chặn ở gateway hay ở dịch vụ?"* Ở `svc-files`, sau APISIX. Mọi đường tải tệp lên đều đi qua đây, không có
   đường nào ghi thẳng vào SeaweedFS. Tệp được quét trên luồng trước khi ghi vào kho. ClamAV không trả lời thì
-  từ chối tệp (`503`), không cho qua.
+  từ chối tệp (`503`), không cho qua. Không quét ở cổng vì WAF trong APISIX (coraza-proxy-wasm) không soi được
+  nội dung tệp trong multipart (`platform/apisix/README.md`, mục WAF).
+- *"Có kho cách ly không?"* Không. Tệp nhiễm bị từ chối và không lưu ở đâu, người tải thấy lý do ngay. Sổ kiểm toán
+  giữ cỡ tệp, SHA-256 và tên mẫu ClamAV để tra lại.
 - *"Mã độc mới, chưa có mẫu thì sao?"* ClamAV chỉ bắt được mẫu đã biết. Mẫu tự cập nhật nhiều lần mỗi ngày
   (freshclam chạy sẵn trong image `clamav/clamav`). Lớp sau là: tệp không bao giờ được thực thi trên máy chủ,
   PDF chỉ được đọc trong tiến trình con có giới hạn bộ nhớ, CPU và thời gian (F2.7).
@@ -289,8 +318,8 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
 
 - *"Bí mật vẫn nằm trong `.env` mà?"* Đúng. `.env` vẫn là nguồn: container `openbao` nhận chúng và nạp vào két mỗi
   lần khởi động. Cái được: dịch vụ của đội không giữ bí mật trong biến môi trường, mỗi dịch vụ chỉ đọc được phần của
-  mình, mọi lần đọc có sổ. Phần mềm thượng nguồn (Hasura, SeaweedFS, Meilisearch, Centrifugo) vẫn đọc bí mật của
-  chúng từ biến môi trường.
+  mình, mọi lần đọc có sổ. Phần mềm thượng nguồn (PostgreSQL, Keycloak, Flowable, Hasura, SeaweedFS, Meilisearch,
+  Centrifugo; Parseable, Scorpio, restic khi bật profile) vẫn đọc bí mật của chúng từ biến môi trường.
 - *"Khóa mở két để đâu?"* `MOC_OPENBAO_SEAL_KEY` trong `.env`, khóa phục hồi và token khởi động trong volume của két,
   `role_id`/`secret_id` của dịch vụ trong volume riêng của dịch vụ đó. Ai có quyền Docker trên máy chủ vẫn đọc được
   két. Static seal đổi an toàn lấy khả năng tự phục hồi; bản thật nên dùng KMS hoặc HSM (seal `pkcs11`, `awskms`…).
@@ -555,8 +584,10 @@ tự nhúng các đoạn ở vòng nền rồi tìm lai (từ khóa + theo nghĩ
 **Trên giao diện** (`vanthu`, thanh bên → "Hỏi đáp văn bản"; hoặc nút "Hỏi trợ lý" ở Tìm kiếm): gõ "Điều kiện xét
 học bổng khuyến khích học tập là gì?" → khối "Câu trích nguyên văn" có "3,2", nguồn "[1] 88/CTSV · tr. 1 · Phòng
 Công tác sinh viên", nút "Mở văn bản"; bật mô hình thì sau đó có thêm khối "Trả lời của trợ lý" ghi rõ "Do mô hình
-ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Đăng nhập `giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào
-bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: dòng hỏi đáp của tác tử, không có câu hỏi.
+ngôn ngữ viết — đối chiếu nguồn trước khi dùng". Bấm nhãn nguồn "88/CTSV · tr. 1" → tệp PDF mở ngay dưới danh sách
+nguồn, đúng trang 1. "Mở văn bản" → nút "Hỏi về văn bản này" mở lại trang Hỏi đáp chỉ hỏi trong 88/CTSV. Đăng nhập
+`giangvienktpm`, hỏi lại → "Không tìm thấy văn bản nào bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán:
+dòng hỏi đáp của tác tử, không có câu hỏi.
 
 **Nếu giám khảo hỏi:**
 
@@ -576,9 +607,8 @@ bạn được xem có nội dung này". `truongkhoa` mở Sổ kiểm toán: d�
   Internet lúc chạy và không biết quyền của Signet — phần lọc, trích dẫn, kiểm đầu ra vẫn phải tự viết.
 - *"Lưu câu hỏi ở đâu?"* Không lưu: không bảng hội thoại, sổ chỉ có siêu dữ liệu; trang Hỏi đáp chỉ giữ trong bộ
   nhớ trình duyệt.
-- *"Còn gì chưa làm?"* Bản scan chưa OCR nền nên chỉ hỏi được theo trích yếu (nguồn ghi "trích yếu", không bịa
-  trang); mỗi câu hỏi độc lập, chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản
-  giả, sạch hơn văn bản thật.
+- *"Còn gì chưa làm?"* Bản scan chỉ có chữ OCR của 3 trang đầu, có thể sai chữ, sai dấu (#253); mỗi câu hỏi độc lập,
+  chưa hỏi tiếp theo ngữ cảnh; tìm từ khóa chỉ xét 10 từ đầu câu hỏi; số đo trên văn bản giả, sạch hơn văn bản thật.
 
 ## Ngoài 4 nguyên lý: gợi ý giao việc — `make demo-giao-viec`
 
@@ -660,7 +690,8 @@ khối này.
   không cần nút "gợi ý sai". Không đủ văn bản tương tự, hay phiếu chia đều, thì không gợi ý.
 - *"Căn cứ có làm lộ văn bản hạn chế?"* Ba lớp: không vào chỉ mục; svc-files hậu kiểm; trigger CSDL. Giao diện còn
   hậu kiểm danh sách căn cứ bằng token người xem trước khi hiện.
-- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn chưa xét ngày lễ; chỉ
+- *"Còn gì chưa làm?"* Chưa gợi ý người xử lý (việc của trưởng đơn vị ở bước phân công); hạn tránh ngày lễ dương
+  lịch cố định, còn Tết Âm lịch và ngày nghỉ bù phải do người vận hành thêm vào `MOC_HOLIDAYS` mỗi năm; chỉ
   dựa vào trích yếu (đầu nội dung công văn toàn khuôn mẫu "Căn cứ…", "Kính gửi…"); dữ liệu mẫu nhỏ, hai đơn vị hợp lệ.
 
 ## Ngoài 4 nguyên lý: ký số văn bản đi (minh họa) — `make demo-ky-so`
@@ -907,8 +938,8 @@ trong thư mục mã nguồn. Kịch bản 5 phút ở [`dac-ta-san-pham.md`](da
 - Lệnh dừng ở bước sai, in tên bước, thoát 1. Chạy lại ngay được: mỗi màn chạy lại bao nhiêu lần cũng được.
 - Dịch vụ chết hay `unhealthy`: `make ps` (bản cài: `docker compose ps`), rồi một lượt tự phục hồi
   `python3 scripts/reconcile.py --heal-only`; xem lỗi bằng `docker compose logs --tail 50 <dịch vụ>`.
-- Vẫn lỗi: bỏ màn đó, mở lượt CI xanh của đúng commit đang chạy — job "Chạy thử toàn hệ thống (PoF #4)" có từng bước
-  `make demo-*` kèm nhật ký — rồi đi tiếp; còn giờ thì quay lại.
+- Vẫn lỗi: bỏ màn đó, mở lượt CI xanh của đúng commit đang chạy — các job "Chạy thử: luong-chinh", "Chạy thử: ai",
+  "Chạy thử: sao-luu" có từng bước `make demo-*` kèm nhật ký — rồi đi tiếp; còn giờ thì quay lại.
 - Dữ liệu demo hỏng tới mức không dùng được: khôi phục lượt sao lưu lấy hôm trước,
   `python3 scripts/moc.py backup restore <lượt>` (hỏi lại trước khi thay dữ liệu; Signet dừng trong lúc khôi phục). Chỉ
   làm khi còn thời gian, không thì sang máy dự phòng.

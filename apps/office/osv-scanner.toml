@@ -21,11 +21,6 @@
 # đã dựng sẵn qua nginx, không chứa gói npm nào.
 
 [[IgnoredVulns]]
-id = "GHSA-vfj7-8cjw-p6xm"
-ignoreUntil = 2026-12-31
-reason = "braces 3.0.3, chưa có bản vá: nuxt → nitropack → globby → micromatch, chỉ khớp mẫu glob của mã nguồn lúc dựng."
-
-[[IgnoredVulns]]
 id = "GHSA-86w9-cpqp-85rv"
 ignoreUntil = 2026-12-31
 reason = "node-forge 1.4.0, chưa có bản vá: nuxt → @nuxt/cli → listhen, chỉ tạo chứng chỉ HTTPS cho nuxt dev."
@@ -33,14 +28,5 @@ reason = "node-forge 1.4.0, chưa có bản vá: nuxt → @nuxt/cli → listhen,
 [[IgnoredVulns]]
 id = "GHSA-vjh5-4x84-xrqp"
 ignoreUntil = 2026-12-31
-reason = "nuxt/@nuxt/nitro-server 4.5.2: server-side route rules; app-office chỉ là trang tĩnh qua nginx."
-
-[[IgnoredVulns]]
-id = "GHSA-jjm6-p2m9-9w4x"
-ignoreUntil = 2026-12-31
-reason = "nuxt 4.5.2: javascript: URL in NuxtLink khi pages bị tắt; Signet bật pages và dùng CSP chặn inline script."
-
-[[IgnoredVulns]]
-id = "GHSA-xfq5-w38q-pc2x"
-ignoreUntil = 2026-12-31
-reason = "nuxt 4.5.2: server islands không khử khuẩn useHeadSafe; app-office không dùng server islands."
+# Đã vá ở 4.6.2 (GitHub đóng cảnh báo), nhưng bản ghi OSV còn khoảng 3.x không có bản vá, mở tới mọi phiên bản sau
+reason = "nuxt, @nuxt/nitro-server 4.6.2 đã vá; OSV vẫn khớp do khoảng 3.x chưa vá. App-office là trang tĩnh qua nginx."

@@ -29,7 +29,8 @@
     "board": "Overview",
     "metrics": "Metrics",
     "feedback": "Feedback",
-    "selfCheck": "Self-assessment"
+    "selfCheck": "Self-assessment",
+    "sensors": "Sensor map"
   },
   "role": {
     "clerk": "Clerk",
@@ -256,6 +257,7 @@
     "files": "Files",
     "noFiles": "No files.",
     "download": "Download",
+    "downloadNamed": "Download {name}",
     "type": "Type",
     "symbol": "Reference",
     "issuer": "Issuer",
@@ -270,9 +272,11 @@
     "info_role": "For information",
     "timeline": "Timeline",
     "history": "History",
+    "activity": "Document activity",
     "historyHint": "From the audit log: who changed what, and when. Content fields (summary, file names…) only show that they changed.",
     "historyEmpty": "No audit log entries yet.",
     "register": "Register",
+    "registering": "Registering…",
     "registerConfirm": "Register this document? The number is assigned automatically, consecutively per year.",
     "notFound": "Document not found, or you are not allowed to see it.",
     "restricted": "Restricted",
@@ -287,6 +291,7 @@
     "createdBy": "Drafted by",
     "preview": "Download preview (PDF)",
     "edit": "Edit draft",
+    "askAbout": "Ask about this document",
     "submit": "Submit for signing",
     "resubmit": "Resubmit",
     "submitTitle": "Submit draft",
@@ -359,10 +364,15 @@
     "xuLy": {
       "title": "Report result",
       "result": "Result",
-      "done": "Report done"
+      "done": "Report done",
+      "brief": "Your assignment",
+      "assignedBy": "Assigned by",
+      "required": "required",
+      "consequence": "Submitting this report completes your assigned task."
     },
     "pick": "— Choose —",
     "done": "Moved to the next step.",
+    "processing": "Submitting…",
     "duyet": {
       "note": "Comment",
       "approve": "Approve, send to signer",
@@ -436,6 +446,14 @@
     "took": "{s} s",
     "history": "Questions in this session",
     "historyNote": "Questions and answers stay on this page only and are not stored on the server — reloading the page clears them.",
+    "scope": {
+      "title": "Asking about one document only",
+      "chip": "In {label}",
+      "unnamed": "the selected document",
+      "clear": "Ask across all documents",
+      "missing": "This document was not found, or you are not allowed to view it — the assistant will have nothing to answer from.",
+      "notIndexed": "This document is not in the assistant's collection (restricted, cancelled or not yet issued) — the question will find no evidence."
+    },
     "source": {
       "title": "Sources",
       "n": "Source {n}",
@@ -447,6 +465,15 @@
     },
     "openDocument": "Open document",
     "openDocumentFor": "Open document {label}",
+    "viewSource": "View file: {label}",
+    "viewPage": "View page {n}",
+    "viewFile": "View file",
+    "viewer": {
+      "title": "Viewing {label}",
+      "newTab": "Open in a new tab",
+      "close": "Close",
+      "note": "Page numbers count PDF pages (page 1 is the first page of the file) and may differ from the numbers printed on the document."
+    },
     "page": "p. {n}",
     "pageSpoken": "page {n}",
     "summaryOnly": "summary",
@@ -533,11 +560,16 @@
     "documents_summary": "The summary must be 10–500 characters.",
     "infected": "The file contains malware and was blocked.",
     "unscannable": "The file is password-protected or nested too deeply for the malware scanner to check — blocked. Remove the password or unpack it, then upload again.",
+    "type_mismatch": "The file's content does not match its extension (e.g. a .pdf that is really a web page), so it was blocked. Save it in the right format and upload again.",
+    "type_not_allowed": "Runnable files (programs, scripts such as .exe, .bat, .js) are not accepted.",
+    "image_unreadable": "The image is damaged or too large to strip its hidden data (EXIF, GPS location), so it was not saved. Shrink or re-save the image and upload again.",
     "too_large": "The file is too large.",
     "rate_limited": "Too many requests in a short time. Wait a few seconds and try again.",
+    "http": "The server could not answer (HTTP {status}). Try again in a few minutes, or report this code.",
     "blocked": "The security gateway blocked this content because some text looks like an attack pattern. Edit the text or file name you sent and try again, or tell your administrator.",
     "blockedId": "The security gateway blocked this content because some text looks like an attack pattern (ID {id}). Edit the text or file name you sent and try again, or tell your administrator, quoting this ID.",
     "noRole": "Your account has no role or unit yet. Contact your unit administrator.",
+    "noAccess": "Your account's role may not view or do this. Open the items listed in your menu.",
     "documents_body_length": "The body is longer than 20,000 characters.",
     "invalid": "Some fields are not valid, see the highlighted fields.",
     "document_files_sealed": "Restricted documents only take files uploaded in restricted mode (encrypted), and encrypted files only go to restricted documents",
@@ -643,7 +675,15 @@
       "serial": "Certificate serial number",
       "signedAt": "Signed at (time stated in the signature)",
       "illustrative": "The signature uses Signet's internal public key infrastructure, for illustration only — it has no legal standing like a public digital signature. PDF readers will report it as untrusted because this internal CA is not on any public trust list.",
-      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above."
+      "none": "This document has no digital signature (issued while signing was off or failed, or a restricted document). Its integrity is still checked with SHA-256 as above.",
+      "caDownload": "Download the CA certificate (illustrative)",
+      "caFingerprint": "SHA-256 fingerprint"
+    },
+    "anchors": {
+      "title": "Audit log anchors",
+      "text": "The system regularly copies anchors of its hash-chained audit log off the server, each signed by the key vault. Anyone can check those signatures with this public key (OpenSSL 3) without trusting the server.",
+      "download": "Download the anchor signing public key",
+      "fingerprint": "SHA-256 fingerprint (the key field in the anchor file)"
     },
     "noCrypto": "This browser cannot compute SHA-256 (HTTPS required). Look up by code instead.",
     "rateLimited": "Too many lookups. Wait a minute and try again.",
@@ -1126,6 +1166,31 @@
     "status": "Status",
     "underHour": "under 1 hour"
   },
+  "archiveBoard": {
+    "title": "Archived documents (cold store)",
+    "sourceShort": "Counted straight from the archive packages in the cold store (Parquet, DuckDB); the counts are not taken from the business database.",
+    "source": "From {n} package in the cold bucket {bucket}: Parquet, computed by DuckDB at {at}. Counts only. | From {n} packages in the cold bucket {bucket}: Parquet, computed by DuckDB at {at}. Counts only.",
+    "empty": "No case file archived yet. Figures appear here once closed case files move to the cold store.",
+    "unavailable": "Could not read the cold store or the database. Try again later.",
+    "unreadable": "{n} package fails the hash check, misses a part or is malformed and is left out: {codes}. Tell an administrator. | {n} packages fail the hash check, miss a part or are malformed and are left out: {codes}. Tell an administrator.",
+    "caseFiles": "Archived case files",
+    "incomingDocuments": "Archived incoming documents",
+    "outgoingDocuments": "Archived outgoing documents",
+    "byYear": "By year of issue",
+    "byType": "By document type",
+    "byDepartment": "By department that filed the case",
+    "year": "Year",
+    "unknownYear": "Unknown year",
+    "incoming": "Incoming",
+    "outgoing": "Outgoing",
+    "total": "Total",
+    "type": "Type",
+    "department": "Department",
+    "noDepartment": "Unknown department",
+    "caseFilesShort": "Case files",
+    "documents": "Documents",
+    "yearSummary": "{year}: {incoming} incoming, {outgoing} outgoing"
+  },
   "feedback": {
     "button": "Feedback",
     "title": "Feedback on the e-Office",
@@ -1138,7 +1203,7 @@
     "high": "Very satisfied",
     "comment": "A few words",
     "placeholder": "What is inconvenient, what should change…",
-    "privacy": "Do not write names, ID card numbers or phone numbers.",
+    "privacy": "Do not write names, ID card numbers or phone numbers. Long numbers and emails are masked if you do.",
     "send": "Send feedback",
     "sent": "Feedback sent. Thank you!",
     "mineLink": "Feedback you sent",
@@ -1282,13 +1347,69 @@
     "inputs": "Inputs",
     "outputs": "Outputs",
     "quality": "Quality check",
-    "passed": "Passed",
-    "failedCheck": "Failed",
     "notChecked": "Not checked",
     "reports": "All report views ({n})",
     "reportsHint": "Every office.v_… view in the database, including views no Overview chart uses yet (e.g. those of the Metrics page).",
     "usedBy": "Used by",
     "export": "Download OpenLineage (.jsonl)"
+  },
+  "quality": {
+    "status": {
+      "PASSED": "Passed",
+      "WARNING": "Warning",
+      "FAILED": "Failed",
+      "NONE": "Not checked"
+    },
+    "unavailable": "Could not check",
+    "flagOf": "Data quality check of {chart}",
+    "title": "Data quality checks",
+    "hint": "Rules computed in the database every time the page opens (view office.report_checks), on your unit's figures, not recomputed in the browser. Threshold 0: one document off raises a flag. The Overview page shows the worst flag next to each chart.",
+    "view": "View",
+    "rule": "Rule",
+    "result": "Result",
+    "figures": "Figures",
+    "rules": {
+      "status_total": {
+        "name": "Status totals match incoming documents",
+        "what": "The status chart's bars plus restricted incoming documents (shown separately) must equal the incoming documents counted directly in the documents table. A gap means documents vanish from the page.",
+        "figures": "On the page {actual} / in the database {expected} incoming documents",
+        "detail": "Statuses with documents the chart does not draw: {detail}"
+      },
+      "department_total": {
+        "name": "Department totals match documents in progress",
+        "what": "The department chart's documents must add up to the In progress bar of the status chart. Documents without a known lead department (assigned to someone not in the directory, no lead task) raise a warning.",
+        "figures": "By department {actual} / in progress {expected}; {issues} without a lead department"
+      },
+      "processing_coverage": {
+        "name": "Processing time covers every finished document",
+        "what": "Finished documents without a finish time are left out of the average (warning); counting more than exist, or a month with negative total hours, fails. All months, not only the 12 on the chart.",
+        "figures": "Timed {actual} / {expected} finished documents",
+        "detail": "Months with negative total hours: {detail}"
+      },
+      "unique_keys": {
+        "name": "Join keys are unique and not empty",
+        "what": "The page matches figures by month and by department: a duplicate key is silently skipped, an empty key drops off the chart.",
+        "figures": "{expected} rows, {issues} with a duplicate or empty key"
+      },
+      "no_personal_columns": {
+        "name": "No personal data columns",
+        "what": "From the database catalog: a view exposing an email, phone, ID card number, birth date, address, full name or username column fails; only reading such a column (also through a nested view) is a warning.",
+        "figures": "{actual} personal columns exposed, {issues} personal columns read",
+        "detail": "Columns: {detail}"
+      }
+    },
+    "archive": {
+      "run": "Quality checks of this run",
+      "source": "The checks svc-files recorded in the OpenLineage events (dataQualityAssertions facet), verbatim, not recomputed.",
+      "table": "{table}: {passed}/{total} checks passed",
+      "failedItems": "failed: {items}",
+      "none": "This run recorded no checks in the lineage: nothing vouches for the package's row counts.",
+      "stopped": "The archiving run at {time} was stopped by a failed quality check; the case file is not in cold storage."
+    },
+    "assertion": {
+      "row_count_equals_source": "row count matches the database",
+      "not_null": "column {column} not empty"
+    }
   },
   "hpdi": {
     "title": "H-P-D-I self-assessment",
@@ -1357,6 +1478,33 @@
     "gapsNone": "None: no later space is ahead of the one before it.",
     "gap": "{to} is {diff} levels above {from}.",
     "gapsHint": "Following the linear evolution principle H → P → D → I: a later space built on an earlier one that is not solid easily turns into “garbage in, garbage out”.",
+    "shapeTitle": "Shape",
+    "shape": {
+      "diamond": {
+        "name": "Complete diamond",
+        "text": "[P], [D] and [I] all reach near the top and little work is manual: processes stop errors, data is clean, AI runs on a solid base."
+      },
+      "illusion": {
+        "name": "Technology illusion",
+        "text": "[D] or [I] is ahead of [P]: analytics or AI built before the process foundation, so careless data entry turns into wrong results."
+      },
+      "kite": {
+        "name": "Off-centre kite",
+        "text": "[P] is solid but [D] and [I] are almost absent: work follows the process, but there are no figures to steer by (blind execution)."
+      },
+      "spear": {
+        "name": "Fragmented spear",
+        "text": "Most work still rests on people and [P], [D], [I] stay near the centre: the unit depends on a few key staff."
+      },
+      "transitional": {
+        "name": "In transition",
+        "text": "None of the four archetypes in the course book fits; see the foundation gaps and the space to work on first."
+      }
+    },
+    "shares": "Shares estimated as in the course book: [H] {h} % · [P] {p} % · [D] {d} % · [I] {i} %",
+    "shapeHint": "From the DX-OS course book, section 2.4 (Dr Tạ Tuấn Anh, CC BY 4.0): [P], [D] and [I] each take at most 30 %, converted from the score (level 1 is 0 %, level 5 is 30 %); [H] is the work left on people, 100 % minus the other three, not the [H] space score. The book also multiplies by an evidence factor; here it is 1 because every level already describes observable practice. A guide only, not a DTI score.",
+    "gigoTitle": "Garbage in, garbage out",
+    "gigo": "Intelligence and analytics rest on a weak base: [I] is above [D], or [D] and [I] are ahead of [P]. AI and reports that learn from wrong data give wrong results. Pause expanding [I] (agent suggestions, AI questions), standardise [P] and [D] first, and check the data quality flags of the reports:",
     "steps": "Next steps",
     "first": "Do first",
     "stepFrom": "from question {q} ({title}), currently at level {n}",
@@ -1373,5 +1521,165 @@
     "when": "Saved at",
     "sources": "References",
     "sourcesNote": "Question set {id}. Scoring and limitations: docs/tu-chan-doan.md in the source code."
+  },
+  "apps": {
+    "nav": "Applications",
+    "title": "Application catalog",
+    "subtitle": "Applications running on the Signet core, sharing one sign-in",
+    "builtinTitle": "Built into the core",
+    "builtinHint": "Installed with the core, same version as the core.",
+    "installedTitle": "Installed from a manifest",
+    "installedHint": "Added by the system administrator with moc app install, without changing core code.",
+    "removedTitle": "Removed",
+    "removedHint": "moc app remove took down the route, sign-in client and container; the application's data is kept.",
+    "none": {
+      "builtin": "No built-in applications.",
+      "installed": "No application has been installed from a manifest yet.",
+      "removed": "No application has been removed."
+    },
+    "state": {
+      "builtin": "Built into the core",
+      "installed": "Installed",
+      "removed": "Removed"
+    },
+    "version": "Version",
+    "coreVersion": "same as the core",
+    "installedAt": "Installed at",
+    "updatedAt": "Updated at",
+    "removedAt": "Removed at",
+    "manifestHash": "Manifest hash",
+    "hashHint": "The manifest hash is the SHA-256 of app.yaml at install time: compare it with sha256sum apps/<folder>/app.yaml on the server to confirm the installed version is the reviewed one.",
+    "copy": "Copy",
+    "copyHashOf": "Copy the manifest hash of {app}",
+    "copied": "Manifest hash copied",
+    "copyFailed": "The browser does not allow copying — select the hash below by hand",
+    "open": "Open",
+    "builtin": {
+      "office": {
+        "title": "Electronic office",
+        "description": "Incoming and outgoing documents, assignments, case files, search, Q&A, audit log — the first application on the core."
+      },
+      "personal": {
+        "title": "P.A.R.A personal space",
+        "description": "Each person's own place for files in four folders: Projects, Areas, Resources, Archives."
+      }
+    }
+  },
+  "sensors": {
+    "title": "Storage sensor map",
+    "subtitle": "Latest temperature of each room in the records storage against the alert threshold, with sensor data quality flags. Refreshes every 30 seconds.",
+    "forbidden": "This page is for clerks, staff, department heads and unit directors.",
+    "off": "Sensors are not enabled",
+    "offHint": {
+      "off": "No NGSI-LD context broker is configured to receive sensor readings (MOC_NGSI_URL of svc-workflow). Contact your system administrator.",
+      "unavailable": "The NGSI-LD context broker (iot profile) is not running or not answering yet, so there are no readings. Administrators enable it with make demo-it-ot or docker compose --profile iot up -d."
+    },
+    "plan": "Storage floor plan",
+    "planLabel": "Floor plan of the records storage, each room coloured by its latest temperature against the threshold",
+    "panHint": "Scroll horizontally to see the full plan. Detailed readings are listed below.",
+    "corridor": "Corridor",
+    "checkedAt": "Read at {time}",
+    "room": {
+      "kho-1": "Stack room 1",
+      "kho-2": "Stack room 2",
+      "kho-3": "Stack room 3",
+      "phong-doc": "Reading room",
+      "xu-ly": "Processing room",
+      "may-chu": "Server room"
+    },
+    "outside": "Not on the plan",
+    "outsideHint": "{n} sensor(s) declare no room code (room attribute) or a code that is not on the plan: listed in the table only.",
+    "count": "{n} sensors",
+    "legend": "Legend",
+    "threshold": "Alert threshold {threshold} (MOC_OT_THRESHOLD). Above it, the system drafts an \"Incident report\" for the staff member responsible for the sensor.",
+    "level": {
+      "over": "Above threshold",
+      "near": "Near threshold",
+      "normal": "Normal",
+      "unknown": "Reading not trusted",
+      "empty": "No sensor"
+    },
+    "levelHint": {
+      "over": "above {threshold}",
+      "near": "above {from}, up to {threshold}; a hint only, no alert is sent",
+      "normal": "{from} or below",
+      "unknown": "no reading yet, signal lost or out of range",
+      "empty": "no sensor in this room"
+    },
+    "flags": "Data quality flags",
+    "flag": {
+      "stale": "Signal lost",
+      "out_of_range": "Out of range",
+      "duplicate_time": "Repeated time",
+      "future_time": "Future time"
+    },
+    "flagHint": {
+      "stale": "no new reading for more than {n} minutes",
+      "out_of_range": "value is not a number, or outside the sensor's measuring range ({min} to {max})",
+      "duplicate_time": "the latest reading has the same observation time (observedAt) as another reading: stuck device clock or replayed message",
+      "future_time": "the latest reading's observation time (observedAt) is more than {slack} minutes ahead of the server clock: device clock running fast; signal loss is then judged by when the broker received the reading"
+    },
+    "flagsNote": "Flags are computed by the server from the sensor's digital twin in the context broker; rooms flagged signal lost or out of range are not coloured by the reading.",
+    "table": "Sensors",
+    "colRoom": "Room",
+    "colSensor": "Sensor",
+    "colValue": "Latest reading",
+    "colAt": "Observed at",
+    "colFlags": "Flags",
+    "none": "Your unit has no sensor sending readings yet.",
+    "note": "Sample floor plan of one storage level; sensors are placed by the room code the device declares. You only see your own unit's sensors."
+  },
+  "fe": {
+    "skip": "Skip to main content",
+    "organization": "Organization workspace",
+    "navigation": "Main navigation",
+    "verify": "Verify a document",
+    "localData": "Your organization owns its data",
+    "menu": "Open navigation",
+    "all": "All",
+    "overdue": "Overdue",
+    "backInbox": "Back to my tasks",
+    "urgent": "Urgent",
+    "searchTasks": "Search your tasks…",
+    "tasks": "{n} tasks",
+    "due": "Due date",
+    "noTasks": "No matching tasks",
+    "tryFilter": "Try another filter or search term.",
+    "loaded": "{n} documents in this list",
+    "filterDocuments": "Filter the list shown…",
+    "listHint": "Track records and progress within your organization.",
+    "loading": "Loading documents…",
+    "receiveNew": "Receive a document",
+    "todayShort": "Today",
+    "scrollTable": "Scroll horizontally to read all columns."
+  },
+  "desk": {
+    "queue": "To process",
+    "draft": "Unnumbered draft",
+    "clearFilters": "Clear filters",
+    "compose": "New document",
+    "pending": "{n} tasks awaiting action.",
+    "filter": "Filter tasks",
+    "noDeadline": "No deadline",
+    "attention": "Needs attention",
+    "remaining": "Other tasks",
+    "category": "Direction",
+    "allDocuments": "All documents"
+  },
+  "shell": {
+    "closeNav": "Close navigation"
+  },
+  "pageError": {
+    "notFound": "Page not found",
+    "notFoundDetail": "This link no longer exists or has changed. Return to your tasks to continue.",
+    "title": "Unable to open this page",
+    "detail": "Something went wrong while loading this page. Return to your tasks and try again.",
+    "home": "Back to my tasks"
+  },
+  "authCallback": {
+    "title": "Signing in",
+    "detail": "Signet is opening your workspace.",
+    "failed": "Unable to sign in",
+    "retryDetail": "Your sign-in session may have expired. Please sign in again."
   }
 }

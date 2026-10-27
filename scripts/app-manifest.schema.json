@@ -124,7 +124,7 @@
           "items": {"enum": ["office.document.received", "office.document.registered", "office.document.issued"]}
         },
         "webhook": {
-          "description": "Hasura gọi http://app-<tên>:<port><path> trong mạng nội bộ — không có route ra ngoài",
+          "description": "Hasura gọi qua cổng hook nội bộ của APISIX tới http://app-<tên>:<port><path>, không ra ngoài",
           "type": "object",
           "additionalProperties": false,
           "required": ["port", "path"],
@@ -141,6 +141,31 @@
             "interval_sec": {"type": "integer", "minimum": 1, "maximum": 3600},
             "timeout_sec": {"type": "integer", "minimum": 1, "maximum": 60}
           }
+        }
+      }
+    },
+    "workflow": {
+      "title": "Quy trình chạy trên Flowable của lõi",
+      "description": "BPMN, form (đường tương đối với manifest); id, formKey mở đầu <tên>. (docs/them-ung-dung.md 1.5)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["processes", "forms"],
+      "properties": {
+        "processes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._/-]*\\.bpmn20\\.xml$", "maxLength": 200}
+        },
+        "forms": {
+          "description": "formKey → tệp JSON Schema 2020-12; tên trường là tên biến của quy trình",
+          "type": "object",
+          "maxProperties": 40,
+          "propertyNames": {"pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+                            "maxLength": 80},
+          "additionalProperties": {"type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9._/-]*\\.json$",
+                                   "maxLength": 200}
         }
       }
     }

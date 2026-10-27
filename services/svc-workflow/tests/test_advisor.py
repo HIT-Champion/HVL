@@ -200,6 +200,17 @@ def test_due_written_on_the_letter_is_not_overridden(advisor, library, flowable,
         "suggested", str(DEPT_DT), None, None)
 
 
+def test_suggested_due_date_skips_the_configured_holidays(hasura, flowable, files, library):
+    # 26/10 + 10 ngày = thứ Năm 5/11; nghỉ 5/11, 6/11 thì sang thứ Hai 9/11, số ngày theo thói quen vẫn là 10
+    settings = Settings.from_env({**ENV, "MOC_HOLIDAYS": "01-01,2026-11-05..2026-11-06"})
+    advisor = Advisor(hasura, flowable, files, settings, clock=Tick(), today=lambda: TODAY)  # type: ignore[arg-type]
+    goi_y(flowable)
+    files.similar_answer = answer((P1, 0.9), (P2, 0.8), (P3, 0.7), (P4, 0.35))
+    run(advisor.run_jobs())
+    row = library.suggestions[DOC]
+    assert (row["status"], row["due_days"], row["due_on"]) == ("suggested", 10, "2026-11-09")
+
+
 def test_nothing_similar_is_recorded_as_none(advisor, library, flowable, files):
     goi_y(flowable)
     assert run(advisor.handle(flowable.jobs[0])) == "none"
@@ -490,10 +501,19 @@ def test_settings_read_the_five_variables():
     ("MOC_SUGGEST_ENABLED", "co"), ("MOC_SUGGEST_POLL_INTERVAL_S", "-1"), ("MOC_SUGGEST_TIMEOUT_S", "0"),
     ("MOC_SUGGEST_TIMEOUT_S", "60"), ("MOC_SUGGEST_MIN_SCORE", "1.5"), ("MOC_SUGGEST_MIN_SCORE", "nan"),
     ("MOC_ASSIGNER_ID", ""), ("MOC_ASSIGNER_ID", "x" * 65), ("MOC_SUGGEST_TIMEOUT_S", "mười"),
+    ("MOC_HOLIDAYS", "30/04"), ("MOC_HOLIDAYS", "2027-02-13..2027-02-05"), ("MOC_HOLIDAYS", "2027-01-01..2027-12-31"),
 ])
 def test_bad_suggestion_settings_stop_the_service(name, value):
     with pytest.raises(ConfigError):
         Settings.from_env({**ENV, name: value})
+
+
+def test_holidays_default_to_the_fixed_public_holidays():
+    legal = Settings.from_env(ENV).holidays
+    assert legal.yearly == {(1, 1), (4, 30), (5, 1), (9, 2)} and not legal.dates
+    assert Settings.from_env({**ENV, "MOC_HOLIDAYS": " "}).holidays == legal     # để trống như không đặt
+    s = Settings.from_env({**ENV, "MOC_HOLIDAYS": "01-01, 2027-02-05..2027-02-12"})
+    assert s.holidays.yearly == {(1, 1)} and len(s.holidays.dates) == 8
 
 
 def test_app_runs_the_advisor_only_when_polling(hasura, flowable, files, library):

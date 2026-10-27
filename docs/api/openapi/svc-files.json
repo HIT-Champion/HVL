@@ -137,6 +137,7 @@
     "/api/files": {
       "post": {
         "summary": "Tải tệp lên: quét ClamAV, sạch mới lưu",
+        "description": "Sau ClamAV: nhận loại theo byte đầu, không tin tên, mime khai; `mime_type` trả về là loại theo nội dung. Ảnh JPEG, PNG được bỏ siêu dữ liệu (EXIF, GPS, XMP, chú thích; xoay theo hướng EXIF trước) nên `sha256`, `size_bytes` là của ảnh đã làm sạch; tệp loại khác lưu nguyên từng byte.",
         "operationId": "upload_file_api_files_post",
         "security": [
           {
@@ -175,13 +176,13 @@
             "description": "Tệp vượt giới hạn MOC_FILES_MAX_MB"
           },
           "415": {
-            "description": "restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
+            "description": "`type_mismatch`: nội dung không khớp đuôi tệp (hay mime khai khi tên không có đuôi), vd tệp .pdf là HTML · `type_not_allowed`: chương trình, kịch bản chạy được (theo nội dung hay đuôi .exe, .bat, .js…) — `found` là loại theo nội dung · `restricted_pdf_only`: restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable)"
           },
           "422": {
-            "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán"
+            "description": "Tệp chứa mã độc (infected), hoặc có mật khẩu, nén quá nhiều lớp nên không quét được (unscannable) — đã chặn, không lưu, ghi file.rejected vào sổ kiểm toán · `image_unreadable` + `reason` (corrupt, too_many_pixels, timeout, memory): ảnh JPEG, PNG hỏng hoặc quá lớn nên không bỏ được siêu dữ liệu — không lưu"
           },
           "503": {
-            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — không lưu"
+            "description": "ClamAV, kho đối tượng, CSDL hoặc két khóa (restricted=true) không sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác hay xử lý ảnh khác — không lưu"
           }
         },
         "requestBody": {
@@ -992,6 +993,52 @@
         }
       }
     },
+    "/api/verify/ca.pem": {
+      "get": {
+        "summary": "Chứng thư CA nội bộ ký văn bản đi (PEM, chỉ minh họa; không cần đăng nhập)",
+        "operationId": "verify_ca_pem_api_verify_ca_pem_get",
+        "responses": {
+          "200": {
+            "description": "Tệp PEM",
+            "content": {
+              "application/x-pem-file": {}
+            }
+          },
+          "404": {
+            "description": "Két chưa có (két khởi tạo trước khi có tính năng này, hoặc không dùng két)"
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "Két không trả lời"
+          }
+        }
+      }
+    },
+    "/api/verify/anchor-key.pem": {
+      "get": {
+        "summary": "Khóa công khai Ed25519 ký mốc neo sổ kiểm toán (PEM SubjectPublicKeyInfo; không cần đăng nhập)",
+        "operationId": "verify_anchor_key_api_verify_anchor_key_pem_get",
+        "responses": {
+          "200": {
+            "description": "Tệp PEM",
+            "content": {
+              "application/x-pem-file": {}
+            }
+          },
+          "404": {
+            "description": "Két chưa có (két khởi tạo trước khi có tính năng này, hoặc không dùng két)"
+          },
+          "429": {
+            "description": "Vượt giới hạn tra cứu theo địa chỉ IP (APISIX)"
+          },
+          "503": {
+            "description": "Két không trả lời"
+          }
+        }
+      }
+    },
     "/api/verify/{code}": {
       "get": {
         "summary": "Tra văn bản đã phát hành theo mã tra cứu in cạnh mã QR (không cần đăng nhập)",
@@ -1285,10 +1332,75 @@
           }
         }
       }
+    },
+    "/api/case-files/archive-stats": {
+      "get": {
+        "summary": "Trang Điều hành: số liệu văn bản đã nộp lưu — DuckDB đọc các gói Parquet trong bucket lạnh",
+        "description": "Quyền như trang Điều hành: chỉ lãnh đạo đơn vị, số liệu của đơn vị trong token (Hasura trả các hồ sơ đã nộp lưu người gọi xem được). Mỗi gói: manifest so băm với CSDL, bảng văn bản so băm với manifest, rồi DuckDB đếm trên mọi bảng một lượt. Chỉ số đếm; lưu đệm tới khi có hồ sơ mới nộp lưu (có gói không đọc được thì 60 giây). Mỗi tập manifest mới là một run OpenLineage `moc.archive.stats` (đầu vào: các bảng Parquet đã đọc).",
+        "operationId": "case_file_archive_stats_api_case_files_archive_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveStatsOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "403": {
+            "description": "`forbidden`: chỉ lãnh đạo đơn vị (`director`), như trang Điều hành"
+          },
+          "503": {
+            "description": "Chưa đọc được CSDL hoặc bucket lạnh"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "ArchiveDepartmentOut": {
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id",
+            "description": "Phòng lập hồ sơ, theo manifest của gói"
+          },
+          "case_files": {
+            "type": "integer",
+            "title": "Case Files"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_id",
+          "case_files",
+          "documents"
+        ],
+        "title": "ArchiveDepartmentOut"
+      },
       "ArchiveOut": {
         "properties": {
           "case_file_id": {
@@ -1428,6 +1540,137 @@
         ],
         "title": "ArchiveRunOut",
         "description": "Kết quả nộp lưu theo yêu cầu: gói đã nằm trong bucket lạnh, đọc lại khớp băm, CSDL đã chuyển `archived`."
+      },
+      "ArchiveStatsOut": {
+        "properties": {
+          "case_files": {
+            "type": "integer",
+            "title": "Case Files",
+            "description": "Số hồ sơ đã nộp lưu có gói đọc được, khớp băm"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "incoming": {
+            "type": "integer",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "type": "integer",
+            "title": "Outgoing"
+          },
+          "by_year": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveYearOut"
+            },
+            "type": "array",
+            "title": "By Year"
+          },
+          "by_type": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveTypeOut"
+            },
+            "type": "array",
+            "title": "By Type"
+          },
+          "by_department": {
+            "items": {
+              "$ref": "#/components/schemas/ArchiveDepartmentOut"
+            },
+            "type": "array",
+            "title": "By Department"
+          },
+          "unreadable": {
+            "items": {
+              "$ref": "#/components/schemas/UnreadablePackageOut"
+            },
+            "type": "array",
+            "title": "Unreadable",
+            "description": "Hồ sơ có gói không đọc được (lệch băm, thiếu đối tượng, sai dạng): không vào số liệu, bình thường rỗng. Chỉ `case_file_id` và ký hiệu (`code`); lý do ghi vào nhật ký (`case_file.archive_stats_skipped`)"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket",
+            "description": "Bucket lạnh (khóa ghi S3 Object Lock) chứa các gói"
+          },
+          "computed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Computed At",
+            "description": "Lúc DuckDB tính; tính lại khi có hồ sơ mới nộp lưu"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_files",
+          "documents",
+          "incoming",
+          "outgoing",
+          "by_year",
+          "by_type",
+          "by_department",
+          "unreadable",
+          "bucket",
+          "computed_at"
+        ],
+        "title": "ArchiveStatsOut",
+        "description": "Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bảng Parquet trong bucket lạnh (#304). Chỉ số đếm."
+      },
+      "ArchiveTypeOut": {
+        "properties": {
+          "type_code": {
+            "type": "string",
+            "title": "Type Code",
+            "description": "Mã loại văn bản (office.document_types)"
+          },
+          "incoming": {
+            "type": "integer",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "type": "integer",
+            "title": "Outgoing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type_code",
+          "incoming",
+          "outgoing"
+        ],
+        "title": "ArchiveTypeOut"
+      },
+      "ArchiveYearOut": {
+        "properties": {
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year",
+            "description": "Năm ban hành của văn bản (thiếu thì năm của hồ sơ)"
+          },
+          "incoming": {
+            "type": "integer",
+            "title": "Incoming"
+          },
+          "outgoing": {
+            "type": "integer",
+            "title": "Outgoing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "incoming",
+          "outgoing"
+        ],
+        "title": "ArchiveYearOut"
       },
       "ArchivedDocumentOut": {
         "properties": {
@@ -1686,6 +1929,19 @@
             ],
             "title": "Type Code",
             "description": "Mã loại văn bản, vd CV"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Chỉ hỏi trong một văn bản (nút \"Hỏi về văn bản này\"). Chỉ thu hẹp phạm vi: văn bản người hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt"
           },
           "ask_id": {
             "anyOf": [
@@ -2893,6 +3149,25 @@
         ],
         "title": "StatusOut",
         "description": "Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thái, không tên máy, địa chỉ hay số liệu nghiệp vụ."
+      },
+      "UnreadablePackageOut": {
+        "properties": {
+          "case_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case File Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "case_file_id",
+          "code"
+        ],
+        "title": "UnreadablePackageOut"
       },
       "ValidationError": {
         "properties": {

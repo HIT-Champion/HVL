@@ -32,12 +32,12 @@ from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
 from conftest import ISSUER, FakeHasura, text_pdf
-from svc_files import app as app_module
 from svc_files import sealed
 from svc_files.app import content_disposition, create_app
 from svc_files.archive import ARCHIVE, Archiver, ColdStore, manifest_key
 from svc_files.auth import HASURA_CLAIMS
 from svc_files.hasura import HasuraError
+from svc_files.office import api as office_api
 from test_archive import CASE, D1, D2, F1, F2, NOW, TENANT, FakeHot, FakeS3, sha
 from test_archive import FakeHasura as AdminHasura
 from test_archive import case_file as sample_case_file
@@ -255,7 +255,7 @@ def release(room: Room) -> None:
 
 
 def test_archiving_waits_for_the_run_in_progress_then_answers_busy_without_an_audit_row(room, tok, monkeypatch):
-    monkeypatch.setattr(app_module, "SEALING_QUEUE_S", 0.05)
+    monkeypatch.setattr(office_api, "SEALING_QUEUE_S", 0.05)
     hold(room)
     try:
         r = room.client.post(f"/api/case-files/{CASE}/archive", headers=manager(tok))

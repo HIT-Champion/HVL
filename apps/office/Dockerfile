@@ -32,6 +32,10 @@ FROM nginxinc/nginx-unprivileged:1.30.6-alpine@sha256:f5116ed4606f3eb015dd4a8e28
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY --from=build /src/apps/office/.output/public /usr/share/nginx/html
+# Giấy phép SIL OFL-1.1 đi cùng tệp phông Be Vietnam Pro mà Vite chép từ gói npm vào /_nuxt/ (#305), ở đúng chỗ OFL.txt
+# cũ khi phông còn nằm trong repo
+COPY --from=build /src/apps/office/node_modules/@fontsource/be-vietnam-pro/LICENSE \
+     /usr/share/nginx/html/fonts/be-vietnam-pro/OFL.txt
 COPY --from=build /src/apps/office/.output/csp.conf /etc/nginx/csp.conf
 ENV MOC_REALM=moc
 EXPOSE 8080

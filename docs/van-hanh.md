@@ -72,14 +72,15 @@ phần bí mật của mình; két ghi sổ mọi lần đăng nhập và đọc
 dùng *static seal*: khởi động lại là tự mở khóa, không cần người nhập khóa. Két cũng giữ khóa `moc-files` (transit)
 bọc khóa của từng tệp văn bản hạn chế: `svc-files` chỉ xin được khóa mới và nhờ két mở khóa đã bọc, không lấy được
 khóa gốc. Từ F4.5 két có thêm PKI nội bộ để ký số văn bản đi (chỉ minh họa): CA gốc `moc-root` trong mount `pki`,
-khóa ký `moc-ky-so-<đơn vị>` trong transit; `svc-files` nhờ két ký từng bản phát hành, không lấy được khóa riêng. Thử:
-`make demo-ket-bi-mat`, `make demo-han-che`, `make demo-ky-so` (`docs/demo-script.md`).
+khóa ký `moc-ky-so-<đơn vị>` trong transit; `svc-files` nhờ két ký từng bản phát hành, không lấy được khóa riêng. Két
+còn giữ khóa Ed25519 `moc-anchor` (transit) ký mốc neo sổ kiểm toán: `svc-files` chỉ ký và đọc khóa công khai (mục Mốc
+neo công khai bên dưới). Thử: `make demo-ket-bi-mat`, `make demo-han-che`, `make demo-ky-so` (`docs/demo-script.md`).
 
 Nói rõ giới hạn:
 
 - `.env` vẫn là nguồn của các bí mật: container `openbao` nhận chúng qua biến môi trường và nạp lại vào két mỗi lần
-  khởi động. Hasura, SeaweedFS, Meilisearch, Centrifugo (phần mềm thượng nguồn) vẫn đọc bí mật của chúng từ biến môi
-  trường.
+  khởi động. Phần mềm thượng nguồn vẫn đọc bí mật của chúng từ biến môi trường: PostgreSQL, Keycloak, Flowable,
+  Hasura, SeaweedFS, Meilisearch, Centrifugo, và Parseable, Scorpio, restic khi bật profile của chúng.
 - Khóa mở két `MOC_OPENBAO_SEAL_KEY` nằm trong `.env`; khóa phục hồi, token khởi động và role_id/secret_id của dịch vụ
   nằm trong volume trên đĩa. Ai có quyền Docker trên máy chủ vẫn đọc được két. Két chỉ nằm trong mạng nội bộ
   `secrets` cùng hai dịch vụ (container khác không tới được), chưa có TLS.
@@ -103,46 +104,167 @@ Nói rõ giới hạn:
   tự tắt ký số (nhật ký `office.signing.disabled`, dò lại mỗi 5 phút): văn bản vẫn phát hành như cũ, chỉ không có chữ
   ký số; mọi thứ khác chạy như trước. Dựng PKI lỗi lúc khởi tạo két mới cũng vậy: `start.sh` ghi "chưa dựng được PKI
   nội bộ", két vẫn lên, và không tự thử lại.
-- Nâng cấp tay một két cũ (một lần; dừng timer reconciler trước như mục GitOps bên dưới):
-  1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` một listener chỉ nghe trong container, bật lại endpoint tạo token root bằng
-     khóa phục hồi (OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không
-     dùng được ở đây), rồi `docker compose restart openbao`:
-     ```hcl
-     listener "tcp" {
-       address                                  = "127.0.0.1:8210"
-       tls_disable                              = true
-       disable_unauthed_generate_root_endpoints = false
-     }
-     ```
-  2. Tạo token root bằng khóa phục hồi, ghi vào `root-token` cạnh khóa phục hồi trong volume `openbao_data`. Khóa phục
-     hồi, mã OTP và token chỉ đi qua tệp tạm (quyền 600) và stdin, không qua tham số dòng lệnh (`ps` nhìn thấy); bước
-     nào không ra giá trị thì dừng, không ghi `root-token` rỗng:
-     ```bash
-     docker compose exec openbao sh -c '
-       set -eu; umask 077
-       A=http://127.0.0.1:8210/v1/sys/generate-root; K=/openbao/file/moc
-       get() { sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
-       init=$(wget -qO- --post-data "{}" $A/attempt)     # két tự sinh mã OTP một lần
-       otp=$(echo "$init" | get otp); nonce=$(echo "$init" | get nonce)
-       [ -n "$otp" ] && [ -n "$nonce" ] || { echo "không mở được lượt tạo token root (đang có lượt dở?)"; exit 1; }
-       printf "{\"key\":\"%s\",\"nonce\":\"%s\"}" "$(cat $K/recovery-key)" "$nonce" > $K/.generate-root
-       enc=$(wget -qO- --post-file $K/.generate-root $A/update | get encoded_token); rm -f $K/.generate-root
-       [ -n "$enc" ] || { echo "két không nhận khóa phục hồi"; exit 1; }
-       printf "{\"encoded_token\":\"%s\",\"otp\":\"%s\"}" "$enc" "$otp" |
-         bao write -field=token sys/decode-token - > $K/root-token.new
-       [ -s $K/root-token.new ] && mv $K/root-token.new $K/root-token'
-     ```
-     Báo "đang có lượt dở" (lần chạy trước hỏng giữa chừng): hủy lượt đó bằng `docker compose exec -e
-     BAO_ADDR=http://127.0.0.1:8210 openbao bao delete sys/generate-root/attempt` rồi chạy lại. Các bước này chưa diễn
-     tập trên một két thật đã có dữ liệu: sao lưu (`make backup`) trước khi làm.
-  3. Gỡ listener vừa thêm, `docker compose restart openbao`. Thấy token root, `start.sh` chạy lại phần cấu hình — làm
-     lại được, không đổi bí mật, khóa `moc-files` hay AppRole; thêm PKI và policy mới của `svc-files` — rồi thu hồi
-     token. Nhật ký két có "đã dựng PKI nội bộ"; `svc-files` bật ký số ở lần dò kế tiếp (hoặc `docker compose
-     restart svc-files`).
+- **Két khởi tạo trước khi có chữ ký mốc neo không ký mốc** cho tới khi nâng cấp tay như dưới đây: két đó chưa có khóa
+  `moc-anchor`, policy của `svc-files` chưa có quyền ký. `svc-files` vẫn neo vào bucket lạnh như trước, chỉ không có chữ
+  ký (nhật ký `core.audit.anchor_unsigned`, một lần mỗi lần khởi động); `/api/verify/anchor-key.pem` trả 404, trang
+  `/xac-thuc` ẩn khối mốc neo; `moc audit anchor --to`, `--publish` ghi dòng không chữ ký. Mốc cũ không chữ ký vẫn hợp
+  lệ khi kiểm. Nâng cấp xong, `svc-files` ký từ lượt neo kế tiếp, không cần khởi động lại: policy mới áp ngay cho token
+  đang dùng.
+- Nâng cấp tay một két cũ, một lần: dừng timer reconciler trước như mục GitOps bên dưới, sao lưu (`python3
+  scripts/moc.py backup create`), rồi từ thư mục mã nguồn của bản đang cài chạy `scripts/nang_cap.sh ket /opt/moc`.
+  Két đã có khóa `moc-anchor` (`/api/verify/anchor-key.pem` trả khóa công khai) thì kịch bản không làm gì. Các bước:
+  1. Thêm tạm vào cuối `platform/openbao/openbao.hcl` của bản cài một listener chỉ nghe trong container
+     (`127.0.0.1:8210`, `disable_unauthed_generate_root_endpoints = false`): bật lại endpoint tạo token root bằng khóa
+     phục hồi, OpenBao tắt mặc định từ 2.5.3; lệnh `bao operator generate-root` từ 2.6 cần sẵn token nên không dùng
+     được ở đây. Khởi động lại két.
+  2. Trong container, tạo token root bằng khóa phục hồi, ghi vào `root-token` cạnh khóa phục hồi trong volume
+     `openbao_data`. Khóa phục hồi, mã OTP và token chỉ đi qua tệp tạm (quyền 600) và stdin, không qua tham số dòng
+     lệnh (`ps` nhìn thấy); bước nào không ra giá trị thì dừng, không ghi `root-token` rỗng.
+  3. Trả `openbao.hcl` về đúng bản đã cài, khởi động lại két. Thấy token root, `start.sh` chạy lại phần cấu hình — làm
+     lại được, không đổi bí mật, khóa `moc-files` hay AppRole; thêm PKI, khóa `moc-anchor` và policy mới của
+     `svc-files` — rồi thu hồi token (nhật ký két: "đã cấu hình két; token root đã thu hồi"). Kịch bản khởi động lại
+     `svc-files` (nó nhớ kết quả đọc khóa 5 phút) và chờ `/api/verify/anchor-key.pem` ra một khối `PUBLIC KEY`;
+     `svc-files` ký mốc neo từ lượt neo kế tiếp.
+
+  Lỗi ở bất kỳ bước nào thì kịch bản hủy lượt tạo token root còn dở, trả `openbao.hcl` về như cũ, khởi động lại két;
+  sửa lỗi rồi chạy lại. Két không tự cấu hình xong thì token root vừa tạo còn nằm trong volume: kịch bản in lệnh thu
+  hồi và xóa nó, dùng khi không chạy lại nữa. Job CI `.github/workflows/nang-cap.yml` tập đúng kịch bản này trên két
+  của bản phát hành trước, sau khi nâng bản cài lên: tệp văn bản hạn chế tạo từ bản cũ vẫn mở được, smoke đạt.
 - Cách cuối cùng là dựng lại két (xóa volume `openbao_data` rồi khởi động lại): bí mật nạp lại từ `.env`, có PKI, nhưng
   khóa `moc-files` mới khác nên tệp văn bản hạn chế đã lưu không mở được nữa — **không làm trên máy có dữ liệu thật**.
+  Khóa `moc-anchor` cũng mới: mốc đã công bố trước đó vẫn kiểm được bằng khóa cũ còn trong lịch sử kho mốc công khai.
 - Đổi bí mật trong `.env` rồi `make up`: két được dựng lại và nạp bí mật mới, `svc-files`, `svc-workflow` khởi động
   lại theo (`depends_on … restart: true`, cần Docker Compose 2.17 trở lên).
+
+## Mốc neo công khai
+
+Sổ kiểm toán là một chuỗi băm; `svc-files` neo đầu chuỗi (số dòng cuối, hash của nó) vào bucket lạnh khóa ghi mỗi 10
+phút, và `moc audit verify` chỉ ra dòng bị viết lại khi đối chiếu với các mốc (`docs/mo-hinh-du-lieu.md` §1). Bucket
+đó vẫn nằm trên chính máy chủ. Mốc neo công khai đưa một bản ra ngoài, ai cũng kiểm được mà không phải tin máy chủ:
+
+- Két ký mỗi mốc bằng khóa Ed25519 `moc-anchor` trong transit — két sinh khóa, không cho xuất; policy của `svc-files`
+  chỉ cho ký và đọc khóa công khai. Mốc ghi khi két chưa có khóa (két cũ, mục Két bí mật) vẫn hợp lệ, chỉ không có chữ
+  ký.
+- Mỗi giờ, timer trên máy chủ chép mốc mới nhất kèm chữ ký vào `anchors.jsonl` của một **kho git công khai** do đơn vị
+  giữ, commit và đẩy lên. Nhánh của kho cấm đẩy ép, nên mốc đã công bố không rút lại được, kể cả khi máy chủ bị chiếm.
+- Khóa công khai: `https://<máy chủ>/api/verify/anchor-key.pem` (không cần đăng nhập), bản sao `anchor-key.pem` trong
+  kho mốc; vân tay SHA-256 hiện ở cuối trang `/xac-thuc`.
+
+Thông điệp két ký cho một mốc là năm dòng UTF-8, dòng nào cũng kết thúc bằng một ký tự xuống dòng (`\n`):
+
+```text
+signet-anchor-v1
+<audit_id: số dòng sổ, thập phân>
+<hash: 64 chữ hex thường>
+<anchored_at: lúc kho ghi mốc vào bucket lạnh, giờ UTC, dạng 2026-10-25T01:15:03Z>
+<system: URL công khai của hệ thống, MOC_PUBLIC_URL>
+```
+
+Chữ ký là Ed25519 thuần (RFC 8032, không băm trước). Dòng đầu tách chữ ký này khỏi mọi việc ký khác, `system` gắn mốc
+với đúng một hệ thống (mốc của bản chạy thử không mạo được mốc của bản thật). Mọi trường đều suy ra từ mốc đã khóa
+trong bucket, nên ký lại một mốc ra đúng chữ ký cũ. Mỗi dòng của `anchors.jsonl` chứa đủ các trường để dựng lại thông
+điệp, kèm vân tay khóa (`key`, SHA-256 của DER khóa công khai) và chữ ký (`sig`, base64) — trong tệp là một dòng,
+ở đây ngắt ra cho dễ đọc:
+
+```json
+{"v": "signet-anchor-v1", "audit_id": 42, "hash": "abab…ab", "anchored_at": "2026-10-25T01:15:03Z",
+ "system": "https://signet.example", "key": "sha256:06e3fd8f…", "sig": "6Zd3HmfkSkXW…"}
+```
+
+### Cài đặt (một lần)
+
+1. **Tạo một kho công khai riêng** cho mốc, vd `signet-anchors` trên GitHub, GitLab hay Gitea của đơn vị — không chứa
+   gì khác, không dùng chung với mã nguồn. Bảo vệ nhánh mặc định: **cấm đẩy ép (force push), cấm xóa nhánh**, không
+   bắt buộc review (máy chủ đẩy thẳng). GitHub: Settings → Rules → Rulesets (hoặc Branches) → bật *Block force pushes*,
+   *Restrict deletions* cho nhánh mặc định, không cho ai bỏ qua (kể cả quản trị). GitLab: Settings → Repository →
+   Protected branches, *Allowed to force push* tắt.
+2. **Khóa triển khai** (deploy key) chỉ ghi được vào đúng kho đó, không dùng token cá nhân hay khóa của người nào. Trên
+   máy chủ, bằng người vận hành `moc`:
+   ```bash
+   ssh-keygen -t ed25519 -N '' -C "signet-anchor@$(hostname)" -f ~/.ssh/signet-anchors
+   cat >> ~/.ssh/config <<'CONF'
+   Host signet-anchors
+     HostName github.com
+     User git
+     IdentityFile ~/.ssh/signet-anchors
+     IdentitiesOnly yes
+   CONF
+   ```
+   Thêm `~/.ssh/signet-anchors.pub` vào kho: GitHub Settings → Deploy keys → *Allow write access*; GitLab Settings →
+   Repository → Deploy keys → *Grant write permissions*. Khóa này không đọc hay ghi được kho nào khác.
+3. **Bản sao trên máy chủ**, đúng đường dẫn trong `platform/systemd/moc-anchor-publish.service`:
+   ```bash
+   sudo install -d -o moc -g moc /var/lib/moc
+   sudo -u moc git clone signet-anchors:<tổ chức>/signet-anchors.git /var/lib/moc/neo-cong-khai
+   sudo -u moc python3 /opt/moc/scripts/moc.py audit anchor --publish /var/lib/moc/neo-cong-khai   # thử một lượt
+   ```
+   Lượt đầu commit `anchors.jsonl` và `anchor-key.pem` với tác giả cố định "Signet anchor", thông điệp `Anchor #<số
+   dòng> <16 chữ hex đầu của hash>`, rồi `git push` lên `origin`.
+4. **Timer** (tệp mẫu, như reconciler GitOps):
+   ```bash
+   sudo cp platform/systemd/moc-anchor-publish.service platform/systemd/moc-anchor-publish.timer /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable --now moc-anchor-publish.timer
+   journalctl -u moc-anchor-publish -f
+   ```
+
+`--publish` chỉ thêm commit: không bao giờ `--force`, không amend, không viết lại lịch sử. Đầu chuỗi chưa đổi thì
+không có commit mới. Push lỗi (mất mạng, kho từ chối) thì lệnh thoát 2, commit vẫn nằm ở bản sao và lượt sau đẩy
+tiếp; nhánh trên kho đã đi khác (ai đó đẩy commit khác) thì push bị từ chối và người vận hành phải xem tay — lệnh không
+tự ép. Bản sao chưa có remote thì chỉ commit tại chỗ. Không dùng kho git: `moc audit anchor --to TỆP` chỉ ghi thêm
+dòng vào một tệp để chép ra ngoài bằng cách khác.
+
+Két đã có khóa thì không mốc nào được ghi ra tệp mà thiếu chữ ký: két không trả lời lúc ký (hoặc lúc hỏi khóa), tệp
+đã có dòng có chữ ký, hay cạnh tệp đã có `anchor-key.pem` thì `--to`/`--publish` không ghi dòng chưa ký, thoát 2, và
+lượt sau ký lại (cùng mốc ra cùng chữ ký). Nhờ vậy người kiểm coi một dòng chưa ký đứng sau dòng đã ký là chữ ký đã bị
+gỡ — lỗi như chữ ký sai. `--publish` chỉ ghi `anchor-key.pem` khi tệp đã có dòng có chữ ký, nên `anchor-key.pem` nằm
+cạnh một tệp không còn dòng ký nào cũng là lỗi; `anchor_sig.py` không thấy dòng nào có chữ ký thì thoát 2 (chưa kiểm
+được gì). Dòng chưa ký đứng trước mọi dòng đã ký là mốc ghi khi két chưa có khóa: ai gỡ chữ ký của những dòng đầu tệp
+(giữ lại dòng ký sau đó) thì chỉ lịch sử git của kho công khai cho thấy (lệnh `git log -p` ở dưới).
+
+### Kiểm từ bên ngoài (chỉ cần git, jq, OpenSSL 3)
+
+```bash
+git clone https://github.com/<tổ chức>/signet-anchors.git && cd signet-anchors
+# khóa đúng của hệ thống: vân tay phải trùng vân tay ở cuối trang https://<máy chủ>/xac-thuc
+openssl pkey -pubin -in anchor-key.pem -outform DER | sha256sum
+# lịch sử chỉ có thêm dòng: lệnh này không in gì (không dòng nào của anchors.jsonl từng bị sửa hay xóa)
+git log -p --format= -- anchors.jsonl | grep '^-[^-]'
+```
+
+Kiểm chữ ký một dòng (ở đây là dòng cuối; dòng khác thì thay `tail -n 1` bằng `sed -n <số dòng>p`):
+
+```bash
+tail -n 1 anchors.jsonl > line.json
+jq -r '.v, .audit_id, .hash, .anchored_at, .system' line.json > msg.bin     # đúng năm dòng đã ký
+jq -r .sig line.json | openssl base64 -d -A > sig.bin
+openssl pkeyutl -verify -pubin -inkey anchor-key.pem -rawin -in msg.bin -sigfile sig.bin
+```
+
+`Signature Verified Successfully`: dòng do két của hệ thống ký và chưa bị sửa chữ nào. Không có jq thì viết tay thông
+điệp từ các trường của dòng: `printf '%s\n' signet-anchor-v1 <audit_id> <hash> <anchored_at> <system> > msg.bin`.
+Kiểm cả tệp một lần: từ mã nguồn Signet, `python3 scripts/anchor_sig.py anchors.jsonl anchor-key.pem` (Python thuần,
+không cài thêm gì, không cần hệ thống đang chạy).
+
+Đơn vị đối chiếu sổ với mốc đã công bố trên máy chủ: `python3 scripts/moc.py audit verify --anchors
+/var/lib/moc/neo-cong-khai/anchors.jsonl` — kiểm chữ ký từng dòng (bằng `anchor-key.pem` cạnh tệp, `--key`, hoặc khóa
+két đang dùng), rồi so từng mốc với chuỗi tính lại: mốc lệch là sổ đã bị viết lại từ khoảng đó; dòng chữ ký sai, hay
+dòng chưa ký sau dòng đã ký, là lỗi (thoát 1) và không được dùng để kết luận.
+
+Nói rõ giới hạn:
+
+- Chữ ký chứng minh dòng do két của hệ thống ký, không chứng minh sổ đúng: người chiếm được `svc-files` ký được mốc
+  mới cho một chuỗi đã viết lại. Cái chặn là các mốc cũ đã công bố không rút được — nhánh cấm đẩy ép, người khác đã
+  clone — nên mốc cũ lệch với sổ mới và `moc audit verify --anchors` chỉ ra.
+- `anchored_at` là giờ của kho đối tượng trên máy chủ; giờ trong commit cũng do máy chủ đặt. Bằng chứng thời gian
+  độc lập là lúc push mà nhà cung cấp git ghi (GitHub: trang Activity của kho) và các bản clone của người khác.
+- Khóa triển khai nằm trên máy chủ: người chiếm máy chủ thêm được commit (kể cả commit sửa dòng cũ) nhưng không xóa
+  được lịch sử; lệnh `git log -p … | grep` ở trên lộ ra ngay.
+- Dựng lại két là có khóa `moc-anchor` mới: `anchor-key.pem` trong kho được ghi đè ở lượt kế tiếp, mốc ký trước đó
+  kiểm bằng khóa cũ trong lịch sử (`git log -p -- anchor-key.pem`); trường `key` của từng dòng cho biết khóa nào.
+- Kho công khai cho người ngoài thấy nhịp hoạt động (số dòng sổ theo giờ) và URL hệ thống, không thấy nội dung nào: hash
+  chỉ là băm.
+- Sổ đăng ký văn bản in ra (`/api/registers/…/pdf`) có mốc neo mới nhất lúc in ở chân trang (`Mốc neo #<số> · <16 chữ
+  hex> · <giờ>`): đối chiếu dòng đó trong kho mốc là biết sổ kiểm toán lúc in chưa bị viết lại về sau.
 
 ## GitOps và tự phục hồi
 
@@ -151,12 +273,15 @@ systemd timer gọi nó mỗi 60 giây (tệp mẫu [`platform/systemd/`](../pla
 container: không gắn socket Docker vào container nào). Mỗi lượt:
 
 - **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
-  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Thử: `make demo-tu-phuc-hoi` (`docs/demo-script.md`).
+  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Dịch vụ chạy một lần `keycloak-fonts` (chép phông của
+  theme đăng nhập vào volume, #305) đã xong, thoát 0, không tính là đã dừng. Thử: `make demo-tu-phuc-hoi`
+  (`docs/demo-script.md`).
 - **GitOps** (khi đặt `MOC_GITOPS_DIR` trong `.env` của bản cài): kéo nhánh `MOC_GITOPS_BRANCH` (mặc định `deploy`)
-  về một bản sao git riêng của reconciler (bản sao có thay đổi chưa commit thì reconciler từ chối, không xóa việc của
-  ai). Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm lúc cài), thì dựng image của commit đó, dừng Signet, cài lại
-  đúng commit vào thư mục cài rồi chạy lại. Cài hỏng giữa chừng thì cài lại commit đang chạy trước đó. Commit áp lỗi
-  thì không thử lại mỗi phút mà đợi commit kế tiếp.
+  về một bản sao git riêng của reconciler. Lần chạy đầu mà bản sao có thay đổi chưa commit thì reconciler từ chối,
+  không xóa việc của ai; từ khi đã áp một commit, mỗi lần áp đều `checkout -f` và `clean -fd` bản sao, nên đừng sửa
+  tay trong đó. Có commit mới, hoặc tệp đã cài bị sửa tay (khác băm lúc cài), thì dựng image của commit đó, dừng
+  Signet, cài lại đúng commit vào thư mục cài rồi chạy lại. Cài hỏng giữa chừng thì cài lại commit đang chạy trước đó.
+  Commit áp lỗi thì không thử lại mỗi phút mà đợi commit kế tiếp.
 
 ```bash
 # trên máy chủ, đã make install PREFIX=/opt/moc; người vận hành moc thuộc nhóm docker
@@ -168,6 +293,8 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
 
 - Áp một commit là cài lại toàn bộ: Signet dừng khoảng một phút (`install.sh` không thay cấu hình dưới container đang
   chạy). Image cũ theo commit không tự xóa.
+- Profile thêm trong `MOC_EXTRA_PROFILES` của bản cài (`tunnel`, `ai`…) đi cùng mọi lệnh compose của reconciler, như
+  `Makefile`: áp commit dừng rồi chạy lại cả chúng, tự phục hồi cũng thấy chúng (#351).
 - `.env` (bí mật, cấu hình riêng của máy chủ) không nằm trong git và reconciler không đụng tới.
 - Lượt reconciler bỏ qua khi đang sao lưu, khôi phục, `make install` (cả ba dùng chung một khóa trên thư mục cài),
   khi lần khôi phục trước dừng giữa chừng (không chạy lại Signet trên dữ liệu dở dang: chạy lại `backup restore`) hoặc
@@ -192,12 +319,58 @@ echo "MOC_GITOPS_ALLOWED_SIGNERS=/etc/moc/allowed_signers" >> /opt/moc/.env
   Đầu nhánh `deploy` phải là commit do người trong danh sách ký: đưa bản lên bằng `git merge --no-ff -S` thay cho
   `--ff-only` (`docs/git_flow.md` mục 7) — commit gộp trên GitHub mang chữ ký OpenPGP của GitHub, không được nhận.
 
+## Quét mã độc (ClamAV)
+
+Mọi tệp tải lên đều qua ClamAV trước khi lưu. Container `clamav` tự tải chữ ký mới (freshclam, mỗi ngày một lần),
+người vận hành không phải làm gì. Có một hạn chế (#287): mỗi lần clamd nạp lại chữ ký, nó ngừng quét tới khi nạp xong.
+Đã đo: khoảng 10 giây trên máy CI, 8 giây bằng một container thử trên máy chạy bản online; máy bận hay yếu có thể
+tới khoảng 1 phút. Lý do là compose đặt `ConcurrentDatabaseReload no` để đỡ RAM (#288 đo lại lựa chọn này).
+Clamd nạp lại vào hai lúc:
+
+- mỗi ngày một lần, ngay sau khi freshclam tải bản chữ ký mới;
+- khoảng 10 phút sau khi ClamAV khởi động (`make up`, nâng cấp, khởi động lại máy), nếu đúng lúc khởi động freshclam
+  tải được bản mới.
+
+Cách nhận ra và xử lý:
+
+- **Người dùng thấy:** tệp đứng ở "Đang tải lên và quét virus…". Quá 60 giây (`CLAMAV_TIMEOUT_S` của `svc-files`) thì
+  báo trạm quét mã độc chưa sẵn sàng (`503 scanner_unavailable`), tệp chưa được lưu. Trang trạng thái có thể báo
+  "Quét mã độc" gián đoạn trong lúc đó.
+- **Xử lý:** chờ khoảng 1 phút rồi tải lại. Không cần khởi động lại gì: khởi động lại `clamav` chỉ làm nó nạp chữ ký
+  lại từ đầu.
+- **Nhận ra trong nhật ký:** trên máy chủ, trong thư mục cài, chạy `docker compose logs clamav`. Lúc bắt đầu nạp lại
+  có dòng "SelfCheck: Database modification detected. Forcing reload" hoặc "Clamd successfully notified about the
+  update", rồi "Reading databases from /var/lib/clamav". Nạp xong có "Database correctly reloaded".
+- **Kiểm tải lên ngay sau khi nâng cấp:** nhật ký có "daily.cld updated" (hay "daily.cvd updated") kèm "Clamd was NOT
+  notified" nghĩa là khoảng 10 phút sau khi khởi động clamd sẽ tự nạp lại. Muốn kiểm ngay thì cho nạp luôn: chạy
+  `docker compose exec -T clamav clamdscan --reload`, chờ dòng "Database correctly reloaded" rồi mới tải lên.
+- **Tải chữ ký mới ngay, không chờ lượt hằng ngày.** Ví dụ trước khi nâng cấp, để lúc khởi động lại chữ ký đã mới
+  nhất và clamd không phải nạp lại giữa chừng. Lệnh:
+
+  ```bash
+  docker compose exec -T clamav freshclam --log=/tmp/freshclam-tay.log
+  ```
+
+  - **Phải có `--log`.** freshclam chạy nền giữ khóa tệp nhật ký `/var/log/clamav/freshclam.log`, nên thiếu cờ này
+    lệnh báo "Failed to lock the log file" rồi dừng, không cập nhật gì.
+  - **Chạy bằng root vẫn an toàn.** Lệnh bỏ quyền root theo `DatabaseOwner`, nên tệp chữ ký vẫn thuộc user `clamav`
+    và freshclam nền vẫn cập nhật tiếp được.
+  - **Có bản mới thì clamd nạp lại ngay.** freshclam báo "Clamd successfully notified about the update"; tải lên dừng
+    tới khi nhật ký có "Database correctly reloaded". Đo bằng một container thử trên máy chạy bản online: khoảng 8
+    giây; khi máy đang bận có thể lâu hơn.
+  - **Đã mới nhất** thì lệnh chỉ báo "database is up-to-date".
+  - **Vẫn báo lỗi khóa** thì có thể freshclam nền đang tự cập nhật: chờ 1 phút rồi chạy lại.
+
 ## Giám sát
 
-APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 chỉ trong mạng nội bộ). Prometheus thu
-mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra ngoài. Grafana hiện bảng điều khiển
-**Signet — cổng API** nạp sẵn: yêu cầu mỗi giây theo route, mã trạng thái (429 = vượt giới hạn tốc độ), tỉ lệ lỗi 5xx,
-độ trễ p95, băng thông, kết nối đang mở.
+APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 không publish: chỉ container ở mạng
+`moc`, `apps` tới được — container ứng dụng đọc được số đếm theo route, không có token hay dữ liệu nghiệp vụ).
+Prometheus còn thu bảng trạng thái của `svc-files` (`GET /metrics`, #274): mỗi thành phần của trang `/trang-thai` một
+dòng `moc_component_up`, cùng lần dò và lưu đệm 10 giây với `/api/status`; `/metrics` chỉ gọi được trong mạng `moc`,
+qua cổng API thì 404. Prometheus thu mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không mở cổng ra
+ngoài. Grafana hiện
+bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi giây theo route, mã trạng thái (429 = vượt giới hạn tốc
+độ), tỉ lệ lỗi 5xx, độ trễ p95, băng thông, kết nối đang mở.
 
 - Grafana chỉ nghe `127.0.0.1:MOC_GRAFANA_PORT` (mặc định 3300) trên máy chủ — xem từ máy khác qua đường hầm SSH:
   `ssh -L 3300:127.0.0.1:3300 máy-chủ` rồi mở `http://localhost:3300`.
@@ -205,6 +378,44 @@ mỗi 15 giây, giữ `MOC_METRICS_RETENTION` (mặc định 15 ngày), không m
   `platform/monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
+- Prometheus chỉ đọc `platform/monitoring/prometheus.yml` và `canh-bao.yml` lúc khởi động. Sửa tay trên máy đang chạy
+  thì khởi động lại nó: `docker compose restart prometheus` trong thư mục cài. Lúc nâng cấp, `scripts/nang_cap.sh` đã
+  dừng rồi chạy lại cả hệ thống nên bản mới tự nạp tệp mới.
+
+### Cảnh báo
+
+Prometheus tính 8 luật trong `platform/monitoring/canh-bao.yml` mỗi 15 giây: nhóm `cong-api` trên chỉ số APISIX
+(#255), nhóm `thanh-phan` trên bảng trạng thái của svc-files (#274). Nhãn `route` là id route trong
+`platform/apisix/apisix.yaml`; nhãn `component` là mã thành phần ở `services/svc-files/README.md`, mục Trạng thái hệ
+thống.
+
+| Cảnh báo | Mức | Bật khi |
+|---|---|---|
+| `GatewayMetricsDown` | critical | Prometheus không thu được chỉ số của APISIX quá 2 phút: cổng có thể đã dừng |
+| `UpstreamUnreachable` | critical | Một route trả 502 hoặc 504 liên tục 3 phút: APISIX tự sinh hai mã này khi dịch vụ sau cổng chết hay quá giờ |
+| `High5xxRatio` | warning | Hơn 5% yêu cầu lỗi 5xx trong 5 phút, khi có hơn 0,1 yêu cầu/giây |
+| `SlowRoute` | warning | p95 thời gian trả lời trên 3 giây trong 10 phút, ở route graphql, app-office, app-ca-nhan, keycloak, dang-nhap, dang-nhap-post |
+| `ComponentDown` | critical | Một thành phần bắt buộc (`cong-api`, `dang-nhap`, `csdl`, `quet-ma-doc`, `quy-trinh`, `luu-tru`) gián đoạn quá 2 phút: trang `/trang-thai` báo cả Signet gián đoạn |
+| `OptionalComponentDown` | warning | Két khóa (`ket-khoa`) hay tìm kiếm (`tim-kiem`) gián đoạn quá 5 phút |
+| `StatusMetricsDown` | critical | Prometheus không đọc được `/metrics` của svc-files quá 2 phút: svc-files có thể đã dừng. Khi đó các dòng `moc_component_up` mất chứ không về 0, nên `ComponentDown` không bật |
+| `AlertRulesFailing` | warning | Prometheus tính luật bị lỗi trong 10 phút qua |
+
+- Xem ở hàng "Cảnh báo đang bật" cuối bảng điều khiển Grafana. `pending` là điều kiện đã đúng nhưng chưa đủ thời
+  gian của luật. Trên máy chủ, trong thư mục cài:
+  `docker compose exec -T prometheus wget -q -O - http://localhost:9090/api/v1/alerts`.
+- Chưa có Alertmanager: cảnh báo không gửi email hay chat, người vận hành phải mở Grafana để thấy.
+- 503 không tính là "không trả lời". svc-files trả 503 có chủ ý (`busy`, `scanner_unavailable`… kèm `Retry-After`),
+  nên 503 chỉ tính vào tỉ lệ 5xx. Độ trễ của svc-files không xét: tải lên, đọc văn bản đến, hỏi đáp vốn chậm theo
+  thiết kế.
+- svc-workflow không có route riêng mà nằm sau Hasura Actions; lỗi của nó về trình duyệt là GraphQL 200 có `errors`,
+  nên nhóm `cong-api` không thấy. Nhóm `thanh-phan` thấy qua thành phần `quy-trinh`: bảng trạng thái gọi `/readyz` của
+  svc-workflow, trong đó có kiểm Flowable.
+- Nhóm `cong-api` dựa trên lưu lượng thật: không ai gọi tới thì nhóm này không thấy dịch vụ chết. Nhóm `thanh-phan`
+  thì không cần lưu lượng: Prometheus thu bảng trạng thái 15 giây một lần.
+- Trợ lý AI không có cảnh báo: Ollama không trả lời thì bảng trạng thái báo `off` như khi chưa bật (không phân biệt
+  được), và thành phần `off` không có dòng `moc_component_up`.
+- Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
+  `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
 
 ## Trang trạng thái hệ thống
 
@@ -219,13 +430,16 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
 - **Đọc thế nào:** Cổng API, Đăng nhập một lần, CSDL, Quét mã độc, Quy trình, Lưu trữ tệp gián đoạn thì tình trạng
   chung là *Hệ thống đang gián đoạn*. Két khóa, Tìm kiếm, Trợ lý AI gián đoạn, hoặc thành phần nào chỉ chạy một phần,
   thì *Một số thành phần đang gặp sự cố*: văn bản hạn chế và ký số (két), tìm kiếm, hỏi đáp tạm không dùng được, còn
-  lại vẫn chạy. Trợ lý AI *Tắt* (chưa bật profile `ai`, hoặc tắt hỏi đáp) là cấu hình, không phải sự cố.
+  lại vẫn chạy. Trợ lý AI *Tắt* khi chưa bật profile `ai`, tắt hỏi đáp, hoặc Ollama không trả lời: trang không phân
+  biệt được ba trường hợp này, nên *Tắt* mà profile `ai` đang bật thì xem `docker compose logs ollama`. Trợ lý vẫn tìm
+  theo từ khóa.
 - **Không lộ gì:** chỉ có nhãn cố định và trạng thái; không tên máy, địa chỉ IP, URL nội bộ, phiên bản từng thành phần,
   số người dùng hay số văn bản, thông báo lỗi. Lý do cụ thể nằm trong nhật ký của `svc-files` (sự kiện
   `core.status.changed`, ghi khi một thành phần đổi trạng thái): `docker compose logs svc-files | grep status.changed`.
-- **Không thành đường tấn công:** `svc-files` lưu đệm kết quả 10 giây cho mọi người (`MOC_STATUS_CACHE_S`), mỗi lần
-  dò một thành phần tối đa 3 giây (`MOC_STATUS_TIMEOUT_S`); APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` (mặc định 30)
-  lần một phút mỗi địa chỉ IP, vượt thì `429`.
+- **Không thành đường tấn công:** `svc-files` lưu đệm kết quả 10 giây cho mọi người, mỗi lần dò một thành phần tối đa
+  3 giây (mặc định của `MOC_STATUS_CACHE_S`, `MOC_STATUS_TIMEOUT_S` trong `svc-files`; compose không truyền hai biến
+  này, đặt trong `.env` không có tác dụng); APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` (mặc định 30) lần một phút mỗi
+  địa chỉ IP, vượt thì `429`.
 - Trang chỉ trả lời "đang chạy hay không" ngay lúc này; diễn biến theo thời gian, độ trễ, tỉ lệ lỗi xem ở Grafana (mục
   Giám sát). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
 
@@ -234,7 +448,7 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
 Profile `logs` (tắt mặc định) gom log của các dịch vụ về một chỗ để tra theo **mã yêu cầu**. APISIX gắn mã
 `X-Request-Id` cho mọi yêu cầu (giữ mã client tự gửi, trả lại ở header của phản hồi) và ghi ở cuối dòng truy cập;
 Hasura chuyển mã sang `svc-workflow`; `svc-workflow` ghi mã trong nhật ký, gửi tiếp sang Hasura và `svc-files`. Cùng
-một mã nằm ở dòng log của APISIX, `svc-workflow`, `svc-files` và ở cột `request_id` của sổ kiểm toán
+một mã nằm ở dòng log của APISIX, `svc-workflow`, Hasura, `svc-files` và ở cột `request_id` của sổ kiểm toán
 `core.audit_log`.
 
 Đường đi: driver log `fluentd` của Docker → **Vector** 0.59 (cổng `127.0.0.1:24224` trên máy chủ, tách mã yêu cầu, che
@@ -243,11 +457,36 @@ Driver đặt trong tệp compose phủ [`platform/logs/docker-compose.logs.yml`
 chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docker`. `docker logs`, `make logs` vẫn đọc được như cũ
 (Docker giữ bản cục bộ 10 MB × 3 cho driver ngoài).
 
-- **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ đã che thông tin cá nhân
-  trong nhật ký (F4.4). **Không thu** Hasura, Keycloak, PostgreSQL, Meilisearch, OpenBao…: nhật ký của chúng chưa
-  che, đưa vào kho log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ tự che thông tin cá nhân
+  trong nhật ký (F4.4) — cùng `hasura`, `keycloak`, `postgres`: ba dịch vụ này không tự che, Vector che bằng luật
+  riêng (dưới đây) trước bước che chung. **Không thu** Meilisearch, OpenBao, Flowable…: chưa có luật riêng, đưa vào kho
+  log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Luật riêng** cho ba dịch vụ không tự che, mỗi luật có ca trong `vector.test.yaml`:
+  - **Hasura** (dòng JSON): `event` là `hasura.<loại log>` (`hasura.http-log`, `hasura.websocket-log`…);
+    `request_id` lấy trong `detail` (`detail.request_id`, `detail.operation.request_id`, ở `websocket-log` là
+    `detail.event.detail.request_id`). Đó là `X-Request-Id` mà APISIX, `svc-workflow`, `svc-files` gửi kèm lời gọi
+    GraphQL, nên `make logs-tra` ra cả dòng của Hasura. Khóa `query`, `raw_query` là chuỗi (câu GraphQL, thân yêu
+    cầu) và cả nhánh `query.variables` (khóa trong biến `jsonb` cũng là dữ liệu), `generated_sql` (của `query-log`, mặc
+    định tắt), `internal` của lỗi (tham số, câu SQL, `DETAIL` của PostgreSQL) thay bằng `[REDACTED]`; `operationName`
+    giữ lại. Hasura 2.51 ghi câu và biến mỗi lần mở subscription. Dòng `http-log` lỗi của nó chỉ có `code`, `error`,
+    `path`, kể cả với vai trò admin và `DEV_MODE=true` (đã thử 26/10/2026). Luật `raw_query`, `internal` để phòng
+    bản khác.
+  - **PostgreSQL**: mỗi mục log bắt đầu bằng tiền tố mặc định `%m [%p] ` rồi loại (`ERROR:`, `DETAIL:`…). Dòng
+    không có tiền tố bị bỏ: đó là dòng tiếp của mục nhiều dòng (câu lệnh hay dòng vi phạm có xuống dòng) hay lời
+    của script khởi tạo, không biết thuộc mục nào nên không che đúng được. Các phần bị che:
+    - `STATEMENT:`, `QUERY:` chỉ giữ từ đầu (`STATEMENT:  insert [REDACTED]`);
+    - `DETAIL:` che giá trị khóa (`Key (email)=([REDACTED]) already exists.`), dòng vi phạm (`Failing row contains
+      ([REDACTED]).`), `Token "…"` của JSON sai;
+    - `CONTEXT:` che câu trong nháy (`SQL statement "…"`) và đoạn trích sau `line N:` (`JSON data`, `COPY`);
+    - tham số `$1 = '…'`, giá trị gõ sai kiểu (`invalid input syntax for type uuid: "…"`, `malformed array
+      literal: "…"`; luật này cũng chạy cho lời lỗi Hasura chuyển nguyên).
+
+    Dòng dừng giữa giá trị (giá trị có xuống dòng) thì che tới hết dòng. Lời báo `ERROR:` giữ nguyên: lời của các
+    hàm trong `db/migrations` chỉ có mã, trạng thái, số hồ sơ. Đổi `log_line_prefix` thì mọi dòng bị bỏ.
+  - **Keycloak**: `username="…"` ở sự kiện `LOGIN_ERROR` (tên người dùng gõ vào: gõ nhầm mật khẩu vào ô tên thì
+    lộ). `userId`, `clientId`, `error` giữ lại. `sessionId`, chuỗi truy vấn của `redirect_uri` đã bị bước che chung che.
 - **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
-  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (29 ca; bỏ một luật nào thì có ca đỏ):
+  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (39 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
   - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;
   - giá trị của khóa có chữ `password`, `passwd`, `pwd`, `secret`, `token`, `api key`, `private key`, `credential`,
     `session`, kể cả có tiền tố, hậu tố (`HASURA_ADMIN_SECRET=`, `POSTGRES_PASSWORD=`, `access_token`,
@@ -304,7 +543,12 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
     (`msg="tim svc-files:8000/a?q=Do Thi I"`);
   - số sau từ khóa tách nhóm bằng dấu cách không ngắt (U+00A0); từ khóa gõ dạng Unicode tổ hợp (NFD);
   - ký tự nhiều byte nằm đúng chỗ Docker cắt thành `�`; dòng quá 64 mảnh (khoảng 1 MiB) hoặc mảnh cuối tới sau 10
-    giây thì che từng phần (bí mật vắt qua chỗ chia lọt).
+    giây thì che từng phần (bí mật vắt qua chỗ chia lọt);
+  - PostgreSQL: lời báo `ERROR:` của hàm tự viết (`raise exception '… %', giá_trị`), token sau `syntax error at or
+    near "…"`, `HINT:`, `DETAIL:` khác các dạng ở trên;
+  - Hasura: lời lỗi khác hai dạng giá trị gõ sai kiểu ở trên; `user_vars` (vai trò, mã người dùng, mã đơn vị),
+    `http_info.ip`, đường dẫn URL giữ nguyên;
+  - Keycloak: trường khác `username` của sự kiện (`ipAddress`, đường dẫn của `redirect_uri`), dòng traceback Java.
 
   **Che thừa** (không lọt, chỉ mất chữ): khóa vô hại có chữ `token`, `session`, `pwd` (`max_tokens`,
   `session_timeout=3600`, `PWD=/app`); số, kể cả ngày giờ, nằm trong 20 ký tự sau từ khóa (`tài khoản a lúc
@@ -315,21 +559,22 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
   `--sort-key name` cũng bị che); từ dài từ 8 ký tự đứng sau chữ `basic`, `bearer` (`basic authentication`); dấu `,`
   `;` ngay sau giá trị bị che (`token=X,user=a` thành `token=[REDACTED]user=a`).
 - **Cột** của luồng `moc`: `service`, `container`, `stream` (stdout/stderr), `timestamp`, `event`, `request_id` (dòng
-  JSON của `svc-files`, `svc-workflow`; dòng của APISIX; chỉ mã đúng dạng `[A-Za-z0-9._:-]{1,128}`, như `event`),
+  JSON của `svc-files`, `svc-workflow`, Hasura; dòng của APISIX; chỉ mã đúng dạng `[A-Za-z0-9._:-]{1,128}`, như
+  `event`; dòng PostgreSQL, Keycloak không có, tra theo `service`),
   `message`; Parseable thêm `p_timestamp` (giờ nhận, UTC), `p_src_ip` (IP của Vector trong mạng `logs`),
   `p_user_agent` (của Vector).
 
 ```bash
-make logs-up                       # bật: Vector, Parseable; tạo lại 5 container; đặt giữ log; tới lần make up sau
+make logs-up                       # bật: Vector, Parseable; tạo lại 8 container; đặt giữ log; tới lần make up sau
 make logs-tra ID=<mã>              # dòng của mọi dịch vụ mang mã, 60 phút gần nhất (PHUT=… để đổi)
-make demo-log-tap-trung            # màn demo: một mã đi qua APISIX → svc-workflow → svc-files
-make logs-down                     # tắt: 5 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
+make demo-log-tap-trung            # màn demo: một mã qua APISIX → svc-workflow → Hasura, svc-files; SQL lỗi…
+make logs-down                     # tắt: 8 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
 ```
 
 - **Bật lâu dài:** thêm `logs` vào `MOC_EXTRA_PROFILES` trong `.env` (vd `MOC_EXTRA_PROFILES=tunnel,logs`) rồi chạy
   `make up` (hoặc `make logs-up`); từ đó `make up`, `make down`, `make ps`… tự nạp tệp phủ và profile, và mỗi lần
   `make up` thêm mật khẩu vào `.env` cũ nếu thiếu, tạo luồng, đặt lại thời gian giữ log (kể cả sau khi xóa volume
-  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 5 dịch vụ về
+  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 8 dịch vụ về
   `json-file` (Vector, Parseable vẫn chạy nhưng không nhận gì).
 - **Mật khẩu:** `MOC_LOGS_PASSWORD` do `make env` sinh; `.env` sinh trước F3.14 thiếu dòng này thì `make logs-up` (và
   `make up` khi `logs` có trong `MOC_EXTRA_PROFILES`) tự thêm một chuỗi ngẫu nhiên đúng như `make env` (không in ra).
@@ -365,8 +610,11 @@ make logs-down                     # tắt: 5 dịch vụ về json-file, dừng
 
 **Rủi ro, hạn chế người vận hành cần biết:**
 
-- **Bật hay tắt phải tạo lại 5 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`): vài
-  giây gián đoạn; đổi driver log chỉ có hiệu lực khi tạo lại container.
+- **Bật hay tắt phải tạo lại 8 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
+  `hasura`, `keycloak`, `postgres`): đổi driver log chỉ có hiệu lực khi tạo lại container. `make logs-up`,
+  `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi động lại cả CSDL,
+  Hasura, Keycloak: vài giây không đăng nhập, không ghi được; dịch vụ khác giữ kết nối tới CSDL (Flowable) phải tự
+  nối lại. Nên bật, tắt ngoài giờ làm việc.
 - **Cổng fluent `127.0.0.1:24224` không cần đăng nhập** (driver `fluentd` của Docker không có xác thực): tiến trình
   nào trên máy chủ cũng gửi được dòng giả vào kho log (dòng giả vẫn qua bước che). Máy chủ dùng chung nhiều người thì
   đây là hạn chế thật.
@@ -388,6 +636,15 @@ make logs-down                     # tắt: 5 dịch vụ về json-file, dừng
   bỏ — dịch vụ không bị chặn. Bản cục bộ (`docker logs`) vẫn còn. Đo bằng driver thật (kiểm thử độc lập, 23/10/2026):
   dừng Vector (`docker stop -t 1`) thì mất 13 dòng đang trong lô của Vector; dòng của container chạy lâu ghi lúc
   Vector chết vẫn tới sau khi Vector chạy lại; container ngắn hạn ghi lúc Vector chết thì mất hết (0/100 000 dòng).
+  Số đo này có trước khi bật báo nhận (mục dưới).
+- **Báo nhận từng dòng** (`fluentd-request-ack: "true"`, #226): driver gửi kèm mã `chunk`, Vector trả `ack` ngay khi
+  dòng đã vào pipeline. Vector không bật `acknowledgements` đầu-cuối nên không chờ Parseable lưu. Không có `ack` (kết
+  nối đã chết, ví dụ sau khi Vector chạy lại) thì driver đóng kết nối, nối lại rồi gửi lại dòng đó. Trước #226,
+  dòng đầu tiên của một dịch vụ im lâu (PostgreSQL, Keycloak) ghi vào kết nối chết thì mất mà không báo lỗi.
+  `make demo-log-tap-trung` (bước 8) kiểm việc này. Hệ quả:
+  - Vector nhận dòng rồi chết trước khi kịp trả `ack` thì dòng đó tới kho hai lần;
+  - mỗi container gửi lần lượt từng dòng và chờ `ack` rồi mới gửi tiếp. Việc chờ nằm trong dockerd: dịch vụ vẫn không
+    bị chặn (`mode: non-blocking`), dòng chưa gửi nằm trong bộ đệm như khi Vector chết.
 - **Lớp che của Vector không thay được F4.4:** chỉ thu dịch vụ đã che; dịch vụ mới muốn thu thì phải che trong chính nó
   trước.
 - `X-Request-Id` do client đặt được (APISIX giữ mã client gửi). `svc-workflow` chỉ nhận mã khớp
@@ -406,8 +663,10 @@ của mỗi đơn vị (`NGSILD-Tenant` = mã đơn vị; mã có dấu thì `t`
 `temperature>MOC_OT_THRESHOLD`. Cảm biến vượt ngưỡng thì broker gọi `svc-workflow`, và dịch vụ dựng dự thảo văn bản
 đi "Báo cáo sự cố" (loại Báo cáo, độ khẩn "Khẩn") từ mẫu cho chuyên viên phụ trách cảm biến, ghi sự kiện `ot.alarm`
 vào dòng thời gian và báo người đó ngay. Còn dự thảo chưa trình (hoặc bị trả lại) của cùng cảm biến thì không dựng
-thêm, chỉ nhắc người phụ trách, mỗi ngày nhiều nhất một lần. Dự thảo đi tiếp theo luồng văn bản đi như mọi văn bản
-khác.
+thêm, chỉ nhắc người phụ trách, mỗi ngày nhiều nhất một lần. Giờ, ngày của báo cáo và của lượt nhắc theo giờ đo thiết
+bị gửi (`observedAt`); giờ đó muộn hơn giờ máy chủ quá 2 phút (đồng hồ thiết bị chạy nhanh, như cờ **giờ đo ở tương
+lai** bên dưới) thì theo lúc máy chủ nhận số đo, và dự thảo ghi rõ giờ thiết bị — không thì thiết bị nhanh 30 phút
+gửi số đo lúc 23 giờ 50 làm báo cáo ghi ngày hôm sau. Dự thảo đi tiếp theo luồng văn bản đi như mọi văn bản khác.
 
 ```bash
 make demo-it-ot                       # bật profile iot, cảm biến giả lập 24 → 41 °C, dự thảo, trình
@@ -416,11 +675,28 @@ docker compose --profile iot --profile iot-sim run --rm ot-sensor --tenant CNTT 
 ```
 
 - Thực thể cảm biến `urn:ngsi-ld:TemperatureSensor:<mã>` có `name` (tên phòng), `responsible` (tên đăng nhập
-  chuyên viên phụ trách) và `temperature` (°C, `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động
-  của đúng đơn vị, có phòng; không thì sự kiện bị bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+  chuyên viên phụ trách), `room` (mã phòng trên sơ đồ kho, tùy chọn: `sensor.py --room kho-1`) và `temperature` (°C,
+  `observedAt`). Người phụ trách phải là chuyên viên đang hoạt động của đúng đơn vị, có phòng; không thì sự kiện bị
+  bỏ qua (ghi nhật ký `ot.alarm_ignored`).
+- **Sơ đồ cảm biến** (`/cam-bien` của Văn phòng điện tử, văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo đơn vị): mặt
+  bằng kho lưu trữ mẫu (SVG, không tải gì ngoài), mỗi phòng tô màu theo số đo mới nhất của cảm biến cùng mã phòng so
+  với `MOC_OT_THRESHOLD`. Đọc qua Hasura Action `otSensorMap`: `svc-workflow` chỉ hỏi broker ở tenant của đơn vị
+  người xem. Bốn cờ chất lượng tính ở `svc-workflow`: **mất tín hiệu** — quá `MOC_OT_STALE_MIN` phút (mặc định 10,
+  1–1440) không có số đo mới; đặt từ 2–3 lần chu kỳ gửi của thiết bị thật; **ngoài dải** — giá trị không phải số
+  hoặc ngoài −55…125 °C (dải đo của cảm biến DS18B20, hằng số trong `ot.py`); **trùng `observedAt`** — số đo mới
+  nhất cùng giờ đo với một lần đo khác trong 10 lần gần nhất (temporal API); **giờ đo ở tương lai** — `observedAt`
+  muộn hơn giờ máy chủ quá 2 phút (`FUTURE_SLACK` trong `ot.py`): đồng hồ thiết bị chạy nhanh. Khi đó mất tín hiệu
+  xét theo lúc broker nhận số đo (`modifiedAt`), không theo giờ thiết bị — không thì thiết bị lệch giờ mà mất tín
+  hiệu không bao giờ bị gắn cờ. Profile `iot` tắt thì trang báo "Chưa bật cảm biến", không lỗi. Giả lỗi để xem cờ:
+  `sensor.py --late 30` (số đo cũ 30 phút), `--frozen-clock` (đồng hồ đứng), `--clock-ahead 30` (đồng hồ nhanh 30
+  phút), `--readings 22,-127`.
 - Broker và CSDL của nó không mở cổng ra máy chủ. Ba mạng nội bộ riêng: thiết bị ↔ broker (`iot-devices`), broker ↔
   `svc-workflow` (`iot`), broker ↔ CSDL của nó (`iot-db`) — thiết bị không gọi được `svc-workflow`. Mỗi lần gọi
   `POST /ot/notify/<tenant>` phải kèm token riêng của đơn vị (HMAC từ khóa Actions của `svc-workflow`), sai thì 401.
+- **Giới hạn của sơ đồ:** mặt bằng mẫu cố định trong `apps/office/app/utils/otMap.ts` (một tầng, 6 phòng), mọi đơn vị
+  dùng chung; dải đo không theo từng cảm biến; broker ghi lịch sử bất đồng bộ nên cờ trùng `observedAt` có thể chậm vài
+  giây; tối đa 100 cảm biến mỗi đơn vị. Cờ chỉ hiện trên sơ đồ: số đo vượt ngưỡng vẫn dựng dự thảo "Báo cáo sự cố" kể
+  cả khi ngoài dải.
 - **Giới hạn:** broker không xác thực — ai vào được mạng thiết bị là ghi được vào tenant của đơn vị bất kỳ, kể cả
   khai người phụ trách là một chuyên viên của đơn vị đó. Triển khai thật phải đặt cổng thiết bị trước broker (IoT
   Agent hoặc PEP proxy của FIWARE) cấp tenant theo khóa của từng thiết bị; bản rút gọn chỉ có cảm biến giả lập.

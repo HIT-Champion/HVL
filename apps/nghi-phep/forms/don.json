@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:app:nghi-phep:form:don",
+  "title": "Đơn xin nghỉ",
+  "description": "Form bắt đầu quy trình nghỉ phép (formKey nghi-phep.don). Ca thử dùng chung: don.cases.json.",
+  "x-moc-title": {"vi": "Đơn xin nghỉ", "en": "Leave request"},
+  "x-moc-order": ["loai", "tuNgay", "denNgay", "lyDo"],
+  "x-moc-range": [["tuNgay", "denNgay"]],
+  "x-moc-nfc": true,
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["loai", "tuNgay", "denNgay"],
+  "properties": {
+    "loai": {
+      "title": "Loại nghỉ",
+      "enum": ["phep-nam", "om", "viec-rieng", "khong-luong"],
+      "x-moc-ui": {
+        "label": {"vi": "Loại nghỉ", "en": "Leave type"},
+        "options": {
+          "phep-nam": {"vi": "Phép năm", "en": "Annual leave"},
+          "om": {"vi": "Nghỉ ốm", "en": "Sick leave"},
+          "viec-rieng": {"vi": "Việc riêng", "en": "Personal leave"},
+          "khong-luong": {"vi": "Nghỉ không lương", "en": "Unpaid leave"}
+        }
+      }
+    },
+    "tuNgay": {
+      "title": "Từ ngày",
+      "type": "string",
+      "format": "date",
+      "pattern": "^20[0-9]{2}-",
+      "x-moc-ui": {
+        "label": {"vi": "Từ ngày", "en": "From"},
+        "errors": {"pattern": {"vi": "Năm phải từ 2000 đến 2099", "en": "The year must be between 2000 and 2099"}}
+      }
+    },
+    "denNgay": {
+      "title": "Đến ngày",
+      "type": "string",
+      "format": "date",
+      "pattern": "^20[0-9]{2}-",
+      "x-moc-ui": {
+        "label": {"vi": "Đến ngày", "en": "To"},
+        "help": {"vi": "Tính cả ngày này. Nghỉ một ngày thì chọn trùng ngày bắt đầu.",
+                 "en": "Inclusive. For a single day, pick the start date again."},
+        "errors": {"pattern": {"vi": "Năm phải từ 2000 đến 2099", "en": "The year must be between 2000 and 2099"}}
+      }
+    },
+    "lyDo": {
+      "title": "Lý do",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "$ref": "#/$defs/text",
+      "x-moc-ui": {"widget": "textarea", "rows": 3, "label": {"vi": "Lý do", "en": "Reason"}}
+    }
+  },
+  "$defs": {
+    "text": {
+      "$comment": "Như $defs.text của schemas/van-ban-den.json: xuống dòng được, không ký tự ẩn, không trắng hai đầu.",
+      "type": "string",
+      "allOf": [
+        {"not": {"pattern": "[\u0000-\t\u000b\f\u000e-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f]"}},
+        {"not": {"pattern": "[\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\u2028\u2029]"}},
+        {"not": {"pattern": "^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]"}},
+        {"not": {"pattern": "[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"}}
+      ]
+    }
+  }
+}

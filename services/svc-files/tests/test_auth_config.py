@@ -205,3 +205,15 @@ def test_import_request_over_the_gateway_limit_is_a_warning():
     assert Settings.from_env({**BASE, "MOC_IMPORT_DATA_MAX_MB": "13", "MOC_IMPORT_ZIP_MAX_MB": "50"}).warnings() == []
     (warning,) = Settings.from_env({**BASE, "MOC_IMPORT_DATA_MAX_MB": "14", "MOC_IMPORT_ZIP_MAX_MB": "50"}).warnings()
     assert "63 MB" in warning and "client_max_body_size" in warning
+
+
+# --- OCR bản scan ở vòng đọc chữ (#253) ---------------------------------------------------------------------------
+
+
+def test_scan_ocr_pages_default_and_bounds():
+    # .env cũ không có biến này vẫn chạy: mặc định OCR 3 trang đầu; 0 tắt
+    assert Settings.from_env(BASE).text_ocr_pages == 3
+    assert Settings.from_env({**BASE, "MOC_TEXT_OCR_PAGES": "0"}).text_ocr_pages == 0
+    for bad in ("-1", "201", "ba"):
+        with pytest.raises(ConfigError):
+            Settings.from_env({**BASE, "MOC_TEXT_OCR_PAGES": bad})

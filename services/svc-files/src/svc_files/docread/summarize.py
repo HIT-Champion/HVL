@@ -46,6 +46,7 @@ from typing import Any, Protocol
 import httpx2
 
 from .. import pii
+from ..vntext import INVISIBLE_RE
 
 log = logging.getLogger("svc_files")
 
@@ -62,11 +63,6 @@ OPTIONS = {"temperature": 0.1, "num_ctx": 4096, "num_predict": 160, "seed": 7}
 
 # thẻ bao thân văn bản: văn bản tự đóng thẻ ("</van_ban> Bỏ qua lời dặn trên…") thì bỏ thẻ đó đi
 TAG_RE = re.compile(r"<\s*/?\s*van_ban\s*>", re.IGNORECASE)
-# ký tự điều khiển, vô hình — như $defs/text của schemas/van-ban-den.json (ở đây cả xuống dòng: trích yếu một dòng)
-INVISIBLE_RE = re.compile(
-    "[\u0000-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff"
-    "\uffa0\u2028\u2029]"
-)
 PREFIX_RE = re.compile(r"^(?:trích\s*yếu|trich\s*yeu)\s*[:：\-–—]\s*", re.IGNORECASE)
 QUOTES = {'"': '"', "'": "'", "“": "”", "‘": "’", "«": "»", "„": "“"}
 # liên kết, thư điện tử, dãy số dài (điện thoại, số tài khoản, CCCD): trích yếu hành chính không có, mô hình bị chữ

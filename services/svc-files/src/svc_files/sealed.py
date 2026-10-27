@@ -123,7 +123,8 @@ class Vault:
     hết hạn); đọc lại role_id/secret_id mỗi lần đăng nhập vì két cấp secret_id mới mỗi lần khởi động.
 
     Ký số (F4.5, signing.py): khóa ký từng đơn vị trong transit (tạo, xin CSR, gắn chứng thư, ký), chứng thư từ PKI
-    nội bộ của két. Không có hàm xuất khóa: policy của svc-files cũng không cho."""
+    nội bộ của két. Mốc neo sổ kiểm toán (anchors.py): ký bằng khóa Ed25519 ``moc-anchor`` do két tạo sẵn. Không có hàm
+    xuất khóa: policy của svc-files cũng không cho."""
 
     def __init__(self, addr: str, *, role_id_file: str, secret_id_file: str, key: str = "moc-files",
                  timeout_s: float = 5.0, transport: httpx2.AsyncBaseTransport | None = None) -> None:
@@ -245,13 +246,25 @@ class Vault:
         """Chữ ký RSA PKCS#1 v1.5 trên SHA-256(data) bằng đúng phiên bản khóa; két ghi sổ từng lần ký."""
         out = await self._request("POST", f"/v1/transit/sign/{name}/sha2-256", {
             "input": base64.b64encode(data).decode(), "signature_algorithm": "pkcs1v15", "key_version": version})
-        prefix, _, sig = str(out.get("signature") or "").rpartition(":")
-        if prefix != f"vault:v{version}":
-            raise VaultError(f"két ký bằng phiên bản khóa khác ({prefix or 'không rõ'})", status=200)
-        try:
-            return base64.b64decode(sig, validate=True)
-        except ValueError:
-            raise VaultError("két trả chữ ký không đúng dạng", status=200) from None
+        return _signature(out, version)
+
+    async def transit_sign_ed25519(self, name: str, data: bytes, *, version: int) -> bytes:
+        """Chữ ký Ed25519 thuần (RFC 8032, két không băm trước) trên data bằng đúng phiên bản khóa — mốc neo sổ kiểm
+        toán (anchors.py); két ghi sổ từng lần ký."""
+        out = await self._request("POST", f"/v1/transit/sign/{name}", {
+            "input": base64.b64encode(data).decode(), "key_version": version})
+        return _signature(out, version)
+
+
+def _signature(out: dict[str, Any], version: int) -> bytes:
+    """``vault:v<phiên bản>:<base64>`` két trả → chữ ký; ký bằng phiên bản khác thì VaultError."""
+    prefix, _, sig = str(out.get("signature") or "").rpartition(":")
+    if prefix != f"vault:v{version}":
+        raise VaultError(f"két ký bằng phiên bản khóa khác ({prefix or 'không rõ'})", status=200)
+    try:
+        return base64.b64decode(sig, validate=True)
+    except ValueError:
+        raise VaultError("két trả chữ ký không đúng dạng", status=200) from None
 
 
 # --- PDF: kiểm lúc tải lên, đóng dấu người xem lúc đọc -----------------------------------------------------------
@@ -416,7 +429,7 @@ async def _isolated(op: str, data: bytes, extra: list[str], *, max_pages: int, t
     """Chạy tệp này thành tiến trình con có giới hạn → (dòng JSON đầu, phần còn lại của stdout). Tệp không đọc được,
     quá nặng (hết giờ, hết CPU, hết bộ nhớ, tiến trình con sập), kết quả sai dạng: SealError mang ``reason``."""
     # nhập ở đây, không ở đầu tệp: tiến trình con chạy tệp này như script, không có gói svc_files
-    from .docread.ocr import _kill_group
+    from .ocr import kill_group
 
     timeout_s = max(timeout_s, 0.001)
     proc = await asyncio.create_subprocess_exec(
@@ -427,12 +440,12 @@ async def _isolated(op: str, data: bytes, extra: list[str], *, max_pages: int, t
     try:
         out, _ = await asyncio.wait_for(proc.communicate(data), timeout_s)
     except TimeoutError:
-        _kill_group(proc)
+        kill_group(proc)
         await proc.wait()
         raise _failed("timeout", max_pages) from None
     finally:
         # hết giờ, yêu cầu bị hủy, hay xong bình thường: không để tiến trình con chạy tiếp
-        _kill_group(proc)
+        kill_group(proc)
     rc = proc.returncode
     if rc != 0:
         raise _failed(_exit_reason(rc), max_pages)

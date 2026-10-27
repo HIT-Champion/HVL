@@ -25,7 +25,7 @@ import unicodedata
 import pytest
 
 from conftest import text_pdf
-from svc_files.docread.pdflayout import PAGE_CHARS, PdfLayout, _parse, clean, extract, extract_layout
+from svc_files.pdflayout import PAGE_CHARS, PdfLayout, _parse, clean, extract, extract_layout
 
 
 def pdf_with(stream: bytes) -> bytes:
@@ -90,7 +90,7 @@ def test_clean_keeps_spacing_but_drops_invisible_characters():
 
 
 def test_long_pages_are_cut_and_flagged(monkeypatch):
-    import svc_files.docread.pdflayout as pdflayout
+    import svc_files.pdflayout as pdflayout
 
     monkeypatch.setattr(pdflayout, "PAGE_CHARS", 10)
     got = extract(text_pdf("Mot dong rat dai cua trang dau"))

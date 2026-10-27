@@ -16,9 +16,19 @@ giá trị `${{TÊN}}` lấy từ biến môi trường. Đây là cổng duy nh
 - Mỗi yêu cầu có `X-Request-Id` (giữ nguyên tới sổ kiểm toán).
 - `GET /api/status` (route `trang-thai`, trạng thái hệ thống) như cổng xác thực: không cần token, giới hạn theo IP
   (`MOC_RATE_STATUS_PER_MIN`, mặc định 30/phút). Chỉ đúng đường này; `/api/*` chưa khai báo vẫn rơi vào route `chan`.
-- Máy chủ trạng thái của APISIX (`apisix.status`, `GET /status/ready` ở cổng 7085) chỉ nghe trong mạng nội bộ,
-  không publish ra máy chủ: svc-files hỏi nó cho dòng "Cổng API" của trang trạng thái (`200` mọi worker đã nạp cấu
-  hình, `503` còn worker chưa nạp).
+- Máy chủ trạng thái của APISIX (`apisix.status`, `GET /status/ready` ở cổng 7085) không publish ra máy chủ, chỉ
+  container ở mạng `moc`, `apps` tới được: svc-files hỏi nó cho dòng "Cổng API" của trang trạng thái (`200` mọi worker
+  đã nạp cấu hình, `503` còn worker chưa nạp). Ứng dụng ở mạng `apps` cũng đọc được hai mã đó, không có gì khác.
+- **Cách ly ứng dụng.** APISIX ở hai mạng: `moc` (lõi) và `apps` (container ứng dụng — `app-office`, `app-ca-nhan`,
+  ứng dụng cài bằng `moc app install`; mạng `internal`, không ra Internet). Ứng dụng không tới được dịch vụ lõi nào
+  ngoài APISIX: trang tĩnh, và phần máy chủ của ứng dụng (lấy token client credentials ở route `dang-nhap`, gọi
+  `/v1/graphql`) đều qua đúng các route trên, cùng kiểm token, giới hạn tốc độ, WAF như trình duyệt.
+- **Cổng hook 9081** (`node_listen` trong `config.yaml`, không publish): Hasura giao sự kiện của lõi tới ứng dụng qua
+  đây. `moc app install` sinh cho mỗi ứng dụng nghe sự kiện một route `POST /su-kien/<tên>` có
+  `vars: [["server_port", "==", "9081"]]` — cổng công khai 9080 không khớp (404) — viết lại (`proxy-rewrite`) về đúng
+  đường webhook của manifest trên cổng webhook của ứng dụng; header `X-Moc-Hook-Secret` đi nguyên tới ứng dụng, ứng dụng
+  tự kiểm. Route nằm trong `.moc-apps/apisix.yaml`, không có trong tệp này
+  ([`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) 1.3).
 
 Sửa route: sửa `apisix.yaml` rồi `docker compose restart apisix`.
 
@@ -169,6 +179,7 @@ luồng đăng nhập Keycloak có TOTP, tải lên 28 tệp mẫu, và 7 389 y�
 | 10010 | `/realms/<realm>/…` | mọi luật CRS trên `ARGS:password`, `password-new`, `password-confirm` | Mật khẩu là chuỗi tùy ý; Keycloak chỉ băm, không đưa vào truy vấn hay lệnh | `P@ss'word--1`, `x/../../y`… → 942100, 930100: không đăng nhập, không đổi mật khẩu được |
 | 10010 | `/realms/<realm>/…` | 931100, 934110 trên `ARGS:redirect_uri`, `post_logout_redirect_uri` | Keycloak so redirect URI với đúng danh sách của client, không tự gọi tới URL đó | `http://localhost:8080/` (CI, máy dev) → 934110; `http://192.168.1.10:8080/` → 931100 |
 | 10010 | `/realms/<realm>/…` | 942100, dải 933000–933999, 930120 trên cookie `KC_AUTH_SESSION_HASH`, `AUTH_SESSION_ID`, `KC_RESTART`, `KEYCLOAK_IDENTITY`, `KEYCLOAK_SESSION`, `KC_STATE_CHECKER` và `ARGS:session_code`, `tab_id`, `client_data`, `code_challenge`, `refresh_token`, `id_token_hint`; thêm dải 932000–932999 trên `KC_AUTH_SESSION_HASH` | Token ngẫu nhiên do Keycloak, oidc-client-ts sinh (base64, JWT), không phải chữ người dùng gõ. Đo trên 52 500 giá trị ngẫu nhiên đúng dạng (#140): khoảng 1/2 500 giá trị mỗi loại tình cờ trùng mẫu — libinjection (`"+…"` trong ngoặc kép mà Keycloak bọc cookie, `8--…`), tên hàm PHP (`rtrim`, `fputs`), đuôi tệp (`.nsr`), lệnh Unix (base64 có `/`, `+`). Luật SQLi khác, XSS, Java (944…), Node.js (934…) vẫn soi các trường này | CI develop 6710703: đăng nhập trên trình duyệt → 403 (942100 trên `KC_AUTH_SESSION_HASH`); đăng nhập hỏng ngẫu nhiên |
+| 10011 | `/realms/<realm>/protocol/openid-connect/token` | 942100, dải 933000–933999, 930120 trên `ARGS:code`, `code_verifier`, `client_secret` | Bước đổi mã lấy token: ứng dụng gửi lại mã `code` Keycloak vừa trả (cùng giá trị 10020 gỡ ở trang ứng dụng) và `code_verifier` của PKCE — chuỗi ngẫu nhiên, Keycloak chỉ so khớp. Verifier base64url theo RFC 7636 (kịch bản demo, thư viện OIDC khác) tình cờ trùng libinjection; oidc-client-ts của ba ứng dụng sinh verifier hex (ba UUID bỏ gạch). `client_secret`: phần máy chủ của ứng dụng cài bằng `moc app install` chỉ ở mạng `apps`, lấy token client credentials qua cổng; bí mật do lệnh sinh là base64url 32 byte (`secrets.token_urlsafe(32)`) — cùng loại chuỗi với verifier base64url, Keycloak chỉ so khớp | CI #154: đổi mã lấy token → 403 (942100 trên `code_verifier` `71--7iZ…`, #162). Đo khi chưa có luật, 50 000 mẫu mỗi loại: verifier hex của oidc-client-ts bị chặn 0 lần, verifier base64url 32 byte 2 lần (≈ 1/25 000, cả hai có `--` hoặc `7-`), `code` dạng Keycloak 0 lần. Có luật này, cùng phép đo: 0/150 000; giá trị CI ở trên qua (200) cả hai tham số. `client_secret` chưa thấy bị chặn thật: thêm vì cùng phân bố với verifier base64url đã đo, mà bí mật cố định theo bản cài — trúng mẫu thì ứng dụng không lấy được token lần nào |
 | 10020 | `/`, `/<ứng dụng>/`, `…/dang-nhap` (redirect URI của mọi ứng dụng) | 942100, dải 933000–933999, 930120 trên `ARGS:code`, `session_state` | Keycloak gửi mã `code` và `session_state` (token ngẫu nhiên) về trang ứng dụng, như dòng trên | bộ đo #140: `<uuid>.nSR….<uuid>`, `8--…` → 930120, 942100 |
 | 10020 | `/`, `/<ứng dụng>/`, `…/dang-nhap` (redirect URI của mọi ứng dụng) | 931100, 934110 trên `ARGS:iss` | Keycloak gửi `iss` (RFC 9207, URL của realm) về trang đăng nhập; URL công khai là `localhost` hay IP thì CRS coi là SSRF/RFI. Không dịch vụ nào gọi tới `iss`; oidc-client-ts chỉ so với issuer đã biết | như trên, ở bước quay về ứng dụng |
 | 10030 | `/v1/graphql` | dải 932000–932999 (chèn lệnh), 933000–933999 (PHP) và 942290 trên `ARGS:json.query` | Chữ truy vấn GraphQL do ứng dụng viết; Hasura phân tích theo ngữ pháp GraphQL rồi sinh SQL tham số hóa. Tên cột `diff`, `time` trùng lệnh Unix, `_is_null` trùng hàm PHP, biến `$where` trùng toán tử MongoDB. Biến vẫn soi (trừ 10031); SQLi, XSS, Log4Shell (944…), Node.js (934…) viết thẳng vào chữ truy vấn vẫn bị chặn | sổ kiểm toán, văn bản đến/đi, sơ đồ, thông báo, smoke → 932235, 932260, 933150, 942290 |
@@ -176,6 +187,7 @@ luồng đăng nhập Keycloak có TOTP, tải lên 28 tệp mẫu, và 7 389 y�
 | 10032 | `/api/documents/ask` | dải 932…, 933…, 931100, 931120 trên `ARGS:json.question` | Câu hỏi cho trợ lý (`hoi-dap.vue`): người dùng dán đoạn văn bản vào hỏi; câu hỏi chỉ đưa cho tìm kiếm và mô hình ngôn ngữ | như 10031 |
 | 10033 | `/api/search`, `/tim-kiem` | 931100, 931120, 933160 trên `ARGS:q` | Ô Tìm kiếm: q chỉ đưa cho Meilisearch hay đọc ở trình duyệt, không tải, không chạy. Chèn lệnh, PHP khác, SQLi, XSS trong q vẫn bị chặn | dán `http://192.168.1.10:8080/van-ban/12` → 931100; "File đính kèm ở đâu?" → 931120; dán dòng "Đính kèm: 03 file (PDF, Word, Excel)." → 933160 (hàm PHP `file(`) |
 | 10040 | `/api/files`, `/api/imports/<loại>` | 920120 trên `FILES` (tên tệp); 922130 trên `MULTIPART_PART_HEADERS:file`, `data`, `archive` | Tên tệp chỉ là dữ liệu, `svc-files` tự làm sạch (mục "Phân vai"). Tên trường (`FILES_NAMES`) và đường khác vẫn soi; tên `../…`, `.php` vẫn 403 | `Tờ trình 'gấp'.pdf`, `Kế hoạch; đợt 1.pdf`, `Báo cáo "2026".pdf`, `a=b&c=d.pdf` → 920120; `Kết quả: đạt!.pdf` → 922130 (dấu `:` sau chữ có dấu) |
+| 10050 | `/api/verify/ca.pem`, `/api/verify/anchor-key.pem` (đúng hai đường) | 920440 trên `REQUEST_BASENAME` (đuôi tệp bị cấm) | Chứng thư CA nội bộ (#56) và khóa công khai ký mốc neo sổ kiểm toán: tệp công khai `svc-files` đọc từ két, không mở tệp nào theo tên trong đường dẫn; route `xac-thuc` chỉ cho GET, giới hạn theo IP. Đuôi `.pem` khác, `.key`, `.bak`, đường khác vẫn 403 | `GET /api/verify/ca.pem`, `/api/verify/anchor-key.pem` → 920440 (`.pem` có trong `tx.restricted_extensions` của CRS 4.14.0, 5 điểm đủ chặn) — thử trên Coraza 3.3.3 với bộ luật của coraza-proxy-wasm 0.6.0, chưa có trên stack |
 | 920350 | mọi đường | gỡ hẳn | Signet được mở bằng IP trong mạng nội bộ. Dưới APISIX, coraza-proxy-wasm thêm `Host` lần nữa nên luật "Host là địa chỉ IP" cộng điểm hai lần (6 ≥ 5) | mọi yêu cầu vào bằng IP → 403 |
 
 Luật riêng — hai lỗ hổng của Coraza 3.3.3 (mục dưới):
@@ -349,3 +361,11 @@ trong bộ nhớ: mỗi worker tới ~230 MB sau khi soi tệp 24 MB.
   đi tiếp: thêm chữ trước đường dẫn ("Xem tại http://…"), bỏ dấu `?` cuối; người quản trị tra `X-Request-Id` (mục "Đọc
   nhật ký chặn") rồi thêm loại trừ nếu đó là chữ thật hay gặp.
 - Cổng tốn thêm ~0,4–0,8 GB RAM (số đo trên).
+- Đổi `apisix.yaml` khi đang chạy thì khởi động lại `apisix`, đừng dựa vào việc APISIX tự nạp lại (#299). APISIX so
+  `mtime` mỗi giây và nạp lại, khi đó coraza-proxy-wasm dựng ngữ cảnh mới và đọc lại CRS trong máy ảo WebAssembly cũ
+  của từng worker. Có lần bộ nhớ hỏng: `wasm trap: out of bounds memory access` trong `proxy_on_configure` → 503, rồi
+  `worker process … exited on signal 11`, yêu cầu đang chạy trên worker đó mất kết nối. Việc nạp lại vẫn có thể xảy
+  ra trong vài giây trước khi khởi động lại; khởi động lại thay mọi worker, kể cả worker đã hỏng. `moc app` ghi tệp
+  route xong thì tự khởi động lại `apisix` và chờ cổng trả lời
+  ([`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.2). Sửa tay tệp route trên máy đang chạy cũng vậy:
+  `docker compose restart apisix`. Cổng gián đoạn vài giây.

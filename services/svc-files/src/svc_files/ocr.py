@@ -30,6 +30,9 @@ Kết quả: ``ok`` kèm TSV từng trang · ``failed`` kèm lý do: ``no_text``
 ``password``, ``corrupt``, ``timeout``, ``memory`` — lỗi của tệp, kể cả khi tesseract chết vì tín hiệu (SIGKILL,
 SIGABRT: ``memory``; tín hiệu khác: ``corrupt``) hay tự báo hết bộ nhớ; ``no_tesseract``, ``engine_failed`` (thiếu
 chương trình; tesseract tự thoát mã dương — thiếu dữ liệu ngôn ngữ) — lỗi của máy chủ.
+
+Dùng chung, không riêng đọc văn bản đến (docread/): chữ bản scan cho tìm kiếm (texts.py, #253); ``kill_group``,
+``killed`` cũng dọn tiến trình con của sealed.py, imageclean.py.
 """
 
 from __future__ import annotations
@@ -66,7 +69,7 @@ class OcrResult:
     note: str | None = None
 
 
-def _killed(returncode: int) -> str:
+def killed(returncode: int) -> str:
     """Lý do khi tiến trình (tesseract, tiến trình con) chết vì tín hiệu — mã trả về âm. Đều là lỗi của tệp (422)."""
     sig = -returncode
     if sig == signal.SIGXCPU:
@@ -151,7 +154,8 @@ def _xobject(page: Any, key: Any) -> Any:
 
 
 def pdf_images(data: bytes, max_pages: int, max_pixels: int) -> tuple[int | None, Iterator[Any]]:
-    """(số trang, ảnh nhúng lớn nhất của từng trang trong ``max_pages`` trang đầu — giải mã lần lượt)."""
+    """(số trang, ảnh nhúng lớn nhất của từng trang trong ``max_pages`` trang đầu — giải mã lần lượt). Trang không có
+    ảnh nào cho ``None`` để TSV các trang sau vẫn đúng số trang (#253: trợ lý trích "tr. n" từ chữ OCR)."""
     from pypdf import PasswordType, PdfReader
 
     reader = PdfReader(io.BytesIO(data), strict=False)
@@ -180,6 +184,7 @@ def pdf_images(data: bytes, max_pages: int, max_pixels: int) -> tuple[int | None
                 if w * h > size:
                     best, size = key, w * h
             if best is None:
+                yield None
                 continue
             obj = _xobject(page, best)
             # kiểm kích thước khai trong PDF TRƯỚC khi giải mã: pypdf giải nén cả ảnh vào bộ nhớ
@@ -211,7 +216,7 @@ def tesseract(png: bytes, *, binary: str, lang: str, timeout_s: float) -> str:
     except subprocess.TimeoutExpired as exc:
         raise _Fail("timeout") from exc
     if proc.returncode < 0:
-        raise _Fail(_killed(proc.returncode))
+        raise _Fail(killed(proc.returncode))
     if proc.returncode != 0:
         # tự thoát với mã dương: thiếu dữ liệu ngôn ngữ, cài hỏng — lỗi của máy chủ (503); trừ khi tự báo hết bộ nhớ
         raise _Fail("memory" if MEMORY_RE.search(proc.stderr[-STDERR_BYTES:]) else "engine_failed")
@@ -226,10 +231,12 @@ def recognize(data: bytes, kind: str, *, binary: str, lang: str, max_pages: int,
             pages, images = pdf_images(data, max_pages, max_pixels)
         else:
             pages, images = 1, iter([open_image(data, max_pixels)])
-        tsv = [tesseract(prepare(img), binary=binary, lang=lang, timeout_s=timeout_s) for img in images]
+        # trang không có ảnh: TSV rỗng, giữ chỗ của trang
+        tsv = ["" if img is None else tesseract(prepare(img), binary=binary, lang=lang, timeout_s=timeout_s)
+               for img in images]
     except _Fail as exc:
         return OcrResult("failed", exc.pages, (), exc.note)
-    if not tsv:
+    if not any(tsv):
         return OcrResult("failed", pages, (), "no_text")
     return OcrResult("ok", pages, tuple(tsv))
 
@@ -258,7 +265,7 @@ def _main(argv: list[str]) -> int:
 # --- trong svc-files ----------------------------------------------------------------------------------------
 
 
-def _kill_group(proc: asyncio.subprocess.Process) -> None:
+def kill_group(proc: asyncio.subprocess.Process) -> None:
     """Giết cả nhóm tiến trình (tiến trình con + tesseract). Nhóm còn thành viên thì mã nhóm chưa bị cấp lại."""
     try:
         os.killpg(proc.pid, signal.SIGKILL)
@@ -279,14 +286,14 @@ async def run_ocr(data: bytes, kind: str, *, binary: str = "tesseract", lang: st
     try:
         out, _ = await asyncio.wait_for(proc.communicate(data), timeout_s)
     except TimeoutError:
-        _kill_group(proc)
+        kill_group(proc)
         await proc.wait()
         return OcrResult("failed", None, (), "timeout")
     finally:
         # hết giờ, yêu cầu bị hủy, hay xong bình thường: nhóm không còn ai chạy tiếp
-        _kill_group(proc)
+        kill_group(proc)
     if proc.returncode is not None and proc.returncode < 0:
-        return OcrResult("failed", None, (), _killed(proc.returncode))
+        return OcrResult("failed", None, (), killed(proc.returncode))
     if proc.returncode != 0:
         return OcrResult("failed", None, (), "corrupt")
     return _parse(out, max_pages)

@@ -23,6 +23,10 @@ Sổ phải liền số từ 01 đến hết năm, kể cả văn bản hạn ch
 ký hiệu và chữ "Hạn chế"; trích yếu, tác giả, người ký, nơi gửi, nơi nhận, độ khẩn đều bị che. Ai được đọc gì vẫn
 do Hasura quyết (app.py hỏi lại bằng token người in), ở đây không viết lại quy tắc. Bản JSON cho giao diện và bản
 PDF dựng từ cùng các ô đã định dạng.
+
+Chân mỗi trang PDF in mốc neo sổ kiểm toán mới nhất lúc in (anchors.py): ``Mốc neo #<id> · <16 chữ hex đầu của hash> ·
+<giờ>``. Sổ giấy đã ký nhận vì thế trỏ được vào một mốc trong tệp mốc chép ra ngoài máy chủ: đối chiếu mốc đó là biết
+sổ kiểm toán lúc in chưa bị viết lại về sau. Chưa neo lần nào thì không in gì.
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from .anchors import Mark
 from .render import display_code
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -71,6 +76,15 @@ class Register:
     entries: tuple[Entry, ...]
     last_number: int            # số cuối đã cấp trong năm (office.registers)
     printed_at: datetime
+    anchor: Mark | None = None  # mốc neo sổ kiểm toán mới nhất lúc in, in ở chân trang
+
+    @property
+    def anchor_note(self) -> str:
+        """Chữ ở chân trang; chưa có mốc thì rỗng."""
+        if self.anchor is None:
+            return ""
+        a = self.anchor
+        return f"Mốc neo #{a.audit_id} · {a.hash[:16]} · {a.anchored_at.astimezone(VN).strftime('%H:%M %d/%m/%Y')}"
 
     @property
     def title(self) -> str:
@@ -170,8 +184,9 @@ def _outgoing(doc: dict[str, Any], hidden: bool) -> tuple[str, ...]:
 
 
 def build_register(data: dict[str, Any], visible: set[str], *, direction: str, year: int,
-                   printed_at: datetime) -> Register:
-    """Sổ từ dữ liệu hasura.REGISTER; visible: id các văn bản người in được đọc (Hasura trả theo token của họ)."""
+                   printed_at: datetime, anchor: Mark | None = None) -> Register:
+    """Sổ từ dữ liệu REGISTER (office/hasura.py); visible: id các văn bản người in được đọc (Hasura trả theo token
+    của họ)."""
     tenant = data.get("core_tenants_by_pk") or {}
     users = {u["id"]: u["full_name"] for u in data.get("core_users") or []}
     registers = data.get("office_registers") or []
@@ -184,6 +199,7 @@ def build_register(data: dict[str, Any], visible: set[str], *, direction: str, y
     return Register(
         direction=direction, year=year, org_name=tenant.get("name") or "", parent_name=tenant.get("parent_name"),
         entries=tuple(entries), last_number=registers[0]["last_number"] if registers else 0, printed_at=printed_at,
+        anchor=anchor,
     )
 
 
@@ -221,6 +237,11 @@ td.hidden { font-style: italic; color: #444; }
 CENTERED = {"in": {0, 1, 4}, "out": {1, 6, 7}}
 
 
+def _css_string(text: str) -> str:
+    """Chuỗi CSS trong ngoặc kép (thuộc tính content)."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
+
+
 def register_html(reg: Register) -> str:
     cols = reg.columns
     widths = "".join(f'<col style="width:{w}mm">' for w in WIDTHS[reg.direction])
@@ -252,12 +273,15 @@ def register_html(reg: Register) -> str:
     hidden = sum(e.hidden for e in reg.entries)
     hidden_note = (f" {hidden} dòng là văn bản hạn chế người in không được đọc: chỉ in số, ngày, số ký hiệu."
                    if hidden else "")
+    # mốc neo ở góc trái chân mọi trang, kể cả bìa; WeasyPrint không đọc HTML trong <style> nên chỉ cần thoát kiểu CSS
+    footer = (f"<style>@page {{ @bottom-left {{ content: {_css_string(reg.anchor_note)}; font-size: 8pt;"
+              f" color: #555; }} }}</style>" if reg.anchor_note else "")
     return f"""<!doctype html>
 <html lang="vi"><head><meta charset="utf-8">
 <title>{_e(reg.title)} năm {reg.year} — {_e(reg.org_name)}</title>
 <meta name="author" content="{_e(reg.org_name)}">
 <meta name="generator" content="Signet">
-<style>{CSS}</style></head>
+<style>{CSS}</style>{footer}</head>
 <body>
 <section class="cover">
   <div class="org">{f'<div>{_e(reg.parent_name)}</div>' if reg.parent_name else ''}<b>{_e(reg.org_name)}</b></div>

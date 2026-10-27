@@ -23,9 +23,15 @@
 #   /api/imports, /api/imports/*     → svc-files (nạp lô văn bản đến)  — cần token
 #   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
 #   /api/status                      → svc-files (trạng thái hệ thống) — không cần token
+#   /api/workflow/*                  → svc-workflow (quy trình của ứng dụng cắm bằng manifest) — cần token
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
+#   /tai-lieu-api, /tai-lieu-api/*   → app-tai-lieu-api (Swagger UI) — không cần token; gọi thử đi qua các route trên
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
+#
+# Container ứng dụng chỉ ở mạng `apps` cùng APISIX (docker-compose.yml): phần máy chủ của ứng dụng cũng gọi lõi qua
+# đúng các route trên. Cổng hook 9081 (config.yaml, không publish) chỉ có route POST /su-kien/<ứng dụng> do
+# `moc app install` sinh trong .moc-apps/apisix.yaml: Hasura giao sự kiện tới ứng dụng (docs/them-ung-dung.md 1.3).
 #
 # Kiểm token ở biên bằng JWKS của Keycloak (zero-trust: Hasura và svc-files vẫn kiểm lại).
 #
@@ -57,12 +63,21 @@ upstreams:
     type: roundrobin
     # mặc định 60 giây; completeTask (phát hành) được Hasura chờ tới 90 giây (db/metadata/actions.yaml)
     timeout: {connect: 6, send: 100, read: 100}
+    # Hasura (Warp) quét kết nối mỗi 30 giây, đóng kết nối rảnh sau 30–60 giây; APISIX mặc định giữ 60 giây nên yêu
+    # cầu gửi đúng lúc Hasura đóng bị 502 ("upstream prematurely closed connection"). Giữ 25 giây (< 30) để chỉ APISIX
+    # đóng kết nối rảnh; size, requests là mặc định của APISIX
+    keepalive_pool: {size: 320, idle_timeout: 25, requests: 1000}
     nodes:
       "hasura:8080": 1
   - id: svc-files
     type: roundrobin
     nodes:
       "svc-files:8000": 1
+  # Chỉ route svc-workflow ở dưới (/api/workflow/*) tới đây; Hasura Actions, /ot/notify của dịch vụ không qua cổng
+  - id: svc-workflow
+    type: roundrobin
+    nodes:
+      "svc-workflow:8000": 1
   - id: app-office
     type: roundrobin
     nodes:
@@ -72,6 +87,12 @@ upstreams:
     type: roundrobin
     nodes:
       "app-ca-nhan:8080": 1
+  # Tài liệu API (apps/tai-lieu-api, #357): Swagger UI; "Try it out" gọi lõi qua đúng các route ở dưới bằng token người
+  # dùng
+  - id: app-tai-lieu-api
+    type: roundrobin
+    nodes:
+      "app-tai-lieu-api:8080": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -219,6 +240,25 @@ global_rules:
                 ctl:ruleRemoveTargetById=942100;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=933000-933999;ARGS:id_token_hint,
                 ctl:ruleRemoveTargetById=930120;ARGS:id_token_hint"
+              # Loại trừ 1b — bước đổi mã lấy token (#162): ứng dụng gửi lại mã code Keycloak vừa trả (cùng
+              # giá trị loại trừ 2 gỡ ở trang ứng dụng) và code_verifier của PKCE. Verifier base64url theo
+              # RFC 7636 (kịch bản demo, thư viện OIDC khác) tình cờ trùng libinjection: "71--7iZ…" → 942100,
+              # 403. client_secret: phần máy chủ của ứng dụng cài bằng `moc app install` (mạng apps, chỉ tới được
+              # APISIX) lấy token client credentials qua đây; bí mật là base64url 32 byte (secrets.token_urlsafe) —
+              # cùng loại chuỗi với verifier ở trên, Keycloak chỉ so khớp. Chỉ trên đúng endpoint token, đúng ba
+              # luật bắt nhầm token như loại trừ 1
+              - >-
+                SecRule REQUEST_FILENAME "@streq /realms/${{MOC_REALM}}/protocol/openid-connect/token" "id:10011,
+                phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=930120;ARGS:code_verifier,
+                ctl:ruleRemoveTargetById=942100;ARGS:client_secret,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:client_secret,
+                ctl:ruleRemoveTargetById=930120;ARGS:client_secret"
               # Loại trừ 2 — trang Keycloak trả về sau đăng nhập: tham số iss (RFC 9207) là URL của realm; URL công khai
               # là localhost hay IP thì 934110 (SSRF), 931100 (RFI) bắt nhầm. Áp cho mọi redirect URI của ứng dụng: `/`,
               # `/<ứng dụng>/`, `…/dang-nhap` — kể cả ứng dụng cài thêm bằng `moc app install`. Mã code, session_state
@@ -313,6 +353,12 @@ global_rules:
                 ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:file,
                 ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:data,
                 ctl:ruleRemoveTargetById=922130;MULTIPART_PART_HEADERS:archive"
+              # Loại trừ 9 — tải chứng thư CA nội bộ, khóa công khai ký mốc neo ở cổng xác thực: đuôi .pem nằm trong
+              # tx.restricted_extensions của CRS (920440, đủ 5 điểm là chặn). Chỉ đúng hai đường cố định, chỉ GET (route
+              # xac-thuc); svc-files trả tệp công khai đọc từ két, không mở tệp nào theo tên trong đường dẫn
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/api/verify/(?:ca|anchor-key)\.pem$" "id:10050,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=920440;REQUEST_BASENAME"
               # GHSA-6r3q-mjv7-xr8m: Coraza 3.3.3 lặng lẽ bỏ tham số thứ 1000 trở đi (SecArgumentsLimit), không soi
               # chúng — chặn hẳn yêu cầu chạm giới hạn đó (tham số truy vấn, form urlencoded)
               - >-
@@ -385,6 +431,15 @@ routes:
            "/api/imports", "/api/imports/*"]
     methods: [GET, POST]
     upstream_id: svc-files
+    plugin_config_id: can-token
+
+  # Quy trình của ứng dụng cắm bằng manifest (#301, docs/them-ung-dung.md 1.5): bắt đầu quy trình, hộp việc, hoàn
+  # thành việc trên Flowable của lõi. Cùng kiểm token, giới hạn tốc độ (WAF ở global rule) như /api/files; svc-workflow
+  # kiểm lại token và chỉ nhận token của đúng client app-<tên> (azp)
+  - id: svc-workflow
+    uris: ["/api/workflow/*"]
+    methods: [GET, POST]
+    upstream_id: svc-workflow
     plugin_config_id: can-token
 
   # Cổng xác thực văn bản đã phát hành (F2.13): ai cũng gọi được, không cần token — chỉ đọc, mỗi lần đúng một
@@ -466,6 +521,11 @@ routes:
     uris: ["/ca-nhan", "/ca-nhan/*"]
     methods: [GET, HEAD]
     upstream_id: app-ca-nhan
+
+  - id: app-tai-lieu-api
+    uris: ["/tai-lieu-api", "/tai-lieu-api/*"]
+    methods: [GET, HEAD]
+    upstream_id: app-tai-lieu-api
 
   - id: app-office
     uri: /*

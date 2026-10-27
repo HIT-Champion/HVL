@@ -13,8 +13,9 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@fontsource/be-vietnam-pro": "5.3.0",
     "echarts": "6.1.0",
-    "nuxt": "4.5.2",
+    "nuxt": "4.6.2",
     "oidc-client-ts": "3.5.0",
     "vue-i18n": "11.4.13"
   },

@@ -193,7 +193,7 @@ const feedbackAverage = computed(() => averageRating(feedbackTotal.value))
         <p class="mt-3 text-xs text-stone-500">{{ t('metrics.beforeNote') }}</p>
       </section>
 
-      <div class="grid gap-4 xl:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <section class="card overflow-x-auto p-4" data-testid="metrics-assign-months">
           <h2 class="font-medium text-stone-900">{{ t('metrics.assign.byMonth') }}</h2>
           <p v-if="!monthRows(assign).length" class="py-8 text-center text-sm text-stone-500">{{ t('metrics.noData') }}</p>

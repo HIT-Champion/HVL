@@ -19,12 +19,23 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Luật cảnh báo (#255): chỉ hiện ở /alerts của Prometheus và bảng điều khiển Grafana, chưa gửi ra ngoài
+rule_files:
+  - canh-bao.yml
+
 scrape_configs:
   # Cổng API: plugin prometheus của APISIX xuất chỉ số ở cổng 9091 (platform/apisix/config.yaml, không mở ra ngoài)
   - job_name: apisix
     metrics_path: /apisix/prometheus/metrics
     static_configs:
       - targets: ["apisix:9091"]
+
+  # Bảng trạng thái của svc-files (#274): mỗi thành phần một dòng moc_component_up, cùng lần dò của trang /trang-thai
+  # (lưu đệm 10 giây). Thu 15 giây một lần nên thành phần chết vẫn bị thấy khi không ai gọi tới. Sửa tệp này trên máy
+  # đang chạy thì phải khởi động lại prometheus: tệp chỉ được đọc lúc khởi động
+  - job_name: svc-files
+    static_configs:
+      - targets: ["svc-files:8000"]
 
   - job_name: prometheus
     static_configs:

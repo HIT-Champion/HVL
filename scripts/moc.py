@@ -16,14 +16,20 @@
 
 """Lệnh vận hành Signet trên máy chủ — chỉ dùng thư viện chuẩn, chạy được ngay trong thư mục cài (make install).
 
-    python3 scripts/moc.py audit verify [--anchors TỆP ...] [--json]
+    python3 scripts/moc.py audit verify [--anchors TỆP ...] [--key TỆP.pem ...] [--json]
         Tính lại toàn bộ sổ kiểm toán bên ngoài CSDL, so với các mốc neo trong bucket lạnh (và trong tệp, nếu
-        có), so hash của văn bản đã phát hành. Thoát 0: nguyên vẹn; 1: có dòng bị sửa; 2: không kiểm được, hoặc
-        chưa đủ bằng chứng (chưa có mốc neo, mốc quá cũ, bucket không khóa ghi). (make audit)
+        có), so hash của văn bản đã phát hành. Mốc trong tệp có chữ ký thì kiểm chữ ký (anchor_sig.py) bằng khóa
+        trong --key, anchor-key.pem cạnh tệp mốc, hoặc khóa két đang dùng. Thoát 0: nguyên vẹn; 1: có dòng bị sửa,
+        hoặc mốc trong tệp có chữ ký sai, hay không có chữ ký mà đứng sau mốc đã ký; 2: không kiểm được, hoặc chưa đủ
+        bằng chứng (chưa có mốc neo, mốc quá cũ, bucket không khóa ghi, chữ ký không có khóa để kiểm). (make audit)
 
-    python3 scripts/moc.py audit anchor [--to TỆP]
-        Neo đầu chuỗi ngay, không đợi vòng neo định kỳ của svc-files. --to: ghi thêm mốc vào một tệp, để chép
-        ra ngoài máy chủ (kho git riêng của đơn vị, thư điện tử…) — bản này nằm ngoài tầm cả quản trị máy chủ.
+    python3 scripts/moc.py audit anchor [--to TỆP] [--publish THƯ_MỤC]
+        Neo đầu chuỗi ngay, không đợi vòng neo định kỳ của svc-files. --to: ghi thêm mốc (kèm chữ ký của két nếu
+        két có khóa moc-anchor) vào một tệp, để chép ra ngoài máy chủ — bản này nằm ngoài tầm cả quản trị máy chủ.
+        Két có khóa mà mốc không có chữ ký (két không trả lời lúc ký) thì không ghi, thoát 2; lượt sau ghi lại.
+        --publish: như --to với THƯ_MỤC/anchors.jsonl trong một bản sao git, chép khóa công khai ra anchor-key.pem,
+        commit (tác giả "Signet anchor") và git push nếu có remote — không bao giờ ép (--force). Timer
+        platform/systemd/moc-anchor-publish.timer chạy lệnh này định kỳ (docs/van-hanh.md mục Mốc neo công khai).
 
     python3 scripts/moc.py backup create [--keep N]
         Sao lưu mọi CSDL và tệp vào kho restic (MOC_BACKUP_DIR), mã hóa bằng MOC_BACKUP_PASSWORD. --keep N: sau đó
@@ -51,6 +57,11 @@
         chỉ nạp từ tệp ở lần khởi động đầu; vd bản cài cũ chưa có app-ca-nhan). Không sửa client đã có. make seed
         cũng gọi. Thoát 0: xong; 1: bị từ chối; 2: không gọi được Keycloak. (chi tiết trong scripts/realm_clients.py)
 
+    python3 scripts/moc.py realm theme [--dry-run] [--json]
+        Áp theme đăng nhập Signet (loginTheme trong moc-realm.json) cho realm nạp từ trước khi có theme. Chỉ đặt khi
+        realm còn dùng theme mặc định; không đổi theme quản trị đã chọn. Thoát 0: xong hoặc không cần đặt; 1: Keycloak
+        chưa có thư mục theme (docker compose up -d keycloak) hoặc từ chối; 2: không gọi được Keycloak.
+
     python3 scripts/moc.py app install apps/<thư mục>/app.yaml [--dry-run] | list [--json] | remove TÊN [--dry-run]
                            | sync [--files] [--json]
         Cắm ứng dụng vào lõi bằng manifest, không sửa tệp lõi nào: client Keycloak, route APISIX, container, schema và
@@ -65,6 +76,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -73,14 +85,21 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
+import anchor_sig
 import backup
 import realm_clients
 import tenants
 import ung_dung
-from audit_chain import ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Report, check, local_time, to_datetime
+from audit_chain import (ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Problem, Report, check, local_time,
+                         to_datetime)
 from moc_env import ENV, ROOT
 
 COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
+# Kho mốc công khai (audit anchor --publish): tên tệp trong bản sao git và tác giả cố định của mỗi commit
+ANCHORS_FILE = "anchors.jsonl"
+KEY_FILE = "anchor-key.pem"
+SIGNATURE_RESULTS = ("valid", "invalid", "unsigned", "unsigned_late", "unknown_key")
+PUBLISH_AUTHOR = ("Signet anchor", "anchor@signet.invalid")
 
 
 class Unavailable(Exception):
@@ -168,13 +187,63 @@ def read_file_anchors(path: pathlib.Path) -> list[dict[str, Any]]:
         try:
             a = json.loads(line)
             anchors.append({"audit_id": int(a["audit_id"]), "hash": str(a["hash"]).lower(),
-                            "anchored_at": a.get("anchored_at"), "source": path.name})
+                            "anchored_at": a.get("anchored_at"), "source": path.name, "line": n,
+                            # chữ ký (signet-anchor-v1) phủ cả bốn giá trị audit_id, hash, anchored_at, system
+                            **{k: a[k] for k in ("v", "system", "key", "sig") if k in a}})
         except (ValueError, KeyError, TypeError):
             raise Unavailable(f"{path}:{n}: dòng không phải mốc neo (cần JSON có audit_id, hash)") from None
     return anchors
 
 
-def render(report: Report, gaps: list[str], notes: list[str]) -> None:
+def file_keys(paths: list[pathlib.Path]) -> dict[str, bytes]:
+    """Khóa công khai ký mốc neo trong các tệp PEM → {vân tay: khóa}."""
+    keys: dict[str, bytes] = {}
+    for path in paths:
+        try:
+            keys.update(anchor_sig.public_keys(path.read_text(encoding="utf-8")))
+        except OSError as exc:
+            raise Unavailable(f"không đọc được tệp khóa {path}: {exc.strerror}") from None
+        except ValueError as exc:
+            raise Unavailable(f"{path}: {exc}") from None
+    return keys
+
+
+def check_signatures(files: list[list[dict[str, Any]]], keys: dict[str, bytes],
+                     ) -> tuple[list[dict[str, Any]], dict[str, dict[str, int]], list[Problem], list[str]]:
+    """Kiểm chữ ký các mốc, từng tệp theo thứ tự dòng → (mốc dùng để đối chiếu chuỗi, số đếm theo tệp, lỗi, chỗ chưa
+    đủ bằng chứng). Mốc chữ ký sai, hay không có chữ ký mà đứng sau mốc đã ký (chữ ký bị gỡ), bị loại khỏi phần đối
+    chiếu: dòng đó đã bị sửa sau khi ký (hoặc không do két này ký), giá trị của nó không đáng tin để kết luận chuỗi
+    đúng hay sai. Mốc chưa ký đứng trước mọi mốc đã ký (ghi trước khi két có khóa) vẫn đối chiếu như trước."""
+    kept, problems, gaps = [], [], []
+    counts: dict[str, dict[str, int]] = {}
+    unknown: dict[tuple[str, str], int] = {}
+    checked = [(a, result) for lines in files for a, result in zip(lines, anchor_sig.check_all(lines, keys))]
+    for a, result in checked:
+        stats = counts.setdefault(a["source"], dict.fromkeys(SIGNATURE_RESULTS, 0))
+        stats[result] += 1
+        if result == "invalid":
+            problems.append(Problem(
+                "anchor_signature", a["audit_id"],
+                f"mốc #{a['audit_id']} ({a['source']}, dòng {a['line']}): chữ ký không khớp — dòng đã bị sửa sau khi"
+                " ký, hoặc không do két của hệ thống này ký"))
+            continue
+        if result == "unsigned_late":
+            problems.append(Problem(
+                "anchor_unsigned_late", a["audit_id"],
+                f"mốc #{a['audit_id']} ({a['source']}, dòng {a['line']}): không có chữ ký mà đứng sau mốc đã ký — chữ"
+                " ký đã bị gỡ khỏi dòng (két có khóa thì moc audit anchor không ghi mốc chưa ký)"))
+            continue
+        if result == "unknown_key":
+            where = (a["source"], str(a.get("key")))
+            unknown[where] = unknown.get(where, 0) + 1
+        kept.append(a)
+    for (source, key), n in unknown.items():
+        gaps.append(f"{n} mốc trong {source} ký bằng khóa {key[:23]}… mà không có khóa công khai nào khớp: chưa kiểm"
+                    " được chữ ký (thêm --key TỆP.pem)")
+    return kept, counts, problems, gaps
+
+
+def render(report: Report, gaps: list[str], notes: list[str], signatures: dict[str, dict[str, int]]) -> None:
     print("Sổ kiểm toán — tính lại chuỗi bên ngoài CSDL")
     chain = [p for p in report.problems if p.kind in {"gap", "prev_hash", "hash", "head"}]
     if not chain:
@@ -182,6 +251,11 @@ def render(report: Report, gaps: list[str], notes: list[str]) -> None:
     for source, stats in report.anchors.items():
         mark = "✓" if stats["matched"] == stats["checked"] else "✗"
         print(f"  {mark} {source}: {stats['matched']}/{stats['checked']} mốc neo khớp")
+    for source, sig in signatures.items():
+        expected = sig["valid"] + sig["invalid"] + sig["unsigned_late"]
+        if expected:
+            mark = "✓" if sig["valid"] == expected else "✗"
+            print(f"  {mark} {source}: {sig['valid']}/{expected} chữ ký mốc neo hợp lệ")
     if report.latest_anchor and not any(p.kind.startswith("anchor") for p in report.problems):
         a = report.latest_anchor
         tail = f", {report.unanchored} dòng sau đó chưa neo" if report.unanchored else ", không còn dòng nào chưa neo"
@@ -227,7 +301,30 @@ def verify(args: argparse.Namespace) -> int:
     notes: list[str] = []
     gaps: list[str] = []
     try:
-        anchors = [a for path in args.anchors for a in read_file_anchors(path)]
+        files = [read_file_anchors(path) for path in args.anchors]
+        anchors = [a for lines in files for a in lines]
+        # khóa kiểm chữ ký: --key, anchor-key.pem cạnh tệp mốc (bố cục của --publish), khóa két đang dùng khi cần
+        keys = file_keys([*args.key, *(p.parent / KEY_FILE for p in args.anchors if (p.parent / KEY_FILE).is_file())])
+        if any(a.get("sig") and a.get("key") not in keys for a in anchors):
+            try:
+                current = anchors_tool("key")["key"]
+                if current:
+                    keys.update(anchor_sig.public_keys(current["pem"]))
+            except (Unavailable, KeyError, TypeError, ValueError) as exc:
+                notes.append(f"không đọc được khóa ký mốc neo trong két: {exc}")
+        anchors, signatures, bad_signatures, unchecked = check_signatures(files, keys)
+        gaps += unchecked
+        for path, lines in zip(args.anchors, files):
+            if any(a.get("sig") for a in lines):
+                continue
+            if (path.parent / KEY_FILE).is_file():
+                # --publish chỉ ghi anchor-key.pem khi tệp đã có mốc có chữ ký
+                bad_signatures.append(Problem(
+                    "anchor_unsigned_all", lines[-1]["audit_id"] if lines else None,
+                    f"cạnh {path.name} có {KEY_FILE} mà tệp không còn mốc nào có chữ ký — chữ ký đã bị gỡ khỏi"
+                    " mọi dòng (hoặc các dòng đã bị xóa)"))
+            elif args.key:
+                gaps.append(f"{path.name} không có mốc nào có chữ ký: --key chưa kiểm được chữ ký nào")
         with Snapshot() as snap:
             # Liệt kê bucket SAU lúc đọc CSDL: mọi mốc mà bảng tra cứu đã ghi đều phải thấy trong bucket
             bucket: dict[str, Any] | None = None
@@ -241,10 +338,15 @@ def verify(args: argparse.Namespace) -> int:
     except Unavailable as exc:
         print(f"✗ {exc}. Signet có đang chạy không? (make ps)", file=sys.stderr)
         return 2
+    report.problems += bad_signatures
     if bucket is not None:
         gaps += coverage(report, bucket)
     if report.later:
         notes.append(f"{report.later} mốc neo ghi trong lúc đang kiểm, đối chiếu ở lần sau")
+    for source, stats in signatures.items():
+        if stats["unsigned"]:
+            notes.append(f"{stats['unsigned']} mốc trong {source} không có chữ ký (ghi khi két chưa có khóa ký mốc"
+                         " neo): chỉ đối chiếu giá trị")
     # Chỉ là lời khai trong CSDL, không miễn lỗi nào: người sửa được CSDL cũng thêm được một dòng như vậy
     for r in report.restores:
         notes.append(f"dòng #{r['id']}: khôi phục từ bản sao lưu lượt {r['run']} lúc {local_time(r['at'])}, chuỗi quay"
@@ -256,13 +358,111 @@ def verify(args: argparse.Namespace) -> int:
             "ok": report.ok, "complete": not gaps, "rows": report.rows, "last_id": report.last_id,
             "last_hash": report.last_hash, "anchors": report.anchors, "latest_anchor": report.latest_anchor,
             "unanchored": report.unanchored, "rewritten": report.rewritten, "documents": report.documents,
-            "gaps": gaps, "notes": notes, "problems": [p.__dict__ for p in report.problems],
+            "signatures": signatures, "gaps": gaps, "notes": notes,
+            "problems": [p.__dict__ for p in report.problems],
         }, ensure_ascii=False))
     else:
-        render(report, gaps, notes)
+        render(report, gaps, notes, signatures)
     if not report.ok:
         return 1
     return 2 if gaps else 0
+
+
+def append_line(path: pathlib.Path, line: dict[str, Any]) -> bool:
+    """Ghi thêm một mốc vào tệp JSON lines; mốc (audit_id, hash) đã có thì thôi → có ghi hay không."""
+    have = read_file_anchors(path) if path.exists() else []
+    if any((a["audit_id"], a["hash"]) == (line["audit_id"], line["hash"]) for a in have):
+        return False
+    # tệp sửa tay có thể thiếu dấu xuống dòng cuối: không để hai mốc dính vào một dòng
+    gap = "\n" if path.exists() and path.read_bytes()[-1:] not in (b"", b"\n") else ""
+    with path.open("a", encoding="utf-8") as f:
+        f.write(gap + json.dumps(line, ensure_ascii=False) + "\n")
+    return True
+
+
+def unsigned_refused(paths: list[pathlib.Path]) -> str | None:
+    """Lý do không ghi một mốc chưa ký vào các tệp mốc này; None: két chưa có khóa, ghi như cũ.
+
+    Két đã có khóa mà mốc không có chữ ký là két không trả lời lúc ký. Người kiểm không phân biệt được dòng như vậy
+    với một dòng bị gỡ chữ ký (anchor_sig.check_all coi dòng chưa ký sau dòng đã ký là lỗi), nên không ghi; lượt sau
+    két ký lại đúng mốc đó (cùng mốc, cùng thời điểm ghi bucket, cùng chữ ký) hoặc mốc mới hơn."""
+    for path in paths:
+        if path.exists() and any(a.get("sig") for a in read_file_anchors(path)):
+            return f"{path} đã có mốc có chữ ký"
+        if (path.parent / KEY_FILE).exists():
+            return f"cạnh {path.name} đã có khóa ký mốc {path.parent / KEY_FILE}"
+    try:
+        key = anchors_tool("key")["key"]
+    except (Unavailable, KeyError, TypeError) as exc:
+        return f"không hỏi được két đã có khóa ký mốc chưa ({exc})"
+    return "két đã có khóa ký mốc moc-anchor nhưng không ký được mốc này" if key else None
+
+
+def git(directory: pathlib.Path, *args: str, author: bool = False) -> subprocess.CompletedProcess[str]:
+    """git trong bản sao mốc công khai; không hỏi gì trên terminal (chạy từ timer). author: tác giả cố định."""
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    if author:
+        env |= {"GIT_AUTHOR_NAME": PUBLISH_AUTHOR[0], "GIT_AUTHOR_EMAIL": PUBLISH_AUTHOR[1],
+                "GIT_COMMITTER_NAME": PUBLISH_AUTHOR[0], "GIT_COMMITTER_EMAIL": PUBLISH_AUTHOR[1]}
+    return subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True, encoding="utf-8",
+                          env=env)
+
+
+def publish(directory: pathlib.Path, line: dict[str, Any]) -> int:
+    """Ghi mốc vào THƯ_MỤC/anchors.jsonl, khóa công khai vào anchor-key.pem, commit, push nếu có remote.
+
+    Chỉ thêm commit, không bao giờ viết lại lịch sử: không --force, không amend; nhánh công khai cấm đẩy ép (docs/
+    van-hanh.md mục Mốc neo công khai) nên bản sao ở máy chủ có bị sửa cũng không xóa được mốc đã công bố. Push hỏng
+    (mất mạng) thì commit vẫn nằm lại, lần chạy sau đẩy tiếp."""
+    if git(directory, "rev-parse", "--is-inside-work-tree").stdout.strip() != "true":
+        print(f"✗ {directory} không phải một bản sao git (git init hoặc git clone kho mốc công khai trước)",
+              file=sys.stderr)
+        return 2
+    path = directory / ANCHORS_FILE
+    try:
+        added = append_line(path, line)
+        signed = any(a.get("sig") for a in read_file_anchors(path))
+    except Unavailable as exc:
+        print(f"✗ {exc}", file=sys.stderr)
+        return 2
+    files = [ANCHORS_FILE]
+    try:
+        key = anchors_tool("key")["key"]
+    except (Unavailable, KeyError, TypeError) as exc:
+        key = None
+        print(f"  không đọc được khóa công khai trong két ({exc}): giữ nguyên {KEY_FILE}", file=sys.stderr)
+    pem = directory / KEY_FILE
+    # khóa chỉ đi cùng mốc có chữ ký: audit verify coi anchor-key.pem cạnh một tệp không có dòng ký nào là chữ ký bị gỡ
+    if key and signed and (not pem.exists() or pem.read_text(encoding="utf-8") != key["pem"]):
+        # khóa đổi (két dựng lại): ghi đè, lịch sử git vẫn giữ khóa cũ cho các mốc ký trước đó
+        pem.write_text(key["pem"], encoding="utf-8")
+    if pem.exists():
+        files.append(KEY_FILE)
+    out = git(directory, "add", "--", *files)
+    if out.returncode != 0:
+        print(f"✗ git add: {out.stderr.strip()}", file=sys.stderr)
+        return 2
+    if git(directory, "diff", "--cached", "--quiet", "--", *files).returncode == 1:
+        message = f"Anchor #{line['audit_id']} {line['hash'][:16]}"
+        out = git(directory, "commit", "--quiet", "-m", message, "--", *files, author=True)
+        if out.returncode != 0:
+            print(f"✗ git commit: {out.stderr.strip() or out.stdout.strip()}", file=sys.stderr)
+            return 2
+        print(f"  đã commit \"{message}\" vào {directory}")
+    elif not added:
+        print(f"  mốc này đã có trong {path}, không có gì mới để commit")
+    remotes = git(directory, "remote").stdout.split()
+    if not remotes:
+        print(f"  {directory} chưa có remote: chỉ commit tại chỗ, chưa công bố ra ngoài")
+        return 0
+    remote = "origin" if "origin" in remotes else remotes[0]
+    out = git(directory, "push", "--porcelain", remote, "HEAD")
+    if out.returncode != 0:
+        print(f"✗ git push {remote}: {out.stderr.strip() or out.stdout.strip()} — commit vẫn ở {directory},"
+              " lần chạy sau đẩy tiếp", file=sys.stderr)
+        return 2
+    print(f"  đã đẩy lên {remote}")
+    return 0
 
 
 def anchor(args: argparse.Namespace) -> int:
@@ -278,24 +478,42 @@ def anchor(args: argparse.Namespace) -> int:
         print(f"✓ Đã neo đầu chuỗi #{result['audit_id']} ({result['hash'][:12]}…) vào {result['location']}")
     else:
         print(f"✓ Đầu chuỗi #{result['audit_id']} ({result['hash'][:12]}…) đã được neo, không có dòng sổ mới")
-    if args.to:
+    signed = result.get("signed")
+    if signed:
+        # đúng các trường két đã ký (anchor_sig.py dựng lại thông điệp từ chúng)
+        line = {"v": anchor_sig.MESSAGE, "audit_id": result["audit_id"], "hash": result["hash"],
+                "anchored_at": signed["anchored_at"], "system": signed["system"], "key": signed["key"],
+                "sig": signed["sig"]}
+        print(f"  két đã ký mốc bằng khóa {signed['key'][:23]}…")
+    else:
         line = {"audit_id": result["audit_id"], "hash": result["hash"],
-                "anchored_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "anchored_at": result.get("anchored_at") or datetime.now().astimezone().isoformat(timespec="seconds"),
                 "system": ENV.get("MOC_PUBLIC_URL", "")}
+        if args.to or args.publish:
+            targets = [p for p in (args.to, args.publish and args.publish / ANCHORS_FILE) if p]
+            try:
+                refused = unsigned_refused(targets)
+            except Unavailable as exc:
+                print(f"✗ {exc}", file=sys.stderr)
+                return 2
+            if refused:
+                print(f"✗ Không ghi mốc chưa ký ra tệp: {refused}. Dòng chưa ký sau dòng đã ký bị coi là chữ ký bị"
+                      " gỡ; lượt sau thử lại (docs/van-hanh.md mục Mốc neo công khai)", file=sys.stderr)
+                return 2
+            print("  mốc không có chữ ký: két chưa có khóa moc-anchor (docs/van-hanh.md mục Két bí mật)")
+    if args.to:
         try:
-            have = read_file_anchors(args.to) if args.to.exists() else []
+            added = append_line(args.to, line)
         except Unavailable as exc:
             print(f"✗ {exc}", file=sys.stderr)
             return 2
-        if any((a["audit_id"], a["hash"]) == (line["audit_id"], line["hash"]) for a in have):
-            print(f"  mốc này đã có trong {args.to}")
-        else:
-            # tệp sửa tay có thể thiếu dấu xuống dòng cuối: không để hai mốc dính vào một dòng
-            gap = "\n" if args.to.exists() and args.to.read_bytes()[-1:] not in (b"", b"\n") else ""
-            with args.to.open("a", encoding="utf-8") as f:
-                f.write(gap + json.dumps(line, ensure_ascii=False) + "\n")
+        if added:
             print(f"  đã ghi thêm vào {args.to} — chép tệp này ra ngoài máy chủ để giữ một bản nữa;"
                   f" kiểm bằng: python3 scripts/moc.py audit verify --anchors {args.to}")
+        else:
+            print(f"  mốc này đã có trong {args.to}")
+    if args.publish:
+        return publish(args.publish, line)
     return 0
 
 
@@ -313,10 +531,15 @@ def main(argv: list[str] | None = None) -> int:
     v = audit.add_parser("verify", help="tính lại chuỗi, so mốc neo và hash văn bản")
     v.add_argument("--anchors", type=pathlib.Path, action="append", default=[], metavar="TỆP",
                    help="tệp mốc neo đã chép ra ngoài (mỗi dòng một JSON, do audit anchor --to ghi)")
+    v.add_argument("--key", type=pathlib.Path, action="append", default=[], metavar="TỆP.pem",
+                   help="khóa công khai kiểm chữ ký mốc trong tệp (anchor-key.pem); mặc định: tệp cạnh tệp mốc,"
+                        " khóa két")
     v.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     v.set_defaults(run=verify)
     a = audit.add_parser("anchor", help="neo đầu chuỗi ngay")
     a.add_argument("--to", type=pathlib.Path, metavar="TỆP", help="ghi thêm mốc vào tệp này")
+    a.add_argument("--publish", type=pathlib.Path, metavar="THƯ_MỤC",
+                   help="ghi mốc vào anchors.jsonl của bản sao git này, commit, push nếu có remote (không bao giờ ép)")
     a.set_defaults(run=anchor)
 
     b = groups.add_parser("backup", help="sao lưu, khôi phục CSDL và tệp (F3.4)").add_subparsers(dest="cmd",
@@ -372,12 +595,16 @@ def main(argv: list[str] | None = None) -> int:
     tk.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     tk.set_defaults(run=tenants.cmd_check)
 
-    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md)").add_subparsers(
-        dest="cmd", required=True)
+    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md), theme đăng nhập"
+                           ).add_subparsers(dest="cmd", required=True)
     rc = rm.add_parser("clients", help="thêm client ứng dụng trên trình duyệt còn thiếu so với moc-realm.json")
     rc.add_argument("--dry-run", action="store_true", help="chỉ in client sẽ thêm, không thay đổi gì")
     rc.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     rc.set_defaults(run=realm_clients.cmd_clients)
+    rt = rm.add_parser("theme", help="áp theme đăng nhập Signet (loginTheme của moc-realm.json) cho realm đã nạp")
+    rt.add_argument("--dry-run", action="store_true", help="chỉ in việc sẽ làm, không thay đổi gì")
+    rt.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    rt.set_defaults(run=realm_clients.cmd_theme)
 
     ung_dung.add_parser(groups)
     args = parser.parse_args(argv)

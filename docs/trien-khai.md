@@ -19,7 +19,9 @@ Internet ──443/80──▶ Caddy (máy chủ) ──▶ 127.0.0.1:8080 APISI
 install` ra thư mục riêng, chạy từ đó), một proxy TLS ở cổng 443 đặt các tiêu đề như Caddyfile ở bước 5 (nginx với
 chứng thư tự ký, thay cho Caddy và Let's Encrypt), rồi qua `https://`: các mục kiểm ở bước 6, smoke, 13 kịch bản e2e
 trên trình duyệt, màn kiểm dịch, ký số, che thông tin cá nhân, kiểm sổ kiểm toán. Chưa diễn tập: bước 2 (máy diễn tập
-đã có Docker), Caddy, Let's Encrypt thật — xem mục 8.
+đã có Docker), Caddy, Let's Encrypt thật — xem mục 8. Phần `https` của CI (#261) chạy lại trên mọi pull request:
+`.env` như bước 3, proxy như bước 5 (nginx với chứng thư tự ký thay Caddy), rồi smoke và `kiem_ban_online.py` của
+bước 6.
 
 ## 1. Chuẩn bị
 
@@ -44,7 +46,7 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
   | sudo tee /etc/apt/sources.list.d/docker.list
 sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-docker --version && docker compose version     # cần Docker ≥ 24.0, compose ≥ 2.20
+docker --version && docker compose version     # cần Docker ≥ 24.0, compose ≥ 2.17
 
 # Người vận hành moc: chạy Signet, sao lưu, reconciler. Nhóm docker có quyền ngang root trên máy — chỉ người vận hành
 sudo adduser --disabled-password --gecos "" moc
@@ -61,6 +63,60 @@ Docker tự mở cổng của container mà **không qua ufw**, nên chặn bằ
 Máy 8 GB nên thêm 4 GB swap cho lần dựng image đầu tiên:
 `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile` (thêm
 `/swapfile none swap sw 0 0` vào `/etc/fstab` để giữ sau khi khởi động lại).
+
+## 2b. Máy không kéo được image từ Docker Hub
+
+Phần lớn image của Signet lấy từ Docker Hub (`docker.io`): 17 image trong `docker-compose.yml` và 4 image nền mà các
+Dockerfile của đội dựng lên (`node`, `python`, `nginxinc/nginx-unprivileged`, `apache/apisix`). Mạng chặn Docker Hub,
+hay đã hết lượt tải ẩn danh của Docker Hub (lỗi `toomanyrequests`), thì `make up`, `make install` và
+`scripts/nang_cap.sh` dừng ở bước kéo hoặc dựng image. Cách xử lý: cho Docker kéo các image này qua `mirror.gcr.io`, bản
+sao Docker Hub của Google.
+
+Tạo hoặc sửa `/etc/docker/daemon.json` (cần `sudo`; người cài tự làm, Signet không sửa cấu hình Docker của máy) cho có
+khóa `registry-mirrors`. Tệp đã có nội dung thì chỉ thêm khóa này, giữ JSON hợp lệ:
+
+```json
+{
+  "registry-mirrors": ["https://mirror.gcr.io"]
+}
+```
+
+```bash
+sudo systemctl reload docker                             # nạp lại cấu hình, container đang chạy không bị dừng
+docker info --format '{{json .RegistryConfig.Mirrors}}'  # phải có "https://mirror.gcr.io/"
+```
+
+Docker chỉ dùng mirror cho image của Docker Hub: thử mirror trước, mirror không có thì quay về Docker Hub. Bộ dựng mặc
+định của Docker Engine (BuildKit chạy trong dockerd) cũng đọc `registry-mirrors`, nên `make up` dựng image của đội vẫn
+kéo image nền qua mirror. Đã đổi sang builder `docker-container` (`docker buildx create --use …`) thì builder đó không
+đọc `daemon.json`: khai mirror trong `buildkitd.toml` của nó
+([Configure BuildKit](https://docs.docker.com/build/buildkit/configure/#registry-mirror)). Mọi image đều ghim theo
+digest (`@sha256:…`), Docker kiểm nội dung tải về theo digest, nên mirror không tráo được image.
+
+Ngày 26/10/2026 đã kiểm: cả 21 image ghim đều có trên `mirror.gcr.io`, đủ mọi lớp của bản `linux/amd64`. `mirror.gcr.io`
+chỉ giữ các image được kéo nhiều, nên khi cài một phiên bản khác hãy kiểm lại bằng lệnh dưới. Lệnh chỉ đọc manifest,
+không kéo image; chạy trong thư mục mã nguồn (bản clone hay gói phát hành đã giải nén), nơi `make up`, `make install`
+dựng image:
+
+```bash
+grep -hoE '(image:|FROM) +[a-z][^ ]*@sha256:[0-9a-f]{64}' docker-compose.yml */*/Dockerfile \
+  | awk '{print $2}' | sort -u | grep -vE '^(quay|ghcr)\.io/' | while read -r ref; do
+    repo=${ref%%[:@]*}; [[ $repo == */* ]] || repo=library/$repo
+    docker buildx imagetools inspect "mirror.gcr.io/$repo@${ref#*@}" >/dev/null 2>&1 && echo "có    $ref" ||
+      echo "THIẾU $ref"
+  done
+```
+
+Có dòng `THIẾU` thì mirror chưa giữ image đó: dùng một mirror Docker Hub khác mà máy cài vào được (của trường, của
+công ty), hoặc mở Docker Hub cho lần cài ấy.
+
+Ngoài Docker Hub, lần cài đầu còn tải từ các nguồn sau, mirror trên không thay được:
+
+- `quay.io` (Keycloak, Parseable) và `ghcr.io` (coraza-proxy-wasm, lớp WAF dựng vào image APISIX);
+- lúc dựng image của đội: gói npm (`registry.npmjs.org`), gói Python (`pypi.org`, `files.pythonhosted.org`), gói Debian
+  của svc-files (`deb.debian.org`);
+- lúc chạy: ClamAV tải chữ ký virus (`database.clamav.net`). Khi bật profile `ai-pull`, mô hình ngôn ngữ tải từ thư
+  viện Ollama (`registry.ollama.ai`).
 
 ## 3. Lấy mã nguồn và cấu hình
 
@@ -194,12 +250,35 @@ curl -s https://moc.example.vn/realms/moc/.well-known/openid-configuration \
 docker compose logs --tail 3 apisix                                   # cột đầu: IP của người vừa gọi
 ```
 
+```bash
+python3 scripts/kiem_ban_online.py https://moc.example.vn   # từ thư mục mã nguồn, máy nào có Python cũng được
+```
+
+`make install` không chép `kiem_ban_online.py` vào `/opt/moc`. Kịch bản kiểm từ bên ngoài, như trình duyệt của người
+dùng thấy, rồi báo mọi mục trượt:
+- chứng chỉ hợp lệ, còn ít nhất 14 ngày;
+- `http://` chuyển sang `https://`;
+- `/api/status` ok (thêm `--version 1.2.0` để đòi đúng bản);
+- `issuer`, `token_endpoint` như dưới đây;
+- header CSP, `nosniff` còn qua proxy.
+
+Job `.github/workflows/ban-online.yml` chạy kịch bản này trên bản online của đội, với phiên bản là thẻ phát hành mới
+nhất: mỗi sáng lúc 07:17, và ngay sau khi workflow Release phát hành xong. Từ lúc phát hành tới lúc nâng, job đỏ vì
+bản online còn chạy bản cũ. Nâng xong thì chạy tay job (Actions → Bản online → Run workflow) để xác nhận từ bên ngoài.
+Địa chỉ đổi bằng biến `MOC_ONLINE_URL` của repo.
+
+Job thứ hai của workflow đó kiểm bản dev https://signet-dev.htechcs.com mỗi sáng. Đây là bản cài có reconciler theo
+nhánh `develop` (`MOC_GITOPS_BRANCH=develop`, kéo mỗi 15 phút). Các mục kiểm như trên, nhưng `/api/status` phải là bản
+dựng từ đầu `develop` (`--commit`). Lần gộp mới nhất chưa quá 30 phút thì bản dựng từ commit liền trước cũng đạt.
+Reconciler kẹt thì job đỏ. Địa chỉ đổi bằng biến `MOC_DEV_URL`.
+
 - `issuer` và `token_endpoint` đều phải bắt đầu bằng `https://moc.example.vn/realms/moc`. `issuer` sai (`http://…`,
   `localhost`) là `MOC_PUBLIC_URL` sai; chỉ `token_endpoint` sai (`http://…` hay có `:9080`) là `MOC_TRUSTED_PROXY`
   chưa khớp dải mạng Docker, hoặc Caddyfile thiếu dòng `header_up`.
 - Cột đầu dòng nhật ký APISIX phải là IP thật của máy vừa gọi `curl`. Ra `172.x.0.1` là `MOC_TRUSTED_PROXY` chưa khớp:
-  lấy gateway thật bằng `docker inspect $(docker compose ps -q apisix) --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'`, sửa
-  `/opt/moc/.env` rồi `docker compose up -d apisix`.
+  lấy gateway thật của mạng `moc` (APISIX ở hai mạng `moc`, `apps`; cổng publish đi qua `moc`) bằng
+  `docker inspect $(docker compose ps -q apisix) --format '{{(index .NetworkSettings.Networks "moc_moc").Gateway}}'`,
+  sửa `/opt/moc/.env` rồi `docker compose up -d apisix`.
 - Mở `https://moc.example.vn` trên trình duyệt, đăng nhập `vanthu` (mật khẩu `MOC_DEMO_PASSWORD`, mã TOTP từ
   `python3 scripts/totp.py`). Tài khoản cho giám khảo: `giamkhao` (chuyên viên, không cần TOTP; hộp việc có sẵn hai
   việc).
@@ -225,15 +304,54 @@ kho chỉ gồm tệp đã mã hóa). Diễn tập khôi phục: [`van-hanh.md`]
 commit mới trên nhánh `deploy` tự được cài lại thì làm thêm một bản sao riêng của reconciler (`/opt/moc-src`, nhánh
 `deploy`) và đặt `MOC_GITOPS_DIR` như `van-hanh.md` — không dùng chung `~/Signet`.
 
-**Nâng cấp tay** (không dùng GitOps):
+**Nâng cấp tay** (không dùng GitOps): dừng timer reconciler nếu có (`sudo systemctl stop moc-reconcile.timer`), lấy mã
+nguồn bản mới (gói `.tar.gz` của trang Release, hoặc `git pull` trong `~/Signet`), rồi từ thư mục đó:
 
 ```bash
-cd /opt/moc && python3 scripts/moc.py backup create     # sao lưu trước
-cd ~/Signet && git pull
-cd /opt/moc && docker compose down
-cd ~/Signet && make install PREFIX=/opt/moc         # giữ .env của bản cài, chỉ đổi MOC_VERSION
-cd /opt/moc && docker compose up -d --wait --wait-timeout 900
+scripts/nang_cap.sh nang /opt/moc
 ```
+
+Kịch bản:
+
+1. Dựng image bản mới khi trang còn chạy, kéo trước các image dựng sẵn máy chưa có (của mọi profile bản cài đang bật):
+   lúc dừng trang không phải chờ tải, lỗi mạng thì dừng ở đây khi chưa đổi gì.
+2. Sao lưu bằng chính bản đang chạy, in mã lượt, chép `.env` ra `/opt/moc/.env.truoc-<lượt>` (quyền 600, có bí mật):
+   nâng xong, không cần lùi nữa thì xóa.
+3. Dừng trang, `make install PREFIX=/opt/moc`, chạy lại. Hasura áp migration mới khi khởi động. `.env` của bản cài được
+   giữ, trừ `MOC_VERSION` và hai biến `make install` đặt lại mỗi lần: `COMPOSE_PROFILES` (`core,app` cộng
+   `MOC_EXTRA_PROFILES`) và `COMPOSE_FILE` (theo profile `logs` và ứng dụng đã cài), nên sửa tay hai biến này sẽ mất.
+4. Chạy `moc.py realm clients` và `realm theme`.
+5. Kiểm từng mục rồi báo các mục trượt:
+   - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm (so với số liệu chụp ở
+     bước 2, nên chỉ `nang` kiểm được);
+   - dịch vụ chạy trước khi nâng vẫn chạy (chỉ `nang`), không cái nào chưa khỏe;
+   - `/api/status` báo đúng phiên bản mới;
+   - realm đủ client và theme;
+   - `moc.py audit verify`;
+   - `smoke.py`. Smoke trượt đúng ở bước hỏi đáp (chữ chưa kịp vào chỉ mục khi máy quá tải) thì chạy lại một lần, có in
+     rõ là lần thử lại.
+
+Nếu dừng giữa chừng sau khi trang đã dừng, hoặc kiểm có mục trượt, kịch bản in lệnh lùi:
+
+```bash
+scripts/nang_cap.sh lui /opt/moc <mã nguồn bản cũ> <lượt>
+```
+
+Lệnh lùi cài lại bản cũ rồi khôi phục đúng lượt sao lưu đó: CSDL, tệp và két về như lúc trước khi nâng, sau đó kiểm lại
+như trên, trừ hai mục chỉ `nang` kiểm được. Gói cũ chưa có tệp `VERSION` (trước 1.2.0) thì đặt `MOC_VERSION=1.1.0`
+trước lệnh.
+
+`scripts/nang_cap.sh kiem /opt/moc` chỉ chạy phần kiểm. Job CI `.github/workflows/nang-cap.yml` chạy cả ba đường trên
+bản cài của thẻ phát hành trước: nâng lên commit của PR, nâng két cũ (`ket`, [`van-hanh.md`](van-hanh.md) mục Két bí
+mật), lùi về. Job chạy trên PR phát hành và trên PR có đổi migration, két, realm, compose, cài đặt hay sao lưu.
+
+Realm Keycloak chỉ nạp từ tệp ở lần khởi động đầu, nên phần realm mới của bản sau không tự vào bản cài cũ. Nâng cấp
+bằng GitOps cũng vậy. Hai lệnh realm ở bước 4 lo phần này, chạy lại không đổi gì
+([`platform/keycloak/README.md`](../platform/keycloak/README.md)):
+
+- `realm theme` đặt theme đăng nhập Signet, chỉ khi realm còn dùng theme mặc định. Nó báo lỗi nếu container keycloak
+  chưa gắn thư mục theme.
+- `realm clients` thêm client của ứng dụng mới.
 
 Biến `.env` mới của bản mới (CHANGELOG ghi rõ) thêm vào `/opt/moc/.env`. **Không chạy `make reset` hay
 `docker compose down -v` trên máy chủ**: xóa sạch dữ liệu, kể cả két (tệp văn bản hạn chế không mở được nữa).
@@ -267,9 +385,17 @@ thư, mất khi container dừng), không dùng làm máy chủ thư thật.
 - **Chỉ đoạn trình duyệt ↔ Caddy có TLS.** Các dịch vụ gọi nhau bằng HTTP trong mạng Docker (APISIX → Keycloak, các
   dịch vụ → OpenBao, …). Mạng này không mở ra ngoài, nhưng một container bị chiếm quyền thì thấy được lưu lượng chưa
   mã hóa trong đó.
-- **`MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy**: container nào cũng gửi được `X-Forwarded-For`
-  giả để né giới hạn tốc độ đăng nhập. Muốn hẹp hơn thì đặt đúng gateway lấy ở bước 6 (`172.x.0.1/32`); với Cloudflare
-  Tunnel là dải của mạng `moc` (`docker network inspect moc_moc --format '{{(index .IPAM.Config 0).Subnet}}'`).
+- **`MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy**, kể cả container ứng dụng ở mạng `apps`: container
+  nào cũng gửi được `X-Forwarded-For` giả để né giới hạn tốc độ đăng nhập. Muốn hẹp hơn thì đặt đúng gateway lấy ở
+  bước 6 (`172.x.0.1/32`); với Cloudflare Tunnel là dải của mạng `moc`
+  (`docker network inspect moc_moc --format '{{(index .IPAM.Config 0).Subnet}}'`) — `cloudflared` vẫn chỉ ở mạng
+  `moc`, mạng `apps` (ứng dụng, APISIX) không cần có trong dải tin cậy. Dải và gateway do Docker cấp lúc tạo mạng:
+  `make down` rồi `make up`, nâng cấp bằng `scripts/nang_cap.sh` hay reconciler GitOps (cả hai `docker compose down`
+  trước khi cài) xóa, tạo lại mọi mạng và có thể đánh số lại — bản này thêm mạng `apps`, nên lần tạo lại đầu tiên sau
+  khi nâng cấp dễ cấp cho `moc` một dải khác. Giá trị đã thu hẹp khi đó trỏ sai mạng: Keycloak trả `token_endpoint`
+  `http://…` (trình duyệt chặn đăng nhập), mọi người dùng chung một bộ đếm giới hạn. Sau mỗi lần tạo lại mạng, so hai
+  lệnh trên với `MOC_TRUSTED_PROXY` trong `.env` (cột đầu nhật ký APISIX ra `172.x.0.1` là lệch), lệch thì sửa rồi
+  `docker compose up -d apisix`. `make up` không xóa mạng nên không đánh số lại.
 - **Cloudflare Tunnel (mục 5b): TLS kết thúc ở Cloudflare**, Cloudflare thấy nội dung yêu cầu trước khi chuyển vào
   đường hầm — hợp với máy demo, cân nhắc với dữ liệu thật. Máy tắt hay mất mạng là trang ngừng; Cloudflare gói Free
   giới hạn mỗi yêu cầu 100 MB (APISIX đã chặn trên 64 MB).

@@ -24,7 +24,9 @@ Theo đúng thứ tự, mỗi bước chặn được thì chặn trước khi t
 3. ``generate``: chờ lượt (``MOC_ASK_CONCURRENCY``, tối đa ``MOC_ASK_QUEUE_S``, quá thì 503 busy).
 4. Có mô hình nhúng thì nhúng câu hỏi (≤ 5 giây; lỗi → chỉ tìm theo từ khóa).
 5. Truy xuất: Meilisearch lọc trước theo vai trò, Hasura hậu kiểm **bằng token người hỏi** (retrieve.py). Tìm lai lỗi
-   thì retrieve.py đã tìm lại chỉ bằng từ khóa: cảnh báo ``embed_unavailable``.
+   thì retrieve.py đã tìm lại chỉ bằng từ khóa: cảnh báo ``embed_unavailable``. Có ``document_id`` ("Hỏi về văn bản
+   này") thì thêm một điều kiện lọc, chỉ thu hẹp; câu hỏi có số ký hiệu, ngày, cụm trong ngoặc kép thì tìm lai nghiêng
+   về từ khóa (``retrieve.semantic_ratio``).
 6. Câu trích nguyên văn (extract.py) — luôn chạy, tất định.
 7. ``generate`` + có đoạn + mô hình sẵn sàng + còn ≥ 5 giây → mô hình viết câu trả lời từ đúng các đoạn đã hậu kiểm;
    máy chủ kiểm và tự gán trích dẫn [n] theo bằng chứng (grounding.py). Không đạt thì vẫn 200 với câu trích và cảnh báo.
@@ -39,9 +41,10 @@ Che thông tin cá nhân (F4.4): mô hình chỉ đọc bản che. Mỗi lượt
 kiếm, câu trích nguyên văn và nguồn trả người hỏi (người có quyền đọc văn bản) giữ số thật; câu trả lời của mô hình
 giữ nhãn. Số chỗ đã che ghi ở khóa ``masked`` của nhật ký, không vào sổ.
 
-Vòng nhúng nền chỉ bị giữ (``hold``) **trong lúc** lượt hỏi gọi Ollama (nhúng câu hỏi, sinh), không phải mỗi lượt hỏi:
-câu trích không cần mô hình thì không giữ gì. Người hỏi ngắt kết nối thì api.py hủy lượt (``CancelledError``): lời
-gọi Ollama bị ngắt, lượt sinh được nhả; không trả lời nên không ghi sổ, chỉ có nhật ký ``office.assist.ask_cancelled``.
+Vòng nhúng nền chỉ bị giữ **trong lúc** lượt hỏi gọi Ollama (nhúng câu hỏi, sinh) — suốt lời gọi, lâu bao nhiêu cũng
+vậy (#192) — và ``HOLD_S`` giây sau mỗi lời gọi, không phải mỗi lượt hỏi: câu trích không cần mô hình thì không giữ
+gì. Người hỏi ngắt kết nối thì api.py hủy lượt (``CancelledError``): lời gọi Ollama bị ngắt, lượt sinh được nhả, thôi
+giữ vòng nền; không trả lời nên không ghi sổ, chỉ có nhật ký ``office.assist.ask_cancelled``.
 """
 
 from __future__ import annotations
@@ -51,8 +54,8 @@ import json
 import logging
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Any, Protocol
 
 from .. import pii
@@ -74,7 +77,7 @@ MAX_QUESTION = 500          # ký tự sau chuẩn hóa
 EMBED_TIMEOUT_S = 5.0       # nhúng câu hỏi; quá thì tìm theo từ khóa
 MODEL_MIN_S = 5.0           # còn ít hơn thế trong hạn tổng thì không hỏi mô hình
 SAVE_RESERVE_S = 3.0        # để dành cho bước ghi sổ cuối yêu cầu
-HOLD_S = 5.0                # giữ vòng nhúng nền từng chừng này giây, gia hạn tới khi lời gọi Ollama xong
+HOLD_S = 5.0                # lời gọi Ollama xong thì vòng nhúng nền còn nhường thêm chừng này giây (_holding)
 RETRY_AFTER = "10"
 WARNINGS = ("embed_unavailable", "model_unavailable", "model_timeout", "model_rejected", "model_declined")
 
@@ -96,13 +99,14 @@ class AskBody(Protocol):
     direction: str | None
     year: int | None
     type_code: str | None
+    document_id: uuid.UUID | None   # chỉ hỏi trong văn bản này — vẫn trong phạm vi người hỏi được xem
     ask_id: uuid.UUID | None
 
 
 class _Hold(Protocol):
     embedder_ready: bool        # Meilisearch đã có embedder của mô hình nhúng hiện tại
 
-    def hold(self, seconds: float) -> None: ...
+    def holding(self, after_s: float = ...) -> AbstractContextManager[None]: ...
 
 
 class _Hasura(Protocol):
@@ -190,7 +194,7 @@ class Assistant:
             warnings.append("embed_unavailable")    # Meilisearch chưa có embedder: tìm lai chắc chắn lỗi, không nhúng
         elif self.ai.embed_available:
             left = deadline - self._clock()
-            async with self._holding():
+            with self._holding():
                 got = await self.ai.embed([question], query=True, timeout_s=max(min(EMBED_TIMEOUT_S, left), 0.1))
             if got:
                 vector = got[0]
@@ -199,8 +203,9 @@ class Assistant:
 
         try:
             found = await self.retriever.search(
-                scope, q=vi.keyword_query(question), vector=vector, limit=s.ask_top_k,
-                filters=Filters(direction=body.direction, year=body.year, type_code=body.type_code))
+                scope, q=vi.keyword_query(question), vector=vector, limit=s.ask_top_k, question=question,
+                filters=Filters(direction=body.direction, year=body.year, type_code=body.type_code,
+                                document_id=None if body.document_id is None else str(body.document_id)))
         except HasuraAuthError as exc:
             raise AskError(401, "invalid_token", "Token không hợp lệ hoặc đã hết hạn",
                            headers={"WWW-Authenticate": "Bearer"}) from exc
@@ -259,8 +264,8 @@ class Assistant:
         _log("office.assist.asked", request_id, tenant_id=principal.tenant_id, actor_id=principal.user_id,
              mode=body.mode, status=status, q_length=len(question), terms=len(vi.terms(question)),
              candidates=found.candidates, relaxed=found.relaxed, hits=len(passages), cited=len(cited),
-             semantic=found.semantic, model=model, warnings=",".join(warnings), masked=masked,
-             duration_ms=duration_ms)
+             semantic=found.semantic, ratio=found.ratio, scoped=body.document_id is not None, model=model,
+             warnings=",".join(warnings), masked=masked, duration_ms=duration_ms)
         cited_set = set(cited)
         return {
             "ask_id": ask_id, "status": status, "answer": answer_out, "extract": extract_out,
@@ -282,7 +287,7 @@ class Assistant:
         masker = pii.Masker()
         asked = masker.mask(question).text
         srcs = grounding.sources(passages, best, max_chars=self.settings.ask_context_chars, masker=masker)
-        async with self._holding():
+        with self._holding():
             result = await self.ai.chat(grounding.messages(srcs, asked), format=grounding.FORMAT,
                                         options=grounding.OPTIONS,
                                         timeout_s=min(self.settings.ask_model_timeout_s, left - SAVE_RESERVE_S))
@@ -298,22 +303,13 @@ class Assistant:
         _log("office.assist.model_rejected", request_id, model=model, reason=verdict.reason, masked=masker.total)
         return None, model, "model_rejected", masker.total
 
-    @asynccontextmanager
-    async def _holding(self) -> AsyncIterator[None]:
-        """Trong khối này lượt hỏi đang gọi Ollama: vòng nhúng nền không mở lô mới (``hold``, gia hạn mỗi nửa
-        ``HOLD_S``). Ra khỏi khối thì thôi gia hạn: vòng nền mở lô mới chậm nhất ``HOLD_S`` giây sau."""
-
-        async def renew() -> None:
-            while True:
-                await asyncio.sleep(HOLD_S / 2)
-                self.indexer.hold(HOLD_S)
-
-        self.indexer.hold(HOLD_S)
-        task = asyncio.create_task(renew())
-        try:
-            yield
-        finally:
-            task.cancel()
+    def _holding(self) -> AbstractContextManager[None]:
+        """Khối gọi Ollama của lượt hỏi: vòng nhúng nền không mở lô mới suốt khối, lời gọi lâu bao nhiêu cũng vậy
+        (``ChunkIndexer.holding``, #192). Ra khỏi khối (kể cả khi lượt bị hủy) vòng nền còn nhường thêm ``HOLD_S``
+        giây: nhúng câu hỏi xong còn bước truy xuất rồi mới sinh, mà lô đã mở thì không dừng giữa chừng được (tới 8
+        đoạn, vài giây trên máy chỉ có CPU); người hỏi tiếp ngay cũng không phải chờ lô. Phần nhường thêm chịu trần
+        ``index.MAX_HOLD_S`` (#184)."""
+        return self.indexer.holding(HOLD_S)
 
 
 def _log(event: str, request_id: str, **fields: object) -> None:

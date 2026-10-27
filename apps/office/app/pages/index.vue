@@ -30,11 +30,61 @@ interface InboxTask {
   document: { symbol: string | null; summary: string; issuer_name: string | null; register_number: number | null; status: string } | null
 }
 
+type Filter = 'all' | 'today' | 'overdue' | 'urgent'
+type Category = 'all' | 'incoming' | 'outgoing'
+
 const { t } = useI18n()
 const { gql } = useApi()
 const tasks = ref<InboxTask[]>([])
 const loading = ref(true)
 const failure = ref('')
+
+// Lọc, tìm trên các việc đã tải, không gọi lại máy chủ. Giữ qua lúc mở một văn bản rồi bấm "Về hộp việc"
+const query = useState<string>('inbox-query', () => '')
+const filter = useState<Filter>('inbox-filter', () => 'all')
+const category = useState<Category>('inbox-category', () => 'all')
+const filters: Record<Filter, string> = {
+  all: 'fe.all',
+  today: 'fe.todayShort',
+  overdue: 'fe.overdue',
+  urgent: 'fe.urgent',
+}
+
+// ngày hôm nay (giờ Việt Nam) để tính quá hạn, cập nhật mỗi phút: trang mở qua nửa đêm vẫn đúng
+const day = ref(today())
+let clock: ReturnType<typeof setInterval> | undefined
+onMounted(() => { clock = setInterval(() => { day.value = today() }, 60_000) })
+onBeforeUnmount(() => clearInterval(clock))
+
+const overdue = (task: InboxTask) => !!task.due_on && task.due_on < day.value
+const dueToday = (task: InboxTask) => task.due_on === day.value
+const urgent = (task: InboxTask) => !!task.urgency && task.urgency !== 'normal'
+// so khớp không dấu: gõ "dao tao" vẫn ra "Đào tạo"
+const normalize = (value: string) =>
+  value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd')
+
+const visible = computed(() => {
+  const needle = normalize(query.value)
+  return tasks.value.filter((task) => {
+    if (category.value === 'incoming' && !task.form_key.startsWith('vbden.')) return false
+    if (category.value === 'outgoing' && !task.form_key.startsWith('vbdi.')) return false
+    if (filter.value === 'overdue' && !overdue(task)) return false
+    if (filter.value === 'today' && !dueToday(task)) return false
+    if (filter.value === 'urgent' && !urgent(task)) return false
+    const doc = task.document
+    return normalize([doc?.summary, doc?.symbol, doc?.issuer_name].join(' ')).includes(needle)
+  })
+})
+// việc khẩn hoặc quá hạn tách lên nhóm "Cần chú ý"
+const attention = (task: InboxTask) => urgent(task) || overdue(task)
+const attentionTasks = computed(() => visible.value.filter(attention))
+const otherTasks = computed(() => visible.value.filter((task) => !attention(task)))
+const filtered = computed(() => !!query.value || filter.value !== 'all' || category.value !== 'all')
+function clearFilters() {
+  query.value = ''
+  filter.value = 'all'
+  category.value = 'all'
+}
 
 // việc mới đẩy tới lúc đang tải dở: lượt cũ về sau không đè danh sách mới hơn
 let seq = 0
@@ -69,43 +119,99 @@ watch(lastPush, (n) => { if (n?.kind.startsWith('task.')) load() })
 </script>
 
 <template>
-  <div>
-    <PageHeader :title="t('inbox.title')" :subtitle="t('inbox.subtitle')">
-      <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
-    </PageHeader>
-
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading && !tasks.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <div v-else-if="!tasks.length" class="card flex flex-col items-center gap-2 p-12 text-center text-stone-500">
-      <svg class="h-10 w-10 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      {{ t('inbox.empty') }}
+  <div class="moc-desk">
+    <div class="moc-desk-heading">
+      <div>
+        <h1>{{ t('inbox.title') }}</h1>
+        <p>{{ t('inbox.subtitle') }}</p>
+        <p aria-live="polite">
+          {{ loading && !tasks.length ? t('fe.loading') : t('desk.pending', { n: tasks.length }) }}
+        </p>
+      </div>
+      <NuxtLink v-if="claims?.role === 'clerk'" to="/van-ban-den/tiep-nhan" class="btn-primary">
+        {{ t('fe.receiveNew') }}
+      </NuxtLink>
+      <!-- không đặt aria-label "Soạn văn bản đi": trùng tên mục menu; chữ "Soạn mới" đủ nghĩa -->
+      <NuxtLink v-if="claims?.role === 'staff'" to="/van-ban-di/soan" class="btn-primary">
+        <svg
+          width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14m-7-7h14" />
+        </svg>
+        {{ t('desk.compose') }}
+      </NuxtLink>
     </div>
 
-    <ul v-else class="space-y-3" data-testid="inbox">
-      <li v-for="task in tasks" :key="task.id">
-        <NuxtLink
-          :to="`/van-ban/${task.document_id}`"
-          class="card flex flex-col gap-3 p-4 transition hover:border-brand-600 hover:shadow-md sm:flex-row sm:items-center"
+    <div class="moc-inbox-toolbar">
+      <div class="moc-desk-search">
+        <svg
+          width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+          aria-hidden="true"
         >
-          <div class="min-w-0 flex-1">
-            <div class="mb-1 flex flex-wrap items-center gap-2">
-              <span class="chip bg-brand-50 text-brand-800 ring-1 ring-brand-200">{{ t(`task.${task.form_key}`) }}</span>
-              <UrgencyChip :urgency="task.urgency" quiet />
-              <span v-if="task.document?.register_number" class="text-xs text-stone-500">
-                {{ t('incoming.number') }} {{ task.document.register_number }}
-              </span>
-            </div>
-            <div class="truncate font-medium text-stone-900">{{ task.document?.summary }}</div>
-            <div class="mt-0.5 text-sm text-stone-500">
-              {{ task.document?.symbol }}<span v-if="task.document?.issuer_name"> · {{ task.document.issuer_name }}</span>
-            </div>
-          </div>
-          <div class="shrink-0 text-sm text-stone-500 sm:text-right">
-            <div>{{ t('inbox.received') }}: {{ fmtDateTime(task.created_at) }}</div>
-            <div v-if="task.due_on" class="font-medium text-amber-700">{{ t('inbox.due') }}: {{ fmtDate(task.due_on) }}</div>
-          </div>
-        </NuxtLink>
-      </li>
-    </ul>
+          <path d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
+        </svg>
+        <input v-model="query" type="search" :placeholder="t('fe.searchTasks')" :aria-label="t('fe.searchTasks')">
+      </div>
+      <select v-model="category" class="input moc-inbox-filter" :aria-label="t('desk.category')">
+        <option value="all">{{ t('desk.allDocuments') }}</option>
+        <option value="incoming">{{ t('nav.incoming') }}</option>
+        <option value="outgoing">{{ t('nav.outgoing') }}</option>
+      </select>
+      <select v-model="filter" class="input moc-inbox-filter" :aria-label="t('desk.filter')">
+        <option v-for="(label, key) in filters" :key="key" :value="key">{{ t(label) }}</option>
+      </select>
+      <button class="btn-secondary moc-inbox-refresh" :disabled="loading" :aria-label="t('app.refresh')" @click="load">
+        <svg
+          width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0112-1l2 3M4 15l2 3a7 7 0 0012-1" />
+        </svg>
+      </button>
+    </div>
+
+    <div v-if="failure" class="moc-state" role="alert">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load">{{ t('app.retry') }}</button>
+    </div>
+    <div v-if="loading && !tasks.length" :aria-label="t('fe.loading')" aria-busy="true">
+      <div v-for="n in 3" :key="n" class="moc-skeleton" />
+    </div>
+    <div v-else-if="!visible.length && !failure" class="moc-empty">
+      <h2>{{ filtered ? t('fe.noTasks') : t('inbox.empty') }}</h2>
+      <p v-if="filtered">{{ t('fe.tryFilter') }}</p>
+      <button v-if="filtered" class="btn-secondary mt-4" @click="clearFilters">{{ t('desk.clearFilters') }}</button>
+    </div>
+    <div v-else-if="visible.length" :aria-busy="loading" class="sg-task-groups" data-testid="inbox">
+      <section v-if="attentionTasks.length" class="sg-attention" :aria-label="t('desk.attention')">
+        <div class="sg-section-heading">
+          <h2>
+            <svg
+              width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path d="m12 3 10 18H2L12 3zm0 6v5m0 3v1" />
+            </svg>
+            {{ t('desk.attention') }}
+          </h2>
+          <span>{{ t('fe.tasks', { n: attentionTasks.length }) }}</span>
+        </div>
+        <TransitionGroup name="sg-task" tag="ul">
+          <TaskQueueItem
+            v-for="task in attentionTasks" :key="task.id" :task="task" :overdue="overdue(task)" highlight
+          />
+        </TransitionGroup>
+      </section>
+      <section v-if="otherTasks.length" :aria-label="attentionTasks.length ? t('desk.remaining') : t('desk.queue')">
+        <div v-if="attentionTasks.length" class="sg-section-heading">
+          <h2>{{ t('desk.remaining') }}</h2>
+          <span>{{ t('fe.tasks', { n: otherTasks.length }) }}</span>
+        </div>
+        <TransitionGroup name="sg-task" tag="ul" class="sg-task-list">
+          <TaskQueueItem v-for="task in otherTasks" :key="task.id" :task="task" :overdue="overdue(task)" />
+        </TransitionGroup>
+      </section>
+    </div>
   </div>
 </template>

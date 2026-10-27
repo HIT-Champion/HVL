@@ -23,6 +23,45 @@
       "ly_do": "youch kéo theo cho trang báo lỗi của máy chủ phát triển Nuxt, chỉ chạy lúc phát triển, không nằm trong trang phát hành (DEPENDENCIES.md, Tầng 2)"
     },
     {
+      "goi": "pkg:npm/argparse",
+      "giay_phep": "Python-2.0",
+      "ly_do": "js-yaml kéo theo, đọc YAML lúc dựng trang tài liệu (website/), không nằm trong trang đăng lên. Python-2.0 là bộ giấy phép dễ dãi của Python, SPDX ghi OSI phê duyệt (DEPENDENCIES.md, Công cụ dựng)"
+    },
+    {
+      "goi": "pkg:npm/elkjs",
+      "giay_phep": "EPL-2.0",
+      "ly_do": "Mermaid kéo theo để dàn sơ đồ trên trang tài liệu (website/), dùng nguyên bản, không sửa. EPL-2.0 là copyleft yếu theo từng tệp, OSI phê duyệt, không lan sang mã của Signet; mã nguồn ở github.com/kieler/elkjs (DEPENDENCIES.md, Công cụ dựng)"
+    },
+    {
+      "goi": "pkg:npm/robust-predicates",
+      "giay_phep": "Unlicense",
+      "ly_do": "d3-delaunay (qua Mermaid) kéo theo cho sơ đồ trên trang tài liệu (website/). Unlicense đưa mã vào phạm vi công cộng, OSI phê duyệt (DEPENDENCIES.md, Công cụ dựng)"
+    },
+    {
+      "goi": "pkg:npm/eval",
+      "phien_ban": "0.1.8",
+      "giay_phep": "MIT",
+      "ly_do": "@docusaurus/core kéo theo, chỉ chạy lúc dựng trang tài liệu. Tệp khóa không ghi giấy phép (package.json dùng trường licenses kiểu cũ); tệp LICENSE trong gói là MIT"
+    },
+    {
+      "goi": "pkg:npm/require-like",
+      "phien_ban": "0.1.2",
+      "giay_phep": "MIT",
+      "ly_do": "eval kéo theo, chỉ chạy lúc dựng trang tài liệu. package.json không khai giấy phép; tệp License trong gói là MIT"
+    },
+    {
+      "goi": "pkg:npm/format",
+      "phien_ban": "0.2.2",
+      "giay_phep": "MIT",
+      "ly_do": "fault (tô màu mã trong Markdown) kéo theo, chỉ chạy lúc dựng trang tài liệu. Tệp khóa không ghi giấy phép; package.json khai MIT ở trường licenses kiểu cũ, gói không kèm tệp LICENSE"
+    },
+    {
+      "goi": "pkg:npm/khroma",
+      "phien_ban": "2.1.0",
+      "giay_phep": "MIT",
+      "ly_do": "Mermaid kéo theo (tính màu sơ đồ trên trang tài liệu). package.json không khai giấy phép; tệp license trong gói là MIT"
+    },
+    {
       "goi": "pkg:pypi/pillow",
       "giay_phep": "MIT-CMU",
       "ly_do": "Pillow khai trực tiếp trong svc-files (DEPENDENCIES.md). MIT-CMU là một dạng HPND: dễ dãi, chỉ đòi giữ thông báo bản quyền, không copyleft; SPDX ghi HPND được OSI phê duyệt nhưng chưa đánh dấu riêng MIT-CMU"
@@ -128,6 +167,18 @@
       "phien_ban": "v2.6.2",
       "giay_phep": "MIT",
       "ly_do": "Action của workflow phát hành, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v2.6.2 là MIT"
+    },
+    {
+      "goi": "pkg:github/actions/upload-pages-artifact",
+      "phien_ban": "v5.0.0",
+      "giay_phep": "MIT",
+      "ly_do": "Action của workflow trang tài liệu, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v5.0.0 là MIT"
+    },
+    {
+      "goi": "pkg:github/actions/deploy-pages",
+      "phien_ban": "v5.0.1",
+      "giay_phep": "MIT",
+      "ly_do": "Action của workflow trang tài liệu, không vào sản phẩm. Syft không đọc giấy phép của action; tệp LICENSE ở thẻ v5.0.1 là MIT"
     }
   ]
 }

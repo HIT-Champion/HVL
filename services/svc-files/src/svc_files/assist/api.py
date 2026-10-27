@@ -52,6 +52,9 @@ class AskIn(BaseModel):
     direction: Literal["in", "out"] | None = Field(None, description="Chỉ văn bản đến (in) hoặc văn bản đi (out)")
     year: int | None = Field(None, ge=2000, le=2100, description="Năm ban hành")
     type_code: str | None = Field(None, pattern=r'^[^\s/"\\-]{1,10}$', description="Mã loại văn bản, vd CV")
+    document_id: uuid.UUID | None = Field(
+        None, description="Chỉ hỏi trong một văn bản (nút \"Hỏi về văn bản này\"). Chỉ thu hẹp phạm vi: văn bản người "
+                          "hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt")
     ask_id: uuid.UUID | None = Field(None, description="Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng "
                                                        "sổ kiểm toán cùng một câu hỏi")
 

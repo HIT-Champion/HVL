@@ -42,8 +42,9 @@ from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from .flowable import ExternalJob, FlowableClient, FlowableError, Task
-from .hasura import BRIEF, OVERDUE_DOCUMENTS, READERS, Actor, HasuraClient
+from .hasura import Actor, HasuraClient
 from .notify import Notifier, People, brief_of
+from .office.queries import BRIEF, OVERDUE_DOCUMENTS, READERS
 
 log = logging.getLogger("svc_workflow")
 

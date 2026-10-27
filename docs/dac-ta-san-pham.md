@@ -250,7 +250,7 @@ tiền tố bucket — không sửa mã của lõi. Đây là bằng chứng cho
 | (i) Vòng đời dữ liệu | Lập hồ sơ, nộp lưu: nóng → lạnh, có căn cứ NĐ 30 và Luật Lưu trữ |
 | (ii) IT/OT | Cảm biến → bản sao số NGSI-LD → báo cáo sự cố vào luồng văn bản đi |
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo dashboard ← bảng ← sự kiện; nguồn gốc mỗi văn bản (ai nhận, ai sửa, bản nào được phát hành) |
-| (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ, két bí mật, cấu hình trong git, tự phục hồi |
+| (iv) Zero-Trust + GitOps | Kiểm dịch trước khi lưu, két bí mật, cấu hình trong git, tự phục hồi |
 
 Các năng lực đề nêu tên mà sản phẩm chạm tới một cách tự nhiên:
 
@@ -272,7 +272,7 @@ Các năng lực đề nêu tên mà sản phẩm chạm tới một cách tự 
 | 3 | Chuyên viên soạn công văn trả lời từ mẫu → trình → lãnh đạo duyệt → văn thư cấp số → PDF phát hành có mã QR | — |
 | 4 | **Giám khảo quét QR bằng điện thoại** → "văn bản thật, ban hành ngày …". Sửa một chữ trong PDF, thả vào cổng → "không khớp" | Quét bằng điện thoại của đội |
 | 5 | Hỏi trợ lý "tháng này có công văn nào về tuyển sinh sắp quá hạn?" → trả lời kèm số ký hiệu; dashboard văn bản quá hạn theo phòng | Không có F4.2 thì dùng tìm kiếm + dashboard |
-| 6 | `docker rm -f` một dịch vụ → hệ thống tự dựng lại; tệp EICAR bị chặn ở cửa ngõ | Video quay sẵn |
+| 6 | `docker rm -f` một dịch vụ → hệ thống tự dựng lại; tệp EICAR bị từ chối trước khi lưu | Video quay sẵn |
 
 ---
 

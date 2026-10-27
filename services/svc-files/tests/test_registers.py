@@ -26,6 +26,7 @@ import pytest
 
 from conftest import TENANT_A
 from svc_files.hasura import HasuraAuthError, HasuraError
+from svc_files.anchors import Mark
 from svc_files.registers import COLUMNS, HIDDEN, WIDTHS, Register, build_register, register_html, render_register_pdf
 
 OTHER_TENANT = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000b")
@@ -55,12 +56,16 @@ def outgoing(number: int, **over) -> dict:
 
 
 def book(docs: list[dict], *, direction: str = "in", visible: set[str] | None = None, last: int | None = None,
-         users: list[dict] | None = None) -> Register:
+         users: list[dict] | None = None, anchor: Mark | None = None) -> Register:
     data = {"core_tenants_by_pk": TENANT,
             "office_registers": [{"last_number": last if last is not None else len(docs)}] if docs or last else [],
             "office_documents": docs, "core_users": users or []}
     seen = {d["id"] for d in docs} if visible is None else visible
-    return build_register(data, seen, direction=direction, year=2026, printed_at=PRINTED)
+    return build_register(data, seen, direction=direction, year=2026, printed_at=PRINTED, anchor=anchor)
+
+
+ANCHOR = Mark(1234, "0123456789abcdef" + "f" * 48, datetime(2026, 10, 20, 1, 15, 3, tzinfo=UTC))
+FOOTER = "Mốc neo #1234 · 0123456789abcdef · 08:15 20/10/2026"      # 01:15 UTC là 08:15 giờ Việt Nam
 
 
 # --- cột, ô theo mẫu sổ -----------------------------------------------------------------------------------
@@ -188,6 +193,37 @@ def test_render_register_pdf_with_weasyprint():
     assert pdf.startswith(b"%PDF-") and len(pdf) > 5000
 
 
+# --- chân trang: mốc neo sổ kiểm toán --------------------------------------------------------------------------
+
+
+def test_footer_prints_the_latest_anchor_on_every_page():
+    reg = book([incoming(1)], anchor=ANCHOR)
+    assert reg.anchor_note == FOOTER
+    page = register_html(reg)
+    assert f'@page {{ @bottom-left {{ content: "{FOOTER}";' in page
+    assert page.index(FOOTER) < page.index("</head>")         # trong stylesheet: mọi trang, kể cả bìa
+
+
+def test_no_anchor_yet_prints_nothing():
+    reg = book([incoming(1)])
+    assert reg.anchor_note == "" and "Mốc neo" not in register_html(reg) and "@bottom-left" not in register_html(reg)
+
+
+def test_footer_text_lands_in_the_pdf():
+    try:
+        import weasyprint  # noqa: F401
+    except OSError:
+        pytest.skip("máy này thiếu thư viện Pango của WeasyPrint (image svc-files có sẵn)")
+    import io
+
+    from pypdf import PdfReader
+
+    pages = PdfReader(io.BytesIO(render_register_pdf(book([incoming(n) for n in range(1, 40)], anchor=ANCHOR)))).pages
+    assert len(pages) >= 2
+    for page in pages:                                         # bìa và từng trang bảng, chữ không bị cắt
+        assert FOOTER in " ".join(page.extract_text().split())
+
+
 # --- API ----------------------------------------------------------------------------------------------------
 
 
@@ -200,7 +236,7 @@ def printed(monkeypatch):
         seen.append(reg)
         return b"%PDF-1.7 fake register"
 
-    monkeypatch.setattr("svc_files.app.render_register_pdf", fake)
+    monkeypatch.setattr("svc_files.office.api.render_register_pdf", fake)
     return seen
 
 
@@ -329,3 +365,12 @@ def test_no_pdf_without_an_audit_record(client, hasura, make_token, printed, mon
 def test_registers_are_in_the_public_api(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert {"/api/registers/{direction}/{year}", "/api/registers/{direction}/{year}/pdf"} <= set(paths)
+
+
+def test_printed_register_carries_the_anchor_the_anchorer_last_wrote(client, hasura, make_token, printed):
+    hasura.add_registered(TENANT_A, "in", 1)
+    assert get(client, make_token(), "/api/registers/in/2026/pdf").status_code == 200
+    assert printed[0].anchor is None                           # vòng neo chưa ghi gì (test tắt vòng nền)
+    client.app.state.anchorer.latest = ANCHOR
+    assert get(client, make_token(), "/api/registers/in/2026/pdf").status_code == 200
+    assert printed[1].anchor == ANCHOR

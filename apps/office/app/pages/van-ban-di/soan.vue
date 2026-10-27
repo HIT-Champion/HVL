@@ -92,7 +92,13 @@ const draft = useFormDraft<Kept>(
   },
 )
 
-onMounted(async () => {
+// Tải danh mục, văn bản đến để trả lời, đơn vị nhận và dự thảo đang sửa; lỗi thì báo ngay trên trang kèm nút Thử lại
+// (gọi lại hàm này). Bản dở chỉ khôi phục một lần, khi đã tải xong
+const initialFailure = ref('')
+let restored = false
+async function loadInitial() {
+  loading.value = true
+  initialFailure.value = ''
   if (claims.value?.role !== 'staff') return router.replace('/van-ban-di')
   try {
     const data = await gql<{
@@ -110,13 +116,17 @@ onMounted(async () => {
     if (route.query.reply) form.reply_to_id = String(route.query.reply)
     if (editId.value) await loadDraft(editId.value)
     if (restricted.value) draft.clear()
-    else if (!locked.value && draft.resume()) notice.info(t('compose.restored'))
+    else if (!locked.value && !restored) {
+      restored = true
+      if (draft.resume()) notice.info(t('compose.restored'))
+    }
   } catch (e) {
-    notice.error(errorText(t, e))
+    initialFailure.value = errorText(t, e)
   } finally {
     loading.value = false
   }
-})
+}
+onMounted(loadInitial)
 
 async function loadDraft(id: string) {
   const data = await gql<{ office_documents_by_pk: {
@@ -167,7 +177,11 @@ function removeAttachment(a: Attachment) {
 
 async function save() {
   tried.value = true
-  if (Object.keys(errors.value).length || uploading.value) return
+  if (Object.keys(errors.value).length) {
+    await focusInvalidField()
+    return
+  }
+  if (uploading.value) return
   saving.value = true
   const fields = {
     type_code: form.type_code, summary: form.summary.trim(), body: form.body.trim(), recipients: recipientList.value,
@@ -215,9 +229,17 @@ async function save() {
 <template>
   <div class="max-w-3xl">
     <NuxtLink :to="editId ? `/van-ban/${editId}` : '/van-ban-di'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
-    <PageHeader :title="editId ? t('compose.editTitle') : t('compose.title')" :subtitle="t('compose.subtitle')" />
+    <PageHeader :title="editId ? t('compose.editTitle') : t('compose.title')" :subtitle="t('compose.subtitle')">
+      <!-- đang sửa dự thảo: soạn văn bản mới ngay từ đầu trang. Không đặt tên truy cập trùng mục "Soạn văn bản đi" ở
+           thanh bên (e2e bấm mục đó theo tên) -->
+      <NuxtLink v-if="editId" to="/van-ban-di/soan" class="btn-secondary">{{ t('desk.compose') }}</NuxtLink>
+    </PageHeader>
 
     <p v-if="loading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <div v-else-if="initialFailure" class="moc-state" role="alert">
+      <span>{{ initialFailure }}</span>
+      <button type="button" class="btn-secondary" @click="loadInitial">{{ t('app.retry') }}</button>
+    </div>
     <p v-else-if="locked" class="card p-8 text-center text-stone-500">{{ t('compose.notEditable') }}</p>
 
     <form v-else class="card space-y-5 p-6" novalidate @submit.prevent="save">
@@ -238,23 +260,35 @@ async function save() {
 
       <div>
         <label class="label" for="summary">{{ t('compose.summary') }}</label>
-        <input id="summary" v-model="form.summary" class="input" maxlength="500" :aria-invalid="tried && !!errors.summary">
-        <p v-if="tried && errors.summary" class="field-error">{{ errors.summary }}</p>
+        <input
+          id="summary" v-model="form.summary" class="input" maxlength="500" required
+          :aria-invalid="tried && !!errors.summary"
+          :aria-describedby="tried && errors.summary ? 'summary-error' : undefined"
+        >
+        <p v-if="tried && errors.summary" id="summary-error" class="field-error">{{ errors.summary }}</p>
         <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.summaryHint') }}</p>
       </div>
 
       <div>
         <label class="label" for="body">{{ t('compose.body') }}</label>
-        <textarea id="body" v-model="form.body" rows="12" class="input font-serif leading-relaxed" :aria-invalid="tried && !!errors.body" />
-        <p v-if="tried && errors.body" class="field-error">{{ errors.body }}</p>
+        <textarea
+          id="body" v-model="form.body" rows="12" class="input font-sans leading-relaxed"
+          required :aria-invalid="tried && !!errors.body"
+          :aria-describedby="tried && errors.body ? 'body-error' : undefined"
+        />
+        <p v-if="tried && errors.body" id="body-error" class="field-error">{{ errors.body }}</p>
         <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.bodyHint') }}</p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label class="label" for="recipients">{{ t('compose.recipients') }}</label>
-          <textarea id="recipients" v-model="form.recipients" rows="3" class="input" :aria-invalid="tried && !!errors.recipients" />
-          <p v-if="tried && errors.recipients" class="field-error">{{ errors.recipients }}</p>
+          <textarea
+            id="recipients" v-model="form.recipients" rows="3" class="input" required
+            :aria-invalid="tried && !!errors.recipients"
+            :aria-describedby="tried && errors.recipients ? 'recipients-error' : undefined"
+          />
+          <p v-if="tried && errors.recipients" id="recipients-error" class="field-error">{{ errors.recipients }}</p>
           <p v-else class="mt-1 text-xs text-stone-500">{{ t('compose.recipientsHint') }}</p>
         </div>
         <div>

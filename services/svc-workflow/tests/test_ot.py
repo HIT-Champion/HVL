@@ -24,7 +24,7 @@ import inspect
 import json
 import pathlib
 import textwrap
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx2
@@ -270,6 +270,27 @@ def test_reading_rejects_malformed_entities():
     assert reading(odd, NOW).room == "phong-may-chu"
 
 
+def at(stamp: datetime, value: Any = 41) -> dict[str, Any]:
+    entity = sensor(value)
+    entity["temperature"]["observedAt"] = stamp.isoformat().replace("+00:00", "Z")
+    return entity
+
+
+def test_reading_uses_server_time_when_device_clock_runs_ahead():
+    # muộn hơn giờ máy chủ quá FUTURE_SLACK (2 phút, như cờ future_time của sơ đồ): giờ đo là giờ máy chủ nhận,
+    # giữ giờ thiết bị cho dự thảo
+    for ahead in (timedelta(minutes=2, seconds=1), timedelta(minutes=30), timedelta(days=400)):
+        r = reading(at(NOW + ahead), NOW)
+        assert (r.observed_at, r.device_at) == (NOW, NOW + ahead)
+    # đồng hồ đúng, nhanh trong FUTURE_SLACK (lệch NTP, trễ mạng) hay chậm dưới một ngày: giữ giờ thiết bị như trước
+    for off in (timedelta(minutes=2), timedelta(seconds=30), timedelta(0), -timedelta(minutes=30),
+                -timedelta(hours=23)):
+        r = reading(at(NOW + off), NOW)
+        assert (r.observed_at, r.device_at) == (NOW + off, None)
+    late = reading(at(NOW - timedelta(days=2)), NOW)  # chậm quá một ngày: giờ máy chủ, như trước, không ghi chú
+    assert (late.observed_at, late.device_at) == (NOW, None)
+
+
 def test_alarm_builds_urgent_report_draft_for_responsible_staff(bridge, db, notifier):
     created = run(bridge.handle("CNTT", notification(sensor(41.5)), now=NOW))
     assert len(created) == 1
@@ -301,6 +322,35 @@ def test_open_draft_of_same_sensor_is_not_duplicated(bridge, db, notifier):
     assert run(bridge.handle("CNTT", notification(sensor(43)), now=NOW)) == []
     db.drafts[0][0]["status"] = "in_review"  # đã trình: lần vượt ngưỡng sau là sự cố mới
     assert len(run(bridge.handle("CNTT", notification(sensor(44)), now=NOW))) == 1
+
+
+def test_fast_device_clock_near_midnight_dates_report_and_reminder_by_server_day(bridge, db, notifier):
+    # 23 giờ 50 ngày 20/10 giờ Việt Nam; đồng hồ thiết bị nhanh 30 phút nên observedAt đã là 00 giờ 20 ngày 21/10
+    now = datetime(2026, 10, 20, 16, 50, tzinfo=UTC)
+    first = run(bridge.handle("CNTT", notification(at(now + timedelta(minutes=30), 41.5)), now=now))[0]
+    doc, event, _ = db.drafts[0]
+    assert doc["summary"] == "Báo cáo sự cố nhiệt độ Phòng máy chủ tầng 3 vượt ngưỡng ngày 20/10/2026"
+    assert doc["body"].startswith("Hồi 23 giờ 50 ngày 20/10/2026, cảm biến nhiệt độ tại Phòng máy chủ tầng 3")
+    assert ("35 °C.\n\nLưu ý: đồng hồ của cảm biến chạy nhanh (thiết bị ghi giờ đo 00 giờ 20 ngày 21/10/2026);"
+            " giờ, ngày nêu trên là lúc hệ thống nhận số đo.\n\n1. Diễn biến:") in doc["body"]
+    assert event["data"]["observed_at"] == "2026-10-20T16:50:00+00:00"
+    assert event["data"]["device_observed_at"] == "2026-10-20T17:20:00+00:00"
+    # lần vượt ngưỡng sau chỉ nhắc, khóa theo ngày của giờ máy chủ: 23 giờ 55 còn ngày 20/10 (trùng khóa, CSDL bỏ),
+    # 00 giờ 10 mới sang ngày 21/10
+    for minutes in (5, 20):
+        later = now + timedelta(minutes=minutes)
+        assert run(bridge.handle("CNTT", notification(at(later + timedelta(minutes=30), 42)), now=later)) == []
+    assert notifier.keys == [f"ot.alarm:{first}:2026-10-20"] * 2 + [f"ot.alarm:{first}:2026-10-21"]
+
+
+def test_normal_device_clock_near_midnight_keeps_device_time(bridge, db, notifier):
+    now = datetime(2026, 10, 20, 16, 59, 30, tzinfo=UTC)  # 23 giờ 59 phút 30 giây ngày 20/10 giờ Việt Nam
+    first = run(bridge.handle("CNTT", notification(at(now - timedelta(minutes=1))), now=now))[0]
+    doc, event, _ = db.drafts[0]
+    assert doc["summary"].endswith("ngày 20/10/2026") and doc["body"].startswith("Hồi 23 giờ 58 ngày 20/10/2026")
+    assert "35 °C.\n\n1. Diễn biến:" in doc["body"] and "chạy nhanh" not in doc["body"]
+    assert event["data"]["observed_at"] == "2026-10-20T16:58:30+00:00" and "device_observed_at" not in event["data"]
+    assert notifier.keys == [f"ot.alarm:{first}:2026-10-20"]
 
 
 def test_concurrent_alarms_make_one_draft(bridge, db):
@@ -420,7 +470,7 @@ def test_no_content_routes_have_no_return_with_body(hasura, flowable):
     # Kiểm lại luật SonarQube python:S8400 trong CI: route khai 204 chỉ trả Response rỗng, lỗi thì ném ra
     app = client_for(hasura, flowable).app
     routes = [r for r in app.routes if isinstance(r, APIRoute) and r.status_code == 204]
-    assert [r.path for r in routes] == ["/ot/notify/{tenant}"]
+    assert [r.path for r in routes] == ["/ot/notify/{tenant}", "/api/workflow/{app}/tasks/{task_id}"]
     for route in routes:
         tree = ast.parse(textwrap.dedent(inspect.getsource(route.endpoint)))
         returns = {ast.unparse(n.value) if n.value else "" for n in ast.walk(tree) if isinstance(n, ast.Return)}

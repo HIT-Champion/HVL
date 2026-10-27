@@ -56,6 +56,25 @@ input Int_comparison_exp {
   _nin: [Int!]
 }
 
+type OtSensor {
+  flags: [String!]!
+  id: String!
+  name: String!
+  observed_at: timestamptz
+  room: String
+  value: Float
+}
+
+type OtSensorMap {
+  checked_at: timestamptz!
+  range_max: Float!
+  range_min: Float!
+  sensors: [OtSensor!]!
+  stale_after_min: Int!
+  status: String!
+  threshold: Float!
+}
+
 type ReceiveIncomingOutput {
   document: office_documents
   document_id: uuid!
@@ -156,6 +175,79 @@ input bytea_comparison_exp {
   _lte: bytea
   _neq: bytea
   _nin: [bytea!]
+}
+
+"Danh mục ứng dụng cắm vào lõi bằng manifest: tên, mô tả, đường, phiên bản, lúc cài, lúc gỡ, SHA-256 tệp app.yaml lúc cài; không manifest, cổng, biến môi trường"
+type core_app_catalog {
+  description: String
+  installed_at: timestamptz
+  name: String
+  path: String
+  title: String
+  updated_at: timestamptz
+  version: String
+}
+
+"Boolean expression to filter rows from the table \"core.app_catalog\". All fields are combined with a logical 'AND'."
+input core_app_catalog_bool_exp {
+  _and: [core_app_catalog_bool_exp!]
+  _not: core_app_catalog_bool_exp
+  _or: [core_app_catalog_bool_exp!]
+  description: String_comparison_exp
+  installed_at: timestamptz_comparison_exp
+  name: String_comparison_exp
+  path: String_comparison_exp
+  title: String_comparison_exp
+  updated_at: timestamptz_comparison_exp
+  version: String_comparison_exp
+}
+
+"Ordering options when selecting data from \"core.app_catalog\"."
+input core_app_catalog_order_by {
+  description: order_by
+  installed_at: order_by
+  name: order_by
+  path: order_by
+  title: order_by
+  updated_at: order_by
+  version: order_by
+}
+
+"select columns of table \"core.app_catalog\""
+enum core_app_catalog_select_column {
+  "column name"
+  description
+  "column name"
+  installed_at
+  "column name"
+  name
+  "column name"
+  path
+  "column name"
+  title
+  "column name"
+  updated_at
+  "column name"
+  version
+}
+
+"Streaming cursor of the table \"core_app_catalog\""
+input core_app_catalog_stream_cursor_input {
+  "Stream column input with initial value"
+  initial_value: core_app_catalog_stream_cursor_value_input!
+  "cursor ordering"
+  ordering: cursor_ordering
+}
+
+"Initial value of the column from where the streaming should start"
+input core_app_catalog_stream_cursor_value_input {
+  description: String
+  installed_at: timestamptz
+  name: String
+  path: String
+  title: String
+  updated_at: timestamptz
+  version: String
 }
 
 "columns and relationships of \"core.files\""
@@ -2853,6 +2945,19 @@ input personal_items_updates {
 }
 
 type query_root {
+  "fetch data from the table: \"core.app_catalog\""
+  core_app_catalog(
+    "distinct select on columns"
+    distinct_on: [core_app_catalog_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_app_catalog_order_by!]
+    "filter the rows returned"
+    where: core_app_catalog_bool_exp
+  ): [core_app_catalog!]!
   "fetch data from the table: \"core.files\""
   core_files(
     "distinct select on columns"
@@ -3174,6 +3279,7 @@ type query_root {
   ): [office_registers!]!
   "fetch data from the table: \"office.registers\" using primary key columns"
   office_registers_by_pk(id: uuid!): office_registers
+  otSensorMap: OtSensorMap!
   "fetch data from the table: \"personal.items\""
   personal_items(
     "distinct select on columns"
@@ -3192,6 +3298,28 @@ type query_root {
 }
 
 type subscription_root {
+  "fetch data from the table: \"core.app_catalog\""
+  core_app_catalog(
+    "distinct select on columns"
+    distinct_on: [core_app_catalog_select_column!]
+    "limit the number of rows returned"
+    limit: Int
+    "skip the first n rows. Use only with order_by"
+    offset: Int
+    "sort the rows by one or more columns"
+    order_by: [core_app_catalog_order_by!]
+    "filter the rows returned"
+    where: core_app_catalog_bool_exp
+  ): [core_app_catalog!]!
+  "fetch data from the table in a streaming manner: \"core.app_catalog\""
+  core_app_catalog_stream(
+    "maximum number of rows returned in a single batch"
+    batch_size: Int!
+    "cursor to stream the results returned by the query"
+    cursor: [core_app_catalog_stream_cursor_input]!
+    "filter the rows returned"
+    where: core_app_catalog_bool_exp
+  ): [core_app_catalog!]!
   "fetch data from the table: \"core.files\""
   core_files(
     "distinct select on columns"

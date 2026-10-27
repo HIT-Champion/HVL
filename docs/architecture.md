@@ -11,7 +11,8 @@
 >
 > 1. **Gồm gì.** Lõi Tầng 1 không giao diện: phần mềm nguồn mở dùng nguyên bản (Keycloak, APISIX, Hasura, PostgreSQL,
 >    Flowable, SeaweedFS, Meilisearch, ClamAV, OpenBao, Centrifugo) cộng hai dịch vụ Python của đội, `svc-files` và
->    `svc-workflow`. Tầng 2 là hai ứng dụng trang tĩnh: Văn phòng điện tử và Không gian cá nhân P.A.R.A.
+>    `svc-workflow`. Tầng 2 là ba ứng dụng: Văn phòng điện tử, Không gian cá nhân P.A.R.A (hai trang tĩnh) và Bảng tin
+>    đơn vị (cắm bằng `moc app install`).
 > 2. **Chạy thế nào.** Mọi yêu cầu vào qua một cổng APISIX có kiểm token. Dữ liệu có cấu trúc đi qua Hasura, quyền tới
 >    từng dòng; tệp đi qua `svc-files`, quét ClamAV trước khi lưu; bước quy trình do Flowable giữ.
 > 3. **Vì sao chọn vậy.** Không viết lại phần mềm đã có, chạy trên một máy 8 GB, không dịch vụ trả phí (§1); từng lựa
@@ -68,12 +69,13 @@ chạy, chuỗi đó đi như sau: danh tính Keycloak [H] đi trong token tới
 văn bản, giao việc và sự kiện đó qua Hasura, đúng quyền người xem; tác tử [I] có danh tính riêng (vai trò Hasura
 `agent`), việc của nó vào sổ kiểm toán, và nó chỉ gợi ý — người quyết.
 
-Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (14 dịch vụ), `app` là Tầng 2
-(`app-office`, `app-ca-nhan`); `make up` bật cả hai. Phần tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio,
-PostGIS), `logs` (Vector, Parseable), `mail` (Mailpit), `tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng
-khi gọi `make ai-model`, `make demo-it-ot`, `make backup` hay `make restore`. Kế hoạch dời việc đổi profile sang
-Phase 1, dự kiến `core / app / ops / ai` ([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0);
-hiện là `core`, `app` cộng các phần tùy chọn ở trên, không có profile `ops`.
+Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (15 dịch vụ, trong đó
+`keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`); `make up` bật cả hai. Phần
+tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `mail` (Mailpit),
+`tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`, `make demo-it-ot`, `make
+backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến `core / app / ops / ai`
+([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`,
+`app` cộng các phần tùy chọn ở trên, không có profile `ops`.
 
 ### 1.3. Ràng buộc tài nguyên
 
@@ -96,10 +98,10 @@ của ba câu, đúng mức đã kiểm:
 | 2. Cài dưới một giờ | **Chưa đo** với người ngoài đội trên máy sạch | `ROADMAP.md`, giai đoạn 5 |
 | 3. Không dịch vụ trả phí bắt buộc | Đạt | [`trien-khai.md`](trien-khai.md) §5, §5b |
 
-- **Câu 1.** `make up` bật profile `core` và `app` (16 dịch vụ). README ghi khoảng 3,2 GB (số đo ghi "15 container", từ
-  trước khi thêm `app-ca-nhan`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa. Bật mô
-  hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`) cần máy
-  16 GB.
+- **Câu 1.** `make up` bật profile `core` và `app` (17 dịch vụ, 16 chạy liên tục). README ghi khoảng 3,2 GB (đo
+  từ trước khi thêm `app-ca-nhan`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa.
+  Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
+  cần máy 16 GB.
 - **Câu 2.** Cài từ mã nguồn bằng `make env`, `make up`, `make seed`; `make install PREFIX=…` cài ra ngoài thư mục mã
   nguồn (F1.8).
 - **Câu 3.** Mô hình chạy tại chỗ; Cloudflare Tunnel chỉ là một cách lên mạng (profile `tunnel`, tắt mặc định), máy có
@@ -120,7 +122,7 @@ flowchart LR
     U2["Người nhận văn bản<br/>quét QR, không đăng nhập"]
   end
   GW{{"APISIX 3.18 — cổng duy nhất mở ra ngoài<br/>WAF · kiểm JWT · giới hạn tốc độ<br/>X-Request-Id · quản trị: 404"}}
-  subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app)"]
+  subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app; mạng apps: chỉ tới APISIX)"]
     OFF["app-office<br/>Văn phòng điện tử · Nuxt 4"]
     CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
   end
@@ -161,7 +163,7 @@ flowchart LR
   GW -->|"/api/case-files/*, /api/imports, /api/imports/*"| SF
   GW -->|"/api/verify, /api/verify/*, /api/status<br/>không cần token"| SF
   GW -->|"/realtime · WebSocket"| CE
-  HA -->|"5 Actions"| WF
+  HA -->|"6 Actions"| WF
   HA -->|"SQL"| PG
   WF -->|"REST, external worker"| FL
   WF -->|"đẩy thông báo"| CE
@@ -189,14 +191,18 @@ flowchart LR
   gọi `svc-workflow` kèm `X-Moc-Action-Secret`; `svc-workflow` gọi `svc-files` bằng token tài khoản dịch vụ (client
   credentials). Cổng gỡ khóa quản trị Hasura khỏi mọi yêu cầu từ ngoài.
 - **Hai đường ghi.** Dữ liệu có cấu trúc đi qua Hasura: quyền theo vai trò và đơn vị tới từng dòng; thao tác làm đổi
-  trạng thái quy trình là 5 Hasura Actions do `svc-workflow` xử lý; dịch vụ này không có route ở cổng và chính nó cũng
+  trạng thái quy trình đi qua Hasura Actions do `svc-workflow` xử lý; dịch vụ này không có route ở cổng và chính nó cũng
   ghi qua Hasura, bằng vai trò `service`, `agent`. Tệp đi qua `svc-files`: quét ClamAV trước khi ghi SeaweedFS, tải về
   sau khi Hasura xác nhận người hỏi được xem.
 - **Mạng con khép kín.** SeaweedFS chỉ ở mạng `storage`, OpenBao ở `secrets`, Ollama ở `ai` — mạng `internal` của
   Docker, chỉ `svc-files` (và `svc-workflow` với `secrets`) nối vào, nên không thành phần nào khác chạm được tệp, két
-  hay mô hình qua mạng. Ngoại lệ có chủ ý: container `restic` (profile `backup`, không mạng) gắn thẳng volume của
-  SeaweedFS và OpenBao để sao lưu (`docker-compose.yml`, `scripts/backup.py`). Flowable không gọi ra ngoài: việc tự động
-  là việc giao ra ngoài (external worker) do `svc-workflow` kéo về (QĐ-009).
+  hay mô hình qua mạng. Container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app install`) chỉ ở
+  mạng `apps` (`internal`), nơi chỉ có APISIX: ứng dụng tới lõi duy nhất qua cổng, kể cả phần máy chủ của ứng dụng
+  (token client credentials, GraphQL đi qua đúng các route của trình duyệt, cùng kiểm token, giới hạn tốc độ, WAF).
+  Hasura giao sự kiện tới ứng dụng qua cổng hook 9081 của APISIX — không publish, route hook chỉ khớp ở cổng đó
+  ([`them-ung-dung.md`](them-ung-dung.md) 1.3). Ngoại lệ có chủ ý: container `restic` (profile `backup`, không
+  mạng) gắn thẳng volume của SeaweedFS và OpenBao để sao lưu (`docker-compose.yml`, `scripts/backup.py`). Flowable không
+  gọi ra ngoài: việc tự động là việc giao ra ngoài (external worker) do `svc-workflow` kéo về (QĐ-009).
 
 ## 3. Bản đồ công cụ
 
@@ -213,7 +219,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|
 | Nền chung | APISIX 3.18.0 · `svc-files`, `svc-workflow` (Python 3.13, FastAPI 0.143) · ClamAV 1.5.4 · OpenBao 2.7.1 · sổ kiểm toán chuỗi băm · pyHanko 0.37.0 · bộ che thông tin cá nhân |
 | [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) |
-| [P] Quy trình | Flowable REST 8.0.0 · 5 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) |
+| [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) |
 | [D] Dữ liệu | PostgreSQL 16 · Hasura CE v2.51.0 · SeaweedFS 4.48 · Meilisearch CE v1.54.3 · DuckDB 1.5.6 · phả hệ OpenLineage · dashboard ECharts 6.1.0 · Scorpio 6.0.2 và PostGIS 16-3.5 (profile `iot`) |
 | [I] Trí tuệ | Ollama 0.35.1 (profile `ai`) · Qwen3-1.7B, Qwen3-Embedding-0.6B · Tesseract 5.5.0 · truy xuất có nguồn tự viết · ba tác tử |
 | Vận hành | Prometheus 3.15.0, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
@@ -228,7 +234,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Apache APISIX | 3.18.0 | Cổng duy nhất: danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ, gắn `X-Request-Id`, xuất chỉ số cho Prometheus | ② | `platform/apisix/` | F1.2 Hoàn thiện |
 | Coraza + OWASP CRS | Coraza 3.3.3, CRS 4.14.0 (coraza-proxy-wasm 0.6.0) | Tường lửa ứng dụng web trong APISIX (plugin proxy-wasm, global rule): soi mọi yêu cầu trước khi kiểm token, chặn mặc định (QĐ-013) | ② | `platform/apisix/` | F3.15 Dùng được |
 | `svc-files` *(mã của đội)* | Python 3.13, FastAPI 0.143 | Cửa duy nhất của tệp, tìm kiếm, dựng PDF, cổng xác thực, trạng thái hệ thống, tác tử đọc văn bản đến và trợ lý hỏi đáp. Phân loại từng module: §4.3 | ① ④ | `services/svc-files/` | nhiều mã F — xem từng thành phần ở các bảng dưới |
-| `svc-workflow` *(mã của đội)* | Python 3.13, FastAPI 0.143 | 5 Hasura Actions, nối Flowable, nhắc hạn, liên thông, thông báo đa kênh, đồng bộ danh bạ Keycloak → `core.users`, tác tử gợi ý giao việc. Phân loại: §4.3 | ⑤ ⑦ | `services/svc-workflow/` | F1.4 Hoàn thiện |
+| `svc-workflow` *(mã của đội)* | Python 3.13, FastAPI 0.143 | 6 Hasura Actions, nối Flowable, nhắc hạn, liên thông, thông báo đa kênh, đồng bộ danh bạ Keycloak → `core.users`, tác tử gợi ý giao việc. Phân loại: §4.3 | ⑤ ⑦ | `services/svc-workflow/` | F1.4 Hoàn thiện |
 | ClamAV | 1.5.4 | Quét mọi tệp trước khi ghi (giao thức INSTREAM qua TCP); không trả lời thì từ chối, không lưu | ① | `svc_files/clamav.py` | F1.6, F3.1 Hoàn thiện |
 | OpenBao | 2.7.1 | Két bí mật (static seal, AppRole cho hai dịch vụ), khóa transit `moc-files` mã hóa tệp của văn bản hạn chế, PKI nội bộ và khóa ký của từng đơn vị | ① | `platform/openbao/`, `svc_files/sealed.py`, `svc_files/signing.py` | F3.2 Hoàn thiện (mục 3 xếp két ở mức Dùng được); F3.7 Hoàn thiện |
 | Sổ kiểm toán chuỗi băm *(mã của đội)* | — | Trigger `core.audit()` ghi mọi thay đổi vào `core.audit_log` nối chuỗi băm; mốc đầu chuỗi neo ra bucket khóa ghi; `make audit` kiểm lại | ⑥ | `db/migrations/default/1792281600100_core_schema/`, `svc_files/anchors.py`, `scripts/audit_chain.py` | F2.12 Hoàn thiện |
@@ -240,14 +246,14 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
 | Keycloak | 26.7.5 | Đăng nhập một lần cho mọi ứng dụng, TOTP bắt buộc với vai trò quan trọng; vai trò, đơn vị, phòng đưa vào token (claim của Hasura); mỗi đơn vị một Organization | ① ② | `platform/keycloak/realm/moc-realm.json`, `scripts/tenants.py` | F1.1 Hoàn thiện; F3.12 Hoàn thiện |
-| Không gian cá nhân P.A.R.A *(mã của đội)* | JavaScript thuần, nginx-unprivileged 1.30.6 | Ứng dụng thứ hai: mỗi người xếp tệp của mình vào Dự án, Lĩnh vực, Tài nguyên, Lưu trữ; dùng đăng nhập, tệp, sổ kiểm toán của lõi | Tầng 2 | `apps/ca-nhan/`, schema `personal` | Không có mã F; bước CI `make demo-ca-nhan` ([`them-ung-dung.md`](them-ung-dung.md) §3) |
+| Không gian cá nhân P.A.R.A *(mã của đội)* | JavaScript thuần, nginx-unprivileged 1.30.6 | Ứng dụng thứ hai: mỗi người xếp tệp của mình vào Dự án, Lĩnh vực, Tài nguyên, Lưu trữ; dùng đăng nhập, tệp, sổ kiểm toán của lõi | Tầng 2 | `apps/ca-nhan/`, schema `personal` | Không có mã F; bước CI `make demo-ca-nhan` ([`them-ung-dung.md`](them-ung-dung.md) §4) |
 
 **[P] Không gian Quy trình**
 
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
 | Flowable REST | 8.0.0 | Động cơ BPMN cho `van-ban-den`, `van-ban-di`: giữ bước và người phải làm, timer nhắc hạn; việc tự động giao ra ngoài cho `svc-workflow` (QĐ-009) | ⑤ | `services/svc-workflow/processes/` | F1.4, F2.3, F2.4 Hoàn thiện |
-| Hasura Actions | Hasura 2.51.0 | Cửa ghi nghiệp vụ: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `completeTask` (cùng truy vấn hộp việc `myTasks`) → `svc-workflow`, kèm biến phiên lấy từ JWT | ⑤ | `db/metadata/actions.yaml` | F1.4 Hoàn thiện |
+| Hasura Actions | Hasura 2.51.0 | Cửa ghi nghiệp vụ: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `completeTask` (cùng truy vấn hộp việc `myTasks` và sơ đồ cảm biến `otSensorMap` của F3.10) → `svc-workflow`, kèm biến phiên lấy từ JWT | ⑤ | `db/metadata/actions.yaml` | F1.4 Hoàn thiện |
 | JSON Schema dùng chung | Ajv 8.20.0 (giao diện), jsonschema 4.26 (`svc-workflow`) | Poka-yoke ba lớp: form, máy chủ, ràng buộc CSDL theo cùng một tệp schema | — | `schemas/` | F2.2 Hoàn thiện |
 | Centrifugo | 6.9.7 | Đẩy thông báo từng người qua WebSocket `/realtime`, tự kiểm token Keycloak | ⑦ | `platform/centrifugo/config.yaml`, `svc_workflow/notify.py` | F2.5 Hoàn thiện |
 | Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP và webhook Mattermost, Slack, ntfy (`core.notification_deliveries`, tắt mặc định) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
@@ -262,7 +268,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Hasura GraphQL Engine CE | v2.51.0 | GraphQL tự sinh, quyền theo vai trò và đơn vị tới từng dòng; khóa quản trị không bao giờ đi từ ngoài vào | ③ | `db/metadata/` | F1.3 Hoàn thiện |
 | SeaweedFS | 4.48 | Kho tệp S3: bucket nóng `moc-files`; bucket lạnh `moc-cold` có Object Lock cho mốc neo sổ kiểm toán và gói nộp lưu (QĐ-010) | ④ | `svc_files/storage.py`, `svc_files/anchors.py`, `svc_files/archive.py` | F1.5 Hoàn thiện |
 | Meilisearch CE | v1.54.3 | Tìm toàn văn văn bản, cả chữ trong PDF; chỉ mục đoạn `chunks` của trợ lý hỏi đáp (tìm lai từ khóa và véc-tơ). Chỉ trả id, Hasura quyết ai đọc được | ④ | `svc_files/search.py`, `svc_files/texts.py`, `svc_files/assist/meili.py` | F1.7, F2.7 Hoàn thiện |
-| DuckDB | 1.5.6, thư viện trong `svc-files` | Ghi bảng của hồ sơ nộp lưu thành Parquet; phòng đọc đọc lại | ③ ④ | `svc_files/archive.py` | F3.8 Dùng được; PR #124 (giao diện hồ sơ, phòng đọc) nâng lên Hoàn thiện khi được gộp |
+| DuckDB | 1.5.6, thư viện trong `svc-files` | Ghi bảng của hồ sơ nộp lưu thành Parquet; phòng đọc đọc lại; trang Điều hành đếm văn bản đã nộp lưu trên các gói (#304) | ③ ④ | `svc_files/archive.py`, `svc_files/archive_stats.py` | F3.8 Hoàn thiện (giao diện hồ sơ, phòng đọc: #124) |
 | Phả hệ dữ liệu *(mã của đội)* | OpenLineage 2-0-2, thư viện chuẩn | Sự kiện cho từng bước nộp lưu, lưu ở `core.lineage_events`; phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL (`office.report_lineage`), trang `/pha-he` vẽ đồ thị; Marquez chưa đưa vào | — | `svc_files/lineage.py`, migration `1792281602900_report_lineage` | F3.9 Hoàn thiện |
 | Dashboard điều hành | Apache ECharts 6.1.0 | Trang `/dieu-hanh` của `app-office` đọc bốn view `office.v_*` qua Hasura, đúng quyền đơn vị | ③ | `apps/office/app/pages/dieu-hanh.vue`, migration `1792281601200_dashboard` | F3.11 Hoàn thiện |
 | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | Bản sao số của cảm biến theo NGSI-LD; vượt ngưỡng thì báo `svc-workflow` (profile `iot`) | ③ | `svc_workflow/ot.py`, `services/ot-sensor/` | F3.10 Minh họa |
@@ -273,7 +279,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|---|---|---|---|
 | Ollama | 0.35.1 | Chạy mô hình tại chỗ (profile `ai`, tắt mặc định, giới hạn 6 GB RAM); mạng `ai` không ra Internet, chỉ `svc-files` nối vào | — | dịch vụ `ollama` trong `docker-compose.yml` | phần tùy chọn của F4.1, F4.2 |
 | Qwen3-1.7B, Qwen3-Embedding-0.6B | `qwen3:1.7b`, `qwen3-embedding:0.6b` | Viết trích yếu và câu trả lời có trích dẫn; nhúng đoạn và câu hỏi | — | `svc_files/docread/summarize.py`, `svc_files/assist/ai.py` | F4.1, F4.2 |
-| Tesseract OCR | 5.5.0, gói Debian trong image `svc-files` | Nhận dạng chữ bản scan, ảnh chụp, chạy trong tiến trình con có giới hạn | — | `svc_files/docread/ocr.py` | F4.1 Hoàn thiện |
+| Tesseract OCR | 5.5.0, gói Debian trong image `svc-files` | Nhận dạng chữ bản scan, ảnh chụp, chạy trong tiến trình con có giới hạn | — | `svc_files/ocr.py` | F4.1 Hoàn thiện |
 | Truy xuất và trả lời có nguồn *(mã của đội)* | — | RAG tự viết: Meilisearch làm kho véc-tơ, quyền ở hai lớp, câu trích nguyên văn, kiểm trích dẫn (QĐ-004) | — | `svc_files/assist/` | F4.2 Hoàn thiện |
 | Tác tử `moc-doc-reader`, `moc-assistant`, `moc-assigner` *(mã của đội)* | — | Chỉ gợi ý, người quyết; danh tính riêng (vai trò Hasura `agent`), mỗi việc vào sổ kiểm toán (QĐ-005) | — | `svc_files/docread/`, `svc_files/assist/`, `svc_workflow/advisor.py` | F4.1, F4.2, F4.3 Hoàn thiện |
 
@@ -281,13 +287,13 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
-| Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Thu chỉ số của APISIX mỗi 15 giây; Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
-| Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 5 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
+| Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
+| Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 8 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
 | Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, kiểm chữ ký commit nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
-| cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Dùng được |
+| cloudflared | 2026.10.0 | Cloudflare Tunnel cho máy không có IP công khai (profile `tunnel`, tùy chọn) | — | dịch vụ `cloudflared` trong `docker-compose.yml` | F1.9 Hoàn thiện (tunnel chưa kiểm trong CI) |
 
-Khi PR #121 được gộp, có thêm F4.7 — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (Dùng được): bảng
+F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (Dùng được): bảng
 `office.maturity_assessments` và một trang của Văn phòng điện tử; không thêm thành phần nào, không sửa `services/`.
 
 </details>
@@ -298,7 +304,7 @@ Khi PR #121 được gộp, có thêm F4.7 — tự chẩn đoán mức trưởn
 |---|---|---|---|
 | [H] Quản trị tri thức (wiki) | **Chưa có** | Trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2); chưa có kho tri thức nào khác | `ROADMAP.md` giai đoạn 1, 4 |
 | [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email và webhook tới Mattermost, Slack, ntfy — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
-| [H] Cổng nội bộ | Một phần | Hai ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; chưa có trang dẫn qua lại | `ROADMAP.md` giai đoạn 1 |
+| [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
 | [P] Biểu mẫu low-code | **Chưa có** | Form viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py` | `ROADMAP.md` giai đoạn 2 |
 | [P] Tự động hóa, kịch bản serverless (⑤) | **Chưa có** | Vòng nền viết cứng trong `svc-files`, `svc-workflow`; Kestra đã cân nhắc, chưa đưa vào | `muc-hoan-thien.md` §3; `DEPENDENCIES.md` |
 | [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
@@ -326,12 +332,15 @@ liên thông, nộp lưu hồ sơ, đọc văn bản đến, gợi ý giao việ
 và `svc-workflow`. Nhiều cơ chế dùng chung (tải tệp, tìm kiếm, trợ lý, thông báo, nạp lô) còn viết cứng bảng, vai trò
 hay câu chữ của Văn phòng.
 
-Thứ đã tách cứng chỉ có hai: **cổng** — ứng dụng chỉ là client gọi lõi qua APISIX; **khóa ngoại CSDL** — mỗi ứng dụng
-có schema riêng (`office`, `personal`), `core` không đặt khóa ngoại nào sang `office`. Phần còn lại của CSDL vẫn dính:
-một hàm của `core` đọc `office`, ba cột in văn bản đi trong `core.tenants`, hàm `core.audit_overview` viết cứng loại
-dòng sổ của Văn phòng, hai tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4).
-Ở mức mã thì chưa tách. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`, nhưng
-nó mang theo các chỗ dính đó (§4.6). Tách là việc sau `v1.2.0` (§4.7).
+Thứ đã tách cứng chỉ có hai: **cổng** — ứng dụng chỉ là client gọi lõi qua APISIX, và mạng buộc điều đó: container ứng
+dụng chỉ ở mạng `apps`, nơi chỉ có APISIX (§2); **khóa ngoại CSDL** — mỗi ứng dụng có schema riêng (`office`,
+`personal`), `core` không đặt khóa ngoại nào sang `office`. Phần còn lại của CSDL vẫn dính: hai hàm của `core` đọc
+`office`, ba cột in văn bản đi trong `core.tenants`, hàm `core.audit_overview` viết cứng loại dòng sổ của Văn phòng, hai
+tệp metadata của `core` trỏ sang `office`, năm vai trò cố định của nghiệp vụ văn thư (§4.4). Ở mức mã, bước 1–2 của
+§4.7 đã làm ở #302: phần Văn phòng của hai dịch vụ nằm trong gói `office/`, chỉ gắn route và chạy vòng nền khi
+`MOC_OFFICE_ENABLED` bật; tắt thì hai dịch vụ vẫn lên và phần lõi vẫn chạy (`make demo-tat-van-phong`, có trong CI). Vẫn
+chung tiến trình, chung image. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`,
+nhưng nó mang theo các chỗ dính ở CSDL, metadata và vai trò (§4.6). Các bước còn lại là việc sau `v1.3.0` (§4.7).
 
 ### 4.2. Sơ đồ
 
@@ -363,7 +372,7 @@ flowchart TB
   OFF -->|"/api/status"| SFL
   OFF -->|"/api/files, /api/search,<br/>/api/documents/ask"| SFN
   OFF -->|"/api/registers/*, /api/verify,<br/>xem trước, đọc văn bản đến"| SFV
-  OFF -->|"5 Actions qua Hasura"| WFV
+  OFF -->|"6 Actions qua Hasura"| WFV
   OFF -->|"/v1/graphql"| OFFICE
   SFN --> SFL
   SFV --> SFL
@@ -398,6 +407,10 @@ giá trị của nghiệp vụ văn thư — thì phần mã đó phải làm g�
 
 Xếp theo mã thật trên `9147e0f`: import nội gói, route, tên bảng, hằng số. Route xếp theo hàm xử lý của nó; mô-đun có
 hai phần rõ rệt thì xếp từng phần; `__init__.py` chỉ có chú thích, không xếp. "Dính" là chỗ phải gỡ khi tách (§4.4).
+Sau `9147e0f` có thêm bốn route công khai: `/api/verify/ca.pem` của #158, nộp lưu và xem tệp phòng đọc của #124 là của
+Văn phòng; `/api/verify/anchor-key.pem` của #158 là của lõi (khóa công khai ký mốc neo sổ kiểm toán, cùng nhóm với
+`anchors.py`). Thêm nữa có Action `otSensorMap` của IT/OT (#183) và `imageclean.py` (#150); §4.4 và §4.7 đếm theo mã
+hiện tại.
 
 | Nhóm | `svc-files` | `svc-workflow` | Route công khai của `svc-files` (16) | CSDL |
 |---|---|---|---|---|
@@ -426,27 +439,29 @@ hai phần rõ rệt thì xếp từng phần; `__init__.py` chỉ có chú thí
 | `pii.py` | Lõi | Bộ che, chỉ thư viện chuẩn |
 | `pdftext.py` | Lõi | Đọc lớp chữ PDF trong tiến trình con; không gọi CSDL |
 | `assist/store.py` | Lõi | Ghi một dòng `core.audit_log` cho mỗi lượt hỏi, bằng vai trò `agent` |
-| `docread/ocr.py`, `docread/layout.py`, `docread/pdflayout.py` | Lõi | Tesseract trong tiến trình con có giới hạn, dựng bố cục trang; không bảng, không câu chữ nghiệp vụ. Dính: nằm trong gói `docread/` của Văn phòng |
+| `ocr.py`, `layout.py`, `pdflayout.py` | Lõi | Tesseract trong tiến trình con có giới hạn, dựng bố cục trang; không bảng, không câu chữ nghiệp vụ. Trước #302 nằm trong gói `docread/` của Văn phòng |
 | `imports/parse.py`, `imports/spool.py`, khung của `imports/runner.py` (`Importer`, `Handler`) | Lõi | Đọc NDJSON, CSV; giữ zip tạm; chạy mẻ có giữ dòng và thử lại. Loại lô do nơi gọi truyền vào (`handlers`) |
 | route `POST /api/files`, `GET /api/files/{file_id}` (trong `app.py`) | Dáng nghiệp vụ | Tải lên qua ClamAV, tải về khi Hasura cho xem — đúng hai đường ứng dụng thứ hai dùng. Viết cứng của Văn phòng: nhánh `restricted` ("Văn bản hạn chế chỉ nhận tệp PDF…", đóng dấu người xem qua `sealed.py`). Dính: quyền tải về đi qua bộ lọc của `core_files.yaml`, có nhánh sang `office.document_files` |
-| `sealed.py` | Dáng nghiệp vụ | Mã hóa từng tệp bằng khóa transit, đóng dấu tên người xem là cơ chế chung; lớp dấu in sẵn câu của văn bản hạn chế ("VĂN BẢN HẠN CHẾ — bản giải mã cho …"). Dính: gọi `docread.ocr._kill_group` |
-| `hasura.py` | Dáng nghiệp vụ | Máy khách chung (token người dùng, vai trò `service`, `agent`) nhưng chứa câu GraphQL của Văn phòng: `LETTER`, `REGISTER`, `VERIFY`, `DISPATCH_SOURCE`, `VISIBLE_CASE_FILE`, `CHANGED_DOCUMENTS`… |
+| `sealed.py` | Dáng nghiệp vụ | Mã hóa từng tệp bằng khóa transit, đóng dấu tên người xem là cơ chế chung; lớp dấu in sẵn câu của văn bản hạn chế ("VĂN BẢN HẠN CHẾ — bản giải mã cho …"). Trước #302 gọi `docread.ocr._kill_group`, nay `ocr.kill_group` |
+| `hasura.py` | Dáng nghiệp vụ | Máy khách chung (token người dùng, vai trò `service`, `agent`); câu của tìm kiếm (`CHANGED_DOCUMENTS`) còn đọc `office.documents`. Câu chỉ Văn phòng dùng (`LETTER`, `REGISTER`, `VERIFY`, `DISPATCH_SOURCE`, `VISIBLE_CASE_FILE`…) đã sang `office/hasura.py` (#302) |
 | `search.py`, route `GET /api/search` | Dáng nghiệp vụ | Meilisearch xếp hạng, Hasura lọc quyền; chỉ mục và trường lọc là của `office.documents` |
 | `texts.py` | Dáng nghiệp vụ | Đọc chữ PDF ở vòng nền; tệp chọn bằng `PENDING_TEXTS` theo `office.document_files`, bỏ tệp của văn bản hạn chế |
 | `assist/ai.py`, `assist/meili.py`, `assist/grounding.py`, `assist/extract.py` | Dáng nghiệp vụ | Gọi mô hình, kho véc-tơ trên Meilisearch, khung lời dặn, trích câu. Viết cứng: sự kiện `office.assist.*` và tiền tố truy vấn "Vietnamese administrative documents" (`ai`), trường lọc `direction`, `type_code` (`meili`), lời dặn "trợ lý tra cứu văn bản hành chính" (`grounding`), loại văn bản (`extract`) |
-| `assist/chunks.py`, `assist/index.py`, `assist/scope.py`, `assist/answer.py`, `assist/retrieve.py`, `assist/vi.py`, `assist/api.py` (route `POST /api/documents/ask`) | Dáng nghiệp vụ | Cắt đoạn, đồng bộ chỉ mục, lọc trước theo quyền, trả lời có trích dẫn; điều kiện "văn bản đủ điều kiện" và bộ lọc theo vai trò viết lại đúng `office.document_visible`. Dính: `vi.py` import `docread.rules.fold`, `docread.summarize.INVISIBLE_RE`; `retrieve.py` import `docread.rules.fold` |
+| `assist/chunks.py`, `assist/index.py`, `assist/scope.py`, `assist/answer.py`, `assist/retrieve.py`, `assist/vi.py`, `assist/api.py` (route `POST /api/documents/ask`) | Dáng nghiệp vụ | Cắt đoạn, đồng bộ chỉ mục, lọc trước theo quyền, trả lời có trích dẫn; điều kiện "văn bản đủ điều kiện" và bộ lọc theo vai trò viết lại đúng `office.document_visible`. Trước #302 `vi.py`, `retrieve.py` import `fold`, `INVISIBLE_RE` từ `docread/`, nay từ `vntext.py` |
 | `imports/api.py` (route `/api/imports`, `/api/imports/*`), `imports/store.py` | Dáng nghiệp vụ | API lô, bảng `core.import_jobs`, `core.import_rows` dùng chung; viết cứng `Kind = Literal["incoming"]` và câu dò trùng trên `office_documents` |
 | `signing.py` | Dáng nghiệp vụ | Ký PAdES bằng khóa của đơn vị trong két; sự kiện nhật ký `office.signing.*`; chỉ `/internal/issue` gọi |
 | `lineage.py` | Dáng nghiệp vụ | Dựng sự kiện OpenLineage, ghi `core.lineage_events`; tên job `moc.case_file.archive` và cột các bảng Parquet của Văn phòng viết trong mã |
 | `render.py`, route `POST /internal/issue`, `GET /api/documents/{document_id}/preview` | Văn phòng | PDF văn bản đi theo thể thức NĐ 30/2020 (WeasyPrint), mã QR, mã tra cứu |
-| route `GET /api/verify`, `GET /api/verify/{code}` (trong `app.py`) | Văn phòng | Chỉ đọc `office.issued_documents`; mã tra cứu do `/internal/issue` và `office_number_outgoing` sinh. README gọi đây là con dấu "kiểm chứng được từ bên ngoài" của lõi, nhưng gỡ Văn phòng thì route không còn gì để trả |
+| route `GET /api/verify`, `GET /api/verify/{code}` (router `verify` của `office/api.py`) | Văn phòng | Chỉ đọc `office.issued_documents`; mã tra cứu do `/internal/issue` và `office_number_outgoing` sinh. README gọi đây là con dấu "kiểm chứng được từ bên ngoài" của lõi, nhưng gỡ Văn phòng thì route không còn gì để trả |
 | `registers.py`, route `/api/registers/*` | Văn phòng | Sổ đăng ký văn bản đến, đi theo Phụ lục IV NĐ 30/2020; `office.registers`, `office.documents` |
 | `dispatch.py`, route `POST /internal/dispatch-file` | Văn phòng | Chép bản phát hành sang kho của đơn vị nhận; `office.dispatches`, hàm `office.deliver_dispatch` |
-| `archive.py`, route `GET /api/case-files/{case_file_id}/archive` | Văn phòng | Nộp lưu hồ sơ (`office.case_files`, hàm `office.archive_case_file`), Parquet bằng DuckDB. Khi PR #124 được gộp: thêm `POST /api/case-files/{case_file_id}/archive` và route xem tệp trong phòng đọc |
+| `archive.py`, route `GET /api/case-files/{case_file_id}/archive` | Văn phòng | Nộp lưu hồ sơ (`office.case_files`, hàm `office.archive_case_file`), Parquet bằng DuckDB. Sau `9147e0f`, #124 thêm `POST /api/case-files/{case_file_id}/archive` và route xem tệp trong phòng đọc |
+| `archive_stats.py` | Văn phòng | Số liệu văn bản đã nộp lưu cho trang Điều hành (#304, route `GET /api/case-files/archive-stats` trong `office/api.py`): DuckDB đếm trên các bảng Parquet trong bucket lạnh, chỉ lãnh đạo đơn vị; phả hệ job `moc.archive.stats` |
 | `docread/api.py` (route `POST /api/files/{file_id}/read`), `docread/reader.py`, `docread/rules.py`, `docread/summarize.py`, `docread/store.py` | Văn phòng | Tác tử đọc văn bản đến theo bố cục NĐ 30/2020, viết trích yếu, ghi `office.intake_suggestions`. `rules.fold` (bỏ dấu tiếng Việt) là hàm chung nằm trong mô-đun này |
 | `IncomingHandler` và hai mutation `receiveIncoming`, `registerIncoming` trong `imports/runner.py` | Văn phòng | Mỗi dòng của lô văn bản đến đi đúng đường tiếp nhận lẻ rồi vào sổ |
 | `assist/similar.py`, route `POST /internal/similar-documents` | Văn phòng | Chỉ phục vụ tác tử gợi ý giao việc của `svc-workflow` (F4.3) |
-| `app.py`, `config.py` | Trộn | `create_app` dựng mọi thành phần, gắn cả 19 route (12 khai thẳng, 7 qua `install()` của bốn mô-đun), chạy 9 tác vụ nền; `Settings` chứa biến của cả ba nhóm |
+| `office/api.py` | Văn phòng | Lớp `Office` dựng tác tử đọc văn bản đến, bucket lạnh, vòng nộp lưu, `ArchiveStats`; `routers()` trả ba `APIRouter` (`documents`, `verify`, `case_files`) với 12 route Văn phòng trước khai thẳng trong `app.py` (#302) |
+| `app.py`, `config.py` | Trộn | `create_app` dựng thành phần lõi, khai thẳng 5 route lõi và dáng nghiệp vụ (tải lên, tải về, tìm kiếm, `/api/status`, `anchor-key.pem`), gắn trợ lý qua `install()`. Phần Văn phòng (`office/api.py`, đọc văn bản đến, `similar`, nạp lô) chỉ dựng, gắn route, chạy vòng nền khi `MOC_OFFICE_ENABLED` bật (#302); vẫn import cả khi tắt. `Settings` chứa biến của cả ba nhóm |
 
 `svc-workflow` (`services/svc-workflow/src/svc_workflow/`):
 
@@ -456,7 +471,7 @@ hai phần rõ rệt thì xếp từng phần; `__init__.py` chỉ có chú thí
 | `openbao.py`, `pii.py` | Lõi | Bản chép của tệp cùng tên trong `svc-files` |
 | `directory.py` | Dáng nghiệp vụ | Đồng bộ người dùng Keycloak → `core.users` là cơ chế chung; viết cứng `ROLES = {"clerk", "staff", "manager", "director", "tenant_admin"}` |
 | `notify.py` | Dáng nghiệp vụ | Ghi `core.notifications`, đẩy qua Centrifugo; nhận `document_id`, người nhận và người được báo tiếp chọn theo vai trò văn thư (`staff` → `manager` → `director`) |
-| `hasura.py` | Dáng nghiệp vụ | Máy khách vai trò `service`, nhưng gần như mọi câu là của Văn phòng (`office_register_incoming`, `office_number_outgoing`, `office_dispatches`…) |
+| `hasura.py` | Dáng nghiệp vụ | Máy khách vai trò `service`, `Actor` (biến phiên, cả nhóm ứng viên của BPMN văn bản), hai câu của danh bạ. 23 câu của Văn phòng (`office_register_incoming`, `office_number_outgoing`, `office_dispatches`…) đã sang `office/queries.py` (#302) |
 | `channels.py` | Dáng nghiệp vụ | Kênh email, webhook dùng chung; loại thông báo và câu chữ là của Văn phòng (`document.issued`, `task.overdue`…) |
 | `schemas.py` | Dáng nghiệp vụ | Bộ kiểm JSON Schema chung; schema hiện có là form văn bản đến `schemas/van-ban-den.json` |
 | `workflow.py`, route `POST /actions/{name}` | Văn phòng | Nghiệp vụ của 5 Actions: tiếp nhận, vào sổ, trình văn bản đi, hộp việc, hoàn thành việc; đối soát với Flowable |
@@ -467,7 +482,10 @@ hai phần rõ rệt thì xếp từng phần; `__init__.py` chỉ có chú thí
 | `ot.py`, route `POST /ot/notify/{tenant}` | Văn phòng | Cảm biến vượt ngưỡng → dự thảo văn bản đi "Báo cáo sự cố" trong `office.documents` |
 | `files.py` | Văn phòng | Gọi `/internal/issue`, `/internal/dispatch-file`, `/internal/similar-documents` của `svc-files` |
 | `processes/*.bpmn20.xml` | Văn phòng | Hai quy trình `van-ban-den`, `van-ban-di` |
-| `app.py`, `config.py` | Trộn | Route `/actions/{name}` chỉ nhận 5 Action của Văn phòng; 8 vòng định kỳ của cả hai nhóm cộng một lần triển khai BPMN. Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
+| `office/api.py` | Văn phòng | Lớp `Office` theo khuôn `Part`: gắn `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN văn bản, sáu vòng định kỳ của Văn phòng (#302) |
+| `apps/` (`bpmn.py`, `forms.py`, `bundle.py`, `deploy.py`, `auth.py`, `api.py`) | Lõi | Quy trình của ứng dụng cắm bằng manifest (#301): kiểm BPMN theo danh sách trắng và form JSON Schema, triển khai lên Flowable với tiền tố `<tên>.`, API chung `/api/workflow/<tên>/…` chỉ nhận token của client `app-<tên>`. Không biết ứng dụng cụ thể nào, luôn bật, không theo `MOC_OFFICE_ENABLED` |
+| `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
+| `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ) và quy trình của ứng dụng (`apps/`, #301); chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
 CSDL và metadata Hasura:
 
@@ -495,13 +513,16 @@ CSDL và metadata Hasura:
 
 Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git grep`:
 
-- **Mã.** Mọi route của `svc-files` gắn vào app trong `create_app` (`svc_files/app.py`): 12 route khai thẳng (chưa kể
-  `/healthz`, `/readyz`), 7 route qua hàm `install()` của `docread/api.py`, `assist/api.py`, `imports/api.py`,
-  `assist/similar.py`. Theo `docs/api/openapi/svc-files.json` có 16 route công khai — 1 lõi, 8 dáng nghiệp vụ, 7 Văn
-  phòng — cộng 3 route nội bộ đều của Văn phòng. Mô-đun dáng nghiệp vụ gọi vào gói `docread/` của Văn phòng: `sealed.py`
-  → `docread.ocr._kill_group`; `assist/vi.py` → `docread.rules.fold`, `docread.summarize.INVISIBLE_RE`;
-  `assist/retrieve.py` → `docread.rules.fold`. Ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` cũng nằm trong gói
-  đó. Hai tệp `hasura.py` để câu GraphQL của hai phần chung một chỗ.
+- **Mã.** Theo `docs/api/openapi/svc-files.json` có 20 route công khai — 2 lõi, 8 dáng nghiệp vụ, 10 Văn phòng — cộng
+  3 route nội bộ đều của Văn phòng. Đã gỡ ở #302. Bước 1 của §4.7: mô-đun dáng nghiệp vụ không còn gọi vào gói
+  `docread/` của Văn phòng — `kill_group`, `killed` nằm ở `ocr.py`; `fold`, `DASHES`, `DATE`, `SYMBOL`, `INVISIBLE_RE` ở
+  `vntext.py`; ba mô-đun lõi `ocr.py`, `layout.py`, `pdflayout.py` ra gói gốc. Câu GraphQL chỉ Văn phòng dùng sang
+  `svc_files/office/hasura.py`, `svc_workflow/office/queries.py`. Bước 2: 12 route Văn phòng của `svc-files` sang ba
+  `APIRouter` trong `svc_files/office/api.py`; Actions, `/ot/notify/{tenant}`, BPMN và vòng định kỳ của Văn phòng trong
+  `svc-workflow` sang lớp `Office` (`svc_workflow/office/api.py`, khuôn `parts.py`); cả hai chỉ gắn khi
+  `MOC_OFFICE_ENABLED` bật. Còn lại: `app.py` của hai dịch vụ vẫn import gói Văn phòng (cùng WeasyPrint, pyHanko…) cả
+  khi tắt; khi tắt, `svc-files` vẫn dò két cho ký số lúc khởi động và `/readyz` báo `"ai": false` (cờ này lấy từ tác
+  tử đọc văn bản đến).
 - **Phạm vi.** Tìm kiếm, đọc chữ PDF, chỉ mục đoạn của trợ lý chọn dữ liệu từ `office.documents`,
   `office.document_files`: tệp của ứng dụng khác (vd trong `personal`) không tìm được, trợ lý không đọc tới.
 - **Tệp và quyền xem tệp.** Route `/api/files` có nhánh `restricted` của văn bản hạn chế. Bộ lọc quyền của `core.files`
@@ -509,14 +530,18 @@ Danh sách phải gỡ trước khi tách (§4.7), kiểm được bằng `git g
 - **Vai trò.** `core.users.role` và `ROLES` của `directory.py` chỉ nhận năm vai trò, bốn trong đó là vai trò văn thư.
   Token chỉ mang một trong năm vai trò đó, nên quyền của ứng dụng thứ hai (`personal_items.yaml`) cũng gắn vào bốn vai
   trò văn thư; quản trị đơn vị (`tenant_admin`) không đọc `core.files` nên không có không gian cá nhân
-  ([`them-ung-dung.md`](them-ung-dung.md) §3, §5).
+  ([`them-ung-dung.md`](them-ung-dung.md) §4, §6).
 - **CSDL.** Hàm `core.file_texts_skip_restricted` nằm ở schema `core` mà đọc `office.documents`,
-  `office.document_files`; migration `1792281600500_outgoing` của Văn phòng thêm ba cột vào `core.tenants`; 9 migration
-  định nghĩa lại `core.audit_overview` mỗi khi thêm loại dòng sổ; `core.import_jobs.kind` chỉ nhận `incoming`.
+  `office.document_files`; trigger `core.app_events_publish()` trên `office.document_events` đọc `office.documents`, và
+  `core.app_events.kind` chỉ nhận ba loại `office.document.*` (migration `1792281603200_app_registry`); migration
+  `1792281600500_outgoing` của Văn phòng thêm ba cột vào `core.tenants`; 9 migration định nghĩa lại
+  `core.audit_overview` mỗi khi thêm loại dòng sổ; `core.import_jobs.kind` chỉ nhận `incoming`.
 - **Metadata Hasura.** `core_files.yaml`, `core_audit_log.yaml` trỏ sang `office` — ngược với quy tắc đặt cho ứng dụng
-  mới: "không thêm quan hệ vào metadata của lõi" ([`them-ung-dung.md`](them-ung-dung.md) §2, bước 6).
+  mới: "không thêm quan hệ vào metadata của lõi" ([`them-ung-dung.md`](them-ung-dung.md) §3, bước 6).
 - **Vận hành.** Dựng PDF, OCR (tiến trình con), nộp lưu chạy chung container với tải tệp lên của mọi ứng dụng; triển
-  khai lại phần Văn phòng là khởi động lại cả `svc-files` hay `svc-workflow`.
+  khai lại phần Văn phòng là khởi động lại cả `svc-files` hay `svc-workflow`. `MOC_OFFICE_ENABLED=false` để kiểm lõi
+  đứng được một mình, không phải cách vận hành: giao diện Văn phòng vẫn được phục vụ nhưng route của nó trả
+  404, Action Hasura của nó báo lỗi.
 
 ### 4.5. Vì sao đang gộp
 
@@ -550,45 +575,51 @@ như §4.3, §4.4 đã xếp: hai route `/api/files` và bộ lọc quyền củ
 `office.document_files`); và bốn vai trò Hasura `clerk`, `staff`, `manager`, `director` mà quyền của `personal.items`
 gắn vào (`personal_items.yaml`) — `tenant_admin` không đọc `core.files` nên không có không gian cá nhân. Lúc thêm ứng
 dụng này, `git diff --stat` trên `services/`, `apps/office/`, các migration có từ trước, `core_*.yaml`, `office_*.yaml`,
-`actions.*` đều không in dòng nào ([`them-ung-dung.md`](them-ung-dung.md) §4). Kiểm trên hệ thống chạy: `make
+`actions.*` đều không in dòng nào ([`them-ung-dung.md`](them-ung-dung.md) §5). Kiểm trên hệ thống chạy: `make
 demo-ca-nhan`, có trong CI. Giới hạn của bằng chứng này: tải lên của P.A.R.A vẫn chạy trong tiến trình `svc-files` có
 phần Văn phòng — tách về đường đi của mã và dữ liệu, chưa tách về tiến trình.
 
 Ứng dụng thứ ba, Bảng tin đơn vị (`apps/bang-tin`), đi xa hơn một bước: cài bằng `moc app install` từ manifest, không
 sửa tệp nào của lõi — client Keycloak, route APISIX, metadata Hasura nằm trong `.moc-apps/` ngoài git. Migration chạy
 bằng vai trò CSDL riêng không có quyền trên `core`, `office`, `personal`; ứng dụng biết văn bản vừa vào sổ qua luồng
-`core.app_events` chứ không đọc bảng của Văn phòng. Kiểm trên hệ thống chạy: `make demo-cai-ung-dung`, có trong CI
-([`them-ung-dung.md`](them-ung-dung.md) mục 1).
+`core.app_events` chứ không dò bảng của Văn phòng; trang chỉ đọc số ký hiệu, trích yếu, chiều văn bản qua quan hệ
+GraphQL tới `office.documents`, theo quyền của người đang xem (`apps/bang-tin/app.yaml`). Container của nó chỉ ở mạng
+`apps`: nhận sự kiện qua cổng hook của APISIX, lấy token, ghi GraphQL qua cổng công khai như trình duyệt. Kiểm trên hệ
+thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](them-ung-dung.md) mục 1).
 
 ### 4.7. Hướng tách
 
-Đây là việc sau `v1.2.0`, chưa xếp ngày.
+Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa xếp ngày (#324).
 
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
 1. Gói lõi không import gói nào của Văn phòng (`git grep` các dòng `from .docread`, `from .render`… trong mô-đun lõi
-   không in gì).
+   không in gì). **Đạt ở #302**, trừ chỗ ráp: `app.py` của hai dịch vụ (nhóm "Trộn" ở §4.3) còn import `office`.
 2. Không còn hàm, cột, quan hệ metadata nào của `core` trỏ sang `office`; quyền xem `core.files` không phụ thuộc bảng
    nào của `office`.
 3. Vai trò của một ứng dụng là của ứng dụng đó: ứng dụng mới khai vai trò riêng mà không sửa `core.users.role` hay
    `directory.py`.
 4. Tắt phần Văn phòng bằng cấu hình thì `svc-files`, `svc-workflow` vẫn lên; phần lõi của `make smoke` và
-   `make demo-ca-nhan` vẫn xanh.
+   `make demo-ca-nhan` vẫn xanh. **Đạt ở #302**: `MOC_OFFICE_ENABLED=false`, kiểm bằng `make demo-tat-van-phong` trong
+   CI.
 5. Ứng dụng thứ ba có tìm kiếm và thông báo cho dữ liệu của mình mà không đọc bảng `office`.
 
 **Bước**, mỗi bước một pull request, luồng chính (smoke, e2e) giữ xanh:
 
-1. Gỡ chỗ dính trong mã: đưa `_kill_group`, `fold`, `INVISIBLE_RE` và ba mô-đun lõi của `docread/` sang chỗ chung;
-   tách câu GraphQL của Văn phòng khỏi hai tệp `hasura.py`.
-2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 8 route Văn phòng đang khai thẳng
-   trong `app.py` (xem trước, hai route sổ, hai route xác thực, nộp lưu, `/internal/issue`, `/internal/dispatch-file`)
+1. Gỡ chỗ dính trong mã: đưa `_kill_group`, `_killed`, `fold` (cùng `DASHES`, `DATE`, `SYMBOL`), `INVISIBLE_RE` và
+   ba mô-đun lõi của `docread/` sang chỗ chung;
+   tách câu GraphQL của Văn phòng khỏi hai tệp `hasura.py`. **Đã làm ở #302.**
+2. Tách router: khuôn `install(app, …)` đã có ở bốn mô-đun, nên phần còn phải dời là 12 route Văn phòng đang khai thẳng
+   trong `app.py` (xem trước, hai route sổ, ba route xác thực, bốn route nộp lưu, `/internal/issue`,
+   `/internal/dispatch-file`; `/api/verify/anchor-key.pem` là của lõi, ở lại)
    sang `APIRouter` riêng (vd gói `svc_files/office/`; Actions của `svc-workflow` cũng vậy); `create_app` chỉ
-   `include_router` và chạy tác vụ nền của Văn phòng khi phần đó được bật.
-3. Dọn CSDL: dời `core.file_texts_skip_restricted` sang schema `office`; cột in văn bản đi của `core.tenants` sang một
-   bảng của `office`; danh sách trắng của `core.audit_overview` thành dữ liệu mỗi ứng dụng tự thêm dòng; nhánh
-   `office.document_files` trong bộ lọc quyền của `core.files` và năm vai trò cố định của `core.users.role` thành thứ
-   ứng dụng tự khai; nguồn dữ liệu của tìm kiếm, chữ PDF, chỉ mục đoạn thành thứ ứng dụng khai báo (vd một view theo
-   quy ước tên) thay vì truy vấn viết cứng trên `office.documents`.
+   `include_router` và chạy tác vụ nền của Văn phòng khi phần đó được bật. **Đã làm ở #302**, cờ
+   `MOC_OFFICE_ENABLED` (mặc định bật); OpenAPI sinh ra của hai dịch vụ không đổi.
+3. Dọn CSDL: dời `core.file_texts_skip_restricted` và trigger `core.app_events_publish` sang schema `office`; cột in văn
+   bản đi của `core.tenants` sang một bảng của `office`; danh sách trắng của `core.audit_overview` thành dữ liệu mỗi ứng
+   dụng tự thêm dòng; nhánh `office.document_files` trong bộ lọc quyền của `core.files` và năm vai trò cố định của
+   `core.users.role` thành thứ ứng dụng tự khai; nguồn dữ liệu của tìm kiếm, chữ PDF, chỉ mục đoạn thành thứ ứng dụng
+   khai báo (vd một view theo quy ước tên) thay vì truy vấn viết cứng trên `office.documents`.
 4. Đóng gói phần Văn phòng thành gói Python riêng trong repo; vẫn chạy chung tiến trình.
 5. Khi 1–4 xong và có lý do vận hành (tải riêng, phát hành riêng): chạy phần Văn phòng thành dịch vụ riêng, gọi lõi qua
    API như mọi ứng dụng.
@@ -614,7 +645,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 | QĐ-001 | "mọi tệp mã phải mang header Apache-2.0 (CI cưỡng chế)" | Vẫn đúng với tệp mã; tệp không chèn được header (JSON, ảnh, Markdown…) khai giấy phép trong `REUSE.toml` |
 | QĐ-002 | "dùng chung cho mọi thành phần, tách bằng schema hoặc database riêng" | Đúng, trừ Scorpio: broker bắt buộc phần mở rộng `postgis` nên có CSDL PostGIS riêng (profile `iot`) |
 | QĐ-002 | "tài liệu vận hành ở giai đoạn 5 phải có quy trình sao lưu và phục hồi rõ ràng" | Đã có: `make backup`, `make restore` (restic, F3.4), [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục" |
-| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` chạy 16 dịch vụ (14 của `core`, 2 của `app`); profile chia theo tầng và phần tùy chọn (§1.2) |
+| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 17 dịch vụ (15 của `core`, 2 của `app`), 16 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
@@ -715,7 +746,8 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 - **Hệ quả:** tắt `svc-files` thì văn bản vẫn tới lãnh đạo ngay, chỉ có dòng `failed`; CI chạy đủ bằng tìm theo từ khóa
   và bỏ phiếu. Gợi ý giải thích được ("vì 3 văn bản tương tự đã giao Tổ Đào tạo") và tốt dần khi có thêm văn bản đã
   giao; ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác đo được dễ cao ảo — số đo luôn báo kèm số văn bản, số đơn vị.
-  Chưa xét ngày lễ khi tính hạn; chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
+  Hạn tránh thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS`; ngày lễ âm lịch, ngày nghỉ bù do người vận hành thêm mỗi
+  năm. Chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
   thêm một dòng tác tử ở Sổ kiểm toán và tab Lịch sử — dòng sổ không mang trích yếu, không mang căn cứ. Chi tiết:
   `docs/mo-hinh-du-lieu.md` §1, §3, §4.2, README của `svc-workflow`.
 
@@ -852,7 +884,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 - **Quyết định:**
   1. Flowable REST 8.0.0, CSDL riêng `flowable` trên cùng máy chủ PostgreSQL, chỉ trong mạng nội bộ (cổng chặn
      `/flowable-rest/*`). `svc-workflow` triển khai hai quy trình `van-ban-den`, `van-ban-di` lúc khởi động.
-  2. Về dữ liệu và trạng thái quy trình, ứng dụng chỉ nói chuyện với GraphQL; thao tác đổi trạng thái là 5 Hasura
+  2. Về dữ liệu và trạng thái quy trình, ứng dụng chỉ nói chuyện với GraphQL; thao tác đổi trạng thái đi qua Hasura
      Actions do `svc-workflow` xử lý, thuê ước, người dùng, vai trò lấy từ biến phiên của JWT. Flowable giữ bước và
      người phải làm (nhóm ứng viên dạng `t:<đơn vị>:director`); `office.documents` giữ dữ liệu và bản chiếu trạng thái,
      chỉ `svc-workflow` (vai trò Hasura `service`) ghi cột `status`. Hoàn thành một việc: kiểm quyền và dữ liệu → nhận
@@ -926,12 +958,13 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   giữa hai phần là gọi hàm. Đổi lại: chưa tắt hay thay được Văn phòng mà không sửa mã lõi; tìm kiếm, chữ PDF, trợ lý chỉ
   phủ văn bản của Văn phòng; triển khai lại phần Văn phòng là khởi động lại cả dịch vụ lõi; còn những chỗ dính ở §4.4.
   Ứng dụng thứ hai vẫn cắm được mà không sửa `services/` (§4.6). Hướng tách, tiêu chí, cái giá: §4.7 — việc sau
-  `v1.2.0`.
+  `v1.3.0`.
 
 ### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX
 
-> **Trạng thái:** gộp ở #130, F3.15 mức Dùng được cho tới khi smoke và e2e qua WAF xanh đủ lâu trên CI và chạy trên
-> bản online. Số đo dưới đây đo trên máy thử lúc làm.
+> **Trạng thái:** gộp ở #130; smoke và e2e chạy qua WAF trên mọi pull request. F3.15 mức Dùng được cho tới khi chữ
+> nghiệp vụ ở các ô nhập liệu không còn cần người quản trị thêm loại trừ ([`muc-hoan-thien.md`](muc-hoan-thien.md)).
+> Số đo dưới đây đo trên máy thử lúc làm.
 
 - **Bối cảnh:** nguyên lý (iv) và F3.15 — chặn tải tấn công trong yêu cầu ngay ở biên; cụm ② "API Gateway zero-trust"
   còn ghi "chưa có WAF".
@@ -967,10 +1000,13 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   vai trò CSDL quyền hẹp ([`trien-khai.md`](trien-khai.md) §8). Mốc neo sổ kiểm toán ra bucket khóa ghi là để chặn đúng
   đường siêu người dùng viết lại sổ (`svc_files/anchors.py`).
 - **Mạng**: TLS chỉ ở đoạn trình duyệt ↔ proxy, trong mạng Docker các dịch vụ gọi nhau bằng HTTP;
-  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy ([`trien-khai.md`](trien-khai.md) §8). WAF (F3.15,
+  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy, kể cả container ứng dụng ở mạng `apps`
+  ([`trien-khai.md`](trien-khai.md) §8). Ứng dụng chỉ tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
+  tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
-- **Quan sát**: chỉ có chỉ số của APISIX, chưa có tracing phân tán, chưa có cảnh báo; log tập trung tắt mặc định
-  (F3.13, F3.14).
+- **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ, chưa có
+  tracing phân tán; cảnh báo chỉ hiện trong Grafana, Prometheus, chưa gửi ra ngoài; log tập trung tắt mặc định (F3.13,
+  F3.14).
 - **Két bí mật**: `.env` vẫn là nguồn bí mật; chưa có quy trình xoay khóa transit, xoay bí mật
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, cụm ①).
 - **Số đo còn thiếu**: chạy trên máy 8 GB và "cài dưới một giờ" chưa đo (§1.3); cột "trước" của số đo thành công chưa

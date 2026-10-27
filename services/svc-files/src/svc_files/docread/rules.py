@@ -32,13 +32,13 @@ Không chữ nào của văn bản được ghi nhật ký ở đây.
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
-from .layout import Line, clean
+from ..layout import Line, clean
+from ..vntext import DASHES, DATE, SYMBOL, fold
 
 Confidence = Literal["high", "medium", "low"]
 
@@ -67,44 +67,16 @@ CATALOG = frozenset(TYPE_NAMES) - {"TT", "NĐ", "TTLT"}   # mặc định khi kh
 URGENCY = {"HOATOC": "hoa_toc", "THUONGKHAN": "thuong_khan", "KHAN": "khan"}
 
 # ---------------------------------------------------------------------------------------------------------------
-# Bỏ dấu giữ nguyên độ dài: mỗi ký tự Latin có dấu → chữ gốc (đ → d, Đ → D); ký tự khác giữ nguyên
-
-
-def _fold_table() -> dict[int, str]:
-    table = {ord("đ"): "d", ord("Đ"): "D", 0xD0: "D", 0xF0: "d", 0x189: "D", 0x111: "d", 0x110: "D"}
-    for start, end in ((0xC0, 0x250), (0x1E00, 0x1F00)):
-        for cp in range(start, end):
-            base = unicodedata.normalize("NFD", chr(cp))[0]
-            if base != chr(cp) and base.isascii():
-                table.setdefault(cp, base)
-    return table
-
-
-_FOLD = _fold_table()
-
-
-def fold(s: str) -> str:
-    """Bỏ dấu tiếng Việt, GIỮ NGUYÊN ĐỘ DÀI (``len(fold(s)) == len(s)`` với chữ NFC): vị trí khớp trên chữ đã bỏ dấu
-    cũng là vị trí trên chữ gốc."""
-    return s.translate(_FOLD)
-
-
-# ---------------------------------------------------------------------------------------------------------------
 # Mẫu (các ví dụ trong tests/test_docread_rules.py đều chạy qua)
 
-SYMBOL = re.compile(r"\b(?P<pre>[Ss][Oo06])\s*[:.;]?\s*(?P<sym>(?P<num>[0-9OoIl]{1,5})[A-Za-z]?\s*/\s*"
-                    r"(?:(?:19|20)[0-9]{2}\s*/\s*)?[A-Za-z0-9&]{1,12}(?:\s*-\s*[A-Za-z0-9&]{1,12}){0,4})")
 BARE = re.compile(r"(?<![\w/])(?P<sym>[0-9]{1,5}/(?:(?:19|20)[0-9]{2}/)?[A-Z][A-Za-z&]{0,11}"
                   r"(?:-[A-Z0-9][A-Za-z0-9&]{0,11}){1,4})(?![\w/])")
 NO_NUMBER = re.compile(r"\b[Ss][Oo06]\s*[:;]?[\s._…]*/\s*[A-Za-z]")       # "Số:   /QĐ-UBND" chưa điền số
-DATE = re.compile(r"(?i)(?:(?P<place>[A-Z][A-Za-z.' ]{1,40}?)\s*,\s*)?ng[a-z]{0,2}y\s+(?P<d>[0-9]{1,2})\s+"
-                  r"th[a-z]{0,2}ng\s+(?P<m>[0-9]{1,2})\s+n[a-z]{0,2}m\s+(?P<y>(?:19|20)[0-9]{2})\b")
 DATE_NUM = re.compile(r"(?i)ng[a-z]{0,2}y\s+(?P<d>[0-9]{1,2})\s*[/.-]\s*(?P<m>[0-9]{1,2})\s*[/.-]\s*"
                       r"(?P<y>(?:19|20)[0-9]{2})\b")
 VV = re.compile(r"(?i)^\s*(?:V\s*/\s*v\b|ve\s+viec\b)[\s.:]*")
 MOTTO = re.compile(r"CONG\s*HOA\s*XA\s*HOI\s*CHU\s*NGHIA\s*VIET\s*NAM|DOC\s*LAP\s*-?\s*TU\s*DO\s*-?\s*HANH\s*PHUC")
 RULE_LINE = re.compile(r"^[-_=.*~ ]+$")
-DASHES = re.compile("[‐-―−]")
 _SYM_SPACES = re.compile(r"\s*([/-])\s*")
 _SENTENCE_END = re.compile(r"(?<![A-ZĐ])[.!?;](?=\s|$)")
 # Hết trích yếu: "Kính gửi", "Căn cứ …", "Theo đề nghị …", "Điều 1." (không phải "điều kiện")

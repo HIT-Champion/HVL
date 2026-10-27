@@ -32,6 +32,7 @@ const comment = ref('')
 const sending = ref(false)
 const failure = ref('')
 const root = ref<HTMLElement | null>(null)
+const toggle = ref<HTMLButtonElement | null>(null)
 const screen = computed(() => feedbackScreen(route.path))
 
 const SEND = `mutation ($r: Int!, $c: String, $s: String!) {
@@ -44,6 +45,12 @@ function outside(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', outside))
 onBeforeUnmount(() => document.removeEventListener('click', outside))
 watch(() => route.fullPath, () => { open.value = false })
+// Esc đóng khung đang mở và trả tiêu điểm về nút Góp ý, không để tiêu điểm lạc khi khung biến mất
+function escape() {
+  if (!open.value) return
+  open.value = false
+  toggle.value?.focus()
+}
 
 async function send() {
   if (!rating.value || sending.value) return
@@ -64,12 +71,17 @@ async function send() {
 </script>
 
 <template>
-  <div ref="root" class="relative">
-    <button class="btn-ghost text-xs" :aria-expanded="open" data-testid="feedback-open" @click="open = !open">
+  <div ref="root" class="relative" @keydown.esc.stop="escape">
+    <button
+      ref="toggle" type="button" class="btn-ghost text-xs" :aria-expanded="open" data-testid="feedback-open"
+      @click="open = !open"
+    >
       {{ t('feedback.button') }}
     </button>
     <form
-      v-if="open" class="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-stone-200 bg-white p-4 shadow-xl"
+      v-if="open"
+      class="moc-feedback-panel absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border
+             border-stone-200 bg-white p-4 shadow-xl"
       :aria-label="t('feedback.title')" data-testid="feedback-form" @submit.prevent="send"
     >
       <div class="font-semibold text-stone-900">{{ t('feedback.title') }}</div>
@@ -105,3 +117,17 @@ async function send() {
     </form>
   </div>
 </template>
+
+<style scoped>
+/* Điện thoại: nút Góp ý không nằm sát mép phải nên khung neo right-0 bị đẩy lố mép trái (x = -29px ở 390px). Dưới
+   640px khung bám màn hình: cách hai mép 16px, ngay dưới thanh trên, cuộn được khi bàn phím ảo chiếm chỗ */
+@media (max-width: 639px) {
+  .moc-feedback-panel {
+    position: fixed;
+    inset: 76px 16px auto;
+    width: auto;
+    max-height: calc(100dvh - 100px);
+    overflow-y: auto;
+  }
+}
+</style>

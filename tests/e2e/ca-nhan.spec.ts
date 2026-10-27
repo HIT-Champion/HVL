@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { PASSWORD, shot, signIn, textPdf } from './helpers'
+import { PASSWORD, SCAN_TIMEOUT, shot, signIn, textPdf } from './helpers'
 
 // Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A ở /ca-nhan/, client Keycloak riêng
 // app-ca-nhan. Đã đăng nhập Văn phòng điện tử thì vào thẳng, không nhập lại mật khẩu (SSO); tải tệp lên thư mục Dự án
@@ -37,7 +37,8 @@ test('không gian cá nhân: SSO từ Văn phòng điện tử, tải lên, chuy
   const name = `de-cuong-${tag}.pdf`
   const content = textPdf('De cuong hoc phan', `Ma thu ${tag}`)
   await page.locator('#file').setInputFiles({ name, mimeType: 'application/pdf', buffer: content })
-  await expect(page.getByText(`Đã tải ${name} lên, trạm quét báo sạch, đã xếp vào Dự án.`)).toBeVisible()
+  await expect(page.getByText(`Đã tải ${name} lên, trạm quét báo sạch, đã xếp vào Dự án.`))
+    .toBeVisible({ timeout: SCAN_TIMEOUT })
   await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible()
 
   await page.getByRole('combobox', { name: `Chuyển ${name} sang thư mục` }).selectOption('archives')
@@ -54,4 +55,18 @@ test('không gian cá nhân: SSO từ Văn phòng điện tử, tải lên, chuy
   expect(download.suggestedFilename()).toBe(name)
   expect(readFileSync(await download.path()).equals(content)).toBe(true)
   await shot(page, '35-ca-nhan-luu-tru')
+
+  // phông Be Vietnam Pro tự phục vụ ở /ca-nhan/fonts/ tải được dưới CSP của ứng dụng (#235)
+  const faces = await page.evaluate(async () =>
+    (await document.fonts.load('600 16px "Be Vietnam Pro"', 'Không gian')).map((f) => f.status))
+  expect(faces).toEqual(['loaded'])
+
+  // máy tính bảng, điện thoại: không cuộn ngang; trên điện thoại dòng tệp thành thẻ, ô chuyển thư mục vẫn dùng được
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  for (const width of [768, 390]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(overflow).toBeLessThanOrEqual(0)
+    await expect(page.getByRole('combobox', { name: `Chuyển ${name} sang thư mục` })).toBeVisible()
+    await shot(page, `35-ca-nhan-${width}`)
+  }
 })

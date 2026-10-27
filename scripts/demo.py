@@ -21,7 +21,9 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py nong-lanh
         (i) Vòng đời dữ liệu nóng → lạnh: chuyên viên lập hồ sơ, đóng; svc-files nộp lưu thành gói Parquet + tệp +
         manifest có băm trên bucket lạnh khóa ghi, gỡ chi tiết khỏi CSDL nghiệp vụ; văn bản vẫn tìm thấy, quét QR vẫn
-        khớp, phòng đọc đọc lại gói bằng DuckDB, xem tệp PDF có dấu tên người xem. (make demo-nong-lanh)
+        khớp, phòng đọc đọc lại gói bằng DuckDB, xem tệp PDF có dấu tên người xem; số liệu đã nộp lưu của trang Điều
+        hành (DuckDB đếm trên các gói Parquet) tăng đúng bằng hồ sơ vừa nộp lưu, phả hệ ghi lượt đọc. (make
+        demo-nong-lanh)
     python3 scripts/demo.py kiem-dich
         (iv) Kiểm dịch tại cửa ngõ: tệp sạch qua, tệp chứa chuỗi kiểm thử EICAR bị ClamAV chặn trước khi chạm
         kho; lần chặn nằm trong sổ kiểm toán chuỗi băm, neo ra ngoài CSDL và kiểm lại được. (make demo-kiem-dich)
@@ -38,7 +40,8 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py it-ot
         (ii) Hội tụ IT/OT: bật context broker NGSI-LD (profile iot); cảm biến nhiệt độ phòng máy chủ giả lập gửi các
         lần đo, vượt ngưỡng thì svc-workflow dựng dự thảo "Báo cáo sự cố" từ mẫu cho chuyên viên phụ trách; chuyên viên
-        trình, dự thảo vào luồng văn bản đi. (make demo-it-ot)
+        trình, dự thảo vào luồng văn bản đi; sơ đồ cảm biến kho (/cam-bien) tô màu từng phòng và gắn cờ chất lượng
+        (mất tín hiệu, ngoài dải, trùng observedAt, observedAt ở tương lai). (make demo-it-ot)
     python3 scripts/demo.py lien-thong
         Liên thông văn bản trong hệ thống (F3.12, không thuộc 4 nguyên lý): Khoa CNTT phát hành công văn gửi Khoa
         Kinh tế; bên nhận tự có văn bản đến cùng tệp (cùng SHA-256), cùng mã xác thực; vào sổ, lãnh đạo có việc chỉ
@@ -100,8 +103,8 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         Log tập trung (F3.14, profile logs — chưa bật thì màn tự bật bằng make logs-up và để nguyên): văn thư phát hành
         một công văn với X-Request-Id tự đặt; yêu cầu đi qua APISIX → Hasura → svc-workflow → svc-files; tra
         Parseable theo mã đó ra dòng của cả ba dịch vụ, sổ kiểm toán có dòng cùng mã; không đăng nhập thì không đọc
-        được kho log; không dòng nào có token, cookie, chuỗi truy vấn; docker logs vẫn đọc được. (make
-        demo-log-tap-trung)
+        được kho log; không dòng nào có token, cookie, chuỗi truy vấn; docker logs vẫn đọc được; Vector chạy lại thì
+        dòng đầu tiên của dịch vụ đang im ghi sau đó vẫn tới kho. (make demo-log-tap-trung)
     python3 scripts/demo.py cai-ung-dung
         Cắm ứng dụng thứ ba bằng MỘT lệnh (docs/them-ung-dung.md mục 1): `moc app install apps/bang-tin/app.yaml` —
         kế hoạch --dry-run không đổi gì; cài xong mở /bang-tin/ qua APISIX, đăng nhập một lần (client app-bang-tin,
@@ -109,6 +112,12 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         sự kiện qua Event Trigger, văn bản hạn chế thì không; cài lại không tạo gì mới; gỡ thì route, client, trigger,
         container mất, dữ liệu còn; git status trước và sau giống hệt: không tệp nào của lõi đổi. (make
         demo-cai-ung-dung)
+    python3 scripts/demo.py quy-trinh
+        Quy trình của ứng dụng chạy trên lõi (#301, docs/them-ung-dung.md mục Đơn nghỉ phép): cài apps/nghi-phep —
+        BPMN, form của ứng dụng lên động cơ quy trình của lõi; bản có scriptTask bị từ chối trước khi đổi gì; nhân viên
+        gửi đơn qua API chung bằng token app-nghi-phep (dữ liệu sai → 422 đúng mã từng trường); chỉ trưởng phòng cùng
+        phòng thấy và duyệt được; token của client khác → 403; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép;
+        duyệt → đơn kết thúc với quyết định đồng ý; cài lại không đổi gì; gỡ giữ lịch sử đơn. (make demo-quy-trinh)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -119,6 +128,7 @@ import argparse
 import base64
 import hashlib
 import json
+import pathlib
 import re
 import subprocess
 import sys
@@ -576,6 +586,62 @@ def oltp_detail(ids: list[str]) -> dict[str, int]:
     return {"liên kết tệp": files, "dòng thời gian": events, "giao việc": assignments}
 
 
+ARCHIVE_STATS_RUN = """query { core_lineage_events(where: {job: {_eq: "moc.archive.stats"}}, order_by: {id: desc},
+  limit: 1) { inputs } }"""
+
+
+def archive_stats(session: Session) -> dict[str, Any]:
+    """Số liệu đã nộp lưu của trang Điều hành (#304): DuckDB đếm trên các gói Parquet trong bucket lạnh."""
+    stats, _ = call_json("GET", f"{PUBLIC_URL}/api/case-files/archive-stats", headers=session.auth)
+    return stats
+
+
+def year_counts(stats: dict[str, Any]) -> Counter:
+    counts: Counter = Counter()
+    for r in stats["by_year"]:
+        counts[(r["year"], "in")] += r["incoming"]
+        counts[(r["year"], "out")] += r["outgoing"]
+    return counts
+
+
+def check_archive_stats(director: Session, staff: Session, before: dict[str, Any], docs: dict[str, dict[str, Any]],
+                        done: dict[str, Any]) -> None:
+    """Màn nóng → lạnh, bước 5: số liệu lạnh tăng đúng bằng hồ sơ vừa nộp lưu (tổng, theo năm ban hành và chiều), chỉ
+    lãnh đạo đơn vị đọc được, phả hệ ghi lượt DuckDB đọc các gói."""
+    started = time.monotonic()
+    after = archive_stats(director)
+    elapsed = time.monotonic() - started
+    grown = year_counts(after)
+    grown.subtract(year_counts(before))
+    changed = {k: v for k, v in grown.items() if v}
+    expected = dict(Counter((d["year"], d["direction"]) for d in docs.values()))
+    if after["case_files"] - before["case_files"] != 1 or after["documents"] - before["documents"] != len(docs) \
+            or changed != expected:
+        raise DemoFailed(f"số liệu lạnh chưa khớp hồ sơ vừa nộp lưu: trước {before['case_files']} hồ sơ,"
+                         f" {before['documents']} văn bản; sau {after['case_files']}, {after['documents']};"
+                         f" theo năm tăng {changed}, cần {expected}")
+    if any(u["case_file_id"] == done["case_file_id"] for u in after["unreadable"]):
+        raise DemoFailed("gói vừa nộp lưu không đọc lại được để phân tích")
+    ok(f"lãnh đạo đơn vị: {after['case_files']} hồ sơ, {after['documents']} văn bản đã nộp lưu (đến"
+       f" {after['incoming']}, đi {after['outgoing']}) — thêm 1 hồ sơ, {len(docs)} văn bản so với trước bước 2;"
+       f" {elapsed:.1f} giây")
+    ok("theo năm ban hành: " + "; ".join(f"{r['year'] or '?'}: đến {r['incoming']}, đi {r['outgoing']}"
+                                         for r in after["by_year"]))
+    try:
+        archive_stats(staff)
+    except HTTPError as exc:
+        if exc.status != 403:
+            raise DemoFailed(f"chuyên viên gọi số liệu đã nộp lưu trả {exc.status}") from exc
+    else:
+        raise DemoFailed("chuyên viên đọc được số liệu đã nộp lưu của cả đơn vị")
+    ok("chuyên viên gọi cùng API → 403: như trang Điều hành, chỉ lãnh đạo đơn vị")
+    runs = director.gql(ARCHIVE_STATS_RUN)["core_lineage_events"]
+    table = f"s3://{after['bucket']}/{done['archive_key']}documents-"
+    if not runs or not any(name.startswith(table) for name in runs[0]["inputs"]):
+        raise DemoFailed("phả hệ chưa ghi lượt DuckDB đọc gói vừa nộp lưu (job moc.archive.stats)")
+    ok(f"phả hệ: run moc.archive.stats đọc {len(runs[0]['inputs'])} bảng Parquet, có bảng văn bản của gói vừa nộp lưu")
+
+
 def nong_lanh() -> None:
     print("Màn (i) · Vòng đời dữ liệu: nóng → lạnh — hồ sơ đã đóng được nộp lưu thành gói Parquet + tệp + manifest có"
           " băm trên bucket lạnh khóa ghi; CSDL nghiệp vụ chỉ giữ bản ghi rút gọn")
@@ -594,10 +660,17 @@ def nong_lanh() -> None:
     ids = by_user[username][:3]
     staff = Session(username)
     docs = {}
-    for row in psql("select id, direction, coalesce(symbol, ''), coalesce(verify_code, ''), summary from"
+    for row in psql("select id, direction, coalesce(symbol, ''), coalesce(verify_code, ''),"
+                    " coalesce(extract(year from issued_on)::int::text, ''), summary from"
                     f" office.documents where id in ({', '.join(repr(i) for i in ids)})").splitlines():
-        i, direction, symbol, code, summary = row.split("|", 4)
-        docs[i] = {"direction": direction, "symbol": symbol, "verify_code": code, "summary": summary}
+        i, direction, symbol, code, year, summary = row.split("|", 5)
+        docs[i] = {"direction": direction, "symbol": symbol, "verify_code": code, "summary": summary,
+                   "year": int(year) if year else datetime.now().year}   # thiếu ngày ban hành: năm của hồ sơ
+    # số liệu đã nộp lưu trước khi nộp lưu hồ sơ này (bước 5 so lại): lãnh đạo đơn vị của người lập hồ sơ
+    director = Session(psql("select d.username from core.users d join core.users s on s.tenant_id = d.tenant_id"
+                            f" where s.username = '{username}' and d.role = 'director' and d.enabled"
+                            " order by d.username limit 1"))
+    cold_before = archive_stats(director)
     cf = staff.gql(CREATE_CASE_FILE, {"o": {"year": datetime.now().year, "code": f"HS-{tag}",
                                             "title": f"Hồ sơ thử nộp lưu {tag}", "retention_years": 10}})
     cf = cf["insert_office_case_files_one"]
@@ -677,7 +750,10 @@ def nong_lanh() -> None:
     else:
         ok("phòng đọc: các tệp trong gói không phải PDF — chỉ hiện băm, cỡ, không mở")
 
-    say(5, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
+    say(5, "Phân tích trên dữ liệu lạnh: trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB trên các gói Parquet")
+    check_archive_stats(director, staff, cold_before, docs, done)
+
+    say(6, "Gói lưu trữ không sửa, không xóa được — kể cả bằng khóa quản trị kho (S3 Object Lock, COMPLIANCE)")
     try_delete = (
         "import os, sys\n"
         "from svc_files.config import Settings\n"
@@ -829,6 +905,7 @@ def pha_he() -> None:
 
 OT_SENSOR = "phong-may-chu"
 OT_ROOM = "Phòng máy chủ tầng 3"
+OT_PLAN_ROOM = "may-chu"  # mã phòng trên sơ đồ cảm biến kho (apps/office/app/utils/otMap.ts)
 OT_STAFF = "chuyenviendt"
 OT_SUBSCRIPTION = "urn:ngsi-ld:Subscription:moc-ot-alarm"
 
@@ -846,6 +923,9 @@ COMPLETE_TASK = ("mutation ($t: String!, $o: String!, $d: jsonb) { completeTask(
                  " task_id } }")
 
 # Gửi một thông báo giả (token sai) tới svc-workflow, in mã HTTP nhận được hoặc "không tới được"
+# Sơ đồ cảm biến kho (Action otSensorMap, trang /cam-bien)
+OT_MAP = "{ otSensorMap { status threshold stale_after_min sensors { id room value observed_at flags } } }"
+
 OT_PROBE = """
 import sys, urllib.error, urllib.request
 req = urllib.request.Request(sys.argv[1], data=b'{"data": []}', method="POST",
@@ -931,7 +1011,8 @@ def it_ot() -> None:
     readings = [threshold - 11, threshold - 6, threshold - 2, threshold + 2, threshold + 6]
     say(2, f"Cảm biến {OT_ROOM} gửi các lần đo: {' → '.join(f'{r:g}' for r in readings)} °C (ngưỡng {threshold:g} °C)")
     out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", OT_SENSOR, "--name", OT_ROOM,
-              "--responsible", OT_STAFF, "--readings", ",".join(f"{r:g}" for r in readings), "--interval", "1")
+              "--room", OT_PLAN_ROOM, "--responsible", OT_STAFF, "--readings", ",".join(f"{r:g}" for r in readings),
+              "--interval", "1")
     sent = [json.loads(line) for line in out.decode().splitlines() if line.startswith("{")]
     if len(sent) != len(readings) or any(r.get("status") != 204 for r in sent):
         raise DemoFailed(f"cảm biến chưa gửi đủ: {sent}")
@@ -989,6 +1070,68 @@ def it_ot() -> None:
                          f" token sai phải 401 (nhận {from_inside})")
     ok("mạng thiết bị chỉ thấy broker, không tới được svc-workflow; thông báo giả từ mạng nội bộ (svc-files) với token"
        " sai bị từ chối (401) — token mỗi đơn vị suy từ khóa của svc-workflow, chỉ broker giữ")
+
+    ot_sensor_map(tenant, threshold, readings[-1])
+
+
+def ot_sensor_map(tenant: str, threshold: float, server_room: float) -> None:
+    """Bước 7 của màn it-ot: sơ đồ cảm biến kho, cờ chất lượng tính ở svc-workflow, đọc qua Action có kiểm quyền."""
+    stale_min = int(ENV.get("MOC_OT_STALE_MIN") or 10)
+    # mã cảm biến = mã phòng, tên phòng, số đo (dưới ngưỡng: không dựng dự thảo), cách giả lỗi của sensor.py, cờ chờ
+    rooms = [
+        ("kho-1", "Kho bảo quản 1", [threshold - 14, threshold - 13], [], []),
+        ("kho-2", "Kho bảo quản 2", [threshold - 13, -127], [], ["out_of_range"]),
+        ("kho-3", "Kho bảo quản 3", [threshold - 12, threshold - 11], ["--frozen-clock"], ["duplicate_time"]),
+        ("phong-doc", "Phòng đọc", [threshold - 11], ["--late", str(stale_min + 20)], ["stale"]),
+        ("xu-ly", "Phòng xử lý tài liệu", [threshold - 10], ["--clock-ahead", "30"], ["future_time"]),
+    ]
+    say(7, "Sơ đồ cảm biến kho: năm cảm biến gửi số đo — bình thường; -127 °C (ngoài dải); đồng hồ đứng (trùng"
+           f" observedAt); số đo cũ {stale_min + 20} phút (mất tín hiệu); đồng hồ nhanh 30 phút (giờ đo ở tương lai)")
+    for code, name, values, fault, _ in rooms:
+        out = iot("run", "--rm", "-T", "ot-sensor", "--tenant", tenant, "--sensor", code, "--name", name,
+                  "--room", code, "--responsible", OT_STAFF, "--readings", ",".join(f"{v:g}" for v in values),
+                  "--interval", "1", *fault)
+        sent = [json.loads(line) for line in out.decode().splitlines() if line.startswith("{")]
+        if len(sent) != len(values) or any(r.get("status") != 204 for r in sent):
+            raise DemoFailed(f"cảm biến {code} chưa gửi đủ: {sent}")
+    want = {f"urn:ngsi-ld:TemperatureSensor:{code}": flags for code, _, _, _, flags in rooms}
+    server = f"urn:ngsi-ld:TemperatureSensor:{OT_SENSOR}"
+    clerk = Session("vanthu")
+    # lịch sử đo (để xét trùng observedAt) broker ghi bất đồng bộ, sau vài chục giây: chờ tới khi đủ cờ
+    deadline = time.monotonic() + 60
+    while True:
+        board = clerk.gql(OT_MAP)["otSensorMap"]
+        got = {s["id"]: s for s in board["sensors"]}
+        seen = {sid: got.get(sid, {}).get("flags") for sid in want}
+        wrong = {sid: flags for sid, flags in seen.items() if flags != want[sid]}
+        if board["status"] == "ready" and not wrong and server in got:
+            break
+        if time.monotonic() > deadline:
+            raise DemoFailed(f"sau 60 giây sơ đồ vẫn chưa đúng cờ (trạng thái {board['status']}): {wrong}")
+        time.sleep(1)
+    room = got[server]
+    if room["room"] != OT_PLAN_ROOM or room["value"] != server_room or {"out_of_range", "duplicate_time"} & set(
+            room["flags"]):
+        raise DemoFailed(f"phòng máy chủ trên sơ đồ chưa đúng: {room}")
+    if got["urn:ngsi-ld:TemperatureSensor:kho-2"]["value"] != -127:
+        raise DemoFailed(f"kho 2 phải hiện số -127 kèm cờ ngoài dải: {got['urn:ngsi-ld:TemperatureSensor:kho-2']}")
+    ok(f"văn thư thấy {len(got)} cảm biến: phòng máy chủ {server_room:g} °C vượt ngưỡng {board['threshold']:g} °C (đỏ);"
+       " kho 1 bình thường; kho 2 \"ngoài dải\", kho 3 \"trùng giờ đo\", phòng đọc \"mất tín hiệu\" (quá"
+       f" {board['stale_after_min']} phút), phòng xử lý \"giờ đo ở tương lai\" (mất tín hiệu xét theo lúc broker nhận)"
+       " — cờ do svc-workflow tính, không tin số của thiết bị")
+
+    other = Session("vanthukt").gql(OT_MAP)["otSensorMap"]
+    if set(want) & {s["id"] for s in other["sensors"]} or server in {s["id"] for s in other["sensors"]}:
+        raise DemoFailed(f"văn thư Khoa Kinh tế thấy cảm biến của Khoa CNTT: {other['sensors']}")
+    try:
+        Session("quantri").gql(OT_MAP)
+    except RuntimeError as exc:
+        refused = str(exc)
+    else:
+        raise DemoFailed("quản trị đơn vị gọi được otSensorMap: Action phải chỉ cho các vai trò đọc được văn bản")
+    ok(f"văn thư Khoa Kinh tế chỉ thấy cảm biến của đơn vị mình ({len(other['sensors'])}); quản trị đơn vị không có"
+       f" Action này ({refused[:80]}) — trình duyệt không gọi thẳng broker, đọc qua APISIX → Hasura → svc-workflow")
+    print(f"\nXem trên giao diện (vanthu): {PUBLIC_URL}/cam-bien")
 
 
 DISPATCH_UNITS = "{ office_dispatch_units(order_by: {name: asc}) { id code name } }"
@@ -3478,9 +3621,11 @@ def nap_lo() -> None:
 
 
 # --- F3.14 · Log tập trung (make demo-log-tap-trung) ------------------------------------------------------------
-# Một yêu cầu phát hành đi qua đủ ba dịch vụ đã che PII mà log tập trung thu: APISIX (dòng truy cập, mã ở cuối dòng),
-# svc-workflow (office.action.done), svc-files (office.document.rendered…)
-LOG_TRACED = ("apisix", "svc-workflow", "svc-files")
+# Dịch vụ log tập trung thu (LOGGED_SERVICES của Makefile, tệp phủ platform/logs/docker-compose.logs.yml)
+LOG_COLLECTED = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres")
+# Một yêu cầu phát hành đi qua: APISIX (dòng truy cập, mã ở cuối dòng), svc-workflow (office.action.done), Hasura
+# (svc-workflow, svc-files gửi mã kèm lời gọi GraphQL: hasura.http-log), svc-files (office.document.rendered…)
+LOG_TRACED = ("apisix", "svc-workflow", "hasura", "svc-files")
 # Không dòng nào trong kho log được có: token (Bearer, JWT), chuỗi truy vấn của ô tìm kiếm hay của lần đăng nhập
 LOG_FORBIDDEN = ("Bearer ey", "eyJ", "?q=", "?code=", "?state=")
 LOGS_WAIT_S = 60.0
@@ -3488,6 +3633,32 @@ LOGS_WAIT_S = 60.0
 
 def traced_services(rows: list[dict[str, Any]]) -> set[str]:
     return {str(r["service"]) for r in rows if r.get("service")}
+
+
+def logged_since(rows: list[dict[str, Any]], since: str) -> list[dict[str, Any]]:
+    """Dòng Parseable nhận từ mốc ``since`` (utc_mark()) trở đi. p_timestamp là giờ UTC, không ghi múi giờ."""
+    start = datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    out = []
+    for row in rows:
+        try:
+            at = datetime.fromisoformat(str(row.get("p_timestamp") or ""))
+        except ValueError:
+            continue
+        if (at if at.tzinfo else at.replace(tzinfo=timezone.utc)) >= start:
+            out.append(row)
+    return out
+
+
+def postgres_entry(rows: list[dict[str, Any]], marker: str) -> list[dict[str, Any]]:
+    """Các dòng PostgreSQL của mục lỗi có ``marker`` trong lời báo: dòng ERROR rồi các dòng cùng tiền tố "%m [%p] "
+    (CONTEXT, STATEMENT…). Không dựa vào thứ tự: các dòng tới Parseable cùng lô có cùng p_timestamp, order by xếp tùy
+    ý. Không có dòng ERROR mang dấu thì []."""
+    rows = [r for r in rows if r.get("service") == "postgres"]
+    for row in rows:
+        found = re.match(r"(.* \[\d+\] )ERROR:  .*" + re.escape(marker), str(row.get("message") or ""))
+        if found:
+            return [row] + [r for r in rows if r is not row and str(r.get("message") or "").startswith(found.group(1))]
+    return []
 
 
 def log_leaks(rows: list[dict[str, Any]], secrets: list[str]) -> list[str]:
@@ -3517,26 +3688,28 @@ def log_tap_trung() -> None:
     import log_tap_trung as lt
     from moc_env import load_env
 
-    print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → svc-files; Vector thu log của"
-          " các dịch vụ đã che thông tin cá nhân (F4.4), che lần hai, gửi Parseable; tra theo mã ra dòng của cả ba")
-    logged = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow")
+    print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → Hasura, svc-files; Vector"
+          " thu log, che lần hai (Hasura, Keycloak, PostgreSQL không tự che: luật riêng), gửi Parseable; tra theo mã ra"
+          " dòng của cả bốn; câu SQL lỗi, lần đăng nhập sai vào kho đã che")
 
-    say(1, "Log tập trung (profile logs): Vector, Parseable chạy; 5 dịch vụ gửi log qua driver fluentd của Docker")
+    say(1, f"Log tập trung (profile logs): Vector, Parseable chạy; {len(LOG_COLLECTED)} dịch vụ gửi log qua driver"
+           " fluentd của Docker")
     turned_on = False
     try:
         request("GET", f"{lt.base_url(ENV)}/api/v1/liveness", timeout=5)
         running = True
     except (HTTPError, OSError):
         running = False
-    drivers = {s: log_driver(s) for s in logged}
+    drivers = {s: log_driver(s) for s in LOG_COLLECTED}
     if not running or any(d != "fluentd" for d in drivers.values()):
         if not (ROOT / "Makefile").is_file():
             raise DemoFailed("log tập trung chưa bật và đây là bản cài (không có Makefile): thêm logs vào"
                              " MOC_EXTRA_PROFILES rồi cài lại (make install) — docs/van-hanh.md mục Log tập trung")
-        print("   chưa bật: make logs-up (tạo lại 5 container, giữ nguyên dữ liệu)")
+        print(f"   chưa bật: make logs-up (tạo lại {len(LOG_COLLECTED)} container, giữ nguyên dữ liệu; CSDL, Hasura,"
+              " Keycloak gián đoạn vài giây)")
         subprocess.run(["make", "--no-print-directory", "logs-up"], cwd=ROOT, check=True)
         turned_on = True
-        drivers = {s: log_driver(s) for s in logged}
+        drivers = {s: log_driver(s) for s in LOG_COLLECTED}
     if any(d != "fluentd" for d in drivers.values()):
         raise DemoFailed(f"dịch vụ chưa gửi log qua fluentd: {drivers}")
     env = load_env()        # make logs-up có thể vừa thêm MOC_LOGS_PASSWORD vào .env
@@ -3583,7 +3756,50 @@ def log_tap_trung() -> None:
         raise DemoFailed(f"core.audit_log không có dòng nào mang request_id {rid} (văn bản {doc_id})")
     ok("psql core.audit_log: " + ", ".join(f"{a} ×{n}" for a, n in audit))
 
-    say(5, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
+    say(5, "PostgreSQL, Keycloak không tự che: một câu SQL lỗi có giá trị giả, một lần đăng nhập bằng tên không có")
+    since = utc_mark()
+    fake = f"Nguyen Van A {uuid.uuid4().hex[:8]}"           # giá trị trong câu lệnh lỗi: kho log không được có
+    try:
+        psql(f"do $$ declare ghi_chu text := '{fake}'; begin raise exception '{rid}: lỗi thử log tập trung'; end $$")
+        raise DemoFailed("câu SQL thử không lỗi")
+    except subprocess.CalledProcessError:
+        pass
+    user = f"{rid}-{uuid.uuid4().hex[:6]}"                  # Keycloak ghi tên gõ vào ở LOGIN_ERROR: kho không được có
+    try:
+        call_json("POST", f"{PUBLIC_URL}/realms/moc/protocol/openid-connect/token",
+                  form={"grant_type": "password", "client_id": "moc-cli", "username": user,
+                        "password": uuid.uuid4().hex, "scope": "openid"})
+        raise DemoFailed(f"Keycloak cho đăng nhập bằng tên không có {user}")
+    except HTTPError as exc:
+        if exc.status not in (400, 401):
+            raise
+    deadline = time.monotonic() + LOGS_WAIT_S
+    while True:
+        try:
+            pg = logged_since(api.recent("postgres", 10), since)
+            kc = logged_since(api.recent("keycloak", 10), since)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        entry = postgres_entry(pg, rid)
+        statement = [r for r in entry if " STATEMENT:  " in str(r.get("message"))]
+        failed = [r for r in kc if "LOGIN_ERROR" in str(r.get("message") or "")]
+        if (statement and failed) or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    cli_lines(lt.table(entry + failed, 70))
+    if not entry:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres mang {rid}")
+    if not statement or not all(str(r.get("message")).endswith(" STATEMENT:  do [REDACTED]") for r in statement):
+        raise DemoFailed("dòng STATEMENT của câu lỗi không có hoặc không bị che")
+    if not failed:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng LOGIN_ERROR của keycloak")
+    for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc)):
+        if any(value in json.dumps(r, ensure_ascii=False) for r in rows_):
+            raise DemoFailed(f"kho log có nguyên văn giá trị {service} phải che")
+    ok(f"postgres: {len(entry)} dòng của mục lỗi (ERROR giữ lời báo, câu lệnh chỉ còn từ đầu); keycloak: LOGIN_ERROR"
+       " không còn tên gõ vào")
+
+    say(6, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
     for who_, auth in (("không đăng nhập", None), ("sai mật khẩu", lt.auth_header(lt.USER, uuid.uuid4().hex))):
         try:
             request("GET", f"{api.base_url}/api/v1/logstream", headers={"Authorization": auth} if auth else None,
@@ -3593,13 +3809,13 @@ def log_tap_trung() -> None:
             if exc.status not in (401, 403):
                 raise
             ok(f"{who_}: HTTP {exc.status}")
-    leaked = log_leaks(rows, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""), env.get("HASURA_ADMIN_SECRET", ""),
-                              env.get("MOC_ACTION_SECRET", "")])
+    leaked = log_leaks(rows + pg + kc, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""),
+                                        env.get("HASURA_ADMIN_SECRET", ""), env.get("MOC_ACTION_SECRET", "")])
     if leaked:
         raise DemoFailed(f"kho log có dấu hiệu cấm: {', '.join(leaked[:6])}")
     ok(f"không dòng nào chứa {', '.join(LOG_FORBIDDEN)}, token phiên của văn thư hay khóa của hệ thống")
 
-    say(6, "docker logs vẫn đọc được (dual logging của Docker): bản cục bộ cũng có mã")
+    say(7, "docker logs vẫn đọc được (dual logging của Docker): bản cục bộ cũng có mã")
     time.sleep(max(0.0, sent + LOG_FLUSH_S - time.monotonic()))
     local = service_logs(mark, "apisix", "svc-workflow")
     without = [s for s, text in local.items() if rid not in text]
@@ -3607,10 +3823,53 @@ def log_tap_trung() -> None:
         raise DemoFailed(f"docker compose logs của {', '.join(without)} không có mã {rid}")
     ok("docker compose logs apisix, svc-workflow: có dòng mang mã")
 
+    say(8, "Vector chạy lại (cập nhật, sự cố): dòng đầu tiên một dịch vụ đang im ghi sau đó vẫn tới kho")
+    began = time.monotonic()
+    compose("--profile", "logs", "restart", "vector")
+    # Kết nối cũ của driver fluentd tới Vector đã chết. Gọi qua APISIX mỗi 2 giây, cùng một mã: mã có trong kho là
+    # Vector đã nhận lại
+    probe = f"{rid}-v"
+    deadline = time.monotonic() + LOGS_WAIT_S
+    while True:
+        request("GET", f"{PUBLIC_URL}/", headers={"X-Request-Id": probe}, timeout=10)
+        try:
+            back = api.find(probe, 5)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        if back or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    if not back:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Vector chạy lại vẫn chưa gửi dòng nào của apisix mang {probe}")
+    up = time.monotonic() - began
+    # postgres im từ bước 5: dòng ERROR này là lần ghi đầu tiên của nó sau khi Vector chạy lại
+    marker = f"{rid}-sau-khoi-dong-lai"
+    try:
+        psql(f"do $$ begin raise exception '{marker}'; end $$")
+        raise DemoFailed("câu SQL thử không lỗi")
+    except subprocess.CalledProcessError:
+        pass
+    asked = time.monotonic()
+    deadline = asked + LOGS_WAIT_S
+    while True:
+        try:
+            entry = postgres_entry(api.recent("postgres", 10), marker)
+        except lt.ParseableError as exc:
+            raise DemoFailed(str(exc)) from exc
+        if entry or time.monotonic() > deadline:
+            break
+        time.sleep(2)
+    if not entry:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres ghi sau khi Vector chạy"
+                         " lại: driver fluentd gửi vào kết nối đã chết mà không biết")
+    ok(f"Vector nhận lại sau {up:.0f} giây; dòng ERROR đầu tiên của postgres sau đó tới kho sau"
+       f" {time.monotonic() - asked:.0f} giây")
+
     print(f"\n   Giao diện: {api.base_url} — tài khoản {lt.USER}, mật khẩu là MOC_LOGS_PASSWORD trong .env; giữ"
           f" {env.get('MOC_LOGS_RETENTION_DAYS') or '7'} ngày")
     if turned_on:
-        print("   Màn này đã bật log tập trung và để nguyên. Tắt: make logs-down (tạo lại 5 container)")
+        print(f"   Màn này đã bật log tập trung và để nguyên. Tắt: make logs-down (tạo lại {len(LOG_COLLECTED)}"
+              " container)")
     else:
         print("   Tắt: bỏ logs khỏi MOC_EXTRA_PROFILES (nếu có) rồi make logs-down")
 
@@ -3628,6 +3887,20 @@ def app_query() -> str:
     if not found:
         raise DemoFailed("apps/bang-tin/public/tin.js không còn QUERY_TIN")
     return found.group(1)
+
+
+def catalog_queries() -> tuple[str, str]:
+    """Đúng hai câu GraphQL trang Danh mục ứng dụng (/ung-dung) gửi (apps/office/app/utils/apps.ts): mọi vai trò;
+    lãnh đạo, quản trị đơn vị (thêm băm manifest, ứng dụng đã gỡ)."""
+    ts = (ROOT / "apps" / "office" / "app" / "utils" / "apps.ts").read_text(encoding="utf-8")
+    found = [re.search(rf"export const {name} = `([^`]*)`", ts) for name in ("APPS_QUERY", "APPS_QUERY_LEADER")]
+    if not (found[0] and found[1]):
+        raise DemoFailed("apps/office/app/utils/apps.ts không còn APPS_QUERY, APPS_QUERY_LEADER")
+    return found[0].group(1), found[1].group(1)
+
+
+def catalog_row(session: Session, query: str) -> dict[str, Any] | None:
+    return next((a for a in session.gql(query)["core_app_catalog"] if a["name"] == APP_NAME), None)
 
 
 def moc_app(*args: str) -> str:
@@ -3654,19 +3927,41 @@ def state_digest() -> str:
     return h.hexdigest()
 
 
-def app_container() -> list[str]:
-    """Container của service app-bang-tin trong project compose của thư mục này (tên project tùy nơi cài); gỡ rồi thì
+def app_container(name: str = APP_NAME) -> list[str]:
+    """Container của service app-<tên> trong project compose của thư mục này (tên project tùy nơi cài); gỡ rồi thì
     tệp phủ không còn service đó, compose báo lỗi — coi như không có container."""
     import ung_dung
-    proc = subprocess.run([*ung_dung.COMPOSE, "ps", "-q", f"app-{APP_NAME}"], cwd=ROOT,
+    proc = subprocess.run([*ung_dung.COMPOSE, "ps", "-q", f"app-{name}"], cwd=ROOT,
                           env=ung_dung.System(ROOT).env(), capture_output=True, text=True)
     return proc.stdout.split() if proc.returncode == 0 else []
 
 
-def app_clients() -> list[str]:
+# Chạy trong container ứng dụng: in các host:cổng mở được kết nối TCP (tên không phân giải được cũng là không tới được)
+NET_PROBE = """import socket, sys
+for target in sys.argv[1:]:
+    host, port = target.rsplit(":", 1)
+    try:
+        socket.create_connection((host, int(port)), timeout=3).close()
+    except OSError:
+        continue
+    print(target)
+"""
+
+
+def app_reach(*targets: str) -> list[str]:
+    """host:cổng mà container app-bang-tin tới được (mạng apps: chỉ APISIX)."""
+    import ung_dung
+    proc = subprocess.run([*ung_dung.COMPOSE, "exec", "-T", f"app-{APP_NAME}", "python3", "-c", NET_PROBE, *targets],
+                          cwd=ROOT, env=ung_dung.System(ROOT).env(), capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise DemoFailed(f"không chạy được thử mạng trong app-{APP_NAME}: {proc.stderr.strip()[-300:]}")
+    return proc.stdout.split()
+
+
+def app_clients(name: str = APP_NAME) -> list[str]:
     import tenants
     return sorted(c["clientId"] for c in tenants.connect().clients()
-                  if c.get("clientId") in (f"app-{APP_NAME}", f"app-{APP_NAME}-svc"))
+                  if c.get("clientId") in (f"app-{name}", f"app-{name}-svc"))
 
 
 def app_metadata() -> tuple[bool, bool]:
@@ -3756,6 +4051,21 @@ def cai_ung_dung() -> None:
     reader.gql(query)
     ok(f"token azp app-{APP_NAME}, vai trò {hasura.get('x-hasura-default-role')}, đơn vị của người dùng; câu GraphQL "
        "của trang chạy được trên bang_tin.tin")
+    # Trang Danh mục ứng dụng của Văn phòng điện tử (core.app_catalog): chuyên viên thấy ứng dụng vừa cài để mở, không
+    # đọc được băm manifest, ứng dụng đã gỡ
+    catalog_q, catalog_leader_q = catalog_queries()
+    version = re.search(r"^version: (\S+)$", (ROOT / APP_MANIFEST).read_text(encoding="utf-8"), re.M)
+    entry = catalog_row(gv(OWNER), catalog_q)
+    if not entry or entry["path"] != APP_PATH.rstrip("/") or entry["version"] != (version and version.group(1)):
+        raise DemoFailed(f"Danh mục ứng dụng của {OWNER} không có {APP_NAME} đúng đường, phiên bản: {entry}")
+    try:
+        gv(OWNER).gql(catalog_leader_q)
+    except RuntimeError:     # Hasura: field 'manifest_sha256' not found — vai trò không được đọc cột
+        pass
+    else:
+        raise DemoFailed(f"{OWNER} (chuyên viên) đọc được băm manifest, ứng dụng đã gỡ trong Danh mục ứng dụng")
+    ok(f"Danh mục ứng dụng (/ung-dung) của {OWNER}: \"{entry['title']}\" {entry['version']} ở {entry['path']}/; "
+       "băm manifest, ứng dụng đã gỡ: chỉ lãnh đạo, quản trị đơn vị")
 
     say(5, "Văn thư vào sổ một văn bản đến thường và một văn bản hạn chế → lõi phát sự kiện, ứng dụng nhận qua webhook")
     tag = uuid.uuid4().hex[:6].upper()
@@ -3771,7 +4081,8 @@ def cai_ung_dung() -> None:
     if not seen or seen[0]["kind"] != "office.document.registered" or not seen[0].get("document"):
         raise DemoFailed(f"sau 60 giây lãnh đạo khoa chưa thấy tin của văn bản {tag}/BT-VP: {seen}")
     ok(f"lãnh đạo khoa thấy tin \"{seen[0]['document']['symbol']} — Văn bản đến đã vào sổ\" sau "
-       f"{time.monotonic() - sent:.1f} giây (Event Trigger → app-{APP_NAME}:8081 → GraphQL bằng danh tính dịch vụ)")
+       f"{time.monotonic() - sent:.1f} giây (Event Trigger → APISIX cổng hook 9081 → app-{APP_NAME}:8081 → token, "
+       "GraphQL qua APISIX bằng danh tính dịch vụ)")
     leaked = psql(f"select (select count(*) from core.app_events where document_id = '{secret}') + "
                   f"(select count(*) from bang_tin.tin where document_id = '{secret}')")
     if leaked != "0":
@@ -3780,16 +4091,36 @@ def cai_ung_dung() -> None:
     if any(t["document_id"] == normal for t in reader.gql(query)["bang_tin_tin"]):
         raise DemoFailed(f"{OWNER} thấy tin của văn bản chưa được giao cho mình")
     ok(f"{OWNER} (chưa được giao văn bản đó) không thấy tin: Bảng tin theo đúng quyền xem văn bản của lõi")
+    reach = app_reach("apisix:9080", "keycloak:8080", "hasura:8080", "postgres:5432", "svc-files:8000")
+    if reach != ["apisix:9080"]:
+        raise DemoFailed(f"container app-{APP_NAME} (mạng apps) phải chỉ tới được apisix:9080, đang tới được: {reach}")
+    try:
+        request("POST", f"{PUBLIC_URL}/su-kien/{APP_NAME}", data=b"{}", headers={"Content-Type": "application/json"})
+        public_hook = 200
+    except HTTPError as exc:
+        public_hook = exc.status
+    if public_hook != 404:
+        raise DemoFailed(f"POST /su-kien/{APP_NAME} ở cổng công khai phải 404 (route hook chỉ ở cổng 9081): "
+                         f"{public_hook}")
+    ok(f"app-{APP_NAME} chỉ tới được APISIX (Keycloak, Hasura, PostgreSQL, svc-files: không); route hook chỉ ở cổng "
+       "nội bộ 9081, cổng công khai trả 404")
 
     say(6, f"Chạy lại moc app install {APP_MANIFEST}: không tạo gì mới")
     container, digest = app_container(), state_digest()
     migrations = psql(f"select count(*) from core.app_migrations where app = '{APP_NAME}'")
+    entry = catalog_row(gv("truongkhoa"), catalog_leader_q)
     out = moc_app("install", APP_MANIFEST)
     if (app_container() != container or state_digest() != digest
             or psql(f"select count(*) from core.app_migrations where app = '{APP_NAME}'") != migrations
             or "client đã có" not in out or "không có migration mới" not in out):
         raise DemoFailed("cài lại phải giữ nguyên container, .moc-apps/, migration, client:\n" + out)
     ok("cùng container, .moc-apps/ không đổi một byte, không migration mới, client đã có")
+    sha = hashlib.sha256((ROOT / APP_MANIFEST).read_bytes()).hexdigest()
+    if not entry or entry["manifest_sha256"] != sha or catalog_row(gv("truongkhoa"), catalog_leader_q) != entry:
+        raise DemoFailed(f"Danh mục ứng dụng của lãnh đạo: băm manifest phải là SHA-256 của {APP_MANIFEST} ({sha}), "
+                         f"cài lại không đổi dòng nào: {entry}")
+    ok(f"Danh mục ứng dụng của lãnh đạo khoa: băm manifest {sha[:12]}… = sha256sum {APP_MANIFEST}; cài lại không đổi "
+       "lúc cài, lúc cập nhật")
 
     say(7, f"moc app remove {APP_NAME}: route, client, trigger, container mất; dữ liệu còn")
     rows = psql(f"select count(*) from bang_tin.tin where document_id = '{normal}'")
@@ -3807,6 +4138,10 @@ def cai_ung_dung() -> None:
         raise DemoFailed(".moc-apps/apisix.yaml phải giống hệt tệp lõi khi không còn ứng dụng")
     ok(f"/bang-tin/ không còn là Bảng tin; không container, client, trigger; bang_tin.tin còn {rows} dòng của "
        "văn bản thử; tệp chạy APISIX giống hệt tệp lõi")
+    gone, entry = catalog_row(gv(OWNER), catalog_q), catalog_row(gv("truongkhoa"), catalog_leader_q)
+    if gone or not entry or not entry["removed_at"]:
+        raise DemoFailed(f"Danh mục ứng dụng sau khi gỡ: {OWNER} vẫn thấy {gone}; lãnh đạo thấy {entry}")
+    ok(f"Danh mục ứng dụng: {OWNER} không còn thấy {APP_NAME}; lãnh đạo khoa thấy \"Đã gỡ\" lúc {entry['removed_at']}")
 
     say(8, "Tệp của lõi không đổi: git status trước và sau giống hệt (trạng thái ứng dụng ở .moc-apps/, ngoài git)")
     git_after = git_state()
@@ -3820,12 +4155,321 @@ def cai_ung_dung() -> None:
     ok("không tệp nào được theo dõi trong git đổi; không tệp mới ngoài .gitignore")
 
 
+# ------------------------------------------------------------------------------- quy trình của ứng dụng qua lõi (#301)
+
+QT_MANIFEST = "apps/nghi-phep/app.yaml"
+QT_NAME, QT_PATH = "nghi-phep", "/nghi-phep/"
+QT_CLIENT = f"app-{QT_NAME}"
+QT_CALLBACK = f"{PUBLIC_URL}/nghi-phep/dang-nhap"
+QT_API = f"{PUBLIC_URL}/api/workflow/nghi-phep"
+QT_PROCESS, QT_FORM_DON, QT_FORM_DUYET = "nghi-phep.don", "nghi-phep.don", "nghi-phep.duyet"
+# seed/users.csv, Khoa CNTT: giảng viên và trưởng Bộ môn KTPM cùng phòng; tổ trưởng Đào tạo là trưởng phòng khác của
+# cùng đơn vị (scripts/tests/test_nghi_phep.py kiểm theo tệp seed)
+QT_STAFF, QT_MANAGER, QT_OTHER = "giangvienktpm", "truongbmktpm", "totruongdt"
+# Dữ liệu sai và mã lỗi lõi phải trả, trùng ca thử dùng chung apps/nghi-phep/forms/*.cases.json (test kiểm)
+QT_BAD_RANGE = {"denNgay": "x-moc-range"}
+QT_WRONG_TYPE, QT_BAD_TYPE = "nghi-mat", {"loai": "enum"}
+QT_WRONG_DECISION, QT_BAD_DECISION = "Đồng ý", {"quyetDinh": "enum"}
+
+
+def leave_request(today: Any, tag: str) -> dict[str, str]:
+    """Đơn hợp lệ theo forms/don.json: phép năm từ một tuần sau, ba ngày; lý do ở dạng NFC như form dọn."""
+    start = today + timedelta(days=7)
+    return {"loai": "phep-nam", "tuNgay": start.isoformat(), "denNgay": (start + timedelta(days=2)).isoformat(),
+            "lyDo": unicodedata.normalize("NFC", f"Về quê dự đám cưới em gái ({tag})")}
+
+
+def bad_range(req: dict[str, str]) -> dict[str, str]:
+    """Cùng đơn, đến ngày trước từ ngày: lõi phải trả 422 {"denNgay": "x-moc-range"}."""
+    return {**req, "tuNgay": req["denNgay"], "denNgay": req["tuNgay"]}
+
+
+def poison_bpmn(xml: str) -> str:
+    """BPMN của ứng dụng chèn thêm một scriptTask chạy lệnh trên máy chủ ngay sau lúc gửi đơn — lõi phải từ chối khi
+    cài, trước khi đổi gì."""
+    flow = 'sourceRef="guiDon" targetRef="duyet"/>'
+    if xml.count(flow) != 1:
+        raise ValueError("BPMN của nghi-phep không còn luồng guiDon → duyet")
+    script = ('sourceRef="guiDon" targetRef="chayMa"/>\n'
+              '    <scriptTask id="chayMa" name="Chạy lệnh trên máy chủ" scriptFormat="groovy">'
+              '<script>"id".execute()</script></scriptTask>\n'
+              '    <sequenceFlow id="f0" sourceRef="chayMa" targetRef="duyet"/>')
+    return xml.replace(flow, script)
+
+
+def poison_copy(target: pathlib.Path) -> pathlib.Path:
+    """Chép apps/nghi-phep sang thư mục tạm (ngoài cây mã nguồn), thay BPMN bằng bản độc → đường tới app.yaml."""
+    import shutil
+    src = ROOT / "apps" / QT_NAME
+    shutil.copytree(src, target, ignore=shutil.ignore_patterns("node_modules", "tests"))
+    bpmn = target / "workflow" / "don-nghi-phep.bpmn20.xml"
+    bpmn.write_text(poison_bpmn(bpmn.read_text(encoding="utf-8")), encoding="utf-8")
+    return target / "app.yaml"
+
+
+def qt_call(token: str, method: str, path: str, data: Any = None) -> tuple[int, Any]:
+    """API quy trình chung của lõi, gọi như trang (apps/nghi-phep/public/don.js) → (mã HTTP, thân JSON hoặc None)."""
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    body = None
+    if data is not None:
+        body = json.dumps({"data": data}, ensure_ascii=False).encode()
+        headers["Content-Type"] = "application/json"
+    try:
+        status, _, raw = request(method, f"{QT_API}{path}", data=body, headers=headers)
+    except HTTPError as exc:
+        status, raw = exc.status, exc.body.encode()
+    try:
+        return status, json.loads(raw) if raw else None
+    except ValueError:
+        return status, None
+
+
+def qt_ok(token: str, method: str, path: str, data: Any = None, *, want: int = 200) -> Any:
+    status, body = qt_call(token, method, path, data)
+    if status != want:
+        raise DemoFailed(f"{method} /api/workflow/{QT_NAME}{path} trả {status} (cần {want}): {json.dumps(body)[:300]}")
+    return body
+
+
+def qt_list(token: str, path: str) -> list[dict[str, Any]]:
+    """GET một danh sách của API chung (/processes, /tasks): phải là mảng các đối tượng."""
+    body = qt_ok(token, "GET", path)
+    if not isinstance(body, list) or not all(isinstance(x, dict) for x in body):
+        raise DemoFailed(f"GET /api/workflow/{QT_NAME}{path} phải trả một mảng: {json.dumps(body)[:300]}")
+    return body
+
+
+def qt_login(username: str, browser: Any = None) -> str:
+    """Đăng nhập như trang (apps/nghi-phep/public/auth.js): code + PKCE S256, response_mode=fragment, client
+    app-nghi-phep. Phiên SSO có sẵn thì Keycloak chuyển thẳng về; chưa có thì gõ mật khẩu, rồi mã TOTP nếu Keycloak hỏi
+    (trưởng phòng — mã tính từ MOC_DEMO_TOTP_SECRET như make seed cài) → access token."""
+    import html
+    import urllib.parse
+
+    from demo_ca_nhan import Browser, exchange
+    from moc_env import _otp_counter, totp_at
+
+    browser = browser or Browser()
+    verifier = base64.urlsafe_b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = uuid.uuid4().hex
+    query = urllib.parse.urlencode({"client_id": QT_CLIENT, "redirect_uri": QT_CALLBACK, "response_type": "code",
+                                    "response_mode": "fragment", "scope": "openid profile", "state": state,
+                                    "code_challenge": challenge, "code_challenge_method": "S256"})
+    resp = browser.opener.open(f"{PUBLIC_URL}/realms/{ENV.get('MOC_REALM', 'moc')}/protocol/openid-connect/auth?"
+                               f"{query}", timeout=30)
+    otp_sent = 0
+    for _ in range(6):
+        url = urllib.parse.urlsplit(resp.geturl())
+        if url.path == urllib.parse.urlsplit(QT_CALLBACK).path:
+            break
+        page = resp.read().decode(errors="replace")
+        form = re.search(r'<form[^>]*\saction="([^"]+)"', page)
+        if form is None:
+            raise DemoFailed(f"{username}: Keycloak không chuyển về {QT_CALLBACK}, cũng không hỏi đăng nhập "
+                             f"({url.path})")
+        if 'name="otp"' in page:
+            if not ENV.get("MOC_DEMO_TOTP_SECRET") or otp_sent >= 3:
+                raise DemoFailed(f"{username}: Keycloak không nhận mã TOTP (MOC_DEMO_TOTP_SECRET khác khóa make seed "
+                                 "đã cài?)")
+            if otp_sent:
+                time.sleep(1.5)        # hai lần sai sát nhau thì Keycloak coi là dò mật khẩu
+            fields = {"otp": totp_at(ENV["MOC_DEMO_TOTP_SECRET"], _otp_counter(username))}
+            otp_sent += 1
+        elif 'name="password"' in page:
+            fields = {"username": username, "password": ENV["MOC_DEMO_PASSWORD"]}
+        else:
+            raise DemoFailed(f"{username}: trang Keycloak lạ ở {url.path} (cần đổi mật khẩu, cài TOTP?)")
+        resp = browser.opener.open(urllib.parse.urljoin(resp.geturl(), html.unescape(form.group(1))), timeout=30,
+                                   data=urllib.parse.urlencode(fields).encode())
+    params = urllib.parse.parse_qs(urllib.parse.urlsplit(resp.geturl()).fragment)
+    if "code" not in params or params.get("state") != [state]:
+        raise DemoFailed(f"{username}: {QT_CLIENT} không nhận được mã cấp quyền đúng state sau khi đăng nhập")
+    return exchange(QT_CLIENT, QT_CALLBACK, params["code"][0], verifier)["access_token"]
+
+
+def task_of(tasks: Any, process_id: str) -> dict[str, Any] | None:
+    """Việc của một đơn trong danh sách /tasks."""
+    return next((t for t in tasks or [] if t.get("processId") == process_id), None)
+
+
+def flowable_sql(query: str) -> str:
+    """Một câu trên CSDL của Flowable (docker-compose.yml: jdbc:postgresql://postgres:5432/flowable)."""
+    out = compose("exec", "-T", "postgres", "psql", "-X", "-q", "-t", "-A", "-U", ENV.get("POSTGRES_USER", "moc"),
+                  "-d", "flowable", "-c", query)
+    return out.decode().strip()
+
+
+def qt_versions() -> int:
+    """Số phiên bản định nghĩa quy trình nghi-phep.don lõi đã triển khai lên Flowable."""
+    return int(flowable_sql(f"select count(*) from act_re_procdef where key_ = '{QT_PROCESS}'") or 0)
+
+
+def qt_history() -> int:
+    """Số đơn (phiên quy trình, cả đã kết thúc) của nghi-phep.don trong lịch sử Flowable."""
+    return int(flowable_sql(f"select count(*) from act_hi_procinst where proc_def_id_ like '{QT_PROCESS}:%'") or 0)
+
+
+def quy_trinh() -> None:
+    import tempfile
+
+    from demo_ca_nhan import Browser, claims_of, exchange
+
+    print("Quy trình của ứng dụng chạy trên lõi — Đơn nghỉ phép (apps/nghi-phep): ứng dụng mang BPMN và form, lõi "
+          "triển khai, kiểm form, giao việc theo phòng; không sửa tệp nào của lõi")
+    listed = json.loads(moc_app("list", "--json"))["apps"]
+    if any(a["name"] == QT_NAME and (a["installed"] or a["removing"]) for a in listed):
+        moc_app("remove", QT_NAME)
+        print("   (gỡ bản cài từ lần chạy trước)")
+    git_before = git_state()
+    tag = uuid.uuid4().hex[:6].upper()
+
+    say(1, "Cài một bản có BPMN độc (scriptTask chạy lệnh trên máy chủ): lõi từ chối, không đổi gì")
+    digest, versions = state_digest(), qt_versions()
+    with tempfile.TemporaryDirectory(prefix="moc-nghi-phep-doc-") as tmp:
+        code, out, err = moc("app", "install", str(poison_copy(pathlib.Path(tmp) / QT_NAME)))
+    said = (err or out).strip()
+    if code != 1 or "scriptTask" not in said:
+        raise DemoFailed(f"BPMN có scriptTask phải bị từ chối (thoát 1, lời báo nêu scriptTask): thoát {code}\n{said}")
+    if state_digest() != digest or app_container(QT_NAME) or app_clients(QT_NAME) or qt_versions() != versions:
+        raise DemoFailed("bị từ chối nhưng đã đổi .moc-apps/, tạo container, client hoặc triển khai quy trình")
+    print("\n".join(f"   {ln}" for ln in said.splitlines()[-4:]))
+    ok("thoát 1, lời báo nêu scriptTask; .moc-apps/ không đổi, không container, client, không quy trình mới")
+
+    say(2, f"moc app install {QT_MANIFEST} — một lệnh: trang, client, BPMN và form lên động cơ quy trình của lõi")
+    started = time.monotonic()
+    out = moc_app("install", QT_MANIFEST)
+    print("\n".join(f"   {ln}" for ln in out.strip().splitlines()))
+    if not app_container(QT_NAME) or app_clients(QT_NAME) != [QT_CLIENT] or qt_versions() < 1:
+        raise DemoFailed(f"sau khi cài: container {app_container(QT_NAME)}, client {app_clients(QT_NAME)}, quy trình "
+                         f"{QT_PROCESS} trên Flowable: {qt_versions()} phiên bản")
+    status, headers, body = request("GET", f"{PUBLIC_URL}{QT_PATH}")
+    csp = next((v for k, v in headers.items() if k.lower() == "content-security-policy"), "")
+    config = json.loads(request("GET", f"{PUBLIC_URL}{QT_PATH}config.json")[2])
+    if status != 200 or "Đơn nghỉ phép" not in body.decode() or "script-src 'self'" not in csp \
+            or config.get("clientId") != QT_CLIENT:
+        raise DemoFailed(f"{QT_PATH} trả {status}, CSP {csp!r}, config {config}")
+    ok(f"xong sau {time.monotonic() - started:.0f} giây: container app-{QT_NAME}, client {QT_CLIENT} (không client "
+       f"dịch vụ), {QT_PROCESS} trên Flowable; {QT_PATH} 200, CSP script-src 'self'")
+
+    say(3, f"{QT_STAFF} đăng nhập Văn phòng điện tử rồi mở Đơn nghỉ phép (SSO, PKCE) — form lấy từ lõi")
+    browser = Browser()
+    code, verifier, _ = browser.authorize("app-office", f"{PUBLIC_URL}/", QT_STAFF)
+    office_token = exchange("app-office", f"{PUBLIC_URL}/", code, verifier)["access_token"]
+    staff = qt_login(QT_STAFF, browser)
+    if claims_of(staff).get("azp") != QT_CLIENT:
+        raise DemoFailed(f"token của trang Đơn nghỉ phép có azp {claims_of(staff).get('azp')}")
+    for key, name in ((QT_FORM_DON, "don"), (QT_FORM_DUYET, "duyet")):
+        served = qt_ok(staff, "GET", f"/forms/{key}")
+        mine = json.loads((ROOT / "apps" / QT_NAME / "forms" / f"{name}.json").read_text(encoding="utf-8"))
+        if not isinstance(served, dict) or served.get("properties") != mine["properties"]:
+            raise DemoFailed(f"GET /forms/{key} không trả đúng forms/{name}.json của ứng dụng")
+    ok(f"token azp {QT_CLIENT}, không hỏi lại mật khẩu; GET /forms/{QT_FORM_DON}, /forms/{QT_FORM_DUYET} trả đúng "
+       "JSON Schema trong forms/ của ứng dụng")
+
+    say(4, "Nhân viên gửi đơn: dữ liệu sai → 422 đúng mã từng trường; dữ liệu đúng → quy trình chạy")
+    today = datetime.now(timezone(timedelta(hours=7))).date()
+    req = leave_request(today, tag)
+    for wrong, want, what in ((bad_range(req), QT_BAD_RANGE, "đến ngày trước từ ngày"),
+                              ({**req, "loai": QT_WRONG_TYPE}, QT_BAD_TYPE, "loại nghỉ không có trong danh sách")):
+        status, body = qt_call(staff, "POST", f"/processes/{QT_PROCESS}", wrong)
+        if status != 422 or (body or {}).get("errors") != want:
+            raise DemoFailed(f"{what}: cần 422 {{\"errors\": {json.dumps(want)}}}, nhận {status} {body}")
+        ok(f"{what}: 422 {json.dumps(want)}")
+    pid = (qt_ok(staff, "POST", f"/processes/{QT_PROCESS}", req, want=201) or {}).get("id")
+    mine = next((p for p in qt_list(staff, "/processes") if p.get("id") == pid), None) if pid else None
+    if not mine or mine.get("endedAt") or mine.get("processKey") != QT_PROCESS:
+        raise DemoFailed(f"đơn vừa gửi ({pid}) phải có trong \"Đơn của tôi\", đang chờ duyệt: {mine}")
+    ok(f"201, đơn {pid}: {req['tuNgay']} → {req['denNgay']}, \"Đơn của tôi\" ghi đang chờ duyệt")
+
+    say(5, f"Ai thấy việc: trưởng phòng cùng phòng ({QT_MANAGER}) thấy; phòng khác ({QT_OTHER}), người gửi không")
+    manager = qt_login(QT_MANAGER)
+    task = None
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline and task is None:
+        task = task_of(qt_list(manager, "/tasks"), pid)
+        time.sleep(0 if task else 1)
+    if not task or task.get("formKey") != QT_FORM_DUYET or (task.get("data") or {}).get("tuNgay") != req["tuNgay"]:
+        raise DemoFailed(f"{QT_MANAGER} không thấy việc duyệt đơn {pid} (formKey {QT_FORM_DUYET}, kèm dữ liệu đơn)")
+    ok(f"{QT_MANAGER}: việc \"{task.get('name')}\" ({QT_FORM_DUYET}) kèm dữ liệu đơn")
+    other = qt_login(QT_OTHER)
+    for who_, token in ((QT_OTHER, other), (QT_STAFF, staff)):
+        if task_of(qt_list(token, "/tasks"), pid):
+            raise DemoFailed(f"{who_} thấy việc duyệt đơn của {QT_STAFF}")
+        status, _ = qt_call(token, "POST", f"/tasks/{task['id']}", {"quyetDinh": "dong-y"})
+        if status not in (403, 404):
+            raise DemoFailed(f"{who_} duyệt được đơn của {QT_STAFF}: {status}")
+    ok(f"{QT_OTHER} (phòng khác), {QT_STAFF} (người gửi) không thấy việc; tự duyệt → 403/404")
+
+    say(6, "Ranh giới: token của client khác bị cổng từ chối; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép")
+    office_mgr = who(QT_MANAGER)
+    for client, token in (("app-office", office_token), ("moc-cli", office_mgr.token)):
+        status, _ = qt_call(token, "GET", "/processes")
+        if status != 403:
+            raise DemoFailed(f"token azp {client} gọi /api/workflow/{QT_NAME}/processes phải 403, nhận {status}")
+    inbox = office_mgr.gql("{ myTasks { id form_key } }")["myTasks"]
+    leaked = [t for t in inbox if t["id"] == task["id"] or str(t["form_key"]).startswith(f"{QT_NAME}.")]
+    if leaked:
+        raise DemoFailed(f"hộp việc Văn phòng điện tử của {QT_MANAGER} có việc của ứng dụng: {leaked}")
+    ok(f"azp app-office, moc-cli → 403; myTasks của {QT_MANAGER} ({len(inbox)} việc) không có việc nghỉ phép")
+
+    say(7, f"{QT_MANAGER} duyệt: dữ liệu sai → 422; đồng ý → đơn của {QT_STAFF} kết thúc với quyết định đồng ý")
+    status, body = qt_call(manager, "POST", f"/tasks/{task['id']}", {"quyetDinh": QT_WRONG_DECISION})
+    if status != 422 or (body or {}).get("errors") != QT_BAD_DECISION:
+        raise DemoFailed(f"quyết định viết khác mã: cần 422 {json.dumps(QT_BAD_DECISION)}, nhận {status} {body}")
+    note = unicodedata.normalize("NFC", f"Nhớ bàn giao việc đang làm ({tag})")
+    qt_ok(manager, "POST", f"/tasks/{task['id']}", {"quyetDinh": "dong-y", "ghiChu": note}, want=204)
+    done = None
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline and not done:
+        done = next((p for p in qt_list(staff, "/processes") if p.get("id") == pid and p.get("endedAt")), None)
+        time.sleep(0 if done else 1)
+    if not done or (done.get("data") or {}).get("quyetDinh") != "dong-y":
+        raise DemoFailed(f"đơn {pid} phải kết thúc với quyetDinh dong-y: {done}")
+    if task_of(qt_list(manager, "/tasks"), pid):
+        raise DemoFailed(f"việc duyệt đơn {pid} vẫn còn trong danh sách của {QT_MANAGER}")
+    ok(f"422 {json.dumps(QT_BAD_DECISION)}; rồi 204 — \"Đơn của tôi\": kết thúc lúc {done['endedAt']}, quyết định "
+       "dong-y; việc không còn")
+
+    say(8, f"Chạy lại moc app install {QT_MANIFEST}: không đổi gì")
+    container, digest, versions = app_container(QT_NAME), state_digest(), qt_versions()
+    out = moc_app("install", QT_MANIFEST)
+    if app_container(QT_NAME) != container or state_digest() != digest or qt_versions() != versions \
+            or "client đã có" not in out:
+        raise DemoFailed("cài lại phải giữ nguyên container, .moc-apps/, client và số phiên bản quy trình:\n" + out)
+    ok(f"cùng container, .moc-apps/ không đổi một byte, client đã có, {QT_PROCESS} vẫn {versions} phiên bản")
+
+    say(9, f"moc app remove {QT_NAME}: trang, client, container mất; lịch sử đơn còn")
+    history = qt_history()
+    print("\n".join(f"   {ln}" for ln in moc_app("remove", QT_NAME).strip().splitlines()))
+    _, _, body = request("GET", f"{PUBLIC_URL}{QT_PATH}")
+    status, _ = qt_call(staff, "GET", "/processes")
+    problems = [what for what, bad in (("trang", "Đơn nghỉ phép" in body.decode(errors="replace")),
+                                        ("container", bool(app_container(QT_NAME))),
+                                        ("client", bool(app_clients(QT_NAME))), ("API", status == 200)) if bad]
+    if problems:
+        raise DemoFailed(f"sau khi gỡ còn: {', '.join(problems)}")
+    if qt_history() != history or history < 1:
+        raise DemoFailed(f"gỡ ứng dụng không được xóa lịch sử đơn ({history} → {qt_history()})")
+    ok(f"{QT_PATH} không còn là Đơn nghỉ phép, API trả {status}; không container, client; lịch sử Flowable còn "
+       f"{history} đơn")
+
+    say(10, "Tệp của lõi không đổi: git status trước và sau giống hệt")
+    git_after = git_state()
+    if git_before is None:
+        ok("không phải thư mục git (bản cài) — bỏ qua so sánh")
+        return
+    if git_after != git_before:
+        raise DemoFailed("cây mã nguồn đổi trong lúc cài/gỡ:\n" + git_after)
+    ok("không tệp nào được theo dõi trong git đổi; không tệp mới ngoài .gitignore")
+
+
 DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ket-bi-mat": ket_bi_mat,
          "tu-phuc-hoi": tu_phuc_hoi, "pha-he": pha_he, "it-ot": it_ot, "lien-thong": lien_thong,
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
          "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung,
-         "cai-ung-dung": cai_ung_dung}
+         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh}
 
 
 def main(argv: list[str] | None = None) -> int:

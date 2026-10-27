@@ -53,7 +53,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .files import DISPATCH_FINAL, DispatchFileError, FilesClient, FilesError
-from .hasura import (
+from .hasura import Actor, HasuraClient, HasuraError
+from .notify import Notifier, brief_of
+from .office.queries import (
     BRIEF,
     DELIVER,
     DISPATCH,
@@ -62,11 +64,7 @@ from .hasura import (
     DOCUMENT_DISPATCHES,
     FAIL_DISPATCH,
     PENDING_DISPATCHES,
-    Actor,
-    HasuraClient,
-    HasuraError,
 )
-from .notify import Notifier, brief_of
 from .workflow import SYSTEM_ACTOR, _Turns
 
 log = logging.getLogger("svc_workflow")

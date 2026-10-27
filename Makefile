@@ -28,7 +28,7 @@ ENV_FILE := .env
 # COMPOSE_PROFILES trong bản cài (make install)
 EXTRA_PROFILES := $(shell sed -n 's/^MOC_EXTRA_PROFILES=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr ',' ' ')
 COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXTRA_PROFILES),--profile $(p)))
-# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 5 dịch vụ sang
+# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 8 dịch vụ sang
 # fluentd → Vector. Chỉ nạp khi bật; tắt thì docker compose chỉ đọc docker-compose.yml như cũ. export: lệnh con
 # (demo.py, moc.py… gọi docker compose) cũng nạp tệp phủ
 # Ứng dụng cài bằng manifest (moc app install, docs/them-ung-dung.md): tệp phủ compose sinh trong .moc-apps/. Có thì
@@ -37,7 +37,7 @@ APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
 APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
 BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
 LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
-LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow
+LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres
 # Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
 LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
 ifneq ($(LOGS_ON),)
@@ -51,7 +51,7 @@ PREFIX ?= /opt/moc
         demo-ky-so \
         demo-che-pii do-che-pii \
         demo-nap-lo nap-lo-mau \
-        demo-ca-nhan \
+        demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung \
         reconcile \
@@ -130,13 +130,13 @@ logs-env: $(ENV_FILE)
 	@sed -n 's/^MOC_LOGS_PASSWORD=//p' $(ENV_FILE) | tail -n 1 | grep -q . || { echo "MOC_LOGS_PASSWORD trong" \
 	  "$(ENV_FILE) rỗng: Parseable không khởi động với mật khẩu rỗng — đặt một chuỗi ngẫu nhiên" >&2; exit 1; }
 
-logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; apisix, app-office, app-ca-nhan, svc-files, svc-workflow gửi log qua driver fluentd (tạo lại 5 container). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
+logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; 8 dịch vụ (LOGGED_SERVICES) gửi log qua driver fluentd (tạo lại 8 container: CSDL, Hasura, Keycloak gián đoạn vài giây). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
 	@COMPOSE_FILE=$(LOGS_COMPOSE_FILE) $(COMPOSE) --profile logs up -d --wait vector parseable $(LOGGED_SERVICES)
 	@python3 scripts/log_tap_trung.py init
-	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 5 dịch vụ về json-file" \
+	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 8 dịch vụ về json-file" \
 	  "(Vector, Parseable vẫn chạy mà không nhận gì) — bật lâu dài thì thêm logs vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
 
-logs-down: env-ready ## Tắt log tập trung: 5 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
+logs-down: env-ready ## Tắt log tập trung: 8 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
 	@! echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || { echo "Bỏ logs khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
 	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
 	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
@@ -163,7 +163,7 @@ smoke: $(ENV_FILE) ## Kiểm tra nhanh luồng chính qua cổng APISIX
 PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
 
 e2e: $(ENV_FILE) ## Kiểm thử trên trình duyệt thật (Playwright): văn bản đến, văn bản đi, ký số, thông báo, sổ kiểm toán, sổ đăng ký, kiểm dịch, văn bản hạn chế, đọc văn bản đến
-	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" \
+	@docker run --rm --network host --ipc host --env-file $(ENV_FILE) -u "$$(id -u):$$(id -g)" -e CI \
 	  -e HOME=/tmp -e npm_config_cache=/tmp/.npm -v "$(CURDIR)/tests/e2e:/e2e" -w /e2e \
 	  -v "$(CURDIR)/seed/van-ban-den:/mau:ro" -e MOC_SAMPLES_DIR=/mau $(PLAYWRIGHT_IMAGE) \
 	  sh -c 'npm ci --no-audit --no-fund --ignore-scripts >/dev/null && npx playwright test'
@@ -176,6 +176,9 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@cd apps/ca-nhan && npm test
 	@cd apps/bang-tin && node --test tests/*.test.js
 	@python3 -m unittest discover -s apps/bang-tin/tests
+	@cd apps/nghi-phep && node --test tests/*.test.js
+	@python3 -m unittest discover -s apps/nghi-phep/tests
+	@python3 -m unittest discover -s apps/tai-lieu-api/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
@@ -250,7 +253,10 @@ nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến m�
 demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
 	@python3 scripts/demo_ca_nhan.py
 
-.PHONY: app-install app-list app-remove demo-cai-ung-dung
+demo-tat-van-phong: $(ENV_FILE) ## Tắt phần Văn phòng điện tử (MOC_OFFICE_ENABLED=false) trong svc-files, svc-workflow: route, Action của Văn phòng không còn; phần lõi của make smoke và make demo-ca-nhan vẫn đạt; xong thì bật lại (#302)
+	@python3 scripts/demo_tat_van_phong.py
+
+.PHONY: app-install app-list app-remove demo-cai-ung-dung demo-quy-trinh
 
 app-install: env-ready ## Cắm ứng dụng bằng manifest, không sửa lõi: make app-install APP=apps/bang-tin/app.yaml [DRY=1]
 	@test -n "$(APP)" || { echo "Thiếu tham số: make app-install APP=apps/<thư mục>/app.yaml" >&2; exit 1; }
@@ -266,6 +272,9 @@ app-remove: env-ready ## Gỡ ứng dụng cài bằng manifest, GIỮ dữ li�
 demo-cai-ung-dung: $(ENV_FILE) ## Cắm Bảng tin bằng một lệnh: cài, SSO, sự kiện, cài lại, gỡ giữ dữ liệu; lõi không đổi
 	@python3 scripts/demo.py cai-ung-dung
 
+demo-quy-trinh: $(ENV_FILE) ## Quy trình ứng dụng qua lõi (Đơn nghỉ phép): BPMN độc bị từ chối, 422, duyệt theo phòng
+	@python3 scripts/demo.py quy-trinh
+
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py
 
@@ -274,6 +283,10 @@ backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (M
 
 restore: $(ENV_FILE) ## Khôi phục lượt sao lưu mới nhất (hỏi lại trước khi thay dữ liệu); các lượt: python3 scripts/moc.py backup list
 	@python3 scripts/moc.py backup restore
+
+.PHONY: copyright
+copyright: ## Sinh COPYRIGHT.txt (bảng phần mềm thượng nguồn) từ các bảng thành phần của DEPENDENCIES.md
+	@python3 scripts/copyright_txt.py
 
 api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
 	@python3 scripts/api_docs.py

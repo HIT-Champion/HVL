@@ -14,8 +14,10 @@ Built for the **Vietnam Student Olympiad in Informatics 2026 — Open Source Sof
 DX-OS Open-Core. Most project documentation is written in Vietnamese; this page is a translation of
 [README.md](README.md).
 
-**Try it:** <https://signet.htechcs.com> (release v1.0.0, see [Try it out](#try-it-out)) · or install it on your own
+**Try it:** <https://signet.htechcs.com> (latest release, see [Try it out](#try-it-out)) · or install it on your own
 machine with four commands from [Building from source](#building-from-source).
+
+**Five-minute tour and documentation map (in Vietnamese):** [`docs/README.md`](docs/README.md).
 
 **Quick links:** [Introduction](#introduction) · [Architecture](#architecture) · [Features](#features) ·
 [Four principles](#evidence-for-the-four-design-principles) · [Technology](#technology-and-licenses) ·
@@ -56,9 +58,17 @@ applications: the e-Office and the P.A.R.A personal space, a second application 
 changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). A third application, the
 unit news board, exists only once installed with `moc app install`, so the diagram does not show it. Only the APISIX
 gateway is exposed, and every request passes its web application firewall before it reaches the core; the labels on
-its arrows are the real paths. Thick borders mark the team's own code, boxes with a logo are upstream open source used
-as is, and the moving dots follow two real requests. H-P-D-I architecture and technical decisions:
-[`docs/architecture.md`](docs/architecture.md) (Vietnamese).
+its arrows are the real paths. The same holds inside the machine:
+- application containers sit on their own Docker network, `apps` (no Internet access), where APISIX is the only core
+  service;
+- so an application's server side also reaches the core through the gateway, with the same token check, rate limits
+  and WAF as a browser;
+- `make demo-cai-ung-dung` checks that the container reaches APISIX only
+  ([`docs/them-ung-dung.md`](docs/them-ung-dung.md#14-migration-và-mô-hình-tin-cậy) section 1.4, Vietnamese).
+
+Thick borders mark the team's own code, boxes with a logo are upstream open source used as is, and the moving dots
+follow two real requests. H-P-D-I architecture and technical decisions: [`docs/architecture.md`](docs/architecture.md)
+(Vietnamese).
 
 ## Features
 
@@ -78,10 +88,10 @@ Decree 30/2020/NĐ-CP on clerical work:
 | Units send documents to each other by email | In-system exchange on the same installation: the recipient gets an incoming document at once, byte-identical file, with a verification code | [P] |
 | Sensitive documents leak | Per-file encryption, decrypted only in memory for named readers; every opened page is stamped with the viewer's name | [P] |
 | Managers cannot see where work is stuck | An executive dashboard built on real data | [D] |
-| Finding old documents takes time | Full-text search, including text inside attached PDFs; a Q&A assistant answers with document number and page | [I] |
+| Finding old documents takes time | Full-text search, including text inside attached PDFs and scans (OCR); a Q&A assistant answers with document number and page | [I] |
 
 Also: incoming and outgoing registers in the Decree 30 format; several units on one installation, each person seeing
-only their own unit's data; Vietnamese and English interface. Scope and roles:
+only their own unit's data; the e-Office interface in Vietnamese and English. Scope and roles:
 [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md); maturity of each feature with its evidence:
 [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md) (both in Vietnamese).
 
@@ -118,7 +128,8 @@ each agent (Vietnamese): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 ### Screenshots
 
 Taken automatically during the e2e run (`make e2e`), with fictional sample data. The interface is in Vietnamese by
-default; every page also has an English version.
+default; every page of the e-Office, the P.A.R.A personal space and the unit news board also has an English
+version.
 
 | The clerk uploads an incoming letter, the agent pre-fills the fields | Managers see where work is stuck | Recipients verify a document without signing in |
 |---|---|---|
@@ -131,24 +142,26 @@ repeatable any number of times — the presentation script is [`docs/demo-script
 
 | Principle | Demo | Command |
 |---|---|---|
-| (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match"; in the UI: build case files, department heads archive, the reading room shows files stamped with the viewer's name | `make demo-nong-lanh` |
+| (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match"; in the UI: build case files, department heads archive, the reading room shows files stamped with the viewer's name; the director's dashboard counts archived documents with DuckDB straight from the Parquet packages in cold storage | `make demo-nong-lanh` |
 | (ii) IT/OT convergence | Temperature sensor → NGSI-LD (Scorpio) → above the threshold, a draft "incident report" enters the outgoing document workflow | `make demo-it-ot` |
 | (iii) Data governance | OpenLineage provenance: the archive package traces back to the business tables and original files; row counts and required columns checked before writing; every Overview chart traces back to its view and source tables (computed from the PostgreSQL catalog), shown as a graph on the Data lineage page (`/pha-he`) | `make demo-pha-he` |
-| (iv) Zero-Trust | Quarantine: an EICAR file is blocked at the door, and the block is written to the audit log | `make demo-kiem-dich` |
+| (iv) Zero-Trust | Malware screening: `svc-files` scans every file with ClamAV before storing it; an EICAR file is refused, not stored, and the refusal is written to the audit log | `make demo-kiem-dich` |
 | (iv) Zero-Trust | Restricted documents: files encrypted in storage, only named people can open them, opened copies carry the viewer's name | `make demo-han-che` |
-| (iv) Zero-Trust | Secrets vault: services hold no secrets, the vault unseals itself on restart | `make demo-ket-bi-mat` |
+| (iv) Zero-Trust | Secrets vault: `svc-files` and `svc-workflow` read their secrets from OpenBao (AppRole), not from environment variables; the vault unseals itself on restart | `make demo-ket-bi-mat` |
 | (iv) GitOps | Self-healing: delete a container and the reconciler rebuilds it from what git declares | `make demo-tu-phuc-hoi` |
 
 Business demos, run the same way: `make demo-lien-thong` (exchange between two units), `make demo-nap-lo` (batch import
 of incoming documents), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (AI
 assistants), `make demo-ky-so` (digital signature, illustrative), `make demo-ca-nhan` (a second application on the same
-core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-log-tap-trung`
-(centralised logs).
+core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-quy-trinh` (a fourth
+application that brings its own process and runs it on the core's workflow engine), `make demo-tat-van-phong`
+(turning off the e-Office part, the core keeps running), `make demo-log-tap-trung` (centralised logs).
 
 ## Technology and licenses
 
 Signet orchestrates open-source software in its original form: official images, pinned versions, no upstream code
-modified. The full list, libraries and reasons for each choice included: [`DEPENDENCIES.md`](DEPENDENCIES.md).
+modified. The full table (version, license, homepage): [`COPYRIGHT.txt`](COPYRIGHT.txt); the reasons for each
+choice: [`DEPENDENCIES.md`](DEPENDENCIES.md).
 
 | Space | Component | Version | License | Role in Signet |
 |---|---|---|---|---|
@@ -166,7 +179,7 @@ modified. The full list, libraries and reasons for each choice included: [`DEPEN
 | Trust | ClamAV | 1.5.4 | GPL-2.0 | Malware scanning before storage |
 | Trust | OpenBao | 2.7.1 | MPL-2.0 | Secrets vault, encryption keys for restricted documents, internal CA and signing keys |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | NGSI-LD digital twins of sensors (profile `iot`) |
-| Operations | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | API gateway monitoring, internal network only |
+| Operations | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Monitoring and alerts for the API gateway and each component's status, internal network only |
 | Operations | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Centralised logs with personal data masked, optional (profile `logs`) |
 | Operations | restic | 0.19.1 | BSD-2-Clause | Encrypted backup of databases, files and the vault |
 
@@ -227,16 +240,21 @@ python3 scripts/seed.py                 # sample data, first time only
 
 - `PREFIX` defaults to `/opt/moc`. The version comes from `git describe`; when installing from a `.tar.gz` package,
   set it by hand: `make install PREFIX=/opt/moc MOC_VERSION=0.1.0`.
+- If the package has a `VERSION` file at its root, the version is already recorded there (`git archive` fills it in
+  when packing) and `make install` reads it, no need to set it by hand.
 - Upgrade: stop the installation and run `make install` again with the same `PREFIX`. Compose, configuration and
-  images are replaced; the installation's `.env` is kept, only `MOC_VERSION` changes.
+  images are replaced; the installation's `.env` is kept, except `MOC_VERSION`,
+  `COMPOSE_PROFILES` and `COMPOSE_FILE`, which `make install` sets again each time.
+  For a running installation with data, use `scripts/nang_cap.sh nang /opt/moc`: it backs up first, checks
+  afterwards and prints the rollback command ([`docs/trien-khai.md`](docs/trien-khai.md), section Vận hành).
 - Uninstall: `make uninstall PREFIX=/opt/moc` removes exactly the installed files, keeping `.env` and the data.
 
 ## Try it out
 
-**Online:** <https://signet.htechcs.com> runs release v1.0.0 on the team's machine, reaching the Internet through
-Cloudflare Tunnel. Trial accounts are sent with the contest submission; the repository does not publish passwords.
-Features newer than v1.0.0 (the "Chưa phát hành" — unreleased — section of [`CHANGELOG.md`](CHANGELOG.md)) are
-available when you install from source.
+**Online:** <https://signet.htechcs.com> runs the latest release on the team's machine, reaching the Internet through
+Cloudflare Tunnel; `.github/workflows/ban-online.yml` checks daily that it runs the newest tag. Trial accounts are
+sent with the contest submission; the repository does not publish passwords. Unreleased features (the "Chưa phát hành"
+section of [`CHANGELOG.md`](CHANGELOG.md)) are available when you install from source.
 
 **Your own installation:** the shared password of the sample accounts is the value of `MOC_DEMO_PASSWORD` in `.env`.
 Clerks, faculty leaders, team and division heads, and unit administrators must use two-factor authentication: after
@@ -260,6 +278,7 @@ handle and a reply draft the team head sent back for changes.
 |---|---|---|
 | <http://localhost:8080> | e-Office | Yes |
 | <http://localhost:8080/ca-nhan/> | P.A.R.A personal space | Yes |
+| <http://localhost:8080/tai-lieu-api/> | API documentation (Swagger UI): the core API and the e-Office API, sign in to try calls through the gateway | Optional |
 | <http://localhost:8080/bang-tin/> | Unit news board, once installed with `make app-install APP=apps/bang-tin/app.yaml` | Yes |
 | <http://localhost:8080/xac-thuc> | Document verification portal: enter a code or drop a PDF; codes of the issued sample documents are on each document's detail page (Outgoing documents, Issued tab) | No |
 | <http://localhost:8080/trang-thai> | System status | No |
@@ -302,6 +321,7 @@ GitOps, and scans for secrets and vulnerable dependencies. Reminders can only be
 | Symptom | Cause and fix |
 |---|---|
 | `make check` reports a missing `.env` or `docker compose` | Run `make env` to create `.env`; install the Docker Compose v2 plugin, 2.17 or newer |
+| `make up` stops while pulling or building images: a timeout reaching `docker.io`, or `toomanyrequests` | The network blocks Docker Hub, or the anonymous pull limit is used up. Let Docker pull through the `mirror.gcr.io` mirror (`registry-mirrors`, needs `sudo`) as described in section 2b of [`docs/trien-khai.md`](docs/trien-khai.md#2b-máy-không-kéo-được-image-từ-docker-hub) (Vietnamese) |
 | `make up` takes long, services still `starting` or `unhealthy` | The first run pulls about 5 GB of images and ClamAV loads its virus signatures, which takes a few minutes; `make up` waits up to 10 minutes. Watch with `make ps`, `make logs` |
 | Port 8080 is already used by another program | Set `MOC_HTTP_PORT=8081` and `MOC_PUBLIC_URL=http://localhost:8081` in `.env` before the first `make up`: the Keycloak realm loads this address only once, so if it already ran, `make reset` and start again |
 | Signing in fails when opened by a LAN IP address | Browsers only allow Web Crypto (PKCE sign-in, SHA-256 on the verification page) over `https` or on `localhost`. Use `localhost`, or set up HTTPS following [`docs/trien-khai.md`](docs/trien-khai.md) |
@@ -322,7 +342,7 @@ Most documents are in Vietnamese.
 | Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
 | Technical | [H-P-D-I architecture](docs/architecture.md) · [Data model and permissions](docs/mo-hinh-du-lieu.md) · [Product specification](docs/dac-ta-san-pham.md) · [Feature maturity with evidence](docs/muc-hoan-thien.md) · [AI evaluation](docs/danh-gia-ai.md) · ["After" metrics of spec §8](docs/so-lieu-sau.md) · [H-P-D-I self-assessment](docs/tu-chan-doan.md) · [Git workflow](docs/git_flow.md) |
 | Contest | [PoF self-assessment](docs/du-thi/pof-checklist.md) · [Likely jury questions](docs/du-thi/hoi-dap-hoi-dong.md) · [Theme, rules, judging criteria](docs/du-thi/olp-2026-brief.md) · [Problem statement analysis](docs/du-thi/olp-2026-de-thi.md) · [Development plan](docs/du-thi/ke-hoach-phat-trien.md) · [Research before the problem statement](docs/du-thi/nghien-cuu/) |
-| Project | [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
+| Project | [Copyright and third-party software](COPYRIGHT.txt) · [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
 
 ### Repository layout
 
@@ -331,10 +351,10 @@ software the core uses unmodified (official images, no changes to upstream code)
 
 ```
 apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nhan/) · unit news board
-                     (bang-tin/, plugged in with moc app install)
+                     (bang-tin/, plugged in with moc app install) · Swagger UI API documentation (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, BPMN workflows, notifications, reminders, assignment suggestions
                      svc-files/: files, quarantine, search, PDF rendering, signing, verification portal, AI agents
-                     ot-sensor/: simulated temperature sensor (profile iot)
+                     ot-sensor/: simulated temperature sensor (profile iot-sim)
 db/                  PostgreSQL schema, Hasura permissions by role and unit, hash-chained audit log; tests/
 schemas/             Form JSON Schemas, shared by the interface, the services and the database
 platform/            Configuration for Keycloak, APISIX, Centrifugo, OpenBao, monitoring, centralised logs, systemd

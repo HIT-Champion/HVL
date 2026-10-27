@@ -180,7 +180,10 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   chuỗi tính bằng Python. Ba lớp: chuỗi liền mạch; hash của dòng tại mỗi mốc bằng hash đã neo (viết lại chuỗi
   từ dòng k thì mọi mốc từ k lệch, dòng bị sửa nằm giữa mốc cuối còn khớp và mốc đầu bị lệch); `content_sha256`
   của mọi văn bản bằng giá trị lần cuối ghi vào sổ (đổi hash để một tệp giả "khớp" ở cổng xác thực mà tắt
-  trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ.
+  trigger thì bị bắt). `audit anchor --to <tệp>` ghi thêm một bản mốc vào tệp để chép ra ngoài máy chủ, kèm chữ ký
+  Ed25519 của két (khóa `moc-anchor`); `--publish` đẩy mốc lên một kho git công khai cấm đẩy ép, người ngoài kiểm chữ
+  ký bằng OpenSSL (`docs/van-hanh.md` mục Mốc neo công khai). Mốc trong tệp có chữ ký sai, hay không có chữ ký mà
+  đứng sau mốc đã ký, thì `audit verify` báo lỗi.
 - **Xem sổ:** `director`, `tenant_admin` đọc dòng sổ của đơn vị mình nhưng không đọc cột `diff`; trường tính
   toán `overview` (`core.audit_overview(r)`) giữ tên mọi cột đã đổi, còn giá trị chỉ giữ ở các cột không chứa
   nội dung (trạng thái, số, ngày, cờ, mã người, mã văn bản; năm, số dòng của lần in sổ đăng ký — migration
@@ -395,6 +398,16 @@ bản không hạn chế; không `data`, không người làm (hàm chép đặt
 Schema `moc_app` chỉ có hàm `moc_app.migration_done` (security definer): vai trò CSDL `moc_appdb_<schema>` của từng
 ứng dụng gọi nó cuối mỗi migration để kiểm đối tượng vừa tạo rồi ghi `core.app_migrations`
 ([`them-ung-dung.md`](them-ung-dung.md) mục 1.4).
+
+**Danh mục ứng dụng** (migration 1792281603400; trang `/ung-dung` của Văn phòng điện tử). View `core.app_catalog` là
+cửa đọc duy nhất của `core.apps` qua GraphQL, đúng 9 cột: `name`, `title`, `description` (= `manifest ->>
+'description'`, gọt khoảng trắng, trống thì `null`), `path`, `version`, `installed_at`, `updated_at`, `removed_at`,
+`manifest_sha256` (SHA-256 các byte của `app.yaml` lúc cài). Không có `manifest` (image, cổng, healthcheck, biến môi
+trường, cổng webhook), `schema_name`. Dữ liệu toàn hệ thống, không cột đơn vị: `clerk`, `staff`, `manager` đọc 7 cột
+đầu của ứng dụng chưa gỡ (`removed_at is null`); `director`, `tenant_admin` đọc cả 9 cột, mọi dòng; không vai trò nào
+ghi, `service` không đọc. Ứng dụng có sẵn trong lõi (Văn phòng điện tử, Không gian cá nhân) không cài bằng manifest
+nên không có ở đây — trang khai chúng trong `apps/office/app/utils/apps.ts` (test đối chiếu tên, đường giữ chỗ, route,
+image).
 
 **Cách ly giữa các đơn vị** (F3.12). Một đơn vị là một dòng `core.tenants`; thêm bằng `python3 scripts/moc.py tenant
 create` (dòng đơn vị, phòng, Organization trong Keycloak, quản trị đơn vị — `van-hanh.md`, mục Thêm đơn vị). Ranh
@@ -869,10 +882,15 @@ create table office.feedback (
 - `feedback_screen`: chỉ chữ thường, gạch nối và `:id`, tối đa 6 đoạn, không chuỗi truy vấn — id văn bản hay
   `?q=<số CCCD>` không lọt vào bảng.
 - Trigger `before insert` `office.feedback_guard()`: gọt khoảng trắng hai đầu của `comment` (chỉ còn khoảng trắng thì
-  null), đặt `created_at = now()`, khóa tư vấn theo (đơn vị, người gửi) rồi đếm: quá 3 góp ý trong 10 phút hay 20 trong
-  24 giờ thì lỗi `check_violation` có câu `feedback_rate: …`. Lỗi raise không có tên ràng buộc đi kèm: Hasura trả mã
-  `permission-error`, câu `Check constraint violation. feedback_rate: …`, nên giao diện tìm tên trong câu. Đếm cả dòng
-  thêm trước đó trong cùng câu lệnh (mutation nhiều dòng) và các lần gửi song song.
+  null), che bằng `office.mask_pii` khi nội dung trong 500 ký tự (cắt lại ở 500 nếu email ngắn làm câu dài ra; quá 500
+  thì để nguyên cho `feedback_comment` từ chối), đặt `created_at = now()`, khóa tư vấn theo (đơn vị, người gửi) rồi đếm:
+  quá 3 góp ý trong 10 phút hay 20 trong 24 giờ thì lỗi `check_violation` có câu `feedback_rate: …`. Lỗi raise không có
+  tên ràng buộc đi kèm: Hasura trả mã `permission-error`, câu `Check constraint violation. feedback_rate: …`, nên giao
+  diện tìm tên trong câu. Đếm cả dòng thêm trước đó trong cùng câu lệnh (mutation nhiều dòng) và các lần gửi song song.
+- Hàm `office.mask_pii(text)` (immutable, strict; migration 1792281603600, #265): thay email, dãy số liền từ 9 chữ số
+  và dãy chia nhóm bằng dấu cách, chấm, gạch từ 9 chữ số bắt đầu bằng 0, +84 hay (+84) bằng `[đã che]`. Không che số
+  dính chữ, nhóm số trong mã UUID, phần sau của "chữ số + dấu chấm" (số tiền "10.000.000.000" giữ nguyên). Migration
+  che luôn các góp ý đã có; số gốc không lưu ở đâu nên `down.sql` không mở lại được.
 - Hàm `office.feedback_mine(feedback, hasura_session)` → trường `mine`: góp ý này của người đang xem. Người gửi lọc góp
   ý của mình mà không ai đọc được `user_id`.
 - Quyền: `clerk`, `staff`, `manager`, `director`, `tenant_admin` thêm được (chỉ `rating`, `comment`, `screen`; Hasura
@@ -922,6 +940,26 @@ thêm lượt nộp lưu gần nhất từ `core.lineage_events` (§2.4): tên d
 khai cả `office.archived_document_facts` mà `v_processing_time` đọc. Giới hạn: view gọi một hàm SQL đọc bảng thì
 catalog không ghi cạnh tới bảng đó (hiện không view `v_` nào gọi hàm tự viết — test chặn); phả hệ mức bảng, chưa mức
 cột.
+
+**Kiểm chất lượng số liệu báo cáo** (F3.9, F3.11, migration 1792281603300). `office.report_checks` tính lúc truy vấn
+một bộ luật trên các khung nhìn mà trang Điều hành vẽ; trang Điều hành hiện cờ nặng nhất cạnh từng biểu đồ, trang Phả hệ
+hiện từng luật. Ngưỡng của mọi luật là 0. Luật chọn theo chỗ ràng buộc schema không chặn được:
+
+| Luật | Khung nhìn | PASSED / WARNING / FAILED |
+|---|---|---|
+| `status_total` | `v_document_counts` | Σ 6 cột của biểu đồ trạng thái (đúng `IN_STATUSES` của trang) + văn bản đến hạn chế = số văn bản đến đếm trên `office.documents` / — / lệch (`detail`: trạng thái biểu đồ không vẽ) |
+| `department_total` | `v_overdue_by_department` | Σ "đang xử lý" theo phòng = cột "Đang xử lý" của biểu đồ trạng thái, không văn bản nào ở dòng "chưa rõ phòng" / khớp nhưng có (`issues`) / lệch |
+| `processing_coverage` | `v_processing_time` | văn bản đến đã xong (done, archived; không hạn chế) đều có mốc xong / thiếu mốc (`issues` văn bản không vào trung bình) / tính thừa, hay có tháng tổng giờ âm (`detail`) |
+| `unique_keys` | cả bốn | khóa trang dùng để ghép số (tháng, phòng, bộ chiều của `v_document_counts`) không trùng, không rỗng / — / trùng hoặc rỗng |
+| `no_personal_columns` | mọi `office.v_*` | không cột nào mang tên thông tin cá nhân / view (hay view lồng nó đọc qua) đọc cột như vậy (`pg_depend` mức cột) / xuất ra |
+
+Cột: `tenant_id`, `rule`, `report`, `status`, `expected`, `actual`, `issues`, `detail` (`text[]`). Một dòng
+`core.tenants` nhân lateral với các luật của đúng đơn vị đó (mỗi khung nhìn đọc một lần), nên lọc
+`tenant_id = X-Hasura-Tenant-Id` chỉ tính cho một đơn vị; phần catalog giống nhau cho mọi đơn vị. Hasura cho `director`
+đọc với bộ lọc đó, như dashboard. `status_total` và `unique_keys` hôm nay đúng theo cấu trúc (ràng buộc, GROUP BY): là
+luật chặn hồi quy khi sửa view, `db/tests/test_report_checks.py` giả lập bằng cách thay tạm view. Tên cột cá nhân theo
+mẫu tên (email, phone, cccd, cmnd, birth, address, full_name, username…): cột đặt tên lạ không bắt được; khóa người dùng
+(`user_id`, `created_by`) không tính.
 
 ### 2.6. Schema `personal` — Không gian cá nhân P.A.R.A (ứng dụng thứ hai)
 
@@ -1114,6 +1152,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
 | `completeTask(taskId, outcome, data)` | Người được giao task | Kiểm task thuộc về người gọi, văn bản hạn chế thì người gọi phải đọc được nó (403 `restricted`), kiểm `data` theo JSON Schema của `formKey`, hoàn thành task Flowable, cập nhật bảng và ghi `document_events` |
+| `otSensorMap` (query) | `clerk`, `staff`, `manager`, `director` — các vai trò đọc được dự thảo "Báo cáo sự cố" | Sơ đồ cảm biến OT (F3.10): đọc context broker NGSI-LD ở tenant của đơn vị trong biến phiên (thực thể `TemperatureSensor`, lịch sử 10 lần đo gần nhất), trả số đo mới nhất, mã phòng (`room`), ngưỡng và cờ chất lượng — `stale` (quá `MOC_OT_STALE_MIN` phút không có số đo), `out_of_range` (không phải số hoặc ngoài −55…125 °C), `duplicate_time` (số đo mới nhất trùng `observedAt` với lần đo khác), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút; khi đó `stale` xét theo lúc broker nhận số đo). Chỉ đọc, không ghi CSDL; chưa bật broker thì `status` = `off` / `unavailable`, không lỗi |
 
 Mọi Action **idempotent** theo `(documentId, trạng thái hiện tại)` hoặc `taskId`: gọi lại sau lỗi mạng không
 cấp số hai lần. `completeTask` chạy theo thứ tự: kiểm quyền và dữ liệu → nhận việc trong Flowable (người khác
@@ -1355,7 +1394,7 @@ chống trùng bằng `event.data.new.id`.
 | `core.intake.suggested` | Tác tử đọc xong một tệp văn bản đến, có gợi ý (F4.1). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `core.assistant.answered` | Trợ lý hỏi đáp trả lời một câu hỏi (F4.2). Chỉ ở sổ kiểm toán, khuôn bên dưới |
 | `core.assignment.suggested` | Tác tử gợi ý giao việc xong một văn bản đến, có gợi ý hay không (F4.3). Ở sổ kiểm toán và tab Lịch sử của văn bản, khuôn bên dưới |
-| `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo |
+| `ot.alarm` | Cảm biến vượt ngưỡng, có dự thảo báo cáo sự cố (F3.10). Trong `office.document_events`: `actor_kind` `service` (`svc-workflow`), `data` = mã cảm biến, tên phòng, nhiệt độ, ngưỡng, giờ đo (`observed_at`; đồng hồ thiết bị chạy nhanh quá 2 phút thì là giờ máy chủ nhận, giờ thiết bị gửi ở `device_observed_at`) |
 
 Ba sự kiện liên thông do chính hàm `office.deliver_dispatch` ghi (`actor_kind` `service`), cùng giao dịch với văn bản
 đến; không bao giờ mang `task_id` — chỉ mục `document_events_task_once` là chỉ mục duy nhất cho cả bảng.

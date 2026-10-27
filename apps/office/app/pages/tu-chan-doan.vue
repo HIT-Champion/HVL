@@ -129,6 +129,10 @@ const complete = computed(() => answered.value === total)
 const scores = computed(() => hpdiScores(FRAMEWORK, answers))
 const gaps = computed(() => hpdiGaps(scores.value))
 const focus = computed(() => hpdiFocus(scores.value))
+// Tỷ trọng, hình dạng theo giáo trình DX-OS mục 2.4; GIGO: [I] trên nền [D] chưa vững hoặc Ảo giác công nghệ
+const shares = computed(() => hpdiShares(scores.value))
+const shape = computed(() => (shares.value ? hpdiShape(shares.value) : null))
+const gigo = computed(() => hpdiGigo(scores.value, shape.value))
 const steps = computed(() => hpdiNextSteps(FRAMEWORK, answers))
 // So với lần lưu gần nhất trước đó (vừa lưu xong thì so với lần trước nữa, không so với chính nó)
 const previous = computed(() => history.value.find((r) => r.id !== savedId.value) ?? null)
@@ -301,7 +305,7 @@ async function save() {
         <p v-if="!complete" class="py-8 text-center text-sm text-stone-500">
           {{ t('hpdi.answerAll', { n: total - answered }) }}
         </p>
-        <div v-else class="mt-2 grid gap-4 lg:grid-cols-2">
+        <div v-else class="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
             <EChart :option="radar" :height="320" :label="radarLabel" />
             <table class="mt-2 w-full text-sm" data-testid="hpdi-scores">
@@ -344,6 +348,32 @@ async function save() {
                 </li>
               </ul>
               <p class="mt-1 text-xs text-stone-500">{{ t('hpdi.gapsHint') }}</p>
+            </div>
+            <div v-if="shape && shares" data-testid="hpdi-shape">
+              <h3 class="font-medium text-stone-900">{{ t('hpdi.shapeTitle') }}</h3>
+              <p class="mt-1 text-stone-700">
+                <span class="font-medium" :data-testid="`hpdi-shape-${shape}`">
+                  {{ t(`hpdi.shape.${shape}.name`) }}</span>: {{ t(`hpdi.shape.${shape}.text`) }}
+              </p>
+              <p class="mt-1 text-stone-600 tabular-nums" data-testid="hpdi-shares">
+                {{ t('hpdi.shares', { h: number.format(shares.h), p: number.format(shares.p),
+                                      d: number.format(shares.d), i: number.format(shares.i) }) }}
+              </p>
+              <p class="mt-1 text-xs text-stone-500">{{ t('hpdi.shapeHint') }}</p>
+            </div>
+            <div v-if="gigo" class="rounded-md bg-red-50 px-3 py-2 text-red-900" data-testid="hpdi-gigo">
+              <h3 class="font-medium">{{ t('hpdi.gigoTitle') }}</h3>
+              <p class="mt-1">{{ t('hpdi.gigo') }}</p>
+              <p class="mt-1">
+                <span v-if="!hpdiLinkOpen(HPDI_QUALITY_LINK, role)" data-testid="hpdi-gigo-other">
+                  {{ otherPage(HPDI_QUALITY_LINK) }}
+                </span>
+                <!-- #chat-luong: mục "Kiểm chất lượng số liệu" của trang Phả hệ số liệu -->
+                <NuxtLink v-else :to="{ path: HPDI_QUALITY_LINK.to, hash: '#chat-luong' }"
+                          class="font-medium underline">
+                  {{ text(HPDI_QUALITY_LINK.label) }}
+                </NuxtLink>
+              </p>
             </div>
           </div>
         </div>

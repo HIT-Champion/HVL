@@ -93,18 +93,28 @@ async function load(append = false) {
 
 watch(tab, () => load())
 onMounted(() => load())
+
+// Lọc nhanh trên các dòng đã tải, không gọi lại máy chủ; so khớp không dấu ("dao tao" ra "Đào tạo")
+const query = ref('')
+const normalize = (value: string) =>
+  value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd')
+const filteredRows = computed(() => {
+  const needle = normalize(query.value)
+  return rows.value.filter((row) =>
+    normalize([row.symbol, row.summary, row.department?.name, row.creator?.full_name].join(' ')).includes(needle))
+})
 </script>
 
 <template>
   <div>
-    <PageHeader :title="t('outgoing.title')">
+    <PageHeader :title="t('outgoing.title')" :subtitle="t('fe.listHint')">
       <NuxtLink v-if="claims?.role === 'staff'" to="/van-ban-di/soan" class="btn-primary">
         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M12 5v14m-7-7h14" /></svg>
         {{ t('outgoing.compose') }}
       </NuxtLink>
     </PageHeader>
 
-    <div class="mb-4 flex gap-1 border-b border-stone-200" role="tablist">
+    <div class="moc-tabs" role="tablist">
       <button
         v-for="(_, key) in tabs" :key="key" role="tab" :aria-selected="tab === key"
         class="-mb-px border-b-2 px-4 py-2 text-sm font-medium"
@@ -115,12 +125,24 @@ onMounted(() => load())
       </button>
     </div>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="loading && !rows.length" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-    <p v-else-if="!rows.length" class="card p-12 text-center text-stone-500">{{ t('outgoing.empty') }}</p>
-    <div v-else class="card overflow-x-auto">
+    <div class="moc-toolbar">
+      <input
+        v-model="query" type="search" class="input" :aria-label="t('fe.filterDocuments')"
+        :placeholder="t('fe.filterDocuments')"
+      >
+      <span class="moc-count" aria-live="polite">{{ t('fe.loaded', { n: filteredRows.length }) }}</span>
+    </div>
+    <div v-if="failure" class="moc-state" role="alert">
+      <span>{{ failure }}</span>
+      <button class="btn-secondary" @click="load()">{{ t('app.retry') }}</button>
+    </div>
+    <div v-else-if="loading && !rows.length" aria-busy="true" :aria-label="t('fe.loading')">
+      <div v-for="n in 5" :key="n" class="moc-skeleton" />
+    </div>
+    <p v-else-if="!filteredRows.length" class="card p-12 text-center text-stone-500">{{ t('outgoing.empty') }}</p>
+    <div v-else class="moc-doc-table moc-outgoing-table overflow-x-auto">
       <table class="w-full text-sm">
-        <thead class="border-b border-stone-200 bg-stone-50 text-left text-xs font-medium tracking-wide text-stone-500 uppercase">
+        <thead class="border-b border-stone-200 text-left text-xs font-medium text-stone-500">
           <tr>
             <th class="px-4 py-3">{{ t('outgoing.symbol') }}</th>
             <th class="px-4 py-3">{{ t('outgoing.summary') }}</th>
@@ -129,10 +151,13 @@ onMounted(() => load())
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-100">
-          <tr v-for="row in rows" :key="row.id" class="cursor-pointer hover:bg-brand-50/40" @click="router.push(`/van-ban/${row.id}`)">
+          <tr
+            v-for="row in filteredRows" :key="row.id" class="cursor-pointer hover:bg-brand-50/40"
+            @click="router.push(`/van-ban/${row.id}`)"
+          >
             <td class="px-4 py-3 whitespace-nowrap">
               <div v-if="row.symbol" class="font-medium">{{ row.symbol }}</div>
-              <div v-else class="text-stone-400">{{ t('outgoing.unnumbered') }}</div>
+              <div v-else class="text-stone-500">{{ t('outgoing.unnumbered') }}</div>
               <div class="text-xs text-stone-500">{{ row.type_code }}</div>
             </td>
             <td class="max-w-md px-4 py-3">
@@ -143,7 +168,9 @@ onMounted(() => load())
               </div>
             </td>
             <td class="px-4 py-3"><StatusChip :status="row.status" /></td>
-            <td class="px-4 py-3 whitespace-nowrap text-stone-600">{{ fmtDate(row.issued_on) }}</td>
+            <td :data-label="t('outgoing.issuedOn')" class="px-4 py-3 whitespace-nowrap text-stone-600">
+              {{ fmtDate(row.issued_on) }}
+            </td>
           </tr>
         </tbody>
       </table>

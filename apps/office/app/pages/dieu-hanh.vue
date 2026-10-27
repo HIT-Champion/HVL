@@ -18,6 +18,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import type { ReportCheck } from '~/utils/quality'
 
 // Dashboard điều hành (F3.11), cho lãnh đạo đơn vị: văn bản đến theo trạng thái, quá hạn theo phòng, thời gian
 // xử lý, văn bản khẩn, văn bản đi theo tháng. Số liệu lấy từ bốn khung nhìn chỉ có số đếm (migration
@@ -25,6 +26,10 @@ import { useI18n } from 'vue-i18n'
 // chối. Văn bản hạn chế không vào phép chia nào, chỉ có con số tổng (lý do ở migration).
 // Nút "Nguồn số liệu" của từng biểu đồ mở trang Phả hệ (F3.9): biểu đồ nào dùng khung nhìn nào khai ở
 // app/utils/lineage.ts, tests/lineage.test.ts đối chiếu với QUERY và các computed dưới đây.
+// Cạnh nút đó là cờ kiểm chất lượng số liệu (Đạt / Cảnh báo / Trượt): bộ luật tính trong CSDL lúc truy vấn
+// (office.report_checks, migration 1792281603300), hỏi bằng truy vấn riêng CHECKS ngay sau khi có số liệu — luật đọc
+// lại đúng các khung nhìn đó, chạy song song thì tranh CPU của CSDL với chính truy vấn biểu đồ đang chờ.
+// Lỗi thì cờ ghi "chưa kiểm được", số liệu vẫn hiện.
 
 interface Count {
   direction: string
@@ -46,11 +51,13 @@ const QUERY = `{
   office_v_processing_time(order_by: {month: asc}) { month documents total_hours with_due on_time }
   office_v_outgoing_by_month(order_by: {month: asc}) { month documents }
 }`
+const CHECKS = '{ office_report_checks { rule report status expected actual issues detail } }'
 const IN_STATUSES = ['received', 'registered', 'in_progress', 'done', 'archived', 'cancelled'] as const
 const OPEN = new Set(['received', 'registered', 'in_progress'])
 const MONTHS = 12
-const BRAND = '#0f766e'
-const LATE = '#dc2626'
+// màu biểu đồ theo nhận diện "Liền mạch": olive của hành động chính, đỏ trầm cho quá hạn
+const BRAND = '#555b3f'
+const LATE = '#a02727'
 // giống grid.containLabel của ECharts 5: nhãn trục nằm trong khung
 const GRID = { left: 8, right: 16, top: 16, bottom: 8, outerBoundsMode: 'same', outerBoundsContain: 'axisLabel' }
 
@@ -62,10 +69,21 @@ const counts = ref<Count[]>([])
 const departments = ref<Department[]>([])
 const processing = ref<Processing[]>([])
 const outgoing = ref<Outgoing[]>([])
+const checks = ref<ReportCheck[] | null>(null)
+const checksFailed = ref(false)
 const loaded = ref(false)
 const loading = ref(false)
 const failure = ref('')
 const allowed = computed(() => claims.value?.role === 'director')
+
+async function loadChecks() {
+  try {
+    checks.value = (await gql<{ office_report_checks: ReportCheck[] }>(CHECKS)).office_report_checks
+    checksFailed.value = false
+  } catch {
+    checksFailed.value = true
+  }
+}
 
 // Làm mới giữ số cũ trên trang tới khi có số mới, không vẽ lại từ đầu
 async function load() {
@@ -88,6 +106,7 @@ async function load() {
   } finally {
     loading.value = false
   }
+  if (loaded.value) await loadChecks()
 }
 onMounted(() => {
   if (allowed.value) load()
@@ -153,12 +172,24 @@ const departmentHeight = computed(() => Math.max(256, departments.value.length *
 const inHours = computed(() => processingByMonth.value.every((r) => !r.documents || r.total_hours / r.documents < 24))
 
 const tooltip = { trigger: 'axis', axisPointer: { type: 'shadow' } }
+// Thanh ngang: tên trạng thái đọc trọn trên trục dọc, trạng thái đầu quy trình ở trên cùng
 const statusChart = computed(() => ({
   tooltip,
-  grid: GRID,
-  xAxis: { type: 'category', data: byStatus.value.map((r) => t(`status.${r.status}`)), axisLabel: { interval: 0, width: 72, overflow: 'break' } },
-  yAxis: { type: 'value', minInterval: 1 },
-  series: [{ type: 'bar', name: t('board.count'), data: byStatus.value.map((r) => r.documents), itemStyle: { color: BRAND }, label: { show: true, position: 'top' } }],
+  grid: { ...GRID, right: 32 },
+  xAxis: { type: 'value', minInterval: 1 },
+  yAxis: {
+    type: 'category',
+    inverse: true,
+    data: byStatus.value.map((r) => t(`status.${r.status}`)),
+    axisLabel: { interval: 0, width: 105, fontSize: 13, overflow: 'break' },
+  },
+  series: [{
+    type: 'bar',
+    name: t('board.count'),
+    data: byStatus.value.map((r) => r.documents),
+    itemStyle: { color: BRAND },
+    label: { show: true, position: 'right' },
+  }],
 }))
 const departmentChart = computed(() => {
   const rows = [...departments.value].reverse() // nhiều quá hạn nhất ở trên cùng
@@ -177,19 +208,22 @@ const departmentChart = computed(() => {
 const processingChart = computed(() => ({
   tooltip,
   grid: GRID,
-  xAxis: { type: 'category', data: months.value.map(monthLabel) },
+  xAxis: { type: 'category', data: months.value.map(monthLabel), axisLabel: { showMaxLabel: true, hideOverlap: true } },
   yAxis: { type: 'value' },
   series: [{
     type: 'bar',
     name: inHours.value ? t('board.avgHours') : t('board.avgDays'),
-    data: processingByMonth.value.map((r) => (r.documents ? Math.round((r.total_hours / r.documents / (inHours.value ? 1 : 24)) * 100) / 100 : 0)),
+    // tháng không có văn bản xong để trống (null); tháng xử lý rất nhanh vẫn có cột thấp nhất 2px, không thành 0
+    data: processingByMonth.value.map((r) => (r.documents
+      ? Math.round((r.total_hours / r.documents / (inHours.value ? 1 : 24)) * 100) / 100 : null)),
+    barMinHeight: 2,
     itemStyle: { color: BRAND },
   }],
 }))
 const outgoingChart = computed(() => ({
   tooltip,
   grid: GRID,
-  xAxis: { type: 'category', data: months.value.map(monthLabel) },
+  xAxis: { type: 'category', data: months.value.map(monthLabel), axisLabel: { showMaxLabel: true, hideOverlap: true } },
   yAxis: { type: 'value', minInterval: 1 },
   series: [{ type: 'bar', name: t('board.issued'), data: outgoingByMonth.value.map((r) => r.documents), itemStyle: { color: BRAND } }],
 }))
@@ -204,7 +238,7 @@ const outgoingChart = computed(() => ({
     <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
     <p v-if="allowed && !loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <div v-if="allowed && loaded" class="space-y-4">
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="board-kpis">
+      <div class="moc-board-kpis" data-testid="board-kpis">
         <div class="card p-4">
           <div class="text-sm text-stone-500">{{ t('board.open') }}</div>
           <div class="mt-1 text-3xl font-semibold text-stone-900" data-testid="kpi-open">{{ kpis.open }}</div>
@@ -233,14 +267,20 @@ const outgoingChart = computed(() => ({
         <p v-if="restricted" class="text-xs text-stone-500" data-testid="board-restricted">
           {{ t('board.restricted', { n: restricted }) }}
         </p>
-        <SourceLink chart="kpis" class="ml-auto" />
+        <div class="ml-auto flex items-center gap-2">
+          <ChartChecks chart="kpis" :checks="checks" :failed="checksFailed" />
+          <SourceLink chart="kpis" />
+        </div>
       </div>
 
-      <div class="grid gap-4 xl:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <section class="card p-4" data-testid="board-status">
           <div class="flex items-start justify-between gap-3">
             <h2 class="font-medium text-stone-900">{{ t('board.byStatus') }}</h2>
-            <SourceLink chart="status" />
+            <div class="flex shrink-0 items-center gap-2">
+              <ChartChecks chart="status" :checks="checks" :failed="checksFailed" />
+              <SourceLink chart="status" />
+            </div>
           </div>
           <EChart :option="statusChart" :label="byStatus.map((r) => `${t(`status.${r.status}`)}: ${r.documents}`).join(', ')" />
           <table class="mt-2 w-full text-sm">
@@ -259,7 +299,10 @@ const outgoingChart = computed(() => ({
         <section class="card p-4" data-testid="board-departments">
           <div class="flex items-start justify-between gap-3">
             <h2 class="font-medium text-stone-900">{{ t('board.byDepartment') }}</h2>
-            <SourceLink chart="departments" />
+            <div class="flex shrink-0 items-center gap-2">
+              <ChartChecks chart="departments" :checks="checks" :failed="checksFailed" />
+              <SourceLink chart="departments" />
+            </div>
           </div>
           <p v-if="!departments.length" class="py-12 text-center text-sm text-stone-500">{{ t('board.empty') }}</p>
           <template v-else>
@@ -286,7 +329,10 @@ const outgoingChart = computed(() => ({
               <span class="text-sm font-normal text-stone-500"
                 >({{ inHours ? t('board.unitHours') : t('board.unitDays') }})</span>
             </h2>
-            <SourceLink chart="processing" />
+            <div class="flex shrink-0 items-center gap-2">
+              <ChartChecks chart="processing" :checks="checks" :failed="checksFailed" />
+              <SourceLink chart="processing" />
+            </div>
           </div>
           <EChart :option="processingChart" :label="processingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${duration(r.total_hours / r.documents)}`).join(', ') || t('board.noneDone')" />
           <table class="mt-2 w-full text-sm">
@@ -307,7 +353,10 @@ const outgoingChart = computed(() => ({
         <section class="card p-4" data-testid="board-outgoing">
           <div class="flex items-start justify-between gap-3">
             <h2 class="font-medium text-stone-900">{{ t('board.outgoing') }}</h2>
-            <SourceLink chart="outgoing" />
+            <div class="flex shrink-0 items-center gap-2">
+              <ChartChecks chart="outgoing" :checks="checks" :failed="checksFailed" />
+              <SourceLink chart="outgoing" />
+            </div>
           </div>
           <EChart :option="outgoingChart" :label="outgoingByMonth.filter((r) => r.documents).map((r) => `${monthLabel(r.month)}: ${r.documents}`).join(', ') || t('board.empty')" />
           <table class="mt-2 w-full text-sm">
@@ -324,5 +373,6 @@ const outgoingChart = computed(() => ({
         </section>
       </div>
     </div>
+    <ArchiveBoard v-if="allowed" class="mt-4" />
   </div>
 </template>

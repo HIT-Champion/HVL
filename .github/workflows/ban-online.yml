@@ -1,0 +1,99 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Kiểm bản chạy công khai qua HTTPS từ bên ngoài (F1.9, #197): chứng chỉ, HTTP chuyển sang HTTPS, /api/status chạy đúng
+# thẻ phát hành mới nhất, Keycloak sau proxy, header bảo mật (scripts/kiem_ban_online.py).
+# GitHub chạy lịch, nút chạy tay và lượt sau Release theo tệp trên nhánh mặc định (develop); PR đổi chính tệp này hay
+# kịch bản thì chạy job trên PR đó. Từ lúc phát hành tới lúc nâng bản online, job đỏ vì bản online còn chạy bản cũ —
+# đúng ý. Nâng xong thì chạy tay (Actions → Bản online → Run workflow) để thấy xanh ngay (#344).
+# Job thứ hai kiểm bản dev theo develop (máy MinhQuang, reconciler kéo develop mỗi 15 phút, #344) như thế, nhưng đòi
+# phiên bản dựng từ commit đầu develop thay vì thẻ: reconciler kẹt thì job đỏ.
+name: Bản online
+
+on:
+  schedule:
+    - cron: '17 0 * * *'    # 07:17 giờ Việt Nam
+  workflow_dispatch:
+  # Ngay khi workflow Release xong, không đợi tới 07:17 hôm sau. Không dùng `release: published`: Release tạo bản phát
+  # hành bằng GITHUB_TOKEN, mà sự kiện do GITHUB_TOKEN sinh ra không gọi workflow khác.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - .github/workflows/ban-online.yml
+      - scripts/kiem_ban_online.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ban-online-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Địa chỉ bản online; đổi bằng biến MOC_ONLINE_URL của repo (Settings → Variables), không cần sửa tệp
+  ONLINE_URL: ${{ vars.MOC_ONLINE_URL || 'https://signet.htechcs.com' }}
+  DEV_URL: ${{ vars.MOC_DEV_URL || 'https://signet-dev.htechcs.com' }}
+
+jobs:
+  kiem:
+    name: Kiểm bản online qua HTTPS
+    # Release đỏ (thẻ không nằm trên main, phát hành lại…) thì không có bản mới nào để đòi
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Thẻ vX.Y.Z mới nhất (bỏ thẻ thử -rc…): bản online phải chạy đúng bản đó. Đọc hết danh sách rồi mới lọc —
+      # `git tag | awk '{…; exit}'` dưới pipefail có thể hỏng khi awk thoát sớm
+      - name: Thẻ phát hành mới nhất
+        run: |
+          tags=$(git tag -l 'v[0-9]*' --sort=-v:refname)
+          tag=$(awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }' <<<"$tags")
+          [ -n "$tag" ] || { echo "::error::không có thẻ phát hành vX.Y.Z"; exit 1; }
+          echo "Thẻ mới nhất: $tag"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Kiểm ${{ env.ONLINE_URL }}
+        run: python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}"
+
+  kiem-dev:
+    name: Kiểm bản dev theo develop
+    # Lượt sau Release chỉ đòi thẻ mới trên bản online
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Reconciler kéo develop mỗi 15 phút rồi dựng, cài lại trong vài phút: commit gộp chưa tới 30 phút thì bản dev
+      # còn chạy commit trước đó cũng đạt. Lấy từ đầu develop lùi tới commit đầu tiên đã gộp quá 30 phút (lấy cả nó)
+      - name: Kiểm ${{ env.DEV_URL }}, đúng commit của develop
+        run: |
+          git fetch -q --no-tags --depth 20 origin develop
+          now=$(date +%s)
+          args=()
+          while read -r sha at; do
+            args+=(--commit "$sha")
+            [ "$at" -ge $((now - 1800)) ] || break
+          done < <(git log --first-parent -n 20 --format='%H %ct' FETCH_HEAD)
+          echo "Đầu develop: ${args[1]}; nhận $(( ${#args[@]} / 2 )) commit"
+          python3 scripts/kiem_ban_online.py "$DEV_URL" "${args[@]}"

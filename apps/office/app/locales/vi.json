@@ -29,7 +29,8 @@
     "board": "Điều hành",
     "metrics": "Số đo",
     "feedback": "Góp ý",
-    "selfCheck": "Tự chẩn đoán"
+    "selfCheck": "Tự chẩn đoán",
+    "sensors": "Sơ đồ cảm biến"
   },
   "role": {
     "clerk": "Văn thư",
@@ -256,6 +257,7 @@
     "files": "Tệp đính kèm",
     "noFiles": "Chưa có tệp.",
     "download": "Tải về",
+    "downloadNamed": "Tải về {name}",
     "type": "Loại",
     "symbol": "Số, ký hiệu",
     "issuer": "Cơ quan ban hành",
@@ -270,9 +272,11 @@
     "info_role": "Để biết",
     "timeline": "Dòng thời gian",
     "history": "Lịch sử",
+    "activity": "Hoạt động của văn bản",
     "historyHint": "Từ sổ kiểm toán: ai đổi gì, lúc nào. Trường nội dung (trích yếu, tên tệp…) chỉ báo là đã đổi.",
     "historyEmpty": "Chưa có dòng nào trong sổ kiểm toán.",
     "register": "Vào sổ",
+    "registering": "Đang vào sổ…",
     "registerConfirm": "Vào sổ văn bản này? Số đến được cấp tự động, liên tiếp theo năm.",
     "notFound": "Không tìm thấy văn bản, hoặc bạn không có quyền xem.",
     "restricted": "Hạn chế",
@@ -287,6 +291,7 @@
     "createdBy": "Người soạn",
     "preview": "Tải bản xem trước (PDF)",
     "edit": "Sửa dự thảo",
+    "askAbout": "Hỏi về văn bản này",
     "submit": "Trình ký",
     "resubmit": "Trình lại",
     "submitTitle": "Trình dự thảo",
@@ -359,10 +364,15 @@
     "xuLy": {
       "title": "Báo cáo kết quả",
       "result": "Kết quả xử lý",
-      "done": "Báo cáo xong"
+      "done": "Báo cáo xong",
+      "brief": "Yêu cầu được giao",
+      "assignedBy": "Người giao",
+      "required": "bắt buộc",
+      "consequence": "Báo cáo kết quả sẽ hoàn thành phần việc được giao cho anh/chị."
     },
     "pick": "— Chọn —",
     "done": "Đã chuyển bước tiếp theo.",
+    "processing": "Đang chuyển bước…",
     "duyet": {
       "note": "Ý kiến",
       "approve": "Đồng ý, trình ký",
@@ -436,6 +446,14 @@
     "took": "{s} giây",
     "history": "Các câu hỏi trong phiên này",
     "historyNote": "Câu hỏi và câu trả lời chỉ giữ trên trang này, không lưu ở máy chủ — tải lại trang là mất.",
+    "scope": {
+      "title": "Chỉ hỏi trong văn bản",
+      "chip": "Trong {label}",
+      "unnamed": "văn bản đã chọn",
+      "clear": "Hỏi trong mọi văn bản",
+      "missing": "Không tìm thấy văn bản này, hoặc bạn không được xem — trợ lý sẽ không có căn cứ để trả lời.",
+      "notIndexed": "Văn bản này không có trong kho của trợ lý (văn bản hạn chế, đã hủy hoặc chưa phát hành) — câu hỏi sẽ không có căn cứ."
+    },
     "source": {
       "title": "Nguồn",
       "n": "Nguồn {n}",
@@ -447,6 +465,15 @@
     },
     "openDocument": "Mở văn bản",
     "openDocumentFor": "Mở văn bản {label}",
+    "viewSource": "Xem tệp: {label}",
+    "viewPage": "Xem trang {n}",
+    "viewFile": "Xem tệp",
+    "viewer": {
+      "title": "Đang xem {label}",
+      "newTab": "Mở trong thẻ mới",
+      "close": "Đóng",
+      "note": "Số trang tính theo tệp PDF (trang 1 là trang đầu của tệp), có thể khác số trang in trên văn bản."
+    },
     "page": "tr. {n}",
     "pageSpoken": "trang {n}",
     "summaryOnly": "trích yếu",
@@ -533,11 +560,16 @@
     "documents_summary": "Trích yếu phải dài 10–500 ký tự.",
     "infected": "Tệp nhiễm mã độc, đã bị chặn.",
     "unscannable": "Tệp có mật khẩu hoặc nén quá nhiều lớp nên trạm quét mã độc không kiểm được bên trong — đã chặn. Bỏ mật khẩu hoặc giải nén rồi tải lên lại.",
+    "type_mismatch": "Nội dung tệp không khớp đuôi tệp (vd tệp .pdf thực ra là trang web) nên đã bị chặn. Lưu lại đúng định dạng rồi tải lên lại.",
+    "type_not_allowed": "Không nhận tệp chạy được (chương trình, kịch bản như .exe, .bat, .js).",
+    "image_unreadable": "Ảnh hỏng hoặc quá lớn nên không bỏ được thông tin ẩn (EXIF, vị trí GPS) — chưa lưu. Thu nhỏ hoặc lưu lại ảnh rồi tải lên lại.",
     "too_large": "Tệp vượt quá dung lượng cho phép.",
     "rate_limited": "Thao tác quá nhanh, hệ thống tạm dừng nhận yêu cầu. Chờ ít giây rồi thử lại.",
+    "http": "Máy chủ chưa trả lời được (HTTP {status}). Thử lại sau ít phút; còn lỗi thì báo quản trị kèm mã này.",
     "blocked": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công. Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị.",
     "blockedId": "Cổng an ninh chặn nội dung này vì có chữ giống mẫu tấn công (mã {id}). Sửa lại chữ hoặc tên tệp vừa gửi rồi thử lại, hoặc báo người quản trị kèm mã trên.",
     "noRole": "Tài khoản chưa được gán vai trò hoặc đơn vị. Liên hệ quản trị đơn vị.",
+    "noAccess": "Vai trò của tài khoản này không được xem hay làm việc này. Hãy mở các mục có trong menu của bạn.",
     "documents_body_length": "Nội dung dài quá 20.000 ký tự.",
     "invalid": "Dữ liệu chưa hợp lệ, xem các ô được đánh dấu.",
     "document_files_sealed": "Văn bản hạn chế chỉ nhận tệp tải lên ở chế độ hạn chế (đã mã hóa), và tệp đã mã hóa chỉ gắn vào văn bản hạn chế",
@@ -643,7 +675,15 @@
       "serial": "Số sê-ri chứng thư",
       "signedAt": "Ký lúc (giờ tự ghi trong chữ ký)",
       "illustrative": "Chữ ký dùng hạ tầng khóa công khai nội bộ của Signet, chỉ để minh họa — không có giá trị pháp lý như chữ ký số công cộng. Trình đọc PDF sẽ báo chữ ký chưa tin cậy vì CA nội bộ này không nằm trong danh sách tin cậy công cộng.",
-      "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên."
+      "none": "Văn bản này không có chữ ký số (phát hành khi ký số chưa bật hoặc ký lỗi, hoặc là văn bản hạn chế). Tính nguyên vẹn vẫn kiểm bằng SHA-256 như trên.",
+      "caDownload": "Tải chứng thư CA (minh họa)",
+      "caFingerprint": "Vân tay SHA-256"
+    },
+    "anchors": {
+      "title": "Mốc neo sổ kiểm toán",
+      "text": "Hệ thống định kỳ chép mốc của sổ kiểm toán chuỗi băm ra ngoài máy chủ, mỗi mốc có chữ ký của két khóa. Ai cũng tự kiểm được chữ ký đó bằng khóa công khai này (OpenSSL 3), không cần tin máy chủ.",
+      "download": "Tải khóa công khai ký mốc neo",
+      "fingerprint": "Vân tay SHA-256 (trường key trong tệp mốc)"
     },
     "noCrypto": "Trình duyệt này không tính được SHA-256 (cần kết nối HTTPS). Hãy tra bằng mã.",
     "rateLimited": "Tra cứu quá nhiều lần, chờ một phút rồi thử lại.",
@@ -1126,6 +1166,31 @@
     "status": "Trạng thái",
     "underHour": "dưới 1 giờ"
   },
+  "archiveBoard": {
+    "title": "Văn bản đã nộp lưu (kho lạnh)",
+    "sourceShort": "Đếm thẳng trên gói lưu trữ trong kho lạnh (Parquet, DuckDB); số đếm không lấy từ CSDL nghiệp vụ.",
+    "source": "Từ {n} gói trong bucket lạnh {bucket}: Parquet, DuckDB tính lúc {at}. Chỉ có số đếm.",
+    "empty": "Chưa có hồ sơ nào nộp lưu. Số liệu hiện ở đây khi hồ sơ đã đóng được nộp lưu sang kho lạnh.",
+    "unavailable": "Chưa đọc được kho lạnh hoặc CSDL, thử lại sau.",
+    "unreadable": "{n} gói lệch băm, thiếu một phần hoặc sai dạng, không vào số liệu: {codes}. Báo quản trị kiểm tra kho lạnh.",
+    "caseFiles": "Hồ sơ đã nộp lưu",
+    "incomingDocuments": "Văn bản đến đã nộp lưu",
+    "outgoingDocuments": "Văn bản đi đã nộp lưu",
+    "byYear": "Theo năm ban hành",
+    "byType": "Theo loại văn bản",
+    "byDepartment": "Theo phòng lập hồ sơ",
+    "year": "Năm",
+    "unknownYear": "Không rõ năm",
+    "incoming": "Đến",
+    "outgoing": "Đi",
+    "total": "Tổng",
+    "type": "Loại",
+    "department": "Phòng",
+    "noDepartment": "Chưa rõ phòng",
+    "caseFilesShort": "Hồ sơ",
+    "documents": "Văn bản",
+    "yearSummary": "{year}: đến {incoming}, đi {outgoing}"
+  },
   "feedback": {
     "button": "Góp ý",
     "title": "Góp ý về Văn phòng điện tử",
@@ -1138,7 +1203,7 @@
     "high": "Rất hài lòng",
     "comment": "Vài dòng góp ý",
     "placeholder": "Điều gì chưa tiện, nên sửa gì…",
-    "privacy": "Đừng ghi họ tên, số CCCD, số điện thoại.",
+    "privacy": "Đừng ghi họ tên, số CCCD, số điện thoại. Lỡ ghi thì dãy số dài và email được tự che.",
     "send": "Gửi góp ý",
     "sent": "Đã gửi góp ý. Cảm ơn bạn!",
     "mineLink": "Góp ý đã gửi",
@@ -1282,13 +1347,69 @@
     "inputs": "Đầu vào",
     "outputs": "Đầu ra",
     "quality": "Kiểm chất lượng",
-    "passed": "Đạt",
-    "failedCheck": "Trượt",
     "notChecked": "Không kiểm",
     "reports": "Mọi khung nhìn báo cáo ({n})",
     "reportsHint": "Mọi view office.v_… trong CSDL, kể cả khung nhìn chưa có biểu đồ trên trang Điều hành (vd của trang Số đo).",
     "usedBy": "Biểu đồ dùng",
     "export": "Tải OpenLineage (.jsonl)"
+  },
+  "quality": {
+    "status": {
+      "PASSED": "Đạt",
+      "WARNING": "Cảnh báo",
+      "FAILED": "Trượt",
+      "NONE": "Không kiểm"
+    },
+    "unavailable": "Chưa kiểm được",
+    "flagOf": "Kiểm chất lượng số liệu của {chart}",
+    "title": "Kiểm chất lượng số liệu",
+    "hint": "Bộ luật tính trong CSDL mỗi lần mở trang (view office.report_checks), trên số của đơn vị mình, không tính lại ở trình duyệt. Ngưỡng 0: lệch một văn bản là có cờ. Trang Điều hành hiện cờ nặng nhất cạnh từng biểu đồ.",
+    "view": "Khung nhìn",
+    "rule": "Luật",
+    "result": "Kết quả",
+    "figures": "Số liệu",
+    "rules": {
+      "status_total": {
+        "name": "Tổng theo trạng thái khớp tổng văn bản đến",
+        "what": "Σ các cột của biểu đồ trạng thái cộng văn bản đến hạn chế (dòng riêng) phải bằng số văn bản đến đếm thẳng trên bảng văn bản. Lệch là văn bản biến mất khỏi trang.",
+        "figures": "Trên trang {actual} / trong CSDL {expected} văn bản đến",
+        "detail": "Trạng thái có văn bản mà biểu đồ không vẽ: {detail}"
+      },
+      "department_total": {
+        "name": "Tổng theo phòng khớp số đang xử lý",
+        "what": "Σ văn bản của biểu đồ theo phòng phải bằng cột Đang xử lý của biểu đồ trạng thái. Văn bản chưa rõ phòng chủ trì (giao cho người chưa có trong danh bạ, chưa có việc chủ trì) là Cảnh báo.",
+        "figures": "Theo phòng {actual} / đang xử lý {expected}; {issues} chưa rõ phòng chủ trì"
+      },
+      "processing_coverage": {
+        "name": "Thời gian xử lý tính đủ văn bản đã xong",
+        "what": "Văn bản đã xong mà thiếu mốc xong không vào trung bình (Cảnh báo); tính thừa, hay có tháng tổng giờ âm, là Trượt. Tính trên mọi tháng, không chỉ 12 tháng trên biểu đồ.",
+        "figures": "Tính được {actual} / {expected} văn bản đã xong",
+        "detail": "Tháng có tổng giờ âm: {detail}"
+      },
+      "unique_keys": {
+        "name": "Khóa ghép số không trùng, không rỗng",
+        "what": "Trang ghép số theo tháng, theo phòng: dòng trùng khóa bị bỏ qua, dòng rỗng khóa rơi khỏi biểu đồ mà không báo lỗi.",
+        "figures": "{expected} dòng, {issues} dòng trùng hoặc rỗng khóa"
+      },
+      "no_personal_columns": {
+        "name": "Không có cột thông tin cá nhân",
+        "what": "Theo catalog CSDL: khung nhìn xuất ra cột email, số điện thoại, CCCD/CMND, ngày sinh, địa chỉ, họ tên, tên đăng nhập là Trượt; chỉ đọc cột như vậy (kể cả qua view lồng) là Cảnh báo.",
+        "figures": "{actual} cột cá nhân xuất ra, {issues} cột cá nhân được đọc",
+        "detail": "Cột: {detail}"
+      }
+    },
+    "archive": {
+      "run": "Kiểm chất lượng của lượt này",
+      "source": "Nguyên văn các mục kiểm svc-files đã ghi trong sự kiện OpenLineage (facet dataQualityAssertions), không tính lại.",
+      "table": "{table}: {passed}/{total} mục đạt",
+      "failedItems": "trượt: {items}",
+      "none": "Lượt này không ghi mục kiểm nào trong phả hệ: không có gì bảo chứng số dòng của gói.",
+      "stopped": "Lượt nộp lưu lúc {time} bị dừng vì trượt kiểm chất lượng, hồ sơ chưa vào kho lạnh."
+    },
+    "assertion": {
+      "row_count_equals_source": "số dòng khớp CSDL",
+      "not_null": "cột {column} không rỗng"
+    }
   },
   "hpdi": {
     "title": "Tự chẩn đoán H-P-D-I",
@@ -1357,6 +1478,33 @@
     "gapsNone": "Không có: không gian sau không vượt không gian trước.",
     "gap": "{to} cao hơn {from} {diff} mức.",
     "gapsHint": "Theo nguyên lý tiến hóa tuyến tính H → P → D → I: không gian sau dựng trên không gian trước chưa vững dễ thành “rác vào, rác ra”.",
+    "shapeTitle": "Hình dạng",
+    "shape": {
+      "diamond": {
+        "name": "Kim cương toàn vẹn",
+        "text": "[P], [D], [I] cùng vươn gần đỉnh, việc thủ công còn ít: quy trình chặn sai lệch, dữ liệu sạch, AI chạy trên nền vững."
+      },
+      "illusion": {
+        "name": "Ảo giác công nghệ",
+        "text": "[D] hoặc [I] đi trước [P]: công cụ phân tích, AI dựng khi chưa có móng quy trình, dữ liệu nhập đối phó nên kết quả ra cũng sai."
+      },
+      "kite": {
+        "name": "Cánh diều lệch tâm",
+        "text": "[P] đã vững nhưng [D], [I] gần như chưa có: làm đúng quy trình mà chưa có số liệu để điều hành (vận hành mù)."
+      },
+      "spear": {
+        "name": "Mũi giáo phân mảnh",
+        "text": "Phần lớn việc vẫn trên vai con người, [P], [D], [I] còn sát tâm: đơn vị phụ thuộc vào vài người chủ chốt."
+      },
+      "transitional": {
+        "name": "Đang chuyển tiếp",
+        "text": "Chưa khớp nguyên mẫu nào trong bốn nguyên mẫu giáo trình tả; xem lệch nền và không gian nên làm trước."
+      }
+    },
+    "shares": "Tỷ trọng ước theo giáo trình: [H] {h} % · [P] {p} % · [D] {d} % · [I] {i} %",
+    "shapeHint": "Theo giáo trình DX-OS mục 2.4 (TS. Tạ Tuấn Anh, CC BY 4.0): [P], [D], [I] mỗi trục tối đa 30 %, quy từ điểm (mức 1 là 0 %, mức 5 là 30 %); [H] là phần việc còn lại trên vai con người, bằng 100 % trừ ba trục kia, không phải điểm không gian [H]. Giáo trình nhân thêm hệ số thực chứng; ở đây lấy bằng 1 vì mỗi mức đã tả việc quan sát được. Chỉ để định hướng, không phải điểm DTI.",
+    "gigoTitle": "Rác vào, rác ra",
+    "gigo": "Trí tuệ, phân tích đang dựng trên nền chưa vững: [I] cao hơn [D], hoặc [D], [I] đi trước [P]. AI và báo cáo học từ dữ liệu nhập sai sẽ cho kết quả sai. Nên tạm dừng mở rộng [I] (gợi ý của tác tử, hỏi đáp AI), chuẩn hóa [P], [D] trước, và xem cờ kiểm chất lượng số liệu của các báo cáo:",
     "steps": "Bước tiếp theo",
     "first": "Làm trước",
     "stepFrom": "từ câu {q} ({title}), đang ở mức {n}",
@@ -1373,5 +1521,165 @@
     "when": "Lúc lưu",
     "sources": "Nguồn tham khảo",
     "sourcesNote": "Bộ câu {id}. Cách chấm và giới hạn: docs/tu-chan-doan.md trong mã nguồn."
+  },
+  "apps": {
+    "nav": "Ứng dụng",
+    "title": "Danh mục ứng dụng",
+    "subtitle": "Các ứng dụng chạy trên lõi Signet, dùng chung một lần đăng nhập",
+    "builtinTitle": "Có sẵn trong lõi",
+    "builtinHint": "Cài cùng lõi, cùng phiên bản với lõi.",
+    "installedTitle": "Cài bằng manifest",
+    "installedHint": "Quản trị hệ thống cắm thêm bằng lệnh moc app install, không sửa mã của lõi.",
+    "removedTitle": "Đã gỡ",
+    "removedHint": "Lệnh moc app remove đã gỡ đường dẫn, đăng nhập và container; dữ liệu của ứng dụng vẫn giữ.",
+    "none": {
+      "builtin": "Không có ứng dụng có sẵn.",
+      "installed": "Chưa có ứng dụng nào cài bằng manifest.",
+      "removed": "Chưa gỡ ứng dụng nào."
+    },
+    "state": {
+      "builtin": "Có sẵn trong lõi",
+      "installed": "Đã cài",
+      "removed": "Đã gỡ"
+    },
+    "version": "Phiên bản",
+    "coreVersion": "theo bản lõi",
+    "installedAt": "Cài lúc",
+    "updatedAt": "Cập nhật lúc",
+    "removedAt": "Gỡ lúc",
+    "manifestHash": "Băm manifest",
+    "hashHint": "Băm manifest là SHA-256 của tệp app.yaml lúc cài: so với kết quả sha256sum apps/<thư mục>/app.yaml trên máy chủ để biết bản đang cài đúng bản đã duyệt.",
+    "copy": "Chép",
+    "copyHashOf": "Chép băm manifest của {app}",
+    "copied": "Đã chép băm manifest",
+    "copyFailed": "Trình duyệt không cho chép — chọn tay chuỗi băm dưới đây",
+    "open": "Mở",
+    "builtin": {
+      "office": {
+        "title": "Văn phòng điện tử",
+        "description": "Văn bản đến, văn bản đi, giao việc, hồ sơ công việc, tìm kiếm, hỏi đáp, sổ kiểm toán — ứng dụng đầu tiên trên lõi."
+      },
+      "personal": {
+        "title": "Không gian cá nhân P.A.R.A",
+        "description": "Chỗ cất tệp của riêng mỗi người trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ."
+      }
+    }
+  },
+  "sensors": {
+    "title": "Sơ đồ cảm biến kho",
+    "subtitle": "Nhiệt độ mới nhất của từng phòng trong kho lưu trữ so với ngưỡng cảnh báo, kèm cờ chất lượng dữ liệu cảm biến. Trang tự cập nhật 30 giây một lần.",
+    "forbidden": "Trang này dành cho văn thư, chuyên viên, lãnh đạo phòng và lãnh đạo đơn vị.",
+    "off": "Chưa bật cảm biến",
+    "offHint": {
+      "off": "Hệ thống chưa cấu hình context broker NGSI-LD nhận số đo của cảm biến (MOC_NGSI_URL của svc-workflow). Liên hệ người quản trị hệ thống.",
+      "unavailable": "Context broker NGSI-LD (profile iot) chưa chạy hoặc chưa trả lời, nên chưa có số đo nào. Người quản trị bật bằng make demo-it-ot hoặc docker compose --profile iot up -d."
+    },
+    "plan": "Mặt bằng kho lưu trữ",
+    "planLabel": "Sơ đồ mặt bằng kho lưu trữ, mỗi phòng tô màu theo nhiệt độ mới nhất so với ngưỡng",
+    "panHint": "Cuộn ngang để xem đủ sơ đồ. Bảng số đo chi tiết ở bên dưới.",
+    "corridor": "Hành lang",
+    "checkedAt": "Đọc lúc {time}",
+    "room": {
+      "kho-1": "Kho bảo quản 1",
+      "kho-2": "Kho bảo quản 2",
+      "kho-3": "Kho bảo quản 3",
+      "phong-doc": "Phòng đọc",
+      "xu-ly": "Phòng xử lý tài liệu",
+      "may-chu": "Phòng máy chủ"
+    },
+    "outside": "Ngoài sơ đồ",
+    "outsideHint": "{n} cảm biến chưa khai mã phòng (thuộc tính room) hoặc khai mã không có trên sơ đồ: chỉ có trong bảng.",
+    "count": "{n} cảm biến",
+    "legend": "Chú giải",
+    "threshold": "Ngưỡng cảnh báo {threshold} (MOC_OT_THRESHOLD). Vượt ngưỡng thì hệ thống dựng dự thảo \"Báo cáo sự cố\" cho chuyên viên phụ trách cảm biến.",
+    "level": {
+      "over": "Vượt ngưỡng",
+      "near": "Gần ngưỡng",
+      "normal": "Bình thường",
+      "unknown": "Không tin được số đo",
+      "empty": "Chưa có cảm biến"
+    },
+    "levelHint": {
+      "over": "trên {threshold}",
+      "near": "trên {from}, tới {threshold}; chỉ để lưu ý, không gửi cảnh báo",
+      "normal": "từ {from} trở xuống",
+      "unknown": "chưa có số đo, mất tín hiệu hoặc ngoài dải",
+      "empty": "phòng chưa gắn cảm biến nào"
+    },
+    "flags": "Cờ chất lượng dữ liệu",
+    "flag": {
+      "stale": "Mất tín hiệu",
+      "out_of_range": "Ngoài dải",
+      "duplicate_time": "Trùng giờ đo",
+      "future_time": "Giờ đo ở tương lai"
+    },
+    "flagHint": {
+      "stale": "quá {n} phút không có số đo mới",
+      "out_of_range": "giá trị không phải số, hoặc ngoài dải đo của cảm biến ({min} đến {max})",
+      "duplicate_time": "số đo mới nhất mang cùng thời điểm đo (observedAt) với một lần đo khác: đồng hồ thiết bị đứng hoặc gửi lặp",
+      "future_time": "thời điểm đo (observedAt) của số đo mới nhất muộn hơn giờ máy chủ quá {slack} phút: đồng hồ thiết bị chạy nhanh; khi đó mất tín hiệu tính theo lúc broker nhận số đo"
+    },
+    "flagsNote": "Cờ do máy chủ tính từ bản sao số của cảm biến trong context broker; phòng có cờ mất tín hiệu hay ngoài dải không tô theo số đo.",
+    "table": "Các cảm biến",
+    "colRoom": "Phòng",
+    "colSensor": "Cảm biến",
+    "colValue": "Số đo mới nhất",
+    "colAt": "Thời điểm đo",
+    "colFlags": "Cờ",
+    "none": "Đơn vị chưa có cảm biến nào gửi số đo.",
+    "note": "Sơ đồ mẫu của một tầng kho lưu trữ; cảm biến vào phòng theo mã phòng thiết bị tự khai. Chỉ thấy cảm biến của đơn vị mình."
+  },
+  "fe": {
+    "skip": "Đến nội dung chính",
+    "organization": "Không gian của đơn vị",
+    "navigation": "Điều hướng chính",
+    "verify": "Xác thực văn bản",
+    "localData": "Dữ liệu do đơn vị quản lý",
+    "menu": "Mở điều hướng",
+    "all": "Tất cả",
+    "overdue": "Quá hạn",
+    "backInbox": "Về hộp việc",
+    "urgent": "Văn bản khẩn",
+    "searchTasks": "Tìm trong hộp việc…",
+    "tasks": "{n} công việc",
+    "due": "Hạn giải quyết",
+    "noTasks": "Không có việc phù hợp",
+    "tryFilter": "Thử đổi bộ lọc hoặc tìm bằng từ khác.",
+    "loaded": "{n} văn bản trong danh sách",
+    "filterDocuments": "Lọc trong danh sách đang hiện…",
+    "listHint": "Theo dõi hồ sơ và tiến độ trong phạm vi đơn vị.",
+    "loading": "Đang tải hồ sơ…",
+    "receiveNew": "Tiếp nhận mới",
+    "todayShort": "Hôm nay",
+    "scrollTable": "Cuộn ngang để xem đầy đủ các cột của sổ."
+  },
+  "desk": {
+    "queue": "Cần xử lý",
+    "draft": "Dự thảo chưa cấp số",
+    "clearFilters": "Xóa bộ lọc",
+    "compose": "Soạn mới",
+    "pending": "{n} công việc đang chờ xử lý.",
+    "filter": "Lọc công việc",
+    "noDeadline": "Chưa có hạn",
+    "attention": "Cần chú ý",
+    "remaining": "Các công việc còn lại",
+    "category": "Chiều văn bản",
+    "allDocuments": "Tất cả văn bản"
+  },
+  "shell": {
+    "closeNav": "Đóng điều hướng"
+  },
+  "pageError": {
+    "notFound": "Không tìm thấy trang",
+    "notFoundDetail": "Đường dẫn này không còn tồn tại hoặc đã được thay đổi. Anh/chị có thể trở về hộp việc để tiếp tục.",
+    "title": "Chưa thể mở trang",
+    "detail": "Đã có lỗi khi tải trang. Vui lòng quay lại hộp việc và thử lại.",
+    "home": "Về hộp việc"
+  },
+  "authCallback": {
+    "title": "Đang đăng nhập",
+    "detail": "Signet đang mở không gian làm việc của anh/chị.",
+    "failed": "Chưa thể đăng nhập",
+    "retryDetail": "Phiên đăng nhập có thể đã hết hạn. Vui lòng thử đăng nhập lại."
   }
 }

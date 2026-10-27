@@ -9,16 +9,17 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 
 | Vai trò | Tài khoản mẫu | Truy vấn | Thao tác ghi | Schema |
 |---|---|--:|--:|---|
-| `clerk` (văn thư) | `vanthu` | 42 | 15 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
-| `staff` (chuyên viên) | `chuyenviendt` | 35 | 30 | [`graphql/staff.graphql`](graphql/staff.graphql) |
-| `manager` (lãnh đạo phòng) | `totruongdt` | 35 | 20 | [`graphql/manager.graphql`](graphql/manager.graphql) |
-| `director` (lãnh đạo đơn vị) | `truongkhoa` | 65 | 15 | [`graphql/director.graphql`](graphql/director.graphql) |
-| `tenant_admin` (quản trị đơn vị) | `quantri` | 27 | 13 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
+| `clerk` (văn thư) | `vanthu` | 44 | 15 | [`graphql/clerk.graphql`](graphql/clerk.graphql) |
+| `staff` (chuyên viên) | `chuyenviendt` | 37 | 30 | [`graphql/staff.graphql`](graphql/staff.graphql) |
+| `manager` (lãnh đạo phòng) | `totruongdt` | 37 | 20 | [`graphql/manager.graphql`](graphql/manager.graphql) |
+| `director` (lãnh đạo đơn vị) | `truongkhoa` | 68 | 15 | [`graphql/director.graphql`](graphql/director.graphql) |
+| `tenant_admin` (quản trị đơn vị) | `quantri` | 28 | 13 | [`graphql/tenant_admin.graphql`](graphql/tenant_admin.graphql) |
 
 ## Truy vấn (`query`)
 
 | Trường | `clerk` | `staff` | `manager` | `director` | `tenant_admin` |
 |---|:-:|:-:|:-:|:-:|:-:|
+| `core_app_catalog` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `core_audit_anchors` |  |  |  | ✓ | ✓ |
 | `core_audit_anchors_aggregate` |  |  |  | ✓ | ✓ |
 | `core_audit_log` |  |  |  | ✓ | ✓ |
@@ -70,6 +71,7 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_maturity_assessments_by_pk` |  |  |  | ✓ |  |
 | `office_registers` | ✓ |  |  | ✓ | ✓ |
 | `office_registers_by_pk` | ✓ |  |  | ✓ | ✓ |
+| `office_report_checks` |  |  |  | ✓ |  |
 | `office_report_lineage` |  |  |  | ✓ |  |
 | `office_v_assignment_suggestion_accuracy` |  |  |  | ✓ | ✓ |
 | `office_v_assignment_suggestion_accuracy_aggregate` |  |  |  | ✓ | ✓ |
@@ -82,6 +84,7 @@ Ngoài ra Hasura còn lọc theo dòng (cùng đơn vị, cùng phòng, văn b�
 | `office_v_overdue_rate` |  |  |  | ✓ |  |
 | `office_v_processing_time` |  |  |  | ✓ |  |
 | `office_v_time_to_assign` |  |  |  | ✓ |  |
+| `otSensorMap` | ✓ | ✓ | ✓ | ✓ |  |
 | `personal_items` | ✓ | ✓ | ✓ | ✓ |  |
 | `personal_items_by_pk` | ✓ | ✓ | ✓ | ✓ |  |
 

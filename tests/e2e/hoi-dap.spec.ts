@@ -20,8 +20,9 @@ import { PASSWORD, TOTP_SECRET, shot, signIn } from './helpers'
 // Hỏi đáp trên kho văn bản (F4.2) trên giao diện: văn thư mở "Hỏi đáp", hỏi điều kiện xét học bổng khuyến khích học
 // tập → khối "Câu trích nguyên văn" có "3,2", nguồn "88/CTSV · tr. 1" (công văn seed của Phòng Công tác sinh viên);
 // dấu [1] đưa tới mục nguồn. Giảng viên Bộ môn KTPM hỏi đúng câu đó → không thấy 88/CTSV (công văn giao Tổ Đào tạo),
-// có câu "Không tìm thấy…". CI không bật mô hình ngôn ngữ: chỉ kiểm phần trích nguyên văn, chạy được cả khi có mô hình
-// (câu trích hiện ngay, câu trả lời của mô hình đến sau).
+// có câu "Không tìm thấy…". "Hỏi về văn bản này" ở trang chi tiết chỉ hỏi trong văn bản đó; nhãn nguồn mở tệp đúng
+// trang. CI không bật mô hình ngôn ngữ: chỉ kiểm phần trích nguyên văn, chạy được cả khi có mô hình (câu trích hiện
+// ngay, câu trả lời của mô hình đến sau).
 
 const QUESTION = 'Điều kiện xét học bổng khuyến khích học tập là gì?'
 const DONE = /^(answered|passages_only|no_evidence|error)$/
@@ -41,7 +42,7 @@ test('hỏi đáp: văn thư thấy câu trích nguyên văn và nguồn; giản
   // 1. Từ Tìm kiếm, "Hỏi trợ lý" mang câu đang tìm sang trang Hỏi đáp: điền sẵn, không tự gửi
   const clerk = await signIn(browser, 'vanthu', { otp: true })
   await clerk.getByRole('link', { name: 'Tìm kiếm', exact: true }).click()
-  await clerk.getByRole('searchbox').fill('học bổng')
+  await clerk.getByRole('searchbox', { name: 'Tìm kiếm văn bản' }).fill('học bổng')
   await clerk.getByRole('link', { name: 'Hỏi trợ lý' }).click()
   await expect(clerk).toHaveURL(/\/hoi-dap\?q=/)
   await expect(clerk.getByRole('heading', { level: 1, name: 'Hỏi đáp văn bản' })).toBeVisible()
@@ -71,7 +72,24 @@ test('hỏi đáp: văn thư thấy câu trích nguyên văn và nguồn; giản
   await expect(clerk).toHaveURL(/\/van-ban\/[0-9a-f-]{36}$/)
   await expect(clerk.getByText('88/CTSV').first()).toBeVisible()
 
-  // 3. Giảng viên Bộ môn KTPM: công văn giao Tổ Đào tạo, không được xem → không có nguồn nào, câu "Không tìm thấy"
+  // 3. "Hỏi về văn bản này": trang Hỏi đáp chỉ hỏi trong 88/CTSV, mọi nguồn của văn bản đó; nhãn nguồn mở tệp ở khung
+  // xem, đúng trang được trích (#page=n); bỏ phạm vi thì về hỏi cả kho
+  await clerk.getByTestId('ask-about').click()
+  await expect(clerk).toHaveURL(/\/hoi-dap\?van_ban=[0-9a-f-]{36}$/)
+  await expect(clerk.getByTestId('ask-scope')).toContainText('88/CTSV')
+  const scoped = await ask(clerk, QUESTION)
+  await expect(scoped).toHaveAttribute('data-state', 'answered')
+  await expect(scoped.getByTestId('ask-scope-chip')).toContainText('88/CTSV')
+  const items = await scoped.getByTestId('ask-sources').locator('li').allInnerTexts()
+  expect(items.length).toBeGreaterThan(0)
+  for (const item of items) expect(item).toContain('88/CTSV')
+  await scoped.getByRole('button', { name: 'Xem tệp: 88/CTSV, trang 1' }).first().click()
+  await expect(scoped.getByTestId('ask-viewer').locator('iframe')).toHaveAttribute('src', /^blob:.+#page=1$/)
+  await clerk.getByTestId('ask-scope').getByRole('button', { name: 'Hỏi trong mọi văn bản' }).click()
+  await expect(clerk).toHaveURL(/\/hoi-dap$/)
+  await expect(clerk.getByTestId('ask-scope')).toHaveCount(0)
+
+  // 4. Giảng viên Bộ môn KTPM: công văn giao Tổ Đào tạo, không được xem → không có nguồn nào, câu "Không tìm thấy"
   const lecturer = await signIn(browser, 'giangvienktpm')
   await lecturer.getByRole('link', { name: 'Hỏi đáp', exact: true }).click()
   const other = await ask(lecturer, QUESTION)

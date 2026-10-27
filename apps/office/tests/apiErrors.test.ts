@@ -94,7 +94,7 @@ Object.assign(globalThis, {
   XMLHttpRequest: FakeXhr,
 })
 
-const { ApiError, useApi } = await import('../app/composables/useApi.ts')
+const { ApiError, useApi, viewerType } = await import('../app/composables/useApi.ts')
 const { errorText } = await import('../app/utils/errors.ts')
 const api = useApi()
 
@@ -113,6 +113,8 @@ const calls: Record<string, () => Promise<unknown>> = {
   readingRoom: () => api.readingRoom('00000000-0000-0000-0000-000000000002'),
   viewArchivedFile: () => api.viewArchivedFile('00000000-0000-0000-0000-000000000002',
     '00000000-0000-0000-0000-000000000001'),
+  // số liệu đã nộp lưu trên trang Điều hành (#304)
+  archiveStats: () => api.archiveStats(),
 }
 
 async function failure(call: () => Promise<unknown>): Promise<InstanceType<typeof ApiError>> {
@@ -152,7 +154,7 @@ test('403 JSON của Hasura, svc-files giữ mã cũ, không thành blocked', as
 
   reply = jsonReply(403, { detail: { code: 'forbidden', message: 'Không có quyền với tệp này' } })
   for (const name of ['upload', 'preview', 'register', 'search', 'readFile', 'ask', 'archiveCaseFile', 'readingRoom',
-    'viewArchivedFile']) {
+    'viewArchivedFile', 'archiveStats']) {
     const e = await failure(calls[name])
     assert.equal(e.code, 'forbidden', name)
     assert.equal(e.message, 'Không có quyền với tệp này', name)
@@ -176,6 +178,25 @@ test('gql: trang lỗi không phải JSON ở mã khác (502 của cổng) → A
   assert.deepEqual(await calls.gql(), { insert_office_documents_one: { id: 'abc' } })
 })
 
+test('gql: JSON không có data (cổng trả 404 kèm {}) → ApiError HTTP 404, không trả undefined (#278)', async () => {
+  for (const [status, body] of [[404, {}], [500, { message: 'oops' }], [200, {}], [200, { data: null }]] as const) {
+    reply = jsonReply(status, body)
+    const e = await failure(calls.gql)
+    assert.equal(e.message, `HTTP ${status}`, JSON.stringify(body))
+    assert.equal(e.status, status)
+  }
+  reply = jsonReply(404, {})
+  const e = await failure(calls.gql)
+  assert.equal(errorText(tVi as never, e),
+    'Máy chủ chưa trả lời được (HTTP 404). Thử lại sau ít phút; còn lỗi thì báo quản trị kèm mã này.')
+  assert.match(errorText(tEn as never, e), /^The server could not answer \(HTTP 404\)\. /)
+  assert.doesNotMatch(errorText(tVi as never, e), /Cannot read|undefined|Có lỗi xảy ra/)
+
+  // lỗi GraphQL kèm mã HTTP không thành công vẫn báo câu của Hasura như trước
+  reply = jsonReply(400, { errors: [{ message: 'field "x" not found', extensions: { code: 'validation-failed' } }] })
+  assert.equal((await failure(calls.gql)).code, 'validation-failed')
+})
+
 test('errorText: blocked → câu của cổng kèm mã, hai ngôn ngữ; không còn "Unexpected token"', async () => {
   reply = blockedReply()
   const e = await failure(calls.gql)
@@ -195,7 +216,62 @@ test('errorText: blocked → câu của cổng kèm mã, hai ngôn ngữ; không
   // lỗi khác giữ câu cũ
   const limited = new ApiError('rate_limited', 'rate_limited', 429)
   assert.equal(errorText(tVi as never, limited), lookup(vi, 'error.rate_limited'))
-  assert.equal(errorText(tVi as never, new ApiError('HTTP 502', null, 502)), 'HTTP 502')
+  assert.equal(errorText(tVi as never, new ApiError('HTTP 502', null, 502)),
+    'Máy chủ chưa trả lời được (HTTP 502). Thử lại sau ít phút; còn lỗi thì báo quản trị kèm mã này.')
+})
+
+test('errorText: tệp sai loại, tệp chạy được, ảnh không bỏ được EXIF → câu riêng, hai ngôn ngữ', async () => {
+  const codes = [['type_mismatch', 415], ['type_not_allowed', 415], ['image_unreadable', 422]] as const
+  for (const [code, status] of codes) {
+    reply = jsonReply(status, { detail: { code, message: 'Câu tiếng Việt của máy chủ', found: 'text/html' } })
+    const e = await failure(calls.upload)
+    assert.equal(e.code, code)
+    assert.equal(e.status, status)
+    for (const [t, messages] of [[tVi, vi], [tEn, en]] as const) {
+      const text = errorText(t as never, e)
+      assert.ok(lookup(messages, `error.${code}`), code)
+      assert.equal(text, lookup(messages, `error.${code}`))
+    }
+  }
+})
+
+test('errorText: Hasura từ chối vai trò (đọc, ghi ngoài quyền) → câu noAccess, hai ngôn ngữ (#242)', async () => {
+  // dạng lỗi của Hasura v2.51: bảng, khung nhìn, cột, action không có trong quyền của vai trò; điều kiện quyền khi ghi
+  const denied = [
+    { message: "field 'office_v_document_counts' not found in type: 'query_root'",
+      extensions: { path: '$.selectionSet.office_v_document_counts', code: 'validation-failed' } },
+    { message: "field 'otSensorMap' not found in type: 'query_root'",
+      extensions: { path: '$.selectionSet.otSensorMap', code: 'validation-failed' } },
+    { message: "field 'body' not found in type: 'office_documents'",
+      extensions: { path: '$.selectionSet.office_documents_by_pk.selectionSet.body', code: 'validation-failed' } },
+    { message: 'check constraint of an insert permission has failed',
+      extensions: { path: '$.selectionSet.insert_office_documents_one.args.object', code: 'permission-error' } },
+  ]
+  for (const error of denied) {
+    reply = jsonReply(200, { errors: [error] })
+    const e = await failure(calls.gql)
+    for (const [t, messages] of [[tVi, vi], [tEn, en]] as const) {
+      assert.equal(errorText(t as never, e), lookup(messages, 'error.noAccess'), error.message)
+    }
+  }
+
+  // permission-error còn mang mọi check_violation của CSDL (docs/mo-hinh-du-lieu.md, feedback_guard): tên ràng buộc
+  // giữ câu riêng của nó, câu tiếng Việt của trigger giữ nguyên, không thành "vai trò không được"
+  const violation = (message: string) =>
+    jsonReply(200, { errors: [{ message, extensions: { code: 'permission-error' } }] })
+  reply = violation('Check constraint violation. feedback_rate: quá 3 góp ý trong 10 phút')
+  assert.equal(errorText(tVi as never, await failure(calls.gql)), lookup(vi, 'error.feedback_rate'))
+  reply = violation('Check constraint violation. maturity_rate: đã lưu tự chẩn đoán trong 10 phút qua')
+  assert.equal(errorText(tEn as never, await failure(calls.gql)), lookup(en, 'error.maturity_rate'))
+  const closed = 'Check constraint violation. hồ sơ HS-2026-01 đã đóng, không thêm văn bản được'
+  reply = violation(closed)
+  assert.equal(errorText(tVi as never, await failure(calls.gql)), closed)
+
+  // lỗi kiểm khác của Hasura (câu hỏi sai kiểu biến) giữ câu cũ
+  const typo = "variable 'o' is declared as 'office_documents_insert_input!', but used where 'String' is expected"
+  reply = jsonReply(200, { errors: [{ message: typo, extensions: { code: 'validation-failed' } }] })
+  assert.equal(errorText(tVi as never, await failure(calls.gql)), typo)
+  for (const messages of [vi, en]) assert.doesNotMatch(lookup(messages, 'error.noAccess') ?? '', /\{|not found/)
 })
 
 test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đáp chuyển blocked cho errorText', () => {
@@ -210,4 +286,14 @@ test('khóa i18n của lỗi cổng chặn đủ hai ngôn ngữ; trang Hỏi đ
   const passed = page.match(/!\[([^\]]+)\]\.includes\(e\.code/)?.[1] ?? ''
   assert.ok(passed.includes("'blocked'"), passed)
   assert.equal(lookup(vi, 'assist.error.blocked'), undefined)
+})
+
+test('khung xem nguồn của Hỏi đáp: bản scan giữ kiểu ảnh, HTML, SVG hay kiểu lạ đều thành PDF', () => {
+  assert.equal(viewerType('application/pdf'), 'application/pdf')
+  assert.equal(viewerType('image/jpeg'), 'image/jpeg')
+  assert.equal(viewerType('IMAGE/PNG; charset=binary'), 'image/png')
+  // object URL cùng origin với ứng dụng: không bao giờ để byte trả về chạy như trang HTML hay SVG
+  for (const type of ['text/html', 'image/svg+xml', 'application/xhtml+xml', 'image/tiff', '', null]) {
+    assert.equal(viewerType(type), 'application/pdf', String(type))
+  }
 })

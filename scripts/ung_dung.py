@@ -25,22 +25,34 @@
 Trạng thái mong muốn nằm trong `.moc-apps/` của thư mục chạy (ngoài git): bản ghi từng ứng dụng đã cài
 (`apps/<tên>.json`: manifest đã kiểm, SQL migration, image) và các tệp dựng từ bản ghi + tệp lõi:
   - `apisix.yaml`: `platform/apisix/apisix.yaml` chép nguyên văn, chèn upstream và route của ứng dụng (trước route bắt
-    mọi đường của app-office). Ghi đè TẠI CHỖ: APISIX gắn từng tệp, mỗi giây so mtime và tự nạp lại; tệp mới đổi tên
-    vào chỗ thì container không thấy (inode cũ). Lúc đang ghi APISIX thấy thiếu dấu #END và giữ cấu hình cũ;
-  - `hasura-metadata/`: `db/metadata` chép nguyên văn + bảng, quyền, quan hệ của ứng dụng + event trigger. Image
-    cli-migrations của Hasura áp lại thư mục này mỗi lần khởi động: phần của ứng dụng sống qua khởi động lại;
+    mọi đường của app-office): trang GET/HEAD ở cổng công khai; ứng dụng nghe sự kiện có thêm route hook POST
+    /su-kien/<tên> chỉ khớp ở cổng hook 9081 (không publish), viết lại đúng về đường webhook của ứng dụng. Ghi đè TẠI
+    CHỖ: APISIX gắn từng tệp, mỗi giây so mtime và tự nạp lại; tệp mới đổi tên vào chỗ thì container không thấy (inode
+    cũ). Lúc đang ghi APISIX thấy thiếu dấu #END và giữ cấu hình cũ. Ghi xong thì khởi động lại apisix và chờ cổng
+    trả lời (restart_apisix, #299: nạp lại nóng làm hỏng bộ nhớ của WAF);
+  - `hasura-metadata/`: `db/metadata` chép nguyên văn + bảng, quyền, quan hệ của ứng dụng + event trigger (webhook
+    http://apisix:9081/su-kien/<tên>: Hasura chỉ ở mạng `moc`, ứng dụng chỉ ở `apps`). Image cli-migrations của Hasura
+    áp lại thư mục này mỗi lần khởi động: phần của ứng dụng sống qua khởi động lại;
   - `docker-compose.apps.yml`: tệp phủ — bind mount của apisix, hasura trỏ sang hai mục trên, bí mật header webhook cho
-    hasura (env_file), service app-<tên> của từng ứng dụng. `COMPOSE_FILE` trong .env thêm tệp này;
+    hasura (env_file), service app-<tên> của từng ứng dụng ở mạng `apps` (chỉ tới được APISIX: token Keycloak, GraphQL
+    đi qua cổng công khai http://apisix:9080 như trình duyệt). `COMPOSE_FILE` trong .env thêm tệp này;
   - `hasura.env`, `<tên>.env` (0600): bí mật sinh lúc cài — không nằm trong manifest, không in ra.
 CSDL ghi trạng thái đã áp: `core.apps`, `core.app_migrations` (migration 1792281603200, có sổ kiểm toán).
+
+Ứng dụng khai `workflow` (BPMN + form JSON Schema, #301): gói các tệp đó (nội dung lưu trong bản ghi) thành zip, đưa
+qua stdin cho `python -m svc_workflow.apps.deploy check|install <tên>` trong container svc-workflow. Bước 1 (manifest)
+cho svc-workflow kiểm gói — BPMN theo danh sách trắng, form — trước mọi thay đổi; bước "quy trình" sau Keycloak triển
+khai thành một deployment trên Flowable của lõi. Gỡ thì tạm dừng các định nghĩa quy trình đó (lịch sử, đơn đang dở giữ
+nguyên). docs/them-ung-dung.md mục 1.5.
 
 Migration của ứng dụng chạy trên một phiên psql mà session user là vai trò CSDL riêng của ứng dụng
 (`moc_appdb_<schema>`: không superuser, không CREATEROLE, BYPASSRLS, chỉ làm chủ schema của nó, không quyền gì trên
 `core`, `office`, `personal`; LOGIN chỉ trong lúc chạy migration). RESET ROLE hay SQL động không leo lên được vai trò
 khác; đối tượng tạo ra vẫn thuộc vai trò đó. Cuối mỗi migration, cùng giao dịch, `moc_app.migration_done()` kiểm các
 đối tượng trong schema (không dựa vào bảng, hàm ngoài schema; hàm của ứng dụng thành SECURITY DEFINER) — vì Hasura đọc,
-ghi bảng ứng dụng bằng superuser `moc`. Vẫn là ứng dụng ĐÃ TIN: container của nó ở mạng nội bộ `moc`. Gỡ ứng dụng không
-xóa dữ liệu (schema, các dòng, vai trò CSDL còn nguyên).
+ghi bảng ứng dụng bằng superuser `moc`. Vẫn là ứng dụng ĐÃ TIN (mã chạy không bị kiểm), nhưng container của nó chỉ ở
+mạng `apps`: tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như trình duyệt. Gỡ ứng dụng không xóa dữ
+liệu (schema, các dòng, vai trò CSDL còn nguyên).
 
 Thoát 0: xong; 1: bị từ chối (manifest sai, xung đột) hoặc một bước lỗi — in rõ bước nào, sửa rồi chạy lại; 2: không gọi
 được Signet (CSDL, Keycloak, Docker).
@@ -49,10 +61,12 @@ Thoát 0: xong; 1: bị từ chối (manifest sai, xung đột) hoặc một bư
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import copy
 import fcntl
 import hashlib
+import io
 import json
 import math
 import os
@@ -62,6 +76,7 @@ import secrets
 import subprocess
 import sys
 import time
+import zipfile
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -81,6 +96,14 @@ CORE_GATEWAY = "platform/apisix/apisix.yaml"
 CORE_METADATA = "db/metadata"
 SCHEMA = "scripts/app-manifest.schema.json"
 FORMAT = 1                                   # định dạng bản ghi .moc-apps/apps/<tên>.json
+# Container ứng dụng chỉ ở mạng `apps` (docker-compose.yml), chỉ tới được APISIX: gọi lõi qua cổng công khai như trình
+# duyệt; Hasura (mạng `moc`) giao sự kiện qua cổng hook 9081 — node_listen trong platform/apisix/config.yaml, không
+# publish (test kiểm cả hai phía)
+APP_NETWORK = "apps"
+GATEWAY_URL = "http://apisix:9080"
+HOOK_PORT = 9081
+HOOK_URL = f"http://apisix:{HOOK_PORT}"
+HOOK_PREFIX = "/su-kien"                      # route hook: POST /su-kien/<tên>, chỉ ở cổng HOOK_PORT
 
 # Danh sách trắng sự kiện của lõi: PHẢI trùng mảng trong core.app_events_publish() (migration 1792281603200; test kiểm)
 EVENT_KINDS = ("office.document.received", "office.document.registered", "office.document.issued")
@@ -98,9 +121,9 @@ RESERVED_NAMES = {"office", "ca-nhan", "core", "moc", "admin", "api", "svc"}
 RESERVED_PATHS = {
     "/realms", "/resources", "/v1", "/v2", "/v1alpha1", "/api", "/realtime", "/admin", "/console", "/healthz",
     "/metrics", "/flowable-rest", "/status", "/ca-nhan", "/config", "/favicon",
-    "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
+    "/cam-bien", "/dang-nhap", "/dieu-hanh", "/gop-y", "/ho-so", "/hoi-dap", "/pha-he", "/so-dang-ky", "/so-do",
     "/so-kiem-toan", "/tim-kiem", "/trang-thai", "/tu-chan-doan", "/van-ban", "/van-ban-den", "/van-ban-di",
-    "/xac-thuc",
+    "/xac-thuc", "/ung-dung", "/su-kien",
 }
 # Biến môi trường do lõi đặt cho container ứng dụng; manifest không ghi đè được
 PROVIDED_ENV = {"MOC_REALM", "MOC_APP_NAME", "MOC_APP_PATH", "MOC_KEYCLOAK_INTERNAL_URL", "MOC_GRAPHQL_INTERNAL_URL",
@@ -111,10 +134,18 @@ TENANT_VAR = "x-hasura-tenant-id"
 MAX_SQL_BYTES = 1_000_000
 HOOK_HEADER = "X-Moc-Hook-Secret"
 DEFAULT_RETRY = {"num_retries": 5, "interval_sec": 10, "timeout_sec": 10}
+# Quy trình của ứng dụng (#301): svc-workflow kiểm, triển khai trong container (services/svc-workflow/…/apps/deploy.py)
+WORKFLOW_CLI = ("python", "-m", "svc_workflow.apps.deploy")
+WORKFLOW_MANIFEST = "moc-workflow.json"        # mục lục trong gói, như svc_workflow/apps/bundle.py
+MAX_WORKFLOW_FILE = 512 * 1024
 
 
 class AppError(Exception):
     """Không làm được hoặc làm thì sai — viết cho người vận hành đọc (thoát 1)."""
+
+
+class WorkflowRejected(AppError):
+    """svc-workflow từ chối gói quy trình (BPMN, form sai) — lỗi viết cho người cài đọc."""
 
 
 class StepFailed(Exception):
@@ -413,7 +444,8 @@ def check_manifest(m: dict[str, Any], base: pathlib.Path, schema: dict[str, Any]
     if test and test[0] not in ("CMD", "CMD-SHELL"):
         errors.append("healthcheck.test: phần tử đầu phải là CMD hoặc CMD-SHELL")
     if "events" in m and m["events"]["webhook"]["port"] == m["port"]:
-        errors.append("events.webhook.port: phải khác port của trang (cổng webhook không có route qua APISIX)")
+        errors.append("events.webhook.port: phải khác port của trang (trang có route ở cổng công khai; webhook chỉ "
+                      "có route ở cổng hook nội bộ của APISIX)")
     if "build" in m["image"]:
         try:
             folder = _inside(base, m["image"]["build"], "image.build")
@@ -421,7 +453,46 @@ def check_manifest(m: dict[str, Any], base: pathlib.Path, schema: dict[str, Any]
                 errors.append(f"image.build: {folder} không có Dockerfile")
         except AppError as exc:
             errors.append(str(exc))
+    if "workflow" in m:
+        errors += workflow_errors(m, base)
     return errors + check_tables(m)
+
+
+def workflow_errors(m: dict[str, Any], base: pathlib.Path) -> list[str]:
+    """Phần kiểm được ở máy cài: formKey có tiền tố <tên>., tệp có thật, nằm trong thư mục ứng dụng. BPMN, nội dung
+    form do svc-workflow kiểm lúc cài (danh sách trắng, svc_workflow/apps/bpmn.py)."""
+    errors = [f"workflow.forms.{key}: formKey phải mở đầu bằng {m['name']}." for key in m["workflow"]["forms"]
+              if not key.startswith(f"{m['name']}.")]
+    files = [("workflow.processes", rel) for rel in m["workflow"]["processes"]]
+    files += [(f"workflow.forms.{key}", rel) for key, rel in m["workflow"]["forms"].items()]
+    for what, rel in files:
+        try:
+            path = _inside(base, rel, what)
+        except AppError as exc:
+            errors.append(str(exc))
+            continue
+        if not path.is_file():
+            errors.append(f"{what}: không có tệp {rel}")
+        elif path.stat().st_size > MAX_WORKFLOW_FILE:
+            errors.append(f"{what}: tệp {rel} lớn quá {MAX_WORKFLOW_FILE // 1024} KB")
+    return errors
+
+
+def read_workflow(manifest: dict[str, Any], base: pathlib.Path) -> dict[str, Any]:
+    """Nội dung BPMN, form vào bản ghi (như SQL migration): sync, hoàn tác dựng lại được gói dù thư mục nguồn đổi."""
+    def text(rel: str, what: str) -> tuple[str, str]:
+        path = _inside(base, rel, what)
+        try:
+            return path.relative_to(base).as_posix(), path.read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            raise AppError(f"{what}: {rel} không phải UTF-8") from None
+    wf = manifest["workflow"]
+    processes = dict(text(rel, "workflow.processes") for rel in wf["processes"])
+    forms = {}
+    for key, rel in wf["forms"].items():
+        path, content = text(rel, f"workflow.forms.{key}")
+        forms[key] = {"path": path, "text": content}
+    return {"processes": processes, "forms": forms}
 
 
 def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str, Any]:
@@ -445,6 +516,7 @@ def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str,
     folder = manifest["database"].get("migrations")
     migrations = read_migrations(_inside(base, folder, "database.migrations")) if folder else []
     build = str(_inside(base, manifest["image"]["build"], "image.build")) if "build" in manifest["image"] else None
+    workflow = read_workflow(manifest, base) if "workflow" in manifest else None
     events = None
     if "events" in manifest:
         events = {"kinds": sorted(manifest["events"]["kinds"]), "port": manifest["events"]["webhook"]["port"],
@@ -458,16 +530,30 @@ def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str,
         "read_only": manifest.get("read_only", True),
         "environment": manifest.get("environment", {}), "schema": manifest["database"]["schema"],
         "migrations": migrations, "tables": manifest.get("metadata", {}).get("tables", []),
-        "service_account": bool(manifest.get("service_account")), "events": events,
+        "service_account": bool(manifest.get("service_account")), "events": events, "workflow": workflow,
         "manifest": manifest, "manifest_sha256": hashlib.sha256(raw).hexdigest(), "source": str(path),
     }
 
 
 # ---------------------------------------------------------------------------------------- sinh tệp (hàm thuần)
 
+def hook_id(name: str) -> str:
+    """id upstream, route hook của ứng dụng: không trùng được `app-<tên>` của ứng dụng nào (mọi id đó mở đầu `app-`)."""
+    return f"su-kien-app-{name}"
+
+
+def hook_uri(name: str) -> str:
+    return f"{HOOK_PREFIX}/{name}"
+
+
 def gateway_text(core: str, apps: list[dict[str, Any]]) -> str:
     """Tệp chạy của APISIX: tệp lõi nguyên văn; upstream của ứng dụng chèn ngay sau `upstreams:`, route chèn ngay trước
-    route `app-office` (bắt mọi đường, priority -10). Không ứng dụng nào: trả đúng tệp lõi."""
+    route `app-office` (bắt mọi đường, priority -10). Không ứng dụng nào: trả đúng tệp lõi.
+
+    Ứng dụng nghe sự kiện có thêm route hook: đúng một đường POST /su-kien/<tên>, chỉ khớp khi yêu cầu tới cổng hook
+    (server_port 9081, không publish — cổng công khai 9080 trả 404), viết lại về đúng đường webhook của ứng dụng trên
+    cổng webhook của nó. Không gỡ, không thêm header: X-Moc-Hook-Secret của Hasura tới ứng dụng nguyên vẹn, ứng dụng
+    vẫn tự kiểm."""
     if not apps:
         return core
     lines = core.splitlines(keepends=True)
@@ -488,6 +574,15 @@ def gateway_text(core: str, apps: list[dict[str, Any]]) -> str:
         n = app["name"]
         ups.append(f"  # moc app install: {n} (.moc-apps/apps/{n}.json)\n  - id: app-{n}\n    type: roundrobin\n"
                    f"    nodes:\n      \"app-{n}:{app['port']}\": 1\n")
+        if app.get("events"):
+            ev, h = app["events"], hook_id(n)
+            ups.append(f"  # moc app install: {n} — cổng webhook, chỉ route hook {h} tới\n  - id: {h}\n"
+                       f"    type: roundrobin\n    nodes:\n      \"app-{n}:{ev['port']}\": 1\n")
+            rts.append(f"  # moc app install: {n} — webhook sự kiện: chỉ ở cổng hook {HOOK_PORT} (không publish), "
+                       "đúng một đường, header bí mật đi nguyên tới ứng dụng\n"
+                       f"  - id: {h}\n    uri: {hook_uri(n)}\n    methods: [POST]\n"
+                       f"    vars: [[\"server_port\", \"==\", \"{HOOK_PORT}\"]]\n    upstream_id: {h}\n"
+                       f"    plugins:\n      proxy-rewrite:\n        uri: {json.dumps(ev['path'])}\n\n")
         rts.append(f"  # moc app install: {n} — trang tĩnh, không cần token; dữ liệu đi qua route của lõi ở trên\n"
                    f"  - id: app-{n}\n    uris: [\"{app['path']}\", \"{app['path']}/*\"]\n    methods: [GET, HEAD]\n"
                    f"    upstream_id: app-{n}\n\n")
@@ -501,13 +596,15 @@ def table_file(app: dict[str, Any], table: dict[str, Any]) -> str:
 def event_trigger(app: dict[str, Any]) -> dict[str, Any]:
     """Thân sự kiện chuẩn của Hasura, không request_transform: Hasura v2.51 ghi cả yêu cầu gốc (kèm header bí mật) vào
     nhật ký container khi trigger có transform (đã đo). Mọi loại trong danh sách trắng đều tới; ứng dụng tự bỏ loại
-    không nghe (MOC_APP_EVENT_KINDS). session_variables là null: lõi xóa người làm trước khi ghi core.app_events."""
+    không nghe (MOC_APP_EVENT_KINDS). session_variables là null: lõi xóa người làm trước khi ghi core.app_events.
+    Hasura (mạng `moc`) không tới thẳng được container ứng dụng (mạng `apps`): gọi route hook của APISIX, route đó
+    viết lại về http://app-<tên>:<port><path> của manifest (gateway_text)."""
     ev = app["events"]
     return {
         "name": service_role(app["name"]),
         "definition": {"enable_manual": False, "insert": {"columns": "*"}},
         "retry_conf": ev["retry"],
-        "webhook": f"http://app-{app['name']}:{ev['port']}{ev['path']}",
+        "webhook": f"{HOOK_URL}{hook_uri(app['name'])}",
         "headers": [{"name": HOOK_HEADER, "value_from_env": hook_env(app["name"])}],
     }
 
@@ -564,15 +661,15 @@ def overlay(apps: list[dict[str, Any]]) -> dict[str, Any]:
         n = app["name"]
         svc: dict[str, Any] = {
             "image": app["image"], "pull_policy": "never" if app.get("build") else "missing",
-            "profiles": ["app"], "restart": "unless-stopped", "networks": ["moc"],
+            "profiles": ["app"], "restart": "unless-stopped", "networks": [APP_NETWORK],
             "logging": {"driver": "json-file", "options": {"max-size": "10m", "max-file": "3"}},
             "read_only": app.get("read_only", True), "tmpfs": ["/tmp"], "cap_drop": ["ALL"],
             "security_opt": ["no-new-privileges:true"],
             "mem_limit": app["memory"], "cpus": 1.0,
             "environment": {**{k: literal(v) for k, v in app["environment"].items()},
                             "MOC_REALM": "${MOC_REALM:-moc}", "MOC_APP_NAME": n,
-                            "MOC_APP_PATH": app["path"], "MOC_KEYCLOAK_INTERNAL_URL": "http://keycloak:8080",
-                            "MOC_GRAPHQL_INTERNAL_URL": "http://hasura:8080/v1/graphql"},
+                            "MOC_APP_PATH": app["path"], "MOC_KEYCLOAK_INTERNAL_URL": GATEWAY_URL,
+                            "MOC_GRAPHQL_INTERNAL_URL": f"{GATEWAY_URL}/v1/graphql"},
             "env_file": [f"{STATE}/{n}.env"],
         }
         if app.get("events"):
@@ -679,8 +776,13 @@ class State:
         _write_atomic(self.dir / "apps" / f"{rec['name']}.json",
                       (json.dumps(rec, ensure_ascii=False, indent=2) + "\n").encode())
 
+    def before_path(self, name: str) -> pathlib.Path:
+        """Bản ghi trước lần cài dở (rỗng: chưa có bản ghi), đích hoàn tác của các lần cài sau đó: có từ lúc một lần cài
+        ghi bản ghi mới tới khi một lần cài xong, hoàn tác xong hay gỡ."""
+        return self.dir / "truoc-khi-cai" / f"{name}.json"
+
     def drop(self, name: str) -> None:
-        for path in (self.dir / "apps" / f"{name}.json", self.dir / f"{name}.env"):
+        for path in (self.dir / "apps" / f"{name}.json", self.dir / f"{name}.env", self.before_path(name)):
             with contextlib.suppress(FileNotFoundError):
                 path.unlink()
 
@@ -787,6 +889,10 @@ APPLY_METADATA = (
     " > config.yaml; hasura-cli metadata apply --skip-update-check 2>&1")
 CALL_METADATA = ('curl -sS -H "X-Hasura-Admin-Secret: $HASURA_GRAPHQL_ADMIN_SECRET" -H "Content-Type: application/json"'
                  " --data-binary @- http://127.0.0.1:8080/v1/metadata")
+# Cổng đã trả lời chưa (restart_apisix): trang cấu hình OIDC của realm $1 qua route keycloak — có WAF, không giới hạn
+# lượt. Gọi từ container hasura vì image APISIX không có curl; chưa kết nối được thì curl in 000
+PROBE_GATEWAY = ('curl -s -o /dev/null -w "%{http_code}" --max-time 10'
+                 ' "http://apisix:9080/realms/$1/.well-known/openid-configuration" || true')
 
 
 def _tail(text: str, n: int = 4) -> str:
@@ -874,6 +980,9 @@ class System:
 
     def apply_metadata(self) -> str:
         return self.exec("hasura", "sh", "-c", APPLY_METADATA, timeout=180)
+
+    def gateway_code(self, realm: str) -> str:
+        return self.exec("hasura", "sh", "-c", PROBE_GATEWAY, "sh", realm, timeout=30).strip()
 
 
 # ---------------------------------------------------------------------------------------- CSDL
@@ -1173,6 +1282,73 @@ def hasura_check(system: System, apps: list[dict[str, Any]], gone: list[dict[str
     return f"metadata đã áp: {n} bảng ứng dụng, {sum(1 for a in apps if a.get('events'))} event trigger, nhất quán"
 
 
+# ---------------------------------------------------------------------------------------- quy trình (svc-workflow)
+
+def workflow_bundle(rec: dict[str, Any]) -> str:
+    """Gói quy trình của bản ghi: zip (mục lục moc-workflow.json + tệp ở đường tương đối với manifest), base64. Cùng
+    nội dung thì cùng byte (thứ tự, mốc thời gian cố định)."""
+    wf = rec["workflow"]
+    index = {"app": rec["name"], "processes": sorted(wf["processes"]),
+             "forms": {key: f["path"] for key, f in sorted(wf["forms"].items())}}
+    files = {**wf["processes"], **{f["path"]: f["text"] for f in wf["forms"].values()}}
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, text in [(WORKFLOW_MANIFEST, json.dumps(index, ensure_ascii=False, sort_keys=True)),
+                           *sorted(files.items())]:
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            zf.writestr(info, text.encode("utf-8"))
+    return base64.b64encode(out.getvalue()).decode("ascii")
+
+
+def workflow_cli(system: System, action: str, name: str, bundle: str | None = None) -> dict[str, Any]:
+    """Gọi svc_workflow.apps.deploy trong container: một dòng JSON; ok false → WorkflowRejected liệt kê mọi lỗi."""
+    out = system.exec("svc-workflow", *WORKFLOW_CLI, action, name, input=bundle, timeout=180)
+    try:
+        result = json.loads(out.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        raise AppError(f"svc-workflow trả lời lạ: {out.strip()[-200:]!r}") from None
+    if not result.get("ok"):
+        errors = [str(e) for e in result.get("errors") or ["không rõ lỗi"]]
+        raise WorkflowRejected(f"quy trình chưa đúng ({len(errors)} lỗi):\n  - " + "\n  - ".join(errors))
+    return result
+
+
+def workflow_check(system: System, rec: dict[str, Any]) -> dict[str, Any]:
+    """svc-workflow kiểm gói (không đổi gì trên Flowable). Từ chối → WorkflowRejected; không gọi được → Unavailable."""
+    try:
+        return workflow_cli(system, "check", rec["name"], workflow_bundle(rec))
+    except WorkflowRejected:
+        raise
+    except AppError as exc:
+        raise Unavailable(f"chưa gọi được svc-workflow để kiểm quy trình: {exc}") from None
+
+
+def step_workflow(system: System, rec: dict[str, Any], *, dry_run: bool,
+                  checked: dict[str, Any] | None = None) -> str:
+    """Triển khai gói quy trình (chạy lại không đổi thì giữ nguyên); manifest bỏ workflow thì tạm dừng quy trình đã
+    triển khai. dry_run: chỉ báo kết quả kiểm (checked: lần kiểm ở bước manifest), không triển khai."""
+    name = rec["name"]
+    if not rec.get("workflow"):
+        if dry_run:
+            return "manifest không còn workflow: sẽ tạm dừng quy trình đã triển khai (lịch sử giữ nguyên)"
+        done = workflow_cli(system, "remove", name)
+        return (f"manifest không còn workflow: đã tạm dừng {done.get('suspended', 0)} định nghĩa quy trình (lịch sử "
+                "giữ nguyên)")
+    wf = rec["workflow"]
+    what = f"{len(wf['processes'])} quy trình, {len(wf['forms'])} form"
+    if dry_run:
+        done = checked if checked is not None else workflow_check(system, rec)
+        state = {True: "đã triển khai đúng bản này", False: "sẽ triển khai"}.get(
+            done.get("current"), "sẽ triển khai (chưa hỏi được Flowable)")
+        return f"{state} {done.get('deployment')} ({what})"
+    done = workflow_cli(system, "install", name, workflow_bundle(rec))
+    result = (f"đã triển khai {done.get('deployment')}" if done.get("deployed")
+              else f"{done.get('deployment')} đã triển khai, giữ nguyên")
+    again = f"; bật lại {done['activated']} định nghĩa đang tạm dừng" if done.get("activated") else ""
+    return f"{result} ({what}){again}"
+
+
 # ---------------------------------------------------------------------------------------- khóa, chạy từng bước
 
 @contextlib.contextmanager
@@ -1245,6 +1421,25 @@ def up_services(system: System, names: list[str], *, dry_run: bool) -> str:
     return "đang chạy: " + ", ".join(names)
 
 
+def restart_apisix(system: System, *, wait_s: float = 90) -> str:
+    """Lệnh nào vừa ghi tệp route của APISIX (GATEWAY) thì gọi hàm này sau up_services: khởi động lại apisix rồi chờ
+    cổng trả 200 (#299). APISIX tự nạp lại tệp khi mtime đổi, nhưng mỗi lần nạp lại bộ lọc WAF coraza-proxy-wasm 0.6.0
+    dựng ngữ cảnh mới, đọc lại CRS trong máy ảo WebAssembly cũ của worker và có lúc hỏng bộ nhớ (wasm trap trong
+    proxy_on_configure → 503, rồi worker chết vì SIGSEGV). Khởi động lại thì mỗi worker có máy ảo mới và chỉ dựng ngữ
+    cảnh một lần, như lúc make up. Cổng gián đoạn vài giây."""
+    realm = compose_env_values(system.root).get("MOC_REALM") or "moc"
+    system.compose("restart", "apisix", timeout=180)
+    started, code = time.monotonic(), ""
+    while time.monotonic() - started < wait_s:
+        code = system.gateway_code(realm)
+        if code == "200":
+            return f"đã khởi động lại apisix (tệp route đổi), cổng trả lời sau {time.monotonic() - started:.0f} giây"
+        time.sleep(1)
+    raise AppError(f"đã khởi động lại apisix nhưng sau {wait_s:.0f} giây cổng vẫn chưa trả 200 (mã {code or '?'})"
+                   " — xem docker compose logs apisix, sửa xong thì docker compose restart apisix (chạy lại lệnh"
+                   " không khởi động lại nữa vì tệp route đã khớp)")
+
+
 # ---------------------------------------------------------------------------------------- các lệnh
 
 def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bool = False,
@@ -1259,13 +1454,40 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
     old = state.records().get(rec["name"])
     old_json = state.dir / "apps" / f"{rec['name']}.json"
     old_bytes = old_json.read_bytes() if old_json.exists() else None
+    # Lần cài trước hỏng sau khi đã ghi bản ghi (tệp chạy, container): hoàn tác về bản ghi trước lần cài dở đó, không
+    # phải bản ghi nó để lại
+    before_json = state.before_path(rec["name"])
+    before_bytes = (before_json.read_bytes() or None) if before_json.exists() else old_bytes
+    before = json.loads(before_bytes) if before_bytes else None
     out(f"{'Kế hoạch cài' if dry_run else 'Cài'} {rec['name']} {rec['version']} — {rec['title']} ở {rec['path']}/"
         f"{' (đã cài, chạy lại: chỉ làm phần còn thiếu)' if old and not old.get('removing') else ''}")
-    out("  1/8 manifest: hợp lệ"
+    # bước quy trình: manifest khai workflow, hoặc bản cài trước có mà bản này bỏ (tạm dừng quy trình cũ)
+    had_workflow = bool(before and before.get("workflow") and not before.get("removing"))
+    with_workflow = bool(rec.get("workflow")) or had_workflow
+    total = 9 if with_workflow else 8
+    wf = rec.get("workflow")
+    checked: dict[str, Any] | None = None
+    note = " (svc-workflow đã kiểm)"
+    if wf:
+        # Kiểm gói quy trình trước mọi thay đổi: BPMN độc, form sai bị từ chối khi chưa dựng image, chưa tạo schema,
+        # bí mật, client nào (bước quy trình sau Keycloak chỉ còn triển khai)
+        try:
+            checked = workflow_check(system, rec)
+        except WorkflowRejected as exc:
+            raise StepFailed(1, total, "manifest", exc) from exc
+        except Unavailable as exc:
+            if not dry_run:
+                raise StepFailed(1, total, "manifest", exc) from exc
+            note = f" (chưa kiểm được: {exc})"
+            checked = {"ok": True, "current": None, "deployment": "gói quy trình"}
+    out(f"  1/{total} manifest: hợp lệ"
         f" ({len(rec['migrations'])} migration, {len(rec['tables'])} bảng"
+        f"{', ' + str(len(wf['processes'])) + ' quy trình' + note if wf else ''}"
         f"{', nghe ' + ', '.join(rec['events']['kinds']) if rec.get('events') else ''})")
     env = compose_env_values(state.root)
     made: list[str] = []
+    wrote: list[str] = []
+    deployed: list[bool] = []                 # bước quy trình đã đổi Flowable ở lần cài này (hoàn tác cần biết)
 
     def secrets_step() -> str:
         made.extend(state.ensure_secrets(rec, dry_run=dry_run))
@@ -1273,10 +1495,13 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
 
     def files_step() -> str:
         if not dry_run:
+            if not before_json.exists():
+                _write_atomic(before_json, old_bytes or b"")
             state.save(rec)
             changed = state.write()
         else:
             changed = sorted(set(_preview(state, rec)))
+        wrote.extend(changed)
         return (f"{'sẽ đổi' if dry_run else 'đã ghi'} {len(changed)} tệp: " + ", ".join(_short(changed))) \
             if changed else "đã khớp"
 
@@ -1285,22 +1510,62 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
                              {"MOC_CLIENT_SECRET": "…"}, new_secret="MOC_CLIENT_SECRET" in made, dry_run=dry_run)
 
     def undo() -> str:
-        """Bước 8 lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài này rồi áp lại
-        metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng. CSDL, client giữ (chạy lại dùng
-        tiếp)."""
+        """Bước Hasura lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài dở đầu tiên
+        rồi áp metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng; quy trình về bản của lần cài
+        trước (chưa có thì tạm dừng). CSDL, client giữ (chạy lại dùng tiếp)."""
         try:
-            if old_bytes is None:
+            if before_bytes is None:
                 system.compose("rm", "--stop", "--force", f"app-{rec['name']}", timeout=180)
                 old_json.unlink(missing_ok=True)
             else:
-                _write_atomic(old_json, old_bytes)
-            state.write()
+                _write_atomic(old_json, before_bytes)
+            before_json.unlink(missing_ok=True)
+            if GATEWAY in state.write():
+                restart_apisix(system)
             system.apply_metadata()
             bad = system.metadata({"type": "get_inconsistent_metadata", "args": {}}).get("inconsistent_objects")
             return ("đã trả tệp chạy và metadata Hasura về như trước lần cài này"
-                    + (f", còn {len(bad)} chỗ không nhất quán" if bad else ", nhất quán"))
+                    + (f", còn {len(bad)} chỗ không nhất quán" if bad else ", nhất quán") + workflow_back())
         except (AppError, Unavailable) as exc:
             return f"không trả về được ({exc}) — gỡ: python3 scripts/moc.py app remove {rec['name']}"
+
+    def workflow_back() -> str:
+        if not deployed:
+            return ""
+        try:
+            if had_workflow:
+                workflow_cli(system, "install", rec["name"], workflow_bundle(before))
+                return "; quy trình về bản của lần cài trước"
+            workflow_cli(system, "remove", rec["name"])
+            return "; quy trình vừa triển khai đã tạm dừng"
+        except AppError as exc:
+            return f"; chưa trả được quy trình ({exc})"
+
+    def workflow_step() -> str:
+        result = step_workflow(system, rec, dry_run=dry_run, checked=checked)
+        if not dry_run:
+            deployed.append(True)
+        return result
+
+    def or_workflow_back(step: Callable[[], str]) -> Callable[[], str]:
+        """Bước sau "quy trình" lỗi thì quy trình về bản của lần cài trước (chưa có thì tạm dừng): không để BPMN, form
+        mới chạy khi trang, route còn bản cũ hay chưa có. Tệp chạy, container giữ như lúc lỗi (chạy lại làm tiếp); bước
+        Hasura trả cả tệp chạy (undo)."""
+        def run() -> str:
+            try:
+                return step()
+            except (AppError, Unavailable) as exc:
+                back = workflow_back()
+                if not back:
+                    raise
+                raise AppError(f"{exc}{back}") from exc
+        return run
+
+    def container_step() -> str:
+        up = up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)
+        if GATEWAY not in wrote:
+            return up
+        return f"{up}; " + ("sẽ khởi động lại apisix vì tệp route đổi" if dry_run else restart_apisix(system))
 
     def hasura_step() -> str:
         if dry_run:
@@ -1316,12 +1581,15 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         ("CSDL", lambda: step_database(system, rec, dry_run=dry_run)),
         ("bí mật", secrets_step),
         ("Keycloak", keycloak_step),
-        ("tệp chạy", files_step),
-        ("container", lambda: up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)),
+        *([("quy trình", workflow_step)] if with_workflow else []),
+        ("tệp chạy", or_workflow_back(files_step)),
+        ("container", or_workflow_back(container_step)),
         ("Hasura", hasura_step),
     ]
     with ops_lock(state.root):
         run_steps(steps, out, first=2, dry_run=dry_run)
+        if not dry_run:
+            before_json.unlink(missing_ok=True)
     return {"name": rec["name"], "dry_run": dry_run, "image": rec["image"], "secrets_created": made}
 
 
@@ -1381,6 +1649,7 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
             raise AppError(f"không có ứng dụng {name} trong {STATE}/apps/ (moc app list để xem)")
         return _remove_half_install(name, row, system=system, state=state, dry_run=dry_run, out=out)
     out(f"{'Kế hoạch gỡ' if dry_run else 'Gỡ'} {name} — dữ liệu, schema {rec['schema']} giữ nguyên (không xóa)")
+    wrote: list[str] = []
 
     def container_step() -> str:
         if rec.get("removing"):              # lần gỡ trước đã qua bước này; tệp phủ không còn service để gọi tên
@@ -1395,17 +1664,25 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
             return f"sẽ bỏ route {rec['path']}, bảng và trigger khỏi tệp chạy"
         state.save({**rec, "removing": True})
         changed = state.write()
+        wrote.extend(changed)
         return f"đã ghi {len(changed)} tệp: " + ", ".join(_short(changed)) if changed else "đã khớp"
 
     def hasura_step() -> str:
         if dry_run:
             return "sẽ áp metadata không còn bảng, trigger của ứng dụng"
         up_services(system, ["apisix", "hasura"], dry_run=False)
+        restarted = restart_apisix(system) if GATEWAY in wrote else ""
         system.apply_metadata()
-        return hasura_check(system, state.active(), gone=[rec])
+        return hasura_check(system, state.active(), gone=[rec]) + (f"; {restarted}" if restarted else "")
 
     def keycloak_step() -> str:
         return _remove_keycloak(system, name, dry_run=dry_run)
+
+    def workflow_step() -> str:
+        if dry_run:
+            return "sẽ tạm dừng mọi định nghĩa quy trình của ứng dụng; lịch sử, đơn đang dở giữ nguyên trong Flowable"
+        done = workflow_cli(system, "remove", name)
+        return f"đã tạm dừng {done.get('suspended', 0)} định nghĩa quy trình; lịch sử, đơn đang dở giữ nguyên"
 
     def db_step() -> str:
         if dry_run:
@@ -1415,8 +1692,11 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
         state.write()
         return f"core.apps.removed_at đã ghi; schema {rec['schema']} và dữ liệu giữ nguyên"
 
+    # quy trình tạm dừng trước khi xóa client: bước quy trình lỗi thì Keycloak chưa đổi gì, chạy lại gỡ tiếp — không có
+    # lúc client đã xóa mà định nghĩa quy trình vẫn nhận đơn từ token còn hạn
     steps = [("container", container_step), ("tệp chạy", files_step), ("Hasura", hasura_step),
-             ("Keycloak", keycloak_step), ("CSDL", db_step)]
+             *([("quy trình", workflow_step)] if rec.get("workflow") else []), ("Keycloak", keycloak_step),
+             ("CSDL", db_step)]
     with ops_lock(state.root):
         run_steps(steps, out, dry_run=dry_run)
     return {"name": name, "dry_run": dry_run}
@@ -1441,7 +1721,11 @@ def sync(*, state: State, system: System, files_only: bool = False, out: Callabl
             result["actions"].append(f"{rec['name']}: " + step_keycloak(
                 system, rec, env, state.secrets(rec["name"]), new_secret="MOC_CLIENT_SECRET" in made[rec["name"]],
                 dry_run=False))
+            if rec.get("workflow"):
+                result["actions"].append(f"{rec['name']}: quy trình: {step_workflow(system, rec, dry_run=False)}")
         up_services(system, ["apisix", "hasura", *(f"app-{a['name']}" for a in apps)], dry_run=False)
+        if GATEWAY in result["changed"]:
+            result["actions"].append(restart_apisix(system))
         system.apply_metadata()
         result["actions"].append(hasura_check(system, apps))
     for line in result["actions"]:

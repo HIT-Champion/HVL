@@ -19,12 +19,15 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
+import { askAbout, canAskAbout } from '~/utils/answer'
+import { documentBackTarget, processingBrief } from '~/utils/taskContext'
 
 // Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
 // khung xử lý việc đang chờ người dùng. Văn bản đi có thêm nội dung, nơi nhận, người ký, bản xem trước, trình ký và mã xác thực.
 // Hasura chỉ trả văn bản người dùng được đọc — không thấy thì báo "không tìm thấy".
 // Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Signet có thẻ trạng thái chuyển từng đơn vị;
 // văn bản đến nhận theo đường này có thẻ "Nhận từ …" với mã xác thực của bên gửi và đối chiếu SHA-256 tệp.
+// Nút "Hỏi về văn bản này" (F4.2) mở trang Hỏi đáp chỉ hỏi trong văn bản này — chỉ khi văn bản có trong kho của trợ lý.
 
 interface Dispatch {
   id: string
@@ -92,6 +95,9 @@ const submitting = ref(false)
 const signer = ref('')
 
 const id = computed(() => String(route.params.id))
+// mở từ hộp việc (?from=inbox): quay lại hộp việc; chuyên viên thấy phần việc của mình ngay trong khung báo kết quả
+const backTarget = computed(() => documentBackTarget(route.query.from, doc.value?.direction))
+const brief = computed(() => processingBrief(doc.value?.assignments ?? [], claims.value?.userId, doc.value?.due_on))
 
 // Lịch sử (F3.5): các dòng sổ kiểm toán về văn bản — ai sửa gì, lúc nào — cho mọi người đọc được văn bản. Tải khi mở
 // tab; cột nội dung (trích yếu, tên tệp…) chỉ báo là đã đổi, như màn Sổ kiểm toán.
@@ -106,6 +112,20 @@ interface HistoryRow {
 }
 const side = ref<'timeline' | 'history'>('timeline')
 const history = ref<HistoryRow[] | null>(null)
+const historyLoading = ref(false)
+const historyFailure = ref('')
+// hai tab Dòng thời gian / Lịch sử theo mẫu tab của WAI-ARIA: mũi tên trái phải, Home, End chuyển tab và đưa tiêu điểm
+const timelineTab = ref<HTMLButtonElement | null>(null)
+const historyTab = ref<HTMLButtonElement | null>(null)
+function sideKey(event: KeyboardEvent) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const other = side.value === 'timeline' ? 'history' : 'timeline'
+  const next = event.key === 'Home' ? 'timeline' : event.key === 'End' ? 'history' : other
+  if (next === 'history') void openHistory()
+  else side.value = 'timeline'
+  nextTick(() => (next === 'history' ? historyTab.value : timelineTab.value)?.focus())
+}
 const userNames = computed(() => new Map(users.value.map((u) => [u.id, u.full_name])))
 const departmentNames = computed(() => new Map(departments.value.map((d) => [d.id, d.name])))
 const unitNames = computed(() => new Map(units.value.map((u) => [u.id, u.name])))
@@ -113,6 +133,8 @@ const { label, action, who, changes } = useAuditFormat(userNames, departmentName
 
 async function openHistory() {
   side.value = 'history'
+  historyLoading.value = true
+  historyFailure.value = ''
   const want = id.value      // đổi sang văn bản khác giữa chừng: bỏ kết quả của văn bản cũ
   try {
     const data = await gql<{ office_document_history: HistoryRow[] }>(`
@@ -123,7 +145,10 @@ async function openHistory() {
       }`, { id: want })
     if (want === id.value) history.value = data.office_document_history
   } catch (e) {
-    notice.error(errorText(t, e))
+    // báo lỗi ngay trong tab, kèm nút thử lại, thay vì một thông báo nổi tự tắt
+    if (want === id.value) historyFailure.value = errorText(t, e)
+  } finally {
+    if (want === id.value) historyLoading.value = false
   }
 }
 const nameOf = (uid: string | null) => users.value.find((u) => u.id === uid)?.full_name ?? (uid ? uid.slice(0, 8) : '')
@@ -376,6 +401,9 @@ const assignments = computed(() => {
 })
 
 watch(id, () => {
+  side.value = 'timeline'
+  historyFailure.value = ''
+  historyLoading.value = false
   history.value = null      // lịch sử của văn bản trước: không hiện nhầm trong lúc tải
   load()
 })
@@ -388,7 +416,9 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
 <template>
   <div>
-    <NuxtLink :to="outgoing ? '/van-ban-di' : '/van-ban-den'" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">← {{ t('app.back') }}</NuxtLink>
+    <NuxtLink :to="backTarget" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">
+      ← {{ t(route.query.from === 'inbox' ? 'fe.backInbox' : 'app.back') }}
+    </NuxtLink>
 
     <p v-if="loading && !doc" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
     <p v-else-if="missing" class="card p-8 text-center text-stone-500">{{ t('doc.notFound') }}</p>
@@ -415,10 +445,18 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           <p v-else class="mt-1 text-sm text-stone-500">{{ doc.symbol }} · {{ doc.issuer_name }} · {{ fmtDate(doc.issued_on) }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering" @click="register">
-            {{ t('doc.register') }}
+          <button
+            v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering"
+            :aria-busy="registering" @click="register"
+          >
+            {{ registering ? t('doc.registering') : t('doc.register') }}
           </button>
           <NuxtLink v-if="canEdit" :to="`/van-ban-di/soan?id=${doc.id}`" class="btn-secondary">{{ t('doc.edit') }}</NuxtLink>
+          <NuxtLink
+            v-if="canAskAbout(doc, claims?.role)" :to="askAbout(doc.id)" class="btn-secondary" data-testid="ask-about"
+          >
+            {{ t('doc.askAbout') }}
+          </NuxtLink>
           <button v-if="outgoing && !issuedFile" class="btn-secondary" @click="showPreview">{{ t('doc.preview') }}</button>
           <button v-if="issuedFile" class="btn-primary" @click="download(issuedFile.id, issuedFile.filename).catch((e) => notice.error(errorText(t, e)))">
             {{ t('doc.download') }} {{ t('doc.fileRole.issued').toLowerCase() }}
@@ -426,12 +464,12 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
         </div>
       </div>
 
-      <div class="grid gap-6 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-2">
           <TaskPanel
             v-if="task" :key="task.id" :task-id="task.id" :form-key="task.form_key" :document-due="doc.due_on"
             :document-id="doc.id" :restricted="doc.restricted" :users="users" :departments="departments"
-            :my-department="claims?.departmentId ?? null" :my-id="claims?.userId ?? ''" @done="load"
+            :my-department="claims?.departmentId ?? null" :my-id="claims?.userId ?? ''" :brief="brief" @done="load"
           />
 
           <!-- trình dự thảo: lần đầu, hoặc trình lại sau khi bị trả lại -->
@@ -509,7 +547,9 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           <!-- nội dung văn bản đi -->
           <section v-if="outgoing" class="card p-5">
             <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.body') }}</h2>
-            <div class="space-y-2 font-serif text-[15px] leading-relaxed whitespace-pre-line text-stone-800">{{ doc.body }}</div>
+            <div class="space-y-2 font-sans text-[15px] leading-relaxed whitespace-pre-line text-stone-800">
+              {{ doc.body }}
+            </div>
           </section>
 
           <!-- thông tin -->
@@ -549,14 +589,19 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
             <ul v-else class="divide-y divide-stone-100">
               <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id" class="flex items-center gap-3 py-2 text-sm">
                 <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5" /></svg>
-                <span class="min-w-0 flex-1 truncate">{{ f.file!.filename }}</span>
+                <span class="min-w-0 flex-1 break-words">{{ f.file!.filename }}</span>
                 <span v-if="f.file!.encrypted" class="chip gap-1 bg-stone-800 text-white" :title="t('doc.sealedHint')" data-testid="file-sealed">
                   <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11V8a5 5 0 0110 0v3M6 11h12v9H6z" /></svg>
                   {{ t('doc.sealed') }}
                 </span>
                 <span class="chip bg-stone-100 text-stone-600">{{ t(`doc.fileRole.${f.role}`) }}</span>
                 <span class="text-xs text-stone-500">{{ fmtSize(f.file!.size_bytes) }}</span>
-                <button class="btn-ghost text-brand-800" @click="download(f.file!.id, f.file!.filename).catch((e) => notice.error(errorText(t, e)))">{{ t('doc.download') }}</button>
+                <button
+                  class="btn-ghost text-brand-800" :aria-label="t('doc.downloadNamed', { name: f.file!.filename })"
+                  @click="download(f.file!.id, f.file!.filename).catch((e) => notice.error(errorText(t, e)))"
+                >
+                  {{ t('doc.download') }}
+                </button>
               </li>
             </ul>
           </section>
@@ -615,31 +660,55 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
         <!-- dòng thời gian -->
         <aside class="card h-fit p-5">
-          <div role="tablist" class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold">
+          <div
+            role="tablist" :aria-label="t('doc.activity')"
+            class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold" @keydown="sideKey"
+          >
             <button
-              role="tab" :aria-selected="side === 'timeline'" class="-mb-px border-b-2 pb-2"
+              id="document-timeline-tab" ref="timelineTab" role="tab" aria-controls="document-timeline"
+              :tabindex="side === 'timeline' ? 0 : -1" :aria-selected="side === 'timeline'"
+              class="-mb-px border-b-2 pb-2"
               :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
               @click="side = 'timeline'"
             >
               {{ t('doc.timeline') }}
             </button>
             <button
-              role="tab" :aria-selected="side === 'history'" class="-mb-px border-b-2 pb-2"
+              id="document-history-tab" ref="historyTab" role="tab" aria-controls="document-history"
+              :tabindex="side === 'history' ? 0 : -1" :aria-selected="side === 'history'"
+              class="-mb-px border-b-2 pb-2"
               :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
               @click="openHistory"
             >
               {{ t('doc.history') }}
             </button>
           </div>
-          <ol v-if="side === 'timeline'" class="relative space-y-5 border-l border-stone-200 pl-5" data-testid="timeline">
-            <li v-for="(item, i) in timeline" :key="item.key" class="relative">
-              <span class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white" :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'" />
-              <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
-              <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
-              <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
-            </li>
-          </ol>
-          <div v-else data-testid="history">
+          <!-- tabpanel bọc ngoài danh sách: role trên chính <ol> thay mất vai trò list, các <li> mồ côi (axe, #246) -->
+          <div
+            id="document-timeline" v-show="side === 'timeline'" role="tabpanel" aria-labelledby="document-timeline-tab"
+            tabindex="0" data-testid="timeline"
+          >
+            <ol class="relative space-y-5 border-l border-stone-200 pl-5">
+              <li v-for="(item, i) in timeline" :key="item.key" class="relative">
+                <span
+                  class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white"
+                  :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'"
+                />
+                <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
+                <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
+                <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
+              </li>
+            </ol>
+          </div>
+          <div
+            id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab"
+            tabindex="0" :aria-busy="historyLoading" data-testid="history"
+          >
+            <p v-if="historyLoading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+            <div v-if="historyFailure" class="text-sm" role="alert">
+              {{ historyFailure }}
+              <button class="btn-secondary mt-2" @click="openHistory">{{ t('app.retry') }}</button>
+            </div>
             <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
             <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
             <ol class="space-y-4">

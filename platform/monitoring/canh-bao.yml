@@ -1,0 +1,106 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# F3.13 — luật cảnh báo (#255, #274). Chưa có Alertmanager: cảnh báo chỉ hiện ở Prometheus (/alerts) và bảng điều
+# khiển Grafana, không gửi ra ngoài. Test: platform/monitoring/kiem-tra/canh-bao.test.yml (promtool test rules, bước
+# CI "Giám sát").
+#   * cong-api: chỉ số của APISIX, nhãn `route` là id route trong platform/apisix/apisix.yaml. Dựa trên lưu lượng thật:
+#     không ai gọi tới thì nhóm này không thấy dịch vụ chết;
+#   * thanh-phan: bảng trạng thái của svc-files (GET /metrics, cùng lần dò của trang /trang-thai), Prometheus thu 15
+#     giây một lần nên không cần ai gọi tới. Nhãn `component` là mã thành phần (status.py), `critical` là "true" khi
+#     thành phần gián đoạn làm cả Signet gián đoạn.
+groups:
+  - name: cong-api
+    rules:
+      - alert: GatewayMetricsDown
+        expr: up{job="apisix"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus không thu được chỉ số của cổng API — APISIX có thể đã dừng
+
+      # 502, 504 là mã APISIX tự sinh khi upstream chết hoặc quá giờ. 503 thì không: svc-files trả 503 có chủ ý
+      # (busy, scanner_unavailable… kèm Retry-After), trang trạng thái trả 503 khi có thành phần lỗi — 503 chỉ tính
+      # vào tỉ lệ 5xx. Cửa sổ 1 phút, kéo dài 3 phút: một lỗi lẻ (vd lúc khởi động lại) không bật cảnh báo.
+      # svc-workflow không có route riêng (nằm sau Hasura Actions, lỗi của nó về trình duyệt là GraphQL 200 có
+      # errors): route graphql chỉ báo Hasura không trả lời.
+      - alert: UpstreamUnreachable
+        expr: sum by (route) (rate(apisix_http_status{code=~"502|504"}[1m])) > 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Route {{ $labels.route }}: dịch vụ sau cổng không trả lời (502/504 liên tục)"
+
+      # Có sàn lưu lượng: trang ít người dùng thì một lỗi lẻ đã là 100%
+      - alert: High5xxRatio
+        expr: |
+          sum(rate(apisix_http_status{code=~"5.."}[5m])) / sum(rate(apisix_http_status[5m])) > 0.05
+          and sum(rate(apisix_http_status[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Hơn 5% yêu cầu qua cổng API lỗi 5xx trong 5 phút
+
+      # Chỉ route tương tác. Không tính realtime (WebSocket mở lâu) và svc-files: tải lên + quét ClamAV, đọc văn bản
+      # đến (tới 50 giây), hỏi đáp, xuất lô, ký số vốn chậm theo thiết kế. Độ trễ APISIX tính bằng mili giây.
+      - alert: SlowRoute
+        expr: |
+          histogram_quantile(0.95, sum by (le, route) (rate(apisix_http_latency_bucket{type="request",
+            route=~"graphql|app-office|app-ca-nhan|keycloak|dang-nhap|dang-nhap-post"}[5m]))) > 3000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Route {{ $labels.route }}: p95 thời gian trả lời trên 3 giây trong 10 phút"
+
+  - name: thanh-phan
+    rules:
+      - alert: ComponentDown
+        expr: moc_component_up{critical="true"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Thành phần {{ $labels.component }} gián đoạn — cả Signet ngừng phục vụ"
+
+      - alert: OptionalComponentDown
+        expr: moc_component_up{critical="false"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Thành phần {{ $labels.component }} gián đoạn — Signet vẫn chạy nhưng thiếu phần việc này"
+
+      # svc-files dừng thì các dòng moc_component_up cũng mất (không về 0): chỉ luật này bật
+      - alert: StatusMetricsDown
+        expr: up{job="svc-files"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus không đọc được bảng trạng thái của svc-files — svc-files có thể đã dừng
+
+  - name: prometheus
+    rules:
+      - alert: AlertRulesFailing
+        expr: sum(increase(prometheus_rule_evaluation_failures_total[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Prometheus tính luật cảnh báo bị lỗi — cảnh báo có thể không bật khi cần

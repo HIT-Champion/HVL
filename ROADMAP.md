@@ -4,11 +4,12 @@ Lộ trình bám theo nguyên lý **tiến hóa tuyến tính** của mô hình 
 danh tính, sự kiện, dữ liệu của không gian trước ([`docs/architecture.md`](docs/architecture.md) §1.2). Đây cũng là thứ
 tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là lịch phát triển nội bộ.
 
-Trạng thái ghi ngày 25/10/2026, trên nhánh `develop`, sau bản `v1.0.0` (23/10, bản cho vòng trường). Các giai đoạn là
-thứ tự phụ thuộc, không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0`, phần làm sau đó nằm ở mục
-"Chưa phát hành" của [`CHANGELOG.md`](CHANGELOG.md). Mã tính năng F tra ở
-[`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn chế đã biết của
-từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
+Trạng thái ghi ngày 25/10/2026, trên nhánh `develop`, sau bản `v1.1.0` (25/10). Các giai đoạn là thứ tự phụ thuộc,
+không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ 25/10 tới
+27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó
+nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã tính năng
+F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn chế đã biết
+của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 
 - `[x]` — đã có: mức **Hoàn thiện** trong `docs/muc-hoan-thien.md`, hoặc có bằng chứng ghi trong dòng.
 - `[ ]` **Một phần** — có mã chạy được (mức Dùng được, Minh họa hay Một phần); phần còn thiếu ghi ngay sau.
@@ -43,7 +44,7 @@ trường số khép kín.
       token (F1.1, F2.1)
 - [x] Một điểm vào: cổng API APISIX, danh sách trắng đường dẫn, kiểm JWT ở biên, giới hạn tốc độ (F1.2)
 - [x] Tường lửa ứng dụng web ở cổng: Coraza + OWASP CRS trong APISIX, chặn mặc định, loại trừ có lý do (F3.15,
-      nguyên lý iv; mức Dùng được cho tới khi smoke qua WAF xanh trên CI)
+      nguyên lý iv; mức Dùng được: chữ lạ ở ô chữ ngắn có thể bị chặn nhầm, người quản trị phải thêm loại trừ)
 - [x] Lưu trữ tệp nội bộ: SeaweedFS, tệp chỉ vào và ra qua `svc-files`, ClamAV quét trước khi ghi (F1.5, F1.6)
 - [x] Cấu trúc thư mục **P.A.R.A**: Không gian cá nhân `apps/ca-nhan` (Dự án, Lĩnh vực, Tài nguyên, Lưu trữ), ứng
       dụng thứ hai cắm vào lõi, không sửa dòng nào trong `services/`
@@ -51,8 +52,9 @@ trường số khép kín.
 - [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng
       thứ ba Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng
       được, bước CI `make demo-cai-ung-dung`)
-- [ ] **Một phần** — cổng nội bộ: hai ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; chưa có trang cổng
-      dẫn từ ứng dụng này sang ứng dụng kia
+- [ ] **Một phần** — cổng nội bộ: các ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; trang Ứng dụng
+      (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng
+      riêng
 - [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email và webhook
       Mattermost, Slack, ntfy, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
 - [ ] Hệ quản trị tri thức (wiki)
@@ -100,7 +102,7 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
       (`docs/du-thi/ke-hoach-phat-trien.md` §6)
 - [x] Vòng đời nóng → lạnh (F3.8): hồ sơ đã đóng nộp lưu thành Parquet + tệp + manifest có băm trên bucket khóa ghi
       (`make demo-nong-lanh`); trên giao diện: trang Hồ sơ công việc, lãnh đạo phòng nộp lưu, phòng đọc xem tệp PDF
-      có dấu tên người xem
+      có dấu tên người xem; trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB trên gói Parquet (#304)
 - [x] Phả hệ dữ liệu (F3.9): OpenLineage cho lượt nộp lưu, kiểm số dòng và cột bắt buộc trước khi ghi Parquet
       (`make demo-pha-he`); phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL, trang Phả hệ số liệu
       (`/pha-he`) vẽ đồ thị, mỗi biểu đồ ở trang Điều hành có nút Nguồn số liệu
@@ -142,31 +144,34 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       compose, cấu hình hợp lệ; `make install PREFIX=…` cài ra ngoài thư mục mã nguồn rồi chạy từ đó, có bước CI (F1.8)
 - [ ] Chứng minh "dưới một giờ": chưa đo với người ngoài đội trên máy sạch (việc của Phase 5 trong
       `docs/du-thi/ke-hoach-phat-trien.md`); `make check` chưa kiểm RAM và phiên bản Docker
-- [ ] **Một phần** — lên mạng (F1.9, mức Dùng được): HTTPS sau Caddy hoặc Cloudflare Tunnel theo
-      [`docs/trien-khai.md`](docs/trien-khai.md); HTTPS mới kiểm bằng tay, chưa có bước CI
+- [x] Lên mạng (F1.9, mức Hoàn thiện): HTTPS sau Caddy hoặc Cloudflare Tunnel theo
+      [`docs/trien-khai.md`](docs/trien-khai.md); phần CI `https` (#261) chạy smoke qua proxy TLS nginx với chứng
+      thư tự ký trên mọi pull request. Cloudflare Tunnel chưa kiểm trong CI
 - [x] Tài liệu vận hành: sao lưu, khôi phục, két bí mật, GitOps, giám sát ([`docs/van-hanh.md`](docs/van-hanh.md));
       triển khai, nâng cấp (`docs/trien-khai.md`). Sao lưu → xóa → khôi phục chạy trong CI (F3.4); reconciler GitOps
       dựng lại container bị xóa (F3.3)
 - [x] Trang công khai Trạng thái hệ thống `/trang-thai`: tình trạng từng thành phần, phiên bản, giờ sao lưu gần nhất
       (`docs/van-hanh.md`, mục Trang trạng thái hệ thống)
-- [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana mới thu chỉ số của APISIX, chưa có chỉ số
-      từng dịch vụ, chưa có cảnh báo
+- [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana thu chỉ số của APISIX và trạng thái từng
+      thành phần (#274), chưa có chỉ số bên trong từng dịch vụ; có luật cảnh báo (#255, #274) nhưng chỉ xem trong
+      Grafana, Prometheus, chưa gửi ra ngoài
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
-      định; `X-Request-Id` đi xuyên `svc-workflow`; mới thu 5 dịch vụ, chưa thu Hasura, Keycloak, PostgreSQL
+      định; `X-Request-Id` đi xuyên `svc-workflow`; thu 8 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202)
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
       văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
-- [ ] **Một phần** — tiếng Anh: giao diện Việt / Anh cùng bộ khóa (F2.9, mức Dùng được) và `README.en.md`; chưa có
-      hướng dẫn dịch cho người đóng góp, tài liệu vận hành chưa có bản tiếng Anh (issue #59)
+- [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được), Không
+      gian cá nhân và Bảng tin cũng có bản tiếng Anh (#306), `README.en.md`, hướng dẫn dịch cho người đóng góp
+      (`CONTRIBUTING.md`, mục "Dịch giao diện"); tài liệu vận hành chưa có bản tiếng Anh (issue #59)
 - [ ] **Một phần** — cộng đồng và số đo thực tế: `CONTRIBUTING.md`, mẫu issue (F2.11, mức Một phần); thu góp ý và
       trang Số đo theo đặc tả §8 (F4.6, mức Dùng được). Chưa có đơn vị chạy thử nên cột "trước" của số đo còn trống
 
 ## Sau vòng trường
 
 Việc còn thiếu thật theo `docs/muc-hoan-thien.md`, xếp theo ưu tiên, kèm lý do. Không gắn ngày: kế hoạch chỉ có hai
-mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.2.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
-Việc nào chưa xong trước 26/11 thì để sau `v1.2.0`.
+mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.3.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
+Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
 
 1. **Đơn vị chạy thử thật** (F2.11, F4.6): đo cột "trước" của số đo §8, nhận góp ý của người ngoài đội. Mọi số đo hiện
    tính trên dữ liệu mẫu; chưa có đơn vị dùng thật thì chưa biết sản phẩm giải đúng bài toán đến đâu.
@@ -182,9 +187,10 @@ Việc nào chưa xong trước 26/11 thì để sau `v1.2.0`.
 7. **Khuôn văn bản, biểu mẫu sửa được không cần sửa mã** ([P] low-code): trước hết cho quản trị đơn vị tự sửa mẫu văn
    bản đi (F2.4). Thiết kế quy trình bằng giao diện cần một công cụ thay `bpmn-js`, vốn bị loại vì giấy phép
    (`docs/du-thi/ke-hoach-phat-trien.md` §6).
-8. **Hạn chế đã ghi của tính năng đã có**: gửi lại liên thông lỗi (F3.12), hạn xử lý không tính ngày nghỉ, ngày lễ
-   (F2.3, F4.3), chữ OCR vào chỉ mục tìm kiếm (F2.7), két bí mật có TLS và xoay khóa (F3.2), tự chép kho sao lưu ra
-   ngoài máy chủ (F3.4).
+8. **Hạn chế đã ghi của tính năng đã có**: gửi lại liên thông lỗi (F3.12), thời hạn từng bước của quy trình không
+   trừ ngày nghỉ, ngày lễ (F2.3), lịch ngày lễ âm lịch tự có thay vì người vận hành thêm mỗi năm (F4.3), chữ OCR của cả
+   bản scan chứ không chỉ 3 trang đầu (F2.7), két bí mật có TLS và xoay khóa (F3.2), tự chép kho sao lưu ra ngoài máy
+   chủ (F3.4).
 9. **Dịch thuật trong lõi** (cụm ②): dịch vụ dịch chạy tại chỗ cho mọi ứng dụng. Xếp sau vì người dùng hiện là cơ
    quan trong nước và giao diện đã có tiếng Anh.
 10. **WebGIS** (đề nêu ở [D] của Tầng 2): nghiệp vụ văn thư hiện chưa cần bản đồ; làm khi có ứng dụng cần.

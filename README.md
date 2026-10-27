@@ -12,8 +12,10 @@
 Sản phẩm dự thi **Olympic Tin học Sinh viên Việt Nam 2026 — nội dung Phần mềm Nguồn mở (OLP PMNM 2026)**, chủ đề
 DX-OS Open-Core.
 
-**Dùng thử:** <https://signet.htechcs.com> (bản v1.0.0, xem [Chạy thử](#chạy-thử)) · tự cài trên máy mình bằng bốn
-lệnh ở [Cài đặt từ mã nguồn](#cài-đặt-từ-mã-nguồn-building-from-source).
+**Dùng thử:** <https://signet.htechcs.com> (bản phát hành mới nhất, xem [Chạy thử](#chạy-thử)) · tự cài trên máy mình
+bằng bốn lệnh ở [Cài đặt từ mã nguồn](#cài-đặt-từ-mã-nguồn-building-from-source).
+
+**Xem nhanh 5 phút, tìm tài liệu theo từng phần:** [`docs/README.md`](docs/README.md).
 
 **Đọc nhanh:** [Giới thiệu](#giới-thiệu) · [Kiến trúc](#kiến-trúc) · [Tính năng](#tính-năng) ·
 [4 nguyên lý](#bằng-chứng-4-nguyên-lý) · [Công nghệ](#công-nghệ-và-giấy-phép) ·
@@ -50,9 +52,15 @@ Tầng 1 là lõi không giao diện: định danh, cổng API, dữ liệu, quy
 điện tử và Không gian cá nhân P.A.R.A, ứng dụng thứ hai cắm vào cùng lõi mà không sửa dòng mã nào của lõi
 ([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Ứng dụng thứ ba, Bảng tin đơn vị, chỉ có khi cắm bằng lệnh
 `moc app install` nên không vẽ trong sơ đồ. Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó
-trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Viền đậm là mã của đội, hộp có logo là phần mềm nguồn mở dùng
-nguyên bản, chấm sáng đi theo hai yêu cầu thật. Kiến trúc H-P-D-I và các quyết định kỹ thuật:
-[`docs/architecture.md`](docs/architecture.md).
+trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Bên trong máy cũng vậy:
+- container ứng dụng ở mạng Docker riêng `apps` (không ra Internet), nơi dịch vụ lõi duy nhất là APISIX;
+- vì thế phần máy chủ của ứng dụng cũng gọi lõi qua cổng, qua cùng bước kiểm token, giới hạn tốc độ, WAF như trình
+  duyệt;
+- `make demo-cai-ung-dung` kiểm container chỉ tới được APISIX
+  ([`docs/them-ung-dung.md`](docs/them-ung-dung.md#14-migration-và-mô-hình-tin-cậy) mục 1.4).
+
+Viền đậm là mã của đội, hộp có logo là phần mềm nguồn mở dùng nguyên bản, chấm sáng đi theo hai yêu cầu thật. Kiến trúc
+H-P-D-I và các quyết định kỹ thuật: [`docs/architecture.md`](docs/architecture.md).
 
 ## Tính năng
 
@@ -71,10 +79,10 @@ xử lý → trả lời → phát hành → lưu trữ** theo Nghị định 30
 | Đơn vị gửi văn bản cho nhau qua email | Liên thông trên cùng bản cài: bên nhận có ngay văn bản đến, tệp trùng từng byte, kèm mã xác thực | [P] |
 | Văn bản nhạy cảm bị lộ | Mã hóa từng tệp, chỉ giải mã trong bộ nhớ cho người có tên; bản mở đóng tên người xem lên mọi trang | [P] |
 | Lãnh đạo không biết việc nghẽn ở đâu | Dashboard điều hành từ số liệu thật | [D] |
-| Tìm lại văn bản cũ mất thời gian | Tìm toàn văn, cả chữ trong tệp PDF đính kèm; trợ lý hỏi đáp trả lời kèm số ký hiệu và trang | [I] |
+| Tìm lại văn bản cũ mất thời gian | Tìm toàn văn, cả chữ trong tệp PDF đính kèm và bản scan (nhận dạng chữ); trợ lý hỏi đáp trả lời kèm số ký hiệu và trang | [I] |
 
 Ngoài ra: sổ đăng ký văn bản đến, đi đúng mẫu NĐ 30; nhiều đơn vị trên một bản cài, mỗi người chỉ thấy dữ liệu của
-đơn vị mình; giao diện tiếng Việt và tiếng Anh. Phạm vi và vai trò:
+đơn vị mình; Văn phòng điện tử có giao diện tiếng Việt và tiếng Anh. Phạm vi và vai trò:
 [`docs/dac-ta-san-pham.md`](docs/dac-ta-san-pham.md); mức hoàn thiện từng tính năng kèm bằng chứng:
 [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md).
 
@@ -110,8 +118,8 @@ từng tác tử: [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 
 ### Ảnh chụp màn hình
 
-Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt, trang nào cũng có bản
-tiếng Anh.
+Chụp tự động trong lượt e2e (`make e2e`), dữ liệu mẫu hư cấu. Giao diện mặc định tiếng Việt; trang nào của Văn
+phòng điện tử, Không gian cá nhân và Bảng tin cũng có bản tiếng Anh.
 
 | Văn thư tải công văn lên, tác tử điền sẵn các ô | Lãnh đạo xem việc nghẽn ở đâu | Người nhận tự kiểm văn bản, không cần đăng nhập |
 |---|---|---|
@@ -124,23 +132,26 @@ nhiêu lần cũng được — kịch bản trình bày ở [`docs/demo-script.
 
 | Nguyên lý | Màn demo | Lệnh |
 |---|---|---|
-| (i) Vòng đời và tốc độ dữ liệu | Hồ sơ đã đóng nộp lưu thành gói Parquet + tệp + manifest có băm trên kho lạnh khóa ghi; vẫn tìm thấy, quét mã QR vẫn "khớp"; trên giao diện: lập hồ sơ, lãnh đạo phòng nộp lưu, phòng đọc xem tệp có dấu tên người xem | `make demo-nong-lanh` |
+| (i) Vòng đời và tốc độ dữ liệu | Hồ sơ đã đóng nộp lưu thành gói Parquet + tệp + manifest có băm trên kho lạnh khóa ghi; vẫn tìm thấy, quét mã QR vẫn "khớp"; trên giao diện: lập hồ sơ, lãnh đạo phòng nộp lưu, phòng đọc xem tệp có dấu tên người xem; trang Điều hành có số liệu văn bản đã nộp lưu do DuckDB đếm thẳng trên gói Parquet trong kho lạnh | `make demo-nong-lanh` |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ → NGSI-LD (Scorpio) → vượt ngưỡng thì dựng dự thảo "Báo cáo sự cố" vào luồng văn bản đi | `make demo-it-ot` |
 | (iii) Quản trị dữ liệu | Phả hệ OpenLineage: gói lưu trữ truy ngược về bảng nghiệp vụ và tệp gốc; kiểm số dòng, cột bắt buộc trước khi ghi; mỗi biểu đồ ở trang Điều hành truy về khung nhìn và bảng nguồn (tính từ catalog PostgreSQL), xem đồ thị ở trang Phả hệ số liệu (`/pha-he`) | `make demo-pha-he` |
-| (iv) Zero-Trust | Kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán | `make demo-kiem-dich` |
+| (iv) Zero-Trust | Kiểm dịch: mọi tệp qua ClamAV trong `svc-files` trước khi ghi vào kho; tệp EICAR bị từ chối, không lưu, lần chặn vào sổ kiểm toán | `make demo-kiem-dich` |
 | (iv) Zero-Trust | Văn bản hạn chế: tệp mã hóa trong kho, chỉ người có tên mở được, bản mở có dấu tên | `make demo-han-che` |
-| (iv) Zero-Trust | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa khi khởi động lại | `make demo-ket-bi-mat` |
+| (iv) Zero-Trust | Két bí mật: `svc-files`, `svc-workflow` lấy bí mật từ két OpenBao (AppRole), không qua biến môi trường; két tự mở khóa khi khởi động lại | `make demo-ket-bi-mat` |
 | (iv) GitOps | Tự phục hồi: xóa container, reconciler dựng lại theo khai báo trong git | `make demo-tu-phuc-hoi` |
 
 Các màn nghiệp vụ, cùng cách chạy: `make demo-lien-thong` (liên thông hai đơn vị), `make demo-nap-lo` (nạp lô văn bản
 đến), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (trợ lý AI),
 `make demo-ky-so` (ký số, minh họa), `make demo-ca-nhan` (ứng dụng thứ hai trên cùng lõi), `make demo-cai-ung-dung`
-(cắm ứng dụng thứ ba bằng một lệnh), `make demo-log-tap-trung` (log tập trung).
+(cắm ứng dụng thứ ba bằng một lệnh), `make demo-quy-trinh` (ứng dụng thứ tư mang quy trình riêng, chạy trên động cơ
+quy trình của lõi), `make demo-tat-van-phong` (tắt phần Văn phòng điện tử, lõi vẫn chạy), `make demo-log-tap-trung`
+(log tập trung).
 
 ## Công nghệ và giấy phép
 
 Signet điều phối phần mềm nguồn mở ở dạng nguyên bản: image chính thức, phiên bản ghim, không sửa mã thượng nguồn.
-Danh mục đầy đủ, cả thư viện và lý do chọn: [`DEPENDENCIES.md`](DEPENDENCIES.md).
+Bảng đầy đủ (phiên bản, giấy phép, trang chủ): [`COPYRIGHT.txt`](COPYRIGHT.txt); lý do chọn từng thư viện:
+[`DEPENDENCIES.md`](DEPENDENCIES.md).
 
 | Không gian | Thành phần | Phiên bản | Giấy phép | Vai trò trong Signet |
 |---|---|---|---|---|
@@ -158,7 +169,7 @@ Danh mục đầy đủ, cả thư viện và lý do chọn: [`DEPENDENCIES.md`]
 | Tin cậy | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc trước khi lưu |
 | Tin cậy | OpenBao | 2.7.1 | MPL-2.0 | Két bí mật, khóa mã hóa văn bản hạn chế, CA nội bộ và khóa ký |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | Bản sao số của cảm biến theo NGSI-LD (profile `iot`) |
-| Vận hành | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát cổng API, chỉ trong mạng nội bộ |
+| Vận hành | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát, cảnh báo cổng API và trạng thái từng thành phần, chỉ trong mạng nội bộ |
 | Vận hành | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Log tập trung đã che thông tin cá nhân, tùy chọn (profile `logs`) |
 | Vận hành | restic | 0.19.1 | BSD-2-Clause | Sao lưu mã hóa CSDL, tệp, két |
 
@@ -219,15 +230,20 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 
 - `PREFIX` mặc định là `/opt/moc`. Phiên bản lấy từ `git describe`; cài từ gói `.tar.gz` thì đặt tay:
   `make install PREFIX=/opt/moc MOC_VERSION=0.1.0`.
+- Gói có tệp `VERSION` ở thư mục gốc thì phiên bản đã ghi sẵn trong đó (`git archive` điền khi đóng gói), `make install`
+  tự đọc, không cần đặt tay.
 - Nâng cấp: dừng bản cài, `make install` lại với cùng `PREFIX`. Compose, cấu hình và image được thay; `.env` của bản
-  cài được giữ, chỉ đổi `MOC_VERSION`.
+  cài được giữ, trừ `MOC_VERSION`, `COMPOSE_PROFILES` và `COMPOSE_FILE` do `make install` đặt lại mỗi lần.
+  Bản cài đang chạy có dữ liệu thì dùng `scripts/nang_cap.sh nang /opt/moc`: sao lưu trước, kiểm sau, có lệnh lùi
+  ([`docs/trien-khai.md`](docs/trien-khai.md) mục Vận hành).
 - Gỡ: `make uninstall PREFIX=/opt/moc` xóa đúng các tệp đã cài, giữ `.env` và dữ liệu.
 
 ## Chạy thử
 
-**Bản online** <https://signet.htechcs.com> chạy bản phát hành v1.0.0 trên máy của đội, ra Internet qua Cloudflare
-Tunnel. Tài khoản dùng thử gửi kèm hồ sơ dự thi; repo không công khai mật khẩu. Tính năng mới hơn v1.0.0 (mục
-"Chưa phát hành" của [`CHANGELOG.md`](CHANGELOG.md)) có khi tự cài từ mã nguồn.
+**Bản online** <https://signet.htechcs.com> chạy bản phát hành mới nhất trên máy của đội, ra Internet qua Cloudflare
+Tunnel; `.github/workflows/ban-online.yml` kiểm hằng ngày bản đó đúng thẻ mới nhất. Tài khoản dùng thử gửi kèm hồ sơ
+dự thi; repo không công khai mật khẩu. Tính năng chưa phát hành (mục "Chưa phát hành" của
+[`CHANGELOG.md`](CHANGELOG.md)) có khi tự cài từ mã nguồn.
 
 **Bản tự cài:** mật khẩu chung của các tài khoản mẫu là giá trị `MOC_DEMO_PASSWORD` trong `.env`. Văn thư, lãnh đạo,
 tổ trưởng, trưởng bộ môn và quản trị đơn vị bắt buộc xác thực hai bước: sau mật khẩu nhập mã TOTP. `make seed` cài sẵn
@@ -251,6 +267,7 @@ và một dự thảo phúc đáp bị tổ trưởng trả lại chờ sửa.
 |---|---|---|
 | <http://localhost:8080> | Văn phòng điện tử | Có |
 | <http://localhost:8080/ca-nhan/> | Không gian cá nhân P.A.R.A | Có |
+| <http://localhost:8080/tai-lieu-api/> | Tài liệu API (Swagger UI): đọc API lõi và API Văn phòng điện tử, đăng nhập để gọi thử qua cổng | Không bắt buộc |
 | <http://localhost:8080/bang-tin/> | Bảng tin đơn vị, sau khi cắm bằng `make app-install APP=apps/bang-tin/app.yaml` | Có |
 | <http://localhost:8080/xac-thuc> | Cổng xác thực văn bản: nhập mã hoặc thả tệp PDF; mã của văn bản mẫu ở trang chi tiết văn bản (Văn bản đi, tab Đã phát hành) | Không |
 | <http://localhost:8080/trang-thai> | Trạng thái hệ thống | Không |
@@ -292,6 +309,7 @@ Nhắc hạn chỉ kiểm được khi hạn ngắn: `MOC_SLA_DURATION=PT20S mak
 | Hiện tượng | Nguyên nhân và cách xử lý |
 |---|---|
 | `make check` báo thiếu `.env` hoặc `docker compose` | Chạy `make env` để sinh `.env`; cài plugin Docker Compose v2 từ 2.17 trở lên |
+| `make up` dừng khi kéo hay dựng image: hết thời gian chờ tới `docker.io`, hoặc `toomanyrequests` | Mạng chặn Docker Hub hoặc đã hết lượt tải ẩn danh. Cho Docker kéo qua bản sao `mirror.gcr.io` (khóa `registry-mirrors`, cần `sudo`) theo mục 2b của [`docs/trien-khai.md`](docs/trien-khai.md#2b-máy-không-kéo-được-image-từ-docker-hub) |
 | `make up` chạy lâu, dịch vụ còn `starting` hoặc `unhealthy` | Lần đầu phải tải khoảng 5 GB image và ClamAV nạp chữ ký virus, mất vài phút; `make up` chờ tối đa 10 phút. Theo dõi bằng `make ps`, `make logs` |
 | Cổng 8080 đã có chương trình khác dùng | Đặt `MOC_HTTP_PORT=8081` và `MOC_PUBLIC_URL=http://localhost:8081` trong `.env` trước lần `make up` đầu tiên: realm Keycloak chỉ nạp địa chỉ này một lần, đã chạy rồi thì `make reset` rồi dựng lại |
 | Mở bằng IP trong mạng LAN thì không đăng nhập được | Trình duyệt chỉ cho dùng Web Crypto (đăng nhập PKCE, tính SHA-256 ở trang xác thực) trên `https` hoặc `localhost`. Dùng `localhost`, hoặc lên HTTPS theo [`docs/trien-khai.md`](docs/trien-khai.md) |
@@ -309,7 +327,7 @@ kèm kết quả `make ps` và đoạn `make logs` của dịch vụ lỗi.
 | Dùng và vận hành | [Kịch bản demo](docs/demo-script.md) · [Vận hành](docs/van-hanh.md) · [Triển khai lên máy chủ](docs/trien-khai.md) · [Tài liệu API](docs/api/README.md) · [Thêm ứng dụng mới trên lõi](docs/them-ung-dung.md) |
 | Kỹ thuật | [Kiến trúc H-P-D-I](docs/architecture.md) · [Mô hình dữ liệu và quyền](docs/mo-hinh-du-lieu.md) · [Đặc tả sản phẩm](docs/dac-ta-san-pham.md) · [Mức hoàn thiện kèm bằng chứng](docs/muc-hoan-thien.md) · [Đánh giá AI](docs/danh-gia-ai.md) · [Số đo "sau" theo đặc tả §8](docs/so-lieu-sau.md) · [Tự chẩn đoán H-P-D-I](docs/tu-chan-doan.md) · [Quy trình Git](docs/git_flow.md) |
 | Dự thi | [Bảng tự chấm PoF](docs/du-thi/pof-checklist.md) · [Câu hội đồng dễ hỏi](docs/du-thi/hoi-dap-hoi-dong.md) · [Chủ đề, thể lệ, tiêu chí chấm](docs/du-thi/olp-2026-brief.md) · [Phân tích đề thi](docs/du-thi/olp-2026-de-thi.md) · [Kế hoạch phát triển](docs/du-thi/ke-hoach-phat-trien.md) · [Nghiên cứu trước khi có đề](docs/du-thi/nghien-cuu/) |
-| Dự án | [Phụ thuộc và giấy phép](DEPENDENCIES.md) · [Lịch sử thay đổi](CHANGELOG.md) · [Hướng dẫn đóng góp](CONTRIBUTING.md) · [Chính sách bảo mật](SECURITY.md) · [Lộ trình](ROADMAP.md) · [Quy tắc ứng xử](CODE_OF_CONDUCT.md) |
+| Dự án | [Bản quyền và thành phần thứ ba](COPYRIGHT.txt) · [Phụ thuộc và giấy phép](DEPENDENCIES.md) · [Lịch sử thay đổi](CHANGELOG.md) · [Hướng dẫn đóng góp](CONTRIBUTING.md) · [Chính sách bảo mật](SECURITY.md) · [Lộ trình](ROADMAP.md) · [Quy tắc ứng xử](CODE_OF_CONDUCT.md) |
 
 ### Cấu trúc thư mục
 
@@ -318,10 +336,10 @@ nguyên bản (image chính thức, không sửa mã thượng nguồn).
 
 ```
 apps/                Văn phòng điện tử (office/, Nuxt 4) · Không gian cá nhân P.A.R.A (ca-nhan/) · Bảng tin đơn vị
-                     (bang-tin/, cắm bằng moc app install)
+                     (bang-tin/, cắm bằng moc app install) · Tài liệu API bằng Swagger UI (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, quy trình BPMN, thông báo, nhắc hạn, gợi ý giao việc
                      svc-files/: tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực, các tác tử AI
-                     ot-sensor/: cảm biến nhiệt độ giả lập (profile iot)
+                     ot-sensor/: cảm biến nhiệt độ giả lập (profile iot-sim)
 db/                  Lược đồ PostgreSQL, quyền Hasura theo vai trò và đơn vị, sổ kiểm toán chuỗi băm; tests/
 schemas/             JSON Schema của form, dùng chung cho giao diện, dịch vụ và CSDL
 platform/            Cấu hình Keycloak, APISIX, Centrifugo, OpenBao, giám sát, log tập trung, systemd

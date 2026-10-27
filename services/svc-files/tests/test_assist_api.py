@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 import uuid
 from types import SimpleNamespace
 
@@ -187,6 +186,18 @@ def test_filters_and_scope_reach_the_retriever(asking):
     assert call["scope"].where and "u-chuyen-vien" in call["scope"].where[0]
 
 
+def test_document_scope_and_the_whole_question_reach_the_retriever(asking, log_records):
+    env = asking(passages=demo())
+    assert ask(env, env.token(), document_id=D88.upper()).status_code == 200
+    call = env.retriever.calls[0]
+    # id chuẩn hóa (chữ thường) trước khi vào bộ lọc; nguyên câu hỏi để chọn tỷ trọng nghĩa (câu tìm đã bỏ ngoặc kép)
+    assert call["filters"].document_id == D88 and call["question"] == QUESTION
+    (done,) = [r for r in log_records if r["event"] == "office.assist.asked"]
+    assert done["scoped"] is True and "ratio" in done
+    assert ask(env, env.token()).status_code == 200
+    assert env.retriever.calls[1]["filters"].document_id is None
+
+
 # --- quyền ---------------------------------------------------------------------------------------------------------
 
 
@@ -297,21 +308,31 @@ def test_model_is_skipped_when_the_deadline_is_near(asking):
     assert fake.calls("/api/chat") == []
 
 
-def test_background_embedding_is_held_only_while_ollama_is_called(asking, monkeypatch):
+def test_background_embedding_is_held_only_while_ollama_is_called(asking):
     async def slow(request):
         await asyncio.sleep(0.5)
         return good_answer()
 
-    env = asking(passages=demo(), ai=ollama(FakeOllama(reply=slow)))
-    assert ask(env, env.token()).status_code == 200            # câu trích: chỉ nhúng câu hỏi, giữ ngắn
-    assert env.indexer.holds == [answer_module.HOLD_S] and answer_module.HOLD_S <= 5
+    ai = ollama(FakeOllama(reply=slow))
+    env = asking(passages=demo(), ai=ai)
+    seen: list[tuple[str, int]] = []        # (bước, số khối giữ đang mở lúc bắt đầu bước)
+
+    def watch(step, call):
+        async def watched(*args, **kwargs):
+            seen.append((step, env.indexer.active))
+            return await call(*args, **kwargs)
+        return watched
+
+    ai.embed, ai.chat = watch("embed", ai.embed), watch("chat", ai.chat)
+    env.retriever.search = watch("search", env.retriever.search)
+    assert ask(env, env.token()).status_code == 200            # câu trích: chỉ nhúng câu hỏi
+    assert seen == [("embed", 1), ("search", 0)] and env.indexer.holds == [answer_module.HOLD_S]
+    seen.clear()
     env.indexer.holds.clear()
-    monkeypatch.setattr(answer_module, "HOLD_S", 0.1)       # gia hạn mỗi 0,05 giây
     assert ask(env, env.token(), mode="generate").json()["answer"]["source"] == "model"
-    during = len(env.indexer.holds)
-    assert during >= 4 and set(env.indexer.holds) == {0.1}     # gia hạn suốt 0,5 giây sinh
-    time.sleep(0.3)
-    assert len(env.indexer.holds) == during                    # gọi xong thì thôi giữ
+    # giữ suốt từng lời gọi Ollama (cả 0,5 giây sinh), không giữ lúc truy xuất; mỗi lời gọi xong nhường thêm HOLD_S
+    assert seen == [("embed", 1), ("search", 0), ("chat", 1)] and env.indexer.active == 0
+    assert env.indexer.holds == [answer_module.HOLD_S] * 2 and answer_module.HOLD_S <= 5
 
 
 def test_busy_is_503_with_retry_after_only_for_generate(asking):
@@ -355,13 +376,13 @@ def _post(app, token: str, body: dict, gone: asyncio.Event):
 
 
 def test_disconnect_cancels_the_model_call_frees_the_slot_and_writes_no_audit_row(
-        scanner, store, verifier, meili, vault, signing_key, log_records, monkeypatch):
-    monkeypatch.setattr(answer_module, "HOLD_S", 0.02)
-
+        scanner, store, verifier, meili, vault, signing_key, log_records):
     async def scenario():
         started, cancelled = asyncio.Event(), asyncio.Event()
+        held: list[int] = []
 
         async def endless(request):
+            held.append(indexer.active)
             started.set()
             try:
                 await asyncio.sleep(30)
@@ -388,6 +409,7 @@ def test_disconnect_cancels_the_model_call_frees_the_slot_and_writes_no_audit_ro
         gone.set()
         await asyncio.wait_for(call, 5)
         assert cancelled.is_set() and not assistant.slots.locked()
+        assert held == [1] and indexer.active == 0              # giữ vòng nền suốt lời gọi; bị hủy thì thôi giữ
         assert sent[0]["status"] == 499 and hasura.agent_events == []
 
         # lượt kế tiếp không phải chờ hàng 20 giây
@@ -396,9 +418,7 @@ def test_disconnect_cancels_the_model_call_frees_the_slot_and_writes_no_audit_ro
         await asyncio.wait_for(call, 5)
         assert sent[0]["status"] == 200
         assert [e["diff"]["answer_source"] for e in hasura.agent_events] == ["model"]
-        holds = len(indexer.holds)
-        await asyncio.sleep(0.1)
-        assert len(indexer.holds) == holds                      # lượt bị hủy không để lại vòng gia hạn hold
+        assert indexer.active == 0                              # không lượt nào để lại khối giữ đang mở
         await ai.aclose()
 
     asyncio.run(scenario())
@@ -428,7 +448,7 @@ def test_newlines_and_invisible_characters_are_normalized_not_rejected(asking):
 
 @pytest.mark.parametrize("body", [
     {"mode": "tom-tat"}, {"year": 1999}, {"type_code": "CV/QĐ"}, {"direction": "ngang"}, {"ask_id": "khong-phai"},
-    {"cau_hoi": "thừa khóa"}, {"question": 42},
+    {"cau_hoi": "thừa khóa"}, {"question": 42}, {"document_id": "khong-phai"},
 ])
 def test_malformed_bodies_are_422(asking, body):
     env = asking(passages=demo())
@@ -601,6 +621,10 @@ def test_end_to_end_with_the_real_chunk_index_and_retriever(scanner, store, veri
         nobody = client.post("/api/documents/ask", json={"question": QUESTION}, headers={
             "Authorization": f"Bearer {ask_token(signing_key, sub='u-tp', role='manager')}"})
         ready = client.get("/readyz").json()["assist"]
+        searched = len(index.searches)
+        # hỏi trong một văn bản: văn bản được đọc, văn bản không được đọc (lọc trước cho qua, hậu kiểm bỏ)
+        mine, other = (client.post("/api/documents/ask", headers={"Authorization": f"Bearer {ask_token(signing_key)}"},
+                                   json={"question": QUESTION, "document_id": doc}) for doc in (d88, hidden))
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "answered" and body["semantic"] is True and body["answer"]["source"] == "extract"
@@ -616,5 +640,9 @@ def test_end_to_end_with_the_real_chunk_index_and_retriever(scanner, store, veri
     assert search["hybrid"]["embedder"] == "emb_qwen3_embedding_0_6b" and len(search["vector"]) == DIMS
     assert fake.calls("/api/embed")[-1]["input"][0].startswith("Instruct: ")
     # quản lý không có phòng: không gọi Meilisearch, không có căn cứ
-    assert nobody.json()["status"] == "no_evidence" and len(index.searches) == 1
+    assert nobody.json()["status"] == "no_evidence" and searched == 1
     assert ready == {"index": True, "semantic": True, "model": True, "embed_pending": 0, "embed_failed": 0}
+    assert mine.json()["status"] == "answered" and [x["document_id"] for x in mine.json()["sources"]] == [d88]
+    assert index.searches[searched]["filter"][-1] == f'document_id = "{d88}"'
+    assert other.json()["status"] == "no_evidence" and other.json()["sources"] == []
+    assert "XANH LAM" not in other.text and "99/MAT" not in other.text

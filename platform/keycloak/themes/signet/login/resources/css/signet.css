@@ -1,0 +1,258 @@
+/*
+ * Copyright 2026 Signet Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Nhận diện "Liền mạch", phủ lên css/styles.css của keycloak.v2: chỉ đổi màu, phông, nền, khung thẻ, ô nhập, nút,
+ * logo; template, biểu mẫu, bản dịch của theme cha giữ nguyên. Cùng chất liệu với Văn phòng điện tử
+ * (apps/office/app/assets/css/main.css): nền xám lục nhạt, thẻ trắng bo 12px, ô nhập và nút bo 8px, nút olive, phông
+ * Be Vietnam Pro tự phục vụ (@font-face ở resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm
+ * @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp này theo theme.properties; #305). Chỉ chế độ sáng (darkMode=false
+ * trong theme.properties). PatternFly 5 khai biến toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng.
+ * Không @import, không tải gì ngoài máy chủ Keycloak.
+ */
+
+:root {
+  color-scheme: light;
+  --signet-ground: #f4f5f1;
+  --signet-ink: #202820;
+  --signet-muted: #515b50;
+  --signet-edge: #d9ddd4;
+  --signet-field: #898a79;
+  --signet-focus: #666d4c;
+  --signet-olive: #555b3f;
+  --signet-olive-dark: #42492e;
+  --signet-ease: cubic-bezier(.16, 1, .3, 1);
+  --signet-font: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  /* nút chính, liên kết, viền ô đang chọn: olive brand-700 (chữ trắng trên nền này 7,1:1), rê chuột brand-800.
+     PatternFly đặt lại primary-color--100, link--Color bằng bản --dark-* trong ô nhập nên đổi cả hai bộ */
+  --pf-v5-global--primary-color--100: #555b3f;
+  --pf-v5-global--primary-color--200: #42492e;
+  --pf-v5-global--primary-color--dark-100: #555b3f;
+  --pf-v5-global--active-color--100: #555b3f;
+  --pf-v5-global--link--Color: #555b3f;
+  --pf-v5-global--link--Color--hover: #42492e;
+  --pf-v5-global--link--Color--dark: #555b3f;
+  --pf-v5-global--link--Color--dark--hover: #42492e;
+  --pf-v5-global--FontFamily--text: var(--signet-font);
+  --pf-v5-global--FontFamily--heading: var(--signet-font);
+}
+
+html, body, .pf-v5-c-login {
+  background: var(--signet-ground) !important;
+  color: var(--signet-ink);
+  font-family: var(--signet-font);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+body { margin: 0; font-size: 14px; line-height: 1.5; }
+button, input, select, textarea { font: inherit; }
+a { color: var(--signet-olive); text-underline-offset: 3px; }
+::selection { background: #eee3bc; color: #202820; }
+:focus-visible { outline: 2px solid var(--signet-focus); outline-offset: 3px; }
+
+/* Bố cục: một cột 480px giữa trang, logo và tên ở trên thẻ */
+.pf-v5-c-login {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 40px 24px;
+}
+.pf-v5-c-login__container {
+  display: flex;
+  flex-direction: column;
+  width: 480px;
+  max-width: 100%;
+  margin: auto;
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+}
+.pf-v5-c-login__header { padding: 0; text-align: left; }
+
+/* Đầu trang: biểu tượng Liền mạch trên ô vàng bơ + displayName của realm ("Signet"), chữ thường thay vì chữ hoa
+   giãn cách của theme cha */
+#kc-header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0;
+  color: #30342a !important;
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.04em;
+  line-height: 1.2;
+  text-transform: none;
+}
+#kc-header-wrapper::before {
+  content: "";
+  display: block;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #e0d3a5;
+  border-radius: 10px;
+  background: #eee3bc url("../img/signet-symbol.svg") center / 28px no-repeat;
+}
+
+/* Thẻ đăng nhập: trắng, viền mảnh, không bóng như .card của Văn phòng điện tử */
+.pf-v5-c-login .pf-v5-c-login__main {
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+  background: #fff;
+  border: 1px solid var(--signet-edge);
+  border-radius: 12px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.pf-v5-c-login__main-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 30px 32px 0;
+  border: 0;
+}
+#kc-page-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--signet-ink);
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.pf-v5-c-login__main-header-utilities { flex-shrink: 0; align-self: flex-start; max-width: 150px; margin: 0; }
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control { min-height: 40px; }
+.pf-v5-c-login__main-header-utilities select {
+  min-width: 0;
+  padding-inline: 10px 30px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+}
+.pf-v5-c-login__main-body { padding: 26px 32px 32px; }
+.pf-v5-c-login__main-footer { background: transparent; color: var(--signet-muted); font-size: 13px; }
+.pf-v5-c-login__main-footer:empty { display: none; }
+
+/* Ô nhập: viền đủ bốn cạnh (theme cha chỉ gạch dưới), cao 44px, viền olive và vòng nhạt khi đang nhập */
+.pf-v5-c-form { gap: 22px; }
+.pf-v5-c-form__group-label { padding-bottom: 8px !important; }
+.pf-v5-c-form__label { color: var(--signet-ink); font-size: 14px; font-weight: 500; }
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--after--BorderBottomWidth: 0;
+  min-height: 44px;
+  border: 1px solid var(--signet-field);
+  border-radius: 8px;
+  background: #fff;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.pf-v5-c-form-control::before, .pf-v5-c-form-control::after { border: 0 !important; }
+.pf-v5-c-form-control:focus-within { border-color: var(--signet-focus); box-shadow: 0 0 0 2px #e9ead8; }
+.pf-v5-c-form-control input, .pf-v5-c-form-control select, .pf-v5-c-form-control textarea {
+  min-height: 42px;
+  color: var(--signet-ink);
+  caret-color: var(--signet-olive);
+  font-family: inherit;
+  font-size: 14px;
+}
+.pf-v5-c-form-control input { padding: 10px 12px; }
+.pf-v5-c-form-control input:focus { outline: 0; }
+.pf-v5-c-form-control.pf-m-error { border-color: #b42318; }
+/* ô mật khẩu kèm nút hiện/ẩn: viền bao cả nhóm */
+.pf-v5-c-input-group {
+  gap: 0;
+  overflow: visible;
+  border: 1px solid var(--signet-field);
+  border-radius: 8px;
+  background: #fff;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.pf-v5-c-input-group:focus-within { border-color: var(--signet-focus); box-shadow: 0 0 0 2px #e9ead8; }
+.pf-v5-c-input-group .pf-v5-c-form-control { border: 0; box-shadow: none; }
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border-radius: 0 8px 8px 0;
+  color: var(--signet-muted);
+  background: transparent;
+}
+.pf-v5-c-button.pf-m-control::after { border: 0; }
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover { background: #efeee3; }
+
+/* Nút chính: olive, chữ trắng, nhấn thì lún 1px */
+.pf-v5-c-button.pf-m-primary {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--signet-olive);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 160ms, transform 180ms var(--signet-ease);
+}
+.pf-v5-c-button.pf-m-primary::after { border: 0; }
+.pf-v5-c-button.pf-m-primary:hover { background: var(--signet-olive-dark); }
+.pf-v5-c-button.pf-m-primary:active { transform: translateY(1px) scale(.99); }
+.pf-v5-c-button.pf-m-primary:disabled { color: #666a59; background: #ece7df; cursor: not-allowed; }
+
+.pf-v5-c-alert {
+  padding: 12px;
+  border: 1px solid #edb4ad;
+  border-radius: 8px;
+  background: #fff4f2;
+  color: #8e271d;
+  font-size: 14px;
+}
+.pf-v5-c-helper-text, .pf-v5-c-form__helper-text { font-size: 13px; }
+#kc-otp-login-form .pf-v5-c-tile { border-radius: 8px; }
+#kc-totp-settings { padding-left: 20px; }
+#kc-totp-settings li { margin-bottom: 16px; }
+#kc-totp-secret-key { overflow-wrap: anywhere; }
+#kc-form-options, #kc-info, #kc-info-wrapper { color: var(--signet-muted); font-size: 13px; }
+
+/* Điện thoại: lề hẹp hơn, ô nhập chữ 16px để trình duyệt không phóng to khi chạm */
+@media (max-width: 540px) {
+  .pf-v5-c-login { padding: 28px 18px; }
+  .pf-v5-c-login__container { gap: 24px; }
+  .pf-v5-c-login__main-header { flex-wrap: wrap; gap: 14px; padding: 24px 22px 0; }
+  .pf-v5-c-login__main-body { padding: 22px; }
+  .pf-v5-c-login__main-header-utilities { max-width: 100%; }
+  #kc-page-title { font-size: 22px; }
+  .pf-v5-c-form-control input, .pf-v5-c-form-control select { font-size: 16px; }
+  .pf-v5-c-login__main-header-utilities select { font-size: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+  .pf-v5-c-button.pf-m-primary:active { transform: none; }
+}

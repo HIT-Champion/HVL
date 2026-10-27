@@ -23,7 +23,101 @@ const { t, locale } = useI18n()
 const auth = useAuth()
 const claims = auth.claims
 const route = useRoute()
+
+// Thanh bên: trên máy tính thu về một dải biểu tượng, mở ra khi rê chuột vào hoặc khi focus bằng bàn phím (focus do
+// bấm chuột không tính, không thì bấm một mục xong thanh bên cứ mở đè lên nội dung). Màn hẹp hay màn cảm ứng: ngăn
+// kéo mở bằng nút menu, Esc đóng, Tab chỉ đi vòng trong ngăn kéo.
 const open = ref(false)
+const mobile = ref(false)
+const hovering = ref(false)
+const keyboardFocus = ref(false)
+const collapsed = computed(() => !mobile.value && !hovering.value && !keyboardFocus.value)
+const menuButton = ref<HTMLButtonElement | null>(null)
+let hoverExit: ReturnType<typeof setTimeout> | undefined
+// Bấm chuột vào một mục, kể cả mục của trang đang mở (route không đổi nên watch(route) ở dưới không chạy): thu thanh
+// bên, đóng ngăn kéo, rồi không cho rê chuột mở lại tới khi con trỏ rời hẳn thanh bên và vào lại. Không thì con trỏ còn
+// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Bấm chuột cũng xóa focus bàn phím: Tab tới một
+// mục rồi bấm chuột đúng mục đó thì không có focusin mới, thanh bên cứ mở theo focus cũ. Enter bằng bàn phím
+// (event.detail = 0) vẫn giữ thanh bên mở theo focus như cũ
+let pointerPicked = false
+function pickInNavigation(event: MouseEvent) {
+  if (!(event.target as HTMLElement).closest('a[href]')) return
+  open.value = false
+  if (!event.detail) return
+  pointerPicked = true
+  keyboardFocus.value = false
+  hovering.value = false
+}
+// Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
+// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung
+function moveInNavigation(event: PointerEvent) {
+  if (!event.movementX && !event.movementY) return
+  clearTimeout(hoverExit)
+  if (pointerPicked) return
+  hovering.value = true
+}
+function leaveNavigation() {
+  pointerPicked = false
+  clearTimeout(hoverExit)
+  hoverExit = setTimeout(() => { hovering.value = false }, 140)
+}
+function focusNavigation(event: FocusEvent) {
+  keyboardFocus.value = (event.target as HTMLElement).matches(':focus-visible')
+}
+function blurNavigation(event: FocusEvent) {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) keyboardFocus.value = false
+}
+
+let media: MediaQueryList | undefined
+function updateViewport() {
+  mobile.value = media?.matches ?? false
+  if (!mobile.value) open.value = false
+}
+onMounted(() => {
+  media = window.matchMedia('(max-width: 900px), (hover: none)')
+  updateViewport()
+  media.addEventListener('change', updateViewport)
+})
+watch(open, async (value) => {
+  document.body.style.overflow = value && mobile.value ? 'hidden' : ''
+  await nextTick()
+  if (value) document.querySelector<HTMLElement>('#app-navigation a')?.focus()
+  else if (mobile.value) menuButton.value?.focus()
+})
+
+function keyboard(event: KeyboardEvent) {
+  if (event.key === 'Escape') open.value = false
+  if (event.key === 'Tab' && open.value && mobile.value) {
+    const items = [...document.querySelectorAll<HTMLElement>('#app-navigation a, #app-navigation button')]
+      .filter((item) => item.getClientRects().length && getComputedStyle(item).visibility !== 'hidden')
+    const first = items[0]
+    const last = items.at(-1)
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last?.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first?.focus()
+    }
+  }
+}
+onMounted(() => window.addEventListener('keydown', keyboard))
+
+// Ngày trên thanh trên, đổi lúc qua nửa đêm
+const calendarDay = ref(today())
+let calendarClock: ReturnType<typeof setInterval> | undefined
+onMounted(() => { calendarClock = setInterval(() => { calendarDay.value = today() }, 60_000) })
+const dateLabel = computed(() => new Intl.DateTimeFormat(locale.value === 'vi' ? 'vi-VN' : 'en-GB', {
+  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+}).format(new Date(`${calendarDay.value}T12:00:00`)))
+
+onBeforeUnmount(() => {
+  media?.removeEventListener('change', updateViewport)
+  window.removeEventListener('keydown', keyboard)
+  clearInterval(calendarClock)
+  clearTimeout(hoverExit)
+  document.body.style.overflow = ''
+})
 
 const { gql } = useApi()
 const tenantName = ref('')
@@ -52,6 +146,10 @@ const nav = computed(() => {
       icon: 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm6 6h6',
     })
   }
+  // Sơ đồ cảm biến kho (F3.10, Action otSensorMap): cùng các vai trò đọc được dự thảo "Báo cáo sự cố" mà cảm biến
+  // vượt ngưỡng dựng ra; quản trị đơn vị không đọc văn bản nên không có
+  if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/cam-bien',
+    label: t('nav.sensors'), icon: 'M3 5h18v14H3zM3 11h7m4 0h7M9 5v6m6-6v6m-3 2v6' })
   items.push({ to: '/tim-kiem', label: t('nav.search'), icon: 'M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z' })
   // Hỏi đáp trên kho văn bản (F4.2): vai trò nghiệp vụ; quản trị đơn vị không đọc văn bản nên không hỏi được
   if (role === 'clerk' || role === 'staff' || role === 'manager' || role === 'director') items.push({ to: '/hoi-dap', label: t('nav.ask'), icon: 'M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z' })
@@ -66,22 +164,34 @@ const nav = computed(() => {
   // Tự chẩn đoán H-P-D-I: lãnh đạo đơn vị trả lời, lưu, xem bằng chứng đo được; lãnh đạo phòng trả lời, không lưu
   if (role === 'director' || role === 'manager') items.push({ to: '/tu-chan-doan', label: t('nav.selfCheck'), icon: 'M12 3l8.5 6.2-3.2 10H6.7L3.5 9.2 12 3zm0 5l4 2.9-1.5 4.6h-5L8 10.9 12 8z' })
   if (role === 'director' || role === 'tenant_admin') items.push({ to: '/so-kiem-toan', label: t('nav.audit'), icon: 'M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3zm-3 9l2 2 4-4' })
+  // Danh mục ứng dụng trên lõi: mọi vai trò xem để mở; lãnh đạo, quản trị đơn vị thấy thêm băm manifest, ứng dụng đã gỡ
+  if (role) {
+    items.push({ to: '/ung-dung', label: t('apps.nav'),
+                 icon: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z' })
+  }
   // Góp ý (F4.6): mọi vai trò gửi được; trang xem lại góp ý của mình, lãnh đạo, quản trị đơn vị xem thêm tổng hợp
   if (role) items.push({ to: '/gop-y', label: t('nav.feedback'), icon: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9L12 3z' })
   return items
 })
 
+// Mục đang mở: đúng đường dẫn, hoặc trang con của nó (/ho-so/… thuộc Hồ sơ công việc) trừ khi trang con đã có mục
+// riêng (/van-ban-den/tiep-nhan)
 function active(to: string) {
+  if (to === '/') return route.path === '/'
   return route.path === to
+    || (route.path.startsWith(`${to}/`) && !nav.value.some((item) => item.to !== to && route.path === item.to))
 }
 
 function toggleLocale() {
   locale.value = locale.value === 'vi' ? 'en' : 'vi'
   try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
-  document.documentElement.lang = locale.value
 }
 
-watch(() => route.fullPath, () => { open.value = false })
+// Chọn xong một trang thì đóng ngăn kéo và thu thanh bên lại, để thanh bên không nằm đè lên nội dung vừa mở
+watch(() => route.fullPath, () => {
+  open.value = false
+  hovering.value = false
+})
 
 // Thông báo (F2.5): một kết nối realtime cho cả phiên làm việc; mỗi lần (nối lại) kết nối thì tải lại danh sách,
 // vì tin đẩy lúc mất kết nối không được gửi lại
@@ -112,62 +222,112 @@ async function logout() {
 </script>
 
 <template>
-  <div class="min-h-screen md:flex">
-    <!-- thanh bên -->
-    <aside
-      class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-stone-200 bg-white transition md:static md:translate-x-0"
-      :class="{ 'translate-x-0': open }"
+  <div class="sg-shell" :class="{ 'is-collapsed': collapsed, 'is-mobile-open': open }">
+    <a
+      href="#main-content"
+      class="btn-primary sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"
     >
-      <div class="flex h-16 items-center gap-3 border-b border-stone-200 px-5">
-        <img src="/favicon.svg" alt="" class="h-8 w-8">
-        <div>
-          <div class="text-lg leading-none font-semibold text-brand-800">{{ t('app.name') }}</div>
-          <div class="text-xs text-stone-500">{{ t('app.tagline') }}</div>
-        </div>
+      {{ t('fe.skip') }}
+    </a>
+    <aside
+      id="app-navigation" class="sg-sidebar" :aria-label="t('fe.navigation')"
+      :inert="mobile && !open ? true : undefined"
+      @pointermove="moveInNavigation" @pointerleave="leaveNavigation" @click="pickInNavigation"
+      @focusin="focusNavigation" @focusout="blurNavigation"
+    >
+      <div class="sg-brand-row">
+        <NuxtLink to="/" class="sg-wordmark" :aria-label="t('app.name')">
+          <svg
+            class="sg-brand-mark" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="9"
+            stroke-linecap="round" aria-hidden="true"
+          >
+            <path d="M45 10H26c-9 0-16 7-16 16s7 16 16 16h12" />
+            <path d="M19 54h19c9 0 16-7 16-16s-7-16-16-16H26" />
+          </svg>
+          <span class="sg-brand-full">Signet</span>
+        </NuxtLink>
+        <button class="btn-ghost sg-close-menu" :aria-label="t('shell.closeNav')" @click="open = false">
+          <svg
+            width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+            aria-hidden="true"
+          >
+            <path d="m6 6 12 12M6 18 18 6" />
+          </svg>
+        </button>
       </div>
-      <nav class="space-y-1 p-3">
+      <nav class="sg-nav" :aria-label="t('fe.navigation')">
         <NuxtLink
-          v-for="item in nav" :key="item.to" :to="item.to"
-          class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium"
-          :class="active(item.to) ? 'bg-brand-50 text-brand-800' : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'"
+          v-for="item in nav" :key="item.to" :to="item.to" class="sg-nav-link" :class="{ 'is-active': active(item.to) }"
+          :aria-label="item.label" :title="collapsed ? item.label : undefined"
+          :aria-current="active(item.to) ? 'page' : undefined"
         >
-          <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <svg
+            width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+            aria-hidden="true"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
           </svg>
-          {{ item.label }}
+          <span class="sg-nav-label">{{ item.label }}</span>
         </NuxtLink>
       </nav>
-      <div class="absolute inset-x-0 bottom-0 border-t border-stone-200 p-4 text-xs text-stone-500">
-        {{ tenantName }}
-        <NuxtLink to="/trang-thai" class="mt-1 block text-stone-400 hover:text-brand-700 hover:underline">
-          {{ t('health.title') }}
-        </NuxtLink>
+      <div class="sg-sidebar-bottom">
+        <div class="sg-account">
+          <span class="sg-avatar" data-testid="avatar-initial" aria-hidden="true">
+            {{ initialOf(claims?.givenName ?? '', claims?.name ?? '') }}
+          </span>
+          <div class="sg-account-name sg-nav-label">
+            <strong>{{ claims?.name }}</strong>
+            <small>{{ claims?.role ? t(`role.${claims.role}`) : t('error.noRole') }}</small>
+          </div>
+          <button class="btn-ghost sg-logout" :aria-label="t('nav.logout')" :title="t('nav.logout')" @click="logout">
+            <svg
+              width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path d="M9 4H4v16h5m6-4l4-4-4-4m-7 4h11" />
+            </svg>
+          </button>
+        </div>
       </div>
     </aside>
-    <div v-if="open" class="fixed inset-0 z-30 bg-black/30 md:hidden" @click="open = false" />
+    <Transition name="sg-scrim">
+      <button v-if="open" class="sg-scrim" :aria-label="t('shell.closeNav')" tabindex="-1" @click="open = false" />
+    </Transition>
 
-    <div class="flex min-w-0 flex-1 flex-col">
-      <!-- thanh trên -->
-      <header class="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-stone-200 bg-white/90 px-4 backdrop-blur md:px-8">
-        <button class="btn-ghost md:hidden" :aria-label="t('nav.inbox')" @click="open = !open">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
-        </button>
-        <div class="flex-1" />
-        <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>
-        <FeedbackButton v-if="claims?.role" />
-        <NotificationBell v-if="claims?.role && claims.role !== 'tenant_admin'" />
-        <div v-if="claims" class="hidden text-right sm:block">
-          <div class="text-sm font-medium text-stone-900">{{ claims.name }}</div>
-          <div class="text-xs text-stone-500">{{ claims.role ? t(`role.${claims.role}`) : t('error.noRole') }}</div>
+    <div class="sg-workspace" :inert="mobile && open ? true : undefined">
+      <header class="sg-topbar">
+        <div class="sg-topbar-context">
+          <button
+            ref="menuButton" class="btn-secondary sg-mobile-menu" :aria-label="t('fe.menu')"
+            aria-controls="app-navigation" :aria-expanded="open" @click="open = !open"
+          >
+            <svg
+              width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <span>{{ tenantName || t('fe.organization') }}</span>
         </div>
-        <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800" aria-hidden="true" data-testid="avatar-initial">
-          {{ initialOf(claims?.givenName ?? '', claims?.name ?? '') }}
+        <div class="sg-topbar-tools">
+          <time :datetime="calendarDay">{{ dateLabel }}</time>
+          <FeedbackButton v-if="claims?.role" />
+          <NotificationBell v-if="claims?.role && claims.role !== 'tenant_admin'" />
+          <button class="btn-ghost sg-language" :aria-label="t('nav.language')" @click="toggleLocale">
+            {{ locale === 'vi' ? 'EN' : 'VI' }}
+          </button>
         </div>
-        <button class="btn-secondary" @click="logout">{{ t('nav.logout') }}</button>
       </header>
-      <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8 md:py-8">
+      <main id="main-content" class="moc-sheet">
         <slot />
       </main>
+      <footer class="moc-shell-footer">
+        <span>Signet <span aria-hidden="true">/</span> {{ t('app.tagline') }}</span>
+        <NuxtLink to="/xac-thuc" class="moc-footer-verify">{{ t('fe.verify') }}</NuxtLink>
+        <NuxtLink to="/trang-thai">{{ t('health.title') }}</NuxtLink>
+        <span>{{ t('fe.localData') }}</span>
+      </footer>
     </div>
   </div>
 </template>

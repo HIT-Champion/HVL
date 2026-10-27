@@ -27,6 +27,7 @@ from urllib.parse import urlsplit
 
 from .channels import KINDS, SMTP_PORTS, WEBHOOK_FORMATS
 from .sla import parse_duration
+from .suggest import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, parse_holidays
 
 REQUIRED = (
     "HASURA_ADMIN_SECRET",
@@ -65,12 +66,18 @@ class Settings:
     directory_sync_interval_s: float
     reconcile_interval_s: float
     sla_poll_interval_s: float
+    # Văn phòng điện tử (office/api.py), ứng dụng đầu tiên chạy chung tiến trình: false thì không gắn route
+    # /actions/{name}, /ot/notify/{tenant}, không triển khai BPMN văn bản, không chạy vòng định kỳ nào của nó; phần
+    # chung (danh bạ, kênh thông báo, /healthz, /readyz) vẫn chạy (docs/architecture.md §4.7)
+    office_enabled: bool = True
     # F3.10 IT/OT: context broker NGSI-LD (Scorpio, profile iot); để trống thì tắt. Ngưỡng nhiệt độ (°C) dựng báo cáo
-    # sự cố; địa chỉ broker gọi lại svc-workflow; chu kỳ kiểm subscription của các đơn vị
+    # sự cố; địa chỉ broker gọi lại svc-workflow; chu kỳ kiểm subscription của các đơn vị; số phút không có số đo thì
+    # sơ đồ cảm biến gắn cờ mất tín hiệu
     ngsi_url: str = ""
     ot_threshold: float = 35.0
     ot_notify_url: str = "http://svc-workflow:8000"
     ot_interval_s: float = 15.0
+    ot_stale_min: int = 10
     # F3.12 liên thông: chu kỳ vòng nền chuyển dòng chờ đến hạn và báo dòng đã chuyển mà chưa báo — ngắn hơn
     # MOC_RECONCILE_INTERVAL_S để lần thử lại (30 giây, 1 phút, 2 phút…) đúng hẹn
     dispatch_interval_s: float = 30.0
@@ -82,6 +89,8 @@ class Settings:
     suggest_timeout_s: float = 10.0
     suggest_min_score: float = 0.3
     assigner_id: str = "moc-assigner"
+    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (MOC_HOLIDAYS, cú pháp ở suggest.parse_holidays)
+    holidays: Holidays = NO_HOLIDAYS
     # Định tuyến thông báo đa kênh (channels.py): ngoài chuông trên web, gửi thêm qua email (SMTP) và webhook. Trống máy
     # chủ thư và URL webhook thì tắt, như trước. Cổng 0: theo kiểu TLS (587 starttls, 465 ssl, 25 none). Loại thông báo
     # trống: mọi loại. Mật khẩu SMTP và URL webhook (khóa nằm trong đường dẫn) là bí mật, lấy từ két như các bí mật
@@ -105,6 +114,11 @@ class Settings:
         if missing:
             raise ConfigError("Thiếu biến môi trường: " + ", ".join(missing))
         try:
+            # để trống thì như không đặt, giống docker-compose.yml (${MOC_HOLIDAYS:-…})
+            holidays = parse_holidays(env.get("MOC_HOLIDAYS", "").strip() or LEGAL_HOLIDAYS)
+        except ValueError as exc:
+            raise ConfigError(f"MOC_HOLIDAYS: {exc}") from exc
+        try:
             return cls(
                 hasura_url=env.get("HASURA_URL", "http://hasura:8080").rstrip("/"),
                 hasura_admin_secret=env["HASURA_ADMIN_SECRET"],
@@ -126,16 +140,19 @@ class Settings:
                 directory_sync_interval_s=float(env.get("MOC_DIRECTORY_SYNC_INTERVAL_S", "15")),
                 reconcile_interval_s=float(env.get("MOC_RECONCILE_INTERVAL_S", "300")),
                 sla_poll_interval_s=float(env.get("MOC_SLA_POLL_INTERVAL_S", "5")),
+                office_enabled=_flag("MOC_OFFICE_ENABLED", env.get("MOC_OFFICE_ENABLED", "true")),
                 ngsi_url=env.get("MOC_NGSI_URL", "").rstrip("/"),
                 ot_threshold=float(env.get("MOC_OT_THRESHOLD", "35")),
                 ot_notify_url=env.get("MOC_OT_NOTIFY_URL", "http://svc-workflow:8000").rstrip("/"),
                 ot_interval_s=float(env.get("MOC_OT_SUBSCRIPTION_INTERVAL_S", "15")),
+                ot_stale_min=int(env.get("MOC_OT_STALE_MIN", "10")),
                 dispatch_interval_s=float(env.get("MOC_DISPATCH_INTERVAL_S", "30")),
                 suggest_enabled=_flag("MOC_SUGGEST_ENABLED", env.get("MOC_SUGGEST_ENABLED", "true")),
                 suggest_poll_interval_s=float(env.get("MOC_SUGGEST_POLL_INTERVAL_S", "2")),
                 suggest_timeout_s=float(env.get("MOC_SUGGEST_TIMEOUT_S", "10")),
                 suggest_min_score=float(env.get("MOC_SUGGEST_MIN_SCORE", "0.3")),
                 assigner_id=env.get("MOC_ASSIGNER_ID", "moc-assigner").strip(),
+                holidays=holidays,
                 smtp_host=env.get("MOC_SMTP_HOST", "").strip(),
                 smtp_port=int(env.get("MOC_SMTP_PORT", "").strip() or 0),
                 smtp_tls=env.get("MOC_SMTP_TLS", "").strip().lower() or "starttls",
@@ -160,6 +177,8 @@ class Settings:
             raise ConfigError(f"MOC_SLA_DURATION: {exc}") from exc
         if not math.isfinite(self.ot_threshold):
             raise ConfigError("MOC_OT_THRESHOLD phải là một số (°C)")
+        if not 1 <= self.ot_stale_min <= 1440:
+            raise ConfigError("MOC_OT_STALE_MIN phải là số phút nguyên từ 1 đến 1440")
         if not (math.isfinite(self.suggest_poll_interval_s) and self.suggest_poll_interval_s >= 0):
             raise ConfigError("MOC_SUGGEST_POLL_INTERVAL_S phải ≥ 0 (0: không nhận việc gợi ý giao việc)")
         # cả một việc gợi ý ≤ hạn gọi svc-files + 10 giây, phải xong trước khi khóa việc (PT1M) hết

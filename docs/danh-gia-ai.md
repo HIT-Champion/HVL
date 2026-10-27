@@ -16,14 +16,15 @@ Ba nguyên tắc chung:
   Internet. Không bật profile `ai` (mặc định, cả CI) thì cả bốn phần vẫn chạy bằng quy tắc, OCR và tìm kiếm toàn văn;
   cột "không bật `ai`" trong các bảng dưới đây là đường đó.
 - **Số đo là cổng CI.** Mỗi lệnh `make do-…` thoát 1 khi dưới ngưỡng hoặc khi có rò rỉ (nguồn bị cấm, căn cứ là văn
-  bản hạn chế, che nhầm). `do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec` là bước của job CI dựng toàn hệ thống
-  (`.github/workflows/ci.yml`, không bật `ai`); `do-che-pii` chạy trong `make test`.
+  bản hạn chế, che nhầm). `do-doc-van-ban`, `do-hoi-dap`, `do-giao-viec` là bước của CI job `chay-thu`, phần `ai`
+  (`.github/workflows/ci.yml`; phần này mang tên nhóm tác tử AI, CI không bật profile `ai`); `do-che-pii` chạy trong
+  `make test`.
 
 ## Tóm tắt
 
 | Mã | Tác tử (danh tính) · mã nguồn | Mô hình, công cụ | Không bật `ai` | Đo lại | Kết quả chính |
 |---|---|---|---|---|---|
-| F4.1 | `moc-doc-reader` · `services/svc-files/src/svc_files/docread/` | Quy tắc thể thức NĐ 30, pypdf, Tesseract `vie`; Qwen3-1.7B chỉ viết trích yếu | Đủ sáu ô, trích yếu theo quy tắc | `make do-doc-van-ban` | 22 văn bản mẫu: số ký hiệu đúng 20/22, ngày ban hành 22/22, 0 ô "chắc chắn" sai (22/10/2026) |
+| F4.1 | `moc-doc-reader` · `services/svc-files/src/svc_files/docread/` | Quy tắc thể thức NĐ 30, pypdf, Tesseract `vie`; Qwen3-1.7B chỉ viết trích yếu | Đủ sáu ô, trích yếu theo quy tắc | `make do-doc-van-ban` | 22 văn bản mẫu: số ký hiệu đúng 20/22, ngày ban hành 22/22, 0 ô "chắc chắn" sai (22/10/2026; trùng ở 3 lần chạy CI ngày 26/10/2026) |
 | F4.2 | `moc-assistant` · `services/svc-files/src/svc_files/assist/` | Meilisearch tìm lai, Qwen3-Embedding-0.6B, Qwen3-1.7B | Tìm từ khóa, trả câu trích nguyên văn | `make do-hoi-dap` | 19 câu: recall@3 16/16, từ chối đúng 3/3, 0 nguồn bị cấm; câu trả lời của mô hình qua kiểm 16/16 (23/10/2026, bản online) |
 | F4.3 | `moc-assigner` · `services/svc-workflow/src/svc_workflow/advisor.py`, `suggest.py` | Bỏ phiếu kNN có trọng số trên phần truy xuất của F4.2; **không** mô hình sinh | Chạy đủ (tìm từ khóa) | `make do-giao-viec` | 29 văn bản lịch sử, bỏ một ra: top-1 29/29 (gốc so sánh 55 %), 0 căn cứ là văn bản hạn chế (22/10/2026) |
 | F4.4 | Bộ lọc, không phải tác tử · `services/svc-files/src/svc_files/pii.py` | Nhận dạng theo cấu trúc bằng `re`, chỉ thư viện chuẩn Python | Luôn bật | `make do-che-pii` | 81 063 ký tự kho mẫu: 0 chỗ che nhầm; 15/15 đột biến mã bị test bắt (23/10/2026) |
@@ -64,6 +65,11 @@ không dùng".
     8 lõi và 6 GB (`MOC_AI_CPUS=8`, `MOC_AI_MEM_LIMIT`), mô hình `qwen3:1.7b` + `qwen3-embedding:0.6b`.
 - **Nguồn** ghi ở từng bảng: README dịch vụ, `CHANGELOG.md`, hoặc nhật ký của lần chạy (nhật ký không nằm trong repo —
   chạy lại đúng lệnh ghi kèm là ra bảng cùng dạng).
+- **Số của CI.** Ba lần chạy xanh trên `develop` ngày 26/10/2026, CI job `chay-thu`, phần `ai`, máy chạy
+  `ubuntu-24.04` của GitHub (không phải máy A, B), **không bật mô hình ngôn ngữ** (không có cả mô hình nhúng): run
+  40273958769 tại `034fcf0`, 40275440368 tại `1799525`, 40277791744 tại `9498628`. Số trùng nhau ở cả ba lần thì ghi
+  "ổn định qua 3 lần", khác nhau thì ghi khoảng. Nhật ký CI bị xóa sau 90 ngày (khoảng 24/01/2027) nên số được chép vào
+  đây; đo lại thì xem các bước `make do-…` của phần `ai` trên một lần chạy `develop` mới.
 - Phân vị (p50, p95) lấy theo hạng gần nhất trên các lượt của lần đo (`percentile` trong `scripts/demo.py`).
 - Đường dẫn rút gọn trong các mục dưới: `docread/…`, `assist/…`, `pii.py`, `config.py` nằm trong
   `services/svc-files/src/svc_files/`; `advisor.py`, `suggest.py` nằm trong `services/svc-workflow/src/svc_workflow/`;
@@ -77,7 +83,7 @@ cậy. Văn thư đối chiếu bản gốc, sửa, rồi tự lưu. Chi tiết:
 [README svc-files](../services/svc-files/README.md#đọc-văn-bản-đến-f41).
 
 **Mô hình, công cụ.** pypdf đọc lớp chữ giữ bố cục; ảnh và PDF scan qua Tesseract (`-l vie --oem 1 --psm 3`). Quy tắc
-tự viết theo thể thức NĐ 30 (`docread/rules.py`, `docread/layout.py`) quyết **mọi** trường. Qwen3-1.7B chỉ viết trích
+tự viết theo thể thức NĐ 30 (`docread/rules.py`, `layout.py`) quyết **mọi** trường. Qwen3-1.7B chỉ viết trích
 yếu, chỉ khi quy tắc không ra trích yếu tin cậy cao (`MOC_AI_SUMMARY=fallback`, mặc định).
 
 **Dữ liệu đánh giá.** `seed/van-ban-den/`: 22 văn bản hư cấu (cơ quan có chữ "Mẫu", người ký "Nguyễn Văn A", chân trang
@@ -119,6 +125,9 @@ stack, 22/10/2026, máy A, không bật `ai`. Mỗi ô: đúng / sai / trống; 
 - Thời gian một lần đọc (22/10, không mô hình): PDF có chữ trung bình 0,6 giây, lâu nhất 0,7 giây; ảnh / bản scan
   trung bình 1,3 giây, lâu nhất 1,9 giây. Có mô hình (21/10, 14 mẫu đầu, `qwen3:1.7b` trên CPU, mô hình đã nạp): PDF có
   chữ kèm trích yếu của mô hình 4,1 giây, ảnh scan kèm trích yếu 6,6 giây.
+- Ba lần chạy CI ngày 26/10 (mục "Cách đọc số đo"): mọi ô của bảng trên trùng ở cả ba lần và trùng lần đo 22/10, ổn
+  định qua 3 lần. Thời gian trung bình một lần đọc trên máy CI: PDF có chữ 0,5–0,6 giây (svc-files tự đo 452–597 ms),
+  ảnh / bản scan 1,1–1,5 giây (1 065–1 482 ms).
 
 **Chưa đo.** Chất lượng trích yếu do mô hình viết trên cả 22 mẫu (lần đo 22/10 không bật `ai`; bảng của
 `do-doc-van-ban` chưa tách trích yếu theo nguồn quy tắc / mô hình — cách đo: bật `ai`, chạy lại, đọc trường
@@ -127,7 +136,8 @@ nguyên khi lưu). So sánh PaddleOCR / VietOCR và dữ liệu `tessdata_best`.
 
 **Giới hạn.** OCR sai dấu, thừa ký tự (`131/ĐT1-ĐHM`, `07/CĐÐ-UBND`, "Cõ phần"); cơ quan ban hành của văn bản liên tịch
 hay có tên riêng đặt cạnh dòng chủ quản dễ sai; tên loại ngoài danh mục ("KẾ HOẠCH LIÊN TỊCH") thì không có loại, không
-có trích yếu theo quy tắc. Bản scan chưa được OCR cho tìm kiếm toàn văn (F2.7 chỉ đọc lớp chữ).
+có trích yếu theo quy tắc. Bản scan (PDF không có lớp chữ) vào tìm kiếm toàn văn F2.7 và đoạn hỏi đáp F4.2 chỉ bằng
+chữ OCR của `MOC_TEXT_OCR_PAGES` trang đầu (mặc định 3), có thể sai chữ, sai dấu (#253).
 
 **Cơ chế an toàn.**
 
@@ -145,7 +155,7 @@ có trích yếu theo quy tắc. Bản scan chưa được OCR cho tìm kiếm t
   yếu theo quy tắc (`docread/summarize.py`; test `tests/test_docread_summarize.py`).
 - *Tiến trình con có giới hạn:* đọc PDF, OCR chạy trong tiến trình con `python -I` có `RLIMIT_AS`, `RLIMIT_CPU`, quá
   giờ thì bị giết (OCR giết cả nhóm, tesseract không chạy mồ côi); Pillow có trần điểm ảnh; tesseract không thấy bí mật
-  của dịch vụ (`docread/ocr.py`, `docread/pdflayout.py`).
+  của dịch vụ (`ocr.py`, `pdflayout.py` của `svc-files`).
 - *Danh tính, sổ kiểm toán:* mỗi lần đọc một dòng `intake.suggested` bằng vai trò Hasura `agent`, danh tính
   `moc-doc-reader` ép từ preset; dòng sổ chỉ có siêu dữ liệu (cách đọc, số trang, tên trường tìm thấy, mô hình, thời
   gian), không chữ của văn bản; không ghi được sổ thì không trả gợi ý (`docread/store.py`, `docread/reader.py`).
@@ -160,7 +170,9 @@ n"; bật `ai` thì thêm câu trả lời ngắn do mô hình viết, có tríc
 [README svc-files](../services/svc-files/README.md#hỏi-đáp-trên-kho-văn-bản-f42).
 
 **Mô hình, công cụ.** Chỉ mục đoạn `chunks` trên Meilisearch (đoạn ≤ 1 200 ký tự, không vượt trang); tìm lai từ khóa +
-véc-tơ khi có Qwen3-Embedding-0.6B (tỷ trọng nghĩa 0,5, ngưỡng điểm 0,75), chỉ từ khóa kèm lượt tìm nới khi không có.
+véc-tơ khi có Qwen3-Embedding-0.6B (tỷ trọng nghĩa 0,5 — 0,2 khi câu hỏi có số ký hiệu, ngày hay cụm trong ngoặc kép;
+ngưỡng điểm 0,75), chỉ từ khóa kèm lượt tìm nới khi không có. Không câu nào trong 19 câu đánh giá dưới đây có các dấu
+hiệu đó, nên số đo không đổi khi thêm quy tắc này.
 Chế độ `extract` tất định, không cần mô hình; chế độ `generate` dùng Qwen3-1.7B viết câu trả lời từ tối đa 4 đoạn đã
 hậu kiểm. Đường ống tự viết trong `assist/` (không LlamaIndex, QĐ-004).
 
@@ -192,17 +204,22 @@ bất kỳ nguồn bị cấm nào, hoặc recall@3 dưới 80 %.
 
 **Kết quả.**
 
-| | 21/10/2026 · máy A · không bật `ai` | 21/10/2026 · máy A · bật `ai` | 23/10/2026 · máy B (bản online) · bật `ai` |
-|---|---|---|---|
-| Nguồn | README svc-files | README svc-files | nhật ký `python3 scripts/demo.py do-hoi-dap`, 191 giây |
-| recall@3 (câu dương) | 16 / 16 | 16 / 16 | 16 / 16 (cả 16 nguồn đúng đứng đầu) |
-| Câu trích có từ khóa của đáp án | 15 / 16 | 15 / 16 | 15 / 16 |
-| Từ chối đúng | 3 / 3 (2 `no_evidence`, 1 `passages_only`) | 3 / 3 (`no_evidence`) | 3 / 3 (`no_evidence`) |
-| Lượt có nguồn bị cấm | 0 | 0 | 0 |
-| Lượt tìm theo nghĩa | — | — | 19 / 19 |
-| `extract` p50 / p95 | 20 / 61 ms | 0,44 / 0,70 s (gồm nhúng câu hỏi) | 0,4 / 0,5 s phía người gọi; svc-files tự đo 191 / 306 ms |
-| Câu của mô hình: qua kiểm · có từ khóa · trích đúng nguồn | — | 16 / 16 · 16 / 16 · 16 / 16 | 16 / 16 · 16 / 16 · 16 / 16 |
-| `generate` p50 / p95 | — | 14,3 / 23,5 s | 8,9 / 21,1 s |
+| | 21/10/2026 · máy A · không bật `ai` | 21/10/2026 · máy A · bật `ai` | 23/10/2026 · máy B (bản online) · bật `ai` | 26/10/2026 · CI, 3 lần · không bật `ai` |
+|---|---|---|---|---|
+| Nguồn | README svc-files | README svc-files | nhật ký `python3 scripts/demo.py do-hoi-dap`, 191 giây | bước `make do-hoi-dap` của 3 run ở mục "Cách đọc số đo" |
+| recall@3 (câu dương) | 16 / 16 | 16 / 16 | 16 / 16 (cả 16 nguồn đúng đứng đầu) | 16 / 16 |
+| Câu trích có từ khóa của đáp án | 15 / 16 | 15 / 16 | 15 / 16 | 15 / 16 |
+| Từ chối đúng | 3 / 3 (2 `no_evidence`, 1 `passages_only`) | 3 / 3 (`no_evidence`) | 3 / 3 (`no_evidence`) | 3 / 3 (1 `no_evidence`, 2 `passages_only`) |
+| Lượt có nguồn bị cấm | 0 | 0 | 0 | 0 |
+| Lượt tìm theo nghĩa | — | — | 19 / 19 | 0 / 19 |
+| `extract` p50 / p95 | 20 / 61 ms | 0,44 / 0,70 s (gồm nhúng câu hỏi) | 0,4 / 0,5 s phía người gọi; svc-files tự đo 191 / 306 ms | svc-files tự đo 16–25 / 54–66 ms |
+| Câu của mô hình: qua kiểm · có từ khóa · trích đúng nguồn | — | 16 / 16 · 16 / 16 · 16 / 16 | 16 / 16 · 16 / 16 · 16 / 16 | — |
+| `generate` p50 / p95 | — | 14,3 / 23,5 s | 8,9 / 21,1 s | — |
+
+- Cột CI chỉ đo phần tìm và trích câu (`extract`, câu trả lời là câu trích nguyên văn), **không đo câu trả lời của mô
+  hình**, nên không cùng điều kiện với hai cột bật `ai`. Mọi số trừ độ trễ trùng nhau ở cả ba lần, ổn định qua 3 lần.
+  So với cột 21/10 không bật `ai`, tổng từ chối đúng vẫn 3 / 3 nhưng chia khác (1 `no_evidence` + 2 `passages_only`
+  thay vì 2 + 1): chưa rõ nguyên nhân.
 
 - Lần đo 23/10 chạy trên chính máy B, gọi qua địa chỉ công khai của bản online (`MOC_PUBLIC_URL`), nên thời gian phía
   người gọi gồm cả đường mạng; trước khi đo, chờ svc-files nhúng xong các đoạn tồn (`embed_pending` = 0) để việc nhúng
@@ -221,7 +238,8 @@ liệu thật câu hỏi không được lưu; tỉ lệ `no_evidence`, `model_r
 
 **Giới hạn.** Ngưỡng và hằng số kiểm chỉnh trên kho mẫu nhỏ; kiểm theo từ không bắt được câu sai mà dùng đúng chữ của
 nguồn, và có thể loại oan câu có từ đệm; tìm từ khóa không hiểu từ đồng nghĩa (bật tìm theo nghĩa thì có); Meilisearch
-chỉ xét 10 từ đầu câu tìm; bản scan chỉ có đoạn "trích yếu". Danh sách đủ ở README svc-files.
+chỉ xét 10 từ đầu câu tìm; bản scan chỉ có chữ OCR của 3 trang đầu, OCR không ra chữ thì chỉ có đoạn "trích yếu".
+Danh sách đủ ở README svc-files.
 
 **Cơ chế an toàn.**
 
@@ -254,7 +272,8 @@ sửa hay bỏ gợi ý. Chi tiết: [README svc-workflow](../services/svc-workf
 [README svc-files](../services/svc-files/README.md#văn-bản-tương-tự-cho-tác-tử-gợi-ý-giao-việc-f43).
 
 **Mô hình, công cụ.** **Không mô hình sinh nào chọn đơn vị** (QĐ-005): bỏ phiếu kNN có trọng số trên tối đa 5 căn cứ,
-hạn là trung vị số ngày của các căn cứ ủng hộ (`suggest.py`, thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
+hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` (`suggest.py`,
+thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
 phần truy xuất của F4.2 qua route nội bộ `POST /internal/similar-documents` (`assist/similar.py`): câu tìm từ trích yếu,
 tìm từ khóa kèm lượt tìm nới; có Qwen3-Embedding thì tìm lai, tối đa 3 giây. Flowable chạy nhánh song song và timer.
 
@@ -271,26 +290,33 @@ mồi) hoặc top-1 dưới 60 % (`none`, `failed` tính là sai).
 
 **Kết quả.**
 
-| | `CHANGELOG.md` mục [1.0.0] | Lần chạy trình tự job CI, 22/10/2026, máy A, không bật `ai` |
-|---|---|---|
-| top-1 | 29 / 29 | 29 / 29 |
-| Gốc so sánh "luôn đoán đơn vị đông nhất" | 55 % | 55 % |
-| Độ phủ (có gợi ý) | — | 29 / 29 |
-| Đúng theo độ tin cậy: cao · vừa · thấp | — | 28 / 28 · 1 / 1 · 0 / 0 |
-| Sai số hạn trung bình tuyệt đối · lệch ≤ 1 ngày | 1,1 ngày · — | 1,3 ngày · 20 / 29 |
-| Một lần gợi ý (svc-files + bỏ phiếu) p50 / p95 | 71 ms / — | 73 / 83 ms |
-| Vào sổ → có dòng gợi ý, trên dòng thật, p50 / p95 | — | 1,0 / 2,7 s (25 văn bản) |
-| Lượt tìm theo nghĩa | — | 0 / 29 |
-| Căn cứ là văn bản hạn chế | — | 0 |
+| | `CHANGELOG.md` mục [1.0.0] | Lần chạy trình tự job CI, 22/10/2026, máy A, không bật `ai` | 26/10/2026 · CI, 3 lần · không bật `ai` |
+|---|---|---|---|
+| top-1 | 29 / 29 | 29 / 29 | 29 / 29 |
+| Gốc so sánh "luôn đoán đơn vị đông nhất" | 55 % | 55 % | 55 % |
+| Độ phủ (có gợi ý) | — | 29 / 29 | 29 / 29 |
+| Đúng theo độ tin cậy: cao · vừa · thấp | — | 28 / 28 · 1 / 1 · 0 / 0 | 29 / 29 · 0 / 0 · 0 / 0 |
+| Sai số hạn trung bình tuyệt đối · lệch ≤ 1 ngày | 1,1 ngày · — | 1,3 ngày · 20 / 29 | 0,9 ngày · 23 / 29 |
+| Một lần gợi ý (svc-files + bỏ phiếu) p50 / p95 | 71 ms / — | 73 / 83 ms | 65–72 / 73–87 ms |
+| Vào sổ → có dòng gợi ý, trên dòng thật, p50 / p95 | — | 1,0 / 2,7 s (25 văn bản) | 1,0–1,3 / 2,5–3,2 s (16–18 văn bản) |
+| Lượt tìm theo nghĩa | — | 0 / 29 | 0 / 29 |
+| Căn cứ là văn bản hạn chế | — | 0 | 0 |
 
 `CHANGELOG.md` không ghi ngày và máy của lần đo; cột thứ hai là nhật ký của lần chạy ngày 22/10 (không nằm trong repo).
+Cột thứ ba là bước `make do-giao-viec` của 3 run ở mục "Cách đọc số đo": mọi số trừ độ trễ và số văn bản của dòng thật
+trùng nhau ở cả ba lần, ổn định qua 3 lần. So với lần 22/10, sai số hạn giảm từ 1,3 xuống 0,9 ngày, lệch ≤ 1 ngày tăng
+từ 20 lên 23 / 29, cả 29 gợi ý mang độ tin cậy cao: **chưa rõ nguyên nhân**. Mã bỏ phiếu (`suggest.py`, `advisor.py`)
+không đổi logic từ 22/10; phần tìm của svc-files (`assist/`) và dữ liệu `make seed` có commit đổi giữa hai lần, chưa
+đối từng commit.
+
 top-2, top-3 vô nghĩa khi chỉ có hai đơn vị hợp lệ. Dữ liệu chia cụm gọn và chỉ hai đơn vị, nên top-1 cao hơn thực tế:
 đọc cùng gốc so sánh 55 %.
 
 **Chưa đo.** Với tìm theo nghĩa (bật `ai`: 0/29 lượt ở trên là tìm từ khóa); trên nhiều đơn vị hơn; trên dữ liệu thật —
 view `office.v_assignment_suggestion_accuracy` (tỉ lệ lãnh đạo giữ đơn vị, giữ hạn, sai số hạn).
 
-**Giới hạn.** Chưa xét ngày lễ (chỉ tránh thứ Bảy, Chủ nhật); chỉ gợi ý đơn vị và hạn, không gợi ý người xử lý; chỉ mục
+**Giới hạn.** Ngày lễ mặc định chỉ có lễ dương lịch cố định; Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù do người vận hành thêm
+vào `MOC_HOLIDAYS` mỗi năm (#280); chỉ gợi ý đơn vị và hạn, không gợi ý người xử lý; chỉ mục
 đoạn đồng bộ vài giây một lần nên văn bản vừa giao chưa làm căn cứ ngay; trích yếu quá ngắn hay chỉ có từ chung thì ít
 kết quả đúng; ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt trên dữ liệu mẫu.
 

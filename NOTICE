@@ -29,4 +29,13 @@ THÀNH PHẦN THỨ BA
 -----------------
 Signet điều phối (orchestrate) các phần mềm nguồn mở thượng nguồn ở dạng NGUYÊN
 BẢN, không sao chép và không chỉnh sửa mã nguồn của chúng vào kho này. Danh sách
-đầy đủ kèm giấy phép tương ứng: xem DEPENDENCIES.md.
+đầy đủ kèm phiên bản, giấy phép và trang chủ: xem COPYRIGHT.txt; lý do chọn từng
+thành phần và chính sách giấy phép: xem DEPENDENCIES.md.
+
+Phông chữ giao diện cũng vậy: kho này không chứa tệp phông nào. Be Vietnam Pro,
+Copyright 2021 The Be Vietnam Pro Project Authors
+(https://github.com/bettergui/BeVietnamPro), phát hành theo SIL Open Font License
+1.1, được lấy đúng như gói npm @fontsource/be-vietnam-pro phát hành (đội không sửa;
+phiên bản ghim trong package-lock.json) lúc dựng image: Văn phòng điện tử, Không
+gian cá nhân và dịch vụ keycloak-fonts (theme đăng nhập) tự phục vụ phông để không
+tải gì từ bên ngoài, mỗi nơi kèm toàn văn giấy phép của gói (OFL.txt).

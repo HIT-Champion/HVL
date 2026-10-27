@@ -22,7 +22,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
-import { LOAI, QUERY_TIN, dong, gio, tenNguoi } from '../public/tin.js'
+import { LOAI, QUERY_TIN, VAI_TRO_XEM, dong, gio, loiTaiTin, tenNguoi, vaiTro } from '../public/tin.js'
 
 const APP = new URL('../', import.meta.url)
 const ROOT = new URL('../../../', import.meta.url)
@@ -69,6 +69,36 @@ test('tên trong token có dấu tiếng Việt, token hỏng thì rỗng', () =
   const part = Buffer.from(JSON.stringify({ name: 'Nguyễn Thị Hà', preferred_username: 'ha' })).toString('base64url')
   assert.equal(tenNguoi(`h.${part}.s`), 'Nguyễn Thị Hà')
   assert.equal(tenNguoi('khong-phai-token'), '')
+})
+
+test('vai trò đọc được bảng tin khớp select_permissions của app.yaml; vai trò lấy từ token', () => {
+  const manifest = read(APP, 'app.yaml')
+  const select = manifest.slice(manifest.indexOf('select_permissions:'), manifest.indexOf('insert_permissions:'))
+  assert.deepEqual([...select.matchAll(/role: (\w+)/g)].map((m) => m[1]).sort(), [...VAI_TRO_XEM].sort())
+  assert.ok(!VAI_TRO_XEM.includes('tenant_admin'))
+  const claims = { 'https://hasura.io/jwt/claims': { 'x-hasura-default-role': 'tenant_admin' } }
+  assert.equal(vaiTro(`h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`), 'tenant_admin')
+  assert.equal(vaiTro('khong-phai-token'), null)
+  for (const c of [null, [], 'chu', 7]) {
+    const token = `h.${Buffer.from(JSON.stringify(c)).toString('base64url')}.s`
+    assert.equal(vaiTro(token), null, JSON.stringify(c))
+    assert.equal(tenNguoi(token), '')
+  }
+  // kiểm vai trò cả lúc mở trang và ở mỗi lần làm mới
+  const app = read(APP, 'public/app.js')
+  assert.match(app, /if \(khongXem\(user\.access_token\)\) return/)
+  assert.match(app, /if \(current && !khongXem\(current\.access_token\)\) draw\(/)
+})
+
+test('lỗi validation-failed của GraphQL thành câu đọc được; lỗi khác giữ nguyên', () => {
+  const error = { message: "field 'bang_tin_tin' not found in type: 'query_root'",
+    extensions: { code: 'validation-failed' } }
+  const text = loiTaiTin({ errors: [error] }, 200)
+  assert.match(text, /không đọc được bảng tin/)
+  assert.doesNotMatch(text, /query_root|bang_tin_tin/)
+  assert.equal(loiTaiTin({ errors: [{ message: 'database query error' }] }, 200), 'database query error')
+  assert.equal(loiTaiTin({}, 503), 'HTTP 503')
+  assert.equal(loiTaiTin(null, 502), 'HTTP 502')
 })
 
 test('trang không có script nội tuyến, đăng nhập dùng client và đường của ứng dụng', () => {

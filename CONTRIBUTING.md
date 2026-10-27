@@ -48,8 +48,8 @@ git remote add upstream https://github.com/HIT-Champion/Signet.git
 git fetch upstream
 git switch -c feat/<số-issue>-<mô-tả-ngắn> upstream/develop   # hoặc fix/, docs/, refactor/, test/
 
-# 4. Cấu hình môi trường
-cp .env.example .env
+# 4. Cấu hình môi trường: sinh .env từ .env.example, mọi change_me thay bằng chuỗi ngẫu nhiên
+make env
 
 # 5. Sửa mã, rồi kiểm tra trước khi commit
 make license-fix      # tự chèn header giấy phép vào tệp mã mới
@@ -62,8 +62,9 @@ git push -u origin feat/<số-issue>-<mô-tả-ngắn>
 ```
 
 Pull request cần **CI xanh** và được **một người duy trì duyệt**, sau đó được gộp vào `develop` bằng
-*Squash and merge*. `main` chỉ nhận bản phát hành do người duy trì gộp từ `develop`. Thành viên đội tạo
-nhánh thẳng trên repo, không cần fork — xem [`docs/git_flow.md`](docs/git_flow.md).
+*Squash and merge*. `main` chỉ nhận bản phát hành do người duy trì gộp từ `develop`, hay từ `hotfix/X.Y.Z` khi
+sửa gấp bản đã phát hành. Thành viên đội tạo nhánh thẳng trên repo, không cần fork — xem
+[`docs/git_flow.md`](docs/git_flow.md).
 
 ## Quy ước commit
 
@@ -71,7 +72,7 @@ Theo [Conventional Commits](https://www.conventionalcommits.org/). Commit, tiêu
 (từ 23/10/2026, commit cũ giữ tiếng Việt — xem [`docs/git_flow.md`](docs/git_flow.md) mục 3.1):
 
 ```
-<loại>(<phạm vi>): <mô tả ngắn, ≤ 72 ký tự>
+<loại>(<phạm vi>): <mô tả ngắn; cả dòng ≤ 72 ký tự>
 
 feat(workflow): add a director approval step above the amount threshold
 fix(files): block files when ClamAV times out instead of storing them
@@ -81,7 +82,7 @@ ci: pin the checkout action version
 
 - **Loại**: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.
 - **Phạm vi** theo thành phần: `gateway`, `auth`, `db`, `workflow`, `files`, `realtime`, `office`,
-  `ca-nhan`, `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
+  `ca-nhan`, `bang-tin`, `ai`, `data`, `ops`, `cli`, `scripts`, `e2e`, `ci`, `deps`, `docs`, `release`.
 - Chân commit ghi `Closes #<số-issue>` để tự đóng issue khi gộp vào `develop`.
 - CI kiểm tiêu đề pull request theo đúng quy ước này, vì khi squash nó thành dòng đầu của commit.
 
@@ -98,12 +99,60 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
   chạy lại `make license-fix`.
 - Không hard-code cấu hình. Tham số mới phải được khai báo trong `.env.example` kèm chú thích.
 - Mã phải chạy được khi hệ thống được cài **ngoài** thư mục mã nguồn.
-- Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng.
-- Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md`
-  kèm giấy phép và kiểm tra tính tương thích với Apache-2.0.
+- Tệp chữ xuống dòng bằng LF (`.editorconfig`, `.gitattributes`). Clone trên Windows vẫn ra LF. Bản clone có từ trước
+  #244 thì chạy một lần `git rm -rq --cached . && git reset --hard` để checkout lại ra LF (lệnh bỏ mọi thay đổi chưa
+  commit).
+- Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng: mỗi thay đổi một dòng (tối đa
+  120 ký tự) trong nhóm Đã thêm, Đã sửa đổi, Đã sửa lỗi hay Bảo mật, nói thay đổi gì, kèm số issue hoặc PR. Chi
+  tiết cài đặt, số test để ở PR và tài liệu.
+- Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md` (tên dẫn tới trang chủ,
+  kèm giấy phép), kiểm tra tính tương thích với Apache-2.0, rồi chạy `make copyright` để sinh lại `COPYRIGHT.txt`.
 - Thêm hay nâng gói npm, Python thì chạy `make sbom && make license-audit` (cần Docker và mạng): CI kiểm giấy phép của
   mọi gói, kể cả gói gián tiếp. Gói ngoài chính sách hay chưa rõ giấy phép cần ngoại lệ ghi lý do trong
   `.github/license-exceptions.json`.
+
+## Dịch giao diện
+
+Phần song ngữ Việt / Anh hiện có:
+
+- **Văn phòng điện tử** (`apps/office`): mọi câu trên giao diện. Ngôn ngữ chọn bằng nút trên thanh trên; trang công
+  khai cũng có nút này.
+- **Không gian cá nhân** (`apps/ca-nhan`) và **Bảng tin** (`apps/bang-tin`): mọi câu trên giao diện. Nút đổi ngôn
+  ngữ ở thanh trên; lựa chọn lưu chung với Văn phòng điện tử.
+- **Trang đăng nhập**: theme Keycloak `signet`, câu nằm ở `platform/keycloak/themes/signet/login/messages/`
+  (`messages_vi.properties`, `messages_en.properties`).
+
+Ứng dụng mẫu Nghỉ phép (`apps/nghi-phep`) chỉ có tiếng Việt. PDF phát hành và sổ in theo thể thức văn bản tiếng Việt.
+
+Trong Văn phòng điện tử:
+
+- Câu nằm trong `apps/office/app/locales/vi.json` và `en.json`. Hai tệp cùng cây khóa, cùng tham số `{x}`. Thêm câu
+  mới thì thêm khóa ở **cả hai** tệp và gọi `t('nhom.khoa')` trong template hoặc script. Không viết chữ thẳng trong
+  template, kể cả `placeholder`, `title`, `aria-label`.
+- Dữ liệu song ngữ viết trong mã, như bộ câu tự chẩn đoán (`app/utils/hpdi.ts`), dùng dạng `{ vi: '…', en: '…' }`.
+- Kiểm bằng `cd apps/office && npm test` (Node 24, `node --test`):
+  - `tests/answer.test.ts`: hai tệp cùng khóa, cùng tham số;
+  - `tests/i18n.test.ts`: mọi khóa `t('…')` có thật; phần viết thẳng của khóa ghép `` t(`a.${x}`) `` có trong
+    `vi.json`; template và script không có chữ tiếng Việt viết cứng, trừ trường `vi:`.
+
+  Ngoài ra, e2e `tests/e2e/tieng-anh.spec.ts` chạy luồng chính bằng tiếng Anh.
+- Thêm ngôn ngữ thứ ba hiện phải sửa mã:
+  - `app/plugins/i18n.ts`: danh sách bản dịch; ngôn ngữ đã chọn lưu ở `localStorage`, khóa `moc.locale`;
+  - nút đổi ngôn ngữ ở `app/layouts/default.vue` và `app/layouts/public.vue`, hiện là công tắc giữa hai ngôn ngữ;
+  - các chỗ chọn định dạng số, ngày theo `locale.value === 'vi'`;
+  - hàm `hpdiText` của `app/utils/hpdi.ts`;
+  - test so cặp `vi` và `en` ở `tests/answer.test.ts`.
+
+Trong Không gian cá nhân và Bảng tin (JavaScript thuần, mỗi ứng dụng một bảng riêng vì image dựng từ thư mục ứng dụng):
+
+- Câu nằm trong `public/i18n.js` của ứng dụng, đối tượng `MESSAGES` có hai bảng `vi`, `en` cùng khóa, cùng tham số
+  `{x}`. Mã gọi `t('khoa')`. Chữ tĩnh của `index.html` để sẵn bản tiếng Việt và mang `data-i18n="khoa"` (chữ của phần
+  tử) hoặc `data-i18n-<thuộc tính>="khoa"` (vd `data-i18n-aria-label`); `localize()` gán lại theo ngôn ngữ đã chọn.
+- Kiểm bằng `node --test tests/*.test.js` trong thư mục ứng dụng: `tests/i18n.test.js` bắt chữ tiếng Việt viết cứng
+  trong `public/*.js`, chữ tĩnh của `index.html` không có khóa hay lệch bảng, khóa thiếu ở một trong hai bảng.
+  e2e `tests/e2e/tieng-anh.spec.ts` mở cả hai ứng dụng bằng tiếng Anh.
+
+Tài liệu tiếng Anh: `README.en.md`. Bản tiếng Anh của hướng dẫn vận hành đang chờ người đóng góp (issue #59).
 
 ## Báo lỗi
 

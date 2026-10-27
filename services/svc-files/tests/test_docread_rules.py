@@ -25,8 +25,9 @@ from datetime import date
 
 import pytest
 
-from svc_files.docread.layout import Line
-from svc_files.docread.rules import CATALOG, MAX_BODY, Field, fold, suggest, title_case
+from svc_files.docread.rules import CATALOG, MAX_BODY, Field, suggest, title_case
+from svc_files.layout import Line
+from svc_files.vntext import fold
 
 TODAY = date(2026, 10, 21)
 # Vị trí cột trên trang (0..1): trái là cơ quan, số ký hiệu; phải là quốc hiệu, ngày; giữa là tên loại; thân rộng cả trang
@@ -403,7 +404,12 @@ def test_adversarial_text_is_fast(name):
         [Line(text)],                                                                  # một dòng dài
         [Line(chunk, 0.05, 0.4, 0.01 + (i % 40) * 0.01) for i, chunk in enumerate(chunks)],     # nhiều dòng ngắn
     ]
+    # Bắt regex bùng nổ (bậc hai trở lên: hàng giây tới hàng phút trên 50 000 ký tự), không đo hiệu năng: lấy lần nhanh
+    # nhất trong 3 lần, ngưỡng 1 giây. Ngưỡng cũ 0,3 giây cho một lần đo đỏ ngẫu nhiên trên máy CI (0,34 giây, #155)
     for lines in shapes:
-        started = time.perf_counter()
-        suggest(lines, today=TODAY)
-        assert time.perf_counter() - started < 0.3, f"{name}: {len(lines)} dòng chậm quá"
+        best = float("inf")
+        for _ in range(3):
+            started = time.perf_counter()
+            suggest(lines, today=TODAY)
+            best = min(best, time.perf_counter() - started)
+        assert best < 1.0, f"{name}: {len(lines)} dòng chậm quá ({best:.2f} giây)"

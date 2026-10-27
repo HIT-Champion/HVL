@@ -218,7 +218,7 @@ def render_pdf(letter: Letter) -> bytes:
 
 
 def letter_from(row: dict, *, verify_base: str | None = None, draft: bool = False) -> Letter:
-    """Văn bản từ dữ liệu CSDL (hasura.LETTER). draft: bản xem trước — bỏ số, ngày, mã dù văn bản đã có."""
+    """Văn bản từ dữ liệu CSDL (office/hasura.py LETTER). draft: bản xem trước — bỏ số, ngày, mã dù văn bản đã có."""
     tenant = row["tenant"]
     issued = not draft and bool(row.get("symbol"))
     approved = (row.get("events") or [{}])[0].get("created_at")

@@ -24,6 +24,10 @@ import { expect, type Browser, type Page } from '@playwright/test'
 export const PASSWORD = process.env.MOC_DEMO_PASSWORD ?? ''
 export const TOTP_SECRET = process.env.MOC_DEMO_TOTP_SECRET ?? ''
 const SHOTS = process.env.MOC_E2E_SCREENSHOTS ?? 'test-results/screens'
+// Hạn chờ trạm quét sau khi tải lên, bằng CLAMAV_TIMEOUT_S của svc-files (quá hạn đó svc-files trả 503). clamd nạp
+// lại chữ ký sau mỗi lần freshclam tải bản mới, và trong lúc nạp không quét tệp nào (ConcurrentDatabaseReload no):
+// một tệp tải lên đúng lúc đó chờ tới khi nạp xong, lâu hơn nhiều so với hạn 15 giây mặc định của expect (#287)
+export const SCAN_TIMEOUT = 60_000
 
 // Tệp PDF một trang có lớp chữ (Helvetica, chỉ ASCII) để tải lên: ClamAV quét như tệp thật, svc-files đọc được chữ
 // để tìm theo nội dung (F2.7)
@@ -104,6 +108,11 @@ export async function signIn(browser: Browser, username: string, { otp = false }
   return page
 }
 
+// Trong lúc chụp toàn trang, Chrome đổi cỡ khung nhìn tạm thời: media query màn hẹp (max-width: 900px), (hover: none)
+// báo đổi rồi đổi lại, thanh bên nhảy sang độ rộng 256px của ngăn kéo rồi chạy chuyển động thu về 76px, nên ảnh có
+// thanh bên mở dở đè lên nội dung (#218). Chụp với chuyển động tắt
+const STILL = '*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; }'
+
 export async function shot(page: Page, name: string) {
-  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true })
+  await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true, animations: 'disabled', style: STILL })
 }

@@ -107,7 +107,7 @@ jobs:
             echo "profile $p: $(wc -w <<<"$services") dịch vụ"
           done
 
-      # F3.14: profile logs (tắt mặc định) cùng tệp phủ đổi driver log của 5 dịch vụ sang fluentd phân giải được
+      # F3.14: profile logs (tắt mặc định) cùng tệp phủ đổi driver log của 8 dịch vụ sang fluentd phân giải được
       - name: Profile log tập trung phân giải được
         env:
           COMPOSE_FILE: docker-compose.yml:platform/logs/docker-compose.logs.yml
@@ -122,6 +122,15 @@ jobs:
              -v "$PWD/platform/logs/kiem-tra/mat-khau-gia.txt:/run/secrets/moc_logs_password:ro")
           docker run --rm --network none "${m[@]}" "$image" validate --deny-warnings /etc/vector/vector.yaml
           docker run --rm --network none "${m[@]}" "$image" test /etc/vector/vector.yaml /etc/vector/vector.test.yaml
+
+      # F3.13 (#255): cấu hình Prometheus nạp được luật cảnh báo, mỗi luật có ca bật và ca không bật trong
+      # platform/monitoring/kiem-tra/canh-bao.test.yml. promtool có sẵn trong image ghim digest ở docker-compose.yml
+      - name: Giám sát — cấu hình Prometheus và luật cảnh báo (promtool check config, test rules)
+        run: |
+          image=$(sed -n '/^  prometheus:$/,/^    image:/s/^    image: //p' docker-compose.yml)
+          m=(--entrypoint promtool -v "$PWD/platform/monitoring:/etc/prometheus:ro")
+          docker run --rm --network none "${m[@]}" "$image" check config /etc/prometheus/prometheus.yml
+          docker run --rm --network none "${m[@]}" "$image" test rules /etc/prometheus/kiem-tra/canh-bao.test.yml
 
       - name: Script khả thi và đúng cú pháp
         run: |
@@ -159,7 +168,7 @@ jobs:
 
       - name: Có đủ tài liệu bắt buộc
         run: |
-          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md; do
+          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md COPYRIGHT.txt; do
             test -f "$f" || { echo "::error::Thiếu $f"; exit 1; }
           done
           echo "Đủ tài liệu bắt buộc."
@@ -228,7 +237,8 @@ jobs:
         run: docker logs --tail 200 moc-db-it-hasura || true
 
   # PR chỉ đổi tài liệu (*.md, ảnh trong docs/; trừ docs/api/ do máy sinh, CI so với hệ thống thật) thì không dựng
-  # cả hệ thống. Push lên develop, main luôn chạy đủ
+  # cả hệ thống; PR không đổi tệp nào (commit gộp chỉ ghi lịch sử, PR gộp ngược sau phát hành) cũng vậy. Push lên
+  # develop, main luôn chạy đủ
   thay-doi:
     name: Phạm vi thay đổi
     runs-on: ubuntu-24.04
@@ -244,10 +254,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          SO_TEP: ${{ github.event.pull_request.changed_files }}
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then echo "ma=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # gh api lỗi thì bước dừng ở đây (bash -e). Danh sách rỗng chỉ hợp lệ khi chính sự kiện báo 0 tệp
           files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
-          test -n "$files" || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+          if [ -z "$files" ]; then
+            test "$SO_TEP" = 0 || { echo "::error::Không đọc được danh sách tệp của PR"; exit 1; }
+            echo "ma=false" >> "$GITHUB_OUTPUT"; echo "PR không đổi tệp nào, không dựng hệ thống"; exit 0
+          fi
           ma=$(grep -vE '\.md$|^docs/.*\.(png|jpe?g|svg|gif|webp)$' <<<"$files"; grep -E '^docs/api/' <<<"$files") || true
           if [ -n "$ma" ]; then
             echo "ma=true" >> "$GITHUB_OUTPUT"
@@ -257,11 +272,11 @@ jobs:
             echo "PR chỉ đổi tài liệu, không dựng hệ thống:"; cat <<<"$files"
           fi
 
-  # Năm phần chạy song song trên năm máy. Phần nào cũng tự dựng và nạp mẫu (≈ 3 phút) rồi chạy nhóm bước của mình theo
+  # Sáu phần chạy song song trên sáu máy. Phần nào cũng tự dựng và nạp mẫu (≈ 3 phút) rồi chạy nhóm bước của mình theo
   # đúng thứ tự cũ: luồng chính, các màn lõi | e2e | màn AI và số đo | nộp lưu, phả hệ, ký số, sao lưu và khôi phục |
-  # cài đặt, GitOps. Bước cần trạng thái do bước trước để lại thì ở cùng phần: phả hệ sau nộp lưu, đo "sau" sau màn
-  # giao việc, nộp lưu và ký số trước sao lưu để bản khôi phục có cả hồ sơ lạnh, CA và khóa ký. Job build kiểm tên phần
-  # trong điều kiện từng bước khớp ma trận
+  # cài đặt, GitOps | HTTPS sau proxy TLS (cấu hình từ trước make up, nên là phần riêng). Bước cần trạng thái do bước
+  # trước để lại thì ở cùng phần: phả hệ sau nộp lưu, đo "sau" sau màn giao việc, nộp lưu và ký số trước sao lưu để bản
+  # khôi phục có cả hồ sơ lạnh, CA và khóa ký. Job build kiểm tên phần trong điều kiện từng bước khớp ma trận
   chay-thu:
     name: "Chạy thử: ${{ matrix.phan }}"
     needs: [build, thay-doi]
@@ -271,7 +286,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phan: [luong-chinh, e2e, ai, sao-luu, cai-dat]
+        phan: [luong-chinh, e2e, ai, sao-luu, cai-dat, https]
     env:
       # gồm cả profile iot: khi lỗi, nhật ký có cả broker NGSI-LD (màn IT/OT tự bật profile này)
       COMPOSE: docker compose --profile core --profile app --profile iot
@@ -300,8 +315,110 @@ jobs:
       - name: Sinh cấu hình (make env)
         run: make env
 
+      # F1.9 (#261): phần https dựng đường HTTPS sau proxy của docs/trien-khai.md — bước 3 sửa .env trước khi chạy,
+      # proxy TLS như Caddyfile ở bước 5 (nginx-unprivileged ghim trong apps/office/Dockerfile thay Caddy, chứng thư do
+      # một CA tự ký cấp cho signet.test), rồi make up, make seed và mọi bước sau đi qua proxy. Đây không phải đường
+      # của bản online (Cloudflare Tunnel)
+      - name: HTTPS sau proxy TLS — .env như docs/trien-khai.md bước 3, proxy như bước 5
+        if: matrix.phan == 'https'
+        run: |
+          sed -i -e 's#^MOC_PUBLIC_URL=.*#MOC_PUBLIC_URL=https://signet.test#' \
+                 -e 's#^MOC_HTTP_PORT=.*#MOC_HTTP_PORT=127.0.0.1:8080#' \
+                 -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=172.16.0.0/12#' .env
+          want='MOC_(PUBLIC_URL=https://signet.test|HTTP_PORT=127.0.0.1:8080|TRUSTED_PROXY=172.16.0.0/12)'
+          test "$(grep -cxE "$want" .env)" = 3
+          echo "127.0.0.1 signet.test" | sudo tee -a /etc/hosts
+          d="$RUNNER_TEMP/https" && mkdir -p "$d"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=Signet CI CA" -keyout "$d/ca.key" \
+            -out "$d/ca.pem" -addext basicConstraints=critical,CA:true -addext keyUsage=critical,keyCertSign,cRLSign
+          openssl req -newkey rsa:2048 -nodes -subj "/CN=signet.test" -keyout "$d/site.key" -out "$d/site.csr"
+          printf '%s\n' subjectAltName=DNS:signet.test extendedKeyUsage=serverAuth basicConstraints=CA:false \
+            > "$d/site.ext"
+          openssl x509 -req -in "$d/site.csr" -CA "$d/ca.pem" -CAkey "$d/ca.key" -CAcreateserial -days 30 \
+            -extfile "$d/site.ext" -out "$d/site.pem"
+          chmod 644 "$d/site.key"   # nginx đọc bằng uid 101; khóa chỉ sống trong lượt CI này
+          # seed, smoke, kiem_ban_online.py (Python) tin CA này qua SSL_CERT_FILE; giữ cả kho CA của máy cho bước khác
+          cat /etc/ssl/certs/ca-certificates.crt "$d/ca.pem" > "$d/ca-bundle.pem"
+          echo "SSL_CERT_FILE=$d/ca-bundle.pem" >> "$GITHUB_ENV"
+          # Như Caddyfile bước 5: X-Forwarded-For/-Proto/-Host, X-Forwarded-Port 443, WebSocket (thông báo realtime),
+          # cổng 80 chuyển sang 443, không giới hạn cỡ yêu cầu (APISIX chặn trên 64 MB)
+          cat > "$d/proxy.conf" <<'NGINX'
+          map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+          server {
+              listen 80;
+              server_name signet.test;
+              return 301 https://$host$request_uri;
+          }
+          server {
+              listen 443 ssl;
+              server_name signet.test;
+              ssl_certificate /tls/site.pem;
+              ssl_certificate_key /tls/site.key;
+              client_max_body_size 0;
+              location / {
+                  proxy_pass http://127.0.0.1:8080;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto https;
+                  proxy_set_header X-Forwarded-Host $host;
+                  proxy_set_header X-Forwarded-Port 443;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection $connection_upgrade;
+                  proxy_read_timeout 120s;
+              }
+          }
+          NGINX
+          img=$(sed -n 's#^FROM \(nginxinc/nginx-unprivileged:[^ ]*\).*#\1#p' apps/office/Dockerfile)
+          # Docker Hub đôi khi trả 502: thử 3 lần, lần thứ ba vẫn lỗi thì dừng bước tại đây
+          for i in 1 2 3; do docker pull -q "$img" && break; test "$i" -lt 3; sleep 15; done
+          # nginx-unprivileged chạy uid 101; --network host dùng chung mạng của runner để tới 127.0.0.1:8080 như Caddy
+          # trên máy chủ, nên phải cho tiến trình thường mở cổng 80, 443 của runner
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
+          docker run -d --name moc-https-proxy --network host -v "$d/proxy.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$d/site.pem:/tls/site.pem:ro" -v "$d/site.key:/tls/site.key:ro" "$img"
+          sleep 2
+          running=$(docker inspect -f '{{.State.Running}}' moc-https-proxy)
+          [ "$running" = true ] || { docker logs moc-https-proxy; exit 1; }
+
       - name: Dựng image và khởi động lõi + ứng dụng (make up)
         run: make up
+
+      # Volume chữ ký của CI luôn mới tạo: freshclam tải bản daily mới đúng lúc clamd đang nạp bản có sẵn trong image,
+      # nên 600 giây sau (SelfCheck) clamd tự nạp lại, và suốt lúc nạp không quét gì (ConcurrentDatabaseReload no). Tải
+      # lên của smoke, e2e rơi vào lúc đó thì treo (#287). Bắt clamd nạp ngay bây giờ, trước mọi bước tải lên; cấu hình
+      # chạy thật giữ nguyên
+      - name: ClamAV dùng bản chữ ký freshclam vừa tải
+        run: |
+          daily() {   # "ClamAV 1.5.4/28165/…": clamdscan hỏi clamd đang dùng bản nào, clamscan đọc tệp trên đĩa
+            $COMPOSE exec -T clamav timeout 90 "$1" --version 2>/dev/null | sed -n 's#^ClamAV [^/]*/\([0-9]*\)/.*#\1#p'
+          }
+          # $SECONDS đếm từ đầu bước: không bắt đầu vòng mới sau 4 phút. Vòng đang dở có thể kéo thêm, vì mỗi lần hỏi
+          # chờ tối đa 90 giây (clamd đang nạp thì trả lời khi nạp xong); câu cảnh báo in số giây thật
+          while [ "$SECONDS" -lt 240 ]; do
+            # chỉ so khi freshclam đã xong lượt đầu (tải bản mới, báo đã mới nhất, hay lỗi): sớm hơn thì có thể so trước
+            # khi nó ghi tệp
+            if $COMPOSE logs clamav | grep -qE 'daily\.c[lv]d (updated|database is up-to-date)|update process failed'
+            then
+              disk=$(daily clamscan) loaded=$(daily clamdscan)
+              echo "daily trên đĩa: ${disk:-?}, clamd đang dùng: ${loaded:-?}"
+              if [ -n "$disk" ] && [ "$disk" = "$loaded" ]; then exit 0; fi
+              # clamd chưa trả lời thì chưa gửi RELOAD; đang nạp thì clamdscan --version chờ tới khi nạp xong
+              if [ -n "$loaded" ] && [ -z "${sent:-}" ]; then
+                $COMPOSE exec -T clamav timeout 60 clamdscan --reload || true
+                sent=1
+              fi
+            fi
+            sleep 5
+          done
+          echo "::warning::clamd chưa dùng bản daily trên đĩa sau $SECONDS giây: tải lên có thể treo lúc clamd nạp lại"
+
+      # Phần e2e quét trợ năng cả Bảng tin (#250, tests/e2e/tro-nang.spec.ts), là ứng dụng cắm bằng manifest. Cài trước
+      # make seed: tin của Bảng tin chỉ sinh từ sự kiện mới (Event Trigger không đọc lại dòng cũ), nên văn bản mẫu vào
+      # sổ, phát hành sau khi cài mới thành tin. Lần cài đầu tạo lại apisix, hasura; lệnh chờ chúng healthy mới trả về
+      - name: Cài Bảng tin cho phần quét trợ năng (make app-install)
+        if: matrix.phan == 'e2e'
+        run: make app-install APP=apps/bang-tin/app.yaml
 
       - name: Nạp dữ liệu mẫu (make seed)
         run: make seed
@@ -333,6 +450,17 @@ jobs:
       - name: Văn bản đến, văn bản đi, thông báo realtime trên trình duyệt thật (make e2e)
         if: matrix.phan == 'e2e'
         run: make e2e
+
+      # Ảnh màn hình của e2e (shot() trong tests/e2e/helpers.ts) ở mọi lần chạy, cả khi xanh: ảnh giao diện trong
+      # README (docs/anh/) chép từ artifact e2e-anh-<lần chạy>, không phải dựng cả hệ thống ở máy
+      - name: Tải lên ảnh màn hình e2e
+        if: matrix.phan == 'e2e' && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-anh-${{ github.run_attempt }}
+          path: tests/e2e/test-results/screens/
+          retention-days: 7
+          if-no-files-found: ignore
 
       # Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A với client Keycloak riêng, SSO
       # với Văn phòng điện tử; tải lên qua svc-files (ClamAV), xếp, chuyển, tải về; người khác không với tới; sổ kiểm
@@ -414,14 +542,29 @@ jobs:
         if: matrix.phan == 'luong-chinh'
         run: make demo-cai-ung-dung
 
-      # F3.14: bật profile logs (Vector, Parseable; 5 dịch vụ chuyển sang driver fluentd) → một mã X-Request-Id tự đặt
-      # đi qua APISIX → svc-workflow → svc-files, tra Parseable ra đủ dòng của ba dịch vụ, sổ kiểm toán ghi cùng mã, kho
-      # log không còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log của các dịch vụ
+      # #301: ứng dụng thứ tư apps/nghi-phep mang BPMN và form (mục workflow của manifest), lõi kiểm rồi triển khai lên
+      # Flowable: bản có scriptTask bị từ chối trước khi đổi gì; nhân viên gửi đơn qua /api/workflow/nghi-phep bằng
+      # token app-nghi-phep, dữ liệu sai → 422 đúng mã; chỉ trưởng phòng cùng phòng thấy và duyệt; token client khác
+      # → 403; hộp việc Văn phòng không lẫn; cài lại không đổi gì; gỡ giữ lịch sử. Cài cũng tạo lại apisix, hasura
+      - name: Quy trình của ứng dụng qua lõi (make demo-quy-trinh)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-quy-trinh
+
+      # F3.14: bật profile logs (Vector, Parseable; 8 dịch vụ chuyển sang driver fluentd, tạo lại cả CSDL, Hasura,
+      # Keycloak) → một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files, tra Parseable ra đủ
+      # dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai vào kho đã che; kho log không
+      # còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log của các dịch vụ
       - name: Log tập trung tra theo mã yêu cầu (make logs-up, make demo-log-tap-trung)
         if: matrix.phan == 'luong-chinh'
         run: |
           make logs-up
           make demo-log-tap-trung
+
+      # #302: tắt phần Văn phòng điện tử trong svc-files, svc-workflow thì lõi vẫn lên, phần lõi của smoke và
+      # demo-ca-nhan vẫn đạt; xong bật lại. Đặt cuối phần luong-chinh vì màn này dựng lại hai dịch vụ
+      - name: Tắt Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-tat-van-phong
 
       # F4.1: văn thư tải công văn PDF có chữ → tác tử moc-doc-reader gợi ý số ký hiệu, ngày, cơ quan, loại, trích yếu;
       # ảnh chụp → nhận dạng chữ (Tesseract); văn thư sửa một ô rồi vào sổ; sổ kiểm toán có dòng của tác tử, không mang
@@ -527,7 +670,8 @@ jobs:
           PY
 
       # F3.3 GitOps với repo git cục bộ: nhánh deploy là trạng thái mong muốn của bản cài. Reconciler áp commit mới
-      # được đẩy lên, rồi đưa tệp đã cài bị sửa tay về đúng commit đó; smoke lại sau cùng
+      # được đẩy lên, rồi đưa tệp đã cài bị sửa tay về đúng commit đó; smoke lại sau cùng. Bản cài bật thêm profile
+      # mail (MOC_EXTRA_PROFILES, như tunnel trên máy chủ): áp commit phải dừng cả mailpit rồi chạy lại nó
       - name: GitOps — reconciler áp commit mới, sửa lệch cấu hình (scripts/reconcile.py)
         if: matrix.phan == 'cai-dat'
         run: |
@@ -536,8 +680,10 @@ jobs:
           git push -q "$RUNNER_TEMP/moc.git" HEAD:refs/heads/deploy
           git clone -q -b deploy "$RUNNER_TEMP/moc.git" "$RUNNER_TEMP/moc-src"
           cd "$RUNNER_TEMP/moc"
-          printf 'MOC_GITOPS_DIR=%s\n' "$RUNNER_TEMP/moc-src" >> .env
+          printf 'MOC_GITOPS_DIR=%s\nMOC_EXTRA_PROFILES=mail\n' "$RUNNER_TEMP/moc-src" >> .env
+          docker compose --profile mail up -d --wait mailpit
           python3 scripts/reconcile.py
+          docker compose ps --status running --services | grep -qx mailpit
           out=$(python3 scripts/reconcile.py)
           grep -q 'không có gì phải làm' <<<"$out"
           git clone -q -b deploy "$RUNNER_TEMP/moc.git" "$RUNNER_TEMP/dev"
@@ -553,6 +699,27 @@ jobs:
           if grep -q '^# sửa tay' docker-compose.yml; then exit 1; fi
           MOC_SLA_DURATION=PT24H python3 scripts/smoke.py
 
+      # F1.9 (#261): kiểm như docs/trien-khai.md bước 6, từ ngoài vào qua proxy — kiem_ban_online.py: chứng chỉ, HTTP
+      # sang HTTPS, /api/status, issuer và token_endpoint của Keycloak sau proxy, header bảo mật; smoke trọn qua
+      # https:// (đăng nhập, tải tệp, thông báo qua wss://); APISIX tin X-Forwarded-For của proxy nên nhật ký ghi IP
+      # của máy gọi, không phải gateway của mạng Docker
+      - name: HTTPS sau proxy TLS — kiểm như docs/trien-khai.md bước 6, smoke qua https://
+        if: matrix.phan == 'https'
+        run: |
+          python3 scripts/kiem_ban_online.py https://signet.test
+          MOC_SLA_DURATION=PT24H python3 scripts/smoke.py
+          ua="moc-ci-https-$GITHUB_RUN_ID"
+          curl -fsS --cacert "$RUNNER_TEMP/https/ca.pem" -A "$ua" -o /dev/null https://signet.test/api/status
+          # APISIX ghi nhật ký truy cập có đệm (buffer=16384 flush=3 trong mẫu nginx của nó): chờ dòng ra tới 15 giây
+          line=
+          for _ in $(seq 1 15); do
+            line=$($COMPOSE logs --no-color --no-log-prefix --tail 1000 apisix | grep -F "\"$ua\"" | tail -1)
+            [ -n "$line" ] && break
+            sleep 1
+          done
+          echo "nhật ký APISIX: ${line%% *} …"
+          test "${line%% *}" = 127.0.0.1
+
       - name: Trạng thái và nhật ký dịch vụ khi lỗi
         if: failure()
         run: |
@@ -560,6 +727,10 @@ jobs:
           mkdir -p ci-logs
           for s in $($COMPOSE config --services); do
             $COMPOSE logs --no-color --tail=1000 "$s" > "ci-logs/$s.log" 2>&1 || true
+          done
+          # Vector, Parseable (profile logs) và proxy TLS của phần https không có trong $COMPOSE: lấy theo tên container
+          for c in $(docker ps -a --format '{{.Names}}' | grep -E '^moc-(vector|parseable)-1$|^moc-https-proxy$'); do
+            docker logs --tail=1000 "$c" > "ci-logs/$c.log" 2>&1 || true
           done
           tail -n 30 ci-logs/*.log
 
@@ -574,7 +745,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # Đúng tên job mà ruleset yêu cầu (.github/rulesets/): đạt khi cả năm phần đạt, hoặc khi PR chỉ đổi tài liệu
+  # Đúng tên job mà ruleset yêu cầu (.github/rulesets/): đạt khi cả sáu phần đạt, hoặc khi PR chỉ đổi tài liệu
   stack:
     name: "Chạy thử toàn hệ thống (PoF #4)"
     needs: [thay-doi, chay-thu]
@@ -582,7 +753,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Cả năm phần chạy thử đều đạt
+      - name: Cả sáu phần chạy thử đều đạt
         env:
           MA: ${{ needs.thay-doi.outputs.ma }}
           THAY_DOI: ${{ needs.thay-doi.result }}

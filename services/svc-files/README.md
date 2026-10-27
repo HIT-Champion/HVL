@@ -1,8 +1,9 @@
 # svc-files
 
 Cửa duy nhất để tệp vào và ra khỏi kho đối tượng của Signet. Tệp tải lên được **quét ClamAV trước**,
-sạch mới ghi vào SeaweedFS và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp
-chưa quét. Tải xuống: svc-files hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
+sạch mới nhận loại theo nội dung (phải khớp đuôi tệp; ảnh JPEG, PNG được bỏ EXIF, vị trí GPS), rồi ghi vào SeaweedFS
+và thêm dòng `core.files`; ClamAV không trả lời thì từ chối, không bao giờ lưu tệp chưa quét. Tải xuống: svc-files
+hỏi Hasura **bằng chính token của người dùng** xem họ có được xem tệp không —
 quy tắc quyền chỉ nằm ở `db/metadata`, svc-files không viết lại. Tìm kiếm cũng vậy: Meilisearch xếp hạng,
 Hasura quyết ai được đọc văn bản nào; tìm được cả theo chữ trong tệp PDF đính kèm. Văn bản đi được dựng thành PDF đúng thể thức NĐ 30 ở đây, và cổng xác thực
 trả lời người ngoài một văn bản có thật, còn nguyên vẹn không. Sổ đăng ký văn bản đến / đi cũng in ra PDF ở đây.
@@ -22,6 +23,7 @@ issue #19, #20.
 |---|---|
 | `POST /api/files`: kiểm JWT → quét ClamAV → ghi SeaweedFS → thêm dòng `core.files` | **Xong** |
 | Tệp nhiễm: ghi `file.rejected` vào sổ kiểm toán `core.audit_log` | **Xong** |
+| Sau ClamAV: loại theo byte đầu phải khớp đuôi tệp, chặn chương trình, kịch bản; lưu mime theo nội dung; ảnh JPEG, PNG bỏ EXIF, GPS, XMP (xoay đúng chiều trước) | **Xong** |
 | `GET /api/files/{id}`: kiểm quyền qua Hasura → đọc SeaweedFS | **Xong** |
 | `GET /api/search`: số ký hiệu, trích yếu, cơ quan ban hành; gõ không dấu được | **Xong** |
 | Tìm trong nội dung văn bản đi và lớp chữ của PDF đính kèm; báo kết quả nào khớp nội dung | **Xong** (F2.7) |
@@ -53,6 +55,8 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | Đường dẫn | Kết quả |
 |---|---|
 | `POST /api/files` (multipart, trường `file`) | `201` `{id, object_key, filename, mime_type, size_bytes, sha256, scanned_at, encrypted}` |
+| | `mime_type` theo nội dung, không theo tên hay mime khai; ảnh JPEG, PNG: `sha256`, `size_bytes` của ảnh đã bỏ siêu dữ liệu — mục Kiểm loại tệp, bỏ siêu dữ liệu ảnh |
+| | `415` `type_mismatch` nội dung không khớp đuôi tệp (hay mime khai khi tên không đuôi), `type_not_allowed` chương trình, kịch bản chạy được — kèm `found` (loại theo nội dung) · `422` `image_unreadable` + `reason` (`corrupt`, `too_many_pixels`, `timeout`, `memory`) ảnh không bỏ được siêu dữ liệu · `503` `busy` (+ `Retry-After: 10`) khi đang xử lý hai ảnh khác — **không lưu** |
 | | `?restricted=true` — tệp cho văn bản hạn chế, lưu mã hóa (mục Văn bản hạn chế): `415` `restricted_pdf_only` + `reason` khi không phải PDF đọc được, không mật khẩu, tối đa `MOC_RESTRICTED_MAX_PAGES` trang, hoặc quá nặng để kiểm (`timeout`, `memory`) · `503` `vault_unavailable` khi két chưa sẵn sàng, `busy` (+ `Retry-After: 10`) khi đang kiểm, đóng dấu tệp hạn chế khác — **không lưu** |
 | | `401` thiếu hoặc sai token · `403` token không có `tenant_id` |
 | | `413` vượt `MOC_FILES_MAX_MB` · `400` tệp rỗng hoặc thiếu trường `file` |
@@ -60,7 +64,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | | `403` `unknown_tenant` — thuê ước trong token chưa có trong `core.tenants` |
 | | `503` ClamAV, SeaweedFS hoặc Hasura không sẵn sàng — **không lưu** (đã ghi vào kho thì gỡ ra) |
 | `POST /api/files/{id}/read` | Chỉ `clerk`, chỉ tệp chính mình tải lên. `?force=true` đọc lại. `200` `{file_id, status, method, pages, fields, warnings, summary_source, model, duration_ms, cached, read_at}` · `401` · `403` `forbidden` · `404` `not_found` (cả tệp người khác) · `409` `restricted` tệp mã hóa hoặc tệp đang gắn vào văn bản hạn chế (trước gợi ý đã lưu, trước khi đọc byte) · `413` `too_large` · `415` `unsupported` · `422` `unreadable` + `reason` · `503` `busy` (+ `Retry-After: 10`), `reader_disabled`, `ocr_unavailable`, `storage_unavailable`, `database_unavailable` — mục Đọc văn bản đến |
-| `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director`. Thân `{question, mode: extract\|generate, direction, year, type_code, ask_id}`. `200` `{ask_id, status, answer, extract, sources, semantic, ai_available, warnings, duration_ms}`, `Cache-Control: no-store` · `400` `invalid_question` · `401` · `403` `forbidden` · `422` thân sai · `503` `assistant_disabled`, `busy` (+ `Retry-After: 10`), `search_unavailable`, `database_unavailable` — mục Hỏi đáp trên kho văn bản |
+| `POST /api/documents/ask` | `clerk`, `staff`, `manager`, `director`. Thân `{question, mode: extract\|generate, direction, year, type_code, document_id, ask_id}`. `200` `{ask_id, status, answer, extract, sources, semantic, ai_available, warnings, duration_ms}`, `Cache-Control: no-store` · `400` `invalid_question` · `401` · `403` `forbidden` · `422` thân sai · `503` `assistant_disabled`, `busy` (+ `Retry-After: 10`), `search_unavailable`, `database_unavailable` — mục Hỏi đáp trên kho văn bản |
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `422` `unstampable` + `reason` không đóng dấu được (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng), `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng, `busy` (+ `Retry-After: 10`) |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
@@ -80,6 +84,7 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `POST /internal/dispatch-file` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{dispatch_id, actor_id}`. `201` `{file_id, sha256, size_bytes}` bản sao mới · `200` cùng thân khi bản sao đã có · `404` không có dòng `office.dispatches` · `409` `{code}`: `not_pending` dòng không còn chờ, `not_issued` văn bản chưa phát hành, `restricted` văn bản hạn chế / tệp mã hóa, `cold` tệp đã sang kho lạnh, `integrity` byte trong kho không khớp băm · `422` trạm quét chặn · `503` ClamAV, kho, CSDL không sẵn sàng (mục Liên thông) |
 | `POST /internal/similar-documents` | Như `/internal/issue` (chỉ dịch vụ nội bộ). Thân `{tenant_id, document_id, limit}` (`limit` 1–30, mặc định 15; thừa trường → `422`). `200` `{document_id, hits: [{document_id, score}], terms, semantic, duration_ms}` · `404` `not_found` · `409` `not_incoming`, `restricted` · `503` `assistant_disabled`, `search_unavailable`, `database_unavailable` (mục Văn bản tương tự cho tác tử gợi ý giao việc) |
 | `GET /healthz` | Tiến trình còn sống |
+| `GET /metrics` | Bảng trạng thái (mục Trạng thái hệ thống) ở dạng chữ của Prometheus, chỉ trong mạng nội bộ: cổng API trả `404` |
 | `GET /readyz` | `200` khi gọi được ClamAV, SeaweedFS và Hasura, ngược lại `503`; Meilisearch hỏng thì vẫn `200` nhưng `status: "degraded"`; `ai`: mô hình trích yếu (F4.1) đang sẵn sàng không; `assist: {index, semantic, model, embed_pending, embed_failed}` (F4.2): chỉ mục đoạn đã đồng bộ xong một lượt; tìm theo nghĩa được (mô hình nhúng sẵn sàng, đúng số chiều, embedder đã áp trong Meilisearch); mô hình viết câu trả lời sẵn sàng; số đoạn còn chờ nhúng và số đoạn làm mô hình nhúng lỗi (null khi không nhúng hoặc chưa đếm) — cả hai không ảnh hưởng `status` |
 
 Ai xem được tệp: người tải lên, và người đọc được văn bản có gắn tệp đó (`db/README.md`, mục Vai trò).
@@ -91,6 +96,63 @@ có `ETag`: mỗi lần mở là một bản khác).
 Khóa đối tượng: `tenant/<tenant_id>/<yyyy>/<mm>/<id>` — thuê ước lấy từ token, không lấy từ dữ liệu client
 gửi; khóa không trả ra ngoài. Mỗi dòng nhật ký là một đối tượng JSON có `request_id` (lấy từ `X-Request-Id`
 do APISIX gắn); mã này cũng đi vào cột `request_id` của sổ kiểm toán.
+
+### Kiểm loại tệp, bỏ siêu dữ liệu ảnh
+
+`filetype.py`, `imageclean.py`. Trình duyệt khai mime theo đuôi tệp, mà đuôi thì đổi được: svc-files không tin cả
+hai, nhận loại theo byte đầu. Mọi tệp vào kho qua `ingest()` — `POST /api/files` và tệp trong zip của lô nạp — theo
+thứ tự:
+
+```
+quét ClamAV byte gốc, cùng lượt tính SHA-256, cỡ → nhiễm: file.rejected, 422 · ClamAV không trả lời: 503
+  → nhận loại theo 8 KB đầu (filetype.check) → sai: 415 type_mismatch | type_not_allowed
+  → restricted=true: chỉ PDF theo nội dung → kiểm PDF, mã hóa (mục Văn bản hạn chế)
+  → ảnh JPEG, PNG: bỏ siêu dữ liệu trong tiến trình con (imageclean.run_clean) → hỏng, quá lớn: 422 image_unreadable
+  → SHA-256, cỡ của byte sẽ lưu → ghi SeaweedFS → core.files (mime theo nội dung)
+```
+
+- **ClamAV luôn đứng trước**: chỉ tệp sạch mới được nhận loại. Tệp EICAR đặt đuôi `.pdf`, `.jpg`, `.exe` vẫn là tệp
+  nhiễm (`422 infected`, dòng `file.rejected` trong sổ kiểm toán — `make demo-kiem-dich`, `scripts/smoke.py`), không
+  thành `415`.
+- **Chữ ký** (`SIGNATURES`): PDF `%PDF-`, JPEG, PNG, GIF, TIFF, WebP, BMP, hộp `ftyp` (HEIC, AVIF, MP4), vỏ zip
+  `PK\x03\x04` (docx, xlsx, pptx, odt, epub, zip), vỏ OLE `D0 CF 11 E0` (doc, xls, ppt, msg, cả docx đặt mật khẩu),
+  RTF, 7z, RAR, gzip, xz, MP3, Ogg, FLAC, WAV, AVI, Matroska. Không khớp chữ ký nào thì xem có phải chữ (không byte
+  NUL, ký tự điều khiển ≤ 1%; UTF-8, UTF-16, mã cũ TCVN3, VNI đều qua) — HTML, SVG, XML nhận theo thẻ mở đầu như
+  trình duyệt; còn lại là nhị phân không rõ loại. Đọc văn bản đến (F4.1) dùng cùng bảng.
+- **Chặn luôn** (`415 type_not_allowed`): chương trình (PE `MZ`, ELF, Mach-O, lớp Java), kịch bản `#!`, và đuôi chạy
+  được khi người nhận mở (`RUNNABLE`: `.exe`, `.dll`, `.scr`, `.msi`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.hta`,
+  `.lnk`, `.url`, `.reg`, `.jar`, `.sh`, `.apk`, `.php`…) dù nội dung gì. Đuôi tính như Windows: `a.exe.` là `.exe`,
+  tên chỉ có đuôi `.bat` là `.bat`. Xét cả tên ASCII mà tải về ghi vào `filename=` (`curl -OJ`, `wget` lưu theo tên
+  đó): `x.bát`, `x.ｂａｔ` gập thành `x.bat` nên cũng chặn (`filetype.ascii_name`).
+- **Phải khớp** (`415 type_mismatch`, kèm `found`): đuôi có trong `EXTENSIONS` thì nội dung phải thuộc họ của đuôi —
+  tệp tải về mở theo đuôi, nên đuôi quyết chứ không phải mime khai (Windows có Excel khai `.csv` là
+  `application/vnd.ms-excel`). Tên không đuôi hay đuôi lạ: xét mime khai (`application/octet-stream` không nói gì).
+  Nới cho tệp có thật: đuôi ảnh nhận mọi loại ảnh (ảnh PNG, WebP mang đuôi `.jpg` hay gặp); `.docx`, `.xlsx`, `.pptx`
+  nhận cả vỏ OLE (bản đặt mật khẩu); `.doc`, `.xls` nhận cả zip, RTF và chữ (bảng HTML, XML do phần mềm khác xuất ra
+  đuôi `.xls`); đuôi chữ (`.txt`, `.csv`, `.md`, `.json`, `.xml`, `.html`, `.svg`) nhận mọi nội dung chữ.
+- **Không ràng buộc**: đuôi lạ (`.dwg`, `.mp4`, `.mp3`…) kèm mime khai lạ — nhận như trước, chỉ chặn tệp chạy được.
+- **Mime lưu** (`core.files.mime_type`, `mime_type` trả về): theo nội dung (không rõ: `application/octet-stream`);
+  riêng vỏ zip, OLE và chữ — không tự nói là docx hay xlsx, csv hay md — đúng họ của đuôi thì lấy mime của đuôi (hay
+  mime khai). Ảnh PNG mang đuôi `.jpg` lưu là `image/png`, làm sạch như PNG. Tải về vẫn kèm `attachment`, `nosniff`,
+  CSP `sandbox` như trước.
+- **Ảnh JPEG, PNG bỏ siêu dữ liệu**: EXIF (tọa độ GPS, máy chụp, giờ chụp), XMP, IPTC, chú thích JPEG, chữ PNG (`tEXt`,
+  `iTXt`, `zTXt`, `eXIf`). Pillow giải mã rồi mã hóa lại, sau khi xoay theo hướng EXIF (ảnh chụp dọc không nằm ngang).
+  Giữ hồ sơ màu ICC, DPI, màu trong suốt, đủ khung ảnh động APNG (không xoay); JPEG nhiều khung (MPO: ảnh chân dung
+  iPhone, máy Nikon, Sony, Samsung) chỉ giữ khung đầu, xoay như ảnh thường; JPEG giữ bảng lượng tử, cách lấy mẫu màu
+  của tệp gốc và tối ưu mã Huffman — ảnh trông như cũ, cỡ xấp xỉ cũ. Đo 25/10 trên ảnh mẫu `seed/van-ban-den/`: 4 ảnh
+  JPEG đổi dưới 1% điểm ảnh, lệch tối đa 11/255, cỡ lệch dưới 0,1%; ảnh PNG giữ nguyên mọi điểm ảnh, cỡ +4%; mỗi ảnh
+  0,1–0,2 giây kể cả dựng tiến trình con (ảnh 99 MP: 0,7–2,4 giây). Byte nối sau ảnh (tệp đa hình ảnh + HTML, zip) rơi
+  mất. Byte lưu khác byte tải lên nên `sha256`, `size_bytes` (phản hồi, `core.files`) là của ảnh đã làm sạch. Loại
+  khác lưu **nguyên từng byte** — PDF giữ nguyên để cổng xác thực, phòng đọc so băm.
+- **Ảnh chỉ giải mã trong tiến trình con**, như OCR: `python -I imageclean.py`, `RLIMIT_AS` 2 GB, hạn 30 giây
+  (`RLIMIT_CPU` = hạn + 5), quá hạn giết cả nhóm; trần 100 triệu điểm ảnh kiểm trước khi giải mã (ảnh bom giải nén).
+  Hai lượt cùng lúc, chờ lượt quá 10 giây thì `503 busy` + `Retry-After: 10`. Không làm được → `422 image_unreadable`
+  kèm `reason` (`corrupt`, `too_many_pixels`, `timeout`, `memory`), không lưu.
+- **Nhật ký** `core.file.type_rejected`: mã, loại tìm thấy, đuôi, mime khai — không ghi tên tệp; không vào sổ kiểm toán
+  (khác tệp nhiễm).
+- **Chưa làm**: ảnh TIFF, HEIC, WebP, GIF, tệp Office, PDF vẫn giữ siêu dữ liệu của chúng; không xét bên trong vỏ zip,
+  OLE (docx đổi đuôi thành xlsx vẫn qua); PDF có byte lạ trước `%PDF-` bị coi là không phải PDF (như đọc văn bản đến,
+  kiểm văn bản hạn chế).
 
 ### Tìm kiếm
 
@@ -132,9 +194,21 @@ tự mỗi văn bản. Xếp hạng: khớp nội dung đứng sau khớp số k
   còn tồn (vd tệp tải lên trước khi có F2.7) thì đọc tiếp ngay. Chữ từng trang nối bằng xuống dòng, vị trí đầu mỗi
   trang lưu ở `page_starts` (F4.2: trích dẫn có số trang). Kết quả ghi vào
   `core.file_texts` (khóa quản trị; không vai trò người dùng nào đọc được bảng này), mỗi tệp một lần: `ok`, `empty`
-  (không có lớp chữ — bản scan, để dành OCR F4.1), `failed` kèm lý do (`encrypted`, `timeout`, `memory`,
+  (không có lớp chữ và OCR không ra chữ, xem dưới), `failed` kèm lý do (`encrypted`, `timeout`, `memory`,
   `too large`, `missing` — kho không có đối tượng, `unreadable` — kho lỗi 5 lượt liền, `not saved` — CSDL không
   nhận kết quả, `bad output`, lỗi của pypdf).
+- **Bản scan được nhận dạng chữ (#253).** PDF không có lớp chữ thì vòng nền OCR `MOC_TEXT_OCR_PAGES` trang đầu (mặc
+  định 3) bằng đúng đường OCR của tác tử đọc văn bản đến: ảnh nhúng lớn nhất mỗi trang, tiến trình con có giới hạn
+  bộ nhớ, CPU, điểm ảnh (mục Đọc văn bản đến), hạn chung cho cả tệp là số trang đó × `MOC_OCR_TIMEOUT_S`. Đọc lần
+  lượt từng tệp, nên mỗi lúc vòng nền chỉ OCR một tệp. Ra chữ thì ghi `ok` như lớp chữ, kèm `page_starts` đúng từng
+  trang (trang không có ảnh giữ chỗ), `note` = `ocr <số trang đã đọc>/<số trang>`: tìm theo nội dung và trợ lý hỏi
+  đáp dùng được chữ này. Không ra chữ vì tệp thì giữ `empty`, `note` = `ocr <lý do>` (`no_text` — không có ảnh,
+  `too_many_pixels`, `corrupt`) hoặc `ocr <n>/<số trang> blank` (ảnh không có chữ nào): bản scan mờ không phải tệp
+  hỏng, và không bị đọc lại. Hỏng vì máy (`timeout` lúc máy bận, `memory`, `no_tesseract`, `engine_failed` — thiếu
+  gói ngôn ngữ) thì tệp ở lại hàng đợi, lượt sau OCR lại như lỗi kho; 5 lượt liền vẫn hỏng thì ghi `empty`, `note` =
+  `ocr <lý do>`. Nhật ký `core.file.text_ocr` ghi số trang đã đọc, số ký tự, thời gian, không ghi chữ. Chữ OCR có
+  thể sai chữ, sai dấu; các trang sau `MOC_TEXT_OCR_PAGES` trang đầu không vào chỉ mục. Migration
+  `1792281603500_file_texts_ocr` xóa các dòng `empty` cũ để bản scan đã có được đọc lại một lần sau khi nâng cấp.
 - **Một tệp lỗi không chặn hàng đợi.** Hàng đợi chung mọi thuê ước, tệp cũ nhất trước: tệp nào cũng phải đi tới
   một dòng kết quả, nếu không thì tệp đó đứng đầu mãi. Số trang tệp tự khai (`/Count`, pypdf trả nguyên với tệp mã
   hóa) không được tin — lấy số trang thật sau khi duyệt cây trang; kết quả của tiến trình con được kiểm đúng ràng
@@ -166,13 +240,13 @@ có nhãn "Gợi ý". **Tác tử không tạo văn bản**: văn thư đối ch
   tệp đang gắn vào văn bản hạn chế (kể cả tệp rõ có từ trước F3.7), trả `409` trước cả gợi ý đã lưu và trước khi đọc
   byte nào (bản chữ trần hay bản gửi mô hình đều vô hiệu việc hạn chế); CSDL chặn thêm bằng trigger (không lưu gợi ý
   của tệp gắn vào văn bản hạn chế, xóa gợi ý khi văn bản bật hạn chế).
-- **Đọc.** Nhận loại theo byte đầu (PDF `%PDF-`, JPEG, PNG, TIFF), không tin mime khai. PDF: lớp chữ giữ bố cục
-  (`pdflayout.py`, pypdf chế độ `layout`, `MOC_READ_TEXT_PAGES` trang đầu); trang 1 có từ 40 ký tự không trắng thì
-  dùng (`method: text`), không thì OCR ảnh nhúng lớn nhất của từng trang (không rasterize: image không có poppler,
-  pdfium — PDF máy scan là một ảnh mỗi trang); PDF ít chữ mà không có ảnh nhúng nào, hay máy chủ chưa OCR được (thiếu
-  tesseract, thiếu dữ liệu ngôn ngữ), thì dùng lớp chữ ít ỏi đó (`method: text`). Ảnh: OCR (`method: ocr`). OCR
-  (`ocr.py`): Pillow xoay theo EXIF, đổi xám, giãn tương phản, đưa cạnh dài về 2000–3500 px, gửi PNG cho
-  `tesseract stdin stdout -l vie --oem 1 --psm 3 tsv`.
+- **Đọc.** Nhận loại theo byte đầu (PDF `%PDF-`, JPEG, PNG, TIFF — bảng chữ ký chung `filetype.py`), không tin mime
+  khai. PDF: lớp chữ giữ bố cục (`pdflayout.py`, pypdf chế độ `layout`, `MOC_READ_TEXT_PAGES` trang đầu); trang 1 có từ
+  40 ký tự không trắng thì dùng (`method: text`), không thì OCR ảnh nhúng lớn nhất của từng trang (không rasterize:
+  image không có poppler, pdfium — PDF máy scan là một ảnh mỗi trang); PDF ít chữ mà không có ảnh nhúng nào, hay máy chủ
+  chưa OCR được (thiếu tesseract, thiếu dữ liệu ngôn ngữ), thì dùng lớp chữ ít ỏi đó (`method: text`). Ảnh: OCR
+  (`method: ocr`). OCR (`ocr.py`): Pillow xoay theo EXIF, đổi xám, giãn tương phản, đưa cạnh dài về 2000–3500 px, gửi
+  PNG cho `tesseract stdin stdout -l vie --oem 1 --psm 3 tsv`.
 - **Tiến trình con có giới hạn**, như `pdftext.py`: `python -I`, `RLIMIT_AS` (lớp chữ 1 GB, OCR `MOC_OCR_MEMORY_MB`),
   `RLIMIT_CPU`, quá giờ thì giết. Tiến trình OCR mở phiên riêng: quá giờ hoặc yêu cầu bị hủy thì giết **cả nhóm**
   (`os.killpg`), tesseract không chạy mồ côi. Pillow có trần điểm ảnh (`MOC_OCR_MAX_PIXELS`), cả khi pypdf giải mã
@@ -270,8 +344,8 @@ Mô hình chỉ chạy khi quy tắc chưa ra trích yếu chắc chắn: trên 
 xám), các tệp khác giữ thời gian như khi không bật mô hình. Từ bản này chữ OCR không trường nào `high` nên mọi ảnh, bản
 scan đều qua mô hình khi bật `ai` (thêm khoảng 3,5–6 giây).
 
-Chưa làm: OCR bản scan cho tìm kiếm toàn văn (F2.7 chỉ đọc lớp chữ); so sánh PaddleOCR / VietOCR; dữ liệu
-`tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ volume nếu cần chính xác hơn).
+Chưa làm: so sánh PaddleOCR / VietOCR; dữ liệu `tessdata_best` (gói Debian là bản nhanh — đặt `TESSDATA_PREFIX` trỏ
+volume nếu cần chính xác hơn). OCR bản scan cho tìm kiếm toàn văn đã có ở vòng đọc chữ (#253, mục Tìm kiếm).
 
 ### Hỏi đáp trên kho văn bản (F4.2)
 
@@ -283,12 +357,13 @@ câu hỏi độc lập, không lưu hội thoại.
 **Chỉ mục đoạn** (`chunks.py`, `index.py`, `meili.py`). Chỉ mục Meilisearch riêng `MOC_ASK_INDEX` (`chunks`), một tài
 liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
 
-- **Nguồn**: chữ PDF của F2.7 (`core.file_texts`, có `page_starts`), không đọc lại tệp. Văn bản đến: bản chính và tài
-  liệu kèm theo (đánh trang riêng từng tệp), mọi trạng thái trừ `cancelled`. Văn bản đi: chỉ khi `issued`, `archived`,
-  nguồn là bản phát hành — dự thảo chưa có giá trị, đổi liên tục. **Văn bản hạn chế không bao giờ có đoạn nào.**
+- **Nguồn**: chữ PDF của F2.7 (`core.file_texts`, có `page_starts`; bản scan là chữ OCR, #253), không đọc lại tệp.
+  Văn bản đến: bản chính và tài liệu kèm theo (đánh trang riêng từng tệp), mọi trạng thái trừ `cancelled`. Văn bản
+  đi: chỉ khi `issued`, `archived`, nguồn là bản phát hành — dự thảo chưa có giá trị, đổi liên tục. **Văn bản hạn chế
+  không bao giờ có đoạn nào.**
 - **Cắt đoạn** theo từng trang, ≤ 1 200 ký tự, cắt ở ranh giới câu rồi khoảng trắng, đoạn sau mở đầu bằng câu cuối của
-  đoạn trước; không đoạn nào vượt trang. Bản scan, tệp lỗi, văn bản chưa có tệp: một đoạn "trích yếu" (loại, số ký
-  hiệu, ngày, cơ quan ban hành, trích yếu) — trích dẫn ghi "trích yếu", không bịa số trang.
+  đoạn trước; không đoạn nào vượt trang. Bản scan OCR không ra chữ, tệp lỗi, văn bản chưa có tệp: một đoạn "trích
+  yếu" (loại, số ký hiệu, ngày, cơ quan ban hành, trích yếu) — trích dẫn ghi "trích yếu", không bịa số trang.
 - **Mỗi đoạn mang thuộc tính quyền** chép từ văn bản: thuê ước, chiều, phòng, người tạo, phòng và người được giao
   (giao việc chưa hủy).
 - **Vòng nền** mỗi `MOC_ASK_SYNC_INTERVAL_S` giây, như chỉ mục F2.7 (con trỏ thời gian lùi 60 giây, lật trang theo id).
@@ -297,7 +372,9 @@ liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
   đoạn. Mọi tác vụ Meilisearch của một lượt phải xong thì con trỏ mới tiến; một tác vụ lỗi thì lượt sau đọc lại.
 - **Tìm theo nghĩa** (tùy chọn): embedder `userProvided` đặt tên theo mô hình (`emb_qwen3_embedding_0_6b`); svc-files
   tự gọi Ollama `/api/embed` theo lô `MOC_AI_EMBED_BATCH` đoạn ở vòng nền, và không mở lô mới trong lúc một lượt hỏi
-  đang gọi Ollama (nhúng câu hỏi, viết câu trả lời). Meilisearch không vào mạng `ai`. Chưa có véc-tơ thì đoạn vẫn tìm được bằng từ khóa; không có mô hình (CI) thì
+  đang gọi Ollama (nhúng câu hỏi, viết câu trả lời), lời gọi lâu bao nhiêu cũng vậy, và 5 giây sau mỗi lời gọi. Phần 5
+  giây sau đó nối liền quá 30 giây (người hỏi liên tục) thì vòng nền vẫn nhúng một lô lúc không có lời gọi nào rồi lại
+  nhường. Meilisearch không vào mạng `ai`. Chưa có véc-tơ thì đoạn vẫn tìm được bằng từ khóa; không có mô hình (CI) thì
   chỉ tìm từ khóa. Đổi `MOC_AI_EMBED_MODEL` là bỏ embedder cũ và nhúng lại từ đầu. Câu hỏi đưa đi nhúng mang tiền tố
   chỉ dẫn mà Qwen3-Embedding cần (`Instruct: …\nQuery: …`); đoạn văn bản thì không.
 - **Khi nhúng lỗi.** Cấu hình tìm từ khóa và cấu hình embedder áp thành hai tác vụ: embedder bị Meilisearch từ chối thì
@@ -314,7 +391,8 @@ liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
 1. **Lọc trước** trong Meilisearch: thuê ước lấy từ token (luôn đứng đầu), rồi điều kiện theo vai trò viết đúng như
    `office.document_visible` — văn thư, lãnh đạo: cả đơn vị; trưởng phòng: văn bản của phòng mình hoặc có giao việc
    cho phòng mình (token không có phòng thì không tìm gì); chuyên viên: mình tạo, được giao cho mình, hoặc văn bản đi
-   của phòng mình. Lớp này chỉ quyết **độ phủ**.
+   của phòng mình. Lớp này chỉ quyết **độ phủ**. Hỏi trong một văn bản (`document_id`, nút "Hỏi về văn bản này" ở
+   trang chi tiết) thêm điều kiện `document_id = …` nối AND sau các điều kiện trên — chỉ thu hẹp, không thay chúng.
 2. **Hậu kiểm** bằng Hasura với **token người hỏi** (như tìm kiếm F2.7), bỏ cả văn bản đang `restricted`. Lớp này quyết
    **an toàn**: chỉ mục chậm vài giây sau khi bật hạn chế hay hủy giao việc cũng không lộ đoạn nào. svc-files không
    viết lại quy tắc quyền. Số ký hiệu, trích yếu, trạng thái trả về lấy từ Hasura (bản mới nhất), không từ chỉ mục.
@@ -331,6 +409,14 @@ gần đủ câu hỏi, dù lượt chính đã đủ đoạn. Kết quả của
 tính cho đoạn có nguyên văn từ đó (bỏ dấu như Meilisearch) — đoạn có đủ câu hỏi không bị chấm thấp vì đứng sau trong
 kết quả của từ phổ biến. Lượt nới lỗi thì giữ kết quả lượt chính. Nhật ký `office.assist.asked` ghi số đoạn nhờ tìm nới
 (`relaxed`). Khi tìm theo nghĩa, phần nghĩa đã phủ câu hỏi dùng chữ khác nên không nới.
+
+**Tỷ trọng nghĩa theo câu hỏi** (`retrieve.semantic_ratio`). Câu hỏi có số ký hiệu (`123/QĐ-ĐHCN`, `88/CTSV`, "Số
+152a/TB-VP" — mẫu `SYMBOL` của bộ đọc văn bản đến và token số ký hiệu của `vi.py`), ngày (`15/11/2026`, "ngày 5 tháng
+3 năm 2026") hay cụm trong ngoặc kép thì tìm lai dùng `min(MOC_ASK_SEMANTIC_RATIO, 0,2)`; câu khác giữ tỷ trọng cấu
+hình. Meilisearch xếp chung hai danh sách theo điểm nhân trọng số: đoạn khớp từ khóa (điểm `s_k`) đứng trước đoạn chỉ
+gần nghĩa (độ tương đồng `s_v`) khi `(1 − r)·s_k > r·s_v`. Với 0,5 phải có `s_k > s_v` — văn bản cùng chủ đề khác số ký
+hiệu dễ đẩy văn bản có đúng số ký hiệu xuống; với 0,2 mọi đoạn khớp từ khóa có điểm > 0,25 đứng trước. Không về 0 để
+đoạn gần nghĩa vẫn lấp chỗ khi người hỏi gõ khác chữ trong văn bản. Nhật ký ghi tỷ trọng đã dùng (`ratio`).
 
 Không đoạn nào qua được hai lớp → `no_evidence`, **không gọi mô hình**; trả lời y hệt nhau dù văn bản không tồn tại hay
 người hỏi không được đọc.
@@ -367,10 +453,11 @@ người hỏi không được đọc.
   trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
   hai dòng sổ cùng một thực thể.
 - **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
-  cited, semantic, model, warnings, duration_ms}, `office.assist.ask_failed` {code}, `office.assist.model_rejected`
-  {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` / `ai_unavailable` (khi đổi trạng thái),
-  `office.assist.embed_dims_mismatch` {dims, expected} (mức error), `office.assist.indexed` / `embedded` /
-  `embed_skipped` {ids} / `index_failed` {error, stage, reason}, `config.warning` {message} lúc khởi động.
+  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms}, `office.assist.ask_failed`
+  {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` /
+  `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch` {dims, expected} (mức error),
+  `office.assist.indexed` / `embedded` / `embed_skipped` {ids} / `index_failed` {error, stage, reason},
+  `config.warning` {message} lúc khởi động.
 
 | Kết quả | Ý nghĩa |
 |---|---|
@@ -411,8 +498,9 @@ Chưa làm, giới hạn đã biết:
   bản trong cùng lệnh).
 - Hủy một giao việc không đổi `updated_at` hay `assigned_at`, nên thuộc tính quyền của đoạn còn cũ tới lần văn bản đổi
   sau. Việc này chỉ làm giảm độ phủ; hậu kiểm vẫn giữ an toàn.
-- Meilisearch chỉ xét 10 từ đầu của câu tìm; câu hỏi gõ không dấu bỏ được ít từ dừng hơn. Bản scan chỉ có đoạn "trích
-  yếu" (chưa OCR nền). Tách câu dựa trên lớp chữ PDF, có thể lệch với PDF dàn trang lạ.
+- Meilisearch chỉ xét 10 từ đầu của câu tìm; câu hỏi gõ không dấu bỏ được ít từ dừng hơn. Bản scan chỉ có chữ OCR
+  của `MOC_TEXT_OCR_PAGES` trang đầu, có thể sai chữ, sai dấu (#253). Tách câu dựa trên lớp chữ PDF, có thể lệch với
+  PDF dàn trang lạ.
 - Ngưỡng và hằng số kiểm (`RELAX_MIN`, độ phủ 60 %, ngưỡng câu trích) chỉnh trên kho mẫu nhỏ; cần đo lại trên kho
   thật. Kiểm theo từ không bắt được câu sai mà dùng đúng chữ của nguồn (vd "loại Xuất sắc" khi nguồn có cả "Xuất sắc"
   lẫn "Tốt"); câu có từ đệm không có trong nguồn ("… như sau:") có thể bị loại oan — người dùng vẫn có câu trích.
@@ -817,6 +905,25 @@ lỗi trong phả hệ chỉ có tên lớp lỗi (không tên tệp, số ký h
 và, nếu đặt `MOC_OPENLINEAGE_URL`, gửi thêm tới máy chủ nhận OpenLineage (Marquez). Ghi phả hệ lỗi chỉ thành cảnh báo,
 không chặn nộp lưu. Không có tên hồ sơ, trích yếu trong sự kiện — chỉ key đối tượng, tên bảng, số dòng.
 
+**Phân tích trên dữ liệu lạnh (#304, `archive_stats.py`).** `GET /api/case-files/archive-stats` cho phần "Văn bản đã
+nộp lưu (kho lạnh)" của trang Điều hành: số hồ sơ, số văn bản đến, đi, theo năm ban hành (văn bản không có ngày ban
+hành tính theo năm của hồ sơ), theo loại văn bản, theo phòng lập hồ sơ. Quyền như trang Điều hành: chỉ lãnh đạo đơn vị
+(vai trò mặc định `director`, vai trò khác `403 forbidden`), danh sách hồ sơ đã nộp lưu lấy từ Hasura bằng token của
+người gọi nên chỉ có hồ sơ của đơn vị mình. Mỗi gói: manifest tải theo băm trong CSDL, so băm (như phòng đọc), phải là
+manifest định dạng `moc-archive/1` của đúng hồ sơ, đúng đơn vị, gói nằm đúng `cold/<đơn vị>/case/<hồ sơ>/`; bảng
+`documents-<sha256>.parquet` so băm với manifest, rồi DuckDB đọc thử riêng bảng đó (đủ cột, ép được về kiểu của lược
+đồ). Sau cùng DuckDB đọc mọi bảng văn bản một lượt (`read_parquet` trên danh sách tệp) và đếm, mỗi lượt tối đa
+`MOC_ARCHIVE_STATS_THREADS` luồng và `MOC_ARCHIVE_STATS_MEMORY_MB` MB RAM. Gói lệch băm, thiếu đối tượng, manifest khác
+định dạng hay sai dạng, bảng văn bản thiếu cột thì không đếm: câu trả lời chỉ ghi hồ sơ đó trong `unreadable`
+(`case_file_id` và `code` — ký hiệu hồ sơ); lý do chỉ vào nhật ký, sự kiện `case_file.archive_stats_skipped` cho từng
+gói, rồi `case_file.archive_mismatch` liệt kê các hồ sơ. Chỉ có số đếm: không trích yếu, số ký hiệu hay tên người. Chưa
+có hồ sơ nào nộp lưu thì trả số 0, không đọc bucket. Gói không đổi nên kết quả lưu đệm theo đơn vị tới khi tập manifest
+đổi (có hồ sơ mới nộp lưu); kết quả có gói không đọc được chỉ lưu đệm 60 giây. Mỗi đơn vị một lượt tính mỗi lúc, đơn vị
+này tính lâu không bắt đơn vị khác đợi. Mỗi tập manifest mới là một run OpenLineage `moc.archive.stats` (đầu vào: các
+bảng Parquet đã đọc) trong `core.lineage_events`. CSDL không trả lời (kể cả metadata Hasura hỏng, `validation-failed`) →
+`503 database_unavailable`, bucket lạnh không trả lời → `503 storage_unavailable`. Mỗi khi có hồ sơ mới nộp lưu thì đọc
+lại mọi gói của đơn vị: chưa đo với hàng nghìn gói.
+
 Chưa làm: dọn bản nóng khi giao dịch đã chạy mà svc-files không nhận được trả lời (hồ sơ đã `archived`, tệp đã
 `cold`, bản nóng còn thừa — không mất gì).
 
@@ -827,11 +934,12 @@ Chạy tay trong container: `python -m svc_files.archive now --case-file <id>` n
 
 `sealed.py`. Không dùng cho bí mật nhà nước (Luật Bảo vệ bí mật nhà nước 2018 đòi hệ thống, mật mã được cấp phép).
 
-- **Tải lên** `POST /api/files?restricted=true`: quét ClamAV như mọi tệp, rồi chỉ nhận PDF mở được không cần mật
-  khẩu (cần đọc được để đóng dấu). Két cấp một khóa dữ liệu AES-256 riêng cho tệp (`transit/datakey/plaintext/
-  moc-files`): khóa rõ để mã hóa trong bộ nhớ rồi bỏ, khóa đã bọc (`vault:v1:…`) ghi vào `core.files.wrapped_dek`
-  cùng `encrypted = true`. Kho chỉ nhận bản mã `MOC1` + nonce 12 byte + AES-256-GCM với AAD = id đơn vị ‖ id tệp
-  (chép bản mã sang dòng tệp khác thì không mở được). `sha256`, `size_bytes` của dòng tệp là của bản rõ.
+- **Tải lên** `POST /api/files?restricted=true`: quét ClamAV, nhận loại như mọi tệp, rồi chỉ nhận PDF (theo nội dung) mở
+  được không cần mật khẩu (cần đọc được để đóng dấu). Két cấp một khóa dữ liệu AES-256 riêng cho tệp
+  (`transit/datakey/plaintext/moc-files`): khóa rõ để mã hóa trong bộ nhớ rồi bỏ, khóa đã bọc (`vault:v1:…`) ghi vào
+  `core.files.wrapped_dek` cùng `encrypted = true`. Kho chỉ nhận bản mã `MOC1` + nonce 12 byte + AES-256-GCM với AAD =
+  id đơn vị ‖ id tệp (chép bản mã sang dòng tệp khác thì không mở được). `sha256`, `size_bytes` của dòng tệp là của bản
+  rõ.
 - **Bản phát hành** của văn bản hạn chế (`/internal/issue`) cũng lưu mã hóa như vậy.
 - **Mở tệp** `GET /api/files/{id}`: kiểm quyền như mọi tệp — tệp mã hóa đã gắn vào văn bản thì chỉ theo quyền đọc
   văn bản, kể cả với người tạo dòng tệp (bị gỡ khỏi danh sách xem là hết tải) — két mở khóa đã bọc (`transit/decrypt`), giải mã trong bộ
@@ -886,6 +994,12 @@ người dùng hay số văn bản, thông báo lỗi; lý do chi tiết chỉ v
   ai gọi trong lúc đó chờ chung lượt ấy. Mỗi lần dò có hạn `MOC_STATUS_TIMEOUT_S` giây, quá hạn là `down`; lần dò cũ
   còn treo thì lượt sau chờ tiếp chính lần đó, không mở lần mới. APISIX giới hạn `MOC_RATE_STATUS_PER_MIN` lần một
   phút mỗi IP. Bao nhiêu người gọi trong 10 giây cũng chỉ là một lượt dò mỗi thành phần (test: 50 lượt gọi cùng lúc).
+- **Cho Prometheus (#274):** `GET /metrics` trả cùng kết quả gom, cùng lưu đệm, ở dạng chữ của Prometheus:
+  `moc_component_up{component="<mã>",critical="true|false"}` bằng 1 khi thành phần `ok` hay `degraded`, 0 khi
+  `down`; thành phần `off` không có dòng. `critical` là `"true"` với thành phần làm cả hệ thống `down` (cột cuối bảng
+  trên). Prometheus thu 15 giây một lần, nên thành phần chết vẫn bật cảnh báo khi không ai gọi tới
+  (`docs/van-hanh.md`, mục Cảnh báo). Không có URL hay tên máy trong nhãn. Route `chan` của APISIX trả 404 cho
+  `/metrics`, nên chỉ gọi được trong mạng nội bộ.
 - **Sao lưu gần nhất:** dòng `system.backed_up` mới nhất trong sổ kiểm toán (`moc backup create` ghi sau mỗi lượt sao
   lưu), hoặc giờ của lượt vừa khôi phục (`system.restored`), lấy cái mới hơn; chưa có thì `null`.
 - **Tên mô hình** bỏ phần trước dấu `/` cuối (registry có thể là tên máy nội bộ), chỉ nhận `[0-9A-Za-z._:-]`; phiên
@@ -906,14 +1020,15 @@ POST /api/imports/incoming ─► token → vai trò clerk → bật? → Conten
   → một mutation: core.import_jobs + core.import_rows + sổ import.created → 202 + Location
 vòng nền: lô đến giờ (run_after) → người tạo còn là văn thư đang bật? → mẻ ≤ MOC_IMPORT_CHUNK dòng chờ, mỗi dòng:
   giành dòng (cập nhật có điều kiện: claimed_until + mã lượt giữ claim_id) → tra trùng trước
-  → mỗi tệp trong zip qua ingest() (ClamAV → kho → core.files)
+  → mỗi tệp trong zip qua ingest() (ClamAV → nhận loại, làm sạch ảnh → kho → core.files)
   → Action receiveIncoming thay mặt văn thư → [register=true] registerIncoming → ghi kết quả dòng
   → dòng không thành văn bản: gỡ tệp đã lưu cho dòng (core.files chưa gắn văn bản + đối tượng trong kho)
   → hết dòng chờ: đóng lô (số đếm; trigger ghi import.finished cùng giao dịch, đúng một lần) → xóa zip
 ```
 
-- **Cùng đường với tiếp nhận lẻ.** Tệp đính kèm qua đúng `ingest()` của `POST /api/files`: quét ClamAV, tệp của văn bản
-  hạn chế lưu mã hóa, nhiễm thì ghi `file.rejected` với `request_id` `<lô>:<dòng>`. Dữ liệu qua đúng Action
+- **Cùng đường với tiếp nhận lẻ.** Tệp đính kèm qua đúng `ingest()` của `POST /api/files`: quét ClamAV, nhận loại theo
+  nội dung (sai đuôi: dòng `type_mismatch`), ảnh bỏ siêu dữ liệu, tệp của văn bản hạn chế lưu mã hóa, nhiễm thì ghi
+  `file.rejected` với `request_id` `<lô>:<dòng>`. Dữ liệu qua đúng Action
   `receiveIncoming` — kiểm schema `van-ban-den.json`, tra danh mục loại, tệp phải do chính người gửi tải lên, chặn
   trùng, ghi văn bản và dòng sổ kiểm toán chuỗi băm của nó — với phiên của văn thư tạo lô: vai trò `clerk`, đơn vị,
   người, phòng lấy từ token đã kiểm lúc tạo lô. `register=true` thì gọi tiếp `registerIncoming` (cấp số đến, khởi chạy
@@ -1093,6 +1208,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_FILES_TRANSIT_KEY` | `moc-files` | Khóa transit trong két bọc khóa của tệp văn bản hạn chế (F3.7); không đặt `MOC_OPENBAO_ADDR` thì không nhận, không mở tệp mã hóa (`503`) |
 | `MOC_RESTRICTED_MAX_PAGES` | `500` | Trần số trang PDF của văn bản hạn chế (≥ 1): quá thì không nhận (`415`), không đóng dấu (`422`) |
 | `MOC_SIGN_ENABLED` | `true` | Ký số PAdES bản phát hành (F4.5, chỉ minh họa); `false`: phát hành không ký, không gọi transit hay PKI. Chỉ có tác dụng khi có `MOC_OPENBAO_ADDR` |
+| `MOC_OFFICE_ENABLED` | `true` | Phần Văn phòng điện tử (#302, `office/api.py`): văn bản đi, sổ đăng ký, cổng xác thực (trừ `anchor-key.pem`), liên thông, nộp lưu, phòng đọc, đọc văn bản đến, `/internal/similar-documents`, nạp lô `/api/imports*`, vòng nộp lưu và vòng dò mô hình đọc văn bản. `false`: dịch vụ vẫn lên với phần lõi — tải lên, tải xuống, tìm kiếm, hỏi đáp, trạng thái, mốc neo; route của Văn phòng trả 404, lô nạp dở nằm nguyên trong CSDL, bật lại thì làm tiếp. Để kiểm lõi đứng được một mình (`make demo-tat-van-phong`), không dùng khi vận hành thật |
 | `CLAMAV_HOST`, `CLAMAV_PORT` | `clamav`, `3310` | |
 | `CLAMAV_TIMEOUT_S` | `60` | |
 | `HASURA_URL` | `http://hasura:8080` | Gọi trong mạng nội bộ, không qua APISIX |
@@ -1103,6 +1219,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_SEARCH_INDEX` | `documents` | Tự tạo và áp cấu hình khi khởi động |
 | `MOC_SEARCH_SYNC_INTERVAL_S` | `5` | `0` tắt vòng đồng bộ nền |
 | `MOC_TEXT_INTERVAL_S` | `10` | Chu kỳ đọc chữ của PDF mới gắn vào văn bản; `0` tắt vòng đọc |
+| `MOC_TEXT_OCR_PAGES` | `3` | Bản scan (PDF không có lớp chữ): số trang đầu OCR ở vòng đọc chữ, hạn cả tệp = số trang × `MOC_OCR_TIMEOUT_S`; `0` tắt (#253) |
 | `MOC_PUBLIC_URL` | phần trước `/realms/` của `MOC_OIDC_ISSUER` | In vào mã QR của bản phát hành |
 | `MOC_SERVICE_CLIENTS` | `svc-workflow` | Client Keycloak được gọi `/internal/*`, cách nhau dấu phẩy |
 | `MOC_COLD_BUCKET` | `moc-cold` | Bucket lạnh có khóa ghi, tự tạo; phải khác `MOC_FILES_BUCKET` |
@@ -1110,6 +1227,8 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_AUDIT_ANCHOR_RETENTION_DAYS` | `3650` | Hạn giữ mỗi mốc; trong hạn không ai xóa được |
 | `MOC_ARCHIVE_INTERVAL_S` | `3600` | Chu kỳ tìm hồ sơ đến hạn nộp lưu; `0` tắt vòng nộp lưu |
 | `MOC_ARCHIVE_AFTER_DAYS` | `365` | Hồ sơ đóng từ chừng ấy ngày trở lên thì nộp lưu |
+| `MOC_ARCHIVE_STATS_THREADS` | `2` | Số luồng DuckDB mỗi lượt đếm kho lạnh cho trang Điều hành (#304) |
+| `MOC_ARCHIVE_STATS_MEMORY_MB` | `256` | Trần RAM của DuckDB mỗi lượt đếm kho lạnh; quá trần thì tràn ra thư mục tạm |
 | `MOC_OPENLINEAGE_URL` | (rỗng) | Gửi thêm sự kiện phả hệ tới máy chủ OpenLineage, vd `http://marquez:5000/api/v1/lineage`; rỗng thì chỉ ghi `core.lineage_events` |
 | `MOC_READ_ENABLED` | `true` | Đọc văn bản đến (F4.1); `false`: `503 reader_disabled` |
 | `MOC_READ_MAX_MB` | = `MOC_FILES_MAX_MB` | Tệp lớn hơn thì không đọc (`413`) |
@@ -1134,7 +1253,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ASK_SYNC_INTERVAL_S` | `5` | Chu kỳ đồng bộ + nhúng chỉ mục đoạn; `0` chỉ hợp lệ khi `MOC_ASK_ENABLED=false` (bật trợ lý mà không có vòng nền thì chỉ mục đoạn không bao giờ có: svc-files từ chối khởi động) |
 | `MOC_ASK_TOP_K` · `MOC_ASK_CANDIDATES` · `MOC_ASK_PER_DOC` | `5` · `24` · `2` | Số nguồn trả về · số đoạn lấy từ Meilisearch mỗi lượt · số đoạn tối đa mỗi văn bản |
 | `MOC_ASK_MIN_SCORE` · `MOC_ASK_MIN_SCORE_SEMANTIC` | `0` · `0.75` | Ngưỡng `_rankingScore` khi tìm từ khóa · tìm lai (0–1). Từ khóa để 0: chiến lược `frequency` đã buộc đoạn chứa từ hiếm nhất của câu hỏi, điểm `words` thấp cả với nguồn đúng. Tìm lai 0,75: trên kho mẫu nguồn đúng đứng đầu ≥ 0,88, câu không có đáp án ≤ 0,70 |
-| `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1) |
+| `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1); câu hỏi có số ký hiệu, ngày, cụm trong ngoặc kép dùng tối đa 0,2 |
 | `MOC_ASK_DEADLINE_S` | `50` | Hạn tổng một lượt hỏi, tối đa 55 (dưới 60 giây của APISIX) |
 | `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
 | `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |
@@ -1220,6 +1339,17 @@ brotli 1.2.1, brotlicffi 1.2.1.0).
   SeaweedFS chỉ nằm trong mạng nội bộ; bản triển khai phải nạp tệp danh tính S3 (`-s3.config`).
 - **ClamAV**: giữ volume `/var/lib/clamav`; image `clamav/clamav:1.5.4` đã kèm sẵn chữ ký nên quét được ngay
   sau khi clamd nạp xong (đo trên máy dev: khoảng 1 phút, 3,6 triệu chữ ký).
+- **ClamAV nạp lại chữ ký thì ngừng quét** (#287). Compose đặt `ConcurrentDatabaseReload no`, nên trong lúc clamd
+  nạp lại, không tệp nào được quét. Clamd nạp lại vào hai lúc:
+  - mỗi ngày một lần, khi freshclam tải bản daily mới (image chạy freshclam `--checks=1`) rồi báo clamd;
+  - khoảng 10 phút sau khi khởi động (`SelfCheck 600`), nếu freshclam tải bản mới lúc clamd còn đang nạp bản cũ.
+    Lúc đó clamd chưa nhận báo được: nhật ký có "Clamd was NOT notified".
+
+  Trong lúc nạp, `POST /api/files` (và mọi đường quét tệp) chờ clamd. Quá `CLAMAV_TIMEOUT_S` thì trả
+  `503 scanner_unavailable`, tệp chưa được lưu. Dấu hiệu và cách xử lý cho người vận hành: `docs/van-hanh.md`, mục
+  "Quét mã độc (ClamAV)". CI cho clamd nạp ngay bản freshclam vừa tải, trước mọi bước tải lên:
+  job `chay-thu`, bước "ClamAV dùng bản chữ ký freshclam vừa tải". Bật nạp song song (clamd vẫn quét bằng bộ chữ ký
+  cũ, RAM đỉnh gần gấp đôi) chờ số đo: #288.
 - **Meilisearch**: `MEILI_ENV=production`, `MEILI_MASTER_KEY` (≥ 16 byte, từ `.env`), `MEILI_NO_ANALYTICS=true`,
   volume `/meili_data`. Mất volume cũng không sao: svc-files khởi động lại là đồng bộ lại toàn bộ.
 - **svc-files** cần `HASURA_URL`, `HASURA_ADMIN_SECRET`, `MOC_OIDC_ISSUER`, `MOC_OIDC_JWKS_URL` giống Hasura,

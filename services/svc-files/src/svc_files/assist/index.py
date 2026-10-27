@@ -27,7 +27,11 @@ Một tác vụ, chạy tuần tự để ghi và nhúng không đua nhau:
 - ``embed_once``: lấy một lô đoạn chưa nhúng bằng mô hình hiện tại, gọi mô hình nhúng, ghi véc-tơ. Lô lỗi không do
   đường gọi thì nhúng lại từng đoạn; đoạn vẫn làm mô hình lỗi (HTTP lỗi, NaN…) được đánh dấu ``"<mô hình>#failed"``
   để không chặn mãi các đoạn sau — chỉ tìm được theo từ khóa, nhúng lại khi chữ đổi hoặc đổi mô hình.
-- ``hold``: lượt hỏi đang chờ mô hình thì không mở lô nhúng nền mới.
+- Nhường mô hình cho lượt hỏi, hai loại giữ. ``holding``: trong lúc một lời gọi mô hình của lượt hỏi đang chạy thì
+  không mở lô nhúng nền mới, lời gọi lâu bao nhiêu cũng vậy — một lô chen vào làm câu trả lời chậm thêm (#192).
+  ``hold``: giữ theo hạn, gồm phần giữ thêm sau mỗi lời gọi; chuỗi giữ liền quá ``MAX_HOLD_S`` thì vẫn mở một lô
+  (lúc không có lời gọi nào) rồi lại nhường: người hỏi lại dày hơn ``answer.HOLD_S`` không làm đoạn mới chờ véc-tơ
+  mãi (#184).
 - ``embed_pending`` / ``embed_failed``: số đoạn còn chờ nhúng / đã đánh dấu hỏng, đếm cuối mỗi vòng cho ``/readyz``.
 
 Nhật ký không bao giờ có chữ văn bản: ``office.assist.indexed``, ``office.assist.embedded``,
@@ -41,7 +45,8 @@ import json
 import logging
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
@@ -58,6 +63,7 @@ WAIT_S = 120.0             # đợi tác vụ Meilisearch (đổi embedder trên
 EMBEDDER_RETRY_S = 60.0    # cấu hình embedder lỗi: thử lại sau chừng này giây (đồng bộ vẫn chạy mỗi vòng)
 FAILED = "#failed"         # embed_model = "<mô hình>#failed": đoạn làm mô hình lỗi tất định (tên Ollama không có #)
 CANARY = "Mộc"             # câu mẫu: mô hình nhúng được nó thì lỗi của một đoạn là do đoạn, không do mô hình
+MAX_HOLD_S = 30.0          # giữ theo hạn (hold) liền quá chừng này giây thì vẫn nhúng một lô rồi lại nhường
 
 
 class Embedder(Protocol):
@@ -135,18 +141,39 @@ class ChunkIndexer:
         self.embed_failed: int | None = None    # đoạn đã đánh dấu hỏng với mô hình hiện tại
         self._embedder_retry_at = 0.0
         self._hold_until = 0.0
+        self._held_since = 0.0        # đầu chuỗi giữ liền hiện tại, hoặc lúc lô gần nhất được mở giữa chuỗi
+        self._calls = 0               # lời gọi mô hình của lượt hỏi đang chạy (holding): giữ tuyệt đối, không có trần
         # id văn bản → (changed_at, dấu các đoạn) đã ghi trong cửa sổ overlap: không đọc lại chỉ mục khi không đổi
         self._pushed: dict[str, tuple[datetime, tuple[tuple[str, str, str], ...]]] = {}
 
     # --- nhường mô hình cho lượt hỏi ------------------------------------------------------------------------------
 
     def hold(self, seconds: float) -> None:
-        """Không mở lô nhúng nền mới trong ``seconds`` giây tới (lượt hỏi đang cần mô hình)."""
-        self._hold_until = max(self._hold_until, self._clock() + seconds)
+        """Không mở lô nhúng nền mới trong ``seconds`` giây tới (lượt hỏi sắp cần mô hình); chịu trần ``MAX_HOLD_S``."""
+        now = self._clock()
+        if now >= self._hold_until:         # đã hết giữ: chuỗi giữ liền mới
+            self._held_since = now
+        self._hold_until = max(self._hold_until, now + seconds)
+
+    @contextmanager
+    def holding(self, after_s: float = 0.0) -> Iterator[None]:
+        """Trong khối, lượt hỏi đang gọi mô hình: không mở lô nhúng nền mới suốt khối, không có trần. Ra khỏi khối — kể
+        cả khi lượt bị hủy (``CancelledError``) — thì thôi giữ tuyệt đối, chỉ còn ``hold(after_s)``: phần giữ thêm này
+        nối vào chuỗi giữ liền nên chịu trần ``MAX_HOLD_S`` như mọi lần ``hold``."""
+        self._calls += 1
+        try:
+            yield
+        finally:
+            self._calls -= 1
+            if after_s > 0:
+                self.hold(after_s)
 
     @property
     def held(self) -> bool:
-        return self._clock() < self._hold_until
+        """Đang giữ: còn lời gọi mô hình đang chạy (``holding``), hoặc còn hạn ``hold`` mà chuỗi giữ liền chưa quá
+        ``MAX_HOLD_S`` kể từ đầu chuỗi hoặc lô gần nhất."""
+        now = self._clock()
+        return self._calls > 0 or (now < self._hold_until and now - self._held_since < MAX_HOLD_S)
 
     # --- đồng bộ --------------------------------------------------------------------------------------------------
 
@@ -272,6 +299,8 @@ class ChunkIndexer:
                 or not ai.embed_available or self.held):
             return 0
         started = self._clock()
+        if started < self._hold_until:      # giữ liền quá MAX_HOLD_S: lô này đi, rồi lại nhường thêm MAX_HOLD_S
+            self._held_since = started
         rows = await self.index.fetch(self._pending(), ["id", "kind", "text", "symbol", "summary"], self.batch)
         if not rows:
             return 0

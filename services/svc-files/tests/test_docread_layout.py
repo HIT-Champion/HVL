@@ -26,8 +26,8 @@ from datetime import date
 import pytest
 
 from conftest import text_pdf
-from svc_files.docread.layout import Line, text_lines, tsv_lines
 from svc_files.docread.rules import suggest
+from svc_files.layout import Line, text_lines, tsv_lines
 
 TODAY = date(2026, 10, 21)
 

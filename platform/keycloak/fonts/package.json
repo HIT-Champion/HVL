@@ -1,0 +1,10 @@
+{
+  "name": "moc-keycloak-fonts",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Signet — phông Be Vietnam Pro của theme đăng nhập Keycloak, lấy từ npm lúc dựng image keycloak-fonts",
+  "dependencies": {
+    "@fontsource/be-vietnam-pro": "5.3.0"
+  }
+}

@@ -13,10 +13,17 @@ Chủ: issue #15.
 | `submitOutgoing(documentId, signerId)` | `staff` | Người soạn trình dự thảo → khởi chạy `van-ban-di`, hoặc trình lại sau khi bị trả lại. Có đơn vị nhận trong hệ thống (`recipient_tenant_ids`) thì kiểm: có thật, không phải đơn vị mình, văn bản không hạn chế (`400`, `fields.recipient_tenant_ids` = `unknown` / `self` / `restricted`) |
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
 | `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` → liên thông tới đơn vị nhận trong hệ thống |
+| `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Chỉ đọc: số đo mới nhất và cờ chất lượng của các cảm biến NGSI-LD trong đơn vị người gọi (mục IT/OT bên dưới) |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
 xuất bằng `make api-docs`.
+
+**Quy trình của ứng dụng (#301)**: gói `svc_workflow/apps/` (luôn bật, không phụ thuộc `MOC_OFFICE_ENABLED`) mở năm
+đường `/api/workflow/{app}/…` qua APISIX cho ứng dụng cắm bằng manifest — token phải của client `app-{app}` — và lệnh
+`python -m svc_workflow.apps.deploy check|install|remove <tên>` mà `moc app install | remove` gọi trong container:
+kiểm BPMN theo danh sách trắng, form, rồi triển khai thành một deployment trên cùng Flowable. Chi tiết:
+[`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.10, [`docs/api/README.md`](../../docs/api/README.md) §8.
 
 **Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
 chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:
@@ -74,10 +81,23 @@ thay subscription; broker chưa chạy thì chỉ ghi nhật ký một lần; m�
 tới thì kiểm token, đọc từng cảm biến vượt ngưỡng (bỏ ký tự điều khiển trong tên phòng), rồi dựng dự thảo văn bản đi
 "Báo cáo sự cố" (một giao dịch GraphQL cùng sự kiện `ot.alarm`) đứng tên chuyên viên khai ở thuộc tính `responsible`
 của cảm biến, và báo người đó. Còn dự thảo chưa trình hoặc bị trả lại của cùng cảm biến thì không dựng thêm, chỉ nhắc
-(khóa thông báo theo dự thảo và ngày). Vòng nền còn giữ một subscription "neo" tạm dừng ở tenant mặc định
-(`urn:ngsi-ld:Subscription:moc-ot-context`): Scorpio 6.0.2 cất ngữ cảnh JSON-LD của subscription trong CSDL của tenant
-nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi thông báo (nhật ký Scorpio: "Mutiny had
-to drop … ResponseException").
+(khóa thông báo theo dự thảo và ngày). Giờ, ngày trong dự thảo và ngày của khóa theo `observedAt` của thiết bị;
+muộn hơn giờ máy chủ quá 2 phút (`FUTURE_SLACK`, đồng hồ thiết bị chạy nhanh) thì theo giờ máy chủ nhận thông báo,
+dự thảo ghi rõ giờ thiết bị gửi, sự kiện giữ giờ đó ở `device_observed_at`. Vòng nền còn giữ một subscription
+"neo" tạm dừng ở tenant mặc định (`urn:ngsi-ld:Subscription:moc-ot-context`): Scorpio 6.0.2 cất ngữ cảnh JSON-LD của
+subscription trong CSDL của tenant nhưng lúc gửi thông báo lại tìm ở tenant mặc định — thiếu neo thì broker bỏ mọi
+thông báo (nhật ký Scorpio: "Mutiny had to drop … ResponseException").
+
+**Sơ đồ cảm biến** (F3.10, Action `otSensorMap`, trang `/cam-bien` của Văn phòng điện tử): đọc broker ở tenant NGSI-LD
+của đơn vị trong biến phiên — `GET /ngsi-ld/v1/entities?type=TemperatureSensor&options=sysAttrs` (tối đa 100 cảm
+biến) và lịch sử 10 lần đo gần nhất của từng cảm biến (temporal API, tối đa 8 lời gọi một lúc, cả lượt 8 giây) — rồi
+trả số đo mới nhất, mã phòng (Property `room`), ngưỡng và bốn cờ chất lượng: `stale` (quá `MOC_OT_STALE_MIN` phút
+không có số đo, theo `observedAt`, thiếu hay ở tương lai thì `modifiedAt` — lúc broker nhận), `out_of_range` (không
+phải số hữu hạn hoặc ngoài −55…125 °C — dải đo của DS18B20), `duplicate_time` (số đo mới nhất trùng `observedAt` với
+lần đo khác trong lịch sử), `future_time` (`observedAt` muộn hơn giờ máy chủ quá 2 phút — đồng hồ thiết bị chạy
+nhanh; thiết bị đó mất tín hiệu vẫn bị gắn `stale`).
+Vai trò `clerk`, `staff`, `manager`, `director`. Chưa đặt `MOC_NGSI_URL` thì `status` = `off`; broker không trả lời
+hay trả lỗi thì `unavailable` — vẫn 200, không 5xx. Chỉ đọc, không ghi CSDL.
 
 **Liên thông trong hệ thống** (F3.12, `dispatch.py`): văn bản đi có đơn vị nhận trong hệ thống thì lúc phát hành
 CSDL tạo một dòng `office.dispatches` `pending` cho mỗi đơn vị, cùng giao dịch (trigger — hộp thư đi). Sau khi
@@ -113,8 +133,8 @@ Mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây dịch vụ nhận tối đa 5 việc 
    văn bản tương tự, chưa văn bản nào được giao, hoặc đơn vị không có lãnh đạo phòng → `none` với lý do
    `no_similar`/`no_history`/`no_valid_unit`;
 5. hạn: trung vị (thấp) số ngày từ lúc vào sổ (giờ VN) tới hạn của các căn cứ ủng hộ, chỉ tính 1..365 ngày; hạn đề xuất
-   = ngày vào sổ + số ngày, rơi vào thứ Bảy/Chủ nhật thì sang thứ Hai, sớm nhất là ngày mai. Văn bản đã ghi hạn giải
-   quyết thì không gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
+   = ngày vào sổ + số ngày, sớm nhất là ngày mai, rơi vào thứ Bảy, Chủ nhật hay ngày lễ (`MOC_HOLIDAYS`) thì sang
+   ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
 6. lưu dòng `office.assignment_suggestions` (căn cứ chỉ có id, điểm, đơn vị, số ngày) và một dòng sổ
    `assignment.suggested` trong **cùng một mutation**, bằng vai trò `agent` danh tính `MOC_ASSIGNER_ID` (preset ép thuê
    ước, `agent_id`, `actor_id`, `actor_kind = agent`), mã yêu cầu `goi-y:<id việc>`. `diff` có đúng 9 khóa vô hướng:
@@ -137,9 +157,16 @@ trong container: `docker compose exec -T svc-workflow python -m svc_workflow.adv
 (top-1, gốc so sánh, sai số hạn, độ trễ) và giới hạn của chúng: [`docs/danh-gia-ai.md`](../../docs/danh-gia-ai.md),
 mục F4.3.
 
-Giới hạn: chưa xét ngày lễ (chưa có lịch nghỉ, chỉ tránh thứ Bảy/Chủ nhật); chỉ gợi ý đơn vị chủ trì và hạn, **không**
-gợi ý người xử lý (việc của bước phân công); ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác top-1 dễ cao ảo — đọc kèm
-số căn cứ và số đơn vị. Ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt theo lần đo đầu trên stack thật.
+**Ngày lễ** (`MOC_HOLIDAYS`, #280). Các mục cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
+`YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định `01-01,04-30,05-01,09-02` là các ngày lễ dương lịch cố
+định ở Điều 112 Bộ luật Lao động 2019. Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc khánh và ngày nghỉ bù đổi
+theo năm, nên người vận hành thêm theo lịch nghỉ Chính phủ công bố, rồi tạo lại container svc-workflow. Sai dạng, ngày
+không có thật, khoảng ngược hay dài quá 31 ngày thì dịch vụ dừng lúc khởi động. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã
+lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình (`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
+
+Giới hạn: ngày lễ âm lịch và ngày nghỉ bù không tự có, người vận hành phải thêm mỗi năm; chỉ gợi ý đơn vị chủ trì và
+hạn, **không** gợi ý người xử lý (việc của bước phân công); ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác top-1 dễ cao
+ảo — đọc kèm số căn cứ và số đơn vị. Ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt theo lần đo đầu trên stack thật.
 
 **Văn bản hạn chế** (F3.7): sau mỗi bước, người phải làm việc đang mở được thêm vào danh sách xem
 (`office.document_acl`, đã có tên thì giữ nguyên); người không đọc được văn bản thì `completeTask` từ chối (`403`
@@ -180,6 +207,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_DIRECTORY_CLIENT_SECRET` | **bắt buộc** | Client `svc-workflow` trong realm (quyền `view-users`) |
 | `HASURA_URL`, `FLOWABLE_URL`, `MOC_KEYCLOAK_URL` | `http://hasura:8080`, `http://flowable:8080/flowable-rest/service`, `http://keycloak:8080` | Mạng nội bộ |
 | `MOC_REALM` | `moc` | |
+| `MOC_OFFICE_ENABLED` | `true` | Phần Văn phòng điện tử (#302, `office/api.py`): route `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN trong `MOC_PROCESSES_DIR`, sáu vòng nền của Văn phòng. `false`: dịch vụ vẫn lên với phần chung — đồng bộ danh bạ, thông báo và kênh ngoài, `/healthz`, `/readyz`; route của Văn phòng trả 404, không đọc `MOC_SCHEMAS_DIR`. Để kiểm lõi đứng được một mình (`make demo-tat-van-phong`), không dùng khi vận hành thật |
 | `MOC_PROCESSES_DIR` | `/app/processes` | Compose gắn `processes/` vào đây |
 | `MOC_SCHEMAS_DIR` | `/app/schemas` | JSON Schema dùng chung với giao diện, dựng sẵn vào image từ `schemas/` ở gốc repo (`docker build --build-context schemas=schemas services/svc-workflow`). Thiếu hoặc hỏng tệp thì dịch vụ dừng khi khởi động |
 | `MOC_SLA_DURATION` | `PT24H` | Thời hạn mỗi bước (ISO 8601: ngày, giờ, phút, giây — `P1D`, `PT24H`, `PT1M`). Sai dạng thì dịch vụ dừng khi khởi động. Gắn vào quy trình lúc khởi chạy: đổi giá trị không đổi hạn của văn bản đang xử lý |
@@ -192,11 +220,13 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_OT_THRESHOLD` | `35` | Ngưỡng nhiệt độ (°C) của subscription |
 | `MOC_OT_NOTIFY_URL` | `http://svc-workflow:8000` | Địa chỉ broker dùng để gọi lại dịch vụ |
 | `MOC_OT_SUBSCRIPTION_INTERVAL_S` | `15` | Chu kỳ kiểm subscription; `0` tắt vòng nền |
+| `MOC_OT_STALE_MIN` | `10` | Sơ đồ cảm biến: quá chừng ấy phút (1–1440) không có số đo thì cảm biến mang cờ `stale` (mất tín hiệu) |
 | `MOC_SUGGEST_ENABLED` | `true` | Tác tử gợi ý giao việc (F4.3). `false`: vẫn nhận việc `moc-goi-y` nhưng hoàn thành ngay, không gọi svc-files, không ghi gì |
 | `MOC_SUGGEST_POLL_INTERVAL_S` | `2` | Chu kỳ nhận việc gợi ý; `0` không chạy vòng nền — nhánh gợi ý tự hết sau `PT10M` |
 | `MOC_SUGGEST_TIMEOUT_S` | `10` | Hạn gọi svc-files (0–40 giây); cả một việc ≤ hạn + 10 giây, dưới khóa việc `PT1M` |
 | `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
 | `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
+| `MOC_HOLIDAYS` | `01-01,04-30,05-01,09-02` | Ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: `MM-DD` hằng năm, `YYYY-MM-DD`, `YYYY-MM-DD..YYYY-MM-DD` (≤ 31 ngày); trống thì như mặc định. Xem đoạn "Ngày lễ" |
 | `MOC_SMTP_HOST` | trống | Máy chủ thư; trống thì tắt kênh email |
 | `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa, chỉ cho relay nội bộ như Mailpit, không bao giờ đăng nhập — xem dưới bảng) |
 | `MOC_SMTP_PORT` | theo `MOC_SMTP_TLS` | `587` (starttls), `465` (ssl), `25` (none) |

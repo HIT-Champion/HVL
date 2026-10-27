@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:app:nghi-phep:form:duyet",
+  "title": "Duyệt đơn xin nghỉ",
+  "description": "Form của bước duyệt (formKey nghi-phep.duyet). Ca thử dùng chung: duyet.cases.json.",
+  "x-moc-title": {"vi": "Duyệt đơn xin nghỉ", "en": "Review the leave request"},
+  "x-moc-order": ["quyetDinh", "ghiChu"],
+  "x-moc-nfc": true,
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["quyetDinh"],
+  "properties": {
+    "quyetDinh": {
+      "title": "Quyết định",
+      "enum": ["dong-y", "tu-choi"],
+      "x-moc-ui": {
+        "widget": "radio",
+        "label": {"vi": "Quyết định", "en": "Decision"},
+        "options": {
+          "dong-y": {"vi": "Đồng ý", "en": "Approve"},
+          "tu-choi": {"vi": "Từ chối", "en": "Decline"}
+        }
+      }
+    },
+    "ghiChu": {
+      "title": "Ghi chú",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "$ref": "#/$defs/text",
+      "x-moc-ui": {
+        "widget": "textarea",
+        "rows": 3,
+        "label": {"vi": "Ghi chú", "en": "Note"},
+        "help": {"vi": "Người gửi đơn đọc được ghi chú này.", "en": "The requester can read this note."}
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "$comment": "Như $defs.text của schemas/van-ban-den.json: xuống dòng được, không ký tự ẩn, không trắng hai đầu.",
+      "type": "string",
+      "allOf": [
+        {"not": {"pattern": "[\u0000-\t\u000b\f\u000e-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f]"}},
+        {"not": {"pattern": "[\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\u2028\u2029]"}},
+        {"not": {"pattern": "^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]"}},
+        {"not": {"pattern": "[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"}}
+      ]
+    }
+  }
+}

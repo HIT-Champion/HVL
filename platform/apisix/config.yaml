@@ -22,12 +22,18 @@ deployment:
     config_provider: yaml
 
 apisix:
-  node_listen: 9080
+  # 9080: cổng công khai (ports của docker-compose.yml). 9081: cổng hook — Hasura gọi webhook sự kiện của ứng dụng cài
+  # bằng `moc app install` qua đây (container ứng dụng chỉ ở mạng `apps`, Hasura ở `moc`). Không publish; route hook
+  # (sinh trong .moc-apps/apisix.yaml) chỉ khớp khi server_port là 9081, nên cổng công khai không tới được chúng
+  node_listen:
+    - 9080
+    - 9081
   enable_ipv6: false
   enable_control: false
   enable_server_tokens: false
-  # Máy chủ trạng thái của APISIX: /status/ready trả 200 khi mọi worker đã nạp route. Chỉ trong mạng nội bộ `moc` (không
-  # có trong ports của docker-compose.yml); svc-files dò rồi gom vào trang trạng thái hệ thống công khai (/api/status)
+  # Máy chủ trạng thái của APISIX: /status/ready trả 200 khi mọi worker đã nạp route. Không có trong ports của
+  # docker-compose.yml: chỉ container ở mạng `moc` và `apps` tới được (ứng dụng chỉ đọc được 200/503, không có gì khác);
+  # svc-files dò rồi gom vào trang trạng thái hệ thống công khai (/api/status)
   status:
     ip: 0.0.0.0
     port: 7085
@@ -120,7 +126,8 @@ plugins:
 
 plugin_attr:
   prometheus:
-    # Cổng xuất chỉ số riêng, chỉ trong mạng nội bộ `moc` (không có trong ports của docker-compose.yml)
+    # Cổng xuất chỉ số riêng, không có trong ports của docker-compose.yml: chỉ container ở mạng `moc`, `apps` tới được.
+    # Chỉ số là số đếm theo route, mã trạng thái, độ trễ, địa chỉ upstream — không token, không dữ liệu nghiệp vụ
     export_addr:
       ip: 0.0.0.0
       port: 9091

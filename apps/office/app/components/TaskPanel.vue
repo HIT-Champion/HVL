@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { SuggestApply } from '~/utils/assignSuggest'
+import type { ProcessingBrief } from '~/utils/taskContext'
 
 // Khung xử lý việc đang chờ người dùng trên một văn bản (formKey trong services/svc-workflow/processes/*.bpmn20.xml).
 // Gửi completeTask; svc-workflow kiểm lại dữ liệu và quyền, Flowable chuyển sang bước tiếp theo.
@@ -36,6 +37,8 @@ const props = defineProps<{
   departments: PanelDepartment[]
   myDepartment: string | null
   myId: string
+  // phần việc được giao cho người xem (vbden.xuLy), trang văn bản tính từ các lượt giao
+  brief?: ProcessingBrief | null
 }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -59,6 +62,7 @@ const fileNote = ref('')
 const assign = reactive({ user_id: '', note: '' })
 // vbden.xuLy
 const result = ref('')
+const resultField = ref<HTMLTextAreaElement | null>(null)
 // vbdi.duyetPhong, vbdi.duyetDonVi: ý kiến; trả lại thì bắt buộc
 const reviewNote = ref('')
 const returning = ref(false)
@@ -80,6 +84,8 @@ const directErrors = computed(() => {
 })
 
 async function complete(outcome: string, data: Record<string, unknown>) {
+  // bấm hai lần lúc đang gửi: lượt sau không gửi lại completeTask
+  if (busy.value) return
   busy.value = true
   try {
     await gql(
@@ -105,9 +111,12 @@ function takeSuggestion(p: SuggestApply) {
   if (p.due_on) direct.due_on = p.due_on
 }
 
-function submitDirect() {
+async function submitDirect() {
   tried.value = true
-  if (Object.keys(directErrors.value).length) return
+  if (Object.keys(directErrors.value).length) {
+    await focusInvalidField()
+    return
+  }
   complete('direct', {
     instruction: direct.instruction.trim(),
     ...(direct.leadKind === 'department' ? { lead_department_id: direct.lead_department_id } : { lead_user_id: direct.lead_user_id }),
@@ -116,9 +125,12 @@ function submitDirect() {
   })
 }
 
-function submitAssign() {
+async function submitAssign() {
   tried.value = true
-  if (!assign.user_id) return
+  if (!assign.user_id) {
+    await focusInvalidField()
+    return
+  }
   complete('assign', { user_id: assign.user_id, note: assign.note.trim() || null })
 }
 
@@ -126,9 +138,12 @@ function approve() {
   complete('approve', { note: reviewNote.value.trim() || null })
 }
 
-function sendBack() {
+async function sendBack() {
   returning.value = true
-  if (!reviewNote.value.trim()) return
+  if (!reviewNote.value.trim()) {
+    await focusInvalidField()
+    return
+  }
   complete('return', { note: reviewNote.value.trim() })
 }
 
@@ -139,15 +154,21 @@ function issue() {
 
 function submitDone() {
   tried.value = true
-  if (!result.value.trim()) return
+  if (!result.value.trim()) {
+    resultField.value?.focus()
+    return
+  }
   complete('done', { result_note: result.value.trim() })
 }
 </script>
 
 <template>
-  <section class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
-    <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
+  <section
+    class="card overflow-hidden border-brand-200 ring-2 ring-brand-100" :aria-busy="busy" data-testid="task-panel"
+  >
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 bg-brand-50 px-5 py-3">
       <h2 class="text-sm font-semibold text-brand-900">{{ t(`task.${formKey}`) }}</h2>
+      <span v-if="busy" class="text-sm text-stone-600" role="status">{{ t('form.processing') }}</span>
     </div>
 
     <!-- Lãnh đạo đơn vị chỉ đạo -->
@@ -160,8 +181,11 @@ function submitDone() {
       <div>
         <label class="label" for="instruction">{{ t('form.chiDao.instruction') }}</label>
         <textarea id="instruction" v-model="direct.instruction" rows="3" class="input" maxlength="2000"
-                  :aria-invalid="tried && !!directErrors.instruction" />
-        <p v-if="tried && directErrors.instruction" class="field-error">{{ directErrors.instruction }}</p>
+                  required :aria-invalid="tried && !!directErrors.instruction"
+                  :aria-describedby="tried && directErrors.instruction ? 'instruction-error' : undefined" />
+        <p v-if="tried && directErrors.instruction" id="instruction-error" class="field-error">
+          {{ directErrors.instruction }}
+        </p>
       </div>
       <fieldset>
         <legend class="label">{{ t('form.chiDao.leadKind') }}</legend>
@@ -172,19 +196,27 @@ function submitDone() {
       </fieldset>
       <div v-if="direct.leadKind === 'department'">
         <label class="label" for="lead_dept">{{ t('form.chiDao.department') }}</label>
-        <select id="lead_dept" v-model="direct.lead_department_id" class="input" :aria-invalid="tried && !!directErrors.lead">
+        <select
+          id="lead_dept" v-model="direct.lead_department_id" class="input" required
+          :aria-invalid="tried && !!directErrors.lead"
+          :aria-describedby="tried && directErrors.lead ? 'lead-error' : undefined"
+        >
           <option value="">{{ t('form.pick') }}</option>
           <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
         </select>
       </div>
       <div v-else>
         <label class="label" for="lead_user">{{ t('form.chiDao.user') }}</label>
-        <select id="lead_user" v-model="direct.lead_user_id" class="input" :aria-invalid="tried && !!directErrors.lead">
+        <select
+          id="lead_user" v-model="direct.lead_user_id" class="input" required
+          :aria-invalid="tried && !!directErrors.lead"
+          :aria-describedby="tried && directErrors.lead ? 'lead-error' : undefined"
+        >
           <option value="">{{ t('form.pick') }}</option>
           <option v-for="u in handlers" :key="u.id" :value="u.id">{{ u.full_name }} — {{ deptName(u.department_id) }}</option>
         </select>
       </div>
-      <p v-if="tried && directErrors.lead" class="field-error">{{ directErrors.lead }}</p>
+      <p v-if="tried && directErrors.lead" id="lead-error" class="field-error">{{ directErrors.lead }}</p>
       <fieldset>
         <legend class="label">{{ t('form.chiDao.supports') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></legend>
         <div class="grid gap-1.5 sm:grid-cols-2">
@@ -195,12 +227,19 @@ function submitDone() {
       </fieldset>
       <div class="max-w-xs">
         <label class="label" for="due">{{ t('form.chiDao.due') }}</label>
-        <input id="due" v-model="direct.due_on" type="date" class="input" :min="today()" :aria-invalid="tried && !!directErrors.due_on">
-        <p v-if="tried && directErrors.due_on" class="field-error">{{ directErrors.due_on }}</p>
+        <input
+          id="due" v-model="direct.due_on" type="date" class="input" :min="today()"
+          :aria-invalid="tried && !!directErrors.due_on"
+          :aria-describedby="tried && directErrors.due_on ? 'due-error' : undefined"
+        >
+        <p v-if="tried && directErrors.due_on" id="due-error" class="field-error">{{ directErrors.due_on }}</p>
       </div>
       <div class="flex flex-wrap items-end justify-between gap-3 border-t border-stone-100 pt-4">
-        <div class="flex items-end gap-2">
-          <input v-model="fileNote" class="input w-56" :aria-label="t('form.chiDao.fileNote')" :placeholder="t('form.chiDao.fileNote')">
+        <div class="flex min-w-0 flex-wrap items-end gap-2">
+          <input
+            v-model="fileNote" class="input w-full sm:w-56" :aria-label="t('form.chiDao.fileNote')"
+            :placeholder="t('form.chiDao.fileNote')"
+          >
           <button type="button" class="btn-secondary" :disabled="busy" @click="complete('file', { note: fileNote.trim() || null })">{{ t('form.chiDao.file') }}</button>
         </div>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.chiDao.direct') }}</button>
@@ -211,17 +250,18 @@ function submitDone() {
     <form v-else-if="formKey === 'vbden.phanCong'" class="space-y-4 p-5" novalidate @submit.prevent="submitAssign">
       <div>
         <label class="label" for="assignee">{{ t('form.phanCong.user') }}</label>
-        <select id="assignee" v-model="assign.user_id" class="input" :aria-invalid="tried && !assign.user_id">
+        <select id="assignee" v-model="assign.user_id" class="input" required :aria-invalid="tried && !assign.user_id"
+          :aria-describedby="tried && !assign.user_id ? 'assignee-error' : undefined">
           <option value="">{{ t('form.pick') }}</option>
           <option v-for="u in myPeople" :key="u.id" :value="u.id">{{ u.full_name }}</option>
         </select>
-        <p v-if="tried && !assign.user_id" class="field-error">{{ t('validation.required') }}</p>
+        <p v-if="tried && !assign.user_id" id="assignee-error" class="field-error">{{ t('validation.required') }}</p>
       </div>
       <div>
         <label class="label" for="note">{{ t('form.phanCong.note') }} <span class="font-normal text-stone-400">({{ t('app.optional') }})</span></label>
         <textarea id="note" v-model="assign.note" rows="2" class="input" maxlength="2000" />
       </div>
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" :disabled="busy" @click="complete('self', { note: assign.note.trim() || null })">{{ t('form.phanCong.self') }}</button>
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.phanCong.assign') }}</button>
       </div>
@@ -229,10 +269,33 @@ function submitDone() {
 
     <!-- Chuyên viên báo kết quả -->
     <form v-else-if="formKey === 'vbden.xuLy'" class="space-y-4 p-5" novalidate @submit.prevent="submitDone">
+      <!-- chỉ đạo, người giao, hạn của phần việc này: không phải cuộn xuống dòng xử lý để đọc lại -->
+      <div v-if="brief" class="sg-assignment-brief" data-testid="processing-brief">
+        <h3 class="text-sm font-semibold">{{ t('form.xuLy.brief') }}</h3>
+        <p v-for="line in brief.instructions" :key="line" class="mt-2 whitespace-pre-line text-sm">{{ line }}</p>
+        <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <div v-if="brief.assignedBy">
+            <dt class="text-stone-500">{{ t('form.xuLy.assignedBy') }}</dt>
+            <dd class="font-medium">{{ users.find((u) => u.id === brief?.assignedBy)?.full_name || t('app.none') }}</dd>
+          </div>
+          <div>
+            <dt class="text-stone-500">{{ t('doc.due') }}</dt>
+            <dd class="font-medium">{{ brief.dueOn ? fmtDate(brief.dueOn) : t('desk.noDeadline') }}</dd>
+          </div>
+        </dl>
+      </div>
       <div>
-        <label class="label" for="result">{{ t('form.xuLy.result') }}</label>
-        <textarea id="result" v-model="result" rows="4" class="input" maxlength="4000" :aria-invalid="tried && !result.trim()" />
-        <p v-if="tried && !result.trim()" class="field-error">{{ t('validation.required') }}</p>
+        <label class="label" for="result">
+          {{ t('form.xuLy.result') }} <span class="font-normal text-stone-500">({{ t('form.xuLy.required') }})</span>
+        </label>
+        <textarea
+          id="result" ref="resultField" v-model="result" rows="4" class="input" maxlength="4000" required
+          aria-required="true" aria-describedby="result-help result-error" :aria-invalid="tried && !result.trim()"
+        />
+        <p id="result-help" class="mt-2 text-sm text-stone-500">{{ t('form.xuLy.consequence') }}</p>
+        <p id="result-error" v-show="tried && !result.trim()" class="field-error" role="alert">
+          {{ t('validation.required') }}
+        </p>
       </div>
       <div class="flex justify-end border-t border-stone-100 pt-4">
         <button type="submit" class="btn-primary" :disabled="busy">{{ t('form.xuLy.done') }}</button>
@@ -247,10 +310,13 @@ function submitDone() {
       <div>
         <label class="label" for="review-note">{{ t('form.duyet.note') }}</label>
         <textarea id="review-note" v-model="reviewNote" rows="3" class="input" maxlength="2000"
-                  :placeholder="t('form.duyet.returnNote')" :aria-invalid="returning && !reviewNote.trim()" />
-        <p v-if="returning && !reviewNote.trim()" class="field-error">{{ t('form.duyet.returnNote') }}</p>
+                  :placeholder="t('form.duyet.returnNote')" :aria-invalid="returning && !reviewNote.trim()"
+                  :aria-describedby="returning && !reviewNote.trim() ? 'review-note-error' : undefined" />
+        <p v-if="returning && !reviewNote.trim()" id="review-note-error" class="field-error">
+          {{ t('form.duyet.returnNote') }}
+        </p>
       </div>
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" :disabled="busy" @click="sendBack">{{ t('form.duyet.return') }}</button>
         <button type="submit" class="btn-primary" :disabled="busy">
           {{ formKey === 'vbdi.duyetDonVi' ? t('form.duyet.sign') : t('form.duyet.approve') }}
@@ -265,7 +331,7 @@ function submitDone() {
         <input v-model="isPublic" type="checkbox" class="mt-0.5 h-4 w-4 accent-brand-700">
         <span>{{ t('form.phatHanh.public') }}<span class="block text-xs text-stone-500">{{ t('form.phatHanh.publicHint') }}</span></span>
       </label>
-      <div class="flex justify-end gap-2 border-t border-stone-100 pt-4">
+      <div class="flex flex-wrap justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" class="btn-secondary" @click="preview(documentId).catch((e) => notice.error(errorText(t, e)))">
           {{ t('form.duyet.preview') }}
         </button>

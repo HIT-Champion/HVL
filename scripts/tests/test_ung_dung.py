@@ -386,17 +386,20 @@ class Migrations(unittest.TestCase):
 
 
 class Gateway(unittest.TestCase):
-    UPSTREAM = re.compile(r"  # moc app install: [^\n]*\n  - id: app-[a-z0-9-]+\n    type: roundrobin\n    nodes:\n"
-                          r"      [^\n]*\n")
+    UPSTREAM = re.compile(r"  # moc app install: [^\n]*\n  - id: (?:su-kien-)?app-[a-z0-9-]+\n    type: roundrobin\n"
+                          r"    nodes:\n      [^\n]*\n")
     ROUTE = re.compile(r"  # moc app install: [^\n]*\n  - id: app-[a-z0-9-]+\n    uris: [^\n]*\n    methods: [^\n]*\n"
                        r"    upstream_id: [^\n]*\n\n")
+    HOOK = re.compile(r"  # moc app install: [^\n]*\n  - id: su-kien-app-[a-z0-9-]+\n    uri: [^\n]*\n"
+                      r"    methods: \[POST\]\n    vars: [^\n]*\n    upstream_id: [^\n]*\n    plugins:\n"
+                      r"      proxy-rewrite:\n        uri: [^\n]*\n\n")
 
     def setUp(self) -> None:
         self.core = (REPO / u.CORE_GATEWAY).read_text(encoding="utf-8")
 
     def strip(self, text: str) -> str:
         """Bỏ đúng các khối đã chèn → phải còn lại tệp lõi, từng byte."""
-        return self.ROUTE.sub("", self.UPSTREAM.sub("", text))
+        return self.HOOK.sub("", self.ROUTE.sub("", self.UPSTREAM.sub("", text)))
 
     def test_no_app_is_byte_identical(self) -> None:
         self.assertEqual(u.gateway_text(self.core, []), self.core)
@@ -412,7 +415,20 @@ class Gateway(unittest.TestCase):
         self.assertGreater(app_route, lines.index("  - id: chan"))
         self.assertEqual(lines[lines.index("upstreams:") + 2], "  - id: app-bang-tin")
         self.assertIn('    uris: ["/bang-tin", "/bang-tin/*"]', lines)
-        self.assertNotIn("8081", text)                              # cổng webhook không có route
+        # cổng webhook chỉ có trong upstream của route hook; route đó chỉ khớp ở cổng hook 9081, đúng một đường
+        self.assertEqual(text.count("8081"), 1)
+        self.assertIn('      "app-bang-tin:8081": 1', lines)
+        hook = text[text.index("  - id: su-kien-app-bang-tin\n    uri:"):]
+        hook = hook[:hook.index("\n\n")]
+        self.assertEqual(hook.splitlines()[1:], [
+            "    uri: /su-kien/bang-tin", "    methods: [POST]", '    vars: [["server_port", "==", "9081"]]',
+            "    upstream_id: su-kien-app-bang-tin", "    plugins:", "      proxy-rewrite:", '        uri: "/su-kien"'])
+
+    def test_app_without_events_has_no_hook(self) -> None:
+        text = u.gateway_text(self.core, [record(events=None)])
+        self.assertEqual(self.strip(text), self.core)
+        self.assertNotIn("su-kien-app-", text)
+        self.assertNotIn("server_port", text)
 
     def test_unknown_core_blocks_survive(self) -> None:
         """Như bản WAF của việc 88: global rule lạ, chuỗi nhiều dòng có chữ giống mốc — vẫn chép nguyên văn."""
@@ -468,7 +484,8 @@ class Metadata(unittest.TestCase):
         self.assertEqual(table, rec["tables"][0])
         events = yaml_nho.loads(tree["databases/default/tables/core_app_events.yaml"].decode())
         trigger = events["event_triggers"][0]
-        self.assertEqual(trigger["webhook"], "http://app-bang-tin:8081/su-kien")
+        # Hasura (mạng moc) tới ứng dụng (mạng apps) chỉ qua route hook của APISIX ở cổng nội bộ 9081
+        self.assertEqual(trigger["webhook"], "http://apisix:9081/su-kien/bang-tin")
         self.assertEqual(trigger["headers"], [{"name": "X-Moc-Hook-Secret", "value_from_env": "MOC_APP_HOOK_BANG_TIN"}])
         self.assertNotIn("value", trigger["headers"][0])                     # bí mật không nằm trong metadata
         includes = yaml_nho.loads(tree["databases/default/tables/tables.yaml"].decode())
@@ -503,7 +520,10 @@ class Compose(unittest.TestCase):
                          ["./.moc-apps/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro"])
         self.assertEqual(data["services"]["hasura"]["volumes"], ["./.moc-apps/hasura-metadata:/hasura-metadata:ro"])
         app = data["services"]["app-bang-tin"]
-        self.assertEqual((app["profiles"], app["networks"], app["pull_policy"]), (["app"], ["moc"], "never"))
+        self.assertEqual((app["profiles"], app["networks"], app["pull_policy"]), (["app"], ["apps"], "never"))
+        env = app["environment"]                                            # lõi chỉ qua cổng công khai
+        self.assertEqual((env["MOC_KEYCLOAK_INTERNAL_URL"], env["MOC_GRAPHQL_INTERNAL_URL"]),
+                         ("http://apisix:9080", "http://apisix:9080/v1/graphql"))
         self.assertTrue(app["read_only"])
         self.assertEqual((app["cap_drop"], app["mem_limit"], app["cpus"]), (["ALL"], "96m", 1.0))
         self.assertEqual(app["security_opt"], ["no-new-privileges:true"])
@@ -526,7 +546,8 @@ class Compose(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:            # compose thật đọc tệp phủ thật, .env có giá trị giả
             root = pathlib.Path(tmp)
             (root / "docker-compose.yml").write_text("services:\n  hasura:\n    image: busybox\n  apisix:\n"
-                                                     "    image: busybox\nnetworks:\n  moc: {}\n", encoding="utf-8")
+                                                     "    image: busybox\nnetworks:\n  moc: {}\n  apps: {}\n",
+                                                     encoding="utf-8")
             (root / (".e" + "nv")).write_text("HASURA_ADMIN_SECRET=GIA-khoa\nPOSTGRES_PASSWORD=GIA-mk\n",
                                              encoding="utf-8")
             (root / ".moc-apps").mkdir()
@@ -645,6 +666,7 @@ def fake_system(root: pathlib.Path) -> Any:
             self.images: set[str] = set()
             self.applied = 0
             self.broken_once = False                 # lần áp metadata kế tiếp báo không nhất quán
+            self.gateway: list[str] = []             # mã cổng trả cho các lần hỏi tới (hết thì 200)
 
         def run(self, cmd: list[str], *, input: str | None = None, timeout: float = 900) -> str:
             self.calls.append(cmd)
@@ -661,6 +683,10 @@ def fake_system(root: pathlib.Path) -> Any:
         def apply_metadata(self) -> str:
             self.applied += 1
             return "Metadata applied"
+
+        def gateway_code(self, realm: str) -> str:
+            self.calls.append(["cổng", realm])
+            return self.gateway.pop(0) if self.gateway else "200"
 
         def metadata(self, body: dict[str, Any]) -> Any:
             if body["type"] == "get_inconsistent_metadata":
@@ -712,7 +738,8 @@ class Flow(unittest.TestCase):
         self.assertFalse([c for c in self.system.calls if c[:2] in (["docker", "build"], ["docker", "compose"])])
         plan = "\n".join(self.lines)
         for needle in ("2/8 image: sẽ dựng", "3/8 CSDL: sẽ ghi core.apps; sẽ áp 1 migration: 1_tin",
-                       "5/8 Keycloak: sẽ thêm app-bang-tin, thêm app-bang-tin-svc", "8/8 Hasura: sẽ áp"):
+                       "5/8 Keycloak: sẽ thêm app-bang-tin, thêm app-bang-tin-svc",
+                       "; sẽ khởi động lại apisix vì tệp route đổi", "8/8 Hasura: sẽ áp"):
             self.assertIn(needle, plan)
 
     def test_install_then_again_creates_nothing_new(self) -> None:
@@ -752,6 +779,40 @@ class Flow(unittest.TestCase):
         self.assertIn("không có migration mới", "\n".join(self.lines))
         self.assertIn("đã khớp", "\n".join(self.lines))
 
+    def test_gateway_restarts_only_when_routes_change(self) -> None:
+        # #299: tệp route đổi thì khởi động lại apisix sau compose up rồi chờ cổng, không để APISIX tự nạp lại
+        self.env.write_text(self.env.read_text(encoding="utf-8") + "MOC_REALM=hvl\n", encoding="utf-8")
+        restart = [*u.COMPOSE, "restart", "apisix"]
+
+        def steps() -> list[str]:
+            return [c[-1] if c[0] == "cổng" else c[len(u.COMPOSE)] for c in self.system.calls
+                    if c[0] == "cổng" or c[len(u.COMPOSE):len(u.COMPOSE) + 1] in (["up"], ["restart"], ["rm"])]
+
+        self.system.gateway = ["000", "503"]                      # đang khởi động, WAF chưa sẵn sàng
+        with unittest.mock.patch.object(u.time, "sleep") as sleep:
+            self.install()
+        self.assertEqual(steps(), ["up", "restart", "hvl", "hvl", "hvl"])
+        self.assertEqual(sleep.call_count, 2)
+        self.assertIn("đã khởi động lại apisix (tệp route đổi), cổng trả lời sau", "\n".join(self.lines))
+
+        self.system.calls.clear()
+        self.install()                                            # không đổi gì: không khởi động lại
+        self.assertEqual(steps(), ["up"])
+        self.assertNotIn(restart, self.system.calls)
+
+        self.system.calls.clear()
+        u.remove("bang-tin", state=self.state, system=self.system, out=self.lines.append)
+        self.assertEqual(steps(), ["rm", "up", "restart", "hvl"])
+
+    def test_gateway_not_answering_fails_with_hint(self) -> None:
+        self.system.gateway = ["502"]
+        with self.assertRaisesRegex(u.AppError, r"cổng vẫn chưa trả 200 \(mã 502\) — xem docker compose logs apisix, "
+                                                r"sửa xong thì docker compose restart apisix"):
+            with unittest.mock.patch.object(u.time, "monotonic", side_effect=[0, 0, 91]), \
+                    unittest.mock.patch.object(u.time, "sleep"):
+                u.restart_apisix(self.system)
+        self.assertEqual(self.system.calls, [[*u.COMPOSE, "restart", "apisix"], ["cổng", "moc"]])
+
     def test_failure_names_the_step_and_rerun_completes(self) -> None:
         self.system.kc.fail = True
         with self.assertRaises(u.StepFailed) as ctx:
@@ -776,6 +837,7 @@ class Flow(unittest.TestCase):
         self.assertEqual((self.tmp / u.GATEWAY).read_bytes(), (self.tmp / u.CORE_GATEWAY).read_bytes())
         self.assertIn([*u.COMPOSE, "rm", "--stop", "--force", "app-bang-tin"], self.system.calls)
         self.assertEqual(self.system.applied, 2)                    # áp hỏng, rồi áp lại bản trước
+        self.assertEqual(self.system.calls.count([*u.COMPOSE, "restart", "apisix"]), 2)   # cài, rồi trả tệp route về
         self.assertNotEqual(self.snapshot(), before)                 # .moc-apps có (tệp phủ trống ứng dụng, bí mật)
         self.lines.clear()
         self.install()                                               # sửa xong chạy lại: hoàn tất

@@ -58,6 +58,9 @@ precedence = "closest"
 SPDX-FileCopyrightText = "Chủ sở hữu từng dự án, xem docs/anh/logo/NGUON.md"
 SPDX-License-Identifier = "LicenseRef-Logos"
 
+# Phông Be Vietnam Pro (SIL OFL-1.1) không còn nằm trong kho: lấy từ gói npm @fontsource/be-vietnam-pro lúc dựng
+# image (#305, NOTICE), nên không khai ở đây.
+
 # Ảnh sơ đồ kiến trúc: đội vẽ (scripts/so_do_kien_truc.py), bên trong có các logo ở trên
 [[annotations]]
 path = ["docs/anh/kien-truc-tong-the.gif", "docs/anh/kien-truc-tong-the.en.gif"]
