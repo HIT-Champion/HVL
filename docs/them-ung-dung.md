@@ -527,7 +527,6 @@ mới, một tệp metadata mới, một dòng `!include`), công cụ vận hà
 - Chưa có hạn mức dung lượng cho mỗi người; cỡ tệp tối đa theo `svc-files`.
 - Đường dưới `/ca-nhan/` không có tệp thì trả trang chính (ứng dụng một trang).
 - Đặt `MOC_OIDC_AUDIENCE` cho `svc-files` thì client mới cũng phải có mapper audience tương ứng.
-- Giao diện chỉ tiếng Việt.
 
 ## 7. Ứng dụng mẫu có quy trình riêng: Đơn nghỉ phép
 

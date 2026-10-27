@@ -145,9 +145,9 @@ repeatable any number of times — the presentation script is [`docs/demo-script
 | (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match"; in the UI: build case files, department heads archive, the reading room shows files stamped with the viewer's name; the director's dashboard counts archived documents with DuckDB straight from the Parquet packages in cold storage | `make demo-nong-lanh` |
 | (ii) IT/OT convergence | Temperature sensor → NGSI-LD (Scorpio) → above the threshold, a draft "incident report" enters the outgoing document workflow | `make demo-it-ot` |
 | (iii) Data governance | OpenLineage provenance: the archive package traces back to the business tables and original files; row counts and required columns checked before writing; every Overview chart traces back to its view and source tables (computed from the PostgreSQL catalog), shown as a graph on the Data lineage page (`/pha-he`) | `make demo-pha-he` |
-| (iv) Zero-Trust | Quarantine: an EICAR file is blocked at the door, and the block is written to the audit log | `make demo-kiem-dich` |
+| (iv) Zero-Trust | Malware screening: `svc-files` scans every file with ClamAV before storing it; an EICAR file is refused, not stored, and the refusal is written to the audit log | `make demo-kiem-dich` |
 | (iv) Zero-Trust | Restricted documents: files encrypted in storage, only named people can open them, opened copies carry the viewer's name | `make demo-han-che` |
-| (iv) Zero-Trust | Secrets vault: services hold no secrets, the vault unseals itself on restart | `make demo-ket-bi-mat` |
+| (iv) Zero-Trust | Secrets vault: `svc-files` and `svc-workflow` read their secrets from OpenBao (AppRole), not from environment variables; the vault unseals itself on restart | `make demo-ket-bi-mat` |
 | (iv) GitOps | Self-healing: delete a container and the reconciler rebuilds it from what git declares | `make demo-tu-phuc-hoi` |
 
 Business demos, run the same way: `make demo-lien-thong` (exchange between two units), `make demo-nap-lo` (batch import
