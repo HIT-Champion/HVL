@@ -318,8 +318,8 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
 
 - *"Bí mật vẫn nằm trong `.env` mà?"* Đúng. `.env` vẫn là nguồn: container `openbao` nhận chúng và nạp vào két mỗi
   lần khởi động. Cái được: dịch vụ của đội không giữ bí mật trong biến môi trường, mỗi dịch vụ chỉ đọc được phần của
-  mình, mọi lần đọc có sổ. Phần mềm thượng nguồn (Hasura, SeaweedFS, Meilisearch, Centrifugo) vẫn đọc bí mật của
-  chúng từ biến môi trường.
+  mình, mọi lần đọc có sổ. Phần mềm thượng nguồn (PostgreSQL, Keycloak, Flowable, Hasura, SeaweedFS, Meilisearch,
+  Centrifugo; Parseable, Scorpio, restic khi bật profile) vẫn đọc bí mật của chúng từ biến môi trường.
 - *"Khóa mở két để đâu?"* `MOC_OPENBAO_SEAL_KEY` trong `.env`, khóa phục hồi và token khởi động trong volume của két,
   `role_id`/`secret_id` của dịch vụ trong volume riêng của dịch vụ đó. Ai có quyền Docker trên máy chủ vẫn đọc được
   két. Static seal đổi an toàn lấy khả năng tự phục hồi; bản thật nên dùng KMS hoặc HSM (seal `pkcs11`, `awskms`…).
