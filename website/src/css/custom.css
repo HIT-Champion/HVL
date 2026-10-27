@@ -1,0 +1,64 @@
+/*
+  Copyright 2026 Signet Team
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  SPDX-License-Identifier: Apache-2.0
+*/
+
+/* Màu của nhận diện Liền mạch (apps/office/app/assets/css/main.css): xanh ô liu trên nền giấy. Chữ chính trên nền đạt
+   tương phản 6,98:1 ở chế độ sáng, 10:1 ở chế độ tối (WCAG AA cần 4,5:1). */
+:root {
+  --ifm-color-primary: #555b3f;
+  --ifm-color-primary-dark: #4d5239;
+  --ifm-color-primary-darker: #484d36;
+  --ifm-color-primary-darkest: #3c402c;
+  --ifm-color-primary-light: #69704e;
+  --ifm-color-primary-lighter: #727b55;
+  --ifm-color-primary-lightest: #8f996c;
+  --ifm-background-color: #fffdf6;
+  --ifm-background-surface-color: #fffdf6;
+  --ifm-font-color-base: #202820;
+  --ifm-font-family-base: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ifm-heading-font-family: var(--ifm-font-family-base);
+  --ifm-code-font-size: 92%;
+  --ifm-table-stripe-background: rgba(85, 91, 63, 0.05);
+  --ifm-footer-background-color: #303722;
+  --docusaurus-highlighted-code-line-bg: rgba(85, 91, 63, 0.12);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #c9cca6;
+  --ifm-color-primary-dark: #bbbf8e;
+  --ifm-color-primary-darker: #b4b883;
+  --ifm-color-primary-darkest: #9ea45f;
+  --ifm-color-primary-light: #ced1af;
+  --ifm-color-primary-lighter: #d1d4b3;
+  --ifm-color-primary-lightest: #d9dbc1;
+  --ifm-background-color: #1c1f18;
+  --ifm-background-surface-color: #23271e;
+  --ifm-font-color-base: #e6e8dc;
+  --ifm-footer-background-color: #151812;
+  --docusaurus-highlighted-code-line-bg: rgba(201, 204, 166, 0.15);
+}
+
+/* Bảng trong tài liệu nhiều cột: cuộn ngang trong khung bảng, không làm tràn cả trang trên điện thoại */
+.markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown details {
+  margin-bottom: var(--ifm-spacing-vertical);
+}

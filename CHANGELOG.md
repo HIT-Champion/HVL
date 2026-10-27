@@ -253,6 +253,15 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   tĩnh của `index.html` khớp bảng dịch, `vi` và `en` cùng khóa, cùng tham số. Test giao diện +14. e2e
   `tieng-anh.spec.ts` thêm một test: bấm "English" ở Không gian cá nhân, rồi Bảng tin và Văn phòng điện tử mở ra cũng
   tiếng Anh; về lại tiếng Việt ở Văn phòng điện tử thì Không gian cá nhân về theo.
+- Trang tài liệu dựng bằng Docusaurus 3.10 trong `website/` (#308). Trang đọc thẳng `docs/` và README của các thành
+  phần, không chép nội dung; tệp `.md` đọc như CommonMark nên GitHub và trang hiện cùng một tệp, không cần front
+  matter. Có trang chủ, mục lục theo người đọc (xem nhanh, dự thi, sản phẩm, cài đặt và vận hành, nhà phát triển), sơ
+  đồ Mermaid, tìm kiếm tiếng Việt chạy trong trình duyệt, phông và màu của Signet tự phục vụ, không gọi CDN. Liên kết
+  tới tệp mã, thư mục đổi thành liên kết GitHub; liên kết tới tệp `.md` không tồn tại làm bước dựng dừng. Workflow
+  `trang-tai-lieu.yml` dựng trang trên mọi PR; push lên `develop` thì đăng lên GitHub Pages khi repo đã bật Pages.
+  Gói npm kèm theo, ngoại lệ giấy phép (EPL-2.0 của elkjs, Python-2.0, Unlicense…) và lỗ hổng chấp nhận tạm của gói
+  chỉ chạy lúc dựng ghi ở `DEPENDENCIES.md` mục Trang tài liệu, `.github/license-exceptions.json`,
+  `website/osv-scanner.toml`.
 - Trang thuật ngữ `docs/thuat-ngu.md` (#308), cho mục Giới thiệu của trang tài liệu: các từ của Signet theo sáu nhóm
   (sản phẩm và kiến trúc, văn bản và nghiệp vụ văn thư, vai trò, tin cậy và vận hành, trợ lý AI, ứng dụng). Mỗi từ
   giải thích trong một, hai dòng, kèm mã tính năng nếu có và tài liệu gốc để đọc kỹ hơn.
@@ -789,7 +798,7 @@ Bản cho vòng trường. Lõi Signet có thêm ứng dụng thứ hai và cắ
   trong mã `svc-files` viết bằng mã thoát. Test mới chạy lại các luật này mà không cần SonarQube: route khai 204 không
   `return` thân, ký tự hai chiều ở `services/`, `apps/`, `scripts/`, nhãn ô nhập và `type` của nút trong form ở mọi
   tệp `.vue`. Các cảnh báo còn lại là báo nhầm, không chèn `NOSONAR`. Test svc-workflow +5, office +3, scripts +2.
-- Cổng WAF chặn (F3.15) thì Văn phòng điện tử báo "Cổng an ninh chặn nội dung này… (mã <X-Request-Id>)", thay cho "Có
+- Cổng WAF chặn (F3.15) thì Văn phòng điện tử báo "Cổng an ninh chặn nội dung này… (mã `<X-Request-Id>`)", thay cho "Có
   lỗi xảy ra: Unexpected token '<'…" (đọc trang 403 HTML của cổng như JSON), "HTTP 403" hay câu "không có quyền" sai
   nghĩa ở trang Hỏi đáp. 403 JSON của Hasura, svc-files giữ như cũ. E2e `waf.spec.ts`: tên tệp có `' ; =`, dự thảo có
   đề mục I./II./III. và đường dẫn theo IP, ô Tìm kiếm "File …?" đi qua WAF; ô Nơi nhận chỉ là `http://<IP>/…` bị chặn

@@ -67,6 +67,33 @@ sử dụng"*).
 > (tiêu chí PoF #4). CI trên GitHub Actions chỉ gọi lại đúng các lệnh `make` ở trên, nên dựng và kiểm
 > thử trên máy riêng không cần GitHub.
 
+### Trang tài liệu (`website/`)
+
+Trang tài liệu (#308) dựng thẳng từ `docs/` và các README thành trang tĩnh, đăng lên GitHub Pages. Không thuộc sản
+phẩm: bản cài của Signet không chạy, không phục vụ trang này. Gói npm nạp theo `website/package-lock.json`.
+
+| Thành phần | Phiên bản | Giấy phép | Vai trò |
+|---|---|---|---|
+| Docusaurus (`@docusaurus/core`, `preset-classic`, `theme-mermaid`, `utils`) | 3.10.2 | MIT | Dựng trang từ tệp `.md` (đọc như CommonMark), mục lục, sơ đồ Mermaid |
+| React, React DOM | 19.2.8 | MIT | Giao diện của trang (qua Docusaurus) |
+| Mermaid | 12.2.0 | MIT | Vẽ sơ đồ Mermaid của `docs/architecture.md` (qua `@docusaurus/theme-mermaid`) |
+| `@easyops-cn/docusaurus-search-local` | 0.55.3 | MIT | Tìm kiếm: chỉ mục dựng sẵn lúc build, tìm ngay trong trình duyệt (lunr, `lunr-languages` có tiếng Việt), không gọi dịch vụ ngoài |
+| Be Vietnam Pro (`@fontsource/be-vietnam-pro`) | 5.3.0 | OFL-1.1 | Phông của trang, cùng phông giao diện ứng dụng; tự phục vụ, không gọi CDN. Bản dựng kèm `fonts/be-vietnam-pro/OFL.txt` lấy từ gói |
+
+Quét `website/package-lock.json` ngày 27/10/2026: 1305 gói khác nhau. Ngoài danh sách giấy phép được nhận chỉ có ba
+gói, cùng bốn gói tệp khóa không ghi giấy phép; đều có ngoại lệ ghi lý do trong `.github/license-exceptions.json`:
+
+| Gói | Giấy phép | Kéo theo bởi | Ghi chú |
+|---|---|---|---|
+| `argparse` | Python-2.0 | js-yaml | Bộ giấy phép dễ dãi của Python, SPDX ghi OSI phê duyệt. Chỉ chạy lúc dựng |
+| `elkjs` | EPL-2.0 | Mermaid | Copyleft yếu theo từng tệp, OSI phê duyệt; dùng nguyên bản, không sửa, nên không lan sang mã của Signet. Nằm trong JS của trang; mã nguồn ở [kieler/elkjs](https://github.com/kieler/elkjs) |
+| `robust-predicates` | Unlicense | d3-delaunay (qua Mermaid) | Đưa mã vào phạm vi công cộng, OSI phê duyệt |
+| `eval`, `require-like`, `format`, `khroma` | MIT | Docusaurus, Mermaid | `package.json` không khai giấy phép hay khai bằng trường `licenses` kiểu cũ; tệp LICENSE trong gói là MIT |
+
+`lunr-languages` (MPL-1.1, copyleft yếu) dùng nguyên bản cho tìm kiếm tiếng Việt. Ba lỗ hổng OSV-Scanner báo ở gói chỉ
+chạy lúc dựng (serialize-javascript, tinypool) hay máy chủ phát triển (uuid của sockjs) ghi lý do và hạn xem lại trong
+`website/osv-scanner.toml`.
+
 ## Tầng 1 — Lõi nền tảng
 
 | Thành phần | Phiên bản ghim | Giấy phép | Vai trò | Cách nạp | Phase |
@@ -299,7 +326,10 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   OSI phê duyệt cho HPND nhưng chưa cho riêng MIT-CMU.
 - ✅ MPL-1.1, LGPL-2.1+, SIL OFL 1.1 cho thư viện và phông dùng nguyên bản, không sửa: Pyphen (chọn MPL-1.1
   trong ba giấy phép), Pango (nạp động), phông Liberation, phông giao diện Be Vietnam Pro (gói npm
-  `@fontsource/be-vietnam-pro`, không nằm trong repo; mỗi bản dựng kèm `OFL.txt` lấy từ gói).
+  `@fontsource/be-vietnam-pro`, không nằm trong repo; mỗi bản dựng kèm `OFL.txt` lấy từ gói), `lunr-languages` của
+  trang tài liệu.
+- ✅ Python-2.0, Unlicense (OSI phê duyệt) và EPL-2.0 (copyleft yếu, dùng nguyên bản) chỉ cho gói của trang tài liệu
+  `website/`, qua ngoại lệ có lý do: `argparse`, `robust-predicates`, `elkjs` (mục Trang tài liệu).
 - ✅ CC-BY-4.0, CC0-1.0 chỉ cho dữ liệu và công cụ chạy lúc dựng, lúc phát triển, không vào sản phẩm: `caniuse-lite`,
   `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
   theo BSD-3-Clause, `type-fest` theo MIT.

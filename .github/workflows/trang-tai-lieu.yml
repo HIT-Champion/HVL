@@ -1,0 +1,99 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Trang tài liệu (#308, website/): dựng bằng Docusaurus trên mọi PR để liên kết hỏng trong docs/ hay README đỏ ngay ở
+# PR; push lên develop thì đăng lên GitHub Pages. Repo chưa bật Pages (Settings → Pages → Source: GitHub Actions, cần
+# quyền quản trị) thì vẫn dựng, bỏ qua bước đăng kèm ghi chú, không làm đỏ develop.
+
+name: Trang tài liệu
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trang-tai-lieu-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dung:
+    name: Dựng trang tài liệu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      dang: ${{ steps.pages.outputs.dang }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.20.0"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Thư viện dựng trang theo package-lock.json
+        working-directory: website
+        run: npm ci --no-audit --no-fund --ignore-scripts
+
+      # onBrokenLinks, onBrokenMarkdownLinks, onBrokenMarkdownImages đặt 'throw' trong docusaurus.config.js
+      - name: Dựng trang, dừng khi có liên kết hỏng
+        working-directory: website
+        run: npm run build
+
+      - name: Repo đã bật GitHub Pages chưa
+        id: pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/pages" --silent; then
+            echo "dang=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Repo chưa bật GitHub Pages (Source: GitHub Actions): trang đã dựng nhưng chưa đăng"
+          fi
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.pages.outputs.dang == '1'
+        with:
+          path: website/build
+
+  dang:
+    name: Đăng lên GitHub Pages
+    needs: dung
+    if: needs.dung.outputs.dang == '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.dang.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - id: dang
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
