@@ -275,6 +275,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   Markdown đọc được cả trên GitHub và trang tài liệu, không cần plugin OpenAPI. `scripts/tests/test_api_docs.py`
   (8 test, trong `make test`) kiểm trang trong git khớp tệp OpenAPI trong git, nên quên sinh lại thì đỏ ngay ở job
   test đơn vị.
+- `COPYRIGHT.txt`: bản quyền Signet và bảng phần mềm thượng nguồn (phiên bản, giấy phép, trang chủ), sinh từ
+  `DEPENDENCIES.md` bằng `make copyright`, test chặn lệch (#346).
 
 ### Đã sửa đổi
 - Kiểm bản online ngay sau khi phát hành (#344, giai đoạn 0 của triển khai liên tục): `ban-online.yml` chạy thêm khi
@@ -545,6 +547,8 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   proxy trả 404 kèm `{}`) làm trang hiện lỗi JavaScript "Cannot read properties of undefined". Nay báo "Máy chủ chưa
   trả lời được (HTTP 404)…" kèm lời khuyên thử lại, hai ngôn ngữ; lỗi `HTTP <mã>` khác (trang 502 của cổng) cũng
   hiện câu ấy thay vì chữ "HTTP 502" trơn. Test đơn vị +1.
+- `DEPENDENCIES.md` ghi Kestra, Marquez, openlineage-python, Typer, Gotenberg như đang dùng: chuyển sang mục đã
+  cân nhắc nhưng không dùng (#346).
 
 ### Bảo mật
 - Giao diện Văn phòng điện tử nâng Nuxt 4.5.2 → 4.6.2 (#321), đóng bốn cảnh báo Dependabot của Nuxt: GHSA-vjh5-4x84-xrqp

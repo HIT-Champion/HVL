@@ -168,7 +168,7 @@ jobs:
 
       - name: Có đủ tài liệu bắt buộc
         run: |
-          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md; do
+          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md COPYRIGHT.txt; do
             test -f "$f" || { echo "::error::Thiếu $f"; exit 1; }
           done
           echo "Đủ tài liệu bắt buộc."
