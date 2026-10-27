@@ -103,8 +103,8 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
   #244 thì chạy một lần `git rm -rq --cached . && git reset --hard` để checkout lại ra LF (lệnh bỏ mọi thay đổi chưa
   commit).
 - Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng.
-- Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md`
-  kèm giấy phép và kiểm tra tính tương thích với Apache-2.0.
+- Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md` (tên dẫn tới trang chủ,
+  kèm giấy phép), kiểm tra tính tương thích với Apache-2.0, rồi chạy `make copyright` để sinh lại `COPYRIGHT.txt`.
 - Thêm hay nâng gói npm, Python thì chạy `make sbom && make license-audit` (cần Docker và mạng): CI kiểm giấy phép của
   mọi gói, kể cả gói gián tiếp. Gói ngoài chính sách hay chưa rõ giấy phép cần ngoại lệ ghi lý do trong
   `.github/license-exceptions.json`.
