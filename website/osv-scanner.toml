@@ -1,0 +1,53 @@
+# Copyright 2026 Signet Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Lỗ hổng OSV-Scanner báo trong website/package-lock.json mà chưa nâng được, mỗi mục kèm lý do và hạn xem lại. Cả ba
+# gói chỉ chạy trên máy dựng trang hay máy chủ phát triển; trang đăng lên chỉ là tệp HTML, JS, CSS tĩnh, không chứa
+# các gói này. Đầu vào của chúng là cấu hình của chính trang, không có dữ liệu từ người ngoài. Quét ngày 27/10/2026.
+# - serialize-javascript: copy-webpack-plugin, css-minimizer-webpack-plugin còn ghim ^6; bản vá đủ ba lỗi là 7.1.3
+#   (22/10/2026), chưa đủ hai tuần theo quy định nâng phụ thuộc. Docusaurus không dùng gói này để sinh trang.
+# - tinypool: @docusaurus/core 3.10.2 ghim ^1, bản vá ở dòng 2.x.
+# - uuid: sockjs của máy chủ phát triển webpack (npm start), không có trong bản dựng.
+
+[[IgnoredVulns]]
+id = "GHSA-5c6j-r48x-rmvq"
+ignoreUntil = 2026-12-31
+reason = "serialize-javascript 6.0.2: plugin webpack tuần tự hóa tùy chọn dựng; bản vá ở 7.x, hai plugin ghim ^6."
+
+[[IgnoredVulns]]
+id = "GHSA-m5mm-p8h7-m29v"
+ignoreUntil = 2026-12-31
+reason = "serialize-javascript 6.0.2: XSS khi chèn kết quả vào thẻ script; không dùng để sinh trang."
+
+[[IgnoredVulns]]
+id = "GHSA-qj8w-gfj5-8c6v"
+ignoreUntil = 2026-12-31
+reason = "serialize-javascript 6.0.2: tốn CPU với đối tượng giả mảng; đầu vào chỉ là tùy chọn dựng."
+
+[[IgnoredVulns]]
+id = "GHSA-5gmw-xhrv-c9v3"
+ignoreUntil = 2026-12-31
+reason = "tinypool 1.1.1 (@docusaurus/core ghim ^1): luồng dựng trang lúc build, tùy chọn do Docusaurus đặt."
+
+[[IgnoredVulns]]
+id = "GHSA-85c8-ppgw-ccpr"
+ignoreUntil = 2026-12-31
+reason = "tinypool 1.1.1: như GHSA-5gmw-xhrv-c9v3, chỉ chạy lúc build với tùy chọn của Docusaurus."
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+ignoreUntil = 2026-12-31
+reason = "uuid 8.3.2 (sockjs, chỉ khi npm start): lỗi ở v3, v5, v6 khi truyền buf; sockjs chỉ gọi v4."
