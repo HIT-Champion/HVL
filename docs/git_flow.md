@@ -112,6 +112,10 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `chore` | Việc vặt khác: dọn dẹp, phát hành | — |
 | `revert` | Hoàn tác một commit trước | — |
 
+Mỗi thay đổi ghi một dòng trong nhóm tương ứng của CHANGELOG (tối đa 120 ký tự): nói thay đổi gì với người dùng,
+kèm số issue hoặc PR, ví dụ `- Trang tài liệu Docusaurus đăng lên GitHub Pages (#342).` Chi tiết cài đặt, số test,
+biến môi trường để ở PR và tài liệu của tính năng.
+
 ### 3.3. Phạm vi
 
 | Phạm vi | Bao gồm | Mảng chính |

@@ -102,7 +102,9 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
 - Tệp chữ xuống dòng bằng LF (`.editorconfig`, `.gitattributes`). Clone trên Windows vẫn ra LF. Bản clone có từ trước
   #244 thì chạy một lần `git rm -rq --cached . && git reset --hard` để checkout lại ra LF (lệnh bỏ mọi thay đổi chưa
   commit).
-- Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng.
+- Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng: mỗi thay đổi một dòng (tối đa
+  120 ký tự) trong nhóm Đã thêm, Đã sửa đổi, Đã sửa lỗi hay Bảo mật, nói thay đổi gì, kèm số issue hoặc PR. Chi
+  tiết cài đặt, số test để ở PR và tài liệu.
 - Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md`
   kèm giấy phép và kiểm tra tính tương thích với Apache-2.0.
 - Thêm hay nâng gói npm, Python thì chạy `make sbom && make license-audit` (cần Docker và mạng): CI kiểm giấy phép của
