@@ -2,7 +2,8 @@
 
 Hướng dẫn từng bước cho người dùng Văn phòng điện tử và các ứng dụng chạy trên lõi Signet, mỗi vai trò một trang.
 Trang chỉ ghi việc làm hằng ngày: vào mục nào, bấm nút nào. Phần giải thích cách hệ thống chạy nằm ở tài liệu gốc,
-trang này trỏ tới chứ không chép lại.
+trang này trỏ tới chứ không chép lại. Gặp từ chưa rõ như vào sổ, nộp lưu, văn bản hạn chế, liên thông thì tra
+[Thuật ngữ](../thuat-ngu.md).
 
 ## Chọn trang theo vai trò
 
