@@ -14,8 +14,10 @@ Built for the **Vietnam Student Olympiad in Informatics 2026 — Open Source Sof
 DX-OS Open-Core. Most project documentation is written in Vietnamese; this page is a translation of
 [README.md](README.md).
 
-**Try it:** <https://signet.htechcs.com> (release v1.1.0, see [Try it out](#try-it-out)) · or install it on your own
+**Try it:** <https://signet.htechcs.com> (latest release, see [Try it out](#try-it-out)) · or install it on your own
 machine with four commands from [Building from source](#building-from-source).
+
+**Five-minute tour and documentation map (in Vietnamese):** [`docs/README.md`](docs/README.md).
 
 **Quick links:** [Introduction](#introduction) · [Architecture](#architecture) · [Features](#features) ·
 [Four principles](#evidence-for-the-four-design-principles) · [Technology](#technology-and-licenses) ·
@@ -126,8 +128,8 @@ each agent (Vietnamese): [`docs/danh-gia-ai.md`](docs/danh-gia-ai.md).
 ### Screenshots
 
 Taken automatically during the e2e run (`make e2e`), with fictional sample data. The interface is in Vietnamese by
-default; every e-Office page also has an English version (the P.A.R.A personal space and Bảng tin are in
-Vietnamese only).
+default; every page of the e-Office, the P.A.R.A personal space and the unit news board also has an English
+version.
 
 | The clerk uploads an incoming letter, the agent pre-fills the fields | Managers see where work is stuck | Recipients verify a document without signing in |
 |---|---|---|
@@ -140,24 +142,26 @@ repeatable any number of times — the presentation script is [`docs/demo-script
 
 | Principle | Demo | Command |
 |---|---|---|
-| (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match"; in the UI: build case files, department heads archive, the reading room shows files stamped with the viewer's name | `make demo-nong-lanh` |
+| (i) Data life cycle and velocity | A closed file is archived as a Parquet package + files + hashed manifest in write-locked cold storage; still searchable, and scanning the QR code still says "match"; in the UI: build case files, department heads archive, the reading room shows files stamped with the viewer's name; the director's dashboard counts archived documents with DuckDB straight from the Parquet packages in cold storage | `make demo-nong-lanh` |
 | (ii) IT/OT convergence | Temperature sensor → NGSI-LD (Scorpio) → above the threshold, a draft "incident report" enters the outgoing document workflow | `make demo-it-ot` |
 | (iii) Data governance | OpenLineage provenance: the archive package traces back to the business tables and original files; row counts and required columns checked before writing; every Overview chart traces back to its view and source tables (computed from the PostgreSQL catalog), shown as a graph on the Data lineage page (`/pha-he`) | `make demo-pha-he` |
-| (iv) Zero-Trust | Quarantine: an EICAR file is blocked at the door, and the block is written to the audit log | `make demo-kiem-dich` |
+| (iv) Zero-Trust | Malware screening: `svc-files` scans every file with ClamAV before storing it; an EICAR file is refused, not stored, and the refusal is written to the audit log | `make demo-kiem-dich` |
 | (iv) Zero-Trust | Restricted documents: files encrypted in storage, only named people can open them, opened copies carry the viewer's name | `make demo-han-che` |
-| (iv) Zero-Trust | Secrets vault: services hold no secrets, the vault unseals itself on restart | `make demo-ket-bi-mat` |
+| (iv) Zero-Trust | Secrets vault: `svc-files` and `svc-workflow` read their secrets from OpenBao (AppRole), not from environment variables; the vault unseals itself on restart | `make demo-ket-bi-mat` |
 | (iv) GitOps | Self-healing: delete a container and the reconciler rebuilds it from what git declares | `make demo-tu-phuc-hoi` |
 
 Business demos, run the same way: `make demo-lien-thong` (exchange between two units), `make demo-nap-lo` (batch import
 of incoming documents), `make demo-doc-van-ban`, `make demo-hoi-dap`, `make demo-giao-viec`, `make demo-che-pii` (AI
 assistants), `make demo-ky-so` (digital signature, illustrative), `make demo-ca-nhan` (a second application on the same
-core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-log-tap-trung`
-(centralised logs).
+core), `make demo-cai-ung-dung` (plugging in a third application with one command), `make demo-quy-trinh` (a fourth
+application that brings its own process and runs it on the core's workflow engine), `make demo-tat-van-phong`
+(turning off the e-Office part, the core keeps running), `make demo-log-tap-trung` (centralised logs).
 
 ## Technology and licenses
 
 Signet orchestrates open-source software in its original form: official images, pinned versions, no upstream code
-modified. The full list, libraries and reasons for each choice included: [`DEPENDENCIES.md`](DEPENDENCIES.md).
+modified. The full table (version, license, homepage): [`COPYRIGHT.txt`](COPYRIGHT.txt); the reasons for each
+choice: [`DEPENDENCIES.md`](DEPENDENCIES.md).
 
 | Space | Component | Version | License | Role in Signet |
 |---|---|---|---|---|
@@ -247,10 +251,10 @@ python3 scripts/seed.py                 # sample data, first time only
 
 ## Try it out
 
-**Online:** <https://signet.htechcs.com> runs release v1.1.0 on the team's machine, reaching the Internet through
-Cloudflare Tunnel. Trial accounts are sent with the contest submission; the repository does not publish passwords.
-Features newer than v1.1.0 (the "Chưa phát hành" — unreleased — section of [`CHANGELOG.md`](CHANGELOG.md)) are
-available when you install from source.
+**Online:** <https://signet.htechcs.com> runs the latest release on the team's machine, reaching the Internet through
+Cloudflare Tunnel; `.github/workflows/ban-online.yml` checks daily that it runs the newest tag. Trial accounts are
+sent with the contest submission; the repository does not publish passwords. Unreleased features (the "Chưa phát hành"
+section of [`CHANGELOG.md`](CHANGELOG.md)) are available when you install from source.
 
 **Your own installation:** the shared password of the sample accounts is the value of `MOC_DEMO_PASSWORD` in `.env`.
 Clerks, faculty leaders, team and division heads, and unit administrators must use two-factor authentication: after
@@ -274,6 +278,7 @@ handle and a reply draft the team head sent back for changes.
 |---|---|---|
 | <http://localhost:8080> | e-Office | Yes |
 | <http://localhost:8080/ca-nhan/> | P.A.R.A personal space | Yes |
+| <http://localhost:8080/tai-lieu-api/> | API documentation (Swagger UI): the core API and the e-Office API, sign in to try calls through the gateway | Optional |
 | <http://localhost:8080/bang-tin/> | Unit news board, once installed with `make app-install APP=apps/bang-tin/app.yaml` | Yes |
 | <http://localhost:8080/xac-thuc> | Document verification portal: enter a code or drop a PDF; codes of the issued sample documents are on each document's detail page (Outgoing documents, Issued tab) | No |
 | <http://localhost:8080/trang-thai> | System status | No |
@@ -337,7 +342,7 @@ Most documents are in Vietnamese.
 | Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
 | Technical | [H-P-D-I architecture](docs/architecture.md) · [Data model and permissions](docs/mo-hinh-du-lieu.md) · [Product specification](docs/dac-ta-san-pham.md) · [Feature maturity with evidence](docs/muc-hoan-thien.md) · [AI evaluation](docs/danh-gia-ai.md) · ["After" metrics of spec §8](docs/so-lieu-sau.md) · [H-P-D-I self-assessment](docs/tu-chan-doan.md) · [Git workflow](docs/git_flow.md) |
 | Contest | [PoF self-assessment](docs/du-thi/pof-checklist.md) · [Likely jury questions](docs/du-thi/hoi-dap-hoi-dong.md) · [Theme, rules, judging criteria](docs/du-thi/olp-2026-brief.md) · [Problem statement analysis](docs/du-thi/olp-2026-de-thi.md) · [Development plan](docs/du-thi/ke-hoach-phat-trien.md) · [Research before the problem statement](docs/du-thi/nghien-cuu/) |
-| Project | [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
+| Project | [Copyright and third-party software](COPYRIGHT.txt) · [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
 
 ### Repository layout
 
@@ -346,7 +351,7 @@ software the core uses unmodified (official images, no changes to upstream code)
 
 ```
 apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nhan/) · unit news board
-                     (bang-tin/, plugged in with moc app install)
+                     (bang-tin/, plugged in with moc app install) · Swagger UI API documentation (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, BPMN workflows, notifications, reminders, assignment suggestions
                      svc-files/: files, quarantine, search, PDF rendering, signing, verification portal, AI agents
                      ot-sensor/: simulated temperature sensor (profile iot-sim)

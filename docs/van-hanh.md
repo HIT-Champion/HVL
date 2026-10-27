@@ -79,8 +79,8 @@ neo công khai bên dưới). Thử: `make demo-ket-bi-mat`, `make demo-han-che`
 Nói rõ giới hạn:
 
 - `.env` vẫn là nguồn của các bí mật: container `openbao` nhận chúng qua biến môi trường và nạp lại vào két mỗi lần
-  khởi động. Hasura, SeaweedFS, Meilisearch, Centrifugo (phần mềm thượng nguồn) vẫn đọc bí mật của chúng từ biến môi
-  trường.
+  khởi động. Phần mềm thượng nguồn vẫn đọc bí mật của chúng từ biến môi trường: PostgreSQL, Keycloak, Flowable,
+  Hasura, SeaweedFS, Meilisearch, Centrifugo, và Parseable, Scorpio, restic khi bật profile của chúng.
 - Khóa mở két `MOC_OPENBAO_SEAL_KEY` nằm trong `.env`; khóa phục hồi, token khởi động và role_id/secret_id của dịch vụ
   nằm trong volume trên đĩa. Ai có quyền Docker trên máy chủ vẫn đọc được két. Két chỉ nằm trong mạng nội bộ
   `secrets` cùng hai dịch vụ (container khác không tới được), chưa có TLS.
@@ -273,7 +273,9 @@ systemd timer gọi nó mỗi 60 giây (tệp mẫu [`platform/systemd/`](../pla
 container: không gắn socket Docker vào container nào). Mỗi lượt:
 
 - **Tự phục hồi**: container unhealthy thì khởi động lại; dịch vụ khai trong compose mà mất container hoặc đã dừng
-  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Thử: `make demo-tu-phuc-hoi` (`docs/demo-script.md`).
+  thì dựng lại (`docker compose up -d` đúng các dịch vụ đó). Dịch vụ chạy một lần `keycloak-fonts` (chép phông của
+  theme đăng nhập vào volume, #305) đã xong, thoát 0, không tính là đã dừng. Thử: `make demo-tu-phuc-hoi`
+  (`docs/demo-script.md`).
 - **GitOps** (khi đặt `MOC_GITOPS_DIR` trong `.env` của bản cài): kéo nhánh `MOC_GITOPS_BRANCH` (mặc định `deploy`)
   về một bản sao git riêng của reconciler. Lần chạy đầu mà bản sao có thay đổi chưa commit thì reconciler từ chối,
   không xóa việc của ai; từ khi đã áp một commit, mỗi lần áp đều `checkout -f` và `clean -fd` bản sao, nên đừng sửa
@@ -291,6 +293,8 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
 
 - Áp một commit là cài lại toàn bộ: Signet dừng khoảng một phút (`install.sh` không thay cấu hình dưới container đang
   chạy). Image cũ theo commit không tự xóa.
+- Profile thêm trong `MOC_EXTRA_PROFILES` của bản cài (`tunnel`, `ai`…) đi cùng mọi lệnh compose của reconciler, như
+  `Makefile`: áp commit dừng rồi chạy lại cả chúng, tự phục hồi cũng thấy chúng (#351).
 - `.env` (bí mật, cấu hình riêng của máy chủ) không nằm trong git và reconciler không đụng tới.
 - Lượt reconciler bỏ qua khi đang sao lưu, khôi phục, `make install` (cả ba dùng chung một khóa trên thư mục cài),
   khi lần khôi phục trước dừng giữa chừng (không chạy lại Signet trên dữ liệu dở dang: chạy lại `backup restore`) hoặc

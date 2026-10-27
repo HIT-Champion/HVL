@@ -39,10 +39,10 @@ from PIL import Image
 from conftest import GOOD_SUMMARY, ISSUER, OLLAMA_MODEL, TENANT_A, FakeOllama, fake_tesseract, text_pdf
 from svc_files.app import create_app
 from svc_files.config import Settings
-from svc_files.docread.layout import Line
 from svc_files.docread.reader import Reader
 from svc_files.docread.rules import Field, Suggestion
 from svc_files.docread.summarize import NullSummarizer, OllamaSummarizer
+from svc_files.layout import Line
 
 LETTER_LINES = ("UBND TINH MAU", "So: 99/TB-SMK", "Ha Noi, ngay 15 thang 10 nam 2026", "THONG BAO",
                 "Lich hop giao ban thang 11 cua nha truong")
@@ -550,7 +550,7 @@ def test_thin_text_layer_is_used_when_tesseract_is_missing(reading, make_token, 
 
 def test_thin_text_layer_is_used_when_tesseract_has_no_language_data(reading, make_token, tmp_path, monkeypatch):
     from svc_files.docread import reader as reader_module
-    from svc_files.docread.ocr import OcrResult
+    from svc_files.ocr import OcrResult
 
     async def no_vie(*args, **kwargs):
         return OcrResult("failed", None, (), "engine_failed")

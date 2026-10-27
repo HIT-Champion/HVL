@@ -19,6 +19,12 @@ Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hi
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
 xuất bằng `make api-docs`.
 
+**Quy trình của ứng dụng (#301)**: gói `svc_workflow/apps/` (luôn bật, không phụ thuộc `MOC_OFFICE_ENABLED`) mở năm
+đường `/api/workflow/{app}/…` qua APISIX cho ứng dụng cắm bằng manifest — token phải của client `app-{app}` — và lệnh
+`python -m svc_workflow.apps.deploy check|install|remove <tên>` mà `moc app install | remove` gọi trong container:
+kiểm BPMN theo danh sách trắng, form, rồi triển khai thành một deployment trên cùng Flowable. Chi tiết:
+[`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.10, [`docs/api/README.md`](../../docs/api/README.md) §8.
+
 **Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
 chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:
 chỉ mục duy nhất `document_events_task_once` (một việc một sự kiện — lỗi này thì đọc lại sự kiện đã ghi, hoàn
@@ -201,6 +207,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_DIRECTORY_CLIENT_SECRET` | **bắt buộc** | Client `svc-workflow` trong realm (quyền `view-users`) |
 | `HASURA_URL`, `FLOWABLE_URL`, `MOC_KEYCLOAK_URL` | `http://hasura:8080`, `http://flowable:8080/flowable-rest/service`, `http://keycloak:8080` | Mạng nội bộ |
 | `MOC_REALM` | `moc` | |
+| `MOC_OFFICE_ENABLED` | `true` | Phần Văn phòng điện tử (#302, `office/api.py`): route `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN trong `MOC_PROCESSES_DIR`, sáu vòng nền của Văn phòng. `false`: dịch vụ vẫn lên với phần chung — đồng bộ danh bạ, thông báo và kênh ngoài, `/healthz`, `/readyz`; route của Văn phòng trả 404, không đọc `MOC_SCHEMAS_DIR`. Để kiểm lõi đứng được một mình (`make demo-tat-van-phong`), không dùng khi vận hành thật |
 | `MOC_PROCESSES_DIR` | `/app/processes` | Compose gắn `processes/` vào đây |
 | `MOC_SCHEMAS_DIR` | `/app/schemas` | JSON Schema dùng chung với giao diện, dựng sẵn vào image từ `schemas/` ở gốc repo (`docker build --build-context schemas=schemas services/svc-workflow`). Thiếu hoặc hỏng tệp thì dịch vụ dừng khi khởi động |
 | `MOC_SLA_DURATION` | `PT24H` | Thời hạn mỗi bước (ISO 8601: ngày, giờ, phút, giây — `P1D`, `PT24H`, `PT1M`). Sai dạng thì dịch vụ dừng khi khởi động. Gắn vào quy trình lúc khởi chạy: đổi giá trị không đổi hạn của văn bản đang xử lý |

@@ -66,6 +66,10 @@ class Settings:
     directory_sync_interval_s: float
     reconcile_interval_s: float
     sla_poll_interval_s: float
+    # Văn phòng điện tử (office/api.py), ứng dụng đầu tiên chạy chung tiến trình: false thì không gắn route
+    # /actions/{name}, /ot/notify/{tenant}, không triển khai BPMN văn bản, không chạy vòng định kỳ nào của nó; phần
+    # chung (danh bạ, kênh thông báo, /healthz, /readyz) vẫn chạy (docs/architecture.md §4.7)
+    office_enabled: bool = True
     # F3.10 IT/OT: context broker NGSI-LD (Scorpio, profile iot); để trống thì tắt. Ngưỡng nhiệt độ (°C) dựng báo cáo
     # sự cố; địa chỉ broker gọi lại svc-workflow; chu kỳ kiểm subscription của các đơn vị; số phút không có số đo thì
     # sơ đồ cảm biến gắn cờ mất tín hiệu
@@ -136,6 +140,7 @@ class Settings:
                 directory_sync_interval_s=float(env.get("MOC_DIRECTORY_SYNC_INTERVAL_S", "15")),
                 reconcile_interval_s=float(env.get("MOC_RECONCILE_INTERVAL_S", "300")),
                 sla_poll_interval_s=float(env.get("MOC_SLA_POLL_INTERVAL_S", "5")),
+                office_enabled=_flag("MOC_OFFICE_ENABLED", env.get("MOC_OFFICE_ENABLED", "true")),
                 ngsi_url=env.get("MOC_NGSI_URL", "").rstrip("/"),
                 ot_threshold=float(env.get("MOC_OT_THRESHOLD", "35")),
                 ot_notify_url=env.get("MOC_OT_NOTIFY_URL", "http://svc-workflow:8000").rstrip("/"),

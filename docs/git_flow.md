@@ -112,6 +112,10 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `chore` | Việc vặt khác: dọn dẹp, phát hành | — |
 | `revert` | Hoàn tác một commit trước | — |
 
+Mỗi thay đổi ghi một dòng trong nhóm tương ứng của CHANGELOG (tối đa 120 ký tự): nói thay đổi gì với người dùng,
+kèm số issue hoặc PR, ví dụ `- Trang tài liệu Docusaurus đăng lên GitHub Pages (#342).` Chi tiết cài đặt, số test,
+biến môi trường để ở PR và tài liệu của tính năng.
+
 ### 3.3. Phạm vi
 
 | Phạm vi | Bao gồm | Mảng chính |
@@ -125,6 +129,7 @@ Anh trong ngoặc; tài liệu, `CHANGELOG.md` và giao diện vẫn tiếng Vi�
 | `office` | `apps/office` — giao diện web | Frontend |
 | `ca-nhan` | `apps/ca-nhan` — Không gian cá nhân P.A.R.A, ứng dụng thứ hai trên lõi | Frontend |
 | `bang-tin` | `apps/bang-tin` — Bảng tin đơn vị, ứng dụng thứ ba, cắm bằng `moc app install` | Frontend · Backend |
+| `nghi-phep` | `apps/nghi-phep` — Đơn nghỉ phép, ứng dụng thứ tư, quy trình chạy trên lõi (#301) | Frontend · Backend |
 | `ai` | `svc-ai`: RAG, OCR, tác tử | AI |
 | `data` | Kestra, nóng → lạnh, lineage | AI |
 | `ops` | Compose, reconciler, sao lưu, giám sát, OpenBao | Backend |
@@ -184,8 +189,8 @@ trình soạn thảo mở sẵn mẫu; các dòng bắt đầu bằng `#` tự b
 # <loại>(<phạm vi>): <mô tả ngắn bằng tiếng Anh, không chấm cuối; cả dòng ≤ 72 ký tự>
 #
 # Loại:    feat fix perf refactor docs test build ci chore revert
-# Phạm vi: gateway auth db workflow files realtime office ca-nhan bang-tin ai data ops cli scripts e2e ci deps docs
-#          release
+# Phạm vi: gateway auth db workflow files realtime office ca-nhan bang-tin nghi-phep ai data ops cli scripts e2e ci
+#          deps docs release
 #
 # Thân (tùy chọn, tiếng Anh): VÌ SAO thay đổi. Xuống dòng ở 72 ký tự.
 #
@@ -300,7 +305,7 @@ gh pr create --base develop --fill               # 5. mở PR vào develop (nhá
 
 ## 6. Phát hành
 
-Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10 · `v1.1.0` 25/10 (ba bản đã phát hành) · `v1.2.0` 30/10, bản cho vòng trường ·
+Lịch: `v0.1.0` 18/10 · `v1.0.0` 23/10 · `v1.1.0` 25/10 · `v1.2.0` 27/10, bản cho vòng trường (bốn bản đã phát hành) ·
 `v1.3.0` 03/12, bản nộp chấm (mục 8). Các lệnh dưới đây lấy `1.1.0` làm ví dụ. Gói phát hành tên `signet-X.Y.Z.tar.gz`
 từ `v1.1.0`; gói của `v0.1.0`, `v1.0.0` giữ tên cũ `moc-X.Y.Z.tar.gz` (không gắn lại thẻ đã đẩy).
 
@@ -410,8 +415,7 @@ git verify-commit HEAD                            # thấy Good "git" signature 
 
 | Từ | Quy tắc |
 |---|---|
-| **tối 28/10** | Chốt danh sách cho `v1.2.0`: PR chưa gộp thì sang `v1.3.0`. Từ 29/10 chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` tới khi gắn thẻ |
-| **30/10** | Phát hành `v1.2.0`, bản cho vòng trường 01/11 (`v1.1.0` đã phát hành 25/10) |
+| **27/10** | Phát hành `v1.2.0`, bản cho vòng trường 01/11, sớm hơn lịch cũ 30/10 (#354); không đóng băng 28–29/10 nữa, `develop` đi tiếp tới `v1.3.0` |
 | **26/11** | Đóng băng tính năng: chỉ nhận PR `fix`, `docs`, `test`, `chore(release)` |
 | **03/12** | Phát hành `v1.3.0`, bản nộp chấm. Sau đó mỗi PR sửa lỗi gộp vào `develop` đi kèm một bản vá `v1.3.x` trước 17:00 06/12: lúc chấm, `develop` (nhánh mặc định, giám khảo clone) và `main` cùng nội dung |
 | **05/12 → 10/12** | Không đẩy `deploy` trừ khi cả đội đồng ý (sự cố chặn demo) |

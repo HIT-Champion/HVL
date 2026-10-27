@@ -5,8 +5,9 @@ danh tính, sự kiện, dữ liệu của không gian trước ([`docs/architec
 tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là lịch phát triển nội bộ.
 
 Trạng thái ghi ngày 25/10/2026, trên nhánh `develop`, sau bản `v1.1.0` (25/10). Các giai đoạn là thứ tự phụ thuộc,
-không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Phần làm sau đó nằm ở
-mục "Chưa phát hành" của [`CHANGELOG.md`](CHANGELOG.md), sẽ ra ở `v1.2.0` (30/10, bản cho vòng trường). Mã tính năng
+không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ 25/10 tới
+27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó
+nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã tính năng
 F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn chế đã biết
 của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 
@@ -101,7 +102,7 @@ Mục tiêu: mọi câu hỏi điều hành trả lời được bằng số li�
       (`docs/du-thi/ke-hoach-phat-trien.md` §6)
 - [x] Vòng đời nóng → lạnh (F3.8): hồ sơ đã đóng nộp lưu thành Parquet + tệp + manifest có băm trên bucket khóa ghi
       (`make demo-nong-lanh`); trên giao diện: trang Hồ sơ công việc, lãnh đạo phòng nộp lưu, phòng đọc xem tệp PDF
-      có dấu tên người xem
+      có dấu tên người xem; trang Điều hành đếm văn bản đã nộp lưu bằng DuckDB trên gói Parquet (#304)
 - [x] Phả hệ dữ liệu (F3.9): OpenLineage cho lượt nộp lưu, kiểm số dòng và cột bắt buộc trước khi ghi Parquet
       (`make demo-pha-he`); phả hệ báo cáo ← khung nhìn ← bảng tính từ catalog PostgreSQL, trang Phả hệ số liệu
       (`/pha-he`) vẽ đồ thị, mỗi biểu đồ ở trang Điều hành có nút Nguồn số liệu
@@ -160,9 +161,9 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
       văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
-- [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được),
-      `README.en.md`, hướng dẫn dịch cho người đóng góp (`CONTRIBUTING.md`, mục "Dịch giao diện"); Không gian cá nhân,
-      Bảng tin chỉ có tiếng Việt; tài liệu vận hành chưa có bản tiếng Anh (issue #59)
+- [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được), Không
+      gian cá nhân và Bảng tin cũng có bản tiếng Anh (#306), `README.en.md`, hướng dẫn dịch cho người đóng góp
+      (`CONTRIBUTING.md`, mục "Dịch giao diện"); tài liệu vận hành chưa có bản tiếng Anh (issue #59)
 - [ ] **Một phần** — cộng đồng và số đo thực tế: `CONTRIBUTING.md`, mẫu issue (F2.11, mức Một phần); thu góp ý và
       trang Số đo theo đặc tả §8 (F4.6, mức Dùng được). Chưa có đơn vị chạy thử nên cột "trước" của số đo còn trống
 

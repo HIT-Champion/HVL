@@ -1,0 +1,170 @@
+Signet — Lõi DX-OS Open-Core nguồn mở và ứng dụng Văn phòng điện tử
+Copyright 2026 Signet Team. Mã nguồn: https://github.com/HIT-Champion/Signet
+
+Signet là phần mềm nguồn mở: bạn được dùng, sửa đổi và phân phối lại theo Giấy phép Apache, phiên bản 2.0 (Apache
+License, Version 2.0) do Apache Software Foundation công bố.
+
+Signet được phân phối với mong muốn hữu ích nhưng KHÔNG KÈM BẢO ĐẢM NÀO, kể cả bảo đảm ngầm định về khả năng thương mại
+hay sự phù hợp với một mục đích cụ thể. Chi tiết xem Giấy phép Apache.
+
+Toàn văn giấy phép ở tệp LICENSE; thông báo bản quyền và mục đích chọn giấy phép ở tệp NOTICE; bản gốc của giấy phép:
+https://www.apache.org/licenses/LICENSE-2.0.
+
+Signet dùng các phần mềm, thư viện, phông chữ và mô hình của bên thứ ba; mỗi thành phần giữ bản quyền và giấy phép
+riêng. Signet nạp chúng ở dạng nguyên bản (image Docker chính thức, gói npm và pip ghim phiên bản trong tệp khóa),
+không chép mã nguồn của chúng vào kho này. Bảng dưới đây là các thành phần dùng trực tiếp, sinh từ DEPENDENCIES.md
+(make copyright). Lý do chọn từng thành phần, chính sách giấy phép, các gói kéo theo có giấy phép cần giải thích và
+các thành phần đã cân nhắc nhưng không dùng: xem DEPENDENCIES.md. Mọi gói kể cả gói kéo theo: SBOM
+signet-X.Y.Z.cdx.json kèm mỗi bản phát hành.
+
+
+Tên                             Phiên bản       Giấy phép               Mô tả                                     Trang chủ
+=======================================================================================================================================================================
+
+CÔNG CỤ DỰNG VÀ VẬN HÀNH
+=======================================================================================================================================================================
+Docker Engine                   ≥ 24.0          Apache-2.0              Đóng gói và chạy container                https://docs.docker.com/engine/
+Docker Compose v2               ≥ 2.20          Apache-2.0              Điều phối đa dịch vụ                      https://github.com/docker/compose
+Caddy                           ≥ 2.6           Apache-2.0              Proxy TLS trên máy chủ                    https://caddyserver.com
+Python                          ≥ 3.10          PSF-2.0                 Chạy make seed, make smoke                https://www.python.org
+Node.js                         24.20.0         MIT                     Dựng giao diện thành trang tĩnh, cài gói  https://nodejs.org
+                                                                        npm của app-ca-nhan, app-bang-tin,
+                                                                        app-nghi-phep, app-tai-lieu-api và phông
+                                                                        của theme đăng nhập
+Playwright                      1.63.0          Apache-2.0              Kiểm thử trên trình duyệt thật            https://playwright.dev
+axe-core, @axe-core/playwright  4.13.0          MPL-2.0                 Kiểm trợ năng tự động theo WCAG 2.0, 2.1  https://github.com/dequelabs/axe-core
+                                                                        mức A, AA trong e2e
+GNU Make                        ≥ 4.0           GPL-3.0+                Điều phối lệnh                            https://www.gnu.org/software/make/
+Git                             ≥ 2.30          GPL-2.0                 Quản lý mã nguồn, sinh gói phát hành      https://git-scm.com
+uv                              0.12.19         Apache-2.0 / MIT        Cài thư viện test theo băm và chạy make   https://github.com/astral-sh/uv
+                                                                        test, test db/tests/
+actionlint                      1.7.12          MIT                     Kiểm cú pháp và lỗi thường gặp trong      https://github.com/rhysd/actionlint
+                                                                        .github/workflows/
+gitleaks                        8.30.1          MIT                     Quét bí mật lộ trong toàn bộ lịch sử      https://github.com/gitleaks/gitleaks
+                                                                        commit
+OSV-Scanner                     2.6.0           Apache-2.0              Đối chiếu tệp khóa phụ thuộc với cơ sở    https://github.com/google/osv-scanner
+                                                                        dữ liệu lỗ hổng OSV
+REUSE tool                      5.0.2           GPL-3.0-or-later        Kiểm mọi tệp đều có thông tin bản quyền   https://github.com/fsfe/reuse-tool
+                                                                        và giấy phép theo chuẩn REUSE
+Syft                            1.54.1          Apache-2.0              Sinh SBOM CycloneDX của cây mã nguồn      https://github.com/anchore/syft
+Chromium                        bản có          BSD-3-Clause            Chỉ khi sửa sơ đồ kiến trúc của README    https://www.chromium.org
+                                --headless=new
+FFmpeg                          ≥ 6.0           LGPL-2.1-or-later       Chỉ khi sửa sơ đồ kiến trúc               https://ffmpeg.org
+                                                (GPL-2.0-or-later tùy
+                                                bản dựng)
+
+TRANG TÀI LIỆU (website/)
+=======================================================================================================================================================================
+Docusaurus (@docusaurus/core,   3.10.2          MIT                     Dựng trang từ tệp .md                     https://docusaurus.io
+preset-classic, theme-mermaid,
+utils)
+React, React DOM                19.2.8          MIT                     Giao diện của trang                       https://react.dev
+Mermaid                         12.2.0          MIT                     Vẽ sơ đồ Mermaid của                      https://mermaid.js.org
+                                                                        docs/architecture.md
+@easyops-cn/docusaurus-search-  0.55.3          MIT                     Tìm kiếm                                  https://github.com/easyops-cn/docusaurus-search-local
+local
+Be Vietnam Pro                  5.3.0           OFL-1.1                 Phông của trang, cùng phông giao diện     https://github.com/bettergui/BeVietnamPro
+(@fontsource/be-vietnam-pro)                                            ứng dụng
+
+TẦNG 1 — LÕI NỀN TẢNG
+=======================================================================================================================================================================
+Keycloak                        26.7.5          Apache-2.0              Định danh tập trung                       https://www.keycloak.org
+Apache APISIX                   3.18.0          Apache-2.0              Cổng API                                  https://apisix.apache.org
+PostgreSQL                      16              PostgreSQL License      Cơ sở dữ liệu quan hệ chính               https://www.postgresql.org
+Hasura GraphQL Engine (CE)      v2.51.0         Apache-2.0              Tự sinh API GraphQL, phân quyền cấp       https://github.com/hasura/graphql-engine
+                                                                        dòng, Actions, Event Triggers
+Flowable (REST)                 8.0.0           Apache-2.0              Động cơ quy trình BPMN                    https://github.com/flowable/flowable-engine
+SeaweedFS                       4.48            Apache-2.0              Lưu trữ đối tượng chuẩn S3                https://github.com/seaweedfs/seaweedfs
+ClamAV                          1.5.4           GPL-2.0                 Quét mã độc tệp tải lên                   https://www.clamav.net
+Meilisearch (Community          v1.54.3         MIT                     Tìm kiếm toàn văn                         https://github.com/meilisearch/meilisearch
+Edition)
+nginx (unprivileged)            1.30.6          BSD-2-Clause            Phục vụ trang tĩnh của app-office,        https://github.com/nginx/docker-nginx-unprivileged
+                                                                        app-ca-nhan sau APISIX
+Centrifugo                      v6.9.7          Apache-2.0              Đẩy thông báo thời gian thực qua          https://centrifugal.dev
+                                                                        WebSocket
+
+TẦNG 2 — ỨNG DỤNG WEB
+=======================================================================================================================================================================
+Nuxt                            4.6.2           MIT                     Khung ứng dụng web                        https://nuxt.com
+Vue                             3.5             MIT                     Thư viện giao diện                        https://vuejs.org
+oidc-client-ts                  3.5.0           Apache-2.0              Đăng nhập OIDC                            https://github.com/authts/oidc-client-ts
+Swagger UI (swagger-ui-dist)    5.33.2          Apache-2.0              Trang Tài liệu API /tai-lieu-api/         https://github.com/swagger-api/swagger-ui
+vue-i18n                        11.4.13         MIT                     Song ngữ Việt / Anh                       https://vue-i18n.intlify.dev
+Tailwind CSS (+                 4.3.3           MIT                     Định dạng giao diện                       https://tailwindcss.com
+@tailwindcss/vite)
+Ajv                             8.20.0          MIT                     Biên dịch JSON Schema dùng chung          https://ajv.js.org
+Apache ECharts                  6.1.0           Apache-2.0              Biểu đồ dashboard điều hành               https://echarts.apache.org
+Be Vietnam Pro                  5.3.0           OFL-1.1                 Phông giao diện của nhận diện Liền mạch   https://github.com/bettergui/BeVietnamPro
+(@fontsource/be-vietnam-pro)
+
+DỊCH VỤ TỰ VIẾT (services/, cli/)
+=======================================================================================================================================================================
+FastAPI                         0.143           MIT                     Khung viết svc-files, svc-workflow,       https://fastapi.tiangolo.com
+                                                                        svc-ai
+uvicorn                         0.54            BSD-3-Clause            Máy chủ ASGI chạy các dịch vụ             https://uvicorn.dev
+httpx2 (+ httpcore2,            2.13            BSD-3-Clause            Gọi Hasura, Flowable, Keycloak,           https://github.com/pydantic/httpx2
+truststore)                                     (truststore: MIT)       Meilisearch
+python-multipart                0.0.32          Apache-2.0              Đọc tệp tải lên                           https://github.com/Kludex/python-multipart
+boto3                           1.43            Apache-2.0              Gọi SeaweedFS qua giao thức S3            https://github.com/boto/boto3
+PyJWT (+ cryptography)          2.15 · 50.0     MIT (cryptography:      Kiểm JWT Keycloak trong svc-files và ở    https://github.com/jpadilla/pyjwt
+                                                Apache-2.0 / BSD)       API quy trình cho ứng dụng của
+                                                                        svc-workflow
+WeasyPrint (+ pydyf, tinycss2,  70.0            BSD-3-Clause            Dựng PDF văn bản đi đúng thể thức NĐ 30   https://weasyprint.org
+cssselect2, tinyhtml5,                          (tinyhtml5: MIT)        từ khuôn HTML
+webencodings)
+fontTools (+ Brotli, zopfli)    4.66            MIT (zopfli:            Nhúng và nén phông vào PDF                https://github.com/fonttools/fonttools
+                                                Apache-2.0)
+Pillow                          13.0            MIT-CMU (HPND)          Xử lý ảnh khi dựng PDF                    https://python-pillow.github.io
+Pyphen                          0.18            GPL-2.0+ / LGPL-2.1+ /  Ngắt từ khi dàn chữ                       https://github.com/Kozea/Pyphen
+                                                MPL-1.1, Signet dùng
+                                                theo MPL-1.1
+segno                           1.6             BSD-3-Clause            Mã QR in trên văn bản phát hành, dẫn tới  https://github.com/heuer/segno
+                                                                        cổng xác thực
+pypdf                           6.21.2          BSD-3-Clause            Đọc lớp chữ của PDF đính kèm để tìm theo  https://github.com/py-pdf/pypdf
+                                                                        nội dung
+pytest                          9.1             MIT                     Test đơn vị và tích hợp                   https://pytest.org
+jsonschema (+ referencing,      4.26            MIT                     svc-workflow kiểm lại dữ liệu form theo   https://github.com/python-jsonschema/jsonschema
+jsonschema-specifications,                                              JSON Schema dùng chung
+rpds-py, attrs)
+DuckDB                          1.5.6           MIT                     Nộp lưu hồ sơ                             https://duckdb.org
+pyHanko (+                      0.37.0 ·        MIT                     Ký số PAdES bản phát hành bằng khóa       https://github.com/MatthiasValvekens/pyHanko
+pyhanko-certvalidator,          0.32.1                                  trong Transit, kiểm chữ ký
+asn1crypto, tzlocal, lxml,
+aiohttp và 7 gói con,
+oscrypto, uritools, certifi;
+tzdata chỉ trên Windows)
+
+VẬN HÀNH VÀ BỐN NGUYÊN LÝ THIẾT KẾ
+=======================================================================================================================================================================
+OpenBao                         2.7.1           MPL-2.0                 Két bí mật và khóa                        https://openbao.org
+Scorpio Broker                  6.0.2           BSD-3-Clause            Context broker NGSI-LD cho dữ liệu cảm    https://github.com/ScorpioBroker/ScorpioBroker
+                                                                        biến
+PostGIS                         16-3.5          GPL-2.0                 CSDL riêng của Scorpio                    https://postgis.net
+Prometheus                      v3.15.0         Apache-2.0              Thu chỉ số của cổng API                   https://prometheus.io
+Grafana (OSS)                   13.2.3          AGPL-3.0                Hiển thị giám sát                         https://github.com/grafana/grafana
+cloudflared                     2026.10.0       Apache-2.0              Cloudflare Tunnel                         https://github.com/cloudflare/cloudflared
+Mailpit                         v1.31.4         MIT                     Hộp thư thử cho thông báo email của       https://mailpit.axllent.org
+                                                                        svc-workflow
+restic                          0.19.1          BSD-2-Clause            Sao lưu, khôi phục CSDL và tệp            https://restic.net
+Vector                          0.59.0          MPL-2.0                 Thu log của 8 dịch vụ qua driver fluentd  https://vector.dev
+                                                                        của Docker, che lần hai, gửi Parseable
+Parseable                       3.2.4           AGPL-3.0                Lưu và tra log tập trung                  https://github.com/parseablehq/parseable
+Coraza + OWASP CRS              Coraza v3.3.3,  Apache-2.0              Tường lửa ứng dụng web ở cổng API         https://coraza.io
+                                CRS v4.14.0                                                                       https://coreruleset.org
+
+TRÍ TUỆ NHÂN TẠO
+=======================================================================================================================================================================
+Ollama                          0.35.1          MIT                     Chạy mô hình ngôn ngữ cục bộ              https://ollama.com
+Qwen3-1.7B                      qwen3:1.7b      Apache-2.0              Trọng số mô hình viết trích yếu           https://huggingface.co/Qwen/Qwen3-1.7B
+Qwen3-Embedding-0.6B            qwen3-embeddin  Apache-2.0              Mô hình nhúng đoạn văn bản và câu hỏi     https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+                                g:0.6b                                  cho tìm theo nghĩa của trợ lý hỏi đáp
+Tesseract OCR (+ dữ liệu vie)   5.5.0           Apache-2.0              Nhận dạng chữ trên công văn scan, ảnh     https://github.com/tesseract-ocr/tesseract
+                                                                        chụp khi tiếp nhận
+=======================================================================================================================================================================
+
+Giấy phép của mọi gói npm, Python và action CI, kể cả gói kéo theo, được kiểm trên mỗi pull request (make sbom,
+make license-audit) theo chính sách ở DEPENDENCIES.md, mục "Kiểm tra tương thích giấy phép"; ngoại lệ ghi lý do
+trong .github/license-exceptions.json. Danh sách giấy phép được OSI phê duyệt: https://opensource.org/licenses.
+
+Thông tin bản quyền của từng tệp mã nguồn ở phần đầu tệp; tệp không chèn được (JSON, ảnh, tài liệu) khai trong
+REUSE.toml.

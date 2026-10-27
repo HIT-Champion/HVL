@@ -16,10 +16,10 @@
 
 """Chữ tiếng Việt cho trợ lý hỏi đáp (F4.2) — thuần Python, không I/O.
 
-- ``normalize``: NFC, bỏ ký tự điều khiển / vô hình (như ``docread.summarize.INVISIBLE_RE``), gộp khoảng trắng.
+- ``normalize``: NFC, bỏ ký tự điều khiển / vô hình (như ``vntext.INVISIBLE_RE``), gộp khoảng trắng.
 - ``tokens``: chữ thường, tách theo ký tự không phải chữ, nhưng giữ nguyên số (``3,2``, ``15/11/2026``,
   ``200.000``) và số ký hiệu (``88/CTSV``, ``131/ĐT-ĐH``) thành một token.
-- ``terms``: token bỏ từ dừng, khử trùng, so khớp trên dạng bỏ dấu (``docread.rules.fold``). Từ dừng so trên token
+- ``terms``: token bỏ từ dừng, khử trùng, so khớp trên dạng bỏ dấu (``vntext.fold``). Từ dừng so trên token
   chữ thường **còn dấu**: bỏ dấu trước thì "có" trùng "cơ" của "cơ quan", "thì" trùng "thi" của "kỳ thi".
 - ``keyword_query``: tối đa 10 term (Meilisearch chỉ xét 10 từ đầu của câu tìm), viết lại bằng chữ gốc.
 - ``sentences``: khoảng ``[đầu, cuối)`` của từng câu, để trích nguyên văn.
@@ -30,8 +30,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from ..docread.rules import fold
-from ..docread.summarize import INVISIBLE_RE
+from ..vntext import INVISIBLE_RE, fold
 
 MAX_QUERY_TERMS = 10
 

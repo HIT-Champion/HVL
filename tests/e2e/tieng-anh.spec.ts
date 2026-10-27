@@ -147,6 +147,67 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
   await expect.poll(() => savedLocale(staff)).toBe('vi')
 })
 
+// Không gian cá nhân và Bảng tin (#306): nút "English" ở thanh trên; lựa chọn lưu chung khóa moc.locale với Văn phòng
+// điện tử (cùng tên miền), nên mở ứng dụng kia hay Văn phòng điện tử cũng ra tiếng Anh, và đổi lại ở đâu cũng được.
+// Chữ so khớp lấy nguyên văn từ public/i18n.js của từng ứng dụng. Bảng tin cắm bằng manifest: CI cài trước make e2e
+// (ci.yml), máy chưa cài thì bỏ phần đó và ghi chú vào báo cáo như tro-nang.spec.ts
+test('Không gian cá nhân, Bảng tin bằng tiếng Anh, chung lựa chọn với Văn phòng điện tử', async ({ browser }) => {
+  test.skip(!PASSWORD, 'đặt MOC_DEMO_PASSWORD (make e2e tự đọc từ .env)')
+
+  const page = await signIn(browser, 'giangvienktpm')
+  const html = page.locator('html')
+  await page.goto('/ca-nhan/')
+  const folders = page.getByRole('navigation', { name: 'Thư mục P.A.R.A' })
+  await expect(folders.getByRole('link')).toHaveText([/Dự án/, /Lĩnh vực/, /Tài nguyên/, /Lưu trữ/])
+  await expect(html).toHaveAttribute('lang', 'vi')
+
+  // 1. Không gian cá nhân: thư mục, tiêu đề, nút tải lên, đăng xuất sang tiếng Anh; nút kia ghi "Tiếng Việt"
+  await page.getByRole('button', { name: 'English', exact: true }).click()
+  await expect(html).toHaveAttribute('lang', 'en')
+  await expect(page.getByRole('navigation', { name: 'P.A.R.A folders' }).getByRole('link'))
+    .toHaveText([/Projects/, /Areas/, /Resources/, /Archives/])
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Projects')
+  await expect(page.getByText('Upload a file to Projects', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Tiếng Việt', exact: true })).toHaveAttribute('lang', 'vi')
+  await expect(page.getByText('Dự án', { exact: true })).toHaveCount(0)
+  await expect.poll(() => savedLocale(page)).toBe('en')
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Projects')
+  await expect(html).toHaveAttribute('lang', 'en')
+  await shot(page, '45-tieng-anh-ca-nhan')
+
+  // 2. Bảng tin mở ra đã là tiếng Anh; tin (nếu có) mang nhãn loại tiếng Anh
+  const board = (await (await page.request.get('/bang-tin/')).text()).includes('id="tin"')
+  if (board) {
+    await page.goto('/bang-tin/')
+    await expect(page.getByRole('heading', { level: 1, name: 'Unit news board' })).toBeVisible()
+    await expect(html).toHaveAttribute('lang', 'en')
+    await expect(page.getByRole('button', { name: 'Tiếng Việt', exact: true })).toBeVisible()
+    await expect(page.locator('#tin li, #trang-thai:not(:empty)').first()).toBeVisible()
+    if (await page.locator('#tin li').count()) {
+      await expect(page.locator('#tin li .loai').first())
+        .toHaveText(/^(Incoming document registered|Outgoing document issued)$/)
+    }
+    await shot(page, '46-tieng-anh-bang-tin')
+  } else {
+    expect(process.env.CI, 'CI phải cài Bảng tin trước make e2e (ci.yml, bước make app-install)').toBeFalsy()
+    test.info().annotations.push({ type: 'bỏ qua /bang-tin/',
+      description: 'chưa cài Bảng tin: make app-install APP=apps/bang-tin/app.yaml' })
+  }
+
+  // 3. Văn phòng điện tử cũng tiếng Anh; về lại tiếng Việt ở đó thì Không gian cá nhân cũng về theo
+  await page.goto('/')
+  await expect(html).toHaveAttribute('lang', 'en')
+  await page.getByRole('button', { name: 'Tiếng Việt', exact: true }).click()
+  await expect(html).toHaveAttribute('lang', 'vi')
+  await expect.poll(() => savedLocale(page)).toBe('vi')
+  await page.goto('/ca-nhan/')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Dự án')
+  await expect(html).toHaveAttribute('lang', 'vi')
+  await expect(page.getByRole('button', { name: 'English', exact: true })).toBeVisible()
+})
+
 test('trang công khai đổi sang tiếng Anh không cần đăng nhập', async ({ browser }) => {
   // trình duyệt tiếng Anh: ứng dụng không theo ngôn ngữ trình duyệt, vẫn mở ra tiếng Việt cho tới khi bấm nút
   const outsider = await (await browser.newContext({ locale: 'en-GB' })).newPage()

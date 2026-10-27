@@ -25,6 +25,9 @@ Hai cách gọi:
   ``core.files`` sau khi quét sạch, ghi sự kiện vào sổ kiểm toán, đọc ``object_key``.
 - **Vai trò khác đặt sẵn phiên** (``as_role``): như service nhưng chọn vai trò — tác tử đọc văn bản đến (F4.1) gọi
   bằng vai trò ``agent``, Hasura ép danh tính, thuê ước qua preset (docread/store.py).
+
+Câu chỉ Văn phòng điện tử dùng (văn bản đi, sổ đăng ký, cổng xác thực, liên thông, phòng đọc) nằm ở
+``office/hasura.py`` — lớp con ``OfficeHasura`` của máy khách này.
 """
 
 from __future__ import annotations
@@ -72,12 +75,6 @@ mutation LogEvent($o: core_audit_log_insert_input!) {
 VISIBLE_FILE = """
 query VisibleFile($id: uuid!) {
   core_files_by_pk(id: $id) { id filename mime_type size_bytes sha256 encrypted created_by }
-}"""
-
-# Phòng đọc hồ sơ đã nộp lưu (F3.8): hỏi bằng token người dùng, Hasura quyết ai xem được hồ sơ nào
-VISIBLE_CASE_FILE = """
-query VisibleCaseFile($id: uuid!) {
-  office_case_files_by_pk(id: $id) { id code title year status closed_on archived_at archive_key archive_sha256 }
 }"""
 
 # Kèm: tệp có đang gắn vào văn bản hạn chế nào không. Tệp rõ của văn bản hạn chế có từ trước F3.7 (hoặc văn bản
@@ -169,65 +166,12 @@ query AskDocumentsService($ids: [uuid!]!) {{
   office_documents(where: {{_and: [{{id: {{_in: $ids}}}}, {{restricted: {{_eq: false}}}}]}}) {{ {_ASK_FIELDS} }}
 }}"""
 
-# Văn bản đích của tác tử gợi ý giao việc (F4.3, /internal/similar-documents): vai trò service lọc thuê ước nên văn
-# bản của thuê ước khác trả null; đọc cả văn bản hạn chế để route từ chối (409) trước khi tìm gì
-SIMILAR_TARGET = """
-query SimilarTarget($id: uuid!) {
-  office_documents_by_pk(id: $id) { id direction restricted summary }
-}"""
-
 # Kết quả tìm kiếm: chỉ những văn bản người dùng được đọc, dữ liệu mới nhất từ CSDL
 VISIBLE_DOCUMENTS = """
 query VisibleDocuments($ids: [uuid!]!) {
   office_documents(where: {id: {_in: $ids}}) {
     id direction status type_code symbol issuer_name issued_on summary urgency register_number registered_at due_on
   }
-}"""
-
-# Văn bản đi để dựng PDF: dùng chung cho bản phát hành (vai trò service) và bản xem trước (token người dùng —
-# Hasura áp quyền đọc, người không được đọc văn bản nhận null)
-LETTER = """
-query Letter($id: uuid!, $tenant: uuid!) {
-  office_documents_by_pk(id: $id) {
-    id direction status type_code summary body recipients symbol issued_on verify_code restricted
-    document_type { name in_symbol }
-    department { code }
-    signer { full_name }
-    events(where: {kind: {_eq: "office.document.approved"}}, order_by: {created_at: desc}, limit: 1) { created_at }
-  }
-  core_tenants_by_pk(id: $tenant) { code name parent_name place_name head_title }
-}"""
-
-# Cổng xác thực: đúng một văn bản đã phát hành, theo mã tra cứu hoặc theo băm (vai trò verifier, chỉ đọc
-# khung nhìn office.issued_documents). Năm cột chữ ký số (F4.5) null với văn bản không ký
-VERIFY = """
-query Verify($where: office_issued_documents_bool_exp!) {
-  office_issued_documents(where: $where, limit: 1) {
-    verify_code content_sha256 symbol issued_on type_name issuer_name parent_name summary status
-    signature_level signed_at signer_name signer_ca certificate_serial
-  }
-}"""
-
-# Sổ đăng ký văn bản đến / đi của một năm (F2.8): mọi dòng của sổ, kể cả văn bản hạn chế, để sổ in ra liền số
-# (vai trò service). Dòng nào người in không được đọc thì registers.py che nội dung — hỏi lại bằng token của họ.
-REGISTER = """
-query Register($tenant: uuid!, $direction: String!, $year: Int!) {
-  core_tenants_by_pk(id: $tenant) { code name parent_name head_title }
-  office_registers(where: {direction: {_eq: $direction}, year: {_eq: $year}}) { last_number }
-  office_documents(where: {register: {direction: {_eq: $direction}, year: {_eq: $year}}},
-                   order_by: {register_number: asc}) {
-    id status symbol issuer_name issued_on summary urgency restricted register_number registered_at due_on
-    recipients verify_code
-    document_type { name }
-    department { name }
-    signer { full_name }
-    assignments(where: {role: {_eq: "lead"}, parent_id: {_is_null: true}, status: {_neq: "cancelled"}},
-                order_by: {assigned_at: asc}, limit: 1) {
-      user_id department { name }
-    }
-    events(where: {kind: {_eq: "office.document.issued"}}, limit: 1) { created_at }
-  }
-  core_users { id full_name }
 }"""
 
 # Neo sổ kiểm toán (anchors.py): đầu chuỗi — khóa quản trị, không vai trò nào đọc được core.audit_head
@@ -239,28 +183,6 @@ query AuditHead {
 RECORD_ANCHOR = """
 mutation RecordAnchor($o: core_audit_anchors_insert_input!) {
   insert_core_audit_anchors_one(object: $o, on_conflict: {constraint: audit_anchors_once, update_columns: []}) { id }
-}"""
-
-# Liên thông trong hệ thống (F3.12): dòng outbox, văn bản nguồn và bản phát hành của nó — khóa quản trị không kèm vai
-# trò (dòng outbox, văn bản thuộc đơn vị gửi; bản sao thuộc đơn vị nhận). svc-workflow chỉ gửi id dòng, mọi thứ khác
-# đọc từ CSDL: bên gọi không chỉ định được tệp nào.
-DISPATCH_SOURCE = """
-query DispatchSource($id: uuid!) {
-  office_dispatches_by_pk(id: $id) {
-    id tenant_id to_tenant_id status file_id source_sha256
-    document {
-      id status restricted content_sha256
-      files(where: {role: {_eq: "issued"}}) {
-        file { id object_key filename mime_type size_bytes sha256 encrypted storage_tier }
-      }
-    }
-  }
-}"""
-
-# Bản sao đã có chưa (id định trước = dispatches.file_id): gọi lại sau khi đã chép thì trả đúng dòng đó
-DISPATCHED_FILE = """
-query DispatchedFile($id: uuid!) {
-  core_files_by_pk(id: $id) { id tenant_id object_key size_bytes sha256 }
 }"""
 
 # Lời gọi Action thay mặt văn thư (act_as): Hasura chờ Action tối đa 30 giây (db/metadata/actions.yaml)
@@ -304,11 +226,13 @@ class Location:
     restricted: bool = False  # đang gắn vào văn bản hạn chế (kể cả khi tệp không mã hóa)
 
 
-def _bytea(hex_digest: str) -> str:
+def to_bytea(hex_digest: str) -> str:
+    """Băm hex → giá trị bytea của Hasura."""
     return "\\x" + hex_digest
 
 
-def _hex(bytea: str) -> str:
+def from_bytea(bytea: str) -> str:
+    """Giá trị bytea Hasura trả về → hex."""
     return bytea[2:] if bytea.startswith("\\x") else bytea
 
 
@@ -423,7 +347,7 @@ class HasuraClient:
             "filename": filename,
             "mime_type": mime_type,
             "size_bytes": size_bytes,
-            "sha256": _bytea(sha256_hex),
+            "sha256": to_bytea(sha256_hex),
             "scanned_at": scanned_at.isoformat(),
         }
         if wrapped_dek is not None:
@@ -439,7 +363,7 @@ class HasuraClient:
             "signer_name": signature.signer_name,
             "ca_name": signature.ca_name,
             "serial": signature.serial,
-            "cert_sha256": _bytea(signature.cert_sha256),
+            "cert_sha256": to_bytea(signature.cert_sha256),
             "not_after": signature.not_after.isoformat(),
             "key_name": signature.key_name,
             "key_version": signature.key_version,
@@ -491,7 +415,7 @@ class HasuraClient:
             filename=row["filename"],
             mime_type=row["mime_type"],
             size_bytes=int(row["size_bytes"]),
-            sha256=_hex(row["sha256"]),
+            sha256=from_bytea(row["sha256"]),
             encrypted=bool(row.get("encrypted")),
             created_by=row.get("created_by"),
         )
@@ -512,19 +436,6 @@ class HasuraClient:
                     ) -> dict[str, Any]:
         """Khóa quản trị không kèm vai trò, cho việc nội bộ không nhận tham số từ người dùng (job nộp lưu F3.8)."""
         return await self._call(query, variables, {"X-Hasura-Admin-Secret": self._secret, **(headers or {})})
-
-    async def visible_case_file(self, token: str, case_file_id: uuid.UUID) -> dict[str, Any] | None:
-        """Hồ sơ nếu người giữ token được xem, ngược lại None; vai trò không đọc hồ sơ cũng là None."""
-        try:
-            data = await self._call(VISIBLE_CASE_FILE, {"id": str(case_file_id)}, {"Authorization": f"Bearer {token}"})
-        except HasuraAuthError:
-            raise
-        except HasuraError as exc:
-            if exc.code == "validation-failed":
-                return None
-            raise
-        row = data.get("office_case_files_by_pk")
-        return {**row, "archive_sha256": _hex(row["archive_sha256"]) if row["archive_sha256"] else None} if row else None
 
     async def changed_documents(self, since: datetime, limit: int, after: str) -> list[dict[str, Any]]:
         """Văn bản sửa (hoặc có tệp vừa được đọc chữ) từ `since` của mọi thuê ước, để đồng bộ chỉ mục tìm kiếm.
@@ -584,13 +495,6 @@ class HasuraClient:
                                 self._as_service(tenant_id, actor_id, request_id or str(uuid.uuid4())))
         return {row["id"]: row for row in data["office_documents"]}
 
-    async def similar_target(self, tenant_id: uuid.UUID, document_id: uuid.UUID, *, request_id: str = "",
-                             actor_id: str = "svc-files") -> dict[str, Any] | None:
-        """``{id, direction, restricted, summary}`` của văn bản đích (F4.3) trong đúng thuê ước, None khi không có."""
-        data = await self.as_role("service", tenant_id, actor_id, request_id or str(uuid.uuid4()), SIMILAR_TARGET,
-                                  {"id": str(document_id)})
-        return data.get("office_documents_by_pk")
-
     async def file_location(
         self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, file_id: uuid.UUID
     ) -> Location | None:
@@ -600,66 +504,11 @@ class HasuraClient:
             return None
         return Location(row["object_key"], row.get("wrapped_dek"), bool(row.get("restricted_links")))
 
-    async def letter(self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str,
-                     document_id: uuid.UUID) -> dict[str, Any] | None:
-        """Dữ liệu dựng bản phát hành, đọc bằng vai trò service của đúng thuê ước trong yêu cầu."""
-        data = await self._call(LETTER, {"id": str(document_id), "tenant": str(tenant_id)},
-                                self._as_service(tenant_id, actor_id, request_id))
-        return _letter(data)
-
-    async def visible_letter(self, token: str, tenant_id: uuid.UUID, document_id: uuid.UUID) -> dict[str, Any] | None:
-        """Dữ liệu dựng bản xem trước nếu người giữ token được đọc văn bản, ngược lại None."""
-        try:
-            data = await self._call(LETTER, {"id": str(document_id), "tenant": str(tenant_id)},
-                                    {"Authorization": f"Bearer {token}"})
-        except HasuraAuthError:
-            raise
-        except HasuraError as exc:
-            if exc.code == "validation-failed":  # vai trò không đọc văn bản (vd tenant_admin)
-                return None
-            raise
-        return _letter(data)
-
-    async def register(self, *, tenant_id: uuid.UUID, actor_id: str, request_id: str, direction: str,
-                       year: int) -> dict[str, Any]:
-        """Mọi dòng của sổ đăng ký một năm, đọc bằng vai trò service của đúng thuê ước trong token người gọi."""
-        return await self._call(REGISTER, {"tenant": str(tenant_id), "direction": direction, "year": year},
-                                self._as_service(tenant_id, actor_id, request_id))
-
-    async def verify(self, *, code: str | None = None, sha256_hex: str | None = None) -> dict[str, Any] | None:
-        """Văn bản đã phát hành có mã tra cứu hoặc băm này (vai trò verifier), không có thì None."""
-        where = {"verify_code": {"_eq": code}} if code else {"content_sha256": {"_eq": _bytea(sha256_hex or "")}}
-        data = await self._call(VERIFY, {"where": where},
-                                {"X-Hasura-Admin-Secret": self._secret, "X-Hasura-Role": "verifier"})
-        rows = data["office_issued_documents"]
-        if not rows:
-            return None
-        return {**rows[0], "content_sha256": _hex(rows[0]["content_sha256"])}
-
-    async def dispatch_source(self, dispatch_id: uuid.UUID) -> dict[str, Any] | None:
-        """Dòng office.dispatches kèm văn bản nguồn; ``document.issued``: bản phát hành (0 hoặc 1 tệp). Băm đổi sang
-        hex. Không có dòng thì None."""
-        data = await self._call(DISPATCH_SOURCE, {"id": str(dispatch_id)}, {"X-Hasura-Admin-Secret": self._secret})
-        row = data.get("office_dispatches_by_pk")
-        if row is None:
-            return None
-        doc = {k: v for k, v in row["document"].items() if k != "files"}
-        issued = [{**link["file"], "sha256": _hex(link["file"]["sha256"])} for link in row["document"]["files"]]
-        content = _hex(doc["content_sha256"]) if doc["content_sha256"] else None
-        return {**row, "source_sha256": _hex(row["source_sha256"]),
-                "document": {**doc, "content_sha256": content, "issued": issued}}
-
-    async def dispatched_file(self, file_id: uuid.UUID) -> dict[str, Any] | None:
-        """Dòng core.files có id này, của bất kỳ thuê ước nào (bản sao liên thông đã chép chưa); băm dạng hex."""
-        data = await self._call(DISPATCHED_FILE, {"id": str(file_id)}, {"X-Hasura-Admin-Secret": self._secret})
-        row = data.get("core_files_by_pk")
-        return {**row, "sha256": _hex(row["sha256"])} if row else None
-
     async def audit_head(self) -> tuple[int, str]:
         """(id dòng cuối, hash dòng cuối) của sổ kiểm toán."""
         data = await self._call(AUDIT_HEAD, {}, {"X-Hasura-Admin-Secret": self._secret})
         head = data["core_audit_head"][0]
-        return int(head["last_id"]), _hex(head["last_hash"])
+        return int(head["last_id"]), from_bytea(head["last_hash"])
 
     async def last_backup(self) -> datetime | None:
         """Giờ của lượt sao lưu gần nhất mà CSDL biết; chưa sao lưu lần nào thì None."""
@@ -677,13 +526,6 @@ class HasuraClient:
         return max(times, default=None)
 
     async def record_anchor(self, audit_id: int, hash_hex: str, location: str) -> None:
-        await self._call(RECORD_ANCHOR, {"o": {"audit_id": audit_id, "hash": _bytea(hash_hex), "location": location}},
+        await self._call(RECORD_ANCHOR, {"o": {"audit_id": audit_id, "hash": to_bytea(hash_hex), "location": location}},
                          {"X-Hasura-Admin-Secret": self._secret})
-
-
-def _letter(data: dict[str, Any]) -> dict[str, Any] | None:
-    doc, tenant = data.get("office_documents_by_pk"), data.get("core_tenants_by_pk")
-    if doc is None or tenant is None or doc["direction"] != "out":
-        return None
-    return {**doc, "tenant": tenant}
 

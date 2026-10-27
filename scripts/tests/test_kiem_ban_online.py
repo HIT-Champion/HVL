@@ -17,8 +17,9 @@
 """Kiểm bản online qua HTTPS (scripts/kiem_ban_online.py, .github/workflows/ban-online.yml) trên một site giả, không
 mạng: bản lành đạt cả năm mục; chứng chỉ sắp hết hạn, bắt tay TLS lỗi, TLS cũ, HTTP không chuyển sang HTTPS, trạng thái
 down, lệch phiên bản, URL http:// hay :9080 của Keycloak, thiếu header bảo mật đều là lỗi; thành phần suy giảm chỉ
-cảnh báo; mọi mục đều chạy và lỗi liệt kê hết; địa chỉ sai bị từ chối trước khi gọi mạng. Workflow chạy hằng ngày, chạy
-tay, chạy trên PR đổi chính nó, truyền thẻ phát hành mới nhất cho kịch bản.
+cảnh báo; mọi mục đều chạy và lỗi liệt kê hết; địa chỉ sai bị từ chối trước khi gọi mạng. Bản dev theo develop phải
+dựng từ một commit đã nêu (--commit). Workflow chạy hằng ngày, chạy tay, chạy trên PR đổi chính nó, truyền thẻ phát
+hành mới nhất cho kịch bản, đầu develop cùng các commit gộp trong 30 phút cho job bản dev.
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
@@ -47,6 +48,8 @@ sys.modules["kiem_ban_online"] = kiem     # @dataclass tra module của lớp tr
 spec.loader.exec_module(kiem)
 
 BASE = "https://signet.example"
+HEAD = "2e1ba0c" + "4" * 33
+OLDER = "88a3417" + "5" * 33
 DAY = 86400
 
 
@@ -153,6 +156,28 @@ class CheckTest(unittest.TestCase):
         self.site.replies[f"{BASE}/api/status"] = kiem.Reply(502, {}, b"<html>Bad gateway</html>")
         self.assert_fails("/api/status", "trả 502, không phải JSON")
 
+    def test_dev_build_must_come_from_one_of_the_commits(self) -> None:
+        for running in ("2e1ba0c", HEAD[:12], "0.1.0-328-g2e1ba0c", "88a3417"):
+            with self.subTest(running):
+                self.site.status["version"] = running
+                code, out = self.run_check("--commit", HEAD, "--commit", OLDER)
+                self.assertEqual(code, 0, out)
+        for running in ("dev", "1.2.0", "2e1ba0d", "2e1ba0", None):
+            with self.subTest(running):
+                self.site.status["version"] = running
+                code, out = self.run_check("--commit", HEAD, "--commit", OLDER)
+                self.assertEqual(code, 1, out)
+                self.assertIn(f"  - /api/status: chạy bản {running}, không dựng từ commit {HEAD[:12]} (hay 1 commit"
+                              " trước đó)", out)
+
+    def test_commit_is_a_full_sha_and_excludes_version(self) -> None:
+        for args in (["--commit", HEAD[:7]], ["--commit", HEAD.upper()], ["--commit", HEAD, "--version", "1.2.0"]):
+            with self.subTest(args), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as stop:
+                    self.run_check(*args)
+                self.assertEqual(stop.exception.code, 2)
+        self.assertEqual(self.site.calls, [])
+
     def test_degraded_component_only_warns(self) -> None:
         self.site.status["status"] = "degraded"
         self.site.status["components"][0]["status"] = "degraded"
@@ -246,9 +271,28 @@ class WorkflowTest(unittest.TestCase):
         for path in listed:
             self.assertTrue((ROOT / path).is_file(), path)
 
+    def test_runs_right_after_a_successful_release(self) -> None:
+        # Tên trong `workflows:` phải đúng `name:` của release.yml: đổi một bên mà quên bên kia thì lượt này im lặng
+        self.assertRegex(self.text, r"(?m)^  workflow_run:\n    workflows: \[Release\]\n    types: \[completed\]$")
+        release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertRegex(release, r"(?m)^name: Release$")
+        self.assertIn("if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'",
+                      self.text)
+        # Bản phát hành do GITHUB_TOKEN tạo không gọi được workflow khác, `release:` sẽ không bao giờ chạy
+        self.assertNotRegex(self.text, r"(?m)^  release:")
+
     def test_checks_the_latest_release_tag(self) -> None:
         self.assertIn('python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}"', self.text)
         self.assertIn("permissions:\n  contents: read", self.text)
+
+    def test_dev_job_checks_recent_develop_commits(self) -> None:
+        job = self.text[self.text.index("\n  kiem-dev:\n"):]
+        self.assertIn("if: github.event_name != 'workflow_run'\n", job)
+        self.assertIn("git fetch -q --no-tags --depth 20 origin develop", job)
+        self.assertIn("git log --first-parent -n 20 --format='%H %ct' FETCH_HEAD", job)
+        self.assertIn('[ "$at" -ge $((now - 1800)) ] || break', job)
+        self.assertIn('python3 scripts/kiem_ban_online.py "$DEV_URL" "${args[@]}"', job)
+        self.assertIn("vars.MOC_DEV_URL || 'https://signet-dev.htechcs.com'", self.text)
 
     def test_checkout_is_pinned_like_ci(self) -> None:
         pin = re.compile(r"uses: actions/checkout@([0-9a-f]{40})")

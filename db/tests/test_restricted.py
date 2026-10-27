@@ -38,7 +38,7 @@ NOTIFY = """mutation ($rows: [core_notifications_insert_input!]!) {
   insert_core_notifications(objects: $rows) { returning { id data } }
 }"""
 
-# Đúng mutation svc-workflow gửi khi tự cấp quyền xem cho người nhận việc (svc_workflow/hasura.py SHARE)
+# Đúng mutation svc-workflow gửi khi tự cấp quyền xem cho người nhận việc (svc_workflow/office/queries.py SHARE)
 SHARE = """mutation ($rows: [office_document_acl_insert_input!]!) {
   insert_office_document_acl(objects: $rows, on_conflict: {constraint: document_acl_pkey, update_columns: []}) {
     affected_rows }

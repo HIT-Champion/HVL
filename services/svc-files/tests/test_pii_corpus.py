@@ -36,9 +36,8 @@ from collections.abc import Iterator
 
 import pytest
 
-from svc_files import pdftext, pii
-from svc_files.docread import pdflayout
-from svc_files.docread.layout import tsv_lines
+from svc_files import pdflayout, pdftext, pii
+from svc_files.layout import tsv_lines
 
 SEED = pathlib.Path(__file__).resolve().parents[3] / "seed"
 SAMPLES = SEED / "van-ban-den"

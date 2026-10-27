@@ -25,8 +25,9 @@ from datetime import date
 
 import pytest
 
-from svc_files.docread.layout import Line
-from svc_files.docread.rules import CATALOG, MAX_BODY, Field, fold, suggest, title_case
+from svc_files.docread.rules import CATALOG, MAX_BODY, Field, suggest, title_case
+from svc_files.layout import Line
+from svc_files.vntext import fold
 
 TODAY = date(2026, 10, 21)
 # Vị trí cột trên trang (0..1): trái là cơ quan, số ký hiệu; phải là quốc hiệu, ngày; giữa là tên loại; thân rộng cả trang

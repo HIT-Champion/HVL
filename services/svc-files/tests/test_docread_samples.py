@@ -37,8 +37,8 @@ from datetime import date
 
 import pytest
 
-from svc_files.docread.layout import text_lines, tsv_lines
 from svc_files.docread.rules import CATALOG, Suggestion, suggest
+from svc_files.layout import text_lines, tsv_lines
 
 SAMPLES = pathlib.Path(__file__).resolve().parents[3] / "seed" / "van-ban-den"
 FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "ocr"

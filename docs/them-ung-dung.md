@@ -16,7 +16,7 @@ Có hai cách cắm thêm một ứng dụng:
 ## 1. Một lệnh: `moc app install`
 
 ```bash
-python3 scripts/moc.py app install apps/bang-tin/app.yaml --dry-run   # in kế hoạch 8 bước, không đổi gì
+python3 scripts/moc.py app install apps/bang-tin/app.yaml --dry-run   # in kế hoạch 8 bước (9 khi có workflow)
 python3 scripts/moc.py app install apps/bang-tin/app.yaml             # make app-install APP=apps/bang-tin/app.yaml
 python3 scripts/moc.py app list                                       # make app-list
 python3 scripts/moc.py app remove bang-tin                            # make app-remove APP=bang-tin — GIỮ dữ liệu
@@ -25,7 +25,8 @@ python3 scripts/moc.py app remove bang-tin                            # make app
 Chạy trên một bản Signet đang chạy (`make up`), ở thư mục chạy (gốc repo hoặc thư mục `make install`). Chạy lại bao
 nhiêu lần cũng được: bước nào đã khớp thì bỏ qua, không tạo client, migration, container trùng. Lỗi giữa chừng thì
 lệnh báo đúng bước (`✗ bước 5/8 (Keycloak): …`) và cách chạy lại; chạy lại chỉ làm phần còn thiếu. Thoát 0: xong;
-1: manifest sai, xung đột hay một bước lỗi; 2: không gọi được CSDL, Keycloak, Docker.
+1: manifest sai (kể cả BPMN, form bị `svc-workflow` từ chối), xung đột hay một bước lỗi; 2: không gọi được CSDL,
+Keycloak, Docker, `svc-workflow`.
 
 Người dùng thấy ứng dụng đã cài ở trang **Danh mục ứng dụng** của Văn phòng điện tử (`/ung-dung`, mục "Ứng dụng" ở
 thanh bên, mọi vai trò): tên, mô tả (`description` của manifest), nút Mở tới `/<đường>/`, phiên bản, lúc cài, cùng hai
@@ -53,6 +54,7 @@ không cần PyYAML trong thư mục cài): không nhận chuỗi nhiều dòng 
 | `metadata.tables` | Cùng định dạng tệp bảng của `db/metadata`: bảng, quan hệ, `select`/`insert`/`update_permissions` | Bảng chỉ trong schema của ứng dụng; quan hệ chỉ một chiều về `core`, `office`; vai trò chỉ `clerk`, `staff`, `manager`, `director`, `tenant_admin` (và `app_<tên>` khi có `service_account`); vai trò người dùng phải lọc theo đơn vị: `filter` (đọc, sửa) và `check` (thêm, khi không `set`) có `tenant_id: {_eq: X-Hasura-Tenant-Id}` ở gốc hoặc trong `_and` cấp đầu — nằm trong `_or`, `_not` không tính; hoặc `set: {tenant_id: X-Hasura-Tenant-Id}` khi thêm; điều kiện trong quyền (mọi vai trò) không có `_exists`, qua quan hệ sang `core`, `office` chỉ nhận `visible: {_eq: true}` (xem 1.9); bảng phải có ở bước 3 (sau migration); không có `delete_permissions`, `event_triggers` |
 | `service_account` | `true`: client bí mật `app-<tên>-svc` cho phần máy chủ (xem 1.5) | — |
 | `events` | `kinds` (danh sách trắng của lõi), `webhook: {port, path}`, `retry` | `webhook.port` khác `port` (cổng webhook không có route ra ngoài) |
+| `workflow` | `processes`: tệp BPMN `*.bpmn20.xml`; `forms`: `formKey` → tệp JSON Schema — quy trình chạy trên Flowable của lõi (1.10) | `formKey` mở đầu `<tên>.`; tệp có thật, trong thư mục ứng dụng; nội dung BPMN, form do `svc-workflow` kiểm ở bước 1 (danh sách trắng, 1.10) |
 
 Không có bí mật nào trong manifest: header webhook và client secret do lệnh sinh lúc cài.
 
@@ -68,6 +70,10 @@ Không có bí mật nào trong manifest: header webhook và client secret do l�
 | 6 | Tệp chạy dựng từ tệp lõi + bản ghi các ứng dụng đã cài | `.moc-apps/` (dưới đây), `COMPOSE_FILE` trong `.env` |
 | 7 | `docker compose up -d --no-deps apisix hasura app-<tên>`: compose chỉ tạo lại dịch vụ có cấu hình đổi; tệp route `.moc-apps/apisix.yaml` vừa đổi thì khởi động lại `apisix` và chờ cổng trả lời (#299) | Docker |
 | 8 | Hasura: `hasura-cli metadata apply` thư mục metadata trộn trong container, kiểm bảng được track, trigger có mặt, không có gì không nhất quán; lỗi thì trả tệp chạy và metadata về như trước lần cài này | Metadata Hasura |
+
+Manifest khai `workflow` thì lệnh có 9 bước: ở bước 1, `svc-workflow` kiểm gói quy trình trước mọi thay đổi (BPMN
+độc, form sai bị từ chối khi chưa dựng image, chưa tạo schema, client nào); bước "quy trình" đứng ngay sau Keycloak
+(bước 6) triển khai gói lên Flowable, các bước sau lùi một số. Chi tiết: 1.10.
 
 Mọi thứ của ứng dụng nằm trong `.moc-apps/` của thư mục chạy (`.gitignore` bỏ qua), tệp của lõi không đổi một byte:
 
@@ -263,7 +269,8 @@ Rủi ro (xem cả bảng ranh giới ở 1.4):
 Giới hạn:
 
 - Một ứng dụng một container, một trang dưới một đường; không có route API riêng qua APISIX — API của ứng dụng là
-  GraphQL trên bảng của nó và các đường có sẵn của lõi (`/v1/graphql`, `/api/files`).
+  GraphQL trên bảng của nó và các đường có sẵn của lõi (`/v1/graphql`, `/api/files`, `/api/workflow/<tên>/…` khi
+  khai `workflow` — 1.10).
 - Không có Action, remote schema, cron trigger cho ứng dụng; không quan hệ từ bảng của lõi sang bảng ứng dụng.
 - Danh sách sự kiện cố định ở lõi (3 loại văn bản); thêm loại là sửa migration của lõi. Không phải trục streaming:
   không đọc lại từ một vị trí, không nhóm người nghe, không bảo đảm thứ tự; mỗi ứng dụng một webhook.
@@ -280,6 +287,135 @@ Giới hạn:
 - Với Keycloak, Hasura, APISIX thật, lệnh chỉ được kiểm bằng màn `make demo-cai-ung-dung` (bước CI ở phần
   `luong-chinh` của job `chay-thu`); test trong `scripts/tests` không gọi dịch vụ thật.
 
+### 1.10. Quy trình của ứng dụng (`workflow`, #301)
+
+Ứng dụng mang quy trình nghiệp vụ của riêng nó (BPMN) và form (JSON Schema) mà không cần máy chủ nghiệp vụ, không cần
+bảng: lõi triển khai quy trình lên chính Flowable của `svc-workflow`, kiểm dữ liệu form, giao việc theo đơn vị và
+phòng, rồi mở một API chung cho trang của ứng dụng. Ứng dụng mẫu: Đơn nghỉ phép (`apps/nghi-phep`, mục 7).
+
+```yaml
+workflow:
+  processes: [workflow/don-nghi-phep.bpmn20.xml]      # đường tương đối với app.yaml
+  forms:
+    nghi-phep.don: forms/don.json                      # formKey → JSON Schema 2020-12
+    nghi-phep.duyet: forms/duyet.json
+```
+
+**Cài, cài lại, gỡ.** `moc app install` gói các tệp khai (nội dung lưu cả trong bản ghi `.moc-apps/apps/<tên>.json`,
+nên `moc app sync` và hoàn tác dựng lại được gói dù thư mục nguồn đổi) thành zip, đưa qua stdin cho lệnh chạy trong
+container `svc-workflow`:
+
+```bash
+docker compose exec -T svc-workflow python -m svc_workflow.apps.deploy check|install <tên>   # stdin: zip base64
+docker compose exec -T svc-workflow python -m svc_workflow.apps.deploy remove <tên>
+```
+
+Lệnh lấy thông tin đăng nhập Flowable đúng như lúc dịch vụ khởi động (`Settings.from_env(with_secrets(…))`: mật khẩu
+`rest-admin` trong két OpenBao, đọc bằng AppRole của `svc-workflow`), không qua dòng lệnh hay biến môi trường của người
+chạy. Gói hợp lệ thành **một** deployment tên `app/<tên>@<12 ký tự đầu SHA-256 nội dung>`, tài nguyên đặt tên theo khóa:
+`<processKey>.bpmn20.xml`, `<formKey>.json` và mục lục `moc-app.json`. Deployment mới nhất của ứng dụng đã cùng tên thì
+không triển khai lại — cài lại không đổi gì không thêm phiên bản định nghĩa quy trình nào. Gói khác thì thành phiên bản
+mới: đơn bắt đầu sau đó theo bản mới; đơn đang chạy đi tiếp theo BPMN cũ, việc của nó kiểm theo form của chính
+deployment cũ. Bước nào sau bước quy trình lỗi (tệp chạy, container, Hasura) thì quy trình về như trước lần cài này: cài
+lại gói của lần cài trước, chưa có thì tạm dừng — không để BPMN, form mới chạy khi trang, route còn bản cũ hay chưa có
+(#332). Tệp chạy, container giữ như lúc lỗi, chạy lại thì làm tiếp; riêng bước Hasura trả cả tệp chạy về. Lần cài dở đầu
+tiên ghi bản ghi trước nó vào `.moc-apps/truoc-khi-cai/<tên>.json`: lỗi thêm lần nữa vẫn hoàn tác về đó, không về bản
+ghi lần dở để lại; cài xong, hoàn tác xong hay gỡ thì xóa tệp này.
+
+`moc app remove` (và manifest bỏ mục `workflow`) **tạm dừng** (suspend) mọi định nghĩa quy trình có khóa `<tên>.…` cùng
+các phiên đang chạy — không xóa deployment: lịch sử đơn (`act_hi_*`), biến, đơn đang dở còn nguyên trong Flowable, như
+schema CSDL của ứng dụng gỡ không bị xóa. API coi ứng dụng là đã gỡ (`404 app_not_installed`) khi không định nghĩa nào
+của deployment mới nhất còn chạy. Cài lại thì bật lại, đơn đang dở làm tiếp. Khi gỡ, bước quy trình chạy trước bước xóa
+client Keycloak: lỗi thì client còn nguyên, chạy lại `moc app remove` gỡ tiếp (#332).
+
+**Kiểm BPMN theo danh sách trắng** (`svc_workflow/apps/bpmn.py`). BPMN của ứng dụng chạy trong cùng động cơ với quy
+trình Văn phòng điện tử và bằng quyền của động cơ: `scriptTask` chạy mã, `serviceTask` gọi lớp Java hay bean, listener
+chạy khi qua một bước, biểu thức `${…}` (JUEL) gọi được phương thức của mọi đối tượng trong ngữ cảnh (đọc, sửa quy
+trình của đơn vị khác). Flowable còn tính biểu thức ở tên việc, `documentation`, `formKey`, hạn, người được giao. Nên
+chỉ nhận đúng những gì một quy trình duyệt cần; mọi thứ khác bị từ chối, lời báo tiếng Việt kèm tệp, dòng, phần tử:
+
+| Phần | Nhận | Không nhận |
+|---|---|---|
+| Phần tử | `definitions`, `process` (đúng một mỗi tệp), `startEvent` (đúng một), `endEvent`, `userTask`, `exclusiveGateway`, `parallelGateway`, `sequenceFlow`, `conditionExpression`, `documentation`; sơ đồ BPMN DI (`bpmndi`, `dc`, `di` theo namespace, tiền tố gì cũng được) | `scriptTask`, `serviceTask`, `sendTask`, `receiveTask`, `businessRuleTask`, `callActivity`, `subProcess`, `boundaryEvent`, timer, message, signal, `extensionElements`, listener, mọi phần tử của namespace khác |
+| Thuộc tính | Chỉ các thuộc tính liệt kê cho từng phần tử, giá trị theo mẫu hẹp (id, số, chữ không có `${`/`#{`) | `flowable:class`, `expression`, `delegateExpression`, `resultVariable`, `skipExpression`… và mọi thuộc tính `activiti:` |
+| Điều kiện | `${bien == 'chuoi'}`, `!=`, nối bằng `&&` hoặc `||`; biến là trường **bắt buộc** của một form trong manifest | Gọi hàm, thuộc tính, ngoặc, số, `#{…}` |
+| Ai làm việc | `flowable:candidateGroups` chỉ `t:${tenantId}:<vai trò>` hoặc `t:${tenantId}:d:${departmentId}:<vai trò>` (vai trò của realm: `clerk`, `staff`, `manager`, `director`, `tenant_admin`), cách nhau bằng dấu phẩy; `flowable:assignee` chỉ `${initiator}` | Nhóm, người cố định hay tính bằng biểu thức khác |
+| Form, hạn | `flowable:formKey` bắt buộc ở sự kiện bắt đầu và mọi `userTask`, dạng `<tên>.<khóa>`, có trong `workflow.forms`; `flowable:dueDate` chỉ khoảng ISO 8601 viết sẵn (`P3D`, `PT24H`); `flowable:initiator` chỉ `initiator` | — |
+| Tệp | UTF-8, tối đa 512 KB | `<!DOCTYPE`, `<!ENTITY` (thực thể ngoài đọc được tệp của máy chủ, thực thể lồng làm nổ bộ nhớ), chỉ thị xử lý `<?…?>` |
+
+Process id (= `processKey`) phải dạng `<tên>.<khóa>`: ứng dụng không chạm được quy trình Văn phòng điện tử hay của ứng
+dụng khác. Process id tối đa 22 ký tự: Flowable đặt id định nghĩa `<khóa>:<phiên bản>:<uuid>`, chuỗi đó quá 64 ký tự
+thì id chỉ còn uuid, lõi không còn biết việc thuộc ứng dụng nào (22 ký tự vừa tới phiên bản 9999). Gói còn bị từ chối
+khi hai tệp cùng process id, khi có tệp không khai.
+
+**Kiểm form** (`svc_workflow/apps/forms.py`). Lúc cài, form phải là JSON Schema 2020-12 hợp lệ, `type: object`,
+`additionalProperties: false` (mọi biến ghi vào quy trình đều được khai); tên trường dạng camelCase (là tên biến
+Flowable), không trùng biến hệ thống `tenantId`, `departmentId`, `initiator`, cũng không trùng tên Flowable dành sẵn
+trong biểu thức `execution`, `task`, `authenticatedUserId`, `currentTenantId` (điều kiện của BPMN đọc ra giá trị của
+động cơ chứ không phải giá trị gửi lên, #330); mỗi trường một giá trị đơn (chuỗi, số, đúng/sai — biến Flowable không
+chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng JSON Pointer (`#/…`), tới đúng
+một schema, không vòng, lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai ở gốc form (dưới gốc chúng đổi
+chỗ `#/…` trỏ tới); `x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB; không dùng `patternProperties`,
+`propertyNames` (mẫu chạy trên mọi khóa gửi lên, kể cả khóa thừa). `pattern` chạy bằng `re` của Python, quay lui, ngay
+trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ (ReDoS, vd `^(a+)+$`) với vài chục ký tự làm đứng cả dịch vụ,
+kể cả Action của Văn phòng điện tử. Nên lúc cài không nhận mẫu lặp lồng trong lặp (trừ lặp đúng n lần như
+`(,[0-9]{3})*`), có `|` hay tham chiếu ngược (`\1`) trong phần lặp, dài quá 512 ký tự. Phần lặp nối nhau vẫn tốn thời
+gian đa thức, và jsonschema kiểm bằng `re.search`: mẫu không neo `^` thử lại ở mọi vị trí, `a+$` đã tốn bình phương độ
+dài chuỗi. Lõi ước lượng số bước quay lui: tích (cận trên − cận dưới + 1) của các phần lặp không cố định và số nhánh của
+mỗi `|`, nhân độ dài chuỗi L cho mỗi phần lặp không chặn trên (`+`, `*`, `{n,}`) và thêm L nếu không neo `^`; quá 10^7
+bước (khoảng 30 ms) thì không nhận, cả form có trần 3·10^7 bước cho một lần gửi: mỗi schema con jsonschema đi qua tính
+3000 bước (khoảng 7 µs) cộng số bước của `pattern` ở đó, đích ở `$defs` tính một lần cho mỗi chỗ `$ref` trỏ tới — nên cả
+`$ref` lồng nhau không có `pattern` nào (`allOf` mười `$ref` tới tầng sau, bốn tầng) cũng không nhận (#323). Khi số bước
+tăng theo L, `pattern` phải có `maxLength` ngay cạnh (cùng một schema) làm L; lúc nhận dữ liệu, chuỗi dài quá
+`maxLength` đó không chạy `pattern` (chỉ báo `maxLength`). Mẫu không có chỗ quay lui (lớp ký tự cấm, `^20[0-9]{2}-`) hay
+neo `^` với phần lặp có chặn (`^[A-Z]{2,5}$`, `^[^@\s]{1,64}@[^@\s]{1,63}\.[a-z]{2,10}$`) không cần `maxLength`;
+`^\S.*$` cần. Lúc nhận dữ liệu, giá trị mảng hay đối tượng báo `type` ngay mà không chạy schema (không ghi được thành
+biến); còn lại lõi kiểm bằng đúng `schemas.FormSchema` của form tiếp nhận văn bản đến (mã lỗi như
+[`schemas/README.md`](../schemas/README.md)) cộng `x-moc-range` (trường sau trước trường trước → mã `x-moc-range` ở
+trường sau; kiểm sau cùng, bỏ qua khi một trong hai trường đã có lỗi). Chỉ trường đã khai, có mặt và khác `null` được
+ghi thành biến, giữ kiểu (chuỗi, long, double, boolean).
+
+**API** (route APISIX `svc-workflow`: `/api/workflow/*`, `GET`/`POST`, cùng kiểm token, giới hạn tốc độ như
+`/api/files`; bảng đủ ở [`docs/api/README.md`](api/README.md)):
+
+| Yêu cầu | Trả |
+|---|---|
+| `GET /api/workflow/<tên>/forms/<formKey>` | `200`: JSON Schema của form, đúng tệp manifest khai (bản mới nhất) |
+| `POST /api/workflow/<tên>/processes/<processKey>` `{"data": {…}}` | `201 {"id"}`; kiểm theo form của sự kiện bắt đầu; lõi tự đặt `tenantId`, `departmentId` (rỗng nếu người gửi không thuộc phòng nào), `initiator` từ token |
+| `GET /api/workflow/<tên>/processes` | Đơn người này đã gửi, mới nhất trước: `[{id, processKey, startedAt, endedAt, data}]` — `data` gồm dữ liệu đơn và dữ liệu các bước đã xong (vd `quyetDinh`, `ghiChu`) |
+| `GET /api/workflow/<tên>/tasks` | Việc của ứng dụng giao cho người này (`assignee`) hoặc cho một nhóm của người này, cùng đơn vị, cũ nhất trước: `[{id, name, formKey, processKey, processId, createdAt, dueAt, data}]` |
+| `POST /api/workflow/<tên>/tasks/<taskId>` `{"data": {…}}` | `204`: kiểm theo form của việc, nhận việc rồi hoàn thành |
+
+Thân yêu cầu tối đa 64 KB, lớn hơn → `413 too_large` (#323). Lỗi kiểm dữ liệu: `422 {"errors": {trường: mã}}` (gửi tên
+biến hệ thống → `additionalProperties`). Lỗi khác dạng `{"detail": {"code", "message"}}` như `svc-files`: `401` thiếu,
+sai, hết hạn token; `403` token không phải của client `app-<tên>` (`azp` — token của Văn phòng điện tử, `moc-cli` hay
+của ứng dụng khác không dùng được) hoặc tài khoản chưa gán đơn vị; `404` ứng dụng chưa cài hoặc đã gỡ, form, quy trình,
+việc không có hoặc không thuộc ứng dụng, đơn vị, người này (không nói việc của người khác có tồn tại); `409` việc vừa có
+người khác nhận; `503` chưa gọi được Flowable hoặc Keycloak. APISIX kiểm chữ ký, hạn của token ở biên; `svc-workflow`
+kiểm lại theo JWKS của realm (`iss` là URL công khai của realm như `x-oidc` trong `docker-compose.yml`), thêm `azp`.
+
+Nhóm của người dùng lấy từ claim của token: `t:<đơn vị>:<vai trò>` và, khi có phòng, `t:<đơn vị>:d:<phòng>:<vai trò>`
+— bao trùm nhóm Văn phòng điện tử dùng. Hộp việc Văn phòng điện tử chỉ nhận việc của quy trình `van-ban-den`,
+`van-ban-di` (form của ứng dụng có khai trường tên `documentId` cũng không lẫn vào), và không hoàn thành được việc của
+ứng dụng; API của ứng dụng chỉ thấy việc có khóa quy trình `<tên>.…`.
+
+Kiểm không cần hệ thống chạy: svc-workflow `test_app_forms.py` (gồm mọi ca của `apps/*/forms/*.cases.json`, dùng chung
+với form trên trình duyệt), `test_app_bpmn.py` (các ca BPMN độc), `test_app_deploy.py` (gói, triển khai, cài lại, gỡ,
+lệnh trong container với Flowable giả), `test_app_api.py` (token RSA thật, Flowable giả), `test_app_core.py` (hộp việc
+Văn phòng không lẫn việc ứng dụng; các lệnh REST mới); scripts `test_ung_dung_quy_trinh.py`. Trên hệ thống thật:
+`make demo-quy-trinh` (mục 7).
+
+Giới hạn:
+
+- Chỉ quy trình duyệt: không timer, không nhắc hạn (hạn chỉ hiện ở `dueAt`), không bước tự động, không gửi thư hay gọi
+  API ra ngoài, không quy trình con. Điều kiện chỉ so chuỗi bằng, khác.
+- Form không có tệp đính kèm, không trường nhiều giá trị.
+- Đơn vị tách bằng biến `tenantId` và nhóm ứng viên `t:<đơn vị>:…` như quy trình Văn phòng điện tử, không dùng tenant
+  của Flowable.
+- "Đơn của tôi" đọc lịch sử theo các `processKey` trong bản cài mới nhất; mỗi truy vấn tối đa 500 dòng, chưa phân trang.
+- Gỡ không xóa gì khỏi Flowable; chưa có lệnh dọn lịch sử quy trình của ứng dụng đã gỡ.
+- API không trả tên người gửi đơn (chỉ dữ liệu form); không hủy được đơn đã gửi.
+
 ## 2. Ứng dụng nhận gì từ lõi
 
 | Việc | Lõi làm sẵn | Ứng dụng chỉ cần |
@@ -290,6 +426,7 @@ Giới hạn:
 | Dữ liệu và quyền | GraphQL tự sinh, quyền theo vai trò và đơn vị đến từng dòng | Bảng trong schema riêng, khai quyền trong metadata |
 | Tệp | `POST /api/files`: ClamAV quét, sạch mới vào kho; `GET /api/files/{id}`: tải về nếu được xem | Gọi đúng hai đường đó |
 | Sổ kiểm toán | Trigger `core.audit()` ghi chuỗi băm, neo ra kho lạnh, `moc audit verify` kiểm lại | Gắn trigger vào bảng của mình (cách làm tay; ứng dụng cài bằng manifest thì không — 1.4) |
+| Quy trình | Flowable của `svc-workflow`: triển khai BPMN đã kiểm, kiểm form, giao việc theo đơn vị, phòng, vai trò, API `/api/workflow/<tên>/…` (1.10) | BPMN và form JSON Schema khai ở `workflow` của manifest |
 | Vận hành | Sao lưu và khôi phục cả CSDL, reconciler GitOps dựng lại container theo compose | Một service trong profile `app` |
 
 ## 3. Làm tay (tham chiếu)
@@ -390,4 +527,48 @@ mới, một tệp metadata mới, một dòng `!include`), công cụ vận hà
 - Chưa có hạn mức dung lượng cho mỗi người; cỡ tệp tối đa theo `svc-files`.
 - Đường dưới `/ca-nhan/` không có tệp thì trả trang chính (ứng dụng một trang).
 - Đặt `MOC_OIDC_AUDIENCE` cho `svc-files` thì client mới cũng phải có mapper audience tương ứng.
-- Giao diện chỉ tiếng Việt.
+
+## 7. Ứng dụng mẫu có quy trình riêng: Đơn nghỉ phép
+
+`apps/nghi-phep` (#301) là ứng dụng thứ tư, dựng để cho thấy một ứng dụng mang quy trình nghiệp vụ của riêng nó mà
+không có máy chủ nghiệp vụ, không có bảng nào: nhân viên gửi đơn nghỉ phép, trưởng phòng **của chính phòng người gửi**
+duyệt hoặc từ chối kèm ghi chú, người gửi theo dõi kết quả. Mục này chỉ tả ứng dụng; cách lõi nhận mục `workflow` của
+manifest, kiểm BPMN và mở API chung là phần lõi của #301 trong tài liệu này. Ứng dụng chỉ chạy khi lõi đã có phần đó.
+
+| Phần | Ở nghi-phep |
+|---|---|
+| Manifest | [`apps/nghi-phep/app.yaml`](../apps/nghi-phep/app.yaml): `/nghi-phep`, cổng 8080, 64 MiB; `database` chỉ vì manifest bắt buộc (schema trống `nghi_phep`, không migration); `workflow`: một quy trình, hai form |
+| Quy trình | [`workflow/don-nghi-phep.bpmn20.xml`](../apps/nghi-phep/workflow/don-nghi-phep.bpmn20.xml), id `nghi-phep.don`: gửi đơn → "Trưởng phòng duyệt" (nhóm `t:${tenantId}:d:${departmentId}:manager`, như bước duyệt cấp phòng của văn bản đi) → cổng rẽ theo `quyetDinh` → "Đã duyệt" / "Bị từ chối". Chỉ sự kiện, việc người làm, cổng rẽ; có sơ đồ BPMN DI |
+| Form | `forms/don.json` (loại nghỉ, từ ngày, đến ngày, lý do) và `forms/duyet.json` (quyết định, ghi chú): JSON Schema, kiểm ở trình duyệt bằng `public/schema-form.js` và ở lõi khi nhận |
+| Image | Python thư viện chuẩn trên `python:3.13.16-slim` ghim digest (như Bảng tin), không root (10001), chỉ trang tĩnh; bản dựng cho trình duyệt của `oidc-client-ts` lấy từ npm lúc dựng |
+| Trang | Đăng nhập Authorization Code + PKCE (client `app-nghi-phep`, `response_mode=fragment`). Ba phần: Gửi đơn; Đơn của tôi (trạng thái, nội dung, quyết định); Việc cần duyệt (chỉ hiện khi có việc, tự làm mới mỗi 30 giây). Lỗi `422` của lõi hiện dưới đúng ô |
+
+Trang gọi `/api/workflow/nghi-phep/…` bằng token của người dùng: lấy form, gửi đơn, xem đơn của mình, xem và làm việc
+duyệt của mình. Ai thấy việc nào, dữ liệu có hợp form không, đơn lưu ở đâu là việc của lõi; trang không quyết định
+điều gì trong số đó. Chi tiết trang, bảng API: [`apps/nghi-phep/README.md`](../apps/nghi-phep/README.md).
+
+Kiểm không cần hệ thống chạy (trong `make test`): `apps/nghi-phep/tests` — `node --test` (form dựng từ schema; đường
+API, đọc câu trả lời, trạng thái đơn; khóa trong app.yaml, BPMN, form khớp nhau; tỉ lệ tương phản màu) và `unittest`
+(máy chủ trang trên cổng ngẫu nhiên; BPMN chỉ dùng phần tử được phép, mọi nút tới được kết thúc);
+`scripts/tests/test_nghi_phep.py` cho phần thuần của kịch bản dưới đây.
+
+Kiểm trên hệ thống đang chạy: `make demo-quy-trinh` (cần `make seed`), bước CI "Quy trình của ứng dụng qua lõi (make
+demo-quy-trinh)" ở phần `luong-chinh` của job `chay-thu`, ngay sau bước của Bảng tin. Kịch bản dùng ba tài khoản mẫu
+cùng đơn vị Khoa CNTT: chuyên viên `giangvienktpm` và trưởng bộ môn `truongbmktpm` cùng Bộ môn KTPM, tổ trưởng
+`totruongdt` ở phòng Đào tạo — để cùng một quy trình cho thấy việc duyệt tới đúng phòng và không tới phòng khác:
+
+1. Bản sao của ứng dụng với BPMN có thêm một `scriptTask` bị từ chối lúc cài, không đổi gì trên hệ thống.
+2. Cài; trang `/nghi-phep/` qua APISIX có CSP, `config.json` mang client `app-nghi-phep`.
+3. Chuyên viên đăng nhập Văn phòng điện tử rồi vào ứng dụng không hỏi lại mật khẩu; form lõi trả về khớp
+   `forms/*.json`.
+4. Đơn sai (đến ngày trước từ ngày, loại nghỉ ngoài danh sách) → `422` đúng mã ở đúng ô; đơn đúng → `201`, nằm ở
+   "Đơn của tôi" với trạng thái chờ duyệt.
+5. Trưởng bộ môn cùng phòng thấy việc duyệt; tổ trưởng phòng khác và chính người gửi không thấy, không làm được.
+6. Token của `app-office`, `moc-cli` bị từ chối (`403`); hộp việc của Văn phòng điện tử không lẫn việc nghỉ phép.
+7. Quyết định ngoài danh sách → `422`; "Đồng ý" → `204`, quy trình kết thúc với `quyetDinh = dong-y`.
+8. Cài lại không đổi gì (cùng container, cùng trạng thái trong `.moc-apps/`, không thêm phiên bản quy trình).
+9. Gỡ: trang, container, client mất; API của ứng dụng thôi trả `200`; lịch sử đơn còn trong động cơ quy trình.
+10. `git status` trước và sau giống hệt.
+
+Giới hạn của ứng dụng mẫu: việc duyệt chỉ có nội dung đơn, không có tên người gửi (API chung không trả); giao diện
+chỉ tiếng Việt; một bước duyệt, không ủy quyền, không hủy đơn đã gửi.

@@ -21,35 +21,11 @@
  * template, biểu mẫu, bản dịch của theme cha giữ nguyên. Cùng bảng màu với Văn phòng điện tử
  * (apps/office/app/assets/css/main.css, apps/office/DESIGN.md): khối lục bảo sâu #0b5a47 là mảng tối duy nhất, như
  * thanh bên của ứng dụng; trang trắng, chữ mực lục đậm; lục bảo #0b6b53 cho nút chính, liên kết, viền focus; đỏ chỉ cho
- * lỗi. Ô nhập và nút bo 8px, thẻ bo 14px; phông Be Vietnam Pro tự phục vụ (resources/fonts, OFL-1.1). Chỉ chế độ sáng
- * (darkMode=false trong theme.properties). PatternFly 5 khai biến toàn cục trong :where(:root) (độ ưu tiên 0) nên :root
- * ở đây thắng. Không @import, không tải gì ngoài máy chủ Keycloak.
+ * lỗi. Ô nhập và nút bo 8px, thẻ bo 14px; phông Be Vietnam Pro tự phục vụ (@font-face ở
+ * resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp
+ * này theo theme.properties; #305). Chỉ chế độ sáng (darkMode=false trong theme.properties). PatternFly 5 khai biến
+ * toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng. Không @import, không tải gì ngoài máy chủ Keycloak.
  */
-
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url("../fonts/be-vietnam-pro/BeVietnamPro-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url("../fonts/be-vietnam-pro/BeVietnamPro-Medium.ttf") format("truetype");
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url("../fonts/be-vietnam-pro/BeVietnamPro-SemiBold.ttf") format("truetype");
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url("../fonts/be-vietnam-pro/BeVietnamPro-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-display: swap;
-}
 
 /* Tỉ lệ tương phản WCAG 2.2 AA ghi cạnh màu: chữ ≥ 4,5:1, viền ô nhập và viền focus ≥ 3:1 trên đúng nền của nó */
 :root {

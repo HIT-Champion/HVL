@@ -133,7 +133,7 @@ async def run_clean(data: bytes, mime: str, *, max_pixels: int = MAX_PIXELS, tim
                     memory_mb: int = MEMORY_MB) -> bytes:
     """clean trong tiến trình con có giới hạn; ``mime`` là khóa của FORMATS. Không làm được: CleanError."""
     # nhập ở đây, không ở đầu tệp: tiến trình con chạy tệp này như script, không có gói svc_files
-    from .docread.ocr import _kill_group, _killed
+    from .ocr import kill_group, killed
 
     fmt = FORMATS[mime]
     timeout_s = max(timeout_s, 0.001)
@@ -145,15 +145,15 @@ async def run_clean(data: bytes, mime: str, *, max_pixels: int = MAX_PIXELS, tim
     try:
         out, _ = await asyncio.wait_for(proc.communicate(data), timeout_s)
     except TimeoutError:
-        _kill_group(proc)
+        kill_group(proc)
         await proc.wait()
         raise CleanError("timeout") from None
     finally:
         # hết giờ, yêu cầu bị hủy, hay xong bình thường: không để tiến trình con chạy tiếp
-        _kill_group(proc)
+        kill_group(proc)
     rc = proc.returncode
     if rc is not None and rc < 0:
-        raise CleanError(_killed(rc))      # SIGXCPU → timeout; SIGKILL, SIGABRT → memory; tín hiệu khác → corrupt
+        raise CleanError(killed(rc))      # SIGXCPU → timeout; SIGKILL, SIGABRT → memory; tín hiệu khác → corrupt
     if rc != 0:
         raise CleanError("memory" if rc == EXIT_MEMORY else "corrupt")
     # kết quả của tiến trình con đọc tệp không tin cậy: kiểm dạng trước khi dùng

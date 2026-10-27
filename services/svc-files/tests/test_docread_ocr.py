@@ -33,7 +33,7 @@ import pytest
 from PIL import Image
 
 from conftest import SAMPLE_TSV, fake_tesseract, text_pdf
-from svc_files.docread.ocr import SERVER_NOTES, OcrResult, _parse, run_ocr
+from svc_files.ocr import SERVER_NOTES, OcrResult, _parse, run_ocr
 
 
 def image(size=(1200, 800), mode="L", fmt="PNG", **save) -> bytes:
@@ -171,7 +171,7 @@ def lying_pdf(real: tuple[int, int], declared: tuple[int, int]) -> bytes:
 def test_pdf_image_larger_than_declared_stops_before_decoding(tmp_path, monkeypatch, real):
     from PIL import ImageFile
 
-    from svc_files.docread.ocr import _Fail, pdf_images
+    from svc_files.ocr import _Fail, pdf_images
 
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", Image.MAX_IMAGE_PIXELS)     # trả lại trần mặc định sau test
     decoded: list[tuple[int, int]] = []

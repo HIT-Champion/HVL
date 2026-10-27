@@ -42,7 +42,7 @@ test('bốn thư mục P.A.R.A khớp ràng buộc items_para của personal.ite
   assert.ok(m, 'không thấy ràng buộc items_para')
   const keys = [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1])
   assert.deepEqual(FOLDERS.map((f) => f.key), keys)
-  assert.equal(new Set(FOLDERS.map((f) => f.name)).size, 4)
+  assert.equal(new Set(FOLDERS.map((f) => folderName(f.key))).size, 4)
   assert.ok(isFolder(DEFAULT_FOLDER))
 })
 

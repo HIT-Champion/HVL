@@ -382,11 +382,16 @@ class RulesTest(unittest.TestCase):
                          ("/api/verify/ca.key", False), ("/api/files/ca.pem", False), ("/x/api/verify/ca.pem", False),
                          ("/api/verify/caXpem", False)):
             self.assertEqual(bool(re.search(path, uri)), hit, uri)
-        # svc-files phục vụ đúng hai đường này (khai báo trước /api/verify/{code}), route xac-thuc chỉ cho GET
-        app = read(ROOT / "services" / "svc-files" / "src" / "svc_files" / "app.py")
-        self.assertIn('@app.get("/api/verify/ca.pem"', app)
+        # svc-files phục vụ đúng hai đường này (gắn trước /api/verify/{code}), route xac-thuc chỉ cho GET. ca.pem nằm ở
+        # router documents của Văn phòng, anchor-key.pem ở lõi; router verify (có /api/verify/{code}) gắn sau cả hai
+        src = ROOT / "services" / "svc-files" / "src" / "svc_files"
+        app, office = read(src / "app.py"), read(src / "office" / "api.py")
+        self.assertIn('@documents.get("/api/verify/ca.pem"', office)
+        self.assertIn('@verify.get("/api/verify/{code}"', office)
         self.assertIn('@app.get("/api/verify/anchor-key.pem"', app)
-        self.assertLess(app.index('"/api/verify/anchor-key.pem"'), app.index('"/api/verify/{code}"'))
+        verify_mounted = app.index("app.include_router(routes.verify)")
+        self.assertLess(app.index("app.include_router(routes.documents)"), verify_mounted)
+        self.assertLess(app.index('"/api/verify/anchor-key.pem"'), verify_mounted)
 
     def test_argument_limit_rules_block(self) -> None:
         # GHSA-6r3q-mjv7-xr8m: tham số thứ 1000 trở đi không được soi — chặn hẳn

@@ -142,7 +142,7 @@ class Page(Base):
     def test_static_files_with_headers(self) -> None:
         status, headers, body = call(self.page + "/bang-tin/")
         self.assertEqual(status, 200)
-        self.assertIn(b"<title>", body)
+        self.assertIn(b"<title", body)
         self.assertIn("script-src 'self'", headers["Content-Security-Policy"])
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
@@ -162,7 +162,7 @@ class Page(Base):
     def test_no_file_outside_public(self) -> None:
         index = call(self.page + "/bang-tin/")[2]
         for path in ("/bang-tin/../server.py", "/bang-tin/%2e%2e/server.py", "/bang-tin/..%2fserver.py",
-                     "/bang-tin/%2e%2e%2fapp.yaml"):
+                     "/bang-tin/%2e%2e%2fapp.yaml", "/bang-tin/%00", "/bang-tin/app.js%00.txt"):
             with self.subTest(path=path):
                 status, _, body = call(self.page + path)
                 self.assertEqual(status, 200)

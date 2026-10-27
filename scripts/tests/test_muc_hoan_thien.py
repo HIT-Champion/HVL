@@ -17,8 +17,8 @@
 """Bảng mức hoàn thiện ghi đúng số hàm test (#285). docs/muc-hoan-thien.md ghi "<thư mục> `tệp` N" trong các bảng: tệp
 đó có N hàm test, đếm tĩnh như §1 của chính tài liệu. Không có gì kiểm nên số lệch dần, có chỗ sai từ lúc viết
 (`test_anchors.py` ghi 38, tệp có 28). Test đọc mọi dòng bảng và kiểm:
-  * thư mục viết tắt như đầu tài liệu (svc-files, svc-workflow, db, scripts, office, ca-nhan, bang-tin, e2e), viết một
-    lần thì áp cho các tệp sau nó trong cùng ô;
+  * thư mục viết tắt như đầu tài liệu (svc-files, svc-workflow, db, scripts, office, ca-nhan, bang-tin, nghi-phep,
+    e2e), viết một lần thì áp cho các tệp sau nó trong cùng ô;
   * mỗi "`tệp` N" sau một thư mục là tệp có thật, có đúng N hàm test: Python `def test_` (cả async), giao diện
     (`.ts`, `.js`) `test(` hay `it(` đầu dòng, e2e `test(` sát lề;
   * "`test_x_*.py` N" là tổng mọi tệp khớp mẫu, trừ các tệp nêu trong "(trừ `…`)" ngay sau số;
@@ -44,6 +44,7 @@ DIRS = {
     "office": "apps/office/tests",
     "ca-nhan": "apps/ca-nhan/tests",
     "bang-tin": "apps/bang-tin/tests",
+    "nghi-phep": "apps/nghi-phep/tests",
     "e2e": "tests/e2e",
 }
 # thư mục rồi khoảng trắng ("office: …" cũng được): không bắt `db` trong "job `db`" vì sau nó là dấu `

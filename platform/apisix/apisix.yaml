@@ -23,8 +23,10 @@
 #   /api/imports, /api/imports/*     → svc-files (nạp lô văn bản đến)  — cần token
 #   /api/verify, /api/verify/*       → svc-files (cổng xác thực)    — không cần token
 #   /api/status                      → svc-files (trạng thái hệ thống) — không cần token
+#   /api/workflow/*                  → svc-workflow (quy trình của ứng dụng cắm bằng manifest) — cần token
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
+#   /tai-lieu-api, /tai-lieu-api/*   → app-tai-lieu-api (Swagger UI) — không cần token; gọi thử đi qua các route trên
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Container ứng dụng chỉ ở mạng `apps` cùng APISIX (docker-compose.yml): phần máy chủ của ứng dụng cũng gọi lõi qua
@@ -71,6 +73,11 @@ upstreams:
     type: roundrobin
     nodes:
       "svc-files:8000": 1
+  # Chỉ route svc-workflow ở dưới (/api/workflow/*) tới đây; Hasura Actions, /ot/notify của dịch vụ không qua cổng
+  - id: svc-workflow
+    type: roundrobin
+    nodes:
+      "svc-workflow:8000": 1
   - id: app-office
     type: roundrobin
     nodes:
@@ -80,6 +87,12 @@ upstreams:
     type: roundrobin
     nodes:
       "app-ca-nhan:8080": 1
+  # Tài liệu API (apps/tai-lieu-api, #357): Swagger UI; "Try it out" gọi lõi qua đúng các route ở dưới bằng token người
+  # dùng
+  - id: app-tai-lieu-api
+    type: roundrobin
+    nodes:
+      "app-tai-lieu-api:8080": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -420,6 +433,15 @@ routes:
     upstream_id: svc-files
     plugin_config_id: can-token
 
+  # Quy trình của ứng dụng cắm bằng manifest (#301, docs/them-ung-dung.md 1.5): bắt đầu quy trình, hộp việc, hoàn
+  # thành việc trên Flowable của lõi. Cùng kiểm token, giới hạn tốc độ (WAF ở global rule) như /api/files; svc-workflow
+  # kiểm lại token và chỉ nhận token của đúng client app-<tên> (azp)
+  - id: svc-workflow
+    uris: ["/api/workflow/*"]
+    methods: [GET, POST]
+    upstream_id: svc-workflow
+    plugin_config_id: can-token
+
   # Cổng xác thực văn bản đã phát hành (F2.13): ai cũng gọi được, không cần token — chỉ đọc, mỗi lần đúng một
   # văn bản theo mã tra cứu hoặc băm, không liệt kê được
   - id: xac-thuc
@@ -499,6 +521,11 @@ routes:
     uris: ["/ca-nhan", "/ca-nhan/*"]
     methods: [GET, HEAD]
     upstream_id: app-ca-nhan
+
+  - id: app-tai-lieu-api
+    uris: ["/tai-lieu-api", "/tai-lieu-api/*"]
+    methods: [GET, HEAD]
+    upstream_id: app-tai-lieu-api
 
   - id: app-office
     uri: /*

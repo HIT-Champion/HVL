@@ -20,18 +20,25 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import httpx2
 import pytest
 
 from svc_workflow import flowable
-from svc_workflow.flowable import FlowableClient, FlowableError
+from svc_workflow.flowable import FlowableClient, FlowableError, Task
 
 BASE = "http://flowable:8080/flowable-rest/service"
 # body lỗi 500 của BaseExceptionHandlerAdvice khi gặp FlowableOptimisticLockingException (run 40197127090 của CI)
 CONCURRENT = {"message": "Internal server error",
               "exception": "Execution[ id '8dd073b9' ] - definition 'van-ban-den:1:2906c0a0' - activity 'hanChiDao' "
                            "- parent '8dd073b1' was updated by another transaction concurrently"}
+# dạng thông điệp PersistenceException của MyBatis khi PostgreSQL hủy một bên của deadlock; deadlock này thấy ở
+# run 40337213084 của CI (#316)
+DEADLOCK = {"message": "Internal server error",
+            "exception": "\n### Error updating database.  Cause: org.postgresql.util.PSQLException: ERROR: deadlock "
+                         "detected\n  Detail: Process 84 waits for ShareLock on transaction 2812; blocked by process "
+                         "85.\n### SQL: delete from ACT_RU_EXECUTION where ID_ = ? and REV_ = ?"}
 OTHER_500 = {"message": "Internal server error", "exception": "Cannot invoke \"Object.toString()\" because x is null"}
 
 
@@ -71,12 +78,90 @@ def test_complete_job_is_retried_after_optimistic_locking():
     assert got is None and seen == ["/flowable-rest/external-job-api/acquire/jobs/j-1/complete"] * 3
 
 
+def test_complete_is_retried_after_a_deadlock():
+    got, seen = calls([(500, DEADLOCK), (204, None)], lambda c: c.complete("t-1", {"outcome": "assign"}))
+    assert got is None and seen == ["/flowable-rest/service/runtime/tasks/t-1"] * 2
+
+
+def test_complete_job_is_retried_after_a_deadlock():
+    got, seen = calls([(500, DEADLOCK), (204, None)], lambda c: c.complete_job("j-1", "w"))
+    assert got is None and seen == ["/flowable-rest/external-job-api/acquire/jobs/j-1/complete"] * 2
+
+
 def test_retries_stop_after_the_last_delay():
     got, seen = calls([(500, CONCURRENT)] * 3, lambda c: c.complete("t-1", {}))
     assert isinstance(got, FlowableError) and got.status == 500 and got.concurrent and len(seen) == 3
 
 
-@pytest.mark.parametrize("status, body", [(500, OTHER_500), (409, CONCURRENT), (404, None), (503, None)])
+@pytest.mark.parametrize("status, body", [(500, OTHER_500), (409, CONCURRENT), (409, DEADLOCK), (404, None),
+                                          (503, None)])
 def test_other_errors_are_not_retried(status, body):
     got, seen = calls([(status, body), (204, None)], lambda c: c.complete("t-1", {}))
     assert isinstance(got, FlowableError) and got.status == status and not got.concurrent and len(seen) == 1
+
+
+def test_task_process_key_is_empty_when_flowable_dropped_the_key():
+    def task(definition_id: str) -> Task:
+        return Task("t-1", "Duyệt", "nghi-phep.duyet", None, "p-1", "2026-10-26T00:00:00Z",
+                    process_definition_id=definition_id)
+    assert task("nghi-phep.don:3:8a0c6a52-0000-4000-8000-000000000001").process_key == "nghi-phep.don"
+    # id quá 64 ký tự: Flowable chỉ để uuid — không đoán khóa, không khớp quy trình nào
+    assert task("8a0c6a52-0000-4000-8000-000000000001").process_key == ""
+    assert task("").process_key == ""
+
+
+def raw_paths(call) -> tuple[Any, list[bytes]]:
+    """Như ``calls`` nhưng ghi đường gọi đúng như gửi đi (chưa giải mã); Flowable giả trả 404 cho mọi yêu cầu."""
+    seen: list[bytes] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request.url.raw_path)
+        return httpx2.Response(404, json={"message": "Not found"})
+
+    async def go():
+        client = FlowableClient(BASE, "rest-admin", "x", transport=httpx2.MockTransport(handler))
+        try:
+            return await call(client)
+        except FlowableError as exc:
+            return exc
+        finally:
+            await client.aclose()
+
+    return asyncio.run(go()), seen
+
+
+PATH_ID_CALLS = [
+    (lambda c, i: c.task(i), b"/runtime/tasks/"),
+    (lambda c, i: c.candidate_groups(i), b"/runtime/tasks/"),
+    (lambda c, i: c.claim(i, "u-1"), b"/runtime/tasks/"),
+    (lambda c, i: c.complete(i, {}), b"/runtime/tasks/"),
+    (lambda c, i: c.complete_typed(i, []), b"/runtime/tasks/"),
+    (lambda c, i: c.delete_process(i, "thừa"), b"/runtime/process-instances/"),
+    (lambda c, i: c.set_variables(i, {}), b"/runtime/process-instances/"),
+    (lambda c, i: c.definition(i), b"/repository/process-definitions/"),
+    (lambda c, i: c.set_definition_state(i, "suspend"), b"/repository/process-definitions/"),
+    (lambda c, i: c.resource(i, "forms/don.json"), b"/repository/deployments/"),
+]
+
+
+@pytest.mark.parametrize("call, path", PATH_ID_CALLS)
+def test_ids_are_sent_as_one_path_segment(call, path):
+    result, seen = raw_paths(lambda client: call(client, "nghi-phep.don:3:8a0c6a52-0000-4000-8000-000000000001"))
+    assert len(seen) == 1
+    assert seen[0].startswith(b"/flowable-rest/service" + path + b"nghi-phep.don%3A3%3A8a0c6a52-0000-4000-8000-")
+
+
+@pytest.mark.parametrize("given", ["../t-2?x=1#y", "a/b", "..", ".", "", "t%2F1", "x" * 65])
+@pytest.mark.parametrize("call, path", PATH_ID_CALLS)
+def test_ids_flowable_cannot_have_are_not_sent(given, call, path):
+    # id lấy từ yêu cầu gửi lên: Flowable không có id nào như thế. Gửi đi thì firewall của Spring trả 400 cho "%2F",
+    # "%2E" (ra 503 thay vì "không có việc"), "" thành danh sách việc — báo 404 như Flowable, không gửi đi
+    result, seen = raw_paths(lambda client: call(client, given))
+    assert seen == []
+    assert result is None or (isinstance(result, FlowableError) and result.status == 404)
+
+
+def test_task_with_an_id_flowable_cannot_have_is_none():
+    # task() là chỗ đầu tiên id từ yêu cầu gửi lên đi qua (apps/api.py, workflow.py): None → "không có việc"
+    for given in ("..", "", "a/b", "t-1#x"):
+        assert raw_paths(lambda client: client.task(given)) == (None, [])

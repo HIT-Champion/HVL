@@ -71,6 +71,26 @@ services:
       timeout: 5s
       retries: 30
 
+  # Phông Be Vietnam Pro của theme đăng nhập (#305): image của đội (platform/keycloak/fonts) lấy phông từ gói npm
+  # @fontsource/be-vietnam-pro lúc dựng, repo không chứa tệp phông nào (PoF #5); Keycloak vẫn chạy image chính thức.
+  # Chạy một lần trước keycloak: chép phông vào volume keycloak_fonts rồi thoát 0, keycloak gắn volume đó vào thư mục
+  # phông của theme. Không mạng, không capability nào, chạy user node của image (volume mới lấy chủ của thư mục
+  # /theme-fonts trong image). Không dùng x-common: restart "no", không mạng
+  keycloak-fonts:
+    build: ./platform/keycloak/fonts
+    image: moc/keycloak-fonts:${MOC_VERSION:-dev}
+    profiles: [core]
+    restart: "no"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - keycloak_fonts:/theme-fonts
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
   # F1.1 — SSO. Realm nạp từ platform/keycloak/realm/ ở lần đầu (bỏ qua nếu realm đã có).
   keycloak:
     <<: *common
@@ -100,6 +120,9 @@ services:
       - ./platform/keycloak/realm:/opt/keycloak/data/import:ro
       # theme đăng nhập Signet (loginTheme của realm): chỉ CSS, logo, chuỗi; kế thừa keycloak.v2 có sẵn trong image
       - ./platform/keycloak/themes/signet:/opt/keycloak/themes/signet:ro
+      # phông của theme do keycloak-fonts chép vào volume (#305), gắn đè lên thư mục giữ chỗ có sẵn trong theme: điểm
+      # gắn phải có trước vì thư mục theme gắn chỉ đọc
+      - keycloak_fonts:/opt/keycloak/themes/signet/login/resources/fonts/be-vietnam-pro:ro
     ports:
       # trang quản trị: chỉ trên máy chủ, không qua APISIX
       - 127.0.0.1:${KEYCLOAK_ADMIN_PORT:-8180}:8080
@@ -114,6 +137,8 @@ services:
       start_period: 30s
     depends_on:
       postgres: {condition: service_healthy}
+      # phông đã nằm trong volume trước khi trang đăng nhập phục vụ; `up --wait` coi dịch vụ này xong là đạt
+      keycloak-fonts: {condition: service_completed_successfully}
 
   # F1.2 — cổng duy nhất mở ra ngoài. F3.15: image APISIX ghim digest cộng nguyên bản tệp WAF coraza-proxy-wasm ghim
   # digest (platform/apisix/Dockerfile), không sửa mã của hai dự án; luật WAF trong apisix.yaml
@@ -374,6 +399,9 @@ services:
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
       MOC_SIGN_ENABLED: ${MOC_SIGN_ENABLED:-true}
+      # #302 — phần Văn phòng điện tử chạy chung tiến trình với lõi. false: chỉ chạy phần lõi, không gắn route,
+      # Action, vòng nền của Văn phòng (docs/architecture.md §4.7); dùng để kiểm lõi đứng được một mình
+      MOC_OFFICE_ENABLED: ${MOC_OFFICE_ENABLED:-true}
       # Trang trạng thái hệ thống (/api/status, công khai): phiên bản đang chạy; svc-files còn dò APISIX (cổng trạng
       # thái 7085 nội bộ), JWKS của Keycloak, /readyz của svc-workflow
       MOC_VERSION: ${MOC_VERSION:-dev}
@@ -405,6 +433,9 @@ services:
       # F3.2 — khóa Hasura, khóa Actions, mật khẩu Flowable, khóa Centrifugo, client secret lấy từ két (AppRole)
       MOC_OPENBAO_ADDR: http://openbao:8200
       MOC_OPENBAO_SECRET_PATH: moc/data/svc-workflow
+      # #302 — phần Văn phòng điện tử chạy chung tiến trình với lõi. false: chỉ chạy phần lõi, không gắn route,
+      # Action, vòng nền của Văn phòng (docs/architecture.md §4.7); dùng để kiểm lõi đứng được một mình
+      MOC_OFFICE_ENABLED: ${MOC_OFFICE_ENABLED:-true}
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
       # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
       MOC_NGSI_URL: http://scorpio:9090
@@ -774,11 +805,26 @@ services:
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
 
+  # Tài liệu API (#357): Swagger UI công khai ở /tai-lieu-api/, client Keycloak riêng app-tai-lieu-api. Là ứng dụng
+  # Tầng 2 để lõi vẫn không có giao diện: "Try it out" gọi lõi qua đúng các route của cổng như mọi ứng dụng. Hai bộ
+  # OpenAPI chia lúc dựng từ docs/api/openapi/ (ngữ cảnh phụ, viết một dòng để make install thay được). Chỉ ở mạng apps
+  app-tai-lieu-api:
+    <<: *common
+    build: {context: ./apps/tai-lieu-api, additional_contexts: {openapi: ./docs/api/openapi}}
+    image: moc/app-tai-lieu-api:${MOC_VERSION:-dev}
+    profiles: [app]
+    networks: [apps]
+    read_only: true                       # máy chủ thư viện chuẩn, không ghi gì (như app-nghi-phep)
+    mem_limit: 64m
+    environment:
+      MOC_REALM: ${MOC_REALM:-moc}
+
 networks:
   moc:
     driver: bridge
-  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, ứng dụng cài bằng moc app install). Ứng dụng tới
-  # lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra Internet
+  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, ứng dụng cài bằng moc app
+  # install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra
+  # Internet
   apps:
     driver: bridge
     internal: true
@@ -826,6 +872,8 @@ volumes:
   openbao_svc_workflow:
   # trọng số mô hình ngôn ngữ (F4.1, profile ai); không sao lưu: tải lại được bằng make ai-model
   ollama_models:
+  # phông của theme đăng nhập (#305): keycloak-fonts chép lại mỗi lần docker compose up; không sao lưu
+  keycloak_fonts:
 
 secrets:
   # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ

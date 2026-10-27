@@ -76,6 +76,9 @@ class Settings:
     anchor_retention_days: int      # hạn giữ mỗi mốc neo, trong hạn không ai xóa được
     archive_interval_s: float = 3600.0  # chu kỳ nộp lưu hồ sơ đã đóng (F3.8); 0: tắt vòng nền
     archive_after_days: int = 365   # hồ sơ đóng từ chừng ấy ngày thì nộp lưu (NĐ 30: trong 01 năm)
+    # #304 — trần của DuckDB mỗi lượt đếm kho lạnh; mặc định DuckDB dùng mọi lõi và ~80% RAM của máy
+    archive_stats_threads: int = 2
+    archive_stats_memory_mb: int = 256
     openlineage_url: str = ""       # gửi thêm sự kiện phả hệ tới máy chủ OpenLineage (vd Marquez); rỗng: chỉ ghi CSDL
     # F3.7 — két giữ khóa transit bọc khóa dữ liệu của tệp văn bản hạn chế; rỗng: không nhận, không mở tệp mã hóa
     vault_addr: str = ""
@@ -86,6 +89,10 @@ class Settings:
     # vài trang, kèm phụ lục hiếm quá vài trăm; 25 MB bản scan ~ 50–250 trang. Đo 22/10: đóng dấu 500 trang ~3 giây,
     # 2000 trang ~13 giây trong tiến trình con — 500 đủ rộng mà mỗi lần xem vẫn nhanh
     restricted_max_pages: int = 500
+    # Văn phòng điện tử (docs/architecture.md §4.3): route văn bản đi, sổ đăng ký, cổng xác thực, liên thông, nộp lưu,
+    # phòng đọc, đọc văn bản đến, gợi ý giao việc, nạp lô văn bản đến; vòng nền nộp lưu, dò mô hình trích yếu, nạp lô.
+    # false: không gắn route nào của Văn phòng (404), không chạy vòng nền của nó; lõi vẫn chạy
+    office_enabled: bool = True
     # F4.5 — ký số PAdES bản phát hành bằng khóa transit của đơn vị, chứng thư từ CA nội bộ trong két (chỉ minh họa);
     # chỉ có tác dụng khi có két. false: phát hành không ký, không gọi transit hay PKI
     sign_enabled: bool = True
@@ -197,12 +204,15 @@ class Settings:
                 anchor_retention_days=int(env.get("MOC_AUDIT_ANCHOR_RETENTION_DAYS", "3650")),
                 archive_interval_s=float(env.get("MOC_ARCHIVE_INTERVAL_S", "3600")),
                 archive_after_days=int(env.get("MOC_ARCHIVE_AFTER_DAYS", "365")),
+                archive_stats_threads=int(env.get("MOC_ARCHIVE_STATS_THREADS", "2")),
+                archive_stats_memory_mb=int(env.get("MOC_ARCHIVE_STATS_MEMORY_MB", "256")),
                 openlineage_url=env.get("MOC_OPENLINEAGE_URL", "").strip(),
                 vault_addr=(env.get("MOC_OPENBAO_ADDR") or "").rstrip("/"),
                 vault_role_id_file=env.get("MOC_OPENBAO_ROLE_ID_FILE", "/run/openbao/role_id"),
                 vault_secret_id_file=env.get("MOC_OPENBAO_SECRET_ID_FILE", "/run/openbao/secret_id"),
                 transit_key=env.get("MOC_FILES_TRANSIT_KEY", "moc-files"),
                 restricted_max_pages=int(env.get("MOC_RESTRICTED_MAX_PAGES", "500")),
+                office_enabled=_flag("MOC_OFFICE_ENABLED", env.get("MOC_OFFICE_ENABLED", "true")),
                 sign_enabled=_flag("MOC_SIGN_ENABLED", env.get("MOC_SIGN_ENABLED", "true")),
                 read_enabled=_flag("MOC_READ_ENABLED", env.get("MOC_READ_ENABLED", "true")),
                 read_max_bytes=int(env.get("MOC_READ_MAX_MB") or env.get("MOC_FILES_MAX_MB", "25")) * 1024 * 1024,
@@ -276,6 +286,8 @@ class Settings:
             raise ConfigError("MOC_ARCHIVE_INTERVAL_S phải ≥ 0 (0: tắt vòng nộp lưu)")
         if self.archive_after_days < 0:
             raise ConfigError("MOC_ARCHIVE_AFTER_DAYS phải ≥ 0")
+        if self.archive_stats_threads < 1 or self.archive_stats_memory_mb < 64:
+            raise ConfigError("MOC_ARCHIVE_STATS_THREADS phải ≥ 1, MOC_ARCHIVE_STATS_MEMORY_MB phải ≥ 64")
         if self.cold_bucket == self.bucket:
             # bucket lạnh khóa ghi, còn bucket tệp thường phải xóa được
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")

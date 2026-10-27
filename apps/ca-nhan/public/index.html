@@ -20,9 +20,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Signet — Không gian cá nhân</title>
-  <meta name="description" content="Signet — lưu trữ cá nhân theo P.A.R.A: Dự án, Lĩnh vực, Tài nguyên, Lưu trữ">
+  <!-- chữ tĩnh để sẵn bằng tiếng Việt (ngôn ngữ mặc định); app.js gán lại theo ngôn ngữ đã chọn: data-i18n là chữ của
+       phần tử, data-i18n-<thuộc tính> là thuộc tính, khóa ở i18n.js (tests/i18n.test.js kiểm chữ ở đây khớp bảng) -->
+  <title data-i18n="page.title">Signet — Không gian cá nhân</title>
+  <meta name="description" data-i18n-content="page.description"
+        content="Signet — lưu trữ cá nhân theo P.A.R.A: Dự án, Lĩnh vực, Tài nguyên, Lưu trữ">
   <link rel="icon" type="image/svg+xml" href="/ca-nhan/favicon.svg">
+  <!-- phông Be Vietnam Pro: @font-face của gói npm @fontsource/be-vietnam-pro, Dockerfile chép vào fonts/ (#305) -->
+  <link rel="stylesheet" href="/ca-nhan/fonts/be-vietnam-pro/be-vietnam-pro.css">
   <link rel="stylesheet" href="/ca-nhan/style.css">
   <!-- thư viện trước, mã của trang sau: cả hai chạy theo thứ tự sau khi đọc xong trang -->
   <script src="/ca-nhan/lib/oidc-client-ts.min.js" defer></script>
@@ -32,20 +37,23 @@
   <header class="top">
     <a class="brand" href="/ca-nhan/">
       <img src="/ca-nhan/favicon.svg" alt="" width="28" height="28">
-      <span><strong>Không gian cá nhân</strong><small>Signet · P.A.R.A</small></span>
+      <span><strong data-i18n="page.brand">Không gian cá nhân</strong><small>Signet · P.A.R.A</small></span>
     </a>
-    <nav class="top-nav" aria-label="Ứng dụng">
-      <a href="/">Văn phòng điện tử</a>
+    <nav class="top-nav" aria-label="Ứng dụng" data-i18n-aria-label="nav.apps">
+      <a href="/" data-i18n="nav.office">Văn phòng điện tử</a>
       <span id="who" class="who"></span>
-      <button id="logout" type="button" class="btn ghost" hidden>Đăng xuất</button>
+      <!-- tên ngôn ngữ kia viết bằng chính tiếng đó; lang của nút đổi theo (lang.other) -->
+      <button id="lang" type="button" class="btn ghost" lang="en" data-i18n="lang.switch"
+              data-i18n-lang="lang.other">English</button>
+      <button id="logout" type="button" class="btn ghost" data-i18n="nav.logout" hidden>Đăng xuất</button>
     </nav>
   </header>
 
   <main>
-    <p id="status" class="status" role="status">Đang đăng nhập…</p>
+    <p id="status" class="status" role="status" data-i18n="status.signingIn">Đang đăng nhập…</p>
 
     <div id="space" class="space" hidden>
-      <nav class="folders" aria-label="Thư mục P.A.R.A">
+      <nav class="folders" aria-label="Thư mục P.A.R.A" data-i18n-aria-label="nav.folders">
         <ul id="folders"></ul>
       </nav>
 
@@ -56,7 +64,7 @@
             <p id="folder-hint" class="hint"></p>
           </div>
           <div class="upload">
-            <label class="btn primary" for="file" id="upload-label">Tải tệp lên</label>
+            <label class="btn primary" for="file" id="upload-label" data-i18n="upload.button">Tải tệp lên</label>
             <input id="file" type="file" class="visually-hidden">
             <progress id="progress" max="100" value="0" hidden></progress>
           </div>
@@ -64,26 +72,27 @@
 
         <div id="message" class="message" hidden>
           <span id="message-text"></span>
-          <button id="retry" type="button" class="btn link" hidden>Thử xếp lại</button>
+          <button id="retry" type="button" class="btn link" data-i18n="upload.retry" hidden>Thử xếp lại</button>
         </div>
 
         <table id="items" class="items" hidden>
           <thead>
             <tr>
-              <th scope="col">Tên tệp</th>
-              <th scope="col">Dung lượng</th>
-              <th scope="col">Quét sạch lúc</th>
-              <th scope="col"><span class="visually-hidden">Thao tác</span></th>
+              <th scope="col" data-i18n="column.name">Tên tệp</th>
+              <th scope="col" data-i18n="column.size">Dung lượng</th>
+              <th scope="col" data-i18n="column.scanned">Quét sạch lúc</th>
+              <th scope="col"><span class="visually-hidden" data-i18n="column.actions">Thao tác</span></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
-        <p id="empty" class="empty" hidden>Thư mục trống. Tải tệp lên, hoặc chuyển tệp từ thư mục khác sang.</p>
+        <p id="empty" class="empty" data-i18n="folder.empty" hidden>
+          Thư mục trống. Tải tệp lên, hoặc chuyển tệp từ thư mục khác sang.</p>
       </section>
     </div>
   </main>
 
-  <footer class="foot">
+  <footer class="foot" data-i18n="page.footer">
     Tệp tải lên được trạm quét mã độc của lõi kiểm trước khi lưu; mỗi lần xếp, chuyển tệp vào sổ kiểm toán chuỗi băm của
     đơn vị. Ứng dụng này không tự làm các việc đó — lõi Signet làm, cho mọi ứng dụng cắm vào nó.
   </footer>

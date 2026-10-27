@@ -262,8 +262,15 @@ dùng thấy, rồi báo mọi mục trượt:
 - `issuer`, `token_endpoint` như dưới đây;
 - header CSP, `nosniff` còn qua proxy.
 
-Job `.github/workflows/ban-online.yml` chạy kịch bản này mỗi sáng trên bản online của đội, với phiên bản là thẻ phát
-hành mới nhất. Địa chỉ đổi bằng biến `MOC_ONLINE_URL` của repo.
+Job `.github/workflows/ban-online.yml` chạy kịch bản này trên bản online của đội, với phiên bản là thẻ phát hành mới
+nhất: mỗi sáng lúc 07:17, và ngay sau khi workflow Release phát hành xong. Từ lúc phát hành tới lúc nâng, job đỏ vì
+bản online còn chạy bản cũ. Nâng xong thì chạy tay job (Actions → Bản online → Run workflow) để xác nhận từ bên ngoài.
+Địa chỉ đổi bằng biến `MOC_ONLINE_URL` của repo.
+
+Job thứ hai của workflow đó kiểm bản dev https://signet-dev.htechcs.com mỗi sáng. Đây là bản cài có reconciler theo
+nhánh `develop` (`MOC_GITOPS_BRANCH=develop`, kéo mỗi 15 phút). Các mục kiểm như trên, nhưng `/api/status` phải là bản
+dựng từ đầu `develop` (`--commit`). Lần gộp mới nhất chưa quá 30 phút thì bản dựng từ commit liền trước cũng đạt.
+Reconciler kẹt thì job đỏ. Địa chỉ đổi bằng biến `MOC_DEV_URL`.
 
 - `issuer` và `token_endpoint` đều phải bắt đầu bằng `https://moc.example.vn/realms/moc`. `issuer` sai (`http://…`,
   `localhost`) là `MOC_PUBLIC_URL` sai; chỉ `token_endpoint` sai (`http://…` hay có `:9080`) là `MOC_TRUSTED_PROXY`

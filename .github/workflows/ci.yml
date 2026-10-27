@@ -168,7 +168,7 @@ jobs:
 
       - name: Có đủ tài liệu bắt buộc
         run: |
-          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md; do
+          for f in README.md CHANGELOG.md CONTRIBUTING.md DEPENDENCIES.md COPYRIGHT.txt; do
             test -f "$f" || { echo "::error::Thiếu $f"; exit 1; }
           done
           echo "Đủ tài liệu bắt buộc."
@@ -542,6 +542,14 @@ jobs:
         if: matrix.phan == 'luong-chinh'
         run: make demo-cai-ung-dung
 
+      # #301: ứng dụng thứ tư apps/nghi-phep mang BPMN và form (mục workflow của manifest), lõi kiểm rồi triển khai lên
+      # Flowable: bản có scriptTask bị từ chối trước khi đổi gì; nhân viên gửi đơn qua /api/workflow/nghi-phep bằng
+      # token app-nghi-phep, dữ liệu sai → 422 đúng mã; chỉ trưởng phòng cùng phòng thấy và duyệt; token client khác
+      # → 403; hộp việc Văn phòng không lẫn; cài lại không đổi gì; gỡ giữ lịch sử. Cài cũng tạo lại apisix, hasura
+      - name: Quy trình của ứng dụng qua lõi (make demo-quy-trinh)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-quy-trinh
+
       # F3.14: bật profile logs (Vector, Parseable; 8 dịch vụ chuyển sang driver fluentd, tạo lại cả CSDL, Hasura,
       # Keycloak) → một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files, tra Parseable ra đủ
       # dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai vào kho đã che; kho log không
@@ -551,6 +559,12 @@ jobs:
         run: |
           make logs-up
           make demo-log-tap-trung
+
+      # #302: tắt phần Văn phòng điện tử trong svc-files, svc-workflow thì lõi vẫn lên, phần lõi của smoke và
+      # demo-ca-nhan vẫn đạt; xong bật lại. Đặt cuối phần luong-chinh vì màn này dựng lại hai dịch vụ
+      - name: Tắt Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-tat-van-phong
 
       # F4.1: văn thư tải công văn PDF có chữ → tác tử moc-doc-reader gợi ý số ký hiệu, ngày, cơ quan, loại, trích yếu;
       # ảnh chụp → nhận dạng chữ (Tesseract); văn thư sửa một ô rồi vào sổ; sổ kiểm toán có dòng của tác tử, không mang
@@ -656,7 +670,8 @@ jobs:
           PY
 
       # F3.3 GitOps với repo git cục bộ: nhánh deploy là trạng thái mong muốn của bản cài. Reconciler áp commit mới
-      # được đẩy lên, rồi đưa tệp đã cài bị sửa tay về đúng commit đó; smoke lại sau cùng
+      # được đẩy lên, rồi đưa tệp đã cài bị sửa tay về đúng commit đó; smoke lại sau cùng. Bản cài bật thêm profile
+      # mail (MOC_EXTRA_PROFILES, như tunnel trên máy chủ): áp commit phải dừng cả mailpit rồi chạy lại nó
       - name: GitOps — reconciler áp commit mới, sửa lệch cấu hình (scripts/reconcile.py)
         if: matrix.phan == 'cai-dat'
         run: |
@@ -665,8 +680,10 @@ jobs:
           git push -q "$RUNNER_TEMP/moc.git" HEAD:refs/heads/deploy
           git clone -q -b deploy "$RUNNER_TEMP/moc.git" "$RUNNER_TEMP/moc-src"
           cd "$RUNNER_TEMP/moc"
-          printf 'MOC_GITOPS_DIR=%s\n' "$RUNNER_TEMP/moc-src" >> .env
+          printf 'MOC_GITOPS_DIR=%s\nMOC_EXTRA_PROFILES=mail\n' "$RUNNER_TEMP/moc-src" >> .env
+          docker compose --profile mail up -d --wait mailpit
           python3 scripts/reconcile.py
+          docker compose ps --status running --services | grep -qx mailpit
           out=$(python3 scripts/reconcile.py)
           grep -q 'không có gì phải làm' <<<"$out"
           git clone -q -b deploy "$RUNNER_TEMP/moc.git" "$RUNNER_TEMP/dev"

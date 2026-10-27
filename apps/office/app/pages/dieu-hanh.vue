@@ -405,5 +405,6 @@ const outgoingChart = computed(() => ({
         </section>
       </div>
     </div>
+    <ArchiveBoard v-if="allowed" class="mt-4" />
   </div>
 </template>

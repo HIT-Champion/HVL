@@ -16,32 +16,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* Phông Be Vietnam Pro tự phục vụ như app-office: bản trùng từng byte, giấy phép OFL-1.1 (OFL.txt cùng thư mục) */
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/ca-nhan/fonts/be-vietnam-pro/BeVietnamPro-Regular.ttf) format("truetype");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/ca-nhan/fonts/be-vietnam-pro/BeVietnamPro-Medium.ttf) format("truetype");
-  font-weight: 500;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/ca-nhan/fonts/be-vietnam-pro/BeVietnamPro-SemiBold.ttf) format("truetype");
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Be Vietnam Pro";
-  src: url(/ca-nhan/fonts/be-vietnam-pro/BeVietnamPro-Bold.ttf) format("truetype");
-  font-weight: 700;
-  font-display: swap;
-}
-
 /* Màu "Lịch hạn" của Signet như app-office (apps/office/app/assets/css/main.css, DESIGN.md), viết tay: ứng dụng
    không có bước dựng CSS. Trang trắng; thanh trên lục bảo sâu như thanh bên của Văn phòng, là khối tối duy nhất. */
 :root {

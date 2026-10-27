@@ -40,10 +40,14 @@ có chữ ký của két, tính lại cả chuỗi ngoài CSDL và kiểm chữ 
 neo tải được ở cổng xác thực không cần token, vân tay khớp két. Kèm các kiểm tra chặn: tệp EICAR, không token, đường
 quản trị, đơn vị khác không thấy văn bản; văn thư đăng nhập — trên trình duyệt hay qua client moc-cli của kịch bản —
 phải nhập mã TOTP; giới hạn tốc độ.
+
+--chi-loi: chỉ phần của lõi — cổng, két, tự phục hồi, đăng nhập, WAF, trạm kiểm dịch, tải lên và tải về — không đi
+luồng nào của Văn phòng điện tử; vẫn đúng khi MOC_OFFICE_ENABLED=false (make demo-tat-van-phong, #302).
 """
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import html
@@ -418,8 +422,12 @@ def check_waf(clerk: Session, director: Session, staff: Session, tag: str) -> No
     ok(f"chữ thật từng bị chặn nhầm qua WAF ở nội dung dự thảo và ô Tìm kiếm: {', '.join(samples)}")
 
 
-def main() -> None:
-    print(f"Kiểm tra {PUBLIC_URL}")
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="smoke", description="Kiểm nhanh luồng chính qua cổng APISIX")
+    parser.add_argument("--chi-loi", action="store_true",
+                        help="chỉ phần của lõi, không đi luồng của Văn phòng điện tử (dùng được khi đã tắt Văn phòng)")
+    args = parser.parse_args(argv)
+    print(f"Kiểm tra {PUBLIC_URL}" + (" — chỉ phần lõi" if args.chi_loi else ""))
     tag = uuid.uuid4().hex[:6].upper()
 
     print("Cổng APISIX")
@@ -554,6 +562,24 @@ def main() -> None:
                                               "signature": "Eicar-Test-Signature"}] \
         or fail(f"sổ kiểm toán không có đúng một dòng file.rejected của lần chặn này: {blocked}")
     ok("lần chặn nằm trong sổ kiểm toán: lãnh đạo thấy mẫu mã độc, cỡ tệp; tên tệp ẩn")
+
+    if args.chi_loi:
+        # Cùng hai route tệp mà ứng dụng nào cũng dùng (docs/architecture.md §4.6), không gắn vào văn bản nào
+        print("Tệp")
+        content = text_pdf(f"Kiem phan loi {tag}")
+        stored = clerk.upload(f"loi-{tag}.pdf", content)
+        _, _, got = request("GET", f"{PUBLIC_URL}/api/files/{stored['id']}", headers=clerk.auth)
+        got == content and stored["sha256"] == hashlib.sha256(content).hexdigest() \
+            or fail("tải về không đúng từng byte tệp vừa tải lên")
+        ok(f"tải lên qua ClamAV rồi tải về đúng từng byte ({stored['sha256'][:12]}…)")
+        try:
+            request("GET", f"{PUBLIC_URL}/api/files/{stored['id']}", headers=other_tenant.auth)
+            fail("đơn vị khác tải được tệp")
+        except HTTPError as exc:
+            exc.status == 404 or fail(f"đơn vị khác tải tệp: HTTP {exc.status}")
+        ok("đơn vị khác không tải được tệp (404)")
+        print(f"Đạt {passed} kiểm tra (chỉ phần lõi).")
+        return
 
     print("Luồng văn bản đến")
     # Văn bản hạn chế tiếp nhận TRƯỚC: svc-files đọc chữ PDF theo thứ tự tải lên, nên khi công văn dưới đã tìm được

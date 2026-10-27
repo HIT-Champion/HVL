@@ -47,7 +47,8 @@ from svc_files.assist.scope import NOTHING, Scope, service_scope
 from svc_files.assist.similar import SIMILAR_PREFIX, similar_text, subject_text
 from svc_files.assist.vi import keyword_query
 from svc_files.config import Settings
-from svc_files.hasura import HasuraClient, HasuraError
+from svc_files.hasura import HasuraError
+from svc_files.office.hasura import OfficeHasura
 from svc_files.search import SearchError
 
 ENV = {
@@ -226,7 +227,7 @@ def test_similar_target_reads_with_the_service_role_of_the_requested_tenant():
         row = {"id": body["variables"]["id"], "direction": "in", "restricted": False, "summary": SUMMARY}
         return httpx2.Response(200, json={"data": {"office_documents_by_pk": row if len(seen) == 1 else None}})
 
-    client = HasuraClient("http://hasura:8080", "bi-mat", transport=httpx2.MockTransport(reply))
+    client = OfficeHasura("http://hasura:8080", "bi-mat", transport=httpx2.MockTransport(reply))
     document_id = uuid.uuid4()
     got = run(client.similar_target(TENANT_A, document_id, request_id="req-1"))
     assert got == {"id": str(document_id), "direction": "in", "restricted": False, "summary": SUMMARY}

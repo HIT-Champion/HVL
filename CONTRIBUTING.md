@@ -102,9 +102,11 @@ Bảng giải thích từng loại, phạm vi và ví dụ: [`docs/git_flow.md`]
 - Tệp chữ xuống dòng bằng LF (`.editorconfig`, `.gitattributes`). Clone trên Windows vẫn ra LF. Bản clone có từ trước
   #244 thì chạy một lần `git rm -rq --cached . && git reset --hard` để checkout lại ra LF (lệnh bỏ mọi thay đổi chưa
   commit).
-- Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng.
-- Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md`
-  kèm giấy phép và kiểm tra tính tương thích với Apache-2.0.
+- Cập nhật `CHANGELOG.md` mục `[Chưa phát hành]` cho mọi thay đổi hướng người dùng: mỗi thay đổi một dòng (tối đa
+  120 ký tự) trong nhóm Đã thêm, Đã sửa đổi, Đã sửa lỗi hay Bảo mật, nói thay đổi gì, kèm số issue hoặc PR. Chi
+  tiết cài đặt, số test để ở PR và tài liệu.
+- Nếu thêm một phần mềm thượng nguồn mới, phải bổ sung dòng tương ứng vào `DEPENDENCIES.md` (tên dẫn tới trang chủ,
+  kèm giấy phép), kiểm tra tính tương thích với Apache-2.0, rồi chạy `make copyright` để sinh lại `COPYRIGHT.txt`.
 - Thêm hay nâng gói npm, Python thì chạy `make sbom && make license-audit` (cần Docker và mạng): CI kiểm giấy phép của
   mọi gói, kể cả gói gián tiếp. Gói ngoài chính sách hay chưa rõ giấy phép cần ngoại lệ ghi lý do trong
   `.github/license-exceptions.json`.
@@ -115,11 +117,12 @@ Phần song ngữ Việt / Anh hiện có:
 
 - **Văn phòng điện tử** (`apps/office`): mọi câu trên giao diện. Ngôn ngữ chọn bằng nút trên thanh trên; trang công
   khai cũng có nút này.
+- **Không gian cá nhân** (`apps/ca-nhan`) và **Bảng tin** (`apps/bang-tin`): mọi câu trên giao diện. Nút đổi ngôn
+  ngữ ở thanh trên; lựa chọn lưu chung với Văn phòng điện tử.
 - **Trang đăng nhập**: theme Keycloak `signet`, câu nằm ở `platform/keycloak/themes/signet/login/messages/`
   (`messages_vi.properties`, `messages_en.properties`).
 
-Không gian cá nhân (`apps/ca-nhan`) và Bảng tin (`apps/bang-tin`) chỉ có tiếng Việt. PDF phát hành và sổ in theo thể
-thức văn bản tiếng Việt.
+Ứng dụng mẫu Nghỉ phép (`apps/nghi-phep`) chỉ có tiếng Việt. PDF phát hành và sổ in theo thể thức văn bản tiếng Việt.
 
 Trong Văn phòng điện tử:
 
@@ -139,6 +142,15 @@ Trong Văn phòng điện tử:
   - các chỗ chọn định dạng số, ngày theo `locale.value === 'vi'`;
   - hàm `hpdiText` của `app/utils/hpdi.ts`;
   - test so cặp `vi` và `en` ở `tests/answer.test.ts`.
+
+Trong Không gian cá nhân và Bảng tin (JavaScript thuần, mỗi ứng dụng một bảng riêng vì image dựng từ thư mục ứng dụng):
+
+- Câu nằm trong `public/i18n.js` của ứng dụng, đối tượng `MESSAGES` có hai bảng `vi`, `en` cùng khóa, cùng tham số
+  `{x}`. Mã gọi `t('khoa')`. Chữ tĩnh của `index.html` để sẵn bản tiếng Việt và mang `data-i18n="khoa"` (chữ của phần
+  tử) hoặc `data-i18n-<thuộc tính>="khoa"` (vd `data-i18n-aria-label`); `localize()` gán lại theo ngôn ngữ đã chọn.
+- Kiểm bằng `node --test tests/*.test.js` trong thư mục ứng dụng: `tests/i18n.test.js` bắt chữ tiếng Việt viết cứng
+  trong `public/*.js`, chữ tĩnh của `index.html` không có khóa hay lệch bảng, khóa thiếu ở một trong hai bảng.
+  e2e `tests/e2e/tieng-anh.spec.ts` mở cả hai ứng dụng bằng tiếng Anh.
 
 Tài liệu tiếng Anh: `README.en.md`. Bản tiếng Anh của hướng dẫn vận hành đang chờ người đóng góp (issue #59).
 

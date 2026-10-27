@@ -25,6 +25,7 @@ import httpx2
 import pytest
 
 from svc_files.hasura import HasuraAuthError, HasuraClient, HasuraError
+from svc_files.office.hasura import OfficeHasura
 
 TENANT = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000a")
 FILE = uuid.UUID("3c4d0000-0000-4000-8000-000000000001")
@@ -54,6 +55,10 @@ def run(coro):
 
 def client(rec: Recorder) -> HasuraClient:
     return HasuraClient("http://hasura:8080", "bi-mat", transport=httpx2.MockTransport(rec))
+
+
+def office_client(rec: Recorder) -> OfficeHasura:
+    return OfficeHasura("http://hasura:8080", "bi-mat", transport=httpx2.MockTransport(rec))
 
 
 def test_insert_file_runs_as_service_with_session_from_token():
@@ -182,7 +187,8 @@ def test_dispatch_source_reads_with_admin_secret_and_returns_hex_hashes():
                                          "mime_type": "application/pdf", "size_bytes": 10, "sha256": "\\x" + "ab" * 32,
                                          "encrypted": False, "storage_tier": "hot"}}]},
     }}}))
-    row = run(client(rec).dispatch_source(uuid.uuid4()))
+    office = OfficeHasura("http://hasura:8080", "bi-mat", transport=httpx2.MockTransport(rec))
+    row = run(office.dispatch_source(uuid.uuid4()))
     headers, _ = rec.last
     assert headers["x-hasura-admin-secret"] == "bi-mat" and "x-hasura-role" not in headers
     assert row["source_sha256"] == row["document"]["content_sha256"] == row["document"]["issued"][0]["sha256"] \
@@ -263,3 +269,23 @@ def test_ask_documents_service_runs_as_service_of_the_tenant_and_skips_restricte
     headers, body = rec.last
     assert headers["x-hasura-role"] == "service" and headers["x-hasura-tenant-id"] == str(TENANT)
     assert "{restricted: {_eq: false}}" in body["query"]
+
+
+def test_archived_case_files_ask_with_the_user_token_and_return_hex_hashes():
+    key = f"cold/{TENANT}/case/c-1/"
+    rec = Recorder((200, {"data": {"office_case_files": [
+        {"id": "c-1", "code": "HS-01", "archive_key": key, "archive_sha256": "\\x" + "ef" * 32},
+        {"id": "c-2", "code": "HS-02", "archive_key": None, "archive_sha256": None}]}}))
+    got = run(office_client(rec).archived_case_files("token-lanh-dao"))
+    headers, body = rec.last
+    assert headers["authorization"] == "Bearer token-lanh-dao" and "x-hasura-admin-secret" not in headers
+    assert '{status: {_eq: "archived"}}' in body["query"]
+    assert got == [{"id": "c-1", "code": "HS-01", "archive_key": key, "archive_sha256": "ef" * 32}]
+    # lãnh đạo đơn vị đọc được hồ sơ: validation-failed là metadata hỏng, ra như lỗi CSDL (503), không thành kho trống
+    rec = Recorder((200, {"errors": [{"message": "field not found", "extensions": {"code": "validation-failed"}}]}))
+    with pytest.raises(HasuraError) as exc:
+        run(office_client(rec).archived_case_files("t"))
+    assert exc.value.code == "validation-failed" and not isinstance(exc.value, HasuraAuthError)
+    rec = Recorder((200, {"errors": [{"message": "JWTExpired", "extensions": {"code": "invalid-jwt"}}]}))
+    with pytest.raises(HasuraAuthError):
+        run(office_client(rec).archived_case_files("t"))

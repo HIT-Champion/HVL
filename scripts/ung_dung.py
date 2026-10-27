@@ -39,6 +39,12 @@ Trạng thái mong muốn nằm trong `.moc-apps/` của thư mục chạy (ngo�
   - `hasura.env`, `<tên>.env` (0600): bí mật sinh lúc cài — không nằm trong manifest, không in ra.
 CSDL ghi trạng thái đã áp: `core.apps`, `core.app_migrations` (migration 1792281603200, có sổ kiểm toán).
 
+Ứng dụng khai `workflow` (BPMN + form JSON Schema, #301): gói các tệp đó (nội dung lưu trong bản ghi) thành zip, đưa
+qua stdin cho `python -m svc_workflow.apps.deploy check|install <tên>` trong container svc-workflow. Bước 1 (manifest)
+cho svc-workflow kiểm gói — BPMN theo danh sách trắng, form — trước mọi thay đổi; bước "quy trình" sau Keycloak triển
+khai thành một deployment trên Flowable của lõi. Gỡ thì tạm dừng các định nghĩa quy trình đó (lịch sử, đơn đang dở giữ
+nguyên). docs/them-ung-dung.md mục 1.5.
+
 Migration của ứng dụng chạy trên một phiên psql mà session user là vai trò CSDL riêng của ứng dụng
 (`moc_appdb_<schema>`: không superuser, không CREATEROLE, BYPASSRLS, chỉ làm chủ schema của nó, không quyền gì trên
 `core`, `office`, `personal`; LOGIN chỉ trong lúc chạy migration). RESET ROLE hay SQL động không leo lên được vai trò
@@ -55,10 +61,12 @@ Thoát 0: xong; 1: bị từ chối (manifest sai, xung đột) hoặc một bư
 from __future__ import annotations
 
 import argparse
+import base64
 import contextlib
 import copy
 import fcntl
 import hashlib
+import io
 import json
 import math
 import os
@@ -68,6 +76,7 @@ import secrets
 import subprocess
 import sys
 import time
+import zipfile
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -125,10 +134,18 @@ TENANT_VAR = "x-hasura-tenant-id"
 MAX_SQL_BYTES = 1_000_000
 HOOK_HEADER = "X-Moc-Hook-Secret"
 DEFAULT_RETRY = {"num_retries": 5, "interval_sec": 10, "timeout_sec": 10}
+# Quy trình của ứng dụng (#301): svc-workflow kiểm, triển khai trong container (services/svc-workflow/…/apps/deploy.py)
+WORKFLOW_CLI = ("python", "-m", "svc_workflow.apps.deploy")
+WORKFLOW_MANIFEST = "moc-workflow.json"        # mục lục trong gói, như svc_workflow/apps/bundle.py
+MAX_WORKFLOW_FILE = 512 * 1024
 
 
 class AppError(Exception):
     """Không làm được hoặc làm thì sai — viết cho người vận hành đọc (thoát 1)."""
+
+
+class WorkflowRejected(AppError):
+    """svc-workflow từ chối gói quy trình (BPMN, form sai) — lỗi viết cho người cài đọc."""
 
 
 class StepFailed(Exception):
@@ -436,7 +453,46 @@ def check_manifest(m: dict[str, Any], base: pathlib.Path, schema: dict[str, Any]
                 errors.append(f"image.build: {folder} không có Dockerfile")
         except AppError as exc:
             errors.append(str(exc))
+    if "workflow" in m:
+        errors += workflow_errors(m, base)
     return errors + check_tables(m)
+
+
+def workflow_errors(m: dict[str, Any], base: pathlib.Path) -> list[str]:
+    """Phần kiểm được ở máy cài: formKey có tiền tố <tên>., tệp có thật, nằm trong thư mục ứng dụng. BPMN, nội dung
+    form do svc-workflow kiểm lúc cài (danh sách trắng, svc_workflow/apps/bpmn.py)."""
+    errors = [f"workflow.forms.{key}: formKey phải mở đầu bằng {m['name']}." for key in m["workflow"]["forms"]
+              if not key.startswith(f"{m['name']}.")]
+    files = [("workflow.processes", rel) for rel in m["workflow"]["processes"]]
+    files += [(f"workflow.forms.{key}", rel) for key, rel in m["workflow"]["forms"].items()]
+    for what, rel in files:
+        try:
+            path = _inside(base, rel, what)
+        except AppError as exc:
+            errors.append(str(exc))
+            continue
+        if not path.is_file():
+            errors.append(f"{what}: không có tệp {rel}")
+        elif path.stat().st_size > MAX_WORKFLOW_FILE:
+            errors.append(f"{what}: tệp {rel} lớn quá {MAX_WORKFLOW_FILE // 1024} KB")
+    return errors
+
+
+def read_workflow(manifest: dict[str, Any], base: pathlib.Path) -> dict[str, Any]:
+    """Nội dung BPMN, form vào bản ghi (như SQL migration): sync, hoàn tác dựng lại được gói dù thư mục nguồn đổi."""
+    def text(rel: str, what: str) -> tuple[str, str]:
+        path = _inside(base, rel, what)
+        try:
+            return path.relative_to(base).as_posix(), path.read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            raise AppError(f"{what}: {rel} không phải UTF-8") from None
+    wf = manifest["workflow"]
+    processes = dict(text(rel, "workflow.processes") for rel in wf["processes"])
+    forms = {}
+    for key, rel in wf["forms"].items():
+        path, content = text(rel, f"workflow.forms.{key}")
+        forms[key] = {"path": path, "text": content}
+    return {"processes": processes, "forms": forms}
 
 
 def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str, Any]:
@@ -460,6 +516,7 @@ def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str,
     folder = manifest["database"].get("migrations")
     migrations = read_migrations(_inside(base, folder, "database.migrations")) if folder else []
     build = str(_inside(base, manifest["image"]["build"], "image.build")) if "build" in manifest["image"] else None
+    workflow = read_workflow(manifest, base) if "workflow" in manifest else None
     events = None
     if "events" in manifest:
         events = {"kinds": sorted(manifest["events"]["kinds"]), "port": manifest["events"]["webhook"]["port"],
@@ -473,7 +530,7 @@ def load_manifest(path: pathlib.Path, *, root: pathlib.Path = ROOT) -> dict[str,
         "read_only": manifest.get("read_only", True),
         "environment": manifest.get("environment", {}), "schema": manifest["database"]["schema"],
         "migrations": migrations, "tables": manifest.get("metadata", {}).get("tables", []),
-        "service_account": bool(manifest.get("service_account")), "events": events,
+        "service_account": bool(manifest.get("service_account")), "events": events, "workflow": workflow,
         "manifest": manifest, "manifest_sha256": hashlib.sha256(raw).hexdigest(), "source": str(path),
     }
 
@@ -719,8 +776,13 @@ class State:
         _write_atomic(self.dir / "apps" / f"{rec['name']}.json",
                       (json.dumps(rec, ensure_ascii=False, indent=2) + "\n").encode())
 
+    def before_path(self, name: str) -> pathlib.Path:
+        """Bản ghi trước lần cài dở (rỗng: chưa có bản ghi), đích hoàn tác của các lần cài sau đó: có từ lúc một lần cài
+        ghi bản ghi mới tới khi một lần cài xong, hoàn tác xong hay gỡ."""
+        return self.dir / "truoc-khi-cai" / f"{name}.json"
+
     def drop(self, name: str) -> None:
-        for path in (self.dir / "apps" / f"{name}.json", self.dir / f"{name}.env"):
+        for path in (self.dir / "apps" / f"{name}.json", self.dir / f"{name}.env", self.before_path(name)):
             with contextlib.suppress(FileNotFoundError):
                 path.unlink()
 
@@ -1220,6 +1282,73 @@ def hasura_check(system: System, apps: list[dict[str, Any]], gone: list[dict[str
     return f"metadata đã áp: {n} bảng ứng dụng, {sum(1 for a in apps if a.get('events'))} event trigger, nhất quán"
 
 
+# ---------------------------------------------------------------------------------------- quy trình (svc-workflow)
+
+def workflow_bundle(rec: dict[str, Any]) -> str:
+    """Gói quy trình của bản ghi: zip (mục lục moc-workflow.json + tệp ở đường tương đối với manifest), base64. Cùng
+    nội dung thì cùng byte (thứ tự, mốc thời gian cố định)."""
+    wf = rec["workflow"]
+    index = {"app": rec["name"], "processes": sorted(wf["processes"]),
+             "forms": {key: f["path"] for key, f in sorted(wf["forms"].items())}}
+    files = {**wf["processes"], **{f["path"]: f["text"] for f in wf["forms"].values()}}
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, text in [(WORKFLOW_MANIFEST, json.dumps(index, ensure_ascii=False, sort_keys=True)),
+                           *sorted(files.items())]:
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            zf.writestr(info, text.encode("utf-8"))
+    return base64.b64encode(out.getvalue()).decode("ascii")
+
+
+def workflow_cli(system: System, action: str, name: str, bundle: str | None = None) -> dict[str, Any]:
+    """Gọi svc_workflow.apps.deploy trong container: một dòng JSON; ok false → WorkflowRejected liệt kê mọi lỗi."""
+    out = system.exec("svc-workflow", *WORKFLOW_CLI, action, name, input=bundle, timeout=180)
+    try:
+        result = json.loads(out.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        raise AppError(f"svc-workflow trả lời lạ: {out.strip()[-200:]!r}") from None
+    if not result.get("ok"):
+        errors = [str(e) for e in result.get("errors") or ["không rõ lỗi"]]
+        raise WorkflowRejected(f"quy trình chưa đúng ({len(errors)} lỗi):\n  - " + "\n  - ".join(errors))
+    return result
+
+
+def workflow_check(system: System, rec: dict[str, Any]) -> dict[str, Any]:
+    """svc-workflow kiểm gói (không đổi gì trên Flowable). Từ chối → WorkflowRejected; không gọi được → Unavailable."""
+    try:
+        return workflow_cli(system, "check", rec["name"], workflow_bundle(rec))
+    except WorkflowRejected:
+        raise
+    except AppError as exc:
+        raise Unavailable(f"chưa gọi được svc-workflow để kiểm quy trình: {exc}") from None
+
+
+def step_workflow(system: System, rec: dict[str, Any], *, dry_run: bool,
+                  checked: dict[str, Any] | None = None) -> str:
+    """Triển khai gói quy trình (chạy lại không đổi thì giữ nguyên); manifest bỏ workflow thì tạm dừng quy trình đã
+    triển khai. dry_run: chỉ báo kết quả kiểm (checked: lần kiểm ở bước manifest), không triển khai."""
+    name = rec["name"]
+    if not rec.get("workflow"):
+        if dry_run:
+            return "manifest không còn workflow: sẽ tạm dừng quy trình đã triển khai (lịch sử giữ nguyên)"
+        done = workflow_cli(system, "remove", name)
+        return (f"manifest không còn workflow: đã tạm dừng {done.get('suspended', 0)} định nghĩa quy trình (lịch sử "
+                "giữ nguyên)")
+    wf = rec["workflow"]
+    what = f"{len(wf['processes'])} quy trình, {len(wf['forms'])} form"
+    if dry_run:
+        done = checked if checked is not None else workflow_check(system, rec)
+        state = {True: "đã triển khai đúng bản này", False: "sẽ triển khai"}.get(
+            done.get("current"), "sẽ triển khai (chưa hỏi được Flowable)")
+        return f"{state} {done.get('deployment')} ({what})"
+    done = workflow_cli(system, "install", name, workflow_bundle(rec))
+    result = (f"đã triển khai {done.get('deployment')}" if done.get("deployed")
+              else f"{done.get('deployment')} đã triển khai, giữ nguyên")
+    again = f"; bật lại {done['activated']} định nghĩa đang tạm dừng" if done.get("activated") else ""
+    return f"{result} ({what}){again}"
+
+
 # ---------------------------------------------------------------------------------------- khóa, chạy từng bước
 
 @contextlib.contextmanager
@@ -1325,14 +1454,40 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
     old = state.records().get(rec["name"])
     old_json = state.dir / "apps" / f"{rec['name']}.json"
     old_bytes = old_json.read_bytes() if old_json.exists() else None
+    # Lần cài trước hỏng sau khi đã ghi bản ghi (tệp chạy, container): hoàn tác về bản ghi trước lần cài dở đó, không
+    # phải bản ghi nó để lại
+    before_json = state.before_path(rec["name"])
+    before_bytes = (before_json.read_bytes() or None) if before_json.exists() else old_bytes
+    before = json.loads(before_bytes) if before_bytes else None
     out(f"{'Kế hoạch cài' if dry_run else 'Cài'} {rec['name']} {rec['version']} — {rec['title']} ở {rec['path']}/"
         f"{' (đã cài, chạy lại: chỉ làm phần còn thiếu)' if old and not old.get('removing') else ''}")
-    out("  1/8 manifest: hợp lệ"
+    # bước quy trình: manifest khai workflow, hoặc bản cài trước có mà bản này bỏ (tạm dừng quy trình cũ)
+    had_workflow = bool(before and before.get("workflow") and not before.get("removing"))
+    with_workflow = bool(rec.get("workflow")) or had_workflow
+    total = 9 if with_workflow else 8
+    wf = rec.get("workflow")
+    checked: dict[str, Any] | None = None
+    note = " (svc-workflow đã kiểm)"
+    if wf:
+        # Kiểm gói quy trình trước mọi thay đổi: BPMN độc, form sai bị từ chối khi chưa dựng image, chưa tạo schema,
+        # bí mật, client nào (bước quy trình sau Keycloak chỉ còn triển khai)
+        try:
+            checked = workflow_check(system, rec)
+        except WorkflowRejected as exc:
+            raise StepFailed(1, total, "manifest", exc) from exc
+        except Unavailable as exc:
+            if not dry_run:
+                raise StepFailed(1, total, "manifest", exc) from exc
+            note = f" (chưa kiểm được: {exc})"
+            checked = {"ok": True, "current": None, "deployment": "gói quy trình"}
+    out(f"  1/{total} manifest: hợp lệ"
         f" ({len(rec['migrations'])} migration, {len(rec['tables'])} bảng"
+        f"{', ' + str(len(wf['processes'])) + ' quy trình' + note if wf else ''}"
         f"{', nghe ' + ', '.join(rec['events']['kinds']) if rec.get('events') else ''})")
     env = compose_env_values(state.root)
     made: list[str] = []
     wrote: list[str] = []
+    deployed: list[bool] = []                 # bước quy trình đã đổi Flowable ở lần cài này (hoàn tác cần biết)
 
     def secrets_step() -> str:
         made.extend(state.ensure_secrets(rec, dry_run=dry_run))
@@ -1340,6 +1495,8 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
 
     def files_step() -> str:
         if not dry_run:
+            if not before_json.exists():
+                _write_atomic(before_json, old_bytes or b"")
             state.save(rec)
             changed = state.write()
         else:
@@ -1353,23 +1510,56 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
                              {"MOC_CLIENT_SECRET": "…"}, new_secret="MOC_CLIENT_SECRET" in made, dry_run=dry_run)
 
     def undo() -> str:
-        """Bước 8 lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài này rồi áp lại
-        metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng. CSDL, client giữ (chạy lại dùng
-        tiếp)."""
+        """Bước Hasura lỗi: trả bản ghi, tệp chạy (route, metadata trộn, tệp phủ) về như trước lần cài dở đầu tiên
+        rồi áp metadata — Hasura không giữ phần hỏng, ứng dụng khác cài sau không vướng; quy trình về bản của lần cài
+        trước (chưa có thì tạm dừng). CSDL, client giữ (chạy lại dùng tiếp)."""
         try:
-            if old_bytes is None:
+            if before_bytes is None:
                 system.compose("rm", "--stop", "--force", f"app-{rec['name']}", timeout=180)
                 old_json.unlink(missing_ok=True)
             else:
-                _write_atomic(old_json, old_bytes)
+                _write_atomic(old_json, before_bytes)
+            before_json.unlink(missing_ok=True)
             if GATEWAY in state.write():
                 restart_apisix(system)
             system.apply_metadata()
             bad = system.metadata({"type": "get_inconsistent_metadata", "args": {}}).get("inconsistent_objects")
             return ("đã trả tệp chạy và metadata Hasura về như trước lần cài này"
-                    + (f", còn {len(bad)} chỗ không nhất quán" if bad else ", nhất quán"))
+                    + (f", còn {len(bad)} chỗ không nhất quán" if bad else ", nhất quán") + workflow_back())
         except (AppError, Unavailable) as exc:
             return f"không trả về được ({exc}) — gỡ: python3 scripts/moc.py app remove {rec['name']}"
+
+    def workflow_back() -> str:
+        if not deployed:
+            return ""
+        try:
+            if had_workflow:
+                workflow_cli(system, "install", rec["name"], workflow_bundle(before))
+                return "; quy trình về bản của lần cài trước"
+            workflow_cli(system, "remove", rec["name"])
+            return "; quy trình vừa triển khai đã tạm dừng"
+        except AppError as exc:
+            return f"; chưa trả được quy trình ({exc})"
+
+    def workflow_step() -> str:
+        result = step_workflow(system, rec, dry_run=dry_run, checked=checked)
+        if not dry_run:
+            deployed.append(True)
+        return result
+
+    def or_workflow_back(step: Callable[[], str]) -> Callable[[], str]:
+        """Bước sau "quy trình" lỗi thì quy trình về bản của lần cài trước (chưa có thì tạm dừng): không để BPMN, form
+        mới chạy khi trang, route còn bản cũ hay chưa có. Tệp chạy, container giữ như lúc lỗi (chạy lại làm tiếp); bước
+        Hasura trả cả tệp chạy (undo)."""
+        def run() -> str:
+            try:
+                return step()
+            except (AppError, Unavailable) as exc:
+                back = workflow_back()
+                if not back:
+                    raise
+                raise AppError(f"{exc}{back}") from exc
+        return run
 
     def container_step() -> str:
         up = up_services(system, ["apisix", "hasura", f"app-{rec['name']}"], dry_run=dry_run)
@@ -1391,12 +1581,15 @@ def install(manifest: pathlib.Path, *, state: State, system: System, dry_run: bo
         ("CSDL", lambda: step_database(system, rec, dry_run=dry_run)),
         ("bí mật", secrets_step),
         ("Keycloak", keycloak_step),
-        ("tệp chạy", files_step),
-        ("container", container_step),
+        *([("quy trình", workflow_step)] if with_workflow else []),
+        ("tệp chạy", or_workflow_back(files_step)),
+        ("container", or_workflow_back(container_step)),
         ("Hasura", hasura_step),
     ]
     with ops_lock(state.root):
         run_steps(steps, out, first=2, dry_run=dry_run)
+        if not dry_run:
+            before_json.unlink(missing_ok=True)
     return {"name": rec["name"], "dry_run": dry_run, "image": rec["image"], "secrets_created": made}
 
 
@@ -1485,6 +1678,12 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
     def keycloak_step() -> str:
         return _remove_keycloak(system, name, dry_run=dry_run)
 
+    def workflow_step() -> str:
+        if dry_run:
+            return "sẽ tạm dừng mọi định nghĩa quy trình của ứng dụng; lịch sử, đơn đang dở giữ nguyên trong Flowable"
+        done = workflow_cli(system, "remove", name)
+        return f"đã tạm dừng {done.get('suspended', 0)} định nghĩa quy trình; lịch sử, đơn đang dở giữ nguyên"
+
     def db_step() -> str:
         if dry_run:
             return f"sẽ ghi core.apps.removed_at; KHÔNG xóa schema {rec['schema']} và dữ liệu"
@@ -1493,8 +1692,11 @@ def remove(name: str, *, state: State, system: System, dry_run: bool = False,
         state.write()
         return f"core.apps.removed_at đã ghi; schema {rec['schema']} và dữ liệu giữ nguyên"
 
+    # quy trình tạm dừng trước khi xóa client: bước quy trình lỗi thì Keycloak chưa đổi gì, chạy lại gỡ tiếp — không có
+    # lúc client đã xóa mà định nghĩa quy trình vẫn nhận đơn từ token còn hạn
     steps = [("container", container_step), ("tệp chạy", files_step), ("Hasura", hasura_step),
-             ("Keycloak", keycloak_step), ("CSDL", db_step)]
+             *([("quy trình", workflow_step)] if rec.get("workflow") else []), ("Keycloak", keycloak_step),
+             ("CSDL", db_step)]
     with ops_lock(state.root):
         run_steps(steps, out, dry_run=dry_run)
     return {"name": name, "dry_run": dry_run}
@@ -1519,6 +1721,8 @@ def sync(*, state: State, system: System, files_only: bool = False, out: Callabl
             result["actions"].append(f"{rec['name']}: " + step_keycloak(
                 system, rec, env, state.secrets(rec["name"]), new_secret="MOC_CLIENT_SECRET" in made[rec["name"]],
                 dry_run=False))
+            if rec.get("workflow"):
+                result["actions"].append(f"{rec['name']}: quy trình: {step_workflow(system, rec, dry_run=False)}")
         up_services(system, ["apisix", "hasura", *(f"app-{a['name']}" for a in apps)], dry_run=False)
         if GATEWAY in result["changed"]:
             result["actions"].append(restart_apisix(system))

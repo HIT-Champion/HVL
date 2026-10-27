@@ -51,7 +51,7 @@ PREFIX ?= /opt/moc
         demo-ky-so \
         demo-che-pii do-che-pii \
         demo-nap-lo nap-lo-mau \
-        demo-ca-nhan \
+        demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung \
         reconcile \
@@ -176,6 +176,9 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@cd apps/ca-nhan && npm test
 	@cd apps/bang-tin && node --test tests/*.test.js
 	@python3 -m unittest discover -s apps/bang-tin/tests
+	@cd apps/nghi-phep && node --test tests/*.test.js
+	@python3 -m unittest discover -s apps/nghi-phep/tests
+	@python3 -m unittest discover -s apps/tai-lieu-api/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
@@ -250,7 +253,10 @@ nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến m�
 demo-ca-nhan: $(ENV_FILE) ## Ứng dụng thứ hai trên lõi (docs/them-ung-dung.md): Không gian cá nhân P.A.R.A — client Keycloak riêng, SSO với Văn phòng điện tử; tải lên qua ClamAV, xếp, chuyển, tải về; người khác không với tới; sổ kiểm toán của lõi
 	@python3 scripts/demo_ca_nhan.py
 
-.PHONY: app-install app-list app-remove demo-cai-ung-dung
+demo-tat-van-phong: $(ENV_FILE) ## Tắt phần Văn phòng điện tử (MOC_OFFICE_ENABLED=false) trong svc-files, svc-workflow: route, Action của Văn phòng không còn; phần lõi của make smoke và make demo-ca-nhan vẫn đạt; xong thì bật lại (#302)
+	@python3 scripts/demo_tat_van_phong.py
+
+.PHONY: app-install app-list app-remove demo-cai-ung-dung demo-quy-trinh
 
 app-install: env-ready ## Cắm ứng dụng bằng manifest, không sửa lõi: make app-install APP=apps/bang-tin/app.yaml [DRY=1]
 	@test -n "$(APP)" || { echo "Thiếu tham số: make app-install APP=apps/<thư mục>/app.yaml" >&2; exit 1; }
@@ -266,6 +272,9 @@ app-remove: env-ready ## Gỡ ứng dụng cài bằng manifest, GIỮ dữ li�
 demo-cai-ung-dung: $(ENV_FILE) ## Cắm Bảng tin bằng một lệnh: cài, SSO, sự kiện, cài lại, gỡ giữ dữ liệu; lõi không đổi
 	@python3 scripts/demo.py cai-ung-dung
 
+demo-quy-trinh: $(ENV_FILE) ## Quy trình ứng dụng qua lõi (Đơn nghỉ phép): BPMN độc bị từ chối, 422, duyệt theo phòng
+	@python3 scripts/demo.py quy-trinh
+
 reconcile: $(ENV_FILE) ## Một lượt reconciler GitOps + tự phục hồi (systemd timer gọi mỗi 60 giây, xem platform/systemd/)
 	@python3 scripts/reconcile.py
 
@@ -274,6 +283,10 @@ backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (M
 
 restore: $(ENV_FILE) ## Khôi phục lượt sao lưu mới nhất (hỏi lại trước khi thay dữ liệu); các lượt: python3 scripts/moc.py backup list
 	@python3 scripts/moc.py backup restore
+
+.PHONY: copyright
+copyright: ## Sinh COPYRIGHT.txt (bảng phần mềm thượng nguồn) từ các bảng thành phần của DEPENDENCIES.md
+	@python3 scripts/copyright_txt.py
 
 api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
 	@python3 scripts/api_docs.py
