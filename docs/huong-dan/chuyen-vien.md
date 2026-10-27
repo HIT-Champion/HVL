@@ -1,8 +1,9 @@
 # Hướng dẫn cho chuyên viên
 
 Vai trò `staff`. Tài khoản mẫu: `chuyenviendt`, `giamkhao`, `giangvienktpm`. Đăng nhập không cần xác thực hai bước.
-Chuyên viên thấy văn bản được giao cho mình và văn bản mình soạn. Với dữ liệu mẫu, Hộp việc của `giamkhao` có sẵn một
-công văn khẩn chờ xử lý và một dự thảo bị tổ trưởng trả lại chờ sửa.
+Chuyên viên thấy văn bản được giao cho mình, văn bản mình soạn và mọi văn bản đi của phòng mình; trợ lý Hỏi đáp tìm
+trong đúng phạm vi đó. Văn bản hạn chế thì chỉ thấy khi mình tạo hoặc được cấp quyền xem. Với dữ liệu mẫu, Hộp việc
+của `giamkhao` có sẵn một công văn khẩn chờ xử lý và một dự thảo bị tổ trưởng trả lại chờ sửa.
 
 Menu gồm: Hộp việc, Văn bản đến, Văn bản đi, Soạn văn bản đi, Hồ sơ công việc, Sơ đồ cảm biến, Tìm kiếm, Hỏi đáp, Ứng
 dụng, Góp ý. Phần dùng chung: [Việc chung](viec-chung.md).

@@ -9,8 +9,9 @@ Các việc dưới đây giống nhau ở mọi vai trò nghiệp vụ: văn th
 Hộp việc là trang đầu sau khi đăng nhập. Mỗi dòng là một việc đang chờ bạn, có số ký hiệu, trích yếu, độ khẩn và hạn.
 
 1. Việc khẩn hoặc quá hạn nằm ở nhóm **Cần chú ý** trên cùng. Các việc khác nằm ở nhóm **Các công việc còn lại**.
-2. Muốn thu hẹp danh sách thì gõ vào ô **Tìm trong hộp việc…**, chọn **Chiều văn bản** (văn bản đến hay đi) hoặc chọn
-   trong ô **Lọc công việc**. Bấm **Xóa bộ lọc** để xem lại tất cả, **Làm mới** để tải lại.
+2. Muốn thu hẹp danh sách thì gõ vào ô **Tìm trong hộp việc…**, chọn văn bản đến hay đi ở ô chọn thứ nhất (mặc định
+   **Tất cả văn bản**), hoặc chọn **Hôm nay**, **Quá hạn**, **Văn bản khẩn** ở ô chọn thứ hai. Nút hình hai mũi tên
+   vòng bên cạnh dùng để tải lại danh sách. Nếu không việc nào khớp bộ lọc, trang hiện nút **Xóa bộ lọc**.
 3. Bấm vào một việc để mở văn bản. Khung việc cần làm nằm ngay trên trang văn bản. Cách làm từng loại việc có ở trang
    của vai trò.
 4. Làm xong, màn hình báo "Đã chuyển bước tiếp theo." và việc rời khỏi hộp việc.
@@ -70,9 +71,10 @@ Cách lãnh đạo phòng duyệt đơn: [Lãnh đạo phòng](lanh-dao-phong.md
 
 ## Sơ đồ cảm biến
 
-Chỉ có khi máy chủ bật cảm biến kho lưu trữ. Mở **Sơ đồ cảm biến** để xem nhiệt độ mới nhất của từng phòng trong kho, so
-với ngưỡng cảnh báo. Trang tự cập nhật 30 giây một lần. Nhiệt độ vượt ngưỡng thì hệ thống gửi thông báo và soạn sẵn
-một dự thảo "Báo cáo sự cố". Cách hoạt động: [`demo-script.md`](../demo-script.md), mục "Hội tụ IT/OT".
+Mở **Sơ đồ cảm biến** để xem nhiệt độ mới nhất của từng phòng trong kho lưu trữ, so với ngưỡng cảnh báo. Nếu máy chủ
+chưa bật cảm biến, trang báo **Chưa bật cảm biến**. Trang tự cập nhật 30 giây một lần. Nhiệt độ vượt ngưỡng thì hệ
+thống gửi thông báo và soạn sẵn một dự thảo "Báo cáo sự cố". Cách hoạt động: [`demo-script.md`](../demo-script.md),
+mục "Hội tụ IT/OT".
 
 ## Góp ý
 

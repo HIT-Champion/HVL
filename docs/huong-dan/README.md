@@ -31,13 +31,15 @@ thử tách đơn vị: mỗi bên chỉ thấy văn bản của khoa mình. M�
    dụng xác thực trên điện thoại (FreeOTP, Aegis, Google Authenticator). Lần đăng nhập đầu, quét mã QR trên màn hình
    để thêm tài khoản vào ứng dụng đó. Tài khoản mẫu của bản tự cài lấy mã bằng `make totp`.
 4. Vào được thì thanh bên trái là menu, mỗi vai trò thấy một bộ mục khác nhau. Cuối thanh bên có tên, vai trò của bạn
-   và nút **Đăng xuất**. Thanh trên cùng có nút **Góp ý**, chuông thông báo và nút đổi ngôn ngữ **EN** / **VI**.
+   và nút đăng xuất (biểu tượng mũi tên ra khỏi khung, rê chuột vào hiện chữ "Đăng xuất"). Thanh trên cùng có nút
+   **Góp ý**, chuông thông báo và nút đổi ngôn ngữ **EN** / **VI**.
 
 Mã bị từ chối thường do đồng hồ điện thoại lệch: bật giờ tự động. Sai 10 lần thì tài khoản bị tạm khóa.
 
 ## Một văn bản đi qua những ai
 
-Mỗi bước dưới đây là một việc trong **Hộp việc** của người phải làm, kèm một thông báo.
+Văn thư tự mở trang tiếp nhận văn bản đến, chuyên viên tự mở trang soạn văn bản đi. Từ bước chỉ đạo (văn bản đến) và
+bước duyệt dự thảo (văn bản đi) trở đi, mỗi bước là một việc trong **Hộp việc** của người phải làm, kèm một thông báo.
 
 ```mermaid
 flowchart LR

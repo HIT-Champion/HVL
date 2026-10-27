@@ -17,7 +17,7 @@ sửa hay xóa lén một dòng đều bị phát hiện.
 
 1. Đầu trang cho biết chuỗi đã được neo ra ngoài cơ sở dữ liệu tới dòng nào, lúc nào. Mỗi lần neo, hệ thống chép băm
    của dòng mới nhất ra kho lưu trữ khóa ghi, không ai sửa hay xóa được, kể cả quản trị.
-2. Chọn nhóm cần xem bằng các tab: Tất cả, Văn bản, Giao việc, Tệp, Người dùng và quyền xem, Danh mục.
+2. Chọn nhóm cần xem bằng các tab: Tất cả, Văn bản, Giao việc, Tệp, "Người dùng, quyền xem", Danh mục.
 3. Mỗi dòng có **Thời điểm**, **Người thực hiện**, **Thao tác**, **Thay đổi**, **Dòng sổ**. Bấm **Xem thêm** để tải
    các dòng cũ hơn.
 

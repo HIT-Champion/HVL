@@ -1,7 +1,8 @@
 # Hướng dẫn cho lãnh đạo đơn vị
 
 Vai trò `director`: thủ trưởng, cấp phó của đơn vị. Tài khoản mẫu: `truongkhoa` (Khoa CNTT), `truongkhoakt` (Khoa Kinh
-tế). Đăng nhập cần mã xác thực hai bước. Lãnh đạo đơn vị thấy mọi văn bản của đơn vị mình.
+tế). Đăng nhập cần mã xác thực hai bước. Lãnh đạo đơn vị thấy mọi văn bản của đơn vị mình, trừ văn bản hạn chế mà
+mình không tạo và không được cấp quyền xem.
 
 Menu gồm: Hộp việc, Văn bản đến, Văn bản đi, Sổ đăng ký, Hồ sơ công việc (chỉ xem), Sơ đồ cảm biến, Tìm kiếm, Hỏi đáp,
 Điều hành, Số đo, Phả hệ số liệu, Tự chẩn đoán, Sổ kiểm toán, Ứng dụng, Góp ý. Phần dùng chung:
@@ -43,8 +44,8 @@ người rồi bấm **Cấp quyền xem**, hoặc bấm **Gỡ** để thu lạ
 
 - **Điều hành**: số liệu văn bản của đơn vị, tính lúc mở trang. Gồm văn bản đến chưa xong, quá hạn, khẩn chưa xong,
   thời gian xử lý trung bình, văn bản đến theo trạng thái và theo phòng chủ trì, văn bản đi phát hành theo tháng, văn
-  bản đã nộp lưu trong kho lạnh. Văn bản hạn chế chỉ được tính vào con số tổng. Mỗi biểu đồ có liên kết **Nguồn số
-  liệu** dẫn sang trang Phả hệ số liệu.
+  bản đã nộp lưu trong kho lạnh. Văn bản hạn chế chỉ được tính vào con số tổng. Các thẻ số đầu trang và bốn biểu đồ
+  có liên kết **Nguồn số liệu** dẫn sang trang Phả hệ số liệu; phần văn bản đã nộp lưu thì không có.
 - **Phả hệ số liệu**: cho biết mỗi biểu đồ của trang Điều hành lấy số từ khung nhìn nào, khung nhìn đó đọc bảng nào,
   kèm kết quả kiểm chất lượng của lượt nộp lưu gần nhất. Bấm **Tải OpenLineage (.jsonl)** để tải về. Chi tiết:
   [`demo-script.md`](../demo-script.md), mục "Phả hệ và kiểm chất lượng".

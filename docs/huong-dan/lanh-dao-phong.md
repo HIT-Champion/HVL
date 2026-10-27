@@ -2,7 +2,8 @@
 
 Vai trò `manager`: trưởng phòng, tổ trưởng, trưởng bộ môn. Tài khoản mẫu: `totruongdt` (Tổ trưởng Đào tạo),
 `truongbmktpm` (trưởng Bộ môn Kỹ thuật phần mềm). Đăng nhập cần mã xác thực hai bước. Lãnh đạo phòng thấy văn bản
-được giao cho phòng mình.
+của phòng mình, kể cả dự thảo của người trong phòng, và văn bản được giao cho phòng. Văn bản hạn chế thì chỉ thấy khi
+mình tạo hoặc được cấp quyền xem.
 
 Menu gồm: Hộp việc, Văn bản đến, Văn bản đi, Hồ sơ công việc, Sơ đồ cảm biến, Tìm kiếm, Hỏi đáp, Tự chẩn đoán, Ứng dụng,
 Góp ý. Phần dùng chung: [Việc chung](viec-chung.md).
@@ -12,7 +13,7 @@ Góp ý. Phần dùng chung: [Việc chung](viec-chung.md).
 Việc **Phân công xử lý** đến Hộp việc khi lãnh đạo đơn vị giao phòng bạn chủ trì một văn bản.
 
 1. Mở việc. Đọc ý kiến chỉ đạo và hạn ở mục **Giao xử lý** trên trang văn bản.
-2. Ở khung **Phân công trong phòng**, chọn người trong ô **Giao cho**, ghi **Lời dặn** nếu cần, rồi bấm **Giao việc**.
+2. Ở khung **Phân công xử lý**, chọn người trong ô **Giao cho**, ghi **Lời dặn** nếu cần, rồi bấm **Giao việc**.
    Người đó nhận việc **Xử lý văn bản**.
 3. Nếu tự làm thì bấm **Tôi tự xử lý**. Việc **Xử lý văn bản** sẽ về Hộp việc của bạn, cách làm giống chuyên viên
    ([Xử lý văn bản được giao](chuyen-vien.md#xử-lý-văn-bản-được-giao)).
