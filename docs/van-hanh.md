@@ -683,8 +683,9 @@ ssh -L 16686:127.0.0.1:16686 <máy chủ>   # xem từ xa: http://127.0.0.1:1668
   dừng và báo lỗi, vì APISIX gặp giá trị sai sẽ bỏ cả global rule chung với WAF và mã yêu cầu.
 - **Che dữ liệu, hai lớp:**
   - `svc-files`, `svc-workflow` (`tracing.py`) chỉ gửi thuộc tính trong danh sách trắng: phương thức, mã trạng thái,
-    route, đường dẫn không có chuỗi truy vấn, tên máy. Chuỗi qua bộ che thông tin cá nhân (F4.4). URL tới máy ngoài
-    (webhook Slack, ntfy… có token trong đường dẫn) chỉ còn `scheme://máy`. Lỗi chỉ giữ tên loại ngoại lệ, không giữ
+    route, đường dẫn không có chuỗi truy vấn, tên máy. Chuỗi qua bộ che thông tin cá nhân (F4.4). Lời gọi tới máy
+    ngoài mạng của Signet (tên có dấu chấm hay địa chỉ IP: webhook, liên thông) không có span và không
+    mang `traceparent`, nên mã trace không ra khỏi các dịch vụ nội bộ. Lỗi chỉ giữ tên loại ngoại lệ, không giữ
     thông điệp hay traceback. Không ghi header nào (`Authorization`, cookie).
   - Jaeger bỏ `http.target` (đường dẫn kèm chuỗi truy vấn) trong span của APISIX, giữ `url.path`.
 - **Giới hạn:**

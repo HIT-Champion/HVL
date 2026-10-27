@@ -25,6 +25,7 @@ import http.server
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import threading
@@ -80,6 +81,7 @@ def traced(monkeypatch):
     textmap = get_global_textmap()
     t = Traced()
     monkeypatch.setattr(tracing, "install", lambda app, service: t.install(app, service))
+    monkeypatch.setenv("OTEL_PYTHON_HTTPX_EXCLUDED_URLS", "")      # install() đặt biến này; trả lại như cũ sau test
     yield t
     HTTPX2ClientInstrumentor().uninstrument()
     for app, provider in t.installed:
@@ -161,7 +163,8 @@ def test_only_requests_sampled_at_the_gateway_are_recorded(traced_client, traced
 
 @pytest.fixture
 def upstream():
-    """Máy chủ HTTP nội bộ giả (tên không có dấu chấm như meilisearch, hasura trong mạng Docker)."""
+    """Máy chủ HTTP giả. Gọi bằng ``localhost`` là dịch vụ nội bộ (tên không có dấu chấm như meilisearch, hasura
+    trong mạng Docker); gọi bằng ``127.0.0.1`` là máy ngoài (tên có dấu chấm: webhook, cổng SMS trong mạng LAN)."""
 
     class Handler(http.server.BaseHTTPRequestHandler):
         seen: list[dict[str, str]] = []
@@ -171,6 +174,8 @@ def upstream():
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"{}")
+
+        do_POST = do_GET
 
         def log_message(self, *args) -> None:
             pass
@@ -190,10 +195,9 @@ def small_app(traced, upstream):
     async def goi() -> dict[str, bool]:
         async with httpx2.AsyncClient(timeout=5) as c:
             await c.get(f"{base}/indexes/docs/search", params={"q": PHONE})
-            try:            # máy ngoài (tên có dấu chấm), token trong đường dẫn như webhook Slack
-                await c.post(f"http://moc:mat-khau@hooks.example.invalid/services/T0/B0/{'b' * 24}?x=1", json={})
-            except httpx2.ConnectError:
-                pass
+            # máy ngoài, token trong đường dẫn như webhook Slack
+            outside = base.replace("http://localhost", "http://moc:mat-khau@127.0.0.1")
+            await c.post(f"{outside}/services/T0/B0/{'b' * 24}?x=1", json={})
         raise ValueError(f"không gửi được cho {EMAIL}")
 
     traced.install(app, "svc-files")
@@ -201,26 +205,31 @@ def small_app(traced, upstream):
         yield c
 
 
+def calls(upstream, host: str) -> list[dict[str, str]]:
+    """Header (tên viết thường) của các lời gọi tới máy chủ giả qua tên máy ``host``."""
+    seen = [{k.lower(): v for k, v in headers.items()} for headers in upstream[1]]
+    return [h for h in seen if h["host"].rpartition(":")[0] == host]
+
+
 def test_client_calls_inside_a_sampled_request(small_app, traced, upstream):
     headers = {"traceparent": SAMPLED, "baggage": "nguoi-dung=nguyenvanb"}
     assert small_app.get("/goi", headers=headers).status_code == 500
     spans = traced.spans()
     (server,) = [s for s in spans if s.kind == SpanKind.SERVER]
-    internal, external = sorted((s for s in spans if s.kind == SpanKind.CLIENT), key=lambda s: s.name)
+    (internal,) = [s for s in spans if s.kind == SpanKind.CLIENT]                      # máy ngoài: không có span
     assert internal.attributes["http.url"].endswith("/indexes/docs/search")             # nội bộ: giữ đường dẫn
     assert internal.attributes["http.url"].startswith("http://localhost:")
-    assert external.attributes["http.url"] == "http://hooks.example.invalid"           # ngoài: chỉ còn máy
-    assert [dict(e.attributes) for e in external.events] == [{"exception.type": "httpx2.ConnectError"}]
     assert server.status.status_code == StatusCode.ERROR and server.status.description is None
     assert [dict(e.attributes) for e in server.events] == [{"exception.type": "ValueError"}]
-    for span in (internal, external, server):
+    for span in (internal, server):
         assert span.context.trace_id == int(TRACE, 16)
         text = flat(span)
         for leak in ("0912", "nguyenvanb", "mat-khau", "bbbb", "/services/", "?", "Traceback"):
             assert leak not in text, (leak, text)
-    # dịch vụ phía sau nhận traceparent của cùng trace; không có baggage dù client gửi
-    (seen,) = upstream[1]
-    assert seen["traceparent"].split("-")[1] == TRACE and "baggage" not in {k.lower() for k in seen}
+    # dịch vụ phía sau nhận traceparent của cùng trace, không có baggage dù client gửi; máy ngoài không nhận gì
+    (inside,), (outside,) = calls(upstream, "localhost"), calls(upstream, "127.0.0.1")
+    assert inside["traceparent"].split("-")[1] == TRACE and "baggage" not in inside
+    assert not {"traceparent", "tracestate", "baggage"} & set(outside)
 
 
 def test_unsampled_requests_and_background_work_leave_no_span(small_app, traced, upstream):
@@ -234,6 +243,20 @@ def test_unsampled_requests_and_background_work_leave_no_span(small_app, traced,
     asyncio.run(background())
     assert traced.spans() == []
     assert all("baggage" not in {k.lower() for k in seen} for seen in upstream[1])
+    # trace không ghi (cờ 00) vẫn có mã hợp lệ, propagator vẫn chèn: máy ngoài thì không nhận
+    outside = calls(upstream, "127.0.0.1")
+    assert len(outside) == 2 and all("traceparent" not in seen for seen in outside)
+
+
+def test_external_hosts_are_left_alone():
+    pattern = re.compile(tracing.EXTERNAL)
+    for url in ("https://hooks.slack.com/services/T0", "http://u:p@192.168.1.50:8080/message", "http://[::1]:80/",
+                "https://bot-api.zaloplatforms.com/bot123:abc/sendMessage", "http://127.0.0.1:9/x"):
+        assert pattern.search(url), url
+    for url in ("http://hasura:8080/v1/graphql", "http://meilisearch:7700/indexes", "http://localhost:1/a.b",
+                "http://svc-files:8000/x?h=a.b", "http://u.v@keycloak:8080/realms"):
+        assert not pattern.search(url), url
+    assert "," not in tracing.EXTERNAL
 
 
 # --- bộ che -------------------------------------------------------------------------------------------------------

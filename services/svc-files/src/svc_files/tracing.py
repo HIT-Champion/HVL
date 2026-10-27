@@ -19,12 +19,13 @@
 Bật khi ``MOC_TRACE_RATIO`` > 0, cùng biến APISIX dùng để lấy mẫu (profile ``trace`` chạy Jaeger; docs/van-hanh.md mục
 Truy vết). Tắt thì ``create_app`` không import tệp này, không nạp gói OpenTelemetry nào. Dịch vụ không tự lấy mẫu: chỉ
 ghi span khi yêu cầu mang ``traceparent`` APISIX đã chọn (``ParentBased(ALWAYS_OFF)``), nên việc nền (đồng bộ danh bạ,
-gửi thông báo, lập chỉ mục…) không sinh span nào.
+gửi thông báo, lập chỉ mục…) không sinh span nào. Lời gọi httpx2 tới máy ngoài mạng của Signet (``EXTERNAL``: webhook,
+liên thông) không có span và không mang ``traceparent``: mã trace chỉ đi giữa các dịch vụ nội bộ.
 
 Span rời dịch vụ qua ``Redacting``, theo danh sách trắng:
 - chỉ giữ thuộc tính có tên trong ``KEEP``, ``PATHS``, ``URLS``; mọi giá trị chuỗi qua ``pii.mask_text``;
-- đường dẫn, URL bỏ chuỗi truy vấn (ô tìm kiếm ``?q=…``); URL tới máy ngoài (tên có dấu chấm: webhook Slack, ntfy…
-  mang token trong đường dẫn) chỉ còn ``scheme://host[:port]``;
+- đường dẫn, URL bỏ chuỗi truy vấn (ô tìm kiếm ``?q=…``); URL có tên máy chứa dấu chấm (tên miền công khai trong
+  ``http.url`` của span phía máy chủ; lời gọi ra ngoài đã không có span) chỉ còn ``scheme://host[:port]``;
 - sự kiện ngoại lệ chỉ giữ ``exception.type``; bỏ mô tả lỗi của trạng thái (thường là ``str(exc)``).
 Instrumentation không ghi header (Authorization, cookie) nếu không bật; danh sách trắng bỏ chúng cả khi có.
 svc_workflow/tracing.py là bản chép y hệt byte của tệp này (test so byte).
@@ -32,6 +33,7 @@ svc_workflow/tracing.py là bản chép y hệt byte của tệp này (test so b
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -53,6 +55,10 @@ from . import pii
 ENDPOINT = "http://jaeger:4318/v1/traces"
 # dò sống, dò sẵn sàng, chỉ số Prometheus: không ghi span
 EXCLUDED = "healthz,readyz,metrics"
+# Máy ngoài mạng Docker của Signet: tên máy có dấu chấm (tên miền, IPv4) hoặc IPv6. Dịch vụ nội bộ gọi nhau bằng tên
+# không dấu chấm (hasura, meilisearch, keycloak…). Biểu thức chính quy của OTEL_PYTHON_HTTPX_EXCLUDED_URLS: không có
+# dấu phẩy (dấu phẩy tách các mục)
+EXTERNAL = r"^[a-z][a-z0-9+.-]*://([^/@]*@)?(\[|[^/:@]*\.[^/@]*($|[/?#]))"
 
 # Thuộc tính được rời dịch vụ: tên theo quy ước HTTP cũ và mới của instrumentation FastAPI, httpx2
 KEEP = frozenset({
@@ -121,12 +127,14 @@ class Redacting(SpanExporter):
 
 
 def install(app: FastAPI, service: str, *, exporter: SpanExporter | None = None) -> TracerProvider:
-    """Ghi span cho route của ``app`` và mọi lời gọi httpx2 trong tiến trình. ``exporter``: test thay Jaeger."""
+    """Ghi span cho route của ``app`` và lời gọi httpx2 tới dịch vụ nội bộ. ``exporter``: test thay Jaeger."""
     # chỉ traceparent: baggage client tự gửi không được chuyển tiếp sang dịch vụ khác hay webhook ngoài
     set_global_textmap(TraceContextTextMapPropagator())
     provider = TracerProvider(resource=Resource.create({"service.name": service}), sampler=ParentBased(ALWAYS_OFF))
     provider.add_span_processor(BatchSpanProcessor(Redacting(exporter or OTLPSpanExporter(ENDPOINT, timeout=3))))
     FastAPIInstrumentor.instrument_app(app, tracer_provider=provider, excluded_urls=EXCLUDED,
                                        exclude_spans=["receive", "send"])
+    # instrumentation đọc danh sách loại trừ lúc instrument(): URL khớp thì không span, không chèn traceparent
+    os.environ["OTEL_PYTHON_HTTPX_EXCLUDED_URLS"] = EXTERNAL
     HTTPX2ClientInstrumentor().instrument(tracer_provider=provider)
     return provider
