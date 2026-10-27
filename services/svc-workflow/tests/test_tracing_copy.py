@@ -20,6 +20,7 @@ Hasura chuyển tiếp traceparent của APISIX (forward_client_headers), nên A
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import sys
@@ -57,8 +58,11 @@ def test_off_by_default_and_open_telemetry_is_not_loaded():
             "directory=NoDirectory()); "
             "print(sorted(m for m in sys.modules if m.startswith(('opentelemetry.sdk', 'opentelemetry.exporter', "
             "'opentelemetry.instrumentation', 'svc_workflow.tracing'))))")
+    tests = pathlib.Path(__file__).resolve().parent
+    # pytest tự thêm src, tests vào sys.path (pyproject.toml), tiến trình con thì không: CI không cài gói
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(tests.parent / "src"), str(tests)])}
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120,
-                          cwd=pathlib.Path(__file__).parent)
+                          cwd=tests, env=env)
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[]"
 
