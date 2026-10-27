@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Đã sửa đổi
+- Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại (#374).
+
 ## [1.2.1] - 2026-10-28
 
 Bản vá đúng bản đang chạy online: giao diện Lịch hạn (hộp việc xếp theo ngày hạn) cho Văn phòng điện tử, trang đăng
