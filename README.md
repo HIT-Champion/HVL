@@ -150,7 +150,8 @@ quy trình của lõi), `make demo-tat-van-phong` (tắt phần Văn phòng đi�
 ## Công nghệ và giấy phép
 
 Signet điều phối phần mềm nguồn mở ở dạng nguyên bản: image chính thức, phiên bản ghim, không sửa mã thượng nguồn.
-Danh mục đầy đủ, cả thư viện và lý do chọn: [`DEPENDENCIES.md`](DEPENDENCIES.md).
+Bảng đầy đủ (phiên bản, giấy phép, trang chủ): [`COPYRIGHT.txt`](COPYRIGHT.txt); lý do chọn từng thư viện:
+[`DEPENDENCIES.md`](DEPENDENCIES.md).
 
 | Không gian | Thành phần | Phiên bản | Giấy phép | Vai trò trong Signet |
 |---|---|---|---|---|
@@ -324,7 +325,7 @@ kèm kết quả `make ps` và đoạn `make logs` của dịch vụ lỗi.
 | Dùng và vận hành | [Kịch bản demo](docs/demo-script.md) · [Vận hành](docs/van-hanh.md) · [Triển khai lên máy chủ](docs/trien-khai.md) · [Tài liệu API](docs/api/README.md) · [Thêm ứng dụng mới trên lõi](docs/them-ung-dung.md) |
 | Kỹ thuật | [Kiến trúc H-P-D-I](docs/architecture.md) · [Mô hình dữ liệu và quyền](docs/mo-hinh-du-lieu.md) · [Đặc tả sản phẩm](docs/dac-ta-san-pham.md) · [Mức hoàn thiện kèm bằng chứng](docs/muc-hoan-thien.md) · [Đánh giá AI](docs/danh-gia-ai.md) · [Số đo "sau" theo đặc tả §8](docs/so-lieu-sau.md) · [Tự chẩn đoán H-P-D-I](docs/tu-chan-doan.md) · [Quy trình Git](docs/git_flow.md) |
 | Dự thi | [Bảng tự chấm PoF](docs/du-thi/pof-checklist.md) · [Câu hội đồng dễ hỏi](docs/du-thi/hoi-dap-hoi-dong.md) · [Chủ đề, thể lệ, tiêu chí chấm](docs/du-thi/olp-2026-brief.md) · [Phân tích đề thi](docs/du-thi/olp-2026-de-thi.md) · [Kế hoạch phát triển](docs/du-thi/ke-hoach-phat-trien.md) · [Nghiên cứu trước khi có đề](docs/du-thi/nghien-cuu/) |
-| Dự án | [Phụ thuộc và giấy phép](DEPENDENCIES.md) · [Lịch sử thay đổi](CHANGELOG.md) · [Hướng dẫn đóng góp](CONTRIBUTING.md) · [Chính sách bảo mật](SECURITY.md) · [Lộ trình](ROADMAP.md) · [Quy tắc ứng xử](CODE_OF_CONDUCT.md) |
+| Dự án | [Bản quyền và thành phần thứ ba](COPYRIGHT.txt) · [Phụ thuộc và giấy phép](DEPENDENCIES.md) · [Lịch sử thay đổi](CHANGELOG.md) · [Hướng dẫn đóng góp](CONTRIBUTING.md) · [Chính sách bảo mật](SECURITY.md) · [Lộ trình](ROADMAP.md) · [Quy tắc ứng xử](CODE_OF_CONDUCT.md) |
 
 ### Cấu trúc thư mục
 

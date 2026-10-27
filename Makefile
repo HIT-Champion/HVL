@@ -283,6 +283,10 @@ backup: $(ENV_FILE) ## Sao lưu mọi CSDL và tệp vào kho restic mã hóa (M
 restore: $(ENV_FILE) ## Khôi phục lượt sao lưu mới nhất (hỏi lại trước khi thay dữ liệu); các lượt: python3 scripts/moc.py backup list
 	@python3 scripts/moc.py backup restore
 
+.PHONY: copyright
+copyright: ## Sinh COPYRIGHT.txt (bảng phần mềm thượng nguồn) từ các bảng thành phần của DEPENDENCIES.md
+	@python3 scripts/copyright_txt.py
+
 api-docs: $(ENV_FILE) ## Xuất tài liệu API vào docs/api/ từ hệ thống đang chạy: schema GraphQL theo vai trò, OpenAPI
 	@python3 scripts/api_docs.py
 

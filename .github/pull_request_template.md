@@ -32,7 +32,7 @@ Closes #
 - [ ] The feature documentation is updated **in this PR**
 - [ ] New configuration (if any) is declared in `.env.example` with a comment
 - [ ] `CHANGELOG.md` section `[Chưa phát hành]` has one line per user-visible change (Vietnamese, issue or PR no.)
-- [ ] New upstream software (if any) is recorded in `DEPENDENCIES.md` with its OSI license
+- [ ] New upstream software (if any) is in `DEPENDENCIES.md` with its OSI license; `COPYRIGHT.txt` regenerated
 - [ ] No upstream project is forked, patched or bundled
 - [ ] No secrets, `.env`, real data or model weights in the change
 

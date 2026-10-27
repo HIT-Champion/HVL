@@ -38,6 +38,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
   trang API REST sinh từ OpenAPI (#307, #308, #309, #319, #340, #341, #343).
 - Giao diện tiếng Anh cho Không gian cá nhân và Bảng tin, chung ngôn ngữ đã chọn với Văn phòng điện tử (#306, #337).
 - Trang tài liệu Docusaurus đọc thẳng `docs/`, tìm kiếm tiếng Việt, không gọi CDN, đăng lên GitHub Pages (#308, #342).
+- `COPYRIGHT.txt`: bản quyền và bảng phần mềm thượng nguồn, sinh từ `DEPENDENCIES.md` bằng `make copyright` (#347).
 
 ### Đã sửa đổi
 - Kiểm bản online chạy thêm ngay sau mỗi lần phát hành: bản online chưa nâng lên thẻ mới thì đỏ ngay (#344, #345).
@@ -75,6 +76,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Quản trị đơn vị mở trang văn bản, hồ sơ, sổ đăng ký thì được đưa về sổ kiểm toán thay vì báo lỗi (#230, #241).
 - Bảng tin kiểm lại quyền mỗi lần làm mới, báo lỗi quyền bằng câu đọc được thay vì lỗi GraphQL (#230, #241, #248, #249).
 - Form đưa tiêu điểm về ô sai đầu tiên, trình đọc màn hình đọc được lỗi; hộp Góp ý vừa màn hình điện thoại (#248, #249).
+- `DEPENDENCIES.md` bỏ năm thành phần chưa từng dùng (Kestra, Marquez, openlineage-python, Typer, Gotenberg) (#347).
 
 ### Bảo mật
 - Nuxt của Văn phòng điện tử nâng 4.5.2 → 4.6.2, đóng bốn cảnh báo Dependabot (Signet không dính) (#321, #322).
