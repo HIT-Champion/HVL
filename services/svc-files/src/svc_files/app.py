@@ -428,6 +428,9 @@ def create_app(
                     "với token Bearer do Keycloak cấp (docs/api/README.md).",
         lifespan=lifespan,
     )
+    if settings.trace_ratio > 0:            # #364: chỉ nạp OpenTelemetry khi bật truy vết
+        from . import tracing
+        tracing.install(app, "svc-files")
     app.state.indexer = indexer
     app.state.extractor = extractor
     app.state.anchorer = anchorer

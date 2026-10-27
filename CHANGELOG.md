@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Đã thêm
+- Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
+
 ### Đã sửa đổi
 - Giao diện "Lịch hạn" cho Văn phòng điện tử, trang đăng nhập, P.A.R.A, Bảng tin: hộp việc xếp theo ngày hạn (#291).
 - Hướng dẫn sử dụng theo vai trò khớp giao diện Lịch hạn, có ảnh chụp các màn chính (#308).
