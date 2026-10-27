@@ -1147,7 +1147,7 @@ Cách gọi, schema GraphQL theo vai trò và OpenAPI xuất từ hệ thống �
 
 | Action | Ai gọi | Làm gì |
 |---|---|---|
-| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn bản hạn chế phải kèm toàn tệp đã mã hóa, văn bản thường không được kèm tệp mã hóa (`file_ids`: `not_sealed`, `sealed`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm |
+| `receiveIncoming(data)` | `clerk` | Tiếp nhận văn bản đến (F2.2). Kiểm `data` theo `schemas/van-ban-den.json` — cùng tệp form đã kiểm — rồi tra loại văn bản, tệp do chính người gọi tải lên, văn bản trùng (cùng cơ quan, số ký hiệu, ngày; kể cả văn bản hạn chế văn thư không thấy). Ghi văn bản `received` kèm tệp (tệp đầu là bản chính) bằng vai trò `service`, người tạo là người gọi. Lỗi trả từng trường trong `extensions.fields` (`schemas/README.md`). Văn bản hạn chế phải kèm toàn tệp đã mã hóa, văn bản thường không được kèm tệp mã hóa (`file_ids`: `not_sealed`, `sealed`). Văn thư không có quyền ghi thẳng bảng văn bản lẫn bảng tệp đính kèm. Trigger `documents_received` ghi sự kiện `office.document.received` cùng giao dịch (#381) |
 | `registerIncoming(documentId)` | `clerk` | Gọi hàm `office.register_incoming` (một giao dịch: khóa văn bản, lấy số kế tiếp của sổ năm nay, `received → registered`, ghi sự kiện), rồi khởi chạy `van-ban-den` với `businessKey = documentId`. Flowable lỗi thì vẫn giữ số đã cấp; job đối soát (5 phút) khởi chạy sau |
 | `myTasks` (query) | `clerk`, `staff`, `manager`, `director` | Việc giao đích danh cho người gọi và việc chưa ai nhận của nhóm vai trò của họ; khẩn xếp trước. Kiểu trả về có quan hệ `document` sang `office_documents`, nên Hasura áp quyền đọc văn bản như mọi truy vấn khác |
 | `submitOutgoing(documentId, signerId)` | `staff` (người soạn) | Kiểm dự thảo có nội dung, nơi nhận; người ký là lãnh đạo đơn vị; phòng có lãnh đạo phòng duyệt. `draft → in_review` thì khởi chạy `van-ban-di`; `returned → in_review` thì hoàn thành việc `vbdi.chinhSua`, quy trình quay về bước duyệt cấp phòng (đổi được người ký) |
@@ -1373,7 +1373,7 @@ chống trùng bằng `event.data.new.id`.
 
 | `type` | Phát khi |
 |---|---|
-| `office.document.received` | Văn thư thêm văn bản đến |
+| `office.document.received` | Văn thư thêm văn bản đến: trigger `documents_received` (migration `1792281603800_document_received`, #381), lúc xảy ra là `created_at` của văn bản; văn bản nhận liên thông có `office.document.arrived` thay cho sự kiện này |
 | `office.document.registered` | Vào sổ, có số đến |
 | `office.document.directed` | Lãnh đạo ghi ý kiến chỉ đạo |
 | `office.document.assigned` | Có việc giao cho một người hoặc phòng |
