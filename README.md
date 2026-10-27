@@ -12,8 +12,8 @@
 Sản phẩm dự thi **Olympic Tin học Sinh viên Việt Nam 2026 — nội dung Phần mềm Nguồn mở (OLP PMNM 2026)**, chủ đề
 DX-OS Open-Core.
 
-**Dùng thử:** <https://signet.htechcs.com> (bản v1.1.0, xem [Chạy thử](#chạy-thử)) · tự cài trên máy mình bằng bốn
-lệnh ở [Cài đặt từ mã nguồn](#cài-đặt-từ-mã-nguồn-building-from-source).
+**Dùng thử:** <https://signet.htechcs.com> (bản phát hành mới nhất, xem [Chạy thử](#chạy-thử)) · tự cài trên máy mình
+bằng bốn lệnh ở [Cài đặt từ mã nguồn](#cài-đặt-từ-mã-nguồn-building-from-source).
 
 **Xem nhanh 5 phút, tìm tài liệu theo từng phần:** [`docs/README.md`](docs/README.md).
 
@@ -240,9 +240,10 @@ python3 scripts/seed.py                 # dữ liệu mẫu, lần đầu
 
 ## Chạy thử
 
-**Bản online** <https://signet.htechcs.com> chạy bản phát hành v1.1.0 trên máy của đội, ra Internet qua Cloudflare
-Tunnel. Tài khoản dùng thử gửi kèm hồ sơ dự thi; repo không công khai mật khẩu. Tính năng mới hơn v1.1.0 (mục
-"Chưa phát hành" của [`CHANGELOG.md`](CHANGELOG.md)) có khi tự cài từ mã nguồn.
+**Bản online** <https://signet.htechcs.com> chạy bản phát hành mới nhất trên máy của đội, ra Internet qua Cloudflare
+Tunnel; `.github/workflows/ban-online.yml` kiểm hằng ngày bản đó đúng thẻ mới nhất. Tài khoản dùng thử gửi kèm hồ sơ
+dự thi; repo không công khai mật khẩu. Tính năng chưa phát hành (mục "Chưa phát hành" của
+[`CHANGELOG.md`](CHANGELOG.md)) có khi tự cài từ mã nguồn.
 
 **Bản tự cài:** mật khẩu chung của các tài khoản mẫu là giá trị `MOC_DEMO_PASSWORD` trong `.env`. Văn thư, lãnh đạo,
 tổ trưởng, trưởng bộ môn và quản trị đơn vị bắt buộc xác thực hai bước: sau mật khẩu nhập mã TOTP. `make seed` cài sẵn

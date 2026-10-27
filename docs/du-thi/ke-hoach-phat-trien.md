@@ -21,7 +21,7 @@
 | **5** — Đóng gói, nộp bài                | 26/11–06/12 | Đóng băng tính năng, tự chấm PoF, gửi thư 05/12                                                                                                                                                                                                                        | `v1.3.0` |
 
 Phiên bản thực tế: các phần việc của Phase 1–4 làm xong sau `v0.1.0` được phát hành chung trong `v1.0.0` (23/10),
-`v1.1.0` (25/10) và `v1.2.0` (30/10, bản cho vòng trường 01/11); không phát hành riêng `v0.2.0`, `v0.5.0`, `v0.9.0`.
+`v1.1.0` (25/10) và `v1.2.0` (27/10, bản cho vòng trường 01/11); không phát hành riêng `v0.2.0`, `v0.5.0`, `v0.9.0`.
 Bản nộp chấm của Phase 5 là `v1.3.0`.
 
 ### Ưu tiên (MoSCoW)

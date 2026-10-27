@@ -14,7 +14,7 @@ Built for the **Vietnam Student Olympiad in Informatics 2026 — Open Source Sof
 DX-OS Open-Core. Most project documentation is written in Vietnamese; this page is a translation of
 [README.md](README.md).
 
-**Try it:** <https://signet.htechcs.com> (release v1.1.0, see [Try it out](#try-it-out)) · or install it on your own
+**Try it:** <https://signet.htechcs.com> (latest release, see [Try it out](#try-it-out)) · or install it on your own
 machine with four commands from [Building from source](#building-from-source).
 
 **Five-minute tour and documentation map (in Vietnamese):** [`docs/README.md`](docs/README.md).
@@ -251,10 +251,10 @@ python3 scripts/seed.py                 # sample data, first time only
 
 ## Try it out
 
-**Online:** <https://signet.htechcs.com> runs release v1.1.0 on the team's machine, reaching the Internet through
-Cloudflare Tunnel. Trial accounts are sent with the contest submission; the repository does not publish passwords.
-Features newer than v1.1.0 (the "Chưa phát hành" — unreleased — section of [`CHANGELOG.md`](CHANGELOG.md)) are
-available when you install from source.
+**Online:** <https://signet.htechcs.com> runs the latest release on the team's machine, reaching the Internet through
+Cloudflare Tunnel; `.github/workflows/ban-online.yml` checks daily that it runs the newest tag. Trial accounts are
+sent with the contest submission; the repository does not publish passwords. Unreleased features (the "Chưa phát hành"
+section of [`CHANGELOG.md`](CHANGELOG.md)) are available when you install from source.
 
 **Your own installation:** the shared password of the sample accounts is the value of `MOC_DEMO_PASSWORD` in `.env`.
 Clerks, faculty leaders, team and division heads, and unit administrators must use two-factor authentication: after
