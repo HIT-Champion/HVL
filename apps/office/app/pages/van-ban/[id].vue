@@ -392,7 +392,8 @@ function eventTitle(e: DocEvent): string {
 }
 
 // Dòng thời gian: bước đầu (tiếp nhận / tạo dự thảo) lấy từ chính văn bản, các bước sau từ office.document_events.
-// Văn bản đến nhận liên thông do dịch vụ tạo: bước đầu là sự kiện "nhận liên thông", không thêm bước "tiếp nhận"
+// Văn bản đến nhận liên thông do dịch vụ tạo: bước đầu là sự kiện "nhận liên thông", không thêm bước "tiếp nhận".
+// Sự kiện office.document.received (#381) trùng bước đầu nên bỏ qua; văn bản tạo trước #381 không có sự kiện này
 const timeline = computed(() => {
   if (!doc.value) return []
   const first = outgoing.value ? t('event.drafted') : t('event.received')
@@ -400,6 +401,7 @@ const timeline = computed(() => {
     ? []
     : [{ key: 'first', title: first, who: nameOf(doc.value.created_by), at: doc.value.created_at, note: null }]
   for (const e of doc.value.events) {
+    if (e.kind === 'office.document.received') continue
     const title = eventTitle(e)
     let note = e.note
     if (e.kind === 'office.document.arrived' && e.data.verify_code) {
