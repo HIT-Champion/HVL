@@ -675,11 +675,11 @@ def main(argv: list[str] | None = None) -> None:
     final = staff.gql("""query ($id: uuid!) { office_documents_by_pk(id: $id) { status
         events(order_by: {id: asc}) { kind } assignments { role status } } }""", {"id": doc_id})["office_documents_by_pk"]
     kinds = [e["kind"] for e in final["events"]]
-    expected = ["office.document.registered", "office.document.directed", "office.document.assigned",
-                "office.document.processed"]
+    expected = ["office.document.received", "office.document.registered", "office.document.directed",
+                "office.document.assigned", "office.document.processed"]
     final["status"] == "done" or fail(f"văn bản chưa xong: {final['status']}")
     kinds == expected or fail(f"dòng thời gian sai: {kinds}")
-    ok("văn bản ở trạng thái done, dòng thời gian đủ 4 bước")
+    ok("văn bản ở trạng thái done, dòng thời gian đủ 5 bước, từ tiếp nhận")
 
     print("Cách ly")
     seen = other_tenant.gql("query ($id: uuid!) { office_documents_by_pk(id: $id) { id } }", {"id": doc_id})

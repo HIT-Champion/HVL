@@ -51,8 +51,9 @@ trust out of the box, without building them itself:
 
 ## Architecture
 
-[![Architecture diagram: users go through the APISIX gateway to the Tier 2 applications and the Tier 1 core services,
-optional parts in the bottom row](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
+[![Architecture diagram: users go through the APISIX gateway to the Tier 2 applications and the Tier 1 core services;
+the right column holds the outside notification channels: email, webhooks, SMS,
+Zalo](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
 
 Tier 1 is the headless core: identity, API gateway, data, workflow and the trust layer. Tier 2 holds the
 applications: the e-Office and the P.A.R.A personal space. That second application changes no core service code, but
