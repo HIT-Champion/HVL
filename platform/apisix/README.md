@@ -48,6 +48,11 @@ không ai tới APISIX từ loopback của chính container, tức không tin ai
   nhập, cổng xác thực đếm riêng từng người, nhật ký truy cập ghi IP người dùng. Thiếu nó thì mọi người dùng chung một
   bộ đếm (IP gateway của mạng Docker).
 
+`MOC_TRUSTED_PROXY=auto` (#211): entrypoint `kiem-moi-truong.sh` đọc `/proc/net/route` của container lúc khởi động và
+đặt dải của mạng có route mặc định. Đó là mạng `moc`, vì `apps` là internal. Dải này chứa gateway mà cổng publish đi
+qua và `cloudflared`; container ứng dụng ở mạng `apps` nằm ngoài. Không đọc được thì entrypoint dừng với mã 64, không
+lùi về một dải rộng.
+
 Proxy không gửi `X-Forwarded-Port` (Caddy mặc định không gửi) thì APISIX điền cổng của nó và Keycloak trả
 `https://tên-miền:9080/…`: Caddyfile phải có `header_up X-Forwarded-Port 443`.
 

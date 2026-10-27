@@ -324,8 +324,8 @@ jobs:
         run: |
           sed -i -e 's#^MOC_PUBLIC_URL=.*#MOC_PUBLIC_URL=https://signet.test#' \
                  -e 's#^MOC_HTTP_PORT=.*#MOC_HTTP_PORT=127.0.0.1:8080#' \
-                 -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=172.16.0.0/12#' .env
-          want='MOC_(PUBLIC_URL=https://signet.test|HTTP_PORT=127.0.0.1:8080|TRUSTED_PROXY=172.16.0.0/12)'
+                 -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=auto#' .env
+          want='MOC_(PUBLIC_URL=https://signet.test|HTTP_PORT=127.0.0.1:8080|TRUSTED_PROXY=auto)'
           test "$(grep -cxE "$want" .env)" = 3
           echo "127.0.0.1 signet.test" | sudo tee -a /etc/hosts
           d="$RUNNER_TEMP/https" && mkdir -p "$d"
@@ -701,16 +701,57 @@ jobs:
 
       # F1.9 (#261): kiểm như docs/trien-khai.md bước 6, từ ngoài vào qua proxy — kiem_ban_online.py: chứng chỉ, HTTP
       # sang HTTPS, /api/status, issuer và token_endpoint của Keycloak sau proxy, header bảo mật; smoke trọn qua
-      # https:// (đăng nhập, tải tệp, thông báo qua wss://); APISIX tin X-Forwarded-For của proxy nên nhật ký ghi IP
-      # của máy gọi, không phải gateway của mạng Docker
+      # https:// (đăng nhập, tải tệp, thông báo qua wss://). MOC_TRUSTED_PROXY=auto (#211): APISIX tin X-Forwarded-For
+      # của proxy (gateway của mạng moc) nên nhật ký ghi IP của máy gọi, không phải gateway; app-office (chỉ ở mạng
+      # apps) gửi X-Forwarded-For giả thì không được tin, nhật ký ghi IP thật của container
       - name: HTTPS sau proxy TLS — kiểm như docs/trien-khai.md bước 6, smoke qua https://
         if: matrix.phan == 'https'
         run: |
           python3 scripts/kiem_ban_online.py https://signet.test
           MOC_SLA_DURATION=PT24H python3 scripts/smoke.py
+          # Cột đầu (IP) của dòng nhật ký truy cập mang User-Agent $1. APISIX ghi nhật ký có đệm (buffer=16384 flush=3
+          # trong mẫu nginx của nó): chờ dòng ra tới 15 giây
+          first_column() {
+            line=
+            for _ in $(seq 1 15); do
+              line=$($COMPOSE logs --no-color --no-log-prefix --tail 1000 apisix | grep -F "\"$1\"" | tail -1)
+              [ -n "$line" ] && break
+              sleep 1
+            done
+            echo "${line%% *}"
+          }
+          $COMPOSE logs --no-color --no-log-prefix apisix | grep -F 'MOC_TRUSTED_PROXY=auto →'
           ua="moc-ci-https-$GITHUB_RUN_ID"
           curl -fsS --cacert "$RUNNER_TEMP/https/ca.pem" -A "$ua" -o /dev/null https://signet.test/api/status
-          # APISIX ghi nhật ký truy cập có đệm (buffer=16384 flush=3 trong mẫu nginx của nó): chờ dòng ra tới 15 giây
+          ip=$(first_column "$ua")
+          echo "nhật ký APISIX: $ip …"
+          test "$ip" = 127.0.0.1
+          ua="moc-ci-gia-ip-$GITHUB_RUN_ID"
+          $COMPOSE exec -T app-office wget -q -O /dev/null -U "$ua" --header 'X-Forwarded-For: 203.0.113.7' \
+            http://apisix:9080/api/status || true
+          real=$(docker inspect -f '{{(index .NetworkSettings.Networks "moc_apps").IPAddress}}' \
+            "$($COMPOSE ps -q app-office)")
+          ip=$(first_column "$ua")
+          echo "nhật ký APISIX: $ip …, app-office ở mạng apps: $real"
+          test -n "$real" && test "$ip" = "$real"
+
+      # #211: make down xóa mạng, make up tạo lại, nâng cấp cũng vậy; Docker có thể cấp cho mạng moc một dải khác. Giữ
+      # dải cũ bằng một mạng khác để chắc chắn dải đổi: auto đọc lại dải lúc APISIX khởi động, Keycloak sau proxy vẫn
+      # trả token_endpoint https://, nhật ký vẫn ghi IP của máy gọi
+      - name: HTTPS sau proxy TLS — tạo lại mạng với dải khác, MOC_TRUSTED_PROXY=auto vẫn đúng
+        if: matrix.phan == 'https'
+        run: |
+          old=$(docker network inspect moc_moc -f '{{(index .IPAM.Config 0).Subnet}}')
+          make down
+          docker network create --subnet "$old" moc-ci-giu-dai > /dev/null
+          make up
+          new=$(docker network inspect moc_moc -f '{{(index .IPAM.Config 0).Subnet}}')
+          echo "mạng moc: $old → $new"
+          test -n "$new" && test "$new" != "$old"
+          $COMPOSE logs --no-color --no-log-prefix apisix | grep -F "MOC_TRUSTED_PROXY=auto → $new"
+          python3 scripts/kiem_ban_online.py https://signet.test
+          ua="moc-ci-mang-moi-$GITHUB_RUN_ID"
+          curl -fsS --cacert "$RUNNER_TEMP/https/ca.pem" -A "$ua" -o /dev/null https://signet.test/api/status
           line=
           for _ in $(seq 1 15); do
             line=$($COMPOSE logs --no-color --no-log-prefix --tail 1000 apisix | grep -F "\"$ua\"" | tail -1)
@@ -719,6 +760,7 @@ jobs:
           done
           echo "nhật ký APISIX: ${line%% *} …"
           test "${line%% *}" = 127.0.0.1
+          docker network rm moc-ci-giu-dai > /dev/null
 
       - name: Trạng thái và nhật ký dịch vụ khi lỗi
         if: failure()

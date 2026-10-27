@@ -1000,8 +1000,9 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   vai trò CSDL quyền hẹp ([`trien-khai.md`](trien-khai.md) §8). Mốc neo sổ kiểm toán ra bucket khóa ghi là để chặn đúng
   đường siêu người dùng viết lại sổ (`svc_files/anchors.py`).
 - **Mạng**: TLS chỉ ở đoạn trình duyệt ↔ proxy, trong mạng Docker các dịch vụ gọi nhau bằng HTTP;
-  `MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy, kể cả container ứng dụng ở mạng `apps`
-  ([`trien-khai.md`](trien-khai.md) §8). Ứng dụng chỉ tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
+  `MOC_TRUSTED_PROXY=auto` tin mọi container ở mạng `moc` (dịch vụ lõi, `cloudflared`), không tin mạng `apps`; bản
+  cài cũ còn `172.16.0.0/12` thì tin mọi container trên máy ([`trien-khai.md`](trien-khai.md) §8, #211). Ứng dụng chỉ
+  tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
   tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
 - **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ, chưa có

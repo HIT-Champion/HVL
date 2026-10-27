@@ -133,7 +133,7 @@ Sửa bốn dòng trong `.env` (thay `moc.example.vn` bằng tên miền thật)
 ```bash
 sed -i -e 's#^MOC_PUBLIC_URL=.*#MOC_PUBLIC_URL=https://moc.example.vn#' \
        -e 's#^MOC_HTTP_PORT=.*#MOC_HTTP_PORT=127.0.0.1:8080#' \
-       -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=172.16.0.0/12#' \
+       -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=auto#' \
        -e 's#^MOC_BACKUP_DIR=.*#MOC_BACKUP_DIR=/var/backups/moc#' .env
 grep -E '^MOC_(PUBLIC_URL|HTTP_PORT|TRUSTED_PROXY|BACKUP_DIR)=' .env     # đủ bốn dòng, đúng giá trị
 make check
@@ -143,11 +143,15 @@ make check
   báo realtime đều theo địa chỉ này. **Đổi sau khi đã chạy** thì realm Keycloak đã nạp vẫn giữ địa chỉ cũ — đặt đúng
   ngay từ đầu.
 - `MOC_HTTP_PORT=127.0.0.1:8080`: APISIX chỉ nghe trên máy chủ, Caddy chuyển vào đây.
-- `MOC_TRUSTED_PROXY=172.16.0.0/12`: APISIX chỉ tin `X-Forwarded-Proto`, `-Host`, `-Port`, `-For` của yêu cầu tới từ dải
-  này. Caddy tới APISIX qua cổng `127.0.0.1:8080`, Docker chuyển vào container từ gateway của mạng Docker (thường
-  `172.x.0.1`). Thiếu dòng này thì Keycloak tưởng người dùng đang ở `http://`, trình duyệt chặn lần đăng nhập, và mọi
-  người dùng chung một bộ đếm giới hạn tốc độ. Docker của máy chủ đặt dải mạng khác (`default-address-pools` trong
-  `/etc/docker/daemon.json`) thì đặt đúng dải đó — bước 6 có lệnh kiểm.
+- `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin `X-Forwarded-Proto`, `-Host`, `-Port`, `-For` của yêu cầu tới từ dải của
+  mạng Docker `moc`. Caddy tới APISIX qua cổng `127.0.0.1:8080`, Docker chuyển vào container từ gateway của mạng này.
+  Thiếu dòng này thì Keycloak tưởng người dùng đang ở `http://`, trình duyệt chặn lần đăng nhập, và mọi người dùng chung
+  một bộ đếm giới hạn tốc độ.
+  - Lúc khởi động, APISIX đọc dải từ route mặc định của chính nó (`platform/apisix/kiem-moi-truong.sh`). Docker tạo lại
+    mạng với dải khác (`make down`, nâng cấp) thì giá trị vẫn đúng.
+  - Mạng `apps` của container ứng dụng là internal, không có route mặc định, nên không bao giờ được tin.
+  - Không đọc được route thì APISIX dừng, báo lỗi ở `docker compose logs apisix`.
+  - Đặt một dải cụ thể (vd `172.16.0.0/12`) vẫn được, nhưng dải đó phải khớp mạng sau mỗi lần tạo lại (mục 8).
 - Máy demo công khai: giữ `MOC_CLI_CLIENT_ENABLED=true` để `seed.py`, `smoke.py` chạy được; muốn xem nhắc hạn ngay khi
   demo thì `MOC_SLA_DURATION=PT1M` (mặc định `PT24H`). Máy có dữ liệu thật: `MOC_CLI_CLIENT_ENABLED=false`, không chạy
   `seed.py`, `smoke.py` (cả hai ghi dữ liệu thử vào hệ thống).
@@ -219,7 +223,7 @@ Internet ──HTTPS──▶ Cloudflare ◀── đường hầm (cloudflared 
    ```bash
    sed -i -e 's#^MOC_PUBLIC_URL=.*#MOC_PUBLIC_URL=https://signet.example.vn#' \
           -e 's#^MOC_HTTP_PORT=.*#MOC_HTTP_PORT=127.0.0.1:8080#' \
-          -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=172.16.0.0/12#' \
+          -e 's#^MOC_TRUSTED_PROXY=.*#MOC_TRUSTED_PROXY=auto#' \
           -e 's#^MOC_EXTRA_PROFILES=.*#MOC_EXTRA_PROFILES=tunnel#' \
           -e 's#^MOC_BACKUP_DIR=.*#MOC_BACKUP_DIR=/var/backups/moc#' .env
    ```
@@ -230,7 +234,8 @@ Internet ──HTTPS──▶ Cloudflare ◀── đường hầm (cloudflared 
    -d --wait` trong `/opt/moc` dựng cả `cloudflared`; trong thư mục mã nguồn `make up`, `make down`, `make ps` cũng
    kèm profile `tunnel`. Kiểm: `docker compose logs cloudflared | grep -c 'Registered tunnel connection'` ra 4.
 
-Bỏ qua bước 5. `cloudflared` tới APISIX từ một địa chỉ trong mạng Docker `moc` nên `MOC_TRUSTED_PROXY` như với Caddy.
+Bỏ qua bước 5. `cloudflared` tới APISIX từ một địa chỉ trong mạng Docker `moc` nên `MOC_TRUSTED_PROXY=auto` như với
+Caddy.
 Cloudflare gửi `X-Forwarded-Proto: https` và `X-Forwarded-For` (IP người dùng) nhưng không gửi `X-Forwarded-Port`:
 APISIX tự lấy 443 cho các route của Keycloak (`map` `moc_cong_chuyen_tiep` trong `platform/apisix/config.yaml`), không thì
 Keycloak trả địa chỉ token `https://…:9080/…` và trình duyệt không đăng nhập được. Bước 6 kiểm như với Caddy, thay
@@ -275,10 +280,11 @@ Reconciler kẹt thì job đỏ. Địa chỉ đổi bằng biến `MOC_DEV_URL`
 - `issuer` và `token_endpoint` đều phải bắt đầu bằng `https://moc.example.vn/realms/moc`. `issuer` sai (`http://…`,
   `localhost`) là `MOC_PUBLIC_URL` sai; chỉ `token_endpoint` sai (`http://…` hay có `:9080`) là `MOC_TRUSTED_PROXY`
   chưa khớp dải mạng Docker, hoặc Caddyfile thiếu dòng `header_up`.
-- Cột đầu dòng nhật ký APISIX phải là IP thật của máy vừa gọi `curl`. Ra `172.x.0.1` là `MOC_TRUSTED_PROXY` chưa khớp:
-  lấy gateway thật của mạng `moc` (APISIX ở hai mạng `moc`, `apps`; cổng publish đi qua `moc`) bằng
-  `docker inspect $(docker compose ps -q apisix) --format '{{(index .NetworkSettings.Networks "moc_moc").Gateway}}'`,
-  sửa `/opt/moc/.env` rồi `docker compose up -d apisix`.
+- Cột đầu dòng nhật ký APISIX phải là IP thật của máy vừa gọi `curl`. Ra `172.x.0.1` là `MOC_TRUSTED_PROXY` chưa khớp.
+  Với `auto`, dải APISIX đã chọn nằm ở dòng `MOC_TRUSTED_PROXY=auto → …` của `docker compose logs apisix`. Dải đó phải
+  chứa gateway của mạng `moc` (APISIX ở hai mạng `moc`, `apps`; cổng publish đi qua `moc`):
+  `docker inspect $(docker compose ps -q apisix) --format '{{(index .NetworkSettings.Networks "moc_moc").Gateway}}'`.
+  Đặt dải cụ thể thì sửa `/opt/moc/.env` cho khớp gateway đó, rồi `docker compose up -d apisix`.
 - Mở `https://moc.example.vn` trên trình duyệt, đăng nhập `vanthu` (mật khẩu `MOC_DEMO_PASSWORD`, mã TOTP từ
   `python3 scripts/totp.py`). Tài khoản cho giám khảo: `giamkhao` (chuyên viên, không cần TOTP; hộp việc có sẵn hai
   việc).
@@ -385,17 +391,17 @@ thư, mất khi container dừng), không dùng làm máy chủ thư thật.
 - **Chỉ đoạn trình duyệt ↔ Caddy có TLS.** Các dịch vụ gọi nhau bằng HTTP trong mạng Docker (APISIX → Keycloak, các
   dịch vụ → OpenBao, …). Mạng này không mở ra ngoài, nhưng một container bị chiếm quyền thì thấy được lưu lượng chưa
   mã hóa trong đó.
-- **`MOC_TRUSTED_PROXY=172.16.0.0/12` tin mọi container trên máy**, kể cả container ứng dụng ở mạng `apps`: container
-  nào cũng gửi được `X-Forwarded-For` giả để né giới hạn tốc độ đăng nhập. Muốn hẹp hơn thì đặt đúng gateway lấy ở
-  bước 6 (`172.x.0.1/32`); với Cloudflare Tunnel là dải của mạng `moc`
-  (`docker network inspect moc_moc --format '{{(index .IPAM.Config 0).Subnet}}'`) — `cloudflared` vẫn chỉ ở mạng
-  `moc`, mạng `apps` (ứng dụng, APISIX) không cần có trong dải tin cậy. Dải và gateway do Docker cấp lúc tạo mạng:
-  `make down` rồi `make up`, nâng cấp bằng `scripts/nang_cap.sh` hay reconciler GitOps (cả hai `docker compose down`
-  trước khi cài) xóa, tạo lại mọi mạng và có thể đánh số lại — bản này thêm mạng `apps`, nên lần tạo lại đầu tiên sau
-  khi nâng cấp dễ cấp cho `moc` một dải khác. Giá trị đã thu hẹp khi đó trỏ sai mạng: Keycloak trả `token_endpoint`
-  `http://…` (trình duyệt chặn đăng nhập), mọi người dùng chung một bộ đếm giới hạn. Sau mỗi lần tạo lại mạng, so hai
-  lệnh trên với `MOC_TRUSTED_PROXY` trong `.env` (cột đầu nhật ký APISIX ra `172.x.0.1` là lệch), lệch thì sửa rồi
-  `docker compose up -d apisix`. `make up` không xóa mạng nên không đánh số lại.
+- **`MOC_TRUSTED_PROXY=auto` tin mọi container ở mạng `moc`**: các dịch vụ lõi, `cloudflared`, và gateway mà cổng
+  publish đi qua. Container ứng dụng chỉ ở mạng `apps` (internal), nằm ngoài dải đó: `X-Forwarded-For` giả của chúng bị
+  bỏ, giới hạn tốc độ đăng nhập đếm theo IP thật của container (#211).
+  - Một dịch vụ lõi bị chiếm quyền vẫn giả được `X-Forwarded-For`.
+  - Bản cài cũ còn `MOC_TRUSTED_PROXY=172.16.0.0/12` thì tin mọi container trên máy, kể cả mạng `apps`. Nâng cấp không
+    đổi `.env`: đổi tay sang `auto` rồi `docker compose up -d apisix`.
+  - Dải cụ thể (vd gateway `172.x.0.1/32` lấy ở bước 6) không tự theo mạng. Dải và gateway do Docker cấp lúc tạo mạng.
+    `make down` rồi `make up`, nâng cấp bằng `scripts/nang_cap.sh` hay reconciler GitOps (cả hai `docker compose down`
+    trước khi cài) đều xóa, tạo lại mọi mạng và có thể đánh số lại. Giá trị cố định khi đó trỏ sai mạng: Keycloak trả
+    `token_endpoint` `http://…` (trình duyệt chặn đăng nhập), mọi người dùng chung một bộ đếm giới hạn. `auto` đọc lại
+    dải mỗi lần APISIX khởi động nên không lệch.
 - **Cloudflare Tunnel (mục 5b): TLS kết thúc ở Cloudflare**, Cloudflare thấy nội dung yêu cầu trước khi chuyển vào
   đường hầm — hợp với máy demo, cân nhắc với dữ liệu thật. Máy tắt hay mất mạng là trang ngừng; Cloudflare gói Free
   giới hạn mỗi yêu cầu 100 MB (APISIX đã chặn trên 64 MB).
