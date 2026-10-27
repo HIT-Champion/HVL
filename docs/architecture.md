@@ -112,8 +112,8 @@ của ba câu, đúng mức đã kiểm:
 Vẽ theo `docker-compose.yml` và [`platform/apisix/apisix.yaml`](../platform/apisix/apisix.yaml); nhãn mũi tên ra từ cổng
 là đường dẫn thật (realm mặc định `moc`). Ảnh động ở README ([`anh/kien-truc-tong-the.gif`](anh/kien-truc-tong-the.gif))
 vẽ cùng hệ thống cho người mới đọc. Các nhóm [H] [P] [D] [I] theo bảng §3; `svc-files` đứng ở nhóm Tin cậy như trong
-ảnh. Hai dịch vụ của đội (`svc-files`, `svc-workflow`) còn chứa phần máy chủ của Văn phòng điện tử — §4 tách riêng phần
-đó.
+ảnh. Nét đứt là phần tùy chọn, bật theo profile hay chạy khi gọi lệnh. Hai dịch vụ của đội (`svc-files`,
+`svc-workflow`) còn chứa phần máy chủ của Văn phòng điện tử — §4 tách riêng phần đó.
 
 ```mermaid
 flowchart LR
@@ -125,6 +125,8 @@ flowchart LR
   subgraph TANG2["Tầng 2 — ứng dụng, trang tĩnh (profile app; mạng apps: chỉ tới APISIX)"]
     OFF["app-office<br/>Văn phòng điện tử · Nuxt 4"]
     CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
+    TL["app-tai-lieu-api<br/>Tài liệu API · Swagger UI"]
+    APP["ứng dụng cắm bằng manifest<br/>Bảng tin, Nghỉ phép (moc app install)"]
   end
   subgraph TANG1["Tầng 1 — lõi không giao diện (profile core)"]
     subgraph KGH["[H] Nhân sự"]
@@ -140,6 +142,7 @@ flowchart LR
       PG[("PostgreSQL 16<br/>core · office · personal")]
       MS["Meilisearch 1.54<br/>tìm toàn văn"]
       SW[("SeaweedFS 4.48<br/>kho tệp S3")]
+      SC["Scorpio 6.0 NGSI-LD<br/>cảm biến IoT · profile iot"]
     end
     subgraph TINCAY["Tin cậy"]
       SF["svc-files<br/>tệp, tìm kiếm, PDF, AI"]
@@ -151,18 +154,25 @@ flowchart LR
     end
     subgraph VANHANH["Vận hành"]
       PM["Prometheus + Grafana"]
+      JG["Jaeger 2.22<br/>truy vết · profile trace"]
+      LG["Vector 0.59 + Parseable 3.2<br/>log tập trung · profile logs"]
+      BK["restic 0.19<br/>sao lưu · moc backup"]
     end
   end
   U1 --> GW
   U2 --> GW
   GW -->|"/*"| OFF
   GW -->|"/ca-nhan, /ca-nhan/*"| CN
+  GW -->|"/tai-lieu-api, /tai-lieu-api/*"| TL
+  GW -->|"/bang-tin/*, /nghi-phep/* — route thêm lúc cài"| APP
+  APP -->|"token, GraphQL: chỉ qua cổng"| GW
   GW -->|"/realms/moc, /realms/moc/*, /resources/*"| KC
   GW -->|"/v1/graphql"| HA
   GW -->|"/api/files, /api/files/*, /api/search,<br/>/api/documents/*, /api/registers/*"| SF
   GW -->|"/api/case-files/*, /api/imports, /api/imports/*"| SF
   GW -->|"/api/verify, /api/verify/*, /api/status<br/>không cần token"| SF
   GW -->|"/realtime · WebSocket"| CE
+  GW -->|"/api/workflow/* — quy trình của ứng dụng cắm thêm"| WF
   HA -->|"6 Actions"| WF
   HA -->|"SQL"| PG
   WF -->|"REST, external worker"| FL
@@ -180,6 +190,13 @@ flowchart LR
   FL -->|"CSDL flowable"| PG
   KC -->|"CSDL keycloak"| PG
   PM -->|"chỉ số mỗi 15 giây"| GW
+  WF -.->|"NGSI-LD"| SC
+  GW -.->|"span, tỉ lệ MOC_TRACE_RATIO"| JG
+  SF -.->|"span"| JG
+  WF -.->|"span"| JG
+  GW -.->|"log 8 dịch vụ, driver fluentd"| LG
+  BK -.->|"sao lưu"| PG
+  BK -.->|"sao lưu"| SW
 ```
 
 - **Một cửa.** Chỉ APISIX mở cổng ra mạng (`MOC_HTTP_PORT`, mặc định 8080). Yêu cầu GET, HEAD tới đường không có trong
