@@ -86,7 +86,7 @@ jobs:
 
       # Reconciler kéo develop mỗi 15 phút rồi dựng, cài lại trong vài phút: commit gộp chưa tới 30 phút thì bản dev
       # còn chạy commit trước đó cũng đạt. Lấy từ đầu develop lùi tới commit đầu tiên đã gộp quá 30 phút (lấy cả nó)
-      - name: Commit của develop bản dev phải chạy
+      - name: Kiểm ${{ env.DEV_URL }}, đúng commit của develop
         run: |
           git fetch -q --no-tags --depth 20 origin develop
           now=$(date +%s)
@@ -96,7 +96,4 @@ jobs:
             [ "$at" -ge $((now - 1800)) ] || break
           done < <(git log --first-parent -n 20 --format='%H %ct' FETCH_HEAD)
           echo "Đầu develop: ${args[1]}; nhận $(( ${#args[@]} / 2 )) commit"
-          echo "COMMITS=${args[*]}" >> "$GITHUB_ENV"
-
-      - name: Kiểm ${{ env.DEV_URL }}
-        run: python3 scripts/kiem_ban_online.py "$DEV_URL" $COMMITS
+          python3 scripts/kiem_ban_online.py "$DEV_URL" "${args[@]}"

@@ -291,7 +291,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("git fetch -q --no-tags --depth 20 origin develop", job)
         self.assertIn("git log --first-parent -n 20 --format='%H %ct' FETCH_HEAD", job)
         self.assertIn('[ "$at" -ge $((now - 1800)) ] || break', job)
-        self.assertIn('python3 scripts/kiem_ban_online.py "$DEV_URL" $COMMITS', job)
+        self.assertIn('python3 scripts/kiem_ban_online.py "$DEV_URL" "${args[@]}"', job)
         self.assertIn("vars.MOC_DEV_URL || 'https://signet-dev.htechcs.com'", self.text)
 
     def test_checkout_is_pinned_like_ci(self) -> None:
