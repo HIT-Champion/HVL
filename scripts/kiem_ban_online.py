@@ -20,7 +20,8 @@
 - Chứng chỉ: hợp lệ với kho CA của máy chạy, đúng tên máy, TLS từ 1.2, còn ít nhất ``--min-days`` ngày.
 - HTTP chuyển sang HTTPS: ``http://<máy>/`` trả mã chuyển hướng về ``https://<máy>``.
 - ``/api/status`` trả 200, ``status`` là ``ok`` hoặc ``degraded`` (thành phần không ``ok`` in thành cảnh báo, ``down``
-  là lỗi), ``version`` đúng ``--version`` nếu có.
+  là lỗi), ``version`` đúng ``--version`` nếu có. Bản dựng từ git (reconciler theo nhánh: ``git describe --tags
+  --always``, ra ``<băm>`` hay ``<thẻ>-<n>-g<băm>``) thì ``--commit`` (lặp được): băm đó là đầu của một commit đã nêu.
 - Keycloak sau proxy: ``issuer`` OIDC của realm là ``https://<máy>/realms/moc``, ``authorization_endpoint`` và
   ``token_endpoint`` nằm dưới đó. Proxy không chuyển đúng ``X-Forwarded-*`` thì Keycloak sinh URL ``http://`` hay có
   ``:9080``, và đăng nhập hỏng.
@@ -28,6 +29,7 @@
   ``X-Content-Type-Options: nosniff``.
 
   python3 scripts/kiem_ban_online.py https://signet.htechcs.com [--version 1.2.0] [--min-days 14]
+  python3 scripts/kiem_ban_online.py https://signet-dev.htechcs.com --commit <sha đầu develop> [--commit <sha>…]
 
 Chạy hết các mục rồi báo mục trượt. Thoát 0 khi đạt, 1 khi có mục trượt, 2 khi gọi sai. Chỉ dùng thư viện chuẩn.
 """
@@ -37,6 +39,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import ssl
 import sys
@@ -55,6 +58,8 @@ MIN_DAYS = 14               # Let's Encrypt gia hạn khi còn 30 ngày: dưới
 TLS_OK = ("TLSv1.2", "TLSv1.3")
 REDIRECTS = (301, 302, 307, 308)
 USER_AGENT = "signet-kiem-ban-online"
+# phiên bản `git describe --tags --always` (bỏ v): băm rút gọn, hay sau thẻ gần nhất `<thẻ>-<n>-g<băm>`
+DESCRIBED = re.compile(r"(?:.+-g)?([0-9a-f]{7,40})")
 
 
 @dataclass
@@ -160,7 +165,12 @@ def check_redirect(site: Site, report: Report, host: str, base: str) -> None:
         report.fail(item, f"http://{host}/ trả {reply.status}{went}, cần chuyển về {base}")
 
 
-def check_status(site: Site, report: Report, base: str, version: str | None) -> None:
+def built_from(running: Any, commits: list[str]) -> bool:
+    m = DESCRIBED.fullmatch(running) if isinstance(running, str) else None
+    return bool(m) and any(c.startswith(m[1]) for c in commits)
+
+
+def check_status(site: Site, report: Report, base: str, version: str | None, commits: list[str]) -> None:
     item = "/api/status"
     try:
         reply = site.get(f"{base}/api/status")
@@ -178,6 +188,9 @@ def check_status(site: Site, report: Report, base: str, version: str | None) -> 
         report.fail(item, f"status {state}" + (" (" + "; ".join(bad) + ")" if bad else ""))
     elif version is not None and running != version:
         report.fail(item, f"chạy bản {running}, bản phát hành mới nhất là {version}")
+    elif commits and not built_from(running, commits):
+        more = f" (hay {len(commits) - 1} commit trước đó)" if len(commits) > 1 else ""
+        report.fail(item, f"chạy bản {running}, không dựng từ commit {commits[0][:12]}{more}")
     else:
         report.ok(item, f"status {state}, bản {running}")
         if bad:
@@ -228,11 +241,12 @@ def check_headers(site: Site, report: Report, base: str) -> None:
         report.ok(item, "Content-Security-Policy, X-Content-Type-Options: nosniff")
 
 
-def check(site: Site, base: str, host: str, version: str | None, min_days: int, now: float) -> Report:
+def check(site: Site, base: str, host: str, version: str | None, min_days: int, now: float,
+          commits: list[str] | None = None) -> Report:
     report = Report()
     check_certificate(site, report, min_days, now)
     check_redirect(site, report, host, base)
-    check_status(site, report, base, version)
+    check_status(site, report, base, version, commits or [])
     check_issuer(site, report, base)
     check_headers(site, report, base)
     return report
@@ -241,7 +255,10 @@ def check(site: Site, base: str, host: str, version: str | None, min_days: int, 
 def main(argv: list[str] | None = None, site: Callable[[str, int], Site] = Internet) -> int:
     parser = argparse.ArgumentParser(description="Kiểm bản chạy công khai qua HTTPS.")
     parser.add_argument("url", help="địa chỉ gốc, vd. https://signet.htechcs.com")
-    parser.add_argument("--version", help="phiên bản phải chạy, không có tiền tố v (vd. thẻ phát hành mới nhất)")
+    want = parser.add_mutually_exclusive_group()
+    want.add_argument("--version", help="phiên bản phải chạy, không có tiền tố v (vd. thẻ phát hành mới nhất)")
+    want.add_argument("--commit", action="append", default=[],
+                      help="bản phải dựng từ commit này (băm đủ 40 ký tự; lặp được: commit nào trong số đó cũng đạt)")
     parser.add_argument("--min-days", type=int, default=MIN_DAYS,
                         help=f"số ngày tối thiểu chứng chỉ còn hạn (mặc định {MIN_DAYS})")
     args = parser.parse_args(argv)
@@ -252,8 +269,11 @@ def main(argv: list[str] | None = None, site: Callable[[str, int], Site] = Inter
     base = f"https://{host}" + (f":{port}" if port != 443 else "")
     if args.version is not None and args.version.startswith("v"):
         args.version = args.version[1:]
+    bad = [c for c in args.commit if not re.fullmatch(r"[0-9a-f]{40}", c)]
+    if bad:
+        parser.error(f"--commit cần băm SHA-1 đủ 40 ký tự thường, đang là {bad[0]}")
 
-    report = check(site(host, port), base, host, args.version, args.min_days, time.time())
+    report = check(site(host, port), base, host, args.version, args.min_days, time.time(), args.commit)
     annotate = bool(os.environ.get("GITHUB_ACTIONS"))
     for warning in report.warnings:
         if annotate:

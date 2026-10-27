@@ -9,6 +9,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Bản dev theo `develop` tại signet-dev.htechcs.com; job kiểm hằng ngày đòi đúng commit đầu `develop` (#344).
 - Quy trình là dịch vụ của lõi: ứng dụng khai BPMN và form JSON Schema trong manifest, gọi API `/api/workflow/<tên>/…`;
   `moc app install` kiểm chặt gói, cài lỗi thì lùi bản trước, gỡ giữ lịch sử đơn (#301, #320, #323, #327, #330–#333).
 - Ứng dụng mẫu Đơn nghỉ phép, chỉ có quy trình và form trên lõi: nhân viên gửi, trưởng phòng duyệt (#301, #303, #312).

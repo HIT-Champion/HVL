@@ -19,6 +19,8 @@
 # GitHub chạy lịch, nút chạy tay và lượt sau Release theo tệp trên nhánh mặc định (develop); PR đổi chính tệp này hay
 # kịch bản thì chạy job trên PR đó. Từ lúc phát hành tới lúc nâng bản online, job đỏ vì bản online còn chạy bản cũ —
 # đúng ý. Nâng xong thì chạy tay (Actions → Bản online → Run workflow) để thấy xanh ngay (#344).
+# Job thứ hai kiểm bản dev theo develop (máy MinhQuang, reconciler kéo develop mỗi 15 phút, #344) như thế, nhưng đòi
+# phiên bản dựng từ commit đầu develop thay vì thẻ: reconciler kẹt thì job đỏ.
 name: Bản online
 
 on:
@@ -46,6 +48,7 @@ concurrency:
 env:
   # Địa chỉ bản online; đổi bằng biến MOC_ONLINE_URL của repo (Settings → Variables), không cần sửa tệp
   ONLINE_URL: ${{ vars.MOC_ONLINE_URL || 'https://signet.htechcs.com' }}
+  DEV_URL: ${{ vars.MOC_DEV_URL || 'https://signet-dev.htechcs.com' }}
 
 jobs:
   kiem:
@@ -71,3 +74,26 @@ jobs:
 
       - name: Kiểm ${{ env.ONLINE_URL }}
         run: python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}"
+
+  kiem-dev:
+    name: Kiểm bản dev theo develop
+    # Lượt sau Release chỉ đòi thẻ mới trên bản online
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Reconciler kéo develop mỗi 15 phút rồi dựng, cài lại trong vài phút: commit gộp chưa tới 30 phút thì bản dev
+      # còn chạy commit trước đó cũng đạt. Lấy từ đầu develop lùi tới commit đầu tiên đã gộp quá 30 phút (lấy cả nó)
+      - name: Kiểm ${{ env.DEV_URL }}, đúng commit của develop
+        run: |
+          git fetch -q --no-tags --depth 20 origin develop
+          now=$(date +%s)
+          args=()
+          while read -r sha at; do
+            args+=(--commit "$sha")
+            [ "$at" -ge $((now - 1800)) ] || break
+          done < <(git log --first-parent -n 20 --format='%H %ct' FETCH_HEAD)
+          echo "Đầu develop: ${args[1]}; nhận $(( ${#args[@]} / 2 )) commit"
+          python3 scripts/kiem_ban_online.py "$DEV_URL" "${args[@]}"
