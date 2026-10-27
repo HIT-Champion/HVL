@@ -56,6 +56,7 @@ ROLES = frozenset({"clerk", "staff", "manager", "director", "tenant_admin"})
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE = re.compile(r"[A-HJ-NP-Z2-9]{8}")
 LINK_TTL = timedelta(minutes=15)
+HINT_EVERY = timedelta(minutes=10)  # mỗi chat nhận lời nhắc cách dùng tối đa một lần trong khoảng này
 POLL_S = 30                         # long polling của getUpdates
 MAX_BACKOFF_S = 300.0
 
@@ -136,6 +137,7 @@ class Channels:
         self.router = router
         self._clock = clock or (lambda: datetime.now(UTC))
         self._codes = codes
+        self._hinted: dict[str, datetime] = {}     # chat_id → lần nhắc gần nhất (chỉ trong bộ nhớ)
 
     @classmethod
     def build(cls, settings: Settings, hasura: HasuraClient, router: Router | None) -> Self:
@@ -282,19 +284,30 @@ class Channels:
                     error = exc.reason if isinstance(exc, Failure) else type(exc).__name__
                     log.warning(json.dumps({"event": "core.channel.zalo_link_failed", "error": error}))
 
+    async def _hint(self, bot: ZaloBot, chat_id: str) -> bool:
+        """Nhắc cách dùng, mỗi chat tối đa một lần trong HINT_EVERY: tin rác không làm bot trả lời dồn."""
+        now = self._clock()
+        last = self._hinted.get(chat_id)
+        if last is not None and now - last < HINT_EVERY:
+            return False
+        if len(self._hinted) >= 1000:                 # giữ bộ nhớ có hạn: bỏ các chat đã qua khoảng chờ
+            self._hinted = {k: v for k, v in self._hinted.items() if now - v < HINT_EVERY}
+        self._hinted[chat_id] = now
+        await bot.send(chat_id, HINT)
+        return True
+
     async def link(self, bot: ZaloBot, update: dict[str, Any]) -> str:
         """Một tin nhắn cho bot → ``linked`` | ``bad_code`` | ``hint`` | ``ignored`` (đã trả lời trong Zalo)."""
         message = update.get("message") if update.get("event_name") == "message.text.received" else None
         chat = (message or {}).get("chat") or {}
         chat_id, text = str(chat.get("id") or ""), (message or {}).get("text")
-        # chỉ trò chuyện riêng với bot: mã đọc trong nhóm thì người khác cũng thấy; chat_id dài hơn cột thì bỏ qua
-        if (not 0 < len(chat_id) <= 64 or not isinstance(text, str)
-                or chat.get("chat_type", "PRIVATE") != "PRIVATE"):
+        # chỉ trò chuyện riêng với bot (thiếu chat_type cũng bỏ qua): mã đọc trong nhóm thì người khác cũng thấy;
+        # chat_id dài hơn cột thì bỏ qua
+        if not 0 < len(chat_id) <= 64 or not isinstance(text, str) or chat.get("chat_type") != "PRIVATE":
             return "ignored"
         code = re.sub(r"[\s-]", "", text).upper()
         if not CODE.fullmatch(code):
-            await bot.send(chat_id, HINT)
-            return "hint"
+            return "hint" if await self._hint(bot, chat_id) else "ignored"
         found = (await self.hasura.as_system(FIND_CODE, {"code": code}))["core_notification_subscriptions"]
         expires = _time(found[0].get("link_expires_at")) if found else None
         linked = 0

@@ -127,9 +127,9 @@ class Bot:
         return item
 
 
-def message(text: str, chat_id: str = CHAT, chat_type: str = "PRIVATE") -> dict[str, Any]:
-    return {"event_name": "message.text.received",
-            "message": {"text": text, "from": {"id": "zl-user"}, "chat": {"id": chat_id, "chat_type": chat_type}}}
+def message(text: str, chat_id: str = CHAT, chat_type: str | None = "PRIVATE") -> dict[str, Any]:
+    chat = {"id": chat_id} if chat_type is None else {"id": chat_id, "chat_type": chat_type}
+    return {"event_name": "message.text.received", "message": {"text": text, "from": {"id": "zl-user"}, "chat": chat}}
 
 
 def make(store: Store, clock: Clock, *, sms: bool = True, zalo: bool = True, codes: list[str] | None = None,
@@ -243,6 +243,7 @@ def test_link_writes_in_the_tenant_of_the_code(clock):
 @pytest.mark.parametrize(("update", "outcome", "reply"), [
     (message("xin chào"), "hint", HINT),
     (message("ABCD2345", chat_type="GROUP"), "ignored", None),
+    (message("ABCD2345", chat_type=None), "ignored", None),        # thiếu chat_type: không coi là chat riêng
     (message("ABCD2345", chat_id="x" * 65), "ignored", None),
     ({"event_name": "message.image.received", "message": {"chat": {"id": CHAT}}}, "ignored", None),
     ({"event_name": "message.text.received"}, "ignored", None),
@@ -253,6 +254,17 @@ def test_other_messages_get_a_hint_or_nothing(clock, update, outcome, reply):
     assert run(make(store, clock).link(bot, update)) == outcome
     assert bot.sent == ([(CHAT, reply)] if reply else [])
     assert "FindCode" not in store.calls
+
+
+def test_the_hint_is_sent_at_most_once_per_chat_in_ten_minutes(clock):
+    bot = Bot()
+    channels = make(Store(), clock)
+    assert run(channels.link(bot, message("xin chào"))) == "hint"
+    assert run(channels.link(bot, message("còn đó không"))) == "ignored"
+    assert run(channels.link(bot, message("chào", chat_id="zl-chat-2"))) == "hint"
+    clock.tick(minutes=10)
+    assert run(channels.link(bot, message("xin chào"))) == "hint"
+    assert bot.sent == [(CHAT, HINT), ("zl-chat-2", HINT), (CHAT, HINT)]
 
 
 def test_turning_zalo_off_forgets_the_chat(clock):

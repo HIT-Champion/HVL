@@ -801,6 +801,9 @@
     "link": "Liên kết",
     "turnOff": "Tắt",
     "cancel": "Hủy",
+    "zaloLinkLabel": "Liên kết Zalo",
+    "zaloTurnOffLabel": "Tắt thông báo qua Zalo",
+    "zaloCancelLabel": "Hủy mã liên kết Zalo",
     "error": {
       "channel_off": "Bản cài này chưa bật kênh thông báo đó",
       "no_phone": "Danh bạ chưa có số điện thoại của bạn: nhờ quản trị thêm rồi bật lại",

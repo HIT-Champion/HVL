@@ -370,7 +370,9 @@ SMS, Zalo (#365, migration 1792281603700) chỉ gửi cho người tự bật: `
 hạn (`link_code`, `link_expires_at`, chỉ mục duy nhất). Ràng buộc: Zalo bật thì phải có chat_id; SMS không có chat_id
 hay mã. Trigger xếp hàng chỉ thêm dòng `sms`, `zalo` khi người nhận còn bật kênh, tài khoản còn hoạt động và — với
 SMS — `core.users.phone` có số. Bảng gắn sổ kiểm toán; chỉ `service` đọc, ghi (qua Action `myChannels`,
-`setMyChannel`), người dùng không đọc thẳng; `phone` của `core.users` cũng chỉ `service` đọc.
+`setMyChannel`), người dùng không đọc thẳng; `phone` của `core.users` cũng chỉ `service` đọc. Sổ kiểm toán chỉ ghi
+thêm, nên `diff` giữ mãi số điện thoại, chat_id và mã liên kết cũ. Không vai trò người dùng nào đọc `diff` thô:
+`overview` của lãnh đạo, quản trị đơn vị lấy theo danh sách cho phép (`core.audit_overview`), không có ba trường này.
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 **Lô nạp khối lớn** (cụm ⑤, migration 1792281602800; mô tả: `services/svc-files/README.md`, mục Nạp lô văn bản

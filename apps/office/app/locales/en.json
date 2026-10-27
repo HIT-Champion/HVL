@@ -801,6 +801,9 @@
     "link": "Link",
     "turnOff": "Turn off",
     "cancel": "Cancel",
+    "zaloLinkLabel": "Link Zalo",
+    "zaloTurnOffLabel": "Turn off Zalo notifications",
+    "zaloCancelLabel": "Cancel the Zalo link code",
     "error": {
       "channel_off": "This installation has not enabled that notification channel",
       "no_phone": "Your directory entry has no phone number: ask an administrator to add one, then turn it on again",

@@ -387,7 +387,8 @@ thư, mất khi container dừng), không dùng làm máy chủ thư thật.
   `MOC_SMS_GATEWAY_USER`, `MOC_SMS_GATEWAY_PASSWORD` (Basic Auth hiện trong ứng dụng). Số điện thoại do quản trị nhập
   ở trang quản trị Keycloak (Users → người dùng → "Số điện thoại (nhận SMS)"); danh bạ đồng bộ trong vài phút. Tin đi
   bằng SIM của điện thoại nên tính cước như tin nhắn thường: nên giới hạn loại, vd
-  `MOC_NOTIFY_SMS_KINDS=task.overdue,task.escalated`.
+  `MOC_NOTIFY_SMS_KINDS=task.overdue,task.escalated`. Chế độ Local Server nhận mật khẩu Basic Auth qua HTTP thường:
+  chỉ để điện thoại trong mạng LAN tin cậy cùng máy chủ, không mở cổng của ứng dụng ra Internet.
 - Zalo: tạo bot trên Zalo Bot Platform, đặt `MOC_ZALO_BOT_TOKEN` và, nếu có, `MOC_ZALO_BOT_URL` (địa chỉ `https://` mở
   bot, hiện cho người dùng lúc liên kết). Không đặt webhook cho bot: svc-workflow đọc tin bằng long polling, máy chủ
   không cần mở cổng nào ra ngoài.

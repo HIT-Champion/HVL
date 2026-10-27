@@ -111,10 +111,11 @@ onMounted(load)
           </button>
           <button
             v-else-if="c.enabled || c.link_code" type="button" :disabled="busy"
+            :aria-label="c.enabled ? t('channels.zaloTurnOffLabel') : t('channels.zaloCancelLabel')"
             class="shrink-0 text-xs font-medium text-stone-600 hover:underline" @click="set('zalo', false)"
           >{{ c.enabled ? t('channels.turnOff') : t('channels.cancel') }}</button>
           <button
-            v-else type="button" :disabled="busy" data-testid="zalo-link"
+            v-else type="button" :disabled="busy" data-testid="zalo-link" :aria-label="t('channels.zaloLinkLabel')"
             class="shrink-0 text-xs font-medium text-brand-700 hover:underline" @click="set('zalo', true)"
           >{{ t('channels.link') }}</button>
         </div>
