@@ -57,7 +57,6 @@ from collections.abc import Iterator
 from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-COMPOSE = ["docker", "compose", "--profile", "core", "--profile", "app"]
 MANIFEST = ".moc-install"           # danh sách tệp do make install quản lý (scripts/install.sh)
 STATE = "moc-reconcile.json"        # trong thư mục .git của bản sao: commit đã áp, băm tệp lúc cài
 RESTORING = ".moc-restoring"        # scripts/backup.py đặt trước khi dừng Signet để khôi phục, xóa khi xong
@@ -99,6 +98,15 @@ def setting(name: str, default: str = "") -> str:
     return os.environ.get(name) or dotenv().get(name) or default
 
 
+def compose() -> list[str]:
+    """`docker compose` với đúng các profile của bản này: core, app cùng MOC_EXTRA_PROFILES (như Makefile, như
+    COMPOSE_PROFILES install.sh ghi vào bản cài). Cờ --profile đè COMPOSE_PROFILES của .env: chỉ có core, app thì
+    `down` để sót container của profile thêm (cloudflared của tunnel…) còn chạy từ thư mục cài, install.sh từ chối cài
+    lại, `up` không chạy lại chúng."""
+    extra = [p.strip() for p in setting("MOC_EXTRA_PROFILES").split(",") if p.strip()]
+    return ["docker", "compose", *(arg for p in dict.fromkeys(["core", "app", *extra]) for arg in ("--profile", p))]
+
+
 def write_private(path: pathlib.Path, data: str) -> None:
     """Ghi cả tệp một lần (tệp tạm rồi đổi tên), chỉ chủ sở hữu đọc được: bị ngắt giữa chừng thì tệp cũ còn nguyên."""
     tmp = path.with_name(path.name + ".tmp")
@@ -134,10 +142,10 @@ def ops_lock(wait_s: float = 0) -> Iterator[bool]:
 def containers() -> tuple[list[str], set[str], dict[str, dict[str, Any]]]:
     """Dịch vụ khai trong compose, các dịch vụ chạy một lần trong số đó và container hiện có của chúng (theo tên dịch
     vụ). Dịch vụ chạy một lần: dịch vụ khác chờ nó chạy xong (service_completed_successfully), như keycloak-fonts."""
-    services = json.loads(_run([*COMPOSE, "config", "--format", "json"]).stdout).get("services") or {}
+    services = json.loads(_run([*compose(), "config", "--format", "json"]).stdout).get("services") or {}
     once = {dep for svc in services.values() for dep, cond in (svc.get("depends_on") or {}).items()
             if cond.get("condition") == "service_completed_successfully"}
-    raw = _run([*COMPOSE, "ps", "-a", "--format", "json"]).stdout.strip()
+    raw = _run([*compose(), "ps", "-a", "--format", "json"]).stdout.strip()
     # Compose cũ in một mảng JSON, bản mới in mỗi container một dòng
     rows = json.loads(raw) if raw.startswith("[") else [json.loads(line) for line in raw.splitlines() if line]
     # bỏ container chạy một lần (`docker compose run …`): không phải container của dịch vụ
@@ -152,7 +160,7 @@ def heal(report: dict[str, Any]) -> None:
     left = [s for s in paused if s in BACKUP_PAUSES]
     for s in left:
         try:
-            _run([*COMPOSE, "unpause", s], timeout=60)
+            _run([*compose(), "unpause", s], timeout=60)
             report["actions"].append(f"bỏ tạm dừng {s} (còn lại từ một lần sao lưu bị ngắt)")
         except (ReconcileError, subprocess.TimeoutExpired) as exc:
             report["problems"].append(f"không bỏ tạm dừng được {s}: {exc}")
@@ -178,7 +186,7 @@ def heal(report: dict[str, Any]) -> None:
     # unhealthy trước: `up` dừng ngay khi một phụ thuộc service_healthy đang unhealthy
     for s in unhealthy:
         try:
-            _run([*COMPOSE, "restart", s], timeout=300)
+            _run([*compose(), "restart", s], timeout=300)
             report["actions"].append(f"khởi động lại {s} (unhealthy)")
         except (ReconcileError, subprocess.TimeoutExpired) as exc:
             report["problems"].append(f"không khởi động lại được {s}: {exc}")
@@ -186,7 +194,7 @@ def heal(report: dict[str, Any]) -> None:
         # chỉ đúng các dịch vụ thiếu, đã dừng; --no-recreate: không dựng lại container đang chạy chỉ vì biến môi
         # trường của lượt này khác lúc chúng được tạo
         try:
-            _run([*COMPOSE, "up", "-d", "--no-build", "--no-recreate", *missing, *stopped], timeout=900)
+            _run([*compose(), "up", "-d", "--no-build", "--no-recreate", *missing, *stopped], timeout=900)
             report["actions"] += [f"dựng lại {s} (không còn container)" for s in missing]
             report["actions"] += [f"chạy lại {s} (đã dừng: {actual[s].get('Status', '')})" for s in stopped]
         except (ReconcileError, subprocess.TimeoutExpired) as exc:
@@ -304,7 +312,7 @@ def check_gateway_env(src: pathlib.Path, env: dict[str, str]) -> None:
     script = src / "platform" / "apisix" / "kiem-moi-truong.sh"
     if not script.is_file():                            # commit chưa có WAF
         return
-    resolved = json.loads(_run([*COMPOSE, "config", "--format", "json", "apisix"], cwd=src, env=env).stdout)
+    resolved = json.loads(_run([*compose(), "config", "--format", "json", "apisix"], cwd=src, env=env).stdout)
     values = resolved["services"]["apisix"].get("environment") or {}
     check = {"PATH": env.get("PATH", os.defpath)}
     check.update({k: str(values[k]) for k in ("MOC_WAF", "MOC_APISIX_WORKERS") if values.get(k) is not None})
@@ -316,7 +324,7 @@ def check_gateway_env(src: pathlib.Path, env: dict[str, str]) -> None:
 
 def install(src: pathlib.Path, env: dict[str, str]) -> None:
     _run(["bash", str(src / "scripts" / "install.sh"), "install", str(ROOT)], cwd=src, env=env, timeout=1800)
-    _run([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"], env=env, timeout=900)
+    _run([*compose(), "up", "-d", "--wait", "--wait-timeout", "600"], env=env, timeout=900)
 
 
 def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) -> None:
@@ -325,8 +333,8 @@ def apply(git: list[str], src: pathlib.Path, target: str, previous: str | None) 
         raise ReconcileError("commit không có scripts/install.sh")
     check_gateway_env(src, env)
     # dựng image trước khi dừng Signet: lỗi dựng thì hệ thống cũ vẫn chạy; install.sh dựng lại sau đó trúng bộ nhớ đệm
-    _run([*COMPOSE, "build"], cwd=src, env=env, timeout=1800)
-    _run([*COMPOSE, "down"], timeout=300)
+    _run([*compose(), "build"], cwd=src, env=env, timeout=1800)
+    _run([*compose(), "down"], timeout=300)
     try:
         install(src, env)
     except (ReconcileError, subprocess.TimeoutExpired, OSError) as exc:

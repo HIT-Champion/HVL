@@ -293,6 +293,8 @@ sudo cp platform/systemd/moc-reconcile.* /etc/systemd/system/ && sudo systemctl 
 
 - Áp một commit là cài lại toàn bộ: Signet dừng khoảng một phút (`install.sh` không thay cấu hình dưới container đang
   chạy). Image cũ theo commit không tự xóa.
+- Profile thêm trong `MOC_EXTRA_PROFILES` của bản cài (`tunnel`, `ai`…) đi cùng mọi lệnh compose của reconciler, như
+  `Makefile`: áp commit dừng rồi chạy lại cả chúng, tự phục hồi cũng thấy chúng (#351).
 - `.env` (bí mật, cấu hình riêng của máy chủ) không nằm trong git và reconciler không đụng tới.
 - Lượt reconciler bỏ qua khi đang sao lưu, khôi phục, `make install` (cả ba dùng chung một khóa trên thư mục cài),
   khi lần khôi phục trước dừng giữa chừng (không chạy lại Signet trên dữ liệu dở dang: chạy lại `backup restore`) hoặc
