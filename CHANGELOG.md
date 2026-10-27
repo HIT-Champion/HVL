@@ -256,6 +256,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Trang thuật ngữ `docs/thuat-ngu.md` (#308), cho mục Giới thiệu của trang tài liệu: các từ của Signet theo sáu nhóm
   (sản phẩm và kiến trúc, văn bản và nghiệp vụ văn thư, vai trò, tin cậy và vận hành, trợ lý AI, ứng dụng). Mỗi từ
   giải thích trong một, hai dòng, kèm mã tính năng nếu có và tài liệu gốc để đọc kỹ hơn.
+- Trang API REST đọc được (#308): `make api-docs` sinh thêm `docs/api/rest-svc-files.md`,
+  `docs/api/rest-svc-workflow.md` từ chính hai tệp OpenAPI. Mỗi trang có bảng mọi thao tác, rồi từng thao tác với
+  tóm tắt, mô tả, tham số, thân yêu cầu, mã trả về, cuối trang là các kiểu dữ liệu. Không thêm thư viện: trang
+  Markdown đọc được cả trên GitHub và trang tài liệu, không cần plugin OpenAPI. `scripts/tests/test_api_docs.py`
+  (7 test, trong `make test`) kiểm trang trong git khớp tệp OpenAPI trong git, nên quên sinh lại thì đỏ ngay ở job
+  test đơn vị.
 
 ### Đã sửa đổi
 - Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của
