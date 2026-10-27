@@ -3880,6 +3880,16 @@ APP_NAME, APP_PATH = "bang-tin", "/bang-tin/"
 APP_CALLBACK = f"{PUBLIC_URL}/bang-tin/dang-nhap"
 
 
+def need_sources(screen: str, *rels: str) -> None:
+    """Màn cắm ứng dụng đọc gói ứng dụng mẫu trong apps/ của thư mục mã nguồn; bản cài (make install) không chép apps/,
+    vì gói ứng dụng nằm ngoài lõi. Kiểm trước khi gỡ hay đổi gì: thiếu tệp mà vẫn chạy thì màn gỡ ứng dụng đang cài
+    rồi mới dừng."""
+    missing = [rel for rel in rels if not (ROOT / rel).exists()]
+    if missing:
+        raise DemoFailed(f"không có {', '.join(missing)}: bản cài không chép apps/ (gói ứng dụng nằm ngoài lõi). Chạy "
+                         f"make demo-{screen} trong thư mục mã nguồn; chưa gỡ hay đổi gì")
+
+
 def app_query() -> str:
     """Đúng câu GraphQL trang Bảng tin gửi (apps/bang-tin/public/tin.js)."""
     js = (ROOT / "apps" / "bang-tin" / "public" / "tin.js").read_text(encoding="utf-8")
@@ -4001,6 +4011,7 @@ def cai_ung_dung() -> None:
     from demo_ca_nhan import OWNER, Browser, as_session, claims_of, exchange
 
     print("Cắm ứng dụng thứ ba bằng một lệnh — Bảng tin đơn vị (apps/bang-tin): không sửa tệp nào của lõi")
+    need_sources("cai-ung-dung", APP_MANIFEST, "apps/bang-tin/public/tin.js", "apps/office/app/utils/apps.ts")
     listed = json.loads(moc_app("list", "--json"))["apps"]
     if any(a["name"] == APP_NAME and (a["installed"] or a["removing"]) for a in listed):
         moc_app("remove", APP_NAME)
@@ -4317,6 +4328,7 @@ def quy_trinh() -> None:
 
     print("Quy trình của ứng dụng chạy trên lõi — Đơn nghỉ phép (apps/nghi-phep): ứng dụng mang BPMN và form, lõi "
           "triển khai, kiểm form, giao việc theo phòng; không sửa tệp nào của lõi")
+    need_sources("quy-trinh", QT_MANIFEST, f"apps/{QT_NAME}/forms")
     listed = json.loads(moc_app("list", "--json"))["apps"]
     if any(a["name"] == QT_NAME and (a["installed"] or a["removing"]) for a in listed):
         moc_app("remove", QT_NAME)
