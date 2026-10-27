@@ -277,6 +277,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   test đơn vị.
 
 ### Đã sửa đổi
+- Kiểm bản online ngay sau khi phát hành (#344, giai đoạn 0 của triển khai liên tục): `ban-online.yml` chạy thêm khi
+  workflow Release xong và xanh, nên bản online chưa nâng lên thẻ mới thì đỏ ngay, không đợi tới 07:17 hôm sau. Dùng
+  `workflow_run` vì Release tạo bản phát hành bằng `GITHUB_TOKEN`, sự kiện `release` khi đó không gọi workflow khác.
+  Nâng xong thì chạy tay job để xác nhận; `docs/trien-khai.md` ghi cách làm.
 - Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của
   `svc-files` không còn import gói `docread/` của Văn phòng: `kill_group`, `killed` và ba mô-đun `ocr.py`, `layout.py`,
   `pdflayout.py` ra gói gốc, `fold`, `INVISIBLE_RE` sang `vntext.py`. Câu GraphQL chỉ Văn phòng dùng sang
