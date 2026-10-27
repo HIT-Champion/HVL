@@ -190,11 +190,11 @@ mục "Checklist trước giờ trình diễn".
 ## 9. Tốn bao nhiêu, máy tối thiểu thế nào?
 
 Không có tiền giấy phép: mọi thành phần là phần mềm nguồn mở, GitHub và Cloudflare gói Free đủ dùng; chi phí là máy và
-điện. Hệ thống mặc định (16 container) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình — số đo từ trước khi thêm
-`app-ca-nhan`, một nginx phục vụ trang tĩnh; máy chủ đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng chưa đo thật trên máy
-8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng `MOC_AI_MEM_LIMIT`,
-`MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một laptop của đội (i5-12500H) qua Cloudflare
-Tunnel, không cần IP công khai.
+điện. Hệ thống mặc định (18 dịch vụ, 17 chạy liên tục) dùng khoảng 3,2–3,5 GB RAM khi chạy, chưa bật mô hình — số đo từ
+trước khi thêm `app-ca-nhan`, `app-tai-lieu-api`, hai trang tĩnh nhỏ; máy chủ đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa, nhưng
+chưa đo thật trên máy 8 GB. Bật mô hình AI cần máy 16 GB (Ollama giới hạn mặc định 6 GB RAM, 4 lõi; đặt lại bằng
+`MOC_AI_MEM_LIMIT`, `MOC_AI_CPUS`). Bản online <https://signet.htechcs.com> chạy trên một laptop của đội (i5-12500H) qua
+Cloudflare Tunnel, không cần IP công khai.
 
 **Bằng chứng:** README mục "Yêu cầu hệ thống"; [`docs/trien-khai.md`](../trien-khai.md) §1, §5b, §8;
 `docker-compose.yml` (dịch vụ `ollama`); `docs/architecture.md` §1.3.

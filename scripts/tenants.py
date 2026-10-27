@@ -467,6 +467,15 @@ class Keycloak:
         """PUT realm. Gửi nguyên bản vừa đọc đã sửa, như enable_organizations."""
         self._req("PUT", "", rep)
 
+    # user profile: realm_clients.py thêm thuộc tính của tệp realm còn thiếu (vd phone_number, #365)
+    def user_profile(self) -> dict[str, Any]:
+        return self._req("GET", "/users/profile")[0]
+
+    def update_user_profile(self, rep: dict[str, Any]) -> None:
+        """PUT cấu hình user profile. Gửi nguyên bản vừa đọc đã thêm thuộc tính: thiếu thuộc tính nào là Keycloak xóa
+        thuộc tính đó."""
+        self._req("PUT", "/users/profile", rep)
+
     def login_themes(self) -> set[str]:
         """Tên các theme đăng nhập máy chủ Keycloak đang có: dựng sẵn trong image và thư mục /opt/keycloak/themes."""
         info, _ = self._req("GET", "/serverinfo", server=True)

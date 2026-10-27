@@ -20,7 +20,8 @@
 import { useI18n } from 'vue-i18n'
 import type { AppNotification } from '~/composables/useNotifications'
 
-// Chuông thông báo trên thanh trên: số chưa đọc, 20 tin mới nhất, chấm xanh khi đang nhận tin trực tiếp
+// Chuông thông báo trên thanh trên: số chưa đọc, 20 tin mới nhất, chấm xanh khi đang nhận tin trực tiếp; cuối khung
+// là kênh SMS, Zalo người dùng tự bật (NotificationChannels, chỉ hiện khi bản cài có cấu hình kênh)
 const { t } = useI18n()
 const { items, unread, markRead, markAllRead } = useNotifications()
 const { state } = useRealtime()
@@ -102,6 +103,7 @@ async function readAll() {
         </li>
       </ul>
       <p v-else class="px-4 py-10 text-center text-sm text-stone-500">{{ t('notify.empty') }}</p>
+      <NotificationChannels />
     </div>
     </Transition>
   </div>

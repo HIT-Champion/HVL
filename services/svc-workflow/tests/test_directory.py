@@ -20,15 +20,19 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 
 from conftest import DEPT_DT, TENANT
-from svc_workflow.directory import Directory, to_row
+from svc_workflow.directory import Directory, phone, to_row
 
 
-def kc_user(uid: str, role: str = "staff", tenant: str = str(TENANT), **extra) -> dict:
+def kc_user(uid: str, role: str = "staff", tenant: str = str(TENANT), *, phone_number: str | None = None,
+            **extra) -> dict:
+    attrs = {"tenant_id": [tenant], "moc_role": [role], "department_id": [str(DEPT_DT)]}
+    if phone_number is not None:
+        attrs["phone_number"] = [phone_number]
     return {"id": uid, "username": uid, "firstName": "Nguyễn Văn", "lastName": "An", "email": f"{uid}@x.vn",
-            "enabled": True, "attributes": {"tenant_id": [tenant], "moc_role": [role], "department_id": [str(DEPT_DT)]},
-            **extra}
+            "enabled": True, "attributes": attrs, **extra}
 
 
 def test_mapping_puts_vietnamese_name_in_order():
@@ -81,3 +85,22 @@ def test_nothing_written_when_in_sync():
     d, hasura = directory_with([kc_user("u1")], [row])
     assert asyncio.run(d.sync_once()) == 0 and hasura.upserts == []
 
+
+
+# số điện thoại giả lập
+@pytest.mark.parametrize(("given", "stored"), [
+    ("0912 345 678", "+84912345678"), ("+84 912.345.678", "+84912345678"), ("(0912) 345-678", "+84912345678"),
+    ("0084912345678", "+84912345678"), ("+12025550123", "+12025550123"), ("", None), (None, None),
+    ("12345", None), ("+0912345678", None), ("09123abc45", None), ("0912345678901234567", None),
+])
+def test_phone_numbers_become_e164_or_nothing(given, stored):
+    assert phone(given) == stored
+
+
+def test_phone_is_synced_and_a_change_is_written():
+    _, row = to_row(kc_user("u1", phone_number="0912345678"))
+    assert row["phone"] == "+84912345678"
+    d, hasura = directory_with([kc_user("u1", phone_number="0987654321")], [row])
+    assert asyncio.run(d.sync_once()) == 1
+    assert hasura.upserts[0][0]["phone"] == "+84987654321"
+    assert to_row(kc_user("u2"))[1]["phone"] is None

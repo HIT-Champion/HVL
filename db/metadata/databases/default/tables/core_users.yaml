@@ -15,14 +15,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Danh bạ người dùng, đồng bộ từ Keycloak (svc-workflow, vai trò service). Người trong thuê ước đọc được
-# để chọn người được giao việc và hiện tên trên dòng thời gian; không ai sửa qua GraphQL.
+# để chọn người được giao việc và hiện tên trên dòng thời gian; không ai sửa qua GraphQL. Số điện thoại (phone, kênh
+# SMS của thông báo, #365) chỉ dịch vụ đọc.
 table:
   name: users
   schema: core
 insert_permissions:
   - role: service
     permission:
-      columns: [id, department_id, username, full_name, email, role, enabled]
+      columns: [id, department_id, username, full_name, email, phone, role, enabled]
       set:
         tenant_id: X-Hasura-Tenant-Id
       check: {}
@@ -40,10 +41,12 @@ select_permissions:
   - role: tenant_admin
     permission: *tenant_select
   - role: service
-    permission: *tenant_select
+    permission:
+      columns: [id, department_id, username, full_name, email, phone, role, enabled]
+      filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
 update_permissions:
   - role: service
     permission:
-      columns: [department_id, username, full_name, email, role, enabled]
+      columns: [department_id, username, full_name, email, phone, role, enabled]
       filter: {tenant_id: {_eq: X-Hasura-Tenant-Id}}
       check: {tenant_id: {_eq: X-Hasura-Tenant-Id}}

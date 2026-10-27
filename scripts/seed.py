@@ -141,6 +141,7 @@ def main() -> None:
     seed_tenants()
     try:
         print("  " + realm_clients.describe(realm_clients.run(ENV)))
+        print("  " + realm_clients.describe_profile(realm_clients.run_profile(ENV)))
         seed_users()
         seed_organizations()
     except HTTPError as exc:

@@ -10,11 +10,13 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ### Đã thêm
 - Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
+- Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
 
 ### Đã sửa đổi
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại (#374).
 
 ### Đã sửa lỗi
+- Tài liệu lệch mã: số dịch vụ, số test, màn demo không chạy trên bản online, ROADMAP sau `v1.2.1` (#379).
 - Bản cài có `scripts/demo_tat_van_phong.py`; màn cắm ứng dụng trong bản cài dừng trước khi gỡ ứng dụng (#376).
 - Tệp OpenLineage tải từ trang Phả hệ số liệu ghi `producer` là repo Signet, không còn tên repo cũ (#376).
 

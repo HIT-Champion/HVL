@@ -1,10 +1,11 @@
 # app-ca-nhan — Không gian cá nhân P.A.R.A
 
 Ứng dụng thứ hai trên lõi Signet: mỗi người một chỗ cất tệp của riêng mình trong bốn thư mục Dự án, Lĩnh vực, Tài
-nguyên, Lưu trữ; tải lên, chuyển thư mục, tải về. Thêm vào mà không sửa mã của lõi — các bước và bằng chứng ở
-[`docs/them-ung-dung.md`](../../docs/them-ung-dung.md). Trang tĩnh JavaScript thuần (không bước biên dịch), nginx
-phục vụ ở `/ca-nhan/` sau APISIX; mọi dữ liệu lấy qua cổng cùng tên miền — `/realms/moc` (Keycloak, client
-`app-ca-nhan`), `/v1/graphql` (Hasura, bảng `personal.items`), `/api/files` (svc-files: ClamAV, kho tệp).
+nguyên, Lưu trữ; tải lên, chuyển thư mục, tải về. Thêm vào mà không sửa mã dịch vụ lõi, chỉ thêm tay cấu hình (realm,
+route, compose, migration, metadata) — các bước và bằng chứng ở [`docs/them-ung-dung.md`](../../docs/them-ung-dung.md).
+Trang tĩnh JavaScript thuần (không bước biên dịch), nginx phục vụ ở `/ca-nhan/` sau APISIX; mọi dữ liệu lấy qua cổng
+cùng tên miền — `/realms/moc` (Keycloak, client `app-ca-nhan`), `/v1/graphql` (Hasura, bảng `personal.items`),
+`/api/files` (svc-files: ClamAV, kho tệp).
 
 | Tệp | Nội dung |
 |---|---|

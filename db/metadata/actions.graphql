@@ -47,6 +47,16 @@ type Query {
   otSensorMap: OtSensorMap!
 }
 
+type Query {
+  "Kênh SMS, Zalo bản cài đã cấu hình cho thông báo, kèm trạng thái của người gọi; rỗng khi chưa cấu hình kênh nào"
+  myChannels: [MyChannel!]!
+}
+
+type Mutation {
+  "Người gọi bật, tắt kênh SMS hoặc Zalo cho thông báo của mình. Bật Zalo khi chưa liên kết: nhận mã để nhắn cho bot"
+  setMyChannel(channel: String!, enabled: Boolean!): [MyChannel!]!
+}
+
 type ReceiveIncomingOutput {
   document_id: uuid!
 }
@@ -96,4 +106,19 @@ type OtSensor {
   value: Float
   observed_at: timestamptz
   flags: [String!]!
+}
+
+"Một kênh thông báo người dùng tự bật (#365)"
+type MyChannel {
+  "sms hoặc zalo"
+  channel: String!
+  "Người gọi đã bật; Zalo bật nghĩa là đã liên kết"
+  enabled: Boolean!
+  "SMS: số trong danh bạ đã che, còn mã nước và ba số cuối; null khi danh bạ chưa có số (quản trị thêm)"
+  phone: String
+  "Zalo chưa liên kết: mã dùng một lần để nhắn cho bot"
+  link_code: String
+  link_expires_at: timestamptz
+  "Zalo: địa chỉ mở bot của đơn vị (MOC_ZALO_BOT_URL), nếu có"
+  bot_url: String
 }

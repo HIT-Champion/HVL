@@ -164,10 +164,10 @@ class HasuraClient:
 # --- danh bạ (directory.py) -----------------------------------------------------------------------------
 
 TENANT_USERS = """
-query TenantUsers { core_users { id department_id username full_name email role enabled } }"""
+query TenantUsers { core_users { id department_id username full_name email phone role enabled } }"""
 
 UPSERT_USERS = """
 mutation UpsertUsers($rows: [core_users_insert_input!]!) {
   insert_core_users(objects: $rows, on_conflict: {constraint: users_pkey,
-    update_columns: [department_id, username, full_name, email, role, enabled]}) { affected_rows }
+    update_columns: [department_id, username, full_name, email, phone, role, enabled]}) { affected_rows }
 }"""
