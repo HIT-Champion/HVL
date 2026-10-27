@@ -342,6 +342,8 @@ services:
       # tùy chọn (thông báo đa kênh của svc-workflow): rỗng thì không nạp
       MOC_SMTP_PASSWORD: ${MOC_SMTP_PASSWORD:-}
       MOC_NOTIFY_WEBHOOK_URL: ${MOC_NOTIFY_WEBHOOK_URL:-}
+      MOC_SMS_GATEWAY_PASSWORD: ${MOC_SMS_GATEWAY_PASSWORD:-}
+      MOC_ZALO_BOT_TOKEN: ${MOC_ZALO_BOT_TOKEN:-}
     volumes:
       - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
@@ -462,9 +464,10 @@ services:
       MOC_HOLIDAYS: ${MOC_HOLIDAYS:-01-01,04-30,05-01,09-02}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
-      # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP) và webhook (Mattermost, Slack, ntfy) qua hộp thư đi
-      # core.notification_deliveries. MOC_SMTP_HOST và MOC_NOTIFY_WEBHOOK_URL đều rỗng (mặc định) thì tắt hẳn. Mật
-      # khẩu SMTP và URL webhook lấy từ két; liên kết trong thư: <MOC_PUBLIC_URL>/van-ban/<id>
+      # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP), webhook (Mattermost, Slack, ntfy), SMS, Zalo qua
+      # hộp thư đi core.notification_deliveries. MOC_SMTP_HOST, MOC_NOTIFY_WEBHOOK_URL, MOC_SMS_GATEWAY_URL,
+      # MOC_ZALO_BOT_TOKEN đều rỗng (mặc định) thì tắt hẳn. Mật khẩu SMTP, URL webhook, mật khẩu cổng SMS, token bot
+      # Zalo lấy từ két; liên kết trong thư: <MOC_PUBLIC_URL>/van-ban/<id>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
       MOC_SMTP_HOST: ${MOC_SMTP_HOST:-}
       MOC_SMTP_PORT: ${MOC_SMTP_PORT:-}
@@ -474,6 +477,11 @@ services:
       MOC_NOTIFY_WEBHOOK_FORMAT: ${MOC_NOTIFY_WEBHOOK_FORMAT:-json}
       MOC_NOTIFY_EMAIL_KINDS: ${MOC_NOTIFY_EMAIL_KINDS:-}
       MOC_NOTIFY_WEBHOOK_KINDS: ${MOC_NOTIFY_WEBHOOK_KINDS:-}
+      MOC_SMS_GATEWAY_URL: ${MOC_SMS_GATEWAY_URL:-}
+      MOC_SMS_GATEWAY_USER: ${MOC_SMS_GATEWAY_USER:-}
+      MOC_ZALO_BOT_URL: ${MOC_ZALO_BOT_URL:-}
+      MOC_NOTIFY_SMS_KINDS: ${MOC_NOTIFY_SMS_KINDS:-}
+      MOC_NOTIFY_ZALO_KINDS: ${MOC_NOTIFY_ZALO_KINDS:-}
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
       - ./services/svc-workflow/processes:/app/processes:ro
