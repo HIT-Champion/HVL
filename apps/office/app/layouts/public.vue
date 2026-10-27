@@ -35,9 +35,10 @@ function toggleLocale() {
 
 <template>
   <div class="moc-public flex min-h-screen flex-col">
-    <header class="border-b border-stone-200">
-      <div class="mx-auto flex h-16 w-full items-center gap-3 px-4" :class="width">
-        <div class="flex-1">
+    <!-- thanh trên như khung chính: nền trắng, kẻ --edge; tên trang công khai đứng cạnh tên sản phẩm -->
+    <header class="border-b border-stone-200 bg-white">
+      <div class="mx-auto flex min-h-16 w-full items-center gap-4 px-4 py-2 sm:px-6" :class="width">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-0.5">
           <div class="moc-public-wordmark text-brand-800">
             <svg
               class="sg-brand-mark" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="9"
@@ -48,21 +49,28 @@ function toggleLocale() {
             </svg>
             <span>{{ t('app.name') }}</span>
           </div>
-          <div class="text-xs text-stone-500">{{ subtitle }}</div>
+          <div class="min-w-0 text-[13px] text-stone-600 sm:border-l sm:border-stone-200 sm:pl-4 sm:text-sm">
+            {{ subtitle }}
+          </div>
         </div>
-        <button class="btn-ghost text-xs" @click="toggleLocale">{{ t('nav.language') }}</button>
+        <button class="btn-ghost text-[13px]" @click="toggleLocale">{{ t('nav.language') }}</button>
       </div>
     </header>
-    <main class="mx-auto w-full flex-1 px-4 py-8" :class="width">
+    <main class="mx-auto w-full flex-1 px-4 py-8 sm:px-6 sm:py-10" :class="width">
       <slot />
     </main>
-    <footer class="space-y-1 py-6 text-center text-xs text-stone-500">
-      <div>{{ t('verify.footer') }}</div>
-      <nav class="flex justify-center gap-3">
-        <NuxtLink to="/xac-thuc" class="hover:text-brand-700 hover:underline">{{ t('verify.title') }}</NuxtLink>
-        <span aria-hidden="true">·</span>
-        <NuxtLink to="/trang-thai" class="hover:text-brand-700 hover:underline">{{ t('health.title') }}</NuxtLink>
-      </nav>
+    <footer class="border-t border-stone-100">
+      <div
+        class="mx-auto flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-5 text-[13px]
+          text-stone-500 sm:px-6"
+        :class="width"
+      >
+        <p>{{ t('verify.footer') }}</p>
+        <nav class="flex flex-wrap items-center gap-x-5">
+          <NuxtLink to="/xac-thuc" class="moc-public-link">{{ t('verify.title') }}</NuxtLink>
+          <NuxtLink to="/trang-thai" class="moc-public-link">{{ t('health.title') }}</NuxtLink>
+        </nav>
+      </div>
     </footer>
   </div>
 </template>

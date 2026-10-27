@@ -6,23 +6,38 @@ Các việc dưới đây giống nhau ở mọi vai trò nghiệp vụ: văn th
 
 ## Hộp việc
 
-Hộp việc là trang đầu sau khi đăng nhập. Mỗi dòng là một việc đang chờ bạn, có số ký hiệu, trích yếu, độ khẩn và hạn.
+Hộp việc là trang đầu sau khi đăng nhập. Câu dưới tiêu đề cho biết bạn có bao nhiêu việc đang chờ và việc có hạn gần
+nhất còn mấy ngày.
 
-1. Việc khẩn hoặc quá hạn nằm ở nhóm **Cần chú ý** trên cùng. Các việc khác nằm ở nhóm **Các công việc còn lại**.
-2. Muốn thu hẹp danh sách thì gõ vào ô **Tìm trong hộp việc…**, chọn văn bản đến hay đi ở ô chọn thứ nhất (mặc định
-   **Tất cả văn bản**), hoặc chọn **Hôm nay**, **Quá hạn**, **Văn bản khẩn** ở ô chọn thứ hai. Nút hình hai mũi tên
-   vòng bên cạnh dùng để tải lại danh sách. Nếu không việc nào khớp bộ lọc, trang hiện nút **Xóa bộ lọc**.
-3. Bấm vào một việc để mở văn bản. Khung việc cần làm nằm ngay trên trang văn bản. Cách làm từng loại việc có ở trang
-   của vai trò.
-4. Làm xong, màn hình báo "Đã chuyển bước tiếp theo." và việc rời khỏi hộp việc.
+![Hộp việc của lãnh đạo phòng: lịch hạn hai tuần, các việc xếp theo ngày hạn](../anh/huong-dan/hop-viec.png)
 
-Trang văn bản còn có **Tệp đính kèm** (bấm **Tải về**), **Dòng thời gian** và tab **Lịch sử** lấy từ sổ kiểm toán: ai
-đổi gì, lúc nào.
+1. **Lịch hạn** là dải hai tuần, từ thứ Hai tuần này tới Chủ nhật tuần sau. Ngày nào có việc đến hạn thì có chấm dưới
+   số ngày, chấm đỏ là việc khẩn. Hai đầu dải là ô **Quá hạn** và ô **Sau đó** (hạn sau hai tuần), thêm ô **Chưa có
+   hạn** nếu có việc chưa đặt hạn; mỗi ô này ghi số việc.
+2. Bấm một ô để chỉ xem việc của ô đó. Bấm lại ô đó, hoặc bấm **Xem tất cả … việc**, để xem lại cả danh sách. Nút
+   **Thu gọn lịch** ẩn dải ngày, **Mở lịch** hiện lại, trình duyệt nhớ lựa chọn này. Trên điện thoại, lần đầu mở thì
+   lịch thu gọn sẵn.
+3. Dưới lịch, các việc xếp theo ngày hạn, gần nhất trước. Mỗi nhóm ghi ngày và "còn … ngày", "hết hạn hôm nay" hoặc
+   "quá hạn … ngày". Trong cùng một ngày, việc khẩn hơn đứng trước. Việc chưa có hạn nằm ở nhóm **Chưa có hạn** cuối
+   trang. Mỗi dòng có trích yếu, độ khẩn, số ký hiệu (dự thảo thì chưa có), nơi gửi, ngày việc đến và tên việc.
+4. Muốn thu hẹp danh sách thì gõ vào ô **Tìm trong hộp việc…** (gõ không dấu cũng được), chọn văn bản đến hay đi ở ô
+   chọn thứ nhất (mặc định **Tất cả văn bản**), hoặc chọn **Hôm nay**, **Quá hạn**, **Văn bản khẩn** ở ô chọn thứ hai.
+   Trên điện thoại, hai ô chọn gập sau nút **Lọc**. Nút hình hai mũi tên vòng bên cạnh dùng để tải lại danh sách. Nếu
+   không việc nào khớp, trang hiện nút **Xóa bộ lọc**.
+5. Bấm vào một việc để mở văn bản. Khung **Việc của bạn** nằm đầu trang văn bản, ghi tên việc phải làm. Cách làm từng
+   loại việc có ở trang của vai trò.
+6. Làm xong, màn hình báo "Đã chuyển bước tiếp theo." và việc rời khỏi hộp việc.
+
+Trang văn bản còn có khung **Thông tin văn bản**, **Tệp đính kèm** (bấm **Tải về**), **Dòng thời gian** và tab
+**Lịch sử** lấy từ sổ kiểm toán: ai đổi gì, lúc nào. Văn bản còn đang xử lý mà hạn cách ngày vào sổ không quá 13 ngày
+thì dưới tên văn bản có một dải ngày, từ ngày vào sổ tới hạn.
 
 ## Thông báo
 
 Chuông trên thanh trên cùng báo việc mới, việc hoặc văn bản quá hạn, văn bản vừa phát hành, văn bản liên thông từ
 đơn vị khác. Bấm vào một thông báo để mở văn bản. Bấm **Đánh dấu đã đọc hết** để xóa số đếm trên chuông.
+
+![Danh sách thông báo mở từ chuông trên thanh trên cùng](../anh/huong-dan/thong-bao.png)
 
 ## Tìm kiếm
 
@@ -39,6 +54,8 @@ Chuông trên thanh trên cùng báo việc mới, việc hoặc văn bản quá
 3. Câu trả lời gồm **Câu trích nguyên văn** lấy từ văn bản. Nếu đơn vị bật mô hình ngôn ngữ thì có thêm **Trả lời của
    trợ lý**. Mỗi ý đều ghi văn bản nguồn: bấm **Mở văn bản** để đối chiếu trước khi dùng.
 
+![Hỏi đáp: câu trích nguyên văn và hai văn bản nguồn](../anh/huong-dan/hoi-dap.png)
+
 Trợ lý chỉ tìm trong các văn bản bạn được xem, không bao giờ dùng văn bản hạn chế. Câu hỏi chỉ giữ trên trang, tải lại
 trang là mất. Cách trợ lý tìm và trả lời: [`demo-script.md`](../demo-script.md), mục "hỏi đáp trên kho văn bản".
 
@@ -53,6 +70,8 @@ trang là mất. Cách trợ lý tìm và trả lời: [`demo-script.md`](../dem
    nén nhiều lớp sẽ bị chặn.
 4. Muốn chuyển tệp sang thư mục khác thì chọn ở ô **Chuyển sang…** trên dòng của tệp. Bấm **Tải về** để lấy tệp.
 5. Bấm **Văn phòng điện tử** để quay lại.
+
+![Không gian cá nhân, thư mục Lưu trữ có một tệp](../anh/huong-dan/khong-gian-ca-nhan.png)
 
 ## Bảng tin đơn vị
 
@@ -91,6 +110,7 @@ dùng chung lựa chọn này: nút ở đó ghi **English** / **Tiếng Việt*
 ## Xác thực một văn bản đã phát hành
 
 Không cần đăng nhập. Mở trang `/xac-thuc` của Signet (bản online:
-[signet.htechcs.com/xac-thuc](https://signet.htechcs.com/xac-thuc)). Nhập mã xác thực in cạnh mã QR trên văn bản, hoặc
+[signet.htechcs.com/xac-thuc](https://signet.htechcs.com/xac-thuc)); đã đăng nhập thì bấm **Xác thực văn bản** ở cuối
+thanh bên. Nhập mã xác thực in cạnh mã QR trên văn bản, hoặc
 thả tệp PDF đã phát hành vào trang. Nếu tệp đã bị sửa, trang báo không khớp. Gửi trang này cho người nhận văn bản ở
 ngoài đơn vị.

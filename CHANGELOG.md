@@ -8,6 +8,16 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+## [1.2.1] - 2026-10-28
+
+Bản vá đúng bản đang chạy online: giao diện Lịch hạn (hộp việc xếp theo ngày hạn) cho Văn phòng điện tử, trang đăng
+nhập, P.A.R.A, Bảng tin, và hướng dẫn sử dụng theo vai trò có ảnh chụp các màn chính. Không thêm tính năng, không đổi
+API hay biến cấu hình; nâng tại chỗ từ `v1.2.0`.
+
+### Đã sửa đổi
+- Giao diện "Lịch hạn" cho Văn phòng điện tử, trang đăng nhập, P.A.R.A, Bảng tin: hộp việc xếp theo ngày hạn (#291).
+- Hướng dẫn sử dụng theo vai trò khớp giao diện Lịch hạn, có ảnh chụp các màn chính (#308).
+
 ## [1.2.0] - 2026-10-27
 
 Bản cho vòng trường 01/11. Quy trình thành dịch vụ của lõi: ứng dụng khai BPMN và form JSON Schema trong manifest, có

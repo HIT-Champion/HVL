@@ -29,6 +29,8 @@ dụng, Góp ý. Phần dùng chung: [Việc chung](viec-chung.md).
 6. Chọn người ký ở ô **Lãnh đạo đơn vị ký**, rồi bấm **Trình ký**. Dự thảo đi qua lãnh đạo phòng duyệt trước, sau đó
    tới người ký.
 
+![Trang soạn văn bản đi trước khi lưu dự thảo](../anh/huong-dan/soan-van-ban-di.png)
+
 Theo dõi dự thảo ở mục **Văn bản đi**, qua các tab Dự thảo, Đang trình, Đã phát hành, Tất cả.
 
 ## Sửa dự thảo bị trả lại
@@ -49,6 +51,8 @@ phòng mình.
    văn bản đã thuộc hồ sơ khác. Muốn bỏ một văn bản thì bấm **Bỏ khỏi hồ sơ**.
 3. Khi công việc kết thúc, bấm **Đóng hồ sơ**. Hồ sơ phải có ít nhất một văn bản. Sau khi đóng, hồ sơ không thêm hay
    bỏ văn bản được nữa.
+
+![Hồ sơ đang lập: thông tin hồ sơ, văn bản trong hồ sơ và ô tìm văn bản để thêm](../anh/huong-dan/ho-so.png)
 
 Lãnh đạo phòng là người nộp lưu hồ sơ đã đóng ([Lãnh đạo phòng](lanh-dao-phong.md#nộp-lưu-hồ-sơ)). Hồ sơ đã nộp lưu
 chỉ mở được ở chế độ xem, gọi là **Phòng đọc**. Mỗi trang PDF trong Phòng đọc có dấu tên bạn và giờ xem, và mỗi lần

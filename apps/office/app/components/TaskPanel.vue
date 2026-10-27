@@ -163,11 +163,12 @@ function submitDone() {
 </script>
 
 <template>
-  <section
-    class="card overflow-hidden border-brand-200 ring-2 ring-brand-100" :aria-busy="busy" data-testid="task-panel"
-  >
-    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 bg-brand-50 px-5 py-3">
-      <h2 class="text-sm font-semibold text-brand-900">{{ t(`task.${formKey}`) }}</h2>
+  <section class="sg-work" :aria-busy="busy" data-testid="task-panel">
+    <div class="sg-work-head">
+      <div>
+        <p class="sg-work-kicker">{{ t('doc.yourTask') }}</p>
+        <h2>{{ t(`task.${formKey}`) }}</h2>
+      </div>
       <span v-if="busy" class="text-sm text-stone-600" role="status">{{ t('form.processing') }}</span>
     </div>
 

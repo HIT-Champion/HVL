@@ -26,7 +26,7 @@ const tone: Record<string, string> = {
   cancelled: 'bg-stone-200 text-stone-600',
   draft: 'bg-stone-100 text-stone-700',
   in_review: 'bg-stone-100 text-stone-700',
-  returned: 'bg-rose-100 text-rose-800',
+  returned: 'bg-red-100 text-red-800',
   approved: 'bg-brand-100 text-brand-800',
   issued: 'bg-brand-100 text-brand-900',
 }

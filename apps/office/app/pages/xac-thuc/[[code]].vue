@@ -163,102 +163,161 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-stone-900">{{ t('verify.title') }}</h1>
-      <p class="mt-1 text-sm text-stone-500">{{ t('verify.subtitle') }}</p>
-    </div>
+  <div>
+    <PageHeader :title="t('verify.title')" :subtitle="t('verify.subtitle')" />
 
-    <form class="card flex flex-wrap items-end gap-3 p-5" @submit.prevent="submitCode">
-      <div class="min-w-48 flex-1">
-        <label class="label" for="verify-code">{{ t('verify.code') }}</label>
-        <input id="verify-code" v-model="code" class="input font-mono tracking-wider uppercase" maxlength="40" autocomplete="off"
-               :placeholder="t('verify.codeHint')">
-      </div>
-      <button type="submit" class="btn-primary" :disabled="checking || !code.trim()">{{ t('verify.lookup') }}</button>
-    </form>
-
-    <p v-if="checking" class="text-sm text-stone-500">{{ t('verify.checking') }}</p>
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-
-    <!-- kết quả -->
-    <section v-if="result === 'valid' && found" class="card overflow-hidden" data-testid="verify-valid">
-      <div class="flex items-center gap-3 border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-emerald-900">
-        <svg class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        <span class="font-semibold">{{ t('verify.valid') }}</span>
-      </div>
-      <dl class="grid gap-x-6 gap-y-3 p-5 text-sm sm:grid-cols-2">
-        <div><dt class="text-stone-500">{{ t('verify.symbol') }}</dt><dd class="font-medium">{{ found.symbol }}</dd></div>
-        <div><dt class="text-stone-500">{{ t('verify.issuedOn') }}</dt><dd class="font-medium">{{ fmtDate(found.issued_on) }}</dd></div>
-        <div><dt class="text-stone-500">{{ t('verify.type') }}</dt><dd class="font-medium">{{ found.type_name }}</dd></div>
-        <div>
-          <dt class="text-stone-500">{{ t('verify.issuer') }}</dt>
-          <dd class="font-medium">{{ found.issuer_name }}<span v-if="found.parent_name" class="block text-xs font-normal text-stone-500">{{ found.parent_name }}</span></dd>
+    <div class="moc-stack">
+      <form class="moc-block flex flex-wrap items-end gap-3" @submit.prevent="submitCode">
+        <div class="min-w-48 flex-1">
+          <label class="label" for="verify-code">{{ t('verify.code') }}</label>
+          <input
+            id="verify-code" v-model="code" class="input font-mono tracking-wider uppercase" maxlength="40"
+            autocomplete="off" :placeholder="t('verify.codeHint')"
+          >
         </div>
-        <div class="sm:col-span-2">
-          <dt class="text-stone-500">{{ t('verify.summary') }}</dt>
-          <dd :class="found.summary ? 'font-medium' : 'text-stone-400'">{{ found.summary ?? t('verify.summaryHidden') }}</dd>
+        <button type="submit" class="btn-primary" :disabled="checking || !code.trim()">{{ t('verify.lookup') }}</button>
+      </form>
+
+      <p v-if="checking" class="moc-loading">{{ t('verify.checking') }}</p>
+      <p v-if="failure" class="moc-state">{{ failure }}</p>
+
+      <!-- kết quả: một khối; chữ ký số, kết quả so tệp là các phần trong khối, ngăn bằng đường kẻ -->
+      <section v-if="result === 'valid' && found" class="moc-block overflow-hidden !p-0" data-testid="verify-valid">
+        <div class="flex items-center gap-3 border-b border-emerald-100 bg-emerald-50 px-6 py-3.5 text-emerald-900">
+          <svg
+            class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="font-semibold">{{ t('verify.valid') }}</span>
         </div>
-        <div><dt class="text-stone-500">{{ t('verify.code') }}</dt><dd class="font-mono font-semibold tracking-wider">{{ readableCode }}</dd></div>
-        <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('verify.sha256') }}</dt><dd class="font-mono text-xs break-all text-stone-700">{{ found.sha256 }}</dd></div>
-      </dl>
-      <!-- chữ ký số PAdES (F4.5, chỉ minh họa): luôn kèm câu nói rõ không có giá trị pháp lý -->
-      <div v-if="found.signature" class="mx-5 mb-5 rounded-md border border-stone-200 p-4" data-testid="verify-signature">
-        <h2 class="flex items-center gap-2 text-sm font-semibold text-stone-900">
-          <svg class="h-4 w-4 shrink-0 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 7.125L16.862 4.487" /></svg>
-          {{ t('verify.signature.title') }}
-        </h2>
-        <dl class="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          <div><dt class="text-stone-500">{{ t('verify.signature.level') }}</dt><dd class="font-medium">{{ found.signature.level }}</dd></div>
-          <div><dt class="text-stone-500">{{ t('verify.signature.signedAt') }}</dt><dd class="font-medium">{{ fmtDateTime(found.signature.signed_at) }}</dd></div>
-          <div><dt class="text-stone-500">{{ t('verify.signature.signer') }}</dt><dd class="font-medium">{{ found.signature.signer }}</dd></div>
-          <div><dt class="text-stone-500">{{ t('verify.signature.ca') }}</dt><dd class="font-medium">{{ found.signature.ca }}</dd></div>
-          <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('verify.signature.serial') }}</dt><dd class="font-mono text-xs break-all text-stone-700">{{ found.signature.serial }}</dd></div>
+        <dl class="moc-facts px-6 py-5">
+          <div><dt>{{ t('verify.symbol') }}</dt><dd>{{ found.symbol }}</dd></div>
+          <div><dt>{{ t('verify.issuedOn') }}</dt><dd class="tabular-nums">{{ fmtDate(found.issued_on) }}</dd></div>
+          <div><dt>{{ t('verify.type') }}</dt><dd>{{ found.type_name }}</dd></div>
+          <div>
+            <dt>{{ t('verify.issuer') }}</dt>
+            <dd>{{ found.issuer_name }}</dd>
+            <dd v-if="found.parent_name">{{ found.parent_name }}</dd>
+          </div>
+          <div class="is-wide">
+            <dt>{{ t('verify.summary') }}</dt>
+            <dd :class="found.summary ? '' : '!font-normal !text-stone-500'">
+              {{ found.summary ?? t('verify.summaryHidden') }}
+            </dd>
+          </div>
+          <div><dt>{{ t('verify.code') }}</dt><dd class="font-mono tracking-wider">{{ readableCode }}</dd></div>
+          <div class="is-wide">
+            <dt>{{ t('verify.sha256') }}</dt>
+            <dd class="font-mono text-[13px] break-all">{{ found.sha256 }}</dd>
+          </div>
         </dl>
-        <p class="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">{{ t('verify.signature.illustrative') }}</p>
-        <div class="mt-3 text-xs text-stone-600" data-testid="verify-ca">
-          <a :href="CA_URL" download="signet-ca.pem"
-             class="font-medium text-brand-700 underline underline-offset-2">{{ t('verify.signature.caDownload') }}</a>
-          <span v-if="caFingerprint" class="mt-1 block">{{ t('verify.signature.caFingerprint') }}:
-            <span class="font-mono break-all text-stone-700">{{ caFingerprint }}</span></span>
+        <!-- chữ ký số PAdES (F4.5, chỉ minh họa): luôn kèm câu nói rõ không có giá trị pháp lý -->
+        <div v-if="found.signature" class="border-t border-stone-100 px-6 py-5" data-testid="verify-signature">
+          <h2 class="moc-block-title flex items-center gap-2">
+            <svg
+              class="h-4 w-4 shrink-0 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              stroke-width="1.8" aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round" stroke-linejoin="round"
+                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6
+                  18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 7.125L16.862 4.487"
+              />
+            </svg>
+            {{ t('verify.signature.title') }}
+          </h2>
+          <dl class="moc-facts mt-3">
+            <div><dt>{{ t('verify.signature.level') }}</dt><dd>{{ found.signature.level }}</dd></div>
+            <div>
+              <dt>{{ t('verify.signature.signedAt') }}</dt>
+              <dd class="tabular-nums">{{ fmtDateTime(found.signature.signed_at) }}</dd>
+            </div>
+            <div><dt>{{ t('verify.signature.signer') }}</dt><dd>{{ found.signature.signer }}</dd></div>
+            <div><dt>{{ t('verify.signature.ca') }}</dt><dd>{{ found.signature.ca }}</dd></div>
+            <div class="is-wide">
+              <dt>{{ t('verify.signature.serial') }}</dt>
+              <dd class="font-mono text-[13px] break-all">{{ found.signature.serial }}</dd>
+            </div>
+          </dl>
+          <p class="moc-note mt-4 text-[13px]">{{ t('verify.signature.illustrative') }}</p>
+          <div class="mt-3 text-[13px] text-stone-600" data-testid="verify-ca">
+            <a :href="CA_URL" download="signet-ca.pem"
+               class="font-medium text-brand-700 underline underline-offset-2"
+            >{{ t('verify.signature.caDownload') }}</a>
+            <span v-if="caFingerprint" class="mt-1 block">{{ t('verify.signature.caFingerprint') }}:
+              <span class="font-mono break-all text-stone-700">{{ caFingerprint }}</span></span>
+          </div>
         </div>
-      </div>
-      <p v-else class="mx-5 mb-5 text-xs text-stone-500" data-testid="verify-unsigned">{{ t('verify.signature.none') }}</p>
-      <div v-if="match !== null" class="mx-5 mb-5 rounded-md px-4 py-3 text-sm font-medium" data-testid="verify-match"
-           :class="match ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'">
-        {{ match ? t('verify.match') : t('verify.mismatch') }}<span v-if="fileName" class="block text-xs font-normal opacity-90">{{ fileName }}</span>
-      </div>
-    </section>
+        <p v-else class="border-t border-stone-100 px-6 py-4 text-[13px] text-stone-500" data-testid="verify-unsigned">
+          {{ t('verify.signature.none') }}
+        </p>
+        <!-- so tệp: nền nhạt theo kết quả, không chữ nhỏ trên nền đậm -->
+        <div
+          v-if="match !== null" data-testid="verify-match"
+          class="mx-6 mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm font-semibold"
+          :class="match ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-800'"
+        >
+          <svg
+            class="mt-0.5 h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+          >
+            <path v-if="match" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path v-else d="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
+          </svg>
+          <span class="min-w-0">
+            {{ match ? t('verify.match') : t('verify.mismatch') }}
+            <span v-if="fileName" class="block text-[13px] font-normal wrap-anywhere">{{ fileName }}</span>
+          </span>
+        </div>
+      </section>
 
-    <section v-else-if="result === 'not_found'" class="card border-amber-200 bg-amber-50 p-5 text-amber-900" data-testid="verify-not-found">
-      <div class="font-semibold">{{ t('verify.notFound') }}</div>
-      <p class="mt-1 text-sm">{{ t('verify.notFoundHint') }}</p>
-      <p v-if="fileName" class="mt-1 text-xs opacity-80">{{ fileName }}</p>
-    </section>
+      <section
+        v-else-if="result === 'not_found'" data-testid="verify-not-found"
+        class="rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 text-amber-900"
+      >
+        <div class="font-semibold">{{ t('verify.notFound') }}</div>
+        <p class="mt-1 text-sm">{{ t('verify.notFoundHint') }}</p>
+        <p v-if="fileName" class="mt-1 text-[13px] wrap-anywhere">{{ fileName }}</p>
+      </section>
 
-    <!-- thả tệp: tra theo băm, hoặc so với văn bản vừa tra -->
-    <label
-      class="card flex cursor-pointer flex-col items-center gap-2 border-2 border-dashed p-8 text-center text-sm text-stone-600"
-      :class="dragging ? 'border-brand-600 bg-brand-50' : 'border-stone-300'"
-      @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
-    >
-      <input id="verify-file" type="file" accept="application/pdf,.pdf" class="sr-only"
-             @change="onFile(($event.target as HTMLInputElement).files?.[0])">
-      <svg class="h-8 w-8 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
-      <span class="font-medium text-stone-800">{{ found ? t('verify.compare') : t('verify.file') }}</span>
-      <span class="text-xs text-stone-500">{{ t('verify.fileHint') }}</span>
-    </label>
+      <!-- thả tệp: tra theo băm, hoặc so với văn bản vừa tra; ô chọn tệp ẩn nên viền sáng lên khi có tiêu điểm -->
+      <label
+        class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-6 py-10
+          text-center text-sm text-stone-600 focus-within:outline-2 focus-within:outline-offset-2
+          focus-within:outline-brand-700"
+        :class="dragging ? 'border-brand-600 bg-brand-50' : 'border-stone-300 bg-white hover:bg-stone-50'"
+        @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop"
+      >
+        <input
+          id="verify-file" type="file" accept="application/pdf,.pdf" class="sr-only"
+          @change="onFile(($event.target as HTMLInputElement).files?.[0])"
+        >
+        <svg
+          class="h-8 w-8 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round" stroke-linejoin="round"
+            d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+          />
+        </svg>
+        <span class="font-medium text-stone-800">{{ found ? t('verify.compare') : t('verify.file') }}</span>
+        <span class="max-w-prose text-[13px] text-stone-500">{{ t('verify.fileHint') }}</span>
+      </label>
 
-    <!-- mốc neo sổ kiểm toán: khóa công khai để người ngoài tự kiểm mốc đã công bố; két chưa có khóa thì ẩn -->
-    <section v-if="anchorKey" class="card p-5 text-sm text-stone-600" data-testid="verify-anchor-key">
-      <h2 class="font-semibold text-stone-900">{{ t('verify.anchors.title') }}</h2>
-      <p class="mt-1 text-xs">{{ t('verify.anchors.text') }}</p>
-      <a :href="ANCHOR_KEY_URL" download="signet-anchor-key.pem"
-         class="mt-2 inline-block text-xs font-medium text-brand-700 underline underline-offset-2">
-        {{ t('verify.anchors.download') }}
-      </a>
-      <p v-if="anchorKey.fingerprint" class="mt-1 text-xs">{{ t('verify.anchors.fingerprint') }}:
-        <span class="font-mono break-all text-stone-700">{{ anchorKey.fingerprint }}</span></p>
-    </section>
+      <!-- mốc neo sổ kiểm toán: khóa công khai để người ngoài tự kiểm mốc đã công bố; két chưa có khóa thì ẩn -->
+      <section v-if="anchorKey" class="moc-block text-[13px] text-stone-600" data-testid="verify-anchor-key">
+        <h2 class="moc-block-title">{{ t('verify.anchors.title') }}</h2>
+        <p class="mt-1">{{ t('verify.anchors.text') }}</p>
+        <a :href="ANCHOR_KEY_URL" download="signet-anchor-key.pem"
+           class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2">
+          {{ t('verify.anchors.download') }}
+        </a>
+        <p v-if="anchorKey.fingerprint" class="mt-1">{{ t('verify.anchors.fingerprint') }}:
+          <span class="font-mono break-all text-stone-700">{{ anchorKey.fingerprint }}</span></p>
+      </section>
+    </div>
   </div>
 </template>

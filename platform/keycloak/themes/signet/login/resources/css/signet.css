@@ -17,235 +17,433 @@
  */
 
 /*
- * Nhận diện "Liền mạch", phủ lên css/styles.css của keycloak.v2: chỉ đổi màu, phông, nền, khung thẻ, ô nhập, nút,
- * logo; template, biểu mẫu, bản dịch của theme cha giữ nguyên. Cùng chất liệu với Văn phòng điện tử
- * (apps/office/app/assets/css/main.css): nền xám lục nhạt, thẻ trắng bo 12px, ô nhập và nút bo 8px, nút olive, phông
- * Be Vietnam Pro tự phục vụ (@font-face ở resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm
- * @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp này theo theme.properties; #305). Chỉ chế độ sáng (darkMode=false
- * trong theme.properties). PatternFly 5 khai biến toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng.
- * Không @import, không tải gì ngoài máy chủ Keycloak.
+ * Giao diện "Lịch hạn" (#291), phủ lên css/styles.css của keycloak.v2: chỉ đổi màu, phông, bố cục, ô nhập, nút, logo;
+ * template, biểu mẫu, bản dịch của theme cha giữ nguyên. Cùng bảng màu với Văn phòng điện tử
+ * (apps/office/app/assets/css/main.css, apps/office/DESIGN.md): khối lục bảo sâu #0b5a47 là mảng tối duy nhất, như
+ * thanh bên của ứng dụng; trang trắng, chữ mực lục đậm; lục bảo #0b6b53 cho nút chính, liên kết, viền focus; đỏ chỉ cho
+ * lỗi. Ô nhập và nút bo 8px, thẻ bo 14px; phông Be Vietnam Pro tự phục vụ (@font-face ở
+ * resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp
+ * này theo theme.properties; #305). Chỉ chế độ sáng (darkMode=false trong theme.properties). PatternFly 5 khai biến
+ * toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng. Không @import, không tải gì ngoài máy chủ
+ * Keycloak.
  */
 
+/* Tỉ lệ tương phản WCAG 2.2 AA ghi cạnh màu: chữ ≥ 4,5:1, viền ô nhập và viền focus ≥ 3:1 trên đúng nền của nó */
 :root {
   color-scheme: light;
-  --signet-ground: #f4f5f1;
-  --signet-ink: #202820;
-  --signet-muted: #515b50;
-  --signet-edge: #d9ddd4;
-  --signet-field: #898a79;
-  --signet-focus: #666d4c;
-  --signet-olive: #555b3f;
-  --signet-olive-dark: #42492e;
+  --signet-field: #0b5a47;         /* khối lục bảo; chữ trắng 8,2:1 */
+  --signet-field-ink: #cfe7dc;     /* chữ phụ trên khối lục bảo 6,3:1 */
+  --signet-ink: #10201b;           /* 16,9:1 trên trắng */
+  --signet-label: #36463f;         /* 10:1 */
+  --signet-muted: #4d5f56;         /* 6,8:1 */
+  --signet-edge: #d6e1dc;          /* viền thẻ, đường kẻ: trang trí, không phải viền điều khiển */
+  --signet-paper: #f5f9f7;
+  --signet-active: #e6f2ec;
+  --signet-control: #7a8d84;       /* viền ô nhập 3,5:1 */
+  --signet-control-hover: #56685f;
+  --signet-emerald: #0b6b53;       /* nút chính (chữ trắng 6,5:1), liên kết, viền focus 6,5:1 */
+  --signet-emerald-dark: #095a46;  /* rê chuột 8,2:1 */
+  --signet-red: #9f2019;           /* viền, chữ lỗi 7,8:1 */
   --signet-ease: cubic-bezier(.16, 1, .3, 1);
   --signet-font: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
-  /* nút chính, liên kết, viền ô đang chọn: olive brand-700 (chữ trắng trên nền này 7,1:1), rê chuột brand-800.
-     PatternFly đặt lại primary-color--100, link--Color bằng bản --dark-* trong ô nhập nên đổi cả hai bộ */
-  --pf-v5-global--primary-color--100: #555b3f;
-  --pf-v5-global--primary-color--200: #42492e;
-  --pf-v5-global--primary-color--dark-100: #555b3f;
-  --pf-v5-global--active-color--100: #555b3f;
-  --pf-v5-global--link--Color: #555b3f;
-  --pf-v5-global--link--Color--hover: #42492e;
-  --pf-v5-global--link--Color--dark: #555b3f;
-  --pf-v5-global--link--Color--dark--hover: #42492e;
+  /* PatternFly đặt lại Color--100, primary-color--100, link--Color bằng bản --dark-* trong ô nhập nên đổi cả hai bộ.
+     success, warning, danger, info lấy thang lục bảo, hổ phách, đỏ, mực của ứng dụng: hộp thông báo, chữ lỗi dưới ô
+     nhập, dấu * bắt buộc, gợi ý mật khẩu của theme cha đổi theo mà không phải phủ từng lớp */
+  --pf-v5-global--Color--100: #10201b;
+  --pf-v5-global--Color--200: #4d5f56;
+  --pf-v5-global--Color--dark-100: #10201b;
+  --pf-v5-global--Color--dark-200: #4d5f56;
+  --pf-v5-global--BorderColor--100: #d6e1dc;
+  --pf-v5-global--BorderColor--dark-100: #d6e1dc;
+  --pf-v5-global--icon--Color--light: #4d5f56;
+  --pf-v5-global--icon--Color--light--dark: #4d5f56;
+  --pf-v5-global--primary-color--100: #0b6b53;
+  --pf-v5-global--primary-color--200: #095a46;
+  --pf-v5-global--primary-color--dark-100: #0b6b53;
+  --pf-v5-global--active-color--100: #0b6b53;
+  --pf-v5-global--link--Color: #0b6b53;
+  --pf-v5-global--link--Color--hover: #095a46;
+  --pf-v5-global--link--Color--dark: #0b6b53;
+  --pf-v5-global--link--Color--dark--hover: #095a46;
+  --pf-v5-global--success-color--100: #0b6b53;
+  --pf-v5-global--success-color--200: #074737;
+  --pf-v5-global--warning-color--100: #7a4800;
+  --pf-v5-global--warning-color--200: #5f3800;
+  --pf-v5-global--danger-color--100: #9f2019;
+  --pf-v5-global--danger-color--200: #861a14;
+  --pf-v5-global--info-color--100: #4d5f56;
+  --pf-v5-global--info-color--200: #10201b;
+  --pf-v5-global--BorderRadius--sm: 8px;
   --pf-v5-global--FontFamily--text: var(--signet-font);
   --pf-v5-global--FontFamily--heading: var(--signet-font);
 }
 
-html, body, .pf-v5-c-login {
-  background: var(--signet-ground) !important;
+/* keycloak.v2 phủ ảnh nền tối lên .login-pf body: trang trắng như vùng làm việc của ứng dụng */
+html, .login-pf body {
+  background: #fff;
   color: var(--signet-ink);
   font-family: var(--signet-font);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
-body { margin: 0; font-size: 14px; line-height: 1.5; }
+body { margin: 0; font-size: 16px; line-height: 1.5; }
 button, input, select, textarea { font: inherit; }
-a { color: var(--signet-olive); text-underline-offset: 3px; }
-::selection { background: #eee3bc; color: #202820; }
-:focus-visible { outline: 2px solid var(--signet-focus); outline-offset: 3px; }
+::selection { background: #b7dccb; color: #10201b; }
+.pf-v5-c-login :focus-visible { outline: 2px solid var(--signet-emerald); outline-offset: 3px; }
 
-/* Bố cục: một cột 480px giữa trang, logo và tên ở trên thẻ */
+/* Bố cục: khối lục bảo bên trái cao hết trang (đúng chỗ thanh bên của ứng dụng sau khi đăng nhập), thẻ đăng nhập
+   trắng giữa phần còn lại. Thứ tự trên trang giữ như HTML của theme cha: đầu trang rồi thẻ */
 .pf-v5-c-login {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  display: block;
   min-height: 100dvh;
-  padding: 40px 24px;
+  padding: 0;
 }
 .pf-v5-c-login__container {
-  display: flex;
-  flex-direction: column;
-  width: 480px;
-  max-width: 100%;
-  margin: auto;
+  display: grid;
+  grid-template-columns: clamp(300px, 36vw, 520px) minmax(0, 1fr);
+  grid-template-areas: "header main";
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  margin: 0;
   padding: 0;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 28px;
+  gap: 0;
 }
-.pf-v5-c-login__header { padding: 0; text-align: left; }
 
-/* Đầu trang: biểu tượng Liền mạch trên ô vàng bơ + displayName của realm ("Signet"), chữ thường thay vì chữ hoa
-   giãn cách của theme cha */
-#kc-header-wrapper {
+/* Đầu trang: chữ S trắng, displayName của realm ("Signet") và dòng phụ như thanh bên của ứng dụng; chữ thường thay vì
+   chữ hoa giãn cách của theme cha */
+.pf-v5-c-login__header {
+  grid-area: header;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0;
-  color: #30342a !important;
-  font-family: inherit;
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -.04em;
-  line-height: 1.2;
-  text-transform: none;
+  min-width: 0;
+  margin: 0;
+  padding: 48px clamp(32px, 4vw, 64px);
+  background: var(--signet-field);
+  color: #fff;
 }
+.pf-v5-c-login__header :focus-visible { outline-color: #fff; }
+#kc-header-wrapper {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  color: #fff !important;
+  font-family: inherit;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.15;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* logo Liền mạch (img/signet-symbol.svg) dùng làm mặt nạ, tô trắng trên nền lục bảo */
 #kc-header-wrapper::before {
   content: "";
-  display: block;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border: 1px solid #e0d3a5;
-  border-radius: 10px;
-  background: #eee3bc url("../img/signet-symbol.svg") center / 28px no-repeat;
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 48px;
+  background-color: #fff;
+  -webkit-mask: url("../img/signet-symbol.svg") center / contain no-repeat;
+  mask: url("../img/signet-symbol.svg") center / contain no-repeat;
 }
+/* dòng phụ theo ngôn ngữ của trang (<html lang>), cùng chữ với app.tagline của ứng dụng: "Văn phòng điện tử",
+   "e-Office". Viết bằng mã thoát để không phụ thuộc bảng mã Keycloak gửi kèm CSS */
+#kc-header-wrapper::after {
+  content: "V\0103n ph\00F2ng \0111i\1EC7n t\1EED";
+  grid-column: 2;
+  margin-top: 4px;
+  color: var(--signet-field-ink);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+#kc-header-wrapper:lang(en)::after { content: "e-Office"; }
 
-/* Thẻ đăng nhập: trắng, viền mảnh, không bóng như .card của Văn phòng điện tử */
+/* Thẻ đăng nhập: trắng, viền mảnh, không bóng như .card của ứng dụng */
 .pf-v5-c-login .pf-v5-c-login__main {
-  width: 100%;
+  grid-area: main;
+  align-self: center;
+  justify-self: center;
+  width: min(440px, 100% - 48px);
   min-width: 0;
-  align-self: stretch;
+  margin: 48px 0;
   background: #fff;
   border: 1px solid var(--signet-edge);
-  border-radius: 12px;
+  border-radius: 14px;
   box-shadow: none;
-  overflow: hidden;
 }
+/* keycloak.v2 kẻ vạch xanh 4px ở cạnh trên đầu thẻ: bỏ. Tiêu đề dài (trang cài TOTP, bản tiếng Anh) xuống dòng
+   trong phần của nó, ô chọn ngôn ngữ luôn ở góc phải như theme cha */
 .pf-v5-c-login__main-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 30px 32px 0;
+  gap: 16px;
+  padding: 32px 36px 0;
   border: 0;
 }
 #kc-page-title {
+  flex: 1 1 0;
   min-width: 0;
   margin: 0;
   color: var(--signet-ink);
   font-family: inherit;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -.025em;
-  line-height: 1.35;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
-.pf-v5-c-login__main-header-utilities { flex-shrink: 0; align-self: flex-start; max-width: 150px; margin: 0; }
-.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control { min-height: 40px; }
-.pf-v5-c-login__main-header-utilities select {
-  min-width: 0;
-  padding-inline: 10px 30px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: 13px;
-}
-.pf-v5-c-login__main-body { padding: 26px 32px 32px; }
-.pf-v5-c-login__main-footer { background: transparent; color: var(--signet-muted); font-size: 13px; }
-.pf-v5-c-login__main-footer:empty { display: none; }
+.pf-v5-c-login__main-header-utilities { flex: 0 0 auto; max-width: 160px; margin: 0; }
+.pf-v5-c-login__main-header-utilities select { min-height: 42px; font-size: 14px; }
+.pf-v5-c-login__main-body { padding: 24px 36px 36px; }
+.pf-v5-c-login__main-footer { background: transparent; color: var(--signet-muted); font-size: 14px; }
+.pf-v5-c-login__main-footer-band { padding: 20px 0 0; border-top: 1px solid var(--signet-edge); text-align: left; }
+#kc-form-options, #kc-info, #kc-info-wrapper { color: var(--signet-muted); font-size: 14px; }
 
-/* Ô nhập: viền đủ bốn cạnh (theme cha chỉ gạch dưới), cao 44px, viền olive và vòng nhạt khi đang nhập */
-.pf-v5-c-form { gap: 22px; }
+/* Liên kết trong thẻ có gạch chân: lục bảo cạnh chữ mực chỉ 2,6:1, màu thôi chưa đủ phân biệt (WCAG 1.4.1) */
+.pf-v5-c-login__main a:not(.pf-v5-c-button) {
+  color: var(--signet-emerald);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.pf-v5-c-login__main a:not(.pf-v5-c-button):hover {
+  color: var(--signet-emerald-dark);
+  text-decoration-thickness: 2px;
+}
+
+/* Biểu mẫu: nhãn 14px đậm vừa trên ô, chữ trong ô 16px (điện thoại không phóng to khi chạm) */
+.pf-v5-c-form { --pf-v5-c-form--GridGap: 20px; }
 .pf-v5-c-form__group-label { padding-bottom: 8px !important; }
-.pf-v5-c-form__label { color: var(--signet-ink); font-size: 14px; font-weight: 500; }
+.pf-v5-c-form__label, .pf-v5-c-form__label-text { color: var(--signet-label); font-size: 14px; font-weight: 500; }
+.pf-v5-c-form__helper-text { margin-top: 8px; }
+.pf-v5-c-helper-text { font-size: 14px; }
+.pf-v5-c-check__label { color: var(--signet-ink); font-size: 14px; }
+input[type=checkbox], input[type=radio] { accent-color: var(--signet-emerald); }
+
+/* Ô nhập: viền đủ bốn cạnh (theme cha chỉ gạch dưới), cao 44px; đang nhập thì viền lục bảo dày 2px. Khoảng đệm đặt
+   qua biến của PatternFly để chỗ cho biểu tượng lỗi, mũi tên chọn ngôn ngữ vẫn tính đúng */
 .pf-v5-c-form-control {
+  --pf-v5-c-form-control--inset--base: 12px;
+  --pf-v5-c-form-control--PaddingTop: 9px;
+  --pf-v5-c-form-control--PaddingBottom: 9px;
+  --pf-v5-c-form-control--FontSize: 16px;
   --pf-v5-c-form-control--after--BorderBottomWidth: 0;
+  --pf-v5-c-form-control__icon--PaddingTop: 9px;
+  --pf-v5-c-form-control__toggle-icon--PaddingTop: 9px;
+  --pf-v5-c-form-control__toggle-icon--PaddingLeft: 4px;
+  --pf-v5-c-form-control__toggle-icon--PaddingRight: 0;
+  --pf-v5-c-form-control__select--PaddingLeft: 12px;
+  --pf-v5-c-form-control__select--PaddingRight: 36px;
   min-height: 44px;
-  border: 1px solid var(--signet-field);
+  border: 1px solid var(--signet-control);
   border-radius: 8px;
   background: #fff;
   transition: border-color 160ms, box-shadow 160ms;
 }
 .pf-v5-c-form-control::before, .pf-v5-c-form-control::after { border: 0 !important; }
-.pf-v5-c-form-control:focus-within { border-color: var(--signet-focus); box-shadow: 0 0 0 2px #e9ead8; }
-.pf-v5-c-form-control input, .pf-v5-c-form-control select, .pf-v5-c-form-control textarea {
-  min-height: 42px;
-  color: var(--signet-ink);
-  caret-color: var(--signet-olive);
-  font-family: inherit;
-  font-size: 14px;
+.pf-v5-c-form-control:hover { border-color: var(--signet-control-hover); }
+.pf-v5-c-form-control.pf-m-readonly { background: var(--signet-paper); }
+/* ô lỗi viền đỏ; đang nhập thì viền lục bảo như .input của ứng dụng, dòng lỗi bên dưới vẫn còn */
+.pf-v5-c-form-control.pf-m-error { border-color: var(--signet-red); }
+.pf-v5-c-form-control:focus-within {
+  border-color: var(--signet-emerald);
+  box-shadow: 0 0 0 1px var(--signet-emerald);
 }
-.pf-v5-c-form-control input { padding: 10px 12px; }
-.pf-v5-c-form-control input:focus { outline: 0; }
-.pf-v5-c-form-control.pf-m-error { border-color: #b42318; }
-/* ô mật khẩu kèm nút hiện/ẩn: viền bao cả nhóm */
+.pf-v5-c-form-control > :is(input, select, textarea) {
+  border-radius: inherit;
+  color: var(--signet-ink);
+  caret-color: var(--signet-emerald);
+  font-family: inherit;
+}
+/* viền trong suốt thay cho outline: 0: chế độ tương phản cao của hệ điều hành bỏ box-shadow nhưng tô viền này */
+.pf-v5-c-form-control > :is(input, select, textarea):focus { outline: 2px solid transparent; outline-offset: 0; }
+.pf-v5-c-form-control > select { background: transparent; }
+/* trình duyệt tự điền tô nền xanh dương: đổi sang nền chọn lục nhạt của ứng dụng */
+.pf-v5-c-form-control > input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 100px var(--signet-active) inset;
+  -webkit-text-fill-color: var(--signet-ink);
+}
+
+/* Nhóm ô + nút (mật khẩu kèm nút hiện/ẩn, tên đăng nhập kèm nút đăng nhập lại, mã kèm nút sao chép): viền bao cả
+   nhóm, ô bên trong bỏ viền; góc của phần tử đầu và cuối bo theo nhóm */
 .pf-v5-c-input-group {
+  --pf-v5-c-input-group__item--MarginLeft: 0;
   gap: 0;
-  overflow: visible;
-  border: 1px solid var(--signet-field);
+  border: 1px solid var(--signet-control);
   border-radius: 8px;
   background: #fff;
   transition: border-color 160ms, box-shadow 160ms;
 }
-.pf-v5-c-input-group:focus-within { border-color: var(--signet-focus); box-shadow: 0 0 0 2px #e9ead8; }
-.pf-v5-c-input-group .pf-v5-c-form-control { border: 0; box-shadow: none; }
-.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
-  height: 44px;
-  min-width: 44px;
-  padding: 0;
-  border-radius: 0 8px 8px 0;
-  color: var(--signet-muted);
-  background: transparent;
+.pf-v5-c-input-group:hover { border-color: var(--signet-control-hover); }
+.pf-v5-c-input-group:has(.pf-m-error) { border-color: var(--signet-red); }
+.pf-v5-c-input-group:focus-within {
+  border-color: var(--signet-emerald);
+  box-shadow: 0 0 0 1px var(--signet-emerald);
 }
-.pf-v5-c-button.pf-m-control::after { border: 0; }
-.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover { background: #efeee3; }
+.pf-v5-c-input-group .pf-v5-c-form-control,
+.pf-v5-c-input-group .pf-v5-c-form-control:focus-within {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+/* PatternFly để nút inline-block, biểu tượng nằm sát mép trên: căn giữa bằng flex */
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--signet-muted);
+  transition: background-color 160ms, color 160ms;
+}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control::after { border: 0; }
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover { background: #ebf2ef; color: var(--signet-ink); }
+/* viền focus của nút vẽ vào trong, không đè lên viền nhóm */
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:focus-visible { outline-offset: -4px; }
+.pf-v5-c-input-group > .pf-v5-c-input-group__item:first-child > * {
+  border-start-start-radius: 7px;
+  border-end-start-radius: 7px;
+}
+.pf-v5-c-input-group > .pf-v5-c-input-group__item:last-child > * {
+  border-start-end-radius: 7px;
+  border-end-end-radius: 7px;
+}
+/* chú thích của nút đăng nhập lại: theme cha đặt sang phải nút, tràn khỏi thẻ và màn điện thoại; đưa lên trên */
+.kc-login-tooltip .kc-tooltip-text {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: auto;
+  width: max-content;
+  min-width: 0;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--signet-ink);
+  color: #fff;
+  box-shadow: none;
+  font-size: 14px;
+}
+.kc-login-tooltip:hover .kc-tooltip-text { opacity: 1; }
+.kc-login-tooltip .kc-tooltip-text::after {
+  top: 100%;
+  right: 17px;
+  margin-top: 0;
+  border-color: var(--signet-ink) transparent transparent;
+}
 
-/* Nút chính: olive, chữ trắng, nhấn thì lún 1px */
+/* Nút chính: lục bảo, chữ trắng, nhấn thì lún 1px; viền trong suốt để chế độ tương phản cao vẫn thấy khung nút */
 .pf-v5-c-button.pf-m-primary {
   min-height: 44px;
-  padding: 10px 16px;
-  border: 0;
+  padding: 9px 16px;
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--signet-olive);
+  background: var(--signet-emerald);
   color: #fff;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color 160ms, transform 180ms var(--signet-ease);
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 160ms, box-shadow 160ms, transform 180ms var(--signet-ease);
 }
 .pf-v5-c-button.pf-m-primary::after { border: 0; }
-.pf-v5-c-button.pf-m-primary:hover { background: var(--signet-olive-dark); }
+.pf-v5-c-button.pf-m-primary:hover { background: var(--signet-emerald-dark); box-shadow: 0 3px 8px #10201b14; }
 .pf-v5-c-button.pf-m-primary:active { transform: translateY(1px) scale(.99); }
-.pf-v5-c-button.pf-m-primary:disabled { color: #666a59; background: #ece7df; cursor: not-allowed; }
-
-.pf-v5-c-alert {
-  padding: 12px;
-  border: 1px solid #edb4ad;
+.pf-v5-c-button.pf-m-primary:disabled {
+  color: #526459;
+  background: #ebf2ef;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+/* Nút phụ (quay lại đăng nhập, thử cách khác, hủy) như .btn-secondary của ứng dụng: nền trắng, viền như ô nhập.
+   Nút không có lớp kiểu nào (kcButtonDefaultClass của theme cha để trống) cũng theo kiểu này */
+.pf-v5-c-button.pf-m-secondary,
+.pf-v5-c-login__main .pf-v5-c-button:not([class*="pf-m-"]) {
+  min-height: 44px;
+  padding: 9px 16px;
+  border: 1px solid var(--signet-control);
   border-radius: 8px;
-  background: #fff4f2;
-  color: #8e271d;
+  background: #fff;
+  color: #22312b;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 160ms, border-color 160ms;
+}
+.pf-v5-c-button.pf-m-secondary::after,
+.pf-v5-c-login__main .pf-v5-c-button:not([class*="pf-m-"])::after { border: 0; }
+.pf-v5-c-button.pf-m-secondary:hover,
+.pf-v5-c-login__main .pf-v5-c-button:not([class*="pf-m-"]):hover {
+  border-color: var(--signet-control-hover);
+  background: var(--signet-paper);
+  color: var(--signet-ink);
+}
+.pf-v5-c-button.pf-m-link { font-weight: 500; }
+
+/* Hộp thông báo: viền mảnh đủ bốn cạnh, nền nhạt theo loại; chữ và biểu tượng lấy từ biến success, warning, danger,
+   info ở :root (đỏ 8,8:1, hổ phách 9,6:1, lục 9,8:1, mực 15,9:1 trên nền của từng loại). Không viền màu dày */
+.pf-v5-c-alert {
+  padding: 12px 14px;
+  border: 1px solid var(--signet-edge);
+  border-radius: 8px;
+  background: var(--signet-paper);
+  box-shadow: none;
   font-size: 14px;
 }
-.pf-v5-c-helper-text, .pf-v5-c-form__helper-text { font-size: 13px; }
-#kc-otp-login-form .pf-v5-c-tile { border-radius: 8px; }
+.pf-v5-c-alert.pf-m-danger { border-color: #f4c5bf; background: #fdf1ef; }
+.pf-v5-c-alert.pf-m-warning { border-color: #f3dc9f; background: #fdf8ea; }
+.pf-v5-c-alert.pf-m-success { border-color: #b7dccb; background: #eef7f3; }
+.pf-v5-c-alert__title { font-weight: 500; }
+
+/* Chọn thiết bị OTP (ô chọn của theme cha), cài TOTP: viền như ô nhập, ô đang chọn viền lục bảo trên nền chọn thay
+   cho vạch dưới và cú nhấc lên 6px của PatternFly */
+.pf-v5-c-tile { --pf-v5-c-tile--m-selected--TranslateY: 0; border-radius: 8px; cursor: pointer; }
+.pf-v5-c-tile::before { border-color: var(--signet-control); border-radius: 8px; }
+.pf-v5-c-tile::after { display: none; }
+.pf-v5-c-tile.pf-m-selected { background: var(--signet-active); }
+.pf-v5-c-tile.pf-m-selected::before { border: 2px solid var(--signet-emerald); }
 #kc-totp-settings { padding-left: 20px; }
 #kc-totp-settings li { margin-bottom: 16px; }
 #kc-totp-secret-key { overflow-wrap: anywhere; }
-#kc-form-options, #kc-info, #kc-info-wrapper { color: var(--signet-muted); font-size: 13px; }
+#kc-totp-secret-qr-code { max-width: 100%; height: auto; }
 
-/* Điện thoại: lề hẹp hơn, ô nhập chữ 16px để trình duyệt không phóng to khi chạm */
+/* Máy tính bảng dọc, điện thoại: khối lục bảo thành dải ngang trên đầu trang, thẻ ở dưới */
+@media (max-width: 899px) {
+  .pf-v5-c-login__container {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "header" "main";
+  }
+  .pf-v5-c-login__header { padding: 16px 24px; }
+  #kc-header-wrapper { column-gap: 12px; font-size: 22px; }
+  #kc-header-wrapper::before { width: 36px; height: 36px; }
+  #kc-header-wrapper::after { margin-top: 2px; font-size: 14px; }
+  .pf-v5-c-login .pf-v5-c-login__main { align-self: start; margin: 40px 0; }
+}
+/* Điện thoại (390px): thẻ bỏ viền, liền mép với lề 16px như trang của ứng dụng; không cuộn ngang */
 @media (max-width: 540px) {
-  .pf-v5-c-login { padding: 28px 18px; }
-  .pf-v5-c-login__container { gap: 24px; }
-  .pf-v5-c-login__main-header { flex-wrap: wrap; gap: 14px; padding: 24px 22px 0; }
-  .pf-v5-c-login__main-body { padding: 22px; }
-  .pf-v5-c-login__main-header-utilities { max-width: 100%; }
+  .pf-v5-c-login__header { padding: 14px 16px; }
+  .pf-v5-c-login .pf-v5-c-login__main { width: 100%; margin: 0; border: 0; border-radius: 0; }
+  .pf-v5-c-login__main-header { padding: 24px 16px 0; }
+  .pf-v5-c-login__main-body { padding: 20px 16px 32px; }
   #kc-page-title { font-size: 22px; }
-  .pf-v5-c-form-control input, .pf-v5-c-form-control select { font-size: 16px; }
-  .pf-v5-c-login__main-header-utilities select { font-size: 13px; }
+  .pf-v5-c-login__main-header-utilities select { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -255,4 +453,9 @@ a { color: var(--signet-olive); text-underline-offset: 3px; }
     scroll-behavior: auto !important;
   }
   .pf-v5-c-button.pf-m-primary:active { transform: none; }
+}
+
+/* Chế độ tương phản cao: nền khối lục bảo thành màu hệ thống, logo vẽ bằng màu chữ của hệ thống */
+@media (forced-colors: active) {
+  #kc-header-wrapper::before { forced-color-adjust: none; background-color: CanvasText; }
 }

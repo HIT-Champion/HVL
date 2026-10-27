@@ -66,84 +66,72 @@ test('giao diện: lỗi tải danh mục ở trang soạn thảo có nút thử
   await expect(page.getByRole('button', { name: 'Lưu dự thảo', exact: true })).toBeVisible()
 })
 
-test('giao diện: thanh bên mở khi rê chuột hoặc dùng bàn phím, không đẩy nội dung', async ({ browser }) => {
+test('giao diện: thanh bên mở khi rê chuột hoặc Tab, đẩy nội dung, chỉ thu khi chuột rời', async ({ browser }) => {
   test.skip(!PASSWORD, 'Cần dữ liệu mẫu và MOC_DEMO_PASSWORD')
   const page = await signIn(browser, 'chuyenviendt')
   await page.setViewportSize({ width: 1440, height: 900 })
   const shell = page.locator('.sg-shell')
   const sidebar = page.locator('#app-navigation')
   const main = page.locator('#main-content')
+  const left = async () => (await main.boundingBox())!.x
 
   await page.mouse.move(800, 300)
   await expect(shell).toHaveClass(/is-collapsed/)
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBeLessThanOrEqual(76)
-  const x = (await main.boundingBox())!.x
   const bounds = (await sidebar.boundingBox())!
   expect([bounds.x, bounds.y, bounds.height]).toEqual([0, 0, 900])
+  const x = await left()
+  expect(x).toBeGreaterThanOrEqual(76)
 
-  // rê chuột vào dải biểu tượng: mở ra, nằm đè, nội dung không bị đẩy; đi tiếp vào phần vừa mở vẫn mở
+  // rê chuột vào dải biểu tượng: mở 248px, nội dung dịch sang theo, không nằm dưới thanh bên
   await page.mouse.move(35, 200)
   await expect(shell).not.toHaveClass(/is-collapsed/)
   await expect(page.locator('.sg-brand-full')).toHaveCSS('opacity', '1')
-  expect((await main.boundingBox())!.x).toBe(x)
+  await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(248)
+  await expect.poll(left).toBe(x + 172)
   await page.mouse.move(200, 220)
   await expect(shell).not.toHaveClass(/is-collapsed/)
-  await page.mouse.move(800, 300)
-  await expect(shell).toHaveClass(/is-collapsed/)
 
-  // bấm một mục: sang trang mới và thu lại dù chuột còn trên thanh bên, focus do chuột không giữ thanh bên mở
+  // bấm một mục, rồi bấm lại mục của chính trang đang mở: sang trang, thanh bên vẫn mở vì chuột còn trên đó
   const incoming = page.getByRole('link', { name: 'Văn bản đến', exact: true })
   await incoming.click()
   await expect(page).toHaveURL(/\/van-ban-den$/)
-  await expect(shell).toHaveClass(/is-collapsed/)
-  // con trỏ còn nằm trên biểu tượng vừa bấm: nhích 1px không làm thanh bên mở lại (chờ 400ms để chắc); ra hẳn khỏi
-  // thanh bên rồi vào lại thì mở như thường (#297)
-  const box = (await incoming.boundingBox())!
-  const [pointerX, pointerY] = [box.x + 24, box.y + box.height / 2]
-  await page.mouse.move(pointerX + 1, pointerY)
   await page.waitForTimeout(400)
-  await expect(shell).toHaveClass(/is-collapsed/)
-  // bấm mục của chính trang đang mở (route không đổi): vẫn thu lại, nhích chuột cũng không mở lại
-  await page.mouse.move(800, 300)
-  await page.mouse.move(pointerX, pointerY)
   await expect(shell).not.toHaveClass(/is-collapsed/)
-  await page.mouse.click(pointerX, pointerY)
-  await expect(page).toHaveURL(/\/van-ban-den$/)
-  await expect(shell).toHaveClass(/is-collapsed/)
-  await page.mouse.move(pointerX + 1, pointerY)
+  await incoming.click()
   await page.waitForTimeout(400)
-  await expect(shell).toHaveClass(/is-collapsed/)
-  await page.mouse.move(800, 300)
-  await page.mouse.move(pointerX, pointerY)
   await expect(shell).not.toHaveClass(/is-collapsed/)
+  expect(await left()).toBe(x + 172)
+
+  // chỉ rời chuột khỏi thanh bên mới thu, nội dung về lại sau dải 76px
   await page.mouse.move(800, 300)
   await expect(shell).toHaveClass(/is-collapsed/)
+  await expect.poll(left).toBe(x)
   // bàn phím: Tab sang mục kế tiếp thì mở, focus rời thanh bên thì thu
   await page.keyboard.press('Tab')
   await expect(shell).not.toHaveClass(/is-collapsed/)
-  // đổi từ bàn phím sang chuột: thanh bên đang mở theo focus, bấm chuột đúng mục đang focus (không có focusin mới) vẫn
-  // thu, nhích chuột không mở lại; Tab tiếp thì mở theo bàn phím như thường
+  // đổi từ bàn phím sang chuột: bấm chuột đúng mục đang focus (không có focusin mới) thì focus bàn phím không còn giữ
+  // thanh bên, chuột rời đi là thu; Tab tiếp thì mở theo bàn phím như thường
   const focused = page.locator('#app-navigation a:focus')
   const fbox = (await focused.boundingBox())!
   const href = (await focused.getAttribute('href'))!
   await page.mouse.click(fbox.x + 24, fbox.y + fbox.height / 2)
   await expect(page).toHaveURL(new RegExp(`${href}$`))
-  await expect(shell).toHaveClass(/is-collapsed/)
-  await page.mouse.move(fbox.x + 25, fbox.y + fbox.height / 2)
-  await page.waitForTimeout(400)
+  await expect(shell).not.toHaveClass(/is-collapsed/)
+  await page.mouse.move(800, 300)
   await expect(shell).toHaveClass(/is-collapsed/)
   await page.keyboard.press('Tab')
   await expect(shell).not.toHaveClass(/is-collapsed/)
   await page.getByTestId('notification-bell').focus()
   await expect(shell).toHaveClass(/is-collapsed/)
 
-  // giảm chuyển động: vẫn mở, đóng nhưng không có thời gian chuyển (chuột còn trên thanh bên từ lần bấm ở trên: ra
-  // ngoài trước rồi mới rê vào)
+  // giảm chuyển động: vẫn mở, đóng, nội dung vẫn dịch theo, nhưng không có thời gian chuyển
   await page.mouse.move(800, 300)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.mouse.move(35, 200)
   await expect(shell).not.toHaveClass(/is-collapsed/)
   await expect(sidebar).toHaveCSS('transition-duration', '0s')
+  await expect(shell).toHaveCSS('transition-duration', '0s')
   await page.mouse.move(800, 300)
   await expect(shell).toHaveClass(/is-collapsed/)
 

@@ -66,12 +66,23 @@ onMounted(() => { if (q.value) run() })
   <div>
     <PageHeader :title="t('search.title')">
       <NuxtLink v-if="canAsk" :to="askLink" class="btn-secondary" data-testid="ask-assistant">
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z" /></svg>
+        <svg
+          class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h5M21 12a9 9 0 01-13.2 8L3 21l1.1-4.6A9 9 0 1121 12z"
+          />
+        </svg>
         {{ t('search.askAssistant') }}
       </NuxtLink>
     </PageHeader>
-    <form class="card mb-6 flex flex-col gap-3 p-4 sm:flex-row" @submit.prevent="run()">
-      <input v-model="q" type="search" class="input flex-1" :aria-label="t('search.title')" :placeholder="t('search.placeholder')" maxlength="200" autofocus>
+    <!-- ô tìm đứng thẳng trên nền trang, không bọc khung: kết quả là phần chính -->
+    <form class="mb-6 flex flex-col gap-3 sm:flex-row" @submit.prevent="run()">
+      <input
+        v-model="q" type="search" class="input flex-1" :aria-label="t('search.title')"
+        :placeholder="t('search.placeholder')" maxlength="200" autofocus
+      >
       <select v-model="direction" class="input sm:w-44" :aria-label="t('search.directionLabel')">
         <option value="">{{ t('search.any') }}</option>
         <option value="in">{{ t('search.direction.in') }}</option>
@@ -80,23 +91,34 @@ onMounted(() => { if (q.value) run() })
       <button type="submit" class="btn-primary" :disabled="loading || !q.trim()">{{ t('search.button') }}</button>
     </form>
 
-    <p v-if="failure" class="card p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-else-if="searched && !hits.length" class="card p-12 text-center text-stone-500">{{ t('search.empty') }}</p>
-    <ul v-else class="space-y-3">
+    <p v-if="failure" class="moc-state">{{ failure }}</p>
+    <p v-else-if="loading && !hits.length" class="moc-loading">{{ t('app.loading') }}</p>
+    <p v-else-if="searched && !hits.length" class="moc-empty">{{ t('search.empty') }}</p>
+    <ul v-else-if="hits.length" class="moc-list">
       <li v-for="h in hits" :key="h.id">
-        <NuxtLink :to="`/van-ban/${h.id}`" class="card block p-4 transition hover:border-brand-600 hover:shadow-md">
-          <div class="mb-1 flex flex-wrap items-center gap-2">
+        <NuxtLink :to="`/van-ban/${h.id}`" class="moc-list-link">
+          <div class="flex flex-wrap items-center gap-2">
             <StatusChip :status="h.status" />
             <UrgencyChip :urgency="h.urgency" quiet />
-            <span class="text-xs text-stone-500">{{ t(`search.direction.${h.direction}`) }}<span v-if="h.register_number"> · {{ t('incoming.number') }} {{ h.register_number }}</span></span>
-            <span v-if="h.matched_content" class="chip bg-amber-50 text-amber-800" :title="t('search.matchedContentHint')">{{ t('search.matchedContent') }}</span>
+            <span class="text-[13px] text-stone-500 tabular-nums">
+              {{ t(`search.direction.${h.direction}`) }}<span v-if="h.register_number">
+                · {{ t('incoming.number') }} {{ h.register_number }}</span>
+            </span>
+            <span
+              v-if="h.matched_content" class="chip bg-amber-50 text-amber-800"
+              :title="t('search.matchedContentHint')"
+            >
+              {{ t('search.matchedContent') }}
+            </span>
           </div>
-          <div class="font-medium text-stone-900">{{ h.summary }}</div>
-          <div class="mt-0.5 text-sm text-stone-500">{{ h.symbol }} · {{ h.issuer_name }} · {{ fmtDate(h.issued_on) }}</div>
+          <div class="mt-1.5 text-[15px] leading-snug font-medium text-stone-900 wrap-anywhere">{{ h.summary }}</div>
+          <div class="mt-1 text-sm text-stone-500 tabular-nums wrap-anywhere">
+            {{ h.symbol }} · {{ h.issuer_name }} · {{ fmtDate(h.issued_on) }}
+          </div>
         </NuxtLink>
       </li>
     </ul>
-    <div v-if="next !== null" class="mt-4 text-center">
+    <div v-if="next !== null" class="moc-more">
       <button class="btn-secondary" :disabled="loading" @click="run(true)">{{ t('search.more') }}</button>
     </div>
   </div>

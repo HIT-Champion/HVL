@@ -96,48 +96,49 @@ const sections = computed(() => [
     <PageHeader :title="t('apps.title')" :subtitle="t('apps.subtitle')">
       <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
     </PageHeader>
-    <p v-if="failure" class="card mb-4 p-4 text-sm text-red-700">{{ failure }}</p>
-    <p v-if="!loaded && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-if="failure" class="moc-state mb-6">{{ failure }}</p>
+    <p v-if="!loaded && !failure" class="moc-loading">{{ t('app.loading') }}</p>
 
-    <div v-if="loaded" class="space-y-8">
-      <p
-        v-if="leader" class="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600"
-        data-testid="apps-hash-hint"
-      >
+    <div v-if="loaded" class="space-y-9">
+      <p v-if="leader" class="moc-aside" data-testid="apps-hash-hint">
         {{ t('apps.hashHint') }}
       </p>
+      <!-- mỗi nhóm một danh sách: ứng dụng là một hàng (tên, mô tả | phiên bản, băm | nút Mở), không thành lưới thẻ -->
       <section v-for="s in sections" :key="s.id" :data-testid="`apps-${s.id}`">
-        <h2 class="font-medium text-stone-900">{{ s.title }}</h2>
-        <p class="mt-1 text-sm text-stone-500">{{ s.hint }}</p>
-        <p v-if="!s.entries.length" class="card mt-3 p-6 text-center text-sm text-stone-500">
+        <h2 class="moc-block-title">{{ s.title }}</h2>
+        <p class="moc-block-hint">{{ s.hint }}</p>
+        <p v-if="!s.entries.length" class="moc-empty mt-3">
           {{ t(`apps.none.${s.id}`) }}
         </p>
-        <ul v-else class="mt-3 grid gap-4 md:grid-cols-2">
-          <li v-for="a in s.entries" :key="a.name" class="card flex flex-col p-4" :data-testid="`app-${a.name}`">
-            <div class="flex items-start gap-3">
-              <div class="min-w-0 flex-1">
-                <h3 class="font-medium" :class="a.state === 'removed' ? 'text-stone-500' : 'text-stone-900'">
+        <ul v-else class="moc-list mt-3">
+          <li
+            v-for="a in s.entries" :key="a.name" :data-testid="`app-${a.name}`"
+            class="grid gap-x-8 gap-y-3 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] lg:items-start"
+          >
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h3 class="font-semibold" :class="a.state === 'removed' ? 'text-stone-500' : 'text-stone-900'">
                   {{ a.title }}
                 </h3>
-                <p class="font-mono text-xs text-stone-400">{{ a.name }} · {{ a.path }}</p>
+                <span class="chip" :class="tone[a.state]">{{ t(`apps.state.${a.state}`) }}</span>
               </div>
-              <span class="chip" :class="tone[a.state]">{{ t(`apps.state.${a.state}`) }}</span>
+              <p class="mt-0.5 font-mono text-xs text-stone-500 wrap-anywhere">{{ a.name }} · {{ a.path }}</p>
+              <p v-if="a.description" class="mt-2 max-w-[70ch] text-sm text-stone-600">{{ a.description }}</p>
             </div>
-            <p v-if="a.description" class="mt-2 text-sm text-stone-600">{{ a.description }}</p>
-            <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dl class="grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-4 gap-y-1 text-sm">
               <dt class="text-stone-500">{{ t('apps.version') }}</dt>
-              <dd class="font-mono text-stone-800">{{ a.version ?? t('apps.coreVersion') }}</dd>
+              <dd class="font-mono text-stone-800 wrap-anywhere">{{ a.version ?? t('apps.coreVersion') }}</dd>
               <template v-if="a.installedAt">
                 <dt class="text-stone-500">{{ t('apps.installedAt') }}</dt>
-                <dd class="text-stone-800">{{ fmtDateTime(a.installedAt) }}</dd>
+                <dd class="text-stone-800 tabular-nums">{{ fmtDateTime(a.installedAt) }}</dd>
               </template>
               <template v-if="a.updatedAt">
                 <dt class="text-stone-500">{{ t('apps.updatedAt') }}</dt>
-                <dd class="text-stone-800">{{ fmtDateTime(a.updatedAt) }}</dd>
+                <dd class="text-stone-800 tabular-nums">{{ fmtDateTime(a.updatedAt) }}</dd>
               </template>
               <template v-if="a.removedAt">
                 <dt class="text-stone-500">{{ t('apps.removedAt') }}</dt>
-                <dd class="text-stone-800">{{ fmtDateTime(a.removedAt) }}</dd>
+                <dd class="text-stone-800 tabular-nums">{{ fmtDateTime(a.removedAt) }}</dd>
               </template>
               <template v-if="a.sha256">
                 <dt class="text-stone-500">{{ t('apps.manifestHash') }}</dt>
@@ -146,7 +147,7 @@ const sections = computed(() => [
                     {{ shortHash(a.sha256) }}
                   </code>
                   <button
-                    type="button" class="btn-ghost px-2 py-0.5 text-xs"
+                    type="button" class="btn-ghost min-h-8 px-2 py-0.5 text-xs"
                     :aria-label="t('apps.copyHashOf', { app: a.title })" @click="copy(a.sha256)"
                   >
                     {{ t('apps.copy') }}
@@ -154,7 +155,7 @@ const sections = computed(() => [
                 </dd>
               </template>
             </dl>
-            <div v-if="a.href" class="mt-auto pt-4">
+            <div v-if="a.href" class="lg:justify-self-end">
               <NuxtLink v-if="a.internal" :to="a.href" class="btn-secondary" :data-testid="`open-${a.name}`">
                 {{ t('apps.open') }}
               </NuxtLink>
