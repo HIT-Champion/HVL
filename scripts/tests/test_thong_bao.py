@@ -14,9 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Thông báo đa kênh (email, webhook) của svc-workflow ở phần điều phối: mặc định tắt, mật khẩu SMTP và URL webhook đi
-qua két (bí mật tùy chọn của platform/openbao/start.sh), hộp thư thử Mailpit chỉ ở profile mail, giao diện chỉ mở ở
-127.0.0.1. Kiểm chữ và chạy hàm shell bằng sh (không có PyYAML, không cần Docker).
+"""Thông báo đa kênh (email, webhook, SMS, Zalo) của svc-workflow ở phần điều phối: mặc định tắt, mật khẩu SMTP, URL
+webhook, mật khẩu cổng SMS, token bot Zalo đi qua két (bí mật tùy chọn của platform/openbao/start.sh), hộp thư thử
+Mailpit chỉ ở profile mail, giao diện chỉ mở ở 127.0.0.1. Kiểm chữ và chạy hàm shell bằng sh (không có PyYAML,
+không cần Docker).
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
@@ -63,17 +64,22 @@ class WorkflowSettingsTest(unittest.TestCase):
         self.assertIn("MOC_SMTP_HOST: ${MOC_SMTP_HOST:-}", block)
         self.assertNotIn("MOC_NOTIFY_WEBHOOK_URL", block)  # URL có khóa: chỉ qua két
         self.assertNotIn("MOC_SMTP_PASSWORD", block)
+        self.assertNotIn("MOC_SMS_GATEWAY_PASSWORD", block)
+        self.assertNotIn("MOC_ZALO_BOT_TOKEN", block)      # token nằm trong đường dẫn API: chỉ qua két
+        self.assertIn("MOC_SMS_GATEWAY_URL: ${MOC_SMS_GATEWAY_URL:-}", block)
         self.assertNotIn("mailpit", block)                 # không phụ thuộc hộp thư thử
-        values = dict(re.findall(r"^(MOC_(?:SMTP|NOTIFY)_[A-Z_]+)=(.*)$",
+        values = dict(re.findall(r"^(MOC_(?:SMTP|NOTIFY|SMS|ZALO)_[A-Z_]+)=(.*)$",
                                  ENV_EXAMPLE.read_text(encoding="utf-8"), re.M))
-        self.assertEqual(values["MOC_SMTP_HOST"], "")
-        self.assertEqual(values["MOC_NOTIFY_WEBHOOK_URL"], "")
-        self.assertEqual(values["MOC_SMTP_PASSWORD"], "")
+        for name in ("MOC_SMTP_HOST", "MOC_NOTIFY_WEBHOOK_URL", "MOC_SMTP_PASSWORD", "MOC_SMS_GATEWAY_URL",
+                     "MOC_SMS_GATEWAY_PASSWORD", "MOC_ZALO_BOT_TOKEN"):
+            self.assertEqual(values[name], "", name)
 
     def test_secrets_reach_the_vault_container_only(self) -> None:
         block = service_block("openbao")
         self.assertIn("MOC_SMTP_PASSWORD: ${MOC_SMTP_PASSWORD:-}", block)
         self.assertIn("MOC_NOTIFY_WEBHOOK_URL: ${MOC_NOTIFY_WEBHOOK_URL:-}", block)
+        self.assertIn("MOC_SMS_GATEWAY_PASSWORD: ${MOC_SMS_GATEWAY_PASSWORD:-}", block)
+        self.assertIn("MOC_ZALO_BOT_TOKEN: ${MOC_ZALO_BOT_TOKEN:-}", block)
 
 
 @unittest.skipUnless(shutil.which("sh"), "cần sh")
@@ -98,10 +104,11 @@ class OptionalSecretsTest(unittest.TestCase):
 
     def test_optional_secrets_escaped_when_set(self) -> None:
         url = 'https://chat.example.com/hooks/k"\\1'
-        proc = self.secrets({**REQUIRED, "MOC_SMTP_PASSWORD": "mk", "MOC_NOTIFY_WEBHOOK_URL": url})
+        optional = {"MOC_SMTP_PASSWORD": "mk", "MOC_NOTIFY_WEBHOOK_URL": url, "MOC_SMS_GATEWAY_PASSWORD": "sms$1",
+                    "MOC_ZALO_BOT_TOKEN": "123:token-bot"}
+        proc = self.secrets({**REQUIRED, **optional})
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertEqual(json.loads(proc.stdout),
-                         {**REQUIRED, "MOC_SMTP_PASSWORD": "mk", "MOC_NOTIFY_WEBHOOK_URL": url})
+        self.assertEqual(json.loads(proc.stdout), {**REQUIRED, **optional})
 
     def test_required_secret_still_stops(self) -> None:
         proc = self.secrets({k: v for k, v in REQUIRED.items() if k != "CENTRIFUGO_API_KEY"})

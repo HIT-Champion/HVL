@@ -7,7 +7,7 @@ Hasura Actions của Văn phòng điện tử: API nội bộ, chỉ Hasura gọ
 bằng GraphQL. Riêng /api/workflow/{app}/… (quy trình của ứng dụng cắm bằng manifest) đi qua cổng, cần token của client
 app-<tên> (docs/api/README.md).
 
-OpenAPI 3.1.0, 7 thao tác:
+OpenAPI 3.1.0, 8 thao tác:
 
 | Thao tác | Tóm tắt |
 |---|---|
@@ -18,6 +18,7 @@ OpenAPI 3.1.0, 7 thao tác:
 | `GET /api/workflow/{app}/processes` | Đơn người này đã gửi qua ứng dụng, mới nhất trước |
 | `GET /api/workflow/{app}/tasks` | Việc của ứng dụng giao cho người này hoặc nhóm của người này, cũ nhất trước |
 | `POST /api/workflow/{app}/tasks/{task_id}` | Hoàn thành một việc với dữ liệu form của việc |
+| `POST /actions/channels/{name}` | Kênh thông báo của chính người gọi (SMS, Zalo): myChannels, setMyChannel |
 
 ## `POST /ot/notify/{tenant}`
 
@@ -197,6 +198,38 @@ Trả về:
 | 409 | Việc vừa có người khác nhận |  |
 | 422 | Dữ liệu chưa đúng form: {"errors": {trường: mã}} (schemas/README.md, x-moc-range) | `application/json` `object` |
 | 413 | Thân yêu cầu lớn quá 64 KB |  |
+
+## `POST /actions/channels/{name}`
+
+Kênh thông báo của chính người gọi (SMS, Zalo): myChannels, setMyChannel
+
+Tham số:
+
+| Tên | Ở | Bắt buộc | Kiểu | Mô tả |
+|---|---|:-:|---|---|
+| `name` | đường dẫn | ✓ | `string` |  |
+| `X-Moc-Action-Secret` | header | ✓ | `string` | Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET) |
+
+Thân yêu cầu `application/json`:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|:-:|---|
+| `action` | `object` | ✓ |  |
+| `input` | `object` | ✓ | Đối số của Action, khai trong db/metadata/actions.graphql |
+| `session_variables` | `object (giá trị string)` | ✓ | Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, x-hasura-tenant-id, x-hasura-department-id |
+
+Trả về:
+
+| Mã | Nghĩa | Nội dung |
+|---|---|---|
+| 200 | Danh sách MyChannel: mỗi kênh cá nhân bản cài đã cấu hình một dòng (db/metadata/actions.graphql) | `application/json` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
+| 400 | Sai định dạng Action, hoặc kênh chưa được cấu hình trên bản cài | `application/json` `object` |
+| 401 | Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi | `application/json` `object` |
+| 403 | Vai trò không được dùng Action này | `application/json` `object` |
+| 409 | Tài khoản chưa có trong danh bạ của đơn vị, hoặc chưa có số điện thoại để bật SMS | `application/json` `object` |
+| 500 | Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký | `application/json` `object` |
+| 503 | Chưa gọi được CSDL, thử lại sau | `application/json` `object` |
 
 ## Kiểu dữ liệu
 

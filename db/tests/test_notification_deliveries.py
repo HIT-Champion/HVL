@@ -15,7 +15,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Kênh ngoài của thông báo (core.notification_deliveries): dòng chờ gửi tạo cùng giao dịch với thông báo, gọi lại
-cùng khóa không thêm dòng, chỉ dịch vụ của đơn vị đọc và ghi kết quả, mỗi lần đổi vào sổ kiểm toán."""
+cùng khóa không thêm dòng, chỉ dịch vụ của đơn vị đọc và ghi kết quả, mỗi lần đổi vào sổ kiểm toán. SMS, Zalo (#365):
+chỉ có dòng chờ cho người đã tự bật kênh (core.notification_subscriptions), SMS cần số điện thoại trong danh bạ.
+
+Số điện thoại, chat_id Zalo trong tệp này là giả lập."""
 
 from __future__ import annotations
 
@@ -53,9 +56,27 @@ query ($now: timestamptz!, $ids: [bigint!]!) {
                                        notification_id: {_in: $ids}}, order_by: {id: asc}) {
     id tenant_id channel attempts
     notification { kind document_id data created_at }
-    recipient { full_name email enabled }
+    recipient { full_name email enabled phone }
+    subscriptions { channel enabled zalo_chat_id }
   }
 }"""
+
+# đúng mutation của svc-workflow (subscriptions.SAVE)
+SAVE = """
+mutation ($row: core_notification_subscriptions_insert_input!) {
+  insert_core_notification_subscriptions_one(object: $row, on_conflict: {
+    constraint: notification_subscriptions_pkey, update_columns: [enabled, zalo_chat_id, link_code, link_expires_at]
+  }) { channel }
+}"""
+
+SUBS = """
+query ($users: [String!]!) {
+  core_notification_subscriptions(where: {user_id: {_in: $users}}, order_by: [{user_id: asc}, {channel: asc}]) {
+    user_id channel enabled zalo_chat_id link_code
+  }
+}"""
+
+PHONE = "+84912345678"      # giả lập
 
 
 @pytest.fixture(scope="module")
@@ -104,10 +125,16 @@ def test_queued_in_the_same_insert_once_per_channel(people):
     assert count == [["3"]]
 
 
+def subscribe(service, user: str, channel: str, enabled: bool = True, **extra) -> None:
+    row = {"user_id": user, "channel": channel, "enabled": enabled, "zalo_chat_id": None, "link_code": None,
+           "link_expires_at": None, **extra}
+    service.gql(SAVE, {"row": row})
+
+
 def test_channel_list_is_checked(people):
     w = people
     with pytest.raises(GraphQLError):
-        notify(w.service_a, "task:kd-2:assigned", (w.staff_a1.sub, ["sms"]))
+        notify(w.service_a, "task:kd-2:assigned", (w.staff_a1.sub, ["fax"]))
     # cùng một kênh hai lần vẫn chỉ một dòng
     created = notify(w.service_a, "task:kd-3:assigned", (w.staff_a1.sub, ["email", "email"]))
     assert [r["channel"] for r in deliveries(w.service_a, created)] == ["email"]
@@ -179,3 +206,92 @@ def test_each_change_is_in_the_audit_chain(people):
     # thông báo vẫn không vào sổ (bản tin phái sinh), chỉ lần gửi qua kênh ngoài
     assert sql(f"select count(*) from core.audit_log where entity = 'core.notifications' "
                f"and tenant_id = '{w.tenant_a}'") == [["0"]]
+
+
+# --- SMS, Zalo (#365) -------------------------------------------------------------------------------------------------
+
+def test_personal_channels_only_for_people_who_turned_them_on(people):
+    w = people
+    sql(f"update core.users set phone = '{PHONE}' where tenant_id = '{w.tenant_a}' and id = '{w.staff_a1.sub}'")
+    subscribe(w.service_a, w.staff_a1.sub, "sms")
+    subscribe(w.service_a, w.staff_a1.sub, "zalo", zalo_chat_id="zl-chat-5566")
+    subscribe(w.service_a, w.staff_a2.sub, "sms")              # bật SMS nhưng danh bạ chưa có số
+    subscribe(w.service_a, w.director_a.sub, "sms", enabled=False)
+    created = notify(w.service_a, "task:kd-8:assigned", (w.staff_a1.sub, ["email", "sms", "zalo"]),
+                     (w.staff_a2.sub, ["sms", "zalo"]), (w.director_a.sub, ["sms", "zalo"]))
+    assert sorted((r["user_id"], r["channel"]) for r in deliveries(w.service_a, created)) == sorted(
+        [(w.staff_a1.sub, "email"), (w.staff_a1.sub, "sms"), (w.staff_a1.sub, "zalo")])
+
+    # tài khoản bị khóa: không có dòng SMS, Zalo nữa (email vẫn như trước, vòng nền bỏ qua lúc gửi)
+    sql(f"update core.users set enabled = false where tenant_id = '{w.tenant_a}' and id = '{w.staff_a1.sub}'")
+    try:
+        created = notify(w.service_a, "task:kd-9:assigned", (w.staff_a1.sub, ["email", "sms", "zalo"]))
+        assert [r["channel"] for r in deliveries(w.service_a, created)] == ["email"]
+    finally:
+        sql(f"update core.users set enabled = true where tenant_id = '{w.tenant_a}' and id = '{w.staff_a1.sub}'")
+
+    # vòng nền đọc số điện thoại, chat_id kèm dòng chờ
+    first = notify(w.service_a, "task:kd-10:assigned", (w.staff_a1.sub, ["sms", "zalo"]))
+    body = gql_raw(DUE, {"now": "2100-01-01T00:00:00Z", "ids": [first[0]["id"]]},
+                   headers={"X-Hasura-Admin-Secret": ADMIN_SECRET})
+    rows = body["data"]["core_notification_deliveries"]
+    assert [r["channel"] for r in rows] == ["sms", "zalo"]
+    assert rows[0]["recipient"]["phone"] == PHONE
+    assert sorted((x["channel"], x["zalo_chat_id"]) for x in rows[1]["subscriptions"]) == [
+        ("sms", None), ("zalo", "zl-chat-5566")]
+
+
+def test_subscription_rows_are_checked(people):
+    w = people
+    later = "2100-01-01T00:00:00Z"
+    bad = [
+        {"channel": "zalo", "enabled": True},                                    # bật Zalo mà chưa liên kết
+        {"channel": "sms", "zalo_chat_id": "zl-1"},                              # chat_id chỉ của Zalo
+        {"channel": "sms", "link_code": "ABCD2345", "link_expires_at": later},
+        {"channel": "zalo", "link_code": "abcd2345", "link_expires_at": later},  # chữ thường
+        {"channel": "zalo", "link_code": "ABCD1234", "link_expires_at": later},  # có 1: dễ nhầm với I
+        {"channel": "zalo", "link_code": "ABCD2345"},                            # mã thiếu hạn
+        {"channel": "fax"},
+    ]
+    for row in bad:
+        with pytest.raises(GraphQLError):
+            subscribe(w.service_a, w.staff_a2.sub, **{"enabled": False, **row})
+    with pytest.raises(GraphQLError):                                            # chưa có trong danh bạ
+        subscribe(w.service_a, f"khong-co-{w.tag}", "sms")
+    # mã liên kết duy nhất trên mọi đơn vị: vòng đọc tin của bot tìm mã không cần biết đơn vị
+    code = f"Q{w.tag}Z".translate(str.maketrans("01", "23"))     # tag: 6 chữ số hex hoa → 8 ký tự hợp lệ
+    subscribe(w.service_a, w.staff_a2.sub, "zalo", enabled=False, link_code=code, link_expires_at=later)
+    with pytest.raises(GraphQLError):
+        subscribe(w.service_b, w.clerk_b.sub, "zalo", enabled=False, link_code=code, link_expires_at=later)
+    with pytest.raises(SQLError, match="users_phone"):
+        sql(f"update core.users set phone = '0912345678' where tenant_id = '{w.tenant_a}' and id = '{w.staff_a2.sub}'")
+
+
+def test_only_service_of_the_tenant_sees_subscriptions_and_phones(people):
+    w = people
+    subscribe(w.service_a, w.director_a.sub, "sms", enabled=True)
+    users = [w.director_a.sub]
+    assert w.service_a.gql(SUBS, {"users": users})["core_notification_subscriptions"] == [
+        {"user_id": w.director_a.sub, "channel": "sms", "enabled": True, "zalo_chat_id": None, "link_code": None}]
+    assert w.service_b.gql(SUBS, {"users": users})["core_notification_subscriptions"] == []
+    for user in (w.director_a, w.staff_a1, w.admin_a):
+        with pytest.raises(GraphQLError):
+            user.gql(SUBS, {"users": users})
+    # số điện thoại: dịch vụ đọc được, người trong đơn vị (chọn người giao việc) thì không
+    phones = "query ($id: String!) { core_users(where: {id: {_eq: $id}}) { id phone } }"
+    assert w.service_a.gql(phones, {"id": w.staff_a1.sub})["core_users"][0]["id"] == w.staff_a1.sub
+    for user in (w.staff_a2, w.admin_a):
+        with pytest.raises(GraphQLError):
+            user.gql(phones, {"id": w.staff_a1.sub})
+    assert w.admin_a.gql("query ($id: String!) { core_users(where: {id: {_eq: $id}}) { id } }",
+                         {"id": w.staff_a1.sub})["core_users"] == [{"id": w.staff_a1.sub}]
+
+
+def test_subscription_changes_are_in_the_audit_chain(people):
+    w = people
+    subscribe(w.service_b, w.clerk_b.sub, "sms", enabled=False)
+    subscribe(w.service_b, w.clerk_b.sub, "sms", enabled=True)
+    subscribe(w.service_b, w.clerk_b.sub, "sms", enabled=True)          # không đổi gì: không thêm dòng sổ
+    rows = sql("select action, actor_kind from core.audit_log where entity = 'core.notification_subscriptions' "
+               f"and entity_id = '{w.tenant_b}/{w.clerk_b.sub}/sms' order by id")
+    assert rows == [["insert", "service"], ["update", "service"]]

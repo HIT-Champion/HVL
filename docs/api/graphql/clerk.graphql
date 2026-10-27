@@ -56,6 +56,20 @@ input Int_comparison_exp {
   _nin: [Int!]
 }
 
+type MyChannel {
+  "Zalo: địa chỉ mở bot của đơn vị (MOC_ZALO_BOT_URL), nếu có"
+  bot_url: String
+  "sms hoặc zalo"
+  channel: String!
+  "Người gọi đã bật; Zalo bật nghĩa là đã liên kết"
+  enabled: Boolean!
+  "Zalo chưa liên kết: mã dùng một lần để nhắn cho bot"
+  link_code: String
+  link_expires_at: timestamptz
+  "SMS: số trong danh bạ đã che, còn mã nước và ba số cuối; null khi danh bạ chưa có số (quản trị thêm)"
+  phone: String
+}
+
 type OtSensor {
   flags: [String!]!
   id: String!
@@ -975,6 +989,7 @@ type mutation_root {
   ): [office_document_acl!]!
   receiveIncoming(data: jsonb!): ReceiveIncomingOutput
   registerIncoming(documentId: uuid!): RegisterIncomingOutput
+  setMyChannel(channel: String!, enabled: Boolean!): [MyChannel!]!
   "update data of the table: \"core.notifications\""
   update_core_notifications(
     "sets the columns of the filtered rows to the given values"
@@ -3059,6 +3074,7 @@ type query_root {
   ): [core_users!]!
   "fetch data from the table: \"core.users\" using primary key columns"
   core_users_by_pk(id: String!): core_users
+  myChannels: [MyChannel!]!
   myTasks: [WorkTask!]!
   "fetch data from the table: \"office.assignments\""
   office_assignments(
