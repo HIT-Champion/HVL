@@ -306,16 +306,18 @@ def checkout(git: list[str], src: pathlib.Path, commit: str) -> dict[str, str]:
 
 
 def check_gateway_env(src: pathlib.Path, env: dict[str, str]) -> None:
-    """F3.15: MOC_WAF, MOC_APISIX_WORKERS sai thì APISIX thoát ngay lúc khởi động rồi khởi động lại liên tục, mà
-    `up --wait` vẫn báo xong (apisix không có healthcheck). Kiểm trước khi dừng Signet, bằng chính script entrypoint
-    của image — cùng nguồn với `make up` (Makefile, env-ready) — với giá trị compose của commit sắp áp sẽ dùng."""
+    """F3.15: MOC_WAF, MOC_APISIX_WORKERS (#364: cả MOC_TRACE_RATIO) sai thì APISIX thoát ngay lúc khởi động rồi khởi
+    động lại liên tục, mà `up --wait` vẫn báo xong (apisix không có healthcheck). Kiểm trước khi dừng Signet, bằng chính
+    script entrypoint của image — cùng nguồn với `make up` (Makefile, env-ready) — với giá trị compose của commit sắp
+    áp sẽ dùng."""
     script = src / "platform" / "apisix" / "kiem-moi-truong.sh"
     if not script.is_file():                            # commit chưa có WAF
         return
     resolved = json.loads(_run([*compose(), "config", "--format", "json", "apisix"], cwd=src, env=env).stdout)
     values = resolved["services"]["apisix"].get("environment") or {}
     check = {"PATH": env.get("PATH", os.defpath)}
-    check.update({k: str(values[k]) for k in ("MOC_WAF", "MOC_APISIX_WORKERS") if values.get(k) is not None})
+    check.update({k: str(values[k]) for k in ("MOC_WAF", "MOC_APISIX_WORKERS", "MOC_TRACE_RATIO")
+                  if values.get(k) is not None})
     proc = _run(["sh", str(script), "--chi-kiem"], cwd=src, env=check, check=False)
     if proc.returncode != 0:
         detail = " ".join((proc.stderr or proc.stdout).split()) or f"thoát {proc.returncode}"
