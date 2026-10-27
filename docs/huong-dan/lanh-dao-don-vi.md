@@ -22,6 +22,8 @@ Việc **Cho ý kiến chỉ đạo** đến Hộp việc mỗi khi văn thư v�
 5. Bấm **Giao xử lý**. Nếu giao một phòng, lãnh đạo phòng đó nhận việc phân công. Nếu giao một người, người đó nhận
    thẳng việc xử lý.
 
+![Khung Cho ý kiến chỉ đạo, có gợi ý giao việc của tác tử](../anh/huong-dan/chi-dao.png)
+
 Văn bản chỉ để biết, không cần ai xử lý: ghi lý do (không bắt buộc) rồi bấm **Lưu, không xử lý**.
 
 Cách tác tử tìm gợi ý: [`demo-script.md`](../demo-script.md), mục "gợi ý giao việc".
@@ -46,9 +48,13 @@ người rồi bấm **Cấp quyền xem**, hoặc bấm **Gỡ** để thu lạ
   thời gian xử lý trung bình, văn bản đến theo trạng thái và theo phòng chủ trì, văn bản đi phát hành theo tháng, văn
   bản đã nộp lưu trong kho lạnh. Văn bản hạn chế chỉ được tính vào con số tổng. Các thẻ số đầu trang và bốn biểu đồ
   có liên kết **Nguồn số liệu** dẫn sang trang Phả hệ số liệu; phần văn bản đã nộp lưu thì không có.
+
+  ![Trang Điều hành: thẻ số đầu trang và biểu đồ văn bản đến](../anh/huong-dan/dieu-hanh.png)
 - **Phả hệ số liệu**: cho biết mỗi biểu đồ của trang Điều hành lấy số từ khung nhìn nào, khung nhìn đó đọc bảng nào,
   kèm kết quả kiểm chất lượng của lượt nộp lưu gần nhất. Bấm **Tải OpenLineage (.jsonl)** để tải về. Chi tiết:
   [`demo-script.md`](../demo-script.md), mục "Phả hệ và kiểm chất lượng".
+
+  ![Trang Phả hệ số liệu: đồ thị từ bảng tới khung nhìn tới biểu đồ](../anh/huong-dan/pha-he.png)
 - **Số đo**: bốn chỉ số trước và sau khi dùng hệ thống, theo [`dac-ta-san-pham.md`](../dac-ta-san-pham.md) mục 8,
   kèm điểm góp ý trung bình của người dùng. Cách đo từng chỉ số: [`so-lieu-sau.md`](../so-lieu-sau.md).
 - **Tự chẩn đoán**: trả lời bộ câu về mức trưởng thành số theo bốn không gian Con người, Quy trình, Dữ liệu, Trí tuệ,
@@ -57,5 +63,7 @@ người rồi bấm **Cấp quyền xem**, hoặc bấm **Gỡ** để thu lạ
 - **Sổ kiểm toán**: mọi thay đổi dữ liệu của đơn vị, nối thành chuỗi băm SHA-256, nên sửa hay xóa lén một dòng đều bị
   phát hiện. Trên trang văn bản, bấm **Xem trong sổ kiểm toán** để xem các dòng của riêng văn bản đó. Trong sổ, bấm
   **Mở văn bản** để quay lại văn bản.
+
+  ![Sổ kiểm toán, tab Văn bản: mốc neo ở đầu trang, mỗi dòng có băm của dòng sổ](../anh/huong-dan/so-kiem-toan.png)
 - **Sổ đăng ký**: xem và in giống văn thư ([Sổ đăng ký](van-thu.md#sổ-đăng-ký)).
 - **Góp ý**: ngoài góp ý của mình, lãnh đạo đơn vị thấy phần **Tổng hợp của đơn vị**, không hiện tên người gửi.

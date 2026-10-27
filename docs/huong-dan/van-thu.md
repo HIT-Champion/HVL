@@ -17,6 +17,8 @@ Tìm kiếm, Hỏi đáp, Ứng dụng, Góp ý. Phần dùng chung: [Việc chu
    nội dung, Độ khẩn, Hạn giải quyết. Bấm lưu nghĩa là văn thư xác nhận các ô này.
 5. Bấm **Lưu và vào sổ**. Văn bản được cấp số đến, liên tiếp theo năm, rồi chuyển tới lãnh đạo đơn vị để chỉ đạo.
 
+![Trang tiếp nhận sau khi bấm Đọc văn bản: các ô điền sẵn có nhãn Gợi ý](../anh/huong-dan/tiep-nhan-goi-y.png)
+
 Nếu chỉ bấm **Lưu văn bản**, văn bản sẽ nằm ở tab **Chờ vào sổ** của mục Văn bản đến. Khi sẵn sàng, mở văn bản đó và
 bấm **Vào sổ**. Nếu văn bản có vẻ đã được tiếp nhận trước đó (trùng số ký hiệu, cơ quan ban hành, ngày), màn hình sẽ
 báo để bạn kiểm tra lại.
@@ -64,6 +66,8 @@ cho người nhận. Nếu người soạn đã chọn đơn vị ở mục "G�
    thống trước khi in.
 3. Bấm **In sổ (PDF)** để in ra giấy, ký nhận và đóng sổ cuối năm. Cột Ký nhận và Số lượng bản ghi tay trên bản in.
    Mỗi lần in đều được ghi vào sổ kiểm toán.
+
+![Sổ văn bản đến của năm, dòng báo sổ liền số ở đầu bảng](../anh/huong-dan/so-dang-ky.png)
 
 ## Theo dõi văn bản
 

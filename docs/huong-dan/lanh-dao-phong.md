@@ -39,6 +39,8 @@ Lập hồ sơ, thêm văn bản và đóng hồ sơ làm giống chuyên viên
    hay xóa được. Cơ sở dữ liệu nghiệp vụ chỉ giữ lại bản ghi rút gọn.
 3. Hồ sơ sang tab **Đã nộp lưu**. Từ đây hồ sơ chỉ mở được ở chế độ xem, gọi là **Phòng đọc**.
 
+![Hồ sơ đã nộp lưu: vị trí gói trong kho lạnh, băm manifest, hạn khóa ghi và Phòng đọc](../anh/huong-dan/nop-luu.png)
+
 Hồ sơ đã đóng mà không ai nộp lưu thì hệ thống tự nộp lưu sau thời hạn cấu hình, mặc định 365 ngày. Kho lạnh hoạt động
 thế nào: [`demo-script.md`](../demo-script.md), mục "Nóng → lạnh".
 
