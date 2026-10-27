@@ -82,9 +82,11 @@ secrets_of() {
   case $1 in
     svc-files) secrets_json SEAWEEDFS_S3_ACCESS_KEY SEAWEEDFS_S3_SECRET_KEY HASURA_ADMIN_SECRET \
                  MEILISEARCH_API_KEY=MEILI_MASTER_KEY ;;
-    # mật khẩu SMTP, URL webhook (có khóa trong đường dẫn) của thông báo đa kênh: chỉ có khi đã cấu hình
+    # mật khẩu SMTP, URL webhook (có khóa trong đường dẫn), mật khẩu cổng SMS, token bot Zalo của thông báo đa kênh:
+    # chỉ có khi đã cấu hình
     svc-workflow) secrets_json HASURA_ADMIN_SECRET MOC_ACTION_SECRET FLOWABLE_ADMIN_PASSWORD CENTRIFUGO_API_KEY \
-                    MOC_DIRECTORY_CLIENT_SECRET 'MOC_SMTP_PASSWORD?' 'MOC_NOTIFY_WEBHOOK_URL?' ;;
+                    MOC_DIRECTORY_CLIENT_SECRET 'MOC_SMTP_PASSWORD?' 'MOC_NOTIFY_WEBHOOK_URL?' \
+                    'MOC_SMS_GATEWAY_PASSWORD?' 'MOC_ZALO_BOT_TOKEN?' ;;
     *) die "không biết dịch vụ $1" ;;
   esac
 }

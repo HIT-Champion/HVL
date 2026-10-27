@@ -783,6 +783,33 @@
     "restricted": "Văn bản hạn chế",
     "documentIncoming": "Văn bản đến liên thông từ {name}"
   },
+  "channels": {
+    "title": "Kênh thông báo",
+    "sms": "Tin nhắn SMS",
+    "smsTo": "Gửi tới số {phone}",
+    "noPhone": "Danh bạ chưa có số điện thoại của bạn: nhờ quản trị thêm",
+    "zalo": "Zalo",
+    "zaloOff": "Chưa liên kết",
+    "zaloPending": "Đang chờ bạn nhắn mã cho bot",
+    "zaloLinked": "Đã liên kết, thông báo gửi tới Zalo của bạn",
+    "zaloDone": "Đã liên kết Zalo",
+    "zaloStep": "Mở bot của đơn vị trên Zalo rồi nhắn mã này:",
+    "expires": "Mã dùng được tới {at}",
+    "openBot": "Mở bot trên Zalo",
+    "check": "Đã nhắn, kiểm tra lại",
+    "newCode": "Lấy mã mới",
+    "link": "Liên kết",
+    "turnOff": "Tắt",
+    "cancel": "Hủy",
+    "zaloLinkLabel": "Liên kết Zalo",
+    "zaloTurnOffLabel": "Tắt thông báo qua Zalo",
+    "zaloCancelLabel": "Hủy mã liên kết Zalo",
+    "error": {
+      "channel_off": "Bản cài này chưa bật kênh thông báo đó",
+      "no_phone": "Danh bạ chưa có số điện thoại của bạn: nhờ quản trị thêm rồi bật lại",
+      "not_synced": "Tài khoản chưa có trong danh bạ của đơn vị, thử lại sau ít phút"
+    }
+  },
   "audit": {
     "title": "Sổ kiểm toán",
     "subtitle": "Mọi thay đổi dữ liệu của đơn vị, nối thành chuỗi băm SHA-256: sửa hay xóa lén một dòng đều bị phát hiện.",

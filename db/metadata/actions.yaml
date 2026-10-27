@@ -98,6 +98,35 @@ actions:
       - role: staff
       - role: manager
       - role: director
+  # Kênh SMS, Zalo của thông báo (#365): phần chung của svc-workflow, chạy cả khi tắt Văn phòng điện tử nên route riêng
+  # /actions/channels/…; người gọi chỉ đọc, sửa kênh của chính mình (biến phiên). Mọi vai trò người dùng
+  - name: myChannels
+    definition:
+      kind: ""
+      handler: '{{MOC_WORKFLOW_URL}}/actions/channels/myChannels'
+      forward_client_headers: true
+      headers:
+        - name: X-Moc-Action-Secret
+          value_from_env: MOC_ACTION_SECRET
+      timeout: 15
+      type: query
+    permissions: &channel_roles
+      - role: clerk
+      - role: staff
+      - role: manager
+      - role: director
+      - role: tenant_admin
+  - name: setMyChannel
+    definition:
+      kind: synchronous
+      handler: '{{MOC_WORKFLOW_URL}}/actions/channels/setMyChannel'
+      forward_client_headers: true
+      headers:
+        - name: X-Moc-Action-Secret
+          value_from_env: MOC_ACTION_SECRET
+      timeout: 15
+      type: mutation
+    permissions: *channel_roles
 custom_types:
   enums: []
   input_objects: []
@@ -139,4 +168,5 @@ custom_types:
           field_mapping: {document_id: id}
     - name: OtSensorMap
     - name: OtSensor
+    - name: MyChannel
   scalars: []

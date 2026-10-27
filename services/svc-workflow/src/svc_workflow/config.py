@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from email.utils import parseaddr
@@ -107,6 +108,17 @@ class Settings:
     notify_webhook_kinds: tuple[str, ...] = ()
     notify_interval_s: float = 5.0
     public_url: str = ""
+    # Kênh SMS, Zalo (#365): chỉ gửi tới người đã tự bật kênh (Action setMyChannel). Trống URL cổng SMS và token bot
+    # Zalo thì tắt, như trước. Cổng SMS: ứng dụng SMS Gateway for Android, chế độ Local Server, trên một điện thoại có
+    # SIM cùng mạng LAN (POST <url>/message, Basic Auth). Mật khẩu cổng SMS và token bot (nằm trong đường dẫn API của
+    # Zalo) là bí mật, lấy từ két. Địa chỉ mở bot (tùy chọn) hiện cho người dùng lúc liên kết
+    sms_gateway_url: str = ""
+    sms_gateway_user: str = ""
+    sms_gateway_password: str = field(default="", repr=False)
+    zalo_bot_token: str = field(default="", repr=False)
+    zalo_bot_url: str = ""
+    notify_sms_kinds: tuple[str, ...] = ()
+    notify_zalo_kinds: tuple[str, ...] = ()
     # truy vết (#364): > 0 thì gửi span tới Jaeger (tracing.py). Tỉ lệ lấy mẫu do APISIX quyết; ở đây chỉ là bật/tắt
     trace_ratio: float = 0.0
 
@@ -167,6 +179,13 @@ class Settings:
                 notify_webhook_kinds=_kinds(env.get("MOC_NOTIFY_WEBHOOK_KINDS", "")),
                 notify_interval_s=float(env.get("MOC_NOTIFY_INTERVAL_S", "5")),
                 public_url=env.get("MOC_PUBLIC_URL", "").strip().rstrip("/"),
+                sms_gateway_url=env.get("MOC_SMS_GATEWAY_URL", "").strip().rstrip("/"),
+                sms_gateway_user=env.get("MOC_SMS_GATEWAY_USER", "").strip(),
+                sms_gateway_password=env.get("MOC_SMS_GATEWAY_PASSWORD", ""),
+                zalo_bot_token=env.get("MOC_ZALO_BOT_TOKEN", "").strip(),
+                zalo_bot_url=env.get("MOC_ZALO_BOT_URL", "").strip(),
+                notify_sms_kinds=_kinds(env.get("MOC_NOTIFY_SMS_KINDS", "")),
+                notify_zalo_kinds=_kinds(env.get("MOC_NOTIFY_ZALO_KINDS", "")),
                 trace_ratio=float(env.get("MOC_TRACE_RATIO", "").strip() or 0),
             )
         except ValueError as exc:
@@ -221,8 +240,23 @@ class Settings:
                 raise ConfigError("MOC_NOTIFY_WEBHOOK_URL phải là địa chỉ http:// hoặc https://")
         if self.notify_webhook_format not in WEBHOOK_FORMATS:
             raise ConfigError("MOC_NOTIFY_WEBHOOK_FORMAT chỉ nhận json hoặc ntfy")
+        if self.sms_gateway_url:
+            url = urlsplit(self.sms_gateway_url)
+            if url.scheme not in ("http", "https") or not url.hostname or url.username or url.query:
+                raise ConfigError("MOC_SMS_GATEWAY_URL phải là địa chỉ http:// hoặc https:// của cổng SMS, không kèm "
+                                  "tài khoản, vd http://192.168.1.50:8080")
+            if not (self.sms_gateway_user and self.sms_gateway_password):
+                raise ConfigError("Đặt MOC_SMS_GATEWAY_URL thì phải có MOC_SMS_GATEWAY_USER và "
+                                  "MOC_SMS_GATEWAY_PASSWORD (Basic Auth hiện trong ứng dụng trên điện thoại)")
+        # token đi vào đường dẫn API: chỉ nhận ký tự an toàn trong URL; không in token
+        if self.zalo_bot_token and not re.fullmatch(r"[A-Za-z0-9:_.-]{10,200}", self.zalo_bot_token):
+            raise ConfigError("MOC_ZALO_BOT_TOKEN không đúng dạng token bot Zalo (chữ, số, dấu : _ . -)")
+        if self.zalo_bot_url and urlsplit(self.zalo_bot_url).scheme != "https":
+            raise ConfigError("MOC_ZALO_BOT_URL phải là địa chỉ https://, vd đường dẫn mở bot trong Zalo")
         for name, kinds in (("MOC_NOTIFY_EMAIL_KINDS", self.notify_email_kinds),
-                            ("MOC_NOTIFY_WEBHOOK_KINDS", self.notify_webhook_kinds)):
+                            ("MOC_NOTIFY_WEBHOOK_KINDS", self.notify_webhook_kinds),
+                            ("MOC_NOTIFY_SMS_KINDS", self.notify_sms_kinds),
+                            ("MOC_NOTIFY_ZALO_KINDS", self.notify_zalo_kinds)):
             unknown = sorted(set(kinds) - set(KINDS))
             if unknown:
                 raise ConfigError(f"{name}: không có loại thông báo {', '.join(unknown)} (có: {', '.join(KINDS)})")

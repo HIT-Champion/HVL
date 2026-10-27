@@ -14,10 +14,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Kênh ngoài của thông báo (email, webhook; migration 1792281602600): mỗi dòng là một lần gửi một thông báo qua một
-# kênh. Dòng do trigger tạo lúc ghi thông báo; svc-workflow (vai trò service) đọc dòng chờ của đơn vị, ghi kết quả
-# (trạng thái, số lần thử, lỗi, hạn thử lại, lúc gửi) — không thêm, không xóa. Vòng nền đọc dòng đến hạn của mọi đơn
-# vị bằng khóa quản trị (as_system, chỉ đọc) kèm người nhận trong danh bạ. Không vai trò người dùng nào đọc bảng này.
+# Kênh ngoài của thông báo (email, webhook: migration 1792281602600; SMS, Zalo: 1792281603700): mỗi dòng là một lần
+# gửi một thông báo qua một kênh. Dòng do trigger tạo lúc ghi thông báo; svc-workflow (vai trò service) đọc dòng chờ
+# của đơn vị, ghi kết quả (trạng thái, số lần thử, lỗi, hạn thử lại, lúc gửi) — không thêm, không xóa. Vòng nền đọc
+# dòng đến hạn của mọi đơn vị bằng khóa quản trị (as_system, chỉ đọc) kèm người nhận trong danh bạ (email, số điện
+# thoại) và kênh người đó đã bật (chat_id Zalo). Không vai trò người dùng nào đọc bảng này.
 table:
   name: notification_deliveries
   schema: core
@@ -30,6 +31,12 @@ object_relationships:
       manual_configuration:
         remote_table: {name: users, schema: core}
         column_mapping: {tenant_id: tenant_id, user_id: id}
+array_relationships:
+  - name: subscriptions
+    using:
+      manual_configuration:
+        remote_table: {name: notification_subscriptions, schema: core}
+        column_mapping: {tenant_id: tenant_id, user_id: user_id}
 select_permissions:
   - role: service
     permission:
