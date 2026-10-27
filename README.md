@@ -135,9 +135,9 @@ nhiêu lần cũng được — kịch bản trình bày ở [`docs/demo-script.
 | (i) Vòng đời và tốc độ dữ liệu | Hồ sơ đã đóng nộp lưu thành gói Parquet + tệp + manifest có băm trên kho lạnh khóa ghi; vẫn tìm thấy, quét mã QR vẫn "khớp"; trên giao diện: lập hồ sơ, lãnh đạo phòng nộp lưu, phòng đọc xem tệp có dấu tên người xem; trang Điều hành có số liệu văn bản đã nộp lưu do DuckDB đếm thẳng trên gói Parquet trong kho lạnh | `make demo-nong-lanh` |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ → NGSI-LD (Scorpio) → vượt ngưỡng thì dựng dự thảo "Báo cáo sự cố" vào luồng văn bản đi | `make demo-it-ot` |
 | (iii) Quản trị dữ liệu | Phả hệ OpenLineage: gói lưu trữ truy ngược về bảng nghiệp vụ và tệp gốc; kiểm số dòng, cột bắt buộc trước khi ghi; mỗi biểu đồ ở trang Điều hành truy về khung nhìn và bảng nguồn (tính từ catalog PostgreSQL), xem đồ thị ở trang Phả hệ số liệu (`/pha-he`) | `make demo-pha-he` |
-| (iv) Zero-Trust | Kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán | `make demo-kiem-dich` |
+| (iv) Zero-Trust | Kiểm dịch: mọi tệp qua ClamAV trong `svc-files` trước khi ghi vào kho; tệp EICAR bị từ chối, không lưu, lần chặn vào sổ kiểm toán | `make demo-kiem-dich` |
 | (iv) Zero-Trust | Văn bản hạn chế: tệp mã hóa trong kho, chỉ người có tên mở được, bản mở có dấu tên | `make demo-han-che` |
-| (iv) Zero-Trust | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa khi khởi động lại | `make demo-ket-bi-mat` |
+| (iv) Zero-Trust | Két bí mật: `svc-files`, `svc-workflow` lấy bí mật từ két OpenBao (AppRole), không qua biến môi trường; két tự mở khóa khi khởi động lại | `make demo-ket-bi-mat` |
 | (iv) GitOps | Tự phục hồi: xóa container, reconciler dựng lại theo khai báo trong git | `make demo-tu-phuc-hoi` |
 
 Các màn nghiệp vụ, cùng cách chạy: `make demo-lien-thong` (liên thông hai đơn vị), `make demo-nap-lo` (nạp lô văn bản

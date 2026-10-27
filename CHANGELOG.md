@@ -311,6 +311,14 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   12 thêm phần DuckDB đếm văn bản đã nộp lưu (#304), câu 13 viết lại phần low-code (form dựng từ JSON Schema, #303) và
   giới hạn của quy trình ứng dụng (#325); thêm câu 15 (ứng dụng mang luồng duyệt riêng, #301) và câu 16 (vì sao cài
   ứng dụng bằng dòng lệnh).
+- Tài liệu nói đúng phạm vi đã làm, theo lần chấm thử thứ hai:
+  - kiểm dịch là `svc-files` quét bằng ClamAV trước khi ghi vào kho, sau cổng API, không có kho cách ly (README hai
+    thứ tiếng, `docs/demo-script.md`, `docs/dac-ta-san-pham.md`), thay cho "chặn ở cửa ngõ";
+  - két bí mật thay biến môi trường cho `svc-files`, `svc-workflow`, không phải cho mọi dịch vụ;
+  - `docs/du-thi/hoi-dap-hoi-dong.md`: câu 1 nêu số bảng, migration, route của Văn phòng còn nằm trong lõi (#324);
+    câu 4, 5 sửa phạm vi (AppRole, ClamAV sau cổng, CI không gọi mô hình thật); thêm câu 17 (kho lạnh) và câu 18
+    (tên Signet và tên mã `moc`);
+  - bỏ dòng lỗi thời "Giao diện chỉ tiếng Việt" ở `docs/them-ung-dung.md` mục 6 (đã có tiếng Anh từ #306).
 - Phông Be Vietnam Pro lấy từ gói npm `@fontsource/be-vietnam-pro` 5.3.0 (OFL-1.1) lúc dựng thay vì commit trong repo
   (#305, PoF #5): xóa 12 tệp TTF (ba bản trùng từng byte ở Văn phòng điện tử, Không gian cá nhân, theme đăng nhập) cùng
   `OFL.txt`, `LICENSES/OFL-1.1.txt` và khối phông trong `REUSE.toml`; `git ls-files` không còn tệp phông nào. Cùng bốn

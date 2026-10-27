@@ -25,36 +25,46 @@
 | 14 | [Lõi "không giao diện" mà sao có Grafana, trang quản trị Keycloak?](#14-lõi-không-giao-diện-mà-sao-có-grafana-trang-quản-trị-keycloak) | Tiêu chí 7, cụm ① ⑥ |
 | 15 | [Ứng dụng thứ ba muốn có luồng duyệt riêng thì làm thế nào?](#15-ứng-dụng-thứ-ba-muốn-có-luồng-duyệt-riêng-thì-làm-thế-nào) | R1–R7, tiêu chí 7 |
 | 16 | [Vì sao cài ứng dụng bằng dòng lệnh, không có nút trên giao diện?](#16-vì-sao-cài-ứng-dụng-bằng-dòng-lệnh-không-có-nút-trên-giao-diện) | Tiêu chí 9, nguyên lý (iv) |
+| 17 | [Kho lạnh có thật sự tách khỏi kho nóng không?](#17-kho-lạnh-có-thật-sự-tách-khỏi-kho-nóng-không) | Nguyên lý (i), cụm ④ |
+| 18 | [Sản phẩm tên Signet, sao lệnh và cấu hình vẫn là `moc`?](#18-sản-phẩm-tên-signet-sao-lệnh-và-cấu-hình-vẫn-là-moc) | PoF #3, #6 |
 
 ## 1. Open-Core nằm ở đâu, ứng dụng khác dùng lại lõi thế nào?
 
 Tầng 1 là profile `core` của `docker-compose.yml` (Keycloak, APISIX, Hasura + PostgreSQL, Flowable, SeaweedFS,
-Meilisearch, ClamAV, OpenBao, `svc-files`, `svc-workflow`), không có giao diện: chỉ APISIX mở cổng ra ngoài, đường
-quản trị (`/console`, `/v1/metadata`, `/admin`…) trả 404. Ứng dụng nào cũng gọi lõi qua một cổng bằng token Keycloak —
+Meilisearch, ClamAV, OpenBao, `svc-files`, `svc-workflow`), không có giao diện: chỉ APISIX mở cổng ra ngoài, đường quản
+trị (`/console`, `/v1/metadata`, `/admin`…) trả 404. Ứng dụng nào cũng gọi lõi qua một cổng bằng token Keycloak —
 GraphQL cho dữ liệu, REST cho tệp, tìm kiếm, WebSocket cho thông báo; riêng cổng xác thực văn bản không cần token — và
 đơn vị, vai trò luôn lấy từ token. Dữ liệu dùng chung nằm ở schema `core` (đơn vị, tệp, sổ kiểm toán, thông báo); Văn
 phòng điện tử có schema `office` riêng, ứng dụng mới thêm schema của nó và một client Keycloak theo mẫu `app-office`,
 không sửa `core`. Có ba ứng dụng Tầng 2: Văn phòng điện tử (`app-office`, gồm cả cổng xác thực công khai `/xac-thuc`),
-Không gian cá nhân P.A.R.A (`app-ca-nhan`, `/ca-nhan/`) và Bảng tin đơn vị (`/bang-tin/`). Ứng dụng thứ hai chỉ thêm
-schema `personal`, client `app-ca-nhan`, một route APISIX và một service compose, không sửa dòng nào trong
-`services/`, và dùng chung phiên đăng nhập, sổ kiểm toán, quét mã độc của lõi. Ứng dụng thứ ba cắm bằng một lệnh:
-`moc app install apps/bang-tin/app.yaml` đọc manifest rồi tạo client Keycloak, route APISIX, container, schema và
-migration chạy bằng vai trò CSDL riêng của ứng dụng (không có quyền gì trên lõi), quyền Hasura và Event Trigger nhận
-sự kiện văn bản của lõi; các tệp lõi không đổi (`git diff` trống), gỡ thì giữ dữ liệu. `smoke.py` và các màn demo thao
-tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Ứng dụng còn mang được quy trình duyệt của riêng nó
-lên động cơ quy trình của lõi (câu 15). Phần nghiệp vụ văn phòng phía máy chủ (Actions vào sổ, phát hành, dựng PDF văn
-bản đi) còn chạy chung tiến trình với lõi trong `svc-workflow`, `svc-files`, nhưng đã tách thành router riêng sau cờ
-`MOC_OFFICE_ENABLED`: tắt cờ thì hai dịch vụ vẫn lên, phần lõi của `make smoke` và `make demo-ca-nhan` vẫn đạt. Tách
-hẳn thành dịch vụ riêng là bước 3–5 của `docs/architecture.md` §4.7, chưa làm (#324).
+Không gian cá nhân P.A.R.A (`app-ca-nhan`, `/ca-nhan/`) và Bảng tin đơn vị (`/bang-tin/`). Ứng dụng thứ hai làm tay:
+thêm schema `personal`, và thêm client `app-ca-nhan`, một route, một service vào chính các tệp cấu hình của lõi (realm,
+`apisix.yaml`, `docker-compose.yml`); không sửa dòng nào trong `services/`, và dùng chung phiên đăng nhập, sổ kiểm toán,
+quét mã độc của lõi. Ứng dụng thứ ba cắm bằng một lệnh: `moc app install apps/bang-tin/app.yaml` đọc manifest rồi tạo
+client Keycloak, route APISIX, container, schema và migration chạy bằng vai trò CSDL riêng của ứng dụng (không có quyền
+gì trên lõi), quyền Hasura và Event Trigger nhận sự kiện văn bản của lõi; các tệp lõi không đổi (`git diff` trống), gỡ
+thì giữ dữ liệu. `smoke.py` và các màn demo thao tác như người dùng qua đúng cổng đó, bằng token của tài khoản mẫu. Ứng
+dụng còn mang được quy trình duyệt của riêng nó lên động cơ quy trình của lõi (câu 15).
+
+Chỗ lõi chưa sạch, đội nói thẳng: Văn phòng điện tử vẫn nằm trong lõi ở cả ba lớp. Mã: phần nghiệp vụ văn phòng phía máy
+chủ (Actions vào sổ, phát hành, dựng PDF văn bản đi, vòng nộp lưu) chạy chung tiến trình với lõi, trong thư mục
+`office/` của `svc-files` và `svc-workflow`. CSDL: 29 trên 45 bảng Hasura theo dõi thuộc schema `office` (15 `core`, 1
+`personal`); 31 trên 36 migration đụng `office`, 26 trong số đó nhắc tới cả `core` lẫn `office` trong cùng một tệp, nên
+muốn dựng CSDL lõi không có Văn phòng thì phải tách lại các tệp đó. Cổng: route của `svc-files` trong
+`platform/apisix/apisix.yaml` mang luôn `/api/documents/*`, `/api/registers/*`, `/api/case-files/*`. Phần đã làm là bước
+1–2 của `docs/architecture.md` §4.7 (#302): mã Văn phòng tách thành router riêng sau cờ `MOC_OFFICE_ENABLED`; tắt cờ thì
+hai dịch vụ vẫn lên, không gắn route, Action, BPMN hay vòng nền nào của Văn phòng, phần lõi của `make smoke` và
+`make demo-ca-nhan` vẫn đạt. Cờ đó cho thấy ranh giới trong mã đã có; tách CSDL, vai trò và gói riêng là bước 3–5, chưa
+làm, chưa xếp ngày (#324).
 
 **Bằng chứng:** README mục "Kiến trúc"; [`docs/api/README.md`](../api/README.md) (§1 "Muốn thêm một ứng dụng Tầng 2");
 [`docs/them-ung-dung.md`](../them-ung-dung.md) (§1 `moc app install`, mẫu `apps/bang-tin`; §3–§4 làm tay, mẫu
-`apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`, `make demo-quy-trinh` (ứng dụng mang quy trình
-riêng, `apps/nghi-phep`), `make demo-tat-van-phong`;
-[`docs/architecture.md`](../architecture.md) §4.7 (tiêu chí xong 4 đạt ở #302);
-[`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `platform/apisix/apisix.yaml`; `make smoke` (chặn đường quản
-trị); CI job `chay-thu`, phần `luong-chinh`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)" và bước "Tắt
-Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)".
+`apps/ca-nhan`), `make demo-cai-ung-dung`, `make demo-ca-nhan`, `make demo-quy-trinh` (ứng dụng mang quy trình riêng,
+`apps/nghi-phep`), `make demo-tat-van-phong`; [`docs/architecture.md`](../architecture.md) §4.7 (tiêu chí xong 4 đạt ở
+#302); [`docs/mo-hinh-du-lieu.md`](../mo-hinh-du-lieu.md) §0; `db/metadata/databases/default/tables/` (tệp `core_*`,
+`office_*`), `db/migrations/default/`; `platform/apisix/apisix.yaml` (route của `svc-files`); `make smoke` (chặn đường
+quản trị); CI job `chay-thu`, phần `luong-chinh`, bước "Tài liệu API trong docs/api/ khớp mã (make api-docs)" và bước
+"Tắt Văn phòng điện tử, lõi vẫn chạy (make demo-tat-van-phong)".
 
 ## 2. Vì sao nguồn mở, có thoát được một nhà cung cấp không?
 
@@ -89,41 +99,50 @@ vị"; CI job `chay-thu`, phần `luong-chinh`, bước "Thêm đơn vị bằng
 
 ## 4. Bảo mật: đăng nhập, tệp độc, văn bản nhạy cảm, nhật ký
 
-Đăng nhập một lần qua Keycloak; văn thư, lãnh đạo, tổ trưởng, quản trị đơn vị bắt buộc mã TOTP, cả ở đường lấy token
-cho script. Keycloak chặn dò mật khẩu, APISIX giới hạn lượt đăng nhập theo IP và kiểm JWT ngay ở biên, dịch vụ phía
-sau kiểm lại token. Trước cả bước kiểm token, mọi yêu cầu qua tường lửa ứng dụng web Coraza + OWASP CRS 4.14
-(paranoia 1) chạy trong APISIX: SQLi, XSS, đọc tệp hệ thống, tải lên tệp `.php` nhận 403 kèm mã yêu cầu để tra nhật
-ký; mỗi loại trừ cho dữ liệu thật có lý do và test riêng. Mọi tệp qua ClamAV trước khi ghi vào kho; ClamAV không trả
-lời thì từ chối (`503`) chứ không cho qua. Văn bản hạn chế: mỗi tệp một khóa AES-256 bọc trong két OpenBao, kho và bản
-sao lưu chỉ có bản mã, bản rõ chỉ ở trong bộ nhớ cho người có tên và mang tên người xem; dịch vụ lấy bí mật từ két
-bằng AppRole, không qua biến môi trường. Mọi thay đổi vào sổ kiểm toán chuỗi băm SHA-256, đầu chuỗi neo định kỳ (mặc
-định 10 phút) ra bucket khóa ghi: `make audit` tính lại cả chuỗi ngoài CSDL và chỉ ra dòng bị sửa, kể cả khi người sửa
-tắt trigger hay viết lại cả chuỗi. Giới hạn đã ghi: các container gọi nhau bằng HTTP trong mạng nội bộ, Hasura nối
-CSDL bằng siêu người dùng; chưa có bản WebAssembly nào mang Coraza đã vá 12 lỗ hổng công bố 02/10/2026 — hai lỗ mức
+Đăng nhập một lần qua Keycloak; văn thư, lãnh đạo, tổ trưởng, quản trị đơn vị bắt buộc mã TOTP, cả ở đường lấy token cho
+script. Keycloak chặn dò mật khẩu, APISIX giới hạn lượt đăng nhập theo IP và kiểm JWT ngay ở biên, dịch vụ phía sau kiểm
+lại token. Trước cả bước kiểm token, mọi yêu cầu qua tường lửa ứng dụng web Coraza + OWASP CRS 4.14 (paranoia 1) chạy
+trong APISIX: SQLi, XSS, đọc tệp hệ thống, tải lên tệp `.php` nhận 403 kèm mã yêu cầu để tra nhật ký; mỗi loại trừ cho
+dữ liệu thật có lý do và test riêng. Mọi tệp qua ClamAV trước khi ghi vào kho: `svc-files` quét ngay khi nhận, tức là
+sau cổng APISIX, vì WAF ở cổng không soi được nội dung tệp trong multipart; ClamAV không trả lời thì từ chối (`503`) chứ
+không cho qua. Tệp nhiễm bị từ chối và không được lưu ở đâu, không có kho cách ly: sổ kiểm toán ghi lần chặn (người tải,
+cỡ tệp, SHA-256, tên mẫu ClamAV). Văn bản hạn chế: mỗi tệp một khóa AES-256 bọc trong két OpenBao, kho và bản sao lưu
+chỉ có bản mã, bản rõ chỉ ở trong bộ nhớ cho người có tên và mang tên người xem; hai dịch vụ của đội (`svc-files`,
+`svc-workflow`) lấy bí mật từ két bằng AppRole, không qua biến môi trường. Mọi thay đổi vào sổ kiểm toán chuỗi băm
+SHA-256, đầu chuỗi neo định kỳ (mặc định 10 phút) ra bucket khóa ghi: `make audit` tính lại cả chuỗi ngoài CSDL và chỉ
+ra dòng bị sửa, kể cả khi người sửa tắt trigger hay viết lại cả chuỗi. Giới hạn đã ghi: PostgreSQL, Keycloak, Hasura,
+SeaweedFS, Meilisearch, Centrifugo vẫn nhận bí mật qua biến môi trường, và `.env` vẫn là nguồn của mọi bí mật, kể cả
+khóa mở két (static seal, để két tự mở khi khởi động lại); các container gọi nhau bằng HTTP trong mạng nội bộ, Hasura
+nối CSDL bằng siêu người dùng; chưa có bản WebAssembly nào mang Coraza đã vá 12 lỗ hổng công bố 02/10/2026 — hai lỗ mức
 high có biện pháp ở cổng, các cách lẩn WAF mức medium thì dịch vụ vẫn tự kiểm đầu vào.
 
 **Bằng chứng:** `platform/keycloak/README.md`; `platform/apisix/README.md` mục WAF (luật, loại trừ, lỗ hổng của Coraza
-3.3.3); `make smoke` khối "Tường lửa ứng dụng web"; `make demo-kiem-dich`, `make demo-han-che`, `make demo-ket-bi-mat`,
-`make audit`; `db/README.md` (test sổ kiểm toán, gồm các kiểu sửa lén); [`docs/trien-khai.md`](../trien-khai.md) §8;
-CI job `chay-thu`: phần `luong-chinh` (`make smoke`, bước `make demo-han-che`, `make demo-ket-bi-mat`), phần `e2e`
+3.3.3; ClamAV soi nội dung tệp); `make smoke` khối "Tường lửa ứng dụng web"; `make demo-kiem-dich`, `make demo-han-che`,
+`make demo-ket-bi-mat`, `make audit`; [`docs/muc-hoan-thien.md`](../muc-hoan-thien.md) F3.2 (giới hạn của két);
+`db/README.md` (test sổ kiểm toán, gồm các kiểu sửa lén); [`docs/trien-khai.md`](../trien-khai.md) §8; CI job
+`chay-thu`: phần `luong-chinh` (`make smoke`, bước `make demo-han-che`, `make demo-ket-bi-mat`), phần `e2e`
 (`kiem-dich.spec.ts`), phần `sao-luu` (`make audit` sau khi khôi phục); job `security` (gitleaks, OSV-Scanner).
 
 ## 5. AI có bịa không, dữ liệu có ra khỏi máy không?
 
-Mô hình (Qwen3 1,7B và Qwen3-Embedding 0,6B, trọng số Apache-2.0) chạy bằng Ollama trên chính máy chủ, trong mạng
-Docker `ai` không ra Internet, đã tắt tính năng đám mây; chữ gửi mô hình đã che số định danh, điện thoại, email, số
-tài khoản. Trợ lý chỉ tìm trong văn bản người hỏi được xem: lọc ngay trong chỉ mục theo quy tắc quyền, rồi hậu kiểm
-từng văn bản bằng Hasura với token người hỏi trước khi đoạn nào tới mô hình; văn bản hạn chế không bao giờ vào chỉ
-mục. Đường mặc định không cần mô hình: câu trích nguyên văn kèm "số ký hiệu · tr. n"; khi mô hình viết, `svc-files` tự
-gắn [n] cho từng câu theo đoạn nguồn, câu không có căn cứ thì người dùng chỉ thấy câu trích. Đo trên bản online ngày
-23/10/2026 (laptop i5-12500H, Ollama 0.35.1 dùng 8 lõi CPU, `python3 scripts/demo.py do-hoi-dap`, 19 câu): recall@3
-16/16, từ chối đúng 3/3, 0 nguồn bị cấm, tìm p50 0,4 s / p95 0,5 s; câu của mô hình trích đúng nguồn 16/16, viết p50
-8,9 s / p95 21,1 s. Kho mẫu nhỏ, câu hỏi do đội viết: đây là mức trần, chưa phải số trên văn bản thật.
+Mô hình (Qwen3 1,7B và Qwen3-Embedding 0,6B, trọng số Apache-2.0) chạy bằng Ollama trên chính máy chủ, trong mạng Docker
+`ai` không ra Internet, đã tắt tính năng đám mây; chữ gửi mô hình đã che số định danh, điện thoại, email, số tài khoản.
+Trợ lý chỉ tìm trong văn bản người hỏi được xem: lọc ngay trong chỉ mục theo quy tắc quyền, rồi hậu kiểm từng văn bản
+bằng Hasura với token người hỏi trước khi đoạn nào tới mô hình; văn bản hạn chế không bao giờ vào chỉ mục. Đường mặc
+định không cần mô hình: câu trích nguyên văn kèm "số ký hiệu · tr. n"; khi mô hình viết, `svc-files` tự gắn [n] cho từng
+câu theo đoạn nguồn, câu không có căn cứ thì người dùng chỉ thấy câu trích. Đo trên bản online ngày 23/10/2026 (laptop
+i5-12500H, Ollama 0.35.1 dùng 8 lõi CPU, `python3 scripts/demo.py do-hoi-dap`, 19 câu): recall@3 16/16, từ chối đúng
+3/3, 0 nguồn bị cấm, tìm p50 0,4 s / p95 0,5 s; câu của mô hình trích đúng nguồn 16/16, viết p50 8,9 s / p95 21,1 s. Kho
+mẫu nhỏ, câu hỏi do đội viết: đây là mức trần, chưa phải số trên văn bản thật. CI không bật profile `ai`: phần `ai` của
+CI chạy đường không mô hình (tìm theo từ khóa, trả lời bằng câu trích) và giữ phần quyền — câu về quyền hay văn bản hạn
+chế mà ra nguồn bị cấm thì CI đỏ. Đường có mô hình (Ollama, Qwen3) chỉ được kiểm bằng test đơn vị với mô hình giả và lần
+đo tay ở trên; chưa có bước CI nào gọi mô hình thật.
 
 **Bằng chứng:** `make demo-hoi-dap`, `make do-hoi-dap` (thoát 1 khi có nguồn bị cấm), `make demo-che-pii`,
-`make do-che-pii`; `services/svc-files/README.md` (bảng số đo); `docs/architecture.md` QĐ-004, QĐ-006;
-`docker-compose.yml` (dịch vụ `ollama`, mạng `ai`); CI job `chay-thu`, phần `ai`, bước "Đo chất lượng hỏi đáp
-(make do-hoi-dap)".
+`make do-che-pii`; `services/svc-files/README.md` (bảng số đo); [`docs/danh-gia-ai.md`](../danh-gia-ai.md) (CI không bật
+profile `ai`); `services/svc-files/tests/assist_fakes.py` (mô hình giả); `docs/architecture.md` QĐ-004, QĐ-006;
+`docker-compose.yml` (dịch vụ `ollama`, mạng `ai`); CI job `chay-thu`, phần `ai`, bước "Đo chất lượng hỏi đáp (make
+do-hoi-dap)", không có mô hình.
 
 ## 6. Hỏng máy, mất dữ liệu thì sao?
 
@@ -300,3 +319,32 @@ gỡ.
 **Bằng chứng:** [`docs/them-ung-dung.md`](../them-ung-dung.md) mục 1 (lệnh, trang Danh mục ứng dụng), 1.2 (từng bước
 ghi vào đâu), 1.9 (giới hạn); `scripts/ung_dung.py`; `make demo-cai-ung-dung` (cài, cài lại, gỡ giữ dữ liệu); e2e
 `ung-dung.spec.ts`.
+
+## 17. Kho lạnh có thật sự tách khỏi kho nóng không?
+
+Tách về quyền và vòng đời, chưa tách về máy. Kho lạnh là bucket `moc-cold` trên cùng SeaweedFS với bucket nóng
+`moc-files`, bật S3 Object Lock chế độ COMPLIANCE: trong hạn giữ, không ai xóa, ghi đè hay rút ngắn hạn được, kể cả tài
+khoản quản trị kho. Vòng nộp lưu là một tác vụ nền trong tiến trình `svc-files` (phần Văn phòng): hồ sơ đã đóng thành
+gói Parquet + tệp + manifest có băm trong bucket lạnh, chi tiết rời CSDL; văn bản vẫn tìm thấy, cổng xác thực vẫn
+"khớp", và gói đọc được bằng DuckDB hay công cụ Parquet bất kỳ, không cần Signet. Chưa có: kho lạnh ở máy hay dịch vụ S3
+khác (cấu hình chỉ đổi được tên bucket, `MOC_COLD_BUCKET`, còn địa chỉ S3 dùng chung với kho nóng), và job nộp lưu chạy
+tách khỏi `svc-files`. Vì bucket lạnh nằm trên chính máy chủ, mốc neo sổ kiểm toán còn chép ra ngoài được
+(`moc audit anchor --to`, `--publish`) và được két ký bằng khóa Ed25519 `moc-anchor` để người ngoài tự kiểm (#56).
+
+**Bằng chứng:** [`docs/architecture.md`](../architecture.md) QĐ-010; `services/svc-files/src/svc_files/config.py`
+(`MOC_COLD_BUCKET` phải khác bucket nóng); `services/svc-files/src/svc_files/app.py` (vòng `office.archiver`);
+`services/svc-files/src/svc_files/anchors.py` (chữ ký mốc neo); `make demo-nong-lanh` (xóa gói bị từ chối); CI job
+`chay-thu`, phần `sao-luu`, bước "Nộp lưu hồ sơ nóng → lạnh (make demo-nong-lanh)".
+
+## 18. Sản phẩm tên Signet, sao lệnh và cấu hình vẫn là `moc`?
+
+Signet là tên sản phẩm; dự án trước đây tên Mộc. Phần người dùng và người tải thấy đã mang tên Signet: giao diện, trang
+đăng nhập (theme `signet`), README, gói phát hành `signet-<phiên bản>.tar.gz` cùng SBOM `signet-<phiên bản>.cdx.json`.
+Tên mã kỹ thuật `moc` còn trong biến `MOC_*`, realm Keycloak `moc`, lệnh `scripts/moc.py`, image `moc/*`, thư mục cài
+mẫu `/opt/moc`. Đổi các tên này đụng vào bản cài đang chạy: tên realm nằm trong issuer của mọi token mà APISIX và Hasura
+kiểm, biến `MOC_*` nằm trong `.env` của mọi bản cài. Vì vậy đổi tên mã phải đi kèm một bước nâng cấp chuyển đổi cho bản
+đang chạy; đội chưa xếp lịch việc này.
+
+**Bằng chứng:** README mục "Tài liệu" (ghi chú về tên mã); `.github/workflows/release.yml` (tên gói phát hành);
+`docker-compose.yml` (`HASURA_GRAPHQL_JWT_SECRET`: issuer `${MOC_PUBLIC_URL}/realms/${MOC_REALM:-moc}`);
+`platform/apisix/apisix.yaml` (`discovery` theo `MOC_REALM`).

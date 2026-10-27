@@ -21,9 +21,9 @@ Trước buổi trình diễn làm theo [checklist](#checklist-trước-giờ-tr
 | (i) Vòng đời và tốc độ dữ liệu | Nóng → lạnh: hồ sơ đã đóng chuyển sang kho lạnh, vẫn tìm, xác thực và phân tích được (DuckDB trên gói Parquet) | `make demo-nong-lanh` | Có (F3.8) |
 | (ii) Hội tụ IT/OT | Cảm biến nhiệt độ phòng máy → NGSI-LD → dựng nháp báo cáo sự cố | `make demo-it-ot` | Có (F3.10) |
 | (iii) Quản trị dữ liệu | Phả hệ: báo cáo ← bảng ← sự kiện; kiểm chất lượng tự động | `make demo-pha-he` | Có (F3.9) |
-| (iv) Zero-Trust + GitOps | Kiểm dịch tại cửa ngõ | `make demo-kiem-dich` | Có (F3.1) |
+| (iv) Zero-Trust + GitOps | Kiểm dịch trước khi lưu | `make demo-kiem-dich` | Có (F3.1) |
 | (iv) Zero-Trust + GitOps | Văn bản hạn chế: tệp mã hóa trong kho, chỉ người có tên mở được, bản mở có dấu tên | `make demo-han-che` | Có (F3.7) |
-| (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ không giữ bí mật, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
+| (iv) Zero-Trust + GitOps | Két bí mật: dịch vụ của đội không nhận bí mật qua biến môi trường, két tự mở khóa | `make demo-ket-bi-mat` | Có (F3.2) |
 | (iv) Zero-Trust + GitOps | Tự phục hồi từ cấu hình trong git | `make demo-tu-phuc-hoi` | Có (F3.3) |
 
 Ngoài các màn nguyên lý còn năm màn nghiệp vụ, cùng cách chạy: liên thông văn bản giữa hai đơn vị trên cùng bản cài
@@ -204,12 +204,13 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
   view là đồ thị đổi theo. Chỉ cạnh biểu đồ → khung nhìn khai trong mã giao diện, và có test so với truy vấn thật của
   trang Điều hành (`apps/office/tests/lineage.test.ts`).
 
-## (iv) Kiểm dịch tại cửa ngõ — `make demo-kiem-dich`
+## (iv) Kiểm dịch trước khi lưu — `make demo-kiem-dich`
 
 **Điều muốn chứng minh:**
 
 - Không tệp nào chạm kho mà chưa qua ClamAV.
-- Tệp nhiễm bị chặn ngay ở cửa ngõ, không được lưu. Thứ duy nhất còn lại là dòng sổ kiểm toán ghi lần chặn.
+- Tệp nhiễm bị từ chối ngay khi `svc-files` nhận, trước khi ghi vào kho, và không được lưu ở đâu. Thứ duy nhất còn
+  lại là dòng sổ kiểm toán ghi lần chặn.
 - Sổ kiểm toán là chuỗi băm, neo ra ngoài CSDL: ai sửa hay xóa dòng đó, kể cả quản trị, đều bị phát hiện.
 
 **Lệnh in ra 5 bước:**
@@ -233,7 +234,10 @@ Parquet → gói lưu trữ, số dòng đã kiểm); nút "Tải OpenLineage (.
 
 - *"Chặn ở gateway hay ở dịch vụ?"* Ở `svc-files`, sau APISIX. Mọi đường tải tệp lên đều đi qua đây, không có
   đường nào ghi thẳng vào SeaweedFS. Tệp được quét trên luồng trước khi ghi vào kho. ClamAV không trả lời thì
-  từ chối tệp (`503`), không cho qua.
+  từ chối tệp (`503`), không cho qua. Không quét ở cổng vì WAF trong APISIX (coraza-proxy-wasm) không soi được
+  nội dung tệp trong multipart (`platform/apisix/README.md`, mục WAF).
+- *"Có kho cách ly không?"* Không. Tệp nhiễm bị từ chối và không lưu ở đâu, người tải thấy lý do ngay. Sổ kiểm toán
+  giữ cỡ tệp, SHA-256 và tên mẫu ClamAV để tra lại.
 - *"Mã độc mới, chưa có mẫu thì sao?"* ClamAV chỉ bắt được mẫu đã biết. Mẫu tự cập nhật nhiều lần mỗi ngày
   (freshclam chạy sẵn trong image `clamav/clamav`). Lớp sau là: tệp không bao giờ được thực thi trên máy chủ,
   PDF chỉ được đọc trong tiến trình con có giới hạn bộ nhớ, CPU và thời gian (F2.7).
