@@ -113,10 +113,11 @@ def app() -> dict:
 # ------------------------------------------------------------------------------------------- danh sách trắng sự kiện
 
 def test_app_events_whitelist_skips_restricted_documents(world):
+    # office.document.received do trigger documents_received ghi lúc tiếp nhận (#381), các loại khác ghi tay ở đây
     doc = received(world.clerk_a, incoming(world.tag, 9301))["id"]
     secret = received(world.clerk_a, incoming(world.tag, 9302, restricted=True))["id"]
     for d in (doc, secret):
-        for kind in (*KINDS, "office.document.directed", "office.document.assigned"):
+        for kind in (*KINDS[1:], "office.document.directed", "office.document.assigned"):
             sql(f"insert into office.document_events (tenant_id, document_id, kind, actor_id, actor_kind, data) "
                 f"values ('{world.tenant_a}', '{d}', '{kind}', 'van-thu', 'user', '{{\"note\": \"bí mật\"}}')")
     rows = sql(f"select e.kind, e.tenant_id, (e.id = d.id)::text, (e.occurred_at = d.created_at)::text "
@@ -133,7 +134,8 @@ def test_registered_through_core_function_reaches_feed(world):
     doc = received(world.clerk_a, incoming(world.tag, 9303))["id"]
     Service(world.clerk_a.sub, "service", world.tenant_a).gql(
         "mutation ($id: uuid!) { office_register_incoming(args: {document_id: $id}) { id } }", {"id": doc})
-    assert sql(f"select kind from core.app_events where document_id = '{doc}'") == [["office.document.registered"]]
+    assert sql(f"select kind from core.app_events where document_id = '{doc}' order by id") == [
+        ["office.document.received"], ["office.document.registered"]]
 
 
 def test_feed_and_registry_are_not_in_graphql_for_users(world):

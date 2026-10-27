@@ -16,7 +16,8 @@
 
 """Sinh sơ đồ kiến trúc tổng thể của Signet cho README: SVG có chuyển động và GIF lặp khép kín.
 
-Yêu cầu đi từ trái sang phải: người dùng → cổng APISIX → dịch vụ → dữ liệu. Đường nối chạy nét theo chiều dữ liệu, hai
+Yêu cầu đi từ trái sang phải: người dùng → cổng APISIX → dịch vụ → dữ liệu; ngoài cùng bên phải là các kênh bên ngoài
+mà svc-workflow gửi thông báo tới (tùy chọn). Đường nối chạy nét theo chiều dữ liệu, hai
 chấm sáng đi theo hai yêu cầu thật (văn bản vào quy trình BPMN; tệp qua kiểm dịch). Màu theo không gian H-P-D-I, viền
 đậm là mã của đội, logo đặt trên phần mềm nguồn mở dùng nguyên bản (docs/anh/logo/, nguồn ở NGUON.md).
 
@@ -47,7 +48,7 @@ THU_MUC_LOGO = ROOT / "docs" / "anh" / "logo"
 ROW = [60 + i * 88 + (24 if i >= 3 else 0) for i in range(9)]
 MID = [y + 29 for y in ROW]
 UY = (320, 480)
-W, H = 1280, ROW[8] + 162
+W, H = 1500, ROW[8] + 162  # cột 1280–1480: kênh thông báo bên ngoài
 NET, XUNG = 0.8, 6.4  # chu kỳ chạy nét và chu kỳ chấm sáng (giây); 6,4 = 8 vòng nét nên GIF lặp khép kín
 BUOC = 0.08  # 8/100 giây một khung (GIF đếm thời gian theo 1/100 giây): 10 khung một vòng nét, 80 khung cả GIF
 SO_KHUNG = round(XUNG / BUOC)
@@ -75,9 +76,12 @@ T = {
         scorpio=("Scorpio (tùy chọn)", "NGSI-LD, cảm biến IoT"),
         jaeger=("Jaeger (tùy chọn)", "truy vết cổng → dịch vụ"),
         logs=("Vector + Parseable", "log tập trung (tùy chọn)"), restic=("restic", "sao lưu CSDL và kho tệp"),
+        ext="Ngoài hệ thống (tùy chọn)", mail=("Email, webhook chat", "SMTP · Mattermost, Slack, ntfy"),
+        sms=("SMS", "điện thoại Android cùng LAN"), zalo=("Zalo", "bot của đơn vị"),
+        ext_note=["người dùng tự bật", "SMS, Zalo cho mình"],
         l_metrics="chỉ số", l_sql="SQL", l_actions="Actions", l_push="đẩy thông báo", l_bpmn="BPMN", l_secret="bí mật",
         l_meta="siêu dữ liệu", l_scan="kiểm dịch", l_store="lưu tệp", l_index="chỉ mục", l_keys="khóa, bí mật",
-        l_span="span", l_ngsi="NGSI-LD",
+        l_span="span", l_ngsi="NGSI-LD", l_notify="gửi thông báo",
         legend=[("app", "Ứng dụng"), ("id", "Định danh [H]"), ("proc", "Quy trình [P]"), ("data", "Dữ liệu [D]"),
                 ("ai", "AI [I]"), ("trust", "Tin cậy"), ("ops", "Vận hành")],
         bold="Viền đậm: mã của đội · viền mảnh có logo: phần mềm nguồn mở dùng nguyên bản",
@@ -107,9 +111,12 @@ T = {
         scorpio=("Scorpio (optional)", "NGSI-LD, IoT sensors"),
         jaeger=("Jaeger (optional)", "gateway → service tracing"),
         logs=("Vector + Parseable", "central logs (optional)"), restic=("restic", "database and file backup"),
+        ext="Outside services (optional)", mail=("Email, chat webhooks", "SMTP · Mattermost, Slack, ntfy"),
+        sms=("SMS", "Android phone on the LAN"), zalo=("Zalo", "the unit's bot"),
+        ext_note=["each user opts in", "to SMS and Zalo"],
         l_metrics="metrics", l_sql="SQL", l_actions="Actions", l_push="push", l_bpmn="BPMN", l_secret="secrets",
         l_meta="metadata", l_scan="scan", l_store="store", l_index="index", l_keys="keys, secrets",
-        l_span="spans", l_ngsi="NGSI-LD",
+        l_span="spans", l_ngsi="NGSI-LD", l_notify="notifications",
         legend=[("app", "Applications"), ("id", "Identity [H]"), ("proc", "Process [P]"), ("data", "Data [D]"),
                 ("ai", "AI [I]"), ("trust", "Trust"), ("ops", "Operations")],
         bold="Thick border: written by the team · thin border with logo: upstream open source used as is",
@@ -238,6 +245,11 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     text(1236, R[3] - 16, tx["t1"], 10.5, 600, "#8c959f", "end", ' letter-spacing="0.6"')
     for i, s in enumerate(tx["note"]):
         text(1236, 100 + i * 16, s, 11, 400, "#57606a", "end", ' font-style="italic"')
+    # kênh bên ngoài, ngang hàng Scorpio, Flowable, OpenBao: svc-workflow gọi ra, không có gì gọi vào
+    a('<rect x="1280" y="316" width="200" height="316" rx="24" fill="none" stroke="#8c959f" stroke-dasharray="4 4"/>')
+    text(1296, 338, tx["ext"], 11.5, 400, "#57606a", "start")
+    for i, s in enumerate(tx["ext_note"]):
+        text(1380, 604 + i * 15, s, 10.5, 400, "#57606a", extra=' font-style="italic"')
 
     # đường nối vẽ trước, nằm dưới hộp; nhãn từ cổng là đường dẫn thật trong cấu hình APISIX
     for y in UY:
@@ -265,6 +277,10 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     edge([*nhanh, (1005, M[7]), (1030, M[7])])
     edge([(700, R[6] + 12), (765, R[6] + 12), (765, R[6] - 15), (1015, R[6] - 15), (1015, R[5] + 43),
           (1030, R[5] + 43)], tx["l_keys"], 890, R[6] - 19)
+    # thông báo ra ngoài: từ đỉnh svc-workflow, qua khe giữa hàng Scorpio và Flowable, rẽ tới từng kênh
+    for k in (3, 4, 5):
+        edge([(935, R[4]), (935, R[3] + bh + 7), (1275, R[3] + bh + 7), (1275, M[k]), (1295, M[k])])
+    text(1100, R[3] + bh + 23, tx["l_notify"], 10, 400, "#57606a")
 
     # chấm sáng đi theo luồng, vẽ dưới hộp: vào hộp thì khuất, ra hộp thì hiện
     for color, path, begin in XUNG_SANG:
@@ -310,6 +326,8 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
                                 (x4, 6, "meili", "data", False), (x4, 7, "ollama", "ai", False),
                                 (x4, 8, "restic", "ops", False)):
         box(x, R[r], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
+    for r, k in ((3, "mail"), (4, "sms"), (5, "zalo")):
+        box(1295, R[r], bw, bh, "user", *tx[k])
 
     # chú giải
     ly = R[8] + 95

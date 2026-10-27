@@ -172,7 +172,9 @@ python3 scripts/seed.py                         # chỉ máy demo: 2 đơn vị,
 
 Từ đây mọi lệnh vận hành chạy trong `/opt/moc` bằng `python3 scripts/…` và `docker compose …` (bản cài không có
 `Makefile`): `make smoke` thành `python3 scripts/smoke.py`, `make demo-kiem-dich` thành `python3 scripts/demo.py
-kiem-dich`, `make totp` thành `python3 scripts/totp.py`.
+kiem-dich`, `make totp` thành `python3 scripts/totp.py`. Bản cài không chép `apps/`, vì gói ứng dụng nằm ngoài lõi.
+Vì vậy hai màn cắm ứng dụng (`make demo-cai-ung-dung`, `make demo-quy-trinh`) chỉ chạy trong thư mục mã nguồn. Chạy
+trong bản cài thì màn dừng ngay, chưa gỡ hay đổi gì.
 
 ## 5. HTTPS bằng Caddy
 

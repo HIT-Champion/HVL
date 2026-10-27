@@ -63,6 +63,16 @@ class RuntimeTest(unittest.TestCase):
     def test_runtime_entries_exist(self) -> None:
         self.assertEqual([rel for rel in runtime() if not (ROOT / rel).exists()], [])
 
+    def test_every_make_demo_script_is_installed(self) -> None:
+        # Bản cài không có Makefile: màn make demo-… chạy bằng python3 scripts/<tệp>.py trong /opt/moc
+        # (docs/demo-script.md, Phương án dự phòng). Thiếu demo_tat_van_phong.py từng làm màn đó không có ở bản cài
+        make = (ROOT / "Makefile").read_text(encoding="utf-8")
+        recipes = re.findall(r"^demo-[\w-]+:.*\n((?:\t.*\n)+)", make, re.M)
+        used = sorted({f"scripts/{name}.py" for recipe in recipes
+                       for name in re.findall(r"python3 scripts/(\w+)\.py", recipe)})
+        self.assertIn("scripts/demo_tat_van_phong.py", used)
+        self.assertEqual([rel for rel in used if rel not in runtime()], [], "thêm vào RUNTIME của scripts/install.sh")
+
 
 if __name__ == "__main__":
     unittest.main()

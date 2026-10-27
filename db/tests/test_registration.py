@@ -52,7 +52,7 @@ def test_numbers_are_consecutive_and_recorded(world):
     assert second["register_number"] == first["register_number"] + 1
 
     events = sql(f"select kind, actor_id, data->>'register_number' from office.document_events "
-                 f"where document_id = '{first['id']}'")
+                 f"where document_id = '{first['id']}' and kind = 'office.document.registered'")
     assert events == [["office.document.registered", world.clerk_a.sub, str(first["register_number"])]]
 
 
@@ -65,7 +65,24 @@ def test_registering_twice_does_not_take_a_second_number(world):
     last = sql(f"select last_number from office.registers r join office.documents d on d.register_id = r.id "
                f"where d.id = '{doc}'")[0][0]
     assert int(last) >= first["register_number"]
-    assert sql(f"select count(*) from office.document_events where document_id = '{doc}'") == [["1"]]
+    assert sql(f"select count(*) from office.document_events where document_id = '{doc}' "
+               f"and kind = 'office.document.registered'") == [["1"]]
+
+
+def test_receiving_writes_the_received_event(world):
+    """#381: văn bản đến mới có đúng một sự kiện office.document.received, người làm là văn thư, cùng lúc với văn
+    bản; vào sổ thêm sự kiện registered sau nó. Dự thảo văn bản đi không có sự kiện này."""
+    doc = receive(world, 9107)
+    events = sql("select e.kind, e.actor_id, e.actor_kind, (e.created_at = d.created_at)::text "
+                 "from office.document_events e join office.documents d on d.id = e.document_id "
+                 f"where e.document_id = '{doc}'")
+    assert events == [["office.document.received", world.clerk_a.sub, "user", "true"]]
+    register(as_clerk(world.service_a, world.clerk_a), doc)
+    assert sql(f"select kind from office.document_events where document_id = '{doc}' order by id") == [
+        ["office.document.received"], ["office.document.registered"]]
+    draft = world.staff_a1.gql(INSERT_DOC, {"o": {"type_code": "TB", "summary": "Dự thảo không có sự kiện tiếp nhận"}})
+    draft_id = draft["insert_office_documents_one"]["id"]
+    assert sql(f"select count(*) from office.document_events where document_id = '{draft_id}'") == [["0"]]
 
 
 def test_parallel_registrations_get_distinct_consecutive_numbers(world):
@@ -174,7 +191,7 @@ def test_a_task_is_written_once(world):
     for _ in range(2):
         svc.gql(EVENT, {"e": {**event, "kind": "office.task.overdue", "data": {"sla_task_id": task}}})
         svc.gql(EVENT, {"e": {**event, "kind": "office.document.overdue", "data": {}}})
-    kinds = sql(f"select kind from office.document_events where document_id = '{doc}' and kind <> "
-                f"'office.document.registered' order by id")
+    kinds = sql(f"select kind from office.document_events where document_id = '{doc}' and kind not in "
+                f"('office.document.received', 'office.document.registered') order by id")
     assert [k for (k,) in kinds] == ["office.document.directed"] + ["office.task.overdue",
                                                                      "office.document.overdue"] * 2
