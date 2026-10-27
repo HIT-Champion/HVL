@@ -651,9 +651,53 @@ make logs-down                     # tắt: 8 dịch vụ về json-file, dừng
   `[A-Za-z0-9._:-]{1,128}`, mã khác thì thay bằng mã mới (trả lại ở header); `svc-files` chưa kiểm (như từ trước):
   chuỗi tùy ý vào nhật ký và các dòng sổ kiểm toán nó ghi. Vector chỉ đưa mã đúng dạng đó vào cột `request_id`;
   `make logs-tra` kiểm mã trước khi ghép vào câu SQL.
-- Không có tracing (span, thời gian từng chặng): chỉ nối dòng theo mã. Docker rootless và Docker Desktop (dockerd
-  không chung mạng với máy chủ): chưa thử cổng `127.0.0.1:24224`. RAM lúc nghỉ khoảng 18 MiB (Vector) và 45 MiB
-  (Parseable) — `docker stats` trên máy dev ngày 23/10/2026; dưới tải chưa đo.
+- Log chỉ nối dòng theo mã; thời gian từng chặng xem ở mục Truy vết phân tán dưới đây. Docker rootless và Docker
+  Desktop (dockerd không chung mạng với máy chủ): chưa thử cổng `127.0.0.1:24224`. RAM lúc nghỉ khoảng 18 MiB
+  (Vector) và 45 MiB (Parseable) — `docker stats` trên máy dev ngày 23/10/2026; dưới tải chưa đo.
+
+## Truy vết phân tán
+
+Profile `trace` (tắt mặc định, #364) cho thấy một yêu cầu đi qua những chặng nào, mỗi chặng mất bao lâu: APISIX →
+`svc-files` hay Hasura → `svc-workflow` → các lời gọi HTTP của dịch vụ (Hasura, Meilisearch, OpenBao, Ollama,
+Flowable…).
+**Jaeger** 2.22 nhận span qua OTLP/HTTP (cổng 4318, chỉ trong mạng `moc`), giữ 10 000 trace mới nhất trong RAM
+([`platform/trace/jaeger.yaml`](../platform/trace/jaeger.yaml)) và mở giao diện ở `127.0.0.1:16686` trên máy chủ.
+
+```bash
+# .env: thêm trace vào MOC_EXTRA_PROFILES (vd MOC_EXTRA_PROFILES=tunnel,trace) và đặt tỉ lệ, rồi
+MOC_TRACE_RATIO=0.1
+make up
+ssh -L 16686:127.0.0.1:16686 <máy chủ>   # xem từ xa: http://127.0.0.1:16686
+```
+
+- **Lấy mẫu ở APISIX:** plugin `opentelemetry` (global rule trong `apisix.yaml`) chọn `MOC_TRACE_RATIO` yêu cầu (0–1)
+  theo `trace_id`, gửi `traceparent` cho dịch vụ phía sau. `svc-files`, `svc-workflow` không tự chọn: chỉ ghi span khi
+  `traceparent` mang cờ đã chọn, nên việc nền (đồng bộ danh bạ, gửi thông báo, lập chỉ mục) không sinh span. Hasura
+  chuyển tiếp `traceparent` sang Action (`forward_client_headers`), nên span của `svc-workflow` nằm cùng trace với
+  APISIX; Hasura không có span riêng (bản CE không hỗ trợ OpenTelemetry).
+- **Tìm theo mã yêu cầu:** span của APISIX có thẻ `x-request-id`; trên giao diện Jaeger chọn dịch vụ `apisix`, ô Tags
+  gõ `x-request-id=<mã>`. Mã này cũng là mã của `make logs-tra` (mục Log tập trung).
+- **Tắt** (`MOC_TRACE_RATIO=0`, mặc định): APISIX không ghi span nào, hai dịch vụ không nạp OpenTelemetry. Giữ `0` khi
+  không bật profile `trace`: tỉ lệ khác 0 mà không có Jaeger thì APISIX và dịch vụ ghi lỗi gửi span vào nhật ký.
+  Giá trị phải là số từ 0 tới 1 (`0`, `0.1`, `1`); sai thì `make up`, reconciler GitOps và chính container APISIX
+  dừng và báo lỗi, vì APISIX gặp giá trị sai sẽ bỏ cả global rule chung với WAF và mã yêu cầu.
+- **Che dữ liệu, hai lớp:**
+  - `svc-files`, `svc-workflow` (`tracing.py`) chỉ gửi thuộc tính trong danh sách trắng: phương thức, mã trạng thái,
+    route, đường dẫn không có chuỗi truy vấn, tên máy. Chuỗi qua bộ che thông tin cá nhân (F4.4). Lời gọi tới máy
+    ngoài mạng của Signet (tên có dấu chấm hay địa chỉ IP: webhook, liên thông) không có span và không
+    mang `traceparent`, nên mã trace không ra khỏi các dịch vụ nội bộ. Lỗi chỉ giữ tên loại ngoại lệ, không giữ
+    thông điệp hay traceback. Không ghi header nào (`Authorization`, cookie).
+  - Jaeger bỏ `http.target` (đường dẫn kèm chuỗi truy vấn) trong span của APISIX, giữ `url.path`.
+- **Giới hạn:**
+  - span của APISIX vẫn có `user_agent.original` và `x-request-id` do client gửi (chuỗi tùy ý);
+  - client tự gửi `traceparent` thì APISIX nối vào `trace_id` đó, và chọn theo chính `trace_id` đó: client chọn được
+    `trace_id` rơi vào tỉ lệ, chỉ làm tăng số span (giới hạn tốc độ vẫn áp);
+  - Flowable, Keycloak, PostgreSQL chưa gửi span;
+  - Jaeger 2.22 bỏ API HTTP v1 mà nguồn dữ liệu Jaeger của Grafana dùng, nên chưa xem trace trong Grafana;
+  - trace mất khi container Jaeger khởi động lại; giao diện không có tài khoản, như Grafana.
+- **RAM** (máy dev, 28/10/2026): Jaeger nghỉ 11 MiB, đỉnh 123 MiB khi đầy 10 000 trace 6 span (bộ nhớ cgroup của
+  container; trần compose 256m). Mỗi tiến trình `svc-files`, `svc-workflow` thêm khoảng 15 MiB khi bật (RSS, đo
+  trước và sau khi nạp OpenTelemetry); tắt thì không thêm gì.
 
 ## Hội tụ IT/OT
 
