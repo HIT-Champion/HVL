@@ -31,7 +31,7 @@ Closes #
 - [ ] Tests are added or updated for the change (where it can be tested)
 - [ ] The feature documentation is updated **in this PR**
 - [ ] New configuration (if any) is declared in `.env.example` with a comment
-- [ ] `CHANGELOG.md` section `[Chưa phát hành]` is updated (user-visible changes, written in Vietnamese)
+- [ ] `CHANGELOG.md` section `[Chưa phát hành]` has one line per user-visible change (Vietnamese, issue or PR no.)
 - [ ] New upstream software (if any) is in `DEPENDENCIES.md` with its OSI license; `COPYRIGHT.txt` regenerated
 - [ ] No upstream project is forked, patched or bundled
 - [ ] No secrets, `.env`, real data or model weights in the change
