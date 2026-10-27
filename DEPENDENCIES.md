@@ -35,7 +35,8 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
   WeasyPrint dùng trong `svc-files`. 24/10/2026: pypdf 6.21.2 (21/10, vá GHSA-6c7f-9265-g8fw, GHSA-gmh7-3g9r-mjh5,
   GHSA-jr96-gvgh-j3r4, HIGH: PDF dị dạng làm chạy rất lâu); serialize-javascript 7.1.3 (22/10, GHSA-m5mm-p8h7-m29v)
   và fast-uri 3.1.9 (19/10, bốn GHSA mức LOW/MODERATE) — gói kéo theo khi dựng `apps/office`, chọn đúng bản vá chứ
-  không lấy bản mới hơn (serialize-javascript 7.1.4 ra 23/10).
+  không lấy bản mới hơn (serialize-javascript 7.1.4 ra 23/10). 27/10/2026: cùng serialize-javascript 7.1.3 cho trang
+  tài liệu (`website/`, #349).
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -87,7 +88,7 @@ phẩm: bản cài của Signet không chạy, không phục vụ trang này. G�
 | [`@easyops-cn/docusaurus-search-local`](https://github.com/easyops-cn/docusaurus-search-local) | 0.55.3 | MIT | Tìm kiếm: chỉ mục dựng sẵn lúc build, tìm ngay trong trình duyệt (lunr, `lunr-languages` có tiếng Việt), không gọi dịch vụ ngoài |
 | [Be Vietnam Pro](https://github.com/bettergui/BeVietnamPro) (`@fontsource/be-vietnam-pro`) | 5.3.0 | OFL-1.1 | Phông của trang, cùng phông giao diện ứng dụng; tự phục vụ, không gọi CDN. Bản dựng kèm `fonts/be-vietnam-pro/OFL.txt` lấy từ gói |
 
-Quét `website/package-lock.json` ngày 27/10/2026: 1305 gói khác nhau. Ngoài danh sách giấy phép được nhận chỉ có ba
+Quét `website/package-lock.json` ngày 27/10/2026: 1304 gói khác nhau. Ngoài danh sách giấy phép được nhận chỉ có ba
 gói, cùng bốn gói tệp khóa không ghi giấy phép; đều có ngoại lệ ghi lý do trong `.github/license-exceptions.json`:
 
 | Gói | Giấy phép | Kéo theo bởi | Ghi chú |
@@ -97,9 +98,17 @@ gói, cùng bốn gói tệp khóa không ghi giấy phép; đều có ngoại l
 | `robust-predicates` | Unlicense | d3-delaunay (qua Mermaid) | Đưa mã vào phạm vi công cộng, OSI phê duyệt |
 | `eval`, `require-like`, `format`, `khroma` | MIT | Docusaurus, Mermaid | `package.json` không khai giấy phép hay khai bằng trường `licenses` kiểu cũ; tệp LICENSE trong gói là MIT |
 
-`lunr-languages` (MPL-1.1, copyleft yếu) dùng nguyên bản cho tìm kiếm tiếng Việt. Ba lỗ hổng OSV-Scanner báo ở gói chỉ
-chạy lúc dựng (serialize-javascript, tinypool) hay máy chủ phát triển (uuid của sockjs) ghi lý do và hạn xem lại trong
-`website/osv-scanner.toml`.
+`lunr-languages` (MPL-1.1, copyleft yếu) dùng nguyên bản cho tìm kiếm tiếng Việt.
+
+Ba gói kéo theo có lỗ hổng mà gói cha còn ghim dải cũ được ép lên bản vá bằng `overrides` trong `website/package.json`
+(#349); cả ba chỉ chạy lúc dựng hay ở máy chủ phát triển, không có trong trang đăng lên. Gói cha nâng dải thì bỏ mục
+tương ứng.
+
+| Gói | Bản ép | Gói cha ghim | Ghi chú |
+|---|---|---|---|
+| `serialize-javascript` | 7.1.3 | copy-webpack-plugin, css-minimizer-webpack-plugin: `^6` | Hai plugin gọi `serialize(obj)`, 7.x vẫn xuất hàm CommonJS đó. Ngoại lệ vá bảo mật, xem mục Cách đọc |
+| `tinypool` | 2.1.2 | @docusaurus/core 3.10.2: `^1` | Docusaurus chỉ nạp khi bật `future.faster.ssgWorkerThreads`; trang không bật. Muốn bật thì dựng thử trước |
+| `uuid` (chỉ dưới sockjs) | 11.1.1 | sockjs 0.3.24 (máy chủ của `npm start`): `^8.3.2` | sockjs gọi `require('uuid').v4`, 11.x còn bản CommonJS |
 
 ## Tầng 1 — Lõi nền tảng
 

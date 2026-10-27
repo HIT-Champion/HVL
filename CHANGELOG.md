@@ -79,6 +79,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - `DEPENDENCIES.md` bỏ năm thành phần chưa từng dùng (Kestra, Marquez, openlineage-python, Typer, Gotenberg) (#347).
 
 ### Bảo mật
+- Trang tài liệu ép serialize-javascript, tinypool, uuid lên bản vá, đóng sáu cảnh báo Dependabot (#349).
 - Nuxt của Văn phòng điện tử nâng 4.5.2 → 4.6.2, đóng bốn cảnh báo Dependabot (Signet không dính) (#321, #322).
 - Góp ý trong ứng dụng tự che số điện thoại, CCCD, số tài khoản, email trước khi lưu, cả góp ý đã gửi (#265, #266).
 - Tải lên kiểm loại tệp theo nội dung, chặn chương trình, kịch bản; ảnh JPEG, PNG được gỡ EXIF, vị trí GPS (#149, #150).
