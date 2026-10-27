@@ -8,6 +8,13 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+## [1.2.0] - 2026-10-27
+
+Bản cho vòng trường 01/11. Quy trình thành dịch vụ của lõi: ứng dụng khai BPMN và form JSON Schema trong manifest, có
+ứng dụng mẫu Đơn nghỉ phép chỉ dùng lõi; Văn phòng điện tử tách khỏi lõi sau một cờ. Giao diện Liền mạch, kiểm trợ năng
+WCAG 2.2 AA và song ngữ; OCR bản scan, hỏi đáp trong một văn bản, thống kê kho lạnh bằng DuckDB. Vận hành: kiểm bản
+online qua HTTPS mỗi ngày, kịch bản nâng cấp có lùi bản, bản dev tự theo `develop`; trang tài liệu trên GitHub Pages.
+
 ### Đã thêm
 - Bản dev theo `develop` tại signet-dev.htechcs.com; job kiểm hằng ngày đòi đúng commit đầu `develop` (#344).
 - Quy trình là dịch vụ của lõi: ứng dụng khai BPMN và form JSON Schema trong manifest, gọi API `/api/workflow/<tên>/…`;
@@ -45,7 +52,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Kiểm bản online chạy thêm ngay sau mỗi lần phát hành: bản online chưa nâng lên thẻ mới thì đỏ ngay (#344, #345).
 - Tách mã Văn phòng điện tử khỏi lõi: dời mã chung và câu GraphQL riêng của Văn phòng, gắn phần Văn phòng sau một cờ;
   tắt thì lõi vẫn chạy; `make demo-tat-van-phong` kiểm trong CI, không đụng bản cài khác (#302, #315, #318, #328, #329).
-- Lịch phiên bản: v1.2.0 ngày 30/10 cho vòng trường, bản nộp chấm 03/12 đổi thành v1.3.0 (#179, #180).
+- Lịch phiên bản: v1.2.0 cho vòng trường, bản nộp chấm 03/12 đổi thành v1.3.0 (#179, #180, #354).
 - Ứng dụng cách ly khỏi mạng lõi: chỉ tới được cổng APISIX, gọi lõi qua cổng như trình duyệt (#207, #208).
 - Ảnh giao diện trong README chụp lại theo giao diện Liền mạch; CI lưu ảnh màn hình e2e ở mọi lần chạy (#218, #220).
 - Không gian cá nhân theo giao diện Liền mạch; sơ đồ cảm biến, Phả hệ dùng được trên điện thoại (#235, #237, #239).

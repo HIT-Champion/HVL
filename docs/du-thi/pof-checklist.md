@@ -56,8 +56,8 @@ head -3 LICENSE        # xác nhận là toàn văn, không phải link
 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
-| ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 3 bản v0.1.0, v1.0.0, v1.1.0 | −5 |
-| ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
+| ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 4 bản v0.1.0, v1.0.0, v1.1.0, v1.2.0 | −5 |
+| ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`, `v1.2.0`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
 | ✅ | Dùng **định dạng mở** cho gói phát hành | `.tar.gz` — **tuyệt đối không** `.zip`, `.rar`, `.arj`. Mỗi bản kèm gói `.tar.gz` tự sinh và `.sha256`, không tải lên gói nén nào khác; v1.1.0 thêm SBOM `.cdx.json` | −3 |
 
 > ⚠️ GitHub **tự động** đính kèm cả `Source code (zip)` và `Source code (tar.gz)` vào mỗi release.
