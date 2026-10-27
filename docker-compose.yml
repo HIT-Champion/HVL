@@ -805,11 +805,26 @@ services:
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
 
+  # Tài liệu API (#357): Swagger UI công khai ở /tai-lieu-api/, client Keycloak riêng app-tai-lieu-api. Là ứng dụng
+  # Tầng 2 để lõi vẫn không có giao diện: "Try it out" gọi lõi qua đúng các route của cổng như mọi ứng dụng. Hai bộ
+  # OpenAPI chia lúc dựng từ docs/api/openapi/ (ngữ cảnh phụ, viết một dòng để make install thay được). Chỉ ở mạng apps
+  app-tai-lieu-api:
+    <<: *common
+    build: {context: ./apps/tai-lieu-api, additional_contexts: {openapi: ./docs/api/openapi}}
+    image: moc/app-tai-lieu-api:${MOC_VERSION:-dev}
+    profiles: [app]
+    networks: [apps]
+    read_only: true                       # máy chủ thư viện chuẩn, không ghi gì (như app-nghi-phep)
+    mem_limit: 64m
+    environment:
+      MOC_REALM: ${MOC_REALM:-moc}
+
 networks:
   moc:
     driver: bridge
-  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, ứng dụng cài bằng moc app install). Ứng dụng tới
-  # lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra Internet
+  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, ứng dụng cài bằng moc app
+  # install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra
+  # Internet
   apps:
     driver: bridge
     internal: true

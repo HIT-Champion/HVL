@@ -178,6 +178,7 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 	@python3 -m unittest discover -s apps/bang-tin/tests
 	@cd apps/nghi-phep && node --test tests/*.test.js
 	@python3 -m unittest discover -s apps/nghi-phep/tests
+	@python3 -m unittest discover -s apps/tai-lieu-api/tests
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify

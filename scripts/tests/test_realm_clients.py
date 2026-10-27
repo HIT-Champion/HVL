@@ -157,9 +157,11 @@ class SubstituteTest(unittest.TestCase):
 class SelectTest(unittest.TestCase):
     def test_only_browser_apps(self) -> None:
         apps = {c["clientId"]: c for c in realm_clients.browser_apps(realm_file())}
-        self.assertEqual(set(apps), {"app-office", "app-ca-nhan"})
+        self.assertEqual(set(apps), {"app-office", "app-ca-nhan", "app-tai-lieu-api"})
         self.assertEqual(apps["app-ca-nhan"]["redirectUris"], ["https://signet.example/ca-nhan/*"])
-        self.assertEqual(apps["app-ca-nhan"]["attributes"]["pkce.code.challenge.method"], "S256")
+        self.assertEqual(apps["app-tai-lieu-api"]["redirectUris"], ["https://signet.example/tai-lieu-api/*"])
+        for name in ("app-ca-nhan", "app-tai-lieu-api"):
+            self.assertEqual(apps[name]["attributes"]["pkce.code.challenge.method"], "S256")
 
     def test_cli_and_service_clients_excluded(self) -> None:
         rest = {c["clientId"]: c for c in realm_file()["clients"]}
@@ -175,29 +177,30 @@ class SelectTest(unittest.TestCase):
 
 class SyncTest(unittest.TestCase):
     def test_adds_only_missing_app(self) -> None:
-        # bản cài dựng trước khi có app-ca-nhan
-        kc = FakeKeycloak(*BUILT_IN, "app-office", "moc-cli", "svc-workflow")
+        # bản cài dựng trước khi có app-tai-lieu-api (v1.1.0)
+        kc = FakeKeycloak(*BUILT_IN, "app-office", "app-ca-nhan", "moc-cli", "svc-workflow")
         result = realm_clients.sync(client(kc), realm_file())
-        self.assertEqual(result, {"present": ["app-office"], "created": ["app-ca-nhan"]})
+        self.assertEqual(result, {"present": ["app-office", "app-ca-nhan"], "created": ["app-tai-lieu-api"]})
         self.assertEqual(kc.writes(), [("POST", "/clients")])
         sent = kc.calls[-1][2]
-        want = next(c for c in realm_file()["clients"] if c["clientId"] == "app-ca-nhan")
+        want = next(c for c in realm_file()["clients"] if c["clientId"] == "app-tai-lieu-api")
         self.assertEqual(sent, want)   # đúng như tệp realm: mapper claim Hasura, PKCE, địa chỉ chuyển hướng
         self.assertEqual({m["name"] for m in sent["protocolMappers"]},
                          {m["name"] for m in next(c for c in realm_file()["clients"]
                                                   if c["clientId"] == "app-office")["protocolMappers"]})
         # chạy lại: không tạo trùng, không sửa gì
         again = realm_clients.sync(client(kc), realm_file())
-        self.assertEqual(again, {"present": ["app-office", "app-ca-nhan"], "created": []})
+        self.assertEqual(again, {"present": ["app-office", "app-ca-nhan", "app-tai-lieu-api"], "created": []})
         self.assertEqual(kc.writes(), [("POST", "/clients")])
 
     def test_never_recreates_removed_cli_or_service_client(self) -> None:
-        kc = FakeKeycloak(*BUILT_IN, "app-office", "app-ca-nhan")   # quản trị đã gỡ moc-cli, svc-workflow
+        kc = FakeKeycloak(*BUILT_IN, "app-office", "app-ca-nhan", "app-tai-lieu-api")   # đã gỡ moc-cli, svc-workflow
         self.assertEqual(realm_clients.sync(client(kc), realm_file())["created"], [])
         self.assertEqual(kc.writes(), [])
 
     def test_paging(self) -> None:
-        kc = FakeKeycloak(*(f"c{i}" for i in range(tenants.PAGE * 2 + 3)), "app-office", "app-ca-nhan")
+        kc = FakeKeycloak(*(f"c{i}" for i in range(tenants.PAGE * 2 + 3)), "app-office", "app-ca-nhan",
+                          "app-tai-lieu-api")
         self.assertEqual(realm_clients.sync(client(kc), realm_file())["created"], [])
 
 
@@ -206,16 +209,17 @@ class CommandTest(unittest.TestCase):
         kc = FakeKeycloak(*BUILT_IN, "app-office")
         code, out, _ = run_moc(kc, "realm", "clients", "--dry-run", "--json")
         self.assertEqual(code, 0)
-        self.assertEqual(json.loads(out), {"present": ["app-office"], "created": ["app-ca-nhan"], "dry_run": True})
+        self.assertEqual(json.loads(out), {"present": ["app-office"], "created": ["app-ca-nhan", "app-tai-lieu-api"],
+                                           "dry_run": True})
         self.assertEqual(kc.writes(), [])
 
     def test_text(self) -> None:
         kc = FakeKeycloak(*BUILT_IN, "app-office")
         code, out, _ = run_moc(kc, "realm", "clients")
         self.assertEqual(code, 0)
-        self.assertIn("vừa thêm app-ca-nhan; đã có app-office", out)
+        self.assertIn("vừa thêm app-ca-nhan, app-tai-lieu-api; đã có app-office", out)
         code, out, _ = run_moc(kc, "realm", "clients")
-        self.assertIn("app-office, app-ca-nhan — đã có đủ", out)
+        self.assertIn("app-office, app-ca-nhan, app-tai-lieu-api — đã có đủ", out)
 
     def test_refused_and_unavailable(self) -> None:
         code, _, err = run_moc(FakeKeycloak(status=403), "realm", "clients")

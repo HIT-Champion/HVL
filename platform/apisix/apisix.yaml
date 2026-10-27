@@ -26,6 +26,7 @@
 #   /api/workflow/*                  → svc-workflow (quy trình của ứng dụng cắm bằng manifest) — cần token
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
+#   /tai-lieu-api, /tai-lieu-api/*   → app-tai-lieu-api (Swagger UI) — không cần token; gọi thử đi qua các route trên
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Container ứng dụng chỉ ở mạng `apps` cùng APISIX (docker-compose.yml): phần máy chủ của ứng dụng cũng gọi lõi qua
@@ -86,6 +87,12 @@ upstreams:
     type: roundrobin
     nodes:
       "app-ca-nhan:8080": 1
+  # Tài liệu API (apps/tai-lieu-api, #357): Swagger UI; "Try it out" gọi lõi qua đúng các route ở dưới bằng token người
+  # dùng
+  - id: app-tai-lieu-api
+    type: roundrobin
+    nodes:
+      "app-tai-lieu-api:8080": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -514,6 +521,11 @@ routes:
     uris: ["/ca-nhan", "/ca-nhan/*"]
     methods: [GET, HEAD]
     upstream_id: app-ca-nhan
+
+  - id: app-tai-lieu-api
+    uris: ["/tai-lieu-api", "/tai-lieu-api/*"]
+    methods: [GET, HEAD]
+    upstream_id: app-tai-lieu-api
 
   - id: app-office
     uri: /*

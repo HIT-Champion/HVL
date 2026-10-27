@@ -267,6 +267,7 @@ và một dự thảo phúc đáp bị tổ trưởng trả lại chờ sửa.
 |---|---|---|
 | <http://localhost:8080> | Văn phòng điện tử | Có |
 | <http://localhost:8080/ca-nhan/> | Không gian cá nhân P.A.R.A | Có |
+| <http://localhost:8080/tai-lieu-api/> | Tài liệu API (Swagger UI): đọc API lõi và API Văn phòng điện tử, đăng nhập để gọi thử qua cổng | Không bắt buộc |
 | <http://localhost:8080/bang-tin/> | Bảng tin đơn vị, sau khi cắm bằng `make app-install APP=apps/bang-tin/app.yaml` | Có |
 | <http://localhost:8080/xac-thuc> | Cổng xác thực văn bản: nhập mã hoặc thả tệp PDF; mã của văn bản mẫu ở trang chi tiết văn bản (Văn bản đi, tab Đã phát hành) | Không |
 | <http://localhost:8080/trang-thai> | Trạng thái hệ thống | Không |
@@ -335,7 +336,7 @@ nguyên bản (image chính thức, không sửa mã thượng nguồn).
 
 ```
 apps/                Văn phòng điện tử (office/, Nuxt 4) · Không gian cá nhân P.A.R.A (ca-nhan/) · Bảng tin đơn vị
-                     (bang-tin/, cắm bằng moc app install)
+                     (bang-tin/, cắm bằng moc app install) · Tài liệu API bằng Swagger UI (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, quy trình BPMN, thông báo, nhắc hạn, gợi ý giao việc
                      svc-files/: tệp, kiểm dịch, tìm kiếm, dựng PDF, ký số, cổng xác thực, các tác tử AI
                      ot-sensor/: cảm biến nhiệt độ giả lập (profile iot-sim)
