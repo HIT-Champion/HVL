@@ -53,6 +53,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Phông Be Vietnam Pro lấy từ gói npm thay vì lưu trong repo, vẫn tự phục vụ; dịch vụ mới `keycloak-fonts` (#305, #314).
 
 ### Đã sửa lỗi
+- Reconciler dừng, chạy lại cả profile thêm của bản cài (`MOC_EXTRA_PROFILES`, như `tunnel`) khi áp commit (#351).
 - Id việc, phiên quy trình gửi lên được kiểm dạng trước khi ghép vào đường dẫn REST của Flowable (#330, #331).
 - Hoàn thành việc không còn báo lỗi khi Flowable gặp khóa lạc quan hay deadlock; tự gọi lại (#189, #190, #316, #317).
 - Thanh bên không mở lại che trang sau khi bấm chọn mục; viền focus mục menu không còn bị cắt (#216, #217, #297, #298).
