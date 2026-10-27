@@ -253,6 +253,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   tĩnh của `index.html` khớp bảng dịch, `vi` và `en` cùng khóa, cùng tham số. Test giao diện +14. e2e
   `tieng-anh.spec.ts` thêm một test: bấm "English" ở Không gian cá nhân, rồi Bảng tin và Văn phòng điện tử mở ra cũng
   tiếng Anh; về lại tiếng Việt ở Văn phòng điện tử thì Không gian cá nhân về theo.
+- Trang thuật ngữ `docs/thuat-ngu.md` (#308), cho mục Giới thiệu của trang tài liệu: các từ của Signet theo sáu nhóm
+  (sản phẩm và kiến trúc, văn bản và nghiệp vụ văn thư, vai trò, tin cậy và vận hành, trợ lý AI, ứng dụng). Mỗi từ
+  giải thích trong một, hai dòng, kèm mã tính năng nếu có và tài liệu gốc để đọc kỹ hơn.
 - Hướng dẫn sử dụng theo vai trò `docs/huong-dan/` (một phần của #308): trang mục lục (đăng nhập, tài khoản mẫu, một
   văn bản đi qua những ai), trang việc chung, và mỗi vai trò một trang: văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo
   đơn vị, quản trị đơn vị. Mỗi trang ghi việc hằng ngày theo từng bước, đúng tên mục và nút trên giao diện, và trỏ tới
