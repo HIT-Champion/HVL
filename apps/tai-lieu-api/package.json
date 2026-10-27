@@ -1,0 +1,15 @@
+{
+  "name": "moc-app-tai-lieu-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Signet — Tài liệu API: Swagger UI công khai cho API lõi và API Văn phòng điện tử, gọi thử qua cổng",
+  "dependencies": {
+    "oidc-client-ts": "3.5.0",
+    "swagger-ui-dist": "5.33.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

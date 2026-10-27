@@ -1,0 +1,85 @@
+/*
+ * Copyright 2026 Signet Team
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* Tài liệu API: thanh trên, nút, thẻ chọn bộ theo màu Liền mạch như apps/nghi-phep, phông hệ thống (không tải phông).
+   Phần thân là của Swagger UI (lib/swagger-ui/swagger-ui.css), chỉ chỉnh khoảng cách cho khớp trang. */
+:root {
+  --brand-700: #555b3f;
+  --brand-800: #42492e;
+  --stone-50: #f4f5f1;
+  --stone-300: #aaa995;
+  --stone-600: #555b48;
+  --stone-900: #202820;
+  --butter: #eee3bc;
+  --butter-edge: #e0d3a5;
+  --red-50: #fef2f2;
+  --red-700: #b91c1c;
+  --focus: #666d4c;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+  color: var(--stone-900);
+  background: #fff;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; line-height: 1.5; }
+button { font: inherit; }
+main { flex: 1; width: 100%; max-width: 80rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+main:focus { outline: none; }
+h1 { font-size: 1.375rem; margin: 0.5rem 0 0.25rem; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+/* liên kết bỏ qua: chỉ hiện khi bàn phím tới */
+.bo-qua { position: absolute; left: -9999px; top: 0.5rem; padding: 0.5rem 0.75rem; background: #fff;
+  color: var(--brand-800); border: 2px solid var(--focus); border-radius: 0.5rem; z-index: 10; }
+.bo-qua:focus { left: 0.5rem; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  padding: 0.75rem 1.25rem; background: var(--butter); border-bottom: 1px solid var(--butter-edge); }
+.brand { display: flex; align-items: center; gap: 0.6rem; color: inherit; text-decoration: none; }
+.brand span { display: flex; flex-direction: column; line-height: 1.2; }
+.brand small { color: var(--stone-600); font-size: 0.75rem; }
+.top-nav { display: flex; align-items: center; gap: 1rem; font-size: 0.875rem; flex-wrap: wrap; }
+.top-nav a { color: var(--brand-800); text-underline-offset: 3px; }
+.who { font-weight: 600; }
+
+/* nút cao tối thiểu 44px như Văn phòng */
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0.5rem 1rem;
+  border-radius: 0.5rem; border: 1px solid transparent; font-weight: 600; cursor: pointer;
+  background: var(--brand-700); color: #fff; }
+.btn:hover { background: var(--brand-800); }
+.btn.ghost { background: none; border-color: #8a8466; color: var(--stone-900); }
+.btn.ghost:hover { background: #e6d9ab; }
+
+.hint { margin: 0 0 1rem; color: var(--stone-600); font-size: 0.9375rem; max-width: 56rem; }
+.status { color: var(--stone-600); min-height: 1.5em; margin: 0.5rem 0 0; }
+.loi { margin: 0.5rem 0 1rem; padding: 0.75rem 1rem; border-radius: 0.5rem; background: var(--red-50);
+  color: var(--red-700); border: 1px solid #fecaca; }
+
+.tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; border-bottom: 1px solid var(--stone-300); }
+.tab { min-height: 44px; padding: 0.5rem 0.9rem; border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--stone-600); font-weight: 600; cursor: pointer; }
+.tab:hover { color: var(--stone-900); }
+.tab[aria-current="true"] { color: var(--stone-900); border-bottom-color: var(--brand-700); }
+
+/* Swagger UI: bỏ lề ngang riêng của nó (main đã có), giữ nguyên phần còn lại */
+.swagger-ui .wrapper { padding: 0; max-width: none; }
+.swagger-ui .information-container .info { margin: 1.25rem 0; }
+
+.foot { padding: 1rem 1.25rem; font-size: 0.8125rem; color: var(--stone-600); text-align: center;
+  background: var(--stone-50); }

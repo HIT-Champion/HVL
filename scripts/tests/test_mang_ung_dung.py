@@ -14,9 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Cách ly mạng ứng dụng khỏi lõi: container ứng dụng (app-office, app-ca-nhan, ứng dụng cài bằng `moc app install`)
-chỉ ở mạng `apps` (internal), nơi chỉ có APISIX — tới lõi duy nhất qua cổng. Hasura giao sự kiện tới ứng dụng qua cổng
-hook 9081 của APISIX: có trong node_listen, không publish, route hook chỉ khớp ở cổng đó. Kiểm chữ docker-compose.yml,
+"""Cách ly mạng ứng dụng khỏi lõi: container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, ứng dụng cài bằng
+`moc app install`) chỉ ở mạng `apps` (internal), nơi chỉ có APISIX — tới lõi duy nhất qua cổng. Hasura giao sự kiện tới
+ứng dụng qua cổng hook 9081 của APISIX: có trong node_listen, không publish, route hook chỉ khớp ở cổng đó. Kiểm chữ
+docker-compose.yml,
 platform/apisix/config.yaml và tệp do scripts/ung_dung.py sinh (không có PyYAML, không cần Docker, không đọc .env).
 Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
@@ -39,7 +40,7 @@ from test_duong_ham import service_block  # noqa: E402
 COMPOSE = ROOT / "docker-compose.yml"
 CONFIG = ROOT / "platform" / "apisix" / "config.yaml"
 APP = ROOT / "apps" / "bang-tin" / "app.yaml"
-APPS_NET = {"apisix", "app-office", "app-ca-nhan"}        # đúng các service của docker-compose.yml ở mạng apps
+APPS_NET = {"apisix", "app-office", "app-ca-nhan", "app-tai-lieu-api"}   # đúng các service ở mạng apps
 CORE_HOSTS = ("keycloak", "hasura", "postgres", "svc-files", "svc-workflow", "openbao", "seaweedfs", "centrifugo",
               "meilisearch", "flowable", "clamav", "ollama", "scorpio")
 
@@ -163,7 +164,7 @@ def record(**changes: Any) -> dict[str, Any]:
 
 class ComposeNetworks(unittest.TestCase):
     def test_apps_only_on_apps_network(self) -> None:
-        for name in ("app-office", "app-ca-nhan"):
+        for name in ("app-office", "app-ca-nhan", "app-tai-lieu-api"):
             self.assertEqual(networks_of(service_block(name)), ["apps"], name)    # ghi đè x-common (mạng moc)
             self.assertNotIn("ports:", service_block(name), name)
 

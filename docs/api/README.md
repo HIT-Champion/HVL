@@ -42,9 +42,11 @@ gh run download <run-id> -n docs-api-1 -D docs/api   # <run-id> lấy ở trang 
 ```
 
 Đọc API REST thì mở [`rest-svc-files.md`](rest-svc-files.md), [`rest-svc-workflow.md`](rest-svc-workflow.md).
-Muốn thử gọi ngay trên trang web, mở các tệp OpenAPI bằng công cụ đọc OpenAPI 3.1, ví dụ Swagger UI hay Redoc chạy
-cục bộ. Các tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào
-cũng nạp được.
+Muốn gọi thử ngay trên trình duyệt thì mở trang Swagger UI `/tai-lieu-api/` của bản đang chạy (bản online:
+<https://signet.htechcs.com/tai-lieu-api/>; máy phát triển: <http://localhost:8080/tai-lieu-api/>). Trang chia hai bộ:
+API lõi và API Văn phòng điện tử, lấy từ đúng các tệp OpenAPI ở đây lúc dựng image; đăng nhập thì token của mình được
+điền sẵn, "Try it out" gọi qua cổng như mọi ứng dụng ([`apps/tai-lieu-api`](../../apps/tai-lieu-api/README.md)). Các
+tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào cũng nạp được.
 
 ## Đường dẫn qua cổng
 
@@ -58,6 +60,7 @@ cũng nạp được.
 | `GET /api/status` | `svc-files`: trạng thái hệ thống | Không; giới hạn theo IP |
 | `GET /realtime` (WebSocket) | Centrifugo: thông báo đẩy (§4) | Gửi trong lệnh `connect` đầu tiên |
 | `GET /ca-nhan/` và trang tĩnh dưới đó | Không gian cá nhân P.A.R.A (`app-ca-nhan`), ứng dụng thứ hai trên lõi | — |
+| `GET /tai-lieu-api/` và trang tĩnh dưới đó | Tài liệu API bằng Swagger UI (`app-tai-lieu-api`), gọi thử qua cổng | — |
 | `GET /` và trang tĩnh | Giao diện Văn phòng điện tử | — |
 
 Cổng trả `404` cho các đường còn lại:

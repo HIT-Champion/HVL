@@ -44,6 +44,7 @@ online qua HTTPS mỗi ngày, kịch bản nâng cấp có lùi bản, bản dev
 - e2e quét trợ năng bằng axe (WCAG 2.2 AA) trên các trang chính và Bảng tin (#246, #247, #250, #263, #264, #272).
 - Tài liệu mới: trang xem nhanh `docs/README.md` (tự kiểm PoF đủ 24/24), thuật ngữ, hướng dẫn sử dụng theo vai trò,
   trang API REST sinh từ OpenAPI (#307, #308, #309, #319, #340, #341, #343).
+- Trang Tài liệu API `/tai-lieu-api/` bằng Swagger UI: API lõi và API Văn phòng điện tử, đăng nhập để gọi thử (#357).
 - Giao diện tiếng Anh cho Không gian cá nhân và Bảng tin, chung ngôn ngữ đã chọn với Văn phòng điện tử (#306, #337).
 - Trang tài liệu Docusaurus đọc thẳng `docs/`, tìm kiếm tiếng Việt, không gọi CDN, đăng lên GitHub Pages (#308, #342).
 - `COPYRIGHT.txt`: bản quyền và bảng phần mềm thượng nguồn, sinh từ `DEPENDENCIES.md` bằng `make copyright` (#347).

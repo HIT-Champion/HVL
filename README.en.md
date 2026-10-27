@@ -278,6 +278,7 @@ handle and a reply draft the team head sent back for changes.
 |---|---|---|
 | <http://localhost:8080> | e-Office | Yes |
 | <http://localhost:8080/ca-nhan/> | P.A.R.A personal space | Yes |
+| <http://localhost:8080/tai-lieu-api/> | API documentation (Swagger UI): the core API and the e-Office API, sign in to try calls through the gateway | Optional |
 | <http://localhost:8080/bang-tin/> | Unit news board, once installed with `make app-install APP=apps/bang-tin/app.yaml` | Yes |
 | <http://localhost:8080/xac-thuc> | Document verification portal: enter a code or drop a PDF; codes of the issued sample documents are on each document's detail page (Outgoing documents, Issued tab) | No |
 | <http://localhost:8080/trang-thai> | System status | No |
@@ -350,7 +351,7 @@ software the core uses unmodified (official images, no changes to upstream code)
 
 ```
 apps/                e-Office (office/, Nuxt 4) · P.A.R.A personal space (ca-nhan/) · unit news board
-                     (bang-tin/, plugged in with moc app install)
+                     (bang-tin/, plugged in with moc app install) · Swagger UI API documentation (tai-lieu-api/)
 services/            svc-workflow/: Hasura Actions, BPMN workflows, notifications, reminders, assignment suggestions
                      svc-files/: files, quarantine, search, PDF rendering, signing, verification portal, AI agents
                      ot-sensor/: simulated temperature sensor (profile iot-sim)
