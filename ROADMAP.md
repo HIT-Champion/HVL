@@ -4,7 +4,7 @@ Lộ trình bám theo nguyên lý **tiến hóa tuyến tính** của mô hình 
 danh tính, sự kiện, dữ liệu của không gian trước ([`docs/architecture.md`](docs/architecture.md) §1.2). Đây cũng là thứ
 tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là lịch phát triển nội bộ.
 
-Trạng thái ghi ngày 25/10/2026, trên nhánh `develop`, sau bản `v1.1.0` (25/10). Các giai đoạn là thứ tự phụ thuộc,
+Trạng thái ghi ngày 28/10/2026, trên nhánh `develop`, sau bản `v1.2.1` (28/10). Các giai đoạn là thứ tự phụ thuộc,
 không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ 25/10 tới
 27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)), giao diện Lịch
 hạn ở bản vá `v1.2.1` (28/10); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã
@@ -49,9 +49,10 @@ trường số khép kín.
 - [x] Cấu trúc thư mục **P.A.R.A**: Không gian cá nhân `apps/ca-nhan` (Dự án, Lĩnh vực, Tài nguyên, Lưu trữ), ứng
       dụng thứ hai cắm vào lõi, không sửa dòng nào trong `services/`
       ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), bước CI `make demo-ca-nhan`)
-- [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng
-      thứ ba Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng
-      được, bước CI `make demo-cai-ung-dung`)
+- [x] Cắm ứng dụng bằng một lệnh: `moc app install apps/<thư mục>/app.yaml`, không sửa tệp nào của lõi; ứng dụng thứ ba
+      Bảng tin đơn vị `apps/bang-tin` ([`docs/them-ung-dung.md`](docs/them-ung-dung.md) mục 1, mức Dùng được, bước CI
+      `make demo-cai-ung-dung`); ứng dụng chạy quy trình riêng trên Flowable của lõi qua `/api/workflow/*`, ứng dụng mẫu
+      Đơn nghỉ phép `apps/nghi-phep` (#301, bước CI `make demo-quy-trinh`)
 - [ ] **Một phần** — cổng nội bộ: các ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; trang Ứng dụng
       (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng
       riêng
@@ -74,15 +75,18 @@ bộ phận.
 - [x] Ràng buộc **Poka-yoke** ba lớp — form, máy chủ, CSDL — theo một JSON Schema dùng chung
       `schemas/van-ban-den.json`; chặn vào sổ trùng (F2.2)
 - [x] Trục API giữa các thành phần: GraphQL tự sinh từ CSDL (Hasura) và REST của `svc-files`, cùng đi qua APISIX; tài
-      liệu API xuất tự động ở `docs/api/` (F1.3, F1.10)
+      liệu API xuất tự động ở `docs/api/` (F1.3, F1.10); trang Tài liệu API `/tai-lieu-api/` (Swagger UI, gọi thử qua
+      cổng, #357) và trang tài liệu Docusaurus trên GitHub Pages (#308, #342)
 - [ ] **Một phần** — API nạp lô văn bản đến `POST /api/imports/incoming` (cụm ⑤, mức Dùng được; bước CI
       `make demo-nap-lo`): mới có một loại lô, chưa có màn "Nhập lô" trên giao diện
 - [ ] **Một phần** — hướng sự kiện: các bước của văn bản ghi vào `office.document_events`, mọi thay đổi vào sổ kiểm
       toán `core.audit_log`; ứng dụng cài bằng `moc app install` nhận luồng `core.app_events` qua Hasura Event
       Triggers (đến, vào sổ, phát hành; không văn bản hạn chế). Chưa có broker streaming: không phát lại, không bảo
       đảm thứ tự (cụm ⑥)
-- [ ] Biểu mẫu low-code: form viết trong mã; JSON Schema dùng chung mới có cho form tiếp nhận văn bản đến, khuôn văn
-      bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4)
+- [ ] **Một phần** — biểu mẫu low-code: form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form
+      (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã, JSON Schema dùng chung mới có cho form tiếp nhận văn bản
+      đến, khuôn văn bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4); chưa có trình dựng form
+      (#303)
 - [ ] Tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): việc nền hiện là vòng lặp viết trong
       `svc-files`, `svc-workflow`
 

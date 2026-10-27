@@ -17,7 +17,10 @@
 // Phần không đụng trình duyệt (test bằng node --test): đường của API quy trình chung của lõi, dựng lời gọi, đọc câu
 // trả lời, trạng thái một đơn, ngày giờ, đối chiếu danh sách việc. Trang (app.js) chỉ vẽ.
 
-/** API chung của lõi cho quy trình của ứng dụng; APISIX chỉ nhận token của client app-nghi-phep ở đây. */
+/**
+ * API chung của lõi cho quy trình của ứng dụng. APISIX kiểm token; svc-workflow chỉ nhận token của client
+ * app-nghi-phep (`azp`) ở đây.
+ */
 export const API = '/api/workflow/nghi-phep'
 export const QUY_TRINH = 'nghi-phep.don'
 export const FORM_DON = 'nghi-phep.don'

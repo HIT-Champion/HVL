@@ -628,14 +628,14 @@ bản che idempotent. Thời gian tuyến tính theo độ dài chữ (chuỗi b
   ```
 
 **Đo — `make do-che-pii`** (không cần Docker; `test_pii_corpus.py` và `test_pii_mutation.py` đã chạy trong
-`make test`). Che nhầm trên kho mẫu (đo 22/10/2026, 22 văn bản đến), đọc như bản chạy thật (lớp chữ và bố cục của
-PDF, TSV OCR có sẵn) — tổng 81 023 ký tự, 747 chuỗi số ứng viên, 0 chỗ bị che:
+`make test`). Che nhầm trên kho mẫu (đo lại 28/10/2026, 22 văn bản đến), đọc như bản chạy thật (lớp chữ và bố cục của
+PDF, TSV OCR có sẵn) — tổng 81 063 ký tự, 747 chuỗi số ứng viên, 0 chỗ bị che:
 
 | Nguồn | Tệp / chuỗi | Ký tự | Chuỗi số ứng viên | Bị che |
 |---|---|---|---|---|
 | `seed/van-ban-den`, PDF có lớp chữ | 15 | 37 416 | 370 | **0** |
 | `seed/van-ban-den`, bản scan (TSV OCR) | 7 | 6 442 | 68 | **0** |
-| `seed/hoi-dap`, mọi trang | 6 | 19 957 | 144 | **0** |
+| `seed/hoi-dap`, mọi trang | 6 | 19 997 | 144 | **0** |
 | Nhãn, câu hỏi, lịch sử giao việc | 1 248 chuỗi | 17 208 | 165 | **0** |
 
 Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp (`test_pii.py`), vì kho mẫu không có — và không được có —

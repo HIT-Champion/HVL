@@ -221,8 +221,8 @@ trình duyệt ── /bang-tin/ ──► APISIX ──► app-bang-tin:8080   
             ── /v1/graphql (token người dùng) ──► Hasura ── bang_tin_tin { document { symbol summary } }
 ```
 
-Kiểm: `apps/bang-tin/tests` (`node --test` 5, `unittest` 15, trong `make test`); `scripts/tests/test_ung_dung.py`
-47, `test_mang_ung_dung.py` 8 (mạng `apps`, cổng hook), `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13
+Kiểm: `apps/bang-tin/tests` (`node --test` 14, `unittest` 15, trong `make test`); `scripts/tests/test_ung_dung.py`
+49, `test_mang_ung_dung.py` 8 (mạng `apps`, cổng hook), `test_yaml_nho.py` 6; `db/tests/test_app_registry.py` 13
 hàm (44 ca, PostgreSQL và Hasura thật khi `MOC_IT=1`, job CI `db` có đặt); `make demo-cai-ung-dung` trên hệ thống đang
 chạy (bước CI ở phần `luong-chinh` của job `chay-thu`).
 
@@ -475,7 +475,7 @@ vào thư mục đang mở, chuyển tệp giữa các thư mục, tải về. C
 | 5 | Migration `1792281602500_personal_space`: schema `personal`, bảng `personal.items` (`file_id`, `tenant_id`, `owner_id`, `para`, mốc thời gian); trigger `items_guard`; `core.audit('file_id')` |
 | 6 | `personal_items.yaml`: clerk, staff, manager, director thêm (`file_id`, `para`), đọc, đổi `para` mục của mình; không ai xóa; quan hệ `file` về `core.files` |
 | 7 | `moc realm clients` thêm `app-ca-nhan` vào bản cài dựng trước khi có ứng dụng |
-| 8 | `apps/ca-nhan/tests` (13 test, `node --test`), `db/tests/test_ca_nhan.py` (11 test), `make demo-ca-nhan`, `tests/e2e/ca-nhan.spec.ts`, phạm vi commit `ca-nhan` |
+| 8 | `apps/ca-nhan/tests` (20 test, `node --test`), `db/tests/test_ca_nhan.py` (11 test), `make demo-ca-nhan`, `tests/e2e/ca-nhan.spec.ts`, phạm vi commit `ca-nhan` |
 
 Một lần tải lên đi qua những gì lõi đã có:
 
