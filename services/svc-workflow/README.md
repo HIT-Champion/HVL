@@ -69,6 +69,27 @@ lỗi kèm mã SMTP/HTTP — không chép thông điệp lỗi của smtplib, ht
 Mỗi lần xếp hàng và mỗi kết quả vào sổ kiểm toán chuỗi băm (đã gửi cho ai, qua kênh nào, lúc nào, thử mấy lần). Thử
 trên máy không cần máy chủ thư: profile `mail` (Mailpit) — xem [docs/trien-khai.md](../../docs/trien-khai.md) mục 7.
 
+**Thông báo qua SMS, Zalo** (`channels.py`, `subscriptions.py`, #365; chỉ khi đặt `MOC_SMS_GATEWAY_URL` hoặc
+`MOC_ZALO_BOT_TOKEN`, mặc định tắt): khác email, hai kênh này chỉ gửi cho người **tự bật** ở mục Kênh thông báo cuối
+chuông (Action `myChannels`, `setMyChannel`, bảng `core.notification_subscriptions`). `Router.route` khai `sms`,
+`zalo` cho mọi dòng thông báo, trừ văn bản hạn chế; trigger CSDL chỉ xếp hàng khi người nhận còn bật kênh, tài khoản
+chưa khóa và — với SMS — danh bạ có số. Lúc gửi xét lại cả ba điều. Tin ngắn, không tên người, không ý kiến hay trích
+yếu: `Signet: <như chuông>` kèm liên kết.
+
+- SMS: [SMS Gateway for Android](https://github.com/capcom6/android-sms-gateway) (Apache-2.0) chế độ Local Server
+  trên một điện thoại có SIM cùng mạng LAN với máy chủ: `POST <MOC_SMS_GATEWAY_URL>/message`, Basic Auth, 202 là đã
+  vào hàng gửi của điện thoại. Số lấy từ `core.users.phone`, đồng bộ từ thuộc tính `phone_number` của Keycloak
+  (quản trị nhập; người dùng chỉ xem, không tự sửa), chuẩn hóa về `+84…` (`directory.py`). Giao diện chỉ thấy số đã
+  che (`+84••••••678`).
+- Zalo: bot của đơn vị trên Zalo Bot Platform (`MOC_ZALO_BOT_TOKEN`). Bật Zalo sinh mã 8 ký tự hạn 15 phút; người
+  dùng nhắn mã cho bot, vòng nền đọc tin bằng `getUpdates` (long polling 30 giây, lùi dần tới 5 phút khi lỗi — bot
+  không được đặt webhook), ghi `zalo_chat_id` rồi trả lời trong Zalo. Chỉ nhận chat ghi rõ là riêng
+  (`chat_type: PRIVATE`); mã sai, hết hạn thì bot báo lại; tin không phải mã nhận lời nhắc cách dùng, mỗi chat tối đa
+  một lần trong 10 phút. Tắt Zalo xóa chat_id, bật lại phải liên kết lại.
+
+Thử lại, `failed`, `skipped` như email; lỗi Zalo ghi mã lỗi của API (`Zalo <mã>`), 429 và lỗi tạm thử lại. Nhật ký
+không có số điện thoại, chat_id, mã liên kết hay nội dung tin.
+
 **Nhắc hạn** (`sla.py`): mỗi việc trong BPMN có timer `R2/${slaDuration}`; timer bắn thì Flowable tạo việc giao
 ra ngoài (external worker, topic `moc-sla`), dịch vụ lấy về mỗi `MOC_SLA_POLL_INTERVAL_S` giây: quá một thời
 hạn thì nhắc người phải làm, quá hai thì báo thêm lãnh đạo của họ.
@@ -235,6 +256,11 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_NOTIFY_WEBHOOK_URL` | trống | URL `http`/`https` nhận tin; lấy từ két; trống thì tắt kênh webhook |
 | `MOC_NOTIFY_WEBHOOK_FORMAT` | `json` | `json` (`{"text": …}`: Mattermost, Slack) hoặc `ntfy` |
 | `MOC_NOTIFY_EMAIL_KINDS`, `MOC_NOTIFY_WEBHOOK_KINDS` | trống (mọi loại) | Chỉ gửi các loại này, cách nhau bằng dấu phẩy, vd `task.overdue,task.escalated`; loại lạ thì dịch vụ dừng khi khởi động |
+| `MOC_SMS_GATEWAY_URL` | trống | Địa chỉ `http(s)://` của SMS Gateway for Android (Local Server), vd `http://192.168.1.50:8080`; trống thì tắt kênh SMS |
+| `MOC_SMS_GATEWAY_USER`, `MOC_SMS_GATEWAY_PASSWORD` | trống | Basic Auth hiện trong ứng dụng trên điện thoại; bắt buộc khi đặt URL; mật khẩu lấy từ két |
+| `MOC_ZALO_BOT_TOKEN` | trống | Token bot Zalo (nằm trong đường dẫn API, lấy từ két); trống thì tắt kênh Zalo |
+| `MOC_ZALO_BOT_URL` | trống | Địa chỉ `https://` mở bot, hiện cho người dùng lúc liên kết |
+| `MOC_NOTIFY_SMS_KINDS`, `MOC_NOTIFY_ZALO_KINDS` | trống (mọi loại) | Như `MOC_NOTIFY_EMAIL_KINDS`; SMS tốn tiền, nên đặt vd `task.overdue,task.escalated` |
 | `MOC_NOTIFY_INTERVAL_S` | `5` | Chu kỳ vòng nền gửi thông báo ngoài; `0` tắt (dòng chờ nằm nguyên tới khi bật lại) |
 | `MOC_PUBLIC_URL` | trống | Địa chỉ trang web cho liên kết trong thư, tin webhook; trống thì không kèm liên kết |
 

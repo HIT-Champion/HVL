@@ -69,6 +69,35 @@ def error_doc(description: str) -> dict[str, Any]:
     }}}}
 
 
+def action_doc(responses: dict[str, Any]) -> dict[str, Any]:
+    """``openapi_extra`` của một route Hasura Action: header bí mật, thân ``{action, input, session_variables}``."""
+    return {
+        "parameters": [{
+            "name": "X-Moc-Action-Secret", "in": "header", "required": True, "schema": {"type": "string"},
+            "description": "Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET)",
+        }],
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": {
+                "type": "object",
+                "required": ["action", "input", "session_variables"],
+                "properties": {
+                    "action": {"type": "object", "required": ["name"], "properties": {
+                        "name": {"type": "string", "description": "Trùng {name} trên đường dẫn"}}},
+                    "input": {"type": "object",
+                              "description": "Đối số của Action, khai trong db/metadata/actions.graphql"},
+                    "session_variables": {
+                        "type": "object", "additionalProperties": {"type": "string"},
+                        "description": "Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, "
+                                       "x-hasura-tenant-id, x-hasura-department-id",
+                    },
+                },
+            }}},
+        },
+        "responses": responses,
+    }
+
+
 def action_error(status: int, code: str, message: str, fields: dict[str, str] | None = None) -> JSONResponse:
     # Định dạng lỗi Hasura chuyển nguyên cho client: errors[0].message và extensions (code, fields)
     extensions: dict[str, Any] = {"code": code}

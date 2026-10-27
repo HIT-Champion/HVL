@@ -47,7 +47,7 @@ from ..flowable import FlowableClient
 from ..hasura import Actor, HasuraClient, HasuraError
 from ..notify import Notifier
 from ..ot import MAP_ROLES, TOKEN_HEADER, OtBridge, map_result
-from ..parts import action_error, deploy_processes, error_doc, every
+from ..parts import action_doc, action_error, deploy_processes, error_doc, every
 from ..schemas import FormSchema, SchemaFileError
 from ..sla import Deadlines
 from ..workflow import Workflow, WorkflowError
@@ -55,40 +55,17 @@ from ..workflow import Workflow, WorkflowError
 log = logging.getLogger("svc_workflow")
 
 # Thân yêu cầu đọc bằng tay để lỗi nào cũng trả đúng định dạng Action, nên khai cho tài liệu OpenAPI ở đây.
-ACTION_DOC: dict[str, Any] = {
-    "parameters": [{
-        "name": "X-Moc-Action-Secret", "in": "header", "required": True, "schema": {"type": "string"},
-        "description": "Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET)",
-    }],
-    "requestBody": {
-        "required": True,
-        "content": {"application/json": {"schema": {
-            "type": "object",
-            "required": ["action", "input", "session_variables"],
-            "properties": {
-                "action": {"type": "object", "required": ["name"],
-                           "properties": {"name": {"type": "string", "description": "Trùng {name} trên đường dẫn"}}},
-                "input": {"type": "object", "description": "Đối số của Action, khai trong db/metadata/actions.graphql"},
-                "session_variables": {
-                    "type": "object", "additionalProperties": {"type": "string"},
-                    "description": "Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, "
-                                   "x-hasura-tenant-id, x-hasura-department-id",
-                },
-            },
-        }}},
-    },
-    "responses": {
-        "200": {"description": "Kết quả của Action, đúng kiểu trả về khai trong db/metadata/actions.graphql"},
-        "400": error_doc("Sai định dạng Action; dữ liệu văn bản đến, kết quả hoặc dữ liệu của việc không hợp lệ"),
-        "401": error_doc("Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi"),
-        "403": error_doc("Vai trò không được dùng Action này, hoặc việc không giao cho người gọi"),
-        "404": error_doc("Không có văn bản hoặc việc"),
-        "409": error_doc("Văn bản đến trùng văn bản đã tiếp nhận, văn bản sai trạng thái, việc vừa có người khác "
-                         "nhận, hoặc CSDL từ chối"),
-        "500": error_doc("Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký"),
-        "503": error_doc("Chưa gọi được Flowable hoặc CSDL, thử lại sau"),
-    },
-}
+ACTION_DOC = action_doc({
+    "200": {"description": "Kết quả của Action, đúng kiểu trả về khai trong db/metadata/actions.graphql"},
+    "400": error_doc("Sai định dạng Action; dữ liệu văn bản đến, kết quả hoặc dữ liệu của việc không hợp lệ"),
+    "401": error_doc("Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi"),
+    "403": error_doc("Vai trò không được dùng Action này, hoặc việc không giao cho người gọi"),
+    "404": error_doc("Không có văn bản hoặc việc"),
+    "409": error_doc("Văn bản đến trùng văn bản đã tiếp nhận, văn bản sai trạng thái, việc vừa có người khác "
+                     "nhận, hoặc CSDL từ chối"),
+    "500": error_doc("Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký"),
+    "503": error_doc("Chưa gọi được Flowable hoặc CSDL, thử lại sau"),
+})
 
 
 async def refused(request: Request, exc: WorkflowError) -> JSONResponse:

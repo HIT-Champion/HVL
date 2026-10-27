@@ -28,6 +28,10 @@ hay client dịch vụ `svc-workflow` mà quản trị đã cố ý gỡ. Gọi 
 Cùng lý do, `moc realm theme` áp `loginTheme` của tệp realm (theme đăng nhập Signet, platform/keycloak/themes/) cho
 realm nạp từ trước khi có theme: chỉ đặt khi realm còn dùng theme mặc định của Keycloak, không đổi theme quản trị đã
 chọn; Keycloak chưa thấy thư mục theme (container dựng từ docker-compose.yml cũ) thì báo, không đặt.
+
+`moc realm profile` thêm vào user profile của realm đang chạy các thuộc tính của tệp realm còn thiếu (vd `phone_number`
+cho kênh SMS, #365): realm khai user profile tường minh, thuộc tính chưa khai thì Keycloak không lưu. Không sửa thuộc
+tính đã có (quản trị có thể đã đổi quyền, kiểm tra), không xóa thuộc tính quản trị tự thêm.
 """
 
 from __future__ import annotations
@@ -171,4 +175,68 @@ def cmd_theme(args: argparse.Namespace) -> int:
         print(json.dumps({**result, "dry_run": args.dry_run}, ensure_ascii=False))
     else:
         print(describe_theme(result, dry_run=args.dry_run))
+    return 0
+
+
+# --- user profile: moc realm profile -------------------------------------------------------------------------------
+
+PROFILE = "org.keycloak.userprofile.UserProfileProvider"
+
+
+def file_profile(realm: dict[str, Any]) -> dict[str, Any]:
+    """Cấu hình user profile khai trong tệp realm (chuỗi JSON trong components)."""
+    try:
+        return json.loads(realm["components"][PROFILE][0]["config"]["kc.user.profile.config"][0])
+    except (KeyError, IndexError, ValueError) as exc:
+        raise tenants.TenantError(f"{REALM_FILE.name} không khai user profile ({PROFILE})") from exc
+
+
+def sync_profile(kc: Any, realm: dict[str, Any], *, dry_run: bool = False) -> dict[str, list[str]]:
+    """{"present": thuộc tính đã có, "added": thuộc tính vừa thêm (sẽ thêm, với dry_run)}; nhóm thuộc tính mà thuộc
+    tính mới dùng cũng được thêm nếu realm chưa có."""
+    want = file_profile(realm)
+    rep = kc.user_profile()
+    have = {a.get("name") for a in rep.get("attributes") or []}
+    missing = [a for a in want.get("attributes") or [] if a["name"] not in have]
+    out = {"present": [a["name"] for a in want.get("attributes") or [] if a["name"] in have],
+           "added": [a["name"] for a in missing]}
+    if not missing or dry_run:
+        return out
+    groups = {g.get("name") for g in rep.get("groups") or []}
+    used = {a.get("group") for a in missing} - {None}
+    new_groups = [g for g in want.get("groups") or [] if g["name"] in used - groups]
+    kc.update_user_profile({**rep, "attributes": [*(rep.get("attributes") or []), *missing],
+                            "groups": [*(rep.get("groups") or []), *new_groups]})
+    now = {a.get("name") for a in kc.user_profile().get("attributes") or []}
+    if not set(out["added"]) <= now:
+        raise tenants.TenantError(f"Keycloak không nhận thuộc tính {', '.join(sorted(set(out['added']) - now))} cho "
+                                  f"user profile của realm {kc.realm_name}")
+    return out
+
+
+def run_profile(env: dict[str, str], *, dry_run: bool = False, kc: Any = None) -> dict[str, list[str]]:
+    realm = realm_from_text(REALM_FILE.read_text(encoding="utf-8"), env)
+    return sync_profile(kc or tenants.connect(), realm, dry_run=dry_run)
+
+
+def describe_profile(result: dict[str, list[str]], *, dry_run: bool = False) -> str:
+    if not result["added"]:
+        return "user profile: đã có đủ thuộc tính của moc-realm.json"
+    return f"user profile: {'sẽ thêm' if dry_run else 'vừa thêm'} thuộc tính {', '.join(result['added'])}"
+
+
+def cmd_profile(args: argparse.Namespace) -> int:
+    import moc_env
+    try:
+        result = run_profile(moc_env.ENV, dry_run=args.dry_run)
+    except tenants.Unavailable as exc:
+        print(f"{exc}. Signet có đang chạy không? (make ps)", file=sys.stderr)
+        return 2
+    except tenants.TenantError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({**result, "dry_run": args.dry_run}, ensure_ascii=False))
+    else:
+        print(describe_profile(result, dry_run=args.dry_run))
     return 0

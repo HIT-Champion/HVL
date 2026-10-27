@@ -86,9 +86,9 @@ elif args in (["backup", "create"], ["backup", "check"]):
     print("đã sao lưu")
 elif args[:3] == ["realm", "clients", "--dry-run"]:
     print(json.dumps({"present": ["app-office"], "created": [], "dry_run": True}))
-elif args in (["realm", "clients"], ["realm", "theme"]):
+elif args in (["realm", "clients"], ["realm", "theme"], ["realm", "profile"]):
     print("realm: đã đặt")  # nang gọi lệnh của bản mới
-elif args[:2] == ["realm", "theme"]:
+elif args[:2] in (["realm", "theme"], ["realm", "profile"]):
     sys.exit(2)  # --help, --dry-run: như bản cũ chưa có lệnh này
 elif args[:2] == ["audit", "verify"]:
     print("sổ kiểm toán khớp")

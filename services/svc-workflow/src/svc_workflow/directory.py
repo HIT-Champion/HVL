@@ -20,7 +20,8 @@ Keycloak là nguồn sự thật về người dùng; bảng core.users chỉ đ
 tên trên dòng thời gian. Mỗi lượt: đọc toàn bộ người dùng của realm (tài khoản dịch vụ svc-workflow, quyền
 view-users), so với bảng theo từng thuê ước, chỉ ghi dòng thay đổi — sổ kiểm toán không bị nhiễu.
 Người bị xóa hoặc khóa trong Keycloak thì đánh dấu enabled = false, không xóa dòng (dòng thời gian cũ
-vẫn hiện được tên).
+vẫn hiện được tên). Số điện thoại (thuộc tính ``phone_number``, cho kênh SMS #365) đưa về dạng E.164; số không đọc
+được thì để trống, như chưa nhập.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections import defaultdict
 from typing import Any
@@ -38,6 +40,7 @@ from .hasura import TENANT_USERS, UPSERT_USERS, Actor, HasuraClient, HasuraError
 
 ROLES = {"clerk", "staff", "manager", "director", "tenant_admin"}
 PAGE = 100
+E164 = re.compile(r"\+[1-9][0-9]{7,14}")      # khớp ràng buộc users_phone của core.users
 
 log = logging.getLogger("svc_workflow")
 
@@ -49,6 +52,16 @@ class DirectoryError(Exception):
 def _first(attrs: dict[str, list[str]], name: str) -> str | None:
     values = attrs.get(name) or []
     return values[0] if values else None
+
+
+def phone(value: str | None) -> str | None:
+    """Số điện thoại nhập tay → E.164. Số bắt đầu bằng 0 là số trong nước (+84); 00 là tiền tố gọi quốc tế."""
+    digits = re.sub(r"[\s.()-]", "", value or "")
+    if digits.startswith("00"):
+        digits = "+" + digits[2:]
+    elif digits.startswith("0"):
+        digits = "+84" + digits[1:]
+    return digits if E164.fullmatch(digits) else None
 
 
 def to_row(user: dict[str, Any]) -> tuple[uuid.UUID, dict[str, Any]] | None:
@@ -73,6 +86,7 @@ def to_row(user: dict[str, Any]) -> tuple[uuid.UUID, dict[str, Any]] | None:
         "username": user["username"],
         "full_name": name,
         "email": user.get("email"),
+        "phone": phone(_first(attrs, "phone_number")),
         "role": role,
         "enabled": bool(user.get("enabled", True)),
     }

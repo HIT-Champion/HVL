@@ -783,6 +783,33 @@
     "restricted": "Restricted document",
     "documentIncoming": "Incoming document from {name} (within the system)"
   },
+  "channels": {
+    "title": "Notification channels",
+    "sms": "SMS",
+    "smsTo": "Sent to {phone}",
+    "noPhone": "Your directory entry has no phone number: ask an administrator to add one",
+    "zalo": "Zalo",
+    "zaloOff": "Not linked",
+    "zaloPending": "Waiting for you to send the code to the bot",
+    "zaloLinked": "Linked, notifications go to your Zalo",
+    "zaloDone": "Zalo linked",
+    "zaloStep": "Open your organisation's bot on Zalo and send this code:",
+    "expires": "Code valid until {at}",
+    "openBot": "Open the bot on Zalo",
+    "check": "Sent it, check again",
+    "newCode": "Get a new code",
+    "link": "Link",
+    "turnOff": "Turn off",
+    "cancel": "Cancel",
+    "zaloLinkLabel": "Link Zalo",
+    "zaloTurnOffLabel": "Turn off Zalo notifications",
+    "zaloCancelLabel": "Cancel the Zalo link code",
+    "error": {
+      "channel_off": "This installation has not enabled that notification channel",
+      "no_phone": "Your directory entry has no phone number: ask an administrator to add one, then turn it on again",
+      "not_synced": "Your account is not in your organisation's directory yet, try again in a few minutes"
+    }
+  },
   "audit": {
     "title": "Audit log",
     "subtitle": "Every data change in your organisation, linked into a SHA-256 hash chain: editing or deleting a row in secret is detected.",
