@@ -193,6 +193,7 @@ Thư viện Python cài qua `pip` với tệp khóa phiên bản.
 | [jsonschema](https://github.com/python-jsonschema/jsonschema) (+ referencing, jsonschema-specifications, rpds-py, attrs) | 4.26 | MIT | `svc-workflow` kiểm lại dữ liệu form theo JSON Schema dùng chung (`schemas/`) | pip | 2 |
 | [DuckDB](https://duckdb.org) | 1.5.6 | MIT | Nộp lưu hồ sơ (F3.8, `svc-files`): ghi bảng văn bản, giao việc, dòng thời gian thành Parquet (nén zstd) và đọc lại cho phòng đọc. Một wheel nhúng, không kéo thêm gói Python, không chạy máy chủ riêng | pip | 3 |
 | [pyHanko](https://github.com/MatthiasValvekens/pyHanko) (+ pyhanko-certvalidator, asn1crypto, tzlocal, lxml, aiohttp và 7 gói con, oscrypto, uritools, certifi; tzdata chỉ trên Windows) | 0.37.0 · 0.32.1 | MIT (lxml BSD-3, aiohttp Apache-2.0/MIT, certifi MPL-2.0, aiohappyeyeballs PSF-2.0) | Ký số PAdES bản phát hành bằng khóa trong Transit, kiểm chữ ký (svc-files, F4.5, chỉ minh họa) | pip | 4 |
+| [OpenTelemetry Python](https://opentelemetry.io/docs/languages/python/) (SDK, exporter OTLP/HTTP, instrumentation FastAPI và httpx2, kéo theo protobuf, requests, wrapt…) | 1.45.1 · 0.66b1 | Apache-2.0 (protobuf BSD-3, wrapt BSD-2, asgiref BSD-3, urllib3 MIT) | Truy vết phân tán (#364): `svc-files`, `svc-workflow` ghi span của yêu cầu APISIX đã chọn, che theo danh sách trắng rồi gửi Jaeger (`tracing.py`). Chỉ nạp khi `MOC_TRACE_RATIO` > 0 | pip | 4 |
 
 **Ký số văn bản đi (F4.5, chỉ minh họa)** thêm một gói khai trực tiếp, pyHanko, cùng các gói nó kéo theo. Ghim bản mới
 nhất phát hành trước 06/10/2026 (quy tắc hai tuần); ngày lấy từ PyPI (lần tải lên đầu tiên của bản đó), giấy phép từ
@@ -222,6 +223,31 @@ Gói đã có trong khóa, giữ nguyên bản: `cryptography` 50.0.2 (pyHanko �
 4.16.0. Image `svc-files` nặng thêm khoảng 15 MB (lxml, aiohttp; có wheel manylinux cho CPython 3.13). Khóa ký và CA
 không phải gói: chúng nằm trong két OpenBao sẵn có (mount `transit`, `pki`).
 
+**Truy vết phân tán (#364)** thêm bốn gói khai trực tiếp vào cả `svc-files` và `svc-workflow`, ghim đúng bản
+(`==`). Gói nó kéo theo ghim bản mới nhất phát hành trước 13/10/2026 (`--exclude-newer-package`, quy tắc hai tuần);
+ngày lấy từ PyPI, giấy phép từ METADATA. Tắt (mặc định) thì không gói nào được nạp lúc chạy.
+
+| Gói | Bản | Phát hành | Giấy phép | Vì sao có |
+|---|---|---|---|---|
+| opentelemetry-sdk | 1.45.1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: TracerProvider, lấy mẫu theo cha, xử lý lô |
+| opentelemetry-exporter-otlp-proto-http | 1.45.1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: gửi span tới Jaeger qua OTLP/HTTP |
+| opentelemetry-instrumentation-fastapi | 0.66b1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: span cho mỗi route |
+| opentelemetry-instrumentation-httpx | 0.66b1 | 06/10/2026 | Apache-2.0 | Khai trực tiếp: span cho lời gọi httpx2 (`HTTPX2ClientInstrumentor`) |
+| opentelemetry-exporter-otlp-proto-common, opentelemetry-proto | 1.45.1 | 06/10/2026 | Apache-2.0 | Exporter: mã hóa span sang protobuf |
+| opentelemetry-exporter-http-transport, opentelemetry-exporter-otlp-common | 0.66b1 | 06/10/2026 | Apache-2.0 | Exporter |
+| opentelemetry-instrumentation, -instrumentation-asgi, -semantic-conventions, -util-http | 0.66b1 | 06/10/2026 | Apache-2.0 | Instrumentation FastAPI, httpx |
+| asgiref | 3.12.1 | 14/07/2026 | BSD-3-Clause | Instrumentation ASGI; 3.13.0 (23/10) quá mới |
+| protobuf | 7.36.2 | 17/09/2026 | BSD-3-Clause | opentelemetry-proto |
+| googleapis-common-protos | 1.75.5 | 29/09/2026 | Apache-2.0 | Exporter; 1.76.0 (22/10) quá mới |
+| requests | 2.34.2 | 14/05/2026 | Apache-2.0 | Exporter gửi HTTP bằng requests |
+| charset-normalizer | 3.5.2 | 30/09/2026 | MIT | requests |
+| urllib3 | 2.8.0 | 15/09/2026 | MIT | requests (`svc-files` đã có qua botocore) |
+| certifi | 2026.10.19 | 20/10/2026 | MPL-2.0 | requests, chỉ mới ở `svc-workflow`; cùng bản và cùng ngoại lệ vá bảo mật như `svc-files` ở bảng trên. Span đi `http://jaeger:4318`, không dùng TLS |
+| wrapt | 2.5.0 | 27/09/2026 | BSD-2-Clause | Instrumentation; 2.5.1 (14/10) quá mới |
+| packaging | 26.3 | 04/08/2026 | Apache-2.0 OR BSD-2-Clause | Instrumentation |
+
+`opentelemetry-api` 1.45.1 đã có trong khóa từ trước (FastAPI kéo theo), giữ nguyên.
+
 Phiên bản cụ thể kèm băm nằm ở `requirements.txt` của từng dịch vụ; image dịch vụ dựng từ
 `python:3.13.16-slim` (PSF-2.0). Image `svc-files` cài thêm từ kho Debian: Pango (LGPL-2.1+, nạp động lúc
 chạy, không sửa), HarfBuzz (MIT) và phông Liberation 2.1 (SIL OFL 1.1) — cùng số đo với Times New Roman mà
@@ -249,6 +275,7 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
 | [restic](https://restic.net) | 0.19.1 | BSD-2-Clause | Sao lưu, khôi phục CSDL và tệp (`moc backup`): mã hóa, khử trùng lặp; chỉ chạy khi gọi, không mạng | `restic/restic:0.19.1` | 3 |
 | [Vector](https://vector.dev) | 0.59.0 | MPL-2.0 | Thu log của 8 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
 | [Parseable](https://github.com/parseablehq/parseable) | 3.2.4 | AGPL-3.0 | Lưu và tra log tập trung (F3.14, profile `logs`): dịch vụ độc lập, chỉ nghe 127.0.0.1, chạy root nhưng bỏ mọi capability, basic auth (mật khẩu rỗng thì không mở cổng), giữ `MOC_LOGS_RETENTION_DAYS` ngày, tắt kiểm bản mới và gửi số liệu sử dụng | `quay.io/parseablehq/parseable:v3.2.4`, ghim digest (image 02/10/2026) | 3 |
+| [Jaeger](https://www.jaegertracing.io) | 2.22.0 | Apache-2.0 | Nhận và hiện trace (#364, profile `trace`, tắt mặc định): span OTLP/HTTP của APISIX (plugin `opentelemetry`), `svc-files`, `svc-workflow`; giữ 10 000 trace trong RAM, giao diện chỉ nghe 127.0.0.1, không tài khoản; bỏ chuỗi truy vấn trước khi lưu (`platform/trace/jaeger.yaml`) | `jaegertracing/jaeger:2.22.0`, ghim digest (image 06/10/2026) | 4 |
 | [Coraza](https://coraza.io) + [OWASP CRS](https://coreruleset.org) | Coraza v3.3.3, CRS v4.14.0 (trong coraza-proxy-wasm 0.6.0) | Apache-2.0 | Tường lửa ứng dụng web ở cổng API (F3.15): mọi yêu cầu qua CRS paranoia 1 trước khi kiểm token, tải tấn công → 403; nội dung tệp vẫn do ClamAV soi | `ghcr.io/corazawaf/coraza-proxy-wasm:0.6.0` (phát hành 06/07/2025), ghim digest, kiểm sha256 tệp `.wasm`; APISIX nạp bằng `wasm.plugins` | 3 |
 
 **Ghi chú:**

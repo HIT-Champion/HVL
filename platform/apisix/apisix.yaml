@@ -130,6 +130,19 @@ plugin_configs:
           set:
             X-Forwarded-Port: $moc_cong_chuyen_tiep
 
+# #364 — truy vết phân tán: span gửi Jaeger của profile trace (OTLP/HTTP, chỉ trong mạng moc). trace_id ngẫu nhiên,
+# không lấy từ X-Request-Id (mã đó là UUID có gạch, không làm trace_id được); mã yêu cầu nằm ở thuộc tính
+# x-request-id của span, tìm trong Jaeger bằng thẻ x-request-id=<mã>. Không bật profile trace thì để
+# MOC_TRACE_RATIO=0: APISIX không gửi gì
+plugin_metadata:
+  - id: opentelemetry
+    trace_id_source: random
+    resource:
+      service.name: apisix
+    collector:
+      address: jaeger:4318
+      request_timeout: 3
+
 global_rules:
   - id: 1
     plugins:
@@ -137,6 +150,16 @@ global_rules:
         header_name: X-Request-Id
         include_in_response: true
         algorithm: uuid
+      # #364: chọn MOC_TRACE_RATIO yêu cầu (0–1) theo trace_id, gửi traceparent cho dịch vụ phía sau. trace_id_ratio
+      # chứ không parent_base: cờ lấy mẫu trong traceparent client tự gửi không bắt APISIX ghi. Chạy sau request-id
+      # (priority 12009 < 12015) nên span mang mã yêu cầu. http.target của span có chuỗi truy vấn: Jaeger bỏ
+      # (platform/trace/jaeger.yaml)
+      opentelemetry:
+        sampler:
+          name: trace_id_ratio
+          options:
+            fraction: ${{MOC_TRACE_RATIO:=0}}
+        additional_header_prefix_attributes: [x-request-id]
       # F3.13: đếm yêu cầu, mã trạng thái, độ trễ của mọi route; nhãn route là id trong tệp này (graphql, svc-files, …)
       prometheus: {}
       # F3.15: Coraza 3.3.3 trong coraza-proxy-wasm đọc JSON bằng đệ quy không giới hạn (GHSA-6gcq-wc29-5xf2): thân

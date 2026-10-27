@@ -78,12 +78,14 @@ env-ready: $(ENV_FILE)
 	@! grep -qE '^[A-Z0-9_]+=change_me' $(ENV_FILE) || { echo "$(ENV_FILE) còn giá trị mẫu change_me:" \
 	  $$(grep -oE '^[A-Z0-9_]+=change_me' $(ENV_FILE) | cut -d= -f1) \
 	  "— đổi thành chuỗi ngẫu nhiên, hoặc xóa $(ENV_FILE) rồi make env" >&2; exit 1; }
-	@# F3.15: MOC_WAF, MOC_APISIX_WORKERS sai thì APISIX dừng ngay lúc khởi động — kiểm trước bằng chính script
-	@# entrypoint của image (cùng nguồn với reconciler GitOps), với giá trị compose sẽ dùng: shell rồi .env, mặc định
+	@# F3.15: MOC_WAF, MOC_APISIX_WORKERS (#364: MOC_TRACE_RATIO) sai thì APISIX dừng ngay lúc khởi động — kiểm trước
+	@# bằng chính script entrypoint của image (cùng nguồn với reconciler GitOps), với giá trị compose sẽ dùng: shell rồi
+	@# .env, mặc định
 	@json=$$($(COMPOSE) config --format json apisix 2>/dev/null) || exit 0; \
 	  get() { printf '%s\n' "$$json" | sed -n "s/^ *\"$$1\": \"\(.*\)\",*\$$/\1/p"; }; \
-	  w=$$(get MOC_WAF); n=$$(get MOC_APISIX_WORKERS); \
+	  w=$$(get MOC_WAF); n=$$(get MOC_APISIX_WORKERS); r=$$(get MOC_TRACE_RATIO); \
 	  if [ -n "$$w" ]; then export MOC_WAF="$$w"; fi; if [ -n "$$n" ]; then export MOC_APISIX_WORKERS="$$n"; fi; \
+	  if [ -n "$$r" ]; then export MOC_TRACE_RATIO="$$r"; fi; \
 	  sh platform/apisix/kiem-moi-truong.sh --chi-kiem
 
 check: ## Kiểm tra tiền điều kiện của môi trường

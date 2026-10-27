@@ -107,6 +107,8 @@ class Settings:
     notify_webhook_kinds: tuple[str, ...] = ()
     notify_interval_s: float = 5.0
     public_url: str = ""
+    # truy vết (#364): > 0 thì gửi span tới Jaeger (tracing.py). Tỉ lệ lấy mẫu do APISIX quyết; ở đây chỉ là bật/tắt
+    trace_ratio: float = 0.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -165,6 +167,7 @@ class Settings:
                 notify_webhook_kinds=_kinds(env.get("MOC_NOTIFY_WEBHOOK_KINDS", "")),
                 notify_interval_s=float(env.get("MOC_NOTIFY_INTERVAL_S", "5")),
                 public_url=env.get("MOC_PUBLIC_URL", "").strip().rstrip("/"),
+                trace_ratio=float(env.get("MOC_TRACE_RATIO", "").strip() or 0),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -188,6 +191,8 @@ class Settings:
             raise ConfigError("MOC_SUGGEST_MIN_SCORE phải trong khoảng [0, 1] (thang _rankingScore)")
         if not 1 <= len(self.assigner_id) <= 64:
             raise ConfigError("MOC_ASSIGNER_ID phải có 1–64 ký tự")
+        if not 0 <= self.trace_ratio <= 1:      # NaN cũng sai
+            raise ConfigError("MOC_TRACE_RATIO phải trong khoảng [0, 1] (0: tắt truy vết)")
         self._check_channels()
 
     def warnings(self) -> list[str]:
