@@ -122,7 +122,7 @@ git ls-files | grep -E '(vendor|third_party|node_modules)/' && echo "VI PHẠM" 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
 | ✅ | Có hệ thống ghi nhận lỗi (bug tracker) | GitHub Issues **đã bật** + mẫu báo lỗi + **có issue thật**: mẫu `bug_report.yml`, `feature_request.yml`; 137 issue, 117 đã đóng | −5 |
-| ✅ | Có lịch sử thay đổi (changelog) | `CHANGELOG.md` theo Keep a Changelog, có mục cho v0.1.0, v1.0.0, v1.1.0 và mục "Chưa phát hành" (CI job "Tài liệu" kiểm) | −5 |
+| ✅ | Có lịch sử thay đổi (changelog) | `CHANGELOG.md` theo Keep a Changelog, có mục cho v0.1.0, v1.0.0, v1.1.0, v1.2.0 và mục "Chưa phát hành" (CI job "Tài liệu" kiểm) | −5 |
 | ✅ | Có README và hướng dẫn | `README.md`, bản tiếng Anh `README.en.md`; xem nhanh và bản đồ tài liệu ở `docs/README.md` | −5 |
 
 > ⚠️ Bật Issues nhưng để trống trông như chưa dùng bao giờ. Trong quá trình phát triển, hãy mở
