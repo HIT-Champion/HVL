@@ -18,12 +18,14 @@ là cổng xác thực văn bản đã phát hành (`/api/verify`) và trạng t
 | [`thao-tac-theo-vai-tro.md`](thao-tac-theo-vai-tro.md) | Bảng vai trò × truy vấn, thao tác ghi |
 | [`openapi/svc-files.json`](openapi/svc-files.json) | OpenAPI 3.1 của API tệp và tìm kiếm |
 | [`openapi/svc-workflow.json`](openapi/svc-workflow.json) | OpenAPI 3.1 của `svc-workflow`: API nội bộ chạy Hasura Actions (chỉ Hasura gọi) và API quy trình của ứng dụng `/api/workflow/…` (§8) |
+| [`rest-svc-files.md`](rest-svc-files.md), [`rest-svc-workflow.md`](rest-svc-workflow.md) | Hai tệp OpenAPI trên viết thành trang đọc được: từng thao tác với tham số, thân yêu cầu, mã trả về, rồi các kiểu dữ liệu |
 
 Trừ tệp README này, mọi tệp trên **sinh tự động** từ hệ thống đang chạy:
 
 - Schema GraphQL lấy qua cổng, bằng token của tài khoản mẫu thuộc từng vai trò. Nhờ vậy nó đúng là những gì một
   ứng dụng nhận được.
-- OpenAPI do FastAPI sinh từ mã của dịch vụ.
+- OpenAPI do FastAPI sinh từ mã của dịch vụ; trang `rest-*.md` sinh từ chính tệp OpenAPI đó. `make test` kiểm trang
+  trong git khớp tệp OpenAPI trong git (`scripts/tests/test_api_docs.py`), không cần dựng hệ thống.
 
 Đổi schema, quyền hay endpoint thì sinh lại rồi commit cùng thay đổi:
 
@@ -39,8 +41,9 @@ thành artifact `docs-api-<lần chạy>` của job "Chạy thử: luong-chinh";
 gh run download <run-id> -n docs-api-1 -D docs/api   # <run-id> lấy ở trang Checks của PR
 ```
 
-Muốn xem dạng trang web, mở các tệp OpenAPI bằng công cụ
-đọc OpenAPI 3.1, ví dụ Swagger UI hay Redoc chạy cục bộ. Các tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào
+Đọc API REST thì mở [`rest-svc-files.md`](rest-svc-files.md), [`rest-svc-workflow.md`](rest-svc-workflow.md).
+Muốn thử gọi ngay trên trang web, mở các tệp OpenAPI bằng công cụ đọc OpenAPI 3.1, ví dụ Swagger UI hay Redoc chạy
+cục bộ. Các tệp `.graphql` là SDL chuẩn, công cụ GraphQL nào
 cũng nạp được.
 
 ## Đường dẫn qua cổng

@@ -260,6 +260,12 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   văn bản đi qua những ai), trang việc chung, và mỗi vai trò một trang: văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo
   đơn vị, quản trị đơn vị. Mỗi trang ghi việc hằng ngày theo từng bước, đúng tên mục và nút trên giao diện, và trỏ tới
   tài liệu gốc thay vì chép lại. `docs/README.md` trỏ tới hướng dẫn ở mục Xem nhanh.
+- Trang API REST đọc được (#308): `make api-docs` sinh thêm `docs/api/rest-svc-files.md`,
+  `docs/api/rest-svc-workflow.md` từ chính hai tệp OpenAPI. Mỗi trang có bảng mọi thao tác, rồi từng thao tác với
+  tóm tắt, mô tả, tham số, thân yêu cầu, mã trả về, cuối trang là các kiểu dữ liệu. Không thêm thư viện: trang
+  Markdown đọc được cả trên GitHub và trang tài liệu, không cần plugin OpenAPI. `scripts/tests/test_api_docs.py`
+  (8 test, trong `make test`) kiểm trang trong git khớp tệp OpenAPI trong git, nên quên sinh lại thì đỏ ngay ở job
+  test đơn vị.
 
 ### Đã sửa đổi
 - Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của

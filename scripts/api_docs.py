@@ -20,6 +20,8 @@
   khoản mẫu — đúng những gì một ứng dụng nhận được, không dùng khóa quản trị Hasura
 - thao-tac-theo-vai-tro.md: vai trò nào gọi được truy vấn, thao tác ghi nào
 - openapi/svc-files.json, openapi/svc-workflow.json: OpenAPI do FastAPI sinh, lấy trong mạng nội bộ
+- rest-svc-files.md, rest-svc-workflow.md: chính hai tệp OpenAPI đó viết thành trang đọc được (thao tác, tham số,
+  thân yêu cầu, mã trả về, kiểu dữ liệu), cho GitHub và trang tài liệu (#308), không cần công cụ đọc OpenAPI
 
 Cần hệ thống đang chạy và đã `make seed`. Chạy với --check thì chỉ so với docs/api/, thoát 1 nếu tài liệu
 đã cũ so với mã (CI dùng).
@@ -31,7 +33,9 @@ import difflib
 import json
 import os
 import pathlib
+import re
 import sys
+import textwrap
 
 from moc_env import ROOT, Session, compose
 
@@ -50,6 +54,12 @@ SERVICES = {
     "svc-workflow": "Hasura gọi chạy Actions, context broker NGSI-LD gọi /ot/notify (nội bộ); /api/workflow qua cổng",
 }
 BUILTIN_SCALARS = {"String", "Int", "Float", "Boolean", "ID"}
+# Trang rest-<dịch vụ>.md
+HTTP_METHODS = ("get", "post", "put", "patch", "delete")
+PARAM_IN = {"path": "đường dẫn", "query": "query", "header": "header", "cookie": "cookie"}
+# Mô tả mặc định FastAPI tự điền cho mã trả về; mô tả viết trong mã dịch vụ thì giữ nguyên
+FASTAPI_TEXT = {"Successful Response": "Thành công", "Validation Error": "Dữ liệu gửi lên sai kiểu, thiếu trường"}
+BLOCK_START = re.compile(r"([-+*#>=|]|\d+[.)])(\s|$)")  # mở đầu khối Markdown: danh sách, tiêu đề, trích dẫn, bảng
 
 INTROSPECTION = """
 query {
@@ -220,12 +230,121 @@ def openapi_file(service: str) -> str:
     return json.dumps(json.loads(raw), indent=2, ensure_ascii=False) + "\n"
 
 
+def prose(text: str | None) -> list[str]:
+    """Đoạn văn gói ở 120 ký tự như tài liệu viết tay; không cắt giữa từ, nên `code` dài vẫn nguyên. Dòng gói ra
+    mà mở đầu như danh sách, tiêu đề, trích dẫn (`- `, `1. `, `# `, `> `…) thì Markdown đọc sai: kéo thêm chữ của
+    dòng trên xuống cho tới khi hết."""
+    lines = textwrap.wrap(" ".join((text or "").split()), 120, break_long_words=False, break_on_hyphens=False)
+    for i in range(1, len(lines)):
+        while BLOCK_START.match(lines[i]) and " " in lines[i - 1]:
+            lines[i - 1], word = lines[i - 1].rsplit(" ", 1)
+            lines[i] = f"{word} {lines[i]}"
+    return lines
+
+
+def cell(text: str | None) -> str:
+    """Chữ đặt vào một ô bảng Markdown: một dòng, dấu `|` được thoát."""
+    return " ".join((text or "").split()).replace("|", "\\|")
+
+
+def schema_type(s: dict) -> str:
+    """Kiểu viết gọn: tên kiểu cho $ref, `X[]` cho mảng, các nhánh anyOf nối bằng "hoặc"."""
+    if "$ref" in s:
+        return s["$ref"].rsplit("/", 1)[-1]
+    if "anyOf" in s:
+        return " hoặc ".join(schema_type(x) for x in s["anyOf"])
+    if "const" in s:
+        return json.dumps(s["const"], ensure_ascii=False)
+    if "enum" in s:
+        return ", ".join(json.dumps(v, ensure_ascii=False) for v in s["enum"])
+    kind = s.get("type", "any")
+    if kind == "array":
+        return schema_type(s.get("items", {})) + "[]"
+    if kind == "object" and isinstance(s.get("additionalProperties"), dict):
+        return f"object (giá trị {schema_type(s['additionalProperties'])})"
+    return f"{kind} ({s['format']})" if "format" in s else kind
+
+
+def described(s: dict) -> str:
+    """Mô tả của một trường, kèm giá trị mặc định nếu có."""
+    text = cell(s.get("description"))
+    if "default" in s:
+        if text and not text.endswith((".", ":", "?", "!")):
+            text += "."
+        text += (" " if text else "") + f"Mặc định `{cell(json.dumps(s['default'], ensure_ascii=False))}`."
+    return text
+
+
+def fields_table(s: dict) -> list[str]:
+    required = set(s.get("required", []))
+    lines = ["| Trường | Kiểu | Bắt buộc | Mô tả |", "|---|---|:-:|---|"]
+    for name, field in (s.get("properties") or {}).items():
+        lines.append(f"| `{name}` | `{cell(schema_type(field))}` | {'✓' if name in required else ''} "
+                     f"| {described(field)} |")
+    return lines if len(lines) > 2 else []
+
+
+def operation(method: str, path: str, op: dict) -> list[str]:
+    lines = ["", f"## `{method.upper()} {path}`", ""] + prose(op.get("summary"))
+    if op.get("description"):
+        lines += [""] + prose(op["description"])
+    if op.get("parameters"):
+        lines += ["", "Tham số:", "", "| Tên | Ở | Bắt buộc | Kiểu | Mô tả |", "|---|---|:-:|---|---|"]
+        for p in op["parameters"]:
+            schema = p.get("schema", {})
+            lines.append(f"| `{p['name']}` | {PARAM_IN[p['in']]} | {'✓' if p.get('required') else ''} "
+                         f"| `{cell(schema_type(schema))}` | {described({**schema, **p})} |")
+    for ctype, body in (op.get("requestBody") or {}).get("content", {}).items():
+        schema = body.get("schema", {})
+        if "$ref" in schema:
+            lines += ["", f"Thân yêu cầu `{ctype}`: kiểu `{schema_type(schema)}`."]
+        else:
+            lines += ["", f"Thân yêu cầu `{ctype}`:", ""] + fields_table(schema)
+    lines += ["", "Trả về:", "", "| Mã | Nghĩa | Nội dung |", "|---|---|---|"]
+    for code, resp in op.get("responses", {}).items():
+        content = ", ".join(f"`{ctype}`" + (f" `{cell(schema_type(c['schema']))}`" if c.get("schema") else "")
+                            for ctype, c in (resp.get("content") or {}).items())
+        meaning = FASTAPI_TEXT.get(resp.get("description"), resp.get("description"))
+        lines.append(f"| {code} | {cell(meaning)} | {content} |")
+    return lines
+
+
+def rest_file(service: str, spec: dict) -> str:
+    ops = [(m, path, op) for path, item in spec["paths"].items() for m, op in item.items() if m in HTTP_METHODS]
+    lines = [
+        f"# API REST của `{service}`",
+        "",
+        f"> Tệp sinh tự động bằng `make api-docs` từ [`openapi/{service}.json`](openapi/{service}.json), không sửa",
+        "> tay. Lấy token và gọi API: [README](README.md).",
+        "",
+    ] + prose(spec["info"].get("description")) + [
+        "",
+        f"OpenAPI {spec['openapi']}, {len(ops)} thao tác:",
+        "",
+        "| Thao tác | Tóm tắt |",
+        "|---|---|",
+    ]
+    lines += [f"| `{m.upper()} {path}` | {cell(op.get('summary'))} |" for m, path, op in ops]
+    for m, path, op in ops:
+        lines += operation(m, path, op)
+    lines += ["", "## Kiểu dữ liệu", "", "Các kiểu mà thân yêu cầu và nội dung trả về ở trên nhắc tới."]
+    for name, schema in sorted(spec.get("components", {}).get("schemas", {}).items()):
+        lines += ["", f"### `{name}`"]
+        if schema.get("description"):
+            lines += [""] + prose(schema["description"])
+        table = fields_table(schema)
+        lines += [""] + (table or [f"Kiểu `{cell(schema_type(schema))}`."])
+    return "\n".join(lines) + "\n"
+
+
 def build() -> dict[str, str]:
     accounts = demo_accounts()
     schemas = {role: Session(accounts[role]).gql(INTROSPECTION)["__schema"] for role in ROLES}
     files = {f"graphql/{role}.graphql": graphql_file(role, schemas[role]) for role in ROLES}
     files["thao-tac-theo-vai-tro.md"] = matrix_file(schemas, accounts)
-    files.update({f"openapi/{service}.json": openapi_file(service) for service in SERVICES})
+    for service in SERVICES:
+        files[f"openapi/{service}.json"] = spec = openapi_file(service)
+        files[f"rest-{service}.md"] = rest_file(service, json.loads(spec))
     return files
 
 
@@ -233,7 +352,7 @@ def main() -> None:
     check = "--check" in sys.argv[1:]
     files = build()
     # Tệp sinh ra từ lần trước nhưng nay không còn (đổi tên vai trò, bỏ dịch vụ)
-    leftover = sorted(str(p.relative_to(OUT)) for pattern in ("graphql/*.graphql", "openapi/*.json")
+    leftover = sorted(str(p.relative_to(OUT)) for pattern in ("graphql/*.graphql", "openapi/*.json", "rest-*.md")
                       for p in OUT.glob(pattern) if str(p.relative_to(OUT)) not in files)
     changed = []
     for rel, content in files.items():
