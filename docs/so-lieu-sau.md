@@ -65,7 +65,7 @@ hệ thống làm được hôm nay:
 | Nhận văn bản đến | Văn thư nhận bản giấy, ghi sổ tay | Vẫn đến bằng giấy hay thư điện tử từ ngoài; văn thư quét, tải PDF lên, vào sổ trên hệ thống (F2.2, F2.3) |
 | Trình lãnh đạo chỉ đạo | Mang bản giấy lên phòng lãnh đạo, chờ bút phê | Văn bản vào hộp việc của lãnh đạo, có thông báo; lãnh đạo giao chủ trì, phối hợp trên hệ thống (F2.3, F2.5) |
 | Chuyển phòng xử lý | Photo, mang tới từng phòng | Phòng được giao thấy ngay trong hộp việc; lãnh đạo phòng phân công người (F2.3) |
-| Nhắc hạn | Gọi điện, nhắn tin | Sự kiện `office.document.overdue` báo trên web; email, webhook khi bản cài cấu hình `MOC_SMTP_HOST`, `MOC_NOTIFY_WEBHOOK_URL` (mặc định tắt) |
+| Nhắc hạn | Gọi điện, nhắn tin | Sự kiện `office.document.overdue` báo trên web; email, webhook khi bản cài cấu hình `MOC_SMTP_HOST`, `MOC_NOTIFY_WEBHOOK_URL`; SMS, Zalo cho người tự bật khi cấu hình `MOC_SMS_GATEWAY_URL`, `MOC_ZALO_BOT_TOKEN` (mặc định tắt) |
 | Văn bản đi | Soạn, in, trình ký, đóng dấu, cấp số tay | Soạn, duyệt, cấp số, phát hành PDF trên hệ thống (F2.4); ký số F4.5 chỉ minh họa nên vẫn in để ký tay, đóng dấu |
 | Phát hành, xác thực | Gửi bản giấy, bên nhận gọi hỏi lại | PDF có mã QR, SHA-256; ai cũng tra được ở cổng xác thực công khai (F2.13) |
 | Gửi đơn vị khác | Thư bưu điện, thư điện tử | Liên thông (F3.12) chỉ giữa các đơn vị trên cùng hệ thống; đơn vị ngoài vẫn gửi như cũ |
