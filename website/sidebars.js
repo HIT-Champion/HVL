@@ -83,7 +83,11 @@ export default {
           type: 'category',
           label: 'API',
           link: {type: 'doc', id: 'docs/api/README'},
-          items: [trang('docs/api/thao-tac-theo-vai-tro', 'Thao tác theo vai trò')],
+          items: [
+            trang('docs/api/rest-svc-files', 'API REST: svc-files'),
+            trang('docs/api/rest-svc-workflow', 'API REST: svc-workflow'),
+            trang('docs/api/thao-tac-theo-vai-tro', 'Thao tác theo vai trò'),
+          ],
         },
         trang('docs/them-ung-dung', 'Thêm ứng dụng mới'),
         {
