@@ -52,7 +52,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ReadOut` |
+| 200 | Thành công | `application/json` `ReadOut` |
 | 401 | Thiếu hoặc sai token (`missing_token`, `invalid_token`) |  |
 | 403 | `forbidden` — không phải văn thư |  |
 | 404 | `not_found` — không có tệp, không xem được, không do người gọi tải lên, hoặc không còn trong kho |  |
@@ -78,12 +78,12 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `AskOut` |
+| 200 | Thành công | `application/json` `AskOut` |
 | 400 | `invalid_question` — rỗng sau chuẩn hóa, quá 500 ký tự, có ký tự điều khiển, hoặc chỉ toàn từ dừng |  |
 | 401 | `missing_token`, `invalid_token` (cả khi Hasura từ chối token lúc hậu kiểm) |  |
 | 403 | `forbidden` — vai trò không phải văn thư, lãnh đạo, trưởng phòng, chuyên viên |  |
 | 503 | `assistant_disabled` · `busy` (kèm `Retry-After: 10`, chờ lượt sinh quá `MOC_ASK_QUEUE_S`) · `search_unavailable` · `database_unavailable` — gồm cả khi chưa ghi được sổ kiểm toán: không ghi được sổ thì không trả lời |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `POST /api/files`
 
@@ -109,7 +109,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 201 | Successful Response | `application/json` `FileOut` |
+| 201 | Thành công | `application/json` `FileOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 413 | Tệp vượt giới hạn MOC_FILES_MAX_MB |  |
 | 415 | `type_mismatch`: nội dung không khớp đuôi tệp (hay mime khai khi tên không có đuôi), vd tệp .pdf là HTML · `type_not_allowed`: chương trình, kịch bản chạy được (theo nội dung hay đuôi .exe, .bat, .js…) — `found` là loại theo nội dung · `restricted_pdf_only`: restricted=true mà tệp không phải PDF đọc được, không khóa, tối đa MOC_RESTRICTED_MAX_PAGES trang, hoặc quá nặng để kiểm trong giới hạn thời gian, bộ nhớ (`reason`) (PDF phải nhập mật khẩu mới mở thì bị chặn trước ở bước quét: 422 unscannable) |  |
@@ -146,7 +146,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 202 | Successful Response | `application/json` `ImportOut` |
+| 202 | Thành công | `application/json` `ImportOut` |
 | 200 | Gửi lại cùng Idempotency-Key, cùng nội dung: lô đã tạo trước đó | `application/json` `ImportOut` |
 | 400 | `missing_file` · `unknown_format` · `bad_encoding` (không phải UTF-8) · `bad_header` (CSV thiếu cột bắt buộc, có cột lạ) · `bad_format` (CSV hỏng cấu trúc) · `empty` · `bad_archive` (zip hỏng, quá 5000 mục, tên trùng) · `bad_idempotency_key` · `empty_file` |  |
 | 401 | Thiếu hoặc sai token |  |
@@ -171,11 +171,11 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ImportOut` |
+| 200 | Thành công | `application/json` `ImportOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 404 | `not_found` — không có lô, hoặc lô của người khác (kể cả cùng đơn vị) — hai trường hợp như nhau |  |
 | 503 | `database_unavailable` |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/imports/{job_id}/rows`
 
@@ -194,11 +194,11 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ImportRowsOut` |
+| 200 | Thành công | `application/json` `ImportRowsOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 404 | `not_found` — không có lô, hoặc lô của người khác (kể cả cùng đơn vị) — hai trường hợp như nhau |  |
 | 503 | `database_unavailable` |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/imports`
 
@@ -214,10 +214,10 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ImportsOut` |
+| 200 | Thành công | `application/json` `ImportsOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 503 | `database_unavailable` |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/files/{file_id}`
 
@@ -264,11 +264,11 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `SearchOut` |
+| 200 | Thành công | `application/json` `SearchOut` |
 | 400 | Câu tìm trống, hoặc `cursor` sai, không phải của câu tìm này |  |
 | 401 | Thiếu hoặc sai token |  |
 | 503 | Meilisearch hoặc CSDL không sẵn sàng |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/documents/{document_id}/preview`
 
@@ -289,7 +289,7 @@ Trả về:
 | 404 | Không có văn bản đi, hoặc người gọi không được đọc — hai trường hợp trả như nhau |  |
 | 409 | Văn bản đã phát hành: tải bản phát hành thay vì xem trước |  |
 | 503 | CSDL không sẵn sàng |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/registers/{direction}/{year}`
 
@@ -306,11 +306,11 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `RegisterOut` |
+| 200 | Thành công | `application/json` `RegisterOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký |  |
 | 503 | CSDL không sẵn sàng |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/registers/{direction}/{year}/pdf`
 
@@ -331,7 +331,7 @@ Trả về:
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký |  |
 | 503 | CSDL không sẵn sàng |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/verify/ca.pem`
 
@@ -376,7 +376,7 @@ Trả về:
 | 200 | valid: văn bản đã phát hành; not_found: không có văn bản nào khớp | `application/json` `VerifyOut` |
 | 429 | Vượt giới hạn tra cứu theo địa chỉ IP (APISIX) |  |
 | 503 | CSDL không sẵn sàng |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/verify`
 
@@ -395,7 +395,7 @@ Trả về:
 | 200 | valid: văn bản đã phát hành; not_found: không có văn bản nào khớp | `application/json` `VerifyOut` |
 | 429 | Vượt giới hạn tra cứu theo địa chỉ IP (APISIX) |  |
 | 503 | CSDL không sẵn sàng |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/status`
 
@@ -405,7 +405,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `StatusOut` |
+| 200 | Thành công | `application/json` `StatusOut` |
 | 429 | Vượt giới hạn theo địa chỉ IP (APISIX) |  |
 
 ## `GET /api/case-files/{case_file_id}/archive`
@@ -422,12 +422,12 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ArchiveOut` |
+| 200 | Thành công | `application/json` `ArchiveOut` |
 | 404 | Không có hồ sơ, hoặc người gọi không được xem |  |
 | 409 | Hồ sơ chưa nộp lưu |  |
 | 502 | `archive_mismatch`: gói trong bucket lạnh không khớp băm ghi trong CSDL, hoặc thiếu một phần của gói |  |
 | 503 | Chưa đọc được CSDL hoặc bucket lạnh |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `POST /api/case-files/{case_file_id}/archive`
 
@@ -447,13 +447,13 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ArchiveRunOut` |
+| 200 | Thành công | `application/json` `ArchiveRunOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | `forbidden`: chỉ lãnh đạo phòng (`manager`) nộp lưu hồ sơ của phòng mình |  |
 | 404 | Không có hồ sơ, hoặc hồ sơ không thuộc phòng của người gọi |  |
 | 409 | `not_closed` hồ sơ còn mở · `already_archived` đã nộp lưu (kể cả lượt khác vừa xong) · `archive_failed` + `message`: không nộp lưu được (văn bản không còn ở trạng thái nộp lưu được, đang gửi liên thông, tệp trong kho nóng không khớp băm…) · `archive_conflict`: CSDL từ chối vì hồ sơ hay văn bản đổi trong lúc nộp lưu — CSDL không đổi gì |  |
 | 503 | CSDL, kho đối tượng hoặc sổ kiểm toán chưa sẵn sàng; `busy` (kèm `Retry-After: 10`) khi đang có lượt nộp lưu khác trong tiến trình (nút bấm hay vòng nền) — chưa ghi sổ |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/case-files/{case_file_id}/archive/files/{file_id}`
 
@@ -496,7 +496,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `ArchiveStatsOut` |
+| 200 | Thành công | `application/json` `ArchiveStatsOut` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | `forbidden`: chỉ lãnh đạo đơn vị (`director`), như trang Điều hành |  |
 | 503 | Chưa đọc được CSDL hoặc bucket lạnh |  |

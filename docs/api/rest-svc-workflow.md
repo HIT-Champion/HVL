@@ -36,11 +36,11 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 204 | Successful Response |  |
+| 204 | Thành công |  |
 | 401 | Thiếu hoặc sai token của đơn vị |  |
 | 404 | Chưa cấu hình MOC_NGSI_URL |  |
 | 503 | Chưa ghi được CSDL, broker sẽ báo lỗi gửi |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `POST /actions/{name}`
 
@@ -66,7 +66,7 @@ Trả về:
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
 | 200 | Kết quả của Action, đúng kiểu trả về khai trong db/metadata/actions.graphql | `application/json` |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 | 400 | Sai định dạng Action; dữ liệu văn bản đến, kết quả hoặc dữ liệu của việc không hợp lệ | `application/json` `object` |
 | 401 | Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi | `application/json` `object` |
 | 403 | Vai trò không được dùng Action này, hoặc việc không giao cho người gọi | `application/json` `object` |
@@ -90,12 +90,12 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `object` |
+| 200 | Thành công | `application/json` `object` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị |  |
 | 404 | Ứng dụng chưa cài, đã gỡ hoặc không có form này |  |
 | 503 | Chưa gọi được Flowable hoặc Keycloak, thử lại sau |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `POST /api/workflow/{app}/processes/{process_key}`
 
@@ -118,7 +118,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 201 | Successful Response | `application/json` `object (giá trị string)` |
+| 201 | Thành công | `application/json` `object (giá trị string)` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị |  |
 | 404 | Ứng dụng chưa cài, đã gỡ hoặc không có quy trình này |  |
@@ -140,12 +140,12 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `object[]` |
+| 200 | Thành công | `application/json` `object[]` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị |  |
 | 404 | Ứng dụng chưa cài hoặc đã gỡ |  |
 | 503 | Chưa gọi được Flowable hoặc Keycloak, thử lại sau |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `GET /api/workflow/{app}/tasks`
 
@@ -161,12 +161,12 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 200 | Successful Response | `application/json` `object[]` |
+| 200 | Thành công | `application/json` `object[]` |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị |  |
 | 404 | Ứng dụng chưa cài hoặc đã gỡ |  |
 | 503 | Chưa gọi được Flowable hoặc Keycloak, thử lại sau |  |
-| 422 | Validation Error | `application/json` `HTTPValidationError` |
+| 422 | Dữ liệu gửi lên sai kiểu, thiếu trường | `application/json` `HTTPValidationError` |
 
 ## `POST /api/workflow/{app}/tasks/{task_id}`
 
@@ -189,7 +189,7 @@ Trả về:
 
 | Mã | Nghĩa | Nội dung |
 |---|---|---|
-| 204 | Successful Response |  |
+| 204 | Thành công |  |
 | 401 | Thiếu hoặc sai token |  |
 | 403 | Token không phải của client app-<tên>, hoặc tài khoản chưa gán đơn vị |  |
 | 404 | Ứng dụng đã gỡ; việc không còn hoặc không thuộc người này |  |

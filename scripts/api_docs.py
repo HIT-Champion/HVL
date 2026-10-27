@@ -57,6 +57,8 @@ BUILTIN_SCALARS = {"String", "Int", "Float", "Boolean", "ID"}
 # Trang rest-<dịch vụ>.md
 HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 PARAM_IN = {"path": "đường dẫn", "query": "query", "header": "header", "cookie": "cookie"}
+# Mô tả mặc định FastAPI tự điền cho mã trả về; mô tả viết trong mã dịch vụ thì giữ nguyên
+FASTAPI_TEXT = {"Successful Response": "Thành công", "Validation Error": "Dữ liệu gửi lên sai kiểu, thiếu trường"}
 BLOCK_START = re.compile(r"([-+*#>=|]|\d+[.)])(\s|$)")  # mở đầu khối Markdown: danh sách, tiêu đề, trích dẫn, bảng
 
 INTROSPECTION = """
@@ -302,7 +304,8 @@ def operation(method: str, path: str, op: dict) -> list[str]:
     for code, resp in op.get("responses", {}).items():
         content = ", ".join(f"`{ctype}`" + (f" `{cell(schema_type(c['schema']))}`" if c.get("schema") else "")
                             for ctype, c in (resp.get("content") or {}).items())
-        lines.append(f"| {code} | {cell(resp.get('description'))} | {content} |")
+        meaning = FASTAPI_TEXT.get(resp.get("description"), resp.get("description"))
+        lines.append(f"| {code} | {cell(meaning)} | {content} |")
     return lines
 
 

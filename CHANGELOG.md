@@ -260,7 +260,7 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   `docs/api/rest-svc-workflow.md` từ chính hai tệp OpenAPI. Mỗi trang có bảng mọi thao tác, rồi từng thao tác với
   tóm tắt, mô tả, tham số, thân yêu cầu, mã trả về, cuối trang là các kiểu dữ liệu. Không thêm thư viện: trang
   Markdown đọc được cả trên GitHub và trang tài liệu, không cần plugin OpenAPI. `scripts/tests/test_api_docs.py`
-  (7 test, trong `make test`) kiểm trang trong git khớp tệp OpenAPI trong git, nên quên sinh lại thì đỏ ngay ở job
+  (8 test, trong `make test`) kiểm trang trong git khớp tệp OpenAPI trong git, nên quên sinh lại thì đỏ ngay ở job
   test đơn vị.
 
 ### Đã sửa đổi

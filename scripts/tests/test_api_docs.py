@@ -87,12 +87,24 @@ class RestPages(unittest.TestCase):
             for name in s["components"]["schemas"]:
                 self.assertIn(f"\n### `{name}`\n", page)
 
-    def test_no_line_opens_a_markdown_block_by_accident(self) -> None:
+    def test_wrapped_text_never_opens_a_markdown_block(self) -> None:
+        # Mọi đoạn văn lấy từ OpenAPI (mô tả API, tóm tắt, mô tả thao tác, mô tả kiểu): dòng thứ hai trở đi của bản gói
+        # không được mở đầu như danh sách, tiêu đề, trích dẫn, bảng
         for service in api_docs.SERVICES:
-            prose = [line for line in api_docs.rest_file(service, spec(service)).splitlines()
-                     if line and not line.startswith(("#", "|", ">"))]
-            for line in prose:
-                self.assertIsNone(api_docs.BLOCK_START.match(line), line)
+            s = spec(service)
+            texts = [s["info"].get("description")]
+            texts += [op.get(k) for item in s["paths"].values() for op in item.values() if isinstance(op, dict)
+                      for k in ("summary", "description")]
+            texts += [schema.get("description") for schema in s["components"]["schemas"].values()]
+            for text in filter(None, texts):
+                for line in api_docs.prose(text)[1:]:
+                    self.assertIsNone(api_docs.BLOCK_START.match(line), line)
+
+    def test_fastapi_default_texts_are_translated(self) -> None:
+        for service in api_docs.SERVICES:
+            page = api_docs.rest_file(service, spec(service))
+            self.assertNotIn("Successful Response", page)
+            self.assertNotIn("Validation Error", page)
 
 
 class Helpers(unittest.TestCase):
