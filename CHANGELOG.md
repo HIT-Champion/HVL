@@ -18,6 +18,8 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ### Đã sửa lỗi
 - Tài liệu lệch mã: số dịch vụ, số test, màn demo không chạy trên bản online, ROADMAP sau `v1.2.1` (#379).
 - Sự kiện `office.document.received` nay được ghi khi văn thư thêm văn bản đến, ứng dụng nghe nó mới nhận được (#381).
+- Bản cài có `scripts/demo_tat_van_phong.py`; màn cắm ứng dụng trong bản cài dừng trước khi gỡ ứng dụng (#376).
+- Tệp OpenLineage tải từ trang Phả hệ số liệu ghi `producer` là repo Signet, không còn tên repo cũ (#376).
 
 ## [1.2.1] - 2026-10-28
 

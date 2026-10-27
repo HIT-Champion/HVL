@@ -17,7 +17,8 @@
 """Màn make demo-quy-trinh (scripts/demo.py quy-trinh, #301) — phần không cần Signet đang chạy: ba tài khoản mẫu đúng
 vai, đúng phòng theo seed/users.csv; dữ liệu sai và mã lỗi chờ đợi trùng ca thử dùng chung của form; đơn mẫu hợp lệ;
 bản BPMN độc có scriptTask nằm trên đường đi; lời gọi API như trang; đăng nhập qua mật khẩu rồi mã TOTP; bước CI và
-lệnh make. Không cần Docker, không đọc .env. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
+lệnh make; ở bản cài (không có apps/) màn này và make demo-cai-ung-dung dừng trước lệnh moc app đầu tiên. Không cần
+Docker, không đọc .env. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
@@ -253,6 +254,45 @@ class Calls(unittest.TestCase):
 
 
 QT_RANGE = {"denNgay": "x-moc-range"}
+
+
+class Reached(Exception):
+    pass
+
+
+class InstallDir(unittest.TestCase):
+    """Bản cài (make install) không chép apps/: hai màn cắm ứng dụng phải dừng trước lệnh moc app đầu tiên. Chạy tiếp
+    thì màn gỡ ứng dụng đang cài (lần chạy trước) rồi mới hỏng vì thiếu gói ứng dụng."""
+
+    SCREENS = (("cai-ung-dung", "cai_ung_dung"), ("quy-trinh", "quy_trinh"))
+
+    def run_screen(self, name: str, root: pathlib.Path, moc: Any) -> None:
+        fake = types.ModuleType("demo_ca_nhan")
+        for attr in ("OWNER", "Browser", "as_session", "claims_of", "exchange"):
+            setattr(fake, attr, None)
+        with mock.patch.object(demo, "ROOT", root), mock.patch.object(demo, "moc", moc), \
+                mock.patch.dict(sys.modules, {"demo_ca_nhan": fake}), mock.patch("builtins.print"):
+            getattr(demo, name)()
+
+    def test_install_dir_stops_before_moc_app(self) -> None:
+        def no_moc(*args: Any) -> Any:
+            raise AssertionError(f"thiếu apps/ mà vẫn gọi moc {' '.join(args)}")
+
+        for screen, name in self.SCREENS:
+            with self.subTest(screen), tempfile.TemporaryDirectory() as tmp, \
+                    self.assertRaises(demo.DemoFailed) as caught:
+                self.run_screen(name, pathlib.Path(tmp), no_moc)
+            self.assertIn("bản cài không chép apps/", str(caught.exception))
+            self.assertIn(f"make demo-{screen} trong thư mục mã nguồn", str(caught.exception))
+
+    def test_source_tree_passes_the_check(self) -> None:
+        def reached(*args: Any) -> Any:
+            raise Reached(args)
+
+        for screen, name in self.SCREENS:
+            with self.subTest(screen), self.assertRaises(Reached) as caught:
+                self.run_screen(name, ROOT, reached)
+            self.assertEqual(caught.exception.args[0][:2], ("app", "list"))
 
 
 class Wiring(unittest.TestCase):
