@@ -13,7 +13,8 @@ Không cần cài gì:
 3. **Dùng thử (2 phút):** <https://signet.htechcs.com>. Mật khẩu tài khoản dùng thử gửi kèm hồ sơ dự thi, không có
    trong repo; danh sách tài khoản ở [`README.md`](../README.md#chạy-thử), mục Chạy thử. Tài khoản chuyên viên mà mục
    đó gợi ý để thử nhanh không cần xác thực hai bước; lúc nạp dữ liệu mẫu, hộp việc của tài khoản này có một công văn
-   khẩn chờ xử lý và một dự thảo bị trả lại chờ sửa.
+   khẩn chờ xử lý và một dự thảo bị trả lại chờ sửa. Bấm gì ở từng bước, theo vai trò:
+   [`huong-dan/`](huong-dan/README.md).
 4. **Xác thực văn bản (1 phút):** <https://signet.htechcs.com/xac-thuc>, không cần đăng nhập: tra mã in cạnh mã QR
    hoặc thả tệp PDF đã phát hành; tệp bị sửa thì báo không khớp.
 5. **Kiểm tự động (30 giây):** trang [Actions](https://github.com/HIT-Champion/Signet/actions/workflows/ci.yml).
