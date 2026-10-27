@@ -246,6 +246,16 @@ class WorkflowTest(unittest.TestCase):
         for path in listed:
             self.assertTrue((ROOT / path).is_file(), path)
 
+    def test_runs_right_after_a_successful_release(self) -> None:
+        # Tên trong `workflows:` phải đúng `name:` của release.yml: đổi một bên mà quên bên kia thì lượt này im lặng
+        self.assertRegex(self.text, r"(?m)^  workflow_run:\n    workflows: \[Release\]\n    types: \[completed\]$")
+        release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertRegex(release, r"(?m)^name: Release$")
+        self.assertIn("if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'",
+                      self.text)
+        # Bản phát hành do GITHUB_TOKEN tạo không gọi được workflow khác, `release:` sẽ không bao giờ chạy
+        self.assertNotRegex(self.text, r"(?m)^  release:")
+
     def test_checks_the_latest_release_tag(self) -> None:
         self.assertIn('python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}"', self.text)
         self.assertIn("permissions:\n  contents: read", self.text)

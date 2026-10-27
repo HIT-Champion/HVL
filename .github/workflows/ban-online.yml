@@ -16,14 +16,20 @@
 
 # Kiểm bản chạy công khai qua HTTPS từ bên ngoài (F1.9, #197): chứng chỉ, HTTP chuyển sang HTTPS, /api/status chạy đúng
 # thẻ phát hành mới nhất, Keycloak sau proxy, header bảo mật (scripts/kiem_ban_online.py).
-# GitHub chạy lịch và nút chạy tay theo tệp trên nhánh mặc định (develop); PR đổi chính tệp này hay kịch bản thì chạy
-# job trên PR đó. Từ lúc gắn thẻ mới tới lúc nâng bản online, job đỏ vì bản online còn chạy bản cũ — đúng ý.
+# GitHub chạy lịch, nút chạy tay và lượt sau Release theo tệp trên nhánh mặc định (develop); PR đổi chính tệp này hay
+# kịch bản thì chạy job trên PR đó. Từ lúc phát hành tới lúc nâng bản online, job đỏ vì bản online còn chạy bản cũ —
+# đúng ý. Nâng xong thì chạy tay (Actions → Bản online → Run workflow) để thấy xanh ngay (#344).
 name: Bản online
 
 on:
   schedule:
     - cron: '17 0 * * *'    # 07:17 giờ Việt Nam
   workflow_dispatch:
+  # Ngay khi workflow Release xong, không đợi tới 07:17 hôm sau. Không dùng `release: published`: Release tạo bản phát
+  # hành bằng GITHUB_TOKEN, mà sự kiện do GITHUB_TOKEN sinh ra không gọi workflow khác.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   pull_request:
     branches: [main, develop]
     paths:
@@ -44,6 +50,8 @@ env:
 jobs:
   kiem:
     name: Kiểm bản online qua HTTPS
+    # Release đỏ (thẻ không nằm trên main, phát hành lại…) thì không có bản mới nào để đòi
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
