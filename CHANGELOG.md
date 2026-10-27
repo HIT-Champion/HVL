@@ -314,7 +314,9 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
 - Tài liệu nói đúng phạm vi đã làm, theo lần chấm thử thứ hai:
   - kiểm dịch là `svc-files` quét bằng ClamAV trước khi ghi vào kho, sau cổng API, không có kho cách ly (README hai
     thứ tiếng, `docs/demo-script.md`, `docs/dac-ta-san-pham.md`), thay cho "chặn ở cửa ngõ";
-  - két bí mật thay biến môi trường cho `svc-files`, `svc-workflow`, không phải cho mọi dịch vụ;
+  - két bí mật thay biến môi trường cho `svc-files`, `svc-workflow`, không phải cho mọi dịch vụ; danh sách phần mềm
+    thượng nguồn còn đọc bí mật từ biến môi trường ghi đủ ở hỏi đáp câu 4, `docs/van-hanh.md`, `docs/demo-script.md`,
+    `docs/muc-hoan-thien.md` F3.2 (thêm PostgreSQL, Keycloak, Flowable và các profile tùy chọn);
   - `docs/du-thi/hoi-dap-hoi-dong.md`: câu 1 nêu số bảng, migration, route của Văn phòng còn nằm trong lõi (#324);
     câu 4, 5 sửa phạm vi (AppRole, ClamAV sau cổng, CI không gọi mô hình thật); thêm câu 17 (kho lạnh) và câu 18
     (tên Signet và tên mã `moc`);

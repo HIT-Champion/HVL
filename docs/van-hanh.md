@@ -79,8 +79,8 @@ neo công khai bên dưới). Thử: `make demo-ket-bi-mat`, `make demo-han-che`
 Nói rõ giới hạn:
 
 - `.env` vẫn là nguồn của các bí mật: container `openbao` nhận chúng qua biến môi trường và nạp lại vào két mỗi lần
-  khởi động. Hasura, SeaweedFS, Meilisearch, Centrifugo (phần mềm thượng nguồn) vẫn đọc bí mật của chúng từ biến môi
-  trường.
+  khởi động. Phần mềm thượng nguồn vẫn đọc bí mật của chúng từ biến môi trường: PostgreSQL, Keycloak, Flowable,
+  Hasura, SeaweedFS, Meilisearch, Centrifugo, và Parseable, Scorpio, restic khi bật profile của chúng.
 - Khóa mở két `MOC_OPENBAO_SEAL_KEY` nằm trong `.env`; khóa phục hồi, token khởi động và role_id/secret_id của dịch vụ
   nằm trong volume trên đĩa. Ai có quyền Docker trên máy chủ vẫn đọc được két. Két chỉ nằm trong mạng nội bộ
   `secrets` cùng hai dịch vụ (container khác không tới được), chưa có TLS.

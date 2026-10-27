@@ -110,11 +110,12 @@ cỡ tệp, SHA-256, tên mẫu ClamAV). Văn bản hạn chế: mỗi tệp m�
 chỉ có bản mã, bản rõ chỉ ở trong bộ nhớ cho người có tên và mang tên người xem; hai dịch vụ của đội (`svc-files`,
 `svc-workflow`) lấy bí mật từ két bằng AppRole, không qua biến môi trường. Mọi thay đổi vào sổ kiểm toán chuỗi băm
 SHA-256, đầu chuỗi neo định kỳ (mặc định 10 phút) ra bucket khóa ghi: `make audit` tính lại cả chuỗi ngoài CSDL và chỉ
-ra dòng bị sửa, kể cả khi người sửa tắt trigger hay viết lại cả chuỗi. Giới hạn đã ghi: PostgreSQL, Keycloak, Hasura,
-SeaweedFS, Meilisearch, Centrifugo vẫn nhận bí mật qua biến môi trường, và `.env` vẫn là nguồn của mọi bí mật, kể cả
-khóa mở két (static seal, để két tự mở khi khởi động lại); các container gọi nhau bằng HTTP trong mạng nội bộ, Hasura
-nối CSDL bằng siêu người dùng; chưa có bản WebAssembly nào mang Coraza đã vá 12 lỗ hổng công bố 02/10/2026 — hai lỗ mức
-high có biện pháp ở cổng, các cách lẩn WAF mức medium thì dịch vụ vẫn tự kiểm đầu vào.
+ra dòng bị sửa, kể cả khi người sửa tắt trigger hay viết lại cả chuỗi. Giới hạn đã ghi: phần mềm thượng nguồn
+(PostgreSQL, Keycloak, Flowable, Hasura, SeaweedFS, Meilisearch, Centrifugo; Parseable, Scorpio, restic khi bật profile)
+vẫn nhận bí mật qua biến môi trường, và `.env` vẫn là nguồn của mọi bí mật, kể cả khóa mở két (static seal, để két tự mở
+khi khởi động lại); các container gọi nhau bằng HTTP trong mạng nội bộ, Hasura nối CSDL bằng siêu người dùng; chưa có
+bản WebAssembly nào mang Coraza đã vá 12 lỗ hổng công bố 02/10/2026 — hai lỗ mức high có biện pháp ở cổng, các cách lẩn
+WAF mức medium thì dịch vụ vẫn tự kiểm đầu vào.
 
 **Bằng chứng:** `platform/keycloak/README.md`; `platform/apisix/README.md` mục WAF (luật, loại trừ, lỗ hổng của Coraza
 3.3.3; ClamAV soi nội dung tệp); `make smoke` khối "Tường lửa ứng dụng web"; `make demo-kiem-dich`, `make demo-han-che`,
