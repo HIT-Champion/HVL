@@ -21,6 +21,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Bản cài có `scripts/demo_tat_van_phong.py`; màn cắm ứng dụng trong bản cài dừng trước khi gỡ ứng dụng (#376).
 - Tệp OpenLineage tải từ trang Phả hệ số liệu ghi `producer` là repo Signet, không còn tên repo cũ (#376).
 
+### Bảo mật
+- `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
+
 ## [1.2.1] - 2026-10-28
 
 Bản vá đúng bản đang chạy online: giao diện Lịch hạn (hộp việc xếp theo ngày hạn) cho Văn phòng điện tử, trang đăng
