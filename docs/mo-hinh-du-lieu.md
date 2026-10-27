@@ -95,6 +95,7 @@ create table core.users (                   -- danh bạ, đồng bộ từ Keyc
   username       text not null,
   full_name      text not null,                 -- "firstName lastName" của Keycloak: họ đệm + tên
   email          text,
+  phone          text,                          -- số nhận SMS, E.164 (+84…): phone_number của Keycloak (#365)
   role           text not null check (role in ('clerk', 'staff', 'manager', 'director', 'tenant_admin')),
   enabled        boolean not null default true  -- bị xóa hoặc khóa trong Keycloak: false, không xóa dòng
 );
@@ -364,6 +365,12 @@ Kênh ngoài (email, webhook; migration 1792281602600): svc-workflow khai ở c�
 `sent_at`; unique `(notification_id, channel)`). Bảng này gắn sổ kiểm toán — lần gửi ra ngoài hệ thống phải truy được
 — và không có địa chỉ email, URL hay nội dung: người nhận đọc từ `core.users` lúc gửi. Chỉ `service` của đơn vị đọc và
 ghi kết quả; người dùng không đọc (mô tả: `services/svc-workflow/README.md`).
+SMS, Zalo (#365, migration 1792281603700) chỉ gửi cho người tự bật: `core.notification_subscriptions` một dòng mỗi
+(người, kênh `sms` | `zalo`) — `enabled`, với Zalo thêm `zalo_chat_id` (đã liên kết) hoặc mã liên kết 8 ký tự còn
+hạn (`link_code`, `link_expires_at`, chỉ mục duy nhất). Ràng buộc: Zalo bật thì phải có chat_id; SMS không có chat_id
+hay mã. Trigger xếp hàng chỉ thêm dòng `sms`, `zalo` khi người nhận còn bật kênh, tài khoản còn hoạt động và — với
+SMS — `core.users.phone` có số. Bảng gắn sổ kiểm toán; chỉ `service` đọc, ghi (qua Action `myChannels`,
+`setMyChannel`), người dùng không đọc thẳng; `phone` của `core.users` cũng chỉ `service` đọc.
 Centrifugo chỉ đẩy bản sao tới trình duyệt đang mở (§5), nên mất kết nối không mất thông báo.
 
 **Lô nạp khối lớn** (cụm ⑤, migration 1792281602800; mô tả: `services/svc-files/README.md`, mục Nạp lô văn bản

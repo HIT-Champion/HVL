@@ -320,13 +320,13 @@ Kịch bản:
 3. Dừng trang, `make install PREFIX=/opt/moc`, chạy lại. Hasura áp migration mới khi khởi động. `.env` của bản cài được
    giữ, trừ `MOC_VERSION` và hai biến `make install` đặt lại mỗi lần: `COMPOSE_PROFILES` (`core,app` cộng
    `MOC_EXTRA_PROFILES`) và `COMPOSE_FILE` (theo profile `logs` và ứng dụng đã cài), nên sửa tay hai biến này sẽ mất.
-4. Chạy `moc.py realm clients` và `realm theme`.
+4. Chạy `moc.py realm clients`, `realm theme` và `realm profile`.
 5. Kiểm từng mục rồi báo các mục trượt:
    - số người dùng, văn bản, tệp không ít đi; dòng cuối sổ kiểm toán lúc trước còn nguyên băm (so với số liệu chụp ở
      bước 2, nên chỉ `nang` kiểm được);
    - dịch vụ chạy trước khi nâng vẫn chạy (chỉ `nang`), không cái nào chưa khỏe;
    - `/api/status` báo đúng phiên bản mới;
-   - realm đủ client và theme;
+   - realm đủ client, theme và thuộc tính user profile;
    - `moc.py audit verify`;
    - `smoke.py`. Smoke trượt đúng ở bước hỏi đáp (chữ chưa kịp vào chỉ mục khi máy quá tải) thì chạy lại một lần, có in
      rõ là lần thử lại.
@@ -346,12 +346,14 @@ bản cài của thẻ phát hành trước: nâng lên commit của PR, nâng k
 mật), lùi về. Job chạy trên PR phát hành và trên PR có đổi migration, két, realm, compose, cài đặt hay sao lưu.
 
 Realm Keycloak chỉ nạp từ tệp ở lần khởi động đầu, nên phần realm mới của bản sau không tự vào bản cài cũ. Nâng cấp
-bằng GitOps cũng vậy. Hai lệnh realm ở bước 4 lo phần này, chạy lại không đổi gì
+bằng GitOps cũng vậy. Ba lệnh realm ở bước 4 lo phần này, chạy lại không đổi gì
 ([`platform/keycloak/README.md`](../platform/keycloak/README.md)):
 
 - `realm theme` đặt theme đăng nhập Signet, chỉ khi realm còn dùng theme mặc định. Nó báo lỗi nếu container keycloak
   chưa gắn thư mục theme.
 - `realm clients` thêm client của ứng dụng mới.
+- `realm profile` thêm thuộc tính user profile mới (vd `phone_number` cho SMS, #365), không sửa thuộc tính đã
+  có.
 
 Biến `.env` mới của bản mới (CHANGELOG ghi rõ) thêm vào `/opt/moc/.env`. **Không chạy `make reset` hay
 `docker compose down -v` trên máy chủ**: xóa sạch dữ liệu, kể cả két (tệp văn bản hạn chế không mở được nữa).
@@ -377,6 +379,22 @@ Thử trên máy, không cần máy chủ thư: đặt `MOC_EXTRA_PROFILES=mail`
 thư mà không chuyển đi đâu, xem ở `http://127.0.0.1:8025` (chỉ mở trên máy; đổi cổng bằng `MOC_MAIL_UI_PORT`). Mailpit
 không thuộc profile `core`, `app`: là công cụ demo, thư nằm trong tệp tạm của container, không có volume (tối đa 500
 thư, mất khi container dừng), không dùng làm máy chủ thư thật.
+
+**Thông báo qua SMS, Zalo** (tùy chọn, #365; chỉ gửi cho người tự bật ở mục Kênh thông báo cuối chuông):
+
+- SMS: cài [SMS Gateway for Android](https://github.com/capcom6/android-sms-gateway) lên một điện thoại có SIM cùng
+  mạng LAN với máy chủ, bật Local Server, rồi đặt `MOC_SMS_GATEWAY_URL` (vd `http://192.168.1.50:8080`),
+  `MOC_SMS_GATEWAY_USER`, `MOC_SMS_GATEWAY_PASSWORD` (Basic Auth hiện trong ứng dụng). Số điện thoại do quản trị nhập
+  ở trang quản trị Keycloak (Users → người dùng → "Số điện thoại (nhận SMS)"); danh bạ đồng bộ trong vài phút. Tin đi
+  bằng SIM của điện thoại nên tính cước như tin nhắn thường: nên giới hạn loại, vd
+  `MOC_NOTIFY_SMS_KINDS=task.overdue,task.escalated`.
+- Zalo: tạo bot trên Zalo Bot Platform, đặt `MOC_ZALO_BOT_TOKEN` và, nếu có, `MOC_ZALO_BOT_URL` (địa chỉ `https://` mở
+  bot, hiện cho người dùng lúc liên kết). Không đặt webhook cho bot: svc-workflow đọc tin bằng long polling, máy chủ
+  không cần mở cổng nào ra ngoài.
+
+Rồi `docker compose up -d --wait`: két nạp lại mật khẩu cổng SMS và token bot, svc-workflow khởi động lại. Bản cài
+dựng trước #365 chạy thêm `python3 scripts/moc.py realm profile` để realm có thuộc tính `phone_number` (`nang_cap.sh`
+tự chạy). Lần gửi xem bằng câu `psql` ở trên (kênh `sms`, `zalo`).
 
 ## 8. Giới hạn đã biết
 

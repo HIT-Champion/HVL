@@ -62,6 +62,11 @@
         realm còn dùng theme mặc định; không đổi theme quản trị đã chọn. Thoát 0: xong hoặc không cần đặt; 1: Keycloak
         chưa có thư mục theme (docker compose up -d keycloak) hoặc từ chối; 2: không gọi được Keycloak.
 
+    python3 scripts/moc.py realm profile [--dry-run] [--json]
+        Thêm vào user profile của realm đang chạy thuộc tính có trong moc-realm.json mà realm chưa có (vd phone_number
+        cho kênh SMS, #365). Không sửa, không xóa thuộc tính đã có. Thoát 0: xong; 1: bị từ chối; 2: không gọi được
+        Keycloak.
+
     python3 scripts/moc.py app install apps/<thư mục>/app.yaml [--dry-run] | list [--json] | remove TÊN [--dry-run]
                            | sync [--files] [--json]
         Cắm ứng dụng vào lõi bằng manifest, không sửa tệp lõi nào: client Keycloak, route APISIX, container, schema và
@@ -595,8 +600,8 @@ def main(argv: list[str] | None = None) -> int:
     tk.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     tk.set_defaults(run=tenants.cmd_check)
 
-    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md), theme đăng nhập"
-                           ).add_subparsers(dest="cmd", required=True)
+    rm = groups.add_parser("realm", help="realm Keycloak: client của ứng dụng (docs/them-ung-dung.md), theme đăng "
+                           "nhập, user profile").add_subparsers(dest="cmd", required=True)
     rc = rm.add_parser("clients", help="thêm client ứng dụng trên trình duyệt còn thiếu so với moc-realm.json")
     rc.add_argument("--dry-run", action="store_true", help="chỉ in client sẽ thêm, không thay đổi gì")
     rc.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
@@ -605,6 +610,10 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--dry-run", action="store_true", help="chỉ in việc sẽ làm, không thay đổi gì")
     rt.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     rt.set_defaults(run=realm_clients.cmd_theme)
+    rp = rm.add_parser("profile", help="thêm thuộc tính user profile còn thiếu so với moc-realm.json (vd phone_number)")
+    rp.add_argument("--dry-run", action="store_true", help="chỉ in thuộc tính sẽ thêm, không thay đổi gì")
+    rp.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
+    rp.set_defaults(run=realm_clients.cmd_profile)
 
     ung_dung.add_parser(groups)
     args = parser.parse_args(argv)
