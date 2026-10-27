@@ -43,7 +43,11 @@ from xml.sax.saxutils import escape
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 THU_MUC_LOGO = ROOT / "docs" / "anh" / "logo"
 
-W, H = 1280, 770
+# hàng hộp: ba hàng Tầng 2, sáu hàng Tầng 1 (lùi thêm 24 cho nhãn tầng); hai hộp người dùng
+ROW = [60 + i * 88 + (24 if i >= 3 else 0) for i in range(9)]
+MID = [y + 29 for y in ROW]
+UY = (320, 480)
+W, H = 1280, ROW[8] + 162
 NET, XUNG = 0.8, 6.4  # chu kỳ chạy nét và chu kỳ chấm sáng (giây); 6,4 = 8 vòng nét nên GIF lặp khép kín
 BUOC = 0.08  # 8/100 giây một khung (GIF đếm thời gian theo 1/100 giây): 10 khung một vòng nét, 80 khung cả GIF
 SO_KHUNG = round(XUNG / BUOC)
@@ -51,12 +55,16 @@ SO_KHUNG = round(XUNG / BUOC)
 T = {
     "vi": dict(
         users="Người dùng", net="Mạng nội bộ Docker", t2="TẦNG 2 · ỨNG DỤNG CÓ GIAO DIỆN",
-        t1="TẦNG 1 · LÕI KHÔNG GIAO DIỆN", note=["Ứng dụng mới cắm vào lõi qua cổng,", "không sửa dòng mã nào của lõi"],
+        t1="TẦNG 1 · LÕI KHÔNG GIAO DIỆN", note=["Ứng dụng mới cắm vào lõi qua cổng,", "không sửa dòng mã nào của lõi;",
+              "mạng apps chỉ tới được cổng"],
         u1=("Trình duyệt", ["văn thư, lãnh đạo,", "chuyên viên, quản trị"]),
         u2=("Người nhận văn bản", ["kiểm văn bản qua QR,", "không cần đăng nhập"]),
+        net_in=["qua Internet, hoặc", "Cloudflare Tunnel (tùy chọn)"],
         gw=("Cổng API", "Apache APISIX", ["cổng duy nhất", "mở ra ngoài", "", "kiểm JWT ở biên", "gắn X-Request-Id",
-                                         "giới hạn tốc độ", "chặn đường quản trị"]),
+                                         "giới hạn tốc độ", "tường lửa Coraza", "chặn đường quản trị"]),
         office=("Văn phòng điện tử", "app-office · Nuxt 4"), canhan=("Không gian cá nhân", "app-ca-nhan · P.A.R.A"),
+        tailieu=("Tài liệu API", "app-tai-lieu-api · Swagger UI"),
+        plug=("Bảng tin · Nghỉ phép", "cắm thêm bằng manifest: moc app install"),
         kc=("Keycloak", "đăng nhập một lần, TOTP"), cf=("Centrifugo", "thông báo tức thời"),
         hasura=("Hasura", "GraphQL, quyền từng dòng"), files=("svc-files", "tệp, tìm kiếm, PDF, AI"),
         mon=("Prometheus + Grafana", "giám sát cổng API"), wf=("svc-workflow", "Actions, nhắc hạn"),
@@ -64,8 +72,12 @@ T = {
         sw=("SeaweedFS", "kho tệp S3, nộp lưu"), flow=("Flowable", "quy trình BPMN"),
         bao=("OpenBao", "két bí mật, khóa ký"), meili=("Meilisearch", "tìm toàn văn"),
         ollama=("Ollama (tùy chọn)", "mô hình ngôn ngữ cục bộ"),
+        scorpio=("Scorpio (tùy chọn)", "NGSI-LD, cảm biến IoT"),
+        jaeger=("Jaeger (tùy chọn)", "truy vết cổng → dịch vụ"),
+        logs=("Vector + Parseable", "log tập trung (tùy chọn)"), restic=("restic", "sao lưu CSDL và kho tệp"),
         l_metrics="chỉ số", l_sql="SQL", l_actions="Actions", l_push="đẩy thông báo", l_bpmn="BPMN", l_secret="bí mật",
         l_meta="siêu dữ liệu", l_scan="kiểm dịch", l_store="lưu tệp", l_index="chỉ mục", l_keys="khóa, bí mật",
+        l_span="span", l_ngsi="NGSI-LD",
         legend=[("app", "Ứng dụng"), ("id", "Định danh [H]"), ("proc", "Quy trình [P]"), ("data", "Dữ liệu [D]"),
                 ("ai", "AI [I]"), ("trust", "Tin cậy"), ("ops", "Vận hành")],
         bold="Viền đậm: mã của đội · viền mảnh có logo: phần mềm nguồn mở dùng nguyên bản",
@@ -74,12 +86,17 @@ T = {
     ),
     "en": dict(
         users="Users", net="Internal Docker network", t2="TIER 2 · APPLICATIONS WITH A UI", t1="TIER 1 · HEADLESS CORE",
-        note=["New apps plug into the core through the gateway,", "without changing a line of the core"],
+        note=["New apps plug into the core through the gateway,", "without changing a line of the core;",
+              "the apps network reaches only the gateway"],
         u1=("Browser", ["clerks, managers,", "staff, administrators"]),
         u2=("Document recipients", ["verify a document by QR,", "no sign-in needed"]),
+        net_in=["over the Internet, or a", "Cloudflare Tunnel (optional)"],
         gw=("API gateway", "Apache APISIX", ["the only entry point", "exposed outside", "", "JWT checked at the edge",
-                                            "adds X-Request-Id", "rate limiting", "blocks admin paths"]),
+                                            "adds X-Request-Id", "rate limiting", "Coraza firewall",
+                                            "blocks admin paths"]),
         office=("e-Office", "app-office · Nuxt 4"), canhan=("Personal space", "app-ca-nhan · P.A.R.A"),
+        tailieu=("API docs", "app-tai-lieu-api · Swagger UI"),
+        plug=("News board · Leave requests", "plugged in by manifest: moc app install"),
         kc=("Keycloak", "single sign-on, TOTP"), cf=("Centrifugo", "real-time notifications"),
         hasura=("Hasura", "GraphQL, row-level access"), files=("svc-files", "files, search, PDF, AI"),
         mon=("Prometheus + Grafana", "API gateway monitoring"), wf=("svc-workflow", "Actions, deadlines"),
@@ -87,8 +104,12 @@ T = {
         sw=("SeaweedFS", "S3 file store, archive"), flow=("Flowable", "BPMN workflows"),
         bao=("OpenBao", "secrets vault, signing keys"), meili=("Meilisearch", "full-text search"),
         ollama=("Ollama (optional)", "local language model"),
+        scorpio=("Scorpio (optional)", "NGSI-LD, IoT sensors"),
+        jaeger=("Jaeger (optional)", "gateway → service tracing"),
+        logs=("Vector + Parseable", "central logs (optional)"), restic=("restic", "database and file backup"),
         l_metrics="metrics", l_sql="SQL", l_actions="Actions", l_push="push", l_bpmn="BPMN", l_secret="secrets",
         l_meta="metadata", l_scan="scan", l_store="store", l_index="index", l_keys="keys, secrets",
+        l_span="spans", l_ngsi="NGSI-LD",
         legend=[("app", "Applications"), ("id", "Identity [H]"), ("proc", "Process [P]"), ("data", "Data [D]"),
                 ("ai", "AI [I]"), ("trust", "Trust"), ("ops", "Operations")],
         bold="Thick border: written by the team · thin border with logo: upstream open source used as is",
@@ -104,16 +125,17 @@ C = {  # màu nền, màu viền theo vai trò (bảng màu của draw.io)
 }
 
 # logo trên từng hộp phần mềm nguồn mở; hộp mã của đội không có logo
-LOGO = dict(gw=["apisix"], kc=["keycloak"], cf=["centrifugo"], hasura=["hasura"], mon=["prometheus", "grafana"],
-            pg=["postgresql"], clam=["clamav"], sw=["seaweedfs"], flow=["flowable"], bao=["openbao"],
-            meili=["meilisearch"], ollama=["ollama"])
+LOGO = dict(gw=["apisix", "coraza"], kc=["keycloak"], cf=["centrifugo"], hasura=["hasura"],
+            mon=["prometheus", "grafana"], jaeger=["jaeger"], pg=["postgresql"], clam=["clamav"], sw=["seaweedfs"],
+            logs=["vector", "parseable"], scorpio=["scorpio"], flow=["flowable"], bao=["openbao"],
+            meili=["meilisearch"], ollama=["ollama"], restic=["restic"])
 
 # hai yêu cầu có chấm sáng: (màu, đường đi chỉ gồm M/H/V, lệch pha so với chấm đầu)
 XUNG_SANG = [
     # văn bản: trình duyệt → cổng → Hasura → svc-workflow → Flowable
-    ("#d79b00", "M210,277 H345 V441 H740 V368 H865 V353 H1115", 0.0),
+    ("#d79b00", f"M210,{UY[0] + 37} H345 V{MID[5]} H740 V{ROW[4] + 44} H865 V{MID[4]} H1115", 0.0),
     # tệp: trình duyệt → cổng → svc-files → ClamAV
-    ("#b85450", "M210,277 H345 V529 H865", XUNG / 2),
+    ("#b85450", f"M210,{UY[0] + 37} H345 V{MID[6]} H865", XUNG / 2),
 ]
 
 
@@ -200,39 +222,49 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     a("</style>\n</defs>")
     a(f'<rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="12" fill="#ffffff" stroke="#d0d7de"/>')
 
-    # vùng: người dùng ở ngoài, mạng nội bộ chứa hai tầng
-    a('<rect x="20" y="200" width="210" height="320" rx="24" fill="none" stroke="#8c959f" stroke-dasharray="4 4"/>')
-    text(36, 222, tx["users"], 11.5, 400, "#57606a", "start")
-    a('<rect x="460" y="22" width="800" height="662" rx="32" fill="none" stroke="#8c959f" stroke-dasharray="4 4"/>')
-    text(484, 44, tx["net"], 11.5, 400, "#57606a", "start")
-    a('<rect x="472" y="54" width="776" height="164" rx="18" fill="#f6f9ff"/>')
-    text(1236, 76, tx["t2"], 10.5, 600, "#6c8ebf", "end", ' letter-spacing="0.6"')
-    text(1236, 246, tx["t1"], 10.5, 600, "#8c959f", "end", ' letter-spacing="0.6"')
-    for i, s in enumerate(tx["note"]):
-        text(1236, 160 + i * 16, s, 11, 400, "#57606a", "end", ' font-style="italic"')
+    R, M = ROW, MID
+    x2, x3, x4, bw, bh = 530, 780, 1030, 170, 58  # cột 2 là lối vào từ cổng; cột 3, 4 là dịch vụ, dữ liệu phía sau
 
-    # hàng của cột 2 (lối vào từ cổng); cột 3, 4 là dịch vụ và dữ liệu phía sau
-    row = {i: 60 + i * 88 for i in range(7)}
-    mid = {i: row[i] + 29 for i in range(7)}
-    x2, x3, x4, bw, bh = 530, 780, 1030, 170, 58
+    # vùng: người dùng ở ngoài, mạng nội bộ chứa hai tầng
+    a('<rect x="20" y="280" width="210" height="340" rx="24" fill="none" stroke="#8c959f" stroke-dasharray="4 4"/>')
+    text(36, 302, tx["users"], 11.5, 400, "#57606a", "start")
+    for i, s in enumerate(tx["net_in"]):
+        text(125, 584 + i * 15, s, 10.5, 400, "#57606a", extra=' font-style="italic"')
+    a(f'<rect x="460" y="22" width="800" height="{R[8] + bh + 18 - 22}" rx="32" fill="none" stroke="#8c959f" '
+      'stroke-dasharray="4 4"/>')
+    text(484, 44, tx["net"], 11.5, 400, "#57606a", "start")
+    a(f'<rect x="472" y="54" width="776" height="{R[2] + bh + 12 - 54}" rx="18" fill="#f6f9ff"/>')
+    text(1236, 76, tx["t2"], 10.5, 600, "#6c8ebf", "end", ' letter-spacing="0.6"')
+    text(1236, R[3] - 16, tx["t1"], 10.5, 600, "#8c959f", "end", ' letter-spacing="0.6"')
+    for i, s in enumerate(tx["note"]):
+        text(1236, 100 + i * 16, s, 11, 400, "#57606a", "end", ' font-style="italic"')
 
     # đường nối vẽ trước, nằm dưới hộp; nhãn từ cổng là đường dẫn thật trong cấu hình APISIX
-    edge([(210, 277), (270, 277)])
-    edge([(210, 437), (270, 437)])
-    routes = ["/", "/ca-nhan/", "/realms/moc", "/realtime", "/v1/graphql", "/api/…", tx["l_metrics"]]
+    for y in UY:
+        edge([(210, y + 37), (270, y + 37)])
+    routes = ["/", "/ca-nhan/", "/tai-lieu-api/", "/realms/moc", "/realtime", "/v1/graphql", "/api/…",
+              tx["l_metrics"], tx["l_span"]]
     for i, r in enumerate(routes):
-        edge([(420, mid[i]), (x2, mid[i])], r, 475, mid[i] - 6, mono=r.startswith("/"))
-    edge([(700, 441), (780, 441)], tx["l_sql"], 740, 435)
-    edge([(700, 425), (740, 425), (740, 368), (780, 368)], tx["l_actions"], 746, 400, "start")
-    edge([(780, 345), (700, 345)], tx["l_push"], 740, 339)
-    edge([(950, 353), (1030, 353)], tx["l_bpmn"], 990, 347)
-    edge([(950, 370), (990, 370), (990, 428), (1030, 428)], tx["l_secret"], 996, 404, "start")
-    edge([(615, 500), (615, 470)], tx["l_meta"], 622, 489, "start")
-    edge([(700, 529), (780, 529)], tx["l_scan"], 740, 523)
-    edge([(700, 543), (740, 543), (740, 617), (780, 617)], tx["l_store"], 746, 584, "start")
-    edge([(700, 551), (755, 551), (755, 573), (1005, 573), (1005, 529), (1030, 529)], tx["l_index"], 998, 548, "end")
-    edge([(700, 551), (755, 551), (755, 573), (1005, 573), (1005, 617), (1030, 617)])
-    edge([(700, 512), (765, 512), (765, 485), (1015, 485), (1015, 455), (1030, 455)], tx["l_keys"], 890, 481)
+        edge([(420, M[i]), (x2, M[i])], r, 475, M[i] - 6, mono=r.startswith("/"))
+    # ứng dụng cắm bằng manifest (route thêm lúc cài) và quy trình của chúng tới thẳng svc-workflow: đi giữa hai hàng
+    edge([(420, R[1] - 15), (740, R[1] - 15), (740, M[1]), (x3, M[1])], "/bang-tin/ …", 475, R[1] - 21, mono=True)
+    edge([(420, R[4] - 15), (800, R[4] - 15), (800, R[4])], "/api/workflow/", 475, R[4] - 21, mono=True)
+    edge([(900, R[4]), (900, M[3]), (x4, M[3])], tx["l_ngsi"], 965, M[3] - 6)
+    edge([(700, M[5]), (780, M[5])], tx["l_sql"], 740, M[5] - 6)
+    edge([(700, M[5] - 16), (740, M[5] - 16), (740, R[4] + 44), (780, R[4] + 44)], tx["l_actions"], 746, R[5] - 12,
+         "start")
+    edge([(780, R[4] + 21), (700, R[4] + 21)], tx["l_push"], 740, R[4] + 15)
+    edge([(950, M[4]), (1030, M[4])], tx["l_bpmn"], 990, M[4] - 6)
+    edge([(950, R[4] + 46), (990, R[4] + 46), (990, R[5] + 16), (1030, R[5] + 16)], tx["l_secret"], 996, R[5] - 8,
+         "start")
+    edge([(615, R[6]), (615, R[5] + bh)], tx["l_meta"], 622, R[6] - 11, "start")
+    edge([(700, M[6]), (780, M[6])], tx["l_scan"], 740, M[6] - 6)
+    edge([(700, R[6] + 43), (740, R[6] + 43), (740, M[7]), (780, M[7])], tx["l_store"], 746, R[7] - 4, "start")
+    nhanh = [(700, R[6] + 51), (755, R[6] + 51), (755, R[6] + 73), (1005, R[6] + 73)]
+    edge([*nhanh, (1005, M[6]), (1030, M[6])], tx["l_index"], 998, R[6] + 48, "end")
+    edge([*nhanh, (1005, M[7]), (1030, M[7])])
+    edge([(700, R[6] + 12), (765, R[6] + 12), (765, R[6] - 15), (1015, R[6] - 15), (1015, R[5] + 43),
+          (1030, R[5] + 43)], tx["l_keys"], 890, R[6] - 19)
 
     # chấm sáng đi theo luồng, vẽ dưới hộp: vào hộp thì khuất, ra hộp thì hiện
     for color, path, begin in XUNG_SANG:
@@ -248,42 +280,49 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
               f'opacity="{do_mo(p):.2f}"/>')
 
     # hộp
-    for key, y in (("u1", 240), ("u2", 400)):
+    for key, y in zip(("u1", "u2"), UY):
         t, sub = tx[key]
         a(f'<rect x="40" y="{y}" width="170" height="74" rx="8" fill="#ffffff" stroke="#8c959f"/>')
         text(125, y + 24, t, 12.5, 600)
         for i, s in enumerate(sub):
             text(125, y + 44 + i * 15, s, 10.5, 400, "#57606a")
     f, s = C["gw"]
-    a(f'<rect x="270" y="50" width="150" height="610" rx="12" fill="{f}" stroke="{s}" stroke-width="1.2"/>')
+    a(f'<rect x="270" y="50" width="150" height="{R[8] + bh - 50}" rx="12" fill="{f}" stroke="{s}" '
+      'stroke-width="1.2"/>')
     gt, gs, gl = tx["gw"]
-    text(345, 300, gt, 14, 600)
-    text(345, 318, gs, 11, 400, "#3d8b7d")
+    gy = (50 + R[8] + bh) / 2 - 72  # khối chữ giữa cổng
+    text(345, gy, gt, 14, 600)
+    text(345, gy + 18, gs, 11, 400, "#3d8b7d")
     for i, s in enumerate(gl):
         if s:
-            text(345, 346 + i * 16, s, 10.5, 400, "#57606a")
+            text(345, gy + 46 + i * 16, s, 10.5, 400, "#57606a")
     huy_hieu(420, 50, LOGO["gw"], C["gw"][1])
-    col2 = [("office", "app", True), ("canhan", "app", True), ("kc", "id", False), ("cf", "proc", False),
-            ("hasura", "data", False), ("files", "trust", True), ("mon", "ops", False)]
+    col2 = [("office", "app", True), ("canhan", "app", True), ("tailieu", "app", True), ("kc", "id", False),
+            ("cf", "proc", False), ("hasura", "data", False), ("files", "trust", True), ("mon", "ops", False),
+            ("jaeger", "ops", False)]
     for i, (k, kind, team) in enumerate(col2):
-        box(x2, row[i], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
-    for x, r, k, kind, team in ((x3, 3, "wf", "proc", True), (x3, 4, "pg", "data", False),
-                                (x3, 5, "clam", "trust", False), (x3, 6, "sw", "data", False),
-                                (x4, 3, "flow", "proc", False), (x4, 4, "bao", "trust", False),
-                                (x4, 5, "meili", "data", False), (x4, 6, "ollama", "ai", False)):
-        box(x, row[r], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
+        box(x2, R[i], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
+    box(x3, R[1], x4 + bw - x3, bh, "app", *tx["plug"], team=True)
+    for x, r, k, kind, team in ((x3, 4, "wf", "proc", True), (x3, 5, "pg", "data", False),
+                                (x3, 6, "clam", "trust", False), (x3, 7, "sw", "data", False),
+                                (x3, 8, "logs", "ops", False), (x4, 3, "scorpio", "data", False),
+                                (x4, 4, "flow", "proc", False), (x4, 5, "bao", "trust", False),
+                                (x4, 6, "meili", "data", False), (x4, 7, "ollama", "ai", False),
+                                (x4, 8, "restic", "ops", False)):
+        box(x, R[r], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
 
     # chú giải
+    ly = R[8] + 95
     lx = 24
     for kind, label in tx["legend"]:
         f, s = C[kind]
-        a(f'<rect x="{lx}" y="703" width="16" height="12" rx="3" fill="{f}" stroke="{s}"/>')
-        text(lx + 22, 713, label, 11, 400, "#57606a", "start")
+        a(f'<rect x="{lx}" y="{ly}" width="16" height="12" rx="3" fill="{f}" stroke="{s}"/>')
+        text(lx + 22, ly + 10, label, 11, 400, "#57606a", "start")
         lx += 22 + len(label) * 6.4 + 22
-    text(24, 742, tx["bold"], 11, 400, "#57606a", "start")
-    a('<circle cx="760" cy="738" r="4.5" fill="#d79b00" stroke="#ffffff" stroke-width="1.5"/>')
-    text(772, 742, tx["pulse"], 11, 400, "#57606a", "start")
-    text(1256, 742, tx["credit"], 10, 400, "#8c959f", "end")
+    text(24, ly + 39, tx["bold"], 11, 400, "#57606a", "start")
+    a(f'<circle cx="760" cy="{ly + 35}" r="4.5" fill="#d79b00" stroke="#ffffff" stroke-width="1.5"/>')
+    text(772, ly + 39, tx["pulse"], 11, 400, "#57606a", "start")
+    text(1256, ly + 39, tx["credit"], 10, 400, "#8c959f", "end")
     a("</svg>")
     return "\n".join(out) + "\n"
 
