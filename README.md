@@ -49,10 +49,11 @@ chức tự cài, tự làm chủ. Ứng dụng mới chỉ cần cắm vào lõ
 [![Sơ đồ kiến trúc: người dùng đi qua cổng APISIX vào hai ứng dụng Tầng 2 và các dịch vụ lõi Tầng 1](docs/anh/kien-truc-tong-the.gif)](docs/anh/kien-truc-tong-the.gif)
 
 Tầng 1 là lõi không giao diện: định danh, cổng API, dữ liệu, quy trình và lớp tin cậy. Tầng 2 là ứng dụng: Văn phòng
-điện tử và Không gian cá nhân P.A.R.A, ứng dụng thứ hai cắm vào cùng lõi mà không sửa dòng mã nào của lõi
-([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Ứng dụng thứ ba, Bảng tin đơn vị, chỉ có khi cắm bằng lệnh
-`moc app install` nên không vẽ trong sơ đồ. Chỉ cổng APISIX mở ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó
-trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Bên trong máy cũng vậy:
+điện tử và Không gian cá nhân P.A.R.A. Ứng dụng thứ hai này không sửa mã dịch vụ lõi, nhưng được thêm tay vào cấu hình
+lõi (client Keycloak, route ở cổng, bảng và quyền trong CSDL). Ứng dụng thứ ba, Bảng tin đơn vị, cắm vào bằng một lệnh
+`moc app install` mà không sửa tệp nào của lõi ([`docs/them-ung-dung.md`](docs/them-ung-dung.md)). Chỉ cổng APISIX mở
+ra ngoài, mọi yêu cầu qua tường lửa ứng dụng web ở đó trước khi tới lõi; nhãn trên mũi tên là đường dẫn thật. Bên
+trong máy cũng vậy:
 - container ứng dụng ở mạng Docker riêng `apps` (không ra Internet), nơi dịch vụ lõi duy nhất là APISIX;
 - vì thế phần máy chủ của ứng dụng cũng gọi lõi qua cổng, qua cùng bước kiểm token, giới hạn tốc độ, WAF như trình
   duyệt;
@@ -89,7 +90,8 @@ Ngoài ra: sổ đăng ký văn bản đến, đi đúng mẫu NĐ 30; nhiều �
 ### Không gian cá nhân P.A.R.A
 
 Tệp của mỗi người xếp trong bốn thư mục Dự án · Lĩnh vực · Tài nguyên · Lưu trữ; client Keycloak riêng, gọi lõi qua
-cổng như mọi ứng dụng, không sửa dòng mã nào của lõi (`make demo-ca-nhan`).
+cổng như mọi ứng dụng, không sửa mã dịch vụ lõi; bảng, quyền, client và route được thêm tay vào cấu hình lõi
+(`make demo-ca-nhan`).
 
 ### Cắm thêm ứng dụng bằng một lệnh
 
@@ -186,7 +188,7 @@ tiếp, được kiểm tự động bằng `make license-audit`.
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 và `docker buildx` |
 | GNU Make | 4.0 | điều phối lệnh |
 | Python | 3.10 | chỉ thư viện chuẩn, không cài thêm gì: dữ liệu mẫu, smoke, demo, sao lưu, cài đặt và các lệnh vận hành |
-| RAM | 8 GB | cả hệ thống (profile mặc định, 16 container) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB), đo từ trước khi thêm `app-ca-nhan` (một nginx phục vụ trang tĩnh); bật mô hình AI cần thêm tới 6 GB |
+| RAM | 8 GB | cả hệ thống (profile mặc định: 18 dịch vụ, 17 chạy liên tục) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB), đo từ trước khi thêm `app-ca-nhan` (một nginx phục vụ trang tĩnh) và `app-tai-lieu-api` (trang tài liệu API, giới hạn 64 MB); bật mô hình AI cần thêm tới 6 GB |
 | Đĩa trống | 10 GB | image khoảng 5 GB; mô hình AI thêm khoảng 2 GB |
 
 Toàn bộ công cụ dùng để dựng Signet đều là phần mềm nguồn mở. Không cần bất kỳ công cụ nguồn đóng hay tự chế nào.
@@ -283,7 +285,7 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 | [Thêm đơn vị](docs/van-hanh.md#thêm-đơn-vị-thuê-ước) (khoa, phòng, trường thành viên) | `python3 scripts/moc.py tenant create …` |
 | [Sao lưu và khôi phục](docs/van-hanh.md#sao-lưu-và-khôi-phục) mọi CSDL, tệp, két vào kho restic mã hóa | `make backup`, `make restore` |
 | [Két bí mật](docs/van-hanh.md#két-bí-mật) OpenBao: giới hạn, nâng cấp két cũ để ký số | `make demo-ket-bi-mat` |
-| [GitOps và tự phục hồi](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer, chỉ áp commit đã ký | `make reconcile` |
+| [GitOps và tự phục hồi](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer; đặt `MOC_GITOPS_ALLOWED_SIGNERS` thì chỉ áp commit đã ký | `make reconcile` |
 | [Giám sát](docs/van-hanh.md#giám-sát) cổng API bằng Prometheus + Grafana | đường hầm SSH tới cổng 3300 |
 | [Log tập trung](docs/van-hanh.md#log-tập-trung): Vector + Parseable, tra theo mã yêu cầu `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
 | [Hội tụ IT/OT](docs/van-hanh.md#hội-tụ-itot): broker NGSI-LD, cảm biến | `make demo-it-ot` |

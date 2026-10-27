@@ -258,7 +258,7 @@ python3 scripts/kiem_ban_online.py https://moc.example.vn   # từ thư mục m�
 dùng thấy, rồi báo mọi mục trượt:
 - chứng chỉ hợp lệ, còn ít nhất 14 ngày;
 - `http://` chuyển sang `https://`;
-- `/api/status` ok (thêm `--version 1.2.0` để đòi đúng bản);
+- `/api/status` ok (thêm `--version 1.2.1` để đòi đúng bản);
 - `issuer`, `token_endpoint` như dưới đây;
 - header CSP, `nosniff` còn qua proxy.
 

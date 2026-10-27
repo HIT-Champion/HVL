@@ -35,31 +35,32 @@ kiểm của `scripts/smoke.py`.
 
 ## 1. Số test
 
-Đếm tĩnh trên `develop` 5ea8fbc; số chạy lấy từ log của lần CI
-[40179833930](https://github.com/HIT-Champion/Signet/actions/runs/40179833930) trên 772d81f (25/10/2026, xanh hết) —
-commit kế tiếp (#144) chỉ sửa chuỗi trong hai tệp test, không thêm, bớt test nào.
+Đếm tĩnh trên `develop` 6e2ba1f (gộp ngược `v1.2.1`); số chạy lấy từ log của lần CI
+[40552387498](https://github.com/HIT-Champion/Signet/actions/runs/40552387498) trên e32dd1d (27/10/2026, xanh hết) —
+cây mã của e32dd1d và 6e2ba1f giống hệt nhau.
 
-| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Chạy trong CI (lần 40179833930) | Job CI |
+| Phần | Thư mục | Cách đếm tĩnh | Đếm tĩnh | Chạy trong CI (lần 40552387498) | Job CI |
 |---|---|---|---|---|---|
-| svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 853 hàm | 1 428 đạt, 9 bỏ qua | `unit` (`make test`) |
-| svc-workflow | `services/svc-workflow/tests/` | như trên | 284 hàm | 486 đạt | `unit` (`make test`) |
-| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 372 hàm | 372 chạy, đạt, 2 bỏ qua | `unit` (`make test`) |
-| Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 149 lời gọi | 199 đạt | `unit` (`make test`) |
-| Không gian cá nhân P.A.R.A | `apps/ca-nhan/tests/` | như trên | 13 lời gọi | 13 đạt | `unit` (`make test`) |
-| Bảng tin đơn vị | `apps/bang-tin/tests/` | như trên; `def test_` cho tệp Python | 5 lời gọi + 15 hàm | 5 + 15 đạt | `unit` (`make test`) |
-| Đơn nghỉ phép (#301) | `apps/nghi-phep/tests/` | như trên | 24 lời gọi + 12 hàm | thêm sau lần CI này, chưa đo | `unit` (`make test`) |
-| CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 321 hàm | 543 đạt | `db` (`MOC_IT=1`) |
-| Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 23 test trong 19 tệp `*.spec.ts` | 23 đạt | `chay-thu`, phần `e2e`, bước `make e2e` |
-| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 91 kiểm | 91 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
+| svc-files | `services/svc-files/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 952 hàm | 1 691 đạt, 9 bỏ qua | `unit` (`make test`) |
+| svc-workflow | `services/svc-workflow/tests/` | như trên | 433 hàm | 963 đạt | `unit` (`make test`) |
+| Lệnh vận hành, demo | `scripts/tests/` | như trên (phương thức `unittest`) | 596 hàm | 596 chạy, 594 đạt, 2 bỏ qua | `unit` (`make test`) |
+| Giao diện Văn phòng điện tử | `apps/office/tests/` | `grep -hE '^\s*(test\|it)\('` | 212 lời gọi | 262 đạt | `unit` (`make test`) |
+| Không gian cá nhân P.A.R.A | `apps/ca-nhan/tests/` | như trên | 20 lời gọi | 20 đạt | `unit` (`make test`) |
+| Bảng tin đơn vị | `apps/bang-tin/tests/` | như trên; `def test_` cho tệp Python | 14 lời gọi + 15 hàm | 14 + 15 đạt | `unit` (`make test`) |
+| Đơn nghỉ phép (#301) | `apps/nghi-phep/tests/` | như trên | 24 lời gọi + 12 hàm | 111 + 12 đạt | `unit` (`make test`) |
+| Trang tài liệu API (#357) | `apps/tai-lieu-api/tests/` | `def test_` | 15 hàm | 15 đạt | `unit` (`make test`) |
+| CSDL + Hasura thật | `db/tests/` | `grep -rhoE '^\s*(async )?def test_'` | 337 hàm | 583 đạt | `db` (`MOC_IT=1`) |
+| Trình duyệt thật (Playwright) | `tests/e2e/` | `grep -hE '^test\('` | 43 test trong 28 tệp `*.spec.ts` | 49 đạt | `chay-thu`, phần `e2e`, bước `make e2e` |
+| Smoke qua cổng APISIX | `scripts/smoke.py` | `grep -cE '^\s*ok\('` | 101 kiểm | 99 kiểm đạt | `chay-thu`, phần `luong-chinh`, bước `make smoke` |
 
-**Tổng đếm tĩnh: 2 035 test** (853 + 284 + 372 + 149 + 13 + 5 + 15 + 321 + 23), cộng 91 kiểm của smoke; **lúc chạy
-trong CI: 3 082 test đạt** (1 428 + 486 + 370 + 199 + 13 + 20 + 543 + 23 — `scripts` tính 370 vì 2 test bỏ qua), cộng
-91 kiểm smoke. Số lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test sinh trong vòng lặp nhân một hàm
-thành nhiều ca. Test của `scripts` chỉ bỏ qua có điều kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư
+**Tổng đếm tĩnh: 2 673 test** (952 + 433 + 596 + 212 + 20 + 14 + 15 + 24 + 12 + 15 + 337 + 43), cộng 101 kiểm của smoke;
+**lúc chạy trong CI: 4 329 test đạt** (1 691 + 963 + 594 + 262 + 20 + 14 + 15 + 111 + 12 + 15 + 583 + 49 — `scripts`
+tính 594 vì 2 test bỏ qua), cộng 99 kiểm smoke. Số lúc chạy lớn hơn số đếm tĩnh vì `pytest.mark.parametrize` và test
+sinh trong vòng lặp nhân một hàm thành nhiều ca; smoke đạt ít hơn số `ok(` vì vài kiểm nằm trong nhánh `if`, chỉ chạy
+khi đủ điều kiện. Test của `scripts` chỉ bỏ qua có điều kiện (`skipIf`, `skipUnless`: thiếu công cụ, thư viện hay thư
 mục). 9 test bỏ qua của svc-files là `integration/test_live.py` (chỉ chạy khi đặt `MOC_IT=1` và khóa JWT thử — job
 `unit` không đặt, nên 9 test này không chạy ở đâu tự động). Không gán cho tính năng nào: svc-files `test_hasura.py` 20
-(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 4, `paging.test.ts` 4.
-Dòng Đơn nghỉ phép (#301) thêm sau lần đếm và lần CI trên: hai tổng chưa tính nó, cột CI để trống tới lần chốt sau.
+(máy khách Hasura dùng chung), `integration/test_live.py` 9, office `format.test.ts` 6, `paging.test.ts` 4.
 
 ## 2. Ma trận tính năng
 

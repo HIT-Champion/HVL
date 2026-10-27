@@ -11,8 +11,8 @@
 >
 > 1. **Gồm gì.** Lõi Tầng 1 không giao diện: phần mềm nguồn mở dùng nguyên bản (Keycloak, APISIX, Hasura, PostgreSQL,
 >    Flowable, SeaweedFS, Meilisearch, ClamAV, OpenBao, Centrifugo) cộng hai dịch vụ Python của đội, `svc-files` và
->    `svc-workflow`. Tầng 2 là ba ứng dụng: Văn phòng điện tử, Không gian cá nhân P.A.R.A (hai trang tĩnh) và Bảng tin
->    đơn vị (cắm bằng `moc app install`).
+>    `svc-workflow`. Tầng 2 là các ứng dụng: Văn phòng điện tử, Không gian cá nhân P.A.R.A (hai trang tĩnh), trang tài
+>    liệu API, và Bảng tin đơn vị, Nghỉ phép (cắm bằng `moc app install`).
 > 2. **Chạy thế nào.** Mọi yêu cầu vào qua một cổng APISIX có kiểm token. Dữ liệu có cấu trúc đi qua Hasura, quyền tới
 >    từng dòng; tệp đi qua `svc-files`, quét ClamAV trước khi lưu; bước quy trình do Flowable giữ.
 > 3. **Vì sao chọn vậy.** Không viết lại phần mềm đã có, chạy trên một máy 8 GB, không dịch vụ trả phí (§1); từng lựa
@@ -70,12 +70,12 @@ văn bản, giao việc và sự kiện đó qua Hasura, đúng quyền người
 `agent`), việc của nó vào sổ kiểm toán, và nó chỉ gợi ý — người quyết.
 
 Profile của `docker-compose.yml` chia theo **tầng**, không theo trục: `core` là Tầng 1 (15 dịch vụ, trong đó
-`keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`); `make up` bật cả hai. Phần
-tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `mail` (Mailpit),
-`tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`, `make demo-it-ot`, `make
-backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến `core / app / ops / ai`
-([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`,
-`app` cộng các phần tùy chọn ở trên, không có profile `ops`.
+`keycloak-fonts` chạy một lần rồi thoát), `app` là Tầng 2 (`app-office`, `app-ca-nhan`, `app-tai-lieu-api`); `make up`
+bật cả hai. Phần tùy chọn có profile riêng: `ai` (Ollama), `iot` (Scorpio, PostGIS), `logs` (Vector, Parseable), `trace`
+(Jaeger), `mail` (Mailpit), `tunnel` (cloudflared); `ai-pull`, `iot-sim`, `backup` chỉ dùng khi gọi `make ai-model`,
+`make demo-it-ot`, `make backup` hay `make restore`. Kế hoạch dời việc đổi profile sang Phase 1, dự kiến
+`core / app / ops / ai` ([`ke-hoach-phat-trien.md`](du-thi/ke-hoach-phat-trien.md), cuối Phase 0); hiện là `core`, `app`
+cộng các phần tùy chọn ở trên, không có profile `ops`.
 
 ### 1.3. Ràng buộc tài nguyên
 
@@ -98,9 +98,9 @@ của ba câu, đúng mức đã kiểm:
 | 2. Cài dưới một giờ | **Chưa đo** với người ngoài đội trên máy sạch | `ROADMAP.md`, giai đoạn 5 |
 | 3. Không dịch vụ trả phí bắt buộc | Đạt | [`trien-khai.md`](trien-khai.md) §5, §5b |
 
-- **Câu 1.** `make up` bật profile `core` và `app` (17 dịch vụ, 16 chạy liên tục). README ghi khoảng 3,2 GB (đo
-  từ trước khi thêm `app-ca-nhan`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB đĩa.
-  Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
+- **Câu 1.** `make up` bật profile `core` và `app` (18 dịch vụ, 17 chạy liên tục). README ghi khoảng 3,2 GB (đo từ trước
+  khi thêm `app-ca-nhan`, `app-tai-lieu-api`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB
+  đĩa. Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
   cần máy 16 GB.
 - **Câu 2.** Cài từ mã nguồn bằng `make env`, `make up`, `make seed`; `make install PREFIX=…` cài ra ngoài thư mục mã
   nguồn (F1.8).
@@ -191,16 +191,16 @@ flowchart LR
   gọi `svc-workflow` kèm `X-Moc-Action-Secret`; `svc-workflow` gọi `svc-files` bằng token tài khoản dịch vụ (client
   credentials). Cổng gỡ khóa quản trị Hasura khỏi mọi yêu cầu từ ngoài.
 - **Hai đường ghi.** Dữ liệu có cấu trúc đi qua Hasura: quyền theo vai trò và đơn vị tới từng dòng; thao tác làm đổi
-  trạng thái quy trình đi qua Hasura Actions do `svc-workflow` xử lý; dịch vụ này không có route ở cổng và chính nó cũng
-  ghi qua Hasura, bằng vai trò `service`, `agent`. Tệp đi qua `svc-files`: quét ClamAV trước khi ghi SeaweedFS, tải về
-  sau khi Hasura xác nhận người hỏi được xem.
+  trạng thái quy trình đi qua Hasura Actions do `svc-workflow` xử lý; ở cổng, dịch vụ này chỉ có route `/api/workflow/*`
+  cho quy trình của ứng dụng cắm bằng manifest (#301), và chính nó cũng ghi qua Hasura, bằng vai trò `service`, `agent`.
+  Tệp đi qua `svc-files`: quét ClamAV trước khi ghi SeaweedFS, tải về sau khi Hasura xác nhận người hỏi được xem.
 - **Mạng con khép kín.** SeaweedFS chỉ ở mạng `storage`, OpenBao ở `secrets`, Ollama ở `ai` — mạng `internal` của
   Docker, chỉ `svc-files` (và `svc-workflow` với `secrets`) nối vào, nên không thành phần nào khác chạm được tệp, két
-  hay mô hình qua mạng. Container ứng dụng (`app-office`, `app-ca-nhan`, ứng dụng cài bằng `moc app install`) chỉ ở
-  mạng `apps` (`internal`), nơi chỉ có APISIX: ứng dụng tới lõi duy nhất qua cổng, kể cả phần máy chủ của ứng dụng
-  (token client credentials, GraphQL đi qua đúng các route của trình duyệt, cùng kiểm token, giới hạn tốc độ, WAF).
-  Hasura giao sự kiện tới ứng dụng qua cổng hook 9081 của APISIX — không publish, route hook chỉ khớp ở cổng đó
-  ([`them-ung-dung.md`](them-ung-dung.md) 1.3). Ngoại lệ có chủ ý: container `restic` (profile `backup`, không
+  hay mô hình qua mạng. Container ứng dụng (`app-office`, `app-ca-nhan`, `app-tai-lieu-api`, ứng dụng cài bằng
+  `moc app install`) chỉ ở mạng `apps` (`internal`), nơi chỉ có APISIX: ứng dụng tới lõi duy nhất qua cổng, kể cả phần
+  máy chủ của ứng dụng (token client credentials, GraphQL đi qua đúng các route của trình duyệt, cùng kiểm token, giới
+  hạn tốc độ, WAF). Hasura giao sự kiện tới ứng dụng qua cổng hook 9081 của APISIX — không publish, route hook chỉ khớp
+  ở cổng đó ([`them-ung-dung.md`](them-ung-dung.md) 1.3). Ngoại lệ có chủ ý: container `restic` (profile `backup`, không
   mạng) gắn thẳng volume của SeaweedFS và OpenBao để sao lưu (`docker-compose.yml`, `scripts/backup.py`). Flowable không
   gọi ra ngoài: việc tự động là việc giao ra ngoài (external worker) do `svc-workflow` kéo về (QĐ-009).
 
@@ -645,7 +645,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 | QĐ-001 | "mọi tệp mã phải mang header Apache-2.0 (CI cưỡng chế)" | Vẫn đúng với tệp mã; tệp không chèn được header (JSON, ảnh, Markdown…) khai giấy phép trong `REUSE.toml` |
 | QĐ-002 | "dùng chung cho mọi thành phần, tách bằng schema hoặc database riêng" | Đúng, trừ Scorpio: broker bắt buộc phần mở rộng `postgis` nên có CSDL PostGIS riêng (profile `iot`) |
 | QĐ-002 | "tài liệu vận hành ở giai đoạn 5 phải có quy trình sao lưu và phục hồi rõ ràng" | Đã có: `make backup`, `make restore` (restic, F3.4), [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục" |
-| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 17 dịch vụ (15 của `core`, 2 của `app`), 16 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
+| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 18 dịch vụ (15 của `core`, 3 của `app`), 17 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
@@ -763,7 +763,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   cần thêm mô hình ngôn ngữ (spaCy không có pipeline tiếng Việt chính thức) mà bộ nhận dạng dựng sẵn không có định
   dạng Việt Nam, nên vẫn phải tự viết regex. phonenumbers — metadata lớn phải ghim và cập nhật, không biết CCCD hay số
   tài khoản. Luật lỏng "0 + 9–11 chữ số" — che cả đuôi UUID, mã số thuế, số hiệu dài (các chuỗi âm tính trong
-  `test_pii.py`); luật theo cấu trúc che nhầm 0 chỗ trên kho mẫu: 81 023 ký tự, 747 chuỗi số ứng viên, đo lại bằng
+  `test_pii.py`); luật theo cấu trúc che nhầm 0 chỗ trên kho mẫu: 81 063 ký tự, 747 chuỗi số ứng viên, đo lại bằng
   `make do-che-pii`.
 - **Phương án chỗ che cho mô hình:** che trong chỉ mục — mất tìm theo số, phải nhúng lại toàn bộ, câu trích không còn
   khớp văn bản gốc. Che sau khi cắt cửa sổ ngữ cảnh — lọt mẩu số bị cắt đôi ("…liên hệ 0912 345"). Điền số thật trở
@@ -929,8 +929,9 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 - **Quyết định:** trang tĩnh. `apps/office`: Nuxt 4 với `ssr: false`, dựng ra tệp tĩnh, `nginx-unprivileged` 1.30.6 phục
   vụ. `apps/ca-nhan`: JavaScript thuần, không bước biên dịch, cùng image nginx. Đăng nhập OIDC Authorization Code với
   PKCE (`oidc-client-ts`); dữ liệu qua `/v1/graphql`, tệp qua `/api/*`, thông báo qua `/realtime` — cùng gốc với cổng
-  nên không cần CORS. `svc-workflow` không có route ở cổng: chỉ Hasura gọi nó. Giao diện chỉ đọc vai trò trong token để
-  vẽ menu; quyền do Hasura và dịch vụ kiểm.
+  nên không cần CORS. Văn phòng không gọi thẳng `svc-workflow`: Hasura Actions gọi nó (route `/api/workflow/*` ở cổng,
+  thêm sau ở #301, dành cho ứng dụng cắm bằng manifest). Giao diện chỉ đọc vai trò trong token để vẽ menu; quyền do
+  Hasura và dịch vụ kiểm.
 - **Lý do (căn cứ duy nhất trong repo):** chú thích ở `apps/office/nuxt.config.ts` — "Giao diện chạy hoàn toàn trên
   trình duyệt (SPA): dựng thành trang tĩnh, nginx phục vụ, mọi dữ liệu lấy qua APISIX cùng tên miền — không có máy chủ
   Node nào phải chạy ở bản triển khai." Không tài liệu nào ghi SSR từng được cân nhắc hay ràng buộc 8 GB là lý do.

@@ -54,11 +54,12 @@ trust out of the box, without building them itself:
 [![Architecture diagram: users go through the APISIX gateway to the two Tier 2 applications and the Tier 1 core services](docs/anh/kien-truc-tong-the.en.gif)](docs/anh/kien-truc-tong-the.en.gif)
 
 Tier 1 is the headless core: identity, API gateway, data, workflow and the trust layer. Tier 2 holds the
-applications: the e-Office and the P.A.R.A personal space, a second application plugged into the same core without
-changing a line of core code ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). A third application, the
-unit news board, exists only once installed with `moc app install`, so the diagram does not show it. Only the APISIX
-gateway is exposed, and every request passes its web application firewall before it reaches the core; the labels on
-its arrows are the real paths. The same holds inside the machine:
+applications: the e-Office and the P.A.R.A personal space. That second application changes no core service code, but
+it was added by hand to the core configuration (a Keycloak client, a gateway route, tables and permissions in the
+database). A third application, the unit news board, plugs in with one `moc app install` command without changing any
+core file ([`docs/them-ung-dung.md`](docs/them-ung-dung.md), Vietnamese). Only the APISIX gateway is exposed, and
+every request passes its web application firewall before it reaches the core; the labels on its arrows are the real
+paths. The same holds inside the machine:
 - application containers sit on their own Docker network, `apps` (no Internet access), where APISIX is the only core
   service;
 - so an application's server side also reaches the core through the gateway, with the same token check, rate limits
@@ -98,7 +99,8 @@ only their own unit's data; the e-Office interface in Vietnamese and English. Sc
 ### P.A.R.A personal space
 
 Each person's files in four folders — Projects · Areas · Resources · Archives; its own Keycloak client, calling the
-core through the gateway like any application, without changing a line of core code (`make demo-ca-nhan`).
+core through the gateway like any application, without changing core service code; its tables, permissions, client
+and route were added by hand to the core configuration (`make demo-ca-nhan`).
 
 ### Plugging in an application with one command
 
@@ -196,7 +198,7 @@ package, transitive ones included, is checked automatically with `make license-a
 | Docker Engine | 24.0 | with the `docker compose` v2 plugin 2.17+ and `docker buildx` |
 | GNU Make | 4.0 | runs the commands |
 | Python | 3.10 | standard library only, nothing to install: sample data, smoke tests, demos, backup, install and operations commands |
-| RAM | 8 GB | the whole system (default profiles, 16 containers) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages) was added; the AI model needs up to 6 GB more |
+| RAM | 8 GB | the whole system (default profiles: 18 services, 17 running continuously) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages) and `app-tai-lieu-api` (the API docs page, capped at 64 MB) were added; the AI model needs up to 6 GB more |
 | Free disk | 10 GB | images about 5 GB; AI models about 2 GB more |
 
 Every tool used to build Signet is open-source software. No closed-source or home-made tool is needed.
@@ -294,7 +296,7 @@ Administrator tasks on a running installation are described in [`docs/van-hanh.m
 | [Adding a unit](docs/van-hanh.md#thêm-đơn-vị-thuê-ước) (faculty, office, member school) | `python3 scripts/moc.py tenant create …` |
 | [Backup and restore](docs/van-hanh.md#sao-lưu-và-khôi-phục) of every database, file and the vault into an encrypted restic repository | `make backup`, `make restore` |
 | [Secrets vault](docs/van-hanh.md#két-bí-mật) OpenBao: limits, upgrading an old vault for digital signatures | `make demo-ket-bi-mat` |
-| [GitOps and self-healing](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer, applies signed commits only | `make reconcile` |
+| [GitOps and self-healing](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer; with `MOC_GITOPS_ALLOWED_SIGNERS` set, applies signed commits only | `make reconcile` |
 | [Monitoring](docs/van-hanh.md#giám-sát) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
 | [Centralised logs](docs/van-hanh.md#log-tập-trung): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
 | [IT/OT convergence](docs/van-hanh.md#hội-tụ-itot): NGSI-LD broker, sensors | `make demo-it-ot` |

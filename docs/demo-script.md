@@ -5,8 +5,9 @@ cho từng nguyên lý. Mỗi màn dưới đây:
 
 - chạy bằng **một lệnh** trên hệ thống đang chạy (`make up`, `make seed`), xong trong **dưới một phút**;
 - in từng bước kèm dấu ✓, sai bước nào thì dừng và nói rõ bước đó (thoát 1);
-- chạy lại bao nhiêu lần cũng được, không sửa dữ liệu mẫu (mỗi lần chỉ thêm dữ liệu riêng của lần chạy, vd một
-  tệp sạch chưa gắn văn bản và vài dòng sổ kiểm toán).
+- chạy lại được nhiều lần, mỗi lần chỉ thêm dữ liệu riêng của lần chạy (vd một tệp sạch chưa gắn văn bản và vài dòng
+  sổ kiểm toán). Trừ `nong-lanh`: mỗi lần nộp lưu tối đa ba văn bản mẫu đã xong sang kho lạnh, không đảo ngược được;
+  hết văn bản thì màn báo chạy `make seed`. `pha-he` gọi `nong-lanh` khi chưa có lượt nộp lưu nào.
 
 Trên máy chủ đã `make install`, chạy `python3 scripts/demo.py <màn>` trong thư mục cài, thay cho `make demo-<màn>`.
 
@@ -868,7 +869,7 @@ câu trích tự mở.
   người làm đơn. Che là việc của chỗ chữ ra khỏi phạm vi quyền đọc: mô hình (dù chạy tại chỗ) và nhật ký (ai vào được
   máy chủ đều đọc được). Sổ kiểm toán không che: sổ có phân quyền và chuỗi băm, che vào sổ là sửa chứng cứ.
 - *"Che nhầm số ký hiệu, ngày tháng, số tiền thì sao?"* Không che chuỗi số chỉ vì đủ dài: số ký hiệu `131/…`, ngày,
-  tiền, UUID, mã số thuế sau "MST", tổng đài 1900, dãy số nhỏ của bảng đều có test âm tính; trên kho mẫu (81 023 ký
+  tiền, UUID, mã số thuế sau "MST", tổng đài 1900, dãy số nhỏ của bảng đều có test âm tính; trên kho mẫu (81 063 ký
   tự, 747 chuỗi số ứng viên) 0 chỗ bị che — `make do-che-pii` đo lại được. Luật lỏng "0 + 9–11 chữ số" thì che cả đuôi
   UUID và mã số thuế.
 - *"Mô hình chỉ thấy `[SĐT-1]` thì trả lời được gì?"* Đúng câu "số điện thoại liên hệ là [SĐT-1]", có trích dẫn; số
@@ -885,6 +886,19 @@ qua Cloudflare Tunnel (profile `tunnel`, [`trien-khai.md`](trien-khai.md) mục 
 online → máy dự phòng chạy tại chỗ → video quay sẵn**, không gỡ lỗi trước hội đồng quá một phút. Trên bản cài, lệnh là
 `python3 scripts/…` và `docker compose …` trong `/opt/moc` (bản cài không có `Makefile`); trên máy dự phòng là `make …`
 trong thư mục mã nguồn. Kịch bản 5 phút ở [`dac-ta-san-pham.md`](dac-ta-san-pham.md) §7 có cột dự phòng cho từng màn.
+
+**Màn nào chạy trên bản online khi đang có người dùng.** Vài màn cố ý dừng hay khởi động lại dịch vụ, nên trong lúc
+chạy không tải được tệp hay cổng ngắt vài giây:
+
+- `ket-bi-mat`: khởi động lại `openbao`, `svc-files`, `svc-workflow`;
+- `tu-phuc-hoi`: xóa container `svc-files`, dừng `centrifugo`;
+- `giao-viec`: bước 10 dừng `svc-files`;
+- `cai-ung-dung`, `quy-trinh`: cài, gỡ ứng dụng làm APISIX khởi động lại khi tệp route đổi;
+- `tat-van-phong`: dựng lại `svc-files`, `svc-workflow` hai lần.
+
+`nong-lanh` và `pha-he` tiêu văn bản mẫu (xem đầu tệp). Những màn này chạy trên máy dự phòng, hoặc báo trước với hội
+đồng rằng đây là phá thật. Trên bản online đang có người dùng, chạy màn không dừng dịch vụ nào, như
+`make demo-kiem-dich` (bản cài: `python3 scripts/demo.py kiem-dich`).
 
 **Mất Internet hoặc Cloudflare** (trang online không mở được, hoặc hiện trang lỗi của Cloudflare):
 
