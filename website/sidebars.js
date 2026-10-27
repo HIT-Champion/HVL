@@ -25,6 +25,19 @@ export default {
   taiLieu: [
     trang('docs/README', 'Xem nhanh 5 phút'),
     trang('README', 'Giới thiệu Signet'),
+    {
+      type: 'category',
+      label: 'Hướng dẫn sử dụng',
+      link: {type: 'doc', id: 'docs/huong-dan/README'},
+      items: [
+        trang('docs/huong-dan/van-thu', 'Văn thư'),
+        trang('docs/huong-dan/chuyen-vien', 'Chuyên viên'),
+        trang('docs/huong-dan/lanh-dao-phong', 'Lãnh đạo phòng'),
+        trang('docs/huong-dan/lanh-dao-don-vi', 'Lãnh đạo đơn vị'),
+        trang('docs/huong-dan/quan-tri', 'Quản trị đơn vị'),
+        trang('docs/huong-dan/viec-chung', 'Việc chung của mọi vai trò'),
+      ],
+    },
     trang('docs/thuat-ngu', 'Thuật ngữ'),
     {
       type: 'category',
