@@ -19,9 +19,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-// Lịch hạn của hộp việc: hai tuần từ Thứ Hai tuần này, mỗi ngày đếm việc đến hạn (chấm đỏ là việc khẩn hoặc đã
-// quá hạn), hai đầu là ô Quá hạn và Sau đó. Bấm một ô để chỉ xem việc của ô đó, bấm lại để bỏ. Thu gọn được; lựa
-// chọn nhớ trong trình duyệt (chỉ cho tiện, không lưu được thì thôi).
+// Lịch hạn của hộp việc: hai tuần từ Thứ Hai tuần này, mỗi ngày từ hôm nay đếm việc đến hạn (chấm đỏ là việc khẩn),
+// hai đầu là ô Quá hạn và Sau đó. Mỗi việc nằm đúng một ô: việc hạn đã qua chỉ đếm ở ô Quá hạn, kể cả hạn vào một
+// ngày đầu tuần đã qua, nên các ngày đó để trống. Bấm một ô để chỉ xem việc của ô đó, bấm lại để bỏ. Thu gọn được;
+// lựa chọn nhớ trong trình duyệt (chỉ cho tiện, không lưu được thì thôi).
 interface DueTask { due_on: string | null; urgency: string }
 
 const props = defineProps<{ tasks: DueTask[]; day: string }>()
@@ -34,10 +35,10 @@ const urgent = (task: DueTask) => !!task.urgency && task.urgency !== 'normal'
 const perDay = computed(() => {
   const map = new Map<string, { n: number; hot: number }>()
   for (const task of props.tasks) {
-    if (!task.due_on) continue
+    if (!task.due_on || task.due_on < props.day) continue      // quá hạn: chỉ ở ô Quá hạn
     const cell = map.get(task.due_on) ?? { n: 0, hot: 0 }
     cell.n++
-    if (urgent(task) || task.due_on < props.day) cell.hot++
+    if (urgent(task)) cell.hot++
     map.set(task.due_on, cell)
   }
   return map
@@ -51,7 +52,7 @@ const dayLabel = (iso: string) => {
   const n = perDay.value.get(iso)?.n ?? 0
   return n ? t('desk.dayTasks', { date: long(iso), n }, n) : t('desk.dayNone', { date: long(iso) })
 }
-// tối đa ba chấm mỗi ngày, chấm đỏ (khẩn, quá hạn) đứng trước
+// tối đa ba chấm mỗi ngày, chấm đỏ (khẩn) đứng trước
 function dots(iso: string): boolean[] {
   const cell = perDay.value.get(iso)
   if (!cell) return []

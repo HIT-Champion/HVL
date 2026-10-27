@@ -26,16 +26,15 @@ focus là trắng vì viền lục bảo chung chìm vào nền.
 ## Chữ
 
 Be Vietnam Pro tự phục vụ (OFL-1.1, gói npm `@fontsource/be-vietnam-pro`), bốn độ đậm 400–700, không thêm phông khác.
-Tiêu đề trang 26px
-600; tiêu đề khối 16px 600; chữ thường 14–16px; số đi `tabular-nums`. Ngày hạn trên lịch là chữ số lớn, không phải ô
-thống kê.
+Tiêu đề trang 26px/600; tiêu đề khối 16px/600; chữ thường 14–16px; số đi `tabular-nums`. Ngày hạn trên lịch là chữ số
+lớn, không phải ô thống kê.
 
 ## Khung
 
-- Thanh bên 76px (biểu tượng) mở thành 248px khi rê chuột hoặc focus bàn phím; nội dung dịch sang theo cùng nhịp,
-  không bị che. Chỉ thu lại khi con trỏ rời thanh bên: bấm mục menu hay đổi trang không thu.
-  Hành vi giữ đúng #297/#298 (`tests/e2e/giao-dien.spec.ts`): bấm chọn thì thu, nhích chuột không mở lại, Esc thu;
-  ≤ 900px hoặc màn cảm ứng thành ngăn kéo. Không ghim mở.
+- Thanh bên 76px (biểu tượng) mở thành 248px khi rê chuột hoặc focus bàn phím; nội dung dịch sang 172px theo cùng
+  nhịp, không bị che. Chỉ thu lại khi con trỏ hay focus rời thanh bên: bấm mục menu hay đổi trang không thu (thay luật
+  "bấm chọn thì thu" của #298). Esc thu; ≤ 900px hoặc màn cảm ứng thành ngăn kéo. Không ghim mở. Kiểm ở
+  `tests/e2e/giao-dien.spec.ts`.
 - Thanh trên trải hết chiều ngang: đơn vị › trang đang mở, ngày, góp ý, chuông, ngôn ngữ. Trang ngoài menu đặt tên
   qua `useState('sg-crumb')`.
 - Không có chân trang kiểu website. Xác thực văn bản và trạng thái hệ thống nằm cuối thanh bên.
