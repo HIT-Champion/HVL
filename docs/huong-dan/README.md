@@ -5,6 +5,9 @@ Trang chỉ ghi việc làm hằng ngày: vào mục nào, bấm nút nào. Ph�
 trang này trỏ tới chứ không chép lại. Gặp từ chưa rõ như vào sổ, nộp lưu, văn bản hạn chế, liên thông thì tra
 [Thuật ngữ](../thuat-ngu.md).
 
+Ảnh trong hướng dẫn do bộ kiểm thử e2e của CI tự chụp, trên hệ thống dựng từ mã nguồn với dữ liệu mẫu. Vì vậy ngày,
+số đếm và tên văn bản trên ảnh khác với máy của bạn.
+
 ## Chọn trang theo vai trò
 
 | Vai trò | Tài khoản mẫu | Việc chính | Trang |
@@ -30,9 +33,11 @@ thử tách đơn vị: mỗi bên chỉ thấy văn bản của khoa mình. M�
 3. Văn thư, lãnh đạo phòng, lãnh đạo đơn vị và quản trị đơn vị phải xác thực hai bước: nhập tiếp mã 6 số trong ứng
    dụng xác thực trên điện thoại (FreeOTP, Aegis, Google Authenticator). Lần đăng nhập đầu, quét mã QR trên màn hình
    để thêm tài khoản vào ứng dụng đó. Tài khoản mẫu của bản tự cài lấy mã bằng `make totp`.
-4. Vào được thì thanh bên trái là menu, mỗi vai trò thấy một bộ mục khác nhau. Cuối thanh bên có tên, vai trò của bạn
-   và nút đăng xuất (biểu tượng mũi tên ra khỏi khung, rê chuột vào hiện chữ "Đăng xuất"). Thanh trên cùng có nút
-   **Góp ý**, chuông thông báo và nút đổi ngôn ngữ **EN** / **VI**.
+4. Vào được thì thanh bên trái là menu, mỗi vai trò thấy một bộ mục khác nhau. Trên máy tính, thanh bên chỉ hiện biểu
+   tượng, rê chuột vào thì mở ra kèm tên mục; trên điện thoại, bấm nút menu ở góc trên. Cuối thanh bên có **Xác thực
+   văn bản**, **Trạng thái hệ thống**, rồi tên, vai trò của bạn và nút đăng xuất (biểu tượng mũi tên ra khỏi khung, rê
+   chuột vào hiện chữ "Đăng xuất"). Thanh trên cùng ghi tên đơn vị và trang đang mở, ngày hôm nay, nút **Góp ý**,
+   chuông thông báo và nút đổi ngôn ngữ **EN** / **VI**.
 
 Mã bị từ chối thường do đồng hồ điện thoại lệch: bật giờ tự động. Sai 10 lần thì tài khoản bị tạm khóa.
 

@@ -10,6 +10,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ### Đã sửa đổi
 - Giao diện "Lịch hạn" cho Văn phòng điện tử, trang đăng nhập, P.A.R.A, Bảng tin: hộp việc xếp theo ngày hạn (#291).
+- Hướng dẫn sử dụng theo vai trò khớp giao diện Lịch hạn, có ảnh chụp các màn chính (#308).
 
 ## [1.2.0] - 2026-10-27
 
