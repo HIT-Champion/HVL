@@ -6,10 +6,10 @@ tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là l�
 
 Trạng thái ghi ngày 25/10/2026, trên nhánh `develop`, sau bản `v1.1.0` (25/10). Các giai đoạn là thứ tự phụ thuộc,
 không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ 25/10 tới
-27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó
-nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã tính năng
-F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn chế đã biết
-của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
+27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)), giao diện Lịch
+hạn ở bản vá `v1.2.1` (28/10); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã
+tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn
+chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 
 - `[x]` — đã có: mức **Hoàn thiện** trong `docs/muc-hoan-thien.md`, hoặc có bằng chứng ghi trong dòng.
 - `[ ]` **Một phần** — có mã chạy được (mức Dùng được, Minh họa hay Một phần); phần còn thiếu ghi ngay sau.

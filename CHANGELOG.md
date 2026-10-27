@@ -11,6 +11,12 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ### Đã thêm
 - Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
 
+## [1.2.1] - 2026-10-28
+
+Bản vá đúng bản đang chạy online: giao diện Lịch hạn (hộp việc xếp theo ngày hạn) cho Văn phòng điện tử, trang đăng
+nhập, P.A.R.A, Bảng tin, và hướng dẫn sử dụng theo vai trò có ảnh chụp các màn chính. Không thêm tính năng, không đổi
+API hay biến cấu hình; nâng tại chỗ từ `v1.2.0`.
+
 ### Đã sửa đổi
 - Giao diện "Lịch hạn" cho Văn phòng điện tử, trang đăng nhập, P.A.R.A, Bảng tin: hộp việc xếp theo ngày hạn (#291).
 - Hướng dẫn sử dụng theo vai trò khớp giao diện Lịch hạn, có ảnh chụp các màn chính (#308).
