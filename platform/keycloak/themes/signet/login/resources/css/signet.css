@@ -24,7 +24,8 @@
  * lỗi. Ô nhập và nút bo 8px, thẻ bo 14px; phông Be Vietnam Pro tự phục vụ (@font-face ở
  * resources/fonts/be-vietnam-pro/be-vietnam-pro.css của gói npm @fontsource/be-vietnam-pro, OFL-1.1, nạp trước tệp
  * này theo theme.properties; #305). Chỉ chế độ sáng (darkMode=false trong theme.properties). PatternFly 5 khai biến
- * toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng. Không @import, không tải gì ngoài máy chủ Keycloak.
+ * toàn cục trong :where(:root) (độ ưu tiên 0) nên :root ở đây thắng. Không @import, không tải gì ngoài máy chủ
+ * Keycloak.
  */
 
 /* Tỉ lệ tương phản WCAG 2.2 AA ghi cạnh màu: chữ ≥ 4,5:1, viền ô nhập và viền focus ≥ 3:1 trên đúng nền của nó */

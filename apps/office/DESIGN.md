@@ -25,7 +25,8 @@ focus là trắng vì viền lục bảo chung chìm vào nền.
 
 ## Chữ
 
-Be Vietnam Pro tự phục vụ (OFL-1.1, `public/fonts`), bốn độ đậm 400–700, không thêm phông khác. Tiêu đề trang 26px
+Be Vietnam Pro tự phục vụ (OFL-1.1, gói npm `@fontsource/be-vietnam-pro`), bốn độ đậm 400–700, không thêm phông khác.
+Tiêu đề trang 26px
 600; tiêu đề khối 16px 600; chữ thường 14–16px; số đi `tabular-nums`. Ngày hạn trên lịch là chữ số lớn, không phải ô
 thống kê.
 
