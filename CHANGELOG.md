@@ -11,6 +11,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ### Đã thêm
 - Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
 
+### Đã sửa đổi
+- Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại (#374).
+
 ### Đã sửa lỗi
 - Bản cài có `scripts/demo_tat_van_phong.py`; màn cắm ứng dụng trong bản cài dừng trước khi gỡ ứng dụng (#376).
 - Tệp OpenLineage tải từ trang Phả hệ số liệu ghi `producer` là repo Signet, không còn tên repo cũ (#376).
