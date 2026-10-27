@@ -160,7 +160,10 @@ class ReconcileGatewayEnvTest(unittest.TestCase):
                               ({}, None),
                               ({"MOC_WAF": "Bogus", "MOC_APISIX_WORKERS": "4"}, "MOC_WAF='Bogus'"),
                               ({"MOC_WAF": "On ", "MOC_APISIX_WORKERS": "4"}, "MOC_WAF='On '"),
-                              ({"MOC_WAF": "On", "MOC_APISIX_WORKERS": "0"}, "MOC_APISIX_WORKERS='0'")):
+                              ({"MOC_WAF": "On", "MOC_APISIX_WORKERS": "0"}, "MOC_APISIX_WORKERS='0'"),
+                              # #364: tỉ lệ truy vết nằm trong cùng global rule với WAF
+                              ({"MOC_WAF": "On", "MOC_TRACE_RATIO": "0.1"}, None),
+                              ({"MOC_WAF": "On", "MOC_TRACE_RATIO": "1.5"}, "MOC_TRACE_RATIO='1.5'")):
             with self.subTest(values):
                 self.environment = values
                 if error is None:

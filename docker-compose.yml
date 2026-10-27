@@ -26,6 +26,8 @@
 #   profile tunnel — Cloudflare Tunnel ra Internet (tùy chọn, MOC_EXTRA_PROFILES=tunnel; docs/trien-khai.md)
 #   profile mail   — Mailpit, hộp thư thử cho thông báo email (chỉ để demo, MOC_EXTRA_PROFILES=mail)
 #   profile logs   — log tập trung Vector + Parseable (tắt mặc định; make logs-up; docs/van-hanh.md mục Log tập trung)
+#   profile trace  — truy vết phân tán Jaeger (tắt mặc định; MOC_EXTRA_PROFILES=trace, MOC_TRACE_RATIO; docs/van-hanh.md
+#                    mục Truy vết)
 #
 #   make up        # = docker compose --profile core --profile app up -d
 # ---------------------------------------------------------------------------
@@ -162,6 +164,8 @@ services:
       # F3.15: On chặn | DetectionOnly chỉ ghi nhật ký | Off; số worker (mỗi worker nạp một bộ luật WAF)
       MOC_WAF: ${MOC_WAF:-On}
       MOC_APISIX_WORKERS: ${MOC_APISIX_WORKERS:-4}
+      # #364: tỉ lệ yêu cầu được truy vết (0–1); 0 thì không ghi span nào. Gửi tới Jaeger của profile trace
+      MOC_TRACE_RATIO: ${MOC_TRACE_RATIO:-0}
     volumes:
       - ./platform/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./platform/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
@@ -368,6 +372,8 @@ services:
       MOC_RESTRICTED_MAX_PAGES: ${MOC_RESTRICTED_MAX_PAGES:-500}
       # in vào mã QR của văn bản đi phát hành: <MOC_PUBLIC_URL>/xac-thuc/<mã>
       MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      # #364: > 0 thì ghi span của yêu cầu APISIX đã chọn, gửi Jaeger (profile trace)
+      MOC_TRACE_RATIO: ${MOC_TRACE_RATIO:-0}
       # F2.12 — neo đầu chuỗi sổ kiểm toán ra bucket lạnh có khóa ghi
       MOC_AUDIT_ANCHOR_INTERVAL_S: ${MOC_AUDIT_ANCHOR_INTERVAL_S:-600}
       MOC_AUDIT_ANCHOR_RETENTION_DAYS: ${MOC_AUDIT_ANCHOR_RETENTION_DAYS:-3650}
@@ -437,6 +443,8 @@ services:
       # Action, vòng nền của Văn phòng (docs/architecture.md §4.7); dùng để kiểm lõi đứng được một mình
       MOC_OFFICE_ENABLED: ${MOC_OFFICE_ENABLED:-true}
       MOC_SLA_DURATION: ${MOC_SLA_DURATION:-PT24H}
+      # #364: > 0 thì ghi span của Action mà APISIX đã chọn (Hasura chuyển tiếp traceparent), gửi Jaeger
+      MOC_TRACE_RATIO: ${MOC_TRACE_RATIO:-0}
       # F3.10 — context broker NGSI-LD (profile iot); chưa bật profile thì chỉ ghi nhật ký một lần
       MOC_NGSI_URL: http://scorpio:9090
       MOC_OT_THRESHOLD: ${MOC_OT_THRESHOLD:-35}
@@ -580,6 +588,25 @@ services:
       retries: 18
     depends_on:
       prometheus: {condition: service_healthy}
+
+  # ---- Truy vết phân tán (#364), profile trace — tắt mặc định (docs/van-hanh.md mục Truy vết) -----------------------
+  # Jaeger (Apache-2.0) nhận span OTLP/HTTP ở cổng 4318, chỉ trong mạng moc: APISIX chọn MOC_TRACE_RATIO yêu cầu,
+  # svc-files và svc-workflow ghi tiếp theo traceparent APISIX gửi. Giữ 10 000 trace mới nhất trong RAM, mất khi khởi
+  # động lại (platform/trace/jaeger.yaml). Giao diện chỉ nghe 127.0.0.1 trên máy chủ, không tài khoản như Grafana: xem
+  # từ xa qua đường hầm SSH. Image distroless, không có shell nên không có healthcheck
+  jaeger:
+    <<: *common
+    image: jaegertracing/jaeger:2.22.0@sha256:836b967b5abcf1f7758066aa6b348619267a2f1459f72d472840570f9bd88a17
+    profiles: [trace]
+    command: ["--config", "/etc/jaeger/jaeger.yaml"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # đỉnh đo được 123 MiB khi đầy 10 000 trace
+    volumes:
+      - ./platform/trace/jaeger.yaml:/etc/jaeger/jaeger.yaml:ro
+    ports:
+      - 127.0.0.1:${MOC_TRACE_PORT:-16686}:16686
 
   # ---- Log tập trung (F3.14), profile logs — tắt mặc định (docs/van-hanh.md mục Log tập trung) ---------------------
   # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của 8 dịch vụ sang fluentd: apisix, app-office,

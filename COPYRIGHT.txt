@@ -133,6 +133,11 @@ asn1crypto, tzlocal, lxml,
 aiohttp và 7 gói con,
 oscrypto, uritools, certifi;
 tzdata chỉ trên Windows)
+OpenTelemetry Python (SDK,      1.45.1 ·        Apache-2.0              Truy vết phân tán                         https://opentelemetry.io/docs/languages/python/
+exporter OTLP/HTTP,             0.66b1
+instrumentation FastAPI và
+httpx2, kéo theo protobuf,
+requests, wrapt…)
 
 VẬN HÀNH VÀ BỐN NGUYÊN LÝ THIẾT KẾ
 =======================================================================================================================================================================
@@ -149,6 +154,7 @@ restic                          0.19.1          BSD-2-Clause            Sao lưu
 Vector                          0.59.0          MPL-2.0                 Thu log của 8 dịch vụ qua driver fluentd  https://vector.dev
                                                                         của Docker, che lần hai, gửi Parseable
 Parseable                       3.2.4           AGPL-3.0                Lưu và tra log tập trung                  https://github.com/parseablehq/parseable
+Jaeger                          2.22.0          Apache-2.0              Nhận và hiện trace                        https://www.jaegertracing.io
 Coraza + OWASP CRS              Coraza v3.3.3,  Apache-2.0              Tường lửa ứng dụng web ở cổng API         https://coraza.io
                                 CRS v4.14.0                                                                       https://coreruleset.org
 

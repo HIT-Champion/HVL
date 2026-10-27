@@ -100,7 +100,7 @@ jobs:
 
       - name: Mọi profile đều phân giải được và có dịch vụ
         run: |
-          for p in core app iot iot-sim ai ai-pull mail; do
+          for p in core app iot iot-sim ai ai-pull mail trace; do
             services=$(docker compose --profile "$p" config --services) \
               || { echo "::error::Profile '$p' không hợp lệ"; exit 1; }
             test -n "$services" || { echo "::error::Profile '$p' không có dịch vụ nào"; exit 1; }
@@ -131,6 +131,14 @@ jobs:
           m=(--entrypoint promtool -v "$PWD/platform/monitoring:/etc/prometheus:ro")
           docker run --rm --network none "${m[@]}" "$image" check config /etc/prometheus/prometheus.yml
           docker run --rm --network none "${m[@]}" "$image" test rules /etc/prometheus/kiem-tra/canh-bao.test.yml
+
+      # #364: cấu hình Jaeger của profile trace (khóa sai, thành phần không có trong bản này thì đỏ). Image đúng dòng
+      # ghim digest trong docker-compose.yml
+      - name: Truy vết — cấu hình Jaeger (jaeger validate)
+        run: |
+          image=$(sed -n '/^  jaeger:$/,/^    image:/s/^    image: //p' docker-compose.yml)
+          docker run --rm --network none -v "$PWD/platform/trace/jaeger.yaml:/etc/jaeger/jaeger.yaml:ro" \
+            "$image" validate --config /etc/jaeger/jaeger.yaml
 
       - name: Script khả thi và đúng cú pháp
         run: |

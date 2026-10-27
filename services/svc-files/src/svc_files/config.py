@@ -165,6 +165,8 @@ class Settings:
     # trần byte một lô được ghi vào kho: tổng cỡ (đã giải nén) các mục zip mà các dòng trỏ tới, mỗi lần trỏ tính một
     # lần — không có trần này thì zip 8 KB trỏ lặp lại thành hàng chục MB trong kho
     import_store_max_bytes: int = 200 * 1024 * 1024
+    # truy vết (#364): > 0 thì gửi span tới Jaeger (tracing.py). Tỉ lệ lấy mẫu do APISIX quyết; ở đây chỉ là bật/tắt
+    trace_ratio: float = 0.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -269,6 +271,7 @@ class Settings:
                 import_spool_dir=env.get("MOC_IMPORT_SPOOL_DIR", "/tmp/moc-nap-lo").strip(),
                 import_spool_bytes=int(env.get("MOC_IMPORT_SPOOL_MB", "200")) * 1024 * 1024,
                 import_store_max_bytes=int(env.get("MOC_IMPORT_STORE_MAX_MB", "200")) * 1024 * 1024,
+                trace_ratio=float(env.get("MOC_TRACE_RATIO", "").strip() or 0),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -293,6 +296,8 @@ class Settings:
             raise ConfigError("MOC_COLD_BUCKET phải khác MOC_FILES_BUCKET")
         if self.restricted_max_pages < 1:
             raise ConfigError("MOC_RESTRICTED_MAX_PAGES phải ≥ 1")
+        if not 0 <= self.trace_ratio <= 1:      # NaN cũng sai
+            raise ConfigError("MOC_TRACE_RATIO phải trong khoảng [0, 1] (0: tắt truy vết)")
         self._check_reader()
         self._check_assistant()
         self._check_status()

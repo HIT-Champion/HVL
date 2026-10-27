@@ -42,6 +42,14 @@ case $workers in
     ;;
 esac
 
+# #364: tỉ lệ truy vết 0–1 (0, 1, 0.25…). Giá trị này nằm trong global rule chung với WAF ở apisix.yaml: sai kiểu thì
+# APISIX bỏ cả global rule đó — mất luôn WAF, mã yêu cầu — nên cũng dừng ngay
+ratio=${MOC_TRACE_RATIO:-0}
+if ! printf '%s\n' "$ratio" | grep -Eqx '0(\.[0-9]+)?|1(\.0+)?'; then
+  echo "Signet: MOC_TRACE_RATIO='$ratio' không hợp lệ — số từ 0 tới 1, vd 0.1 (0: tắt truy vết)" >&2
+  exit 64
+fi
+
 if [ "${1-}" = --chi-kiem ]; then
   exit 0
 fi
