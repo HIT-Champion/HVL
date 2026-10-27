@@ -16,6 +16,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại (#374).
 
 ### Đã sửa lỗi
+- Tài liệu lệch mã: số dịch vụ, số test, màn demo không chạy trên bản online, ROADMAP sau `v1.2.1` (#379).
 - Sự kiện `office.document.received` nay được ghi khi văn thư thêm văn bản đến, ứng dụng nghe nó mới nhận được (#381).
 
 ## [1.2.1] - 2026-10-28
