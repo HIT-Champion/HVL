@@ -55,8 +55,8 @@ trường số khép kín.
 - [ ] **Một phần** — cổng nội bộ: các ứng dụng chung một phiên SSO, cùng một tên miền sau APISIX; trang Ứng dụng
       (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng
       riêng
-- [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email và webhook
-      Mattermost, Slack, ntfy, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
+- [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email, webhook
+      Mattermost, Slack, ntfy, SMS, Zalo, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
 - [ ] Hệ quản trị tri thức (wiki)
 - [x] Dữ liệu mẫu: `make seed` tạo đơn vị, phòng ban, tài khoản theo vai trò, văn bản ở mọi bước, qua API như người
       dùng thật (F2.10); thêm đơn vị bằng một lệnh `moc tenant create` (F3.12)
@@ -180,8 +180,10 @@ Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
    tự, thêm loại sự kiện ngoài văn bản; chưa thêm broker.
 3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, chưa có): Kestra đã cân nhắc, chưa đưa vào (`DEPENDENCIES.md`).
    Hiện thêm một việc tự động là phải sửa mã dịch vụ.
-4. **Truy vết, giám sát đủ** (cụm ⑥): tracing phân tán, chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).
-5. **Thông báo đa kênh đủ** (cụm ⑦): SMS, Zalo; mỗi người tự chọn kênh; webhook riêng từng đơn vị thay một URL chung.
+4. **Truy vết, giám sát đủ** (cụm ⑥): span của Hasura, Flowable, Keycloak, PostgreSQL (Jaeger mới có span của cổng và
+   hai dịch vụ, #364), chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).
+5. **Thông báo đa kênh đủ** (cụm ⑦): SMS, Zalo đã có, từng người tự bật (#365); còn cho từng người tắt email, webhook
+   riêng từng đơn vị thay một URL chung.
 6. **Lớp ngữ nghĩa báo cáo, số liệu theo kỳ** (cụm ③): chỉ số và chiều định nghĩa một lần cho mọi báo cáo; chụp số
    liệu theo kỳ để số đã chốt không đổi về sau.
 7. **Khuôn văn bản, biểu mẫu sửa được không cần sửa mã** ([P] low-code): trước hết cho quản trị đơn vị tự sửa mẫu văn

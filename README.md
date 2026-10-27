@@ -46,8 +46,8 @@ chức tự cài, tự làm chủ. Ứng dụng mới chỉ cần cắm vào lõ
 
 ## Kiến trúc
 
-[![Sơ đồ kiến trúc: người dùng đi qua cổng APISIX vào các ứng dụng Tầng 2 và các dịch vụ lõi Tầng 1, phần tùy chọn ở
-hàng dưới](docs/anh/kien-truc-tong-the.gif)](docs/anh/kien-truc-tong-the.gif)
+[![Sơ đồ kiến trúc: người dùng đi qua cổng APISIX vào các ứng dụng Tầng 2 và các dịch vụ lõi Tầng 1; cột phải là
+kênh thông báo bên ngoài: email, webhook, SMS, Zalo](docs/anh/kien-truc-tong-the.gif)](docs/anh/kien-truc-tong-the.gif)
 
 Tầng 1 là lõi không giao diện: định danh, cổng API, dữ liệu, quy trình và lớp tin cậy. Tầng 2 là ứng dụng: Văn phòng
 điện tử và Không gian cá nhân P.A.R.A, ứng dụng thứ hai cắm vào cùng lõi mà không sửa dòng mã nào của lõi

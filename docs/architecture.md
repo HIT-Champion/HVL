@@ -112,8 +112,9 @@ của ba câu, đúng mức đã kiểm:
 Vẽ theo `docker-compose.yml` và [`platform/apisix/apisix.yaml`](../platform/apisix/apisix.yaml); nhãn mũi tên ra từ cổng
 là đường dẫn thật (realm mặc định `moc`). Ảnh động ở README ([`anh/kien-truc-tong-the.gif`](anh/kien-truc-tong-the.gif))
 vẽ cùng hệ thống cho người mới đọc. Các nhóm [H] [P] [D] [I] theo bảng §3; `svc-files` đứng ở nhóm Tin cậy như trong
-ảnh. Nét đứt là phần tùy chọn, bật theo profile hay chạy khi gọi lệnh. Hai dịch vụ của đội (`svc-files`,
-`svc-workflow`) còn chứa phần máy chủ của Văn phòng điện tử — §4 tách riêng phần đó.
+ảnh. Nét đứt là phần tùy chọn, bật theo profile hay chạy khi gọi lệnh. Kênh thông báo bên ngoài nằm ngoài mạng Docker
+(cột phải của ảnh): `svc-workflow` gọi ra khi bản cài đặt cấu hình, không có gì từ đó gọi vào. Hai dịch vụ của đội
+(`svc-files`, `svc-workflow`) còn chứa phần máy chủ của Văn phòng điện tử — §4 tách riêng phần đó.
 
 ```mermaid
 flowchart LR
@@ -159,6 +160,11 @@ flowchart LR
       BK["restic 0.19<br/>sao lưu · moc backup"]
     end
   end
+  subgraph NGOAI["Ngoài hệ thống — kênh thông báo, tắt mặc định"]
+    EM["Máy chủ thư SMTP<br/>webhook Mattermost, Slack, ntfy"]
+    SMS["SMS Gateway for Android<br/>điện thoại có SIM cùng LAN"]
+    ZL["Zalo Bot Platform<br/>bot của đơn vị"]
+  end
   U1 --> GW
   U2 --> GW
   GW -->|"/*"| OFF
@@ -191,6 +197,9 @@ flowchart LR
   KC -->|"CSDL keycloak"| PG
   PM -->|"chỉ số mỗi 15 giây"| GW
   WF -.->|"NGSI-LD"| SC
+  WF -.->|"email, webhook: hộp thư đi"| EM
+  WF -.->|"POST /message: người dùng tự bật"| SMS
+  WF -.->|"getUpdates, sendMessage:<br/>người dùng tự bật, liên kết bằng mã"| ZL
   GW -.->|"span, tỉ lệ MOC_TRACE_RATIO"| JG
   SF -.->|"span"| JG
   WF -.->|"span"| JG
@@ -273,7 +282,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Hasura Actions | Hasura 2.51.0 | Cửa ghi nghiệp vụ: `receiveIncoming`, `registerIncoming`, `submitOutgoing`, `completeTask` (cùng truy vấn hộp việc `myTasks` và sơ đồ cảm biến `otSensorMap` của F3.10) → `svc-workflow`, kèm biến phiên lấy từ JWT | ⑤ | `db/metadata/actions.yaml` | F1.4 Hoàn thiện |
 | JSON Schema dùng chung | Ajv 8.20.0 (giao diện), jsonschema 4.26 (`svc-workflow`) | Poka-yoke ba lớp: form, máy chủ, ràng buộc CSDL theo cùng một tệp schema | — | `schemas/` | F2.2 Hoàn thiện |
 | Centrifugo | 6.9.7 | Đẩy thông báo từng người qua WebSocket `/realtime`, tự kiểm token Keycloak | ⑦ | `platform/centrifugo/config.yaml`, `svc_workflow/notify.py` | F2.5 Hoàn thiện |
-| Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP và webhook Mattermost, Slack, ntfy (`core.notification_deliveries`, tắt mặc định) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
+| Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP, webhook Mattermost, Slack, ntfy, SMS, Zalo (`core.notification_deliveries`, tắt mặc định; SMS, Zalo do từng người tự bật) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
 | Nạp lô *(mã của đội)* | — | `POST /api/imports/incoming`: tệp NDJSON hoặc CSV, mỗi dòng qua ClamAV và Action `receiveIncoming` thay mặt văn thư | ⑤ | `svc_files/imports/` | Dùng được (mục 3, cụm ⑤) |
 | Mailpit | v1.31.4 | Hộp thư thử cho email thông báo (profile `mail`, chỉ để demo) | ⑦ | `docker-compose.yml` | — |
 
@@ -320,9 +329,9 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 | Khe cắm trong kế hoạch | Hiện trạng | Đang lấp bằng | Nguồn |
 |---|---|---|---|
 | [H] Quản trị tri thức (wiki) | **Chưa có** | Trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2); chưa có kho tri thức nào khác | `ROADMAP.md` giai đoạn 1, 4 |
-| [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email và webhook tới Mattermost, Slack, ntfy — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
+| [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email, webhook tới Mattermost, Slack, ntfy, SMS, Zalo — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
 | [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
-| [P] Biểu mẫu low-code | **Chưa có** | Form viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py` | `ROADMAP.md` giai đoạn 2 |
+| [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; chưa có trình dựng form (#303) | `ROADMAP.md` giai đoạn 2 |
 | [P] Tự động hóa, kịch bản serverless (⑤) | **Chưa có** | Vòng nền viết cứng trong `svc-files`, `svc-workflow`; Kestra đã cân nhắc, chưa đưa vào | `muc-hoan-thien.md` §3; `DEPENDENCIES.md` |
 | [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
 | [D] Thu thập, làm sạch, đồng bộ sang kho phân tích | **Chưa có** | Chặn dữ liệu bẩn ngay ở điểm nhập (Poka-yoke ba lớp); dashboard đọc thẳng view trên CSDL nghiệp vụ | `ROADMAP.md` giai đoạn 3 |
@@ -330,9 +339,9 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 | [D] Lớp ngữ nghĩa báo cáo, số liệu chuỗi thời gian (③) | Một phần | Mỗi báo cáo một view viết tay; `office.archived_document_facts` giữ số liệu của văn bản đã nộp lưu | `muc-hoan-thien.md` §3 |
 | [I] Kho véc-tơ riêng | Không dùng (chủ ý) | Chỉ mục đoạn `chunks` trên Meilisearch sẵn có (QĐ-004) | `DEPENDENCIES.md` |
 | [I] Cổng giám sát tác tử | **Chưa có** màn riêng | Dòng của tác tử trong sổ kiểm toán; số đo từng tác tử ở [`danh-gia-ai.md`](danh-gia-ai.md) | `ROADMAP.md` giai đoạn 4 |
-| Tracing phân tán (⑥) | **Chưa có** | `X-Request-Id` từ APISIX đi qua hai dịch vụ tới `core.audit_log.request_id` | `muc-hoan-thien.md` §3 |
+| Tracing phân tán (⑥) | Một phần | Jaeger (profile `trace`, tắt mặc định, #364): span của APISIX, `svc-files`, `svc-workflow`, lưu trong RAM; chưa có span của Hasura, Flowable, Keycloak, PostgreSQL. `X-Request-Id` từ APISIX đi qua hai dịch vụ tới `core.audit_log.request_id` | `muc-hoan-thien.md` §3 |
 | Dịch thuật trong lõi (②) | Một phần | Chỉ bản địa hóa giao diện tiếng Việt, tiếng Anh | `muc-hoan-thien.md` §3 |
-| SMS, Zalo (⑦) | **Chưa có** | Email, webhook | `muc-hoan-thien.md` §3 |
+| SMS, Zalo (⑦) | Một phần | SMS qua SMS Gateway for Android trên điện thoại cùng LAN, Zalo qua bot của đơn vị; tắt mặc định, từng người tự bật (#365). Mới thử với cổng, bot giả trong test, chưa với tài khoản thật | `muc-hoan-thien.md` §3 |
 
 Ứng viên đã cân nhắc nhưng không dùng — vì giấy phép không thuộc danh sách OSI, của chính nó hay của phụ thuộc bắt
 buộc (Vault, n8n, Redpanda, MongoDB, immudb, Directus, bpmn-js; Orion vì bắt buộc MongoDB), vì đã ngừng phát triển
@@ -489,7 +498,7 @@ hiện tại.
 | `directory.py` | Dáng nghiệp vụ | Đồng bộ người dùng Keycloak → `core.users` là cơ chế chung; viết cứng `ROLES = {"clerk", "staff", "manager", "director", "tenant_admin"}` |
 | `notify.py` | Dáng nghiệp vụ | Ghi `core.notifications`, đẩy qua Centrifugo; nhận `document_id`, người nhận và người được báo tiếp chọn theo vai trò văn thư (`staff` → `manager` → `director`) |
 | `hasura.py` | Dáng nghiệp vụ | Máy khách vai trò `service`, `Actor` (biến phiên, cả nhóm ứng viên của BPMN văn bản), hai câu của danh bạ. 23 câu của Văn phòng (`office_register_incoming`, `office_number_outgoing`, `office_dispatches`…) đã sang `office/queries.py` (#302) |
-| `channels.py` | Dáng nghiệp vụ | Kênh email, webhook dùng chung; loại thông báo và câu chữ là của Văn phòng (`document.issued`, `task.overdue`…) |
+| `channels.py` | Dáng nghiệp vụ | Kênh email, webhook, SMS, Zalo dùng chung; loại thông báo và câu chữ là của Văn phòng (`document.issued`, `task.overdue`…) |
 | `schemas.py` | Dáng nghiệp vụ | Bộ kiểm JSON Schema chung; schema hiện có là form văn bản đến `schemas/van-ban-den.json` |
 | `workflow.py`, route `POST /actions/{name}` | Văn phòng | Nghiệp vụ của 5 Actions: tiếp nhận, vào sổ, trình văn bản đi, hộp việc, hoàn thành việc; đối soát với Flowable |
 | `forms.py` | Văn phòng | Dữ liệu của từng `formKey` trong BPMN văn bản |

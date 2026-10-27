@@ -251,7 +251,8 @@ chính tệp đó, không viết mã giao diện (`apps/nghi-phep/public/schema-
 của Văn phòng điện tử vẫn viết trong mã (#303), chưa có trình thiết kế quy trình hay form trên giao diện (bpmn-js bị
 loại vì giấy phép). Quy trình của ứng dụng cắm thêm mới là quy trình duyệt: chưa có timer, bước tự động, gọi API ra
 ngoài; form chưa có tệp đính kèm (#325). Thông báo gửi trong ứng dụng qua
-WebSocket (Centrifugo) và, khi cấu hình, qua email và webhook chat; chưa có SMS, Zalo, chưa cho từng người chọn kênh.
+WebSocket (Centrifugo) và, khi cấu hình, qua email, webhook chat, SMS, Zalo; SMS, Zalo do từng người tự bật, email
+chưa cho từng người tắt, SMS và Zalo chưa thử với tài khoản thật.
 Một máy, không chịu lỗi nhiều nút, chưa đo tải; bản online chạy trên laptop qua Cloudflare Tunnel, chưa lên VPS thật.
 Ký số chỉ minh họa bằng CA nội bộ, chưa liên thông Trục văn bản quốc gia, không dùng cho văn bản mật; số đo AI trên
 kho văn bản giả lập, chưa có đơn vị dùng thật.
