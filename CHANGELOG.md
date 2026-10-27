@@ -8,6 +8,9 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+### Đã sửa đổi
+- Giao diện "Lịch hạn" cho Văn phòng điện tử, trang đăng nhập, P.A.R.A, Bảng tin: hộp việc xếp theo ngày hạn (#291).
+
 ## [1.2.0] - 2026-10-27
 
 Bản cho vòng trường 01/11. Quy trình thành dịch vụ của lõi: ứng dụng khai BPMN và form JSON Schema trong manifest, có

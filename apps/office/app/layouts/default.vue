@@ -24,9 +24,10 @@ const auth = useAuth()
 const claims = auth.claims
 const route = useRoute()
 
-// Thanh bên: trên máy tính thu về một dải biểu tượng, mở ra khi rê chuột vào hoặc khi focus bằng bàn phím (focus do
-// bấm chuột không tính, không thì bấm một mục xong thanh bên cứ mở đè lên nội dung). Màn hẹp hay màn cảm ứng: ngăn
-// kéo mở bằng nút menu, Esc đóng, Tab chỉ đi vòng trong ngăn kéo.
+// Thanh bên: trên máy tính thu về một dải biểu tượng, mở ra khi rê chuột vào hoặc khi focus bằng bàn phím. Mở hay thu,
+// nội dung đều dịch theo (main.css), không bị che. Chỉ con trỏ rời thanh bên mới thu lại: bấm một mục, kể cả mục của
+// trang đang mở, hay đổi trang đều không thu. Màn hẹp hay màn cảm ứng: ngăn kéo mở bằng nút menu, Esc đóng, Tab chỉ đi
+// vòng trong ngăn kéo.
 const open = ref(false)
 const mobile = ref(false)
 const hovering = ref(false)
@@ -34,30 +35,22 @@ const keyboardFocus = ref(false)
 const collapsed = computed(() => !mobile.value && !hovering.value && !keyboardFocus.value)
 const menuButton = ref<HTMLButtonElement | null>(null)
 let hoverExit: ReturnType<typeof setTimeout> | undefined
-// Bấm chuột vào một mục, kể cả mục của trang đang mở (route không đổi nên watch(route) ở dưới không chạy): thu thanh
-// bên, đóng ngăn kéo, rồi không cho rê chuột mở lại tới khi con trỏ rời hẳn thanh bên và vào lại. Không thì con trỏ còn
-// nằm trong dải 76px, nhích 1px là thanh bên bật ra che trang vừa mở. Bấm chuột cũng xóa focus bàn phím: Tab tới một
-// mục rồi bấm chuột đúng mục đó thì không có focusin mới, thanh bên cứ mở theo focus cũ. Enter bằng bàn phím
-// (event.detail = 0) vẫn giữ thanh bên mở theo focus như cũ
-let pointerPicked = false
+// Bấm một mục: đóng ngăn kéo. Bấm bằng chuột còn xóa focus bàn phím: Tab tới một mục rồi bấm chuột đúng mục đó thì
+// không có focusin mới, thanh bên sẽ mở mãi theo focus cũ dù con trỏ đã rời đi. Enter bằng bàn phím (event.detail = 0)
+// vẫn giữ thanh bên mở theo focus
 function pickInNavigation(event: MouseEvent) {
   if (!(event.target as HTMLElement).closest('a[href]')) return
   open.value = false
-  if (!event.detail) return
-  pointerPicked = true
-  keyboardFocus.value = false
-  hovering.value = false
+  if (event.detail) keyboardFocus.value = false
 }
 // Mở theo pointermove có dịch chuyển, không theo pointerenter: Chrome bắn pointerenter lên thanh bên cả khi con trỏ
-// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở đè lên nội dung
+// đứng yên mà bố cục đổi (lúc chụp ảnh toàn trang cửa sổ thu về 1×1 rồi trả lại), thanh bên tự mở
 function moveInNavigation(event: PointerEvent) {
   if (!event.movementX && !event.movementY) return
   clearTimeout(hoverExit)
-  if (pointerPicked) return
   hovering.value = true
 }
 function leaveNavigation() {
-  pointerPicked = false
   clearTimeout(hoverExit)
   hoverExit = setTimeout(() => { hovering.value = false }, 140)
 }
@@ -182,16 +175,19 @@ function active(to: string) {
     || (route.path.startsWith(`${to}/`) && !nav.value.some((item) => item.to !== to && route.path === item.to))
 }
 
+// Thanh trên: tên đơn vị › trang đang mở. Trang ngoài menu (văn bản đang đọc) tự đặt tên qua useState('sg-crumb');
+// đổi trang thì xóa để tên cũ không còn treo lại
+const crumb = useState<string>('sg-crumb', () => '')
+const pageLabel = computed(() => crumb.value || nav.value.find((item) => active(item.to))?.label || '')
+
 function toggleLocale() {
   locale.value = locale.value === 'vi' ? 'en' : 'vi'
   try { localStorage.setItem('moc.locale', locale.value) } catch { /* bỏ qua */ }
 }
 
-// Chọn xong một trang thì đóng ngăn kéo và thu thanh bên lại, để thanh bên không nằm đè lên nội dung vừa mở
-watch(() => route.fullPath, () => {
-  open.value = false
-  hovering.value = false
-})
+// Chọn xong một trang thì đóng ngăn kéo; thanh bên trên máy tính giữ nguyên, chỉ thu khi con trỏ rời đi
+watch(() => route.fullPath, () => { open.value = false })
+watch(() => route.path, () => { crumb.value = '' })
 
 // Thông báo (F2.5): một kết nối realtime cho cả phiên làm việc; mỗi lần (nối lại) kết nối thì tải lại danh sách,
 // vì tin đẩy lúc mất kết nối không được gửi lại
@@ -244,7 +240,7 @@ async function logout() {
             <path d="M45 10H26c-9 0-16 7-16 16s7 16 16 16h12" />
             <path d="M19 54h19c9 0 16-7 16-16s-7-16-16-16H26" />
           </svg>
-          <span class="sg-brand-full">Signet</span>
+          <span class="sg-brand-full"><b>Signet</b><small>{{ t('app.tagline') }}</small></span>
         </NuxtLink>
         <button class="btn-ghost sg-close-menu" :aria-label="t('shell.closeNav')" @click="open = false">
           <svg
@@ -271,6 +267,30 @@ async function logout() {
         </NuxtLink>
       </nav>
       <div class="sg-sidebar-bottom">
+        <div class="sg-utility">
+          <NuxtLink to="/xac-thuc" class="sg-nav-link" :aria-label="t('fe.verify')"
+            :title="collapsed ? t('fe.verify') : undefined"
+          >
+            <svg
+              width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M12 3a9 9 0 110 18 9 9 0 010-18z" />
+            </svg>
+            <span class="sg-nav-label">{{ t('fe.verify') }}</span>
+          </NuxtLink>
+          <NuxtLink to="/trang-thai" class="sg-nav-link" :aria-label="t('health.title')"
+            :title="collapsed ? t('health.title') : undefined"
+          >
+            <svg
+              width="19" height="19" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 12h4l3-8 4 16 3-8h4" />
+            </svg>
+            <span class="sg-nav-label">{{ t('health.title') }}</span>
+          </NuxtLink>
+        </div>
         <div class="sg-account">
           <span class="sg-avatar" data-testid="avatar-initial" aria-hidden="true">
             {{ initialOf(claims?.givenName ?? '', claims?.name ?? '') }}
@@ -298,7 +318,7 @@ async function logout() {
       <header class="sg-topbar">
         <div class="sg-topbar-context">
           <button
-            ref="menuButton" class="btn-secondary sg-mobile-menu" :aria-label="t('fe.menu')"
+            ref="menuButton" class="btn-ghost sg-mobile-menu" :aria-label="t('fe.menu')"
             aria-controls="app-navigation" :aria-expanded="open" @click="open = !open"
           >
             <svg
@@ -308,7 +328,18 @@ async function logout() {
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span>{{ tenantName || t('fe.organization') }}</span>
+          <p class="sg-crumb">
+            <b>{{ tenantName || t('fe.organization') }}</b>
+            <template v-if="pageLabel">
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+              <span>{{ pageLabel }}</span>
+            </template>
+          </p>
         </div>
         <div class="sg-topbar-tools">
           <time :datetime="calendarDay">{{ dateLabel }}</time>
@@ -322,12 +353,6 @@ async function logout() {
       <main id="main-content" class="moc-sheet">
         <slot />
       </main>
-      <footer class="moc-shell-footer">
-        <span>Signet <span aria-hidden="true">/</span> {{ t('app.tagline') }}</span>
-        <NuxtLink to="/xac-thuc" class="moc-footer-verify">{{ t('fe.verify') }}</NuxtLink>
-        <NuxtLink to="/trang-thai">{{ t('health.title') }}</NuxtLink>
-        <span>{{ t('fe.localData') }}</span>
-      </footer>
     </div>
   </div>
 </template>

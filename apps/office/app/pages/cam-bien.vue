@@ -106,27 +106,29 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
     <PageHeader :title="t('sensors.title')" :subtitle="t('sensors.subtitle')">
       <button v-if="allowed" class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
     </PageHeader>
-    <p v-if="!allowed" class="card p-12 text-center text-stone-500">{{ t('sensors.forbidden') }}</p>
-    <p v-else-if="failure" class="card mb-4 p-4 text-sm text-red-700" role="alert">{{ failure }}</p>
-    <p v-if="allowed && !data && !failure" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+    <p v-if="!allowed" class="moc-empty">{{ t('sensors.forbidden') }}</p>
+    <p v-else-if="failure" class="moc-state mb-6" role="alert">{{ failure }}</p>
+    <p v-if="allowed && !data && !failure" class="moc-loading">{{ t('app.loading') }}</p>
 
-    <section v-if="allowed && data && !ready" class="card border border-amber-200 bg-amber-50 p-5 text-amber-900"
-             role="status" data-testid="sensors-off" :data-status="data.status">
-      <h2 class="text-lg font-semibold">{{ t('sensors.off') }}</h2>
-      <p class="mt-1 text-sm">{{ t(`sensors.offHint.${data.status}`) }}</p>
+    <section
+      v-if="allowed && data && !ready" class="moc-note" role="status" data-testid="sensors-off"
+      :data-status="data.status"
+    >
+      <h2 class="moc-block-title">{{ t('sensors.off') }}</h2>
+      <p class="mt-1">{{ t(`sensors.offHint.${data.status}`) }}</p>
     </section>
 
-    <div v-if="allowed && data && ready" class="space-y-4">
-      <div class="grid gap-4 lg:grid-cols-3">
-        <section class="card min-w-0 p-4 lg:col-span-2" data-testid="sensor-plan">
-          <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-            <h2 id="sensor-plan-title" class="font-medium text-stone-900">{{ t('sensors.plan') }}</h2>
-            <span class="text-xs text-stone-500">
+    <div v-if="allowed && data && ready" class="moc-stack">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section class="moc-block lg:col-span-2" data-testid="sensor-plan">
+          <div class="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 id="sensor-plan-title" class="moc-block-title">{{ t('sensors.plan') }}</h2>
+            <span class="text-[13px] text-stone-500 tabular-nums">
               {{ t('sensors.checkedAt', { time: fmtDateTime(data.checked_at) }) }}
             </span>
           </div>
           <!-- dưới 540px chữ trên sơ đồ quá nhỏ: giữ bề rộng đó, vùng cuộn ngang nhận tiêu điểm để cuộn bằng phím -->
-          <p class="mb-2 text-xs text-stone-500 sm:hidden">{{ t('sensors.panHint') }}</p>
+          <p class="mb-2 text-[13px] text-stone-500 sm:hidden">{{ t('sensors.panHint') }}</p>
           <div
             class="overflow-x-auto" tabindex="0" role="region" aria-labelledby="sensor-plan-title"
             data-testid="sensor-plan-scroll"
@@ -173,11 +175,11 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
           </div>
         </section>
 
-        <aside class="card space-y-4 p-4 text-sm" data-testid="sensor-legend">
+        <aside class="moc-block space-y-5 text-sm" data-testid="sensor-legend">
           <div>
-            <h2 class="font-medium text-stone-900">{{ t('sensors.legend') }}</h2>
-            <p class="mt-1 text-xs text-stone-500">{{ t('sensors.threshold', { threshold }) }}</p>
-            <ul class="mt-2 space-y-1.5">
+            <h2 class="moc-block-title">{{ t('sensors.legend') }}</h2>
+            <p class="moc-block-hint">{{ t('sensors.threshold', { threshold }) }}</p>
+            <ul class="mt-3 space-y-2">
               <li v-for="level in LEVEL_ORDER" :key="level" class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 16 16" aria-hidden="true">
                   <rect x="1" y="1" width="14" height="14" rx="2" stroke-width="2"
@@ -188,9 +190,9 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
               </li>
             </ul>
           </div>
-          <div>
-            <h2 class="font-medium text-stone-900">{{ t('sensors.flags') }}</h2>
-            <ul class="mt-2 space-y-1.5">
+          <div class="border-t border-stone-100 pt-4">
+            <h2 class="moc-block-title">{{ t('sensors.flags') }}</h2>
+            <ul class="mt-3 space-y-2">
               <li v-for="flag in FLAG_ORDER" :key="flag" :data-testid="`sensor-flag-${flag}`">
                 <span class="font-medium text-red-700">
                   <svg
@@ -203,52 +205,54 @@ const sensorFlags = (s: OtSensor) => knownFlags(s.flags)
                 <span class="text-stone-500"> — {{ flagHint(flag) }}</span>
               </li>
             </ul>
-            <p class="mt-2 text-xs text-stone-500">{{ t('sensors.flagsNote') }}</p>
+            <p class="moc-foot">{{ t('sensors.flagsNote') }}</p>
           </div>
         </aside>
       </div>
 
       <section
-        class="card overflow-x-auto p-4" tabindex="0" aria-labelledby="sensor-table-title" data-testid="sensor-table"
+        class="moc-block overflow-x-auto" tabindex="0" aria-labelledby="sensor-table-title" data-testid="sensor-table"
       >
-        <h2 id="sensor-table-title" class="font-medium text-stone-900">{{ t('sensors.table') }}</h2>
-        <p v-if="!sensors.length" class="mt-2 text-sm text-stone-500">{{ t('sensors.none') }}</p>
-        <table v-else class="mt-2 w-full min-w-[40rem] text-sm">
-          <thead class="text-left text-xs text-stone-500">
+        <h2 id="sensor-table-title" class="moc-block-title mb-2">{{ t('sensors.table') }}</h2>
+        <p v-if="!sensors.length" class="moc-empty">{{ t('sensors.none') }}</p>
+        <table v-else class="moc-table min-w-[40rem]">
+          <thead>
             <tr>
-              <th class="py-1 pr-3 font-medium">{{ t('sensors.colRoom') }}</th>
-              <th class="py-1 pr-3 font-medium">{{ t('sensors.colSensor') }}</th>
-              <th class="py-1 pr-3 font-medium">{{ t('sensors.colValue') }}</th>
-              <th class="py-1 pr-3 font-medium">{{ t('sensors.colAt') }}</th>
-              <th class="py-1 font-medium">{{ t('sensors.colFlags') }}</th>
+              <th>{{ t('sensors.colRoom') }}</th>
+              <th>{{ t('sensors.colSensor') }}</th>
+              <th>{{ t('sensors.colValue') }}</th>
+              <th>{{ t('sensors.colAt') }}</th>
+              <th>{{ t('sensors.colFlags') }}</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-stone-100">
+          <tbody>
             <tr v-for="s in sensors" :key="s.id" :data-testid="`sensor-row-${s.id.split(':').pop()}`">
-              <td class="py-1.5 pr-3">{{ roomLabel(s.room) }}</td>
-              <td class="py-1.5 pr-3">
+              <td>{{ roomLabel(s.room) }}</td>
+              <td>
                 <div class="text-stone-900">{{ s.name }}</div>
                 <div class="font-mono text-xs text-stone-500">{{ s.id.split(':').pop() }}</div>
               </td>
-              <td class="py-1.5 pr-3">
-                <span class="chip" :class="LEVEL_TONE[sensorLevel(s, data.threshold)].chip">
+              <td>
+                <span class="chip tabular-nums" :class="LEVEL_TONE[sensorLevel(s, data.threshold)].chip">
                   {{ fmtTemp(s.value, locale) }}
                 </span>
               </td>
-              <td class="py-1.5 pr-3 text-stone-600">{{ fmtDateTime(s.observed_at) }}</td>
-              <td class="py-1.5">
-                <span v-for="f in sensorFlags(s)" :key="f" class="chip mr-1 bg-red-50 text-red-700"
-                      :title="flagHint(f)">{{ t(`sensors.flag.${f}`) }}</span>
+              <td class="text-stone-600">{{ fmtDateTime(s.observed_at) }}</td>
+              <td>
+                <span
+                  v-for="f in sensorFlags(s)" :key="f" class="chip mr-1 bg-red-50 text-red-700"
+                  :title="flagHint(f)"
+                >{{ t(`sensors.flag.${f}`) }}</span>
               </td>
             </tr>
           </tbody>
         </table>
-        <p v-if="placed.outside.length" class="mt-2 text-xs text-stone-500" data-testid="sensor-outside">
+        <p v-if="placed.outside.length" class="moc-foot" data-testid="sensor-outside">
           {{ t('sensors.outsideHint', { n: placed.outside.length }) }}
         </p>
       </section>
 
-      <p class="text-xs text-stone-500">{{ t('sensors.note') }}</p>
+      <p class="text-[13px] text-stone-500">{{ t('sensors.note') }}</p>
     </div>
   </div>
 </template>

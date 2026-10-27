@@ -113,7 +113,6 @@
   },
   "inbox": {
     "title": "My tasks",
-    "subtitle": "Tasks waiting for you — urgent first",
     "empty": "Nothing is waiting for you.",
     "received": "Received",
     "due": "Due",
@@ -140,6 +139,7 @@
   "receive": {
     "title": "Receive an incoming document",
     "subtitle": "Upload the electronic copy, enter the document details, then register.",
+    "details": "Document details",
     "file": "Document file",
     "drop": "Drop a PDF or image here, or click to choose",
     "scanning": "Uploading and scanning for malware…",
@@ -253,6 +253,10 @@
     }
   },
   "doc": {
+    "yourTask": "Your task",
+    "runFrom": "Logged",
+    "runDue": "Due",
+    "runLabel": "From registration on {from} to the due date {to}",
     "info": "Document details",
     "files": "Files",
     "noFiles": "No files.",
@@ -409,11 +413,19 @@
   "assist": {
     "title": "Ask the documents",
     "intro": "The assistant only searches documents you are allowed to see; restricted documents are never included. Every point cites a reference number and page so you can check it.",
+    "emptyTitle": "What do you need from the documents?",
+    "suggestTitle": "Try asking",
+    "suggest": {
+      "credits": "What is the minimum number of credits to be considered for a scholarship?",
+      "examDeadline": "When are exam papers and answer keys due?",
+      "language": "Which language certificate is required to graduate?"
+    },
     "label": "Question",
     "placeholder": "For example: What are the requirements for a merit scholarship?",
     "keysHint": "Enter to ask, Shift+Enter for a new line",
     "count": "{n}/{max} characters",
     "ask": "Ask",
+    "answerBy": "Assistant",
     "any": "All",
     "direction": {
       "label": "Documents",
@@ -459,6 +471,7 @@
       "n": "Source {n}",
       "cite": "Source {n}: {label}",
       "cited": "Cited",
+      "details": "Details",
       "excerpt": "Passage",
       "more": "Show the full passage",
       "less": "Collapse the passage"
@@ -1634,7 +1647,6 @@
     "organization": "Organization workspace",
     "navigation": "Main navigation",
     "verify": "Verify a document",
-    "localData": "Your organization owns its data",
     "menu": "Open navigation",
     "all": "All",
     "overdue": "Overdue",
@@ -1654,17 +1666,31 @@
     "scrollTable": "Scroll horizontally to read all columns."
   },
   "desk": {
-    "queue": "To process",
     "draft": "Unnumbered draft",
     "clearFilters": "Clear filters",
     "compose": "New document",
-    "pending": "{n} tasks awaiting action.",
     "filter": "Filter tasks",
+    "filters": "Filters",
     "noDeadline": "No deadline",
-    "attention": "Needs attention",
-    "remaining": "Other tasks",
     "category": "Direction",
-    "allDocuments": "All documents"
+    "allDocuments": "All documents",
+    "finding": "{n} task waiting. Nearest due {date}, {left}. | {n} tasks waiting. Nearest due {date}, {left}.",
+    "findingNoDue": "{n} task waiting, no due date yet. | {n} tasks waiting, none with a due date yet.",
+    "received": "received {date}",
+    "dueOver": "{n} day overdue | {n} days overdue",
+    "dueToday": "due today",
+    "dueLeft": "{n} day left | {n} days left",
+    "calendar": "Due dates",
+    "later": "Later",
+    "hideCalendar": "Hide calendar",
+    "showCalendar": "Show calendar",
+    "dayTasks": "{date}: {n} task | {date}: {n} tasks",
+    "dayNone": "{date}: no tasks",
+    "showingDay": "Showing tasks due {date}.",
+    "showingOverdue": "Showing overdue tasks.",
+    "showingLater": "Showing tasks due after {date}.",
+    "showingNoDue": "Showing tasks with no due date.",
+    "showAll": "Show all {n} task | Show all {n} tasks"
   },
   "shell": {
     "closeNav": "Close navigation"

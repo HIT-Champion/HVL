@@ -113,7 +113,6 @@
   },
   "inbox": {
     "title": "Hộp việc",
-    "subtitle": "Việc đang chờ bạn — văn bản khẩn xếp trước",
     "empty": "Không còn việc nào chờ bạn.",
     "received": "Nhận lúc",
     "due": "Hạn",
@@ -140,6 +139,7 @@
   "receive": {
     "title": "Tiếp nhận văn bản đến",
     "subtitle": "Tải bản điện tử lên, nhập thông tin trên văn bản rồi vào sổ.",
+    "details": "Thông tin trên văn bản",
     "file": "Tệp văn bản",
     "drop": "Kéo thả tệp PDF hoặc ảnh vào đây, hoặc bấm để chọn",
     "scanning": "Đang tải lên và quét virus…",
@@ -253,6 +253,10 @@
     }
   },
   "doc": {
+    "yourTask": "Việc của bạn",
+    "runFrom": "Vào sổ",
+    "runDue": "Hạn",
+    "runLabel": "Từ ngày vào sổ {from} tới hạn {to}",
     "info": "Thông tin văn bản",
     "files": "Tệp đính kèm",
     "noFiles": "Chưa có tệp.",
@@ -409,11 +413,19 @@
   "assist": {
     "title": "Hỏi đáp văn bản",
     "intro": "Trợ lý chỉ tìm trong các văn bản bạn được xem; văn bản hạn chế không bao giờ được đưa vào. Mỗi ý có số ký hiệu và trang để bạn đối chiếu.",
+    "emptyTitle": "Bạn cần tìm gì trong văn bản?",
+    "suggestTitle": "Thử hỏi",
+    "suggest": {
+      "credits": "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?",
+      "examDeadline": "Hạn nộp đề thi và đáp án là ngày nào?",
+      "language": "Chuẩn đầu ra ngoại ngữ xét tốt nghiệp cần chứng chỉ gì?"
+    },
     "label": "Câu hỏi",
     "placeholder": "Ví dụ: Điều kiện xét học bổng khuyến khích học tập là gì?",
     "keysHint": "Enter để hỏi, Shift+Enter để xuống dòng",
     "count": "{n}/{max} ký tự",
     "ask": "Hỏi",
+    "answerBy": "Trợ lý",
     "any": "Tất cả",
     "direction": {
       "label": "Văn bản",
@@ -459,6 +471,7 @@
       "n": "Nguồn {n}",
       "cite": "Nguồn {n}: {label}",
       "cited": "Được trích",
+      "details": "Chi tiết",
       "excerpt": "Đoạn trích",
       "more": "Xem đủ đoạn trích",
       "less": "Thu gọn đoạn trích"
@@ -1634,7 +1647,6 @@
     "organization": "Không gian của đơn vị",
     "navigation": "Điều hướng chính",
     "verify": "Xác thực văn bản",
-    "localData": "Dữ liệu do đơn vị quản lý",
     "menu": "Mở điều hướng",
     "all": "Tất cả",
     "overdue": "Quá hạn",
@@ -1654,17 +1666,31 @@
     "scrollTable": "Cuộn ngang để xem đầy đủ các cột của sổ."
   },
   "desk": {
-    "queue": "Cần xử lý",
     "draft": "Dự thảo chưa cấp số",
     "clearFilters": "Xóa bộ lọc",
     "compose": "Soạn mới",
-    "pending": "{n} công việc đang chờ xử lý.",
     "filter": "Lọc công việc",
+    "filters": "Lọc",
     "noDeadline": "Chưa có hạn",
-    "attention": "Cần chú ý",
-    "remaining": "Các công việc còn lại",
     "category": "Chiều văn bản",
-    "allDocuments": "Tất cả văn bản"
+    "allDocuments": "Tất cả văn bản",
+    "finding": "{n} việc chờ bạn. Hạn gần nhất {date}, {left}.",
+    "findingNoDue": "{n} việc chờ bạn, chưa việc nào có hạn.",
+    "received": "nhận {date}",
+    "dueOver": "quá hạn {n} ngày",
+    "dueToday": "hết hạn hôm nay",
+    "dueLeft": "còn {n} ngày",
+    "calendar": "Lịch hạn",
+    "later": "Sau đó",
+    "hideCalendar": "Thu gọn lịch",
+    "showCalendar": "Mở lịch",
+    "dayTasks": "{date}: {n} việc",
+    "dayNone": "{date}: không có việc",
+    "showingDay": "Đang xem việc hạn {date}.",
+    "showingOverdue": "Đang xem việc quá hạn.",
+    "showingLater": "Đang xem việc hạn sau {date}.",
+    "showingNoDue": "Đang xem việc chưa có hạn.",
+    "showAll": "Xem tất cả {n} việc"
   },
   "shell": {
     "closeNav": "Đóng điều hướng"

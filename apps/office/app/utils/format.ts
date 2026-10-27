@@ -40,11 +40,51 @@ export function today(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date())
 }
 
+// Ngày (YYYY-MM-DD) theo giờ Việt Nam của một thời điểm, như lúc vào sổ
+export function dayOf(value: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: VN }).format(new Date(value))
+}
+
 // Cộng ngày trên lịch (YYYY-MM-DD), tính theo UTC để không vướng giờ mùa hè của máy người dùng
 export function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
+}
+
+// Số ngày từ ngày a tới ngày b (YYYY-MM-DD), âm khi b trước a
+export function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
+}
+
+// Thứ Hai của tuần chứa ngày (YYYY-MM-DD): lịch hạn của hộp việc bắt đầu từ đó
+export function weekStart(iso: string): string {
+  return addDays(iso, -((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7))
+}
+
+// Thứ trong tuần của một ngày: dài "Thứ Bảy" / "Saturday", ngắn "T7" / "Sat"
+export function fmtWeekday(iso: string, locale: string, style: 'long' | 'short' = 'long'): string {
+  const en = locale === 'en'
+  const weekday = style === 'long' ? 'long' : en ? 'short' : 'narrow'
+  return new Intl.DateTimeFormat(en ? 'en-GB' : 'vi-VN', { weekday, timeZone: 'UTC' })
+    .format(new Date(`${iso}T00:00:00Z`))
+}
+
+// Tên tháng trong câu: "tháng 10" / "October"; khác năm hiện tại thì kèm năm
+export function fmtMonth(iso: string, locale: string, currentYear?: string): string {
+  const en = locale === 'en'
+  const year = currentYear && iso.slice(0, 4) !== currentYear ? 'numeric' : undefined
+  const text = new Intl.DateTimeFormat(en ? 'en-GB' : 'vi-VN', { month: 'long', year, timeZone: 'UTC' })
+    .format(new Date(`${iso}T00:00:00Z`))
+  return en ? text : text.toLocaleLowerCase('vi')
+}
+
+// Hạn so với hôm nay: quá hạn, hôm nay, sắp tới (còn 1–2 ngày), còn xa; n là số ngày (dương)
+export function dueState(due: string, day: string): { tone: 'over' | 'today' | 'soon' | 'ok'; n: number } {
+  const n = daysBetween(day, due)
+  if (n < 0) return { tone: 'over', n: -n }
+  if (n === 0) return { tone: 'today', n: 0 }
+  return { tone: n <= 2 ? 'soon' : 'ok', n }
 }
 
 // Số đo (nhiệt độ cảm biến…) theo kiểu Việt Nam: 41,5

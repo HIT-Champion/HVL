@@ -41,16 +41,16 @@ onMounted(async () => {
         <span>{{ $t('app.name') }}</span>
       </div>
       <div class="card p-7 sm:p-8" aria-live="polite">
-        <h1 id="callback-title" class="text-2xl font-bold">
+        <h1 id="callback-title">
           {{ $t(failed ? 'authCallback.failed' : 'authCallback.title') }}
         </h1>
-        <p class="mt-3 text-sm leading-relaxed text-stone-600">
+        <p class="mt-3 text-[15px] leading-relaxed text-stone-600">
           {{ $t(failed ? 'authCallback.retryDetail' : 'authCallback.detail') }}
         </p>
         <template v-if="failed">
           <button class="btn-primary mt-6 w-full" @click="auth.login('/')">{{ $t('app.retry') }}</button>
           <!-- đăng nhập lỗi: xem hệ thống có đang gián đoạn không (trang công khai) -->
-          <NuxtLink to="/trang-thai" class="mt-4 block text-center text-sm text-brand-700 hover:underline">
+          <NuxtLink to="/trang-thai" class="mt-4 block py-1 text-center text-sm text-brand-700 hover:underline">
             {{ $t('health.title') }}
           </NuxtLink>
         </template>

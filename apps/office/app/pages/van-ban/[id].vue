@@ -76,7 +76,7 @@ interface Doc {
 }
 interface DocEvent { id: number; kind: string; actor_id: string; actor_kind: string; note: string | null; data: Record<string, any>; created_at: string }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { gql, download, preview } = useApi()
 const notice = useNotice()
 const claims = useAuth().claims
@@ -307,6 +307,35 @@ const canEdit = computed(() => outgoing.value && claims.value?.role === 'staff' 
 const lastReturn = computed(() => [...(doc.value?.events ?? [])].reverse().find((e) => e.kind === 'office.document.returned')?.note ?? '')
 const issuedFile = computed(() => doc.value?.files.find((f) => f.role === 'issued')?.file ?? null)
 const verifyCode = computed(() => fmtVerifyCode(doc.value?.verify_code))
+function downloadIssued() {
+  const file = issuedFile.value
+  if (file) download(file.id, file.filename).catch((e) => notice.error(errorText(t, e)))
+}
+
+// Hạn của văn bản: ô lịch ở đầu trang (ngày hạn là chữ số lớn, còn hay quá bao nhiêu ngày) và đoạn đường từ ngày vào
+// sổ tới hạn. Văn bản đã xong, đã phát hành, đã hủy thì chỉ ghi ngày hạn, không đếm
+const day = today()
+const FINISHED = ['done', 'archived', 'cancelled', 'issued', 'closed']
+const finished = computed(() => FINISHED.includes(doc.value?.status ?? ''))
+const due = computed(() => (doc.value?.due_on ? { iso: doc.value.due_on, ...dueState(doc.value.due_on, day) } : null))
+const dueLeft = computed(() => {
+  if (!due.value || finished.value) return ''
+  if (due.value.tone === 'over') return t('desk.dueOver', { n: due.value.n }, due.value.n)
+  if (due.value.tone === 'today') return t('desk.dueToday')
+  return t('desk.dueLeft', { n: due.value.n }, due.value.n)
+})
+// đoạn đường chỉ hiện khi còn đang làm và ngắn (1–13 ngày) để vừa một hàng
+const run = computed(() => {
+  if (!due.value || finished.value || !doc.value?.registered_at) return []
+  const from = dayOf(doc.value.registered_at)
+  const span = daysBetween(from, due.value.iso)
+  return span >= 1 && span <= 13 ? Array.from({ length: span + 1 }, (_, i) => addDays(from, i)) : []
+})
+function runTag(iso: string) {
+  if (iso === run.value[0]) return t('doc.runFrom')
+  if (iso === due.value?.iso) return t('doc.runDue')
+  return iso === day ? t('fe.todayShort') : fmtWeekday(iso, locale.value, 'short')
+}
 
 // Văn bản đi gửi trong hệ thống: chưa phát hành thì là danh sách sẽ gửi, phát hành rồi thì trạng thái từng đơn vị
 const dispatches = computed(() => doc.value?.dispatches ?? [])
@@ -412,12 +441,22 @@ onMounted(load)
 // có người vừa làm một bước với văn bản này (F2.5): tải lại để thấy trạng thái, việc và dòng thời gian mới
 const { lastPush } = useNotifications()
 watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
+
+// thanh trên: đơn vị › số ký hiệu văn bản đang đọc (chưa có số thì "Dự thảo" hay "Văn bản đến"), không lặp trích yếu
+const crumb = useState<string>('sg-crumb', () => '')
+watch([doc, locale], ([d]) => { if (d) crumb.value = d.symbol || t(outgoing.value ? 'doc.draft' : 'nav.incoming') })
 </script>
 
 <template>
-  <div>
-    <NuxtLink :to="backTarget" class="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-brand-800">
-      ← {{ t(route.query.from === 'inbox' ? 'fe.backInbox' : 'app.back') }}
+  <div class="sg-doc">
+    <NuxtLink :to="backTarget" class="sg-back">
+      <svg
+        width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+        aria-hidden="true"
+      >
+        <path d="M19 12H5m6-6l-6 6 6 6" />
+      </svg>
+      {{ t(route.query.from === 'inbox' ? 'fe.backInbox' : 'app.back') }}
     </NuxtLink>
 
     <p v-if="loading && !doc" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
@@ -427,24 +466,46 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
       <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.retry') }}</button>
     </div>
 
-    <div v-else-if="doc" class="space-y-6">
-      <!-- tiêu đề -->
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="min-w-0">
-          <div class="mb-2 flex flex-wrap items-center gap-2">
+    <template v-else-if="doc">
+      <!-- đầu trang: ô hạn như tờ lịch, trích yếu, số ký hiệu, đoạn đường vào sổ → hạn; nút thao tác bên phải -->
+      <header class="sg-doc-band" :class="{ 'has-due': due }">
+        <p v-if="due" class="sg-due-card" :class="finished ? 'is-done' : `is-${due.tone}`">
+          <span class="sg-due-card-label">{{ t('doc.due') }}</span>{{ ' ' }}
+          <span class="sg-due-card-num">{{ Number(due.iso.slice(8)) }}</span>{{ ' ' }}
+          <span class="sg-due-card-day">{{ fmtWeekday(due.iso, locale) }}</span>{{ ' ' }}
+          <span class="sg-due-card-month">{{ fmtMonth(due.iso, locale, day.slice(0, 4)) }}</span>
+          <template v-if="dueLeft">{{ ' ' }}<span class="sg-due-card-left">{{ dueLeft }}</span></template>
+        </p>
+        <div class="sg-doc-head">
+          <p class="sg-doc-tags">
             <StatusChip :status="doc.status" />
             <UrgencyChip :urgency="doc.urgency" quiet />
             <span v-if="doc.restricted" class="chip bg-stone-800 text-white">{{ t('doc.restricted') }}</span>
-            <span v-if="doc.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">{{ t('incoming.dispatched') }}</span>
-            <span class="text-sm text-stone-500">{{ doc.document_type?.name }}</span>
-          </div>
-          <h1 class="text-xl font-semibold text-stone-900">{{ doc.summary }}</h1>
-          <p v-if="outgoing" class="mt-1 text-sm text-stone-500">
-            {{ doc.symbol ?? t('doc.draft') }} · {{ doc.department?.name }}<span v-if="doc.issued_on"> · {{ fmtDate(doc.issued_on) }}</span>
+            <span v-if="doc.source_id" class="chip bg-brand-100 text-brand-800" data-testid="dispatched-chip">
+              {{ t('incoming.dispatched') }}
+            </span>
+            <span class="sg-doc-kind">{{ doc.document_type?.name }}</span>
           </p>
-          <p v-else class="mt-1 text-sm text-stone-500">{{ doc.symbol }} · {{ doc.issuer_name }} · {{ fmtDate(doc.issued_on) }}</p>
+          <h1 class="sg-doc-title">{{ doc.summary }}</h1>
+          <p v-if="outgoing" class="sg-doc-meta">
+            {{ doc.symbol ?? t('doc.draft') }} · {{ doc.department?.name }}<span v-if="doc.issued_on">
+              · {{ fmtDate(doc.issued_on) }}</span>
+          </p>
+          <p v-else class="sg-doc-meta">{{ doc.symbol }} · {{ doc.issuer_name }} · {{ fmtDate(doc.issued_on) }}</p>
+          <ol
+            v-if="run.length" class="sg-run"
+            :aria-label="t('doc.runLabel', { from: fmtDate(run[0]), to: fmtDate(due?.iso) })"
+          >
+            <li
+              v-for="iso in run" :key="iso" class="sg-run-day"
+              :class="{ 'is-past': iso < day, 'is-today': iso === day, 'is-due': iso === due?.iso }"
+            >
+              <span class="sg-run-tag">{{ runTag(iso) }}</span>{{ ' ' }}
+              <span class="sg-run-num">{{ Number(iso.slice(8)) }}</span>
+            </li>
+          </ol>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="sg-doc-tools">
           <button
             v-if="claims?.role === 'clerk' && doc.status === 'received'" class="btn-primary" :disabled="registering"
             :aria-busy="registering" @click="register"
@@ -458,14 +519,14 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
             {{ t('doc.askAbout') }}
           </NuxtLink>
           <button v-if="outgoing && !issuedFile" class="btn-secondary" @click="showPreview">{{ t('doc.preview') }}</button>
-          <button v-if="issuedFile" class="btn-primary" @click="download(issuedFile.id, issuedFile.filename).catch((e) => notice.error(errorText(t, e)))">
+          <button v-if="issuedFile" class="btn-primary" @click="downloadIssued">
             {{ t('doc.download') }} {{ t('doc.fileRole.issued').toLowerCase() }}
           </button>
         </div>
-      </div>
+      </header>
 
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="space-y-6 lg:col-span-2">
+      <div class="sg-doc-grid">
+        <div class="sg-doc-main">
           <TaskPanel
             v-if="task" :key="task.id" :task-id="task.id" :form-key="task.form_key" :document-due="doc.due_on"
             :document-id="doc.id" :restricted="doc.restricted" :users="users" :departments="departments"
@@ -473,9 +534,12 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           />
 
           <!-- trình dự thảo: lần đầu, hoặc trình lại sau khi bị trả lại -->
-          <section v-if="canEdit" class="card overflow-hidden border-brand-200 ring-2 ring-brand-100">
-            <div class="border-b border-brand-100 bg-brand-50 px-5 py-3">
-              <h2 class="text-sm font-semibold text-brand-900">{{ t('doc.submitTitle') }}</h2>
+          <section v-if="canEdit" class="sg-work">
+            <div class="sg-work-head">
+              <div>
+                <p class="sg-work-kicker">{{ t('doc.yourTask') }}</p>
+                <h2>{{ t('doc.submitTitle') }}</h2>
+              </div>
             </div>
             <form class="space-y-4 p-5" @submit.prevent="submit">
               <p v-if="doc.status === 'returned' && lastReturn" class="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">
@@ -507,7 +571,7 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
           <!-- gửi trong hệ thống (F3.12): chưa phát hành thì là danh sách sẽ gửi, phát hành rồi thì trạng thái từng đơn vị -->
           <section v-if="outgoing && (dispatches.length || doc.recipient_tenant_ids.length)" class="card p-5" data-testid="dispatch">
-            <h2 class="mb-1 text-sm font-semibold text-stone-800">{{ t('doc.dispatch.title') }}</h2>
+            <h2 class="sg-block-title mb-1">{{ t('doc.dispatch.title') }}</h2>
             <p class="mb-3 text-xs text-stone-500">{{ dispatches.length ? t('doc.dispatch.sentHint') : t('doc.dispatch.plannedHint') }}</p>
             <ul v-if="dispatches.length" class="divide-y divide-stone-100">
               <li v-for="d in dispatches" :key="d.id" class="flex items-start gap-3 py-2 text-sm">
@@ -528,7 +592,9 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
           <!-- nhận liên thông từ đơn vị khác trong hệ thống (F3.12) -->
           <section v-if="!outgoing && doc.dispatch_in" class="card p-5" data-testid="dispatch-in">
-            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.dispatch.from', { name: doc.dispatch_in.from_unit?.name ?? doc.issuer_name ?? '' }) }}</h2>
+            <h2 class="sg-block-title mb-3">
+              {{ t('doc.dispatch.from', { name: doc.dispatch_in.from_unit?.name ?? doc.issuer_name ?? '' }) }}
+            </h2>
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div class="text-sm text-stone-500">{{ t('doc.dispatch.sourceCode') }}</div>
@@ -546,45 +612,15 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
           <!-- nội dung văn bản đi -->
           <section v-if="outgoing" class="card p-5">
-            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.body') }}</h2>
+            <h2 class="sg-block-title mb-3">{{ t('doc.body') }}</h2>
             <div class="space-y-2 font-sans text-[15px] leading-relaxed whitespace-pre-line text-stone-800">
               {{ doc.body }}
             </div>
           </section>
 
-          <!-- thông tin -->
-          <section v-if="outgoing" class="card p-5">
-            <h2 class="mb-4 text-sm font-semibold text-stone-800">{{ t('doc.info') }}</h2>
-            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div><dt class="text-stone-500">{{ t('doc.symbol') }}</dt><dd class="font-medium">{{ doc.symbol ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.issuedOn') }}</dt><dd class="font-medium">{{ fmtDate(doc.issued_on) }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.department') }}</dt><dd class="font-medium">{{ doc.department?.name ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.createdBy') }}</dt><dd class="font-medium">{{ nameOf(doc.created_by) }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.signer') }}</dt><dd class="font-medium">{{ doc.signer_id ? nameOf(doc.signer_id) : '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.urgency') }}</dt><dd class="font-medium">{{ t(`urgency.${doc.urgency}`) }}</dd></div>
-              <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('doc.recipients') }}</dt><dd class="font-medium">{{ doc.recipients.join('; ') || '—' }}</dd></div>
-              <div v-if="doc.reply_to" class="sm:col-span-2">
-                <dt class="text-stone-500">{{ t('doc.replyTo') }}</dt>
-                <dd><NuxtLink :to="`/van-ban/${doc.reply_to.id}`" class="font-medium text-brand-800 hover:underline">{{ doc.reply_to.symbol }} — {{ doc.reply_to.summary }}</NuxtLink></dd>
-              </div>
-            </dl>
-          </section>
-          <section v-else class="card p-5">
-            <h2 class="mb-4 text-sm font-semibold text-stone-800">{{ t('doc.info') }}</h2>
-            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div><dt class="text-stone-500">{{ t('doc.symbol') }}</dt><dd class="font-medium">{{ doc.symbol ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.issuedOn') }}</dt><dd class="font-medium">{{ fmtDate(doc.issued_on) }}</dd></div>
-              <div class="sm:col-span-2"><dt class="text-stone-500">{{ t('doc.issuer') }}</dt><dd class="font-medium">{{ doc.issuer_name ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.number') }}</dt><dd class="font-medium tabular-nums">{{ doc.register_number ?? '—' }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.registered') }}</dt><dd class="font-medium">{{ fmtDateTime(doc.registered_at) }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.due') }}</dt><dd class="font-medium">{{ fmtDate(doc.due_on) }}</dd></div>
-              <div><dt class="text-stone-500">{{ t('doc.urgency') }}</dt><dd class="font-medium">{{ t(`urgency.${doc.urgency}`) }}</dd></div>
-            </dl>
-          </section>
-
           <!-- tệp -->
           <section class="card p-5">
-            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.files') }}</h2>
+            <h2 class="sg-block-title mb-3">{{ t('doc.files') }}</h2>
             <p v-if="!doc.files.length" class="text-sm text-stone-500">{{ t('doc.noFiles') }}</p>
             <ul v-else class="divide-y divide-stone-100">
               <li v-for="f in doc.files.filter((x) => x.file)" :key="f.file!.id" class="flex items-center gap-3 py-2 text-sm">
@@ -608,7 +644,7 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
           <!-- người được xem văn bản hạn chế (F3.7) -->
           <section v-if="doc.restricted && canManageViewers && viewers" class="card p-5" data-testid="viewers">
-            <h2 class="mb-1 text-sm font-semibold text-stone-800">{{ t('doc.viewers') }}</h2>
+            <h2 class="sg-block-title mb-1">{{ t('doc.viewers') }}</h2>
             <p class="mb-3 text-xs text-stone-500">{{ t('doc.viewersHint') }}</p>
             <p v-if="!viewers.length" class="text-sm text-stone-500">{{ t('doc.viewersEmpty') }}</p>
             <ul v-else class="mb-3 divide-y divide-stone-100">
@@ -639,7 +675,7 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
 
           <!-- giao xử lý -->
           <section v-if="doc.assignments.length" class="card p-5">
-            <h2 class="mb-3 text-sm font-semibold text-stone-800">{{ t('doc.assignments') }}</h2>
+            <h2 class="sg-block-title mb-3">{{ t('doc.assignments') }}</h2>
             <ul class="space-y-3 text-sm">
               <li v-for="a in assignments" :key="a.id" class="flex gap-3" :class="{ 'ml-6': a.parent_id }">
                 <span class="chip h-fit" :class="a.role === 'lead' ? 'bg-brand-100 text-brand-800' : 'bg-stone-100 text-stone-700'">
@@ -658,78 +694,121 @@ watch(lastPush, (n) => { if (n?.document_id === id.value) load() })
           </section>
         </div>
 
-        <!-- dòng thời gian -->
-        <aside class="card h-fit p-5">
-          <div
-            role="tablist" :aria-label="t('doc.activity')"
-            class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold" @keydown="sideKey"
-          >
-            <button
-              id="document-timeline-tab" ref="timelineTab" role="tab" aria-controls="document-timeline"
-              :tabindex="side === 'timeline' ? 0 : -1" :aria-selected="side === 'timeline'"
-              class="-mb-px border-b-2 pb-2"
-              :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
-              @click="side = 'timeline'"
+        <aside class="sg-doc-side">
+          <!-- thông tin: nhãn trái, giá trị phải; giá trị dài (nơi gửi, nơi nhận, văn bản trả lời) nằm dưới nhãn -->
+          <section v-if="outgoing" class="card p-5">
+            <h2 class="sg-block-title mb-2">{{ t('doc.info') }}</h2>
+            <dl class="sg-facts">
+              <div><dt>{{ t('doc.symbol') }}</dt><dd>{{ doc.symbol ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.issuedOn') }}</dt><dd>{{ fmtDate(doc.issued_on) }}</dd></div>
+              <div><dt>{{ t('doc.department') }}</dt><dd>{{ doc.department?.name ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.createdBy') }}</dt><dd>{{ nameOf(doc.created_by) }}</dd></div>
+              <div><dt>{{ t('doc.signer') }}</dt><dd>{{ doc.signer_id ? nameOf(doc.signer_id) : '—' }}</dd></div>
+              <div><dt>{{ t('doc.urgency') }}</dt><dd>{{ t(`urgency.${doc.urgency}`) }}</dd></div>
+              <div class="is-wide">
+                <dt>{{ t('doc.recipients') }}</dt><dd>{{ doc.recipients.join('; ') || '—' }}</dd>
+              </div>
+              <div v-if="doc.reply_to" class="is-wide">
+                <dt>{{ t('doc.replyTo') }}</dt>
+                <dd>
+                  <NuxtLink :to="`/van-ban/${doc.reply_to.id}`" class="sg-link">
+                    {{ doc.reply_to.symbol }} — {{ doc.reply_to.summary }}
+                  </NuxtLink>
+                </dd>
+              </div>
+            </dl>
+          </section>
+          <section v-else class="card p-5">
+            <h2 class="sg-block-title mb-2">{{ t('doc.info') }}</h2>
+            <dl class="sg-facts">
+              <div><dt>{{ t('doc.symbol') }}</dt><dd>{{ doc.symbol ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.issuedOn') }}</dt><dd>{{ fmtDate(doc.issued_on) }}</dd></div>
+              <div class="is-wide"><dt>{{ t('doc.issuer') }}</dt><dd>{{ doc.issuer_name ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.number') }}</dt><dd class="tabular-nums">{{ doc.register_number ?? '—' }}</dd></div>
+              <div><dt>{{ t('doc.registered') }}</dt><dd>{{ fmtDateTime(doc.registered_at) }}</dd></div>
+              <div><dt>{{ t('doc.due') }}</dt><dd>{{ fmtDate(doc.due_on) }}</dd></div>
+              <div><dt>{{ t('doc.urgency') }}</dt><dd>{{ t(`urgency.${doc.urgency}`) }}</dd></div>
+            </dl>
+          </section>
+          <!-- dòng thời gian, lịch sử thay đổi -->
+          <div class="card p-5">
+            <div
+              role="tablist" :aria-label="t('doc.activity')"
+              class="mb-4 flex gap-4 border-b border-stone-200 text-sm font-semibold" @keydown="sideKey"
             >
-              {{ t('doc.timeline') }}
-            </button>
-            <button
-              id="document-history-tab" ref="historyTab" role="tab" aria-controls="document-history"
-              :tabindex="side === 'history' ? 0 : -1" :aria-selected="side === 'history'"
-              class="-mb-px border-b-2 pb-2"
-              :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
-              @click="openHistory"
-            >
-              {{ t('doc.history') }}
-            </button>
-          </div>
-          <!-- tabpanel bọc ngoài danh sách: role trên chính <ol> thay mất vai trò list, các <li> mồ côi (axe, #246) -->
-          <div
-            id="document-timeline" v-show="side === 'timeline'" role="tabpanel" aria-labelledby="document-timeline-tab"
-            tabindex="0" data-testid="timeline"
-          >
-            <ol class="relative space-y-5 border-l border-stone-200 pl-5">
-              <li v-for="(item, i) in timeline" :key="item.key" class="relative">
-                <span
-                  class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white"
-                  :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'"
-                />
-                <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
-                <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
-                <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
-              </li>
-            </ol>
-          </div>
-          <div
-            id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab"
-            tabindex="0" :aria-busy="historyLoading" data-testid="history"
-          >
-            <p v-if="historyLoading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
-            <div v-if="historyFailure" class="text-sm" role="alert">
-              {{ historyFailure }}
-              <button class="btn-secondary mt-2" @click="openHistory">{{ t('app.retry') }}</button>
+              <button
+                id="document-timeline-tab" ref="timelineTab" role="tab" aria-controls="document-timeline"
+                :tabindex="side === 'timeline' ? 0 : -1" :aria-selected="side === 'timeline'"
+                class="-mb-px border-b-2 pb-2"
+                :class="side === 'timeline' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
+                @click="side = 'timeline'"
+              >
+                {{ t('doc.timeline') }}
+              </button>
+              <button
+                id="document-history-tab" ref="historyTab" role="tab" aria-controls="document-history"
+                :tabindex="side === 'history' ? 0 : -1" :aria-selected="side === 'history'"
+                class="-mb-px border-b-2 pb-2"
+                :class="side === 'history' ? 'border-brand-600 text-stone-900' : 'border-transparent text-stone-500'"
+                @click="openHistory"
+              >
+                {{ t('doc.history') }}
+              </button>
             </div>
-            <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
-            <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
-            <ol class="space-y-4">
-              <li v-for="row in history ?? []" :key="row.id" class="text-sm">
-                <div class="font-medium text-stone-900">{{ action(row) }} · {{ label('audit.entity', row.entity) }}</div>
-                <div class="text-xs text-stone-500">{{ who(row) }} · {{ fmtDateTime(row.occurred_at) }}</div>
-                <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700"><span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}</div>
-                <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
-                  {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
-                </div>
-              </li>
-            </ol>
+            <!-- tabpanel bọc ngoài danh sách: role trên chính <ol> thay mất vai trò list, các <li> mồ côi
+                 (axe, #246) -->
+            <div
+              id="document-timeline" v-show="side === 'timeline'" role="tabpanel"
+              aria-labelledby="document-timeline-tab"
+              tabindex="0" data-testid="timeline"
+            >
+              <ol class="relative space-y-5 border-l border-stone-200 pl-5">
+                <li v-for="(item, i) in timeline" :key="item.key" class="relative">
+                  <span
+                    class="absolute top-1 -left-[25px] h-2.5 w-2.5 rounded-full ring-4 ring-white"
+                    :class="i === 0 ? 'bg-brand-600' : 'bg-stone-300'"
+                  />
+                  <div class="text-sm font-medium text-stone-900">{{ item.title }}</div>
+                  <div class="text-xs text-stone-500">{{ item.who }} · {{ fmtDateTime(item.at) }}</div>
+                  <p v-if="item.note" class="mt-1 text-sm text-stone-600">{{ item.note }}</p>
+                </li>
+              </ol>
+            </div>
+            <div
+              id="document-history" v-show="side === 'history'" role="tabpanel" aria-labelledby="document-history-tab"
+              tabindex="0" :aria-busy="historyLoading" data-testid="history"
+            >
+              <p v-if="historyLoading" class="text-sm text-stone-500">{{ t('app.loading') }}</p>
+              <div v-if="historyFailure" class="text-sm" role="alert">
+                {{ historyFailure }}
+                <button class="btn-secondary mt-2" @click="openHistory">{{ t('app.retry') }}</button>
+              </div>
+              <p class="mb-3 text-xs text-stone-500">{{ t('doc.historyHint') }}</p>
+              <p v-if="history && !history.length" class="text-sm text-stone-500">{{ t('doc.historyEmpty') }}</p>
+              <ol class="space-y-4">
+                <li v-for="row in history ?? []" :key="row.id" class="text-sm">
+                  <div class="font-medium text-stone-900">
+                    {{ action(row) }} · {{ label('audit.entity', row.entity) }}
+                  </div>
+                  <div class="text-xs text-stone-500">{{ who(row) }} · {{ fmtDateTime(row.occurred_at) }}</div>
+                  <div v-for="c in changes(row).shown" :key="c.col" class="text-stone-700">
+                    <span class="text-stone-500">{{ c.col }}:</span> {{ c.text }}
+                  </div>
+                  <div v-if="changes(row).hidden.length" class="text-xs text-stone-500" :title="t('audit.hiddenHint')">
+                    {{ t('audit.hidden', { cols: changes(row).hidden.join(', ') }) }}
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <NuxtLink
+              v-if="claims?.role === 'director'" :to="{ path: '/so-kiem-toan', query: { van_ban: doc.id } }"
+              class="mt-5 inline-block text-xs font-medium text-brand-700 hover:underline"
+            >
+              {{ t('audit.openAudit') }}
+            </NuxtLink>
           </div>
-          <NuxtLink
-            v-if="claims?.role === 'director'" :to="{ path: '/so-kiem-toan', query: { van_ban: doc.id } }"
-            class="mt-5 inline-block text-xs font-medium text-brand-700 hover:underline"
-          >
-            {{ t('audit.openAudit') }}
-          </NuxtLink>
         </aside>
       </div>
-    </div>
+    </template>
   </div>
 </template>
