@@ -9,6 +9,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ## [Chưa phát hành]
 
 ### Đã thêm
+- Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
 - Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
 
 ## [1.2.1] - 2026-10-28

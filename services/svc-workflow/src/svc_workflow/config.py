@@ -119,6 +119,8 @@ class Settings:
     zalo_bot_url: str = ""
     notify_sms_kinds: tuple[str, ...] = ()
     notify_zalo_kinds: tuple[str, ...] = ()
+    # truy vết (#364): > 0 thì gửi span tới Jaeger (tracing.py). Tỉ lệ lấy mẫu do APISIX quyết; ở đây chỉ là bật/tắt
+    trace_ratio: float = 0.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Settings:
@@ -184,6 +186,7 @@ class Settings:
                 zalo_bot_url=env.get("MOC_ZALO_BOT_URL", "").strip(),
                 notify_sms_kinds=_kinds(env.get("MOC_NOTIFY_SMS_KINDS", "")),
                 notify_zalo_kinds=_kinds(env.get("MOC_NOTIFY_ZALO_KINDS", "")),
+                trace_ratio=float(env.get("MOC_TRACE_RATIO", "").strip() or 0),
             )
         except ValueError as exc:
             raise ConfigError(f"Giá trị số không hợp lệ: {exc}") from exc
@@ -207,6 +210,8 @@ class Settings:
             raise ConfigError("MOC_SUGGEST_MIN_SCORE phải trong khoảng [0, 1] (thang _rankingScore)")
         if not 1 <= len(self.assigner_id) <= 64:
             raise ConfigError("MOC_ASSIGNER_ID phải có 1–64 ký tự")
+        if not 0 <= self.trace_ratio <= 1:      # NaN cũng sai
+            raise ConfigError("MOC_TRACE_RATIO phải trong khoảng [0, 1] (0: tắt truy vết)")
         self._check_channels()
 
     def warnings(self) -> list[str]:

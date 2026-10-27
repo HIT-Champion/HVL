@@ -65,6 +65,7 @@ nginx_config:
     - MOC_RATE_REALTIME_PER_MIN
     - MOC_RATE_STATUS_PER_MIN
     - MOC_WAF
+    - MOC_TRACE_RATIO
   # F4.4: đường dẫn bỏ chuỗi truy vấn cho access_log_format bên dưới. $request_uri (đường dẫn client gửi) và
   # $upstream_uri (APISIX ghép sẵn ?… vào) đều mang chuỗi truy vấn; log_format không cắt chuỗi được nên dùng map:
   # giữ phần trước dấu ? đầu tiên (nhóm khớp đặt tên moc_dd…)
@@ -123,6 +124,8 @@ plugins:
   - prometheus
   # F3.15: chặn thân JSON lồng quá sâu trước khi tới WAF (global rule trong apisix.yaml)
   - serverless-pre-function
+  # #364: truy vết phân tán, bật toàn cục trong apisix.yaml; MOC_TRACE_RATIO=0 (mặc định) thì không ghi span nào
+  - opentelemetry
 
 plugin_attr:
   prometheus:
