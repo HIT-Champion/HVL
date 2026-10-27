@@ -253,6 +253,10 @@ Mọi thay đổi đáng chú ý của Signet (trước 23/10/2026 tên là Mộ
   tĩnh của `index.html` khớp bảng dịch, `vi` và `en` cùng khóa, cùng tham số. Test giao diện +14. e2e
   `tieng-anh.spec.ts` thêm một test: bấm "English" ở Không gian cá nhân, rồi Bảng tin và Văn phòng điện tử mở ra cũng
   tiếng Anh; về lại tiếng Việt ở Văn phòng điện tử thì Không gian cá nhân về theo.
+- Hướng dẫn sử dụng theo vai trò `docs/huong-dan/` (một phần của #308): trang mục lục (đăng nhập, tài khoản mẫu, một
+  văn bản đi qua những ai), trang việc chung, và mỗi vai trò một trang: văn thư, chuyên viên, lãnh đạo phòng, lãnh đạo
+  đơn vị, quản trị đơn vị. Mỗi trang ghi việc hằng ngày theo từng bước, đúng tên mục và nút trên giao diện, và trỏ tới
+  tài liệu gốc thay vì chép lại. `docs/README.md` trỏ tới hướng dẫn ở mục Xem nhanh.
 
 ### Đã sửa đổi
 - Tách mã Văn phòng điện tử khỏi lõi, bước 1 của `docs/architecture.md` §4.7 (#302). Mô-đun lõi, dáng nghiệp vụ của
