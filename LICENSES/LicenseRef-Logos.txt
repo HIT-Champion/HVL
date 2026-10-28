@@ -3,9 +3,9 @@ Logo của các dự án nguồn mở trong sơ đồ kiến trúc
 Các tệp trong docs/anh/logo/ và các logo nằm trong ảnh sơ đồ kiến trúc (docs/anh/kien-truc-tong-the*.gif) là nhãn
 hiệu và tác phẩm của chủ sở hữu từng dự án; nguồn từng tệp ghi ở docs/anh/logo/NGUON.md.
 
-Signet không sở hữu và không cấp phép lại các logo này. Chúng không thuộc phạm vi giấy phép Apache-2.0 của Signet,
-không phải thành phần phần mềm của Signet, và chỉ được dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng. Muốn dùng
-lại, hãy theo chính sách nhãn hiệu của từng dự án.
+Signet không sở hữu và không cấp phép lại các logo này. Chúng không thuộc phạm vi giấy phép Apache-2.0 của Signet, không
+phải thành phần phần mềm của Signet, và chỉ được dùng để nhận diện phần mềm nguồn mở mà Signet sử dụng hoặc gửi thông
+báo tới. Muốn dùng lại, hãy theo chính sách nhãn hiệu của từng dự án.
 
 ---
 
@@ -15,5 +15,5 @@ The files in docs/anh/logo/ and the logos inside the architecture diagram images
 trademarks and works of their respective owners; the source of each file is listed in docs/anh/logo/NGUON.md.
 
 Signet does not own or relicense these logos. They are not covered by Signet's Apache-2.0 license, are not software
-components of Signet, and are used only to identify the open source software Signet uses. To reuse them, follow each
-project's trademark policy.
+components of Signet, and are used only to identify the open source software Signet uses or sends notifications to. To
+reuse them, follow each project's trademark policy.
