@@ -525,6 +525,7 @@ create table office.documents (
   recipients       text[] not null default '{}',        -- nơi nhận, như in trên văn bản
   recipient_tenant_ids uuid[] not null default '{}',    -- đơn vị nhận trong hệ thống (F3.12, migration 1792281601800)
   body             text check (char_length(body) <= 20000),  -- nội dung văn bản đi; mỗi dòng một đoạn
+  language         text not null default 'vi' check (language in ('vi', 'en')),  -- ngôn ngữ in (F2.9)
   reply_to_id      uuid references office.documents,    -- trả lời văn bản đến nào
   content_sha256   bytea unique check (content_sha256 is null or octet_length(content_sha256) = 32),
   verify_code      text unique check (verify_code is null or verify_code ~ '^[A-Z2-7]{10}$'),

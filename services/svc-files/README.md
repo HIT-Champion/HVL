@@ -694,6 +694,11 @@ Căn cứ: Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị 
   "V/v …" dưới số, "Kính gửi"), nội dung, nơi nhận kèm "Lưu: VT, <phòng>.", chức vụ và tên người ký, giờ ký duyệt
   trên Signet. Bản phát hành có mã QR dẫn tới `<MOC_PUBLIC_URL>/xac-thuc/<mã>`. Mọi chữ người dùng nhập được thoát
   HTML. Phông Liberation Serif (cùng số đo Times New Roman) cài trong image.
+- **Văn bản tiếng Anh** (F2.9, cột `language` = `en`, người soạn chọn): cùng thể thức, phần cố định theo cách dịch
+  thường dùng (`TEXT` trong `render.py`): "Socialist Republic of Vietnam", "Independence - Freedom - Happiness",
+  "No.:", ngày "Hà Nội, October 19, 2026", "Re:", "To:", "Recipients:", "As above", "Archived: Records office",
+  khối xác thực, chữ "DRAFT" chìm; tên loại theo mã (`TYPE_NAMES_EN`). Chữ người dùng nhập (tên đơn vị, địa danh,
+  chức danh người ký, trích yếu, nội dung, nơi nhận) giữ nguyên. Giá trị khác `vi`, `en` dựng như tiếng Việt.
 - **"Đã duyệt trên hệ thống Signet"** chỉ ghi lại việc người ký bấm duyệt trong Signet. Tính toàn vẹn đến từ SHA-256 của
   tệp, lưu trong CSDL và trong sổ kiểm toán chuỗi băm, kiểm được ở cổng xác thực. Từ F4.5 bản phát hành (không hạn
   chế) có thêm chữ ký số PAdES bằng PKI nội bộ — chỉ minh họa (mục Ký số văn bản đi).

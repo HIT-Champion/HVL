@@ -20,7 +20,8 @@ dụng, Góp ý. Phần dùng chung: [Việc chung](viec-chung.md).
 
 1. Bấm **Soạn văn bản đi** trên menu, hoặc **Soạn mới** trên Hộp việc.
 2. Điền **Loại văn bản**, **Trích yếu nội dung** (công văn ghi theo dạng "Về việc …"), **Nội dung** (mỗi dòng là một
-   đoạn), **Nơi nhận** (mỗi dòng một nơi) và **Độ khẩn**.
+   đoạn), **Nơi nhận** (mỗi dòng một nơi) và **Độ khẩn**. **Ngôn ngữ của văn bản** để Tiếng Việt; chọn Tiếng Anh
+   thì quốc hiệu, số, ngày, nơi nhận, khối xác thực in bằng tiếng Anh, phần bạn gõ giữ nguyên.
 3. Các ô không bắt buộc: **Trả lời văn bản đến**, **Tài liệu kèm theo** (được quét virus trước khi lưu), **Gửi trong
    hệ thống**. Ở ô cuối, tích những đơn vị cũng dùng Signet: văn bản phát hành xong sẽ tự chuyển tới văn thư của họ.
 4. Bấm **Lưu dự thảo**. Nếu lỡ tải lại trang khi chưa lưu, phần đang soạn dở được khôi phục.
