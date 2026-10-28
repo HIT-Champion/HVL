@@ -131,12 +131,12 @@ C = {  # màu nền, màu viền theo vai trò (bảng màu của draw.io)
     "ai": ("#d5e8d4", "#82b366"), "trust": ("#f8cecc", "#b85450"), "ops": ("#f5f5f5", "#8c959f"),
 }
 
-# logo trên từng hộp phần mềm nguồn mở; hộp mã của đội không có logo. Kênh ngoài chỉ gắn logo dự án nguồn mở
-# (Mattermost, ntfy, SMS Gateway for Android); Slack, Zalo là dịch vụ đóng nên không có
+# logo trên từng hộp phần mềm nguồn mở; hộp mã của đội không có logo. Kênh ngoài chỉ gắn logo dự án nguồn mở (ntfy,
+# SMS Gateway for Android); Slack, Zalo là dịch vụ đóng, nhãn hiệu Mattermost phải xin phép trước nên chỉ ghi tên
 LOGO = dict(gw=["apisix", "coraza"], kc=["keycloak"], cf=["centrifugo"], hasura=["hasura"],
             mon=["prometheus", "grafana"], jaeger=["jaeger"], pg=["postgresql"], clam=["clamav"], sw=["seaweedfs"],
             logs=["vector", "parseable"], scorpio=["scorpio"], flow=["flowable"], bao=["openbao"],
-            meili=["meilisearch"], ollama=["ollama"], restic=["restic"], mail=["mattermost", "ntfy"],
+            meili=["meilisearch"], ollama=["ollama"], restic=["restic"], mail=["ntfy"],
             sms=["sms-gateway"])
 
 # hai yêu cầu có chấm sáng: (màu, đường đi chỉ gồm M/H/V, lệch pha so với chấm đầu)
