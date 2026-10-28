@@ -21,12 +21,12 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
 from conftest import TENANT_A
-from svc_files.render import Letter, display_code, letter_from, letter_html, render_pdf, vn_date
+from svc_files.render import TEXT, Letter, display_code, en_date, letter_from, letter_html, render_pdf, vn_date
 
 OTHER_TENANT = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000b")
 
@@ -101,6 +101,67 @@ def test_preview_of_a_numbered_document_hides_number_and_code(hasura):
     assert draft.draft and draft.verify_code is None and draft.issued_on is None
     issued = letter_from(row, verify_base="https://moc.example/xac-thuc")
     assert issued.verify_url == "https://moc.example/xac-thuc/ABCDE23456" and issued.signer_name == "Phạm Minh Đức"
+
+
+# --- văn bản tiếng Anh (F2.9, #398) ---------------------------------------------------------------------
+
+
+def test_both_letter_languages_have_the_same_texts():
+    assert TEXT["vi"].keys() == TEXT["en"].keys()
+    assert all(TEXT[lang]["verify"].count("{}") == 1 for lang in TEXT)
+
+
+@pytest.mark.parametrize(("day", "text"), [
+    (date(2026, 2, 5), "Hà Nội, February 5, 2026"),
+    (date(2026, 10, 19), "Hà Nội, October 19, 2026"),
+])
+def test_english_dates_keep_the_place_as_entered(day, text):
+    assert en_date(day, "Hà Nội") == text
+    assert en_date(None, None).endswith(f", {date.today().year}")
+
+
+def test_english_letter_translates_the_fixed_parts_only():
+    page = letter_html(base_letter(lang="en", type_name="Notice", summary="Về việc họp giao ban",
+                                   symbol="05/TB-CNTT", issued_on=date(2026, 10, 19), verify_code="ABCDE23456",
+                                   verify_url="https://moc.example/xac-thuc/ABCDE23456", signer_name="Phạm Minh Đức",
+                                   approved_at=datetime(2026, 10, 19, 3, 0, tzinfo=UTC)))
+    for text in ('<html lang="en">', "Socialist Republic of Vietnam", "Independence - Freedom - Happiness",
+                 "No.: 05/TB-CNTT", "October 19, 2026", '<div class="name">Notice</div>', "Recipients:",
+                 "<li>- Các bộ môn;</li>", "<li>- Archived: Records office, ĐT.</li>", "Head of unit",
+                 "Approved in the Signet system<br>10:00 on 19/10/2026", 'alt="Verification QR code"',
+                 "open\nhttps://moc.example/xac-thuc and enter the code", "ABCDE-23456", "SHA-256",
+                 # chữ người dùng nhập giữ nguyên
+                 "Khoa Công nghệ thông tin", "Về việc họp giao ban", "<p>Đoạn một.</p>", "Phạm Minh Đức"):
+        assert text in page, text
+    for vietnamese in ("Cộng hòa", "Độc lập", "Số:", "ngày ", "Nơi nhận", "Lưu:", "Thủ trưởng", "Đã duyệt",
+                       "Kiểm tra văn bản", "Mã QR"):
+        assert vietnamese not in page, vietnamese
+
+
+def test_english_official_letter_has_re_line_and_to():
+    page = letter_html(base_letter(lang="en", type_code="CV", type_name="Official letter", in_symbol=False,
+                                   summary="Re: sending staff to the training", recipients=["Phòng Đào tạo"]))
+    assert "Re: sending staff to the training" in page and "Re: Re:" not in page
+    assert "To: Phòng Đào tạo." in page and "<li>- As above;</li>" in page and "Kính gửi" not in page
+    many = letter_html(base_letter(lang="en", in_symbol=False, recipients=["A", "B"]))
+    assert "To:<ul><li>- A;</li><li>- B.</li></ul>" in many
+
+
+def test_english_draft_is_watermarked_without_number():
+    page = letter_html(base_letter(lang="en"))
+    assert "/TB-CNTT" in page and "DRAFT" in page and "DỰ THẢO" not in page
+    assert "Draft — not yet approved" in page and "Preview of a draft: no number" in page
+    assert "data:image/svg+xml" not in page and "(draft)" in page
+
+
+@pytest.mark.parametrize(("language", "lang", "name"), [("en", "en", "Notice"), ("vi", "vi", "Thông báo"),
+                                                         (None, "vi", "Thông báo"), ("fr", "vi", "Thông báo")])
+def test_letter_from_reads_the_document_language(hasura, language, lang, name):
+    row = hasura._public(hasura.letters[hasura.add_letter(TENANT_A, language=language)])
+    letter = letter_from(row, verify_base="https://moc.example/xac-thuc")
+    assert (letter.lang, letter.type_name) == (lang, name)
+    custom = letter_from({**row, "type_code": "XYZ", "document_type": {"name": "Loại riêng", "in_symbol": True}})
+    assert custom.type_name == "Loại riêng"
 
 
 def test_render_pdf_with_weasyprint():
