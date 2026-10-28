@@ -160,7 +160,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       luật cảnh báo (#255, #274) qua Alertmanager thành thông báo ở chuông của quản trị đơn vị, kèm email, webhook nếu
       đã bật (#284). Chưa có chỉ số bên trong từng dịch vụ
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
-      định; `X-Request-Id` đi xuyên `svc-workflow`; thu 8 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202)
+      định; `X-Request-Id` đi xuyên `svc-workflow`; thu 9 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202),
+      Meilisearch (#395)
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200

@@ -3627,13 +3627,23 @@ def nap_lo() -> None:
 
 # --- F3.14 · Log tập trung (make demo-log-tap-trung) ------------------------------------------------------------
 # Dịch vụ log tập trung thu (LOGGED_SERVICES của Makefile, tệp phủ platform/logs/docker-compose.logs.yml)
-LOG_COLLECTED = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres")
+LOG_COLLECTED = ("apisix", "app-office", "app-ca-nhan", "svc-files", "svc-workflow", "hasura", "keycloak", "postgres",
+                 "meilisearch")
 # Một yêu cầu phát hành đi qua: APISIX (dòng truy cập, mã ở cuối dòng), svc-workflow (office.action.done), Hasura
 # (svc-workflow, svc-files gửi mã kèm lời gọi GraphQL: hasura.http-log), svc-files (office.document.rendered…)
 LOG_TRACED = ("apisix", "svc-workflow", "hasura", "svc-files")
 # Không dòng nào trong kho log được có: token (Bearer, JWT), chuỗi truy vấn của ô tìm kiếm hay của lần đăng nhập
 LOG_FORBIDDEN = ("Bearer ey", "eyJ", "?q=", "?code=", "?state=")
 LOGS_WAIT_S = 60.0
+# Gọi thẳng Meilisearch từ container svc-files, không khóa: 401, dòng HTTP của Meilisearch mang chuỗi truy vấn q=…
+MEILI_PROBE = """
+import sys, urllib.error, urllib.parse, urllib.request
+url = "http://meilisearch:7700/indexes/demo-log/search?" + urllib.parse.urlencode({"q": sys.argv[1]})
+try:
+    print(urllib.request.urlopen(url, timeout=10).status)
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+"""
 
 
 def traced_services(rows: list[dict[str, Any]]) -> set[str]:
@@ -3694,8 +3704,8 @@ def log_tap_trung() -> None:
     from moc_env import load_env
 
     print("Màn F3.14 · Log tập trung — một mã X-Request-Id đi qua APISIX → svc-workflow → Hasura, svc-files; Vector"
-          " thu log, che lần hai (Hasura, Keycloak, PostgreSQL không tự che: luật riêng), gửi Parseable; tra theo mã ra"
-          " dòng của cả bốn; câu SQL lỗi, lần đăng nhập sai vào kho đã che")
+          " thu log, che lần hai (Hasura, Keycloak, PostgreSQL, Meilisearch không tự che: luật riêng), gửi Parseable;"
+          " tra theo mã ra dòng của cả bốn; câu SQL lỗi, lần đăng nhập sai, câu tìm vào kho đã che")
 
     say(1, f"Log tập trung (profile logs): Vector, Parseable chạy; {len(LOG_COLLECTED)} dịch vụ gửi log qua driver"
            " fluentd của Docker")
@@ -3711,7 +3721,7 @@ def log_tap_trung() -> None:
             raise DemoFailed("log tập trung chưa bật và đây là bản cài (không có Makefile): thêm logs vào"
                              " MOC_EXTRA_PROFILES rồi cài lại (make install) — docs/van-hanh.md mục Log tập trung")
         print(f"   chưa bật: make logs-up (tạo lại {len(LOG_COLLECTED)} container, giữ nguyên dữ liệu; CSDL, Hasura,"
-              " Keycloak gián đoạn vài giây)")
+              " Keycloak, tìm kiếm gián đoạn vài giây)")
         subprocess.run(["make", "--no-print-directory", "logs-up"], cwd=ROOT, check=True)
         turned_on = True
         drivers = {s: log_driver(s) for s in LOG_COLLECTED}
@@ -3761,7 +3771,8 @@ def log_tap_trung() -> None:
         raise DemoFailed(f"core.audit_log không có dòng nào mang request_id {rid} (văn bản {doc_id})")
     ok("psql core.audit_log: " + ", ".join(f"{a} ×{n}" for a, n in audit))
 
-    say(5, "PostgreSQL, Keycloak không tự che: một câu SQL lỗi có giá trị giả, một lần đăng nhập bằng tên không có")
+    say(5, "PostgreSQL, Keycloak, Meilisearch không tự che: một câu SQL lỗi có giá trị giả, một lần đăng nhập bằng tên"
+           " không có, một câu tìm gọi thẳng Meilisearch")
     since = utc_mark()
     fake = f"Nguyen Van A {uuid.uuid4().hex[:8]}"           # giá trị trong câu lệnh lỗi: kho log không được có
     try:
@@ -3778,31 +3789,42 @@ def log_tap_trung() -> None:
     except HTTPError as exc:
         if exc.status not in (400, 401):
             raise
+    query = uuid.uuid4().hex[:12]                           # câu tìm gửi Meilisearch: kho không được có
+    status = compose("exec", "-T", "svc-files", "python", "-c", MEILI_PROBE, f"Tran Thi B {query}").decode().strip()
+    if status != "401":
+        raise DemoFailed(f"Meilisearch trả {status} cho câu tìm không khóa, cần 401")
     deadline = time.monotonic() + LOGS_WAIT_S
     while True:
         try:
             pg = logged_since(api.recent("postgres", 10), since)
             kc = logged_since(api.recent("keycloak", 10), since)
+            ms = logged_since(api.recent("meilisearch", 10), since)
         except lt.ParseableError as exc:
             raise DemoFailed(str(exc)) from exc
         entry = postgres_entry(pg, rid)
         statement = [r for r in entry if " STATEMENT:  " in str(r.get("message"))]
         failed = [r for r in kc if "LOGIN_ERROR" in str(r.get("message") or "")]
-        if (statement and failed) or time.monotonic() > deadline:
+        searched = [r for r in ms if "/indexes/demo-log/search" in str(r.get("message") or "")]
+        if (statement and failed and searched) or time.monotonic() > deadline:
             break
         time.sleep(2)
-    cli_lines(lt.table(entry + failed, 70))
+    cli_lines(lt.table(entry + failed + searched, 70))
     if not entry:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng ERROR của postgres mang {rid}")
     if not statement or not all(str(r.get("message")).endswith(" STATEMENT:  do [REDACTED]") for r in statement):
         raise DemoFailed("dòng STATEMENT của câu lỗi không có hoặc không bị che")
     if not failed:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng LOGIN_ERROR của keycloak")
-    for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc)):
+    if not searched:
+        raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng HTTP của meilisearch cho câu tìm thử")
+    if not all('"query_parameters":"[REDACTED]"' in str(r.get("message")) and '"error":"[REDACTED]"'
+               in str(r.get("message")) for r in searched):
+        raise DemoFailed("dòng HTTP của meilisearch không che chuỗi truy vấn hay lời lỗi")
+    for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc), ("meilisearch", query, ms)):
         if any(value in json.dumps(r, ensure_ascii=False) for r in rows_):
             raise DemoFailed(f"kho log có nguyên văn giá trị {service} phải che")
     ok(f"postgres: {len(entry)} dòng của mục lỗi (ERROR giữ lời báo, câu lệnh chỉ còn từ đầu); keycloak: LOGIN_ERROR"
-       " không còn tên gõ vào")
+       " không còn tên gõ vào; meilisearch: dòng HTTP 401 của câu tìm không còn chuỗi truy vấn, lời lỗi")
 
     say(6, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
     for who_, auth in (("không đăng nhập", None), ("sai mật khẩu", lt.auth_header(lt.USER, uuid.uuid4().hex))):
@@ -3814,7 +3836,7 @@ def log_tap_trung() -> None:
             if exc.status not in (401, 403):
                 raise
             ok(f"{who_}: HTTP {exc.status}")
-    leaked = log_leaks(rows + pg + kc, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""),
+    leaked = log_leaks(rows + pg + kc + ms, [clerk.token, env.get("MOC_LOGS_PASSWORD", ""),
                                         env.get("HASURA_ADMIN_SECRET", ""), env.get("MOC_ACTION_SECRET", "")])
     if leaked:
         raise DemoFailed(f"kho log có dấu hiệu cấm: {', '.join(leaked[:6])}")

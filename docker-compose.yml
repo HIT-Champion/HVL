@@ -312,6 +312,9 @@ services:
       MEILI_ENV: production
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?}
       MEILI_NO_ANALYTICS: "true"
+      # mỗi dòng nhật ký một đối tượng JSON: lời lỗi nhiều dòng không tách thành nhiều dòng log, Vector che được theo
+      # khóa (log tập trung F3.14, platform/logs/vector.yaml)
+      MEILI_EXPERIMENTAL_LOGS_MODE: json
     volumes:
       - meili_data:/meili_data
 
@@ -650,11 +653,11 @@ services:
       - 127.0.0.1:${MOC_TRACE_PORT:-16686}:16686
 
   # ---- Log tập trung (F3.14), profile logs — tắt mặc định (docs/van-hanh.md mục Log tập trung) ---------------------
-  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của 8 dịch vụ sang fluentd: apisix, app-office,
-  # app-ca-nhan, svc-files, svc-workflow tự che thông tin cá nhân (F4.4); hasura, keycloak, postgres do Vector che bằng
-  # luật riêng (#202). dockerd gửi dòng log vào Vector qua cổng 127.0.0.1. Không gắn docker.sock, không đọc
-  # /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ nào khác của Signet. Không dùng x-common (mạng
-  # moc); log của chính chúng ghi json-file, không gửi vào mình.
+  # Bật thì platform/logs/docker-compose.logs.yml đổi driver log của 9 dịch vụ sang fluentd: apisix, app-office,
+  # app-ca-nhan, svc-files, svc-workflow tự che thông tin cá nhân (F4.4); hasura, keycloak, postgres (#202), meilisearch
+  # (#395) do Vector che bằng luật riêng. dockerd gửi dòng log vào Vector qua cổng 127.0.0.1. Không gắn docker.sock,
+  # không đọc /var/lib/docker. Hai dịch vụ chỉ ở mạng logs: không tới được dịch vụ nào khác của Signet. Không dùng
+  # x-common (mạng moc); log của chính chúng ghi json-file, không gửi vào mình.
   vector:
     image: timberio/vector:0.59.0-distroless-static@sha256:2138c72ef15477d3a60126da851407a198ec61d2ff4cd600a4e69db5f6a29ff7
     profiles: [logs]
