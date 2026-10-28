@@ -202,7 +202,7 @@ do_install() {
   # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài
   extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
   set_env "$dest/.env" COMPOSE_PROFILES "core,app${extra:+,$extra}"
-  # Log tập trung (F3.14, profile logs): tệp phủ đổi driver log của 8 dịch vụ. docker compose đọc COMPOSE_FILE trong
+  # Log tập trung (F3.14, profile logs): tệp phủ đổi driver log của 9 dịch vụ. docker compose đọc COMPOSE_FILE trong
   # .env của bản cài (reconciler, lệnh gõ tay); bỏ logs thì trả về chỉ docker-compose.yml
   if [[ ",$extra," == *,logs,* ]]; then
     set_env "$dest/.env" COMPOSE_FILE docker-compose.yml:platform/logs/docker-compose.logs.yml

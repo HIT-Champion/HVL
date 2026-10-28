@@ -15,9 +15,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Vector (profile logs, F3.14 — docs/van-hanh.md mục Log tập trung): nhận log của apisix, app-office, app-ca-nhan,
-# svc-files, svc-workflow, hasura, keycloak, postgres qua driver fluentd của Docker
+# svc-files, svc-workflow, hasura, keycloak, postgres, meilisearch qua driver fluentd của Docker
 # (platform/logs/docker-compose.logs.yml), tách mã yêu cầu, che lần hai thứ không được rời máy, gửi Parseable. Năm dịch
-# vụ đầu tự che (F4.4), ở đây chỉ là lưới an toàn cho dòng lọt qua (dòng lỗi nginx, traceback). Ba dịch vụ sau không
+# vụ đầu tự che (F4.4), ở đây chỉ là lưới an toàn cho dòng lọt qua (dòng lỗi nginx, traceback). Bốn dịch vụ sau không
 # tự che: luật riêng cho từng dịch vụ bên dưới, rồi qua cùng bước che chung. Kiểm: vector validate, vector test
 # (platform/logs/vector.test.yaml).
 secret:
@@ -75,6 +75,15 @@ transforms:
           rid = string(parsed.detail.request_id) ?? string(parsed.detail.operation.request_id) ?? ""
           if rid == "" { rid = string(parsed.detail.event.detail.request_id) ?? "" }
         }
+        if service == "meilisearch" {
+          # Meilisearch ghi JSON (MEILI_EXPERIMENTAL_LOGS_MODE trong docker-compose.yml): mỗi yêu cầu HTTP một dòng lúc
+          # đóng span "HTTP request". /health trả 200 (bảng trạng thái, /readyz của svc-files hỏi liên tục) bỏ cả dòng
+          if (string(parsed.span.route) ?? "") == "/health" && (to_string(parsed.span.status_code) ?? "") == "200" {
+            abort
+          }
+          ev = "meilisearch." + replace(string(parsed.target) ?? "", "::", ".")
+          if (string(parsed.span.name) ?? "") == "HTTP request" { ev = "meilisearch.http" }
+        }
         if match(ev, r'^[A-Za-z0-9._:-]{1,128}$') { out.event = ev }
         # Khóa bí mật ở mọi tầng (kể cả giá trị là số, null, object lồng): thay cả giá trị trước khi viết lại
         flat = flatten(object!(parsed))
@@ -96,6 +105,19 @@ transforms:
               flat = set!(flat, [k], "[REDACTED]")
             }
           }
+          # Meilisearch không tự che: query_parameters (gọi GET thì câu tìm q=…, biểu thức filter=…) và error (lời lỗi
+          # trích giá trị tài liệu, biểu thức lọc, có khi nhiều dòng) thay cả giá trị; spans lặp lại span nên bỏ. Chuỗi
+          # khác: Meilisearch trích giá trị trong dấu ` (Document identifier `…` is invalid), dấu lồng nhau được nên
+          # thay từ dấu ` đầu tiên tới hết chuỗi
+          if service == "meilisearch" {
+            if match(k, r'^spans(\.|$)') {
+              flat = remove!(flat, [k])
+            } else if match(k, r'(^|\.)(?:query_parameters|error)$') && v != "" {
+              flat = set!(flat, [k], "[REDACTED]")
+            } else if is_string(v) {
+              flat = set!(flat, [k], replace(string!(v), r'(?s)`.*', "`[REDACTED]"))
+            }
+          }
         }
         msg = encode_json(unflatten(flat))
       } else {
@@ -106,6 +128,13 @@ transforms:
           m, err = parse_regex(line, r'^\S+ - \S+ \[[^\]]*\] .*"(?P<rid>[^"]*)"\s*$')
         }
         if err == null { rid = string(m.rid) ?? "" }
+        # Meilisearch ghi chữ (bỏ MEILI_EXPERIMENTAL_LOGS_MODE): cùng luật như bản JSON ở trên. Dòng tiếp của lời lỗi
+        # nhiều dòng không biết thuộc dòng nào: bản chữ chỉ là đường lùi, cấu hình mặc định ghi JSON
+        if service == "meilisearch" {
+          msg = replace(msg, r'(\bquery_parameters=)\S*', "${1}[REDACTED]")
+          msg = replace(msg, r'(\berror=).*', "${1}[REDACTED]")
+          msg = replace(msg, r'`.*', "`[REDACTED]")
+        }
       }
       if service == "postgres" {
         # Mỗi mục log của PostgreSQL bắt đầu bằng tiền tố mặc định "%m [%p] " rồi loại (ERROR:, DETAIL:…). Dòng không
