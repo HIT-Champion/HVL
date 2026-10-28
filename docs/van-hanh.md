@@ -620,8 +620,8 @@ make logs-down                     # tắt: 9 dịch vụ về json-file, dừng
 - **Bật hay tắt phải tạo lại 9 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
   `hasura`, `keycloak`, `postgres`, `meilisearch`): đổi driver log chỉ có hiệu lực khi tạo lại container.
   `make logs-up`, `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi
-  động lại cả CSDL, Hasura, Keycloak, Meilisearch: vài giây không đăng nhập, không ghi được, không tìm được; dịch vụ khác giữ kết nối tới CSDL (Flowable) phải tự
-  nối lại. Nên bật, tắt ngoài giờ làm việc.
+  động lại cả CSDL, Hasura, Keycloak, Meilisearch: vài giây không đăng nhập, không ghi được, không tìm được; dịch vụ
+  khác giữ kết nối tới CSDL (Flowable) phải tự nối lại. Nên bật, tắt ngoài giờ làm việc.
 - **Cổng fluent `127.0.0.1:24224` không cần đăng nhập** (driver `fluentd` của Docker không có xác thực): tiến trình
   nào trên máy chủ cũng gửi được dòng giả vào kho log (dòng giả vẫn qua bước che). Máy chủ dùng chung nhiều người thì
   đây là hạn chế thật.

@@ -560,8 +560,9 @@ jobs:
 
       # F3.14: bật profile logs (Vector, Parseable; 9 dịch vụ chuyển sang driver fluentd, tạo lại cả CSDL, Hasura,
       # Keycloak, Meilisearch) → một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → Hasura, svc-files, tra
-      # Parseable ra đủ dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai, câu tìm gọi thẳng
-      # Meilisearch vào kho đã che; kho log không còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver log
+      # Parseable ra đủ dòng của bốn dịch vụ, sổ kiểm toán ghi cùng mã; câu SQL lỗi, lần đăng nhập sai, câu tìm gọi
+      # thẳng Meilisearch vào kho đã che; kho log không còn token, cookie, chuỗi truy vấn. Để cuối phần vì đổi driver
+      # log
       - name: Log tập trung tra theo mã yêu cầu (make logs-up, make demo-log-tap-trung)
         if: matrix.phan == 'luong-chinh'
         run: |
