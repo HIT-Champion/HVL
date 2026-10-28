@@ -1472,8 +1472,13 @@
     scroll-behavior: auto !important;
     transition-duration: 0s !important;
   }
+  /* vào, ra ngay ở trạng thái cuối: Vue giữ lớp *-enter-from hai khung hình, opacity 0 lúc đó làm thông báo realtime
+     vừa tới thành link không chữ với axe (#391) */
   .sg-task-enter-from, .sg-task-leave-to,
-  .sg-popover-enter-from, .sg-popover-leave-to, .sg-notice-enter-from, .sg-notice-leave-to { transform: none; }
+  .sg-popover-enter-from, .sg-popover-leave-to, .sg-notice-enter-from, .sg-notice-leave-to {
+    opacity: 1;
+    transform: none;
+  }
   .sg-nav-label, .sg-brand-full { transform: none !important; }
   .sg-nav-link:hover svg, .sg-task-link:hover .sg-task-go, .sg-task-link:focus-visible .sg-task-go,
   .btn-primary:active, .btn-secondary:active, .btn-ghost:active { transform: none !important; }
