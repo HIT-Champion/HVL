@@ -89,8 +89,11 @@ bộ phận.
       (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã, JSON Schema dùng chung mới có cho form tiếp nhận văn bản
       đến, khuôn văn bản đi viết trong `services/svc-files/src/svc_files/render.py` (F2.4); chưa có trình dựng form
       (#303)
-- [ ] Tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): việc nền hiện là vòng lặp viết trong
-      `svc-files`, `svc-workflow`
+- [ ] **Một phần** — tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): Node-RED ở `/tu-dong/`,
+      profile `tu-dong` tắt mặc định, cho người vận hành nền tảng soạn flow; đăng nhập Keycloak, chỉ vai trò `operator`
+      ([`docs/van-hanh.md`](docs/van-hanh.md) mục Tự động hóa bằng Node-RED, bước CI `make demo-tu-dong`, #366). Còn
+      thiếu: danh tính cho flow gọi API của lõi, webhook, hai flow mẫu, bước BPMN gọi flow; việc nền của lõi vẫn viết
+      trong `svc-files`, `svc-workflow`
 
 ## Giai đoạn 3 — [D] Không gian Dữ liệu
 
@@ -186,8 +189,9 @@ Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
 2. **Trục sự kiện** (cụm ⑥, một phần): ứng dụng cài bằng `moc app install` đã nghe được sự kiện [P] qua luồng
    `core.app_events` và Hasura Event Triggers, không đọc thẳng bảng của Văn phòng điện tử. Còn thiếu: phát lại, thứ
    tự, thêm loại sự kiện ngoài văn bản; chưa thêm broker.
-3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, chưa có): Kestra đã cân nhắc, chưa đưa vào (`DEPENDENCIES.md`).
-   Hiện thêm một việc tự động là phải sửa mã dịch vụ.
+3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, một phần): Node-RED (profile `tu-dong`, #366) cho người vận
+   hành soạn flow; còn thiếu danh tính cho flow gọi API của lõi, webhook, bước BPMN gọi flow qua `svc-workflow`
+   (topic `moc-tu-dong`). Việc nền của lõi vẫn viết trong mã dịch vụ.
 4. **Truy vết, giám sát đủ** (cụm ⑥): span của Hasura, Flowable, Keycloak, PostgreSQL (Jaeger mới có span của cổng và
    hai dịch vụ, #364), chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).
 5. **Thông báo đa kênh đủ** (cụm ⑦): SMS, Zalo đã có, từng người tự bật (#365); còn cho từng người tắt email, webhook

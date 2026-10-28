@@ -1,9 +1,9 @@
 # Vận hành Signet
 
 Các việc của người quản trị trên một bản cài đang chạy: thêm đơn vị, sao lưu và khôi phục, két bí mật, GitOps và tự phục
-hồi, giám sát, trang trạng thái hệ thống, wiki nội bộ, hội tụ IT/OT. Cài lần đầu: [README](../README.md), mục "Cài đặt
-từ mã nguồn"; lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md). Lệnh vận hành là
-`python3 scripts/moc.py …` (tên mã kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
+hồi, giám sát, trang trạng thái hệ thống, wiki nội bộ, tự động hóa bằng Node-RED, hội tụ IT/OT. Cài lần đầu:
+[README](../README.md), mục "Cài đặt từ mã nguồn"; lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md).
+Lệnh vận hành là `python3 scripts/moc.py …` (tên mã kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
 
 ## Thêm đơn vị (thuê ước)
 
@@ -66,6 +66,8 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
 - Wiki nội bộ (profile `wiki`): volume `wiki_data` vào cùng lượt, wiki tạm dừng trong lúc chép volume của nó (CSDL,
   tệp không chờ). Khôi phục thay cả volume đó; wiki đang chạy thì dừng trước, chạy lại sau. Lượt sao lưu có từ trước
   khi có wiki thì giữ nguyên wiki đang có.
+- Tự động hóa Node-RED (profile `tu-dong`): volume `tu_dong_data` vào cùng lượt theo đúng cách đó (Node-RED tạm dừng
+  lúc chép, dừng trước khi khôi phục, chạy lại sau).
 - Lượt sao lưu xong ghi dòng `system.backed_up` vào sổ kiểm toán; trang trạng thái hệ thống hiện giờ của lượt gần
   nhất từ dòng đó. Ghi không được thì lệnh chỉ cảnh báo, bản sao lưu vẫn dùng được.
 
@@ -783,6 +785,50 @@ make wiki-down                          # tắt: bỏ wiki khỏi MOC_EXTRA_PROF
     được trong Keycloak, nên người dùng không tự nhận tài khoản wiki của người khác.
   - Nội dung trang vẫn qua các luật SQLi, XSS của WAF như ô chữ tự do của Văn phòng điện tử: trang có ví dụ câu SQL,
     mã HTML có thể bị chặn (403) khi lưu; gặp thì người quản trị thêm loại trừ trong `apisix.yaml`.
+
+## Tự động hóa bằng Node-RED
+
+Profile `tu-dong` (tắt mặc định, #366) thêm **Node-RED 5.0.8** ở `/tu-dong/`: người vận hành nền tảng kéo thả flow
+(hẹn giờ, gọi HTTP, hàm JavaScript, mẫu chữ) thay vì viết thêm vòng lặp trong mã dịch vụ. Đăng nhập chỉ qua Keycloak
+(client công khai `tu-dong`, PKCE), và chỉ người có vai trò `operator` của client đó vào được trình soạn; không ai có
+sẵn vai trò này, kể cả quản trị đơn vị.
+
+```bash
+# bật lâu dài: .env thêm tu-dong vào MOC_EXTRA_PROFILES (vd MOC_EXTRA_PROFILES=wiki,tu-dong), rồi
+make up                                 # dựng image, chạy Node-RED, chạy moc tu-dong sync
+# hoặc bật một lần (make down tắt, make up sau đó không bật lại)
+make tu-dong-up
+python3 scripts/moc.py tu-dong operator add <tên đăng nhập>      # cấp vai trò; remove gỡ, list liệt kê
+make demo-tu-dong                       # kiểm: chưa đăng nhập, không có vai trò thì không vào; triển khai flow qua cổng
+make tu-dong-down                       # tắt: bỏ tu-dong khỏi MOC_EXTRA_PROFILES trước; giữ flow đã lưu
+```
+
+- **`moc tu-dong sync`** thêm client Keycloak `tu-dong`, vai trò `operator` và mapper `tu-dong-roles` (đưa vai trò
+  vào ID token), hoặc đặt lại đường chuyển hướng khi đổi `MOC_PUBLIC_URL`. Chạy lại được; `--dry-run` chỉ in việc sẽ
+  làm. Node-RED chỉ tin vai trò trong ID token, thứ thư viện `openid-client` đã kiểm chữ ký, `iss`, `aud`.
+- **Gỡ vai trò** có hiệu lực ở lần đăng nhập sau: token trình soạn còn hạn (8 giờ) vẫn dùng được tới khi hết hạn hoặc
+  Node-RED khởi động lại (`docker compose --profile tu-dong restart tu-dong`).
+- **Khóa sẵn trong [`platform/tu-dong/settings.js`](../platform/tu-dong/settings.js)** (gắn vào image, không sửa trên
+  giao diện): không có node `exec` (chạy lệnh shell); không cài, không tải node lên từ trình soạn; node Function
+  không nạp module ngoài; flow chưa mở endpoint HTTP (`httpNodeRoot` tắt); không gửi số liệu chẩn đoán ra ngoài.
+  Lúc dựng image, `kiem-tra.cjs` nạp thật tệp này và kiểm các khóa đó, kiểm cả hàm xét vai trò.
+- **`MOC_TU_DONG_SECRET`** mã hóa thông tin đăng nhập lưu trong flow (mật khẩu, token của node): `make up`,
+  `make tu-dong-up` thêm vào `.env` cũ nếu thiếu. Đổi khóa thì Node-RED không mở được thông tin đăng nhập đã lưu.
+- **Mạng, tài nguyên:** container ở mạng `apps` như ứng dụng cắm thêm: flow chỉ tới lõi qua `http://apisix:9080`
+  (kiểm token, giới hạn tốc độ, WAF như với trình duyệt), không tới CSDL hay dịch vụ lõi nào. Rootfs chỉ đọc (ghi
+  vào `/data`, `/tmp`), bỏ mọi capability, trần 256 MiB (issue #366 đo container trống khoảng 75 MiB; chưa đo dưới
+  tải). WAF gỡ ba luật bắt nhầm token đăng nhập (loại trừ 10080) và không soi thân của API lưu flow, thư viện (10081),
+  vì thân đó là mã JavaScript, HTML ([`platform/apisix/README.md`](../platform/apisix/README.md)).
+- **Sao lưu:** volume `tu_dong_data` (flow, thông tin đăng nhập đã mã hóa, phiên trình soạn) vào `moc backup`
+  (mục Sao lưu và khôi phục). Ai sửa flow nào ghi vào nhật ký container (`docker compose --profile tu-dong logs
+  tu-dong`, dòng audit của Node-RED), chưa vào sổ kiểm toán.
+- **Giới hạn:**
+  - Node-RED là một không gian flow chung, không tách theo đơn vị: người có vai trò `operator` sửa được mọi flow, và
+    flow gọi được mọi API qua cổng mà thông tin đăng nhập trong flow cho phép. Vì vậy đây là công cụ của người vận
+    hành nền tảng, không phải của từng đơn vị.
+  - Chưa có: danh tính riêng cho flow gọi API của lõi, endpoint nhận webhook (`/tu-dong/hook/…`), hai flow mẫu (danh
+    sách văn bản sắp hạn lúc 07:00, báo lãnh đạo khi văn bản Hỏa tốc vào sổ) và bước BPMN gọi flow qua
+    `svc-workflow` — các bước tiếp theo của #366.
 
 ## Hội tụ IT/OT
 

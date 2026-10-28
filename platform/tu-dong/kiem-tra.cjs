@@ -27,6 +27,7 @@ assert.equal(settings.httpNodeRoot, false)
 assert.deepEqual(settings.nodesExcludes, ['90-exec.js'])
 assert.equal(settings.functionExternalModules, false)
 assert.equal(settings.externalModules.palette.allowInstall, false)
+assert.equal(settings.externalModules.palette.allowUpload, false)
 
 const { strategy } = settings.adminAuth
 const instance = new strategy.strategy(strategy.options, strategy.options.verify)

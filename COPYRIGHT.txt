@@ -164,6 +164,10 @@ Plugin oauth của DokuWiki       2026-10-20      GPL-2.0 (kèm            Đăn
                                                 0.8.11, MIT)
 Plugin oauthgeneric của         2025-10-02      GPL-2.0                 Dịch vụ OAuth chung cho plugin oauth      https://github.com/cosmocode/dokuwiki-plugin-oauthgeneric
 DokuWiki
+Node-RED                        5.0.8           Apache-2.0              Tự động hóa không sửa mã                  https://nodered.org
+openid-client (kèm jose         6.8.8           MIT                     Passport strategy cho đăng nhập Keycloak  https://github.com/panva/openid-client
+6.2.12, oauth4webapi 3.8.8)                                             của Node-RED                              https://github.com/panva/jose
+                                                                                                                  https://github.com/panva/oauth4webapi
 Coraza + OWASP CRS              Coraza v3.3.3,  Apache-2.0              Tường lửa ứng dụng web ở cổng API         https://coraza.io
                                 CRS v4.14.0                                                                       https://coreruleset.org
 
