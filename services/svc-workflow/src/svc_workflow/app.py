@@ -23,7 +23,8 @@ mạng nội bộ cũng không tin ai (zero-trust).
 ``create_app`` dựng phần chung (Hasura, Flowable, danh bạ, thông báo và kênh ngoài, ``/healthz``, ``/readyz``) rồi gắn
 từng phần nghiệp vụ đang bật theo khuôn của ``parts.py``: Văn phòng điện tử (``office/api.py``, tắt bằng
 ``MOC_OFFICE_ENABLED=false``), quy trình của ứng dụng cắm (``apps/api.py``), kênh SMS, Zalo người dùng tự bật
-(``subscriptions.py``), cảnh báo vận hành Alertmanager gửi sang (``alerts.py``).
+(``subscriptions.py``), cảnh báo vận hành Alertmanager gửi sang (``alerts.py``), robot của flow tự động hóa Node-RED
+báo người trong đơn vị (``tu_dong.py``).
 
 Chạy: ``uvicorn svc_workflow.app:create_app --factory``
 """
@@ -57,6 +58,7 @@ from .openbao import with_secrets
 from .ot import OtBridge
 from .parts import Part
 from .subscriptions import Channels
+from .tu_dong import FlowNotices
 
 log = logging.getLogger("svc_workflow")
 # Mã yêu cầu nhận từ X-Request-Id: cùng luật với bước tách mã của Vector và make logs-tra (log tập trung F3.14)
@@ -111,6 +113,8 @@ def create_app(
     parts.append(channels)
     # cảnh báo vận hành (#284): Alertmanager gọi POST /ops/alerts → thông báo ops.alert cho quản trị đơn vị
     parts.append(OpsAlerts.build(settings, hasura, notifier))
+    # tự động hóa Node-RED (#366): robot của flow báo người trong đơn vị theo vai trò (Action notifyFromFlow)
+    parts.append(FlowNotices.build(settings, hasura, notifier))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

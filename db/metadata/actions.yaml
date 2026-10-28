@@ -127,6 +127,20 @@ actions:
       timeout: 15
       type: mutation
     permissions: *channel_roles
+  # Tự động hóa Node-RED (#366): robot của flow (vai trò tu_dong, client Keycloak tu-dong-robot-<mã>) báo người trong
+  # đơn vị mình theo vai trò; svc-workflow ghi và đẩy như mọi thông báo. Chỉ robot gọi được
+  - name: notifyFromFlow
+    definition:
+      kind: synchronous
+      handler: '{{MOC_WORKFLOW_URL}}/actions/tu-dong/notifyFromFlow'
+      forward_client_headers: true
+      headers:
+        - name: X-Moc-Action-Secret
+          value_from_env: MOC_ACTION_SECRET
+      timeout: 15
+      type: mutation
+    permissions:
+      - role: tu_dong
 custom_types:
   enums: []
   input_objects: []
@@ -169,4 +183,5 @@ custom_types:
     - name: OtSensorMap
     - name: OtSensor
     - name: MyChannel
+    - name: NotifyFromFlowOutput
   scalars: []

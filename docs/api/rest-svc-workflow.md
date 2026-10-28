@@ -7,7 +7,7 @@ Hasura Actions của Văn phòng điện tử: API nội bộ, chỉ Hasura gọ
 bằng GraphQL. Riêng /api/workflow/{app}/… (quy trình của ứng dụng cắm bằng manifest) đi qua cổng, cần token của client
 app-<tên> (docs/api/README.md).
 
-OpenAPI 3.1.0, 9 thao tác:
+OpenAPI 3.1.0, 10 thao tác:
 
 | Thao tác | Tóm tắt |
 |---|---|
@@ -20,6 +20,7 @@ OpenAPI 3.1.0, 9 thao tác:
 | `POST /api/workflow/{app}/tasks/{task_id}` | Hoàn thành một việc với dữ liệu form của việc |
 | `POST /actions/channels/{name}` | Kênh thông báo của chính người gọi (SMS, Zalo): myChannels, setMyChannel |
 | `POST /ops/alerts` | Nhận cảnh báo của Alertmanager → thông báo ops.alert cho quản trị đơn vị (F3.13) |
+| `POST /actions/tu-dong/{name}` | Robot của flow tự động hóa báo người trong đơn vị theo vai trò: notifyFromFlow (#366) |
 
 ## `POST /ot/notify/{tenant}`
 
@@ -249,6 +250,38 @@ Trả về:
 | 401 | Thiếu hoặc sai token |  |
 | 404 | Chưa đặt MOC_ALERT_TOKEN |  |
 | 503 | Chưa ghi được CSDL, Alertmanager sẽ gửi lại |  |
+
+## `POST /actions/tu-dong/{name}`
+
+Robot của flow tự động hóa báo người trong đơn vị theo vai trò: notifyFromFlow (#366)
+
+Tham số:
+
+| Tên | Ở | Bắt buộc | Kiểu | Mô tả |
+|---|---|:-:|---|---|
+| `name` | đường dẫn | ✓ | `string` |  |
+| `X-Moc-Action-Secret` | header | ✓ | `string` | Bí mật chung giữa Hasura và svc-workflow (MOC_ACTION_SECRET) |
+
+Thân yêu cầu `application/json`:
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|:-:|---|
+| `action` | `object` | ✓ |  |
+| `input` | `object` | ✓ | Đối số của Action, khai trong db/metadata/actions.graphql |
+| `session_variables` | `object (giá trị string)` | ✓ | Biến phiên Hasura lấy từ JWT đã kiểm: x-hasura-role, x-hasura-user-id, x-hasura-tenant-id, x-hasura-department-id |
+
+Trả về:
+
+| Mã | Nghĩa | Nội dung |
+|---|---|---|
+| 200 | NotifyFromFlowOutput {sent}: số người vừa nhận thông báo; người đã có thông báo cùng khóa không tính (db/metadata/actions.graphql) | `application/json` |
+| 422 | Gửi kèm văn bản cho vai trò có thể không xem được nó: chỉ director, clerk (extensions.fields.roles = document_readers_only) | `application/json` `object` |
+| 400 | Sai định dạng Action, hoặc đối số sai: extensions.fields chỉ trường sai và mã lỗi | `application/json` `object` |
+| 401 | Thiếu hoặc sai X-Moc-Action-Secret: không phải Hasura gọi | `application/json` `object` |
+| 403 | Không phải robot (vai trò tu_dong), hoặc văn bản hạn chế | `application/json` `object` |
+| 404 | Không có văn bản này trong đơn vị của robot | `application/json` `object` |
+| 500 | Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký | `application/json` `object` |
+| 503 | Chưa gọi được CSDL, thử lại sau | `application/json` `object` |
 
 ## Kiểu dữ liệu
 
