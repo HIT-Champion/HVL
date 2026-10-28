@@ -48,7 +48,7 @@ query ArchivedCaseFiles {
 LETTER = """
 query Letter($id: uuid!, $tenant: uuid!) {
   office_documents_by_pk(id: $id) {
-    id direction status type_code summary body recipients symbol issued_on verify_code restricted
+    id direction status type_code summary body recipients symbol issued_on verify_code restricted language
     document_type { name in_symbol }
     department { code }
     signer { full_name }

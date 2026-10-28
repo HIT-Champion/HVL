@@ -2325,6 +2325,7 @@ type office_documents {
   is_public: Boolean!
   issued_on: date
   issuer_name: String
+  language: String!
   process_id: String
   recipient_tenant_ids: [uuid!]!
   recipients: [String!]!
@@ -2403,6 +2404,7 @@ input office_documents_bool_exp {
   is_public: Boolean_comparison_exp
   issued_on: date_comparison_exp
   issuer_name: String_comparison_exp
+  language: String_comparison_exp
   process_id: String_comparison_exp
   recipient_tenant_ids: uuid_array_comparison_exp
   recipients: String_array_comparison_exp
@@ -2438,6 +2440,7 @@ type office_documents_max_fields {
   id: uuid
   issued_on: date
   issuer_name: String
+  language: String
   process_id: String
   recipient_tenant_ids: [uuid!]
   recipients: [String!]
@@ -2468,6 +2471,7 @@ type office_documents_min_fields {
   id: uuid
   issued_on: date
   issuer_name: String
+  language: String
   process_id: String
   recipient_tenant_ids: [uuid!]
   recipients: [String!]
@@ -2508,6 +2512,7 @@ input office_documents_order_by {
   is_public: order_by
   issued_on: order_by
   issuer_name: order_by
+  language: order_by
   process_id: order_by
   recipient_tenant_ids: order_by
   recipients: order_by
@@ -2556,6 +2561,8 @@ enum office_documents_select_column {
   issued_on
   "column name"
   issuer_name
+  "column name"
+  language
   "column name"
   process_id
   "column name"
@@ -2630,6 +2637,7 @@ input office_documents_stream_cursor_value_input {
   is_public: Boolean
   issued_on: date
   issuer_name: String
+  language: String
   process_id: String
   recipient_tenant_ids: [uuid!]
   recipients: [String!]

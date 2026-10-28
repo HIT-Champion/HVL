@@ -55,6 +55,8 @@ let nextKey = 1
 
 const form = reactive({
   type_code: 'CV', summary: '', body: '', recipients: '', urgency: 'normal', reply_to_id: '', recipient_tenant_ids: [] as string[],
+  // ngôn ngữ của văn bản in ra (F2.9): phần cố định của PDF theo ngôn ngữ này, chữ người soạn gõ giữ nguyên
+  language: 'vi',
 })
 
 const recipientList = computed(() => form.recipients.split('\n').map((r) => r.trim()).filter(Boolean))
@@ -132,10 +134,11 @@ async function loadDraft(id: string) {
   const data = await gql<{ office_documents_by_pk: {
     status: string; created_by: string; restricted: boolean; type_code: string; summary: string; body: string | null
     recipients: string[]; recipient_tenant_ids: string[]
-    urgency: string; reply_to_id: string | null; files: { role: string; file: { id: string; filename: string } | null }[]
+    urgency: string; reply_to_id: string | null; language: string
+    files: { role: string; file: { id: string; filename: string } | null }[]
   } | null }>(`
     query ($id: uuid!) { office_documents_by_pk(id: $id) {
-      status created_by restricted type_code summary body recipients recipient_tenant_ids urgency reply_to_id
+      status created_by restricted type_code summary body recipients recipient_tenant_ids urgency reply_to_id language
       files(where: {role: {_eq: "attachment"}}) { role file { id filename } }
     } }`, { id })
   const doc = data.office_documents_by_pk
@@ -147,6 +150,7 @@ async function loadDraft(id: string) {
   Object.assign(form, {
     type_code: doc.type_code, summary: doc.summary, body: doc.body ?? '', recipients: doc.recipients.join('\n'),
     urgency: doc.urgency, reply_to_id: doc.reply_to_id ?? '', recipient_tenant_ids: [...doc.recipient_tenant_ids],
+    language: doc.language,
   })
   attachments.value = doc.files.filter((f) => f.file).map((f) => ({
     key: nextKey++, name: f.file!.filename, state: 'clean' as const, existing: true,
@@ -185,7 +189,7 @@ async function save() {
   saving.value = true
   const fields = {
     type_code: form.type_code, summary: form.summary.trim(), body: form.body.trim(), recipients: recipientList.value,
-    urgency: form.urgency, reply_to_id: form.reply_to_id || null,
+    urgency: form.urgency, reply_to_id: form.reply_to_id || null, language: form.language,
     // bản dở cũ có thể còn đơn vị đã bỏ khỏi hệ thống: chỉ gửi đơn vị còn trong danh sách
     recipient_tenant_ids: restricted.value ? [] : form.recipient_tenant_ids.filter((x) => units.value.some((u) => u.id === x)),
   }
@@ -248,7 +252,7 @@ async function save() {
     <p v-else-if="locked" class="moc-empty">{{ t('compose.notEditable') }}</p>
 
     <form v-else class="moc-block space-y-5" novalidate @submit.prevent="save">
-      <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-3">
         <div>
           <label class="label" for="type">{{ t('compose.type') }}</label>
           <select id="type" v-model="form.type_code" class="input">
@@ -260,6 +264,13 @@ async function save() {
           <select id="urgency" v-model="form.urgency" class="input">
             <option v-for="u in ['normal', 'khan', 'thuong_khan', 'hoa_toc']" :key="u" :value="u">{{ t(`urgency.${u}`) }}</option>
           </select>
+        </div>
+        <div>
+          <label class="label" for="language">{{ t('compose.language') }}</label>
+          <select id="language" v-model="form.language" class="input" aria-describedby="language-hint">
+            <option v-for="l in ['vi', 'en']" :key="l" :value="l">{{ t(`compose.languages.${l}`) }}</option>
+          </select>
+          <p id="language-hint" class="mt-1 text-[13px] text-stone-500">{{ t('compose.languageHint') }}</p>
         </div>
       </div>
 
