@@ -10,15 +10,17 @@
   ],
   "rules": [
     "size", "json", "depth", "root", "draft", "root-type", "additional-properties", "properties", "reserved",
-    "engine-name", "field-name", "field-schema", "scalar", "enum", "x-moc-date", "required", "x-moc-range",
-    "root-only", "ref-external", "dynamic-ref", "format", "pattern-properties", "ref-target", "ref-loop", "steps",
-    "pattern", "schema"
+    "engine-name", "el-keyword", "field-name", "field-schema", "scalar", "enum", "x-moc-date", "required",
+    "x-moc-range", "root-only", "ref-external", "dynamic-ref", "format", "pattern-properties", "ref-target",
+    "ref-loop", "steps", "pattern", "schema"
   ],
   "serverOnly": ["pattern", "schema"],
   "constants": {
     "DRAFT": "https://json-schema.org/draft/2020-12/schema",
     "RESERVED": ["tenantId", "departmentId", "initiator"],
     "ENGINE_NAMES": ["execution", "task", "authenticatedUserId", "currentTenantId"],
+    "EL_KEYWORDS": ["and", "div", "empty", "eq", "false", "ge", "gt", "instanceof", "le", "lt", "mod", "ne", "not",
+      "null", "or", "true"],
     "VARIABLE": "[a-z][A-Za-z0-9]{0,63}",
     "SCALAR_TYPES": ["boolean", "integer", "null", "number", "string"],
     "FORMATS": ["date", "uuid"],
@@ -148,6 +150,9 @@
     {"name": "trường trùng biến hệ thống", "set": {"/properties/tenantId": {"type": "string"}}, "errors": ["reserved"]},
     {"name": "trường trùng tên Flowable", "set": {"/properties/execution": {"type": "string"}},
      "errors": ["engine-name"]},
+    {"name": "trường trùng từ khóa EL", "set": {"/properties/le": {"type": "string"}}, "errors": ["el-keyword"]},
+    {"name": "trường trùng từ khóa EL instanceof", "set": {"/properties/instanceof": {"type": "boolean"}},
+     "errors": ["el-keyword"]},
     {"name": "tên trường có gạch dưới", "set": {"/properties/ho_ten": {"type": "string"}}, "errors": ["field-name"]},
     {"name": "tên trường viết hoa đầu", "set": {"/properties/HoTen": {"type": "string"}}, "errors": ["field-name"]},
     {"name": "tên trường mở đầu bằng số", "set": {"/properties/1hang": {"type": "string"}}, "errors": ["field-name"]},

@@ -25,9 +25,9 @@
 // ước lượng ở đây không cộng phần của pattern. Tệp này không dùng gì của Nuxt để Node chạy test được.
 
 export type FormRule = 'size' | 'json' | 'depth' | 'root' | 'draft' | 'root-type' | 'additional-properties'
-  | 'properties' | 'reserved' | 'engine-name' | 'field-name' | 'field-schema' | 'scalar' | 'enum' | 'x-moc-date'
-  | 'required' | 'x-moc-range' | 'root-only' | 'ref-external' | 'dynamic-ref' | 'format' | 'pattern-properties'
-  | 'ref-target' | 'ref-loop' | 'steps' | 'pattern' | 'schema'
+  | 'properties' | 'reserved' | 'engine-name' | 'el-keyword' | 'field-name' | 'field-schema' | 'scalar' | 'enum'
+  | 'x-moc-date' | 'required' | 'x-moc-range' | 'root-only' | 'ref-external' | 'dynamic-ref' | 'format'
+  | 'pattern-properties' | 'ref-target' | 'ref-loop' | 'steps' | 'pattern' | 'schema'
 
 export interface FormProblem {
   rule: FormRule
@@ -48,6 +48,9 @@ export const FORM_LIMITS = {
   RESERVED: ['tenantId', 'departmentId', 'initiator'],
   // tên Flowable giải thành giá trị của động cơ trong biểu thức BPMN, trước khi tìm biến
   ENGINE_NAMES: ['execution', 'task', 'authenticatedUserId', 'currentTenantId'],
+  // từ khóa của biểu thức (JUEL): biến trùng tên không viết được trong ${…}
+  EL_KEYWORDS: ['and', 'div', 'empty', 'eq', 'false', 'ge', 'gt', 'instanceof', 'le', 'lt', 'mod', 'ne', 'not', 'null',
+    'or', 'true'],
   VARIABLE: '[a-z][A-Za-z0-9]{0,63}',
   SCALAR_TYPES: ['boolean', 'integer', 'null', 'number', 'string'],
   FORMATS: ['date', 'uuid'],
@@ -67,9 +70,9 @@ export const FORM_LIMITS = {
 }
 
 export const FORM_RULES: FormRule[] = ['size', 'json', 'depth', 'root', 'draft', 'root-type', 'additional-properties',
-  'properties', 'reserved', 'engine-name', 'field-name', 'field-schema', 'scalar', 'enum', 'x-moc-date', 'required',
-  'x-moc-range', 'root-only', 'ref-external', 'dynamic-ref', 'format', 'pattern-properties', 'ref-target', 'ref-loop',
-  'steps', 'pattern', 'schema']
+  'properties', 'reserved', 'engine-name', 'el-keyword', 'field-name', 'field-schema', 'scalar', 'enum', 'x-moc-date',
+  'required', 'x-moc-range', 'root-only', 'ref-external', 'dynamic-ref', 'format', 'pattern-properties', 'ref-target',
+  'ref-loop', 'steps', 'pattern', 'schema']
 
 export const SERVER_ONLY_RULES: FormRule[] = ['pattern', 'schema']
 
@@ -223,6 +226,7 @@ export function checkForm(text: string): FormProblem[] {
   for (const [name, prop] of Object.entries(props)) {
     if (FORM_LIMITS.RESERVED.includes(name)) problems.push({ rule: 'reserved', field: name })
     else if (FORM_LIMITS.ENGINE_NAMES.includes(name)) problems.push({ rule: 'engine-name', field: name })
+    else if (FORM_LIMITS.EL_KEYWORDS.includes(name)) problems.push({ rule: 'el-keyword', field: name })
     else if (!VARIABLE.test(name)) problems.push({ rule: 'field-name', field: name })
     if (!isObject(prop)) {
       problems.push({ rule: 'field-schema', field: name })

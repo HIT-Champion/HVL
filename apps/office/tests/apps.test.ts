@@ -39,7 +39,7 @@ const UNG_DUNG = read('../../../scripts/ung_dung.py')
 const APISIX = read('../../../platform/apisix/apisix.yaml')
 const COMPOSE = read('../../../docker-compose.yml')
 const WIKI_IMAGE = read('../../../platform/wiki/Dockerfile')
-const page = read('../app/pages/ung-dung.vue')
+const page = read('../app/pages/ung-dung/index.vue')
 const layout = read('../app/layouts/default.vue')
 
 type Messages = { [key: string]: string | Messages }
