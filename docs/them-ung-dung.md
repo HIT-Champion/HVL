@@ -353,11 +353,14 @@ khi hai tệp cùng process id, khi có tệp không khai.
 Flowable), không trùng biến hệ thống `tenantId`, `departmentId`, `initiator`, cũng không trùng tên Flowable dành sẵn
 trong biểu thức `execution`, `task`, `authenticatedUserId`, `currentTenantId` (điều kiện của BPMN đọc ra giá trị của
 động cơ chứ không phải giá trị gửi lên, #330); mỗi trường một giá trị đơn (chuỗi, số, đúng/sai — biến Flowable không
-chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng JSON Pointer (`#/…`), tới đúng
-một schema, không vòng, lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai ở gốc form (dưới gốc chúng đổi
-chỗ `#/…` trỏ tới); `x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB; không dùng `patternProperties`,
-`propertyNames` (mẫu chạy trên mọi khóa gửi lên, kể cả khóa thừa). `pattern` chạy bằng `re` của Python, quay lui, ngay
-trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ (ReDoS, vd `^(a+)+$`) với vài chục ký tự làm đứng cả dịch vụ,
+chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng JSON Pointer (`#/…`; giải
+`%XX` cả chuỗi rồi mới tách theo `/` như jsonschema, chỉ số mảng không có số 0 đầu), tới đúng một schema, không vòng,
+lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai ở gốc form (dưới gốc chúng đổi chỗ `#/…` trỏ tới);
+`x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB, không có `NaN`, `Infinity`; đối tượng và mảng lồng
+nhau tối đa 32 tầng, schema lồng nhau cũng tối đa 32 tầng tính cả qua `$ref` (jsonschema đi đệ quy từng tầng khi kiểm
+dữ liệu gửi lên, #386); không dùng `patternProperties`, `propertyNames` (mẫu chạy trên mọi khóa gửi lên, kể cả khóa
+thừa). `pattern` chạy bằng `re` của Python, quay lui, ngay trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ
+(ReDoS, vd `^(a+)+$`) với vài chục ký tự làm đứng cả dịch vụ,
 kể cả Action của Văn phòng điện tử. Nên lúc cài không nhận mẫu lặp lồng trong lặp (trừ lặp đúng n lần như
 `(,[0-9]{3})*`), có `|` hay tham chiếu ngược (`\1`) trong phần lặp, dài quá 512 ký tự. Phần lặp nối nhau vẫn tốn thời
 gian đa thức, và jsonschema kiểm bằng `re.search`: mẫu không neo `^` thử lại ở mọi vị trí, `a+$` đã tốn bình phương độ
@@ -400,10 +403,16 @@ Nhóm của người dùng lấy từ claim của token: `t:<đơn vị>:<vai tr
 ứng dụng; API của ứng dụng chỉ thấy việc có khóa quy trình `<tên>.…`.
 
 Kiểm không cần hệ thống chạy: svc-workflow `test_app_forms.py` (gồm mọi ca của `apps/*/forms/*.cases.json`, dùng chung
-với form trên trình duyệt), `test_app_bpmn.py` (các ca BPMN độc), `test_app_deploy.py` (gói, triển khai, cài lại, gỡ,
-lệnh trong container với Flowable giả), `test_app_api.py` (token RSA thật, Flowable giả), `test_app_core.py` (hộp việc
-Văn phòng không lẫn việc ứng dụng; các lệnh REST mới); scripts `test_ung_dung_quy_trinh.py`. Trên hệ thống thật:
-`make demo-quy-trinh` (mục 7).
+với form trên trình duyệt, và mọi ca luật lúc cài của `tests/app_form_rules.cases.json`), `test_app_bpmn.py` (các ca
+BPMN độc), `test_app_deploy.py` (gói, triển khai, cài lại, gỡ, lệnh trong container với Flowable giả),
+`test_app_api.py` (token RSA thật, Flowable giả), `test_app_core.py` (hộp việc Văn phòng không lẫn việc ứng dụng; các
+lệnh REST mới); scripts `test_ung_dung_quy_trinh.py`. Trên hệ thống thật: `make demo-quy-trinh` (mục 7).
+
+Trình dựng form của Văn phòng điện tử (#303) có bản chép các luật lúc cài ở trên, trên trình duyệt:
+`apps/office/app/utils/formRules.ts`. Bản này trả mã luật thay cho câu lỗi, và chạy chung bộ ca thử
+`app_form_rules.cases.json` (cả hằng số như 256 KB, 32 tầng) với `check_form`. Hai luật chỉ lõi kiểm là `pattern` dễ
+quay lui bùng nổ và JSON Schema hợp lệ theo meta-schema. Sửa luật lúc cài thì sửa cả bản trên trình duyệt và tệp ca
+thử, nếu không test hai bên đỏ.
 
 Giới hạn:
 

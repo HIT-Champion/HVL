@@ -20,6 +20,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Sự kiện `office.document.received` nay được ghi khi văn thư thêm văn bản đến, ứng dụng nghe nó mới nhận được (#381).
 - Bản cài có `scripts/demo_tat_van_phong.py`; màn cắm ứng dụng trong bản cài dừng trước khi gỡ ứng dụng (#376).
 - Tệp OpenLineage tải từ trang Phả hệ số liệu ghi `producer` là repo Signet, không còn tên repo cũ (#376).
+- `moc app install` báo lỗi rõ với tệp form sai kiểu hay lồng quá 32 tầng (cả qua `$ref`), không còn lỗi 500 (#386).
 
 ### Bảo mật
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
