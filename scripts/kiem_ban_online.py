@@ -28,8 +28,11 @@
 - Header bảo mật của cổng đi qua proxy: trang chủ còn ``Content-Security-Policy`` và
   ``X-Content-Type-Options: nosniff``.
 
-  python3 scripts/kiem_ban_online.py https://signet.htechcs.com [--version 1.2.0] [--min-days 14]
+  python3 scripts/kiem_ban_online.py https://signet.htechcs.com [--version 1.2.0] [--min-days 14] [--wait-minutes 60]
   python3 scripts/kiem_ban_online.py https://signet-dev.htechcs.com --commit <sha đầu develop> [--commit <sha>…]
+
+``--wait-minutes`` (lượt ngay sau phát hành, #344): trước khi kiểm, hỏi lại ``/api/status`` mỗi 30 giây tới khi chạy
+đúng bản, tối đa chừng ấy phút; hết hạn mà vẫn bản cũ thì mục ``/api/status`` trượt như không đợi.
 
 Chạy hết các mục rồi báo mục trượt. Thoát 0 khi đạt, 1 khi có mục trượt, 2 khi gọi sai. Chỉ dùng thư viện chuẩn.
 """
@@ -57,6 +60,7 @@ MAX_BODY = 1 << 20          # /api/status, cấu hình OIDC chỉ vài KiB; tran
 MIN_DAYS = 14               # Let's Encrypt gia hạn khi còn 30 ngày: dưới 14 ngày là việc gia hạn đã hỏng
 TLS_OK = ("TLSv1.2", "TLSv1.3")
 REDIRECTS = (301, 302, 307, 308)
+WAIT_EVERY_S = 30           # --wait-minutes: khoảng giữa hai lần hỏi /api/status
 USER_AGENT = "signet-kiem-ban-online"
 # phiên bản `git describe --tags --always` (bỏ v): băm rút gọn, hay sau thẻ gần nhất `<thẻ>-<n>-g<băm>`
 DESCRIBED = re.compile(r"(?:.+-g)?([0-9a-f]{7,40})")
@@ -241,6 +245,25 @@ def check_headers(site: Site, report: Report, base: str) -> None:
         report.ok(item, "Content-Security-Policy, X-Content-Type-Options: nosniff")
 
 
+def wait_for(site: Site, base: str, wanted: Callable[[Any], bool], minutes: float) -> None:
+    """Đợi ``/api/status`` chạy đúng bản: bản online nâng tay vài phút tới vài chục phút sau khi phát hành, giữa chừng
+    Signet dừng (không gọi được, 502 của proxy) — cứ hỏi lại. Hết ``minutes`` phút thì thôi, phần kiểm báo lệch bản."""
+    deadline = time.monotonic() + minutes * 60
+    while True:
+        try:
+            status = _json(site.get(f"{base}/api/status"))
+        except OSError:
+            status = None
+        running = status.get("version") if isinstance(status, dict) else None
+        if wanted(running):
+            return
+        if time.monotonic() >= deadline:
+            print(f"… đợi hết {minutes:g} phút, bản online vẫn chạy {running}")
+            return
+        print(f"… bản online đang chạy {running}, hỏi lại sau {WAIT_EVERY_S} giây")
+        time.sleep(WAIT_EVERY_S)
+
+
 def check(site: Site, base: str, host: str, version: str | None, min_days: int, now: float,
           commits: list[str] | None = None) -> Report:
     report = Report()
@@ -261,6 +284,8 @@ def main(argv: list[str] | None = None, site: Callable[[str, int], Site] = Inter
                       help="bản phải dựng từ commit này (băm đủ 40 ký tự; lặp được: commit nào trong số đó cũng đạt)")
     parser.add_argument("--min-days", type=int, default=MIN_DAYS,
                         help=f"số ngày tối thiểu chứng chỉ còn hạn (mặc định {MIN_DAYS})")
+    parser.add_argument("--wait-minutes", type=float, default=0,
+                        help="đợi tối đa chừng này phút cho /api/status chạy đúng --version hay --commit rồi mới kiểm")
     args = parser.parse_args(argv)
     url = urllib.parse.urlsplit(args.url)
     if url.scheme != "https" or not url.hostname or url.path.strip("/") or url.query or url.fragment:
@@ -272,8 +297,14 @@ def main(argv: list[str] | None = None, site: Callable[[str, int], Site] = Inter
     bad = [c for c in args.commit if not re.fullmatch(r"[0-9a-f]{40}", c)]
     if bad:
         parser.error(f"--commit cần băm SHA-1 đủ 40 ký tự thường, đang là {bad[0]}")
+    if args.wait_minutes < 0 or args.wait_minutes and args.version is None and not args.commit:
+        parser.error("--wait-minutes cần số không âm, đi cùng --version hay --commit")
 
-    report = check(site(host, port), base, host, args.version, args.min_days, time.time(), args.commit)
+    target = site(host, port)
+    if args.wait_minutes:
+        wait_for(target, base, lambda running: running == args.version if args.version is not None
+                 else built_from(running, args.commit), args.wait_minutes)
+    report = check(target, base, host, args.version, args.min_days, time.time(), args.commit)
     annotate = bool(os.environ.get("GITHUB_ACTIONS"))
     for warning in report.warnings:
         if annotate:

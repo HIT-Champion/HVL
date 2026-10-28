@@ -17,8 +17,8 @@
 # Kiểm bản chạy công khai qua HTTPS từ bên ngoài (F1.9, #197): chứng chỉ, HTTP chuyển sang HTTPS, /api/status chạy đúng
 # thẻ phát hành mới nhất, Keycloak sau proxy, header bảo mật (scripts/kiem_ban_online.py).
 # GitHub chạy lịch, nút chạy tay và lượt sau Release theo tệp trên nhánh mặc định (develop); PR đổi chính tệp này hay
-# kịch bản thì chạy job trên PR đó. Từ lúc phát hành tới lúc nâng bản online, job đỏ vì bản online còn chạy bản cũ —
-# đúng ý. Nâng xong thì chạy tay (Actions → Bản online → Run workflow) để thấy xanh ngay (#344).
+# kịch bản thì chạy job trên PR đó. Lượt ngay sau Release đợi tối đa 60 phút cho bản online nâng tay xong rồi mới kiểm
+# (#344). Lượt theo lịch, chạy tay thì kiểm ngay: bản online còn chạy bản cũ là đỏ — đúng ý.
 # Job thứ hai kiểm bản dev theo develop (máy MinhQuang, reconciler kéo develop mỗi 15 phút, #344) như thế, nhưng đòi
 # phiên bản dựng từ commit đầu develop thay vì thẻ: reconciler kẹt thì job đỏ.
 name: Bản online
@@ -56,7 +56,7 @@ jobs:
     # Release đỏ (thẻ không nằm trên main, phát hành lại…) thì không có bản mới nào để đòi
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: ${{ github.event_name == 'workflow_run' && 75 || 10 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,8 +72,12 @@ jobs:
           echo "Thẻ mới nhất: $tag"
           echo "TAG=$tag" >> "$GITHUB_ENV"
 
+      # Ngay sau Release, bản online còn chờ người nâng tay (nang_cap.sh nang; v1.2.0, v1.2.1 xong sau 25 và 6 phút):
+      # đợi /api/status báo đúng thẻ, tối đa 60 phút, thay vì đỏ ngay
       - name: Kiểm ${{ env.ONLINE_URL }}
-        run: python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}"
+        env:
+          WAIT_MINUTES: ${{ github.event_name == 'workflow_run' && 60 || 0 }}
+        run: python3 scripts/kiem_ban_online.py "$ONLINE_URL" --version "${TAG#v}" --wait-minutes "$WAIT_MINUTES"
 
   kiem-dev:
     name: Kiểm bản dev theo develop

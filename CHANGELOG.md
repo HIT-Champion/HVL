@@ -14,6 +14,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ### Đã sửa đổi
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại, thêm kênh thông báo bên ngoài (#374).
+- Job "Bản online" chạy ngay sau Release đợi tối đa 60 phút cho bản online nâng xong rồi mới kiểm (#344).
 
 ### Đã sửa lỗi
 - Tài liệu lệch mã: số dịch vụ, số test, màn demo không chạy trên bản online, ROADMAP sau `v1.2.1` (#379).
