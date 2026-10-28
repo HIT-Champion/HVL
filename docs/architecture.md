@@ -98,7 +98,7 @@ của ba câu, đúng mức đã kiểm:
 | 2. Cài dưới một giờ | **Chưa đo** với người ngoài đội trên máy sạch | `ROADMAP.md`, giai đoạn 5 |
 | 3. Không dịch vụ trả phí bắt buộc | Đạt | [`trien-khai.md`](trien-khai.md) §5, §5b |
 
-- **Câu 1.** `make up` bật profile `core` và `app` (18 dịch vụ, 17 chạy liên tục). README ghi khoảng 3,2 GB (đo từ trước
+- **Câu 1.** `make up` bật profile `core` và `app` (19 dịch vụ, 18 chạy liên tục). README ghi khoảng 3,2 GB (đo từ trước
   khi thêm `app-ca-nhan`, `app-tai-lieu-api`); diễn tập triển khai đo khoảng 3,5 GB. Máy đề xuất 4 vCPU, 8 GB RAM, 40 GB
   đĩa. Bật mô hình ngôn ngữ (profile `ai`, Ollama giới hạn mặc định 6 GB — dịch vụ `ollama` trong `docker-compose.yml`)
   cần máy 16 GB.
@@ -154,7 +154,7 @@ flowchart LR
       OL["Ollama 0.35<br/>profile ai"]
     end
     subgraph VANHANH["Vận hành"]
-      PM["Prometheus + Grafana"]
+      PM["Prometheus + Grafana<br/>Alertmanager"]
       JG["Jaeger 2.22<br/>truy vết · profile trace"]
       LG["Vector 0.59 + Parseable 3.2<br/>log tập trung · profile logs"]
       BK["restic 0.19<br/>sao lưu · moc backup"]
@@ -196,6 +196,7 @@ flowchart LR
   FL -->|"CSDL flowable"| PG
   KC -->|"CSDL keycloak"| PG
   PM -->|"chỉ số mỗi 15 giây"| GW
+  PM -->|"cảnh báo: /ops/alerts"| WF
   WF -.->|"NGSI-LD"| SC
   WF -.->|"email, webhook: hộp thư đi"| EM
   WF -.->|"POST /message: người dùng tự bật"| SMS
@@ -248,7 +249,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) |
 | [D] Dữ liệu | PostgreSQL 16 · Hasura CE v2.51.0 · SeaweedFS 4.48 · Meilisearch CE v1.54.3 · DuckDB 1.5.6 · phả hệ OpenLineage · dashboard ECharts 6.1.0 · Scorpio 6.0.2 và PostGIS 16-3.5 (profile `iot`) |
 | [I] Trí tuệ | Ollama 0.35.1 (profile `ai`) · Qwen3-1.7B, Qwen3-Embedding-0.6B · Tesseract 5.5.0 · truy xuất có nguồn tự viết · ba tác tử |
-| Vận hành | Prometheus 3.15.0, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
+| Vận hành | Prometheus 3.15.0, Alertmanager 0.34.1, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
 
 <details>
 <summary><b>Bảng chi tiết từng không gian</b>: vai trò, cụm Tầng 1, vị trí trong repo, mức</summary>
@@ -313,7 +314,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 
 | Thành phần | Phiên bản | Vai trò trong Signet | Cụm | Ở đâu trong repo | Mức |
 |---|---|---|---|---|---|
-| Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Dùng được |
+| Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Thu chỉ số của APISIX và trạng thái từng thành phần (`GET /metrics` của svc-files) mỗi 15 giây, tính luật cảnh báo; Alertmanager gọi svc-workflow để cảnh báo thành thông báo cho quản trị đơn vị (#284); Grafana chỉ nghe 127.0.0.1 | ⑥ | `platform/monitoring/` | F3.13 Hoàn thiện |
 | Vector, Parseable | 0.59.0, 3.2.4 | Log tập trung của 8 dịch vụ, che lần hai, tra theo `X-Request-Id` (profile `logs`, tắt mặc định) | ⑥ | `platform/logs/` | F3.14 Dùng được |
 | restic | 0.19.1 | Sao lưu mã hóa CSDL, tệp, két (`make backup`, `make restore`) | ⑥ | `scripts/backup.py` | F3.4 Hoàn thiện |
 | Reconciler GitOps *(mã của đội)* | systemd timer | Mỗi 60 giây khởi động lại container unhealthy, dựng lại container bị mất; khi bật GitOps thì cài commit mới của nhánh `deploy`, kiểm chữ ký commit nếu đặt `MOC_GITOPS_ALLOWED_SIGNERS` | ⑥ | `scripts/reconcile.py`, `platform/systemd/` | F3.3 Hoàn thiện |
@@ -510,6 +511,7 @@ hiện tại.
 | `processes/*.bpmn20.xml` | Văn phòng | Hai quy trình `van-ban-den`, `van-ban-di` |
 | `office/api.py` | Văn phòng | Lớp `Office` theo khuôn `Part`: gắn `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN văn bản, sáu vòng định kỳ của Văn phòng (#302) |
 | `apps/` (`bpmn.py`, `forms.py`, `bundle.py`, `deploy.py`, `auth.py`, `api.py`) | Lõi | Quy trình của ứng dụng cắm bằng manifest (#301): kiểm BPMN theo danh sách trắng và form JSON Schema, triển khai lên Flowable với tiền tố `<tên>.`, API chung `/api/workflow/<tên>/…` chỉ nhận token của client `app-<tên>`. Không biết ứng dụng cụ thể nào, luôn bật, không theo `MOC_OFFICE_ENABLED` |
+| `alerts.py`, route `POST /ops/alerts` | Lõi | Cảnh báo vận hành Alertmanager gửi sang (#284) → thông báo `ops.alert` cho vai trò `tenant_admin` của mọi đơn vị, không gắn văn bản; phần chung, gắn cả khi tắt Văn phòng |
 | `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
 | `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ) và quy trình của ứng dụng (`apps/`, #301); chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
@@ -671,7 +673,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 | QĐ-001 | "mọi tệp mã phải mang header Apache-2.0 (CI cưỡng chế)" | Vẫn đúng với tệp mã; tệp không chèn được header (JSON, ảnh, Markdown…) khai giấy phép trong `REUSE.toml` |
 | QĐ-002 | "dùng chung cho mọi thành phần, tách bằng schema hoặc database riêng" | Đúng, trừ Scorpio: broker bắt buộc phần mở rộng `postgis` nên có CSDL PostGIS riêng (profile `iot`) |
 | QĐ-002 | "tài liệu vận hành ở giai đoạn 5 phải có quy trình sao lưu và phục hồi rõ ràng" | Đã có: `make backup`, `make restore` (restic, F3.4), [`van-hanh.md`](van-hanh.md) mục "Sao lưu và khôi phục" |
-| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 18 dịch vụ (15 của `core`, 3 của `app`), 17 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
+| QĐ-003 | "Cần điều phối khoảng 8–12 dịch vụ"; "profile theo trục" | `make up` dựng 19 dịch vụ (16 của `core`, 3 của `app`), 18 chạy liên tục, `keycloak-fonts` chạy một lần; profile chia theo tầng và phần tùy chọn (§1.2) |
 
 ### QĐ-001: Chọn Apache-2.0 làm giấy phép dự án
 
@@ -1033,8 +1035,8 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
 - **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ, chưa có
-  tracing phân tán; cảnh báo chỉ hiện trong Grafana, Prometheus, chưa gửi ra ngoài; log tập trung tắt mặc định (F3.13,
-  F3.14).
+  tracing phân tán; cảnh báo tới mọi quản trị đơn vị (chuông, kênh ngoài nếu bật), chưa chọn được người nhận; log tập
+  trung tắt mặc định (F3.13, F3.14).
 - **Két bí mật**: `.env` vẫn là nguồn bí mật; chưa có quy trình xoay khóa transit, xoay bí mật
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, cụm ①).
 - **Số đo còn thiếu**: chạy trên máy 8 GB và "cài dưới một giờ" chưa đo (§1.3); cột "trước" của số đo thành công chưa

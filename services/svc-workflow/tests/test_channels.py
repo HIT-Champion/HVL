@@ -51,6 +51,7 @@ from svc_workflow.channels import (
     KINDS,
     MAX_ATTEMPTS,
     NOTE,
+    OPS_RESOLVED,
     RESTRICTED,
     SOMEONE,
     TITLES,
@@ -194,10 +195,12 @@ def test_texts_match_the_web_bell():
     assert FORMS == forms
     keys = {"task.assigned": "taskAssigned", "task.overdue": "taskOverdue", "task.escalated": "taskEscalated",
             "document.issued": "documentIssued", "document.processed": "documentProcessed",
-            "document.overdue": "documentOverdue", "ot.alarm": "otAlarm", "document.incoming": "documentIncoming"}
+            "document.overdue": "documentOverdue", "ot.alarm": "otAlarm", "document.incoming": "documentIncoming",
+            "ops.alert": "opsAlert"}
     assert set(keys) == set(KINDS) == set(TITLES)
     for kind, key in keys.items():
         assert TITLES[kind] == vi["notify"][key], kind
+    assert OPS_RESOLVED == vi["notify"]["opsResolved"]
     assert (SOMEONE, RESTRICTED, NOTE.replace("{note}", "{note}")) == (
         vi["notify"]["someone"], vi["notify"]["restricted"], vi["notify"]["note"])
 
@@ -213,6 +216,11 @@ def test_describe_like_the_bell_and_without_names_for_the_webhook():
     assert describe("ot.alarm", {"name": "Phòng máy\n1", "temperature": 1234.5}).title == (
         "Cảnh báo nhiệt độ Phòng máy 1: 1.234,5 °C — đã có dự thảo báo cáo sự cố")
     assert describe("document.issued", {"symbol": "05/TB", "summary": "Lịch họp"}).detail == "Lịch họp"
+    alert = {"status": "firing", "message": "Thành phần Hasura\nngừng chạy", "component": "hasura"}
+    shown = describe("ops.alert", alert, names=False)
+    assert (shown.title, shown.detail, shown.note) == ("Cảnh báo vận hành: Thành phần Hasura ngừng chạy", "", "")
+    assert make_router()._link({"kind": "ops.alert", "document_id": None}) == "https://signet.example.com/trang-thai"
+    assert describe("ops.alert", {**alert, "status": "resolved"}).title == "Hết cảnh báo: Thành phần Hasura ngừng chạy"
 
 
 # --- gửi: Hasura giả của hộp thư đi --------------------------------------------------------------------------------

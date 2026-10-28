@@ -53,7 +53,7 @@ PREFIX ?= /opt/moc
         demo-nap-lo nap-lo-mau \
         demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
-        logs-env logs-up logs-down logs-tra demo-log-tap-trung \
+        logs-env logs-up logs-down logs-tra demo-log-tap-trung alert-env demo-canh-bao \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
@@ -99,7 +99,7 @@ check: ## Kiểm tra tiền điều kiện của môi trường
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: env-ready $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready alert-env $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync --files)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
@@ -123,6 +123,13 @@ restart: down up ## Khởi động lại toàn bộ hệ thống
 
 logs: ## Theo dõi nhật ký của mọi dịch vụ
 	@$(COMPOSE) logs -f --tail=100
+
+alert-env: $(ENV_FILE)
+	@# .env sinh trước #284 thiếu token Alertmanager → svc-workflow: sinh như make env, không in giá trị. Dòng có mà
+	@# rỗng là đã chọn tắt cảnh báo ra chuông: giữ nguyên
+	@grep -q '^MOC_ALERT_TOKEN=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Cảnh báo ra chuông (#284), make up thêm\nMOC_ALERT_TOKEN=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) && echo "Đã thêm MOC_ALERT_TOKEN (ngẫu nhiên) vào $(ENV_FILE)."; }
 
 logs-env: $(ENV_FILE)
 	@# .env sinh trước F3.14 thiếu mật khẩu: sinh đúng như make env (scripts/gen-env.sh), không in giá trị
@@ -184,6 +191,9 @@ test: ## Chạy test đơn vị của các dịch vụ, lệnh vận hành và p
 
 audit: $(ENV_FILE) ## Kiểm sổ kiểm toán: tính lại chuỗi băm ngoài CSDL, so mốc neo trong bucket lạnh, hash văn bản
 	@python3 scripts/moc.py audit verify
+
+demo-canh-bao: $(ENV_FILE) ## Màn cảnh báo vận hành (F3.13): cảnh báo giả qua Alertmanager thành thông báo ở chuông của quản trị mọi đơn vị, hết cảnh báo thêm một thông báo, token sai bị từ chối (docs/demo-script.md)
+	@python3 scripts/demo.py canh-bao
 
 demo-kiem-dich: $(ENV_FILE) ## Màn demo (iv) kiểm dịch: tệp EICAR bị chặn ở cửa ngõ, lần chặn vào sổ kiểm toán (docs/demo-script.md)
 	@python3 scripts/demo.py kiem-dich

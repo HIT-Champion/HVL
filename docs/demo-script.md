@@ -38,7 +38,9 @@ văn bản vừa vào sổ, kèm căn cứ (`make demo-giao-viec`, F4.3) — xem
 bộ trong két, **chỉ minh họa** (`make demo-ky-so`, F4.5) — xem
 [mục này](#ngoài-4-nguyên-lý-ký-số-văn-bản-đi-minh-họa--make-demo-ky-so). Màn che thông tin cá nhân trong chữ
 gửi mô hình và trong nhật ký (`make demo-che-pii`, F4.4) là bằng chứng cho cụm ② của đề — xem
-[mục cuối](#ngoài-4-nguyên-lý-che-thông-tin-cá-nhân--make-demo-che-pii).
+[mục này](#ngoài-4-nguyên-lý-che-thông-tin-cá-nhân--make-demo-che-pii). Màn cảnh báo vận hành ra chuông của quản trị
+đơn vị (`make demo-canh-bao`, F3.13, dưới hai phút) là bằng chứng cho cụm ⑥ — xem
+[mục cuối](#ngoài-4-nguyên-lý-cảnh-báo-vận-hành-ra-chuông--make-demo-canh-bao).
 
 ## (i) Nóng → lạnh — `make demo-nong-lanh`
 
@@ -878,6 +880,39 @@ câu trích tự mở.
 - *"Còn gì chưa làm?"* Họ tên, địa chỉ (cần nhận dạng thực thể tiếng Việt), hộ chiếu, biển số xe; số dính chữ
   (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura, PostgreSQL, Keycloak và `error_log` của
   APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại.
+
+## Ngoài 4 nguyên lý: cảnh báo vận hành ra chuông — `make demo-canh-bao`
+
+**Điều muốn chứng minh:**
+
+- Sự cố không chỉ hiện trong Grafana: luật cảnh báo của Prometheus đi qua Alertmanager tới `svc-workflow`, thành thông
+  báo ở chuông của quản trị đơn vị — mọi đơn vị, vì thành phần dùng chung gián đoạn thì đơn vị nào cũng chịu — kèm
+  email, webhook, SMS, Zalo nếu bản cài đã bật kênh đó (#284).
+- Hết sự cố có thông báo "Hết cảnh báo"; Alertmanager gửi lại không làm chuông đổ thêm.
+- Trong mạng nội bộ cũng không ai tự gửi thông báo vào chuông được nếu không có token.
+
+**Lệnh in ra 4 bước:**
+
+1. Prometheus đang nối Alertmanager (`/api/v1/alertmanagers`); Alertmanager có token gọi `svc-workflow` (tệp trên
+   tmpfs, không in ra).
+2. Đẩy một cảnh báo giả (`DemoCanhBao`, thành phần `demo-<mã>`, không đụng dịch vụ thật) vào API của Alertmanager.
+   Sau khoảng 30 giây (Alertmanager gom cảnh báo bật cùng lúc) chuông của `quantri` có "Cảnh báo vận hành: Thành phần
+   demo-… gián đoạn"; trong CSDL đúng mỗi quản trị đơn vị một thông báo, văn thư, lãnh đạo, chuyên viên không nhận.
+3. Đặt `endsAt` cho cảnh báo: trong vòng một phút mỗi quản trị thêm đúng một thông báo "Hết cảnh báo: …", thông báo
+   bật không bị ghi thêm.
+4. Gọi thẳng `POST /ops/alerts` của `svc-workflow` từ trong mạng nội bộ bằng token sai → `401`.
+
+Trên giao diện: đăng nhập `quantri`, chuông có thông báo màu cam; bấm vào mở trang `/trang-thai`.
+
+**Nếu giám khảo hỏi:**
+
+- *"Cảnh báo thật trông thế nào?"* Như màn này, câu là `summary` của luật trong `platform/monitoring/canh-bao.yml`, vd
+  "Thành phần tim-kiem gián đoạn — Signet vẫn chạy nhưng thiếu phần việc này". Tám luật và ngưỡng: `docs/van-hanh.md`
+  mục Cảnh báo; mỗi luật có ca bật, ca không bật trong `promtool test rules` (bước CI "Giám sát").
+- *"Sao không cho Alertmanager gửi email thẳng?"* Gửi qua `svc-workflow` thì dùng lại kênh, người nhận, chống trùng,
+  hộp thư đi có thử lại của thông báo nghiệp vụ, không khai mật khẩu SMTP lần thứ hai trong cấu hình Alertmanager.
+- *"Chọn người nhận được không?"* Chưa: mọi quản trị đơn vị đều nhận. Tắt tạm một cảnh báo (silence) phải gọi API của
+  Alertmanager.
 
 ## Phương án dự phòng
 

@@ -199,7 +199,7 @@ realtime.onConnected(reload)
 realtime.onMessage((msg) => {
   notifications.receive(msg)
   const text = describeNotification(t, msg)
-  notice.info(text.title, { detail: text.note || text.detail, to: msg.document_id ? `/van-ban/${msg.document_id}` : undefined })
+  notice.info(text.title, { detail: text.note || text.detail, to: notificationLink(msg) })
 })
 onMounted(() => {
   reload()

@@ -1113,6 +1113,30 @@
           }
         }
       }
+    },
+    "/ops/alerts": {
+      "post": {
+        "summary": "Nhận cảnh báo của Alertmanager → thông báo ops.alert cho quản trị đơn vị (F3.13)",
+        "description": "Chỉ Alertmanager gọi (receiver webhook trong platform/monitoring/alertmanager.yml), kèm Authorization: Bearer MOC_ALERT_TOKEN. Thân là webhook phiên bản 4 của Alertmanager; mỗi cảnh báo firing/resolved thành một thông báo cho mọi người dùng vai trò tenant_admin, gửi lại không sinh thông báo thứ hai.",
+        "operationId": "ops_alerts_ops_alerts_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Thân không phải webhook của Alertmanager"
+          },
+          "401": {
+            "description": "Thiếu hoặc sai token"
+          },
+          "404": {
+            "description": "Chưa đặt MOC_ALERT_TOKEN"
+          },
+          "503": {
+            "description": "Chưa ghi được CSDL, Alertmanager sẽ gửi lại"
+          }
+        }
+      }
     }
   },
   "components": {

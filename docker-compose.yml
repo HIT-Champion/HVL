@@ -344,6 +344,8 @@ services:
       MOC_NOTIFY_WEBHOOK_URL: ${MOC_NOTIFY_WEBHOOK_URL:-}
       MOC_SMS_GATEWAY_PASSWORD: ${MOC_SMS_GATEWAY_PASSWORD:-}
       MOC_ZALO_BOT_TOKEN: ${MOC_ZALO_BOT_TOKEN:-}
+      # tùy chọn (#284): token Alertmanager gọi svc-workflow; bản cài cũ chưa có thì tắt cảnh báo ra chuông
+      MOC_ALERT_TOKEN: ${MOC_ALERT_TOKEN:-}
     volumes:
       - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
@@ -560,6 +562,34 @@ services:
       retries: 12
     depends_on:
       apisix: {condition: service_started}
+
+  # Alertmanager (Apache-2.0, #284): nhận cảnh báo của Prometheus, gọi svc-workflow POST /ops/alerts → thông báo
+  # ops.alert cho quản trị đơn vị. Không mở cổng ra ngoài, không giữ trạng thái: nhật ký gửi trên tmpfs, mất khi khởi
+  # động lại thì lần gửi lại không sinh thông báo thứ hai (svc-workflow chống trùng). Token chung với svc-workflow
+  # (két nạp cho svc-workflow); alertmanager.sh chép vào tệp cho credentials_file, thiếu thì chạy cấu hình không gửi
+  alertmanager:
+    <<: *common
+    image: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    profiles: [core]
+    entrypoint: ["sh", "/etc/alertmanager/alertmanager.sh"]
+    environment:
+      MOC_ALERT_TOKEN: ${MOC_ALERT_TOKEN:-}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /alertmanager:size=16m
+      - /tmp:size=1m
+    mem_limit: 64m
+    volumes:
+      - ./platform/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./platform/monitoring/alertmanager-khong-gui.yml:/etc/alertmanager/alertmanager-khong-gui.yml:ro
+      - ./platform/monitoring/alertmanager.sh:/etc/alertmanager/alertmanager.sh:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   # Grafana (AGPL-3.0) chạy như một dịch vụ độc lập, nguyên bản; Signet chỉ nạp cấu hình qua tệp
   grafana:

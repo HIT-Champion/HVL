@@ -11,6 +11,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ### Đã thêm
 - Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
 - Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
+- Cảnh báo của Prometheus qua Alertmanager thành thông báo ở chuông (và kênh ngoài) của quản trị đơn vị (#284).
 
 ### Đã sửa đổi
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại, thêm kênh thông báo bên ngoài (#374).
