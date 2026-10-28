@@ -66,6 +66,7 @@ T = {
         office=("Văn phòng điện tử", "app-office · Nuxt 4"), canhan=("Không gian cá nhân", "app-ca-nhan · P.A.R.A"),
         tailieu=("Tài liệu API", "app-tai-lieu-api · Swagger UI"),
         plug=("Bảng tin · Nghỉ phép", "cắm thêm bằng manifest: moc app install"),
+        tudong=("Node-RED (tùy chọn)", "flow tự động gọi API"), wiki=("DokuWiki (tùy chọn)", "wiki nội bộ từng đơn vị"),
         kc=("Keycloak", "đăng nhập một lần, TOTP"), cf=("Centrifugo", "thông báo tức thời"),
         hasura=("Hasura", "GraphQL, quyền từng dòng"), files=("svc-files", "tệp, tìm kiếm, PDF, AI"),
         mon=("Prometheus + Grafana", "giám sát cổng API"), wf=("svc-workflow", "Actions, nhắc hạn"),
@@ -101,6 +102,7 @@ T = {
         office=("e-Office", "app-office · Nuxt 4"), canhan=("Personal space", "app-ca-nhan · P.A.R.A"),
         tailieu=("API docs", "app-tai-lieu-api · Swagger UI"),
         plug=("News board · Leave requests", "plugged in by manifest: moc app install"),
+        tudong=("Node-RED (optional)", "flows that call the API"), wiki=("DokuWiki (optional)", "a wiki for each unit"),
         kc=("Keycloak", "single sign-on, TOTP"), cf=("Centrifugo", "real-time notifications"),
         hasura=("Hasura", "GraphQL, row-level access"), files=("svc-files", "files, search, PDF, AI"),
         mon=("Prometheus + Grafana", "API gateway monitoring"), wf=("svc-workflow", "Actions, deadlines"),
@@ -137,7 +139,7 @@ LOGO = dict(gw=["apisix", "coraza"], kc=["keycloak"], cf=["centrifugo"], hasura=
             mon=["prometheus", "grafana"], jaeger=["jaeger"], pg=["postgresql"], clam=["clamav"], sw=["seaweedfs"],
             logs=["vector", "parseable"], scorpio=["scorpio"], flow=["flowable"], bao=["openbao"],
             meili=["meilisearch"], ollama=["ollama"], restic=["restic"], mail=["ntfy"],
-            sms=["sms-gateway"])
+            sms=["sms-gateway"], tudong=["node-red"], wiki=["dokuwiki"])
 
 # hai yêu cầu có chấm sáng: (màu, đường đi chỉ gồm M/H/V, lệch pha so với chấm đầu)
 XUNG_SANG = [
@@ -264,6 +266,10 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     # ứng dụng cắm bằng manifest (route thêm lúc cài) và quy trình của chúng tới thẳng svc-workflow: đi giữa hai hàng
     edge([(420, R[1] - 15), (740, R[1] - 15), (740, M[1]), (x3, M[1])], "/bang-tin/ …", 475, R[1] - 21, mono=True)
     edge([(420, R[4] - 15), (800, R[4] - 15), (800, R[4])], "/api/workflow/", 475, R[4] - 21, mono=True)
+    # Node-RED, DokuWiki (profile riêng, mạng apps như Tầng 2): chung một lối giữa hàng 1 và hàng 2, rẽ xuống từng hộp
+    edge([(420, R[2] - 15), (760, R[2] - 15), (760, M[2]), (x3, M[2])], "/tu-dong/, /wiki/", 477, R[2] - 21,
+         mono=True)
+    edge([(760, R[2] - 15), (1010, R[2] - 15), (1010, M[2]), (x4, M[2])])
     edge([(900, R[4]), (900, M[3]), (x4, M[3])], tx["l_ngsi"], 965, M[3] - 6)
     edge([(700, M[5]), (780, M[5])], tx["l_sql"], 740, M[5] - 6)
     edge([(700, M[5] - 16), (740, M[5] - 16), (740, R[4] + 44), (780, R[4] + 44)], tx["l_actions"], 746, R[5] - 12,
@@ -322,7 +328,8 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     for i, (k, kind, team) in enumerate(col2):
         box(x2, R[i], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
     box(x3, R[1], x4 + bw - x3, bh, "app", *tx["plug"], team=True)
-    for x, r, k, kind, team in ((x3, 4, "wf", "proc", True), (x3, 5, "pg", "data", False),
+    for x, r, k, kind, team in ((x3, 2, "tudong", "app", False), (x4, 2, "wiki", "app", False),
+                                (x3, 4, "wf", "proc", True), (x3, 5, "pg", "data", False),
                                 (x3, 6, "clam", "trust", False), (x3, 7, "sw", "data", False),
                                 (x3, 8, "logs", "ops", False), (x4, 3, "scorpio", "data", False),
                                 (x4, 4, "flow", "proc", False), (x4, 5, "bao", "trust", False),

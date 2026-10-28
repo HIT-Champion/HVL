@@ -128,6 +128,8 @@ flowchart LR
     CN["app-ca-nhan<br/>Không gian cá nhân P.A.R.A"]
     TL["app-tai-lieu-api<br/>Tài liệu API · Swagger UI"]
     APP["ứng dụng cắm bằng manifest<br/>Bảng tin, Nghỉ phép (moc app install)"]
+    NR["Node-RED · profile tu-dong<br/>flow tự động, chỉ người vận hành soạn"]
+    WK["DokuWiki · profile wiki<br/>wiki nội bộ từng đơn vị"]
   end
   subgraph TANG1["Tầng 1 — lõi không giao diện (profile core)"]
     subgraph KGH["[H] Nhân sự"]
@@ -172,6 +174,10 @@ flowchart LR
   GW -->|"/tai-lieu-api, /tai-lieu-api/*"| TL
   GW -->|"/bang-tin/*, /nghi-phep/* — route thêm lúc cài"| APP
   APP -->|"token, GraphQL: chỉ qua cổng"| GW
+  GW -.->|"/tu-dong, /tu-dong/* · WebSocket"| NR
+  NR -.->|"OIDC, token robot, GraphQL<br/>(Action notifyFromFlow): chỉ qua cổng"| GW
+  GW -.->|"/wiki, /wiki/*"| WK
+  WK -.->|"OIDC: chỉ qua cổng"| GW
   GW -->|"/realms/moc, /realms/moc/*, /resources/*"| KC
   GW -->|"/v1/graphql"| HA
   GW -->|"/api/files, /api/files/*, /api/search,<br/>/api/documents/*, /api/registers/*"| SF
