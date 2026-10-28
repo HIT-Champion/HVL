@@ -1,9 +1,9 @@
 # Vận hành Signet
 
 Các việc của người quản trị trên một bản cài đang chạy: thêm đơn vị, sao lưu và khôi phục, két bí mật, GitOps và tự phục
-hồi, giám sát, trang trạng thái hệ thống, hội tụ IT/OT. Cài lần đầu: [README](../README.md), mục "Cài đặt từ mã nguồn";
-lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md). Lệnh vận hành là `python3 scripts/moc.py …` (tên mã
-kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
+hồi, giám sát, trang trạng thái hệ thống, wiki nội bộ, hội tụ IT/OT. Cài lần đầu: [README](../README.md), mục "Cài đặt
+từ mã nguồn"; lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md). Lệnh vận hành là
+`python3 scripts/moc.py …` (tên mã kỹ thuật `moc` giữ từ tên cũ của sản phẩm).
 
 ## Thêm đơn vị (thuê ước)
 
@@ -33,6 +33,8 @@ python3 scripts/moc.py tenant check KTCK     # Organization, thành viên, danh 
   hóa gắn với đơn vị — lý do ở [`docs/mo-hinh-du-lieu.md`](mo-hinh-du-lieu.md) §1. Riêng khóa ký số văn bản đi
   (F4.5, minh họa) là của từng đơn vị, để chứng thư nói được đơn vị nào phát hành; `svc-files` tự tạo nó trong két ở
   lần phát hành đầu của đơn vị.
+- Đã bật wiki nội bộ thì chạy thêm `python3 scripts/moc.py wiki sync` để đơn vị mới có không gian riêng (mục Wiki
+  nội bộ); chưa chạy thì người của đơn vị mới chỉ đọc được trang đầu của wiki.
 
 ## Sao lưu và khôi phục
 
@@ -61,6 +63,9 @@ python3 scripts/moc.py backup restore 20261020-020000   # khôi phục một lư
   root trong container (để đọc tệp của SeaweedFS): ổ NFS phải cho root ghi (`no_root_squash`).
 - Chỉ mục tìm kiếm và chữ ký ClamAV không sao lưu: `svc-files` dựng lại chỉ mục từ CSDL khi khởi động, ClamAV tự
   tải chữ ký.
+- Wiki nội bộ (profile `wiki`): volume `wiki_data` vào cùng lượt, wiki tạm dừng trong lúc chép volume của nó (CSDL,
+  tệp không chờ). Khôi phục thay cả volume đó; wiki đang chạy thì dừng trước, chạy lại sau. Lượt sao lưu có từ trước
+  khi có wiki thì giữ nguyên wiki đang có.
 - Lượt sao lưu xong ghi dòng `system.backed_up` vào sổ kiểm toán; trang trạng thái hệ thống hiện giờ của lượt gần
   nhất từ dòng đó. Ghi không được thì lệnh chỉ cảnh báo, bản sao lưu vẫn dùng được.
 
@@ -698,6 +703,50 @@ ssh -L 16686:127.0.0.1:16686 <máy chủ>   # xem từ xa: http://127.0.0.1:1668
 - **RAM** (máy dev, 28/10/2026): Jaeger nghỉ 11 MiB, đỉnh 123 MiB khi đầy 10 000 trace 6 span (bộ nhớ cgroup của
   container; trần compose 256m). Mỗi tiến trình `svc-files`, `svc-workflow` thêm khoảng 15 MiB khi bật (RSS, đo
   trước và sau khi nạp OpenTelemetry); tắt thì không thêm gì.
+
+## Wiki nội bộ
+
+Profile `wiki` (tắt mặc định, #367) thêm **DokuWiki** ở `/wiki/`: sổ tay, quy trình, hướng dẫn nội bộ viết dạng trang
+wiki, không phải văn bản có số. Mỗi đơn vị một không gian `don-vi:<mã>` chỉ người của đơn vị đó đọc, sửa, tải tệp
+lên; trang đầu liệt kê không gian của các đơn vị. Đăng nhập chỉ qua Keycloak (cùng tài khoản, cùng bước đăng nhập như
+Văn phòng điện tử); chưa đăng nhập thì vào `/wiki/` chuyển sang trang đăng nhập. Trang Ứng dụng của Văn phòng điện tử
+có thẻ "Wiki nội bộ" khi wiki đang trả lời.
+
+```bash
+# bật lâu dài: .env thêm wiki vào MOC_EXTRA_PROFILES (vd MOC_EXTRA_PROFILES=tunnel,wiki), rồi
+make up                                 # dựng image, chạy wiki, chạy moc wiki sync
+# hoặc bật một lần (make down tắt, make up sau đó không bật lại)
+make wiki-up
+make demo-wiki                          # kiểm: hai đơn vị không đọc, không sửa được trang của nhau
+python3 scripts/moc.py wiki sync        # sau mỗi lần thêm đơn vị (moc tenant create)
+make wiki-down                          # tắt: bỏ wiki khỏi MOC_EXTRA_PROFILES trước; giữ trang, tệp đã lưu
+```
+
+- **`moc wiki sync`** thêm client Keycloak `wiki` (confidential, bí mật `MOC_WIKI_CLIENT_SECRET` — `make up`, `make
+  wiki-up` thêm vào `.env` cũ nếu thiếu) hoặc đặt lại bí mật, đường chuyển hướng và mapper `groups` (= `tenant_id`)
+  của nó; rồi ghi danh sách quyền `conf/acl.auth.php` và trang đầu từ `core.tenants`. Chạy lại được; `--dry-run` chỉ
+  in việc sẽ làm. Mã đơn vị thành tên không gian như alias của Organization (`KTCK` → `ktck`, `ĐT` → `dt`).
+- **Quyền:** DokuWiki xét từ không gian sâu nhất lên. Mỗi đơn vị có đúng một dòng cho không gian của mình; không gian
+  cha `don-vi` không cấp cho ai, nên không gian không còn dòng (đơn vị đổi mã, đơn vị mới chưa chạy `wiki sync`) rơi
+  về dòng `* @ALL 0`: không ai đọc, không ai tạo trang. Người đăng nhập đọc được trang đầu và các trang hướng dẫn cú
+  pháp đi kèm DokuWiki (`wiki:*`), không sửa được. Nhóm của một người lấy lại từ Keycloak mỗi lần đăng nhập: chuyển
+  sang đơn vị khác thì lần đăng nhập sau mất quyền ở đơn vị cũ.
+- **Không có tài khoản quản trị DokuWiki** (quản trị đọc được mọi không gian): trang quản trị, cài plugin, sửa cấu
+  hình trên giao diện đều tắt. Cấu hình nằm ở
+  [`platform/wiki/signet.protected.php`](../platform/wiki/signet.protected.php) (gắn chỉ đọc), plugin đi theo image;
+  trình cài đặt `install.php` đã bỏ. Tài khoản trong wiki do plugin oauth tạo ở
+  lần đăng nhập đầu, không đăng ký, không đặt lại mật khẩu trong wiki.
+- **Sơ đồ trang** (`?do=index`) hiện tên không gian của mọi đơn vị (trang đầu vốn liệt kê chúng), không hiện trang
+  của đơn vị khác. Tìm kiếm chỉ trả trang người tìm đọc được.
+- **Mạng, tài nguyên:** container ở mạng `apps` như ứng dụng cắm thêm, chạy uid 33, bỏ mọi capability, trần 256 MiB
+  (issue #367 đo container trống 37–70 MiB; chưa đo dưới tải); tệp tải lên tới 64 MB như mọi đường qua APISIX. Wiki
+  gọi Keycloak qua `http://apisix:9080`, không tới thẳng dịch vụ lõi nào. WAF bỏ một số luật trên ô nội dung trang
+  và tham số đăng nhập (loại trừ 10070, [`platform/apisix/README.md`](../platform/apisix/README.md)): chọn theo các
+  loại trừ đã đo ở Văn phòng điện tử, chưa đo chặn nhầm trên chính wiki.
+- **Sao lưu:** volume `wiki_data` (trang, bản cũ của trang, tệp tải lên, tài khoản, danh sách quyền) vào `moc backup`
+  (mục Sao lưu và khôi phục).
+- **Giới hạn:** chưa có không gian chung cả trường cùng sửa; đơn vị đổi mã thì trang cũ còn trong volume nhưng không
+  ai đọc được tới khi chuyển tay sang không gian mới; trang wiki không vào ô tìm kiếm của Văn phòng điện tử.
 
 ## Hội tụ IT/OT
 

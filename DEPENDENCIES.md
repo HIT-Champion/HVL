@@ -36,7 +36,10 @@ dưới đây bằng `make copyright`; `scripts/tests/test_copyright_txt.py` bá
   GHSA-jr96-gvgh-j3r4, HIGH: PDF dị dạng làm chạy rất lâu); serialize-javascript 7.1.3 (22/10, GHSA-m5mm-p8h7-m29v)
   và fast-uri 3.1.9 (19/10, bốn GHSA mức LOW/MODERATE) — gói kéo theo khi dựng `apps/office`, chọn đúng bản vá chứ
   không lấy bản mới hơn (serialize-javascript 7.1.4 ra 23/10). 27/10/2026: cùng serialize-javascript 7.1.3 cho trang
-  tài liệu (`website/`, #349).
+  tài liệu (`website/`, #349). 28/10/2026: plugin oauth của DokuWiki, commit b709c33 (21/10) cho wiki nội bộ (#367):
+  bản trước commit 3a1666c (18/10, "fix(security): sign the login cookie") không ký cookie đăng nhập, ai biết email
+  của một người làm được cookie đăng nhập thay người đó; b709c33 thêm bản sửa kèm theo (bỏ cookie bị từ chối trước khi
+  DokuWiki đọc). Tác giả không công bố mã GHSA, OSV-Scanner không đọc plugin tải trong Dockerfile.
 - **Digest**: image bên thứ ba trong `docker-compose.yml`, các `Dockerfile` và image Playwright của `make e2e`
   ghi dạng `thẻ@sha256:…`. Docker kéo theo digest (bản đã chạy CI), thẻ chỉ để người đọc: thẻ bị đẩy lại
   (`postgres:16-alpine`, `python:3.13.16-slim`, `clamav/clamav:1.5.4` đã bị đẩy lại sau khi đội kéo) thì
@@ -276,6 +279,9 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
 | [Vector](https://vector.dev) | 0.59.0 | MPL-2.0 | Thu log của 8 dịch vụ qua driver fluentd của Docker, che lần hai, gửi Parseable (F3.14, profile `logs`, tắt mặc định): chạy uid 65534, không gắn `docker.sock`, cổng nhận chỉ nghe 127.0.0.1; mật khẩu Parseable qua compose secret | `timberio/vector:0.59.0-distroless-static`, ghim digest (image 06/10/2026) | 3 |
 | [Parseable](https://github.com/parseablehq/parseable) | 3.2.4 | AGPL-3.0 | Lưu và tra log tập trung (F3.14, profile `logs`): dịch vụ độc lập, chỉ nghe 127.0.0.1, chạy root nhưng bỏ mọi capability, basic auth (mật khẩu rỗng thì không mở cổng), giữ `MOC_LOGS_RETENTION_DAYS` ngày, tắt kiểm bản mới và gửi số liệu sử dụng | `quay.io/parseablehq/parseable:v3.2.4`, ghim digest (image 02/10/2026) | 3 |
 | [Jaeger](https://www.jaegertracing.io) | 2.22.0 | Apache-2.0 | Nhận và hiện trace (#364, profile `trace`, tắt mặc định): span OTLP/HTTP của APISIX (plugin `opentelemetry`), `svc-files`, `svc-workflow`; giữ 10 000 trace trong RAM, giao diện chỉ nghe 127.0.0.1, không tài khoản; bỏ chuỗi truy vấn trước khi lưu (`platform/trace/jaeger.yaml`) | `jaegertracing/jaeger:2.22.0`, ghim digest (image 06/10/2026) | 4 |
+| [DokuWiki](https://www.dokuwiki.org) | 2026-07-14c | GPL-2.0 | Wiki nội bộ ([H] Quản trị tri thức, #367, profile `wiki`, tắt mặc định): mỗi đơn vị một không gian `don-vi:<mã>` chỉ người của đơn vị đọc và sửa (`scripts/wiki.py` ghi danh sách quyền), đăng nhập chỉ qua Keycloak, không tài khoản quản trị; dịch vụ độc lập trong mạng `apps`, chạy uid 33, bỏ mọi capability, 256 MiB | `dokuwiki/dokuwiki:2026-07-14c`, ghim digest (DokuWiki phát hành 02/09/2026), bỏ `install.php`; volume `wiki_data` nằm trong `moc backup` | 4 |
+| [Plugin oauth](https://github.com/cosmocode/dokuwiki-plugin-oauth) của DokuWiki | 2026-10-20 (commit b709c33) | GPL-2.0 (kèm lusitanian/oauth 0.8.11, MIT) | Đăng nhập DokuWiki bằng OAuth: tạo tài khoản ở lần đăng nhập đầu, lấy lại nhóm (đơn vị) mỗi lần đăng nhập. Ngoại lệ vá bảo mật, xem mục Cách đọc | Tải trong `platform/wiki/Dockerfile` theo commit, kiểm sha256, nguyên bản | 4 |
+| [Plugin oauthgeneric](https://github.com/cosmocode/dokuwiki-plugin-oauthgeneric) của DokuWiki | 2025-10-02 (commit b5a5653) | GPL-2.0 | Dịch vụ OAuth chung cho plugin oauth: nối client `wiki` của Keycloak, đọc tên, email, nhóm từ userinfo | Như plugin oauth | 4 |
 | [Coraza](https://coraza.io) + [OWASP CRS](https://coreruleset.org) | Coraza v3.3.3, CRS v4.14.0 (trong coraza-proxy-wasm 0.6.0) | Apache-2.0 | Tường lửa ứng dụng web ở cổng API (F3.15): mọi yêu cầu qua CRS paranoia 1 trước khi kiểm token, tải tấn công → 403; nội dung tệp vẫn do ClamAV soi | `ghcr.io/corazawaf/coraza-proxy-wasm:0.6.0` (phát hành 06/07/2025), ghim digest, kiểm sha256 tệp `.wasm`; APISIX nạp bằng `wasm.plugins` | 3 |
 
 **Ghi chú:**
@@ -294,6 +300,12 @@ thư viện chuẩn (`scripts/yaml_nho.py`): không thêm PyYAML vào thư mục
   OSV-Scanner không đọc tệp `.wasm`: lỗ hổng mới của Coraza phải theo dõi tay (GitHub Security Advisories của
   `corazawaf/coraza`). Khi có bản phát hành mang Coraza ≥ 3.8.1 thì đổi digest và băm trong Dockerfile; hướng thay
   nếu cần bản vá sớm hơn: coraza-caddy (Coraza 3.8.1) thành một container đứng trước APISIX — so sánh ở README đó.
+- DokuWiki: thẻ `2026-07-14c` của image được đẩy lại khi dựng lại; digest đang ghim là bản đẩy 24/10/2026, mã DokuWiki
+  vẫn của bản phát hành 02/09/2026. Hai plugin của CosmoCode (nhóm làm DokuWiki) không có bản phát hành, chỉ có commit
+  và ngày trong `plugin.info.txt`: ghim commit và sha256 của tệp nén. Plugin oauth mang sẵn thư viện lusitanian/oauth
+  0.8.11 (MIT, 14/02/2018, không còn bản mới) trong `vendor/`. Tệp duy nhất của Signet mà DokuWiki đọc là
+  `platform/wiki/signet.protected.php` (chỉ gán cấu hình); wiki nói chuyện với Signet qua HTTP (OpenID Connect
+  qua APISIX), không liên kết mã.
 
 ## Trí tuệ nhân tạo
 
@@ -378,7 +390,8 @@ Giấy phép được chấp nhận trong Signet (tương thích với Apache-2.
   `mdn-data`, `@speed-highlight/core` (mục Tầng 2). Gói cho chọn giấy phép thì chọn giấy phép OSI: `node-forge`
   theo BSD-3-Clause, `type-fest` theo MIT.
 - ⚠️ GPL-2.0/3.0, AGPL-3.0 — chấp nhận được khi chạy như **dịch vụ độc lập** giao tiếp qua mạng,
-  không liên kết mã. Hiện gồm: ClamAV và PostGIS (GPL-2.0), Grafana và Parseable (AGPL-3.0).
+  không liên kết mã. Hiện gồm: ClamAV, PostGIS, DokuWiki cùng hai plugin oauth, oauthgeneric (GPL-2.0), Grafana và
+  Parseable (AGPL-3.0).
 - ❌ Mọi giấy phép không được OSI phê duyệt, giấy phép "source-available" (BUSL, SSPL, Elastic
   License, Sustainable Use License), hoặc bất kỳ thành phần nguồn đóng nào.
 - Logo các dự án trong sơ đồ kiến trúc (`docs/anh/logo/`, ảnh `docs/anh/kien-truc-tong-the*.gif`) không phải thành phần

@@ -11,6 +11,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ### Đã thêm
 - Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
 - Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
+- Wiki nội bộ DokuWiki ở `/wiki/` (profile `wiki`, tắt mặc định): đăng nhập Keycloak, mỗi đơn vị một không gian (#367).
 
 ### Đã sửa đổi
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại, thêm kênh thông báo bên ngoài (#374).
