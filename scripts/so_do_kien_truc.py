@@ -131,11 +131,13 @@ C = {  # màu nền, màu viền theo vai trò (bảng màu của draw.io)
     "ai": ("#d5e8d4", "#82b366"), "trust": ("#f8cecc", "#b85450"), "ops": ("#f5f5f5", "#8c959f"),
 }
 
-# logo trên từng hộp phần mềm nguồn mở; hộp mã của đội không có logo
+# logo trên từng hộp phần mềm nguồn mở; hộp mã của đội không có logo. Kênh ngoài chỉ gắn logo dự án nguồn mở (ntfy,
+# SMS Gateway for Android); Slack, Zalo là dịch vụ đóng, nhãn hiệu Mattermost phải xin phép trước nên chỉ ghi tên
 LOGO = dict(gw=["apisix", "coraza"], kc=["keycloak"], cf=["centrifugo"], hasura=["hasura"],
             mon=["prometheus", "grafana"], jaeger=["jaeger"], pg=["postgresql"], clam=["clamav"], sw=["seaweedfs"],
             logs=["vector", "parseable"], scorpio=["scorpio"], flow=["flowable"], bao=["openbao"],
-            meili=["meilisearch"], ollama=["ollama"], restic=["restic"])
+            meili=["meilisearch"], ollama=["ollama"], restic=["restic"], mail=["ntfy"],
+            sms=["sms-gateway"])
 
 # hai yêu cầu có chấm sáng: (màu, đường đi chỉ gồm M/H/V, lệch pha so với chấm đầu)
 XUNG_SANG = [
@@ -246,8 +248,9 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
     for i, s in enumerate(tx["note"]):
         text(1236, 100 + i * 16, s, 11, 400, "#57606a", "end", ' font-style="italic"')
     # kênh bên ngoài, ngang hàng Scorpio, Flowable, OpenBao: svc-workflow gọi ra, không có gì gọi vào
-    a('<rect x="1280" y="316" width="200" height="316" rx="24" fill="none" stroke="#8c959f" stroke-dasharray="4 4"/>')
-    text(1296, 338, tx["ext"], 11.5, 400, "#57606a", "start")
+    # nhãn khung nằm trên huy hiệu logo của hộp đầu (huy hiệu nhô 12 lên trên mép hộp)
+    a('<rect x="1280" y="304" width="200" height="328" rx="24" fill="none" stroke="#8c959f" stroke-dasharray="4 4"/>')
+    text(1296, 326, tx["ext"], 11.5, 400, "#57606a", "start")
     for i, s in enumerate(tx["ext_note"]):
         text(1380, 604 + i * 15, s, 10.5, 400, "#57606a", extra=' font-style="italic"')
 
@@ -327,7 +330,7 @@ def ve(lang: str = "vi", khung: float | None = None) -> str:
                                 (x4, 8, "restic", "ops", False)):
         box(x, R[r], bw, bh, kind, *tx[k], team=team, logo=LOGO.get(k, ()))
     for r, k in ((3, "mail"), (4, "sms"), (5, "zalo")):
-        box(1295, R[r], bw, bh, "user", *tx[k])
+        box(1295, R[r], bw, bh, "user", *tx[k], logo=LOGO.get(k, ()))
 
     # chú giải
     ly = R[8] + 95
