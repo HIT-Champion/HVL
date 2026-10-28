@@ -110,11 +110,6 @@ export const BUILDER_PROBLEMS: BuilderProblemCode[] = ['app', 'key', 'title', 'f
   'name-reserved', 'name-taken', 'length', 'rows', 'bounds', 'options', 'option-label', 'option-value', 'option-taken',
   'after', 'after-loop', 'rule']
 
-// Từ khóa của biểu thức EL (JUEL) trong BPMN: biến trùng tên thì `${le == 'x'}` không dịch được. Luật lúc cài của máy
-// chủ chưa chặn; trình dựng không suy ra và báo lỗi khi người dùng tự đặt
-export const EL_KEYWORDS = ['and', 'div', 'empty', 'eq', 'false', 'ge', 'gt', 'instanceof', 'le', 'lt', 'mod', 'ne',
-  'not', 'null', 'or', 'true']
-
 export interface BuilderProblem {
   code: BuilderProblemCode
   field?: number         // id trường
@@ -125,7 +120,8 @@ export interface BuilderProblem {
 const VARIABLE = new RegExp(`^(?:${FORM_LIMITS.VARIABLE})$`)
 const APP = new RegExp(`^(?:${BUILDER_LIMITS.APP})$`)
 const FORM_KEY = new RegExp(`^(?:${BUILDER_LIMITS.FORM_KEY})$`)
-const TAKEN = new Set([...FORM_LIMITS.RESERVED, ...FORM_LIMITS.ENGINE_NAMES, ...EL_KEYWORDS])
+// tên luật lúc cài không cho: tên suy ra tránh, tên người dùng tự đặt thì báo name-reserved
+const TAKEN = new Set([...FORM_LIMITS.RESERVED, ...FORM_LIMITS.ENGINE_NAMES, ...FORM_LIMITS.EL_KEYWORDS])
 const empty = (): Bilingual => ({ vi: '', en: '' })
 
 // Ô chữ: không ký tự điều khiển, ký tự vô hình; không khoảng trắng ở đầu hoặc cuối; ô một dòng không xuống dòng. Viết
