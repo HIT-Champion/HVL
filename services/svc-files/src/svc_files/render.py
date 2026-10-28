@@ -33,6 +33,22 @@ import segno
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
+# Tên tiếng Anh của loại văn bản NĐ 30 (migration 1792281600300_document_types), theo mã; bản tiếng Anh của sổ đăng ký
+# và của văn bản đi dùng chung (F2.9, #398). Loại đơn vị tự thêm không có ở đây thì giữ tên đã khai
+TYPE_NAMES_EN = {
+    "CV": "Official letter", "NQ": "Resolution", "QĐ": "Decision", "CT": "Directive", "QC": "Regulations",
+    "QYĐ": "Rules", "TC": "Communiqué", "TB": "Notice", "HD": "Guidance", "CTr": "Programme", "KH": "Plan",
+    "PA": "Option plan", "ĐA": "Scheme", "DA": "Project", "BC": "Report", "BB": "Minutes", "TTr": "Submission",
+    "HĐ": "Contract", "CĐ": "Official telegram", "BGN": "Memorandum of understanding", "BTT": "Agreement",
+    "GUQ": "Power of attorney", "GM": "Invitation", "GGT": "Letter of introduction", "GNP": "Leave permit",
+    "PG": "Dispatch slip", "PC": "Transfer slip", "PB": "Notification slip",
+}
+
+
+def type_name(document_type: dict, lang: str = "vi") -> str:
+    """Tên loại văn bản theo ngôn ngữ: tiếng Anh theo mã nếu biết, không thì tên trong CSDL."""
+    return (lang == "en" and TYPE_NAMES_EN.get(document_type.get("code") or "")) or document_type["name"]
+
 
 @dataclass(frozen=True)
 class Letter:

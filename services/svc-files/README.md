@@ -68,8 +68,8 @@ xuất nằm ở [`docs/api/openapi/svc-files.json`](../../docs/api/openapi/svc-
 | `GET /api/files/{id}` | `200` nội dung tệp · `404` không có tệp **hoặc** không được xem (trả như nhau) · `401` · `503` · tệp mã hóa: `200` bản giải mã có dấu người xem, `422` `unstampable` + `reason` không đóng dấu được (quá `MOC_RESTRICTED_MAX_PAGES` trang, quá nặng, hỏng), `500` `sealed_corrupt` bản mã hỏng hoặc không khớp tệp, `503` két hoặc sổ kiểm toán chưa sẵn sàng, `busy` (+ `Retry-After: 10`) |
 | `GET /api/search?q=` | `200` `{hits: [...], next_cursor}` · `400` câu tìm trống, `cursor` sai · `422` tham số sai · `401` · `503` |
 | `GET /api/documents/{id}/preview` | `200` PDF dự thảo (chữ "DỰ THẢO", chưa số) · `404` không có hoặc không được đọc · `409` đã phát hành |
-| `GET /api/registers/{in\|out}/{năm}` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ hay năm (2000–2100) sai · `401` · `503` |
-| `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf`; ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
+| `GET /api/registers/{in\|out}/{năm}[?lang=vi\|en]` | Chỉ `clerk`, `director`. `200` `{direction, year, title, org_name, columns, entries: [{number, document_id, hidden, cells}], last_number, missing}` · `403` vai trò khác · `422` chiều sổ, năm (2000–2100) hay `lang` sai · `401` · `503` |
+| `GET /api/registers/{in\|out}/{năm}/pdf` | Như trên, trả PDF `so-dang-ky-van-ban-{den\|di}-<năm>.pdf` (`lang=en`: `register-{incoming\|outgoing}-<năm>.pdf`); ghi `register.printed` vào sổ kiểm toán trước khi trả, ghi không được thì `503`, không có PDF |
 | `GET /api/verify/{mã}` | **Không cần token.** `200` `{result: "valid" \| "not_found", document}`; nhận cả `abcde-23456`, `ABCDE 23456`. `document.signature`: chữ ký số của bản phát hành `{level, signer, ca, serial, signed_at, illustrative: true}`, `null` với văn bản cũ, văn bản hạn chế (F4.5) |
 | `GET /api/verify?sha256=` | **Không cần token.** Như trên, tra theo băm; `422` khi không phải 64 ký tự hex |
 | `GET /api/status` | **Không cần token.** `200` `{status, checked_at, version, uptime_s, last_backup_at, ai: {enabled, model, semantic}, layers, components: [{id, layer, label, software, status}]}`, `Cache-Control: no-store`; trạng thái `ok` · `degraded` · `down` (thành phần) và `off` (tắt theo cấu hình). Mọi người gọi trong 10 giây nhận cùng một kết quả · `429` quá `MOC_RATE_STATUS_PER_MIN` lần một phút mỗi IP (APISIX) — mục Trạng thái hệ thống |
@@ -813,7 +813,11 @@ các trường theo mẫu sổ ở Phụ lục IV, ký nhận và đóng sổ.
 - **Một chỗ dựng ô.** Bản JSON cho giao diện và bản PDF cùng các ô đã định dạng (ngày `dd/mm/yyyy` theo giờ Việt
   Nam), nên màn hình và giấy không lệch nhau. PDF A4 ngang: bìa (cơ quan chủ quản, đơn vị, năm, từ ngày đến ngày,
   từ số đến số), bảng có hàng đánh số cột lặp lại ở mỗi trang, chỗ văn thư ký cuối sổ.
-- **Mỗi lần in** ghi `register.printed` (`entity_id` `in/2026`, kèm số dòng và số dòng bị che) vào sổ kiểm toán.
+- **Tiếng Anh** (F2.9, `?lang=en`; mặc định `vi`). Giao diện gửi ngôn ngữ đang chọn. Chữ cố định đổi theo ngôn ngữ:
+  tên sổ, tên cột, bìa, chân trang, chỗ ký, ghi chú (độ khẩn, "Restricted", hạn giải quyết), tên loại văn bản theo
+  mã (`TYPE_NAMES_EN` trong `render.py`; mã không có trong bảng thì giữ tên đã khai). Chữ người dùng nhập (trích
+  yếu, tác giả, nơi nhận, tên đơn vị) giữ nguyên. Ngày vẫn `dd/mm/yyyy`.
+- **Mỗi lần in** ghi `register.printed` (`entity_id` `in/2026`, kèm số dòng, số dòng bị che, `lang`) vào sổ kiểm toán.
   Mỗi lúc dựng tối đa hai bản in, để in sổ dài không chiếm hết luồng của tải tệp lên, xuống.
 
 ### Neo sổ kiểm toán (F2.12)

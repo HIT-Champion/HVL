@@ -77,7 +77,7 @@ query Register($tenant: uuid!, $direction: String!, $year: Int!) {
                    order_by: {register_number: asc}) {
     id status symbol issuer_name issued_on summary urgency restricted register_number registered_at due_on
     recipients verify_code
-    document_type { name }
+    document_type { code name }
     department { name }
     signer { full_name }
     assignments(where: {role: {_eq: "lead"}, parent_id: {_is_null: true}, status: {_neq: "cancelled"}},
