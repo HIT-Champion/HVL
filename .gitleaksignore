@@ -10,3 +10,8 @@
 d74d742381c28a6104ae5111a657f89a4c198ca6:services/svc-files/tests/conftest.py:generic-api-key:1005
 # #159: bản đầu của chính tệp này (nhánh #161) có chú thích trích nguyên dòng ở trên.
 26ad4fb277a0790982efb6936e2a20c13f7db655:.gitleaksignore:generic-api-key:7
+# #367: ba dòng ARG ghim commit và sha256 của hai plugin DokuWiki trong platform/wiki/Dockerfile (nhánh của PR #397):
+# băm công khai của mã nguồn thượng nguồn, không phải bí mật. CI quét mọi ref nên commit này làm đỏ cả PR khác.
+b9a77130711e2cb7faae119bcb9b78a965181e80:platform/wiki/Dockerfile:generic-api-key:25
+b9a77130711e2cb7faae119bcb9b78a965181e80:platform/wiki/Dockerfile:generic-api-key:26
+b9a77130711e2cb7faae119bcb9b78a965181e80:platform/wiki/Dockerfile:generic-api-key:27

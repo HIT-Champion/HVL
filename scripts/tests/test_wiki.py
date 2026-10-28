@@ -304,10 +304,12 @@ class ConfigTest(unittest.TestCase):
     def test_image_pinned_and_plugins_checked(self) -> None:
         text = read(WIKI_DIR / "Dockerfile")
         self.assertRegex(text, r"\nFROM dokuwiki/dokuwiki:[0-9-]+[a-z]?@sha256:[0-9a-f]{64}\n")
-        for arg in ("OAUTH", "OAUTHGENERIC"):
+        for arg in ("LOGIN_PLUGIN", "GENERIC_PLUGIN"):
             self.assertRegex(text, rf"\nARG {arg}=[0-9a-f]{{40}}\n")
             self.assertRegex(text, rf"\nARG {arg}_SHA256=[0-9a-f]{{64}}\n")
         self.assertIn('sha256sum -c -', text)
+        # gitleaks (generic-api-key) bắt chuỗi hex sau tên có chữ auth: commit gộp vào develop sẽ đỏ
+        self.assertNotRegex(text, r"(?i)ARG \w*auth\w*=")
         self.assertIn("lib/plugins.core/$1", text)
         self.assertIn("rm /var/www/html/install.php", text)
         self.assertIn("\nUSER 33:33\n", text)

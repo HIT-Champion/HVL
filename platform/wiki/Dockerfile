@@ -21,16 +21,17 @@
 # người làm được cookie đăng nhập thay người đó.
 FROM dokuwiki/dokuwiki:2026-07-14c@sha256:8f77037a8a643ee0bf5545d3127d49e5e5ff7ea6d942b864d8fa0d15ea4c8cdd
 
-ARG OAUTH=b709c33bbca80ca4eccb1c761c53386bcaa80c14
-ARG OAUTH_SHA256=063e57c2fb3f8b1821309babdcc9c350e8b12c1bd1d6a3fc68c60008a8098856
-ARG OAUTHGENERIC=b5a56539fa613753e7163ae291ba7b759033040f
-ARG OAUTHGENERIC_SHA256=a52e7f5ac0ac92ee9fc5ca76bd94f171e7e62658383b96d817f6f9966709acec
+# Tên ARG không có chữ "auth": luật generic-api-key của gitleaks coi chuỗi hex đứng sau tên như thế là khóa bí mật
+ARG LOGIN_PLUGIN=b709c33bbca80ca4eccb1c761c53386bcaa80c14
+ARG LOGIN_PLUGIN_SHA256=063e57c2fb3f8b1821309babdcc9c350e8b12c1bd1d6a3fc68c60008a8098856
+ARG GENERIC_PLUGIN=b5a56539fa613753e7163ae291ba7b759033040f
+ARG GENERIC_PLUGIN_SHA256=a52e7f5ac0ac92ee9fc5ca76bd94f171e7e62658383b96d817f6f9966709acec
 
 # Sau hai plugin: bỏ install.php (trình cài đặt đặt được tài khoản quản trị; bản cài này cấu hình bằng tệp); đổi chủ
 # /storage sang user 33 (www-data) để container chạy hẳn bằng user đó, không qua root — volume mới lấy chủ của thư mục
 # trong image (BuildKit giữ thay đổi sau VOLUME của image gốc)
 RUN set -eu; cd /tmp; \
-    for p in "oauth $OAUTH $OAUTH_SHA256" "oauthgeneric $OAUTHGENERIC $OAUTHGENERIC_SHA256"; do \
+    for p in "oauth $LOGIN_PLUGIN $LOGIN_PLUGIN_SHA256" "oauthgeneric $GENERIC_PLUGIN $GENERIC_PLUGIN_SHA256"; do \
       set -- $p; \
       curl -fsSL --retry 5 -o "$1.tgz" "https://github.com/cosmocode/dokuwiki-plugin-$1/archive/$2.tar.gz"; \
       echo "$3  $1.tgz" | sha256sum -c -; \

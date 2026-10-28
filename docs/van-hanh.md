@@ -747,6 +747,12 @@ make wiki-down                          # tắt: bỏ wiki khỏi MOC_EXTRA_PROF
   (mục Sao lưu và khôi phục).
 - **Giới hạn:** chưa có không gian chung cả trường cùng sửa; đơn vị đổi mã thì trang cũ còn trong volume nhưng không
   ai đọc được tới khi chuyển tay sang không gian mới; trang wiki không vào ô tìm kiếm của Văn phòng điện tử.
+  - Plugin oauth nối tài khoản wiki với tài khoản Keycloak theo email: người không có email trong Keycloak không đăng
+    nhập được wiki; xóa một tài khoản Keycloak rồi tạo người khác cùng email thì người mới dùng lại tên wiki cũ (lịch
+    sử sửa trang ghi chung một tên), còn quyền vẫn theo đơn vị của người mới. Email, `tenant_id` chỉ quản trị sửa
+    được trong Keycloak, nên người dùng không tự nhận tài khoản wiki của người khác.
+  - Nội dung trang vẫn qua các luật SQLi, XSS của WAF như ô chữ tự do của Văn phòng điện tử: trang có ví dụ câu SQL,
+    mã HTML có thể bị chặn (403) khi lưu; gặp thì người quản trị thêm loại trừ trong `apisix.yaml`.
 
 ## Hội tụ IT/OT
 
