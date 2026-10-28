@@ -28,6 +28,8 @@
 #   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
 #   /tai-lieu-api, /tai-lieu-api/*   → app-tai-lieu-api (Swagger UI) — không cần token; gọi thử đi qua các route trên
 #   /wiki, /wiki/*                   → wiki (DokuWiki, profile wiki)  — wiki tự đăng nhập bằng Keycloak, tự kiểm quyền
+#   /tu-dong, /tu-dong/*             → tu-dong (Node-RED, profile tu-dong; có WebSocket) — Node-RED tự đăng nhập bằng
+#                                      Keycloak, chỉ vai trò operator, tự kiểm token trình soạn
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Container ứng dụng chỉ ở mạng `apps` cùng APISIX (docker-compose.yml): phần máy chủ của ứng dụng cũng gọi lõi qua
@@ -99,6 +101,11 @@ upstreams:
     type: roundrobin
     nodes:
       "wiki:8080": 1
+  # Tự động hóa Node-RED (#366, profile tu-dong — tắt mặc định): chưa bật thì không có container, route /tu-dong trả 503
+  - id: tu-dong
+    type: roundrobin
+    nodes:
+      "tu-dong:1880": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -429,6 +436,32 @@ global_rules:
                 ctl:ruleRemoveTargetById=931120;ARGS:prefix,
                 ctl:ruleRemoveTargetById=931120;ARGS:suffix,
                 ctl:ruleRemoveTargetById=931120;ARGS:summary"
+              # Loại trừ 11 — tự động hóa Node-RED (#366, mọi đường dưới /tu-dong). Keycloak trả về
+              # /tu-dong/auth/strategy/callback kèm iss, code, session_state như loại trừ 2; Node-RED trả mã đổi một lần
+              # (base64 ngẫu nhiên, có + / =) về trình soạn ở /tu-dong/?code=, trình soạn gửi lại mã đó ở POST
+              # /tu-dong/auth/token; cookie phiên connect.sid chỉ dùng trong lúc bắt tay với Keycloak. Gỡ đúng ba luật
+              # bắt nhầm token (#140) trên đúng các khóa đó
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/tu-dong(?:/|$)" "id:10080,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=931100;ARGS:iss,
+                ctl:ruleRemoveTargetById=934110;ARGS:iss,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_state,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_state,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_state,
+                ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:connect.sid,
+                ctl:ruleRemoveTargetById=933000-933999;REQUEST_COOKIES:connect.sid,
+                ctl:ruleRemoveTargetById=930120;REQUEST_COOKIES:connect.sid"
+              # Loại trừ 12 — thân của API lưu flow, thư viện của Node-RED (POST /tu-dong/flows, /tu-dong/flow[/<id>],
+              # POST /tu-dong/library/…): mã JavaScript của node Function, HTML của node Template, câu truy vấn — đúng
+              # thứ CRS chặn, mỗi loại node một tên trường nên không loại trừ theo khóa được; lại mang thông tin đăng
+              # nhập của node, không để WAF ghi ra log. Chỉ token trình soạn (vai trò operator) mới được Node-RED nhận
+              # flow. Không soi thân ở đúng các đường này; tham số truy vấn, header vẫn soi
+              - >-
+                SecRule REQUEST_FILENAME "@rx ^/tu-dong/(?:flows|flow(?:/[^/]+)?|library/.+)$"
+                "id:10081,phase:1,pass,nolog,ctl:requestBodyAccess=Off"
               - Include @owasp_crs/*.conf
               # Loại trừ 4 — Host là địa chỉ IP: Signet được mở bằng IP trong mạng nội bộ; dưới APISIX coraza-proxy-wasm
               # thêm Host lần nữa nên luật cộng điểm hai lần (6 ≥ 5) và chặn mọi yêu cầu vào bằng IP
@@ -598,6 +631,16 @@ routes:
     plugins:
       proxy-rewrite:
         regex_uri: ["^/wiki/?(.*)$", "/$1"]
+
+  # Tự động hóa bằng Node-RED (#366): Node-RED tự đăng nhập bằng Keycloak (client công khai `tu-dong`, chỉ vai trò
+  # operator) và tự kiểm token của trình soạn ở mỗi lời gọi nên không qua can-token. Trình soạn gọi API bằng GET, POST,
+  # PUT, DELETE và nhận sự kiện qua WebSocket /tu-dong/comms. httpAdminRoot của Node-RED là /tu-dong: không bỏ tiền tố.
+  # Không có endpoint HTTP của flow (httpNodeRoot tắt, platform/tu-dong/settings.js)
+  - id: tu-dong
+    uris: ["/tu-dong", "/tu-dong/*"]
+    methods: [GET, HEAD, POST, PUT, DELETE]
+    upstream_id: tu-dong
+    enable_websocket: true
 
   - id: app-office
     uri: /*

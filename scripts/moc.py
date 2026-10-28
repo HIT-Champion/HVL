@@ -79,6 +79,13 @@
         khi thêm đơn vị. Thoát 0: xong; 1: bị từ chối hoặc wiki không chạy; 2: không gọi được CSDL, Keycloak.
         (make wiki-up cũng gọi; chi tiết trong scripts/wiki.py)
 
+    python3 scripts/moc.py tu-dong sync [--dry-run] [--json]
+    python3 scripts/moc.py tu-dong operator add|remove TÊN | list [--json]
+        Tự động hóa bằng Node-RED (#366, profile tu-dong): thêm client Keycloak `tu-dong`, vai trò `operator` và mapper
+        đưa vai trò vào ID token, hoặc đặt lại đường chuyển hướng; cấp, gỡ, liệt kê người vào được trình soạn
+        /tu-dong/ (không ai có sẵn). Thoát 0: xong; 1: bị từ chối hoặc thiếu MOC_TU_DONG_SECRET; 2: không gọi được
+        Keycloak. (make tu-dong-up gọi sync; chi tiết trong scripts/tu_dong.py)
+
 Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`, gọi Keycloak qua cổng
 quản trị nội bộ (127.0.0.1): không mở thêm cổng nào, không cần mật khẩu ngoài .env.
 """
@@ -100,6 +107,7 @@ import anchor_sig
 import backup
 import realm_clients
 import tenants
+import tu_dong
 import ung_dung
 import wiki
 from audit_chain import (ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Problem, Report, check, local_time,
@@ -624,6 +632,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ung_dung.add_parser(groups)
     wiki.add_parser(groups)
+    tu_dong.add_parser(groups)
     args = parser.parse_args(argv)
     return args.run(args)
 

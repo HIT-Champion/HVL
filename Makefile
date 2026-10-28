@@ -46,6 +46,9 @@ endif
 # Wiki nội bộ (#367, profile wiki; docs/van-hanh.md mục Wiki nội bộ). Bật lâu dài (wiki trong MOC_EXTRA_PROFILES): make
 # up cũng thêm bí mật client vào .env cũ (wiki-env) và đồng bộ client Keycloak, quyền theo đơn vị (moc wiki sync)
 WIKI_ON := $(filter wiki,$(EXTRA_PROFILES))
+# Tự động hóa bằng Node-RED (#366, profile tu-dong; docs/van-hanh.md mục Tự động hóa bằng Node-RED). Bật lâu dài
+# (tu-dong trong MOC_EXTRA_PROFILES): make up cũng thêm khóa vào .env cũ (tu-dong-env) và đồng bộ client Keycloak
+TU_DONG_ON := $(filter tu-dong,$(EXTRA_PROFILES))
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
@@ -58,6 +61,7 @@ PREFIX ?= /opt/moc
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung alert-env demo-canh-bao \
         wiki-env wiki-up wiki-down demo-wiki \
+        tu-dong-env tu-dong-up tu-dong-down demo-tu-dong \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
@@ -103,11 +107,12 @@ check: ## Kiểm tra tiền điều kiện của môi trường
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: env-ready alert-env $(if $(LOGS_ON),logs-env) $(if $(WIKI_ON),wiki-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready alert-env $(if $(LOGS_ON),logs-env) $(if $(WIKI_ON),wiki-env) $(if $(TU_DONG_ON),tu-dong-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync --files)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
 	$(if $(WIKI_ON),@python3 scripts/moc.py wiki sync)
+	$(if $(TU_DONG_ON),@python3 scripts/moc.py tu-dong sync)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync)
 	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
@@ -118,11 +123,13 @@ ai-model: $(ENV_FILE) ## Tải mô hình sinh MOC_AI_MODEL (mặc định qwen3:
 	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs --profile wiki down
+	@$(COMPOSE) --profile iot --profile iot-sim --profile tu-dong \
+	  --profile ai --profile ai-pull --profile logs --profile wiki down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Signet trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs --profile wiki down -v
+	@$(COMPOSE) --profile iot --profile iot-sim --profile tu-dong \
+	  --profile ai --profile ai-pull --profile logs --profile wiki down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
@@ -179,6 +186,27 @@ wiki-down: env-ready ## Tắt wiki nội bộ: dừng, xóa container; giữ tra
 	@! echo " $(EXTRA_PROFILES) " | grep -q ' wiki ' || { echo "Bỏ wiki khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
 	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
 	@$(COMPOSE) --profile wiki rm -sf wiki
+
+tu-dong-env: $(ENV_FILE)
+	@# .env sinh trước #366 thiếu khóa mã hóa thông tin đăng nhập của flow: sinh như make env, không in giá trị
+	@grep -q '^MOC_TU_DONG_SECRET=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Tự động hóa Node-RED (#366), make up / make tu-dong-up thêm\nMOC_TU_DONG_SECRET=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) \
+	  && echo "Đã thêm MOC_TU_DONG_SECRET (ngẫu nhiên) vào $(ENV_FILE)."; }
+
+tu-dong-up: env-ready tu-dong-env ## Bật tự động hóa Node-RED (#366, trình soạn ở /tu-dong/): đăng nhập Keycloak, chỉ vai trò operator; tạo client Keycloak tu-dong. Cấp vai trò: python3 scripts/moc.py tu-dong operator add <tên>. Giữ qua make up: thêm tu-dong vào MOC_EXTRA_PROFILES
+	@$(COMPOSE) --profile tu-dong up -d --build --wait tu-dong
+	@python3 scripts/moc.py tu-dong sync
+	@echo " $(EXTRA_PROFILES) " | grep -q ' tu-dong ' || echo "Lưu ý: make down tắt Node-RED, make up sau đó không" \
+	  "bật lại — bật lâu dài thì thêm tu-dong vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
+
+tu-dong-down: env-ready ## Tắt tự động hóa Node-RED: dừng, xóa container; giữ flow đã lưu (volume tu_dong_data — make reset mới xóa)
+	@! echo " $(EXTRA_PROFILES) " | grep -q ' tu-dong ' || { echo "Bỏ tu-dong khỏi MOC_EXTRA_PROFILES trong" \
+	  "$(ENV_FILE) trước, không thì make up lần sau lại bật" >&2; exit 1; }
+	@$(COMPOSE) --profile tu-dong rm -sf tu-dong
+
+demo-tu-dong: $(ENV_FILE) ## Màn tự động hóa (#366, cần make tu-dong-up): chưa đăng nhập, không có vai trò operator thì không vào được trình soạn; người vận hành đăng nhập Keycloak, triển khai flow qua cổng (WAF bật); không node exec, không cài node từ npm
+	@python3 scripts/demo_tu_dong.py
 
 demo-wiki: $(ENV_FILE) ## Màn wiki nội bộ (#367, cần make wiki-up): người phòng CNTT viết trang trong không gian đơn vị mình; văn thư phòng KT và khách chưa đăng nhập không đọc được; tài khoản đến từ Keycloak, không mật khẩu riêng
 	@python3 scripts/demo_wiki.py

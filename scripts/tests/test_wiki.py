@@ -373,8 +373,8 @@ class ConfigTest(unittest.TestCase):
         for rel in ("platform/wiki/signet.protected.php", "scripts/wiki.py", "scripts/demo_wiki.py"):
             self.assertIn(rel, runtime)
         backup = read(SCRIPTS / "backup.py")
-        self.assertIn('WIKI = "/data/wiki"', backup)
-        self.assertIn('restic("restore", f"{manifest[\'wiki\'][\'snapshot\']}:{WIKI}", "--target", WIKI, "--delete")',
+        self.assertIn('"wiki": ("wiki", "/data/wiki", ', backup)       # OPTIONAL: chép, khôi phục như Node-RED (#366)
+        self.assertIn('restic("restore", f"{manifest[key][\'snapshot\']}:{path}", "--target", path, "--delete")',
                       backup)
 
 

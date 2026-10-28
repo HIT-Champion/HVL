@@ -25,12 +25,14 @@ soạn đổi mã đó lấy token của Node-RED ở POST /tu-dong/auth/token. 
 - người vận hành (`quantri`, được cấp vai trò bằng `moc tu-dong operator add`) vào được, triển khai được một flow có
   node Function, Template chứa mã JavaScript, HTML, câu GraphQL qua cổng mà WAF không chặn, đọc lại đúng flow đó;
 - không có node exec, không cài node từ npm; WebSocket của trình soạn (/tu-dong/comms) bắt tay được qua cổng.
+--sau-khoi-phuc: chỉ đăng nhập lại và đọc flow của lần chạy trước — bước kiểm sau moc backup restore trong CI.
 
 Thoát 0: đạt; 1: có bước sai hoặc không gọi được Signet.
 """
 
 from __future__ import annotations
 
+import argparse
 import base64
 import html
 import json
@@ -238,9 +240,29 @@ def run() -> None:
     print(f"\nĐẠT — trình soạn: {ROOT_URL} (đăng nhập bằng {OPERATOR})")
 
 
-def main() -> int:
+def operator_token() -> str:
+    code = exchange_code(login(OPERATOR))
+    if not code:
+        raise DemoFailed(f"{OPERATOR} có vai trò operator mà Node-RED không cấp mã")
+    return editor_token(code)
+
+
+def after_restore() -> None:
+    print("Node-RED sau khi khôi phục bản sao lưu (#366): flow triển khai trước lúc sao lưu còn nguyên")
+    status, saved = api("GET", "flows", operator_token())
+    nodes = {n.get("id"): n for n in saved.get("flows", [])} if isinstance(saved, dict) else {}
+    if status != 200 or nodes.get("moc-demo-fn", {}).get("func") != FUNCTION:
+        raise DemoFailed(f"GET /tu-dong/flows trả {status}; flow {FLOW_TAB} không còn như trước lúc sao lưu")
+    ok(f"{OPERATOR} đăng nhập lại (vai trò operator còn trong Keycloak), đọc được flow {FLOW_TAB}: "
+       f"{nodes[FLOW_TAB].get('info')}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--sau-khoi-phuc", action="store_true", help="chỉ kiểm flow của lần chạy trước còn đó")
+    args = parser.parse_args(argv)
     try:
-        run()
+        after_restore() if args.sau_khoi_phuc else run()
     except (DemoFailed, tu_dong.tenants.TenantError, tu_dong.tenants.Unavailable, urllib.error.URLError,
             OSError) as exc:
         print(f"\n✗ {exc}", file=sys.stderr)

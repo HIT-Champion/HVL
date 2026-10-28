@@ -14,9 +14,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tự động hóa bằng Node-RED (#366): client Keycloak `tu-dong`, vai trò operator (`moc tu-dong`); settings.js, image.
-Keycloak giả: không cần Docker, không đọc .env. settings.js nạp thật lúc dựng image (platform/tu-dong/kiem-tra.cjs);
-màn chạy thật trên stack: make demo-tu-dong (CI)."""
+"""Tự động hóa bằng Node-RED (#366): client Keycloak `tu-dong`, vai trò operator (`moc tu-dong`); settings.js, image,
+compose, route, Makefile. Keycloak, docker, moc.py giả: không cần Docker, không đọc .env. settings.js nạp thật lúc
+dựng image (platform/tu-dong/kiem-tra.cjs); màn chạy thật trên stack: make demo-tu-dong (CI)."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ import io
 import json
 import pathlib
 import re
+import shutil
 import sys
 import types
 import unittest
@@ -34,6 +35,11 @@ from typing import Any
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 ROOT = SCRIPTS.parent
 TU_DONG_DIR = ROOT / "platform" / "tu-dong"
+sys.path.insert(0, str(SCRIPTS / "tests"))
+
+import test_wiki  # noqa: E402  (make giả, khối service của wiki; import cả module để test của nó không chạy ở đây)
+
+service_block = test_wiki.service_block
 
 tu_dong: Any = None
 _saved: dict[str, Any] = {}
@@ -271,6 +277,69 @@ class ImageTest(unittest.TestCase):
             self.assertRegex(meta.get("integrity", ""), r"^sha512-", name)
             self.assertEqual(meta.get("license"), "MIT", name)
             self.assertTrue(meta.get("resolved", "").startswith("https://registry.npmjs.org/"), name)
+
+
+
+class ConfigTest(unittest.TestCase):
+    def test_compose_service_off_by_default_unprivileged_apps_network_only(self) -> None:
+        compose = read(ROOT / "docker-compose.yml")
+        block = service_block(compose, "tu-dong")
+        for line in ("profiles: [tu-dong]", "networks: [apps]", "read_only: true", "cap_drop: [ALL]",
+                     "security_opt: [no-new-privileges:true]", "build: ./platform/tu-dong", "- tu_dong_data:/data",
+                     "MOC_TU_DONG_SECRET: ${MOC_TU_DONG_SECRET:-}",
+                     "fetch('http://127.0.0.1:1880/tu-dong/auth/login')"):
+            self.assertIn(line, block)
+        self.assertNotIn("ports:", block)                       # chỉ tới được qua APISIX
+        self.assertIn("\n  tu_dong_data:\n", compose[compose.index("\nvolumes:\n"):])
+        self.assertIn("- tu_dong_data:/data/tu-dong", service_block(compose, "restic"))
+
+    def test_route_behind_the_gateway_and_reserved(self) -> None:
+        apisix = read(ROOT / "platform" / "apisix" / "apisix.yaml")
+        route = apisix[apisix.index("  - id: tu-dong\n    uris:"):]
+        route = route[:route.index("\n\n")]
+        for line in ('uris: ["/tu-dong", "/tu-dong/*"]', "upstream_id: tu-dong", "enable_websocket: true"):
+            self.assertIn(line, route)
+        self.assertNotIn("proxy-rewrite", route)                # Node-RED chạy sẵn dưới /tu-dong/ (httpAdminRoot)
+        self.assertIn('"/wiki", "/tu-dong",', read(SCRIPTS / "ung_dung.py"))     # RESERVED_PATHS: ứng dụng không che
+
+    def test_env_make_install_backup_ci(self) -> None:
+        self.assertRegex(read(ROOT / (".e" + "nv.example")), r"\nMOC_TU_DONG_SECRET=change_me\n")
+        make = read(ROOT / "Makefile")
+        for target in ("tu-dong-env:", "tu-dong-up:", "tu-dong-down:", "demo-tu-dong:"):
+            self.assertIn(f"\n{target}", make)
+        self.assertEqual(make.count("--profile iot --profile iot-sim --profile tu-dong \\\n"), 2)  # make down, reset
+        runtime = re.search(r"^RUNTIME=\((.*?)\)", read(SCRIPTS / "install.sh"), re.M | re.S).group(1).split()
+        for rel in ("scripts/tu_dong.py", "scripts/demo_tu_dong.py"):
+            self.assertIn(rel, runtime)
+        self.assertIn("|| extra_build+=(--profile tu-dong)", read(SCRIPTS / "install.sh"))
+        self.assertIn("    tu_dong.add_parser(groups)\n", read(SCRIPTS / "moc.py"))
+        self.assertIn('"tu_dong": ("tu-dong", "/data/tu-dong", ', read(SCRIPTS / "backup.py"))
+        ci = read(ROOT / ".github" / "workflows" / "ci.yml")
+        for line in ("make demo-tu-dong", "moc_wiki_data moc_tu_dong_data",
+                     "python3 scripts/demo_tu_dong.py --sau-khoi-phuc"):
+            self.assertIn(line, ci)
+
+
+@unittest.skipUnless(shutil.which("make"), "cần GNU Make")
+class MakefileTest(unittest.TestCase):
+    """make up, make tu-dong-up với docker và moc.py giả (bộ chạy của test_wiki)."""
+
+    run_make = test_wiki.MakefileTest.run_make
+
+    def test_make_up_with_tu_dong_profile_fills_secret_and_syncs(self) -> None:
+        env, docker, moc, _ = self.run_make("up", "MOC_PUBLIC_URL=https://x\nMOC_EXTRA_PROFILES=tu-dong\n")
+        self.assertRegex(env, r"\nMOC_TU_DONG_SECRET=[0-9a-f]{48}\n")
+        self.assertIn("compose --profile core --profile app --profile tu-dong up -d --build --wait", docker)
+        self.assertEqual(moc, "tu-dong sync\n")
+        again, _, _, _ = self.run_make("up", env)
+        self.assertEqual(again.count("MOC_TU_DONG_SECRET="), 1)
+
+    def test_tu_dong_up_starts_only_node_red_then_syncs(self) -> None:
+        env, docker, moc, out = self.run_make("tu-dong-up", "MOC_PUBLIC_URL=https://x\nMOC_EXTRA_PROFILES=\n")
+        self.assertRegex(env, r"\nMOC_TU_DONG_SECRET=[0-9a-f]{48}\n")
+        self.assertEqual(docker, "compose --profile core --profile app --profile tu-dong up -d --build --wait tu-dong")
+        self.assertEqual(moc, "tu-dong sync\n")
+        self.assertIn("MOC_EXTRA_PROFILES", out)                # nhắc cách bật lâu dài
 
 
 if __name__ == "__main__":
