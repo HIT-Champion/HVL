@@ -151,7 +151,10 @@ def api(method: str, path: str, token: str | None, body: object = None) -> tuple
         status, _, raw = request(method, f"{ROOT_URL}{path}", data=data, headers=headers)
     except HTTPError as exc:
         return exc.status, exc.body if hasattr(exc, "body") else str(exc)
-    return status, json.loads(raw) if raw else None
+    try:
+        return status, json.loads(raw) if raw else None
+    except ValueError:              # POST /inject/<id> trả chữ "OK", không phải JSON
+        return status, raw.decode(errors="replace") if isinstance(raw, bytes) else raw
 
 
 def sample_flow() -> list[dict[str, object]]:
