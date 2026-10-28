@@ -121,7 +121,8 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
     python3 scripts/demo.py canh-bao
         Cảnh báo vận hành (F3.13, #284): Prometheus nối Alertmanager; một cảnh báo giả đẩy vào Alertmanager thành thông
         báo ở chuông của quản trị mọi đơn vị (quantri thấy qua GraphQL), không ai khác nhận; hết cảnh báo thì mỗi quản
-        trị thêm đúng một thông báo; gọi svc-workflow bằng token sai → 401. (make demo-canh-bao)
+        trị thêm đúng một thông báo; gọi svc-workflow bằng token sai → 401; dịch vụ ngoài mạng alerts không tới được
+        API của Alertmanager. Thông báo của màn đánh dấu đã đọc ở cuối. (make demo-canh-bao)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -3884,6 +3885,17 @@ ALERT_BELL = """query Alerts {
 }"""
 # Alertmanager gom 30 giây trước lần gửi đầu của một nhóm, gửi phần đổi (hết cảnh báo) mỗi phút (alertmanager.yml)
 ALERT_WAIT_S = 120
+# Gọi API của Alertmanager từ một container chỉ ở mạng moc (svc-files): tới được thì in "reached"
+ALERTMANAGER_PROBE = """
+import urllib.error, urllib.request
+try:
+    urllib.request.urlopen("http://alertmanager:9093/-/ready", timeout=5)
+    print("reached")
+except urllib.error.HTTPError:
+    print("reached")
+except OSError as exc:
+    print(type(exc).__name__)
+"""
 
 
 def in_alertmanager(url: str, body: Any, *headers: str) -> bytes:
@@ -3928,21 +3940,23 @@ def canh_bao() -> None:
     alert = {"labels": {"alertname": "DemoCanhBao", "severity": "warning", "component": component},
              "annotations": {"summary": f"Thành phần {component} gián đoạn (màn demo, không phải sự cố thật)"},
              "startsAt": starts}
+    tenants = set(psql("select distinct tenant_id from core.users where role = 'tenant_admin' and enabled").split())
     in_alertmanager("http://localhost:9093/api/v2/alerts", [alert])
     admin = Session("quantri")
     started = time.monotonic()
+    # svc-workflow ghi lần lượt từng đơn vị: chờ tới khi chuông của quantri có và mọi đơn vị đã có dòng
     while True:
         rows = [r for r in admin.gql(ALERT_BELL)["core_notifications"]
                 if r["data"].get("component") == component and r["data"].get("status") == "firing"]
-        if rows:
+        got = alert_rows(component, "firing")
+        if rows and {r["tenant"] for r in got} >= tenants:
             break
         if time.monotonic() - started > ALERT_WAIT_S:
-            raise DemoFailed(f"sau {ALERT_WAIT_S} giây chuông của quantri chưa có cảnh báo {component}")
+            raise DemoFailed(f"sau {ALERT_WAIT_S} giây chuông của quantri {'có' if rows else 'chưa có'} cảnh báo"
+                             f" {component}, {len({r['tenant'] for r in got})}/{len(tenants)} đơn vị có thông báo")
         time.sleep(3)
     ok(f"sau {time.monotonic() - started:.0f} giây chuông của quantri (quản trị đơn vị): «Cảnh báo vận hành:"
        f" {rows[0]['data']['message']}»")
-    got = alert_rows(component, "firing")
-    tenants = set(psql("select distinct tenant_id from core.users where role = 'tenant_admin' and enabled").split())
     if {r["role"] for r in got} != {"tenant_admin"} or {r["tenant"] for r in got} != tenants:
         raise DemoFailed(f"cảnh báo phải tới quản trị của mọi đơn vị ({len(tenants)}), không ai khác: {got}")
     ok(f"{len(got)} thông báo cho quản trị của {len(tenants)} đơn vị; văn thư, lãnh đạo, chuyên viên không nhận")
@@ -3968,7 +3982,16 @@ def canh_bao() -> None:
             raise DemoFailed(f"svc-workflow trả lỗi khác 401: {exc.stderr!r}") from exc
     else:
         raise DemoFailed("svc-workflow nhận cảnh báo với token sai")
-    ok("401 — trong mạng nội bộ cũng không ai gửi được thông báo vào chuông nếu không có token")
+    ok("401 — gọi thẳng svc-workflow mà không có token thì không ghi được thông báo")
+
+    say(5, "API của Alertmanager (đẩy cảnh báo, tạo silence, không đăng nhập) chỉ ở mạng alerts: svc-files không tới")
+    reached = compose("exec", "-T", "svc-files", "python", "-c", ALERTMANAGER_PROBE).decode().strip()
+    if reached == "reached":
+        raise DemoFailed("svc-files (mạng moc) gọi được API của Alertmanager: alertmanager phải chỉ ở mạng alerts")
+    ok(f"svc-files → alertmanager:9093: {reached}; chỉ Prometheus, svc-workflow chung mạng với Alertmanager")
+    # thông báo giả của màn: đánh dấu đã đọc để chuông của quản trị không đếm (email, SMS… đã gửi nếu kênh đang bật)
+    psql(f"update core.notifications set read_at = now() where kind = 'ops.alert' and read_at is null"
+         f" and data->>'component' = '{component}'")
 
 
 # ------------------------------------------------------------------------------------------- cắm ứng dụng bằng manifest

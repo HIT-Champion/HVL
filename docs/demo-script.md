@@ -889,9 +889,10 @@ câu trích tự mở.
   báo ở chuông của quản trị đơn vị — mọi đơn vị, vì thành phần dùng chung gián đoạn thì đơn vị nào cũng chịu — kèm
   email, webhook, SMS, Zalo nếu bản cài đã bật kênh đó (#284).
 - Hết sự cố có thông báo "Hết cảnh báo"; Alertmanager gửi lại không làm chuông đổ thêm.
-- Trong mạng nội bộ cũng không ai tự gửi thông báo vào chuông được nếu không có token.
+- Gọi thẳng `svc-workflow` không có token thì không ghi được thông báo; API của Alertmanager (không đăng nhập) chỉ
+  Prometheus, `svc-workflow` tới được (mạng `alerts` riêng).
 
-**Lệnh in ra 4 bước:**
+**Lệnh in ra 5 bước:**
 
 1. Prometheus đang nối Alertmanager (`/api/v1/alertmanagers`); Alertmanager có token gọi `svc-workflow` (tệp trên
    tmpfs, không in ra).
@@ -901,8 +902,11 @@ câu trích tự mở.
 3. Đặt `endsAt` cho cảnh báo: trong vòng một phút mỗi quản trị thêm đúng một thông báo "Hết cảnh báo: …", thông báo
    bật không bị ghi thêm.
 4. Gọi thẳng `POST /ops/alerts` của `svc-workflow` từ trong mạng nội bộ bằng token sai → `401`.
+5. Từ `svc-files` (mạng `moc`) gọi `alertmanager:9093` không tới: không đẩy được cảnh báo giả, không tắt được cảnh báo
+   thật. Cuối màn, thông báo giả được đánh dấu đã đọc; bản cài đã bật email, SMS, Zalo thì các kênh đó đã gửi thật.
 
-Trên giao diện: đăng nhập `quantri`, chuông có thông báo màu cam; bấm vào mở trang `/trang-thai`.
+Trên giao diện: đăng nhập `quantri`, chuông có thông báo màu cam (xem trước bước 5 khi chưa đánh dấu đã đọc, hoặc
+trong danh sách của chuông); bấm vào mở trang `/trang-thai`.
 
 **Nếu giám khảo hỏi:**
 
@@ -912,7 +916,9 @@ Trên giao diện: đăng nhập `quantri`, chuông có thông báo màu cam; b�
 - *"Sao không cho Alertmanager gửi email thẳng?"* Gửi qua `svc-workflow` thì dùng lại kênh, người nhận, chống trùng,
   hộp thư đi có thử lại của thông báo nghiệp vụ, không khai mật khẩu SMTP lần thứ hai trong cấu hình Alertmanager.
 - *"Chọn người nhận được không?"* Chưa: mọi quản trị đơn vị đều nhận. Tắt tạm một cảnh báo (silence) phải gọi API của
-  Alertmanager.
+  Alertmanager (`amtool` trong container), chưa có trên giao diện.
+- *"CSDL sập thì sao?"* Cảnh báo về chính sự cố đó không ghi được vào chuông cho tới khi PostgreSQL, Hasura,
+  `svc-workflow` chạy lại (`svc-workflow` trả 503, Alertmanager gửi lại); trong lúc đó chỉ Grafana, Prometheus thấy.
 
 ## Phương án dự phòng
 

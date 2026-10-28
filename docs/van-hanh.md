@@ -416,6 +416,13 @@ thống.
   tự thêm một chuỗi ngẫu nhiên. Để trống là tắt: Alertmanager chạy `alertmanager-khong-gui.yml` (nhận mà không gửi),
   `POST /ops/alerts` trả 404. Token là bí mật của svc-workflow trong két; đổi token: sửa `.env`, `docker compose up -d`
   (tạo lại `openbao`, `alertmanager`) rồi `docker compose restart svc-workflow`.
+- API 9093 của Alertmanager không đăng nhập (đẩy cảnh báo, tạo silence): Alertmanager chỉ ở mạng `alerts`
+  (`internal`) cùng Prometheus, `svc-workflow`; dịch vụ khác của mạng `moc` không tới được.
+- Hạn chế: PostgreSQL, Hasura hay `svc-workflow` gián đoạn thì cảnh báo về chính sự cố đó chưa vào chuông được
+  (`svc-workflow` trả 503, Alertmanager gửi lại ở các lần sau); trong lúc đó chỉ Grafana, Prometheus thấy. Gửi lỗi vì
+  token sai (401) không có cảnh báo riêng: Prometheus chưa thu chỉ số của Alertmanager. Tắt tạm một cảnh báo phải dùng
+  `amtool` trong container: `docker compose exec alertmanager amtool silence add alertname=<tên> --comment=<lý do>
+  --alertmanager.url=http://localhost:9093`.
 - Thử cả đường đi: `make demo-canh-bao` (cảnh báo giả, không đụng dịch vụ thật). Cảnh báo Alertmanager đang giữ:
   `docker compose exec -T alertmanager wget -q -O - http://localhost:9093/api/v2/alerts`. Gửi lỗi thì xem
   `docker compose logs alertmanager` và dòng `ops.alert.failed` của svc-workflow.

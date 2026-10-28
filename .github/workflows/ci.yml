@@ -551,7 +551,8 @@ jobs:
           python3 scripts/moc.py tenant check
 
       # F3.13 (#284): cảnh báo giả qua Alertmanager → svc-workflow → chuông của quản trị cả ba đơn vị, không ai khác;
-      # hết cảnh báo thêm đúng một thông báo mỗi người; token sai → 401. Sau bước trên: đơn vị thứ ba đã có quản trị
+      # hết cảnh báo thêm đúng một thông báo mỗi người; token sai → 401; svc-files không tới được API của Alertmanager
+      # (mạng alerts). Sau bước trên: đơn vị thứ ba đã có quản trị
       - name: Cảnh báo vận hành ra chuông (make demo-canh-bao)
         if: matrix.phan == 'luong-chinh'
         run: make demo-canh-bao

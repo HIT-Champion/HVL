@@ -344,7 +344,7 @@ async function logout() {
         <div class="sg-topbar-tools">
           <time :datetime="calendarDay">{{ dateLabel }}</time>
           <FeedbackButton v-if="claims?.role" />
-          <NotificationBell v-if="claims?.role && claims.role !== 'tenant_admin'" />
+          <NotificationBell v-if="claims?.role" />
           <button class="btn-ghost sg-language" :aria-label="t('nav.language')" @click="toggleLocale">
             {{ locale === 'vi' ? 'EN' : 'VI' }}
           </button>
