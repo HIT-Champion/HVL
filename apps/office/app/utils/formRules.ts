@@ -39,7 +39,7 @@ export interface FormProblem {
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 type JsonObject = { [key: string]: Json }
-type Cost = [steps: number, refDepth: number]
+type Cost = [steps: number, refDepth: number, levels: number]
 
 // Cùng tên, cùng giá trị với forms.py; tập hợp ghi thành mảng đã sắp xếp
 export const FORM_LIMITS = {
@@ -55,6 +55,8 @@ export const FORM_LIMITS = {
   MAX_FORM_BYTES: 256 * 1024,
   MAX_DEPTH: 32,
   MAX_REF_DEPTH: 16,
+  // chỉ số mảng trong JSON Pointer của $ref
+  ARRAY_INDEX: '0|[1-9][0-9]{0,8}',
   NODE_STEPS: 3000,
   MAX_FORM_STEPS: 3 * 10 ** 7,
   ROOT_ONLY: ['$id', '$anchor', '$dynamicAnchor', '$recursiveAnchor'],
@@ -72,6 +74,7 @@ export const FORM_RULES: FormRule[] = ['size', 'json', 'depth', 'root', 'draft',
 export const SERVER_ONLY_RULES: FormRule[] = ['pattern', 'schema']
 
 const VARIABLE = new RegExp(`^(?:${FORM_LIMITS.VARIABLE})$`)
+const ARRAY_INDEX = new RegExp(`^(?:${FORM_LIMITS.ARRAY_INDEX})$`)
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
@@ -132,9 +135,9 @@ function walk(node: Json, problems: FormProblem[], schema = true, root = true): 
 class RefProblem extends Error {
   problem: FormProblem
 
-  constructor(rule: 'ref-target' | 'ref-loop', ref: string) {
+  constructor(rule: 'ref-target' | 'ref-loop' | 'depth', ref?: string) {
     super(rule)
-    this.problem = { rule, detail: ref }
+    this.problem = ref === undefined ? { rule } : { rule, detail: ref }
   }
 }
 
@@ -144,14 +147,14 @@ function unquote(text: string): string {
     (run) => decoder.decode(Uint8Array.from(run.slice(1).split('%'), (hex) => parseInt(hex, 16))))
 }
 
-// "#/…" (JSON Pointer) trong chính form → đích
+// "#/…" (JSON Pointer) trong chính form → đích. Giải %XX cả chuỗi rồi mới tách theo "/", như _resolve
 function resolve(root: JsonObject, ref: string): Json {
   if (ref !== '#' && !ref.startsWith('#/')) throw new RefProblem('ref-target', ref)
   let node: Json = root
-  for (const raw of ref === '#' ? [] : ref.slice(2).split('/')) {
-    const part = unquote(raw).replaceAll('~1', '/').replaceAll('~0', '~')
+  for (const raw of ref === '#' ? [] : unquote(ref.slice(2)).split('/')) {
+    const part = raw.replaceAll('~1', '/').replaceAll('~0', '~')
     if (isObject(node) && Object.hasOwn(node, part)) node = node[part]!
-    else if (Array.isArray(node) && /^[0-9]+$/.test(part) && Number(part) < node.length) node = node[Number(part)]!
+    else if (Array.isArray(node) && ARRAY_INDEX.test(part) && Number(part) < node.length) node = node[Number(part)]!
     else throw new RefProblem('ref-target', ref)
   }
   return node
@@ -169,29 +172,35 @@ function* subschemas(node: JsonObject): Generator<Json | undefined> {
   }
 }
 
-// Như _cost: [số bước, số tầng $ref sâu nhất bên dưới]. refs: các đích $ref đang đi qua; memo: kết quả theo đích (so
-// bằng chính đối tượng, như id() của Python)
-function cost(node: Json | undefined, root: JsonObject, refs: Json[], memo: Map<Json, Cost>): Cost {
-  if (!isObject(node)) return [0, 0]
+// Như _cost: [số bước, số tầng $ref sâu nhất bên dưới, số tầng schema từ node trở xuống kể cả qua $ref], node ở tầng
+// level tính từ gốc. refs: các đích $ref đang đi qua; memo: kết quả theo đích (so bằng chính đối tượng, như id() của
+// Python)
+function cost(node: Json | undefined, root: JsonObject, refs: Json[], memo: Map<Json, Cost>, level: number): Cost {
+  if (!isObject(node)) return [0, 0, 0]
+  if (level > FORM_LIMITS.MAX_DEPTH) throw new RefProblem('depth')
   let steps = FORM_LIMITS.NODE_STEPS
   let deepest = 0
+  let levels = 1
   const ref = own(node, '$ref')
   if (typeof ref === 'string' && ref.startsWith('#')) {
     const target = resolve(root, ref)
     if (refs.includes(target) || refs.length >= FORM_LIMITS.MAX_REF_DEPTH) throw new RefProblem('ref-loop', ref)
-    if (!memo.has(target)) memo.set(target, cost(target, root, [...refs, target], memo))
-    const [subSteps, subDepth] = memo.get(target)!
+    if (!memo.has(target)) memo.set(target, cost(target, root, [...refs, target], memo, level + 1))
+    const [subSteps, subDepth, subLevels] = memo.get(target)!
     // đích đã tính từ chỗ nông hơn, chỗ này lồng sâu hơn
     if (refs.length + 1 + subDepth > FORM_LIMITS.MAX_REF_DEPTH) throw new RefProblem('ref-loop', ref)
+    if (level + subLevels > FORM_LIMITS.MAX_DEPTH) throw new RefProblem('depth')
     steps += subSteps
     deepest = subDepth + 1
+    levels = subLevels + 1
   }
   for (const sub of subschemas(node)) {
-    const [subSteps, subDepth] = cost(sub, root, refs, memo)
+    const [subSteps, subDepth, subLevels] = cost(sub, root, refs, memo, level + 1)
     steps += subSteps
     deepest = Math.max(deepest, subDepth)
+    levels = Math.max(levels, subLevels + 1)
   }
-  return [steps, deepest]
+  return [steps, deepest, levels]
 }
 
 /** Nội dung một tệp form → các luật bị vi phạm, [] khi qua mọi luật trình duyệt kiểm được. */
@@ -247,7 +256,7 @@ export function checkForm(text: string): FormProblem[] {
   }
   walk(schema, problems)
   try {
-    const [steps] = cost(schema, schema, [], new Map())
+    const [steps] = cost(schema, schema, [], new Map(), 1)
     if (steps > FORM_LIMITS.MAX_FORM_STEPS) problems.push({ rule: 'steps', detail: String(steps) })
   } catch (e) {
     if (!(e instanceof RefProblem)) throw e

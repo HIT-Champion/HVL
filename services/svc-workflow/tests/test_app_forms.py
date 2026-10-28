@@ -386,7 +386,7 @@ RULES = json.loads(Path(__file__).with_name("app_form_rules.cases.json").read_te
 RULE_MESSAGES = {
     "size": r"^tệp lớn quá",
     "json": r"^không phải JSON UTF-8",
-    "depth": r"^JSON lồng quá",
+    "depth": r"^(JSON|schema) lồng quá",
     "root": r"^cần một đối tượng JSON Schema ở gốc",
     "draft": r"^\$schema phải là",
     "root-type": r"^type ở gốc phải là object",

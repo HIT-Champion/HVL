@@ -353,12 +353,14 @@ khi hai tệp cùng process id, khi có tệp không khai.
 Flowable), không trùng biến hệ thống `tenantId`, `departmentId`, `initiator`, cũng không trùng tên Flowable dành sẵn
 trong biểu thức `execution`, `task`, `authenticatedUserId`, `currentTenantId` (điều kiện của BPMN đọc ra giá trị của
 động cơ chứ không phải giá trị gửi lên, #330); mỗi trường một giá trị đơn (chuỗi, số, đúng/sai — biến Flowable không
-chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng JSON Pointer (`#/…`), tới đúng
-một schema, không vòng, lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai ở gốc form (dưới gốc chúng đổi
-chỗ `#/…` trỏ tới); `x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB, đối tượng và mảng lồng nhau
-tối đa 32 tầng (#386); không dùng `patternProperties`,
-`propertyNames` (mẫu chạy trên mọi khóa gửi lên, kể cả khóa thừa). `pattern` chạy bằng `re` của Python, quay lui, ngay
-trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ (ReDoS, vd `^(a+)+$`) với vài chục ký tự làm đứng cả dịch vụ,
+chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng JSON Pointer (`#/…`; giải
+`%XX` cả chuỗi rồi mới tách theo `/` như jsonschema, chỉ số mảng không có số 0 đầu), tới đúng một schema, không vòng,
+lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai ở gốc form (dưới gốc chúng đổi chỗ `#/…` trỏ tới);
+`x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB, không có `NaN`, `Infinity`; đối tượng và mảng lồng
+nhau tối đa 32 tầng, schema lồng nhau cũng tối đa 32 tầng tính cả qua `$ref` (jsonschema đi đệ quy từng tầng khi kiểm
+dữ liệu gửi lên, #386); không dùng `patternProperties`, `propertyNames` (mẫu chạy trên mọi khóa gửi lên, kể cả khóa
+thừa). `pattern` chạy bằng `re` của Python, quay lui, ngay trong vòng sự kiện của svc-workflow: mẫu quay lui bùng nổ
+(ReDoS, vd `^(a+)+$`) với vài chục ký tự làm đứng cả dịch vụ,
 kể cả Action của Văn phòng điện tử. Nên lúc cài không nhận mẫu lặp lồng trong lặp (trừ lặp đúng n lần như
 `(,[0-9]{3})*`), có `|` hay tham chiếu ngược (`\1`) trong phần lặp, dài quá 512 ký tự. Phần lặp nối nhau vẫn tốn thời
 gian đa thức, và jsonschema kiểm bằng `re.search`: mẫu không neo `^` thử lại ở mọi vị trí, `a+$` đã tốn bình phương độ

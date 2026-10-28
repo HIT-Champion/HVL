@@ -62,8 +62,9 @@ SCALAR_TYPES = {"string", "integer", "number", "boolean", "null"}
 FORMATS = {"date", "uuid"}
 DATE_RULES = {"not-after-today", "not-before-today"}
 MAX_FORM_BYTES = 256 * 1024
-# Tầng đối tượng, mảng lồng nhau trong tệp form: form thật chỉ vài tầng. Trần thấp để json.loads và các hàm đi đệ quy
-# dưới đây (_walk; _cost, mỗi $ref thêm tối đa MAX_DEPTH khung) không chạm giới hạn đệ quy của Python
+# Tầng đối tượng, mảng lồng nhau trong tệp form: form thật chỉ vài tầng. Trần thấp để json.loads, _walk không chạm giới
+# hạn đệ quy của Python. Cũng là trần số tầng schema tính cả qua $ref (_cost): kiểm dữ liệu gửi lên, jsonschema đi đệ
+# quy khoảng 12 khung mỗi tầng allOf — 16 $ref nối nhau, mỗi đích lồng 20 tầng đã quá giới hạn
 MAX_DEPTH = 32
 LONG = (-(2**63), 2**63 - 1)    # biến kiểu long của Flowable
 
@@ -87,6 +88,9 @@ SUBSCHEMA = ("not", "if", "then", "else", "items", "contains", "additionalProper
 SUBSCHEMA_LISTS = ("allOf", "anyOf", "oneOf", "prefixItems")
 SUBSCHEMA_MAPS = ("properties", "patternProperties", "dependentSchemas")
 MAX_REF_DEPTH = 16
+# Chỉ số mảng trong JSON Pointer của $ref: số ASCII không có số 0 đầu (RFC 6901), tối đa 9 chữ số. int() của Python
+# còn nhận "١", "01", "-1", " 1" và ném lỗi với "²" hay quá 4300 chữ số
+ARRAY_INDEX = re.compile(r"0|[1-9][0-9]{0,8}")
 # jsonschema đi qua một schema con mất khoảng 7 µs, cỡ 2300 bước của re: tính mỗi nút 3000 bước, để $ref lồng nhau
 # (allOf mười $ref tới tầng sau, tầng sau lại thế) không qua được trần dù không có pattern nào
 NODE_STEPS = 3000
@@ -96,6 +100,11 @@ ROOT_ONLY = ("$id", "$anchor", "$dynamicAnchor", "$recursiveAnchor")
 
 def _scalar(value: Any) -> bool:
     return value is None or isinstance(value, (str, bool, int, float))
+
+
+def _no_constant(name: str) -> Any:
+    """json.loads nhận NaN, Infinity, -Infinity; JSON (và JSON.parse của trình duyệt) thì không."""
+    raise ValueError(f"{name} không phải giá trị JSON")
 
 
 def _one_of(value: Any, allowed: set[str]) -> bool:
@@ -299,15 +308,16 @@ class RefProblem(Exception):
 
 
 def _resolve(root: dict[str, Any], ref: str) -> Any:
-    """``#/…`` (JSON Pointer) trong chính form → schema đích; trỏ không tới đâu thì RefProblem."""
+    """``#/…`` (JSON Pointer) trong chính form → schema đích; trỏ không tới đâu thì RefProblem. Giải %XX cả chuỗi rồi
+    mới tách theo ``/`` như thư viện referencing mà jsonschema dùng, nên ``%2F`` cũng là dấu tách."""
     if ref != "#" and not ref.startswith("#/"):
         raise RefProblem(f"$ref {ref!r}: chỉ nhận JSON Pointer trong chính form (#/…)")
     node: Any = root
-    for part in ref[2:].split("/") if ref != "#" else ():
-        part = unquote(part).replace("~1", "/").replace("~0", "~")
+    for part in unquote(ref[2:]).split("/") if ref != "#" else ():
+        part = part.replace("~1", "/").replace("~0", "~")
         if isinstance(node, dict) and part in node:
             node = node[part]
-        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+        elif isinstance(node, list) and ARRAY_INDEX.fullmatch(part) and int(part) < len(node):
             node = node[int(part)]
         else:
             raise RefProblem(f"$ref {ref!r} không trỏ tới schema nào trong form")
@@ -317,8 +327,9 @@ def _resolve(root: dict[str, Any], ref: str) -> Any:
 def form_steps(schema: dict[str, Any]) -> int:
     """Số bước ước lượng khi kiểm một lần gửi (giá trị đơn): ``NODE_STEPS`` cho mỗi schema jsonschema đi qua, cộng số
     bước quay lui của pattern ở đó. Đích một ``$ref`` trỏ bao nhiêu chỗ tính bấy nhiêu lần, như jsonschema chạy; lúc cài
-    mỗi đích chỉ đi qua một lần. $ref vòng hay lồng quá ``MAX_REF_DEPTH`` tầng → RefProblem."""
-    return _cost(schema, schema, (), {})[0]
+    mỗi đích chỉ đi qua một lần. $ref vòng hay lồng quá ``MAX_REF_DEPTH`` tầng, schema lồng quá ``MAX_DEPTH`` tầng tính
+    cả qua $ref → RefProblem."""
+    return _cost(schema, schema, (), {}, 1)[0]
 
 
 def _subschemas(node: dict[str, Any]) -> Iterator[Any]:
@@ -330,12 +341,21 @@ def _subschemas(node: dict[str, Any]) -> Iterator[Any]:
         yield from node[key].values() if isinstance(node.get(key), dict) else ()
 
 
-def _cost(node: Any, root: dict[str, Any], refs: tuple[int, ...], memo: dict[int, tuple[int, int]]) -> tuple[int, int]:
-    """(số bước, số tầng $ref sâu nhất bên dưới) của ``node``. ``refs``: các đích $ref đang đi qua, ``memo``: kết quả
-    theo đích — khóa là chính đích (id), nên hai cách viết cùng một JSON Pointer không bị tính hai lần."""
+def _too_deep() -> RefProblem:
+    return RefProblem(f"schema lồng quá {MAX_DEPTH} tầng tính cả qua $ref — jsonschema đi đệ quy từng tầng khi kiểm "
+                      "dữ liệu gửi lên")
+
+
+def _cost(node: Any, root: dict[str, Any], refs: tuple[int, ...], memo: dict[int, tuple[int, int, int]],
+          level: int) -> tuple[int, int, int]:
+    """(số bước, số tầng $ref sâu nhất bên dưới, số tầng schema từ ``node`` trở xuống kể cả qua $ref) của ``node``, ở
+    tầng ``level`` tính từ gốc. ``refs``: các đích $ref đang đi qua, ``memo``: kết quả theo đích — khóa là chính đích
+    (id), nên hai cách viết cùng một JSON Pointer không bị tính hai lần."""
     if not isinstance(node, dict):
-        return 0, 0
-    steps, depth = NODE_STEPS, 0
+        return 0, 0, 0
+    if level > MAX_DEPTH:
+        raise _too_deep()
+    steps, depth, levels = NODE_STEPS, 0, 1
     if isinstance(node.get("pattern"), str):
         steps += pattern_cost(node["pattern"], _bound(node.get("maxLength")))[1]
     ref = node.get("$ref")
@@ -344,15 +364,18 @@ def _cost(node: Any, root: dict[str, Any], refs: tuple[int, ...], memo: dict[int
         if id(target) in refs or len(refs) >= MAX_REF_DEPTH:
             raise RefProblem(f"$ref {ref!r} trỏ vòng hoặc lồng quá {MAX_REF_DEPTH} tầng")
         if id(target) not in memo:
-            memo[id(target)] = _cost(target, root, (*refs, id(target)), memo)
-        sub_steps, sub_depth = memo[id(target)]
-        if len(refs) + 1 + sub_depth > MAX_REF_DEPTH:      # đích đã tính từ chỗ nông hơn, chỗ này lồng sâu hơn
+            memo[id(target)] = _cost(target, root, (*refs, id(target)), memo, level + 1)
+        sub_steps, sub_depth, sub_levels = memo[id(target)]
+        # đích đã tính từ chỗ nông hơn, chỗ này lồng sâu hơn
+        if len(refs) + 1 + sub_depth > MAX_REF_DEPTH:
             raise RefProblem(f"$ref {ref!r} trỏ vòng hoặc lồng quá {MAX_REF_DEPTH} tầng")
-        steps, depth = steps + sub_steps, sub_depth + 1
+        if level + sub_levels > MAX_DEPTH:
+            raise _too_deep()
+        steps, depth, levels = steps + sub_steps, sub_depth + 1, sub_levels + 1
     for sub in _subschemas(node):
-        sub_steps, sub_depth = _cost(sub, root, refs, memo)
-        steps, depth = steps + sub_steps, max(depth, sub_depth)
-    return steps, depth
+        sub_steps, sub_depth, sub_levels = _cost(sub, root, refs, memo, level + 1)
+        steps, depth, levels = steps + sub_steps, max(depth, sub_depth), max(levels, sub_levels + 1)
+    return steps, depth, levels
 
 
 def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
@@ -360,7 +383,7 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
     if len(raw) > MAX_FORM_BYTES:
         return None, [f"{where}: tệp lớn quá {MAX_FORM_BYTES // 1024} KB"]
     try:
-        schema = json.loads(raw.decode("utf-8"))
+        schema = json.loads(raw.decode("utf-8"), parse_constant=_no_constant)
     except RecursionError:
         return None, [f"{where}: JSON lồng quá {MAX_DEPTH} tầng"]
     except (UnicodeDecodeError, ValueError) as exc:
