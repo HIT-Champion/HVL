@@ -34,8 +34,8 @@ test('cảnh báo vận hành: câu theo trạng thái, chi tiết là thành ph
   assert.deepEqual(describeNotification(t, { kind: 'ops.alert', data }), {
     title: 'notify.opsAlert {"message":"Thành phần hasura gián đoạn"}', detail: 'hasura — /v1/graphql', note: '',
   })
-  const resolved = describeNotification(t, { kind: 'ops.alert', data: { status: 'resolved', message: 'ComponentDown' } })
-  assert.deepEqual(resolved, { title: 'notify.opsResolved {"message":"ComponentDown"}', detail: '', note: '' })
+  const resolved = { status: 'resolved', message: 'ComponentDown' }
+  assert.deepEqual(describeNotification(t, { kind: 'ops.alert', data: resolved }), { title: 'notify.opsResolved {"message":"ComponentDown"}', detail: '', note: '' })
 })
 
 test('bấm thông báo: văn bản gắn kèm, cảnh báo vận hành mở trang trạng thái, còn lại không đi đâu', () => {
