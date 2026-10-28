@@ -5,7 +5,7 @@ mà lõi sử dụng hoặc gửi thông báo tới; chúng không thuộc giấ
 ([`LICENSES/LicenseRef-Logos.txt`](../../../LICENSES/LicenseRef-Logos.txt)). Muốn dùng lại, hãy theo chính sách nhãn
 hiệu của từng dự án.
 
-Lấy ngày 24/10/2026 (tám logo cuối bảng: 28/10/2026, #374), chuẩn hóa về PNG 64×64 nền trắng: logo có nền trong
+Lấy ngày 24/10/2026 (mười logo cuối bảng: 28/10/2026, #374), chuẩn hóa về PNG 64×64 nền trắng: logo có nền trong
 suốt được cắt sát rồi đặt giữa, chừa lề để khung tròn không cắt vào logo; avatar tràn nền giữ nguyên. Sơ đồ sinh bằng
 [`scripts/so_do_kien_truc.py`](../../../scripts/so_do_kien_truc.py).
 
@@ -32,3 +32,5 @@ suốt được cắt sát rồi đặt giữa, chừa lề để khung tròn kh
 | `restic.png` | restic | Avatar của tổ chức <https://github.com/restic> |
 | `ntfy.png` | ntfy | <https://github.com/binwiederhier/ntfy>, tệp `web/public/static/images/ntfy.png` |
 | `sms-gateway.png` | SMS Gateway for Android | Avatar của tổ chức <https://github.com/android-sms-gateway> |
+| `node-red.png` | Node-RED | <https://github.com/node-red/node-red>, tệp `packages/node_modules/@node-red/editor-client/src/images/node-red-icon.svg` |
+| `dokuwiki.png` | DokuWiki | Avatar của tổ chức <https://github.com/dokuwiki> |
