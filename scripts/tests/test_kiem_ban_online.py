@@ -26,6 +26,7 @@ Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 from __future__ import annotations
 
 import contextlib
+import http.client
 import importlib.util
 import io
 import json
@@ -70,6 +71,7 @@ class FakeSite:
             {"id": "postgres", "label": "CSDL", "status": "ok"}, {"id": "ollama", "label": "Mô hình", "status": "off"}]}
         self.replies: dict[str, kiem.Reply] = {}
         self.unreachable: set[str] = set()
+        self.cut: set[str] = set()          # kết nối đứt giữa thân trả lời
         self.calls: list[str] = []
 
     def certificate(self) -> tuple[dict[str, Any], str]:
@@ -81,6 +83,8 @@ class FakeSite:
         self.calls.append(url)
         if url in self.unreachable:
             raise ConnectionRefusedError("connection refused")
+        if url in self.cut:
+            raise http.client.IncompleteRead(b'{"status"', 40)
         if url in self.replies:
             return self.replies[url]
         if url == "http://signet.example/":
@@ -190,18 +194,20 @@ class CheckTest(unittest.TestCase):
         return now, sleep.start()
 
     def test_waits_for_the_upgrade_after_a_release(self) -> None:
-        # nâng tay: lúc đầu bản cũ, giữa chừng Signet dừng (không gọi được, rồi 502 của proxy), sau đó lên bản mới
+        # nâng tay: lúc đầu bản cũ, giữa chừng Signet dừng (không gọi được, đứt giữa thân trả lời, rồi 502 của proxy),
+        # sau đó lên bản mới
         status = f"{BASE}/api/status"
         self.site.status["version"] = "1.1.0"
         steps = [lambda: self.site.unreachable.add(status),
-                 lambda: (self.site.unreachable.clear(), self.site.replies.update({status: kiem.Reply(502, {}, b"")})),
+                 lambda: (self.site.unreachable.clear(), self.site.cut.add(status)),
+                 lambda: (self.site.cut.clear(), self.site.replies.update({status: kiem.Reply(502, {}, b"")})),
                  lambda: (self.site.replies.clear(), self.site.status.update(version="1.2.0"))]
         _, slept = self.clock()
         slept.side_effect = lambda s: steps.pop(0)()
         code, out = self.run_check("--version", "1.2.0", "--wait-minutes", "60")
         self.assertEqual(code, 0, out)
-        self.assertEqual([c.args for c in slept.call_args_list], [(30,)] * 3)
-        self.assertEqual(re.findall(r"… bản online đang chạy (\S+),", out), ["1.1.0", "None", "None"])
+        self.assertEqual([c.args for c in slept.call_args_list], [(30,)] * 4)
+        self.assertEqual(re.findall(r"… bản online đang chạy (\S+),", out), ["1.1.0", "None", "None", "None"])
         self.assertIn("✓ /api/status: status ok, bản 1.2.0", out)
 
     def test_wait_for_a_dev_build_uses_the_commits(self) -> None:

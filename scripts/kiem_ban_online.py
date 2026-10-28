@@ -40,6 +40,7 @@ Chạy hết các mục rồi báo mục trượt. Thoát 0 khi đạt, 1 khi c�
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -247,12 +248,13 @@ def check_headers(site: Site, report: Report, base: str) -> None:
 
 def wait_for(site: Site, base: str, wanted: Callable[[Any], bool], minutes: float) -> None:
     """Đợi ``/api/status`` chạy đúng bản: bản online nâng tay vài phút tới vài chục phút sau khi phát hành, giữa chừng
-    Signet dừng (không gọi được, 502 của proxy) — cứ hỏi lại. Hết ``minutes`` phút thì thôi, phần kiểm báo lệch bản."""
+    Signet dừng (không gọi được, 502 của proxy, đứt giữa thân trả lời) — cứ hỏi lại. Hết ``minutes`` phút thì thôi,
+    phần kiểm báo lệch bản."""
     deadline = time.monotonic() + minutes * 60
     while True:
         try:
             status = _json(site.get(f"{base}/api/status"))
-        except OSError:
+        except (OSError, http.client.HTTPException):     # IncompleteRead không phải OSError
             status = None
         running = status.get("version") if isinstance(status, dict) else None
         if wanted(running):
