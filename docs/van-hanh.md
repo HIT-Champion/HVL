@@ -378,8 +378,9 @@ bảng điều khiển **Signet — cổng API** nạp sẵn: yêu cầu mỗi g
   `platform/monitoring/grafana/dashboards/` rồi cài lại, không sửa trên giao diện.
 - Grafana (AGPL-3.0) chạy nguyên bản trong container riêng; Signet chỉ nạp cấu hình qua tệp, không liên kết mã.
 - Chỉ số không nằm trong bản sao lưu (`make backup`): khôi phục xong thì Prometheus thu lại từ đầu.
-- Prometheus chỉ đọc `platform/monitoring/prometheus.yml` và `canh-bao.yml` lúc khởi động. Sửa tay trên máy đang chạy
-  thì khởi động lại nó: `docker compose restart prometheus` trong thư mục cài. Lúc nâng cấp, `scripts/nang_cap.sh` đã
+- Prometheus chỉ đọc `platform/monitoring/prometheus.yml` và `canh-bao.yml` lúc khởi động, Alertmanager cũng vậy với
+  `alertmanager.yml`. Sửa tay trên máy đang chạy thì khởi động lại dịch vụ đó: `docker compose restart prometheus`
+  (`alertmanager`) trong thư mục cài. Lúc nâng cấp, `scripts/nang_cap.sh` đã
   dừng rồi chạy lại cả hệ thống nên bản mới tự nạp tệp mới.
 
 ### Cảnh báo
@@ -403,7 +404,28 @@ thống.
 - Xem ở hàng "Cảnh báo đang bật" cuối bảng điều khiển Grafana. `pending` là điều kiện đã đúng nhưng chưa đủ thời
   gian của luật. Trên máy chủ, trong thư mục cài:
   `docker compose exec -T prometheus wget -q -O - http://localhost:9090/api/v1/alerts`.
-- Chưa có Alertmanager: cảnh báo không gửi email hay chat, người vận hành phải mở Grafana để thấy.
+- Cảnh báo đang bật đi tiếp sang Alertmanager (#284, `platform/monitoring/alertmanager.yml`): gom theo tên cảnh báo,
+  chờ 30 giây trước lần gửi đầu, gửi phần đổi mỗi phút, còn bật thì nhắc lại sau 12 giờ. Alertmanager gọi
+  `svc-workflow` (`POST /ops/alerts`, token `MOC_ALERT_TOKEN`): mỗi lần bật, mỗi lần hết là một thông báo ở chuông của
+  mọi quản trị đơn vị (vai trò `tenant_admin`) của mọi đơn vị, bấm vào mở trang `/trang-thai`. Bản cài đã bật email,
+  webhook, SMS, Zalo (mục Thông báo đa kênh) thì cảnh báo đi cả kênh đó, trừ khi `MOC_NOTIFY_*_KINDS` liệt kê loại mà
+  không có `ops.alert`.
+- Thông báo chỉ mang câu `summary` của luật, mức, nhãn `component`, `route`. Alertmanager gửi lại (nhắc 12 giờ, khởi
+  động lại mất nhật ký gửi) không thêm dòng: khóa chống trùng là fingerprint, thời điểm bật và trạng thái.
+- `MOC_ALERT_TOKEN`: `make env` sinh; `.env` cũ thiếu dòng này thì `make up`, `make install` (cả `scripts/nang_cap.sh`)
+  tự thêm một chuỗi ngẫu nhiên. Để trống là tắt: Alertmanager chạy `alertmanager-khong-gui.yml` (nhận mà không gửi),
+  `POST /ops/alerts` trả 404. Token là bí mật của svc-workflow trong két; đổi token: sửa `.env`, `docker compose up -d`
+  (tạo lại `openbao`, `alertmanager`) rồi `docker compose restart svc-workflow`.
+- API 9093 của Alertmanager không đăng nhập (đẩy cảnh báo, tạo silence): Alertmanager chỉ ở mạng `alerts`
+  (`internal`) cùng Prometheus, `svc-workflow`; dịch vụ khác của mạng `moc` không tới được.
+- Hạn chế: PostgreSQL, Hasura hay `svc-workflow` gián đoạn thì cảnh báo về chính sự cố đó chưa vào chuông được
+  (`svc-workflow` trả 503, Alertmanager gửi lại ở các lần sau); trong lúc đó chỉ Grafana, Prometheus thấy. Gửi lỗi vì
+  token sai (401) không có cảnh báo riêng: Prometheus chưa thu chỉ số của Alertmanager. Tắt tạm một cảnh báo phải dùng
+  `amtool` trong container: `docker compose exec alertmanager amtool silence add alertname=<tên> --comment=<lý do>
+  --alertmanager.url=http://localhost:9093`.
+- Thử cả đường đi: `make demo-canh-bao` (cảnh báo giả, không đụng dịch vụ thật). Cảnh báo Alertmanager đang giữ:
+  `docker compose exec -T alertmanager wget -q -O - http://localhost:9093/api/v2/alerts`. Gửi lỗi thì xem
+  `docker compose logs alertmanager` và dòng `ops.alert.failed` của svc-workflow.
 - 503 không tính là "không trả lời". svc-files trả 503 có chủ ý (`busy`, `scanner_unavailable`… kèm `Retry-After`),
   nên 503 chỉ tính vào tỉ lệ 5xx. Độ trễ của svc-files không xét: tải lên, đọc văn bản đến, hỏi đáp vốn chậm theo
   thiết kế.

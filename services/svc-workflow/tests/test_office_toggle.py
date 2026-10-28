@@ -55,8 +55,9 @@ APP_ROUTES = [("/api/workflow/{app}/forms/{form_key}", {"GET"}),
               ("/api/workflow/{app}/processes/{process_key}", {"POST"}), ("/api/workflow/{app}/processes", {"GET"}),
               ("/api/workflow/{app}/tasks", {"GET"}), ("/api/workflow/{app}/tasks/{task_id}", {"POST"})]
 APP_PATHS = [path for path, _ in APP_ROUTES]
-# kênh SMS, Zalo người dùng tự bật (#365, subscriptions.py): phần chung, luôn gắn sau cùng
-CHANNEL_ROUTES = [("/actions/channels/{name}", {"POST"})]
+# kênh SMS, Zalo người dùng tự bật (#365, subscriptions.py) và cảnh báo vận hành (#284, alerts.py): phần chung,
+# luôn gắn sau cùng
+CHANNEL_ROUTES = [("/actions/channels/{name}", {"POST"}), ("/ops/alerts", {"POST"})]
 
 
 class Started:
@@ -158,7 +159,7 @@ def test_office_on_keeps_routes_and_background_jobs(hasura, flowable, files, sta
     app = make_app(ENV, hasura, flowable, files, started)
     assert routes(app) == ROUTES + APP_ROUTES + CHANNEL_ROUTES
     assert list(app.openapi()["paths"]) == ["/ot/notify/{tenant}", "/actions/{name}", *APP_PATHS,
-                                            "/actions/channels/{name}"]
+                                            "/actions/channels/{name}", "/ops/alerts"]
     office = app.state.office
     assert isinstance(office, Office) and app.state.workflow is office.workflow and app.state.ot is office.ot
     with TestClient(app) as c:
@@ -171,7 +172,7 @@ def test_office_on_keeps_routes_and_background_jobs(hasura, flowable, files, sta
 def test_office_off_still_starts_with_the_shared_part_only(hasura, flowable, files, started, deployed):
     app = make_app(OFF, hasura, flowable, files, started)
     assert routes(app) == ROUTES[:6] + APP_ROUTES + CHANNEL_ROUTES
-    assert list(app.openapi()["paths"]) == [*APP_PATHS, "/actions/channels/{name}"]
+    assert list(app.openapi()["paths"]) == [*APP_PATHS, "/actions/channels/{name}", "/ops/alerts"]
     assert app.state.office is None and not hasattr(app.state, "workflow")
     with TestClient(app) as c:
         wait_until(lambda: set(started.names) >= COMMON_JOBS)

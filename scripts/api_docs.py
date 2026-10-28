@@ -51,7 +51,8 @@ ROLES = {
 }
 SERVICES = {
     "svc-files": "qua cổng APISIX ở /api/files, /api/search",
-    "svc-workflow": "Hasura gọi chạy Actions, context broker NGSI-LD gọi /ot/notify (nội bộ); /api/workflow qua cổng",
+    "svc-workflow": "Hasura gọi chạy Actions, context broker NGSI-LD gọi /ot/notify, Alertmanager gọi /ops/alerts "
+                    "(nội bộ); /api/workflow qua cổng",
 }
 BUILTIN_SCALARS = {"String", "Int", "Float", "Boolean", "ID"}
 # Trang rest-<dịch vụ>.md

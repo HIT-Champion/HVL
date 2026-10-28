@@ -14,9 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# F3.13 — luật cảnh báo (#255, #274). Chưa có Alertmanager: cảnh báo chỉ hiện ở Prometheus (/alerts) và bảng điều
-# khiển Grafana, không gửi ra ngoài. Test: platform/monitoring/kiem-tra/canh-bao.test.yml (promtool test rules, bước
-# CI "Giám sát").
+# F3.13 — luật cảnh báo (#255, #274). Cảnh báo hiện ở Prometheus (/alerts), bảng điều khiển Grafana và qua Alertmanager
+# (#284, alertmanager.yml) thành thông báo ops.alert cho quản trị đơn vị: `summary` là câu trên chuông, nhãn
+# `component`, `route` là dòng chi tiết. Test: platform/monitoring/kiem-tra/canh-bao.test.yml (promtool test rules,
+# bước CI "Giám sát").
 #   * cong-api: chỉ số của APISIX, nhãn `route` là id route trong platform/apisix/apisix.yaml. Dựa trên lưu lượng thật:
 #     không ai gọi tới thì nhóm này không thấy dịch vụ chết;
 #   * thanh-phan: bảng trạng thái của svc-files (GET /metrics, cùng lần dò của trang /trang-thai), Prometheus thu 15

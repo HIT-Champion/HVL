@@ -55,9 +55,22 @@ export function describeNotification(t: Translate, n: Pick<RealtimeMessage, 'kin
     // liên thông (F3.12): văn bản đi của đơn vị khác trong hệ thống vừa vào sổ chờ của đơn vị mình
     case 'document.incoming':
       return { title: t('notify.documentIncoming', { name: d.from_name ?? '' }), detail: doc, note }
+    // cảnh báo vận hành (F3.13): Alertmanager → svc-workflow, gửi quản trị đơn vị; chi tiết là thành phần, route
+    case 'ops.alert':
+      return {
+        title: t(d.status === 'resolved' ? 'notify.opsResolved' : 'notify.opsAlert', { message: d.message ?? '' }),
+        detail: [d.component, d.route].filter(Boolean).join(' — '),
+        note: '',
+      }
     default:
       return { title: n.kind, detail: doc, note }
   }
+}
+
+// Bấm vào thông báo (chuông, toast): văn bản gắn kèm; cảnh báo vận hành mở trang trạng thái hệ thống
+export function notificationLink(n: Pick<RealtimeMessage, 'kind' | 'document_id'>): string | undefined {
+  if (n.document_id) return `/van-ban/${n.document_id}`
+  return n.kind === 'ops.alert' ? '/trang-thai' : undefined
 }
 
 export function useNotifications() {

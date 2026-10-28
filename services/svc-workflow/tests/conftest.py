@@ -569,6 +569,8 @@ class FakeHasura:
         found = await self._dispatch_op(op, None, variables or {})
         if found is not None:
             return found
+        if op == "Tenants":     # cảnh báo vận hành (alerts.py) gửi cho quản trị của mọi đơn vị
+            return {"core_tenants": [{"id": tid, "code": tid[:8]} for tid in sorted(self.units)]}
         if "OverdueDocuments" in query:
             return {"office_documents": self.overdue}
         return {"office_documents": []}

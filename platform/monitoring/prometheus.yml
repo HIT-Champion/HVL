@@ -19,9 +19,15 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Luật cảnh báo (#255): chỉ hiện ở /alerts của Prometheus và bảng điều khiển Grafana, chưa gửi ra ngoài
+# Luật cảnh báo (#255): hiện ở /alerts của Prometheus, bảng điều khiển Grafana; cảnh báo đang bật đẩy sang
+# Alertmanager (#284, alertmanager.yml) → svc-workflow → chuông của quản trị đơn vị
 rule_files:
   - canh-bao.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
   # Cổng API: plugin prometheus của APISIX xuất chỉ số ở cổng 9091 (platform/apisix/config.yaml, không mở ra ngoài)

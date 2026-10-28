@@ -156,9 +156,9 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       dựng lại container bị xóa (F3.3)
 - [x] Trang công khai Trạng thái hệ thống `/trang-thai`: tình trạng từng thành phần, phiên bản, giờ sao lưu gần nhất
       (`docs/van-hanh.md`, mục Trang trạng thái hệ thống)
-- [ ] **Một phần** — giám sát (F3.13, mức Dùng được): Prometheus + Grafana thu chỉ số của APISIX và trạng thái từng
-      thành phần (#274), chưa có chỉ số bên trong từng dịch vụ; có luật cảnh báo (#255, #274) nhưng chỉ xem trong
-      Grafana, Prometheus, chưa gửi ra ngoài
+- [x] Giám sát và cảnh báo (F3.13): Prometheus + Grafana thu chỉ số của APISIX và trạng thái từng thành phần (#274);
+      luật cảnh báo (#255, #274) qua Alertmanager thành thông báo ở chuông của quản trị đơn vị, kèm email, webhook nếu
+      đã bật (#284). Chưa có chỉ số bên trong từng dịch vụ
 - [ ] **Một phần** — log tập trung (F3.14, mức Dùng được, #105): Vector + Parseable theo profile `logs`, tắt mặc
       định; `X-Request-Id` đi xuyên `svc-workflow`; thu 9 dịch vụ, cả Hasura, Keycloak, PostgreSQL (#202),
       Meilisearch (#395)
