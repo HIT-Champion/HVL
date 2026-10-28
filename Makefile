@@ -306,7 +306,7 @@ demo-ky-so: $(ENV_FILE) ## Màn ký số (F4.5, chỉ minh họa): văn bản đ
 demo-che-pii: $(ENV_FILE) ## Màn che thông tin cá nhân (F4.4): đơn giả lập có CCCD, số điện thoại, email, STK — tìm và trích nguyên văn vẫn có số thật; nhật ký apisix, app-office, svc-files, svc-workflow không còn giá trị nào, không còn chuỗi truy vấn; mô hình chỉ thấy nhãn (docs/demo-script.md)
 	@python3 scripts/demo.py che-pii
 
-do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 15 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
+do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số chỗ bị che trên kho mẫu seed/ (phải 0), 18 đột biến mã của pii.py (phải bị test bắt hết); thoát 1 khi che nhầm hoặc có đột biến sống sót
 	@cd services/svc-files && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q -s \
 	  tests/test_pii_corpus.py tests/test_pii_mutation.py
 

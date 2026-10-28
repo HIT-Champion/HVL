@@ -22,11 +22,12 @@ Ollama) và nhật ký (``PiiFilter``). Chỉ mục tìm kiếm, câu trích ngu
 
 Tự viết, chỉ dùng thư viện chuẩn: Presidio kéo spaCy, numpy… mà vẫn không có định dạng Việt Nam. Nhận theo cấu trúc
 chứ không theo "dãy số đủ dài": chuỗi số ứng viên → cụm nhóm liền nhau → kiểm mã tỉnh, thế kỷ, năm sinh, đầu số đã
-cấp. CMND và số tài khoản không có cấu trúc riêng nên chỉ nhận khi đứng ngay sau từ khóa.
+cấp. CMND và số tài khoản không có cấu trúc riêng nên chỉ nhận khi đứng ngay sau từ khóa. Số dính chữ chỉ nhận khi là
+số di động viết liền sau tiền tố điện thoại (``ĐT0912…``, ``Tel0912…``).
 
-Sót có chủ đích: số dính chữ (``ĐT0912…``), số có hai ký tự trắng liền (cả dòng trống), CCCD sau ``/``; số viết từng
-cặp (``09 12 34 56 78``), số nhóm nối bằng phẩy không cách; số máy bàn kiểu cũ 10 số, số nước ngoài; họ tên, địa chỉ;
-CMND và số tài khoản không có từ khóa; chữ không ở dạng NFC có thể sót từ khóa.
+Sót có chủ đích: số dính chữ khác (``HS0912…``, máy bàn sau ``Tel``), số có hai ký tự trắng liền (cả dòng trống),
+CCCD sau ``/``; số viết từng cặp (``09 12 34 56 78``), số nhóm nối bằng phẩy không cách; số máy bàn kiểu cũ 10 số, số
+nước ngoài; họ tên, địa chỉ; CMND và số tài khoản không có từ khóa; chữ không ở dạng NFC có thể sót từ khóa.
 
     python -m svc_files.pii mask  < tệp     # in bản che, nhãn trơn [SĐT] (svc-workflow: svc_workflow.pii)
     python -m svc_files.pii count < tệp     # in {"chars", "total", "spans"} — không bao giờ in giá trị
@@ -104,6 +105,10 @@ GLUED_RE = re.compile(r"[^\W_]|[@/]|[.,]\d")      # khớp ngay sau số thì s�
 # 030–031 và sẽ chạm 032. Số 10 chữ số ngay sau từ khóa MST thì không coi là SĐT; CCCD 12 số sau MST (MST cá nhân là
 # số định danh) vẫn che.
 TAX_KEYWORD_RE = re.compile(r"\b(?:mst|ma\s+so\s+thue|ma\s+so\s+doanh\s+nghiep|msdn)\b")
+# Tiền tố điện thoại viết liền số (#58): "ĐT0912345678", "SĐT0912 345 678", "Tel0912…" — so trên bản gấp dấu ("SDT",
+# "sđt" cũng khớp). Tiền tố đứng đầu dòng hay sau khoảng trắng, dấu câu; không sau chữ, chữ số, "_", "/", "-", "@" (mã
+# hồ sơ "HSĐT0912…", số ký hiệu "QĐ-ĐT…").
+PHONE_PREFIX_RE = re.compile(r"(?<![\w/@\-])(?:s?dt|dd|tel|phone)(?=\d)")
 
 
 class _Fold(dict):
@@ -308,6 +313,30 @@ def _keyword_spans(text: str, folded: str) -> list[Span]:
     return out
 
 
+def _prefixed_phone_spans(text: str, folded: str, year: int) -> list[Span]:
+    """Đường tiền tố: số di động 10 số viết liền sau "ĐT", "SĐT", "DĐ", "Tel", "Phone" — đường cấu trúc bỏ qua vì số
+    dính chữ. Thay tiền tố bằng dấu cách cùng độ dài rồi cho đường cấu trúc xét lại, giữ số bắt đầu ngay sau tiền tố:
+    cùng quy tắc nhóm, biên, phần lẻ như số đứng riêng. Tiền tố không đứng sau chữ, chữ số, nên thay nó không đổi biên
+    của số đứng trước. Máy bàn, CCCD sau tiền tố không nhận: mã có chữ dính số vẫn giữ nguyên."""
+    parts: list[str] = []
+    ends: set[int] = set()
+    at = 0
+    for k in PHONE_PREFIX_RE.finditer(folded):
+        parts += (text[at:k.start()], " " * (k.end() - k.start()))
+        at = k.end()
+        ends.add(at)
+    if not ends:
+        return []
+    parts.append(text[at:])
+    unglued = "".join(parts)
+    out: list[Span] = []
+    for s in _number_spans(unglued, fold(unglued), year):
+        d = _digits(unglued[s.start:s.end])
+        if s.start in ends and len(d) == 10 and _is_mobile(d[:3]):
+            out.append(s)
+    return out
+
+
 def _find_once(text: str, year: int) -> list[Span]:
     folded = fold(text)
     protected = [m.span() for m in UUID_RE.finditer(text)]
@@ -315,6 +344,7 @@ def _find_once(text: str, year: int) -> list[Span]:
     candidates = [(0, s) for s in _keyword_spans(text, folded)]
     candidates += [(1, Span(m.start(), m.end(), "email")) for m in EMAIL_RE.finditer(text)]
     candidates += [(2, s) for s in _number_spans(text, folded, year)]
+    candidates += [(2, s) for s in _prefixed_phone_spans(text, folded, year)]
     candidates.sort(key=lambda c: (c[1].start, c[0], c[1].start - c[1].end))
     out: list[Span] = []
     for _, s in candidates:

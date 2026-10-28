@@ -572,7 +572,7 @@ Che luôn bật, không có biến cấu hình để tắt.
 |---|---|---|---|
 | Số định danh / CCCD 12 số | `[CCCD]` | `[CCCD-n]` | 3 số đầu là một trong 63 mã tỉnh (Thông tư 59/2021/TT-BCA), chữ số thứ 4 là 0–3, năm sinh không ở tương lai; **hoặc** 12 số bất kỳ ngay sau từ khóa ("CCCD", "căn cước", "số định danh"…) |
 | CMND | `[CMND]` | `[CMND-n]` | **chỉ** ngay sau từ khóa ("CMND", "CMT", "chứng minh nhân dân"…), 9 hoặc 12 số |
-| Điện thoại | `[SĐT]` | `[SĐT-n]` | di động 10 số có đầu số đã cấp (10/2026, gồm 095), máy bàn `02x` 11 số, di động 11 số cũ; `+84`, `(+84)`, `0084`, `+84 (0)`, `84…` liền, mã vùng `(024)`; viết liền hay theo nhóm (nhóm đầu ≥ 3 chữ số, trừ sau `+84` / mã vùng) |
+| Điện thoại | `[SĐT]` | `[SĐT-n]` | di động 10 số có đầu số đã cấp (10/2026, gồm 095), máy bàn `02x` 11 số, di động 11 số cũ; `+84`, `(+84)`, `0084`, `+84 (0)`, `84…` liền, mã vùng `(024)`; viết liền hay theo nhóm (nhóm đầu ≥ 3 chữ số, trừ sau `+84` / mã vùng); di động 10 số viết liền sau `ĐT`, `SĐT`, `DĐ`, `Tel`, `Phone` (`ĐT0912…`, không phân biệt dấu, hoa thường) khi tiền tố đứng đầu dòng hay sau khoảng trắng, dấu câu |
 | Email | `[EMAIL]` | `[EMAIL-n]` | cú pháp địa chỉ có tên miền cấp cao (`user@localhost`, `@pytest.fixture` không khớp) |
 | Số tài khoản | `[STK]` | `[STK-n]` | **chỉ** ngay sau từ khóa ("số tài khoản", "STK", "tài khoản ngân hàng số"…), 6–19 chữ số |
 
@@ -639,17 +639,19 @@ PDF, TSV OCR có sẵn) — tổng 81 063 ký tự, 747 chuỗi số ứng viên
 | Nhãn, câu hỏi, lịch sử giao việc | 1 248 chuỗi | 17 208 | 165 | **0** |
 
 Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp (`test_pii.py`), vì kho mẫu không có — và không được có —
-dữ liệu thật mang thông tin cá nhân: 95 chỗ dương tính trong 84 chuỗi đều bị che (cả số ngắt dòng, tên tệp
-`don_0912…`), 80 chuỗi âm tính khó (giấy tờ, ngày, tiền, UUID, hex, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng,
-email giả…) không bị che, 1 144 ca đột biến dữ liệu vào (11 toán tử) đúng kỳ vọng. Đột biến mã: 15 đột biến của
-`pii.py` (bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số, bỏ cổng mã số thuế, giữ chuỗi truy vấn, xuống dòng không
-là phân cách, bỏ điều kiện nhóm đầu ≥ 3 chữ số, che một lượt…) — **15/15 bị test giết**, khoảng 1,5 giây. Có chỗ che
-nhầm, sót một ca dương tính hay một đột biến sống sót thì lệnh thoát 1.
+dữ liệu thật mang thông tin cá nhân: 109 chỗ dương tính trong 96 chuỗi đều bị che (cả số ngắt dòng, tên tệp
+`don_0912…`, số dính sau `ĐT`/`SĐT`/`Tel`), 87 chuỗi âm tính khó (giấy tờ, ngày, tiền, UUID, hex, mã số thuế, đầu số
+chưa cấp, dãy số nhỏ của bảng, mã có chữ dính số như `HSĐT0912…`, email giả…) không bị che, 1 291 ca đột biến dữ liệu
+vào (11 toán tử) đúng kỳ vọng. Đột biến mã: 18 đột biến của `pii.py` (bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu
+số, bỏ cổng mã số thuế, giữ chuỗi truy vấn, xuống dòng không là phân cách, bỏ điều kiện nhóm đầu ≥ 3 chữ số, che một
+lượt, bỏ đường tiền tố điện thoại…) — **18/18 bị test giết**, khoảng 2 giây. Có chỗ che nhầm, sót một ca dương tính
+hay một đột biến sống sót thì lệnh thoát 1.
 
 **Giới hạn:**
 
-- **Sót có chủ đích:** số dính chữ (`ĐT0912…`), số có hai ký tự trắng liền (hai dấu cách, dòng trống, cách rồi
-  xuống dòng), CCCD sau `/`; số viết từng cặp (`09 12 34 56 78`: nhóm đầu 2 chữ số), `84 912 345 678` (bỏ dấu cộng mà
+- **Sót có chủ đích:** số dính chữ, trừ di động 10 số sau tiền tố điện thoại (`HS0912…`, `ĐTDĐ0912…`, máy bàn
+  sau `Tel`, tiền tố sau `/`, `-`), số có hai ký tự trắng liền (hai dấu cách, dòng trống, cách rồi xuống dòng), CCCD
+  sau `/`; số viết từng cặp (`09 12 34 56 78`: nhóm đầu 2 chữ số), `84 912 345 678` (bỏ dấu cộng mà
   có cách — viết liền `84912345678` thì che), số viết theo nhóm nối bằng phẩy không cách (`0912 345 678,0987 654 321`;
   hai dãy ≥ 9 chữ số liền nối bằng phẩy thì che cả hai); số máy bàn kiểu cũ 10 số (trước 2017), số nước ngoài; CMND
   và số tài khoản không có từ khóa; chữ không ở dạng NFC có thể sót từ khóa.

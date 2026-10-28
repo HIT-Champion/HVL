@@ -851,8 +851,8 @@ Bước nào sai thì dừng, thoát 1 — kể cả khi chỉ một cách viế
 
 **Đo — `make do-che-pii`** (không cần Docker, vài giây): đọc kho mẫu như bản chạy thật (lớp chữ và bố cục PDF, TSV
 OCR, mọi trang văn bản hỏi đáp, mọi chuỗi trong nhãn, câu hỏi, lịch sử giao việc), in bảng số ký tự, số chuỗi số ứng
-viên, số chỗ bị che — phải là 0 ở mọi nguồn; rồi chạy 15 đột biến mã của bộ che (bỏ kiểm mã tỉnh, nới đầu số, bỏ vùng
-bảo vệ UUID, giữ chuỗi truy vấn…) — cả 15 phải bị test giết. Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp
+viên, số chỗ bị che — phải là 0 ở mọi nguồn; rồi chạy 18 đột biến mã của bộ che (bỏ kiểm mã tỉnh, nới đầu số, bỏ vùng
+bảo vệ UUID, giữ chuỗi truy vấn…) — cả 18 phải bị test giết. Bắt đúng chỉ chứng minh được trên bộ định dạng tổng hợp
 (`test_pii.py`): kho mẫu không có, và không được có, dữ liệu thật mang thông tin cá nhân. Số đo ghi ở
 `services/svc-files/README.md`.
 
@@ -878,8 +878,9 @@ câu trích tự mở.
   thật nằm ngay ở câu trích nguyên văn bên dưới, giao diện nói rõ. Không điền số thật trở lại vào câu của mô hình: mô
   hình có thể đặt nhãn sai chỗ, gán số người này cho người khác.
 - *"Còn gì chưa làm?"* Họ tên, địa chỉ (cần nhận dạng thực thể tiếng Việt), hộ chiếu, biển số xe; số dính chữ
-  (`ĐT0912…`), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura, PostgreSQL, Keycloak và `error_log` của
-  APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ nhúng tính trước F4.4 còn tới khi nhúng lại.
+  (trừ di động sau `ĐT`, `SĐT`, `Tel`…), CMND và số tài khoản không có từ khóa đi kèm; nhật ký của Hasura,
+  PostgreSQL, Keycloak và `error_log` của APISIX, nginx (định dạng cố định, vẫn có `?q=` khi phía sau lỗi); véc-tơ
+  nhúng tính trước F4.4 còn tới khi nhúng lại.
 
 ## Ngoài 4 nguyên lý: cảnh báo vận hành ra chuông — `make demo-canh-bao`
 
