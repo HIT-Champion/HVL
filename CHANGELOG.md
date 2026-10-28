@@ -28,6 +28,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - `moc app install` báo lỗi rõ với tệp form sai kiểu hay lồng quá 32 tầng (cả qua `$ref`), không còn lỗi 500 (#386).
 - Smoke không còn trượt bước hỏi đáp ngay sau khi nâng cấp hay trên bản cài tìm theo nghĩa (#360).
 - Bật giảm chuyển động thì thông báo, dòng hộp việc, popover hiện ngay, không qua khung trong suốt (#391).
+- `moc app install` từ chối form có trường trùng từ khóa của biểu thức (`le`, `not`, `or`…), điều kiện BPMN không đọc được (#405).
 
 ### Bảo mật
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
