@@ -15,6 +15,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Wiki nội bộ DokuWiki ở `/wiki/` (profile `wiki`, tắt mặc định): đăng nhập Keycloak, mỗi đơn vị một không gian (#367).
 - Sổ đăng ký văn bản đến, đi xem và in bằng tiếng Anh khi người in chọn giao diện tiếng Anh (#398).
 - Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
+- Giao diện tiếng Anh cho Đơn nghỉ phép, cả form dựng từ JSON Schema, chung ngôn ngữ với Văn phòng điện tử (#398).
 - Tự động hóa Node-RED ở `/tu-dong/` (profile `tu-dong`, tắt mặc định): đăng nhập Keycloak, chỉ người vận hành (#366).
 
 ### Đã sửa đổi
@@ -30,6 +31,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - `moc app install` báo lỗi rõ với tệp form sai kiểu hay lồng quá 32 tầng (cả qua `$ref`), không còn lỗi 500 (#386).
 - Smoke không còn trượt bước hỏi đáp ngay sau khi nâng cấp hay trên bản cài tìm theo nghĩa (#360).
 - Bật giảm chuyển động thì thông báo, dòng hộp việc, popover hiện ngay, không qua khung trong suốt (#391).
+- `moc app install` từ chối form có trường trùng từ khóa của biểu thức BPMN (`le`, `not`, `or`…) (#405).
 
 ### Bảo mật
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).

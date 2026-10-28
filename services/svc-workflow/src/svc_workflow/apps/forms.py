@@ -57,6 +57,9 @@ RESERVED = ("tenantId", "departmentId", "initiator")
 # Flowable 8 giải các tên này trong biểu thức của BPMN (điều kiện rẽ nhánh) thành giá trị của động cơ trước khi tìm biến
 # (VariableContainerELResolver, ProcessVariableScopeELResolver; task: khi biểu thức chạy trên một việc)
 ENGINE_NAMES = ("execution", "task", "authenticatedUserId", "currentTenantId")
+# từ khóa của ngôn ngữ biểu thức (JUEL): biến trùng tên không viết được trong ``${…}``, ``${le == 'x'}`` lỗi cú pháp
+EL_KEYWORDS = ("and", "div", "empty", "eq", "false", "ge", "gt", "instanceof", "le", "lt", "mod", "ne", "not",
+               "null", "or", "true")
 VARIABLE = re.compile(r"[a-z][A-Za-z0-9]{0,63}", re.ASCII)
 SCALAR_TYPES = {"string", "integer", "number", "boolean", "null"}
 FORMATS = {"date", "uuid"}
@@ -408,6 +411,9 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
         elif name in ENGINE_NAMES:
             errors.append(f"{where}: trường {name} trùng tên Flowable dành sẵn trong biểu thức "
                           f"({', '.join(ENGINE_NAMES)}) — điều kiện của BPMN không đọc được giá trị gửi lên")
+        elif name in EL_KEYWORDS:
+            errors.append(f"{where}: trường {name} trùng từ khóa của biểu thức ({', '.join(EL_KEYWORDS)}) — điều kiện "
+                          "của BPMN không viết được biến này")
         elif not VARIABLE.fullmatch(name):
             errors.append(f"{where}: tên trường {name!r} phải dạng camelCase (chữ thường đầu, chỉ chữ và số, "
                           "≤ 64 ký tự) — là tên biến Flowable")

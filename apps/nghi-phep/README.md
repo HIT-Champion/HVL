@@ -19,9 +19,9 @@ của nó (Flowable sau `svc-workflow`). Trang gọi API chung của lõi bằng
 | `workflow/don-nghi-phep.bpmn20.xml` | Quy trình `nghi-phep.don`: gửi đơn (`nghi-phep.don`) → "Trưởng phòng duyệt" (`nghi-phep.duyet`, nhóm `t:${tenantId}:d:${departmentId}:manager` như bước duyệt cấp phòng của văn bản đi) → cổng rẽ theo `quyetDinh` → "Đã duyệt" / "Bị từ chối". Chỉ sự kiện, việc người làm, cổng rẽ: không có mã chạy trên máy chủ; có sơ đồ BPMN DI |
 | `forms/don.json`, `forms/duyet.json` | Mẫu đơn (loại nghỉ, từ ngày, đến ngày, lý do) và mẫu duyệt (quyết định, ghi chú); ca thử dùng chung `*.cases.json` |
 | `server.py` | Python thư viện chuẩn, không root, hệ tệp gốc chỉ đọc: chỉ trang tĩnh ở `:8080` (CSP `script-src 'self'`, nhật ký không ghi chuỗi truy vấn), `config.json`, `healthz`. Không bí mật, không client dịch vụ |
-| `public/` | Trang duy nhất: `auth.js` đăng nhập Authorization Code + PKCE (oidc-client-ts, `response_mode=fragment`, client `app-nghi-phep`); `schema-form.js` dựng form từ JSON Schema; `don.js` đường API, đọc câu trả lời, trạng thái đơn — phần không đụng trình duyệt; `app.js` vẽ ba phần |
+| `public/` | Trang duy nhất: `auth.js` đăng nhập Authorization Code + PKCE (oidc-client-ts, `response_mode=fragment`, client `app-nghi-phep`); `schema-form.js` dựng form từ JSON Schema; `don.js` đường API, đọc câu trả lời, trạng thái đơn — phần không đụng trình duyệt; `app.js` vẽ ba phần; `i18n.js` bảng dịch vi/en (#398; ngôn ngữ lưu chung khóa `moc.locale` với Văn phòng điện tử) |
 | `Dockerfile` | `node:24.20.0-slim` lấy bản cho trình duyệt của oidc-client-ts theo `package-lock.json`; `python:3.13.16-slim` ghim digest, user 10001 |
-| `tests/` | `node --test tests/*.test.js` (form dựng từ schema; `don.js`; khớp app.yaml ↔ BPMN ↔ form; tương phản màu); `python3 -m unittest discover -s tests` (máy chủ thật trên cổng ngẫu nhiên; BPMN chỉ dùng phần tử được phép, nhóm duyệt, mọi nút tới được kết thúc) |
+| `tests/` | `node --test tests/*.test.js` (form dựng từ schema; `don.js`; khớp app.yaml ↔ BPMN ↔ form; tương phản màu; bảng dịch vi/en, không chữ tiếng Việt viết cứng trong `public/*.js`); `python3 -m unittest discover -s tests` (máy chủ thật trên cổng ngẫu nhiên; BPMN chỉ dùng phần tử được phép, nhóm duyệt, mọi nút tới được kết thúc) |
 
 ## Trang
 
@@ -37,7 +37,12 @@ Ba phần, chuyển bằng thanh trên cùng (tiêu điểm về tiêu đề ph�
 
 Trợ năng: mọi ô có nhãn; lỗi gắn vào ô bằng `aria-describedby`, `aria-invalid`; báo kết quả qua vùng `role="status"`,
 lỗi chung qua `role="alert"`; liên kết bỏ qua tới nội dung; nút cao tối thiểu 44 px; màu chữ trên nền đạt tỉ lệ
-4,5:1 (test đo). Giao diện chỉ tiếng Việt.
+4,5:1 (test đo).
+
+Ngôn ngữ: tiếng Việt mặc định; nút "English" ở thanh trên đổi cả trang sang tiếng Anh, kể cả nhãn, lựa chọn, câu báo
+lỗi của form (nhãn lấy từ `x-moc-ui` `{vi, en}` của tệp form, câu chung từ `public/i18n.js`). Lựa chọn lưu chung khóa
+`moc.locale` với Văn phòng điện tử, Bảng tin, Không gian cá nhân; đổi lúc đang gõ thì form vẽ lại, chữ đã gõ còn
+nguyên. Ngày giờ vẫn viết dd/mm/yyyy theo giờ Việt Nam.
 
 ## API chung của lõi mà trang gọi
 
