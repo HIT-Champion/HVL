@@ -75,7 +75,7 @@ class Page(unittest.TestCase):
             self.assertIn(rule, csp)
         self.assertNotIn("unsafe", csp)
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
-        for name in ("app.js", "don.js", "auth.js", "schema-form.js"):
+        for name in ("app.js", "don.js", "auth.js", "schema-form.js", "i18n.js"):
             with self.subTest(name=name):
                 status, headers, _ = call(f"{self.base}/nghi-phep/{name}")
                 self.assertEqual((status, headers["Content-Type"]), (200, "text/javascript; charset=utf-8"))

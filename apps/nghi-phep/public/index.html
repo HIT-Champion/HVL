@@ -20,8 +20,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Đơn nghỉ phép — Signet</title>
-  <meta name="description" content="Signet — gửi đơn nghỉ phép, trưởng phòng duyệt trên quy trình của lõi">
+  <!-- chữ tĩnh để sẵn bằng tiếng Việt (ngôn ngữ mặc định); app.js gán lại theo ngôn ngữ đã chọn: data-i18n là chữ của
+       phần tử, data-i18n-<thuộc tính> là thuộc tính, khóa ở i18n.js (tests/i18n.test.js kiểm chữ ở đây khớp bảng) -->
+  <title data-i18n="page.title">Đơn nghỉ phép — Signet</title>
+  <meta name="description" data-i18n-content="page.description"
+        content="Signet — gửi đơn nghỉ phép, trưởng phòng duyệt trên quy trình của lõi">
   <link rel="icon" href="/nghi-phep/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/nghi-phep/style.css">
   <!-- thư viện trước, mã của trang sau: cả hai chạy theo thứ tự sau khi đọc xong trang -->
@@ -29,56 +32,64 @@
   <script src="/nghi-phep/app.js" type="module"></script>
 </head>
 <body>
-  <a class="bo-qua" href="#noi-dung">Bỏ qua, tới nội dung chính</a>
+  <a class="bo-qua" href="#noi-dung" data-i18n="page.skip">Bỏ qua, tới nội dung chính</a>
   <header class="top">
     <a class="brand" href="/nghi-phep/">
       <img src="/nghi-phep/favicon.svg" alt="" width="28" height="28">
-      <span><strong>Đơn nghỉ phép</strong><small>Signet · quy trình trên lõi</small></span>
+      <span><strong data-i18n="page.brand">Đơn nghỉ phép</strong>
+        <small data-i18n="page.tagline">Signet · quy trình trên lõi</small></span>
     </a>
-    <nav class="top-nav" aria-label="Ứng dụng">
-      <a href="/">Văn phòng điện tử</a>
-      <span id="nguoi" class="who">Đang đăng nhập…</span>
-      <button id="thoat" type="button" class="btn ghost" hidden>Đăng xuất</button>
+    <nav class="top-nav" aria-label="Ứng dụng" data-i18n-aria-label="nav.apps">
+      <a href="/" data-i18n="nav.office">Văn phòng điện tử</a>
+      <span id="nguoi" class="who" data-i18n="status.signingIn">Đang đăng nhập…</span>
+      <!-- tên ngôn ngữ kia viết bằng chính tiếng đó; lang của nút đổi theo (lang.other) -->
+      <button id="doi-ngon-ngu" type="button" class="btn ghost" lang="en" data-i18n="lang.switch"
+              data-i18n-lang="lang.other">English</button>
+      <button id="thoat" type="button" class="btn ghost" data-i18n="nav.logout" hidden>Đăng xuất</button>
     </nav>
   </header>
 
   <main id="noi-dung" tabindex="-1">
-    <p id="tin" class="status" role="status">Đang nạp mẫu đơn…</p>
+    <p id="tin" class="status" role="status" data-i18n="status.loadingForms">Đang nạp mẫu đơn…</p>
     <div id="loi" class="loi" role="alert" hidden></div>
 
     <div id="ung-dung" hidden>
-      <nav class="tabs" aria-label="Các phần của ứng dụng">
-        <button type="button" class="tab" data-phan="gui-don" aria-controls="gui-don">Gửi đơn</button>
+      <nav class="tabs" aria-label="Các phần của ứng dụng" data-i18n-aria-label="nav.sections">
+        <button type="button" class="tab" data-phan="gui-don" aria-controls="gui-don"
+                data-i18n="tab.request">Gửi đơn</button>
+        <!-- nhãn trong span riêng: gán chữ theo ngôn ngữ không xóa số đếm bên cạnh -->
         <button type="button" class="tab" data-phan="don-cua-toi" aria-controls="don-cua-toi">
-          Đơn của tôi <span id="dem-don" class="dem"></span>
+          <span data-i18n="tab.mine">Đơn của tôi</span> <span id="dem-don" class="dem"></span>
         </button>
         <button type="button" class="tab" data-phan="viec-can-duyet" aria-controls="viec-can-duyet" hidden>
-          Việc cần duyệt <span id="dem-viec" class="dem"></span>
+          <span data-i18n="tab.review">Việc cần duyệt</span> <span id="dem-viec" class="dem"></span>
         </button>
       </nav>
 
       <section id="gui-don" class="phan" aria-labelledby="tieu-de-gui-don">
-        <h1 id="tieu-de-gui-don" tabindex="-1">Gửi đơn nghỉ phép</h1>
-        <p class="hint">Trưởng phòng của phòng bạn nhận đơn và duyệt. Kết quả hiện ở phần "Đơn của tôi".</p>
+        <h1 id="tieu-de-gui-don" tabindex="-1" data-i18n="request.heading">Gửi đơn nghỉ phép</h1>
+        <p class="hint" data-i18n="request.hint">Trưởng phòng của phòng bạn nhận đơn và duyệt. Kết quả hiện ở phần "Đơn
+          của tôi".</p>
         <div id="form-don" class="khung-form"></div>
       </section>
 
       <section id="don-cua-toi" class="phan" aria-labelledby="tieu-de-don-cua-toi" hidden>
-        <h1 id="tieu-de-don-cua-toi" tabindex="-1">Đơn của tôi</h1>
-        <p id="khong-co-don" class="empty" hidden>Bạn chưa gửi đơn nào.</p>
+        <h1 id="tieu-de-don-cua-toi" tabindex="-1" data-i18n="mine.heading">Đơn của tôi</h1>
+        <p id="khong-co-don" class="empty" data-i18n="mine.empty" hidden>Bạn chưa gửi đơn nào.</p>
         <ul id="danh-sach-don" class="danh-sach"></ul>
       </section>
 
       <section id="viec-can-duyet" class="phan" aria-labelledby="tieu-de-viec-can-duyet" hidden>
-        <h1 id="tieu-de-viec-can-duyet" tabindex="-1">Việc cần duyệt</h1>
-        <p class="hint">Đơn của nhân viên trong phòng bạn đang chờ quyết định. Người gửi đọc được ghi chú.</p>
-        <p id="khong-co-viec" class="empty" hidden>Không còn đơn nào chờ duyệt.</p>
+        <h1 id="tieu-de-viec-can-duyet" tabindex="-1" data-i18n="review.heading">Việc cần duyệt</h1>
+        <p class="hint" data-i18n="review.hint">Đơn của nhân viên trong phòng bạn đang chờ quyết định. Người gửi đọc
+          được ghi chú.</p>
+        <p id="khong-co-viec" class="empty" data-i18n="review.empty" hidden>Không còn đơn nào chờ duyệt.</p>
         <ul id="danh-sach-viec" class="danh-sach"></ul>
       </section>
     </div>
   </main>
 
-  <footer class="foot">
+  <footer class="foot" data-i18n="page.footer">
     Ứng dụng này không có máy chủ nghiệp vụ: đơn, việc duyệt, ai được thấy việc nào đều do động cơ quy trình của lõi
     Signet giữ và kiểm. Mẫu đơn là tệp JSON Schema, quy trình là tệp BPMN nằm trong thư mục của ứng dụng.
   </footer>
