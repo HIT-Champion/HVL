@@ -28,7 +28,7 @@ ENV_FILE := .env
 # COMPOSE_PROFILES trong bản cài (make install)
 EXTRA_PROFILES := $(shell sed -n 's/^MOC_EXTRA_PROFILES=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr ',' ' ')
 COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXTRA_PROFILES),--profile $(p)))
-# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 8 dịch vụ sang
+# Log tập trung (F3.14, profile logs; docs/van-hanh.md mục Log tập trung): tệp phủ đổi driver log của 9 dịch vụ sang
 # fluentd → Vector. Chỉ nạp khi bật; tắt thì docker compose chỉ đọc docker-compose.yml như cũ. export: lệnh con
 # (demo.py, moc.py… gọi docker compose) cũng nạp tệp phủ
 # Ứng dụng cài bằng manifest (moc app install, docs/them-ung-dung.md): tệp phủ compose sinh trong .moc-apps/. Có thì
@@ -37,7 +37,7 @@ APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
 APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
 BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
 LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
-LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres
+LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres meilisearch
 # Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
 LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
 ifneq ($(LOGS_ON),)
@@ -139,13 +139,13 @@ logs-env: $(ENV_FILE)
 	@sed -n 's/^MOC_LOGS_PASSWORD=//p' $(ENV_FILE) | tail -n 1 | grep -q . || { echo "MOC_LOGS_PASSWORD trong" \
 	  "$(ENV_FILE) rỗng: Parseable không khởi động với mật khẩu rỗng — đặt một chuỗi ngẫu nhiên" >&2; exit 1; }
 
-logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; 8 dịch vụ (LOGGED_SERVICES) gửi log qua driver fluentd (tạo lại 8 container: CSDL, Hasura, Keycloak gián đoạn vài giây). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
+logs-up: env-ready logs-env ## Bật log tập trung (F3.14): Vector + Parseable; 9 dịch vụ (LOGGED_SERVICES) gửi log qua driver fluentd (tạo lại 9 container: CSDL, Hasura, Keycloak, tìm kiếm gián đoạn vài giây). Giữ qua make up: thêm logs vào MOC_EXTRA_PROFILES
 	@COMPOSE_FILE=$(LOGS_COMPOSE_FILE) $(COMPOSE) --profile logs up -d --wait vector parseable $(LOGGED_SERVICES)
 	@python3 scripts/log_tap_trung.py init
-	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 8 dịch vụ về json-file" \
+	@echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || echo "Lưu ý: make up lần sau trả 9 dịch vụ về json-file" \
 	  "(Vector, Parseable vẫn chạy mà không nhận gì) — bật lâu dài thì thêm logs vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
 
-logs-down: env-ready ## Tắt log tập trung: 8 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
+logs-down: env-ready ## Tắt log tập trung: 9 dịch vụ về json-file (tạo lại container), dừng Vector, Parseable; giữ log đã lưu (volume parseable_data — make reset mới xóa)
 	@! echo " $(EXTRA_PROFILES) " | grep -q ' logs ' || { echo "Bỏ logs khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
 	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
 	@COMPOSE_FILE=$(BASE_COMPOSE_FILE) $(COMPOSE) up -d --wait --no-deps $(LOGGED_SERVICES)
