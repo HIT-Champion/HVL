@@ -892,6 +892,22 @@
               "minimum": 2000,
               "title": "Year"
             }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "vi",
+                "en"
+              ],
+              "type": "string",
+              "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi",
+              "default": "vi",
+              "title": "Lang"
+            },
+            "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi"
           }
         ],
         "responses": {
@@ -962,6 +978,22 @@
               "minimum": 2000,
               "title": "Year"
             }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "vi",
+                "en"
+              ],
+              "type": "string",
+              "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi",
+              "default": "vi",
+              "title": "Lang"
+            },
+            "description": "Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi"
           }
         ],
         "responses": {
