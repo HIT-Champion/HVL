@@ -15,6 +15,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Wiki nội bộ DokuWiki ở `/wiki/` (profile `wiki`, tắt mặc định): đăng nhập Keycloak, mỗi đơn vị một không gian (#367).
 - Sổ đăng ký văn bản đến, đi xem và in bằng tiếng Anh khi người in chọn giao diện tiếng Anh (#398).
 - Tự động hóa Node-RED ở `/tu-dong/` (profile `tu-dong`, tắt mặc định): đăng nhập Keycloak, chỉ người vận hành (#366).
+- Robot của đơn vị cho flow Node-RED gọi API, hai flow mẫu: văn bản sắp hạn lúc 07:00, văn bản Hỏa tốc (#366).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).

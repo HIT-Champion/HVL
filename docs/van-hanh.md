@@ -828,9 +828,37 @@ make tu-dong-down                       # tắt: bỏ tu-dong khỏi MOC_EXTRA_P
   - Node-RED là một không gian flow chung, không tách theo đơn vị: người có vai trò `operator` sửa được mọi flow, và
     flow gọi được mọi API qua cổng mà thông tin đăng nhập trong flow cho phép. Vì vậy đây là công cụ của người vận
     hành nền tảng, không phải của từng đơn vị.
-  - Chưa có: danh tính riêng cho flow gọi API của lõi, endpoint nhận webhook (`/tu-dong/hook/…`), hai flow mẫu (danh
-    sách văn bản sắp hạn lúc 07:00, báo lãnh đạo khi văn bản Hỏa tốc vào sổ) và bước BPMN gọi flow qua
-    `svc-workflow` — các bước tiếp theo của #366.
+  - Chưa có: endpoint nhận webhook (`/tu-dong/hook/…`) và bước BPMN gọi flow qua `svc-workflow` — bước tiếp theo
+    của #366.
+
+### Robot của flow và hai flow mẫu
+
+Flow gọi API của lõi bằng **robot của một đơn vị**, không mượn tài khoản người (#366):
+
+```bash
+python3 scripts/moc.py tu-dong robot add CNTT     # in ROBOT_ID, ROBOT_SECRET; chạy lại thì đặt lại cấu hình, giữ bí mật
+python3 scripts/moc.py tu-dong robot list         # robot đang có, đơn vị của từng robot
+python3 scripts/moc.py tu-dong robot rotate CNTT  # bí mật lộ: Keycloak sinh bí mật mới, bí mật cũ hết dùng ngay
+python3 scripts/moc.py tu-dong robot remove CNTT  # gỡ robot; token đã cấp còn dùng được tới khi hết hạn (5 phút)
+```
+
+- **Robot là gì:** client Keycloak confidential `tu-dong-robot-<mã>` chỉ có luồng `client_credentials` (không đăng
+  nhập trình duyệt, không mật khẩu người), không full scope. Access token mang cố định vai trò Hasura `tu_dong`, đơn
+  vị của robot và `x-hasura-user-id` là chính tên robot. Tài khoản dịch vụ của client không vào danh bạ người dùng.
+- **Robot được làm gì:** đọc văn bản **không hạn chế** của đơn vị mình (số ký hiệu, trích yếu, độ khẩn, trạng thái,
+  hạn, ngày vào sổ, phòng xử lý; không có nội dung, người tạo, người nhận), và gọi Action `notifyFromFlow` báo người
+  trong đơn vị theo vai trò. Không ghi bảng nào, không đọc danh bạ, thông báo, văn bản hạn chế hay của đơn vị khác
+  ([`db/tests/test_tu_dong.py`](../db/tests/test_tu_dong.py)).
+- **`notifyFromFlow(roles, title, text, document_id, key)`** (svc-workflow): gửi thông báo loại `flow.message` vào
+  chuông, đẩy tức thời như thông báo khác; cùng `key` thì không gửi lại (flow chạy lại không báo trùng). Gắn
+  `document_id` thì chỉ gửi được cho `director`, `clerk` — hai vai trò xem được mọi văn bản không hạn chế của đơn vị,
+  để trích yếu không tới người không được xem văn bản đó. Văn bản của đơn vị khác, văn bản hạn chế bị từ chối.
+- **Hai flow mẫu** ([`platform/tu-dong/flow-mau.json`](../platform/tu-dong/flow-mau.json), tab "Signet — flow mẫu",
+  để tắt): (1) 07:00 hằng ngày gom văn bản đến chưa xong có hạn trong 3 ngày tới, báo lãnh đạo đơn vị một tin; (2) mỗi
+  phút tìm văn bản Hỏa tốc vừa vào sổ, báo lãnh đạo mỗi văn bản một tin, bấm vào mở văn bản. Dùng: trình soạn → menu
+  ☰ → Import → chọn tệp; mở tab, điền `ROBOT_ID`, `ROBOT_SECRET` (biến bí mật, mã hóa bằng `MOC_TU_DONG_SECRET`)
+  trong phần Environment của tab; bật tab, Deploy. Một đơn vị một robot: muốn chạy cho đơn vị khác thì nhân bản tab,
+  điền robot của đơn vị đó.
 
 ## Hội tụ IT/OT
 
