@@ -1,5 +1,7 @@
 # Vận hành Signet
 
+**English:** [van-hanh.en.md](van-hanh.en.md)
+
 Các việc của người quản trị trên một bản cài đang chạy: thêm đơn vị, sao lưu và khôi phục, két bí mật, GitOps và tự phục
 hồi, giám sát, trang trạng thái hệ thống, wiki nội bộ, tự động hóa bằng Node-RED, hội tụ IT/OT. Cài lần đầu:
 [README](../README.md), mục "Cài đặt từ mã nguồn"; lên máy chủ có tên miền và HTTPS: [`trien-khai.md`](trien-khai.md).

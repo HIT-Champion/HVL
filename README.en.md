@@ -291,17 +291,17 @@ handle and a reply draft the team head sent back for changes.
 
 ## Operations and testing
 
-Administrator tasks on a running installation are described in [`docs/van-hanh.md`](docs/van-hanh.md) (Vietnamese):
+Administrator tasks on a running installation are described in [`docs/van-hanh.en.md`](docs/van-hanh.en.md):
 
 | Task | Main command |
 |---|---|
-| [Adding a unit](docs/van-hanh.md#thêm-đơn-vị-thuê-ước) (faculty, office, member school) | `python3 scripts/moc.py tenant create …` |
-| [Backup and restore](docs/van-hanh.md#sao-lưu-và-khôi-phục) of every database, file and the vault into an encrypted restic repository | `make backup`, `make restore` |
-| [Secrets vault](docs/van-hanh.md#két-bí-mật) OpenBao: limits, upgrading an old vault for digital signatures | `make demo-ket-bi-mat` |
-| [GitOps and self-healing](docs/van-hanh.md#gitops-và-tự-phục-hồi): systemd timer; with `MOC_GITOPS_ALLOWED_SIGNERS` set, applies signed commits only | `make reconcile` |
-| [Monitoring](docs/van-hanh.md#giám-sát) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
-| [Centralised logs](docs/van-hanh.md#log-tập-trung): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
-| [IT/OT convergence](docs/van-hanh.md#hội-tụ-itot): NGSI-LD broker, sensors | `make demo-it-ot` |
+| [Adding a unit](docs/van-hanh.en.md#adding-a-unit-tenant) (faculty, office, member school) | `python3 scripts/moc.py tenant create …` |
+| [Backup and restore](docs/van-hanh.en.md#backup-and-restore) of every database, file and the vault into an encrypted restic repository | `make backup`, `make restore` |
+| [Secrets vault](docs/van-hanh.en.md#secrets-vault) OpenBao: limits, upgrading an old vault for digital signatures | `make demo-ket-bi-mat` |
+| [GitOps and self-healing](docs/van-hanh.en.md#gitops-and-self-healing): systemd timer; with `MOC_GITOPS_ALLOWED_SIGNERS` set, applies signed commits only | `make reconcile` |
+| [Monitoring](docs/van-hanh.en.md#monitoring) of the API gateway with Prometheus + Grafana | SSH tunnel to port 3300 |
+| [Centralised logs](docs/van-hanh.en.md#centralised-logs): Vector + Parseable, searched by request id `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
+| [IT/OT convergence](docs/van-hanh.en.md#itot-convergence): NGSI-LD broker, sensors | `make demo-it-ot` |
 | [Plugging in an application](docs/them-ung-dung.md#1-một-lệnh-moc-app-install) from a manifest, no core changes; removal keeps data | `python3 scripts/moc.py app install …`, `app list`, `app remove` |
 | [Web application firewall](platform/apisix/README.md#tường-lửa-ứng-dụng-web--waf-f315): block, log only or off; find a block by `X-Request-Id` | `MOC_WAF=On` · `DetectionOnly` · `Off` |
 | [Checking the audit log](db/README.md) outside the database | `make audit` |
@@ -343,7 +343,7 @@ Most documents are in Vietnamese.
 
 | Group | Documents |
 |---|---|
-| Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
+| Use and operations | [Demo script](docs/demo-script.md) · [Operations](docs/van-hanh.en.md) · [Deploying to a server](docs/trien-khai.md) · [API documentation](docs/api/README.md) · [Adding a new application on the core](docs/them-ung-dung.md) |
 | Technical | [H-P-D-I architecture](docs/architecture.md) · [Data model and permissions](docs/mo-hinh-du-lieu.md) · [Product specification](docs/dac-ta-san-pham.md) · [Feature maturity with evidence](docs/muc-hoan-thien.md) · [AI evaluation](docs/danh-gia-ai.md) · ["After" metrics of spec §8](docs/so-lieu-sau.md) · [H-P-D-I self-assessment](docs/tu-chan-doan.md) · [Git workflow](docs/git_flow.md) |
 | Contest | [PoF self-assessment](docs/du-thi/pof-checklist.md) · [Likely jury questions](docs/du-thi/hoi-dap-hoi-dong.md) · [Theme, rules, judging criteria](docs/du-thi/olp-2026-brief.md) · [Problem statement analysis](docs/du-thi/olp-2026-de-thi.md) · [Development plan](docs/du-thi/ke-hoach-phat-trien.md) · [Research before the problem statement](docs/du-thi/nghien-cuu/) |
 | Project | [Copyright and third-party software](COPYRIGHT.txt) · [Dependencies and licenses](DEPENDENCIES.md) · [Change history](CHANGELOG.md) · [Contributing guide](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Roadmap](ROADMAP.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
