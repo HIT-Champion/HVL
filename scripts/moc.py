@@ -73,6 +73,12 @@
         migration riêng, bảng và quyền Hasura, event trigger nghe sự kiện của lõi. Chạy lại được; lỗi giữa chừng thì
         báo bước nào. Gỡ giữ nguyên dữ liệu. (make app-install APP=…; chi tiết trong scripts/ung_dung.py)
 
+    python3 scripts/moc.py wiki sync [--dry-run] [--json]
+        Wiki nội bộ (#367, profile wiki): thêm hoặc cập nhật client Keycloak `wiki`, ghi danh sách quyền của DokuWiki
+        để mỗi đơn vị chỉ đọc, sửa không gian don-vi:<mã> của mình, và trang đầu liệt kê các không gian. Chạy lại sau
+        khi thêm đơn vị. Thoát 0: xong; 1: bị từ chối hoặc wiki không chạy; 2: không gọi được CSDL, Keycloak.
+        (make wiki-up cũng gọi; chi tiết trong scripts/wiki.py)
+
 Đọc CSDL qua `docker compose exec postgres psql`, đọc bucket qua `docker compose exec svc-files`, gọi Keycloak qua cổng
 quản trị nội bộ (127.0.0.1): không mở thêm cổng nào, không cần mật khẩu ngoài .env.
 """
@@ -95,6 +101,7 @@ import backup
 import realm_clients
 import tenants
 import ung_dung
+import wiki
 from audit_chain import (ANCHORS_SQL, DOCUMENTS_SQL, HEAD_SQL, NOW_SQL, ROWS_SQL, Problem, Report, check, local_time,
                          to_datetime)
 from moc_env import ENV, ROOT
@@ -616,6 +623,7 @@ def main(argv: list[str] | None = None) -> int:
     rp.set_defaults(run=realm_clients.cmd_profile)
 
     ung_dung.add_parser(groups)
+    wiki.add_parser(groups)
     args = parser.parse_args(argv)
     return args.run(args)
 

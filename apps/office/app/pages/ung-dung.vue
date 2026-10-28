@@ -18,13 +18,14 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { appCatalog, appsQuery, isAppLeader, shortHash } from '~/utils/apps'
+import { OPTIONAL_APPS, appCatalog, appsQuery, isAppLeader, shortHash } from '~/utils/apps'
 import type { CatalogEntry, InstalledApp } from '~/utils/apps'
 
 // Danh mục ứng dụng chạy trên lõi Signet: ứng dụng có sẵn trong lõi và ứng dụng cắm bằng manifest (core.app_catalog).
 // Ai đăng nhập cũng xem để mở ứng dụng; lãnh đạo, quản trị đơn vị xem thêm băm manifest và ứng dụng đã gỡ — Hasura
 // không cho vai trò khác đọc hai cột đó (db/metadata/.../core_app_catalog.yaml). Chỉ để xem: cài, gỡ bằng `moc app`
-// trên máy chủ. Phiên bản của ứng dụng có sẵn là phiên bản lõi (GET /api/status, công khai).
+// trên máy chủ. Phiên bản của ứng dụng có sẵn là phiên bản lõi (GET /api/status, công khai). Ứng dụng tùy chọn (wiki
+// nội bộ, profile wiki) chỉ hiện khi đường kiểm sức khỏe của nó trả lời.
 
 const { t } = useI18n()
 const { gql } = useApi()
@@ -33,11 +34,12 @@ const claims = useAuth().claims
 
 const rows = ref<InstalledApp[]>([])
 const coreVersion = ref<string | null>(null)
+const optional = ref<string[]>([])
 const loaded = ref(false)
 const loading = ref(false)
 const failure = ref('')
 const leader = computed(() => isAppLeader(claims.value?.role))
-const groups = computed(() => appCatalog(t, rows.value, coreVersion.value))
+const groups = computed(() => appCatalog(t, rows.value, coreVersion.value, optional.value))
 
 async function loadCoreVersion() {
   try {
@@ -49,6 +51,19 @@ async function loadCoreVersion() {
   }
 }
 
+async function probeOptional() {
+  const found = await Promise.all(OPTIONAL_APPS.map(async (a) => {
+    try {
+      const res = await fetch(a.probe, { cache: 'no-store' })
+      // "ok" chứ không chỉ 200: route chưa có thì app-office trả trang của chính nó
+      return res.ok && (await res.text()).trim() === 'ok' ? a.name : null
+    } catch {
+      return null
+    }
+  }))
+  optional.value = found.filter((name): name is string => name !== null)
+}
+
 async function load() {
   loading.value = true
   failure.value = ''
@@ -56,6 +71,7 @@ async function load() {
     const [data] = await Promise.all([
       gql<{ core_app_catalog: InstalledApp[] }>(appsQuery(claims.value?.role)),
       loadCoreVersion(),
+      probeOptional(),
     ])
     rows.value = data.core_app_catalog
     loaded.value = true
