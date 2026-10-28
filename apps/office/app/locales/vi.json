@@ -646,6 +646,12 @@
     "recipients": "Nơi nhận",
     "recipientsHint": "Mỗi dòng một nơi nhận; công văn in thành \"Kính gửi\"",
     "urgency": "Độ khẩn",
+    "language": "Ngôn ngữ của văn bản",
+    "languages": {
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh"
+    },
+    "languageHint": "Tiếng Anh: quốc hiệu, số, ngày, nơi nhận, khối xác thực in bằng tiếng Anh; nội dung bạn gõ giữ nguyên",
     "replyTo": "Trả lời văn bản đến",
     "replyNone": "— Không —",
     "attachments": "Tài liệu kèm theo",

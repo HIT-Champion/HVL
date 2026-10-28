@@ -14,6 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { PASSWORD, shot, signIn } from './helpers'
 
@@ -22,8 +23,8 @@ import { PASSWORD, shot, signIn } from './helpers'
 // bằng tiếng Anh: form trống bị chặn với lời báo tiếng Anh, lưu được, trang văn bản và danh sách văn bản đi hiện nhãn,
 // trạng thái tiếng Anh; tải lại trang vẫn giữ (moc.locale trong localStorage); bấm "Tiếng Việt" thì về lại. Chữ so
 // khớp lấy nguyên văn từ apps/office/app/locales/en.json. Trang công khai (trạng thái hệ thống, xác thực văn bản):
-// người ngoài dùng trình duyệt tiếng Anh vẫn mở ra tiếng Việt, đổi bằng nút, không cần đăng nhập. PDF phát hành, sổ
-// in vẫn theo thể thức tiếng Việt, không kiểm ở đây.
+// người ngoài dùng trình duyệt tiếng Anh vẫn mở ra tiếng Việt, đổi bằng nút, không cần đăng nhập. Dự thảo chọn
+// ngôn ngữ văn bản "English" (#398): svc-files dựng được bản xem trước PDF; chữ trong PDF kiểm ở test của svc-files.
 
 const tag = Math.random().toString(36).slice(2, 7).toUpperCase()
 const summary = `Invitation to the joint seminar with partner universities in November (test ${tag})`
@@ -95,6 +96,7 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
   await staff.getByLabel('Body', { exact: true }).fill(
     'The Faculty of Information Technology invites partner universities to a joint seminar in November.')
   await staff.getByLabel('Recipients', { exact: true }).fill('International Cooperation Office')
+  await staff.getByLabel('Document language', { exact: true }).selectOption({ label: 'English' })
   await staff.getByRole('button', { name: 'Save draft' }).click()
   await expect(staff.getByText('Draft saved.')).toBeVisible()
 
@@ -108,7 +110,11 @@ test('giao diện tiếng Anh: đổi ngôn ngữ, danh sách, soạn dự thả
   }
   await expect(staff.getByLabel('Signing director')).toBeVisible()
   await expect(staff.getByRole('button', { name: 'Submit for signing' })).toBeVisible()
-  await expect(staff.getByRole('button', { name: 'Download preview (PDF)' })).toBeVisible()
+  const [preview] = await Promise.all([
+    staff.waitForEvent('download'),
+    staff.getByRole('button', { name: 'Download preview (PDF)' }).click(),
+  ])
+  expect(readFileSync(await preview.path()).subarray(0, 5).toString()).toBe('%PDF-')
   await expect(staff.getByTestId('timeline').getByText('Draft created', { exact: true })).toBeVisible()
   await staff.getByRole('tab', { name: 'History', exact: true }).click()
   await expect(staff.getByTestId('history').getByText('Created · Document', { exact: true })).toBeVisible()

@@ -115,6 +115,24 @@ def test_staff_writes_body_only_while_draft(world):
     assert sql(f"select body like '%Trân trọng.' from office.documents where id = '{doc}'") == [["t"]]
 
 
+def test_staff_picks_the_letter_language_only_while_draft(world):
+    """F2.9 (#398): tiếng Việt mặc định; người soạn chọn tiếng Anh khi soạn, sửa được tới lúc trình; ngôn ngữ khác
+    bị chặn; mọi vai trò đọc được (svc-files dựng PDF theo cột này)."""
+    vi, en = draft(world, 9321), draft(world, 9322, language="en")
+    assert sql(f"select language from office.documents where id in ('{vi}', '{en}') order by language desc") \
+        == [["vi"], ["en"]]
+    set_language = ("mutation ($id: uuid!, $l: String!) { update_office_documents(where: {id: {_eq: $id}}, "
+                    "_set: {language: $l}) { affected_rows } }")
+    assert world.staff_a1.gql(set_language, {"id": vi, "l": "en"})["update_office_documents"]["affected_rows"] == 1
+    with pytest.raises(GraphQLError, match="documents_language"):
+        world.staff_a1.gql(set_language, {"id": vi, "l": "fr"})
+    approve(world, en)
+    assert world.staff_a1.gql(set_language, {"id": en, "l": "vi"})["update_office_documents"]["affected_rows"] == 0
+    read = "query ($id: uuid!) { office_documents_by_pk(id: $id) { language } }"
+    assert world.director_a.gql(read, {"id": en})["office_documents_by_pk"] == {"language": "en"}
+    assert as_clerk(world).gql(read, {"id": vi})["office_documents_by_pk"] == {"language": "en"}
+
+
 def test_incoming_documents_have_no_body(world):
     with pytest.raises(GraphQLError, match="documents_body_only_out"):
         received(world.clerk_a, {"type_code": "CV", "symbol": "1/X", "issuer_name": "UBND", "issued_on": "2026-10-15",
