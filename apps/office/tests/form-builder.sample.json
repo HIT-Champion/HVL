@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:moc:app:mua-sam:form:de-nghi-mua-sam",
+  "title": "Đề nghị mua sắm",
+  "x-moc-title": {
+    "vi": "Đề nghị mua sắm",
+    "en": "Purchase request"
+  },
+  "x-moc-order": [
+    "tenHang",
+    "soLuong",
+    "donGiaDong",
+    "loai",
+    "mucDo",
+    "ngayDeNghi",
+    "canTruocNgay",
+    "lyDo",
+    "daCoBaoGia"
+  ],
+  "x-moc-range": [
+    [
+      "ngayDeNghi",
+      "canTruocNgay"
+    ]
+  ],
+  "x-moc-nfc": true,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenHang",
+    "soLuong",
+    "loai",
+    "mucDo",
+    "ngayDeNghi",
+    "canTruocNgay",
+    "daCoBaoGia"
+  ],
+  "properties": {
+    "tenHang": {
+      "title": "Tên hàng",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "$ref": "#/$defs/line",
+      "x-moc-ui": {
+        "widget": "text",
+        "label": {
+          "vi": "Tên hàng",
+          "en": "Item"
+        },
+        "help": {
+          "vi": "Ghi như trên báo giá.",
+          "en": "As on the quote."
+        }
+      }
+    },
+    "soLuong": {
+      "title": "Số lượng",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "x-moc-ui": {
+        "widget": "number",
+        "label": {
+          "vi": "Số lượng",
+          "en": "Quantity"
+        }
+      }
+    },
+    "donGiaDong": {
+      "title": "Đơn giá (đồng)",
+      "type": "number",
+      "minimum": 0,
+      "x-moc-ui": {
+        "widget": "number",
+        "label": "Đơn giá (đồng)"
+      }
+    },
+    "loai": {
+      "title": "Loại",
+      "type": "string",
+      "enum": [
+        "van-phong-pham",
+        "thiet-bi",
+        "dich-vu"
+      ],
+      "x-moc-ui": {
+        "widget": "select",
+        "label": {
+          "vi": "Loại",
+          "en": "Category"
+        },
+        "options": {
+          "van-phong-pham": {
+            "vi": "Văn phòng phẩm",
+            "en": "Stationery"
+          },
+          "thiet-bi": {
+            "vi": "Thiết bị",
+            "en": "Equipment"
+          },
+          "dich-vu": "Dịch vụ"
+        }
+      }
+    },
+    "mucDo": {
+      "title": "Mức độ",
+      "type": "string",
+      "enum": [
+        "thuong",
+        "gap"
+      ],
+      "x-moc-ui": {
+        "widget": "radio",
+        "label": {
+          "vi": "Mức độ",
+          "en": "Priority"
+        },
+        "options": {
+          "thuong": {
+            "vi": "Thường",
+            "en": "Normal"
+          },
+          "gap": {
+            "vi": "Gấp",
+            "en": "Urgent"
+          }
+        }
+      }
+    },
+    "ngayDeNghi": {
+      "title": "Ngày đề nghị",
+      "type": "string",
+      "format": "date",
+      "x-moc-date": "not-after-today",
+      "x-moc-ui": {
+        "widget": "date",
+        "label": {
+          "vi": "Ngày đề nghị",
+          "en": "Request date"
+        }
+      }
+    },
+    "canTruocNgay": {
+      "title": "Cần trước ngày",
+      "type": "string",
+      "format": "date",
+      "x-moc-date": "not-before-today",
+      "x-moc-ui": {
+        "widget": "date",
+        "label": {
+          "vi": "Cần trước ngày",
+          "en": "Needed by"
+        }
+      }
+    },
+    "lyDo": {
+      "title": "Lý do",
+      "type": "string",
+      "maxLength": 1000,
+      "$ref": "#/$defs/text",
+      "x-moc-ui": {
+        "widget": "textarea",
+        "label": {
+          "vi": "Lý do",
+          "en": "Reason"
+        },
+        "rows": 3
+      }
+    },
+    "daCoBaoGia": {
+      "title": "Đã có báo giá",
+      "type": "boolean",
+      "x-moc-ui": {
+        "widget": "checkbox",
+        "label": {
+          "vi": "Đã có báo giá",
+          "en": "Quote attached"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "line": {
+      "type": "string",
+      "allOf": [
+        {
+          "not": {
+            "pattern": "[\u0000-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f]"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\u2028\u2029]"
+          }
+        },
+        {
+          "not": {
+            "pattern": "^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"
+          }
+        }
+      ]
+    },
+    "text": {
+      "type": "string",
+      "allOf": [
+        {
+          "not": {
+            "pattern": "[\u0000-\t\u000b\f\u000e-\u001f\u007f-\u009f\u00ad\u115f\u1160\u200b-\u200f]"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164\ufeff\uffa0\u2028\u2029]"
+          }
+        },
+        {
+          "not": {
+            "pattern": "^[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]"
+          }
+        },
+        {
+          "not": {
+            "pattern": "[\t\n\u000b\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$"
+          }
+        }
+      ]
+    }
+  }
+}

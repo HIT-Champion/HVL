@@ -20,12 +20,14 @@
 import { useI18n } from 'vue-i18n'
 import { OPTIONAL_APPS, appCatalog, appsQuery, isAppLeader, shortHash } from '~/utils/apps'
 import type { CatalogEntry, InstalledApp } from '~/utils/apps'
+import { canBuildForms } from '~/utils/formBuilder'
 
 // Danh mục ứng dụng chạy trên lõi Signet: ứng dụng có sẵn trong lõi và ứng dụng cắm bằng manifest (core.app_catalog).
 // Ai đăng nhập cũng xem để mở ứng dụng; lãnh đạo, quản trị đơn vị xem thêm băm manifest và ứng dụng đã gỡ — Hasura
 // không cho vai trò khác đọc hai cột đó (db/metadata/.../core_app_catalog.yaml). Chỉ để xem: cài, gỡ bằng `moc app`
 // trên máy chủ. Phiên bản của ứng dụng có sẵn là phiên bản lõi (GET /api/status, công khai). Ứng dụng tùy chọn (wiki
-// nội bộ, profile wiki) chỉ hiện khi đường kiểm sức khỏe của nó trả lời.
+// nội bộ, profile wiki) chỉ hiện khi đường kiểm sức khỏe của nó trả lời. Quản trị đơn vị có thêm nút sang trình dựng
+// form (/ung-dung/dung-form, #303).
 
 const { t } = useI18n()
 const { gql } = useApi()
@@ -39,6 +41,7 @@ const loaded = ref(false)
 const loading = ref(false)
 const failure = ref('')
 const leader = computed(() => isAppLeader(claims.value?.role))
+const builder = computed(() => canBuildForms(claims.value?.role))
 const groups = computed(() => appCatalog(t, rows.value, coreVersion.value, optional.value))
 
 async function loadCoreVersion() {
@@ -110,6 +113,9 @@ const sections = computed(() => [
 <template>
   <div>
     <PageHeader :title="t('apps.title')" :subtitle="t('apps.subtitle')">
+      <NuxtLink v-if="builder" to="/ung-dung/dung-form" class="btn-secondary" data-testid="open-form-builder">
+        {{ t('formBuilder.open') }}
+      </NuxtLink>
       <button class="btn-secondary" :disabled="loading" @click="load">{{ t('app.refresh') }}</button>
     </PageHeader>
     <p v-if="failure" class="moc-state mb-6">{{ failure }}</p>
