@@ -1602,6 +1602,10 @@
       "personal": {
         "title": "P.A.R.A personal space",
         "description": "Each person's own place for files in four folders: Projects, Areas, Resources, Archives."
+      },
+      "wiki": {
+        "title": "Internal wiki",
+        "description": "Notes and how-tos for each unit (DokuWiki): only people in a unit can read and edit its space."
       }
     }
   },
