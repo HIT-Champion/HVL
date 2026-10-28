@@ -352,8 +352,10 @@ khi hai tệp cùng process id, khi có tệp không khai.
 `additionalProperties: false` (mọi biến ghi vào quy trình đều được khai); tên trường dạng camelCase (là tên biến
 Flowable), không trùng biến hệ thống `tenantId`, `departmentId`, `initiator`, cũng không trùng tên Flowable dành sẵn
 trong biểu thức `execution`, `task`, `authenticatedUserId`, `currentTenantId` (điều kiện của BPMN đọc ra giá trị của
-động cơ chứ không phải giá trị gửi lên, #330); mỗi trường một giá trị đơn (chuỗi, số, đúng/sai — biến Flowable không
-chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp, dạng JSON Pointer (`#/…`; giải
+động cơ chứ không phải giá trị gửi lên, #330), không trùng 16 từ khóa của biểu thức JUEL `and`, `or`, `not`, `le`,
+`empty`… (`EL_KEYWORDS`: điều kiện `${le == 'x'}` là lỗi cú pháp); mỗi trường một giá trị đơn (chuỗi, số, đúng/sai —
+biến Flowable không chứa đối tượng, mảng); `format` chỉ `date`, `uuid`; `$ref` chỉ trỏ trong chính tệp,
+dạng JSON Pointer (`#/…`; giải
 `%XX` cả chuỗi rồi mới tách theo `/` như jsonschema, chỉ số mảng không có số 0 đầu), tới đúng một schema, không vòng,
 lồng tối đa 16 tầng; `$id`, `$anchor`, `$dynamicAnchor` chỉ khai ở gốc form (dưới gốc chúng đổi chỗ `#/…` trỏ tới);
 `x-moc-range` là các cặp hai trường `format: date`; tối đa 256 KB, không có `NaN`, `Infinity`; đối tượng và mảng lồng

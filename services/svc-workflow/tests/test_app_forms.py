@@ -394,6 +394,7 @@ RULE_MESSAGES = {
     "properties": r"^cần properties",
     "reserved": r"trùng biến hệ thống",
     "engine-name": r"trùng tên Flowable",
+    "el-keyword": r"trùng từ khóa của biểu thức",
     "field-name": r"^tên trường .* phải dạng camelCase",
     "field-schema": r"phải là một schema \(đối tượng\)$",
     "scalar": r": chỉ nhận giá trị đơn",
