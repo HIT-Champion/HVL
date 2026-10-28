@@ -30,7 +30,8 @@ const body = 'Thực hiện Công văn của Phòng Đào tạo, Khoa đã rà s
 
 async function openTask(page: Page, screenshot?: string) {
   await page.goto('/')
-  const item = page.getByRole('link', { name: new RegExp(tag) })
+  // trong hộp việc: tin realtime ở góc màn hình cũng là liên kết mang trích yếu (#415)
+  const item = page.getByTestId('inbox').getByRole('link', { name: new RegExp(tag) })
   await expect(item).toBeVisible()
   if (screenshot) await shot(page, screenshot)
   await item.click()
