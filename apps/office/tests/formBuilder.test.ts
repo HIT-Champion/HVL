@@ -24,10 +24,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import {
-  BUILDER_DATE_RULES, BUILDER_DEFS, BUILDER_LIMITS, BUILDER_PROBLEMS, BUILDER_WIDGETS, FORM_BUILDER_ROLES,
+  BUILDER_DATE_RULES, BUILDER_DEFS, BUILDER_LIMITS, BUILDER_PROBLEMS, BUILDER_WIDGETS, EL_KEYWORDS, FORM_BUILDER_ROLES,
   addBuilderField, addBuilderOption, builderFile, builderFormFrom, builderFormKey, builderName, builderProblems,
-  builderSchema, builderSlug, canBuildForms, moveBuilderItem, newBuilderForm, removeBuilderField, setBuilderWidget,
-  syncBuilderNames,
+  builderSchema, builderSlug, canBuildForms, freezeBuilderNames, moveBuilderItem, newBuilderForm, removeBuilderField,
+  setBuilderWidget, syncBuilderNames,
 } from '../app/utils/formBuilder.ts'
 import type { Bilingual, BuilderField, BuilderForm, BuilderWidget } from '../app/utils/formBuilder.ts'
 import { FORM_LIMITS, checkForm } from '../app/utils/formRules.ts'
@@ -176,6 +176,10 @@ test('tên biến, giá trị lựa chọn, khóa form suy từ chữ không d�
     assert.equal(builderSlug(text!), slug, text)
   }
   assert.equal(builderSlug('abc '.repeat(30)), 'abc-'.repeat(10).slice(0, -1))
+  // giá trị lựa chọn không phải mở bằng chữ: giữ số đầu
+  for (const [text, slug] of [['3 ngày', '3-ngay'], ['5', '5'], ['Ngày 2', 'ngay-2']]) {
+    assert.equal(builderSlug(text!, false), slug, text)
+  }
 })
 
 test('tên suy ra không trùng nhau, không trùng biến hệ thống, nhường tên người dùng tự đặt', () => {
@@ -204,6 +208,44 @@ test('tên suy ra không trùng nhau, không trùng biến hệ thống, nhườ
   options(form, s, [{ vi: 'Có', en: '' }, { vi: 'Có', en: 'Yes' }, { vi: 'Không', en: '' }])
   syncBuilderNames(form)
   assert.deepEqual(s.options.map((o) => o.value), ['co', 'co2', 'khong'])
+
+  // từ khóa EL như biến thường thì `${le == 'x'}` trong BPMN không dịch được: tên suy ra tránh
+  const le = field(form, 'text', { vi: 'Lễ', en: '' })
+  const not = field(form, 'text', { vi: 'Not', en: '' })
+  const score = field(form, 'radio', { vi: 'Điểm', en: '' })
+  options(form, score, ['1', '2', '3 ngày', '3 Ngày'].map((vi) => ({ vi, en: '' })))
+  syncBuilderNames(form)
+  assert.deepEqual([le.name, not.name], ['le2', 'not2'])
+  assert.deepEqual(score.options.map((o) => o.value), ['1', '2', '3-ngay', '3-ngay2'])
+  assert.equal(EL_KEYWORDS.length, 16)
+})
+
+test('tải tệp rồi thì tên, khóa, giá trị đang có giữ nguyên khi xóa, đổi chỗ, đổi nhãn', () => {
+  const form = newBuilderForm()
+  form.title.vi = 'Đơn'
+  const a = field(form, 'date', { vi: 'Ngày', en: '' })
+  const b = field(form, 'date', { vi: 'Ngày', en: '' })
+  const c = field(form, 'select', { vi: 'Loại', en: '' })
+  options(form, c, [{ vi: 'Có', en: '' }, { vi: 'Có', en: '' }])
+  syncBuilderNames(form)
+  // chưa tải: xóa trường đầu thì trường sau lấy lại tên "ngay"
+  const draft = builderFormFrom(JSON.parse(JSON.stringify(form)))
+  removeBuilderField(draft, draft.fields[0]!.id)
+  syncBuilderNames(draft)
+  assert.equal(draft.fields[0]!.name, 'ngay')
+
+  freezeBuilderNames(form)
+  removeBuilderField(form, a.id)
+  c.options.shift()
+  form.title.vi = 'Đơn khác'
+  c.label.vi = 'Kiểu'
+  syncBuilderNames(form)
+  assert.deepEqual([b.name, c.name, c.options[0]!.value, form.key], ['ngay2', 'loai', 'co2', 'don'])
+  // trường thêm sau lần tải vẫn suy theo nhãn
+  const d = field(form, 'text', { vi: 'Ghi chú', en: '' })
+  syncBuilderNames(form)
+  assert.equal(d.name, 'ghiChu')
+  assert.equal(d.named, false)
 })
 
 test('mỗi lỗi của trình dựng chỉ ra đúng trường, đúng lựa chọn', () => {
@@ -214,6 +256,10 @@ test('mỗi lỗi của trình dựng chỉ ra đúng trường, đúng lựa ch
     assert.ok(builderProblems({ ...sampleForm(), app }).some((p) => p.code === 'app'), app)
   }
   assert.ok(builderProblems({ ...sampleForm(), key: '1don', keyed: true }).some((p) => p.code === 'key'))
+  // tên trong workflow.forms là cả <app>.<key>: tới 80 ký tự
+  const long = (key: string) => builderProblems({ ...sampleForm(), app: 'a'.repeat(30), key, keyed: true })
+  assert.deepEqual(long('b'.repeat(49)), [])
+  assert.deepEqual(long('b'.repeat(50)), [{ code: 'key' }])
 
   const form = sampleForm()
   const [text, qty, , select, , asked, needed, reason] = form.fields as BuilderField[]
@@ -243,13 +289,29 @@ test('mỗi lỗi của trình dựng chỉ ra đúng trường, đúng lựa ch
   choice!.options = []
   notes!.rows = 21
   notes!.minLength = 2000
+  const [, qty2, price] = more.fields as BuilderField[]
+  Object.assign(qty2!, { name: 'or', named: true })
+  Object.assign(price!, { name: 'empty', named: true })
   assert.deepEqual(codes(more), [
     ['name-reserved', first!.id, undefined],
+    ['name-reserved', qty2!.id, undefined],
+    ['name-reserved', price!.id, undefined],
     ['options', choice!.id, undefined],
     ['length', notes!.id, undefined],
     ['rows', notes!.id, undefined],
     ['name-taken', box!.id, undefined],
   ])
+
+  // A không trước B, B không trước A: chỉ gửi được khi hai ngày bằng nhau
+  const loop = sampleForm()
+  const dates = loop.fields.filter((f) => f.widget === 'date')
+  const third = field(loop, 'date', { vi: 'Ngày giao', en: '' })
+  syncBuilderNames(loop)
+  dates[0]!.after = third.id
+  third.after = dates[1]!.id
+  assert.deepEqual(codes(loop), [dates[0]!, dates[1]!, third].map((f) => ['after-loop', f.id, undefined]))
+  third.after = null
+  assert.deepEqual(codes(loop), [])
 
   // trường, lựa chọn chưa có nhãn: tên, giá trị suy ra rỗng nhưng chỉ báo nhãn; có nhãn mà không suy được thì báo
   const opt = sampleForm()
@@ -339,6 +401,24 @@ test('chỉ quản trị đơn vị mở trình dựng; trang Ứng dụng chỉ
   const builder = read('../app/pages/ung-dung/dung-form.vue')
   assert.match(builder, /import \{ mountForm \} from '~\/lib\/schema-form\.js'/)
   assert.match(builder, /const allowed = computed\(\(\) => canBuildForms\(claims\.value\?\.role\)\)/)
+})
+
+test('chữ chỉ có tiếng Anh thì tệp ghi chuỗi tiếng Anh: form tiếng Việt không hiện chữ rỗng', () => {
+  const form = newBuilderForm()
+  field(form, 'text', { vi: 'Ghi chú', en: 'Note' }, { help: { vi: ' ', en: 'Optional.' } })
+  syncBuilderNames(form)
+  type Props = { properties: Record<string, { 'x-moc-ui': Record<string, unknown> }> }
+  const ui = (builderSchema(form) as Props).properties.ghiChu!['x-moc-ui']
+  assert.deepEqual([ui.label, ui.help], [{ vi: 'Ghi chú', en: 'Note' }, 'Optional.'])
+})
+
+test('tên ứng dụng, khóa form theo đúng luật của app-manifest.schema.json', () => {
+  const manifest = JSON.parse(read('../../../scripts/app-manifest.schema.json'))
+  const { APP, APP_MIN, APP_MAX, FORM_KEY, FORM_KEY_MAX } = BUILDER_LIMITS
+  const name = manifest.properties.name
+  assert.deepEqual([name.pattern, name.minLength, name.maxLength], [`^${APP}$`, APP_MIN, APP_MAX])
+  const keys = manifest.properties.workflow.properties.forms.propertyNames
+  assert.deepEqual([keys.pattern, keys.maxLength], [`^${APP}\\.${FORM_KEY}$`, FORM_KEY_MAX])
 })
 
 test('mỗi kiểu ô, luật ngày, lỗi của trình dựng có câu ở cả hai ngôn ngữ', () => {

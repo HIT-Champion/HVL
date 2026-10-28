@@ -21,8 +21,8 @@ import { useI18n } from 'vue-i18n'
 import { mountForm } from '~/lib/schema-form.js'
 import {
   BUILDER_DATE_RULES, BUILDER_LIMITS, BUILDER_WIDGETS, addBuilderField, addBuilderOption, builderFile, builderFormFrom,
-  builderFormKey, builderProblems, builderSchema, canBuildForms, moveBuilderItem, newBuilderForm, removeBuilderField,
-  setBuilderWidget, syncBuilderNames,
+  builderFormKey, builderProblems, builderSchema, canBuildForms, freezeBuilderNames, moveBuilderItem, newBuilderForm,
+  removeBuilderField, setBuilderWidget, syncBuilderNames,
 } from '~/utils/formBuilder'
 import type {
   BuilderField, BuilderForm, BuilderOption, BuilderProblem, BuilderProblemCode, BuilderWidget,
@@ -77,6 +77,7 @@ function problemText(p: BuilderProblem): string {
   const option = f && p.option !== undefined ? f.options.findIndex((o) => o.id === p.option) + 1 : 0
   return t(`formBuilder.problem.${p.code}`, {
     field: fieldTitle(f), option, rule: p.rule ?? '', max: BUILDER_LIMITS.MAX_LENGTH, rows: BUILDER_LIMITS.MAX_ROWS,
+    keyMax: BUILDER_LIMITS.FORM_KEY_MAX,
   })
 }
 const problemsOf = (f: BuilderField) => problems.value.filter((p) => p.field === f.id)
@@ -125,21 +126,29 @@ function numberInput(event: Event): number | null {
   return Number.isNaN(value) ? null : value
 }
 
-// Gõ tên, khóa, giá trị lưu là tự đặt; xóa trắng thì lại suy theo nhãn
+// Gõ tên, khóa, giá trị là tự đặt, kể cả khi đang xóa trắng để gõ lại (suy ngay thì ô điền lại chữ cũ, phím sau gõ
+// nối vào đó). Rời ô mà vẫn trống mới quay về suy theo nhãn
+const typed = (event: Event) => (event.target as HTMLInputElement).value.trim()
 function setName(f: BuilderField, event: Event) {
-  const value = (event.target as HTMLInputElement).value.trim()
-  f.named = value !== ''
-  f.name = value
+  f.named = true
+  f.name = typed(event)
 }
 function setKey(event: Event) {
-  const value = (event.target as HTMLInputElement).value.trim()
-  form.keyed = value !== ''
-  form.key = value
+  form.keyed = true
+  form.key = typed(event)
 }
-
 function setValue(o: BuilderOption, event: Event) {
-  o.value = (event.target as HTMLInputElement).value.trim()
-  o.named = o.value !== ''
+  o.named = true
+  o.value = typed(event)
+}
+function unsetName(f: BuilderField) {
+  if (!f.name) f.named = false
+}
+function unsetKey() {
+  if (!form.key) form.keyed = false
+}
+function unsetValue(o: BuilderOption) {
+  if (!o.value) o.named = false
 }
 
 function addOption(f: BuilderField) {
@@ -157,7 +166,7 @@ const FORM_INPUTS: Partial<Record<BuilderProblemCode, string>> = {
 }
 const FIELD_INPUTS: Partial<Record<BuilderProblemCode, string>> = {
   'name': 'name', 'name-reserved': 'name', 'name-taken': 'name', 'length': 'max', 'rows': 'rows', 'bounds': 'minimum',
-  'options': 'add-option', 'after': 'after',
+  'options': 'add-option', 'after': 'after', 'after-loop': 'after',
 }
 function showProblem(p: BuilderProblem) {
   if (p.field === undefined) {
@@ -171,6 +180,7 @@ function showProblem(p: BuilderProblem) {
 
 function download() {
   if (problems.value.length) return
+  freezeBuilderNames(form)
   const url = URL.createObjectURL(new Blob([file.value], { type: 'application/json' }))
   const a = document.createElement('a')
   a.href = url
@@ -247,7 +257,7 @@ watch([file, locale, preview], render, { flush: 'post' })
               <label class="label" for="fb-key">{{ t('formBuilder.key') }}</label>
               <input
                 id="fb-key" :value="form.key" class="input font-mono" maxlength="60" spellcheck="false"
-                autocomplete="off" aria-describedby="fb-key-help" @input="setKey"
+                autocomplete="off" aria-describedby="fb-key-help" @input="setKey" @change="unsetKey"
               >
               <p id="fb-key-help" class="moc-foot mt-1">{{ t('formBuilder.keyHint') }}</p>
             </div>
@@ -331,6 +341,7 @@ watch([file, locale, preview], render, { flush: 'post' })
                     <input
                       :id="`fb-${f.id}-name`" :value="f.name" class="input font-mono" maxlength="64" spellcheck="false"
                       autocomplete="off" :aria-describedby="`fb-${f.id}-name-help`" @input="setName(f, $event)"
+                      @change="unsetName(f)"
                     >
                     <p :id="`fb-${f.id}-name-help`" class="moc-foot mt-1">{{ t('formBuilder.nameHint') }}</p>
                   </div>
@@ -452,6 +463,7 @@ watch([file, locale, preview], render, { flush: 'post' })
                             <input
                               :id="`fb-${o.id}-value`" :value="o.value" class="input font-mono" maxlength="100"
                               spellcheck="false" autocomplete="off" @input="setValue(o, $event)"
+                              @change="unsetValue(o)"
                             >
                             <button
                               type="button" class="btn-ghost px-2.5 text-red-700"

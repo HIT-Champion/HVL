@@ -49,6 +49,8 @@ export const BUILDER_LIMITS = {
   APP_MIN: 2,
   APP_MAX: 30,
   FORM_KEY: '[a-z][a-z0-9]*(-[a-z0-9]+)*',
+  // cả formKey <app>.<key>: maxLength của tên trong workflow.forms (app-manifest.schema.json)
+  FORM_KEY_MAX: 80,
   // độ dài tối đa (ký tự) mặc định của ô một dòng, ô nhiều dòng, và trần trình dựng cho đặt
   TEXT_LENGTH: 200,
   TEXTAREA_LENGTH: 2000,
@@ -101,12 +103,17 @@ export interface BuilderForm {
 
 export type BuilderProblemCode = 'app' | 'key' | 'title' | 'fields' | 'label' | 'name' | 'name-reserved'
   | 'name-taken' | 'length' | 'rows' | 'bounds' | 'options' | 'option-label' | 'option-value' | 'option-taken'
-  | 'after' | 'rule'
+  | 'after' | 'after-loop' | 'rule'
 
 // mỗi mã một câu formBuilder.problem.<mã> ở cả hai ngôn ngữ (test)
 export const BUILDER_PROBLEMS: BuilderProblemCode[] = ['app', 'key', 'title', 'fields', 'label', 'name',
   'name-reserved', 'name-taken', 'length', 'rows', 'bounds', 'options', 'option-label', 'option-value', 'option-taken',
-  'after', 'rule']
+  'after', 'after-loop', 'rule']
+
+// Từ khóa của biểu thức EL (JUEL) trong BPMN: biến trùng tên thì `${le == 'x'}` không dịch được. Luật lúc cài của máy
+// chủ chưa chặn; trình dựng không suy ra và báo lỗi khi người dùng tự đặt
+export const EL_KEYWORDS = ['and', 'div', 'empty', 'eq', 'false', 'ge', 'gt', 'instanceof', 'le', 'lt', 'mod', 'ne',
+  'not', 'null', 'or', 'true']
 
 export interface BuilderProblem {
   code: BuilderProblemCode
@@ -118,7 +125,7 @@ export interface BuilderProblem {
 const VARIABLE = new RegExp(`^(?:${FORM_LIMITS.VARIABLE})$`)
 const APP = new RegExp(`^(?:${BUILDER_LIMITS.APP})$`)
 const FORM_KEY = new RegExp(`^(?:${BUILDER_LIMITS.FORM_KEY})$`)
-const TAKEN = new Set([...FORM_LIMITS.RESERVED, ...FORM_LIMITS.ENGINE_NAMES])
+const TAKEN = new Set([...FORM_LIMITS.RESERVED, ...FORM_LIMITS.ENGINE_NAMES, ...EL_KEYWORDS])
 const empty = (): Bilingual => ({ vi: '', en: '' })
 
 // Ô chữ: không ký tự điều khiển, ký tự vô hình; không khoảng trắng ở đầu hoặc cuối; ô một dòng không xuống dòng. Viết
@@ -147,17 +154,20 @@ function clean(text: string): string {
     .replace(/\s+/gu, ' ').trim()
 }
 
+// Chỉ có tiếng Anh thì ghi chuỗi tiếng Anh: {vi: '', en} làm form tiếng Việt hiện chữ rỗng (say() lấy '' của vi)
 function bilingual(text: Bilingual): string | Bilingual {
   const vi = clean(text.vi)
   const en = clean(text.en)
+  if (!vi) return en
   return en && en !== vi ? { vi, en } : vi
 }
 
-// Từ chữ không dấu của nhãn: "Từ ngày" → ["tu", "ngay"]; bỏ các từ đầu mở bằng chữ số (tên phải mở bằng chữ cái)
-function words(text: string): string[] {
+// Từ chữ không dấu của nhãn: "Từ ngày" → ["tu", "ngay"]. Tên, khóa phải mở bằng chữ cái nên bỏ các từ đầu mở bằng
+// chữ số; giá trị lựa chọn thì giữ ("3 ngày" → "3-ngay")
+function words(text: string, letterFirst = true): string[] {
   const parts = text.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
     .toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
-  while (parts.length && /^[0-9]/.test(parts[0]!)) parts.shift()
+  while (letterFirst && parts.length && /^[0-9]/.test(parts[0]!)) parts.shift()
   return parts
 }
 
@@ -168,8 +178,8 @@ export function builderName(label: string): string {
 }
 
 /** Khóa form, giá trị lựa chọn suy từ chữ, kiểu gạch nối: "Phép năm" → "phep-nam". */
-export function builderSlug(text: string): string {
-  return words(text).join('-').slice(0, BUILDER_LIMITS.SLUG_LENGTH).replace(/-+$/, '')
+export function builderSlug(text: string, letterFirst = true): string {
+  return words(text, letterFirst).join('-').slice(0, BUILDER_LIMITS.SLUG_LENGTH).replace(/-+$/, '')
 }
 
 function unique(base: string, taken: Set<string>): string {
@@ -283,9 +293,21 @@ export function syncBuilderNames(form: BuilderForm): void {
     const values = new Set(f.options.filter((o) => o.named).map((o) => o.value))
     for (const o of f.options) {
       if (o.named) continue
-      const value = unique(builderSlug(o.label.vi), values)
+      const value = unique(builderSlug(o.label.vi, false), values)
       if (o.value !== value) o.value = value
     }
+  }
+}
+
+/**
+ * Giữ nguyên khóa form, tên trường, giá trị lựa chọn đang có (gọi khi tải tệp về): quy trình viết theo tệp đã tải không
+ * đổi nghĩa khi sau đó xóa hay đổi thứ tự trường làm tên suy ra (ngay, ngay2…) đổi chỗ cho nhau.
+ */
+export function freezeBuilderNames(form: BuilderForm): void {
+  if (form.key) form.keyed = true
+  for (const f of form.fields) {
+    if (f.name) f.named = true
+    for (const o of f.options) if (o.value) o.named = true
   }
 }
 
@@ -416,8 +438,20 @@ function fieldProblems(form: BuilderForm, f: BuilderField, seen: Set<string>): B
   if (f.widget === 'date' && f.after !== null) {
     const from = form.fields.find((g) => g.id === f.after)
     if (!from || from.widget !== 'date' || from.id === f.id) add('after')
+    else if (inLoop(form, f)) add('after-loop')
   }
   return out
+}
+
+// A không trước B, B không trước A (hay vòng dài hơn): form chỉ gửi được khi mọi ngày trong vòng bằng nhau
+function inLoop(form: BuilderForm, f: BuilderField): boolean {
+  const after = new Map(form.fields.map((g) => [g.id, g.after]))
+  const seen = new Set<number>()
+  for (let id = f.after; id !== null && !seen.has(id); id = after.get(id) ?? null) {
+    if (id === f.id) return true
+    seen.add(id)
+  }
+  return false
 }
 
 /**
@@ -426,9 +460,9 @@ function fieldProblems(form: BuilderForm, f: BuilderField, seen: Set<string>): B
  */
 export function builderProblems(form: BuilderForm): BuilderProblem[] {
   const out: BuilderProblem[] = []
-  const { APP_MIN, APP_MAX } = BUILDER_LIMITS
+  const { APP_MIN, APP_MAX, FORM_KEY_MAX } = BUILDER_LIMITS
   if (!(APP.test(form.app) && form.app.length >= APP_MIN && form.app.length <= APP_MAX)) out.push({ code: 'app' })
-  if (!FORM_KEY.test(form.key)) out.push({ code: 'key' })
+  if (!FORM_KEY.test(form.key) || builderFormKey(form).length > FORM_KEY_MAX) out.push({ code: 'key' })
   if (!clean(form.title.vi)) out.push({ code: 'title' })
   if (!form.fields.length) out.push({ code: 'fields' })
   const seen = new Set<string>()
