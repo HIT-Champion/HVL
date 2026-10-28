@@ -376,6 +376,34 @@ class FlowMauTest(unittest.TestCase):
             self.assertIn(part, hoa_toc)
 
 
+class DemoDateTest(unittest.TestCase):
+    """demo_tu_dong.vn_date: ngày giờ Việt Nam của mốc Hasura trả về, Postgres ghi +00:00 hay +07:00 đều đúng (CI chạy
+    +07:00: cộng thẳng 7 giờ thì sau 17:00 thành ngày mai, bước 10 không thấy tin sắp hạn của hôm nay)."""
+
+    def setUp(self) -> None:
+        env = sys.modules["moc_env"]
+        for name in ("USER_AGENT", "Session", "_otp_counter", "request", "totp_at"):
+            self.addCleanup(lambda n=name, had=hasattr(env, name), old=getattr(env, name, None):
+                            setattr(env, n, old) if had else delattr(env, n))
+            setattr(env, name, getattr(env, name, None))
+        ca_nhan = types.ModuleType("demo_ca_nhan")
+        ca_nhan.Browser, ca_nhan.DemoFailed, ca_nhan.ok, ca_nhan.say = None, Exception, print, print
+        for name, module in (("demo_ca_nhan", ca_nhan), ("demo_tu_dong", None)):
+            self.addCleanup(lambda n=name, old=sys.modules.get(name):
+                            sys.modules.__setitem__(n, old) if old else sys.modules.pop(n, None))
+            if module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = module
+        self.demo = importlib.import_module("demo_tu_dong")
+
+    def test_vn_date_converts_the_offset_instead_of_adding_seven_hours(self) -> None:
+        for at, day in (("2026-10-28T18:37:05.12345+07:00", "2026-10-28"), ("2026-10-28T23:59:59+07:00", "2026-10-28"),
+                        ("2026-10-28T11:37:05.123456+00:00", "2026-10-28"), ("2026-10-28T17:00:00Z", "2026-10-29"),
+                        ("2026-10-28T16:59:59Z", "2026-10-28")):
+            self.assertEqual(self.demo.vn_date(at), day, at)
+
+
 class SettingsTest(unittest.TestCase):
     """platform/tu-dong/settings.js: đọc chữ (kiem-tra.cjs nạp thật lúc dựng image)."""
 
