@@ -22,13 +22,13 @@ cộng một từ khóa riêng chỉ form của ứng dụng dùng: ``"x-moc-ran
 ``x-moc-range`` gắn vào trường sau. Kiểm sau mọi từ khóa khác; trường nào đã có lỗi hoặc không phải chuỗi thì không so.
 Không thêm vào ``schemas.py`` để form của Văn phòng điện tử (Ajv biên dịch sẵn) không lệch với máy chủ.
 
-Lúc triển khai, form phải: là JSON Schema 2020-12 hợp lệ; ``type: object``, ``additionalProperties: false`` (mọi biến
-ghi vào quy trình đều được khai); tên trường dạng camelCase, không trùng biến hệ thống; giá trị là một giá trị đơn
-(biến Flowable); ``$ref`` chỉ trỏ trong chính tệp (không tải gì từ ngoài); ``format`` chỉ ``date``, ``uuid`` — hai
-định dạng cả trình duyệt lẫn máy chủ cùng kiểm; không có ``patternProperties``, ``propertyNames``; ``pattern`` không
-dễ quay lui bùng nổ, có ``maxLength`` cạnh nó khi thời gian kiểm tăng theo độ dài chuỗi (``pattern_problem``), cả form
-cộng lại không quá ``MAX_FORM_STEPS``. Lúc kiểm dữ liệu, chuỗi dài quá ``maxLength`` không chạy ``pattern``
-(``AppValidator``).
+Lúc triển khai, form phải: là JSON Schema 2020-12 hợp lệ, lồng không quá ``MAX_DEPTH`` tầng; ``type: object``,
+``additionalProperties: false`` (mọi biến ghi vào quy trình đều được khai); tên trường dạng camelCase, không trùng biến
+hệ thống; giá trị là một giá trị đơn (biến Flowable); ``$ref`` chỉ trỏ trong chính tệp (không tải gì từ ngoài);
+``format`` chỉ ``date``, ``uuid`` — hai định dạng cả trình duyệt lẫn máy chủ cùng kiểm; không có ``patternProperties``,
+``propertyNames``; ``pattern`` không dễ quay lui bùng nổ, có ``maxLength`` cạnh nó khi thời gian kiểm tăng theo độ dài
+chuỗi (``pattern_problem``), cả form cộng lại không quá ``MAX_FORM_STEPS``. Lúc kiểm dữ liệu, chuỗi dài quá
+``maxLength`` không chạy ``pattern`` (``AppValidator``). Tệp sai kiểu ở đâu cũng thành câu lỗi, không ném ngoại lệ.
 """
 
 from __future__ import annotations
@@ -58,6 +58,9 @@ SCALAR_TYPES = {"string", "integer", "number", "boolean", "null"}
 FORMATS = {"date", "uuid"}
 DATE_RULES = {"not-after-today", "not-before-today"}
 MAX_FORM_BYTES = 256 * 1024
+# Tầng đối tượng, mảng lồng nhau trong tệp form: form thật chỉ vài tầng. Trần thấp để json.loads và các hàm đi đệ quy
+# dưới đây (_walk; _cost, mỗi $ref thêm tối đa MAX_DEPTH khung) không chạm giới hạn đệ quy của Python
+MAX_DEPTH = 32
 LONG = (-(2**63), 2**63 - 1)    # biến kiểu long của Flowable
 
 # ``pattern`` chạy bằng ``re`` (quay lui) ngay trong vòng sự kiện của svc-workflow lúc kiểm dữ liệu gửi lên, và ``re``
@@ -89,6 +92,23 @@ ROOT_ONLY = ("$id", "$anchor", "$dynamicAnchor", "$recursiveAnchor")
 
 def _scalar(value: Any) -> bool:
     return value is None or isinstance(value, (str, bool, int, float))
+
+
+def _one_of(value: Any, allowed: set[str]) -> bool:
+    """``value`` là một chuỗi trong ``allowed``. Đối tượng, mảng thì sai, không để ``in`` của set ném TypeError."""
+    return isinstance(value, str) and value in allowed
+
+
+def _depth(value: Any) -> int:
+    """Số tầng đối tượng, mảng lồng nhau của một giá trị JSON; đi bằng vòng lặp, không đệ quy."""
+    deepest, stack = 0, [(value, 1)]
+    while stack:
+        node, level = stack.pop()
+        children = node.values() if isinstance(node, dict) else node if isinstance(node, list) else None
+        if children is not None:
+            deepest = max(deepest, level)
+            stack.extend((child, level + 1) for child in children)
+    return deepest
 
 
 def bad_value(value: Any) -> bool:
@@ -337,8 +357,12 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
         return None, [f"{where}: tệp lớn quá {MAX_FORM_BYTES // 1024} KB"]
     try:
         schema = json.loads(raw.decode("utf-8"))
+    except RecursionError:
+        return None, [f"{where}: JSON lồng quá {MAX_DEPTH} tầng"]
     except (UnicodeDecodeError, ValueError) as exc:
         return None, [f"{where}: không phải JSON UTF-8 ({exc})"]
+    if _depth(schema) > MAX_DEPTH:
+        return None, [f"{where}: JSON lồng quá {MAX_DEPTH} tầng"]
     if not isinstance(schema, dict):
         return None, [f"{where}: cần một đối tượng JSON Schema ở gốc"]
     errors: list[str] = []
@@ -364,20 +388,22 @@ def check_form(where: str, raw: bytes) -> tuple[AppForm | None, list[str]]:
             errors.append(f"{where}: trường {name} phải là một schema (đối tượng)")
             continue
         types = prop.get("type", [])
-        if not set(types if isinstance(types, list) else [types]) <= SCALAR_TYPES:
+        if not all(_one_of(t, SCALAR_TYPES) for t in (types if isinstance(types, list) else [types])):
             errors.append(f"{where}: trường {name}: chỉ nhận giá trị đơn (string, integer, number, boolean) — biến "
                           "Flowable không chứa đối tượng, mảng")
         if isinstance(prop.get("enum"), list) and not all(_scalar(v) for v in prop["enum"]):
             errors.append(f"{where}: trường {name}: enum chỉ gồm giá trị đơn")
-        if "x-moc-date" in prop and prop["x-moc-date"] not in DATE_RULES:
+        if "x-moc-date" in prop and not _one_of(prop["x-moc-date"], DATE_RULES):
             errors.append(f"{where}: trường {name}: x-moc-date chỉ nhận {', '.join(sorted(DATE_RULES))}")
-    missing = [r for r in schema.get("required") or [] if r not in props]
-    if missing:
+    required = schema.get("required", [])
+    if not isinstance(required, list):
+        errors.append(f"{where}: required phải là danh sách tên trường")
+    elif missing := [r for r in required if not (isinstance(r, str) and r in props)]:
         errors.append(f"{where}: required có trường không khai trong properties: {', '.join(map(str, missing))}")
     ranges = schema.get("x-moc-range", [])
+    dates = {name for name, prop in props.items() if isinstance(prop, dict) and prop.get("format") == "date"}
     if not isinstance(ranges, list) or not all(
-            isinstance(p, list) and len(p) == 2 and p[0] != p[1]
-            and all(isinstance(props.get(f), dict) and props[f].get("format") == "date" for f in p) for p in ranges):
+            isinstance(p, list) and len(p) == 2 and p[0] != p[1] and all(_one_of(f, dates) for f in p) for p in ranges):
         errors.append(f"{where}: x-moc-range phải là danh sách cặp [trường trước, trường sau], hai trường đã khai "
                       "trong properties với format: date (như bộ kiểm form trên trình duyệt)")
     _walk(schema, where, errors)
