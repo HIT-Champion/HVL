@@ -70,9 +70,11 @@ export function sampleForm(): BuilderForm {
   return form
 }
 
-test('lib/schema-form.js là bản chép từng byte của module form trong apps/nghi-phep', () => {
-  assert.equal(read('../app/lib/schema-form.js'), read('../../nghi-phep/public/schema-form.js'),
-    'sửa apps/nghi-phep/public/schema-form.js thì chép lại sang apps/office/app/lib/')
+test('lib/schema-form.js và bảng dịch lib/i18n.js là bản chép từng byte của module form trong apps/nghi-phep', () => {
+  for (const file of ['schema-form.js', 'i18n.js']) {
+    assert.equal(read(`../app/lib/${file}`), read(`../../nghi-phep/public/${file}`),
+      `sửa apps/nghi-phep/public/${file} thì chép lại sang apps/office/app/lib/`)
+  }
 })
 
 test('ô nhiều dòng dùng đúng $defs.text của form nghỉ phép; ô một dòng chặn thêm xuống dòng', () => {
