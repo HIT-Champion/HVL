@@ -51,6 +51,18 @@ if ! ./scripts/release-notes.sh "$VERSION" > /dev/null; then
   exit 1
 fi
 
+# macOS không có sha256sum mà có shasum -a 256, in cùng dạng "<băm>  <tên tệp>" nên sha256sum -c vẫn đọc được (#57).
+# Chọn trước khi gắn thẻ: thiếu cả hai thì dừng lúc chưa có thẻ, chưa có gói
+if command -v sha256sum > /dev/null; then
+  SHA256=(sha256sum)
+elif command -v shasum > /dev/null; then
+  SHA256=(shasum -a 256)
+else
+  echo "Lỗi: không có sha256sum hay shasum để sinh tổng kiểm tra — cài coreutils (hoặc perl có shasum)" \
+       "rồi chạy lại." >&2
+  exit 1
+fi
+
 TAG="v$VERSION"
 DIST="dist"
 
@@ -85,7 +97,7 @@ git archive --format=tar.gz \
             "$TAG"
 
 echo "==> Sinh tổng kiểm tra SHA-256"
-( cd "$DIST" && sha256sum "signet-$VERSION.tar.gz" > "signet-$VERSION.tar.gz.sha256" )
+( cd "$DIST" && "${SHA256[@]}" "signet-$VERSION.tar.gz" > "signet-$VERSION.tar.gz.sha256" )
 
 # Kiểm chính gói sẽ phát hành, cùng lệnh với release.yml: tệp cấm, giấy phép, .sha256, thư mục gốc, VERSION. Gói hỏng
 # thì gỡ thẻ vừa gắn (chưa đẩy, chưa ai tải) và xóa gói — sửa xong chạy lại được ngay
