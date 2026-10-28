@@ -172,7 +172,7 @@ Bảng đầy đủ (phiên bản, giấy phép, trang chủ): [`COPYRIGHT.txt`]
 | Tin cậy | ClamAV | 1.5.4 | GPL-2.0 | Quét mã độc trước khi lưu |
 | Tin cậy | OpenBao | 2.7.1 | MPL-2.0 | Két bí mật, khóa mã hóa văn bản hạn chế, CA nội bộ và khóa ký |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | Bản sao số của cảm biến theo NGSI-LD (profile `iot`) |
-| Vận hành | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát, cảnh báo cổng API và trạng thái từng thành phần, chỉ trong mạng nội bộ |
+| Vận hành | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Apache-2.0, AGPL-3.0 | Giám sát cổng API và trạng thái từng thành phần, chỉ trong mạng nội bộ; cảnh báo tới chuông của quản trị đơn vị |
 | Vận hành | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Log tập trung đã che thông tin cá nhân, tùy chọn (profile `logs`) |
 | Vận hành | restic | 0.19.1 | BSD-2-Clause | Sao lưu mã hóa CSDL, tệp, két |
 
@@ -189,7 +189,7 @@ tiếp, được kiểm tự động bằng `make license-audit`.
 | Docker Engine | 24.0 | kèm plugin `docker compose` v2 từ 2.17 và `docker buildx` |
 | GNU Make | 4.0 | điều phối lệnh |
 | Python | 3.10 | chỉ thư viện chuẩn, không cài thêm gì: dữ liệu mẫu, smoke, demo, sao lưu, cài đặt và các lệnh vận hành |
-| RAM | 8 GB | cả hệ thống (profile mặc định: 18 dịch vụ, 17 chạy liên tục) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB), đo từ trước khi thêm `app-ca-nhan` (một nginx phục vụ trang tĩnh) và `app-tai-lieu-api` (trang tài liệu API, giới hạn 64 MB); bật mô hình AI cần thêm tới 6 GB |
+| RAM | 8 GB | cả hệ thống (profile mặc định: 19 dịch vụ, 18 chạy liên tục) đo được khoảng 3,2 GB khi chạy (ClamAV 0,8 GB, Keycloak 0,6 GB, APISIX và Flowable mỗi dịch vụ 0,35 GB, Grafana 0,3 GB), đo từ trước khi thêm `app-ca-nhan` (một nginx phục vụ trang tĩnh) `app-tai-lieu-api` (trang tài liệu API, giới hạn 64 MB) và `alertmanager` (giới hạn 64 MB); bật mô hình AI cần thêm tới 6 GB |
 | Đĩa trống | 10 GB | image khoảng 5 GB; mô hình AI thêm khoảng 2 GB |
 
 Toàn bộ công cụ dùng để dựng Signet đều là phần mềm nguồn mở. Không cần bất kỳ công cụ nguồn đóng hay tự chế nào.

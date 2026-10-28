@@ -36,12 +36,14 @@ onMounted(() => document.addEventListener('click', outside))
 onBeforeUnmount(() => document.removeEventListener('click', outside))
 
 const URGENT = new Set(['task.overdue', 'task.escalated', 'document.overdue', 'ot.alarm'])
-const rows = computed(() => items.value.map((n) => ({ n, ...describeNotification(t, n), urgent: URGENT.has(n.kind) })))
+const urgent = (n: AppNotification) => URGENT.has(n.kind) || (n.kind === 'ops.alert' && n.data.status === 'firing')
+const rows = computed(() => items.value.map((n) => ({ n, ...describeNotification(t, n), urgent: urgent(n) })))
 
 async function go(n: AppNotification) {
   open.value = false
   markRead(n).catch(() => { /* lần sau tải lại vẫn thấy chưa đọc */ })
-  if (n.document_id) await navigateTo(`/van-ban/${n.document_id}`)
+  const to = notificationLink(n)
+  if (to) await navigateTo(to)
 }
 
 async function readAll() {

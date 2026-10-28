@@ -183,7 +183,7 @@ choice: [`DEPENDENCIES.md`](DEPENDENCIES.md).
 | Trust | ClamAV | 1.5.4 | GPL-2.0 | Malware scanning before storage |
 | Trust | OpenBao | 2.7.1 | MPL-2.0 | Secrets vault, encryption keys for restricted documents, internal CA and signing keys |
 | IT/OT | Scorpio Broker, PostGIS | 6.0.2, 16-3.5 | BSD-3-Clause, GPL-2.0 | NGSI-LD digital twins of sensors (profile `iot`) |
-| Operations | Prometheus, Grafana OSS | 3.15.0, 13.2.3 | Apache-2.0, AGPL-3.0 | Monitoring and alerts for the API gateway and each component's status, internal network only |
+| Operations | Prometheus, Alertmanager, Grafana OSS | 3.15.0, 0.34.1, 13.2.3 | Apache-2.0, AGPL-3.0 | Monitoring of the API gateway and each component's status, internal network only; alerts reach the unit admins' notification bell |
 | Operations | Vector, Parseable | 0.59.0, 3.2.4 | MPL-2.0, AGPL-3.0 | Centralised logs with personal data masked, optional (profile `logs`) |
 | Operations | restic | 0.19.1 | BSD-2-Clause | Encrypted backup of databases, files and the vault |
 
@@ -200,7 +200,7 @@ package, transitive ones included, is checked automatically with `make license-a
 | Docker Engine | 24.0 | with the `docker compose` v2 plugin 2.17+ and `docker buildx` |
 | GNU Make | 4.0 | runs the commands |
 | Python | 3.10 | standard library only, nothing to install: sample data, smoke tests, demos, backup, install and operations commands |
-| RAM | 8 GB | the whole system (default profiles: 18 services, 17 running continuously) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages) and `app-tai-lieu-api` (the API docs page, capped at 64 MB) were added; the AI model needs up to 6 GB more |
+| RAM | 8 GB | the whole system (default profiles: 19 services, 18 running continuously) measured at about 3.2 GB when running (ClamAV 0.8 GB, Keycloak 0.6 GB, APISIX and Flowable 0.35 GB each, Grafana 0.3 GB), measured before `app-ca-nhan` (an nginx serving static pages), `app-tai-lieu-api` (the API docs page, capped at 64 MB) and `alertmanager` (capped at 64 MB) were added; the AI model needs up to 6 GB more |
 | Free disk | 10 GB | images about 5 GB; AI models about 2 GB more |
 
 Every tool used to build Signet is open-source software. No closed-source or home-made tool is needed.

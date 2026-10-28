@@ -204,6 +204,13 @@ do_install() {
     (umask 077 && cp "$SRC/.env" "$dest/.env")
     echo "    .env: chép từ thư mục mã nguồn (chỉ chủ sở hữu đọc được)"
   fi
+  # #284: bản cài trước cảnh báo vận hành chưa có token Alertmanager → svc-workflow: sinh như make env
+  # (scripts/gen-env.sh), không in giá trị. Dòng có mà rỗng là đã chọn tắt: giữ nguyên
+  grep -q '^MOC_ALERT_TOKEN=' "$dest/.env" || {
+    printf '\n# Cảnh báo ra chuông (#284), make install thêm\nMOC_ALERT_TOKEN=%s\n' \
+      "$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')" >> "$dest/.env"
+    echo "    .env: thêm MOC_ALERT_TOKEN (ngẫu nhiên) cho cảnh báo vận hành"
+  }
   grep -q '^MOC_VERSION=' "$dest/.env" || printf '\n# Do make install đặt: thẻ image của đội và profile chạy mặc định\n' >> "$dest/.env"
   set_env "$dest/.env" MOC_VERSION "$ver"
   # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài

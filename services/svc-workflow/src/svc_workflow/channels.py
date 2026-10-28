@@ -71,9 +71,9 @@ from .hasura import Actor, HasuraClient, HasuraError
 log = logging.getLogger("svc_workflow")
 
 ACTOR = "svc-workflow"
-# Loại thông báo svc-workflow gửi (notify.py, sla.py, workflow.py, dispatch.py, ot.py)
+# Loại thông báo svc-workflow gửi (notify.py, sla.py, workflow.py, dispatch.py, ot.py, alerts.py)
 KINDS = ("task.assigned", "task.overdue", "task.escalated", "document.issued", "document.processed",
-         "document.overdue", "document.incoming", "ot.alarm")
+         "document.overdue", "document.incoming", "ot.alarm", "ops.alert")
 SMTP_PORTS = {"starttls": 587, "ssl": 465, "none": 25}
 # Lý do ghi vào last_error khi MOC_SMTP_TLS=none đi cùng MOC_SMTP_USER (SmtpConfig.plain_login)
 PLAIN_LOGIN = ("Không đăng nhập máy chủ thư qua kết nối không mã hóa (MOC_SMTP_TLS=none, có MOC_SMTP_USER): "
@@ -105,7 +105,9 @@ TITLES = {
     "document.overdue": "Văn bản quá hạn giải quyết ({due})",
     "ot.alarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố",
     "document.incoming": "Văn bản đến liên thông từ {name}",
+    "ops.alert": "Cảnh báo vận hành: {message}",
 }
+OPS_RESOLVED = "Hết cảnh báo: {message}"
 SOMEONE = "Người được giao"
 RESTRICTED = "Văn bản hạn chế"
 NOTE = "Ý kiến: {note}"
@@ -196,6 +198,8 @@ def describe(kind: str, data: dict[str, Any], *, names: bool = True) -> Text:
         title = template.format(name=d.get("name") or "", value=_number(d.get("temperature")))
     elif kind == "document.incoming":
         title = template.format(name=d.get("from_name") or "")
+    elif kind == "ops.alert":     # cảnh báo của Prometheus (alerts.py): không gắn văn bản nào
+        title = (OPS_RESOLVED if d.get("status") == "resolved" else template).format(message=d.get("message") or "")
     else:
         title = kind
     return Text(_one_line(title), doc, note)
@@ -512,6 +516,8 @@ class Router:
 
     def _link(self, note: dict[str, Any]) -> str:
         doc = note.get("document_id")
+        if note.get("kind") == "ops.alert" and self.public_url:     # cảnh báo vận hành: trang trạng thái công khai
+            return f"{self.public_url}/trang-thai"
         return f"{self.public_url}/van-ban/{doc}" if doc and self.public_url else ""
 
     # --- email -------------------------------------------------------------------------------------------------------

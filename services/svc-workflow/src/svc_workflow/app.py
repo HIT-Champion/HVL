@@ -23,7 +23,7 @@ mạng nội bộ cũng không tin ai (zero-trust).
 ``create_app`` dựng phần chung (Hasura, Flowable, danh bạ, thông báo và kênh ngoài, ``/healthz``, ``/readyz``) rồi gắn
 từng phần nghiệp vụ đang bật theo khuôn của ``parts.py``: Văn phòng điện tử (``office/api.py``, tắt bằng
 ``MOC_OFFICE_ENABLED=false``), quy trình của ứng dụng cắm (``apps/api.py``), kênh SMS, Zalo người dùng tự bật
-(``subscriptions.py``).
+(``subscriptions.py``), cảnh báo vận hành Alertmanager gửi sang (``alerts.py``).
 
 Chạy: ``uvicorn svc_workflow.app:create_app --factory``
 """
@@ -43,6 +43,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from . import __version__, pii
+from .alerts import OpsAlerts
 from .apps.api import AppWorkflow
 from .channels import Router
 from .config import Settings
@@ -108,6 +109,8 @@ def create_app(
     # liên kết Zalo chỉ khi có bot
     channels = Channels.build(settings, hasura, router)
     parts.append(channels)
+    # cảnh báo vận hành (#284): Alertmanager gọi POST /ops/alerts → thông báo ops.alert cho quản trị đơn vị
+    parts.append(OpsAlerts.build(settings, hasura, notifier))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

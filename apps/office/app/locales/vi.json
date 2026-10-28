@@ -781,7 +781,9 @@
     "documentOverdue": "Văn bản quá hạn giải quyết ({due})",
     "otAlarm": "Cảnh báo nhiệt độ {name}: {value} °C — đã có dự thảo báo cáo sự cố",
     "restricted": "Văn bản hạn chế",
-    "documentIncoming": "Văn bản đến liên thông từ {name}"
+    "documentIncoming": "Văn bản đến liên thông từ {name}",
+    "opsAlert": "Cảnh báo vận hành: {message}",
+    "opsResolved": "Hết cảnh báo: {message}"
   },
   "channels": {
     "title": "Kênh thông báo",

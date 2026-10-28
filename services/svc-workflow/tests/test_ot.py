@@ -470,7 +470,7 @@ def test_no_content_routes_have_no_return_with_body(hasura, flowable):
     # Kiểm lại luật SonarQube python:S8400 trong CI: route khai 204 chỉ trả Response rỗng, lỗi thì ném ra
     app = client_for(hasura, flowable).app
     routes = [r for r in app.routes if isinstance(r, APIRoute) and r.status_code == 204]
-    assert [r.path for r in routes] == ["/ot/notify/{tenant}", "/api/workflow/{app}/tasks/{task_id}"]
+    assert [r.path for r in routes] == ["/ot/notify/{tenant}", "/api/workflow/{app}/tasks/{task_id}", "/ops/alerts"]
     for route in routes:
         tree = ast.parse(textwrap.dedent(inspect.getsource(route.endpoint)))
         returns = {ast.unparse(n.value) if n.value else "" for n in ast.walk(tree) if isinstance(n, ast.Return)}

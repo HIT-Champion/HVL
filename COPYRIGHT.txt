@@ -146,6 +146,9 @@ Scorpio Broker                  6.0.2           BSD-3-Clause            Context 
                                                                         biến
 PostGIS                         16-3.5          GPL-2.0                 CSDL riêng của Scorpio                    https://postgis.net
 Prometheus                      v3.15.0         Apache-2.0              Thu chỉ số của cổng API                   https://prometheus.io
+Alertmanager                    v0.34.1         Apache-2.0              Nhận cảnh báo đang bật của Prometheus,    https://github.com/prometheus/alertmanager
+                                                                        gom theo luật, chống gửi dồn rồi gọi
+                                                                        svc-workflow
 Grafana (OSS)                   13.2.3          AGPL-3.0                Hiển thị giám sát                         https://github.com/grafana/grafana
 cloudflared                     2026.10.0       Apache-2.0              Cloudflare Tunnel                         https://github.com/cloudflare/cloudflared
 Mailpit                         v1.31.4         MIT                     Hộp thư thử cho thông báo email của       https://mailpit.axllent.org
