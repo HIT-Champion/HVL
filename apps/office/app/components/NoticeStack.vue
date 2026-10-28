@@ -27,12 +27,14 @@ const { notices } = useNotice()
     name="sg-notice" tag="div" aria-live="polite"
     class="pointer-events-none fixed right-4 bottom-4 z-50 flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-2"
   >
+    <!-- tin có đường dẫn giữ vai trò liên kết, tên lấy từ chữ của tin: role status không lấy tên từ nội dung (#407);
+         khung đã có aria-live nên tin vẫn được đọc khi hiện -->
     <component
       :is="n.to ? NuxtLink : 'div'"
       v-for="n in notices" :key="n.id" :to="n.to"
       class="pointer-events-auto block rounded-lg px-4 py-3 text-sm shadow-lg"
       :class="n.kind === 'ok' ? 'bg-brand-800 text-white' : n.kind === 'info' ? 'bg-white text-stone-900 ring-1 ring-stone-200 hover:ring-brand-600' : 'bg-red-600 text-white'"
-      :role="n.kind === 'error' ? 'alert' : 'status'"
+      :role="n.to ? undefined : n.kind === 'error' ? 'alert' : 'status'"
       :data-testid="n.kind === 'info' ? 'realtime-notice' : undefined"
     >
       <div :class="{ 'font-medium': n.kind === 'info' }">{{ n.text }}</div>
