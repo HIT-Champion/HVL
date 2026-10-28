@@ -24,7 +24,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import {
-  BUILDER_DATE_RULES, BUILDER_DEFS, BUILDER_LIMITS, BUILDER_PROBLEMS, BUILDER_WIDGETS, EL_KEYWORDS, FORM_BUILDER_ROLES,
+  BUILDER_DATE_RULES, BUILDER_DEFS, BUILDER_LIMITS, BUILDER_PROBLEMS, BUILDER_WIDGETS, FORM_BUILDER_ROLES,
   addBuilderField, addBuilderOption, builderFile, builderFormFrom, builderFormKey, builderName, builderProblems,
   builderSchema, builderSlug, canBuildForms, freezeBuilderNames, moveBuilderItem, newBuilderForm, removeBuilderField,
   setBuilderWidget, syncBuilderNames,
@@ -217,7 +217,12 @@ test('tên suy ra không trùng nhau, không trùng biến hệ thống, nhườ
   syncBuilderNames(form)
   assert.deepEqual([le.name, not.name], ['le2', 'not2'])
   assert.deepEqual(score.options.map((o) => o.value), ['1', '2', '3-ngay', '3-ngay2'])
-  assert.equal(EL_KEYWORDS.length, 16)
+  // mọi tên luật lúc cài không cho đều bị trình dựng báo trước, bằng câu của chính nó
+  for (const name of [...FORM_LIMITS.RESERVED, ...FORM_LIMITS.ENGINE_NAMES, ...FORM_LIMITS.EL_KEYWORDS]) {
+    const typed = sampleForm()
+    Object.assign(typed.fields[0]!, { name, named: true })
+    assert.deepEqual(builderProblems(typed).map((p) => p.code), ['name-reserved'], name)
+  }
 })
 
 test('tải tệp rồi thì tên, khóa, giá trị đang có giữ nguyên khi xóa, đổi chỗ, đổi nhãn', () => {
