@@ -80,7 +80,7 @@ bản đến vừa vào sổ và văn bản đi vừa phát hành, chỉ gồm v
 
 ## Đơn nghỉ phép
 
-Chỉ có khi đơn vị đã cài ứng dụng này. Giao diện chỉ có tiếng Việt.
+Chỉ có khi đơn vị đã cài ứng dụng này.
 
 1. Mở **Ứng dụng**, ở thẻ **Đơn nghỉ phép** bấm **Mở**.
 2. Ở phần **Gửi đơn**, điền Loại nghỉ, Từ ngày, Đến ngày, Lý do rồi bấm **Gửi đơn**.
@@ -104,8 +104,8 @@ mục "Hội tụ IT/OT".
 
 ## Đổi ngôn ngữ
 
-Bấm **EN** trên thanh trên cùng để chuyển sang tiếng Anh, bấm **VI** để về tiếng Việt. Không gian cá nhân và Bảng tin
-dùng chung lựa chọn này: nút ở đó ghi **English** / **Tiếng Việt**. Đơn nghỉ phép chỉ có tiếng Việt.
+Bấm **EN** trên thanh trên cùng để chuyển sang tiếng Anh, bấm **VI** để về tiếng Việt. Không gian cá nhân, Bảng tin
+và Đơn nghỉ phép dùng chung lựa chọn này: nút ở đó ghi **English** / **Tiếng Việt**.
 
 ## Xác thực một văn bản đã phát hành
 

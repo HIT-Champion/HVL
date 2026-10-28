@@ -579,5 +579,5 @@ cùng đơn vị Khoa CNTT: chuyên viên `giangvienktpm` và trưởng bộ mô
 9. Gỡ: trang, container, client mất; API của ứng dụng thôi trả `200`; lịch sử đơn còn trong động cơ quy trình.
 10. `git status` trước và sau giống hệt.
 
-Giới hạn của ứng dụng mẫu: việc duyệt chỉ có nội dung đơn, không có tên người gửi (API chung không trả); giao diện
-chỉ tiếng Việt; một bước duyệt, không ủy quyền, không hủy đơn đã gửi.
+Giới hạn của ứng dụng mẫu: việc duyệt chỉ có nội dung đơn, không có tên người gửi (API chung không trả); một bước
+duyệt, không ủy quyền, không hủy đơn đã gửi.
