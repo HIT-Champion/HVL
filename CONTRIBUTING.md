@@ -124,7 +124,7 @@ Phần song ngữ Việt / Anh hiện có:
 - **Trang đăng nhập**: theme Keycloak `signet`, câu nằm ở `platform/keycloak/themes/signet/login/messages/`
   (`messages_vi.properties`, `messages_en.properties`).
 
-PDF phát hành và sổ in theo thể thức văn bản tiếng Việt.
+Văn bản đi in theo ngôn ngữ người soạn chọn (mặc định tiếng Việt), sổ đăng ký theo ngôn ngữ người in.
 
 Trong Văn phòng điện tử:
 
