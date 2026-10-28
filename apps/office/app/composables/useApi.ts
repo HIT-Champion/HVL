@@ -334,9 +334,9 @@ export function useApi() {
     return savePdf(`/api/documents/${documentId}/preview`, `du-thao-${documentId.slice(0, 8)}.pdf`)
   }
 
-  /** Sổ đăng ký một năm để xem trên màn hình. */
-  async function register(direction: 'in' | 'out', year: number): Promise<RegisterBook> {
-    const res = await authFetch(`/api/registers/${direction}/${year}`)
+  /** Sổ đăng ký một năm để xem trên màn hình; tên cột, ghi chú theo ngôn ngữ giao diện (F2.9). */
+  async function register(direction: 'in' | 'out', year: number, lang = 'vi'): Promise<RegisterBook> {
+    const res = await authFetch(`/api/registers/${direction}/${year}?lang=${lang === 'en' ? 'en' : 'vi'}`)
     const blocked = gatewayBlock(res.status, res.headers)
     if (blocked) throw blocked
     const body = await res.json().catch(() => ({}))
@@ -345,9 +345,11 @@ export function useApi() {
   }
 
   /** In sổ đăng ký ra PDF (A4 ngang) để ký nhận, đóng sổ; mỗi lần in được ghi vào sổ kiểm toán. */
-  function printRegister(direction: 'in' | 'out', year: number): Promise<void> {
-    return savePdf(`/api/registers/${direction}/${year}/pdf`,
-      `so-dang-ky-van-ban-${direction === 'in' ? 'den' : 'di'}-${year}.pdf`)
+  function printRegister(direction: 'in' | 'out', year: number, lang = 'vi'): Promise<void> {
+    const name = lang === 'en'
+      ? `register-${direction === 'in' ? 'incoming' : 'outgoing'}-${year}.pdf`
+      : `so-dang-ky-van-ban-${direction === 'in' ? 'den' : 'di'}-${year}.pdf`
+    return savePdf(`/api/registers/${direction}/${year}/pdf?lang=${lang === 'en' ? 'en' : 'vi'}`, name)
   }
 
   async function search(params: Record<string, string | number | undefined>): Promise<{ hits: SearchHit[]; next_cursor: string | null }> {
