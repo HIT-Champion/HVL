@@ -488,6 +488,21 @@ class Keycloak:
         info, _ = self._req("GET", "/serverinfo", server=True)
         return {t.get("name") for t in ((info or {}).get("themes") or {}).get("login") or []}
 
+    # vai trò của client (moc tu-dong, scripts/tu_dong.py): client_id là id nội bộ, không phải clientId
+    def client_roles(self, client_id: str) -> list[dict[str, Any]]:
+        return self._req("GET", f"/clients/{client_id}/roles")[0] or []
+
+    def create_client_role(self, client_id: str, rep: dict[str, Any]) -> None:
+        self._req("POST", f"/clients/{client_id}/roles", rep)
+
+    def client_role_users(self, client_id: str, role: str) -> list[dict[str, Any]]:
+        return self._all(f"/clients/{client_id}/roles/{urllib.parse.quote(role, safe='')}/users")
+
+    def grant_client_roles(self, user_id: str, client_id: str, roles: list[dict[str, Any]], *,
+                           revoke: bool = False) -> None:
+        """Gán (POST) hoặc gỡ (DELETE) vai trò client cho tài khoản; thân là danh sách vai trò như client_roles trả."""
+        self._req("DELETE" if revoke else "POST", f"/users/{user_id}/role-mappings/clients/{client_id}", roles)
+
 
 def admin_token() -> str:
     """Token quản trị Keycloak (realm master, KEYCLOAK_ADMIN_* trong .env), qua cổng quản trị nội bộ."""

@@ -246,7 +246,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|
 | Nền chung | APISIX 3.18.0 · `svc-files`, `svc-workflow` (Python 3.13, FastAPI 0.143) · ClamAV 1.5.4 · OpenBao 2.7.1 · sổ kiểm toán chuỗi băm · pyHanko 0.37.0 · bộ che thông tin cá nhân |
 | [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) · DokuWiki 2026-07-14c (profile `wiki`) |
-| [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) |
+| [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) · Node-RED 5.0.8 (profile `tu-dong`) |
 | [D] Dữ liệu | PostgreSQL 16 · Hasura CE v2.51.0 · SeaweedFS 4.48 · Meilisearch CE v1.54.3 · DuckDB 1.5.6 · phả hệ OpenLineage · dashboard ECharts 6.1.0 · Scorpio 6.0.2 và PostGIS 16-3.5 (profile `iot`) |
 | [I] Trí tuệ | Ollama 0.35.1 (profile `ai`) · Qwen3-1.7B, Qwen3-Embedding-0.6B · Tesseract 5.5.0 · truy xuất có nguồn tự viết · ba tác tử |
 | Vận hành | Prometheus 3.15.0, Alertmanager 0.34.1, Grafana OSS 13.2.3 · Vector 0.59.0, Parseable 3.2.4 (profile `logs`) · restic 0.19.1 · reconciler GitOps · cloudflared 2026.10.0 (profile `tunnel`) |
@@ -287,6 +287,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP, webhook Mattermost, Slack, ntfy, SMS, Zalo (`core.notification_deliveries`, tắt mặc định; SMS, Zalo do từng người tự bật) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
 | Nạp lô *(mã của đội)* | — | `POST /api/imports/incoming`: tệp NDJSON hoặc CSV, mỗi dòng qua ClamAV và Action `receiveIncoming` thay mặt văn thư | ⑤ | `svc_files/imports/` | Dùng được (mục 3, cụm ⑤) |
 | Mailpit | v1.31.4 | Hộp thư thử cho email thông báo (profile `mail`, chỉ để demo) | ⑦ | `docker-compose.yml` | — |
+| Node-RED | 5.0.8, openid-client 6.8.8 | Tự động hóa không sửa mã (profile `tu-dong`, tắt mặc định): người vận hành nền tảng soạn flow ở `/tu-dong/`; đăng nhập Keycloak, chỉ vai trò `operator` của client `tu-dong`; không node `exec`, không cài node từ trình soạn; flow tới lõi qua APISIX | ⑤ | `platform/tu-dong/`, `scripts/tu_dong.py` | — (#366) |
 
 **[D] Không gian Dữ liệu**
 
@@ -334,7 +335,7 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 | [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email, webhook tới Mattermost, Slack, ntfy, SMS, Zalo — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
 | [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
 | [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; chưa có trình dựng form (#303) | `ROADMAP.md` giai đoạn 2 |
-| [P] Tự động hóa, kịch bản serverless (⑤) | **Chưa có** | Vòng nền viết cứng trong `svc-files`, `svc-workflow`; Kestra đã cân nhắc, chưa đưa vào | `muc-hoan-thien.md` §3; `DEPENDENCIES.md` |
+| [P] Tự động hóa, kịch bản serverless (⑤) | Một phần (profile `tu-dong`, tắt mặc định) | Node-RED ở `/tu-dong/` cho người vận hành nền tảng: đăng nhập Keycloak, chỉ vai trò `operator`, flow tới lõi qua APISIX (#366); flow chưa có danh tính gọi API của lõi, chưa có flow mẫu; vòng nền của lõi vẫn viết cứng trong `svc-files`, `svc-workflow` | `muc-hoan-thien.md` §3; `van-hanh.md` mục Tự động hóa bằng Node-RED |
 | [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
 | [D] Thu thập, làm sạch, đồng bộ sang kho phân tích | **Chưa có** | Chặn dữ liệu bẩn ngay ở điểm nhập (Poka-yoke ba lớp); dashboard đọc thẳng view trên CSDL nghiệp vụ | `ROADMAP.md` giai đoạn 3 |
 | [D] BI riêng | **Chưa có** (chủ ý) | Trang `/dieu-hanh` (ECharts) đọc view `office.v_*` qua Hasura. Metabase bị loại: bản nguồn mở không đăng nhập bằng Keycloak được, đọc thẳng CSDL bỏ qua quyền đơn vị | `DEPENDENCIES.md` |
@@ -1020,8 +1021,9 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
 
 - **Lõi còn ôm phần máy chủ của Văn phòng điện tử**: tách cứng ở cổng và khóa ngoại CSDL; hàm, cột, metadata, vai trò
   của `core` còn dính `office`; chưa tách ở mã (§4, QĐ-012).
-- **Thiếu một năng lực Tầng 1**: nơi chạy kịch bản serverless (⑤); việc nền là vòng lặp viết cứng trong hai dịch vụ.
-  Trục sự kiện (⑥) mới một phần: Event Triggers giao `core.app_events` tới ứng dụng, chưa phải broker
+- **Kịch bản serverless (⑤) mới một phần**: Node-RED (profile `tu-dong`, #366) cho người vận hành soạn flow, nhưng flow
+  chưa có danh tính gọi API của lõi; việc nền của lõi vẫn là vòng lặp viết cứng trong hai dịch vụ. Trục sự kiện (⑥)
+  mới một phần: Event Triggers giao `core.app_events` tới ứng dụng, chưa phải broker
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, QĐ-008).
 - **Một máy, một PostgreSQL**: điểm lỗi đơn (QĐ-002), không tự mở rộng, không chịu lỗi nhiều nút (QĐ-003); sổ kiểm toán
   là một chuỗi băm, mọi giao dịch ghi sổ xếp hàng ở dòng `core.audit_head`; chưa đo tải

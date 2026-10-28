@@ -186,7 +186,7 @@ chưa phủ hết năng lực của cụm.
 | ④ | Chỉ mục toàn văn | Meilisearch, `svc_files/search.py`, `svc_files/texts.py` | Hoàn thiện | F2.7; bản scan vào chỉ mục bằng chữ OCR của 3 trang đầu (#253) |
 | ④ | Trộn dữ liệu sinh biểu mẫu, báo cáo động | WeasyPrint: `svc_files/render.py` (văn bản đi), `svc_files/registers.py` (sổ đăng ký); dự thảo "Báo cáo sự cố" (`svc_workflow/ot.py`) | Dùng được | Có kiểm trong CI, nhưng khuôn viết trong mã: đổi mẫu phải sửa mã |
 | ⑤ Quy trình, tự động hóa | BPMN quản lý trạng thái luồng phê duyệt | Flowable 8, `services/svc-workflow/processes/*.bpmn20.xml` | Hoàn thiện | F1.4, F2.3, F2.4. Ứng dụng cắm thêm dùng chung động cơ này qua API `/api/workflow/<ứng dụng>/…` (#301; mục 2.5, mức Dùng được) |
-| ⑤ | Thực thi kịch bản serverless | — | **Chưa có** | Không có nơi chạy kịch bản do người dùng nạp. Kestra đã cân nhắc nhưng chưa đưa vào (`DEPENDENCIES.md`); việc nền là vòng lặp viết cứng trong `svc-files`, `svc-workflow` |
+| ⑤ | Thực thi kịch bản serverless | Node-RED 5.0.8 (profile `tu-dong`, tắt mặc định), `platform/tu-dong/`, `scripts/tu_dong.py` | Một phần | Người vận hành nền tảng (vai trò `operator` của client Keycloak `tu-dong`) soạn, triển khai flow ở `/tu-dong/` không sửa mã dịch vụ; không node `exec`, không cài node từ trình soạn, chỉ tới lõi qua APISIX (#366, [`van-hanh.md`](van-hanh.md) mục Tự động hóa bằng Node-RED, bước CI `make demo-tu-dong`). Chưa có danh tính riêng cho flow gọi API của lõi, endpoint webhook, flow mẫu và bước BPMN gọi flow; việc nền của lõi vẫn là vòng lặp trong `svc-files`, `svc-workflow` |
 | ⑤ | API nạp dữ liệu khối lớn theo lô | `POST /api/imports/incoming` của svc-files (`svc_files/imports/`), bảng `core.import_jobs`, `core.import_rows` | Dùng được | Văn bản đến: tệp NDJSON/CSV + zip tệp đính kèm, xử lý nền theo mẻ; mỗi dòng qua đúng ClamAV và Action `receiveIncoming` thay mặt văn thư, lỗi từng dòng, gửi lại không nhân đôi, chạy tiếp sau khi svc-files khởi động lại. svc-files `test_imports_*.py` 108; db `test_import_jobs.py` 18; bước CI `make demo-nap-lo`. Chưa có màn "Nhập lô" trên giao diện — gọi API; mới có một loại lô (văn bản đến); zip tệp đính kèm mất khi svc-files khởi động lại (dòng còn cần tệp báo `archive_lost`) |
 | ⑥ Vận hành, giám sát, kiểm toán | Log truy vết phân tán | APISIX gắn `X-Request-Id` (`platform/apisix/apisix.yaml`) và ghi nó ở cuối dòng log truy cập; `svc-files`, `svc-workflow` ghi mã này vào nhật ký, chuyển tiếp sang Hasura và vào `core.audit_log.request_id`; log tập trung (F3.14, profile `logs`) tra theo mã: `make logs-tra ID=…`. Truy vết (#364, profile `trace`): APISIX lấy mẫu `MOC_TRACE_RATIO` yêu cầu, `svc-files`, `svc-workflow` ghi span tiếp theo `traceparent` (`tracing.py`), Jaeger 2.22 lưu trong RAM và hiện thời gian từng chặng; tìm theo thẻ `x-request-id` | Dùng được | Tắt mặc định (cả log tập trung và truy vết). Span che hai lớp: dịch vụ gửi theo danh sách trắng, bỏ chuỗi truy vấn, URL ngoài chỉ còn tên máy, lỗi chỉ còn tên loại; Jaeger bỏ `http.target` của APISIX. Chưa có span của Hasura (bản CE), Flowable, Keycloak, PostgreSQL; trace mất khi Jaeger khởi động lại; chưa xem được trong Grafana (Jaeger 2.22 bỏ API v1). Bằng chứng: svc-files `test_tracing.py`, svc-workflow `test_tracing_copy.py`, scripts `test_truy_vet.py`; bước CI `jaeger validate`. Giám sát: Prometheus + Grafana chỉ có chỉ số APISIX (F3.13) |
 | ⑥ | Kiểm toán bất biến | Sổ kiểm toán chuỗi băm (`db/migrations/default/1792281600100_core_schema/`), neo ra bucket khóa ghi, `scripts/audit_chain.py` | Hoàn thiện | F2.12 |
@@ -197,12 +197,12 @@ chưa phủ hết năng lực của cụm.
 | ⑦ | WebSocket thời gian thực | Centrifugo, `platform/centrifugo/config.yaml`, route `/realtime` | Hoàn thiện | F2.5 |
 | ⑦ | Hàng đợi bất đồng bộ chống chối bỏ | Hộp thư đi `office.dispatches` (`svc_workflow/dispatch.py`); việc giao ra ngoài của Flowable (topic `moc-goi-y`, `moc-sla`) | Một phần | Liên thông (F3.12) có thử lại lùi dần, so SHA-256, ghi sổ kiểm toán cả hai đơn vị trong cùng giao dịch. Chưa có hàng đợi dùng chung cho ứng dụng khác, chưa có biên nhận ký số |
 
-**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 4, Minh họa 1, Một phần 6, **Chưa có 1**.
+**Tổng: 29 năng lực** — Hoàn thiện 17, Dùng được 4, Minh họa 1, Một phần 7, **Chưa có 0**.
 
-- Chưa có: kịch bản serverless (⑤).
-- Một phần: dịch thuật trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), trục sự
-  kiện (⑥: Event Triggers giao tới webhook của ứng dụng, chưa phải broker streaming), định tuyến thông báo đa kênh
-  (⑦: email chưa cho từng người tắt; SMS, Zalo chưa thử với tài khoản thật), hàng đợi chống chối bỏ (⑦).
+- Một phần: kịch bản serverless (⑤: Node-RED cho người vận hành, flow chưa có danh tính gọi API của lõi), dịch thuật
+  trong lõi (②), đóng băng số liệu chuỗi thời gian (③), lớp ngữ nghĩa báo cáo (③), trục sự kiện (⑥: Event Triggers giao
+  tới webhook của ứng dụng, chưa phải broker streaming), định tuyến thông báo đa kênh (⑦: email chưa cho từng người tắt;
+  SMS, Zalo chưa thử với tài khoản thật), hàng đợi chống chối bỏ (⑦).
 - Bốn dịch vụ bắt buộc (SSO, cổng API, dữ liệu có cấu trúc và phi cấu trúc, quy trình) đều ở mức Hoàn thiện.
 
 ## 4. Kiểm lại

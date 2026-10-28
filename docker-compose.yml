@@ -848,6 +848,7 @@ services:
       - seaweedfs_data:/data/seaweedfs
       - openbao_data:/data/openbao            # F3.7: khóa transit bọc khóa của tệp văn bản hạn chế
       - wiki_data:/data/wiki                  # #367: trang, tệp, tài khoản của wiki nội bộ (profile wiki)
+      - tu_dong_data:/data/tu-dong            # #366: flow, thông tin đăng nhập đã mã hóa của Node-RED (profile tu-dong)
 
   # ===========================================================================
   # Tầng 2 — ứng dụng
@@ -920,12 +921,44 @@ services:
       # cấu hình của Signet đè lên tệp protected của image (nạp sau cùng, trang quản trị không ghi đè được)
       - ./platform/wiki/signet.protected.php:/var/www/html/conf.core/docker.protected.php:ro
 
+  # Tự động hóa không sửa mã (#366), profile tu-dong — tắt mặc định (make tu-dong-up; docs/van-hanh.md mục Tự động hóa
+  # bằng Node-RED). Node-RED 5 (Apache-2.0) bản minimal ghim digest cộng openid-client (platform/tu-dong/Dockerfile),
+  # trình soạn dưới /tu-dong/, đăng nhập Keycloak, chỉ người có vai trò operator của client `tu-dong` (moc tu-dong).
+  # Một không gian flow chung cho người vận hành nền tảng, không tách theo đơn vị. Chỉ ở mạng apps: flow gọi lõi qua
+  # APISIX như ứng dụng, không tới CSDL hay dịch vụ lõi nào. Flow, thông tin đăng nhập của flow (mã hóa bằng
+  # MOC_TU_DONG_SECRET), phiên trình soạn là tệp trong volume tu_dong_data (moc backup chép)
+  tu-dong:
+    <<: *common
+    build: ./platform/tu-dong
+    image: moc/tu-dong:${MOC_VERSION:-dev}
+    profiles: [tu-dong]
+    networks: [apps]
+    read_only: true                       # chỉ ghi vào /data (volume) và /tmp
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # issue #366 đo container trống khoảng 75 MiB
+    environment:
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_REALM: ${MOC_REALM:-moc}
+      MOC_TU_DONG_SECRET: ${MOC_TU_DONG_SECRET:-}
+      TZ: Asia/Ho_Chi_Minh                # node inject hẹn giờ (07:00 hằng ngày) theo giờ Việt Nam
+    volumes:
+      - tu_dong_data:/data
+    healthcheck:
+      # healthcheck.js của image đọc /data/settings.js, bản này để settings ở /moc: hỏi thẳng trang đăng nhập
+      test: ["CMD", "node", "-e",
+             "fetch('http://127.0.0.1:1880/tu-dong/auth/login').then(r => process.exit(+!r.ok), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
 networks:
   moc:
     driver: bridge
-  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, wiki, ứng dụng cài bằng moc
-  # app install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra
-  # Internet
+  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, wiki, tu-dong, ứng dụng cài
+  # bằng moc app install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt.
+  # Không ra Internet
   apps:
     driver: bridge
     internal: true
@@ -982,6 +1015,8 @@ volumes:
   keycloak_fonts:
   # wiki nội bộ (#367, profile wiki): trang, tệp tải lên, tài khoản, danh sách quyền; moc backup chép
   wiki_data:
+  # tự động hóa Node-RED (#366, profile tu-dong): flow, thông tin đăng nhập của flow đã mã hóa, phiên; moc backup chép
+  tu_dong_data:
 
 secrets:
   # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ
