@@ -62,6 +62,10 @@ export function describeNotification(t: Translate, n: Pick<RealtimeMessage, 'kin
         detail: [d.component, d.route].filter(Boolean).join(' — '),
         note: '',
       }
+    // flow Node-RED (#366): robot của đơn vị gửi qua Action notifyFromFlow; tiêu đề, nội dung do người vận hành viết
+    // trong flow, Vue hiện dạng chữ thường; không có nội dung thì hiện văn bản gắn kèm
+    case 'flow.message':
+      return { title: t('notify.flowMessage', { title: d.title ?? '' }), detail: d.text || doc, note: '' }
     default:
       return { title: n.kind, detail: doc, note }
   }
