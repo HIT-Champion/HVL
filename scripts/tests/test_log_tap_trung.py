@@ -265,8 +265,8 @@ class MakefileTest(unittest.TestCase):
     def test_logged_services_match_the_override(self) -> None:
         text = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn(f"LOGGED_SERVICES := {' '.join(LOGGED)}\n", text)
-        self.assertIn("--profile ai-pull --profile logs down\n", text)
-        self.assertIn("--profile ai-pull --profile logs down -v\n", text)
+        self.assertIn("--profile ai-pull --profile logs --profile wiki down\n", text)
+        self.assertIn("--profile ai-pull --profile logs --profile wiki down -v\n", text)
 
 
 class PureFunctionTest(unittest.TestCase):

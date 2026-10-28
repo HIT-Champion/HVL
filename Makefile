@@ -43,6 +43,9 @@ LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
 ifneq ($(LOGS_ON),)
 export COMPOSE_FILE := $(LOGS_COMPOSE_FILE)
 endif
+# Wiki nội bộ (#367, profile wiki; docs/van-hanh.md mục Wiki nội bộ). Bật lâu dài (wiki trong MOC_EXTRA_PROFILES): make
+# up cũng thêm bí mật client vào .env cũ (wiki-env) và đồng bộ client Keycloak, quyền theo đơn vị (moc wiki sync)
+WIKI_ON := $(filter wiki,$(EXTRA_PROFILES))
 # Nơi cài khi chạy ngoài thư mục mã nguồn (make install)
 PREFIX ?= /opt/moc
 
@@ -54,6 +57,7 @@ PREFIX ?= /opt/moc
         demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung \
+        wiki-env wiki-up wiki-down demo-wiki \
         reconcile \
         backup restore install uninstall license-check license-fix sbom license-audit lint release clean
 
@@ -99,10 +103,11 @@ check: ## Kiểm tra tiền điều kiện của môi trường
 build: $(ENV_FILE) ## Dựng image của các dịch vụ do đội viết
 	@$(COMPOSE) build
 
-up: env-ready $(if $(LOGS_ON),logs-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
+up: env-ready $(if $(LOGS_ON),logs-env) $(if $(WIKI_ON),wiki-env) ## Khởi động lõi (Tầng 1) và Văn phòng điện tử (Tầng 2)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync --files)
 	@$(COMPOSE) up -d --build --wait --wait-timeout 600
 	$(if $(LOGS_ON),@python3 scripts/log_tap_trung.py init)
+	$(if $(WIKI_ON),@python3 scripts/moc.py wiki sync)
 	$(if $(wildcard .moc-apps/apps),@python3 scripts/moc.py app sync)
 	@echo "Signet đang chạy ở $$(grep '^MOC_PUBLIC_URL=' $(ENV_FILE) | cut -d= -f2). Nạp dữ liệu mẫu: make seed"
 
@@ -113,11 +118,11 @@ ai-model: $(ENV_FILE) ## Tải mô hình sinh MOC_AI_MODEL (mặc định qwen3:
 	@$(COMPOSE) --profile ai-pull run --rm ollama-pull
 
 down: ## Dừng toàn bộ dịch vụ (giữ dữ liệu)
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs --profile wiki down
 
 reset: ## Dừng và XÓA toàn bộ dữ liệu (CSDL, tệp, chỉ mục)
 	@read -p "Xóa toàn bộ dữ liệu của Signet trên máy này? [y/N] " a && [ "$$a" = y ]
-	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs down -v
+	@$(COMPOSE) --profile iot --profile iot-sim --profile ai --profile ai-pull --profile logs --profile wiki down -v
 
 restart: down up ## Khởi động lại toàn bộ hệ thống
 
@@ -149,6 +154,26 @@ logs-tra: $(ENV_FILE) ## Tra log tập trung theo mã yêu cầu (header X-Reque
 
 demo-log-tap-trung: $(ENV_FILE) ## Màn log tập trung (F3.14): một mã X-Request-Id tự đặt đi qua APISIX → svc-workflow → svc-files; Parseable trả dòng của cả ba cùng mã, sổ kiểm toán cùng mã; không lộ token; docker logs vẫn đọc được
 	@python3 scripts/demo.py log-tap-trung
+
+wiki-env: $(ENV_FILE)
+	@# .env sinh trước #367 thiếu bí mật client: sinh đúng như make env (scripts/gen-env.sh), không in giá trị
+	@grep -q '^MOC_WIKI_CLIENT_SECRET=' $(ENV_FILE) || { umask 077 \
+	  && printf '\n# Wiki nội bộ (#367), make up / make wiki-up thêm\nMOC_WIKI_CLIENT_SECRET=change_me\n' \
+	  | ./scripts/gen-env.sh /dev/stdin >> $(ENV_FILE) && echo "Đã thêm MOC_WIKI_CLIENT_SECRET (ngẫu nhiên) vào $(ENV_FILE)."; }
+
+wiki-up: env-ready wiki-env ## Bật wiki nội bộ (#367, DokuWiki ở /wiki/): đăng nhập Keycloak, mỗi đơn vị một không gian riêng; tạo client Keycloak wiki, ghi quyền theo đơn vị (chạy lại sau khi thêm đơn vị). Giữ qua make up: thêm wiki vào MOC_EXTRA_PROFILES
+	@$(COMPOSE) --profile wiki up -d --build --wait wiki
+	@python3 scripts/moc.py wiki sync
+	@echo " $(EXTRA_PROFILES) " | grep -q ' wiki ' || echo "Lưu ý: make down tắt wiki, make up sau đó không bật" \
+	  "lại — bật lâu dài thì thêm wiki vào MOC_EXTRA_PROFILES trong $(ENV_FILE)"
+
+wiki-down: env-ready ## Tắt wiki nội bộ: dừng, xóa container; giữ trang, tệp đã lưu (volume wiki_data — make reset mới xóa)
+	@! echo " $(EXTRA_PROFILES) " | grep -q ' wiki ' || { echo "Bỏ wiki khỏi MOC_EXTRA_PROFILES trong $(ENV_FILE)" \
+	  "trước, không thì make up lần sau lại bật" >&2; exit 1; }
+	@$(COMPOSE) --profile wiki rm -sf wiki
+
+demo-wiki: $(ENV_FILE) ## Màn wiki nội bộ (#367, cần make wiki-up): người phòng CNTT viết trang trong không gian đơn vị mình; văn thư phòng KT và khách chưa đăng nhập không đọc được; tài khoản đến từ Keycloak, không mật khẩu riêng
+	@python3 scripts/demo_wiki.py
 
 ps: ## Liệt kê trạng thái các dịch vụ
 	@$(COMPOSE) ps
