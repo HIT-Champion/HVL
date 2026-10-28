@@ -25,7 +25,12 @@ soạn đổi mã đó lấy token của Node-RED ở POST /tu-dong/auth/token. 
 - người vận hành (`quantri`, được cấp vai trò bằng `moc tu-dong operator add`) vào được, triển khai được một flow có
   node Function, Template chứa mã JavaScript, HTML, câu GraphQL qua cổng mà WAF không chặn, đọc lại đúng flow đó;
 - không có node exec, file, watch; không cài node từ npm; WebSocket của trình soạn (/tu-dong/comms) bắt tay được
-  qua cổng.
+  qua cổng;
+- robot của Khoa CNTT (`moc tu-dong robot add CNTT`) lấy token client_credentials: claim Hasura cố định vai trò
+  `tu_dong`, đọc được văn bản của đơn vị, không đọc được nội dung văn bản, danh bạ, thông báo;
+- hai flow mẫu (platform/tu-dong/flow-mau.json) triển khai kèm bí mật của robot: văn thư vào sổ văn bản Hỏa tốc thì
+  trưởng khoa nhận đúng một thông báo gắn văn bản (chạy lại flow không báo trùng); flow 07:00 bấm tay gửi trưởng khoa
+  một danh sách văn bản sắp hạn mỗi ngày. Flow mẫu để chạy tiếp sau màn demo.
 --sau-khoi-phuc: chỉ đăng nhập lại và đọc flow của lần chạy trước — bước kiểm sau moc backup restore trong CI.
 
 Thoát 0: đạt; 1: có bước sai hoặc không gọi được Signet.
@@ -35,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import html
 import json
 import os
@@ -46,14 +52,23 @@ import time
 import urllib.error
 import urllib.parse
 import uuid
+from datetime import datetime, timedelta
 
 import tu_dong
 from demo_ca_nhan import Browser, DemoFailed, ok, say
-from moc_env import ENV, PUBLIC_URL, REALM, USER_AGENT, HTTPError, _otp_counter, request, totp_at
+from moc_env import (ENV, PUBLIC_URL, REALM, ROOT, USER_AGENT, HTTPError, Session, _otp_counter, call_json, request,
+                     totp_at)
 
 ROOT_URL = f"{PUBLIC_URL}{tu_dong.BASE}"
 OPERATOR, OTHER = "quantri", "giangvienktpm"     # seed/users.csv: quản trị Khoa CNTT (TOTP); giảng viên Khoa CNTT
 FLOW_TAB = "moc-demo-tu-dong"
+UNIT = "CNTT"                                    # seed: robot của Khoa CNTT gửi cho trưởng khoa, văn thư nhập văn bản
+DIRECTOR, CLERK = "truongkhoa", "vanthu"
+CLAIMS = "https://hasura.io/jwt/claims"
+FLOW_MAU = ROOT / "platform" / "tu-dong" / "flow-mau.json"
+MAU_TAB, HOA_TOC, HAN = "moc-flow-mau", "moc-mau-hoa-toc-inject", "moc-mau-han-inject"
+NOTICES = """{ core_notifications(where: {kind: {_eq: "flow.message"}}, order_by: {created_at: desc}, limit: 50) {
+  id document_id data created_at } }"""
 # Mã của flow mẫu: trông như tấn công với bộ luật CRS (lệnh, HTML, câu truy vấn) nhưng là việc thường ngày của flow
 FUNCTION = """// Văn bản Hỏa tốc vừa vào sổ: báo lãnh đạo (bản thu gọn của flow mẫu, #366 bước 2)
 const doc = msg.payload || {};
@@ -136,7 +151,10 @@ def api(method: str, path: str, token: str | None, body: object = None) -> tuple
         status, _, raw = request(method, f"{ROOT_URL}{path}", data=data, headers=headers)
     except HTTPError as exc:
         return exc.status, exc.body if hasattr(exc, "body") else str(exc)
-    return status, json.loads(raw) if raw else None
+    try:
+        return status, json.loads(raw) if raw else None
+    except ValueError:              # POST /inject/<id> trả chữ "OK", không phải JSON
+        return status, raw.decode(errors="replace") if isinstance(raw, bytes) else raw
 
 
 def sample_flow() -> list[dict[str, object]]:
@@ -148,6 +166,67 @@ def sample_flow() -> list[dict[str, object]]:
          "fieldType": "msg", "format": "html", "syntax": "mustache", "template": TEMPLATE, "output": "str",
          "x": 420, "y": 80, "wires": [[]]},
     ]
+
+
+def robot_token(client_id: str, secret: str) -> str:
+    """Token của robot như node HTTP của flow mẫu lấy: luồng client_credentials qua cổng."""
+    data, _ = call_json("POST", f"{PUBLIC_URL}/realms/{REALM}/protocol/openid-connect/token",
+                        form={"grant_type": "client_credentials", "client_id": client_id, "client_secret": secret})
+    return data["access_token"]
+
+
+def claims_of(token: str) -> dict[str, object]:
+    body = token.split(".")[1]
+    return json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+
+
+def graphql(token: str, query: str, variables: dict[str, object] | None = None) -> dict[str, object]:
+    data, _ = call_json("POST", f"{PUBLIC_URL}/v1/graphql", {"query": query, "variables": variables or {}},
+                        headers={"Authorization": f"Bearer {token}"})
+    return data
+
+
+def flow_mau_body(current: dict[str, object], robot_id: str, secret: str) -> dict[str, object]:
+    """Flow mẫu như người vận hành nhập rồi điền biến của tab: ROBOT_SECRET đặt ở `credentials` của chính node tab
+    (Node-RED mã hóa vào flows_cred.json) — không đặt `credentials` ở gốc thân, Node-RED sẽ coi đó là toàn bộ thông tin
+    đăng nhập của mọi node và thay hết."""
+    nodes = copy.deepcopy(json.loads(FLOW_MAU.read_text(encoding="utf-8")))
+    tab = next(n for n in nodes if n["type"] == "tab")
+    for var in tab["env"]:
+        if var["name"] == "ROBOT_ID":
+            var["value"] = robot_id
+    tab["credentials"] = {"ROBOT_SECRET": secret}
+    keep = [n for n in current.get("flows", []) if n.get("id") != MAU_TAB and n.get("z") != MAU_TAB]
+    return {"flows": keep + nodes, "rev": current.get("rev")}
+
+
+def fire(token: str, inject: str) -> None:
+    """Bấm nút của node inject (API trình soạn). POST /flows trả lời trước khi node chạy: 404 thì đợi, thử lại."""
+    for _ in range(20):
+        status, _ = api("POST", f"inject/{inject}", token)
+        if status == 200:
+            return
+        time.sleep(1)
+    raise DemoFailed(f"POST /tu-dong/inject/{inject} trả {status}: flow mẫu chưa chạy")
+
+
+def vn_date(at: str) -> str:
+    """Ngày theo giờ Việt Nam của một mốc timestamptz Hasura trả về."""
+    return (datetime.fromisoformat(at) + timedelta(hours=7)).strftime("%Y-%m-%d")
+
+
+def wait_notices(director: Session, robot: str, doc_id: str | None, *, day: str | None = None,
+                 timeout_s: float = 60) -> list[dict[str, object]]:
+    """Thông báo flow.message của robot trong chuông của lãnh đạo: gắn văn bản doc_id, hoặc (doc_id None) không gắn
+    văn bản và tạo trong ngày `day` (giờ Việt Nam)."""
+    deadline = time.time() + timeout_s
+    while True:
+        rows = [n for n in director.gql(NOTICES)["core_notifications"]
+                if n["document_id"] == doc_id and n["data"].get("robot") == robot
+                and (day is None or vn_date(n["created_at"]) == day)]
+        if rows or time.time() > deadline:
+            return rows
+        time.sleep(2)
 
 
 def websocket_handshake() -> str:
@@ -239,7 +318,64 @@ def run() -> None:
     if " 101 " not in f"{line} ":
         raise DemoFailed(f"WebSocket /tu-dong/comms qua cổng: {line!r}")
     ok(f"{len(names)} loại node, không có exec, file, watch; palette không cài, không tải lên; /tu-dong/comms: {line}")
-    print(f"\nĐẠT — trình soạn: {ROOT_URL} (đăng nhập bằng {OPERATOR})")
+
+    say(7, f"Robot của đơn vị {UNIT} (moc tu-dong robot add): token client_credentials, vai trò Hasura tu_dong")
+    robot = tu_dong.add_robot(kc, UNIT)
+    rtoken = robot_token(robot["client_id"], robot["secret"])
+    hasura = claims_of(rtoken).get(CLAIMS) or {}
+    if (hasura.get("x-hasura-default-role"), hasura.get("x-hasura-allowed-roles"), hasura.get("x-hasura-tenant-id"),
+            hasura.get("x-hasura-user-id")) != ("tu_dong", ["tu_dong"], robot["tenant_id"], robot["client_id"]):
+        raise DemoFailed(f"claim Hasura trong token của {robot['client_id']} không đúng: {hasura}")
+    seen = graphql(rtoken, "{ office_documents(limit: 5) { id symbol urgency status due_on } }")
+    if seen.get("errors") or not isinstance(seen.get("data", {}).get("office_documents"), list):
+        raise DemoFailed(f"robot không đọc được văn bản của đơn vị: {str(seen)[:160]}")
+    for query in ("{ office_documents(limit: 1) { body } }", "{ core_users { id } }", "{ core_notifications { id } }"):
+        if not graphql(rtoken, query).get("errors"):
+            raise DemoFailed(f"robot đọc được thứ không được đọc: {query}")
+    ok(f"{robot['client_id']} ({robot['result']}): đọc {len(seen['data']['office_documents'])} văn bản của đơn vị; "
+       "không đọc được nội dung văn bản, danh bạ, thông báo")
+
+    say(8, "Nhập hai flow mẫu (platform/tu-dong/flow-mau.json), điền ROBOT_ID, ROBOT_SECRET của tab, triển khai")
+    status, current = api("GET", "flows", token)
+    status, result = api("POST", "flows", token, flow_mau_body(current, robot["client_id"], robot["secret"])) \
+        if status == 200 and isinstance(current, dict) else (status, current)
+    if status != 200:
+        raise DemoFailed(f"triển khai flow mẫu: POST /tu-dong/flows trả {status} {str(result)[:120]}")
+    status, secret = api("GET", f"credentials/tab/{MAU_TAB}", token)
+    if status != 200 or secret != {"has_ROBOT_SECRET": True}:
+        raise DemoFailed(f"Node-RED không giữ ROBOT_SECRET của tab {MAU_TAB}: {status} {secret}")
+    ok(f"tab {MAU_TAB}: 07:00 hằng ngày văn bản sắp hạn; mỗi phút văn bản Hỏa tốc vừa vào sổ; bí mật robot chỉ còn "
+       "dạng has_ROBOT_SECRET")
+
+    say(9, f"{CLERK} vào sổ một văn bản Hỏa tốc hạn ngày mai → flow báo {DIRECTOR} (lãnh đạo đơn vị) ngay")
+    clerk, director = Session(CLERK), Session(DIRECTOR)
+    today = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 7 * 3600))
+    due = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 7 * 3600 + 86400))
+    symbol = f"{tag[:4]}/HT-ĐHCN"
+    doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
+        "type_code": "CV", "symbol": symbol, "issuer_name": "Trường Đại học Công nghiệp", "issued_on": today,
+        "urgency": "hoa_toc", "due_on": due, "summary": f"Về việc nộp báo cáo kiểm định gấp (demo #366, {tag})",
+    }})["receiveIncoming"]["document_id"]
+    clerk.gql("mutation ($id: uuid!) { registerIncoming(documentId: $id) { register_number } }", {"id": doc_id})
+    fire(token, HOA_TOC)
+    first = wait_notices(director, robot["client_id"], doc_id)
+    if len(first) != 1 or symbol not in str(first[0]["data"]):
+        raise DemoFailed(f"{DIRECTOR} có {len(first)} thông báo của flow cho văn bản Hỏa tốc {symbol}, không phải 1")
+    fire(token, HOA_TOC)                # chạy lại: cùng khóa hoa-toc:<id>, máy chủ không báo lần nữa
+    time.sleep(5)
+    if len(again := wait_notices(director, robot["client_id"], doc_id, timeout_s=0)) != 1:
+        raise DemoFailed(f"chạy lại flow Hỏa tốc: {DIRECTOR} có {len(again)} thông báo cho {symbol}")
+    ok(f"\"{first[0]['data'].get('title')}\" — {symbol}, bấm vào mở văn bản; chạy lại flow không báo trùng")
+
+    # khóa han:<ngày>: mỗi ngày một tin — đã báo hôm nay (07:00, lần chạy trước) thì bấm lại không báo thêm
+    say(10, f"Flow 07:00 (bấm tay thay vì đợi giờ): {DIRECTOR} nhận danh sách văn bản đến hạn trong 3 ngày")
+    fire(token, HAN)
+    digest = wait_notices(director, robot["client_id"], None, day=today)
+    if len(digest) != 1:
+        raise DemoFailed(f"{DIRECTOR} có {len(digest)} danh sách văn bản sắp hạn hôm nay {today}, không phải 1")
+    ok(f"\"{digest[0]['data'].get('title')}\" (một tin mỗi ngày)")
+    print(f"\nĐẠT — trình soạn: {ROOT_URL} (đăng nhập bằng {OPERATOR}); flow mẫu đang chạy ở tab {MAU_TAB} (tắt: mở "
+          "tab, Disable, Deploy)")
 
 
 def operator_token() -> str:

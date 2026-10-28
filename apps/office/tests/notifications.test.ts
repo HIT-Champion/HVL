@@ -15,8 +15,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-// Chuông thông báo: câu của cảnh báo vận hành (F3.13, #284), đường dẫn khi bấm thông báo (chuông, toast), chuông hiện
-// cho mọi vai trò — cả quản trị đơn vị, vai trò duy nhất nhận ops.alert.
+// Chuông thông báo: câu của cảnh báo vận hành (F3.13, #284), của flow Node-RED (#366), đường dẫn khi bấm thông báo
+// (chuông, toast), chuông hiện cho mọi vai trò — cả quản trị đơn vị, vai trò duy nhất nhận ops.alert.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -40,6 +40,16 @@ test('cảnh báo vận hành: câu theo trạng thái, chi tiết là thành ph
   })
 })
 
+test('flow Node-RED: tiêu đề có nhãn tự động, chi tiết là nội dung hoặc văn bản gắn kèm', () => {
+  const data = { title: 'Văn bản hỏa tốc', symbol: '12/QĐ-ĐHCN', summary: 'Về lịch thi', robot: 'tu-dong-robot-cntt' }
+  assert.deepEqual(describeNotification(t, { kind: 'flow.message', data }), {
+    title: 'notify.flowMessage {"title":"Văn bản hỏa tốc"}', detail: '12/QĐ-ĐHCN — Về lịch thi', note: '',
+  })
+  assert.equal(describeNotification(t, { kind: 'flow.message', data: { ...data, text: '3 văn bản sắp hạn' } }).detail,
+    '3 văn bản sắp hạn')
+  assert.equal(notificationLink({ kind: 'flow.message', document_id: 'd-2' }), '/van-ban/d-2')
+})
+
 test('bấm thông báo: văn bản gắn kèm, cảnh báo vận hành mở trang trạng thái, còn lại không đi đâu', () => {
   assert.equal(notificationLink({ kind: 'task.assigned', document_id: 'd-1' }), '/van-ban/d-1')
   assert.equal(notificationLink({ kind: 'ops.alert', document_id: null }), '/trang-thai')
@@ -50,6 +60,7 @@ test('câu cảnh báo có ở cả hai ngôn ngữ, cùng tham số message', (
   for (const lang of ['vi', 'en']) {
     const notify = JSON.parse(read(`../app/locales/${lang}.json`)).notify as Record<string, string>
     for (const key of ['opsAlert', 'opsResolved']) assert.match(notify[key] ?? '', /\{message\}/, `${lang} ${key}`)
+    assert.match(notify.flowMessage ?? '', /\{title\}/, `${lang} flowMessage`)
   }
 })
 

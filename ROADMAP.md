@@ -91,9 +91,10 @@ bộ phận.
       (#303)
 - [ ] **Một phần** — tự động hóa không cần sửa mã dịch vụ (kịch bản serverless, cụm ⑤): Node-RED ở `/tu-dong/`,
       profile `tu-dong` tắt mặc định, cho người vận hành nền tảng soạn flow; đăng nhập Keycloak, chỉ vai trò `operator`
-      ([`docs/van-hanh.md`](docs/van-hanh.md) mục Tự động hóa bằng Node-RED, bước CI `make demo-tu-dong`, #366). Còn
-      thiếu: danh tính cho flow gọi API của lõi, webhook, hai flow mẫu, bước BPMN gọi flow; việc nền của lõi vẫn viết
-      trong `svc-files`, `svc-workflow`
+      ([`docs/van-hanh.md`](docs/van-hanh.md) mục Tự động hóa bằng Node-RED, bước CI `make demo-tu-dong`, #366). Flow
+      gọi lõi bằng robot của đơn vị (`moc tu-dong robot add`, vai trò Hasura `tu_dong` chỉ đọc, Action
+      `notifyFromFlow`), hai flow mẫu. Còn thiếu: webhook, bước BPMN gọi flow; việc nền của lõi vẫn viết trong
+      `svc-files`, `svc-workflow`
 
 ## Giai đoạn 3 — [D] Không gian Dữ liệu
 
@@ -190,7 +191,7 @@ Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
    `core.app_events` và Hasura Event Triggers, không đọc thẳng bảng của Văn phòng điện tử. Còn thiếu: phát lại, thứ
    tự, thêm loại sự kiện ngoài văn bản; chưa thêm broker.
 3. **Việc nền khai báo, kịch bản serverless** (cụm ⑤, một phần): Node-RED (profile `tu-dong`, #366) cho người vận
-   hành soạn flow; còn thiếu danh tính cho flow gọi API của lõi, webhook, bước BPMN gọi flow qua `svc-workflow`
+   hành soạn flow, gọi lõi bằng robot của đơn vị; còn thiếu webhook, bước BPMN gọi flow qua `svc-workflow`
    (topic `moc-tu-dong`). Việc nền của lõi vẫn viết trong mã dịch vụ.
 4. **Truy vết, giám sát đủ** (cụm ⑥): span của Hasura, Flowable, Keycloak, PostgreSQL (Jaeger mới có span của cổng và
    hai dịch vụ, #364), chỉ số từng dịch vụ, cảnh báo — nối tiếp log tập trung (#105).

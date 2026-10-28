@@ -205,7 +205,7 @@ tu-dong-down: env-ready ## Tắt tự động hóa Node-RED: dừng, xóa contai
 	  "$(ENV_FILE) trước, không thì make up lần sau lại bật" >&2; exit 1; }
 	@$(COMPOSE) --profile tu-dong rm -sf tu-dong
 
-demo-tu-dong: $(ENV_FILE) ## Màn tự động hóa (#366, cần make tu-dong-up): chưa đăng nhập, không có vai trò operator thì không vào được trình soạn; người vận hành đăng nhập Keycloak, triển khai flow qua cổng (WAF bật); không node exec, không cài node từ npm
+demo-tu-dong: $(ENV_FILE) ## Màn tự động hóa (#366, cần make tu-dong-up): chưa đăng nhập, không có vai trò operator thì không vào được trình soạn; người vận hành đăng nhập Keycloak, triển khai flow qua cổng (WAF bật); không node exec, không cài node từ npm; robot của đơn vị, hai flow mẫu (Hỏa tốc báo lãnh đạo, văn bản sắp hạn)
 	@python3 scripts/demo_tu_dong.py
 
 demo-wiki: $(ENV_FILE) ## Màn wiki nội bộ (#367, cần make wiki-up): người phòng CNTT viết trang trong không gian đơn vị mình; văn thư phòng KT và khách chưa đăng nhập không đọc được; tài khoản đến từ Keycloak, không mật khẩu riêng

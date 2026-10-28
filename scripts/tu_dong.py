@@ -30,6 +30,14 @@ này dành cho người vận hành nền tảng, không cấp theo đơn vị, 
 
 Mapper `tu-dong-roles` đưa vai trò client vào ID token: settings.js chỉ tin claim của ID token, thứ openid-client đã
 kiểm chữ ký, iss, aud.
+
+Robot của flow (`moc tu-dong robot add|list|rotate|remove <mã đơn vị>`): flow gọi API của lõi bằng danh tính riêng của
+một đơn vị, không mượn tài khoản người. Mỗi đơn vị một client confidential `tu-dong-robot-<alias>` chỉ có luồng
+client_credentials; mapper claim cố định đưa vào access token vai trò Hasura `tu_dong` (chỉ đọc văn bản không hạn chế
+của đơn vị, gọi Action notifyFromFlow — db/metadata), x-hasura-tenant-id của đơn vị và x-hasura-user-id là chính
+clientId (nhật ký, khóa thông báo ghi tên robot). Không đặt full scope: token không mang vai trò nào khác của realm.
+Tài khoản dịch vụ của client không có tenant_id, moc_role nên không vào danh bạ core.users. Bí mật do Keycloak sinh,
+`robot add` in ra để dán vào biến ROBOT_SECRET của flow mẫu (platform/tu-dong/flow-mau.json); lộ thì `robot rotate`.
 """
 
 from __future__ import annotations
@@ -130,6 +138,115 @@ def set_operator(kc: Any, username: str, *, revoke: bool = False) -> str:
     return "removed" if revoke else "added"
 
 
+# --- robot của flow -----------------------------------------------------------------------------------------------
+
+ROBOT_PREFIX = "tu-dong-robot-"
+ROBOT_ROLE = "tu_dong"
+CLAIMS = "https://hasura\\.io/jwt/claims"     # như mapper của client trong moc-realm.json: dấu chấm của tên miền thoát
+
+
+def robot_id(code: str) -> str:
+    return ROBOT_PREFIX + tenants.alias_for(code)
+
+
+def _claim(name: str, value: str, json_type: str = "String") -> dict[str, Any]:
+    return {"name": f"hasura-{name}", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
+            "config": {"claim.name": f"{CLAIMS}.x-hasura-{name}", "claim.value": value, "jsonType.label": json_type,
+                       "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false",
+                       "introspection.token.claim": "true"}}
+
+
+def robot_mappers(code: str, tenant_id: str) -> list[dict[str, Any]]:
+    return [_claim("user-id", robot_id(code)), _claim("tenant-id", tenant_id),
+            _claim("default-role", ROBOT_ROLE), _claim("allowed-roles", json.dumps([ROBOT_ROLE]), "JSON")]
+
+
+def robot_rep(code: str) -> dict[str, Any]:
+    """Client confidential chỉ có luồng client_credentials, không đường chuyển hướng, không full scope."""
+    return {
+        "clientId": robot_id(code),
+        "name": f"Robot tự động hóa — {code}",
+        "description": f"Flow Node-RED (#366) gọi API của lõi thay mặt đơn vị {code}: vai trò Hasura {ROBOT_ROLE}",
+        "enabled": True,
+        "protocol": "openid-connect",
+        "publicClient": False,
+        "clientAuthenticatorType": "client-secret",
+        "standardFlowEnabled": False,
+        "implicitFlowEnabled": False,
+        "directAccessGrantsEnabled": False,
+        "serviceAccountsEnabled": True,
+        "fullScopeAllowed": False,
+        "redirectUris": [],
+        "webOrigins": [],
+    }
+
+
+def _unit(code: str, db: Any = None) -> dict[str, Any]:
+    rows = (db or tenants.database()).query(tenants.TENANTS_SQL) or []
+    unit = next((r for r in rows if r["code"] == code), None)
+    if unit is None:
+        raise tenants.TenantError(f"không có đơn vị mã {code} (python3 scripts/moc.py tenant list)")
+    return unit
+
+
+def _robot(kc: Any, code: str) -> dict[str, Any] | None:
+    return next((c for c in kc.clients() if c.get("clientId") == robot_id(code)), None)
+
+
+def add_robot(kc: Any, code: str, *, db: Any = None) -> dict[str, Any]:
+    """Thêm robot của đơn vị, hoặc đặt lại các trường, mapper của robot đã có (chạy lại được) → clientId, bí mật."""
+    unit = _unit(code, db)
+    found = _robot(kc, code)
+    want = robot_rep(code)
+    mappers = robot_mappers(code, unit["id"])
+    if found is None:
+        kc.create_client({**want, "protocolMappers": mappers})
+        found = _robot(kc, code)
+        if found is None:
+            raise tenants.TenantError(f"Keycloak tạo client {want['clientId']} xong nhưng không đọc lại được")
+        action = "created"
+    else:
+        kc.update_client(found["id"], {**found, **want})
+        have = {m.get("name"): m for m in kc.protocol_mappers(found["id"])}
+        for mapper in mappers:
+            old = have.get(mapper["name"])
+            if old is None:
+                kc.add_protocol_mapper(found["id"], mapper)
+            elif old.get("protocolMapper") != mapper["protocolMapper"] or old.get("config") != mapper["config"]:
+                kc.update_protocol_mapper(found["id"], old["id"], {**mapper, "id": old["id"]})
+        action = "updated"
+    return {"client_id": want["clientId"], "code": code, "tenant_id": unit["id"], "result": action,
+            "secret": kc.client_secret(found["id"])}
+
+
+def rotate_robot(kc: Any, code: str) -> dict[str, Any]:
+    found = _robot(kc, code)
+    if found is None:
+        raise tenants.TenantError(f"đơn vị {code} chưa có robot — python3 scripts/moc.py tu-dong robot add {code}")
+    return {"client_id": found["clientId"], "code": code, "result": "rotated",
+            "secret": kc.client_secret(found["id"], regenerate=True)}
+
+
+def remove_robot(kc: Any, code: str) -> str:
+    """"removed" | "unchanged": gỡ client của robot; token đã cấp còn hạn (mặc định 5 phút) tới khi hết hạn."""
+    found = _robot(kc, code)
+    if found is None:
+        return "unchanged"
+    kc.delete_client(found["id"])
+    return "removed"
+
+
+def robots(kc: Any) -> list[dict[str, Any]]:
+    """Robot đang có: clientId, đơn vị (claim tenant-id cố định), bật hay tắt."""
+    out = []
+    for c in sorted((c for c in kc.clients() if str(c.get("clientId", "")).startswith(ROBOT_PREFIX)),
+                    key=lambda c: c["clientId"]):
+        tenant = next((m["config"].get("claim.value") for m in kc.protocol_mappers(c["id"])
+                       if m.get("name") == "hasura-tenant-id"), None)
+        out.append({"client_id": c["clientId"], "tenant_id": tenant, "enabled": bool(c.get("enabled"))})
+    return out
+
+
 def check_secret(env: dict[str, str]) -> None:
     """Khóa mã hóa thông tin đăng nhập trong flow (credentialSecret): container dừng nếu thiếu, ở đây báo sớm hơn."""
     if len(env.get(SECRET_VAR, "")) < 32 or env.get(SECRET_VAR) == "change_me":
@@ -190,6 +307,35 @@ def cmd_operator(args: argparse.Namespace) -> int:
     return _run(work)
 
 
+def cmd_robot(args: argparse.Namespace) -> int:
+    def work() -> int:
+        kc = tenants.connect()
+        if args.action == "list":
+            rows = robots(kc)
+            lines = [f"{r['client_id']}  đơn vị {r['tenant_id'] or '?'}" + ("" if r["enabled"] else "  (đang tắt)")
+                     for r in rows]
+            print(json.dumps(rows, ensure_ascii=False) if args.json else "\n".join(lines) or "(chưa có robot nào)")
+            return 0
+        if not args.code:
+            raise tenants.TenantError(f"cần mã đơn vị: moc tu-dong robot {args.action} <mã>")
+        if args.action == "remove":
+            done = remove_robot(kc, args.code)
+            print(json.dumps({"client_id": robot_id(args.code), "result": done}) if args.json
+                  else f"{robot_id(args.code)}: {'đã gỡ' if done == 'removed' else 'không có, không đổi'}")
+            return 0
+        out = add_robot(kc, args.code) if args.action == "add" else rotate_robot(kc, args.code)
+        if args.json:
+            print(json.dumps(out, ensure_ascii=False))
+            return 0
+        text = {"created": "đã tạo", "updated": "đã có, đặt lại cấu hình", "rotated": "đã đổi bí mật"}[out["result"]]
+        print(f"{out['client_id']} (đơn vị {args.code}): {text}\n"
+              f"  ROBOT_ID={out['client_id']}\n  ROBOT_SECRET={out['secret']}\n"
+              "Dán hai giá trị vào biến của tab flow mẫu trong /tu-dong/ (ROBOT_SECRET là biến bí mật, Node-RED mã hóa "
+              f"bằng {SECRET_VAR}); lộ thì: moc tu-dong robot rotate {args.code}")
+        return 0
+    return _run(work)
+
+
 def add_parser(groups: Any) -> None:
     t = groups.add_parser("tu-dong", help="tự động hóa bằng Node-RED (#366, profile tu-dong)").add_subparsers(
         dest="cmd", required=True)
@@ -202,3 +348,8 @@ def add_parser(groups: Any) -> None:
     to.add_argument("username", nargs="?", type=tenants.username_arg, help="tên đăng nhập (add, remove)")
     to.add_argument("--json", action="store_true", help="in kết quả dạng JSON")
     to.set_defaults(run=cmd_operator)
+    tr = t.add_parser("robot", help="robot của flow theo đơn vị: client_credentials, vai trò Hasura tu_dong (chỉ đọc)")
+    tr.add_argument("action", choices=["add", "list", "rotate", "remove"])
+    tr.add_argument("code", nargs="?", type=tenants.code_arg, help="mã đơn vị (add, rotate, remove), vd CNTT")
+    tr.add_argument("--json", action="store_true", help="in kết quả dạng JSON (add, rotate: có cả bí mật)")
+    tr.set_defaults(run=cmd_robot)

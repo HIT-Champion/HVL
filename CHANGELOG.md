@@ -18,6 +18,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
 - Giao diện tiếng Anh cho Đơn nghỉ phép, cả form dựng từ JSON Schema, chung ngôn ngữ với Văn phòng điện tử (#398).
 - Tự động hóa Node-RED ở `/tu-dong/` (profile `tu-dong`, tắt mặc định): đăng nhập Keycloak, chỉ người vận hành (#366).
+- Robot của đơn vị cho flow Node-RED gọi API, hai flow mẫu: văn bản sắp hạn lúc 07:00, văn bản Hỏa tốc (#366).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).

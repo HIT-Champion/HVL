@@ -1,0 +1,589 @@
+[
+  {
+    "id": "moc-flow-mau",
+    "type": "tab",
+    "label": "Signet — flow mẫu",
+    "disabled": false,
+    "info": "**Flow mẫu của Signet** (#366): hai việc chạy tự động bằng *robot* của một đơn vị.\n\n- **Văn bản sắp hạn — 07:00**: 7 giờ sáng mỗi ngày (giờ Việt Nam) tìm văn bản đến đã vào sổ hoặc đang xử lý có hạn giải quyết trong 3 ngày tới, kể cả văn bản đã quá hạn, rồi gửi lãnh đạo đơn vị (vai trò `director`) một thông báo gộp. Mỗi ngày chỉ báo một lần.\n- **Hỏa tốc vừa vào sổ — mỗi phút**: văn bản đến độ khẩn Hỏa tốc vào sổ trong 15 phút gần nhất được báo lãnh đạo ngay, mỗi văn bản một thông báo, không báo lại.\n\n### Cài đặt\n\n1. Trên máy chủ Signet, tạo robot cho đơn vị: `python3 scripts/moc.py tu-dong robot add <mã đơn vị>`. Lệnh in mã client (`ROBOT_ID`) và khóa (`ROBOT_SECRET`) của robot.\n2. Nhập flow: menu ☰ → *Import* → chọn tệp `platform/tu-dong/flow-mau.json` → *Import*.\n3. Bấm đúp vào tên tab **Signet — flow mẫu** để mở thuộc tính tab, mục *Environment Variables*: điền `ROBOT_ID` và `ROBOT_SECRET` (kiểu khóa: chỉ ghi, không đọc lại được, lưu mã hóa). `SIGNET_GATEWAY` (`http://apisix:9080`) và `SIGNET_REALM` (`moc`) để nguyên khi chạy trong Docker của Signet. Bấm *Done*.\n4. Bấm *Deploy*. Muốn chạy thử ngay thì bấm nút vuông bên trái nút inject **07:00 hằng ngày** hoặc **Mỗi phút**.\n\nKết quả hiện dưới từng nút; lỗi hiện ở khung *Debug* (nút **Lỗi của flow mẫu**).\n\n### Cách chạy\n\nRobot là client Keycloak riêng của đơn vị (`client_credentials`). Token của nó mang vai trò Hasura `tu_dong`: chỉ đọc văn bản không hạn chế của đơn vị mình và gọi `notifyFromFlow` (gửi người trong đơn vị có vai trò cho trước; cùng `key` thì không gửi lần hai). Nhóm **Lấy token của robot** giữ token trong ngữ cảnh flow, dùng lại tới khi còn dưới 30 giây. Mọi lỗi HTTP, GraphQL đi qua `node.error` nên nút Catch bắt được, flow không dừng.\n",
+    "env": [
+      {
+        "name": "ROBOT_ID",
+        "value": "",
+        "type": "str"
+      },
+      {
+        "name": "ROBOT_SECRET",
+        "type": "cred"
+      },
+      {
+        "name": "SIGNET_GATEWAY",
+        "value": "http://apisix:9080",
+        "type": "str"
+      },
+      {
+        "name": "SIGNET_REALM",
+        "value": "moc",
+        "type": "str"
+      }
+    ]
+  },
+  {
+    "id": "moc-mau-g-token",
+    "type": "group",
+    "z": "moc-flow-mau",
+    "name": "Lấy token của robot",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "moc-mau-token-ghi-chu",
+      "moc-mau-token-in",
+      "moc-mau-token-chuan-bi",
+      "moc-mau-token-http",
+      "moc-mau-token-luu",
+      "moc-mau-token-ve"
+    ],
+    "x": 70,
+    "y": 25,
+    "w": 940,
+    "h": 190
+  },
+  {
+    "id": "moc-mau-g-han",
+    "type": "group",
+    "z": "moc-flow-mau",
+    "name": "Văn bản sắp hạn — 07:00",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "moc-mau-han-ghi-chu",
+      "moc-mau-han-inject",
+      "moc-mau-han-token",
+      "moc-mau-han-truy-van",
+      "moc-mau-han-http",
+      "moc-mau-han-soan",
+      "moc-mau-han-gui",
+      "moc-mau-han-ket-qua"
+    ],
+    "x": 50,
+    "y": 225,
+    "w": 860,
+    "h": 210
+  },
+  {
+    "id": "moc-mau-g-hoa-toc",
+    "type": "group",
+    "z": "moc-flow-mau",
+    "name": "Hỏa tốc vừa vào sổ — mỗi phút",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "moc-mau-hoa-toc-ghi-chu",
+      "moc-mau-hoa-toc-inject",
+      "moc-mau-hoa-toc-token",
+      "moc-mau-hoa-toc-truy-van",
+      "moc-mau-hoa-toc-http",
+      "moc-mau-hoa-toc-tach",
+      "moc-mau-hoa-toc-gui",
+      "moc-mau-hoa-toc-ket-qua"
+    ],
+    "x": 60,
+    "y": 465,
+    "w": 860,
+    "h": 210
+  },
+  {
+    "id": "moc-mau-token-ghi-chu",
+    "type": "comment",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-token",
+    "name": "Dùng chung: link call → Lấy token → msg.token",
+    "info": "Nhánh nào cần token thì dùng nút **link call** gọi tới **Lấy token**. msg trở về giữ nguyên các trường của nơi gọi (payload, topic, …) và có thêm `msg.token`.\n\nToken giữ ở ngữ cảnh flow (`robotToken`, trong bộ nhớ), dùng lại khi còn hơn 30 giây. Thiếu `ROBOT_ID`, `ROBOT_SECRET` hoặc Keycloak từ chối thì báo lỗi và dừng: nút link call báo hết giờ sau 30 giây.\n",
+    "x": 280,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "moc-mau-token-in",
+    "type": "link in",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-token",
+    "name": "Lấy token",
+    "links": [],
+    "x": 115,
+    "y": 140,
+    "wires": [
+      [
+        "moc-mau-token-chuan-bi"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-token-chuan-bi",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-token",
+    "name": "Dùng lại token hoặc xin mới",
+    "func": "// Token còn hơn 30 giây thì dùng lại (cổng 1, trả thẳng về nơi gọi); hết thì xin token mới của robot (cổng 2).\n// ROBOT_ID, ROBOT_SECRET đặt ở thuộc tính của tab (Environment Variables), không viết vào mã\nconst id = env.get('ROBOT_ID');\nconst secret = env.get('ROBOT_SECRET');\nif (!id || !secret) {\n    node.status({ fill: 'red', shape: 'ring', text: 'thiếu ROBOT_ID hoặc ROBOT_SECRET' });\n    node.error('Chưa đặt ROBOT_ID, ROBOT_SECRET ở thuộc tính của tab (Environment Variables): chạy \"python3 '\n        + 'scripts/moc.py tu-dong robot add <mã đơn vị>\" trên máy chủ Signet, dán hai giá trị rồi Deploy', msg);\n    return null;\n}\n\nconst cached = flow.get('robotToken');\nif (cached && cached.robotId === id && cached.expiresAt - Date.now() > 30000) {\n    msg.token = cached.accessToken;\n    const left = Math.round((cached.expiresAt - Date.now()) / 1000);\n    node.status({ fill: 'green', shape: 'dot', text: 'dùng lại token, còn ' + left + ' giây' });\n    return [msg, null];\n}\n\n// Nút http request ghi đè các trường dưới đây: cất của nơi gọi vào msg.tokenCaller, bước sau trả lại nguyên vẹn\nconst caller = {};\nconst touched = ['payload', 'url', 'headers', 'statusCode', 'responseUrl', 'redirectList', 'retry', 'responseCookies'];\nfor (const k of touched) {\n    if (Object.prototype.hasOwnProperty.call(msg, k)) {\n        caller[k] = msg[k];\n    }\n}\nmsg.tokenCaller = caller;\n\nconst gateway = String(env.get('SIGNET_GATEWAY') || 'http://apisix:9080').replace(/\\/+$/, '');\nconst realm = env.get('SIGNET_REALM') || 'moc';\nmsg.url = gateway + '/realms/' + encodeURIComponent(realm) + '/protocol/openid-connect/token';\nmsg.headers = {\n    'Authorization': 'Basic ' + Buffer.from(id + ':' + secret).toString('base64'),\n    'Content-Type': 'application/x-www-form-urlencoded',\n};\nmsg.payload = 'grant_type=client_credentials';\nnode.status({ fill: 'blue', shape: 'dot', text: 'xin token mới' });\nreturn [null, msg];\n",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 320,
+    "y": 140,
+    "wires": [
+      [
+        "moc-mau-token-ve"
+      ],
+      [
+        "moc-mau-token-http"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-token-http",
+    "type": "http request",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-token",
+    "name": "Keycloak: xin token robot",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 560,
+    "y": 180,
+    "wires": [
+      [
+        "moc-mau-token-luu"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-token-luu",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-token",
+    "name": "Lưu token, trả về nơi gọi",
+    "func": "// Keycloak trả access_token và expires_in (giây). Giữ token trong ngữ cảnh flow (bộ nhớ, không ghi đĩa) để các lần\n// chạy sau dùng lại, rồi trả msg về nơi gọi với các trường cũ và msg.token\nconst body = msg.payload;\nif (msg.statusCode !== 200 || !body || typeof body !== 'object' || typeof body.access_token !== 'string') {\n    const why = (body && typeof body === 'object' && (body.error_description || body.error))\n        || (typeof body === 'string' ? body.slice(0, 200) : '');\n    // Lỗi kết nối thì msg.headers còn là header gửi đi (có Basic của robot): bỏ trước khi báo lỗi\n    delete msg.headers;\n    delete msg.tokenCaller;\n    node.status({ fill: 'red', shape: 'ring', text: 'không lấy được token (' + msg.statusCode + ')' });\n    node.error('Keycloak không cấp token cho robot (' + msg.statusCode + (why ? ': ' + why : '') + '): kiểm '\n        + 'ROBOT_ID, ROBOT_SECRET, SIGNET_GATEWAY, SIGNET_REALM ở thuộc tính của tab', msg);\n    return null;\n}\n\nconst ttl = Number(body.expires_in) > 0 ? Number(body.expires_in) : 60;\nflow.set('robotToken', {\n    robotId: env.get('ROBOT_ID'),\n    accessToken: body.access_token,\n    expiresAt: Date.now() + ttl * 1000,\n});\n\nconst caller = msg.tokenCaller || {};\nconst touched = ['payload', 'url', 'headers', 'statusCode', 'responseUrl', 'redirectList', 'retry', 'responseCookies'];\nfor (const k of touched) {\n    delete msg[k];\n}\nObject.assign(msg, caller);\ndelete msg.tokenCaller;\nmsg.token = body.access_token;\nnode.status({ fill: 'green', shape: 'dot', text: 'token mới, hạn ' + ttl + ' giây' });\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 800,
+    "y": 180,
+    "wires": [
+      [
+        "moc-mau-token-ve"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-token-ve",
+    "type": "link out",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-token",
+    "name": "Trả về nơi gọi",
+    "mode": "return",
+    "links": [],
+    "x": 975,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "moc-mau-han-ghi-chu",
+    "type": "comment",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Báo lãnh đạo văn bản đến hạn trong 3 ngày",
+    "info": "Inject chạy lúc 07:00 mỗi ngày theo múi giờ của container (`TZ=Asia/Ho_Chi_Minh`). Ngày hôm nay, hạn +3 ngày và `key` tính theo giờ Việt Nam trong mã, không phụ thuộc múi giờ máy.\n\nTiêu đề: *3 văn bản đến hạn trong 3 ngày tới (1 đã quá hạn)*; mỗi dòng: *• số, ký hiệu — trích yếu (hạn dd/mm)*. Tối đa 20 văn bản, hạn sớm nhất trước; nội dung giới hạn 1000 ký tự nên danh sách dài kết thúc bằng *… và N văn bản khác*. `key = han:<ngày>`.\n",
+    "x": 260,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "moc-mau-han-inject",
+    "type": "inject",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "07:00 hằng ngày",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "00 07 * * *",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 340,
+    "wires": [
+      [
+        "moc-mau-han-token"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-han-token",
+    "type": "link call",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Lấy token",
+    "links": [
+      "moc-mau-token-in"
+    ],
+    "linkType": "static",
+    "timeout": "30",
+    "x": 340,
+    "y": 340,
+    "wires": [
+      [
+        "moc-mau-han-truy-van"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-han-truy-van",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Hỏi văn bản sắp hạn",
+    "func": "// Văn bản đến đã vào sổ hoặc đang xử lý có hạn giải quyết tới hết ngày thứ 3 kể từ hôm nay, gồm cả văn bản đã quá\n// hạn. Quyền của vai trò tu_dong đã giới hạn trong đơn vị của robot và văn bản không hạn chế\nconst QUERY = `query VanBanSapHan($den: date!) {\n  office_documents(\n    where: {direction: {_eq: \"in\"}, status: {_in: [\"registered\", \"in_progress\"]}, due_on: {_lte: $den}}\n    order_by: {due_on: asc}\n    limit: 20\n  ) { id symbol summary due_on }\n}`;\n\n// Ngày theo giờ Việt Nam (UTC+7 quanh năm), không phụ thuộc múi giờ của máy chạy Node-RED\nconst vnDate = (days) => new Date(Date.now() + 7 * 3600e3 + days * 86400e3).toISOString().slice(0, 10);\nmsg.today = vnDate(0);\n\nconst gateway = String(env.get('SIGNET_GATEWAY') || 'http://apisix:9080').replace(/\\/+$/, '');\nmsg.url = gateway + '/v1/graphql';\nmsg.headers = { 'Authorization': 'Bearer ' + msg.token };\nmsg.payload = { query: QUERY, variables: { den: vnDate(3) } };\nnode.status({ fill: 'blue', shape: 'dot', text: 'hỏi văn bản hạn tới ' + vnDate(3) });\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 540,
+    "y": 340,
+    "wires": [
+      [
+        "moc-mau-han-http"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-han-http",
+    "type": "http request",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Hasura: văn bản sắp hạn",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 780,
+    "y": 340,
+    "wires": [
+      [
+        "moc-mau-han-soan"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-han-soan",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Soạn thông báo cho lãnh đạo",
+    "func": "// Trả lời của Hasura có lỗi (HTTP khác 200, không phải JSON, có \"errors\") thì báo bằng node.error để nút Catch bắt\n// được, trả true để dừng nhánh. Token bị từ chối (invalid-jwt, 401) thì bỏ token đang giữ: lần sau xin token mới\nfunction graphqlError(msg, step) {\n    const body = msg.payload;\n    const isObject = body !== null && typeof body === 'object';\n    const errors = isObject && Array.isArray(body.errors) ? body.errors : [];\n    if (msg.statusCode === 200 && isObject && errors.length === 0) {\n        return false;\n    }\n    let why;\n    if (errors.length > 0) {\n        why = errors.map((e) => e && e.message).join('; ');\n    } else if (msg.statusCode === 200) {\n        why = 'trả lời không phải JSON';\n    } else {\n        why = 'HTTP ' + msg.statusCode + (typeof body === 'string' ? ': ' + body.slice(0, 200) : '');\n    }\n    if (msg.statusCode === 401 || errors.some((e) => e && e.extensions && e.extensions.code === 'invalid-jwt')) {\n        flow.set('robotToken', undefined);\n    }\n    node.status({ fill: 'red', shape: 'ring', text: (step + ' lỗi: ' + why).slice(0, 80) });\n    node.error(step + ' lỗi: ' + why, msg);\n    return true;\n}\n\nif (graphqlError(msg, 'Hỏi văn bản sắp hạn')) {\n    return null;\n}\nconst docs = (msg.payload.data && msg.payload.data.office_documents) || [];\nif (docs.length === 0) {\n    node.status({ fill: 'grey', shape: 'ring', text: 'không có văn bản sắp hạn' });\n    return null;\n}\n\n// Một tin gộp cho lãnh đạo đơn vị; key theo ngày (giờ Việt Nam) nên bấm chạy lại trong ngày không báo lần hai\nconst MUTATION = `mutation BaoTin(\n  $roles: [String!]!, $title: String!, $text: String, $document_id: uuid, $key: String!\n) {\n  notifyFromFlow(roles: $roles, title: $title, text: $text, document_id: $document_id, key: $key) { sent }\n}`;\nconst today = msg.today;\nconst overdue = docs.filter((d) => d.due_on < today).length;\nconst ddmm = (date) => date.slice(8, 10) + '/' + date.slice(5, 7);\nconst cut = (s) => (s.length > 100 ? s.slice(0, 99) + '…' : s);\n\n// notifyFromFlow nhận text tối đa 1000 ký tự: hết chỗ thì dòng cuối ghi \"… và N văn bản khác\"\nconst MAX_TEXT = 1000;\nconst more = (n) => '… và ' + n + ' văn bản khác';\nconst lines = [];\nlet used = 0;\nfor (let i = 0; i < docs.length; i++) {\n    const d = docs[i];\n    const line = `• ${d.symbol || '(chưa số)'} — ${cut(d.summary)} (hạn ${ddmm(d.due_on)})`;\n    const rest = docs.length - i - 1;\n    const room = rest > 0 ? 1 + more(rest).length : 0;\n    if (used + (i > 0 ? 1 : 0) + line.length + room > MAX_TEXT) {\n        lines.push(more(docs.length - i));\n        break;\n    }\n    used += (i > 0 ? 1 : 0) + line.length;\n    lines.push(line);\n}\n\nlet title = docs.length + ' văn bản đến hạn trong 3 ngày tới';\nif (overdue > 0) {\n    title += ' (' + overdue + ' đã quá hạn)';\n}\n// msg.url vẫn là /v1/graphql của bước hỏi; msg.headers lúc này là header trả về nên đặt lại\nmsg.headers = { 'Authorization': 'Bearer ' + msg.token };\nmsg.payload = {\n    query: MUTATION,\n    variables: { roles: ['director'], title, text: lines.join('\\n'), key: 'han:' + today },\n};\nnode.status({ fill: 'blue', shape: 'dot', text: title });\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 300,
+    "y": 400,
+    "wires": [
+      [
+        "moc-mau-han-gui"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-han-gui",
+    "type": "http request",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Hasura: notifyFromFlow",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 560,
+    "y": 400,
+    "wires": [
+      [
+        "moc-mau-han-ket-qua"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-han-ket-qua",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-han",
+    "name": "Kiểm kết quả gửi",
+    "func": "// Trả lời của Hasura có lỗi (HTTP khác 200, không phải JSON, có \"errors\") thì báo bằng node.error để nút Catch bắt\n// được, trả true để dừng nhánh. Token bị từ chối (invalid-jwt, 401) thì bỏ token đang giữ: lần sau xin token mới\nfunction graphqlError(msg, step) {\n    const body = msg.payload;\n    const isObject = body !== null && typeof body === 'object';\n    const errors = isObject && Array.isArray(body.errors) ? body.errors : [];\n    if (msg.statusCode === 200 && isObject && errors.length === 0) {\n        return false;\n    }\n    let why;\n    if (errors.length > 0) {\n        why = errors.map((e) => e && e.message).join('; ');\n    } else if (msg.statusCode === 200) {\n        why = 'trả lời không phải JSON';\n    } else {\n        why = 'HTTP ' + msg.statusCode + (typeof body === 'string' ? ': ' + body.slice(0, 200) : '');\n    }\n    if (msg.statusCode === 401 || errors.some((e) => e && e.extensions && e.extensions.code === 'invalid-jwt')) {\n        flow.set('robotToken', undefined);\n    }\n    node.status({ fill: 'red', shape: 'ring', text: (step + ' lỗi: ' + why).slice(0, 80) });\n    node.error(step + ' lỗi: ' + why, msg);\n    return true;\n}\n\nif (graphqlError(msg, 'Gửi thông báo')) {\n    return null;\n}\nconst result = msg.payload.data && msg.payload.data.notifyFromFlow;\nif (!result || typeof result.sent !== 'number') {\n    node.status({ fill: 'red', shape: 'ring', text: 'trả lời của notifyFromFlow không đúng dạng' });\n    node.error('Gửi thông báo lỗi: trả lời không có data.notifyFromFlow.sent', msg);\n    return null;\n}\nconst what = msg.document && msg.document.symbol ? ' · ' + msg.document.symbol : '';\nnode.status(result.sent > 0\n    ? { fill: 'green', shape: 'dot', text: 'đã báo ' + result.sent + ' người' + what }\n    : { fill: 'grey', shape: 'ring', text: 'không gửi thêm (đã báo rồi hoặc không có người nhận)' + what });\nmsg.payload = result;\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 780,
+    "y": 400,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-ghi-chu",
+    "type": "comment",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Báo lãnh đạo ngay khi văn bản Hỏa tốc vào sổ",
+    "info": "Chạy mỗi 60 giây. Văn bản Hỏa tốc vào sổ trong 15 phút gần nhất, chưa xong: mỗi văn bản một thông báo có `document_id`, `key = hoa-toc:<id>` nên dù được hỏi lại ở các phút sau vẫn chỉ báo một lần.\n",
+    "x": 280,
+    "y": 520,
+    "wires": []
+  },
+  {
+    "id": "moc-mau-hoa-toc-inject",
+    "type": "inject",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Mỗi phút",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "60",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 140,
+    "y": 580,
+    "wires": [
+      [
+        "moc-mau-hoa-toc-token"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-token",
+    "type": "link call",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Lấy token",
+    "links": [
+      "moc-mau-token-in"
+    ],
+    "linkType": "static",
+    "timeout": "30",
+    "x": 340,
+    "y": 580,
+    "wires": [
+      [
+        "moc-mau-hoa-toc-truy-van"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-truy-van",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Hỏi văn bản Hỏa tốc mới",
+    "func": "// Văn bản đến độ khẩn Hỏa tốc, chưa xong, vào sổ trong 15 phút gần nhất. Chạy mỗi phút nên một văn bản có thể được\n// hỏi nhiều lần: key của thông báo theo id văn bản, máy chủ không gửi lại\nconst QUERY = `query HoaTocMoi($tu: timestamptz!) {\n  office_documents(\n    where: {direction: {_eq: \"in\"}, urgency: {_eq: \"hoa_toc\"}, status: {_in: [\"registered\", \"in_progress\"]},\n      registered_at: {_gte: $tu}}\n    order_by: {registered_at: asc}\n    limit: 20\n  ) { id symbol summary registered_at }\n}`;\n\nconst gateway = String(env.get('SIGNET_GATEWAY') || 'http://apisix:9080').replace(/\\/+$/, '');\nmsg.url = gateway + '/v1/graphql';\nmsg.headers = { 'Authorization': 'Bearer ' + msg.token };\nmsg.payload = { query: QUERY, variables: { tu: new Date(Date.now() - 15 * 60e3).toISOString() } };\nnode.status({ fill: 'blue', shape: 'dot', text: 'hỏi văn bản Hỏa tốc 15 phút qua' });\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 550,
+    "y": 580,
+    "wires": [
+      [
+        "moc-mau-hoa-toc-http"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-http",
+    "type": "http request",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Hasura: văn bản Hỏa tốc",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 790,
+    "y": 580,
+    "wires": [
+      [
+        "moc-mau-hoa-toc-tach"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-tach",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Mỗi văn bản một thông báo",
+    "func": "// Trả lời của Hasura có lỗi (HTTP khác 200, không phải JSON, có \"errors\") thì báo bằng node.error để nút Catch bắt\n// được, trả true để dừng nhánh. Token bị từ chối (invalid-jwt, 401) thì bỏ token đang giữ: lần sau xin token mới\nfunction graphqlError(msg, step) {\n    const body = msg.payload;\n    const isObject = body !== null && typeof body === 'object';\n    const errors = isObject && Array.isArray(body.errors) ? body.errors : [];\n    if (msg.statusCode === 200 && isObject && errors.length === 0) {\n        return false;\n    }\n    let why;\n    if (errors.length > 0) {\n        why = errors.map((e) => e && e.message).join('; ');\n    } else if (msg.statusCode === 200) {\n        why = 'trả lời không phải JSON';\n    } else {\n        why = 'HTTP ' + msg.statusCode + (typeof body === 'string' ? ': ' + body.slice(0, 200) : '');\n    }\n    if (msg.statusCode === 401 || errors.some((e) => e && e.extensions && e.extensions.code === 'invalid-jwt')) {\n        flow.set('robotToken', undefined);\n    }\n    node.status({ fill: 'red', shape: 'ring', text: (step + ' lỗi: ' + why).slice(0, 80) });\n    node.error(step + ' lỗi: ' + why, msg);\n    return true;\n}\n\nif (graphqlError(msg, 'Hỏi văn bản Hỏa tốc')) {\n    node.done();\n    return;\n}\nconst docs = (msg.payload.data && msg.payload.data.office_documents) || [];\nif (docs.length === 0) {\n    node.status({ fill: 'grey', shape: 'ring', text: 'không có văn bản Hỏa tốc mới' });\n    node.done();\n    return;\n}\n\n// Mỗi văn bản một tin, gắn document_id để người nhận mở thẳng văn bản; key theo id nên không báo lại\nconst MUTATION = `mutation BaoTin(\n  $roles: [String!]!, $title: String!, $text: String, $document_id: uuid, $key: String!\n) {\n  notifyFromFlow(roles: $roles, title: $title, text: $text, document_id: $document_id, key: $key) { sent }\n}`;\nfor (const d of docs) {\n    const symbol = d.symbol || '(chưa số)';\n    // notifyFromFlow nhận text tối đa 1000 ký tự (trích yếu tối đa 500 nên thường không phải cắt)\n    const text = symbol + ' — ' + d.summary;\n    const out = RED.util.cloneMessage(msg);\n    // url vẫn là /v1/graphql của bước hỏi; headers lúc này là header trả về nên đặt lại\n    out.headers = { 'Authorization': 'Bearer ' + msg.token };\n    out.document = { id: d.id, symbol };\n    out.payload = {\n        query: MUTATION,\n        variables: {\n            roles: ['director'],\n            title: 'Văn bản Hỏa tốc vừa vào sổ',\n            text: text.length > 1000 ? text.slice(0, 999) + '…' : text,\n            document_id: d.id,\n            key: 'hoa-toc:' + d.id,\n        },\n    };\n    node.send(out, false);\n}\nnode.status({ fill: 'blue', shape: 'dot', text: docs.length + ' văn bản Hỏa tốc' });\nnode.done();\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 300,
+    "y": 640,
+    "wires": [
+      [
+        "moc-mau-hoa-toc-gui"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-gui",
+    "type": "http request",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Hasura: notifyFromFlow",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 560,
+    "y": 640,
+    "wires": [
+      [
+        "moc-mau-hoa-toc-ket-qua"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-hoa-toc-ket-qua",
+    "type": "function",
+    "z": "moc-flow-mau",
+    "g": "moc-mau-g-hoa-toc",
+    "name": "Kiểm kết quả gửi",
+    "func": "// Trả lời của Hasura có lỗi (HTTP khác 200, không phải JSON, có \"errors\") thì báo bằng node.error để nút Catch bắt\n// được, trả true để dừng nhánh. Token bị từ chối (invalid-jwt, 401) thì bỏ token đang giữ: lần sau xin token mới\nfunction graphqlError(msg, step) {\n    const body = msg.payload;\n    const isObject = body !== null && typeof body === 'object';\n    const errors = isObject && Array.isArray(body.errors) ? body.errors : [];\n    if (msg.statusCode === 200 && isObject && errors.length === 0) {\n        return false;\n    }\n    let why;\n    if (errors.length > 0) {\n        why = errors.map((e) => e && e.message).join('; ');\n    } else if (msg.statusCode === 200) {\n        why = 'trả lời không phải JSON';\n    } else {\n        why = 'HTTP ' + msg.statusCode + (typeof body === 'string' ? ': ' + body.slice(0, 200) : '');\n    }\n    if (msg.statusCode === 401 || errors.some((e) => e && e.extensions && e.extensions.code === 'invalid-jwt')) {\n        flow.set('robotToken', undefined);\n    }\n    node.status({ fill: 'red', shape: 'ring', text: (step + ' lỗi: ' + why).slice(0, 80) });\n    node.error(step + ' lỗi: ' + why, msg);\n    return true;\n}\n\nif (graphqlError(msg, 'Gửi thông báo')) {\n    return null;\n}\nconst result = msg.payload.data && msg.payload.data.notifyFromFlow;\nif (!result || typeof result.sent !== 'number') {\n    node.status({ fill: 'red', shape: 'ring', text: 'trả lời của notifyFromFlow không đúng dạng' });\n    node.error('Gửi thông báo lỗi: trả lời không có data.notifyFromFlow.sent', msg);\n    return null;\n}\nconst what = msg.document && msg.document.symbol ? ' · ' + msg.document.symbol : '';\nnode.status(result.sent > 0\n    ? { fill: 'green', shape: 'dot', text: 'đã báo ' + result.sent + ' người' + what }\n    : { fill: 'grey', shape: 'ring', text: 'không gửi thêm (đã báo rồi hoặc không có người nhận)' + what });\nmsg.payload = result;\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 780,
+    "y": 640,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "moc-mau-loi-catch",
+    "type": "catch",
+    "z": "moc-flow-mau",
+    "name": "Lỗi trong tab",
+    "scope": null,
+    "uncaught": false,
+    "x": 130,
+    "y": 740,
+    "wires": [
+      [
+        "moc-mau-loi-debug"
+      ]
+    ]
+  },
+  {
+    "id": "moc-mau-loi-debug",
+    "type": "debug",
+    "z": "moc-flow-mau",
+    "name": "Lỗi của flow mẫu",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "error",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 340,
+    "y": 740,
+    "wires": []
+  },
+  {
+    "id": "moc-mau-loi-ghi-chu",
+    "type": "comment",
+    "z": "moc-flow-mau",
+    "name": "Lỗi → khung Debug",
+    "info": "Bắt mọi lỗi trong tab (node.error) và hiện thông báo lỗi ở khung Debug.",
+    "x": 560,
+    "y": 740,
+    "wires": []
+  }
+]

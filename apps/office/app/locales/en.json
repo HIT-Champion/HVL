@@ -789,7 +789,8 @@
     "restricted": "Restricted document",
     "documentIncoming": "Incoming document from {name} (within the system)",
     "opsAlert": "Operations alert: {message}",
-    "opsResolved": "Alert resolved: {message}"
+    "opsResolved": "Alert resolved: {message}",
+    "flowMessage": "Automation: {title}"
   },
   "channels": {
     "title": "Notification channels",

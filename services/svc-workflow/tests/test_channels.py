@@ -196,7 +196,7 @@ def test_texts_match_the_web_bell():
     keys = {"task.assigned": "taskAssigned", "task.overdue": "taskOverdue", "task.escalated": "taskEscalated",
             "document.issued": "documentIssued", "document.processed": "documentProcessed",
             "document.overdue": "documentOverdue", "ot.alarm": "otAlarm", "document.incoming": "documentIncoming",
-            "ops.alert": "opsAlert"}
+            "ops.alert": "opsAlert", "flow.message": "flowMessage"}
     assert set(keys) == set(KINDS) == set(TITLES)
     for kind, key in keys.items():
         assert TITLES[kind] == vi["notify"][key], kind

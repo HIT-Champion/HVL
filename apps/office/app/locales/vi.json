@@ -789,7 +789,8 @@
     "restricted": "Văn bản hạn chế",
     "documentIncoming": "Văn bản đến liên thông từ {name}",
     "opsAlert": "Cảnh báo vận hành: {message}",
-    "opsResolved": "Hết cảnh báo: {message}"
+    "opsResolved": "Hết cảnh báo: {message}",
+    "flowMessage": "Tự động: {title}"
   },
   "channels": {
     "title": "Kênh thông báo",

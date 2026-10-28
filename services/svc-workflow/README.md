@@ -14,6 +14,7 @@ Chủ: issue #15.
 | `myTasks` | người dùng nghiệp vụ | Việc của người gọi và của nhóm vai trò của họ, khẩn trước |
 | `completeTask(taskId, outcome, data)` | người được giao | Kiểm quyền và dữ liệu → nhận việc → ghi CSDL (một giao dịch) → hoàn thành trong Flowable. Phát hành văn bản đi (`vbdi.phatHanh`): cấp số đi (hàm `office.number_outgoing`) → `svc-files` dựng PDF có mã QR → ghi băm, `issued` → liên thông tới đơn vị nhận trong hệ thống |
 | `otSensorMap` | `clerk`, `staff`, `manager`, `director` | Chỉ đọc: số đo mới nhất và cờ chất lượng của các cảm biến NGSI-LD trong đơn vị người gọi (mục IT/OT bên dưới) |
+| `notifyFromFlow(roles, title, text, document_id, key)` | `tu_dong` (robot của flow Node-RED) | Báo người đang hoạt động của đơn vị robot theo vai trò, thông báo `flow.message` (mục Tự động hóa bên dưới) |
 
 Chi tiết từng loại việc, dữ liệu và nhóm ứng viên: [`docs/mo-hinh-du-lieu.md`](../../docs/mo-hinh-du-lieu.md) §4.
 Hợp đồng HTTP giữa Hasura và dịch vụ (thân yêu cầu, mã lỗi): [`docs/api/openapi/svc-workflow.json`](../../docs/api/openapi/svc-workflow.json),
@@ -31,6 +32,16 @@ kiểm BPMN theo danh sách trắng, form, rồi triển khai thành một deplo
 chuông và kênh ngoài như thông báo khác; khóa chống trùng `ops.alert:<fingerprint>:<startsAt>:<status>` nên
 Alertmanager gửi lại không thêm dòng. Thông báo chỉ có câu `summary`, mức, nhãn `component`, `route` của luật. Thiếu
 token → 404, sai token → 401, thân sai dạng → 400, chưa ghi được CSDL → 503 (Alertmanager gửi lại).
+
+**Tự động hóa bằng Node-RED (#366)**: `tu_dong.py` (luôn bật) nhận Action `notifyFromFlow` ở
+`POST /actions/tu-dong/{name}`. Chỉ vai trò `tu_dong` gọi được: token client credentials của robot đơn vị, người làm
+(`x-hasura-user-id`) là tên client của robot, không phải người trong danh bạ. Robot báo mọi người đang hoạt động có vai
+trò trong `roles` của chính đơn vị mình (đọc, ghi bằng vai trò service theo đơn vị của phiên); thông báo
+`flow.message` mang `title` (một dòng, ≤ 120 ký tự), `text` (≤ 1000 ký tự, giữ xuống dòng), `robot` và phần văn bản như
+thông báo khác, đi chuông và kênh ngoài (webhook, SMS, Zalo không mang `text`). Khóa chống trùng `flow:<robot>:<key>`:
+gửi lại cùng `key` không thêm dòng, `sent` là số người vừa nhận. Kèm `document_id` thì chỉ được `director`, `clerk`
+(hai vai trò thấy mọi văn bản không hạn chế của đơn vị; vai trò khác → 422 `fields.roles = document_readers_only`);
+văn bản của đơn vị khác → 404, văn bản hạn chế → 403. Nhật ký `tu_dong.notify` không có tiêu đề, lời nhắn.
 
 **Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
 chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:

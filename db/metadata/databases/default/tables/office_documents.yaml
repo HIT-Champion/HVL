@@ -135,6 +135,18 @@ select_permissions:
     permission: *user_select
   - role: director
     permission: *user_select
+  # Robot của flow Node-RED (#366, scripts/tu_dong.py): mỗi đơn vị một robot, chỉ đọc văn bản không hạn chế của đơn vị
+  # mình, không có nội dung (body), người tạo, người nhận; không ghi gì. Không dùng `visible`: quy tắc đó xét theo
+  # vai trò người dùng, robot không có trong danh sách người được xem nào
+  - role: tu_dong
+    permission:
+      columns: [id, direction, status, type_code, symbol, issuer_name, issued_on, summary, urgency, register_number,
+                registered_at, due_on, department_id, created_at, updated_at]
+      filter:
+        _and:
+          - tenant_id: {_eq: X-Hasura-Tenant-Id}
+          - restricted: {_eq: false}
+      allow_aggregations: true
   - role: service
     permission:
       columns: [id, tenant_id, direction, status, type_code, symbol, issuer_name, issued_on, summary, body,

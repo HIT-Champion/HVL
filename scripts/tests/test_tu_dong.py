@@ -14,9 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tự động hóa bằng Node-RED (#366): client Keycloak `tu-dong`, vai trò operator (`moc tu-dong`); settings.js, image,
-compose, route, Makefile. Keycloak, docker, moc.py giả: không cần Docker, không đọc .env. settings.js nạp thật lúc
-dựng image (platform/tu-dong/kiem-tra.cjs); màn chạy thật trên stack: make demo-tu-dong (CI)."""
+"""Tự động hóa bằng Node-RED (#366): client Keycloak `tu-dong`, vai trò operator, robot của đơn vị (`moc tu-dong`);
+hai flow mẫu; settings.js, image, compose, route, Makefile. Keycloak, docker, moc.py giả: không cần Docker, không đọc
+.env. settings.js nạp thật lúc dựng image (platform/tu-dong/kiem-tra.cjs); màn chạy thật trên stack: make
+demo-tu-dong (CI)."""
 
 from __future__ import annotations
 
@@ -103,6 +104,17 @@ class FakeKc:
 
     def update_client(self, client_id: str, rep: dict[str, Any]) -> None:
         self.calls.append(("update", client_id, rep))
+
+    def delete_client(self, client_id: str) -> None:
+        self.calls.append(("delete", client_id))
+        self._clients = [c for c in self._clients if c["id"] != client_id]
+
+    def client_secret(self, client_id: str, *, regenerate: bool = False) -> str:
+        self.calls.append(("secret", client_id, regenerate))
+        return "bi-mat-moi" if regenerate else "bi-mat"
+
+    def update_protocol_mapper(self, client_id: str, mapper_id: str, rep: dict[str, Any]) -> None:
+        self.calls.append(("mapper-put", client_id, mapper_id, rep))
 
     def protocol_mappers(self, client_id: str) -> list[dict[str, Any]]:
         return self.mappers.get(client_id, [])
@@ -229,6 +241,141 @@ class OperatorTest(unittest.TestCase):
             parser.parse_args(["tu-dong", "operator", "grant", "quantri"])
 
 
+CNTT = "c300d5bb-028f-44cc-ba10-7b5277a4225d"
+
+
+class FakeDb:
+    def query(self, sql: str) -> list[dict[str, Any]]:
+        assert sql == tu_dong.tenants.TENANTS_SQL
+        return [{"id": CNTT, "code": "CNTT"}, {"id": "t-kt", "code": "KT"}]
+
+
+class RobotTest(unittest.TestCase):
+    """moc tu-dong robot: mỗi đơn vị một client confidential, chỉ client_credentials, claim Hasura cố định."""
+
+    def test_client_credentials_only_no_full_scope(self) -> None:
+        rep = tu_dong.robot_rep("CNTT")
+        self.assertEqual(rep["clientId"], "tu-dong-robot-cntt")
+        self.assertEqual((rep["publicClient"], rep["serviceAccountsEnabled"], rep["fullScopeAllowed"]),
+                         (False, True, False))
+        self.assertFalse(rep["standardFlowEnabled"] or rep["implicitFlowEnabled"] or rep["directAccessGrantsEnabled"])
+        self.assertEqual((rep["redirectUris"], rep["webOrigins"]), ([], []))
+
+    def test_fixed_hasura_claims_in_the_access_token_only(self) -> None:
+        mappers = {m["name"]: m for m in tu_dong.robot_mappers("CNTT", CNTT)}
+        claims = {m["config"]["claim.name"]: m["config"]["claim.value"] for m in mappers.values()}
+        ns = "https://hasura\\.io/jwt/claims."
+        self.assertEqual(claims, {ns + "x-hasura-user-id": "tu-dong-robot-cntt", ns + "x-hasura-tenant-id": CNTT,
+                                  ns + "x-hasura-default-role": "tu_dong",
+                                  ns + "x-hasura-allowed-roles": '["tu_dong"]'})
+        self.assertEqual(mappers["hasura-allowed-roles"]["config"]["jsonType.label"], "JSON")
+        for m in mappers.values():
+            self.assertEqual(m["protocolMapper"], "oidc-hardcoded-claim-mapper")
+            self.assertEqual((m["config"]["access.token.claim"], m["config"]["id.token.claim"],
+                              m["config"]["userinfo.token.claim"]), ("true", "false", "false"))
+        realm = read(ROOT / "platform" / "keycloak" / "realm" / "moc-realm.json")
+        self.assertIn('"claim.name": "https://hasura\\\\.io/jwt/claims.x-hasura-tenant-id"', realm)
+
+    def test_add_creates_then_resets_drifted_fields_and_mappers(self) -> None:
+        kc = FakeKc([{"id": "k1", "clientId": "tu-dong"}])
+        out = tu_dong.add_robot(kc, "CNTT", db=FakeDb())
+        self.assertEqual(out, {"client_id": "tu-dong-robot-cntt", "code": "CNTT", "tenant_id": CNTT,
+                               "result": "created", "secret": "bi-mat"})
+        self.assertEqual(kc.calls[0][1]["protocolMappers"], tu_dong.robot_mappers("CNTT", CNTT))
+        kc.calls.clear()
+        kc._clients[-1].update(fullScopeAllowed=True, directAccessGrantsEnabled=True, description="cũ")
+        drifted = {**tu_dong.robot_mappers("CNTT", "t-khac")[1], "id": "m2"}
+        kc.mappers["k-new"] = [{**tu_dong.robot_mappers("CNTT", CNTT)[0], "id": "m1"}, drifted]
+        self.assertEqual(tu_dong.add_robot(kc, "CNTT", db=FakeDb())["result"], "updated")
+        update = kc.calls[0]
+        self.assertEqual((update[0], update[1], update[2]["fullScopeAllowed"], update[2]["directAccessGrantsEnabled"]),
+                         ("update", "k-new", False, False))
+        self.assertEqual(kc.calls[1], ("mapper-put", "k-new", "m2",
+                                       {**tu_dong.robot_mappers("CNTT", CNTT)[1], "id": "m2"}))
+        self.assertEqual([c[2]["name"] for c in kc.calls if c[0] == "mapper"],
+                         ["hasura-default-role", "hasura-allowed-roles"])
+        self.assertEqual(kc.calls[-1], ("secret", "k-new", False))
+
+    def test_unknown_unit_is_refused_before_touching_keycloak(self) -> None:
+        kc = FakeKc()
+        with self.assertRaisesRegex(tu_dong.tenants.TenantError, "không có đơn vị mã XYZ"):
+            tu_dong.add_robot(kc, "XYZ", db=FakeDb())
+        self.assertEqual(kc.calls, [])
+
+    def test_rotate_list_remove(self) -> None:
+        kc = FakeKc([{"id": "k1", "clientId": "tu-dong"},
+                     {"id": "k2", "clientId": "tu-dong-robot-kt", "enabled": False},
+                     {"id": "k3", "clientId": "tu-dong-robot-cntt", "enabled": True}])
+        kc.mappers["k3"] = [{**tu_dong.robot_mappers("CNTT", CNTT)[1], "id": "m"}]
+        self.assertEqual(tu_dong.robots(kc), [
+            {"client_id": "tu-dong-robot-cntt", "tenant_id": CNTT, "enabled": True},
+            {"client_id": "tu-dong-robot-kt", "tenant_id": None, "enabled": False}])
+        self.assertEqual(tu_dong.rotate_robot(kc, "CNTT")["secret"], "bi-mat-moi")
+        self.assertEqual(kc.calls, [("secret", "k3", True)])
+        with self.assertRaisesRegex(tu_dong.tenants.TenantError, "robot add ĐT"):
+            tu_dong.rotate_robot(kc, "ĐT")
+        self.assertEqual(tu_dong.remove_robot(kc, "CNTT"), "removed")
+        self.assertEqual(tu_dong.remove_robot(kc, "CNTT"), "unchanged")
+        self.assertEqual([c["clientId"] for c in kc.clients()], ["tu-dong", "tu-dong-robot-kt"])
+
+    def test_cli_parses_robot(self) -> None:
+        import argparse
+        parser = argparse.ArgumentParser()
+        tu_dong.add_parser(parser.add_subparsers(dest="group"))
+        args = parser.parse_args(["tu-dong", "robot", "add", "CNTT", "--json"])
+        self.assertEqual((args.action, args.code, args.json, args.run), ("add", "CNTT", True, tu_dong.cmd_robot))
+        self.assertIsNone(parser.parse_args(["tu-dong", "robot", "list"]).code)
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            parser.parse_args(["tu-dong", "robot", "add", "a/b"])
+
+
+class FlowMauTest(unittest.TestCase):
+    """platform/tu-dong/flow-mau.json: hai flow mẫu nhập vào trình soạn; chạy thật trên stack ở make demo-tu-dong."""
+
+    flow = json.loads(read(TU_DONG_DIR / "flow-mau.json"))
+    nodes = {n["id"]: n for n in flow}
+    code = "\n".join(n.get("func", "") for n in flow)
+
+    def test_one_tab_only_allowed_node_types(self) -> None:
+        self.assertEqual(len(self.nodes), len(self.flow))
+        tabs = [n for n in self.flow if n["type"] == "tab"]
+        self.assertEqual([t["id"] for t in tabs], ["moc-flow-mau"])
+        self.assertTrue(all(n.get("z") == "moc-flow-mau" for n in self.flow if n["type"] != "tab"))
+        allowed = {"tab", "group", "comment", "inject", "link in", "link out", "link call", "function", "http request",
+                   "catch", "debug"}
+        self.assertLessEqual({n["type"] for n in self.flow}, allowed)
+
+    def test_robot_secret_is_a_credential_never_shipped(self) -> None:
+        env = {e["name"]: e for e in self.nodes["moc-flow-mau"]["env"]}
+        self.assertEqual(env["ROBOT_SECRET"], {"name": "ROBOT_SECRET", "type": "cred"})
+        self.assertEqual((env["ROBOT_ID"]["value"], env["SIGNET_GATEWAY"]["value"]), ("", "http://apisix:9080"))
+        self.assertNotIn('"credentials"', read(TU_DONG_DIR / "flow-mau.json"))
+        debug = self.nodes["moc-mau-loi-debug"]
+        self.assertEqual((debug["complete"], debug["targetType"]), ("error", "msg"))   # không in msg (có token)
+
+    def test_schedules(self) -> None:
+        self.assertEqual(self.nodes["moc-mau-han-inject"]["crontab"], "00 07 * * *")   # TZ của container: giờ VN
+        self.assertEqual(self.nodes["moc-mau-hoa-toc-inject"]["repeat"], "60")
+
+    def test_reads_only_columns_the_robot_role_has(self) -> None:
+        meta = read(ROOT / "db" / "metadata" / "databases" / "default" / "tables" / "office_documents.yaml")
+        block = re.search(r"- role: tu_dong\n\s+permission:\n\s+columns: \[(.*?)\]", meta, re.S).group(1)
+        allowed = {c.strip() for c in block.split(",")}
+        queries = re.findall(r"office_documents\(([\s\S]*?)\n\s*\) \{([^}]*)\}", self.code)
+        self.assertEqual(len(queries), 2)
+        for where, fields in queries:
+            used = set(fields.split()) | set(re.findall(r"(\w+): \{_", where))
+            self.assertLessEqual(used, allowed)
+
+    def test_notifies_directors_once_per_key(self) -> None:
+        self.assertEqual(self.code.count("notifyFromFlow(roles: $roles"), 2)
+        han, hoa_toc = self.nodes["moc-mau-han-soan"]["func"], self.nodes["moc-mau-hoa-toc-tach"]["func"]
+        self.assertIn("roles: ['director'], title, text: lines.join('\\n'), key: 'han:' + today", han)
+        self.assertNotIn("document_id: d.id", han)       # danh sách gộp không gắn văn bản
+        for part in ("roles: ['director'],", "document_id: d.id,", "key: 'hoa-toc:' + d.id,"):
+            self.assertIn(part, hoa_toc)
+
+
 class SettingsTest(unittest.TestCase):
     """platform/tu-dong/settings.js: đọc chữ (kiem-tra.cjs nạp thật lúc dựng image)."""
 
@@ -310,7 +457,7 @@ class ConfigTest(unittest.TestCase):
             self.assertIn(f"\n{target}", make)
         self.assertEqual(make.count("--profile iot --profile iot-sim --profile tu-dong \\\n"), 2)  # make down, reset
         runtime = re.search(r"^RUNTIME=\((.*?)\)", read(SCRIPTS / "install.sh"), re.M | re.S).group(1).split()
-        for rel in ("scripts/tu_dong.py", "scripts/demo_tu_dong.py"):
+        for rel in ("scripts/tu_dong.py", "scripts/demo_tu_dong.py", "platform/tu-dong/flow-mau.json"):
             self.assertIn(rel, runtime)
         self.assertIn("|| extra_build+=(--profile tu-dong)", read(SCRIPTS / "install.sh"))
         self.assertIn("    tu_dong.add_parser(groups)\n", read(SCRIPTS / "moc.py"))

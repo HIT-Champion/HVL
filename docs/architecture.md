@@ -287,7 +287,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Hộp thư đi trong CSDL *(mã của đội)* | — | Liên thông văn bản giữa đơn vị (`office.dispatches`); email SMTP, webhook Mattermost, Slack, ntfy, SMS, Zalo (`core.notification_deliveries`, tắt mặc định; SMS, Zalo do từng người tự bật) (QĐ-008) | ⑦ | `svc_workflow/dispatch.py`, `svc_workflow/channels.py` | F3.12 Hoàn thiện; định tuyến thông báo đa kênh: Một phần (mục 3) |
 | Nạp lô *(mã của đội)* | — | `POST /api/imports/incoming`: tệp NDJSON hoặc CSV, mỗi dòng qua ClamAV và Action `receiveIncoming` thay mặt văn thư | ⑤ | `svc_files/imports/` | Dùng được (mục 3, cụm ⑤) |
 | Mailpit | v1.31.4 | Hộp thư thử cho email thông báo (profile `mail`, chỉ để demo) | ⑦ | `docker-compose.yml` | — |
-| Node-RED | 5.0.8, openid-client 6.8.8 | Tự động hóa không sửa mã (profile `tu-dong`, tắt mặc định): người vận hành nền tảng soạn flow ở `/tu-dong/`; đăng nhập Keycloak, chỉ vai trò `operator` của client `tu-dong`; không node `exec`, không cài node từ trình soạn; flow tới lõi qua APISIX | ⑤ | `platform/tu-dong/`, `scripts/tu_dong.py` | — (#366) |
+| Node-RED | 5.0.8, openid-client 6.8.8 | Tự động hóa không sửa mã (profile `tu-dong`, tắt mặc định): người vận hành nền tảng soạn flow ở `/tu-dong/`; đăng nhập Keycloak, chỉ vai trò `operator` của client `tu-dong`; không node `exec`, không cài node từ trình soạn; flow tới lõi qua APISIX bằng robot của đơn vị (vai trò Hasura `tu_dong`) | ⑤ | `platform/tu-dong/`, `scripts/tu_dong.py` | — (#366) |
 
 **[D] Không gian Dữ liệu**
 
@@ -335,7 +335,7 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 | [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email, webhook tới Mattermost, Slack, ntfy, SMS, Zalo — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
 | [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
 | [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; chưa có trình dựng form (#303) | `ROADMAP.md` giai đoạn 2 |
-| [P] Tự động hóa, kịch bản serverless (⑤) | Một phần (profile `tu-dong`, tắt mặc định) | Node-RED ở `/tu-dong/` cho người vận hành nền tảng: đăng nhập Keycloak, chỉ vai trò `operator`, flow tới lõi qua APISIX (#366); flow chưa có danh tính gọi API của lõi, chưa có flow mẫu; vòng nền của lõi vẫn viết cứng trong `svc-files`, `svc-workflow` | `muc-hoan-thien.md` §3; `van-hanh.md` mục Tự động hóa bằng Node-RED |
+| [P] Tự động hóa, kịch bản serverless (⑤) | Một phần (profile `tu-dong`, tắt mặc định) | Node-RED ở `/tu-dong/` cho người vận hành nền tảng: đăng nhập Keycloak, chỉ vai trò `operator`, flow tới lõi qua APISIX bằng robot của đơn vị, hai flow mẫu (#366); chưa có webhook, bước BPMN gọi flow; vòng nền của lõi vẫn viết cứng trong `svc-files`, `svc-workflow` | `muc-hoan-thien.md` §3; `van-hanh.md` mục Tự động hóa bằng Node-RED |
 | [P] Trục streaming sự kiện (⑥) | Một phần | Luồng `core.app_events` (đến, vào sổ, phát hành; không văn bản hạn chế) qua Hasura Event Triggers tới ứng dụng cài bằng `moc app install`; chưa phải broker: không phát lại, không bảo đảm thứ tự. Bảng sự kiện, hộp thư đi trong PostgreSQL (QĐ-008); Centrifugo chỉ đẩy tới trình duyệt | `muc-hoan-thien.md` §3, [`them-ung-dung.md`](them-ung-dung.md) mục 1 |
 | [D] Thu thập, làm sạch, đồng bộ sang kho phân tích | **Chưa có** | Chặn dữ liệu bẩn ngay ở điểm nhập (Poka-yoke ba lớp); dashboard đọc thẳng view trên CSDL nghiệp vụ | `ROADMAP.md` giai đoạn 3 |
 | [D] BI riêng | **Chưa có** (chủ ý) | Trang `/dieu-hanh` (ECharts) đọc view `office.v_*` qua Hasura. Metabase bị loại: bản nguồn mở không đăng nhập bằng Keycloak được, đọc thẳng CSDL bỏ qua quyền đơn vị | `DEPENDENCIES.md` |
@@ -514,6 +514,7 @@ hiện tại.
 | `office/api.py` | Văn phòng | Lớp `Office` theo khuôn `Part`: gắn `/actions/{name}`, `/ot/notify/{tenant}`, triển khai BPMN văn bản, sáu vòng định kỳ của Văn phòng (#302) |
 | `apps/` (`bpmn.py`, `forms.py`, `bundle.py`, `deploy.py`, `auth.py`, `api.py`) | Lõi | Quy trình của ứng dụng cắm bằng manifest (#301): kiểm BPMN theo danh sách trắng và form JSON Schema, triển khai lên Flowable với tiền tố `<tên>.`, API chung `/api/workflow/<tên>/…` chỉ nhận token của client `app-<tên>`. Không biết ứng dụng cụ thể nào, luôn bật, không theo `MOC_OFFICE_ENABLED` |
 | `alerts.py`, route `POST /ops/alerts` | Lõi | Cảnh báo vận hành Alertmanager gửi sang (#284) → thông báo `ops.alert` cho vai trò `tenant_admin` của mọi đơn vị, không gắn văn bản; phần chung, gắn cả khi tắt Văn phòng |
+| `tu_dong.py`, route `POST /actions/tu-dong/{name}` | Lõi | Action `notifyFromFlow` của robot flow Node-RED (vai trò Hasura `tu_dong`, #366) → thông báo `flow.message` cho người của đơn vị robot theo vai trò; kèm văn bản thì chỉ `director`, `clerk`; cùng khóa không báo lại |
 | `parts.py` | Lõi | Khuôn `Part` (`install`, `jobs`, `aclose`) để gắn một phần nghiệp vụ; vòng định kỳ, triển khai BPMN có thử lại, định dạng lỗi Hasura Action; không biết phần cụ thể nào |
 | `app.py`, `config.py` | Trộn | `create_app` dựng phần chung (danh bạ, thông báo: hai vòng định kỳ) và quy trình của ứng dụng (`apps/`, #301); chỉ dựng và gắn phần Văn phòng khi `MOC_OFFICE_ENABLED` bật (#302). Gói tự mô tả là "Hasura Actions của Văn phòng điện tử" (`__init__.py`) |
 
@@ -1021,8 +1022,9 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
 
 - **Lõi còn ôm phần máy chủ của Văn phòng điện tử**: tách cứng ở cổng và khóa ngoại CSDL; hàm, cột, metadata, vai trò
   của `core` còn dính `office`; chưa tách ở mã (§4, QĐ-012).
-- **Kịch bản serverless (⑤) mới một phần**: Node-RED (profile `tu-dong`, #366) cho người vận hành soạn flow, nhưng flow
-  chưa có danh tính gọi API của lõi; việc nền của lõi vẫn là vòng lặp viết cứng trong hai dịch vụ. Trục sự kiện (⑥)
+- **Kịch bản serverless (⑤) mới một phần**: Node-RED (profile `tu-dong`, #366) cho người vận hành soạn flow, gọi lõi
+  bằng robot của đơn vị; chưa có webhook, bước BPMN gọi flow, việc nền của lõi vẫn là vòng lặp viết cứng trong hai
+  dịch vụ. Trục sự kiện (⑥)
   mới một phần: Event Triggers giao `core.app_events` tới ứng dụng, chưa phải broker
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, QĐ-008).
 - **Một máy, một PostgreSQL**: điểm lỗi đơn (QĐ-002), không tự mở rộng, không chịu lỗi nhiều nút (QĐ-003); sổ kiểm toán
