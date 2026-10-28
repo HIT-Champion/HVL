@@ -318,7 +318,7 @@ class ConfigTest(unittest.TestCase):
         self.assertIn('"tu_dong": ("tu-dong", "/data/tu-dong", ', backup)
         # volume tạo mới lúc khôi phục: gốc /data phải về lại user node-red, không thì Node-RED không ghi được gì
         self.assertIn('ROOT_OWNER = {"tu_dong": "1000:0"}', backup)
-        self.assertIn('"--entrypoint",\n                               "chown", "restic", ROOT_OWNER[key], path]', backup)
+        self.assertRegex(backup, r'"--entrypoint",\s+"chown", "restic", ROOT_OWNER\[key\], path\]')
         ci = read(ROOT / ".github" / "workflows" / "ci.yml")
         for line in ("make demo-tu-dong", "moc_wiki_data moc_tu_dong_data",
                      "python3 scripts/demo_tu_dong.py --sau-khoi-phuc"):
