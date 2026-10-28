@@ -476,7 +476,7 @@ def routers(
         503: {"description": "CSDL không sẵn sàng"},
     }
 
-    async def _read_register(direction: str, year: int, request: Request, principal: Principal) -> Register:
+    async def _read_register(direction: str, year: int, lang: str, request: Request, principal: Principal) -> Register:
         try:
             data = await hasura.register(tenant_id=principal.tenant_id, actor_id=principal.user_id,
                                          request_id=request.state.request_id, direction=direction, year=year)
@@ -494,24 +494,27 @@ def routers(
         except HasuraError as exc:
             raise error(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
         return build_register(data, visible, direction=direction, year=year, printed_at=datetime.now(UTC),
-                              anchor=anchorer.latest)
+                              anchor=anchorer.latest, lang=lang)
 
-    async def _register(direction: str, year: int, request: Request, principal: Principal) -> Register:
+    async def _register(direction: str, year: int, lang: str, request: Request, principal: Principal) -> Register:
         if not REGISTER_ROLES & set(principal.roles):
             raise error(403, "forbidden", "Chỉ văn thư và lãnh đạo đơn vị xem, in sổ đăng ký")
-        reg = await _read_register(direction, year, request, principal)
+        reg = await _read_register(direction, year, lang, request, principal)
         # Số cuối đã cấp và các dòng là hai câu đọc riêng: văn thư khác vào sổ đúng lúc đó thì có thể thấy số mới mà
         # chưa thấy dòng của nó. Đọc lại một lần; vẫn thiếu thì là thiếu thật, báo ra.
-        return await _read_register(direction, year, request, principal) if reg.missing else reg
+        return await _read_register(direction, year, lang, request, principal) if reg.missing else reg
 
     Direction = Annotated[Literal["in", "out"], Path(description="in: sổ văn bản đến; out: sổ văn bản đi")]
     Year = Annotated[int, Path(ge=2000, le=2100)]
+    # F2.9 (#398): chữ cố định của sổ (tên cột, ghi chú, bìa) theo ngôn ngữ người xem; chữ người dùng nhập giữ nguyên
+    Lang = Annotated[Literal["vi", "en"], Query(description="Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi")]
 
     @documents.get("/api/registers/{direction}/{year}", response_model=RegisterOut, responses=register_responses,
                    summary="Sổ đăng ký văn bản đến / đi của một năm, đúng các cột sẽ in")
     async def register_json(direction: Direction, year: Year, request: Request,
-                            principal: Annotated[Principal, Depends(current_principal)]) -> JSONResponse:
-        reg = await _register(direction, year, request, principal)
+                            principal: Annotated[Principal, Depends(current_principal)],
+                            lang: Lang = "vi") -> JSONResponse:
+        reg = await _register(direction, year, lang, request, principal)
         out = RegisterOut(
             direction=direction, year=year, title=reg.title, org_name=reg.org_name, columns=list(reg.columns),
             entries=[RegisterEntryOut(number=e.number, document_id=e.document_id, hidden=e.hidden, cells=list(e.cells))
@@ -528,8 +531,9 @@ def routers(
         summary="In sổ đăng ký văn bản đến / đi của một năm ra PDF để ký nhận, đóng sổ (NĐ 30/2020, Điều 16, 22)",
     )
     async def register_pdf(direction: Direction, year: Year, request: Request,
-                           principal: Annotated[Principal, Depends(current_principal)]) -> Response:
-        reg = await _register(direction, year, request, principal)
+                           principal: Annotated[Principal, Depends(current_principal)],
+                           lang: Lang = "vi") -> Response:
+        reg = await _register(direction, year, lang, request, principal)
         async with printing:    # WeasyPrint tốn CPU: không để nhiều lần in chiếm hết luồng của tải tệp lên, xuống
             pdf = await asyncio.to_thread(render_register_pdf, reg)
         # In sổ là việc đáng ghi lại: ai in, sổ nào, bao nhiêu dòng — vào sổ kiểm toán chuỗi băm
@@ -538,13 +542,14 @@ def routers(
                 tenant_id=principal.tenant_id, actor_id=principal.user_id, request_id=request.state.request_id,
                 action="register.printed", entity="office.registers", entity_id=f"{direction}/{year}",
                 details={"direction": direction, "year": year, "entries": len(reg.entries),
-                         "masked": sum(e.hidden for e in reg.entries)},
+                         "masked": sum(e.hidden for e in reg.entries), "lang": lang},
             )
         except HasuraError as exc:
             raise error(503, "database_unavailable", "Chưa ghi được sổ kiểm toán, thử lại sau") from exc
         log_event("office.register.printed", request, tenant_id=principal.tenant_id, actor_id=principal.user_id,
                   direction=direction, year=year, entries=len(reg.entries))
-        name = f"so-dang-ky-van-ban-{'den' if direction == 'in' else 'di'}-{year}.pdf"
+        name = (f"so-dang-ky-van-ban-{'den' if direction == 'in' else 'di'}-{year}.pdf" if lang == "vi"
+                else f"register-{'incoming' if direction == 'in' else 'outgoing'}-{year}.pdf")
         return Response(pdf, media_type="application/pdf", headers={
             **DOWNLOAD_HEADERS, **NO_STORE, "Content-Disposition": content_disposition(name),
         })
