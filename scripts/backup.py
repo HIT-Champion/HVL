@@ -81,6 +81,10 @@ OPTIONAL = {
     "tu_dong": ("tu-dong", "/data/tu-dong", "Tự động hóa Node-RED (volume tu_dong_data)"),           # #366
 }
 WITH_OPTIONAL = [*COMPOSE, *(arg for service, _, _ in OPTIONAL.values() for arg in ("--profile", service))]
+# Chủ của thư mục gốc volume, cho dịch vụ không chạy bằng root. `restic restore <snapshot>:<đường>` trả nội dung kèm
+# quyền từng tệp, không trả quyền của chính thư mục gốc: volume tạo mới lúc khôi phục (máy mới, volume đã xóa) thì gốc
+# thuộc root, Node-RED không tạo được tệp nào trong /data (EACCES ở .sessions.json). 1000:0 là chủ image Node-RED đặt
+ROOT_OWNER = {"tu_dong": "1000:0"}
 HOST = "moc"                            # tên máy ghi vào snapshot: cố định, để restic tìm ra lượt trước và chỉ đọc
 TAG = "moc"                             # tệp đã đổi (container mỗi lần một tên khác)
 MANIFEST = "manifest.json"
@@ -526,6 +530,9 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
                 if key in manifest:
                     _call(restic("restore", f"{manifest[key]['snapshot']}:{path}", "--target", path, "--delete"),
                           f"không khôi phục được {label}")
+                    if key in ROOT_OWNER:
+                        _call([*COMPOSE, "--profile", "backup", "run", "--rm", "-T", "--no-deps", "--entrypoint",
+                               "chown", "restic", ROOT_OWNER[key], path], f"không trả quyền thư mục gốc của {label}")
                     print(f"  ✓ {label}", flush=True)
             diff = {"run": manifest["run"], "backed_up_at": manifest["created_at"], "audit_id": head["id"],
                     "version": manifest["version"]}
