@@ -25,6 +25,13 @@ xuất bằng `make api-docs`.
 kiểm BPMN theo danh sách trắng, form, rồi triển khai thành một deployment trên cùng Flowable. Chi tiết:
 [`docs/them-ung-dung.md`](../../docs/them-ung-dung.md) mục 1.10, [`docs/api/README.md`](../../docs/api/README.md) §8.
 
+**Cảnh báo vận hành (#284, F3.13)**: `alerts.py` (luôn bật) mở `POST /ops/alerts` trong mạng nội bộ cho Alertmanager
+(`platform/monitoring/alertmanager.yml`), kèm `Authorization: Bearer <MOC_ALERT_TOKEN>`. Mỗi cảnh báo `firing` hay
+`resolved` của webhook thành một thông báo `ops.alert` cho mọi người dùng vai trò `tenant_admin` của mọi đơn vị, đi
+chuông và kênh ngoài như thông báo khác; khóa chống trùng `ops.alert:<fingerprint>:<startsAt>:<status>` nên
+Alertmanager gửi lại không thêm dòng. Thông báo chỉ có câu `summary`, mức, nhãn `component`, `route` của luật. Thiếu
+token → 404, sai token → 401, thân sai dạng → 400, chưa ghi được CSDL → 503 (Alertmanager gửi lại).
+
 **Không ghi hai lần**: các lần gọi cùng một việc (`completeTask`) hay cùng một văn bản (vào sổ, trình, job đối soát)
 chạy lần lượt trong tiến trình, lần sau thấy việc lần trước đã làm. CSDL chặn thêm khi có nhiều bản sao dịch vụ:
 chỉ mục duy nhất `document_events_task_once` (một việc một sự kiện — lỗi này thì đọc lại sự kiện đã ghi, hoàn
@@ -213,9 +220,9 @@ svc-workflow python -m svc_workflow.pii count < tệp`. Loại, nhãn, giới h�
 
 Năm bí mật (khóa Hasura, khóa Actions, mật khẩu Flowable, client secret, khóa Centrifugo) không truyền qua biến môi
 trường: khi có `MOC_OPENBAO_ADDR`, lúc khởi động dịch vụ đăng nhập két OpenBao bằng AppRole của riêng mình và đọc
-chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Mật khẩu SMTP và
-URL webhook (thường chứa khóa) cũng đi qua két, là bí mật tùy chọn: rỗng thì két không có. Két chưa sẵn sàng thì
-thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
+chúng (F3.2, `platform/openbao/start.sh`); không đặt thì đọc thẳng biến môi trường (test, chạy tay). Mật khẩu SMTP,
+URL webhook (thường chứa khóa), token của Alertmanager cũng đi qua két, là bí mật tùy chọn: rỗng thì két không có.
+Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng ngay.
 
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
@@ -263,6 +270,7 @@ thử lại tới 60 giây; két từ chối (`400`/`403`/`404`) thì dừng nga
 | `MOC_NOTIFY_SMS_KINDS`, `MOC_NOTIFY_ZALO_KINDS` | trống (mọi loại) | Như `MOC_NOTIFY_EMAIL_KINDS`; SMS tốn tiền, nên đặt vd `task.overdue,task.escalated` |
 | `MOC_NOTIFY_INTERVAL_S` | `5` | Chu kỳ vòng nền gửi thông báo ngoài; `0` tắt (dòng chờ nằm nguyên tới khi bật lại) |
 | `MOC_PUBLIC_URL` | trống | Địa chỉ trang web cho liên kết trong thư, tin webhook; trống thì không kèm liên kết |
+| `MOC_ALERT_TOKEN` | trống | Token của Alertmanager khi gọi `POST /ops/alerts` (16–200 ký tự chữ, số, `.` `_` `~` `+` `/` `-`; `make env` sinh), lấy từ két; trống thì route trả 404 |
 
 `MOC_SMTP_TLS=none` mà có `MOC_SMTP_USER`: svc-workflow không nối máy chủ thư để mật khẩu không đi qua kết nối rõ.
 Dịch vụ vẫn chạy, lúc khởi động ghi một dòng `config.warning`; mỗi thư báo lỗi với lý do trong `last_error` và được

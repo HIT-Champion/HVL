@@ -466,14 +466,15 @@ def main(argv: list[str] | None = None) -> None:
     secrets = {"svc-files": ("SEAWEEDFS_S3_ACCESS_KEY", "SEAWEEDFS_S3_SECRET_KEY", "HASURA_ADMIN_SECRET",
                              "MEILI_MASTER_KEY"),
                "svc-workflow": ("HASURA_ADMIN_SECRET", "MOC_ACTION_SECRET", "FLOWABLE_ADMIN_PASSWORD",
-                                "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET")}
+                                "CENTRIFUGO_API_KEY", "MOC_DIRECTORY_CLIENT_SECRET", "MOC_ALERT_TOKEN")}
     for service, names in secrets.items():
         # so băm giá trị chứ không so tên: bí mật không được nằm trong env dưới bất kỳ tên nào
         hashed = json.loads(compose("exec", "-T", service, "python", "-c",
                                     "import hashlib, json, os\n"
                                     "print(json.dumps({k: hashlib.sha256(v.encode()).hexdigest()"
                                     " for k, v in os.environ.items()}))"))
-        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names}
+        # MOC_ALERT_TOKEN (#284) tùy chọn: bản cài cũ có thể chưa có
+        wanted = {hashlib.sha256(ENV[n].encode()).hexdigest(): n for n in names if ENV.get(n)}
         leaked = sorted(f"{wanted[h]} (biến {k})" for k, h in hashed.items() if h in wanted)
         not leaked or fail(f"{service} còn nhận bí mật qua biến môi trường: {', '.join(leaked)}")
     ok("két đã mở khóa (static seal); svc-files, svc-workflow không có bí mật nào trong biến môi trường")
@@ -1512,6 +1513,10 @@ def main(argv: list[str] | None = None) -> None:
     firing = sorted(r["name"] for r in rules if r.get("state") == "firing")
     ok(f"Prometheus nạp và tính được {len(rules)} luật cảnh báo (nhóm cong-api, thanh-phan, prometheus); đang bật:"
        f" {', '.join(firing) or 'không'}")
+    # #284: cảnh báo đang bật đi tiếp sang Alertmanager → svc-workflow (đường tới chuông: make demo-canh-bao)
+    managers = [a.get("url", "") for a in prometheus_api("alertmanagers").get("activeAlertmanagers", [])]
+    any("alertmanager:9093" in u for u in managers) or fail(f"Prometheus chưa nối Alertmanager: {managers}")
+    ok(f"Prometheus gửi cảnh báo tới Alertmanager ({', '.join(managers)})")
     # Prometheus thu /metrics của svc-files 15 giây một lần: mỗi thành phần khác `off` của /api/status có đúng một dòng
     # moc_component_up = 1. So với /api/status chứ không với một số cố định: smoke cũng chạy trên bản đang nâng cấp
     # (scripts/nang_cap.sh), cấu hình có thể khác. Ngay sau make up Prometheus có thể chưa thu lượt nào: chờ tới 60 giây

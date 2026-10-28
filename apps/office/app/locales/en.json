@@ -781,7 +781,9 @@
     "documentOverdue": "Document past its due date ({due})",
     "otAlarm": "Temperature alert in {name}: {value} °C — incident report draft ready",
     "restricted": "Restricted document",
-    "documentIncoming": "Incoming document from {name} (within the system)"
+    "documentIncoming": "Incoming document from {name} (within the system)",
+    "opsAlert": "Operations alert: {message}",
+    "opsResolved": "Alert resolved: {message}"
   },
   "channels": {
     "title": "Notification channels",

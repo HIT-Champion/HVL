@@ -118,6 +118,11 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         gửi đơn qua API chung bằng token app-nghi-phep (dữ liệu sai → 422 đúng mã từng trường); chỉ trưởng phòng cùng
         phòng thấy và duyệt được; token của client khác → 403; hộp việc Văn phòng điện tử không lẫn việc nghỉ phép;
         duyệt → đơn kết thúc với quyết định đồng ý; cài lại không đổi gì; gỡ giữ lịch sử đơn. (make demo-quy-trinh)
+    python3 scripts/demo.py canh-bao
+        Cảnh báo vận hành (F3.13, #284): Prometheus nối Alertmanager; một cảnh báo giả đẩy vào Alertmanager thành thông
+        báo ở chuông của quản trị mọi đơn vị (quantri thấy qua GraphQL), không ai khác nhận; hết cảnh báo thì mỗi quản
+        trị thêm đúng một thông báo; gọi svc-workflow bằng token sai → 401; dịch vụ ngoài mạng alerts không tới được
+        API của Alertmanager. Thông báo của màn đánh dấu đã đọc ở cuối. (make demo-canh-bao)
 
 Thoát 0 khi màn chạy đúng như kịch bản, 1 khi có bước sai (in rõ bước nào).
 """
@@ -3873,6 +3878,122 @@ def log_tap_trung() -> None:
     else:
         print("   Tắt: bỏ logs khỏi MOC_EXTRA_PROFILES (nếu có) rồi make logs-down")
 
+# --- F3.13 · Cảnh báo vận hành ra chuông (make demo-canh-bao) ---------------------------------------------------------
+
+ALERT_BELL = """query Alerts {
+  core_notifications(where: {kind: {_eq: "ops.alert"}}, order_by: {id: desc}, limit: 20) { id data }
+}"""
+# Alertmanager gom 30 giây trước lần gửi đầu của một nhóm, gửi phần đổi (hết cảnh báo) mỗi phút (alertmanager.yml)
+ALERT_WAIT_S = 120
+# Gọi API của Alertmanager từ một container chỉ ở mạng moc (svc-files): tới được thì in "reached"
+ALERTMANAGER_PROBE = """
+import urllib.error, urllib.request
+try:
+    urllib.request.urlopen("http://alertmanager:9093/-/ready", timeout=5)
+    print("reached")
+except urllib.error.HTTPError:
+    print("reached")
+except OSError as exc:
+    print(type(exc).__name__)
+"""
+
+
+def in_alertmanager(url: str, body: Any, *headers: str) -> bytes:
+    """POST JSON bằng wget trong container alertmanager: Alertmanager, svc-workflow không mở cổng ra ngoài."""
+    args = ["exec", "-T", "alertmanager", "wget", "-q", "-O", "-", "--header", "Content-Type: application/json"]
+    for header in headers:
+        args += ["--header", header]
+    return compose(*args, "--post-data", json.dumps(body), url)
+
+
+def alert_rows(component: str, status: str) -> list[dict[str, str]]:
+    """Người nhận thông báo ops.alert của thành phần giả, theo vai trò và đơn vị (đọc thẳng CSDL)."""
+    out = psql("select u.role, n.tenant_id from core.notifications n join core.users u on u.tenant_id = n.tenant_id"
+               f" and u.id = n.user_id where n.kind = 'ops.alert' and n.data->>'component' = '{component}'"
+               f" and n.data->>'status' = '{status}'")
+    return [dict(zip(("role", "tenant"), line.split("|"))) for line in out.splitlines() if line]
+
+
+def canh_bao() -> None:
+    print("Màn F3.13 · Cảnh báo vận hành — Prometheus tính luật, Alertmanager gom rồi gọi svc-workflow: mỗi cảnh báo"
+          " thành thông báo ở chuông của quản trị mọi đơn vị (kèm email, webhook… nếu đã bật kênh); hết sự cố có thông"
+          " báo hết cảnh báo; gọi svc-workflow bằng token sai bị từ chối")
+
+    say(1, "Prometheus gửi cảnh báo đang bật cho Alertmanager; Alertmanager có token gọi svc-workflow")
+    try:
+        raw = compose("exec", "-T", "prometheus", "wget", "-q", "-O", "-", "http://localhost:9090/api/v1/alertmanagers")
+        urls = [a.get("url", "") for a in json.loads(raw)["data"]["activeAlertmanagers"]]
+    except (subprocess.CalledProcessError, ValueError, KeyError) as exc:
+        raise DemoFailed(f"không hỏi được Prometheus: {exc}") from exc
+    if not any("alertmanager:9093" in u for u in urls):
+        raise DemoFailed(f"Prometheus chưa nối Alertmanager: {urls}")
+    try:
+        compose("exec", "-T", "alertmanager", "test", "-s", "/tmp/moc-alert-token")
+    except subprocess.CalledProcessError as exc:
+        raise DemoFailed("Alertmanager chạy cấu hình không gửi: .env chưa có MOC_ALERT_TOKEN — make up (tự thêm), bản"
+                         " cài thì make install lại (docs/van-hanh.md mục Cảnh báo)") from exc
+    ok(f"Prometheus → {', '.join(urls)}; Alertmanager có token (tệp trên tmpfs, không in ra)")
+
+    say(2, "Giả một sự cố: đẩy cảnh báo ComponentDown của một thành phần giả vào Alertmanager")
+    component = f"demo-{uuid.uuid4().hex[:6]}"
+    starts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    alert = {"labels": {"alertname": "DemoCanhBao", "severity": "warning", "component": component},
+             "annotations": {"summary": f"Thành phần {component} gián đoạn (màn demo, không phải sự cố thật)"},
+             "startsAt": starts}
+    tenants = set(psql("select distinct tenant_id from core.users where role = 'tenant_admin' and enabled").split())
+    in_alertmanager("http://localhost:9093/api/v2/alerts", [alert])
+    admin = Session("quantri")
+    started = time.monotonic()
+    # svc-workflow ghi lần lượt từng đơn vị: chờ tới khi chuông của quantri có và mọi đơn vị đã có dòng
+    while True:
+        rows = [r for r in admin.gql(ALERT_BELL)["core_notifications"]
+                if r["data"].get("component") == component and r["data"].get("status") == "firing"]
+        got = alert_rows(component, "firing")
+        if rows and {r["tenant"] for r in got} >= tenants:
+            break
+        if time.monotonic() - started > ALERT_WAIT_S:
+            raise DemoFailed(f"sau {ALERT_WAIT_S} giây chuông của quantri {'có' if rows else 'chưa có'} cảnh báo"
+                             f" {component}, {len({r['tenant'] for r in got})}/{len(tenants)} đơn vị có thông báo")
+        time.sleep(3)
+    ok(f"sau {time.monotonic() - started:.0f} giây chuông của quantri (quản trị đơn vị): «Cảnh báo vận hành:"
+       f" {rows[0]['data']['message']}»")
+    if {r["role"] for r in got} != {"tenant_admin"} or {r["tenant"] for r in got} != tenants:
+        raise DemoFailed(f"cảnh báo phải tới quản trị của mọi đơn vị ({len(tenants)}), không ai khác: {got}")
+    ok(f"{len(got)} thông báo cho quản trị của {len(tenants)} đơn vị; văn thư, lãnh đạo, chuyên viên không nhận")
+
+    say(3, "Hết sự cố: Alertmanager gửi «đã hết», mỗi quản trị thêm một thông báo; gửi lại không thêm dòng")
+    alert["endsAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    in_alertmanager("http://localhost:9093/api/v2/alerts", [alert])
+    started = time.monotonic()
+    while len(alert_rows(component, "resolved")) < len(got):
+        if time.monotonic() - started > ALERT_WAIT_S:
+            raise DemoFailed(f"sau {ALERT_WAIT_S} giây chưa có thông báo hết cảnh báo {component}")
+        time.sleep(3)
+    if len(alert_rows(component, "firing")) != len(got):
+        raise DemoFailed("cảnh báo đang bật bị ghi thêm lần nữa")
+    ok(f"sau {time.monotonic() - started:.0f} giây: «Hết cảnh báo: {alert['annotations']['summary']}»; mỗi quản trị"
+       " đúng một thông báo bật, một thông báo hết")
+
+    say(4, "Gọi thẳng svc-workflow POST /ops/alerts bằng token sai (từ trong mạng nội bộ)")
+    try:
+        in_alertmanager("http://svc-workflow:8000/ops/alerts", {"alerts": [alert]}, "Authorization: Bearer sai-token")
+    except subprocess.CalledProcessError as exc:
+        if b"401" not in (exc.stderr or b""):
+            raise DemoFailed(f"svc-workflow trả lỗi khác 401: {exc.stderr!r}") from exc
+    else:
+        raise DemoFailed("svc-workflow nhận cảnh báo với token sai")
+    ok("401 — gọi thẳng svc-workflow mà không có token thì không ghi được thông báo")
+
+    say(5, "API của Alertmanager (đẩy cảnh báo, tạo silence, không đăng nhập) chỉ ở mạng alerts: svc-files không tới")
+    reached = compose("exec", "-T", "svc-files", "python", "-c", ALERTMANAGER_PROBE).decode().strip()
+    if reached == "reached":
+        raise DemoFailed("svc-files (mạng moc) gọi được API của Alertmanager: alertmanager phải chỉ ở mạng alerts")
+    ok(f"svc-files → alertmanager:9093: {reached}; chỉ Prometheus, svc-workflow chung mạng với Alertmanager")
+    # thông báo giả của màn: đánh dấu đã đọc để chuông của quản trị không đếm (email, SMS… đã gửi nếu kênh đang bật)
+    psql(f"update core.notifications set read_at = now() where kind = 'ops.alert' and read_at is null"
+         f" and data->>'component' = '{component}'")
+
+
 # ------------------------------------------------------------------------------------------- cắm ứng dụng bằng manifest
 
 APP_MANIFEST = "apps/bang-tin/app.yaml"
@@ -4481,7 +4602,7 @@ DEMOS = {"nong-lanh": nong_lanh, "kiem-dich": kiem_dich, "han-che": han_che, "ke
          "doc-van-ban": doc_van_ban, "do-doc-van-ban": do_doc_van_ban, "hoi-dap": hoi_dap, "do-hoi-dap": do_hoi_dap,
          "giao-viec": giao_viec, "do-giao-viec": do_giao_viec, "ky-so": ky_so, "che-pii": che_pii,
          "do-so-lieu-sau": do_so_lieu_sau, "nap-lo": nap_lo, "log-tap-trung": log_tap_trung,
-         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh}
+         "cai-ung-dung": cai_ung_dung, "quy-trinh": quy_trinh, "canh-bao": canh_bao}
 
 
 def main(argv: list[str] | None = None) -> int:

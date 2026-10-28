@@ -132,6 +132,14 @@ jobs:
           docker run --rm --network none "${m[@]}" "$image" check config /etc/prometheus/prometheus.yml
           docker run --rm --network none "${m[@]}" "$image" test rules /etc/prometheus/kiem-tra/canh-bao.test.yml
 
+      # #284: cấu hình Alertmanager (gửi tới svc-workflow, và bản không gửi khi chưa có token) đọc được. amtool có sẵn
+      # trong image ghim digest ở docker-compose.yml
+      - name: Giám sát — cấu hình Alertmanager (amtool check-config)
+        run: |
+          image=$(sed -n '/^  alertmanager:$/,/^    image:/s/^    image: //p' docker-compose.yml)
+          docker run --rm --network none --entrypoint amtool -v "$PWD/platform/monitoring:/etc/alertmanager:ro" \
+            "$image" check-config /etc/alertmanager/alertmanager.yml /etc/alertmanager/alertmanager-khong-gui.yml
+
       # #364: cấu hình Jaeger của profile trace (khóa sai, thành phần không có trong bản này thì đỏ). Image đúng dòng
       # ghim digest trong docker-compose.yml
       - name: Truy vết — cấu hình Jaeger (jaeger validate)
@@ -541,6 +549,13 @@ jobs:
           if grep -q 'tạo mới\|đặt lại' <<<"$out"; then echo "chạy lại mà vẫn tạo mới hoặc đặt lại mật khẩu"; exit 1; fi
           python3 scripts/moc.py tenant list
           python3 scripts/moc.py tenant check
+
+      # F3.13 (#284): cảnh báo giả qua Alertmanager → svc-workflow → chuông của quản trị cả ba đơn vị, không ai khác;
+      # hết cảnh báo thêm đúng một thông báo mỗi người; token sai → 401; svc-files không tới được API của Alertmanager
+      # (mạng alerts). Sau bước trên: đơn vị thứ ba đã có quản trị
+      - name: Cảnh báo vận hành ra chuông (make demo-canh-bao)
+        if: matrix.phan == 'luong-chinh'
+        run: make demo-canh-bao
 
       # Ứng dụng thứ ba cắm bằng một lệnh (docs/them-ung-dung.md mục 1): moc app install apps/bang-tin/app.yaml —
       # client Keycloak, route APISIX, container, migration bằng vai trò CSDL riêng, quyền Hasura, Event Trigger; SSO,

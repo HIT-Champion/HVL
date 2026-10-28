@@ -7,7 +7,7 @@ Hasura Actions của Văn phòng điện tử: API nội bộ, chỉ Hasura gọ
 bằng GraphQL. Riêng /api/workflow/{app}/… (quy trình của ứng dụng cắm bằng manifest) đi qua cổng, cần token của client
 app-<tên> (docs/api/README.md).
 
-OpenAPI 3.1.0, 8 thao tác:
+OpenAPI 3.1.0, 9 thao tác:
 
 | Thao tác | Tóm tắt |
 |---|---|
@@ -19,6 +19,7 @@ OpenAPI 3.1.0, 8 thao tác:
 | `GET /api/workflow/{app}/tasks` | Việc của ứng dụng giao cho người này hoặc nhóm của người này, cũ nhất trước |
 | `POST /api/workflow/{app}/tasks/{task_id}` | Hoàn thành một việc với dữ liệu form của việc |
 | `POST /actions/channels/{name}` | Kênh thông báo của chính người gọi (SMS, Zalo): myChannels, setMyChannel |
+| `POST /ops/alerts` | Nhận cảnh báo của Alertmanager → thông báo ops.alert cho quản trị đơn vị (F3.13) |
 
 ## `POST /ot/notify/{tenant}`
 
@@ -230,6 +231,24 @@ Trả về:
 | 409 | Tài khoản chưa có trong danh bạ của đơn vị, hoặc chưa có số điện thoại để bật SMS | `application/json` `object` |
 | 500 | Lỗi không mong đợi; câu trả về có mã yêu cầu để tra nhật ký | `application/json` `object` |
 | 503 | Chưa gọi được CSDL, thử lại sau | `application/json` `object` |
+
+## `POST /ops/alerts`
+
+Nhận cảnh báo của Alertmanager → thông báo ops.alert cho quản trị đơn vị (F3.13)
+
+Chỉ Alertmanager gọi (receiver webhook trong platform/monitoring/alertmanager.yml), kèm Authorization: Bearer
+MOC_ALERT_TOKEN. Thân là webhook phiên bản 4 của Alertmanager; mỗi cảnh báo firing/resolved thành một thông báo cho mọi
+người dùng vai trò tenant_admin, gửi lại không sinh thông báo thứ hai.
+
+Trả về:
+
+| Mã | Nghĩa | Nội dung |
+|---|---|---|
+| 204 | Thành công |  |
+| 400 | Thân không phải webhook của Alertmanager |  |
+| 401 | Thiếu hoặc sai token |  |
+| 404 | Chưa đặt MOC_ALERT_TOKEN |  |
+| 503 | Chưa ghi được CSDL, Alertmanager sẽ gửi lại |  |
 
 ## Kiểu dữ liệu
 
