@@ -13,6 +13,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).
 - Cảnh báo của Prometheus qua Alertmanager thành thông báo ở chuông (và kênh ngoài) của quản trị đơn vị (#284).
 - Sổ đăng ký văn bản đến, đi xem và in bằng tiếng Anh khi người in chọn giao diện tiếng Anh (#398).
+- Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
 
 ### Đã sửa đổi
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại, thêm kênh thông báo bên ngoài (#374).
