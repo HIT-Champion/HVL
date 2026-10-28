@@ -1233,11 +1233,11 @@ tests:
           - type: vrl
             source: |
               m = string!(.message)
-              assert!(contains(m, "query_parameters=[REDACTED] user_agent="), m)
-              assert!(contains(m, "error=[REDACTED]"), m)
               for_each(["Tran+Thi", "Le Van C", "nguoi_ky"]) -> |_i, s| {
                 assert!(!contains(m, s), s)
               }
+              assert!(contains(m, "query_parameters=[REDACTED] user_agent="), m)
+              assert!(contains(m, "error=[REDACTED]"), m)
           - type: vrl
             source: |
               m = string!(.message)
