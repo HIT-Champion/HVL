@@ -59,6 +59,13 @@ export const BUILTIN_APPS = [
   { name: 'ca-nhan', key: 'personal', href: '/ca-nhan/', service: 'app-ca-nhan' },
 ] as const
 
+// Ứng dụng tùy chọn đi cùng bản cài, chạy theo profile tắt mặc định (docker-compose.yml): chỉ vào danh mục khi trang
+// gọi được đường kiểm sức khỏe của nó qua APISIX — profile tắt thì không có container, APISIX trả 503. Phiên bản là của
+// phần mềm thượng nguồn ghim trong platform/<tên>/Dockerfile (test so), không phải phiên bản lõi
+export const OPTIONAL_APPS = [
+  { name: 'wiki', key: 'wiki', href: '/wiki/', probe: '/wiki/health.php', version: 'DokuWiki 2026-07-14c' },
+] as const
+
 export type AppState = 'builtin' | 'installed' | 'removed'
 
 export interface CatalogEntry {
@@ -111,8 +118,10 @@ function entry(row: InstalledApp): CatalogEntry {
   }
 }
 
-// Có sẵn theo thứ tự khai; đã cài theo tên; đã gỡ: gỡ gần nhất trước
-export function appCatalog(t: (key: string) => string, rows: InstalledApp[], coreVersion: string | null): Catalog {
+// Có sẵn theo thứ tự khai, rồi ứng dụng tùy chọn đang bật (available: tên trả lời đường kiểm sức khỏe); đã cài theo
+// tên; đã gỡ: gỡ gần nhất trước
+export function appCatalog(t: (key: string) => string, rows: InstalledApp[], coreVersion: string | null,
+  available: readonly string[] = []): Catalog {
   const builtin = BUILTIN_APPS.map((b): CatalogEntry => ({
     name: b.name,
     title: t(`apps.builtin.${b.key}.title`),
@@ -127,6 +136,14 @@ export function appCatalog(t: (key: string) => string, rows: InstalledApp[], cor
     sha256: null,
     state: 'builtin',
   }))
+  for (const o of OPTIONAL_APPS) {
+    if (!available.includes(o.name)) continue
+    builtin.push({
+      name: o.name, title: t(`apps.builtin.${o.key}.title`), description: t(`apps.builtin.${o.key}.description`),
+      path: o.href, href: o.href, internal: false, version: o.version, installedAt: null, updatedAt: null,
+      removedAt: null, sha256: null, state: 'builtin',
+    })
+  }
   const entries = rows.map(entry)
   const installed = entries.filter((e) => e.state === 'installed')
     .sort((a, b) => a.title.localeCompare(b.title, 'vi') || a.name.localeCompare(b.name))

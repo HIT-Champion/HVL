@@ -27,6 +27,7 @@
 #   /realtime                        → Centrifugo (WebSocket)        — token gửi trong kết nối, Centrifugo kiểm
 #   /ca-nhan, /ca-nhan/*             → app-ca-nhan (giao diện tĩnh)  — không cần token; ứng dụng thứ hai trên lõi
 #   /tai-lieu-api, /tai-lieu-api/*   → app-tai-lieu-api (Swagger UI) — không cần token; gọi thử đi qua các route trên
+#   /wiki, /wiki/*                   → wiki (DokuWiki, profile wiki)  — wiki tự đăng nhập bằng Keycloak, tự kiểm quyền
 #   /*                               → app-office (giao diện tĩnh)   — không cần token
 #
 # Container ứng dụng chỉ ở mạng `apps` cùng APISIX (docker-compose.yml): phần máy chủ của ứng dụng cũng gọi lõi qua
@@ -93,6 +94,11 @@ upstreams:
     type: roundrobin
     nodes:
       "app-tai-lieu-api:8080": 1
+  # Wiki nội bộ (#367, profile wiki — tắt mặc định): chưa bật thì không có container, route /wiki trả 503
+  - id: wiki
+    type: roundrobin
+    nodes:
+      "wiki:8080": 1
   - id: centrifugo
     type: roundrobin
     nodes:
@@ -391,6 +397,38 @@ global_rules:
                 SecRule &ARGS_POST "@ge 1000" "id:10061,phase:2,deny,status:403,log,
                 msg:'Quá nhiều tham số form (GHSA-6r3q-mjv7-xr8m)',chain"
               - SecRule REQBODY_PROCESSOR "@streq URLENCODED"
+              # Loại trừ 10 — wiki nội bộ (#367, mọi đường dưới /wiki/). Keycloak trả về /wiki/doku.php sau đăng nhập
+              # như loại trừ 2: iss là URL của realm, code, session_state là token ngẫu nhiên — gỡ đúng ba luật bắt nhầm
+              # token (#140). Nội dung trang khi lưu, xem trước, lưu nháp (POST /wiki/<trang>, /wiki/lib/exe/ajax.php:
+              # wikitext, phần trước, sau của đoạn đang sửa) và tóm tắt thay đổi là chữ tự do như loại trừ 5: DokuWiki
+              # chỉ lưu thành tệp chữ rồi dựng HTML có escape (không bật htmlok, phpok), không chạy, không tải URL.
+              # SQLi, XSS, duyệt thư mục, Log4Shell, Node.js vẫn soi
+              - >-
+                SecRule REQUEST_FILENAME "@beginsWith /wiki/" "id:10070,phase:1,pass,nolog,
+                ctl:ruleRemoveTargetById=931100;ARGS:iss,
+                ctl:ruleRemoveTargetById=934110;ARGS:iss,
+                ctl:ruleRemoveTargetById=942100;ARGS:code,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:code,
+                ctl:ruleRemoveTargetById=930120;ARGS:code,
+                ctl:ruleRemoveTargetById=942100;ARGS:session_state,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:session_state,
+                ctl:ruleRemoveTargetById=930120;ARGS:session_state,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:prefix,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:suffix,
+                ctl:ruleRemoveTargetById=932000-932999;ARGS:summary,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:prefix,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:suffix,
+                ctl:ruleRemoveTargetById=933000-933999;ARGS:summary,
+                ctl:ruleRemoveTargetById=931100;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=931100;ARGS:prefix,
+                ctl:ruleRemoveTargetById=931100;ARGS:suffix,
+                ctl:ruleRemoveTargetById=931100;ARGS:summary,
+                ctl:ruleRemoveTargetById=931120;ARGS:wikitext,
+                ctl:ruleRemoveTargetById=931120;ARGS:prefix,
+                ctl:ruleRemoveTargetById=931120;ARGS:suffix,
+                ctl:ruleRemoveTargetById=931120;ARGS:summary"
               - Include @owasp_crs/*.conf
               # Loại trừ 4 — Host là địa chỉ IP: Signet được mở bằng IP trong mạng nội bộ; dưới APISIX coraza-proxy-wasm
               # thêm Host lần nữa nên luật cộng điểm hai lần (6 ≥ 5) và chặn mọi yêu cầu vào bằng IP
@@ -549,6 +587,17 @@ routes:
     uris: ["/tai-lieu-api", "/tai-lieu-api/*"]
     methods: [GET, HEAD]
     upstream_id: app-tai-lieu-api
+
+  # Wiki nội bộ (#367): DokuWiki tự đăng nhập bằng Keycloak (client bí mật `wiki`) và tự kiểm quyền theo đơn vị nên
+  # không qua can-token; POST để lưu trang, tải tệp. DokuWiki chạy ở gốc container (basedir /wiki/): bỏ tiền tố trước
+  # khi chuyển vào
+  - id: wiki
+    uris: ["/wiki", "/wiki/*"]
+    methods: [GET, HEAD, POST]
+    upstream_id: wiki
+    plugins:
+      proxy-rewrite:
+        regex_uri: ["^/wiki/?(.*)$", "/$1"]
 
   - id: app-office
     uri: /*

@@ -39,8 +39,9 @@ MANIFEST=.moc-install
 # import, demo_ca_nhan.py, demo_tat_van_phong.py), reconciler GitOps (reconcile.py), cảm biến giả lập của profile iot
 # (compose chỉ đọc ở đây profile core, app nên không thấy bind mount của nó), log tập trung của profile logs (cấu hình
 # Vector, tệp compose phủ, lệnh chuẩn bị và tra Parseable), cắm ứng dụng bằng manifest (moc app: ung_dung.py, bộ đọc
-# YAML, JSON Schema của manifest), cấu hình Jaeger của profile trace (#364). Không chép apps/: gói ứng dụng nằm ngoài
-# lõi, nên demo.py cai-ung-dung, quy-trinh chỉ chạy trong thư mục mã nguồn
+# YAML, JSON Schema của manifest), cấu hình Jaeger của profile trace (#364), cấu hình và lệnh đồng bộ của wiki nội bộ,
+# màn demo của nó (profile wiki, #367). Không chép apps/: gói ứng dụng nằm ngoài lõi, nên demo.py cai-ung-dung,
+# quy-trinh chỉ chạy trong thư mục mã nguồn
 RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/smoke.py scripts/totp.py
          scripts/moc.py scripts/audit_chain.py scripts/anchor_sig.py scripts/backup.py scripts/tenants.py
          scripts/demo.py scripts/nap_lo_mau.py scripts/reconcile.py scripts/realm_clients.py scripts/demo_ca_nhan.py
@@ -48,7 +49,8 @@ RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/sm
          seed services/ot-sensor/sensor.py
          platform/logs/vector.yaml platform/logs/docker-compose.logs.yml scripts/log_tap_trung.py
          scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json
-         platform/trace/jaeger.yaml)
+         platform/trace/jaeger.yaml
+         platform/wiki/signet.protected.php scripts/wiki.py scripts/demo_wiki.py)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -159,7 +161,12 @@ do_install() {
   if grep '^OUTSIDE' <<<"$mounts" >&2; then die "có bind mount trỏ ra ngoài thư mục mã nguồn"; fi
 
   echo "==> Dựng image của đội, thẻ $ver"
-  (cd "$SRC" && MOC_VERSION="$ver" "${COMPOSE[@]}" build)
+  # Image wiki nội bộ (#367) chỉ dựng khi bật profile wiki: theo .env của bản cài nếu đã có, không thì .env sắp chép
+  local envf extra extra_build=()
+  envf="$dest/.env"; [ -f "$envf" ] || envf="$SRC/.env"
+  extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$envf" | tail -n 1 | tr -d ' ')"
+  [[ ",$extra," != *,wiki,* ]] || extra_build=(--profile wiki)
+  (cd "$SRC" && MOC_VERSION="$ver" "${COMPOSE[@]}" "${extra_build[@]}" build)
 
   local files=()
   while IFS= read -r rel; do files+=("$rel"); done \

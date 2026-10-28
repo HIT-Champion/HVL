@@ -25,6 +25,8 @@ Mỗi lần sao lưu là một "lượt": vài snapshot restic cùng thẻ `run-
   đây — mất két là mất mọi tệp mã hóa. Két khôi phục mở bằng khóa static seal trong .env đang dùng
   (MOC_OPENBAO_SEAL_KEY): cất một bản .env ở chỗ riêng, KHÔNG để chung với kho sao lưu — thiếu nó thì không khôi
   phục được, có cả hai thì mở được mọi tệp mã hóa;
+- cả volume wiki nội bộ (#367, profile wiki): trang, tệp tải lên, tài khoản, danh sách quyền của DokuWiki — tệp riêng,
+  không dính CSDL hay kho tệp, nên chỉ tạm dừng wiki lúc chép volume của nó. Chưa bật wiki thì volume trống;
 - manifest.json, ghi sau cùng. Lượt thiếu manifest là lượt hỏng giữa chừng, không dùng để khôi phục. Trong đó có
   tên vai trò CSDL của các ứng dụng cài thêm (`moc_appdb_*`, scripts/ung_dung.py): vai trò thuộc cả máy chủ
   PostgreSQL, pg_dump một CSDL không chép, nên khôi phục sang máy mới thì tạo lại chúng (NOLOGIN) trước pg_restore.
@@ -39,7 +41,7 @@ restic (BSD-2-Clause) chạy trong container `restic` (profile backup, không m�
 sau chỉ thêm phần đã đổi. Kho ở MOC_BACKUP_DIR, khóa là MOC_BACKUP_PASSWORD — mất khóa là mất bản sao lưu. Chỉ mục
 Meilisearch và chữ ký ClamAV không sao lưu: svc-files đồng bộ lại chỉ mục từ CSDL khi khởi động, ClamAV tự tải chữ
 ký. Lịch sử cảm biến của màn demo IT/OT (Scorpio, profile iot) cũng không sao lưu. Lượt sao lưu cũ chưa có két thì
-khôi phục giữ nguyên két đang có.
+khôi phục giữ nguyên két đang có, chưa có wiki thì giữ nguyên wiki đang có.
 """
 
 from __future__ import annotations
@@ -69,6 +71,10 @@ WRITERS = ("svc-files", "seaweedfs", "openbao")            # tạm dừng suốt
 DB_WRITERS = ("hasura", "svc-workflow", "flowable", "keycloak")   # tạm dừng lúc dump CSDL
 FILES = "/data/seaweedfs"               # chỗ volume SeaweedFS gắn vào container restic
 VAULT = "/data/openbao"                 # chỗ volume két OpenBao gắn vào container restic (F3.7)
+WIKI = "/data/wiki"                     # chỗ volume wiki nội bộ gắn vào container restic (#367)
+# Wiki chạy ở profile wiki (tắt mặc định): hỏi trạng thái, tạm dừng, dừng nó theo cả profile này. Khởi động lại Signet
+# sau khôi phục vẫn bằng COMPOSE: không bật wiki khi nó đang tắt
+WITH_WIKI = [*COMPOSE, "--profile", "wiki"]
 HOST = "moc"                            # tên máy ghi vào snapshot: cố định, để restic tìm ra lượt trước và chỉ đọc
 TAG = "moc"                             # tệp đã đổi (container mỗi lần một tên khác)
 MANIFEST = "manifest.json"
@@ -175,7 +181,7 @@ def _guard(repo: pathlib.Path) -> Iterator[None]:
 
 
 def _services(status: str) -> set[str]:
-    return set(_call([*COMPOSE, "ps", "--status", status, "--services"],
+    return set(_call([*WITH_WIKI, "ps", "--status", status, "--services"],
                      "không hỏi được trạng thái dịch vụ").decode().split())
 
 
@@ -183,18 +189,19 @@ def _unpause(services: list[str]) -> None:
     """Bỏ tạm dừng từng dịch vụ; dịch vụ không còn tạm dừng thì thôi. Lỗi thì báo cách chạy tay."""
     failed = []
     for service in services:
-        proc = subprocess.run([*COMPOSE, "unpause", service], cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True)
+        proc = subprocess.run([*WITH_WIKI, "unpause", service], cwd=ROOT, stdin=subprocess.DEVNULL,
+                              capture_output=True)
         if proc.returncode != 0 and b"not paused" not in proc.stderr:
             failed.append(service)
     services.clear()
     if failed:
-        raise BackupError(f"CHƯA chạy lại được {', '.join(failed)} — chạy tay: docker compose --profile core unpause"
-                          f" {' '.join(failed)}")
+        raise BackupError(f"CHƯA chạy lại được {', '.join(failed)} — chạy tay: docker compose --profile core"
+                          f" --profile wiki unpause {' '.join(failed)}")
 
 
 def _resume_left_paused() -> None:
     """Lần sao lưu trước bị giết cứng (SIGKILL) giữa lúc tạm dừng: chạy lại các dịch vụ đó trước khi làm gì."""
-    left = sorted(_services("paused") & {*WRITERS, *DB_WRITERS})
+    left = sorted(_services("paused") & {*WRITERS, *DB_WRITERS, "wiki"})
     if left:
         _unpause(list(left))
         print(f"  ⚠ {', '.join(left)} còn tạm dừng từ một lần sao lưu bị ngắt: đã chạy lại", flush=True)
@@ -334,6 +341,16 @@ def create(keep: int | None = None) -> dict[str, Any]:
                 print(f"  ✓ Két (volume OpenBao): {_size(part['bytes'])}", flush=True)
             finally:
                 _unpause(held + paused)
+            wiki: list[str] = []
+            try:
+                if "wiki" in running:
+                    wiki.append("wiki")
+                    _call([*WITH_WIKI, "pause", "wiki"], "không tạm dừng được wiki")
+                manifest["wiki"] = part = _summary(_call(_backup_args(tags, WIKI),
+                                                         "restic không chép được volume wiki nội bộ"))
+            finally:
+                _unpause(wiki)
+            print(f"  ✓ Wiki nội bộ (volume wiki_data): {_size(part['bytes'])}", flush=True)
             _call(_backup_args(tags, "--stdin", "--stdin-filename", MANIFEST), "restic không ghi được manifest",
                   input=json.dumps(manifest, ensure_ascii=False, indent=1).encode())
         except BaseException:
@@ -420,6 +437,8 @@ def _check_readable(target: dict[str, Any], manifest: dict[str, Any]) -> None:
     wanted[FILES.lstrip("/")] = manifest["files"]["snapshot"]
     if "vault" in manifest:                 # lượt sao lưu trước F3.7 chưa có két
         wanted[VAULT.lstrip("/")] = manifest["vault"]["snapshot"]
+    if "wiki" in manifest:                  # lượt sao lưu trước #367 chưa có wiki
+        wanted[WIKI.lstrip("/")] = manifest["wiki"]["snapshot"]
     missing = [name for name, sid in wanted.items() if target["parts"].get(name) != sid]
     if missing:
         raise BackupError(f"lượt {manifest['run']} không còn đủ phần trong kho ({', '.join(missing)}) — chọn lượt khác")
@@ -442,6 +461,7 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         print(f"Lượt {manifest['run']}, sao lưu lúc {_when(manifest['run'])} (Signet {manifest['version']}):"
               f" CSDL {', '.join(manifest['databases'])}; tệp {_size(manifest['files']['bytes'])};"
               f" {'két' if 'vault' in manifest else 'chưa có két (giữ két đang có)'};"
+              f" {'wiki' if 'wiki' in manifest else 'chưa có wiki (giữ wiki đang có)'};"
               f" sổ kiểm toán tới dòng #{head['id']}.")
         current = ENV.get("MOC_VERSION") or "dev"
         if manifest["version"] != current:
@@ -466,8 +486,11 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
         _check_readable(target, manifest)
         print("  ✓ Bản sao lưu đọc được trọn vẹn", flush=True)
         started = time.monotonic()
+        wiki_was_running = "wiki" in manifest and "wiki" in _services("running")
         try:
             RESTORING.write_text(f"{manifest['run']}\n", encoding="utf-8")
+            if wiki_was_running:
+                _call([*WITH_WIKI, "rm", "-sf", "wiki"], "không dừng được wiki")
             _call([*COMPOSE, "down"], "không dừng được Signet")
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "300", "postgres"], "PostgreSQL không lên")
             print("  ✓ Đã dừng Signet, chỉ chạy PostgreSQL", flush=True)
@@ -489,12 +512,18 @@ def restore(rid: str | None, *, yes: bool = False) -> dict[str, Any] | None:
                 _call(restic("restore", f"{manifest['vault']['snapshot']}:{VAULT}", "--target", VAULT, "--delete"),
                       "không khôi phục được két")
                 print("  ✓ Két (volume OpenBao)", flush=True)
+            if "wiki" in manifest:
+                _call(restic("restore", f"{manifest['wiki']['snapshot']}:{WIKI}", "--target", WIKI, "--delete"),
+                      "không khôi phục được wiki nội bộ")
+                print("  ✓ Wiki nội bộ (volume wiki_data)", flush=True)
             diff = {"run": manifest["run"], "backed_up_at": manifest["created_at"], "audit_id": head["id"],
                     "version": manifest["version"]}
             event = _psql(RESTORED_SQL, actor=_actor(), run=manifest["run"], diff=json.dumps(diff, ensure_ascii=False))
             print(f"  ✓ Lần khôi phục ghi vào sổ kiểm toán: dòng #{event}", flush=True)
             _call([*COMPOSE, "up", "-d", "--wait", "--wait-timeout", "600"],
                   "Signet chưa chạy lại được — xem: make logs")
+            if wiki_was_running:            # image đã có từ lúc wiki đang chạy: không dựng lại
+                _call([*WITH_WIKI, "up", "-d", "--no-build", "--wait", "wiki"], "wiki nội bộ chưa chạy lại được")
             RESTORING.unlink(missing_ok=True)
         except BaseException:
             print(f"✗ Khôi phục dừng giữa chừng; Signet có thể đang dừng. Sửa lỗi bên dưới rồi chạy lại: python3"
