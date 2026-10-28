@@ -270,9 +270,10 @@ dùng thấy, rồi báo mọi mục trượt:
 - header CSP, `nosniff` còn qua proxy.
 
 Job `.github/workflows/ban-online.yml` chạy kịch bản này trên bản online của đội, với phiên bản là thẻ phát hành mới
-nhất: mỗi sáng lúc 07:17, và ngay sau khi workflow Release phát hành xong. Từ lúc phát hành tới lúc nâng, job đỏ vì
-bản online còn chạy bản cũ. Nâng xong thì chạy tay job (Actions → Bản online → Run workflow) để xác nhận từ bên ngoài.
-Địa chỉ đổi bằng biến `MOC_ONLINE_URL` của repo.
+nhất: mỗi sáng lúc 07:17, và ngay sau khi workflow Release phát hành xong. Lượt sau Release đợi bản online nâng xong
+(`--wait-minutes 60`: hỏi lại `/api/status` mỗi 30 giây, tối đa 60 phút) rồi mới kiểm; quá 60 phút mà chưa nâng thì
+job đỏ. Lượt mỗi sáng và lượt chạy tay (Actions → Bản online → Run workflow) kiểm ngay, bản online còn chạy bản cũ là
+đỏ. Địa chỉ đổi bằng biến `MOC_ONLINE_URL` của repo.
 
 Job thứ hai của workflow đó kiểm bản dev https://signet-dev.htechcs.com mỗi sáng. Đây là bản cài có reconciler theo
 nhánh `develop` (`MOC_GITOPS_BRANCH=develop`, kéo mỗi 15 phút). Các mục kiểm như trên, nhưng `/api/status` phải là bản
