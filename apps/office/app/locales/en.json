@@ -646,6 +646,12 @@
     "recipients": "Recipients",
     "recipientsHint": "One recipient per line",
     "urgency": "Urgency",
+    "language": "Document language",
+    "languages": {
+      "vi": "Vietnamese",
+      "en": "English"
+    },
+    "languageHint": "English: the national heading, number, date, recipients and verification block print in English; your text stays as typed",
     "replyTo": "In reply to",
     "replyNone": "— None —",
     "attachments": "Attachments",
