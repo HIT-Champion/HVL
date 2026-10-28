@@ -845,14 +845,20 @@ python3 scripts/moc.py tu-dong robot remove CNTT  # gỡ robot; token đã cấp
 - **Robot là gì:** client Keycloak confidential `tu-dong-robot-<mã>` chỉ có luồng `client_credentials` (không đăng
   nhập trình duyệt, không mật khẩu người), không full scope. Access token mang cố định vai trò Hasura `tu_dong`, đơn
   vị của robot và `x-hasura-user-id` là chính tên robot. Tài khoản dịch vụ của client không vào danh bạ người dùng.
-- **Robot được làm gì:** đọc văn bản **không hạn chế** của đơn vị mình (số ký hiệu, trích yếu, độ khẩn, trạng thái,
-  hạn, ngày vào sổ, phòng xử lý; không có nội dung, người tạo, người nhận), và gọi Action `notifyFromFlow` báo người
-  trong đơn vị theo vai trò. Không ghi bảng nào, không đọc danh bạ, thông báo, văn bản hạn chế hay của đơn vị khác
+- **Robot được làm gì:** đọc văn bản **không hạn chế** của đơn vị mình, kể cả dự thảo văn bản đi (`draft`, `returned`)
+  như lãnh đạo, văn thư thấy (số ký hiệu, trích yếu, độ khẩn, trạng thái, hạn, ngày vào sổ, phòng xử lý; không có nội
+  dung, người tạo, người nhận), và gọi Action `notifyFromFlow` báo người trong đơn vị theo vai trò. Không ghi bảng nào,
+  không đọc danh bạ, thông báo, văn bản hạn chế hay của đơn vị khác
   ([`db/tests/test_tu_dong.py`](../db/tests/test_tu_dong.py)).
 - **`notifyFromFlow(roles, title, text, document_id, key)`** (svc-workflow): gửi thông báo loại `flow.message` vào
   chuông, đẩy tức thời như thông báo khác; cùng `key` thì không gửi lại (flow chạy lại không báo trùng). Gắn
   `document_id` thì chỉ gửi được cho `director`, `clerk` — hai vai trò xem được mọi văn bản không hạn chế của đơn vị,
   để trích yếu không tới người không được xem văn bản đó. Văn bản của đơn vị khác, văn bản hạn chế bị từ chối.
+  Luật này chỉ giữ văn bản gắn kèm: flow tự chép trích yếu, số ký hiệu vào `title`, `text` thì chúng tới mọi vai trò
+  đã chọn — người viết flow chỉ gửi những thông tin đó cho `director`, `clerk`, như hai flow mẫu.
+- **Kênh ngoài:** `flow.message` đi chuông và cả email, webhook, SMS, Zalo khi `MOC_NOTIFY_*_KINDS` để trống (mọi
+  loại); danh sách văn bản sắp hạn mang theo nhiều trích yếu. Muốn tin của flow chỉ ở chuông thì liệt kê các loại
+  khác vào `MOC_NOTIFY_*_KINDS`, bỏ `flow.message`.
 - **Hai flow mẫu** ([`platform/tu-dong/flow-mau.json`](../platform/tu-dong/flow-mau.json), tab "Signet — flow mẫu",
   để tắt): (1) 07:00 hằng ngày gom văn bản đến chưa xong có hạn trong 3 ngày tới, báo lãnh đạo đơn vị một tin; (2) mỗi
   phút tìm văn bản Hỏa tốc vừa vào sổ, báo lãnh đạo mỗi văn bản một tin, bấm vào mở văn bản. Dùng: trình soạn → menu
