@@ -18,6 +18,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { setLocale } from '~/lib/i18n.js'
 import { mountForm } from '~/lib/schema-form.js'
 import {
   BUILDER_DATE_RULES, BUILDER_LIMITS, BUILDER_WIDGETS, addBuilderField, addBuilderOption, builderFile, builderFormFrom,
@@ -28,8 +29,9 @@ import type {
   BuilderField, BuilderForm, BuilderOption, BuilderProblem, BuilderProblemCode, BuilderWidget,
 } from '~/utils/formBuilder'
 
-// Trình dựng form (#303 bước 1b): khai trường, xem trước bằng đúng module form của ứng dụng (lib/schema-form.js, bản
-// chép của apps/nghi-phep/public/schema-form.js — test so từng byte), tải tệp JSON Schema về để đặt vào gói ứng dụng.
+// Trình dựng form (#303 bước 1b): khai trường, xem trước bằng đúng module form của ứng dụng (lib/schema-form.js và
+// bảng dịch lib/i18n.js nó dùng, bản chép của apps/nghi-phep/public/ — test so từng byte), tải tệp JSON Schema về để
+// đặt vào gói ứng dụng.
 // Không gọi API nào: form chỉ vào lõi khi người vận hành chạy `moc app install`, svc-workflow kiểm lại lúc đó. Bản đang
 // dựng giữ trong sessionStorage (useFormDraft) để hết phiên đăng nhập không mất; rời trang là bỏ.
 
@@ -204,6 +206,8 @@ function render() {
     return
   }
   try {
+    // câu báo lỗi của ô theo lang truyền vào; câu báo schema hỏng theo ngôn ngữ đang dùng của bảng dịch
+    setLocale(locale.value)
     mountForm(el, builderSchema(form), {
       lang: locale.value,
       idPrefix: 'xem-truoc-',

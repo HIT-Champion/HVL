@@ -24,7 +24,11 @@
 // và chỉ hiểu tập từ khóa ghi ở schemas/README.md: schema dùng điều khác thì báo ngay lúc nạp, không lặng lẽ bỏ qua.
 //
 // Gợi ý hiển thị nằm trong schema: x-moc-title, x-moc-order ở gốc; x-moc-ui ở từng trường (widget, label, note, help,
-// rows, options, errors). Chữ là chuỗi hoặc {vi, en}. Mọi chữ gán bằng textContent, không bao giờ innerHTML.
+// rows, options, errors). Chữ là chuỗi hoặc {vi, en}. Câu chung (ô không bắt buộc, câu báo lỗi theo mã, schema hỏng)
+// lấy từ bảng dịch của ứng dụng (i18n.js, khóa form.*, schema.*). Mọi chữ gán bằng textContent, không bao giờ
+// innerHTML.
+
+import { t } from './i18n.js'
 
 // từ khóa chỉ để chú thích, không kiểm gì; x-moc-* do formErrors() hay phần vẽ form đọc
 const NOTES = new Set(['$schema', '$id', '$defs', '$comment', 'title', 'description', 'default', 'examples'])
@@ -110,19 +114,17 @@ class Checker {
   }
 
   // Duyệt cả schema lúc nạp: từ khóa lạ, giá trị từ khóa sai dạng, kiểu lạ, định dạng lạ, $ref ra ngoài, pattern hỏng
-  // đều ném lỗi ngay
+  // đều ném lỗi ngay (câu theo ngôn ngữ đang dùng, trang hiện kèm câu "không nạp được mẫu đơn")
   #inspect(node, at) {
     if (typeof node === 'boolean') return
-    if (!isObject(node)) throw new Error(`Schema ${at}: phải là đối tượng`)
+    if (!isObject(node)) throw new Error(t('schema.notObject', { at }))
     for (const [key, value] of Object.entries(node)) {
-      if (key === '$defs' && !isObject(value)) throw new Error(`Schema ${at}: $defs phải là đối tượng`)
+      if (key === '$defs' && !isObject(value)) throw new Error(t('schema.defs', { at }))
       if (NOTES.has(key) || key.startsWith('x-moc-')) continue
-      if (!Object.hasOwn(SHAPES, key)) throw new Error(`Schema ${at}: không hỗ trợ từ khóa ${key}`)
-      if (key === 'type' && !SHAPES.type(value)) throw new Error(`Schema ${at}: kiểu ${JSON.stringify(value)} không có`)
-      if (key === 'format' && !SHAPES.format(value)) {
-        throw new Error(`Schema ${at}: định dạng ${String(value)} không hỗ trợ (chỉ date, uuid)`)
-      }
-      if (!SHAPES[key](value)) throw new Error(`Schema ${at}: ${key} sai dạng (${JSON.stringify(value)})`)
+      if (!Object.hasOwn(SHAPES, key)) throw new Error(t('schema.keyword', { at, key }))
+      if (key === 'type' && !SHAPES.type(value)) throw new Error(t('schema.type', { at, type: JSON.stringify(value) }))
+      if (key === 'format' && !SHAPES.format(value)) throw new Error(t('schema.format', { at, format: String(value) }))
+      if (!SHAPES[key](value)) throw new Error(t('schema.shape', { at, key, value: JSON.stringify(value) }))
       if (key === 'pattern') this.#regex(value)
       if (key === '$ref') this.#resolve(value)
     }
@@ -149,7 +151,7 @@ class Checker {
     const defs = this.#root.$defs
     // Object.hasOwn: "#/$defs/constructor", "#/$defs/__proto__" không được trỏ vào prototype
     const target = m && isObject(defs) && Object.hasOwn(defs, m[1]) ? defs[m[1]] : undefined
-    if (target === undefined) throw new Error(`Schema: $ref ${String(ref)} không trỏ tới #/$defs/… có sẵn`)
+    if (target === undefined) throw new Error(t('schema.ref', { ref: String(ref) }))
     return target
   }
 
@@ -158,7 +160,7 @@ class Checker {
   #acyclic(node, refs) {
     if (!isObject(node)) return
     if (node.$ref !== undefined) {
-      if (refs.includes(node.$ref)) throw new Error(`Schema: $ref vòng ${[...refs, node.$ref].join(' → ')}`)
+      if (refs.includes(node.$ref)) throw new Error(t('schema.cycle', { path: [...refs, node.$ref].join(' → ') }))
       this.#acyclic(this.#resolve(node.$ref), [...refs, node.$ref])
     }
     for (const sub of Object.values(node.properties ?? {})) this.#acyclic(sub, refs)
@@ -173,21 +175,21 @@ class Checker {
     const order = root['x-moc-order']
     if (order !== undefined && !(Array.isArray(order) && order.length === names.length
       && names.every((n) => order.includes(n)))) {
-      throw new Error('Schema: x-moc-order phải liệt kê đủ và đúng các trường trong properties')
+      throw new Error(t('schema.order'))
     }
     const ranges = root['x-moc-range']
-    if (ranges !== undefined && !Array.isArray(ranges)) throw new Error('Schema: x-moc-range phải là mảng các cặp')
+    if (ranges !== undefined && !Array.isArray(ranges)) throw new Error(t('schema.ranges'))
     for (const pair of ranges ?? []) {
       const dates = Array.isArray(pair) && pair.length === 2
         && pair.every((n) => typeof n === 'string' && Object.hasOwn(props, n) && props[n].format === 'date')
-      if (!dates) throw new Error(`Schema: x-moc-range ${JSON.stringify(pair)} phải là cặp hai trường format date`)
+      if (!dates) throw new Error(t('schema.range', { pair: JSON.stringify(pair) }))
     }
     for (const [name, prop] of Object.entries(props)) {
       const ui = prop['x-moc-ui']
       if (ui === undefined) continue
-      if (!isObject(ui)) throw new Error(`Schema: x-moc-ui của ${name} phải là đối tượng`)
+      if (!isObject(ui)) throw new Error(t('schema.ui', { name }))
       if (ui.widget !== undefined && !WIDGETS.has(ui.widget)) {
-        throw new Error(`Schema: x-moc-ui.widget của ${name} không có (${String(ui.widget)})`)
+        throw new Error(t('schema.widget', { name, widget: String(ui.widget) }))
       }
     }
   }
@@ -392,70 +394,8 @@ export function clean(list, values) {
   return data
 }
 
-const TEXT = {
-  vi: {
-    optional: 'không bắt buộc',
-    pick: '— Chọn —',
-    submit: 'Gửi',
-    yes: 'Có',
-    no: 'Không',
-    empty: '—',
-    top: 'Chưa gửi được, kiểm tra lại:',
-    required: 'Không được để trống',
-    between: 'Cần {min}–{max} ký tự',
-    minLength: 'Cần ít nhất {min} ký tự',
-    maxLength: 'Tối đa {max} ký tự',
-    minimum: 'Nhỏ nhất là {min}',
-    maximum: 'Lớn nhất là {max}',
-    minItems: 'Chọn ít nhất {min} mục',
-    maxItems: 'Chọn tối đa {max} mục',
-    uniqueItems: 'Có mục được chọn hai lần',
-    date: 'Ngày không có thật hoặc sai dạng',
-    format: 'Không đúng định dạng',
-    'not-after-today': 'Không được sau hôm nay',
-    'not-before-today': 'Không được trước hôm nay',
-    'x-moc-range': 'Không được trước «{other}»',
-    'x-moc-nfc': 'Chữ tiếng Việt chưa ở dạng dựng sẵn (Unicode NFC)',
-    not: 'Có khoảng trắng thừa ở đầu hoặc cuối, xuống dòng hoặc ký tự ẩn',
-    enum: 'Không có trong danh sách',
-    const: 'Không đúng giá trị yêu cầu',
-    type: 'Sai kiểu dữ liệu',
-    additionalProperties: 'Trường không có trong mẫu',
-    invalid: 'Giá trị chưa hợp lệ',
-  },
-  en: {
-    optional: 'optional',
-    pick: '— Choose —',
-    submit: 'Submit',
-    yes: 'Yes',
-    no: 'No',
-    empty: '—',
-    top: 'Not sent yet. Please check:',
-    required: 'Required',
-    between: '{min}–{max} characters',
-    minLength: 'At least {min} characters',
-    maxLength: 'At most {max} characters',
-    minimum: 'At least {min}',
-    maximum: 'At most {max}',
-    minItems: 'Choose at least {min}',
-    maxItems: 'Choose at most {max}',
-    uniqueItems: 'An item is chosen twice',
-    date: 'Not a real date, or not in the right form',
-    format: 'Invalid format',
-    'not-after-today': 'Cannot be in the future',
-    'not-before-today': 'Cannot be before today',
-    'x-moc-range': 'Cannot be before "{other}"',
-    'x-moc-nfc': 'Text is not in composed Unicode form (NFC)',
-    not: 'Extra spaces at the start or end, line breaks or hidden characters',
-    enum: 'Not in the list',
-    const: 'Not the required value',
-    type: 'Wrong data type',
-    additionalProperties: 'Field not in the form',
-    invalid: 'Invalid value',
-  },
-}
-const word = (lang, key, params = {}) =>
-  (TEXT[lang] ?? TEXT.vi)[key].replace(/\{(\w+)\}/g, (_m, k) => String(params[k] ?? ''))
+// Câu chung theo ngôn ngữ truyền vào hàm (lang của form), không theo ngôn ngữ đang dùng của trang
+const word = (lang, key, params = {}) => t(key, params, lang)
 
 /** Câu báo cho một mã lỗi của một ô; x-moc-ui.errors của trường thay câu chung. list: mọi ô, để gọi tên ô kia. */
 export function message(f, code, lang = 'vi', list = [], schema = {}) {
@@ -463,38 +403,47 @@ export function message(f, code, lang = 'vi', list = [], schema = {}) {
   if (own) return say(own, lang)
   const p = f.prop
   switch (code) {
-    case 'required': return word(lang, 'required')
+    case 'required': return word(lang, 'form.required')
     case 'minLength':
-      if (typeof p.minLength !== 'number' || p.minLength <= 1) return word(lang, 'required')
+      if (typeof p.minLength !== 'number' || p.minLength <= 1) return word(lang, 'form.required')
       return typeof p.maxLength === 'number'
-        ? word(lang, 'between', { min: p.minLength, max: p.maxLength })
-        : word(lang, 'minLength', { min: p.minLength })
-    case 'maxLength': return word(lang, 'maxLength', { max: p.maxLength })
-    case 'minimum': return word(lang, 'minimum', { min: p.minimum })
-    case 'maximum': return word(lang, 'maximum', { max: p.maximum })
-    case 'minItems': return word(lang, 'minItems', { min: p.minItems })
-    case 'maxItems': return word(lang, 'maxItems', { max: p.maxItems })
-    case 'format': case 'pattern': return word(lang, f.widget === 'date' ? 'date' : 'format')
-    case 'x-moc-date': return word(lang, p['x-moc-date'] === 'not-after-today' ? 'not-after-today' : 'not-before-today')
+        ? word(lang, 'form.between', { min: p.minLength, max: p.maxLength })
+        : word(lang, 'form.minLength', { min: p.minLength })
+    case 'maxLength': return word(lang, 'form.maxLength', { max: p.maxLength })
+    case 'minimum': return word(lang, 'form.minimum', { min: p.minimum })
+    case 'maximum': return word(lang, 'form.maximum', { max: p.maximum })
+    case 'minItems': return word(lang, 'form.minItems', { min: p.minItems })
+    case 'maxItems': return word(lang, 'form.maxItems', { max: p.maxItems })
+    case 'format': case 'pattern': return f.widget === 'date' ? word(lang, 'form.date') : word(lang, 'form.format')
+    case 'x-moc-date':
+      return p['x-moc-date'] === 'not-after-today'
+        ? word(lang, 'form.notAfterToday')
+        : word(lang, 'form.notBeforeToday')
     case 'x-moc-range': {
       const pair = (schema['x-moc-range'] ?? []).find(([, b]) => b === f.name)
       const other = list.find((g) => g.name === pair?.[0])
-      return word(lang, 'x-moc-range', { other: other?.label ?? pair?.[0] ?? '' })
+      return word(lang, 'form.range', { other: other?.label ?? pair?.[0] ?? '' })
     }
-    case 'x-moc-nfc': case 'not': case 'enum': case 'const': case 'type': case 'uniqueItems':
-    case 'additionalProperties':
-      return word(lang, code)
+    case 'x-moc-nfc': return word(lang, 'form.nfc')
+    case 'not': return word(lang, 'form.not')
+    case 'enum': return word(lang, 'form.enum')
+    case 'const': return word(lang, 'form.const')
+    case 'type': return word(lang, 'form.type')
+    case 'uniqueItems': return word(lang, 'form.uniqueItems')
+    case 'additionalProperties': return word(lang, 'form.additionalProperties')
     // mã chỉ máy chủ biết (vd duplicate) mà schema không đặt câu riêng trong x-moc-ui.errors
-    default: return word(lang, 'invalid')
+    default: return word(lang, 'form.invalid')
   }
 }
 
 function shown(f, value, lang) {
-  if (value === undefined || value === null || value === '') return word(lang, 'empty')
-  if (Array.isArray(value)) return value.length ? value.map((v) => shown(f, v, lang)).join(', ') : word(lang, 'empty')
+  if (value === undefined || value === null || value === '') return word(lang, 'form.empty')
+  if (Array.isArray(value)) {
+    return value.length ? value.map((v) => shown(f, v, lang)).join(', ') : word(lang, 'form.empty')
+  }
   const option = f.options.find((o) => same(o.value, value))
   if (option) return option.label
-  if (typeof value === 'boolean') return word(lang, value ? 'yes' : 'no')
+  if (typeof value === 'boolean') return value ? word(lang, 'form.yes') : word(lang, 'form.no')
   if (f.widget === 'date' && typeof value === 'string' && isDate(value)) return value.split('-').reverse().join('/')
   return String(value)
 }
@@ -508,9 +457,11 @@ export function summary(schema, data, lang = 'vi') {
 /**
  * Dựng form vào container. onSubmit(data) chỉ được gọi với dữ liệu đã dọn và qua kiểm; nút gửi khóa đến khi promise
  * của nó xong. Trả về setErrors(lỗi {trường: mã}, vd từ 422 của máy chủ), values() (dữ liệu đã dọn) và reset().
+ * options.draft: chữ đang gõ dở điền vào ô lúc dựng (trang dựng lại form khi đổi ngôn ngữ); khác values, reset() không
+ * quay về draft mà về values hay default của schema.
  */
 export function mountForm(container, schema, options = {}) {
-  const { values: given = {}, onSubmit, submitLabel, idPrefix = 'sf-' } = options
+  const { values: given = {}, draft, onSubmit, submitLabel, idPrefix = 'sf-' } = options
   const lang = String(options.lang ?? 'vi').toLowerCase().startsWith('en') ? 'en' : 'vi'
   checkSchema(schema)
   const list = fields(schema, lang, idPrefix)
@@ -525,7 +476,7 @@ export function mountForm(container, schema, options = {}) {
   const hidden = list.filter((f) => f.hidden)
   for (const f of hidden) {
     if (f.required && start(f) === undefined) {
-      throw new Error(`Schema: trường ẩn ${f.name} bắt buộc mà không có giá trị`)
+      throw new Error(word(lang, 'schema.hidden', { name: f.name }))
     }
   }
 
@@ -542,7 +493,7 @@ export function mountForm(container, schema, options = {}) {
   for (const f of list.filter((g) => !g.hidden)) controls.set(f.name, field(f))
 
   const submit = make('button', { type: 'submit', className: 'sf-submit' })
-  submit.textContent = submitLabel || word(lang, 'submit')
+  submit.textContent = submitLabel || word(lang, 'form.submit')
   const actions = make('div', { className: 'sf-actions' })
   actions.append(submit)
   form.append(actions)
@@ -552,7 +503,7 @@ export function mountForm(container, schema, options = {}) {
     const wrap = make(group ? 'fieldset' : 'div', { className: `sf-field sf-${f.widget}` })
     const caption = make(group ? 'legend' : 'label', { className: 'sf-label', textContent: f.label })
     if (!group) caption.htmlFor = f.id
-    const mark = f.note || (f.required ? '' : word(lang, 'optional'))
+    const mark = f.note || (f.required ? '' : word(lang, 'form.optional'))
     if (mark && f.widget !== 'checkbox') {
       caption.append(' ', make('span', { className: 'sf-note', textContent: `(${mark})` }))
     }
@@ -593,7 +544,7 @@ export function mountForm(container, schema, options = {}) {
       let input
       if (f.widget === 'select') {
         input = make('select')
-        input.append(make('option', { value: '', textContent: word(lang, 'pick') }))
+        input.append(make('option', { value: '', textContent: word(lang, 'form.pick') }))
         f.options.forEach((o, i) => input.append(make('option', { value: String(i), textContent: o.label })))
         get = () => (input.value === '' ? undefined : f.options[Number(input.value)]?.value)
         set = (v) => {
@@ -673,7 +624,7 @@ export function mountForm(container, schema, options = {}) {
     }
     top.replaceChildren()
     if (rest.length) {
-      top.append(make('p', { textContent: word(lang, 'top') }))
+      top.append(make('p', { textContent: word(lang, 'form.top') }))
       const ul = make('ul')
       ul.append(...rest.map((text) => make('li', { textContent: text })))
       top.append(ul)
@@ -688,12 +639,17 @@ export function mountForm(container, schema, options = {}) {
     }
   }
 
-  function reset() {
-    for (const c of controls.values()) c.set(start(c.f))
+  // điền mọi ô theo value(trường), rồi đặt lại ngày nhỏ nhất của ô "đến" theo ô "từ"
+  function fill(value) {
+    for (const c of controls.values()) c.set(value(c.f))
     for (const [a, b] of ranges) {
       const from = controls.get(a), to = controls.get(b)
       if (from?.f.widget === 'date' && to?.f.widget === 'date') to.inputs[0].min = from.get()
     }
+  }
+
+  function reset() {
+    fill(start)
     setErrors({})
   }
 
@@ -718,6 +674,7 @@ export function mountForm(container, schema, options = {}) {
   })
 
   reset()
+  if (isObject(draft)) fill((f) => (Object.hasOwn(draft, f.name) ? draft[f.name] : start(f)))
   container.replaceChildren(form)
   return { setErrors, values: current, reset }
 }
