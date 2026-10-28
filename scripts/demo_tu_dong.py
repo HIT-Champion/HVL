@@ -52,7 +52,7 @@ import time
 import urllib.error
 import urllib.parse
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import tu_dong
 from demo_ca_nhan import Browser, DemoFailed, ok, say
@@ -65,6 +65,7 @@ FLOW_TAB = "moc-demo-tu-dong"
 UNIT = "CNTT"                                    # seed: robot của Khoa CNTT gửi cho trưởng khoa, văn thư nhập văn bản
 DIRECTOR, CLERK = "truongkhoa", "vanthu"
 CLAIMS = "https://hasura.io/jwt/claims"
+VN = timezone(timedelta(hours=7))                # giờ Việt Nam, UTC+7 quanh năm
 FLOW_MAU = ROOT / "platform" / "tu-dong" / "flow-mau.json"
 MAU_TAB, HOA_TOC, HAN = "moc-flow-mau", "moc-mau-hoa-toc-inject", "moc-mau-han-inject"
 NOTICES = """{ core_notifications(where: {kind: {_eq: "flow.message"}}, order_by: {created_at: desc}, limit: 50) {
@@ -211,8 +212,9 @@ def fire(token: str, inject: str) -> None:
 
 
 def vn_date(at: str) -> str:
-    """Ngày theo giờ Việt Nam của một mốc timestamptz Hasura trả về."""
-    return (datetime.fromisoformat(at) + timedelta(hours=7)).strftime("%Y-%m-%d")
+    """Ngày theo giờ Việt Nam của một mốc timestamptz Hasura trả về. Hasura ghi mốc theo múi giờ của phiên Postgres
+    (+00:00 hay +07:00 tùy máy): đổi múi giờ chứ không cộng 7 giờ, không thì sau 17:00 đã sang ngày mai."""
+    return datetime.fromisoformat(at).astimezone(VN).strftime("%Y-%m-%d")
 
 
 def wait_notices(director: Session, robot: str, doc_id: str | None, *, day: str | None = None,
@@ -349,8 +351,8 @@ def run() -> None:
 
     say(9, f"{CLERK} vào sổ một văn bản Hỏa tốc hạn ngày mai → flow báo {DIRECTOR} (lãnh đạo đơn vị) ngay")
     clerk, director = Session(CLERK), Session(DIRECTOR)
-    today = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 7 * 3600))
-    due = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 7 * 3600 + 86400))
+    now = datetime.now(VN)
+    today, due = now.strftime("%Y-%m-%d"), (now + timedelta(days=1)).strftime("%Y-%m-%d")
     symbol = f"{tag[:4]}/HT-ĐHCN"
     doc_id = clerk.gql("mutation ($d: jsonb!) { receiveIncoming(data: $d) { document_id } }", {"d": {
         "type_code": "CV", "symbol": symbol, "issuer_name": "Trường Đại học Công nghiệp", "issued_on": today,
