@@ -58,7 +58,9 @@ trường số khép kín.
       riêng
 - [ ] **Một phần** — truyền thông nội bộ: thông báo tức thời trong ứng dụng (Centrifugo, F2.5), thêm email, webhook
       Mattermost, Slack, ntfy, SMS, Zalo, tắt mặc định (`docs/muc-hoan-thien.md` mục 3, cụm ⑦); không có chat riêng
-- [ ] Hệ quản trị tri thức (wiki)
+- [x] Hệ quản trị tri thức (wiki): DokuWiki ở `/wiki/`, profile `wiki` tắt mặc định; đăng nhập Keycloak, mỗi đơn vị
+      một không gian chỉ người của đơn vị đọc, sửa ([`docs/van-hanh.md`](docs/van-hanh.md) mục Wiki nội bộ, bước CI
+      `make demo-wiki`, #367). Chưa có không gian chung cả trường, trang wiki chưa vào tìm kiếm và trợ lý hỏi đáp
 - [x] Dữ liệu mẫu: `make seed` tạo đơn vị, phòng ban, tài khoản theo vai trò, văn bản ở mọi bước, qua API như người
       dùng thật (F2.10); thêm đơn vị bằng một lệnh `moc tenant create` (F3.12)
 
@@ -127,7 +129,8 @@ câu trả lời và tìm theo nghĩa.
       mặc định (`make ai-model`, `make up-ai`). Tìm theo nghĩa dùng lại Meilisearch, không thêm CSDL véc-tơ riêng
       (`docs/architecture.md` QĐ-004)
 - [x] Truy xuất tri thức (RAG): trợ lý hỏi đáp trên kho văn bản, trả câu trích nguyên văn kèm "số ký hiệu · tr. n",
-      lọc quyền ở bước truy xuất (F4.2). Kho tri thức hiện là văn bản của Văn phòng điện tử, vì chưa có wiki
+      lọc quyền ở bước truy xuất (F4.2). Kho tri thức hiện là văn bản của Văn phòng điện tử; wiki nội bộ (#367)
+      chưa nối vào
 - [x] Tác tử đọc văn bản đến: lớp chữ PDF hoặc OCR Tesseract, điền sẵn form, văn thư xác nhận (F4.1)
 - [x] Tác tử nghe sự kiện [P], đọc dữ liệu [D]: văn bản vừa vào sổ thì nhánh BPMN song song gợi ý đơn vị chủ trì và
       hạn từ các văn bản tương tự đã giao (F4.3)

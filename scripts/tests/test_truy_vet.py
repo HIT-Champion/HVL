@@ -78,7 +78,7 @@ class JaegerServiceTest(unittest.TestCase):
 
     def test_installed_with_the_release(self) -> None:
         # install.sh chỉ tự đọc bind mount của profile core, app
-        self.assertRegex(read(ROOT / "scripts" / "install.sh"), r"\n\s+platform/trace/jaeger\.yaml\)")
+        self.assertRegex(read(ROOT / "scripts" / "install.sh"), r"\n\s+platform/trace/jaeger\.yaml\s")
 
     def test_ci_validates_the_config_with_the_pinned_image(self) -> None:
         ci = read(ROOT / ".github" / "workflows" / "ci.yml")

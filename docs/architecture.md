@@ -245,7 +245,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 | Không gian | Thành phần đang chạy (phiên bản ghim) |
 |---|---|
 | Nền chung | APISIX 3.18.0 · `svc-files`, `svc-workflow` (Python 3.13, FastAPI 0.143) · ClamAV 1.5.4 · OpenBao 2.7.1 · sổ kiểm toán chuỗi băm · pyHanko 0.37.0 · bộ che thông tin cá nhân |
-| [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) |
+| [H] Nhân sự | Keycloak 26.7.5 · Không gian cá nhân P.A.R.A (ứng dụng thứ hai) · DokuWiki 2026-07-14c (profile `wiki`) |
 | [P] Quy trình | Flowable REST 8.0.0 · 6 Hasura Actions · JSON Schema dùng chung (Ajv 8.20.0, jsonschema 4.26) · Centrifugo 6.9.7 · hộp thư đi trong CSDL · nạp lô · Mailpit v1.31.4 (demo) |
 | [D] Dữ liệu | PostgreSQL 16 · Hasura CE v2.51.0 · SeaweedFS 4.48 · Meilisearch CE v1.54.3 · DuckDB 1.5.6 · phả hệ OpenLineage · dashboard ECharts 6.1.0 · Scorpio 6.0.2 và PostGIS 16-3.5 (profile `iot`) |
 | [I] Trí tuệ | Ollama 0.35.1 (profile `ai`) · Qwen3-1.7B, Qwen3-Embedding-0.6B · Tesseract 5.5.0 · truy xuất có nguồn tự viết · ba tác tử |
@@ -274,6 +274,7 @@ vụ của đội nằm chung "Nền chung" vì cả hai phục vụ nhiều kh�
 |---|---|---|---|---|---|
 | Keycloak | 26.7.5 | Đăng nhập một lần cho mọi ứng dụng, TOTP bắt buộc với vai trò quan trọng; vai trò, đơn vị, phòng đưa vào token (claim của Hasura); mỗi đơn vị một Organization | ① ② | `platform/keycloak/realm/moc-realm.json`, `scripts/tenants.py` | F1.1 Hoàn thiện; F3.12 Hoàn thiện |
 | Không gian cá nhân P.A.R.A *(mã của đội)* | JavaScript thuần, nginx-unprivileged 1.30.6 | Ứng dụng thứ hai: mỗi người xếp tệp của mình vào Dự án, Lĩnh vực, Tài nguyên, Lưu trữ; dùng đăng nhập, tệp, sổ kiểm toán của lõi | Tầng 2 | `apps/ca-nhan/`, schema `personal` | Không có mã F; bước CI `make demo-ca-nhan` ([`them-ung-dung.md`](them-ung-dung.md) §4) |
+| DokuWiki | 2026-07-14c, plugin oauth, oauthgeneric | Wiki nội bộ (profile `wiki`, tắt mặc định): mỗi đơn vị một không gian chỉ người của đơn vị đọc, sửa; đăng nhập Keycloak (client `wiki`), không tài khoản quản trị; mạng `apps`, sau APISIX ở `/wiki/` | — | `platform/wiki/`, `scripts/wiki.py` | — (#367) |
 
 **[P] Không gian Quy trình**
 
@@ -329,7 +330,7 @@ F4.7 (#121) — tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đ�
 
 | Khe cắm trong kế hoạch | Hiện trạng | Đang lấp bằng | Nguồn |
 |---|---|---|---|
-| [H] Quản trị tri thức (wiki) | **Chưa có** | Trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2); chưa có kho tri thức nào khác | `ROADMAP.md` giai đoạn 1, 4 |
+| [H] Quản trị tri thức (wiki) | Tùy chọn (profile `wiki`, tắt mặc định) | DokuWiki ở `/wiki/`: mỗi đơn vị một không gian riêng, đăng nhập Keycloak (#367); trợ lý hỏi đáp trên kho văn bản của Văn phòng điện tử (F4.2). Chưa có không gian chung cả trường, trang wiki không vào tìm kiếm của Văn phòng | `docs/van-hanh.md` mục Wiki nội bộ; `ROADMAP.md` giai đoạn 1, 4 |
 | [H] Chat nội bộ | **Chưa có** | Chuông thông báo (Centrifugo, F2.5), email, webhook tới Mattermost, Slack, ntfy, SMS, Zalo — một chiều, tắt mặc định | `ROADMAP.md` giai đoạn 1; `muc-hoan-thien.md` §3, cụm ⑦ |
 | [H] Cổng nội bộ | Một phần | Các ứng dụng chung một phiên SSO, cùng tên miền sau APISIX; trang Ứng dụng (`/ung-dung`) của Văn phòng mở các ứng dụng khác, các ứng dụng kia có liên kết về Văn phòng; chưa có trang cổng riêng | `ROADMAP.md` giai đoạn 1 |
 | [P] Biểu mẫu low-code | Một phần | Form của ứng dụng cắm bằng manifest khai bằng JSON Schema, trang tự dựng form (Đơn nghỉ phép, #312); form của Văn phòng viết trong mã theo JSON Schema dùng chung; khuôn văn bản đi viết trong `svc_files/render.py`; chưa có trình dựng form (#303) | `ROADMAP.md` giai đoạn 2 |

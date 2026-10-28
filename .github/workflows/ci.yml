@@ -100,7 +100,7 @@ jobs:
 
       - name: Mọi profile đều phân giải được và có dịch vụ
         run: |
-          for p in core app iot iot-sim ai ai-pull mail trace; do
+          for p in core app iot iot-sim ai ai-pull mail trace wiki; do
             services=$(docker compose --profile "$p" config --services) \
               || { echo "::error::Profile '$p' không hợp lệ"; exit 1; }
             test -n "$services" || { echo "::error::Profile '$p' không có dịch vụ nào"; exit 1; }
@@ -653,9 +653,19 @@ jobs:
         if: matrix.phan == 'ai'
         run: make demo-che-pii
 
+      # #367: bật profile wiki (dựng image DokuWiki + hai plugin đăng nhập, ghim băm) → client Keycloak `wiki`, quyền
+      # theo đơn vị; giảng viên Khoa CNTT viết trang trong không gian đơn vị mình qua đúng đường trình duyệt (APISIX,
+      # Keycloak, WAF bật); văn thư Khoa Kinh tế (mật khẩu + TOTP) không đọc, không sửa được, chiều ngược lại cũng vậy;
+      # khách chưa đăng nhập bị đưa sang Keycloak. Trước bước sao lưu: trang này phải còn sau khi khôi phục
+      - name: Wiki nội bộ theo đơn vị (make wiki-up, make demo-wiki)
+        if: matrix.phan == 'sao-luu'
+        run: |
+          make wiki-up
+          make demo-wiki
+
       # Diễn tập khôi phục (F3.4): hai lượt sao lưu (lượt sau chỉ thêm phần đổi, giữ lượt mới nhất), XÓA volume CSDL,
-      # tệp và két, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về cùng),
-      # sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục
+      # tệp, két và wiki, khôi phục rồi kiểm lại: luồng chính chạy, tệp mã hóa từ trước khi xóa vẫn mở được (két về
+      # cùng), sổ kiểm toán khớp mốc neo trong bucket lạnh vừa khôi phục, trang wiki viết trước lúc sao lưu còn nguyên
       - name: Sao lưu, xóa dữ liệu, khôi phục rồi kiểm lại (make backup, make restore)
         if: matrix.phan == 'sao-luu'
         run: |
@@ -665,10 +675,12 @@ jobs:
           runs = json.load(sys.stdin)["runs"]
           assert len(runs) == 1 and runs[0]["complete"], runs'
           make down
-          docker volume rm moc_postgres_data moc_seaweedfs_data moc_openbao_data
+          docker volume rm moc_postgres_data moc_seaweedfs_data moc_openbao_data moc_wiki_data
           python3 scripts/moc.py backup restore --yes
           MOC_SLA_DURATION=PT24H make smoke
           make audit
+          make wiki-up
+          python3 scripts/demo_wiki.py --sau-khoi-phuc
 
       # Dừng bản chạy trong thư mục mã nguồn, cài sang thư mục khác rồi chạy lại từ đó (dùng chung dữ liệu). Kiểm nhanh
       # bằng script của bản cài: cổng, trạng thái, đăng nhập, GraphQL, tải tệp; bước GitOps ngay sau chạy smoke đủ trên
@@ -794,8 +806,10 @@ jobs:
           for s in $($COMPOSE config --services); do
             $COMPOSE logs --no-color --tail=1000 "$s" > "ci-logs/$s.log" 2>&1 || true
           done
-          # Vector, Parseable (profile logs) và proxy TLS của phần https không có trong $COMPOSE: lấy theo tên container
-          for c in $(docker ps -a --format '{{.Names}}' | grep -E '^moc-(vector|parseable)-1$|^moc-https-proxy$'); do
+          # Vector, Parseable (profile logs), wiki (profile wiki) và proxy TLS của phần https không có trong $COMPOSE:
+          # lấy theo tên container
+          names='^moc-(vector|parseable|wiki)-1$|^moc-https-proxy$'
+          for c in $(docker ps -a --format '{{.Names}}' | grep -E "$names"); do
             docker logs --tail=1000 "$c" > "ci-logs/$c.log" 2>&1 || true
           done
           tail -n 30 ci-logs/*.log

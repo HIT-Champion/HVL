@@ -847,6 +847,7 @@ services:
     volumes:
       - seaweedfs_data:/data/seaweedfs
       - openbao_data:/data/openbao            # F3.7: khóa transit bọc khóa của tệp văn bản hạn chế
+      - wiki_data:/data/wiki                  # #367: trang, tệp, tài khoản của wiki nội bộ (profile wiki)
 
   # ===========================================================================
   # Tầng 2 — ứng dụng
@@ -890,11 +891,40 @@ services:
     environment:
       MOC_REALM: ${MOC_REALM:-moc}
 
+  # Wiki nội bộ ([H] Quản trị tri thức, #367), profile wiki — tắt mặc định (make wiki-up; docs/van-hanh.md mục Wiki
+  # nội bộ). DokuWiki (GPL-2.0, dịch vụ riêng nên không lây sang Signet): image chính thức ghim digest cộng nguyên bản
+  # plugin oauth, oauthgeneric (platform/wiki/Dockerfile), dưới /wiki/, đăng nhập Keycloak bằng client bí mật `wiki`.
+  # Mỗi đơn vị một không gian riêng theo danh sách quyền do `moc wiki sync` ghi. Chỉ ở mạng apps như ứng dụng: gọi
+  # Keycloak qua APISIX, không tới CSDL hay dịch vụ lõi nào. Trang, tệp, tài khoản là tệp trong volume wiki_data (moc
+  # backup chép)
+  wiki:
+    <<: *common
+    build: ./platform/wiki
+    image: moc/wiki:${MOC_VERSION:-dev}
+    profiles: [wiki]
+    networks: [apps]
+    user: "33:33"                         # www-data của image, cả Apache; không qua root
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m                       # issue #367 đo container trống 37–70 MiB
+    environment:
+      MOC_PUBLIC_URL: ${MOC_PUBLIC_URL:?}
+      MOC_REALM: ${MOC_REALM:-moc}
+      MOC_WIKI_CLIENT_SECRET: ${MOC_WIKI_CLIENT_SECRET:-}
+      PHP_TIMEZONE: Asia/Ho_Chi_Minh
+      # mặc định của image 256M mỗi yêu cầu bằng cả mem_limit; tệp tải lên tới đúng client_max_body_size của APISIX
+      PHP_MEMORYLIMIT: 128M
+      PHP_UPLOADLIMIT: 64M
+    volumes:
+      - wiki_data:/storage
+      # cấu hình của Signet đè lên tệp protected của image (nạp sau cùng, trang quản trị không ghi đè được)
+      - ./platform/wiki/signet.protected.php:/var/www/html/conf.core/docker.protected.php:ro
+
 networks:
   moc:
     driver: bridge
-  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, ứng dụng cài bằng moc app
-  # install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra
+  # Tầng 2: chỉ apisix và container ứng dụng (app-office, app-ca-nhan, app-tai-lieu-api, wiki, ứng dụng cài bằng moc
+  # app install). Ứng dụng tới lõi duy nhất qua APISIX — kiểm token, giới hạn tốc độ, WAF như với trình duyệt. Không ra
   # Internet
   apps:
     driver: bridge
@@ -950,6 +980,8 @@ volumes:
   ollama_models:
   # phông của theme đăng nhập (#305): keycloak-fonts chép lại mỗi lần docker compose up; không sao lưu
   keycloak_fonts:
+  # wiki nội bộ (#367, profile wiki): trang, tệp tải lên, tài khoản, danh sách quyền; moc backup chép
+  wiki_data:
 
 secrets:
   # F3.14: mật khẩu Parseable cho Vector. Biến chưa đặt (tắt logs) thì compose vẫn chạy như cũ

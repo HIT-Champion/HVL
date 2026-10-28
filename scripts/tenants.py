@@ -462,6 +462,13 @@ class Keycloak:
     def update_client(self, client_id: str, rep: dict[str, Any]) -> None:
         self._req("PUT", f"/clients/{client_id}", rep)
 
+    # mapper của client (PUT client bỏ qua protocolMappers): moc wiki sync thêm mapper `groups` còn thiếu
+    def protocol_mappers(self, client_id: str) -> list[dict[str, Any]]:
+        return self._req("GET", f"/clients/{client_id}/protocol-mappers/models")[0] or []
+
+    def add_protocol_mapper(self, client_id: str, rep: dict[str, Any]) -> None:
+        self._req("POST", f"/clients/{client_id}/protocol-mappers/models", rep)
+
     # theme đăng nhập: realm_clients.py áp loginTheme của tệp realm cho realm đã nạp từ trước
     def update_realm(self, rep: dict[str, Any]) -> None:
         """PUT realm. Gửi nguyên bản vừa đọc đã sửa, như enable_organizations."""
