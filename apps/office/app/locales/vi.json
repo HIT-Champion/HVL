@@ -1604,6 +1604,10 @@
       "personal": {
         "title": "Không gian cá nhân P.A.R.A",
         "description": "Chỗ cất tệp của riêng mỗi người trong bốn thư mục Dự án, Lĩnh vực, Tài nguyên, Lưu trữ."
+      },
+      "wiki": {
+        "title": "Wiki nội bộ",
+        "description": "Trang ghi chép, hướng dẫn của từng đơn vị (DokuWiki): chỉ người trong đơn vị đọc, sửa được không gian của đơn vị mình."
       }
     }
   },

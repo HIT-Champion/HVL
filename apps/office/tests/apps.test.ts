@@ -27,8 +27,8 @@ import { test } from 'node:test'
 import type { Role } from '../app/composables/useAuth.ts'
 import type { InstalledApp } from '../app/utils/apps.ts'
 
-const { APPS_QUERY, APPS_QUERY_LEADER, APP_LEADERS, APP_PATH, BUILTIN_APPS, appCatalog, appHref, appsQuery,
-  isAppLeader, shortHash } = await import('../app/utils/apps.ts')
+const { APPS_QUERY, APPS_QUERY_LEADER, APP_LEADERS, APP_PATH, BUILTIN_APPS, OPTIONAL_APPS, appCatalog, appHref,
+  appsQuery, isAppLeader, shortHash } = await import('../app/utils/apps.ts')
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const META = read('../../../db/metadata/databases/default/tables/core_app_catalog.yaml')
@@ -38,6 +38,7 @@ const CATALOG_SQL = read('../../../db/migrations/default/1792281603400_app_catal
 const UNG_DUNG = read('../../../scripts/ung_dung.py')
 const APISIX = read('../../../platform/apisix/apisix.yaml')
 const COMPOSE = read('../../../docker-compose.yml')
+const WIKI_IMAGE = read('../../../platform/wiki/Dockerfile')
 const page = read('../app/pages/ung-dung.vue')
 const layout = read('../app/layouts/default.vue')
 
@@ -129,6 +130,33 @@ test('ứng dụng có sẵn khớp tên, đường giữ chỗ của moc app, r
   assert.match(COMPOSE, /\n {6}MOC_VERSION: \$\{MOC_VERSION:-dev\}\n/)
 })
 
+test('ứng dụng tùy chọn (#367): đường giữ chỗ, route APISIX, profile riêng, phiên bản đúng image ghim', () => {
+  const reservedPaths = new Set([...(/^RESERVED_PATHS = \{([^}]*)\}/m.exec(UNG_DUNG)?.[1] ?? '').matchAll(/"([^"]+)"/g)]
+    .map((m) => m[1]))
+  assert.deepEqual(OPTIONAL_APPS.map((o) => o.name), ['wiki'])
+  for (const o of OPTIONAL_APPS) {
+    const path = o.href.replace(/\/$/, '')
+    assert.ok(reservedPaths.has(path), path)
+    assert.ok(o.probe.startsWith(o.href), o.probe)
+    assert.match(APISIX, new RegExp(`- id: ${o.name}\\n {4}uris: \\["${path}", "${path}/\\*"\\]\\n`))
+    // tắt mặc định: chỉ chạy khi bật profile cùng tên
+    assert.match(COMPOSE, new RegExp(`\\n {2}${o.name}:\\n(?: {4}.*\\n)*? {4}profiles: \\[${o.name}\\]\\n`))
+  }
+  const tag = /\nFROM dokuwiki\/dokuwiki:([0-9a-z-]+)@sha256:/.exec(WIKI_IMAGE)?.[1]
+  assert.equal(OPTIONAL_APPS[0]!.version, `DokuWiki ${tag}`)
+})
+
+test('ứng dụng tùy chọn chỉ vào danh mục khi đường kiểm sức khỏe trả lời "ok"', () => {
+  assert.deepEqual(appCatalog(tVi, [], 'v1.3.0').builtin.map((e) => e.name), ['office', 'ca-nhan'])
+  const c = appCatalog(tVi, [], 'v1.3.0', ['wiki'])
+  assert.deepEqual(c.builtin.map((e) => [e.name, e.title, e.href, e.internal, e.version, e.state]).at(-1),
+    ['wiki', 'Wiki nội bộ', '/wiki/', false, 'DokuWiki 2026-07-14c', 'builtin'])
+  assert.deepEqual(appCatalog(tVi, [], null, ['khac']).builtin.length, 2)
+  assert.match(page, /fetch\(a\.probe, \{ cache: 'no-store' \}\)/)
+  assert.match(page, /res\.ok && \(await res\.text\(\)\)\.trim\(\) === 'ok' \? a\.name : null/)
+  assert.match(page, /appCatalog\(t, rows\.value, coreVersion\.value, optional\.value\)/)
+})
+
 const SHA = 'ab'.repeat(32)
 const row = (name: string, title: string, extra: Partial<InstalledApp> = {}): InstalledApp => ({
   name, title, description: null, path: `/${name}`, version: '1.0.0', installed_at: '2026-10-20T01:00:00+00:00',
@@ -185,7 +213,9 @@ test('khóa i18n của trang có ở cả vi.json và en.json', () => {
   const keys = new Set<string>(['apps.nav'])
   for (const m of page.matchAll(/\bt\('([\w.]+)'/g)) keys.add(m[1]!)
   for (const state of ['builtin', 'installed', 'removed']) keys.add(`apps.state.${state}`).add(`apps.none.${state}`)
-  for (const b of BUILTIN_APPS) keys.add(`apps.builtin.${b.key}.title`).add(`apps.builtin.${b.key}.description`)
+  for (const b of [...BUILTIN_APPS, ...OPTIONAL_APPS]) {
+    keys.add(`apps.builtin.${b.key}.title`).add(`apps.builtin.${b.key}.description`)
+  }
   assert.ok(keys.size > 30, `chỉ thấy ${keys.size} khóa`)
   for (const key of keys) {
     assert.ok(lookup(vi, key), `vi thiếu ${key}`)
