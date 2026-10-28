@@ -3812,13 +3812,14 @@ def log_tap_trung() -> None:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng LOGIN_ERROR của keycloak")
     if not searched:
         raise DemoFailed(f"sau {LOGS_WAIT_S:.0f} giây Parseable chưa có dòng HTTP của meilisearch cho câu tìm thử")
-    if not all('"query_parameters":"[REDACTED]"' in str(r.get("message")) for r in searched):
-        raise DemoFailed("dòng HTTP của meilisearch không che chuỗi truy vấn")
+    if not all('"query_parameters":"[REDACTED]"' in str(r.get("message")) and '"error":"[REDACTED]"'
+               in str(r.get("message")) for r in searched):
+        raise DemoFailed("dòng HTTP của meilisearch không che chuỗi truy vấn hay lời lỗi")
     for service, value, rows_ in (("postgres", fake, pg), ("keycloak", user, kc), ("meilisearch", query, ms)):
         if any(value in json.dumps(r, ensure_ascii=False) for r in rows_):
             raise DemoFailed(f"kho log có nguyên văn giá trị {service} phải che")
     ok(f"postgres: {len(entry)} dòng của mục lỗi (ERROR giữ lời báo, câu lệnh chỉ còn từ đầu); keycloak: LOGIN_ERROR"
-       " không còn tên gõ vào; meilisearch: dòng HTTP 401 của câu tìm không còn chuỗi truy vấn")
+       " không còn tên gõ vào; meilisearch: dòng HTTP 401 của câu tìm không còn chuỗi truy vấn, lời lỗi")
 
     say(6, "Kho log cần đăng nhập; dòng trong kho không có token, cookie, chuỗi truy vấn")
     for who_, auth in (("không đăng nhập", None), ("sai mật khẩu", lt.auth_header(lt.USER, uuid.uuid4().hex))):

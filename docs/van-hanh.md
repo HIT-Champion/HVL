@@ -491,7 +491,8 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
     tài liệu, biểu thức lọc, có khi nhiều dòng); bỏ `spans` (lặp lại `span`). Chuỗi khác che từ dấu `` ` `` đầu tiên
     tới hết chuỗi: Meilisearch trích giá trị trong dấu đó (``Document identifier `…` is invalid``). `route`, `method`,
     `status_code`, thời gian xử lý giữ lại. Dòng `/health` trả 200 (bảng trạng thái hỏi liên tục) bị bỏ. Bỏ chế độ
-    JSON thì luật chữ cùng nội dung vẫn chạy, nhưng dòng tiếp của lời lỗi nhiều dòng không che được.
+    JSON thì luật chữ cùng nội dung vẫn chạy, nhưng dòng tiếp của lời lỗi nhiều dòng không che được. Đừng đặt
+    `MEILI_LOG_LEVEL=DEBUG` khi đang thu log: mức đó ghi câu tìm và kết quả vào `fields`, luật không che.
 - **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
   [`vector.test.yaml`](../platform/logs/vector.test.yaml) (43 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
   - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;

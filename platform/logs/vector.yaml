@@ -81,7 +81,10 @@ transforms:
           if (string(parsed.span.route) ?? "") == "/health" && (to_string(parsed.span.status_code) ?? "") == "200" {
             abort
           }
-          ev = "meilisearch." + replace(string(parsed.target) ?? "", "::", ".")
+          # target meilisearch::… bỏ tiền tố cho khỏi lặp: meilisearch.search, meilisearch.index_scheduler.…
+          module = replace(string(parsed.target) ?? "", r'^meilisearch(::|$)', "")
+          ev = "meilisearch"
+          if module != "" { ev = ev + "." + replace(module, "::", ".") }
           if (string(parsed.span.name) ?? "") == "HTTP request" { ev = "meilisearch.http" }
         }
         if match(ev, r'^[A-Za-z0-9._:-]{1,128}$') { out.event = ev }
