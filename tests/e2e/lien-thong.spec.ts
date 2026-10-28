@@ -32,7 +32,8 @@ const RECEIVER = 'Khoa Kinh tế'
 
 async function openTask(page: Page) {
   await page.goto('/')
-  await page.getByRole('link', { name: new RegExp(tag) }).click()
+  // trong hộp việc: tin realtime ở góc màn hình cũng là liên kết mang trích yếu (#415)
+  await page.getByTestId('inbox').getByRole('link', { name: new RegExp(tag) }).click()
   await expect(page.getByRole('heading', { level: 1, name: summary })).toBeVisible()
 }
 
