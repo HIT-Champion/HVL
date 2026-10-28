@@ -301,6 +301,7 @@ Tham số:
 |---|---|:-:|---|---|
 | `direction` | đường dẫn | ✓ | `"in", "out"` | in: sổ văn bản đến; out: sổ văn bản đi |
 | `year` | đường dẫn | ✓ | `integer` |  |
+| `lang` | query |  | `"vi", "en"` | Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi. Mặc định `"vi"`. |
 
 Trả về:
 
@@ -322,6 +323,7 @@ Tham số:
 |---|---|:-:|---|---|
 | `direction` | đường dẫn | ✓ | `"in", "out"` | in: sổ văn bản đến; out: sổ văn bản đi |
 | `year` | đường dẫn | ✓ | `integer` |  |
+| `lang` | query |  | `"vi", "en"` | Ngôn ngữ của tên cột, ghi chú, bìa; mặc định vi. Mặc định `"vi"`. |
 
 Trả về:
 
