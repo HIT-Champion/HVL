@@ -36,6 +36,8 @@ from svc_workflow.apps.forms import DRAFT, AppForm, bad_value, check_form, patte
 
 ROOT = Path(__file__).resolve().parents[3]          # gốc repo: CI chạy pytest trong bản checkout đầy đủ
 CASE_FILES = sorted(ROOT.glob("apps/*/forms/*.cases.json"))
+# Tệp trình dựng form của Văn phòng sinh ra (#303; tests/formBuilder.test.ts so từng byte với trình dựng)
+BUILDER_SAMPLE = ROOT / "apps/office/tests/form-builder.sample.json"
 TODAY = date(2026, 10, 26)
 
 
@@ -160,6 +162,18 @@ def with_prop(name: str, prop: Any) -> dict[str, Any]:
 
 def test_sample_forms_pass():
     assert problems(DON) == [] and problems(DUYET) == []
+
+
+def test_form_builder_output_passes_the_server_only_rules():
+    # trình duyệt không kiểm được pattern (ước lượng quay lui) và meta-schema: tệp mẫu có đủ kiểu ô và cả hai $defs mà
+    # trình dựng sinh ra, nên form dựng bằng nó không bị từ chối lúc cài vì hai luật đó
+    form, errors = check_form(BUILDER_SAMPLE.name, BUILDER_SAMPLE.read_bytes())
+    assert errors == [] and form is not None
+    ok = {"tenHang": "Giấy A4", "soLuong": 10, "loai": "thiet-bi", "mucDo": "gap", "ngayDeNghi": "2026-10-26",
+          "canTruocNgay": "2026-10-27", "daCoBaoGia": False, "lyDo": "Hết giấy\nin"}
+    assert form.errors(ok, TODAY) == {}
+    bad = {**ok, "tenHang": "Giấy\nA4", "soLuong": 2.5, "canTruocNgay": "2026-10-25"}
+    assert form.errors(bad, TODAY) == {"tenHang": "not", "soLuong": "type", "canTruocNgay": "x-moc-date"}
 
 
 @pytest.mark.parametrize("schema, needle", [

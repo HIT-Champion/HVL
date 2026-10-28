@@ -53,6 +53,7 @@ const SCREEN_KEYS: Record<string, string> = {
   '/gop-y': 'nav.feedback',
   '/tu-chan-doan': 'nav.selfCheck',
   '/ung-dung': 'apps.nav',
+  '/ung-dung/dung-form': 'formBuilder.title',
   '/cam-bien': 'nav.sensors',
 }
 

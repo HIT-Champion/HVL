@@ -1464,6 +1464,26 @@
   .sg-composer-send { min-height: 44px; }
 }
 
+/* Bản xem trước của trình dựng form (/ung-dung/dung-form, #303): lớp .sf-* do lib/schema-form.js đặt, vẽ như ô nhập,
+   nút, câu báo lỗi của Văn phòng; ứng dụng nghi-phep vẽ cùng các lớp này bằng style.css của nó */
+.sf { display: grid; gap: 16px; }
+.sf-field { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.sf-label { padding: 0; font-size: 14px; font-weight: 500; color: var(--text); }
+.sf-note { font-weight: 400; color: var(--muted); }
+.sf-help { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.sf :is(input:not([type=radio], [type=checkbox]), select, textarea) { @apply input; }
+.sf-checkbox .sf-label, .sf-options label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.sf-options { display: flex; flex-wrap: wrap; gap: 0 20px; font-size: 14px; }
+.sf-options label { cursor: pointer; }
+.sf :is(input[type=radio], input[type=checkbox]) { width: 16px; height: 16px; }
+.sf-error { margin: 0; font-size: 13px; color: #9f2019; }
+.sf-top { padding: 12px 16px; font-size: 14px; color: #861a14; background: #fdf1ef; border: 1px solid #f4c5bf;
+  border-radius: 8px; }
+.sf-top ul { margin-top: 4px; padding-left: 20px; list-style: disc; }
+.sf-actions { display: flex; gap: 12px; }
+.sf-submit { @apply btn-primary; }
+.sf-submit[aria-disabled=true] { cursor: progress; opacity: .7; }
+
 /* Người dùng chọn giảm chuyển động: bỏ hiệu ứng, thời lượng chuyển, cuộn mượt, dịch chuyển khi rê hay nhấn; trạng thái
    vẫn đổi như thường */
 @media (prefers-reduced-motion: reduce) {
