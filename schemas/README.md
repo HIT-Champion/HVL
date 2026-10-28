@@ -107,3 +107,9 @@ Mỗi form có tệp ca thử `*.cases.json` cùng cách viết với `van-ban-d
 của `schemas/`, bộ kiểm trên trình duyệt cho đúng mã như Ajv và svc-workflow. Phía máy chủ,
 `services/svc-workflow/tests/test_app_forms.py` chạy mọi ca của `apps/*/forms/*.cases.json` qua đúng bộ kiểm của API
 (`AppForm`: `FormSchema` + `x-moc-range`) và kiểm form cạnh tệp ca thử qua được luật lúc cài.
+
+Luật lúc cài kiểm chính tệp form, không phải dữ liệu, nên có bộ ca riêng:
+`services/svc-workflow/tests/app_form_rules.cases.json`. `check_form` và bản chép trên trình duyệt
+`apps/office/app/utils/formRules.ts` (cho trình dựng form, #303) cho cùng mã luật trên mọi ca, trừ hai luật chỉ máy chủ
+kiểm (`pattern` dễ quay lui bùng nổ, meta-schema). Chi tiết ở [`docs/them-ung-dung.md`](../docs/them-ung-dung.md) mục
+1.10.

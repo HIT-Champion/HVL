@@ -29,6 +29,10 @@ hệ thống; giá trị là một giá trị đơn (biến Flowable); ``$ref`` 
 ``propertyNames``; ``pattern`` không dễ quay lui bùng nổ, có ``maxLength`` cạnh nó khi thời gian kiểm tăng theo độ dài
 chuỗi (``pattern_problem``), cả form cộng lại không quá ``MAX_FORM_STEPS``. Lúc kiểm dữ liệu, chuỗi dài quá
 ``maxLength`` không chạy ``pattern`` (``AppValidator``). Tệp sai kiểu ở đâu cũng thành câu lỗi, không ném ngoại lệ.
+
+Trình dựng form của Văn phòng điện tử (#303) chép các luật lúc cài sang trình duyệt (``apps/office/app/utils/
+formRules.ts``, trừ ``pattern`` và meta-schema); hai bên chạy chung ``tests/app_form_rules.cases.json``, kể cả các
+hằng số dưới đây. Sửa luật thì sửa cả hai nơi.
 """
 
 from __future__ import annotations

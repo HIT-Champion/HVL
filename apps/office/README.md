@@ -12,7 +12,8 @@ chế độ SPA: dựng thành trang tĩnh, nginx phục vụ sau APISIX; mọi 
 | `app/composables/` | `useAuth` (OIDC + PKCE, oidc-client-ts), `useApi` (GraphQL, tải tệp, tìm kiếm, sổ đăng ký), `useRealtime` (một kết nối WebSocket tới Centrifugo, tự nối lại, làm mới token), `useNotifications` (chuông thông báo), `useAuditFormat` (hiện một dòng sổ kiểm toán: nhãn, người làm, trường đã đổi — trang Sổ kiểm toán và tab Lịch sử) |
 | `app/components/TaskPanel.vue` | Khung xử lý theo `formKey` của BPMN |
 | `scripts/forms.mjs`, `app/utils/forms.ts` | Biên dịch `schemas/*.json` (gốc repo) thành mã kiểm form lúc dựng; quy lỗi về `{trường: mã}` như svc-workflow |
-| `tests/` | Test kiểm form trên bộ ca thử dùng chung `schemas/*.cases.json` (`npm test`, Node 24) |
+| `app/utils/formRules.ts` | Luật kiểm tệp form của ứng dụng lúc cài, chép từ svc-workflow cho trình dựng form (#303), trả mã luật; ca thử chung `services/svc-workflow/tests/app_form_rules.cases.json` |
+| `tests/` | Test kiểm form trên bộ ca thử dùng chung `schemas/*.cases.json`, luật lúc cài trên `app_form_rules.cases.json` (`npm test`, Node 24) |
 | `app/components/NotificationBell.vue` | Chuông: số chưa đọc, 20 tin mới nhất, đánh dấu đã đọc |
 | `app/components/FeedbackButton.vue` | Nút Góp ý trên thanh trên: mức hài lòng 1–5, vài dòng, tự gắn khuôn đường dẫn màn hình đang dùng (`app/utils/feedback.ts`) |
 | `app/pages/tu-chan-doan.vue`, `app/data/tu-chan-doan.json`, `app/utils/hpdi.ts` | Tự chẩn đoán H-P-D-I cho lãnh đạo (F4.7, `docs/tu-chan-doan.md`): bộ câu kèm JSON Schema (`app/data/tu-chan-doan.schema.json`), cách chấm, bằng chứng đo được từ các view đã có, radar qua `EChart.vue` |
