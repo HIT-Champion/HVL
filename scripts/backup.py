@@ -202,7 +202,7 @@ def _unpause(services: list[str]) -> None:
     services.clear()
     if failed:
         raise BackupError(f"CHƯA chạy lại được {', '.join(failed)} — chạy tay: docker compose --profile core"
-                          f" {' '.join(WITH_OPTIONAL[6:])} unpause {' '.join(failed)}")
+                          f" {' '.join(WITH_OPTIONAL[len(COMPOSE):])} unpause {' '.join(failed)}")
 
 
 def _resume_left_paused() -> None:

@@ -265,7 +265,9 @@ class RulesTest(unittest.TestCase):
                                   "10070", "10080", "10081"])
         self.assertNotIn("ctl:ruleEngine=Off", self.directives)
         # tắt soi thân chỉ ở API lưu flow, thư viện của Node-RED (#366), đường neo hai đầu
-        body_off = r'"@rx ([^"]+)"\s+"id:\d+,phase:1,pass,nolog,ctl:requestBodyAccess=Off"'
+        # đường có ".." không được gỡ: WAF so đường thô, APISIX chuyển đường đã chuẩn hóa (/tu-dong/library/../x)
+        body_off = (r'"@rx ([^"]+)"\s+"id:\d+,phase:1,pass,nolog,chain"\n\s+- SecRule REQUEST_FILENAME '
+                    r'"!@contains \.\." "t:none,t:urlDecodeUni,ctl:requestBodyAccess=Off"')
         self.assertEqual(re.findall(body_off, self.directives), ["^/tu-dong/(?:flows|flow(?:/[^/]+)?|library/.+)$"])
         self.assertEqual(self.directives.count("requestBodyAccess"), 1)
         self.assertNotIn("ctl:ruleRemoveByTag", self.directives)

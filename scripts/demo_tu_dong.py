@@ -24,7 +24,8 @@ soạn đổi mã đó lấy token của Node-RED ở POST /tu-dong/auth/token. 
 - người không có vai trò `operator` (giảng viên) qua Keycloak xong vẫn không nhận được mã, không vào được;
 - người vận hành (`quantri`, được cấp vai trò bằng `moc tu-dong operator add`) vào được, triển khai được một flow có
   node Function, Template chứa mã JavaScript, HTML, câu GraphQL qua cổng mà WAF không chặn, đọc lại đúng flow đó;
-- không có node exec, không cài node từ npm; WebSocket của trình soạn (/tu-dong/comms) bắt tay được qua cổng.
+- không có node exec, file, watch; không cài node từ npm; WebSocket của trình soạn (/tu-dong/comms) bắt tay được
+  qua cổng.
 --sau-khoi-phuc: chỉ đăng nhập lại và đọc flow của lần chạy trước — bước kiểm sau moc backup restore trong CI.
 
 Thoát 0: đạt; 1: có bước sai hoặc không gọi được Signet.
@@ -110,7 +111,7 @@ def login(username: str) -> Page:
 def exchange_code(page: Page) -> str | None:
     """Mã đổi một lần Node-RED gắn vào URL, lấy NGUYÊN chữ như trình soạn (settings.js của editor-client đọc bằng biểu
     thức chính quy, không giải mã %, +): mã là base64 nên có + / =."""
-    found = re.search(r"[?&]code=([^&]*)", urllib.parse.urlsplit(page.url).query)
+    found = re.search(r"(?:^|&)code=([^&]*)", urllib.parse.urlsplit(page.url).query)
     return found.group(1) if found else None
 
 
@@ -225,18 +226,19 @@ def run() -> None:
         raise DemoFailed("đọc lại flow không đúng bản vừa triển khai")
     ok(f"đã triển khai, đọc lại đúng mã node Function (lần {tag}); flow để tắt, không chạy")
 
-    say(6, "Khóa của Signet: không node exec, không cài node từ npm; WebSocket trình soạn bắt tay được qua cổng")
+    say(6, "Khóa của Signet: không node exec, file, watch; không cài node từ npm; WebSocket trình soạn qua cổng")
     status, types = api("GET", "nodes", token)
     names = {t for s in types for t in s.get("types", [])} if status == 200 and isinstance(types, list) else set()
-    if not names or "exec" in names or "function" not in names:
-        raise DemoFailed(f"GET /tu-dong/nodes trả {status}; exec có mặt hay thiếu node cơ bản")
+    locked = names & {"exec", "file", "file in", "watch"}
+    if not names or locked or "function" not in names:
+        raise DemoFailed(f"GET /tu-dong/nodes trả {status}; còn node {sorted(locked)} hay thiếu node cơ bản")
     palette = settings.get("externalModules", {}).get("palette", {}) if isinstance(settings, dict) else {}
     if palette.get("allowInstall") is not False or palette.get("allowUpload") is not False:
         raise DemoFailed(f"trình soạn vẫn cho cài node: {palette}")
     line = websocket_handshake()
     if " 101 " not in f"{line} ":
         raise DemoFailed(f"WebSocket /tu-dong/comms qua cổng: {line!r}")
-    ok(f"{len(names)} loại node, không có exec; palette không cài, không tải lên; /tu-dong/comms: {line}")
+    ok(f"{len(names)} loại node, không có exec, file, watch; palette không cài, không tải lên; /tu-dong/comms: {line}")
     print(f"\nĐẠT — trình soạn: {ROOT_URL} (đăng nhập bằng {OPERATOR})")
 
 

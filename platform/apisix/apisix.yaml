@@ -458,10 +458,12 @@ global_rules:
               # POST /tu-dong/library/…): mã JavaScript của node Function, HTML của node Template, câu truy vấn — đúng
               # thứ CRS chặn, mỗi loại node một tên trường nên không loại trừ theo khóa được; lại mang thông tin đăng
               # nhập của node, không để WAF ghi ra log. Chỉ token trình soạn (vai trò operator) mới được Node-RED nhận
-              # flow. Không soi thân ở đúng các đường này; tham số truy vấn, header vẫn soi
+              # flow. Không soi thân ở đúng các đường này; tham số truy vấn, header vẫn soi. WAF so đường thô còn APISIX
+              # chuyển đường đã chuẩn hóa: đường có ".." (kể cả %2e%2e) không được gỡ, vd /tu-dong/library/../auth/token
               - >-
                 SecRule REQUEST_FILENAME "@rx ^/tu-dong/(?:flows|flow(?:/[^/]+)?|library/.+)$"
-                "id:10081,phase:1,pass,nolog,ctl:requestBodyAccess=Off"
+                "id:10081,phase:1,pass,nolog,chain"
+              - SecRule REQUEST_FILENAME "!@contains .." "t:none,t:urlDecodeUni,ctl:requestBodyAccess=Off"
               - Include @owasp_crs/*.conf
               # Loại trừ 4 — Host là địa chỉ IP: Signet được mở bằng IP trong mạng nội bộ; dưới APISIX coraza-proxy-wasm
               # thêm Host lần nữa nên luật cộng điểm hai lần (6 ≥ 5) và chặn mọi yêu cầu vào bằng IP

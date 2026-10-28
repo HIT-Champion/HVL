@@ -21,7 +21,9 @@
 // mạng apps: đổi mã lấy token, tải khóa ký qua cổng APISIX như ứng dụng cắm khác; trình duyệt đi địa chỉ công khai.
 //
 // Khóa: không cài node, module từ npm trên giao diện; node Function không nạp module ngoài; bỏ node exec (chạy lệnh
-// shell); không mở endpoint HTTP của flow (httpNodeRoot) ở bước này; tắt diagnostics, runtimeState, telemetry.
+// shell) và các node đọc, ghi, theo dõi tệp (file, file in, watch: đọc được flows_cred.json, phiên trình soạn,
+// /proc/self/environ); không mở endpoint HTTP của flow (httpNodeRoot) ở bước này; tắt diagnostics, runtimeState,
+// telemetry.
 // Kiểm: kiem-tra.cjs nạp thật tệp này lúc dựng image (Dockerfile); scripts/tests/test_tu_dong.py đọc chữ tệp này.
 
 const { Configuration, None, allowInsecureRequests } = require('openid-client')
@@ -35,7 +37,8 @@ const GATEWAY = process.env.MOC_TU_DONG_GATEWAY || 'http://apisix:9080'
 const PUBLIC_URL = (process.env.MOC_PUBLIC_URL || '').replace(/\/+$/, '')
 const REALM = process.env.MOC_REALM || 'moc'
 const SECRET = process.env.MOC_TU_DONG_SECRET || ''
-// node Function đọc được biến môi trường của tiến trình (env.get): không để lại khóa mã hóa thông tin đăng nhập
+// node Function đọc được biến môi trường của tiến trình (env.get): không để lại khóa mã hóa thông tin đăng nhập.
+// Khối biến lúc khởi động (/proc/self/environ) vẫn giữ khóa: vì vậy bỏ cả node đọc tệp (nodesExcludes)
 delete process.env.MOC_TU_DONG_SECRET
 
 if (!/^https?:\/\/[^/]+$/.test(PUBLIC_URL)) {
@@ -125,7 +128,7 @@ module.exports = {
   functionExternalModules: false,
   functionGlobalContext: {},
   exportGlobalContextKeys: false,
-  nodesExcludes: ['90-exec.js'],
+  nodesExcludes: ['90-exec.js', '10-file.js', '23-watch.js'],
   diagnostics: { enabled: false, ui: false },
   runtimeState: { enabled: false, ui: false },
   telemetry: { enabled: false, updateNotification: false },

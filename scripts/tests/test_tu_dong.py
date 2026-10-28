@@ -245,7 +245,8 @@ class SettingsTest(unittest.TestCase):
         self.assertNotIn("access_token", self.text)
 
     def test_locked_down(self) -> None:
-        for needle in ("httpNodeRoot: false", "functionExternalModules: false", "nodesExcludes: ['90-exec.js']",
+        for needle in ("httpNodeRoot: false", "functionExternalModules: false",
+                       "nodesExcludes: ['90-exec.js', '10-file.js', '23-watch.js']",
                        "palette: { allowInstall: false, allowUpload: false }", "modules: { allowInstall: false }",
                        "autoInstall: false", "diagnostics: { enabled: false", "runtimeState: { enabled: false",
                        "telemetry: { enabled: false", "projects: { enabled: false }",

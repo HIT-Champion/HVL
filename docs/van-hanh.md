@@ -809,11 +809,13 @@ make tu-dong-down                       # tắt: bỏ tu-dong khỏi MOC_EXTRA_P
 - **Gỡ vai trò** có hiệu lực ở lần đăng nhập sau: token trình soạn còn hạn (8 giờ) vẫn dùng được tới khi hết hạn hoặc
   Node-RED khởi động lại (`docker compose --profile tu-dong restart tu-dong`).
 - **Khóa sẵn trong [`platform/tu-dong/settings.js`](../platform/tu-dong/settings.js)** (gắn vào image, không sửa trên
-  giao diện): không có node `exec` (chạy lệnh shell); không cài, không tải node lên từ trình soạn; node Function
-  không nạp module ngoài; flow chưa mở endpoint HTTP (`httpNodeRoot` tắt); không gửi số liệu chẩn đoán ra ngoài.
-  Lúc dựng image, `kiem-tra.cjs` nạp thật tệp này và kiểm các khóa đó, kiểm cả hàm xét vai trò.
+  giao diện): không có node `exec` (chạy lệnh shell), không có node đọc, ghi, theo dõi tệp (`file`, `file in`, `watch`);
+  không cài, không tải node lên từ trình soạn; node Function không nạp module ngoài; flow chưa mở endpoint HTTP
+  (`httpNodeRoot` tắt); không gửi số liệu chẩn đoán ra ngoài. Lúc dựng image, `kiem-tra.cjs` nạp thật tệp này và kiểm
+  các khóa đó, kiểm cả hàm xét vai trò.
 - **`MOC_TU_DONG_SECRET`** mã hóa thông tin đăng nhập lưu trong flow (mật khẩu, token của node): `make up`,
-  `make tu-dong-up` thêm vào `.env` cũ nếu thiếu. Đổi khóa thì Node-RED không mở được thông tin đăng nhập đã lưu.
+  `make tu-dong-up` thêm vào `.env` cũ nếu thiếu. Đổi khóa thì Node-RED không mở được thông tin đăng nhập đã lưu;
+  khôi phục sang máy mới cũng cần đúng khóa này, nên nó đi cùng bản chép `.env` (mục Sao lưu và khôi phục).
 - **Mạng, tài nguyên:** container ở mạng `apps` như ứng dụng cắm thêm: flow chỉ tới lõi qua `http://apisix:9080`
   (kiểm token, giới hạn tốc độ, WAF như với trình duyệt), không tới CSDL hay dịch vụ lõi nào. Rootfs chỉ đọc (ghi
   vào `/data`, `/tmp`), bỏ mọi capability, trần 256 MiB (issue #366 đo container trống khoảng 75 MiB; chưa đo dưới
