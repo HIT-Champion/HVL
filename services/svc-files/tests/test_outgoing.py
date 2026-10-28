@@ -26,7 +26,7 @@ from datetime import UTC, date, datetime
 import pytest
 
 from conftest import TENANT_A
-from svc_files.render import TEXT, Letter, display_code, en_date, letter_from, letter_html, render_pdf, vn_date
+from svc_files.render import VN, TEXT, Letter, display_code, en_date, letter_from, letter_html, render_pdf, vn_date
 
 OTHER_TENANT = uuid.UUID("6f1c0d2e-0000-4000-8000-00000000000b")
 
@@ -117,7 +117,7 @@ def test_both_letter_languages_have_the_same_texts():
 ])
 def test_english_dates_keep_the_place_as_entered(day, text):
     assert en_date(day, "Hà Nội") == text
-    assert en_date(None, None).endswith(f", {date.today().year}")
+    assert en_date(None, None).endswith(f", {datetime.now(VN).year}")
 
 
 def test_english_letter_translates_the_fixed_parts_only():
@@ -128,7 +128,7 @@ def test_english_letter_translates_the_fixed_parts_only():
     for text in ('<html lang="en">', "Socialist Republic of Vietnam", "Independence - Freedom - Happiness",
                  "No.: 05/TB-CNTT", "October 19, 2026", '<div class="name">Notice</div>', "Recipients:",
                  "<li>- Các bộ môn;</li>", "<li>- Archived: Records office, ĐT.</li>", "Head of unit",
-                 "Approved in the Signet system<br>10:00 on 19/10/2026", 'alt="Verification QR code"',
+                 "Approved in the Signet system<br>10:00 on October 19, 2026", 'alt="Verification QR code"',
                  "open\nhttps://moc.example/xac-thuc and enter the code", "ABCDE-23456", "SHA-256",
                  # chữ người dùng nhập giữ nguyên
                  "Khoa Công nghệ thông tin", "Về việc họp giao ban", "<p>Đoạn một.</p>", "Phạm Minh Đức"):
@@ -142,6 +142,9 @@ def test_english_official_letter_has_re_line_and_to():
     page = letter_html(base_letter(lang="en", type_code="CV", type_name="Official letter", in_symbol=False,
                                    summary="Re: sending staff to the training", recipients=["Phòng Đào tạo"]))
     assert "Re: sending staff to the training" in page and "Re: Re:" not in page
+    # tiếng Việt chỉ bỏ "V/v", "Về việc" gõ sẵn: trích yếu bắt đầu bằng "Re:" giữ nguyên như trước
+    vi = letter_html(base_letter(type_code="CV", type_name="Công văn", in_symbol=False, summary="Re: góp ý dự thảo"))
+    assert "V/v Re: góp ý dự thảo" in vi
     assert "To: Phòng Đào tạo." in page and "<li>- As above;</li>" in page and "Kính gửi" not in page
     many = letter_html(base_letter(lang="en", in_symbol=False, recipients=["A", "B"]))
     assert "To:<ul><li>- A;</li><li>- B.</li></ul>" in many

@@ -60,7 +60,7 @@ TEXT = {
         "nation": "Cộng hòa xã hội chủ nghĩa Việt Nam", "motto": "Độc lập - Tự do - Hạnh phúc", "number": "Số:",
         "re": "V/v", "to": "Kính gửi:", "recipients": "Nơi nhận:", "as_above": "Như trên", "archive": "Lưu: VT",
         "head": "Thủ trưởng đơn vị", "draft_stamp": "Dự thảo — chưa ký duyệt",
-        "approved": "Đã duyệt trên hệ thống Signet", "approved_at": "%H:%M ngày %d/%m/%Y",
+        "approved": "Đã duyệt trên hệ thống Signet",
         "draft_note": "Bản xem trước của dự thảo: chưa có số, chưa có mã xác thực, chưa có giá trị phát hành.",
         "qr_alt": "Mã QR xác thực", "verify_page": "trang xác thực",
         "verify": "Văn bản phát hành trên hệ thống Signet. Kiểm tra văn bản còn nguyên vẹn: quét mã QR, hoặc mở\n{}"
@@ -73,7 +73,7 @@ TEXT = {
         "re": "Re:", "to": "To:", "recipients": "Recipients:", "as_above": "As above",
         "archive": "Archived: Records office",
         "head": "Head of unit", "draft_stamp": "Draft — not yet approved",
-        "approved": "Approved in the Signet system", "approved_at": "%H:%M on %d/%m/%Y",
+        "approved": "Approved in the Signet system",
         "draft_note": "Preview of a draft: no number, no verification code, not valid as an issued document.",
         "qr_alt": "Verification QR code", "verify_page": "the verification page",
         "verify": "Issued in the Signet system. To check that this document is intact, scan the QR code, or open\n{}"
@@ -132,6 +132,15 @@ def en_date(d: date | None, place: str | None) -> str:
     if d is None:
         return f"{prefix}{'&nbsp;' * 16}, {datetime.now(VN).year}"
     return f"{prefix}{MONTHS_EN[d.month - 1]} {d.day}, {d.year}"
+
+
+def _approved_at(at: datetime, lang: str) -> str:
+    """Giờ ký duyệt trên con dấu: '09:30 ngày 19/10/2026'; tiếng Anh viết tên tháng như dòng ngày (khỏi đọc
+    nhầm ngày với tháng): '09:30 on October 19, 2026'."""
+    at = at.astimezone(VN)
+    if lang == "en":
+        return f"{at:%H:%M} on {MONTHS_EN[at.month - 1]} {at.day}, {at.year}"
+    return at.strftime("%H:%M ngày %d/%m/%Y")
 
 
 def display_code(code: str) -> str:
@@ -195,7 +204,8 @@ td.sign { width: 55%; text-align: center; }
 def letter_html(letter: Letter) -> str:
     text = TEXT[letter.lang]
     when = vn_date if letter.lang == "vi" else en_date
-    letter_type = "" if letter.in_symbol else f'<div class="vv">{text["re"]} {_e(_strip_vv(letter.summary))}</div>'
+    letter_type = "" if letter.in_symbol \
+        else f'<div class="vv">{text["re"]} {_e(_strip_vv(letter.summary, letter.lang))}</div>'
     head = f"""
 <table class="head"><tr>
   <td class="org">
@@ -232,7 +242,7 @@ def letter_html(letter: Letter) -> str:
     if letter.draft:
         stamp = f'<div class="stamp">{text["draft_stamp"]}</div>'
     else:
-        approved = letter.approved_at.astimezone(VN).strftime(text["approved_at"]) if letter.approved_at else ""
+        approved = _approved_at(letter.approved_at, letter.lang) if letter.approved_at else ""
         stamp = f'<div class="stamp">{text["approved"]}<br>{approved}</div>'
     sign = f"""
   <td class="sign">
@@ -268,9 +278,10 @@ def letter_html(letter: Letter) -> str:
 </body></html>"""
 
 
-def _strip_vv(summary: str) -> str:
-    """Trích yếu công văn in sau "V/v" ("Re:"); bỏ "V/v", "Về việc", "Re:" nếu người soạn đã gõ sẵn."""
-    return re.sub(r"^\s*(v/v|về việc|re:)\s*", "", summary, flags=re.IGNORECASE)
+def _strip_vv(summary: str, lang: str = "vi") -> str:
+    """Trích yếu công văn in sau "V/v" ("Re:"); bỏ "V/v", "Về việc" (tiếng Anh thêm "Re:") nếu người soạn đã gõ sẵn."""
+    lead = r"v/v|về việc|re:" if lang == "en" else r"v/v|về việc"
+    return re.sub(rf"^\s*({lead})\s*", "", summary, flags=re.IGNORECASE)
 
 
 def render_pdf(letter: Letter) -> bytes:
