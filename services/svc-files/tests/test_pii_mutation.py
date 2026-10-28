@@ -56,6 +56,10 @@ MUTANTS = (
     ("xuống dòng không là phân cách", r'SEP = r"(?:\r\n|[\s.\-])"', r'SEP = r"(?:[^\S\r\n]|[.\-])"'),
     ("bỏ điều kiện nhóm đầu ≥ 3 chữ số", "else 3      # số chữ số tối thiểu", "else 2      # số chữ số tối thiểu"),
     ("che một lượt, không lặp tới điểm bất động", "MAX_PASSES = 3", "MAX_PASSES = 1"),
+    ("bỏ đường tiền tố (số dính sau ĐT, SĐT, Tel…)",
+     "candidates += [(2, s) for s in _prefixed_phone_spans(text, folded, year)]", "pass"),
+    ("tiền tố điện thoại không cần ranh giới trước", r'r"(?<![\w/@\-])(?:s?dt', r'r"(?:s?dt'),
+    ("sau tiền tố nhận mọi loại số", "len(d) == 10 and _is_mobile(d[:3])", "True"),
 )
 
 
@@ -77,7 +81,7 @@ def test_the_original_source_passes_every_check():
 
 def test_every_mutant_is_killed():
     source = SOURCE.read_text(encoding="utf-8")
-    assert len(MUTANTS) == 15
+    assert len(MUTANTS) == 18
     started = time.perf_counter()
     rows, survivors = [], []
     for name, old, new in MUTANTS:

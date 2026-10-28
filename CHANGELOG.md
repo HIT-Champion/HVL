@@ -39,6 +39,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 ### Bảo mật
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
 - Cảnh báo `deepmerge` chưa có bản vá (GHSA-gcqx-w48m-w2h4) ghi bỏ qua có hạn: gói chỉ chạy lúc dựng (#387).
+- Bộ che thông tin cá nhân che cả số di động viết liền sau `ĐT`, `SĐT`, `DĐ`, `Tel`, `Phone` (`ĐT0912…`) (#58).
 
 ## [1.2.1] - 2026-10-28
 

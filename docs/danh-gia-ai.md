@@ -27,7 +27,7 @@ Ba nguyên tắc chung:
 | F4.1 | `moc-doc-reader` · `services/svc-files/src/svc_files/docread/` | Quy tắc thể thức NĐ 30, pypdf, Tesseract `vie`; Qwen3-1.7B chỉ viết trích yếu | Đủ sáu ô, trích yếu theo quy tắc | `make do-doc-van-ban` | 22 văn bản mẫu: số ký hiệu đúng 20/22, ngày ban hành 22/22, 0 ô "chắc chắn" sai (22/10/2026; trùng ở 3 lần chạy CI ngày 26/10/2026) |
 | F4.2 | `moc-assistant` · `services/svc-files/src/svc_files/assist/` | Meilisearch tìm lai, Qwen3-Embedding-0.6B, Qwen3-1.7B | Tìm từ khóa, trả câu trích nguyên văn | `make do-hoi-dap` | 19 câu: recall@3 16/16, từ chối đúng 3/3, 0 nguồn bị cấm; câu trả lời của mô hình qua kiểm 16/16 (23/10/2026, bản online) |
 | F4.3 | `moc-assigner` · `services/svc-workflow/src/svc_workflow/advisor.py`, `suggest.py` | Bỏ phiếu kNN có trọng số trên phần truy xuất của F4.2; **không** mô hình sinh | Chạy đủ (tìm từ khóa) | `make do-giao-viec` | 29 văn bản lịch sử, bỏ một ra: top-1 29/29 (gốc so sánh 55 %), 0 căn cứ là văn bản hạn chế (22/10/2026) |
-| F4.4 | Bộ lọc, không phải tác tử · `services/svc-files/src/svc_files/pii.py` | Nhận dạng theo cấu trúc bằng `re`, chỉ thư viện chuẩn Python | Luôn bật | `make do-che-pii` | 81 063 ký tự kho mẫu: 0 chỗ che nhầm; 15/15 đột biến mã bị test bắt (23/10/2026) |
+| F4.4 | Bộ lọc, không phải tác tử · `services/svc-files/src/svc_files/pii.py` | Nhận dạng theo cấu trúc bằng `re`, chỉ thư viện chuẩn Python | Luôn bật | `make do-che-pii` | 81 063 ký tự kho mẫu: 0 chỗ che nhầm; 18/18 đột biến mã bị test bắt (28/10/2026) |
 
 **Không tính là AI ở đây:** ký số PAdES (F4.5) là mật mã khóa công khai (pyHanko, PKI nội bộ trong OpenBao), không có
 mô hình nào; dự thảo "Báo cáo sự cố" khi cảm biến vượt ngưỡng (F3.10) là ngưỡng cộng mẫu văn bản cố định
@@ -370,17 +370,17 @@ sót một ca dương tính hay một đột biến sống sót.
 | `seed/hoi-dap`, mọi trang | 6 | 19 997 | 144 | **0** |
 | Nhãn, câu hỏi, lịch sử giao việc | 1 248 chuỗi | 17 208 | 165 | **0** |
 
-Đột biến mã: **15/15 bị giết** trong 1,6 giây — gồm bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số di động, bỏ cổng
-mã số thuế, số tài khoản không cần từ khóa, giữ chuỗi truy vấn ở nhật ký truy cập, xuống dòng không là phân cách, che
-một lượt thay vì tới điểm bất động.
+Đột biến mã: **18/18 bị giết** trong 1,9 giây (28/10/2026) — gồm bỏ vùng bảo vệ UUID, bỏ kiểm mã tỉnh, nới đầu số di
+động, bỏ cổng mã số thuế, số tài khoản không cần từ khóa, giữ chuỗi truy vấn ở nhật ký truy cập, xuống dòng không là
+phân cách, che một lượt thay vì tới điểm bất động, bỏ đường số dính sau tiền tố `ĐT`/`SĐT`/`Tel`.
 
 **Chưa đo.** Độ nhạy trên dữ liệu thật — không đo được trong repo (không được chứa dữ liệu cá nhân thật); cách đo: trên
 bản cài của đơn vị, `python -m svc_files.pii count < tệp` đếm số chỗ che mà không in giá trị, đối chiếu với người đọc.
 
-**Giới hạn.** Sót có chủ đích: số dính chữ (`ĐT0912…`), số viết từng cặp, số nước ngoài, CMND và số tài khoản không có
-từ khóa; che dư dãy mã 3 chữ số trùng dạng CCCD hợp lệ; không nhận họ tên, địa chỉ (cần nhận dạng thực thể); email, số
-máy bàn của cơ quan cũng bị che trong chữ gửi mô hình; nhật ký của Hasura, PostgreSQL, Keycloak, Meilisearch, Ollama
-không qua bộ lọc. Danh sách đủ ở README svc-files.
+**Giới hạn.** Sót có chủ đích: số dính chữ (trừ di động 10 số sau `ĐT`, `SĐT`, `Tel`…), số viết từng cặp, số nước
+ngoài, CMND và số tài khoản không có từ khóa; che dư dãy mã 3 chữ số trùng dạng CCCD hợp lệ; không nhận họ tên, địa chỉ
+(cần nhận dạng thực thể); email, số máy bàn của cơ quan cũng bị che trong chữ gửi mô hình; nhật ký của Hasura,
+PostgreSQL, Keycloak, Meilisearch, Ollama không qua bộ lọc. Danh sách đủ ở README svc-files.
 
 **Cơ chế an toàn.**
 

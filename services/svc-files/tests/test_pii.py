@@ -151,6 +151,20 @@ POSITIVE = [
     pos("don_0912345678.txt", ("0912345678", "phone"), mutate=False),      # op_tax: "don_MST" không là từ khóa
     pos("CCCD_001205000017.jpg", ("001205000017", "cccd")),
     pos("scan_001205000017_mat_truoc.jpg", ("001205000017", "cccd")),
+    # số di động viết liền sau tiền tố điện thoại (#58): có dấu, không dấu, hoa thường, theo nhóm, sau dấu câu, đầu dòng
+    pos("ĐT0912345678", ("0912345678", "phone")),
+    pos("SĐT0912345678", ("0912345678", "phone")),
+    pos("SDT0912345678", ("0912345678", "phone")),
+    pos("sđt0912 345 678", ("0912 345 678", "phone")),
+    pos("DĐ0987.654.321", ("0987.654.321", "phone")),
+    pos("Tel0912345678", ("0912345678", "phone")),
+    pos("PHONE0951234567", ("0951234567", "phone")),
+    pos("SĐT:0912345678", ("0912345678", "phone")),
+    pos("(ĐT0912345678)", ("0912345678", "phone")),
+    pos("Nguyễn Văn B\nSĐT0912345678.", ("0912345678", "phone")),
+    pos("Liên hệ ĐT0912345678, email nguyenvanb@example.com",
+        ("0912345678", "phone"), ("nguyenvanb@example.com", "email")),
+    pos("ĐT0912345678 0987 654 321", ("0912345678", "phone"), ("0987 654 321", "phone")),
     # che lượt đầu gỡ điều kiện chặn của khớp bên cạnh: find lặp tới điểm bất động (fuzz tìm ra)
     pos("001205000017,0084nguyenvanb@example.com", ("001205000017", "cccd"), ("0084nguyenvanb@example.com", "email")),
     pos("091209120011+840912345678", ("091209120011", "cccd"), ("+840912345678", "phone")),
@@ -191,9 +205,12 @@ NEGATIVE = [
     "/api/files/0912345678", "anchors/0000000001234",
     # số khác: tổng đài, bưu chính, mã số thuế, đầu số chưa cấp, sai độ dài, dính chữ, thiếu từ khóa
     "1900 1234", "1800.1234", "100000", "MST: 0900123456", "MST: 0312345678", "Mã số thuế 0100109106",
-    "Mã số doanh nghiệp: 0912345678", "0301234567", "09123456789", "0912345678901", "ĐT0912345678",
+    "Mã số doanh nghiệp: 0912345678", "0301234567", "09123456789", "0912345678901",
     "0912345678x", "0912  345  678", "0,0912345678", "3.0912345678", "0912345678.25", "số 123456789",
     "1234567890123",
+    # dính chữ (#58): tiền tố điện thoại chỉ đi với di động 10 số, tiền tố không dính chữ, chữ số, "/", "-" phía trước
+    "HSĐT0912345678", "QĐ-ĐT0912345678", "12/ĐT0912345678", "Hotel0912345678", "ĐT0301234567", "ĐT09123456789",
+    "ĐT0912345678x", "ĐT001205000017",
     "Tài khoản 0011 0041 23456", "tài khoản cá nhân", "CMND 12345678", "Số CCCD: 001205000017abc",
     "CCCD 001 205 000 017x",
     "000205000017", "001427000017", "001227000017",
@@ -341,9 +358,10 @@ def op_wrap(b: Base) -> list:
 
 
 def op_tax(b: Base) -> list:
-    """Thêm "MST: " ngay trước SĐT 10 số viết trong nước: không che (cổng mã số thuế)."""
+    """Thêm "MST: " ngay trước SĐT 10 số viết trong nước: không che (cổng mã số thuế). Bỏ qua số dính sau tiền tố
+    ("ĐTMST: …" không có từ khóa đứng riêng)."""
     before, value, after, kind, _ = b
-    if kind != "phone" or len(national(value)) != 10 or value.startswith(CC):
+    if kind != "phone" or len(national(value)) != 10 or value.startswith(CC) or before[-1:].isalpha():
         return []
     return [(before + "MST: ", value, after, None)]
 
@@ -730,9 +748,10 @@ def _best_ms(text: str, runs: int = 3) -> float:
 
 @pytest.mark.parametrize("text", ["12 " * 33000, "1 " * 50000, "a@" * 50000, "x@a." * 25000, "9" * 100000,
                                   "0912345678 " * 9000, "CCCD " + "1 " * 50000, "1\n" * 50000,
-                                  "CCCD " + "1\n" * 50000, "001205000017,0084a@example.com " * 3200],
+                                  "CCCD " + "1\n" * 50000, "001205000017,0084a@example.com " * 3200,
+                                  "SĐT0912345678 " * 7000, "ĐT1 " * 25000],
                          ids=["12-cach", "1-cach", "a@", "x@a.", "9", "nhieu-sdt", "tu-khoa-dai", "1-xuong-dong",
-                              "tu-khoa-xuong-dong", "hai-luot"])
+                              "tu-khoa-xuong-dong", "hai-luot", "tien-to-sdt", "tien-to-ngan"])
 def test_pathological_inputs_stay_fast(text):
     # ngân sách 500 ms (đo trên máy dev: ≤ 150 ms); lấy lần nhanh nhất trong 3 lần để không chập chờn
     assert _best_ms(text) <= 500
