@@ -16,6 +16,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
 
 ### Đã sửa đổi
+- Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).
 - Sơ đồ kiến trúc ở README và `docs/architecture.md` vẽ lại theo lõi hiện tại, thêm kênh thông báo bên ngoài (#374).
 - Job "Bản online" chạy ngay sau Release đợi tối đa 60 phút cho bản online nâng xong rồi mới kiểm (#344).
 

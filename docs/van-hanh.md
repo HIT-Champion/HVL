@@ -480,10 +480,10 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
 (Docker giữ bản cục bộ 10 MB × 3 cho driver ngoài).
 
 - **Thu:** `apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow` — các dịch vụ tự che thông tin cá nhân
-  trong nhật ký (F4.4) — cùng `hasura`, `keycloak`, `postgres`: ba dịch vụ này không tự che, Vector che bằng luật
-  riêng (dưới đây) trước bước che chung. **Không thu** Meilisearch, OpenBao, Flowable…: chưa có luật riêng, đưa vào kho
-  log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
-- **Luật riêng** cho ba dịch vụ không tự che, mỗi luật có ca trong `vector.test.yaml`:
+  trong nhật ký (F4.4) — cùng `hasura`, `keycloak`, `postgres`, `meilisearch`: bốn dịch vụ này không tự che, Vector
+  che bằng luật riêng (dưới đây) trước bước che chung. **Không thu** OpenBao, Flowable, SeaweedFS…: chưa có luật riêng,
+  đưa vào kho log là đưa thông tin cá nhân chưa che đi xa thêm một chỗ.
+- **Luật riêng** cho bốn dịch vụ không tự che, mỗi luật có ca trong `vector.test.yaml`:
   - **Hasura** (dòng JSON): `event` là `hasura.<loại log>` (`hasura.http-log`, `hasura.websocket-log`…);
     `request_id` lấy trong `detail` (`detail.request_id`, `detail.operation.request_id`, ở `websocket-log` là
     `detail.event.detail.request_id`). Đó là `X-Request-Id` mà APISIX, `svc-workflow`, `svc-files` gửi kèm lời gọi
@@ -507,8 +507,16 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
     hàm trong `db/migrations` chỉ có mã, trạng thái, số hồ sơ. Đổi `log_line_prefix` thì mọi dòng bị bỏ.
   - **Keycloak**: `username="…"` ở sự kiện `LOGIN_ERROR` (tên người dùng gõ vào: gõ nhầm mật khẩu vào ô tên thì
     lộ). `userId`, `clientId`, `error` giữ lại. `sessionId`, chuỗi truy vấn của `redirect_uri` đã bị bước che chung che.
+  - **Meilisearch** ghi JSON (`MEILI_EXPERIMENTAL_LOGS_MODE=json` trong `docker-compose.yml`): mỗi yêu cầu HTTP một
+    dòng lúc đóng span `HTTP request`, `event` là `meilisearch.http` (dòng khác: `meilisearch.<target>`). Thay cả giá
+    trị `query_parameters` (gọi `GET` thì có câu tìm `q=…`, biểu thức `filter=…`) và `error` (lời lỗi trích giá trị
+    tài liệu, biểu thức lọc, có khi nhiều dòng); bỏ `spans` (lặp lại `span`). Chuỗi khác che từ dấu `` ` `` đầu tiên
+    tới hết chuỗi: Meilisearch trích giá trị trong dấu đó (``Document identifier `…` is invalid``). `route`, `method`,
+    `status_code`, thời gian xử lý giữ lại. Dòng `/health` trả 200 (bảng trạng thái hỏi liên tục) bị bỏ. Bỏ chế độ
+    JSON thì luật chữ cùng nội dung vẫn chạy, nhưng dòng tiếp của lời lỗi nhiều dòng không che được. Đừng đặt
+    `MEILI_LOG_LEVEL=DEBUG` khi đang thu log: mức đó ghi câu tìm và kết quả vào `fields`, luật không che.
 - **Che lần hai** ([`platform/logs/vector.yaml`](../platform/logs/vector.yaml)), mỗi dạng dưới đây có ca trong
-  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (39 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
+  [`vector.test.yaml`](../platform/logs/vector.test.yaml) (43 ca cả luật riêng ở trên; bỏ một luật nào thì có ca đỏ):
   - token `Bearer`/`Basic` (từ 8 ký tự, kể cả có dấu `=` đệm ở cuối như `Basic dXNlcjpwYXNzd29yZA==`), chuỗi dạng JWT;
   - giá trị của khóa có chữ `password`, `passwd`, `pwd`, `secret`, `token`, `api key`, `private key`, `credential`,
     `session`, kể cả có tiền tố, hậu tố (`HASURA_ADMIN_SECRET=`, `POSTGRES_PASSWORD=`, `access_token`,
@@ -587,16 +595,16 @@ chỉ nạp khi bật. Không gắn `docker.sock`, không đọc `/var/lib/docke
   `p_user_agent` (của Vector).
 
 ```bash
-make logs-up                       # bật: Vector, Parseable; tạo lại 8 container; đặt giữ log; tới lần make up sau
+make logs-up                       # bật: Vector, Parseable; tạo lại 9 container; đặt giữ log; tới lần make up sau
 make logs-tra ID=<mã>              # dòng của mọi dịch vụ mang mã, 60 phút gần nhất (PHUT=… để đổi)
 make demo-log-tap-trung            # màn demo: một mã qua APISIX → svc-workflow → Hasura, svc-files; SQL lỗi…
-make logs-down                     # tắt: 8 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
+make logs-down                     # tắt: 9 dịch vụ về json-file, dừng Vector, Parseable; giữ log đã lưu
 ```
 
 - **Bật lâu dài:** thêm `logs` vào `MOC_EXTRA_PROFILES` trong `.env` (vd `MOC_EXTRA_PROFILES=tunnel,logs`) rồi chạy
   `make up` (hoặc `make logs-up`); từ đó `make up`, `make down`, `make ps`… tự nạp tệp phủ và profile, và mỗi lần
   `make up` thêm mật khẩu vào `.env` cũ nếu thiếu, tạo luồng, đặt lại thời gian giữ log (kể cả sau khi xóa volume
-  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 8 dịch vụ về
+  `parseable_data`). Chỉ `make logs-up` mà không thêm vào `MOC_EXTRA_PROFILES` thì `make up` lần sau trả 9 dịch vụ về
   `json-file` (Vector, Parseable vẫn chạy nhưng không nhận gì).
 - **Mật khẩu:** `MOC_LOGS_PASSWORD` do `make env` sinh; `.env` sinh trước F3.14 thiếu dòng này thì `make logs-up` (và
   `make up` khi `logs` có trong `MOC_EXTRA_PROFILES`) tự thêm một chuỗi ngẫu nhiên đúng như `make env` (không in ra).
@@ -632,11 +640,11 @@ make logs-down                     # tắt: 8 dịch vụ về json-file, dừng
 
 **Rủi ro, hạn chế người vận hành cần biết:**
 
-- **Bật hay tắt phải tạo lại 8 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
-  `hasura`, `keycloak`, `postgres`): đổi driver log chỉ có hiệu lực khi tạo lại container. `make logs-up`,
-  `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi động lại cả CSDL,
-  Hasura, Keycloak: vài giây không đăng nhập, không ghi được; dịch vụ khác giữ kết nối tới CSDL (Flowable) phải tự
-  nối lại. Nên bật, tắt ngoài giờ làm việc.
+- **Bật hay tắt phải tạo lại 9 container** (`apisix`, `app-office`, `app-ca-nhan`, `svc-files`, `svc-workflow`,
+  `hasura`, `keycloak`, `postgres`, `meilisearch`): đổi driver log chỉ có hiệu lực khi tạo lại container.
+  `make logs-up`, `make logs-down` (và `make up` lần đầu sau khi thêm hay bỏ `logs` trong `MOC_EXTRA_PROFILES`) khởi
+  động lại cả CSDL, Hasura, Keycloak, Meilisearch: vài giây không đăng nhập, không ghi được, không tìm được; dịch vụ
+  khác giữ kết nối tới CSDL (Flowable) phải tự nối lại. Nên bật, tắt ngoài giờ làm việc.
 - **Cổng fluent `127.0.0.1:24224` không cần đăng nhập** (driver `fluentd` của Docker không có xác thực): tiến trình
   nào trên máy chủ cũng gửi được dòng giả vào kho log (dòng giả vẫn qua bước che). Máy chủ dùng chung nhiều người thì
   đây là hạn chế thật.

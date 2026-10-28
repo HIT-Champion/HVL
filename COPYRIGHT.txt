@@ -154,7 +154,7 @@ cloudflared                     2026.10.0       Apache-2.0              Cloudfla
 Mailpit                         v1.31.4         MIT                     Hộp thư thử cho thông báo email của       https://mailpit.axllent.org
                                                                         svc-workflow
 restic                          0.19.1          BSD-2-Clause            Sao lưu, khôi phục CSDL và tệp            https://restic.net
-Vector                          0.59.0          MPL-2.0                 Thu log của 8 dịch vụ qua driver fluentd  https://vector.dev
+Vector                          0.59.0          MPL-2.0                 Thu log của 9 dịch vụ qua driver fluentd  https://vector.dev
                                                                         của Docker, che lần hai, gửi Parseable
 Parseable                       3.2.4           AGPL-3.0                Lưu và tra log tập trung                  https://github.com/parseablehq/parseable
 Jaeger                          2.22.0          Apache-2.0              Nhận và hiện trace                        https://www.jaegertracing.io

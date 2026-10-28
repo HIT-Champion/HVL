@@ -1130,3 +1130,116 @@ tests:
               assert!(contains(m, "clientId=\"app-office\""), m)
               assert!(contains(m, "error=\"invalid_user_credentials\""), m)
               assert!(contains(m, "redirect_uri=\"https://signet.example/callback\""), m)
+  - name: dòng HTTP của Meilisearch (JSON) che chuỗi truy vấn, bỏ spans; giữ route, mã trạng thái
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': meilisearch
+          source: stdout
+          log: >-
+            {"timestamp": "2026-10-28T09:00:00.123456Z", "level": "INFO", "fields": {"message": "close",
+            "time.busy": "1.21ms", "time.idle": "35.2µs"}, "target": "meilisearch", "span": {"host": "meilisearch:7700",
+            "method": "GET", "query_parameters": "q=hop+dong+Tran+Thi+B&filter=nguoi_ky%3DLe+Van+C",
+            "route": "/indexes/documents/search", "status_code": 200, "user_agent": "python-httpx/0.28.1",
+            "name": "HTTP request"}, "spans": [{"host": "meilisearch:7700", "method": "GET",
+            "query_parameters": "q=hop+dong+Tran+Thi+B&filter=nguoi_ky%3DLe+Van+C",
+            "route": "/indexes/documents/search", "name": "HTTP request"}]}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "meilisearch")
+              assert_eq!(.event, "meilisearch.http")
+              assert!(!exists(.request_id))
+              m = string!(.message)
+              assert!(!contains(m, "Tran+Thi"), m)
+              assert!(!contains(m, "Le+Van"), m)
+              assert!(!contains(m, "\"spans\""), m)
+              assert!(contains(m, "\"query_parameters\":\"[REDACTED]\""), m)
+              assert!(contains(m, "\"route\":\"/indexes/documents/search\""), m)
+              assert!(contains(m, "\"status_code\":200"), m)
+              assert!(contains(m, "\"method\":\"GET\""), m)
+  - name: lời lỗi Meilisearch (nhiều dòng, trích giá trị trong dấu `) che cả lời ở span, từ dấu ` ở dòng khác
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': meilisearch
+          log: >-
+            {"timestamp": "2026-10-28T09:00:01.5Z", "level": "INFO", "fields": {"message": "close"},
+            "target": "meilisearch", "span": {"method": "POST", "query_parameters": "",
+            "route": "/indexes/documents/search", "status_code": 400, "error": "Attribute `nguoi_ky` is not
+            filterable. Available filterable attributes are: `tenant_id`.\n1:9 nguoi_ky = 'Le Van C'",
+            "name": "HTTP request"}}
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': meilisearch
+          log: >-
+            {"timestamp": "2026-10-28T09:00:02Z", "level": "ERROR", "fields": {"message": "Batch failed:
+            Document identifier `Tran Thi B 01` is invalid. A document identifier can be of type integer or string"},
+            "target": "index_scheduler::scheduler"}
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.event, "meilisearch.http")
+              m = string!(.message)
+              assert!(!contains(m, "Le Van C"), m)
+              assert!(!contains(m, "nguoi_ky"), m)
+              assert!(contains(m, "\"error\":\"[REDACTED]\""), m)
+              assert!(contains(m, "\"status_code\":400"), m)
+          - type: vrl
+            source: |
+              assert_eq!(.event, "meilisearch.index_scheduler.scheduler")
+              m = string!(.message)
+              assert!(!contains(m, "Tran Thi B"), m)
+              assert!(contains(m, "Document identifier `[REDACTED]"), m)
+  - name: Meilisearch bỏ dòng /health trả 200 (bảng trạng thái hỏi liên tục)
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': meilisearch
+          log: >-
+            {"timestamp": "2026-10-28T09:00:03Z", "level": "INFO", "fields": {"message": "close"},
+            "target": "meilisearch", "span": {"method": "GET", "query_parameters": "", "route": "/health",
+            "status_code": 200, "name": "HTTP request"}}
+    no_outputs_from:
+      - moc
+  - name: Meilisearch ghi chữ (bỏ chế độ JSON) vẫn che chuỗi truy vấn, lời lỗi, giá trị trong dấu `
+    inputs:
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': meilisearch
+          log: >-
+            2026-10-28T09:00:04.1Z  INFO HTTP request{method=GET host="meilisearch:7700"
+            route=/indexes/documents/search query_parameters=q=hop+dong+Tran+Thi+B user_agent=python-httpx/0.28.1
+            status_code=400 error=Attribute `nguoi_ky` is not filterable. 1:9 nguoi_ky = 'Le Van C'}: meilisearch: close
+      - insert_at: moc
+        type: log
+        log_fields:
+          '"com.docker.compose.service"': meilisearch
+          log: >-
+            2026-10-28T09:00:05Z ERROR index_scheduler::scheduler: Batch failed: Document identifier `Tran Thi B 01` is
+            invalid.
+    outputs:
+      - extract_from: moc
+        conditions:
+          - type: vrl
+            source: |
+              m = string!(.message)
+              for_each(["Tran+Thi", "Le Van C", "nguoi_ky"]) -> |_i, s| {
+                assert!(!contains(m, s), s)
+              }
+              assert!(contains(m, "query_parameters=[REDACTED] user_agent="), m)
+              assert!(contains(m, "error=[REDACTED]"), m)
+          - type: vrl
+            source: |
+              m = string!(.message)
+              assert!(contains(m, "Document identifier `[REDACTED]"), m)
+              assert!(!contains(m, "Tran Thi B"), m)
