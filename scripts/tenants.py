@@ -503,6 +503,15 @@ class Keycloak:
         """Gán (POST) hoặc gỡ (DELETE) vai trò client cho tài khoản; thân là danh sách vai trò như client_roles trả."""
         self._req("DELETE" if revoke else "POST", f"/users/{user_id}/role-mappings/clients/{client_id}", roles)
 
+    # robot của flow Node-RED (moc tu-dong robot, #366): client confidential, mapper claim cố định
+    def update_protocol_mapper(self, client_id: str, mapper_id: str, rep: dict[str, Any]) -> None:
+        self._req("PUT", f"/clients/{client_id}/protocol-mappers/models/{mapper_id}", rep)
+
+    def client_secret(self, client_id: str, *, regenerate: bool = False) -> str:
+        """Bí mật của client confidential; regenerate: Keycloak sinh bí mật mới, bí mật cũ hết dùng được ngay."""
+        rep, _ = self._req("POST" if regenerate else "GET", f"/clients/{client_id}/client-secret")
+        return (rep or {}).get("value") or ""
+
 
 def admin_token() -> str:
     """Token quản trị Keycloak (realm master, KEYCLOAK_ADMIN_* trong .env), qua cổng quản trị nội bộ."""
