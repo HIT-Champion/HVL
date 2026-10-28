@@ -162,7 +162,7 @@ KEPT = [
     "Trang 12 13 14 15 16, năm 2024 2025 2026",
     "Mã 12345678 tám số",
     "Mã lỗi 123e4567-e89b-12d3-a456-426614174000",   # mã X-Request-Id chép từ câu báo lỗi
-    "SĐT0912345678",                                 # số dính chữ (như #58 ở svc-files)
+    "SĐT0912345678",                                 # số dính chữ: luật SQL không có đường tiền tố của svc-files (#58)
 ]
 
 
