@@ -10,7 +10,8 @@ trả lời người ngoài một văn bản có thật, còn nguyên vẹn khô
 Văn bản đi gửi đơn vị khác trong hệ thống thì bản phát hành được chép sang kho của đơn vị nhận ở đây (liên thông).
 Văn thư tải văn bản đến lên thì tác tử `moc-doc-reader` đọc tệp (lớp chữ PDF hoặc OCR) và gợi ý thông tin tiếp nhận.
 Người dùng hỏi bằng lời thì trợ lý `moc-assistant` tìm đoạn liên quan trong các văn bản **chính họ được đọc** và trả
-lời bằng câu trích nguyên văn kèm số ký hiệu, số trang; mô hình chạy tại chỗ viết câu trả lời ngắn nếu có (F4.2).
+lời bằng câu trích nguyên văn kèm số ký hiệu, số trang; mô hình chạy tại chỗ viết câu trả lời ngắn nếu có (F4.2),
+hoặc máy chủ chuẩn OpenAI khi đơn vị chọn `MOC_ASK_API=openai` (#430).
 
 Thuộc lõi Tầng 1 — F1.5 (dữ liệu phi cấu trúc), F1.6 (trạm kiểm dịch), F1.7 và F2.7 (tìm kiếm, cả nội dung PDF),
 F2.4 (dựng PDF văn bản đi), F2.8 (sổ đăng ký in được), F2.13 (cổng xác thực), F3.12 (liên thông), F4.1 (đọc văn
@@ -449,8 +450,9 @@ người hỏi không được đọc.
 - **Trợ lý có danh tính, có sổ.** Mỗi lượt hỏi ghi **một** dòng `assistant.answered` (thực thể `ai.questions`, id =
   `ask_id`) bằng vai trò Hasura `agent`: preset ép `actor_id = moc-assistant`, `actor_kind = agent`, thuê ước. `diff`
   chỉ có siêu dữ liệu: `user_id, ask_id, mode, status, answer_source, hits, cited` (số nguồn được trích), `documents`
-  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings` — **không câu hỏi, câu trả lời, đoạn
-  trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
+  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings`, `model_where` (`local`: Ollama,
+  `external`: API ngoài, #430; rỗng khi không gọi mô hình) — **không câu hỏi, câu trả lời, đoạn trích**. **Không
+  ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
   hai dòng sổ cùng một thực thể.
 - **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
   cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms}, `office.assist.ask_failed`
@@ -1271,8 +1273,11 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ASK_MIN_SCORE` · `MOC_ASK_MIN_SCORE_SEMANTIC` | `0` · `0.75` | Ngưỡng `_rankingScore` khi tìm từ khóa · tìm lai (0–1). Từ khóa để 0: chiến lược `frequency` đã buộc đoạn chứa từ hiếm nhất của câu hỏi, điểm `words` thấp cả với nguồn đúng. Tìm lai 0,75: trên kho mẫu nguồn đúng đứng đầu ≥ 0,88, câu không có đáp án ≤ 0,70 |
 | `MOC_ASK_SEMANTIC_RATIO` | `0.5` | Tỷ trọng tìm theo nghĩa trong tìm lai (0–1); câu hỏi có số ký hiệu, ngày, cụm trong ngoặc kép dùng tối đa 0,2 |
 | `MOC_ASK_DEADLINE_S` | `50` | Hạn tổng một lượt hỏi, tối đa 55 (dưới 60 giây của APISIX) |
-| `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
+| `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` (với `MOC_ASK_API=openai`: bắt buộc) | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
 | `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |
+| `MOC_ASK_API` | `ollama` | Nơi viết câu trả lời: `ollama` (tại chỗ) hoặc `openai` — máy chủ chuẩn OpenAI ở `MOC_ASK_API_URL`, tên mô hình ở `MOC_ASK_MODEL`, bắt buộc (#430). URL `http://` thì ghi `config.warning`. Chỉ bước viết đi ra ngoài (đã che thông tin cá nhân, bộ kiểm căn cứ giữ nguyên); nhúng vẫn ở Ollama. Xem `docs/van-hanh.md` mục Trợ lý hỏi đáp qua API ngoài |
+| `MOC_ASK_API_URL` | rỗng | Gốc API, vd `https://máy-chủ/v1` (bắt buộc khi `MOC_ASK_API=openai`); dò `GET …/models`, gọi `POST …/chat/completions` |
+| `MOC_ASK_API_KEY` | rỗng | Khóa API (tùy chọn) — bí mật trong két (`platform/openbao/start.sh`), không đặt trong biến môi trường của container; chỉ đi trong tiêu đề `Authorization` |
 | `MOC_ASK_CONTEXT_CHARS` | `2800` | Tổng ký tự các đoạn gửi mô hình |
 | `MOC_ASK_CONCURRENCY` · `MOC_ASK_QUEUE_S` | `1` · `20` | Số lượt `generate` cùng lúc · chờ lượt quá thì `503 busy` |
 | `MOC_AI_EMBED_MODEL` | `qwen3-embedding:0.6b` | Mô hình nhúng trong Ollama (`bge-m3` thay được); đặt rỗng: không nhúng, chỉ tìm từ khóa |

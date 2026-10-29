@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Mô hình của trợ lý hỏi đáp (F4.2) qua Ollama giả: dò từng mô hình, nạp trước, nhúng (kiểm số véc-tơ, số chiều,
-tiền tố câu hỏi), sinh (thân yêu cầu, quá giờ, lỗi), NullAi."""
+tiền tố câu hỏi), sinh (thân yêu cầu, quá giờ, lỗi), NullAi; sinh qua API ngoài chuẩn OpenAI giả (#430)."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ import pytest
 from assist_fakes import CHAT_MODEL, DIMS, EMBED_MODEL, FakeOllama, good_answer, ollama
 from svc_files.assist import ai as ai_mod
 from svc_files.assist import grounding, meili
-from svc_files.assist.ai import ChatResult, NullAi, OllamaAi, make_ai, query_text
+from svc_files.assist.ai import ChatResult, NullAi, OllamaAi, OpenAiChat, SplitAi, make_ai, query_text
 from svc_files.config import Settings
 
 MESSAGES = [{"role": "system", "content": grounding.SYSTEM}, {"role": "user", "content": "<cau_hoi>\nx\n</cau_hoi>"}]
@@ -387,3 +387,171 @@ def test_no_ps_call_before_any_model_is_ready():
     ollama(fake)
     assert fake.calls("/api/ps") == []
 
+
+# --- API ngoài chuẩn OpenAI (#430) -------------------------------------------------------------------------------
+
+API_URL = "https://mo-hinh.example/v1"
+API_MODEL = "mo-hinh-ngoai"
+API_KEY = "khoa-gia"  # ngắn, không giống khóa thật: gitleaks quét mọi ref (#436)
+
+
+class FakeOpenAi:
+    """Máy chủ chuẩn OpenAI giả: ``GET /v1/models``; ``POST /v1/chat/completions`` trả ``reply`` (chuỗi, hoặc hàm
+    async nhận yêu cầu)."""
+
+    def __init__(self, *, reply=None, models_status: int = 200, chat_status: int = 200) -> None:
+        self.reply = reply if reply is not None else good_answer()
+        self.models_status = models_status
+        self.chat_status = chat_status
+        self.requests: list[httpx2.Request] = []
+
+    def calls(self, path: str) -> list[httpx2.Request]:
+        return [r for r in self.requests if r.url.path == path]
+
+    async def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        if request.url.path == "/v1/models":
+            return httpx2.Response(self.models_status, json={"object": "list", "data": [{"id": API_MODEL}]})
+        reply = self.reply
+        if callable(reply):
+            reply = await reply(request)
+            if isinstance(reply, httpx2.Response):
+                return reply
+        return httpx2.Response(self.chat_status, json={
+            "object": "chat.completion",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": reply}, "finish_reason": "stop"}]})
+
+
+def external(fake: FakeOpenAi, *, key: str = API_KEY, probe: bool = True) -> OpenAiChat:
+    ai = OpenAiChat(API_URL, API_MODEL, key, transport=httpx2.MockTransport(fake))
+    if probe:
+        run(ai.probe())
+    return ai
+
+
+def test_external_chat_request_and_reply():
+    fake = FakeOpenAi()
+    ai = external(fake)
+    assert ai.chat_available and not ai.embed_available and ai.chat_where == "external"
+    assert chat(ai) == ChatResult(good_answer(), None)
+    (request,) = fake.calls("/v1/chat/completions")
+    assert request.headers["authorization"] == f"Bearer {API_KEY}"
+    assert json.loads(request.content) == {
+        "model": API_MODEL, "messages": MESSAGES, "stream": False,
+        "response_format": {"type": "json_schema", "json_schema": {
+            "name": "tra_loi", "strict": True, "schema": {**grounding.FORMAT, "additionalProperties": False}}},
+        "temperature": 0.1, "max_tokens": 320, "seed": 7,        # num_ctx là của Ollama: không gửi
+    }
+    assert "additionalProperties" not in grounding.FORMAT       # không sửa schema dùng chung với Ollama
+
+
+def test_external_server_without_a_key_gets_no_authorization_header():
+    fake = FakeOpenAi()
+    ai = external(fake, key="")
+    assert chat(ai) == ChatResult(good_answer(), None)
+    assert all("authorization" not in r.headers for r in fake.requests)
+
+
+def test_external_chat_masks_personal_data_at_egress(log_records):
+    fake = FakeOpenAi()
+    ai = external(fake)
+    leaked = [{"role": "user", "content": "Gọi 0912345678 hoặc a.b@truong.edu.vn"}]
+    run(ai.chat(leaked, format=grounding.FORMAT, options=grounding.OPTIONS, timeout_s=5))
+    (request,) = fake.calls("/v1/chat/completions")
+    sent = json.loads(request.content)["messages"][0]["content"]
+    assert "0912345678" not in sent and "a.b@truong.edu.vn" not in sent
+    assert events(log_records, "office.assist.pii_at_egress") == [{"event": "office.assist.pii_at_egress",
+                                                                   "masked": 2}]
+
+
+def test_external_probe_and_key_never_logged(log_records):
+    assert external(FakeOpenAi()).chat_available
+    for status in (401, 403, 404, 500):
+        ai = external(FakeOpenAi(models_status=status))
+        assert not ai.chat_available
+        assert chat(ai) == ChatResult(None, "model_unavailable")
+    down = events(log_records, "office.assist.ai_unavailable")
+    assert [e["reason"] for e in down] == ["http 401", "http 403", "http 404", "http 500"]
+    assert all(e["where"] == "external" and e["model"] == API_MODEL for e in down)
+    assert all(API_KEY not in json.dumps(r) for r in log_records)
+
+    async def unreachable(request):
+        raise httpx2.ConnectError("không tới được")
+
+    gone = OpenAiChat(API_URL, API_MODEL, API_KEY, transport=httpx2.MockTransport(unreachable))
+    run(gone.probe())
+    assert not gone.chat_available
+    assert events(log_records, "office.assist.ai_unavailable")[-1]["reason"] == "unreachable"
+
+
+def test_external_chat_errors():
+    busy = external(FakeOpenAi(chat_status=503))
+    assert chat(busy) == ChatResult(None, "model_unavailable") and busy.chat_available     # lỗi tạm: vẫn dùng
+    for status in (401, 403, 404):          # khóa sai, hết quyền, sai tên mô hình: chờ lượt dò sau
+        ai = external(FakeOpenAi(chat_status=status))
+        assert chat(ai) == ChatResult(None, "model_unavailable") and not ai.chat_available
+
+    async def slow(request):
+        await asyncio.sleep(0.5)
+        return good_answer()
+
+    assert chat(external(FakeOpenAi(reply=slow)), timeout_s=0.1) == ChatResult(None, "model_timeout")
+
+    async def no_choices(request):
+        return httpx2.Response(200, json={"object": "chat.completion", "choices": []})
+
+    async def not_text(request):
+        return httpx2.Response(200, json={"choices": [{"message": {"role": "assistant", "content": None}}]})
+
+    async def not_json(request):
+        return httpx2.Response(200, text="xin chào")
+
+    for reply in (no_choices, not_text, not_json):
+        assert chat(external(FakeOpenAi(reply=reply))) == ChatResult(None, "model_rejected")
+
+
+def test_external_chat_without_a_probe_makes_no_call():
+    fake = FakeOpenAi()
+    ai = external(fake, probe=False)
+    assert chat(ai) == ChatResult(None, "model_unavailable") and fake.calls("/v1/chat/completions") == []
+
+
+def test_split_ai_embeds_locally_and_writes_externally():
+    local, remote = FakeOllama(), FakeOpenAi()
+    ai = SplitAi(ollama(local, chat=None), external(remote))
+    assert (ai.chat_model, ai.embed_model, ai.chat_where) == (API_MODEL, EMBED_MODEL, "external")
+    assert ai.chat_available and ai.embed_available
+    assert embed(ai, ["x"]) and ai.embed_error is None
+    assert chat(ai) == ChatResult(good_answer(), None)
+    assert len(local.calls("/api/embed")) >= 1 and local.calls("/api/chat") == []
+    assert len(remote.calls("/v1/chat/completions")) == 1
+    run(ai.aclose())
+
+
+def test_split_ai_device_follows_the_local_embedder():
+    # #442: bước viết ở máy chủ ngoài; /api/status báo nơi Ollama tại chỗ đặt mô hình nhúng
+    local = FakeOllama()
+    local.loaded = [{"name": EMBED_MODEL, "size": 1_000, "size_vram": 1_000}]
+    ai = SplitAi(ollama(local, chat=None), external(FakeOpenAi()))
+    assert ai.device == "gpu" and ai.writer.device is None
+    assert SplitAi(NullAi(), external(FakeOpenAi())).device is None
+    run(ai.aclose())
+
+
+def test_chat_where_of_local_clients():
+    assert NullAi().chat_where == "local" and ollama(FakeOllama()).chat_where == "local"
+
+
+def test_make_ai_external_api(settings):
+    env = {"MOC_OIDC_ISSUER": "http://kc/realms/moc", "MOC_OIDC_JWKS_URL": "http://unused/jwks",
+           "SEAWEEDFS_S3_ACCESS_KEY": "t", "SEAWEEDFS_S3_SECRET_KEY": "t", "HASURA_ADMIN_SECRET": "t",
+           "MEILISEARCH_API_KEY": "t", "MOC_AI_URL": "http://ollama:11434", "MOC_ASK_API": "openai",
+           "MOC_ASK_API_URL": API_URL, "MOC_ASK_MODEL": API_MODEL, "MOC_ASK_API_KEY": API_KEY}
+    got = make_ai(Settings.from_env(env))
+    assert isinstance(got, SplitAi) and isinstance(got.writer, OpenAiChat) and isinstance(got.embedder, OllamaAi)
+    assert (got.chat_model, got.embed_model, got.embedder.chat_model) == (API_MODEL, "qwen3-embedding:0.6b", None)
+    run(got.aclose())
+    # không có Ollama: không nhúng (tìm từ khóa), vẫn viết câu trả lời qua API
+    got = make_ai(Settings.from_env({**env, "MOC_AI_URL": ""}))
+    assert isinstance(got.embedder, NullAi) and got.embed_model is None and got.chat_model == API_MODEL
+    run(got.aclose())
