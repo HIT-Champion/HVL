@@ -161,6 +161,11 @@ query AskDocuments($ids: [uuid!]!) {{
 }}"""
 
 # Như trên, phạm vi dịch vụ (F4.3 gợi ý giao việc): vai trò service của đúng thuê ước, không bao giờ văn bản hạn chế
+ASK_DOCUMENTS_SERVICE = f"""
+query AskDocumentsService($ids: [uuid!]!) {{
+  office_documents(where: {{_and: [{{id: {{_in: $ids}}}}, {{restricted: {{_eq: false}}}}]}}) {{ {_ASK_FIELDS} }}
+}}"""
+
 # Hai đường dữ liệu của trợ lý (#441), bằng token người hỏi: Hộp việc (Action myTasks của svc-workflow, như trang
 # chủ) và số văn bản người hỏi được xem (cùng quyền select, allow_aggregations, của trang danh sách)
 ASK_TASKS = """
@@ -172,11 +177,6 @@ ASK_COUNT = """
 query AskCount($where: office_documents_bool_exp!) {
   office_documents_aggregate(where: $where) { aggregate { count } }
 }"""
-
-ASK_DOCUMENTS_SERVICE = f"""
-query AskDocumentsService($ids: [uuid!]!) {{
-  office_documents(where: {{_and: [{{id: {{_in: $ids}}}}, {{restricted: {{_eq: false}}}}]}}) {{ {_ASK_FIELDS} }}
-}}"""
 
 # Kết quả tìm kiếm: chỉ những văn bản người dùng được đọc, dữ liệu mới nhất từ CSDL
 VISIBLE_DOCUMENTS = """

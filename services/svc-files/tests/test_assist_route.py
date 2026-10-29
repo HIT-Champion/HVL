@@ -70,12 +70,19 @@ def routed(question: str, *, scoped: bool = False) -> tuple[str, str, str]:
     ("Tháng trước có mấy công văn đến?", "dem_van_ban", "kw:dem-van-ban"),
     ("Số văn bản đi tháng 9/2026", "dem_van_ban", "kw:dem-van-ban"),          # ngày tháng không phải số ký hiệu
     ("Có bao nhiêu quy chế ban hành năm 2026?", "dem_van_ban", "kw:dem-van-ban"),
+    ("Đếm số văn bản đến tháng 10", "dem_van_ban", "kw:dem-van-ban"),
     # không phải việc của người hỏi, không phải câu đếm, hay mốc thời gian chưa đọc được: tìm như trước
     ("Tôi phải làm những việc gì khi nghỉ phép?", "van_ban", "mac-dinh"),
     ("Hạn nộp hồ sơ học bổng của tôi là khi nào?", "van_ban", "mac-dinh"),
     ("Tối nay có việc gì không?", "van_ban", "mac-dinh"),                      # "tối" không phải "tôi"
     ("Có bao nhiêu sinh viên được học bổng?", "van_ban", "mac-dinh"),
     ("Quyết định 15/QĐ-ĐHM có bao nhiêu văn bản kèm theo?", "van_ban", "mac-dinh"),
+    ("Bao nhiêu năm theo thông tư thì được xét tốt nghiệp?", "van_ban", "mac-dinh"),  # giới từ, đơn vị ở giữa
+    ("Được nghỉ bao nhiêu ngày theo thông báo nghỉ Tết?", "van_ban", "mac-dinh"),
+    ("Sinh viên được miễn bao nhiêu theo quy chế?", "van_ban", "mac-dinh"),
+    ("Mấy giờ thì văn bản được phát hành?", "van_ban", "mac-dinh"),
+    ("Đêm qua có văn bản nào hỏa tốc không?", "van_ban", "mac-dinh"),      # "đêm" không phải "đếm"
+    ("Máy chủ lưu văn bản ở đâu?", "van_ban", "mac-dinh"),                 # "máy" không phải "mấy"
     ("Có bao nhiêu văn bản đến từ ngày 1/10/2026?", "van_ban", "mac-dinh"),
     ("Có bao nhiêu văn bản đến từ tháng 9 đến tháng 10?", "van_ban", "mac-dinh"),
     ("Có bao nhiêu văn bản đến trong quý 3?", "van_ban", "mac-dinh"),
@@ -115,7 +122,7 @@ def test_in_a_document_scope_where_questions_are_about_that_document():
 
 def test_every_reason_is_a_fixed_code_never_words_of_the_question():
     # mã lý do vào sổ kiểm toán: chỉ được là mã của mẫu, không mang chữ người hỏi gõ
-    patterns = route._INTRO + route._OUT_OF_SCOPE + route._MY_TASKS + route._COUNT
+    patterns = route._INTRO + route._OUT_OF_SCOPE + route._MY_TASKS + route._COUNT + route._COUNT_MARKED
     codes = {f"kw:{code}" for code, _, _ in patterns} | {route.DEFAULT_REASON, route.NO_GUIDE_REASON}
     for question in ("Nộp đơn nghỉ phép ở đâu?", "Hướng dẫn cách vào sổ văn bản đến", "Bấm vào đâu để đổi mật khẩu",
                      "Các bước giao việc trên phần mềm"):

@@ -142,13 +142,27 @@ _MY_TASKS: tuple[tuple[str, str, re.Pattern[str]], ...] = (
     ("hop-viec", "vi", re.compile(r"\bhộp việc\b.*\b(?:bao nhiêu|mấy|quá hạn|đến hạn|hết hạn)\b")),
     ("my-tasks", "en", re.compile(r"\bmy (?:tasks?|work items?|assignments?|inbox)\b|\bassigned to me\b")),
 )
-# Đếm văn bản: từ hỏi số lượng rồi (trong hai từ) văn bản hay tên loại; chữ đã bỏ dấu
-_COUNT: tuple[tuple[str, str, re.Pattern[str]], ...] = (
+# Đếm văn bản: từ hỏi số lượng rồi (trong hai từ) văn bản hay tên loại. Hai từ giữa không là giới từ hay đơn vị:
+# "bao nhiêu năm theo thông tư", "mấy giờ thì văn bản…" hỏi nội dung, không hỏi số văn bản
+_NOT_BETWEEN = ("theo trong của tại ở là cho từ về như thì "
+                "ngày năm tháng giờ phút lần trang điều khoản người tiền").split()
+
+
+def _between(words: list[str]) -> str:
+    return rf"(?: (?!(?:{'|'.join(words)})\b)\w+){{0,2}}"
+
+
+_COUNT: tuple[tuple[str, str, re.Pattern[str]], ...] = (                # chữ đã bỏ dấu
     ("dem-van-ban", "vi", re.compile(
-        rf"\b(?:bao nhieu|so luong|tong so|tong cong|thong ke|dem|may)(?: \w+){{0,2}} (?:{data.NOUNS})\b|"
-        rf"^so (?:luong )?(?:{data.NOUNS})\b")),
+        rf"\b(?:bao nhieu|so luong|tong so|tong cong|thong ke){_between([fold(w) for w in _NOT_BETWEEN])} "
+        rf"(?:{data.NOUNS})\b|^so (?:luong )?(?:{data.NOUNS})\b")),
     ("how-many", "en", re.compile(
         r"\b(?:how many|number of|count)(?: \w+){0,2} (?:documents?|letters|decisions|notices|circulars)\b")),
+)
+# "đếm", "mấy" so trên chữ có dấu: bỏ dấu thì trùng "đêm", "máy" ("Đêm qua có văn bản nào…", "Máy chủ lưu văn bản…")
+_COUNT_MARKED: tuple[tuple[str, str, re.Pattern[str]], ...] = (
+    ("dem-van-ban", "vi", re.compile(
+        rf"\b(?:đếm|mấy){_between(_NOT_BETWEEN)} (?:văn bản|{'|'.join(t[2] for t in data.TYPES)})\b")),
 )
 
 
@@ -160,9 +174,10 @@ def _data_route(question: str, text: str, marked: str) -> Route | None:
         for code, lang, pattern in _MY_TASKS:
             if pattern.search(text if lang == "en" else lower):
                 return Route("viec_cua_toi", f"kw:{code}", lang)
-    for code, lang, pattern in _COUNT:
-        if pattern.search(text) and not data.UNSUPPORTED_RE.search(marked):
-            return Route("dem_van_ban", f"kw:{code}", lang)
+    for patterns, against in ((_COUNT, text), (_COUNT_MARKED, lower)):
+        for code, lang, pattern in patterns:
+            if pattern.search(against) and not data.UNSUPPORTED_RE.search(marked):
+                return Route("dem_van_ban", f"kw:{code}", lang)
     return None
 
 
