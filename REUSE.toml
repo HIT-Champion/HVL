@@ -70,9 +70,10 @@ SPDX-License-Identifier = "Apache-2.0 AND LicenseRef-Logos"
 
 # Nguồn dữ liệu công khai (seed/du-lieu-mo/): văn bản nhà nước không thuộc phạm vi bảo hộ quyền tác giả (Điều 15 Luật
 # Sở hữu trí tuệ, LICENSES/LicenseRef-VN-SHTT-Dieu-15.txt); nguồn từng tệp ghi ở manifest.json cùng thư mục, manifest
-# do mã của đội sinh nên vẫn Apache-2.0. Nguồn A (#424): bản Công báo của thông tư Bộ GD&ĐT. Ghi đè "**.pdf" ở khối đầu.
+# do mã của đội sinh nên vẫn Apache-2.0. Nguồn A (#424): bản Công báo của thông tư Bộ GD&ĐT. Nguồn B (#427): câu trích
+# văn bản nhà nước và tin thời sự thuần túy đưa tin về ngày nghỉ lễ, Tết. Ghi đè "**.pdf", "**.txt" ở khối đầu.
 [[annotations]]
-path = ["seed/du-lieu-mo/cong-bao-gddt/*.pdf"]
+path = ["seed/du-lieu-mo/cong-bao-gddt/*.pdf", "seed/du-lieu-mo/ngay-nghi-le/trich/*.txt"]
 precedence = "closest"
 SPDX-FileCopyrightText = "Văn bản nhà nước Việt Nam, xem manifest.json cùng thư mục"
 SPDX-License-Identifier = "LicenseRef-VN-SHTT-Dieu-15"

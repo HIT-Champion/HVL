@@ -172,8 +172,9 @@ Mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây dịch vụ nhận tối đa 5 việc 
    văn bản tương tự, chưa văn bản nào được giao, hoặc đơn vị không có lãnh đạo phòng → `none` với lý do
    `no_similar`/`no_history`/`no_valid_unit`;
 5. hạn: trung vị (thấp) số ngày từ lúc vào sổ (giờ VN) tới hạn của các căn cứ ủng hộ, chỉ tính 1..365 ngày; hạn đề xuất
-   = ngày vào sổ + số ngày, sớm nhất là ngày mai, rơi vào thứ Bảy, Chủ nhật hay ngày lễ (`MOC_HOLIDAYS`) thì sang
-   ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
+   = ngày vào sổ + số ngày, sớm nhất là ngày mai, rơi vào thứ Bảy, Chủ nhật (trừ ngày làm bù) hay ngày lễ
+   (`MOC_HOLIDAYS`, `MOC_HOLIDAYS_FILE`) thì sang ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không
+   gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
 6. lưu dòng `office.assignment_suggestions` (căn cứ chỉ có id, điểm, đơn vị, số ngày) và một dòng sổ
    `assignment.suggested` trong **cùng một mutation**, bằng vai trò `agent` danh tính `MOC_ASSIGNER_ID` (preset ép thuê
    ước, `agent_id`, `actor_id`, `actor_kind = agent`), mã yêu cầu `goi-y:<id việc>`. `diff` có đúng 9 khóa vô hướng:
@@ -198,12 +199,19 @@ mục F4.3.
 
 **Ngày lễ** (`MOC_HOLIDAYS`, #280). Các mục cách nhau bằng dấu phẩy: `MM-DD` lặp hằng năm, `YYYY-MM-DD` một ngày,
 `YYYY-MM-DD..YYYY-MM-DD` một khoảng tối đa 31 ngày. Mặc định `01-01,04-30,05-01,09-02` là các ngày lễ dương lịch cố
-định ở Điều 112 Bộ luật Lao động 2019. Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc khánh và ngày nghỉ bù đổi
-theo năm, nên người vận hành thêm theo lịch nghỉ Chính phủ công bố, rồi tạo lại container svc-workflow. Sai dạng, ngày
-không có thật, khoảng ngược hay dài quá 31 ngày thì dịch vụ dừng lúc khởi động. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã
-lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình (`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
+định ở Điều 112 Bộ luật Lao động 2019. Tết Âm lịch, Giỗ Tổ Hùng Vương, ngày liền kề Quốc khánh, ngày nghỉ bù và thứ
+Bảy làm bù đổi theo năm: dịch vụ đọc thêm lịch nghỉ chính thức của nguồn công khai B (`MOC_HOLIDAYS_FILE`, #427), bản
+chụp `seed/du-lieu-mo/ngay-nghi-le/ngay-nghi.json` gắn chỉ đọc vào `/app/du-lieu-mo/ngay-nghi-le/`. Tệp có `fixed`
+(`MM-DD` hằng năm), `days_off` (khoảng `from`..`to`), `workdays` (thứ Bảy, Chủ nhật làm bù: ngày làm việc, trừ khi
+cũng là ngày lễ). Năm tệp chưa có thì người vận hành thêm vào `MOC_HOLIDAYS` theo lịch nghỉ Chính phủ công bố, rồi
+tạo lại container svc-workflow. Lấy mới tệp: `python3 scripts/nguon_ngay_nghi_le.py`
+([`docs/van-hanh.md`](../../docs/van-hanh.md), mục Lịch nghỉ lễ chính thức). Sai dạng, ngày không có thật, khoảng
+ngược hay dài quá 31 ngày — ở biến hay ở tệp — thì dịch vụ dừng lúc khởi động; không có tệp thì chỉ còn
+`MOC_HOLIDAYS`. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình
+(`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
 
-Giới hạn: ngày lễ âm lịch và ngày nghỉ bù không tự có, người vận hành phải thêm mỗi năm; chỉ gợi ý đơn vị chủ trì và
+Giới hạn: lịch nghỉ chính thức chỉ có các năm đã công bố (bản chụp hiện tới hết 2027, chưa có Giỗ Tổ 2027) và là
+lịch của cán bộ, công chức, viên chức — đơn vị nghỉ khác thì sửa `MOC_HOLIDAYS`; chỉ gợi ý đơn vị chủ trì và
 hạn, **không** gợi ý người xử lý (việc của bước phân công); ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác top-1 dễ cao
 ảo — đọc kèm số căn cứ và số đơn vị. Ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt theo lần đo đầu trên stack thật.
 
@@ -266,6 +274,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_SUGGEST_MIN_SCORE` | `0.3` | Ngưỡng điểm `_rankingScore` (0..1) để một văn bản tương tự làm căn cứ |
 | `MOC_ASSIGNER_ID` | `moc-assigner` | Danh tính tác tử (1–64 ký tự): `actor_id` của dòng sổ, `agent_id` của bảng gợi ý |
 | `MOC_HOLIDAYS` | `01-01,04-30,05-01,09-02` | Ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: `MM-DD` hằng năm, `YYYY-MM-DD`, `YYYY-MM-DD..YYYY-MM-DD` (≤ 31 ngày); trống thì như mặc định. Xem đoạn "Ngày lễ" |
+| `MOC_HOLIDAYS_FILE` | `/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json` | Lịch nghỉ chính thức (nguồn công khai B, #427) cộng vào `MOC_HOLIDAYS`, kể cả thứ Bảy làm bù; rỗng thì tắt, không có tệp thì bỏ qua, tệp hỏng thì dừng lúc khởi động |
 | `MOC_SMTP_HOST` | trống | Máy chủ thư; trống thì tắt kênh email |
 | `MOC_SMTP_TLS` | `starttls` | `starttls`, `ssl` hoặc `none` (không mã hóa, chỉ cho relay nội bộ như Mailpit, không bao giờ đăng nhập — xem dưới bảng) |
 | `MOC_SMTP_PORT` | theo `MOC_SMTP_TLS` | `587` (starttls), `465` (ssl), `25` (none) |
