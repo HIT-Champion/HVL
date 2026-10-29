@@ -71,6 +71,8 @@ public/*.pdf
 !/seed/van-ban-den/*.pdf
 # Kho văn bản mẫu (giả lập) để thử, đo trợ lý hỏi đáp F4.2 — sinh bằng make hoi-dap-mau
 !/seed/hoi-dap/*.pdf
+# Bản chụp nguồn dữ liệu công khai (#424): bản Công báo của văn bản thật, nguồn ở manifest.json cùng thư mục
+!/seed/du-lieu-mo/*/*.pdf
 
 # --- Docker overrides cục bộ -------------------------------------------------
 docker-compose.override.yml

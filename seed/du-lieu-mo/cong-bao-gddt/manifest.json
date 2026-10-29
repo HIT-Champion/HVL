@@ -1,0 +1,76 @@
+{
+  "source": "cong-bao-gddt",
+  "name": "Văn bản của Bộ Giáo dục và Đào tạo đăng Công báo",
+  "publisher": "Văn phòng Chính phủ (Công báo nước CHXHCN Việt Nam)",
+  "home_url": "https://congbao.chinhphu.vn/",
+  "reuse_basis": "Khoản 2 Điều 15 Luật Sở hữu trí tuệ (văn bản hợp nhất số 160/2026/VBHN-LQ-VPQH): văn bản quy phạm pháp luật không thuộc phạm vi bảo hộ quyền tác giả. Công báo yêu cầu ghi rõ nguồn \"congbao.chinhphu.vn\" khi phát hành lại.",
+  "licence": null,
+  "fetched_at": "2026-10-30T02:18:58+07:00",
+  "max_age_days": 400,
+  "files": [
+    {
+      "file": "26-2026-tt-bgddt.pdf",
+      "url": "https://g7.cdnchinhphu.vn/api/download/stream?Url=tm-8mq6BhNw0NbrKRhTDAaHMpvrqWaeHuYm7lW3HNfzTzww8Myg35dDL_fJB4izwEoRXYtkdX_P1Q6B3lbtd-9ldFJAui9BkdUhlS8r0gkPzF6CrKuUEV9dHTGgVDLNIp58henlfPU3Aappi6mYgwA~~&file_name=2026_249_26%2f2026%2fTT-BGD%c4%90T.pdf",
+      "sha256": "d1176323d97d7bc689374c516aa0604c96dd22cd96371be7d68d45a14fa3a04a",
+      "bytes": 543493,
+      "fetched_at": "2026-10-30T02:18:51+07:00",
+      "meta": {
+        "symbol": "26/2026/TT-BGDĐT",
+        "issuer_name": "Bộ Giáo dục và Đào tạo",
+        "issued_on": "2026-04-09",
+        "type_code": "TT",
+        "summary": "Quy định chuẩn nghề nghiệp giảng viên đại học",
+        "gazette": "Công báo số 249 ngày 26/04/2026",
+        "page_url": "https://congbao.chinhphu.vn/van-ban/thong-tu-so-26-2026-tt-bgddt-469372.htm"
+      }
+    },
+    {
+      "file": "49-2026-tt-bgddt.pdf",
+      "url": "https://g7.cdnchinhphu.vn/api/download/stream?Url=tm-8mq6BhNw0NbrKRhTDAaHMpvrqWaeHuYm7lW3HNfzTzww8Myg35dDL_fJB4izwRtXqUylC2raG8h7fhEFKbeRXkMOL7BXcM7dJKAW7gxiyOyGp5yLjsAGWdfGtGsgreyM0NV5Jhe9m1J9FjApEwQ~~&file_name=2026_421_49%2f2026%2fTT-BGD%c4%90T.pdf",
+      "sha256": "cee27c7c92d64ad9f0f20c7052bed0d773231a0b2ca6ac53cf311cd18bed41bb",
+      "bytes": 668039,
+      "fetched_at": "2026-10-30T02:18:53+07:00",
+      "meta": {
+        "symbol": "49/2026/TT-BGDĐT",
+        "issuer_name": "Bộ Giáo dục và Đào tạo",
+        "issued_on": "2026-06-30",
+        "type_code": "TT",
+        "summary": "Quy định ứng dụng công nghệ trong giáo dục đại học, giáo dục nghề nghiệp",
+        "gazette": "Công báo số 421 ngày 20/07/2026",
+        "page_url": "https://congbao.chinhphu.vn/van-ban/thong-tu-so-49-2026-tt-bgddt-470007.htm"
+      }
+    },
+    {
+      "file": "58-2026-tt-bgddt.pdf",
+      "url": "https://g7.cdnchinhphu.vn/api/download/stream?Url=tm-8mq6BhNw0NbrKRhTDAaHMpvrqWaeHuYm7lW3HNfzTzww8Myg35dDL_fJB4izwdAznpg9ghX-ZJMXB8hKtZ6UCMGVlyEJUv1K6m-5-VviJujCQSQIFAVDksToATrPZGQN2SsXQQlvl-3HAXQiwEQ~~&file_name=2026_452_58%2f2026%2fTT-BGD%c4%90T.pdf",
+      "sha256": "e99d0e5c6d58b34a912e04164546e993cb978e761d7446963b6cf70aedd46ccc",
+      "bytes": 586942,
+      "fetched_at": "2026-10-30T02:18:56+07:00",
+      "meta": {
+        "symbol": "58/2026/TT-BGDĐT",
+        "issuer_name": "Bộ Giáo dục và Đào tạo",
+        "issued_on": "2026-07-07",
+        "type_code": "TT",
+        "summary": "Hướng dẫn về quy chế tổ chức và hoạt động của cơ sở giáo dục đại học",
+        "gazette": "Công báo số 452 ngày 30/07/2026",
+        "page_url": "https://congbao.chinhphu.vn/van-ban/thong-tu-so-58-2026-tt-bgddt-470129.htm"
+      }
+    },
+    {
+      "file": "06-2026-tt-bgddt.pdf",
+      "url": "https://g7.cdnchinhphu.vn/api/download/stream?Url=tm-8mq6BhNw0NbrKRhTDAaHMpvrqWaeHuYm7lW3HNfzTzww8Myg35dDL_fJB4izwleJUc2GcANL28NG2xq1UpoRqVYEorBMqdc-ncKrjViHmVIwedrZoFEAkETCm25tDCsjFrxoAHLBcZkm0osOetQ~~&file_name=2026_148_06%2f2026%2fTT-BGD%c4%90T.pdf",
+      "sha256": "3e73bdc887ed282b686ffc8391484435ce3db83dfa8a14aa7b6d7bd037f3e8ed",
+      "bytes": 791340,
+      "fetched_at": "2026-10-30T02:18:58+07:00",
+      "meta": {
+        "symbol": "06/2026/TT-BGDĐT",
+        "issuer_name": "Bộ Giáo dục và Đào tạo",
+        "issued_on": "2026-02-15",
+        "type_code": "TT",
+        "summary": "Ban hành Quy chế tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng",
+        "gazette": "Công báo số 148 ngày 15/03/2026",
+        "page_url": "https://congbao.chinhphu.vn/van-ban/thong-tu-so-06-2026-tt-bgddt-469029.htm"
+      }
+    }
+  ]
+}

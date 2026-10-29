@@ -51,8 +51,9 @@ HEAD_Y = 0.45            # vùng đầu: dòng trang 1 có y < HEAD_Y …
 HEAD_LINES = 30          # … hoặc 30 dòng đầu khi không có tọa độ
 LOW_TEXT = 80            # ít hơn từng này ký tự chữ, số: cảnh báo low_text
 
-# Danh mục loại văn bản (office.document_types, NĐ 30 Phụ lục III) + vài loại văn bản quy phạm chưa có trong danh mục:
-# tên loại dùng để nhận dòng tiêu đề và viết trích yếu, mã chỉ trả khi có trong type_codes
+# Danh mục loại văn bản (office.document_types: NĐ 30 Phụ lục III, thêm Thông tư ở #424) + vài loại văn bản quy
+# phạm chưa có trong danh mục: tên loại dùng để nhận dòng tiêu đề và viết trích yếu, mã chỉ trả khi có trong
+# type_codes
 TYPE_NAMES = {
     "CV": "Công văn", "NQ": "Nghị quyết", "QĐ": "Quyết định", "CT": "Chỉ thị", "QC": "Quy chế", "QYĐ": "Quy định",
     "TC": "Thông cáo", "TB": "Thông báo", "HD": "Hướng dẫn", "CTr": "Chương trình", "KH": "Kế hoạch",
@@ -62,7 +63,7 @@ TYPE_NAMES = {
     "PB": "Phiếu báo",
     "TT": "Thông tư", "NĐ": "Nghị định", "TTLT": "Thông tư liên tịch",
 }
-CATALOG = frozenset(TYPE_NAMES) - {"TT", "NĐ", "TTLT"}   # mặc định khi không truyền type_codes
+CATALOG = frozenset(TYPE_NAMES) - {"NĐ", "TTLT"}   # mặc định khi không truyền type_codes
 
 URGENCY = {"HOATOC": "hoa_toc", "THUONGKHAN": "thuong_khan", "KHAN": "khan"}
 

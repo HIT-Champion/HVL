@@ -783,8 +783,9 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
 - **Hệ quả:** tắt `svc-files` thì văn bản vẫn tới lãnh đạo ngay, chỉ có dòng `failed`; CI chạy đủ bằng tìm theo từ khóa
   và bỏ phiếu. Gợi ý giải thích được ("vì 3 văn bản tương tự đã giao Tổ Đào tạo") và tốt dần khi có thêm văn bản đã
   giao; ít dữ liệu, ít đơn vị hợp lệ thì độ chính xác đo được dễ cao ảo — số đo luôn báo kèm số văn bản, số đơn vị.
-  Hạn tránh thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS`; ngày lễ âm lịch, ngày nghỉ bù do người vận hành thêm mỗi
-  năm. Chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
+  Hạn tránh thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` cộng lịch nghỉ chính thức (Tết, nghỉ bù, làm bù) của
+  nguồn công khai B `seed/du-lieu-mo/ngay-nghi-le` (#427); năm chưa công bố thì người vận hành thêm vào
+  `MOC_HOLIDAYS`. Chỉ gợi ý đơn vị chủ trì, chưa gợi ý người xử lý (bước phân công). Mỗi văn bản đến
   thêm một dòng tác tử ở Sổ kiểm toán và tab Lịch sử — dòng sổ không mang trích yếu, không mang căn cứ. Chi tiết:
   `docs/mo-hinh-du-lieu.md` §1, §3, §4.2, README của `svc-workflow`.
 

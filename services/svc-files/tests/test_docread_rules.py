@@ -252,8 +252,9 @@ def test_only_codes_in_the_catalog_are_returned():
     assert "type_code" not in fields(lines, type_codes=["CV", "TB"])
     thong_tu = letter(symbol="Số: 45/2026/TT-BTN", below=[None, ("C", "THÔNG TƯ"),
                                                           ("C", "Quy định kỹ thuật về số hóa tài liệu lưu trữ")])
-    got = fields(thong_tu, type_codes=CATALOG)
-    assert "type_code" not in got        # Thông tư chưa có trong danh mục office.document_types
+    assert fields(thong_tu, type_codes=CATALOG)["type_code"] == ("TT", "high")    # vào danh mục ở #424
+    got = fields(thong_tu, type_codes=CATALOG - {"TT"})                           # bản cài chưa có migration
+    assert "type_code" not in got
     assert got["summary"] == ("Thông tư quy định kỹ thuật về số hóa tài liệu lưu trữ", "high")
 
 

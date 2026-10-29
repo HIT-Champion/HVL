@@ -43,10 +43,11 @@ def doc_sql(tenant: str, **cols) -> str:
 
 def test_document_types_seeded_from_nd30():
     rows = dict((code, (name, flag)) for code, name, flag in sql("select code, name, in_symbol::text from office.document_types"))
-    assert len(rows) == 28
+    assert len(rows) == 29      # 28 loại của NĐ 30 + Thông tư (TT) cho văn bản nguồn công khai (#424)
     assert rows["CV"] == ("Công văn", "false")
     assert rows["QĐ"] == ("Quyết định", "true")
     assert rows["TTr"] == ("Tờ trình", "true")
+    assert rows["TT"] == ("Thông tư", "true")
 
 
 def test_object_key_must_live_under_own_tenant(world):

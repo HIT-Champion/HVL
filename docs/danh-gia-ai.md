@@ -246,6 +246,12 @@ ra, không làm đỏ.
   So với cột 21/10 không bật `ai`, tổng từ chối đúng vẫn 3 / 3 nhưng chia khác (1 `no_evidence` + 2 `passages_only`
   thay vì 2 + 1): chưa rõ nguyên nhân.
 
+- 30/10/2026, CI, không bật `ai`, bộ 51 câu (bước `make do-hoi-dap` của job "Chạy thử: ai", run 40953517834 của PR
+  #444): recall@3 16 / 16, câu trích có từ khóa 15 / 16, từ chối đúng 3 / 3 (1 `no_evidence`, 2 `passages_only`), 0
+  lượt có nguồn bị cấm. Theo loại (đường đúng · trả lời đúng / số câu): `van_ban` 19 · 19 / 19, `noi_tiep` 5 · 5 / 5,
+  `gioi_thieu` 6 · 6 / 6, `huong_dan` 5 · 5 / 5, `ngoai_pham_vi` 6 · 6 / 6, `viec_cua_toi` 5 · 5 / 5, `dem_van_ban`
+  5 · 5 / 5. svc-files tự đo `extract` p50 14 ms, p95 62 ms.
+
 - Lần đo 23/10 chạy trên chính máy B, gọi qua địa chỉ công khai của bản online (`MOC_PUBLIC_URL`), nên thời gian phía
   người gọi gồm cả đường mạng; trước khi đo, chờ svc-files nhúng xong các đoạn tồn (`embed_pending` = 0) để việc nhúng
   nền không tranh CPU. Như lần đo 21/10, kho tìm gồm cả văn bản mẫu của `make seed`.
@@ -297,8 +303,8 @@ sửa hay bỏ gợi ý. Chi tiết: [README svc-workflow](../services/svc-workf
 [README svc-files](../services/svc-files/README.md#văn-bản-tương-tự-cho-tác-tử-gợi-ý-giao-việc-f43).
 
 **Mô hình, công cụ.** **Không mô hình sinh nào chọn đơn vị** (QĐ-005): bỏ phiếu kNN có trọng số trên tối đa 5 căn cứ,
-hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` (`suggest.py`,
-thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
+hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` cùng lịch
+nghỉ chính thức của nguồn công khai B (#427) (`suggest.py`, thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
 phần truy xuất của F4.2 qua route nội bộ `POST /internal/similar-documents` (`assist/similar.py`): câu tìm từ trích yếu,
 tìm từ khóa kèm lượt tìm nới; có Qwen3-Embedding thì tìm lai, tối đa 3 giây. Flowable chạy nhánh song song và timer.
 
@@ -340,8 +346,9 @@ top-2, top-3 vô nghĩa khi chỉ có hai đơn vị hợp lệ. Dữ liệu chi
 **Chưa đo.** Với tìm theo nghĩa (bật `ai`: 0/29 lượt ở trên là tìm từ khóa); trên nhiều đơn vị hơn; trên dữ liệu thật —
 view `office.v_assignment_suggestion_accuracy` (tỉ lệ lãnh đạo giữ đơn vị, giữ hạn, sai số hạn).
 
-**Giới hạn.** Ngày lễ mặc định chỉ có lễ dương lịch cố định; Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù do người vận hành thêm
-vào `MOC_HOLIDAYS` mỗi năm (#280); chỉ gợi ý đơn vị và hạn, không gợi ý người xử lý; chỉ mục
+**Giới hạn.** Lịch nghỉ chính thức chỉ có các năm Chính phủ đã công bố (bản chụp tới hết 2027, chưa có Giỗ Tổ 2027),
+năm sau đó người vận hành lấy mới hoặc thêm vào `MOC_HOLIDAYS` (#280, #427); chỉ gợi ý đơn vị và hạn, không gợi ý
+người xử lý; chỉ mục
 đoạn đồng bộ vài giây một lần nên văn bản vừa giao chưa làm căn cứ ngay; trích yếu quá ngắn hay chỉ có từ chung thì ít
 kết quả đúng; ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt trên dữ liệu mẫu.
 
