@@ -25,8 +25,9 @@ import { test } from 'node:test'
 import type { AskResult, AskSource } from '../app/composables/useApi.ts'
 
 const {
-  ASK_ROLES, MASK_RE, MAX_QUESTION, SCOPE_PARAM, askAbout, blocks, canAskAbout, canView, citeLabel, cleanQuestion,
-  hasMask, inAssistant, needsGenerate, pageUrl, scopeOf, segments, sourceAnchor, tidy,
+  ASK_ROLES, DATA_GROUP, DATA_ROUTES, MASK_RE, MAX_PREVIOUS, MAX_QUESTION, ROUTES, SCOPE_PARAM, SUGGEST_GROUPS,
+  askAbout, blocks, canAskAbout, canView, citeLabel, cleanQuestion, fallbackSuggestions, hasMask, inAssistant,
+  needsGenerate, pageUrl, previousFor, scopeOf, searched, segments, sourceAnchor, tidy,
 } = await import('../app/utils/answer.ts')
 
 type Messages = { [key: string]: string | Messages }
@@ -152,15 +153,18 @@ test('tự nhờ mô hình viết câu trả lời chỉ khi mô hình sẵn sà
 
 test('khối hiện: câu trả lời của mô hình và câu trích; mô hình không đạt thì chỉ còn câu trích', () => {
   const model = { text: 'Điểm trung bình từ 3,2 trở lên [1].', source: 'model' as const, model: 'qwen3:1.7b' }
-  assert.deepEqual(blocks({ answer: model, extract: SAMPLE.extract }), { model, extract: SAMPLE.extract })
+  assert.deepEqual(blocks({ answer: model, extract: SAMPLE.extract }), { model, extract: SAMPLE.extract, direct: null })
   // model_rejected / model_timeout: answer là chính câu trích
-  assert.deepEqual(blocks({ answer: SAMPLE.answer, extract: SAMPLE.extract }), { model: null, extract: SAMPLE.extract })
+  assert.deepEqual(blocks({ answer: SAMPLE.answer, extract: SAMPLE.extract }),
+    { model: null, extract: SAMPLE.extract, direct: null })
   // mô hình trả lời mà không trích được câu nào
-  assert.deepEqual(blocks({ answer: model, extract: null }), { model, extract: null })
+  assert.deepEqual(blocks({ answer: model, extract: null }), { model, extract: null, direct: null })
   // thiếu extract nhưng answer là câu trích
-  assert.deepEqual(blocks({ answer: SAMPLE.answer, extract: null }), { model: null, extract: SAMPLE.answer })
-  assert.deepEqual(blocks({ answer: null, extract: null }), { model: null, extract: null })
-  assert.deepEqual(blocks({ answer: { ...model, text: '' }, extract: null }), { model: null, extract: null })
+  assert.deepEqual(blocks({ answer: SAMPLE.answer, extract: null }),
+    { model: null, extract: SAMPLE.answer, direct: null })
+  assert.deepEqual(blocks({ answer: null, extract: null }), { model: null, extract: null, direct: null })
+  assert.deepEqual(blocks({ answer: { ...model, text: '' }, extract: null }),
+    { model: null, extract: null, direct: null })
 })
 
 test('nhãn che thông tin cá nhân (F4.4): nhận đúng nhãn, không nhầm với dấu trích dẫn', () => {
@@ -205,6 +209,96 @@ test('kết quả thiếu trường vẫn dùng được: mảng rỗng, nguồn
   assert.equal(meta.sources[0]?.excerpt, '')
   const bare = tidy({ ask_id: 'x', status: 'no_evidence', semantic: false, ai_available: false, duration_ms: 3 } as unknown as AskResult)
   assert.deepEqual([bare.sources, bare.warnings, bare.answer, bare.extract], [[], [], null, null])
+})
+
+// --- bộ định tuyến, câu nối tiếp, gợi ý theo loại câu (hợp đồng API: route, route_reason, rewritten, previous) -------
+
+test('máy chủ chưa có bộ định tuyến: không có route, trang như cũ; route lạ coi như van_ban', () => {
+  const old = tidy(SAMPLE)
+  assert.equal('route' in old, false)
+  assert.equal('route_reason' in old, false)
+  assert.equal(old.rewritten, null)
+  const odd = tidy({ ...SAMPLE, route: 'thoi_tiet', route_reason: 7, rewritten: '  ' } as unknown as AskResult)
+  assert.equal(odd.route, 'van_ban')
+  assert.equal('route_reason' in odd, false)
+  assert.equal(odd.rewritten, null)
+  const follow = tidy({ ...SAMPLE, route: 'van_ban', route_reason: 'mac-dinh', rewritten: ' Khoa Kinh tế học bổng ' })
+  assert.deepEqual([follow.route, follow.route_reason, follow.rewritten],
+    ['van_ban', 'mac-dinh', 'Khoa Kinh tế học bổng'])
+  for (const route of ROUTES) assert.equal(tidy({ ...SAMPLE, route }).route, route)
+})
+
+test('chỉ văn bản và hướng dẫn mới nhờ mô hình viết; giới thiệu, ngoài phạm vi, đường dữ liệu thì không', () => {
+  const ready = { ...SAMPLE, ai_available: true }
+  assert.equal(needsGenerate({ ...ready, route: undefined }), true)
+  for (const route of ['van_ban', 'huong_dan'] as const) {
+    assert.equal(needsGenerate({ ...ready, route }), true, route)
+  }
+  for (const route of ['gioi_thieu', 'ngoai_pham_vi', 'viec_cua_toi', 'dem_van_ban'] as const) {
+    assert.equal(needsGenerate({ ...ready, route }), false, route)
+  }
+  // giới thiệu vẫn là đường tìm đoạn (có nguồn guide, có chip tìm), chỉ không có lượt viết
+  assert.equal(searched('gioi_thieu'), true)
+})
+
+test('câu trả lời thẳng (fixed, data) là khối riêng, không phải câu trích hay câu của mô hình', () => {
+  const data = { text: 'Bạn có 2 việc sắp quá hạn. Căn cứ: Hộp việc của bạn.', source: 'data' as const, model: null }
+  assert.deepEqual(blocks({ answer: data, extract: null }), { model: null, extract: null, direct: data })
+  const fixed = { ...data, source: 'fixed' as const, text: 'Trợ lý chỉ trả lời về văn bản và cách dùng hệ thống.' }
+  assert.deepEqual(blocks({ answer: fixed, extract: null }), { model: null, extract: null, direct: fixed })
+  assert.deepEqual(blocks({ answer: { ...data, text: '' }, extract: null }),
+    { model: null, extract: null, direct: null })
+})
+
+test('nguồn guide (hướng dẫn, giới thiệu trợ lý): nhãn là tên tài liệu, không mở tệp', () => {
+  const guide = source(1, {
+    document_id: null, symbol: 'Hướng dẫn cho văn thư', type_code: null, type_name: 'Hướng dẫn sử dụng',
+    summary: 'Tiếp nhận văn bản đến', issuer_name: null, issued_on: null, direction: null, status: null,
+    kind: 'guide', file_id: null, file_role: null, page: null, path: 'docs/huong-dan/van-thu.md#tiep-nhan',
+  })
+  assert.equal(citeLabel(guide, tVi), 'Hướng dẫn cho văn thư')
+  assert.equal(citeLabel({ ...guide, symbol: null, type_name: null }, tVi), '')
+  assert.equal(canView(guide), false)
+})
+
+test('câu trước gửi kèm: chỉ lượt ngay trước, cùng phạm vi, đã có kết quả; câu đã ghép đi trước câu gốc', () => {
+  const doc = '8c1d2e3f-0000-4000-8000-000000000088'
+  const prior = { scope: null, question: 'Điều kiện xét học bổng là gì?', done: true }
+  assert.equal(previousFor(undefined, null), undefined)                     // lượt đầu
+  assert.equal(previousFor(prior, null), 'Điều kiện xét học bổng là gì?')
+  assert.equal(previousFor({ ...prior, rewritten: null }, null), 'Điều kiện xét học bổng là gì?')
+  // chuỗi ba câu: lượt trước là câu nối tiếp thì gửi câu máy chủ đã ghép
+  assert.equal(previousFor({ ...prior, rewritten: 'học bổng Khoa Kinh tế' }, null), 'học bổng Khoa Kinh tế')
+  assert.equal(previousFor({ ...prior, done: false }, null), undefined)      // lượt trước lỗi hay chưa xong
+  assert.equal(previousFor(prior, doc), undefined)                          // vừa đổi sang hỏi trong một văn bản
+  assert.equal(previousFor({ ...prior, scope: doc }, null), undefined)      // vừa bỏ phạm vi văn bản
+  assert.equal(previousFor({ ...prior, scope: doc }, doc), 'Điều kiện xét học bổng là gì?')
+  assert.equal(previousFor({ ...prior, question: ' Học\nbổng ​ ' }, null), 'Học bổng')
+  assert.equal(previousFor({ ...prior, rewritten: 'x'.repeat(MAX_PREVIOUS + 1) }, null), undefined)
+})
+
+test('gợi ý theo loại câu: mọi câu, tên nhóm, dòng "trả lời được" có ở hai ngôn ngữ', () => {
+  for (const group of [...SUGGEST_GROUPS, DATA_GROUP]) {
+    for (const key of group.keys) assert.ok(tVi(key) && tEn(key), key)
+    assert.ok(tVi(`assist.suggestGroup.${group.route}`) && tEn(`assist.suggestGroup.${group.route}`))
+    assert.ok(tVi(`assist.can.${group.route}`) && tEn(`assist.can.${group.route}`))
+  }
+  for (const route of ROUTES) assert.ok(tVi(`assist.route.${route}`) && tEn(`assist.route.${route}`), route)
+  assert.equal(tVi('assist.understood', { route: tVi('assist.route.gioi_thieu') }), 'Đã hiểu là câu hỏi về: trợ lý')
+  // ba câu văn bản cũ vẫn là nhóm đầu tiên
+  assert.deepEqual(SUGGEST_GROUPS[0], {
+    route: 'van_ban', keys: ['assist.suggest.credits', 'assist.suggest.examDeadline', 'assist.suggest.language'],
+  })
+})
+
+test('nhóm "Việc của tôi" chỉ hiện khi svc-files có đường dữ liệu; gợi ý dự phòng bỏ nhóm vừa hỏi', () => {
+  const routes = SUGGEST_GROUPS.map((g) => g.route)
+  assert.equal(routes.includes('viec_cua_toi'), DATA_ROUTES)
+  assert.equal(new Set(routes).size, routes.length)
+  assert.deepEqual(fallbackSuggestions('van_ban'), SUGGEST_GROUPS.slice(1).map((g) => g.keys[0]))
+  assert.deepEqual(fallbackSuggestions(undefined), fallbackSuggestions('van_ban'))
+  assert.deepEqual(fallbackSuggestions('ngoai_pham_vi'), SUGGEST_GROUPS.map((g) => g.keys[0]))
+  assert.ok(!fallbackSuggestions('huong_dan').includes('assist.suggest.leave'))
 })
 
 // Hai bộ khóa ngôn ngữ phải giống hệt nhau, cùng tham số {x}
