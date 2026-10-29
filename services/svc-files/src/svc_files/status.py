@@ -34,6 +34,9 @@ mô hình ngôn ngữ) không tính.
 Cùng kết quả gom ra dạng chữ của Prometheus ở ``GET /metrics`` (#274): Prometheus thu 15 giây một lần, nên thành
 phần chết vẫn bật cảnh báo khi không ai gọi tới (``platform/monitoring/canh-bao.yml``, nhóm ``thanh-phan``). Đường này
 chỉ gọi được trong mạng nội bộ: route ``chan`` của APISIX trả 404 cho ``/metrics``.
+
+Khóa ``open_data`` (#424): nguồn gốc và tuổi dữ liệu của các nguồn dữ liệu công khai, đọc từ bản chụp trên mount chỉ
+đọc ``MOC_OPEN_DATA_DIR`` (open_data.py). Không tính vào trạng thái chung; lỗi đọc thì danh sách rỗng.
 """
 
 from __future__ import annotations
@@ -49,6 +52,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import httpx2
+
+from .open_data import OpenData
 
 if TYPE_CHECKING:
     from .config import Settings
@@ -107,6 +112,7 @@ class StatusBoard:
     def __init__(self, components: Sequence[Component], *, version: str = "dev",
                  ai_info: Callable[[], dict[str, Any]] | None = None,
                  last_backup: Callable[[], Awaitable[datetime | None]] | None = None,
+                 open_data: Callable[[], list[dict[str, Any]]] | None = None,
                  ttl_s: float = 10.0, timeout_s: float = 3.0, clock: Callable[[], float] = time.monotonic,
                  now: Callable[[], datetime] = lambda: datetime.now(UTC),
                  closers: Sequence[Callable[[], Awaitable[None]]] = ()) -> None:
@@ -116,6 +122,7 @@ class StatusBoard:
         self.timeout_s = timeout_s
         self._ai_info = ai_info or (lambda: {"enabled": False, "model": None, "semantic": False})
         self._last_backup = last_backup
+        self._open_data = open_data
         self._clock = clock
         self._now = now
         self._closers = list(closers)
@@ -192,9 +199,23 @@ class StatusBoard:
         self._changed("sao-luu", "ok")
         return at if isinstance(at, datetime) else None
 
+    async def _sources(self) -> list[dict[str, Any]]:
+        if self._open_data is None:
+            return []
+        read = self._open_data
+        try:
+            # đọc tệp, băm trong luồng riêng; lần đầu (chưa có băm đệm) quá hạn thì lượt sau chờ tiếp chính lần đó
+            sources = await self._bounded("du-lieu-mo", lambda: asyncio.to_thread(read))
+        except Exception as exc:  # noqa: BLE001 — TimeoutError, OSError…: trang chỉ không có danh sách nguồn
+            self._changed("du-lieu-mo", "down", f"{type(exc).__name__}: {exc}")
+            return []
+        self._changed("du-lieu-mo", "ok")
+        return sources if isinstance(sources, list) else []
+
     async def _collect(self) -> dict[str, Any]:
         self.rounds += 1
-        *states, backup = await asyncio.gather(*(self._probe(c) for c in self.components), self._backup())
+        *states, backup, sources = await asyncio.gather(*(self._probe(c) for c in self.components), self._backup(),
+                                                        self._sources())
         rows = list(zip(self.components, states, strict=True))
         if any(c.critical and s == "down" for c, s in rows):
             overall = "down"
@@ -213,6 +234,7 @@ class StatusBoard:
             "layers": [{"id": key, "label": label} for key, label in LAYERS],
             "components": [{"id": c.id, "layer": c.layer, "label": c.label, "software": c.software, "status": s}
                            for c, s in rows],
+            "open_data": sources,
         }
 
 
@@ -313,4 +335,5 @@ def default_board(settings: Settings, *, scanner: Any, store: Any, hasura: Any, 
         Component("tro-ly-ai", "tri-tue", "Trợ lý AI", "Ollama", ai_check, critical=False),
     ]
     return StatusBoard(components, version=settings.version, ai_info=ai_info, last_backup=hasura.last_backup,
+                       open_data=OpenData(settings.open_data_dir) if settings.open_data_dir else None,
                        ttl_s=settings.status_cache_s, timeout_s=settings.status_timeout_s, closers=[http.aclose])

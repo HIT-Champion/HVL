@@ -172,7 +172,8 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
 - [ ] **Một phần** — khung tự chẩn đoán mức trưởng thành H-P-D-I cho lãnh đạo (F4.7, mức Dùng được,
       `/tu-chan-doan`): bộ câu do đội tự viết, chưa thử với đơn vị thật; một người trả lời cho cả đơn vị
 - [ ] **Một phần** — dữ liệu mẫu theo ngành: mới một ngành, văn thư của khoa, trường — `make seed` (F2.10) và lô 200
-      văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
+      văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản nội bộ là giả lập, có thêm bốn thông tư thật của Bộ GD&ĐT lấy
+      từ Công báo (nguồn dữ liệu công khai, #424)
 - [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được), Không
       gian cá nhân và Bảng tin cũng có bản tiếng Anh (#306), `README.en.md`, hướng dẫn dịch cho người đóng góp
       (`CONTRIBUTING.md`, mục "Dịch giao diện"); tài liệu vận hành chưa có bản tiếng Anh (issue #59)

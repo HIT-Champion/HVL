@@ -19,6 +19,7 @@ bộ, địa chỉ IP, thông báo lỗi —; lưu đệm và gom một lượt 
 mở thêm lần dò mới cho thành phần đang treo; tính trạng thái chung; Hasura đọc giờ sao lưu gần nhất."""
 
 import asyncio
+import hashlib
 import json
 import re
 import time
@@ -255,6 +256,7 @@ def status_settings(**extra: str) -> Settings:
         "MOC_AUDIT_ANCHOR_INTERVAL_S": "0", "MOC_TEXT_INTERVAL_S": "0", "MOC_AI_URL": "",
         "MOC_IMPORT_INTERVAL_S": "0",     # vòng nền nạp lô tắt (không tạo thư mục spool)
         "MOC_VERSION": "1.0.0", "MOC_STATUS_TIMEOUT_S": "0.5",
+        "MOC_OPEN_DATA_DIR": "",          # không đọc /srv/du-lieu-mo của máy chạy test
         **extra,
     })
 
@@ -282,7 +284,9 @@ def test_api_status_all_ok_without_token(parts, verifier):
         r = c.get("/api/status")
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     body = r.json()
-    assert set(body) == {"status", "checked_at", "version", "uptime_s", "last_backup_at", "ai", "layers", "components"}
+    assert set(body) == {"status", "checked_at", "version", "uptime_s", "last_backup_at", "ai", "layers", "components",
+                         "open_data"}
+    assert body["open_data"] == []
     assert body["status"] == "ok" and body["version"] == "1.0.0" and isinstance(body["uptime_s"], int)
     assert datetime.fromisoformat(body["last_backup_at"]) == BACKUP_AT
     assert [x["id"] for x in body["components"]] == EXPECTED
@@ -371,8 +375,66 @@ def test_api_status_no_vault_or_workflow_url_is_off(parts, verifier):
 
 def test_openapi_documents_public_status(parts, verifier):
     with status_client(status_settings(), parts, verifier) as c:
-        op = c.get("/openapi.json").json()["paths"]["/api/status"]["get"]
+        spec = c.get("/openapi.json").json()
+    op = spec["paths"]["/api/status"]["get"]
     assert "security" not in op and "429" in op["responses"]
+    assert "open_data" in spec["components"]["schemas"]["StatusOut"]["properties"]
+
+
+# --- nguồn dữ liệu công khai (#424) -------------------------------------------------------------------------------
+
+
+def open_data_source(root, *, sha: str | None = None) -> dict:
+    pdf = b"%PDF-1.7 thong tu\n"
+    folder = root / "cong-bao-gddt"
+    folder.mkdir()
+    (folder / "tt.pdf").write_bytes(pdf)
+    manifest = {"source": "cong-bao-gddt", "name": "Văn bản Bộ GD&ĐT trên Công báo", "publisher": "Văn phòng Chính phủ",
+                "home_url": "https://congbao.chinhphu.vn/", "reuse_basis": "Khoản 2 Điều 15 Luật SHTT", "licence": None,
+                "fetched_at": "2026-10-30T02:10:00+07:00", "max_age_days": 400,
+                "files": [{"file": "tt.pdf", "url": "https://congbao.chinhphu.vn/tt.pdf", "bytes": len(pdf),
+                           "sha256": sha or hashlib.sha256(pdf).hexdigest(), "fetched_at": None,
+                           "meta": {"symbol": "26/2026/TT-BGDĐT"}}]}
+    (folder / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False))
+    return manifest
+
+
+def test_api_status_lists_open_data_sources(tmp_path, parts, verifier):
+    manifest = open_data_source(tmp_path)
+    with status_client(status_settings(MOC_OPEN_DATA_DIR=str(tmp_path)), parts, verifier) as c:
+        body = c.get("/api/status").json()
+    [src] = body["open_data"]
+    assert src["source"] == "cong-bao-gddt" and src["state"] == "ok" and src["max_age_days"] == 400
+    assert isinstance(src["age_days"], int) and src["age_days"] >= 0
+    assert datetime.fromisoformat(src["fetched_at"]) == datetime.fromisoformat(manifest["fetched_at"])
+    assert src["files"] == [{**manifest["files"][0]}]
+    assert body["status"] == "ok"
+
+
+def test_api_status_broken_source_does_not_change_overall(tmp_path, parts, verifier):
+    open_data_source(tmp_path, sha="0" * 64)
+    with status_client(status_settings(MOC_OPEN_DATA_DIR=str(tmp_path)), parts, verifier) as c:
+        body = c.get("/api/status").json()
+    assert [s["state"] for s in body["open_data"]] == ["broken"] and body["status"] == "ok"
+
+
+def test_open_data_failure_or_hang_gives_empty_list(log_records):
+    def boom() -> list:
+        raise OSError("ổ đĩa lỗi")
+
+    def hang() -> list:
+        time.sleep(0.3)
+        return [{"source": "x"}]
+
+    for read in (boom, hang):
+        board = StatusBoard([Component("a", "loi", "A", "X", ok_after([], "a"))], open_data=read, timeout_s=0.05)
+        report = run(board.report())
+        assert report["open_data"] == [] and report["status"] == "ok"
+    assert any(r.get("component") == "du-lieu-mo" and r["state"] == "down" for r in log_records)
+
+
+def test_open_data_dir_default():
+    assert Settings.open_data_dir == "/srv/du-lieu-mo"
 
 
 # --- GET /metrics cho Prometheus (#274) ----------------------------------------------------------------------------
@@ -432,6 +494,7 @@ def test_metrics_escape_label_values():
     ({"MOC_STATUS_CACHE_S": "0"}, "MOC_STATUS_CACHE_S"),
     ({"MOC_STATUS_TIMEOUT_S": "30"}, "MOC_STATUS_TIMEOUT_S"),
     ({"MOC_WORKFLOW_URL": "svc-workflow:8000"}, "MOC_WORKFLOW_URL"),
+    ({"MOC_OPEN_DATA_DIR": "seed/du-lieu-mo"}, "MOC_OPEN_DATA_DIR"),
 ])
 def test_status_config_checked(env, message):
     with pytest.raises(ConfigError, match=message):

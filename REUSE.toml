@@ -67,3 +67,12 @@ path = ["docs/anh/kien-truc-tong-the.gif", "docs/anh/kien-truc-tong-the.en.gif"]
 precedence = "closest"
 SPDX-FileCopyrightText = ["2026 Signet Team", "Logo: chủ sở hữu từng dự án, xem docs/anh/logo/NGUON.md"]
 SPDX-License-Identifier = "Apache-2.0 AND LicenseRef-Logos"
+
+# Nguồn dữ liệu công khai (seed/du-lieu-mo/): văn bản nhà nước không thuộc phạm vi bảo hộ quyền tác giả (Điều 15 Luật
+# Sở hữu trí tuệ, LICENSES/LicenseRef-VN-SHTT-Dieu-15.txt); nguồn từng tệp ghi ở manifest.json cùng thư mục, manifest
+# do mã của đội sinh nên vẫn Apache-2.0. Nguồn A (#424): bản Công báo của thông tư Bộ GD&ĐT. Ghi đè "**.pdf" ở khối đầu.
+[[annotations]]
+path = ["seed/du-lieu-mo/cong-bao-gddt/*.pdf"]
+precedence = "closest"
+SPDX-FileCopyrightText = "Văn bản nhà nước Việt Nam, xem manifest.json cùng thư mục"
+SPDX-License-Identifier = "LicenseRef-VN-SHTT-Dieu-15"
