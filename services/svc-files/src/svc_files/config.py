@@ -134,7 +134,8 @@ class Settings:
     ask_min_score_semantic: float = 0.75
     ask_semantic_ratio: float = 0.5     # tỷ trọng tìm theo nghĩa
     ask_deadline_s: float = 50.0        # hạn tổng một yêu cầu (dưới 60 giây của APISIX)
-    ask_model: str = "qwen3:1.7b"       # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL
+    # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL, trừ MOC_ASK_API=openai (bắt buộc ghi rõ)
+    ask_model: str = "qwen3:1.7b"
     # Nơi viết câu trả lời (#430): ollama (tại chỗ, mặc định) hoặc openai — máy chủ nói chuẩn OpenAI ở
     # MOC_ASK_API_URL (…/v1). Chỉ bước viết đi ra ngoài; nhúng, trích yếu văn bản đến vẫn ở Ollama. Khóa
     # MOC_ASK_API_KEY là bí mật tùy chọn, đến từ két (platform/openbao/start.sh), không in ra repr hay nhật ký
