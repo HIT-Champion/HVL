@@ -177,7 +177,7 @@ Chế độ `extract` tất định, không cần mô hình; chế độ `genera
 hậu kiểm. Đường ống tự viết trong `assist/` (không LlamaIndex, QĐ-004).
 
 **Dữ liệu đánh giá.** `seed/hoi-dap/`: 6 PDF hư cấu, 14 trang — 5 văn bản thường và 1 văn bản hạn chế (53/PA-ĐHM, cụm từ
-riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 51 câu, mỗi câu gắn người hỏi và
+riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 54 câu, mỗi câu gắn người hỏi và
 loại (`loai`). 19 câu tra cứu văn bản (`van_ban`) giữ nguyên từ trước để số đo so được:
 
 - 16 câu dương: đáp án là số ký hiệu + trang, từ khóa phải có, câu chứa câu trả lời;
@@ -202,9 +202,17 @@ loại (`loai`). 19 câu tra cứu văn bản (`van_ban`) giữ nguyên từ tr�
   `do-hoi-dap` đếm bằng `office_documents_aggregate` đúng bộ lọc đó, bằng token người hỏi, so cả số lẫn bộ lọc trợ lý
   đọc từ câu.
 
+3 câu trên văn bản thật của nguồn công khai A (#446), người hỏi là văn thư Khoa CNTT; `make seed` nạp các thông tư
+này thành văn bản đến, đáp án là số ký hiệu + trang của tệp PDF bản Công báo:
+
+- 2 câu `cong_khai`, tìm như câu `van_ban`: "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?" (06/2026/TT-BGDĐT,
+  tr. 18), "Thông tư số 10/2020/TT-BGDĐT hết hiệu lực từ ngày nào?" (58/2026/TT-BGDĐT, tr. 5);
+- 1 câu nối tiếp (`noi_tiep`) "Còn ngành đào tạo giáo viên thì sao?" sau câu về nguyện vọng (cùng trang).
+
 Nhãn: `scripts/hoi_dap_mau.py` viết mỗi thông tin cần hỏi trong đúng một câu, trên đúng một trang (ngắt trang tường
 minh), rồi kiểm bằng pypdf rằng câu trả lời nằm đúng trang và chỉ ở trang đó; câu hỏi và từ khóa do đội viết. Với văn
-bản của `make seed`, câu chứa câu trả lời lấy nguyên văn trong `scripts/seed_documents.py`.
+bản của `make seed`, câu chứa câu trả lời lấy nguyên văn trong `scripts/seed_documents.py`; với thông tư của nguồn A,
+test kiểm bằng pypdf rằng câu đó nằm đúng trang của tệp trong `seed/du-lieu-mo/cong-bao-gddt/`.
 
 **Đo lại.**
 
@@ -224,8 +232,8 @@ bộ định tuyến chọn đúng `route` của câu, câu nối tiếp đượ
 trong `data` bằng số đếm thẳng qua GraphQL. recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in
 riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu đi sai
 đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`, `viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
-này không qua tìm kiếm nên không cần ngưỡng. Câu nối tiếp tìm trong kho như câu `van_ban`, recall@3 của chúng chỉ in
-ra, không làm đỏ.
+này không qua tìm kiếm nên không cần ngưỡng. Câu nối tiếp và câu `cong_khai` tìm trong kho như câu `van_ban`, recall@3
+của chúng chỉ in ra, không làm đỏ.
 
 **Kết quả.**
 
