@@ -215,6 +215,42 @@ class ScoreTest(unittest.TestCase):
         old = demo.score(POSITIVE, result("answered", [src("15/QĐ-ĐHM", 1)], "15 tín chỉ"), 0.1, restricted=[])
         self.assertEqual((old["loai"], old["route_ok"]), ("van_ban", True), "câu không ghi loại là van_ban")
 
+    def test_data_routes(self) -> None:
+        """Đường dữ liệu (#441): đúng khi câu có số và mọi số, bộ lọc bằng đáp án đếm thẳng qua GraphQL."""
+        want = {"data": "documents", "directions": ["in"], "from": "2026-10-01", "to": "2026-11-01", "type_code": None}
+        q = {"id": "d01", "user": "vanthu", "loai": "dem_van_ban", "route": "dem_van_ban", "question": "Bao nhiêu?",
+             "expect": [want]}
+        direct = {"counts": {"in": 3}, "type_code": None, "from": "2026-10-01", "to": "2026-11-01"}
+        data = {"kind": "documents", **direct}
+        got = {**routed("answered", [], "Có 3 văn bản đến …", source="data", route="dem_van_ban"), "data": data}
+        row = demo.score(q, got, 0.1, restricted=[], direct=direct)
+        self.assertEqual((row["route_ok"], row["correct"]), (True, True))
+        wrong = demo.score(q, {**got, "data": {**data, "counts": {"in": 2}}}, 0.1, restricted=[], direct=direct)
+        self.assertFalse(wrong["correct"], "số khác số đếm thẳng")
+        shifted = demo.score(q, {**got, "data": {**data, "from": "2026-09-01"}}, 0.1, restricted=[], direct=direct)
+        self.assertFalse(shifted["correct"], "đếm sai khoảng ngày")
+        self.assertFalse(demo.score(q, got, 0.1, restricted=[], direct=None)["correct"], "chưa đếm thẳng được")
+        searched = demo.score(q, routed("passages_only", [src("15/QĐ-ĐHM", 1)], route="van_ban"), 0.1, restricted=[],
+                              direct=direct)
+        self.assertEqual((searched["route_ok"], searched["correct"]), (False, False))
+        self.assertEqual(demo.direct_where("in", want), {"_and": [
+            {"direction": {"_eq": "in"}},
+            {"registered_at": {"_gte": "2026-10-01T00:00:00+07:00", "_lt": "2026-11-01T00:00:00+07:00"}}]})
+        self.assertEqual(demo.direct_where("out", {**want, "type_code": "QĐ"}), {"_and": [
+            {"direction": {"_eq": "out"}}, {"type_code": {"_eq": "QĐ"}},
+            {"issued_on": {"_gte": "2026-10-01", "_lt": "2026-11-01"}}]})
+        self.assertEqual(demo.direct_where("in", {**want, "from": None, "to": None}),
+                         {"_and": [{"direction": {"_eq": "in"}}]})
+
+    def test_direct_tasks_count_like_the_deadline_calendar(self) -> None:
+        class Asker:
+            def gql(self, query: str, variables: dict | None = None) -> dict:
+                return {"myTasks": [{"id": "a", "due_on": "2026-10-27"}, {"id": "b", "due_on": "2026-10-30"},
+                                    {"id": "c", "due_on": "2026-11-01"}, {"id": "d", "due_on": "2026-11-02"},
+                                    {"id": "e", "due_on": None}]}
+        got = demo.direct_data(Asker(), {"data": "tasks"}, demo.date(2026, 10, 30))
+        self.assertEqual(got, {"tasks": 5, "overdue": 1, "today": 1, "soon": 1, "no_due": 1})
+
     def test_model(self) -> None:
         written = result("answered", [src("15/QĐ-ĐHM", 1), src("88/CTSV", cited=False)], "Cần 15 tín chỉ [1].",
                          source="model", model="qwen3:1.7b")
@@ -427,13 +463,14 @@ class SamplesTest(unittest.TestCase):
         counts = Counter(q["loai"] for q in qs)
         self.assertEqual(set(counts), set(mau.ROUTES))
         self.assertEqual(counts["van_ban"], 19, "bộ cũ giữ nguyên để recall@3 so được với số đo trước")
-        for loai in ("noi_tiep", "gioi_thieu", "huong_dan", "ngoai_pham_vi"):
+        for loai in ("noi_tiep", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban"):
             self.assertGreaterEqual(counts[loai], 5, loai)
         for q in qs:
             self.assertEqual(q["route"], mau.ROUTES[q["loai"]], q["id"])
             self.assertEqual("previous" in q, q["loai"] == "noi_tiep", q["id"])
             wants = q["expect"] if isinstance(q["expect"], list) else []
             self.assertEqual(any("guide" in w for w in wants), q["loai"] in ("gioi_thieu", "huong_dan"), q["id"])
+            self.assertEqual(any("data" in w for w in wants), q["loai"] in demo.DATA_TYPES, q["id"])
             self.assertEqual(q["expect"] == "none", q["loai"] == "ngoai_pham_vi" or q["id"] in ("q17", "q18", "q19"))
             for want in wants:
                 if "guide" not in want:

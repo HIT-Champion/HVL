@@ -466,6 +466,7 @@
     "directTitle": "Answer",
     "dataNote": "Counted directly in the data you are allowed to see, without a language model.",
     "openInbox": "Open the inbox",
+    "openList": "Open the document list",
     "label": "Question",
     "placeholder": "For example: What are the requirements for a merit scholarship?",
     "keysHint": "Enter to ask, Shift+Enter for a new line",

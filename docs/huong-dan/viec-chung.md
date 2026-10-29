@@ -53,6 +53,9 @@ Chuông trên thanh trên cùng báo việc mới, việc hoặc văn bản quá
 2. Gõ câu hỏi, bấm **Hỏi** (hoặc Enter).
 3. Câu trả lời gồm **Câu trích nguyên văn** lấy từ văn bản. Nếu đơn vị bật mô hình ngôn ngữ thì có thêm **Trả lời của
    trợ lý**. Mỗi ý đều ghi văn bản nguồn: bấm **Mở văn bản** để đối chiếu trước khi dùng.
+4. Hỏi về việc của bạn ("Việc nào của tôi sắp quá hạn?") hay số văn bản ("Có bao nhiêu văn bản đến trong tháng
+   này?") thì trợ lý đếm thẳng trong dữ liệu bạn được xem, ghi căn cứ, kèm liên kết **Mở Hộp việc** hoặc **Mở danh
+   sách văn bản**.
 
 ![Hỏi đáp: câu trích nguyên văn và hai văn bản nguồn](../anh/huong-dan/hoi-dap.png)
 

@@ -112,14 +112,26 @@ class AskOut(BaseModel):
     warnings: list[Literal["embed_unavailable", "model_unavailable", "model_timeout", "model_rejected",
                            "model_declined"]]
     duration_ms: int
-    route: Literal["van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi"] = Field(
+    route: Literal["van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban"] = Field(
         description="Đường bộ định tuyến đã chọn: van_ban: tìm trong kho văn bản · gioi_thieu: câu về chính trợ lý, "
                     "câu chào · huong_dan: cách dùng Signet, trả lời từ hướng dẫn sử dụng · ngoai_pham_vi: câu cố "
-                    "định, không tìm. gioi_thieu, ngoai_pham_vi không gọi mô hình, cả khi mode=generate")
+                    "định, không tìm · viec_cua_toi: đếm việc trong Hộp việc của người hỏi · dem_van_ban: đếm văn bản "
+                    "người hỏi được xem. Trừ van_ban, huong_dan, các đường không gọi mô hình, cả khi mode=generate")
     route_reason: str = Field(description="Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh`",
                               examples=["kw:lam-duoc-gi"])
     rewritten: str | None = Field(description="Câu nối tiếp đã ghép với `previous` thành câu độc lập — câu đem đi tìm. "
                                               "null khi không phải câu nối tiếp")
+    data: dict[str, Any] | None = Field(
+        default=None,
+        description="Đường viec_cua_toi, dem_van_ban: các số và bộ lọc của câu trả lời `source: data`, máy đọc. "
+                    "viec_cua_toi: `{kind: tasks, on, tasks, overdue, today, soon, no_due}` · dem_van_ban: `{kind: "
+                    "documents, counts: {in?, out?}, type_code, from, to}` (`to` là ngày sau ngày cuối; null: không "
+                    "lọc theo ngày). null với đường khác",
+        examples=[{"kind": "documents", "counts": {"in": 12}, "type_code": None, "from": "2026-10-01",
+                   "to": "2026-11-01"}])
+    link: str | None = Field(
+        default=None, description="Trang trong Signet xem danh sách đã đếm: `/` (Hộp việc, Lịch hạn), `/van-ban-den`, "
+                                  "`/van-ban-di`; null khi không có trang nào hợp", examples=["/van-ban-den"])
 
 
 ASK_RESPONSES: dict[int | str, dict[str, object]] = {

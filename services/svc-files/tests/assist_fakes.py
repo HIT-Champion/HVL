@@ -28,6 +28,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 import httpx2
@@ -37,7 +38,7 @@ from conftest import ISSUER, TENANT_A, FakeHasura
 from svc_files.auth import HASURA_CLAIMS
 from svc_files.assist.ai import OllamaAi
 from svc_files.assist.retrieve import Passage, Retrieval
-from svc_files.hasura import HasuraError
+from svc_files.hasura import HasuraAuthError, HasuraError
 
 CHAT_MODEL = "qwen3:1.7b"
 EMBED_MODEL = "qwen3-embedding:0.6b"
@@ -134,9 +135,49 @@ class FakeIndexer:
         return None
 
 
+def _matches(row: dict, where: dict) -> bool:
+    """``office_documents_bool_exp`` của đường dem_van_ban: ``_and``, ``_eq``, ``_gte``, ``_lt``; thời điểm so theo
+    giá trị (múi giờ), ngày so theo chữ ISO."""
+    if "_and" in where:
+        return all(_matches(row, w) for w in where["_and"])
+    ((column, ops),) = where.items()
+    value = row.get(column)
+    for op, want in ops.items():
+        if value is None:
+            return False
+        have, want = ((datetime.fromisoformat(value), datetime.fromisoformat(want)) if column == "registered_at"
+                      else (value, want))
+        if not {"_eq": have == want, "_gte": have >= want, "_lt": have < want}[op]:
+            return False
+    return True
+
+
+@dataclass
 class AskHasura(FakeHasura):
     """FakeHasura (conftest) + quyền insert ``core_audit_log`` của vai trò agent như metadata của luồng A: cặp
-    ``assistant.answered`` / ``ai.questions``, preset ``actor_id``, ``actor_kind``, thuê ước."""
+    ``assistant.answered`` / ``ai.questions``, preset ``actor_id``, ``actor_kind``, thuê ước. Hai đường dữ liệu
+    (#441): ``tasks`` là Hộp việc (myTasks) theo sub; ``ask_count`` đếm ``documents`` người giữ token được xem."""
+
+    tasks: dict[str, list[dict]] = field(default_factory=dict)
+    data_calls: list[dict] = field(default_factory=list)       # mỗi lần đếm: cách gọi, sub, điều kiện
+
+    def _claims(self, token: str) -> dict:
+        self._check()
+        if self.reject_tokens:
+            raise HasuraAuthError("JWTExpired", "invalid-jwt")
+        return jwt.decode(token, options={"verify_signature": False})[HASURA_CLAIMS]
+
+    async def ask_tasks(self, token: str) -> list[dict]:
+        ns = self._claims(token)
+        self.data_calls.append({"op": "myTasks", "sub": ns["x-hasura-user-id"]})
+        return [dict(t) for t in self.tasks.get(ns["x-hasura-user-id"], [])]
+
+    async def ask_count(self, token: str, where: dict) -> int:
+        ns = self._claims(token)
+        self.data_calls.append({"op": "count", "sub": ns["x-hasura-user-id"], "where": where})
+        return sum(1 for row in self.documents.values()
+                   if row["tenant_id"] == ns["x-hasura-tenant-id"]
+                   and (row["readers"] is None or ns["x-hasura-user-id"] in row["readers"]) and _matches(row, where))
 
     ASSISTANT_AUDIT_COLUMNS = {"request_id", "action", "entity", "entity_id", "diff"}
     ALLOWED = {("intake.suggested", "core.files"), ("assistant.answered", "ai.questions")}

@@ -11,7 +11,9 @@ guide.
 ## What the assistant can do {#lam-duoc-gi}
 
 I search the documents you can read and quote the passage that answers your question. I answer questions about how to
-use Signet from the user guide. I understand a follow-up to the question just before it. I never search restricted
+use Signet from the user guide. I count the tasks in your inbox and the documents you can read, for example "Which of
+my tasks are almost overdue?" or "How many incoming documents arrived this month?"; the numbers come straight from the
+data, without a language model. I understand a follow-up to the question just before it. I never search restricted
 documents. I do not answer questions outside the documents and Signet itself, such as weather, news or writing for you.
 
 ## How to ask {#cach-hoi}
@@ -37,6 +39,6 @@ Glad to help. You can ask more about the documents or about how to use Signet.
 
 ## Out of scope {#ngoai-pham-vi}
 
-This question is outside what I can answer. I answer questions about the documents you can read and about how to use
-Signet. You could ask, for example: "What are the scholarship conditions?", "Where do I submit a leave request?", "What
-can you do?".
+This question is outside what I can answer. I answer questions about the documents you can read, about how to use
+Signet, about your tasks and document counts. You could ask, for example: "What are the scholarship conditions?",
+"Where do I submit a leave request?", "Which of my tasks are almost overdue?", "What can you do?".
