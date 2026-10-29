@@ -14,6 +14,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Cảnh báo của Prometheus qua Alertmanager thành thông báo ở chuông (và kênh ngoài) của quản trị đơn vị (#284).
 - Wiki nội bộ DokuWiki ở `/wiki/` (profile `wiki`, tắt mặc định): đăng nhập Keycloak, mỗi đơn vị một không gian (#367).
 - Sổ đăng ký văn bản đến, đi xem và in bằng tiếng Anh khi người in chọn giao diện tiếng Anh (#398).
+- Dữ liệu công khai: 4 thông tư Bộ GD&ĐT từ Công báo, nạp khi `make seed`; trang trạng thái báo tuổi dữ liệu (#424).
 - Trang Dựng form cho quản trị đơn vị: khai trường, xem trước, tải tệp JSON Schema cho form của ứng dụng (#303).
 - Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
 - Giao diện tiếng Anh cho Đơn nghỉ phép, cả form dựng từ JSON Schema, chung ngôn ngữ với Văn phòng điện tử (#398).

@@ -68,11 +68,12 @@ precedence = "closest"
 SPDX-FileCopyrightText = ["2026 Signet Team", "Logo: chủ sở hữu từng dự án, xem docs/anh/logo/NGUON.md"]
 SPDX-License-Identifier = "Apache-2.0 AND LicenseRef-Logos"
 
-# Bản chụp nguồn dữ liệu công khai (seed/du-lieu-mo/, #427): bản sao, câu trích văn bản nhà nước và tin thời sự thuần
-# túy đưa tin, không thuộc đối tượng bảo hộ quyền tác giả (Điều 15 Luật Sở hữu trí tuệ). Nguồn từng tệp ở manifest.json
-# cùng thư mục. Khai sau khối đầu nên ghi đè "**.txt", "**.pdf"; manifest.json và dữ liệu đã chuẩn hóa vẫn Apache-2.0
+# Nguồn dữ liệu công khai (seed/du-lieu-mo/): văn bản nhà nước không thuộc phạm vi bảo hộ quyền tác giả (Điều 15 Luật
+# Sở hữu trí tuệ, LICENSES/LicenseRef-VN-SHTT-Dieu-15.txt); nguồn từng tệp ghi ở manifest.json cùng thư mục, manifest
+# do mã của đội sinh nên vẫn Apache-2.0. Nguồn A (#424): bản Công báo của thông tư Bộ GD&ĐT. Nguồn B (#427): câu trích
+# văn bản nhà nước và tin thời sự thuần túy đưa tin về ngày nghỉ lễ, Tết. Ghi đè "**.pdf", "**.txt" ở khối đầu.
 [[annotations]]
-path = ["seed/du-lieu-mo/ngay-nghi-le/trich/*.txt"]
+path = ["seed/du-lieu-mo/cong-bao-gddt/*.pdf", "seed/du-lieu-mo/ngay-nghi-le/trich/*.txt"]
 precedence = "closest"
 SPDX-FileCopyrightText = "Văn bản nhà nước Việt Nam, xem manifest.json cùng thư mục"
 SPDX-License-Identifier = "LicenseRef-VN-SHTT-Dieu-15"

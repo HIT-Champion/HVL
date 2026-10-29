@@ -54,7 +54,7 @@
       "file": "05-thong-tu.pdf",
       "kind": "text",
       "fields": {
-        "type_code": null,
+        "type_code": "TT",
         "symbol": "45/2026/TT-BTN",
         "issued_on": "2026-09-25",
         "issuer_name": "Bộ Tài nguyên Mẫu",
