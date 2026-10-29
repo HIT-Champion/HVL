@@ -189,6 +189,8 @@ class FakeOllama:
         path = request.url.path
         if path == "/api/tags":
             return httpx2.Response(200, json={"models": [{"name": m, "model": m} for m in self.models]})
+        if request.url.path == "/api/ps":       # mô hình đang nạp và phần nằm trong VRAM (MOC_AI_DEVICE)
+            return httpx2.Response(200, json={"models": getattr(self, "loaded", [])})
         if path == "/api/generate":
             return httpx2.Response(200, json={"model": CHAT_MODEL, "done": True})
         if path == "/api/embed":
