@@ -423,6 +423,34 @@ How to recognise it and what to do:
   - **Already up to date:** the command only reports "database is up-to-date".
   - **Still a lock error:** the background freshclam may be updating by itself; wait 1 minute and run it again.
 
+## Official public holidays (public data source B)
+
+Suggested due dates (F4.3) skip Lunar New Year, the Hung Kings' day, days off in lieu, and count make-up Saturdays as
+working days, following the official calendar for civil servants and public employees (#427). The snapshot lives in
+`seed/du-lieu-mo/ngay-nghi-le/`:
+
+- `ngay-nghi.json`: fixed holidays (Article 112 of the Labour Code, Vietnam Culture Day 24/11), the days off of each
+  year, make-up working days; each entry names the document it comes from;
+- `trich/*.txt`: quotes from the Government News articles that state those dates, with the article URL;
+- `manifest.json`: URL, fetch date, SHA-256 of each file, reuse basis (Article 15 of the Law on Intellectual Property),
+  maximum age 400 days.
+
+`docker-compose.yml` mounts this folder read-only into svc-workflow; `MOC_HOLIDAYS_FILE` (default
+`/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json`, empty turns it off) adds the calendar to `MOC_HOLIDAYS`. Without the
+file only `MOC_HOLIDAYS` applies, as before; a broken file stops svc-workflow at start-up with a `MOC_HOLIDAYS_FILE`
+error.
+
+Refresh it when the Government announces the next year's days off (usually in October), no Docker needed:
+
+1. add an entry to `PAGES` in `scripts/nguon_ngay_nghi_le.py`: article URL, quote file, date range, and the date strings
+   exactly as the article writes them;
+2. `python3 scripts/nguon_ngay_nghi_le.py` fetches every article again and checks each date is on its page before it
+   replaces the snapshot. A page that does not load or has lost a date makes it exit 1 and keeps the old snapshot;
+3. `docker compose restart svc-workflow`. Suggestions already saved keep their due dates.
+
+If the source stops working, suggestions keep using the snapshot; for a year the snapshot does not cover, add the days
+to `MOC_HOLIDAYS`.
+
 ## Monitoring
 
 APISIX counts every request through the gateway (plugin `prometheus`; the metrics export port 9091 is not published:

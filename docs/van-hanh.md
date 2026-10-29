@@ -370,6 +370,31 @@ Cách nhận ra và xử lý:
   - **Đã mới nhất** thì lệnh chỉ báo "database is up-to-date".
   - **Vẫn báo lỗi khóa** thì có thể freshclam nền đang tự cập nhật: chờ 1 phút rồi chạy lại.
 
+## Lịch nghỉ lễ chính thức (nguồn công khai B)
+
+Hạn gợi ý giao việc (F4.3) tránh Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù và coi thứ Bảy làm bù là ngày làm việc, theo lịch
+nghỉ chính thức của cán bộ, công chức, viên chức (#427). Bản chụp nằm ở `seed/du-lieu-mo/ngay-nghi-le/`:
+
+- `ngay-nghi.json`: ngày lễ cố định (Điều 112 Bộ luật Lao động, Ngày Văn hóa Việt Nam 24/11), các khoảng nghỉ theo
+  năm, ngày làm bù; mỗi mục ghi văn bản căn cứ;
+- `trich/*.txt`: câu trích các bài trên Báo Điện tử Chính phủ nêu đúng các ngày đó, kèm URL bài;
+- `manifest.json`: URL, ngày lấy, SHA-256 từng tệp, căn cứ dùng lại (Điều 15 Luật Sở hữu trí tuệ), tuổi tối đa 400
+  ngày.
+
+`docker-compose.yml` gắn thư mục này chỉ đọc vào svc-workflow; `MOC_HOLIDAYS_FILE` (mặc định
+`/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json`, rỗng thì tắt) cộng lịch đó vào `MOC_HOLIDAYS`. Không có tệp thì chỉ còn
+`MOC_HOLIDAYS` như trước; tệp hỏng thì svc-workflow dừng lúc khởi động và báo `MOC_HOLIDAYS_FILE`.
+
+Lấy mới khi Chính phủ công bố lịch nghỉ năm sau (thường vào tháng 10), không cần Docker:
+
+1. thêm một mục vào `PAGES` của `scripts/nguon_ngay_nghi_le.py`: URL bài, tệp trích, khoảng ngày, chuỗi ngày đúng như
+   bài viết;
+2. `python3 scripts/nguon_ngay_nghi_le.py` đọc lại mọi bài, kiểm từng ngày có trên bài rồi mới thay bản chụp. Trang
+   không tải được hay không còn ngày nào đó thì lệnh thoát 1, bản chụp cũ giữ nguyên;
+3. `docker compose restart svc-workflow`. Gợi ý đã lưu giữ hạn cũ.
+
+Nguồn ngừng hoạt động thì gợi ý vẫn chạy bằng bản chụp; năm bản chụp chưa có thì thêm ngày vào `MOC_HOLIDAYS`.
+
 ## Giám sát
 
 APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 không publish: chỉ container ở mạng
