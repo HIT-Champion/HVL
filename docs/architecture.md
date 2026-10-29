@@ -1045,9 +1045,10 @@ Gom lại để người đọc không phải tìm ở nhiều nơi; chi tiết 
   tới lõi qua APISIX, nhưng các ứng dụng chung một mạng `apps`,
   tới được nhau và tới cổng trạng thái 7085, cổng chỉ số 9091 của APISIX (chỉ số, không dữ liệu nghiệp vụ). WAF (F3.15,
   QĐ-013) mới ở mức Dùng được; Coraza 3.3.3 còn bốn cách lẩn mức medium đã công bố.
-- **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ, chưa có
-  tracing phân tán; cảnh báo tới mọi quản trị đơn vị (chuông, kênh ngoài nếu bật), chưa chọn được người nhận; log tập
-  trung tắt mặc định (F3.13, F3.14).
+- **Quan sát**: chỉ có chỉ số của APISIX và trạng thái từng thành phần, chưa có chỉ số bên trong từng dịch vụ; tracing
+  phân tán mới ở mức Một phần (Jaeger tắt mặc định, chưa có span của Hasura, Flowable, Keycloak, PostgreSQL); cảnh
+  báo tới mọi quản trị đơn vị (chuông, kênh ngoài nếu bật), chưa chọn được người nhận; log tập trung tắt mặc định
+  (F3.13, F3.14).
 - **Két bí mật**: `.env` vẫn là nguồn bí mật; chưa có quy trình xoay khóa transit, xoay bí mật
   ([`muc-hoan-thien.md`](muc-hoan-thien.md) §3, cụm ①).
 - **Số đo còn thiếu**: chạy trên máy 8 GB và "cài dưới một giờ" chưa đo (§1.3); cột "trước" của số đo thành công chưa
