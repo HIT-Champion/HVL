@@ -165,9 +165,9 @@ def test_answers_are_written_locally_by_default():
 def test_external_answer_api_settings():
     """#430: MOC_ASK_API=openai — URL bỏ "/" cuối, khóa (từ két) không hiện trong repr."""
     s = Settings.from_env({**BASE, "MOC_ASK_API": " OpenAI ", "MOC_ASK_API_URL": " https://mo-hinh.example/v1/ ",
-                           "MOC_ASK_MODEL": "mo-hinh-ngoai", "MOC_ASK_API_KEY": " sk-bi-mat "})
+                           "MOC_ASK_MODEL": "mo-hinh-ngoai", "MOC_ASK_API_KEY": " khoa-gia "})
     assert (s.ask_api, s.ask_api_url, s.ask_model) == ("openai", "https://mo-hinh.example/v1", "mo-hinh-ngoai")
-    assert s.ask_api_key == "sk-bi-mat" and "sk-bi-mat" not in repr(s)
+    assert s.ask_api_key == "khoa-gia" and "khoa-gia" not in repr(s)
     # máy chủ trong mạng của đơn vị, không đòi khóa
     s = Settings.from_env({**BASE, "MOC_ASK_API": "openai", "MOC_ASK_API_URL": "http://vllm:8000/v1"})
     assert (s.ask_api_url, s.ask_api_key, s.ask_model) == ("http://vllm:8000/v1", "", "qwen3:1.7b")

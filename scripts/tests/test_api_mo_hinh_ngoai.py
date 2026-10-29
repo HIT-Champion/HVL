@@ -77,9 +77,9 @@ class VaultSecretTest(unittest.TestCase):
             self.assertEqual(json.loads(proc.stdout), STORED)
 
     def test_key_stored_when_set(self) -> None:
-        proc = self.secrets({**REQUIRED, "MOC_ASK_API_KEY": 'sk-th"u\\1'})
+        proc = self.secrets({**REQUIRED, "MOC_ASK_API_KEY": 'th"u\\1'})
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertEqual(json.loads(proc.stdout), {**STORED, "MOC_ASK_API_KEY": 'sk-th"u\\1'})
+        self.assertEqual(json.loads(proc.stdout), {**STORED, "MOC_ASK_API_KEY": 'th"u\\1'})
 
 
 if __name__ == "__main__":

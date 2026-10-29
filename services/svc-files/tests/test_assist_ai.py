@@ -359,7 +359,7 @@ def test_right_dimensions_are_checked_once():
 
 API_URL = "https://mo-hinh.example/v1"
 API_MODEL = "mo-hinh-ngoai"
-API_KEY = "sk-khoa-bi-mat-430"
+API_KEY = "khoa-gia"  # ngắn, không giống khóa thật: gitleaks quét mọi ref (#436)
 
 
 class FakeOpenAi:
