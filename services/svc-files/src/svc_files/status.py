@@ -120,7 +120,7 @@ class StatusBoard:
         self.version = public_version(version)
         self.ttl_s = ttl_s
         self.timeout_s = timeout_s
-        self._ai_info = ai_info or (lambda: {"enabled": False, "model": None, "semantic": False})
+        self._ai_info = ai_info or (lambda: {"enabled": False, "model": None, "semantic": False, "device": None})
         self._last_backup = last_backup
         self._open_data = open_data
         self._clock = clock
@@ -230,7 +230,8 @@ class StatusBoard:
             "version": self.version,
             "last_backup_at": backup.isoformat(timespec="seconds") if backup else None,
             "ai": {"enabled": bool(info.get("enabled")), "model": public_model(info.get("model")),
-                   "semantic": bool(info.get("semantic"))},
+                   "semantic": bool(info.get("semantic")),
+                   "device": info.get("device") if info.get("device") in ("gpu", "cpu", "gpu+cpu") else None},
             "layers": [{"id": key, "label": label} for key, label in LAYERS],
             "components": [{"id": c.id, "layer": c.layer, "label": c.label, "software": c.software, "status": s}
                            for c, s in rows],
@@ -321,7 +322,9 @@ def default_board(settings: Settings, *, scanner: Any, store: Any, hasura: Any, 
     def ai_info() -> dict[str, Any]:
         enabled = ai_on and bool(ai.chat_available)
         return {"enabled": enabled, "model": ai.chat_model if enabled else None,
-                "semantic": ai_on and bool(ai.embed_available)}
+                "semantic": ai_on and bool(ai.embed_available),
+                # MOC_AI_DEVICE: Ollama báo mô hình nằm trên GPU hay CPU (/api/ps); None khi chưa biết hay đang tắt
+                "device": getattr(ai, "device", None) if ai_on else None}
 
     workflow = f"{settings.workflow_url}/readyz" if settings.workflow_url else ""
     components = [

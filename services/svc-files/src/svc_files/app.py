@@ -182,6 +182,9 @@ class StatusAi(BaseModel):
     enabled: bool = Field(description="Mô hình viết câu trả lời của trợ lý đang sẵn sàng")
     model: str | None = Field(description="Tên mô hình khi bật, vd qwen3:1.7b; null khi tắt")
     semantic: bool = Field(description="Tìm theo nghĩa được (mô hình nhúng sẵn sàng)")
+    device: Literal["gpu", "cpu", "gpu+cpu"] | None = Field(
+        default=None, description="Mô hình của Ollama đang nằm trên GPU, CPU hay chia hai (MOC_AI_DEVICE, /api/ps); "
+                                  "null khi chưa nạp mô hình nào hay trợ lý tắt")
 
 
 class StatusOpenDataFile(BaseModel):
