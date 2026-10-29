@@ -91,9 +91,9 @@ export function cleanQuestion(s: string): string {
 }
 
 /** Kết quả lượt extract có đáng nhờ mô hình viết câu trả lời không: mô hình sẵn sàng, có đoạn trích làm căn cứ, và
- *  đường của câu hỏi là đường tìm đoạn (ngoài phạm vi, đường dữ liệu không bao giờ gọi mô hình). */
+ *  đường của câu hỏi có lượt viết (giới thiệu trợ lý, ngoài phạm vi, đường dữ liệu không bao giờ gọi mô hình). */
 export function needsGenerate(res: Pick<AskResult, 'status' | 'ai_available' | 'sources' | 'route'>): boolean {
-  return res.ai_available === true && res.status !== 'no_evidence' && res.sources.length > 0 && searched(res.route)
+  return res.ai_available === true && res.status !== 'no_evidence' && res.sources.length > 0 && generates(res.route)
 }
 
 /** Ba khối hiện được: câu trả lời do mô hình viết (đã qua kiểm trích dẫn), câu trích nguyên văn, và câu trả lời thẳng
@@ -145,6 +145,12 @@ export const ROUTES: readonly AskRoute[] = ['van_ban', 'gioi_thieu', 'huong_dan'
  *  Máy chủ chưa có bộ định tuyến (không có route) thì mọi câu là văn bản như trước. */
 export function searched(route: AskRoute | undefined): boolean {
   return route === undefined || route === 'van_ban' || route === 'gioi_thieu' || route === 'huong_dan'
+}
+
+/** Đường có lượt mô hình viết câu trả lời: văn bản và hướng dẫn sử dụng. Giới thiệu trợ lý chỉ trả câu trích của tệp
+ *  "Giới thiệu trợ lý", không có lượt generate. */
+export function generates(route: AskRoute | undefined): boolean {
+  return route === undefined || route === 'van_ban' || route === 'huong_dan'
 }
 
 // Gợi ý ở trang trống, chia theo loại câu; mỗi câu đã thử qua bộ định tuyến của svc-files ra đúng đường của nhóm. Thứ

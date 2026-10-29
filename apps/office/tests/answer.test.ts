@@ -27,7 +27,7 @@ import type { AskResult, AskSource } from '../app/composables/useApi.ts'
 const {
   ASK_ROLES, DATA_GROUP, DATA_ROUTES, MASK_RE, MAX_PREVIOUS, MAX_QUESTION, ROUTES, SCOPE_PARAM, SUGGEST_GROUPS,
   askAbout, blocks, canAskAbout, canView, citeLabel, cleanQuestion, fallbackSuggestions, hasMask, inAssistant,
-  needsGenerate, pageUrl, previousFor, scopeOf, segments, sourceAnchor, tidy,
+  needsGenerate, pageUrl, previousFor, scopeOf, searched, segments, sourceAnchor, tidy,
 } = await import('../app/utils/answer.ts')
 
 type Messages = { [key: string]: string | Messages }
@@ -228,15 +228,17 @@ test('máy chủ chưa có bộ định tuyến: không có route, trang như c�
   for (const route of ROUTES) assert.equal(tidy({ ...SAMPLE, route }).route, route)
 })
 
-test('chỉ đường tìm đoạn mới nhờ mô hình viết; ngoài phạm vi và đường dữ liệu thì không', () => {
+test('chỉ văn bản và hướng dẫn mới nhờ mô hình viết; giới thiệu, ngoài phạm vi, đường dữ liệu thì không', () => {
   const ready = { ...SAMPLE, ai_available: true }
   assert.equal(needsGenerate({ ...ready, route: undefined }), true)
-  for (const route of ['van_ban', 'gioi_thieu', 'huong_dan'] as const) {
+  for (const route of ['van_ban', 'huong_dan'] as const) {
     assert.equal(needsGenerate({ ...ready, route }), true, route)
   }
-  for (const route of ['ngoai_pham_vi', 'viec_cua_toi', 'dem_van_ban'] as const) {
+  for (const route of ['gioi_thieu', 'ngoai_pham_vi', 'viec_cua_toi', 'dem_van_ban'] as const) {
     assert.equal(needsGenerate({ ...ready, route }), false, route)
   }
+  // giới thiệu vẫn là đường tìm đoạn (có nguồn guide, có chip tìm), chỉ không có lượt viết
+  assert.equal(searched('gioi_thieu'), true)
 })
 
 test('câu trả lời thẳng (fixed, data) là khối riêng, không phải câu trích hay câu của mô hình', () => {
