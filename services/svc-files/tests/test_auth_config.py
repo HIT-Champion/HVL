@@ -157,6 +157,36 @@ def test_assistant_needs_its_index_loop():
     assert s.ask_sync_interval_s == 0 and s.ask_enabled is False
 
 
+def test_answers_are_written_locally_by_default():
+    s = Settings.from_env(BASE)
+    assert (s.ask_api, s.ask_api_url, s.ask_api_key) == ("ollama", "", "")
+
+
+def test_external_answer_api_settings():
+    """#430: MOC_ASK_API=openai — URL bỏ "/" cuối, khóa (từ két) không hiện trong repr."""
+    s = Settings.from_env({**BASE, "MOC_ASK_API": " OpenAI ", "MOC_ASK_API_URL": " https://mo-hinh.example/v1/ ",
+                           "MOC_ASK_MODEL": "mo-hinh-ngoai", "MOC_ASK_API_KEY": " sk-bi-mat "})
+    assert (s.ask_api, s.ask_api_url, s.ask_model) == ("openai", "https://mo-hinh.example/v1", "mo-hinh-ngoai")
+    assert s.ask_api_key == "sk-bi-mat" and "sk-bi-mat" not in repr(s)
+    # máy chủ trong mạng của đơn vị, không đòi khóa
+    s = Settings.from_env({**BASE, "MOC_ASK_API": "openai", "MOC_ASK_API_URL": "http://vllm:8000/v1"})
+    assert (s.ask_api_url, s.ask_api_key, s.ask_model) == ("http://vllm:8000/v1", "", "qwen3:1.7b")
+
+
+@pytest.mark.parametrize(("env", "message"), [
+    ({"MOC_ASK_API": "claude"}, "MOC_ASK_API phải"),
+    ({"MOC_ASK_API": "openai"}, "MOC_ASK_API_URL"),
+    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "mo-hinh.example/v1"}, "MOC_ASK_API_URL"),
+    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "ftp://mo-hinh.example/v1"}, "MOC_ASK_API_URL"),
+    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1 x"}, "MOC_ASK_API_URL"),
+    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1", "MOC_AI_URL": "",
+      "MOC_AI_MODEL": " ", "MOC_ASK_MODEL": ""}, "MOC_ASK_MODEL"),
+])
+def test_bad_external_answer_api_stops_startup(env, message):
+    with pytest.raises(ConfigError, match=message):
+        Settings.from_env({**BASE, **env})
+
+
 def test_three_models_for_two_ollama_slots_is_a_warning_not_an_error():
     ai = {**BASE, "MOC_AI_URL": "http://ollama:11434"}
     assert Settings.from_env(ai).warnings() == []                                     # một mô hình sinh + nhúng

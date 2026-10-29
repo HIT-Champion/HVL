@@ -349,6 +349,8 @@ services:
       MOC_ZALO_BOT_TOKEN: ${MOC_ZALO_BOT_TOKEN:-}
       # tùy chọn (#284): token Alertmanager gọi svc-workflow; bản cài cũ chưa có thì tắt cảnh báo ra chuông
       MOC_ALERT_TOKEN: ${MOC_ALERT_TOKEN:-}
+      # tùy chọn (#430): khóa API ngoài viết câu trả lời của trợ lý hỏi đáp (svc-files, MOC_ASK_API=openai)
+      MOC_ASK_API_KEY: ${MOC_ASK_API_KEY:-}
     volumes:
       - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
@@ -408,6 +410,10 @@ services:
       MOC_ASK_MODEL: ${MOC_ASK_MODEL:-}
       MOC_ASK_DEADLINE_S: ${MOC_ASK_DEADLINE_S:-50}
       MOC_ASK_MODEL_TIMEOUT_S: ${MOC_ASK_MODEL_TIMEOUT_S:-40}
+      # #430 — openai: viết câu trả lời qua API ngoài chuẩn OpenAI ở MOC_ASK_API_URL, tên mô hình ở MOC_ASK_MODEL;
+      # khóa MOC_ASK_API_KEY đến từ két, không ở đây. Nhúng, trích yếu vẫn ở Ollama. Mặc định ollama
+      MOC_ASK_API: ${MOC_ASK_API:-ollama}
+      MOC_ASK_API_URL: ${MOC_ASK_API_URL:-}
       # F4.5 — ký số PAdES bản phát hành văn bản đi bằng khóa Transit của đơn vị, chứng thư do CA nội bộ trong két
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)

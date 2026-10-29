@@ -80,8 +80,9 @@ secrets_json() {
 
 secrets_of() {
   case $1 in
+    # khóa API ngoài của trợ lý hỏi đáp (#430): chỉ có khi đã cấu hình
     svc-files) secrets_json SEAWEEDFS_S3_ACCESS_KEY SEAWEEDFS_S3_SECRET_KEY HASURA_ADMIN_SECRET \
-                 MEILISEARCH_API_KEY=MEILI_MASTER_KEY ;;
+                 MEILISEARCH_API_KEY=MEILI_MASTER_KEY 'MOC_ASK_API_KEY?' ;;
     # mật khẩu SMTP, URL webhook (có khóa trong đường dẫn), mật khẩu cổng SMS, token bot Zalo của thông báo đa kênh,
     # token Alertmanager (#284): chỉ có khi đã cấu hình
     svc-workflow) secrets_json HASURA_ADMIN_SECRET MOC_ACTION_SECRET FLOWABLE_ADMIN_PASSWORD CENTRIFUGO_API_KEY \

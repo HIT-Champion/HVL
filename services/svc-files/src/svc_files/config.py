@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 REQUIRED = (
     "MOC_OIDC_ISSUER",
@@ -135,6 +135,12 @@ class Settings:
     ask_semantic_ratio: float = 0.5     # tỷ trọng tìm theo nghĩa
     ask_deadline_s: float = 50.0        # hạn tổng một yêu cầu (dưới 60 giây của APISIX)
     ask_model: str = "qwen3:1.7b"       # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL
+    # Nơi viết câu trả lời (#430): ollama (tại chỗ, mặc định) hoặc openai — máy chủ nói chuẩn OpenAI ở
+    # MOC_ASK_API_URL (…/v1). Chỉ bước viết đi ra ngoài; nhúng, trích yếu văn bản đến vẫn ở Ollama. Khóa
+    # MOC_ASK_API_KEY là bí mật tùy chọn, đến từ két (platform/openbao/start.sh), không in ra repr hay nhật ký
+    ask_api: str = "ollama"
+    ask_api_url: str = ""
+    ask_api_key: str = field(default="", repr=False)
     ask_model_timeout_s: float = 40.0
     ask_context_chars: int = 2800       # tổng ký tự nguồn gửi mô hình
     ask_concurrency: int = 1            # số lượt sinh câu trả lời cùng lúc
@@ -248,6 +254,9 @@ class Settings:
                 ask_deadline_s=float(env.get("MOC_ASK_DEADLINE_S", "50")),
                 ask_model=(env.get("MOC_ASK_MODEL") or "").strip() or env.get("MOC_AI_MODEL", "qwen3:1.7b").strip(),
                 ask_model_timeout_s=float(env.get("MOC_ASK_MODEL_TIMEOUT_S", "40")),
+                ask_api=(env.get("MOC_ASK_API") or "ollama").strip().lower(),
+                ask_api_url=(env.get("MOC_ASK_API_URL") or "").strip().rstrip("/"),
+                ask_api_key=(env.get("MOC_ASK_API_KEY") or "").strip(),
                 ask_context_chars=int(env.get("MOC_ASK_CONTEXT_CHARS", "2800")),
                 ask_concurrency=int(env.get("MOC_ASK_CONCURRENCY", "1")),
                 ask_queue_s=float(env.get("MOC_ASK_QUEUE_S", "20")),
@@ -358,6 +367,13 @@ class Settings:
             raise ConfigError("MOC_ASK_DEADLINE_S phải trong khoảng (0, 55] — dưới 60 giây của APISIX")
         if self.ask_model_timeout_s <= 0:
             raise ConfigError("MOC_ASK_MODEL_TIMEOUT_S phải > 0")
+        if self.ask_api not in ("ollama", "openai"):
+            raise ConfigError("MOC_ASK_API phải là ollama (mô hình tại chỗ) hoặc openai (API ngoài chuẩn OpenAI)")
+        if self.ask_api == "openai":
+            if not re.fullmatch(r"https?://[^\s/?#]+(?:/[^\s?#]*)?", self.ask_api_url):
+                raise ConfigError("MOC_ASK_API=openai cần MOC_ASK_API_URL dạng http(s)://máy-chủ/v1")
+            if not self.ask_model:
+                raise ConfigError("MOC_ASK_API=openai cần tên mô hình ở MOC_ASK_MODEL")
         if self.ask_queue_s < 0:
             raise ConfigError("MOC_ASK_QUEUE_S phải ≥ 0")
         for name, count in (("MOC_ASK_TOP_K", self.ask_top_k), ("MOC_ASK_CANDIDATES", self.ask_candidates),
