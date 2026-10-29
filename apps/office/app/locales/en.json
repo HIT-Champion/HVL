@@ -341,6 +341,18 @@
       "hashMismatch": "SHA-256 does NOT match the sender’s issued copy — report it to the administrator",
       "fromHint": "An outgoing document of another unit on Signet, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
       "manualHint": "The clerk registered this document from paper or email; the sender's in-system dispatch arrived later and was only linked, so the attached file is the one the clerk uploaded. Open the verification page to compare it with the issued copy."
+    },
+    "publicSource": {
+      "label": "Public source",
+      "publisher": "Published by",
+      "gazette": "Official Gazette",
+      "original": "Original page",
+      "fetchedAt": "Fetched",
+      "reuse": "Reuse basis",
+      "sha256": "File SHA-256",
+      "hint": "The attached file has the same SHA-256 as the source snapshot. The system never calls the source at run time.",
+      "statusLink": "See data age",
+      "stale": "The snapshot is {n} day old, past its refresh limit. | The snapshot is {n} days old, past its refresh limit."
     }
   },
   "form": {
@@ -803,7 +815,25 @@
     "rateLimited": "Status loaded too often in one minute; the page will retry in a few seconds.",
     "unreachable": "Could not load the status: the API gateway may be down. The page will retry.",
     "stale": "Showing the result of the previous load.",
-    "note": "This page only shows the overall state — no host names, addresses or business figures. Detailed metrics (API gateway traffic and latency) are on the Grafana dashboard for operators."
+    "note": "This page only shows the overall state — no host names, addresses or business figures. Detailed metrics (API gateway traffic and latency) are on the Grafana dashboard for operators.",
+    "openData": {
+      "title": "Public data sources",
+      "hint": "Snapshots of public data, shipped with the source code together with the URL, fetch date, reuse basis and SHA-256 of every file. The system never calls a source at run time: if a source goes offline, the checked snapshot is still used.",
+      "state": {
+        "ok": "Fresh",
+        "stale": "Out of date",
+        "broken": "Snapshot broken"
+      },
+      "fetched": "Fetched",
+      "age": "{n} day ago | {n} days ago",
+      "today": "today",
+      "refresh": "Refresh limit",
+      "maxAge": "{n} day | {n} days",
+      "files": "Files",
+      "reuse": "Reuse basis",
+      "staleHint": "Past its refresh limit and not fetched again; the system is using the snapshot fetched on {date}.",
+      "brokenHint": "The snapshot does not match its manifest (missing file or wrong SHA-256): documents from this source are not labelled as public-source until it is fetched again."
+    }
   },
   "notify": {
     "title": "Notifications",

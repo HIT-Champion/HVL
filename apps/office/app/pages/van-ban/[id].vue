@@ -20,6 +20,8 @@
 import { useI18n } from 'vue-i18n'
 import type { PanelDepartment, PanelUser } from '~/components/TaskPanel.vue'
 import { askAbout, canAskAbout } from '~/utils/answer'
+import { hexOf, loadOpenData, publicOrigin } from '~/utils/openData'
+import type { OpenDataSource } from '~/utils/openData'
 import { documentBackTarget, processingBrief } from '~/utils/taskContext'
 
 // Chi tiết văn bản đến hoặc đi: thông tin, tệp, giao xử lý, dòng thời gian (F2.6), lịch sử thay đổi (F3.5) và
@@ -28,6 +30,8 @@ import { documentBackTarget, processingBrief } from '~/utils/taskContext'
 // Liên thông trong hệ thống (F3.12): văn bản đi gửi đơn vị khác cùng dùng Signet có thẻ trạng thái chuyển từng đơn vị;
 // văn bản đến nhận theo đường này có thẻ "Nhận từ …" với mã xác thực của bên gửi và đối chiếu SHA-256 tệp.
 // Nút "Hỏi về văn bản này" (F4.2) mở trang Hỏi đáp chỉ hỏi trong văn bản này — chỉ khi văn bản có trong kho của trợ lý.
+// Văn bản nạp từ nguồn dữ liệu công khai (seed/du-lieu-mo) có thẻ "Nguồn công khai": tệp đính kèm trùng SHA-256 với
+// một tệp trong manifest của nguồn (GET /api/status, khóa open_data), kèm trang gốc, ngày lấy, căn cứ dùng lại.
 
 interface Dispatch {
   id: string
@@ -354,6 +358,12 @@ const sourceMatch = computed(() => {
     ? sameSha256(main.sha256, doc.value.dispatch_in.source_sha256) : null
 })
 
+// Nguồn công khai: danh sách nguồn hỏi một lần cho mọi trang văn bản (utils/openData.ts, giữ 5 phút); tải lỗi hay
+// svc-files chưa có nguồn nào thì không có thẻ, trang như cũ
+const openData = ref<OpenDataSource[]>([])
+const origin = computed(() => (doc.value && !outgoing.value
+  ? publicOrigin(doc.value.files.map((f) => f.file?.sha256), openData.value) : null))
+
 async function submit() {
   if (!signer.value) return
   submitting.value = true
@@ -439,6 +449,7 @@ watch(id, () => {
   load()
 })
 onMounted(load)
+onMounted(async () => { openData.value = await loadOpenData((url) => fetch(url, { cache: 'no-store' })) })
 
 // có người vừa làm một bước với văn bản này (F2.5): tải lại để thấy trạng thái, việc và dòng thời gian mới
 const { lastPush } = useNotifications()
@@ -590,6 +601,53 @@ watch([doc, locale], ([d]) => { if (d) crumb.value = d.symbol || t(outgoing.valu
             <ul v-else class="flex flex-wrap gap-2">
               <li v-for="u in doc.recipient_tenant_ids" :key="u" class="chip bg-stone-100 text-stone-700">{{ unitName(u) }}</li>
             </ul>
+          </section>
+
+          <!-- văn bản nạp từ nguồn dữ liệu công khai: nguồn, trang gốc, ngày lấy, căn cứ dùng lại, SHA-256 của tệp -->
+          <section v-if="origin" class="card p-5" data-testid="public-source" :data-source="origin.source.source">
+            <h2 class="sg-block-title mb-3 flex flex-wrap items-center gap-2">
+              <span class="chip bg-sky-100 text-sky-800">{{ t('doc.publicSource.label') }}</span>
+              <span>{{ origin.source.name }}</span>
+            </h2>
+            <dl class="sg-facts">
+              <div class="is-wide">
+                <dt>{{ t('doc.publicSource.publisher') }}</dt><dd>{{ origin.source.publisher || '—' }}</dd>
+              </div>
+              <div v-if="origin.gazette" class="is-wide">
+                <dt>{{ t('doc.publicSource.gazette') }}</dt><dd>{{ origin.gazette }}</dd>
+              </div>
+              <div class="is-wide">
+                <dt>{{ t('doc.publicSource.original') }}</dt>
+                <dd>
+                  <a
+                    v-if="origin.link" :href="origin.link" target="_blank" rel="noopener" class="sg-link break-all"
+                    data-testid="public-source-link"
+                  >{{ origin.link }} ↗</a>
+                  <span v-else>—</span>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ t('doc.publicSource.fetchedAt') }}</dt>
+                <dd>{{ origin.fetched_at ? fmtDateTime(origin.fetched_at) : '—' }}</dd>
+              </div>
+              <div class="is-wide">
+                <dt>{{ t('doc.publicSource.reuse') }}</dt>
+                <dd>{{ origin.source.licence ?? origin.source.reuse_basis }}</dd>
+              </div>
+              <div class="is-wide">
+                <dt>{{ t('doc.publicSource.sha256') }}</dt>
+                <dd class="font-mono text-xs break-all" data-testid="public-source-sha256">
+                  {{ hexOf(origin.file.sha256) }}
+                </dd>
+              </div>
+            </dl>
+            <p class="mt-3 text-xs text-stone-500">
+              {{ t('doc.publicSource.hint') }}
+              <NuxtLink to="/trang-thai" class="sg-link">{{ t('doc.publicSource.statusLink') }}</NuxtLink>
+            </p>
+            <p v-if="origin.source.state === 'stale'" class="mt-1 text-xs text-amber-900">
+              {{ t('doc.publicSource.stale', { n: origin.source.age_days }, origin.source.age_days) }}
+            </p>
           </section>
 
           <!-- nhận liên thông từ đơn vị khác trong hệ thống (F3.12) -->

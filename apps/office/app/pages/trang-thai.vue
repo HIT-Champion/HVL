@@ -20,6 +20,7 @@
 import { useI18n } from 'vue-i18n'
 import { OVERALL_TONE, STATE_TONE, STATUS_REFRESH_MS, fmtClock, fmtUptime, groupByLayer } from '~/utils/systemStatus'
 import type { StatusComponent, StatusGroup, SystemStatus } from '~/utils/systemStatus'
+import { OPEN_DATA_TONE, openDataOf, safeUrl } from '~/utils/openData'
 
 // Trạng thái hệ thống, công khai: tình trạng vận hành các thành phần của Signet theo tầng người dùng → lõi → quy trình
 // → dữ liệu → trí tuệ nhân tạo, phiên bản, thời gian chạy liên tục, lượt sao lưu gần nhất, trợ lý AI bật hay tắt.
@@ -37,6 +38,8 @@ let loadedAt = 0
 let timer: ReturnType<typeof setInterval> | undefined
 
 const groups = computed(() => (data.value ? groupByLayer(data.value) : []))
+// nguồn dữ liệu công khai (seed/du-lieu-mo): svc-files chưa có nguồn nào hay bản cũ chưa có khóa thì không hiện mục
+const sources = computed(() => openDataOf(data.value))
 const uptime = computed(() => data.value ? fmtUptime(data.value.uptime_s, {
   day: t('health.units.day'), hour: t('health.units.hour'), minute: t('health.units.minute'),
   less: t('health.units.less'),
@@ -179,6 +182,51 @@ onBeforeUnmount(() => {
           </ul>
         </section>
       </div>
+
+      <!-- nguồn dữ liệu công khai: bản chụp kèm trong mã nguồn, tuổi dữ liệu; nguồn ngừng thì vẫn dùng bản chụp -->
+      <section v-if="sources.length" class="moc-block" data-testid="status-open-data" aria-labelledby="nguon-cong-khai">
+        <h2 id="nguon-cong-khai" class="moc-block-title">{{ t('health.openData.title') }}</h2>
+        <p class="mt-1 text-[13px] text-stone-600">{{ t('health.openData.hint') }}</p>
+        <ul class="mt-4 grid gap-4 lg:grid-cols-2">
+          <li
+            v-for="s in sources" :key="s.source" class="min-w-0 rounded-xl border border-stone-200 p-4"
+            :data-testid="`status-source-${s.source}`" :data-state="s.state"
+          >
+            <div class="flex items-start gap-3">
+              <div class="min-w-0 flex-1">
+                <a
+                  v-if="safeUrl(s.home_url)" :href="safeUrl(s.home_url)!" target="_blank" rel="noopener"
+                  class="text-sm font-medium text-brand-800 underline underline-offset-2"
+                >{{ s.name }}</a>
+                <span v-else class="text-sm font-medium text-stone-900">{{ s.name }}</span>
+                <div class="text-[13px] text-stone-500">{{ s.publisher }}</div>
+              </div>
+              <span class="chip" :class="OPEN_DATA_TONE[s.state]">{{ t(`health.openData.state.${s.state}`) }}</span>
+            </div>
+            <dl class="mt-3 grid gap-x-4 gap-y-1 text-[13px] sm:grid-cols-[9rem_minmax(0,1fr)]">
+              <dt class="text-stone-500">{{ t('health.openData.fetched') }}</dt>
+              <dd class="tabular-nums text-stone-800">
+                {{ s.fetched_at ? fmtDateTime(s.fetched_at) : '—' }}
+                · {{ s.age_days
+                  ? t('health.openData.age', { n: s.age_days }, s.age_days) : t('health.openData.today') }}
+              </dd>
+              <dt class="text-stone-500">{{ t('health.openData.refresh') }}</dt>
+              <dd class="tabular-nums text-stone-800">
+                {{ t('health.openData.maxAge', { n: s.max_age_days }, s.max_age_days) }}
+              </dd>
+              <dt class="text-stone-500">{{ t('health.openData.files') }}</dt>
+              <dd class="tabular-nums text-stone-800">{{ s.files.length }}</dd>
+              <dt class="text-stone-500">{{ t('health.openData.reuse') }}</dt>
+              <dd class="text-stone-800">{{ s.licence ?? s.reuse_basis }}</dd>
+            </dl>
+            <p v-if="s.state !== 'ok'" class="mt-3 text-[13px] text-amber-900" data-testid="status-source-note">
+              {{ s.state === 'stale'
+                ? t('health.openData.staleHint', { date: s.fetched_at ? fmtDate(s.fetched_at) : '—' })
+                : t('health.openData.brokenHint') }}
+            </p>
+          </li>
+        </ul>
+      </section>
 
       <p class="text-[13px] text-stone-500">{{ t('health.note') }}</p>
     </div>

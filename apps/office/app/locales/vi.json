@@ -341,6 +341,18 @@
       "hashMismatch": "SHA-256 KHÔNG khớp bản phát hành của bên gửi — báo quản trị hệ thống",
       "fromHint": "Văn bản đi của đơn vị khác cùng dùng Signet, tự chuyển sang khi bên gửi phát hành. Tệp là bản sao của bản phát hành; mở trang xác thực để đối chiếu.",
       "manualHint": "Văn thư đã tiếp nhận văn bản này từ bản giấy hoặc thư điện tử; bên gửi phát hành qua liên thông sau đó nên chỉ nối vào, tệp đính kèm là bản văn thư tải lên. Mở trang xác thực để đối chiếu với bản phát hành."
+    },
+    "publicSource": {
+      "label": "Nguồn công khai",
+      "publisher": "Cơ quan công bố",
+      "gazette": "Công báo",
+      "original": "Trang gốc",
+      "fetchedAt": "Ngày lấy",
+      "reuse": "Căn cứ dùng lại",
+      "sha256": "SHA-256 của tệp",
+      "hint": "Tệp đính kèm trùng SHA-256 với bản chụp của nguồn. Hệ thống không gọi nguồn lúc chạy.",
+      "statusLink": "Xem tuổi dữ liệu",
+      "stale": "Bản chụp đã {n} ngày, quá hạn làm mới."
     }
   },
   "form": {
@@ -803,7 +815,25 @@
     "rateLimited": "Tải trạng thái quá nhiều lần trong một phút, trang sẽ tự thử lại sau ít giây.",
     "unreachable": "Không tải được trạng thái: có thể cổng API đang gián đoạn. Trang sẽ tự thử lại.",
     "stale": "Đang hiện kết quả của lần tải trước.",
-    "note": "Trang chỉ cho biết tình trạng chung, không có tên máy, địa chỉ hay số liệu nghiệp vụ. Chỉ số chi tiết (lưu lượng, độ trễ của cổng API) xem ở bảng Grafana dành cho người vận hành."
+    "note": "Trang chỉ cho biết tình trạng chung, không có tên máy, địa chỉ hay số liệu nghiệp vụ. Chỉ số chi tiết (lưu lượng, độ trễ của cổng API) xem ở bảng Grafana dành cho người vận hành.",
+    "openData": {
+      "title": "Nguồn dữ liệu công khai",
+      "hint": "Bản chụp dữ liệu từ nguồn công khai, kèm trong mã nguồn cùng URL, ngày lấy, căn cứ dùng lại và SHA-256 từng tệp. Hệ thống không gọi nguồn lúc chạy: nguồn ngừng hoạt động thì vẫn dùng bản chụp đã kiểm tra.",
+      "state": {
+        "ok": "Còn hạn",
+        "stale": "Quá hạn",
+        "broken": "Bản chụp lỗi"
+      },
+      "fetched": "Ngày lấy",
+      "age": "{n} ngày trước",
+      "today": "hôm nay",
+      "refresh": "Hạn làm mới",
+      "maxAge": "{n} ngày",
+      "files": "Số tệp",
+      "reuse": "Căn cứ dùng lại",
+      "staleHint": "Đã quá hạn làm mới mà chưa lấy lại; hệ thống đang dùng bản chụp lấy ngày {date}.",
+      "brokenHint": "Bản chụp không khớp manifest (thiếu tệp hoặc sai SHA-256): văn bản từ nguồn này chưa được gắn nhãn nguồn công khai cho đến khi lấy lại."
+    }
   },
   "notify": {
     "title": "Thông báo",
