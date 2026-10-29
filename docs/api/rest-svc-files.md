@@ -611,7 +611,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|:-:|---|
 | `text` | `string` | ✓ | Chữ thuần; mỗi ý kèm [n] trỏ tới `sources[n-1]`. Giao diện hiển thị như chữ, không như HTML |
-| `source` | `"extract", "model"` | ✓ | extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng |
+| `source` | `"extract", "model", "fixed", "data"` | ✓ | extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng · fixed: câu cố định cho câu hỏi ngoài phạm vi · data: câu có số từ dữ liệu của người hỏi |
 | `model` | `string hoặc null` | ✓ | Mô hình đã viết câu trả lời; null với câu trích |
 
 ### `AskIn`
@@ -625,6 +625,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `type_code` | `string hoặc null` |  | Mã loại văn bản, vd CV |
 | `document_id` | `string (uuid) hoặc null` |  | Chỉ hỏi trong một văn bản (nút "Hỏi về văn bản này"). Chỉ thu hẹp phạm vi: văn bản người hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt |
 | `ask_id` | `string (uuid) hoặc null` |  | Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng sổ kiểm toán cùng một câu hỏi |
+| `previous` | `string hoặc null` |  | Câu hỏi của lượt ngay trước trong cùng phạm vi (`rewritten` của lượt đó nếu có), để hiểu câu nối tiếp như "Còn khoa Kinh tế thì sao?". Máy chủ không lưu; sai dạng thì bị bỏ qua |
 
 ### `AskOut`
 
@@ -639,13 +640,16 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `ai_available` | `boolean` | ✓ | Mô hình viết câu trả lời đang sẵn sàng (gọi lại với mode=generate) |
 | `warnings` | `"embed_unavailable", "model_unavailable", "model_timeout", "model_rejected", "model_declined"[]` | ✓ |  |
 | `duration_ms` | `integer` | ✓ |  |
+| `route` | `"van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi"` | ✓ | Đường bộ định tuyến đã chọn: van_ban: tìm trong kho văn bản · gioi_thieu: câu về chính trợ lý, câu chào · huong_dan: cách dùng Signet, trả lời từ hướng dẫn sử dụng · ngoai_pham_vi: câu cố định, không tìm. gioi_thieu, ngoai_pham_vi không gọi mô hình, cả khi mode=generate |
+| `route_reason` | `string` | ✓ | Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh` |
+| `rewritten` | `string hoặc null` | ✓ | Câu nối tiếp đã ghép với `previous` thành câu độc lập — câu đem đi tìm. null khi không phải câu nối tiếp |
 
 ### `AskSource`
 
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|:-:|---|
 | `n` | `integer` | ✓ | Số trong dấu [n], từ 1 |
-| `document_id` | `string (uuid)` | ✓ |  |
+| `document_id` | `string (uuid) hoặc null` | ✓ | null với nguồn `guide` |
 | `symbol` | `string hoặc null` | ✓ |  |
 | `type_code` | `string hoặc null` | ✓ |  |
 | `type_name` | `string hoặc null` | ✓ |  |
@@ -654,12 +658,13 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `issued_on` | `string (date) hoặc null` | ✓ |  |
 | `direction` | `"in", "out" hoặc null` | ✓ |  |
 | `status` | `string hoặc null` | ✓ |  |
-| `kind` | `"page", "meta"` | ✓ | page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ) |
+| `kind` | `"page", "meta", "guide"` | ✓ | page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ) · guide: mục của hướng dẫn sử dụng hay của Giới thiệu trợ lý; `symbol` là tên tài liệu, `summary` là tiêu đề mục |
 | `file_id` | `string (uuid) hoặc null` | ✓ |  |
 | `file_role` | `"main", "attachment", "issued" hoặc null` | ✓ | main: bản chính · attachment: tài liệu kèm theo · issued: bản phát hành văn bản đi |
 | `page` | `integer hoặc null` | ✓ | Trang trong tệp; null với đoạn meta hoặc chữ chưa có ranh giới trang |
 | `excerpt` | `string` | ✓ | Đoạn trích ≤ 600 ký tự quanh câu khớp nhất |
 | `cited` | `boolean` | ✓ | Câu trả lời có trích nguồn này |
+| `path` | `string hoặc null` |  | Chỉ nguồn `guide`: tệp trong repo kèm neo mục, vd `docs/huong-dan/viec-chung.md#đơn-nghỉ-phép` |
 
 ### `FileOut`
 
