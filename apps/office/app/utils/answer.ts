@@ -20,7 +20,7 @@
 // trang đó; hỏi trong một văn bản bằng ?van_ban=<id>.
 // Tệp này không dùng gì của Nuxt để Node chạy test được (tests/answer.test.ts).
 
-import type { AskAnswer, AskResult, AskSource } from '../composables/useApi'
+import type { AskAnswer, AskResult, AskRoute, AskSource } from '../composables/useApi'
 
 // Hàm dịch của vue-i18n (useI18n().t), chỉ phần dùng ở đây
 export type Translate = (key: string, named?: Record<string, unknown>) => string
@@ -69,7 +69,7 @@ export function segments(text: string | null | undefined, sources: readonly AskS
  */
 export function citeLabel(source: Pick<AskSource, 'symbol' | 'type_name' | 'type_code' | 'kind' | 'file_role' | 'page'>,
   t: Translate, spoken = false): string {
-  const name = source.symbol?.trim() || source.type_name?.trim() || source.type_code
+  const name = source.symbol?.trim() || source.type_name?.trim() || source.type_code || ''
   const where: string[] = []
   if (source.kind === 'meta') where.push(t('assist.summaryOnly'))
   else {
@@ -90,17 +90,22 @@ export function cleanQuestion(s: string): string {
   return s.normalize('NFC').replace(/\s+/gu, ' ').replace(/[\p{Cc}\p{Cf}]/gu, '').replace(/ {2,}/g, ' ').trim()
 }
 
-/** Kết quả lượt extract có đáng nhờ mô hình viết câu trả lời không: mô hình sẵn sàng và có đoạn trích làm căn cứ. */
-export function needsGenerate(res: Pick<AskResult, 'status' | 'ai_available' | 'sources'>): boolean {
-  return res.ai_available === true && res.status !== 'no_evidence' && res.sources.length > 0
+/** Kết quả lượt extract có đáng nhờ mô hình viết câu trả lời không: mô hình sẵn sàng, có đoạn trích làm căn cứ, và
+ *  đường của câu hỏi có lượt viết (giới thiệu trợ lý, ngoài phạm vi, đường dữ liệu không bao giờ gọi mô hình). */
+export function needsGenerate(res: Pick<AskResult, 'status' | 'ai_available' | 'sources' | 'route'>): boolean {
+  return res.ai_available === true && res.status !== 'no_evidence' && res.sources.length > 0 && generates(res.route)
 }
 
-/** Hai khối hiện được: câu trả lời do mô hình viết (đã qua kiểm trích dẫn) và câu trích nguyên văn. Mô hình không
- *  đạt / quá giờ / từ chối thì answer là chính câu trích, chỉ còn khối câu trích. */
-export function blocks(res: Pick<AskResult, 'answer' | 'extract'>): { model: AskAnswer | null; extract: AskAnswer | null } {
+/** Ba khối hiện được: câu trả lời do mô hình viết (đã qua kiểm trích dẫn), câu trích nguyên văn, và câu trả lời thẳng
+ *  không qua tìm đoạn (fixed: ngoài phạm vi; data: số lấy từ dữ liệu). Mô hình không đạt / quá giờ / từ chối thì
+ *  answer là chính câu trích, chỉ còn khối câu trích. */
+export function blocks(res: Pick<AskResult, 'answer' | 'extract'>):
+  { model: AskAnswer | null; extract: AskAnswer | null; direct: AskAnswer | null } {
   const model = res.answer?.source === 'model' && res.answer.text ? res.answer : null
   const extract = res.extract?.text ? res.extract : res.answer?.source === 'extract' && res.answer.text ? res.answer : null
-  return { model, extract }
+  const direct = (res.answer?.source === 'fixed' || res.answer?.source === 'data') && res.answer.text
+    ? res.answer : null
+  return { model, extract, direct }
 }
 
 // Nhãn che thông tin cá nhân (F4.4) mà svc-files đặt vào chữ gửi mô hình: [SĐT-1], [CCCD-2], [EMAIL], [STK-3]… —
@@ -120,7 +125,70 @@ export function tidy(res: AskResult): AskResult {
     ? res.sources.map((s) => ({ ...s, excerpt: typeof s.excerpt === 'string' ? s.excerpt : '' })).sort((a, b) => a.n - b.n)
     : []
   const warnings = Array.isArray(res.warnings) ? [...new Set(res.warnings.filter((w) => typeof w === 'string'))] : []
-  return { ...res, sources, warnings, answer: res.answer ?? null, extract: res.extract ?? null }
+  const out: AskResult = { ...res, sources, warnings, answer: res.answer ?? null, extract: res.extract ?? null }
+  // bộ định tuyến: máy chủ cũ không trả route thì để trống (trang không hiện dòng "Đã hiểu là"); giá trị lạ coi như
+  // van_ban, đúng hợp đồng API
+  if (res.route === undefined || res.route === null) delete out.route
+  else out.route = ROUTES.includes(res.route) ? res.route : 'van_ban'
+  if (typeof res.route_reason !== 'string') delete out.route_reason
+  out.rewritten = typeof res.rewritten === 'string' && res.rewritten.trim() ? res.rewritten.trim() : null
+  return out
+}
+
+// --- bộ định tuyến, câu nối tiếp, gợi ý theo loại câu ----------------------------------------------------------------
+
+// Đường của svc-files (assist/route.py). Chữ hiện ở assist.route.<đường> của vi.json / en.json
+export const ROUTES: readonly AskRoute[] = ['van_ban', 'gioi_thieu', 'huong_dan', 'ngoai_pham_vi', 'viec_cua_toi',
+  'dem_van_ban']
+
+/** Đường có tìm đoạn trong kho (văn bản, giới thiệu trợ lý, hướng dẫn sử dụng): có nguồn, có thể nhờ mô hình viết.
+ *  Máy chủ chưa có bộ định tuyến (không có route) thì mọi câu là văn bản như trước. */
+export function searched(route: AskRoute | undefined): boolean {
+  return route === undefined || route === 'van_ban' || route === 'gioi_thieu' || route === 'huong_dan'
+}
+
+/** Đường có lượt mô hình viết câu trả lời: văn bản và hướng dẫn sử dụng. Giới thiệu trợ lý chỉ trả câu trích của tệp
+ *  "Giới thiệu trợ lý", không có lượt generate. */
+export function generates(route: AskRoute | undefined): boolean {
+  return route === undefined || route === 'van_ban' || route === 'huong_dan'
+}
+
+// Gợi ý ở trang trống, chia theo loại câu; mỗi câu đã thử qua bộ định tuyến của svc-files ra đúng đường của nhóm. Thứ
+// tự nhóm cũng là thứ tự dòng "Trợ lý trả lời được" khi không có căn cứ (assist.can.<đường>). Nhóm "Việc của tôi"
+// (viec_cua_toi, dem_van_ban) bật khi svc-files có hai đường dữ liệu: trước đó câu như vậy đi tìm trong văn bản
+export const DATA_ROUTES = false
+export interface SuggestGroup { route: AskRoute; keys: readonly string[] }
+export const DATA_GROUP: SuggestGroup = {
+  route: 'viec_cua_toi', keys: ['assist.suggest.overdue', 'assist.suggest.countIncoming'],
+}
+export const SUGGEST_GROUPS: readonly SuggestGroup[] = [
+  { route: 'van_ban', keys: ['assist.suggest.credits', 'assist.suggest.examDeadline', 'assist.suggest.language'] },
+  { route: 'huong_dan', keys: ['assist.suggest.leave', 'assist.suggest.compose'] },
+  ...(DATA_ROUTES ? [DATA_GROUP] : []),
+  { route: 'gioi_thieu', keys: ['assist.suggest.whatCanYouDo', 'assist.suggest.model'] },
+]
+
+/** Vài câu gợi ý khi không có căn cứ hoặc câu hỏi ngoài phạm vi: câu đầu của mỗi nhóm, bỏ nhóm của chính đường vừa
+ *  trả lời không được (đang hỏi văn bản mà không thấy thì gợi ý loại khác). */
+export function fallbackSuggestions(route: AskRoute | undefined): string[] {
+  return SUGGEST_GROUPS.filter((g) => g.route !== (route ?? 'van_ban')).map((g) => g.keys[0]!)
+}
+
+// Câu trước gửi kèm câu hỏi mới: hợp đồng API cho tối đa 2000 ký tự trong thân (máy chủ bỏ qua câu quá 500 ký tự sau
+// chuẩn hóa, không báo lỗi)
+export const MAX_PREVIOUS = 2000
+
+/** Lượt hỏi ngay trước, đủ để chọn câu trước: phạm vi (id văn bản, hoặc null khi hỏi mọi văn bản), câu hỏi, câu máy
+ *  chủ đã ghép nếu lượt đó là câu nối tiếp, và lượt đó đã có kết quả chưa. */
+export interface PriorTurn { scope: string | null; question: string; rewritten?: string | null; done: boolean }
+
+/** Câu trước (AskIn.previous) cho câu hỏi mới trong phạm vi scope: chỉ lượt ngay trước, cùng phạm vi, đã có kết quả;
+ *  lượt đó là câu nối tiếp thì gửi câu đã ghép, để chuỗi ba câu vẫn giữ ngữ cảnh. Lượt đầu, vừa đổi phạm vi, lượt
+ *  trước lỗi hay chưa xong thì không gửi. Không bao giờ gửi câu trả lời. */
+export function previousFor(prior: PriorTurn | undefined, scope: string | null): string | undefined {
+  if (!prior?.done || prior.scope !== scope) return undefined
+  const text = cleanQuestion(prior.rewritten?.trim() || prior.question)
+  return text && text.length <= MAX_PREVIOUS ? text : undefined
 }
 
 // --- hỏi trong một văn bản, xem trang được trích ---------------------------------------------------------------------
