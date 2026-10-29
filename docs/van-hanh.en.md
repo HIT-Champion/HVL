@@ -598,6 +598,35 @@ portal and the sidebar after sign-in all link here. While open, the page refresh
 - The page only answers "running or not" right now; trends over time, latency and error ratios are in Grafana (section
   Monitoring). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
 
+## Running the model on a GPU
+
+By default Ollama (profile `ai`) runs models on the CPU, within `MOC_AI_MEM_LIMIT` and `MOC_AI_CPUS`. On a server with
+an NVIDIA card set `MOC_AI_DEVICE=gpu` in `.env` (#442): the Makefile adds the `docker-compose.gpu.yml` overlay to
+`COMPOSE_FILE`, which gives every NVIDIA GPU of the machine to `ollama`; other services and the RAM and CPU limits stay
+the same. Incoming-document summaries (F4.1) and the assistant's embeddings and answers (F4.2) all run in Ollama, so
+they all get faster.
+
+- **The server needs:**
+  - A recent enough NVIDIA driver. Per docs.ollama.com/gpu (read on 30/10/2026): compute capability 5.0 or later with
+    driver 550 or later; cards with compute capability 5.0–6.2 (Maxwell, Pascal; e.g. the Quadro M4000 is 5.2) need
+    driver 570 or later. Look up a card at developer.nvidia.com/cuda-gpus.
+  - The NVIDIA Container Toolkit, then `sudo nvidia-ctk runtime configure --runtime=docker` and a Docker restart so
+    Docker has the `nvidia` runtime. Check: `docker run --rm --gpus all ubuntu nvidia-smi` must print the card.
+  - WSL 2: install the NVIDIA driver on Windows only, never a Linux driver inside WSL; install the NVIDIA Container
+    Toolkit inside the WSL distribution when Docker Engine runs there.
+- **Turn it on:** `./scripts/co-gpu.sh` prints `gpu` when `nvidia-smi` sees a card and Docker has the `nvidia`
+  runtime; `make env` and `make install` call it to suggest the setting. Set `MOC_AI_DEVICE=gpu` in `.env`, then
+  `make up-ai`. For an installed copy, set it in that copy's `.env` and run `make install` again so it writes
+  `COMPOSE_FILE`; `make install` warns when the machine cannot use the GPU yet. To turn it off, set `MOC_AI_DEVICE=cpu`
+  and do the same.
+- **Check:** `GET /api/status`, block `ai`, field `device`: `gpu` (the model sits fully in GPU memory), `gpu+cpu` (not
+  enough GPU memory, part of it runs on the CPU and stays slow), `cpu`; `null` while Ollama has no model loaded or the
+  assistant is off. `svc-files` reads `size_vram` from Ollama's `/api/ps` on every probe. On the server:
+  `docker compose exec ollama ollama ps`, column `PROCESSOR`.
+- **`gpu` set but Docker lacks the `nvidia` runtime:** `ollama` does not start (`could not select device driver
+  "nvidia"`) and the status page shows the AI assistant as *Off*; the assistant still searches by keyword and answers
+  with quotes. Finish the steps above or set `cpu` again.
+
 ## Centralised logs
 
 The `logs` profile (off by default) gathers the services' logs in one place so they can be searched by **request id**.

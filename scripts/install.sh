@@ -51,7 +51,8 @@ RUNTIME=(scripts/moc_env.py scripts/seed.py scripts/seed_documents.py scripts/sm
          scripts/ung_dung.py scripts/yaml_nho.py scripts/app-manifest.schema.json
          platform/trace/jaeger.yaml
          platform/wiki/signet.protected.php scripts/wiki.py scripts/demo_wiki.py
-         scripts/tu_dong.py scripts/demo_tu_dong.py platform/tu-dong/flow-mau.json)
+         scripts/tu_dong.py scripts/demo_tu_dong.py platform/tu-dong/flow-mau.json
+         docker-compose.gpu.yml scripts/co-gpu.sh)
 
 die() { echo "install.sh: $*" >&2; exit 1; }
 
@@ -219,12 +220,23 @@ do_install() {
   # profile thêm (MOC_EXTRA_PROFILES của bản cài, vd tunnel) chạy cùng mỗi lần docker compose up trong bản cài
   extra="$(sed -n 's/^MOC_EXTRA_PROFILES=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
   set_env "$dest/.env" COMPOSE_PROFILES "core,app${extra:+,$extra}"
-  # Log tập trung (F3.14, profile logs): tệp phủ đổi driver log của 9 dịch vụ. docker compose đọc COMPOSE_FILE trong
-  # .env của bản cài (reconciler, lệnh gõ tay); bỏ logs thì trả về chỉ docker-compose.yml
-  if [[ ",$extra," == *,logs,* ]]; then
-    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml:platform/logs/docker-compose.logs.yml
-  elif grep -q '^COMPOSE_FILE=' "$dest/.env"; then
-    set_env "$dest/.env" COMPOSE_FILE docker-compose.yml
+  # Tệp phủ trong COMPOSE_FILE của .env bản cài (docker compose đọc ở reconciler, lệnh gõ tay), cùng thứ tự với
+  # Makefile: GPU cho ollama khi MOC_AI_DEVICE=gpu; log tập trung (F3.14, profile logs) đổi driver log của 9 dịch vụ.
+  # Không bật gì thì trả về chỉ docker-compose.yml
+  device="$(sed -n 's/^MOC_AI_DEVICE=//p' "$dest/.env" | tail -n 1 | tr -d ' ')"
+  files=docker-compose.yml
+  [ "$device" != gpu ] || files+=":docker-compose.gpu.yml"
+  [[ ",$extra," != *,logs,* ]] || files+=":platform/logs/docker-compose.logs.yml"
+  if [ "$files" != docker-compose.yml ] || grep -q '^COMPOSE_FILE=' "$dest/.env"; then
+    set_env "$dest/.env" COMPOSE_FILE "$files"
+  fi
+  # GPU (docs/van-hanh.md mục Chạy mô hình bằng GPU): chỉ báo, không đổi .env thay người vận hành
+  have="$(bash "$SRC/scripts/co-gpu.sh")"
+  if [ "$device" = gpu ] && [ "$have" != gpu ]; then
+    echo "    Cảnh báo: MOC_AI_DEVICE=gpu nhưng chưa thấy GPU NVIDIA hay runtime nvidia của Docker — ollama sẽ không" \
+         "khởi động. Cài driver, NVIDIA Container Toolkit, hoặc đặt lại MOC_AI_DEVICE=cpu." >&2
+  elif [ "$device" != gpu ] && [ "$have" = gpu ]; then
+    echo "    Máy có GPU NVIDIA dùng được trong Docker: đặt MOC_AI_DEVICE=gpu trong $dest/.env rồi make install lại."
   fi
   # Ứng dụng cài bằng moc app (docs/them-ung-dung.md): dựng lại tệp chạy từ lõi vừa chép và bản ghi trong .moc-apps/ của
   # bản cài (không cần CSDL), thêm lại tệp phủ vào COMPOSE_FILE. Đang giữ khóa của bản cài: MOC_OPS_LOCKED
