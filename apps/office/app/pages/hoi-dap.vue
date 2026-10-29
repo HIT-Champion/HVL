@@ -21,15 +21,17 @@ import { useI18n } from 'vue-i18n'
 import { ApiError } from '~/composables/useApi'
 import type { AskBody, AskResult, AskSource } from '~/composables/useApi'
 import {
-  ASK_ROLES, MAX_QUESTION, SCOPE_PARAM, blocks, canView, citeLabel, cleanQuestion, hasMask, inAssistant, needsGenerate,
-  pageUrl, scopeOf, sourceAnchor, tidy,
+  ASK_ROLES, MAX_QUESTION, SCOPE_PARAM, SUGGEST_GROUPS, blocks, canView, citeLabel, cleanQuestion, fallbackSuggestions,
+  hasMask, inAssistant, needsGenerate, pageUrl, previousFor, scopeOf, searched, sourceAnchor, tidy,
 } from '~/utils/answer'
 
 // Hỏi đáp trên kho văn bản (F4.2). Trợ lý moc-assistant (svc-files) chỉ tìm trong các văn bản người hỏi được xem,
 // văn bản hạn chế không bao giờ vào chỉ mục. Hai pha cho mỗi câu hỏi: extract trả ngay câu trích nguyên văn kèm
 // nguồn "số ký hiệu · tr. n" (< 1 giây, không cần mô hình); nếu mô hình sẵn sàng (ai_available) thì tự gọi generate
 // với cùng ask_id — mô hình viết câu trả lời có trích dẫn [n] trong 15–40 giây, bấm Dừng hoặc Esc thì thôi, câu trích
-// vẫn còn đó. Mỗi câu hỏi độc lập; danh sách chỉ giữ trong bộ nhớ trang (tối đa 10), không lưu ở đâu cả.
+// vẫn còn đó. Danh sách chỉ giữ trong bộ nhớ trang (tối đa 10), không lưu ở đâu cả. Câu hỏi mới gửi kèm câu hỏi của
+// lượt ngay trước cùng phạm vi (previous) để svc-files hiểu câu nối tiếp ("Còn khoa Kinh tế thì sao?"); bộ định tuyến
+// của svc-files trả đường đã chọn (route) và câu đã ghép (rewritten), trang hiện thành dòng "Đã hiểu là câu hỏi về: …".
 // Mở từ nút "Hỏi về văn bản này" (?van_ban=<id>) thì chỉ hỏi trong văn bản đó; nhãn nguồn mở tệp đúng trang được trích.
 // Bố cục như một cuộc trò chuyện: một cột giữa vùng làm việc, câu hỏi cũ ở trên, mới ở dưới, khung soạn câu hỏi dính
 // đáy màn hình (main.css, mục "Hỏi đáp").
@@ -40,6 +42,7 @@ interface Turn {
   direction: '' | 'in' | 'out'
   year: number | null
   document: { id: string; label: string } | null   // hỏi trong một văn bản: id, nhãn lúc hỏi
+  previous: string | undefined                       // câu trước đã gửi ở lượt extract, gửi lại y nguyên ở generate
   phase: 'searching' | 'error' | 'shown'
   result: AskResult | null
   error: string
@@ -108,9 +111,9 @@ function clearScope() {
   router.replace({ query: { ...route.query, [SCOPE_PARAM]: undefined } })
 }
 
-// Gợi ý ở trang trống: câu hỏi lấy từ bộ câu hỏi thử của trợ lý (seed/hoi-dap/cau-hoi.json), không gọi thêm API.
-// Bấm chỉ điền vào ô câu hỏi, không tự gửi (như khi mở từ trang Tìm kiếm)
-const SUGGESTIONS = ['assist.suggest.credits', 'assist.suggest.examDeadline', 'assist.suggest.language']
+// Gợi ý ở trang trống, chia theo loại câu (SUGGEST_GROUPS): câu hỏi lấy từ bộ câu hỏi thử của trợ lý
+// (seed/hoi-dap/cau-hoi.json), không gọi thêm API. Bấm chỉ điền vào ô câu hỏi, không tự gửi (như khi mở từ trang Tìm
+// kiếm). Không có căn cứ hay câu hỏi ngoài phạm vi thì lượt đó nói trợ lý trả lời được gì, kèm vài câu gợi ý
 const field = ref<HTMLTextAreaElement | null>(null)
 
 function suggest(key: string) {
@@ -167,9 +170,15 @@ function body(turn: Turn, mode: 'extract' | 'generate'): AskBody {
     ...(turn.direction ? { direction: turn.direction } : {}),
     ...(turn.year ? { year: turn.year } : {}),
     ...(turn.document ? { document_id: turn.document.id } : {}),
+    ...(turn.previous ? { previous: turn.previous } : {}),
     ...(mode === 'generate' && turn.result ? { ask_id: turn.result.ask_id } : {}),
   }
 }
+
+// Dòng "Đã hiểu là câu hỏi về: …" của một lượt: chỉ khi svc-files có bộ định tuyến (trả route); mã lý do để ở title
+const understood = (res: AskResult) =>
+  (res.route ? t('assist.understood', { route: t(`assist.route.${res.route}`) }) : '')
+const outOfScope = (res: AskResult) => res.route === 'ngoai_pham_vi'
 
 function onKey(e: KeyboardEvent) {
   // Enter gửi, Shift+Enter xuống dòng; đang gõ dở bằng bộ gõ tiếng Việt (composition) thì Enter là của bộ gõ
@@ -183,9 +192,14 @@ function submit() {
   if (!question || !ready.value) return
   // hỏi trong một văn bản: bộ lọc chiều, năm không còn nghĩa (đã ẩn), không gửi
   const scoped = scopeId.value
+  const last = turns.value.at(-1)
+  const previous = previousFor(last && {
+    scope: last.document?.id ?? null, question: last.question, rewritten: last.result?.rewritten,
+    done: last.phase === 'shown' && !!last.result,
+  }, scoped)
   const turn: Turn = {
     key: nextKey++, question, direction: scoped ? '' : direction.value, year: scoped ? null : year.value,
-    document: scoped ? { id: scoped, label: scopeLabel.value } : null, phase: 'searching', result: null,
+    document: scoped ? { id: scoped, label: scopeLabel.value } : null, previous, phase: 'searching', result: null,
     error: '', gen: 'idle', genError: '', started: 0, showExtract: false, opened: [],
   }
   // mới nhất ở cuối, như một cuộc trò chuyện; quá 10 thì bỏ câu cũ nhất ở đầu (đang viết thì dừng, đang xem tệp thì
@@ -245,7 +259,11 @@ async function search(key: number) {
   cur.result = res
   cur.phase = 'shown'
   if (res.status === 'no_evidence') {
-    say(t('assist.noEvidence'))
+    say(outOfScope(res) ? t('assist.outOfScope') : t('assist.noEvidence'))
+    return
+  }
+  if (blocks(res).direct) {
+    say(t('assist.live.answered'))
     return
   }
   const found = t('assist.live.found', { n: res.sources.length })
@@ -369,9 +387,12 @@ async function viewSource(turn: Turn, s: AskSource) {
   el?.focus({ preventScroll: true })
 }
 
+// Nguồn guide (mục hướng dẫn sử dụng, giới thiệu trợ lý) không phải văn bản: không có nơi ban hành, ngày, chiều; hiện
+// tệp và mục như chữ, không dựng liên kết
 function metaLine(s: AskSource): string {
   return [s.type_name || s.type_code, s.issuer_name, s.issued_on ? fmtDate(s.issued_on) : '',
-    te(`assist.direction.${s.direction}`) ? t(`assist.direction.${s.direction}`) : ''].filter(Boolean).join(' · ')
+    s.direction && te(`assist.direction.${s.direction}`) ? t(`assist.direction.${s.direction}`) : '',
+    s.kind === 'guide' ? s.path : ''].filter(Boolean).join(' · ')
 }
 
 const took = (res: AskResult) => t('assist.took', { s: fmtNumber(Math.round(Number(res.duration_ms) / 100) / 10) })
@@ -397,17 +418,25 @@ onBeforeUnmount(() => {
 
     <p v-if="!allowed" class="moc-empty">{{ t('assist.error.forbidden') }}</p>
     <template v-else>
-      <!-- trang trống: lời giới thiệu ngắn ở giữa vùng còn lại, vài câu hỏi mẫu bấm để điền -->
+      <!-- trang trống: lời giới thiệu ngắn ở giữa vùng còn lại, câu hỏi mẫu chia theo loại câu, bấm để điền -->
       <section v-if="!turns.length" class="sg-ask-empty" aria-labelledby="ask-empty-title">
         <h2 id="ask-empty-title">{{ t('assist.emptyTitle') }}</h2>
         <p>{{ t('assist.intro') }}</p>
         <div v-if="!scopeId" class="sg-ask-suggest">
           <h3>{{ t('assist.suggestTitle') }}</h3>
-          <ul>
-            <li v-for="key in SUGGESTIONS" :key="key">
-              <button type="button" data-testid="ask-suggestion" @click="suggest(key)">{{ t(key) }}</button>
-            </li>
-          </ul>
+          <div class="sg-ask-groups">
+            <section
+              v-for="group in SUGGEST_GROUPS" :key="group.route" class="sg-ask-group"
+              :aria-labelledby="`goi-y-${group.route}`" data-testid="ask-suggest-group" :data-route="group.route"
+            >
+              <h4 :id="`goi-y-${group.route}`">{{ t(`assist.suggestGroup.${group.route}`) }}</h4>
+              <ul>
+                <li v-for="key in group.keys" :key="key">
+                  <button type="button" data-testid="ask-suggestion" @click="suggest(key)">{{ t(key) }}</button>
+                </li>
+              </ul>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -444,11 +473,25 @@ onBeforeUnmount(() => {
             <p class="sg-turn-by">
               <b>{{ t('assist.answerBy') }}</b>
               <template v-if="turn.result">
-                <span class="chip bg-stone-100 text-stone-700" data-testid="ask-mode">
+                <span
+                  v-if="searched(turn.result.route)" class="chip bg-stone-100 text-stone-700" data-testid="ask-mode"
+                >
                   {{ turn.result.semantic ? t('assist.semantic') : t('assist.keyword') }}
                 </span>
                 <span class="tabular-nums">{{ took(turn.result) }}</span>
               </template>
+            </p>
+            <!-- bộ định tuyến: trợ lý đã hiểu câu hỏi là loại nào, câu nối tiếp đã ghép với câu trước thành câu gì -->
+            <p
+              v-if="turn.result && understood(turn.result)" class="sg-turn-route" data-testid="ask-route"
+              :data-route="turn.result.route"
+              :title="turn.result.route_reason
+                ? t('assist.routeReason', { code: turn.result.route_reason }) : undefined"
+            >
+              <span>{{ understood(turn.result) }}</span>
+              <span v-if="turn.result.rewritten" data-testid="ask-rewritten">
+                {{ t('assist.rewritten', { text: turn.result.rewritten }) }}
+              </span>
             </p>
 
             <!-- đang tìm: chỗ của câu trả lời giữ sẵn bằng vài vạch xám -->
@@ -485,16 +528,48 @@ onBeforeUnmount(() => {
             </div>
 
             <template v-else-if="turn.result">
-              <!-- không có căn cứ: câu giống hệt nhau dù văn bản không tồn tại hay người hỏi không được xem -->
+              <!-- không có căn cứ: câu giống hệt nhau dù văn bản không tồn tại hay người hỏi không được xem. Câu hỏi
+                   ngoài phạm vi (thời tiết, tin tức…): nói thẳng như vậy. Cả hai nói trợ lý trả lời được gì, kèm
+                   gợi ý -->
               <div v-if="turn.result.status === 'no_evidence'" class="sg-turn-none" data-testid="ask-none">
-                <p>{{ t('assist.noEvidence') }}</p>
+                <p>{{ outOfScope(turn.result) ? t('assist.outOfScope') : t('assist.noEvidence') }}</p>
                 <NuxtLink
+                  v-if="!outOfScope(turn.result)"
                   :to="{ path: '/tim-kiem', query: { q: turn.question.slice(0, 200) } }"
                   class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2"
                 >
                   {{ t('assist.openSearch') }}
                 </NuxtLink>
+                <div class="sg-turn-can" data-testid="ask-can">
+                  <p>{{ t('assist.can.title') }}</p>
+                  <ul>
+                    <li v-for="group in SUGGEST_GROUPS" :key="group.route">{{ t(`assist.can.${group.route}`) }}</li>
+                  </ul>
+                  <p>{{ t('assist.suggestTitle') }}</p>
+                  <ul class="sg-turn-chips">
+                    <li v-for="key in fallbackSuggestions(turn.result.route)" :key="key">
+                      <button type="button" data-testid="ask-fallback" @click="suggest(key)">{{ t(key) }}</button>
+                    </li>
+                  </ul>
+                </div>
               </div>
+
+              <!-- câu trả lời thẳng, không qua tìm đoạn: số lấy từ dữ liệu bạn được xem, kèm "Căn cứ: …" -->
+              <section v-else-if="blocks(turn.result).direct" class="sg-answer" data-testid="ask-direct">
+                <h3 class="sr-only">{{ t('assist.directTitle') }}</h3>
+                <AnswerText
+                  :text="blocks(turn.result).direct!.text" :sources="turn.result.sources" :ask="turn.result.ask_id"
+                />
+                <p v-if="blocks(turn.result).direct!.source === 'data'" class="sg-answer-note">
+                  {{ t('assist.dataNote') }}
+                </p>
+                <NuxtLink
+                  v-if="turn.result.route === 'viec_cua_toi'" to="/"
+                  class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2"
+                >
+                  {{ t('assist.openInbox') }}
+                </NuxtLink>
+              </section>
 
               <template v-else>
                 <p v-if="turn.result.status === 'passages_only'" class="moc-note" data-testid="ask-passages">
@@ -636,7 +711,7 @@ onBeforeUnmount(() => {
                         </span>
                         <span class="sg-source-tools">
                           <NuxtLink
-                            :to="`/van-ban/${s.document_id}`"
+                            v-if="s.document_id" :to="`/van-ban/${s.document_id}`"
                             :aria-label="t('assist.openDocumentFor', { label: citeLabel(s, t, true) })"
                           >
                             {{ t('assist.openDocument') }}
@@ -664,7 +739,7 @@ onBeforeUnmount(() => {
                       >
                         <p class="sg-source-meta">
                           <span>{{ metaLine(s) }}</span>
-                          <StatusChip :status="s.status" />
+                          <StatusChip v-if="s.document_id && s.status" :status="s.status" />
                         </p>
                         <p
                           v-if="s.excerpt" :id="`${sourceAnchor(turn.result.ask_id, s.n)}-trich`"
