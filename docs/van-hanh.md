@@ -473,6 +473,39 @@ thống.
 - Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
   `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
 
+## Trợ lý hỏi đáp qua API ngoài
+
+Mặc định trợ lý hỏi đáp (F4.2) viết câu trả lời bằng mô hình chạy tại chỗ trong Ollama. Máy yếu (CPU chậm) hay muốn
+mô hình lớn hơn thì cho bước viết đi tới một máy chủ nói chuẩn OpenAI (#430): vLLM hay llama.cpp trên máy có GPU của
+đơn vị, hoặc dịch vụ đám mây. Đặt trong `.env`:
+
+```
+MOC_ASK_API=openai
+MOC_ASK_API_URL=https://may-chu-mo-hinh/v1
+MOC_ASK_MODEL=<tên mô hình máy chủ đó nhận>
+MOC_ASK_API_KEY=<khóa, để trống nếu máy chủ không đòi>
+```
+
+rồi `docker compose up -d` (tạo lại `openbao`, `svc-files`). Đổi khóa về sau: sửa `.env`, `docker compose up -d` rồi
+`docker compose restart svc-files`.
+
+- **Cái gì rời máy:** chỉ lời gọi viết câu trả lời: câu hỏi và tối đa 4 đoạn văn bản làm căn cứ, **đã che** số điện
+  thoại, CCCD, email, số tài khoản (F4.4). Tìm theo nghĩa (mô hình nhúng) và trích yếu văn bản đến vẫn ở Ollama; không
+  bật profile `ai` thì trợ lý tìm theo từ khóa, chỉ bước viết dùng API. Mô hình nguồn mở chạy tại chỗ vẫn là mặc
+  định khuyên dùng: gửi văn bản tới dịch vụ đám mây là quyết định của đơn vị về dữ liệu của mình.
+- **Kiểm như cũ:** đầu ra ép theo JSON Schema (`response_format`), máy chủ Signet vẫn kiểm từng câu với đoạn nguồn và
+  con số rồi mới gắn trích dẫn; không đạt thì trả câu trích nguyên văn.
+- **Khóa:** là bí mật của `svc-files` trong két như các khóa khác (mục Két bí mật), không nằm trong biến môi trường của
+  container `svc-files`, không vào nhật ký. Chỉ đi trong tiêu đề `Authorization` tới `MOC_ASK_API_URL`. URL dạng
+  `http://` thì `svc-files` ghi `config.warning` lúc khởi động: khóa và đoạn văn bản đi không mã hóa, chỉ hợp với máy
+  chủ trong mạng nội bộ tin cậy.
+- **Tên mô hình:** `MOC_ASK_MODEL` bắt buộc, đúng tên máy chủ đó nhận (vd. `Qwen/Qwen3-4B` của vLLM); không lấy
+  `MOC_AI_MODEL` như khi viết tại chỗ. Thiếu thì `svc-files` dừng lúc khởi động.
+- **Sẵn sàng:** `svc-files` hỏi `GET {MOC_ASK_API_URL}/models` lúc khởi động và mỗi 60 giây; khóa sai (401, 403) hay
+  sai tên mô hình (404) thì coi như chưa sẵn sàng tới lượt dò sau. Nhật ký: `office.assist.ai_ready`,
+  `office.assist.ai_unavailable` có `"where": "external"` và mã HTTP, không có khóa.
+- **Sổ kiểm toán:** dòng `assistant.answered` ghi `model` và `model_where` (`local`: Ollama; `external`: API ngoài).
+
 ## Trang trạng thái hệ thống
 
 `<MOC_PUBLIC_URL>/trang-thai` là trang công khai, không cần đăng nhập: người dùng tự xem Signet có đang chạy bình
@@ -488,7 +521,7 @@ khi đăng nhập đều có đường tới đây. Trang tự làm mới mỗi 
   thì *Một số thành phần đang gặp sự cố*: văn bản hạn chế và ký số (két), tìm kiếm, hỏi đáp tạm không dùng được, còn
   lại vẫn chạy. Trợ lý AI *Tắt* khi chưa bật profile `ai`, tắt hỏi đáp, hoặc Ollama không trả lời: trang không phân
   biệt được ba trường hợp này, nên *Tắt* mà profile `ai` đang bật thì xem `docker compose logs ollama`. Trợ lý vẫn tìm
-  theo từ khóa.
+  theo từ khóa. Viết câu trả lời qua API ngoài (mục dưới) thì phần mềm của thành phần ghi "API ngoài".
 - **Không lộ gì:** chỉ có nhãn cố định và trạng thái; không tên máy, địa chỉ IP, URL nội bộ, phiên bản từng thành phần,
   số người dùng hay số văn bản, thông báo lỗi. Lý do cụ thể nằm trong nhật ký của `svc-files` (sự kiện
   `core.status.changed`, ghi khi một thành phần đổi trạng thái): `docker compose logs svc-files | grep status.changed`.

@@ -1454,13 +1454,15 @@ có giá trị vô hướng, **không** câu hỏi, câu trả lời, số ký h
 {
   "user_id": "<sub người hỏi>", "ask_id": "5d1e…", "mode": "generate", "status": "answered",
   "answer_source": "model", "hits": 5, "cited": 2, "documents": "<id>,<id>", "semantic": true,
-  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": ""
+  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": "",
+  "model_where": "local"
 }
 ```
 
 `mode`: `extract` | `generate`; `status`: `answered` | `passages_only` | `no_evidence`; `answer_source`: `extract` |
 `model` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id các văn bản nguồn,
-cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình hoặc null; `warnings`:
+cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình hoặc null;
+`model_where`: `local` (Ollama) | `external` (API ngoài, #430), null khi không gọi mô hình viết; `warnings`:
 mã cảnh báo cách nhau dấu phẩy (`embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`,
 `model_declined`), rỗng nếu không có. Lãnh đạo xem sổ thấy mọi khóa qua `overview` (§1) trừ `documents`: id văn bản
 nguồn chỉ vai trò `service` đọc được.
