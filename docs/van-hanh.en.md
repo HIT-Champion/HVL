@@ -531,7 +531,11 @@ then `docker compose up -d` (recreates `openbao`, `svc-files`). To change the ke
 - **Same checks:** the output is forced to a JSON Schema (`response_format`), and Signet still checks every sentence
   against the source passages and numbers before adding citations; otherwise it returns the verbatim quote.
 - **Key:** a `svc-files` secret in the vault like the other keys (section Secrets vault), not in the `svc-files`
-  container environment, never logged. It is only sent in the `Authorization` header to `MOC_ASK_API_URL`.
+  container environment, never logged. It is only sent in the `Authorization` header to `MOC_ASK_API_URL`. With an
+  `http://` URL `svc-files` logs `config.warning` at start-up: the key and the passages travel unencrypted, which only
+  suits a model server on a trusted internal network.
+- **Model name:** `MOC_ASK_MODEL` is required and must be a name that server accepts (e.g. `Qwen/Qwen3-4B` on vLLM);
+  it does not fall back to `MOC_AI_MODEL` as it does for local answers. Without it `svc-files` stops at start-up.
 - **Readiness:** `svc-files` calls `GET {MOC_ASK_API_URL}/models` at start-up and every 60 seconds; a wrong key (401,
   403) or model name (404) counts as not ready until the next probe. Log events `office.assist.ai_ready`,
   `office.assist.ai_unavailable` carry `"where": "external"` and the HTTP code, never the key.

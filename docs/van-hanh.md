@@ -471,7 +471,11 @@ rồi `docker compose up -d` (tạo lại `openbao`, `svc-files`). Đổi khóa 
 - **Kiểm như cũ:** đầu ra ép theo JSON Schema (`response_format`), máy chủ Signet vẫn kiểm từng câu với đoạn nguồn và
   con số rồi mới gắn trích dẫn; không đạt thì trả câu trích nguyên văn.
 - **Khóa:** là bí mật của `svc-files` trong két như các khóa khác (mục Két bí mật), không nằm trong biến môi trường của
-  container `svc-files`, không vào nhật ký. Chỉ đi trong tiêu đề `Authorization` tới `MOC_ASK_API_URL`.
+  container `svc-files`, không vào nhật ký. Chỉ đi trong tiêu đề `Authorization` tới `MOC_ASK_API_URL`. URL dạng
+  `http://` thì `svc-files` ghi `config.warning` lúc khởi động: khóa và đoạn văn bản đi không mã hóa, chỉ hợp với máy
+  chủ trong mạng nội bộ tin cậy.
+- **Tên mô hình:** `MOC_ASK_MODEL` bắt buộc, đúng tên máy chủ đó nhận (vd. `Qwen/Qwen3-4B` của vLLM); không lấy
+  `MOC_AI_MODEL` như khi viết tại chỗ. Thiếu thì `svc-files` dừng lúc khởi động.
 - **Sẵn sàng:** `svc-files` hỏi `GET {MOC_ASK_API_URL}/models` lúc khởi động và mỗi 60 giây; khóa sai (401, 403) hay
   sai tên mô hình (404) thì coi như chưa sẵn sàng tới lượt dò sau. Nhật ký: `office.assist.ai_ready`,
   `office.assist.ai_unavailable` có `"where": "external"` và mã HTTP, không có khóa.

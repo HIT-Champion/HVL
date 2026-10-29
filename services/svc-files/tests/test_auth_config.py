@@ -169,8 +169,9 @@ def test_external_answer_api_settings():
     assert (s.ask_api, s.ask_api_url, s.ask_model) == ("openai", "https://mo-hinh.example/v1", "mo-hinh-ngoai")
     assert s.ask_api_key == "khoa-gia" and "khoa-gia" not in repr(s)
     # máy chủ trong mạng của đơn vị, không đòi khóa
-    s = Settings.from_env({**BASE, "MOC_ASK_API": "openai", "MOC_ASK_API_URL": "http://vllm:8000/v1"})
-    assert (s.ask_api_url, s.ask_api_key, s.ask_model) == ("http://vllm:8000/v1", "", "qwen3:1.7b")
+    s = Settings.from_env({**BASE, "MOC_ASK_API": "openai", "MOC_ASK_API_URL": "http://vllm:8000/v1",
+                           "MOC_ASK_MODEL": "Qwen/Qwen3-4B"})
+    assert (s.ask_api_url, s.ask_api_key, s.ask_model) == ("http://vllm:8000/v1", "", "Qwen/Qwen3-4B")
 
 
 @pytest.mark.parametrize(("env", "message"), [
@@ -179,8 +180,10 @@ def test_external_answer_api_settings():
     ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "mo-hinh.example/v1"}, "MOC_ASK_API_URL"),
     ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "ftp://mo-hinh.example/v1"}, "MOC_ASK_API_URL"),
     ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1 x"}, "MOC_ASK_API_URL"),
-    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1", "MOC_AI_URL": "",
-      "MOC_AI_MODEL": " ", "MOC_ASK_MODEL": ""}, "MOC_ASK_MODEL"),
+    # tên mô hình của API ngoài không lấy MOC_AI_MODEL (mô hình Ollama tại chỗ)
+    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1"}, "MOC_ASK_MODEL"),
+    ({"MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1", "MOC_AI_MODEL": "qwen3:4b",
+      "MOC_ASK_MODEL": " "}, "MOC_ASK_MODEL"),
 ])
 def test_bad_external_answer_api_stops_startup(env, message):
     with pytest.raises(ConfigError, match=message):
@@ -197,6 +200,22 @@ def test_three_models_for_two_ollama_slots_is_a_warning_not_an_error():
     assert Settings.from_env({**ai, "MOC_AI_URL": "", "MOC_ASK_MODEL": "qwen3:4b"}).warnings() == []
     (warning,) = Settings.from_env({**ai, "MOC_ASK_MODEL": "qwen3:4b"}).warnings()
     assert "qwen3:4b" in warning and "qwen3:1.7b" in warning and "OLLAMA_MAX_LOADED_MODELS" in warning
+    # viết qua API ngoài (#430): Ollama chỉ giữ mô hình trích yếu và mô hình nhúng
+    assert Settings.from_env({**ai, "MOC_ASK_API": "openai", "MOC_ASK_API_URL": "https://mo-hinh.example/v1",
+                              "MOC_ASK_MODEL": "mo-hinh-ngoai"}).warnings() == []
+
+
+def test_external_answer_api_over_plain_http_is_a_warning():
+    """#430: http:// gửi đoạn văn bản đã che (và khóa) không mã hóa: cảnh báo, không chặn — máy chủ có thể nằm trong
+    mạng nội bộ của đơn vị."""
+    api = {**BASE, "MOC_ASK_API": "openai", "MOC_ASK_MODEL": "mo-hinh-ngoai"}
+    assert Settings.from_env({**api, "MOC_ASK_API_URL": "https://mo-hinh.example/v1",
+                              "MOC_ASK_API_KEY": "khoa-gia"}).warnings() == []
+    (warning,) = Settings.from_env({**api, "MOC_ASK_API_URL": "http://vllm:8000/v1"}).warnings()
+    assert "http://" in warning and "MOC_ASK_API_KEY" not in warning
+    (warning,) = Settings.from_env({**api, "MOC_ASK_API_URL": "http://vllm:8000/v1",
+                                    "MOC_ASK_API_KEY": "khoa-gia"}).warnings()
+    assert "MOC_ASK_API_KEY" in warning and "khoa-gia" not in warning
 
 
 # --- biến của lô nạp văn bản đến (imports/) -------------------------------------------------------------------------
