@@ -56,8 +56,8 @@ head -3 LICENSE        # xác nhận là toàn văn, không phải link
 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
-| ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 5 bản v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1 | −5 |
-| ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
+| ✅ | Có ≥ 1 release **trước thời điểm nộp bài** | Trang Releases của repo: 6 bản v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0 | −5 |
+| ✅ | Phát hành **theo phiên bản** (SemVer) | Thẻ `v0.1.0`, `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.2.1`, `v1.3.0`; `CHANGELOG.md` theo SemVer 2.0.0 | −3 |
 | ✅ | Dùng **định dạng mở** cho gói phát hành | `.tar.gz` — **tuyệt đối không** `.zip`, `.rar`, `.arj`. Mỗi bản kèm gói `.tar.gz` tự sinh và `.sha256`, không tải lên gói nén nào khác; v1.1.0 thêm SBOM `.cdx.json` | −3 |
 
 > ⚠️ GitHub **tự động** đính kèm cả `Source code (zip)` và `Source code (tar.gz)` vào mỗi release.
@@ -122,7 +122,7 @@ git ls-files | grep -E '(vendor|third_party|node_modules)/' && echo "VI PHẠM" 
 | Trạng thái | Yêu cầu | Bằng chứng | Mức trừ nếu thiếu |
 |---|---|---|---|
 | ✅ | Có hệ thống ghi nhận lỗi (bug tracker) | GitHub Issues **đã bật** + mẫu báo lỗi + **có issue thật**: mẫu `bug_report.yml`, `feature_request.yml`; 161 issue, 141 đã đóng (28/10/2026) | −5 |
-| ✅ | Có lịch sử thay đổi (changelog) | `CHANGELOG.md` theo Keep a Changelog, có mục cho v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1 và mục "Chưa phát hành" (CI job "Tài liệu" kiểm) | −5 |
+| ✅ | Có lịch sử thay đổi (changelog) | `CHANGELOG.md` theo Keep a Changelog, có mục cho v0.1.0, v1.0.0, v1.1.0, v1.2.0, v1.2.1, v1.3.0 và mục "Chưa phát hành" (CI job "Tài liệu" kiểm) | −5 |
 | ✅ | Có README và hướng dẫn | `README.md`, bản tiếng Anh `README.en.md`; xem nhanh và bản đồ tài liệu ở `docs/README.md` | −5 |
 
 > ⚠️ Bật Issues nhưng để trống trông như chưa dùng bao giờ. Trong quá trình phát triển, hãy mở

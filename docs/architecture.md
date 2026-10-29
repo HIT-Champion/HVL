@@ -375,7 +375,7 @@ tệp metadata của `core` trỏ sang `office`, năm vai trò cố định củ
 §4.7 đã làm ở #302: phần Văn phòng của hai dịch vụ nằm trong gói `office/`, chỉ gắn route và chạy vòng nền khi
 `MOC_OFFICE_ENABLED` bật; tắt thì hai dịch vụ vẫn lên và phần lõi vẫn chạy (`make demo-tat-van-phong`, có trong CI). Vẫn
 chung tiến trình, chung image. Như vậy vẫn đủ để ứng dụng thứ hai chạy trên lõi mà không sửa dòng nào trong `services/`,
-nhưng nó mang theo các chỗ dính ở CSDL, metadata và vai trò (§4.6). Các bước còn lại là việc sau `v1.3.0` (§4.7).
+nhưng nó mang theo các chỗ dính ở CSDL, metadata và vai trò (§4.6). Các bước còn lại là việc sau `v1.4.0` (§4.7).
 
 ### 4.2. Sơ đồ
 
@@ -626,7 +626,7 @@ thống chạy: `make demo-cai-ung-dung`, có trong CI ([`them-ung-dung.md`](the
 
 ### 4.7. Hướng tách
 
-Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.3.0`, chưa xếp ngày (#324).
+Bước 1–2 đã làm ở #302; bước 3–5 là việc sau `v1.4.0`, chưa xếp ngày (#324).
 
 **Tiêu chí xong** — kiểm được, không cần tin lời:
 
@@ -997,7 +997,7 @@ bản ghi; QĐ-013 ghi WAF, gộp ở #130. Câu nào của QĐ cũ đã lệch 
   giữa hai phần là gọi hàm. Đổi lại: chưa tắt hay thay được Văn phòng mà không sửa mã lõi; tìm kiếm, chữ PDF, trợ lý chỉ
   phủ văn bản của Văn phòng; triển khai lại phần Văn phòng là khởi động lại cả dịch vụ lõi; còn những chỗ dính ở §4.4.
   Ứng dụng thứ hai vẫn cắm được mà không sửa `services/` (§4.6). Hướng tách, tiêu chí, cái giá: §4.7 — việc sau
-  `v1.3.0`.
+  `v1.4.0`.
 
 ### QĐ-013: WAF Coraza dạng proxy-wasm trong APISIX
 
