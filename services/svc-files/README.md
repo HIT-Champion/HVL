@@ -351,8 +351,33 @@ volume nếu cần chính xác hơn). OCR bản scan cho tìm kiếm toàn văn 
 
 `assist/`. Trang "Hỏi đáp văn bản" gọi `POST /api/documents/ask`: người dùng hỏi bằng lời (vd "Điều kiện xét học bổng
 khuyến khích học tập là gì?"), trợ lý tìm đoạn liên quan trong các văn bản **chính người hỏi được đọc** và trả câu trích
-nguyên văn kèm nguồn "88/CTSV · tr. 1". Văn thư, chuyên viên, trưởng phòng, lãnh đạo hỏi được; vai trò khác `403`. Mỗi
-câu hỏi độc lập, không lưu hội thoại.
+nguyên văn kèm nguồn "88/CTSV · tr. 1". Văn thư, chuyên viên, trưởng phòng, lãnh đạo hỏi được; vai trò khác `403`. Máy
+chủ không lưu hội thoại: câu nối tiếp gửi kèm câu hỏi lượt trước (`previous`).
+
+**Bộ định tuyến** (`route.py`, `guide.py`, #423). Trước khi tìm, mỗi câu hỏi đi qua các mẫu tất định so trên chữ bỏ
+dấu, có cả tiếng Anh; mỗi mẫu có mã lý do (`route_reason`, vd `kw:lam-duoc-gi`, `kw:o-dau`, `kw:thoi-tiet`; mặc định
+`mac-dinh`). Không mô hình nào chọn đường. Câu có từ chỉ văn bản ("văn bản", "quyết định", "học bổng", "Điều 5"…) luôn
+về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất là như trước khi có bộ định tuyến.
+
+| `route` | Nhận ra bằng | Trả lời | Tìm trong kho · gọi mô hình |
+|---|---|---|---|
+| `gioi_thieu` | "làm được gì", "bạn là ai", "dùng mô hình nào", "xin chào", "cảm ơn", "what can you do"… | Câu đầu của mục ứng với mã lý do trong tệp Giới thiệu trợ lý (`assist/gioi_thieu/vi.md`, `en.md` khi câu hỏi tiếng Anh), các mục khác của tệp làm nguồn phụ; `answer.source: extract` | không · không, kể cả `mode: generate` |
+| `huong_dan` | "ở đâu", "làm thế nào để", "hướng dẫn cách"… kèm tên chức năng (nghỉ phép, văn bản đi, ký số, mật khẩu…) | Như `van_ban` nhưng nguồn là các mục của hướng dẫn sử dụng (`docs/huong-dan/*.md`, thư mục `MOC_ASK_GUIDE_DIR`) | không · như `van_ban` (bộ kiểm căn cứ y nguyên) |
+| `ngoai_pham_vi` | thời tiết, giá cả, thể thao, viết hộ, lập trình… | Câu cố định nói trợ lý làm được gì, `answer.source: fixed`, `status: no_evidence`, `sources: []` | không · không |
+| `van_ban` | còn lại | Như mô tả bên dưới | có · như bên dưới |
+
+Hỏi trong một văn bản (`document_id`) thì "ở đâu", "làm thế nào" là câu về văn bản đó, không phải hướng dẫn. Nguồn của
+tệp giới thiệu và hướng dẫn là đoạn `kind: guide`: `document_id`, `page`, `file_id` null, `symbol` là tên tài liệu,
+`summary` là tiêu đề mục, `path` là tệp kèm neo mục (`docs/huong-dan/viec-chung.md#đơn-nghỉ-phép`). Kho tĩnh nạp lúc
+khởi động, tìm bằng từ của câu hỏi (`vi.terms`), mục phủ < 35 % trọng số câu hỏi bị bỏ. Thiếu thư mục hướng dẫn thì
+ghi `office.assist.guides_missing`, đường `huong_dan` trả `no_evidence`.
+
+**Câu nối tiếp** (`route.follow_up`). `previous` (tùy chọn, câu hỏi lượt trước; rỗng, quá 500 ký tự hay có ký tự điều
+khiển thì bị bỏ qua, không lỗi) được dùng khi câu mới ≤ 6 từ và có dấu hiệu nối tiếp ("còn … thì sao", "thế còn …",
+"nó", "văn bản đó"…). "Còn khoa Kinh tế thì sao?" sau "Điều kiện xét học bổng khoa CNTT là gì?" thành "Điều kiện xét
+học bổng khoa Kinh tế là gì": từ đầu của phần sau "còn" có trong câu trước thì thay cụm danh từ bắt đầu từ đó, không
+thì nối vào cuối câu trước. Câu ghép (`rewritten`) đi qua bộ định tuyến lần nữa rồi đem đi tìm, trích, hỏi mô hình;
+trang hiện "Đã hiểu là: …". Không ghép được thì câu hỏi đi như câu độc lập.
 
 **Chỉ mục đoạn** (`chunks.py`, `index.py`, `meili.py`). Chỉ mục Meilisearch riêng `MOC_ASK_INDEX` (`chunks`), một tài
 liệu mỗi đoạn, cùng máy Meilisearch với tìm kiếm F2.7.
@@ -449,11 +474,11 @@ người hỏi không được đọc.
 - **Trợ lý có danh tính, có sổ.** Mỗi lượt hỏi ghi **một** dòng `assistant.answered` (thực thể `ai.questions`, id =
   `ask_id`) bằng vai trò Hasura `agent`: preset ép `actor_id = moc-assistant`, `actor_kind = agent`, thuê ước. `diff`
   chỉ có siêu dữ liệu: `user_id, ask_id, mode, status, answer_source, hits, cited` (số nguồn được trích), `documents`
-  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings` — **không câu hỏi, câu trả lời, đoạn
-  trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
+  (id các văn bản trả về), `semantic, model, embed_model, duration_ms, warnings, route, route_reason, followup` (có
+  ghép câu nối tiếp không) — **không câu hỏi, câu trước, câu ghép, câu trả lời, đoạn trích**. **Không ghi được sổ thì không trả lời** (`503 database_unavailable`). Lượt `generate` gửi lại `ask_id` nên
   hai dòng sổ cùng một thực thể.
 - **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
-  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms}, `office.assist.ask_failed`
+  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms, route, route_reason, followup}, `office.assist.ask_failed`
   {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` /
   `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch` {dims, expected} (mức error),
   `office.assist.indexed` / `embedded` / `embed_skipped` {ids} / `index_failed` {error, stage, reason},
@@ -462,8 +487,9 @@ người hỏi không được đọc.
 | Kết quả | Ý nghĩa |
 |---|---|
 | `status` | `answered` có câu trả lời · `passages_only` có đoạn liên quan mà không câu nào đủ khớp để trích · `no_evidence` không đoạn nào (`sources: []`) |
-| `answer`, `extract` | `{text, source: extract\|model, model}`; `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; null khi không có |
-| `sources[]` | Tối đa `MOC_ASK_TOP_K`, theo thứ tự xếp hạng, `n` từ 1: `document_id, symbol, type_code, type_name, summary, issuer_name, issued_on, direction, status` (từ Hasura), `kind: page\|meta, file_id, file_role: main\|attachment\|issued, page, excerpt` (≤ 600 ký tự quanh câu tốt nhất, một dòng), `cited` |
+| `answer`, `extract` | `{text, source: extract\|model\|fixed, model}`; `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; `fixed`: câu cố định của `ngoai_pham_vi` (`extract` null); null khi không có |
+| `sources[]` | Tối đa `MOC_ASK_TOP_K`, theo thứ tự xếp hạng, `n` từ 1: `document_id, symbol, type_code, type_name, summary, issuer_name, issued_on, direction, status` (từ Hasura), `kind: page\|meta\|guide, file_id, file_role: main\|attachment\|issued, page, excerpt` (≤ 600 ký tự quanh câu tốt nhất, một dòng), `cited`; nguồn `guide` có thêm `path`, các trường của văn bản là null |
+| `route` · `route_reason` · `rewritten` | Đường bộ định tuyến chọn · mã lý do (máy đọc, không dịch) · câu nối tiếp đã ghép, null khi không phải câu nối tiếp |
 | `semantic` · `ai_available` | Lượt này có tìm theo nghĩa · mô hình viết câu trả lời đang sẵn sàng |
 | `warnings` | `embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`, `model_declined` (mô hình nói không đủ căn cứ) |
 | `400 invalid_question` | Rỗng sau chuẩn hóa, > 500 ký tự, có ký tự điều khiển, chỉ toàn từ dừng |
@@ -1269,6 +1295,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
 | `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |
 | `MOC_ASK_CONTEXT_CHARS` | `2800` | Tổng ký tự các đoạn gửi mô hình |
+| `MOC_ASK_GUIDE_DIR` | `/app/huong-dan` | Thư mục hướng dẫn sử dụng cho đường `huong_dan` (#423); compose gắn `docs/huong-dan` vào đây, chỉ đọc. Không có thì chỉ đường `huong_dan` trả `no_evidence` |
 | `MOC_ASK_CONCURRENCY` · `MOC_ASK_QUEUE_S` | `1` · `20` | Số lượt `generate` cùng lúc · chờ lượt quá thì `503 busy` |
 | `MOC_AI_EMBED_MODEL` | `qwen3-embedding:0.6b` | Mô hình nhúng trong Ollama (`bge-m3` thay được); đặt rỗng: không nhúng, chỉ tìm từ khóa |
 | `MOC_AI_EMBED_DIMS` · `MOC_AI_EMBED_BATCH` | `1024` · `8` | Số chiều véc-tơ, phải đúng của mô hình (sai thì tắt tìm theo nghĩa, ghi lỗi `embed_dims_mismatch`) · số đoạn mỗi lô nhúng nền |

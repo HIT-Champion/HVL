@@ -139,6 +139,8 @@ class Settings:
     ask_context_chars: int = 2800       # tổng ký tự nguồn gửi mô hình
     ask_concurrency: int = 1            # số lượt sinh câu trả lời cùng lúc
     ask_queue_s: float = 20.0           # chờ lượt sinh quá thì 503 busy
+    # hướng dẫn sử dụng cho đường huong_dan của trợ lý (#423): compose gắn docs/huong-dan vào đây, chỉ đọc
+    ask_guide_dir: str = "/app/huong-dan"
     ai_embed_model: str = "qwen3-embedding:0.6b"    # rỗng: không nhúng, chỉ tìm từ khóa
     ai_embed_dims: int = 1024
     ai_embed_batch: int = 8             # số đoạn mỗi lô nhúng nền
@@ -251,6 +253,7 @@ class Settings:
                 ask_context_chars=int(env.get("MOC_ASK_CONTEXT_CHARS", "2800")),
                 ask_concurrency=int(env.get("MOC_ASK_CONCURRENCY", "1")),
                 ask_queue_s=float(env.get("MOC_ASK_QUEUE_S", "20")),
+                ask_guide_dir=env.get("MOC_ASK_GUIDE_DIR", "/app/huong-dan").strip(),
                 # biến có mà rỗng: tắt nhúng (compose truyền ${MOC_AI_EMBED_MODEL-…}); không có biến: mặc định
                 ai_embed_model=env.get("MOC_AI_EMBED_MODEL", "qwen3-embedding:0.6b").strip(),
                 ai_embed_dims=int(env.get("MOC_AI_EMBED_DIMS", "1024")),

@@ -194,8 +194,9 @@ create table core.audit_anchors (           -- bản tra cứu các lần neo đ
   thời gian, lý do của lượt đọc văn bản đến `intake.suggested` — migration 1792281601900, các khóa này chỉ hiện ở
   dòng sự kiện đó; mã lượt hỏi, chế độ, nguồn câu trả lời, số đoạn, số nguồn được trích, có tìm theo nghĩa không, tên
   mô hình sinh và mô hình nhúng, thời gian, mã cảnh báo của câu trả lời `assistant.answered` — migration
-  1792281602000, cũng chỉ ở dòng sự kiện đó; id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý, số ngày đề xuất,
-  độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
+  1792281602000, cũng chỉ ở dòng sự kiện đó (thêm đường, mã lý do của bộ định tuyến, có ghép câu nối tiếp không,
+  nơi chạy mô hình — migration 1792281604100, #423, #430); id các văn bản nguồn vẫn ẩn; kết quả, lý do không gợi ý,
+  số ngày đề xuất, độ tin cậy, số căn cứ, số văn bản tương tự, có tìm theo nghĩa không, thời gian của gợi ý giao việc
   `assignment.suggested` — migration 1792281602100, chỉ ở dòng sự kiện đó; loại lô, định dạng, có vào sổ không, số
   dòng, số đạt / trùng / lỗi của lô nạp `import.created`, `import.finished` — migration 1792281602800, tên tệp vẫn
   ẩn). Lãnh đạo không đọc được văn bản hạn chế
@@ -1454,7 +1455,8 @@ có giá trị vô hướng, **không** câu hỏi, câu trả lời, số ký h
 {
   "user_id": "<sub người hỏi>", "ask_id": "5d1e…", "mode": "generate", "status": "answered",
   "answer_source": "model", "hits": 5, "cited": 2, "documents": "<id>,<id>", "semantic": true,
-  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": ""
+  "model": "qwen3:1.7b", "embed_model": "qwen3-embedding:0.6b", "duration_ms": 18230, "warnings": "",
+  "route": "van_ban", "route_reason": "mac-dinh", "followup": false
 }
 ```
 
@@ -1462,8 +1464,10 @@ có giá trị vô hướng, **không** câu hỏi, câu trả lời, số ký h
 `model` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id các văn bản nguồn,
 cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình hoặc null; `warnings`:
 mã cảnh báo cách nhau dấu phẩy (`embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`,
-`model_declined`), rỗng nếu không có. Lãnh đạo xem sổ thấy mọi khóa qua `overview` (§1) trừ `documents`: id văn bản
-nguồn chỉ vai trò `service` đọc được.
+`model_declined`), rỗng nếu không có; `route`: đường bộ định tuyến chọn (`van_ban` | `gioi_thieu` | `huong_dan` |
+`ngoai_pham_vi`, #423); `route_reason`: mã của mẫu đã khớp (`kw:lam-duoc-gi`…) hoặc `mac-dinh`, không bao giờ là chữ
+của câu hỏi; `followup`: câu hỏi được ghép với câu trước (câu trước, câu ghép không lưu). Lãnh đạo xem sổ thấy mọi khóa
+qua `overview` (§1) trừ `documents`: id văn bản nguồn chỉ vai trò `service` đọc được.
 
 **Gợi ý giao việc** (F4.3): mỗi văn bản đến tác tử xét xong (có gợi ý, không gợi ý được, hay `svc-files` không trả
 lời), `svc-workflow` ghi một dòng `core.audit_log` bằng vai trò `agent`, **cùng giao dịch** với dòng

@@ -34,7 +34,14 @@ Theo đúng thứ tự, mỗi bước chặn được thì chặn trước khi t
    sổ thì 503, không trả gì.
 
 Không có đoạn nào → ``no_evidence``, không gọi mô hình; giống hệt dù văn bản không tồn tại hay người hỏi không được
-đọc. Nhật ký không bao giờ có câu hỏi, câu trả lời, đoạn trích: chỉ độ dài, số term, số đoạn, thời gian.
+đọc.
+
+Bộ định tuyến (route.py, #423) chọn đường sau bước 2, trước khi tốn gì thêm: ``gioi_thieu`` trả mục của tệp Giới thiệu
+trợ lý, ``ngoai_pham_vi`` trả câu cố định — cả hai không tìm, không gọi mô hình, cả ở ``generate``; ``huong_dan`` tìm
+trong kho hướng dẫn sử dụng (guide.py) thay cho bước 4–5, rồi câu trích và mô hình như văn bản; ``van_ban`` như trên.
+Câu nối tiếp (có ``previous``) được ghép thành câu độc lập trước khi chọn đường; câu ghép thay câu hỏi ở mọi bước sau
+và trả về ở ``rewritten``. Sổ kiểm toán, nhật ký ghi đường và mã lý do, không ghi câu ghép. Nhật ký không bao giờ
+có câu hỏi, câu trả lời, đoạn trích: chỉ độ dài, số term, số đoạn, thời gian.
 
 Che thông tin cá nhân (F4.4): mô hình chỉ đọc bản che. Mỗi lượt ``generate`` một ``pii.Masker``: câu hỏi che trước
 (số trong câu hỏi nhận nhãn ``[SĐT-1]``), rồi các đoạn — cùng số thì cùng nhãn, mô hình vẫn biết "số này của ai". Tìm
@@ -62,9 +69,10 @@ from .. import pii
 from ..auth import Principal
 from ..hasura import HasuraAuthError, HasuraError
 from ..search import SearchError
-from . import extract, grounding, vi
+from . import extract, grounding, guide, route, vi
 from .ai import AiClient
-from .retrieve import Filters, Passage, Retriever
+from .guide import GuideStore
+from .retrieve import Filters, Passage, Retrieval, Retriever
 from .scope import user_scope
 from .store import AnswerLog
 
@@ -101,6 +109,7 @@ class AskBody(Protocol):
     type_code: str | None
     document_id: uuid.UUID | None   # chỉ hỏi trong văn bản này — vẫn trong phạm vi người hỏi được xem
     ask_id: uuid.UUID | None
+    previous: str | None            # câu hỏi lượt trước (câu nối tiếp), máy chủ không lưu
 
 
 class _Hold(Protocol):
@@ -130,11 +139,20 @@ def source_of(n: int, passage: Passage, best: dict[str, tuple[int, int]], cited:
     }
 
 
+def _previous(text: str | None) -> str | None:
+    """Câu hỏi lượt trước đã chuẩn hóa; sai dạng (rỗng, dài, có ký tự điều khiển) thì bỏ qua, không thành lỗi."""
+    if not text or vi.has_control(text):
+        return None
+    out = vi.normalize(text)
+    return out if out and len(out) <= MAX_QUESTION else None
+
+
 class Assistant:
     def __init__(self, settings: Settings, *, retriever: Retriever, ai: AiClient, indexer: _Hold, hasura: _Hasura,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 guides: GuideStore | None = None, clock: Callable[[], float] = time.monotonic) -> None:
         self.settings = settings
         self.retriever = retriever
+        self.guides = guides if guides is not None else GuideStore.load(settings.ask_guide_dir)
         self.ai = ai
         self.indexer = indexer
         self.answers = AnswerLog(hasura, settings.assistant_id)
@@ -171,24 +189,118 @@ class Assistant:
         if vi.has_control(body.question) or not question or len(question) > MAX_QUESTION or not vi.terms(question):
             raise AskError(400, "invalid_question", "Câu hỏi trống, dài quá 500 ký tự, có ký tự điều khiển hoặc chưa "
                                                     "có từ nào để tìm — hãy hỏi cụ thể hơn")
-        if body.mode != "generate":
-            return await self._answer(principal, body, question, scope, request_id, start)
+        scoped = body.document_id is not None
+        chosen = route.route(question, scoped=scoped)
+        rewritten = None
+        if chosen.name in ("van_ban", "huong_dan"):
+            rewritten = route.follow_up(question, _previous(body.previous))
+            if rewritten is not None and chosen.name == "van_ban":
+                chosen = route.route(rewritten, scoped=scoped)
+        if body.mode != "generate" or chosen.name in ("gioi_thieu", "ngoai_pham_vi"):
+            return await self._answer(principal, body, question, rewritten, chosen, scope, request_id, start)
         try:
             await asyncio.wait_for(self.slots.acquire(), s.ask_queue_s)
         except TimeoutError:
             raise AskError(503, "busy", "Trợ lý đang soạn câu trả lời khác, thử lại sau ít giây",
                            headers={"Retry-After": RETRY_AFTER}) from None
         try:
-            return await self._answer(principal, body, question, scope, request_id, start)
+            return await self._answer(principal, body, question, rewritten, chosen, scope, request_id, start)
         finally:
             self.slots.release()
 
-    async def _answer(self, principal: Principal, body: AskBody, question: str, scope: Any, request_id: str,
-                      start: float) -> dict[str, Any]:
+    async def _answer(self, principal: Principal, body: AskBody, question: str, rewritten: str | None,
+                      chosen: route.Route, scope: Any, request_id: str, start: float) -> dict[str, Any]:
         s = self.settings
         deadline = start + s.ask_deadline_s
         warnings: list[str] = []
+        asked = rewritten or question               # câu đem đi tìm, trích, hỏi mô hình
+        fixed: str | None = None                    # câu cố định của đường ngoai_pham_vi
+        if chosen.name == "van_ban":
+            found = await self._search(body, asked, scope, deadline, warnings, request_id)
+        else:
+            if chosen.name == "huong_dan":
+                found_passages = self.guides.search(asked, s.ask_top_k)
+            elif chosen.name == "gioi_thieu":
+                found_passages = self.guides.intro(chosen.reason, chosen.lang)
+            else:
+                found_passages, fixed = [], self.guides.fixed(chosen.lang)
+            found = Retrieval(found_passages, candidates=len(found_passages), semantic=False)
+        passages = list(found.passages[: s.ask_top_k])
 
+        if chosen.name == "gioi_thieu" and passages:
+            # mục chính trả lời nguyên văn, không cần khớp từ với câu hỏi ("Xin chào"); không gọi mô hình
+            first = guide.lead(passages[0])
+            start_at = passages[0].text.find(first)
+            quoted = extract.Extract(f"“{first}” [1]", [1], {passages[0].chunk_id: (start_at, start_at + len(first))})
+        else:
+            quoted = extract.answer(asked, passages)
+        cited = list(quoted.cited)
+        model_text: str | None = None
+        model: str | None = None
+        masked = 0                  # số chỗ đã che trong chữ gửi mô hình viết câu trả lời
+        if body.mode == "generate" and passages and chosen.name in ("van_ban", "huong_dan"):
+            model_text, model, warning, masked = await self._generate(asked, passages, quoted.best, deadline,
+                                                                      request_id)
+            if warning:
+                warnings.append(warning)
+            if model_text:
+                cited = grounding.citations(model_text)
+
+        if not passages:
+            status = "no_evidence"
+        elif quoted.text is None and model_text is None:
+            status = "passages_only"
+        else:
+            status = "answered"
+        extract_out = {"text": quoted.text, "source": "extract", "model": None} if quoted.text else None
+        answer_out = {"text": model_text, "source": "model", "model": model} if model_text else extract_out
+        if fixed is not None:
+            answer_out = {"text": fixed, "source": "fixed", "model": None}
+        answer_source = "model" if model_text else "extract" if quoted.text else "fixed" if fixed else "none"
+        warnings = [w for w in dict.fromkeys(warnings) if w in WARNINGS]
+        ask_id = str(body.ask_id or uuid.uuid4())
+        embed_model = self.ai.embed_model if found.semantic else None
+        duration_ms = self._ms(start)
+
+        diff = {
+            "user_id": principal.user_id, "ask_id": ask_id, "mode": body.mode, "status": status,
+            "answer_source": answer_source, "hits": len(passages), "cited": len(cited),
+            "documents": ",".join(dict.fromkeys(p.document_id for p in passages if p.kind != "guide")),
+            "semantic": found.semantic, "model": model, "embed_model": embed_model, "duration_ms": duration_ms,
+            "warnings": ",".join(warnings), "route": chosen.name, "route_reason": chosen.reason,
+            "followup": rewritten is not None,
+        }
+        try:
+            await self.answers.write(principal.tenant_id, request_id, ask_id, diff)
+        except HasuraError as exc:
+            _log("office.assist.audit_failed", request_id, error=str(exc), code=exc.code)
+            raise AskError(503, "database_unavailable",
+                           "Chưa ghi được sổ kiểm toán nên chưa trả lời — thử lại sau") from exc
+
+        _log("office.assist.asked", request_id, tenant_id=principal.tenant_id, actor_id=principal.user_id,
+             mode=body.mode, status=status, route=chosen.name, route_reason=chosen.reason,
+             followup=rewritten is not None, q_length=len(question), terms=len(vi.terms(asked)),
+             candidates=found.candidates, relaxed=found.relaxed, hits=len(passages), cited=len(cited),
+             semantic=found.semantic, ratio=found.ratio, scoped=body.document_id is not None, model=model,
+             warnings=",".join(warnings), masked=masked, duration_ms=duration_ms)
+        cited_set = set(cited)
+        return {
+            "ask_id": ask_id, "status": status, "answer": answer_out, "extract": extract_out,
+            "sources": [self._source(i + 1, p, quoted.best, cited_set) for i, p in enumerate(passages)],
+            "semantic": found.semantic, "ai_available": self.ai.chat_available, "warnings": warnings,
+            "duration_ms": duration_ms, "route": chosen.name, "route_reason": chosen.reason, "rewritten": rewritten,
+        }
+
+    @staticmethod
+    def _source(n: int, p: Passage, best: dict[str, tuple[int, int]], cited: set[int]) -> dict[str, Any]:
+        if p.kind == "guide":
+            return guide.source(n, p, extract.excerpt(p.text, best.get(p.chunk_id)), n in cited)
+        return source_of(n, p, best, cited)
+
+    async def _search(self, body: AskBody, question: str, scope: Any, deadline: float, warnings: list[str],
+                      request_id: str) -> Retrieval:
+        """Bước 4–5 của đường ``van_ban``: nhúng câu hỏi, tìm lai trong kho văn bản, hậu kiểm bằng token người hỏi."""
+        s = self.settings
         vector: list[float] | None = None
         if self.ai.embed_available and not self.indexer.embedder_ready:
             warnings.append("embed_unavailable")    # Meilisearch chưa có embedder: tìm lai chắc chắn lỗi, không nhúng
@@ -219,60 +331,7 @@ class Assistant:
             # vd embedder chưa có trong Meilisearch (đang khởi động, đang đổi mô hình): đã tìm lại chỉ bằng từ khóa
             _log("office.assist.search_failed", request_id, error=found.hybrid_error, fallback="keywords")
             warnings.append("embed_unavailable")
-        passages = list(found.passages[: s.ask_top_k])
-
-        quoted = extract.answer(question, passages)
-        cited = list(quoted.cited)
-        model_text: str | None = None
-        model: str | None = None
-        masked = 0                  # số chỗ đã che trong chữ gửi mô hình viết câu trả lời
-        if body.mode == "generate" and passages:
-            model_text, model, warning, masked = await self._generate(question, passages, quoted.best, deadline,
-                                                                      request_id)
-            if warning:
-                warnings.append(warning)
-            if model_text:
-                cited = grounding.citations(model_text)
-
-        if not passages:
-            status = "no_evidence"
-        elif quoted.text is None and model_text is None:
-            status = "passages_only"
-        else:
-            status = "answered"
-        extract_out = {"text": quoted.text, "source": "extract", "model": None} if quoted.text else None
-        answer_out = {"text": model_text, "source": "model", "model": model} if model_text else extract_out
-        answer_source = "model" if model_text else "extract" if quoted.text else "none"
-        warnings = [w for w in dict.fromkeys(warnings) if w in WARNINGS]
-        ask_id = str(body.ask_id or uuid.uuid4())
-        embed_model = self.ai.embed_model if found.semantic else None
-        duration_ms = self._ms(start)
-
-        diff = {
-            "user_id": principal.user_id, "ask_id": ask_id, "mode": body.mode, "status": status,
-            "answer_source": answer_source, "hits": len(passages), "cited": len(cited),
-            "documents": ",".join(dict.fromkeys(p.document_id for p in passages)), "semantic": found.semantic,
-            "model": model, "embed_model": embed_model, "duration_ms": duration_ms, "warnings": ",".join(warnings),
-        }
-        try:
-            await self.answers.write(principal.tenant_id, request_id, ask_id, diff)
-        except HasuraError as exc:
-            _log("office.assist.audit_failed", request_id, error=str(exc), code=exc.code)
-            raise AskError(503, "database_unavailable",
-                           "Chưa ghi được sổ kiểm toán nên chưa trả lời — thử lại sau") from exc
-
-        _log("office.assist.asked", request_id, tenant_id=principal.tenant_id, actor_id=principal.user_id,
-             mode=body.mode, status=status, q_length=len(question), terms=len(vi.terms(question)),
-             candidates=found.candidates, relaxed=found.relaxed, hits=len(passages), cited=len(cited),
-             semantic=found.semantic, ratio=found.ratio, scoped=body.document_id is not None, model=model,
-             warnings=",".join(warnings), masked=masked, duration_ms=duration_ms)
-        cited_set = set(cited)
-        return {
-            "ask_id": ask_id, "status": status, "answer": answer_out, "extract": extract_out,
-            "sources": [source_of(i + 1, p, quoted.best, cited_set) for i, p in enumerate(passages)],
-            "semantic": found.semantic, "ai_available": self.ai.chat_available, "warnings": warnings,
-            "duration_ms": duration_ms,
-        }
+        return found
 
     async def _generate(self, question: str, passages: list[Passage], best: dict[str, tuple[int, int]],
                         deadline: float, request_id: str) -> tuple[str | None, str | None, str | None, int]:
