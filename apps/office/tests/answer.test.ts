@@ -25,7 +25,8 @@ import { test } from 'node:test'
 import type { AskResult, AskSource } from '../app/composables/useApi.ts'
 
 const {
-  ASK_ROLES, DATA_GROUP, DATA_LINKS, DATA_ROUTES, MASK_RE, MAX_PREVIOUS, MAX_QUESTION, ROUTES, SCOPE_PARAM, SUGGEST_GROUPS,
+  ASK_ROLES, DATA_GROUP, DATA_LINKS, DATA_ROUTES, MASK_RE, MAX_PREVIOUS, MAX_QUESTION, ROUTES, SCOPE_PARAM,
+  SUGGEST_GROUPS,
   askAbout, blocks, canAskAbout, canView, citeLabel, cleanQuestion, fallbackSuggestions, hasMask, inAssistant,
   needsGenerate, pageUrl, previousFor, scopeOf, searched, segments, sourceAnchor, tidy,
 } = await import('../app/utils/answer.ts')

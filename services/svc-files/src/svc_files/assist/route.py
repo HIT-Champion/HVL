@@ -137,7 +137,8 @@ _MY_TASKS: tuple[tuple[str, str, re.Pattern[str]], ...] = (
     ("viec-cua-toi", "vi", re.compile(rf"\b{_TASK}(?: \w+){{0,4}} của {_ME}\b")),
     ("toi-co-viec", "vi", re.compile(
         rf"\b{_ME} (?:có|còn|đang có|phải xử lý|cần xử lý)(?: \w+){{0,2}} {_TASK}\b")),
-    ("duoc-giao", "vi", re.compile(rf"\b{_ME} (?:được|đang được) (?:giao|phân công)\b|\b(?:giao|phân công) cho {_ME}\b")),
+    ("duoc-giao", "vi", re.compile(
+        rf"\b{_ME} (?:được|đang được) (?:giao|phân công)\b|\b(?:giao|phân công) cho {_ME}\b")),
     ("hop-viec", "vi", re.compile(r"\bhộp việc\b.*\b(?:bao nhiêu|mấy|quá hạn|đến hạn|hết hạn)\b")),
     ("my-tasks", "en", re.compile(r"\bmy (?:tasks?|work items?|assignments?|inbox)\b|\bassigned to me\b")),
 )

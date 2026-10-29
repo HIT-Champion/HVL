@@ -66,7 +66,8 @@ _TYPE_RE = re.compile(rf"\b(?:{'|'.join(t[0] for t in TYPES)})\b")
 _EN_TYPES = {"letters": "CV", "decisions": "QĐ", "notices": "TB", "plans": "KH", "reports": "BC", "circulars": "TT"}
 _EN_TYPE_RE = re.compile(rf"\b(?:{'|'.join(_EN_TYPES)})\b")
 
-_IN_RE = re.compile(rf"\b(?:{NOUNS})(?: moi)? den\b|\b(?:nhan duoc|da nhan|tiep nhan|vao so)\b|\b(?:incoming|received)\b")
+_IN_RE = re.compile(rf"\b(?:{NOUNS})(?: moi)? den\b|\b(?:nhan duoc|da nhan|tiep nhan|vao so)\b"
+                    r"|\b(?:incoming|received)\b")
 _OUT_RE = re.compile(rf"\b(?:{NOUNS})(?: moi)? di\b|\b(?:ban hanh|phat hanh|gui di)\b|\b(?:outgoing|issued|sent)\b")
 
 # Mốc thời gian chưa đọc được (ngày cụ thể, khoảng "từ … đến", quý, tuần): câu đó không thành câu đếm, về ``van_ban``
