@@ -124,7 +124,9 @@ class Question:
 
 # loại câu → đường bộ định tuyến của trợ lý phải chọn (services/svc-files/src/svc_files/assist/route.py)
 ROUTES = {"van_ban": "van_ban", "noi_tiep": "van_ban", "gioi_thieu": "gioi_thieu", "huong_dan": "huong_dan",
-          "ngoai_pham_vi": "ngoai_pham_vi", "viec_cua_toi": "viec_cua_toi", "dem_van_ban": "dem_van_ban"}
+          "ngoai_pham_vi": "ngoai_pham_vi", "viec_cua_toi": "viec_cua_toi", "dem_van_ban": "dem_van_ban",
+          # câu về văn bản thật của nguồn công khai (#446): tìm như van_ban, đếm riêng để 19 câu van_ban giữ nguyên
+          "cong_khai": "van_ban"}
 INTRO = "services/svc-files/src/svc_files/assist/gioi_thieu"
 
 
@@ -331,6 +333,17 @@ QUESTIONS = (
     Question("q16", "vanthu", "Khoa cử giảng viên nào tham dự hội thảo chuyển đổi số?",
              ({"summary_contains": "cử giảng viên tham dự hội thảo chuyển đổi số", "page": 1},), ("Vũ Thị Mai",),
              evidence=SEED_EVIDENCE["Về việc cử giảng viên tham dự hội thảo chuyển đổi số trong giáo dục đại học"]),
+    # Nguồn công khai A (#446): thông tư thật của Bộ GD&ĐT mà make seed nạp từ seed/du-lieu-mo/cong-bao-gddt; trang là
+    # trang của tệp PDF bản Công báo (test_hoi_dap kiểm câu bằng chứng trên đúng trang đó)
+    Question("c01", "vanthu", "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?", _at("06/2026/TT-BGDĐT", 18),
+             ("15 nguyện vọng",), evidence="Thí sinh được đăng ký tối đa 15 nguyện vọng vào các chương trình đào tạo, "
+                                         "các cơ sở giáo dục đại học khác nhau", loai="cong_khai"),
+    Question("c02", "vanthu", "Còn ngành đào tạo giáo viên thì sao?", _at("06/2026/TT-BGDĐT", 18), ("01 đến 05",),
+             evidence="Các chương trình đào tạo giáo viên chỉ xét tuyển thí sinh đăng ký ở các nguyện vọng có thứ tự "
+                      "từ 01 đến 05", loai="noi_tiep",
+             previous="Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?"),
+    Question("c03", "vanthu", "Thông tư số 10/2020/TT-BGDĐT hết hiệu lực từ ngày nào?", _at("58/2026/TT-BGDĐT", 5),
+             ("01 tháng 11 năm 2026",), evidence="hết hiệu lực kể từ ngày 01 tháng 11 năm 2026", loai="cong_khai"),
     # Câu âm: không văn bản nào trả lời được; nội dung văn bản hạn chế (không bao giờ vào chỉ mục)
     Question("q17", "vanthu", "Thủ tục cấp hộ chiếu công vụ?", "none"),
     Question("q18", "vanthu", "Phương án XANH LAM là gì?", "none", forbid=("53/PA-ĐHM",)),

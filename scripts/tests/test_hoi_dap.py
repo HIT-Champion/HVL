@@ -501,6 +501,22 @@ class SamplesTest(unittest.TestCase):
                 self.assertIn(demo.flat(q["evidence"]), demo.flat(body), q["id"])
 
     @unittest.skipUnless(importlib.util.find_spec("pypdf"), "cần pypdf (môi trường test svc-files)")
+    def test_open_data_evidence(self) -> None:
+        """Câu về nguồn công khai A (#446): câu bằng chứng có trên đúng trang của tệp PDF bản Công báo mà make seed nạp
+        (số ký hiệu lấy từ manifest.json như du_lieu_mo.py)."""
+        import pypdf
+
+        folder = ROOT / "seed" / "du-lieu-mo" / "cong-bao-gddt"
+        files = {f["meta"]["symbol"]: folder / f["file"]
+                 for f in json.loads((folder / "manifest.json").read_text(encoding="utf-8"))["files"]}
+        asked = [q for q in self.data["questions"] if q["expect"] != "none" and q["expect"][0].get("symbol") in files]
+        self.assertGreaterEqual(len(asked), 3)
+        for q in asked:
+            want = q["expect"][0]
+            text = pypdf.PdfReader(files[want["symbol"]]).pages[want["page"] - 1].extract_text()
+            self.assertIn(demo.flat(q["evidence"]), demo.flat(text), q["id"])
+
+    @unittest.skipUnless(importlib.util.find_spec("pypdf"), "cần pypdf (môi trường test svc-files)")
     def test_pdf_pages(self) -> None:
         files = {p.name: p.read_bytes() for p in SAMPLES.glob("*.pdf")}
         self.assertEqual(mau.verify(files), [])

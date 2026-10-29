@@ -28,6 +28,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Nguồn công khai B: lịch nghỉ lễ, Tết, nghỉ bù chính thức 2026–2027 cho hạn gợi ý giao việc, có bản chụp (#427).
 - Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn, từ chối câu ngoài phạm vi, ghép câu nối tiếp (#423).
 - Trợ lý hỏi đáp đếm việc trong Hộp việc và số văn bản bằng quyền người hỏi, không qua mô hình (#441).
+- Bộ câu đánh giá trợ lý thêm 3 câu trên thông tư thật của nguồn công khai A, đo riêng (loại `cong_khai`) (#446).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).
