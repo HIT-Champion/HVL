@@ -18,7 +18,7 @@ Image `hasura/graphql-engine:v2.51.0-ce.cli-migrations-v3` tự áp `migrations/
 | Phần | Trạng thái |
 |---|---|
 | `core.tenants`, `core.files`, `core.audit_log` (+ `audit_head`, `audit_anchors`) | **Xong** |
-| `office.departments`, `document_types` (28 loại theo NĐ 30), `registers`, `documents`, `document_files`, `document_acl`, `assignments`, `document_events` | **Xong** |
+| `office.departments`, `document_types` (28 loại theo NĐ 30, thêm Thông tư — #424), `registers`, `documents`, `document_files`, `document_acl`, `assignments`, `document_events` | **Xong** |
 | Quyền Hasura cho 9 vai trò (`clerk`, `staff`, `manager`, `director`, `tenant_admin`, `verifier`, `service`, `agent`, `tu_dong`), cách ly thuê ước | **Xong** — `test_permissions.py` 23 test, cùng phần quyền trong test của từng bảng |
 | Sổ kiểm toán chuỗi băm (F2.12): trigger trên mọi bảng nghiệp vụ, `core.audit_verify()`; mốc neo `core.audit_anchors`; lãnh đạo, quản trị đơn vị xem sổ của đơn vị qua trường `overview` (không lộ nội dung; thấy năm, số dòng của lần in sổ đăng ký; mẫu mã độc, cỡ của tệp bị kiểm dịch chặn; ký hiệu hồ sơ, băm gói nộp lưu) | **Xong** — 23 test, gồm sửa lén khi tắt trigger, viết lại cả chuỗi, cắt đuôi, đổi hash văn bản |
 | `core.users` (danh bạ đồng bộ từ Keycloak), hàm `office.register_incoming` (vào sổ trong một giao dịch), trigger `documents_received` (sự kiện `office.document.received` khi thêm văn bản đến, #381) | **Xong** — `test_registration.py` 11 test |

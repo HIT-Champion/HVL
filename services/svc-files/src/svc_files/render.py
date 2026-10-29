@@ -46,6 +46,7 @@ TYPE_NAMES_EN = {
     "HĐ": "Contract", "CĐ": "Official telegram", "BGN": "Memorandum of understanding", "BTT": "Agreement",
     "GUQ": "Power of attorney", "GM": "Invitation", "GGT": "Letter of introduction", "GNP": "Leave permit",
     "PG": "Dispatch slip", "PC": "Transfer slip", "PB": "Notification slip",
+    "TT": "Circular",   # văn bản quy phạm, chỉ có ở văn bản đến (nguồn công khai, #424)
 }
 
 

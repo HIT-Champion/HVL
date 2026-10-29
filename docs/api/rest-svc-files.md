@@ -826,6 +826,33 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `id` | `string` | ✓ |  |
 | `label` | `string` | ✓ |  |
 
+### `StatusOpenData`
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|:-:|---|
+| `source` | `string` | ✓ | Mã nguồn, tên thư mục trong seed/du-lieu-mo, vd cong-bao-gddt |
+| `name` | `string hoặc null` | ✓ |  |
+| `publisher` | `string hoặc null` | ✓ | Cơ quan công bố |
+| `home_url` | `string hoặc null` | ✓ |  |
+| `reuse_basis` | `string hoặc null` | ✓ | Căn cứ dùng lại (điều luật hay giấy phép) |
+| `licence` | `string hoặc null` | ✓ | Giấy phép mở nếu nguồn có; null: dùng lại theo `reuse_basis` |
+| `fetched_at` | `string (date-time) hoặc null` | ✓ | Lúc lấy bản chụp |
+| `age_days` | `integer hoặc null` | ✓ | Tuổi bản chụp, tính bằng ngày |
+| `max_age_days` | `integer hoặc null` | ✓ |  |
+| `state` | `"ok", "stale", "broken"` | ✓ | ok · stale: quá `max_age_days` · broken: manifest hỏng, thiếu tệp, sai cỡ hay sai SHA-256 |
+| `files` | `StatusOpenDataFile[]` | ✓ |  |
+
+### `StatusOpenDataFile`
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|:-:|---|
+| `file` | `string` | ✓ | Tên tệp trong bản chụp, vd tt-26-2026-tt-bgddt.pdf |
+| `url` | `string hoặc null` | ✓ | Nơi đã tải tệp (http/https) |
+| `sha256` | `string` | ✓ | SHA-256 của tệp; trùng `sha256` của một tệp đính kèm là văn bản từ nguồn này |
+| `bytes` | `integer` | ✓ |  |
+| `fetched_at` | `string (date-time) hoặc null` | ✓ | Lúc tải tệp; null: như `fetched_at` của nguồn |
+| `meta` | `object (giá trị string hoặc integer hoặc number hoặc boolean hoặc null)` | ✓ | Thông tin tùy nguồn, chỉ giá trị đơn, vd symbol, issuer_name, issued_on, page_url, gazette |
+
 ### `StatusOut`
 
 Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thái, không tên máy, địa chỉ hay số liệu nghiệp vụ.
@@ -840,6 +867,7 @@ Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thá
 | `ai` | `StatusAi` | ✓ |  |
 | `layers` | `StatusLayer[]` | ✓ | Các tầng theo thứ tự hiện: người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo |
 | `components` | `StatusComponent[]` | ✓ |  |
+| `open_data` | `StatusOpenData[]` |  | Nguồn dữ liệu công khai đi kèm bản cài (#424): nguồn gốc, tuổi dữ liệu; bản cài không gọi nguồn lúc chạy, chỉ đọc bản chụp |
 
 ### `UnreadablePackageOut`
 

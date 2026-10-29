@@ -1,0 +1,82 @@
+{
+  "source": "ngay-nghi-le",
+  "name": "Lịch nghỉ lễ, Tết chính thức",
+  "publisher": "Bộ Nội vụ, Văn phòng Chính phủ; đăng trên Báo Điện tử Chính phủ (baochinhphu.vn)",
+  "home_url": "https://baochinhphu.vn/",
+  "reuse_basis": "Điều 15 khoản 1, 2, 3 Luật Sở hữu trí tuệ (VBHN 160/2026/VBHN-LQ-VPQH): tin tức thời sự thuần túy đưa tin, văn bản quy phạm pháp luật, văn bản hành chính và số liệu không thuộc phạm vi bảo hộ quyền tác giả. Chỉ giữ câu trích nêu ngày nghỉ, ghi rõ nguồn baochinhphu.vn như trang yêu cầu.",
+  "licence": null,
+  "max_age_days": 400,
+  "fetched_at": "2026-10-30T02:27:13+07:00",
+  "files": [
+    {
+      "file": "ngay-nghi.json",
+      "url": "https://baochinhphu.vn/",
+      "sha256": "652118fe517d4a52be4ef33c466e54ff8a095fd5e2508580c3f419c1ba0b85ba",
+      "bytes": 3033,
+      "fetched_at": "2026-10-30T02:27:13+07:00",
+      "meta": {
+        "kind": "data"
+      }
+    },
+    {
+      "file": "trich/2026-tet-quoc-khanh.txt",
+      "url": "https://baochinhphu.vn/bo-noi-vu-thong-bao-lich-nghi-tet-am-lich-va-nghi-le-quoc-khanh-nam-2026-102251017095507785.htm",
+      "sha256": "8fbdd2b0af195513af05291dc3a6301009f1c48f58f2ed637bf52600beee764a",
+      "bytes": 806,
+      "fetched_at": "2026-10-30T02:27:13+07:00",
+      "meta": {
+        "kind": "quote",
+        "published": "2025-10-17",
+        "page_sha256": "9717f0ad70a34b2ccd7b4f79d8ab442f048eb9ea1ce9c373d1bd6fd231ca7dfc",
+        "documents": [
+          "Thông báo 9441/TB-BNV của Bộ Nội vụ (lịch nghỉ Tết Âm lịch, Quốc khánh năm 2026)"
+        ]
+      }
+    },
+    {
+      "file": "trich/2026-quoc-khanh.txt",
+      "url": "https://baochinhphu.vn/quoc-khanh-2026-cong-chuc-vien-chuc-nghi-5-ngay-lien-tiep-lam-bu-vao-thu-bay-22-8-102260728182643819.htm",
+      "sha256": "bc17af147c810db458214393cf8d1b2e1840e10de00561a349421d3218f45497",
+      "bytes": 1139,
+      "fetched_at": "2026-10-30T02:27:13+07:00",
+      "meta": {
+        "kind": "quote",
+        "published": "2026-07-28",
+        "page_sha256": "4350363304287e4ea69b88133dc656017e876d82cea17b4cf571b17fd774ea65",
+        "documents": [
+          "Thông báo 9441/TB-BNV của Bộ Nội vụ (lịch nghỉ Tết Âm lịch, Quốc khánh năm 2026)"
+        ]
+      }
+    },
+    {
+      "file": "trich/2026-gio-to.txt",
+      "url": "https://baochinhphu.vn/bo-noi-vu-khong-co-chu-truong-hoan-doi-de-nghi-9-ngay-dip-gio-to-30-41-5-102260403124126624.htm",
+      "sha256": "eb09fd10390e8e0de3093614759029719d5b3f19c374ac1bcda55f609e762214",
+      "bytes": 672,
+      "fetched_at": "2026-10-30T02:27:13+07:00",
+      "meta": {
+        "kind": "quote",
+        "published": "2026-04-03",
+        "page_sha256": "ece137306e38086726906d176f71b8301c130543022c22406c2822c6b844b556",
+        "documents": [
+          "Điều 112 khoản 1 Bộ luật Lao động 45/2019/QH14, điểm e; Bộ Nội vụ trả lời họp báo 03/4/2026"
+        ]
+      }
+    },
+    {
+      "file": "trich/2026-2027-vpcp-10065.txt",
+      "url": "https://baochinhphu.vn/pho-thu-tuong-quyet-dinh-phuong-an-nghi-ngay-van-hoa-tet-am-lich-quoc-khanh-10226100217552059.htm",
+      "sha256": "7049a4e8148f1379db7f58d2a50e18540831d00e2f389bfb55682dac9ade26e6",
+      "bytes": 1136,
+      "fetched_at": "2026-10-30T02:27:13+07:00",
+      "meta": {
+        "kind": "quote",
+        "published": "2026-10-02",
+        "page_sha256": "b86a29416f28279931d0c7322cfd17883d5c0e2101993a794cb5f0a23395aa4e",
+        "documents": [
+          "Văn bản 10065/VPCP-KGVX ngày 02/10/2026 của Văn phòng Chính phủ (phương án nghỉ 2026, 2027)"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "source": "ngay-nghi-le",
+  "note": "Lịch nghỉ của cán bộ, công chức, viên chức; workdays: thứ Bảy làm bù",
+  "fixed": [
+    {
+      "date": "01-01",
+      "name": "Tết Dương lịch",
+      "basis": "Điều 112 khoản 1 Bộ luật Lao động 45/2019/QH14, điểm a"
+    },
+    {
+      "date": "04-30",
+      "name": "Ngày Chiến thắng",
+      "basis": "Điều 112 khoản 1 Bộ luật Lao động 45/2019/QH14, điểm c"
+    },
+    {
+      "date": "05-01",
+      "name": "Ngày Quốc tế lao động",
+      "basis": "Điều 112 khoản 1 Bộ luật Lao động 45/2019/QH14, điểm d"
+    },
+    {
+      "date": "09-02",
+      "name": "Quốc khánh",
+      "basis": "Điều 112 khoản 1 Bộ luật Lao động 45/2019/QH14, điểm đ"
+    },
+    {
+      "date": "11-24",
+      "name": "Ngày Văn hóa Việt Nam",
+      "basis": "Nghị quyết 28/2026/QH16, Điều 2 khoản 1 (hiệu lực từ 01/7/2026)"
+    }
+  ],
+  "days_off": [
+    {
+      "from": "2026-02-16",
+      "to": "2026-02-20",
+      "name": "Tết Âm lịch Bính Ngọ",
+      "basis": "Thông báo 9441/TB-BNV của Bộ Nội vụ (lịch nghỉ Tết Âm lịch, Quốc khánh năm 2026)",
+      "quote": "trich/2026-tet-quoc-khanh.txt"
+    },
+    {
+      "from": "2026-04-27",
+      "to": "2026-04-27",
+      "name": "Nghỉ bù Giỗ Tổ Hùng Vương (10/3 âm lịch là Chủ nhật 26/4)",
+      "basis": "Điều 112 khoản 1 Bộ luật Lao động 45/2019/QH14, điểm e; Bộ Nội vụ trả lời họp báo 03/4/2026",
+      "quote": "trich/2026-gio-to.txt"
+    },
+    {
+      "from": "2026-08-31",
+      "to": "2026-09-02",
+      "name": "Quốc khánh (nghỉ thứ Hai 31/8 hoán đổi)",
+      "basis": "Thông báo 9441/TB-BNV của Bộ Nội vụ (lịch nghỉ Tết Âm lịch, Quốc khánh năm 2026)",
+      "quote": "trich/2026-quoc-khanh.txt"
+    },
+    {
+      "from": "2026-11-24",
+      "to": "2026-11-24",
+      "name": "Ngày Văn hóa Việt Nam",
+      "basis": "Văn bản 10065/VPCP-KGVX ngày 02/10/2026 của Văn phòng Chính phủ (phương án nghỉ 2026, 2027)",
+      "quote": "trich/2026-2027-vpcp-10065.txt"
+    },
+    {
+      "from": "2027-02-04",
+      "to": "2027-02-10",
+      "name": "Tết Âm lịch Đinh Mùi",
+      "basis": "Văn bản 10065/VPCP-KGVX ngày 02/10/2026 của Văn phòng Chính phủ (phương án nghỉ 2026, 2027)",
+      "quote": "trich/2026-2027-vpcp-10065.txt"
+    },
+    {
+      "from": "2027-09-02",
+      "to": "2027-09-05",
+      "name": "Quốc khánh",
+      "basis": "Văn bản 10065/VPCP-KGVX ngày 02/10/2026 của Văn phòng Chính phủ (phương án nghỉ 2026, 2027)",
+      "quote": "trich/2026-2027-vpcp-10065.txt"
+    }
+  ],
+  "workdays": [
+    {
+      "date": "2026-08-22",
+      "name": "Làm bù cho thứ Hai 31/8/2026",
+      "basis": "Thông báo 9441/TB-BNV của Bộ Nội vụ (lịch nghỉ Tết Âm lịch, Quốc khánh năm 2026)",
+      "quote": "trich/2026-quoc-khanh.txt"
+    }
+  ]
+}

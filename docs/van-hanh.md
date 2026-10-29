@@ -370,6 +370,31 @@ Cách nhận ra và xử lý:
   - **Đã mới nhất** thì lệnh chỉ báo "database is up-to-date".
   - **Vẫn báo lỗi khóa** thì có thể freshclam nền đang tự cập nhật: chờ 1 phút rồi chạy lại.
 
+## Lịch nghỉ lễ chính thức (nguồn công khai B)
+
+Hạn gợi ý giao việc (F4.3) tránh Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù và coi thứ Bảy làm bù là ngày làm việc, theo lịch
+nghỉ chính thức của cán bộ, công chức, viên chức (#427). Bản chụp nằm ở `seed/du-lieu-mo/ngay-nghi-le/`:
+
+- `ngay-nghi.json`: ngày lễ cố định (Điều 112 Bộ luật Lao động, Ngày Văn hóa Việt Nam 24/11), các khoảng nghỉ theo
+  năm, ngày làm bù; mỗi mục ghi văn bản căn cứ;
+- `trich/*.txt`: câu trích các bài trên Báo Điện tử Chính phủ nêu đúng các ngày đó, kèm URL bài;
+- `manifest.json`: URL, ngày lấy, SHA-256 từng tệp, căn cứ dùng lại (Điều 15 Luật Sở hữu trí tuệ), tuổi tối đa 400
+  ngày.
+
+`docker-compose.yml` gắn thư mục này chỉ đọc vào svc-workflow; `MOC_HOLIDAYS_FILE` (mặc định
+`/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json`, rỗng thì tắt) cộng lịch đó vào `MOC_HOLIDAYS`. Không có tệp thì chỉ còn
+`MOC_HOLIDAYS` như trước; tệp hỏng thì svc-workflow dừng lúc khởi động và báo `MOC_HOLIDAYS_FILE`.
+
+Lấy mới khi Chính phủ công bố lịch nghỉ năm sau (thường vào tháng 10), không cần Docker:
+
+1. thêm một mục vào `PAGES` của `scripts/nguon_ngay_nghi_le.py`: URL bài, tệp trích, khoảng ngày, chuỗi ngày đúng như
+   bài viết;
+2. `python3 scripts/nguon_ngay_nghi_le.py` đọc lại mọi bài, kiểm từng ngày có trên bài rồi mới thay bản chụp. Trang
+   không tải được hay không còn ngày nào đó thì lệnh thoát 1, bản chụp cũ giữ nguyên;
+3. `docker compose restart svc-workflow`. Gợi ý đã lưu giữ hạn cũ.
+
+Nguồn ngừng hoạt động thì gợi ý vẫn chạy bằng bản chụp; năm bản chụp chưa có thì thêm ngày vào `MOC_HOLIDAYS`.
+
 ## Giám sát
 
 APISIX đếm mọi yêu cầu qua cổng (plugin `prometheus`, cổng xuất chỉ số 9091 không publish: chỉ container ở mạng
@@ -447,6 +472,30 @@ thống.
   được), và thành phần `off` không có dòng `moc_component_up`.
 - Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
   `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
+
+## Dữ liệu công khai
+
+Signet kèm bản chụp dữ liệu từ nguồn công khai của nhà nước trong `seed/du-lieu-mo/<mã nguồn>/` (#424): tệp gốc và
+`manifest.json` ghi URL, ngày lấy, căn cứ dùng lại, SHA-256 từng tệp. Nguồn A `cong-bao-gddt`: bốn thông tư của Bộ
+GD&ĐT về giáo dục đại học, bản Công báo (`seed/du-lieu-mo/cong-bao-gddt/README.md`).
+
+- **Bản cài không gọi nguồn lúc chạy.** `svc-files` đọc các manifest qua mount chỉ đọc `/srv/du-lieu-mo`, so SHA-256
+  rồi báo ở `GET /api/status` (khóa `open_data`: `ok`, `stale` khi quá `max_age_days`, `broken` khi thiếu tệp hay sai
+  băm) và trang `/trang-thai`. Nguồn ngừng hoạt động thì Signet vẫn dùng bản chụp gần nhất, trang trạng thái cho biết
+  dữ liệu đã bao nhiêu ngày.
+- **Nạp:** `make seed` nạp mỗi tệp thành một văn bản đến của Khoa CNTT qua API nạp lô (CSV + zip, ClamAV, như văn
+  thư nạp tay), loại "Thông tư" (migration `1792281604000_document_type_tt`). Bản cài đã có dữ liệu mẫu thì chạy
+  riêng `python3 scripts/moc.py du-lieu-mo nap`; chạy lại không tạo trùng. Trang văn bản nhận ra văn bản từ nguồn công
+  khai nhờ SHA-256 của tệp đính kèm trùng với manifest; trợ lý hỏi đáp trích được như mọi văn bản đến.
+- **Kiểm:** `make du-lieu-mo` (`python3 scripts/moc.py du-lieu-mo kiem`) so băm, in tuổi dữ liệu; thoát 1 khi bản
+  chụp hỏng.
+- **Lấy mới** (máy của đội, cần Internet, không chạy trên máy chủ): `make du-lieu-mo-lay`. Lệnh chỉ thay bản chụp khi
+  mọi tệp tải xong, khớp manifest và tổng không quá 3 MB; nguồn lỗi thì giữ bản cũ, thoát 1. Bản chụp mới đi qua PR
+  như mọi tệp `seed/`.
+- **Thêm nguồn:** một module `scripts/nguon_<mã>.py` có `NGUON`, `TEN`, `lay(thu_muc)` trả manifest (khuôn trong
+  `scripts/du_lieu_mo.py`). Chỉ dùng nguồn có căn cứ dùng lại rõ (giấy phép mở, hoặc Điều 15 Luật Sở hữu trí tuệ với
+  văn bản nhà nước), đúng `robots.txt` và điều khoản trang, không dữ liệu cá nhân; khai giấy phép tệp trong
+  `REUSE.toml`.
 
 ## Trợ lý hỏi đáp qua API ngoài
 

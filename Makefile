@@ -62,7 +62,7 @@ PREFIX ?= /opt/moc
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
-        demo-nap-lo nap-lo-mau \
+        demo-nap-lo nap-lo-mau du-lieu-mo du-lieu-mo-lay \
         demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung alert-env demo-canh-bao \
@@ -320,6 +320,12 @@ do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số ch�
 
 demo-nap-lo: $(ENV_FILE) ## Màn nạp lô văn bản đến (cụm ⑤): 200 dòng + zip qua API, EICAR bị chặn, gửi lại không trùng
 	@python3 scripts/demo.py nap-lo
+
+du-lieu-mo: ## Kiểm bản chụp dữ liệu công khai seed/du-lieu-mo (SHA-256, tuổi dữ liệu; không cần Docker, Internet)
+	@python3 scripts/du_lieu_mo.py kiem
+
+du-lieu-mo-lay: ## Lấy mới bản chụp dữ liệu công khai từ nguồn (cần Internet; chỉ thay khi băm khớp, lỗi thì giữ bản cũ)
+	@python3 scripts/du_lieu_mo.py lay
 
 nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến mẫu, có dòng sai cố ý (không cần Docker)
 	@python3 scripts/nap_lo_mau.py

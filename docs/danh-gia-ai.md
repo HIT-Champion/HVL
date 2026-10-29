@@ -285,8 +285,8 @@ sửa hay bỏ gợi ý. Chi tiết: [README svc-workflow](../services/svc-workf
 [README svc-files](../services/svc-files/README.md#văn-bản-tương-tự-cho-tác-tử-gợi-ý-giao-việc-f43).
 
 **Mô hình, công cụ.** **Không mô hình sinh nào chọn đơn vị** (QĐ-005): bỏ phiếu kNN có trọng số trên tối đa 5 căn cứ,
-hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` (`suggest.py`,
-thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
+hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` cùng lịch
+nghỉ chính thức của nguồn công khai B (#427) (`suggest.py`, thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
 phần truy xuất của F4.2 qua route nội bộ `POST /internal/similar-documents` (`assist/similar.py`): câu tìm từ trích yếu,
 tìm từ khóa kèm lượt tìm nới; có Qwen3-Embedding thì tìm lai, tối đa 3 giây. Flowable chạy nhánh song song và timer.
 
@@ -328,8 +328,9 @@ top-2, top-3 vô nghĩa khi chỉ có hai đơn vị hợp lệ. Dữ liệu chi
 **Chưa đo.** Với tìm theo nghĩa (bật `ai`: 0/29 lượt ở trên là tìm từ khóa); trên nhiều đơn vị hơn; trên dữ liệu thật —
 view `office.v_assignment_suggestion_accuracy` (tỉ lệ lãnh đạo giữ đơn vị, giữ hạn, sai số hạn).
 
-**Giới hạn.** Ngày lễ mặc định chỉ có lễ dương lịch cố định; Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù do người vận hành thêm
-vào `MOC_HOLIDAYS` mỗi năm (#280); chỉ gợi ý đơn vị và hạn, không gợi ý người xử lý; chỉ mục
+**Giới hạn.** Lịch nghỉ chính thức chỉ có các năm Chính phủ đã công bố (bản chụp tới hết 2027, chưa có Giỗ Tổ 2027),
+năm sau đó người vận hành lấy mới hoặc thêm vào `MOC_HOLIDAYS` (#280, #427); chỉ gợi ý đơn vị và hạn, không gợi ý
+người xử lý; chỉ mục
 đoạn đồng bộ vài giây một lần nên văn bản vừa giao chưa làm căn cứ ngay; trích yếu quá ngắn hay chỉ có từ chung thì ít
 kết quả đúng; ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt trên dữ liệu mẫu.
 

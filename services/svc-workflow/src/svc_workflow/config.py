@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import re
@@ -28,7 +29,7 @@ from urllib.parse import urlsplit
 
 from .channels import KINDS, SMTP_PORTS, WEBHOOK_FORMATS
 from .sla import parse_duration
-from .suggest import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, parse_holidays
+from .suggest import LEGAL_HOLIDAYS, NO_HOLIDAYS, Holidays, holidays_from_data, parse_holidays
 
 REQUIRED = (
     "HASURA_ADMIN_SECRET",
@@ -36,6 +37,27 @@ REQUIRED = (
     "FLOWABLE_ADMIN_PASSWORD",
     "MOC_DIRECTORY_CLIENT_SECRET",
 )
+
+
+# Lịch nghỉ chính thức (nguồn công khai B): docker-compose.yml gắn seed/du-lieu-mo/ngay-nghi-le vào đây, chỉ đọc
+HOLIDAYS_FILE = "/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json"
+
+
+def read_holidays_file(path: str) -> Holidays | None:
+    """Lịch nghỉ trong ``path`` (``ngay-nghi.json``); None khi ``path`` rỗng (tắt) hay không có tệp (bản cài chưa
+    gắn thư mục): khi đó chỉ còn ``MOC_HOLIDAYS``. Tệp có mà hỏng thì ``ValueError``: dịch vụ dừng lúc khởi động như
+    khi ``MOC_HOLIDAYS`` sai, không lặng lẽ bỏ Tết."""
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{path}: {exc}") from exc
+    try:
+        return holidays_from_data(data)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from exc
 
 
 class ConfigError(RuntimeError):
@@ -90,8 +112,10 @@ class Settings:
     suggest_timeout_s: float = 10.0
     suggest_min_score: float = 0.3
     assigner_id: str = "moc-assigner"
-    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (MOC_HOLIDAYS, cú pháp ở suggest.parse_holidays)
+    # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật: MOC_HOLIDAYS (cú pháp ở suggest.parse_holidays) cộng lịch
+    # nghỉ chính thức của nguồn công khai B (MOC_HOLIDAYS_FILE, #427), kể cả thứ Bảy làm bù
     holidays: Holidays = NO_HOLIDAYS
+    holidays_file: str = ""     # tệp lịch nghỉ đã đọc; rỗng khi tắt hay không có tệp
     # Định tuyến thông báo đa kênh (channels.py): ngoài chuông trên web, gửi thêm qua email (SMTP) và webhook. Trống máy
     # chủ thư và URL webhook thì tắt, như trước. Cổng 0: theo kiểu TLS (587 starttls, 465 ssl, 25 none). Loại thông báo
     # trống: mọi loại. Mật khẩu SMTP và URL webhook (khóa nằm trong đường dẫn) là bí mật, lấy từ két như các bí mật
@@ -135,6 +159,15 @@ class Settings:
             holidays = parse_holidays(env.get("MOC_HOLIDAYS", "").strip() or LEGAL_HOLIDAYS)
         except ValueError as exc:
             raise ConfigError(f"MOC_HOLIDAYS: {exc}") from exc
+        holidays_file = env.get("MOC_HOLIDAYS_FILE", HOLIDAYS_FILE).strip()
+        try:
+            official = read_holidays_file(holidays_file)
+        except ValueError as exc:
+            raise ConfigError(f"MOC_HOLIDAYS_FILE: {exc}") from exc
+        if official is None:
+            holidays_file = ""
+        else:
+            holidays |= official
         try:
             return cls(
                 hasura_url=env.get("HASURA_URL", "http://hasura:8080").rstrip("/"),
@@ -170,6 +203,7 @@ class Settings:
                 suggest_min_score=float(env.get("MOC_SUGGEST_MIN_SCORE", "0.3")),
                 assigner_id=env.get("MOC_ASSIGNER_ID", "moc-assigner").strip(),
                 holidays=holidays,
+                holidays_file=holidays_file,
                 smtp_host=env.get("MOC_SMTP_HOST", "").strip(),
                 smtp_port=int(env.get("MOC_SMTP_PORT", "").strip() or 0),
                 smtp_tls=env.get("MOC_SMTP_TLS", "").strip().lower() or "starttls",
