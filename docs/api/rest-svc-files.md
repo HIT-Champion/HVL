@@ -807,6 +807,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `enabled` | `boolean` | ✓ | Mô hình viết câu trả lời của trợ lý đang sẵn sàng |
 | `model` | `string hoặc null` | ✓ | Tên mô hình khi bật, vd qwen3:1.7b; null khi tắt |
 | `semantic` | `boolean` | ✓ | Tìm theo nghĩa được (mô hình nhúng sẵn sàng) |
+| `device` | `"gpu", "cpu", "gpu+cpu" hoặc null` |  | Mô hình của Ollama đang nằm trên GPU, CPU hay chia hai (MOC_AI_DEVICE, /api/ps); null khi chưa nạp mô hình nào hay trợ lý tắt |
 
 ### `StatusComponent`
 
