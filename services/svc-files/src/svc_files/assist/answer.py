@@ -253,6 +253,7 @@ class Assistant:
             "answer_source": answer_source, "hits": len(passages), "cited": len(cited),
             "documents": ",".join(dict.fromkeys(p.document_id for p in passages)), "semantic": found.semantic,
             "model": model, "embed_model": embed_model, "duration_ms": duration_ms, "warnings": ",".join(warnings),
+            "model_where": self.ai.chat_where if model else None,       # local: Ollama; external: API ngoài (#430)
         }
         try:
             await self.answers.write(principal.tenant_id, request_id, ask_id, diff)

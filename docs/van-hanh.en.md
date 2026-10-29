@@ -534,6 +534,40 @@ circulars of the Ministry of Education and Training on higher education, as publ
   the Law on Intellectual Property for state documents), follow `robots.txt` and the site terms, take no personal
   data, and declare the files' licence in `REUSE.toml`.
 
+## Assistant answers through an external API
+
+By default the question-answering assistant (F4.2) writes its answers with a model running locally in Ollama. On a
+slow machine (CPU only), or to use a larger model, the writing step can go to a server that speaks the OpenAI API
+(#430): vLLM or llama.cpp on a GPU machine of the unit, or a cloud service. Set in `.env`:
+
+```
+MOC_ASK_API=openai
+MOC_ASK_API_URL=https://model-server/v1
+MOC_ASK_MODEL=<model name that server accepts>
+MOC_ASK_API_KEY=<key, empty if the server needs none>
+```
+
+then `docker compose up -d` (recreates `openbao`, `svc-files`). To change the key later: edit `.env`,
+`docker compose up -d`, then `docker compose restart svc-files`.
+
+- **What leaves the machine:** only the answer-writing call: the question and at most 4 source passages, **masked**
+  first (phone numbers, citizen ID numbers, email addresses, bank account numbers; F4.4). Semantic search (the
+  embedding model) and incoming-document summaries stay in Ollama; without the `ai` profile the assistant searches by
+  keyword and only the writing step uses the API. An open model running locally remains the recommended default:
+  sending documents to a cloud service is the unit's own decision about its data.
+- **Same checks:** the output is forced to a JSON Schema (`response_format`), and Signet still checks every sentence
+  against the source passages and numbers before adding citations; otherwise it returns the verbatim quote.
+- **Key:** a `svc-files` secret in the vault like the other keys (section Secrets vault), not in the `svc-files`
+  container environment, never logged. It is only sent in the `Authorization` header to `MOC_ASK_API_URL`. With an
+  `http://` URL `svc-files` logs `config.warning` at start-up: the key and the passages travel unencrypted, which only
+  suits a model server on a trusted internal network.
+- **Model name:** `MOC_ASK_MODEL` is required and must be a name that server accepts (e.g. `Qwen/Qwen3-4B` on vLLM);
+  it does not fall back to `MOC_AI_MODEL` as it does for local answers. Without it `svc-files` stops at start-up.
+- **Readiness:** `svc-files` calls `GET {MOC_ASK_API_URL}/models` at start-up and every 60 seconds; a wrong key (401,
+  403) or model name (404) counts as not ready until the next probe. Log events `office.assist.ai_ready`,
+  `office.assist.ai_unavailable` carry `"where": "external"` and the HTTP code, never the key.
+- **Audit log:** the `assistant.answered` row records `model` and `model_where` (`local`: Ollama; `external`: the API).
+
 ## System status page
 
 `<MOC_PUBLIC_URL>/trang-thai` is a public page, with no sign-in needed: users can see for themselves whether Signet is
@@ -550,7 +584,8 @@ portal and the sidebar after sign-in all link here. While open, the page refresh
   question answering are unavailable for the time being, and the rest still runs. The AI assistant is *Off* when the
   `ai` profile is not on, question answering is turned off, or Ollama does not answer: the page cannot tell these three
   cases apart, so if it shows *Off* while the `ai` profile is on, look at `docker compose logs ollama`. The assistant
-  still searches by keyword.
+  still searches by keyword. When answers are written through an external API (section below), the component's
+  software reads "API ngoài".
 - **What it does not reveal:** only fixed labels and states; no host names, IP addresses, internal URLs, per-component
   versions, user or document counts, or error messages. The specific reason is in the `svc-files` log (event
   `core.status.changed`, written when a component changes state): `docker compose logs svc-files | grep
