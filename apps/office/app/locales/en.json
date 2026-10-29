@@ -341,6 +341,18 @@
       "hashMismatch": "SHA-256 does NOT match the sender’s issued copy — report it to the administrator",
       "fromHint": "An outgoing document of another unit on Signet, delivered here when the sender issued it. The file is a copy of the issued PDF; open the verification page to compare.",
       "manualHint": "The clerk registered this document from paper or email; the sender's in-system dispatch arrived later and was only linked, so the attached file is the one the clerk uploaded. Open the verification page to compare it with the issued copy."
+    },
+    "publicSource": {
+      "label": "Public source",
+      "publisher": "Published by",
+      "gazette": "Official Gazette",
+      "original": "Original page",
+      "fetchedAt": "Fetched",
+      "reuse": "Reuse basis",
+      "sha256": "File SHA-256",
+      "hint": "The attached file has the same SHA-256 as the source snapshot. The system never calls the source at run time.",
+      "statusLink": "See data age",
+      "stale": "The snapshot is {n} day old, past its refresh limit. | The snapshot is {n} days old, past its refresh limit."
     }
   },
   "form": {
@@ -413,13 +425,47 @@
   "assist": {
     "title": "Ask the documents",
     "intro": "The assistant only searches documents you are allowed to see; restricted documents are never included. Every point cites a reference number and page so you can check it.",
-    "emptyTitle": "What do you need from the documents?",
+    "emptyTitle": "What would you like to ask?",
     "suggestTitle": "Try asking",
     "suggest": {
       "credits": "What is the minimum number of credits to be considered for a scholarship?",
       "examDeadline": "When are exam papers and answer keys due?",
-      "language": "Which language certificate is required to graduate?"
+      "language": "Which language certificate is required to graduate?",
+      "leave": "Where do I submit a leave request?",
+      "compose": "How do I draft an outgoing document?",
+      "overdue": "Which of my tasks are almost overdue?",
+      "countIncoming": "How many incoming documents arrived this month?",
+      "whatCanYouDo": "What can you do?",
+      "model": "Which model does the assistant use?"
     },
+    "suggestGroup": {
+      "van_ban": "About documents",
+      "huong_dan": "Using the system",
+      "viec_cua_toi": "My work",
+      "gioi_thieu": "About the assistant"
+    },
+    "can": {
+      "title": "The assistant can answer:",
+      "van_ban": "what the documents you are allowed to see say, citing reference number and page;",
+      "huong_dan": "how to use the e-office, from the user guides;",
+      "viec_cua_toi": "the tasks assigned to you and document counts, counted directly in the data;",
+      "gioi_thieu": "what the assistant does, which model it uses and its limits."
+    },
+    "route": {
+      "van_ban": "document content",
+      "gioi_thieu": "the assistant",
+      "huong_dan": "how to use the system",
+      "ngoai_pham_vi": "something outside its scope",
+      "viec_cua_toi": "your tasks",
+      "dem_van_ban": "document counts"
+    },
+    "understood": "Understood as a question about: {route}",
+    "rewritten": "· Searched for: {text}",
+    "routeReason": "Reason code: {code}",
+    "outOfScope": "This is outside what the assistant covers: it does not look up weather, news or general knowledge, and does not write texts for you.",
+    "directTitle": "Answer",
+    "dataNote": "Counted directly in the data you are allowed to see, without a language model.",
+    "openInbox": "Open the inbox",
     "label": "Question",
     "placeholder": "For example: What are the requirements for a merit scholarship?",
     "keysHint": "Enter to ask, Shift+Enter for a new line",
@@ -769,7 +815,25 @@
     "rateLimited": "Status loaded too often in one minute; the page will retry in a few seconds.",
     "unreachable": "Could not load the status: the API gateway may be down. The page will retry.",
     "stale": "Showing the result of the previous load.",
-    "note": "This page only shows the overall state — no host names, addresses or business figures. Detailed metrics (API gateway traffic and latency) are on the Grafana dashboard for operators."
+    "note": "This page only shows the overall state — no host names, addresses or business figures. Detailed metrics (API gateway traffic and latency) are on the Grafana dashboard for operators.",
+    "openData": {
+      "title": "Public data sources",
+      "hint": "Snapshots of public data, shipped with the source code together with the URL, fetch date, reuse basis and SHA-256 of every file. The system never calls a source at run time: if a source goes offline, the checked snapshot is still used.",
+      "state": {
+        "ok": "Fresh",
+        "stale": "Out of date",
+        "broken": "Snapshot broken"
+      },
+      "fetched": "Fetched",
+      "age": "{n} day ago | {n} days ago",
+      "today": "today",
+      "refresh": "Refresh limit",
+      "maxAge": "{n} day | {n} days",
+      "files": "Files",
+      "reuse": "Reuse basis",
+      "staleHint": "Past its refresh limit and not fetched again; the system is using the snapshot fetched on {date}.",
+      "brokenHint": "The snapshot does not match its manifest (missing file or wrong SHA-256): documents from this source are not labelled as public-source until it is fetched again."
+    }
   },
   "notify": {
     "title": "Notifications",
