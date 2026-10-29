@@ -221,6 +221,7 @@ class StubAi:
     chat_available: bool = False
     embed_available: bool = False
     chat_model: str | None = "qwen3:1.7b"
+    device: str | None = None
 
 
 class Network:
@@ -291,7 +292,7 @@ def test_api_status_all_ok_without_token(parts, verifier):
     assert {x["layer"] for x in body["components"]} == {x["id"] for x in body["layers"]}
     labels = {x["id"]: x["label"] for x in body["components"]}
     assert labels["dang-nhap"] == "Đăng nhập một lần" and labels["quet-ma-doc"] == "Quét mã độc"
-    assert body["ai"] == {"enabled": False, "model": None, "semantic": False}
+    assert body["ai"] == {"enabled": False, "model": None, "semantic": False, "device": None}
     assert set(body["components"][0]) == {"id", "layer", "label", "software", "status"}
     assert leaks(r.text) == []
     # dò đúng nơi: máy chủ trạng thái của APISIX, JWKS của realm, /readyz của svc-workflow
@@ -349,13 +350,16 @@ def test_api_status_ai_on_shows_public_model_name(parts, verifier):
                           meili=parts["meili"], vault=parts["vault"], ai=parts["ai"],
                           transport=httpx2.MockTransport(parts["net"]))
     body = run(board.report())
-    assert body["ai"] == {"enabled": True, "model": "qwen3:1.7b", "semantic": True}
+    assert body["ai"] == {"enabled": True, "model": "qwen3:1.7b", "semantic": True, "device": None}
     assert {x["id"]: x["status"] for x in body["components"]}["tro-ly-ai"] == "ok"
     parts["ai"].chat_available = False                              # chỉ còn tìm theo nghĩa
     board.ttl_s = 0
     body = run(board.report())
-    assert body["ai"] == {"enabled": False, "model": None, "semantic": True}
+    assert body["ai"] == {"enabled": False, "model": None, "semantic": True, "device": None}
     assert {x["id"]: x["status"] for x in body["components"]}["tro-ly-ai"] == "degraded"
+    parts["ai"].chat_available, parts["ai"].device = True, "gpu"     # MOC_AI_DEVICE=gpu, Ollama báo mô hình trên GPU
+    body = run(board.report())
+    assert body["ai"] == {"enabled": True, "model": "qwen3:1.7b", "semantic": True, "device": "gpu"}
     run(board.aclose())
 
 

@@ -21,6 +21,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Robot của đơn vị cho flow Node-RED gọi API, hai flow mẫu: văn bản sắp hạn lúc 07:00, văn bản Hỏa tốc (#366).
 - Hướng dẫn vận hành bằng tiếng Anh `docs/van-hanh.en.md`; README.en.md trỏ sang bản này (#59).
 - Nhãn "Nguồn công khai" trên trang văn bản nạp từ nguồn mở; trang Trạng thái liệt kê nguồn và tuổi dữ liệu (#426).
+- Tùy chọn chạy mô hình bằng GPU NVIDIA (`MOC_AI_DEVICE=gpu`); `/api/status` báo mô hình nằm ở GPU hay CPU (#442).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).

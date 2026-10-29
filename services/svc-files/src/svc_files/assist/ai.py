@@ -27,6 +27,8 @@ theo từ khóa, trả câu trích nguyên văn.
   hữu hạn — sai thì coi như không nhúng được; lý do lần lỗi gần nhất ở ``embed_error`` để vòng nền phân biệt lỗi tạm
   (``TRANSIENT``: thử lại sau) với đoạn làm mô hình lỗi tất định. Véc-tơ đầu tiên Ollama trả (lúc nạp trước hoặc lần
   nhúng đầu) mà khác ``MOC_AI_EMBED_DIMS`` chiều là sai cấu hình: tắt nhúng tới khi khởi động lại, ghi lỗi rõ.
+- Nơi chạy (``MOC_AI_DEVICE``, docker-compose.gpu.yml): mỗi lượt dò, khi đã có mô hình sẵn sàng, đọc ``GET /api/ps``
+  → ``device``: ``gpu`` (cả mô hình trong bộ nhớ GPU), ``cpu``, ``gpu+cpu`` (chia hai); trang trạng thái hiện nó.
 - Sinh: ``POST /api/chat`` không stream, tắt suy nghĩ, đầu ra ép theo JSON Schema (grounding.py dựng lời dặn và kiểm).
 - Không sửa ``docread/summarize.py``: tác tử đọc văn bản đến dò mô hình trích yếu riêng.
 - **Che thông tin cá nhân ở lối ra** (F4.4, pii.py): không byte chữ nào tới Ollama mà chưa qua bộ che. ``embed`` che
@@ -87,6 +89,7 @@ class AiClient(Protocol):
     chat_model: str | None
     embed_model: str | None
     embed_error: str | None     # lý do lần nhúng gần nhất lỗi (None: thành công); đọc ngay sau ``await embed(...)``
+    device: str | None          # gpu, cpu, gpu+cpu theo /api/ps của Ollama; None: chưa biết
 
     @property
     def chat_available(self) -> bool: ...
@@ -106,6 +109,7 @@ class NullAi:
     chat_model: str | None = None
     embed_model: str | None = None
     embed_error: str | None = "model_unavailable"
+    device: str | None = None
     chat_available = False
     embed_available = False
 
@@ -162,6 +166,7 @@ class OllamaAi:
         self.dims = dims
         self.interval_s = interval_s
         self.embed_error: str | None = None
+        self.device: str | None = None      # chưa nạp mô hình nào lần nào: chưa biết
         self._state: dict[str, bool | None] = {"chat": None, "embed": None}     # None: chưa dò lần nào
         self._dims: int | None = None       # số chiều véc-tơ đầu tiên Ollama trả; None: chưa thấy véc-tơ nào
         self._http = httpx2.AsyncClient(base_url=url, timeout=10.0, transport=transport)
@@ -205,6 +210,25 @@ class OllamaAi:
             ok = model in names or f"{model}:latest" in names
             if self._set(kind, ok) and ok:
                 await self._preload(kind, model)
+        if any(self._state.values()):
+            await self._where()
+
+    async def _where(self) -> None:
+        """Mô hình đang nạp nằm ở đâu (``GET /api/ps``): ``size_vram`` bằng ``size`` là ``gpu``, bằng 0 là ``cpu``, ở
+        giữa là ``gpu+cpu`` (VRAM không đủ, Ollama chia lớp). Chưa nạp mô hình nào (hết ``keep_alive``) thì giữ kết quả
+        lần trước."""
+        try:
+            r = await self._http.get("/api/ps", timeout=5.0)
+            models = r.json().get("models") if r.status_code == 200 else None
+        except (httpx2.HTTPError, ValueError, AttributeError, TypeError):
+            return
+        size = vram = 0
+        for m in models if isinstance(models, list) else []:
+            total, gpu = (m.get("size"), m.get("size_vram")) if isinstance(m, dict) else (None, None)
+            if type(total) is int and type(gpu) is int and total > 0:
+                size, vram = size + total, vram + max(0, min(gpu, total))
+        if size:
+            self.device = "cpu" if vram == 0 else "gpu" if vram == size else "gpu+cpu"
 
     async def _preload(self, kind: str, model: str) -> None:
         # nạp trước chỉ để lần hỏi đầu nhanh hơn; lỗi thì lần gọi thật tự nạp
