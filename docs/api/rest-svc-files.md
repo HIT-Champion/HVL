@@ -611,7 +611,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|:-:|---|
 | `text` | `string` | ✓ | Chữ thuần; mỗi ý kèm [n] trỏ tới `sources[n-1]`. Giao diện hiển thị như chữ, không như HTML |
-| `source` | `"extract", "model"` | ✓ | extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng |
+| `source` | `"extract", "model", "fixed", "data"` | ✓ | extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng · fixed: câu cố định cho câu hỏi ngoài phạm vi · data: câu có số từ dữ liệu của người hỏi |
 | `model` | `string hoặc null` | ✓ | Mô hình đã viết câu trả lời; null với câu trích |
 
 ### `AskIn`
@@ -625,6 +625,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `type_code` | `string hoặc null` |  | Mã loại văn bản, vd CV |
 | `document_id` | `string (uuid) hoặc null` |  | Chỉ hỏi trong một văn bản (nút "Hỏi về văn bản này"). Chỉ thu hẹp phạm vi: văn bản người hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt |
 | `ask_id` | `string (uuid) hoặc null` |  | Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng sổ kiểm toán cùng một câu hỏi |
+| `previous` | `string hoặc null` |  | Câu hỏi của lượt ngay trước trong cùng phạm vi (`rewritten` của lượt đó nếu có), để hiểu câu nối tiếp như "Còn khoa Kinh tế thì sao?". Máy chủ không lưu; sai dạng thì bị bỏ qua |
 
 ### `AskOut`
 
@@ -639,13 +640,18 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `ai_available` | `boolean` | ✓ | Mô hình viết câu trả lời đang sẵn sàng (gọi lại với mode=generate) |
 | `warnings` | `"embed_unavailable", "model_unavailable", "model_timeout", "model_rejected", "model_declined"[]` | ✓ |  |
 | `duration_ms` | `integer` | ✓ |  |
+| `route` | `"van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban"` | ✓ | Đường bộ định tuyến đã chọn: van_ban: tìm trong kho văn bản · gioi_thieu: câu về chính trợ lý, câu chào · huong_dan: cách dùng Signet, trả lời từ hướng dẫn sử dụng · ngoai_pham_vi: câu cố định, không tìm · viec_cua_toi: đếm việc trong Hộp việc của người hỏi · dem_van_ban: đếm văn bản người hỏi được xem. Trừ van_ban, huong_dan, các đường không gọi mô hình, cả khi mode=generate |
+| `route_reason` | `string` | ✓ | Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh` |
+| `rewritten` | `string hoặc null` | ✓ | Câu nối tiếp đã ghép với `previous` thành câu độc lập — câu đem đi tìm. null khi không phải câu nối tiếp |
+| `data` | `object hoặc null` |  | Đường viec_cua_toi, dem_van_ban: các số và bộ lọc của câu trả lời `source: data`, máy đọc. viec_cua_toi: `{kind: tasks, on, tasks, overdue, today, soon, no_due}` · dem_van_ban: `{kind: documents, counts: {in?, out?}, type_code, from, to}` (`to` là ngày sau ngày cuối; null: không lọc theo ngày). null với đường khác |
+| `link` | `string hoặc null` |  | Trang trong Signet xem danh sách đã đếm: `/` (Hộp việc, Lịch hạn), `/van-ban-den`, `/van-ban-di`; null khi không có trang nào hợp |
 
 ### `AskSource`
 
 | Trường | Kiểu | Bắt buộc | Mô tả |
 |---|---|:-:|---|
 | `n` | `integer` | ✓ | Số trong dấu [n], từ 1 |
-| `document_id` | `string (uuid)` | ✓ |  |
+| `document_id` | `string (uuid) hoặc null` | ✓ | null với nguồn `guide` |
 | `symbol` | `string hoặc null` | ✓ |  |
 | `type_code` | `string hoặc null` | ✓ |  |
 | `type_name` | `string hoặc null` | ✓ |  |
@@ -654,12 +660,13 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `issued_on` | `string (date) hoặc null` | ✓ |  |
 | `direction` | `"in", "out" hoặc null` | ✓ |  |
 | `status` | `string hoặc null` | ✓ |  |
-| `kind` | `"page", "meta"` | ✓ | page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ) |
+| `kind` | `"page", "meta", "guide"` | ✓ | page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ) · guide: mục của hướng dẫn sử dụng hay của Giới thiệu trợ lý; `symbol` là tên tài liệu, `summary` là tiêu đề mục |
 | `file_id` | `string (uuid) hoặc null` | ✓ |  |
 | `file_role` | `"main", "attachment", "issued" hoặc null` | ✓ | main: bản chính · attachment: tài liệu kèm theo · issued: bản phát hành văn bản đi |
 | `page` | `integer hoặc null` | ✓ | Trang trong tệp; null với đoạn meta hoặc chữ chưa có ranh giới trang |
 | `excerpt` | `string` | ✓ | Đoạn trích ≤ 600 ký tự quanh câu khớp nhất |
 | `cited` | `boolean` | ✓ | Câu trả lời có trích nguồn này |
+| `path` | `string hoặc null` |  | Chỉ nguồn `guide`: tệp trong repo kèm neo mục, vd `docs/huong-dan/viec-chung.md#đơn-nghỉ-phép` |
 
 ### `FileOut`
 
@@ -802,6 +809,7 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `enabled` | `boolean` | ✓ | Mô hình viết câu trả lời của trợ lý đang sẵn sàng |
 | `model` | `string hoặc null` | ✓ | Tên mô hình khi bật, vd qwen3:1.7b; null khi tắt |
 | `semantic` | `boolean` | ✓ | Tìm theo nghĩa được (mô hình nhúng sẵn sàng) |
+| `device` | `"gpu", "cpu", "gpu+cpu" hoặc null` |  | Mô hình của Ollama đang nằm trên GPU, CPU hay chia hai (MOC_AI_DEVICE, /api/ps); null khi chưa nạp mô hình nào hay trợ lý tắt |
 
 ### `StatusComponent`
 
@@ -820,6 +828,33 @@ Số liệu văn bản đã nộp lưu của đơn vị: DuckDB đọc các bả
 | `id` | `string` | ✓ |  |
 | `label` | `string` | ✓ |  |
 
+### `StatusOpenData`
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|:-:|---|
+| `source` | `string` | ✓ | Mã nguồn, tên thư mục trong seed/du-lieu-mo, vd cong-bao-gddt |
+| `name` | `string hoặc null` | ✓ |  |
+| `publisher` | `string hoặc null` | ✓ | Cơ quan công bố |
+| `home_url` | `string hoặc null` | ✓ |  |
+| `reuse_basis` | `string hoặc null` | ✓ | Căn cứ dùng lại (điều luật hay giấy phép) |
+| `licence` | `string hoặc null` | ✓ | Giấy phép mở nếu nguồn có; null: dùng lại theo `reuse_basis` |
+| `fetched_at` | `string (date-time) hoặc null` | ✓ | Lúc lấy bản chụp |
+| `age_days` | `integer hoặc null` | ✓ | Tuổi bản chụp, tính bằng ngày |
+| `max_age_days` | `integer hoặc null` | ✓ |  |
+| `state` | `"ok", "stale", "broken"` | ✓ | ok · stale: quá `max_age_days` · broken: manifest hỏng, thiếu tệp, sai cỡ hay sai SHA-256 |
+| `files` | `StatusOpenDataFile[]` | ✓ |  |
+
+### `StatusOpenDataFile`
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|:-:|---|
+| `file` | `string` | ✓ | Tên tệp trong bản chụp, vd tt-26-2026-tt-bgddt.pdf |
+| `url` | `string hoặc null` | ✓ | Nơi đã tải tệp (http/https) |
+| `sha256` | `string` | ✓ | SHA-256 của tệp; trùng `sha256` của một tệp đính kèm là văn bản từ nguồn này |
+| `bytes` | `integer` | ✓ |  |
+| `fetched_at` | `string (date-time) hoặc null` | ✓ | Lúc tải tệp; null: như `fetched_at` của nguồn |
+| `meta` | `object (giá trị string hoặc integer hoặc number hoặc boolean hoặc null)` | ✓ | Thông tin tùy nguồn, chỉ giá trị đơn, vd symbol, issuer_name, issued_on, page_url, gazette |
+
 ### `StatusOut`
 
 Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thái, không tên máy, địa chỉ hay số liệu nghiệp vụ.
@@ -834,6 +869,7 @@ Trạng thái vận hành, công khai: chỉ chữ cố định và trạng thá
 | `ai` | `StatusAi` | ✓ |  |
 | `layers` | `StatusLayer[]` | ✓ | Các tầng theo thứ tự hiện: người dùng → lõi → quy trình → dữ liệu → trí tuệ nhân tạo |
 | `components` | `StatusComponent[]` | ✓ |  |
+| `open_data` | `StatusOpenData[]` |  | Nguồn dữ liệu công khai đi kèm bản cài (#424): nguồn gốc, tuổi dữ liệu; bản cài không gọi nguồn lúc chạy, chỉ đọc bản chụp |
 
 ### `UnreadablePackageOut`
 

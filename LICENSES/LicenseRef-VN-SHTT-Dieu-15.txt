@@ -1,0 +1,34 @@
+Văn bản nhà nước và tin thời sự trong bản chụp nguồn dữ liệu công khai
+
+Các tệp REUSE.toml khai bằng mã này nằm dưới seed/du-lieu-mo/. Đó là bản sao hoặc câu trích của văn bản nhà nước Việt
+Nam: văn bản quy phạm pháp luật, văn bản hành chính, và tin thời sự thuần túy đưa tin về các văn bản đó. Điều 15 Luật
+Sở hữu trí tuệ (văn bản hợp nhất 160/2026/VBHN-LQ-VPQH) quy định các đối tượng sau không thuộc phạm vi bảo hộ quyền tác
+giả:
+
+  1. Tin tức thời sự thuần tuý đưa tin.
+  2. Văn bản quy phạm pháp luật, văn bản hành chính, văn bản khác thuộc lĩnh vực tư pháp và bản dịch chính thức của
+     văn bản đó.
+  3. Quy trình, hệ thống, phương pháp hoạt động, khái niệm, nguyên lý, số liệu.
+
+Signet không nhận bản quyền các tệp này và không cấp phép lại chúng theo Apache-2.0. Nguồn của từng tệp (URL, ngày lấy,
+SHA-256, căn cứ dùng lại) ghi trong manifest.json cùng thư mục. Khi dùng lại, hãy ghi rõ nguồn như trang gốc yêu cầu.
+Mã lấy nguồn (scripts/) và tệp do mã đó sinh ra (manifest.json, dữ liệu đã chuẩn hóa) vẫn theo Apache-2.0.
+
+---
+
+State documents and news reports in the public data source snapshots
+
+The files that REUSE.toml declares with this identifier are under seed/du-lieu-mo/. They are copies of, or quotes from,
+Vietnamese state documents: legal normative documents, administrative documents, and pure news reports about those
+documents. Article 15 of the Law on Intellectual Property (consolidated text 160/2026/VBHN-LQ-VPQH) states that the
+following are not protected by copyright:
+
+  1. News of current events that is purely informational.
+  2. Legal normative documents, administrative documents, other documents in the judicial field, and their official
+     translations.
+  3. Procedures, systems, methods of operation, concepts, principles and data.
+
+Signet claims no copyright in these files and does not relicense them under Apache-2.0. The source of each file (URL,
+fetch date, SHA-256, reuse basis) is listed in the manifest.json of the same folder. When you reuse them, credit the
+source as the original page asks. The fetch code (scripts/) and the files it generates (manifest.json, normalised data)
+remain under Apache-2.0.

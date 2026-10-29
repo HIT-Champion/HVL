@@ -177,11 +177,30 @@ Chế độ `extract` tất định, không cần mô hình; chế độ `genera
 hậu kiểm. Đường ống tự viết trong `assist/` (không LlamaIndex, QĐ-004).
 
 **Dữ liệu đánh giá.** `seed/hoi-dap/`: 6 PDF hư cấu, 14 trang — 5 văn bản thường và 1 văn bản hạn chế (53/PA-ĐHM, cụm từ
-riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 19 câu, mỗi câu gắn người hỏi:
+riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 51 câu, mỗi câu gắn người hỏi và
+loại (`loai`). 19 câu tra cứu văn bản (`van_ban`) giữ nguyên từ trước để số đo so được:
 
 - 16 câu dương: đáp án là số ký hiệu + trang, từ khóa phải có, câu chứa câu trả lời;
 - 2 câu âm: hỏi điều không có trong kho (q17), hỏi nội dung chỉ có trong văn bản hạn chế (q18);
 - 1 câu bị cấm: giảng viên Bộ môn KTPM hỏi về văn bản giao Tổ Đào tạo, không được xem (q19).
+
+22 câu theo loại của bộ định tuyến (#423), mỗi câu ghi đường phải chọn (`route`):
+
+- 5 câu nối tiếp (`noi_tiep`): kèm câu hỏi lượt trước (`previous`); đáp án là số ký hiệu + trang, câu trả lời là một
+  câu khác của cùng văn bản ("Thế còn loại Giỏi?" sau câu hỏi về học bổng loại Xuất sắc);
+- 6 câu về chính trợ lý (`gioi_thieu`), 5 câu cách dùng Signet (`huong_dan`): đáp án là mục của tệp Giới thiệu trợ lý
+  hay của hướng dẫn sử dụng (`{"guide": "<tệp>#<neo>"}`);
+- 6 câu ngoài phạm vi (`ngoai_pham_vi`): thời tiết, giá vàng, tỷ giá, bóng đá, làm thơ (tiếng Việt, tiếng Anh).
+
+10 câu của hai đường dữ liệu (#441), không gọi mô hình:
+
+- 5 câu việc của người hỏi (`viec_cua_toi`): đáp án `{"data": "tasks"}`; `do-hoi-dap` gọi `myTasks` thẳng qua GraphQL
+  của Hasura bằng token người hỏi, đếm quá hạn, đến hạn hôm nay, đến hạn trong 2 ngày như Lịch hạn, so với `data` của
+  câu trả lời;
+- 5 câu đếm văn bản (`dem_van_ban`): đáp án ghi hướng, khoảng ngày, loại (`{"data": "documents", "directions": ["in"],
+  "from": "2026-10-01", "to": "2026-11-01", "type_code": null}`, mốc ghi rõ tháng, năm để không đổi theo ngày đo);
+  `do-hoi-dap` đếm bằng `office_documents_aggregate` đúng bộ lọc đó, bằng token người hỏi, so cả số lẫn bộ lọc trợ lý
+  đọc từ câu.
 
 Nhãn: `scripts/hoi_dap_mau.py` viết mỗi thông tin cần hỏi trong đúng một câu, trên đúng một trang (ngắt trang tường
 minh), rồi kiểm bằng pypdf rằng câu trả lời nằm đúng trang và chỉ ở trang đó; câu hỏi và từ khóa do đội viết. Với văn
@@ -199,8 +218,14 @@ make do-hoi-dap                      # tìm lai + câu trả lời của mô hì
 Định nghĩa: **recall@3** — câu dương có nguồn khớp đáp án (cùng số ký hiệu và cùng trang) trong 3 nguồn đầu; **từ chối
 đúng** — câu âm, câu bị cấm nhận `no_evidence` hoặc `passages_only`; **nguồn bị cấm** — nguồn mang số ký hiệu trong danh
 sách cấm của câu, hoặc văn bản hạn chế 53/PA-ĐHM (cấm ở **mọi** câu, của mọi người hỏi); **qua kiểm** — câu trả lời
-`source: model` sau khi máy chủ kiểm trích dẫn; **trích đúng nguồn** — có `[n]` trỏ tới nguồn đáp án. Thoát 1 khi có
-bất kỳ nguồn bị cấm nào, hoặc recall@3 dưới 80 %.
+`source: model` sau khi máy chủ kiểm trích dẫn; **trích đúng nguồn** — có `[n]` trỏ tới nguồn đáp án; **đường đúng** —
+bộ định tuyến chọn đúng `route` của câu, câu nối tiếp được ghép (`rewritten`), câu ngoài phạm vi nhận câu cố định
+(`answer.source: fixed`), câu đường dữ liệu nhận câu có số (`answer.source: data`); **đếm đúng** — mọi số và bộ lọc
+trong `data` bằng số đếm thẳng qua GraphQL. recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in
+riêng "đường đúng · trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu đi sai
+đường, hoặc một câu `gioi_thieu`, `huong_dan`, `ngoai_pham_vi`, `viec_cua_toi`, `dem_van_ban` trả lời sai: các đường
+này không qua tìm kiếm nên không cần ngưỡng. Câu nối tiếp tìm trong kho như câu `van_ban`, recall@3 của chúng chỉ in
+ra, không làm đỏ.
 
 **Kết quả.**
 
@@ -220,6 +245,12 @@ bất kỳ nguồn bị cấm nào, hoặc recall@3 dưới 80 %.
   hình**, nên không cùng điều kiện với hai cột bật `ai`. Mọi số trừ độ trễ trùng nhau ở cả ba lần, ổn định qua 3 lần.
   So với cột 21/10 không bật `ai`, tổng từ chối đúng vẫn 3 / 3 nhưng chia khác (1 `no_evidence` + 2 `passages_only`
   thay vì 2 + 1): chưa rõ nguyên nhân.
+
+- 30/10/2026, CI, không bật `ai`, bộ 51 câu (bước `make do-hoi-dap` của job "Chạy thử: ai", run 40953517834 của PR
+  #444): recall@3 16 / 16, câu trích có từ khóa 15 / 16, từ chối đúng 3 / 3 (1 `no_evidence`, 2 `passages_only`), 0
+  lượt có nguồn bị cấm. Theo loại (đường đúng · trả lời đúng / số câu): `van_ban` 19 · 19 / 19, `noi_tiep` 5 · 5 / 5,
+  `gioi_thieu` 6 · 6 / 6, `huong_dan` 5 · 5 / 5, `ngoai_pham_vi` 6 · 6 / 6, `viec_cua_toi` 5 · 5 / 5, `dem_van_ban`
+  5 · 5 / 5. svc-files tự đo `extract` p50 14 ms, p95 62 ms.
 
 - Lần đo 23/10 chạy trên chính máy B, gọi qua địa chỉ công khai của bản online (`MOC_PUBLIC_URL`), nên thời gian phía
   người gọi gồm cả đường mạng; trước khi đo, chờ svc-files nhúng xong các đoạn tồn (`embed_pending` = 0) để việc nhúng
@@ -272,8 +303,8 @@ sửa hay bỏ gợi ý. Chi tiết: [README svc-workflow](../services/svc-workf
 [README svc-files](../services/svc-files/README.md#văn-bản-tương-tự-cho-tác-tử-gợi-ý-giao-việc-f43).
 
 **Mô hình, công cụ.** **Không mô hình sinh nào chọn đơn vị** (QĐ-005): bỏ phiếu kNN có trọng số trên tối đa 5 căn cứ,
-hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` (`suggest.py`,
-thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
+hạn là trung vị số ngày của các căn cứ ủng hộ, dời khỏi thứ Bảy, Chủ nhật và ngày lễ của `MOC_HOLIDAYS` cùng lịch
+nghỉ chính thức của nguồn công khai B (#427) (`suggest.py`, thư viện chuẩn `statistics`). Văn bản tương tự lấy từ
 phần truy xuất của F4.2 qua route nội bộ `POST /internal/similar-documents` (`assist/similar.py`): câu tìm từ trích yếu,
 tìm từ khóa kèm lượt tìm nới; có Qwen3-Embedding thì tìm lai, tối đa 3 giây. Flowable chạy nhánh song song và timer.
 
@@ -315,8 +346,9 @@ top-2, top-3 vô nghĩa khi chỉ có hai đơn vị hợp lệ. Dữ liệu chi
 **Chưa đo.** Với tìm theo nghĩa (bật `ai`: 0/29 lượt ở trên là tìm từ khóa); trên nhiều đơn vị hơn; trên dữ liệu thật —
 view `office.v_assignment_suggestion_accuracy` (tỉ lệ lãnh đạo giữ đơn vị, giữ hạn, sai số hạn).
 
-**Giới hạn.** Ngày lễ mặc định chỉ có lễ dương lịch cố định; Tết Âm lịch, Giỗ Tổ, ngày nghỉ bù do người vận hành thêm
-vào `MOC_HOLIDAYS` mỗi năm (#280); chỉ gợi ý đơn vị và hạn, không gợi ý người xử lý; chỉ mục
+**Giới hạn.** Lịch nghỉ chính thức chỉ có các năm Chính phủ đã công bố (bản chụp tới hết 2027, chưa có Giỗ Tổ 2027),
+năm sau đó người vận hành lấy mới hoặc thêm vào `MOC_HOLIDAYS` (#280, #427); chỉ gợi ý đơn vị và hạn, không gợi ý
+người xử lý; chỉ mục
 đoạn đồng bộ vài giây một lần nên văn bản vừa giao chưa làm căn cứ ngay; trích yếu quá ngắn hay chỉ có từ chung thì ít
 kết quả đúng; ngưỡng `MOC_SUGGEST_MIN_SCORE` chốt trên dữ liệu mẫu.
 

@@ -349,6 +349,8 @@ services:
       MOC_ZALO_BOT_TOKEN: ${MOC_ZALO_BOT_TOKEN:-}
       # tùy chọn (#284): token Alertmanager gọi svc-workflow; bản cài cũ chưa có thì tắt cảnh báo ra chuông
       MOC_ALERT_TOKEN: ${MOC_ALERT_TOKEN:-}
+      # tùy chọn (#430): khóa API ngoài viết câu trả lời của trợ lý hỏi đáp (svc-files, MOC_ASK_API=openai)
+      MOC_ASK_API_KEY: ${MOC_ASK_API_KEY:-}
     volumes:
       - ./platform/openbao:/moc:ro
       - openbao_data:/openbao/file
@@ -408,6 +410,10 @@ services:
       MOC_ASK_MODEL: ${MOC_ASK_MODEL:-}
       MOC_ASK_DEADLINE_S: ${MOC_ASK_DEADLINE_S:-50}
       MOC_ASK_MODEL_TIMEOUT_S: ${MOC_ASK_MODEL_TIMEOUT_S:-40}
+      # #430 — openai: viết câu trả lời qua API ngoài chuẩn OpenAI ở MOC_ASK_API_URL, tên mô hình ở MOC_ASK_MODEL;
+      # khóa MOC_ASK_API_KEY đến từ két, không ở đây. Nhúng, trích yếu vẫn ở Ollama. Mặc định ollama
+      MOC_ASK_API: ${MOC_ASK_API:-ollama}
+      MOC_ASK_API_URL: ${MOC_ASK_API_URL:-}
       # F4.5 — ký số PAdES bản phát hành văn bản đi bằng khóa Transit của đơn vị, chứng thư do CA nội bộ trong két
       # cấp (chỉ minh họa, không có giá trị pháp lý). false: phát hành không ký, không gọi Transit hay PKI. Két khởi
       # tạo trước F4.5 chưa có PKI thì svc-files tự tắt ký số (docs/van-hanh.md mục Két bí mật)
@@ -423,6 +429,10 @@ services:
       MOC_IMPORT_STORE_MAX_MB: ${MOC_IMPORT_STORE_MAX_MB:-200}
     volumes:
       - openbao_svc_files:/run/openbao:ro
+      # #424 — bản chụp nguồn dữ liệu công khai (manifest, SHA-256): /api/status báo nguồn gốc, tuổi dữ liệu
+      - ./seed/du-lieu-mo:/srv/du-lieu-mo:ro
+      # #423 — trợ lý hỏi đáp trả lời câu hỏi cách dùng từ hướng dẫn sử dụng (MOC_ASK_GUIDE_DIR, mặc định thư mục này)
+      - ./docs/huong-dan:/app/huong-dan:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
     # không xuống đĩa. Đủ cho vài lượt tải song song cỡ MOC_FILES_MAX_MB.
     tmpfs:
@@ -467,6 +477,8 @@ services:
       MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
       # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (cú pháp ở .env.example); để trống thì như mặc định
       MOC_HOLIDAYS: ${MOC_HOLIDAYS:-01-01,04-30,05-01,09-02}
+      # lịch nghỉ chính thức (nguồn công khai B, #427): seed/du-lieu-mo/ngay-nghi-le gắn ở volumes; rỗng thì tắt
+      MOC_HOLIDAYS_FILE: ${MOC_HOLIDAYS_FILE-/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
       # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP), webhook (Mattermost, Slack, ntfy), SMS, Zalo qua
@@ -490,6 +502,7 @@ services:
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
       - ./services/svc-workflow/processes:/app/processes:ro
+      - ./seed/du-lieu-mo/ngay-nghi-le:/app/du-lieu-mo/ngay-nghi-le:ro
       - openbao_svc_workflow:/run/openbao:ro
     depends_on:
       # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới

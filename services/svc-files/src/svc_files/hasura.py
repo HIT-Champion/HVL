@@ -166,6 +166,18 @@ query AskDocumentsService($ids: [uuid!]!) {{
   office_documents(where: {{_and: [{{id: {{_in: $ids}}}}, {{restricted: {{_eq: false}}}}]}}) {{ {_ASK_FIELDS} }}
 }}"""
 
+# Hai đường dữ liệu của trợ lý (#441), bằng token người hỏi: Hộp việc (Action myTasks của svc-workflow, như trang
+# chủ) và số văn bản người hỏi được xem (cùng quyền select, allow_aggregations, của trang danh sách)
+ASK_TASKS = """
+query AskTasks {
+  myTasks { id name document_id due_on }
+}"""
+
+ASK_COUNT = """
+query AskCount($where: office_documents_bool_exp!) {
+  office_documents_aggregate(where: $where) { aggregate { count } }
+}"""
+
 # Kết quả tìm kiếm: chỉ những văn bản người dùng được đọc, dữ liệu mới nhất từ CSDL
 VISIBLE_DOCUMENTS = """
 query VisibleDocuments($ids: [uuid!]!) {
@@ -487,6 +499,16 @@ class HasuraClient:
                 return {}
             raise
         return {row["id"]: row for row in data["office_documents"]}
+
+    async def ask_tasks(self, token: str) -> list[dict[str, Any]]:
+        """Việc trong Hộp việc của người giữ token (đường ``viec_cua_toi`` của trợ lý, #441)."""
+        data = await self._call(ASK_TASKS, {}, {"Authorization": f"Bearer {token}"})
+        return list(data["myTasks"])
+
+    async def ask_count(self, token: str, where: dict[str, Any]) -> int:
+        """Số văn bản khớp ``where`` mà người giữ token được xem (đường ``dem_van_ban`` của trợ lý, #441)."""
+        data = await self._call(ASK_COUNT, {"where": where}, {"Authorization": f"Bearer {token}"})
+        return int(data["office_documents_aggregate"]["aggregate"]["count"])
 
     async def ask_documents_service(self, tenant_id: uuid.UUID, ids: list[str], *, actor_id: str = "svc-files",
                                     request_id: str = "") -> dict[str, dict[str, Any]]:

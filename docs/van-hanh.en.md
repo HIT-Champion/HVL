@@ -423,6 +423,34 @@ How to recognise it and what to do:
   - **Already up to date:** the command only reports "database is up-to-date".
   - **Still a lock error:** the background freshclam may be updating by itself; wait 1 minute and run it again.
 
+## Official public holidays (public data source B)
+
+Suggested due dates (F4.3) skip Lunar New Year, the Hung Kings' day, days off in lieu, and count make-up Saturdays as
+working days, following the official calendar for civil servants and public employees (#427). The snapshot lives in
+`seed/du-lieu-mo/ngay-nghi-le/`:
+
+- `ngay-nghi.json`: fixed holidays (Article 112 of the Labour Code, Vietnam Culture Day 24/11), the days off of each
+  year, make-up working days; each entry names the document it comes from;
+- `trich/*.txt`: quotes from the Government News articles that state those dates, with the article URL;
+- `manifest.json`: URL, fetch date, SHA-256 of each file, reuse basis (Article 15 of the Law on Intellectual Property),
+  maximum age 400 days.
+
+`docker-compose.yml` mounts this folder read-only into svc-workflow; `MOC_HOLIDAYS_FILE` (default
+`/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json`, empty turns it off) adds the calendar to `MOC_HOLIDAYS`. Without the
+file only `MOC_HOLIDAYS` applies, as before; a broken file stops svc-workflow at start-up with a `MOC_HOLIDAYS_FILE`
+error.
+
+Refresh it when the Government announces the next year's days off (usually in October), no Docker needed:
+
+1. add an entry to `PAGES` in `scripts/nguon_ngay_nghi_le.py`: article URL, quote file, date range, and the date strings
+   exactly as the article writes them;
+2. `python3 scripts/nguon_ngay_nghi_le.py` fetches every article again and checks each date is on its page before it
+   replaces the snapshot. A page that does not load or has lost a date makes it exit 1 and keeps the old snapshot;
+3. `docker compose restart svc-workflow`. Suggestions already saved keep their due dates.
+
+If the source stops working, suggestions keep using the snapshot; for a year the snapshot does not cover, add the days
+to `MOC_HOLIDAYS`.
+
 ## Monitoring
 
 APISIX counts every request through the gateway (plugin `prometheus`; the metrics export port 9091 is not published:
@@ -507,6 +535,67 @@ Trạng thái hệ thống (system status).
   `platform/monitoring/kiem-tra/canh-bao.test.yml`, run `promtool test rules` as the "Giám sát" step of the build job in
   `.github/workflows/ci.yml` does, then install again.
 
+## Public data
+
+Signet ships snapshots of public government data in `seed/du-lieu-mo/<source code>/` (#424): the original files and a
+`manifest.json` with the URL, fetch date, reuse basis and SHA-256 of each file. Source A `cong-bao-gddt`: four
+circulars of the Ministry of Education and Training on higher education, as published in the Official Gazette
+(`seed/du-lieu-mo/cong-bao-gddt/README.md`).
+
+- **An installed copy never calls the source at run time.** `svc-files` reads the manifests through the read-only
+  mount `/srv/du-lieu-mo`, checks the SHA-256 and reports in `GET /api/status` (key `open_data`: `ok`, `stale` past
+  `max_age_days`, `broken` when a file is missing or its hash differs) and on `/trang-thai`. If the source goes
+  offline Signet keeps using the latest snapshot, and the status page shows how many days old the data is.
+- **Import:** `make seed` imports each file as an incoming document of the IT faculty through the batch import API
+  (CSV + zip, ClamAV, as a clerk would), type "Thông tư" (migration `1792281604000_document_type_tt`). On a copy that
+  already has its sample data run `python3 scripts/moc.py du-lieu-mo nap`; running it again creates no duplicates. The
+  document page recognises a document from a public source because the SHA-256 of its attachment matches the
+  manifest; the assistant quotes it like any incoming document.
+- **Check:** `make du-lieu-mo` (`python3 scripts/moc.py du-lieu-mo kiem`) compares the hashes and prints the age of
+  the data; it exits 1 when a snapshot is broken.
+- **Refresh** (on a team machine with Internet access, not on the server): `make du-lieu-mo-lay`. The command only
+  replaces a snapshot once every file has downloaded, matches the manifest and the total stays within 3 MB; if the
+  source fails it keeps the old snapshot and exits 1. A new snapshot goes through a pull request like any file in
+  `seed/`.
+- **Adding a source:** a module `scripts/nguon_<code>.py` with `NGUON`, `TEN` and `lay(thu_muc)` returning a manifest
+  (template in `scripts/du_lieu_mo.py`). Only use sources with a clear reuse basis (an open licence, or Article 15 of
+  the Law on Intellectual Property for state documents), follow `robots.txt` and the site terms, take no personal
+  data, and declare the files' licence in `REUSE.toml`.
+
+## Assistant answers through an external API
+
+By default the question-answering assistant (F4.2) writes its answers with a model running locally in Ollama. On a
+slow machine (CPU only), or to use a larger model, the writing step can go to a server that speaks the OpenAI API
+(#430): vLLM or llama.cpp on a GPU machine of the unit, or a cloud service. Set in `.env`:
+
+```
+MOC_ASK_API=openai
+MOC_ASK_API_URL=https://model-server/v1
+MOC_ASK_MODEL=<model name that server accepts>
+MOC_ASK_API_KEY=<key, empty if the server needs none>
+```
+
+then `docker compose up -d` (recreates `openbao`, `svc-files`). To change the key later: edit `.env`,
+`docker compose up -d`, then `docker compose restart svc-files`.
+
+- **What leaves the machine:** only the answer-writing call: the question and at most 4 source passages, **masked**
+  first (phone numbers, citizen ID numbers, email addresses, bank account numbers; F4.4). Semantic search (the
+  embedding model) and incoming-document summaries stay in Ollama; without the `ai` profile the assistant searches by
+  keyword and only the writing step uses the API. An open model running locally remains the recommended default:
+  sending documents to a cloud service is the unit's own decision about its data.
+- **Same checks:** the output is forced to a JSON Schema (`response_format`), and Signet still checks every sentence
+  against the source passages and numbers before adding citations; otherwise it returns the verbatim quote.
+- **Key:** a `svc-files` secret in the vault like the other keys (section Secrets vault), not in the `svc-files`
+  container environment, never logged. It is only sent in the `Authorization` header to `MOC_ASK_API_URL`. With an
+  `http://` URL `svc-files` logs `config.warning` at start-up: the key and the passages travel unencrypted, which only
+  suits a model server on a trusted internal network.
+- **Model name:** `MOC_ASK_MODEL` is required and must be a name that server accepts (e.g. `Qwen/Qwen3-4B` on vLLM);
+  it does not fall back to `MOC_AI_MODEL` as it does for local answers. Without it `svc-files` stops at start-up.
+- **Readiness:** `svc-files` calls `GET {MOC_ASK_API_URL}/models` at start-up and every 60 seconds; a wrong key (401,
+  403) or model name (404) counts as not ready until the next probe. Log events `office.assist.ai_ready`,
+  `office.assist.ai_unavailable` carry `"where": "external"` and the HTTP code, never the key.
+- **Audit log:** the `assistant.answered` row records `model` and `model_where` (`local`: Ollama; `external`: the API).
+
 ## System status page
 
 `<MOC_PUBLIC_URL>/trang-thai` is a public page, with no sign-in needed: users can see for themselves whether Signet is
@@ -523,7 +612,8 @@ portal and the sidebar after sign-in all link here. While open, the page refresh
   question answering are unavailable for the time being, and the rest still runs. The AI assistant is *Off* when the
   `ai` profile is not on, question answering is turned off, or Ollama does not answer: the page cannot tell these three
   cases apart, so if it shows *Off* while the `ai` profile is on, look at `docker compose logs ollama`. The assistant
-  still searches by keyword.
+  still searches by keyword. When answers are written through an external API (section below), the component's
+  software reads "API ngoài".
 - **What it does not reveal:** only fixed labels and states; no host names, IP addresses, internal URLs, per-component
   versions, user or document counts, or error messages. The specific reason is in the `svc-files` log (event
   `core.status.changed`, written when a component changes state): `docker compose logs svc-files | grep
@@ -534,6 +624,35 @@ portal and the sidebar after sign-in all link here. While open, the page refresh
   `MOC_RATE_STATUS_PER_MIN` (default 30) requests a minute, and returns `429` beyond that.
 - The page only answers "running or not" right now; trends over time, latency and error ratios are in Grafana (section
   Monitoring). API: `GET /api/status` ([`docs/api/README.md`](api/README.md) §3).
+
+## Running the model on a GPU
+
+By default Ollama (profile `ai`) runs models on the CPU, within `MOC_AI_MEM_LIMIT` and `MOC_AI_CPUS`. On a server with
+an NVIDIA card set `MOC_AI_DEVICE=gpu` in `.env` (#442): the Makefile adds the `docker-compose.gpu.yml` overlay to
+`COMPOSE_FILE`, which gives every NVIDIA GPU of the machine to `ollama`; other services and the RAM and CPU limits stay
+the same. Incoming-document summaries (F4.1) and the assistant's embeddings and answers (F4.2) all run in Ollama, so
+they all get faster.
+
+- **The server needs:**
+  - A recent enough NVIDIA driver. Per docs.ollama.com/gpu (read on 30/10/2026): compute capability 5.0 or later with
+    driver 550 or later; cards with compute capability 5.0–6.2 (Maxwell, Pascal; e.g. the Quadro M4000 is 5.2) need
+    driver 570 or later. Look up a card at developer.nvidia.com/cuda-gpus.
+  - The NVIDIA Container Toolkit, then `sudo nvidia-ctk runtime configure --runtime=docker` and a Docker restart so
+    Docker has the `nvidia` runtime. Check: `docker run --rm --gpus all ubuntu nvidia-smi` must print the card.
+  - WSL 2: install the NVIDIA driver on Windows only, never a Linux driver inside WSL; install the NVIDIA Container
+    Toolkit inside the WSL distribution when Docker Engine runs there.
+- **Turn it on:** `./scripts/co-gpu.sh` prints `gpu` when `nvidia-smi` sees a card and Docker has the `nvidia`
+  runtime; `make env` and `make install` call it to suggest the setting. Set `MOC_AI_DEVICE=gpu` in `.env`, then
+  `make up-ai`. For an installed copy, set it in that copy's `.env` and run `make install` again so it writes
+  `COMPOSE_FILE`; `make install` warns when the machine cannot use the GPU yet. To turn it off, set `MOC_AI_DEVICE=cpu`
+  and do the same.
+- **Check:** `GET /api/status`, block `ai`, field `device`: `gpu` (the model sits fully in GPU memory), `gpu+cpu` (not
+  enough GPU memory, part of it runs on the CPU and stays slow), `cpu`; `null` while Ollama has no model loaded or the
+  assistant is off. `svc-files` reads `size_vram` from Ollama's `/api/ps` on every probe. On the server:
+  `docker compose exec ollama ollama ps`, column `PROCESSOR`.
+- **`gpu` set but Docker lacks the `nvidia` runtime:** `ollama` does not start (`could not select device driver
+  "nvidia"`) and the status page shows the AI assistant as *Off*; the assistant still searches by keyword and answers
+  with quotes. Finish the steps above or set `cpu` again.
 
 ## Centralised logs
 

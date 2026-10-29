@@ -35,13 +35,19 @@ COMPOSE := $(strip docker compose --profile core --profile app $(foreach p,$(EXT
 # đi cùng mọi COMPOSE_FILE mà Makefile tự đặt (log tập trung); không đặt thì compose đọc COMPOSE_FILE trong .env
 APPS_COMPOSE_FILE := $(wildcard .moc-apps/docker-compose.apps.yml)
 APPS_SUFFIX := $(if $(APPS_COMPOSE_FILE),:$(APPS_COMPOSE_FILE))
-BASE_COMPOSE_FILE := docker-compose.yml$(APPS_SUFFIX)
-LOGS_COMPOSE_FILE := docker-compose.yml:platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
+# Mô hình chạy trên GPU NVIDIA (MOC_AI_DEVICE=gpu, docs/van-hanh.md mục Chạy mô hình bằng GPU): tệp phủ cấp GPU cho
+# ollama, đi cùng mọi COMPOSE_FILE mà Makefile đặt. cpu (mặc định) thì compose chỉ đọc docker-compose.yml như cũ
+AI_DEVICE := $(shell sed -n 's/^MOC_AI_DEVICE=//p' $(ENV_FILE) 2>/dev/null | tail -n 1 | tr -d ' ')
+GPU_SUFFIX := $(if $(filter gpu,$(AI_DEVICE)),:docker-compose.gpu.yml)
+BASE_COMPOSE_FILE := docker-compose.yml$(GPU_SUFFIX)$(APPS_SUFFIX)
+LOGS_COMPOSE_FILE := docker-compose.yml$(GPU_SUFFIX):platform/logs/docker-compose.logs.yml$(APPS_SUFFIX)
 LOGGED_SERVICES := apisix app-office app-ca-nhan svc-files svc-workflow hasura keycloak postgres meilisearch
 # Bật lâu dài (logs trong MOC_EXTRA_PROFILES): make up cũng thêm mật khẩu vào .env cũ (logs-env) và đặt giữ log
 LOGS_ON := $(filter logs,$(EXTRA_PROFILES))
 ifneq ($(LOGS_ON),)
 export COMPOSE_FILE := $(LOGS_COMPOSE_FILE)
+else ifneq ($(GPU_SUFFIX),)
+export COMPOSE_FILE := $(BASE_COMPOSE_FILE)
 endif
 # Wiki nội bộ (#367, profile wiki; docs/van-hanh.md mục Wiki nội bộ). Bật lâu dài (wiki trong MOC_EXTRA_PROFILES): make
 # up cũng thêm bí mật client vào .env cũ (wiki-env) và đồng bộ client Keycloak, quyền theo đơn vị (moc wiki sync)
@@ -56,7 +62,7 @@ PREFIX ?= /opt/moc
         demo-doc-van-ban do-doc-van-ban van-ban-mau demo-hoi-dap do-hoi-dap hoi-dap-mau demo-giao-viec do-giao-viec \
         demo-ky-so \
         demo-che-pii do-che-pii \
-        demo-nap-lo nap-lo-mau \
+        demo-nap-lo nap-lo-mau du-lieu-mo du-lieu-mo-lay \
         demo-ca-nhan demo-tat-van-phong \
         do-so-lieu-sau \
         logs-env logs-up logs-down logs-tra demo-log-tap-trung alert-env demo-canh-bao \
@@ -80,6 +86,8 @@ env: ## Sinh .env từ .env.example, thay mọi change_me bằng chuỗi ngẫu 
 	  || { rm -f $(ENV_FILE).tmp; exit 1; }
 	@chmod 600 $(ENV_FILE)
 	@echo "Đã tạo $(ENV_FILE). Mật khẩu của các tài khoản mẫu là giá trị MOC_DEMO_PASSWORD trong tệp này."
+	@[ "$$(./scripts/co-gpu.sh)" != gpu ] || echo "Máy có GPU NVIDIA và Docker có runtime nvidia: đặt MOC_AI_DEVICE=gpu \
+	trong $(ENV_FILE) để Ollama chạy mô hình trên GPU (docs/van-hanh.md, mục Chạy mô hình bằng GPU)."
 
 # .env chép tay từ .env.example mà quên sửa: mật khẩu, khóa (cả khóa quản trị Hasura) ai đọc mã nguồn cũng biết
 env-ready: $(ENV_FILE)
@@ -285,7 +293,7 @@ van-ban-mau: $(ENV_FILE) ## Sinh lại văn bản đến mẫu seed/van-ban-den 
 demo-hoi-dap: $(ENV_FILE) ## Màn hỏi đáp trên kho văn bản (F4.2): trợ lý trả câu trích kèm số ký hiệu, trang; chỉ trong văn bản người hỏi được xem; văn bản hạn chế không vào chỉ mục; sổ kiểm toán không có câu hỏi (docs/demo-script.md)
 	@python3 scripts/demo.py hoi-dap
 
-do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm hoặc recall@3 dưới ngưỡng)
+do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, đường theo loại câu, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm, recall@3 dưới ngưỡng hoặc câu đi sai đường)
 	@python3 scripts/demo.py do-hoi-dap
 
 hoi-dap-mau: $(ENV_FILE) ## Sinh lại kho văn bản mẫu nhiều trang seed/hoi-dap (PDF, cau-hoi.json) trong container svc-files (cần make up)
@@ -312,6 +320,12 @@ do-che-pii: ## Đo bộ che thông tin cá nhân, không cần Docker: số ch�
 
 demo-nap-lo: $(ENV_FILE) ## Màn nạp lô văn bản đến (cụm ⑤): 200 dòng + zip qua API, EICAR bị chặn, gửi lại không trùng
 	@python3 scripts/demo.py nap-lo
+
+du-lieu-mo: ## Kiểm bản chụp dữ liệu công khai seed/du-lieu-mo (SHA-256, tuổi dữ liệu; không cần Docker, Internet)
+	@python3 scripts/du_lieu_mo.py kiem
+
+du-lieu-mo-lay: ## Lấy mới bản chụp dữ liệu công khai từ nguồn (cần Internet; chỉ thay khi băm khớp, lỗi thì giữ bản cũ)
+	@python3 scripts/du_lieu_mo.py lay
 
 nap-lo-mau: ## Sinh lại seed/nap-lo/van-ban-den.csv: 200 văn bản đến mẫu, có dòng sai cố ý (không cần Docker)
 	@python3 scripts/nap_lo_mau.py

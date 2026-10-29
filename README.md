@@ -290,6 +290,7 @@ Các việc của người quản trị trên bản cài đang chạy nằm ở 
 | [Giám sát](docs/van-hanh.md#giám-sát) cổng API bằng Prometheus + Grafana | đường hầm SSH tới cổng 3300 |
 | [Log tập trung](docs/van-hanh.md#log-tập-trung): Vector + Parseable, tra theo mã yêu cầu `X-Request-Id` | `make logs-up`, `make logs-tra ID=…` |
 | [Hội tụ IT/OT](docs/van-hanh.md#hội-tụ-itot): broker NGSI-LD, cảm biến | `make demo-it-ot` |
+| [Dữ liệu công khai](docs/van-hanh.md#dữ-liệu-công-khai): bản chụp thông tư Bộ GD&ĐT từ Công báo, kiểm SHA-256, tuổi dữ liệu | `make du-lieu-mo` |
 | [Cắm ứng dụng](docs/them-ung-dung.md#1-một-lệnh-moc-app-install) bằng manifest, không sửa lõi; gỡ giữ dữ liệu | `python3 scripts/moc.py app install …`, `app list`, `app remove` |
 | [Tường lửa ứng dụng web](platform/apisix/README.md#tường-lửa-ứng-dụng-web--waf-f315): chặn, chỉ ghi nhật ký hay tắt; đọc dòng chặn theo `X-Request-Id` | `MOC_WAF=On` · `DetectionOnly` · `Off` |
 | [Kiểm sổ kiểm toán](db/README.md) ngoài CSDL | `make audit` |

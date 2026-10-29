@@ -221,6 +221,22 @@ def test_ledger_view_shows_how_it_answered_not_what(world: World):
     assert row["diff"]["documents"] == sources
 
 
+def test_ledger_view_shows_the_route_of_each_answer(world: World):
+    # #423: đường, mã lý do, câu nối tiếp; #430: mô hình chạy tại chỗ hay qua API ngoài. Chỉ mã, không chữ câu hỏi
+    ask_id = str(uuid.uuid4())
+    routed = {"route": "gioi_thieu", "route_reason": "kw:lam-duoc-gi", "followup": False, "model_where": "local"}
+    agent(world.tenant_a).gql(LOG, {"e": event(ask_id, world.clerk_a, **routed)})
+    [row] = world.director_a.gql(AUDIT_VIEW, {"e": ask_id})["core_audit_log"]
+    assert {k: row["overview"][k] for k in routed} == routed
+    # khóa của trợ lý không hiện giá trị ở dòng sự kiện khác
+    entity_id = f"lt-{world.tag}-route"
+    world.service_a.gql(INSERT_EVENT, {"o": {
+        "actor_id": "svc-workflow", "actor_kind": "service", "action": "update", "entity": "office.dispatches",
+        "entity_id": entity_id, "diff": {"route": [None, "x"], "route_reason": [None, "y"], "followup": [None, True]}}})
+    [[text]] = sql(f"select core.audit_overview(a)::text from core.audit_log a where a.entity_id = '{entity_id}'")
+    assert json.loads(text) == {"route": None, "route_reason": None, "followup": None}
+
+
 def test_assistant_keys_show_only_on_answers_and_older_keys_stay(world: World):
     # khóa của F3.12 (lần gửi liên thông) vẫn trong danh sách chung; ask_id, hits… chỉ có giá trị ở dòng
     # assistant.answered

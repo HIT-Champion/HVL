@@ -27,8 +27,15 @@ theo từ khóa, trả câu trích nguyên văn.
   hữu hạn — sai thì coi như không nhúng được; lý do lần lỗi gần nhất ở ``embed_error`` để vòng nền phân biệt lỗi tạm
   (``TRANSIENT``: thử lại sau) với đoạn làm mô hình lỗi tất định. Véc-tơ đầu tiên Ollama trả (lúc nạp trước hoặc lần
   nhúng đầu) mà khác ``MOC_AI_EMBED_DIMS`` chiều là sai cấu hình: tắt nhúng tới khi khởi động lại, ghi lỗi rõ.
+- Nơi chạy (``MOC_AI_DEVICE``, docker-compose.gpu.yml): mỗi lượt dò, khi đã có mô hình sẵn sàng, đọc ``GET /api/ps``
+  → ``device``: ``gpu`` (cả mô hình trong bộ nhớ GPU), ``cpu``, ``gpu+cpu`` (chia hai); trang trạng thái hiện nó.
 - Sinh: ``POST /api/chat`` không stream, tắt suy nghĩ, đầu ra ép theo JSON Schema (grounding.py dựng lời dặn và kiểm).
 - Không sửa ``docread/summarize.py``: tác tử đọc văn bản đến dò mô hình trích yếu riêng.
+- **API ngoài** (#430, ``MOC_ASK_API=openai``, mặc định tắt): chỉ bước sinh đi tới máy chủ chuẩn OpenAI
+  (``POST {MOC_ASK_API_URL}/chat/completions``, đầu ra ép bằng ``response_format`` JSON Schema), dò sẵn sàng bằng
+  ``GET /models``; nhúng vẫn ở Ollama (``SplitAi`` ghép hai bên). Che ở lối ra như với Ollama; bộ kiểm căn cứ ở
+  answer.py không đổi. Khóa chỉ đi trong tiêu đề ``Authorization``, không vào nhật ký. ``chat_where`` (``local`` /
+  ``external``) cho sổ kiểm toán biết mô hình chạy ở đâu.
 - **Che thông tin cá nhân ở lối ra** (F4.4, pii.py): không byte chữ nào tới Ollama mà chưa qua bộ che. ``embed`` che
   từng chuỗi (đoạn văn bản, câu hỏi, trích yếu F4.3 đều chỉ ra mô hình qua đây); ``chat`` che nội dung mọi message.
   Bản che idempotent: answer.py đã che câu hỏi và nguồn bằng nhãn đánh số ``[SĐT-1]`` thì ở đây không còn gì để che —
@@ -53,7 +60,8 @@ from .meili import embedder_name  # tên embedder theo mô hình — luồng B �
 if TYPE_CHECKING:
     from ..config import Settings
 
-__all__ = ["TRANSIENT", "AiClient", "ChatResult", "NullAi", "OllamaAi", "embedder_name", "make_ai", "query_text"]
+__all__ = ["TRANSIENT", "AiClient", "ChatResult", "NullAi", "OllamaAi", "OpenAiChat", "SplitAi", "embedder_name",
+           "make_ai", "query_text"]
 
 log = logging.getLogger("svc_files")
 
@@ -85,8 +93,10 @@ class ChatResult:
 
 class AiClient(Protocol):
     chat_model: str | None
+    chat_where: str             # local: Ollama trong máy; external: API ngoài (MOC_ASK_API=openai)
     embed_model: str | None
     embed_error: str | None     # lý do lần nhúng gần nhất lỗi (None: thành công); đọc ngay sau ``await embed(...)``
+    device: str | None          # gpu, cpu, gpu+cpu theo /api/ps của Ollama; None: chưa biết
 
     @property
     def chat_available(self) -> bool: ...
@@ -104,8 +114,10 @@ class NullAi:
     """``MOC_AI_URL`` rỗng: không có mô hình nào — tìm theo từ khóa, trả câu trích."""
 
     chat_model: str | None = None
+    chat_where = "local"
     embed_model: str | None = None
     embed_error: str | None = "model_unavailable"
+    device: str | None = None
     chat_available = False
     embed_available = False
 
@@ -154,6 +166,8 @@ def _vectors(data: object, count: int, dims: int) -> list[list[float]] | None:
 
 
 class OllamaAi:
+    chat_where = "local"
+
     def __init__(self, url: str, chat_model: str | None, embed_model: str | None,
                  transport: httpx2.AsyncBaseTransport | None = None, *, dims: int = 1024,
                  interval_s: float = PROBE_INTERVAL_S) -> None:
@@ -162,6 +176,7 @@ class OllamaAi:
         self.dims = dims
         self.interval_s = interval_s
         self.embed_error: str | None = None
+        self.device: str | None = None      # chưa nạp mô hình nào lần nào: chưa biết
         self._state: dict[str, bool | None] = {"chat": None, "embed": None}     # None: chưa dò lần nào
         self._dims: int | None = None       # số chiều véc-tơ đầu tiên Ollama trả; None: chưa thấy véc-tơ nào
         self._http = httpx2.AsyncClient(base_url=url, timeout=10.0, transport=transport)
@@ -205,6 +220,25 @@ class OllamaAi:
             ok = model in names or f"{model}:latest" in names
             if self._set(kind, ok) and ok:
                 await self._preload(kind, model)
+        if any(self._state.values()):
+            await self._where()
+
+    async def _where(self) -> None:
+        """Mô hình đang nạp nằm ở đâu (``GET /api/ps``): ``size_vram`` bằng ``size`` là ``gpu``, bằng 0 là ``cpu``, ở
+        giữa là ``gpu+cpu`` (VRAM không đủ, Ollama chia lớp). Chưa nạp mô hình nào (hết ``keep_alive``) thì giữ kết quả
+        lần trước."""
+        try:
+            r = await self._http.get("/api/ps", timeout=5.0)
+            models = r.json().get("models") if r.status_code == 200 else None
+        except (httpx2.HTTPError, ValueError, AttributeError, TypeError):
+            return
+        size = vram = 0
+        for m in models if isinstance(models, list) else []:
+            total, gpu = (m.get("size"), m.get("size_vram")) if isinstance(m, dict) else (None, None)
+            if type(total) is int and type(gpu) is int and total > 0:
+                size, vram = size + total, vram + max(0, min(gpu, total))
+        if size:
+            self.device = "cpu" if vram == 0 else "gpu" if vram == size else "gpu+cpu"
 
     async def _preload(self, kind: str, model: str) -> None:
         # nạp trước chỉ để lần hỏi đầu nhanh hơn; lỗi thì lần gọi thật tự nạp
@@ -320,7 +354,144 @@ class OllamaAi:
         return ChatResult(content, None) if isinstance(content, str) else ChatResult(None, "model_rejected")
 
 
+class OpenAiChat:
+    """Bước sinh qua máy chủ nói chuẩn OpenAI (vLLM, llama.cpp, dịch vụ đám mây…). Chỉ có ``chat``; không nhúng."""
+
+    chat_where = "external"
+    embed_model: str | None = None
+    embed_error: str | None = "model_unavailable"
+    embed_available = False
+    device: str | None = None       # máy chủ ngoài: không biết mô hình chạy trên gì
+
+    def __init__(self, url: str, model: str, key: str = "", transport: httpx2.AsyncBaseTransport | None = None, *,
+                 interval_s: float = PROBE_INTERVAL_S) -> None:
+        self.chat_model = model or None
+        self.interval_s = interval_s
+        self._ready: bool | None = None
+        headers = {"Authorization": f"Bearer {key}"} if key else {}
+        self._http = httpx2.AsyncClient(base_url=url, timeout=10.0, transport=transport, headers=headers)
+
+    @property
+    def chat_available(self) -> bool:
+        return self.chat_model is not None and bool(self._ready)
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+    def _set(self, ok: bool, reason: str | None = None) -> None:
+        if ok != self._ready:
+            log.info(json.dumps({"event": "office.assist.ai_ready" if ok else "office.assist.ai_unavailable",
+                                 "kind": "chat", "model": self.chat_model, "where": "external",
+                                 **({"reason": reason} if reason else {})}, ensure_ascii=False))
+        self._ready = ok
+
+    async def probe(self) -> None:
+        """``GET /models`` trả 200 là dùng được. Không đòi mô hình có trong danh sách: có máy chủ chỉ liệt kê một
+        phần, hoặc gọi mô hình bằng bí danh."""
+        if self.chat_model is None:
+            return
+        try:
+            r = await self._http.get("/models", timeout=5.0)
+        except httpx2.HTTPError:
+            self._set(False, "unreachable")
+            return
+        self._set(r.status_code == 200, None if r.status_code == 200 else f"http {r.status_code}")
+
+    async def run(self) -> None:
+        while True:
+            try:
+                await self.probe()
+            except Exception as exc:  # noqa: BLE001 — vòng nền không được chết
+                log.warning(json.dumps({"event": "office.assist.ai_probe_failed", "error": str(exc)},
+                                       ensure_ascii=False))
+            await asyncio.sleep(self.interval_s)
+
+    async def embed(self, texts: Sequence[str], *, query: bool, timeout_s: float) -> list[list[float]] | None:
+        return None
+
+    async def chat(self, messages: list[dict[str, str]], *, format: dict[str, Any], options: dict[str, Any],
+                   timeout_s: float) -> ChatResult:
+        if not self.chat_available:
+            return ChatResult(None, "model_unavailable")
+        messages, masked = _masked(messages)
+        if masked:
+            log.warning(json.dumps({"event": "office.assist.pii_at_egress", "masked": masked}, ensure_ascii=False))
+        # strict: mọi khóa của schema đều bắt buộc, không thêm khóa lạ — đúng như grounding.FORMAT
+        schema = {**format, "additionalProperties": False}
+        body: dict[str, Any] = {
+            "model": self.chat_model, "messages": messages, "stream": False,
+            "response_format": {"type": "json_schema", "json_schema": {"name": "tra_loi", "strict": True,
+                                                                       "schema": schema}},
+        }
+        for ours, theirs in (("temperature", "temperature"), ("num_predict", "max_tokens"), ("seed", "seed")):
+            if ours in options:
+                body[theirs] = options[ours]
+        timeout_s = max(timeout_s, 0.1)
+        try:
+            r = await asyncio.wait_for(self._http.post("/chat/completions", json=body, timeout=timeout_s), timeout_s)
+        except (TimeoutError, httpx2.TimeoutException):
+            return ChatResult(None, "model_timeout")
+        except httpx2.HTTPError:
+            return ChatResult(None, "model_unavailable")
+        if r.status_code in (401, 403, 404):        # khóa sai, hết quyền, sai tên mô hình: lượt dò sau kiểm lại
+            self._set(False, f"http {r.status_code}")
+        if r.status_code != 200:
+            return ChatResult(None, "model_unavailable")
+        try:
+            content = r.json()["choices"][0]["message"]["content"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            return ChatResult(None, "model_rejected")
+        return ChatResult(content, None) if isinstance(content, str) else ChatResult(None, "model_rejected")
+
+
+class SplitAi:
+    """Nhúng ở Ollama tại chỗ (hoặc không nhúng), sinh qua API ngoài."""
+
+    chat_where = "external"
+
+    def __init__(self, embedder: AiClient, writer: OpenAiChat) -> None:
+        self.embedder = embedder
+        self.writer = writer
+        self.chat_model = writer.chat_model
+        self.embed_model = embedder.embed_model
+
+    @property
+    def embed_error(self) -> str | None:
+        return self.embedder.embed_error
+
+    @property
+    def chat_available(self) -> bool:
+        return self.writer.chat_available
+
+    @property
+    def embed_available(self) -> bool:
+        return self.embedder.embed_available
+
+    @property
+    def device(self) -> str | None:
+        """Nơi Ollama tại chỗ đặt mô hình nhúng (và mô hình trích yếu F4.1 nếu cùng máy); bước viết chạy ngoài."""
+        return self.embedder.device
+
+    async def embed(self, texts: Sequence[str], *, query: bool, timeout_s: float) -> list[list[float]] | None:
+        return await self.embedder.embed(texts, query=query, timeout_s=timeout_s)
+
+    async def chat(self, messages: list[dict[str, str]], *, format: dict[str, Any], options: dict[str, Any],
+                   timeout_s: float) -> ChatResult:
+        return await self.writer.chat(messages, format=format, options=options, timeout_s=timeout_s)
+
+    async def run(self) -> None:
+        await asyncio.gather(self.embedder.run(), self.writer.run())
+
+    async def aclose(self) -> None:
+        await self.embedder.aclose()
+        await self.writer.aclose()
+
+
 def make_ai(settings: Settings) -> AiClient:
+    if settings.ask_api == "openai":
+        embedder: AiClient = (OllamaAi(settings.ai_url, None, settings.ai_embed_model, dims=settings.ai_embed_dims)
+                              if settings.ai_url and settings.ai_embed_model else NullAi())
+        return SplitAi(embedder, OpenAiChat(settings.ask_api_url, settings.ask_model, settings.ask_api_key))
     if not settings.ai_url:
         return NullAi()
     return OllamaAi(settings.ai_url, settings.ask_model, settings.ai_embed_model or None,

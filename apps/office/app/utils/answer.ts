@@ -132,8 +132,13 @@ export function tidy(res: AskResult): AskResult {
   else out.route = ROUTES.includes(res.route) ? res.route : 'van_ban'
   if (typeof res.route_reason !== 'string') delete out.route_reason
   out.rewritten = typeof res.rewritten === 'string' && res.rewritten.trim() ? res.rewritten.trim() : null
+  // liên kết của đường dữ liệu: chỉ các trang danh sách đã biết, không bao giờ một URL máy chủ gửi tùy ý
+  out.link = typeof res.link === 'string' && DATA_LINKS.includes(res.link) ? res.link : null
   return out
 }
+
+// Trang xem danh sách mà đường dữ liệu đã đếm: Hộp việc (có Lịch hạn), văn bản đến, văn bản đi
+export const DATA_LINKS: readonly string[] = ['/', '/van-ban-den', '/van-ban-di']
 
 // --- bộ định tuyến, câu nối tiếp, gợi ý theo loại câu ----------------------------------------------------------------
 
@@ -155,8 +160,8 @@ export function generates(route: AskRoute | undefined): boolean {
 
 // Gợi ý ở trang trống, chia theo loại câu; mỗi câu đã thử qua bộ định tuyến của svc-files ra đúng đường của nhóm. Thứ
 // tự nhóm cũng là thứ tự dòng "Trợ lý trả lời được" khi không có căn cứ (assist.can.<đường>). Nhóm "Việc của tôi"
-// (viec_cua_toi, dem_van_ban) bật khi svc-files có hai đường dữ liệu: trước đó câu như vậy đi tìm trong văn bản
-export const DATA_ROUTES = false
+// (viec_cua_toi, dem_van_ban) bật khi svc-files có hai đường dữ liệu (#441)
+export const DATA_ROUTES = true
 export interface SuggestGroup { route: AskRoute; keys: readonly string[] }
 export const DATA_GROUP: SuggestGroup = {
   route: 'viec_cua_toi', keys: ['assist.suggest.overdue', 'assist.suggest.countIncoming'],

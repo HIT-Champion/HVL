@@ -22,6 +22,7 @@ Nâng tại chỗ từ `v1.2.1`; bản cài cũ còn đặt `MOC_TRUSTED_PROXY` 
 - Cảnh báo của Prometheus qua Alertmanager thành thông báo ở chuông (và kênh ngoài) của quản trị đơn vị (#284).
 - Wiki nội bộ DokuWiki ở `/wiki/` (profile `wiki`, tắt mặc định): đăng nhập Keycloak, mỗi đơn vị một không gian (#367).
 - Sổ đăng ký văn bản đến, đi xem và in bằng tiếng Anh khi người in chọn giao diện tiếng Anh (#398).
+- Dữ liệu công khai: 4 thông tư Bộ GD&ĐT từ Công báo, nạp khi `make seed`; trang trạng thái báo tuổi dữ liệu (#424).
 - Trang Dựng form cho quản trị đơn vị: khai trường, xem trước, tải tệp JSON Schema cho form của ứng dụng (#303).
 - Văn bản đi bằng tiếng Anh: người soạn chọn ngôn ngữ, PDF giữ thể thức NĐ 30 với phần cố định tiếng Anh (#398).
 - Giao diện tiếng Anh cho Đơn nghỉ phép, cả form dựng từ JSON Schema, chung ngôn ngữ với Văn phòng điện tử (#398).
@@ -30,6 +31,11 @@ Nâng tại chỗ từ `v1.2.1`; bản cài cũ còn đặt `MOC_TRUSTED_PROXY` 
 - Hướng dẫn vận hành bằng tiếng Anh `docs/van-hanh.en.md`; README.en.md trỏ sang bản này (#59).
 - Nhãn "Nguồn công khai" trên trang văn bản nạp từ nguồn mở; trang Trạng thái liệt kê nguồn và tuổi dữ liệu (#426).
 - Trang Hỏi đáp: gợi ý theo loại câu, câu nối tiếp, dòng "Đã hiểu là…", nói rõ trợ lý trả lời được gì (#422).
+- Trợ lý hỏi đáp viết câu trả lời qua API ngoài chuẩn OpenAI (`MOC_ASK_API=openai`, tắt mặc định), khóa qua két (#430).
+- Tùy chọn chạy mô hình bằng GPU NVIDIA (`MOC_AI_DEVICE=gpu`); `/api/status` báo mô hình nằm ở GPU hay CPU (#442).
+- Nguồn công khai B: lịch nghỉ lễ, Tết, nghỉ bù chính thức 2026–2027 cho hạn gợi ý giao việc, có bản chụp (#427).
+- Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn, từ chối câu ngoài phạm vi, ghép câu nối tiếp (#423).
+- Trợ lý hỏi đáp đếm việc trong Hộp việc và số văn bản bằng quyền người hỏi, không qua mô hình (#441).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).
