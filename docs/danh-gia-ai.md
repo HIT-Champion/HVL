@@ -367,7 +367,7 @@ theo "dãy số đủ dài". `services/svc-workflow/src/svc_workflow/pii.py` là
 - *Bắt đúng* trên bộ định dạng tổng hợp (`tests/test_pii.py`): 95 chỗ dương tính trong 84 chuỗi, 80 chuỗi âm tính khó
   (giấy tờ, ngày, tiền, UUID, mã số thuế, đầu số chưa cấp, dãy số nhỏ của bảng…), 1 144 ca đột biến dữ liệu vào —
   số theo README svc-files.
-- *Đột biến mã:* 15 bản sửa hỏng có chủ đích của `pii.py`, mỗi bản phải bị ít nhất một test bắt
+- *Đột biến mã:* 18 bản sửa hỏng có chủ đích của `pii.py`, mỗi bản phải bị ít nhất một test bắt
   (`tests/test_pii_mutation.py`).
 
 **Đo lại.** `make do-che-pii` (không cần Docker); trên stack: `make demo-che-pii` (nhật ký `apisix`, `app-office`,
