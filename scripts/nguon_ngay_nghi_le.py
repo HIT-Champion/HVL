@@ -178,13 +178,12 @@ def paragraphs(page: bytes) -> list[str]:
 
 
 def quote(page: bytes, needles: list[str]) -> str:
-    """Câu trích: các đoạn có ít nhất một chuỗi cần kiểm. Thiếu chuỗi nào trên trang thì ValueError."""
-    paras = paragraphs(page)
-    missing = [n for n in needles if not any(n in p for p in paras)]
+    """Câu trích: các đoạn có ít nhất một chuỗi cần kiểm. Chuỗi nào không có trong câu trích thì ValueError."""
+    # đoạn ngắn hơn thế này là tiêu đề, chú thích ảnh lặp lại câu dài hơn
+    kept = [p for p in paragraphs(page) if len(p) >= 40 and any(n in p for n in needles)]
+    missing = [n for n in needles if not any(n in p for p in kept)]
     if missing:
         raise ValueError("trang không còn " + ", ".join(repr(m) for m in missing))
-    # đoạn ngắn hơn thế này là tiêu đề, chú thích ảnh lặp lại câu dài hơn
-    kept = [p for p in paras if len(p) >= 40 and any(n in p for n in needles)]
     return "\n\n".join(textwrap.fill(p, WIDTH, break_long_words=False, break_on_hyphens=False) for p in kept)
 
 
@@ -274,9 +273,15 @@ def main(argv: list[str]) -> int:
             return 1
         (work / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
                                             encoding="utf-8")
+        # chép cạnh bản cũ rồi mới đổi tên: lỗi khi chép thì bản cũ còn nguyên
+        fresh = target.with_name(target.name + ".moi")
+        old = target.with_name(target.name + ".cu")
+        shutil.rmtree(fresh, ignore_errors=True)
+        shutil.copytree(work, fresh)
         if target.exists():
-            shutil.rmtree(target)
-        shutil.copytree(work, target)
+            target.rename(old)
+        fresh.rename(target)
+        shutil.rmtree(old, ignore_errors=True)
     print(f"{NGUON}: {len(manifest['files'])} tệp, lấy {manifest['fetched_at']} → {target}")
     return 0
 

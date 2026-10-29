@@ -173,7 +173,8 @@ Mỗi `MOC_SUGGEST_POLL_INTERVAL_S` giây dịch vụ nhận tối đa 5 việc 
    `no_similar`/`no_history`/`no_valid_unit`;
 5. hạn: trung vị (thấp) số ngày từ lúc vào sổ (giờ VN) tới hạn của các căn cứ ủng hộ, chỉ tính 1..365 ngày; hạn đề xuất
    = ngày vào sổ + số ngày, sớm nhất là ngày mai, rơi vào thứ Bảy, Chủ nhật (trừ ngày làm bù) hay ngày lễ
-   (`MOC_HOLIDAYS`, `MOC_HOLIDAYS_FILE`) thì sang ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
+   (`MOC_HOLIDAYS`, `MOC_HOLIDAYS_FILE`) thì sang ngày làm việc kế tiếp. Văn bản đã ghi hạn giải quyết thì không
+   gợi ý hạn — hạn trên văn bản thắng thói quen nội bộ;
 6. lưu dòng `office.assignment_suggestions` (căn cứ chỉ có id, điểm, đơn vị, số ngày) và một dòng sổ
    `assignment.suggested` trong **cùng một mutation**, bằng vai trò `agent` danh tính `MOC_ASSIGNER_ID` (preset ép thuê
    ước, `agent_id`, `actor_id`, `actor_kind = agent`), mã yêu cầu `goi-y:<id việc>`. `diff` có đúng 9 khóa vô hướng:
@@ -202,12 +203,12 @@ mục F4.3.
 Bảy làm bù đổi theo năm: dịch vụ đọc thêm lịch nghỉ chính thức của nguồn công khai B (`MOC_HOLIDAYS_FILE`, #427), bản
 chụp `seed/du-lieu-mo/ngay-nghi-le/ngay-nghi.json` gắn chỉ đọc vào `/app/du-lieu-mo/ngay-nghi-le/`. Tệp có `fixed`
 (`MM-DD` hằng năm), `days_off` (khoảng `from`..`to`), `workdays` (thứ Bảy, Chủ nhật làm bù: ngày làm việc, trừ khi
-cũng là ngày lễ). Năm tệp chưa có thì người vận hành thêm vào `MOC_HOLIDAYS` theo lịch nghỉ Chính
-phủ công bố, rồi tạo lại container svc-workflow. Lấy mới tệp: `python3 scripts/nguon_ngay_nghi_le.py`
+cũng là ngày lễ). Năm tệp chưa có thì người vận hành thêm vào `MOC_HOLIDAYS` theo lịch nghỉ Chính phủ công bố, rồi
+tạo lại container svc-workflow. Lấy mới tệp: `python3 scripts/nguon_ngay_nghi_le.py`
 ([`docs/van-hanh.md`](../../docs/van-hanh.md), mục Lịch nghỉ lễ chính thức). Sai dạng, ngày không có thật, khoảng
 ngược hay dài quá 31 ngày — ở biến hay ở tệp — thì dịch vụ dừng lúc khởi động; không có tệp thì chỉ còn
-`MOC_HOLIDAYS`. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã
-lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình (`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
+`MOC_HOLIDAYS`. Đổi biến chỉ áp cho gợi ý mới, gợi ý đã lưu giữ nguyên hạn cũ. Thời hạn từng bước của quy trình
+(`MOC_SLA_DURATION`) vẫn đếm theo đồng hồ, không trừ ngày nghỉ.
 
 Giới hạn: lịch nghỉ chính thức chỉ có các năm đã công bố (bản chụp hiện tới hết 2027, chưa có Giỗ Tổ 2027) và là
 lịch của cán bộ, công chức, viên chức — đơn vị nghỉ khác thì sửa `MOC_HOLIDAYS`; chỉ gợi ý đơn vị chủ trì và

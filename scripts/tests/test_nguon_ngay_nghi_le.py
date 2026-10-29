@@ -15,8 +15,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Nguồn công khai B (#427, scripts/nguon_ngay_nghi_le.py): bản chụp seed/du-lieu-mo/ngay-nghi-le khớp manifest
-(SHA-256, byte) và khớp bảng PAGES/FIXED; lấy mới bằng trang giả kiểm đủ ngày, thiếu ngày thì lỗi; lỗi thì giữ bản chụp cũ.
-Không gọi mạng. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
+(SHA-256, byte) và khớp bảng PAGES/FIXED; lấy mới bằng trang giả kiểm đủ ngày, thiếu ngày thì lỗi; lỗi thì giữ bản
+chụp cũ. Không gọi mạng. Chạy: python3 -m unittest discover -s scripts/tests (make test)."""
 
 from __future__ import annotations
 
@@ -139,6 +139,12 @@ class FetchTest(unittest.TestCase):
         spec = nguon.PAGES[-1]
         with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(ValueError, spec["url"]):
             nguon.lay(pathlib.Path(tmp), fetch=_fake_fetch(drop=spec["items"][1][5][0]))
+
+    def test_a_date_only_in_a_short_heading_does_not_count(self) -> None:
+        # đoạn < 40 ký tự (tiêu đề, chú thích ảnh) không vào câu trích, nên cũng không làm căn cứ cho ngày
+        page = "<h2>Nghỉ 16/02/2026</h2><p>Bài này nói về lịch nghỉ nhưng không ghi lại ngày nào cả.</p>".encode()
+        with self.assertRaisesRegex(ValueError, "16/02/2026"):
+            nguon.quote(page, ["16/02/2026"])
 
     def test_main_keeps_the_old_snapshot_when_fetching_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
