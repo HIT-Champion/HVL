@@ -431,6 +431,8 @@ services:
       - openbao_svc_files:/run/openbao:ro
       # #424 — bản chụp nguồn dữ liệu công khai (manifest, SHA-256): /api/status báo nguồn gốc, tuổi dữ liệu
       - ./seed/du-lieu-mo:/srv/du-lieu-mo:ro
+      # #423 — trợ lý hỏi đáp trả lời câu hỏi cách dùng từ hướng dẫn sử dụng (MOC_ASK_GUIDE_DIR, mặc định thư mục này)
+      - ./docs/huong-dan:/app/huong-dan:ro
     # F3.7 — tệp tải lên quá 1 MB được đệm ra /tmp trước khi quét, mã hóa: để trong RAM, bản rõ của văn bản hạn chế
     # không xuống đĩa. Đủ cho vài lượt tải song song cỡ MOC_FILES_MAX_MB.
     tmpfs:

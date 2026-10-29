@@ -293,7 +293,7 @@ van-ban-mau: $(ENV_FILE) ## Sinh lại văn bản đến mẫu seed/van-ban-den 
 demo-hoi-dap: $(ENV_FILE) ## Màn hỏi đáp trên kho văn bản (F4.2): trợ lý trả câu trích kèm số ký hiệu, trang; chỉ trong văn bản người hỏi được xem; văn bản hạn chế không vào chỉ mục; sổ kiểm toán không có câu hỏi (docs/demo-script.md)
 	@python3 scripts/demo.py hoi-dap
 
-do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm hoặc recall@3 dưới ngưỡng)
+do-hoi-dap: $(ENV_FILE) ## Đo trợ lý hỏi đáp trên bộ câu hỏi seed/hoi-dap/cau-hoi.json: recall@3, từ chối đúng, đường theo loại câu, thời gian; có profile ai thì đo cả câu trả lời của mô hình (thoát 1 khi có nguồn bị cấm, recall@3 dưới ngưỡng hoặc câu đi sai đường)
 	@python3 scripts/demo.py do-hoi-dap
 
 hoi-dap-mau: $(ENV_FILE) ## Sinh lại kho văn bản mẫu nhiều trang seed/hoi-dap (PDF, cau-hoi.json) trong container svc-files (cần make up)

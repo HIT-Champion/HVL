@@ -57,19 +57,25 @@ class AskIn(BaseModel):
                           "hỏi không được xem, văn bản hạn chế hay không có thì trả `no_evidence` như mọi lượt")
     ask_id: uuid.UUID | None = Field(None, description="Gửi lại `ask_id` của lượt extract ở lượt generate: hai dòng "
                                                        "sổ kiểm toán cùng một câu hỏi")
+    previous: str | None = Field(
+        None, max_length=MAX_BODY_QUESTION,
+        description="Câu hỏi của lượt ngay trước trong cùng phạm vi (`rewritten` của lượt đó nếu có), để hiểu câu nối "
+                    "tiếp như \"Còn khoa Kinh tế thì sao?\". Máy chủ không lưu; sai dạng thì bị bỏ qua",
+        examples=["Điều kiện xét học bổng khoa CNTT là gì?"])
 
 
 class AskAnswer(BaseModel):
     text: str = Field(description="Chữ thuần; mỗi ý kèm [n] trỏ tới `sources[n-1]`. Giao diện hiển thị như chữ, "
                                   "không như HTML")
-    source: Literal["extract", "model"] = Field(description="extract: câu trích nguyên văn · model: mô hình viết, máy "
-                                                            "chủ kiểm và gán [n] theo bằng chứng")
+    source: Literal["extract", "model", "fixed", "data"] = Field(
+        description="extract: câu trích nguyên văn · model: mô hình viết, máy chủ kiểm và gán [n] theo bằng chứng · "
+                    "fixed: câu cố định cho câu hỏi ngoài phạm vi · data: câu có số từ dữ liệu của người hỏi")
     model: str | None = Field(description="Mô hình đã viết câu trả lời; null với câu trích")
 
 
 class AskSource(BaseModel):
     n: int = Field(description="Số trong dấu [n], từ 1")
-    document_id: uuid.UUID
+    document_id: uuid.UUID | None = Field(description="null với nguồn `guide`")
     symbol: str | None
     type_code: str | None
     type_name: str | None
@@ -78,14 +84,18 @@ class AskSource(BaseModel):
     issued_on: date | None
     direction: Literal["in", "out"] | None
     status: str | None
-    kind: Literal["page", "meta"] = Field(description="page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, "
-                                                      "chưa có tệp, tệp không đọc được chữ)")
+    kind: Literal["page", "meta", "guide"] = Field(
+        description="page: đoạn chữ của tệp · meta: chỉ có trích yếu (bản scan, chưa có tệp, tệp không đọc được chữ) · "
+                    "guide: mục của hướng dẫn sử dụng hay của Giới thiệu trợ lý; `symbol` là tên tài liệu, `summary` "
+                    "là tiêu đề mục")
     file_id: uuid.UUID | None
     file_role: Literal["main", "attachment", "issued"] | None = Field(
         description="main: bản chính · attachment: tài liệu kèm theo · issued: bản phát hành văn bản đi")
     page: int | None = Field(description="Trang trong tệp; null với đoạn meta hoặc chữ chưa có ranh giới trang")
     excerpt: str = Field(description="Đoạn trích ≤ 600 ký tự quanh câu khớp nhất")
     cited: bool = Field(description="Câu trả lời có trích nguồn này")
+    path: str | None = Field(None, description="Chỉ nguồn `guide`: tệp trong repo kèm neo mục, vd "
+                                               "`docs/huong-dan/viec-chung.md#đơn-nghỉ-phép`")
 
 
 class AskOut(BaseModel):
@@ -102,6 +112,14 @@ class AskOut(BaseModel):
     warnings: list[Literal["embed_unavailable", "model_unavailable", "model_timeout", "model_rejected",
                            "model_declined"]]
     duration_ms: int
+    route: Literal["van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi"] = Field(
+        description="Đường bộ định tuyến đã chọn: van_ban: tìm trong kho văn bản · gioi_thieu: câu về chính trợ lý, "
+                    "câu chào · huong_dan: cách dùng Signet, trả lời từ hướng dẫn sử dụng · ngoai_pham_vi: câu cố "
+                    "định, không tìm. gioi_thieu, ngoai_pham_vi không gọi mô hình, cả khi mode=generate")
+    route_reason: str = Field(description="Mã lý do, máy đọc: `kw:<mẫu>` (mẫu đã khớp) hoặc `mac-dinh`",
+                              examples=["kw:lam-duoc-gi"])
+    rewritten: str | None = Field(description="Câu nối tiếp đã ghép với `previous` thành câu độc lập — câu đem đi tìm. "
+                                              "null khi không phải câu nối tiếp")
 
 
 ASK_RESPONSES: dict[int | str, dict[str, object]] = {

@@ -40,7 +40,8 @@ ACTION = "assistant.answered"
 ENTITY = "ai.questions"
 ROLE = "agent"
 DIFF_KEYS = ("user_id", "ask_id", "mode", "status", "answer_source", "hits", "cited", "documents", "semantic",
-             "model", "embed_model", "duration_ms", "warnings", "model_where")
+             "model", "embed_model", "duration_ms", "warnings", "route", "route_reason", "followup",
+             "model_where")
 
 
 class _Hasura(Protocol):

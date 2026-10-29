@@ -26,6 +26,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Trợ lý hỏi đáp viết câu trả lời qua API ngoài chuẩn OpenAI (`MOC_ASK_API=openai`, tắt mặc định), khóa qua két (#430).
 - Tùy chọn chạy mô hình bằng GPU NVIDIA (`MOC_AI_DEVICE=gpu`); `/api/status` báo mô hình nằm ở GPU hay CPU (#442).
 - Nguồn công khai B: lịch nghỉ lễ, Tết, nghỉ bù chính thức 2026–2027 cho hạn gợi ý giao việc, có bản chụp (#427).
+- Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn, từ chối câu ngoài phạm vi, ghép câu nối tiếp (#423).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).

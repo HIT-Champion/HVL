@@ -62,9 +62,11 @@ hệ thống đang chạy (cần make seed trước). Chỉ dùng thư viện ch
         được xem; nội dung văn bản hạn chế không ai hỏi ra; sổ kiểm toán ghi lượt hỏi của tác tử, không có câu hỏi,
         câu trả lời; bật profile ai thì mô hình viết câu trả lời có trích dẫn. (make demo-hoi-dap)
     python3 scripts/demo.py do-hoi-dap
-        Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi): bảng trạng thái, nguồn top-3, đúng /
-        sai, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1
-        khi có nguồn bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), hoặc recall@3 dưới ngưỡng. (make do-hoi-dap)
+        Đo trợ lý trên mọi câu trong seed/hoi-dap/cau-hoi.json (đúng người hỏi, câu nối tiếp kèm câu trước): bảng
+        trạng thái, nguồn top-3, đúng / sai, đường, từ khóa, thời gian; recall@3, tỉ lệ từ chối đúng của câu van_ban;
+        đường đúng, trả lời đúng theo loại câu; có mô hình thì đo thêm câu trả lời của mô hình. Thoát 1 khi có nguồn
+        bị cấm ở bất kỳ câu nào (quyền, văn bản hạn chế), recall@3 dưới ngưỡng, hoặc một câu đi sai đường hay trả lời
+        sai ở đường tất định (giới thiệu, hướng dẫn, ngoài phạm vi). (make do-hoi-dap)
     python3 scripts/demo.py giao-viec
         Gợi ý giao việc (F4.3, không cần mô hình): văn thư nạp lịch sử giao việc mẫu seed/giao-viec; văn bản mới vào sổ
         thì lãnh đạo khoa có việc chỉ đạo ngay, vài giây sau tác tử moc-assigner gợi ý đơn vị chủ trì và hạn kèm căn
@@ -1629,6 +1631,10 @@ REFUSED = ("no_evidence", "passages_only")
 # Ngưỡng của make do-hoi-dap: recall@3 trên các câu dương — chốt lại sau lần đo đầu trên bản cài (số đo ghi ở
 # services/svc-files/README.md). Câu quyền, câu hạn chế có nguồn bị cấm thì luôn là lỗi
 RECALL_MIN = 0.8
+# Loại câu trả lời không qua tìm kiếm (kho tĩnh trong svc-files, câu cố định): sai một câu là lỗi, không có ngưỡng
+FIXED_TYPES = ("gioi_thieu", "huong_dan", "ngoai_pham_vi")
+# Đường không gọi lượt generate: trang Hỏi đáp cũng không gọi (hợp đồng API trợ lý, #423)
+NO_GENERATE = ("gioi_thieu", "ngoai_pham_vi")
 # Trưởng đơn vị phân công người xử lý sau khi lãnh đạo khoa giao (seed/users.csv); tên đơn vị trong ý kiến chỉ đạo
 MANAGERS = {"ĐT": "totruongdt", "KTPM": "truongbmktpm"}
 UNIT_NAMES = {"ĐT": "Tổ Đào tạo", "KTPM": "Bộ môn Kỹ thuật phần mềm", "HTTT": "Bộ môn Hệ thống thông tin",
@@ -1682,7 +1688,10 @@ def source_label(src: dict[str, Any]) -> str:
 
 def matches(src: dict[str, Any], want: dict[str, Any]) -> bool:
     """Nguồn khớp một đáp án: cùng số ký hiệu (văn bản đi lấy số lúc phát hành, không biết trước: trích yếu chứa
-    chuỗi cho trước) và cùng trang; đoạn "trích yếu" không có trang nên không khớp đáp án có trang."""
+    chuỗi cho trước) và cùng trang; đoạn "trích yếu" không có trang nên không khớp đáp án có trang. Đáp án ``guide``
+    (câu giới thiệu, hướng dẫn, #423): nguồn ``kind`` guide có đúng đường dẫn tệp kèm neo mục."""
+    if "guide" in want:
+        return src.get("kind") == "guide" and src.get("path") == want["guide"]
     if "symbol" in want:
         same = same_symbol(src.get("symbol"), want["symbol"])
     else:
@@ -1727,7 +1736,14 @@ def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, r
     positive = isinstance(expect, list)
     rank = hit_rank(sources, expect)
     status = result.get("status") or "?"
+    loai = question.get("loai", "van_ban")
+    route_ok = result.get("route", "van_ban") == question.get("route", "van_ban")
+    if loai == "noi_tiep":
+        route_ok = route_ok and result.get("rewritten") is not None     # câu nối tiếp phải được ghép
+    elif loai == "ngoai_pham_vi":
+        route_ok = route_ok and (result.get("answer") or {}).get("source") == "fixed"
     return {"id": question["id"], "user": question["user"], "question": question["question"], "positive": positive,
+            "loai": loai, "route": result.get("route"), "route_ok": route_ok,
             "status": status, "top": [source_label(s) for s in sources[:TOP]], "rank": rank,
             "correct": (rank is not None and rank <= TOP) if positive else status in REFUSED,
             "keywords": keywords_in(answer_text(result), question.get("keywords", [])) if positive else None,
@@ -1760,8 +1776,10 @@ def percentile(values: list[float], p: float) -> float | None:
 
 
 def summarize(rows: list[dict]) -> dict[str, Any]:
-    pos = [r for r in rows if r["positive"]]
-    neg = [r for r in rows if not r["positive"]]
+    """recall@3, từ chối đúng tính trên câu ``van_ban`` (bộ cũ, ngưỡng RECALL_MIN); các loại khác đếm riêng ở
+    ``by_type``: đường đúng, câu trả lời đúng."""
+    pos = [r for r in rows if r["positive"] and r["loai"] == "van_ban"]
+    neg = [r for r in rows if not r["positive"] and r["loai"] == "van_ban"]
     gen = [r for r in rows if r["model"]]
     gen_pos = [r for r in gen if r["positive"]]
     violations = [f"{r['id']} ({r['user']}): {', '.join(r['forbidden'])}" for r in rows if r["forbidden"]]
@@ -1774,7 +1792,13 @@ def summarize(rows: list[dict]) -> dict[str, Any]:
         "no_evidence": sum(r["status"] == "no_evidence" for r in neg), "guarded": sum(r["guarded"] for r in rows),
         "violations": violations, "semantic": sum(r["semantic"] for r in rows), "asked": len(rows),
         "p50": percentile([r["seconds"] for r in rows], 50), "p95": percentile([r["seconds"] for r in rows], 95),
-        "server_p50": percentile(server, 50), "server_p95": percentile(server, 95), "model": None}
+        "server_p50": percentile(server, 50), "server_p95": percentile(server, 95), "model": None,
+        "by_type": {loai: {"asked": sum(r["loai"] == loai for r in rows),
+                           "route_ok": sum(r["route_ok"] for r in rows if r["loai"] == loai),
+                           "correct": sum(r["correct"] for r in rows if r["loai"] == loai)}
+                    for loai in dict.fromkeys(r["loai"] for r in rows)},
+        "route_errors": [f"{r['id']} ({r['loai']}): {r['route']}" for r in rows if not r["route_ok"]],
+        "type_errors": [r["id"] for r in rows if r["loai"] in FIXED_TYPES and r["route_ok"] and not r["correct"]]}
     if gen:
         out["model"] = {
             "asked": len(gen), "by_model": sum(r["model"]["by_model"] for r in gen), "positives": len(gen_pos),
@@ -1789,8 +1813,12 @@ def summarize(rows: list[dict]) -> dict[str, Any]:
 
 
 def verdict(summary: dict[str, Any]) -> list[str]:
-    """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN."""
+    """Lý do thoát 1 (rỗng: đạt): mọi nguồn bị cấm; recall@3 câu dương dưới RECALL_MIN; bộ định tuyến chọn sai đường
+    hay không ghép câu nối tiếp; câu giới thiệu, hướng dẫn, ngoài phạm vi trả lời sai (các đường này tất định)."""
     problems = [f"nguồn bị cấm — {v}" for v in summary["violations"]]
+    problems += [f"đường sai — {e}" for e in summary.get("route_errors", [])]
+    if summary.get("type_errors"):
+        problems.append(f"sai câu trả lời tất định — {', '.join(summary['type_errors'])}")
     if summary["positives"] and summary["recall"] < RECALL_MIN * summary["positives"]:
         problems.append(f"recall@3 {summary['recall']}/{summary['positives']} dưới ngưỡng {RECALL_MIN:.0%}")
     return problems
@@ -1822,12 +1850,16 @@ def result_table(rows: list[dict]) -> str:
     return "\n".join(out)
 
 
-def ask(session: Session, question: str, *, mode: str = "extract", ask_id: str | None = None) -> tuple[dict, float]:
+def ask(session: Session, question: str, *, mode: str = "extract", ask_id: str | None = None,
+        previous: str | None = None) -> tuple[dict, float]:
     """POST /api/documents/ask qua APISIX bằng token người hỏi → (kết quả, số giây). Token hết hạn giữa lượt đo dài
-    thì đăng nhập lại một lần; hết lượt sinh (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần."""
+    thì đăng nhập lại một lần; hết lượt sinh (503 busy) thì đợi như Retry-After rồi gọi lại, tối đa ba lần.
+    ``previous``: câu hỏi lượt trước, cho câu nối tiếp."""
     body: dict[str, Any] = {"question": question, "mode": mode}
     if ask_id:
         body["ask_id"] = ask_id
+    if previous:
+        body["previous"] = previous
     attempts = 0
     while True:
         started = time.monotonic()
@@ -2074,25 +2106,30 @@ def do_hoi_dap() -> None:
     for q in data["questions"]:
         session = who(q["user"])
         try:
-            got, seconds = ask(session, q["question"])
+            got, seconds = ask(session, q["question"], previous=q.get("previous"))
         except (HTTPError, OSError) as exc:
             got, seconds = {"status": failure(exc)}, 0.0
         row = score(q, got, seconds, restricted=sealed)
-        if got.get("ai_available") and got.get("status") not in (None, "no_evidence"):
+        if got.get("ai_available") and got.get("status") not in (None, "no_evidence") \
+                and got.get("route") not in NO_GENERATE:
             try:
-                gen, gen_seconds = ask(session, q["question"], mode="generate", ask_id=got.get("ask_id"))
+                gen, gen_seconds = ask(session, q["question"], mode="generate", ask_id=got.get("ask_id"),
+                                       previous=q.get("previous"))
             except (HTTPError, OSError) as exc:
                 gen, gen_seconds = {"status": failure(exc)}, 0.0
             row["model"] = score_model(q, gen, gen_seconds, restricted=sealed)
         rows.append(row)
         print(f"   {q['id']} {q['user']:<14} {row['status']:<14} {'✓' if row['correct'] else '✗'}"
-              f" {seconds:4.1f} s  {'; '.join(row['top']) or '—'}")
+              f" {row['route'] or '?'}{'' if row['route_ok'] else ' ✗đường'} {seconds:4.1f} s"
+              f"  {'; '.join(row['top']) or '—'}")
 
     s = summarize(rows)
     print("\n" + result_table(rows))
-    print(f"\nrecall@3 (câu dương): {s['recall']}/{s['positives']} · câu trích có từ khóa:"
+    print(f"\nrecall@3 (câu dương van_ban): {s['recall']}/{s['positives']} · câu trích có từ khóa:"
           f" {s['keywords']}/{s['positives']} · từ chối đúng (câu âm, câu bị cấm không được trả lời):"
           f" {s['refused']}/{s['negatives']}, trong đó no_evidence {s['no_evidence']}")
+    print("theo loại (đường đúng · trả lời đúng / số câu): " + " · ".join(
+        f"{loai} {t['route_ok']}·{t['correct']}/{t['asked']}" for loai, t in s["by_type"].items()))
     print(f"an toàn: {len(s['violations'])} lượt có nguồn bị cấm ({s['guarded']} câu có danh sách cấm, văn bản hạn chế"
           f" {', '.join(sealed)} cấm ở mọi câu) · tìm theo nghĩa {s['semantic']}/{s['asked']} lượt")
     print(f"thời gian extract: p50 {s['p50']:.1f} s, p95 {s['p95']:.1f} s"
@@ -2109,7 +2146,8 @@ def do_hoi_dap() -> None:
     problems = verdict(s)
     if problems:
         raise DemoFailed("; ".join(problems))
-    print(f"\n✓ không nguồn bị cấm nào; recall@3 {s['recall']}/{s['positives']} ≥ {RECALL_MIN:.0%}")
+    print(f"\n✓ không nguồn bị cấm nào; mọi câu đi đúng đường; recall@3 {s['recall']}/{s['positives']}"
+          f" ≥ {RECALL_MIN:.0%}")
 
 
 # --- F4.3 · Gợi ý giao việc -----------------------------------------------------------------------------------------
