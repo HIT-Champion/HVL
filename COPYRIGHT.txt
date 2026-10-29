@@ -89,7 +89,7 @@ Nuxt                            4.6.2           MIT                     Khung �
 Vue                             3.5             MIT                     Thư viện giao diện                        https://vuejs.org
 oidc-client-ts                  3.5.0           Apache-2.0              Đăng nhập OIDC                            https://github.com/authts/oidc-client-ts
 Swagger UI (swagger-ui-dist)    5.33.2          Apache-2.0              Trang Tài liệu API /tai-lieu-api/         https://github.com/swagger-api/swagger-ui
-vue-i18n                        11.4.13         MIT                     Song ngữ Việt / Anh                       https://vue-i18n.intlify.dev
+vue-i18n                        11.4.14         MIT                     Song ngữ Việt / Anh                       https://vue-i18n.intlify.dev
 Tailwind CSS (+                 4.3.3           MIT                     Định dạng giao diện                       https://tailwindcss.com
 @tailwindcss/vite)
 Ajv                             8.20.0          MIT                     Biên dịch JSON Schema dùng chung          https://ajv.js.org
