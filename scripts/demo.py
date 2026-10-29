@@ -971,6 +971,16 @@ def ngsi(path: str, tenant: str) -> tuple[int, Any]:
         return int(code) if code.isdigit() else 0, body
 
 
+def ngsi_points(history: Any, attr: str) -> set[tuple[Any, Any]]:
+    """(giá trị, giờ đo) của ``attr`` trong một thực thể của temporal API. Bản JSON-LD rút gọn trả một đối tượng thay vì
+    danh sách khi lịch sử mới có một lần đo (broker ghi lịch sử bất đồng bộ, #432)."""
+    items = history.get(attr, []) if isinstance(history, dict) else []
+    if isinstance(items, dict):
+        items = [items]
+    return {(v.get("value"), v.get("observedAt")) for v in items if isinstance(v, dict)} \
+        if isinstance(items, list) else set()
+
+
 def ot_drafts(staff: Session, sensor: str) -> list[dict[str, Any]]:
     return staff.gql(OT_DRAFTS, {"sensor": {"sensor": sensor}})["office_documents"]
 
@@ -1051,8 +1061,7 @@ def it_ot() -> None:
     deadline = time.monotonic() + 30
     while True:
         code, history = ngsi(f"/temporal/entities/{sensor}?attrs=temperature&lastN=50", tenant)
-        points = {(v.get("value"), v.get("observedAt")) for v in (history or {}).get("temperature", [])} \
-            if code == 200 and isinstance(history, dict) else set()
+        points = ngsi_points(history, "temperature") if code == 200 else set()
         if want <= points:
             break
         if time.monotonic() > deadline:
