@@ -259,12 +259,12 @@ của chúng chỉ in ra, không làm đỏ.
   lượt có nguồn bị cấm. Theo loại (đường đúng · trả lời đúng / số câu): `van_ban` 19 · 19 / 19, `noi_tiep` 5 · 5 / 5,
   `gioi_thieu` 6 · 6 / 6, `huong_dan` 5 · 5 / 5, `ngoai_pham_vi` 6 · 6 / 6, `viec_cua_toi` 5 · 5 / 5, `dem_van_ban`
   5 · 5 / 5. svc-files tự đo `extract` p50 14 ms, p95 62 ms.
-- 30/10/2026, CI, không bật `ai`, bộ 54 câu, kho có thêm 4 thông tư thật của nguồn A (#424) mà `make seed` nạp (job
-  "Chạy thử: ai" run 40964633417 của PR #447): recall@3 16 / 16, câu trích có từ khóa 15 / 16, **từ chối đúng 1 / 3**:
-  q17, q18 nay nhận đoạn không liên quan của các thông tư (`answered`), chỉ q19 (câu quyền) còn `no_evidence`; 0 lượt
-  có nguồn bị cấm. Theo loại: `van_ban` 19 · 17 / 19, `cong_khai` 2 · 2 / 2 (c01, c03 nguồn đúng đứng đầu), `noi_tiep`
-  6 · 6 / 6 (c02 nguồn đúng thứ 2), các loại khác như lần trước. svc-files tự đo `extract` p50 20 ms, p95 70 ms. Sửa
-  từ chối: #448.
+- 30/10/2026, CI, không bật `ai`, bộ 54 câu, kho có thêm 4 thông tư thật của nguồn A (#424) mà `make seed` nạp; lần
+  trên đo trước khi #431 vào nên kho chưa có các thông tư này (job "Chạy thử: ai" run 40964633417 của PR #447):
+  recall@3 16 / 16, câu trích có từ khóa 15 / 16, **từ chối đúng 1 / 3**: q17, q18 nay nhận đoạn không liên quan của
+  các thông tư (`answered`), chỉ q19 (câu quyền) còn `no_evidence`; 0 lượt có nguồn bị cấm. Theo loại: `van_ban` 19 ·
+  17 / 19, `cong_khai` 2 · 2 / 2 (c01, c03 nguồn đúng đứng đầu), `noi_tiep` 6 · 6 / 6 (c02 nguồn đúng thứ 2), các loại
+  khác như lần trước. svc-files tự đo `extract` p50 20 ms, p95 70 ms. Sửa từ chối: #448.
 
 - Lần đo 23/10 chạy trên chính máy B, gọi qua địa chỉ công khai của bản online (`MOC_PUBLIC_URL`), nên thời gian phía
   người gọi gồm cả đường mạng; trước khi đo, chờ svc-files nhúng xong các đoạn tồn (`embed_pending` = 0) để việc nhúng
