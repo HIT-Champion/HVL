@@ -467,6 +467,8 @@ services:
       MOC_ASSIGNER_ID: ${MOC_ASSIGNER_ID:-moc-assigner}
       # ngày lễ hạn gợi ý phải tránh, ngoài thứ Bảy, Chủ nhật (cú pháp ở .env.example); để trống thì như mặc định
       MOC_HOLIDAYS: ${MOC_HOLIDAYS:-01-01,04-30,05-01,09-02}
+      # lịch nghỉ chính thức (nguồn công khai B, #427): seed/du-lieu-mo/ngay-nghi-le gắn ở volumes; rỗng thì tắt
+      MOC_HOLIDAYS_FILE: ${MOC_HOLIDAYS_FILE-/app/du-lieu-mo/ngay-nghi-le/ngay-nghi.json}
       MOC_KEYCLOAK_URL: http://keycloak:8080
       MOC_REALM: ${MOC_REALM:-moc}
       # Thông báo đa kênh: ngoài chuông trên web, gửi email (SMTP), webhook (Mattermost, Slack, ntfy), SMS, Zalo qua
@@ -490,6 +492,7 @@ services:
       TZ: ${MOC_TIMEZONE:-Asia/Ho_Chi_Minh}
     volumes:
       - ./services/svc-workflow/processes:/app/processes:ro
+      - ./seed/du-lieu-mo/ngay-nghi-le:/app/du-lieu-mo/ngay-nghi-le:ro
       - openbao_svc_workflow:/run/openbao:ro
     depends_on:
       # restart: két được dựng lại (vd đổi bí mật trong .env) thì dịch vụ khởi động lại, lấy bí mật mới
