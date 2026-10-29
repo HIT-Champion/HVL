@@ -620,7 +620,11 @@ services:
       GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/cong-api.json
     mem_limit: 512m
-    # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ
+    # không giữ trạng thái: không tài khoản, bảng điều khiển nạp từ tệp — dựng lại container là như cũ. CSDL SQLite
+    # của Grafana để trong RAM: mỗi lần dựng lại chạy ~800 migration, đĩa đồng bộ chậm (WSL2) mất 3 phút, quá hạn
+    # healthcheck (#417)
+    tmpfs:
+      - /var/lib/grafana:size=64m
     volumes:
       - ./platform/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./platform/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro

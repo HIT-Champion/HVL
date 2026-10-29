@@ -21,6 +21,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Tự động hóa Node-RED ở `/tu-dong/` (profile `tu-dong`, tắt mặc định): đăng nhập Keycloak, chỉ người vận hành (#366).
 - Robot của đơn vị cho flow Node-RED gọi API, hai flow mẫu: văn bản sắp hạn lúc 07:00, văn bản Hỏa tốc (#366).
 - Hướng dẫn vận hành bằng tiếng Anh `docs/van-hanh.en.md`; README.en.md trỏ sang bản này (#59).
+- Nhãn "Nguồn công khai" trên trang văn bản nạp từ nguồn mở; trang Trạng thái liệt kê nguồn và tuổi dữ liệu (#426).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).
@@ -38,6 +39,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - `moc app install` từ chối form có trường trùng từ khóa của biểu thức BPMN (`le`, `not`, `or`…) (#405).
 - Tin realtime có đường dẫn là liên kết có tên với trình đọc màn hình, không còn bị axe báo `link-name` (#407).
 - `release.sh` chạy được trên macOS: không có `sha256sum` thì dùng `shasum -a 256`, thiếu cả hai thì dừng sớm (#57).
+- Grafana lên trong vài giây trên đĩa ghi chậm (WSL2), không còn quá hạn healthcheck: CSDL SQLite để trong RAM (#417).
 
 ### Bảo mật
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
