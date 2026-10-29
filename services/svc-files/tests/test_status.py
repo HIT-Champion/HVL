@@ -359,6 +359,31 @@ def test_api_status_ai_on_shows_public_model_name(parts, verifier):
     run(board.aclose())
 
 
+def test_api_status_external_answer_api(parts, verifier):
+    """#430: viết câu trả lời qua API ngoài — trợ lý bật được cả khi không có Ollama; phần mềm ghi rõ "API ngoài",
+    không lộ URL của API."""
+    def board_for(**extra: str):
+        settings = status_settings(MOC_ASK_ENABLED="true", MOC_ASK_SYNC_INTERVAL_S="5", MOC_ASK_API="openai",
+                                   MOC_ASK_API_URL="https://mo-hinh.example/v1", MOC_ASK_MODEL="mo-hinh-ngoai",
+                                   **extra)
+        return default_board(settings, scanner=parts["scanner"], store=parts["store"], hasura=parts["hasura"],
+                             meili=parts["meili"], vault=parts["vault"], ai=parts["ai"],
+                             transport=httpx2.MockTransport(parts["net"]))
+
+    parts["ai"] = StubAi(chat_available=True, embed_available=False, chat_model="mo-hinh-ngoai")
+    board = board_for()
+    body = run(board.report())
+    ai = next(x for x in body["components"] if x["id"] == "tro-ly-ai")
+    assert ai["status"] == "ok" and ai["software"] == "API ngoài"
+    assert body["ai"] == {"enabled": True, "model": "mo-hinh-ngoai", "semantic": False}
+    assert "mo-hinh.example" not in json.dumps(body)
+    run(board.aclose())
+    board = board_for(MOC_AI_URL="http://ollama:11434")
+    ai = next(x for x in run(board.report())["components"] if x["id"] == "tro-ly-ai")
+    assert ai["software"] == "Ollama, API ngoài"
+    run(board.aclose())
+
+
 def test_api_status_no_vault_or_workflow_url_is_off(parts, verifier):
     parts["vault"] = None
     board = default_board(status_settings(MOC_WORKFLOW_URL=""), scanner=parts["scanner"], store=parts["store"],

@@ -1743,7 +1743,8 @@ def direct_where(direction: str, want: dict[str, Any]) -> dict[str, Any]:
     if want.get("type_code"):
         parts.append({"type_code": {"_eq": want["type_code"]}})
     if want.get("from") and direction == "in":
-        parts.append({"registered_at": {"_gte": f"{want['from']}T00:00:00+07:00", "_lt": f"{want['to']}T00:00:00+07:00"}})
+        parts.append({"registered_at": {"_gte": f"{want['from']}T00:00:00+07:00",
+                                        "_lt": f"{want['to']}T00:00:00+07:00"}})
     elif want.get("from"):
         parts.append({"issued_on": {"_gte": want["from"], "_lt": want["to"]}})
     return {"_and": parts}

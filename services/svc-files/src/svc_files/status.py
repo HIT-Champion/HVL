@@ -278,7 +278,10 @@ def default_board(settings: Settings, *, scanner: Any, store: Any, hasura: Any, 
                   transport: httpx2.AsyncBaseTransport | None = None) -> StatusBoard:
     """Bảng trạng thái nối với các client sẵn có của svc-files; ``transport`` thay mạng thật trong test."""
     http = httpx2.AsyncClient(timeout=settings.status_timeout_s, transport=transport, follow_redirects=False)
-    ai_on = bool(settings.ai_url) and settings.ask_enabled
+    # API ngoài (#430) viết câu trả lời được cả khi không có Ollama (khi đó không nhúng, chỉ tìm từ khóa)
+    ai_on = (bool(settings.ai_url) or settings.ask_api == "openai") and settings.ask_enabled
+    ai_software = ("Ollama" if settings.ask_api == "ollama"
+                   else "Ollama, API ngoài" if settings.ai_url else "API ngoài")
 
     async def storage() -> str:
         return "ok" if await asyncio.to_thread(store.ping) else "down"
@@ -310,7 +313,7 @@ def default_board(settings: Settings, *, scanner: Any, store: Any, hasura: Any, 
         Component("quy-trinh", "quy-trinh", "Quy trình", "Flowable", http_check(http, workflow, judge_workflow)),
         Component("luu-tru", "du-lieu", "Lưu trữ tệp", "SeaweedFS", storage),
         Component("tim-kiem", "du-lieu", "Tìm kiếm", "Meilisearch", from_bool(meili.ping), critical=False),
-        Component("tro-ly-ai", "tri-tue", "Trợ lý AI", "Ollama", ai_check, critical=False),
+        Component("tro-ly-ai", "tri-tue", "Trợ lý AI", ai_software, ai_check, critical=False),
     ]
     return StatusBoard(components, version=settings.version, ai_info=ai_info, last_backup=hasura.last_backup,
                        ttl_s=settings.status_cache_s, timeout_s=settings.status_timeout_s, closers=[http.aclose])

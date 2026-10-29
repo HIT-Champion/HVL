@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 REQUIRED = (
     "MOC_OIDC_ISSUER",
@@ -134,7 +134,14 @@ class Settings:
     ask_min_score_semantic: float = 0.75
     ask_semantic_ratio: float = 0.5     # tỷ trọng tìm theo nghĩa
     ask_deadline_s: float = 50.0        # hạn tổng một yêu cầu (dưới 60 giây của APISIX)
-    ask_model: str = "qwen3:1.7b"       # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL
+    # mô hình viết câu trả lời; MOC_ASK_MODEL rỗng thì bằng MOC_AI_MODEL, trừ MOC_ASK_API=openai (bắt buộc ghi rõ)
+    ask_model: str = "qwen3:1.7b"
+    # Nơi viết câu trả lời (#430): ollama (tại chỗ, mặc định) hoặc openai — máy chủ nói chuẩn OpenAI ở
+    # MOC_ASK_API_URL (…/v1). Chỉ bước viết đi ra ngoài; nhúng, trích yếu văn bản đến vẫn ở Ollama. Khóa
+    # MOC_ASK_API_KEY là bí mật tùy chọn, đến từ két (platform/openbao/start.sh), không in ra repr hay nhật ký
+    ask_api: str = "ollama"
+    ask_api_url: str = ""
+    ask_api_key: str = field(default="", repr=False)
     ask_model_timeout_s: float = 40.0
     ask_context_chars: int = 2800       # tổng ký tự nguồn gửi mô hình
     ask_concurrency: int = 1            # số lượt sinh câu trả lời cùng lúc
@@ -248,8 +255,14 @@ class Settings:
                 ask_min_score_semantic=float(env.get("MOC_ASK_MIN_SCORE_SEMANTIC", "0.75")),
                 ask_semantic_ratio=float(env.get("MOC_ASK_SEMANTIC_RATIO", "0.5")),
                 ask_deadline_s=float(env.get("MOC_ASK_DEADLINE_S", "50")),
-                ask_model=(env.get("MOC_ASK_MODEL") or "").strip() or env.get("MOC_AI_MODEL", "qwen3:1.7b").strip(),
+                # API ngoài (#430) không chạy mô hình Ollama tại chỗ: tên mô hình phải ghi rõ, không lấy MOC_AI_MODEL
+                ask_model=(env.get("MOC_ASK_MODEL") or "").strip() or (
+                    "" if (env.get("MOC_ASK_API") or "").strip().lower() == "openai"
+                    else env.get("MOC_AI_MODEL", "qwen3:1.7b").strip()),
                 ask_model_timeout_s=float(env.get("MOC_ASK_MODEL_TIMEOUT_S", "40")),
+                ask_api=(env.get("MOC_ASK_API") or "ollama").strip().lower(),
+                ask_api_url=(env.get("MOC_ASK_API_URL") or "").strip().rstrip("/"),
+                ask_api_key=(env.get("MOC_ASK_API_KEY") or "").strip(),
                 ask_context_chars=int(env.get("MOC_ASK_CONTEXT_CHARS", "2800")),
                 ask_concurrency=int(env.get("MOC_ASK_CONCURRENCY", "1")),
                 ask_queue_s=float(env.get("MOC_ASK_QUEUE_S", "20")),
@@ -361,6 +374,13 @@ class Settings:
             raise ConfigError("MOC_ASK_DEADLINE_S phải trong khoảng (0, 55] — dưới 60 giây của APISIX")
         if self.ask_model_timeout_s <= 0:
             raise ConfigError("MOC_ASK_MODEL_TIMEOUT_S phải > 0")
+        if self.ask_api not in ("ollama", "openai"):
+            raise ConfigError("MOC_ASK_API phải là ollama (mô hình tại chỗ) hoặc openai (API ngoài chuẩn OpenAI)")
+        if self.ask_api == "openai":
+            if not re.fullmatch(r"https?://[^\s/?#]+(?:/[^\s?#]*)?", self.ask_api_url):
+                raise ConfigError("MOC_ASK_API=openai cần MOC_ASK_API_URL dạng http(s)://máy-chủ/v1")
+            if not self.ask_model:
+                raise ConfigError("MOC_ASK_API=openai cần tên mô hình ở MOC_ASK_MODEL")
         if self.ask_queue_s < 0:
             raise ConfigError("MOC_ASK_QUEUE_S phải ≥ 0")
         for name, count in (("MOC_ASK_TOP_K", self.ask_top_k), ("MOC_ASK_CANDIDATES", self.ask_candidates),
@@ -375,17 +395,23 @@ class Settings:
             raise ConfigError("MOC_ASSISTANT_ID phải dài 1–64 ký tự")
 
     def warnings(self) -> list[str]:
-        """Cấu hình chạy được nhưng dễ chậm: app ghi nhật ký ``config.warning`` lúc khởi động, không chặn."""
+        """Cấu hình chạy được nhưng dễ chậm hay kém an toàn: app ghi nhật ký ``config.warning`` lúc khởi động, không
+        chặn."""
         out: list[str] = []
         if self.ai_url and self.ask_enabled:
             # Ollama của compose giữ tối đa 2 mô hình (OLLAMA_MAX_LOADED_MODELS): trích yếu F4.1 (MOC_AI_MODEL) dò và
-            # nạp trước kể cả khi chỉ hỏi đáp, thêm mô hình sinh và mô hình nhúng F4.2
-            models = {self.ai_model, self.ask_model} | ({self.ai_embed_model} if self.ai_embed_model else set())
+            # nạp trước kể cả khi chỉ hỏi đáp, thêm mô hình sinh (trừ khi viết qua API ngoài) và mô hình nhúng F4.2
+            models = ({self.ai_model} | ({self.ask_model} if self.ask_api == "ollama" else set())
+                      | ({self.ai_embed_model} if self.ai_embed_model else set()))
             if len(models) > 2:
                 out.append(f"MOC_ASK_MODEL ({self.ask_model}) khác MOC_AI_MODEL ({self.ai_model}): Ollama phải giữ "
                            f"{len(models)} mô hình nhưng compose chỉ cho 2 (OLLAMA_MAX_LOADED_MODELS) — mô hình bị nạp "
                            "đi nạp lại, câu trả lời và đọc văn bản đến dễ quá giờ. Để trống MOC_ASK_MODEL và đặt mô "
                            "hình muốn dùng vào MOC_AI_MODEL (dùng chung cho trích yếu và câu trả lời)")
+        if self.ask_api == "openai" and self.ask_api_url.startswith("http://"):
+            sent = "đoạn văn bản đã che và MOC_ASK_API_KEY" if self.ask_api_key else "đoạn văn bản đã che"
+            out.append(f"MOC_ASK_API_URL dùng http://: {sent} đi tới máy chủ mô hình không mã hóa. Dùng https://, trừ "
+                       "khi máy chủ đó nằm trong mạng nội bộ tin cậy của đơn vị")
         if self.import_data_max_bytes + self.import_zip_max_bytes > IMPORT_GATEWAY_BYTES:
             out.append("MOC_IMPORT_DATA_MAX_MB + MOC_IMPORT_ZIP_MAX_MB vượt 63 MB: APISIX nhận thân yêu cầu tối đa 64m "
                        "(client_max_body_size, platform/apisix/config.yaml) nên lô lớn bị cổng từ chối (413) trước khi "

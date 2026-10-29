@@ -22,6 +22,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Hướng dẫn vận hành bằng tiếng Anh `docs/van-hanh.en.md`; README.en.md trỏ sang bản này (#59).
 - Nhãn "Nguồn công khai" trên trang văn bản nạp từ nguồn mở; trang Trạng thái liệt kê nguồn và tuổi dữ liệu (#426).
 - Trang Hỏi đáp: gợi ý theo loại câu, câu nối tiếp, dòng "Đã hiểu là…", nói rõ trợ lý trả lời được gì (#422).
+- Trợ lý hỏi đáp viết câu trả lời qua API ngoài chuẩn OpenAI (`MOC_ASK_API=openai`, tắt mặc định), khóa qua két (#430).
 - Trợ lý hỏi đáp tự giới thiệu, chỉ cách dùng theo hướng dẫn, từ chối câu ngoài phạm vi, ghép câu nối tiếp (#423).
 - Trợ lý hỏi đáp đếm việc trong Hộp việc và số văn bản bằng quyền người hỏi, không qua mô hình (#441).
 
