@@ -44,7 +44,8 @@ release_body = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_body)
 WORKFLOW = SCRIPT.parent.parent / ".github" / "workflows" / "release.yml"
 PACKAGE_FILES = ["scripts/kiem_goi.py", "scripts/license-header.sh", "VERSION", ".gitattributes", "LICENSE", "NOTICE",
-                 "LICENSES/Apache-2.0.txt", "LICENSES/LicenseRef-Logos.txt", "REUSE.toml"]
+                 "LICENSES/Apache-2.0.txt", "LICENSES/LicenseRef-Logos.txt", "LICENSES/LicenseRef-VN-SHTT-Dieu-15.txt",
+                 "REUSE.toml"]
 # repo thử không đọc cấu hình git của máy (khóa ký thẻ, hook…), tên người gắn thẻ cố định; bỏ mọi GIT_* thừa hưởng —
 # chạy từ hook git thì GIT_DIR, GIT_INDEX_FILE trỏ về repo thật và lệnh git của test sẽ ghi vào đó
 GIT_ENV = {

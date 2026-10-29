@@ -448,6 +448,30 @@ thống.
 - Đổi ngưỡng: sửa `canh-bao.yml` cùng ca tương ứng trong `platform/monitoring/kiem-tra/canh-bao.test.yml`, chạy
   `promtool test rules` như bước "Giám sát" của job build trong `.github/workflows/ci.yml`, rồi cài lại.
 
+## Dữ liệu công khai
+
+Signet kèm bản chụp dữ liệu từ nguồn công khai của nhà nước trong `seed/du-lieu-mo/<mã nguồn>/` (#424): tệp gốc và
+`manifest.json` ghi URL, ngày lấy, căn cứ dùng lại, SHA-256 từng tệp. Nguồn A `cong-bao-gddt`: bốn thông tư của Bộ
+GD&ĐT về giáo dục đại học, bản Công báo (`seed/du-lieu-mo/cong-bao-gddt/README.md`).
+
+- **Bản cài không gọi nguồn lúc chạy.** `svc-files` đọc các manifest qua mount chỉ đọc `/srv/du-lieu-mo`, so SHA-256
+  rồi báo ở `GET /api/status` (khóa `open_data`: `ok`, `stale` khi quá `max_age_days`, `broken` khi thiếu tệp hay sai
+  băm) và trang `/trang-thai`. Nguồn ngừng hoạt động thì Signet vẫn dùng bản chụp gần nhất, trang trạng thái cho biết
+  dữ liệu đã bao nhiêu ngày.
+- **Nạp:** `make seed` nạp mỗi tệp thành một văn bản đến của Khoa CNTT qua API nạp lô (CSV + zip, ClamAV, như văn
+  thư nạp tay), loại "Thông tư" (migration `1792281604000_document_type_tt`). Bản cài đã có dữ liệu mẫu thì chạy
+  riêng `python3 scripts/moc.py du-lieu-mo nap`; chạy lại không tạo trùng. Trang văn bản nhận ra văn bản từ nguồn công
+  khai nhờ SHA-256 của tệp đính kèm trùng với manifest; trợ lý hỏi đáp trích được như mọi văn bản đến.
+- **Kiểm:** `make du-lieu-mo` (`python3 scripts/moc.py du-lieu-mo kiem`) so băm, in tuổi dữ liệu; thoát 1 khi bản
+  chụp hỏng.
+- **Lấy mới** (máy của đội, cần Internet, không chạy trên máy chủ): `make du-lieu-mo-lay`. Lệnh chỉ thay bản chụp khi
+  mọi tệp tải xong, khớp manifest và tổng không quá 3 MB; nguồn lỗi thì giữ bản cũ, thoát 1. Bản chụp mới đi qua PR
+  như mọi tệp `seed/`.
+- **Thêm nguồn:** một module `scripts/nguon_<mã>.py` có `NGUON`, `TEN`, `lay(thu_muc)` trả manifest (khuôn trong
+  `scripts/du_lieu_mo.py`). Chỉ dùng nguồn có căn cứ dùng lại rõ (giấy phép mở, hoặc Điều 15 Luật Sở hữu trí tuệ với
+  văn bản nhà nước), đúng `robots.txt` và điều khoản trang, không dữ liệu cá nhân; khai giấy phép tệp trong
+  `REUSE.toml`.
+
 ## Trợ lý hỏi đáp qua API ngoài
 
 Mặc định trợ lý hỏi đáp (F4.2) viết câu trả lời bằng mô hình chạy tại chỗ trong Ollama. Máy yếu (CPU chậm) hay muốn

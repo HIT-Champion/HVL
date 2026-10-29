@@ -156,6 +156,9 @@ class Settings:
     workflow_url: str = "http://svc-workflow:8000"                  # /readyz của svc-workflow: Flowable và Hasura
     status_cache_s: float = 10.0        # lưu đệm kết quả gom cho mọi người gọi: gọi dồn không thành lời gọi vào lõi
     status_timeout_s: float = 3.0       # hạn mỗi lần dò một thành phần, quá thì báo gián đoạn
+    # #424: bản chụp nguồn dữ liệu công khai (seed/du-lieu-mo, mount chỉ đọc) — nguồn gốc, tuổi dữ liệu ở khóa
+    # open_data của /api/status (open_data.py). Rỗng: không đọc, open_data là []
+    open_data_dir: str = "/srv/du-lieu-mo"
     # Lô nạp văn bản đến (POST /api/imports/incoming — imports/): một tệp NDJSON/CSV + zip tệp đính kèm tùy chọn,
     # xử lý nền từng mẻ. Zip giữ tạm trong thư mục spool (tmpfs /tmp của compose) tới khi lô xong
     import_interval_s: float = 2.0      # chu kỳ vòng nền khi rảnh; 0: tắt vòng nền và không nhận lô mới (503)
@@ -274,6 +277,7 @@ class Settings:
                 workflow_url=env.get("MOC_WORKFLOW_URL", "http://svc-workflow:8000").strip().rstrip("/"),
                 status_cache_s=float(env.get("MOC_STATUS_CACHE_S", "10")),
                 status_timeout_s=float(env.get("MOC_STATUS_TIMEOUT_S", "3")),
+                open_data_dir=env.get("MOC_OPEN_DATA_DIR", "/srv/du-lieu-mo").strip(),
                 import_interval_s=float(env.get("MOC_IMPORT_INTERVAL_S", "2")),
                 import_chunk=int(env.get("MOC_IMPORT_CHUNK", "20")),
                 import_max_rows=int(env.get("MOC_IMPORT_MAX_ROWS", "1000")),
@@ -347,6 +351,8 @@ class Settings:
         for name, url in (("MOC_GATEWAY_STATUS_URL", self.gateway_status_url), ("MOC_WORKFLOW_URL", self.workflow_url)):
             if url and not url.startswith(("http://", "https://")):
                 raise ConfigError(f"{name} phải là URL http(s)://…, hoặc rỗng để không dò thành phần đó")
+        if self.open_data_dir and not self.open_data_dir.startswith("/"):
+            raise ConfigError("MOC_OPEN_DATA_DIR phải là đường dẫn tuyệt đối, hoặc rỗng để không đọc nguồn công khai")
 
     def _check_assistant(self) -> None:
         """Biến của trợ lý hỏi đáp (F4.2)."""

@@ -66,7 +66,7 @@ GIT_ENV = {
 }
 REPO_FILES = ["scripts/kiem_goi.py", "scripts/license-header.sh", "scripts/release.sh", "scripts/release-notes.sh",
               "Makefile", "VERSION", ".gitattributes", "LICENSE", "NOTICE", "LICENSES/Apache-2.0.txt",
-              "LICENSES/LicenseRef-Logos.txt", "REUSE.toml"]
+              "LICENSES/LicenseRef-Logos.txt", "LICENSES/LicenseRef-VN-SHTT-Dieu-15.txt", "REUSE.toml"]
 HEADER = "".join(KIEM.read_text(encoding="utf-8").splitlines(keepends=True)[:15])
 # Tên tệp môi trường và khối PEM ghép từ mảnh: tệp test này cũng nằm trong gói phát hành, không được tự bị chặn
 ENV = ".e" + "nv"

@@ -267,8 +267,10 @@ def test_every_seeded_document_type_has_an_english_name():
     import pathlib
     import re
 
-    seed = pathlib.Path(__file__).resolve().parents[3] / "db/migrations/default/1792281600300_document_types/up.sql"
-    codes = set(re.findall(r"\('([^']+)',\s*'", seed.read_text(encoding="utf-8")))
+    # danh mục NĐ 30 và loại "Thông tư" của nguồn công khai (#424)
+    migrations = pathlib.Path(__file__).resolve().parents[3] / "db/migrations/default"
+    codes = {code for name in ("1792281600300_document_types", "1792281604000_document_type_tt")
+             for code in re.findall(r"\('([^']+)',\s*'", (migrations / name / "up.sql").read_text(encoding="utf-8"))}
     assert codes and codes == set(TYPE_NAMES_EN)
 
 
