@@ -35,6 +35,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - `moc app install` báo lỗi rõ với tệp form sai kiểu hay lồng quá 32 tầng (cả qua `$ref`), không còn lỗi 500 (#386).
 - Smoke không còn trượt bước hỏi đáp ngay sau khi nâng cấp hay trên bản cài tìm theo nghĩa (#360).
 - Bật giảm chuyển động thì thông báo, dòng hộp việc, popover hiện ngay, không qua khung trong suốt (#391).
+- `make demo-it-ot` không còn đỏ khi lịch sử đo của broker mới có một lần đo (#432).
 - `moc app install` từ chối form có trường trùng từ khóa của biểu thức BPMN (`le`, `not`, `or`…) (#405).
 - Tin realtime có đường dẫn là liên kết có tên với trình đọc màn hình, không còn bị axe báo `link-name` (#407).
 - `release.sh` chạy được trên macOS: không có `sha256sum` thì dùng `shasum -a 256`, thiếu cả hai thì dừng sớm (#57).
