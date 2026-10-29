@@ -170,6 +170,9 @@ export interface AskResult {
   route?: AskRoute
   route_reason?: string      // mã máy đọc (kw:lam-duoc-gi, mac-dinh…), không dịch
   rewritten?: string | null  // câu nối tiếp đã ghép với câu trước; null khi không phải câu nối tiếp
+  // Đường dữ liệu (viec_cua_toi, dem_van_ban, #441): số và bộ lọc máy đọc; trang trong Signet xem danh sách đã đếm
+  data?: Record<string, unknown> | null
+  link?: string | null       // '/', '/van-ban-den', '/van-ban-di'; trang chỉ nhận đúng các trang này (utils/answer.ts)
 }
 
 export interface AskBody {

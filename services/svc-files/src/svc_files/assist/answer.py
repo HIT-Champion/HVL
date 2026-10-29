@@ -39,7 +39,9 @@ Không có đoạn nào → ``no_evidence``, không gọi mô hình; giống h�
 Bộ định tuyến (route.py, #423) chọn đường sau bước 2, trước khi tốn gì thêm: ``gioi_thieu`` trả mục của tệp Giới thiệu
 trợ lý, ``ngoai_pham_vi`` trả câu cố định — cả hai không tìm, không gọi mô hình, cả ở ``generate``; ``huong_dan`` tìm
 trong kho hướng dẫn sử dụng (guide.py) thay cho bước 4–5, rồi câu trích và mô hình như văn bản — kho không có mục nào
-khớp thì đi như ``van_ban`` (mã lý do ``khong-khop-huong-dan``); ``van_ban`` như trên.
+khớp thì đi như ``van_ban`` (mã lý do ``khong-khop-huong-dan``); ``van_ban`` như trên. Hai đường dữ liệu (#441, data.py)
+``viec_cua_toi``, ``dem_van_ban`` đếm thẳng trong CSDL qua Hasura bằng token người hỏi, trả câu có số, ``data`` và
+``link``; không tìm, không gọi mô hình.
 Câu nối tiếp (có ``previous``) được ghép thành câu độc lập trước khi chọn đường; câu ghép thay câu hỏi ở mọi bước sau
 và trả về ở ``rewritten``. Sổ kiểm toán, nhật ký ghi đường và mã lý do, không ghi câu ghép. Nhật ký không bao giờ
 có câu hỏi, câu trả lời, đoạn trích: chỉ độ dài, số term, số đoạn, thời gian.
@@ -63,6 +65,7 @@ import logging
 import time
 import uuid
 from collections.abc import Callable
+from datetime import date, datetime
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -70,7 +73,7 @@ from .. import pii
 from ..auth import Principal
 from ..hasura import HasuraAuthError, HasuraError
 from ..search import SearchError
-from . import extract, grounding, guide, route, vi
+from . import data, extract, grounding, guide, route, vi
 from .ai import AiClient
 from .guide import GuideStore
 from .retrieve import Filters, Passage, Retrieval, Retriever
@@ -123,6 +126,12 @@ class _Hasura(Protocol):
     async def as_role(self, role: str, tenant_id: uuid.UUID, user_id: str, request_id: str, query: str,
                       variables: dict[str, Any]) -> dict[str, Any]: ...
 
+    async def ask_tasks(self, token: str) -> list[dict[str, Any]]: ...
+
+    async def ask_count(self, token: str, where: dict[str, Any]) -> int: ...
+
+    async def ask_documents(self, token: str, ids: list[str]) -> dict[str, dict[str, Any]]: ...
+
 
 def _type_name(doc: dict[str, Any]) -> str | None:
     return doc.get("type_name") or (doc.get("document_type") or {}).get("name")
@@ -150,9 +159,12 @@ def _previous(text: str | None) -> str | None:
 
 class Assistant:
     def __init__(self, settings: Settings, *, retriever: Retriever, ai: AiClient, indexer: _Hold, hasura: _Hasura,
-                 guides: GuideStore | None = None, clock: Callable[[], float] = time.monotonic) -> None:
+                 guides: GuideStore | None = None, clock: Callable[[], float] = time.monotonic,
+                 today: Callable[[], date] | None = None) -> None:
         self.settings = settings
         self.retriever = retriever
+        self.hasura = hasura
+        self._today = today or (lambda: datetime.now(data.VN).date())     # ngày của đường dữ liệu, giờ Việt Nam
         self.guides = guides if guides is not None else GuideStore.load(settings.ask_guide_dir)
         self.ai = ai
         self.indexer = indexer
@@ -200,7 +212,7 @@ class Assistant:
         if chosen.name == "huong_dan" and not self.guides.search(rewritten or question, s.ask_top_k):
             # hướng dẫn sử dụng không có mục nào khớp: có thể là câu về một văn bản, tìm như van_ban
             chosen = route.Route("van_ban", route.NO_GUIDE_REASON, chosen.lang)
-        if body.mode != "generate" or chosen.name in ("gioi_thieu", "ngoai_pham_vi"):
+        if body.mode != "generate" or chosen.name in route.DIRECT_ROUTES:
             return await self._answer(principal, body, question, rewritten, chosen, scope, request_id, start)
         try:
             await asyncio.wait_for(self.slots.acquire(), s.ask_queue_s)
@@ -219,6 +231,7 @@ class Assistant:
         warnings: list[str] = []
         asked = rewritten or question               # câu đem đi tìm, trích, hỏi mô hình
         fixed: str | None = None                    # câu cố định của đường ngoai_pham_vi
+        counted: data.Answer | None = None          # câu có số của đường dữ liệu
         if chosen.name == "van_ban":
             found = await self._search(body, asked, scope, deadline, warnings, request_id)
         else:
@@ -226,6 +239,8 @@ class Assistant:
                 found_passages = self.guides.search(asked, s.ask_top_k)
             elif chosen.name == "gioi_thieu":
                 found_passages = self.guides.intro(chosen.reason, chosen.lang)
+            elif chosen.name in route.DATA_ROUTES:
+                found_passages, counted = [], await self._count(chosen, asked, scope.token, request_id)
             else:
                 found_passages, fixed = [], self.guides.fixed(chosen.lang)
             found = Retrieval(found_passages, candidates=len(found_passages), semantic=False)
@@ -250,7 +265,9 @@ class Assistant:
             if model_text:
                 cited = grounding.citations(model_text)
 
-        if not passages:
+        if counted is not None:
+            status = "answered"
+        elif not passages:
             status = "no_evidence"
         elif quoted.text is None and model_text is None:
             status = "passages_only"
@@ -260,7 +277,10 @@ class Assistant:
         answer_out = {"text": model_text, "source": "model", "model": model} if model_text else extract_out
         if fixed is not None:
             answer_out = {"text": fixed, "source": "fixed", "model": None}
-        answer_source = "model" if model_text else "extract" if quoted.text else "fixed" if fixed else "none"
+        if counted is not None:
+            answer_out = {"text": counted.text, "source": "data", "model": None}
+        answer_source = ("data" if counted else "model" if model_text else "extract" if quoted.text
+                         else "fixed" if fixed else "none")
         warnings = [w for w in dict.fromkeys(warnings) if w in WARNINGS]
         ask_id = str(body.ask_id or uuid.uuid4())
         embed_model = self.ai.embed_model if found.semantic else None
@@ -293,6 +313,7 @@ class Assistant:
             "sources": [self._source(i + 1, p, quoted.best, cited_set) for i, p in enumerate(passages)],
             "semantic": found.semantic, "ai_available": self.ai.chat_available, "warnings": warnings,
             "duration_ms": duration_ms, "route": chosen.name, "route_reason": chosen.reason, "rewritten": rewritten,
+            "data": counted.data if counted else None, "link": counted.link if counted else None,
         }
 
     @staticmethod
@@ -300,6 +321,27 @@ class Assistant:
         if p.kind == "guide":
             return guide.source(n, p, extract.excerpt(p.text, best.get(p.chunk_id)), n in cited)
         return source_of(n, p, best, cited)
+
+    async def _count(self, chosen: route.Route, question: str, token: str, request_id: str) -> data.Answer:
+        """Đường ``viec_cua_toi``, ``dem_van_ban``: đếm bằng token người hỏi (Hasura áp quyền), không gọi mô hình."""
+        today = self._today()
+        try:
+            if chosen.name == "viec_cua_toi":
+                tasks = await self.hasura.ask_tasks(token)
+                ids = list(dict.fromkeys(str(t["document_id"]) for t in data.urgent(tasks, today)[: data.LISTED]))
+                docs = await self.hasura.ask_documents(token, ids) if ids else {}
+                symbols = {k: str(v["symbol"]) for k, v in docs.items() if v.get("symbol")}
+                return data.tasks_answer(tasks, symbols, today, chosen.lang)
+            query = data.count_query(route.folded(question), today)
+            counts = {d: await self.hasura.ask_count(token, data.where(d, query)) for d in query.directions}
+            return data.count_answer(query, counts, chosen.lang)
+        except HasuraAuthError as exc:
+            raise AskError(401, "invalid_token", "Token không hợp lệ hoặc đã hết hạn",
+                           headers={"WWW-Authenticate": "Bearer"}) from exc
+        except HasuraError as exc:
+            # cả khi svc-workflow (myTasks) chưa trả lời: Hasura báo lỗi của Action
+            _log("office.assist.count_failed", request_id, route=chosen.name, error=str(exc), code=exc.code)
+            raise AskError(503, "database_unavailable", "CSDL chưa sẵn sàng") from exc
 
     async def _search(self, body: AskBody, question: str, scope: Any, deadline: float, warnings: list[str],
                       request_id: str) -> Retrieval:

@@ -1461,11 +1461,11 @@ có giá trị vô hướng, **không** câu hỏi, câu trả lời, số ký h
 ```
 
 `mode`: `extract` | `generate`; `status`: `answered` | `passages_only` | `no_evidence`; `answer_source`: `extract` |
-`model` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id các văn bản nguồn,
+`model` | `fixed` | `data` | `none`; `hits`: số đoạn sau hậu kiểm; `cited`: số nguồn được trích; `documents`: id các văn bản nguồn,
 cách nhau dấu phẩy; `semantic`: lượt này có tìm theo nghĩa; `model`, `embed_model`: tên mô hình hoặc null; `warnings`:
 mã cảnh báo cách nhau dấu phẩy (`embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`,
 `model_declined`), rỗng nếu không có; `route`: đường bộ định tuyến chọn (`van_ban` | `gioi_thieu` | `huong_dan` |
-`ngoai_pham_vi`, #423); `route_reason`: mã của mẫu đã khớp (`kw:lam-duoc-gi`…) hoặc `mac-dinh`, không bao giờ là chữ
+`ngoai_pham_vi`, #423; `viec_cua_toi` | `dem_van_ban`, #441); `route_reason`: mã của mẫu đã khớp (`kw:lam-duoc-gi`…) hoặc `mac-dinh`, không bao giờ là chữ
 của câu hỏi; `followup`: câu hỏi được ghép với câu trước (câu trước, câu ghép không lưu). Lãnh đạo xem sổ thấy mọi khóa
 qua `overview` (§1) trừ `documents`: id văn bản nguồn chỉ vai trò `service` đọc được.
 

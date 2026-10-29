@@ -364,9 +364,15 @@ về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất 
 | `gioi_thieu` | "làm được gì", "bạn là ai", "dùng mô hình nào", "xin chào", "cảm ơn", "what can you do"… | Câu đầu của mục ứng với mã lý do trong tệp Giới thiệu trợ lý (`assist/gioi_thieu/vi.md`, `en.md` khi câu hỏi tiếng Anh), các mục khác của tệp làm nguồn phụ; `answer.source: extract` | không · không, kể cả `mode: generate` |
 | `huong_dan` | "ở đâu", "làm thế nào để", "hướng dẫn cách"… kèm tên chức năng (nghỉ phép, văn bản đi, ký số, mật khẩu…), không có số ký hiệu, "số N" | Như `van_ban` nhưng nguồn là các mục của hướng dẫn sử dụng (`docs/huong-dan/*.md`, thư mục `MOC_ASK_GUIDE_DIR`); không mục nào khớp thì tìm văn bản như `van_ban` (mã lý do `khong-khop-huong-dan`) | không · như `van_ban` (bộ kiểm căn cứ y nguyên) |
 | `ngoai_pham_vi` | thời tiết, giá cả, thể thao, viết hộ, lập trình… | Câu cố định nói trợ lý làm được gì, `answer.source: fixed`, `status: no_evidence`, `sources: []` | không · không |
+| `viec_cua_toi` (#441) | việc của chính người hỏi: "việc (nào) của tôi", "tôi có bao nhiêu việc", "tôi được giao", "hộp việc … quá hạn", "my tasks"; ngôi thứ nhất so trên chữ có dấu ("tối", "tới" không phải "tôi"); không có từ chỉ văn bản | Action `myTasks` bằng token người hỏi (như Hộp việc): số việc, quá hạn, đến hạn hôm nay, đến hạn trong 2 ngày (như Lịch hạn, giờ Việt Nam), ba việc gần hạn nhất kèm số ký hiệu văn bản người hỏi đọc được; `answer.source: data`, `data`, `link: /` | không · không |
+| `dem_van_ban` (#441) | "bao nhiêu", "mấy", "số lượng", "thống kê"… rồi "văn bản" hay tên loại (quyết định, công văn…), "how many … documents"; không có số ký hiệu (`12/HD`), không có mốc chưa đọc được (ngày cụ thể, "từ … đến", quý, tuần) | `office_documents_aggregate` bằng token người hỏi: văn bản đến ("đến", "nhận") theo ngày vào sổ, văn bản đi ("đi", "ban hành") theo ngày ban hành, không nói thì đếm cả hai; "tháng 10", "tháng 10/2026", "tháng này", "tháng trước", "năm 2026", "năm nay", "năm ngoái", "hôm nay"; tên loại → `type_code`; `answer.source: data`, `data`, `link: /van-ban-den` hoặc `/van-ban-di` | không · không |
 | `van_ban` | còn lại | Như mô tả bên dưới | có · như bên dưới |
 
-Hỏi trong một văn bản (`document_id`) thì "ở đâu", "làm thế nào" là câu về văn bản đó, không phải hướng dẫn; "Hướng
+Hỏi trong một văn bản (`document_id`) thì "ở đâu", "làm thế nào", "bao nhiêu" là câu về văn bản đó, không phải
+hướng dẫn hay đường dữ liệu. Đường dữ liệu (`assist/data.py`) không có SQL hay GraphQL do mô hình viết: mẫu chữ chọn
+một trong hai truy vấn cố định, Hasura áp quyền theo token như ở trang danh sách; câu trả lời là mẫu câu có số và "Căn
+cứ: …" (ngày tính, cột ngày đã dùng). Hasura từ chối token → `401`; Hasura hay svc-workflow (myTasks) không trả lời →
+`503 database_unavailable`, nhật ký `office.assist.count_failed` {route, error, code}. "Hướng
 dẫn" đứng một mình là loại văn bản (HD), chỉ là câu hỏi cách dùng khi theo sau là "cách", "tôi", "sử dụng"…. Nguồn của
 tệp giới thiệu và hướng dẫn là đoạn `kind: guide`: `document_id`, `page`, `file_id` null, `symbol` là tên tài liệu,
 `summary` là tiêu đề mục, `path` là tệp kèm neo mục (`docs/huong-dan/viec-chung.md#đơn-nghỉ-phép`). Kho tĩnh nạp lúc
@@ -488,9 +494,10 @@ người hỏi không được đọc.
 | Kết quả | Ý nghĩa |
 |---|---|
 | `status` | `answered` có câu trả lời · `passages_only` có đoạn liên quan mà không câu nào đủ khớp để trích · `no_evidence` không đoạn nào (`sources: []`) |
-| `answer`, `extract` | `{text, source: extract\|model\|fixed, model}`; `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; `fixed`: câu cố định của `ngoai_pham_vi` (`extract` null); null khi không có |
+| `answer`, `extract` | `{text, source: extract\|model\|fixed\|data, model}`; `data`: câu có số của `viec_cua_toi`, `dem_van_ban` (`extract` null); `extract` luôn là câu trích, `answer` là câu của mô hình khi đạt kiểm, không thì bằng `extract`; `fixed`: câu cố định của `ngoai_pham_vi` (`extract` null); null khi không có |
 | `sources[]` | Tối đa `MOC_ASK_TOP_K`, theo thứ tự xếp hạng, `n` từ 1: `document_id, symbol, type_code, type_name, summary, issuer_name, issued_on, direction, status` (từ Hasura), `kind: page\|meta\|guide, file_id, file_role: main\|attachment\|issued, page, excerpt` (≤ 600 ký tự quanh câu tốt nhất, một dòng), `cited`; nguồn `guide` có thêm `path`, các trường của văn bản là null |
 | `route` · `route_reason` · `rewritten` | Đường bộ định tuyến chọn · mã lý do (máy đọc, không dịch) · câu nối tiếp đã ghép, null khi không phải câu nối tiếp |
+| `data` · `link` | Đường dữ liệu: `{kind: tasks, on, tasks, overdue, today, soon, no_due}` hoặc `{kind: documents, counts: {in?, out?}, type_code, from, to}` (`to` là ngày sau ngày cuối; `from`, `to` null: mọi thời gian) · trang xem danh sách đã đếm (`/`, `/van-ban-den`, `/van-ban-di`); null với đường khác |
 | `semantic` · `ai_available` | Lượt này có tìm theo nghĩa · mô hình viết câu trả lời đang sẵn sàng |
 | `warnings` | `embed_unavailable`, `model_unavailable`, `model_timeout`, `model_rejected`, `model_declined` (mô hình nói không đủ căn cứ) |
 | `400 invalid_question` | Rỗng sau chuẩn hóa, > 500 ký tự, có ký tự điều khiển, chỉ toàn từ dừng |

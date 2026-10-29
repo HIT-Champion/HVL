@@ -124,7 +124,7 @@ class Question:
 
 # loại câu → đường bộ định tuyến của trợ lý phải chọn (services/svc-files/src/svc_files/assist/route.py)
 ROUTES = {"van_ban": "van_ban", "noi_tiep": "van_ban", "gioi_thieu": "gioi_thieu", "huong_dan": "huong_dan",
-          "ngoai_pham_vi": "ngoai_pham_vi"}
+          "ngoai_pham_vi": "ngoai_pham_vi", "viec_cua_toi": "viec_cua_toi", "dem_van_ban": "dem_van_ban"}
 INTRO = "services/svc-files/src/svc_files/assist/gioi_thieu"
 
 
@@ -277,6 +277,15 @@ def _at(symbol: str, page: int) -> tuple[dict, ...]:
     return ({"symbol": symbol, "page": page},)
 
 
+TASKS = ({"data": "tasks"},)
+
+
+def _count(directions: tuple[str, ...], start: str | None = None, end: str | None = None,
+           type_code: str | None = None) -> tuple[dict, ...]:
+    """Đáp án câu đếm văn bản: hướng, khoảng ngày nửa mở [start, end), loại — demo.py đếm thẳng theo đúng bộ lọc này."""
+    return ({"data": "documents", "directions": list(directions), "from": start, "to": end, "type_code": type_code},)
+
+
 def _guide(path: str) -> tuple[dict, ...]:
     return ({"guide": path},)
 
@@ -368,6 +377,23 @@ QUESTIONS = (
     Question("o04", "chuyenviendt", "Kết quả bóng đá tối qua thế nào?", "none", loai="ngoai_pham_vi"),
     Question("o05", "vanthu", "Viết giúp tôi một bài thơ", "none", loai="ngoai_pham_vi"),
     Question("o06", "vanthu", "Write me a poem", "none", loai="ngoai_pham_vi"),
+    # Việc của người hỏi (#441): số việc trong Hộp việc phải bằng myTasks đếm thẳng qua GraphQL bằng token người hỏi
+    Question("v01", "vanthu", "Việc nào của tôi sắp quá hạn?", TASKS, loai="viec_cua_toi"),
+    Question("v02", "truongkhoa", "Tôi có bao nhiêu việc quá hạn?", TASKS, loai="viec_cua_toi"),
+    Question("v03", "giangvienktpm", "Tôi được giao những việc gì?", TASKS, loai="viec_cua_toi"),
+    Question("v04", "totruongdt", "Có việc nào của mình đến hạn hôm nay không?", TASKS, loai="viec_cua_toi"),
+    Question("v05", "chuyenviendt", "Which of my tasks are almost overdue?", TASKS, loai="viec_cua_toi"),
+    # Đếm văn bản (#441): số phải bằng office_documents_aggregate với đúng bộ lọc ghi ở đây, bằng token người hỏi.
+    # Mốc thời gian ghi rõ tháng, năm để đáp án không đổi theo ngày đo
+    Question("d01", "vanthu", "Có bao nhiêu văn bản đến trong tháng 10/2026?",
+             _count(("in",), "2026-10-01", "2026-11-01"), loai="dem_van_ban"),
+    Question("d02", "truongkhoa", "Thống kê số văn bản đi năm 2026",
+             _count(("out",), "2026-01-01", "2027-01-01"), loai="dem_van_ban"),
+    Question("d03", "vanthu", "Có bao nhiêu quyết định đến trong năm 2026?",
+             _count(("in",), "2026-01-01", "2027-01-01", "QĐ"), loai="dem_van_ban"),
+    Question("d04", "giangvienktpm", "Có bao nhiêu văn bản?", _count(("in", "out")), loai="dem_van_ban"),
+    Question("d05", "chuyenviendt", "How many incoming documents arrived in September 2026?",
+             _count(("in",), "2026-09-01", "2026-10-01"), loai="dem_van_ban"),
 )
 
 

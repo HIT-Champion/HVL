@@ -12,8 +12,10 @@ kèm số ký hiệu và trang của đoạn được trích. Tôi cũng trả l
 
 Tôi tìm trong các văn bản bạn được xem và trích nguyên văn đoạn trả lời câu hỏi, ví dụ "Điều kiện xét học bổng khuyến
 khích học tập là gì?". Tôi trả lời câu hỏi về cách dùng Signet theo hướng dẫn sử dụng, ví dụ "Nộp đơn nghỉ phép ở
-đâu?". Tôi hiểu câu hỏi nối tiếp câu ngay trước, ví dụ "Còn khoa Kinh tế thì sao?". Tôi không tìm trong văn bản hạn
-chế. Tôi không trả lời câu ngoài văn bản và cách dùng Signet, như thời tiết, tin tức hay viết hộ.
+đâu?". Tôi đếm việc trong Hộp việc của bạn và số văn bản bạn được xem, ví dụ "Việc nào của tôi sắp quá hạn?", "Có bao
+nhiêu văn bản đến trong tháng này?"; số đếm thẳng trong dữ liệu, không qua mô hình ngôn ngữ. Tôi hiểu câu hỏi nối tiếp
+câu ngay trước, ví dụ "Còn khoa Kinh tế thì sao?". Tôi không tìm trong văn bản hạn chế. Tôi không trả lời câu ngoài
+văn bản và cách dùng Signet, như thời tiết, tin tức hay viết hộ.
 
 ## Cách hỏi {#cach-hoi}
 
@@ -36,5 +38,6 @@ Rất vui được giúp bạn. Bạn có thể hỏi tiếp về nội dung vă
 
 ## Ngoài phạm vi {#ngoai-pham-vi}
 
-Câu này nằm ngoài phạm vi của tôi. Tôi trả lời câu hỏi về nội dung các văn bản bạn được xem và về cách dùng Signet. Bạn
-có thể hỏi, ví dụ: "Điều kiện xét học bổng là gì?", "Nộp đơn nghỉ phép ở đâu?", "Bạn làm được gì?".
+Câu này nằm ngoài phạm vi của tôi. Tôi trả lời câu hỏi về nội dung các văn bản bạn được xem, về cách dùng Signet, về
+việc của bạn và số văn bản. Bạn có thể hỏi, ví dụ: "Điều kiện xét học bổng là gì?", "Nộp đơn nghỉ phép ở đâu?", "Việc
+nào của tôi sắp quá hạn?", "Bạn làm được gì?".

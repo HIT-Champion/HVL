@@ -177,7 +177,7 @@ Chế độ `extract` tất định, không cần mô hình; chế độ `genera
 hậu kiểm. Đường ống tự viết trong `assist/` (không LlamaIndex, QĐ-004).
 
 **Dữ liệu đánh giá.** `seed/hoi-dap/`: 6 PDF hư cấu, 14 trang — 5 văn bản thường và 1 văn bản hạn chế (53/PA-ĐHM, cụm từ
-riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 41 câu, mỗi câu gắn người hỏi và
+riêng "phương án XANH LAM") — cộng các văn bản mẫu của `make seed`. `cau-hoi.json` có 51 câu, mỗi câu gắn người hỏi và
 loại (`loai`). 19 câu tra cứu văn bản (`van_ban`) giữ nguyên từ trước để số đo so được:
 
 - 16 câu dương: đáp án là số ký hiệu + trang, từ khóa phải có, câu chứa câu trả lời;
@@ -191,6 +191,16 @@ loại (`loai`). 19 câu tra cứu văn bản (`van_ban`) giữ nguyên từ tr�
 - 6 câu về chính trợ lý (`gioi_thieu`), 5 câu cách dùng Signet (`huong_dan`): đáp án là mục của tệp Giới thiệu trợ lý
   hay của hướng dẫn sử dụng (`{"guide": "<tệp>#<neo>"}`);
 - 6 câu ngoài phạm vi (`ngoai_pham_vi`): thời tiết, giá vàng, tỷ giá, bóng đá, làm thơ (tiếng Việt, tiếng Anh).
+
+10 câu của hai đường dữ liệu (#441), không gọi mô hình:
+
+- 5 câu việc của người hỏi (`viec_cua_toi`): đáp án `{"data": "tasks"}`; `do-hoi-dap` gọi `myTasks` thẳng qua GraphQL
+  của Hasura bằng token người hỏi, đếm quá hạn, đến hạn hôm nay, đến hạn trong 2 ngày như Lịch hạn, so với `data` của
+  câu trả lời;
+- 5 câu đếm văn bản (`dem_van_ban`): đáp án ghi hướng, khoảng ngày, loại (`{"data": "documents", "directions": ["in"],
+  "from": "2026-10-01", "to": "2026-11-01", "type_code": null}`, mốc ghi rõ tháng, năm để không đổi theo ngày đo);
+  `do-hoi-dap` đếm bằng `office_documents_aggregate` đúng bộ lọc đó, bằng token người hỏi, so cả số lẫn bộ lọc trợ lý
+  đọc từ câu.
 
 Nhãn: `scripts/hoi_dap_mau.py` viết mỗi thông tin cần hỏi trong đúng một câu, trên đúng một trang (ngắt trang tường
 minh), rồi kiểm bằng pypdf rằng câu trả lời nằm đúng trang và chỉ ở trang đó; câu hỏi và từ khóa do đội viết. Với văn
@@ -210,9 +220,11 @@ make do-hoi-dap                      # tìm lai + câu trả lời của mô hì
 sách cấm của câu, hoặc văn bản hạn chế 53/PA-ĐHM (cấm ở **mọi** câu, của mọi người hỏi); **qua kiểm** — câu trả lời
 `source: model` sau khi máy chủ kiểm trích dẫn; **trích đúng nguồn** — có `[n]` trỏ tới nguồn đáp án; **đường đúng** —
 bộ định tuyến chọn đúng `route` của câu, câu nối tiếp được ghép (`rewritten`), câu ngoài phạm vi nhận câu cố định
-(`answer.source: fixed`). recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in riêng "đường đúng ·
+(`answer.source: fixed`), câu đường dữ liệu nhận câu có số (`answer.source: data`); **đếm đúng** — mọi số và bộ lọc
+trong `data` bằng số đếm thẳng qua GraphQL. recall@3, từ chối đúng chỉ tính trên 19 câu `van_ban`; các loại khác in riêng "đường đúng ·
 trả lời đúng / số câu". Thoát 1 khi có bất kỳ nguồn bị cấm nào, recall@3 dưới 80 %, một câu đi sai đường, hoặc một câu
-`gioi_thieu`, `huong_dan`, `ngoai_pham_vi` trả lời sai: các đường này không qua tìm kiếm nên không cần ngưỡng. Câu nối
+`gioi_thieu`, `huong_dan`, `ngoai_pham_vi`, `viec_cua_toi`, `dem_van_ban` trả lời sai: các đường này không qua tìm
+kiếm nên không cần ngưỡng. Câu nối
 tiếp tìm trong kho như câu `van_ban`, recall@3 của chúng chỉ in ra, không làm đỏ.
 
 **Kết quả.**

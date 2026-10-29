@@ -23,6 +23,9 @@ Không khớp mẫu nào thì về ``van_ban``, tìm trong kho như trước: t�
 - ``gioi_thieu``: câu về chính trợ lý (làm được gì, là ai, dùng mô hình nào), câu chào, cảm ơn → tệp Giới thiệu trợ lý.
 - ``huong_dan``: hỏi cách dùng Signet ("ở đâu", "làm thế nào để" + việc trên phần mềm) → hướng dẫn sử dụng.
 - ``ngoai_pham_vi``: thời tiết, giá vàng, viết mã… → câu cố định, không tìm, không gọi mô hình.
+- ``viec_cua_toi`` (#441): việc của chính người hỏi ("việc nào của tôi sắp quá hạn", "tôi được giao gì") → đếm trong
+  Hộp việc bằng token người hỏi (data.py), không tìm, không gọi mô hình.
+- ``dem_van_ban`` (#441): "bao nhiêu", "số lượng", "thống kê" + văn bản hay tên loại → đếm văn bản người hỏi được xem.
 - ``van_ban``: mặc định.
 
 Câu có từ chỉ văn bản ("quyết định", "quy chế", "học bổng"…) không bao giờ thành ``gioi_thieu`` hay ``ngoai_pham_vi``:
@@ -39,9 +42,12 @@ import re
 from dataclasses import dataclass
 
 from ..vntext import fold
-from . import vi
+from . import data, vi
 
-ROUTES = ("van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi")
+ROUTES = ("van_ban", "gioi_thieu", "huong_dan", "ngoai_pham_vi", "viec_cua_toi", "dem_van_ban")
+DATA_ROUTES = ("viec_cua_toi", "dem_van_ban")
+# đường không tìm đoạn, không gọi mô hình: trả lời ngay, cả ở lượt generate (không chờ lượt sinh)
+DIRECT_ROUTES = ("gioi_thieu", "ngoai_pham_vi", *DATA_ROUTES)
 DEFAULT_REASON = "mac-dinh"
 FOLLOW_UP_MAX_TERMS = 6
 MAX_REWRITTEN = 500         # như MAX_QUESTION của answer.py: dài hơn thì không ghép
@@ -54,7 +60,7 @@ class Route:
     lang: str = "vi"        # ngôn ngữ của mẫu đã khớp (vi · en): chọn bản Giới thiệu trợ lý, câu cố định
 
 
-def _folded(text: str) -> str:
+def folded(text: str) -> str:
     """Câu hỏi đem so mẫu: bỏ dấu, chữ thường, mỗi dấu câu thành dấu cách, gộp khoảng trắng."""
     return " ".join(re.sub(r"[^\w]+", " ", fold(vi.normalize(text)).lower()).split())
 
@@ -113,6 +119,8 @@ _HOW_RE = re.compile(
 # Câu nhắc tới một văn bản cụ thể (số ký hiệu "12/HD-ĐHM", "88/CTSV", ngày "15/11/2026", "số 45") là câu về văn bản,
 # kể cả khi có "ở đâu", "làm thế nào"
 _DOC_REF_RE = re.compile(r"\d+[a-z]?/[a-z0-9]|\bso \d+")
+# Số ký hiệu (chữ sau "/": "12/HD", "88/CTSV"), không phải ngày: câu đếm "tháng 9/2026" vẫn là câu đếm
+_SYMBOL_RE = re.compile(r"\d+[a-z]?/[a-z]")
 # huong_dan mà kho hướng dẫn không có mục nào khớp: tìm trong kho văn bản như van_ban (answer.py)
 NO_GUIDE_REASON = "khong-khop-huong-dan"
 _APP_RE = re.compile(r"\b(?:signet|phan mem|tren he thong|ung dung|giao dien|menu|thanh ben|hop viec|nut)\b")
@@ -122,11 +130,45 @@ _FEATURES_RE = re.compile(
     r"hoi dap|dang nhap|dang xuat|mat khau|xac thuc hai buoc|ma xac thuc|totp|lich han|bang tin|"
     r"khong gian ca nhan|so kiem toan|gop y|doi ngon ngu|tieng anh|xac thuc van ban|so do cam bien)\b")
 
+# Việc của chính người hỏi. Ngôi thứ nhất so trên chữ có dấu, viết thường: bỏ dấu thì "tôi" trùng "tới", "tối"
+_ME = r"(?:tôi|mình|tui)"
+_TASK = r"(?:việc|công việc|nhiệm vụ)"
+_MY_TASKS: tuple[tuple[str, str, re.Pattern[str]], ...] = (
+    ("viec-cua-toi", "vi", re.compile(rf"\b{_TASK}(?: \w+){{0,4}} của {_ME}\b")),
+    ("toi-co-viec", "vi", re.compile(
+        rf"\b{_ME} (?:có|còn|đang có|phải xử lý|cần xử lý)(?: \w+){{0,2}} {_TASK}\b")),
+    ("duoc-giao", "vi", re.compile(rf"\b{_ME} (?:được|đang được) (?:giao|phân công)\b|\b(?:giao|phân công) cho {_ME}\b")),
+    ("hop-viec", "vi", re.compile(r"\bhộp việc\b.*\b(?:bao nhiêu|mấy|quá hạn|đến hạn|hết hạn)\b")),
+    ("my-tasks", "en", re.compile(r"\bmy (?:tasks?|work items?|assignments?|inbox)\b|\bassigned to me\b")),
+)
+# Đếm văn bản: từ hỏi số lượng rồi (trong hai từ) văn bản hay tên loại; chữ đã bỏ dấu
+_COUNT: tuple[tuple[str, str, re.Pattern[str]], ...] = (
+    ("dem-van-ban", "vi", re.compile(
+        rf"\b(?:bao nhieu|so luong|tong so|tong cong|thong ke|dem|may)(?: \w+){{0,2}} (?:{data.NOUNS})\b|"
+        rf"^so (?:luong )?(?:{data.NOUNS})\b")),
+    ("how-many", "en", re.compile(
+        r"\b(?:how many|number of|count)(?: \w+){0,2} (?:documents?|letters|decisions|notices|circulars)\b")),
+)
+
+
+def _data_route(question: str, text: str, marked: str) -> Route | None:
+    """``viec_cua_toi``, ``dem_van_ban``; None khi không khớp. ``text``: câu đã bỏ dấu (``folded``); ``marked``: bỏ
+    dấu, còn dấu câu. Câu đếm có mốc thời gian chưa đọc được thì không nhận (data.UNSUPPORTED_RE)."""
+    lower = " ".join(re.sub(r"[^\w]+", " ", vi.normalize(question).lower()).split())
+    if not DOC_WORDS_RE.search(text):
+        for code, lang, pattern in _MY_TASKS:
+            if pattern.search(text if lang == "en" else lower):
+                return Route("viec_cua_toi", f"kw:{code}", lang)
+    for code, lang, pattern in _COUNT:
+        if pattern.search(text) and not data.UNSUPPORTED_RE.search(marked):
+            return Route("dem_van_ban", f"kw:{code}", lang)
+    return None
+
 
 def route(question: str, *, scoped: bool = False) -> Route:
     """Đường của một câu hỏi (đã ghép nếu là câu nối tiếp). ``scoped``: đang hỏi trong một văn bản ("Hỏi về văn bản
-    này") — khi đó câu "ở đâu", "thế nào" là về văn bản đó, không thành ``huong_dan``."""
-    text = _LEAD_RE.sub("", _folded(question))
+    này") — khi đó câu "ở đâu", "thế nào" là về văn bản đó, không thành ``huong_dan`` hay đường dữ liệu."""
+    text = _LEAD_RE.sub("", folded(question))
     if not DOC_WORDS_RE.search(text):
         for code, lang, pattern in _INTRO:
             if pattern.search(text):
@@ -134,10 +176,15 @@ def route(question: str, *, scoped: bool = False) -> Route:
         for code, lang, pattern in _OUT_OF_SCOPE:
             if pattern.search(text):
                 return Route("ngoai_pham_vi", f"kw:{code}", lang)
-    if not scoped and not _DOC_REF_RE.search(fold(vi.normalize(question)).lower()):     # giữ "/" của số ký hiệu
+    marked = fold(vi.normalize(question)).lower()          # giữ "/" của số ký hiệu
+    if not scoped and not _DOC_REF_RE.search(marked):
         how = _HOW_RE.search(text)
         if how and (_APP_RE.search(text) or _FEATURES_RE.search(text)):
             return Route("huong_dan", "kw:" + how.group(0).replace(" ", "-"))
+    if not scoped and not _SYMBOL_RE.search(marked):
+        found = _data_route(question, text, marked)
+        if found is not None:
+            return found
     return Route("van_ban", DEFAULT_REASON)
 
 
@@ -196,10 +243,10 @@ def follow_up(question: str, previous: str | None) -> str | None:
         return None
     q = _strip_trail(question)
     out: str | None = None
-    folded = fold(q)
-    lead = _CON_LEAD_RE.match(folded)
-    tail = _CON_TAIL_RE.search(folded)
-    if lead and (tail or _CON_STRONG_RE.match(folded)):
+    flat = fold(q)
+    lead = _CON_LEAD_RE.match(flat)
+    tail = _CON_TAIL_RE.search(flat)
+    if lead and (tail or _CON_STRONG_RE.match(flat)):
         rest = q[lead.end(): tail.start() if tail else len(q)].strip(" ,")
         if vi.terms(rest):
             out = _splice(previous, rest)

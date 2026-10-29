@@ -651,6 +651,157 @@
       "route": "ngoai_pham_vi",
       "question": "Write me a poem",
       "expect": "none"
+    },
+    {
+      "id": "v01",
+      "user": "vanthu",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Việc nào của tôi sắp quá hạn?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v02",
+      "user": "truongkhoa",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Tôi có bao nhiêu việc quá hạn?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v03",
+      "user": "giangvienktpm",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Tôi được giao những việc gì?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v04",
+      "user": "totruongdt",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Có việc nào của mình đến hạn hôm nay không?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "v05",
+      "user": "chuyenviendt",
+      "loai": "viec_cua_toi",
+      "route": "viec_cua_toi",
+      "question": "Which of my tasks are almost overdue?",
+      "expect": [
+        {
+          "data": "tasks"
+        }
+      ]
+    },
+    {
+      "id": "d01",
+      "user": "vanthu",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Có bao nhiêu văn bản đến trong tháng 10/2026?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in"
+          ],
+          "from": "2026-10-01",
+          "to": "2026-11-01",
+          "type_code": null
+        }
+      ]
+    },
+    {
+      "id": "d02",
+      "user": "truongkhoa",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Thống kê số văn bản đi năm 2026",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "out"
+          ],
+          "from": "2026-01-01",
+          "to": "2027-01-01",
+          "type_code": null
+        }
+      ]
+    },
+    {
+      "id": "d03",
+      "user": "vanthu",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Có bao nhiêu quyết định đến trong năm 2026?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in"
+          ],
+          "from": "2026-01-01",
+          "to": "2027-01-01",
+          "type_code": "QĐ"
+        }
+      ]
+    },
+    {
+      "id": "d04",
+      "user": "giangvienktpm",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "Có bao nhiêu văn bản?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in",
+            "out"
+          ],
+          "from": null,
+          "to": null,
+          "type_code": null
+        }
+      ]
+    },
+    {
+      "id": "d05",
+      "user": "chuyenviendt",
+      "loai": "dem_van_ban",
+      "route": "dem_van_ban",
+      "question": "How many incoming documents arrived in September 2026?",
+      "expect": [
+        {
+          "data": "documents",
+          "directions": [
+            "in"
+          ],
+          "from": "2026-09-01",
+          "to": "2026-10-01",
+          "type_code": null
+        }
+      ]
     }
   ]
 }

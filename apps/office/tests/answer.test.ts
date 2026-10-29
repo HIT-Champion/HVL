@@ -25,7 +25,7 @@ import { test } from 'node:test'
 import type { AskResult, AskSource } from '../app/composables/useApi.ts'
 
 const {
-  ASK_ROLES, DATA_GROUP, DATA_ROUTES, MASK_RE, MAX_PREVIOUS, MAX_QUESTION, ROUTES, SCOPE_PARAM, SUGGEST_GROUPS,
+  ASK_ROLES, DATA_GROUP, DATA_LINKS, DATA_ROUTES, MASK_RE, MAX_PREVIOUS, MAX_QUESTION, ROUTES, SCOPE_PARAM, SUGGEST_GROUPS,
   askAbout, blocks, canAskAbout, canView, citeLabel, cleanQuestion, fallbackSuggestions, hasMask, inAssistant,
   needsGenerate, pageUrl, previousFor, scopeOf, searched, segments, sourceAnchor, tidy,
 } = await import('../app/utils/answer.ts')
@@ -226,6 +226,15 @@ test('máy chủ chưa có bộ định tuyến: không có route, trang như c�
   assert.deepEqual([follow.route, follow.route_reason, follow.rewritten],
     ['van_ban', 'mac-dinh', 'Khoa Kinh tế học bổng'])
   for (const route of ROUTES) assert.equal(tidy({ ...SAMPLE, route }).route, route)
+})
+
+test('liên kết của đường dữ liệu: chỉ các trang danh sách đã biết', () => {
+  assert.equal(tidy(SAMPLE).link, null)
+  for (const link of DATA_LINKS) assert.equal(tidy({ ...SAMPLE, route: 'dem_van_ban', link }).link, link)
+  for (const link of ['//evil.example', 'https://evil.example', '/van-ban/1', 'javascript:alert(1)', 7]) {
+    assert.equal(tidy({ ...SAMPLE, route: 'dem_van_ban', link } as unknown as AskResult).link, null)
+  }
+  assert.ok(tVi('assist.openList') && tEn('assist.openList'))
 })
 
 test('chỉ văn bản và hướng dẫn mới nhờ mô hình viết; giới thiệu, ngoài phạm vi, đường dữ liệu thì không', () => {

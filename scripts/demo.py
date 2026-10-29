@@ -143,7 +143,7 @@ import time
 import unicodedata
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from urllib.parse import quote
@@ -1631,10 +1631,17 @@ REFUSED = ("no_evidence", "passages_only")
 # Ngưỡng của make do-hoi-dap: recall@3 trên các câu dương — chốt lại sau lần đo đầu trên bản cài (số đo ghi ở
 # services/svc-files/README.md). Câu quyền, câu hạn chế có nguồn bị cấm thì luôn là lỗi
 RECALL_MIN = 0.8
-# Loại câu trả lời không qua tìm kiếm (kho tĩnh trong svc-files, câu cố định): sai một câu là lỗi, không có ngưỡng
-FIXED_TYPES = ("gioi_thieu", "huong_dan", "ngoai_pham_vi")
+# Đường dữ liệu (#441): số trong câu trả lời phải bằng số đếm thẳng qua GraphQL bằng token người hỏi (direct_data)
+DATA_TYPES = ("viec_cua_toi", "dem_van_ban")
+# Loại câu trả lời không qua tìm kiếm (kho tĩnh trong svc-files, câu cố định, số đếm): sai một câu là lỗi, không có
+# ngưỡng
+FIXED_TYPES = ("gioi_thieu", "huong_dan", "ngoai_pham_vi", *DATA_TYPES)
 # Đường không gọi lượt generate: trang Hỏi đáp cũng không gọi (hợp đồng API trợ lý, #423)
-NO_GENERATE = ("gioi_thieu", "ngoai_pham_vi")
+NO_GENERATE = ("gioi_thieu", "ngoai_pham_vi", *DATA_TYPES)
+DIRECT_TASKS = "{ myTasks { id due_on } }"
+DIRECT_COUNT = """query ($w: office_documents_bool_exp!) {
+  office_documents_aggregate(where: $w) { aggregate { count } } }"""
+SOON_DAYS = 2           # như dueState của Lịch hạn và data.py của svc-files: còn 1–2 ngày là sắp đến hạn
 # Trưởng đơn vị phân công người xử lý sau khi lãnh đạo khoa giao (seed/users.csv); tên đơn vị trong ý kiến chỉ đạo
 MANAGERS = {"ĐT": "totruongdt", "KTPM": "truongbmktpm"}
 UNIT_NAMES = {"ĐT": "Tổ Đào tạo", "KTPM": "Bộ môn Kỹ thuật phần mềm", "HTTT": "Bộ môn Hệ thống thông tin",
@@ -1726,11 +1733,48 @@ def restricted_symbols(data: dict[str, Any]) -> list[str]:
     return [d["symbol"] for d in data["documents"] if d.get("restricted")]
 
 
-def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str]) -> dict:
+def vn_today() -> date:
+    return datetime.now(timezone(timedelta(hours=7))).date()
+
+
+def direct_where(direction: str, want: dict[str, Any]) -> dict[str, Any]:
+    """Điều kiện đếm theo đáp án của câu (không theo svc-files): đến theo giờ vào sổ, đi theo ngày ban hành."""
+    parts: list[dict[str, Any]] = [{"direction": {"_eq": direction}}]
+    if want.get("type_code"):
+        parts.append({"type_code": {"_eq": want["type_code"]}})
+    if want.get("from") and direction == "in":
+        parts.append({"registered_at": {"_gte": f"{want['from']}T00:00:00+07:00", "_lt": f"{want['to']}T00:00:00+07:00"}})
+    elif want.get("from"):
+        parts.append({"issued_on": {"_gte": want["from"], "_lt": want["to"]}})
+    return {"_and": parts}
+
+
+def direct_data(session: Session, want: dict[str, Any], today: date) -> dict[str, Any]:
+    """Đáp án của câu đường dữ liệu: đếm thẳng qua GraphQL của Hasura bằng token người hỏi, không qua svc-files."""
+    if want["data"] == "tasks":
+        days = [(date.fromisoformat(t["due_on"][:10]) - today).days if t.get("due_on") else None
+                for t in session.gql(DIRECT_TASKS)["myTasks"]]
+        return {"tasks": len(days), "overdue": sum(d is not None and d < 0 for d in days),
+                "today": sum(d == 0 for d in days), "soon": sum(d is not None and 0 < d <= SOON_DAYS for d in days),
+                "no_due": sum(d is None for d in days)}
+    counts = {d: session.gql(DIRECT_COUNT, {"w": direct_where(d, want)})["office_documents_aggregate"]["aggregate"]
+              ["count"] for d in want["directions"]}
+    return {"counts": counts, "type_code": want.get("type_code"), "from": want.get("from"), "to": want.get("to")}
+
+
+def data_ok(result: dict[str, Any], direct: dict[str, Any] | None) -> bool:
+    """Câu trả lời đường dữ liệu đúng: câu có số (answer.source data) và mọi số, bộ lọc bằng đáp án đếm thẳng."""
+    got = result.get("data") or {}
+    return ((result.get("answer") or {}).get("source") == "data" and direct is not None
+            and all(got.get(k) == v for k, v in direct.items()))
+
+
+def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, restricted: list[str],
+          direct: dict[str, Any] | None = None) -> dict:
     """Chấm một lượt extract theo đáp án: câu dương đúng khi nguồn đáp án nằm trong 3 nguồn đầu; câu âm đúng khi
     trợ lý không trả lời — no_evidence, hoặc passages_only (chỉ đưa đoạn liên quan trong văn bản được xem, không câu
     trích nào đủ khớp: ngưỡng điểm tìm kiếm quyết định, không phải chuyện quyền); nguồn bị cấm (danh sách của câu +
-    văn bản hạn chế) ghi riêng, luôn là lỗi."""
+    văn bản hạn chế) ghi riêng, luôn là lỗi. Câu đường dữ liệu đúng khi số bằng ``direct`` (đếm thẳng, direct_data)."""
     expect = question["expect"]
     sources = result.get("sources") or []
     positive = isinstance(expect, list)
@@ -1745,7 +1789,8 @@ def score(question: dict[str, Any], result: dict[str, Any], seconds: float, *, r
     return {"id": question["id"], "user": question["user"], "question": question["question"], "positive": positive,
             "loai": loai, "route": result.get("route"), "route_ok": route_ok,
             "status": status, "top": [source_label(s) for s in sources[:TOP]], "rank": rank,
-            "correct": (rank is not None and rank <= TOP) if positive else status in REFUSED,
+            "correct": data_ok(result, direct) if loai in DATA_TYPES else
+            (rank is not None and rank <= TOP) if positive else status in REFUSED,
             "keywords": keywords_in(answer_text(result), question.get("keywords", [])) if positive else None,
             "forbidden": forbidden(sources, [*question.get("forbid", []), *restricted]),
             "guarded": bool(question.get("forbid")), "seconds": seconds, "server_ms": result.get("duration_ms"),
@@ -2109,7 +2154,13 @@ def do_hoi_dap() -> None:
             got, seconds = ask(session, q["question"], previous=q.get("previous"))
         except (HTTPError, OSError) as exc:
             got, seconds = {"status": failure(exc)}, 0.0
-        row = score(q, got, seconds, restricted=sealed)
+        direct = None
+        if q.get("loai") in DATA_TYPES:
+            try:
+                direct = direct_data(session, q["expect"][0], vn_today())
+            except (HTTPError, OSError, RuntimeError) as exc:
+                print(f"   {q['id']}: chưa đếm thẳng được qua GraphQL — {exc}")
+        row = score(q, got, seconds, restricted=sealed, direct=direct)
         if got.get("ai_available") and got.get("status") not in (None, "no_evidence") \
                 and got.get("route") not in NO_GENERATE:
             try:

@@ -564,10 +564,10 @@ onBeforeUnmount(() => {
                   {{ t('assist.dataNote') }}
                 </p>
                 <NuxtLink
-                  v-if="turn.result.route === 'viec_cua_toi'" to="/"
+                  v-if="turn.result.link" :to="turn.result.link" data-testid="ask-data-link"
                   class="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2"
                 >
-                  {{ t('assist.openInbox') }}
+                  {{ t(turn.result.route === 'viec_cua_toi' ? 'assist.openInbox' : 'assist.openList') }}
                 </NuxtLink>
               </section>
 

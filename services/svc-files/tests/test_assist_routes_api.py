@@ -167,6 +167,10 @@ def test_the_eval_set_takes_its_labelled_route(asking):
             assert any(g == p for g in guides for p in paths), (q["id"], paths)
         if q["loai"] == "ngoai_pham_vi":
             assert body["status"] == "no_evidence" and body["answer"]["source"] == "fixed", q["id"]
+        if q["loai"] == "dem_van_ban":          # bộ lọc đọc từ câu đúng bộ lọc do-hoi-dap đếm thẳng (#441)
+            want, got = q["expect"][0], body["data"]
+            assert (sorted(got["counts"]), got["from"], got["to"], got["type_code"]) == (
+                sorted(want["directions"]), want["from"], want["to"], want["type_code"]), q["id"]
 
 
 def test_in_a_document_scope_how_to_words_still_search_that_document(asking):

@@ -15,13 +15,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Bộ định tuyến tất định của trợ lý (assist/route.py, #423): đường và mã lý do của các câu thử trong đặc tả, câu có từ
-chỉ văn bản luôn về ``van_ban``, câu nối tiếp ghép với câu trước. Không cần dịch vụ nào."""
+chỉ văn bản luôn về ``van_ban``, câu nối tiếp ghép với câu trước; hai đường dữ liệu (#441) và tham số của câu đếm
+(assist/data.py). Không cần dịch vụ nào."""
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
-from svc_files.assist import route, vi
+from svc_files.assist import data, route, vi
 
 
 def routed(question: str, *, scoped: bool = False) -> tuple[str, str, str]:
@@ -56,12 +59,31 @@ def routed(question: str, *, scoped: bool = False) -> tuple[str, str, str]:
     ("Thời tiết Hà Nội hôm nay thế nào?", "ngoai_pham_vi", "kw:thoi-tiet"),
     ("Giá vàng hôm nay bao nhiêu?", "ngoai_pham_vi", "kw:gia-ca"),
     ("Viết giúp tôi một bài thơ", "ngoai_pham_vi", "kw:viet-ho"),
-    # còn lại: tìm trong kho văn bản như trước (đường dữ liệu chưa có)
+    # việc của chính người hỏi, đếm văn bản (#441)
+    ("Việc nào của tôi sắp quá hạn?", "viec_cua_toi", "kw:viec-cua-toi"),
+    ("Có việc nào của mình đến hạn hôm nay không?", "viec_cua_toi", "kw:viec-cua-toi"),
+    ("Tôi có bao nhiêu việc quá hạn?", "viec_cua_toi", "kw:toi-co-viec"),
+    ("Tôi được giao những việc gì?", "viec_cua_toi", "kw:duoc-giao"),
+    ("Hộp việc còn bao nhiêu việc quá hạn?", "viec_cua_toi", "kw:hop-viec"),
+    ("Có bao nhiêu văn bản đến trong tháng 10?", "dem_van_ban", "kw:dem-van-ban"),
+    ("Thống kê số văn bản đi năm 2026", "dem_van_ban", "kw:dem-van-ban"),
+    ("Tháng trước có mấy công văn đến?", "dem_van_ban", "kw:dem-van-ban"),
+    ("Số văn bản đi tháng 9/2026", "dem_van_ban", "kw:dem-van-ban"),          # ngày tháng không phải số ký hiệu
+    ("Có bao nhiêu quy chế ban hành năm 2026?", "dem_van_ban", "kw:dem-van-ban"),
+    # không phải việc của người hỏi, không phải câu đếm, hay mốc thời gian chưa đọc được: tìm như trước
+    ("Tôi phải làm những việc gì khi nghỉ phép?", "van_ban", "mac-dinh"),
+    ("Hạn nộp hồ sơ học bổng của tôi là khi nào?", "van_ban", "mac-dinh"),
+    ("Tối nay có việc gì không?", "van_ban", "mac-dinh"),                      # "tối" không phải "tôi"
+    ("Có bao nhiêu sinh viên được học bổng?", "van_ban", "mac-dinh"),
+    ("Quyết định 15/QĐ-ĐHM có bao nhiêu văn bản kèm theo?", "van_ban", "mac-dinh"),
+    ("Có bao nhiêu văn bản đến từ ngày 1/10/2026?", "van_ban", "mac-dinh"),
+    ("Có bao nhiêu văn bản đến từ tháng 9 đến tháng 10?", "van_ban", "mac-dinh"),
+    ("Có bao nhiêu văn bản đến trong quý 3?", "van_ban", "mac-dinh"),
+    ("Hộp việc ở đâu?", "huong_dan", "kw:o-dau"),
+    # còn lại: tìm trong kho văn bản như trước
     ("Điều kiện xét học bổng khuyến khích học tập là gì?", "van_ban", "mac-dinh"),
     ("Em cần làm gì để được học bổng?", "van_ban", "mac-dinh"),
     ("Quyết định này giao việc cho ai?", "van_ban", "mac-dinh"),
-    ("Có bao nhiêu văn bản đến trong tháng 10?", "van_ban", "mac-dinh"),
-    ("Việc nào của tôi sắp quá hạn?", "van_ban", "mac-dinh"),
     ("Học phí năm 2026 là bao nhiêu?", "van_ban", "mac-dinh"),
     ("Thông báo về thời tiết hôm nay của nhà trường", "van_ban", "mac-dinh"),
     ("Bạn làm được gì với quy chế đào tạo?", "van_ban", "mac-dinh"),
@@ -78,6 +100,8 @@ def test_vietnamese_questions_take_the_expected_route(question, name, reason):
     ("Thanks", "gioi_thieu", "kw:thanks"),
     ("What is the weather today?", "ngoai_pham_vi", "kw:weather"),
     ("Write me a poem", "ngoai_pham_vi", "kw:write-for-me"),
+    ("Which of my tasks are almost overdue?", "viec_cua_toi", "kw:my-tasks"),
+    ("How many incoming documents arrived this month?", "dem_van_ban", "kw:how-many"),
 ])
 def test_english_questions_route_and_carry_their_language(question, name, reason):
     assert routed(question) == (name, reason, "en")
@@ -85,18 +109,20 @@ def test_english_questions_route_and_carry_their_language(question, name, reason
 
 def test_in_a_document_scope_where_questions_are_about_that_document():
     assert routed("Nộp đơn nghỉ phép ở đâu?", scoped=True) == ("van_ban", "mac-dinh", "vi")
+    assert routed("Có bao nhiêu văn bản đến trong tháng 10?", scoped=True) == ("van_ban", "mac-dinh", "vi")
     assert routed("Bạn làm được gì?", scoped=True)[0] == "gioi_thieu"
 
 
 def test_every_reason_is_a_fixed_code_never_words_of_the_question():
     # mã lý do vào sổ kiểm toán: chỉ được là mã của mẫu, không mang chữ người hỏi gõ
-    codes = {f"kw:{code}" for code, _, _ in route._INTRO + route._OUT_OF_SCOPE} | {route.DEFAULT_REASON,
-                                                                                   route.NO_GUIDE_REASON}
+    patterns = route._INTRO + route._OUT_OF_SCOPE + route._MY_TASKS + route._COUNT
+    codes = {f"kw:{code}" for code, _, _ in patterns} | {route.DEFAULT_REASON, route.NO_GUIDE_REASON}
     for question in ("Nộp đơn nghỉ phép ở đâu?", "Hướng dẫn cách vào sổ văn bản đến", "Bấm vào đâu để đổi mật khẩu",
                      "Các bước giao việc trên phần mềm"):
         name, reason, _ = routed(question)
         assert name == "huong_dan" and route._HOW_RE.fullmatch(reason.removeprefix("kw:").replace("-", " "))
-    for question in ("Xin chào", "Thời tiết Hà Nội hôm nay thế nào?", "Học phí là bao nhiêu?"):
+    for question in ("Xin chào", "Thời tiết Hà Nội hôm nay thế nào?", "Học phí là bao nhiêu?",
+                     "Việc nào của tôi sắp quá hạn?", "Có bao nhiêu văn bản đến trong tháng 10?"):
         assert routed(question)[1] in codes
 
 
@@ -141,3 +167,45 @@ def test_a_spliced_question_longer_than_the_limit_is_dropped():
 def test_a_follow_up_is_routed_again_after_splicing():
     rewritten = route.follow_up("Còn khoa Kinh tế thì sao?", "Điều kiện xét học bổng khoa CNTT là gì?")
     assert rewritten and routed(rewritten) == ("van_ban", "mac-dinh", "vi")
+
+
+def test_a_follow_up_on_a_count_is_counted_again():
+    rewritten = route.follow_up("Còn tháng 9 thì sao?", "Có bao nhiêu văn bản đến trong tháng 10?")
+    assert rewritten == "Có bao nhiêu văn bản đến trong tháng 9"
+    assert routed(rewritten) == ("dem_van_ban", "kw:dem-van-ban", "vi")
+
+
+TODAY = date(2026, 10, 30)
+
+
+@pytest.mark.parametrize(("question", "directions", "start", "end", "type_code"), [
+    ("Có bao nhiêu văn bản đến trong tháng 10?", ("in",), "2026-10-01", "2026-11-01", None),
+    ("Có bao nhiêu văn bản đến trong tháng này?", ("in",), "2026-10-01", "2026-11-01", None),
+    ("Tháng trước có mấy công văn đến?", ("in",), "2026-09-01", "2026-10-01", "CV"),
+    ("Số văn bản đi tháng 12/2025", ("out",), "2025-12-01", "2026-01-01", None),
+    ("Có bao nhiêu văn bản đi tháng 2 năm 2026?", ("out",), "2026-02-01", "2026-03-01", None),
+    ("Thống kê số văn bản đi năm 2026", ("out",), "2026-01-01", "2027-01-01", None),
+    ("Có bao nhiêu quyết định ban hành năm nay?", ("out",), "2026-01-01", "2027-01-01", "QĐ"),
+    ("Năm ngoái nhận được bao nhiêu văn bản?", ("in",), "2025-01-01", "2026-01-01", None),
+    ("Hôm nay có bao nhiêu văn bản đến?", ("in",), "2026-10-30", "2026-10-31", None),
+    ("Có bao nhiêu văn bản?", ("in", "out"), None, None, None),
+    ("Có bao nhiêu thông báo trong tháng 13?", ("in", "out"), None, None, "TB"),       # tháng sai: không lọc ngày
+    ("How many incoming documents arrived this month?", ("in",), "2026-10-01", "2026-11-01", None),
+    ("How many decisions were issued in May 2026?", ("out",), "2026-05-01", "2026-06-01", "QĐ"),
+])
+def test_count_questions_read_direction_period_and_type(question, directions, start, end, type_code):
+    q = data.count_query(route.folded(question), TODAY)
+    assert (q.directions, q.type_code) == (directions, type_code)
+    assert (q.period.start.isoformat() if q.period else None, q.period.end.isoformat() if q.period else None) == \
+        (start, end)
+
+
+def test_incoming_is_counted_by_registration_time_outgoing_by_issue_date():
+    q = data.count_query(route.folded("Có bao nhiêu văn bản trong tháng 10?"), TODAY)
+    assert data.where("in", q) == {"_and": [
+        {"direction": {"_eq": "in"}},
+        {"registered_at": {"_gte": "2026-10-01T00:00:00+07:00", "_lt": "2026-11-01T00:00:00+07:00"}}]}
+    assert data.where("out", q) == {"_and": [
+        {"direction": {"_eq": "out"}}, {"issued_on": {"_gte": "2026-10-01", "_lt": "2026-11-01"}}]}
+    typed = data.count_query(route.folded("Có bao nhiêu công văn đến?"), TODAY)
+    assert data.where("in", typed) == {"_and": [{"direction": {"_eq": "in"}}, {"type_code": {"_eq": "CV"}}]}
