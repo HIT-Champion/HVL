@@ -413,13 +413,47 @@
   "assist": {
     "title": "Hỏi đáp văn bản",
     "intro": "Trợ lý chỉ tìm trong các văn bản bạn được xem; văn bản hạn chế không bao giờ được đưa vào. Mỗi ý có số ký hiệu và trang để bạn đối chiếu.",
-    "emptyTitle": "Bạn cần tìm gì trong văn bản?",
+    "emptyTitle": "Bạn cần hỏi gì?",
     "suggestTitle": "Thử hỏi",
     "suggest": {
       "credits": "Phải đăng ký tối thiểu bao nhiêu tín chỉ để được xét học bổng?",
       "examDeadline": "Hạn nộp đề thi và đáp án là ngày nào?",
-      "language": "Chuẩn đầu ra ngoại ngữ xét tốt nghiệp cần chứng chỉ gì?"
+      "language": "Chuẩn đầu ra ngoại ngữ xét tốt nghiệp cần chứng chỉ gì?",
+      "leave": "Nộp đơn nghỉ phép ở đâu?",
+      "compose": "Làm thế nào để soạn văn bản đi?",
+      "overdue": "Việc nào của tôi sắp quá hạn?",
+      "countIncoming": "Có bao nhiêu văn bản đến trong tháng này?",
+      "whatCanYouDo": "Bạn làm được gì?",
+      "model": "Trợ lý dùng mô hình nào?"
     },
+    "suggestGroup": {
+      "van_ban": "Hỏi về văn bản",
+      "huong_dan": "Cách dùng hệ thống",
+      "viec_cua_toi": "Việc của tôi",
+      "gioi_thieu": "Về trợ lý"
+    },
+    "can": {
+      "title": "Trợ lý trả lời được:",
+      "van_ban": "nội dung các văn bản bạn được xem, kèm số ký hiệu và trang để đối chiếu;",
+      "huong_dan": "cách dùng Văn phòng điện tử, theo hướng dẫn sử dụng;",
+      "viec_cua_toi": "việc được giao cho bạn và số văn bản, đếm thẳng trong dữ liệu;",
+      "gioi_thieu": "trợ lý làm được gì, dùng mô hình nào, giới hạn ra sao."
+    },
+    "route": {
+      "van_ban": "nội dung văn bản",
+      "gioi_thieu": "trợ lý",
+      "huong_dan": "cách dùng hệ thống",
+      "ngoai_pham_vi": "chủ đề ngoài phạm vi",
+      "viec_cua_toi": "việc của bạn",
+      "dem_van_ban": "số lượng văn bản"
+    },
+    "understood": "Đã hiểu là câu hỏi về: {route}",
+    "rewritten": "· Tìm theo: {text}",
+    "routeReason": "Mã lý do: {code}",
+    "outOfScope": "Câu này nằm ngoài phạm vi của trợ lý: trợ lý không tra thời tiết, tin tức hay kiến thức chung và không viết hộ.",
+    "directTitle": "Câu trả lời",
+    "dataNote": "Số đếm thẳng trong dữ liệu bạn được xem, không qua mô hình ngôn ngữ.",
+    "openInbox": "Mở Hộp việc",
     "label": "Câu hỏi",
     "placeholder": "Ví dụ: Điều kiện xét học bổng khuyến khích học tập là gì?",
     "keysHint": "Enter để hỏi, Shift+Enter để xuống dòng",

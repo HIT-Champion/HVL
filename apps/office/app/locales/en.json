@@ -413,13 +413,47 @@
   "assist": {
     "title": "Ask the documents",
     "intro": "The assistant only searches documents you are allowed to see; restricted documents are never included. Every point cites a reference number and page so you can check it.",
-    "emptyTitle": "What do you need from the documents?",
+    "emptyTitle": "What would you like to ask?",
     "suggestTitle": "Try asking",
     "suggest": {
       "credits": "What is the minimum number of credits to be considered for a scholarship?",
       "examDeadline": "When are exam papers and answer keys due?",
-      "language": "Which language certificate is required to graduate?"
+      "language": "Which language certificate is required to graduate?",
+      "leave": "Where do I submit a leave request?",
+      "compose": "How do I draft an outgoing document?",
+      "overdue": "Which of my tasks are almost overdue?",
+      "countIncoming": "How many incoming documents arrived this month?",
+      "whatCanYouDo": "What can you do?",
+      "model": "Which model does the assistant use?"
     },
+    "suggestGroup": {
+      "van_ban": "About documents",
+      "huong_dan": "Using the system",
+      "viec_cua_toi": "My work",
+      "gioi_thieu": "About the assistant"
+    },
+    "can": {
+      "title": "The assistant can answer:",
+      "van_ban": "what the documents you are allowed to see say, citing reference number and page;",
+      "huong_dan": "how to use the e-office, from the user guides;",
+      "viec_cua_toi": "the tasks assigned to you and document counts, counted directly in the data;",
+      "gioi_thieu": "what the assistant does, which model it uses and its limits."
+    },
+    "route": {
+      "van_ban": "document content",
+      "gioi_thieu": "the assistant",
+      "huong_dan": "how to use the system",
+      "ngoai_pham_vi": "something outside its scope",
+      "viec_cua_toi": "your tasks",
+      "dem_van_ban": "document counts"
+    },
+    "understood": "Understood as a question about: {route}",
+    "rewritten": "· Searched for: {text}",
+    "routeReason": "Reason code: {code}",
+    "outOfScope": "This is outside what the assistant covers: it does not look up weather, news or general knowledge, and does not write texts for you.",
+    "directTitle": "Answer",
+    "dataNote": "Counted directly in the data you are allowed to see, without a language model.",
+    "openInbox": "Open the inbox",
     "label": "Question",
     "placeholder": "For example: What are the requirements for a merit scholarship?",
     "keysHint": "Enter to ask, Shift+Enter for a new line",

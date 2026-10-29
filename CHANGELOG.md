@@ -20,6 +20,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - Tự động hóa Node-RED ở `/tu-dong/` (profile `tu-dong`, tắt mặc định): đăng nhập Keycloak, chỉ người vận hành (#366).
 - Robot của đơn vị cho flow Node-RED gọi API, hai flow mẫu: văn bản sắp hạn lúc 07:00, văn bản Hỏa tốc (#366).
 - Hướng dẫn vận hành bằng tiếng Anh `docs/van-hanh.en.md`; README.en.md trỏ sang bản này (#59).
+- Trang Hỏi đáp: gợi ý theo loại câu, câu nối tiếp, dòng "Đã hiểu là…", nói rõ trợ lý trả lời được gì (#422).
 
 ### Đã sửa đổi
 - Log tập trung thu cả Meilisearch: nhật ký JSON, Vector che chuỗi truy vấn, lời lỗi, giá trị trích (#395).
