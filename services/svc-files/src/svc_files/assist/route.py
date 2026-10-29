@@ -105,10 +105,16 @@ _OUT_OF_SCOPE: tuple[tuple[str, str, re.Pattern[str]], ...] = (
     ("write-for-me", "en", re.compile(r"\b(?:write|tell) (?:me )?(?:a )?(?:poem|story|joke|song|code)\b")),
 )
 
-# Hỏi cách làm: dấu hiệu hỏi + (từ chỉ phần mềm hoặc tên chức năng)
+# Hỏi cách làm: dấu hiệu hỏi + (từ chỉ phần mềm hoặc tên chức năng). "Hướng dẫn" một mình là loại văn bản (HD, NĐ 30):
+# chỉ là câu hỏi cách làm khi theo sau là "cách", "tôi", "sử dụng"…
 _HOW_RE = re.compile(
     r"\b(?:o dau|cho nao|lam (?:the nao|sao|cach nao)|the nao de|lam sao de|bang cach nao|cach nao de|cach de|"
-    r"huong dan(?: cach)?|cac buoc|nut nao|muc nao|trang nao|bam (?:vao )?dau|vao dau de)\b")
+    r"huong dan (?:cach|toi|minh|em|su dung|lam)|cac buoc|nut nao|muc nao|trang nao|bam (?:vao )?dau|vao dau de)\b")
+# Câu nhắc tới một văn bản cụ thể (số ký hiệu "12/HD-ĐHM", "88/CTSV", ngày "15/11/2026", "số 45") là câu về văn bản,
+# kể cả khi có "ở đâu", "làm thế nào"
+_DOC_REF_RE = re.compile(r"\d+[a-z]?/[a-z0-9]|\bso \d+")
+# huong_dan mà kho hướng dẫn không có mục nào khớp: tìm trong kho văn bản như van_ban (answer.py)
+NO_GUIDE_REASON = "khong-khop-huong-dan"
 _APP_RE = re.compile(r"\b(?:signet|phan mem|tren he thong|ung dung|giao dien|menu|thanh ben|hop viec|nut)\b")
 _FEATURES_RE = re.compile(
     r"\b(?:nghi phep|don nghi|van ban di|van ban den|ky so|chu ky so|trinh ky|phat hanh van ban|vao so|"
@@ -128,7 +134,7 @@ def route(question: str, *, scoped: bool = False) -> Route:
         for code, lang, pattern in _OUT_OF_SCOPE:
             if pattern.search(text):
                 return Route("ngoai_pham_vi", f"kw:{code}", lang)
-    if not scoped:
+    if not scoped and not _DOC_REF_RE.search(fold(vi.normalize(question)).lower()):     # giữ "/" của số ký hiệu
         how = _HOW_RE.search(text)
         if how and (_APP_RE.search(text) or _FEATURES_RE.search(text)):
             return Route("huong_dan", "kw:" + how.group(0).replace(" ", "-"))
@@ -155,6 +161,10 @@ def _strip_trail(text: str) -> str:
     return _TRAIL_RE.sub("", text)
 
 
+# động từ hay đứng sau cụm danh từ của câu hỏi: cụm bị thay dừng trước chúng ("… đại học quy định gì …")
+_PHRASE_END = {("quy", "định"), ("ban", "hành"), ("áp", "dụng"), ("hướng", "dẫn")}
+
+
 def _splice(previous: str, rest: str) -> str:
     """Thay cụm danh từ của câu trước bằng ``rest`` (phần sau "còn") khi term đầu của ``rest`` có trong câu trước.
 
@@ -169,8 +179,10 @@ def _splice(previous: str, rest: str) -> str:
     first = rest_tokens[0].group(0).lower() if rest_tokens else ""
     if first and first not in vi.STOPWORDS and first in prev_words:
         j = prev_words.index(first)
-        end = j + 1             # cụm danh từ: các token liền sau không phải từ dừng
-        while end < len(prev_tokens) and prev_tokens[end].group(0).lower() not in vi.STOPWORDS:
+        words = [m.group(0).lower() for m in prev_tokens] + [""]
+        end = j + 1             # cụm danh từ: các token liền sau không phải từ dừng, chưa tới động từ
+        while (end < len(prev_tokens) and words[end] not in vi.STOPWORDS
+               and (words[end], words[end + 1]) not in _PHRASE_END):
             end += 1
         return vi.normalize(prev[: prev_tokens[j].start()] + rest + prev[prev_tokens[end - 1].end():])
     return vi.normalize(f"{prev}, {rest}")

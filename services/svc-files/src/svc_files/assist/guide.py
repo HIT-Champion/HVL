@@ -24,7 +24,7 @@ bản; nguồn trả người hỏi là "Hướng dẫn: <tiêu đề>", không 
 - Giới thiệu trợ lý: ``gioi_thieu/vi.md``, ``gioi_thieu/en.md`` cạnh module này; mỗi mục có neo ``{#mã}`` cố định mà
   ``INTRO_SECTIONS`` trỏ tới theo mã lý do của bộ định tuyến (route.py).
 - Hướng dẫn: thư mục ``MOC_ASK_GUIDE_DIR`` (compose gắn ``docs/huong-dan`` vào ``/app/huong-dan``, chỉ đọc). Thiếu thư
-  mục thì kho chỉ có phần giới thiệu, đường ``huong_dan`` trả ``no_evidence``.
+  mục thì kho chỉ có phần giới thiệu, câu hỏi cách dùng tìm trong kho văn bản (answer.py).
 """
 
 from __future__ import annotations

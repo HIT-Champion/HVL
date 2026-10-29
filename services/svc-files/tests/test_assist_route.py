@@ -46,6 +46,12 @@ def routed(question: str, *, scoped: bool = False) -> tuple[str, str, str]:
     ("Làm thế nào để ký số văn bản đi?", "huong_dan", "kw:lam-the-nao"),
     ("Đổi mật khẩu ở đâu?", "huong_dan", "kw:o-dau"),
     ("Hướng dẫn cách vào sổ văn bản đến", "huong_dan", "kw:huong-dan-cach"),
+    ("Văn bản đến ở đâu?", "huong_dan", "kw:o-dau"),
+    # "Hướng dẫn" là loại văn bản (HD); câu nhắc số ký hiệu, "số N" là câu về văn bản dù có "ở đâu"
+    ("Hướng dẫn số 12/HD-ĐHM về nghỉ phép quy định gì?", "van_ban", "mac-dinh"),
+    ("Hướng dẫn nghỉ phép năm 2026 của trường", "van_ban", "mac-dinh"),
+    ("Quyết định giao việc số 45/QĐ-ĐHM ở đâu?", "van_ban", "mac-dinh"),
+    ("Công văn số 88 nộp đơn nghỉ phép ở đâu?", "van_ban", "mac-dinh"),
     # ngoài phạm vi
     ("Thời tiết Hà Nội hôm nay thế nào?", "ngoai_pham_vi", "kw:thoi-tiet"),
     ("Giá vàng hôm nay bao nhiêu?", "ngoai_pham_vi", "kw:gia-ca"),
@@ -84,7 +90,8 @@ def test_in_a_document_scope_where_questions_are_about_that_document():
 
 def test_every_reason_is_a_fixed_code_never_words_of_the_question():
     # mã lý do vào sổ kiểm toán: chỉ được là mã của mẫu, không mang chữ người hỏi gõ
-    codes = {f"kw:{code}" for code, _, _ in route._INTRO + route._OUT_OF_SCOPE} | {route.DEFAULT_REASON}
+    codes = {f"kw:{code}" for code, _, _ in route._INTRO + route._OUT_OF_SCOPE} | {route.DEFAULT_REASON,
+                                                                                   route.NO_GUIDE_REASON}
     for question in ("Nộp đơn nghỉ phép ở đâu?", "Hướng dẫn cách vào sổ văn bản đến", "Bấm vào đâu để đổi mật khẩu",
                      "Các bước giao việc trên phần mềm"):
         name, reason, _ = routed(question)
@@ -105,6 +112,9 @@ def test_every_reason_is_a_fixed_code_never_words_of_the_question():
      "Kỳ thi kết thúc học phần học kỳ I diễn ra khi nào, hạn nộp đề thi"),
     ("Phòng máy mở cửa từ mấy giờ?", "Thế còn tự ý cài đặt phần mềm?",
      "Phòng máy mở cửa từ mấy giờ, tự ý cài đặt phần mềm"),
+    # cụm bị thay dừng trước động từ "quy định", không nuốt nó
+    ("Quy chế đào tạo trình độ đại học quy định gì về học phần?", "Còn trình độ thạc sĩ thì sao?",
+     "Quy chế đào tạo trình độ thạc sĩ quy định gì về học phần"),
 ])
 def test_follow_ups_are_spliced_into_a_standalone_question(previous, question, rewritten):
     assert route.follow_up(vi.normalize(question), vi.normalize(previous)) == rewritten

@@ -104,10 +104,13 @@ def test_how_to_with_a_model_writes_from_guide_passages(asking):
     assert chat["model"] == CHAT_MODEL and "nghỉ phép" in sent and "88/CTSV" not in sent
 
 
-def test_how_to_without_the_guide_folder_has_no_evidence(asking):
+def test_how_to_without_a_matching_guide_section_searches_the_documents(asking):
+    # không có thư mục hướng dẫn, hay không mục nào khớp: có thể là câu về một văn bản, tìm như van_ban
     env = asking(passages=demo(), env={"MOC_ASK_GUIDE_DIR": "/khong-co/huong-dan"})
     body = routed(env, "Nộp đơn nghỉ phép ở đâu?")
-    assert body["route"] == "huong_dan" and body["status"] == "no_evidence" and body["sources"] == []
+    assert (body["route"], body["route_reason"]) == ("van_ban", "khong-khop-huong-dan")
+    assert len(env.retriever.calls) == 1
+    assert env.hasura.agent_events[0]["diff"]["route_reason"] == "khong-khop-huong-dan"
 
 
 def test_a_follow_up_is_spliced_with_the_previous_question(asking, log_records):

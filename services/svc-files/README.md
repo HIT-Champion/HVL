@@ -362,15 +362,16 @@ về `van_ban`; không khớp mẫu nào cũng về `van_ban`, nên tệ nhất 
 | `route` | Nhận ra bằng | Trả lời | Tìm trong kho · gọi mô hình |
 |---|---|---|---|
 | `gioi_thieu` | "làm được gì", "bạn là ai", "dùng mô hình nào", "xin chào", "cảm ơn", "what can you do"… | Câu đầu của mục ứng với mã lý do trong tệp Giới thiệu trợ lý (`assist/gioi_thieu/vi.md`, `en.md` khi câu hỏi tiếng Anh), các mục khác của tệp làm nguồn phụ; `answer.source: extract` | không · không, kể cả `mode: generate` |
-| `huong_dan` | "ở đâu", "làm thế nào để", "hướng dẫn cách"… kèm tên chức năng (nghỉ phép, văn bản đi, ký số, mật khẩu…) | Như `van_ban` nhưng nguồn là các mục của hướng dẫn sử dụng (`docs/huong-dan/*.md`, thư mục `MOC_ASK_GUIDE_DIR`) | không · như `van_ban` (bộ kiểm căn cứ y nguyên) |
+| `huong_dan` | "ở đâu", "làm thế nào để", "hướng dẫn cách"… kèm tên chức năng (nghỉ phép, văn bản đi, ký số, mật khẩu…), không có số ký hiệu, "số N" | Như `van_ban` nhưng nguồn là các mục của hướng dẫn sử dụng (`docs/huong-dan/*.md`, thư mục `MOC_ASK_GUIDE_DIR`); không mục nào khớp thì tìm văn bản như `van_ban` (mã lý do `khong-khop-huong-dan`) | không · như `van_ban` (bộ kiểm căn cứ y nguyên) |
 | `ngoai_pham_vi` | thời tiết, giá cả, thể thao, viết hộ, lập trình… | Câu cố định nói trợ lý làm được gì, `answer.source: fixed`, `status: no_evidence`, `sources: []` | không · không |
 | `van_ban` | còn lại | Như mô tả bên dưới | có · như bên dưới |
 
-Hỏi trong một văn bản (`document_id`) thì "ở đâu", "làm thế nào" là câu về văn bản đó, không phải hướng dẫn. Nguồn của
+Hỏi trong một văn bản (`document_id`) thì "ở đâu", "làm thế nào" là câu về văn bản đó, không phải hướng dẫn; "Hướng
+dẫn" đứng một mình là loại văn bản (HD), chỉ là câu hỏi cách dùng khi theo sau là "cách", "tôi", "sử dụng"…. Nguồn của
 tệp giới thiệu và hướng dẫn là đoạn `kind: guide`: `document_id`, `page`, `file_id` null, `symbol` là tên tài liệu,
 `summary` là tiêu đề mục, `path` là tệp kèm neo mục (`docs/huong-dan/viec-chung.md#đơn-nghỉ-phép`). Kho tĩnh nạp lúc
 khởi động, tìm bằng từ của câu hỏi (`vi.terms`), mục phủ < 35 % trọng số câu hỏi bị bỏ. Thiếu thư mục hướng dẫn thì
-ghi `office.assist.guides_missing`, đường `huong_dan` trả `no_evidence`.
+ghi `office.assist.guides_missing`, câu hỏi cách dùng tìm trong kho văn bản.
 
 **Câu nối tiếp** (`route.follow_up`). `previous` (tùy chọn, câu hỏi lượt trước; rỗng, quá 500 ký tự hay có ký tự điều
 khiển thì bị bỏ qua, không lỗi) được dùng khi câu mới ≤ 6 từ và có dấu hiệu nối tiếp ("còn … thì sao", "thế còn …",
@@ -1295,7 +1296,7 @@ Két chưa sẵn sàng thì thử lại tới 60 giây; két từ chối (`400`/
 | `MOC_ASK_MODEL` | rỗng = `MOC_AI_MODEL` | Mô hình viết câu trả lời, vd `qwen3:4b`. Khác `MOC_AI_MODEL` (kèm mô hình nhúng) là ba mô hình tranh hai chỗ của Ollama (`OLLAMA_MAX_LOADED_MODELS=2` trong compose): nạp đi nạp lại, dễ quá giờ — svc-files ghi `config.warning` lúc khởi động; muốn mô hình khác thì để trống biến này và đổi `MOC_AI_MODEL` |
 | `MOC_ASK_MODEL_TIMEOUT_S` | `40` | Hạn gọi mô hình viết câu trả lời (`model_timeout`) |
 | `MOC_ASK_CONTEXT_CHARS` | `2800` | Tổng ký tự các đoạn gửi mô hình |
-| `MOC_ASK_GUIDE_DIR` | `/app/huong-dan` | Thư mục hướng dẫn sử dụng cho đường `huong_dan` (#423); compose gắn `docs/huong-dan` vào đây, chỉ đọc. Không có thì chỉ đường `huong_dan` trả `no_evidence` |
+| `MOC_ASK_GUIDE_DIR` | `/app/huong-dan` | Thư mục hướng dẫn sử dụng cho đường `huong_dan` (#423); compose gắn `docs/huong-dan` vào đây, chỉ đọc. Không có thì câu hỏi cách dùng tìm trong kho văn bản |
 | `MOC_ASK_CONCURRENCY` · `MOC_ASK_QUEUE_S` | `1` · `20` | Số lượt `generate` cùng lúc · chờ lượt quá thì `503 busy` |
 | `MOC_AI_EMBED_MODEL` | `qwen3-embedding:0.6b` | Mô hình nhúng trong Ollama (`bge-m3` thay được); đặt rỗng: không nhúng, chỉ tìm từ khóa |
 | `MOC_AI_EMBED_DIMS` · `MOC_AI_EMBED_BATCH` | `1024` · `8` | Số chiều véc-tơ, phải đúng của mô hình (sai thì tắt tìm theo nghĩa, ghi lỗi `embed_dims_mismatch`) · số đoạn mỗi lô nhúng nền |

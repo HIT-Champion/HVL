@@ -38,7 +38,8 @@ Không có đoạn nào → ``no_evidence``, không gọi mô hình; giống h�
 
 Bộ định tuyến (route.py, #423) chọn đường sau bước 2, trước khi tốn gì thêm: ``gioi_thieu`` trả mục của tệp Giới thiệu
 trợ lý, ``ngoai_pham_vi`` trả câu cố định — cả hai không tìm, không gọi mô hình, cả ở ``generate``; ``huong_dan`` tìm
-trong kho hướng dẫn sử dụng (guide.py) thay cho bước 4–5, rồi câu trích và mô hình như văn bản; ``van_ban`` như trên.
+trong kho hướng dẫn sử dụng (guide.py) thay cho bước 4–5, rồi câu trích và mô hình như văn bản — kho không có mục nào
+khớp thì đi như ``van_ban`` (mã lý do ``khong-khop-huong-dan``); ``van_ban`` như trên.
 Câu nối tiếp (có ``previous``) được ghép thành câu độc lập trước khi chọn đường; câu ghép thay câu hỏi ở mọi bước sau
 và trả về ở ``rewritten``. Sổ kiểm toán, nhật ký ghi đường và mã lý do, không ghi câu ghép. Nhật ký không bao giờ
 có câu hỏi, câu trả lời, đoạn trích: chỉ độ dài, số term, số đoạn, thời gian.
@@ -196,6 +197,9 @@ class Assistant:
             rewritten = route.follow_up(question, _previous(body.previous))
             if rewritten is not None and chosen.name == "van_ban":
                 chosen = route.route(rewritten, scoped=scoped)
+        if chosen.name == "huong_dan" and not self.guides.search(rewritten or question, s.ask_top_k):
+            # hướng dẫn sử dụng không có mục nào khớp: có thể là câu về một văn bản, tìm như van_ban
+            chosen = route.Route("van_ban", route.NO_GUIDE_REASON, chosen.lang)
         if body.mode != "generate" or chosen.name in ("gioi_thieu", "ngoai_pham_vi"):
             return await self._answer(principal, body, question, rewritten, chosen, scope, request_id, start)
         try:
