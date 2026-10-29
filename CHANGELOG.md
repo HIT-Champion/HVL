@@ -42,6 +42,7 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 - `MOC_TRUSTED_PROXY=auto`: APISIX chỉ tin mạng `moc`, không tin container ở mạng `apps`; bản cài cũ đổi tay (#211).
 - Cảnh báo `deepmerge` chưa có bản vá (GHSA-gcqx-w48m-w2h4) ghi bỏ qua có hạn: gói chỉ chạy lúc dựng (#387).
 - Bộ che thông tin cá nhân che cả số di động viết liền sau `ĐT`, `SĐT`, `DĐ`, `Tel`, `Phone` (`ĐT0912…`) (#58).
+- `vue-i18n` 11.4.14 vá GHSA-83rm-6c8r-g728 và GHSA-8rc2-428q-7ww3 của bản 11.4.13 trong Văn phòng điện tử (#421).
 
 ## [1.2.1] - 2026-10-28
 
