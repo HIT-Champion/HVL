@@ -217,7 +217,7 @@ image dùng nguyên bản; CI kiểm các điều này ở mọi pull request.
 
 `git clone` → `make env` (sinh `.env`, mật khẩu ngẫu nhiên; không sửa tệp mã nào) → `make up` → `make seed`; chỉ cần
 Docker, Make và Python 3.10 thư viện chuẩn, đều là phần mềm nguồn mở. CI làm đúng chuỗi đó trên máy sạch ở mọi pull
-request, rồi smoke, e2e trên trình duyệt thật và 12 màn demo. `make install PREFIX=…` cài ra ngoài thư mục mã nguồn,
+request, rồi smoke, e2e trên trình duyệt thật và 21 màn demo. `make install PREFIX=…` cài ra ngoài thư mục mã nguồn,
 CI smoke lại từ bản cài. Bản phát hành là gói `.tar.gz` kèm `.sha256` (`make release`). Chưa có người ngoài đội tự cài
 từ README trên máy sạch: việc này còn trong kế hoạch.
 
