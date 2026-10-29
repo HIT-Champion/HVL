@@ -14,6 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+import type { OpenDataSource } from './openData'
+
 // Trang trạng thái hệ thống (/trang-thai, công khai): dạng dữ liệu GET /api/status của svc-files và các hàm dựng trang.
 // svc-files lưu đệm 10 giây, APISIX giới hạn theo IP (MOC_RATE_STATUS_PER_MIN, mặc định 30/phút): trang tự làm mới
 // mỗi 30 giây là 2 lần mỗi phút một tab.
@@ -40,6 +42,8 @@ export interface SystemStatus {
   ai: { enabled: boolean; model: string | null; semantic: boolean }
   layers: { id: string; label: string }[]
   components: StatusComponent[]
+  // nguồn dữ liệu công khai và tuổi dữ liệu; bản svc-files cũ chưa có khóa này (đọc bằng openDataOf)
+  open_data?: OpenDataSource[]
 }
 
 export interface StatusGroup {
