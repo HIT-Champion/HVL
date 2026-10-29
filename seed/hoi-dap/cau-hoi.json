@@ -352,6 +352,58 @@
       "evidence": "Phúc đáp Công văn số 47/KHCN của Phòng Khoa học và Hợp tác quốc tế, Khoa Công nghệ thông tin cử giảng viên Vũ Thị Mai, Bộ môn Kỹ thuật phần mềm, tham dự hội thảo và trình bày tham luận về ứng dụng nguồn mở trong quản lý văn bản."
     },
     {
+      "id": "c01",
+      "user": "vanthu",
+      "loai": "cong_khai",
+      "route": "van_ban",
+      "question": "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?",
+      "expect": [
+        {
+          "symbol": "06/2026/TT-BGDĐT",
+          "page": 18
+        }
+      ],
+      "keywords": [
+        "15 nguyện vọng"
+      ],
+      "evidence": "Thí sinh được đăng ký tối đa 15 nguyện vọng vào các chương trình đào tạo, các cơ sở giáo dục đại học khác nhau"
+    },
+    {
+      "id": "c02",
+      "user": "vanthu",
+      "loai": "noi_tiep",
+      "route": "van_ban",
+      "question": "Còn ngành đào tạo giáo viên thì sao?",
+      "expect": [
+        {
+          "symbol": "06/2026/TT-BGDĐT",
+          "page": 18
+        }
+      ],
+      "previous": "Thí sinh được đăng ký tối đa bao nhiêu nguyện vọng?",
+      "keywords": [
+        "01 đến 05"
+      ],
+      "evidence": "Các chương trình đào tạo giáo viên chỉ xét tuyển thí sinh đăng ký ở các nguyện vọng có thứ tự từ 01 đến 05"
+    },
+    {
+      "id": "c03",
+      "user": "vanthu",
+      "loai": "cong_khai",
+      "route": "van_ban",
+      "question": "Thông tư số 10/2020/TT-BGDĐT hết hiệu lực từ ngày nào?",
+      "expect": [
+        {
+          "symbol": "58/2026/TT-BGDĐT",
+          "page": 5
+        }
+      ],
+      "keywords": [
+        "01 tháng 11 năm 2026"
+      ],
+      "evidence": "hết hiệu lực kể từ ngày 01 tháng 11 năm 2026"
+    },
+    {
       "id": "q17",
       "user": "vanthu",
       "loai": "van_ban",
