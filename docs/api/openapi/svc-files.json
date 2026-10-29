@@ -3108,6 +3108,218 @@
         ],
         "title": "StatusLayer"
       },
+      "StatusOpenData": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Mã nguồn, tên thư mục trong seed/du-lieu-mo, vd cong-bao-gddt"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher",
+            "description": "Cơ quan công bố"
+          },
+          "home_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Url"
+          },
+          "reuse_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Basis",
+            "description": "Căn cứ dùng lại (điều luật hay giấy phép)"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence",
+            "description": "Giấy phép mở nếu nguồn có; null: dùng lại theo `reuse_basis`"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At",
+            "description": "Lúc lấy bản chụp"
+          },
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days",
+            "description": "Tuổi bản chụp, tính bằng ngày"
+          },
+          "max_age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Age Days"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "broken"
+            ],
+            "title": "State",
+            "description": "ok · stale: quá `max_age_days` · broken: manifest hỏng, thiếu tệp, sai cỡ hay sai SHA-256"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/StatusOpenDataFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "name",
+          "publisher",
+          "home_url",
+          "reuse_basis",
+          "licence",
+          "fetched_at",
+          "age_days",
+          "max_age_days",
+          "state",
+          "files"
+        ],
+        "title": "StatusOpenData"
+      },
+      "StatusOpenDataFile": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File",
+            "description": "Tên tệp trong bản chụp, vd tt-26-2026-tt-bgddt.pdf"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Nơi đã tải tệp (http/https)"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "SHA-256 của tệp; trùng `sha256` của một tệp đính kèm là văn bản từ nguồn này"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At",
+            "description": "Lúc tải tệp; null: như `fetched_at` của nguồn"
+          },
+          "meta": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Meta",
+            "description": "Thông tin tùy nguồn, chỉ giá trị đơn, vd symbol, issuer_name, issued_on, page_url, gazette"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "url",
+          "sha256",
+          "bytes",
+          "fetched_at",
+          "meta"
+        ],
+        "title": "StatusOpenDataFile"
+      },
       "StatusOut": {
         "properties": {
           "status": {
@@ -3166,6 +3378,14 @@
             },
             "type": "array",
             "title": "Components"
+          },
+          "open_data": {
+            "items": {
+              "$ref": "#/components/schemas/StatusOpenData"
+            },
+            "type": "array",
+            "title": "Open Data",
+            "description": "Nguồn dữ liệu công khai đi kèm bản cài (#424): nguồn gốc, tuổi dữ liệu; bản cài không gọi nguồn lúc chạy, chỉ đọc bản chụp"
           }
         },
         "type": "object",
