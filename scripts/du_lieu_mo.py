@@ -93,7 +93,8 @@ def problems(manifest: Any, folder: pathlib.Path, source: str | None = None) -> 
     out = [f"thiếu hoặc sai kiểu khóa {k}" for k in TEXT_KEYS if not isinstance(manifest.get(k), str)]
     if source is not None and manifest.get("source") != source:
         out.append(f"source là {manifest.get('source')!r}, thư mục là {source!r}")
-    if not isinstance(manifest.get("max_age_days"), int) or manifest["max_age_days"] < 1:
+    age = manifest.get("max_age_days")
+    if isinstance(age, bool) or not isinstance(age, int) or age < 1:       # bool là int: true không phải số ngày
         out.append("max_age_days phải là số nguyên dương")
     if _when(manifest.get("fetched_at")) is None:
         out.append("fetched_at không phải thời điểm ISO 8601 có múi giờ")

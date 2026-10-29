@@ -166,6 +166,7 @@ class Check(unittest.TestCase):
         (self.dir / "manifest.json").write_text("{", encoding="utf-8")
         self.assertEqual(dlm.check(self.dir)["state"], "broken")
         for key, value in (("source", "khac"), ("fetched_at", "2026-10-30T02:00:00"), ("max_age_days", 0),
+                           ("max_age_days", True),
                            ("files", [])):
             m = manifest()
             m[key] = value
