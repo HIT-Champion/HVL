@@ -4,12 +4,13 @@ Lộ trình bám theo nguyên lý **tiến hóa tuyến tính** của mô hình 
 danh tính, sự kiện, dữ liệu của không gian trước ([`docs/architecture.md`](docs/architecture.md) §1.2). Đây cũng là thứ
 tự mà một tổ chức áp dụng Signet nên đi theo, không chỉ là lịch phát triển nội bộ.
 
-Trạng thái ghi ngày 28/10/2026, trên nhánh `develop`, sau bản `v1.2.1` (28/10). Các giai đoạn là thứ tự phụ thuộc,
-không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ 25/10 tới
-27/10 đã ra ở `v1.2.0` (27/10, bản cho vòng trường, mục [1.2.0] của [`CHANGELOG.md`](CHANGELOG.md)), giao diện Lịch
-hạn ở bản vá `v1.2.1` (28/10); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ ra ở `v1.3.0` (03/12, bản nộp chấm). Mã
-tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và hạn
-chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
+Trạng thái ghi ngày 28/10/2026, trên nhánh `develop`, đúng nội dung bản `v1.3.0` (30/10). Các giai đoạn là thứ tự
+phụ thuộc, không phải lịch: phần lớn việc của cả bốn không gian ra cùng bản `v1.0.0` (23/10) và `v1.1.0`. Việc làm từ
+25/10 tới 27/10 đã ra ở `v1.2.0` (27/10), giao diện Lịch hạn ở bản vá `v1.2.1` (28/10), việc làm 28/10 (cảnh báo qua
+Alertmanager, Node-RED, DokuWiki, tiếng Anh, truy vết phân tán) ở `v1.3.0` (30/10, bản cho vòng trường, mục [1.3.0] của
+[`CHANGELOG.md`](CHANGELOG.md)); phần làm sau đó nằm ở mục "Chưa phát hành", sẽ ra ở `v1.4.0` (03/12, bản nộp chấm).
+Mã tính năng F tra ở [`docs/muc-hoan-thien.md`](docs/muc-hoan-thien.md): mức, tệp test, bước CI, lệnh trình diễn và
+hạn chế đã biết của từng tính năng. Mục không có mã F ghi bằng chứng (tệp, lệnh `make`, bước CI) ngay trong dòng.
 
 - `[x]` — đã có: mức **Hoàn thiện** trong `docs/muc-hoan-thien.md`, hoặc có bằng chứng ghi trong dòng.
 - `[ ]` **Một phần** — có mã chạy được (mức Dùng được, Minh họa hay Một phần); phần còn thiếu ghi ngay sau.
@@ -175,15 +176,16 @@ Mục tiêu: một SME không có đội IT tự cài được Signet trong dư�
       văn bản đến `seed/nap-lo/van-ban-den.csv`; văn bản là giả lập, chưa lấy từ công văn đã công bố như kế hoạch
 - [ ] **Một phần** — tiếng Anh: giao diện Văn phòng điện tử Việt / Anh cùng bộ khóa (F2.9, mức Dùng được), Không
       gian cá nhân và Bảng tin cũng có bản tiếng Anh (#306), `README.en.md`, hướng dẫn dịch cho người đóng góp
-      (`CONTRIBUTING.md`, mục "Dịch giao diện"); tài liệu vận hành chưa có bản tiếng Anh (issue #59)
+      (`CONTRIBUTING.md`, mục "Dịch giao diện"), hướng dẫn vận hành `docs/van-hanh.en.md` (#59); các tài
+      liệu khác chưa có bản tiếng Anh
 - [ ] **Một phần** — cộng đồng và số đo thực tế: `CONTRIBUTING.md`, mẫu issue (F2.11, mức Một phần); thu góp ý và
       trang Số đo theo đặc tả §8 (F4.6, mức Dùng được). Chưa có đơn vị chạy thử nên cột "trước" của số đo còn trống
 
 ## Sau vòng trường
 
 Việc còn thiếu thật theo `docs/muc-hoan-thien.md`, xếp theo ưu tiên, kèm lý do. Không gắn ngày: kế hoạch chỉ có hai
-mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.3.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
-Việc nào chưa xong trước 26/11 thì để sau `v1.3.0`.
+mốc, đóng băng tính năng 26/11 và bản nộp chấm `v1.4.0` ngày 03/12 (`docs/du-thi/ke-hoach-phat-trien.md`, Phase 5).
+Việc nào chưa xong trước 26/11 thì để sau `v1.4.0`.
 
 1. **Đơn vị chạy thử thật** (F2.11, F4.6): đo cột "trước" của số đo §8, nhận góp ý của người ngoài đội. Mọi số đo hiện
    tính trên dữ liệu mẫu; chưa có đơn vị dùng thật thì chưa biết sản phẩm giải đúng bài toán đến đâu.

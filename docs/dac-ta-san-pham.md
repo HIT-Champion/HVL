@@ -180,7 +180,7 @@ TOTP bắt buộc cho `clerk`, `manager`, `director`. Tài khoản dùng thử c
 | F2.8 | Sổ đăng ký văn bản đến / đi theo năm; xuất PDF để in (NĐ 30, Điều 16, 22, Phụ lục IV) |
 | F2.9 | Khóa i18n Việt / Anh từ ngày đầu |
 | F2.10 | `make seed` qua API: ~50 văn bản ở nhiều trạng thái, văn bản đến lấy từ công văn đã công bố công khai |
-| F2.11 | Cộng đồng: đơn vị chạy thử dùng bản online, README tiếng Anh, "good first issue" |
+| F2.11 | Cộng đồng: đơn vị chạy thử dùng bản online, README tiếng Anh, người ngoài báo lỗi và góp ý qua issue, đội sửa |
 | F2.12 | **Sổ kiểm toán chuỗi băm** (trước là F3.5): mọi thay đổi vào chuỗi băm SHA-256; `dxos audit verify` chỉ ra dòng bị sửa; neo hash đầu chuỗi ra ngoài CSDL. Hash của mọi văn bản phát hành nằm trong chuỗi |
 | F2.13 | **Cổng xác thực văn bản** (trước là F3.6, `apps/verify`): quét QR hoặc nhập mã → số ký hiệu, ngày, cơ quan ban hành, trích yếu (nếu văn bản được đánh dấu công khai) và kết quả khớp. Thả tệp PDF vào → **trình duyệt tự tính SHA-256, không tải tệp lên** → so khớp. Văn thư dùng cùng chức năng khi tiếp nhận văn bản đến từ một hệ thống Signet khác (NĐ 30, Điều 21) |
 

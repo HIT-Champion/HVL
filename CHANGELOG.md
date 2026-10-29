@@ -8,6 +8,14 @@ Mỗi thay đổi một dòng, kèm số issue hoặc PR trên GitHub; chi tiế
 
 ## [Chưa phát hành]
 
+## [1.3.0] - 2026-10-30
+
+Bản cho vòng trường 01/11. Thêm cảnh báo vận hành qua Alertmanager vào chuông của quản trị đơn vị, tự động hóa
+Node-RED và wiki nội bộ DokuWiki (đăng nhập Keycloak, tắt mặc định), truy vết phân tán Jaeger (profile `trace`), kênh
+SMS, Zalo; tiếng Anh cho sổ đăng ký, văn bản đi và Đơn nghỉ phép; trang Dựng form cho quản trị; hướng dẫn vận hành
+tiếng Anh. Log tập trung thu cả Meilisearch; bộ che thông tin cá nhân bắt cả số di động viết liền sau `ĐT`, `SĐT`.
+Nâng tại chỗ từ `v1.2.1`; bản cài cũ còn đặt `MOC_TRUSTED_PROXY` là một dải cố định thì đổi tay sang `auto` (#211).
+
 ### Đã thêm
 - Truy vết phân tán bằng Jaeger qua APISIX, svc-files, svc-workflow (profile `trace`, tắt mặc định) (#364).
 - Kênh thông báo SMS, Zalo tắt mặc định; mỗi người tự bật ở cuối chuông thông báo, quản trị nhập số điện thoại (#365).

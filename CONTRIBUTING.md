@@ -154,7 +154,7 @@ Trong Không gian cá nhân và Bảng tin (JavaScript thuần, mỗi ứng dụ
   trong `public/*.js`, chữ tĩnh của `index.html` không có khóa hay lệch bảng, khóa thiếu ở một trong hai bảng.
   e2e `tests/e2e/tieng-anh.spec.ts` mở cả hai ứng dụng bằng tiếng Anh.
 
-Tài liệu tiếng Anh: `README.en.md`. Bản tiếng Anh của hướng dẫn vận hành đang chờ người đóng góp (issue #59).
+Tài liệu tiếng Anh: `README.en.md` và hướng dẫn vận hành `docs/van-hanh.en.md` (#59).
 
 ## Báo lỗi
 
