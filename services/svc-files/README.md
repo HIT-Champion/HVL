@@ -481,9 +481,10 @@ người hỏi không được đọc.
   **không câu hỏi, câu trước, câu ghép, câu trả lời, đoạn trích**. **Không ghi được sổ thì không trả lời** (`503
   database_unavailable`). Lượt `generate` gửi lại `ask_id` nên hai dòng sổ cùng một thực thể.
 - **Nhật ký không có chữ**: `office.assist.asked` {tenant_id, actor_id, mode, status, q_length, terms, candidates, hits,
-  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms, route, route_reason, followup}, `office.assist.ask_failed`
-  {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed` {reason}, `office.assist.ai_ready` /
-  `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch` {dims, expected} (mức error),
+  cited, semantic, ratio, scoped (hỏi trong một văn bản), model, warnings, duration_ms, route, route_reason,
+  followup}, `office.assist.ask_failed` {code}, `office.assist.model_rejected` {reason}, `office.assist.embed_failed`
+  {reason}, `office.assist.ai_ready` / `ai_unavailable` (khi đổi trạng thái), `office.assist.embed_dims_mismatch`
+  {dims, expected} (mức error),
   `office.assist.indexed` / `embedded` / `embed_skipped` {ids} / `index_failed` {error, stage, reason},
   `config.warning` {message} lúc khởi động.
 
